@@ -1,10 +1,9 @@
 ---
-name: review-loop
-description: This skill should be used when the user invokes "/review-loop <path>" to review task or instruction files before execution. Runs a moderated review loop with a Reviewer agent and an Author agent to check the overall approach at a high level.
-version: 1.0.0
+description: Review task/instruction files at a high level before execution. Runs a moderated loop with Reviewer and Author agents. Corrects files directly and lists changes at the end.
+argument-hint: <path>
 ---
 
-# Skill: review-loop
+# review-loop
 
 Review task/instruction files at a high level before execution. A Reviewer agent checks the overall approach, the Author agent corrects files directly. Changes are listed at the end.
 
