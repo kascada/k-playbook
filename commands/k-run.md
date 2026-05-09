@@ -1,6 +1,7 @@
 ---
 description: Execute one or more task files. Pass a single .md file or a directory. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place.
 argument-hint: <file-or-directory>
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
 # k-run
@@ -17,6 +18,8 @@ If `$ARGUMENTS` is a directory:
 - Skip files without a leading number
 
 Announce the list of tasks to be executed before starting.
+
+If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 
 ## Step 2 — Execute each task
 

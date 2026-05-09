@@ -1,6 +1,7 @@
 ---
 description: Create a new task file from the current conversation. Determines the next number from tasks/, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving.
 argument-hint: [short-name]
+allowed-tools: [Read, Write, Glob]
 ---
 
 # k-task-create
@@ -25,9 +26,13 @@ If not: derive a short name (2-4 words, lowercase, hyphens) from the conversatio
 Filename: `<number>-<short-name>.md`  
 Example: `014-audiosocket-server.md`
 
-## Step 4 — Identify reference documents
+## Step 4 — Identify reference documents and tools
 
-Look at the current conversation for any file paths, documentation files, or source files that were relevant to the discussed task. Include them as references if they add context for the executing agent.
+Look at the current conversation for:
+- File paths or documentation files relevant to the task → add to `## Referenzen`
+- Tools beyond the standard set (Read, Write, Edit, Bash, Glob, Grep) that will likely be needed → add to `## Tools`
+
+Standard tools (Read, Write, Edit, Bash, Glob, Grep) do not need to be listed — they are always pre-approved in `/k-run`. Only list extras like MCP tools or special permissions.
 
 ## Step 5 — Draft the task
 
@@ -41,6 +46,13 @@ Write a task draft from the conversation context. Structure:
 ## Referenzen
 
 - `path/to/file.md` — <why it is relevant>   (only if applicable)
+
+## Tools
+
+- `Bash` — Verzeichnisse anlegen, Dateien verschieben
+- `mcp__akte-db__mysql_query` — Datenbankabfragen   (nur wenn relevant)
+
+(Nur aufführen wenn über Standard Read/Write/Edit/Bash/Glob/Grep hinaus etwas benötigt wird.)
 
 ## Ziel
 
