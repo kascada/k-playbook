@@ -1,6 +1,7 @@
 ---
 description: Review task/instruction files at a high level before execution. Runs a moderated loop with Reviewer and Author agents. Corrects files directly and lists changes at the end.
 argument-hint: <path>
+allowed-tools: [Read, Write, Edit, Glob]
 ---
 
 # review-loop
