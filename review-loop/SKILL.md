@@ -1,8 +1,16 @@
+---
+name: review-loop
+description: This skill should be used when the user invokes "/review-loop <path>" to review task or instruction files before execution. Runs a moderated review loop with a Reviewer agent and an Author agent to check the overall approach at a high level.
+version: 1.0.0
+---
+
 # Skill: review-loop
 
-TRIGGER when: the user invokes `/review-loop <path>` where `<path>` is a file or directory containing task/instruction files.
+Review task/instruction files at a high level before execution. A Reviewer agent checks the overall approach, the Author agent corrects files directly. Changes are listed at the end.
 
-Review task files at a high level before execution. A Reviewer agent checks the overall approach, the Author agent corrects files directly. Changes are listed at the end.
+## Invocation
+
+`/review-loop <path>` — path is a file or directory containing `.md` task/instruction files.
 
 ---
 
@@ -21,7 +29,7 @@ Spawn a `general-purpose` subagent with this prompt:
 
 ```
 You are reviewing task/instruction files before they are executed by an AI agent.
-Review at a HIGH LEVEL — does the overall approach make sense? You are NOT checking implementation details.
+Review at a HIGH LEVEL — does the overall approach make sense? Do NOT check implementation details.
 The executing agent will fill in details; focus on the big picture.
 
 Files to review:
@@ -29,7 +37,7 @@ Files to review:
 
 Check for:
 - FEHLER   — fundamentally wrong approach, contradiction, or missing critical piece
-- WARNUNG  — potentially problematic, unclear framing
+- WARNUNG  — potentially problematic or unclear framing
 - FEHLEND  — important constraint or context not specified
 
 Output format (table, no intro text):
@@ -74,18 +82,20 @@ If 0 FEHLERs → done. Otherwise repeat from Step 3.
 ### Step 6 — Summary
 
 After completion, list all changes made:
+
 ```
 Geänderte Dateien:
 - <filename>: <what was changed> (FEHLER-01, FEHLER-03)
+
 Offen (nicht gefixt):
 - <ID>: <reason>
 ```
 
 ---
 
-## Review focus (for Reviewer prompt)
+## Review focus
 
-The review is "from above" — check:
+Check from above:
 - Is the overall approach coherent?
 - Are there contradictions between steps or files?
 - Is a critical constraint missing that the executing agent cannot infer?
