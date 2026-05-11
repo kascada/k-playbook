@@ -17,7 +17,18 @@ If `$ARGUMENTS` is a directory:
 - Sort by the leading number in the filename (e.g. `013_foo.md` before `014_bar.md`)
 - Skip files without a leading number
 
-Announce the list of tasks to be executed before starting.
+Announce the list of tasks to be executed before starting. Check the **last** task file for an `## Intent` section and include it in the announcement if present:
+
+```
+Tasks:
+  1. 014-setup-tts.md
+  2. 015-integrate-tts.md  ← letzte
+
+Intent (aus letzter Datei):
+  <intent text>
+
+Tools (zusätzlich): ...
+```
 
 If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 

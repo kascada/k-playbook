@@ -34,7 +34,19 @@ Look at the current conversation for:
 
 Standard tools (Read, Write, Edit, Bash, Glob, Grep) do not need to be listed — they are always pre-approved in `/k-run`. Only list extras like MCP tools or special permissions.
 
-## Step 5 — Draft the task
+## Step 5 — Determine Intent
+
+Derive the Intent from the conversation: what frame or outcome do the task(s) as a whole need to deliver?
+
+**Format:** 1–2 sentences setting the frame, followed by 2–5 bullet points listing the decisive constraints or success criteria. No implementation details — only what must hold true at the end.
+
+**When to include:**
+- Single task file → always include `## Intent`
+- Multiple tasks in a series → include `## Intent` **only in the last file**; if it is unclear whether this is the last file, ask the user before drafting
+
+If the Intent cannot be meaningfully derived from the conversation (e.g. purely mechanical task with no outcome criteria), omit the section.
+
+## Step 6 — Draft the task
 
 Write a task draft from the conversation context. Structure:
 
@@ -42,6 +54,15 @@ Write a task draft from the conversation context. Structure:
 # Task <number> — <Title>
 
 <One sentence describing what this task achieves.>
+
+## Intent
+
+<1–2 sentences setting the frame — what must be true when all tasks are done.>
+- <decisive constraint or success criterion>
+- <decisive constraint or success criterion>
+- ...
+
+(Place Intent first, before Referenzen and Tools, so it is visible immediately.)
 
 ## Referenzen
 
@@ -69,13 +90,13 @@ Write a task draft from the conversation context. Structure:
 
 Omit any section that is empty or not applicable.
 
-## Step 6 — Confirm
+## Step 7 — Confirm
 
 Show the draft to the user and ask: "Passt das so, oder soll ich etwas anpassen?"
 
 Wait for confirmation or corrections before saving.
 
-## Step 7 — Save
+## Step 8 — Save
 
 Write the confirmed task to `tasks/<filename>` using the Write tool.  
 Confirm: "Task gespeichert: tasks/<filename>"
