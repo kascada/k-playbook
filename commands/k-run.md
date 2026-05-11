@@ -87,7 +87,46 @@ When a task is fully completed:
 
 Proceed to the next task in the list. If a task failed (Step 2d), stop — do not execute remaining tasks.
 
-## Step 3 — Final summary
+## Step 3 — Intent alignment check
+
+If all tasks completed successfully AND the last task file contains an `## Intent` section: check whether the executed work actually achieves the stated Intent.
+
+Spawn a `general-purpose` subagent (Critic) with this prompt:
+
+```
+You are doing a final alignment check after a set of tasks was executed.
+Below is the Intent (the goal the tasks were supposed to achieve) and a summary of what was actually done.
+
+## Intent
+<insert intent text>
+
+## Was ausgeführt wurde
+<insert Ausführung summaries from all task files>
+
+Answer only: Does the executed work achieve the stated Intent?
+- Yes → one sentence why
+- Partially → what is missing or not yet covered
+- No → what is misaligned or missing
+
+Output (no intro text):
+| Alignment | Begründung |
+```
+
+Append the result to the last task file under `## Ausführung`:
+
+```
+**Intent-Alignment:** Ja / Teilweise / Nein — <Begründung>
+```
+
+If alignment is **not Yes**: print a clear warning to the user before the final summary:
+
+```
+⚠ Intent nicht vollständig erreicht: <Begründung>
+```
+
+If no Intent is present: skip this step silently.
+
+## Step 4 — Final summary
 
 After all tasks are processed, print a brief summary:
 
@@ -96,4 +135,5 @@ Ausgeführt:   <n> Tasks
 Erfolgreich:  <list of filenames>
 Abgebrochen:  <filename if any> — <reason>
 Übersprungen: <filenames if any>
+Intent:       Ja / Teilweise / Nein / — (kein Intent)
 ```
