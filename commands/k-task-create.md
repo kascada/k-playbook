@@ -14,9 +14,9 @@ Look for a `tasks/` subdirectory relative to the current working directory. If i
 
 ## Step 2 — Determine next number
 
-List all `.md` files in `tasks/` (not subdirectories). Find the highest leading number (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
+Scan `.md` files in **both** `tasks/` and `tasks/old/` (completed tasks land there). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
 
-If `tasks/` is empty or has no numbered files, start at `001`.
+If neither directory has numbered files, start at `001`.
 
 ## Step 3 — Determine filename
 
