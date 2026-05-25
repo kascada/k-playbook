@@ -157,7 +157,26 @@ Statuswerte:
 
 ---
 
-## Schritt 6 — Abschlusszusammenfassung
+## Schritt 6 — Ergebnisdatei archivieren
+
+Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
+
+1. `done/`-Verzeichnis bestimmen:
+   - Naheliegend: `done/` im selben Verzeichnis wie die Ergebnisdatei
+   - Falls unklar (kein `done/` vorhanden, kein Projektkontext erkennbar): fragen
+     > "Wohin soll die abgeschlossene Datei verschoben werden? (Vorschlag: `done/`)"
+
+2. Datei verschieben:
+   - Neuer Name: `YYYY-MM-DD-<originalname>` (heutiges Datum voranstellen)
+   - Beispiel: `result-tech.md` → `done/2026-05-25-result-tech.md`
+
+3. Kurz bestätigen: "Archiviert: `done/YYYY-MM-DD-<name>`"
+
+Wenn noch offene Befunde (☐) vorhanden: Datei **nicht** verschieben — sie bleibt offen.
+
+---
+
+## Schritt 7 — Abschlusszusammenfassung
 
 Nach allen Befunden ausgeben:
 
@@ -170,6 +189,7 @@ Bearbeitet:   <N>
 ~ akzeptiert: <n>
 ✗ falsch:     <n>
 ☐ offen:      <n>  (K/F — warten auf Klärung)
+Archiviert:   done/YYYY-MM-DD-<name>  (oder: — offen, nicht archiviert)
 ```
 
 Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründung warum sie offen blieben.
