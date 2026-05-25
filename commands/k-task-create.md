@@ -71,7 +71,7 @@ Write a task draft from the conversation context. Structure:
 ## Tools
 
 - `Bash` — Verzeichnisse anlegen, Dateien verschieben
-- `mcp__akte-db__mysql_query` — Datenbankabfragen   (nur wenn relevant)
+- `mcp__akte-sql__mysql_query` — Datenbankabfragen   (nur wenn relevant)
 
 (Nur aufführen wenn über Standard Read/Write/Edit/Bash/Glob/Grep hinaus etwas benötigt wird.)
 

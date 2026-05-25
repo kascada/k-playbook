@@ -42,24 +42,18 @@ claude mcp list 2>/dev/null | grep -i "logmcp-"
 
 ## Schritt 2 — Permissions einrichten (einmalig)
 
-Prüfe `.claude/settings.json` (Read). Enthält `permissions.allow` bereits einen Eintrag
+Prüfe `.claude/settings.local.json` (Read). Enthält `permissions.allow` bereits einen Eintrag
 für diesen Server oder das Muster `mcp__logmcp-*`?
 
-Falls nein: füge folgendes in `.claude/settings.json` ein (mit Read + Write, JSON korrekt
-zusammenführen — `jq` per Bash nutzen falls verfügbar):
+Falls nein: füge das Wildcard-Muster in `.claude/settings.local.json` ein (mit Read + Write,
+JSON korrekt zusammenführen — `jq` per Bash nutzen falls verfügbar):
 
 ```json
 "mcp__logmcp-*"
 ```
 
-Falls `jq` nicht verfügbar oder das Muster nicht funktioniert, stattdessen die vier
-spezifischen Einträge für den konkreten Server eintragen:
-```
-"mcp__<server>__list_logs"
-"mcp__<server>__read_log"
-"mcp__<server>__search_log"
-"mcp__<server>__log_info"
-```
+Dieses Muster deckt alle Tools aller LogMCP-Server ab — immer dieses Muster verwenden,
+keine serverspezifischen Einzeleinträge.
 
 ---
 
@@ -97,6 +91,6 @@ Tools: `mcp__logmcp-<hostname>__list_logs` / `read_log` / `search_log` / `log_in
 Ausgeben:
 - Welcher Server verwendet wird
 - Anzahl verfügbarer Log-Dateien (aus `list_logs`)
-- Falls Permissions neu eingetragen: "Freigaben in `.claude/settings.json` gespeichert."
+- Falls Permissions neu eingetragen: "Freigaben in `.claude/settings.local.json` gespeichert."
 - Falls Permissions neu und `list_logs` direkt erfolgreich: kein Neustart nötig.
 - Falls `list_logs` fehlgeschlagen: Neustart-Hinweis (siehe Schritt 3).

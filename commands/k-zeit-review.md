@@ -55,7 +55,7 @@ Gehe jeden Eintrag in `new` durch und prüfe:
 
 Für jedes gefundene Problem:
 
-1. Zeige den betroffenen Eintrag immer mit **Datum und Position** (z.B. „2. Eintrag am 8.5."), nicht nur mit der internen ID. Format: `<position>. Eintrag am <tag>.<monat>.` — Position = 1-basierte Reihenfolge der Einträge des Tages nach `position`-Feld.
+1. Zeige den betroffenen Eintrag **immer** mit **Datum und Position** — niemals mit der internen ID. Format: `<position>. Eintrag am <tag>.<monat>.` — Position = 1-basierte Reihenfolge der Einträge des Tages nach `position`-Feld. Auch in Übersichten und Zusammenfassungen ausschließlich dieses Format verwenden, keine IDs.
 2. Beschreibe das Problem klar (Rechtschreibfehler / Stilproblem / mögliches Duplikat)
 3. Mache einen konkreten Korrekturvorschlag
 4. **Warte auf Bestätigung** des Benutzers

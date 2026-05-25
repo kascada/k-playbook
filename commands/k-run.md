@@ -32,6 +32,29 @@ Tools (zusätzlich): ...
 
 If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 
+## Step 1.5 — Git-Diff-Option
+
+Check whether the working directory (or any parent) contains a `.git` folder:
+
+```bash
+git -C <working-dir> rev-parse --git-dir 2>/dev/null
+```
+
+If **no git repository** is found: skip this step silently, set `DIFF_ENABLED=false`.
+
+If a **git repository is found**:
+
+1. Ask the user:
+   > "Git-Repository gefunden. Soll nach der Ausführung ein Diff der Änderungen in die Auftragsdatei geschrieben werden?"
+
+2. If **no**: set `DIFF_ENABLED=false`, continue.
+
+3. If **yes**:
+   - Ask: "Wurde bereits ein Commit als Baseline gemacht? (Falls nicht, bitte jetzt committen und dann bestätigen.)"
+   - Wait for confirmation.
+   - Record the current HEAD: `BASELINE_HASH=$(git rev-parse HEAD)`
+   - Set `DIFF_ENABLED=true`
+
 ## Step 2 — Execute each task
 
 For each task file, in order:
@@ -78,6 +101,34 @@ When a task is fully completed:
 **Status:** Erfolgreich ausgeführt  
 **Datum:** <today's date>  
 **Zusammenfassung:** <2-3 sentences: what was created or done>
+```
+
+If `DIFF_ENABLED=true`: run the following after the task completes:
+
+```bash
+git diff $BASELINE_HASH --stat
+git diff $BASELINE_HASH
+```
+
+Append the results to the `## Ausführung` section:
+
+```
+**Geänderte Dateien:**
+<output of git diff --stat>
+
+**Code-Änderungen:**
+<output of git diff, limited to the most relevant parts — truncate large diffs to the key hunks, omit generated files, lockfiles, and binary files>
+```
+
+If the diff is longer than ~100 lines: summarize the less important parts in prose and only include the most significant hunks verbatim.
+
+Then invoke the `engineering:code-review` skill, passing **only the diff** as input — no additional file reads or codebase exploration. The review must be strictly limited to the changed lines. Provide the task description as context so the reviewer understands the intent.
+
+Append the review result to `## Ausführung`:
+
+```
+**Code-Review:**
+<findings from engineering:code-review, based solely on the diff>
 ```
 
 2. Ensure `done/` subdirectory exists in the same directory as the task file
