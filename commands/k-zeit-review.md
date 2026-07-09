@@ -9,13 +9,13 @@ Prüft neue Stundenzettel-Einträge auf Rechtschreibung, Stil und Dopplungen geg
 
 ## Server-Zugriff
 
-CLI auf dem Server: `ssh kleist@pluschat.akte.de "/opt/kamran/zeit/zeit <befehl>"`  
+CLI auf dem Server: `ssh kleist@vpn.pluschat.akte.de "/opt/kamran/zeit/zeit <befehl>"`  
 DB-Pfad ist bereits als Default im Binary hinterlegt — kein `-db` nötig.
 
 ## Step 1 — Einträge holen
 
 ```bash
-ssh kleist@pluschat.akte.de "/opt/kamran/zeit/zeit since-lock"
+ssh kleist@vpn.pluschat.akte.de "/opt/kamran/zeit/zeit since-lock"
 ```
 
 Liefert JSON mit:
@@ -63,19 +63,19 @@ Für jedes gefundene Problem:
 Bei Bestätigung: Korrektur direkt einpflegen:
 
 ```bash
-ssh kleist@pluschat.akte.de "/opt/kamran/zeit/zeit edit <id> --desc '<neue beschreibung>'"
+ssh kleist@vpn.pluschat.akte.de "/opt/kamran/zeit/zeit edit <id> --desc '<neue beschreibung>'"
 ```
 
 Bei Stundenkorrektur:
 ```bash
-ssh kleist@pluschat.akte.de "/opt/kamran/zeit/zeit edit <id> --hours <N>"
+ssh kleist@vpn.pluschat.akte.de "/opt/kamran/zeit/zeit edit <id> --hours <N>"
 ```
 
 **Achtung Quoting:** Beschreibungen mit Sonderzeichen oder Anführungszeichen über eine temporäre Datei oder mit sorgfältigem Shell-Escaping übergeben.
 
 **Neuen Eintrag anlegen** (solange `create`-CLI fehlt): über die REST-API direkt auf dem Server:
 ```bash
-ssh kleist@pluschat.akte.de "curl -s -X POST http://localhost:8765/zeit/api/entries \
+ssh kleist@vpn.pluschat.akte.de "curl -s -X POST http://localhost:8765/zeit/api/entries \
   -H 'Content-Type: application/json' \
   -d '{\"date\":\"YYYY-MM-DD\",\"description\":\"...\",\"hours\":N}'"
 ```

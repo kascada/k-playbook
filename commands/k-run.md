@@ -32,50 +32,80 @@ Tools (zusätzlich): ...
 
 If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 
-## Step 1.5 — Git-Diff-Option
+## Step 1.5 — k-run-Config aus CLAUDE.md
 
-Check whether the working directory (or any parent) contains a `.git` folder:
+Collect all CLAUDE.md files that apply to this project (`.claude/CLAUDE.md` in the working directory, plus any `CLAUDE.md` in parent directories up to the repo root). Then run:
 
 ```bash
-git -C <working-dir> rev-parse --git-dir 2>/dev/null
+rg -l "## k-run" <collected CLAUDE.md paths>
 ```
 
-If **no git repository** is found: skip this step silently, set `DIFF_ENABLED=false`.
+**If the command exits with a non-zero code (no match found):**
 
-If a **git repository is found**:
+Print this hint to the user — exactly as shown, no modifications:
 
-1. Ask the user:
-   > "Git-Repository gefunden. Soll nach der Ausführung ein Diff der Änderungen in die Auftragsdatei geschrieben werden?"
+```
+Hinweis: In CLAUDE.md kann ein `## k-run`-Abschnitt eingetragen werden,
+um Vor- und Nach-Ausführung automatisch Befehle zu rufen (z. B. Backup)
+und den Git-Diff automatisch zu erstellen. Beispiel:
 
-2. If **no**: set `DIFF_ENABLED=false`, continue.
+  ## k-run
 
-3. If **yes**:
-   - Ask: "Wurde bereits ein Commit als Baseline gemacht? (Falls nicht, bitte jetzt committen und dann bestätigen.)"
-   - Wait for confirmation.
-   - Record the current HEAD: `BASELINE_HASH=$(git rev-parse HEAD)`
-   - Set `DIFF_ENABLED=true`
+  before: make sichern
+  after: make sichern
+```
+
+Set `DIFF_ENABLED=false`, `BEFORE_CMD=`, `AFTER_CMD=`. Continue.
+
+**If the command exits with 0 (match found) — read that file and extract the `## k-run` section:**
+
+- Extract `before:` value → `BEFORE_CMD` (empty if not present)
+- Extract `after:` value → `AFTER_CMD` (empty if not present)
+- Check for a git repo: `git -C <working-dir> rev-parse --git-dir 2>/dev/null`
+  - If found: record `BASELINE_HASH=$(git rev-parse HEAD)`, set `DIFF_ENABLED=true`
+  - If not found: set `DIFF_ENABLED=false`
+
+**If `BEFORE_CMD` is set:** run it now before executing any tasks. If it fails, stop and report the error to the user — do not proceed.
 
 ## Step 2 — Execute each task
 
-For each task file, in order:
+For each task file, **in strict sequential order** (never parallel — two agents must not modify code simultaneously):
 
 ### 2a — Read and understand
 
-Read the task file completely. Understand what needs to be created or done (code, config, HTML, infrastructure changes, etc.).
+Read the task file completely.
 
-### 2b — Execute
+### 2b — Clarify before delegating
 
-Carry out the described work in the main context. Spawn subagents for heavy implementation work (writing files, generating code) where it keeps the main context manageable — but keep coordination, decisions, and user interaction in the main context.
+**Before** spawning the sub-agent: read the task file carefully and identify anything that is unclear, ambiguous, or requires a decision that cannot be inferred from the task description or codebase.
 
-### 2c — Ask when needed
+If any such questions exist: **stop and ask the user**. Wait for answers before continuing. Do not skip this step, do not guess, and do not make quick-and-dirty decisions to avoid asking — ambiguities must be resolved in the main context where the user can answer them.
 
-If anything is unclear or a decision is needed that cannot be inferred: **stop and ask the user**. Wait for the answer before continuing. Do not guess or skip.
+Only proceed once all open questions are resolved.
 
-### 2d — On error or abort
+### 2c — Delegate to sub-agent
 
-If execution fails or must be aborted mid-task:
-- Note which step was reached
+Spawn a `general-purpose` sub-agent to carry out the task. Pass it:
+
+- The full content of the task file
+- The working directory path
+- Instruction to read all `CLAUDE.md` files in the project tree before starting
+- All clarifications from Step 2b as additional context
+- If `DIFF_ENABLED=true`: the baseline commit hash, with instruction to run `git diff <hash>` after completion and return the diff in its result
+
+The sub-agent must not ask the user questions — by this point all ambiguities are resolved. If the sub-agent encounters an unexpected blocker or decision it cannot cleanly resolve, it must **not** make a quick-and-dirty decision — instead it must stop and report the issue clearly in its result summary so the main agent can escalate to the user.
+
+Wait for the sub-agent to finish before proceeding to the next task.
+
+### 2d — Handle unexpected blockers
+
+If the sub-agent's result reports an unexpected blocker or unresolved decision: **stop and ask the user**. Do not proceed to the next task until resolved. Then decide whether to re-run this task or continue.
+
+### 2e — On error or abort
+
+If the sub-agent reports failure or the task must be aborted:
 - Append the following section to the task file:
+
 
 ```
 ## Ausführung
@@ -89,11 +119,11 @@ If execution fails or must be aborted mid-task:
 - Leave the file in its current location (do not move to `done/`)
 - Stop processing further tasks
 
-### 2e — On success
+### 2f — On success
 
-When a task is fully completed:
+When the sub-agent reports success:
 
-1. Append the following section to the task file:
+1. Append the following section to the task file (using the sub-agent's result summary):
 
 ```
 ## Ausführung
@@ -131,10 +161,16 @@ Append the review result to `## Ausführung`:
 <findings from engineering:code-review, based solely on the diff>
 ```
 
-2. Ensure `done/` subdirectory exists in the same directory as the task file
-3. Move the task file into `done/`
+2. **If `AFTER_CMD` is set:** run it now. If it fails, report the error but do **not** undo the task — it already completed successfully. Just note the failure in the `## Ausführung` section.
 
-### 2f — Continue
+3. Ensure `done/` subdirectory exists in the same directory as the task file
+4. Move the task file into `done/`
+
+### 2g — Continue
+
+Proceed to the next task in the list. If a task failed (Step 2e), stop — do not execute remaining tasks.
+
+### 2g — Continue
 
 Proceed to the next task in the list. If a task failed (Step 2d), stop — do not execute remaining tasks.
 

@@ -21,6 +21,36 @@ Die Datei enthält eine Befundliste. Offene Punkte sind mit `☐` markiert (oder
 
 ---
 
+## Schritt 1b — known-decisions.md prüfen
+
+Im selben Verzeichnis wie die Audit-Datei nach `known-decisions.md` suchen.
+
+**Wenn vorhanden:** Einlesen und intern als `KNOWN_DECISIONS` speichern. Kurz bestätigen:
+> "known-decisions.md gefunden — <N> Einträge geladen."
+
+**Wenn nicht vorhanden:** Fragen:
+> "Es gibt noch keine `known-decisions.md` in diesem Verzeichnis. Diese Datei speichert bewusste Design-Entscheidungen und bekannte Trade-offs, die bei zukünftigen Audits automatisch als „Akzeptiert" vormarkiert werden. Soll ich sie anlegen?"
+
+Wenn ja → Datei anlegen mit diesem Inhalt:
+
+```markdown
+# Known Decisions
+
+Einträge in dieser Datei dokumentieren bewusste Design-Entscheidungen und bekannte Trade-offs.
+Bei Audits werden passende Befunde automatisch als „Akzeptiert (A)" eingestuft — kein manuelles
+Durchgehen nötig.
+
+Format je Eintrag: ID (KD-NNN), Kurztitel, Bereich (Datei/Modul/Konzept), Begründung, Datum.
+
+---
+
+<!-- Einträge folgen hier -->
+```
+
+Wenn nein → `KNOWN_DECISIONS` bleibt leer, Skill läuft ohne diese Funktion.
+
+---
+
 ## Schritt 2 — Kategorien und Autonomie klären
 
 **Kategorien:**
@@ -74,7 +104,10 @@ Wenn das Problem nicht reproduzierbar oder bereits behoben ist → Kategorie **X
 
 ### 4b — Kategorisieren
 
-Kategorie anhand der Definitionen (Schritt 2) bestimmen. Im Zweifel konservativer einordnen (K statt S, T statt S).
+**Vorprüfung gegen known-decisions.md:** Wenn `KNOWN_DECISIONS` geladen ist, zuerst prüfen ob der Befund inhaltlich zu einem Eintrag passt (Bereich, Thema, Beschreibung). Wenn ja → Kategorie automatisch **A (Akzeptiert)**, Grund aus dem KD-Eintrag übernehmen. Den User kurz informieren:
+> "Befund #N → A (akzeptiert) — trifft auf KD-NNN: <Titel> zu."
+
+Wenn kein KD-Treffer: Kategorie anhand der Definitionen (Schritt 2) bestimmen. Im Zweifel konservativer einordnen (K statt S, T statt S).
 
 **Qualitätsleitlinien für Sofort-Fixes:**
 - Kein Quick-and-Dirty. Wenn es keine saubere Lösung gibt, wird aus **S** ein **T**.
@@ -90,10 +123,24 @@ Kategorie anhand der Definitionen (Schritt 2) bestimmen. Im Zweifel konservative
 4. Im Änderungslog (Schritt 5) eintragen
 
 **Kategorie S — NICHT in `AUTO_CATEGORIES`:**
-Befund kurz vorstellen (was genau ist falsch, was wäre der Fix), dann fragen:
-> "Soll ich das beheben?"
 
-Antwort abwarten, dann entsprechend handeln.
+**Pflicht: Code zeigen, dann vorstellen — niemals blind eine Liste abfragen.**
+
+Für jeden Befund einzeln:
+
+1. **Code lesen** (Schritt 4a wurde bereits gemacht)
+2. **Vorstellen mit konkretem Code-Ausschnitt:**
+   - Den relevanten Code-Block (Ist-Stand) zeigen
+   - Das Problem in 1–2 Sätzen erklären
+   - Den geplanten Fix als Code-Diff oder konkreten Codeblock zeigen
+3. **Fragen:**
+   > "Soll ich das so beheben?"
+4. Antwort abwarten, dann entsprechend handeln.
+
+Nicht erlaubt:
+- Mehrere S-Befunde in einer Auswahlliste bündeln ohne Code-Details
+- Nur Befundtitel oder Beschreibung aus dem Audit nennen ohne den tatsächlichen Code-Stand zu zeigen
+- Batch-Fragen wie „Welche davon soll ich fixen?" ohne dass der User den Code kennt
 
 **Kategorie T (Task) — in `AUTO_CATEGORIES`:**
 1. Task-Datei anlegen (in `priv/tasks/` oder dem projektüblichen Tasks-Verzeichnis)
@@ -120,6 +167,20 @@ Immer vorstellen und fragen — auch wenn `AUTO_CATEGORIES` alles enthält.
 
 **Kategorie A (Akzeptiert) — in `AUTO_CATEGORIES`:**
 Status auf `~ akzeptiert` setzen. Kurzen Grund in den Änderungslog schreiben.
+
+Danach — sofern `known-decisions.md` vorhanden ist und der Befund *nicht* durch einen KD-Treffer automatisch geschlossen wurde — fragen:
+> "Soll diese Entscheidung in `known-decisions.md` eingetragen werden, damit sie bei zukünftigen Audits automatisch als 'Akzeptiert' gilt?"
+
+Wenn ja: nächste freie ID bestimmen (KD-NNN), Eintrag am Ende der Datei ergänzen:
+
+```markdown
+### KD-NNN — <Kurztitel>
+**Bereich:** <Datei / Modul / Konzept>
+**Entscheidung:** <Begründung aus dem Befund>
+**Datum:** YYYY-MM-DD
+```
+
+Kurz bestätigen: "KD-NNN eingetragen."
 
 **Kategorie X (Falsch) — in `AUTO_CATEGORIES`:**
 Status auf `✗ falsch` setzen. Kurze Begründung notieren.
