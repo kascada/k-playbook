@@ -1,0 +1,81 @@
+# Subagent-Prompt für Overlay-Repo-Analyse
+
+Kopiere und passe an: <PROJEKTNAME>, <REPO-PFAD>, <PAAR-BESCHREIBUNG>.
+
+---
+
+Führe eine **sehr thorough / very thorough** Analyse des Verzeichnisses
+`<REPO-PFAD>` durch.
+
+## Kontext
+
+<PROJEKTNAME> besteht aus mehreren Repositories. Dieses hier ist ein
+<Overlay / Base>. Für Overlay-Repos gilt: sie enthalten nur Delta-Dateien,
+die im Container über ein Base-Image gelegt werden.
+
+Weitere Repos im Projekt: <PAAR-BESCHREIBUNG>
+
+## Zu untersuchen
+
+### Zweck & Historie
+- README.md komplett lesen und zusammenfassen
+- Git-Log analysieren (Anzahl Commits, Autoren, Evolution)
+- LICENSE prüfen
+
+### Dockerfile & Build
+- Base-Image (bei Overlay: `FROM …`; bei Base: `python:…-slim`, `node:…` o.ä.)
+- Build-Stages, RUN-Steps
+- Ports, ENTRYPOINT, CMD
+
+### Dependencies
+- Bei Python: `requirements.txt` / `pyproject.toml`
+- Bei Node: `package.json`
+- Alle Deps mit Zweck listen
+- Runtime- vs. Dev-Deps trennen
+
+### Verzeichnisstruktur
+- Vollständiger Tree
+- Bei Overlay: klar sagen, welche Files hier liegen und welche NICHT (weil
+  im Base-Image)
+- Config-Files, Env-Vorlagen
+
+### Bei Overlays besonders wichtig
+- Welche Files werden konkret überschrieben?
+- **Nicht** spekulieren, was in der Base drin ist – nur beschreiben, was
+  hier tatsächlich liegt
+- Imports aus `app.*` (Python) / import-Statements (JS) auflisten – daraus
+  ergibt sich, welche Base-Module existieren müssen
+
+### Bei Base-Repos besonders wichtig
+- Alle Module beschreiben
+- Provider-Framework, Base-Klassen dokumentieren
+- API-Endpoints, Datenmodelle
+- ETL-Skripte, Prompt-Systeme
+- Auth, Middleware, Config-Loading
+- Auffälligkeiten (Bugs, Design-Brüche, undokumentierte Env-Vars)
+
+### CI/CD
+- `.github/workflows/`, `.gitlab-ci.yml` – wie wird gebaut/deployed
+- Tests in der CI?
+
+### Auffälligkeiten
+- Bekannte Bugs
+- Design-Brüche
+- Sicherheitsprobleme (Auth fehlt, root im Container, committete Secrets)
+- Ungenutzter Code
+
+## Ergebnis
+
+Gib mir einen **strukturierten, sehr ausführlichen Markdown-Report auf
+Deutsch** zurück, den ich als Datei speichern kann.
+
+Nutze Überschriften (##, ###), Bullet-Listen, Tabellen und Code-Blöcke.
+
+Wichtig ist besonders:
+- Klare Trennung „was ist in diesem Repo" vs. „was wird aus Base erwartet"
+- Konkrete Zahlen (Zeilen, Anzahl Files, Anzahl Commits)
+- Bei Overlays: nicht als Custom-Feature deklarieren, wenn nicht diffend
+  bestätigt
+
+Kein knapper Abriss – volle Tiefe. Der Report ist Grundlage für eine
+Doku-Datei.

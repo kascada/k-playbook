@@ -1,0 +1,63 @@
+# AGENTS.md – <Projektname>
+
+Diese Datei wird von OpenCode in jede Session als Standard-Kontext injiziert.
+Ihr Zweck: Sicherstellen, dass jede AI-Session die vorhandene Dokumentation
+kennt und nutzt, statt Code neu zu analysieren.
+
+## Was ist dieses Projekt?
+
+<Ein bis drei Sätze: was ist es, für wen, in welcher Domäne.>
+
+Beispiel:
+> Das Verzeichnis `<pfad>` enthält <Beschreibung>. Es besteht aus
+> <Anzahl> Repositories/Modulen, die <Zusammenspiel>.
+
+## KRITISCHE REGEL: Docs zuerst
+
+**Bevor du Code liest, Repos durchsuchst oder Struktur analysierst,
+konsultiere IMMER zuerst `docs/`.** Dort steht bereits ausformuliert:
+
+- <Themenbereich 1>
+- <Themenbereich 2>
+- <Themenbereich 3>
+- <...>
+
+Der **Einstieg** ist immer:
+```
+docs/README.md   ← Inhaltsverzeichnis + Stichwort-Index
+```
+
+## Wann DOCH in den Code schauen?
+
+Nur wenn:
+
+1. Die Frage nicht in den Docs abgedeckt ist (mit Stichwort-Index geprüft!)
+2. Die Docs veraltet oder widersprüchlich zum Code sind
+3. Ein konkreter Code-Fix/Feature verlangt wird (dann Code an spezifischer
+   Stelle lesen, nicht das ganze Repo scannen)
+
+**Wenn du im Code etwas findest, das den Docs widerspricht: Docs updaten.**
+Sie sind autoritativ für strukturelle Fragen – aber sie müssen aktuell bleiben.
+
+## Sprache
+
+Diese Doku ist auf **<Sprache>** geschrieben. Antworte in derselben Sprache
+wie der Nutzer (i.d.R. <Standard-Sprache>).
+
+## Workspace-Struktur
+
+```
+<projekt-root>/
+├── AGENTS.md                          diese Datei
+├── opencode.json                      OpenCode-Konfig (bindet AGENTS.md ein)
+├── <verzeichnisse/repos>
+└── docs/                              ★ die autoritative Dokumentation
+```
+
+## Kurzverweise auf wichtige Docs
+
+| Frage | Datei |
+|-------|-------|
+| Was macht das Projekt insgesamt? | `docs/00-overview.md` |
+| Welcher Stack? | `docs/01-stack.md` |
+| <Weitere häufige Einstiegspunkte> | ... |

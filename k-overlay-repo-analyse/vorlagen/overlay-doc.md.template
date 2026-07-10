@@ -1,0 +1,102 @@
+# <Overlay-Repo-Name>
+
+**Pfad:** `<absoluter-pfad>`
+**Origin:** `<git-url>`
+**Rolle:** Docker-Overlay über `<base-image-tag>`. Überschreibt <N> Dateien,
+alles andere kommt aus der Base.
+
+> Für die Base (die die eigentliche Anwendung enthält), siehe
+> [`<base-doc>.md`](./<base-doc>.md).
+
+---
+
+## 1. Zweck
+
+<Was macht dieses Overlay konkret? Warum existiert es getrennt von der Base?>
+
+## 2. Verzeichnisstruktur
+
+```
+<overlay-repo>/
+├── Dockerfile
+├── docker-compose.yaml
+├── README.md
+├── <überschriebene-datei-1>       (X Zeilen; Base: Y Zeilen)
+└── <überschriebene-datei-2>       (X Zeilen; Base: Y Zeilen)
+```
+
+## 3. Dockerfile
+
+```dockerfile
+FROM <base-image>
+WORKDIR /app
+COPY . .
+```
+
+Kommentar zu den Details (Base gepinnt auf welchen Tag, was macht COPY, ...)
+
+## 4. Was wird überschrieben?
+
+### 4.1 `<datei-1>` – Δ <konkrete Zeilenzahl>
+
+**Diff-Übersicht:**
+- Zeilen gelöscht: <X>
+- Zeilen hinzugefügt: <Y>
+- Netto: <±Z>
+
+**Konkrete Änderungen:**
+
+```diff
+- alte Zeile
++ neue Zeile
+```
+
+**Funktionale Änderungen:**
+- Neu: <Funktion/Methode/Feature>
+- Entfernt: <...>
+- Verändert: <...>
+
+### 4.2 `<datei-2>` – <ähnliche Struktur>
+
+...
+
+## 5. Was von der Base übernommen wird (unverändert)
+
+- <Komponente 1>
+- <Komponente 2>
+- ...
+
+## 6. Base vs. Overlay – klare Trennlinie
+
+| Bereich | Base liefert | Overlay ergänzt |
+|---------|--------------|-----------------|
+| <Aspekt 1> | ✅ vollständig | — |
+| <Aspekt 2> | ✅ Basis-Variante | ⚠ ergänzt um <Feature> |
+| <Aspekt 3> | ✅ generisches Schema | ⚠ ersetzt (3 Zeilen Δ) |
+
+## 7. Installation & Start
+
+```bash
+docker compose up --build
+```
+
+Env-Variablen: siehe Base-Doku (`<base-doc>.md`).
+
+## 8. Tests
+
+<Falls vorhanden: pytest-Setup, Ausführung, was getestet wird>
+
+## 9. CI/CD
+
+<Workflow-Beschreibung>
+
+## 10. Was das Overlay NICHT tut
+
+Klar abgegrenzt – folgende Dinge sind Base-Aufgabe:
+
+- <Punkt 1>
+- <Punkt 2>
+
+## 11. Beobachtungen & Lücken
+
+<Auffälligkeiten, offene Punkte, Verbesserungspotenzial>
