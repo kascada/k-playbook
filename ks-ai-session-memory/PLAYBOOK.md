@@ -68,7 +68,7 @@ Identifiziere:
 - Gibt es bereits einen Index/TOC (in `README.md` oder `INDEX.md`)?
 
 Wenn keine Docs existieren: dieses Playbook ist noch nicht anwendbar –
-zuerst Docs schreiben (siehe `k-overlay-repo-analyse/` oder eigene
+zuerst Docs schreiben (siehe `ks-overlay-repo-analyse/` oder eigene
 Recherche).
 
 ### Schritt 2: `docs/README.md` mit Stichwort-Index erweitern
@@ -262,7 +262,7 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 
 ## Verwandte Playbooks
 
-- `k-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
+- `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
 
 ## Referenz-Implementierung

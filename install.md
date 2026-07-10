@@ -66,7 +66,7 @@ opencode
   `/k-akte`, `/k-review-loop`, … zeigen
 - Zum Testen der Skills: eine Nachricht schreiben, deren Thema zu einem
   Playbook passt (z.B. „Ich habe hier ein Overlay-Projekt, das soll
-  analysiert werden") → OpenCode sollte den Skill `k-overlay-repo-analyse`
+  analysiert werden") → OpenCode sollte den Skill `ks-overlay-repo-analyse`
   laden
 
 ---

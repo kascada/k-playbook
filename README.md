@@ -30,11 +30,11 @@ Zwei Arten von Inhalten:
 │   ├── k-vscode-project-color.md
 │   ├── k-zeit-review.md
 │   └── todo.md → k-todo.md              Symlink-Alias
-├── k-ai-session-memory/                 Playbook: docs für AI-Sessions verankern
+├── ks-ai-session-memory/                 Playbook: docs für AI-Sessions verankern
 │   ├── SKILL.md                         Skill-Metadaten (Frontmatter)
 │   ├── PLAYBOOK.md                      Prosa + Checkliste
 │   └── vorlagen/                        Templates
-└── k-overlay-repo-analyse/              Playbook: Docker-Overlay-Projekte analysieren
+└── ks-overlay-repo-analyse/              Playbook: Docker-Overlay-Projekte analysieren
     ├── SKILL.md
     ├── PLAYBOOK.md
     ├── vorlagen/

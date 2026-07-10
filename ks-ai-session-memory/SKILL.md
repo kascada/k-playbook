@@ -1,5 +1,5 @@
 ---
-name: k-ai-session-memory
+name: ks-ai-session-memory
 description: Use when the user wants existing project documentation (docs/, README, analysis notes) to be automatically loaded and prioritized by AI sessions instead of re-analyzed. Sets up AGENTS.md, opencode.json with instructions + references, and a keyword-indexed docs/README.md so future sessions consult docs first before reading code. Trigger keywords - "in memory", "damit du das nächste Mal weißt", "session context", "docs zuerst", "AGENTS.md", "OpenCode Konfig".
 ---
 
@@ -38,11 +38,11 @@ Drei zusammenspielende Bausteine:
 Detaillierte Schritt-für-Schritt-Anleitung mit Prosa + abhakbarer
 Checkliste steht in:
 
-→ **`~/dev/k-playbook/k-ai-session-memory/PLAYBOOK.md`**
+→ **`~/dev/k-playbook/ks-ai-session-memory/PLAYBOOK.md`**
 
 Vorlagen zum Kopieren:
 
-→ **`~/dev/k-playbook/k-ai-session-memory/vorlagen/`**
+→ **`~/dev/k-playbook/ks-ai-session-memory/vorlagen/`**
 
 ## Wichtigste Regel
 

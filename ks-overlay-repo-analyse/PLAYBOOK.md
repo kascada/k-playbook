@@ -297,12 +297,12 @@ Beschreibung + konkreter Diff-Ausschnitt
 Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 ```
 
-Vorlage in `~/dev/k-playbook/k-overlay-repo-analyse/vorlagen/overlay-doc.md.template`
+Vorlage in `~/dev/k-playbook/ks-overlay-repo-analyse/vorlagen/overlay-doc.md.template`
 
 ### Alle Docs verlinken
 
 In `docs/README.md` alle Doc-Dateien listen. Idealerweise anschließend
-das Playbook `k-ai-session-memory/` anwenden, damit die Docs für
+das Playbook `ks-ai-session-memory/` anwenden, damit die Docs für
 Folge-Sessions verankert werden.
 
 ---
@@ -362,13 +362,13 @@ diff -rq --exclude=node_modules --exclude=.git "$BASE" "$OVR"
 - [ ] Doc-Struktur trennt sauber Base-Verhalten von Overlay-Delta
 - [ ] Falls Zwischen-Docs aus Phase 2 existierten: revidiert
 - [ ] `_bases/`-Verzeichnis ggf. in `.gitignore` (falls Workspace unter Git)
-- [ ] Anschließend Playbook `k-ai-session-memory/` angewendet
+- [ ] Anschließend Playbook `ks-ai-session-memory/` angewendet
 
 ---
 
 ## Verwandte Playbooks
 
-- `k-ai-session-memory/` – wendet man **nach** diesem Playbook an, damit
+- `ks-ai-session-memory/` – wendet man **nach** diesem Playbook an, damit
   die entstandenen Docs für Folge-Sessions als autoritativ verankert
   werden.
 
