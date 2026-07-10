@@ -21,7 +21,7 @@ verschiedene AI-Assistant-Umgebungen.
 
 ### 1. Skills registrieren (Playbook-Verzeichnisse)
 
-Die `k-<name>/`-Ordner mit `SKILL.md` sollen automatisch geladen werden.
+Die `ks-<name>/`-Ordner mit `SKILL.md` sollen automatisch geladen werden.
 
 Datei `~/.config/opencode/opencode.jsonc` um `skills.paths` erweitern:
 
@@ -84,7 +84,7 @@ Danach sind die Commands per `/k-<name>` in Claude Code verfügbar.
 
 **Hinweis:** Claude Code kennt aktuell kein direktes Äquivalent zu
 OpenCode-Skills (auto-getriggerte SKILL.md). Die Playbook-Ordner
-`k-<name>/` sind in Claude Code manuell zu konsultieren (z.B. per
+`ks-<name>/` sind in Claude Code manuell zu konsultieren (z.B. per
 `Read`-Tool auf die `PLAYBOOK.md`).
 
 ---
@@ -98,7 +98,7 @@ OpenCode-Skills (auto-getriggerte SKILL.md). Die Playbook-Ordner
 ├── Makefile
 ├── commands/                                    Slash-Commands
 │   └── k-<name>.md
-└── k-<name>/                                    Playbook (Skill)
+└── ks-<name>/                                   Playbook (Skill)
     ├── SKILL.md                                 Frontmatter + Kurzfassung
     ├── PLAYBOOK.md                              Prosa + Checkliste
     └── vorlagen/, scripts/ (optional)
@@ -108,7 +108,7 @@ OpenCode-Skills (auto-getriggerte SKILL.md). Die Playbook-Ordner
 
 ```markdown
 ---
-name: k-<name>
+name: ks-<name>
 description: Use when ...  (konkrete Trigger-Keywords front-loaded)
 ---
 

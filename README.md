@@ -8,7 +8,7 @@ Zwei Arten von Inhalten:
 | Verzeichnis | Was | Aufruf |
 |-------------|-----|--------|
 | `commands/` | Slash-Commands (Kurzbefehle, manuell aufgerufen) | `/k-<name>` |
-| `k-<name>/` | Playbooks (Prozeduren mit Prosa, Checkliste, Templates) | automatisch getriggert (OpenCode-Skill) oder von Hand befolgt |
+| `ks-<name>/` | Playbooks/Skills (Prozeduren mit Prosa, Checkliste, Templates) | automatisch getriggert (OpenCode-Skill) oder von Hand befolgt |
 
 ## Struktur
 
@@ -72,6 +72,6 @@ git push
 ## Konvention
 
 - Alle User-facing Namen beginnen mit `k-` (persönliche Präfix von kleist/kascada)
-- Playbook-Ordner heißen `k-<thema>/`
+- Playbook-/Skill-Ordner heißen `ks-<thema>/` (`ks-` = k-Skill, trennt Skills von Commands)
 - Slash-Commands heißen `commands/k-<thema>.md`
-- Templates in `k-<thema>/vorlagen/`, Skripte in `k-<thema>/scripts/`
+- Templates in `ks-<thema>/vorlagen/`, Skripte in `ks-<thema>/scripts/`
