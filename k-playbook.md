@@ -2,17 +2,30 @@
 marp: true
 title: k-playbook – Guardrails & Workflow für AI-gestützte Entwicklung
 author: Kamran v.Kleist
+paginate: true
+style: |
+  @page { size: A4 landscape; margin: 0; }
+  section {
+    width: 297mm;
+    height: 210mm;
+    padding: 15mm 18mm;
+    font-size: 15pt;
+  }
+  section h1 { font-size: 26pt; }
+  section h2 { font-size: 20pt; }
+  section h3 { font-size: 17pt; }
+  section pre, section code { font-size: 12pt; }
+  section table { font-size: 13pt; }
 ---
 
 # k-playbook
 ### Guardrails & Workflow für AI-gestützte Entwicklung
 
-**Vier Säulen:**
+**Drei Säulen:**
 
 1. **Enforcement** bestehender Vorgaben (Styleguides, Doku, Konventionen)
-2. **Onboarding** – Doku einmalig indexieren & für KI vorbereiten
-3. **External Knowledge** – API-/Lib-Doku + Stolperfallen via RAG
-4. **Umsetzung** – geplante Änderungen strukturiert & sicher erzeugen
+2. **Kontext bereitstellen** – interne + externe Doku, einfacher Zugriff (optional: RAG / MCP)
+3. **Umsetzung** – geplante Änderungen strukturiert & sicher erzeugen
    (Task-Pipeline, Git-Diff-Protokoll, Code-Review, Checks, Deploy)
 
 > Ziel: Ein wiederverwendbares Set aus Skills, Commands & Templates,
@@ -58,21 +71,19 @@ Bei **großen Projekten** — übernommenen wie eigenen — entstehen drei Kernp
 
 **Ziel des k-playbook:** Ein installierbares Set aus Skills, Commands und Templates, das
 
-1. den **Menschen** beim Onboarding in ein Projekt unterstützt (Überblick, Doku-Struktur),
-2. **Regeln definierbar und durchsetzbar** macht (Enforcement),
-3. der **KI** dauerhaft Kontext liefert → weniger Tokens, weniger Halluzinationen, keine Endlosschleifen,
-4. **Änderungen strukturiert und nachvollziehbar** erzeugt — vom Task über den Diff bis zum Deploy.
+1. **Regeln definierbar und durchsetzbar** macht (Enforcement),
+2. **Kontext bereitstellt** — für Mensch (Onboarding, Überblick) und KI (weniger Tokens, weniger Halluzinationen),
+3. **Änderungen strukturiert und nachvollziehbar** erzeugt — vom Task über den Diff bis zum Deploy.
 
 ---
 
-## Überblick – Die vier Säulen
+## Überblick – Die drei Säulen
 
 | Säule | Frage | Ergebnis |
 |-------|-------|----------|
 | **1 · Enforcement** | Wie erzwingen wir bestehende Vorgaben? | Global + projekt-lokale Regeln, `k-enforcement`-Skill, Checks |
-| **2 · Session-Memory** | Wie bekommt die AI Projekt-Kontext? | Indexierte Doku, `AGENTS.md`, Skills |
-| **3 · External RAG** | Wie kennt die AI unsere Libs & deren Fallen? | Recherche-Playbook + lokaler RAG-Store |
-| **4 · Umsetzung** | Wie erzeugen wir Änderungen strukturiert & sicher? | Task-Pipeline (create → review → run → code-review), Git-Diff-Protokoll, Deploy-Gate |
+| **2 · Kontext bereitstellen** | Wie greifen Mensch & KI einfach auf projektinternes und externes Wissen zu? | Kuratierte Doku + Pitfall-Kataloge; optional RAG / MCP-Server |
+| **3 · Umsetzung** | Wie erzeugen wir Änderungen strukturiert & sicher? | Task-Pipeline (create → review → run → code-review), Git-Diff-Protokoll, Deploy-Gate |
 
 ---
 
@@ -116,143 +127,71 @@ Regeln gelten für Änderungen, nicht rückwirkend für den gesamten Bestand.
 
 ---
 
-# Säule 2 – Doku einmalig anlegen, indexieren & für KI vorbereiten
+# Säule 2 – Kontext bereitstellen
+### Daten vorhalten & Zugriff so einfach wie möglich gestalten
 
-## Warum?
+## Prinzip
 
-- AI-Sessions starten **ohne Gedächtnis**.
-- Vorhandene Doku (`docs/`, README, ADRs, Wiki) wird **nicht automatisch gelesen**.
-- Wiederholtes „Analysiere den Code neu" verbrennt Tokens und produziert **inkonsistente Ergebnisse**.
+AI-Sessions starten **ohne Gedächtnis**. Ohne kuratierten Kontext liest die KI in jeder Session dieselben Dateien neu — oder rät, wenn die Suche zu aufwändig wird.
 
-**Prinzip:** *Doku wird einmal kuratiert → dauerhaft für alle Sessions verfügbar.*
+**Zwei Datenquellen** zusammen ergeben den Kontext:
+
+- **Intern**: Projekt-Doku, ADRs, Konventionen, README
+- **Extern**: Libraries & APIs mit ihren Stolperfallen (Version-Pinning, Breaking Changes, Auth-Quirks, …)
+
+**Kern:** Daten **einmal kuratieren**, dann so ablegen und indexieren, dass Mensch *und* KI **so einfach wie möglich** darauf zugreifen können.
+
+---
+
+## Interne Kontext-Basis
+
+- **`AGENTS.md`** im Repo-Root — Kontext-Anker, wird automatisch geladen (Claude Code / OpenCode)
+- **Doc-Index** (`docs/README.md`) mit **Keyword-Tags** pro Datei — schnelles Auffinden
+- **Doku-Aufbereitung** als Doc-as-Code:
+  - Chunking langer Dokumente (header-basiert / semantic)
+  - Frontmatter-Metadaten (`tags`, `scope`, `last-reviewed`)
+  - Cross-Linking über relative Pfade
+  - **ADRs** (Architecture Decision Records) im `docs/adr/`-Format
+
+**Prinzip:** Doku wird einmal kuratiert → dauerhaft für alle Sessions verfügbar.
 
 Referenz-Playbook: `ks-ai-session-memory/`
 
 ---
 
-## Bausteine
+## Externe Kontext-Basis (Libraries & APIs)
 
-### Kontext-Anker
+**Problem:** LLMs kennen Libraries nur bis zum Training-Cutoff. Breaking Changes, deprecated APIs und Stolperfallen (Rate-Limits, Timezone-Bugs, Non-Idempotenz) stehen selten prominent in der offiziellen Doku.
 
-- **`AGENTS.md`** im Repo-Root
-  → wird von OpenCode/Claude Code automatisch geladen
-- **`opencode.json`** mit `instructions[]` + Doc-References
-- **Doc-Index** (`docs/README.md`) mit **Keyword-Tags** pro Datei
+**Kuratierte Pitfall-Kataloge** pro Library:
 
-### Doku-Aufbereitung (Doc-as-Code)
+- Ablage in `docs/libs/<name>.md` mit Frontmatter (`lib`, `version`, `severity`, `date`)
+- Inhalt: Version-Range, Migration-Notes, **Pitfall-Katalog** (Auth, Concurrency, Perf, Security), empfohlene Idioms + Anti-Patterns
+- Quellen: offizielle Docs, Changelog, GitHub-Issues (`bug`, `gotcha`), Stack Overflow, OSV/GHSA für Security
 
-- **Chunking** langer Dokumente (Semantic Splitting, header-basiert)
-- **Frontmatter-Metadaten** (`tags`, `scope`, `last-reviewed`)
-- **Cross-Linking** über relative Pfade
-- **ADRs** (Architecture Decision Records) im `docs/adr/`-Format
-
-### Optional: Vektor-Index
-
-- **Embeddings** (OpenAI `text-embedding-3-*`, `bge-m3`, `nomic-embed-text`)
-- **Vector Store** lokal (Qdrant, Chroma, LanceDB, sqlite-vec)
-- **Retrieval** via MCP-Server → AI holt sich relevante Chunks on-demand
+**Fokus: Pitfalls, nicht Copy-Paste-Snippets.**
 
 ---
 
-## Säule 2 – Der Workflow
+## Optional: Zugriffs-Methoden bei größeren Datenmengen
 
-```
-┌──────────────┐    ┌───────────────┐    ┌────────────────┐
-│  docs/       │───▶│  Indexierung  │───▶│  AGENTS.md     │
-│  README.md   │    │  (Chunking +  │    │  + opencode.   │
-│  ADRs        │    │   Embeddings) │    │    json refs   │
-└──────────────┘    └───────────────┘    └────────────────┘
-        │                                          │
-        │                                          ▼
-        │                                   ┌──────────────┐
-        └──────────────Fallback────────────▶│  AI-Session  │
-                     (Datei-Read)           │  (OpenCode)  │
-                                            └──────────────┘
-```
+Wenn die kuratierten Docs zu umfangreich für das direkte Kontext-Fenster werden, gibt es **mehrere Optionen** — kein Zwang zu einem bestimmten Weg:
 
-- **Fallback-Ebene**: solange kein RAG steht, reicht `AGENTS.md` + `docs/README.md`.
-- **Upgrade-Pfad**: gleiche Doku wird später von RAG-Pipeline konsumiert.
+- **RAG (Retrieval-Augmented Generation)** — Embeddings + Vector Store (`sqlite-vec`, Qdrant, Chroma, LanceDB); Hybrid-Retrieval (BM25 + Dense) für Fachbegriffe; alles offline betreibbar
+- **MCP-Server** — z.B. **Context7** für Live-Library-Docs, oder projekteigene MCP-Server, die kuratierte Inhalte on-demand liefern
+- **Suchbasierte Tools** — ripgrep über `docs/`, DevDocs.io, `docs.rs`, `pkg.go.dev` — reicht oft völlig
+- **Kombinationen** — z.B. Doc-Index (Sparse) + gezielter File-Read
+
+**Faustregel:** Erst prüfen, ob klassisches File-Read reicht — sonst das **einfachste** Werkzeug wählen, das trägt. Nicht der volle RAG-Stack, wenn ein MCP-Server oder ripgrep den Job macht.
 
 ---
 
-# Säule 3 – Externe Doku (APIs / Libs) 
-
-## Problem
-
-- LLMs kennen Libs oft nur bis zum **Training-Cutoff**.
-- Breaking Changes, deprecated APIs, „Version-Pinning-Blindness".
-- **Stolperfallen** (Rate-Limits, Auth-Quirks, Non-Idempotenz, Timezone-Bugs) stehen selten in offizieller Doku prominent.
-- Suche im Web ist teuer, laut und schwer reproduzierbar.
-
-**Ziel:** *Kuratiertes, versionsgenaues Wissen über jede genutzte Library —
-mit Fokus auf **Pitfalls**, nicht Copy-Paste-Snippets.*
-
----
-
-## Recherche-Playbook 
-
-1. **Dependencies erfassen**
-   - Beispielsweise aus `pyproject.toml`, `package.json`, `go.mod`, `Cargo.toml` — oder anderen projekt­typischen Manifesten
-   - Version pro Dependency festhalten (**SBOM-Ansatz**)
-
-2. **Recherche-Quellen**
-   - Offizielle Docs, Changelog, GitHub Issues (Labels `bug`, `gotcha`)
-   - Stack Overflow (Top-Voted Gotchas)
-   - **DevDocs.io**, **Context7-MCP**, `docs.rs`, `pkg.go.dev`
-   - Security-DBs: **OSV**, **GHSA**, NVD
-
-3. **Extraktion**
-   - Pro Lib → strukturierte Markdown-Datei:
-     - Version-Range, Migration-Notes
-     - **Pitfall-Katalog** (Kategorien: Auth, Concurrency, Perf, DX, Security)
-     - Empfohlene Idioms + Anti-Patterns
-     - Links zu maßgeblichen Issues/PRs
-
-4. **Kuratierung**
-   - Ablage in `docs/libs/<name>.md`
-   - Frontmatter mit `lib`, `version`, `severity`, `date`
-
----
-
-## Säule 3 – RAG-Architektur (minimal)
-
-```
-┌─────────────────────┐
-│  docs/libs/*.md     │  ← kuratierte Pitfall-Kataloge
-└─────────┬───────────┘
-          │  (Embedding-Pipeline, on-commit)
-          ▼
-┌─────────────────────┐
-│  Vector Store       │  (Qdrant / Chroma / sqlite-vec – lokal)
-│  + BM25-Hybrid      │
-└─────────┬───────────┘
-          │  (MCP-Tool: `lib-intel.query`)
-          ▼
-┌─────────────────────┐
-│  AI-Session         │  → „Achte auf Fall X in Lib Y v1.2"
-└─────────────────────┘
-```
-
-**Design-Prinzipien:**
-
-- **Hybrid Retrieval** (BM25 + Dense) für Fachbegriffe & Codenamen
-- **Version-aware Filter** (Metadata-Filter im Vector Store)
-- **Kein Cloud-Zwang** – alles offline betreibbar
-- **Reproducibility**: Index-Build ist idempotent, Doku im Git
-
-**Wann RAG überhaupt?**
-Individuell zu entscheiden — die Frage ist, ob die gesammelten Dokumente **trotz Kuratierung und Indexierung zu groß** für das direkte Kontext-Fenster werden.
-Solange die Pitfall-Kataloge übersichtlich bleiben, reicht **klassisches File-Read** (siehe Säule 2 Fallback).
-Erst wenn das nicht mehr trägt, lohnt sich ein **einfaches, minimales RAG** — nicht der volle Stack oben, sondern nur so viel, wie tatsächlich nötig ist (z.B. `sqlite-vec` + ein Embedding-Modell).
-
----
-
-# Säule 4 – Umsetzung
+# Säule 3 – Umsetzung
 
 ## Änderungen strukturiert & nachvollziehbar erzeugen
 
-Die ersten drei Säulen sorgen dafür, dass **Regeln, Projekt-Kontext und externes Wissen** verfügbar sind.
-Säule 4 nutzt das, um **konkrete Änderungen am Code kontrolliert durchzuführen** — von der Idee bis zum Deploy-Gate.
+Die ersten beiden Säulen sorgen dafür, dass **Regeln und Kontext** verfügbar sind.
+Säule 3 nutzt das, um **konkrete Änderungen am Code kontrolliert durchzuführen** — von der Idee bis zum Deploy-Gate.
 
 **Bausteine (im Folgenden je ein eigener Abschnitt):**
 
@@ -452,19 +391,6 @@ Dasselbe Prinzip lässt sich auf weitere Phasen anwenden:
 
 ---
 
-## Säule 3 – Fachbegriffe im Überblick
-
-- **RAG** – Retrieval-Augmented Generation
-- **Embeddings** / **Dense Retrieval** / **Sparse Retrieval (BM25)**
-- **Chunking-Strategien**: Fixed-size, Recursive, Semantic, Late-Chunking
-- **Re-Ranking** (Cross-Encoder, `bge-reranker`)
-- **MCP** – Model Context Protocol (Tools & Resources für die AI)
-- **Context7** – Live-Doku-MCP-Server für Libraries
-- **SBOM** – Software Bill of Materials (Dependency-Inventar)
-- **OSV / GHSA** – Vulnerability-Datenbanken
-
----
-
 # Ausführung (`/k-run`)
 
 ## Was `/k-run` tut
@@ -631,6 +557,42 @@ Zusätzlich zum blockierenden Gate: **umfassender Check** vor größeren Meilens
 
 **Kopplung zurück zu den Tasks:**
 Weil zu jedem Task der **Doku-Nachzug** gehört (siehe Tasks-Abschnitt), hat dieser Check überhaupt eine faire Chance — sonst wäre das Delta zwischen Code und Doku nach kurzer Zeit unaufholbar.
+
+---
+
+# Installation
+
+## `/k-setup` – ein Command, ein Einstieg
+
+Die Installation des k-playbook in einem Projekt läuft über einen einzigen Command:
+
+```
+/k-setup
+```
+
+**Was passiert dabei:**
+
+1. **Erkennung des Ziel-Systems** — je nachdem, ob die Session in **Claude Code** oder **OpenCode** läuft, werden die passenden Skills und Commands am richtigen Ort eingerichtet.
+2. **Einrichtung im Projekt** wird angeboten — kein Zwang, aber der Standardpfad.
+3. **Pfade werden vorgestellt** — alle Verzeichnisse, die das Playbook nutzt (`tasks/`, `checks/`, `reviews/`, `guidelines/`, `enforcement/`, …).
+   - Jeder Pfad kann **umbenannt** oder **an einen anderen Ort** verlegt werden.
+   - Bei Abweichungen werden die zugehörigen Beschreibungen und Templates **automatisch angepasst**.
+
+Ergebnis: das Playbook fügt sich in bestehende Projekt-Konventionen ein, statt sie zu überschreiben.
+
+---
+
+## `K-PLAYBOOK.MD` – die Zentrale im Projekt
+
+Alle Entscheidungen aus `/k-setup` (gewählte Pfade, aktivierte Skills, projektspezifische Anpassungen) landen in einer einzigen Datei im Projekt-Root:
+
+**`K-PLAYBOOK.MD`** (bewusst großgeschrieben — Signal-Datei)
+
+- **Zentrale Übersicht**: welche Bausteine sind aktiv, wo liegen sie, wie werden sie aufgerufen.
+- **Verlinkt** zu allen relevanten Skills, Commands, Guidelines und Regeln.
+- **Ist die erste Anlaufstelle** für neue Team-Mitglieder — Mensch wie KI.
+
+**Nachträgliche Anpassung:** `/k-setup` kann jederzeit **erneut** aufgerufen werden — Pfade ändern, neue Bausteine aktivieren, alte deaktivieren. Alle Änderungen werden konsistent in `K-PLAYBOOK.MD` nachgezogen.
 
 ---
 
