@@ -122,6 +122,26 @@ After confirmation:
    - Written / updated file: `K-PLAYBOOK.MD`.
    - Skipped or inactive blocks (list).
 
+## Step 7 — Docs- und Memory-Check (nur wenn `docs` aktiv)
+
+Falls in Step 3/4 der Baustein `docs` aktiviert wurde: kurzer Zustands-Check am Ende, **nur Prüfen und Hinweisen** — kein automatisches Erzeugen.
+
+Prüfe drei Punkte und zeige sie kompakt:
+
+| Punkt                              | Erwartet                                                | Status |
+|------------------------------------|---------------------------------------------------------|--------|
+| `<docs>/README.md` vorhanden       | Datei existiert                                         | ok / fehlt |
+| `<docs>/README.md` befüllt         | ≥ 20 Zeilen und enthält einen Stichwort-Index-Header    | ok / leer |
+| Memory registriert                 | `AGENTS.md` im Projekt-Root vorhanden **und** `opencode.json` (oder `.jsonc`) enthält `instructions` mit `AGENTS.md` und `references.docs` | ok / fehlt |
+
+Wenn einer oder mehrere Punkte nicht `ok` sind, dem User als **einen** kombinierten Hinweis geben:
+
+> Die Docs sind noch nicht (vollständig) aufgesetzt. Vorschlag: **`/k-code2docs`** aufrufen — der Command scannt den Code semantisch, erzeugt eine thematische Doc-Struktur mit Index und registriert `AGENTS.md` + `opencode.json` in einem Rutsch. (Danach OpenCode neu starten.)
+
+Wenn alle drei Punkte `ok` sind: das dem User bestätigen (keine Aktion nötig).
+
+`/k-setup` **führt `/k-code2docs` nicht automatisch aus**. Der User startet das gezielt, wenn er will.
+
 ## K-PLAYBOOK.MD format
 
 Exact format written by this command (Phase 1). Everything between the `k-setup:managed:begin` and `k-setup:managed:end` markers is managed by `/k-setup` and may be rewritten. Content outside the markers is preserved on updates.
@@ -169,3 +189,4 @@ The following are explicitly **not** done by this command in Phase 1:
 - Registering skills or symlinking commands into `~/.config/opencode/`.
 - Modifying `/k-run`, `/k-task-create`, or any other command so they read paths from `K-PLAYBOOK.MD`. These are separate follow-up tasks per command.
 - Creating templates, guideline stubs, or example checks inside the new directories. Directories start empty.
+- Erzeugen von Docs oder MEMORY-Registrierung — dafür ist `/k-code2docs` zuständig. `/k-setup` prüft nur (Step 7) und verweist.

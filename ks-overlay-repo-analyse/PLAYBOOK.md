@@ -305,6 +305,9 @@ In `docs/README.md` alle Doc-Dateien listen. Idealerweise anschließend
 das Playbook `ks-ai-session-memory/` anwenden, damit die Docs für
 Folge-Sessions verankert werden.
 
+> **Pfad-Hinweis:** Wenn im Projekt-Root eine `K-PLAYBOOK.MD` mit
+> `docs:`-Eintrag existiert, diesen Pfad statt `docs/` verwenden.
+
 ---
 
 ## Troubleshooting
@@ -371,19 +374,3 @@ diff -rq --exclude=node_modules --exclude=.git "$BASE" "$OVR"
 - `ks-ai-session-memory/` – wendet man **nach** diesem Playbook an, damit
   die entstandenen Docs für Folge-Sessions als autoritativ verankert
   werden.
-
-## Referenz-Implementierung
-
-Ein vollständig durchgeführtes Beispiel dieses Playbooks:
-
-- `/home/kleist/dev/clara/` (CLARA-Projekt, 4 Repos, 2 Paare)
-  - Phase 1: `ls /home/kleist/dev/clara/`
-  - Phase 2: 3 parallele Subagenten für die 3 Overlay-Repos
-    (`cloudetair-chatbot-ui`, `squad-cdt-chatbot-ui`, `squad-cdt-chatbot-api`)
-  - Phase 3: `docker pull` + `docker cp` für `cloudetair-chatbot-api`
-    (Snapshot in `_bases/`), zusätzlich `git clone` zum Top-Level
-  - Phase 4: Diff ergab: RAG-Controller +297 Zeilen (echte Erweiterung),
-    Azure-Search-Adapter +1 Zeile netto (nahezu identisch)
-  - Phase 5: Docs unter `/home/kleist/dev/clara/docs/`, mit klarer
-    Base/Overlay-Trennung in `15-cloudetair-chatbot-api.md` und
-    `30-squad-cdt-chatbot-api.md`

@@ -9,6 +9,10 @@ description: Use when the user wants existing project documentation (docs/, READ
 in jeder OpenCode-Session **automatisch als autoritative Quelle** genutzt
 wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.
 
+> **Ausführung:** Die operative Umsetzung (Docs schreiben, `AGENTS.md` und
+> `opencode.json` erzeugen/ergänzen) macht der Command **`/k-code2docs`**.
+> Dieser Skill liefert das *Konzept* und die zugrundeliegenden Vorlagen.
+
 ## Wann anwenden
 
 Immer wenn:

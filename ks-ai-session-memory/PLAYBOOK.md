@@ -9,6 +9,12 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 
 **Nachprüfbar:** Ja – siehe Checkliste am Ende und Verifikations-Test.
 
+> **Ausführungs-Hinweis:** Die konkrete Umsetzung (Docs erzeugen, `AGENTS.md`
+> und `opencode.json` schreiben, Templates befüllen) macht heute der Command
+> **`/k-code2docs`** in einem Rutsch. Dieses PLAYBOOK beschreibt weiterhin
+> das *Modell* — nützlich, wenn jemand konzeptionell verstehen will, was
+> passiert, oder das Setup manuell (ohne Command) machen möchte.
+
 ---
 
 ## Wann anwenden
@@ -24,6 +30,12 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 - Projekt-Verzeichnis mit Doku-Verzeichnis (Standardname `docs/`).
 - Docs sollten mindestens einen Einstiegspunkt haben (`docs/README.md`
   oder `docs/index.md`).
+
+> **Pfad-Hinweis:** Wenn im Projekt-Root eine `K-PLAYBOOK.MD` mit
+> `docs:`-Eintrag existiert (angelegt via `/k-setup`), diesen Pfad statt
+> `docs/` verwenden — überall in diesem Playbook. Wenn nicht: `docs/` als
+> Default nehmen und ggf. nach dem Setup `/k-setup` aufrufen, damit der
+> gewählte Pfad in `K-PLAYBOOK.MD` registriert wird.
 
 ## Konzept
 
@@ -111,7 +123,7 @@ Alphabetisch. Format: Stichwort → Datei-Nr. + Abschnitt.
 - Verweist präzise auf Datei UND Abschnitt (nicht nur Datei)
 - Wächst mit den Docs mit (Regel: neue Doc-Datei → Index-Einträge nachziehen)
 
-Vorlage: `vorlagen/docs-README-header.md.template`
+Vorlage: `vorlagen/docs-README.md.template`
 
 ### Schritt 3: `AGENTS.md` im Projekt-Root anlegen
 
@@ -264,12 +276,8 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 
 - `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
-
-## Referenz-Implementierung
-
-Ein vollständig durchgeführtes Beispiel dieses Playbooks:
-
-- `/home/kleist/dev/clara/` (CLARA-Projekt)
-  - `AGENTS.md` im Root
-  - `opencode.json` im Root
-  - `docs/README.md` mit ~120 Stichwort-Einträgen und Frage→Datei-Tabelle
+- `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
+  aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
+- `/k-setup` (Command) – registriert den gewählten `docs:`-Pfad in
+  `K-PLAYBOOK.MD` und prüft am Ende, ob Docs + MEMORY vorhanden sind
+  (verweist bei Bedarf auf `/k-code2docs`).
