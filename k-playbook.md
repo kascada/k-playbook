@@ -432,13 +432,12 @@ Der Command nutzt Git als **Wahrheits-Anker** — jeder Task hinterlässt einen 
 
 ## Code-Review – Ansatz
 
-**Prinzip:** Für Code-Reviews werden **keine eigenen** Skills/Commands gebaut, sondern **bewährte fremde Sammlungen** eingebunden und orchestriert.
+**Prinzip:** Review-Regeln sind **projekt- und sprachspezifisch** → keine allgemeingültige Lösung sinnvoll. Das k-playbook liefert die **Orchestrierung**, die Review-Dateien liefern den **Inhalt**.
 
-- Review-Regeln sind **projekt- und sprachspezifisch** → keine allgemeingültige Lösung sinnvoll.
-- Ablage der projektspezifischen Definitionen im Verzeichnis **`reviews/`** im Projekt-Repo.
-- Das k-playbook liefert nur die **Orchestrierung**.
-
-> *Die konkrete Ausgestaltung (Auswahl-Logik, Format der Review-Dateien, unterstützte Sammlungen) ist umfangreich und wird an dieser Stelle bewusst ausgespart — Detailkonzept folgt in einem eigenen Kapitel.*
+- **Ablage** wahlweise **projekt-lokal** (`reviews/`, konfiguriert in `K-PLAYBOOK.MD`) oder **global** im Playbook-Repo. Bei Namenskollision gewinnt projekt-lokal.
+- **Review-Dateien sind pfad-frei.** Sie beschreiben nur *was* geprüft wird, Stil-Wahl und Beispiele. Keine Verweise auf Log-Datei, `known-decisions.md` oder Ergebnis-Pfade.
+- **Auflösung durch den Command** (`/k-review`): liest `K-PLAYBOOK.MD`, ermittelt `<reviews>/log.md`, `<reviews>/known-decisions.md`, ggf. `<reviews>/result-<name>.md`. Wird ein Pfad einmal umbenannt, betrifft es nur den Command — nicht N Review-Dateien.
+- **Frontmatter** pro Review liefert Metadaten (`title`, `interval-weeks`, `scope-hint`, optional `handoff`) — deterministisch statt Prosa.
 
 ---
 
@@ -446,11 +445,12 @@ Der Command nutzt Git als **Wahrheits-Anker** — jeder Task hinterlässt einen 
 
 Zwei Bausteine reichen für diese Präsentation aus:
 
-**1 · Auswertungs-Command**
+**1 · Auswertungs-Command** (`/k-review`)
 
-- Startet eine Review-Session und geht **jeden Findpunkt der Reihe nach** durch.
-- Jeder Punkt wird **sauber geprüft** (Kontext, Relevanz, Schweregrad) und dem User **strukturiert vorgestellt**.
-- Keine Batch-Ausgabe von 200 Findings am Stück — sondern moderierter Durchgang.
+- Startet eine Review-Session gegen ein Review-Rezept (projekt-lokal oder global — Auswahlliste, wenn kein Name übergeben wird).
+- Löst Pfade aus `K-PLAYBOOK.MD` auf (`<reviews>/log.md`, `known-decisions.md`).
+- Geht **jeden Findpunkt der Reihe nach** durch — moderiert, keine Batch-Ausgabe.
+- Aktualisiert am Ende die Log-Datei (Datum, Fällig-ab, Protokoll-Zeile).
 
 **2 · Anschluss nach der Besprechung**
 
@@ -584,15 +584,15 @@ Ergebnis: das Playbook fügt sich in bestehende Projekt-Konventionen ein, statt 
 
 ## `K-PLAYBOOK.MD` – die Zentrale im Projekt
 
-Alle Entscheidungen aus `/k-setup` (gewählte Pfade, aktivierte Skills, projektspezifische Anpassungen) landen in einer einzigen Datei im Projekt-Root:
+Alle Entscheidungen aus `/k-setup` (gewählte Pfade, aktivierte Bausteine, projektspezifische Anpassungen) landen in einer einzigen Datei im Projekt-Root:
 
 **`K-PLAYBOOK.MD`** (bewusst großgeschrieben — Signal-Datei)
 
-- **Zentrale Übersicht**: welche Bausteine sind aktiv, wo liegen sie, wie werden sie aufgerufen.
-- **Verlinkt** zu allen relevanten Skills, Commands, Guidelines und Regeln.
-- **Ist die erste Anlaufstelle** für neue Team-Mitglieder — Mensch wie KI.
+- **Config-/Pointer-Datei, keine User-Doku.** Enthält keine Erklärungen für Menschen, sondern die Pfade und Aktivierungs-Zustände, aus denen die Commands (`/k-run`, `/k-review`, `/k-task-create`, …) ihre Konfiguration lesen.
+- **Single Source of Truth für Pfade.** Auch wenn ein Pfad dem Default entspricht, steht er drin — spätere Umbenennungen wirken zentral.
+- Ein `<!-- k-setup:managed -->`-Block markiert den verwalteten Bereich; alles außerhalb bleibt vom User (Notizen, Team-Hinweise).
 
-**Nachträgliche Anpassung:** `/k-setup` kann jederzeit **erneut** aufgerufen werden — Pfade ändern, neue Bausteine aktivieren, alte deaktivieren. Alle Änderungen werden konsistent in `K-PLAYBOOK.MD` nachgezogen.
+**Nachträgliche Anpassung:** `/k-setup` kann jederzeit **erneut** aufgerufen werden — Pfade ändern, neue Bausteine aktivieren, alte deaktivieren. Der managed-Block wird konsistent nachgezogen, User-Anteile bleiben unberührt.
 
 ---
 
