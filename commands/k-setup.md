@@ -1,20 +1,21 @@
 ---
-description: Setup or update the k-playbook config file (K-PLAYBOOK.MD) in the current project. Creates the requested playbook directories (tasks, checks, reviews, guidelines, enforcement, docs) and writes a pointer file at project root that later commands read their paths from. Phase 1 only — global install and command adjustments are separate steps.
-allowed-tools: [Read, Write, Edit, Bash, Glob]
+description: Setup or update the k-playbook config file (K-PLAYBOOK.MD) in the current project. Creates the requested playbook directories (tasks, checks, reviews, guidelines, enforcement, docs) and writes a pointer file at project root that later commands read their paths from.
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
 
 # k-setup
 
 Install or update the k-playbook configuration in the current project.
 
-**Scope of this command (Phase 1):**
+**Scope of this command:**
+- Run a short host-local install preflight and offer to apply `/k-install` logic if the current server is missing command symlinks.
 - Detect whether `K-PLAYBOOK.MD` exists at the project root.
 - If not, ask the user where the playbook directories should live.
 - Offer each known building block for activation.
 - Create the chosen directories.
 - Write `K-PLAYBOOK.MD` as the single pointer file that later commands consult.
 
-**Out of scope (later phases):** adapting the other `/k-*` commands to read paths from `K-PLAYBOOK.MD`; global install checks (`opencode.jsonc`, command symlinks); user-facing project documentation.
+**Out of scope:** changing project code, running reviews, or executing tasks. Global OpenCode registration is owned by `/k-install`; `/k-setup` only performs a preflight and may apply the same install logic after asking.
 
 Important framing:
 - `K-PLAYBOOK.MD` is **not user documentation**. It is a machine-readable pointer/config file. Managed by this command.
@@ -33,6 +34,33 @@ The command knows the following building blocks (in this order):
 | `guidelines`  | `guidelines/`  | Project styleguides / conventions                   |
 | `enforcement` | `enforcement/` | Global-plus-local enforcement rules                 |
 | `docs`        | `docs/`        | Curated internal documentation                      |
+
+## Step 0 — Host install preflight
+
+Before project setup, check whether k-playbook is installed for the current host/server:
+
+1. Determine the playbook repo path best-effort:
+   - If this command file is under a repo path, use that repo.
+   - Else if `./K-PLAYBOOK.MD` exists, read `## Playbook-Quelle` → `repo:`.
+   - Else try `~/dev/k-playbook`.
+2. Check OpenCode command symlinks:
+   - Source files: `<repo>/commands/k-*.md`
+   - Target dir: `~/.config/opencode/command/`
+   - For each source file, expected target: `~/.config/opencode/command/<filename>`
+3. Check OpenCode skill path:
+   - `~/.config/opencode/opencode.jsonc` or `~/.config/opencode/opencode.json`
+   - `skills.paths` should include the repo path.
+
+If everything is ok: continue silently or with one short line.
+
+If command symlinks or skill path are missing/outdated: ask once:
+> "Die globale k-playbook-Installation auf diesem Server ist nicht aktuell. Soll ich jetzt die `/k-install`-Logik ausführen (Command-Symlinks aktualisieren, Skill-Pfad prüfen)?"
+
+If yes: perform the steps from `commands/k-install.md` before continuing with Step 1.
+
+If no: continue with project setup, but mention at the end that `/k-install` should be run on this server so new commands appear in OpenCode.
+
+Do not block project setup just because global installation is incomplete.
 
 ## Step 1 — Detect current state
 
@@ -116,11 +144,44 @@ Wait for confirmation.
 After confirmation:
 
 1. For each active block whose directory does not yet exist: `mkdir -p` the path.
-2. Write `K-PLAYBOOK.MD` at the project root using the confirmed content.
-3. Print a short summary:
+2. **Baustein-spezifische Initialisierung** — für jeden aktiven Baustein, falls definiert (siehe Step 6b).
+3. Write `K-PLAYBOOK.MD` at the project root using the confirmed content.
+4. Print a short summary:
    - Created directories (list).
+   - Created initialization files (list — see Step 6b).
    - Written / updated file: `K-PLAYBOOK.MD`.
    - Skipped or inactive blocks (list).
+   - Host install status: `ok` or `run /k-install`.
+
+## Step 6b — Baustein-spezifische Initialisierung
+
+Manche Bausteine brauchen mehr als nur ein leeres Verzeichnis. Für die folgenden Bausteine legt `/k-setup` beim Aktivieren zusätzliche Dateien an. **Existierende Dateien werden nie überschrieben** — nur angelegt, wenn sie fehlen.
+
+### `reviews`
+
+Wenn `reviews` aktiv ist und `<reviews>/known-decisions.md` noch nicht existiert: Datei mit folgendem Skelett anlegen.
+
+```markdown
+# Known Decisions
+
+Einträge in dieser Datei dokumentieren bewusste Design-Entscheidungen und bekannte Trade-offs.
+Bei Reviews (`/k-review`, `/k-remediation`) werden passende Befunde automatisch als „Akzeptiert (A)"
+eingestuft — kein manuelles Durchgehen nötig.
+
+Format je Eintrag: ID (KD-NNN), Kurztitel, Bereich (Datei/Modul/Konzept), Begründung, Datum.
+
+---
+
+<!-- Einträge folgen hier -->
+```
+
+Grund: Sowohl `/k-review` als auch `/k-remediation` erwarten diese Datei an genau dieser Stelle und legen sie selbst **nicht** an — sie warnen nur, wenn sie fehlt. Die Anlage ist damit ausschließlich Aufgabe von `/k-setup`.
+
+Das Review-Log (`<reviews>/log.md`) wird **nicht** hier angelegt — es entsteht lazy, wenn `/k-review` das erste Mal läuft.
+
+### Weitere Bausteine
+
+Aktuell hat kein anderer Baustein eine automatische Initialisierung. Wenn später einer dazukommt, wird er hier ergänzt.
 
 ## Step 7 — Docs- und Memory-Check (nur wenn `docs` aktiv)
 
@@ -142,9 +203,18 @@ Wenn alle drei Punkte `ok` sind: das dem User bestätigen (keine Aktion nötig).
 
 `/k-setup` **führt `/k-code2docs` nicht automatisch aus**. Der User startet das gezielt, wenn er will.
 
+## Step 8 — Abschluss-Hinweis zur Host-Installation
+
+Am Ende immer kurz den Host-Install-Status nennen:
+
+- Wenn Step 0 ok war oder `/k-install`-Logik erfolgreich ausgeführt wurde:
+  > "Host-Installation: ok. Neue oder aktualisierte Commands sind verlinkt. OpenCode ggf. neu starten."
+- Wenn Step 0 nicht ausgeführt oder abgelehnt wurde:
+  > "Hinweis: Wenn neue `/k-*`-Commands nicht im Autocomplete auftauchen, auf diesem Server einmal `/k-install` ausführen und OpenCode neu starten."
+
 ## K-PLAYBOOK.MD format
 
-Exact format written by this command (Phase 1). Everything between the `k-setup:managed:begin` and `k-setup:managed:end` markers is managed by `/k-setup` and may be rewritten. Content outside the markers is preserved on updates.
+Exact format written by this command. Everything between the `k-setup:managed:begin` and `k-setup:managed:end` markers is managed by `/k-setup` and may be rewritten. Content outside the markers is preserved on updates.
 
 ```markdown
 <!--
@@ -182,11 +252,10 @@ Rules for the managed block:
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
 - `## Playbook-Quelle` lists the repo path (as given) and the ISO date of the last setup run.
 
-## Notes on later phases
+## Notes
 
-The following are explicitly **not** done by this command in Phase 1:
+The following are explicitly **not** done by this command:
 
-- Registering skills or symlinking commands into `~/.config/opencode/`.
 - Modifying `/k-run`, `/k-task-create`, or any other command so they read paths from `K-PLAYBOOK.MD`. These are separate follow-up tasks per command.
 - Creating templates, guideline stubs, or example checks inside the new directories. Directories start empty.
 - Erzeugen von Docs oder MEMORY-Registrierung — dafür ist `/k-code2docs` zuständig. `/k-setup` prüft nur (Step 7) und verweist.

@@ -19,6 +19,7 @@ Zwei Arten von Inhalten:
 ├── Makefile                            git-add + commit + push in einem
 ├── commands/                            Slash-Commands
 │   ├── k-akte.md
+│   ├── k-install.md
 │   ├── k-logmcp.md
 │   ├── k-remediation.md
 │   ├── k-review-loop.md
@@ -45,6 +46,8 @@ Zwei Arten von Inhalten:
 
 → Siehe [`install.md`](./install.md) für die vollständige Einrichtung
 (OpenCode primär, Claude Code optional).
+
+Auf jedem Server einmal `/k-install` ausführen, sobald der Command verfügbar ist. Danach erneut ausführen, wenn neue Dateien unter `commands/k-*.md` dazukommen, damit die OpenCode-Symlinks aktualisiert werden.
 
 ## Versionierung
 

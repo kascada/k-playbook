@@ -19,6 +19,25 @@ verschiedene AI-Assistant-Umgebungen.
 
 ## Setup für OpenCode
 
+### Empfohlen: `/k-install`
+
+Wenn `/k-install` bereits verfügbar ist, diesen Command ausführen:
+
+```text
+/k-install
+```
+
+Der Command erledigt den OpenCode-Teil host-lokal:
+
+- `commands/k-*.md` nach `~/.config/opencode/command/` symlinken
+- `skills.paths` in `~/.config/opencode/opencode.jsonc` prüfen bzw. ergänzen
+- verwaiste alte Command-Links melden
+- daran erinnern, OpenCode neu zu starten
+
+Nach dem Hinzufügen neuer Dateien unter `commands/k-*.md` auf jedem Server erneut `/k-install` ausführen, damit die neuen Symlinks entstehen.
+
+Die folgenden Schritte zeigen die manuelle Variante und dienen als Referenz.
+
 ### 1. Skills registrieren (Playbook-Verzeichnisse)
 
 Die `ks-<name>/`-Ordner mit `SKILL.md` sollen automatisch geladen werden.
@@ -36,9 +55,9 @@ Datei `~/.config/opencode/opencode.jsonc` um `skills.paths` erweitern:
 
 OpenCode scannt beim Start rekursiv nach `**/SKILL.md` in diesem Pfad.
 
-### 2. Slash-Commands registrieren (optional aber empfohlen)
+### 2. Slash-Commands registrieren
 
-Damit die 11 `commands/k-*.md` als Slash-Commands (`/k-akte`,
+Damit die `commands/k-*.md` als Slash-Commands (`/k-akte`,
 `/k-review-loop`, …) in OpenCode verfügbar sind, alle Dateien in das
 OpenCode-Command-Verzeichnis symlinken:
 

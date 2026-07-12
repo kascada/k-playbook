@@ -165,9 +165,11 @@ Referenz-Playbook: `ks-ai-session-memory/`
 
 **Kuratierte Pitfall-Kataloge** pro Library:
 
-- Ablage in `docs/libs/<name>.md` mit Frontmatter (`lib`, `version`, `severity`, `date`)
+- Ablage in `docs/libs/<name>.md` mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`)
 - Inhalt: Version-Range, Migration-Notes, **Pitfall-Katalog** (Auth, Concurrency, Perf, Security), empfohlene Idioms + Anti-Patterns
 - Quellen: offizielle Docs, Changelog, GitHub-Issues (`bug`, `gotcha`), Stack Overflow, OSV/GHSA für Security
+
+**Erzeugung:** Command **`/k-tools-scan`** — erkennt aus Manifest-Files und Code-Nutzung die genutzten Tools, scored sie („empfohlen / optional / skip"), der User bestätigt die Auswahl, dann pro Tool eine Datei mit gezielter (nicht breiter) Web-Recherche. Läuft üblicherweise nach `/k-code2docs`.
 
 **Fokus: Pitfalls, nicht Copy-Paste-Snippets.**
 

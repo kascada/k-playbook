@@ -222,7 +222,7 @@ Kompakte Zusammenfassung:
 - MEMORY: `AGENTS.md` (neu / ergänzt / unverändert), `opencode.json` (neu / ergänzt / unverändert).
 - Restart-Hinweis.
 - Nächster Schritt: „`/k-setup` erneut aufrufen, um zu bestätigen dass alles registriert ist (optional)."
-- Hinweis auf Folge-Command (später): Recherche der genutzten Libs/Stacks (Command wird separat gebaut).
+- Folge-Command: **`/k-tools-scan`** — erzeugt `<docs>/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
 
 ## Wartungs-Hinweise (dem User beim ersten Lauf einmal zeigen)
 

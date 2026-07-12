@@ -1,57 +1,71 @@
 ---
-description: Arbeitet Audit-Befunde strukturiert ab. Verifiziert jeden Befund gegen den echten Code, kategorisiert ihn, behebt sichere Fälle direkt und erstellt Tasks für komplexe. Nur saubere Lösungen — keine Quick-and-Dirty-Fixes.
-argument-hint: <audit-result.md> [weitere Dateien...]
-allowed-tools: [Read, Write, Edit, Bash, Glob, Agent, LSP, TodoWrite]
+description: Arbeitet Befunde aus einer Review-Ergebnisdatei (typisch aus /k-review im Report-Modus) strukturiert ab. Verifiziert jeden Befund gegen den echten Code, kategorisiert ihn, behebt sichere Fälle direkt und erstellt Tasks für komplexe. Nur saubere Lösungen — keine Quick-and-Dirty-Fixes.
+argument-hint: [result-datei.md]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
 # k-remediation
 
-Arbeitet Audit-Befunde aus `$ARGUMENTS` strukturiert ab.
+Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus (z. B. `review-tech`) erzeugt hat.
+
+Die Pfade werden — wie bei `/k-review` — aus `K-PLAYBOOK.MD` gelesen, damit beide Commands dieselben Verzeichnisse verwenden.
 
 ---
 
-## Schritt 1 — Datei bestimmen
+## Schritt 1 — Pfade aus K-PLAYBOOK.MD auflösen
 
-Wenn `$ARGUMENTS` angegeben: diese Datei(en) einlesen.
+Wie `/k-review` (siehe `commands/k-review.md`, Step 1). Kurz:
 
-Wenn nicht: fragen:
-> "Welche Audit-Befund-Datei soll abgearbeitet werden?"
+Lies `./K-PLAYBOOK.MD` und extrahiere aus dem `## Pfade`-Block:
 
-Die Datei enthält eine Befundliste. Offene Punkte sind mit `☐` markiert (oder haben keine Statusspalte). Alle anderen (✓, ~, ✗) überspringen.
+- `reviews:` → `PROJECT_REVIEWS_DIR` (oder `-` / fehlend → unset)
+- `tasks:` → `TASKS_DIR` (oder `-` / fehlend → unset)
 
----
+Daraus abgeleitet:
 
-## Schritt 1b — known-decisions.md prüfen
+- Wenn `PROJECT_REVIEWS_DIR` gesetzt:
+  - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
+  - `DONE_DIR` = `<PROJECT_REVIEWS_DIR>/done/`
+- Wenn `TASKS_DIR` gesetzt: dorthin werden Task-Dateien geschrieben.
+- Wenn `TASKS_DIR` fehlt / inaktiv: User fragen, ob und wohin Task-Dateien geschrieben werden sollen, sobald in Schritt 6 die erste Kategorie **T** ansteht.
 
-Im selben Verzeichnis wie die Audit-Datei nach `known-decisions.md` suchen.
-
-**Wenn vorhanden:** Einlesen und intern als `KNOWN_DECISIONS` speichern. Kurz bestätigen:
-> "known-decisions.md gefunden — <N> Einträge geladen."
-
-**Wenn nicht vorhanden:** Fragen:
-> "Es gibt noch keine `known-decisions.md` in diesem Verzeichnis. Diese Datei speichert bewusste Design-Entscheidungen und bekannte Trade-offs, die bei zukünftigen Audits automatisch als „Akzeptiert" vormarkiert werden. Soll ich sie anlegen?"
-
-Wenn ja → Datei anlegen mit diesem Inhalt:
-
-```markdown
-# Known Decisions
-
-Einträge in dieser Datei dokumentieren bewusste Design-Entscheidungen und bekannte Trade-offs.
-Bei Audits werden passende Befunde automatisch als „Akzeptiert (A)" eingestuft — kein manuelles
-Durchgehen nötig.
-
-Format je Eintrag: ID (KD-NNN), Kurztitel, Bereich (Datei/Modul/Konzept), Begründung, Datum.
+Wenn `K-PLAYBOOK.MD` fehlt: Hinweis auf `/k-setup`, dann mit Defaults weiterarbeiten (`./tasks`, `./reviews`), falls der User zustimmt — sonst abbrechen.
 
 ---
 
-<!-- Einträge folgen hier -->
-```
+## Schritt 2 — Ergebnisdatei bestimmen
 
-Wenn nein → `KNOWN_DECISIONS` bleibt leer, Skill läuft ohne diese Funktion.
+Wenn `$ARGUMENTS` angegeben: diese Datei einlesen.
+
+Wenn nicht:
+
+1. In `<PROJECT_REVIEWS_DIR>` nach `result-*.md` suchen (nicht im `done/`-Unterordner).
+2. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
+3. Wenn mehrere: als Liste zeigen und den User wählen lassen.
+4. Wenn keine: fragen:
+   > "Welche Ergebnisdatei soll abgearbeitet werden?"
+
+**Format-Check:** Die Datei sollte eine Befundtabelle mit Statuszeichen (`☐` für offen, sonst `✓`, `~`, `✗`) enthalten, üblicherweise mit Priorität. Wenn das Format nicht plausibel erkennbar ist: sauber abbrechen mit Hinweis, was erwartet wurde, statt zu raten.
+
+Offene Punkte sind mit `☐` markiert (oder haben keine Statusspalte). Alle anderen (✓, ~, ✗) überspringen.
 
 ---
 
-## Schritt 2 — Kategorien und Autonomie klären
+## Schritt 3 — known-decisions.md laden
+
+Wenn `KNOWN_DECISIONS` existiert:
+
+- Einlesen und intern als `KNOWN_DECISIONS`-Inhalt bereithalten.
+- Kurz bestätigen: „`known-decisions.md` geladen — <N> Einträge."
+
+Wenn die Datei nicht existiert:
+
+- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird von `/k-setup` initialisiert."
+- Weiter — kein automatisches Anlegen an dieser Stelle.
+
+---
+
+## Schritt 4 — Kategorien und Autonomie klären
 
 **Kategorien:**
 
@@ -76,7 +90,7 @@ Warte auf Antwort. Merke welche Kategorien autonom behandelt werden dürfen (`AU
 
 ---
 
-## Schritt 3 — Befunde einlesen und sortieren
+## Schritt 5 — Befunde einlesen und sortieren
 
 Alle offenen Befunde aus der Datei sammeln. Falls die Datei eine Prioritätsspalte enthält: nach Priorität absteigend sortieren (höchste zuerst).
 
@@ -88,39 +102,39 @@ Autonom: <liste der freigegebenen Kategorien>
 
 ---
 
-## Schritt 4 — Jeden Befund abarbeiten
+## Schritt 6 — Jeden Befund abarbeiten
 
 Für jeden offenen Befund der Reihe nach:
 
-### 4a — Code lesen und verifizieren
+### 6a — Code lesen und verifizieren
 
 **Immer zuerst den echten Code lesen** — nie auf Basis der Befundbeschreibung allein handeln.
 
-- Datei und Zeile aus dem Befund aufsuchen (LSP wenn verfügbar, sonst rg/Read)
+- Datei und Zeile aus dem Befund aufsuchen (Read/Grep).
 - Prüfen: Ist das Problem real? Ist die Beschreibung korrekt?
-- Prüfen: Hat sich der Code seit dem Audit geändert (Problem vielleicht schon behoben)?
+- Prüfen: Hat sich der Code seit der Analyse geändert (Problem vielleicht schon behoben)?
 
 Wenn das Problem nicht reproduzierbar oder bereits behoben ist → Kategorie **X**, weiter.
 
-### 4b — Kategorisieren
+### 6b — Kategorisieren
 
 **Vorprüfung gegen known-decisions.md:** Wenn `KNOWN_DECISIONS` geladen ist, zuerst prüfen ob der Befund inhaltlich zu einem Eintrag passt (Bereich, Thema, Beschreibung). Wenn ja → Kategorie automatisch **A (Akzeptiert)**, Grund aus dem KD-Eintrag übernehmen. Den User kurz informieren:
 > "Befund #N → A (akzeptiert) — trifft auf KD-NNN: <Titel> zu."
 
-Wenn kein KD-Treffer: Kategorie anhand der Definitionen (Schritt 2) bestimmen. Im Zweifel konservativer einordnen (K statt S, T statt S).
+Wenn kein KD-Treffer: Kategorie anhand der Definitionen (Schritt 4) bestimmen. Im Zweifel konservativer einordnen (K statt S, T statt S).
 
 **Qualitätsleitlinien für Sofort-Fixes:**
 - Kein Quick-and-Dirty. Wenn es keine saubere Lösung gibt, wird aus **S** ein **T**.
 - Bei mehreren Lösungsoptionen: die elegantere und sicherere wählen. Beispiel: eine etablierte Library einem selbst geschriebenen Workaround vorziehen.
 - Fix muss build- und testbar sein (`go build ./...` bzw. entsprechendes).
 
-### 4c — Handeln
+### 6c — Handeln
 
 **Kategorie S (Sofort) — in `AUTO_CATEGORIES`:**
 1. Fix direkt anwenden
 2. Build/Tests prüfen
 3. Status in Ergebnisdatei auf `✓ behoben` setzen
-4. Im Änderungslog (Schritt 5) eintragen
+4. Im Änderungslog (Schritt 7) eintragen
 
 **Kategorie S — NICHT in `AUTO_CATEGORIES`:**
 
@@ -128,7 +142,7 @@ Wenn kein KD-Treffer: Kategorie anhand der Definitionen (Schritt 2) bestimmen. I
 
 Für jeden Befund einzeln:
 
-1. **Code lesen** (Schritt 4a wurde bereits gemacht)
+1. **Code lesen** (Schritt 6a wurde bereits gemacht)
 2. **Vorstellen mit konkretem Code-Ausschnitt:**
    - Den relevanten Code-Block (Ist-Stand) zeigen
    - Das Problem in 1–2 Sätzen erklären
@@ -143,12 +157,15 @@ Nicht erlaubt:
 - Batch-Fragen wie „Welche davon soll ich fixen?" ohne dass der User den Code kennt
 
 **Kategorie T (Task) — in `AUTO_CATEGORIES`:**
-1. Task-Datei anlegen (in `priv/tasks/` oder dem projektüblichen Tasks-Verzeichnis)
-   - Nächste freie Nummer bestimmen (tasks/ + tasks/done/ durchsuchen)
-   - Datei: `NNN-<kurzname>.md`
-   - Inhalt: Intent, Kontext, Zu bauen (kein Quick-and-Dirty, saubere Lösung beschreiben)
-2. Status in Ergebnisdatei auf `✓ Task NNN` setzen
-3. Im Änderungslog eintragen
+
+Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-create.md` — die Datei dort ist maßgeblich; hier nur der Minimalkern, damit der Flow nicht bricht:
+
+1. Ziel-Verzeichnis: `TASKS_DIR` (aus Schritt 1). Wenn nicht gesetzt: einmal fragen und für den Rest des Laufs merken.
+2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/old/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
+3. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
+4. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
+5. Status in Ergebnisdatei auf `✓ Task NNN` setzen.
+6. Im Änderungslog eintragen.
 
 **Kategorie T — NICHT in `AUTO_CATEGORIES`:**
 Befund vorstellen und fragen ob Task anlegen.
@@ -168,8 +185,8 @@ Immer vorstellen und fragen — auch wenn `AUTO_CATEGORIES` alles enthält.
 **Kategorie A (Akzeptiert) — in `AUTO_CATEGORIES`:**
 Status auf `~ akzeptiert` setzen. Kurzen Grund in den Änderungslog schreiben.
 
-Danach — sofern `known-decisions.md` vorhanden ist und der Befund *nicht* durch einen KD-Treffer automatisch geschlossen wurde — fragen:
-> "Soll diese Entscheidung in `known-decisions.md` eingetragen werden, damit sie bei zukünftigen Audits automatisch als 'Akzeptiert' gilt?"
+Danach — sofern `KNOWN_DECISIONS` vorhanden ist und der Befund *nicht* durch einen KD-Treffer automatisch geschlossen wurde — fragen:
+> "Soll diese Entscheidung in `known-decisions.md` eingetragen werden, damit sie bei zukünftigen Reviews automatisch als 'Akzeptiert' gilt?"
 
 Wenn ja: nächste freie ID bestimmen (KD-NNN), Eintrag am Ende der Datei ergänzen:
 
@@ -180,14 +197,14 @@ Wenn ja: nächste freie ID bestimmen (KD-NNN), Eintrag am Ende der Datei ergänz
 **Datum:** YYYY-MM-DD
 ```
 
-Kurz bestätigen: "KD-NNN eingetragen."
+Kurz bestätigen: „KD-NNN eingetragen."
 
 **Kategorie X (Falsch) — in `AUTO_CATEGORIES`:**
 Status auf `✗ falsch` setzen. Kurze Begründung notieren.
 
 ---
 
-## Schritt 5 — Ergebnisdatei aktualisieren
+## Schritt 7 — Ergebnisdatei aktualisieren
 
 Nach jedem bearbeiteten Befund:
 
@@ -212,32 +229,32 @@ Statuswerte:
 | Datum | # | Kategorie | Aktion | Notiz |
 |-------|---|-----------|--------|-------|
 | YYYY-MM-DD | 12 | Sofort | ✓ behoben | TLS MinVersion 1.2 → 1.3 |
-| YYYY-MM-DD | 3  | Task   | ✓ Task 002 | Log-Streaming, priv/tasks/002-log-streaming.md |
+| YYYY-MM-DD | 3  | Task   | ✓ Task 002 | Log-Streaming, tasks/002-log-streaming.md |
 | YYYY-MM-DD | 13 | Akzeptiert | ~ | Rate-Limiting extern behandelt (SecurityConfig) |
 ```
 
 ---
 
-## Schritt 6 — Ergebnisdatei archivieren
+## Schritt 8 — Ergebnisdatei archivieren
 
 Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 
-1. `done/`-Verzeichnis bestimmen:
-   - Naheliegend: `done/` im selben Verzeichnis wie die Ergebnisdatei
-   - Falls unklar (kein `done/` vorhanden, kein Projektkontext erkennbar): fragen
-     > "Wohin soll die abgeschlossene Datei verschoben werden? (Vorschlag: `done/`)"
+1. Ziel-Verzeichnis bestimmen:
+   - Wenn `DONE_DIR` (`<PROJECT_REVIEWS_DIR>/done/`) gesetzt ist: dort archivieren. Verzeichnis bei Bedarf anlegen.
+   - Wenn nicht gesetzt (kein `PROJECT_REVIEWS_DIR`): fragen:
+     > "Wohin soll die abgeschlossene Datei verschoben werden? (Vorschlag: `done/` neben der Datei)"
 
 2. Datei verschieben:
    - Neuer Name: `YYYY-MM-DD-<originalname>` (heutiges Datum voranstellen)
-   - Beispiel: `result-tech.md` → `done/2026-05-25-result-tech.md`
+   - Beispiel: `result-review-tech.md` → `<DONE_DIR>/2026-07-12-result-review-tech.md`
 
-3. Kurz bestätigen: "Archiviert: `done/YYYY-MM-DD-<name>`"
+3. Kurz bestätigen: „Archiviert: `<DONE_DIR>/YYYY-MM-DD-<name>`"
 
 Wenn noch offene Befunde (☐) vorhanden: Datei **nicht** verschieben — sie bleibt offen.
 
 ---
 
-## Schritt 7 — Abschlusszusammenfassung
+## Schritt 9 — Abschlusszusammenfassung
 
 Nach allen Befunden ausgeben:
 
@@ -250,7 +267,15 @@ Bearbeitet:   <N>
 ~ akzeptiert: <n>
 ✗ falsch:     <n>
 ☐ offen:      <n>  (K/F — warten auf Klärung)
-Archiviert:   done/YYYY-MM-DD-<name>  (oder: — offen, nicht archiviert)
+Archiviert:   <DONE_DIR>/YYYY-MM-DD-<name>  (oder: — offen, nicht archiviert)
 ```
 
 Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründung warum sie offen blieben.
+
+---
+
+## Fehlerfälle
+
+- **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<PROJECT_REVIEWS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
+- **`K-PLAYBOOK.MD` fehlt**: Hinweis auf `/k-setup`, dann Defaults nutzen (falls User zustimmt) oder abbrechen.
+- **`TASKS_DIR` inaktiv**: einmal fragen, wohin Tasks geschrieben werden sollen; Antwort für den Rest des Laufs merken.
