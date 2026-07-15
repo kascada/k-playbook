@@ -2,11 +2,11 @@
 
 Erweitert `/k-review-loop` um optionale, fachliche Review-Perspektiven ("Lenses"), die per Frontmatter im zu prüfenden Task aktiviert werden. Der bisherige generische Critic bleibt Default.
 
-> **Pfad-Konvention:** Alle Pfade in diesem Task beziehen sich auf die Repo-Root (`/home/kleist/dev/k-playbook`). Das Playbook liegt im Unterverzeichnis `k-playbook/` (also `k-playbook/review/…`, `k-playbook/tasks/…`), während `commands/` und `docs/` direkt auf Repo-Ebene liegen. Die Namensgleichheit von Repo-Wurzel und Playbook-Verzeichnis ist beabsichtigt, aber verwirrungsanfällig.
+> **Pfad-Konvention:** Alle Pfade in diesem Task beziehen sich auf die Repo-Root (`/home/kleist/dev/k-playbook`). Das Playbook liegt im Unterverzeichnis `k-playbook/` (also `k-playbook/review/…`, `k-playbook/tasks/…`, `k-playbook/docs/…`), während `commands/` direkt auf Repo-Ebene liegt. Die Namensgleichheit von Repo-Wurzel und Playbook-Verzeichnis ist beabsichtigt, aber verwirrungsanfällig.
 
 ## Intent
 
-Der bestehende Review-Loop (Critic · Editor · Moderator) soll fachliche Blickwinkel bekommen, ohne seine Eleganz zu verlieren. Personas sind reine Prompt-Templates, keine "Charaktere" — der Rollentausch bleibt im Task kodiert (vgl. `docs/k-playbook.md:381`).
+Der bestehende Review-Loop (Critic · Editor · Moderator) soll fachliche Blickwinkel bekommen, ohne seine Eleganz zu verlieren. Personas sind reine Prompt-Templates, keine "Charaktere" — der Rollentausch bleibt im Task kodiert (vgl. `k-playbook/docs/k-playbook.md:381`).
 
 - Default-Verhalten von `/k-review-loop` bleibt unverändert (keine Breaking Changes für bestehende Task-Files ohne Frontmatter)
 - Lenses sind **opt-in** per Frontmatter `review-lens: [architect, security, ...]` im geprüften Task
@@ -18,9 +18,9 @@ Der bestehende Review-Loop (Critic · Editor · Moderator) soll fachliche Blickw
 ## Referenzen
 
 - `commands/k-review-loop.md` — die zu erweiternde Command-Definition
-- `docs/k-playbook.md:342` — Design-Details des Review-Loops (Critic/Editor/Moderator)
-- `docs/k-playbook.md:358` — Tabelle der Perspektiv-Umkehrungen (Basis für die Lens-Auswahl)
-- `docs/k-playbook.md:398` — Umsetzungs-Status, hier ergänzt sich der neue Skill
+- `k-playbook/docs/k-playbook.md:342` — Design-Details des Review-Loops (Critic/Editor/Moderator)
+- `k-playbook/docs/k-playbook.md:358` — Tabelle der Perspektiv-Umkehrungen (Basis für die Lens-Auswahl)
+- `k-playbook/docs/k-playbook.md:398` — Umsetzungs-Status, hier ergänzt sich der neue Skill
 
 ## Ziel
 
@@ -37,9 +37,9 @@ Der bestehende Review-Loop (Critic · Editor · Moderator) soll fachliche Blickw
 
 ## Kontext
 
-- Aktuelle Rollen (`commands/k-review-loop.md:344`): Critic (High-Level-Kritik), Editor (fix/begründen), Moderator (routet/entscheidet). Bewusst **High-Level, keine Details** (`docs/k-playbook.md:345`).
-- Prinzip aus `docs/k-playbook.md:381`: Rollentausch im Task, nicht in Persona-Beschreibung → Lenses sind **Prompt-Varianten**, keine parallelen Personen mit Beziehungen untereinander.
-- Kostenprinzip aus `docs/k-playbook.md:388`: Ein Modell reicht, keine Consensus-Overheads → Lenses laufen parallel, aber Moderator konsolidiert **vor** teurem Editor-Turn.
+- Aktuelle Rollen (`commands/k-review-loop.md:344`): Critic (High-Level-Kritik), Editor (fix/begründen), Moderator (routet/entscheidet). Bewusst **High-Level, keine Details** (`k-playbook/docs/k-playbook.md:345`).
+- Prinzip aus `k-playbook/docs/k-playbook.md:381`: Rollentausch im Task, nicht in Persona-Beschreibung → Lenses sind **Prompt-Varianten**, keine parallelen Personen mit Beziehungen untereinander.
+- Kostenprinzip aus `k-playbook/docs/k-playbook.md:388`: Ein Modell reicht, keine Consensus-Overheads → Lenses laufen parallel, aber Moderator konsolidiert **vor** teurem Editor-Turn.
 - Fallback: Wenn `review-lens:` fehlt oder leer ist → aktueller generischer Critic (kein Regress).
 
 ## Zu bauen
@@ -61,9 +61,9 @@ Der bestehende Review-Loop (Critic · Editor · Moderator) soll fachliche Blickw
   - Step 4: Moderator-Deduplication ergänzen (gleiche Findings aus verschiedenen Lenses zusammenführen). **Editor-Sichtbarkeit:** Der Editor bekommt die **konsolidierte, deduplizierte Findings-Liste ohne Lens-Herkunft** (weniger Kontext-Ballast, Fokus auf das Was, nicht das Wer). Die Lens-Herkunft jedes Findings wird nur im Discussion-Log (Step 9) für Nachvollziehbarkeit festgehalten.
   - Step 9: Discussion-Log erweitern um `**Lenses:** <namen>` und pro Finding die Lens-Herkunft (z. B. `[architect]`, `[security]`, `[architect+qa]` bei dedupliziertem Doppelfund)
 
-- `docs/k-playbook.md`:
-  - Sektion "Umsetzung im k-playbook" (`docs/k-playbook.md:398`): Lenses-Erweiterung dokumentieren
-  - Perspektiv-Tabelle (`docs/k-playbook.md:358`): optional Verweis auf konkrete Lens-Files
+- `k-playbook/docs/k-playbook.md`:
+  - Sektion "Umsetzung im k-playbook" (`k-playbook/docs/k-playbook.md:398`): Lenses-Erweiterung dokumentieren
+  - Perspektiv-Tabelle (`k-playbook/docs/k-playbook.md:358`): optional Verweis auf konkrete Lens-Files
 
 **Nicht Teil dieses Tasks (bewusst später):**
 - Automatische Lens-Auswahl per Heuristik (Task-Typ → Lens-Set)

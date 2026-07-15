@@ -19,6 +19,7 @@ Zwei Arten von Inhalten:
 ├── Makefile                            git-add + commit + push in einem
 ├── commands/                            Slash-Commands
 │   ├── k-akte.md
+│   ├── k-enforcement.md
 │   ├── k-install.md
 │   ├── k-logmcp.md
 │   ├── k-remediation.md
@@ -35,6 +36,9 @@ Zwei Arten von Inhalten:
 │   ├── SKILL.md                         Skill-Metadaten (Frontmatter)
 │   ├── PLAYBOOK.md                      Prosa + Checkliste
 │   └── vorlagen/                        Templates
+├── ks-enforcement/                        Playbook: globale + projektlokale Enforcement-Regeln anwenden
+│   ├── SKILL.md
+│   └── PLAYBOOK.md
 └── ks-overlay-repo-analyse/              Playbook: Docker-Overlay-Projekte analysieren
     ├── SKILL.md
     ├── PLAYBOOK.md

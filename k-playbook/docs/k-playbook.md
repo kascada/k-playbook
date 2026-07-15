@@ -81,7 +81,7 @@ Bei **großen Projekten** — übernommenen wie eigenen — entstehen drei Kernp
 
 | Säule | Frage | Ergebnis |
 |-------|-------|----------|
-| **1 · Enforcement** | Wie erzwingen wir bestehende Vorgaben? | Global + projekt-lokale Regeln, `k-enforcement`-Skill, Checks |
+| **1 · Enforcement** | Wie erzwingen wir bestehende Vorgaben? | Global + projekt-lokale Regeln, `ks-enforcement`-Skill, `/k-enforcement`, Checks |
 | **2 · Kontext bereitstellen** | Wie greifen Mensch & KI einfach auf projektinternes und externes Wissen zu? | Kuratierte Doku + Pitfall-Kataloge; optional RAG / MCP-Server |
 | **3 · Umsetzung** | Wie erzeugen wir Änderungen strukturiert & sicher? | Task-Pipeline (create → review → run → code-review), Git-Diff-Protokoll, Deploy-Gate |
 
@@ -99,7 +99,7 @@ Bei **großen Projekten** — übernommenen wie eigenen — entstehen drei Kernp
 
 Wir nutzen **nicht** `AGENTS.md` als primäre Regelquelle, sondern eine zweistufige Ablage:
 
-- **Global** (im k-playbook: `enforcement/`)
+- **Global** (im k-playbook-Repo: `k-playbook/enforcement/`)
   Regeln, die für **alle** Projekte gelten: Dokumentations-Konventionen, allgemeine Do/Don'ts, generelle Arbeitsweise.
 - **Projekt-lokal** (Verzeichnis im Repo, z.B. `guidelines/` oder `styleguides/`)
   Projekt-spezifische Styleguides, Naming-Conventions, Architektur-Entscheidungen.
@@ -112,18 +112,21 @@ Regeln gelten für Änderungen, nicht rückwirkend für den gesamten Bestand.
 
 ---
 
-## Der Skill `k-enforcement`
+## Skill `ks-enforcement` und Command `/k-enforcement`
 
-**Zentraler Baustein:** Der Skill **`k-enforcement`** 
+**Zentraler Baustein während der Erstellung:** der Skill **`ks-enforcement`**.
 
 - Prüft **laufend während der Erstellung**, dass die Regeln aus global + projekt-lokal tatsächlich eingehalten werden.
 - Kein einmaliger Kontext-Push zu Beginn, sondern **kontinuierliche Prüfung** im Arbeitsprozess.
-- Ergänzt (nicht ersetzt) die späteren Kontrollen durch `/k-review-loop`, `/k-code-review` und die `checks/`.
+- Ergänzt (nicht ersetzt) die späteren Kontrollen durch `/k-enforcement`, `/k-review-loop`, `/k-code-review` und die `checks/`.
+
+**Expliziter Nach-Check:** Der Command **`/k-enforcement`** lädt dieselben Regelquellen und prüft den aktuellen Diff oder Zielpfad gegen diese Regeln.
 
 **Kern-Trennung:**
 
-- Skills → Regel-Einhaltung **während** der Erstellung
-- Checks → Verifikation **danach** (weil Sollen ≠ Tun, siehe Checks-Abschnitt)
+- Skills → Regel-Einhaltung **während** der Erstellung.
+- Commands wie `/k-enforcement` → manuell auslösbare Zwischen- oder Abschlussprüfung.
+- Checks → automatisierbare Verifikation **danach** (weil Sollen ≠ Tun, siehe Checks-Abschnitt).
 
 ---
 
