@@ -1,26 +1,51 @@
 ---
-description: Execute one or more task files. Pass a single .md file or a directory. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place.
-argument-hint: <file-or-directory>
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
+description: Execute one or more task files. If no path is given, uses the tasks: path from K-PLAYBOOK.MD. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place.
+argument-hint: [file-or-directory]
+# model: github-copilot/gpt-5.5
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 ---
 
 # k-run
 
-Execute task files described in `$ARGUMENTS`.
+Execute task files. If `$ARGUMENTS` is empty, use the `tasks:` path from `K-PLAYBOOK.MD`.
 
-## Step 1 — Collect tasks
+## Step 1 — Resolve target path and collect tasks
 
-If `$ARGUMENTS` is a single `.md` file: use that file as a one-item list.
+If `$ARGUMENTS` is provided: treat it as the explicit execution target.
 
-If `$ARGUMENTS` is a directory:
-- Find all `.md` files directly in that directory (not subdirectories)
-- Sort by the leading number in the filename (e.g. `013_foo.md` before `014_bar.md`)
-- Skip files without a leading number
+- If it is a single `.md` file: use that file as a one-item list.
+- If it is a directory: use that directory.
+- If it does not exist: abort with a clear error.
+
+If `$ARGUMENTS` is empty: read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+
+For this command, resolve:
+
+- `tasks:` → `TASKS_DIR`
+
+Command-specific policy:
+
+- If `TASKS_DIR` is set and exists: use it as the execution target.
+- If `TASKS_DIR` is set but missing: tell the user and ask whether to create it or abort. For execution, abort is the default recommendation because there are no tasks to run.
+- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask which file or directory to execute for this run.
+
+Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
+
+Collect tasks:
+
+- If `RUN_TARGET` is a file: use that file as a one-item list.
+- If `RUN_TARGET` is a directory:
+  - Find all `.md` files directly in that directory (not subdirectories).
+  - Exclude `done/`, `old/`, and any archived/completed task subdirectories.
+  - Sort by the leading number in the filename (e.g. `013-foo.md` before `014-bar.md`; also accept `_`).
+  - Skip files without a leading number.
+  - If no runnable `.md` files are found: report „Keine offenen Task-Dateien gefunden" and stop.
 
 Announce the list of tasks to be executed before starting. Check the **last** task file for an `## Intent` section and include it in the announcement if present:
 
 ```
 Tasks:
+  Pfad: tasks/
   1. 014-setup-tts.md
   2. 015-integrate-tts.md  ← letzte
 
@@ -169,10 +194,6 @@ Append the review result to `## Ausführung`:
 ### 2g — Continue
 
 Proceed to the next task in the list. If a task failed (Step 2e), stop — do not execute remaining tasks.
-
-### 2g — Continue
-
-Proceed to the next task in the list. If a task failed (Step 2d), stop — do not execute remaining tasks.
 
 ## Step 3 — Intent alignment check
 

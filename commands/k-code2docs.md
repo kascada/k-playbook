@@ -1,6 +1,7 @@
 ---
-description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Uses paths from K-PLAYBOOK.MD.
-argument-hint: [scope-dir]
+description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses paths from K-PLAYBOOK.MD.
+argument-hint: [target-dir]
+# model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
@@ -14,26 +15,66 @@ Produces:
 - `AGENTS.md` at project root — session-injected pointer to the docs.
 - `opencode.json` at project root — registers `AGENTS.md` + `docs/` reference.
 
+## Step 0 — Target bestimmen und bestätigen
+
+Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind relativ zu `TARGET_DIR`, nicht zwingend zum aktuellen Arbeitsverzeichnis. Nutze dafür die `TARGET_DIR`-Regeln aus `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+
+**Target-Auflösung:**
+
+- Wenn `$ARGUMENTS` gesetzt ist: als Zielverzeichnis behandeln.
+  - Existiert das Verzeichnis: `TARGET_DIR = realpath($ARGUMENTS)`.
+  - Existiert es nicht: abbrechen mit klarer Fehlermeldung.
+- Wenn `$ARGUMENTS` leer ist: `TARGET_DIR = realpath(CWD)`.
+
+**Preflight-Snapshot anzeigen:**
+
+Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` best-effort lesen, um `docs:` und weitere Pfade kompakt anzeigen zu können. Wenn die Datei fehlt oder nicht parsebar ist, nicht abbrechen — Step 1 regelt die Defaults.
+
+```text
+/k-code2docs — Preflight
+─────────────────────────────────────
+Ziel:          <absolute TARGET_DIR>
+Quelle:        Argument | CWD
+K-PLAYBOOK.MD: gefunden (docs: ./docs, tasks: ./tasks, ...) | nicht gefunden
+Git-Repo:      ja (branch: <branch>) | nein
+Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | wird auf ./docs default
+```
+
+Wenn `$ARGUMENTS` gesetzt war: keine Rückfrage — das explizite Ziel gilt.
+
+Wenn `$ARGUMENTS` leer war: frage:
+
+> "Ist das das richtige Repo? (ja/nein)"
+
+Bei „nein": abbrechen mit Hinweis:
+
+> "Abgebrochen. In das gewünschte Repo wechseln (`cd <pfad>`) oder Ziel als Argument angeben: `/k-code2docs <pfad>`."
+
+Bei „ja": weiter mit Step 1.
+
 ## Step 1 — Resolve paths from K-PLAYBOOK.MD
 
-Read `./K-PLAYBOOK.MD` if it exists. Extract from the `## Pfade` block:
+Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+
+For this command, resolve:
 
 - `docs:` → `DOCS_DIR`. If missing or `-`: default to `./docs`. If the default was used, remind the user that `/k-setup` can register it.
 
-`AGENTS_FILE` = `./AGENTS.md` and `OPENCODE_CONFIG` = `./opencode.json` (or `.jsonc` if that variant already exists — do not create both).
+`AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
+
+After applying the default if needed, use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 ## Step 2 — Clarify scope
 
 Ask the user (bundle in one message):
 
 1. Which top-level directories should be analyzed? (Default: everything under the project root that looks like source.)
-2. If `$ARGUMENTS` was provided, use that as the initial scope hint and ask for confirmation.
-3. Any explicit inclusions beyond source (e.g. `infra/`, `deploy/`)?
+2. Any explicit inclusions beyond source (e.g. `infra/`, `deploy/`)?
 
 **Exclusions — apply automatically, no need to ask:**
 
 - Default set: `.git/`, `venv/`, `.venv/`, `env/`, `node_modules/`, `dist/`, `build/`, `target/`, `_bases/`, `.next/`, `.nuxt/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `coverage/`, `htmlcov/`, `.tox/`, `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*`.
-- Additionally: everything matched by `.gitignore` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
+- Additionally: everything matched by `.gitignore` under `TARGET_DIR` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
 
 Announce the final effective exclusion set before scanning, in one compact list. Give the user one chance to add more.
 
@@ -90,7 +131,7 @@ Behalte die Zwanziger-Schritte (`00`, `01`, …) als Sortier-Hilfe. Große Theme
 
 ## Step 5 — Docs schreiben
 
-Pro bestätigtem Thema eine Datei `<DOCS_DIR>/<NN>-<slug>.md`. Rahmen pro Datei:
+Pro bestätigtem Thema eine Datei `<RESOLVED_DOCS_DIR>/<NN>-<slug>.md`. Rahmen pro Datei:
 
 ```markdown
 # <Titel>
@@ -132,7 +173,7 @@ Nach jeder geschriebenen Datei kurz melden welche Datei geschrieben wurde (Datei
 
 ## Step 6 — `README.md` als Index bauen
 
-`<DOCS_DIR>/README.md` mit vier Blöcken:
+`<RESOLVED_DOCS_DIR>/README.md` mit vier Blöcken:
 
 ```markdown
 # <Projektname> — Dokumentation

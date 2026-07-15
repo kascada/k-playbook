@@ -1,6 +1,7 @@
 ---
 description: Stellt den Zugriff auf Logdateien eines Servers über LogMCP her. Fragt nach dem Server wenn nicht angegeben, prüft Zugriff, lädt verfügbare Logs und merkt sich Server und Freigaben im Projekt.
 argument-hint: [<server-name-oder-hostname>] — z.B. "switchbox-dev" oder "logmcp-switchbox-dev"
+# model: github-copilot/gpt-5.4-mini
 allowed-tools: [Bash, Read, Write, Edit]
 ---
 

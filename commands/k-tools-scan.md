@@ -1,6 +1,7 @@
 ---
 description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under <docs>/libs/, plus an index. Uses paths from K-PLAYBOOK.MD. Focuses on pitfalls and idioms, NOT copy-paste snippets.
 argument-hint: [scope-dir]
+# model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 ---
 
@@ -17,11 +18,20 @@ Produces:
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.MD
 
-Read `./K-PLAYBOOK.MD` if present. Extract `docs:` → `DOCS_DIR`. If missing or `-`: default to `./docs`.
+Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-`LIBS_DIR` = `<DOCS_DIR>/libs`.
+For this command, resolve:
 
-If `<DOCS_DIR>/README.md` does not exist or is unpopulated: warnen und dem User empfehlen, zuerst `/k-code2docs` zu laufen — dann bricht die Lib-Doku in eine leere Index-Struktur ein und wird schlechter auffindbar. Weiter nur nach ausdrücklicher Bestätigung.
+- `docs:` → `DOCS_DIR`
+
+Command-specific policy:
+
+- If `DOCS_DIR` is missing, `-`, or `K-PLAYBOOK.MD` is missing: default to `./docs` and remind the user that `/k-setup` can register it.
+- Use `RESOLVED_DOCS_DIR` for all reads and writes.
+
+`LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.
+
+If `<RESOLVED_DOCS_DIR>/README.md` does not exist or is unpopulated: warnen und dem User empfehlen, zuerst `/k-code2docs` zu laufen — dann bricht die Lib-Doku in eine leere Index-Struktur ein und wird schlechter auffindbar. Weiter nur nach ausdrücklicher Bestätigung.
 
 ## Step 2 — Scope klären
 
@@ -42,7 +52,7 @@ Sammle für **jedes** gefundene Paket / Tool:
 - **Nutzung im Code** — grep nach Import-Statement (Sprache-passend: Python `import <name>|from <name>`, JS `require\(['"]<name>|from ['"]<name>`, Go `"<pfad>"` in `import`, …). Zähle:
   - `file_count` — wie viele Dateien importieren
   - `import_count` — Gesamtvorkommen
-- **Doku-Signale** — README/Doku im Repo, das ausdrücklich das Tool erwähnt (best-effort grep im `<DOCS_DIR>` und `README.md`).
+- **Doku-Signale** — README/Doku im Repo, das ausdrücklich das Tool erwähnt (best-effort grep im `<RESOLVED_DOCS_DIR>` und `README.md`).
 
 **Nicht** ins Detail gehen bei transitiven Paketen und bei Standard-Test/Lint/Format-Tools — die werden gleich als `C` klassifiziert.
 
@@ -234,7 +244,7 @@ click, python-dotenv, colorama, isort, pre-commit, coverage, hypothesis,
 requests.
 ```
 
-## Step 10 — `<DOCS_DIR>/README.md` verlinken
+## Step 10 — `<RESOLVED_DOCS_DIR>/README.md` verlinken
 
 Im Haupt-Index eine Sektion **„Libs & Stack"** anlegen oder aktualisieren:
 
@@ -259,7 +269,7 @@ Kompakte Zusammenfassung:
 - Ausgewählt für Recherche: k Tools.
 - Geschrieben / aktualisiert: `<LIBS_DIR>/` (Liste).
 - `<LIBS_DIR>/README.md` (neu / aktualisiert).
-- `<DOCS_DIR>/README.md` — Sektion „Libs & Stack" (neu / aktualisiert), Stichwort-Index um x Einträge ergänzt.
+- `<RESOLVED_DOCS_DIR>/README.md` — Sektion „Libs & Stack" (neu / aktualisiert), Stichwort-Index um x Einträge ergänzt.
 - Offene Fragen: Zusammenfassung, wenn welche in den Files stehen.
 - Hinweis: Bei größeren Upgrades später erneut `/k-tools-scan` laufen — Re-Run-Verhalten ist in Step 6 dokumentiert.
 

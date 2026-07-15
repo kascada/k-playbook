@@ -1,6 +1,7 @@
 ---
 description: Create or update a project-specific VS Code workspace title and dark color theme in `.vscode/settings.json` based on the project path.
 argument-hint: [project-name]
+# model: github-copilot/gpt-5.4-mini
 allowed-tools: [Read, Write, Bash, Glob]
 ---
 

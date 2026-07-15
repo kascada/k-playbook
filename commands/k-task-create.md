@@ -1,20 +1,33 @@
 ---
-description: Create a new task file from the current conversation. Determines the next number from tasks/, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving.
+description: Create a new task file from the current conversation. Uses the tasks: path from K-PLAYBOOK.MD, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving.
 argument-hint: [short-name]
-allowed-tools: [Read, Write, Glob]
+# model: github-copilot/gpt-5.5
+allowed-tools: [Read, Write, Bash, Glob]
 ---
 
 # k-task-create
 
 Create a new task file based on what was discussed in the current conversation.
 
-## Step 1 — Determine target directory
+## Step 1 — Resolve task directory
 
-Look for a `tasks/` subdirectory relative to the current working directory. If it does not exist, ask the user where to save the task before continuing.
+Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+
+For this command, resolve:
+
+- `tasks:` → `TASKS_DIR`
+
+Command-specific policy:
+
+- If `TASKS_DIR` is set and the directory exists: use it.
+- If `TASKS_DIR` is set but the directory does not exist: ask whether to create it. Create only after confirmation.
+- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask where to save the task for this run. Default suggestion: `./tasks`.
+
+Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH` (e.g. `tasks/`).
 
 ## Step 2 — Determine next number
 
-Scan `.md` files in **both** `tasks/` and `tasks/old/` (completed tasks land there). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
+Scan `.md` files in **both** `RESOLVED_TASKS_DIR/` and `RESOLVED_TASKS_DIR/done/` (completed tasks land there via `/k-run`). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
 
 If neither directory has numbered files, start at `001`.
 
@@ -98,5 +111,5 @@ Wait for confirmation or corrections before saving.
 
 ## Step 8 — Save
 
-Write the confirmed task to `tasks/<filename>` using the Write tool.  
-Confirm: "Task gespeichert: tasks/<filename>"
+Write the confirmed task to `<RESOLVED_TASKS_DIR>/<filename>` using the Write tool.  
+Confirm: "Task gespeichert: <TASKS_DISPLAY_PATH>/<filename>"

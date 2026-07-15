@@ -347,6 +347,7 @@ Review von **Task-/Instruction-Dateien vor der Ausführung** — strukturierter 
 - **Deadlock-Handling:** Bis zu 5 Runden Critic ↔ Editor; wiederholt sich das Argument → Moderator entscheidet und dokumentiert.
 - **Intent als externer Anker:** Inline im Task oder als Datei-Referenz (`[requirements.md](…)`). Der finale Alignment-Check fragt nur: *„erreicht der Task sein Intent, ja/nein?"*
 - **Nachvollziehbarkeit:** Discussion-Log wird an die Task-Datei angehängt (Diskussion, Moderator-Entscheidungen, Alignment-Ergebnis, offene Punkte).
+- **Optionale Lenses (fachliche Perspektiven):** Per Frontmatter `review-lens: [architect, security, …]` im Task aktivierbar. Lenses laufen parallel zum generischen Critic, jede mit einem eigenen Prompt-Template (z. B. `review/lenses/architect.md`). Moderator dedupliziert Findings vor der Editor-Runde. Default (kein Frontmatter) = generischer Critic wie bisher.
 
 ---
 
@@ -363,7 +364,24 @@ Dasselbe Prinzip lässt sich auf weitere Phasen anwenden:
 | „Schreibe die Doku dazu" | „Verstehe **nur** aus der Doku, was der Code tut — was fehlt?" |
 | „Erkläre den Bug-Fix" | „Reproduziere den Bug **aus dem Fix** heraus — passt die Kausalität?" |
 
+Die zweite Achse ist **fachlich** — dieselbe Phase, aber unter einer bestimmten Lens:
+
+| Lens          | Kernfrage                                       | Typischer Task |
+|---------------|-------------------------------------------------|----------------|
+| `architect`   | Passt das zu Systemgrenzen und Kopplung?        | Refactor, Cross-Module |
+| `security`    | Wo sind Auth/Injection/Secret-Leaks?            | I/O, Auth-Flows |
+| `qa`          | Womit widerlege ich das? Welche Edge-Cases?     | Bug-Fix, Features |
+| `ops`         | Wie deploye/rolle ich zurück? Prod-Impact?      | Migration, Infra |
+| `performance` | Skaliert das? N+1? Memory?                      | Data-Heavy |
+| `ux`          | Ist die CLI/API/Fehlermeldung verständlich?     | User-facing |
+
+Lenses sind **kombinierbar** mit Umkehrungen: Ein Refactor-Task kann sowohl `architect` (Fach-Lens)
+als auch die Regressions-Umkehrung durchlaufen.
+
 **Kern:** Der Rollentausch ist im **Task** kodiert, nicht in einer Persona-Beschreibung.
+Fachliche Lenses (Tabelle oben) sind **kein Widerspruch dazu**: Sie sind ebenfalls fest
+formulierte Prompt-Templates, keine „Charaktere" mit Beziehungen. Der Unterschied liegt
+nur im fachlichen Fokus (z. B. Security-Fragen vs. generische Kritik).
 
 ---
 
@@ -384,7 +402,9 @@ Dasselbe Prinzip lässt sich auf weitere Phasen anwenden:
   - Critic ↔ Editor ↔ Moderator, bis zu 5 Runden
   - **Intent-Alignment** als finaler Check (Inline-Text oder Datei-Referenz)
   - Discussion-Log wird in die Task-Datei geschrieben (Audit-Trail)
+  - Optionale **Lenses** aus `review/lenses/<name>.md` (fachliche Prompt-Templates, parallel zum Critic)
 - **Skill `ks-review-flip`** *(geplant)*
+  - deckt die **Phasen-Achse** ab (Implementation, Refactor, Doku, Bug-Fix); die **Lens-Achse** (fachliche Perspektive) ist orthogonal dazu und im Review-Loop verankert — beide kombinierbar
   - überträgt das Muster auf **weitere Phasen** (Implementation, Refactor, Doku, Bug-Fix)
   - liefert Prompt-Templates für die häufigsten Rollen-Umkehrungen
   - Verkettung mehrerer Umkehrungen (Producer → Inverter → Judge)

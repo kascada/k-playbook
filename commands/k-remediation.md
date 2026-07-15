@@ -1,6 +1,7 @@
 ---
 description: Arbeitet Befunde aus einer Review-Ergebnisdatei (typisch aus /k-review im Report-Modus) strukturiert ab. Verifiziert jeden Befund gegen den echten Code, kategorisiert ihn, behebt sichere Fälle direkt und erstellt Tasks für komplexe. Nur saubere Lösungen — keine Quick-and-Dirty-Fixes.
 argument-hint: [result-datei.md]
+# model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
@@ -14,22 +15,26 @@ Die Pfade werden — wie bei `/k-review` — aus `K-PLAYBOOK.MD` gelesen, damit 
 
 ## Schritt 1 — Pfade aus K-PLAYBOOK.MD auflösen
 
-Wie `/k-review` (siehe `commands/k-review.md`, Step 1). Kurz:
+Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-Lies `./K-PLAYBOOK.MD` und extrahiere aus dem `## Pfade`-Block:
+For this command, resolve:
 
-- `reviews:` → `PROJECT_REVIEWS_DIR` (oder `-` / fehlend → unset)
-- `tasks:` → `TASKS_DIR` (oder `-` / fehlend → unset)
+- `reviews:` → `PROJECT_REVIEWS_DIR`. `PROJECT_REVIEWS_DIR` ist der aufgelöste absolute Pfad; `-` / fehlend → unset.
+- `tasks:` → `TASKS_DIR`. `TASKS_DIR` ist der aufgelöste absolute Pfad; `-` / fehlend → unset.
 
 Daraus abgeleitet:
 
-- Wenn `PROJECT_REVIEWS_DIR` gesetzt:
+- Wenn `PROJECT_REVIEWS_DIR` gesetzt und vorhanden:
   - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
   - `DONE_DIR` = `<PROJECT_REVIEWS_DIR>/done/`
 - Wenn `TASKS_DIR` gesetzt: dorthin werden Task-Dateien geschrieben.
 - Wenn `TASKS_DIR` fehlt / inaktiv: User fragen, ob und wohin Task-Dateien geschrieben werden sollen, sobald in Schritt 6 die erste Kategorie **T** ansteht.
 
-Wenn `K-PLAYBOOK.MD` fehlt: Hinweis auf `/k-setup`, dann mit Defaults weiterarbeiten (`./tasks`, `./reviews`), falls der User zustimmt — sonst abbrechen.
+Command-specific policy:
+
+- Wenn `K-PLAYBOOK.MD` fehlt: Hinweis auf `/k-setup`, dann mit Defaults weiterarbeiten (`./tasks`, `./reviews`), falls der User zustimmt — sonst abbrechen.
+- Wenn `PROJECT_REVIEWS_DIR` gesetzt aber nicht vorhanden ist: warnen und für Review-Ergebnisdateien interaktiv nachfragen.
+- Wenn `TASKS_DIR` gesetzt aber nicht vorhanden ist: erst bei der ersten Kategorie **T** fragen, ob es angelegt oder ein anderer Zielordner verwendet werden soll.
 
 ---
 

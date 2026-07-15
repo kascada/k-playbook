@@ -1,5 +1,6 @@
 ---
 description: Install or refresh k-playbook for the current host. Registers OpenCode slash-command symlinks and checks skill-path configuration. Run once per server, and again after adding new command files.
+# model: github-copilot/gpt-5.4-mini
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
 

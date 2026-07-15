@@ -1,7 +1,8 @@
 ---
-description: Review task/instruction files using a Critic/Editor dialogue before execution. Two agents debate issues; the Moderator routes, decides, and appends a discussion log. Final intent alignment check at the end.
-argument-hint: <path>
-allowed-tools: [Read, Write, Edit, Glob, Agent]
+description: Review task/instruction files using a Critic/Editor dialogue before execution. If no path is given, uses the tasks: path from K-PLAYBOOK.MD. Two agents debate issues; the Moderator routes, decides, and appends a discussion log. Final intent alignment check at the end.
+argument-hint: [path]
+# model: github-copilot/gpt-5.5
+allowed-tools: [Read, Write, Edit, Glob, Task]
 ---
 
 # k-review-loop
@@ -10,16 +11,44 @@ Review task/instruction files before execution using a structured two-agent dial
 
 ## Invocation
 
-`/k-review-loop <path>` — path is a file or directory containing `.md` task/instruction files.
+`/k-review-loop` — review open task files from the `tasks:` path in `K-PLAYBOOK.MD`.
+`/k-review-loop <path>` — review an explicit file or directory containing `.md` task/instruction files.
 
 ---
 
 ## Execution
 
-### Step 1 — Collect files
+### Step 1 — Resolve target path
 
-If `<path>` is a directory: collect all `.md` files in it.
-If `<path>` is a file: use that file.
+If `$ARGUMENTS` is provided: treat it as the explicit review target.
+
+- If it is a file: use that file.
+- If it is a directory: use that directory.
+- If it does not exist: abort with a clear error.
+
+If `$ARGUMENTS` is empty: read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+
+For this command, resolve:
+
+- `tasks:` → `TASKS_DIR`
+
+Command-specific policy:
+
+- If `TASKS_DIR` is set and exists: use it as the review target.
+- If `TASKS_DIR` is set but missing: tell the user and ask whether to create it or abort. For review, abort is the default recommendation because there are no tasks to review.
+- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask which file or directory to review for this run.
+
+Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
+
+### Step 2 — Collect files
+
+If `REVIEW_TARGET` is a directory:
+- Collect all `.md` files directly in that directory (not subdirectories).
+- Exclude `done/`, `old/`, and any archived/completed task subdirectories.
+- Sort by leading number if present (`001-...`, `014-...`), otherwise alphabetically after numbered files.
+- If no `.md` files are found: report „Keine offenen Task-Dateien gefunden" and stop.
+
+If `REVIEW_TARGET` is a file: use that file.
 
 Read all collected files. For each file, check for an `## Intent` section.
 The Intent can be specified in two ways — both are valid, also in combination:
@@ -40,9 +69,9 @@ ohne Rückfragen implementieren können.
 
 If file references are present: read those files and use their content as Intent.
 If both inline text and file references are present: combine both.
-If no `## Intent` section exists: skip the alignment check (Step 8).
+If no `## Intent` section exists: skip the alignment check (Step 9).
 
-### Step 2 — Print startup summary
+### Step 3 — Print startup summary
 
 Output to the user before doing anything else:
 
@@ -50,13 +79,14 @@ Output to the user before doing anything else:
 Review gestartet
 ─────────────────────────────
 Tasks:   <list of task filenames>
+Pfad:    <REVIEW_TARGET_DISPLAY>
 Intent:  <list of intent filenames, or "— (kein Intent angegeben)">
 Runden:  max. 5
 ```
 
 ---
 
-### Step 3 — Critic round
+### Step 4 — Critic round
 
 Spawn a `general-purpose` subagent (Critic) with this prompt:
 
@@ -82,7 +112,7 @@ Output format (table, no intro text):
 | ID | Kategorie | Datei | Stelle | Problem | Empfehlung |
 ```
 
-### Step 4 — Moderator: route to Editor
+### Step 5 — Moderator: route to Editor
 
 For each issue from the Critic, decide:
 - **Clear mistake → pass to Editor**
@@ -91,7 +121,7 @@ For each issue from the Critic, decide:
 
 Skip WARNUNGs and FEHLENDs unless they block execution.
 
-### Step 5 — Editor round
+### Step 6 — Editor round
 
 Spawn a `general-purpose` subagent (Editor) with this prompt:
 
@@ -112,13 +142,13 @@ Output:
 | ID | Aktion | Begründung |
 ```
 
-### Step 6 — Moderator: route unresolved items back to Critic
+### Step 7 — Moderator: route unresolved items back to Critic
 
 Collect all issues the Editor did NOT fix. For each, pass the Editor's reasoning to the Critic.
 
-If nothing is unresolved and no new issues exist → skip to Step 8 (Intent check).
+If nothing is unresolved and no new issues exist → skip to Step 9 (Intent check).
 
-### Step 7 — Critic responds (repeat up to 5 rounds total)
+### Step 8 — Critic responds (repeat up to 5 rounds total)
 
 Spawn a new Critic subagent with this prompt:
 
@@ -147,12 +177,12 @@ Output:
 - If Critic accepts Editor's reasoning → issue closed
 - If Critic insists or adds new issues → pass to Editor (Step 5), new round
 - If both sides have argued the same point twice without movement → Moderator decides and notes it as a Moderator-Entscheidung
-- If all issues resolved or max 5 rounds reached → proceed to Step 8
+- If all issues resolved or max 5 rounds reached → proceed to Step 9
 - If continuous improvement is happening → allow up to 5 rounds; stop early as soon as agreement is reached
 
 ---
 
-### Step 8 — Intent alignment check (only if Intent was provided)
+### Step 9 — Intent alignment check (only if Intent was provided)
 
 Spawn a final Critic subagent with this prompt:
 
@@ -177,7 +207,7 @@ If alignment is NO → Moderator decides: one more targeted Editor round or ask 
 
 ---
 
-### Step 9 — Discussion log
+### Step 10 — Discussion log
 
 Append the following block to each modified task file:
 
@@ -185,6 +215,7 @@ Append the following block to each modified task file:
 ---
 ## Review-Log (<date>)
 
+**Pfad:** <REVIEW_TARGET_DISPLAY>
 **Intent:** <filenames or "—">
 **Runden:** <N>
 
@@ -195,7 +226,7 @@ Append the following block to each modified task file:
 <List any points where the Moderator broke a deadlock, with brief reasoning>
 
 ### Intent-Alignment
-<Result of Step 8, or "— (kein Intent angegeben)">
+<Result of Step 9, or "— (kein Intent angegeben)">
 
 ### Geänderte Dateien
 - <filename>: <what changed> (FEHLER-01, FEHLER-03)

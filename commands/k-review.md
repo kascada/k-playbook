@@ -1,6 +1,7 @@
 ---
 description: Execute a review from the review catalog (global playbook or project-local). Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
 argument-hint: [review-name]
+# model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
@@ -12,14 +13,16 @@ This command owns the **generic** review process. Review files describe **only**
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.MD
 
-Read `./K-PLAYBOOK.MD` if it exists. Extract from the `## Pfade` block:
+Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-- `reviews:` → `PROJECT_REVIEWS_DIR` (absolute or repo-relative). If value is `-` or entry is missing, `PROJECT_REVIEWS_DIR` is unset.
+For this command, resolve:
+
+- `reviews:` → `PROJECT_REVIEWS_DIR`. Treat `PROJECT_REVIEWS_DIR` as the resolved absolute path. If value is `-` or entry is missing, `PROJECT_REVIEWS_DIR` is unset.
 
 Also set:
 
 - `GLOBAL_REVIEWS_DIR` = `~/dev/k-playbook/review/` (adjust if the playbook repo lives elsewhere — best-effort detection: the directory of the command file's target after `readlink -f`; fall back to `~/dev/k-playbook/review/`).
-- If `PROJECT_REVIEWS_DIR` set:
+- If `PROJECT_REVIEWS_DIR` is set:
   - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
   - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
   - `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (for reviews that produce output files, e.g. tech-debt)
@@ -28,7 +31,10 @@ Also set:
   - `KNOWN_DECISIONS` = unset — warn but continue.
   - `RESULT_DIR` = current working directory; ask before writing.
 
-If `K-PLAYBOOK.MD` is missing, tell the user and suggest running `/k-setup` first. Continue only if the user confirms — using defaults (`PROJECT_REVIEWS_DIR` = `./review` if the directory exists, else unset).
+Command-specific policy:
+
+- If `K-PLAYBOOK.MD` is missing, tell the user and suggest running `/k-setup` first. Continue only if the user confirms — using defaults (`PROJECT_REVIEWS_DIR` = `./review` if the directory exists, else unset).
+- If `PROJECT_REVIEWS_DIR` is set but missing, warn and ask whether to create/use it, ignore it for this run, or abort.
 
 ## Step 2 — Determine the review to run
 

@@ -1,5 +1,6 @@
 ---
-description: Setup or update the k-playbook config file (K-PLAYBOOK.MD) in the current project. Creates the requested playbook directories (tasks, checks, reviews, guidelines, enforcement, docs) and writes a pointer file at project root that later commands read their paths from.
+description: Setup or update the k-playbook config file (K-PLAYBOOK.MD) in the current project. Creates the requested playbook directories/files (tasks, todo, checks, reviews, guidelines, enforcement, docs) and writes a pointer file at project root that later commands read their paths from.
+# model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
 
@@ -10,7 +11,7 @@ Install or update the k-playbook configuration in the current project.
 **Scope of this command:**
 - Run a short host-local install preflight and offer to apply `/k-install` logic if the current server is missing command symlinks.
 - Detect whether `K-PLAYBOOK.MD` exists at the project root.
-- If not, ask the user where the playbook directories should live.
+- If not, ask the user where the playbook directories/files should live.
 - Offer each known building block for activation.
 - Create the chosen directories.
 - Write `K-PLAYBOOK.MD` as the single pointer file that later commands consult.
@@ -26,14 +27,15 @@ Important framing:
 
 The command knows the following building blocks (in this order):
 
-| Key           | Default path   | Purpose (short)                                     |
-|---------------|----------------|-----------------------------------------------------|
-| `tasks`       | `tasks/`       | Task files handled by `/k-task-create`, `/k-run`    |
-| `checks`      | `checks/`      | Project-specific verification scripts / rules       |
-| `reviews`     | `reviews/`     | Code-review definitions (orchestrated externally)   |
-| `guidelines`  | `guidelines/`  | Project styleguides / conventions                   |
-| `enforcement` | `enforcement/` | Global-plus-local enforcement rules                 |
-| `docs`        | `docs/`        | Curated internal documentation                      |
+| Key           | Type      | Default path   | Purpose (short)                                     |
+|---------------|-----------|----------------|-----------------------------------------------------|
+| `tasks`       | directory | `tasks/`       | Task files handled by `/k-task-create`, `/k-run`    |
+| `todo`        | file      | `TODO.md`      | Project todo list handled by `/k-todo`              |
+| `checks`      | directory | `checks/`      | Project-specific verification scripts / rules       |
+| `reviews`     | directory | `reviews/`     | Code-review definitions (orchestrated externally)   |
+| `guidelines`  | directory | `guidelines/`  | Project styleguides / conventions                   |
+| `enforcement` | directory | `enforcement/` | Global-plus-local enforcement rules                 |
+| `docs`        | directory | `docs/`        | Curated internal documentation                      |
 
 ## Step 0 — Host install preflight
 
@@ -73,7 +75,7 @@ Read the current working directory. Check whether `./K-PLAYBOOK.MD` exists (exac
 
 Ask the user:
 
-> Wo sollen die k-playbook-Verzeichnisse in diesem Projekt liegen?
+> Wo sollen die k-playbook-Verzeichnisse und Dateien in diesem Projekt liegen?
 > 
 > (a) Direkt im Projekt-Root (Default)
 > (b) In einem Unterverzeichnis — Default-Name: `k-playbook/`
@@ -85,7 +87,7 @@ If (c): read the name (must be a valid single-segment directory name), then `bas
 
 ## Step 3 — Fresh setup: pick building blocks
 
-For each known building block, ask whether to activate it. Present them as a compact list first, then confirm the selection. Default suggestion: activate `tasks`. All others: ask — do not enable silently.
+For each known building block, ask whether to activate it. Present them as a compact list first, then confirm the selection. Default suggestion: activate `tasks` and `todo`. All others: ask — do not enable silently.
 
 For each activated block:
 - Show the computed path (`<base>/<default-path>`).
@@ -102,13 +104,15 @@ Parse the existing `K-PLAYBOOK.MD`. Extract the `## Pfade` block (see Step 6 for
 For each known building block, determine:
 - Is it listed in `K-PLAYBOOK.MD`?
 - Is it marked active?
-- If active: does the referenced directory actually exist on disk?
+- If active directory block: does the referenced directory actually exist on disk?
+- If active file block: does the referenced file exist, and does its parent directory exist?
 
 Present a status table to the user, e.g.:
 
 ```
 Baustein      Pfad             Status
 tasks         ./tasks          ok
+todo          ./TODO.md        ok
 checks        —                inaktiv
 reviews       ./review         referenziert, aber Verzeichnis fehlt
 guidelines    ./guidelines     ok
@@ -117,7 +121,7 @@ docs          ./docs           ok
 ```
 
 Then ask the user what to do. Offer at least:
-- Fehlende Verzeichnisse anlegen (für referenzierte, aber nicht existierende Pfade).
+- Fehlende Verzeichnisse anlegen und fehlende initialisierte Dateien erzeugen (für referenzierte, aber nicht existierende Pfade).
 - Bisher nicht aufgeführte Bausteine ergänzen (aktivieren oder inaktiv listen).
 - Pfade umbenennen.
 - Nichts ändern und beenden.
@@ -143,10 +147,11 @@ Wait for confirmation.
 
 After confirmation:
 
-1. For each active block whose directory does not yet exist: `mkdir -p` the path.
-2. **Baustein-spezifische Initialisierung** — für jeden aktiven Baustein, falls definiert (siehe Step 6b).
-3. Write `K-PLAYBOOK.MD` at the project root using the confirmed content.
-4. Print a short summary:
+1. For each active directory block whose directory does not yet exist: `mkdir -p` the path.
+2. For each active file block: `mkdir -p` its parent directory if needed.
+3. **Baustein-spezifische Initialisierung** — für jeden aktiven Baustein, falls definiert (siehe Step 6b).
+4. Write `K-PLAYBOOK.MD` at the project root using the confirmed content.
+5. Print a short summary:
    - Created directories (list).
    - Created initialization files (list — see Step 6b).
    - Written / updated file: `K-PLAYBOOK.MD`.
@@ -178,6 +183,17 @@ Format je Eintrag: ID (KD-NNN), Kurztitel, Bereich (Datei/Modul/Konzept), Begrü
 Grund: Sowohl `/k-review` als auch `/k-remediation` erwarten diese Datei an genau dieser Stelle und legen sie selbst **nicht** an — sie warnen nur, wenn sie fehlt. Die Anlage ist damit ausschließlich Aufgabe von `/k-setup`.
 
 Das Review-Log (`<reviews>/log.md`) wird **nicht** hier angelegt — es entsteht lazy, wenn `/k-review` das erste Mal läuft.
+
+### `todo`
+
+Wenn `todo` aktiv ist und die referenzierte Datei noch nicht existiert: Datei mit folgendem Skelett anlegen.
+
+```markdown
+# TODO
+
+```
+
+Existierende TODO-Dateien werden nie überschrieben.
 
 ### Weitere Bausteine
 
@@ -231,6 +247,7 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 ## Pfade
 
 - tasks:       ./tasks
+- todo:        ./TODO.md
 - checks:      -
 - reviews:     -
 - guidelines:  ./guidelines
@@ -247,7 +264,7 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 
 Rules for the managed block:
 - `## Pfade` lists every known building block in the fixed order given in the "Known building blocks" table above.
-- Active blocks: value is the relative path (e.g. `./tasks` or `./k-playbook/tasks`).
+- Active blocks: value is the relative path (e.g. `./tasks`, `./TODO.md`, or `./k-playbook/TODO.md`).
 - Inactive blocks: value is `-`.
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
 - `## Playbook-Quelle` lists the repo path (as given) and the ISO date of the last setup run.
@@ -256,6 +273,6 @@ Rules for the managed block:
 
 The following are explicitly **not** done by this command:
 
-- Modifying `/k-run`, `/k-task-create`, or any other command so they read paths from `K-PLAYBOOK.MD`. These are separate follow-up tasks per command.
+- Executing tasks, reviews, docs generation, or todo management. `/k-setup` only registers paths and initializes required skeleton files.
 - Creating templates, guideline stubs, or example checks inside the new directories. Directories start empty.
 - Erzeugen von Docs oder MEMORY-Registrierung — dafür ist `/k-code2docs` zuständig. `/k-setup` prüft nur (Step 7) und verweist.

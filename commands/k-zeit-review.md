@@ -1,5 +1,6 @@
 ---
 description: Review new Stundenzettel entries for spelling, style, and duplicate billing. Fetches entries via SSH CLI, reads Aiva project docs for context, asks about issues, and applies corrections directly.
+# model: github-copilot/gpt-5.5
 allowed-tools: [Bash, Read, Glob]
 ---
 

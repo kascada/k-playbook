@@ -11,12 +11,12 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 
 ## Pfade
 
-- tasks:       ./tasks
-- checks:      ./checks
-- reviews:     ./review
-- guidelines:  ./guidelines
-- enforcement: ./enforcement
-- docs:        ./docs
+- tasks:       ./k-playbook/tasks
+- checks:      ./k-playbook/checks
+- reviews:     ./k-playbook/review
+- guidelines:  ./k-playbook/guidelines
+- enforcement: ./k-playbook/enforcement
+- docs:        ./k-playbook/docs
 
 ## Playbook-Quelle
 
