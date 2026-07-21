@@ -597,9 +597,9 @@ Die Installation des k-playbook in einem Projekt läuft über einen einzigen Com
 
 **Was passiert dabei:**
 
-1. **Erkennung des Ziel-Systems** — je nachdem, ob die Session in **Claude Code** oder **OpenCode** läuft, werden die passenden Skills und Commands am richtigen Ort eingerichtet.
-2. **Einrichtung im Projekt** wird angeboten — kein Zwang, aber der Standardpfad.
-3. **Pfade werden vorgestellt** — alle Verzeichnisse, die das Playbook nutzt (`tasks/`, `checks/`, `reviews/`, `guidelines/`, `enforcement/`, …).
+1. **Host-Preflight** — `/k-setup` prüft, ob die globalen Commands/Skills auf dem Server aktuell sind, und bietet bei Bedarf die `/k-install`-Logik an.
+2. **Einrichtung im Projekt** — `K-PLAYBOOK.MD` wird angelegt oder aktualisiert.
+3. **Pfade werden vorgestellt** — der projektlokale Basis-Pfad (`base:`) und alle Verzeichnisse, die das Playbook nutzt (`tasks/`, `checks/`, `reviews/`, `guidelines/`, `enforcement/`, …).
    - Jeder Pfad kann **umbenannt** oder **an einen anderen Ort** verlegt werden.
    - Bei Abweichungen werden die zugehörigen Beschreibungen und Templates **automatisch angepasst**.
 
@@ -614,10 +614,10 @@ Alle Entscheidungen aus `/k-setup` (gewählte Pfade, aktivierte Bausteine, proje
 **`K-PLAYBOOK.MD`** (bewusst großgeschrieben — Signal-Datei)
 
 - **Config-/Pointer-Datei, keine User-Doku.** Enthält keine Erklärungen für Menschen, sondern die Pfade und Aktivierungs-Zustände, aus denen die Commands (`/k-run`, `/k-review`, `/k-task-create`, …) ihre Konfiguration lesen.
-- **Single Source of Truth für Pfade.** Auch wenn ein Pfad dem Default entspricht, steht er drin — spätere Umbenennungen wirken zentral.
+- **Single Source of Truth für Pfade.** Auch wenn ein Pfad dem Default entspricht, steht er drin — inklusive `base:` als Hauptpfad und den einzelnen Baustein-Pfaden. Spätere Umbenennungen wirken zentral.
 - Ein `<!-- k-setup:managed -->`-Block markiert den verwalteten Bereich; alles außerhalb bleibt vom User (Notizen, Team-Hinweise).
 
-**Nachträgliche Anpassung:** `/k-setup` kann jederzeit **erneut** aufgerufen werden — Pfade ändern, neue Bausteine aktivieren, alte deaktivieren. Der managed-Block wird konsistent nachgezogen, User-Anteile bleiben unberührt.
+**Nachträgliche Anpassung:** `/k-setup` kann jederzeit **erneut** aufgerufen werden — Pfade ändern, neue Bausteine aktivieren, alte deaktivieren oder fehlende Metadaten wie `base:` nachtragen. Bei bestehenden Installationen erkennt `/k-setup` außerdem alte Root-Defaultpfade wie `./tasks` und bietet die Korrektur auf den gewählten Hauptpfad an, z. B. `./k-playbook/tasks`. Der managed-Block wird konsistent nachgezogen, User-Anteile bleiben unberührt. Eine separate Update-Funktion ist dafür nicht nötig; `/k-setup` ist der Migrationspfad für bestehende Installationen.
 
 ---
 

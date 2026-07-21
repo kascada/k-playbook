@@ -1,6 +1,6 @@
 ---
-description: Durchsucht alte AI-Verläufe. Claude: volle Chat-JSONL-Suche. OpenCode: Log-/Session-Suche in opencode.log. Unterstützt Provider claude|opencode|all, Suchbegriff und optionalen Zeitraum.
-argument-hint: [claude|opencode|all] <Suchbegriff> [heute | gestern | YYYY-MM-DD | YYYY-MM-DD..YYYY-MM-DD] [-all]
+description: "Durchsucht alte AI-Verläufe. Claude: volle Chat-JSONL-Suche. OpenCode: Log-/Session-Suche in opencode.log. Unterstützt Provider claude|opencode|all, Suchbegriff und optionalen Zeitraum."
+argument-hint: "[claude|opencode|all] <Suchbegriff> [heute | gestern | YYYY-MM-DD | YYYY-MM-DD..YYYY-MM-DD] [-all]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Bash, Read, Glob]
 ---

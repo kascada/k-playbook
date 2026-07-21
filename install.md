@@ -57,7 +57,7 @@ OpenCode scannt beim Start rekursiv nach `**/SKILL.md` in diesem Pfad.
 
 ### 2. Slash-Commands registrieren
 
-Damit die `commands/k-*.md` als Slash-Commands (`/k-akte`,
+Damit die `commands/k-*.md` als Slash-Commands (`/k-setup`,
 `/k-review-loop`, …) in OpenCode verfügbar sind, alle Dateien in das
 OpenCode-Command-Verzeichnis symlinken:
 
@@ -82,7 +82,7 @@ opencode
 ### 4. Verifikation
 
 - Nach Neustart: neue Session → `/` eintippen → Autocomplete sollte
-  `/k-akte`, `/k-review-loop`, … zeigen
+  `/k-setup`, `/k-review-loop`, … zeigen
 - Zum Testen der Skills: eine Nachricht schreiben, deren Thema zu einem
   Playbook passt (z.B. „Ich habe hier ein Overlay-Projekt, das soll
   analysiert werden") → OpenCode sollte den Skill `ks-overlay-repo-analyse`

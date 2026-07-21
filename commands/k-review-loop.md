@@ -1,5 +1,5 @@
 ---
-description: Review task/instruction files using a Critic/Editor dialogue before execution. If no path is given, uses the tasks: path from K-PLAYBOOK.MD. Two agents debate issues; the Moderator routes, decides, and appends a discussion log. Final intent alignment check at the end.
+description: "Review task/instruction files using a Critic/Editor dialogue before execution. If no path is given, uses the tasks: path from K-PLAYBOOK.MD. Two agents debate issues; the Moderator routes, decides, and appends a discussion log. Final intent alignment check at the end."
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Glob, Task]

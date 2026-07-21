@@ -29,6 +29,9 @@ Determine `PLAYBOOK_REPO` best-effort:
 - Extract only the `## Pfade` block.
 - Parse list entries shaped like `- key: value`.
 - Treat a missing key, empty value, or `-` as unset.
+- Parse `base:` as project-local playbook base metadata, not as a requested building block.
+- If `base:` is set and relative, resolve it against `TARGET_DIR` and expose it as `PLAYBOOK_BASE_DIR`, with `PLAYBOOK_BASE_DISPLAY_PATH` as the shortest useful display path.
+- If `base:` is missing, leave `PLAYBOOK_BASE_DIR` unset; do not infer it here. Commands that need it may ask the user to run `/k-setup` or apply command-specific fallback policy.
 
 ## Resolve Requested Keys
 
@@ -66,6 +69,7 @@ At the end of path resolution, the command should have:
 
 - `TARGET_DIR`
 - `K_PLAYBOOK_FOUND`
+- `PLAYBOOK_BASE_DIR` and `PLAYBOOK_BASE_DISPLAY_PATH` if `base:` is set
 - one raw variable per requested key, e.g. `TASKS_DIR`
 - one resolved variable per set key, e.g. `RESOLVED_TASKS_DIR`
 - one display variable per set key, e.g. `TASKS_DISPLAY_PATH`

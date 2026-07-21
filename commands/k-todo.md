@@ -1,5 +1,5 @@
 ---
-description: Add a todo item to the project todo file, or list all todos. Uses the todo: path from K-PLAYBOOK.MD when available. Pass text directly to add; call without arguments to list.
+description: "Add a todo item to the project todo file, or list all todos. Uses the todo: path from K-PLAYBOOK.MD when available. Pass text directly to add; call without arguments to list."
 argument-hint: [todo text]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob]

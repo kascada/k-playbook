@@ -11,7 +11,9 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 
 ## Pfade
 
+- base:        ./k-playbook
 - tasks:       ./k-playbook/tasks
+- todo:        ./k-playbook/TODO.md
 - checks:      ./k-playbook/checks
 - reviews:     ./k-playbook/review
 - guidelines:  ./k-playbook/guidelines
@@ -20,7 +22,7 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 
 ## Playbook-Quelle
 
-- repo: ~/dev/k-playbook
-- setup-run: 2026-07-12
+- repo: /home/kleist/dev/k-playbook
+- setup-run: 2026-07-20
 
 <!-- k-setup:managed:end -->

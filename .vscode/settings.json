@@ -4,5 +4,6 @@
     "titleBar.activeBackground": "#cc5500",
     "titleBar.activeForeground": "#ffffff",
     "statusBar.background": "#cc5500"
-  }
+  },
+  "makefile.configureOnOpen": false
 }

@@ -12,6 +12,7 @@ Install or update the k-playbook configuration in the current project.
 - Run a short host-local install preflight and offer to apply `/k-install` logic if the current server is missing command symlinks.
 - Detect whether `K-PLAYBOOK.MD` exists at the project root.
 - If not, ask the user where the playbook directories/files should live.
+- If present, update the managed block in place and apply small schema migrations such as adding missing metadata.
 - Offer each known building block for activation.
 - Create the chosen directories.
 - Write `K-PLAYBOOK.MD` as the single pointer file that later commands consult.
@@ -21,7 +22,9 @@ Install or update the k-playbook configuration in the current project.
 Important framing:
 - `K-PLAYBOOK.MD` is **not user documentation**. It is a machine-readable pointer/config file. Managed by this command.
 - Existing commands and skills are **not** created or modified here. They stay where they are.
+- `K-PLAYBOOK.MD` stores the chosen project-local base path as `base:` plus the individual block paths, so commands can use the base path directly when useful and do not need to infer it repeatedly.
 - `K-PLAYBOOK.MD` **always** contains the paths, even when they match the defaults, so later tools have one source of truth.
+- `/k-setup` is the only update/migration path for `K-PLAYBOOK.MD`; do not introduce a separate update command for managed-block format changes.
 
 ## Known building blocks
 
@@ -85,6 +88,11 @@ If (a): `base` = `.`
 If (b): `base` = `k-playbook`
 If (c): read the name (must be a valid single-segment directory name), then `base` = that name.
 
+Normalize the value written to `K-PLAYBOOK.MD` as `base:`:
+- `.` -> `.`
+- any relative directory -> `./<directory>`
+- absolute paths are allowed only if the user explicitly requested one.
+
 ## Step 3 — Fresh setup: pick building blocks
 
 For each known building block, ask whether to activate it. Present them as a compact list first, then confirm the selection. Default suggestion: activate `tasks` and `todo`. All others: ask — do not enable silently.
@@ -99,7 +107,19 @@ Continue with Step 5.
 
 ## Step 4 — Update mode: gap analysis
 
-Parse the existing `K-PLAYBOOK.MD`. Extract the `## Pfade` block (see Step 6 for format). Build the current `{ key, path, active }` set.
+Parse the existing `K-PLAYBOOK.MD`. Extract the `## Pfade` block (see Step 6 for format). Read `base:` if present. Build the current `{ key, path, active }` set.
+
+If `base:` is missing in an existing file, infer it best-effort from the active paths only for the draft shown to the user:
+- If all active block paths share the same first directory segment, suggest that as `base:` (for example `./k-playbook`).
+- Otherwise suggest `.`.
+- Show that `base:` will be added before writing.
+
+If `base:` is set to a non-root path such as `./k-playbook`, detect legacy root-level default paths and offer to migrate them into the base path:
+- For each active block whose path exactly matches its default root path (`./tasks`, `./TODO.md`, `./checks`, `./reviews`, `./guidelines`, `./enforcement`, `./docs`), compute the migrated path as `<base>/<default-path>`.
+- Show these as `Pfad passt nicht zu base:` in the status table, with the proposed replacement.
+- Do not rewrite custom paths that are not exact default paths unless the user explicitly chooses "Pfade umbenennen".
+- If the migrated target already exists, prefer updating only `K-PLAYBOOK.MD` to point to it.
+- If only the old root-level path exists, ask before moving files/directories; default recommendation is to update paths only when the target exists, otherwise create missing target directories/files without deleting the old path.
 
 For each known building block, determine:
 - Is it listed in `K-PLAYBOOK.MD`?
@@ -118,9 +138,12 @@ reviews       ./review         referenziert, aber Verzeichnis fehlt
 guidelines    ./guidelines     ok
 enforcement   —                nicht in K-PLAYBOOK.MD
 docs          ./docs           ok
+tasks         ./tasks          Pfad passt nicht zu base: Vorschlag ./k-playbook/tasks
 ```
 
 Then ask the user what to do. Offer at least:
+- Managed-Block aktualisieren / fehlende Metadaten ergänzen (default, includes adding `base:` and applying confirmed base-path migrations).
+- Root-Level-Defaultpfade an `base:` anpassen (for example `./tasks` -> `./k-playbook/tasks`).
 - Fehlende Verzeichnisse anlegen und fehlende initialisierte Dateien erzeugen (für referenzierte, aber nicht existierende Pfade).
 - Bisher nicht aufgeführte Bausteine ergänzen (aktivieren oder inaktiv listen).
 - Pfade umbenennen.
@@ -133,6 +156,7 @@ Do **not** silently overwrite or remove anything the user did not confirm.
 ## Step 5 — Draft K-PLAYBOOK.MD
 
 Compose the file content (see Step 6 for the exact format) with the resulting set of paths and metadata:
+- `base`: the project-local playbook base path chosen in Step 2 or preserved/updated in Step 4.
 - `repo`: absolute path to the k-playbook repository (best-effort; ask the user if unclear).
 - `setup-run`: today's date (`YYYY-MM-DD`).
 - Preserve unmanaged content from an existing file (anything outside the managed sections — see Step 6).
@@ -219,7 +243,17 @@ Wenn alle drei Punkte `ok` sind: das dem User bestätigen (keine Aktion nötig).
 
 `/k-setup` **führt `/k-code2docs` nicht automatisch aus**. Der User startet das gezielt, wenn er will.
 
-## Step 8 — Abschluss-Hinweis zur Host-Installation
+## Step 8 — Optionaler CodeQL-Hinweis
+
+Am Ende immer kurz auf das optionale CodeQL-Setup hinweisen, aber **keine** CodeQL-Konfiguration automatisch erzeugen und **keinen** Folge-Command automatisch ausführen.
+
+Hinweistext:
+
+> "Optional: Wenn dieses Projekt CodeQL für Security-, Qualitäts- oder Enforcement-Checks nutzen soll, führe als nächsten Schritt `/k-setup-codeql` aus. Der Command fragt GitHub-CodeQL vs. lokale CodeQL-Datenbank separat ab und trägt die Entscheidung in `K-PLAYBOOK.MD` ein."
+
+Grund: Slash-Commands werden nicht als verlässliche Subroutines verkettet. `/k-setup` bleibt für Basis-Pfade und Initialisierung zuständig; `/k-setup-codeql` übernimmt später die CodeQL-spezifische Konfiguration für Security, Qualität und Enforcement.
+
+## Step 9 — Abschluss-Hinweis zur Host-Installation
 
 Am Ende immer kurz den Host-Install-Status nennen:
 
@@ -246,6 +280,7 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 
 ## Pfade
 
+- base:        .
 - tasks:       ./tasks
 - todo:        ./TODO.md
 - checks:      -
@@ -263,7 +298,8 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 ```
 
 Rules for the managed block:
-- `## Pfade` lists every known building block in the fixed order given in the "Known building blocks" table above.
+- `## Pfade` first lists `base:`, then every known building block in the fixed order given in the "Known building blocks" table above.
+- `base:` is the chosen project-local playbook base path. It is active metadata, not a building block; it is never `-`.
 - Active blocks: value is the relative path (e.g. `./tasks`, `./TODO.md`, or `./k-playbook/TODO.md`).
 - Inactive blocks: value is `-`.
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
@@ -276,3 +312,4 @@ The following are explicitly **not** done by this command:
 - Executing tasks, reviews, docs generation, or todo management. `/k-setup` only registers paths and initializes required skeleton files.
 - Creating templates, guideline stubs, or example checks inside the new directories. Directories start empty.
 - Erzeugen von Docs oder MEMORY-Registrierung — dafür ist `/k-code2docs` zuständig. `/k-setup` prüft nur (Step 7) und verweist.
+- Erzeugen oder Ändern von CodeQL-Konfiguration — dafür ist `/k-setup-codeql` zuständig. `/k-setup` weist nur darauf hin.

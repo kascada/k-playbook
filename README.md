@@ -17,14 +17,16 @@ Zwei Arten von Inhalten:
 ├── README.md                           diese Datei
 ├── install.md                          Setup für OpenCode und Claude Code
 ├── Makefile                            git-add + commit + push in einem
+├── scripts/                            Host-lokale Hilfsskripte
 ├── commands/                            Slash-Commands
-│   ├── k-akte.md
 │   ├── k-enforcement.md
 │   ├── k-install.md
+│   ├── k-install-codeql.md
 │   ├── k-logmcp.md
 │   ├── k-remediation.md
 │   ├── k-review-loop.md
 │   ├── k-run.md
+│   ├── k-setup-codeql.md
 │   ├── k-task-create.md
 │   ├── k-test-check.md
 │   ├── k-todo.md

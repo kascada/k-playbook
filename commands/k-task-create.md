@@ -1,5 +1,5 @@
 ---
-description: Create a new task file from the current conversation. Uses the tasks: path from K-PLAYBOOK.MD, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving.
+description: "Create a new task file from the current conversation. Uses the tasks: path from K-PLAYBOOK.MD, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
 argument-hint: [short-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Bash, Glob]
