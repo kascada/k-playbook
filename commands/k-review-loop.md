@@ -9,6 +9,8 @@ allowed-tools: [Read, Write, Edit, Glob, Task]
 
 Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. The Moderator routes between them, decides on deadlocks, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
 
+`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.MD`, `base:`, and an active `tasks:` path configured by `/k-setup`.
+
 ## Invocation
 
 `/k-review-loop` — review open task files from the `tasks:` path in `K-PLAYBOOK.MD`.
@@ -32,11 +34,15 @@ For this command, resolve:
 
 - `tasks:` → `TASKS_DIR`
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `tasks:`.
+
 Command-specific policy:
 
-- If `TASKS_DIR` is set and exists: use it as the review target.
-- If `TASKS_DIR` is set but missing: tell the user and ask whether to create it or abort. For review, abort is the default recommendation because there are no tasks to review.
-- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask which file or directory to review for this run.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off review.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`, or pass an explicit file/directory argument for a one-off review.
+- If `tasks:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directories.
+- If `tasks:` is set and exists: use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
 

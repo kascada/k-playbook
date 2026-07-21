@@ -11,6 +11,8 @@ Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die 
 
 Die Pfade werden — wie bei `/k-review` — aus `K-PLAYBOOK.MD` gelesen, damit beide Commands dieselben Verzeichnisse verwenden.
 
+`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, an active existing `reviews:` path, and an active existing `tasks:` path configured by `/k-setup`.
+
 ---
 
 ## Schritt 1 — Pfade aus K-PLAYBOOK.MD auflösen
@@ -22,19 +24,20 @@ For this command, resolve:
 - `reviews:` → `PROJECT_REVIEWS_DIR`. `PROJECT_REVIEWS_DIR` ist der aufgelöste absolute Pfad; `-` / fehlend → unset.
 - `tasks:` → `TASKS_DIR`. `TASKS_DIR` ist der aufgelöste absolute Pfad; `-` / fehlend → unset.
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `reviews:` or `tasks:`.
+
 Daraus abgeleitet:
 
-- Wenn `PROJECT_REVIEWS_DIR` gesetzt und vorhanden:
-  - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
-  - `DONE_DIR` = `<PROJECT_REVIEWS_DIR>/done/`
-- Wenn `TASKS_DIR` gesetzt: dorthin werden Task-Dateien geschrieben.
-- Wenn `TASKS_DIR` fehlt / inaktiv: User fragen, ob und wohin Task-Dateien geschrieben werden sollen, sobald in Schritt 6 die erste Kategorie **T** ansteht.
+- `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
+- `DONE_DIR` = `<PROJECT_REVIEWS_DIR>/done/`
+- `TASKS_DIR` = Zielverzeichnis für neue Task-Dateien.
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.MD` fehlt: Hinweis auf `/k-setup`, dann mit Defaults weiterarbeiten (`./tasks`, `./reviews`), falls der User zustimmt — sonst abbrechen.
-- Wenn `PROJECT_REVIEWS_DIR` gesetzt aber nicht vorhanden ist: warnen und für Review-Ergebnisdateien interaktiv nachfragen.
-- Wenn `TASKS_DIR` gesetzt aber nicht vorhanden ist: erst bei der ersten Kategorie **T** fragen, ob es angelegt oder ein anderer Zielordner verwendet werden soll.
+- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` aufrufen lassen.
+- Wenn `base:` fehlt: abbrechen und `/k-setup` aufrufen lassen. Nicht aus vorhandenen Pfaden inferieren.
+- Wenn `reviews:` fehlt, inaktiv ist oder das Verzeichnis nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
+- Wenn `tasks:` fehlt, inaktiv ist oder das Verzeichnis nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
 
 ---
 
@@ -165,7 +168,7 @@ Nicht erlaubt:
 
 Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-create.md` — die Datei dort ist maßgeblich; hier nur der Minimalkern, damit der Flow nicht bricht:
 
-1. Ziel-Verzeichnis: `TASKS_DIR` (aus Schritt 1). Wenn nicht gesetzt: einmal fragen und für den Rest des Laufs merken.
+1. Ziel-Verzeichnis: `TASKS_DIR` (aus Schritt 1). Wenn nicht gesetzt: abbrechen; `/k-setup` muss den Pfad registrieren.
 2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/old/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
 3. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
 4. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
@@ -246,8 +249,7 @@ Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 
 1. Ziel-Verzeichnis bestimmen:
    - Wenn `DONE_DIR` (`<PROJECT_REVIEWS_DIR>/done/`) gesetzt ist: dort archivieren. Verzeichnis bei Bedarf anlegen.
-   - Wenn nicht gesetzt (kein `PROJECT_REVIEWS_DIR`): fragen:
-     > "Wohin soll die abgeschlossene Datei verschoben werden? (Vorschlag: `done/` neben der Datei)"
+   - Wenn nicht gesetzt (kein `PROJECT_REVIEWS_DIR`): abbrechen; `/k-setup` muss den `reviews:`-Pfad registrieren.
 
 2. Datei verschieben:
    - Neuer Name: `YYYY-MM-DD-<originalname>` (heutiges Datum voranstellen)
@@ -282,5 +284,5 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 ## Fehlerfälle
 
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<PROJECT_REVIEWS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
-- **`K-PLAYBOOK.MD` fehlt**: Hinweis auf `/k-setup`, dann Defaults nutzen (falls User zustimmt) oder abbrechen.
-- **`TASKS_DIR` inaktiv**: einmal fragen, wohin Tasks geschrieben werden sollen; Antwort für den Rest des Laufs merken.
+- **`K-PLAYBOOK.MD` fehlt oder `base:` fehlt**: abbrechen und `/k-setup` aufrufen lassen.
+- **`reviews:` oder `tasks:` inaktiv/fehlend**: abbrechen und `/k-setup` aufrufen lassen.

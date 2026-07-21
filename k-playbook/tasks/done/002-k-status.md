@@ -201,3 +201,11 @@ Yes — Die Task-Spezifikation deckt den Intent ab: schneller read-only Check, `
 - WARNUNG-06: `strict` bleibt auf Ausgabe-/Health-Gate-Markierung beschränkt; keine Exit-Semantik erforderlich.
 - WARNUNG-08: Review-Fälligkeit bleibt best-effort mit Fallback; nicht blockierend.
 - WARNUNG-10: Allgemeine Statusregeln bleiben bestehen, sektionale Ausnahmen sind bereits teilweise spezifiziert.
+
+## Ausführung
+
+**Status:** Erfolgreich ausgeführt  
+**Datum:** 2026-07-21  
+**Zusammenfassung:** Neue Slash-Command-Spezifikation `/k-status` in `commands/k-status.md` angelegt. Der Command beschreibt einen read-only Health-Check für `K-PLAYBOOK.MD`, Pfade, Tasks, TODO, Reviews, Enforcement, CodeQL, Git und Docs inklusive Modi und priorisierten Empfehlungen.
+
+**Intent-Alignment:** Ja - Die Spezifikation deckt den schnellen read-only Standardmodus, K-PLAYBOOK.MD als Quelle, CodeQL nur als Preflight, klare erweiterbare Sektionen und konkrete nächste Commands ab.

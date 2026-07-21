@@ -14,6 +14,7 @@ This command is the CodeQL-specific companion to `/k-setup`:
 - `/k-setup` owns the base playbook paths in `K-PLAYBOOK.MD`.
 - `/k-setup-codeql` owns only the CodeQL decision block in `K-PLAYBOOK.MD`.
 - GitHub CodeQL and local CodeQL databases are independent choices; ask for both separately.
+- If GitHub CodeQL is active or planned, also offer to install the local CodeQL CLI for preflight/status checks. This CLI-only install must not create local databases or run analysis.
 - Do not run scans, create databases, or change GitHub Actions automatically. Generate files only after explicit confirmation.
 
 ## Step 1 — Target bestimmen
@@ -57,6 +58,8 @@ Inspect the target project for CodeQL signals:
   - `<base>/codeql/`
   - `<base>/codeql-db/`
   - `.codeql/`
+- Local CLI-only install:
+  - `<base>/codeql-cli/codeql/codeql`
 - CodeQL CLI availability:
   - `codeql version`
 
@@ -107,8 +110,8 @@ Ask the user in one bundled interaction:
 
 If local database is `true` or `planned`, ask for the database path:
 
-- Default: `<base>/codeql-db/` when `base:` is present.
-- Fallback: `./codeql-db/` when `base:` is missing.
+- Default: `<base>/codeql-db/`.
+- If `base:` is missing, this command must already have stopped and asked the user to run `/k-setup`.
 - Normalize relative paths as `./...`.
 
 If GitHub CodeQL is `true` or `planned`, ask whether a workflow path should be recorded:
@@ -175,6 +178,12 @@ After the user confirms the block, ask one separate question only if file genera
 - If local database is `true` and the database parent directory does not exist:
   - Offer to create only the parent directory.
   - Do not run `codeql database create`.
+- If GitHub CodeQL is `true` or `planned` and `codeql version` is missing:
+  - Offer to install only the local CodeQL CLI with `<PLAYBOOK_REPO>/scripts/install-codeql-local.sh --parent "<base>" --cli-only`.
+  - Default recommendation: install it, because `/k-status` and other preflight checks can verify the configured CodeQL setup locally even when analysis runs in GitHub Actions.
+  - Do not create local databases and do not run CodeQL analysis in this path.
+- If GitHub CodeQL is `true` or `planned` and `codeql version` already works:
+  - Report the detected CLI and do not install another copy.
 
 Minimal workflow skeleton, only when explicitly confirmed:
 
@@ -241,6 +250,14 @@ Update `K-PLAYBOOK.MD`:
 
 Then perform any explicitly confirmed optional file generation from Step 5.
 
+If the user explicitly confirmed CLI-only installation, run:
+
+```bash
+bash "<PLAYBOOK_REPO>/scripts/install-codeql-local.sh" --parent "<PLAYBOOK_BASE_DIR>" --cli-only
+```
+
+This may create `<PLAYBOOK_BASE_DIR>/codeql-cli/` only. It must not create databases, SARIF results, or run analysis.
+
 ## Step 7 — Summary
 
 Print a short summary:
@@ -251,6 +268,7 @@ CodeQL-Setup abgeschlossen
 K-PLAYBOOK.MD:  aktualisiert
 GitHub CodeQL:  true | false | planned
 Workflow:       <path> | - | unverändert | erzeugt
+CLI:            ok (<path>) | installiert (<path>) | fehlt/nicht installiert
 Lokale DB:      true | false | planned
 Datenbankpfad:  <path> | -
 Sprachen:       <languages>

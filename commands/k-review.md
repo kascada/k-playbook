@@ -11,6 +11,8 @@ Run a code review against the current project, using a review recipe either from
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review).
 
+`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `reviews:` block may be inactive; in that case only global review recipes are available and no project-local log or known-decisions file is used.
+
 ## Step 1 — Resolve paths from K-PLAYBOOK.MD
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
@@ -19,22 +21,26 @@ For this command, resolve:
 
 - `reviews:` → `PROJECT_REVIEWS_DIR`. Treat `PROJECT_REVIEWS_DIR` as the resolved absolute path. If value is `-` or entry is missing, `PROJECT_REVIEWS_DIR` is unset.
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `reviews:`.
+
 Also set:
 
-- `GLOBAL_REVIEWS_DIR` = `~/dev/k-playbook/review/` (adjust if the playbook repo lives elsewhere — best-effort detection: the directory of the command file's target after `readlink -f`; fall back to `~/dev/k-playbook/review/`).
+- `GLOBAL_REVIEWS_DIR` = `<PLAYBOOK_REPO>/k-playbook/review/` if that directory exists, otherwise `<PLAYBOOK_REPO>/review/` if that exists. If neither exists, continue with project-local reviews only if configured; otherwise abort because no review catalog is available.
 - If `PROJECT_REVIEWS_DIR` is set:
   - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
   - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
   - `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (for reviews that produce output files, e.g. tech-debt)
 - Else:
-  - `LOG_FILE` = unset — announce that no log will be written and ask if the user wants to designate a location for this run only.
+  - `LOG_FILE` = unset — announce that no log will be written. Do not ask for a one-off log path.
   - `KNOWN_DECISIONS` = unset — warn but continue.
-  - `RESULT_DIR` = current working directory; ask before writing.
+  - `RESULT_DIR` = unset. Report-mode reviews that need to write a result require an active existing `reviews:` directory; otherwise abort with a `/k-setup` hint.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing, tell the user and suggest running `/k-setup` first. Continue only if the user confirms — using defaults (`PROJECT_REVIEWS_DIR` = `./review` if the directory exists, else unset).
-- If `PROJECT_REVIEWS_DIR` is set but missing, warn and ask whether to create/use it, ignore it for this run, or abort.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `reviews:` is unset or inactive (`-`): continue with global reviews only. Do not invent a project-local review path.
+- If `PROJECT_REVIEWS_DIR` is set but missing: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
 
 ## Step 2 — Determine the review to run
 
@@ -128,7 +134,7 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis in `<RESULT_DIR>/result-<name>.md` schreiben.
+2. Ergebnis in `<RESULT_DIR>/result-<name>.md` schreiben. If `RESULT_DIR` is unset, abort and ask the user to activate/create `reviews:` via `/k-setup` first.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
    `/k-remediation <RESULT_DIR>/result-review-tech.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
@@ -148,7 +154,7 @@ Wenn `LOG_FILE` gesetzt ist:
    |---|---|---|---|
    | 2026-07-12 | review-python-comment-hardspots | src/upload.py, src/api.py | 3 Vorschläge / 2 übernommen / 1 skip |
 
-Wenn `LOG_FILE` nicht gesetzt ist: dem User zeigen, was hätte geschrieben werden sollen, und fragen wohin.
+Wenn `LOG_FILE` nicht gesetzt ist: dem User zeigen, was hätte geschrieben werden sollen. Nicht nach einem Ersatzpfad fragen; Projektpfade werden über `/k-setup` registriert.
 
 **Log-Skelett** (nur beim ersten Anlegen):
 
@@ -174,4 +180,4 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **`K-PLAYBOOK.MD` fehlt**: Hinweis auf `/k-setup`, dann Defaults nutzen (falls User zustimmt) oder abbrechen.
+- **`K-PLAYBOOK.MD` fehlt oder `base:` fehlt**: abbrechen und `/k-setup` aufrufen lassen.

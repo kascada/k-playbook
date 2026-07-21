@@ -9,6 +9,8 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 Create a new task file based on what was discussed in the current conversation.
 
+`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `tasks:` path configured by `/k-setup`.
+
 ## Step 1 — Resolve task directory
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
@@ -17,11 +19,15 @@ For this command, resolve:
 
 - `tasks:` → `TASKS_DIR`
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `tasks:`.
+
 Command-specific policy:
 
-- If `TASKS_DIR` is set and the directory exists: use it.
-- If `TASKS_DIR` is set but the directory does not exist: ask whether to create it. Create only after confirmation.
-- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask where to save the task for this run. Default suggestion: `./tasks`.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`.
+- If `tasks:` is set but the directory does not exist: abort and tell the user to run `/k-setup` to create/migrate the configured directories.
+- If `tasks:` is set and the directory exists: use it.
 
 Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH` (e.g. `tasks/`).
 

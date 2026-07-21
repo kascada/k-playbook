@@ -61,12 +61,14 @@ After resolving a requested key:
 
 ## Missing Values
 
-This shared module does not choose defaults. The calling command must state its policy explicitly, for example:
+This shared module does not choose defaults. The calling command must state its policy explicitly.
 
-- `tasks:` missing -> ask the user and suggest `./tasks`.
-- `docs:` missing -> default to `./docs` and remind that `/k-setup` can register it.
-- `reviews:` missing -> continue with global reviews only.
-- `todo:` missing -> default to `./TODO.md` or ask the user, depending on the command.
+General policy for commands that use project-local playbook paths:
+
+- Missing `K-PLAYBOOK.MD` -> abort and ask the user to run `/k-setup`, unless the command operates only on an explicit file/directory argument and does not need registered project paths.
+- Missing `base:` -> abort and ask the user to run `/k-setup`. Do not infer it from existing paths.
+- Missing or inactive building block -> abort if the command requires that block; otherwise treat it as intentionally unavailable and do not invent a default path.
+- Missing configured path on disk -> abort or ask the user to run `/k-setup`; commands should not silently create configured project structure unless their command-specific policy explicitly owns that initialization.
 
 ## Required Output From This Step
 

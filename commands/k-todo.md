@@ -9,13 +9,15 @@ allowed-tools: [Read, Write, Edit, Bash, Glob]
 
 Manage the project todo file.
 
+`/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `todo:` path configured by `/k-setup`.
+
 ## Step 1 — Resolve todo file
 
 Determine `TARGET_DIR`:
 
 - If the current working directory contains `K-PLAYBOOK.MD`, use it as `TARGET_DIR`.
 - Else walk upward from the current working directory until a parent containing `K-PLAYBOOK.MD` is found; use that parent as `TARGET_DIR`.
-- Else use the current working directory as `TARGET_DIR` and record `K_PLAYBOOK_FOUND=false`.
+- Else abort and tell the user to run `/k-setup` first.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -23,11 +25,15 @@ For this command, resolve:
 
 - `todo:` → `TODO_PATH`. Treat `TODO_PATH` as the resolved absolute file path.
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `todo:`.
+
 Command-specific policy:
 
-- If `todo:` is set: use it.
-- If `todo:` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the todo path, then use `<TARGET_DIR>/TODO.md` for this run.
-- If the parent directory of `TODO_PATH` does not exist: ask before creating it.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `todo:` is unset or inactive (`-`): abort and tell the user to activate the `todo` block with `/k-setup`.
+- If the parent directory of `TODO_PATH` does not exist: abort and tell the user to run `/k-setup` to create/migrate the configured file parent.
+- If `todo:` is set and its parent directory exists: use it.
 
 ## Step 2 — Branch on arguments
 

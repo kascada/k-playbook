@@ -4,6 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage: install-codeql-local.sh --project <dir> --parent <dir> --languages <list> [--queries <suite>] [--force]
+       install-codeql-local.sh --parent <dir> --cli-only
 
 Installs the CodeQL CLI locally for the current user if needed, creates CodeQL
 databases below the given parent directory, and runs a SARIF-producing query.
@@ -14,11 +15,15 @@ Arguments:
   --languages <list>   Comma-separated CodeQL languages, e.g. python,javascript-typescript.
   --queries <suite>    Query suite or pack. Default: security-extended.
   --force              Recreate existing language databases.
+  --cli-only           Only install or locate the CodeQL CLI, then print its version.
 
-Artifacts:
+Artifacts in full mode:
   <parent>/codeql-cli/        Downloaded CodeQL CLI, if not already on PATH.
   <parent>/databases/<lang>/  CodeQL database per language.
   <parent>/results/<lang>.sarif
+
+Artifacts in --cli-only mode:
+  <parent>/codeql-cli/        Downloaded CodeQL CLI, if not already on PATH.
 USAGE
 }
 
@@ -27,6 +32,7 @@ PARENT_DIR=""
 LANGUAGES=""
 QUERIES="security-extended"
 FORCE=0
+CLI_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       FORCE=1
       shift
       ;;
+    --cli-only)
+      CLI_ONLY=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -62,17 +72,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$PROJECT_DIR" || -z "$PARENT_DIR" || -z "$LANGUAGES" ]]; then
+if [[ -z "$PARENT_DIR" ]]; then
   usage >&2
   exit 2
 fi
 
-if [[ ! -d "$PROJECT_DIR" ]]; then
+if [[ "$CLI_ONLY" -eq 0 && ( -z "$PROJECT_DIR" || -z "$LANGUAGES" ) ]]; then
+  usage >&2
+  exit 2
+fi
+
+if [[ "$CLI_ONLY" -eq 0 && ! -d "$PROJECT_DIR" ]]; then
   echo "Project directory does not exist: $PROJECT_DIR" >&2
   exit 1
 fi
 
-PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd -P)"
+if [[ "$CLI_ONLY" -eq 0 ]]; then
+  PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd -P)"
+fi
 mkdir -p "$PARENT_DIR"
 PARENT_DIR="$(cd "$PARENT_DIR" && pwd -P)"
 
@@ -151,6 +168,13 @@ CODEQL_BIN="$(ensure_codeql)"
 
 echo "CodeQL CLI: $CODEQL_BIN"
 "$CODEQL_BIN" version
+
+if [[ "$CLI_ONLY" -eq 1 ]]; then
+  echo
+  echo "CodeQL CLI install complete"
+  echo "Parent: $PARENT_DIR"
+  exit 0
+fi
 
 DATABASE_ROOT="$PARENT_DIR/databases"
 RESULTS_ROOT="$PARENT_DIR/results"

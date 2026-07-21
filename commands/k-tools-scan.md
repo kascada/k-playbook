@@ -9,6 +9,8 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 
 Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
 
+`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active existing `docs:` path configured by `/k-setup`.
+
 Produces:
 - `<docs>/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
 - `<docs>/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
@@ -24,9 +26,14 @@ For this command, resolve:
 
 - `docs:` → `DOCS_DIR`
 
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `docs:`.
+
 Command-specific policy:
 
-- If `DOCS_DIR` is missing, `-`, or `K-PLAYBOOK.MD` is missing: default to `./docs` and remind the user that `/k-setup` can register it.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `docs:` is unset or inactive (`-`): abort and tell the user to activate the `docs` block with `/k-setup`.
+- If `docs:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
 - Use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 `LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.

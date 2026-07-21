@@ -9,6 +9,8 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
+`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `docs:` path configured by `/k-setup`.
+
 Produces:
 - `<docs>/<NN>-<slug>.md` — one file per coherent topic.
 - `<docs>/README.md` — TOC + alphabetical keyword index + question→file mapping.
@@ -28,16 +30,16 @@ Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind r
 
 **Preflight-Snapshot anzeigen:**
 
-Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` best-effort lesen, um `docs:` und weitere Pfade kompakt anzeigen zu können. Wenn die Datei fehlt oder nicht parsebar ist, nicht abbrechen — Step 1 regelt die Defaults.
+Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` lesen, um `base:`, `docs:` und weitere Pfade kompakt anzeigen zu können. Wenn die Datei fehlt, `base:` fehlt oder nicht parsebar ist, abbrechen und `/k-setup` aufrufen lassen.
 
 ```text
 /k-code2docs — Preflight
 ─────────────────────────────────────
 Ziel:          <absolute TARGET_DIR>
 Quelle:        Argument | CWD
-K-PLAYBOOK.MD: gefunden (docs: ./docs, tasks: ./tasks, ...) | nicht gefunden
+K-PLAYBOOK.MD: gefunden (base: ./k-playbook, docs: ./k-playbook/docs, ...) | fehlt / base fehlt
 Git-Repo:      ja (branch: <branch>) | nein
-Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | wird auf ./docs default
+Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt / inaktiv
 ```
 
 Wenn `$ARGUMENTS` gesetzt war: keine Rückfrage — das explizite Ziel gilt.
@@ -58,11 +60,20 @@ Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
 For this command, resolve:
 
-- `docs:` → `DOCS_DIR`. If missing or `-`: default to `./docs`. If the default was used, remind the user that `/k-setup` can register it.
+- `docs:` → `DOCS_DIR`.
+
+Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `docs:`.
+
+Command-specific policy:
+
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `docs:` is unset or inactive (`-`): abort and tell the user to activate the `docs` block with `/k-setup`.
+- If `docs:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
-After applying the default if needed, use `RESOLVED_DOCS_DIR` for all reads and writes.
+Use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 ## Step 2 — Clarify scope
 
