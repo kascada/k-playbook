@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 Install or update the k-playbook configuration in the current project.
 
 **Scope of this command:**
-- Run a short host-local install preflight and offer to apply `/k-install` logic if the current server is missing command symlinks.
+- Run a short host-local install preflight and report whether `/k-install` should be run on this server.
 - Detect whether `K-PLAYBOOK.MD` exists at the project root.
 - If not, ask the user where the playbook directories/files should live.
 - If present, update the managed block in place and apply small schema migrations such as adding missing metadata.
@@ -17,7 +17,7 @@ Install or update the k-playbook configuration in the current project.
 - Create the chosen directories.
 - Write `K-PLAYBOOK.MD` as the single pointer file that later commands consult.
 
-**Out of scope:** changing project code, running reviews, or executing tasks. Global OpenCode registration is owned by `/k-install`; `/k-setup` only performs a preflight and may apply the same install logic after asking.
+**Out of scope:** changing project code, running reviews, executing tasks, or changing global OpenCode registration. Global OpenCode registration is owned by `/k-install`; `/k-setup` only performs a preflight and reports the status.
 
 Important framing:
 - `K-PLAYBOOK.MD` is **not user documentation**. It is a machine-readable pointer/config file. Managed by this command.
@@ -58,14 +58,9 @@ Before project setup, check whether k-playbook is installed for the current host
 
 If everything is ok: continue silently or with one short line.
 
-If command symlinks or skill path are missing/outdated: ask once:
-> "Die globale k-playbook-Installation auf diesem Server ist nicht aktuell. Soll ich jetzt die `/k-install`-Logik ausführen (Command-Symlinks aktualisieren, Skill-Pfad prüfen)?"
+If command symlinks or skill path are missing/outdated: do **not** run install logic from here. Continue with project setup and mention at the end that `/k-install` should be run on this server so new commands appear in OpenCode.
 
-If yes: perform the steps from `commands/k-install.md` before continuing with Step 1.
-
-If no: continue with project setup, but mention at the end that `/k-install` should be run on this server so new commands appear in OpenCode.
-
-Do not block project setup just because global installation is incomplete.
+Do not block project setup just because global installation is incomplete. `/k-install` is the only command that changes host-global OpenCode registration.
 
 ## Step 1 — Detect current state
 
@@ -109,10 +104,14 @@ Continue with Step 5.
 
 Parse the existing `K-PLAYBOOK.MD`. Extract the `## Pfade` block (see Step 6 for format). Read `base:` if present. Build the current `{ key, path, active }` set.
 
-If `base:` is missing in an existing file, infer it best-effort from the active paths only for the draft shown to the user:
-- If all active block paths share the same first directory segment, suggest that as `base:` (for example `./k-playbook`).
-- Otherwise suggest `.`.
-- Show that `base:` will be added before writing.
+If `base:` is missing in an existing file, do **not** infer it silently. Ask the user which base should be written. Offer these options:
+
+1. Projektverzeichnis (`.`)
+2. Projektverzeichnis/k-playbook (`./k-playbook`) — recommend this when active paths already start with `./k-playbook/`
+3. Aktuelles Verzeichnis — only show this when the current working directory differs from the project root and is inside the project
+4. Anderes Verzeichnis — user enters a relative or explicitly absolute path
+
+Normalize the selected value as in Step 2 and show that `base:` will be added before writing.
 
 If `base:` is set to a non-root path such as `./k-playbook`, detect legacy root-level default paths and offer to migrate them into the base path:
 - For each active block whose path exactly matches its default root path (`./tasks`, `./TODO.md`, `./checks`, `./reviews`, `./guidelines`, `./enforcement`, `./docs`), compute the migrated path as `<base>/<default-path>`.
@@ -257,9 +256,9 @@ Grund: Slash-Commands werden nicht als verlässliche Subroutines verkettet. `/k-
 
 Am Ende immer kurz den Host-Install-Status nennen:
 
-- Wenn Step 0 ok war oder `/k-install`-Logik erfolgreich ausgeführt wurde:
+- Wenn Step 0 ok war:
   > "Host-Installation: ok. Neue oder aktualisierte Commands sind verlinkt. OpenCode ggf. neu starten."
-- Wenn Step 0 nicht ausgeführt oder abgelehnt wurde:
+- Wenn Step 0 nicht ok war oder nicht ausgeführt wurde:
   > "Hinweis: Wenn neue `/k-*`-Commands nicht im Autocomplete auftauchen, auf diesem Server einmal `/k-install` ausführen und OpenCode neu starten."
 
 ## K-PLAYBOOK.MD format

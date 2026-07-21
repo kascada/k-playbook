@@ -20,6 +20,11 @@ Determine `PLAYBOOK_REPO` best-effort:
 - If the command has already defined `TARGET_DIR`, use it.
 - Else if the command received an explicit project/root directory argument, resolve it with `realpath` and validate that it exists.
 - Else use the current working directory as `TARGET_DIR`.
+- Before finalizing `TARGET_DIR`, guard against accidentally targeting the project-local playbook base directory:
+  - If `<TARGET_DIR>/K-PLAYBOOK.MD` is missing, but `<TARGET_DIR>/../K-PLAYBOOK.MD` exists, read the parent file's `base:` value.
+  - If the parent file has no `base:`, do not infer it. Stop or warn according to the calling command's policy and ask the user to run `/k-setup` for the parent project first.
+  - If the resolved parent `base:` path equals the current `TARGET_DIR`, treat the parent directory as the project root and set `TARGET_DIR = realpath(<TARGET_DIR>/..)`. Example: when CWD is `<project>/k-playbook` and parent `K-PLAYBOOK.MD` says `base: ./k-playbook`, the target is `<project>`, not `<project>/k-playbook`.
+  - Announce this correction in the command preflight so the user can see which project root is used.
 - Resolve all repo-relative playbook paths against `TARGET_DIR`.
 
 ## Read `K-PLAYBOOK.MD`
@@ -31,7 +36,7 @@ Determine `PLAYBOOK_REPO` best-effort:
 - Treat a missing key, empty value, or `-` as unset.
 - Parse `base:` as project-local playbook base metadata, not as a requested building block.
 - If `base:` is set and relative, resolve it against `TARGET_DIR` and expose it as `PLAYBOOK_BASE_DIR`, with `PLAYBOOK_BASE_DISPLAY_PATH` as the shortest useful display path.
-- If `base:` is missing, leave `PLAYBOOK_BASE_DIR` unset; do not infer it here. Commands that need it may ask the user to run `/k-setup` or apply command-specific fallback policy.
+- If `base:` is missing, leave `PLAYBOOK_BASE_DIR` unset; do not infer it here. Commands that need the playbook base must stop and ask the user to run `/k-setup`. `/k-setup` is the only command that may ask for and write a missing `base:` migration.
 
 ## Resolve Requested Keys
 

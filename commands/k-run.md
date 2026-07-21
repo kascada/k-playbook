@@ -9,6 +9,8 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 Execute task files. If `$ARGUMENTS` is empty, use the `tasks:` path from `K-PLAYBOOK.MD`.
 
+`/k-run` does not guess project paths. A project without `K-PLAYBOOK.MD`, without `base:`, or without an active `tasks:` path must be migrated with `/k-setup` first.
+
 ## Step 1 - Resolve target path and collect tasks
 
 If `$ARGUMENTS` is provided: treat it as the explicit execution target.
@@ -23,11 +25,15 @@ For this command, resolve:
 
 - `tasks:` -> `TASKS_DIR`
 
+Also require `base:` from `K-PLAYBOOK.MD`; use `PLAYBOOK_BASE_DIR` only as validation metadata, not to infer `tasks:`.
+
 Command-specific policy:
 
-- If `TASKS_DIR` is set and exists: use it as the execution target.
-- If `TASKS_DIR` is set but missing: tell the user and ask whether to create it or abort. For execution, abort is the default recommendation because there are no tasks to run.
-- If `TASKS_DIR` is unset or `K-PLAYBOOK.MD` is missing: tell the user that `/k-setup` can register the task path, then ask which file or directory to execute for this run.
+- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off run.
+- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+- If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`, or pass an explicit file/directory argument for a one-off run.
+- If `tasks:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directories. Do not create it from `/k-run`; there are no tasks to execute.
+- If `tasks:` is set and exists: use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
 

@@ -21,6 +21,7 @@ Determine `TARGET_DIR`:
 
 - If `$ARGUMENTS` is set: treat it as the target directory, resolve with `realpath`, and abort if it does not exist.
 - If `$ARGUMENTS` is empty: `TARGET_DIR = realpath(CWD)`.
+- Before using that value, apply the project-local base guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory has no `K-PLAYBOOK.MD`, but its parent does and the parent file's `base:` resolves to the selected directory, correct `TARGET_DIR` to the parent project root and show that correction in preflight. If the parent file has no `base:`, do not infer it; stop and ask the user to run `/k-setup` for the parent project first.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -44,6 +45,7 @@ Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing, continue but warn that `/k-setup` and `/k-setup-codeql` can register the chosen paths afterwards.
 - If `base:` exists, offer it as the default parent directory for local CodeQL artifacts.
+- If `K-PLAYBOOK.MD` exists but `base:` is missing, stop and ask the user to run `/k-setup` first. Do not infer legacy base paths here.
 - If the CodeQL block has `database: <path>`, offer the parent of that path as the default parent directory.
 - If neither exists, default parent is `./codeql-local`.
 

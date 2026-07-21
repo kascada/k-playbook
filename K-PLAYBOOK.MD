@@ -26,3 +26,18 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 - setup-run: 2026-07-20
 
 <!-- k-setup:managed:end -->
+
+<!-- k-setup-codeql:managed:begin -->
+
+## CodeQL
+
+- enabled:        false
+- github:        false
+- workflow:      -
+- local-database: false
+- database:      -
+- languages:     -
+- queries:       security-extended
+- setup-run:     2026-07-20
+
+<!-- k-setup-codeql:managed:end -->
