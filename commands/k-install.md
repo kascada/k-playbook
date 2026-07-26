@@ -1,5 +1,5 @@
 ---
-description: Install or refresh k-playbook for the current host. Registers OpenCode slash-command symlinks and checks skill-path configuration. Run once per server, and again after adding new command files.
+description: Install or refresh k-playbook for the current host. Registers OpenCode slash-command symlinks, checks skill-path configuration, and runs a host-local security-tool preflight. Run once per server, and again after adding new command files.
 # model: github-copilot/gpt-5.4-mini
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
@@ -13,6 +13,7 @@ Dieser Command ist **host-lokal**: Er richtet OpenCode so ein, dass die globalen
 Typische Nutzung:
 - Einmal pro Server nach dem Klonen von `k-playbook`.
 - Erneut nach dem Hinzufügen neuer Dateien unter `commands/k-*.md`, damit neue Symlinks angelegt werden.
+- Nach dem Einrichten eines Hosts, um den Status der global genutzten Security-Review-Tools zu sehen.
 
 Hinweis zum Bootstrap:
 Wenn `/k-install` auf einem frischen Server noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `install.md` ausführen oder zumindest diesen Command direkt symlinken:
@@ -126,7 +127,34 @@ Nicht automatisch ausführen, außer der User fragt ausdrücklich danach. Dieser
 
 ---
 
-## Schritt 6 — Verifikation
+## Schritt 6 — Security-Tool-Preflight
+
+Am Ende host-lokal pruefen, ob die Security-Review-Tools vorhanden sind. Dieser Schritt installiert nichts automatisch und schreibt keine Projektdateien.
+
+Wenn `<PLAYBOOK_REPO>/scripts/install-security-tools.sh` existiert:
+
+```bash
+bash "<PLAYBOOK_REPO>/scripts/install-security-tools.sh" --preflight
+```
+
+Pruefe und berichte kompakt:
+
+- Pflicht-Tools: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`.
+- Docker-Verfuegbarkeit fuer Fallbacks.
+
+Wenn Pflicht-Tools fehlen, **nicht** aus `/k-install` heraus installieren. Stattdessen den Folge-Command nennen:
+
+```text
+/k-install-security-tools --install missing
+```
+
+Wenn der User waehrend `/k-install` ausdruecklich installieren will, `/k-install-security-tools` separat aufrufen lassen oder nach expliziter Bestaetigung dessen Script-Befehl ausfuehren. Keine stille Installation.
+
+Wenn das Script fehlt, nur warnen und mit der OpenCode-Verifikation fortfahren; die Command-/Skill-Registrierung darf dadurch nicht fehlschlagen.
+
+---
+
+## Schritt 7 — Verifikation
 
 Nach der Installation prüfen:
 
@@ -134,6 +162,7 @@ Nach der Installation prüfen:
 - Für jede Datei `<PLAYBOOK_REPO>/commands/k-*.md` existiert ein Symlink in `OPENCODE_COMMAND_DIR`.
 - Die Symlinks zeigen auf existierende Dateien.
 - `skills.paths` enthält `PLAYBOOK_REPO` oder es wurde erklärt, warum nicht automatisch geändert wurde.
+- Security-Tool-Preflight wurde ausgefuehrt oder als nicht verfuegbar gemeldet.
 
 Ausgabe:
 
@@ -143,6 +172,7 @@ k-install abgeschlossen
 Repo:        <PLAYBOOK_REPO>
 Commands:    <n> Symlinks ok / <m> neu oder aktualisiert
 Skills:      ok | fehlt | manuell nötig
+SecTools:    ok | <n> Pflicht-Tools fehlen | Preflight fehlt
 Verwaist:    <n> alte Links
 
 Wichtig: OpenCode neu starten, damit neue Commands und Skills sichtbar werden.

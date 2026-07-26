@@ -15,7 +15,7 @@ Beide verwenden dieselben Regelquellen und dieselbe Pfadauflösung.
 
 Global gelten alle Markdown-Dateien unter:
 
-`<PLAYBOOK_REPO>/k-playbook/enforcement/*.md`
+`<PLAYBOOK_REPO>/global/rules/*.md`
 
 `PLAYBOOK_REPO` wird best-effort bestimmt:
 

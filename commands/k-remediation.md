@@ -1,5 +1,5 @@
 ---
-description: Arbeitet Befunde aus einer Review-Ergebnisdatei (typisch aus /k-review im Report-Modus) strukturiert ab. Verifiziert jeden Befund gegen den echten Code, kategorisiert ihn, behebt sichere Fälle direkt und erstellt Tasks für komplexe. Nur saubere Lösungen — keine Quick-and-Dirty-Fixes.
+description: Arbeitet Befunde aus einer Review-Ergebnisdatei strukturiert ab. Plant zuerst sinnvolle Remediation-Buendel nach Risiko, Aufwand und Kopplung, beachtet die projektlokale Remediation-Policy aus K-PLAYBOOK.MD und erzeugt je nach Modus Tasks statt direkte Fixes.
 argument-hint: [result-datei.md]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -7,9 +7,26 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-remediation
 
-Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus (z. B. `review-tech`) erzeugt hat.
+Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus erzeugt hat. Vor der Umsetzung wird immer ein Remediation-Plan gebildet: welche Findings zusammen gehoeren, was zuerst kommt, was Quick-Win ist und was einen eigenen Task/Branch/PR braucht.
+
+Unterstützt zwei Formate:
+
+- Legacy-Ergebnisdateien wie `<reviews>/result-*.md` mit Statuszeichen-Tabellen.
+- Result-Familien wie `<reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. CodeQL oder k-check.
 
 Die Pfade werden — wie bei `/k-review` — aus `K-PLAYBOOK.MD` gelesen, damit beide Commands dieselben Verzeichnisse verwenden.
+
+Zusaetzlich liest `/k-remediation` den optionalen Remediation-Managed-Block in `K-PLAYBOOK.MD`:
+
+- `mode:` - `task-branch-pr`, `task-first` oder `direct-allowed`.
+- `target:` - tatsaechlicher Code-/Git-Root, z. B. `./omni-gw` bei Wrapper-Repos.
+- `grouping:` - ob Findings vor der Umsetzung zu sinnvollen Buendeln zusammengefasst werden.
+- `quick-wins:` - ob einfache, wirkungsstarke Buendel hervorgehoben werden.
+- `branch-prefix:` - empfohlener Branch-Prefix fuer Remediation-Branches.
+- `pr-required:` - ob ein PR Teil des erwarteten Workflows ist.
+- `direct-fixes:` - ob direkte Code-Fixes ohne Task erlaubt sind.
+
+Wenn der Block fehlt, gilt legacy-kompatibel `mode: direct-allowed`, `target: .`, `grouping: true`, `quick-wins: true`.
 
 `/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, an active existing `reviews:` path, and an active existing `tasks:` path configured by `/k-setup`.
 
@@ -31,6 +48,8 @@ Daraus abgeleitet:
 - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
 - `DONE_DIR` = `<PROJECT_REVIEWS_DIR>/done/`
 - `TASKS_DIR` = Zielverzeichnis für neue Task-Dateien.
+- `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`, `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`, `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus dem optionalen Remediation-Block.
+- `REMEDIATION_BASE_BRANCH` = aktueller Branch im Target-Repo, falls `target:` ein Git-Repo ist; sonst unset. Bestimme ihn mit `git branch --show-current` im Target-Root. Wenn leer: nutze keinen geratenen Wert, sondern schreibe `Base branch: <manual>` in erzeugte Tasks.
 
 Command-specific policy:
 
@@ -38,6 +57,9 @@ Command-specific policy:
 - Wenn `base:` fehlt: abbrechen und `/k-setup` aufrufen lassen. Nicht aus vorhandenen Pfaden inferieren.
 - Wenn `reviews:` fehlt, inaktiv ist oder das Verzeichnis nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
 - Wenn `tasks:` fehlt, inaktiv ist oder das Verzeichnis nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
+- Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct-fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
+- Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `TARGET_DIR`.
+- Wenn `mode: task-branch-pr` gilt und `target:` ein Git-Repo ist, pruefe vor Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine Branch-/Task-Policy raten: User informieren und bestaetigen lassen, ob Tasks trotzdem erzeugt werden sollen. `/k-remediation` wechselt selbst keinen Branch fuer spaetere Umsetzung; es schreibt den erforderlichen Ausfuehrungskontext in die Task-Dateien.
 
 ---
 
@@ -45,17 +67,38 @@ Command-specific policy:
 
 Wenn `$ARGUMENTS` angegeben: diese Datei einlesen.
 
+Akzeptierte direkte Argumente:
+
+- `<PROJECT_REVIEWS_DIR>/result-*.md`
+- `<PROJECT_REVIEWS_DIR>/results/<family>/<date>/assessment.md`
+- Projektrelative Varianten davon, z. B. `k-playbook/reviews/results/k-check/2026-07-23/assessment.md`
+
 Wenn nicht:
 
-1. In `<PROJECT_REVIEWS_DIR>` nach `result-*.md` suchen (nicht im `done/`-Unterordner).
+1. In `<PROJECT_REVIEWS_DIR>` nach `result-*.md` suchen (nicht im `done/`-Unterordner) und nach `<PROJECT_REVIEWS_DIR>/results/*/*/assessment.md`.
 2. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
 3. Wenn mehrere: als Liste zeigen und den User wählen lassen.
 4. Wenn keine: fragen:
-   > "Welche Ergebnisdatei soll abgearbeitet werden?"
+    > "Welche Ergebnisdatei soll abgearbeitet werden?"
 
-**Format-Check:** Die Datei sollte eine Befundtabelle mit Statuszeichen (`☐` für offen, sonst `✓`, `~`, `✗`) enthalten, üblicherweise mit Priorität. Wenn das Format nicht plausibel erkennbar ist: sauber abbrechen mit Hinweis, was erwartet wurde, statt zu raten.
+**Result-Family-Erkennung:** Wenn die Datei `assessment.md` heisst und der Pfad auf `reviews/results/<family>/<date>/assessment.md` endet:
 
-Offene Punkte sind mit `☐` markiert (oder haben keine Statusspalte). Alle anderen (✓, ~, ✗) überspringen.
+- Setze `RESULT_FORMAT=result-family`.
+- Setze `RESULT_FAMILY=<family>` und `RESULT_DATE=<date>`.
+- Erwarte `findings.md` im selben Verzeichnis.
+- Lies `findings.md` als primaeres Arbeitsregister.
+- `assessment.md` bleibt Quelle/Kurzbewertung und darf nur nachvollziehbar fuer Summary, Handoff-Status oder explizite Remediation-Abschnitte aktualisiert werden.
+- `raw/` und `run-metadata.*` im selben Verzeichnis sind auditierbar und duerfen nicht veraendert werden.
+
+**Legacy-Format-Erkennung:** Sonst `RESULT_FORMAT=legacy` und die Ergebnisdatei selbst als Arbeitsregister verwenden.
+
+**Format-Check Legacy:** Die Datei sollte eine Befundtabelle mit Statuszeichen (`☐` für offen, sonst `✓`, `~`, `✗`) enthalten, üblicherweise mit Priorität. Wenn das Format nicht plausibel erkennbar ist: sauber abbrechen mit Hinweis, was erwartet wurde, statt zu raten.
+
+**Format-Check Result-Family:** `findings.md` muss Markdown-Headings fuer einzelne Findings enthalten und darunter mindestens ein Statusfeld in der Form `- Status: `<wert>``. Wenn `findings.md` fehlt oder kein Statusfeld erkennbar ist: sauber abbrechen. Nicht aus `assessment.md` neue Finding-IDs erraten.
+
+Offene Punkte im Legacy-Format sind mit `☐` markiert (oder haben keine Statusspalte). Alle anderen (✓, ~, ✗) überspringen.
+
+Offene Punkte im Result-Family-Format sind Findings mit Status `open`, `confirmed` oder `context-needed`. `likely-false-positive` ist review-relevant, aber nur nach expliziter User-Auswahl remediation-relevant. `accepted` und `fixed` sind Endzustaende und duerfen nicht automatisch in neue Fix-Tasks ueberfuehrt werden.
 
 ---
 
@@ -73,9 +116,70 @@ Wenn die Datei nicht existiert:
 
 ---
 
-## Schritt 4 — Kategorien und Autonomie klären
+## Schritt 4 — Arbeitsmodus, Buendelung und Autonomie klaeren
 
-**Kategorien:**
+Zeige zuerst die geladene Remediation-Policy:
+
+```text
+Remediation-Policy
+──────────────────
+Modus:        task-branch-pr | task-first | direct-allowed
+Target:       <REMEDIATION_TARGET_DISPLAY>
+Base branch:  <REMEDIATION_BASE_BRANCH or "<manual>">
+Grouping:     true | false
+Quick-Wins:   true | false
+Branch:       <branch-prefix><task-or-bundle>
+PR required:  true | false
+Direct fixes: true | false
+```
+
+Modus-Semantik:
+
+- `task-branch-pr`: Keine direkten Code-Fixes aus `/k-remediation`. Findings werden zu Remediation-Buendeln gruppiert; jedes akzeptierte Buendel erzeugt eine Task-Datei mit Branch-/PR-Hinweis. Umsetzung erfolgt spaeter ueber `/k-run` oder einen dedizierten Dev-Flow auf Branch + PR.
+- `task-first`: Standard ist Task-Erzeugung pro Buendel; direkte Fixes nur nach expliziter User-Freigabe fuer einzelne kleine Buendel.
+- `direct-allowed`: Legacy-Modus. Kleine sichere `S`-Findings duerfen nach Code-Sichtung direkt behoben werden, wenn der User die Kategorien freigibt.
+
+Wenn `mode` fehlt oder unbekannt ist: stoppe und bitte um `/k-setup`-Migration oder explizite Auswahl fuer diese Session.
+
+### Buendelung vor Einzelarbeit
+
+Vor dem Abarbeiten einzelner Befunde muss `/k-remediation` eine Planungsuebersicht erzeugen:
+
+1. Alle remediation-relevanten Findings laden.
+2. Findings nach Kopplung gruppieren:
+   - gleicher Package-/Dependency-Upgrade-Pfad, z. B. `Django >= 5.2.15`.
+   - gleicher Codebereich oder gleiche Datei/Komponente.
+   - gleiche Root Cause / gleiche Konfiguration.
+   - gleiche Verifikationsroute, z. B. ein Test-/Build-Lauf deckt mehrere Findings ab.
+3. Pro Buendel einschaetzen:
+   - Risiko: `P1/P2/P3`, critical/high/medium/low, Runtime vs. Dev/Build.
+   - Aufwand: `S` klein, `M` mittel, `L` gross/unsicher.
+   - Kopplung: welche Findings sollten gemeinsam geloest werden.
+   - Quick-Win: hohe Wirkung bei kleinem Aufwand und klarer Verifikation.
+4. Reihenfolge vorschlagen:
+   - Zuerst P1 + kleiner/mittlerer Aufwand.
+   - Dann P1 gross oder P2 mit klarer Verifikation.
+   - Dann Dev-/Build-only und P3.
+5. Dem User die Buendel-Liste zeigen und bestaetigen lassen, bevor Tasks erzeugt oder Fixes gemacht werden.
+
+Beispiel-Ausgabe:
+
+```text
+Remediation-Plan
+────────────────
+1. P1/S Quick-Win: python-jose >= 3.4.0 (depbot-7, depbot-8)
+2. P1/M: Django Patch-Level (24 Findings)
+3. P1/M: Pillow Patch-Level (17 Findings)
+4. P2/S: azure-core >= 1.38.0
+
+Vorschlag: Fuer die ersten 3 Buendel Tasks erzeugen.
+```
+
+Im Modus `task-branch-pr` sind diese Buendel die Einheit fuer Task/Branch/PR, nicht zwingend einzelne Findings.
+
+### Kategorien
+
+Kategorien gelten nach der Buendelplanung fuer einzelne Findings oder ganze Buendel:
 
 | Kürzel | Name | Bedeutung |
 |--------|------|-----------|
@@ -94,25 +198,62 @@ Frage den User:
 >
 > Oder soll ich jeden Punkt erst vorstellen und du entscheidest?"
 
+Wenn `mode: task-branch-pr` gilt, ersetze die Frage durch:
+
+> "Dieses Projekt nutzt `task-branch-pr`. Ich werde keine direkten Fixes machen. Soll ich fuer die bestaetigten Buendel Task-Dateien mit Branch-/PR-Hinweis erzeugen?"
+
 Warte auf Antwort. Merke welche Kategorien autonom behandelt werden dürfen (`AUTO_CATEGORIES`).
 
 ---
 
-## Schritt 5 — Befunde einlesen und sortieren
+## Schritt 5 — Befunde einlesen, gruppieren und sortieren
 
-Alle offenen Befunde aus der Datei sammeln. Falls die Datei eine Prioritätsspalte enthält: nach Priorität absteigend sortieren (höchste zuerst).
+Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Legacy ist die Arbeitsdatei die Ergebnisdatei. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
+
+Result-Family-Parsing:
+
+- Finding-ID ist die Markdown-Heading-ID, z. B. `### kcheck-logging-003` oder `### py/full-ssrf-001`.
+- Die ID muss aus `findings.md` stammen; Task-Erzeugung darf keine neue ID fuer ein bestehendes Finding erzeugen.
+- Erfasse `Status`, `Prioritaet`, `Quelle`, `Ort`, `Message`, `Raw-Quelle`, `Review-Bewertung`, `Triage-Notiz`, sofern vorhanden.
+- Status-Lifecycle: `open` -> `confirmed` oder `context-needed`; `likely-false-positive`, `accepted` und `fixed` sind dokumentierte End-/Seitenausgaenge. Neue Findings starten als `open`.
+- Remediation-relevant: `open`, `confirmed`, `context-needed`; `likely-false-positive` nur nach expliziter Auswahl; `accepted` und `fixed` nie automatisch.
+
+Falls die Datei eine Prioritätsspalte oder ein `Prioritaet`-Feld enthält: nach Priorität absteigend sortieren (höchste zuerst). Danach die Buendel-Planung aus Schritt 4 anwenden; die Bearbeitungsreihenfolge ist die bestaetigte Buendel-Reihenfolge, nicht die rein sequentielle Finding-Reihenfolge.
 
 Übersicht ausgeben:
 ```
 Befunde geladen: <N> offen
+Buendel: <M> geplant
 Autonom: <liste der freigegebenen Kategorien>
 ```
 
 ---
 
-## Schritt 6 — Jeden Befund abarbeiten
+## Schritt 6 — Buendel oder Befunde abarbeiten
 
-Für jeden offenen Befund der Reihe nach:
+Wenn `grouping: true`, arbeite die bestaetigten Buendel ab. Innerhalb eines Buendels duerfen mehrere Finding-IDs in einer Task zusammengefasst werden, wenn sie denselben Fix-/Verifikationspfad haben. Wenn `grouping: false`, arbeite einzelne Findings wie im Legacy-Flow ab.
+
+Bei `mode: task-branch-pr`:
+
+1. Keine Produktcode-Dateien aendern.
+2. Pro bestaetigtem Buendel eine Task-Datei erzeugen.
+3. Task muss enthalten:
+   - alle Finding-IDs im Buendel.
+   - Result-Pfad und `findings.md`.
+    - Ziel-Root (`target:`), z. B. `./omni-gw`.
+    - vorgeschlagener Branch: `<branch-prefix><NNN>-<slug>`.
+    - Hinweis: PR erforderlich.
+    - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
+    - Abschnitt `## Branch-Preflight` vor `## Zu bauen` mit klarer Pflicht: zuerst im Target-Repo den Dirty-State pruefen, dann vom Base-Branch den Work-Branch erstellen oder auf bestehenden Work-Branch wechseln, und erst danach Dateien aendern.
+    - Verifikationsplan fuer das Buendel.
+4. In `findings.md` bei allen Findings des Buendels `- Remediation: Task <NNN> - <tasks/...md>` ergaenzen oder aktualisieren. Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt ist.
+5. `assessment.md` bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Buendeln.
+
+Bei `mode: task-first`: analog, aber direkte Fixes koennen nach expliziter Einzelfreigabe erlaubt sein.
+
+Bei `mode: direct-allowed`: legacy Flow fuer `S` bleibt erlaubt.
+
+Für jede bestaetigte Einheit der Reihe nach — also je nach Policy ein Buendel oder ein einzelner Befund:
 
 ### 6a — Code lesen und verifizieren
 
@@ -138,13 +279,17 @@ Wenn kein KD-Treffer: Kategorie anhand der Definitionen (Schritt 4) bestimmen. I
 
 ### 6c — Handeln
 
-**Kategorie S (Sofort) — in `AUTO_CATEGORIES`:**
+**Kategorie S (Sofort) — nur wenn direkte Fixes erlaubt sind:**
+
+Dieser Zweig ist nur erlaubt, wenn `REMEDIATION_DIRECT_FIXES=true` und der Modus nicht `task-branch-pr` ist. Im Modus `task-branch-pr` wird auch ein kleiner Sofort-Fix als Task/Buendel mit Branch-/PR-Hinweis geplant.
+
+**Kategorie S — in `AUTO_CATEGORIES` und direkte Fixes erlaubt:**
 1. Fix direkt anwenden
 2. Build/Tests prüfen
 3. Status in Ergebnisdatei auf `✓ behoben` setzen
 4. Im Änderungslog (Schritt 7) eintragen
 
-**Kategorie S — NICHT in `AUTO_CATEGORIES`:**
+**Kategorie S — NICHT in `AUTO_CATEGORIES`, aber direkte Fixes waeren erlaubt:**
 
 **Pflicht: Code zeigen, dann vorstellen — niemals blind eine Liste abfragen.**
 
@@ -169,9 +314,31 @@ Nicht erlaubt:
 Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-create.md` — die Datei dort ist maßgeblich; hier nur der Minimalkern, damit der Flow nicht bricht:
 
 1. Ziel-Verzeichnis: `TASKS_DIR` (aus Schritt 1). Wenn nicht gesetzt: abbrechen; `/k-setup` muss den Pfad registrieren.
-2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/old/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
+2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/done/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
 3. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
 4. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
+    - Bei Result-Familien muss der Task enthalten: Quelle `reviews/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die urspruengliche `Ort`-/`Message`-Angabe.
+    - Bei Buendeln muss der Task enthalten: Buendelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root, vorgeschlagener Branch und PR-Pflicht aus der Remediation-Policy.
+    - Bei `mode: task-branch-pr` muss der Task zusaetzlich diese Struktur enthalten:
+
+```markdown
+## Ausführungskontext
+
+- Target repo: `<REMEDIATION_TARGET_DISPLAY>`
+- Base branch: `<REMEDIATION_BASE_BRANCH or "<manual>">`
+- Work branch: `<REMEDIATION_BRANCH_PREFIX><NNN>-<slug>`
+- PR required: `<REMEDIATION_PR_REQUIRED>`
+- Dirty worktree policy: abort before changing files unless the dirty files are explicitly expected for this task and the user confirms continuation.
+
+## Branch-Preflight
+
+- Before changing files, run the Git preflight in `Target repo`.
+- Verify the target repo is clean or stop and ask the user how to proceed.
+- If `Work branch` does not exist, create it from `Base branch`.
+- If `Work branch` exists, switch to it and verify it is based on the intended `Base branch`, or ask before continuing.
+- Only after this preflight, update code, dependencies, lockfiles, generated files, or review status files.
+```
+
 5. Status in Ergebnisdatei auf `✓ Task NNN` setzen.
 6. Im Änderungslog eintragen.
 
@@ -216,6 +383,8 @@ Status auf `✗ falsch` setzen. Kurze Begründung notieren.
 
 Nach jedem bearbeiteten Befund:
 
+### Legacy-Dateien
+
 **Statusspalte:** Falls die Tabelle noch keine `**Status**`-Spalte hat, diese hinzufügen.
 
 Statuswerte:
@@ -241,9 +410,47 @@ Statuswerte:
 | YYYY-MM-DD | 13 | Akzeptiert | ~ | Rate-Limiting extern behandelt (SecurityConfig) |
 ```
 
+### Result-Familien
+
+Bei `RESULT_FORMAT=result-family` wird primaer `findings.md` aktualisiert:
+
+- Kategorie S nach erfolgreichem Fix und Verifikation: `- Status: `fixed``.
+- Kategorie T mit Task-Datei: Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt und verifiziert ist; ergaenze aber `- Remediation: Task <NNN> - <tasks/...md>` oder aktualisiere ein vorhandenes Remediation-Feld.
+- Kategorie K: `- Status: `context-needed`` mit klarer `Triage-Notiz`.
+- Kategorie A: `- Status: `accepted`` mit Akzeptierungsgrund und optional Known-Decision-Verweis.
+- Kategorie X: `- Status: `likely-false-positive`` mit Begruendung.
+- Wenn ein Befund durch Code-Lektuere bestaetigt wurde, aber noch nicht behoben ist: `- Status: `confirmed``.
+
+Am Ende von `findings.md` einen nachvollziehbaren Abschnitt pflegen:
+
+```markdown
+---
+
+## Remediation-Log
+
+| Datum | Finding-ID | Kategorie | Aktion | Notiz |
+|---|---|---|---|---|
+| YYYY-MM-DD | kcheck-logging-003 | Task | Task 018 | tasks/018-redact-upstream-log.md |
+```
+
+`assessment.md` darf optional einen Abschnitt `## Remediation-Status` bekommen oder aktualisieren:
+
+```markdown
+## Remediation-Status
+
+- YYYY-MM-DD: `/k-remediation` gestartet; <N> remediation-relevante Findings aus `findings.md` geladen.
+- YYYY-MM-DD: Task(s) <...> fuer Finding(s) <...> angelegt.
+```
+
+`raw/` und `run-metadata.*` niemals bearbeiten.
+
 ---
 
 ## Schritt 8 — Ergebnisdatei archivieren
+
+Archivierung gilt nur fuer Legacy-Ergebnisdateien.
+
+Bei Result-Familien wird kein `assessment.md` nach `done/` verschoben. Das Result-Verzeichnis bleibt stabil unter `reviews/results/<family>/<date>/`; Abschluss erfolgt ueber Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`.
 
 Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 

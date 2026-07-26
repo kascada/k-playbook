@@ -7,9 +7,9 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-review
 
-Run a code review against the current project, using a review recipe either from the global playbook (`~/dev/k-playbook/review/`) or from the project-local `reviews:` path in `K-PLAYBOOK.MD`.
+Run a code review against the current project, using a review recipe either from the global review catalog (`<PLAYBOOK_REPO>/global/reviews/`) or from the project-local `reviews:` path in `K-PLAYBOOK.MD`.
 
-This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review).
+This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<PLAYBOOK_REPO>/global/rules/review-authoring.md`.
 
 `/k-review` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `reviews:` block may be inactive; in that case only global review recipes are available and no project-local log or known-decisions file is used.
 
@@ -25,7 +25,7 @@ Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, n
 
 Also set:
 
-- `GLOBAL_REVIEWS_DIR` = `<PLAYBOOK_REPO>/k-playbook/review/` if that directory exists, otherwise `<PLAYBOOK_REPO>/review/` if that exists. If neither exists, continue with project-local reviews only if configured; otherwise abort because no review catalog is available.
+- `GLOBAL_REVIEWS_DIR` = `<PLAYBOOK_REPO>/global/reviews/`. If it does not exist, continue with project-local reviews only if configured; otherwise abort because no review catalog is available.
 - If `PROJECT_REVIEWS_DIR` is set:
   - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
   - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
@@ -83,6 +83,7 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
+- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `<reviews>/results/<result-family>/<YYYY-MM-DD>/`)
 
 If `KNOWN_DECISIONS` is set and the file exists:
 
@@ -134,9 +135,11 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis in `<RESULT_DIR>/result-<name>.md` schreiben. If `RESULT_DIR` is unset, abort and ask the user to activate/create `reviews:` via `/k-setup` first.
+2. Ergebnis schreiben. If `RESULT_DIR` is unset, abort and ask the user to activate/create `reviews:` via `/k-setup` first.
+   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULT_DIR>/results/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
+   - Wenn `result-family` nicht gesetzt ist: Legacy-Pfad `<RESULT_DIR>/result-<name>.md` verwenden.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
-   `/k-remediation <RESULT_DIR>/result-review-tech.md`
+   `/k-remediation <RESULT_DIR>/result-review-tech.md` oder `/k-remediation <RESULT_DIR>/results/<result-family>/<YYYY-MM-DD>/assessment.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
 
 ## Step 6 — Log-Eintrag

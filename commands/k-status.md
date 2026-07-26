@@ -51,9 +51,13 @@ If `<TARGET_DIR>/K-PLAYBOOK.MD` exists, parse only simple metadata from it:
 - Managed CodeQL block markers:
   - `<!-- k-setup-codeql:managed:begin -->`
   - `<!-- k-setup-codeql:managed:end -->`
+- Managed Dependabot block markers:
+  - `<!-- k-setup-dependabot:managed:begin -->`
+  - `<!-- k-setup-dependabot:managed:end -->`
 - `## Pfade` entries shaped like `- key: value`.
 - `## Playbook-Quelle` entries `repo:` and `setup-run:`.
 - `## CodeQL` entries listed in the `codeql` section.
+- `## Dependabot` entries listed in the `dependabot` section.
 
 Marker status:
 
@@ -191,6 +195,7 @@ Run in default, `full`, `strict`, and `codeql` modes.
 Parse the CodeQL managed block from `K-PLAYBOOK.MD` when present:
 
 - `enabled`
+- `target`
 - `github`
 - `workflow`
 - `local-database`
@@ -203,6 +208,8 @@ Rules:
 
 - Valid values for `github` and `local-database` are `true`, `false`, and `planned`.
 - Treat unset, empty, or `-` paths as missing.
+- Treat missing `target:` as legacy project-root target `.` and report it as `WARN` only when the project root is not a Git worktree but a nested Git/app root is likely present.
+- If `target:` is set, check that the referenced path exists. If it is a Git worktree, use it for the CodeQL/Git-oriented status detail; do not run analysis.
 - If `enabled: false`, report CodeQL as disabled and do not do deeper checks beyond marker/config plausibility.
 - If `github: true` or `github: planned`, check that `workflow:` is set and that the referenced file exists.
 - If `local-database: true` or `local-database: planned`, check that `database:` is set and that the referenced path exists.
@@ -213,9 +220,39 @@ Status:
 
 - `OK`: disabled cleanly, or enabled/planned paths and CLI preflight are plausible.
 - `WARN`: enabled/planned but optional pieces are missing, CLI is unavailable, languages are unset, or setup is planned.
-- `FAIL`: the CodeQL managed block has contradictory markers or an active/planned configured path is set but missing.
+- `FAIL`: the CodeQL managed block has contradictory markers, `target:` is set but missing, or an active/planned configured path is set but missing.
 
 Do not run `codeql database create`, `codeql database analyze`, or any upload command.
+
+## Section: dependabot
+
+Run in default, `full`, `strict`, and `reviews` modes.
+
+Parse the optional Dependabot managed block from `K-PLAYBOOK.MD` when present:
+
+- `enabled`
+- `target`
+- `repo`
+- `config`
+- `alerts`
+- `pull-requests`
+- `setup-run`
+
+Rules:
+
+- Treat missing block as `WARN` only when a Dependabot config exists under a nested Git/app root.
+- If `enabled: false`, report disabled cleanly and do not query GitHub.
+- If `target:` is set, check that it exists. If missing, report `FAIL`.
+- If `config:` is set, check that the file exists. If missing while enabled, report `FAIL`.
+- If `repo:` is set, use it as the GitHub Dependabot Alerts source. If missing, derive from the GitHub remote of `target:` when possible; otherwise report `WARN`.
+- Check `gh --version` and `gh auth status` as lightweight preflight only. Do not call the Dependabot alerts API in `/k-status`.
+- `pull-requests: false` is acceptable and should not be reported as a warning when `alerts: true` is set.
+
+Status:
+
+- `OK`: enabled or disabled consistently, target/config exist, repo is known, and `gh` auth is plausible when alerts are enabled.
+- `WARN`: block missing, `gh` unavailable/unauthenticated, repo not derivable, alerts planned/unclear, or PRs intentionally disabled with no alerts flag.
+- `FAIL`: managed markers contradictory, enabled target/config path missing.
 
 ## Section: git
 
@@ -263,10 +300,11 @@ Priority order:
 2. Missing required or configured playbook paths from `paths` → `/k-setup`.
 3. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
 4. CodeQL local database active/planned with missing database or CLI → `/k-install-codeql`.
-5. Open numbered tasks → `/k-run`.
-6. Review files exist and are due, or review support files are incomplete → `/k-review`.
-7. Missing docs index → `/k-code2docs`.
-8. Missing libs index → `/k-tools-scan`.
+5. Dependabot enabled with missing target/config/repo/auth → `/k-review dependabot-alerts` only after setup is corrected.
+6. Open numbered tasks → `/k-run`.
+7. Review files exist and are due, or review support files are incomplete → `/k-review`.
+8. Missing docs index → `/k-code2docs`.
+9. Missing libs index → `/k-tools-scan`.
 
 Do not list more than three commands. Do not recommend commands that would clearly be irrelevant to the current mode; for example, `codeql` mode should not recommend `/k-run` just because tasks exist.
 
@@ -284,7 +322,8 @@ Tasks:         WARN, 3 offen, nächste: 002-k-status.md
 TODO:          OK, 0 offen
 Reviews:       WARN, 2 vorhanden, known-decisions fehlt
 Enforcement:   OK, 1 Regel
-CodeQL:        WARN, enabled=true, github=true workflow fehlt
+CodeQL:        WARN, target=./omni-gw, enabled=true, github=true workflow fehlt
+Dependabot:    OK, target=./omni-gw, repo=koelnmesse-IT/omni-gw, PRs deaktiviert
 Git:           WARN, dirty (4 geändert, 1 untracked)
 Docs:          WARN, docs/README.md fehlt
 
@@ -319,6 +358,7 @@ In `json` mode, produce best-effort JSON with these top-level keys when feasible
   "reviews": {},
   "enforcement": {},
   "codeql": {},
+  "dependabot": {},
   "git": {},
   "docs": {},
   "recommendations": []

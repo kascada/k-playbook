@@ -1,0 +1,550 @@
+#!/usr/bin/env python3
+"""Run global and project-local k-playbook checks."""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+PLAYBOOK_REPO = Path(__file__).resolve().parents[2]
+GLOBAL_CHECKS_DIR = PLAYBOOK_REPO / "global" / "checks"
+K_CHECK_VERSION = "2026-07-24"
+
+DEFAULT_EXCLUDES = {
+    ".coverage",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".next",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".turbo",
+    ".venv",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "env",
+    "node_modules",
+    "staticfiles",
+    "venv",
+}
+
+CI_BASE_REF_ENV = (
+    "GITHUB_BASE_REF",
+    "GITLAB_MERGE_REQUEST_TARGET_BRANCH_NAME",
+    "CI_MERGE_REQUEST_TARGET_BRANCH_NAME",
+    "BITBUCKET_PR_DESTINATION_BRANCH",
+    "SYSTEM_PULLREQUEST_TARGETBRANCH",
+)
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    label: str
+    status: str
+    exit_code: int
+    reason: str
+    technical_error: str
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config-root", default=".", help="Root that contains K-PLAYBOOK.MD.")
+    parser.add_argument(
+        "--target-root",
+        help="Root to scan. Defaults to --config-root. Relative paths are resolved against --config-root.",
+    )
+    parser.add_argument("--mode", choices=("changed", "baseline"), required=True)
+    parser.add_argument("--files-from", help="Explicit newline-separated file list for changed mode.")
+    parser.add_argument("--base-ref", help="Git base ref for changed mode.")
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Additional exclude pattern relative to the target root. May be passed multiple times.",
+    )
+    parser.add_argument("--timeout", type=int, default=300, help="Per-check timeout in seconds.")
+    parser.add_argument(
+        "--output",
+        help="Write the complete raw stdout/stderr stream to this file while preserving normal terminal output.",
+    )
+    parser.add_argument(
+        "--metadata-output",
+        help="Write run metadata as JSON. Use alongside --output for audit-friendly review artifacts.",
+    )
+    return parser.parse_args()
+
+
+class Tee(io.TextIOBase):
+    def __init__(self, *streams: io.TextIOBase) -> None:
+        self.streams = streams
+
+    def write(self, text: str) -> int:
+        for stream in self.streams:
+            stream.write(text)
+        return len(text)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
+
+
+def expand_path(raw_path: str, root: Path) -> Path:
+    expanded = os.path.expanduser(os.path.expandvars(raw_path.strip()))
+    path = Path(expanded)
+    if not path.is_absolute():
+        path = root / path
+    return path.resolve()
+
+
+def read_k_playbook(config_root: Path) -> dict[str, str]:
+    config_path = config_root / "K-PLAYBOOK.MD"
+    if not config_path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    pattern = re.compile(r"^\s*-\s*([A-Za-z0-9_-]+):\s*(.*?)\s*$")
+    for line in config_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if value and value != "-":
+            values[key] = value
+    return values
+
+
+def is_project_git_repo(root: Path) -> bool:
+    completed = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return False
+    try:
+        return Path(completed.stdout.strip()).resolve() == root.resolve()
+    except OSError:
+        return False
+
+
+def normalize_file(path_text: str, root: Path) -> Path | None:
+    if not path_text.strip():
+        return None
+    path = Path(path_text.strip())
+    if not path.is_absolute():
+        path = root / path
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(root.resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved
+
+
+def read_files_from(path: Path, root: Path) -> list[Path]:
+    if not path.exists():
+        raise FileNotFoundError(f"--files-from not found: {path}")
+    files: list[Path] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        normalized = normalize_file(line, root)
+        if normalized is not None:
+            files.append(normalized)
+    return unique_paths(files)
+
+
+def git_output(root: Path, command: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *command],
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+
+
+def git_diff_files(root: Path, base_ref: str) -> list[Path] | None:
+    completed = git_output(root, ["diff", "--name-only", "--diff-filter=ACMRTUXB", f"{base_ref}...HEAD"])
+    if completed.returncode != 0:
+        return None
+    return unique_paths(
+        path for line in completed.stdout.splitlines() if (path := normalize_file(line, root)) is not None
+    )
+
+
+def env_base_ref() -> str | None:
+    for name in CI_BASE_REF_ENV:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value.removeprefix("refs/heads/")
+    return None
+
+
+def upstream_base_ref(root: Path) -> str | None:
+    completed = git_output(root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if completed.returncode != 0:
+        return None
+    upstream = completed.stdout.strip()
+    if not upstream:
+        return None
+    merge_base = git_output(root, ["merge-base", "HEAD", upstream])
+    if merge_base.returncode != 0:
+        return None
+    return merge_base.stdout.strip() or None
+
+
+def parse_status_files(root: Path) -> list[Path]:
+    completed = git_output(root, ["status", "--porcelain", "--untracked-files=all"])
+    if completed.returncode != 0:
+        return []
+
+    files: list[Path] = []
+    for line in completed.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        raw_path = line[3:]
+        if " -> " in raw_path:
+            raw_path = raw_path.split(" -> ", 1)[1]
+        path = normalize_file(raw_path, root)
+        if path is not None:
+            files.append(path)
+    return unique_paths(files)
+
+
+def changed_files(args: argparse.Namespace, root: Path) -> tuple[list[Path], str]:
+    if args.files_from:
+        source = expand_path(args.files_from, root)
+        return read_files_from(source, root), f"files-from:{source}"
+
+    if not is_project_git_repo(root):
+        return [], "no-project-git-repo"
+
+    if args.base_ref:
+        files = git_diff_files(root, args.base_ref)
+        if files is not None:
+            return files, f"base-ref:{args.base_ref}"
+
+    base_from_env = env_base_ref()
+    if base_from_env:
+        files = git_diff_files(root, base_from_env)
+        if files is not None:
+            return files, f"ci-base-ref:{base_from_env}"
+
+    upstream = upstream_base_ref(root)
+    if upstream:
+        files = git_diff_files(root, upstream)
+        if files is not None:
+            return files, f"upstream-merge-base:{upstream}"
+
+    return parse_status_files(root), "git-status"
+
+
+def is_excluded(path: Path, root: Path, extra_patterns: list[str]) -> bool:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return True
+    if any(part in DEFAULT_EXCLUDES for part in relative.parts):
+        return True
+    relative_text = relative.as_posix()
+    return any(fnmatch.fnmatch(relative_text, pattern) for pattern in extra_patterns)
+
+
+def baseline_files(root: Path, extra_patterns: list[str]) -> list[Path]:
+    files: list[Path] = []
+    for current_root, dirnames, filenames in os.walk(root):
+        current = Path(current_root)
+        if current != root and ((current / ".git").exists() or is_excluded(current, root, extra_patterns)):
+            dirnames[:] = []
+            continue
+        dirnames[:] = [name for name in dirnames if name not in DEFAULT_EXCLUDES]
+        for filename in filenames:
+            path = current / filename
+            if path.is_file() and not is_excluded(path, root, extra_patterns):
+                files.append(path.resolve())
+    return unique_paths(files)
+
+
+def unique_paths(paths) -> list[Path]:
+    seen: set[Path] = set()
+    result: list[Path] = []
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        result.append(resolved)
+    return result
+
+
+def discover_checks(config_root: Path, config: dict[str, str]) -> list[tuple[str, Path]]:
+    check_dirs: list[tuple[str, Path]] = [("global", GLOBAL_CHECKS_DIR)]
+    local_value = config.get("local-checks") or config.get("checks")
+    if local_value:
+        check_dirs.append(("local", expand_path(local_value, config_root)))
+
+    checks: list[tuple[str, Path]] = []
+    for scope, check_dir in check_dirs:
+        if not check_dir.is_dir():
+            continue
+        for path in sorted(check_dir.glob("*.sh")):
+            checks.append((scope, path.resolve()))
+    return checks
+
+
+def command_line() -> list[str]:
+    return [sys.argv[0], *sys.argv[1:]]
+
+
+def git_commit(path: Path) -> str | None:
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=path,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip() or None
+
+
+def check_configuration(config_root: Path, config: dict[str, str], checks: list[tuple[str, Path]]) -> dict[str, object]:
+    local_value = config.get("local-checks") or config.get("checks")
+    local_dir = str(expand_path(local_value, config_root)) if local_value else None
+    return {
+        "global_checks_dir": str(GLOBAL_CHECKS_DIR),
+        "local_checks_dir": local_dir,
+        "checks": [{"scope": scope, "path": str(path)} for scope, path in checks],
+    }
+
+
+def write_metadata(path: Path, metadata: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_file_list(files: list[Path]) -> Path:
+    handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, prefix="k-check-files-", suffix=".txt")
+    with handle:
+        for path in files:
+            handle.write(f"{path}\n")
+    return Path(handle.name)
+
+
+def parse_status(stdout: str) -> tuple[str | None, str, str]:
+    status_lines = [line.strip() for line in stdout.splitlines() if line.strip().startswith("K_CHECK_STATUS=")]
+    reason_lines = [line.strip() for line in stdout.splitlines() if line.strip().startswith("K_CHECK_REASON=")]
+    status = status_lines[0].split("=", 1)[1] if len(status_lines) == 1 else None
+    reason = reason_lines[-1].split("=", 1)[1] if reason_lines else ""
+    if len(status_lines) != 1:
+        return status, reason, f"expected exactly one K_CHECK_STATUS line, got {len(status_lines)}"
+    if status not in {"ok", "skip", "fail"}:
+        return status, reason, f"invalid K_CHECK_STATUS={status}"
+    return status, reason, ""
+
+
+def validate_contract(status: str | None, exit_code: int, parse_error: str) -> str:
+    if parse_error:
+        return parse_error
+    if status in {"ok", "skip"} and exit_code == 0:
+        return ""
+    if status == "fail" and exit_code == 1:
+        return ""
+    if exit_code == 2:
+        return "technical check error"
+    return f"inconsistent status/exit code: status={status} exit={exit_code}"
+
+
+def run_check(
+    scope: str,
+    check_path: Path,
+    config_root: Path,
+    target_root: Path,
+    mode: str,
+    files_path: Path,
+    timeout: int,
+) -> CheckResult:
+    label = f"{scope}:{check_path.name}"
+    env = os.environ.copy()
+    env.update(
+        {
+            "K_CHECK_CONFIG_ROOT": str(config_root),
+            "K_CHECK_TARGET_ROOT": str(target_root),
+            "K_CHECK_PROJECT_ROOT": str(target_root),
+            "K_CHECK_MODE": mode,
+            "K_CHECK_FILES_FROM": str(files_path),
+            "K_PLAYBOOK_REPO": str(PLAYBOOK_REPO),
+        }
+    )
+
+    print(f"\n== {label} ==")
+    try:
+        completed = subprocess.run(
+            ["bash", str(check_path)],
+            cwd=target_root,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        if exc.stdout:
+            print(exc.stdout, end="")
+        if exc.stderr:
+            print(exc.stderr, end="", file=sys.stderr)
+        return CheckResult(label, "error", 2, "", f"timeout after {timeout}s")
+
+    if completed.stdout:
+        print(completed.stdout, end="")
+    if completed.stderr:
+        print(completed.stderr, end="", file=sys.stderr)
+
+    status, reason, parse_error = parse_status(completed.stdout)
+    technical_error = validate_contract(status, completed.returncode, parse_error)
+    if technical_error:
+        return CheckResult(label, "error", completed.returncode, reason, technical_error)
+    return CheckResult(label, status or "error", completed.returncode, reason, "")
+
+
+def print_summary(
+    config_root: Path,
+    target_root: Path,
+    mode: str,
+    file_count: int,
+    file_source: str,
+    results: list[CheckResult],
+) -> None:
+    counts = {"ok": 0, "skip": 0, "fail": 0, "error": 0}
+    for result in results:
+        counts[result.status] = counts.get(result.status, 0) + 1
+
+    print("\nK_CHECK_SUMMARY")
+    print(f"config_root={config_root}")
+    print(f"target_root={target_root}")
+    print(f"mode={mode}")
+    print(f"file_source={file_source}")
+    print(f"files={file_count}")
+    print(f"ok={counts['ok']} skip={counts['skip']} fail={counts['fail']} error={counts['error']}")
+    for result in results:
+        detail = result.technical_error or result.reason
+        suffix = f" reason={detail}" if detail else ""
+        print(f"{result.status.upper()} {result.label}{suffix}")
+
+
+def run(args: argparse.Namespace) -> tuple[int, dict[str, object]]:
+    started_at = datetime.now(timezone.utc)
+    config_root = expand_path(args.config_root, Path.cwd())
+    if not config_root.is_dir():
+        print(f"config root not found: {config_root}", file=sys.stderr)
+        return 2, {"error": "config root not found", "config_root": str(config_root)}
+    target_root = expand_path(args.target_root, config_root) if args.target_root else config_root
+    if not target_root.is_dir():
+        print(f"target root not found: {target_root}", file=sys.stderr)
+        return 2, {"error": "target root not found", "target_root": str(target_root)}
+
+    config = read_k_playbook(config_root)
+    try:
+        if args.mode == "changed":
+            files, file_source = changed_files(args, target_root)
+        else:
+            files = baseline_files(target_root, args.exclude)
+            file_source = "baseline"
+    except OSError as exc:
+        print(f"could not build file list: {exc}", file=sys.stderr)
+        return 2, {"error": f"could not build file list: {exc}"}
+
+    files_path = write_file_list(files)
+    checks: list[tuple[str, Path]] = []
+    results: list[CheckResult] = []
+    try:
+        checks = discover_checks(config_root, config)
+        results = [
+            run_check(scope, check, config_root, target_root, args.mode, files_path, args.timeout)
+            for scope, check in checks
+        ]
+        print_summary(config_root, target_root, args.mode, len(files), file_source, results)
+    finally:
+        files_path.unlink(missing_ok=True)
+
+    exit_code = 0
+    if any(result.status == "error" for result in results):
+        exit_code = 2
+    elif any(result.status == "fail" for result in results):
+        exit_code = 1
+
+    metadata: dict[str, object] = {
+        "command": command_line(),
+        "cwd": str(Path.cwd()),
+        "started_at": started_at.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "exit_code": exit_code,
+        "config_root": str(config_root),
+        "target_root": str(target_root),
+        "mode": args.mode,
+        "file_source": file_source,
+        "files": len(files),
+        "timeout_seconds": args.timeout,
+        "exclude": args.exclude,
+        "files_from": args.files_from,
+        "base_ref": args.base_ref,
+        "review_family": "k-check",
+        "check_configuration": check_configuration(config_root, config, checks),
+        "k_check_version": K_CHECK_VERSION,
+        "k_playbook_repo": str(PLAYBOOK_REPO),
+        "k_playbook_git_commit": git_commit(PLAYBOOK_REPO),
+        "results": [result.__dict__ for result in results],
+    }
+    return exit_code, metadata
+
+
+def main() -> int:
+    args = parse_args()
+    metadata_path = expand_path(args.metadata_output, Path.cwd()) if args.metadata_output else None
+    if metadata_path is not None and metadata_path.exists():
+        print(f"metadata file already exists, refusing to overwrite: {metadata_path}", file=sys.stderr)
+        return 2
+
+    if args.output:
+        output_path = expand_path(args.output, Path.cwd())
+        if output_path.exists():
+            print(f"output file already exists, refusing to overwrite: {output_path}", file=sys.stderr)
+            return 2
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as raw_output:
+            with redirect_stdout(Tee(sys.stdout, raw_output)), redirect_stderr(Tee(sys.stderr, raw_output)):
+                exit_code, metadata = run(args)
+    else:
+        exit_code, metadata = run(args)
+
+    if metadata_path is not None:
+        write_metadata(metadata_path, metadata)
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

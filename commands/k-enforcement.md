@@ -11,7 +11,7 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `enforcement:` and `docs:` blocks may be inactive; in that case the command uses only global enforcement rules and skips registered-docs path checks rather than inventing default paths.
+`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `enforcement:` and `docs:` blocks may be inactive; in that case the command uses only global rules and skips registered-docs path checks rather than inventing default paths.
 
 ## Step 1 — Resolve target and paths
 
@@ -31,7 +31,7 @@ Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, n
 
 Also set:
 
-- `GLOBAL_ENFORCEMENT_DIR` = `<PLAYBOOK_REPO>/k-playbook/enforcement/`
+- `GLOBAL_ENFORCEMENT_DIR` = `<PLAYBOOK_REPO>/global/rules/`
 - If `DOCS_DIR` is unset: leave it unset. Do not default to `<TARGET_DIR>/docs`.
 
 Command-specific policy:
@@ -101,7 +101,7 @@ Rules apply to new or changed work, not retroactively to the entire legacy codeb
 
 Always perform this check when code files changed.
 
-Use the loaded rules, especially `001-code-docs-sync.md`, and inspect:
+Use the loaded rules, especially `docs-sync.md`, and inspect:
 
 - Changed source/config/schema/API files.
 - Docs under `DOCS_DIR`, if it exists.

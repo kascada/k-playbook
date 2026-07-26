@@ -17,6 +17,60 @@ verschiedene AI-Assistant-Umgebungen.
 
 ---
 
+## Schnellstart: neuer Host
+
+Auf einem neuen Server/Host sind zwei Dinge zu trennen:
+
+1. **Host-global installieren** - macht k-playbook und Security-Tools fuer alle Projekte verfuegbar.
+2. **Projektlokal einrichten** - registriert in jedem Zielprojekt dessen eigene Pfade per `/k-setup`.
+
+Host-globaler Ablauf:
+
+```text
+/k-install
+/k-install-security-tools --install missing
+```
+
+Danach OpenCode neu starten.
+
+Was `/k-install` auf dem Host macht:
+
+- Slash-Commands nach `~/.config/opencode/command/` symlinken.
+- `skills.paths` in der OpenCode-Konfig pruefen bzw. ergaenzen.
+- Security-Tool-Status anzeigen.
+- Keine Projektdateien schreiben.
+
+Was `/k-install-security-tools --install missing` auf dem Host macht:
+
+- Fehlende Pflicht-Tools user-lokal installieren oder pruefen.
+- Pflicht-Tools: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`.
+- Installationsort fuer Binaries: bevorzugt ein bereits im `PATH` sichtbarer User-Bin-Pfad, z. B. `~/.opencode/bin`.
+- `pip-audit` wird per `pipx` oder eigenem venv bereitgestellt.
+- Keine Projektdateien schreiben und keine Scans starten.
+
+Projektlokaler Ablauf pro Projekt:
+
+```text
+/k-setup
+```
+
+Je nach Projekt danach optional:
+
+```text
+/k-setup-codeql
+```
+
+Was `/k-setup` im Projekt macht:
+
+- `K-PLAYBOOK.MD` im Projekt-Root anlegen oder aktualisieren.
+- Projektlokale Pfade wie `tasks`, `checks`, `reviews`, `docs`, `enforcement` registrieren.
+- Bestaetigte Verzeichnisse oder Initialdateien erzeugen.
+- Keine host-globalen Tools installieren.
+
+Merksatz: `/k-install*` gehoert zum Host, `/k-setup*` gehoert zum Projekt.
+
+---
+
 ## Setup für OpenCode
 
 ### Empfohlen: `/k-install`
@@ -31,10 +85,19 @@ Der Command erledigt den OpenCode-Teil host-lokal:
 
 - `commands/k-*.md` nach `~/.config/opencode/command/` symlinken
 - `skills.paths` in `~/.config/opencode/opencode.jsonc` prüfen bzw. ergänzen
+- Security-Review-Tools host-lokal per Preflight prüfen
 - verwaiste alte Command-Links melden
 - daran erinnern, OpenCode neu zu starten
 
 Nach dem Hinzufügen neuer Dateien unter `commands/k-*.md` auf jedem Server erneut `/k-install` ausführen, damit die neuen Symlinks entstehen.
+
+Wenn der Security-Tool-Preflight fehlende Pflicht-Tools meldet, den separaten host-lokalen Installer ausfuehren:
+
+```text
+/k-install-security-tools --install missing
+```
+
+Dieser Installer schreibt keine Projektdateien. Er stellt die global genutzten Review-Tools bereit: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft` und `grype`.
 
 Die folgenden Schritte zeigen die manuelle Variante und dienen als Referenz.
 

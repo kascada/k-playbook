@@ -11,15 +11,9 @@ Execute task files. If `$ARGUMENTS` is empty, use the `tasks:` path from `K-PLAY
 
 `/k-run` does not guess project paths. A project without `K-PLAYBOOK.MD`, without `base:`, or without an active `tasks:` path must be migrated with `/k-setup` first.
 
-## Step 1 - Resolve target path and collect tasks
+## Step 1 - Resolve project config, target path and collect tasks
 
-If `$ARGUMENTS` is provided: treat it as the explicit execution target.
-
-- If it is a single `.md` file: use that file as a one-item list.
-- If it is a directory: use that directory.
-- If it does not exist: abort with a clear error.
-
-If `$ARGUMENTS` is empty: read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the execution target. This is a preflight even for explicit file/directory arguments, so task execution can resolve `## Ausführungskontext` paths relative to the project root and respect `K-PLAYBOOK.MD`.
 
 For this command, resolve:
 
@@ -29,11 +23,17 @@ Also require `base:` from `K-PLAYBOOK.MD`; use `PLAYBOOK_BASE_DIR` only as valid
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off run.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`, or pass an explicit file/directory argument for a one-off run.
-- If `tasks:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directories. Do not create it from `/k-run`; there are no tasks to execute.
-- If `tasks:` is set and exists: use it as the execution target.
+- If `$ARGUMENTS` is provided: treat it as the explicit execution target after the `K-PLAYBOOK.MD` preflight.
+  - If it is a single `.md` file: use that file as a one-item list.
+  - If it is a directory: use that directory.
+  - If it does not exist: abort with a clear error.
+  - If `K-PLAYBOOK.MD` or `base:` is missing: continue as an explicit one-off run, but announce that registered project paths could not be validated. If the task has `## Ausführungskontext` with a relative `Target repo`, stop and ask for the project root instead of guessing.
+- If `$ARGUMENTS` is empty:
+  - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off run.
+  - If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
+  - If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`, or pass an explicit file/directory argument for a one-off run.
+  - If `tasks:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directories. Do not create it from `/k-run`; there are no tasks to execute.
+  - If `tasks:` is set and exists: use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
 
@@ -106,6 +106,35 @@ For each task file, **in strict sequential order** (never parallel - two agents 
 
 Read the task file completely.
 
+### 2a.1 - Execution context and branch preflight
+
+If the task contains a `## Ausführungskontext` section, parse these fields when present:
+
+- `Target repo:`
+- `Base branch:`
+- `Work branch:`
+- `PR required:`
+- `Dirty worktree policy:`
+
+Also keep these parsed values for the success path. If `PR required` is true, the command must either open a PR after the local commit exists or report the exact missing step that prevents PR creation.
+
+Resolve `Target repo` relative to `TARGET_DIR` unless it is absolute. If no `Target repo` is present, use the current project root as execution root.
+
+Before delegating to a sub-agent, perform the branch preflight in the execution root:
+
+1. Verify the execution root exists and is a Git repo with `git rev-parse --is-inside-work-tree`. If not, stop and ask the user.
+2. Check dirty state with `git status --short`.
+3. If dirty state is non-empty, stop and show the dirty files. Continue only if the user explicitly confirms that these files are expected for this task; otherwise do not delegate.
+4. If `Work branch` is set:
+   - If already on `Work branch`, continue.
+   - Else if the local `Work branch` exists, switch to it with `git switch <Work branch>`.
+   - Else if `Base branch` is set and not `<manual>`, switch to `Base branch` and create the work branch with `git switch -c <Work branch>`.
+   - Else stop and ask which base branch should be used.
+5. If both `Base branch` and `Work branch` are set and `Base branch` is not `<manual>`, verify the work branch is based on the intended base with `git merge-base --is-ancestor <Base branch> HEAD`. If this fails, stop and ask before continuing.
+6. Record the preflight result and pass it to the sub-agent. The sub-agent must treat the selected execution root and branch as mandatory context.
+
+If the task does not contain `## Ausführungskontext`, continue with the existing behavior.
+
 ### 2b - Clarify before delegating
 
 **Before** spawning the sub-agent: read the task file carefully and identify anything that is unclear, ambiguous, or requires a decision that cannot be inferred from the task description or codebase.
@@ -116,10 +145,11 @@ Only proceed once all open questions are resolved.
 
 ### 2c - Delegate to sub-agent
 
-Spawn a `general-purpose` sub-agent to carry out the task. Pass it:
+Spawn a `general` sub-agent to carry out the task. Pass it:
 
 - The full content of the task file
 - The working directory path
+- If `## Ausführungskontext` was present: the resolved execution root, base branch, work branch, PR-required flag, dirty-worktree decision, and the completed branch-preflight result
 - Instruction to read all `CLAUDE.md` files in the project tree before starting
 - All clarifications from Step 2b as additional context
 - If `DIFF_ENABLED=true`: the baseline commit hash, with instruction to run `git diff <hash>` after completion and return the diff in its result
@@ -197,6 +227,41 @@ Append the review result to `## Ausführung`:
 3. Ensure `done/` subdirectory exists in the same directory as the task file
 4. Move the task file into `done/`
 
+### 2f.1 - PR handoff for `PR required: true`
+
+If the task's `## Ausführungskontext` has `PR required: true`, handle PR creation after the task has completed and a local commit exists.
+
+Preflight:
+
+1. Work in the resolved execution root from Step 2a.1.
+2. Verify the branch is `Work branch` if one was specified.
+3. Verify the worktree is clean with `git status --short`; if not clean, stop and report that a commit is required before PR creation.
+4. Verify the branch has an upstream. If it has none, ask before pushing. Do not push silently.
+
+PR body generation:
+
+- Build the PR body as real multiline Markdown in a temporary file, not as a quoted CLI string with `\n` escapes.
+- Use `/tmp/k-run-pr-body-<task-number-or-branch-slug>.md` unless a better existing temp path is already available.
+- Include:
+  - short summary of the change.
+  - finding IDs or task reference if present.
+  - validation commands/results from the task execution.
+  - known residual risks or tests that could not run.
+
+Create the PR with `gh pr create --body-file <file>`:
+
+```bash
+gh pr create \
+  --base <Base branch> \
+  --head <Work branch> \
+  --title "<concise title>" \
+  --body-file /tmp/k-run-pr-body-<slug>.md
+```
+
+Do not use `--body "...\n..."`; Bash will pass literal backslash-n in normal double quotes. If a one-off inline body is unavoidable, use a shell-safe multiline mechanism such as a here-document or ANSI-C quoting, but prefer `--body-file`.
+
+If `gh` is unavailable or not authenticated, print the exact `gh pr create --body-file ...` command and the body-file contents for manual use.
+
 ### 2g - Continue
 
 Proceed to the next task in the list. If a task failed (Step 2e), stop - do not execute remaining tasks.
@@ -205,7 +270,7 @@ Proceed to the next task in the list. If a task failed (Step 2e), stop - do not 
 
 If all tasks completed successfully AND the last task file contains an `## Intent` section: check whether the executed work actually achieves the stated Intent.
 
-Spawn a `general-purpose` subagent (Critic) with this prompt:
+Spawn a `general` subagent (Critic) with this prompt:
 
 ```
 You are doing a final alignment check after a set of tasks was executed.

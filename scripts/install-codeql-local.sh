@@ -24,6 +24,7 @@ Artifacts in full mode:
 
 Artifacts in --cli-only mode:
   <parent>/codeql-cli/        Downloaded CodeQL CLI, if not already on PATH.
+  PATH shim                  Symlink named `codeql` in ~/.opencode/bin or ~/.local/bin when available.
 USAGE
 }
 
@@ -161,10 +162,57 @@ ensure_codeql() {
     exit 1
   fi
 
+  rm -f "$zip_path"
+
   printf '%s\n' "$install_dir/codeql/codeql"
 }
 
+path_contains_dir() {
+  local dir
+  dir="$1"
+  case ":$PATH:" in
+    *":$dir:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ensure_codeql_path_shim() {
+  local codeql_bin current candidate shim_dir shim_path
+  codeql_bin="$1"
+
+  current="$(command -v codeql || true)"
+  if [[ -n "$current" && "$(realpath "$current")" == "$(realpath "$codeql_bin")" ]]; then
+    return
+  fi
+
+  for candidate in "$HOME/.opencode/bin" "$HOME/.local/bin"; do
+    if path_contains_dir "$candidate"; then
+      shim_dir="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "${shim_dir:-}" ]]; then
+    echo "CodeQL CLI is installed, but no supported user bin directory is on PATH." >&2
+    echo "Add this directory to PATH or symlink manually: $codeql_bin" >&2
+    return
+  fi
+
+  mkdir -p "$shim_dir"
+  shim_path="$shim_dir/codeql"
+
+  if [[ -e "$shim_path" && ! -L "$shim_path" ]]; then
+    echo "CodeQL PATH shim already exists and is not a symlink: $shim_path" >&2
+    echo "Leaving it unchanged. CLI remains available at: $codeql_bin" >&2
+    return
+  fi
+
+  ln -sfn "$codeql_bin" "$shim_path"
+  echo "CodeQL PATH shim: $shim_path -> $codeql_bin"
+}
+
 CODEQL_BIN="$(ensure_codeql)"
+ensure_codeql_path_shim "$CODEQL_BIN"
 
 echo "CodeQL CLI: $CODEQL_BIN"
 "$CODEQL_BIN" version

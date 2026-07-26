@@ -25,6 +25,7 @@ Important framing:
 - `K-PLAYBOOK.MD` stores the chosen project-local base path as `base:` plus the individual block paths, so commands can use the base path directly when useful and do not need to infer it repeatedly.
 - `K-PLAYBOOK.MD` **always** contains the paths, even when they match the defaults, so later tools have one source of truth.
 - `/k-setup` is the only update/migration path for `K-PLAYBOOK.MD`; do not introduce a separate update command for managed-block format changes.
+- `/k-setup` also owns project-wide workflow policy blocks that are not specific to one scanner. In particular, it owns `k-setup-remediation`, which defines how `/k-remediation` is allowed to turn findings into work.
 
 ## Known building blocks
 
@@ -159,6 +160,12 @@ Compose the file content (see Step 6 for the exact format) with the resulting se
 - `repo`: absolute path to the k-playbook repository (best-effort; ask the user if unclear).
 - `setup-run`: today's date (`YYYY-MM-DD`).
 - Preserve unmanaged content from an existing file (anything outside the managed sections — see Step 6).
+- Preserve or add the optional `k-setup-remediation` managed block. If missing in update mode, ask which Remediation Mode to use:
+  - `task-branch-pr` - every correction is planned as a Task/Bundle with branch and PR. Best for production projects.
+  - `task-first` - corrections become Tasks/Bundles first; direct fixes only after explicit approval.
+  - `direct-allowed` - small safe fixes may be applied directly; larger work becomes Tasks.
+
+Recommended default for production or shared repos: `task-branch-pr`.
 
 Show the draft to the user with:
 
@@ -294,6 +301,21 @@ Commands (/k-run, /k-task-create, ...) lesen ihre Pfade hier heraus.
 - setup-run: 2026-07-12
 
 <!-- k-setup:managed:end -->
+
+<!-- k-setup-remediation:managed:begin -->
+
+## Remediation
+
+- mode:           task-branch-pr
+- target:         .
+- grouping:       true
+- quick-wins:     true
+- branch-prefix:  remediation/
+- pr-required:    true
+- direct-fixes:   false
+- setup-run:      2026-07-26
+
+<!-- k-setup-remediation:managed:end -->
 ```
 
 Rules for the managed block:
@@ -303,6 +325,7 @@ Rules for the managed block:
 - Inactive blocks: value is `-`.
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
 - `## Playbook-Quelle` lists the repo path (as given) and the ISO date of the last setup run.
+- `## Remediation` defines the project workflow for remediation work. `mode:` is required when the block exists. `target:` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./omni-gw`.
 
 ## Notes
 
