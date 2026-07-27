@@ -26,6 +26,7 @@ Important framing:
 - `K-PLAYBOOK.MD` **always** contains the paths, even when they match the defaults, so later tools have one source of truth.
 - `/k-setup` is the only update/migration path for `K-PLAYBOOK.MD`; do not introduce a separate update command for managed-block format changes.
 - `/k-setup` also owns project-wide workflow policy blocks that are not specific to one scanner. In particular, it owns `k-setup-remediation`, which defines how `/k-remediation` is allowed to turn findings into work.
+- `repo:` in `K-PLAYBOOK.MD` is fixed to `~/dev/k-playbook`. It is written for visibility and for commands to read, but `/k-setup` must not ask the user for an alternative repo path. If the real repo is elsewhere, `/k-install` or the Devcontainer setup must create a symlink so `~/dev/k-playbook` works.
 
 ## Known building blocks
 
@@ -43,19 +44,19 @@ The command knows the following building blocks (in this order):
 
 ## Step 0 — Host install preflight
 
-Before project setup, check whether k-playbook is installed for the current host/server:
+Before project setup, check whether k-playbook is installed for the current host/server using the fixed path contract:
 
-1. Determine the playbook repo path best-effort:
-   - If this command file is under a repo path, use that repo.
-   - Else if `./K-PLAYBOOK.MD` exists, read `## Playbook-Quelle` → `repo:`.
-   - Else try `~/dev/k-playbook`.
-2. Check OpenCode command symlinks:
+1. Set the expected playbook repo path to `~/dev/k-playbook`; expand `~` against the current user.
+2. If `~/dev/k-playbook` is missing but `/workspaces/k-playbook/commands/k-setup.md` exists, treat this as a Devcontainer path-contract gap and create or instruct creation of `~/dev/k-playbook -> /workspaces/k-playbook`. In non-interactive Devcontainer setup, the setup script may create it automatically.
+3. If `~/dev/k-playbook` is missing and current working directory itself is the k-playbook repo, tell the user to move/clone it to `~/dev/k-playbook` or run `/k-install` to create the symlink.
+4. Do not read `K-PLAYBOOK.MD` to choose an alternative basis-repo path. Existing non-standard `repo:` values should be migrated back to `~/dev/k-playbook` when the managed block is updated.
+5. Check OpenCode command symlinks:
    - Source files: `<repo>/commands/k-*.md`
    - Target dir: `~/.config/opencode/command/`
    - For each source file, expected target: `~/.config/opencode/command/<filename>`
-3. Check OpenCode skill path:
+6. Check OpenCode skill path:
    - `~/.config/opencode/opencode.jsonc` or `~/.config/opencode/opencode.json`
-   - `skills.paths` should include the repo path.
+   - `skills.paths` should include `~/dev/k-playbook`.
 
 If everything is ok: continue silently or with one short line.
 
@@ -157,7 +158,7 @@ Do **not** silently overwrite or remove anything the user did not confirm.
 
 Compose the file content (see Step 6 for the exact format) with the resulting set of paths and metadata:
 - `base`: the project-local playbook base path chosen in Step 2 or preserved/updated in Step 4.
-- `repo`: absolute path to the k-playbook repository (best-effort; ask the user if unclear).
+- `repo`: always `~/dev/k-playbook`. Do not ask. Do not preserve older absolute host paths in the managed block.
 - `setup-run`: today's date (`YYYY-MM-DD`).
 - Preserve unmanaged content from an existing file (anything outside the managed sections — see Step 6).
 - Preserve or add the optional `k-setup-remediation` managed block. If missing in update mode, ask which Remediation Mode to use:
@@ -324,7 +325,7 @@ Rules for the managed block:
 - Active blocks: value is the relative path (e.g. `./tasks`, `./TODO.md`, or `./k-playbook/TODO.md`).
 - Inactive blocks: value is `-`.
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
-- `## Playbook-Quelle` lists the repo path (as given) and the ISO date of the last setup run.
+- `## Playbook-Quelle` lists the fixed logical repo path `~/dev/k-playbook` and the ISO date of the last setup run. The path is not user-selectable; portability is achieved with a symlink when the physical repo lives elsewhere.
 - `## Remediation` defines the project workflow for remediation work. `mode:` is required when the block exists. `target:` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./omni-gw`.
 
 ## Notes

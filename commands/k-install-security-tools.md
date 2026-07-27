@@ -32,10 +32,9 @@ Pflicht-Tools:
 
 Bestimme `PLAYBOOK_REPO` wie in `/k-install`:
 
-1. Wenn der aktuelle Arbeitsordner selbst das k-playbook-Repo ist (`commands/` existiert und enthält `k-*.md`): diesen Pfad verwenden.
-2. Sonst, wenn `K-PLAYBOOK.MD` im aktuellen Projekt existiert: aus `## Playbook-Quelle` den Wert `repo:` lesen.
-3. Sonst Default prüfen: `~/dev/k-playbook`.
-4. Wenn unklar oder nicht vorhanden: User fragen, wo das globale k-playbook-Repo liegt.
+1. Fester logischer Pfad: `~/dev/k-playbook`.
+2. Wenn dieser Pfad fehlt, nicht nach einem alternativen Dauerpfad fragen. Den User auffordern, das Repo dorthin zu klonen/verschieben oder einen Symlink dorthin anzulegen.
+3. Wenn `/workspaces/k-playbook` existiert, aber `~/dev/k-playbook` fehlt, ist dies ein Devcontainer-Symlink-Problem; erst den Symlink `~/dev/k-playbook -> /workspaces/k-playbook` herstellen lassen.
 
 Pruefe danach:
 

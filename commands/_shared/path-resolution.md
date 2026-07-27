@@ -8,12 +8,12 @@ The calling command remains responsible for command-specific policy: which keys 
 
 When a command says to read and apply this module, locate it as `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-Determine `PLAYBOOK_REPO` best-effort:
+Determine `PLAYBOOK_REPO`:
 
-- If `<TARGET_DIR>/K-PLAYBOOK.MD` exists and contains `## Playbook-Quelle` with `repo:`, use that path.
-- Else if the slash-command file path can be resolved, use the parent repo that contains `commands/`.
-- Else try `~/dev/k-playbook`.
-- If still unclear, ask the user where the k-playbook repo is.
+- The canonical logical path is always `~/dev/k-playbook`; expand `~` against the current user.
+- If `<TARGET_DIR>/K-PLAYBOOK.MD` exists and contains `## Playbook-Quelle` with `repo:`, read it only as validation/documentation. Expected value is `~/dev/k-playbook`. If it differs, commands should warn and continue with `~/dev/k-playbook` when possible; `/k-setup` owns migrating the value back.
+- If `~/dev/k-playbook` is missing but `/workspaces/k-playbook` exists, this is likely a Devcontainer with a missing symlink. Commands may report a setup error; setup/install flows may create `~/dev/k-playbook -> /workspaces/k-playbook`.
+- If `~/dev/k-playbook` is missing, do not ask for a different permanent path. Ask the user to clone/move the repo there or create a symlink there.
 
 ## Determine `TARGET_DIR`
 

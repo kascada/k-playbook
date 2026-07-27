@@ -17,12 +17,12 @@ Global gelten alle Markdown-Dateien unter:
 
 `<PLAYBOOK_REPO>/global/rules/*.md`
 
-`PLAYBOOK_REPO` wird best-effort bestimmt:
+`PLAYBOOK_REPO` folgt dem festen Pfadvertrag:
 
-- Aus `<TARGET_DIR>/K-PLAYBOOK.MD` → `## Playbook-Quelle` → `repo:`.
-- Sonst aus dem Pfad des aufgerufenen Commands oder Skills.
-- Sonst Fallback `~/dev/k-playbook`.
-- Wenn weiterhin unklar: User fragen.
+- Erwartet ist `~/dev/k-playbook`.
+- `<TARGET_DIR>/K-PLAYBOOK.MD` darf denselben Wert unter `## Playbook-Quelle` → `repo:` sichtbar enthalten.
+- Wenn das physische Repo woanders liegt, muss ein Symlink dafuer sorgen, dass `~/dev/k-playbook` funktioniert.
+- Wenn `~/dev/k-playbook` fehlt: warnen und den User auffordern, `/k-install` oder das Devcontainer-Setup auszufuehren.
 
 ### Projektlokal
 

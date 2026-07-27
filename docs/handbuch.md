@@ -24,6 +24,10 @@ k-playbook trennt globale Bausteine von projektlokalen Daten.
 
 `K-PLAYBOOK.MD` ist die zentrale Pointer-Datei im Projekt. Commands sollen keine Projektpfade raten, sondern diese Datei lesen.
 
+`~/dev/k-playbook` ist dabei der verbindliche logische Pfad zum globalen Basis-Repo. Auf normalen Hosts liegt dort entweder das echte Repo oder ein Symlink auf den echten Klon. In Devcontainern liegt dort typischerweise ein Symlink auf den gemounteten Repo-Pfad, z. B. `/home/vscode/dev/k-playbook -> /workspaces/k-playbook`. Dadurch bleibt der `repo:`-Eintrag in `K-PLAYBOOK.MD` auf Host und Container identisch.
+
+Das Basis-Repo wird zur Laufzeit gebraucht: OpenCode-Command-Eintraege sind Symlinks auf `commands/k-*.md`, Skills werden ueber `skills.paths` aus dem Repo geladen, und Commands/Skills nutzen den `repo:`-Rueckverweis fuer globale Regeln, Shared-Module und Skripte.
+
 Typische projektlokale Pfade:
 
 ```markdown
@@ -58,7 +62,7 @@ Optional pro Projekt:
 /k-setup-codeql
 ```
 
-Details stehen in [`installation.md`](./installation.md) und [`commands.md`](./commands.md).
+Details stehen in [`installation.md`](./installation.md), [`commands.md`](./commands.md) und der kurzen [`FAQ`](./faq.md).
 
 ## Bausteine
 
@@ -132,7 +136,7 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 
 1. Repo nach `~/dev/k-playbook` klonen.
 2. OpenCode starten.
-3. `/k-install` ausfuehren.
+3. Im k-playbook-Repo `/k-install` ausfuehren.
 4. Falls ein Python-venv aktiv ist: `deactivate` ausfuehren.
 5. Fehlende Security-Tools mit `/k-install-security-tools --install missing` installieren.
 6. OpenCode neu starten.
@@ -143,6 +147,14 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 2. Benoetigte Bausteine aktivieren, z. B. `tasks`, `todo`, `reviews`, `docs`, `enforcement`.
 3. Optional `/k-setup-codeql` ausfuehren.
 4. Mit `/k-status` pruefen, ob Pfade und Grundstruktur plausibel sind.
+
+### Zielprojekt Im Devcontainer
+
+1. Host-Repo `~/dev/k-playbook` in den Container mounten, empfohlen nach `/workspaces/k-playbook`.
+2. Im Container `~/dev/k-playbook` als Symlink auf den Mount anlegen.
+3. Container-lokale OpenCode-Command-Symlinks nach `~/.config/opencode/command/` erzeugen oder `/k-install` im Container ausfuehren.
+4. Container-lokale OpenCode-User-Config mit `skills.paths: ["~/dev/k-playbook"]` sicherstellen.
+5. Im Zielprojekt `/k-status` ausfuehren; die Sections `playbook`, `opencode` und `devcontainer` muessen plausibel sein.
 
 ### Docs-First Aufsetzen
 
@@ -172,8 +184,10 @@ run-metadata.json
 ## Betriebsregeln
 
 - `/k-install*` ist host-global und schreibt keine Projektdateien.
+- `/k-install` wird bevorzugt im k-playbook-Repo ausgefuehrt; aus Projekten ist es erlaubt, nutzt aber immer den festen Pfad `~/dev/k-playbook`.
 - `/k-setup*` ist projektlokal und installiert keine host-globalen Tools.
 - `K-PLAYBOOK.MD` ist Konfiguration, keine User-Dokumentation.
+- `repo:` in `K-PLAYBOOK.MD` ist fest `~/dev/k-playbook`; andere physische Repo-Orte werden ueber Symlinks abgebildet.
 - Projektpfade werden nicht geraten, sondern aus `K-PLAYBOOK.MD` gelesen.
 - Review-Rohdaten und Run-Metadaten sind auditierbar und werden nicht still ueberschrieben.
 - Projektwissen gehoert in `docs/`; AI-Sessions sollen Docs zuerst konsultieren.

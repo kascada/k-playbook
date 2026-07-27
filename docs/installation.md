@@ -18,6 +18,49 @@ Alternative:
 git clone git@github.com:kascada/k-playbook.git ~/dev/k-playbook
 ```
 
+Dieser Pfad ist der verbindliche Pfadvertrag fuer k-playbook. Projektdateien wie `K-PLAYBOOK.MD`, OpenCode `skills.paths` und Command-Symlinks zeigen auf `~/dev/k-playbook`, nicht auf einen host-spezifischen absoluten Pfad.
+
+Wenn das echte Repo woanders liegt, wird nicht die Projektkonfiguration angepasst. Stattdessen muss `~/dev/k-playbook` als Symlink auf den echten Klon zeigen:
+
+```bash
+mkdir -p ~/dev
+ln -sfn /pfad/zum/k-playbook ~/dev/k-playbook
+```
+
+Warum das Basis-Repo dauerhaft gebraucht wird:
+
+- OpenCode-Commands werden als Symlinks nach `~/.config/opencode/command/` registriert; die Symlink-Ziele bleiben Dateien unter `~/dev/k-playbook/commands/`.
+- Skills werden ueber `skills.paths: ["~/dev/k-playbook"]` aus dem Basis-Repo geladen.
+- Commands und Skills lesen bei der Arbeit im Zielprojekt `K-PLAYBOOK.MD`; dessen `repo:`-Eintrag dient als Rueckverweis auf das Basis-Repo fuer Shared-Module, globale Regeln, globale Checks und Skripte.
+
+## Devcontainer-Pfadvertrag
+
+Wenn ein Zielprojekt in einem Devcontainer laeuft, muss derselbe logische Pfad `~/dev/k-playbook` auch im Container funktionieren. Das empfohlene Layout ist:
+
+```text
+Host:
+  ~/dev/k-playbook                         echtes Basis-Repo
+
+Container:
+  /workspaces/k-playbook                   Bind-Mount des Host-Repos
+  /home/vscode/dev/k-playbook              Symlink auf /workspaces/k-playbook
+```
+
+Damit bleibt dieser Eintrag in `K-PLAYBOOK.MD` auf Host und Container gleich:
+
+```markdown
+- repo: ~/dev/k-playbook
+```
+
+Der Devcontainer des Zielprojekts sollte diesen Symlink beim Start erzeugen, z. B.:
+
+```bash
+mkdir -p /home/vscode/dev
+ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
+```
+
+Wenn `repo: ~/dev/k-playbook` im Container steht, bedeutet das also **nicht**, dass das Repo physisch dort kopiert wird. Der Pfad wird ueber den Symlink auf den Bind-Mount `/workspaces/k-playbook` aufgeloest.
+
 ## Schnellstart Neuer Host
 
 Auf einem neuen Host sind zwei Dinge getrennt:
@@ -31,6 +74,8 @@ Host-global:
 /k-install
 /k-install-security-tools --install missing
 ```
+
+Empfohlen wird der Aufruf direkt im k-playbook-Repo nach dem Klonen oder nach einem Pull. Aus einem Zielprojekt heraus ist `/k-install` ebenfalls moeglich; der Command nutzt dennoch den festen Pfad `~/dev/k-playbook` und aktualisiert nur die host-globale OpenCode-Registrierung.
 
 Danach OpenCode neu starten.
 
@@ -47,6 +92,8 @@ Optional pro Projekt:
 ```
 
 Merksatz: `/k-install*` gehoert zum Host, `/k-setup*` gehoert zum Projekt.
+
+Haeufige Fragen zum Aufrufort und zu Projekt-venvs stehen in [`faq.md`](./faq.md).
 
 ## OpenCode Setup
 
@@ -67,6 +114,8 @@ Der Command erledigt host-lokal:
 - daran erinnern, OpenCode neu zu starten.
 
 Nach neuen Dateien unter `commands/k-*.md` auf jedem Host erneut `/k-install` ausfuehren.
+
+Wenn `/k-install` aus einem Projekt heraus gestartet wird, waehlt der Command keinen projektspezifischen Repo-Pfad. Er prueft `~/dev/k-playbook`. Falls der aktuelle Arbeitsordner selbst ein k-playbook-Klon ist, aber nicht unter `~/dev/k-playbook` liegt, soll der Command vorschlagen, den Klon dorthin zu verschieben oder nach Bestaetigung einen Symlink nach `~/dev/k-playbook` anzulegen.
 
 ### Bootstrap Wenn `/k-install` Noch Nicht Sichtbar Ist
 
@@ -147,6 +196,8 @@ Der Command:
 
 `K-PLAYBOOK.MD` ist die zentrale Pointer-Datei. Spaetere Commands lesen daraus, wo projektlokale Bausteine liegen.
 
+Der `repo:`-Eintrag im Managed Block ist fest `~/dev/k-playbook`. Er ist sichtbar und wird von Commands gelesen, aber nicht als frei waehlbarer Pfad behandelt. Wenn der physische Klon woanders liegt, muss ein Symlink den Pfadvertrag erfuellen.
+
 ## Optional: CodeQL
 
 Wenn ein Projekt CodeQL nutzen soll:
@@ -178,6 +229,7 @@ Checkliste fuer einen Host:
 - [ ] `~/dev/k-playbook/` existiert und ist ein Git-Repo.
 - [ ] `~/.config/opencode/opencode.jsonc` oder `.json` enthaelt `skills.paths` mit dem Repo-Pfad.
 - [ ] Symlinks unter `~/.config/opencode/command/` zeigen auf `commands/k-*.md`.
+- [ ] `/k-status` zeigt `OpenCode: OK` oder empfiehlt `/k-install` fuer fehlende/falsche Symlinks.
 - [ ] OpenCode wurde neu gestartet.
 - [ ] Autocomplete zeigt `/k-*`-Commands.
 - [ ] Ein Test-Skill wird bei passendem Thema geladen.
@@ -188,9 +240,18 @@ Checkliste fuer ein Projekt:
 
 - [ ] `K-PLAYBOOK.MD` existiert im Projekt-Root.
 - [ ] `base:` ist gesetzt.
+- [ ] `repo:` zeigt auf `~/dev/k-playbook`.
 - [ ] Benoetigte Pfade sind aktiv und existieren.
 - [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
 - [ ] Bei aktiven Docs existiert ein Docs-Index oder `/k-code2docs` ist als naechster Schritt geplant.
+
+Checkliste fuer einen Devcontainer:
+
+- [ ] `/workspaces/k-playbook/commands/` existiert durch den Bind-Mount.
+- [ ] `~/dev/k-playbook` existiert im Container und zeigt auf `/workspaces/k-playbook`.
+- [ ] `~/.config/opencode/command/k-install.md` ist ein Symlink auf `~/dev/k-playbook/commands/k-install.md` oder den aufgeloesten Bind-Mount-Pfad.
+- [ ] `~/.config/opencode/opencode.jsonc` oder `.json` enthaelt `skills.paths` mit `~/dev/k-playbook`.
+- [ ] `/k-status` meldet die Devcontainer-Pfadstruktur nicht als Warnung.
 
 ## Fehlersuche
 

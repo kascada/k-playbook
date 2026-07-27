@@ -1,5 +1,5 @@
 ---
-description: Fast read-only health check for K-PLAYBOOK.MD, registered paths, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
+description: Fast read-only health check for K-PLAYBOOK.MD, OpenCode symlinks, registered paths, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
 argument-hint: [full|codeql|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -12,6 +12,8 @@ Show a fast, read-only health overview for the current project.
 This command is a status preflight, not a repair command:
 
 - Read `K-PLAYBOOK.MD` as the single source of truth for playbook paths and CodeQL decisions.
+- Check host-local OpenCode command symlinks read-only against the resolved k-playbook repo.
+- Check the canonical k-playbook repo path contract, including the Devcontainer symlink case.
 - Prefer small existence and metadata checks over heavy scans.
 - Do not create files, change config, install tools, create CodeQL databases, run CodeQL analysis, upload SARIF, or print Git diffs.
 - Keep output compact and grouped by section so more checks can be added later.
@@ -39,7 +41,13 @@ Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md
 - Read `<TARGET_DIR>/K-PLAYBOOK.MD` if present. If missing, record `K_PLAYBOOK_FOUND=false` and continue with the checks that do not require it.
 - If `K-PLAYBOOK.MD` exists but `base:` is missing, report it as `FAIL` and recommend `/k-setup`; do not infer a base path.
 
-Determine `PLAYBOOK_REPO` best-effort from `K-PLAYBOOK.MD` `## Playbook-Quelle` → `repo:`, else from the command file location, else `~/dev/k-playbook`. Do not ask in this command; if unclear, report it as `WARN`.
+Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` against the current process home before checking the filesystem. Read `K-PLAYBOOK.MD` `## Playbook-Quelle` → `repo:` only as validation metadata; expected value is `~/dev/k-playbook`. Do not ask for an alternate repo path in this command.
+
+Canonical path rule:
+
+- Require `repo: ~/dev/k-playbook` in project `K-PLAYBOOK.MD`; `/k-setup` owns writing or migrating that value.
+- Absolute host paths such as `/home/kleist/dev/k-playbook` are valid only on that host and should be reported as `WARN` in portable projects, especially when `/workspaces/k-playbook` exists.
+- In a Devcontainer, `repo: ~/dev/k-playbook` should resolve to `/home/vscode/dev/k-playbook`, usually a symlink to `/workspaces/k-playbook`.
 
 ## Step 2 — Parse K-PLAYBOOK.MD
 
@@ -78,6 +86,72 @@ Report:
 - `repo:` from `## Playbook-Quelle`, if present.
 - `setup-run:` from `## Playbook-Quelle`, if present.
 - In `full` mode, print or fully summarize `K-PLAYBOOK.MD` after the compact report.
+
+## Section: opencode
+
+Run in default, `full`, and `strict` modes. In `codeql` and `reviews` modes, skip this section unless the resolved `PLAYBOOK_REPO` itself is unclear and relevant to the mode.
+
+Check the host-local OpenCode registration read-only:
+
+- `OPENCODE_COMMAND_DIR = ~/.config/opencode/command`.
+- `OPENCODE_CONFIG_FILE`: prefer `~/.config/opencode/opencode.jsonc`, else `~/.config/opencode/opencode.json`, else mark config as missing.
+- Count files `<PLAYBOOK_REPO>/commands/k-*.md`.
+- For each repo command, check whether `<OPENCODE_COMMAND_DIR>/k-*.md` exists.
+- If the matching OpenCode entry is a symlink, resolve it and check whether it points to the repo command file.
+- If the matching OpenCode entry exists but is not a symlink, report it as `WARN` because `/k-install` cannot safely assume ownership.
+- Count broken or stale `k-*.md` symlinks in `OPENCODE_COMMAND_DIR` that point into the resolved `PLAYBOOK_REPO` but whose target no longer exists.
+- Check whether `PLAYBOOK_REPO` appears in `skills.paths` when the OpenCode config exists. If JSON/JSONC parsing is too fragile, use a conservative text search for the repo path and report `WARN` when unclear.
+
+Do not create directories, edit config, fix links, or delete stale links.
+
+Status:
+
+- `OK`: command dir exists, every repo command has a symlink pointing to the expected file, no stale owned links were found, and `skills.paths` appears to contain `PLAYBOOK_REPO`.
+- `WARN`: command dir missing, some command links are missing/wrong/non-symlink, stale owned links exist, OpenCode config is missing, or `skills.paths` cannot be confirmed.
+- `FAIL`: only if the resolved `PLAYBOOK_REPO` has no `commands/k-*.md` files or cannot be read.
+
+Suggested detail format:
+
+```text
+OpenCode:      WARN, commands 18/20 verlinkt, 1 falsch, 1 verwaist, skills.paths ok
+```
+
+In `full` mode, include a short list of missing, wrong, non-symlink, and stale links, capped at a readable number. Recommend `/k-install` when this section is `WARN` or `FAIL` due to link/config registration issues.
+
+## Section: devcontainer
+
+Run in default, `full`, and `strict` modes when either `/workspaces/k-playbook` exists, `/home/vscode` exists, the current `HOME` is `/home/vscode`, or `TARGET_DIR` is under `/workspaces/`. Otherwise skip this section silently.
+
+Check the Devcontainer path contract read-only:
+
+- `/workspaces/k-playbook/commands/` exists and contains `k-*.md`.
+- `~/dev/k-playbook` exists after tilde expansion in the container.
+- If `~/dev/k-playbook` is a symlink, `readlink` or equivalent resolution points to `/workspaces/k-playbook`.
+- If `K-PLAYBOOK.MD` has `repo: ~/dev/k-playbook`, the resolved path exists and points to the same physical directory as `/workspaces/k-playbook` when possible.
+- If `K-PLAYBOOK.MD` has an absolute host path while the Devcontainer mount exists, report a portability `WARN` and recommend changing it to `~/dev/k-playbook` plus the symlink.
+- `~/.config/opencode/command/k-install.md` exists and resolves to a command file under the resolved playbook repo or under `/workspaces/k-playbook`.
+- `~/.config/opencode/opencode.jsonc` or `.json` contains `skills.paths` with `~/dev/k-playbook` or the resolved equivalent.
+
+Do not create the symlink and do not edit OpenCode config from `/k-status`.
+
+Status:
+
+- `OK`: mount exists, `~/dev/k-playbook` exists and resolves to the mount, command symlink exists, and `skills.paths` is plausible.
+- `WARN`: mount exists but symlink/config/command registration is missing or `repo:` is host-absolute instead of portable.
+- `FAIL`: Devcontainer appears active but neither `/workspaces/k-playbook` nor the resolved `PLAYBOOK_REPO` contains `commands/k-*.md`.
+
+Suggested detail format:
+
+```text
+Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook, command links ok
+```
+
+Recommended fix when the symlink is missing:
+
+```bash
+mkdir -p /home/vscode/dev
+ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
+```
 
 ## Section: paths
 
@@ -298,13 +372,15 @@ Priority order:
 
 1. Missing `K-PLAYBOOK.MD` or missing `base:` → `/k-setup`.
 2. Missing required or configured playbook paths from `paths` → `/k-setup`.
-3. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
-4. CodeQL local database active/planned with missing database or CLI → `/k-install-codeql`.
-5. Dependabot enabled with missing target/config/repo/auth → `/k-review dependabot-alerts` only after setup is corrected.
-6. Open numbered tasks → `/k-run`.
-7. Review files exist and are due, or review support files are incomplete → `/k-review`.
-8. Missing docs index → `/k-code2docs`.
-9. Missing libs index → `/k-tools-scan`.
+3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-setup` for this.
+4. OpenCode command symlinks or `skills.paths` incomplete → `/k-install`.
+5. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
+6. CodeQL local database active/planned with missing database or CLI → `/k-install-codeql`.
+7. Dependabot enabled with missing target/config/repo/auth → `/k-review dependabot-alerts` only after setup is corrected.
+8. Open numbered tasks → `/k-run`.
+9. Review files exist and are due, or review support files are incomplete → `/k-review`.
+10. Missing docs index → `/k-code2docs`.
+11. Missing libs index → `/k-tools-scan`.
 
 Do not list more than three commands. Do not recommend commands that would clearly be irrelevant to the current mode; for example, `codeql` mode should not recommend `/k-run` just because tasks exist.
 
@@ -317,6 +393,8 @@ Default and `strict` output should be compact and scanable:
 ────────────────────────
 Projekt:       /path/to/project
 K-PLAYBOOK:    OK (setup-run 2026-07-20)
+OpenCode:      WARN, commands 18/20 verlinkt, 1 verwaist, skills.paths ok
+Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook
 Pfade:         OK 7 / WARN 1 / FAIL 0
 Tasks:         WARN, 3 offen, nächste: 002-k-status.md
 TODO:          OK, 0 offen
@@ -352,6 +430,7 @@ In `json` mode, produce best-effort JSON with these top-level keys when feasible
   "project": "/path/to/project",
   "mode": "json",
   "playbook": {},
+  "opencode": {},
   "paths": {},
   "tasks": {},
   "todo": {},

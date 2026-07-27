@@ -4,6 +4,8 @@
 
 ## Schnellstart
 
+Pfadvertrag: `k-playbook` muss in jeder Umgebung unter `~/dev/k-playbook` erreichbar sein. Wenn der echte Klon woanders liegt, lege einen Symlink nach `~/dev/k-playbook` an.
+
 ```bash
 gh repo clone kascada/k-playbook ~/dev/k-playbook
 ```
@@ -31,6 +33,7 @@ Der Einstieg ist das Handbuch:
 
 - [`docs/handbuch.md`](./docs/handbuch.md) - Zweck, Konzepte, Standardablaeufe und Betriebsregeln.
 - [`docs/installation.md`](./docs/installation.md) - Installation fuer OpenCode, Security-Tools und optional Claude Code.
+- [`docs/faq.md`](./docs/faq.md) - Kurze Antworten zu `/k-install`, Aufrufort und Projekt-venvs.
 - [`docs/commands.md`](./docs/commands.md) - Zuständigkeiten und Details der wichtigsten Commands.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Review-, Results- und Remediation-Flow.
 - [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
@@ -44,6 +47,32 @@ Der Einstieg ist das Handbuch:
 | `global/rules/` | Projektuebergreifende Enforcement-Regeln | Skill `ks-enforcement` oder `/k-enforcement` |
 | `global/reviews/` | Wiederverwendbare Review-Rezepte | `/k-review <name>` |
 | `global/checks/` | Schnelle generische Checks | `global/bin/k-check` |
+
+## Symlink-Struktur
+
+`/k-install` registriert dieses Repo host-lokal fuer OpenCode. Die Command-Dateien bleiben im Repo; OpenCode bekommt Symlinks:
+
+```text
+~/.config/opencode/command/
+├── k-install.md          -> ~/dev/k-playbook/commands/k-install.md
+├── k-status.md           -> ~/dev/k-playbook/commands/k-status.md
+├── k-setup.md            -> ~/dev/k-playbook/commands/k-setup.md
+└── k-*.md                -> ~/dev/k-playbook/commands/k-*.md
+```
+
+Skills werden nicht einzeln verlinkt. Stattdessen muss das Repo in der OpenCode-Konfiguration stehen:
+
+```jsonc
+{
+  "skills": {
+    "paths": ["~/dev/k-playbook"]
+  }
+}
+```
+
+Security-Tools liegen separat host-/user-lokal, typischerweise unter `~/.opencode/bin` oder `~/.local/bin`. Python-CLI-Tools wie `pip-audit` nutzen `pipx` oder ein dediziertes k-playbook Tool-venv unter `~/.local/share/k-playbook/`, nie ein Projekt-venv.
+
+`/k-status` prueft read-only, ob die OpenCode-Symlinks auf die erwarteten Dateien in diesem Repo zeigen und ob `skills.paths` plausibel gesetzt ist. Repariert wird mit `/k-install`.
 
 ## Grundprinzipien
 

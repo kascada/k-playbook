@@ -15,6 +15,17 @@ Typische Nutzung:
 - Erneut nach dem Hinzufügen neuer Dateien unter `commands/k-*.md`, damit neue Symlinks angelegt werden.
 - Nach dem Einrichten eines Hosts, um den Status der global genutzten Security-Review-Tools zu sehen.
 
+Aufrufort:
+- Bevorzugt direkt im k-playbook-Repo nach Clone/Pull.
+- Aus einem Zielprojekt ist erlaubt; `/k-install` nutzt trotzdem den festen Pfadvertrag `~/dev/k-playbook`.
+- Der Effekt bleibt immer host-global: OpenCode-Symlinks und Skill-Pfad werden fuer diesen Host aktualisiert, nicht das aktuelle Projekt.
+
+Pfadvertrag:
+- Der feste logische Repo-Pfad ist `~/dev/k-playbook`.
+- `K-PLAYBOOK.MD` darf diesen Pfad sichtbar als `repo: ~/dev/k-playbook` enthalten, aber `/k-install` fragt ihn nicht ab und behandelt ihn nicht als frei waehlbar.
+- Wenn der echte Klon woanders liegt, soll `/k-install` vorschlagen, ihn nach `~/dev/k-playbook` zu verschieben. Wenn der User das nicht will, darf `/k-install` nach Bestaetigung einen Symlink von `~/dev/k-playbook` auf den echten Klon anlegen.
+- In Devcontainern gilt derselbe Vertrag: `~/dev/k-playbook` muss existieren; typischerweise ist `/home/vscode/dev/k-playbook` ein Symlink auf `/workspaces/k-playbook`.
+
 Hinweis zum Bootstrap:
 Wenn `/k-install` auf einem frischen Server noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `docs/installation.md` ausführen oder zumindest diesen Command direkt symlinken:
 
@@ -27,15 +38,31 @@ Danach OpenCode neu starten und `/k-install` ausführen.
 
 ---
 
-## Schritt 1 — Playbook-Repo bestimmen
+## Schritt 1 — Pfadvertrag sicherstellen
 
-Bestimme `PLAYBOOK_REPO`:
+Setze immer:
 
-1. Wenn der aktuelle Arbeitsordner selbst das k-playbook-Repo ist (`commands/` existiert und enthält `k-*.md`): diesen Pfad verwenden.
-2. Sonst, wenn `K-PLAYBOOK.MD` im aktuellen Projekt existiert: aus `## Playbook-Quelle` den Wert `repo:` lesen.
-3. Sonst Default prüfen: `~/dev/k-playbook`.
-4. Wenn unklar oder nicht vorhanden: User fragen:
-   > "Wo liegt das k-playbook-Repo auf diesem Server?"
+```text
+PLAYBOOK_REPO=~/dev/k-playbook
+```
+
+Expand `~` gegen das Home des aktuellen Users (`/home/vscode` im Devcontainer). Danach pruefen:
+
+1. Wenn `~/dev/k-playbook/commands/k-install.md` existiert: Pfadvertrag ist erfuellt.
+2. Wenn der aktuelle Arbeitsordner selbst ein k-playbook-Repo ist (`commands/` existiert und enthält `k-*.md`), aber nicht `~/dev/k-playbook`:
+   - Dem User sagen: `k-playbook` soll unter `~/dev/k-playbook` erreichbar sein.
+   - Vorschlag 1: Repo nach `~/dev/k-playbook` verschieben/klonen.
+   - Wenn der User nicht verschieben will: nach Bestaetigung `mkdir -p ~/dev && ln -sfn "<aktueller-repo-pfad>" ~/dev/k-playbook` ausfuehren.
+3. Wenn `/workspaces/k-playbook/commands/k-install.md` existiert und `~/dev/k-playbook` fehlt, ist dies der Devcontainer-Fall:
+   - Nach Bestaetigung oder wenn dies aus einem Devcontainer-Setup-Skript laeuft: `mkdir -p ~/dev && ln -sfn /workspaces/k-playbook ~/dev/k-playbook` ausfuehren.
+4. Wenn `~/dev/k-playbook` fehlt und kein plausibler Klon aus aktuellem Arbeitsordner oder `/workspaces/k-playbook` erkennbar ist:
+   - Abbrechen und dem User vorschlagen, das Repo dorthin zu klonen:
+
+```bash
+gh repo clone kascada/k-playbook ~/dev/k-playbook
+```
+
+Nicht nach einem alternativen dauerhaften Repo-Pfad fragen. Der Vertrag bleibt `~/dev/k-playbook`; Abweichungen werden ueber Symlinks geloest.
 
 Anschließend prüfen:
 
@@ -86,12 +113,12 @@ Wenn ein Link in `OPENCODE_COMMAND_DIR` auf eine nicht mehr existierende Datei u
 
 ## Schritt 4 — Skill-Pfad prüfen
 
-OpenCode-Skills werden über `skills.paths` registriert. Prüfen, ob `PLAYBOOK_REPO` in der OpenCode-Konfig enthalten ist.
+OpenCode-Skills werden über `skills.paths` registriert. Prüfen, ob `~/dev/k-playbook` in der OpenCode-Konfig enthalten ist.
 
 Vorgehen:
 
 1. Wenn `OPENCODE_CONFIG_FILE` existiert: lesen.
-2. Wenn kein `skills.paths` existiert oder `PLAYBOOK_REPO` nicht enthalten ist: Änderung vorschlagen.
+2. Wenn kein `skills.paths` existiert oder `~/dev/k-playbook` nicht enthalten ist: Änderung vorschlagen.
 3. Wenn die Datei nicht existiert: fragen, ob sie angelegt werden soll.
 
 Vorgeschlagene Minimal-Konfig, falls neu:
@@ -100,7 +127,7 @@ Vorgeschlagene Minimal-Konfig, falls neu:
 {
   "$schema": "https://opencode.ai/config.json",
   "skills": {
-    "paths": ["<PLAYBOOK_REPO>"]
+    "paths": ["~/dev/k-playbook"]
   }
 }
 ```
@@ -120,7 +147,7 @@ Wenn `~/.claude/` existiert: Status anzeigen.
 Empfohlener Symlink für Claude Code:
 
 ```bash
-ln -sfn <PLAYBOOK_REPO>/commands ~/.claude/commands
+ln -sfn ~/dev/k-playbook/commands ~/.claude/commands
 ```
 
 Nicht automatisch ausführen, außer der User fragt ausdrücklich danach. Dieser Command ist primär für OpenCode.
@@ -171,7 +198,7 @@ Ausgabe:
 ```text
 k-install abgeschlossen
 ─────────────────────────────────────
-Repo:        <PLAYBOOK_REPO>
+Repo:        ~/dev/k-playbook
 Commands:    <n> Symlinks ok / <m> neu oder aktualisiert
 Skills:      ok | fehlt | manuell nötig
 SecTools:    ok | <n> Pflicht-Tools fehlen | Preflight fehlt
@@ -184,7 +211,7 @@ Wichtig: OpenCode neu starten, damit neue Commands und Skills sichtbar werden.
 
 ## Fehlerfälle
 
-- **Repo nicht gefunden**: Pfad erfragen oder abbrechen.
-- **Keine Commands gefunden**: abbrechen — wahrscheinlich falscher Repo-Pfad.
+- **Repo nicht gefunden**: nicht nach einem alternativen Dauerpfad fragen; Clone nach `~/dev/k-playbook` oder Symlink dorthin vorschlagen.
+- **Keine Commands gefunden**: abbrechen — `~/dev/k-playbook` zeigt nicht auf ein k-playbook-Repo.
 - **OpenCode-Konfig nicht sicher editierbar**: nicht überschreiben; stattdessen konkrete manuelle Änderung ausgeben.
 - **Symlink-Ziel existiert nicht**: Link nicht anlegen; Fehler in Zusammenfassung melden.

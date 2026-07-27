@@ -12,6 +12,7 @@ Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./review
 
 - `/k-install` und `/k-install-security-tools` sind **host-global**. Sie machen Commands, Skills und Security-Tools auf diesem Server fuer alle Projekte verfuegbar.
 - `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.MD` und projektlokale Playbook-Pfade.
+- Der globale k-playbook-Pfad ist fest `~/dev/k-playbook`. Wenn der physische Klon woanders liegt, wird ein Symlink nach `~/dev/k-playbook` angelegt; Projektkonfigurationen waehlen keinen eigenen Basis-Repo-Pfad.
 - Host-Installation schreibt keine Projektdateien.
 - Projekt-Setup installiert keine host-globalen Tools.
 - `/k-install*` darf nicht in einem aktiven Projekt-venv laufen. Falls `VIRTUAL_ENV` gesetzt ist: zuerst `deactivate`.
@@ -44,6 +45,7 @@ Projekt mit CodeQL-Entscheidung:
 | `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.MD` und gewaehlte Playbook-Pfade | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt CodeQL-Block in `K-PLAYBOOK.MD` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.MD` | optional `codeql-cli/`, `databases/`, `results/` |
+| `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | liest `reviews:` und optional `tasks:` | schreibt `<reviews>/results/summary-YYYY-MM-DD.md` |
 | `global/bin/k-check` | globale und projektlokale Checks ausfuehren | liest `checks:` aus `K-PLAYBOOK.MD` | stdout/stderr; optional Raw-Output + Run-Metadaten fuer Review-Artefakte |
 
@@ -63,6 +65,13 @@ Typische Nutzung:
 
 - einmal pro Server nach dem Klonen von `k-playbook`
 - erneut nach neuen oder umbenannten Dateien unter `commands/k-*.md`
+
+Aufrufort:
+
+- Bevorzugt im k-playbook-Repo nach Clone oder Pull.
+- Aus einem Zielprojekt ist erlaubt; der feste Pfadvertrag `~/dev/k-playbook` gilt trotzdem.
+- Der Effekt ist trotzdem immer host-global; das Zielprojekt wird nicht geaendert.
+- Wenn der Klon woanders liegt, soll `/k-install` vorschlagen, ihn nach `~/dev/k-playbook` zu legen oder nach Bestaetigung einen Symlink dorthin anzulegen.
 
 Wenn Pflicht-Tools fuer Security-Reviews fehlen, installiert `/k-install` sie nicht selbst, sondern nennt den Folge-Command:
 
@@ -127,6 +136,8 @@ Der Command:
 
 `K-PLAYBOOK.MD` ist dabei eine Pointer-/Config-Datei. Spaetere Commands lesen daraus, wo die projektlokalen Bausteine liegen.
 
+`/k-setup` schreibt `repo: ~/dev/k-playbook` in den Managed Block. Dieser Wert ist nicht interaktiv waehlbar; Abweichungen werden ueber Symlinks geloest.
+
 ## `/k-setup-codeql`
 
 `/k-setup-codeql` gehoert zur Projektkonfiguration und besitzt den CodeQL-Block in `K-PLAYBOOK.MD`.
@@ -185,6 +196,16 @@ Die Trennung ist absichtlich:
 - `/k-install-codeql` installiert oder betreibt lokale CodeQL-Artefakte, ohne Projekt-Konfig zu schreiben.
 
 Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder erzeugt grosse lokale Artefakte.
+
+## `/k-status`
+
+`/k-status` ist read-only. Neben Projektstatus aus `K-PLAYBOOK.MD` prueft der Command auch die host-lokale OpenCode-Registrierung:
+
+- ob `~/.config/opencode/command/k-*.md` auf die erwarteten Dateien unter `<PLAYBOOK_REPO>/commands/` zeigt.
+- ob verwaiste k-playbook-Symlinks existieren.
+- ob `skills.paths` das k-playbook-Repo plausibel enthaelt.
+
+`/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist `/k-install` die naechste Aktion.
 
 ## `/k-results`
 

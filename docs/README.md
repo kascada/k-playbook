@@ -8,6 +8,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 |---|---|
 | [`handbuch.md`](./handbuch.md) | Zentrale Beschreibung: Zweck, Konzepte, Standardablaeufe, Betriebsregeln. |
 | [`installation.md`](./installation.md) | Host-Installation, OpenCode-Setup, Security-Tools, optional Claude Code. |
+| [`faq.md`](./faq.md) | Kurze Antworten zu `/k-install`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
 | [`../global/checks/README.md`](../global/checks/README.md) | Schnittstelle und Nutzung von `global/bin/k-check`. |
@@ -29,6 +30,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
 - `Installation` -> [`installation.md`](./installation.md)
 - `K-PLAYBOOK.MD` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
+- `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
 - `Remediation` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Reviews` -> [`reviews-and-results.md`](./reviews-and-results.md)
