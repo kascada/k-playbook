@@ -389,6 +389,8 @@ Was man zum Loesen braucht:
 
 Tool-Installation und Docker-Fallbacks gehoeren ins globale k-playbook, nicht in einzelne Zielprojekte.
 
+Vor Installation darf kein Projekt-venv aktiv sein. Python-CLI-Tools gehoeren in `pipx` oder ein dediziertes k-playbook Tool-venv, nicht in `<projekt>/.venv`.
+
 Host-lokaler Preflight:
 
 ```text

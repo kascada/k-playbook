@@ -1,4 +1,35 @@
+# Private/local material
 priv/
+.priv/
+/k-playbook/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python/runtime artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv/
+venv/
+
+# Local caches and logs
+.cache/
+*.log
+*.tmp
+
+# Editor/OS noise
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local security-tool downloads and outputs
 codeql-cli/
 codeql-*.zip
 databases/

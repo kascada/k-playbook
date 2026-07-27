@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Tool installation is host/user-local by policy. Do not install into project venvs.
 REQUIRED_TOOLS=(gitleaks trufflehog pip-audit trivy syft grype)
 OPTIONAL_TOOLS=()
 
@@ -48,7 +49,7 @@ Options:
   --include-optional   Accepted for old command lines; currently no extra tools.
   --prefix <dir>       User-local prefix for native binaries. Default: ~/.local.
   --bin-dir <dir>      Binary directory. Default: first PATH-visible of ~/.opencode/bin or ~/.local/bin, else <prefix>/bin.
-  --venv <dir>         pip-audit venv path for --method venv/auto fallback.
+  --venv <dir>         Dedicated pip-audit tool venv path for --method venv/auto fallback.
   --yes                Do not ask for confirmation after printing the install plan.
   --dry-run            Print what would happen, but do not install.
   -h, --help           Show this help.
@@ -71,6 +72,45 @@ die() {
 
 has_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+ensure_no_active_project_venv() {
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Deaktiviere es zuerst mit 'deactivate'. /k-install-security-tools installiert nur host-/user-lokale Tools, nie in ein Projekt-venv."
+  fi
+}
+
+ensure_no_project_venv_in_path() {
+  local entry
+  IFS=':' read -r -a path_entries <<< "$PATH"
+  for entry in "${path_entries[@]}"; do
+    [[ -z "$entry" ]] && continue
+    if is_project_venv_path "$entry"; then
+      die "PATH enthaelt ein typisches Projekt-venv ($entry). Entferne es zuerst aus PATH bzw. fuehre 'deactivate' aus, damit der Preflight nur host-/user-lokale Tools bewertet."
+    fi
+  done
+}
+
+is_project_venv_path() {
+  local path
+  path="${1%/}"
+  case "$path" in
+    .venv|.venv/*|venv|venv/*|env|env/*|*/.venv|*/.venv/*|*/venv|*/venv/*|*/env|*/env/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+ensure_host_tool_scope() {
+  ensure_no_active_project_venv
+  ensure_no_project_venv_in_path
+  if is_project_venv_path "$BIN_DIR"; then
+    die "Installationsziel liegt in einem typischen Projekt-venv: $BIN_DIR. Nutze ein user-lokales Bin-Verzeichnis wie ~/.opencode/bin oder ~/.local/bin."
+  fi
+  if is_project_venv_path "$VENV_DIR"; then
+    die "pip-audit Tool-venv darf kein Projekt-venv sein: $VENV_DIR. Nutze pipx oder ein dediziertes Tool-venv unter ~/.local/share/k-playbook/."
+  fi
 }
 
 run_or_print() {
@@ -182,13 +222,14 @@ missing_required_count() {
 
 print_preflight() {
   local tool kind status version path image missing_required
+  ensure_host_tool_scope
   missing_required="$(missing_required_count)"
 
   printf '/k-install-security-tools - Preflight\n'
   printf '%s\n' '------------------------------------'
   printf 'Repo:       %s\n' "$PLAYBOOK_REPO"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
-  printf 'pip-audit:  %s\n' "$VENV_DIR"
+  printf 'pip-audit:  %s (dediziertes Tool-venv, nicht Projekt-venv)\n' "$VENV_DIR"
   if has_cmd docker; then
     printf 'Docker:     ok (%s)\n' "$(tool_version docker)"
   else
@@ -401,12 +442,12 @@ install_pip_audit() {
       return
     fi
     if [[ "$method" == "pipx" ]]; then
-      die "pipx is not installed. Use --method venv or install pipx first."
+      die "pipx is not installed. Use --method venv for the dedicated k-playbook tool venv, or install pipx first."
     fi
   fi
 
-  has_cmd python3 || die "python3 is required for pip-audit venv install."
-  log "Installing pip-audit into venv: $VENV_DIR"
+  has_cmd python3 || die "python3 is required for pip-audit tool-venv install."
+  log "Installing pip-audit into dedicated tool venv: $VENV_DIR"
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
     printf 'DRY-RUN: python3 -m venv %q\n' "$VENV_DIR" >&2
@@ -444,7 +485,7 @@ install_tool() {
       case "$method" in
         auto|native|pipx|venv) install_pip_audit "$method" ;;
         docker)
-          log "Docker-Fallback fuer pip-audit ist nicht definiert; installiere pip-audit stattdessen in venv."
+          log "Docker-Fallback fuer pip-audit ist nicht definiert; installiere pip-audit stattdessen in einem dedizierten Tool-venv."
           install_pip_audit venv
           ;;
         *) die "Unknown install method for pip-audit: $method" ;;

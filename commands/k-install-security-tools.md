@@ -11,6 +11,8 @@ Installiere oder pruefe host-lokale Security-Review-Tools fuer alle Projekte, di
 
 Dieser Command ist **host-lokal**. Er veraendert keine Projektdateien, kein `K-PLAYBOOK.MD`, keine Review-Artefakte und startet keine Scans. Er richtet nur wiederverwendbare CLI-Tools bzw. Docker-Fallback-Images auf dem aktuellen Host ein.
 
+Er darf nicht in einem aktiven Projekt-venv laufen. Wenn `VIRTUAL_ENV` gesetzt ist, abbrechen und den User auffordern, zuerst `deactivate` auszufuehren. Python-CLI-Tools duerfen nur via `pipx` oder dediziertem k-playbook Tool-venv installiert werden, nie in `.venv/`, `venv/` oder `env/` eines Projekts.
+
 Er nutzt:
 
 `<PLAYBOOK_REPO>/scripts/install-security-tools.sh`
@@ -56,7 +58,8 @@ Zeige die Ausgabe kompakt. Sie muss enthalten:
 - Fehlende Pflicht-Tools.
 - Docker-Verfuegbarkeit.
 - Docker-Fallback-Images, wo definiert.
-- User-lokale Installationspfade (`~/.opencode/bin` oder `~/.local/bin` und pip-audit-venv).
+- User-lokale Installationspfade (`~/.opencode/bin` oder `~/.local/bin` und dediziertes pip-audit Tool-venv).
+- Hinweis, dass das pip-audit-venv ein dediziertes Tool-venv ist, nicht das Projekt-venv.
 
 Wenn alle Pflicht-Tools vorhanden sind und kein explizites Install-Argument gesetzt ist: mit Status `ok` abschliessen.
 
@@ -92,11 +95,11 @@ bash "<PLAYBOOK_REPO>/scripts/install-security-tools.sh" --install missing --met
 
 Installationswege:
 
-- `--method auto`: native GitHub-Release-Binaries fuer Go/Rust-Tools; `pip-audit` via `pipx`, falls vorhanden, sonst venv.
-- `--method native`: native/user-lokale Installation; `pip-audit` nutzt venv, wenn `pipx` fehlt.
-- `--method docker`: pullt die offiziellen Docker-Fallback-Images, soweit definiert; `pip-audit` wird mangels sinnvoller Docker-Wrapper-Integration per venv bereitgestellt.
+- `--method auto`: native GitHub-Release-Binaries fuer Go/Rust-Tools; `pip-audit` via `pipx`, falls vorhanden, sonst dediziertes k-playbook Tool-venv.
+- `--method native`: native/user-lokale Installation; `pip-audit` nutzt ein dediziertes Tool-venv, wenn `pipx` fehlt.
+- `--method docker`: pullt die offiziellen Docker-Fallback-Images, soweit definiert; `pip-audit` wird mangels sinnvoller Docker-Wrapper-Integration per dediziertem Tool-venv bereitgestellt.
 - `--method pipx`: nur sinnvoll fuer `pip-audit`.
-- `--method venv`: nur sinnvoll fuer `pip-audit`.
+- `--method venv`: nur sinnvoll fuer `pip-audit`; meint ein dediziertes Tool-venv ausserhalb von Projekt-venvs.
 
 Frage dann:
 

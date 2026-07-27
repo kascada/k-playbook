@@ -14,6 +14,7 @@ Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./review
 - `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.MD` und projektlokale Playbook-Pfade.
 - Host-Installation schreibt keine Projektdateien.
 - Projekt-Setup installiert keine host-globalen Tools.
+- `/k-install*` darf nicht in einem aktiven Projekt-venv laufen. Falls `VIRTUAL_ENV` gesetzt ist: zuerst `deactivate`.
 
 Neuer Host:
 
@@ -95,11 +96,11 @@ Fehlende Pflicht-Tools installieren, nach expliziter Bestaetigung:
 
 Installationswege:
 
-- `--method auto`: native GitHub-Release-Binaries fuer CLI-Tools; `pip-audit` via `pipx` oder venv.
-- `--method docker`: pullt offizielle Docker-Fallback-Images, soweit definiert; `pip-audit` wird dabei per venv bereitgestellt.
-- `--method pipx` oder `--method venv`: gezielt fuer `pip-audit`.
+- `--method auto`: native GitHub-Release-Binaries fuer CLI-Tools; `pip-audit` via `pipx`, sonst dediziertes k-playbook Tool-venv.
+- `--method docker`: pullt offizielle Docker-Fallback-Images, soweit definiert; `pip-audit` wird dabei per dediziertem Tool-venv bereitgestellt.
+- `--method pipx` oder `--method venv`: gezielt fuer `pip-audit`; `venv` meint immer ein dediziertes Tool-venv, nie ein Projekt-venv.
 
-Der Command schreibt keine Projektdateien und startet keine Scans. Review-Familien wie Secret-Scanning, Dependency-CVE und IaC/Container konsumieren spaeter nur diese host-lokal verfuegbaren Tools. GitHub Dependabot Alerts werden separat ueber `/k-review dependabot-alerts` und `gh api` importiert; dafuer ist kein lokaler Scanner noetig.
+Der Command bricht ab, wenn ein Python-venv aktiv ist, und schreibt keine Projektdateien, installiert nichts in `.venv/`, `venv/` oder `env/` und startet keine Scans. Review-Familien wie Secret-Scanning, Dependency-CVE und IaC/Container konsumieren spaeter nur diese host-lokal verfuegbaren Tools. GitHub Dependabot Alerts werden separat ueber `/k-review dependabot-alerts` und `gh api` importiert; dafuer ist kein lokaler Scanner noetig.
 
 Die zugehoerigen Review-Rezepte sind globale Report-Mode-Reviews:
 

@@ -16,7 +16,7 @@ Typische Nutzung:
 - Nach dem Einrichten eines Hosts, um den Status der global genutzten Security-Review-Tools zu sehen.
 
 Hinweis zum Bootstrap:
-Wenn `/k-install` auf einem frischen Server noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `install.md` ausführen oder zumindest diesen Command direkt symlinken:
+Wenn `/k-install` auf einem frischen Server noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `docs/installation.md` ausführen oder zumindest diesen Command direkt symlinken:
 
 ```bash
 mkdir -p ~/.config/opencode/command
@@ -130,6 +130,8 @@ Nicht automatisch ausführen, außer der User fragt ausdrücklich danach. Dieser
 ## Schritt 6 — Security-Tool-Preflight
 
 Am Ende host-lokal pruefen, ob die Security-Review-Tools vorhanden sind. Dieser Schritt installiert nichts automatisch und schreibt keine Projektdateien.
+
+Wenn ein Python-venv aktiv ist (`VIRTUAL_ENV` gesetzt) oder ein typischer Projekt-venv-Pfad wie `.venv/bin`, `venv/bin` oder `env/bin` in `PATH` steht, den Security-Tool-Preflight nicht ausfuehren und nicht als host-global werten. User auffordern, `deactivate` auszufuehren bzw. `PATH` zu bereinigen und `/k-install-security-tools` danach separat zu starten.
 
 Wenn `<PLAYBOOK_REPO>/scripts/install-security-tools.sh` existiert:
 
