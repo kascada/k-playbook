@@ -46,18 +46,51 @@ Container:
   /home/vscode/dev/k-playbook              Symlink auf /workspaces/k-playbook
 ```
 
+Wichtig: Der Symlink allein reicht nicht. Das Host-Verzeichnis `~/dev/k-playbook` muss zuerst in den Devcontainer gemountet werden, sonst zeigt `/home/vscode/dev/k-playbook` im Container ins Leere.
+
+Empfohlene Installation aus dem k-playbook-Repo auf dem Host:
+
+```bash
+~/dev/k-playbook/scripts/install-devcontainer-k-playbook.sh /pfad/zum/zielprojekt
+```
+
+Das Script erwartet im Zielprojekt eine vorhandene `.devcontainer/devcontainer.json` und richtet dort die DevContainer-Integration ein.
+
 Damit bleibt dieser Eintrag in `K-PLAYBOOK.MD` auf Host und Container gleich:
 
 ```markdown
 - repo: ~/dev/k-playbook
 ```
 
-Der Devcontainer des Zielprojekts sollte diesen Symlink beim Start erzeugen, z. B.:
+Das Script kopiert `scripts/templates/devcontainer-setup-k-playbook.sh` nach `.devcontainer/setup-k-playbook.sh` im Zielprojekt. Diese Datei ist projektlokale DevContainer-Infrastruktur und wird bewusst ins Zielprojekt kopiert, damit der Container beim Start ohne Zugriff auf das globale Installationsscript reparierbar bleibt.
+
+Das Script passt `.devcontainer/devcontainer.json` an:
+
+- Es ergaenzt den Bind-Mount `~/dev/k-playbook` nach `/workspaces/k-playbook`.
+- Es haengt `sudo bash .devcontainer/setup-k-playbook.sh --install-security-tools` an `postCreateCommand` an.
+- Es setzt oder ergaenzt `postStartCommand`, damit persistierte OpenCode-Volumes bei jedem Container-Start repariert werden.
+
+`.devcontainer/setup-k-playbook.sh` erledigt im Container:
+
+- Symlink `/home/vscode/dev/k-playbook` -> `/workspaces/k-playbook`.
+- Command-Links fuer alle `k-*.md` nach `/home/vscode/.config/opencode/command/` und `/home/vscode/.config/opencode/commands/`.
+- Minimale OpenCode-User-Config mit `skills.paths: ["~/dev/k-playbook"]`, falls noch keine Container-Config existiert.
+- Bei `--install-security-tools`: Installation fehlender Pflicht-Tools (`gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`) in das Home des Container-Users `vscode`, typischerweise unter `/home/vscode/.local/bin` und `/home/vscode/.local/share/k-playbook/`.
+
+Danach den DevContainer neu bauen oder neu starten und OpenCode im Container neu starten. `/k-install` ist kein Shell-Executable, sondern eine OpenCode-Slash-Command-Datei; DevContainer-Lifecycle-Hooks fuehren deshalb nicht `/k-install` aus, sondern bereiten dessen Command-Datei und die Skill-Config direkt vor.
+
+`postStartCommand` fuehrt das Setup ohne `--install-security-tools` aus. Dadurch werden Links und OpenCode-Konfig bei jedem Start repariert, aber Downloads laufen nur beim Erzeugen/Rebuild des Containers.
+
+Wenn `/k-install` danach nicht sichtbar ist, im Container pruefen:
 
 ```bash
-mkdir -p /home/vscode/dev
-ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
+ls -l /workspaces/k-playbook/commands/k-install.md
+ls -l ~/dev/k-playbook/commands/k-install.md
+ls -l ~/.config/opencode/command/k-install.md
+ls -l ~/.config/opencode/commands/k-install.md
 ```
+
+Alle vier Pfade muessen existieren. Wenn der erste fehlt, ist der Bind-Mount nicht gesetzt. Wenn nur der zweite fehlt, fehlt der Symlink. Wenn nur die letzten Pfade fehlen, fehlt der OpenCode-Bootstrap im Container-Home.
 
 Wenn `repo: ~/dev/k-playbook` im Container steht, bedeutet das also **nicht**, dass das Repo physisch dort kopiert wird. Der Pfad wird ueber den Symlink auf den Bind-Mount `/workspaces/k-playbook` aufgeloest.
 

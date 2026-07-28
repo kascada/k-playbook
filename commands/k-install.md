@@ -24,10 +24,10 @@ Pfadvertrag:
 - Der feste logische Repo-Pfad ist `~/dev/k-playbook`.
 - `K-PLAYBOOK.MD` darf diesen Pfad sichtbar als `repo: ~/dev/k-playbook` enthalten, aber `/k-install` fragt ihn nicht ab und behandelt ihn nicht als frei waehlbar.
 - Wenn der echte Klon woanders liegt, soll `/k-install` vorschlagen, ihn nach `~/dev/k-playbook` zu verschieben. Wenn der User das nicht will, darf `/k-install` nach Bestaetigung einen Symlink von `~/dev/k-playbook` auf den echten Klon anlegen.
-- In Devcontainern gilt derselbe Vertrag: `~/dev/k-playbook` muss existieren; typischerweise ist `/home/vscode/dev/k-playbook` ein Symlink auf `/workspaces/k-playbook`.
+- In Devcontainern gilt derselbe Vertrag: `~/dev/k-playbook` muss existieren; typischerweise ist `/home/vscode/dev/k-playbook` ein Symlink auf `/workspaces/k-playbook`. Dafuer muss das Host-Repo zuerst als Bind-Mount nach `/workspaces/k-playbook` im Container verfuegbar sein.
 
 Hinweis zum Bootstrap:
-Wenn `/k-install` auf einem frischen Server noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `docs/installation.md` ausführen oder zumindest diesen Command direkt symlinken:
+Wenn `/k-install` auf einem frischen Server oder in einem Devcontainer noch nicht im Slash-Command-Menü sichtbar ist, einmal die manuelle Installation aus `docs/installation.md` ausführen oder zumindest diesen Command direkt symlinken:
 
 ```bash
 mkdir -p ~/.config/opencode/command
@@ -35,6 +35,16 @@ ln -sf ~/dev/k-playbook/commands/k-install.md ~/.config/opencode/command/k-insta
 ```
 
 Danach OpenCode neu starten und `/k-install` ausführen.
+
+In Devcontainern muss vor diesem Bootstrap zusaetzlich das Repo nach `/workspaces/k-playbook` gemountet und `~/dev/k-playbook` darauf verlinkt sein. `/k-install` ist kein Shell-Executable, sondern eine OpenCode-Slash-Command-Datei; Devcontainer-Lifecycle-Hooks koennen nur die Mount-/Symlink-/Bootstrap-Schritte vorbereiten.
+
+Empfohlener Weg fuer Zielprojekte mit Devcontainer:
+
+```bash
+~/dev/k-playbook/scripts/install-devcontainer-k-playbook.sh /pfad/zum/zielprojekt
+```
+
+Das Script kopiert `scripts/templates/devcontainer-setup-k-playbook.sh` ins Zielprojekt als `.devcontainer/setup-k-playbook.sh` und registriert es in `devcontainer.json`.
 
 ---
 

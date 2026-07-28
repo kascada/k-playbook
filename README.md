@@ -80,6 +80,14 @@ Security-Tools liegen separat host-/user-lokal, typischerweise unter `~/.opencod
 
 `/k-status` prueft read-only, ob die OpenCode-Symlinks auf die erwarteten Dateien in diesem Repo zeigen und ob `skills.paths` plausibel gesetzt ist. Repariert wird mit `/k-install`.
 
+DevContainer brauchen dieselbe Struktur im Container: Das Host-Repo muss z. B. nach `/workspaces/k-playbook` gemountet werden, und `~/dev/k-playbook` im Container zeigt per Symlink darauf. Das richtet pro Zielprojekt dieses Script ein:
+
+```bash
+~/dev/k-playbook/scripts/install-devcontainer-k-playbook.sh /pfad/zum/zielprojekt
+```
+
+Details stehen in [`docs/installation.md`](./docs/installation.md#devcontainer-pfadvertrag).
+
 ## Grundprinzipien
 
 - Schlank und nachvollziehbar: nur Bausteine, die im Alltag genutzt werden.

@@ -150,11 +150,10 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 
 ### Zielprojekt Im Devcontainer
 
-1. Host-Repo `~/dev/k-playbook` in den Container mounten, empfohlen nach `/workspaces/k-playbook`.
-2. Im Container `~/dev/k-playbook` als Symlink auf den Mount anlegen.
-3. Container-lokale OpenCode-Command-Symlinks nach `~/.config/opencode/command/` erzeugen oder `/k-install` im Container ausfuehren.
-4. Container-lokale OpenCode-User-Config mit `skills.paths: ["~/dev/k-playbook"]` sicherstellen.
-5. Im Zielprojekt `/k-status` ausfuehren; die Sections `playbook`, `opencode` und `devcontainer` muessen plausibel sein.
+1. Auf dem Host `~/dev/k-playbook/scripts/install-devcontainer-k-playbook.sh <projekt-root>` ausfuehren.
+2. Das Script schreibt `.devcontainer/setup-k-playbook.sh`, ergaenzt den Mount nach `/workspaces/k-playbook` und registriert `postCreateCommand`/`postStartCommand`.
+3. DevContainer neu bauen oder neu starten und OpenCode im Container neu starten.
+4. Im Zielprojekt `/k-status` ausfuehren; die Sections `playbook`, `opencode` und `devcontainer` muessen plausibel sein.
 
 ### Docs-First Aufsetzen
 
