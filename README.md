@@ -10,6 +10,12 @@ Pfadvertrag: `k-playbook` muss in jeder Umgebung unter `~/dev/k-playbook` erreic
 gh repo clone kascada/k-playbook ~/dev/k-playbook
 ```
 
+Ohne GitHub CLI:
+
+```bash
+git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
+```
+
 Danach in OpenCode:
 
 ```text
