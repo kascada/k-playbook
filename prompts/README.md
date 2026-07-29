@@ -13,6 +13,7 @@ Prompts in empfohlener Reihenfolge:
 1. [`installation/01-host-opencode-registrieren.md`](./installation/01-host-opencode-registrieren.md) - Host-OpenCode nach dem Clone registrieren.
 2. [`installation/02-devcontainer-k-playbook-installieren.md`](./installation/02-devcontainer-k-playbook-installieren.md) - Zielprojekt auf dem Host fuer DevContainer vorbereiten.
 3. [`installation/03-devcontainer-projekt-setup.md`](./installation/03-devcontainer-projekt-setup.md) - Im DevContainer k-playbook pruefen und projektlokal einrichten.
+4. [`installation/04-smoke-test-neues-system.md`](./installation/04-smoke-test-neues-system.md) - Installation in einer Wegwerf-Umgebung wie auf einem neuen System testen.
 
 ## Nutzung
 

@@ -14,7 +14,27 @@ Wenn du die Installation nicht manuell Schritt fuer Schritt ausfuehren willst, k
 2. [`../prompts/installation/02-devcontainer-k-playbook-installieren.md`](../prompts/installation/02-devcontainer-k-playbook-installieren.md) - auf dem Host ausfuehren und Zielprojekt abfragen lassen.
 3. [`../prompts/installation/03-devcontainer-projekt-setup.md`](../prompts/installation/03-devcontainer-projekt-setup.md) - im neu gebauten oder neu gestarteten DevContainer ausfuehren.
 
+Mit OpenCode geht das direkt so:
+
+```bash
+opencode run --dir ~/dev/k-playbook --file ~/dev/k-playbook/prompts/installation/01-host-opencode-registrieren.md "Fuehre den angehaengten Installations-Prompt aus."
+```
+
+```bash
+opencode run --dir ~/dev/k-playbook --file ~/dev/k-playbook/prompts/installation/02-devcontainer-k-playbook-installieren.md "Fuehre den angehaengten Installations-Prompt aus."
+```
+
+Im DevContainer dann aus dem Zielprojekt heraus, z. B.:
+
+```bash
+opencode run --dir /workspaces/example-python-project --file ~/dev/k-playbook/prompts/installation/03-devcontainer-projekt-setup.md "Fuehre den angehaengten Installations-Prompt aus."
+```
+
+Fuer andere Prompts ist der Aufruf analog: `--dir` setzt den Arbeitskontext, `--file` uebergibt die Prompt-Datei.
+
 Die Prompts stehen auch im Index [`../prompts/README.md`](../prompts/README.md).
+
+Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/installation/04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md).
 
 ## 1. k-playbook Auf dem Host Klonen
 
