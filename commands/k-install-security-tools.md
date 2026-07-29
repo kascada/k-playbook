@@ -64,13 +64,13 @@ Wenn alle Pflicht-Tools vorhanden sind und kein explizites Install-Argument gese
 
 ## Schritt 3 - Argumente auswerten
 
-Wenn `$ARGUMENTS` leer ist:
+Wenn der User keine Argumente nach dem Slash-Command angegeben hat:
 
 - Nur Preflight ausfuehren.
 - Wenn Pflicht-Tools fehlen, die empfohlenen Folgekommandos nennen.
 - Nicht automatisch installieren.
 
-Wenn `$ARGUMENTS` nicht leer ist:
+Wenn der User Argumente nach dem Slash-Command angegeben hat:
 
 - Erlaubte Weitergabe an das Script:
   - `--install missing`

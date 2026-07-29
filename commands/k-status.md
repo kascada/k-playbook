@@ -400,8 +400,8 @@ Tasks:         WARN, 3 offen, nächste: 002-k-status.md
 TODO:          OK, 0 offen
 Reviews:       WARN, 2 vorhanden, known-decisions fehlt
 Enforcement:   OK, 1 Regel
-CodeQL:        WARN, target=./omni-gw, enabled=true, github=true workflow fehlt
-Dependabot:    OK, target=./omni-gw, repo=koelnmesse-IT/omni-gw, PRs deaktiviert
+CodeQL:        WARN, target=./app, enabled=true, github=true workflow fehlt
+Dependabot:    OK, target=./app, repo=example-org/example-app, PRs deaktiviert
 Git:           WARN, dirty (4 geändert, 1 untracked)
 Docs:          WARN, docs/README.md fehlt
 

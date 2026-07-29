@@ -47,7 +47,7 @@ Command-specific policy:
 - If `base:` is missing, stop and ask the user to run `/k-setup` first. Do not infer legacy base paths here.
 - If `PLAYBOOK_BASE_DIR` does not exist, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
 - If `checks:` is unset, continue; CodeQL can still be registered, but no project-local check script path is suggested.
-- Determine a CodeQL analysis target directory (`codeql target`) separately from `TARGET_DIR`. Default is `.` (the project root). If the project root is a wrapper and exactly one nested Git worktree contains the detected application manifests, suggest that nested worktree, e.g. `./omni-gw`. Normalize as a project-relative path. Do not infer outside-target paths without asking. Store the resolved path as `CODEQL_TARGET_DIR` and the display path as `CODEQL_TARGET_DISPLAY_PATH`.
+- Determine a CodeQL analysis target directory (`codeql target`) separately from `TARGET_DIR`. Default is `.` (the project root). If the project root is a wrapper and exactly one nested Git worktree contains the detected application manifests, suggest that nested worktree, e.g. `./app`. Normalize as a project-relative path. Do not infer outside-target paths without asking. Store the resolved path as `CODEQL_TARGET_DIR` and the display path as `CODEQL_TARGET_DISPLAY_PATH`.
 
 ## Step 2 — Detect current state
 
@@ -125,7 +125,7 @@ Ask the user in one bundled interaction:
 
 4. Welches Verzeichnis soll CodeQL analysieren?
    - Default: existing `target:` from the CodeQL block if present.
-   - Else if a nested Git/app root was detected, suggest that path, e.g. `./omni-gw`.
+   - Else if a nested Git/app root was detected, suggest that path, e.g. `./app`.
    - Else default to `.`.
    - Normalize relative paths as `./...` except `.`.
    - The target path must exist and should normally be the Git/worktree root whose source manifests are analyzed.
@@ -138,7 +138,7 @@ If local database is `true` or `planned`, ask for the database path:
 
 If GitHub CodeQL is `true` or `planned`, ask whether a workflow path should be recorded:
 
-- Default: `<target>/.github/workflows/codeql.yml`, normalized project-relative. If `target:` is `.`, this is `./.github/workflows/codeql.yml`; if `target:` is `./omni-gw`, this is `./omni-gw/.github/workflows/codeql.yml`.
+- Default: `<target>/.github/workflows/codeql.yml`, normalized project-relative. If `target:` is `.`, this is `./.github/workflows/codeql.yml`; if `target:` is `./app`, this is `./app/.github/workflows/codeql.yml`.
 - Record the path even if the file does not exist yet.
 - Do not create the workflow unless Step 5 explicitly confirms file generation.
 

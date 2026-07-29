@@ -135,7 +135,7 @@ Typische Artefakte:
 
 CodeQL bewertet CWE-/Code-Findings, nicht Dependency-CVEs. Dependency-CVEs gehoeren in eine eigene Result-Familie.
 
-Bei Wrapper-Repos soll der CodeQL-Block in `K-PLAYBOOK.MD` ein `target:` enthalten. Dieses Feld benennt den tatsaechlichen Analyse-/Git-Root, z. B. `./omni-gw`, waehrend Result-Artefakte weiterhin unter dem projektlokalen `reviews:`-Pfad liegen.
+Bei Wrapper-Repos soll der CodeQL-Block in `K-PLAYBOOK.MD` ein `target:` enthalten. Dieses Feld benennt den tatsaechlichen Analyse-/Git-Root, z. B. `./app`, waehrend Result-Artefakte weiterhin unter dem projektlokalen `reviews:`-Pfad liegen.
 
 ### k-check
 
@@ -312,7 +312,7 @@ Projektweite Remediation-Policy:
 ## Remediation
 
 - mode:           task-branch-pr
-- target:         ./omni-gw
+- target:         ./app
 - grouping:       true
 - quick-wins:     true
 - branch-prefix:  remediation/

@@ -32,7 +32,7 @@ Lokale Datenbanken sind eine separate Entscheidung.
 ## Analyse-Target
 
 - Der CodeQL-Block soll `target:` enthalten, wenn der Projektroot nicht identisch mit dem zu analysierenden Git-/App-Root ist.
-- `target:` ist projektrelativ zu `TARGET_DIR`; `.` bedeutet Projektroot, `./omni-gw` bedeutet verschachteltes Produkt-Repo.
+- `target:` ist projektrelativ zu `TARGET_DIR`; `.` bedeutet Projektroot, `./app` bedeutet verschachteltes Produkt-Repo.
 - `/k-setup-codeql` besitzt dieses Feld. Review-, Status- und Install-Commands muessen es lesen und duerfen bei fehlendem Feld nur legacy-kompatibel `.` annehmen.
 
 ## Checks

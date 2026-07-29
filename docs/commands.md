@@ -146,7 +146,7 @@ Der Command fragt getrennt ab:
 
 - ob GitHub CodeQL aktiv, inaktiv oder geplant ist
 - ob eine lokale CodeQL-Datenbank aktiv, inaktiv oder geplant ist
-- welches Projekt-/Git-Verzeichnis CodeQL analysieren soll (`target:`), z. B. `./omni-gw` bei Wrapper-Repos
+- welches Projekt-/Git-Verzeichnis CodeQL analysieren soll (`target:`), z. B. `./app` bei Wrapper-Repos
 - welche Sprachen und Queries registriert werden sollen
 
 Bei GitHub CodeQL darf der Command nur eine lokale CLI-only Installation fuer Preflight- und Statuschecks anbieten. Der erlaubte Script-Aufruf ist:

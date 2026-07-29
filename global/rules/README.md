@@ -15,7 +15,7 @@ Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zi
 
 Wiederverwendbare Checks liegen unter `../checks/` und werden ueber `../bin/k-check` ausgefuehrt. Projektlokale Checks bleiben im jeweiligen Zielprojekt, normalerweise unter `<projekt>/k-playbook/checks/`, und werden ueber `K-PLAYBOOK.MD` registriert.
 
-Globale Checks duerfen keine OMNI-spezifischen Begriffe oder Modellnamen wie `log_operational_event`, `OperationalEvent`, `azure_oid`, `Agent`, `Project`, `ChatMessage`, `omni-gw` oder konkrete OMNI-Runtime-Dateien enthalten. Solche Regeln bleiben projektlokal; Test-Fixtures duerfen diese Begriffe nur als explizite Negativbeispiele markieren.
+Globale Checks duerfen keine projektspezifischen Begriffe, Modellnamen oder Runtime-Dateien enthalten. Solche Regeln bleiben projektlokal; Test-Fixtures duerfen projektspezifische Begriffe nur als explizite Negativbeispiele markieren.
 
 ## Zusammenfuehrung
 

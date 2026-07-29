@@ -326,7 +326,7 @@ Rules for the managed block:
 - Inactive blocks: value is `-`.
 - Two spaces after the colon, then aligned values (visual only; a parser must accept single space too).
 - `## Playbook-Quelle` lists the fixed logical repo path `~/dev/k-playbook` and the ISO date of the last setup run. The path is not user-selectable; portability is achieved with a symlink when the physical repo lives elsewhere.
-- `## Remediation` defines the project workflow for remediation work. `mode:` is required when the block exists. `target:` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./omni-gw`.
+- `## Remediation` defines the project workflow for remediation work. `mode:` is required when the block exists. `target:` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./app`.
 
 ## Notes
 

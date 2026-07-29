@@ -8,9 +8,11 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 |---|---|
 | [`handbuch.md`](./handbuch.md) | Zentrale Beschreibung: Zweck, Konzepte, Standardablaeufe, Betriebsregeln. |
 | [`installation.md`](./installation.md) | Host-Installation, OpenCode-Setup, Security-Tools, optional Claude Code. |
+| [`multi-project-installation.md`](./multi-project-installation.md) | Zentrale Installation fuer mehrere Zielprojekte, Python-/venv- und DevContainer-Workflows. |
 | [`faq.md`](./faq.md) | Kurze Antworten zu `/k-install`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
+| [`../prompts/README.md`](../prompts/README.md) | Kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe. |
 | [`../global/checks/README.md`](../global/checks/README.md) | Schnittstelle und Nutzung von `global/bin/k-check`. |
 | [`../global/rules/README.md`](../global/rules/README.md) | Globale Enforcement-Regeln. |
 
@@ -32,6 +34,8 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `K-PLAYBOOK.MD` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
+- `Multi-Project` -> [`multi-project-installation.md`](./multi-project-installation.md)
+- `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
 - `Remediation` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Reviews` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)

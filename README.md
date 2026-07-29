@@ -23,6 +23,8 @@ Danach in OpenCode:
 /k-install-security-tools --install missing
 ```
 
+Nach einem frischen Clone ist `/k-install` eventuell noch nicht sichtbar. Fuer die einfache gefuehrte Installation nutze die Prompts unter [`prompts/installation/`](./prompts/installation/) oder folge [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
+
 Wichtig: `/k-install*` nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
 
 In jedem Zielprojekt einmal:
@@ -39,9 +41,11 @@ Der Einstieg ist das Handbuch:
 
 - [`docs/handbuch.md`](./docs/handbuch.md) - Zweck, Konzepte, Standardablaeufe und Betriebsregeln.
 - [`docs/installation.md`](./docs/installation.md) - Installation fuer OpenCode, Security-Tools und optional Claude Code.
+- [`docs/multi-project-installation.md`](./docs/multi-project-installation.md) - vereinfachte Installation fuer mehrere Zielprojekte mit Python-/venv- und DevContainer-Workflows.
 - [`docs/faq.md`](./docs/faq.md) - Kurze Antworten zu `/k-install`, Aufrufort und Projekt-venvs.
 - [`docs/commands.md`](./docs/commands.md) - Zuständigkeiten und Details der wichtigsten Commands.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Review-, Results- und Remediation-Flow.
+- [`prompts/README.md`](./prompts/README.md) - kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe.
 - [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
 
 ## Bausteine
@@ -49,6 +53,7 @@ Der Einstieg ist das Handbuch:
 | Bereich | Zweck | Nutzung |
 |---|---|---|
 | `commands/` | Manuelle Slash-Commands | `/k-<name>` |
+| `prompts/` | Kopierbare AI-Assistenten-Auftraege | als Prompt einfuegen |
 | `ks-<name>/` | Skills/Playbooks mit Anleitung, Checkliste und Templates | automatisch durch OpenCode oder manuell |
 | `global/rules/` | Projektuebergreifende Enforcement-Regeln | Skill `ks-enforcement` oder `/k-enforcement` |
 | `global/reviews/` | Wiederverwendbare Review-Rezepte | `/k-review <name>` |
@@ -103,6 +108,7 @@ Details stehen in [`docs/installation.md`](./docs/installation.md#devcontainer-p
 ├── README.md
 ├── docs/                         Handbuch und Detaildokumentation
 ├── commands/                     Slash-Commands
+├── prompts/                      kopierbare AI-Assistenten-Prompts
 ├── global/                       globale Regeln, Reviews, Checks
 ├── ks-ai-session-memory/         Playbook: Docs fuer AI-Sessions verankern
 ├── ks-enforcement/               Playbook: globale + lokale Regeln anwenden

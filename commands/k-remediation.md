@@ -19,7 +19,7 @@ Die Pfade werden — wie bei `/k-review` — aus `K-PLAYBOOK.MD` gelesen, damit 
 Zusaetzlich liest `/k-remediation` den optionalen Remediation-Managed-Block in `K-PLAYBOOK.MD`:
 
 - `mode:` - `task-branch-pr`, `task-first` oder `direct-allowed`.
-- `target:` - tatsaechlicher Code-/Git-Root, z. B. `./omni-gw` bei Wrapper-Repos.
+- `target:` - tatsaechlicher Code-/Git-Root, z. B. `./app` bei Wrapper-Repos.
 - `grouping:` - ob Findings vor der Umsetzung zu sinnvollen Buendeln zusammengefasst werden.
 - `quick-wins:` - ob einfache, wirkungsstarke Buendel hervorgehoben werden.
 - `branch-prefix:` - empfohlener Branch-Prefix fuer Remediation-Branches.
@@ -240,7 +240,7 @@ Bei `mode: task-branch-pr`:
 3. Task muss enthalten:
    - alle Finding-IDs im Buendel.
    - Result-Pfad und `findings.md`.
-    - Ziel-Root (`target:`), z. B. `./omni-gw`.
+    - Ziel-Root (`target:`), z. B. `./app`.
     - vorgeschlagener Branch: `<branch-prefix><NNN>-<slug>`.
     - Hinweis: PR erforderlich.
     - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
