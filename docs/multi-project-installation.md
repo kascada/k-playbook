@@ -45,12 +45,6 @@ Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/i
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 ```
 
-Falls das Repo schon existiert:
-
-```bash
-cd ~/dev/k-playbook
-git pull
-```
 
 ## 2. Host-OpenCode Registrieren
 
