@@ -27,6 +27,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 ## Stichwort-Index
 
 - `AGENTS.md` -> [`ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
+- `Basisinstallation` / `Base-Repo` -> [`../AGENTS.md`](../AGENTS.md), [`handbuch.md`](./handbuch.md)
 - `CodeQL` -> [`commands.md`](./commands.md), [`../global/rules/codeql.md`](../global/rules/codeql.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md), [`../ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
 - `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
@@ -38,6 +39,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `OKF` / `Open Knowledge Format` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
 - `Remediation` -> [`reviews-and-results.md`](./reviews-and-results.md)
+- `Regeln in diesem Repo` -> [`../AGENTS.md`](../AGENTS.md), [`../global/rules/README.md`](../global/rules/README.md)
 - `Reviews` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `Tasks` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)

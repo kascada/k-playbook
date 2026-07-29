@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "references": {
+    "docs": {
+      "path": "./docs",
+      "description": "Autoritative k-playbook-Dokumentation. Zuerst docs/README.md lesen. Hinweis: Dieses Repo ist die k-playbook-Basisinstallation, kein normales Zielprojekt; k-playbook-Enforcement-Regeln gelten hier nicht automatisch direkt als projektlokale Regeln."
+    }
+  }
+}
