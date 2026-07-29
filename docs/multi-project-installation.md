@@ -10,9 +10,10 @@ Diese Reihenfolge richtet k-playbook fuer den Host, ein Zielprojekt und optional
 
 Wenn du die Installation nicht manuell Schritt fuer Schritt ausfuehren willst, kopiere nacheinander diese Prompts in den AI-Assistenten:
 
-1. [`../prompts/installation/01-host-opencode-registrieren.md`](../prompts/installation/01-host-opencode-registrieren.md) - auf dem Host nach dem Clone ausfuehren.
-2. [`../prompts/installation/02-devcontainer-k-playbook-installieren.md`](../prompts/installation/02-devcontainer-k-playbook-installieren.md) - auf dem Host ausfuehren und Zielprojekt abfragen lassen.
-3. [`../prompts/installation/03-devcontainer-projekt-setup.md`](../prompts/installation/03-devcontainer-projekt-setup.md) - im neu gebauten oder neu gestarteten DevContainer ausfuehren.
+1. `git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook`
+2. [`../prompts/installation/01-host-opencode-registrieren.md`](../prompts/installation/01-host-opencode-registrieren.md) - auf dem Host nach dem Clone ausfuehren.
+3. [`../prompts/installation/02-devcontainer-k-playbook-installieren.md`](../prompts/installation/02-devcontainer-k-playbook-installieren.md) - auf dem Host ausfuehren und Zielprojekt abfragen lassen.
+4. [`../prompts/installation/03-devcontainer-projekt-setup.md`](../prompts/installation/03-devcontainer-projekt-setup.md) - im neu gebauten oder neu gestarteten DevContainer ausfuehren.
 
 Mit OpenCode geht das direkt so:
 
@@ -36,7 +37,9 @@ Die Prompts stehen auch im Index [`../prompts/README.md`](../prompts/README.md).
 
 Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/installation/04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md).
 
-## 1. k-playbook Auf dem Host Klonen
+## Halbmanuelle Installation
+
+## 1. k-playbook auf dem Host Klonen
 
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
