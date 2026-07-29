@@ -121,9 +121,7 @@ docker run --rm \
 
 Erwartung: Der Befehl beendet sich mit Exit-Code `0`.
 
-## 5. Ergebnis dokumentieren
-
-## Optional: Security-Tool-Downloads testen
+## 5. Optional: Security-Tool-Downloads testen
 
 Dieser Extended-Test prueft, ob die Security-Tools in einer Wegwerf-Umgebung wirklich heruntergeladen und user-lokal installiert werden koennen. Er ist absichtlich nicht Teil des schnellen Standard-Smoke-Tests, weil er Netzwerk, GitHub-Releases, PyPI und ggf. Docker-Image-Downloads braucht.
 

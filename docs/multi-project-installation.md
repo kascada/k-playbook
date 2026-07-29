@@ -1,4 +1,4 @@
-# Multi-Project-Installation mit k-playbook und DevContainer
+# Multi-Project-Installation mit k-playbook und optionalem DevContainer
 
 Viele aehnliche Frameworks werden einmalig in ein Projekt kopiert, dort angepasst und danach nur schwer aktualisiert. Das erschwert Updates und Wartung, besonders wenn dieselben Workflows in mehreren Projekten genutzt werden.
 
@@ -8,34 +8,57 @@ Diese Reihenfolge richtet k-playbook fuer den Host, ein Zielprojekt und optional
 
 ## Vereinfachte Prompt-Reihenfolge
 
-Wenn du die Installation nicht manuell Schritt fuer Schritt ausfuehren willst, kopiere nacheinander diese Prompts in den AI-Assistenten:
+Die Prompts liegen unter [`../prompts/installation/`](../prompts/installation/). Zuerst kommt immer die gemeinsame Host-Registrierung, danach genau ein Projektpfad: `3A` ohne DevContainer oder `3B` mit DevContainer.
 
-1. `git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook`
-2. [`../prompts/installation/01-host-opencode-registrieren.md`](../prompts/installation/01-host-opencode-registrieren.md) - auf dem Host nach dem Clone ausfuehren.
-3. [`../prompts/installation/02-devcontainer-k-playbook-installieren.md`](../prompts/installation/02-devcontainer-k-playbook-installieren.md) - auf dem Host ausfuehren und Zielprojekt abfragen lassen.
-4. [`../prompts/installation/03-devcontainer-projekt-setup.md`](../prompts/installation/03-devcontainer-projekt-setup.md) - im neu gebauten oder neu gestarteten DevContainer ausfuehren.
+### Gemeinsame Basis
 
-Mit OpenCode geht das direkt so:
+Zuerst k-playbook klonen:
+
+```bash
+git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
+```
+
+Danach auf dem Host ausfuehren:
 
 ```bash
 opencode run --dir ~/dev/k-playbook --file ~/dev/k-playbook/prompts/installation/01-host-opencode-registrieren.md "Fuehre den angehaengten Installations-Prompt aus."
 ```
 
+Prompt: [`01-host-opencode-registrieren.md`](../prompts/installation/01-host-opencode-registrieren.md)
+
+### Pfad A: Projekt ohne DevContainer
+
+Im Zielprojekt auf dem Host ausfuehren:
+
+```bash
+opencode run --dir ~/dev/example-python-project --file ~/dev/k-playbook/prompts/installation/03A-projekt-ohne-devcontainer-setup.md "Fuehre den angehaengten Installations-Prompt aus."
+```
+
+Prompt: [`03A-projekt-ohne-devcontainer-setup.md`](../prompts/installation/03A-projekt-ohne-devcontainer-setup.md)
+
+### Pfad B: Projekt mit DevContainer
+
+Zuerst auf dem Host ausfuehren und das Zielprojekt abfragen lassen:
+
 ```bash
 opencode run --dir ~/dev/k-playbook --file ~/dev/k-playbook/prompts/installation/02-devcontainer-k-playbook-installieren.md "Fuehre den angehaengten Installations-Prompt aus."
 ```
 
-Im DevContainer dann aus dem Zielprojekt heraus, z. B.:
+Prompt: [`02-devcontainer-k-playbook-installieren.md`](../prompts/installation/02-devcontainer-k-playbook-installieren.md)
+
+Danach den DevContainer neu bauen oder neu starten. Anschliessend im DevContainer aus dem Zielprojekt heraus ausfuehren, z. B.:
 
 ```bash
-opencode run --dir /workspaces/example-python-project --file ~/dev/k-playbook/prompts/installation/03-devcontainer-projekt-setup.md "Fuehre den angehaengten Installations-Prompt aus."
+opencode run --dir /workspaces/example-python-project --file ~/dev/k-playbook/prompts/installation/03B-devcontainer-projekt-setup.md "Fuehre den angehaengten Installations-Prompt aus."
 ```
 
-Fuer andere Prompts ist der Aufruf analog: `--dir` setzt den Arbeitskontext, `--file` uebergibt die Prompt-Datei.
+Prompt: [`03B-devcontainer-projekt-setup.md`](../prompts/installation/03B-devcontainer-projekt-setup.md)
+
+### Tests
+
+Zum Testen auf einem simulierten neuen System gibt es [`04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md). Der reproduzierbare Durchlauf steht in [`RUNBOOK-smoke-test-neues-system.md`](../prompts/installation/RUNBOOK-smoke-test-neues-system.md).
 
 Die Prompts stehen auch im Index [`../prompts/README.md`](../prompts/README.md).
-
-Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/installation/04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md). Der reproduzierbare Durchlauf steht in [`../prompts/installation/RUNBOOK-smoke-test-neues-system.md`](../prompts/installation/RUNBOOK-smoke-test-neues-system.md).
 
 ## Halbmanuelle Installation
 
@@ -44,7 +67,6 @@ Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/i
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 ```
-
 
 ## 2. Host-OpenCode Registrieren
 
@@ -56,7 +78,7 @@ Lies ~/dev/k-playbook/commands/k-install.md und fuehre die Installationsanleitun
 
 Dieser Bootstrap registriert den Command; danach reicht fuer zukuenftige Aktualisierungen normal `/k-install`.
 
-Optional danach Security-Tools host-lokal installieren:
+Danach Security-Tools host-lokal installieren:
 
 ```text
 /k-install-security-tools --install missing
@@ -64,7 +86,43 @@ Optional danach Security-Tools host-lokal installieren:
 
 Wichtig: `/k-install*` nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
 
-## 3. DevContainer Fuer k-playbook Vorbereiten
+Danach pro Zielprojekt genau einen Pfad waehlen: `3A` fuer ein normales Projekt ohne DevContainer oder `3B` fuer ein Projekt mit DevContainer.
+
+## 3A. Projekt ohne DevContainer einrichten
+
+Im vorhandenen Zielprojekt OpenCode starten und ausfuehren:
+
+```text
+/k-setup
+```
+
+`/k-setup` legt oder aktualisiert `K-PLAYBOOK.MD` und die projektlokalen k-playbook-Pfade. Das gilt fuer normale Projekte genauso wie fuer Projekte mit aktivem Projekt-venv; der Command installiert keine Tools in das Projekt-venv.
+
+Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach ausfuehren:
+
+```text
+/k-setup-codeql
+```
+
+Falls die lokale CodeQL-CLI noch fehlt, danach den Installationscommand ohne aktives Projekt-venv nutzen:
+
+```text
+/k-install-codeql
+```
+
+Danach im Projektroot pruefen:
+
+```text
+/k-status
+```
+
+Erwartung:
+
+- `playbook` zeigt auf `~/dev/k-playbook`.
+- `opencode` meldet Command-Links und `skills.paths` plausibel.
+- `K-PLAYBOOK.MD` existiert im Projektroot.
+
+## 3B. Projekt mit DevContainer einrichten
 
 Auf dem Host ausfuehren:
 
@@ -82,8 +140,6 @@ Im DevContainer wird dadurch vorbereitet:
 - `skills.paths: ["~/dev/k-playbook"]` wird bei Bedarf in der Container-OpenCode-Konfig angelegt.
 - fehlende Security-Pflicht-Tools werden beim DevContainer-Rebuild fuer den Container-User `vscode` installiert.
 
-## 4. DevContainer Neu Erzeugen
-
 Den DevContainer fuer `~/dev/example-python-project` neu bauen oder neu starten.
 
 Nach dem Start im Container pruefen:
@@ -97,19 +153,13 @@ ls -l ~/.config/opencode/commands/k-install.md
 
 Alle Pfade muessen existieren.
 
-## 5. Projektlokales k-playbook Setup
-
 OpenCode im Container neu starten, im Projektroot `/workspaces/example-python-project` oeffnen und ausfuehren:
 
 ```text
 /k-setup
 ```
 
-`/k-setup` legt oder aktualisiert `K-PLAYBOOK.MD` und die projektlokalen k-playbook-Pfade.
-
-## 6. Optional CodeQL Einrichten
-
-Wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach im Container ausfuehren:
+Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach im Container ausfuehren:
 
 ```text
 /k-setup-codeql
@@ -120,10 +170,6 @@ Falls die lokale CodeQL-CLI noch fehlt, danach den Installationscommand nutzen:
 ```text
 /k-install-codeql
 ```
-
-`/k-setup-codeql` dokumentiert die CodeQL-Entscheidung und Pfade in `K-PLAYBOOK.MD`; `/k-install-codeql` installiert die lokale CodeQL-CLI ausserhalb von Projekt-venvs.
-
-## 7. Container-OpenCode Nochmal Registrieren
 
 Nach `/k-setup` im Container einmal ausfuehren:
 
@@ -139,11 +185,7 @@ Wenn `/k-install` danach noch fehlende Security-Tools meldet, ist der DevContain
 /k-install-security-tools --install missing --yes
 ```
 
-Danach OpenCode im Container neu starten.
-
-## 8. Status Pruefen
-
-Im Projektroot im Container:
+Danach OpenCode im Container neu starten und im Projektroot pruefen:
 
 ```text
 /k-status
@@ -155,7 +197,7 @@ Erwartung:
 - `opencode` meldet Command-Links und `skills.paths` plausibel.
 - `devcontainer` erkennt `/workspaces/k-playbook` und den Symlink `~/dev/k-playbook`.
 
-## 9. VS-Code-Erweiterungen Empfohlen
+## 4. VS-Code-Erweiterungen Empfohlen
 
 VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vscode/extensions.json` anzeigen. Fuer Python-lastige Projekte sind insbesondere sinnvoll:
 
@@ -174,8 +216,21 @@ git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 ```
 
 ```text
-/k-install
+Lies ~/dev/k-playbook/commands/k-install.md und fuehre die Installationsanleitung darin aus.
+/k-install-security-tools --install missing
 ```
+
+Ohne DevContainer im Zielprojekt:
+
+```text
+/k-setup
+# optional:
+/k-setup-codeql
+/k-install-codeql
+/k-status
+```
+
+Mit DevContainer auf dem Host:
 
 ```bash
 ~/dev/k-playbook/scripts/install-devcontainer-k-playbook.sh ~/dev/example-python-project
@@ -185,6 +240,7 @@ DevContainer neu bauen, OpenCode im Container neu starten, dann:
 
 ```text
 /k-setup
+# optional:
 /k-setup-codeql
 /k-install-codeql
 /k-install-security-tools --install missing --yes

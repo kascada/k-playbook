@@ -2,7 +2,7 @@
 
 Du arbeitest im DevContainer des Zielprojekts.
 
-Lies zuerst `~/dev/k-playbook/docs/multi-project-installation.md`, insbesondere Abschnitt `6. DevContainer Neu Erzeugen` bis `10. Status Pruefen`.
+Lies zuerst `~/dev/k-playbook/docs/multi-project-installation.md`, insbesondere Abschnitt `3B. Projekt mit DevContainer einrichten`.
 
 Fuehre danach aus:
 

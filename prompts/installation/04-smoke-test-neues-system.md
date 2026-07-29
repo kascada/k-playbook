@@ -5,6 +5,7 @@ Teste die Multi-Project-Installation in einer Wegwerf-Umgebung so, als waere k-p
 Ziel ist nicht ein vollstaendiger Produkt-DevContainer, sondern ein belastbarer Installations-Smoke-Test fuer:
 
 - Host-OpenCode-Registrierung nach frischem Clone.
+- Normales Projekt-Setup ohne DevContainer kann mit `03A-projekt-ohne-devcontainer-setup.md` getestet werden; dieser Smoke-Test fokussiert die Infrastruktur- und DevContainer-Integration.
 - Vorbereitung eines Dummy-Zielprojekts mit `.devcontainer/devcontainer.json`.
 - Simulation der DevContainer-Seite mit `/workspaces/k-playbook`, `/home/vscode/dev/k-playbook`, OpenCode-Command-Links und `skills.paths`.
 
@@ -145,7 +146,7 @@ Pruefe im Container:
 Wenn der Docker-Container aus Schritt 4 laeuft und `opencode` darin verfuegbar ist, fuehre aus:
 
 ```bash
-opencode run --dir /workspaces/example-python-project --file /home/vscode/dev/k-playbook/prompts/installation/03-devcontainer-projekt-setup.md "Fuehre den angehaengten Installations-Prompt als Smoke-Test aus. Security-Tool-Downloads duerfen fuer diesen Smoke-Test uebersprungen werden. Frage vor CodeQL oder Dependabot."
+opencode run --dir /workspaces/example-python-project --file /home/vscode/dev/k-playbook/prompts/installation/03B-devcontainer-projekt-setup.md "Fuehre den angehaengten Installations-Prompt als Smoke-Test aus. Security-Tool-Downloads duerfen fuer diesen Smoke-Test uebersprungen werden. Frage vor CodeQL oder Dependabot."
 ```
 
 Wenn `opencode` im Container nicht verfuegbar ist, pruefe die deterministischen Effekte aus Prompt 3 direkt:
