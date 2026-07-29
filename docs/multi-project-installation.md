@@ -35,7 +35,7 @@ Fuer andere Prompts ist der Aufruf analog: `--dir` setzt den Arbeitskontext, `--
 
 Die Prompts stehen auch im Index [`../prompts/README.md`](../prompts/README.md).
 
-Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/installation/04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md).
+Zum Testen auf einem simulierten neuen System gibt es zusaetzlich [`../prompts/installation/04-smoke-test-neues-system.md`](../prompts/installation/04-smoke-test-neues-system.md). Der reproduzierbare Durchlauf steht in [`../prompts/installation/RUNBOOK-smoke-test-neues-system.md`](../prompts/installation/RUNBOOK-smoke-test-neues-system.md).
 
 ## Halbmanuelle Installation
 
@@ -54,13 +54,13 @@ git pull
 
 ## 2. Host-OpenCode Registrieren
 
-OpenCode auf dem Host starten und im k-playbook-Repo ausfuehren:
+OpenCode auf dem Host starten und den AI-Assistenten im k-playbook-Repo anweisen:
 
 ```text
-/k-install
+Lies ~/dev/k-playbook/commands/k-install.md und fuehre die Installationsanleitung darin aus.
 ```
 
-Nach einem frischen Clone ist `/k-install` eventuell noch nicht im Slash-Command-Menue sichtbar. Dann den AI-Assistenten anweisen, `~/dev/k-playbook/commands/k-install.md` direkt zu lesen und auszufuehren. Dieser Bootstrap registriert den Command; danach fuer zukuenftige Aktualisierungen normal `/k-install` verwenden.
+Dieser Bootstrap registriert den Command; danach reicht fuer zukuenftige Aktualisierungen normal `/k-install`.
 
 Optional danach Security-Tools host-lokal installieren:
 
@@ -70,35 +70,7 @@ Optional danach Security-Tools host-lokal installieren:
 
 Wichtig: `/k-install*` nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
 
-## 3. Zielprojekt Klonen Oder Aktualisieren
-
-Beispielpfad:
-
-```bash
-cd ~/dev
-git clone <PROJEKT-REPO-URL> example-python-project
-```
-
-Falls das Projekt schon existiert:
-
-```bash
-cd ~/dev/example-python-project
-git pull
-```
-
-## 4. VS-Code-Erweiterungen Empfohlen
-
-VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vscode/extensions.json` anzeigen. Fuer Python-lastige Projekte sind insbesondere sinnvoll:
-
-- SARIF Viewer (`MS-SarifVSCode.sarif-viewer`) fuer CodeQL-/Security-Ergebnisse.
-- GitHub CodeQL (`GitHub.vscode-codeql`) fuer lokale CodeQL-Queries und Datenbanken.
-- Dev Containers (`ms-vscode-remote.remote-containers`) fuer den Container-Workflow.
-- Python (`ms-python.python`) und Pylance (`ms-python.vscode-pylance`) fuer Python-Code.
-- Docker (`ms-azuretools.vscode-docker`) fuer Container-Kontext.
-- YAML (`redhat.vscode-yaml`) fuer GitHub Actions, Dependabot und Configs.
-- ShellCheck (`timonwong.shellcheck`) fuer DevContainer-/Setup-Shellscripts.
-
-## 5. DevContainer Fuer k-playbook Vorbereiten
+## 3. DevContainer Fuer k-playbook Vorbereiten
 
 Auf dem Host ausfuehren:
 
@@ -116,7 +88,7 @@ Im DevContainer wird dadurch vorbereitet:
 - `skills.paths: ["~/dev/k-playbook"]` wird bei Bedarf in der Container-OpenCode-Konfig angelegt.
 - fehlende Security-Pflicht-Tools werden beim DevContainer-Rebuild fuer den Container-User `vscode` installiert.
 
-## 6. DevContainer Neu Erzeugen
+## 4. DevContainer Neu Erzeugen
 
 Den DevContainer fuer `~/dev/example-python-project` neu bauen oder neu starten.
 
@@ -131,7 +103,7 @@ ls -l ~/.config/opencode/commands/k-install.md
 
 Alle Pfade muessen existieren.
 
-## 7. Projektlokales k-playbook Setup
+## 5. Projektlokales k-playbook Setup
 
 OpenCode im Container neu starten, im Projektroot `/workspaces/example-python-project` oeffnen und ausfuehren:
 
@@ -141,7 +113,7 @@ OpenCode im Container neu starten, im Projektroot `/workspaces/example-python-pr
 
 `/k-setup` legt oder aktualisiert `K-PLAYBOOK.MD` und die projektlokalen k-playbook-Pfade.
 
-## 8. Optional CodeQL Einrichten
+## 6. Optional CodeQL Einrichten
 
 Wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach im Container ausfuehren:
 
@@ -157,7 +129,7 @@ Falls die lokale CodeQL-CLI noch fehlt, danach den Installationscommand nutzen:
 
 `/k-setup-codeql` dokumentiert die CodeQL-Entscheidung und Pfade in `K-PLAYBOOK.MD`; `/k-install-codeql` installiert die lokale CodeQL-CLI ausserhalb von Projekt-venvs.
 
-## 9. Container-OpenCode Nochmal Registrieren
+## 7. Container-OpenCode Nochmal Registrieren
 
 Nach `/k-setup` im Container einmal ausfuehren:
 
@@ -175,7 +147,7 @@ Wenn `/k-install` danach noch fehlende Security-Tools meldet, ist der DevContain
 
 Danach OpenCode im Container neu starten.
 
-## 10. Status Pruefen
+## 8. Status Pruefen
 
 Im Projektroot im Container:
 
@@ -188,6 +160,18 @@ Erwartung:
 - `playbook` zeigt auf `~/dev/k-playbook`.
 - `opencode` meldet Command-Links und `skills.paths` plausibel.
 - `devcontainer` erkennt `/workspaces/k-playbook` und den Symlink `~/dev/k-playbook`.
+
+## 9. VS-Code-Erweiterungen Empfohlen
+
+VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vscode/extensions.json` anzeigen. Fuer Python-lastige Projekte sind insbesondere sinnvoll:
+
+- SARIF Viewer (`MS-SarifVSCode.sarif-viewer`) fuer CodeQL-/Security-Ergebnisse.
+- GitHub CodeQL (`GitHub.vscode-codeql`) fuer lokale CodeQL-Queries und Datenbanken.
+- Dev Containers (`ms-vscode-remote.remote-containers`) fuer den Container-Workflow.
+- Python (`ms-python.python`) und Pylance (`ms-python.vscode-pylance`) fuer Python-Code.
+- Docker (`ms-azuretools.vscode-docker`) fuer Container-Kontext.
+- YAML (`redhat.vscode-yaml`) fuer GitHub Actions, Dependabot und Configs.
+- ShellCheck (`timonwong.shellcheck`) fuer DevContainer-/Setup-Shellscripts.
 
 ## Kurzreihenfolge
 

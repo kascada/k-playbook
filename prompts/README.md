@@ -15,6 +15,10 @@ Prompts in empfohlener Reihenfolge:
 3. [`installation/03-devcontainer-projekt-setup.md`](./installation/03-devcontainer-projekt-setup.md) - Im DevContainer k-playbook pruefen und projektlokal einrichten.
 4. [`installation/04-smoke-test-neues-system.md`](./installation/04-smoke-test-neues-system.md) - Installation in einer Wegwerf-Umgebung wie auf einem neuen System testen.
 
+Reproduzierbarer Testdurchlauf:
+
+- [`installation/RUNBOOK-smoke-test-neues-system.md`](./installation/RUNBOOK-smoke-test-neues-system.md) - Testumgebung neu initialisieren und deterministisch pruefen.
+
 ## Nutzung
 
 Oeffne die jeweilige Datei und gib den Inhalt als Auftrag an den AI-Assistenten. Der Assistent soll die referenzierte Doku lesen, Rueckfragen stellen, wenn Zielpfade fehlen, und danach die beschriebenen Schritte ausfuehren und pruefen.
