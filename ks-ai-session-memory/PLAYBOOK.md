@@ -123,6 +123,8 @@ Alphabetisch. Format: Stichwort → Datei-Nr. + Abschnitt.
 - Verweist präzise auf Datei UND Abschnitt (nicht nur Datei)
 - Wächst mit den Docs mit (Regel: neue Doc-Datei → Index-Einträge nachziehen)
 
+Neue Themen- und Tool-Referenzdateien sollten normales Markdown mit leichtgewichtig OKF-kompatiblem YAML-Frontmatter sein. Minimal sinnvoll sind `type`, `title`, `description`, `tags`, `status` und `generated`; `sources` wird nur eingetragen, wenn tatsaechlich externe Quellen genutzt wurden.
+
 Vorlage: `vorlagen/docs-README.md.template`
 
 ### Schritt 3: `AGENTS.md` im Projekt-Root anlegen

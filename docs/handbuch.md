@@ -163,6 +163,8 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 4. Sicherstellen, dass `AGENTS.md` und `opencode.json` die Docs als autoritative Quelle registrieren.
 5. OpenCode neu starten.
 
+Neue von `/k-code2docs` und `/k-tools-scan` erzeugte Doc-Dateien nutzen leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`, `description`, `tags`, `status`, `generated`). Der Hauptindex bleibt bewusst `<docs>/README.md`; es wird kein OKF-`index.md` als Ersatz erzwungen.
+
 ### Review Und Remediation
 
 1. Review ausfuehren: `/k-review <name>`.

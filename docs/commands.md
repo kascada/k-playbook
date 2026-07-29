@@ -207,6 +207,14 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 
 `/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist `/k-install` die naechste Aktion.
 
+## `/k-code2docs` und `/k-tools-scan`
+
+`/k-code2docs` erzeugt die initiale Docs-First-Dokumentation im in `K-PLAYBOOK.MD` registrierten `docs:`-Pfad und registriert sie fuer spaetere AI-Sessions ueber `AGENTS.md` und `opencode.json`.
+
+`/k-tools-scan` ist der zweite Docs-Schritt. Er ergaenzt unter `<docs>/libs/` pitfall-fokussierte Referenzen zu nicht-trivialen Libraries und verlinkt sie im Hauptindex.
+
+Neue von diesen Commands erzeugte Doc-Dateien bleiben normale Markdown-Dateien, enthalten aber leichtgewichtig OKF-kompatibles YAML-Frontmatter. Pflichtanker fuer Menschen und OpenCode bleibt `<docs>/README.md`; ein OKF-`index.md` wird nicht als Ersatz eingefuehrt.
+
 ## `/k-results`
 
 `/k-results` ist der Zwischenschritt zwischen Report-Reviews und Remediation.

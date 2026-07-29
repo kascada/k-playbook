@@ -197,7 +197,17 @@ Erwartung:
 - `opencode` meldet Command-Links und `skills.paths` plausibel.
 - `devcontainer` erkennt `/workspaces/k-playbook` und den Symlink `~/dev/k-playbook`.
 
-## 4. VS-Code-Erweiterungen Empfohlen
+## 4. Docs-First-Dokumentation Aufbauen
+
+Im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, wenn der `docs:`-Baustein in `/k-setup` aktiviert wurde:
+
+```text
+/k-code2docs
+```
+
+Der Command erzeugt den Docs-Index im konfigurierten `docs:`-Pfad und registriert `AGENTS.md` plus `opencode.json` fuer spaetere AI-Sessions. Danach OpenCode neu starten, damit die neue Session-Memory greift.
+
+## 5. VS-Code-Erweiterungen Empfohlen
 
 VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vscode/extensions.json` anzeigen. Fuer Python-lastige Projekte sind insbesondere sinnvoll:
 
@@ -208,14 +218,6 @@ VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vsc
 - Docker (`ms-azuretools.vscode-docker`) fuer Container-Kontext.
 - YAML (`redhat.vscode-yaml`) fuer GitHub Actions, Dependabot und Configs.
 - ShellCheck (`timonwong.shellcheck`) fuer DevContainer-/Setup-Shellscripts.
-
-Danach im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, wenn der `docs:`-Baustein in `/k-setup` aktiviert wurde:
-
-```text
-/k-code2docs
-```
-
-Der Command erzeugt den Docs-Index im konfigurierten `docs:`-Pfad und registriert `AGENTS.md` plus `opencode.json` fuer spaetere AI-Sessions. Danach OpenCode neu starten, damit die neue Session-Memory greift.
 
 ## Kurzreihenfolge
 

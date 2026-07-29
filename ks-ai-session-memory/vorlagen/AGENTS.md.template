@@ -39,6 +39,14 @@ Nur wenn:
 **Wenn du im Code etwas findest, das den Docs widerspricht: Docs updaten.**
 Sie sind autoritativ für strukturelle Fragen – aber sie müssen aktuell bleiben.
 
+## Doc-Format
+
+Die Doc-Dateien sind normales Markdown. Themen- und Tool-Referenzdateien nutzen
+leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`,
+`description`, `tags`, `status`, `generated`), damit Menschen und Agenten die
+Dateien nach Bedeutung, Status und Herkunft einordnen koennen. Der Einstieg
+bleibt `docs/README.md`.
+
 ## Sprache
 
 Diese Doku ist auf **<Sprache>** geschrieben. Antworte in derselben Sprache

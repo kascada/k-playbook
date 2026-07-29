@@ -35,6 +35,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
 - `Multi-Project` -> [`multi-project-installation.md`](./multi-project-installation.md)
+- `OKF` / `Open Knowledge Format` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
 - `Remediation` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Reviews` -> [`reviews-and-results.md`](./reviews-and-results.md)
