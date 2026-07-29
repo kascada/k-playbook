@@ -8,7 +8,7 @@ k-playbook trennt vier Arbeitsschritte:
 
 1. **Review-Familie ausfuehren**: `/k-review <review-name>` erzeugt oder bewertet Ergebnisse einer Scan-/Review-Familie.
 2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `<reviews>/results/<family>/YYYY-MM-DD/`.
-3. **Projektweit priorisieren**: ein kuenftiges Summary-Command soll mehrere Result-Familien zusammenfassen und deduplizieren.
+3. **Projektweit priorisieren**: `/k-results` fasst mehrere Result-Familien zusammen und dedupliziert sie.
 4. **Remediation ausfuehren**: `/k-remediation <result-or-summary>` arbeitet priorisierte, statusfaehige Findings ab.
 
 `/k-remediation` soll nicht erst alle Scannergebnisse aggregieren. Es soll mit einem bereits bewerteten Assessment oder einer priorisierten Summary starten. Innerhalb dieser Eingabe muss es aber vor der Umsetzung Findings zu sinnvollen Remediation-Buendeln gruppieren und nach Risiko, Aufwand, Quick-Win-Potential und gemeinsamer Verifikation sortieren.
@@ -383,7 +383,7 @@ Was man zum Loesen braucht:
 - Akzeptanzkriterium
 ```
 
-`/k-remediation` soll perspektivisch gegen diese Summary laufen koennen, damit die Reihenfolge der Bearbeitung projektweit priorisiert ist.
+`/k-remediation` kann gegen diese Summary laufen, damit die Reihenfolge der Bearbeitung projektweit priorisiert ist.
 
 ## Security-Tool-Installation
 

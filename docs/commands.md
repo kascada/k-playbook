@@ -1,6 +1,6 @@
 # k-playbook Commands
 
-Diese Datei beschreibt die wichtigsten Setup- und Install-Commands und grenzt ihre Zuständigkeiten ab.
+Diese Datei beschreibt die aktuell vorhandenen Setup-, Install-, Workflow- und Hilfs-Commands und grenzt ihre Zustaendigkeiten ab.
 
 Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt und werden dort ueber `K-PLAYBOOK.MD` registriert.
 
@@ -11,6 +11,7 @@ Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./review
 `/k-install*` und `/k-setup*` haben absichtlich unterschiedliche Zustaendigkeiten:
 
 - `/k-install` und `/k-install-security-tools` sind **host-global**. Sie machen Commands, Skills und Security-Tools auf diesem Server fuer alle Projekte verfuegbar.
+- `/k-install-codeql` ist Tooling-/Artefakt-orientiert. Es installiert oder prueft lokale CodeQL-Artefakte, schreibt aber keine Projektkonfiguration.
 - `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.MD` und projektlokale Playbook-Pfade.
 - Der globale k-playbook-Pfad ist fest `~/dev/k-playbook`. Wenn der physische Klon woanders liegt, wird ein Symlink nach `~/dev/k-playbook` angelegt; Projektkonfigurationen waehlen keinen eigenen Basis-Repo-Pfad.
 - Host-Installation schreibt keine Projektdateien.
@@ -38,15 +39,30 @@ Projekt mit CodeQL-Entscheidung:
 
 ## Kurzuebersicht
 
+Aktueller Slash-Command-Bestand unter `commands/`: 20 Dateien (`k-*.md`). Neue Dateien werden auf dem Host erst sichtbar, nachdem `/k-install` die OpenCode-Symlinks aktualisiert hat.
+
 | Command | Scope | Projekt-Konfig | Artefakte / Host |
 |---------|-------|----------------|------------------|
 | `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
+| `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.MD` | optional `codeql-cli/`, `databases/`, `results/` |
 | `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.MD` und gewaehlte Playbook-Pfade | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt CodeQL-Block in `K-PLAYBOOK.MD` | optional CLI-only Artefakt unter `codeql-cli/` |
-| `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.MD` | optional `codeql-cli/`, `databases/`, `results/` |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
+| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | liest `tasks:` | schreibt `<tasks>/<NNN>-<slug>.md` nach Bestaetigung |
+| `/k-run` | Task-Dateien sequenziell ausfuehren | liest `tasks:` und `K-PLAYBOOK.MD`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
+| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | liest optional `tasks:` | Moderator schreibt akzeptierte Task-Edits und Review-Log |
+| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | liest `todo:` | schreibt/ergaenzt `TODO.md` bzw. den registrierten Todo-Pfad |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | liest `reviews:` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `<reviews>/results/<family>/YYYY-MM-DD/` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | liest `reviews:` und optional `tasks:` | schreibt `<reviews>/results/summary-YYYY-MM-DD.md` |
+| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | liest `reviews:`, `tasks:` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
+| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | liest `docs:` | schreibt `<docs>/*.md`, `<docs>/README.md`, `AGENTS.md`, `opencode.json` |
+| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | liest `docs:` | schreibt `<docs>/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
+| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | liest `enforcement:` und `docs:` | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
+| `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | keine eigene Pfad-Konfig | startet Tests, macht Diagnose, fragt vor Fixes |
+| `/k-verlauf` | alte AI-Verlaeufe durchsuchen | keine Projektdatei noetig | liest Claude-JSONL bzw. OpenCode-Logs read-only |
+| `/k-logmcp` | LogMCP-Zugriff fuer Claude-Code-Projekte einrichten | schreibt ggf. `.claude/CLAUDE.md` und `.claude/settings.local.json` | prueft MCP-Zugriff und merkt Server/Permissions |
+| `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | keine `K-PLAYBOOK.MD`-Pflicht | schreibt/merged `.vscode/settings.json` |
 | `global/bin/k-check` | globale und projektlokale Checks ausfuehren | liest `checks:` aus `K-PLAYBOOK.MD` | stdout/stderr; optional Raw-Output + Run-Metadaten fuer Review-Artefakte |
 
 ## `/k-install`
@@ -129,7 +145,7 @@ Die Scanner selbst werden nicht als `global/checks/*.sh` aufgerufen. `k-check` b
 Der Command:
 
 - legt oder aktualisiert `K-PLAYBOOK.MD` im Projekt-Root
-- registriert projektlokale Pfade wie `tasks`, `checks`, `reviews`, `docs`, `enforcement`
+- registriert projektlokale Pfade wie `tasks`, `todo`, `checks`, `reviews`, `guidelines`, `enforcement`, `docs`
 - erstellt bestaetigte Verzeichnisse oder Initialdateien
 - fuehrt keine Tasks, Reviews, Checks oder CodeQL-Analysen aus
 - veraendert keine globale OpenCode-Registrierung
@@ -207,6 +223,59 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 
 `/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist `/k-install` die naechste Aktion.
 
+## Task-Commands: `/k-task-create`, `/k-run`, `/k-review-loop`, `/k-todo`
+
+Diese Commands bilden die Task-Pipeline. Sie raten keine Projektpfade, sondern lesen `K-PLAYBOOK.MD`.
+
+`/k-task-create [short-name]` erzeugt aus dem Gespraechskontext eine neue Task-Datei im registrierten `tasks:`-Pfad. Der Command bestimmt die naechste freie Nummer ueber offene Tasks und `done/`, zeigt den Entwurf zuerst und speichert erst nach Bestaetigung.
+
+`/k-run [file-or-directory]` fuehrt Task-Dateien strikt sequenziell aus. Ohne Argument nutzt er den registrierten `tasks:`-Pfad; mit explizitem Datei- oder Directory-Argument ist ein One-off-Lauf moeglich. Erfolgreiche Tasks bekommen eine Ausfuehrungsnotiz und werden nach `done/` verschoben. Bei Abbruch bleibt die Task-Datei offen.
+
+`/k-run` respektiert `## Ausfuehrungskontext` in Tasks. Wenn dort `Target repo`, `Base branch`, `Work branch` oder `PR required` stehen, fuehrt der Command vor Delegation einen Branch-/Dirty-Worktree-Preflight aus. Bei `PR required: true` gehoert PR-Handoff nach erfolgreichem Task zum Flow.
+
+`/k-review-loop [path]` prueft Task- oder Instruktionsdateien vor der Ausfuehrung. Critic und Editor laufen read-only; nur der Moderator schreibt akzeptierte minimale Edits und haengt ein Review-Log an. Ohne Argument nutzt der Command den registrierten `tasks:`-Pfad.
+
+`/k-todo [todo text]` liest oder ergaenzt die projektlokale Todo-Datei aus `todo:`. Ohne Argument wird der Inhalt angezeigt; mit Text wird ein neuer `- [ ] ...`-Eintrag angehaengt.
+
+## `/k-review`
+
+`/k-review [review-name]` orchestriert globale und projektlokale Review-Rezepte.
+
+Der Command:
+
+- liest globale Rezepte aus `<PLAYBOOK_REPO>/global/reviews/`.
+- liest projektlokale Rezepte aus `reviews:`, falls aktiv.
+- laesst projektlokale Rezepte globale mit gleichem Namen ueberlagern.
+- laedt `known-decisions.md`, falls vorhanden, damit bewusste Entscheidungen nicht erneut als Findings gemeldet werden.
+- schreibt im Projekt-Review-Pfad `log.md`, wenn `reviews:` aktiv ist.
+
+Interaktive Reviews moderieren Stelle fuer Stelle: Vorschlag zeigen, User-Freigabe abwarten, dann erst aendern. Report-Mode-Reviews mit `handoff` schreiben ein Ergebnisartefakt. Bei `result-family` landet es unter `<reviews>/results/<family>/YYYY-MM-DD/` mit typischer Struktur `assessment.md`, `findings.md`, `raw/` und Run-Metadaten.
+
+Aktuelle globale Review-Rezepte:
+
+- `/k-review codeql-security`
+- `/k-review k-check-security`
+- `/k-review secret-scanning`
+- `/k-review dependency-cve`
+- `/k-review dependabot-alerts`
+- `/k-review iac-container`
+- `/k-review tech`
+- `/k-review python-comment-hardspots`
+
+## `/k-remediation`
+
+`/k-remediation [result-datei.md]` arbeitet Findings aus Review-Ergebnissen oder priorisierten Summaries ab.
+
+Unterstuetzte Eingaben:
+
+- Legacy-Dateien wie `<reviews>/result-*.md`.
+- Result-Familien wie `<reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
+- Von `/k-results` erzeugte Summaries unter `<reviews>/results/summary-YYYY-MM-DD.md`.
+
+Der Command liest `reviews:`, `tasks:` und die Remediation-Policy aus `K-PLAYBOOK.MD`. Er gruppiert Findings zuerst zu sinnvollen Buendeln nach Risiko, Aufwand, Kopplung und gemeinsamer Verifikation. Je nach Policy entstehen Tasks mit Branch-/PR-Hinweis, oder kleine direkte Fixes sind nur nach expliziter Freigabe erlaubt.
+
+Wichtig: `raw/` und Run-Metadaten von Result-Familien bleiben read-only. Status, Triage-Notizen, Task-Verweise und Remediation-Logs werden in `findings.md` bzw. nachvollziehbar in `assessment.md` gepflegt.
+
 ## `/k-code2docs` und `/k-tools-scan`
 
 `/k-code2docs` erzeugt die initiale Docs-First-Dokumentation im in `K-PLAYBOOK.MD` registrierten `docs:`-Pfad und registriert sie fuer spaetere AI-Sessions ueber `AGENTS.md` und `opencode.json`.
@@ -235,12 +304,40 @@ Typischer Ablauf:
 /k-review k-check-security
 /k-review secret-scanning
 /k-review dependency-cve
+/k-review dependabot-alerts
 /k-review iac-container
 /k-results
 /k-remediation k-playbook/reviews/results/summary-YYYY-MM-DD.md
 ```
 
-`/k-result` ist ein Alias fuer `/k-results`.
+Es gibt aktuell keine eigene `commands/k-result.md`; der dokumentierte Command ist `/k-results`.
+
+## `/k-enforcement`
+
+`/k-enforcement [target-dir]` ist der explizite Check gegen k-playbook-Regeln. Der gleichnamige Skill `ks-enforcement` wendet diese Regeln waehrend Implementierungsarbeit laufend an; der Slash-Command ist fuer Mid-work- oder Abschlusschecks gedacht.
+
+Der Command:
+
+- laedt globale Regeln aus `<PLAYBOOK_REPO>/global/rules/`.
+- laedt projektlokale Regeln aus `enforcement:`, falls aktiv.
+- prueft bei Code-Aenderungen immer die Docs-Sync-Regel gegen `docs:`, `README.md`, `AGENTS.md` und offensichtliche Architektur-/Setup-/API-Doku.
+- bleibt read-only, solange der User nicht explizit einen Fix verlangt.
+
+Wenn `enforcement:` oder `docs:` inaktiv ist, werden keine Default-Pfade erfunden; globale Regeln gelten trotzdem.
+
+## `/k-test-check`
+
+`/k-test-check [path-or-command]` fuehrt Tests aus, diagnostiziert Fehlschlaege und fragt erst danach, ob Fixes gemacht werden sollen.
+
+Ohne Argument erkennt der Command typische Test-Frameworks, z. B. `pytest`, Jest/Vitest, `make test`, Go oder Rust. Mit Argument nutzt er einen expliziten Pfad oder Testbefehl. Bei roten Tests liest er relevante Test- und Source-Dateien, ordnet die Ursache ein und meldet knapp, ob Test, Code, Umgebung oder ein gebrochener Vertrag betroffen ist.
+
+## Hilfs-Commands: `/k-verlauf`, `/k-logmcp`, `/k-vscode-project-color`
+
+`/k-verlauf [claude|opencode|all] <Suchbegriff> [zeitraum] [-all]` durchsucht alte AI-Verlaeufe. Claude wird ueber `~/.claude/projects/**/*.jsonl` durchsucht; OpenCode ueber Log-/Session-Metadaten in `opencode.log`, nicht zwingend ueber vollstaendige Chattexte. Der Command ist read-only und gibt Treffergruppen mit Zeit, Projekt/Directory und Snippets aus.
+
+`/k-logmcp [server]` richtet in Claude-Code-Projekten LogMCP-Zugriff ein. Er erkennt oder fragt den `logmcp-<hostname>`-Server, prueft MCP-Tools wie `list_logs`, ergaenzt bei Bedarf `.claude/settings.local.json` um das Wildcard-Permission-Muster `mcp__logmcp-*` und merkt den Server in `.claude/CLAUDE.md`.
+
+`/k-vscode-project-color [project-name]` schreibt oder merged eine projektlokale `.vscode/settings.json`, damit VS-Code-Fenster anhand Titel und Farbe unterscheidbar sind. Der Command ist nicht an `K-PLAYBOOK.MD` gebunden und erhaelt bestehende unrelated Settings.
 
 ## `global/bin/k-check`
 
