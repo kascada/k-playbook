@@ -159,7 +159,7 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 
 1. `docs:` in `/k-setup` aktivieren.
 2. `/k-code2docs` nutzen oder das Playbook `ks-ai-session-memory` manuell anwenden.
-3. Sicherstellen, dass `docs/README.md` einen Index hat.
+3. Sicherstellen, dass `<docs>/README.md` im in `K-PLAYBOOK.MD` registrierten `docs:`-Pfad einen Index hat.
 4. Sicherstellen, dass `AGENTS.md` und `opencode.json` die Docs als autoritative Quelle registrieren.
 5. OpenCode neu starten.
 

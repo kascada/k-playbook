@@ -209,6 +209,14 @@ VS Code sollte beim Oeffnen des Projekts die empfohlenen Erweiterungen aus `.vsc
 - YAML (`redhat.vscode-yaml`) fuer GitHub Actions, Dependabot und Configs.
 - ShellCheck (`timonwong.shellcheck`) fuer DevContainer-/Setup-Shellscripts.
 
+Danach im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, wenn der `docs:`-Baustein in `/k-setup` aktiviert wurde:
+
+```text
+/k-code2docs
+```
+
+Der Command erzeugt den Docs-Index im konfigurierten `docs:`-Pfad und registriert `AGENTS.md` plus `opencode.json` fuer spaetere AI-Sessions. Danach OpenCode neu starten, damit die neue Session-Memory greift.
+
 ## Kurzreihenfolge
 
 ```bash
@@ -224,6 +232,7 @@ Ohne DevContainer im Zielprojekt:
 
 ```text
 /k-setup
+/k-code2docs
 # optional:
 /k-setup-codeql
 /k-install-codeql
@@ -240,6 +249,7 @@ DevContainer neu bauen, OpenCode im Container neu starten, dann:
 
 ```text
 /k-setup
+/k-code2docs
 # optional:
 /k-setup-codeql
 /k-install-codeql

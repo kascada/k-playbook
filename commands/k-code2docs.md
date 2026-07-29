@@ -14,8 +14,8 @@ Turn an existing codebase into a curated, indexed documentation set that the AI 
 Produces:
 - `<docs>/<NN>-<slug>.md` — one file per coherent topic.
 - `<docs>/README.md` — TOC + alphabetical keyword index + question→file mapping.
-- `AGENTS.md` at project root — session-injected pointer to the docs.
-- `opencode.json` at project root — registers `AGENTS.md` + `docs/` reference.
+- `AGENTS.md` at project root — session-injected pointer to the configured docs path.
+- `opencode.json` at project root — registers `AGENTS.md` + the configured `docs:` reference.
 
 ## Step 0 — Target bestimmen und bestätigen
 
@@ -27,6 +27,7 @@ Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind r
   - Existiert das Verzeichnis: `TARGET_DIR = realpath($ARGUMENTS)`.
   - Existiert es nicht: abbrechen mit klarer Fehlermeldung.
 - Wenn `$ARGUMENTS` leer ist: `TARGET_DIR = realpath(CWD)`.
+- Danach vor dem Snapshot den project-local base guard aus `path-resolution.md` anwenden: Wenn `TARGET_DIR` versehentlich das in der Parent-`K-PLAYBOOK.MD` konfigurierte `base:`-Verzeichnis ist, auf den Parent als Projekt-Root korrigieren und diese Korrektur im Preflight anzeigen.
 
 **Preflight-Snapshot anzeigen:**
 
@@ -73,7 +74,14 @@ Command-specific policy:
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
-Use `RESOLVED_DOCS_DIR` for all reads and writes.
+Use `RESOLVED_DOCS_DIR` for all doc reads and writes. Do not hard-code `docs/`; all user-visible links and OpenCode references must be derived from the resolved `docs:` value.
+
+Derived paths for Memory registration:
+
+- `DOCS_DISPLAY_PATH` = display path from path-resolution, e.g. `docs/` or `k-playbook/docs/`.
+- `DOCS_README_FROM_AGENTS` = path from `TARGET_DIR` / `AGENTS_FILE` to `<RESOLVED_DOCS_DIR>/README.md`, e.g. `docs/README.md` or `k-playbook/docs/README.md`.
+- `AGENTS_LINK_FROM_DOCS_README` = relative Markdown link from `<RESOLVED_DOCS_DIR>/README.md` to `AGENTS_FILE`, e.g. `../AGENTS.md` or `../../AGENTS.md`.
+- `DOCS_REFERENCE_PATH` = path for `references.docs.path` in `OPENCODE_CONFIG`, relative to the config file directory when possible and prefixed with `./` for same-tree paths, e.g. `./docs` or `./k-playbook/docs`; use an absolute path only if the configured docs directory is outside `TARGET_DIR`.
 
 ## Step 2 — Clarify scope
 
@@ -192,7 +200,7 @@ Nach jeder geschriebenen Datei kurz melden welche Datei geschrieben wurde (Datei
 <Ein Absatz: was das Projekt ist, was in diesen Docs steht.>
 
 > **Für AI-Sessions:** Diese Docs sind **autoritativ**. Nutze sie zuerst,
-> bevor du Code liest. Siehe [`AGENTS.md`](../AGENTS.md) im Projekt-Root.
+> bevor du Code liest. Siehe [`AGENTS.md`](<AGENTS_LINK_FROM_DOCS_README>) im Projekt-Root.
 
 ## Übersicht der Dokumente
 
@@ -239,7 +247,7 @@ Alphabetisch. Format: **Begriff** → `datei.md` §Abschnitt.
 Interner Selbsttest, sichtbar für den User:
 
 1. Wähle **3 Konzepte aus dem Code, die nicht direkt aus einem Doc-Titel folgen** (z. B. eine spezielle Env-Var, ein interner Job-Name, ein bestimmter API-Endpunkt).
-2. Für jedes: versuche über `README.md` (TOC + Index + Q→Datei) in ≤2 Schritten zur Antwort zu kommen.
+2. Für jedes: versuche über `<RESOLVED_DOCS_DIR>/README.md` (TOC + Index + Q→Datei) in ≤2 Schritten zur Antwort zu kommen.
 3. Wenn eines der drei fehlschlägt: Index/Themen nachbessern und Test wiederholen.
 
 Ergebnis dem User zeigen. Erst weiter, wenn alle drei durchkommen.
@@ -250,13 +258,13 @@ Der Kern dieses Schrittes: die entstandenen Docs sind wertlos, wenn Folge-Sessio
 
 **8a — `AGENTS.md`:**
 
-- Existiert nicht → aus `~/dev/k-playbook/ks-ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln).
-- Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `docs/README.md`, Ausnahmen-Regel. Fehlende Punkte **mit Bestätigung** einfügen. Rest unangetastet lassen.
+- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen, wenn `docs:` anders konfiguriert ist.
+- Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
 
 **8b — `opencode.json` (oder `.jsonc` falls schon vorhanden):**
 
-- Existiert nicht → aus `~/dev/k-playbook/ks-ai-session-memory/vorlagen/opencode.json.template` erzeugen. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur (nicht die Template-Platzhalter stehen lassen).
-- Existiert → prüfen ob `instructions` `AGENTS.md` enthält und `references.docs` existiert und die `description` konkret ist. Fehlendes ergänzen, konkret machen — mit Bestätigung.
+- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/opencode.json.template` erzeugen. `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
+- Existiert → prüfen ob `instructions` `AGENTS.md` enthält, `references.docs.path` nach Auflösung relativ zur Config-Datei auf `RESOLVED_DOCS_DIR` zeigt, und die `description` konkret ist. Fehlendes ergänzen, falsche/alte Docs-Pfade korrigieren, konkret machen — mit Bestätigung.
 
 **8c — Restart-Hinweis:**
 
