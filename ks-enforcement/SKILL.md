@@ -1,6 +1,6 @@
 ---
 name: ks-enforcement
-description: Use when code, docs, tests, tasks, reviews, checks, or implementation work may need k-playbook rules applied. Loads global rules from the k-playbook repo plus project-local rules from K-PLAYBOOK.MD `enforcement:` and makes the agent check them during work. Trigger keywords - "Enforcement", "Regeln berücksichtigen", "Checks durchgehen", "Code und Docs", "k-enforcement", "k-playbook/enforcement".
+description: Use when code, docs, tests, tasks, reviews, checks, or implementation work may need k-playbook rules applied. Loads global rules from the k-playbook repo plus project-local rules from k-playbook/enforcement and makes the agent check them during work. Trigger keywords - "Enforcement", "Regeln berücksichtigen", "Checks durchgehen", "Code und Docs", "k-enforcement", "k-playbook/enforcement".
 ---
 
 # Skill: Enforcement
@@ -22,11 +22,11 @@ Immer wenn eine Arbeit Regeln verletzen könnte, insbesondere bei:
 Der Skill lädt zwei Regel-Ebenen:
 
 1. **Global:** `<PLAYBOOK_REPO>/global/rules/*.md`
-2. **Projektlokal:** der in `<TARGET_DIR>/K-PLAYBOOK.MD` registrierte `enforcement:`-Pfad
+2. **Projektlokal:** `<TARGET_DIR>/k-playbook/enforcement/`
 
 `PLAYBOOK_REPO` und `TARGET_DIR` werden nach derselben Logik bestimmt wie in `commands/_shared/path-resolution.md`.
 
-Wenn `K-PLAYBOOK.MD` fehlt oder `enforcement:` leer ist, gelten nur die globalen Regeln. Wenn ein eingetragener projektlokaler Pfad fehlt, den User kurz darauf hinweisen und mit den globalen Regeln fortfahren, sofern die Arbeit dadurch nicht blockiert ist.
+Wenn `K-PLAYBOOK.MD` fehlt, gelten nur die globalen Regeln. Wenn `k-playbook/enforcement/` fehlt, den User kurz darauf hinweisen und mit den globalen Regeln fortfahren, sofern die Arbeit dadurch nicht blockiert ist.
 
 ## Arbeitsweise
 

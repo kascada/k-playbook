@@ -1,5 +1,5 @@
 ---
-description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under <docs>/libs/, plus an index. Uses paths from K-PLAYBOOK.MD. Focuses on pitfalls and idioms, NOT copy-paste snippets.
+description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under k-playbook/docs/libs/, plus an index. Uses the fixed docs path. Focuses on pitfalls and idioms, NOT copy-paste snippets.
 argument-hint: [scope-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
@@ -9,12 +9,12 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 
 Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
 
-`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active existing `docs:` path configured by `/k-setup`.
+`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.MD` and an existing `k-playbook/docs` directory.
 
 Produces:
-- `<docs>/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
-- `<docs>/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
-- Ergänzt `<docs>/README.md` um eine Sektion „Libs & Stack" mit Link auf `libs/README.md`.
+- `k-playbook/docs/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
+- `k-playbook/docs/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
+- Ergänzt `k-playbook/docs/README.md` um eine Sektion „Libs & Stack" mit Link auf `libs/README.md`.
 
 **Fokus:** Pitfalls, Auth-Quirks, Concurrency-Fallen, Version-Migrations-Notes, empfohlene Idiome. **Kein** Copy-Paste-Tutorial — dafür gibt es die offiziellen Docs.
 
@@ -22,18 +22,15 @@ Produces:
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve the fixed `docs` path:
 
-- `docs:` → `DOCS_DIR`
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `docs:`.
+- `RESOLVED_DOCS_DIR = <TARGET_DIR>/k-playbook/docs`.
+- `DOCS_DISPLAY_PATH = k-playbook/docs`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `docs:` is unset or inactive (`-`): abort and tell the user to activate the `docs` block with `/k-setup`.
-- If `docs:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
 - Use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 `LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.

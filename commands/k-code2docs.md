@@ -1,5 +1,5 @@
 ---
-description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses paths from K-PLAYBOOK.MD.
+description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses k-playbook/docs.
 argument-hint: [target-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -9,13 +9,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
-`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `docs:` path configured by `/k-setup`.
+`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.MD`. The docs directory is always `<project>/k-playbook/docs`.
 
 Produces:
-- `<docs>/<NN>-<slug>.md` — one file per coherent topic.
-- `<docs>/README.md` — TOC + alphabetical keyword index + question→file mapping.
+- `k-playbook/docs/<NN>-<slug>.md` — one file per coherent topic.
+- `k-playbook/docs/README.md` — TOC + alphabetical keyword index + question→file mapping.
 - `AGENTS.md` at project root — session-injected pointer to the configured docs path.
-- `opencode.json` at project root — registers `AGENTS.md` + the configured `docs:` reference.
+- `opencode.json` at project root — registers `AGENTS.md` + `./k-playbook/docs`.
 
 ## Step 0 — Target bestimmen und bestätigen
 
@@ -27,20 +27,20 @@ Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind r
   - Existiert das Verzeichnis: `TARGET_DIR = realpath($ARGUMENTS)`.
   - Existiert es nicht: abbrechen mit klarer Fehlermeldung.
 - Wenn `$ARGUMENTS` leer ist: `TARGET_DIR = realpath(CWD)`.
-- Danach vor dem Snapshot den project-local base guard aus `path-resolution.md` anwenden: Wenn `TARGET_DIR` versehentlich das in der Parent-`K-PLAYBOOK.MD` konfigurierte `base:`-Verzeichnis ist, auf den Parent als Projekt-Root korrigieren und diese Korrektur im Preflight anzeigen.
+- Danach vor dem Snapshot den fixed-layout guard aus `path-resolution.md` anwenden: Wenn `TARGET_DIR` versehentlich `<project>/k-playbook` ist, auf den Parent als Projekt-Root korrigieren und diese Korrektur im Preflight anzeigen.
 
 **Preflight-Snapshot anzeigen:**
 
-Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` lesen, um `base:`, `docs:` und weitere Pfade kompakt anzeigen zu können. Wenn die Datei fehlt, `base:` fehlt oder nicht parsebar ist, abbrechen und `/k-setup` aufrufen lassen.
+Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` lesen, um `layout`, `repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-setup` aufrufen lassen.
 
 ```text
 /k-code2docs — Preflight
 ─────────────────────────────────────
 Ziel:          <absolute TARGET_DIR>
 Quelle:        Argument | CWD
-K-PLAYBOOK.MD: gefunden (base: ./k-playbook, docs: ./k-playbook/docs, ...) | fehlt / base fehlt
+K-PLAYBOOK.MD: gefunden (layout: fixed-project-k-playbook) | fehlt
 Git-Repo:      ja (branch: <branch>) | nein
-Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt / inaktiv
+Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt
 ```
 
 Wenn `$ARGUMENTS` gesetzt war: keine Rückfrage — das explizite Ziel gilt.
@@ -59,29 +59,26 @@ Bei „ja": weiter mit Step 1.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve the fixed `docs` path:
 
-- `docs:` → `DOCS_DIR`.
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `docs:`.
+- `RESOLVED_DOCS_DIR = <TARGET_DIR>/k-playbook/docs`.
+- `DOCS_DISPLAY_PATH = k-playbook/docs`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `docs:` is unset or inactive (`-`): abort and tell the user to activate the `docs` block with `/k-setup`.
-- If `docs:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
-Use `RESOLVED_DOCS_DIR` for all doc reads and writes. Do not hard-code `docs/`; all user-visible links and OpenCode references must be derived from the resolved `docs:` value.
+Use `RESOLVED_DOCS_DIR` for all doc reads and writes.
 
 Derived paths for Memory registration:
 
-- `DOCS_DISPLAY_PATH` = display path from path-resolution, e.g. `docs/` or `k-playbook/docs/`.
-- `DOCS_README_FROM_AGENTS` = path from `TARGET_DIR` / `AGENTS_FILE` to `<RESOLVED_DOCS_DIR>/README.md`, e.g. `docs/README.md` or `k-playbook/docs/README.md`.
-- `AGENTS_LINK_FROM_DOCS_README` = relative Markdown link from `<RESOLVED_DOCS_DIR>/README.md` to `AGENTS_FILE`, e.g. `../AGENTS.md` or `../../AGENTS.md`.
-- `DOCS_REFERENCE_PATH` = path for `references.docs.path` in `OPENCODE_CONFIG`, relative to the config file directory when possible and prefixed with `./` for same-tree paths, e.g. `./docs` or `./k-playbook/docs`; use an absolute path only if the configured docs directory is outside `TARGET_DIR`.
+- `DOCS_DISPLAY_PATH` = `k-playbook/docs`.
+- `DOCS_README_FROM_AGENTS` = `k-playbook/docs/README.md`.
+- `AGENTS_LINK_FROM_DOCS_README` = `../../AGENTS.md`.
+- `DOCS_REFERENCE_PATH` = `./k-playbook/docs`.
 
 ## Step 2 — Clarify scope
 
@@ -276,7 +273,7 @@ Der Kern dieses Schrittes: die entstandenen Docs sind wertlos, wenn Folge-Sessio
 
 **8a — `AGENTS.md`:**
 
-- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen, wenn `docs:` anders konfiguriert ist. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
+- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
 - Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
 
 **8b — `opencode.json` (oder `.jsonc` falls schon vorhanden):**
@@ -301,7 +298,7 @@ Kompakte Zusammenfassung:
 - MEMORY: `AGENTS.md` (neu / ergänzt / unverändert), `opencode.json` (neu / ergänzt / unverändert).
 - Restart-Hinweis.
 - Nächster Schritt: „`/k-setup` erneut aufrufen, um zu bestätigen dass alles registriert ist (optional)."
-- Folge-Command: **`/k-tools-scan`** — erzeugt `<docs>/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
+- Folge-Command: **`/k-tools-scan`** — erzeugt `k-playbook/docs/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
 
 ## Wartungs-Hinweise (dem User beim ersten Lauf einmal zeigen)
 

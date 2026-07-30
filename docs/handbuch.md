@@ -20,25 +20,24 @@ k-playbook trennt globale Bausteine von projektlokalen Daten.
 | Ebene | Ort | Inhalt |
 |---|---|---|
 | Global | `~/dev/k-playbook/` | Commands, Skills, globale Regeln, globale Reviews, globale Checks. |
-| Projektlokal | Zielprojekt | `K-PLAYBOOK.MD`, Tasks, TODOs, Checks, Reviews, Docs, Enforcement-Regeln. |
+| Projektlokal | Zielprojekt | `K-PLAYBOOK.MD` plus feste Artefaktstruktur unter `k-playbook/`: Tasks, TODOs, Checks, Reviews, Docs, Enforcement-Regeln. |
 
-`K-PLAYBOOK.MD` ist die zentrale Pointer-Datei im Projekt. Commands sollen keine Projektpfade raten, sondern diese Datei lesen.
+`K-PLAYBOOK.MD` ist die zentrale Config-Datei im Projekt. Die projektlokalen Pfade sind fest aus dem Projektroot abgeleitet.
 
 `~/dev/k-playbook` ist dabei der verbindliche logische Pfad zum globalen Basis-Repo. Auf normalen Hosts liegt dort entweder das echte Repo oder ein Symlink auf den echten Klon. In Devcontainern liegt dort typischerweise ein Symlink auf den gemounteten Repo-Pfad, z. B. `/home/vscode/dev/k-playbook -> /workspaces/k-playbook`. Dadurch bleibt der `repo:`-Eintrag in `K-PLAYBOOK.MD` auf Host und Container identisch.
 
 Das Basis-Repo wird zur Laufzeit gebraucht: OpenCode-Command-Eintraege sind Symlinks auf `commands/k-*.md`, Skills werden ueber `skills.paths` aus dem Repo geladen, und Commands/Skills nutzen den `repo:`-Rueckverweis fuer globale Regeln, Shared-Module und Skripte.
 
-Typische projektlokale Pfade:
+Feste projektlokale Pfade:
 
 ```markdown
-- base:        .
-- tasks:       ./tasks
-- todo:        ./TODO.md
-- checks:      ./checks
-- reviews:     ./reviews
-- guidelines:  ./guidelines
-- enforcement: ./enforcement
-- docs:        ./docs
+- tasks:       k-playbook/tasks/
+- todo:        k-playbook/TODO.md
+- checks:      k-playbook/checks/
+- reviews:     k-playbook/reviews/
+- guidelines:  k-playbook/guidelines/
+- enforcement: k-playbook/enforcement/
+- docs:        k-playbook/docs/
 ```
 
 ## Installation Und Setup
@@ -78,25 +77,25 @@ Kurzuebersicht der wichtigsten Commands nach Arbeitsphase:
 | `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.MD` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.MD` und gewaehlte Playbook-Pfade | keine Host-Aenderung |
+| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.MD` und legt die feste `k-playbook/`-Struktur an | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt CodeQL-Block in `K-PLAYBOOK.MD` | optional CLI-only Artefakt unter `codeql-cli/` |
-| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | liest `docs:` | schreibt `<docs>/*.md`, `<docs>/README.md`, `AGENTS.md`, `opencode.json` |
-| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | liest `docs:` | schreibt `<docs>/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
+| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
+| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
 | **Code-Review** | | | |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | liest `reviews:` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `<reviews>/results/<family>/YYYY-MM-DD/` |
-| `/k-results` | vorhandene Review-Results projektweit priorisieren | liest `reviews:` und optional `tasks:` | schreibt `<reviews>/results/summary-YYYY-MM-DD.md` |
-| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | liest `reviews:`, `tasks:` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `k-playbook/reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` |
+| `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `k-playbook/reviews` und `k-playbook/tasks` | schreibt `k-playbook/reviews/results/summary-YYYY-MM-DD.md` |
+| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | braucht `reviews`, `tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
 | **Task-Flow** | | | |
-| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | liest `tasks:` | schreibt `<tasks>/<NNN>-<slug>.md` nach Bestaetigung |
-| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | liest optional `tasks:` | Moderator schreibt akzeptierte Task-Edits und Review-Log |
-| `/k-run` | Task-Dateien sequenziell ausfuehren | liest `tasks:` und `K-PLAYBOOK.MD`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
+| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | nutzt `k-playbook/tasks` | schreibt `k-playbook/tasks/<NNN>-<slug>.md` nach Bestaetigung |
+| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | nutzt `k-playbook/tasks` | Moderator schreibt akzeptierte Task-Edits und Review-Log |
+| `/k-run` | Task-Dateien sequenziell ausfuehren | braucht `tasks` und `K-PLAYBOOK.MD`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
 | **Nuetzliches** | | | |
 | `/k-verlauf` | alte AI-Verlaeufe durchsuchen | keine Projektdatei noetig | liest Claude-JSONL bzw. OpenCode-Logs read-only |
 | `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | keine `K-PLAYBOOK.MD`-Pflicht | schreibt/merged `.vscode/settings.json` |
 | **Weitere** | | | |
-| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | liest `todo:` | schreibt/ergaenzt `TODO.md` bzw. den registrierten Todo-Pfad |
-| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | liest `enforcement:` und `docs:` | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
+| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `k-playbook/TODO.md` | schreibt/ergaenzt `k-playbook/TODO.md` |
+| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | nutzt `enforcement` und `docs`, falls aktiv | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
 | `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | keine eigene Pfad-Konfig | startet Tests, macht Diagnose, fragt vor Fixes |
 
 Details zu allen Commands stehen in [`commands.md`](./commands.md). Fuer die Reihenfolge bei mehreren Zielprojekten und DevContainern siehe [`multi-project-installation.md`](./multi-project-installation.md).
@@ -123,7 +122,7 @@ Aktuelle Skills:
 
 ### Globale Regeln
 
-Globale Regeln liegen unter `global/rules/`. Sie gelten projektuebergreifend und koennen durch projektlokale Regeln aus dem `enforcement:`-Pfad ergaenzt werden.
+Globale Regeln liegen unter `global/rules/`. Sie gelten projektuebergreifend und koennen durch projektlokale Regeln aus `k-playbook/enforcement/` ergaenzt werden, wenn der Baustein aktiv ist.
 
 Wichtige Regeln:
 
@@ -141,7 +140,7 @@ Wichtige Regeln:
 ~/dev/k-playbook/global/bin/k-check --mode baseline
 ```
 
-Fuer auditierbare Review-Laeufe koennen Raw-Ausgabe und Metadaten dauerhaft in `reviews/results/k-check/<datum>/` geschrieben werden.
+Fuer auditierbare Review-Laeufe koennen Raw-Ausgabe und Metadaten dauerhaft in `k-playbook/reviews/results/k-check/<datum>/` geschrieben werden.
 
 Details: [`../global/checks/README.md`](../global/checks/README.md).
 
@@ -159,9 +158,9 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 ### Neues Projekt
 
 1. Im Projektroot `/k-setup` ausfuehren.
-2. Benoetigte Bausteine aktivieren, z. B. `tasks`, `todo`, `reviews`, `docs`, `enforcement`.
+2. `/k-setup` legt die komplette `k-playbook/`-Struktur an.
 3. Optional `/k-setup-codeql` ausfuehren.
-4. Mit `/k-status` pruefen, ob Pfade und Grundstruktur plausibel sind.
+4. Mit `/k-status` pruefen, ob Layout und Grundstruktur plausibel sind.
 
 ### Zielprojekt Im Devcontainer
 
@@ -172,18 +171,18 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 
 ### Docs-First Aufsetzen
 
-1. `docs:` in `/k-setup` aktivieren.
+1. `docs` in `/k-setup` aktivieren.
 2. `/k-code2docs` nutzen oder das Playbook `ks-ai-session-memory` manuell anwenden.
-3. Sicherstellen, dass `<docs>/README.md` im in `K-PLAYBOOK.MD` registrierten `docs:`-Pfad einen Index hat.
+3. Sicherstellen, dass `k-playbook/docs/README.md` einen Index hat.
 4. Sicherstellen, dass `AGENTS.md` und `opencode.json` die Docs als autoritative Quelle registrieren.
 5. OpenCode neu starten.
 
-Neue von `/k-code2docs` und `/k-tools-scan` erzeugte Doc-Dateien nutzen leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`, `description`, `tags`, `status`, `generated`). Der Hauptindex bleibt bewusst `<docs>/README.md`; es wird kein OKF-`index.md` als Ersatz erzwungen.
+Neue von `/k-code2docs` und `/k-tools-scan` erzeugte Doc-Dateien nutzen leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`, `description`, `tags`, `status`, `generated`). Der Hauptindex bleibt bewusst `k-playbook/docs/README.md`; es wird kein OKF-`index.md` als Ersatz erzwungen.
 
 ### Review Und Remediation
 
 1. Review ausfuehren: `/k-review <name>`.
-2. Resultate unter `<reviews>/results/<family>/<date>/` ablegen.
+2. Resultate unter `k-playbook/reviews/results/<family>/<date>/` ablegen.
 3. Projektweit priorisieren: `/k-results`.
 4. Remediation planen: `/k-remediation <summary-oder-assessment>`.
 5. Erzeugte Tasks mit `/k-run` umsetzen.
@@ -206,7 +205,7 @@ run-metadata.json
 - `repo:` in `K-PLAYBOOK.MD` ist fest `~/dev/k-playbook`; andere physische Repo-Orte werden ueber Symlinks abgebildet.
 - Projektpfade werden nicht geraten, sondern aus `K-PLAYBOOK.MD` gelesen.
 - Review-Rohdaten und Run-Metadaten sind auditierbar und werden nicht still ueberschrieben.
-- Projektwissen gehoert in `docs/`; AI-Sessions sollen Docs zuerst konsultieren.
+- Projektwissen gehoert in `k-playbook/docs/`; AI-Sessions sollen Docs zuerst konsultieren.
 - Neue oder geaenderte Commands muessen nach dem Pull auf jedem Host mit `/k-install` sichtbar gemacht werden.
 
 ## Konventionen

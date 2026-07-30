@@ -27,7 +27,7 @@ Der generische Rahmen wird von `/k-review` orchestriert. Diese Datei beschreibt 
 - **Rohdaten**: Maschinenlesbare Tool-Ausgabe im Ergebnisverzeichnis des Review-Laufs; bei CodeQL SARIF-Dateien.
 - **Assessment**: Kuratierte menschenlesbare Bewertung im Ergebnisverzeichnis des Review-Laufs.
 - **Finding-Register**: Vollstaendige, einzeln statusfaehige Liste aller Tool-Findings.
-- **Ergebnisverzeichnis**: `<reviews>/results/codeql/YYYY-MM-DD/` fuer einen CodeQL-Review-Lauf.
+- **Ergebnisverzeichnis**: `k-playbook/reviews/results/codeql/YYYY-MM-DD/` fuer einen CodeQL-Review-Lauf.
 
 ## Voraussetzungen
 
@@ -37,11 +37,10 @@ Pfad- und Statusauflosung:
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` + `/k-setup-codeql` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
 - Wenn kein CodeQL-Managed-Block vorhanden ist: abbrechen und `/k-setup-codeql` nennen.
 - Wenn weder `github:` noch `local-database:` `true` oder `planned` ist: abbrechen, weil CodeQL fuer dieses Projekt nicht aktiviert ist.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel fuer den Assessment-Report.
-- `checks:` ist fuer ausfuehrbare Pruefroutinen reserviert. SARIF- und Report-Ergebnisse gehoeren nicht dauerhaft nach `checks:`.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel fuer den Assessment-Report.
+- `checks` ist fuer ausfuehrbare Pruefroutinen reserviert. SARIF- und Report-Ergebnisse gehoeren nicht dauerhaft nach `k-playbook/checks/`.
 
 Zu lesen aus dem CodeQL-Block:
 
@@ -79,7 +78,7 @@ SARIF:             <liste vorhandener SARIF im Result Dir oder explizit angegebe
 CLI-Ermittlung:
 
 - Zuerst `codeql version` pruefen.
-- Wenn nicht im PATH, pruefe `<base>/codeql-cli/codeql/codeql version`.
+- Wenn nicht im PATH, pruefe `k-playbook/codeql-cli/codeql/codeql version`.
 - Wenn lokale DB `true` oder `planned` ist und keine CLI gefunden wird: abbrechen und `/k-install-codeql` nennen.
 - Wenn nur GitHub CodeQL aktiv ist und keine lokale CLI vorhanden ist: nicht abbrechen, solange SARIF bereits vorhanden ist oder User nur einen bestehenden GitHub-Code-Scanning-Export bewerten will. Sonst `/k-install-codeql --cli-only` empfehlen.
 
@@ -89,7 +88,7 @@ Frage vor langlaufenden Operationen, was ausgefuehrt werden soll. Nicht automati
 
 Optionen:
 
-- **Vorhandene SARIF auswerten (Default)**: Nutzt SARIF aus `<reviews>/results/codeql/<datum>/raw/` oder explizit vom User angegebene SARIF-Dateien. Keine neue Analyse.
+- **Vorhandene SARIF auswerten (Default)**: Nutzt SARIF aus `k-playbook/reviews/results/codeql/<datum>/raw/` oder explizit vom User angegebene SARIF-Dateien. Keine neue Analyse.
 - **Lokale CodeQL-Analyse ausfuehren**: Nur erlaubt, wenn `local-database:` `true` oder `planned` ist und CLI + Datenbankpfad vorhanden sind. Vor Ausfuehrung exakte Befehle zeigen und bestaetigen lassen.
 - **Nur Preflight**: Keine Report-Erzeugung, nur Status zeigen.
 - **Abbrechen**.
@@ -100,7 +99,7 @@ Wenn lokale Analyse ausgefuehrt wird:
 - Nutze `queries:` aus dem CodeQL-Block als Default.
 - Nutze `target:` aus dem CodeQL-Block als Analyse-/Kontextwurzel. Wenn `target:` fehlt, gilt legacy-kompatibel `.`.
 - Nutze `database:` als Datenbankbasis.
-- Schreibe SARIF nach `<reviews>/results/codeql/YYYY-MM-DD/raw/codeql-<language>.sarif`.
+- Schreibe SARIF nach `k-playbook/reviews/results/codeql/YYYY-MM-DD/raw/codeql-<language>.sarif`.
 - Keine SARIF-Uploads.
 - Keine GitHub-Actions-Aenderungen.
 - Keine Code-Aenderungen.
@@ -134,11 +133,11 @@ Wichtig: CodeQL meldet meistens CWE-basierte Code-Schwachstellenklassen, keine D
 
 ## Report-Artefakte und Pfadkonvention
 
-`checks:` bleibt fuer ausfuehrbare Checks, Check-Skripte und Check-Definitionen reserviert. Review-Ergebnisse werden unter `reviews:` abgelegt.
+`k-playbook/checks/` bleibt fuer ausfuehrbare Checks, Check-Skripte und Check-Definitionen reserviert. Review-Ergebnisse werden unter `k-playbook/reviews/` abgelegt.
 
 Dieses Review schreibt in:
 
-`<reviews>/results/codeql/YYYY-MM-DD/`
+`k-playbook/reviews/results/codeql/YYYY-MM-DD/`
 
 Dateien:
 
@@ -149,7 +148,7 @@ Dateien:
 Optionale Kompatibilitaet beim Auswerten bestehender Projekte:
 
 - Wenn alte SARIF-Dateien unter `checks:` liegen, duerfen sie als Quelle gelesen werden.
-- Neue oder neu erzeugte SARIF-Dateien werden aber in `reviews/results/codeql/YYYY-MM-DD/raw/` geschrieben.
+- Neue oder neu erzeugte SARIF-Dateien werden aber in `k-playbook/reviews/results/codeql/YYYY-MM-DD/raw/` geschrieben.
 
 Typische Rohdateien:
 
@@ -242,7 +241,7 @@ Typische Rohdateien:
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/codeql/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/codeql/YYYY-MM-DD/assessment.md
 ```
 
 Remediation ist ausdruecklich nicht Teil dieses Reviews.

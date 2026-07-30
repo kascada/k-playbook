@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis enthaelt projektuebergreifende Regeln fuer k-playbook.
 
-Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zielprojekt, normalerweise unter `<projekt>/k-playbook/enforcement/`, und werden ueber `K-PLAYBOOK.MD` registriert.
+Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zielprojekt unter `<projekt>/k-playbook/enforcement/`.
 
 ## Dateien
 
@@ -13,12 +13,12 @@ Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zi
 
 ## Globale Checks
 
-Wiederverwendbare Checks liegen unter `../checks/` und werden ueber `../bin/k-check` ausgefuehrt. Projektlokale Checks bleiben im jeweiligen Zielprojekt, normalerweise unter `<projekt>/k-playbook/checks/`, und werden ueber `K-PLAYBOOK.MD` registriert.
+Wiederverwendbare Checks liegen unter `../checks/` und werden ueber `../bin/k-check` ausgefuehrt. Projektlokale Checks bleiben im jeweiligen Zielprojekt unter `<projekt>/k-playbook/checks/`.
 
 Globale Checks duerfen keine projektspezifischen Begriffe, Modellnamen oder Runtime-Dateien enthalten. Solche Regeln bleiben projektlokal; Test-Fixtures duerfen projektspezifische Begriffe nur als explizite Negativbeispiele markieren.
 
 ## Zusammenfuehrung
 
-Commands laden zuerst die globalen Regeln aus diesem Verzeichnis und danach projektlokale Regeln aus dem in `K-PLAYBOOK.MD` registrierten `enforcement:`-Pfad.
+Commands laden zuerst die globalen Regeln aus diesem Verzeichnis und danach projektlokale Regeln aus `<projekt>/k-playbook/enforcement/`, sofern dort Regeldateien liegen.
 
 Projektlokale Regeln ergaenzen die globalen Regeln. Sie ersetzen globale Regeln nur, wenn sie das explizit sagen.

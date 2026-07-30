@@ -1,5 +1,5 @@
 ---
-description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses the tasks: path from K-PLAYBOOK.MD. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
+description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses k-playbook/tasks. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Glob, Task]
@@ -9,11 +9,11 @@ allowed-tools: [Read, Write, Edit, Glob, Task]
 
 Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. Critic and Editor are read-only advisors. The Moderator routes between them, decides on deadlocks, applies accepted edits, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
 
-`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.MD`, `base:`, and an active `tasks:` path configured by `/k-setup`.
+`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.MD`. The task directory is always `<project>/k-playbook/tasks`.
 
 ## Invocation
 
-`/k-review-loop` — review open task files from the `tasks:` path in `K-PLAYBOOK.MD`.
+`/k-review-loop` — review open task files from `k-playbook/tasks`.
 `/k-review-loop <path>` — review an explicit file or directory containing `.md` task/instruction files.
 
 ---
@@ -34,11 +34,12 @@ Review task/instruction files before execution using a structured two-agent dial
 
 Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.MD` and its current directory layout instead of silently using historical defaults.
 
-For this command, resolve:
+For this command, resolve the fixed `tasks` path:
 
-- `tasks:` → `TASKS_DIR`
+- `RESOLVED_TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`.
+- `TASKS_DISPLAY_PATH = k-playbook/tasks`.
 
-Also read `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `tasks:`. Ignore other managed blocks such as Remediation, CodeQL, or Dependabot for target selection; they are command-specific config for other commands.
+Ignore other managed blocks such as Remediation, CodeQL, or Dependabot for target selection; they are command-specific config for other commands.
 
 Command-specific policy:
 
@@ -46,14 +47,12 @@ Command-specific policy:
   - If it is a file: use that file.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.MD` or `base:` is missing: continue as an explicit one-off review, but announce that registered project paths could not be validated.
-  - If `tasks:` is configured and exists, compare the explicit target to it. Continue if the target is outside `tasks:`, but announce that this is an explicit one-off target rather than the registered task queue.
+  - If `K-PLAYBOOK.MD` is missing: continue as an explicit one-off review, but announce that project k-playbook metadata could not be validated.
+  - If `k-playbook/tasks` exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
   - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off review.
-  - If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-  - If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`, or pass an explicit file/directory argument for a one-off review.
-  - If `tasks:` is set but missing on disk: abort and tell the user to run `/k-setup` to create/migrate the configured directories.
-  - If `tasks:` is set and exists: use it as the review target.
+  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directories.
+  - If `k-playbook/tasks` exists: use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
 

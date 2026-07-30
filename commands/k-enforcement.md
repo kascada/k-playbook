@@ -11,7 +11,7 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `enforcement:` and `docs:` blocks may be inactive; in that case the command uses only global rules and skips registered-docs path checks rather than inventing default paths.
+`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.MD` configured by `/k-setup`. Project-local rules are read from `k-playbook/enforcement`; docs checks use `k-playbook/docs`.
 
 ## Step 1 — Resolve target and paths
 
@@ -22,25 +22,21 @@ Determine `TARGET_DIR`:
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve fixed blocks:
 
-- `enforcement:` → `PROJECT_ENFORCEMENT_DIR`. Treat this as the resolved absolute path; `-` / missing / empty means unset.
-- `docs:` → `DOCS_DIR`. Treat this as the resolved absolute path; `-` / missing / empty means unset.
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `enforcement:` or `docs:`.
+- `enforcement` → `PROJECT_ENFORCEMENT_DIR = <TARGET_DIR>/k-playbook/enforcement`.
+- `docs` → `DOCS_DIR = <TARGET_DIR>/k-playbook/docs`.
 
 Also set:
 
 - `GLOBAL_ENFORCEMENT_DIR` = `<PLAYBOOK_REPO>/global/rules/`
-- If `DOCS_DIR` is unset: leave it unset. Do not default to `<TARGET_DIR>/docs`.
+- If `DOCS_DIR` is missing: warn for docs-sync checks, but do not default to any other docs path.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `PROJECT_ENFORCEMENT_DIR` is unset or inactive: continue with global rules only.
-- If `PROJECT_ENFORCEMENT_DIR` is set but missing: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
-- If `DOCS_DIR` is set but missing: warn for docs-sync checks, but do not invent a default docs path.
+- If `PROJECT_ENFORCEMENT_DIR` is missing: warn and continue with global rules only.
+- If `DOCS_DIR` is missing: warn for docs-sync checks, but do not invent a default docs path.
 - If `GLOBAL_ENFORCEMENT_DIR` is missing: abort, because the global rule source cannot be found.
 
 ## Step 2 — Load rule files
@@ -69,7 +65,7 @@ Enforcement-Check
 Ziel:       <TARGET_DIR>
 Global:     <N> Regeln aus <GLOBAL_ENFORCEMENT_DIR>
 Projekt:    <M> Regeln aus <PROJECT_ENFORCEMENT_DIR> | identisch mit global | —
-Docs:       <DOCS_DISPLAY_PATH> | — (inaktiv/nicht registriert)
+Docs:       <DOCS_DISPLAY_PATH> | fehlt
 ```
 
 ## Step 3 — Determine current change scope

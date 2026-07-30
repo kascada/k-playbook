@@ -1,10 +1,10 @@
 # Global Checks
 
-`global/bin/k-check` fuehrt wiederverwendbare Checks aus `global/checks/` und projektlokale Checks aus dem in `K-PLAYBOOK.MD` registrierten `checks:`-Pfad aus.
+`global/bin/k-check` fuehrt wiederverwendbare Checks aus `global/checks/` und projektlokale Checks aus `k-playbook/checks/` aus, wenn das Verzeichnis existiert.
 
 Der Runner trennt zwei Roots:
 
-- `--config-root`: Root mit `K-PLAYBOOK.MD`; daraus kommen lokale k-playbook-Pfade.
+- `--config-root`: Root mit `K-PLAYBOOK.MD`; darunter wird die feste lokale k-playbook-Struktur erwartet.
 - `--target-root`: Codebaum, der gescannt wird; relativ zu `--config-root`, wenn nicht absolut.
 
 ## Aufruf
@@ -17,7 +17,7 @@ Der Runner trennt zwei Roots:
 ~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.MD` gelesen; relative lokale Check-Pfade werden gegen diesen Root aufgeloest. Der Target-Root ist standardmaessig identisch mit dem Config-Root. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
+Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.MD` gelesen; lokale Checks liegen fest unter `k-playbook/checks/`. Der Target-Root ist standardmaessig identisch mit dem Config-Root. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
 
 `--output <file>` schreibt die vollstaendige Runner-Ausgabe zusaetzlich zu stdout/stderr in eine Raw-Datei. `--metadata-output <file>` schreibt Run-Metadaten als JSON, inklusive Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfuegbar. Beide Optionen verweigern vorhandene Ziel-Dateien, damit auditierbare Artefakte nicht still ueberschrieben werden. Fuer Review-Laeufe gehoeren diese Artefakte unter `<reviews>/results/k-check/YYYY-MM-DD/`.
 
@@ -74,7 +74,7 @@ Ist der Target-Root kein Git-Repo, scannt der globale Runner keine nested Repos 
 
 ## Global vs. Lokal
 
-Globale Checks muessen wiederverwendbar bleiben. Projektlokale Regeln gehoeren in `<projekt>/k-playbook/checks` und werden ueber `K-PLAYBOOK.MD` registriert.
+Globale Checks muessen wiederverwendbar bleiben. Projektlokale Checks gehoeren in `<projekt>/k-playbook/checks` und werden genutzt, wenn das Verzeichnis existiert.
 
 Domain-spezifische Begriffe, Modellnamen und Runtime-Dateien gehoeren nicht in globale Checks. Solche Regeln bleiben projektlokal; Test-Fixtures duerfen Domain-Begriffe nur als explizite Negativbeispiele markieren.
 

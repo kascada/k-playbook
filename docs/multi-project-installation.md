@@ -201,13 +201,13 @@ Erwartung:
 
 ## 4. Docs-First-Dokumentation Aufbauen
 
-Im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, wenn der `docs:`-Baustein in `/k-setup` aktiviert wurde:
+Im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, nachdem `/k-setup` die feste Struktur angelegt hat:
 
 ```text
 /k-code2docs
 ```
 
-Der Command erzeugt den Docs-Index im konfigurierten `docs:`-Pfad und registriert `AGENTS.md` plus `opencode.json` fuer spaetere AI-Sessions. Danach OpenCode neu starten, damit die neue Session-Memory greift.
+Der Command erzeugt den Docs-Index unter `k-playbook/docs/` und registriert `AGENTS.md` plus `opencode.json` fuer spaetere AI-Sessions. Danach OpenCode neu starten, damit die neue Session-Memory greift.
 
 ## 5. VS-Code-Erweiterungen Empfohlen
 

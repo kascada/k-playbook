@@ -9,7 +9,7 @@ result-family: dependency-cve
 
 # Review: Dependency-CVE Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `reviews:`.
+Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
 
 ## Zweck
 
@@ -23,8 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `pip-audit --version`, `trivy --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -32,7 +31,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 
 Dieses Review schreibt in:
 
-`<reviews>/results/dependency-cve/YYYY-MM-DD/`
+`k-playbook/reviews/results/dependency-cve/YYYY-MM-DD/`
 
 Dateien:
 
@@ -123,7 +122,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 
 ## Handoff
 
-`/k-remediation <reviews>/results/dependency-cve/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook/reviews/results/dependency-cve/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -152,7 +151,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/dependency-cve/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/dependency-cve/YYYY-MM-DD/assessment.md
 ```
 
 Remediation und Dependency-Upgrades sind ausdruecklich nicht Teil dieses Reviews.

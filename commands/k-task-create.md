@@ -1,5 +1,5 @@
 ---
-description: "Create a new task file from the current conversation. Uses the tasks: path from K-PLAYBOOK.MD, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
+description: "Create a new task file from the current conversation. Uses the fixed k-playbook/tasks path, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
 argument-hint: [short-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Bash, Glob]
@@ -9,27 +9,24 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 Create a new task file based on what was discussed in the current conversation.
 
-`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `tasks:` path configured by `/k-setup`.
+`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.MD` and the task directory is always `<project>/k-playbook/tasks`.
 
 ## Step 1 — Resolve task directory
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve the fixed `tasks` path:
 
-- `tasks:` → `TASKS_DIR`
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `tasks:`.
+- `RESOLVED_TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`.
+- `TASKS_DISPLAY_PATH = k-playbook/tasks`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `tasks:` is unset or inactive (`-`): abort and tell the user to activate the `tasks` block with `/k-setup`.
-- If `tasks:` is set but the directory does not exist: abort and tell the user to run `/k-setup` to create/migrate the configured directories.
-- If `tasks:` is set and the directory exists: use it.
+- If `k-playbook/tasks` does not exist: abort and tell the user to run `/k-setup` to create/migrate the fixed directories.
+- If `k-playbook/tasks` exists: use it.
 
-Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH` (e.g. `tasks/`).
+Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH`.
 
 ## Step 2 — Determine next number
 

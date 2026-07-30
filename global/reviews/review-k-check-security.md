@@ -23,7 +23,7 @@ Erzeuge eine kuratierte Security-Bewertung aus `k-check`-Ergebnissen. `k-check` 
 
 Dieses Review schreibt in:
 
-`<reviews>/results/k-check/YYYY-MM-DD/`
+`k-playbook/reviews/results/k-check/YYYY-MM-DD/`
 
 Dateien:
 
@@ -40,9 +40,8 @@ Pfad- und Statusaufloesung:
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel.
-- `checks:` darf fehlen; dann werden nur globale Checks ausgefuehrt.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Wenn `k-playbook/checks` leer ist, werden nur globale Checks ausgefuehrt.
 - Das Runner-Script ist `<PLAYBOOK_REPO>/global/bin/k-check`.
 
 ## Ausfuehrungsarten
@@ -63,8 +62,8 @@ Typischer Lauf:
   --config-root <TARGET_DIR> \
   --target-root <target-root> \
   --mode <changed|baseline> \
-  --output <reviews>/results/k-check/YYYY-MM-DD/raw/k-check-<mode>.txt \
-  --metadata-output <reviews>/results/k-check/YYYY-MM-DD/run-metadata.json
+  --output k-playbook/reviews/results/k-check/YYYY-MM-DD/raw/k-check-<mode>.txt \
+  --metadata-output k-playbook/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
 Das normale stdout/stderr-Verhalten bleibt erhalten; `--output` schreibt zusaetzlich den vollstaendigen Raw-Stream.
@@ -168,7 +167,7 @@ Neue IDs werden nur fuer neue semantische Findings vergeben. Wiedergefundene ode
 
 ## Handoff
 
-`/k-remediation <reviews>/results/k-check/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook/reviews/results/k-check/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -195,7 +194,7 @@ Neue IDs werden nur fuer neue semantische Findings vergeben. Wiedergefundene ode
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/k-check/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/k-check/YYYY-MM-DD/assessment.md
 ```
 
 Remediation ist ausdruecklich nicht Teil dieses Reviews.

@@ -1,6 +1,6 @@
 # k-playbook
 
-`k-playbook` ist eine kuratierte Sammlung wiederverwendbarer AI-Assistant-Bausteine: Slash-Commands, Skills/Playbooks, globale Regeln, Review-Rezepte und Checks. Das Repo bildet den globalen Werkzeugkasten; projektlokale Pfade, Regeln, Tasks, Reviews und Docs werden im jeweiligen Projekt ueber `K-PLAYBOOK.MD` registriert.
+`k-playbook` ist eine kuratierte Sammlung wiederverwendbarer AI-Assistant-Bausteine: Slash-Commands, Skills/Playbooks, globale Regeln, Review-Rezepte und Checks. Das Repo bildet den globalen Werkzeugkasten; projektlokale Regeln, Tasks, Reviews und Docs liegen im jeweiligen Projekt unter `k-playbook/` und werden ueber `K-PLAYBOOK.MD` eingebunden.
 
 ## Schnellstart
 
@@ -140,9 +140,9 @@ Details stehen in [`docs/installation.md`](./docs/installation.md#devcontainer-p
 
 ## Grundprinzipien
 
-- Schlank und nachvollziehbar: nur Bausteine, die im Alltag genutzt werden.
+- Schlank und nachvollziehbar: feste Struktur, klare Zuständigkeiten.
 - Globales Repo, lokale Projektkonfiguration: keine Pfade raten, sondern `K-PLAYBOOK.MD` lesen.
-- Docs zuerst: Projektwissen soll in `docs/` liegen und per `AGENTS.md`/OpenCode-Konfig in Sessions wirken.
+- Docs zuerst: Projektwissen soll in `k-playbook/docs/` liegen und per `AGENTS.md`/OpenCode-Konfig in Sessions wirken.
 - Review-Ergebnisse auditierbar speichern: `assessment.md`, `findings.md`, `raw/` und Metadaten.
 - Security-Tools host-lokal installieren, nie in Projekt-venvs; Review-Artefakte projektlokal ablegen.
 

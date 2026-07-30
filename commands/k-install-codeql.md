@@ -28,13 +28,11 @@ Determine mode and `TARGET_DIR` from the slash-command argument string:
 - Otherwise set `CLI_ONLY=false`.
 - If the argument string is a target directory without `--cli-only`: resolve it with `realpath`, and abort if it does not exist.
 - If the argument string is empty or exactly `--cli-only`: `TARGET_DIR = realpath(CWD)`.
-- Before using that value, apply the project-local base guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory has no `K-PLAYBOOK.MD`, but its parent does and the parent file's `base:` resolves to the selected directory, correct `TARGET_DIR` to the parent project root and show that correction in preflight. If the parent file has no `base:`, do not infer it; stop and ask the user to run `/k-setup` for the parent project first.
+- Before using that value, apply the fixed-layout guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory is `<project>/k-playbook`, correct `TARGET_DIR` to the parent project root and show that correction in preflight.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-Resolve:
-
-- `base:` → `PLAYBOOK_BASE_DIR`, if present.
+Derive `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook` and `PLAYBOOK_BASE_DISPLAY_PATH = k-playbook`.
 
 Also parse the optional CodeQL managed block in `<TARGET_DIR>/K-PLAYBOOK.MD` between:
 
@@ -52,11 +50,10 @@ Extract when present:
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing, stop and ask the user to run `/k-setup` and `/k-setup-codeql` first.
-- If `base:` is missing, stop and ask the user to run `/k-setup` first. Do not infer legacy base paths here.
-- If `base:` exists, offer it as the default parent directory for local CodeQL artifacts.
+- If `PLAYBOOK_BASE_DIR` is missing, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
+- Offer `PLAYBOOK_BASE_DIR` as the default parent directory for local CodeQL artifacts.
 - If the CodeQL block has `database: <path>`, offer the parent of that path as the default parent directory.
-- If neither a registered `database:` nor `base:` exists, stop; this should only happen when `/k-setup` has not migrated the project yet.
-- In `CLI_ONLY=true`, `languages:` and `database:` are not required. Use `base:` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
+- In `CLI_ONLY=true`, `languages:` and `database:` are not required. Use `PLAYBOOK_BASE_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
 - If `target:` is present, use it as the default project path for full local database mode. If missing, default to `TARGET_DIR` for backward compatibility. The resolved CodeQL project path must exist.
 
 ## Step 2 — Preflight
@@ -103,13 +100,13 @@ If `curl`/`wget` and `unzip` are missing while `codeql` is not already available
 Ask in one bundled interaction:
 
 1. Parent-Verzeichnis für lokale CodeQL-Artefakte?
-    - Default: parent of registered `database:` if set, else `base:`.
+    - Default: parent of registered `database:` if set, else `k-playbook/`.
     - The script will create below it:
       - `codeql-cli/`
       - `databases/`
       - `results/`
 
-In `CLI_ONLY=true`, use `base:` as `PARENT_DIR`. Ask only for confirmation to install/check the CLI there. The script will create or reuse only `codeql-cli/` and will not create `databases/` or `results/`.
+In `CLI_ONLY=true`, use `PLAYBOOK_BASE_DIR` as `PARENT_DIR`. Ask only for confirmation to install/check the CLI there. The script will create or reuse only `codeql-cli/` and will not create `databases/` or `results/`.
 
 For `CLI_ONLY=true`, show this command:
 

@@ -222,12 +222,12 @@ Im Zielprojekt:
 Der Command:
 
 - legt oder aktualisiert `K-PLAYBOOK.MD` im Projekt-Root.
-- registriert projektlokale Pfade wie `tasks`, `todo`, `checks`, `reviews`, `guidelines`, `enforcement`, `docs`.
+- legt die vollstaendige projektlokale Struktur unter `k-playbook/` an.
 - erzeugt bestaetigte Verzeichnisse oder Initialdateien.
 - schreibt keine host-globale OpenCode-Konfiguration.
 - installiert keine host-globalen Tools.
 
-`K-PLAYBOOK.MD` ist die zentrale Pointer-Datei. Spaetere Commands lesen daraus, wo projektlokale Bausteine liegen.
+`K-PLAYBOOK.MD` ist die zentrale Config-Datei. Spaetere Commands leiten ihre Pfade fest aus `k-playbook/` ab.
 
 Der `repo:`-Eintrag im Managed Block ist fest `~/dev/k-playbook`. Er ist sichtbar und wird von Commands gelesen, aber nicht als frei waehlbarer Pfad behandelt. Wenn der physische Klon woanders liegt, muss ein Symlink den Pfadvertrag erfuellen.
 
@@ -272,11 +272,11 @@ Checkliste fuer einen Host:
 Checkliste fuer ein Projekt:
 
 - [ ] `K-PLAYBOOK.MD` existiert im Projekt-Root.
-- [ ] `base:` ist gesetzt.
+- [ ] `layout: fixed-project-k-playbook` ist gesetzt oder `/k-setup` wurde zur Migration ausgefuehrt.
 - [ ] `repo:` zeigt auf `~/dev/k-playbook`.
-- [ ] Benoetigte Pfade sind aktiv und existieren.
+- [ ] Die festen Pfade unter `k-playbook/` existieren.
 - [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
-- [ ] Bei aktiven Docs existiert ein Docs-Index oder `/k-code2docs` ist als naechster Schritt geplant.
+- [ ] Bei Docs existiert ein Docs-Index oder `/k-code2docs` ist als naechster Schritt geplant.
 
 Checkliste fuer einen Devcontainer:
 
@@ -305,5 +305,5 @@ Checkliste fuer einen Devcontainer:
 ### Projektpfade Stimmen Nicht
 
 - Im Projekt `/k-status` ausfuehren.
-- Wenn `K-PLAYBOOK.MD` fehlt oder `base:` fehlt, `/k-setup` ausfuehren.
+- Wenn `K-PLAYBOOK.MD` fehlt oder noch das alte `## Pfade`-Schema nutzt, `/k-setup` ausfuehren.
 - Fehlende Verzeichnisse nicht manuell raten, sondern ueber `/k-setup` bestaetigt erzeugen oder migrieren.

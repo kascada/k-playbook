@@ -1,5 +1,5 @@
 ---
-description: "Add a todo item to the project todo file, or list all todos. Uses the todo: path from K-PLAYBOOK.MD when available. Pass text directly to add; call without arguments to list."
+description: "Add a todo item to the fixed project todo file, or list all todos. Uses k-playbook/TODO.md. Pass text directly to add; call without arguments to list."
 argument-hint: [todo text]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob]
@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob]
 
 Manage the project todo file.
 
-`/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `base:`, and an active `todo:` path configured by `/k-setup`.
+`/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.MD`. The todo file is always `<project>/k-playbook/TODO.md`.
 
 ## Step 1 — Resolve todo file
 
@@ -21,19 +21,16 @@ Determine `TARGET_DIR`:
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve the fixed `todo` path:
 
-- `todo:` → `TODO_PATH`. Treat `TODO_PATH` as the resolved absolute file path.
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `todo:`.
+- `TODO_PATH = <TARGET_DIR>/k-playbook/TODO.md`.
+- `TODO_DISPLAY_PATH = k-playbook/TODO.md`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `todo:` is unset or inactive (`-`): abort and tell the user to activate the `todo` block with `/k-setup`.
 - If the parent directory of `TODO_PATH` does not exist: abort and tell the user to run `/k-setup` to create/migrate the configured file parent.
-- If `todo:` is set and its parent directory exists: use it.
+- If the parent directory exists: use `TODO_PATH`.
 
 ## Step 2 — Branch on arguments
 
@@ -65,6 +62,6 @@ Append a new line at the end of the file:
 
 Output:
 ```
-TODO.md: <TODO_PATH>
+TODO.md: <TODO_DISPLAY_PATH>
 Hinzugefügt: <ARGUMENTS>
 ```

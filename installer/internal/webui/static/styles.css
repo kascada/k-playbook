@@ -303,6 +303,10 @@ button:disabled {
   background: var(--accent-strong);
 }
 
+button.update-available {
+  box-shadow: 0 0 0 3px rgba(47, 93, 80, 0.18), 0 14px 28px rgba(24, 61, 52, 0.22);
+}
+
 .secondary {
   color: var(--accent-strong);
   background: #e5ded0;
@@ -523,19 +527,29 @@ button:disabled {
 }
 
 .project-header,
-.project-check-row {
+.project-check-row,
+.command-action-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
 }
 
-.project-check-row {
+.project-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.project-check-row,
+.command-action-row {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 
-.project-check-row > div:first-child {
+.project-check-row > div:first-child,
+.command-action-row > div:first-child {
   display: grid;
   gap: 3px;
 }
@@ -547,7 +561,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.project-check-row span:not(.status-label) {
+.project-check-row span:not(.status-label),
+.command-action-row span:not(.status-label) {
   color: var(--muted);
   font-size: 0.84rem;
 }
@@ -562,6 +577,16 @@ button:disabled {
   align-items: center;
   gap: 10px;
   white-space: nowrap;
+}
+
+.icon-button {
+  padding: 8px 12px;
+  color: var(--accent-strong);
+  background: rgba(47, 93, 80, 0.12);
+}
+
+.small-button {
+  padding: 8px 12px;
 }
 
 .path {
@@ -672,6 +697,7 @@ select {
 
   .project-header,
   .project-check-row,
+  .command-action-row,
   .project-check-action,
   .security-tool-row {
     align-items: stretch;

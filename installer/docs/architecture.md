@@ -156,10 +156,12 @@ Aktuelle Endpunkte:
 |---|---|---|
 | `GET` | `/api/status` | Pfadvertrag pruefen |
 | `POST` | `/api/repair-path` | Fixbaren Pfadvertrag reparieren |
-| `GET` | `/api/projects` | Gespeicherte Projekt-Auswahl laden |
+| `GET` | `/api/projects` | Gespeicherte Projekt-Auswahl laden, inklusive Projekt-Setup-Status (`K-PLAYBOOK.MD`) und projektlokalem Docs-Status |
+| `DELETE` | `/api/projects` | Projekt nach bestaetigter GUI-Aktion aus der gespeicherten Installer-Liste entfernen; Projektdateien bleiben unveraendert |
 | `POST` | `/api/projects` | Manuelles Projekt speichern |
 | `GET` | `/api/projects/scan?root=dev|home` | Projektkandidaten scannen |
 | `POST` | `/api/projects/scan` | Ausgewaehlte Scan-Projekte speichern |
+| `GET` | `/api/git/status` | Read-only per `git ls-remote` pruefen, ob der Upstream-Branch von k-playbook einen anderen Commit zeigt |
 | `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren |
 | `GET` | `/api/docs` | Markdown-Dateien unter `docs/` listen |
 | `GET` | `/api/docs/file?path=docs/...md` | Markdown-Datei lesen und gerendert ausgeben |
@@ -181,15 +183,16 @@ Aktuelle Endpunkte:
 Die Startseite zeigt:
 
 1. Header mit Button `Status neu laden`.
-   Daneben liegt `k-playbook aktualisieren`; der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
+   Daneben liegt `k-playbook aktualisieren`; beim Start prueft die GUI read-only per `/api/git/status`, ob der Upstream-Branch einen anderen Commit zeigt. Wenn eine neue Version verfuegbar ist, wird der Button hervorgehoben und heisst `Zur neuen Version aktualisieren`. Der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.MD` existiert und ob `docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.MD` fehlt, zeigt der Projektblock `/k-setup`; wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Beide Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
+   Jeder Projektblock bietet `Entfernen`; nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei.
 5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt der jeweilige Projektblock die Zeile `k-playbook im Container erreichbar`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Bei fehlenden Eintraegen zeigt diese Projektzeile `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
 6. Button `Projekte auswaehlen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
-9. Repository-Block mit `Git pull`; nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
+9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
 10. Docs-Block mit gerenderter Markdown-Anzeige.
 11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
 
@@ -225,6 +228,22 @@ Der Block bildet den read-only Teil von `/k-install` und `/k-install-security-to
 - Optional angezeigt: `docker` als spaeterer Fallback-Kontext.
 
 Die GUI prueft pro Tool nur `exec.LookPath()` und eine kurze Versionsabfrage. Sie schreibt keine Dateien, installiert keine Tools und startet keine Scans. Wenn `VIRTUAL_ENV` gesetzt ist oder `PATH` typische Projekt-venv-Segmente wie `.venv`, `venv` oder `env` enthaelt, wird der Scope als Warnung angezeigt, damit Projekt-venvs nicht als host-globale Tool-Installation gewertet werden.
+
+Wenn Pflicht-Tools fehlen, zeigt die GUI eine generische Command-Aktionszeile mit Kopierbutton fuer `/k-install-security-tools --install missing`. Die Hilfe nennt zusaetzlich den Terminal-Fallback `bash ~/dev/k-playbook/scripts/install-security-tools.sh --install missing --method auto`.
+
+### Command-Aktionszeilen
+
+Die GUI startet Slash-Commands nicht selbst, wenn diese im Zielkontext Rueckfragen stellen oder Dateien schreiben. Stattdessen nutzt sie eine wiederverwendbare Command-Aktionszeile mit:
+
+- kurzer Beschreibung,
+- Button zum Kopieren des Slash-Commands,
+- `Hilfe`-Button mit Kontext und optionalem Fallback-Hinweis.
+
+Aktuelle Nutzungen:
+
+- Fehlendes Projekt-Setup: `/k-setup` im jeweiligen Zielprojekt.
+- Leere oder fehlende Projekt-Dokumentation: `/k-code2docs` im Zielprojekt; Hilfe erwaehnt `/k-tools-scan` als vorgelagerten Inventarisierungsschritt.
+- Fehlende Security-Tools: `/k-install-security-tools --install missing`; Hilfe erwaehnt das Shell-Script als Terminal-Fallback.
 
 ### Scan-Seite
 
@@ -380,5 +399,5 @@ Nicht mit `go build ./cmd/k-playbook-installer` ohne `-o` pruefen, wenn kein lok
 1. API-Handler-Tests fuer Status, Docs und Projekt-Speichern ergaenzen.
 2. Docs-Viewer mit Inhaltsverzeichnis oder Datei-Suche erweitern.
 3. Repository-Block um `git status --short` und Remote/Branch-Anzeige ergaenzen.
-4. Projekt-Auswahl um Bearbeiten/Entfernen erweitern.
+4. Projekt-Auswahl um Bearbeiten erweitern.
 5. Installer-Packaging erweitern: Windows und spaeter optional `.app`/native Pakete.

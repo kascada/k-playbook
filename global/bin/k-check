@@ -20,6 +20,7 @@ from pathlib import Path
 
 PLAYBOOK_REPO = Path(__file__).resolve().parents[2]
 GLOBAL_CHECKS_DIR = PLAYBOOK_REPO / "global" / "checks"
+LOCAL_CHECKS_DIR_NAME = Path("k-playbook") / "checks"
 K_CHECK_VERSION = "2026-07-24"
 
 DEFAULT_EXCLUDES = {
@@ -299,9 +300,7 @@ def unique_paths(paths) -> list[Path]:
 
 def discover_checks(config_root: Path, config: dict[str, str]) -> list[tuple[str, Path]]:
     check_dirs: list[tuple[str, Path]] = [("global", GLOBAL_CHECKS_DIR)]
-    local_value = config.get("local-checks") or config.get("checks")
-    if local_value:
-        check_dirs.append(("local", expand_path(local_value, config_root)))
+    check_dirs.append(("local", (config_root / LOCAL_CHECKS_DIR_NAME).resolve()))
 
     checks: list[tuple[str, Path]] = []
     for scope, check_dir in check_dirs:
@@ -331,8 +330,7 @@ def git_commit(path: Path) -> str | None:
 
 
 def check_configuration(config_root: Path, config: dict[str, str], checks: list[tuple[str, Path]]) -> dict[str, object]:
-    local_value = config.get("local-checks") or config.get("checks")
-    local_dir = str(expand_path(local_value, config_root)) if local_value else None
+    local_dir = str((config_root / LOCAL_CHECKS_DIR_NAME).resolve())
     return {
         "global_checks_dir": str(GLOBAL_CHECKS_DIR),
         "local_checks_dir": local_dir,

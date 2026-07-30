@@ -7,7 +7,7 @@ Diese Datei dokumentiert den aktuellen k-playbook-Flow fuer Review-Rezepte, Scan
 k-playbook trennt vier Arbeitsschritte:
 
 1. **Review-Familie ausfuehren**: `/k-review <review-name>` erzeugt oder bewertet Ergebnisse einer Scan-/Review-Familie.
-2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `<reviews>/results/<family>/YYYY-MM-DD/`.
+2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/`.
 3. **Projektweit priorisieren**: `/k-results` fasst mehrere Result-Familien zusammen und dedupliziert sie.
 4. **Remediation ausfuehren**: `/k-remediation <result-or-summary>` arbeitet priorisierte, statusfaehige Findings ab.
 
@@ -24,7 +24,7 @@ Globale Review-Rezepte:
 Projektlokale Review-Ergebnisse:
 
 ```text
-<project>/<reviews>/results/<family>/YYYY-MM-DD/
+<project>/k-playbook/reviews/results/<family>/YYYY-MM-DD/
 ```
 
 Beispiel:
@@ -38,7 +38,7 @@ k-playbook/reviews/results/k-check/2026-07-24/
     └── k-check-baseline.txt
 ```
 
-`checks:` bleibt fuer ausfuehrbare Checks und Check-Definitionen reserviert. Review-Ergebnisse gehoeren unter `reviews:`.
+`k-playbook/checks/` bleibt fuer ausfuehrbare Checks und Check-Definitionen reserviert. Review-Ergebnisse gehoeren unter `k-playbook/reviews/`.
 
 ## Artefakte pro Result-Familie
 
@@ -95,7 +95,7 @@ Grund:
 - Sie erzeugen eigene strukturierte Rohdaten wie JSON, SARIF-aehnliche Reports oder SBOMs.
 - Non-zero Exit-Codes bedeuten oft fachliche Findings, nicht technische Fehler.
 - Ergebnisse muessen dedupliziert, priorisiert und bewertet werden.
-- Raw-Artefakte muessen dauerhaft unter `reviews/results/<family>/YYYY-MM-DD/raw/` landen.
+- Raw-Artefakte muessen dauerhaft unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/raw/` landen.
 - Remediation braucht stabile Finding-IDs, Statuswerte und Quellenbelege.
 
 Darum laufen diese Tools ueber Report-Mode Review-Familien:
@@ -123,7 +123,7 @@ global/reviews/review-codeql-security.md
 Result-Familie:
 
 ```text
-<reviews>/results/codeql/YYYY-MM-DD/
+k-playbook/reviews/results/codeql/YYYY-MM-DD/
 ```
 
 Typische Artefakte:
@@ -135,7 +135,7 @@ Typische Artefakte:
 
 CodeQL bewertet CWE-/Code-Findings, nicht Dependency-CVEs. Dependency-CVEs gehoeren in eine eigene Result-Familie.
 
-Bei Wrapper-Repos soll der CodeQL-Block in `K-PLAYBOOK.MD` ein `target:` enthalten. Dieses Feld benennt den tatsaechlichen Analyse-/Git-Root, z. B. `./app`, waehrend Result-Artefakte weiterhin unter dem projektlokalen `reviews:`-Pfad liegen.
+Bei Wrapper-Repos soll der CodeQL-Block in `K-PLAYBOOK.MD` ein `target:` enthalten. Dieses Feld benennt den tatsaechlichen Analyse-/Git-Root, z. B. `./app`, waehrend Result-Artefakte weiterhin unter `k-playbook/reviews/` liegen.
 
 ### k-check
 
@@ -154,7 +154,7 @@ global/bin/k-check
 Result-Familie:
 
 ```text
-<reviews>/results/k-check/YYYY-MM-DD/
+k-playbook/reviews/results/k-check/YYYY-MM-DD/
 ```
 
 Typischer auditierbarer Lauf:
@@ -164,8 +164,8 @@ Typischer auditierbarer Lauf:
   --config-root <project-root> \
   --target-root <target-root> \
   --mode baseline \
-  --output <reviews>/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt \
-  --metadata-output <reviews>/results/k-check/YYYY-MM-DD/run-metadata.json
+  --output k-playbook/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt \
+  --metadata-output k-playbook/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
 `--output` erhaelt stdout/stderr und schreibt zusaetzlich den vollstaendigen Raw-Stream. `--metadata-output` schreibt Kommando, Exit-Code, Zeitstempel, Roots, Modus, Check-Konfiguration und k-playbook-Version/Git-Commit soweit verfuegbar.
@@ -183,7 +183,7 @@ global/reviews/review-secret-scanning.md
 Result-Familie:
 
 ```text
-<reviews>/results/secret-scanning/YYYY-MM-DD/
+k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/
 ```
 
 Typische Artefakte:
@@ -206,7 +206,7 @@ global/reviews/review-dependency-cve.md
 Result-Familie:
 
 ```text
-<reviews>/results/dependency-cve/YYYY-MM-DD/
+k-playbook/reviews/results/dependency-cve/YYYY-MM-DD/
 ```
 
 Typische Artefakte:
@@ -228,7 +228,7 @@ global/reviews/review-dependabot-alerts.md
 Result-Familie:
 
 ```text
-<reviews>/results/dependabot-alerts/YYYY-MM-DD/
+k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/
 ```
 
 Typische Artefakte:
@@ -251,7 +251,7 @@ global/reviews/review-iac-container.md
 Result-Familie:
 
 ```text
-<reviews>/results/iac-container/YYYY-MM-DD/
+k-playbook/reviews/results/iac-container/YYYY-MM-DD/
 ```
 
 Typische Artefakte:
@@ -268,7 +268,7 @@ Jede dieser Familien muss am Ende eine bewertete Liste in `assessment.md` erzeug
 `/k-review` pflegt projektlokal:
 
 ```text
-<reviews>/log.md
+k-playbook/reviews/log.md
 ```
 
 Das Log enthaelt pro Review-Familie:
@@ -288,14 +288,14 @@ Beispiel-Handoff:
 
 `/k-remediation` soll zwei Eingabeformen verstehen:
 
-- Legacy-Ergebnisdateien wie `<reviews>/result-*.md`.
-- Result-Familien wie `<reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
+- Legacy-Ergebnisdateien wie `k-playbook/reviews/result-*.md`.
+- Result-Familien wie `k-playbook/reviews/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
 
 Bei Result-Familien ist `findings.md` die primaere Arbeitsdatei. `assessment.md` liefert Kontext und Kurzbewertung. `raw/` und `run-metadata.*` sind read-only.
 
 Beim Task-Anlegen muss ein Remediation-Task enthalten:
 
-- Quelle: `reviews/results/<family>/<date>/assessment.md`
+- Quelle: `k-playbook/reviews/results/<family>/<date>/assessment.md`
 - Finding-ID(s) aus `findings.md`
 - Arbeitsregister: `findings.md`
 - Raw-Quelle falls vorhanden
@@ -336,7 +336,7 @@ Die priorisierte Gesamtzusammenfassung wird ueber `/k-results` erzeugt.
 Ziel:
 
 ```text
-<reviews>/results/summary-YYYY-MM-DD.md
+k-playbook/reviews/results/summary-YYYY-MM-DD.md
 ```
 
 Dieses Summary soll mehrere Result-Familien zusammenfassen:
@@ -374,8 +374,8 @@ Kurzbeschreibung.
 Empfehlung: konkreter naechster Schritt.
 
 Quellen:
-- `reviews/results/<family>/<date>/assessment.md`
-- `reviews/results/<family>/<date>/findings.md#<finding-id>`
+- `k-playbook/reviews/results/<family>/<date>/assessment.md`
+- `k-playbook/reviews/results/<family>/<date>/findings.md#<finding-id>`
 
 Was man zum Loesen braucht:
 - betroffene Datei/Zeile

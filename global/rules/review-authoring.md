@@ -10,15 +10,15 @@ Globale Review-Rezepte liegen unter:
 
 `<PLAYBOOK_REPO>/global/reviews/`
 
-Projektlokale Review-Rezepte liegen im `reviews:`-Pfad aus `<TARGET_DIR>/K-PLAYBOOK.MD`, normalerweise:
+Projektlokale Review-Rezepte liegen unter:
 
 `<TARGET_DIR>/k-playbook/reviews/`
 
-Review-Ergebnisse liegen unterhalb des projektlokalen `reviews:`-Pfads, nicht unter `checks:`. `checks:` ist fuer ausfuehrbare Pruefroutinen, Check-Skripte und Regeln reserviert.
+Review-Ergebnisse liegen unterhalb von `k-playbook/reviews/`, nicht unter `k-playbook/checks/`. `checks` ist fuer ausfuehrbare Pruefroutinen, Check-Skripte und Regeln reserviert.
 
 Konvention fuer Report-/Scan-Familien:
 
-`<reviews>/results/<scan-family>/YYYY-MM-DD/`
+`<TARGET_DIR>/k-playbook/reviews/results/<scan-family>/YYYY-MM-DD/`
 
 Typische Dateien darin:
 
@@ -53,7 +53,7 @@ handoff: /k-remediation
 result-family: <family-name>
 ```
 
-`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<reviews>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten enthalten.
+`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `k-playbook/reviews/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten enthalten.
 
 ## Inhalt
 
@@ -70,7 +70,7 @@ Ein Review-Rezept soll enthalten:
 
 Ein Review-Rezept darf nicht duplizieren:
 
-- Pfadauflosung aus `K-PLAYBOOK.MD`.
+- Pfadauflosung des festen `k-playbook/`-Layouts.
 - Laden von `known-decisions.md`.
 - Logging nach `log.md`.
 - Generischen Ablauf Scan, Rueckfragen, Freigabe, Aenderung, Abschluss.

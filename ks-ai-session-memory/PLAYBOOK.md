@@ -1,6 +1,6 @@
 # PLAYBOOK: AI Session Memory
 
-**Ziel:** Vorhandene Projekt-Dokumentation (`docs/`) für OpenCode-Sessions
+**Ziel:** Vorhandene Projekt-Dokumentation (`k-playbook/docs/`) für OpenCode-Sessions
 als **autoritative Quelle** verankern, sodass die AI in jeder Session
 zuerst dort nachschlägt, statt Code neu zu analysieren.
 
@@ -27,15 +27,10 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 ## Voraussetzungen
 
 - OpenCode installiert und lauffähig.
-- Projekt-Verzeichnis mit Doku-Verzeichnis (Standardname `docs/`).
-- Docs sollten mindestens einen Einstiegspunkt haben (`docs/README.md`
-  oder `docs/index.md`).
+- Projekt-Verzeichnis mit Doku-Verzeichnis `k-playbook/docs/`.
+- Docs sollten mindestens einen Einstiegspunkt haben (`k-playbook/docs/README.md`).
 
-> **Pfad-Hinweis:** Wenn im Projekt-Root eine `K-PLAYBOOK.MD` mit
-> `docs:`-Eintrag existiert (angelegt via `/k-setup`), diesen Pfad statt
-> `docs/` verwenden — überall in diesem Playbook. Wenn nicht: `docs/` als
-> Default nehmen und ggf. nach dem Setup `/k-setup` aufrufen, damit der
-> gewählte Pfad in `K-PLAYBOOK.MD` registriert wird.
+> **Pfad-Hinweis:** `/k-setup` legt `k-playbook/docs/` immer an. Keine alternativen Docs-Pfade verwenden.
 
 ## Konzept
 
@@ -45,21 +40,22 @@ Drei Bausteine wirken zusammen:
 Projekt-Root/
 ├── AGENTS.md            (1) meta-Instruktion für jede Session
 ├── opencode.json        (2) sorgt dafür, dass (1) und (3) wirksam sind
-└── docs/
+└── k-playbook/
+    └── docs/
     └── README.md        (3) Stichwort-Index in den Docs selbst
 ```
 
 - **`AGENTS.md`** = „Regel": Docs sind autoritativ.
 - **`opencode.json`** = Mechanik: `AGENTS.md` wird jede Session injiziert,
-  `docs/` als Referenz mit Beschreibung registriert.
-- **`docs/README.md`** = Wegweiser: A–Z-Index + Frage→Datei-Mapping, damit
+  `k-playbook/docs/` als Referenz mit Beschreibung registriert.
+- **`k-playbook/docs/README.md`** = Wegweiser: A–Z-Index + Frage→Datei-Mapping, damit
   die AI innerhalb der Docs gezielt navigiert.
 
 Ohne alle drei Bausteine funktioniert der Mechanismus nicht:
 
 - Fehlt `AGENTS.md` → Session weiß nicht, dass Docs autoritativ sind.
 - Fehlt `opencode.json`-Konfig → `AGENTS.md` wird nicht automatisch geladen.
-- Fehlt der Index in `docs/README.md` → AI kennt die Docs, findet aber die
+- Fehlt der Index in `k-playbook/docs/README.md` → AI kennt die Docs, findet aber die
   Inhalte nicht gezielt und fällt evtl. doch auf Grep zurück.
 
 ---
@@ -70,7 +66,7 @@ Ohne alle drei Bausteine funktioniert der Mechanismus nicht:
 
 ```bash
 cd <projekt-root>
-ls docs/
+ls k-playbook/docs/
 ```
 
 Identifiziere:
@@ -83,7 +79,7 @@ Wenn keine Docs existieren: dieses Playbook ist noch nicht anwendbar –
 zuerst Docs schreiben (siehe `ks-overlay-repo-analyse/` oder eigene
 Recherche).
 
-### Schritt 2: `docs/README.md` mit Stichwort-Index erweitern
+### Schritt 2: `k-playbook/docs/README.md` mit Stichwort-Index erweitern
 
 Grundstruktur:
 
@@ -135,7 +131,7 @@ Muss enthalten:
 
 - **Was ist dieses Projekt** (1–3 Sätze)
 - **Die kritische Regel:** „Docs zuerst konsultieren, bevor Code gelesen wird"
-- **Verweis auf `docs/README.md`** als Einstieg
+- **Verweis auf `k-playbook/docs/README.md`** als Einstieg
 - **Wann DOCH in den Code:** klare Ausnahmen (Docs veraltet, konkreter Fix)
 - **Sprache** (falls nicht Englisch)
 - Optional: Kurzverweise auf die wichtigsten Doc-Dateien
@@ -148,7 +144,7 @@ Muss zwei Dinge tun:
 
 1. `AGENTS.md` als `instructions` einbinden → wird jede Session
    auto-geladen
-2. `docs/` als `references` registrieren, MIT `description` – nur dann
+2. `k-playbook/docs/` als `references` registrieren, MIT `description` – nur dann
    wird sie AI-seitig sichtbar
 
 Minimalfassung:
@@ -159,8 +155,8 @@ Minimalfassung:
   "instructions": ["AGENTS.md"],
   "references": {
     "docs": {
-      "path": "./docs",
-      "description": "Autoritative Projektdokumentation. IMMER zuerst konsultieren (docs/README.md als Index), bevor Code gelesen wird. Enthält <hier Themen listen>."
+      "path": "./k-playbook/docs",
+      "description": "Autoritative Projektdokumentation. IMMER zuerst konsultieren (k-playbook/docs/README.md als Index), bevor Code gelesen wird. Enthält <hier Themen listen>."
     }
   }
 }
@@ -200,7 +196,7 @@ steht und die vorher nur durch Code-Grep zu beantworten war, z.B.:
 
 Erwartetes Verhalten:
 
-- AI konsultiert `docs/README.md`
+- AI konsultiert `k-playbook/docs/README.md`
 - Springt in die im Index verwiesene Datei
 - Antwortet ohne Grep über Repos
 
@@ -220,7 +216,7 @@ Troubleshooting.
 
 ### AI kennt die Docs, findet Inhalt aber nicht
 
-- ✗ `docs/README.md` hat keinen Stichwort-Index → Schritt 2 nachholen
+- ✗ `k-playbook/docs/README.md` hat keinen Stichwort-Index → Schritt 2 nachholen
 - ✗ Index deckt den gefragten Begriff nicht ab → Index erweitern
 - ✗ `references.docs.description` ist zu generisch → konkretere Themen
   auflisten
@@ -242,18 +238,18 @@ korrekt angewendet wurde.
 - [ ] Projekt-Root enthält `AGENTS.md`
 - [ ] `AGENTS.md` beschreibt Projekt kurz (was ist es)
 - [ ] `AGENTS.md` enthält explizit die Regel „Docs zuerst konsultieren"
-- [ ] `AGENTS.md` verweist auf `docs/README.md` als Einstieg
+- [ ] `AGENTS.md` verweist auf `k-playbook/docs/README.md` als Einstieg
 - [ ] `AGENTS.md` beschreibt Ausnahmen (wann doch in Code)
 - [ ] Projekt-Root enthält `opencode.json` (oder `.jsonc`)
 - [ ] `opencode.json` hat `"$schema": "https://opencode.ai/config.json"`
 - [ ] `opencode.json` hat `"instructions": ["AGENTS.md"]`
 - [ ] `opencode.json` hat `"references"` mit Key `"docs"`
 - [ ] Die Referenz hat einen konkreten `"description"`-Text
-- [ ] `docs/README.md` existiert
-- [ ] `docs/README.md` hat eine Datei-Übersicht (TOC)
-- [ ] `docs/README.md` hat einen alphabetischen Stichwort-Index
-- [ ] `docs/README.md` hat eine „Häufige Fragen → Datei"-Tabelle
-- [ ] `docs/README.md` verweist zurück auf `AGENTS.md`
+- [ ] `k-playbook/docs/README.md` existiert
+- [ ] `k-playbook/docs/README.md` hat eine Datei-Übersicht (TOC)
+- [ ] `k-playbook/docs/README.md` hat einen alphabetischen Stichwort-Index
+- [ ] `k-playbook/docs/README.md` hat eine „Häufige Fragen → Datei"-Tabelle
+- [ ] `k-playbook/docs/README.md` verweist zurück auf `AGENTS.md`
 - [ ] OpenCode wurde nach dem Einrichten neu gestartet
 - [ ] Verifikations-Test 1 (Kontext-Check) bestanden
 - [ ] Verifikations-Test 2 (Effekt-Check) bestanden
@@ -280,6 +276,5 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
   auf denen dieses Playbook aufsetzt.
 - `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
   aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
-- `/k-setup` (Command) – registriert den gewählten `docs:`-Pfad in
-  `K-PLAYBOOK.MD` und prüft am Ende, ob Docs + MEMORY vorhanden sind
+- `/k-setup` (Command) – legt die feste `k-playbook/`-Struktur an und prüft am Ende, ob Docs + MEMORY vorhanden sind
   (verweist bei Bedarf auf `/k-code2docs`).

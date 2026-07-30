@@ -9,7 +9,7 @@ result-family: secret-scanning
 
 # Review: Secret-Scanning Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `reviews:`.
+Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
 
 ## Zweck
 
@@ -23,8 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `gitleaks version` und `trufflehog --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -32,7 +31,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 
 Dieses Review schreibt in:
 
-`<reviews>/results/secret-scanning/YYYY-MM-DD/`
+`k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/`
 
 Dateien:
 
@@ -114,7 +113,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 
 ## Handoff
 
-`/k-remediation <reviews>/results/secret-scanning/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -141,7 +140,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/secret-scanning/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/assessment.md
 ```
 
 Remediation und Secret-Rotation sind ausdruecklich nicht Teil dieses Reviews.

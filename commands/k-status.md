@@ -1,5 +1,5 @@
 ---
-description: Fast read-only health check for K-PLAYBOOK.MD, OpenCode symlinks, registered paths, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
+description: Fast read-only health check for K-PLAYBOOK.MD, OpenCode symlinks, fixed project-local k-playbook layout, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
 argument-hint: [full|codeql|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -11,7 +11,7 @@ Show a fast, read-only health overview for the current project.
 
 This command is a status preflight, not a repair command:
 
-- Read `K-PLAYBOOK.MD` as the single source of truth for playbook paths and CodeQL decisions.
+- Read `K-PLAYBOOK.MD` as the project setup metadata and CodeQL decision source. Project-local paths are derived from the complete fixed `k-playbook/` layout.
 - Check host-local OpenCode command symlinks read-only against the resolved k-playbook repo.
 - Check the canonical k-playbook repo path contract, including the Devcontainer symlink case.
 - Prefer small existence and metadata checks over heavy scans.
@@ -37,9 +37,8 @@ Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md
 
 - If the command receives an explicit target directory in a future extension, resolve it with `realpath` and validate it exists.
 - For the current argument set, modes are not target paths; use `TARGET_DIR = realpath(CWD)`.
-- Apply the project-local base guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.MD`, but its parent has one and the parent's `base:` resolves to the current directory, correct `TARGET_DIR` to the parent project root and show this correction in the preflight.
+- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.MD`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the preflight.
 - Read `<TARGET_DIR>/K-PLAYBOOK.MD` if present. If missing, record `K_PLAYBOOK_FOUND=false` and continue with the checks that do not require it.
-- If `K-PLAYBOOK.MD` exists but `base:` is missing, report it as `FAIL` and recommend `/k-setup`; do not infer a base path.
 
 Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` against the current process home before checking the filesystem. Read `K-PLAYBOOK.MD` `## Playbook-Quelle` → `repo:` only as validation metadata; expected value is `~/dev/k-playbook`. Do not ask for an alternate repo path in this command.
 
@@ -62,8 +61,8 @@ If `<TARGET_DIR>/K-PLAYBOOK.MD` exists, parse only simple metadata from it:
 - Managed Dependabot block markers:
   - `<!-- k-setup-dependabot:managed:begin -->`
   - `<!-- k-setup-dependabot:managed:end -->`
-- `## Pfade` entries shaped like `- key: value`.
-- `## Playbook-Quelle` entries `repo:` and `setup-run:`.
+- `## Setup` entries `layout:`, `repo:`, and `setup-run:`.
+- Legacy `## Bausteine` or `## Pfade` entries only as migration signals.
 - `## CodeQL` entries listed in the `codeql` section.
 - `## Dependabot` entries listed in the `dependabot` section.
 
@@ -75,7 +74,7 @@ Marker status:
 
 If `K-PLAYBOOK.MD` is missing, `playbook` is `FAIL` in default, `strict`, `full`, `codeql`, and `reviews` modes.
 
-If `base:` is missing, `playbook` is also `FAIL`; `/k-setup` is the only migration path that may ask for and write the base value.
+If legacy `## Pfade` or `## Bausteine` is present, report `playbook` as `WARN` and recommend `/k-setup` to migrate the managed block. Do not fail solely because old `base:` is missing.
 
 ## Section: playbook
 
@@ -153,11 +152,10 @@ mkdir -p /home/vscode/dev
 ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
 ```
 
-## Section: paths
+## Section: layout
 
-From `## Pfade`, read at least these keys:
+Check these fixed paths:
 
-- `base`
 - `tasks`
 - `todo`
 - `checks`
@@ -166,14 +164,19 @@ From `## Pfade`, read at least these keys:
 - `enforcement`
 - `docs`
 
-Resolve paths as follows:
+If legacy `## Pfade` or `## Bausteine` exists, report a migration warning. Do not use those blocks to decide which paths are expected; all fixed paths are expected.
 
-- Treat missing keys, empty values, and `-` as unset.
-- Resolve relative values against `TARGET_DIR`.
-- Keep absolute values absolute and mark them as `absolute` in detail output.
-- If a resolved path is outside `TARGET_DIR`, mark it as `outside-target` but do not fail solely for that reason.
-- If a path itself is a symlink, mark it as `symlink`. Resolve only enough to identify where it points; do not follow it into heavy scans.
-- Do not recursively traverse configured directories except where a later section explicitly requires a shallow direct-child count.
+Resolve fixed paths as follows:
+
+- `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook`.
+- `tasks` -> `k-playbook/tasks`.
+- `todo` -> `k-playbook/TODO.md`.
+- `checks` -> `k-playbook/checks`.
+- `reviews` -> `k-playbook/reviews`.
+- `guidelines` -> `k-playbook/guidelines`.
+- `enforcement` -> `k-playbook/enforcement`.
+- `docs` -> `k-playbook/docs`.
+- Do not recursively traverse derived directories except where a later section explicitly requires a shallow direct-child count.
 
 Expected type:
 
@@ -182,35 +185,33 @@ Expected type:
 
 Per entry status:
 
-- `OK`: value is set and the expected file/directory exists.
-- `WARN`: value is unset or `-`.
-- `FAIL`: value is set but the expected file/directory is missing.
+- `OK`: expected file/directory exists.
+- `FAIL`: expected file/directory is missing.
 
-Summarize as counts: `Pfade: OK <n> / WARN <n> / FAIL <n>`.
+Summarize as counts: `Layout: OK <n> / WARN <n> / FAIL <n>`.
 
 ## Section: tasks
 
-Run only if `tasks:` is set and the directory exists.
+Run only if `k-playbook/tasks` exists.
 
 Checks:
 
-- Count `.md` files directly inside `tasks:` whose filename starts with a number, for example `002-k-status.md`.
+- Count `.md` files directly inside `k-playbook/tasks` whose filename starts with a number, for example `002-k-status.md`.
 - Ignore `done/` for open tasks.
-- Optionally count numbered `.md` files directly inside `tasks:/done/` as completed tasks.
+- Optionally count numbered `.md` files directly inside `k-playbook/tasks/done/` as completed tasks.
 - Determine the next open task by sorting numeric prefixes ascending.
 
 Status:
 
-- `OK`: `tasks:` exists and no open numbered task files are found.
+- `OK`: `k-playbook/tasks` exists and no open numbered task files are found.
 - `WARN`: open numbered task files exist.
-- `FAIL`: `tasks:` is set but missing; this is normally already counted in `paths`.
-- `WARN`: `tasks:` is unset.
+- `FAIL`: `k-playbook/tasks` is missing; this is normally already counted in `layout`.
 
 Do not read every task file; filenames are enough for this section.
 
 ## Section: todo
 
-Run only if `todo:` is set and the file exists.
+Run only if `k-playbook/TODO.md` exists.
 
 Checks:
 
@@ -221,14 +222,13 @@ Status:
 
 - `OK`: file exists and has no open checkbox items.
 - `WARN`: file exists and has open checkbox items.
-- `FAIL`: `todo:` is set but missing; this is normally already counted in `paths`.
-- `WARN`: `todo:` is unset.
+- `FAIL`: `k-playbook/TODO.md` is missing; this is normally already counted in `layout`.
 
 ## Section: reviews
 
 Run in default, `full`, `strict`, and `reviews` modes.
 
-If `reviews:` is set and exists:
+If `k-playbook/reviews` exists:
 
 - Count `review-*.md` files directly inside it.
 - Check whether `log.md` exists.
@@ -243,24 +243,23 @@ Status:
 
 - `OK`: review directory exists, review files are present or intentionally empty, and support files exist.
 - `WARN`: no review files, missing `log.md`, missing `known-decisions.md`, or due reviews exist.
-- `FAIL`: `reviews:` is set but missing; this is normally already counted in `paths`.
-- `WARN`: `reviews:` is unset.
+- `FAIL`: `k-playbook/reviews` is missing; this is normally already counted in `layout`.
 
 In `reviews` mode, include the short list of review filenames and due candidates when available.
 
 ## Section: enforcement
 
-Run only if `enforcement:` is set and the directory exists.
+Run only if `k-playbook/enforcement` exists.
 
 Checks:
 
-- Count `.md` rule files directly inside `enforcement:`.
+- Count `.md` rule files directly inside `k-playbook/enforcement`.
 - Show a short list of rule filenames, capped at a small readable number; summarize the remainder if needed.
 
 Status:
 
-- `OK`: path exists and at least one `.md` rule file exists.
-- `WARN`: path is unset, missing, or empty. A missing/empty enforcement path is not a `FAIL` because enforcement can be global-only.
+- `OK`: `k-playbook/enforcement` exists and at least one `.md` rule file exists.
+- `WARN`: enforcement directory is missing or empty. A missing/empty enforcement path is not a `FAIL` because enforcement can be global-only.
 
 ## Section: codeql
 
@@ -348,21 +347,21 @@ Suggested commands may mention normal project hygiene, but do not recommend a k-
 
 Checks:
 
-- Resolve `docs:` from `K-PLAYBOOK.MD`.
+- Use `k-playbook/docs`.
 - Check whether the docs directory exists.
-- Check whether `<docs>/README.md` exists.
-- Check whether `<docs>/libs/README.md` exists.
+- Check whether `k-playbook/docs/README.md` exists.
+- Check whether `k-playbook/docs/libs/README.md` exists.
 
 Status:
 
 - `OK`: docs path and both indexes exist.
-- `WARN`: docs path is unset, missing, or one of the index files is missing.
-- `FAIL`: only if `docs:` is set to a path that is expected by config but cannot be resolved at all; simple missing docs are normally recommendations, not blockers.
+- `WARN`: docs is missing or one of the index files is missing.
+- `FAIL`: only if the fixed docs path cannot be checked at all; simple missing docs are normally recommendations, not blockers.
 
 Recommendations for docs:
 
-- Missing `<docs>/README.md` → suggest `/k-code2docs`.
-- Missing `<docs>/libs/README.md` while `<docs>/README.md` exists → suggest `/k-tools-scan`.
+- Missing `k-playbook/docs/README.md` → suggest `/k-code2docs`.
+- Missing `k-playbook/docs/libs/README.md` while `k-playbook/docs/README.md` exists → suggest `/k-tools-scan`.
 
 ## Section: recommendations
 
@@ -370,8 +369,8 @@ Derive at most three next actions from the findings.
 
 Priority order:
 
-1. Missing `K-PLAYBOOK.MD` or missing `base:` → `/k-setup`.
-2. Missing required or configured playbook paths from `paths` → `/k-setup`.
+1. Missing `K-PLAYBOOK.MD` or legacy `## Pfade` schema → `/k-setup`.
+2. Missing required fixed-layout paths from `layout` → `/k-setup`.
 3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-setup` for this.
 4. OpenCode command symlinks or `skills.paths` incomplete → `/k-install`.
 5. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
@@ -395,7 +394,7 @@ Projekt:       /path/to/project
 K-PLAYBOOK:    OK (setup-run 2026-07-20)
 OpenCode:      WARN, commands 18/20 verlinkt, 1 verwaist, skills.paths ok
 Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook
-Pfade:         OK 7 / WARN 1 / FAIL 0
+Layout:        OK 7 / WARN 1 / FAIL 0
 Tasks:         WARN, 3 offen, nächste: 002-k-status.md
 TODO:          OK, 0 offen
 Reviews:       WARN, 2 vorhanden, known-decisions fehlt
@@ -403,7 +402,7 @@ Enforcement:   OK, 1 Regel
 CodeQL:        WARN, target=./app, enabled=true, github=true workflow fehlt
 Dependabot:    OK, target=./app, repo=example-org/example-app, PRs deaktiviert
 Git:           WARN, dirty (4 geändert, 1 untracked)
-Docs:          WARN, docs/README.md fehlt
+Docs:          WARN, k-playbook/docs/README.md fehlt
 
 Nächste Aktionen:
 1. /k-setup-codeql
@@ -431,7 +430,7 @@ In `json` mode, produce best-effort JSON with these top-level keys when feasible
   "mode": "json",
   "playbook": {},
   "opencode": {},
-  "paths": {},
+    "layout": {},
   "tasks": {},
   "todo": {},
   "reviews": {},

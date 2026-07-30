@@ -134,3 +134,17 @@ func UpsertProject(file ProjectsFile, project Project) ProjectsFile {
 	file.Projects = append(file.Projects, project)
 	return file
 }
+
+func RemoveProject(file ProjectsFile, path string) (ProjectsFile, bool) {
+	projects := file.Projects[:0]
+	removed := false
+	for _, project := range file.Projects {
+		if project.Path == path {
+			removed = true
+			continue
+		}
+		projects = append(projects, project)
+	}
+	file.Projects = projects
+	return file, removed
+}

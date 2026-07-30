@@ -46,8 +46,36 @@ type saveScannedRequest struct {
 	Projects []projectRequest `json:"projects"`
 }
 
+type projectsResponse struct {
+	Version  int           `json:"version"`
+	Projects []projectView `json:"projects"`
+}
+
+type projectView struct {
+	store.Project
+	Setup projectCommandStatus `json:"setup"`
+	Docs  projectCommandStatus `json:"docs"`
+}
+
+type projectCommandStatus struct {
+	OK      bool   `json:"ok"`
+	Path    string `json:"path"`
+	Command string `json:"command"`
+	Message string `json:"message"`
+}
+
 type gitPullResult struct {
 	Output string `json:"output"`
+}
+
+type gitStatusResult struct {
+	OK              bool   `json:"ok"`
+	UpdateAvailable bool   `json:"updateAvailable"`
+	Current         string `json:"current"`
+	Remote          string `json:"remote"`
+	Branch          string `json:"branch"`
+	RemoteName      string `json:"remoteName"`
+	Message         string `json:"message"`
 }
 
 type docEntry struct {
@@ -238,9 +266,11 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/status", statusHandler)
 	mux.HandleFunc("POST /api/repair-path", repairPathHandler)
 	mux.HandleFunc("GET /api/projects", projectsHandler)
+	mux.HandleFunc("DELETE /api/projects", removeProjectHandler)
 	mux.HandleFunc("GET /api/projects/scan", scanProjectsHandler)
 	mux.HandleFunc("POST /api/projects", addProjectHandler)
 	mux.HandleFunc("POST /api/projects/scan", saveScannedProjectsHandler)
+	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
 	mux.HandleFunc("POST /api/git/pull", gitPullHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
@@ -426,7 +456,47 @@ func projectsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, file)
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func removeProjectHandler(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+	path, err := projects.NormalizePath(request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	file, err := store.LoadProjects()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	file, removed := store.RemoveProject(file, path)
+	if !removed {
+		writeError(w, http.StatusNotFound, fmt.Errorf("Projekt nicht gespeichert: %s", path))
+		return
+	}
+	if err := store.SaveProjects(file); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func gitStatusHandler(w http.ResponseWriter, r *http.Request) {
+	status, err := checkGitStatus(r.Context())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, status)
 }
 
 func gitPullHandler(w http.ResponseWriter, r *http.Request) {
@@ -451,6 +521,112 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, gitPullResult{Output: strings.TrimSpace(string(output))})
+}
+
+func checkGitStatus(parent context.Context) (gitStatusResult, error) {
+	root, err := repoRoot()
+	if err != nil {
+		return gitStatusResult{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+
+	branch, err := gitOutput(ctx, root, "branch", "--show-current")
+	if err != nil {
+		return gitStatusResult{}, err
+	}
+	if branch == "" {
+		return gitStatusResult{Message: "Kein aktiver Git-Branch erkannt."}, nil
+	}
+
+	remoteName, err := gitOutput(ctx, root, "config", "--get", "branch."+branch+".remote")
+	if err != nil || remoteName == "" {
+		return gitStatusResult{Branch: branch, Message: "Kein Git-Upstream fuer diesen Branch konfiguriert."}, nil
+	}
+
+	mergeRef, err := gitOutput(ctx, root, "config", "--get", "branch."+branch+".merge")
+	if err != nil || mergeRef == "" {
+		return gitStatusResult{Branch: branch, RemoteName: remoteName, Message: "Kein Git-Upstream fuer diesen Branch konfiguriert."}, nil
+	}
+	remoteBranch := strings.TrimPrefix(mergeRef, "refs/heads/")
+
+	current, err := gitOutput(ctx, root, "rev-parse", "HEAD")
+	if err != nil {
+		return gitStatusResult{}, err
+	}
+	remote, err := gitOutput(ctx, root, "ls-remote", "--heads", remoteName, remoteBranch)
+	if ctx.Err() == context.DeadlineExceeded {
+		return gitStatusResult{}, fmt.Errorf("git update check Timeout")
+	}
+	if err != nil {
+		return gitStatusResult{}, err
+	}
+
+	remoteCommit := firstField(remote)
+	if remoteCommit == "" {
+		return gitStatusResult{Branch: branch, RemoteName: remoteName, Current: current, Message: "Remote-Branch nicht gefunden."}, nil
+	}
+
+	updateAvailable := current != remoteCommit
+	remoteKnownLocally := false
+	remoteAncestorOfCurrent := false
+	if updateAvailable && gitObjectExists(ctx, root, remoteCommit) {
+		remoteKnownLocally = true
+		updateAvailable = gitIsAncestor(ctx, root, current, remoteCommit)
+		if !updateAvailable {
+			remoteAncestorOfCurrent = gitIsAncestor(ctx, root, remoteCommit, current)
+		}
+	}
+
+	status := gitStatusResult{
+		OK:              true,
+		UpdateAvailable: updateAvailable,
+		Current:         current,
+		Remote:          remoteCommit,
+		Branch:          branch,
+		RemoteName:      remoteName,
+	}
+	if status.UpdateAvailable {
+		status.Message = "Neue k-playbook-Version verfuegbar."
+	} else if current != remoteCommit && remoteKnownLocally && remoteAncestorOfCurrent {
+		status.Message = "Lokaler Stand ist neuer als Remote."
+	} else if current != remoteCommit && remoteKnownLocally {
+		status.Message = "Remote unterscheidet sich, aber ist kein Fast-Forward-Update."
+	} else {
+		status.Message = "k-playbook ist aktuell."
+	}
+	return status, nil
+}
+
+func gitObjectExists(ctx context.Context, root string, object string) bool {
+	cmd := exec.CommandContext(ctx, "git", "cat-file", "-e", object)
+	cmd.Dir = root
+	return cmd.Run() == nil
+}
+
+func gitIsAncestor(ctx context.Context, root string, ancestor string, descendant string) bool {
+	cmd := exec.CommandContext(ctx, "git", "merge-base", "--is-ancestor", ancestor, descendant)
+	cmd.Dir = root
+	return cmd.Run() == nil
+}
+
+func gitOutput(ctx context.Context, root string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func firstField(value string) string {
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
 }
 
 func docsHandler(w http.ResponseWriter, r *http.Request) {
@@ -577,7 +753,7 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, file)
+	writeJSON(w, http.StatusOK, projectResponse(file))
 }
 
 func saveScannedProjectsHandler(w http.ResponseWriter, r *http.Request) {
@@ -610,7 +786,82 @@ func saveScannedProjectsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, file)
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func projectResponse(file store.ProjectsFile) projectsResponse {
+	response := projectsResponse{Version: file.Version, Projects: make([]projectView, 0, len(file.Projects))}
+	for _, project := range file.Projects {
+		response.Projects = append(response.Projects, projectView{Project: project, Setup: checkProjectSetup(project.Path), Docs: checkProjectDocs(project.Path)})
+	}
+	return response
+}
+
+func checkProjectSetup(projectPath string) projectCommandStatus {
+	status := projectCommandStatus{Command: "/k-setup"}
+	for _, name := range []string{"K-PLAYBOOK.MD", "K-PLAYBOOK.md"} {
+		path := filepath.Join(projectPath, name)
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			status.OK = true
+			status.Path = path
+			status.Message = name + " vorhanden."
+			return status
+		}
+	}
+
+	status.Path = filepath.Join(projectPath, "K-PLAYBOOK.MD")
+	status.Message = "K-PLAYBOOK.MD fehlt."
+	return status
+}
+
+func checkProjectDocs(projectPath string) projectCommandStatus {
+	status := projectCommandStatus{Command: "/k-code2docs", Path: filepath.Join(projectPath, "docs")}
+	hasDocs, err := hasMarkdownFiles(status.Path)
+	if err != nil {
+		status.Message = "docs-Verzeichnis fehlt oder ist nicht lesbar."
+		return status
+	}
+	if !hasDocs {
+		status.Message = "docs-Verzeichnis enthaelt noch keine Markdown-Dateien."
+		return status
+	}
+
+	status.OK = true
+	status.Message = "docs-Verzeichnis enthaelt Markdown-Dateien."
+	return status
+}
+
+func hasMarkdownFiles(root string) (bool, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return false, err
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("kein Verzeichnis: %s", root)
+	}
+
+	found := false
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == ".venv" || entry.Name() == "venv" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.ToLower(filepath.Ext(path)) == ".md" {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, filepath.SkipAll) {
+		return false, err
+	}
+	return found, nil
 }
 
 func projectFromRequest(request projectRequest) (store.Project, error) {

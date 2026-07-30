@@ -3,6 +3,7 @@ const state = {
   scanned: [],
   devcontainers: null,
   securityTools: null,
+  gitStatus: null,
   projects: [],
 };
 
@@ -95,6 +96,7 @@ function showScan() {
 async function refreshAll() {
   await refreshStatus();
   if (state.status && state.status.OK) {
+    await loadGitStatus();
     await refreshProjects();
     await loadDevcontainerStatus();
     await loadOpenCodeStatus();
@@ -111,6 +113,45 @@ async function gitPull() {
     showToast("Repository aktualisiert.");
     await refreshAll();
   });
+}
+
+async function loadGitStatus() {
+  try {
+    const status = await api("/api/git/status");
+    state.gitStatus = status;
+    renderGitStatus(status);
+  } catch (error) {
+    state.gitStatus = null;
+    renderGitStatus(null, error.message);
+  }
+}
+
+function renderGitStatus(status, error = "") {
+  const updateAvailable = Boolean(status && (status.updateAvailable || status.UpdateAvailable));
+  const buttons = [
+    [elements.gitPullTop, "k-playbook aktualisieren"],
+    [elements.gitPull, "Git pull"],
+  ];
+  for (const [button, defaultLabel] of buttons) {
+    button.classList.toggle("primary", updateAvailable);
+    button.classList.toggle("secondary", !updateAvailable);
+    button.classList.toggle("update-available", updateAvailable);
+    button.textContent = updateAvailable ? "Zur neuen Version aktualisieren" : defaultLabel;
+  }
+
+  if (error) {
+    elements.gitOutput.textContent = `Update-Check nicht moeglich: ${error}`;
+    return;
+  }
+  if (!status) {
+    elements.gitOutput.textContent = "Fuehrt im k-playbook-Repo ein sicheres `git pull --ff-only` aus.";
+    return;
+  }
+
+  const message = status.message || status.Message || "Git-Status geprueft.";
+  elements.gitOutput.textContent = updateAvailable
+    ? `${message} Aktualisieren fuehrt git pull --ff-only aus.`
+    : message;
 }
 
 async function shutdownInstaller() {
@@ -414,15 +455,147 @@ function renderProjects(projects) {
     const environment = document.createElement("span");
     environment.className = "project-env";
     environment.textContent = (project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
-    header.append(details, environment);
+    const headerActions = document.createElement("div");
+    headerActions.className = "project-header-actions";
+    headerActions.append(environment, removeProjectButton(project));
+    header.append(details, headerActions);
     card.append(header);
 
     const devcontainerRow = projectDevcontainerRow(project);
     if (devcontainerRow) {
       card.append(devcontainerRow);
     }
+    const setupRow = projectSetupRow(project);
+    if (setupRow) {
+      card.append(setupRow);
+    }
+    const docsRow = projectDocsRow(project);
+    if (docsRow) {
+      card.append(docsRow);
+    }
     elements.projects.append(card);
   }
+}
+
+function removeProjectButton(project) {
+  const projectPath = project.path || project.Path;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary danger small-button";
+  button.textContent = "Entfernen";
+  button.addEventListener("click", () => removeProject(projectPath, button));
+  return button;
+}
+
+async function removeProject(projectPath, button) {
+  if (!window.confirm(`Projekt aus der Installer-Liste entfernen?\n\n${projectPath}\n\nEs werden keine Projektdateien geloescht.`)) {
+    return;
+  }
+
+  await withBusy(button, async () => {
+    const file = await api("/api/projects", {
+      method: "DELETE",
+      body: JSON.stringify({ path: projectPath }),
+    });
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    await loadDevcontainerStatus();
+    showToast("Projekt aus der Liste entfernt.");
+  });
+}
+
+function projectSetupRow(project) {
+  const setup = project.setup || project.Setup;
+  if (!setup || setup.ok || setup.OK) {
+    return null;
+  }
+
+  const projectPath = project.path || project.Path;
+  const command = setup.command || setup.Command || "/k-setup";
+  return commandActionRow({
+    title: "Projekt-Setup fehlt",
+    detail: `${setup.message || setup.Message || "K-PLAYBOOK.MD fehlt."} Im Projekt den Assistenten oeffnen und ${command} ausfuehren.`,
+    command,
+    helpTitle: "Projekt-Setup ausfuehren",
+    helpContextLabel: "Oeffne den Assistenten/OpenCode im Projekt",
+    helpContext: projectPath,
+    helpText: `Der Installer startet ${command} nicht selbst, weil der Slash-Command im Zielprojekt-Kontext Rueckfragen stellt und Dateien dort anlegt.`,
+  });
+}
+
+function projectDocsRow(project) {
+  const docs = project.docs || project.Docs;
+  if (!docs || docs.ok || docs.OK) {
+    return null;
+  }
+
+  const projectPath = project.path || project.Path;
+  const command = docs.command || docs.Command || "/k-code2docs";
+  return commandActionRow({
+    title: "Dokumentation fehlt",
+    detail: `${docs.message || docs.Message || "docs-Verzeichnis ist leer."} Im Projekt ${command} ausfuehren.`,
+    command,
+    helpTitle: "Projekt-Dokumentation erzeugen",
+    helpContextLabel: "Oeffne den Assistenten/OpenCode im Projekt",
+    helpContext: projectPath,
+    helpText: `${command} erzeugt bzw. aktualisiert projektlokale Dokumentation. Wenn zuerst die vorhandenen Projekt-Tools inventarisiert werden sollen, nutze vorher /k-tools-scan.`,
+  });
+}
+
+function commandActionRow({ title, detail, command, helpTitle, helpContextLabel, helpContext, helpText, className = "project-check-row" }) {
+  const row = document.createElement("div");
+  row.className = className;
+
+  const text = document.createElement("div");
+  const titleElement = document.createElement("span");
+  titleElement.className = "project-check-title";
+  titleElement.textContent = title;
+  const detailElement = document.createElement("span");
+  detailElement.textContent = detail;
+  text.append(titleElement, detailElement);
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "icon-button";
+  copy.textContent = command;
+  copy.title = `${command} in die Zwischenablage kopieren`;
+  copy.addEventListener("click", () => copyText(command));
+  action.append(copy);
+
+  const help = document.createElement("button");
+  help.type = "button";
+  help.className = "secondary";
+  help.textContent = "Hilfe";
+  help.addEventListener("click", () => showCommandHelp({ title: helpTitle || title, command, contextLabel: helpContextLabel, context: helpContext, text: helpText }));
+  action.append(help);
+
+  row.append(text, action);
+  return row;
+}
+
+async function copyText(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`${value} kopiert.`);
+  } catch {
+    showToast(`Kopieren fehlgeschlagen. Befehl: ${value}`, true);
+  }
+}
+
+function showCommandHelp({ title, command, contextLabel, context, text }) {
+  const lines = [title, ""];
+  if (contextLabel && context) {
+    lines.push(`1. ${contextLabel}:`, context, "");
+    lines.push("2. Fuehre dort aus:", command);
+  } else {
+    lines.push("Fuehre aus:", command);
+  }
+  if (text) {
+    lines.push("", text);
+  }
+  window.alert(lines.join("\n"));
 }
 
 function projectDevcontainerRow(project) {
@@ -573,6 +746,17 @@ function renderSecurityTools(status) {
     summary.append(scope);
   }
   elements.securityToolsSummary.append(summary);
+
+  if (missingRequired > 0) {
+    elements.securityToolsSummary.append(commandActionRow({
+      title: "Fehlende Security-Tools installieren",
+      detail: "Installation separat im Assistenten oder Terminal starten. Die Installer-GUI installiert bewusst nichts selbst.",
+      command: "/k-install-security-tools --install missing",
+      helpTitle: "Security-Tools installieren",
+      helpText: "Empfohlen ist der Slash-Command in OpenCode: /k-install-security-tools --install missing. Ohne OpenCode kann derselbe Installer direkt im Terminal gestartet werden: bash ~/dev/k-playbook/scripts/install-security-tools.sh --install missing --method auto",
+      className: "command-action-row",
+    }));
+  }
 
   const list = document.createElement("div");
   list.className = "security-tool-list";

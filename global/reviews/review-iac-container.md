@@ -9,7 +9,7 @@ result-family: iac-container
 
 # Review: IaC and Container Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Security-Ergebnissen. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `reviews:`.
+Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Security-Ergebnissen. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
 
 ## Zweck
 
@@ -23,8 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `trivy --version`, `syft --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -32,7 +31,7 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 
 Dieses Review schreibt in:
 
-`<reviews>/results/iac-container/YYYY-MM-DD/`
+`k-playbook/reviews/results/iac-container/YYYY-MM-DD/`
 
 Dateien:
 
@@ -127,7 +126,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Handoff
 
-`/k-remediation <reviews>/results/iac-container/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook/reviews/results/iac-container/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -155,7 +154,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/iac-container/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/iac-container/YYYY-MM-DD/assessment.md
 ```
 
 Remediation und Infrastruktur-Aenderungen sind ausdruecklich nicht Teil dieses Reviews.

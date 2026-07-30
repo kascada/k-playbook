@@ -7,21 +7,20 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-review
 
-Run a code review against the current project, using a review recipe either from the global review catalog (`<PLAYBOOK_REPO>/global/reviews/`) or from the project-local `reviews:` path in `K-PLAYBOOK.MD`.
+Run a code review against the current project, using a review recipe either from the global review catalog (`<PLAYBOOK_REPO>/global/reviews/`) or from the fixed project-local `k-playbook/reviews` directory.
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<PLAYBOOK_REPO>/global/rules/review-authoring.md`.
 
-`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.MD` and `base:` configured by `/k-setup`. The `reviews:` block may be inactive; in that case only global review recipes are available and no project-local log or known-decisions file is used.
+`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.MD` configured by `/k-setup`.
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.MD
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve the fixed `reviews` path:
 
-- `reviews:` → `PROJECT_REVIEWS_DIR`. Treat `PROJECT_REVIEWS_DIR` as the resolved absolute path. If value is `-` or entry is missing, `PROJECT_REVIEWS_DIR` is unset.
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `reviews:`.
+- `PROJECT_REVIEWS_DIR = <TARGET_DIR>/k-playbook/reviews`.
+- `REVIEWS_DISPLAY_PATH = k-playbook/reviews`.
 
 Also set:
 
@@ -30,17 +29,10 @@ Also set:
   - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
   - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
   - `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (for reviews that produce output files, e.g. tech-debt)
-- Else:
-  - `LOG_FILE` = unset — announce that no log will be written. Do not ask for a one-off log path.
-  - `KNOWN_DECISIONS` = unset — warn but continue.
-  - `RESULT_DIR` = unset. Report-mode reviews that need to write a result require an active existing `reviews:` directory; otherwise abort with a `/k-setup` hint.
-
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `base:` is missing: abort and tell the user to run `/k-setup` first. Do not infer it from existing paths.
-- If `reviews:` is unset or inactive (`-`): continue with global reviews only. Do not invent a project-local review path.
-- If `PROJECT_REVIEWS_DIR` is set but missing: abort and tell the user to run `/k-setup` to create/migrate the configured directory.
+- If `PROJECT_REVIEWS_DIR` is missing: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
 
 ## Step 2 — Determine the review to run
 
@@ -83,7 +75,7 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
-- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `<reviews>/results/<result-family>/<YYYY-MM-DD>/`)
+- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `k-playbook/reviews/results/<result-family>/<YYYY-MM-DD>/`)
 
 If `KNOWN_DECISIONS` is set and the file exists:
 
@@ -135,7 +127,7 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis schreiben. If `RESULT_DIR` is unset, abort and ask the user to activate/create `reviews:` via `/k-setup` first.
+2. Ergebnis schreiben. If `RESULT_DIR` is unset, abort and ask the user to activate/create `reviews` via `/k-setup` first.
    - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULT_DIR>/results/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
    - Wenn `result-family` nicht gesetzt ist: Legacy-Pfad `<RESULT_DIR>/result-<name>.md` verwenden.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
@@ -157,7 +149,7 @@ Wenn `LOG_FILE` gesetzt ist:
    |---|---|---|---|
    | 2026-07-12 | review-python-comment-hardspots | src/upload.py, src/api.py | 3 Vorschläge / 2 übernommen / 1 skip |
 
-Wenn `LOG_FILE` nicht gesetzt ist: dem User zeigen, was hätte geschrieben werden sollen. Nicht nach einem Ersatzpfad fragen; Projektpfade werden über `/k-setup` registriert.
+Wenn `LOG_FILE` nicht gesetzt ist: dem User zeigen, was hätte geschrieben werden sollen. Nicht nach einem Ersatzpfad fragen; Projektpfade werden über das feste `/k-setup`-Layout abgeleitet.
 
 **Log-Skelett** (nur beim ersten Anlegen):
 
@@ -183,4 +175,4 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **`K-PLAYBOOK.MD` fehlt oder `base:` fehlt**: abbrechen und `/k-setup` aufrufen lassen.
+- **`K-PLAYBOOK.MD` fehlt**: abbrechen und `/k-setup` aufrufen lassen.

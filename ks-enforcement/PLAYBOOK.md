@@ -26,14 +26,12 @@ Global gelten alle Markdown-Dateien unter:
 
 ### Projektlokal
 
-Projektlokale Regeln liegen im `enforcement:`-Pfad aus `<TARGET_DIR>/K-PLAYBOOK.MD`.
+Projektlokale Regeln liegen unter `<TARGET_DIR>/k-playbook/enforcement/`.
 
 Auflösung:
 
-- Wenn `enforcement:` absolut ist: direkt verwenden.
-- Wenn relativ: gegen `TARGET_DIR` auflösen.
-- Wenn leer, `-` oder fehlend: keine projektlokalen Enforcement-Regeln.
-- Wenn der Pfad gesetzt ist, aber fehlt: warnen und nur auf Nachfrage anlegen; für Checks grundsätzlich mit den globalen Regeln fortfahren.
+- `<TARGET_DIR>/k-playbook/enforcement/` verwenden.
+- Wenn das Verzeichnis fehlt: warnen; für Checks grundsätzlich mit den globalen Regeln fortfahren.
 
 ## Ablauf
 

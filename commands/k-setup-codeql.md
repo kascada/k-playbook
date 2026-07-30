@@ -13,7 +13,7 @@ CodeQL-specific rules live in `<PLAYBOOK_REPO>/global/rules/codeql.md` and must 
 
 This command is the CodeQL-specific companion to `/k-setup`:
 
-- `/k-setup` owns the base playbook paths in `K-PLAYBOOK.MD`.
+- `/k-setup` owns the fixed complete `k-playbook/` project-local layout in `K-PLAYBOOK.MD`.
 - `/k-setup-codeql` owns only the CodeQL decision block in `K-PLAYBOOK.MD`.
 - GitHub CodeQL and local CodeQL databases are independent choices; ask for both separately.
 - If GitHub CodeQL is active or planned, offer only a local CodeQL CLI install for preflight/status checks. Use `scripts/install-codeql-local.sh --parent "<CODEQL_PARENT_DIR>" --cli-only`; this GitHub path must not create local databases, SARIF results, or run analysis.
@@ -25,28 +25,21 @@ Determine `TARGET_DIR` from the slash-command argument string:
 
 - If the argument string is non-empty: treat it as the target directory, resolve with `realpath`, and abort if it does not exist.
 - If the argument string is empty: `TARGET_DIR = realpath(CWD)`.
-- Before using that value, apply the project-local base guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory has no `K-PLAYBOOK.MD`, but its parent does and the parent file's `base:` resolves to the selected directory, correct `TARGET_DIR` to the parent project root and show that correction in preflight. If the parent file has no `base:`, do not infer it; stop and ask the user to run `/k-setup` for the parent project first.
+- Before using that value, apply the fixed-layout guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory is `<project>/k-playbook`, correct `TARGET_DIR` to the parent project root and show that correction in preflight.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+Derive the mandatory local CodeQL artifact parent:
 
-- `base:` → `PLAYBOOK_BASE_DIR` if present.
-- `checks:` → `CHECKS_DIR` if present.
-
-Then derive the mandatory local CodeQL artifact parent:
-
-- `CODEQL_PARENT_DIR = PLAYBOOK_BASE_DIR`
-- `CODEQL_PARENT_DISPLAY_PATH = PLAYBOOK_BASE_DISPLAY_PATH`
+- `CODEQL_PARENT_DIR = <TARGET_DIR>/k-playbook`
+- `CODEQL_PARENT_DISPLAY_PATH = k-playbook`
 
 Use `CODEQL_PARENT_DIR` for every `--parent` argument this command shows or runs. Do not ask for a separate parent in `/k-setup-codeql`; the project-local playbook base is the canonical parent for CLI-only CodeQL artifacts.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.MD` is missing, stop and ask the user to run `/k-setup` first. This command writes only into an existing pointer/config file.
-- If `base:` is missing, stop and ask the user to run `/k-setup` first. Do not infer legacy base paths here.
-- If `PLAYBOOK_BASE_DIR` does not exist, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
-- If `checks:` is unset, continue; CodeQL can still be registered, but no project-local check script path is suggested.
+- If `CODEQL_PARENT_DIR` does not exist, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
 - Determine a CodeQL analysis target directory (`codeql target`) separately from `TARGET_DIR`. Default is `.` (the project root). If the project root is a wrapper and exactly one nested Git worktree contains the detected application manifests, suggest that nested worktree, e.g. `./app`. Normalize as a project-relative path. Do not infer outside-target paths without asking. Store the resolved path as `CODEQL_TARGET_DIR` and the display path as `CODEQL_TARGET_DISPLAY_PATH`.
 
 ## Step 2 — Detect current state
@@ -68,11 +61,11 @@ Inspect the target project for CodeQL signals:
   - `codeql-config.yml`
   - `codeql-config.yaml`
 - Local CodeQL databases or intended database directories:
-  - `<base>/codeql/`
-  - `<base>/codeql-db/`
+  - `k-playbook/codeql/`
+  - `k-playbook/codeql-db/`
   - `.codeql/`
 - Local CLI-only install:
-  - `<base>/codeql-cli/codeql/codeql`
+  - `k-playbook/codeql-cli/codeql/codeql`
 - CodeQL CLI availability:
   - `codeql version`
 
@@ -132,8 +125,7 @@ Ask the user in one bundled interaction:
 
 If local database is `true` or `planned`, ask for the database path:
 
-- Default: `<base>/codeql-db/`.
-- If `base:` is missing, this command must already have stopped and asked the user to run `/k-setup`.
+- Default: `./k-playbook/codeql-db/`.
 - Normalize relative paths as `./...`.
 
 If GitHub CodeQL is `true` or `planned`, ask whether a workflow path should be recorded:

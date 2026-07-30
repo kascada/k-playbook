@@ -17,7 +17,7 @@ Bei jeder Code-Aenderung gilt:
 
 Relevant sind insbesondere:
 
-- Dateien unter dem in `K-PLAYBOOK.MD` registrierten `docs:`-Pfad.
+- Dateien unter `<projekt>/k-playbook/docs/`.
 - Architektur-, Betriebs-, Setup-, API- und Datenmodell-Dokumentation.
 - `README.md`, `AGENTS.md` oder andere Einstiegspunkte, wenn sie das geaenderte Verhalten beschreiben.
 - Projektinterne Guidelines oder Known-Decisions, wenn die Aenderung eine Konvention oder bewusste Entscheidung beruehrt.

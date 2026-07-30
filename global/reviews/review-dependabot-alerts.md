@@ -30,8 +30,7 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt oder inaktiv ist: abbrechen; dieses Review braucht ein lokales `reviews:`-Ziel.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Lies den optionalen Dependabot-Managed-Block zwischen `<!-- k-setup-dependabot:managed:begin -->` und `<!-- k-setup-dependabot:managed:end -->`.
 - Wenn vorhanden, nutze `target:` als Git-/App-Root und `repo:` als GitHub `owner/repo`. Wenn `target:` fehlt, gilt legacy-kompatibel `.`. Wenn `repo:` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
 - Wenn `config:` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull-requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
@@ -43,7 +42,7 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 
 Dieses Review schreibt in:
 
-`<reviews>/results/dependabot-alerts/YYYY-MM-DD/`
+`k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/`
 
 Dateien:
 
@@ -155,7 +154,7 @@ Review-Status in `findings.md`:
 
 ## Handoff
 
-`/k-remediation <reviews>/results/dependabot-alerts/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -190,7 +189,7 @@ Review-Status in `findings.md`:
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation <reviews>/results/dependabot-alerts/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/assessment.md
 ```
 
 Remediation, Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdruecklich nicht Teil dieses Reviews.

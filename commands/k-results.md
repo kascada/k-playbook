@@ -1,5 +1,5 @@
 ---
-description: Build a project-wide prioritized security results summary from existing review result families. Reads reviews/results/*/*/{assessment,findings}.md, deduplicates and ranks findings, then writes reviews/results/summary-YYYY-MM-DD.md. Does not run scanners or remediation.
+description: Build a project-wide prioritized security results summary from existing review result families. Reads k-playbook/reviews/results/*/*/{assessment,findings}.md, deduplicates and ranks findings, then writes k-playbook/reviews/results/summary-YYYY-MM-DD.md. Does not run scanners or remediation.
 argument-hint: [YYYY-MM-DD|latest]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Erzeuge eine projektweite, priorisierte Ergebnis-Zusammenfassung aus vorhandenen Review-Result-Familien.
 
-`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` und `/k-remediation`. Der Command startet keine Scanner, fuehrt keine Remediation aus und veraendert keine Raw-Artefakte. Er liest vorhandene `assessment.md`/`findings.md`-Dateien unter `reviews/results/` und schreibt eine einzelne priorisierte Summary.
+`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` und `/k-remediation`. Der Command startet keine Scanner, fuehrt keine Remediation aus und veraendert keine Raw-Artefakte. Er liest vorhandene `assessment.md`/`findings.md`-Dateien unter `k-playbook/reviews/results/` und schreibt eine einzelne priorisierte Summary.
 
 ## Zielartefakt
 
@@ -20,26 +20,23 @@ Erzeuge eine projektweite, priorisierte Ergebnis-Zusammenfassung aus vorhandenen
 Dieses Artefakt ist der bevorzugte Handoff fuer Remediation:
 
 ```text
-/k-remediation <reviews>/results/summary-YYYY-MM-DD.md
+/k-remediation k-playbook/reviews/results/summary-YYYY-MM-DD.md
 ```
 
 ## Schritt 1 — Pfade aufloesen
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve:
+For this command, resolve fixed blocks:
 
-- `reviews:` -> `PROJECT_REVIEWS_DIR`.
-- `tasks:` -> `TASKS_DIR`, optional aber hilfreich fuer existierende Remediation-Tasks.
-
-Also require `base:` from `K-PLAYBOOK.MD`; use it only as validation metadata, not to infer `reviews:` or `tasks:`.
+- `reviews` -> `PROJECT_REVIEWS_DIR = <TARGET_DIR>/k-playbook/reviews`.
+- `tasks` -> `TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`; optional aber hilfreich fuer existierende Remediation-Tasks.
 
 Command-specific policy:
 
 - Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `base:` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `reviews:` fehlt, inaktiv ist oder das Verzeichnis nicht existiert: abbrechen; Results brauchen ein projektlokales `reviews:`-Ziel.
-- Wenn `tasks:` fehlt oder nicht existiert: warnen, aber fortfahren; dann koennen existierende Tasks nicht abgeglichen werden.
+- Wenn `k-playbook/reviews` nicht existiert: abbrechen; Results brauchen ein projektlokales `reviews`-Ziel.
+- Wenn `k-playbook/tasks` nicht existiert: warnen, aber fortfahren; dann koennen existierende Tasks nicht abgeglichen werden.
 
 Abgeleitete Pfade:
 
@@ -201,8 +198,8 @@ Projekt: `<name>`
 
 ## Quellen
 
-- <family>: `reviews/results/<family>/<date>/assessment.md`
-- Known Decisions: `reviews/known-decisions.md` (<Status>)
+- <family>: `k-playbook/reviews/results/<family>/<date>/assessment.md`
+- Known Decisions: `k-playbook/reviews/known-decisions.md` (<Status>)
 
 ## Priorisierte Uebersicht
 
@@ -216,8 +213,8 @@ Kurzbeschreibung.
 Empfehlung: konkreter naechster Schritt.
 
 Quellen:
-- `reviews/results/<family>/<date>/assessment.md`
-- `reviews/results/<family>/<date>/findings.md#<finding-id>`
+- `k-playbook/reviews/results/<family>/<date>/assessment.md`
+- `k-playbook/reviews/results/<family>/<date>/findings.md#<finding-id>`
 
 Was man zum Loesen braucht:
 - betroffene Datei/Zeile
@@ -230,7 +227,7 @@ Was man zum Loesen braucht:
 
 ## Handoff
 
-`/k-remediation <reviews>/results/summary-YYYY-MM-DD.md`
+`/k-remediation k-playbook/reviews/results/summary-YYYY-MM-DD.md`
 ```
 
 Schreibe knapp, aber loesungsfaehig. Jede Top-Gruppe braucht:
@@ -252,7 +249,7 @@ Wenn `LOG_FILE` existiert:
 | YYYY-MM-DD | results-summary | alle Result-Familien | <N> priorisierte Themen -> `k-playbook/reviews/results/summary-YYYY-MM-DD.md`. Handoff: `/k-remediation ...` |
 ```
 
-Wenn `LOG_FILE` fehlt, zeige die Log-Zeile im Abschluss, aber lege keine Ersatzdatei ausserhalb des registrierten `reviews:`-Pfads an.
+Wenn `LOG_FILE` fehlt, zeige die Log-Zeile im Abschluss, aber lege keine Ersatzdatei ausserhalb von `k-playbook/reviews` an.
 
 ## Schritt 10 — Abschluss
 
