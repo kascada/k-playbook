@@ -22,20 +22,21 @@ INSTALLER_BUILD_BINARY := $(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := ./dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 
-.PHONY: help build release install uninstall gui test clean installer-build installer-install installer-uninstall installer-run installer-test installer-clean path-hint path-setup
+.PHONY: help build dist install install-from-source uninstall gui test clean installer-build installer-install installer-install-from-source installer-uninstall installer-run installer-test installer-clean path-hint path-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfuegbare Targets:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Typischer Start:"
-	@echo "  ./scripts/install-installer.sh"
+	@echo "  make install"
 	@echo "  k-playbook-installer"
+	@echo "  # alternativ ohne make: ./scripts/install-installer.sh"
 	@echo ""
 	@echo "Aus dem Source mit lokal installiertem Go:"
-	@echo "  make install"
+	@echo "  make install-from-source"
 	@echo "  make gui"
 	@echo ""
 	@echo "Nach neu geladenem PATH auch direkt:"
@@ -45,7 +46,7 @@ help: ## Zeigt diese Hilfe an
 build: ## Baut das Installer-Binary nach ./bin/
 	cd installer && go build -o ../bin/$(INSTALLER_BINARY) ./cmd/k-playbook-installer
 
-release: ## Baut Release-Binaries nach ./dist/
+dist: ## Baut Installer-Artefakte nach ./dist/
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
 	for target in $(INSTALLER_RELEASE_TARGETS); do \
@@ -56,7 +57,10 @@ release: ## Baut Release-Binaries nach ./dist/
 		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -ldflags="-s -w" -o "$$output" ./cmd/k-playbook-installer); \
 	done
 
-install: build ## Baut das Binary und verlinkt es nach ~/.local/bin
+install: ## Installiert den Installer ohne Go aus dist/ oder GitHub Releases
+	./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
+
+install-from-source: build ## Baut das Binary und verlinkt es nach ~/.local/bin
 	@mkdir -p "$(INSTALL_BIN)"
 	ln -sfn "$(CURDIR)/$(INSTALLER_BUILD_BINARY)" "$(INSTALL_BIN)/$(INSTALLER_BINARY)"
 	@echo "Verlinkt: $(INSTALL_BIN)/$(INSTALLER_BINARY) -> $(CURDIR)/$(INSTALLER_BUILD_BINARY)"
@@ -82,6 +86,8 @@ clean: ## Entfernt lokale Installer-Build-Artefakte
 installer-build: build ## Alias fuer build
 
 installer-install: install ## Alias fuer install
+
+installer-install-from-source: install-from-source ## Alias fuer install-from-source
 
 installer-uninstall: uninstall ## Alias fuer uninstall
 

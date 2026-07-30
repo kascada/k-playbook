@@ -91,7 +91,7 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -O "$dest" "$url"
   else
-    die "Need curl or wget to download $url. Alternatively run 'make release' on a machine with Go and copy dist/."
+    die "Need curl or wget to download $url. Alternatively run 'make dist' on a machine with Go and copy dist/."
   fi
 }
 
@@ -117,7 +117,7 @@ else
   source_binary="$tmp_dir/$asset"
   url="$RELEASE_BASE_URL/$asset"
   log "Lade Release-Binary: $url"
-  download "$url" "$source_binary"
+  download "$url" "$source_binary" || die "Download fehlgeschlagen. Stelle sicher, dass das Release-Asset existiert, oder baue es mit 'make dist' und fuehre das Script erneut aus."
 fi
 
 mkdir -p "$INSTALL_BIN"

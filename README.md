@@ -4,6 +4,43 @@
 
 ## Schnellstart
 
+Empfohlen fuer Nutzer: Installation ohne lokal installiertes Go.
+
+```bash
+git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
+cd ~/dev/k-playbook
+make install
+# alternativ ohne make: ./scripts/install-installer.sh
+k-playbook-installer
+```
+
+Falls `~/.local/bin` noch nicht im `PATH` liegt, gibt das Script einen Hinweis aus. Die GUI kann dann auch direkt gestartet werden:
+
+```bash
+~/.local/bin/k-playbook-installer
+```
+
+Der Installer prueft den Pfadvertrag `~/dev/k-playbook`, kann ihn bei Bedarf reparieren, verwaltet die Projekt-Auswahl, zeigt die Docs an und kann `git pull --ff-only` ausfuehren.
+
+Selbst bauen geht weiterhin, braucht aber Go auf dem Host:
+
+```bash
+git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
+cd ~/dev/k-playbook
+make install-from-source
+make gui
+```
+
+Maintainer erzeugen Release-Artefakte mit:
+
+```text
+make -C priv release-artifacts
+```
+
+## Veraltet: bisheriger Schnellstart
+
+Dieser Abschnitt bleibt vorerst zur Orientierung stehen, ist aber nicht mehr der empfohlene Einstieg fuer Nutzer.
+
 Gefuehrter Start mit Browser-GUI:
 
 ```bash
@@ -18,11 +55,9 @@ Das Install-Script braucht kein lokal installiertes Go. Es nutzt ein passendes B
 Source-Builds fuer Entwickler brauchen Go:
 
 ```text
-make install
+make install-from-source
 make gui
 ```
-
-Der Installer prueft den Pfadvertrag `~/dev/k-playbook`, kann ihn bei Bedarf reparieren, verwaltet die Projekt-Auswahl, zeigt die Docs an und kann `git pull --ff-only` ausfuehren.
 
 OpenCode-Kommandos bleiben zusaetzlich verfuegbar:
 
@@ -141,7 +176,7 @@ Nach Änderungen:
 cd ~/dev/k-playbook
 make installer-test
 make installer-build
-make release
+make -C priv release-artifacts
 ```
 
 Private Maintainer-Targets liegen lokal unter `priv/Makefile`, nicht im user-facing Root-`Makefile`.

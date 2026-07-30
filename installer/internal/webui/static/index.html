@@ -16,6 +16,7 @@
         </div>
         <div class="hero-actions">
           <button id="refresh" class="secondary">Status neu laden</button>
+          <button id="git-pull-top" class="secondary">k-playbook aktualisieren</button>
           <button id="shutdown" class="secondary danger">Schliessen</button>
         </div>
       </section>
@@ -68,6 +69,21 @@
             <p class="message">Starte einen separaten Scan, wenn du neue Projekte zur Auswahl hinzufuegen willst.</p>
           </div>
           <button id="open-scan" class="primary">Projekte auswaehlen</button>
+        </section>
+
+        <section class="card" id="opencode-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Assistenten</p>
+              <h2>Commands und Skills registrieren</h2>
+            </div>
+            <span id="opencode-pill" class="status-label muted">Pruefen...</span>
+          </div>
+          <div id="opencode-summary" class="summary-list empty">Noch nicht geprueft.</div>
+          <div class="button-row">
+            <button id="opencode-install" class="primary">Registrierung aktualisieren</button>
+            <button id="opencode-refresh" class="secondary">Neu pruefen</button>
+          </div>
         </section>
 
         <section class="card actions-card">
@@ -143,7 +159,8 @@
       <div id="closed" class="closed hidden">
         <div class="card">
           <p class="eyebrow">Installer beendet</p>
-          <h2>Dieses Browserfenster kann jetzt geschlossen werden.</h2>
+          <h2 id="closed-title">Dieses Browserfenster kann jetzt geschlossen werden.</h2>
+          <p id="closed-message" class="message hidden"></p>
         </div>
       </div>
     </main>

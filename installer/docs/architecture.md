@@ -163,6 +163,8 @@ Aktuelle Endpunkte:
 | `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren |
 | `GET` | `/api/docs` | Markdown-Dateien unter `docs/` listen |
 | `GET` | `/api/docs/file?path=docs/...md` | Markdown-Datei lesen und gerendert ausgeben |
+| `GET` | `/api/opencode/status` | OpenCode- und Claude-Command-/Skill-Registrierung pruefen |
+| `POST` | `/api/opencode/install` | Fehlende/falsche k-playbook-Command-/Skill-Symlinks anlegen, verwaiste eigene Symlinks entfernen und OpenCode `skills.paths` konservativ ergaenzen |
 | `POST` | `/api/shutdown` | Lokalen GUI-Server beenden |
 
 `repoRoot()` in `webui/server.go` nutzt den Pfadvertrag und `pathcontract.IsKPlaybookRoot()`, bevor Docs oder Git-Aktionen ausgefuehrt werden.
@@ -178,11 +180,32 @@ Die Startseite zeigt:
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
 4. Gespeicherte `Projekt-Auswahl`.
 5. Button `Projekte auswaehlen`.
-6. Repository-Block mit `Git pull`.
-7. Docs-Block mit gerenderter Markdown-Anzeige.
-8. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
+6. Assistenten-Registrierungsblock fuer OpenCode und Claude.
+7. Repository-Block mit `Git pull`.
+8. Docs-Block mit gerenderter Markdown-Anzeige.
+9. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
 
 Der Installer versucht nicht, den Browser beim Server-Ende automatisch zu schliessen. Browser blockieren das in vielen Faellen, und `open`/`xdg-open` liefern keinen verlaesslichen Tab-Handle. Der robuste Weg ist der explizite `Schliessen`-Button in der GUI oder `Ctrl+C` im Terminal.
+
+### Assistenten-Registrierung
+
+Der Block bildet den zentralen Teil von `/k-install` ab und erweitert ihn um Claude-Code-Symlinks:
+
+- Alle vorhandenen `commands/k-*.md` im k-playbook-Repo werden gezaehlt.
+- Fuer jede Command-Datei wird ein Symlink gleichen Namens unter `~/.config/opencode/command/` erwartet.
+- Fuer Claude Code wird fuer jede Command-Datei ein Symlink gleichen Namens unter `~/.claude/commands/` erwartet.
+- Fuer Claude Skills werden alle `ks-*/SKILL.md` gezaehlt. Der Symlink `~/.claude/skills/<skill-name>` zeigt auf den jeweiligen Skill-Ordner, sodass darunter `SKILL.md` sichtbar ist.
+- Fehlende oder falsche Symlinks werden per `Registrierung aktualisieren` angelegt bzw. ersetzt.
+- Fremde Dateien gleichen Namens, die keine Symlinks sind, werden nur gemeldet und nicht ueberschrieben.
+- Verwaiste k-playbook-Symlinks werden gemeldet und bei `Registrierung aktualisieren` entfernt, sofern sie auf eine nicht mehr existierende Datei unter diesem k-playbook-`commands/` zeigen.
+- `skills.paths` wird in `~/.config/opencode/opencode.jsonc` oder `.json` geprueft.
+- Wenn keine Config existiert, wird eine minimale Config mit `skills.paths: ["~/dev/k-playbook"]` angelegt.
+- Wenn eine einfache Config ohne `skills` existiert, wird `skills` konservativ ergaenzt.
+- Wenn bereits `skills` vorhanden ist und der Pfad fehlt, wird nicht geraten; die GUI meldet, dass manuelle Bearbeitung noetig ist.
+
+Nach Aenderungen an Commands oder Skills muessen betroffene Assistenten neu gestartet werden, weil OpenCode und Claude Code Commands/Skills beim Start bzw. beim Laden ihrer Umgebung erfassen.
+
+UI-Regel: Reine Statusanzeigen duerfen nicht wie Buttons aussehen. Fuer klickbare Aktionen werden `button`, `.primary` und `.secondary` genutzt. Fuer nicht-klickbare Zustandsanzeigen wird `.status-label` genutzt, z. B. `WARN !` oder `OK ✓`, ohne Rahmen und ohne pill-/button-artige Flaeche.
 
 ### Scan-Seite
 
@@ -236,11 +259,12 @@ Empfohlener Ablauf nach einem frischen Clone:
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 cd ~/dev/k-playbook
-./scripts/install-installer.sh
+make install
+# alternativ ohne make: ./scripts/install-installer.sh
 k-playbook-installer
 ```
 
-Dieser Weg braucht kein lokal installiertes Go. `scripts/install-installer.sh` nutzt zuerst ein passendes Release-Artefakt aus `dist/`, falls vorhanden, und laedt sonst das passende Binary aus den GitHub Releases.
+Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes Release-Artefakt aus `dist/`, falls vorhanden, und laedt sonst das passende Binary aus den GitHub Releases.
 
 Wenn `~/.local/bin` noch nicht im PATH liegt, gibt das Script einen Hinweis aus. Alternativ kann direkt gestartet werden:
 
@@ -254,8 +278,9 @@ Das Root-`Makefile` ist user-facing. Es enthaelt Installer-Targets:
 
 ```bash
 make build
-make release
+make dist
 make install
+make install-from-source
 make uninstall
 make gui
 make test
@@ -264,7 +289,7 @@ make path-hint
 make path-setup
 ```
 
-Die alten laengeren Namen bleiben als Aliase erhalten: `make installer-build`, `make installer-install`, `make installer-uninstall`, `make installer-run`, `make installer-test`, `make installer-clean`.
+Die alten laengeren Namen bleiben als Aliase erhalten: `make installer-build`, `make installer-install`, `make installer-install-from-source`, `make installer-uninstall`, `make installer-run`, `make installer-test`, `make installer-clean`.
 
 Build- und Installationspfade:
 
@@ -274,11 +299,11 @@ dist/k-playbook-installer-<os>-<arch>
 ~/.local/bin/k-playbook-installer
 ```
 
-`make release` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert.
+`make dist` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert. Das private Maintainer-Target `make -C priv release-artifacts` ruft dieses Root-Target auf.
 
-`make install` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Beide Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
+`make install` installiert ohne Go ein vorhandenes passendes `dist/`-Artefakt oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`.
 
-`scripts/install-installer.sh` installiert ohne Go ein vorhandenes passendes `dist/`-Artefakt oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten Asset-Namen entsprechen den `make release`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`.
+`make install-from-source` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
 
 Profil-Auswahl im Root-`Makefile`:
 
@@ -301,7 +326,7 @@ Danach muss der Nutzer entweder ein neues Terminal oeffnen oder das ausgegebene 
 . ~/.profile
 ```
 
-Das private Entwickler-Makefile liegt unter `priv/Makefile`. Private Targets wie `sichern` gehoeren nicht ins Root-`Makefile`, weil das Root-`Makefile` fuer Nutzer gedacht ist.
+Das private Entwickler-Makefile liegt unter `priv/Makefile`. Private Targets wie `release-artifacts` und `sichern` gehoeren nicht ins Root-`Makefile`, weil das Root-`Makefile` fuer Nutzer gedacht ist.
 
 Standard-Entwicklung:
 

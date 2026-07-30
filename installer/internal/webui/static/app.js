@@ -9,8 +9,13 @@ const elements = {
   backHome: document.querySelector("#back-home"),
   openScan: document.querySelector("#open-scan"),
   cancelScan: document.querySelector("#cancel-scan"),
+  gitPullTop: document.querySelector("#git-pull-top"),
   gitPull: document.querySelector("#git-pull"),
   gitOutput: document.querySelector("#git-output"),
+  opencodeInstall: document.querySelector("#opencode-install"),
+  opencodeRefresh: document.querySelector("#opencode-refresh"),
+  opencodePill: document.querySelector("#opencode-pill"),
+  opencodeSummary: document.querySelector("#opencode-summary"),
   reloadDocs: document.querySelector("#reload-docs"),
   docsList: document.querySelector("#docs-list"),
   docViewer: document.querySelector("#doc-viewer"),
@@ -36,14 +41,21 @@ const elements = {
   projects: document.querySelector("#projects"),
   toast: document.querySelector("#toast"),
   closed: document.querySelector("#closed"),
+  closedTitle: document.querySelector("#closed-title"),
+  closedMessage: document.querySelector("#closed-message"),
 };
+
+let serverAvailable = true;
 
 elements.refresh.addEventListener("click", refreshAll);
 elements.shutdown.addEventListener("click", shutdownInstaller);
 elements.backHome.addEventListener("click", showHome);
 elements.openScan.addEventListener("click", showScan);
 elements.cancelScan.addEventListener("click", showHome);
+elements.gitPullTop.addEventListener("click", gitPull);
 elements.gitPull.addEventListener("click", gitPull);
+elements.opencodeInstall.addEventListener("click", installOpenCode);
+elements.opencodeRefresh.addEventListener("click", loadOpenCodeStatus);
 elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
@@ -52,6 +64,7 @@ elements.manualForm.addEventListener("submit", addManualProject);
 
 refreshAll();
 showHome();
+startHealthChecks();
 
 function showHome() {
   for (const element of document.querySelectorAll("[data-view='home']")) {
@@ -75,12 +88,13 @@ async function refreshAll() {
   await refreshStatus();
   if (state.status && state.status.OK) {
     await refreshProjects();
+    await loadOpenCodeStatus();
     await loadDocs();
   }
 }
 
 async function gitPull() {
-  await withBusy(elements.gitPull, async () => {
+  await withBusyMany([elements.gitPull, elements.gitPullTop], async () => {
     elements.gitOutput.textContent = "git pull laeuft...";
     const result = await api("/api/git/pull", { method: "POST" });
     elements.gitOutput.textContent = result.output || "Bereits aktuell.";
@@ -96,15 +110,55 @@ async function shutdownInstaller() {
 
   await withBusy(elements.shutdown, async () => {
     await api("/api/shutdown", { method: "POST" });
-    document.body.classList.add("is-closed");
-    elements.closed.classList.remove("hidden");
+    showClosed();
   });
+}
+
+function startHealthChecks() {
+  window.setInterval(checkHealth, 1800);
+}
+
+async function checkHealth() {
+  if (!serverAvailable) {
+    return;
+  }
+
+  try {
+    await fetch("/api/health", { cache: "no-store" });
+  } catch {
+    serverAvailable = false;
+    showClosed("Verbindung zum lokalen Installer verloren.");
+  }
+}
+
+function showClosed(message = "") {
+  serverAvailable = false;
+  document.body.classList.add("is-closed");
+  elements.closedTitle.textContent = "Dieses Browserfenster kann jetzt geschlossen werden.";
+  elements.closedMessage.textContent = message;
+  elements.closedMessage.classList.toggle("hidden", !message);
+  elements.closed.classList.remove("hidden");
 }
 
 async function loadDocs() {
   await withBusy(elements.reloadDocs, async () => {
     const docs = await api("/api/docs");
     renderDocsList(docs);
+  });
+}
+
+async function loadOpenCodeStatus() {
+  await withBusy(elements.opencodeRefresh, async () => {
+    const status = await api("/api/opencode/status");
+    renderOpenCode(status);
+  });
+}
+
+async function installOpenCode() {
+  await withBusy(elements.opencodeInstall, async () => {
+    const result = await api("/api/opencode/install", { method: "POST" });
+    renderOpenCode(result.status);
+    showToast(result.message || "OpenCode-Registrierung aktualisiert.");
   });
 }
 
@@ -303,6 +357,70 @@ function renderProjects(projects) {
   }
 }
 
+function renderOpenCode(status) {
+  elements.opencodePill.textContent = status.ok ? "OK ✓" : "WARN !";
+  elements.opencodePill.className = "status-label " + (status.ok ? "ok" : "warn");
+  elements.opencodeInstall.disabled = status.ok;
+
+  const rows = [
+    ["OpenCode Commands", `${status.linkedCommands || 0}/${status.repoCommands || 0} verlinkt`],
+    ["OpenCode Skills", status.skillsPathOk ? "skills.paths ok" : "skills.paths fehlt"],
+    ["Claude Commands", `${status.claudeLinkedCommands || 0}/${status.repoCommands || 0} verlinkt`],
+    ["Claude Skills", `${status.claudeLinkedSkills || 0}/${status.repoSkills || 0} verlinkt`],
+    ["Config", status.configExists ? status.configFile : `${status.configFile} wird angelegt`],
+  ];
+  if ((status.missingCommands || []).length > 0) {
+    rows.push(["Fehlende Commands", compactList(status.missingCommands)]);
+  }
+  if ((status.wrongCommands || []).length > 0) {
+    rows.push(["Falsche Links", compactList(status.wrongCommands)]);
+  }
+  if ((status.nonSymlinkCommands || []).length > 0) {
+    rows.push(["Nicht-Symlinks", compactList(status.nonSymlinkCommands)]);
+  }
+  if ((status.staleCommands || []).length > 0) {
+    rows.push(["OpenCode verwaist", compactList(status.staleCommands)]);
+  }
+  if ((status.claudeMissingCommands || []).length > 0) {
+    rows.push(["Claude Commands fehlen", compactList(status.claudeMissingCommands)]);
+  }
+  if ((status.claudeMissingSkills || []).length > 0) {
+    rows.push(["Claude Skills fehlen", compactList(status.claudeMissingSkills)]);
+  }
+  if ((status.claudeStaleCommands || []).length > 0) {
+    rows.push(["Claude Commands verwaist", compactList(status.claudeStaleCommands)]);
+  }
+  if ((status.claudeStaleSkills || []).length > 0) {
+    rows.push(["Claude Skills verwaist", compactList(status.claudeStaleSkills)]);
+  }
+  if (!status.configEditable && !status.skillsPathOk) {
+    rows.push(["Manuell noetig", "OpenCode-Konfig enthaelt bereits skills und wird nicht automatisch veraendert."]);
+  }
+  if (status.restartRequired) {
+    rows.push(["Wichtig", "Betroffene Assistenten neu starten."]);
+  }
+
+  elements.opencodeSummary.innerHTML = "";
+  elements.opencodeSummary.classList.remove("empty");
+  for (const [label, value] of rows) {
+    const row = document.createElement("div");
+    row.className = "summary-item";
+    const key = document.createElement("strong");
+    key.textContent = label;
+    const text = document.createElement("span");
+    text.textContent = value;
+    row.append(key, text);
+    elements.opencodeSummary.append(row);
+  }
+}
+
+function compactList(values) {
+  if (values.length <= 4) {
+    return values.join(", ");
+  }
+  return `${values.slice(0, 4).join(", ")} +${values.length - 4} weitere`;
+}
+
 function renderDocsList(docs) {
   elements.docsList.innerHTML = "";
   elements.docsList.classList.toggle("empty", docs.length === 0);
@@ -380,6 +498,21 @@ async function withBusy(button, callback) {
     showToast(error.message, true);
   } finally {
     button.disabled = false;
+  }
+}
+
+async function withBusyMany(buttons, callback) {
+  for (const button of buttons) {
+    button.disabled = true;
+  }
+  try {
+    await callback();
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    for (const button of buttons) {
+      button.disabled = false;
+    }
   }
 }
 
