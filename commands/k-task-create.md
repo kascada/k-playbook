@@ -22,8 +22,8 @@ For this command, resolve the fixed `tasks` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
-- If `k-playbook/tasks` does not exist: abort and tell the user to run `/k-setup` to create the fixed directories.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first.
+- If `k-playbook/tasks` does not exist: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block.
 - If `k-playbook/tasks` exists: use it.
 
 Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH`.

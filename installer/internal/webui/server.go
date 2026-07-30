@@ -66,6 +66,11 @@ type remediationStatus struct {
 	Message string `json:"message"`
 }
 
+type projectConfigContent struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
 type projectCommandStatus struct {
 	OK       bool   `json:"ok"`
 	Path     string `json:"path"`
@@ -280,6 +285,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/projects/scan", scanProjectsHandler)
 	mux.HandleFunc("POST /api/projects/preview", projectPreviewHandler)
 	mux.HandleFunc("POST /api/projects", addProjectHandler)
+	mux.HandleFunc("GET /api/projects/config", projectConfigHandler)
 	mux.HandleFunc("POST /api/projects/structure", completeProjectStructureHandler)
 	mux.HandleFunc("POST /api/projects/remediation", updateProjectRemediationHandler)
 	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
@@ -790,6 +796,22 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func projectConfigHandler(w http.ResponseWriter, r *http.Request) {
+	projectPath, err := projects.NormalizePath(r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	configPath := filepath.Join(projectPath, projects.ConfigFileName)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("K-PLAYBOOK.yaml lesen: %w", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, projectConfigContent{Path: configPath, Content: string(data)})
 }
 
 func completeProjectStructureHandler(w http.ResponseWriter, r *http.Request) {

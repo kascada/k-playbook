@@ -100,7 +100,7 @@ Wenn `k_playbook.repo: ~/dev/k-playbook` im Container steht, bedeutet das also *
 Auf einem neuen Host sind zwei Dinge getrennt:
 
 1. Host-global installieren: macht Commands, Skills und Security-Tools fuer alle Projekte verfuegbar.
-2. Projektlokal einrichten: erzeugt in jedem Zielprojekt `K-PLAYBOOK.yaml` und die feste Struktur per `/k-setup`.
+2. Projektlokal einrichten: erzeugt in jedem Zielprojekt `K-PLAYBOOK.yaml` und die feste Struktur ueber den Installer.
 
 Host-global:
 

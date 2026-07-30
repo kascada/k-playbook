@@ -38,8 +38,8 @@ Use `CODEQL_PARENT_DIR` for every `--parent` argument this command shows or runs
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to run `/k-setup` first. This command writes only into an existing project config file.
-- If `CODEQL_PARENT_DIR` does not exist, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
+- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to add the project with the k-playbook Installer first. This command writes only into an existing project config file.
+- If `CODEQL_PARENT_DIR` does not exist, stop and ask the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block. Do not create the playbook base from this command.
 - Determine a CodeQL analysis target directory (`codeql target`) separately from `TARGET_DIR`. Default is `.` (the project root). If the project root is a wrapper and exactly one nested Git worktree contains the detected application manifests, suggest that nested worktree, e.g. `./app`. Normalize as a project-relative path. Do not infer outside-target paths without asking. Store the resolved path as `CODEQL_TARGET_DIR` and the display path as `CODEQL_TARGET_DISPLAY_PATH`.
 
 ## Step 2 — Detect current state

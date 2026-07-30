@@ -66,8 +66,8 @@ For this command, resolve the fixed `docs` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
-- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create the fixed directory.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 

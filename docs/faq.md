@@ -48,7 +48,7 @@ ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
 ## Was ist der Unterschied zwischen `/k-install` und `/k-setup`?
 
 - `/k-install*` gehoert zum Host: OpenCode-Registrierung, host-lokale Tools, Security-Tool-Preflight.
-- `/k-setup*` gehoert zum Projekt: `K-PLAYBOOK.yaml`, feste projektlokale Struktur, Projektentscheidungen.
+- `/k-setup*` gehoert zum Projekt: `/k-setup` prueft Kernfelder in `K-PLAYBOOK.yaml`; Struktur und Remediation-Default kommen aus dem Installer, spezifische Projektentscheidungen aus Spezialcommands wie `/k-setup-codeql`.
 
 Merksatz:
 

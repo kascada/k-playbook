@@ -11,7 +11,7 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml` configured by `/k-setup`. Project-local rules are read from `k-playbook/enforcement`; docs checks use `k-playbook/docs`.
+`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml` configured by the k-playbook Installer. Project-local rules are read from `k-playbook/enforcement`; docs checks use `k-playbook/docs`.
 
 ## Step 1 — Resolve target and paths
 
@@ -34,7 +34,7 @@ Also set:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first.
 - If `PROJECT_ENFORCEMENT_DIR` is missing: warn and continue with global rules only.
 - If `DOCS_DIR` is missing: warn for docs-sync checks, but do not invent a default docs path.
 - If `GLOBAL_ENFORCEMENT_DIR` is missing: abort, because the global rule source cannot be found.

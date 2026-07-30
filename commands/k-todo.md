@@ -17,7 +17,7 @@ Determine `TARGET_DIR`:
 
 - If the current working directory contains `K-PLAYBOOK.yaml`, use it as `TARGET_DIR`.
 - Else walk upward from the current working directory until a parent containing `K-PLAYBOOK.yaml` is found; use that parent as `TARGET_DIR`.
-- Else abort and tell the user to run `/k-setup` first.
+- Else abort and tell the user to add the project with the k-playbook Installer first.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -28,8 +28,8 @@ For this command, resolve the fixed `todo` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
-- If the parent directory of `TODO_PATH` does not exist: abort and tell the user to run `/k-setup` to create the fixed file parent.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first.
+- If the parent directory of `TODO_PATH` does not exist: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block.
 - If the parent directory exists: use `TODO_PATH`.
 
 ## Step 2 — Branch on arguments

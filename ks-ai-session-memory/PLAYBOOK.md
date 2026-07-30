@@ -30,7 +30,7 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 - Projekt-Verzeichnis mit Doku-Verzeichnis `k-playbook/docs/`.
 - Docs sollten mindestens einen Einstiegspunkt haben (`k-playbook/docs/README.md`).
 
-> **Pfad-Hinweis:** `/k-setup` legt `k-playbook/docs/` immer an. Keine alternativen Docs-Pfade verwenden.
+> **Pfad-Hinweis:** Der k-playbook Installer legt `k-playbook/docs/` an oder vervollstaendigt die Struktur. Keine alternativen Docs-Pfade verwenden.
 
 ## Konzept
 
@@ -276,5 +276,5 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
   auf denen dieses Playbook aufsetzt.
 - `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
   aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
-- `/k-setup` (Command) – legt die feste `k-playbook/`-Struktur an und prüft am Ende, ob Docs + MEMORY vorhanden sind
-  (verweist bei Bedarf auf `/k-code2docs`).
+- `/k-setup` (Command) – prüft die Kernkonfiguration und am Ende, ob Docs + MEMORY vorhanden sind
+  (verweist bei Bedarf auf Installer-`Vervollstaendigen` und `/k-code2docs`).

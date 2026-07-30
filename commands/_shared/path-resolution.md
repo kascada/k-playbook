@@ -2,7 +2,7 @@
 
 Use this module when a command needs project-local k-playbook paths.
 
-The project-local layout is fixed and complete. `/k-setup` creates every standard project-local k-playbook directory/file under `<project>/k-playbook/`. Commands derive paths from the project root; they do not read configurable path values and do not check active/inactive building blocks.
+The project-local layout is fixed and complete. The k-playbook Installer creates or completes every standard project-local k-playbook directory/file under `<project>/k-playbook/`. Commands derive paths from the project root; they do not read configurable path values and do not check active/inactive building blocks.
 
 ## Fixed Layout
 
@@ -66,7 +66,7 @@ File-valued keys: `todo`.
 After resolving a requested key:
 
 - If the derived path exists, record it as usable.
-- If it does not exist, record it as missing; commands should ask the user to run `/k-setup` rather than creating the standard structure themselves.
+- If it does not exist, record it as missing; commands should ask the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block rather than creating the standard structure themselves.
 - For file-valued keys, the calling command may instead check whether the parent directory exists and create the file lazily when that is part of the command's job, e.g. `/k-todo` may create `k-playbook/TODO.md`.
 
 ## Required Output From This Step

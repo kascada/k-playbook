@@ -26,9 +26,9 @@ Zusaetzlich liest `/k-remediation` den optionalen `remediation`-Block in `K-PLAY
 - `pr_required:` - ob ein PR Teil des erwarteten Workflows ist.
 - `direct_fixes:` - ob direkte Code-Fixes ohne Task erlaubt sind.
 
-Wenn der Block fehlt, stoppe und bitte um `/k-setup` oder eine explizite Auswahl fuer diese Session.
+Wenn der Block fehlt, stoppe und bitte darum, das Projekt im k-playbook Installer einzubinden bzw. dort die Remediation-Policy zu setzen, oder frage fuer die aktuelle Session explizit.
 
-`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.yaml`, `k-playbook/reviews`, and `k-playbook/tasks` configured by `/k-setup`.
+`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.yaml`, `k-playbook/reviews`, and `k-playbook/tasks` configured by the k-playbook Installer.
 
 ---
 
@@ -51,9 +51,9 @@ Daraus abgeleitet:
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` aufrufen lassen.
-- Wenn `k-playbook/reviews` nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
-- Wenn `k-playbook/tasks` nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und das Projekt zuerst mit dem k-playbook Installer einbinden lassen.
+- Wenn `k-playbook/reviews` nicht existiert: abbrechen und im k-playbook Installer `Vervollstaendigen` im Projektblock nutzen lassen.
+- Wenn `k-playbook/tasks` nicht existiert: abbrechen und im k-playbook Installer `Vervollstaendigen` im Projektblock nutzen lassen.
 - Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct_fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
 - Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `TARGET_DIR`.
 - Wenn `mode: task-branch-pr` gilt und `target:` ein Git-Repo ist, pruefe vor Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine Branch-/Task-Policy raten: User informieren und bestaetigen lassen, ob Tasks trotzdem erzeugt werden sollen. `/k-remediation` wechselt selbst keinen Branch fuer spaetere Umsetzung; es schreibt den erforderlichen Ausfuehrungskontext in die Task-Dateien.
@@ -108,7 +108,7 @@ Wenn `KNOWN_DECISIONS` existiert:
 
 Wenn die Datei nicht existiert:
 
-- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird von `/k-setup` initialisiert."
+- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird vom k-playbook Installer beim `Vervollstaendigen` initialisiert."
 - Weiter — kein automatisches Anlegen an dieser Stelle.
 
 ---
@@ -453,7 +453,7 @@ Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 
 1. Ziel-Verzeichnis bestimmen:
    - Wenn `DONE_DIR` (`<PROJECT_REVIEWS_DIR>/done/`) gesetzt ist: dort archivieren. Verzeichnis bei Bedarf anlegen.
-   - Wenn nicht gesetzt (kein `PROJECT_REVIEWS_DIR`): abbrechen; `/k-setup` muss die feste Review-Struktur anlegen.
+   - Wenn nicht gesetzt (kein `PROJECT_REVIEWS_DIR`): abbrechen; der k-playbook Installer muss die feste Review-Struktur per `Vervollstaendigen` anlegen.
 
 2. Datei verschieben:
    - Neuer Name: `YYYY-MM-DD-<originalname>` (heutiges Datum voranstellen)

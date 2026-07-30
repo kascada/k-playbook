@@ -46,8 +46,8 @@ Extract when present:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to run `/k-setup` and `/k-setup-codeql` first.
-- If `PLAYBOOK_BASE_DIR` is missing, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
+- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to add the project with the k-playbook Installer and then run `/k-setup-codeql` first.
+- If `PLAYBOOK_BASE_DIR` is missing, stop and ask the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block. Do not create the playbook base from this command.
 - Offer `PLAYBOOK_BASE_DIR` as the default parent directory for local CodeQL artifacts.
 - If `tools.codeql.local_database.path` is set, offer the parent of that path as the default parent directory.
 - In `CLI_ONLY=true`, `languages` and `local_database.path` are not required. Use `PLAYBOOK_BASE_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.

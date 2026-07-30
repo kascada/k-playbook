@@ -98,7 +98,7 @@ Im vorhandenen Zielprojekt OpenCode starten und ausfuehren:
 /k-setup
 ```
 
-`/k-setup` legt oder aktualisiert `K-PLAYBOOK.yaml` und die feste projektlokale k-playbook-Struktur. Das gilt fuer normale Projekte genauso wie fuer Projekte mit aktivem Projekt-venv; der Command installiert keine Tools in das Projekt-venv.
+Der Installer legt `K-PLAYBOOK.yaml` und die feste projektlokale k-playbook-Struktur an oder vervollstaendigt sie. `/k-setup` prueft danach die Projektkonfiguration und aktualisiert bei Bedarf nur die Kernfelder in `K-PLAYBOOK.yaml`; der Command installiert keine Tools in das Projekt-venv.
 
 Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach ausfuehren:
 
@@ -201,7 +201,7 @@ Erwartung:
 
 ## 4. Docs-First-Dokumentation Aufbauen
 
-Im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, nachdem `/k-setup` die feste Struktur angelegt hat:
+Im Zielprojekt die initiale Docs-First-Dokumentation aufbauen, nachdem der Installer die feste Struktur angelegt hat:
 
 ```text
 /k-code2docs

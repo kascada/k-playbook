@@ -14,7 +14,7 @@ Die empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer steh
 
 - `/k-install` und `/k-install-security-tools` sind **host-global**. Sie machen Commands, Skills und Security-Tools auf diesem Server fuer alle Projekte verfuegbar.
 - `/k-install-codeql` ist Tooling-/Artefakt-orientiert. Es installiert oder prueft lokale CodeQL-Artefakte, schreibt aber keine Projektkonfiguration.
-- `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.yaml` und legen die feste projektlokale Playbook-Struktur an.
+- `/k-setup` und `/k-setup-codeql` sind **projektlokal**. `/k-setup` prueft oder aktualisiert Kernfelder in `K-PLAYBOOK.yaml`; die feste Projektstruktur wird vom Installer angelegt oder vervollstaendigt. `/k-setup-codeql` schreibt die CodeQL-Entscheidung.
 - Der globale k-playbook-Pfad ist fest `~/dev/k-playbook`. Wenn der physische Klon woanders liegt, wird ein Symlink nach `~/dev/k-playbook` angelegt; Projektkonfigurationen waehlen keinen eigenen Basis-Repo-Pfad.
 - Host-Installation schreibt keine Projektdateien.
 - Projekt-Setup installiert keine host-globalen Tools.
@@ -49,7 +49,7 @@ Aktueller Slash-Command-Bestand unter `commands/`: 19 Dateien (`k-*.md`). Neue D
 | `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.yaml` und legt die feste `k-playbook/`-Struktur an | keine Host-Aenderung |
+| `/k-setup` | k-playbook-Projektkonfiguration pruefen | aktualisiert Kernfelder in `K-PLAYBOOK.yaml`, prueft Struktur/Docs/Memory read-only | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |

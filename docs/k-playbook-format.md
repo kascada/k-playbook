@@ -146,8 +146,8 @@ Modus beim Einbinden auf `task-first` oder `task-branch-pr` gestellt werden.
 | `pr_required` | boolean | PR als erwarteter Workflow fuer erzeugte Tasks |
 | `direct_fixes` | boolean | direkte Code-Fixes ohne Task grundsaetzlich erlaubt |
 
-Wenn der Block fehlt, soll `/k-remediation` nicht raten, sondern `/k-setup` zur
-Ergaenzung der Policy empfehlen oder fuer die aktuelle Session explizit fragen.
+Wenn der Block fehlt, soll `/k-remediation` nicht raten, sondern den Installer
+zur Ergaenzung der Policy empfehlen oder fuer die aktuelle Session explizit fragen.
 
 ### `tools`
 

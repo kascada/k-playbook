@@ -79,7 +79,7 @@ Kurzuebersicht der wichtigsten Commands nach Arbeitsphase:
 | `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.yaml` und legt die feste `k-playbook/`-Struktur an | keine Host-Aenderung |
+| `/k-setup` | k-playbook-Projektkonfiguration pruefen | aktualisiert Kernfelder in `K-PLAYBOOK.yaml`, prueft Struktur/Docs/Memory read-only | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
@@ -160,7 +160,7 @@ Details: [`../global/checks/README.md`](../global/checks/README.md).
 ### Neues Projekt
 
 1. Im Projektroot `/k-setup` ausfuehren.
-2. `/k-setup` legt die komplette `k-playbook/`-Struktur an.
+2. Der Installer legt die komplette `k-playbook/`-Struktur an oder vervollstaendigt sie im Projektblock.
 3. Optional `/k-setup-codeql` ausfuehren.
 4. Mit `/k-status` pruefen, ob Layout und Grundstruktur plausibel sind.
 

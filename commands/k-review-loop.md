@@ -50,8 +50,8 @@ Command-specific policy:
   - If `K-PLAYBOOK.yaml` is missing: continue as an explicit one-off review, but announce that project k-playbook metadata could not be validated.
   - If `k-playbook/tasks` exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off review.
-  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-setup` to create the fixed directories.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first, or pass an explicit file/directory argument for a one-off review.
+  - If `k-playbook/tasks` is missing on disk: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block.
   - If `k-playbook/tasks` exists: use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
