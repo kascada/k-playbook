@@ -5,7 +5,6 @@ const state = {
   securityTools: null,
   gitStatus: null,
   projects: [],
-  selectedScanPath: "",
 };
 
 const elements = {
@@ -42,7 +41,6 @@ const elements = {
   scanRoot: document.querySelector("#scan-root"),
   scan: document.querySelector("#scan"),
   scanResults: document.querySelector("#scan-results"),
-  saveScan: document.querySelector("#save-scan"),
   manualForm: document.querySelector("#manual-form"),
   manualPath: document.querySelector("#manual-path"),
   manualEnv: document.querySelector("#manual-env"),
@@ -68,7 +66,6 @@ elements.securityToolsRefresh.addEventListener("click", loadSecurityToolsStatus)
 elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
-elements.saveScan.addEventListener("click", addSelectedScannedProject);
 elements.manualForm.addEventListener("submit", addManualProject);
 
 refreshAll();
@@ -294,35 +291,6 @@ async function scanProjects() {
   });
 }
 
-async function addSelectedScannedProject() {
-  const row = document.querySelector(".scan-row.selected");
-  if (!row) {
-    showToast("Bitte ein Projekt auswaehlen.", true);
-    return;
-  }
-
-  const environment = row.querySelector("select").value;
-  if (!environment) {
-    showToast("Bitte die Projektart auswaehlen.", true);
-    return;
-  }
-
-  const project = { path: row.dataset.path, environment };
-  if (!confirmProjectKind(project, environment)) {
-    return;
-  }
-
-  await withBusy(elements.saveScan, async () => {
-    const file = await saveProject(project.path, environment);
-    state.projects = file.projects || file.Projects || [];
-    renderProjects(state.projects);
-    await loadDevcontainerStatus();
-    showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
-    showHome();
-  });
-  updateSaveScanButton();
-}
-
 async function addManualProject(event) {
   event.preventDefault();
   const path = elements.manualPath.value.trim();
@@ -343,9 +311,6 @@ async function addManualProject(event) {
     const environment = preview.environment || preview.Environment || "unknown";
     if (!elements.manualEnv.value && environment === "unknown") {
       showToast("Projektart konnte nicht sicher erkannt werden. Bitte Umgebung auswaehlen.", true);
-      return;
-    }
-    if (!confirmProjectKind(preview, environment)) {
       return;
     }
 
@@ -395,9 +360,7 @@ function renderStatus(status) {
 
 function renderScanned(projects) {
   elements.scanResults.innerHTML = "";
-  state.selectedScanPath = "";
   elements.scanResults.classList.toggle("empty", projects.length === 0);
-  elements.saveScan.classList.toggle("hidden", projects.length === 0);
 
   if (projects.length === 0) {
     elements.scanResults.textContent = "Keine Projekte unter ~/dev gefunden.";
@@ -420,31 +383,55 @@ function renderScanned(projects) {
 
     const detectedEnvironment = project.environment || project.Environment || "unknown";
     const select = environmentSelect(detectedEnvironment === "unknown" ? "" : detectedEnvironment, true);
+
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "primary small-button";
+    add.textContent = "Hinzufuegen";
+
+    const action = document.createElement("div");
+    action.className = "scan-row-action";
+    action.append(select, add);
+
     select.addEventListener("change", () => selectScanRow(row));
-    row.append(details, select);
+    add.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await addScannedProject(row, select, add);
+    });
+
+    row.append(details, action);
     row.addEventListener("click", (event) => {
-      if (event.target === select) {
+      if (event.target === select || event.target === add) {
         return;
       }
       selectScanRow(row);
     });
     elements.scanResults.append(row);
   }
-  updateSaveScanButton();
 }
 
 function selectScanRow(row) {
-  state.selectedScanPath = row.dataset.path;
   for (const current of document.querySelectorAll(".scan-row")) {
     current.classList.toggle("selected", current === row);
   }
-  updateSaveScanButton();
 }
 
-function updateSaveScanButton() {
-  const row = document.querySelector(".scan-row.selected");
-  elements.saveScan.textContent = "Ausgewaehltes Projekt hinzufuegen";
-  elements.saveScan.disabled = !row || !row.querySelector("select").value;
+async function addScannedProject(row, select, button) {
+  selectScanRow(row);
+  const environment = select.value;
+  if (!environment) {
+    showToast("Projektart unbekannt. Bitte Normal oder DevContainer auswaehlen.", true);
+    return;
+  }
+
+  await withBusy(button, async () => {
+    const file = await saveProject(row.dataset.path, environment);
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    await loadDevcontainerStatus();
+    showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
+    showHome();
+  });
 }
 
 function renderProjects(projects) {
@@ -489,12 +476,113 @@ function renderProjects(projects) {
     if (setupRow) {
       card.append(setupRow);
     }
+    const remediationRow = projectRemediationRow(project);
+    if (remediationRow) {
+      card.append(remediationRow);
+    }
+    const structureRow = projectStructureRow(project);
+    if (structureRow) {
+      card.append(structureRow);
+    }
     const docsRow = projectDocsRow(project);
     if (docsRow) {
       card.append(docsRow);
     }
     elements.projects.append(card);
   }
+}
+
+function projectStructureRow(project) {
+  const structure = project.structure || project.Structure;
+  if (!structure || structure.ok || structure.OK) {
+    return null;
+  }
+
+  const projectPath = project.path || project.Path;
+  const missing = structure.missing || structure.Missing || [];
+  const row = document.createElement("div");
+  row.className = "project-check-row";
+
+  const text = document.createElement("div");
+  const title = document.createElement("span");
+  title.className = "project-check-title";
+  title.textContent = "Projektstruktur unvollstaendig";
+  const detail = document.createElement("span");
+  detail.textContent = missing.length > 0
+    ? `Fehlt: ${compactList(missing)}`
+    : (structure.message || structure.Message || "Feste k-playbook-Struktur fehlt teilweise.");
+  text.append(title, detail);
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "primary";
+  button.textContent = "Vervollstaendigen";
+  button.addEventListener("click", () => completeProjectStructure(projectPath, button));
+  action.append(button);
+
+  row.append(text, action);
+  return row;
+}
+
+async function completeProjectStructure(projectPath, button) {
+  await withBusy(button, async () => {
+    const file = await api("/api/projects/structure", {
+      method: "POST",
+      body: JSON.stringify({ path: projectPath }),
+    });
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    showToast("Projektstruktur vervollstaendigt.");
+  });
+}
+
+function projectRemediationRow(project) {
+  const setup = project.setup || project.Setup;
+  if (!setup || !(setup.ok || setup.OK)) {
+    return null;
+  }
+
+  const remediation = project.remediation || project.Remediation || {};
+  const mode = remediation.mode || remediation.Mode || "direct-allowed";
+  const row = document.createElement("div");
+  row.className = "project-check-row";
+
+  const text = document.createElement("div");
+  const title = document.createElement("span");
+  title.className = "project-check-title";
+  title.textContent = "Remediation-Policy";
+  const detail = document.createElement("span");
+  detail.textContent = remediation.message || remediation.Message || "Steuert /k-remediation.";
+  text.append(title, detail);
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const select = remediationSelect(mode);
+  const help = document.createElement("button");
+  help.type = "button";
+  help.className = "secondary small-button";
+  help.textContent = "?";
+  help.title = "Remediation-Policy erklaeren";
+  select.addEventListener("change", () => updateProjectRemediation(project.path || project.Path, select.value, select));
+  help.addEventListener("click", () => showRemediationHelp(select.value));
+  action.append(select, help);
+
+  row.append(text, action);
+  return row;
+}
+
+async function updateProjectRemediation(projectPath, mode, select) {
+  await withBusy(select, async () => {
+    const file = await api("/api/projects/remediation", {
+      method: "POST",
+      body: JSON.stringify({ path: projectPath, mode }),
+    });
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    showToast("Remediation-Policy aktualisiert.");
+  });
 }
 
 function removeProjectButton(project) {
@@ -881,15 +969,13 @@ function detectedLabel(project) {
 function environmentSelect(value, requireChoice = false) {
   const select = document.createElement("select");
   const options = requireChoice ? [
-    ["", "Art auswaehlen"],
+    ["", "Unbekannt - bitte auswaehlen"],
     ["plain", "Normal"],
     ["devcontainer", "DevContainer"],
-    ["unknown", "Unbekannt"],
   ] : [
     ["", "Automatisch erkennen"],
     ["plain", "Normal"],
     ["devcontainer", "DevContainer"],
-    ["unknown", "Unbekannt"],
   ];
   for (const [optionValue, label] of options) {
     const option = document.createElement("option");
@@ -899,6 +985,43 @@ function environmentSelect(value, requireChoice = false) {
     select.append(option);
   }
   return select;
+}
+
+function remediationSelect(value = "direct-allowed") {
+  const select = document.createElement("select");
+  populateRemediationSelect(select, value);
+  return select;
+}
+
+function populateRemediationSelect(select, value = "direct-allowed") {
+  if (!select) {
+    return;
+  }
+  select.innerHTML = "";
+  for (const [optionValue, label] of remediationOptions()) {
+    const option = document.createElement("option");
+    option.value = optionValue;
+    option.textContent = label;
+    option.selected = optionValue === value;
+    select.append(option);
+  }
+}
+
+function remediationOptions() {
+  return [
+    ["direct-allowed", "Direkt erlaubt"],
+    ["task-first", "Erst Tasks"],
+    ["task-branch-pr", "Task + Branch/PR"],
+  ];
+}
+
+function showRemediationHelp(mode) {
+  const help = {
+    "direct-allowed": "Kleine sichere Sofort-Fixes duerfen nach Code-Sichtung direkt umgesetzt werden. Groessere Punkte werden Tasks. Default fuer schnelle Einzelprojekte.",
+    "task-first": "Findings werden zuerst als Tasks/Buendel geplant. Direkte Fixes nur nach expliziter Einzelfreigabe.",
+    "task-branch-pr": "Strengster Modus: keine direkten Fixes aus /k-remediation. Es entstehen Tasks mit Branch-/PR-Hinweis.",
+  };
+  window.alert(help[mode] || help["direct-allowed"]);
 }
 
 function environmentLabel(value) {
@@ -911,19 +1034,6 @@ function environmentLabel(value) {
     default:
       return "Unbekannt";
   }
-}
-
-function confirmProjectKind(project, environment) {
-  const projectPath = project.path || project.Path;
-  return window.confirm([
-    "Projekt hinzufuegen?",
-    "",
-    projectPath,
-    "",
-    `Ist die Projektart richtig erkannt: ${environmentLabel(environment)}?`,
-    "",
-    "Beim Hinzufuegen wird K-PLAYBOOK.yaml angelegt, falls sie fehlt.",
-  ].join("\n"));
 }
 
 async function api(path, options = {}) {

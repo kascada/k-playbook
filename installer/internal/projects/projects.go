@@ -13,6 +13,36 @@ import (
 
 const ConfigFileName = "K-PLAYBOOK.yaml"
 
+const knownDecisionsTemplate = `# Known Decisions
+
+Eintraege in dieser Datei dokumentieren bewusste Design-Entscheidungen und bekannte Trade-offs.
+Bei Reviews (/k-review, /k-remediation) werden passende Befunde automatisch als "Akzeptiert (A)" eingestuft - kein manuelles Durchgehen noetig.
+
+Format je Eintrag: ID (KD-NNN), Kurztitel, Bereich (Datei/Modul/Konzept), Begruendung, Datum.
+
+---
+
+<!-- Eintraege folgen hier -->
+`
+
+const todoTemplate = `# TODO
+
+`
+
+type RemediationMode string
+
+type StructureStatus struct {
+	OK      bool     `json:"ok"`
+	Missing []string `json:"missing"`
+	Message string   `json:"message"`
+}
+
+const (
+	RemediationModeTaskBranchPR  RemediationMode = "task-branch-pr"
+	RemediationModeTaskFirst     RemediationMode = "task-first"
+	RemediationModeDirectAllowed RemediationMode = "direct-allowed"
+)
+
 func NormalizePath(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -90,10 +120,16 @@ func DetectEnvironment(path string) (store.ProjectEnvironment, []string) {
 	return store.EnvironmentUnknown, detected
 }
 
-func EnsureConfig(projectPath string) (bool, error) {
+func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, error) {
 	normalized, err := NormalizePath(projectPath)
 	if err != nil {
 		return false, err
+	}
+	if remediationMode == "" {
+		remediationMode = RemediationModeDirectAllowed
+	}
+	if !IsValidRemediationMode(remediationMode) {
+		return false, fmt.Errorf("ungueltiger Remediation-Modus: %s", remediationMode)
 	}
 
 	info, err := os.Stat(normalized)
@@ -120,14 +156,155 @@ func EnsureConfig(projectPath string) (bool, error) {
 	}
 	defer file.Close()
 
-	if _, err := file.WriteString(MinimalConfig(time.Now())); err != nil {
+	if _, err := file.WriteString(MinimalConfig(time.Now(), remediationMode)); err != nil {
 		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
 	}
 
 	return true, nil
 }
 
-func MinimalConfig(updatedAt time.Time) string {
+func CheckProjectStructure(projectPath string) (StructureStatus, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return StructureStatus{}, err
+	}
+
+	missing := []string{}
+	for _, rel := range fixedProjectDirs() {
+		path := filepath.Join(normalized, filepath.FromSlash(rel))
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				missing = append(missing, rel+"/")
+				continue
+			}
+			return StructureStatus{}, fmt.Errorf("%s pruefen: %w", rel, err)
+		}
+		if !info.IsDir() {
+			missing = append(missing, rel+"/ (kein Verzeichnis)")
+		}
+	}
+	for _, file := range fixedProjectFiles() {
+		path := filepath.Join(normalized, filepath.FromSlash(file.Path))
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				missing = append(missing, file.Path)
+				continue
+			}
+			return StructureStatus{}, fmt.Errorf("%s pruefen: %w", file.Path, err)
+		}
+		if info.IsDir() {
+			missing = append(missing, file.Path+" (kein Datei)")
+		}
+	}
+
+	status := StructureStatus{OK: len(missing) == 0, Missing: missing}
+	if status.OK {
+		status.Message = "Projektstruktur vollstaendig."
+	} else {
+		status.Message = fmt.Sprintf("Projektstruktur unvollstaendig: %d Pfade fehlen oder sind falsch.", len(missing))
+	}
+	return status, nil
+}
+
+func CompleteProjectStructure(projectPath string) (StructureStatus, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return StructureStatus{}, err
+	}
+
+	for _, rel := range fixedProjectDirs() {
+		path := filepath.Join(normalized, filepath.FromSlash(rel))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return StructureStatus{}, fmt.Errorf("%s ist kein Verzeichnis", rel)
+		} else if err != nil && !os.IsNotExist(err) {
+			return StructureStatus{}, fmt.Errorf("%s pruefen: %w", rel, err)
+		}
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			return StructureStatus{}, fmt.Errorf("%s anlegen: %w", rel, err)
+		}
+	}
+
+	for _, file := range fixedProjectFiles() {
+		path := filepath.Join(normalized, filepath.FromSlash(file.Path))
+		if info, err := os.Stat(path); err == nil {
+			if info.IsDir() {
+				return StructureStatus{}, fmt.Errorf("%s ist ein Verzeichnis", file.Path)
+			}
+			continue
+		} else if !os.IsNotExist(err) {
+			return StructureStatus{}, fmt.Errorf("%s pruefen: %w", file.Path, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return StructureStatus{}, fmt.Errorf("%s Elternverzeichnis anlegen: %w", file.Path, err)
+		}
+		if err := os.WriteFile(path, []byte(file.Content), 0o644); err != nil {
+			return StructureStatus{}, fmt.Errorf("%s anlegen: %w", file.Path, err)
+		}
+	}
+
+	return CheckProjectStructure(normalized)
+}
+
+func ReadRemediationMode(projectPath string) (RemediationMode, bool, error) {
+	path, err := configPath(projectPath)
+	if err != nil {
+		return "", false, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false, fmt.Errorf("%s lesen: %w", ConfigFileName, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	inRemediation := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if isTopLevelYAMLLine(line) {
+			inRemediation = strings.TrimSuffix(trimmed, ":") == "remediation"
+			continue
+		}
+		if inRemediation && strings.HasPrefix(trimmed, "mode:") {
+			mode := RemediationMode(strings.TrimSpace(strings.TrimPrefix(trimmed, "mode:")))
+			return mode, true, nil
+		}
+	}
+
+	return "", false, nil
+}
+
+func UpdateRemediationMode(projectPath string, remediationMode RemediationMode) error {
+	if remediationMode == "" {
+		remediationMode = RemediationModeDirectAllowed
+	}
+	if !IsValidRemediationMode(remediationMode) {
+		return fmt.Errorf("ungueltiger Remediation-Modus: %s", remediationMode)
+	}
+
+	path, err := configPath(projectPath)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s lesen: %w", ConfigFileName, err)
+	}
+
+	content := replaceRemediationBlock(string(data), remediationBlock(remediationMode))
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
+	}
+	return nil
+}
+
+func MinimalConfig(updatedAt time.Time, remediationMode RemediationMode) string {
+	if remediationMode == "" {
+		remediationMode = RemediationModeDirectAllowed
+	}
 	return fmt.Sprintf(`schema_version: 1
 layout: fixed-project-k-playbook
 
@@ -136,7 +313,120 @@ k_playbook:
 
 setup:
   updated_at: %s
-`, updatedAt.Format("2006-01-02"))
+
+%s`, updatedAt.Format("2006-01-02"), remediationBlock(remediationMode))
+}
+
+func remediationBlock(remediationMode RemediationMode) string {
+	policy := RemediationPolicy(remediationMode)
+	return fmt.Sprintf(`remediation:
+  mode: %s
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: %t
+  direct_fixes: %t
+`, remediationMode, policy.PRRequired, policy.DirectFixes)
+}
+
+type RemediationPolicyConfig struct {
+	PRRequired  bool
+	DirectFixes bool
+}
+
+func RemediationPolicy(mode RemediationMode) RemediationPolicyConfig {
+	switch mode {
+	case RemediationModeTaskBranchPR:
+		return RemediationPolicyConfig{PRRequired: true, DirectFixes: false}
+	case RemediationModeTaskFirst:
+		return RemediationPolicyConfig{PRRequired: false, DirectFixes: true}
+	default:
+		return RemediationPolicyConfig{PRRequired: false, DirectFixes: true}
+	}
+}
+
+func IsValidRemediationMode(mode RemediationMode) bool {
+	switch mode {
+	case RemediationModeTaskBranchPR, RemediationModeTaskFirst, RemediationModeDirectAllowed:
+		return true
+	default:
+		return false
+	}
+}
+
+func configPath(projectPath string) (string, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(normalized, ConfigFileName), nil
+}
+
+func replaceRemediationBlock(content string, block string) string {
+	lines := strings.Split(content, "\n")
+	start := -1
+	end := len(lines)
+	for index, line := range lines {
+		if isTopLevelYAMLLine(line) && strings.TrimSpace(line) == "remediation:" {
+			start = index
+			break
+		}
+	}
+	if start == -1 {
+		content = strings.TrimRight(content, "\n")
+		if content == "" {
+			return block
+		}
+		return content + "\n\n" + block
+	}
+
+	for index := start + 1; index < len(lines); index++ {
+		line := lines[index]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if isTopLevelYAMLLine(line) {
+			end = index
+			break
+		}
+	}
+
+	newLines := append([]string{}, lines[:start]...)
+	newLines = append(newLines, strings.Split(strings.TrimRight(block, "\n"), "\n")...)
+	newLines = append(newLines, lines[end:]...)
+	return strings.TrimRight(strings.Join(newLines, "\n"), "\n") + "\n"
+}
+
+func isTopLevelYAMLLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return trimmed != "" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && strings.Contains(trimmed, ":")
+}
+
+type fixedFile struct {
+	Path    string
+	Content string
+}
+
+func fixedProjectDirs() []string {
+	return []string{
+		"k-playbook",
+		"k-playbook/tasks",
+		"k-playbook/tasks/done",
+		"k-playbook/checks",
+		"k-playbook/reviews",
+		"k-playbook/guidelines",
+		"k-playbook/enforcement",
+		"k-playbook/docs",
+	}
+}
+
+func fixedProjectFiles() []fixedFile {
+	return []fixedFile{
+		{Path: "k-playbook/TODO.md", Content: todoTemplate},
+		{Path: "k-playbook/reviews/known-decisions.md", Content: knownDecisionsTemplate},
+	}
 }
 
 func ScanDefaultDev() ([]store.Project, error) {

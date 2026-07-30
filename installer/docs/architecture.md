@@ -160,6 +160,8 @@ Aktuelle Endpunkte:
 | `DELETE` | `/api/projects` | Projekt nach bestaetigter GUI-Aktion aus der gespeicherten Installer-Liste entfernen; Projektdateien bleiben unveraendert |
 | `POST` | `/api/projects` | Einzelnes Projekt speichern und fehlende `K-PLAYBOOK.yaml` minimal anlegen |
 | `POST` | `/api/projects/preview` | Einzelnes manuelles Projekt normalisieren und Umgebung erkennen, ohne zu speichern |
+| `POST` | `/api/projects/structure` | Fehlende feste Projektstruktur und Initialdateien unter `k-playbook/` fuer ein gespeichertes Projekt anlegen |
+| `POST` | `/api/projects/remediation` | `remediation:`-Block eines gespeicherten Projekts in `K-PLAYBOOK.yaml` auf den gewaehlten Modus setzen |
 | `GET` | `/api/projects/scan?root=dev|home` | Projektkandidaten scannen |
 | `GET` | `/api/git/status` | Read-only per `git ls-remote` pruefen, ob der Upstream-Branch von k-playbook einen anderen Commit zeigt |
 | `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren |
@@ -186,8 +188,8 @@ Die Startseite zeigt:
    Daneben liegt `k-playbook aktualisieren`; beim Start prueft die GUI read-only per `/api/git/status`, ob der Upstream-Branch einen anderen Commit zeigt. Wenn eine neue Version verfuegbar ist, wird der Button hervorgehoben und heisst `Zur neuen Version aktualisieren`. Der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Projektblock einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen. Wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
-   Jeder Projektblock bietet `Entfernen`; nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert, ob die feste `k-playbook/`-Struktur vollstaendig ist, welcher `remediation.mode` gesetzt ist und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Projektblock einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen. Wenn die feste Struktur unvollstaendig ist, zeigt der Projektblock nur dann eine Zeile `Projektstruktur unvollstaendig` mit `Vervollstaendigen`. Wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
+   Jeder Projektblock bietet `Entfernen`; nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei. Wenn `K-PLAYBOOK.yaml` vorhanden ist, zeigt der Projektblock eine Remediation-Policy-Auswahl mit Hilfe-Button; Aenderungen schreiben nur den `remediation:`-Block der projektlokalen YAML.
 5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt der jeweilige Projektblock die Zeile `k-playbook im Container erreichbar`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Bei fehlenden Eintraegen zeigt diese Projektzeile `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
 6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
@@ -256,14 +258,16 @@ Scan-Roots:
 
 Auswahlverhalten:
 
-- Ganze Zeile ist klickbar.
-- Immer nur ein Projekt kann ausgewaehlt und hinzugefuegt werden.
+- Ganze Zeile ist klickbar und markiert die Zeile optisch.
+- Jede Scan-Zeile hat rechts neben der Art-Auswahl einen eigenen Button `Hinzufuegen`.
+- Immer nur ein Projekt wird pro Aktion hinzugefuegt.
 - Ausgewaehlte Zeile wird optisch markiert.
-- Erkannte Art wird vorausgewaehlt: `Normal` fuer normale Projekte, `DevContainer` fuer `.devcontainer/devcontainer.json`. Bei unbekannter Art muss der Nutzer waehlen.
-- Vor dem Speichern fragt die GUI, ob die erkannte bzw. ausgewaehlte Art richtig ist.
-- Beim Speichern legt Backend/CLI sofort die minimale `K-PLAYBOOK.yaml` gemaess `docs/k-playbook-format.md` an, falls sie fehlt.
+- Erkannte Art wird vorausgewaehlt: `Normal` fuer normale Projekte, `DevContainer` fuer `.devcontainer/devcontainer.json`.
+- Wenn die Art unbekannt ist, zeigt die Auswahl `Unbekannt - bitte auswaehlen`; `Hinzufuegen` fordert dann zur Auswahl von `Normal` oder `DevContainer` auf.
+- Es gibt keinen zusaetzlichen Bestaetigungsdialog. Bei gesetzter Art legt `Hinzufuegen` direkt los.
+- Beim Speichern legt Backend/CLI sofort die minimale `K-PLAYBOOK.yaml` gemaess `docs/k-playbook-format.md` an, falls sie fehlt, und vervollstaendigt die feste Projektstruktur inklusive `k-playbook/TODO.md` und `k-playbook/reviews/known-decisions.md`. Die initiale Remediation-Policy ist `direct-allowed` und kann danach in der Projektauflistung umgestellt werden.
 - Nach dem Speichern springt die GUI zur Startseite zurueck.
-- Manuelles Projekt-Hinzufuegen liegt ebenfalls auf der Scan-Seite, nutzt dieselbe Art-Bestaetigung und springt nach Speichern zur Startseite zurueck.
+- Manuelles Projekt-Hinzufuegen liegt ebenfalls auf der Scan-Seite und springt nach Speichern zur Startseite zurueck. Wenn die Art nicht erkannt wird, muss der Nutzer sie auswaehlen.
 
 ## Docs-Anzeige
 

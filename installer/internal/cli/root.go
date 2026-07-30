@@ -136,7 +136,7 @@ func newProjectsCommand() *cobra.Command {
 			if addEnvironment != string(store.EnvironmentUnknown) {
 				project.Environment = store.ProjectEnvironment(addEnvironment)
 			}
-			createdConfig, err := projects.EnsureConfig(project.Path)
+			createdConfig, err := projects.EnsureConfig(project.Path, projects.RemediationModeDirectAllowed)
 			if err != nil {
 				return err
 			}
@@ -151,7 +151,7 @@ func newProjectsCommand() *cobra.Command {
 			}
 			fmt.Printf("Projekt gespeichert: %s (%s)\n", project.Path, project.Environment)
 			if createdConfig {
-				fmt.Printf("K-PLAYBOOK.yaml angelegt: %s\n", project.Path)
+				fmt.Printf("K-PLAYBOOK.yaml angelegt: %s (remediation: %s)\n", project.Path, projects.RemediationModeDirectAllowed)
 			}
 			return nil
 		},

@@ -11,7 +11,7 @@ import (
 )
 
 func TestMinimalConfig(t *testing.T) {
-	config := MinimalConfig(time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC))
+	config := MinimalConfig(time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), RemediationModeDirectAllowed)
 	expected := `schema_version: 1
 layout: fixed-project-k-playbook
 
@@ -20,6 +20,15 @@ k_playbook:
 
 setup:
   updated_at: 2026-07-30
+
+remediation:
+  mode: direct-allowed
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: false
+  direct_fixes: true
 `
 
 	if config != expected {
@@ -27,10 +36,23 @@ setup:
 	}
 }
 
+func TestMinimalConfigTaskBranchPR(t *testing.T) {
+	config := MinimalConfig(time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), RemediationModeTaskBranchPR)
+	for _, expected := range []string{
+		"mode: task-branch-pr\n",
+		"pr_required: true\n",
+		"direct_fixes: false\n",
+	} {
+		if !strings.Contains(config, expected) {
+			t.Fatalf("config does not contain %q:\n%s", expected, config)
+		}
+	}
+}
+
 func TestEnsureConfigCreatesMinimalConfig(t *testing.T) {
 	root := t.TempDir()
 
-	created, err := EnsureConfig(root)
+	created, err := EnsureConfig(root, RemediationModeDirectAllowed)
 	if err != nil {
 		t.Fatalf("EnsureConfig failed: %v", err)
 	}
@@ -49,18 +71,141 @@ func TestEnsureConfigCreatesMinimalConfig(t *testing.T) {
 		"repo: ~/dev/k-playbook\n",
 		"setup:\n",
 		"updated_at: ",
+		"remediation:\n",
+		"mode: direct-allowed\n",
+		"direct_fixes: true\n",
 	} {
 		if !strings.Contains(content, expected) {
 			t.Fatalf("config does not contain %q:\n%s", expected, content)
 		}
 	}
 
-	created, err = EnsureConfig(root)
+	created, err = EnsureConfig(root, RemediationModeTaskBranchPR)
 	if err != nil {
 		t.Fatalf("second EnsureConfig failed: %v", err)
 	}
 	if created {
 		t.Fatal("expected existing config to be left unchanged")
+	}
+}
+
+func TestUpdateRemediationModeReplacesExistingBlock(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ConfigFileName)
+	initial := `schema_version: 1
+layout: fixed-project-k-playbook
+
+k_playbook:
+  repo: ~/dev/k-playbook
+
+setup:
+  updated_at: 2026-07-30
+
+remediation:
+  mode: direct-allowed
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: false
+  direct_fixes: true
+
+custom:
+  keep: true
+`
+	if err := os.WriteFile(path, []byte(initial), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if err := UpdateRemediationMode(root, RemediationModeTaskBranchPR); err != nil {
+		t.Fatalf("UpdateRemediationMode failed: %v", err)
+	}
+	contentBytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(contentBytes)
+	for _, expected := range []string{
+		"mode: task-branch-pr\n",
+		"pr_required: true\n",
+		"direct_fixes: false\n",
+		"custom:\n",
+		"keep: true\n",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("config does not contain %q:\n%s", expected, content)
+		}
+	}
+}
+
+func TestReadRemediationMode(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ConfigFileName), []byte(MinimalConfig(time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), RemediationModeTaskFirst)), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	mode, found, err := ReadRemediationMode(root)
+	if err != nil {
+		t.Fatalf("ReadRemediationMode failed: %v", err)
+	}
+	if !found {
+		t.Fatal("expected remediation mode to be found")
+	}
+	if mode != RemediationModeTaskFirst {
+		t.Fatalf("expected task-first, got %s", mode)
+	}
+}
+
+func TestCompleteProjectStructure(t *testing.T) {
+	root := t.TempDir()
+
+	status, err := CheckProjectStructure(root)
+	if err != nil {
+		t.Fatalf("CheckProjectStructure failed: %v", err)
+	}
+	if status.OK {
+		t.Fatal("expected incomplete structure")
+	}
+	if len(status.Missing) == 0 {
+		t.Fatal("expected missing paths")
+	}
+
+	status, err = CompleteProjectStructure(root)
+	if err != nil {
+		t.Fatalf("CompleteProjectStructure failed: %v", err)
+	}
+	if !status.OK {
+		t.Fatalf("expected complete structure, missing: %#v", status.Missing)
+	}
+
+	for _, path := range []string{
+		"k-playbook/tasks",
+		"k-playbook/tasks/done",
+		"k-playbook/checks",
+		"k-playbook/reviews",
+		"k-playbook/guidelines",
+		"k-playbook/enforcement",
+		"k-playbook/docs",
+	} {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatalf("expected %s: %v", path, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("expected %s to be a directory", path)
+		}
+	}
+	for _, path := range []string{
+		"k-playbook/TODO.md",
+		"k-playbook/reviews/known-decisions.md",
+	} {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatalf("expected %s: %v", path, err)
+		}
+		if info.IsDir() {
+			t.Fatalf("expected %s to be a file", path)
+		}
 	}
 }
 

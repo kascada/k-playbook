@@ -63,15 +63,9 @@
             </div>
           </div>
           <div id="projects" class="project-list empty">Keine Projekte gespeichert.</div>
-        </section>
-
-        <section class="card actions-card">
-          <div>
-            <p class="eyebrow">Projektliste erweitern</p>
-            <h2>Ein Projekt hinzufuegen</h2>
-            <p class="message">Waehle immer ein Projekt aus, bestaetige die erkannte Art und fuege es dann hinzu.</p>
+          <div class="project-list-footer">
+            <button id="open-scan" class="primary">Projekt hinzufuegen</button>
           </div>
-          <button id="open-scan" class="primary">Projekt hinzufuegen</button>
         </section>
 
         <section class="card" id="opencode-card">
@@ -144,7 +138,6 @@
           </div>
           <div id="scan-results" class="scan-results empty">Noch kein Scan ausgefuehrt.</div>
           <div class="button-row">
-            <button id="save-scan" class="primary hidden" disabled>Ausgewaehltes Projekt hinzufuegen</button>
             <button id="cancel-scan" class="secondary">Abbrechen</button>
           </div>
         </section>
@@ -163,7 +156,6 @@
                 <option value="">Automatisch erkennen</option>
                 <option value="plain">Normal</option>
                 <option value="devcontainer">DevContainer</option>
-                <option value="unknown">Unbekannt</option>
               </select>
             </label>
             <button class="primary" type="submit">Projekt pruefen und hinzufuegen</button>

@@ -42,6 +42,11 @@ type projectRequest struct {
 	Selected    *bool  `json:"selected"`
 }
 
+type remediationRequest struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"`
+}
+
 type projectsResponse struct {
 	Version  int           `json:"version"`
 	Projects []projectView `json:"projects"`
@@ -49,8 +54,16 @@ type projectsResponse struct {
 
 type projectView struct {
 	store.Project
-	Setup projectCommandStatus `json:"setup"`
-	Docs  projectCommandStatus `json:"docs"`
+	Setup       projectCommandStatus     `json:"setup"`
+	Structure   projects.StructureStatus `json:"structure"`
+	Docs        projectCommandStatus     `json:"docs"`
+	Remediation remediationStatus        `json:"remediation"`
+}
+
+type remediationStatus struct {
+	OK      bool   `json:"ok"`
+	Mode    string `json:"mode"`
+	Message string `json:"message"`
 }
 
 type projectCommandStatus struct {
@@ -267,6 +280,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/projects/scan", scanProjectsHandler)
 	mux.HandleFunc("POST /api/projects/preview", projectPreviewHandler)
 	mux.HandleFunc("POST /api/projects", addProjectHandler)
+	mux.HandleFunc("POST /api/projects/structure", completeProjectStructureHandler)
+	mux.HandleFunc("POST /api/projects/remediation", updateProjectRemediationHandler)
 	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
 	mux.HandleFunc("POST /api/git/pull", gitPullHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
@@ -754,7 +769,11 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if _, err := projects.EnsureConfig(project.Path); err != nil {
+	if _, err := projects.EnsureConfig(project.Path, projects.RemediationModeDirectAllowed); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := projects.CompleteProjectStructure(project.Path); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -773,12 +792,82 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, projectResponse(file))
 }
 
+func completeProjectStructureHandler(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+	projectPath, err := projects.NormalizePath(request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := projects.CompleteProjectStructure(projectPath); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	file, err := store.LoadProjects()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func updateProjectRemediationHandler(w http.ResponseWriter, r *http.Request) {
+	var request remediationRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+	projectPath, err := projects.NormalizePath(request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := projects.UpdateRemediationMode(projectPath, projects.RemediationMode(request.Mode)); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	file, err := store.LoadProjects()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
 func projectResponse(file store.ProjectsFile) projectsResponse {
 	response := projectsResponse{Version: file.Version, Projects: make([]projectView, 0, len(file.Projects))}
 	for _, project := range file.Projects {
-		response.Projects = append(response.Projects, projectView{Project: project, Setup: checkProjectSetup(project.Path), Docs: checkProjectDocs(project.Path)})
+		response.Projects = append(response.Projects, projectView{Project: project, Setup: checkProjectSetup(project.Path), Structure: checkProjectStructure(project.Path), Docs: checkProjectDocs(project.Path), Remediation: checkProjectRemediation(project.Path)})
 	}
 	return response
+}
+
+func checkProjectStructure(projectPath string) projects.StructureStatus {
+	status, err := projects.CheckProjectStructure(projectPath)
+	if err != nil {
+		return projects.StructureStatus{Message: "Projektstruktur nicht lesbar."}
+	}
+	return status
+}
+
+func checkProjectRemediation(projectPath string) remediationStatus {
+	mode, found, err := projects.ReadRemediationMode(projectPath)
+	if err != nil {
+		return remediationStatus{Message: "Remediation-Policy nicht lesbar."}
+	}
+	if !found {
+		return remediationStatus{Message: "Remediation-Policy fehlt."}
+	}
+	if !projects.IsValidRemediationMode(mode) {
+		return remediationStatus{Mode: string(mode), Message: "Remediation-Policy ist ungueltig."}
+	}
+	return remediationStatus{OK: true, Mode: string(mode), Message: "Remediation-Policy vorhanden."}
 }
 
 func checkProjectSetup(projectPath string) projectCommandStatus {

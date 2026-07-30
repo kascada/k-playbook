@@ -329,6 +329,12 @@ button.update-available {
   gap: 10px;
 }
 
+.project-list-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
 .summary-item {
   display: flex;
   align-items: center;
@@ -505,7 +511,7 @@ button.update-available {
 
 .scan-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 13px;
@@ -518,6 +524,12 @@ button.update-available {
 .scan-row.selected {
   border-color: rgba(47, 93, 80, 0.7);
   background: rgba(47, 93, 80, 0.08);
+}
+
+.scan-row-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-row {
@@ -690,7 +702,8 @@ select {
   }
 
   .actions-card,
-  .button-row {
+  .button-row,
+  .project-list-footer {
     align-items: stretch;
     flex-direction: column;
   }
@@ -707,5 +720,10 @@ select {
 
   .scan-row {
     grid-template-columns: 1fr;
+  }
+
+  .scan-row-action {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

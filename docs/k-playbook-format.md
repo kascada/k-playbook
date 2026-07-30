@@ -51,6 +51,15 @@ k_playbook:
 
 setup:
   updated_at: 2026-07-30
+
+remediation:
+  mode: direct-allowed
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: false
+  direct_fixes: true
 ```
 
 `k_playbook.repo` ist der feste logische Rueckverweis auf das globale Basis-Repo.
@@ -121,6 +130,11 @@ geschrieben oder aktualisiert hat.
 ### `remediation`
 
 Optionaler Block fuer `/k-remediation`.
+
+Der Installer legt den Block bei neuen Projekteinbindungen standardmaessig mit
+`mode: direct-allowed` an. Das ist fuer kleine, sichere Sofort-Fixes pragmatisch;
+groessere Aenderungen bleiben Tasks. Fuer strengere Team-/PR-Prozesse kann der
+Modus beim Einbinden auf `task-first` oder `task-branch-pr` gestellt werden.
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
