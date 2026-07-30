@@ -3,7 +3,8 @@ priv/
 .priv/
 .k-playbook-local/
 /k-playbook/
-/Makefile
+/bin/
+/dist/
 
 # Secrets and local environment
 .env

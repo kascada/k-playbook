@@ -8,24 +8,40 @@
   </head>
   <body>
     <main class="shell">
-      <section class="hero">
+      <section class="hero" data-view="home">
         <div>
           <p class="eyebrow">Lokaler Installer</p>
           <h1>k-playbook einrichten</h1>
-          <p class="lead">Pfadvertrag pruefen, bei Bedarf reparieren und Zielprojekte auswaehlen.</p>
+          <p class="lead">Pfadvertrag pruefen und Zielprojekte fuer k-playbook auswaehlen.</p>
         </div>
-        <button id="refresh" class="secondary">Aktualisieren</button>
+        <div class="hero-actions">
+          <button id="refresh" class="secondary">Status neu laden</button>
+          <button id="shutdown" class="secondary danger">Schliessen</button>
+        </div>
       </section>
 
-      <section class="card" id="status-card">
-        <div class="section-head">
+      <section class="hero compact hidden" data-view="scan">
+        <div>
+          <p class="eyebrow">Projekt-Auswahl</p>
+          <h1>Projekte scannen</h1>
+          <p class="lead">Projektkandidaten suchen, auswaehlen und danach zur Startseite zurueckkehren.</p>
+        </div>
+        <button id="back-home" class="secondary">Zur Startseite</button>
+      </section>
+
+      <section class="card" id="status-card" data-view="home">
+        <div id="status-head" class="section-head">
           <div>
             <p class="eyebrow">Schritt 1</p>
             <h2>Pfadvertrag</h2>
           </div>
           <span id="status-pill" class="pill muted">Pruefen...</span>
         </div>
-        <dl class="facts">
+        <div id="status-compact" class="status-compact hidden">
+          <span id="compact-text">~/dev/k-playbook ist bereit.</span>
+          <span class="status-check" aria-hidden="true">&#10003;</span>
+        </div>
+        <dl id="status-details" class="facts">
           <div><dt>Erwartet</dt><dd id="expected">-</dd></div>
           <div><dt>Aktuell</dt><dd id="current">-</dd></div>
           <div><dt>Symlink</dt><dd id="symlink">-</dd></div>
@@ -34,17 +50,70 @@
         <button id="repair" class="primary hidden">Symlink anlegen</button>
       </section>
 
-      <section class="grid" id="project-area">
+      <section id="project-area" data-view="home">
         <section class="card">
           <div class="section-head">
             <div>
               <p class="eyebrow">Schritt 2</p>
+              <h2>Projekt-Auswahl</h2>
+            </div>
+          </div>
+          <div id="projects" class="project-list empty">Keine Projekte gespeichert.</div>
+        </section>
+
+        <section class="card actions-card">
+          <div>
+            <p class="eyebrow">Projektliste erweitern</p>
+            <h2>Weitere Projekte auswaehlen</h2>
+            <p class="message">Starte einen separaten Scan, wenn du neue Projekte zur Auswahl hinzufuegen willst.</p>
+          </div>
+          <button id="open-scan" class="primary">Projekte auswaehlen</button>
+        </section>
+
+        <section class="card actions-card">
+          <div>
+            <p class="eyebrow">Repository</p>
+            <h2>k-playbook aktualisieren</h2>
+            <p id="git-output" class="message">Fuehrt im k-playbook-Repo ein sicheres `git pull --ff-only` aus.</p>
+          </div>
+          <button id="git-pull" class="secondary">Git pull</button>
+        </section>
+
+        <section class="card docs-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Dokumentation</p>
+              <h2>Docs ansehen</h2>
+            </div>
+            <button id="reload-docs" class="secondary">Docs neu laden</button>
+          </div>
+          <div class="docs-layout">
+            <div id="docs-list" class="docs-list empty">Noch keine Docs geladen.</div>
+            <article id="doc-viewer" class="doc-viewer empty">Waehle eine Markdown-Datei aus.</article>
+          </div>
+        </section>
+      </section>
+
+      <section data-view="scan" class="hidden">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Scan</p>
               <h2>Projekte scannen</h2>
             </div>
-            <button id="scan" class="secondary">~/dev scannen</button>
+            <div class="scan-controls">
+              <select id="scan-root" aria-label="Scan-Root">
+                <option value="dev">~/dev</option>
+                <option value="home">~</option>
+              </select>
+              <button id="scan" class="secondary">Scannen</button>
+            </div>
           </div>
           <div id="scan-results" class="scan-results empty">Noch kein Scan ausgefuehrt.</div>
-          <button id="save-scan" class="primary hidden">Auswahl speichern</button>
+          <div class="button-row">
+            <button id="save-scan" class="primary hidden" disabled>Auswahl speichern</button>
+            <button id="cancel-scan" class="secondary">Abbrechen</button>
+          </div>
         </section>
 
         <section class="card">
@@ -70,17 +139,13 @@
         </section>
       </section>
 
-      <section class="card">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Gespeichert</p>
-            <h2>Projekt-Auswahl</h2>
-          </div>
-        </div>
-        <div id="projects" class="project-list empty">Keine Projekte gespeichert.</div>
-      </section>
-
       <div id="toast" class="toast hidden"></div>
+      <div id="closed" class="closed hidden">
+        <div class="card">
+          <p class="eyebrow">Installer beendet</p>
+          <h2>Dieses Browserfenster kann jetzt geschlossen werden.</h2>
+        </div>
+      </div>
     </main>
     <script src="/static/app.js"></script>
   </body>

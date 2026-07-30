@@ -5,13 +5,28 @@ const state = {
 
 const elements = {
   refresh: document.querySelector("#refresh"),
+  shutdown: document.querySelector("#shutdown"),
+  backHome: document.querySelector("#back-home"),
+  openScan: document.querySelector("#open-scan"),
+  cancelScan: document.querySelector("#cancel-scan"),
+  gitPull: document.querySelector("#git-pull"),
+  gitOutput: document.querySelector("#git-output"),
+  reloadDocs: document.querySelector("#reload-docs"),
+  docsList: document.querySelector("#docs-list"),
+  docViewer: document.querySelector("#doc-viewer"),
   repair: document.querySelector("#repair"),
+  statusCard: document.querySelector("#status-card"),
+  statusHead: document.querySelector("#status-head"),
   statusPill: document.querySelector("#status-pill"),
+  statusCompact: document.querySelector("#status-compact"),
+  compactText: document.querySelector("#compact-text"),
+  statusDetails: document.querySelector("#status-details"),
   expected: document.querySelector("#expected"),
   current: document.querySelector("#current"),
   symlink: document.querySelector("#symlink"),
   statusMessage: document.querySelector("#status-message"),
   projectArea: document.querySelector("#project-area"),
+  scanRoot: document.querySelector("#scan-root"),
   scan: document.querySelector("#scan"),
   scanResults: document.querySelector("#scan-results"),
   saveScan: document.querySelector("#save-scan"),
@@ -20,21 +35,77 @@ const elements = {
   manualEnv: document.querySelector("#manual-env"),
   projects: document.querySelector("#projects"),
   toast: document.querySelector("#toast"),
+  closed: document.querySelector("#closed"),
 };
 
 elements.refresh.addEventListener("click", refreshAll);
+elements.shutdown.addEventListener("click", shutdownInstaller);
+elements.backHome.addEventListener("click", showHome);
+elements.openScan.addEventListener("click", showScan);
+elements.cancelScan.addEventListener("click", showHome);
+elements.gitPull.addEventListener("click", gitPull);
+elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
 elements.saveScan.addEventListener("click", saveScannedProjects);
 elements.manualForm.addEventListener("submit", addManualProject);
 
 refreshAll();
+showHome();
+
+function showHome() {
+  for (const element of document.querySelectorAll("[data-view='home']")) {
+    element.classList.remove("hidden");
+  }
+  for (const element of document.querySelectorAll("[data-view='scan']")) {
+    element.classList.add("hidden");
+  }
+}
+
+function showScan() {
+  for (const element of document.querySelectorAll("[data-view='home']")) {
+    element.classList.add("hidden");
+  }
+  for (const element of document.querySelectorAll("[data-view='scan']")) {
+    element.classList.remove("hidden");
+  }
+}
 
 async function refreshAll() {
   await refreshStatus();
   if (state.status && state.status.OK) {
     await refreshProjects();
+    await loadDocs();
   }
+}
+
+async function gitPull() {
+  await withBusy(elements.gitPull, async () => {
+    elements.gitOutput.textContent = "git pull laeuft...";
+    const result = await api("/api/git/pull", { method: "POST" });
+    elements.gitOutput.textContent = result.output || "Bereits aktuell.";
+    showToast("Repository aktualisiert.");
+    await refreshAll();
+  });
+}
+
+async function shutdownInstaller() {
+  if (!window.confirm("Installer wirklich beenden?")) {
+    return;
+  }
+
+  await withBusy(elements.shutdown, async () => {
+    await api("/api/shutdown", { method: "POST" });
+    document.body.classList.add("is-closed");
+    elements.closed.classList.remove("hidden");
+  });
+}
+
+async function loadDocs() {
+  await withBusy(elements.reloadDocs, async () => {
+    const docs = await api("/api/docs");
+    renderDocsList(docs);
+  });
 }
 
 async function refreshStatus() {
@@ -66,7 +137,7 @@ async function refreshProjects() {
 
 async function scanProjects() {
   await withBusy(elements.scan, async () => {
-    const projects = await api("/api/projects/scan");
+    const projects = await api(`/api/projects/scan?root=${encodeURIComponent(elements.scanRoot.value)}`);
     state.scanned = projects;
     renderScanned(projects);
   });
@@ -93,7 +164,9 @@ async function saveScannedProjects() {
     });
     renderProjects(file.projects || file.Projects || []);
     showToast("Auswahl gespeichert.");
+    showHome();
   });
+  updateSaveScanButton();
 }
 
 async function addManualProject(event) {
@@ -116,6 +189,7 @@ async function addManualProject(event) {
     elements.manualPath.value = "";
     renderProjects(file.projects || file.Projects || []);
     showToast("Projekt gespeichert.");
+    showHome();
   });
 }
 
@@ -137,6 +211,12 @@ function renderStatus(status) {
 
   elements.repair.classList.toggle("hidden", status.OK || !status.Fixable);
   elements.projectArea.classList.toggle("hidden", !status.OK);
+  elements.statusCard.classList.toggle("status-ok", status.OK);
+  elements.statusHead.classList.toggle("hidden", status.OK);
+  elements.statusCompact.classList.toggle("hidden", !status.OK);
+  elements.statusDetails.classList.toggle("hidden", status.OK);
+  elements.statusMessage.classList.toggle("hidden", status.OK);
+  elements.compactText.textContent = status.Expected ? `${status.Expected} ist bereit.` : "Pfadvertrag ist bereit.";
 }
 
 function renderScanned(projects) {
@@ -156,6 +236,7 @@ function renderScanned(projects) {
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
+    checkbox.addEventListener("change", () => updateScanRow(row));
 
     const details = document.createElement("div");
     const path = document.createElement("div");
@@ -168,8 +249,28 @@ function renderScanned(projects) {
 
     const select = environmentSelect(project.environment || project.Environment || "plain");
     row.append(checkbox, details, select);
+    row.addEventListener("click", (event) => {
+      if (event.target === checkbox || event.target === select) {
+        return;
+      }
+      checkbox.checked = !checkbox.checked;
+      updateScanRow(row);
+    });
     elements.scanResults.append(row);
   }
+  updateSaveScanButton();
+}
+
+function updateScanRow(row) {
+  const checkbox = row.querySelector("input[type='checkbox']");
+  row.classList.toggle("selected", checkbox.checked);
+  updateSaveScanButton();
+}
+
+function updateSaveScanButton() {
+  const selectedCount = document.querySelectorAll(".scan-row input[type='checkbox']:checked").length;
+  elements.saveScan.textContent = selectedCount === 1 ? "1 Projekt speichern" : `${selectedCount} Projekte speichern`;
+  elements.saveScan.disabled = selectedCount === 0;
 }
 
 function renderProjects(projects) {
@@ -200,6 +301,38 @@ function renderProjects(projects) {
     row.append(details, pill);
     elements.projects.append(row);
   }
+}
+
+function renderDocsList(docs) {
+  elements.docsList.innerHTML = "";
+  elements.docsList.classList.toggle("empty", docs.length === 0);
+
+  if (docs.length === 0) {
+    elements.docsList.textContent = "Keine Markdown-Dateien in docs/ gefunden.";
+    return;
+  }
+
+  for (const doc of docs) {
+    const button = document.createElement("button");
+    button.className = "doc-link";
+    button.type = "button";
+    button.textContent = doc.title || doc.path;
+    button.title = doc.path;
+    button.addEventListener("click", async () => {
+      for (const active of document.querySelectorAll(".doc-link.active")) {
+        active.classList.remove("active");
+      }
+      button.classList.add("active");
+      await loadDoc(doc.path);
+    });
+    elements.docsList.append(button);
+  }
+}
+
+async function loadDoc(path) {
+  const doc = await api(`/api/docs/file?path=${encodeURIComponent(path)}`);
+  elements.docViewer.classList.remove("empty");
+  elements.docViewer.innerHTML = doc.html || "";
 }
 
 function detectedLabel(project) {

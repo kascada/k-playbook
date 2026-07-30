@@ -23,6 +23,7 @@ Fuer strukturelle Fragen zuerst `docs/README.md` lesen. Wichtige Einstiegspunkte
 - `docs/handbuch.md` fuer Zweck, Konzepte und Standardablaeufe.
 - `docs/commands.md` fuer Slash-Command-Zustaendigkeiten.
 - `docs/installation.md` fuer Host-Installation und OpenCode-Setup.
+- `installer/docs/architecture.md` fuer Arbeiten am Go-Installer, Browser-GUI, Web-API, Docs-Viewer und Git-Pull-Flow.
 - `docs/reviews-and-results.md` fuer Review-, Results- und Remediation-Flows.
 
 Bei konkreten Code- oder Doku-Aenderungen danach gezielt die betroffenen Dateien lesen.

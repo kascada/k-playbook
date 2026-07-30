@@ -4,19 +4,27 @@
 
 ## Schnellstart
 
-Pfadvertrag: `k-playbook` muss in jeder Umgebung unter `~/dev/k-playbook` erreichbar sein. Wenn der echte Klon woanders liegt, lege einen Symlink nach `~/dev/k-playbook` an.
-
-```bash
-gh repo clone kascada/k-playbook ~/dev/k-playbook
-```
-
-Ohne GitHub CLI:
+Gefuehrter Start mit Browser-GUI:
 
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
+cd ~/dev/k-playbook
+./scripts/install-installer.sh
+k-playbook-installer
 ```
 
-Danach in OpenCode:
+Das Install-Script braucht kein lokal installiertes Go. Es nutzt ein passendes Binary aus `dist/`, falls vorhanden, oder laedt es aus den GitHub Releases.
+
+Source-Builds fuer Entwickler brauchen Go:
+
+```text
+make install
+make gui
+```
+
+Der Installer prueft den Pfadvertrag `~/dev/k-playbook`, kann ihn bei Bedarf reparieren, verwaltet die Projekt-Auswahl, zeigt die Docs an und kann `git pull --ff-only` ausfuehren.
+
+OpenCode-Kommandos bleiben zusaetzlich verfuegbar:
 
 ```text
 /k-install
@@ -131,5 +139,9 @@ Nach Änderungen:
 
 ```bash
 cd ~/dev/k-playbook
-make push
+make installer-test
+make installer-build
+make release
 ```
+
+Private Maintainer-Targets liegen lokal unter `priv/Makefile`, nicht im user-facing Root-`Makefile`.

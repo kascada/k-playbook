@@ -26,6 +26,9 @@ func newRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "k-playbook-installer",
 		Short: "Deterministischer Installer fuer k-playbook",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return webui.Run()
+		},
 	}
 
 	rootCmd.AddCommand(newStatusCommand())

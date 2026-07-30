@@ -56,16 +56,36 @@ select {
   margin-bottom: 22px;
 }
 
+.hero.compact h1 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
 .card {
   padding: 26px;
   border-radius: 26px;
   margin-bottom: 22px;
 }
 
+.card.status-ok {
+  padding: 12px 16px;
+  border-radius: 18px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
   gap: 22px;
+}
+
+.actions-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.docs-card {
+  overflow: hidden;
 }
 
 h1,
@@ -111,11 +131,38 @@ h2 {
   margin-bottom: 22px;
 }
 
+.scan-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+}
+
+.status-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  color: var(--muted);
+}
+
+.status-check {
+  color: var(--accent);
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .facts div,
@@ -201,10 +248,131 @@ button:disabled {
   background: #e5ded0;
 }
 
+.secondary.danger {
+  color: #7c1d1d;
+  background: #f1d8d8;
+}
+
 .scan-results,
 .project-list {
   display: grid;
   gap: 10px;
+}
+
+.button-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.35fr) minmax(0, 0.65fr);
+  gap: 16px;
+}
+
+.docs-list,
+.doc-viewer {
+  min-height: 260px;
+  max-height: 520px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.52);
+  border-radius: 18px;
+}
+
+.docs-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 10px;
+}
+
+.doc-link {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.doc-link.active,
+.doc-link:hover {
+  color: var(--accent-strong);
+  background: rgba(47, 93, 80, 0.1);
+}
+
+.doc-viewer {
+  padding: 18px;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.doc-viewer h1,
+.doc-viewer h2,
+.doc-viewer h3 {
+  margin: 1.1em 0 0.45em;
+  letter-spacing: -0.03em;
+}
+
+.doc-viewer h1:first-child,
+.doc-viewer h2:first-child,
+.doc-viewer h3:first-child {
+  margin-top: 0;
+}
+
+.doc-viewer p,
+.doc-viewer ul,
+.doc-viewer ol,
+.doc-viewer table,
+.doc-viewer pre {
+  margin: 0 0 1em;
+}
+
+.doc-viewer code,
+.doc-viewer pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.doc-viewer code {
+  padding: 0.12em 0.32em;
+  border-radius: 6px;
+  background: rgba(47, 93, 80, 0.1);
+}
+
+.doc-viewer pre {
+  overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: #1f241f;
+  color: #f4f1e8;
+}
+
+.doc-viewer pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.doc-viewer table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doc-viewer th,
+.doc-viewer td {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.doc-viewer blockquote {
+  margin: 0 0 1em;
+  padding-left: 14px;
+  border-left: 4px solid var(--accent);
+  color: var(--muted);
 }
 
 .scan-row,
@@ -214,6 +382,15 @@ button:disabled {
   align-items: center;
   gap: 12px;
   padding: 13px;
+}
+
+.scan-row {
+  cursor: pointer;
+}
+
+.scan-row.selected {
+  border-color: rgba(47, 93, 80, 0.7);
+  background: rgba(47, 93, 80, 0.08);
 }
 
 .project-row {
@@ -279,6 +456,16 @@ select {
   background: var(--error);
 }
 
+.closed {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(244, 241, 232, 0.85);
+  backdrop-filter: blur(12px);
+}
+
 @media (max-width: 820px) {
   .shell {
     width: min(100% - 22px, 1120px);
@@ -291,6 +478,12 @@ select {
     flex-direction: column;
   }
 
+  .scan-controls,
+  .hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .hero,
   .card {
     padding: 20px;
@@ -298,8 +491,15 @@ select {
   }
 
   .grid,
-  .facts {
+  .facts,
+  .docs-layout {
     grid-template-columns: 1fr;
+  }
+
+  .actions-card,
+  .button-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .scan-row,
