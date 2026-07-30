@@ -6,8 +6,9 @@ Deterministischer Installer fuer k-playbook. Das Tool lebt bewusst isoliert unte
 
 - `status` prueft den Pfadvertrag `~/dev/k-playbook`.
 - `status --fix` legt nur dann einen Symlink an, wenn `~/dev/k-playbook` fehlt und das aktuelle k-playbook-Repo sicher erkannt wurde.
-- `gui` startet eine lokale Browser-Oberflaeche, zeigt den Pfadstatus, bietet denselben Symlink-Fix nach Bestaetigung an und sammelt danach Projekt-Auswahlen. Der Projekt-Scan kann `~/dev` oder das Home-Verzeichnis `~` durchsuchen. Ausserdem kann die GUI `git pull --ff-only` ausfuehren und Markdown-Dateien aus `docs/` gerendert anzeigen.
-- Die GUI prueft und aktualisiert die OpenCode-Registrierung fuer `commands/k-*.md` und `skills.paths`.
+- `gui` startet eine lokale Browser-Oberflaeche, zeigt den Pfadstatus, bietet denselben Symlink-Fix nach Bestaetigung an und sammelt danach Projekt-Auswahlen. Der Projekt-Scan kann `~/dev` oder das Home-Verzeichnis `~` durchsuchen. Ausserdem kann die GUI `git pull --ff-only` ausfuehren, Security-Tools read-only pruefen und Markdown-Dateien aus `docs/` gerendert anzeigen.
+- Die GUI prueft und aktualisiert die Assistenten-Registrierung fuer OpenCode und Claude: `commands/k-*.md`, OpenCode `skills.paths` und Claude-Skill-Symlinks.
+- Die GUI zeigt einen Security-Tool-Preflight fuer `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` und optional `docker`; sie installiert dabei nichts.
 - `projects list`, `projects scan` und `projects add` verwalten die lokale Projekt-Auswahl.
 
 Lokale Installer-Daten liegen unter:

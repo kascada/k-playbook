@@ -1,6 +1,9 @@
 const state = {
   status: null,
   scanned: [],
+  devcontainers: null,
+  securityTools: null,
+  projects: [],
 };
 
 const elements = {
@@ -16,6 +19,9 @@ const elements = {
   opencodeRefresh: document.querySelector("#opencode-refresh"),
   opencodePill: document.querySelector("#opencode-pill"),
   opencodeSummary: document.querySelector("#opencode-summary"),
+  securityToolsRefresh: document.querySelector("#security-tools-refresh"),
+  securityToolsPill: document.querySelector("#security-tools-pill"),
+  securityToolsSummary: document.querySelector("#security-tools-summary"),
   reloadDocs: document.querySelector("#reload-docs"),
   docsList: document.querySelector("#docs-list"),
   docViewer: document.querySelector("#doc-viewer"),
@@ -56,6 +62,7 @@ elements.gitPullTop.addEventListener("click", gitPull);
 elements.gitPull.addEventListener("click", gitPull);
 elements.opencodeInstall.addEventListener("click", installOpenCode);
 elements.opencodeRefresh.addEventListener("click", loadOpenCodeStatus);
+elements.securityToolsRefresh.addEventListener("click", loadSecurityToolsStatus);
 elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
@@ -65,6 +72,7 @@ elements.manualForm.addEventListener("submit", addManualProject);
 refreshAll();
 showHome();
 startHealthChecks();
+window.addEventListener("pagehide", notifyClientGone);
 
 function showHome() {
   for (const element of document.querySelectorAll("[data-view='home']")) {
@@ -88,7 +96,9 @@ async function refreshAll() {
   await refreshStatus();
   if (state.status && state.status.OK) {
     await refreshProjects();
+    await loadDevcontainerStatus();
     await loadOpenCodeStatus();
+    await loadSecurityToolsStatus();
     await loadDocs();
   }
 }
@@ -140,6 +150,19 @@ function showClosed(message = "") {
   elements.closed.classList.remove("hidden");
 }
 
+function notifyClientGone() {
+  if (!serverAvailable) {
+    return;
+  }
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon("/api/client-gone");
+    return;
+  }
+
+  fetch("/api/client-gone", { method: "POST", keepalive: true }).catch(() => {});
+}
+
 async function loadDocs() {
   await withBusy(elements.reloadDocs, async () => {
     const docs = await api("/api/docs");
@@ -154,11 +177,41 @@ async function loadOpenCodeStatus() {
   });
 }
 
+async function loadSecurityToolsStatus() {
+  await withBusy(elements.securityToolsRefresh, async () => {
+    const status = await api("/api/security-tools/status");
+    state.securityTools = status;
+    renderSecurityTools(status);
+  });
+}
+
 async function installOpenCode() {
   await withBusy(elements.opencodeInstall, async () => {
     const result = await api("/api/opencode/install", { method: "POST" });
     renderOpenCode(result.status);
     showToast(result.message || "OpenCode-Registrierung aktualisiert.");
+  });
+}
+
+async function loadDevcontainerStatus() {
+  const status = await api("/api/devcontainer/status");
+  state.devcontainers = status;
+  renderProjects(state.projects);
+}
+
+async function installDevcontainer(projectPath, button) {
+  if (!window.confirm(`DevContainer-Integration fuer ${projectPath} eintragen?`)) {
+    return;
+  }
+
+  await withBusy(button, async () => {
+    const result = await api("/api/devcontainer/install", {
+      method: "POST",
+      body: JSON.stringify({ path: projectPath }),
+    });
+    state.devcontainers = result.status;
+    renderProjects(state.projects);
+    showToast(result.message || "DevContainer-Integration aktualisiert.");
   });
 }
 
@@ -180,13 +233,15 @@ async function repairPath() {
     if (status.OK) {
       showToast("Pfadvertrag repariert.");
       await refreshProjects();
+      await loadDevcontainerStatus();
     }
   });
 }
 
 async function refreshProjects() {
   const file = await api("/api/projects");
-  renderProjects(file.projects || file.Projects || []);
+  state.projects = file.projects || file.Projects || [];
+  renderProjects(state.projects);
 }
 
 async function scanProjects() {
@@ -216,7 +271,9 @@ async function saveScannedProjects() {
       method: "POST",
       body: JSON.stringify({ projects: selected }),
     });
-    renderProjects(file.projects || file.Projects || []);
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    await loadDevcontainerStatus();
     showToast("Auswahl gespeichert.");
     showHome();
   });
@@ -241,7 +298,9 @@ async function addManualProject(event) {
       }),
     });
     elements.manualPath.value = "";
-    renderProjects(file.projects || file.Projects || []);
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    await loadDevcontainerStatus();
     showToast("Projekt gespeichert.");
     showHome();
   });
@@ -328,6 +387,7 @@ function updateSaveScanButton() {
 }
 
 function renderProjects(projects) {
+  state.projects = projects;
   elements.projects.innerHTML = "";
   elements.projects.classList.toggle("empty", projects.length === 0);
 
@@ -337,9 +397,11 @@ function renderProjects(projects) {
   }
 
   for (const project of projects) {
-    const row = document.createElement("div");
-    row.className = "project-row";
+    const card = document.createElement("div");
+    card.className = "project-row";
 
+    const header = document.createElement("div");
+    header.className = "project-header";
     const details = document.createElement("div");
     const path = document.createElement("div");
     path.className = "path";
@@ -349,12 +411,79 @@ function renderProjects(projects) {
     meta.textContent = detectedLabel(project);
     details.append(path, meta);
 
-    const pill = document.createElement("span");
-    pill.className = "pill ok";
-    pill.textContent = (project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
-    row.append(details, pill);
-    elements.projects.append(row);
+    const environment = document.createElement("span");
+    environment.className = "project-env";
+    environment.textContent = (project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
+    header.append(details, environment);
+    card.append(header);
+
+    const devcontainerRow = projectDevcontainerRow(project);
+    if (devcontainerRow) {
+      card.append(devcontainerRow);
+    }
+    elements.projects.append(card);
   }
+}
+
+function projectDevcontainerRow(project) {
+  const environment = project.environment || project.Environment || "unknown";
+  if (environment !== "devcontainer") {
+    return null;
+  }
+
+  const projectPath = project.path || project.Path;
+  const missing = devcontainerMissing(projectPath);
+  const checked = missing !== null;
+  const row = document.createElement("div");
+  row.className = "project-check-row";
+
+  const text = document.createElement("div");
+  const title = document.createElement("span");
+  title.className = "project-check-title";
+  title.textContent = "k-playbook im Container erreichbar";
+  if (!checked) {
+    const detail = document.createElement("span");
+    detail.textContent = "Status wird geprueft.";
+    text.append(title, detail);
+  } else if (missing.length > 0) {
+    const detail = document.createElement("span");
+    detail.textContent = `Fehlt: ${missing.join(", ")}`;
+    text.append(title, detail);
+  } else {
+    text.append(title);
+  }
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const stateLabel = document.createElement("span");
+  stateLabel.className = "status-label " + (!checked ? "muted" : missing.length === 0 ? "ok" : "warn");
+  stateLabel.textContent = !checked ? "Pruefen..." : missing.length === 0 ? "OK ✓" : "WARN !";
+  action.append(stateLabel);
+
+  if (checked && missing.length > 0) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "primary";
+    button.textContent = "Eintrag setzen";
+    button.addEventListener("click", () => installDevcontainer(projectPath, button));
+    action.append(button);
+  }
+
+  row.append(text, action);
+  return row;
+}
+
+function devcontainerMissing(projectPath) {
+  const status = state.devcontainers;
+  if (!status) {
+    return null;
+  }
+  const missing = status.missing || status.Missing || [];
+  const project = missing.find((entry) => (entry.path || entry.Path) === projectPath);
+  if (!project) {
+    return [];
+  }
+  return project.missing || project.Missing || [];
 }
 
 function renderOpenCode(status) {
@@ -412,6 +541,64 @@ function renderOpenCode(status) {
     row.append(key, text);
     elements.opencodeSummary.append(row);
   }
+}
+
+function renderSecurityTools(status) {
+  const ok = status.ok || status.OK;
+  const scopeOk = status.scopeOk !== false && status.ScopeOK !== false;
+  const missingRequired = status.missingRequired ?? status.MissingRequired ?? 0;
+  const tools = status.tools || status.Tools || [];
+
+  elements.securityToolsPill.textContent = ok ? "OK ✓" : scopeOk ? "WARN !" : "SCOPE !";
+  elements.securityToolsPill.className = "status-label " + (ok ? "ok" : "warn");
+  elements.securityToolsSummary.innerHTML = "";
+  elements.securityToolsSummary.classList.remove("empty");
+
+  const summary = document.createElement("div");
+  summary.className = "security-summary";
+  const summaryText = document.createElement("p");
+  summaryText.className = "message";
+  summaryText.textContent = status.message || status.Message || (ok ? "Alle Pflicht-Tools sind vorhanden." : `${missingRequired} Pflicht-Tools fehlen.`);
+  summary.append(summaryText);
+
+  if (!scopeOk) {
+    const scope = document.createElement("p");
+    scope.className = "message warn-text";
+    const virtualEnv = status.virtualEnv || status.VirtualEnv || "";
+    const warnings = status.pathWarnings || status.PathWarnings || [];
+    scope.textContent = [
+      virtualEnv ? `VIRTUAL_ENV: ${virtualEnv}` : "",
+      warnings.length > 0 ? `PATH enthaelt: ${warnings.join(", ")}` : "",
+    ].filter(Boolean).join(" | ");
+    summary.append(scope);
+  }
+  elements.securityToolsSummary.append(summary);
+
+  const list = document.createElement("div");
+  list.className = "security-tool-list";
+  for (const tool of tools) {
+    const row = document.createElement("div");
+    row.className = "security-tool-row";
+
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = tool.name || tool.Name;
+    const detail = document.createElement("span");
+    const role = tool.role || tool.Role || "";
+    const path = tool.path || tool.Path || "";
+    const version = tool.version || tool.Version || "";
+    detail.textContent = path ? `${role} - ${version} - ${path}` : role;
+    info.append(name, detail);
+
+    const present = tool.present || tool.Present;
+    const label = document.createElement("span");
+    label.className = "status-label " + (present ? "ok" : (tool.required || tool.Required) ? "warn" : "muted");
+    label.textContent = present ? "OK ✓" : (tool.required || tool.Required) ? "FEHLT !" : "OPTIONAL";
+
+    row.append(info, label);
+    list.append(row);
+  }
+  elements.securityToolsSummary.append(list);
 }
 
 function compactList(values) {

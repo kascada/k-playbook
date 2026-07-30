@@ -14,9 +14,11 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/pathcontract"
@@ -97,8 +99,79 @@ type opencodeInstallResult struct {
 	Message string         `json:"message"`
 }
 
+type devcontainerStatus struct {
+	OK           bool                      `json:"ok"`
+	HasProjects  bool                      `json:"hasProjects"`
+	ProjectCount int                       `json:"projectCount"`
+	ReadyCount   int                       `json:"readyCount"`
+	Missing      []devcontainerProjectInfo `json:"missing"`
+	MountEntry   string                    `json:"mountEntry"`
+	Message      string                    `json:"message"`
+}
+
+type devcontainerProjectInfo struct {
+	Path    string   `json:"path"`
+	Missing []string `json:"missing"`
+}
+
+type devcontainerInstallRequest struct {
+	Path string `json:"path"`
+}
+
+type devcontainerInstallResult struct {
+	Status  devcontainerStatus `json:"status"`
+	Changed bool               `json:"changed"`
+	Output  string             `json:"output"`
+	Message string             `json:"message"`
+}
+
+type securityToolSpec struct {
+	Name     string
+	Role     string
+	Required bool
+}
+
+type securityToolStatus struct {
+	OK              bool               `json:"ok"`
+	ScopeOK         bool               `json:"scopeOk"`
+	MissingRequired int                `json:"missingRequired"`
+	Tools           []securityToolInfo `json:"tools"`
+	VirtualEnv      string             `json:"virtualEnv"`
+	PathWarnings    []string           `json:"pathWarnings"`
+	Message         string             `json:"message"`
+}
+
+type securityToolInfo struct {
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	Required bool   `json:"required"`
+	Present  bool   `json:"present"`
+	Path     string `json:"path"`
+	Version  string `json:"version"`
+}
+
 type serverState struct {
-	shutdown func()
+	shutdown       func()
+	mu             sync.Mutex
+	lastClientSeen time.Time
+	clientGoneAt   time.Time
+}
+
+const (
+	clientGoneShutdownDelay = 10 * time.Second
+	clientHeartbeatTimeout  = 30 * time.Second
+	clientMonitorInterval   = 2 * time.Second
+	toolVersionTimeout      = 2 * time.Second
+)
+
+var securityToolSpecs = []securityToolSpec{
+	{Name: "gitleaks", Role: "Secret-Scanning", Required: true},
+	{Name: "trufflehog", Role: "Tiefes Secret-Scanning", Required: true},
+	{Name: "pip-audit", Role: "Python Dependency-CVEs", Required: true},
+	{Name: "trivy", Role: "Filesystem/Container/IaC-CVEs", Required: true},
+	{Name: "syft", Role: "SBOM-Erzeugung", Required: true},
+	{Name: "grype", Role: "SBOM-/Dependency-CVE-Auswertung", Required: true},
+	{Name: "docker", Role: "Optionaler Fallback fuer Container-Images", Required: false},
 }
 
 var markdown = goldmark.New(
@@ -113,12 +186,13 @@ func Run() error {
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
-	state := serverState{shutdown: stop}
+	state := &serverState{shutdown: stop}
 	server := &http.Server{Handler: routes(state)}
 	serverErr := make(chan error, 1)
 	go func() {
 		serverErr <- server.Serve(listener)
 	}()
+	go state.monitorClient(ctx)
 
 	url := "http://" + listener.Addr().String() + "/"
 	fmt.Printf("k-playbook Installer GUI: %s\n", url)
@@ -159,7 +233,7 @@ func Run() error {
 	}
 }
 
-func routes(state serverState) http.Handler {
+func routes(state *serverState) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", statusHandler)
 	mux.HandleFunc("POST /api/repair-path", repairPathHandler)
@@ -172,15 +246,65 @@ func routes(state serverState) http.Handler {
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
 	mux.HandleFunc("GET /api/opencode/status", opencodeStatusHandler)
 	mux.HandleFunc("POST /api/opencode/install", opencodeInstallHandler)
-	mux.HandleFunc("GET /api/health", healthHandler)
+	mux.HandleFunc("GET /api/security-tools/status", securityToolsStatusHandler)
+	mux.HandleFunc("GET /api/devcontainer/status", devcontainerStatusHandler)
+	mux.HandleFunc("POST /api/devcontainer/install", devcontainerInstallHandler)
+	mux.HandleFunc("GET /api/health", state.healthHandler)
+	mux.HandleFunc("POST /api/client-gone", state.clientGoneHandler)
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
 	mux.HandleFunc("/", staticHandler)
 
 	return mux
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
+	state.noteClientSeen()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (state *serverState) clientGoneHandler(w http.ResponseWriter, r *http.Request) {
+	state.noteClientGone()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (state *serverState) noteClientSeen() {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.lastClientSeen = time.Now()
+	state.clientGoneAt = time.Time{}
+}
+
+func (state *serverState) noteClientGone() {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.clientGoneAt = time.Now()
+}
+
+func (state *serverState) monitorClient(ctx context.Context) {
+	ticker := time.NewTicker(clientMonitorInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if state.shouldShutdownForMissingClient(now) {
+				state.shutdown()
+				return
+			}
+		}
+	}
+}
+
+func (state *serverState) shouldShutdownForMissingClient(now time.Time) bool {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	if !state.clientGoneAt.IsZero() && now.Sub(state.clientGoneAt) >= clientGoneShutdownDelay {
+		return true
+	}
+	return !state.lastClientSeen.IsZero() && now.Sub(state.lastClientSeen) >= clientHeartbeatTimeout
 }
 
 func opencodeStatusHandler(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +337,49 @@ func opencodeInstallHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, opencodeInstallResult{Status: status, Changed: changed, Message: message})
 }
 
-func (state serverState) shutdownHandler(w http.ResponseWriter, r *http.Request) {
+func securityToolsStatusHandler(w http.ResponseWriter, r *http.Request) {
+	status := checkSecurityTools()
+	writeJSON(w, http.StatusOK, status)
+}
+
+func devcontainerStatusHandler(w http.ResponseWriter, r *http.Request) {
+	status, err := checkDevcontainers()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, status)
+}
+
+func devcontainerInstallHandler(w http.ResponseWriter, r *http.Request) {
+	var request devcontainerInstallRequest
+	if r.ContentLength != 0 {
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+			return
+		}
+	}
+
+	output, changed, err := installDevcontainers(r.Context(), request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	status, err := checkDevcontainers()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	message := "DevContainer-Integration ist aktuell."
+	if changed {
+		message = "DevContainer-Integration aktualisiert. DevContainer danach neu bauen oder neu starten."
+	}
+	writeJSON(w, http.StatusOK, devcontainerInstallResult{Status: status, Changed: changed, Output: output, Message: message})
+}
+
+func (state *serverState) shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting_down"})
 	go func() {
 		time.Sleep(150 * time.Millisecond)
@@ -633,6 +799,240 @@ func installOpenCode() (bool, error) {
 		return changed, err
 	}
 	return changed || configChanged, nil
+}
+
+func checkSecurityTools() securityToolStatus {
+	status := securityToolStatus{
+		ScopeOK:      true,
+		VirtualEnv:   os.Getenv("VIRTUAL_ENV"),
+		PathWarnings: projectVenvPathEntries(os.Getenv("PATH")),
+	}
+	if status.VirtualEnv != "" || len(status.PathWarnings) > 0 {
+		status.ScopeOK = false
+	}
+
+	for _, spec := range securityToolSpecs {
+		info := securityToolInfo{Name: spec.Name, Role: spec.Role, Required: spec.Required}
+		if path, err := exec.LookPath(spec.Name); err == nil {
+			info.Present = true
+			info.Path = path
+			info.Version = securityToolVersion(spec.Name)
+		} else if spec.Required {
+			status.MissingRequired++
+		}
+		status.Tools = append(status.Tools, info)
+	}
+
+	status.OK = status.ScopeOK && status.MissingRequired == 0
+	switch {
+	case !status.ScopeOK:
+		status.Message = "Aktives oder im PATH sichtbares Projekt-venv gefunden. Security-Tools erst nach deactivate/PATH-Bereinigung host-global bewerten."
+	case status.MissingRequired > 0:
+		status.Message = fmt.Sprintf("%d Pflicht-Tools fehlen. Installation spaeter separat klaeren.", status.MissingRequired)
+	default:
+		status.Message = "Alle Pflicht-Tools sind vorhanden."
+	}
+
+	return status
+}
+
+func securityToolVersion(tool string) string {
+	args := []string{"--version"}
+	if tool == "gitleaks" || tool == "syft" || tool == "grype" {
+		args = []string{"version"}
+	}
+	output, timedOut := securityToolVersionOutput(tool, args...)
+	if len(output) == 0 && len(args) == 1 && args[0] == "version" {
+		output, timedOut = securityToolVersionOutput(tool, "--version")
+	}
+	if timedOut {
+		return "Timeout bei Versionsabfrage"
+	}
+
+	line := strings.TrimSpace(string(output))
+	if line == "" {
+		return "Version unbekannt"
+	}
+	if index := strings.IndexByte(line, '\n'); index >= 0 {
+		line = line[:index]
+	}
+	return line
+}
+
+func securityToolVersionOutput(tool string, args ...string) ([]byte, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), toolVersionTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, tool, args...)
+	output, _ := cmd.CombinedOutput()
+	return output, ctx.Err() == context.DeadlineExceeded
+}
+
+func projectVenvPathEntries(value string) []string {
+	warnings := []string{}
+	for _, entry := range filepath.SplitList(value) {
+		if isProjectVenvPath(entry) {
+			warnings = append(warnings, entry)
+		}
+	}
+	return warnings
+}
+
+func isProjectVenvPath(path string) bool {
+	path = filepath.ToSlash(strings.TrimRight(path, `/\\`))
+	if path == "" {
+		return false
+	}
+	parts := strings.Split(path, "/")
+	for _, part := range parts {
+		switch part {
+		case ".venv", "venv", "env":
+			return true
+		}
+	}
+	return false
+}
+
+func checkDevcontainers() (devcontainerStatus, error) {
+	file, err := store.LoadProjects()
+	if err != nil {
+		return devcontainerStatus{}, err
+	}
+
+	status := devcontainerStatus{MountEntry: devcontainerMountEntry()}
+	for _, project := range file.Projects {
+		if !project.Selected || project.Environment != store.EnvironmentDevContainer {
+			continue
+		}
+		status.HasProjects = true
+		status.ProjectCount++
+
+		missing := missingDevcontainerIntegration(project.Path)
+		if len(missing) == 0 {
+			status.ReadyCount++
+			continue
+		}
+		status.Missing = append(status.Missing, devcontainerProjectInfo{Path: project.Path, Missing: missing})
+	}
+
+	status.OK = status.HasProjects && status.ReadyCount == status.ProjectCount
+	if !status.HasProjects {
+		status.Message = "Kein gespeichertes DevContainer-Projekt ausgewaehlt."
+	} else if status.OK {
+		status.Message = "Alle DevContainer-Projekte binden ~/dev/k-playbook ein."
+	} else {
+		status.Message = fmt.Sprintf("%d von %d DevContainer-Projekten brauchen die k-playbook-Integration.", len(status.Missing), status.ProjectCount)
+	}
+
+	return status, nil
+}
+
+func installDevcontainers(ctx context.Context, projectPath string) (string, bool, error) {
+	root, err := repoRoot()
+	if err != nil {
+		return "", false, err
+	}
+	file, err := store.LoadProjects()
+	if err != nil {
+		return "", false, err
+	}
+
+	script := filepath.Join(root, "scripts", "install-devcontainer-k-playbook.sh")
+	if _, err := os.Stat(script); err != nil {
+		return "", false, fmt.Errorf("DevContainer-Installationsscript pruefen: %w", err)
+	}
+	if strings.TrimSpace(projectPath) != "" {
+		projectPath, err = projects.NormalizePath(projectPath)
+		if err != nil {
+			return "", false, err
+		}
+	}
+
+	var output strings.Builder
+	changed := false
+	found := false
+	for _, project := range file.Projects {
+		if !project.Selected || project.Environment != store.EnvironmentDevContainer {
+			continue
+		}
+		if projectPath != "" && project.Path != projectPath {
+			continue
+		}
+		found = true
+		if len(missingDevcontainerIntegration(project.Path)) == 0 {
+			continue
+		}
+
+		commandCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		cmd := exec.CommandContext(commandCtx, script, project.Path)
+		cmd.Dir = root
+		data, err := cmd.CombinedOutput()
+		cancel()
+		if output.Len() > 0 {
+			output.WriteString("\n")
+		}
+		output.WriteString(strings.TrimSpace(string(data)))
+		if commandCtx.Err() == context.DeadlineExceeded {
+			return output.String(), changed, fmt.Errorf("DevContainer-Installation Timeout: %s", project.Path)
+		}
+		if err != nil {
+			return output.String(), changed, fmt.Errorf("DevContainer-Integration fuer %s: %w\n%s", project.Path, err, strings.TrimSpace(string(data)))
+		}
+		changed = true
+	}
+	if projectPath != "" && !found {
+		return output.String(), changed, fmt.Errorf("gespeichertes DevContainer-Projekt nicht gefunden: %s", projectPath)
+	}
+
+	return output.String(), changed, nil
+}
+
+func missingDevcontainerIntegration(projectPath string) []string {
+	devcontainerJSON := filepath.Join(projectPath, ".devcontainer", "devcontainer.json")
+	setupScript := filepath.Join(projectPath, ".devcontainer", "setup-k-playbook.sh")
+	missing := []string{}
+
+	data, err := os.ReadFile(devcontainerJSON)
+	if err != nil {
+		return []string{".devcontainer/devcontainer.json fehlt oder ist nicht lesbar"}
+	}
+	content := string(data)
+	if !strings.Contains(content, devcontainerMountEntry()) {
+		missing = append(missing, "Bind-Mount ~/dev/k-playbook -> /workspaces/k-playbook")
+	}
+	if !hasDevcontainerCommand(content, "postCreateCommand", "sudo bash .devcontainer/setup-k-playbook.sh --install-security-tools") {
+		missing = append(missing, "postCreateCommand fuer setup-k-playbook.sh")
+	}
+	if !hasDevcontainerCommand(content, "postStartCommand", "sudo bash .devcontainer/setup-k-playbook.sh") {
+		missing = append(missing, "postStartCommand fuer setup-k-playbook.sh")
+	}
+	if info, err := os.Stat(setupScript); err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+		missing = append(missing, ".devcontainer/setup-k-playbook.sh fehlt oder ist nicht ausfuehrbar")
+	}
+
+	return missing
+}
+
+func devcontainerMountEntry() string {
+	return "source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind"
+}
+
+func hasDevcontainerCommand(content string, name string, desired string) bool {
+	pattern := regexp.MustCompile(`"` + regexp.QuoteMeta(name) + `"\s*:\s*"((?:\\.|[^"\\])*)"`)
+	match := pattern.FindStringSubmatch(content)
+	if len(match) != 2 {
+		return false
+	}
+
+	var value string
+	if err := json.Unmarshal([]byte(`"`+match[1]+`"`), &value); err != nil {
+		return false
+	}
+	for _, part := range strings.Split(value, "&&") {
+		if strings.TrimSpace(part) == desired {
+			return true
+		}
+	}
+	return false
 }
 
 func assistantPaths() (string, string, string, string, error) {

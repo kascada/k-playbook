@@ -165,6 +165,11 @@ Aktuelle Endpunkte:
 | `GET` | `/api/docs/file?path=docs/...md` | Markdown-Datei lesen und gerendert ausgeben |
 | `GET` | `/api/opencode/status` | OpenCode- und Claude-Command-/Skill-Registrierung pruefen |
 | `POST` | `/api/opencode/install` | Fehlende/falsche k-playbook-Command-/Skill-Symlinks anlegen, verwaiste eigene Symlinks entfernen und OpenCode `skills.paths` konservativ ergaenzen |
+| `GET` | `/api/security-tools/status` | Host-lokalen Security-Tool-Preflight als strukturierte Liste pruefen; installiert nichts |
+| `GET` | `/api/devcontainer/status` | Gespeicherte DevContainer-Projekte auf k-playbook-Mount und Setup-Hooks pruefen |
+| `POST` | `/api/devcontainer/install` | Fuer eine konkrete oder alle fehlenden DevContainer-Integrationen `scripts/install-devcontainer-k-playbook.sh <projekt>` ausfuehren |
+| `GET` | `/api/health` | Client-Heartbeat und Verfuegbarkeit des lokalen GUI-Servers pruefen |
+| `POST` | `/api/client-gone` | Browser meldet Tab-/Fenster-Schliessen oder Navigation per `sendBeacon` |
 | `POST` | `/api/shutdown` | Lokalen GUI-Server beenden |
 
 `repoRoot()` in `webui/server.go` nutzt den Pfadvertrag und `pathcontract.IsKPlaybookRoot()`, bevor Docs oder Git-Aktionen ausgefuehrt werden.
@@ -176,14 +181,19 @@ Aktuelle Endpunkte:
 Die Startseite zeigt:
 
 1. Header mit Button `Status neu laden`.
+   Daneben liegt `k-playbook aktualisieren`; der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl`.
-5. Button `Projekte auswaehlen`.
-6. Assistenten-Registrierungsblock fuer OpenCode und Claude.
-7. Repository-Block mit `Git pull`.
-8. Docs-Block mit gerenderter Markdown-Anzeige.
-9. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`.
+5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt der jeweilige Projektblock die Zeile `k-playbook im Container erreichbar`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Bei fehlenden Eintraegen zeigt diese Projektzeile `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
+6. Button `Projekte auswaehlen`.
+7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
+8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
+9. Repository-Block mit `Git pull`; nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
+10. Docs-Block mit gerenderter Markdown-Anzeige.
+11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
+
+Der Client prueft periodisch `/api/health`. Wenn der lokale Server extern beendet wird, z. B. per `Ctrl+C`, erkennt der bereits geladene Browser-Tab den Verbindungsverlust und zeigt denselben Abschluss-Hinweis. Umgekehrt meldet der Browser beim Tab-/Fenster-Schliessen oder bei Navigation `/api/client-gone` per `sendBeacon`; der Server beendet sich danach mit kurzem Timeout. Falls diese Meldung nicht ankommt, beendet sich der Server nach ausbleibenden Heartbeats. Ein Reload bleibt moeglich, weil ein neuer Heartbeat die Abmeldung wieder aufhebt.
 
 Der Installer versucht nicht, den Browser beim Server-Ende automatisch zu schliessen. Browser blockieren das in vielen Faellen, und `open`/`xdg-open` liefern keinen verlaesslichen Tab-Handle. Der robuste Weg ist der explizite `Schliessen`-Button in der GUI oder `Ctrl+C` im Terminal.
 
@@ -206,6 +216,15 @@ Der Block bildet den zentralen Teil von `/k-install` ab und erweitert ihn um Cla
 Nach Aenderungen an Commands oder Skills muessen betroffene Assistenten neu gestartet werden, weil OpenCode und Claude Code Commands/Skills beim Start bzw. beim Laden ihrer Umgebung erfassen.
 
 UI-Regel: Reine Statusanzeigen duerfen nicht wie Buttons aussehen. Fuer klickbare Aktionen werden `button`, `.primary` und `.secondary` genutzt. Fuer nicht-klickbare Zustandsanzeigen wird `.status-label` genutzt, z. B. `WARN !` oder `OK ✓`, ohne Rahmen und ohne pill-/button-artige Flaeche.
+
+### Security-Tool-Preflight
+
+Der Block bildet den read-only Teil von `/k-install` und `/k-install-security-tools --preflight` ab. Er nutzt eine zentrale Tool-Liste im Go-Backend:
+
+- Pflicht: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`.
+- Optional angezeigt: `docker` als spaeterer Fallback-Kontext.
+
+Die GUI prueft pro Tool nur `exec.LookPath()` und eine kurze Versionsabfrage. Sie schreibt keine Dateien, installiert keine Tools und startet keine Scans. Wenn `VIRTUAL_ENV` gesetzt ist oder `PATH` typische Projekt-venv-Segmente wie `.venv`, `venv` oder `env` enthaelt, wird der Scope als Warnung angezeigt, damit Projekt-venvs nicht als host-globale Tool-Installation gewertet werden.
 
 ### Scan-Seite
 
@@ -301,7 +320,7 @@ dist/k-playbook-installer-<os>-<arch>
 
 `make dist` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert. Das private Maintainer-Target `make -C priv release-artifacts` ruft dieses Root-Target auf.
 
-`make install` installiert ohne Go ein vorhandenes passendes `dist/`-Artefakt oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`.
+`make install` installiert ohne Go ein vorhandenes passendes `dist/`-Artefakt oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
 
 `make install-from-source` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
 
@@ -332,7 +351,7 @@ Standard-Entwicklung:
 
 ```bash
 cd installer
-go run ./cmd/k-playbook-installer gui
+go run ./cmd/k-playbook-installer
 ```
 
 Pruefungen nach Aenderungen:

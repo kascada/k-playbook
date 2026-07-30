@@ -4,20 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>k-playbook Installer</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <main class="shell">
-      <section class="hero" data-view="home">
-        <div>
-          <p class="eyebrow">Lokaler Installer</p>
-          <h1>k-playbook einrichten</h1>
-          <p class="lead">Pfadvertrag pruefen und Zielprojekte fuer k-playbook auswaehlen.</p>
+      <section class="hero app-header" data-view="home">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>k-playbook</h1>
         </div>
-        <div class="hero-actions">
-          <button id="refresh" class="secondary">Status neu laden</button>
-          <button id="git-pull-top" class="secondary">k-playbook aktualisieren</button>
-          <button id="shutdown" class="secondary danger">Schliessen</button>
+        <div class="hero-subrow">
+          <p class="eyebrow">Lokaler Installer</p>
+          <div class="hero-actions">
+            <button id="refresh" class="secondary">Status neu laden</button>
+            <button id="git-pull-top" class="secondary">k-playbook aktualisieren</button>
+            <button id="shutdown" class="secondary danger">Schliessen</button>
+          </div>
         </div>
       </section>
 
@@ -55,7 +58,7 @@
         <section class="card">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Schritt 2</p>
+              <p class="eyebrow">Projekte</p>
               <h2>Projekt-Auswahl</h2>
             </div>
           </div>
@@ -83,6 +86,20 @@
           <div class="button-row">
             <button id="opencode-install" class="primary">Registrierung aktualisieren</button>
             <button id="opencode-refresh" class="secondary">Neu pruefen</button>
+          </div>
+        </section>
+
+        <section class="card" id="security-tools-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Security-Tool-Preflight</p>
+              <h2>Security-Tools pruefen</h2>
+            </div>
+            <span id="security-tools-pill" class="status-label muted">Pruefen...</span>
+          </div>
+          <div id="security-tools-summary" class="summary-list empty">Noch nicht geprueft.</div>
+          <div class="button-row">
+            <button id="security-tools-refresh" class="secondary">Neu pruefen</button>
           </div>
         </section>
 
