@@ -1,5 +1,5 @@
 ---
-description: Fast read-only health check for K-PLAYBOOK.MD, OpenCode symlinks, fixed project-local k-playbook layout, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
+description: Fast read-only health check for K-PLAYBOOK.yaml, OpenCode symlinks, fixed project-local k-playbook layout, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
 argument-hint: [full|codeql|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -11,7 +11,7 @@ Show a fast, read-only health overview for the current project.
 
 This command is a status preflight, not a repair command:
 
-- Read `K-PLAYBOOK.MD` as the project setup metadata and CodeQL decision source. Project-local paths are derived from the complete fixed `k-playbook/` layout.
+- Read `K-PLAYBOOK.yaml` as the project setup metadata and tool-decision source. Project-local paths are derived from the complete fixed `k-playbook/` layout.
 - Check host-local OpenCode command symlinks read-only against the resolved k-playbook repo.
 - Check the canonical k-playbook repo path contract, including the Devcontainer symlink case.
 - Prefer small existence and metadata checks over heavy scans.
@@ -23,9 +23,9 @@ This command is a status preflight, not a repair command:
 Interpret `$ARGUMENTS` as one optional mode:
 
 - Empty: compact default report with all sections.
-- `full`: run the default report and additionally print `K-PLAYBOOK.MD` in full when it exists; if it is long, summarize first and then include the full content under a separate heading.
-- `codeql`: only run target resolution, `K-PLAYBOOK.MD` loading, and the `codeql` section plus recommendations relevant to CodeQL.
-- `reviews`: only run target resolution, `K-PLAYBOOK.MD` loading, and the `reviews` section plus recommendations relevant to reviews.
+- `full`: run the default report and additionally print `K-PLAYBOOK.yaml` in full when it exists; if it is long, summarize first and then include the full content under a separate heading.
+- `codeql`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `codeql` section plus recommendations relevant to CodeQL.
+- `reviews`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `reviews` section plus recommendations relevant to reviews.
 - `json`: best-effort machine-readable JSON output. If producing exact JSON without a script would be too fragile for the current shell environment, print the normal checks as a compact JSON-shaped object and clearly mark this mode as an extension point.
 - `strict`: run the same checks as default, but label warnings as failed health gates in the summary. Do not change exit behavior and do not modify the filesystem.
 
@@ -37,54 +37,44 @@ Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md
 
 - If the command receives an explicit target directory in a future extension, resolve it with `realpath` and validate it exists.
 - For the current argument set, modes are not target paths; use `TARGET_DIR = realpath(CWD)`.
-- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.MD`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the preflight.
-- Read `<TARGET_DIR>/K-PLAYBOOK.MD` if present. If missing, record `K_PLAYBOOK_FOUND=false` and continue with the checks that do not require it.
+- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.yaml`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the preflight.
+- Read `<TARGET_DIR>/K-PLAYBOOK.yaml` if present. If missing, record `K_PLAYBOOK_FOUND=false` and continue with the checks that do not require it.
 
-Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` against the current process home before checking the filesystem. Read `K-PLAYBOOK.MD` `## Playbook-Quelle` → `repo:` only as validation metadata; expected value is `~/dev/k-playbook`. Do not ask for an alternate repo path in this command.
+Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` against the current process home before checking the filesystem. Read `K-PLAYBOOK.yaml` `k_playbook.repo` only as validation metadata; expected value is `~/dev/k-playbook`. Do not ask for an alternate repo path in this command.
 
 Canonical path rule:
 
-- Require `repo: ~/dev/k-playbook` in project `K-PLAYBOOK.MD`; `/k-setup` owns writing or migrating that value.
+- Require `k_playbook.repo: ~/dev/k-playbook` in project `K-PLAYBOOK.yaml`; `/k-setup` owns writing that value.
 - Absolute host paths such as `/home/kleist/dev/k-playbook` are valid only on that host and should be reported as `WARN` in portable projects, especially when `/workspaces/k-playbook` exists.
-- In a Devcontainer, `repo: ~/dev/k-playbook` should resolve to `/home/vscode/dev/k-playbook`, usually a symlink to `/workspaces/k-playbook`.
+- In a Devcontainer, `k_playbook.repo: ~/dev/k-playbook` should resolve to `/home/vscode/dev/k-playbook`, usually a symlink to `/workspaces/k-playbook`.
 
-## Step 2 — Parse K-PLAYBOOK.MD
+## Step 2 — Parse K-PLAYBOOK.yaml
 
-If `<TARGET_DIR>/K-PLAYBOOK.MD` exists, parse only simple metadata from it:
+If `<TARGET_DIR>/K-PLAYBOOK.yaml` exists, parse only simple metadata from it:
 
-- Managed setup block markers:
-  - `<!-- k-setup:managed:begin -->`
-  - `<!-- k-setup:managed:end -->`
-- Managed CodeQL block markers:
-  - `<!-- k-setup-codeql:managed:begin -->`
-  - `<!-- k-setup-codeql:managed:end -->`
-- Managed Dependabot block markers:
-  - `<!-- k-setup-dependabot:managed:begin -->`
-  - `<!-- k-setup-dependabot:managed:end -->`
-- `## Setup` entries `layout:`, `repo:`, and `setup-run:`.
-- Legacy `## Bausteine` or `## Pfade` entries only as migration signals.
-- `## CodeQL` entries listed in the `codeql` section.
-- `## Dependabot` entries listed in the `dependabot` section.
+- Top-level entries `schema_version` and `layout`.
+- Nested setup metadata: `k_playbook.repo` and `setup.updated_at`.
+- `remediation` policy entries when present.
+- `tools.codeql` entries listed in the `codeql` section.
+- Optional future `tools.dependabot` entries listed in the `dependabot` section.
 
-Marker status:
+Config status:
 
-- `OK`: every present managed block has exactly one begin marker and one matching end marker in the correct order.
-- `WARN`: a managed block is absent but the file otherwise exists.
-- `FAIL`: begin/end counts differ, a marker order is inverted, or markers are duplicated.
+- `OK`: YAML file exists, has `schema_version: 1`, and has `layout: fixed-project-k-playbook`.
+- `WARN`: YAML file exists but optional sections are absent or values are incomplete.
+- `FAIL`: YAML file is missing, not parseable enough for the required keys, or has an unsupported schema/layout.
 
-If `K-PLAYBOOK.MD` is missing, `playbook` is `FAIL` in default, `strict`, `full`, `codeql`, and `reviews` modes.
-
-If legacy `## Pfade` or `## Bausteine` is present, report `playbook` as `WARN` and recommend `/k-setup` to migrate the managed block. Do not fail solely because old `base:` is missing.
+If `K-PLAYBOOK.yaml` is missing, `playbook` is `FAIL` in default, `strict`, `full`, `codeql`, and `reviews` modes.
 
 ## Section: playbook
 
 Report:
 
 - `Projekt`: absolute `TARGET_DIR`.
-- `K-PLAYBOOK`: `OK`, `WARN`, or `FAIL` with marker status.
-- `repo:` from `## Playbook-Quelle`, if present.
-- `setup-run:` from `## Playbook-Quelle`, if present.
-- In `full` mode, print or fully summarize `K-PLAYBOOK.MD` after the compact report.
+- `K-PLAYBOOK`: `OK`, `WARN`, or `FAIL` with config status.
+- `k_playbook.repo`, if present.
+- `setup.updated_at`, if present.
+- In `full` mode, print or fully summarize `K-PLAYBOOK.yaml` after the compact report.
 
 ## Section: opencode
 
@@ -126,8 +116,8 @@ Check the Devcontainer path contract read-only:
 - `/workspaces/k-playbook/commands/` exists and contains `k-*.md`.
 - `~/dev/k-playbook` exists after tilde expansion in the container.
 - If `~/dev/k-playbook` is a symlink, `readlink` or equivalent resolution points to `/workspaces/k-playbook`.
-- If `K-PLAYBOOK.MD` has `repo: ~/dev/k-playbook`, the resolved path exists and points to the same physical directory as `/workspaces/k-playbook` when possible.
-- If `K-PLAYBOOK.MD` has an absolute host path while the Devcontainer mount exists, report a portability `WARN` and recommend changing it to `~/dev/k-playbook` plus the symlink.
+- If `K-PLAYBOOK.yaml` has `k_playbook.repo: ~/dev/k-playbook`, the resolved path exists and points to the same physical directory as `/workspaces/k-playbook` when possible.
+- If `K-PLAYBOOK.yaml` has an absolute host path while the Devcontainer mount exists, report a portability `WARN` and recommend changing it to `~/dev/k-playbook` plus the symlink.
 - `~/.config/opencode/command/k-install.md` exists and resolves to a command file under the resolved playbook repo or under `/workspaces/k-playbook`.
 - `~/.config/opencode/opencode.jsonc` or `.json` contains `skills.paths` with `~/dev/k-playbook` or the resolved equivalent.
 
@@ -136,7 +126,7 @@ Do not create the symlink and do not edit OpenCode config from `/k-status`.
 Status:
 
 - `OK`: mount exists, `~/dev/k-playbook` exists and resolves to the mount, command symlink exists, and `skills.paths` is plausible.
-- `WARN`: mount exists but symlink/config/command registration is missing or `repo:` is host-absolute instead of portable.
+- `WARN`: mount exists but symlink/config/command registration is missing or `k_playbook.repo` is host-absolute instead of portable.
 - `FAIL`: Devcontainer appears active but neither `/workspaces/k-playbook` nor the resolved `PLAYBOOK_REPO` contains `commands/k-*.md`.
 
 Suggested detail format:
@@ -164,7 +154,7 @@ Check these fixed paths:
 - `enforcement`
 - `docs`
 
-If legacy `## Pfade` or `## Bausteine` exists, report a migration warning. Do not use those blocks to decide which paths are expected; all fixed paths are expected.
+Do not read configurable standard paths from `K-PLAYBOOK.yaml`; all fixed paths are expected.
 
 Resolve fixed paths as follows:
 
@@ -265,35 +255,33 @@ Status:
 
 Run in default, `full`, `strict`, and `codeql` modes.
 
-Parse the CodeQL managed block from `K-PLAYBOOK.MD` when present:
+Parse `tools.codeql` from `K-PLAYBOOK.yaml` when present:
 
-- `enabled`
 - `target`
-- `github`
-- `workflow`
-- `local-database`
-- `database`
+- `github.status`
+- `github.workflow`
+- `local_database.status`
+- `local_database.path`
 - `languages`
 - `queries`
-- `setup-run`
 
 Rules:
 
-- Valid values for `github` and `local-database` are `true`, `false`, and `planned`.
+- Valid values for `github.status` and `local_database.status` are `enabled`, `disabled`, and `planned`.
 - Treat unset, empty, or `-` paths as missing.
 - Treat missing `target:` as legacy project-root target `.` and report it as `WARN` only when the project root is not a Git worktree but a nested Git/app root is likely present.
-- If `target:` is set, check that the referenced path exists. If it is a Git worktree, use it for the CodeQL/Git-oriented status detail; do not run analysis.
-- If `enabled: false`, report CodeQL as disabled and do not do deeper checks beyond marker/config plausibility.
-- If `github: true` or `github: planned`, check that `workflow:` is set and that the referenced file exists.
-- If `local-database: true` or `local-database: planned`, check that `database:` is set and that the referenced path exists.
-- Try `codeql version` only when any of `enabled`, `github`, or `local-database` is `true` or `planned`.
+- If `target` is set, check that the referenced path exists. If it is a Git worktree, use it for the CodeQL/Git-oriented status detail; do not run analysis.
+- If both statuses are `disabled`, report CodeQL as disabled and do not do deeper checks beyond config plausibility.
+- If `github.status` is `enabled` or `planned`, check that `github.workflow` is set and that the referenced file exists.
+- If `local_database.status` is `enabled` or `planned`, check that `local_database.path` is set and that the referenced path exists.
+- Try `codeql version` only when either status is `enabled` or `planned`.
 - If `codeql version` fails or the command is unavailable, report `CLI fehlt` as `WARN`, not as a hard failure by itself.
 
 Status:
 
 - `OK`: disabled cleanly, or enabled/planned paths and CLI preflight are plausible.
 - `WARN`: enabled/planned but optional pieces are missing, CLI is unavailable, languages are unset, or setup is planned.
-- `FAIL`: the CodeQL managed block has contradictory markers, `target:` is set but missing, or an active/planned configured path is set but missing.
+- `FAIL`: `tools.codeql` is malformed, `target` is set but missing, or an active/planned configured path is set but missing.
 
 Do not run `codeql database create`, `codeql database analyze`, or any upload command.
 
@@ -301,31 +289,30 @@ Do not run `codeql database create`, `codeql database analyze`, or any upload co
 
 Run in default, `full`, `strict`, and `reviews` modes.
 
-Parse the optional Dependabot managed block from `K-PLAYBOOK.MD` when present:
+Parse the optional future `tools.dependabot` object from `K-PLAYBOOK.yaml` when present:
 
 - `enabled`
 - `target`
 - `repo`
 - `config`
 - `alerts`
-- `pull-requests`
-- `setup-run`
+- `pull_requests`
 
 Rules:
 
 - Treat missing block as `WARN` only when a Dependabot config exists under a nested Git/app root.
 - If `enabled: false`, report disabled cleanly and do not query GitHub.
-- If `target:` is set, check that it exists. If missing, report `FAIL`.
-- If `config:` is set, check that the file exists. If missing while enabled, report `FAIL`.
-- If `repo:` is set, use it as the GitHub Dependabot Alerts source. If missing, derive from the GitHub remote of `target:` when possible; otherwise report `WARN`.
+- If `target` is set, check that it exists. If missing, report `FAIL`.
+- If `config` is set, check that the file exists. If missing while enabled, report `FAIL`.
+- If `repo` is set, use it as the GitHub Dependabot Alerts source. If missing, derive from the GitHub remote of `target` when possible; otherwise report `WARN`.
 - Check `gh --version` and `gh auth status` as lightweight preflight only. Do not call the Dependabot alerts API in `/k-status`.
-- `pull-requests: false` is acceptable and should not be reported as a warning when `alerts: true` is set.
+- `pull_requests: false` is acceptable and should not be reported as a warning when `alerts: true` is set.
 
 Status:
 
 - `OK`: enabled or disabled consistently, target/config exist, repo is known, and `gh` auth is plausible when alerts are enabled.
 - `WARN`: block missing, `gh` unavailable/unauthenticated, repo not derivable, alerts planned/unclear, or PRs intentionally disabled with no alerts flag.
-- `FAIL`: managed markers contradictory, enabled target/config path missing.
+- `FAIL`: malformed config or enabled target/config path missing.
 
 ## Section: git
 
@@ -369,7 +356,7 @@ Derive at most three next actions from the findings.
 
 Priority order:
 
-1. Missing `K-PLAYBOOK.MD` or legacy `## Pfade` schema → `/k-setup`.
+1. Missing or invalid `K-PLAYBOOK.yaml` → `/k-setup`.
 2. Missing required fixed-layout paths from `layout` → `/k-setup`.
 3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-setup` for this.
 4. OpenCode command symlinks or `skills.paths` incomplete → `/k-install`.
@@ -391,7 +378,7 @@ Default and `strict` output should be compact and scanable:
 /k-status
 ────────────────────────
 Projekt:       /path/to/project
-K-PLAYBOOK:    OK (setup-run 2026-07-20)
+K-PLAYBOOK:    OK (updated_at 2026-07-20)
 OpenCode:      WARN, commands 18/20 verlinkt, 1 verwaist, skills.paths ok
 Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook
 Layout:        OK 7 / WARN 1 / FAIL 0
@@ -399,7 +386,7 @@ Tasks:         WARN, 3 offen, nächste: 002-k-status.md
 TODO:          OK, 0 offen
 Reviews:       WARN, 2 vorhanden, known-decisions fehlt
 Enforcement:   OK, 1 Regel
-CodeQL:        WARN, target=./app, enabled=true, github=true workflow fehlt
+CodeQL:        WARN, target=./app, github=enabled workflow fehlt
 Dependabot:    OK, target=./app, repo=example-org/example-app, PRs deaktiviert
 Git:           WARN, dirty (4 geändert, 1 untracked)
 Docs:          WARN, k-playbook/docs/README.md fehlt
@@ -414,7 +401,7 @@ Use `OK`, `WARN`, and `FAIL` consistently:
 
 - `OK`: present and plausible.
 - `WARN`: optional, planned, unset, dirty, or incomplete but not necessarily broken.
-- `FAIL`: `K-PLAYBOOK.MD` missing, configured required paths missing, contradictory managed markers, or active/planned configured CodeQL paths missing.
+- `FAIL`: `K-PLAYBOOK.yaml` missing, configured required paths missing, invalid config, or active/planned configured CodeQL paths missing.
 
 In `strict` mode, keep the same section lines but add a short health-gate summary, for example:
 

@@ -42,10 +42,6 @@ type projectRequest struct {
 	Selected    *bool  `json:"selected"`
 }
 
-type saveScannedRequest struct {
-	Projects []projectRequest `json:"projects"`
-}
-
 type projectsResponse struct {
 	Version  int           `json:"version"`
 	Projects []projectView `json:"projects"`
@@ -58,10 +54,11 @@ type projectView struct {
 }
 
 type projectCommandStatus struct {
-	OK      bool   `json:"ok"`
-	Path    string `json:"path"`
-	Command string `json:"command"`
-	Message string `json:"message"`
+	OK       bool   `json:"ok"`
+	Path     string `json:"path"`
+	Command  string `json:"command"`
+	Message  string `json:"message"`
+	Severity string `json:"severity"`
 }
 
 type gitPullResult struct {
@@ -268,8 +265,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/projects", projectsHandler)
 	mux.HandleFunc("DELETE /api/projects", removeProjectHandler)
 	mux.HandleFunc("GET /api/projects/scan", scanProjectsHandler)
+	mux.HandleFunc("POST /api/projects/preview", projectPreviewHandler)
 	mux.HandleFunc("POST /api/projects", addProjectHandler)
-	mux.HandleFunc("POST /api/projects/scan", saveScannedProjectsHandler)
 	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
 	mux.HandleFunc("POST /api/git/pull", gitPullHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
@@ -729,6 +726,22 @@ func scanProjects(root string) ([]store.Project, error) {
 	}
 }
 
+func projectPreviewHandler(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+
+	project, err := projectFromRequest(request)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, project)
+}
+
 func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	var request projectRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -738,6 +751,10 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 
 	project, err := projectFromRequest(request)
 	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := projects.EnsureConfig(project.Path); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -756,39 +773,6 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, projectResponse(file))
 }
 
-func saveScannedProjectsHandler(w http.ResponseWriter, r *http.Request) {
-	var request saveScannedRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
-		return
-	}
-
-	file, err := store.LoadProjects()
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-
-	for _, selected := range request.Projects {
-		if selected.Selected != nil && !*selected.Selected {
-			continue
-		}
-		project, err := projectFromRequest(selected)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err)
-			return
-		}
-		file = store.UpsertProject(file, project)
-	}
-
-	if err := store.SaveProjects(file); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, projectResponse(file))
-}
-
 func projectResponse(file store.ProjectsFile) projectsResponse {
 	response := projectsResponse{Version: file.Version, Projects: make([]projectView, 0, len(file.Projects))}
 	for _, project := range file.Projects {
@@ -799,24 +783,24 @@ func projectResponse(file store.ProjectsFile) projectsResponse {
 
 func checkProjectSetup(projectPath string) projectCommandStatus {
 	status := projectCommandStatus{Command: "/k-setup"}
-	for _, name := range []string{"K-PLAYBOOK.MD", "K-PLAYBOOK.md"} {
-		path := filepath.Join(projectPath, name)
-		info, err := os.Stat(path)
-		if err == nil && !info.IsDir() {
-			status.OK = true
-			status.Path = path
-			status.Message = name + " vorhanden."
-			return status
-		}
+	path := filepath.Join(projectPath, projects.ConfigFileName)
+	info, err := os.Stat(path)
+	if err == nil && !info.IsDir() {
+		status.OK = true
+		status.Path = path
+		status.Severity = "ok"
+		status.Message = "K-PLAYBOOK.yaml vorhanden."
+		return status
 	}
 
-	status.Path = filepath.Join(projectPath, "K-PLAYBOOK.MD")
-	status.Message = "K-PLAYBOOK.MD fehlt."
+	status.Path = path
+	status.Severity = "error"
+	status.Message = "K-PLAYBOOK.yaml fehlt. Empfehlung: Projekt aus der Installer-Liste entfernen und neu einbinden."
 	return status
 }
 
 func checkProjectDocs(projectPath string) projectCommandStatus {
-	status := projectCommandStatus{Command: "/k-code2docs", Path: filepath.Join(projectPath, "docs")}
+	status := projectCommandStatus{Command: "/k-code2docs", Path: filepath.Join(projectPath, "k-playbook", "docs")}
 	hasDocs, err := hasMarkdownFiles(status.Path)
 	if err != nil {
 		status.Message = "docs-Verzeichnis fehlt oder ist nicht lesbar."

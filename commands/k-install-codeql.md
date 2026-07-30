@@ -11,7 +11,7 @@ Install and verify local CodeQL for a project.
 
 CodeQL-specific rules live in `<PLAYBOOK_REPO>/global/rules/codeql.md` and must be treated as authoritative for this command.
 
-This command is local-only. It does not configure GitHub CodeQL and does not edit `K-PLAYBOOK.MD`; `/k-setup-codeql` owns the project-local CodeQL decision block.
+This command is local-only. It does not configure GitHub CodeQL and does not edit `K-PLAYBOOK.yaml`; `/k-setup-codeql` owns the project-local `tools.codeql` decision.
 
 Use `--cli-only` when the project uses GitHub CodeQL but still wants a local CLI for fast preflight/status checks without local databases or SARIF results.
 
@@ -34,27 +34,24 @@ Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
 Derive `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook` and `PLAYBOOK_BASE_DISPLAY_PATH = k-playbook`.
 
-Also parse the optional CodeQL managed block in `<TARGET_DIR>/K-PLAYBOOK.MD` between:
-
-- `<!-- k-setup-codeql:managed:begin -->`
-- `<!-- k-setup-codeql:managed:end -->`
+Also parse optional `tools.codeql` metadata from `<TARGET_DIR>/K-PLAYBOOK.yaml` when present.
 
 Extract when present:
 
-- `target:`
-- `local-database:`
-- `database:`
-- `languages:`
-- `queries:`
+- `target`
+- `local_database.status`
+- `local_database.path`
+- `languages`
+- `queries`
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing, stop and ask the user to run `/k-setup` and `/k-setup-codeql` first.
+- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to run `/k-setup` and `/k-setup-codeql` first.
 - If `PLAYBOOK_BASE_DIR` is missing, stop and ask the user to run `/k-setup` first. Do not create the playbook base from this command.
 - Offer `PLAYBOOK_BASE_DIR` as the default parent directory for local CodeQL artifacts.
-- If the CodeQL block has `database: <path>`, offer the parent of that path as the default parent directory.
-- In `CLI_ONLY=true`, `languages:` and `database:` are not required. Use `PLAYBOOK_BASE_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
-- If `target:` is present, use it as the default project path for full local database mode. If missing, default to `TARGET_DIR` for backward compatibility. The resolved CodeQL project path must exist.
+- If `tools.codeql.local_database.path` is set, offer the parent of that path as the default parent directory.
+- In `CLI_ONLY=true`, `languages` and `local_database.path` are not required. Use `PLAYBOOK_BASE_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
+- If `target` is present, use it as the default project path for full local database mode. If missing, default to `TARGET_DIR`. The resolved CodeQL project path must exist.
 
 ## Step 2 — Preflight
 
@@ -68,7 +65,7 @@ Check:
   - `curl` or `wget`
   - `unzip`
 - Git repo status:
-  - Whether the resolved CodeQL project path from `target:` is a Git worktree.
+  - Whether the resolved CodeQL project path from `target` is a Git worktree.
 - Likely languages, using the same detection table as `/k-setup-codeql`:
   - `package.json`, `*.js`, `*.jsx`, `*.ts`, `*.tsx` → `javascript-typescript`
   - `pyproject.toml`, `requirements*.txt`, `*.py` → `python`
@@ -100,7 +97,7 @@ If `curl`/`wget` and `unzip` are missing while `codeql` is not already available
 Ask in one bundled interaction:
 
 1. Parent-Verzeichnis für lokale CodeQL-Artefakte?
-    - Default: parent of registered `database:` if set, else `k-playbook/`.
+    - Default: parent of registered `local_database.path` if set, else `k-playbook/`.
     - The script will create below it:
       - `codeql-cli/`
       - `databases/`
@@ -196,7 +193,7 @@ Datenbanken:
 Ergebnisse:
 - <language>: <path>.sarif ok | fehlt
 
-Hinweis: `K-PLAYBOOK.MD` wurde nicht geändert. Falls die Pfade dauerhaft registriert werden sollen: `/k-setup-codeql` ausführen.
+Hinweis: `K-PLAYBOOK.yaml` wurde nicht geändert. Falls die CodeQL-Entscheidung dauerhaft registriert werden soll: `/k-setup-codeql` ausführen.
 ```
 
 For `CLI_ONLY=true`, print:

@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
-`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.MD`. The docs directory is always `<project>/k-playbook/docs`.
+`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.yaml`. The docs directory is always `<project>/k-playbook/docs`.
 
 Produces:
 - `k-playbook/docs/<NN>-<slug>.md` — one file per coherent topic.
@@ -31,14 +31,14 @@ Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind r
 
 **Preflight-Snapshot anzeigen:**
 
-Für den Snapshot `K-PLAYBOOK.MD` in `TARGET_DIR` lesen, um `layout`, `repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-setup` aufrufen lassen.
+Für den Snapshot `K-PLAYBOOK.yaml` in `TARGET_DIR` lesen, um `layout`, `k_playbook.repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-setup` aufrufen lassen.
 
 ```text
 /k-code2docs — Preflight
 ─────────────────────────────────────
 Ziel:          <absolute TARGET_DIR>
 Quelle:        Argument | CWD
-K-PLAYBOOK.MD: gefunden (layout: fixed-project-k-playbook) | fehlt
+K-PLAYBOOK.yaml: gefunden (layout: fixed-project-k-playbook) | fehlt
 Git-Repo:      ja (branch: <branch>) | nein
 Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt
 ```
@@ -55,7 +55,7 @@ Bei „nein": abbrechen mit Hinweis:
 
 Bei „ja": weiter mit Step 1.
 
-## Step 1 — Resolve paths from K-PLAYBOOK.MD
+## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -66,8 +66,8 @@ For this command, resolve the fixed `docs` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create the fixed directory.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 

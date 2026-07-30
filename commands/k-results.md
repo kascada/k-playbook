@@ -34,7 +34,7 @@ For this command, resolve fixed blocks:
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
 - Wenn `k-playbook/reviews` nicht existiert: abbrechen; Results brauchen ein projektlokales `reviews`-Ziel.
 - Wenn `k-playbook/tasks` nicht existiert: warnen, aber fortfahren; dann koennen existierende Tasks nicht abgeglichen werden.
 

@@ -22,7 +22,7 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 ## Voraussetzungen
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
 - Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `trivy --version`, `syft --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.

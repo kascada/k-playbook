@@ -1,5 +1,5 @@
 ---
-description: Arbeitet Befunde aus einer Review-Ergebnisdatei strukturiert ab. Plant zuerst sinnvolle Remediation-Buendel nach Risiko, Aufwand und Kopplung, beachtet die projektlokale Remediation-Policy aus K-PLAYBOOK.MD und erzeugt je nach Modus Tasks statt direkte Fixes.
+description: Arbeitet Befunde aus einer Review-Ergebnisdatei strukturiert ab. Plant zuerst sinnvolle Remediation-Buendel nach Risiko, Aufwand und Kopplung, beachtet die projektlokale Remediation-Policy aus K-PLAYBOOK.yaml und erzeugt je nach Modus Tasks statt direkte Fixes.
 argument-hint: [result-datei.md]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -16,23 +16,23 @@ Unterstützt zwei Formate:
 
 Die Verzeichnisse sind fest: `k-playbook/reviews` und `k-playbook/tasks`.
 
-Zusaetzlich liest `/k-remediation` den optionalen Remediation-Managed-Block in `K-PLAYBOOK.MD`:
+Zusaetzlich liest `/k-remediation` den optionalen `remediation`-Block in `K-PLAYBOOK.yaml`:
 
 - `mode:` - `task-branch-pr`, `task-first` oder `direct-allowed`.
 - `target:` - tatsaechlicher Code-/Git-Root, z. B. `./app` bei Wrapper-Repos.
 - `grouping:` - ob Findings vor der Umsetzung zu sinnvollen Buendeln zusammengefasst werden.
-- `quick-wins:` - ob einfache, wirkungsstarke Buendel hervorgehoben werden.
-- `branch-prefix:` - empfohlener Branch-Prefix fuer Remediation-Branches.
-- `pr-required:` - ob ein PR Teil des erwarteten Workflows ist.
-- `direct-fixes:` - ob direkte Code-Fixes ohne Task erlaubt sind.
+- `quick_wins:` - ob einfache, wirkungsstarke Buendel hervorgehoben werden.
+- `branch_prefix:` - empfohlener Branch-Prefix fuer Remediation-Branches.
+- `pr_required:` - ob ein PR Teil des erwarteten Workflows ist.
+- `direct_fixes:` - ob direkte Code-Fixes ohne Task erlaubt sind.
 
-Wenn der Block fehlt, gilt legacy-kompatibel `mode: direct-allowed`, `target: .`, `grouping: true`, `quick-wins: true`.
+Wenn der Block fehlt, stoppe und bitte um `/k-setup` oder eine explizite Auswahl fuer diese Session.
 
-`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.MD`, `k-playbook/reviews`, and `k-playbook/tasks` configured by `/k-setup`.
+`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.yaml`, `k-playbook/reviews`, and `k-playbook/tasks` configured by `/k-setup`.
 
 ---
 
-## Schritt 1 — Pfade aus K-PLAYBOOK.MD auflösen
+## Schritt 1 — Pfade aus K-PLAYBOOK.yaml auflösen
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -51,10 +51,10 @@ Daraus abgeleitet:
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` aufrufen lassen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` aufrufen lassen.
 - Wenn `k-playbook/reviews` nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
 - Wenn `k-playbook/tasks` nicht existiert: abbrechen und `/k-setup` aufrufen lassen.
-- Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct-fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
+- Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct_fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
 - Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `TARGET_DIR`.
 - Wenn `mode: task-branch-pr` gilt und `target:` ein Git-Repo ist, pruefe vor Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine Branch-/Task-Policy raten: User informieren und bestaetigen lassen, ob Tasks trotzdem erzeugt werden sollen. `/k-remediation` wechselt selbst keinen Branch fuer spaetere Umsetzung; es schreibt den erforderlichen Ausfuehrungskontext in die Task-Dateien.
 
@@ -125,7 +125,7 @@ Target:       <REMEDIATION_TARGET_DISPLAY>
 Base branch:  <REMEDIATION_BASE_BRANCH or "<manual>">
 Grouping:     true | false
 Quick-Wins:   true | false
-Branch:       <branch-prefix><task-or-bundle>
+Branch:       <branch_prefix><task-or-bundle>
 PR required:  true | false
 Direct fixes: true | false
 ```
@@ -134,9 +134,9 @@ Modus-Semantik:
 
 - `task-branch-pr`: Keine direkten Code-Fixes aus `/k-remediation`. Findings werden zu Remediation-Buendeln gruppiert; jedes akzeptierte Buendel erzeugt eine Task-Datei mit Branch-/PR-Hinweis. Umsetzung erfolgt spaeter ueber `/k-run` oder einen dedizierten Dev-Flow auf Branch + PR.
 - `task-first`: Standard ist Task-Erzeugung pro Buendel; direkte Fixes nur nach expliziter User-Freigabe fuer einzelne kleine Buendel.
-- `direct-allowed`: Legacy-Modus. Kleine sichere `S`-Findings duerfen nach Code-Sichtung direkt behoben werden, wenn der User die Kategorien freigibt.
+- `direct-allowed`: Kleine sichere `S`-Findings duerfen nach Code-Sichtung direkt behoben werden, wenn der User die Kategorien freigibt.
 
-Wenn `mode` fehlt oder unbekannt ist: stoppe und bitte um `/k-setup`-Migration oder explizite Auswahl fuer diese Session.
+Wenn `mode` fehlt oder unbekannt ist: stoppe und bitte um `/k-setup` oder explizite Auswahl fuer diese Session.
 
 ### Buendelung vor Einzelarbeit
 
@@ -238,7 +238,7 @@ Bei `mode: task-branch-pr`:
    - alle Finding-IDs im Buendel.
    - Result-Pfad und `findings.md`.
     - Ziel-Root (`target:`), z. B. `./app`.
-    - vorgeschlagener Branch: `<branch-prefix><NNN>-<slug>`.
+    - vorgeschlagener Branch: `<branch_prefix><NNN>-<slug>`.
     - Hinweis: PR erforderlich.
     - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
     - Abschnitt `## Branch-Preflight` vor `## Zu bauen` mit klarer Pflicht: zuerst im Target-Repo den Dirty-State pruefen, dann vom Base-Branch den Work-Branch erstellen oder auf bestehenden Work-Branch wechseln, und erst danach Dateien aendern.
@@ -488,5 +488,5 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 ## Fehlerfälle
 
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<PROJECT_REVIEWS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
-- **`K-PLAYBOOK.MD` fehlt**: abbrechen und `/k-setup` aufrufen lassen.
+- **`K-PLAYBOOK.yaml` fehlt**: abbrechen und `/k-setup` aufrufen lassen.
 - **`k-playbook/reviews` oder `k-playbook/tasks` fehlen**: abbrechen und `/k-setup` aufrufen lassen.

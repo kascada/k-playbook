@@ -11,9 +11,9 @@ Run a code review against the current project, using a review recipe either from
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<PLAYBOOK_REPO>/global/rules/review-authoring.md`.
 
-`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.MD` configured by `/k-setup`.
+`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.yaml` configured by `/k-setup`.
 
-## Step 1 — Resolve paths from K-PLAYBOOK.MD
+## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -31,8 +31,8 @@ Also set:
   - `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (for reviews that produce output files, e.g. tech-debt)
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `PROJECT_REVIEWS_DIR` is missing: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
+- If `PROJECT_REVIEWS_DIR` is missing: abort and tell the user to run `/k-setup` to create the fixed directory.
 
 ## Step 2 — Determine the review to run
 
@@ -175,4 +175,4 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **`K-PLAYBOOK.MD` fehlt**: abbrechen und `/k-setup` aufrufen lassen.
+- **`K-PLAYBOOK.yaml` fehlt**: abbrechen und `/k-setup` aufrufen lassen.

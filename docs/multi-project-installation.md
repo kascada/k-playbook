@@ -98,7 +98,7 @@ Im vorhandenen Zielprojekt OpenCode starten und ausfuehren:
 /k-setup
 ```
 
-`/k-setup` legt oder aktualisiert `K-PLAYBOOK.MD` und die projektlokalen k-playbook-Pfade. Das gilt fuer normale Projekte genauso wie fuer Projekte mit aktivem Projekt-venv; der Command installiert keine Tools in das Projekt-venv.
+`/k-setup` legt oder aktualisiert `K-PLAYBOOK.yaml` und die feste projektlokale k-playbook-Struktur. Das gilt fuer normale Projekte genauso wie fuer Projekte mit aktivem Projekt-venv; der Command installiert keine Tools in das Projekt-venv.
 
 Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach ausfuehren:
 
@@ -122,7 +122,7 @@ Erwartung:
 
 - `playbook` zeigt auf `~/dev/k-playbook`.
 - `opencode` meldet Command-Links und `skills.paths` plausibel.
-- `K-PLAYBOOK.MD` existiert im Projektroot.
+- `K-PLAYBOOK.yaml` existiert im Projektroot.
 
 ## 3B. Projekt mit DevContainer einrichten
 

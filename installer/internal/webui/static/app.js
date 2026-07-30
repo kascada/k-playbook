@@ -5,6 +5,7 @@ const state = {
   securityTools: null,
   gitStatus: null,
   projects: [],
+  selectedScanPath: "",
 };
 
 const elements = {
@@ -67,7 +68,7 @@ elements.securityToolsRefresh.addEventListener("click", loadSecurityToolsStatus)
 elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
-elements.saveScan.addEventListener("click", saveScannedProjects);
+elements.saveScan.addEventListener("click", addSelectedScannedProject);
 elements.manualForm.addEventListener("submit", addManualProject);
 
 refreshAll();
@@ -293,29 +294,30 @@ async function scanProjects() {
   });
 }
 
-async function saveScannedProjects() {
-  const selected = [...document.querySelectorAll(".scan-row")]
-    .map((row) => ({
-      path: row.dataset.path,
-      environment: row.querySelector("select").value,
-      selected: row.querySelector("input[type='checkbox']").checked,
-    }))
-    .filter((project) => project.selected);
+async function addSelectedScannedProject() {
+  const row = document.querySelector(".scan-row.selected");
+  if (!row) {
+    showToast("Bitte ein Projekt auswaehlen.", true);
+    return;
+  }
 
-  if (selected.length === 0) {
-    showToast("Keine Projekte ausgewaehlt.", true);
+  const environment = row.querySelector("select").value;
+  if (!environment) {
+    showToast("Bitte die Projektart auswaehlen.", true);
+    return;
+  }
+
+  const project = { path: row.dataset.path, environment };
+  if (!confirmProjectKind(project, environment)) {
     return;
   }
 
   await withBusy(elements.saveScan, async () => {
-    const file = await api("/api/projects/scan", {
-      method: "POST",
-      body: JSON.stringify({ projects: selected }),
-    });
+    const file = await saveProject(project.path, environment);
     state.projects = file.projects || file.Projects || [];
     renderProjects(state.projects);
     await loadDevcontainerStatus();
-    showToast("Auswahl gespeichert.");
+    showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
     showHome();
   });
   updateSaveScanButton();
@@ -330,7 +332,7 @@ async function addManualProject(event) {
   }
 
   await withBusy(elements.manualForm.querySelector("button"), async () => {
-    const file = await api("/api/projects", {
+    const preview = await api("/api/projects/preview", {
       method: "POST",
       body: JSON.stringify({
         path,
@@ -338,12 +340,30 @@ async function addManualProject(event) {
         selected: true,
       }),
     });
+    const environment = preview.environment || preview.Environment || "unknown";
+    if (!elements.manualEnv.value && environment === "unknown") {
+      showToast("Projektart konnte nicht sicher erkannt werden. Bitte Umgebung auswaehlen.", true);
+      return;
+    }
+    if (!confirmProjectKind(preview, environment)) {
+      return;
+    }
+
+    const file = await saveProject(path, environment);
     elements.manualPath.value = "";
+    elements.manualEnv.value = "";
     state.projects = file.projects || file.Projects || [];
     renderProjects(state.projects);
     await loadDevcontainerStatus();
-    showToast("Projekt gespeichert.");
+    showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
     showHome();
+  });
+}
+
+async function saveProject(path, environment) {
+  return api("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ path, environment, selected: true }),
   });
 }
 
@@ -375,6 +395,7 @@ function renderStatus(status) {
 
 function renderScanned(projects) {
   elements.scanResults.innerHTML = "";
+  state.selectedScanPath = "";
   elements.scanResults.classList.toggle("empty", projects.length === 0);
   elements.saveScan.classList.toggle("hidden", projects.length === 0);
 
@@ -388,10 +409,6 @@ function renderScanned(projects) {
     row.className = "scan-row";
     row.dataset.path = project.path || project.Path;
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.addEventListener("change", () => updateScanRow(row));
-
     const details = document.createElement("div");
     const path = document.createElement("div");
     path.className = "path";
@@ -401,30 +418,33 @@ function renderScanned(projects) {
     meta.textContent = detectedLabel(project);
     details.append(path, meta);
 
-    const select = environmentSelect(project.environment || project.Environment || "plain");
-    row.append(checkbox, details, select);
+    const detectedEnvironment = project.environment || project.Environment || "unknown";
+    const select = environmentSelect(detectedEnvironment === "unknown" ? "" : detectedEnvironment, true);
+    select.addEventListener("change", () => selectScanRow(row));
+    row.append(details, select);
     row.addEventListener("click", (event) => {
-      if (event.target === checkbox || event.target === select) {
+      if (event.target === select) {
         return;
       }
-      checkbox.checked = !checkbox.checked;
-      updateScanRow(row);
+      selectScanRow(row);
     });
     elements.scanResults.append(row);
   }
   updateSaveScanButton();
 }
 
-function updateScanRow(row) {
-  const checkbox = row.querySelector("input[type='checkbox']");
-  row.classList.toggle("selected", checkbox.checked);
+function selectScanRow(row) {
+  state.selectedScanPath = row.dataset.path;
+  for (const current of document.querySelectorAll(".scan-row")) {
+    current.classList.toggle("selected", current === row);
+  }
   updateSaveScanButton();
 }
 
 function updateSaveScanButton() {
-  const selectedCount = document.querySelectorAll(".scan-row input[type='checkbox']:checked").length;
-  elements.saveScan.textContent = selectedCount === 1 ? "1 Projekt speichern" : `${selectedCount} Projekte speichern`;
-  elements.saveScan.disabled = selectedCount === 0;
+  const row = document.querySelector(".scan-row.selected");
+  elements.saveScan.textContent = "Ausgewaehltes Projekt hinzufuegen";
+  elements.saveScan.disabled = !row || !row.querySelector("select").value;
 }
 
 function renderProjects(projects) {
@@ -454,7 +474,7 @@ function renderProjects(projects) {
 
     const environment = document.createElement("span");
     environment.className = "project-env";
-    environment.textContent = (project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
+    environment.textContent = environmentLabel(project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
     const headerActions = document.createElement("div");
     headerActions.className = "project-header-actions";
     headerActions.append(environment, removeProjectButton(project));
@@ -512,15 +532,42 @@ function projectSetupRow(project) {
 
   const projectPath = project.path || project.Path;
   const command = setup.command || setup.Command || "/k-setup";
+  const severity = setup.severity || setup.Severity || "warn";
+  if (severity === "error") {
+    return projectSetupErrorRow(setup);
+  }
   return commandActionRow({
     title: "Projekt-Setup fehlt",
-    detail: `${setup.message || setup.Message || "K-PLAYBOOK.MD fehlt."} Im Projekt den Assistenten oeffnen und ${command} ausfuehren.`,
+    detail: `${setup.message || setup.Message || "K-PLAYBOOK.yaml fehlt."} Im Projekt den Assistenten oeffnen und ${command} ausfuehren.`,
     command,
     helpTitle: "Projekt-Setup ausfuehren",
     helpContextLabel: "Oeffne den Assistenten/OpenCode im Projekt",
     helpContext: projectPath,
     helpText: `Der Installer startet ${command} nicht selbst, weil der Slash-Command im Zielprojekt-Kontext Rueckfragen stellt und Dateien dort anlegt.`,
   });
+}
+
+function projectSetupErrorRow(setup) {
+  const row = document.createElement("div");
+  row.className = "project-check-row";
+
+  const text = document.createElement("div");
+  const title = document.createElement("span");
+  title.className = "project-check-title";
+  title.textContent = "Fehler: K-PLAYBOOK.yaml fehlt";
+  const detail = document.createElement("span");
+  detail.textContent = setup.message || setup.Message || "Projekt aus der Installer-Liste entfernen und neu einbinden.";
+  text.append(title, detail);
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const label = document.createElement("span");
+  label.className = "status-label error";
+  label.textContent = "FEHLER !";
+  action.append(label);
+
+  row.append(text, action);
+  return row;
 }
 
 function projectDocsRow(project) {
@@ -827,15 +874,20 @@ async function loadDoc(path) {
 function detectedLabel(project) {
   const environment = project.environment || project.Environment || "unknown";
   const detected = project.detected || project.Detected || [];
-  return detected.length > 0 ? `${environment} - ${detected.join(", ")}` : environment;
+  const label = environmentLabel(environment);
+  return detected.length > 0 ? `${label} - ${detected.join(", ")}` : label;
 }
 
-function environmentSelect(value) {
+function environmentSelect(value, requireChoice = false) {
   const select = document.createElement("select");
-  const options = [
+  const options = requireChoice ? [
+    ["", "Art auswaehlen"],
+    ["plain", "Normal"],
+    ["devcontainer", "DevContainer"],
+    ["unknown", "Unbekannt"],
+  ] : [
     ["", "Automatisch erkennen"],
     ["plain", "Normal"],
-    ["venv", "Python venv"],
     ["devcontainer", "DevContainer"],
     ["unknown", "Unbekannt"],
   ];
@@ -847,6 +899,31 @@ function environmentSelect(value) {
     select.append(option);
   }
   return select;
+}
+
+function environmentLabel(value) {
+  switch (value) {
+    case "plain":
+    case "venv":
+      return "Normal";
+    case "devcontainer":
+      return "DevContainer";
+    default:
+      return "Unbekannt";
+  }
+}
+
+function confirmProjectKind(project, environment) {
+  const projectPath = project.path || project.Path;
+  return window.confirm([
+    "Projekt hinzufuegen?",
+    "",
+    projectPath,
+    "",
+    `Ist die Projektart richtig erkannt: ${environmentLabel(environment)}?`,
+    "",
+    "Beim Hinzufuegen wird K-PLAYBOOK.yaml angelegt, falls sie fehlt.",
+  ].join("\n"));
 }
 
 async function api(path, options = {}) {

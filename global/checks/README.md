@@ -4,7 +4,7 @@
 
 Der Runner trennt zwei Roots:
 
-- `--config-root`: Root mit `K-PLAYBOOK.MD`; darunter wird die feste lokale k-playbook-Struktur erwartet.
+- `--config-root`: Root mit `K-PLAYBOOK.yaml`; darunter wird die feste lokale k-playbook-Struktur erwartet.
 - `--target-root`: Codebaum, der gescannt wird; relativ zu `--config-root`, wenn nicht absolut.
 
 ## Aufruf
@@ -17,7 +17,7 @@ Der Runner trennt zwei Roots:
 ~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.MD` gelesen; lokale Checks liegen fest unter `k-playbook/checks/`. Der Target-Root ist standardmaessig identisch mit dem Config-Root. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
+Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.yaml` gelesen; lokale Checks liegen fest unter `k-playbook/checks/`. Der Target-Root ist standardmaessig identisch mit dem Config-Root. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
 
 `--output <file>` schreibt die vollstaendige Runner-Ausgabe zusaetzlich zu stdout/stderr in eine Raw-Datei. `--metadata-output <file>` schreibt Run-Metadaten als JSON, inklusive Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfuegbar. Beide Optionen verweigern vorhandene Ziel-Dateien, damit auditierbare Artefakte nicht still ueberschrieben werden. Fuer Review-Laeufe gehoeren diese Artefakte unter `<reviews>/results/k-check/YYYY-MM-DD/`.
 
@@ -51,7 +51,7 @@ Checks pruefen ihre Anwendbarkeit selbst: Sprache vorhanden, Tool installiert, r
 
 Checks bekommen diese Umgebungsvariablen:
 
-- `K_CHECK_CONFIG_ROOT` — Root mit `K-PLAYBOOK.MD`.
+- `K_CHECK_CONFIG_ROOT` — Root mit `K-PLAYBOOK.yaml`.
 - `K_CHECK_TARGET_ROOT` — gescannter Codebaum.
 - `K_CHECK_PROJECT_ROOT` — Kompatibilitaets-Alias fuer `K_CHECK_TARGET_ROOT`.
 - `K_CHECK_MODE` — `changed` oder `baseline`.

@@ -39,7 +39,7 @@ Dateien:
 Pfad- und Statusaufloesung:
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
 - Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Wenn `k-playbook/checks` leer ist, werden nur globale Checks ausgefuehrt.
 - Das Runner-Script ist `<PLAYBOOK_REPO>/global/bin/k-check`.

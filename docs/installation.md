@@ -18,7 +18,7 @@ Alternative:
 git clone git@github.com:kascada/k-playbook.git ~/dev/k-playbook
 ```
 
-Dieser Pfad ist der verbindliche Pfadvertrag fuer k-playbook. Projektdateien wie `K-PLAYBOOK.MD`, OpenCode `skills.paths` und Command-Symlinks zeigen auf `~/dev/k-playbook`, nicht auf einen host-spezifischen absoluten Pfad.
+Dieser Pfad ist der verbindliche Pfadvertrag fuer k-playbook. Projektdateien wie `K-PLAYBOOK.yaml`, OpenCode `skills.paths` und Command-Symlinks zeigen auf `~/dev/k-playbook`, nicht auf einen host-spezifischen absoluten Pfad.
 
 Wenn das echte Repo woanders liegt, wird nicht die Projektkonfiguration angepasst. Stattdessen muss `~/dev/k-playbook` als Symlink auf den echten Klon zeigen:
 
@@ -31,7 +31,7 @@ Warum das Basis-Repo dauerhaft gebraucht wird:
 
 - OpenCode-Commands werden als Symlinks nach `~/.config/opencode/command/` registriert; die Symlink-Ziele bleiben Dateien unter `~/dev/k-playbook/commands/`.
 - Skills werden ueber `skills.paths: ["~/dev/k-playbook"]` aus dem Basis-Repo geladen.
-- Commands und Skills lesen bei der Arbeit im Zielprojekt `K-PLAYBOOK.MD`; dessen `repo:`-Eintrag dient als Rueckverweis auf das Basis-Repo fuer Shared-Module, globale Regeln, globale Checks und Skripte.
+- Commands und Skills lesen bei der Arbeit im Zielprojekt `K-PLAYBOOK.yaml`; dessen `k_playbook.repo`-Eintrag dient als Rueckverweis auf das Basis-Repo fuer Shared-Module, globale Regeln, globale Checks und Skripte.
 
 ## Devcontainer-Pfadvertrag
 
@@ -56,10 +56,11 @@ Empfohlene Installation aus dem k-playbook-Repo auf dem Host:
 
 Das Script erwartet im Zielprojekt eine vorhandene `.devcontainer/devcontainer.json` und richtet dort die DevContainer-Integration ein.
 
-Damit bleibt dieser Eintrag in `K-PLAYBOOK.MD` auf Host und Container gleich:
+Damit bleibt dieser Eintrag in `K-PLAYBOOK.yaml` auf Host und Container gleich:
 
-```markdown
-- repo: ~/dev/k-playbook
+```yaml
+k_playbook:
+  repo: ~/dev/k-playbook
 ```
 
 Das Script kopiert `scripts/templates/devcontainer-setup-k-playbook.sh` nach `.devcontainer/setup-k-playbook.sh` im Zielprojekt. Diese Datei ist projektlokale DevContainer-Infrastruktur und wird bewusst ins Zielprojekt kopiert, damit der Container beim Start ohne Zugriff auf das globale Installationsscript reparierbar bleibt.
@@ -92,14 +93,14 @@ ls -l ~/.config/opencode/commands/k-install.md
 
 Alle vier Pfade muessen existieren. Wenn der erste fehlt, ist der Bind-Mount nicht gesetzt. Wenn nur der zweite fehlt, fehlt der Symlink. Wenn nur die letzten Pfade fehlen, fehlt der OpenCode-Bootstrap im Container-Home.
 
-Wenn `repo: ~/dev/k-playbook` im Container steht, bedeutet das also **nicht**, dass das Repo physisch dort kopiert wird. Der Pfad wird ueber den Symlink auf den Bind-Mount `/workspaces/k-playbook` aufgeloest.
+Wenn `k_playbook.repo: ~/dev/k-playbook` im Container steht, bedeutet das also **nicht**, dass das Repo physisch dort kopiert wird. Der Pfad wird ueber den Symlink auf den Bind-Mount `/workspaces/k-playbook` aufgeloest.
 
 ## Schnellstart Neuer Host
 
 Auf einem neuen Host sind zwei Dinge getrennt:
 
 1. Host-global installieren: macht Commands, Skills und Security-Tools fuer alle Projekte verfuegbar.
-2. Projektlokal einrichten: registriert in jedem Zielprojekt dessen eigene Pfade per `/k-setup`.
+2. Projektlokal einrichten: erzeugt in jedem Zielprojekt `K-PLAYBOOK.yaml` und die feste Struktur per `/k-setup`.
 
 Host-global:
 
@@ -221,15 +222,15 @@ Im Zielprojekt:
 
 Der Command:
 
-- legt oder aktualisiert `K-PLAYBOOK.MD` im Projekt-Root.
+- legt oder aktualisiert `K-PLAYBOOK.yaml` im Projekt-Root.
 - legt die vollstaendige projektlokale Struktur unter `k-playbook/` an.
 - erzeugt bestaetigte Verzeichnisse oder Initialdateien.
 - schreibt keine host-globale OpenCode-Konfiguration.
 - installiert keine host-globalen Tools.
 
-`K-PLAYBOOK.MD` ist die zentrale Config-Datei. Spaetere Commands leiten ihre Pfade fest aus `k-playbook/` ab.
+`K-PLAYBOOK.yaml` ist die zentrale Config-Datei. Spaetere Commands leiten ihre Pfade fest aus `k-playbook/` ab; Standardpfade werden nicht in der Datei gespeichert.
 
-Der `repo:`-Eintrag im Managed Block ist fest `~/dev/k-playbook`. Er ist sichtbar und wird von Commands gelesen, aber nicht als frei waehlbarer Pfad behandelt. Wenn der physische Klon woanders liegt, muss ein Symlink den Pfadvertrag erfuellen.
+Der `k_playbook.repo`-Eintrag ist fest `~/dev/k-playbook`. Er ist sichtbar und wird von Commands gelesen, aber nicht als frei waehlbarer Pfad behandelt. Wenn der physische Klon woanders liegt, muss ein Symlink den Pfadvertrag erfuellen.
 
 ## Optional: CodeQL
 
@@ -239,7 +240,7 @@ Wenn ein Projekt CodeQL nutzen soll:
 /k-setup-codeql
 ```
 
-Der Command dokumentiert die Entscheidung in `K-PLAYBOOK.MD` und trennt GitHub CodeQL, lokale CLI und lokale Datenbanken. Lokale Analysen werden nicht still durch Setup gestartet.
+Der Command dokumentiert die Entscheidung unter `tools.codeql` in `K-PLAYBOOK.yaml` und trennt GitHub CodeQL, lokale CLI und lokale Datenbanken. Lokale Analysen werden nicht still durch Setup gestartet.
 
 Details: [`commands.md`](./commands.md) und [`../global/rules/codeql.md`](../global/rules/codeql.md).
 
@@ -271,9 +272,9 @@ Checkliste fuer einen Host:
 
 Checkliste fuer ein Projekt:
 
-- [ ] `K-PLAYBOOK.MD` existiert im Projekt-Root.
-- [ ] `layout: fixed-project-k-playbook` ist gesetzt oder `/k-setup` wurde zur Migration ausgefuehrt.
-- [ ] `repo:` zeigt auf `~/dev/k-playbook`.
+- [ ] `K-PLAYBOOK.yaml` existiert im Projekt-Root.
+- [ ] `layout: fixed-project-k-playbook` ist gesetzt.
+- [ ] `k_playbook.repo` zeigt auf `~/dev/k-playbook`.
 - [ ] Die festen Pfade unter `k-playbook/` existieren.
 - [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
 - [ ] Bei Docs existiert ein Docs-Index oder `/k-code2docs` ist als naechster Schritt geplant.
@@ -305,5 +306,5 @@ Checkliste fuer einen Devcontainer:
 ### Projektpfade Stimmen Nicht
 
 - Im Projekt `/k-status` ausfuehren.
-- Wenn `K-PLAYBOOK.MD` fehlt oder noch das alte `## Pfade`-Schema nutzt, `/k-setup` ausfuehren.
+- Wenn `K-PLAYBOOK.yaml` fehlt oder ungueltig ist, `/k-setup` ausfuehren.
 - Fehlende Verzeichnisse nicht manuell raten, sondern ueber `/k-setup` bestaetigt erzeugen oder migrieren.

@@ -11,6 +11,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 | [`multi-project-installation.md`](./multi-project-installation.md) | Zentrale Installation fuer mehrere Zielprojekte, Python-/venv- und DevContainer-Workflows. |
 | [`faq.md`](./faq.md) | Kurze Antworten zu `/k-install`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
+| [`k-playbook-format.md`](./k-playbook-format.md) | YAML-Format der projektlokalen `K-PLAYBOOK.yaml`-Konfiguration. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Installer-Architektur, Browser-GUI, Web-API, Designentscheidungen und Session-Memory fuer weitere Installer-Arbeiten. |
 | [`../prompts/README.md`](../prompts/README.md) | Kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe. |
@@ -35,7 +36,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
 - `Installation` -> [`installation.md`](./installation.md)
 - `Installer` / `Browser-GUI` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
-- `K-PLAYBOOK.MD` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
+- `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
 - `Multi-Project` / `DevContainer-Installation` -> [`multi-project-installation.md`](./multi-project-installation.md), [`commands.md`](./commands.md)

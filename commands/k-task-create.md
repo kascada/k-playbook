@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 Create a new task file based on what was discussed in the current conversation.
 
-`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.MD` and the task directory is always `<project>/k-playbook/tasks`.
+`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.yaml` and the task directory is always `<project>/k-playbook/tasks`.
 
 ## Step 1 — Resolve task directory
 
@@ -22,8 +22,8 @@ For this command, resolve the fixed `tasks` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `k-playbook/tasks` does not exist: abort and tell the user to run `/k-setup` to create/migrate the fixed directories.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
+- If `k-playbook/tasks` does not exist: abort and tell the user to run `/k-setup` to create the fixed directories.
 - If `k-playbook/tasks` exists: use it.
 
 Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH`.

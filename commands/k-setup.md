@@ -1,5 +1,5 @@
 ---
-description: Setup or update the k-playbook config file (K-PLAYBOOK.MD) in the current project. Creates the complete fixed project-local k-playbook/ structure and keeps host-global installation separate.
+description: Setup or update the k-playbook config file (K-PLAYBOOK.yaml) in the current project. Creates the complete fixed project-local k-playbook/ structure and keeps host-global installation separate.
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
@@ -11,22 +11,21 @@ Install or update the k-playbook configuration in the current project.
 **Scope of this command:**
 
 - Run a short host-local install preflight and report whether `/k-install` should be run on this server.
-- Detect whether `K-PLAYBOOK.MD` exists at the project root.
+- Detect whether `K-PLAYBOOK.yaml` exists at the project root.
 - Create the complete fixed project-local structure under `./k-playbook/`.
-- Write `K-PLAYBOOK.MD` as the machine-readable config file that later commands read.
-- Migrate older managed blocks that stored individual paths such as `tasks: ./tasks` or active/inactive building blocks.
+- Write `K-PLAYBOOK.yaml` as the machine-readable config file that later commands read.
 
 **Out of scope:** changing project code, running reviews, executing tasks, or changing global OpenCode registration. Global OpenCode registration is owned by `/k-install`; `/k-setup` only performs a preflight and reports the status.
 
 Important framing:
 
-- `K-PLAYBOOK.MD` is **not user documentation**. It is a machine-readable config file. Managed by this command.
+- `K-PLAYBOOK.yaml` is **not user documentation**. It is a machine-readable config file. Managed by this command.
 - The project-local layout is fixed and complete. `/k-setup` must not ask which directories to create.
 - All standard project-local k-playbook artifacts live below `./k-playbook/`.
-- `K-PLAYBOOK.MD` stores setup metadata, not per-block path values and not active/inactive switches.
-- `/k-setup` is the only update/migration path for `K-PLAYBOOK.MD`; do not introduce a separate update command for managed-block format changes.
+- `K-PLAYBOOK.yaml` stores setup metadata, policies, and tool decisions, not per-block path values and not active/inactive switches.
+- `/k-setup` is the only update path for `K-PLAYBOOK.yaml`; do not introduce a separate update command for format changes.
 - `/k-setup` also owns project-wide workflow policy blocks that are not specific to one scanner. In particular, it owns `k-setup-remediation`, which defines how `/k-remediation` is allowed to turn findings into work.
-- `repo:` in `K-PLAYBOOK.MD` is fixed to `~/dev/k-playbook`. It is written for visibility and for commands to read, but `/k-setup` must not ask the user for an alternative repo path. If the real repo is elsewhere, `/k-install` or the Devcontainer setup must create a symlink so `~/dev/k-playbook` works.
+- `k_playbook.repo` in `K-PLAYBOOK.yaml` is fixed to `~/dev/k-playbook`. It is written for visibility and for commands to read, but `/k-setup` must not ask the user for an alternative repo path. If the real repo is elsewhere, `/k-install` or the Devcontainer setup must create a symlink so `~/dev/k-playbook` works.
 
 ## Fixed Layout
 
@@ -52,29 +51,22 @@ Before project setup, check whether k-playbook is installed for the current host
 1. Set the expected playbook repo path to `~/dev/k-playbook`; expand `~` against the current user.
 2. If `~/dev/k-playbook` is missing but `/workspaces/k-playbook/commands/k-setup.md` exists, treat this as a Devcontainer path-contract gap and create or instruct creation of `~/dev/k-playbook -> /workspaces/k-playbook`. In non-interactive Devcontainer setup, the setup script may create it automatically.
 3. If `~/dev/k-playbook` is missing and current working directory itself is the k-playbook repo, tell the user to move/clone it to `~/dev/k-playbook` or run `/k-install` to create the symlink.
-4. Do not read `K-PLAYBOOK.MD` to choose an alternative basis-repo path. Existing non-standard `repo:` values should be migrated back to `~/dev/k-playbook` when the managed block is updated.
+4. Do not read `K-PLAYBOOK.yaml` to choose an alternative basis-repo path. Existing non-standard `k_playbook.repo` values should be written back to `~/dev/k-playbook` when the config is updated.
 5. Check OpenCode command symlinks and `skills.paths` read-only. If missing/outdated, do **not** run install logic here; mention at the end that `/k-install` should be run.
 
 Do not block project setup just because global installation is incomplete.
 
 ## Step 1 — Detect current state
 
-Read the current working directory. Check whether `./K-PLAYBOOK.MD` exists (exact filename, uppercase preserved; but also accept `K-PLAYBOOK.md` if present — treat as the same file).
+Read the current working directory. Check whether `./K-PLAYBOOK.yaml` exists.
 
-If the command is accidentally run from `<project>/k-playbook/` and the parent contains `K-PLAYBOOK.MD`, switch the project root to the parent and announce that correction.
+If the command is accidentally run from `<project>/k-playbook/` and the parent contains `K-PLAYBOOK.yaml`, switch the project root to the parent and announce that correction.
 
-Supported existing schemas:
+Supported existing schema:
 
-- Current schema: `## Setup` with `layout: fixed-project-k-playbook`.
-- Legacy schema: `## Bausteine` active/inactive entries.
-- Legacy schema: `## Pfade` entries shaped like `- tasks: ./tasks` or `- docs: ./docs`.
+- YAML schema version `1` with `layout: fixed-project-k-playbook`.
 
-For legacy schemas:
-
-- Ignore legacy `base:` and per-block paths for future path derivation. The fixed base is always `./k-playbook`.
-- Show a migration table from legacy values to fixed paths, e.g. `tasks ./tasks -> k-playbook/tasks`.
-- If a legacy source path exists and the fixed target path does not exist, ask before moving data. Default recommendation: create the fixed target and leave old files untouched unless the user explicitly asks to move.
-- Preserve unmanaged content outside managed blocks.
+If `K-PLAYBOOK.yaml` contains unknown top-level fields, preserve them unless they conflict with fields owned by `/k-setup`.
 
 ## Step 2 — Status table
 
@@ -94,25 +86,24 @@ k-playbook/enforcement       fehlt
 k-playbook/docs              fehlt
 ```
 
-If legacy paths exist, include them as migration notes.
-
 Ask one confirmation:
 
-> Ich lege die fehlende feste k-playbook-Struktur an und aktualisiere `K-PLAYBOOK.MD`. Passt das?
+> Ich lege die fehlende feste k-playbook-Struktur an und aktualisiere `K-PLAYBOOK.yaml`. Passt das?
 
 Do **not** ask which directories to create.
 
 Do **not** silently overwrite, remove, or move anything the user did not confirm.
 
-## Step 3 — Draft K-PLAYBOOK.MD
+## Step 3 — Draft K-PLAYBOOK.yaml
 
 Compose the file content with setup metadata:
 
+- `schema_version: 1`.
 - `layout: fixed-project-k-playbook`.
-- `repo: ~/dev/k-playbook`. Do not ask. Do not preserve older absolute host paths in the managed block.
-- `setup-run`: today's date (`YYYY-MM-DD`).
-- Preserve unmanaged content from an existing file (anything outside managed sections).
-- Preserve or add the optional `k-setup-remediation` managed block. If missing in update mode, ask which Remediation Mode to use:
+- `k_playbook.repo: ~/dev/k-playbook`. Do not ask. Do not preserve older absolute host paths.
+- `setup.updated_at`: today's date (`YYYY-MM-DD`).
+- Preserve unknown non-owned top-level YAML fields from an existing `K-PLAYBOOK.yaml`.
+- Preserve or add the optional `remediation` block. If missing in update mode, ask which Remediation Mode to use:
   - `task-branch-pr` - every correction is planned as a Task/Bundle with branch and PR. Best for production projects.
   - `task-first` - corrections become Tasks/Bundles first; direct fixes only after explicit approval.
   - `direct-allowed` - small safe fixes may be applied directly; larger work becomes Tasks.
@@ -132,11 +123,11 @@ After confirmation:
 1. Create all fixed directories from the layout table with `mkdir -p`.
 2. Apply explicitly confirmed legacy moves, if any.
 3. Run standard initialization from Step 4b.
-4. Write `K-PLAYBOOK.MD` at the project root using the confirmed content.
+4. Write `K-PLAYBOOK.yaml` at the project root using the confirmed content.
 5. Print a short summary:
    - Created directories.
    - Created initialization files.
-   - Written / updated file: `K-PLAYBOOK.MD`.
+   - Written / updated file: `K-PLAYBOOK.yaml`.
    - Host install status: `ok` or `run /k-install`.
 
 ## Step 4b — Standard initialization
@@ -194,7 +185,7 @@ At the end, always briefly mention optional CodeQL setup, but do not generate Co
 
 Hinweistext:
 
-> "Optional: Wenn dieses Projekt CodeQL für Security-, Qualitäts- oder Enforcement-Checks nutzen soll, führe als nächsten Schritt `/k-setup-codeql` aus. Der Command fragt GitHub-CodeQL vs. lokale CodeQL-Datenbank separat ab und trägt die Entscheidung in `K-PLAYBOOK.MD` ein."
+> "Optional: Wenn dieses Projekt CodeQL für Security-, Qualitäts- oder Enforcement-Checks nutzen soll, führe als nächsten Schritt `/k-setup-codeql` aus. Der Command fragt GitHub-CodeQL vs. lokale CodeQL-Datenbank separat ab und trägt die Entscheidung in `K-PLAYBOOK.yaml` ein."
 
 ## Step 7 — Abschluss-Hinweis zur Host-Installation
 
@@ -205,52 +196,37 @@ Am Ende immer kurz den Host-Install-Status nennen:
 - Wenn Step 0 nicht ok war oder nicht ausgeführt wurde:
   > "Hinweis: Wenn neue `/k-*`-Commands nicht im Autocomplete auftauchen, auf diesem Server einmal `/k-install` ausführen und OpenCode neu starten."
 
-## K-PLAYBOOK.MD format
+## K-PLAYBOOK.yaml format
 
-Exact format written by this command. Everything between the `k-setup:managed:begin` and `k-setup:managed:end` markers is managed by `/k-setup` and may be rewritten. Content outside the markers is preserved on updates.
+Exact base format written by this command. `/k-setup` owns `schema_version`, `layout`, `k_playbook`, `setup`, and `remediation`.
 
-```markdown
-<!--
-K-PLAYBOOK config file — verwaltet von /k-setup.
-Diese Datei ist keine User-Doku, sondern eine Config-Datei:
-Commands (/k-run, /k-task-create, ...) leiten ihre Pfade aus dem festen ./k-playbook/-Layout ab.
--->
+```yaml
+schema_version: 1
+layout: fixed-project-k-playbook
 
-# K-PLAYBOOK
+k_playbook:
+  repo: ~/dev/k-playbook
 
-<!-- k-setup:managed:begin -->
+setup:
+  updated_at: 2026-07-30
 
-## Setup
-
-- layout:     fixed-project-k-playbook
-- repo:       ~/dev/k-playbook
-- setup-run: 2026-07-30
-
-<!-- k-setup:managed:end -->
-
-<!-- k-setup-remediation:managed:begin -->
-
-## Remediation
-
-- mode:           task-branch-pr
-- target:         .
-- grouping:       true
-- quick-wins:     true
-- branch-prefix:  remediation/
-- pr-required:    true
-- direct-fixes:   false
-- setup-run:      2026-07-30
-
-<!-- k-setup-remediation:managed:end -->
+remediation:
+  mode: task-branch-pr
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: true
+  direct_fixes: false
 ```
 
-Rules for the managed block:
+Rules for the config:
 
-- `## Setup` lists `layout`, `repo`, and `setup-run`.
+- `schema_version` must be `1`.
 - `layout:` must be `fixed-project-k-playbook`.
-- `repo:` is the fixed logical repo path `~/dev/k-playbook`; portability is achieved with a symlink when the physical repo lives elsewhere.
-- Parsers must still tolerate legacy `## Pfade` and `## Bausteine` blocks during migration, but `/k-setup` rewrites to this format.
-- `## Remediation` defines the project workflow for remediation work. `mode:` is required when the block exists. `target:` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./app`.
+- `k_playbook.repo` is the fixed logical repo path `~/dev/k-playbook`; portability is achieved with a symlink when the physical repo lives elsewhere.
+- `remediation` defines the project workflow for remediation work. `mode` is required when the block exists. `target` is the default code/Git root for remediation tasks; use `.` or a project-relative path such as `./app`.
+- Standard paths are not stored. Commands derive them from `<project>/k-playbook/`.
 
 ## Notes
 

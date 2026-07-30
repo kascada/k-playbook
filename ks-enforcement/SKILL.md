@@ -14,7 +14,7 @@ Immer wenn eine Arbeit Regeln verletzen könnte, insbesondere bei:
 - Code-Änderungen.
 - Doc-Änderungen.
 - Test-, Check-, Review- oder Remediation-Arbeiten.
-- Änderungen an Tasks, Guidelines, `K-PLAYBOOK.MD`, `AGENTS.md` oder OpenCode-Konfiguration.
+- Änderungen an Tasks, Guidelines, `K-PLAYBOOK.yaml`, `AGENTS.md` oder OpenCode-Konfiguration.
 - User-Aussagen wie „Enforcement", „Checks durchgehen", „Regeln berücksichtigen" oder „achte darauf".
 
 ## Regelquellen
@@ -26,7 +26,7 @@ Der Skill lädt zwei Regel-Ebenen:
 
 `PLAYBOOK_REPO` und `TARGET_DIR` werden nach derselben Logik bestimmt wie in `commands/_shared/path-resolution.md`.
 
-Wenn `K-PLAYBOOK.MD` fehlt, gelten nur die globalen Regeln. Wenn `k-playbook/enforcement/` fehlt, den User kurz darauf hinweisen und mit den globalen Regeln fortfahren, sofern die Arbeit dadurch nicht blockiert ist.
+Wenn `K-PLAYBOOK.yaml` fehlt, gelten nur die globalen Regeln. Wenn `k-playbook/enforcement/` fehlt, den User kurz darauf hinweisen und mit den globalen Regeln fortfahren, sofern die Arbeit dadurch nicht blockiert ist.
 
 ## Arbeitsweise
 

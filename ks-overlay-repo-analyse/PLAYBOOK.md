@@ -305,8 +305,8 @@ In `docs/README.md` alle Doc-Dateien listen. Idealerweise anschließend
 das Playbook `ks-ai-session-memory/` anwenden, damit die Docs für
 Folge-Sessions verankert werden.
 
-> **Pfad-Hinweis:** Wenn im Projekt-Root eine `K-PLAYBOOK.MD` mit
-> `docs:`-Eintrag existiert, diesen Pfad statt `docs/` verwenden.
+> **Pfad-Hinweis:** Projektlokale k-playbook-Dokumentation liegt fest unter
+> `k-playbook/docs/`; alternative Docs-Pfade werden nicht aus `K-PLAYBOOK.yaml` gelesen.
 
 ---
 

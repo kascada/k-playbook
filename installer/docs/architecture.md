@@ -34,7 +34,7 @@ go run ./cmd/k-playbook-installer projects scan
 go run ./cmd/k-playbook-installer projects add <path> --env plain
 ```
 
-Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten.
+Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten. `projects add` legt beim Speichern `K-PLAYBOOK.yaml` im Zielprojekt an, falls sie fehlt.
 
 ## Designentscheidungen
 
@@ -94,8 +94,8 @@ Wichtige Funktionen:
 Erkennung:
 
 - DevContainer: `.devcontainer/devcontainer.json`
-- Python venv: `.venv/` oder `venv/`
-- Projektmarker: `.git`, `K-PLAYBOOK.MD`, `pyproject.toml`, `package.json`, `go.mod`, `.devcontainer/devcontainer.json`
+- Normal: Projektmarker wie `.git`, `K-PLAYBOOK.yaml`, `pyproject.toml`, `package.json`, `go.mod` oder Python-venv-Verzeichnisse `.venv/` und `venv/`
+- Projektmarker: `.git`, `K-PLAYBOOK.yaml`, `pyproject.toml`, `package.json`, `go.mod`, `.devcontainer/devcontainer.json`
 
 Der Scan ueberspringt typische grosse oder irrelevante Verzeichnisse wie `.git`, `.venv`, `node_modules`, `dist`, `target`, `vendor`, `results`.
 
@@ -118,7 +118,7 @@ Schema:
       "name": "repo-name",
       "environment": "plain|venv|devcontainer|unknown",
       "selected": true,
-      "detected": [".venv/"],
+      "detected": ["go.mod"],
       "addedAt": "...",
       "updatedAt": "..."
     }
@@ -156,11 +156,11 @@ Aktuelle Endpunkte:
 |---|---|---|
 | `GET` | `/api/status` | Pfadvertrag pruefen |
 | `POST` | `/api/repair-path` | Fixbaren Pfadvertrag reparieren |
-| `GET` | `/api/projects` | Gespeicherte Projekt-Auswahl laden, inklusive Projekt-Setup-Status (`K-PLAYBOOK.MD`) und projektlokalem Docs-Status |
+| `GET` | `/api/projects` | Gespeicherte Projekt-Auswahl laden, inklusive Projekt-Setup-Status (`K-PLAYBOOK.yaml`) und projektlokalem `k-playbook/docs`-Status |
 | `DELETE` | `/api/projects` | Projekt nach bestaetigter GUI-Aktion aus der gespeicherten Installer-Liste entfernen; Projektdateien bleiben unveraendert |
-| `POST` | `/api/projects` | Manuelles Projekt speichern |
+| `POST` | `/api/projects` | Einzelnes Projekt speichern und fehlende `K-PLAYBOOK.yaml` minimal anlegen |
+| `POST` | `/api/projects/preview` | Einzelnes manuelles Projekt normalisieren und Umgebung erkennen, ohne zu speichern |
 | `GET` | `/api/projects/scan?root=dev|home` | Projektkandidaten scannen |
-| `POST` | `/api/projects/scan` | Ausgewaehlte Scan-Projekte speichern |
 | `GET` | `/api/git/status` | Read-only per `git ls-remote` pruefen, ob der Upstream-Branch von k-playbook einen anderen Commit zeigt |
 | `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren |
 | `GET` | `/api/docs` | Markdown-Dateien unter `docs/` listen |
@@ -186,10 +186,10 @@ Die Startseite zeigt:
    Daneben liegt `k-playbook aktualisieren`; beim Start prueft die GUI read-only per `/api/git/status`, ob der Upstream-Branch einen anderen Commit zeigt. Wenn eine neue Version verfuegbar ist, wird der Button hervorgehoben und heisst `Zur neuen Version aktualisieren`. Der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.MD` existiert und ob `docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.MD` fehlt, zeigt der Projektblock `/k-setup`; wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Beide Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Projektblock einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen. Wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
    Jeder Projektblock bietet `Entfernen`; nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei.
 5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt der jeweilige Projektblock die Zeile `k-playbook im Container erreichbar`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Bei fehlenden Eintraegen zeigt diese Projektzeile `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
-6. Button `Projekte auswaehlen`.
+6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
 9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
@@ -247,7 +247,7 @@ Aktuelle Nutzungen:
 
 ### Scan-Seite
 
-`Projekte auswaehlen` wechselt auf eine separate Scan-Ansicht.
+`Projekt hinzufuegen` wechselt auf eine separate Scan-Ansicht.
 
 Scan-Roots:
 
@@ -257,11 +257,13 @@ Scan-Roots:
 Auswahlverhalten:
 
 - Ganze Zeile ist klickbar.
-- Checkbox bleibt sichtbar.
-- Ausgewaehlte Zeilen werden optisch markiert.
-- Speicherbutton zeigt Anzahl, z. B. `1 Projekt speichern`, `3 Projekte speichern`.
-- Nach `Auswahl speichern` springt die GUI zur Startseite zurueck.
-- Manuelles Projekt-Hinzufuegen liegt ebenfalls auf der Scan-Seite und springt nach Speichern zur Startseite zurueck.
+- Immer nur ein Projekt kann ausgewaehlt und hinzugefuegt werden.
+- Ausgewaehlte Zeile wird optisch markiert.
+- Erkannte Art wird vorausgewaehlt: `Normal` fuer normale Projekte, `DevContainer` fuer `.devcontainer/devcontainer.json`. Bei unbekannter Art muss der Nutzer waehlen.
+- Vor dem Speichern fragt die GUI, ob die erkannte bzw. ausgewaehlte Art richtig ist.
+- Beim Speichern legt Backend/CLI sofort die minimale `K-PLAYBOOK.yaml` gemaess `docs/k-playbook-format.md` an, falls sie fehlt.
+- Nach dem Speichern springt die GUI zur Startseite zurueck.
+- Manuelles Projekt-Hinzufuegen liegt ebenfalls auf der Scan-Seite, nutzt dieselbe Art-Bestaetigung und springt nach Speichern zur Startseite zurueck.
 
 ## Docs-Anzeige
 

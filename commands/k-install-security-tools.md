@@ -9,7 +9,7 @@ allowed-tools: [Read, Bash, Glob, Grep]
 
 Installiere oder pruefe host-lokale Security-Review-Tools fuer alle Projekte, die dieses globale k-playbook nutzen.
 
-Dieser Command ist **host-lokal**. Er veraendert keine Projektdateien, kein `K-PLAYBOOK.MD`, keine Review-Artefakte und startet keine Scans. Er richtet nur wiederverwendbare CLI-Tools bzw. Docker-Fallback-Images auf dem aktuellen Host ein.
+Dieser Command ist **host-lokal**. Er veraendert keine Projektdateien, kein `K-PLAYBOOK.yaml`, keine Review-Artefakte und startet keine Scans. Er richtet nur wiederverwendbare CLI-Tools bzw. Docker-Fallback-Images auf dem aktuellen Host ein.
 
 Er darf nicht in einem aktiven Projekt-venv laufen. Wenn `VIRTUAL_ENV` gesetzt ist, abbrechen und den User auffordern, zuerst `deactivate` auszufuehren. Python-CLI-Tools duerfen nur via `pipx` oder dediziertem k-playbook Tool-venv installiert werden, nie in `.venv/`, `venv/` oder `env/` eines Projekts.
 

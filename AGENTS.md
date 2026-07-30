@@ -6,7 +6,7 @@ Diese Datei wird von OpenCode als Projekt-Kontext geladen.
 
 Dieses Repo ist die globale k-playbook-Basisinstallation. Es enthaelt die wiederverwendbaren Commands, Skills, Playbooks, globalen Regeln, Reviews, Checks und Installationsskripte fuer Zielprojekte.
 
-Es ist selbst kein normales Zielprojekt mit projektlokaler `K-PLAYBOOK.MD`-Konfiguration.
+Es ist selbst kein normales Zielprojekt mit projektlokaler `K-PLAYBOOK.yaml`-Konfiguration.
 
 ## Wichtige Memory-Regel
 

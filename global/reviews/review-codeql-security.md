@@ -2,7 +2,7 @@
 name: review-codeql-security
 title: CodeQL Security Assessment
 interval-weeks: 4
-scope-hint: CodeQL SARIF-Ergebnisse fuer die in K-PLAYBOOK.MD registrierten Sprachen; keine Remediation, keine Code-Aenderungen
+scope-hint: CodeQL SARIF-Ergebnisse fuer die in K-PLAYBOOK.yaml registrierten Sprachen; keine Remediation, keine Code-Aenderungen
 handoff: /k-remediation
 result-family: codeql
 ---
@@ -36,21 +36,21 @@ Dieses Review darf nur laufen, wenn das Zielprojekt CodeQL bereits ueber `/k-set
 Pfad- und Statusauflosung:
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` + `/k-setup-codeql` nennen.
-- Wenn kein CodeQL-Managed-Block vorhanden ist: abbrechen und `/k-setup-codeql` nennen.
-- Wenn weder `github:` noch `local-database:` `true` oder `planned` ist: abbrechen, weil CodeQL fuer dieses Projekt nicht aktiviert ist.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` + `/k-setup-codeql` nennen.
+- Wenn `tools.codeql` fehlt: abbrechen und `/k-setup-codeql` nennen.
+- Wenn weder `github.status` noch `local_database.status` `enabled` oder `planned` ist: abbrechen, weil CodeQL fuer dieses Projekt nicht aktiviert ist.
 - Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel fuer den Assessment-Report.
 - `checks` ist fuer ausfuehrbare Pruefroutinen reserviert. SARIF- und Report-Ergebnisse gehoeren nicht dauerhaft nach `k-playbook/checks/`.
 
-Zu lesen aus dem CodeQL-Block:
+Zu lesen aus `tools.codeql`:
 
-- `target:`
-- `github:`
-- `workflow:`
-- `local-database:`
-- `database:`
-- `languages:`
-- `queries:`
+- `target`
+- `github.status`
+- `github.workflow`
+- `local_database.status`
+- `local_database.path`
+- `languages`
+- `queries`
 
 ## Preflight
 
@@ -61,11 +61,11 @@ Pruefe kompakt:
 ────────────────────────────────────
 Projekt:           <TARGET_DIR>
 CodeQL Target:     <target oder .>
-K-PLAYBOOK.MD:     gefunden
-CodeQL Block:      gefunden
-GitHub CodeQL:     true | false | planned
+K-PLAYBOOK.yaml:   gefunden
+tools.codeql:      gefunden
+GitHub CodeQL:     enabled | disabled | planned
 Workflow:          <path> | - | fehlt
-Lokale DB:         true | false | planned
+Lokale DB:         enabled | disabled | planned
 Datenbankpfad:     <path> | - | fehlt
 CodeQL CLI:        ok (<version>) | fehlt
 Sprachen:          <languages> | unklar
@@ -79,7 +79,7 @@ CLI-Ermittlung:
 
 - Zuerst `codeql version` pruefen.
 - Wenn nicht im PATH, pruefe `k-playbook/codeql-cli/codeql/codeql version`.
-- Wenn lokale DB `true` oder `planned` ist und keine CLI gefunden wird: abbrechen und `/k-install-codeql` nennen.
+- Wenn lokale DB `enabled` oder `planned` ist und keine CLI gefunden wird: abbrechen und `/k-install-codeql` nennen.
 - Wenn nur GitHub CodeQL aktiv ist und keine lokale CLI vorhanden ist: nicht abbrechen, solange SARIF bereits vorhanden ist oder User nur einen bestehenden GitHub-Code-Scanning-Export bewerten will. Sonst `/k-install-codeql --cli-only` empfehlen.
 
 ## Ausfuehrungsentscheidung
@@ -89,16 +89,16 @@ Frage vor langlaufenden Operationen, was ausgefuehrt werden soll. Nicht automati
 Optionen:
 
 - **Vorhandene SARIF auswerten (Default)**: Nutzt SARIF aus `k-playbook/reviews/results/codeql/<datum>/raw/` oder explizit vom User angegebene SARIF-Dateien. Keine neue Analyse.
-- **Lokale CodeQL-Analyse ausfuehren**: Nur erlaubt, wenn `local-database:` `true` oder `planned` ist und CLI + Datenbankpfad vorhanden sind. Vor Ausfuehrung exakte Befehle zeigen und bestaetigen lassen.
+- **Lokale CodeQL-Analyse ausfuehren**: Nur erlaubt, wenn `local_database.status` `enabled` oder `planned` ist und CLI + Datenbankpfad vorhanden sind. Vor Ausfuehrung exakte Befehle zeigen und bestaetigen lassen.
 - **Nur Preflight**: Keine Report-Erzeugung, nur Status zeigen.
 - **Abbrechen**.
 
 Wenn lokale Analyse ausgefuehrt wird:
 
-- Nutze `languages:` aus dem CodeQL-Block als Default.
-- Nutze `queries:` aus dem CodeQL-Block als Default.
-- Nutze `target:` aus dem CodeQL-Block als Analyse-/Kontextwurzel. Wenn `target:` fehlt, gilt legacy-kompatibel `.`.
-- Nutze `database:` als Datenbankbasis.
+- Nutze `languages` aus `tools.codeql` als Default.
+- Nutze `queries` aus `tools.codeql` als Default.
+- Nutze `target` aus `tools.codeql` als Analyse-/Kontextwurzel. Wenn `target` fehlt, gilt `.`.
+- Nutze `local_database.path` als Datenbankbasis.
 - Schreibe SARIF nach `k-playbook/reviews/results/codeql/YYYY-MM-DD/raw/codeql-<language>.sarif`.
 - Keine SARIF-Uploads.
 - Keine GitHub-Actions-Aenderungen.

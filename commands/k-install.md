@@ -8,7 +8,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 
 Installiert oder aktualisiert die globale k-playbook-Registrierung auf dem aktuellen Server/Host.
 
-Dieser Command ist **host-lokal**: Er richtet OpenCode so ein, dass die globalen Slash-Commands aus diesem Repo verfügbar sind. Er verändert keine Projektdateien und kein `K-PLAYBOOK.MD`.
+Dieser Command ist **host-lokal**: Er richtet OpenCode so ein, dass die globalen Slash-Commands aus diesem Repo verfügbar sind. Er verändert keine Projektdateien und kein `K-PLAYBOOK.yaml`.
 
 Typische Nutzung:
 - Einmal pro Server nach dem Klonen von `k-playbook`.
@@ -22,7 +22,7 @@ Aufrufort:
 
 Pfadvertrag:
 - Der feste logische Repo-Pfad ist `~/dev/k-playbook`.
-- `K-PLAYBOOK.MD` darf diesen Pfad sichtbar als `repo: ~/dev/k-playbook` enthalten, aber `/k-install` fragt ihn nicht ab und behandelt ihn nicht als frei waehlbar.
+- `K-PLAYBOOK.yaml` darf diesen Pfad sichtbar als `k_playbook.repo: ~/dev/k-playbook` enthalten, aber `/k-install` fragt ihn nicht ab und behandelt ihn nicht als frei waehlbar.
 - Wenn der echte Klon woanders liegt, soll `/k-install` vorschlagen, ihn nach `~/dev/k-playbook` zu verschieben. Wenn der User das nicht will, darf `/k-install` nach Bestaetigung einen Symlink von `~/dev/k-playbook` auf den echten Klon anlegen.
 - In Devcontainern gilt derselbe Vertrag: `~/dev/k-playbook` muss existieren; typischerweise ist `/home/vscode/dev/k-playbook` ein Symlink auf `/workspaces/k-playbook`. Dafuer muss das Host-Repo zuerst als Bind-Mount nach `/workspaces/k-playbook` im Container verfuegbar sein.
 

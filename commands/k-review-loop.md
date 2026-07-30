@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Glob, Task]
 
 Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. Critic and Editor are read-only advisors. The Moderator routes between them, decides on deadlocks, applies accepted edits, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
 
-`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.MD`. The task directory is always `<project>/k-playbook/tasks`.
+`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.yaml`. The task directory is always `<project>/k-playbook/tasks`.
 
 ## Invocation
 
@@ -32,26 +32,26 @@ Review task/instruction files before execution using a structured two-agent dial
 
 ### Step 1 — Resolve project config and target path
 
-Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.MD` and its current directory layout instead of silently using historical defaults.
+Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.yaml` and its current directory layout instead of silently using historical defaults.
 
 For this command, resolve the fixed `tasks` path:
 
 - `RESOLVED_TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`.
 - `TASKS_DISPLAY_PATH = k-playbook/tasks`.
 
-Ignore other managed blocks such as Remediation, CodeQL, or Dependabot for target selection; they are command-specific config for other commands.
+Ignore other config sections such as `remediation`, `tools.codeql`, or future `tools.dependabot` for target selection; they are command-specific config for other commands.
 
 Command-specific policy:
 
-- If `$ARGUMENTS` is provided: treat it as the explicit review target after the `K-PLAYBOOK.MD` preflight.
+- If `$ARGUMENTS` is provided: treat it as the explicit review target after the `K-PLAYBOOK.yaml` preflight.
   - If it is a file: use that file.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.MD` is missing: continue as an explicit one-off review, but announce that project k-playbook metadata could not be validated.
+  - If `K-PLAYBOOK.yaml` is missing: continue as an explicit one-off review, but announce that project k-playbook metadata could not be validated.
   - If `k-playbook/tasks` exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off review.
-  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directories.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first, or pass an explicit file/directory argument for a one-off review.
+  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-setup` to create the fixed directories.
   - If `k-playbook/tasks` exists: use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
@@ -96,7 +96,7 @@ Review gestartet
 ─────────────────────────────
 Tasks:   <list of task filenames>
 Pfad:    <REVIEW_TARGET_DISPLAY>
-Config:  K-PLAYBOOK.MD <gefunden|fehlt>; tasks: <TASKS_DISPLAY_PATH or "—">
+Config:  K-PLAYBOOK.yaml <gefunden|fehlt>; tasks: <TASKS_DISPLAY_PATH or "—">
 Intent:  <list of intent filenames, or "— (kein Intent angegeben)">
 Runden:  max. 5
 ```

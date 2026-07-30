@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 
 Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
 
-`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.MD` and an existing `k-playbook/docs` directory.
+`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.yaml` and an existing `k-playbook/docs` directory.
 
 Produces:
 - `k-playbook/docs/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
@@ -18,7 +18,7 @@ Produces:
 
 **Fokus:** Pitfalls, Auth-Quirks, Concurrency-Fallen, Version-Migrations-Notes, empfohlene Idiome. **Kein** Copy-Paste-Tutorial — dafür gibt es die offiziellen Docs.
 
-## Step 1 — Resolve paths from K-PLAYBOOK.MD
+## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
@@ -29,8 +29,8 @@ For this command, resolve the fixed `docs` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.MD` is missing: abort and tell the user to run `/k-setup` first.
-- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create/migrate the fixed directory.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-setup` first.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-setup` to create the fixed directory.
 - Use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 `LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.

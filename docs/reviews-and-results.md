@@ -135,7 +135,7 @@ Typische Artefakte:
 
 CodeQL bewertet CWE-/Code-Findings, nicht Dependency-CVEs. Dependency-CVEs gehoeren in eine eigene Result-Familie.
 
-Bei Wrapper-Repos soll der CodeQL-Block in `K-PLAYBOOK.MD` ein `target:` enthalten. Dieses Feld benennt den tatsaechlichen Analyse-/Git-Root, z. B. `./app`, waehrend Result-Artefakte weiterhin unter `k-playbook/reviews/` liegen.
+Bei Wrapper-Repos soll `tools.codeql.target` in `K-PLAYBOOK.yaml` den tatsaechlichen Analyse-/Git-Root benennen, z. B. `./app`, waehrend Result-Artefakte weiterhin unter `k-playbook/reviews/` liegen.
 
 ### k-check
 
@@ -301,26 +301,20 @@ Beim Task-Anlegen muss ein Remediation-Task enthalten:
 - Raw-Quelle falls vorhanden
 - urspruengliche Ort-/Message-Angabe
 - alle Findings, die zusammen geloest werden sollen, wenn ein gemeinsamer Fix-/Verifikationspfad existiert
-- den projektlokalen Remediation-Modus aus `K-PLAYBOOK.MD`
+- den projektlokalen Remediation-Modus aus `K-PLAYBOOK.yaml`
 - konkrete Verifikationsschritte
 
 Projektweite Remediation-Policy:
 
-```markdown
-<!-- k-setup-remediation:managed:begin -->
-
-## Remediation
-
-- mode:           task-branch-pr
-- target:         ./app
-- grouping:       true
-- quick-wins:     true
-- branch-prefix:  remediation/
-- pr-required:    true
-- direct-fixes:   false
-- setup-run:      2026-07-26
-
-<!-- k-setup-remediation:managed:end -->
+```yaml
+remediation:
+  mode: task-branch-pr
+  target: ./app
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: true
+  direct_fixes: false
 ```
 
 Modi:

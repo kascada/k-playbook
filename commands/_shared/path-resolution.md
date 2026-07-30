@@ -20,7 +20,7 @@ For a project root `TARGET_DIR`, derive:
 | enforcement | `<TARGET_DIR>/k-playbook/enforcement/` |
 | docs | `<TARGET_DIR>/k-playbook/docs/` |
 
-No command should ask for alternative locations for these paths. If a project still has old configurable paths or a `## Bausteine` active/inactive block in `K-PLAYBOOK.MD`, ask the user to run `/k-setup` to migrate the managed block and create the complete fixed structure.
+No command should ask for alternative locations for these paths. `K-PLAYBOOK.yaml` records setup metadata, policies, and tool decisions only; standard paths stay derived from the fixed layout.
 
 ## Loading This Module From Commands
 
@@ -29,7 +29,7 @@ When a command says to read and apply this module, locate it as `<PLAYBOOK_REPO>
 Determine `PLAYBOOK_REPO`:
 
 - The canonical logical path is always `~/dev/k-playbook`; expand `~` against the current user.
-- If `<TARGET_DIR>/K-PLAYBOOK.MD` contains `repo:`, read it only as validation/documentation. Expected value is `~/dev/k-playbook`. If it differs, commands should warn and continue with `~/dev/k-playbook` when possible; `/k-setup` owns migrating the value back.
+- If `<TARGET_DIR>/K-PLAYBOOK.yaml` contains `k_playbook.repo`, read it only as validation/documentation. Expected value is `~/dev/k-playbook`. If it differs, commands should warn and continue with `~/dev/k-playbook` when possible; `/k-setup` owns writing the canonical value.
 - If `~/dev/k-playbook` is missing but `/workspaces/k-playbook` exists, this is likely a Devcontainer with a missing symlink. Commands may report a setup error; setup/install flows may create `~/dev/k-playbook -> /workspaces/k-playbook`.
 - If `~/dev/k-playbook` is missing, do not ask for a different permanent path. Ask the user to clone/move the repo there or create a symlink there.
 
@@ -39,17 +39,16 @@ Determine `PLAYBOOK_REPO`:
 - Else if the command received an explicit project/root directory argument, resolve it with `realpath` and validate that it exists.
 - Else use the current working directory as `TARGET_DIR`.
 - Before finalizing `TARGET_DIR`, guard against accidentally targeting the fixed project-local playbook base directory:
-  - If `<TARGET_DIR>/K-PLAYBOOK.MD` is missing, but `<TARGET_DIR>/../K-PLAYBOOK.MD` exists and `<TARGET_DIR>` is named `k-playbook`, treat the parent directory as the project root and set `TARGET_DIR = realpath(<TARGET_DIR>/..)`. Announce this correction in the command preflight.
+  - If `<TARGET_DIR>/K-PLAYBOOK.yaml` is missing, but `<TARGET_DIR>/../K-PLAYBOOK.yaml` exists and `<TARGET_DIR>` is named `k-playbook`, treat the parent directory as the project root and set `TARGET_DIR = realpath(<TARGET_DIR>/..)`. Announce this correction in the command preflight.
 - Resolve all derived playbook paths against `TARGET_DIR`.
 
-## Read `K-PLAYBOOK.MD`
+## Read `K-PLAYBOOK.yaml`
 
-- Read `<TARGET_DIR>/K-PLAYBOOK.MD` if it exists.
+- Read `<TARGET_DIR>/K-PLAYBOOK.yaml` if it exists.
 - If it is missing, record `K_PLAYBOOK_FOUND=false`; do not abort here.
-- Parse setup metadata only: managed markers, `layout:`, `repo:`, and `setup-run:`.
+- Parse setup metadata only: `schema_version`, `layout`, `k_playbook.repo`, and `setup.updated_at`.
 - Expected layout is `fixed-project-k-playbook`.
-- Legacy `## Pfade` and `## Bausteine` blocks are migration signals only. Do not use them to choose paths or availability.
-- `base:` in old files is legacy metadata. Do not use it to derive paths. The effective playbook base is always `<TARGET_DIR>/k-playbook`.
+- Do not read a `paths:` block for standard paths. The effective playbook base is always `<TARGET_DIR>/k-playbook`.
 
 ## Resolve Requested Keys
 
@@ -78,7 +77,7 @@ At the end of path resolution, the command should have:
 - `K_PLAYBOOK_FOUND`
 - `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook`
 - `PLAYBOOK_BASE_DISPLAY_PATH = k-playbook`
-- `K_PLAYBOOK_SCHEMA = fixed|legacy-paths|legacy-blocks|missing`
+- `K_PLAYBOOK_SCHEMA = yaml|invalid|missing`
 - one derived resolved path per requested key, e.g. `RESOLVED_TASKS_DIR` or `RESOLVED_TODO_PATH`
 - one display variable per requested key, e.g. `TASKS_DISPLAY_PATH`
 - a clear command-specific decision for every missing path

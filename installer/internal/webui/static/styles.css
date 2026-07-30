@@ -505,7 +505,7 @@ button.update-available {
 
 .scan-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 170px;
+  grid-template-columns: minmax(0, 1fr) 170px;
   align-items: center;
   gap: 12px;
   padding: 13px;

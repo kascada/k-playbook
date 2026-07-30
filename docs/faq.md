@@ -16,7 +16,7 @@ Wenn du nur pruefen willst, ob die OpenCode-Symlinks und `skills.paths` stimmen,
 
 Bevorzugt ja: direkt im k-playbook-Repo, z. B. `~/dev/k-playbook`, nach Clone oder Pull. Dann ist eindeutig, welches Repo fuer OpenCode registriert wird.
 
-Aus einem Zielprojekt heraus ist `/k-install` ebenfalls erlaubt. Der Command nutzt trotzdem den festen Pfadvertrag `~/dev/k-playbook`; `K-PLAYBOOK.MD` waehlt keinen alternativen Basis-Repo-Pfad.
+Aus einem Zielprojekt heraus ist `/k-install` ebenfalls erlaubt. Der Command nutzt trotzdem den festen Pfadvertrag `~/dev/k-playbook`; `K-PLAYBOOK.yaml` waehlt keinen alternativen Basis-Repo-Pfad.
 
 Der Effekt bleibt in beiden Faellen host-global:
 
@@ -48,7 +48,7 @@ ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
 ## Was ist der Unterschied zwischen `/k-install` und `/k-setup`?
 
 - `/k-install*` gehoert zum Host: OpenCode-Registrierung, host-lokale Tools, Security-Tool-Preflight.
-- `/k-setup*` gehoert zum Projekt: `K-PLAYBOOK.MD`, projektlokale Pfade, Projektentscheidungen.
+- `/k-setup*` gehoert zum Projekt: `K-PLAYBOOK.yaml`, feste projektlokale Struktur, Projektentscheidungen.
 
 Merksatz:
 

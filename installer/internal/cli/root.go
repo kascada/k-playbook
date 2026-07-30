@@ -136,6 +136,10 @@ func newProjectsCommand() *cobra.Command {
 			if addEnvironment != string(store.EnvironmentUnknown) {
 				project.Environment = store.ProjectEnvironment(addEnvironment)
 			}
+			createdConfig, err := projects.EnsureConfig(project.Path)
+			if err != nil {
+				return err
+			}
 
 			file, err := store.LoadProjects()
 			if err != nil {
@@ -146,6 +150,9 @@ func newProjectsCommand() *cobra.Command {
 				return err
 			}
 			fmt.Printf("Projekt gespeichert: %s (%s)\n", project.Path, project.Environment)
+			if createdConfig {
+				fmt.Printf("K-PLAYBOOK.yaml angelegt: %s\n", project.Path)
+			}
 			return nil
 		},
 	}

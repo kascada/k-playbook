@@ -2,7 +2,7 @@
 
 Diese Datei beschreibt die aktuell vorhandenen Setup-, Install-, Workflow- und Hilfs-Commands und grenzt ihre Zustaendigkeiten ab.
 
-Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt und werden dort ueber `K-PLAYBOOK.MD` registriert.
+Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt unter dem festen `k-playbook/`-Layout; Projektentscheidungen werden ueber `K-PLAYBOOK.yaml` registriert.
 
 Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./reviews-and-results.md) zusammengefasst.
 
@@ -14,7 +14,7 @@ Die empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer steh
 
 - `/k-install` und `/k-install-security-tools` sind **host-global**. Sie machen Commands, Skills und Security-Tools auf diesem Server fuer alle Projekte verfuegbar.
 - `/k-install-codeql` ist Tooling-/Artefakt-orientiert. Es installiert oder prueft lokale CodeQL-Artefakte, schreibt aber keine Projektkonfiguration.
-- `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.MD` und projektlokale Playbook-Pfade.
+- `/k-setup` und `/k-setup-codeql` sind **projektlokal**. Sie schreiben oder aktualisieren Projektkonfigurationen wie `K-PLAYBOOK.yaml` und legen die feste projektlokale Playbook-Struktur an.
 - Der globale k-playbook-Pfad ist fest `~/dev/k-playbook`. Wenn der physische Klon woanders liegt, wird ein Symlink nach `~/dev/k-playbook` angelegt; Projektkonfigurationen waehlen keinen eigenen Basis-Repo-Pfad.
 - Host-Installation schreibt keine Projektdateien.
 - Projekt-Setup installiert keine host-globalen Tools.
@@ -48,23 +48,23 @@ Aktueller Slash-Command-Bestand unter `commands/`: 19 Dateien (`k-*.md`). Neue D
 | **Install** | | | |
 | `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
-| `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.MD` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.MD` und legt die feste `k-playbook/`-Struktur an | keine Host-Aenderung |
-| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt CodeQL-Block in `K-PLAYBOOK.MD` | optional CLI-only Artefakt unter `codeql-cli/` |
+| `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
+| `/k-setup` | k-playbook in einem Projekt konfigurieren | schreibt `K-PLAYBOOK.yaml` und legt die feste `k-playbook/`-Struktur an | keine Host-Aenderung |
+| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
 | **Code-Review** | | | |
 | `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `k-playbook/reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `k-playbook/reviews` und `k-playbook/tasks` | schreibt `k-playbook/reviews/results/summary-YYYY-MM-DD.md` |
-| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | braucht `reviews`, `tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
+| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | nutzt `k-playbook/reviews`, `k-playbook/tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
 | **Task-Flow** | | | |
 | `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | nutzt `k-playbook/tasks` | schreibt `k-playbook/tasks/<NNN>-<slug>.md` nach Bestaetigung |
 | `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | nutzt optional `tasks` | Moderator schreibt akzeptierte Task-Edits und Review-Log |
-| `/k-run` | Task-Dateien sequenziell ausfuehren | braucht `tasks` und `K-PLAYBOOK.MD`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
+| `/k-run` | Task-Dateien sequenziell ausfuehren | nutzt `k-playbook/tasks` und `K-PLAYBOOK.yaml`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
 | **Nuetzliches** | | | |
 | `/k-verlauf` | alte AI-Verlaeufe durchsuchen | keine Projektdatei noetig | liest Claude-JSONL bzw. OpenCode-Logs read-only |
-| `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | keine `K-PLAYBOOK.MD`-Pflicht | schreibt/merged `.vscode/settings.json` |
+| `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | keine `K-PLAYBOOK.yaml`-Pflicht | schreibt/merged `.vscode/settings.json` |
 | **Weitere** | | | |
 | `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `k-playbook/TODO.md` | schreibt/ergaenzt `k-playbook/TODO.md` |
 | `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | nutzt `enforcement` und `docs`, falls aktiv | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
@@ -80,7 +80,7 @@ Der Command:
 - prueft, ob das k-playbook-Repo in `skills.paths` der OpenCode-Konfig registriert ist
 - fuehrt am Ende einen lesenden Security-Tool-Preflight aus
 - veraendert keine Projektdateien
-- schreibt kein `K-PLAYBOOK.MD`
+- schreibt kein `K-PLAYBOOK.yaml`
 
 Typische Nutzung:
 
@@ -149,20 +149,20 @@ Die Scanner selbst werden nicht als `global/checks/*.sh` aufgerufen. `k-check` b
 
 Der Command:
 
-- legt oder aktualisiert `K-PLAYBOOK.MD` im Projekt-Root
+- legt oder aktualisiert `K-PLAYBOOK.yaml` im Projekt-Root
 - legt die vollstaendige projektlokale Struktur unter `k-playbook/` an
 - nutzt immer feste Pfade unter `k-playbook/`
 - erstellt bestaetigte Verzeichnisse oder Initialdateien
 - fuehrt keine Tasks, Reviews, Checks oder CodeQL-Analysen aus
 - veraendert keine globale OpenCode-Registrierung
 
-`K-PLAYBOOK.MD` ist dabei eine Config-Datei. Spaetere Commands leiten ihre Pfade aus dem festen `k-playbook/`-Layout ab.
+`K-PLAYBOOK.yaml` ist dabei eine Config-Datei. Spaetere Commands leiten ihre Pfade aus dem festen `k-playbook/`-Layout ab; Standardpfade werden nicht in der Datei gespeichert.
 
-`/k-setup` schreibt `repo: ~/dev/k-playbook` in den Managed Block. Dieser Wert ist nicht interaktiv waehlbar; Abweichungen werden ueber Symlinks geloest.
+`/k-setup` schreibt `k_playbook.repo: ~/dev/k-playbook`. Dieser Wert ist nicht interaktiv waehlbar; Abweichungen werden ueber Symlinks geloest.
 
 ## `/k-setup-codeql`
 
-`/k-setup-codeql` gehoert zur Projektkonfiguration und besitzt den CodeQL-Block in `K-PLAYBOOK.MD`.
+`/k-setup-codeql` gehoert zur Projektkonfiguration und besitzt `tools.codeql` in `K-PLAYBOOK.yaml`.
 
 Der Command fragt getrennt ab:
 
@@ -181,7 +181,7 @@ Dieser Pfad darf nur `codeql-cli/` anlegen oder wiederverwenden. Er darf keine l
 
 ## `/k-install-codeql`
 
-`/k-install-codeql` ist der lokale CodeQL-Tooling-Command. Er aendert `K-PLAYBOOK.MD` nicht und konfiguriert GitHub CodeQL nicht.
+`/k-install-codeql` ist der lokale CodeQL-Tooling-Command. Er aendert `K-PLAYBOOK.yaml` nicht und konfiguriert GitHub CodeQL nicht.
 
 Mit `--cli-only` installiert oder prueft er nur die CLI:
 
@@ -221,7 +221,7 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 
 ## `/k-status`
 
-`/k-status` ist read-only. Neben Projektstatus aus `K-PLAYBOOK.MD` prueft der Command auch die host-lokale OpenCode-Registrierung:
+`/k-status` ist read-only. Neben Projektstatus aus `K-PLAYBOOK.yaml` prueft der Command auch die host-lokale OpenCode-Registrierung:
 
 - ob `~/.config/opencode/command/k-*.md` auf die erwarteten Dateien unter `<PLAYBOOK_REPO>/commands/` zeigt.
 - ob verwaiste k-playbook-Symlinks existieren.
@@ -231,7 +231,7 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 
 ## Task-Commands: `/k-task-create`, `/k-run`, `/k-review-loop`, `/k-todo`
 
-Diese Commands bilden die Task-Pipeline. Sie raten keine Projektpfade, sondern lesen `K-PLAYBOOK.MD`.
+Diese Commands bilden die Task-Pipeline. Sie raten keine Projektpfade, sondern lesen `K-PLAYBOOK.yaml` als Projekt-Kontext und nutzen die festen Unterverzeichnisse.
 
 `/k-task-create [short-name]` erzeugt aus dem Gespraechskontext eine neue Task-Datei unter `k-playbook/tasks/`. Der Command bestimmt die naechste freie Nummer ueber offene Tasks und `done/`, zeigt den Entwurf zuerst und speichert erst nach Bestaetigung.
 
@@ -278,7 +278,7 @@ Unterstuetzte Eingaben:
 - Result-Familien wie `k-playbook/reviews/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
 - Von `/k-results` erzeugte Summaries unter `k-playbook/reviews/results/summary-YYYY-MM-DD.md`.
 
-Der Command nutzt `k-playbook/reviews`, `k-playbook/tasks` und die Remediation-Policy aus `K-PLAYBOOK.MD`. Er gruppiert Findings zuerst zu sinnvollen Buendeln nach Risiko, Aufwand, Kopplung und gemeinsamer Verifikation. Je nach Policy entstehen Tasks mit Branch-/PR-Hinweis, oder kleine direkte Fixes sind nur nach expliziter Freigabe erlaubt.
+Der Command nutzt `k-playbook/reviews`, `k-playbook/tasks` und die Remediation-Policy aus `K-PLAYBOOK.yaml`. Er gruppiert Findings zuerst zu sinnvollen Buendeln nach Risiko, Aufwand, Kopplung und gemeinsamer Verifikation. Je nach Policy entstehen Tasks mit Branch-/PR-Hinweis, oder kleine direkte Fixes sind nur nach expliziter Freigabe erlaubt.
 
 Wichtig: `raw/` und Run-Metadaten von Result-Familien bleiben read-only. Status, Triage-Notizen, Task-Verweise und Remediation-Logs werden in `findings.md` bzw. nachvollziehbar in `assessment.md` gepflegt.
 
@@ -341,7 +341,7 @@ Ohne Argument erkennt der Command typische Test-Frameworks, z. B. `pytest`, Jest
 
 `/k-verlauf [claude|opencode|all] <Suchbegriff> [zeitraum] [-all]` durchsucht alte AI-Verlaeufe. Claude wird ueber `~/.claude/projects/**/*.jsonl` durchsucht; OpenCode ueber Log-/Session-Metadaten in `opencode.log`, nicht zwingend ueber vollstaendige Chattexte. Der Command ist read-only und gibt Treffergruppen mit Zeit, Projekt/Directory und Snippets aus.
 
-`/k-vscode-project-color [project-name]` schreibt oder merged eine projektlokale `.vscode/settings.json`, damit VS-Code-Fenster anhand Titel und Farbe unterscheidbar sind. Der Command ist nicht an `K-PLAYBOOK.MD` gebunden und erhaelt bestehende unrelated Settings.
+`/k-vscode-project-color [project-name]` schreibt oder merged eine projektlokale `.vscode/settings.json`, damit VS-Code-Fenster anhand Titel und Farbe unterscheidbar sind. Der Command ist nicht an `K-PLAYBOOK.yaml` gebunden und erhaelt bestehende unrelated Settings.
 
 ## `global/bin/k-check`
 
@@ -356,7 +356,7 @@ Typische Nutzung aus einem Projekt-Root:
 ~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/project/k-playbook/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/project/k-playbook/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Runner liest `K-PLAYBOOK.MD` am Projekt-Root, fuehrt `.sh`-Checks aus `global/checks/` und projektlokale `.sh`-Checks aus `k-playbook/checks/` aus. `K-PLAYBOOK.MD` bleibt dabei Config-Datei; Runner-Logik liegt im globalen Repo.
+Der Runner liest `K-PLAYBOOK.yaml` am Projekt-Root, fuehrt `.sh`-Checks aus `global/checks/` und projektlokale `.sh`-Checks aus `k-playbook/checks/` aus. `K-PLAYBOOK.yaml` bleibt dabei Config-Datei; Runner-Logik liegt im globalen Repo.
 
 `--output <file>` erhaelt das normale Terminalverhalten und schreibt die vollstaendige Raw-Ausgabe zusaetzlich in eine Datei. `--metadata-output <file>` schreibt JSON-Metadaten zum Lauf, darunter Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfuegbar. Beide Optionen verweigern vorhandene Ziel-Dateien. Fuer `/k-review k-check-security` gehoeren diese Dateien nach `k-playbook/reviews/results/k-check/YYYY-MM-DD/`.
 

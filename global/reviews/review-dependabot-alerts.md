@@ -29,11 +29,11 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 ## Voraussetzungen
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.MD` fehlt: abbrechen und `/k-setup` nennen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
 - Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
-- Lies den optionalen Dependabot-Managed-Block zwischen `<!-- k-setup-dependabot:managed:begin -->` und `<!-- k-setup-dependabot:managed:end -->`.
-- Wenn vorhanden, nutze `target:` als Git-/App-Root und `repo:` als GitHub `owner/repo`. Wenn `target:` fehlt, gilt legacy-kompatibel `.`. Wenn `repo:` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
-- Wenn `config:` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull-requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
+- Lies optional `tools.dependabot` aus `K-PLAYBOOK.yaml`, falls vorhanden.
+- Wenn vorhanden, nutze `tools.dependabot.target` als Git-/App-Root und `tools.dependabot.repo` als GitHub `owner/repo`. Wenn `target` fehlt, gilt `.`. Wenn `repo` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
+- Wenn `tools.dependabot.config` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
 - Pruefe `gh auth status`.
 - Pruefe, dass das Ziel ein Git-Repo mit GitHub-Remote ist oder der User `owner/repo` explizit vorgibt.
 - Wenn die Dependabot-Alerts-API `404` liefert: nicht als "keine Alerts" werten. Moegliche Ursachen dokumentieren: fehlende Berechtigung, Dependabot Alerts nicht aktiviert, falsches Repository oder private-Repo-Policy.

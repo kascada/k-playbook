@@ -20,7 +20,7 @@ Global gelten alle Markdown-Dateien unter:
 `PLAYBOOK_REPO` folgt dem festen Pfadvertrag:
 
 - Erwartet ist `~/dev/k-playbook`.
-- `<TARGET_DIR>/K-PLAYBOOK.MD` darf denselben Wert unter `## Playbook-Quelle` → `repo:` sichtbar enthalten.
+- `<TARGET_DIR>/K-PLAYBOOK.yaml` darf denselben Wert unter `k_playbook.repo` sichtbar enthalten.
 - Wenn das physische Repo woanders liegt, muss ein Symlink dafuer sorgen, dass `~/dev/k-playbook` funktioniert.
 - Wenn `~/dev/k-playbook` fehlt: warnen und den User auffordern, `/k-install` oder das Devcontainer-Setup auszufuehren.
 

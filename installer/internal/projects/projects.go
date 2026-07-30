@@ -5,10 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/pathcontract"
 	"github.com/kascada/k-playbook/installer/internal/store"
 )
+
+const ConfigFileName = "K-PLAYBOOK.yaml"
 
 func NormalizePath(value string) (string, error) {
 	value = strings.TrimSpace(value)
@@ -72,11 +75,68 @@ func DetectEnvironment(path string) (store.ProjectEnvironment, []string) {
 		candidate := filepath.Join(path, name)
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			detected = append(detected, name+"/")
-			return store.EnvironmentVenv, detected
 		}
 	}
 
+	plainMarkers := existingPlainProjectMarkers(path)
+	if len(plainMarkers) > 0 {
+		detected = append(detected, plainMarkers...)
+		return store.EnvironmentPlain, detected
+	}
+	if len(detected) > 0 {
+		return store.EnvironmentPlain, detected
+	}
+
 	return store.EnvironmentUnknown, detected
+}
+
+func EnsureConfig(projectPath string) (bool, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return false, err
+	}
+
+	info, err := os.Stat(normalized)
+	if err != nil {
+		return false, fmt.Errorf("Projektpfad pruefen: %w", err)
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("Projektpfad ist kein Verzeichnis: %s", normalized)
+	}
+
+	path := filepath.Join(normalized, ConfigFileName)
+	if info, err := os.Stat(path); err == nil {
+		if info.IsDir() {
+			return false, fmt.Errorf("%s ist ein Verzeichnis", path)
+		}
+		return false, nil
+	} else if !os.IsNotExist(err) {
+		return false, fmt.Errorf("%s pruefen: %w", ConfigFileName, err)
+	}
+
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return false, fmt.Errorf("%s anlegen: %w", ConfigFileName, err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(MinimalConfig(time.Now())); err != nil {
+		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
+	}
+
+	return true, nil
+}
+
+func MinimalConfig(updatedAt time.Time) string {
+	return fmt.Sprintf(`schema_version: 1
+layout: fixed-project-k-playbook
+
+k_playbook:
+  repo: ~/dev/k-playbook
+
+setup:
+  updated_at: %s
+`, updatedAt.Format("2006-01-02"))
 }
 
 func ScanDefaultDev() ([]store.Project, error) {
@@ -155,7 +215,7 @@ func Scan(root string) ([]store.Project, error) {
 func looksLikeProject(path string) bool {
 	markers := []string{
 		".git",
-		"K-PLAYBOOK.MD",
+		ConfigFileName,
 		"pyproject.toml",
 		"package.json",
 		"go.mod",
@@ -169,6 +229,23 @@ func looksLikeProject(path string) bool {
 	}
 
 	return false
+}
+
+func existingPlainProjectMarkers(path string) []string {
+	markers := []string{
+		".git",
+		ConfigFileName,
+		"pyproject.toml",
+		"package.json",
+		"go.mod",
+	}
+	detected := []string{}
+	for _, marker := range markers {
+		if exists(filepath.Join(path, marker)) {
+			detected = append(detected, marker)
+		}
+	}
+	return detected
 }
 
 func exists(path string) bool {
