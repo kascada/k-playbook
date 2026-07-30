@@ -6,6 +6,8 @@ Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`.
 
 Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./reviews-and-results.md) zusammengefasst.
 
+Die empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer steht in [`multi-project-installation.md`](./multi-project-installation.md). Das Handbuch enthaelt die kompakte Command-Uebersicht in [`handbuch.md`](./handbuch.md#commands).
+
 ## Grundregel: Install vs. Setup
 
 `/k-install*` und `/k-setup*` haben absichtlich unterschiedliche Zustaendigkeiten:
@@ -39,7 +41,7 @@ Projekt mit CodeQL-Entscheidung:
 
 ## Kurzuebersicht
 
-
+Aktueller Slash-Command-Bestand unter `commands/`: 19 Dateien (`k-*.md`). Neue Dateien werden auf dem Host erst sichtbar, nachdem `/k-install` die OpenCode-Symlinks aktualisiert hat.
 
 | Command | Scope | Projekt-Konfig | Artefakte / Host |
 |---------|-------|----------------|------------------|
@@ -67,7 +69,6 @@ Projekt mit CodeQL-Entscheidung:
 | `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | liest `todo:` | schreibt/ergaenzt `TODO.md` bzw. den registrierten Todo-Pfad |
 | `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | liest `enforcement:` und `docs:` | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
 | `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | keine eigene Pfad-Konfig | startet Tests, macht Diagnose, fragt vor Fixes |
-
 
 ## `/k-install`
 

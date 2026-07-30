@@ -6,6 +6,8 @@ Dieses Setup trennt deshalb eine zentrale, user-lokale k-playbook-Installation, 
 
 Diese Reihenfolge richtet k-playbook fuer den Host, ein Zielprojekt und optional den DevContainer ein.
 
+Die Zuständigkeiten der einzelnen Slash-Commands stehen in [`commands.md`](./commands.md); die kompakte Gesamtuebersicht steht im [`Handbuch`](./handbuch.md#commands).
+
 ## Vereinfachte Prompt-Reihenfolge
 
 Die Prompts liegen unter [`../prompts/installation/`](../prompts/installation/). Zuerst kommt immer die gemeinsame Host-Registrierung, danach genau ein Projektpfad: `3A` ohne DevContainer oder `3B` mit DevContainer.

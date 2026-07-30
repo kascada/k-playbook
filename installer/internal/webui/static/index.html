@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>k-playbook Installer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Lokaler Installer</p>
+          <h1>k-playbook einrichten</h1>
+          <p class="lead">Pfadvertrag pruefen, bei Bedarf reparieren und Zielprojekte auswaehlen.</p>
+        </div>
+        <button id="refresh" class="secondary">Aktualisieren</button>
+      </section>
+
+      <section class="card" id="status-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Schritt 1</p>
+            <h2>Pfadvertrag</h2>
+          </div>
+          <span id="status-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <dl class="facts">
+          <div><dt>Erwartet</dt><dd id="expected">-</dd></div>
+          <div><dt>Aktuell</dt><dd id="current">-</dd></div>
+          <div><dt>Symlink</dt><dd id="symlink">-</dd></div>
+        </dl>
+        <p id="status-message" class="message"></p>
+        <button id="repair" class="primary hidden">Symlink anlegen</button>
+      </section>
+
+      <section class="grid" id="project-area">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Schritt 2</p>
+              <h2>Projekte scannen</h2>
+            </div>
+            <button id="scan" class="secondary">~/dev scannen</button>
+          </div>
+          <div id="scan-results" class="scan-results empty">Noch kein Scan ausgefuehrt.</div>
+          <button id="save-scan" class="primary hidden">Auswahl speichern</button>
+        </section>
+
+        <section class="card">
+          <p class="eyebrow">Optional</p>
+          <h2>Projekt manuell hinzufuegen</h2>
+          <form id="manual-form" class="form">
+            <label>
+              Projektpfad
+              <input id="manual-path" type="text" placeholder="~/dev/mein-projekt" autocomplete="off">
+            </label>
+            <label>
+              Umgebung
+              <select id="manual-env">
+                <option value="">Automatisch erkennen</option>
+                <option value="plain">Normal</option>
+                <option value="venv">Python venv</option>
+                <option value="devcontainer">DevContainer</option>
+                <option value="unknown">Unbekannt</option>
+              </select>
+            </label>
+            <button class="primary" type="submit">Projekt speichern</button>
+          </form>
+        </section>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Gespeichert</p>
+            <h2>Projekt-Auswahl</h2>
+          </div>
+        </div>
+        <div id="projects" class="project-list empty">Keine Projekte gespeichert.</div>
+      </section>
+
+      <div id="toast" class="toast hidden"></div>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

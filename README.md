@@ -25,6 +25,8 @@ Danach in OpenCode:
 
 Nach einem frischen Clone ist `/k-install` eventuell noch nicht sichtbar. Fuer die einfache gefuehrte Installation nutze die Prompts unter [`prompts/installation/`](./prompts/installation/) oder folge [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
 
+Die Command-Zustaendigkeiten und die empfohlene Reihenfolge stehen in [`docs/commands.md`](./docs/commands.md) und [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
+
 Wichtig: `/k-install*` nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
 
 In jedem Zielprojekt einmal:
@@ -41,9 +43,9 @@ Der Einstieg ist das Handbuch:
 
 - [`docs/handbuch.md`](./docs/handbuch.md) - Zweck, Konzepte, Standardablaeufe und Betriebsregeln.
 - [`docs/installation.md`](./docs/installation.md) - Installation fuer OpenCode, Security-Tools und optional Claude Code.
-- [`docs/multi-project-installation.md`](./docs/multi-project-installation.md) - vereinfachte Installation fuer mehrere Zielprojekte mit Python-/venv- und DevContainer-Workflows.
+- [`docs/multi-project-installation.md`](./docs/multi-project-installation.md) - empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer.
 - [`docs/faq.md`](./docs/faq.md) - Kurze Antworten zu `/k-install`, Aufrufort und Projekt-venvs.
-- [`docs/commands.md`](./docs/commands.md) - Zuständigkeiten und Details der wichtigsten Commands.
+- [`docs/commands.md`](./docs/commands.md) - Zuständigkeiten, Gruppen und Details der `/k-*`-Commands.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Review-, Results- und Remediation-Flow.
 - [`prompts/README.md`](./prompts/README.md) - kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe.
 - [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
