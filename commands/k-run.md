@@ -26,9 +26,9 @@ Command-specific policy:
   - If it is a single `.md` file: use that file as a one-item list.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.yaml` is missing: continue as an explicit one-off run, but announce that project k-playbook metadata could not be validated. If the task has `## Ausführungskontext` with a relative `Target repo`, stop and ask for the project root instead of guessing.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`. Do not allow one-off runs without project config.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`, or pass an explicit file/directory argument for a one-off run.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
   - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-run`; there are no tasks to execute.
   - If `k-playbook/tasks` exists: use it as the execution target.
 

@@ -36,6 +36,7 @@ Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md
 
 - For the current argument set, modes are not target paths; use `TARGET_DIR = realpath(CWD)`.
 - Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.yaml`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the compact report.
+- If `<TARGET_DIR>/K-PLAYBOOK.yaml` is still missing after that correction, abort and tell the user to run `/k-gui`.
 
 ## Step 2 - Resolve Installer Binary
 

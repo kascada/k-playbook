@@ -202,7 +202,7 @@ Die Startseite zeigt:
    Wenn die OpenCode-/Claude-Registrierung aktualisiert werden muss, zeigt der Header nach dem initialen `/api/opencode/status` zusaetzlich den hervorgehobenen Button `Registrierung aktualisieren`. Das ist dieselbe Aktion wie im Assistenten-Registrierungsblock und wird bei OK-Status ausgeblendet.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert, ob die feste `k-playbook/`-Struktur vollstaendig ist, welcher `remediation.mode` gesetzt ist und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Die Startseite zeigt diese Werte nur als kurze Statusliste, z. B. `Remediation-Policy: Direkt erlaubt`, `Dokumentation: vorhanden/fehlt`, `Projektstruktur: vollstaendig/unvollstaendig`.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt nutzt die GUI denselben erweiterten read-only Projektstatus wie die CLI `status`: `playbook`, `setup`, `structure`, `docs`, `remediation`, `tasks`, `todo`, `reviews`, `enforcement`, `git`, `recommendations` und bei DevContainer-Projekten `devcontainer`. Die Startseite zeigt diese Werte nur als kurze Statusliste, z. B. `Remediation-Policy: Direkt erlaubt`, `Dokumentation: vorhanden/fehlt`, `Tasks: keine offen`, `Git: sauber`.
    Jeder Projektblock ist als Ganzes anklickbar und wechselt auf die Detailseite. Bearbeitbare Werte, Hilfen und Entfernen-Aktionen liegen nicht in der Startseitenliste, sondern auf der Projekt-Detailseite.
 5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt die kompakte Statusliste den Punkt `Playbook im Container`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Fehlende Eintraege werden auf der Detailseite mit `Eintrag setzen` reparierbar gemacht.
 6. Button `Projekt hinzufuegen`.
@@ -219,7 +219,7 @@ Ein Klick auf einen Projektblock wechselt auf eine Projekt-Detailansicht.
 Die Detailseite zeigt:
 
 - Header mit Projektname, absolutem Pfad und `Zur Projektliste`.
-- Einen eigenen Projektstatus-/Editor-Block mit denselben zentral abgeleiteten Statuswerten wie die Startseite, aber mit Controls, Hilfe und kopierbaren Slash-Commands.
+- Einen eigenen Projektstatus-/Editor-Block mit denselben zentral abgeleiteten Statuswerten wie die Startseite. Bestehende Controls gibt es fuer Remediation, Projektstruktur, Dokumentation und DevContainer-Integration; die zusaetzlichen CLI-Statusfelder wie Tasks, TODO, Reviews, Enforcement, Git und Empfehlungen werden zunaechst read-only angezeigt.
 - `Entfernen` loescht nach Bestaetigung nur den Eintrag aus der lokalen Installer-Projektliste, keine Projektdatei, und fuehrt danach zur Projektliste zurueck.
 - Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Editor einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen.
 - Wenn `K-PLAYBOOK.yaml` vorhanden ist, zeigt der Editor eine Remediation-Policy-Auswahl mit Hilfe-Button; Aenderungen schreiben nur den `remediation:`-Block der projektlokalen YAML.

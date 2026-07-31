@@ -335,21 +335,19 @@ func CheckReviews(projectPath string) ReviewsStatus {
 	}
 	sort.Strings(status.ReviewFiles)
 	status.Reviews = len(status.ReviewFiles)
-	if status.Reviews > 0 && status.HasLog && status.HasKnownDecisions {
+	if status.HasKnownDecisions {
 		status.OK = true
-		status.Message = "Review-Struktur plausibel."
+		if status.Reviews > 0 {
+			status.Message = "Review-Struktur plausibel."
+		} else {
+			status.Message = "Review-Struktur plausibel; keine projektlokalen Review-Rezepte."
+		}
 		return status
 	}
 
 	missing := []string{}
-	if !status.HasLog {
-		missing = append(missing, "log.md")
-	}
 	if !status.HasKnownDecisions {
 		missing = append(missing, "known-decisions.md")
-	}
-	if status.Reviews == 0 {
-		missing = append(missing, "review-*.md")
 	}
 	status.Message = "Review-Struktur unvollstaendig: " + strings.Join(missing, ", ")
 	return status

@@ -631,16 +631,44 @@ async function loadProjectConfig(projectPath) {
 
 function projectStatus(project) {
   const items = [
+    projectPlaybookStatus(project),
     projectSetupStatus(project),
     projectRemediationStatus(project),
     projectStructureStatus(project),
     projectDocsStatus(project),
+    projectTasksStatus(project),
+    projectTodoStatus(project),
+    projectReviewsStatus(project),
+    projectEnforcementStatus(project),
+    projectGitStatus(project),
   ];
   const devcontainer = projectDevcontainerStatus(project);
   if (devcontainer) {
     items.push(devcontainer);
   }
+  const recommendations = projectRecommendationsStatus(project);
+  if (recommendations) {
+    items.push(recommendations);
+  }
   return items;
+}
+
+function projectPlaybookStatus(project) {
+  const playbook = project.playbook || project.Playbook || {};
+  const ok = Boolean(playbook.ok || playbook.OK);
+  const found = Boolean(playbook.found || playbook.Found);
+  const schemaVersion = playbook.schemaVersion || playbook.SchemaVersion || "";
+  const layout = playbook.layout || playbook.Layout || "";
+  return {
+    key: "playbook",
+    label: "Playbook-Konfig",
+    value: ok ? `Schema ${schemaVersion || "ok"}` : found ? "unplausibel" : "fehlt",
+    state: ok ? "ok" : "error",
+    detail: [
+      playbook.message || playbook.Message || (ok ? "K-PLAYBOOK.yaml plausibel." : "K-PLAYBOOK.yaml ist nicht plausibel."),
+      layout ? `Layout: ${layout}` : "",
+    ].filter(Boolean).join(" "),
+  };
 }
 
 function projectSetupStatus(project) {
@@ -707,23 +735,125 @@ function projectDocsStatus(project) {
   };
 }
 
+function projectTasksStatus(project) {
+  const tasks = project.tasks || project.Tasks || {};
+  const open = numberValue(tasks.open ?? tasks.Open);
+  const done = numberValue(tasks.done ?? tasks.Done);
+  const next = tasks.next || tasks.Next || "";
+  return {
+    key: "tasks",
+    label: "Tasks",
+    value: open > 0 ? `${open} offen` : "keine offen",
+    state: open > 0 ? "warn" : "ok",
+    detail: [
+      tasks.message || tasks.Message || (open > 0 ? `${open} offene Tasks.` : "Keine offenen Tasks."),
+      done > 0 ? `${done} erledigt.` : "",
+      next ? `Naechster Task: ${next}` : "",
+    ].filter(Boolean).join(" "),
+  };
+}
+
+function projectTodoStatus(project) {
+  const todo = project.todo || project.Todo || {};
+  const open = numberValue(todo.open ?? todo.Open);
+  return {
+    key: "todo",
+    label: "TODO.md",
+    value: open > 0 ? `${open} offen` : "keine offen",
+    state: open > 0 ? "warn" : "ok",
+    detail: todo.message || todo.Message || (open > 0 ? `${open} offene TODO-Checkboxen.` : "Keine offenen TODO-Checkboxen."),
+  };
+}
+
+function projectReviewsStatus(project) {
+  const reviews = project.reviews || project.Reviews || {};
+  const ok = Boolean(reviews.ok || reviews.OK);
+  const count = numberValue(reviews.reviews ?? reviews.Reviews);
+  const hasLog = Boolean(reviews.hasLog || reviews.HasLog);
+  const hasKnownDecisions = Boolean(reviews.hasKnownDecisions || reviews.HasKnownDecisions);
+  return {
+    key: "reviews",
+    label: "Reviews",
+    value: ok ? `${count} vorhanden` : "unvollstaendig",
+    state: ok ? "ok" : "warn",
+    detail: [
+      reviews.message || reviews.Message || "Review-Struktur geprueft.",
+      hasLog ? "Log vorhanden." : "",
+      hasKnownDecisions ? "Known Decisions vorhanden." : "",
+    ].filter(Boolean).join(" "),
+  };
+}
+
+function projectEnforcementStatus(project) {
+  const enforcement = project.enforcement || project.Enforcement || {};
+  const ok = Boolean(enforcement.ok || enforcement.OK);
+  const rules = numberValue(enforcement.rules ?? enforcement.Rules);
+  return {
+    key: "enforcement",
+    label: "Enforcement-Regeln",
+    value: rules > 0 ? `${rules} vorhanden` : "keine projektlokalen",
+    state: ok ? "ok" : "muted",
+    detail: enforcement.message || enforcement.Message || (rules > 0 ? `${rules} Enforcement-Regeln vorhanden.` : "Keine projektlokalen Enforcement-Regeln vorhanden."),
+  };
+}
+
+function projectGitStatus(project) {
+  const git = project.git || project.Git || {};
+  const worktree = Boolean(git.worktree || git.Worktree);
+  const changed = numberValue(git.changed ?? git.Changed);
+  const untracked = numberValue(git.untracked ?? git.Untracked);
+  const branch = git.branch || git.Branch || "";
+  const clean = worktree && changed === 0 && untracked === 0;
+  return {
+    key: "git",
+    label: "Git",
+    value: !worktree ? "kein Worktree" : clean ? "sauber" : `${changed + untracked} offen`,
+    state: !worktree ? "muted" : clean ? "ok" : "warn",
+    detail: [
+      git.message || git.Message || "Git-Status geprueft.",
+      branch ? `Branch: ${branch}.` : "",
+    ].filter(Boolean).join(" "),
+  };
+}
+
+function projectRecommendationsStatus(project) {
+  const recommendations = project.recommendations || project.Recommendations || [];
+  if (recommendations.length === 0) {
+    return null;
+  }
+  return {
+    key: "recommendations",
+    label: "Empfehlungen",
+    value: compactList(recommendations),
+    state: "warn",
+    detail: `Empfohlen: ${recommendations.join(", ")}`,
+  };
+}
+
 function projectDevcontainerStatus(project) {
   const environment = project.environment || project.Environment || "unknown";
   if (environment !== "devcontainer") {
     return null;
   }
 
-  const missing = devcontainerMissing(project.path || project.Path);
-  const checked = missing !== null;
+  const status = project.devcontainer || project.Devcontainer || null;
+  const missing = status ? (status.missing || status.Missing || []) : devcontainerMissing(project.path || project.Path);
+  const checked = Boolean(status) || missing !== null;
   return {
     key: "devcontainer",
     label: "Playbook im Container",
     value: !checked ? "wird geprueft" : missing.length === 0 ? "erreichbar" : "nicht erreichbar",
     state: !checked ? "muted" : missing.length === 0 ? "ok" : "warn",
-    detail: !checked ? "Status wird geprueft." : missing.length > 0 ? `Fehlt: ${missing.join(", ")}` : "k-playbook ist im Container erreichbar.",
+    detail: status && (status.message || status.Message)
+      ? (status.message || status.Message)
+      : !checked ? "Status wird geprueft." : missing.length > 0 ? `Fehlt: ${missing.join(", ")}` : "k-playbook ist im Container erreichbar.",
     checked,
     missing: missing || [],
   };
+}
+
+function numberValue(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
 function projectEditorStatusRow(project, item) {

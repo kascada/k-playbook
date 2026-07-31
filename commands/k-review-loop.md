@@ -47,10 +47,10 @@ Command-specific policy:
   - If it is a file: use that file.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.yaml` is missing: continue as an explicit one-off review, but announce that project k-playbook metadata could not be validated.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`. Do not allow one-off reviews without project config.
   - If `k-playbook/tasks` exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`, or pass an explicit file/directory argument for a one-off review.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
   - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-gui`.
   - If `k-playbook/tasks` exists: use it as the review target.
 
@@ -96,7 +96,7 @@ Review gestartet
 ─────────────────────────────
 Tasks:   <list of task filenames>
 Pfad:    <REVIEW_TARGET_DISPLAY>
-Config:  K-PLAYBOOK.yaml <gefunden|fehlt>; tasks: <TASKS_DISPLAY_PATH or "—">
+Config:  K-PLAYBOOK.yaml gefunden; tasks: <TASKS_DISPLAY_PATH or "—">
 Intent:  <list of intent filenames, or "— (kein Intent angegeben)">
 Runden:  max. 5
 ```

@@ -294,6 +294,21 @@ func TestStatusReturnsGUIBackedProjectFields(t *testing.T) {
 	}
 }
 
+func TestCheckReviewsAllowsGlobalOnlyReviewRecipes(t *testing.T) {
+	root := t.TempDir()
+	if _, err := CompleteProjectStructure(root); err != nil {
+		t.Fatalf("CompleteProjectStructure failed: %v", err)
+	}
+
+	status := CheckReviews(root)
+	if !status.OK {
+		t.Fatalf("expected reviews OK without local review recipes: %#v", status)
+	}
+	if status.Reviews != 0 {
+		t.Fatalf("expected no local review recipes, got %d", status.Reviews)
+	}
+}
+
 func TestDetectEnvironmentMapsPlainAndDevContainer(t *testing.T) {
 	plain := t.TempDir()
 	if err := os.WriteFile(filepath.Join(plain, "go.mod"), []byte("module example\n"), 0o644); err != nil {
