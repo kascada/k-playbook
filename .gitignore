@@ -4,7 +4,6 @@ priv/
 .k-playbook-local/
 /k-playbook/
 /bin/
-/dist/
 /installer/bin/
 
 # Secrets and local environment
