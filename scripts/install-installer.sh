@@ -8,7 +8,7 @@ Usage: install-installer.sh [--bin-dir <dir>] [--from-dist-only]
 Installs k-playbook-installer without requiring Go on the user machine.
 
 The script first looks for a matching local release artifact under dist/, then
-for an already built local binary, and otherwise downloads the latest release.
+for an already built source binary under bin/, and otherwise downloads the latest release.
 
 Options:
   --bin-dir <dir>       Install directory. Default: ~/.local/bin.
@@ -91,7 +91,7 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -O "$dest" "$url"
   else
-    die "Need curl or wget to download $url. Alternatively copy a matching binary to bin/ or dist/."
+    die "Need curl or wget to download $url. Alternatively build to bin/ or copy a matching release artifact to dist/."
   fi
 }
 
@@ -110,7 +110,6 @@ first_usable_local_binary() {
 
   for candidate in \
     "$PLAYBOOK_REPO/bin/$BINARY" \
-    "$PLAYBOOK_REPO/installer/bin/$BINARY" \
     "$PLAYBOOK_REPO/installer/$BINARY"; do
     if is_usable_local_binary "$candidate"; then
       printf '%s\n' "$candidate"

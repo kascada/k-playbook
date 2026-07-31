@@ -27,16 +27,17 @@ installer/
 ```bash
 go run ./cmd/k-playbook-installer status
 go run ./cmd/k-playbook-installer status --fix
+go run ./cmd/k-playbook-installer status --path-contract
 go run ./cmd/k-playbook-installer status <path>
 go run ./cmd/k-playbook-installer
 go run ./cmd/k-playbook-installer gui
 go run ./cmd/k-playbook-installer projects list
 go run ./cmd/k-playbook-installer projects scan
 go run ./cmd/k-playbook-installer projects add <path> --env plain
-go run ./cmd/k-playbook-installer projects status <path>
+go run ./cmd/k-playbook-installer projects status [path]
 ```
 
-Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten. `status <path>` gibt denselben read-only Projektstatus als JSON aus, den die GUI fuer Projektkarten nutzt. `projects status <path>` bleibt als strukturierter Alias erhalten. `projects add` legt beim Speichern `K-PLAYBOOK.yaml` im Zielprojekt an, falls sie fehlt.
+Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten. `status` gibt fuer das aktuelle Verzeichnis denselben read-only Projektstatus als JSON aus, den die GUI fuer Projektkarten nutzt; `status <path>` tut dasselbe fuer einen expliziten Pfad. `projects status [path]` bleibt als strukturierter Alias erhalten. Der alte Pfadvertrag-Status ist explizit `status --path-contract`; `status --fix` bleibt auf die Pfadvertrag-Reparatur beschraenkt. `projects add` legt beim Speichern `K-PLAYBOOK.yaml` im Zielprojekt an, falls sie fehlt.
 
 ## Designentscheidungen
 
@@ -61,9 +62,11 @@ Cobra-basierte CLI. Registriert aktuell:
 - `gui`
 - `projects`
 
-`status` nutzt `pathcontract.Check()` und optional `pathcontract.Repair()`. `projects` nutzt `projects` und `store`. `gui` startet `webui.Run()`.
+`status` nutzt standardmaessig `projects.Status(path)` und schreibt eingeruecktes JSON nach stdout. Mit `--path-contract` nutzt es `pathcontract.Check()`, mit `--fix` optional `pathcontract.Repair()`. `projects` nutzt `projects` und `store`. `gui` startet `webui.Run()`.
 
-Mit einem Projektpfad nutzt `status <path>` `projects.Status(path)` und schreibt eingeruecktes JSON nach stdout. Das JSON enthaelt Projekt-Metadaten plus `setup`, `structure`, `docs`, `remediation` und bei DevContainer-Projekten `devcontainer`.
+Der Projektstatus enthaelt nur leichte read-only Checks: Projekt-Metadaten plus `playbook`, `setup`, `structure`, `docs`, `remediation`, `tasks`, `todo`, `reviews`, `enforcement`, `git`, `recommendations` und bei DevContainer-Projekten `devcontainer`. Der Status-Command darf keine Tests, Builds, Smoke-Tests, Scanner, CodeQL-Analysen oder andere aufwendige Checks starten.
+
+Die GUI ergaenzt beim Laden gespeicherter Projekte sichere fehlende Defaults in vorhandener `K-PLAYBOOK.yaml`, bevor sie den Projektstatus bildet. Aktuell betrifft das den fehlenden `remediation:`-Block mit `direct-allowed`; bestehende Werte werden nicht ueberschrieben. Diese Schreiblogik liegt bewusst in `projects.EnsureConfigDefaults`, nicht im read-only Status selbst.
 
 ### `internal/pathcontract`
 
@@ -96,6 +99,9 @@ Wichtige Funktionen:
 - `Scan(root)`
 - `Status(path)`
 - `StatusFromProject(project)`
+- `EnsureConfigDefaults(path)`
+
+`Status("")` bzw. CLI `status` nutzt das aktuelle Verzeichnis. Wenn der aktuelle Pfad das projektlokale `k-playbook/`-Unterverzeichnis ist und der Parent `K-PLAYBOOK.yaml` enthaelt, wird auf den Projekt-Root korrigiert.
 
 Erkennung:
 
@@ -197,7 +203,7 @@ Die Startseite zeigt:
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
 4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert, ob die feste `k-playbook/`-Struktur vollstaendig ist, welcher `remediation.mode` gesetzt ist und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Die Startseite zeigt diese Werte nur als kurze Statusliste, z. B. `Remediation-Policy: Direkt erlaubt`, `Dokumentation: vorhanden/fehlt`, `Projektstruktur: vollstaendig/unvollstaendig`.
-   Jeder Projektblock ist als Ganzes anklickbar und wechselt auf die Detailseite; `Entfernen` bleibt eine separate Aktion. Nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei. Bearbeitbare Werte und Hilfen liegen nicht in der Startseitenliste, sondern auf der Projekt-Detailseite.
+   Jeder Projektblock ist als Ganzes anklickbar und wechselt auf die Detailseite. Bearbeitbare Werte, Hilfen und Entfernen-Aktionen liegen nicht in der Startseitenliste, sondern auf der Projekt-Detailseite.
 5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt die kompakte Statusliste den Punkt `Playbook im Container`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Fehlende Eintraege werden auf der Detailseite mit `Eintrag setzen` reparierbar gemacht.
 6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
@@ -214,6 +220,7 @@ Die Detailseite zeigt:
 
 - Header mit Projektname, absolutem Pfad und `Zur Projektliste`.
 - Einen eigenen Projektstatus-/Editor-Block mit denselben zentral abgeleiteten Statuswerten wie die Startseite, aber mit Controls, Hilfe und kopierbaren Slash-Commands.
+- `Entfernen` loescht nach Bestaetigung nur den Eintrag aus der lokalen Installer-Projektliste, keine Projektdatei, und fuehrt danach zur Projektliste zurueck.
 - Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Editor einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen.
 - Wenn `K-PLAYBOOK.yaml` vorhanden ist, zeigt der Editor eine Remediation-Policy-Auswahl mit Hilfe-Button; Aenderungen schreiben nur den `remediation:`-Block der projektlokalen YAML.
 - Wenn die feste Struktur unvollstaendig ist, zeigt der Editor `Vervollstaendigen`.
@@ -339,7 +346,7 @@ make install
 k-playbook-installer
 ```
 
-Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes vorhandenes Binary aus `dist/`, `bin/` oder `installer/bin/` und laedt sonst das passende Binary aus den GitHub Releases.
+Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes Release-Artefakt aus `dist/`, danach ein vorhandenes Source-Binary aus `bin/` und laedt sonst das passende Binary aus den GitHub Releases.
 
 Wenn `~/.local/bin` noch nicht im PATH liegt, gibt das Script einen Hinweis aus. Alternativ kann direkt gestartet werden:
 
@@ -376,7 +383,7 @@ dist/k-playbook-installer-<os>-<arch>
 
 `make dist` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert. Das private Maintainer-Target `make -C priv release-artifacts` ruft dieses Root-Target auf.
 
-`make install` installiert ohne Go ein vorhandenes passendes Binary aus `dist/`, `bin/` oder `installer/bin/` oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten `dist/`-Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
+`make install` installiert ohne Go ein vorhandenes passendes Release-Artefakt aus `dist/`, ein vorhandenes Source-Binary aus `bin/` oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten `dist/`-Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
 
 `make install-from-source` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
 

@@ -509,7 +509,7 @@ function projectSummaryCard(project) {
       openProjectDetail(projectPath);
     }
   });
-  card.append(projectHeader(project, { showDetails: false, showRemove: true }));
+  card.append(projectHeader(project, { showDetails: false, showRemove: false }));
   card.append(projectStatusList(projectStatus(project)));
   return card;
 }
@@ -517,7 +517,7 @@ function projectSummaryCard(project) {
 function projectEditorCard(project) {
   const card = document.createElement("div");
   card.className = "project-row project-editor";
-  card.append(projectHeader(project, { showDetails: false, showRemove: false }));
+  card.append(projectHeader(project, { showDetails: false, showRemove: true }));
 
   for (const item of projectStatus(project)) {
     card.append(projectEditorStatusRow(project, item));
@@ -899,6 +899,11 @@ async function removeProject(projectPath, button) {
     state.projects = file.projects || file.Projects || [];
     renderProjects(state.projects);
     await loadDevcontainerStatus();
+    if (currentProjectPath === projectPath) {
+      currentProjectPath = "";
+      await loadProjectConfig("");
+      showHome();
+    }
     showToast("Projekt aus der Liste entfernt.");
   });
 }

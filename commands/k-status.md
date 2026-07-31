@@ -1,5 +1,5 @@
 ---
-description: Fast read-only health check for K-PLAYBOOK.yaml, OpenCode symlinks, fixed project-local k-playbook layout, tasks, TODOs, reviews, enforcement, CodeQL, Git, and docs, with compact next-action recommendations.
+description: Fast read-only health overview for the current project, backed by k-playbook-installer status JSON.
 argument-hint: [full|codeql|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -11,411 +11,62 @@ Show a fast, read-only health overview for the current project.
 
 This command is a status preflight, not a repair command:
 
-- Read `K-PLAYBOOK.yaml` as the project setup metadata and tool-decision source. Project-local paths are derived from the complete fixed `k-playbook/` layout.
-- Check host-local OpenCode command symlinks read-only against the resolved k-playbook repo.
-- Check the canonical k-playbook repo path contract, including the Devcontainer symlink case.
-- Prefer small existence and metadata checks over heavy scans.
-- Do not create files, change config, install tools, create CodeQL databases, run CodeQL analysis, upload SARIF, or print Git diffs.
-- Keep output compact and grouped by section so more checks can be added later.
+- Start with the binary-backed project status: `k-playbook-installer status`.
+- Treat the binary JSON as the authoritative base for project health.
+- Prefer small existence and metadata checks over scans.
+- Do not create files, change config, install tools, run tests, run builds, run smoke tests, start scanners, create CodeQL databases, run CodeQL analysis, upload SARIF, call GitHub APIs, or print Git diffs.
+- If more checks are needed later, add them to the Go status implementation first where feasible, not as duplicated prompt logic.
 
 ## Modes
 
 Interpret `$ARGUMENTS` as one optional mode:
 
-- Empty: compact default report with all sections.
-- `full`: run the default report and additionally print `K-PLAYBOOK.yaml` in full when it exists; if it is long, summarize first and then include the full content under a separate heading.
-- `codeql`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `codeql` section plus recommendations relevant to CodeQL.
-- `reviews`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `reviews` section plus recommendations relevant to reviews.
-- `json`: machine-readable JSON output. Prefer `k-playbook-installer status <TARGET_DIR>` when the binary is available; it returns the same read-only project status data used by the Installer GUI. If the binary is unavailable, fall back to best-effort JSON and clearly mark this as degraded output.
-- `strict`: run the same checks as default, but label warnings as failed health gates in the summary. Do not change exit behavior and do not modify the filesystem.
+- Empty: compact human-readable report from the binary JSON.
+- `json`: print the binary JSON unchanged.
+- `full`: compact report plus `K-PLAYBOOK.yaml` content when present.
+- `strict`: compact report plus a health-gate summary where warnings count as failed gates.
+- `codeql`: compact report plus lightweight CodeQL config metadata only when present in `K-PLAYBOOK.yaml`; do not run CodeQL.
+- `reviews`: compact report focused on review status from the binary JSON; do not run reviews.
 
 If `$ARGUMENTS` is anything else, print the supported modes and stop without running deeper checks.
 
-## Step 1 — Target And Source
+## Step 1 - Target
 
 Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`:
 
-- If the command receives an explicit target directory in a future extension, resolve it with `realpath` and validate it exists.
 - For the current argument set, modes are not target paths; use `TARGET_DIR = realpath(CWD)`.
-- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.yaml`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the preflight.
-- Read `<TARGET_DIR>/K-PLAYBOOK.yaml` if present. If missing, record `K_PLAYBOOK_FOUND=false` and continue with the checks that do not require it.
+- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.yaml`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the compact report.
 
-Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` against the current process home before checking the filesystem. Read `K-PLAYBOOK.yaml` `k_playbook.repo` only as validation metadata; expected value is `~/dev/k-playbook`. Do not ask for an alternate repo path in this command.
+## Step 2 - Resolve Installer Binary
 
-Canonical path rule:
+Resolve `INSTALLER_BIN` before running status. Try these candidates in order and use the first executable file:
 
-- Require `k_playbook.repo: ~/dev/k-playbook` in project `K-PLAYBOOK.yaml`; `/k-gui` owns creating or completing that file.
-- Absolute host paths such as `/home/kleist/dev/k-playbook` are valid only on that host and should be reported as `WARN` in portable projects, especially when `/workspaces/k-playbook` exists.
-- In a Devcontainer, `k_playbook.repo: ~/dev/k-playbook` should resolve to `/home/vscode/dev/k-playbook`, usually a symlink to `/workspaces/k-playbook`.
+- `k-playbook-installer` from `PATH`.
+- `~/.local/bin/k-playbook-installer`.
+- `~/dev/k-playbook/bin/k-playbook-installer`.
+- `/workspaces/k-playbook/bin/k-playbook-installer`.
 
-## Step 2 — Parse K-PLAYBOOK.yaml
+Do not build the binary from `/k-status`. In particular, do not run `make build`, `go build`, or `go run` from this command. If no candidate is executable, report the binary as unavailable and recommend one of these explicit setup actions:
 
-If `<TARGET_DIR>/K-PLAYBOOK.yaml` exists, parse only simple metadata from it:
+- On a normal host: `make install` or `make install-from-source` in `~/dev/k-playbook`.
+- For local developer testing: `make build` in `~/dev/k-playbook`, then re-run `/k-status`.
+- In a DevContainer: ensure `/workspaces/k-playbook/bin/k-playbook-installer` exists by building it on the host or installing it inside the container.
 
-- Top-level entries `schema_version` and `layout`.
-- Nested setup metadata: `k_playbook.repo` and `setup.updated_at`.
-- `remediation` policy entries when present.
-- `tools.codeql` entries listed in the `codeql` section.
-- Optional future `tools.dependabot` entries listed in the `dependabot` section.
+## Step 3 - Binary Status
 
-Config status:
-
-- `OK`: YAML file exists, has `schema_version: 1`, and has `layout: fixed-project-k-playbook`.
-- `WARN`: YAML file exists but optional sections are absent or values are incomplete.
-- `FAIL`: YAML file is missing, not parseable enough for the required keys, or has an unsupported schema/layout.
-
-If `K-PLAYBOOK.yaml` is missing, `playbook` is `FAIL` in default, `strict`, `full`, `codeql`, and `reviews` modes.
-
-## Section: playbook
-
-Report:
-
-- `Projekt`: absolute `TARGET_DIR`.
-- `K-PLAYBOOK`: `OK`, `WARN`, or `FAIL` with config status.
-- `k_playbook.repo`, if present.
-- `setup.updated_at`, if present.
-- In `full` mode, print or fully summarize `K-PLAYBOOK.yaml` after the compact report.
-
-## Section: opencode
-
-Run in default, `full`, and `strict` modes. In `codeql` and `reviews` modes, skip this section unless the resolved `PLAYBOOK_REPO` itself is unclear and relevant to the mode.
-
-Check the host-local OpenCode registration read-only:
-
-- `OPENCODE_COMMAND_DIR = ~/.config/opencode/command`.
-- `OPENCODE_CONFIG_FILE`: prefer `~/.config/opencode/opencode.jsonc`, else `~/.config/opencode/opencode.json`, else mark config as missing.
-- Count files `<PLAYBOOK_REPO>/commands/k-*.md`.
-- For each repo command, check whether `<OPENCODE_COMMAND_DIR>/k-*.md` exists.
-- If the matching OpenCode entry is a symlink, resolve it and check whether it points to the repo command file.
-- If the matching OpenCode entry exists but is not a symlink, report it as `WARN` because the Installer-GUI cannot safely assume ownership.
-- Count broken or stale `k-*.md` symlinks in `OPENCODE_COMMAND_DIR` that point into the resolved `PLAYBOOK_REPO` but whose target no longer exists.
-- Check whether `PLAYBOOK_REPO` appears in `skills.paths` when the OpenCode config exists. If JSON/JSONC parsing is too fragile, use a conservative text search for the repo path and report `WARN` when unclear.
-
-Do not create directories, edit config, fix links, or delete stale links.
-
-Status:
-
-- `OK`: command dir exists, every repo command has a symlink pointing to the expected file, no stale owned links were found, and `skills.paths` appears to contain `PLAYBOOK_REPO`.
-- `WARN`: command dir missing, some command links are missing/wrong/non-symlink, stale owned links exist, OpenCode config is missing, or `skills.paths` cannot be confirmed.
-- `FAIL`: only if the resolved `PLAYBOOK_REPO` has no `commands/k-*.md` files or cannot be read.
-
-Suggested detail format:
-
-```text
-OpenCode:      WARN, commands 18/20 verlinkt, 1 falsch, 1 verwaist, skills.paths ok
-```
-
-In `full` mode, include a short list of missing, wrong, non-symlink, and stale links, capped at a readable number. Recommend `/k-gui` when this section is `WARN` or `FAIL` due to link/config registration issues.
-
-## Section: devcontainer
-
-Run in default, `full`, and `strict` modes when either `/workspaces/k-playbook` exists, `/home/vscode` exists, the current `HOME` is `/home/vscode`, or `TARGET_DIR` is under `/workspaces/`. Otherwise skip this section silently.
-
-Check the Devcontainer path contract read-only:
-
-- `/workspaces/k-playbook/commands/` exists and contains `k-*.md`.
-- `~/dev/k-playbook` exists after tilde expansion in the container.
-- If `~/dev/k-playbook` is a symlink, `readlink` or equivalent resolution points to `/workspaces/k-playbook`.
-- If `K-PLAYBOOK.yaml` has `k_playbook.repo: ~/dev/k-playbook`, the resolved path exists and points to the same physical directory as `/workspaces/k-playbook` when possible.
-- If `K-PLAYBOOK.yaml` has an absolute host path while the Devcontainer mount exists, report a portability `WARN` and recommend changing it to `~/dev/k-playbook` plus the symlink.
-- `~/.config/opencode/command/k-gui.md` exists and resolves to a command file under the resolved playbook repo or under `/workspaces/k-playbook`.
-- `~/.config/opencode/opencode.jsonc` or `.json` contains `skills.paths` with `~/dev/k-playbook` or the resolved equivalent.
-
-Do not create the symlink and do not edit OpenCode config from `/k-status`.
-
-Status:
-
-- `OK`: mount exists, `~/dev/k-playbook` exists and resolves to the mount, command symlink exists, and `skills.paths` is plausible.
-- `WARN`: mount exists but symlink/config/command registration is missing or `k_playbook.repo` is host-absolute instead of portable.
-- `FAIL`: Devcontainer appears active but neither `/workspaces/k-playbook` nor the resolved `PLAYBOOK_REPO` contains `commands/k-*.md`.
-
-Suggested detail format:
-
-```text
-Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook, command links ok
-```
-
-Recommended fix when the symlink is missing:
+Run the installer status command from `TARGET_DIR`:
 
 ```bash
-mkdir -p /home/vscode/dev
-ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
+"<INSTALLER_BIN>" status
 ```
 
-## Section: layout
-
-Check these fixed paths:
-
-- `tasks`
-- `todo`
-- `checks`
-- `reviews`
-- `guidelines`
-- `enforcement`
-- `docs`
-
-Do not read configurable standard paths from `K-PLAYBOOK.yaml`; all fixed paths are expected.
-
-Resolve fixed paths as follows:
-
-- `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook`.
-- `tasks` -> `k-playbook/tasks`.
-- `todo` -> `k-playbook/TODO.md`.
-- `checks` -> `k-playbook/checks`.
-- `reviews` -> `k-playbook/reviews`.
-- `guidelines` -> `k-playbook/guidelines`.
-- `enforcement` -> `k-playbook/enforcement`.
-- `docs` -> `k-playbook/docs`.
-- Do not recursively traverse derived directories except where a later section explicitly requires a shallow direct-child count.
-
-Expected type:
-
-- `todo` is a file.
-- All other standard keys are directories.
-
-Per entry status:
-
-- `OK`: expected file/directory exists.
-- `FAIL`: expected file/directory is missing.
-
-Summarize as counts: `Layout: OK <n> / WARN <n> / FAIL <n>`.
-
-## Section: tasks
-
-Run only if `k-playbook/tasks` exists.
-
-Checks:
-
-- Count `.md` files directly inside `k-playbook/tasks` whose filename starts with a number, for example `002-k-status.md`.
-- Ignore `done/` for open tasks.
-- Optionally count numbered `.md` files directly inside `k-playbook/tasks/done/` as completed tasks.
-- Determine the next open task by sorting numeric prefixes ascending.
-
-Status:
-
-- `OK`: `k-playbook/tasks` exists and no open numbered task files are found.
-- `WARN`: open numbered task files exist.
-- `FAIL`: `k-playbook/tasks` is missing; this is normally already counted in `layout`.
-
-Do not read every task file; filenames are enough for this section.
-
-## Section: todo
-
-Run only if `k-playbook/TODO.md` exists.
-
-Checks:
-
-- Count open Markdown checkboxes with a simple text search for lines containing `- [ ]`.
-- If no checkboxes are present, report the file as present and `0 checkboxen`, not as an error.
-
-Status:
-
-- `OK`: file exists and has no open checkbox items.
-- `WARN`: file exists and has open checkbox items.
-- `FAIL`: `k-playbook/TODO.md` is missing; this is normally already counted in `layout`.
-
-## Section: reviews
-
-Run in default, `full`, `strict`, and `reviews` modes.
-
-If `k-playbook/reviews` exists:
-
-- Count `review-*.md` files directly inside it.
-- Check whether `log.md` exists.
-- Check whether `known-decisions.md` exists.
-- Best-effort due reviews:
-  - For each `review-*.md`, read only frontmatter if convenient and extract `interval-weeks`.
-  - Read `log.md` only shallowly enough to find a last run date for the review.
-  - If `last-run + interval-weeks <= today`, count it as due.
-  - If this is too ambiguous from the available data, skip due-date calculation and report only counts plus missing log/decision files.
-
-Status:
-
-- `OK`: review directory exists, review files are present or intentionally empty, and support files exist.
-- `WARN`: no review files, missing `log.md`, missing `known-decisions.md`, or due reviews exist.
-- `FAIL`: `k-playbook/reviews` is missing; this is normally already counted in `layout`.
-
-In `reviews` mode, include the short list of review filenames and due candidates when available.
-
-## Section: enforcement
-
-Run only if `k-playbook/enforcement` exists.
-
-Checks:
-
-- Count `.md` rule files directly inside `k-playbook/enforcement`.
-- Show a short list of rule filenames, capped at a small readable number; summarize the remainder if needed.
-
-Status:
-
-- `OK`: `k-playbook/enforcement` exists and at least one `.md` rule file exists.
-- `WARN`: enforcement directory is missing or empty. A missing/empty enforcement path is not a `FAIL` because enforcement can be global-only.
-
-## Section: codeql
-
-Run in default, `full`, `strict`, and `codeql` modes.
-
-Parse `tools.codeql` from `K-PLAYBOOK.yaml` when present:
-
-- `target`
-- `github.status`
-- `github.workflow`
-- `local_database.status`
-- `local_database.path`
-- `languages`
-- `queries`
-
-Rules:
-
-- Valid values for `github.status` and `local_database.status` are `enabled`, `disabled`, and `planned`.
-- Treat unset, empty, or `-` paths as missing.
-- Treat missing `target:` as legacy project-root target `.` and report it as `WARN` only when the project root is not a Git worktree but a nested Git/app root is likely present.
-- If `target` is set, check that the referenced path exists. If it is a Git worktree, use it for the CodeQL/Git-oriented status detail; do not run analysis.
-- If both statuses are `disabled`, report CodeQL as disabled and do not do deeper checks beyond config plausibility.
-- If `github.status` is `enabled` or `planned`, check that `github.workflow` is set and that the referenced file exists.
-- If `local_database.status` is `enabled` or `planned`, check that `local_database.path` is set and that the referenced path exists.
-- Try `codeql version` only when either status is `enabled` or `planned`.
-- If `codeql version` fails or the command is unavailable, report `CLI fehlt` as `WARN`, not as a hard failure by itself.
-
-Status:
-
-- `OK`: disabled cleanly, or enabled/planned paths and CLI preflight are plausible.
-- `WARN`: enabled/planned but optional pieces are missing, CLI is unavailable, languages are unset, or setup is planned.
-- `FAIL`: `tools.codeql` is malformed, `target` is set but missing, or an active/planned configured path is set but missing.
-
-Do not run `codeql database create`, `codeql database analyze`, or any upload command.
-
-## Section: dependabot
-
-Run in default, `full`, `strict`, and `reviews` modes.
-
-Parse the optional future `tools.dependabot` object from `K-PLAYBOOK.yaml` when present:
-
-- `enabled`
-- `target`
-- `repo`
-- `config`
-- `alerts`
-- `pull_requests`
-
-Rules:
-
-- Treat missing block as `WARN` only when a Dependabot config exists under a nested Git/app root.
-- If `enabled: false`, report disabled cleanly and do not query GitHub.
-- If `target` is set, check that it exists. If missing, report `FAIL`.
-- If `config` is set, check that the file exists. If missing while enabled, report `FAIL`.
-- If `repo` is set, use it as the GitHub Dependabot Alerts source. If missing, derive from the GitHub remote of `target` when possible; otherwise report `WARN`.
-- Check `gh --version` and `gh auth status` as lightweight preflight only. Do not call the Dependabot alerts API in `/k-status`.
-- `pull_requests: false` is acceptable and should not be reported as a warning when `alerts: true` is set.
-
-Status:
-
-- `OK`: enabled or disabled consistently, target/config exist, repo is known, and `gh` auth is plausible when alerts are enabled.
-- `WARN`: block missing, `gh` unavailable/unauthenticated, repo not derivable, alerts planned/unclear, or PRs intentionally disabled with no alerts flag.
-- `FAIL`: malformed config or enabled target/config path missing.
-
-## Section: git
-
-Checks:
-
-- Determine whether `TARGET_DIR` is a Git worktree with `git -C <TARGET_DIR> rev-parse --is-inside-work-tree`.
-- If yes, report current branch or detached HEAD.
-- Count changed tracked files and untracked files using status metadata only.
-- Do not print diffs, patch stats, or file contents.
-
-Status:
-
-- `OK`: Git worktree and clean.
-- `WARN`: Git worktree and dirty, or not a Git worktree.
-
-Suggested commands may mention normal project hygiene, but do not recommend a k-playbook command solely for dirty Git state.
-
-## Section: docs
-
-Checks:
-
-- Use `k-playbook/docs`.
-- Check whether the docs directory exists.
-- Check whether `k-playbook/docs/README.md` exists.
-- Check whether `k-playbook/docs/libs/README.md` exists.
-
-Status:
-
-- `OK`: docs path and both indexes exist.
-- `WARN`: docs is missing or one of the index files is missing.
-- `FAIL`: only if the fixed docs path cannot be checked at all; simple missing docs are normally recommendations, not blockers.
-
-Recommendations for docs:
-
-- Missing `k-playbook/docs/README.md` → suggest `/k-code2docs`.
-- Missing `k-playbook/docs/libs/README.md` while `k-playbook/docs/README.md` exists → suggest `/k-tools-scan`.
-
-## Section: recommendations
-
-Derive at most three next actions from the findings.
-
-Priority order:
-
-1. Missing or invalid `K-PLAYBOOK.yaml` → `/k-gui`.
-2. Missing required fixed-layout paths from `layout` → `/k-gui`.
-3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-gui` for this.
-4. OpenCode command symlinks or `skills.paths` incomplete → `/k-gui`.
-5. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
-6. CodeQL local database active/planned with missing database or CLI → `/k-install-codeql`.
-7. Dependabot enabled with missing target/config/repo/auth → `/k-review dependabot-alerts` only after setup is corrected.
-8. Open numbered tasks → `/k-run`.
-9. Review files exist and are due, or review support files are incomplete → `/k-review`.
-10. Missing docs index → `/k-code2docs`.
-11. Missing libs index → `/k-tools-scan`.
-
-Do not list more than three commands. Do not recommend commands that would clearly be irrelevant to the current mode; for example, `codeql` mode should not recommend `/k-run` just because tasks exist.
-
-## Output Format
-
-Default and `strict` output should be compact and scanable:
-
-```text
-/k-status
-────────────────────────
-Projekt:       /path/to/project
-K-PLAYBOOK:    OK (updated_at 2026-07-20)
-OpenCode:      WARN, commands 18/20 verlinkt, 1 verwaist, skills.paths ok
-Devcontainer: OK, ~/dev/k-playbook -> /workspaces/k-playbook
-Layout:        OK 7 / WARN 1 / FAIL 0
-Tasks:         WARN, 3 offen, nächste: 002-k-status.md
-TODO:          OK, 0 offen
-Reviews:       WARN, 2 vorhanden, known-decisions fehlt
-Enforcement:   OK, 1 Regel
-CodeQL:        WARN, target=./app, github=enabled workflow fehlt
-Dependabot:    OK, target=./app, repo=example-org/example-app, PRs deaktiviert
-Git:           WARN, dirty (4 geändert, 1 untracked)
-Docs:          WARN, k-playbook/docs/README.md fehlt
-
-Nächste Aktionen:
-1. /k-setup-codeql
-2. /k-run
-3. /k-code2docs
-```
-
-Use `OK`, `WARN`, and `FAIL` consistently:
-
-- `OK`: present and plausible.
-- `WARN`: optional, planned, unset, dirty, or incomplete but not necessarily broken.
-- `FAIL`: `K-PLAYBOOK.yaml` missing, configured required paths missing, invalid config, or active/planned configured CodeQL paths missing.
-
-In `strict` mode, keep the same section lines but add a short health-gate summary, for example:
-
-```text
-Health-Gates: FAIL (2 warn gates, 1 fail gate)
-```
-
-In `json` mode, first try the binary-backed project status:
+If the shell cannot reliably run with `TARGET_DIR` as working directory, use:
 
 ```bash
-k-playbook-installer status "<TARGET_DIR>"
+"<INSTALLER_BIN>" status "<TARGET_DIR>"
 ```
 
-The binary output is authoritative for the GUI-backed project fields and has this shape:
+Expected JSON shape:
 
 ```json
 {
@@ -424,33 +75,95 @@ The binary output is authoritative for the GUI-backed project fields and has thi
   "environment": "plain",
   "selected": true,
   "detected": ["go.mod"],
+  "playbook": {},
   "setup": {},
   "structure": {},
   "docs": {},
   "remediation": {},
-  "devcontainer": {}
-}
-```
-
-If the binary is unavailable, produce best-effort JSON with these top-level keys when feasible:
-
-```json
-{
-  "project": "/path/to/project",
-  "mode": "json",
-  "playbook": {},
-  "opencode": {},
-    "layout": {},
   "tasks": {},
   "todo": {},
   "reviews": {},
   "enforcement": {},
-  "codeql": {},
-  "dependabot": {},
   "git": {},
-  "docs": {},
-  "recommendations": []
+  "recommendations": [],
+  "devcontainer": {}
 }
 ```
 
-If exact JSON escaping is too error-prone without a helper script, print a `WARN` line before the object stating that JSON mode is best-effort and should be hardened by a future script.
+If `INSTALLER_BIN` is missing, report that the binary is unavailable and include the candidate paths checked. Do not recreate the old manual status implementation as a fallback unless the user explicitly asks for degraded best-effort output.
+
+## Compact Output
+
+Default output should be short and derived from the JSON:
+
+```text
+/k-status
+────────────────────────
+Projekt:       /path/to/project
+K-PLAYBOOK:    OK, updated_at 2026-07-20
+Setup:         OK, K-PLAYBOOK.yaml vorhanden
+Struktur:      WARN, 2 Pfade fehlen
+Docs:          WARN, docs-Verzeichnis enthaelt noch keine Markdown-Dateien
+Remediation:   OK, direct-allowed
+Tasks:         WARN, 3 offen, naechste: 002-example.md
+TODO:          OK, 0 offen
+Reviews:       WARN, known-decisions fehlt
+Enforcement:   OK, 1 Regel
+Git:           WARN, dirty (4 geaendert, 1 untracked)
+Devcontainer:  WARN, 2 Eintraege fehlen
+
+Naechste Aktionen:
+1. /k-gui
+2. /k-run
+3. /k-code2docs
+```
+
+Only show `Devcontainer` when the JSON contains `devcontainer`.
+
+Use these labels consistently:
+
+- `OK`: corresponding JSON object has `ok: true`.
+- `WARN`: corresponding JSON object has `ok: false`, but the project remains inspectable.
+- `FAIL`: the binary command failed, `K-PLAYBOOK.yaml` is missing/invalid, or a configured required path is missing.
+
+## JSON Mode
+
+In `json` mode, print the `"<INSTALLER_BIN>" status` JSON unchanged. Do not prepend warnings or prose unless the binary failed.
+
+## Full Mode
+
+In `full` mode:
+
+- Print the compact report.
+- If `<TARGET_DIR>/K-PLAYBOOK.yaml` exists, read and print it under a separate `K-PLAYBOOK.yaml` heading.
+- Do not print large generated files, diffs, logs, task contents, review contents, or docs contents.
+
+## Strict Mode
+
+In `strict` mode:
+
+- Print the compact report.
+- Add `Health-Gates: OK` only when every shown status object is OK.
+- Add `Health-Gates: FAIL (<warn> warn gates, <fail> fail gates)` when warnings or failures exist.
+- Do not change exit behavior and do not modify files.
+
+## CodeQL Mode
+
+In `codeql` mode:
+
+- Start with the binary status JSON.
+- Read only lightweight `tools.codeql` metadata from `K-PLAYBOOK.yaml` when present.
+- Check configured paths only with existence metadata when needed.
+- Do not run `codeql version`, `codeql database create`, `codeql database analyze`, uploads, or GitHub API calls.
+
+If deeper CodeQL status is needed, add it to the installer binary as a lightweight status field first.
+
+## Reviews Mode
+
+In `reviews` mode:
+
+- Start with the binary status JSON.
+- Report the `reviews` object and recommendations relevant to reviews.
+- Do not run review recipes or read full review result contents.
+
+If due-date calculation or richer review metadata is needed, add it to the installer binary as lightweight status fields first.

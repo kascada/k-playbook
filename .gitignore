@@ -5,6 +5,7 @@ priv/
 /k-playbook/
 /bin/
 /dist/
+/installer/bin/
 
 # Secrets and local environment
 .env

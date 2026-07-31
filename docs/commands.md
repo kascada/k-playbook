@@ -208,13 +208,13 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 
 `/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist die Installer-GUI die naechste Aktion.
 
-Fuer maschinenlesbaren Projektstatus kann `/k-status json` auf das Installer-Binary zurueckgreifen:
+Fuer maschinenlesbaren Projektstatus startet `/k-status json` bevorzugt das Installer-Binary im aktuellen Projekt:
 
 ```bash
-k-playbook-installer status <project-path>
+k-playbook-installer status
 ```
 
-Die Ausgabe ist JSON und enthaelt die in der Installer-GUI genutzten Projektfelder `setup`, `structure`, `docs`, `remediation` und optional `devcontainer`.
+Die Ausgabe ist JSON und enthaelt die in der Installer-GUI genutzten Projektfelder plus leichte Statusbereiche wie `playbook`, `tasks`, `todo`, `reviews`, `enforcement`, `git` und `recommendations`. `/k-status` startet keine Tests, Builds, Smoke-Tests, Scanner oder Analysen; solche Pruefungen bleiben separaten Commands vorbehalten.
 
 ## Task-Commands: `/k-task-create`, `/k-run`, `/k-review-loop`, `/k-todo`
 

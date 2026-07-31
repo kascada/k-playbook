@@ -843,6 +843,7 @@ func updateProjectRemediationHandler(w http.ResponseWriter, r *http.Request) {
 func projectResponse(file store.ProjectsFile) projectsResponse {
 	response := projectsResponse{Version: file.Version, Projects: make([]projects.ProjectStatus, 0, len(file.Projects))}
 	for _, project := range file.Projects {
+		_, _ = projects.EnsureConfigDefaults(project.Path)
 		response.Projects = append(response.Projects, projects.StatusFromProject(project))
 	}
 	return response

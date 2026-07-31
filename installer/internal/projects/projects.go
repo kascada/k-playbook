@@ -163,6 +163,33 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 	return true, nil
 }
 
+func EnsureConfigDefaults(projectPath string) (bool, error) {
+	path, err := configPath(projectPath)
+	if err != nil {
+		return false, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("%s lesen: %w", ConfigFileName, err)
+	}
+
+	content := string(data)
+	updated := content
+	if _, found, err := readRemediationModeFromContent(content); err != nil {
+		return false, err
+	} else if !found {
+		updated = replaceRemediationBlock(updated, remediationBlock(RemediationModeDirectAllowed))
+	}
+
+	if updated == content {
+		return false, nil
+	}
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
+	}
+	return true, nil
+}
+
 func CheckProjectStructure(projectPath string) (StructureStatus, error) {
 	normalized, err := NormalizePath(projectPath)
 	if err != nil {
@@ -256,8 +283,11 @@ func ReadRemediationMode(projectPath string) (RemediationMode, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("%s lesen: %w", ConfigFileName, err)
 	}
+	return readRemediationModeFromContent(string(data))
+}
 
-	lines := strings.Split(string(data), "\n")
+func readRemediationModeFromContent(content string) (RemediationMode, bool, error) {
+	lines := strings.Split(content, "\n")
 	inRemediation := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)

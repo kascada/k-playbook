@@ -41,42 +41,28 @@ func newRootCommand() *cobra.Command {
 
 func newStatusCommand() *cobra.Command {
 	fix := false
+	pathContract := false
 	cmd := &cobra.Command{
 		Use:   "status [path]",
-		Short: "Prueft den Pfadvertrag oder gibt Projektstatus als JSON aus",
+		Short: "Gibt den read-only Projektstatus als JSON aus",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if fix && len(args) == 1 {
+				return fmt.Errorf("--fix kann nur ohne Projektpfad verwendet werden")
+			}
+			if fix || pathContract {
+				return runPathContractStatus(fix)
+			}
+
+			projectPath := "."
 			if len(args) == 1 {
-				if fix {
-					return fmt.Errorf("--fix kann nur ohne Projektpfad verwendet werden")
-				}
-				return writeProjectStatusJSON(args[0])
+				projectPath = args[0]
 			}
-
-			result, err := pathcontract.Check()
-			if err != nil {
-				return err
-			}
-
-			if fix && !result.OK {
-				if err := pathcontract.Repair(result); err != nil {
-					return err
-				}
-				result, err = pathcontract.Check()
-				if err != nil {
-					return err
-				}
-			}
-
-			fmt.Print(ui.RenderPathStatus(result, false))
-			if !result.OK {
-				return fmt.Errorf("Pfadvertrag nicht erfuellt: %s", result.Code)
-			}
-
-			return nil
+			return writeProjectStatusJSON(projectPath)
 		},
 	}
 	cmd.Flags().BoolVar(&fix, "fix", false, "legt den Symlink an, wenn ~/dev/k-playbook fehlt und das aktuelle Repo sicher erkannt wurde")
+	cmd.Flags().BoolVar(&pathContract, "path-contract", false, "prueft nur den ~/dev/k-playbook Pfadvertrag")
 
 	return cmd
 }
@@ -130,11 +116,15 @@ func newProjectsCommand() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "status <path>",
+		Use:   "status [path]",
 		Short: "Gibt den read-only Projektstatus als JSON aus",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return writeProjectStatusJSON(args[0])
+			projectPath := "."
+			if len(args) == 1 {
+				projectPath = args[0]
+			}
+			return writeProjectStatusJSON(projectPath)
 		},
 	})
 
@@ -202,6 +192,30 @@ func writeProjectStatusJSON(projectPath string) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(status)
+}
+
+func runPathContractStatus(fix bool) error {
+	result, err := pathcontract.Check()
+	if err != nil {
+		return err
+	}
+
+	if fix && !result.OK {
+		if err := pathcontract.Repair(result); err != nil {
+			return err
+		}
+		result, err = pathcontract.Check()
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Print(ui.RenderPathStatus(result, false))
+	if !result.OK {
+		return fmt.Errorf("Pfadvertrag nicht erfuellt: %s", result.Code)
+	}
+
+	return nil
 }
 
 func requirePathContract() error {

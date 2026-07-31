@@ -138,6 +138,58 @@ custom:
 	}
 }
 
+func TestEnsureConfigDefaultsAddsMissingRemediationBlock(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ConfigFileName)
+	initial := `schema_version: 1
+layout: fixed-project-k-playbook
+
+k_playbook:
+  repo: ~/dev/k-playbook
+
+setup:
+  updated_at: 2026-07-30
+
+custom:
+  keep: true
+`
+	if err := os.WriteFile(path, []byte(initial), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	changed, err := EnsureConfigDefaults(root)
+	if err != nil {
+		t.Fatalf("EnsureConfigDefaults failed: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected defaults to be added")
+	}
+	contentBytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(contentBytes)
+	for _, expected := range []string{
+		"remediation:\n",
+		"mode: direct-allowed\n",
+		"direct_fixes: true\n",
+		"custom:\n",
+		"keep: true\n",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("config does not contain %q:\n%s", expected, content)
+		}
+	}
+
+	changed, err = EnsureConfigDefaults(root)
+	if err != nil {
+		t.Fatalf("second EnsureConfigDefaults failed: %v", err)
+	}
+	if changed {
+		t.Fatal("expected second defaults call to be unchanged")
+	}
+}
+
 func TestReadRemediationMode(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, ConfigFileName), []byte(MinimalConfig(time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), RemediationModeTaskFirst)), 0o644); err != nil {

@@ -4,15 +4,18 @@
 
 ## Schnellstart
 
-Empfohlen fuer Nutzer: Installation ohne lokal installiertes Go.
+### Normalinstallation ohne Go
+
+Empfohlen fuer Nutzer nach einem frischen Clone:
 
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 cd ~/dev/k-playbook
 make install
-# alternativ ohne make: ./scripts/install-installer.sh
 k-playbook-installer
 ```
+
+`make install` baut nicht aus Source. Es installiert `~/.local/bin/k-playbook-installer` aus einem passenden Release-Artefakt unter `dist/`, aus einem vorhandenen `bin/k-playbook-installer` oder aus den GitHub Releases. Dafuer ist kein lokal installiertes Go noetig.
 
 Falls `~/.local/bin` noch nicht im `PATH` liegt, gibt das Script einen Hinweis aus. Die GUI kann dann auch direkt gestartet werden:
 
@@ -22,7 +25,9 @@ Falls `~/.local/bin` noch nicht im `PATH` liegt, gibt das Script einen Hinweis a
 
 Der Installer prueft den Pfadvertrag `~/dev/k-playbook`, kann ihn bei Bedarf reparieren, verwaltet die Projekt-Auswahl, zeigt die Docs an und kann `git pull --ff-only` ausfuehren.
 
-Selbst bauen geht weiterhin, braucht aber Go auf dem Host:
+### Installation aus Source mit Go
+
+Fuer Entwickler oder lokale Source-Aenderungen:
 
 ```bash
 git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
@@ -30,33 +35,33 @@ cd ~/dev/k-playbook
 make install-from-source
 make gui
 ```
+
+`make install-from-source` ruft `make build` auf, baut `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf dieses Binary. Danach aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf ueber den Symlink.
+
+### Lokal testen als Entwickler
+
+Nach Codeaenderungen am Installer:
+
+```bash
+make build
+./bin/k-playbook-installer status
+./bin/k-playbook-installer
+```
+
+`/k-status` sucht das Binary nicht nur im `PATH`, sondern auch unter `~/dev/k-playbook/bin/k-playbook-installer` und im DevContainer unter `/workspaces/k-playbook/bin/k-playbook-installer`. Ein `make build` auf dem Host reicht deshalb auch fuer DevContainer, wenn das Repo nach `/workspaces/k-playbook` gemountet ist.
+
+Oder direkt GUI starten und vorher automatisch neu bauen:
+
+```bash
+make installer-run
+```
+
+`make installer-run` ist ein Alias fuer `make gui`; `gui` haengt von `build` ab und startet danach `./bin/k-playbook-installer`.
 
 Maintainer erzeugen Release-Artefakte mit:
 
 ```text
 make -C priv release-artifacts
-```
-
-## Veraltet: bisheriger Schnellstart
-
-Dieser Abschnitt bleibt vorerst zur Orientierung stehen, ist aber nicht mehr der empfohlene Einstieg fuer Nutzer.
-
-Gefuehrter Start mit Browser-GUI:
-
-```bash
-git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
-cd ~/dev/k-playbook
-./scripts/install-installer.sh
-k-playbook-installer
-```
-
-Das Install-Script braucht kein lokal installiertes Go. Es nutzt zuerst ein passendes vorhandenes Binary aus `dist/`, `bin/` oder `installer/bin/` und laedt sonst aus den GitHub Releases.
-
-Source-Builds fuer Entwickler brauchen Go:
-
-```text
-make install-from-source
-make gui
 ```
 
 OpenCode-Kommandos bleiben zusaetzlich verfuegbar:
