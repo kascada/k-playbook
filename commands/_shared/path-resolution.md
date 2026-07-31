@@ -2,7 +2,7 @@
 
 Use this module when a command needs project-local k-playbook paths.
 
-The project-local layout is fixed and complete. The k-playbook Installer creates or completes every standard project-local k-playbook directory/file under `<project>/k-playbook/`. Commands derive paths from the project root; they do not read configurable path values and do not check active/inactive building blocks.
+The project-local layout is fixed and complete. The k-playbook Installer creates or completes every standard project-local k-playbook directory/file under `<project>/k-playbook/`. Commands derive k-playbook artifact paths from the project root; they read the actual code/repo root only from `K-PLAYBOOK.yaml` as `project.repo_root`.
 
 ## Fixed Layout
 
@@ -20,7 +20,7 @@ For a project root `TARGET_DIR`, derive:
 | enforcement | `<TARGET_DIR>/k-playbook/enforcement/` |
 | docs | `<TARGET_DIR>/k-playbook/docs/` |
 
-No command should ask for alternative locations for these paths. `K-PLAYBOOK.yaml` records setup metadata, policies, and tool decisions only; standard paths stay derived from the fixed layout.
+No command should ask for alternative locations for these paths. `K-PLAYBOOK.yaml` records setup metadata, policies, the actual code/repo root, and tool decisions; standard k-playbook paths stay derived from the fixed layout.
 
 ## Loading This Module From Commands
 
@@ -46,9 +46,13 @@ Determine `PLAYBOOK_REPO`:
 
 - Read `<TARGET_DIR>/K-PLAYBOOK.yaml` if it exists.
 - If it is missing, record `K_PLAYBOOK_FOUND=false`; do not abort here.
-- Parse setup metadata only: `schema_version`, `layout`, `k_playbook.repo`, and `setup.updated_at`.
+- Parse setup metadata: `schema_version`, `layout`, `k_playbook.repo`, `project.repo_root`, `project.vcs`, and `setup.updated_at`.
 - Expected layout is `fixed-project-k-playbook`.
 - Do not read a `paths:` block for standard paths. The effective playbook base is always `<TARGET_DIR>/k-playbook`.
+- `project.repo_root` is required for code/Git operations. It is relative to `TARGET_DIR`, must not be absolute, and must not escape `TARGET_DIR`.
+- `project.vcs` is required and is either `git` or `none`.
+- If `project.repo_root` or `project.vcs` is missing, empty, or invalid, do not search for Git roots. Stop and tell the user to run `/k-gui`; the GUI owns discovery or the explicit `vcs: none` decision.
+- Store `PROJECT_REPO_ROOT_DIR` as the resolved absolute path and `PROJECT_REPO_ROOT_DISPLAY_PATH` as the configured relative value.
 
 ## Resolve Requested Keys
 

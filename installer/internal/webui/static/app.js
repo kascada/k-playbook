@@ -632,6 +632,7 @@ async function loadProjectConfig(projectPath) {
 function projectStatus(project) {
   const items = [
     projectPlaybookStatus(project),
+    projectRootStatus(project),
     projectSetupStatus(project),
     projectRemediationStatus(project),
     projectStructureStatus(project),
@@ -651,6 +652,24 @@ function projectStatus(project) {
     items.push(recommendations);
   }
   return items;
+}
+
+function projectRootStatus(project) {
+  const root = project.projectRoot || project.ProjectRoot || {};
+  const ok = Boolean(root.ok || root.OK);
+  const repoRoot = root.repoRoot || root.RepoRoot || "";
+  const vcs = root.vcs || root.VCS || "";
+  const candidates = root.candidates || root.Candidates || [];
+  return {
+    key: "project-root",
+    label: "Project-Root",
+    value: ok ? `${repoRoot} (${vcs})` : repoRoot ? "ungueltig" : "fehlt",
+    state: ok ? "ok" : "error",
+    detail: root.message || root.Message || "project.repo_root steuert, wo Commands Code/Git suchen.",
+    repoRoot,
+    vcs,
+    candidates,
+  };
 }
 
 function projectPlaybookStatus(project) {
@@ -858,6 +877,8 @@ function numberValue(value) {
 
 function projectEditorStatusRow(project, item) {
   switch (item.key) {
+    case "project-root":
+      return projectRootEditorRow(project, item);
     case "setup":
       return projectSetupEditorRow(project, item);
     case "remediation":
@@ -871,6 +892,36 @@ function projectEditorStatusRow(project, item) {
     default:
       return projectReadonlyStatusRow(item);
   }
+}
+
+function projectRootEditorRow(project, item) {
+  const projectPath = project.path || project.Path;
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  action.append(statusLabel(item));
+
+  if (item.state === "ok") {
+    const change = document.createElement("button");
+    change.type = "button";
+    change.className = "secondary small-button";
+    change.textContent = "Aendern";
+    change.addEventListener("click", () => chooseProjectRoot(projectPath, item, change));
+    action.append(change);
+    return projectStatusRow(item, action);
+  }
+
+  const detect = document.createElement("button");
+  detect.type = "button";
+  detect.className = "primary small-button";
+  detect.textContent = "Ermitteln";
+  detect.addEventListener("click", () => chooseProjectRoot(projectPath, item, detect));
+  const noGit = document.createElement("button");
+  noGit.type = "button";
+  noGit.className = "secondary small-button";
+  noGit.textContent = "Kein Git";
+  noGit.addEventListener("click", () => chooseNoGitProjectRoot(projectPath, item, noGit));
+  action.append(detect, noGit);
+  return projectStatusRow(item, action);
 }
 
 function projectReadonlyStatusRow(item) {
@@ -1000,6 +1051,82 @@ async function updateProjectRemediation(projectPath, mode, select) {
       await loadProjectConfig(projectPath);
     }
     showToast("Remediation-Policy aktualisiert.");
+  });
+}
+
+async function chooseProjectRoot(projectPath, item, button) {
+  await withBusy(button, async () => {
+    const candidates = await api(`/api/projects/repo-root-candidates?path=${encodeURIComponent(projectPath)}`);
+    const selected = await promptProjectRoot(projectPath, candidates, item);
+    if (!selected) {
+      return;
+    }
+    await updateProjectRoot(projectPath, selected.repoRoot, selected.vcs, button);
+  });
+}
+
+async function chooseNoGitProjectRoot(projectPath, item, button) {
+  const answer = window.prompt(
+    "Dieses Projekt hat kein Git. Welcher relative Pfad ist der Code-Root?",
+    item.repoRoot || ".",
+  );
+  if (answer === null || answer.trim() === "") {
+    return;
+  }
+  await updateProjectRoot(projectPath, answer.trim(), "none", button);
+}
+
+function promptProjectRoot(projectPath, candidates, item) {
+  const candidateList = Array.isArray(candidates) ? candidates : [];
+  if (candidateList.length === 1) {
+    const candidate = candidateList[0];
+    if (window.confirm(`Gefundenen Git-Root eintragen?\n\nProjekt: ${projectPath}\nGit-Root: ${candidate.repoRoot || candidate.RepoRoot}`)) {
+      return Promise.resolve({ repoRoot: candidate.repoRoot || candidate.RepoRoot, vcs: candidate.vcs || candidate.VCS || "git" });
+    }
+    return Promise.resolve(null);
+  }
+
+  const lines = [
+    "Project-Root relativ zum K-PLAYBOOK.yaml-Ordner eingeben.",
+    "",
+  ];
+  if (candidateList.length > 1) {
+    lines.push("Gefundene Git-Repos:");
+    candidateList.forEach((candidate, index) => lines.push(`${index + 1}. ${candidate.repoRoot || candidate.RepoRoot}`));
+    lines.push("", "Gib eine Nummer oder einen relativen Pfad ein.");
+  } else {
+    lines.push("Kein Git-Repo automatisch gefunden. Gib einen relativen Pfad ein oder nutze 'Kein Git'.");
+  }
+  const current = item.repoRoot || ".";
+  const answer = window.prompt(lines.join("\n"), current);
+  if (answer === null) {
+    return Promise.resolve(null);
+  }
+  const trimmed = answer.trim();
+  if (trimmed === "") {
+    return Promise.resolve(null);
+  }
+  const index = Number(trimmed);
+  if (Number.isInteger(index) && index >= 1 && index <= candidateList.length) {
+    const candidate = candidateList[index - 1];
+    return Promise.resolve({ repoRoot: candidate.repoRoot || candidate.RepoRoot, vcs: candidate.vcs || candidate.VCS || "git" });
+  }
+  return Promise.resolve({ repoRoot: trimmed, vcs: "git" });
+}
+
+async function updateProjectRoot(projectPath, repoRoot, vcs, control) {
+  await withBusy(control, async () => {
+    const file = await api("/api/projects/repo-root", {
+      method: "POST",
+      body: JSON.stringify({ path: projectPath, repoRoot, vcs }),
+    });
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+    if (currentProjectPath === projectPath) {
+      renderProjectDetailStatus(findProject(projectPath));
+      await loadProjectConfig(projectPath);
+    }
+    showToast("Project-Root aktualisiert.");
   });
 }
 

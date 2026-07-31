@@ -47,6 +47,12 @@ type remediationRequest struct {
 	Mode string `json:"mode"`
 }
 
+type projectRootRequest struct {
+	Path     string `json:"path"`
+	RepoRoot string `json:"repoRoot"`
+	VCS      string `json:"vcs"`
+}
+
 type projectsResponse struct {
 	Version  int                      `json:"version"`
 	Projects []projects.ProjectStatus `json:"projects"`
@@ -262,6 +268,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/projects/config", projectConfigHandler)
 	mux.HandleFunc("POST /api/projects/structure", completeProjectStructureHandler)
 	mux.HandleFunc("POST /api/projects/remediation", updateProjectRemediationHandler)
+	mux.HandleFunc("GET /api/projects/repo-root-candidates", repoRootCandidatesHandler)
+	mux.HandleFunc("POST /api/projects/repo-root", updateProjectRootHandler)
 	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
 	mux.HandleFunc("POST /api/git/pull", gitPullHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
@@ -828,6 +836,44 @@ func updateProjectRemediationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := projects.UpdateRemediationMode(projectPath, projects.RemediationMode(request.Mode)); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	file, err := store.LoadProjects()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, projectResponse(file))
+}
+
+func repoRootCandidatesHandler(w http.ResponseWriter, r *http.Request) {
+	projectPath, err := projects.NormalizePath(r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	candidates, err := projects.DiscoverRepoRootCandidates(projectPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, candidates)
+}
+
+func updateProjectRootHandler(w http.ResponseWriter, r *http.Request) {
+	var request projectRootRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+	projectPath, err := projects.NormalizePath(request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := projects.UpdateProjectRoot(projectPath, request.RepoRoot, projects.ProjectVCS(request.VCS)); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}

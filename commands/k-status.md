@@ -77,6 +77,7 @@ Expected JSON shape:
   "selected": true,
   "detected": ["go.mod"],
   "playbook": {},
+  "projectRoot": {},
   "setup": {},
   "structure": {},
   "docs": {},
@@ -102,6 +103,7 @@ Default output should be short and derived from the JSON:
 ────────────────────────
 Projekt:       /path/to/project
 K-PLAYBOOK:    OK, updated_at 2026-07-20
+Project-Root:  OK, . (git)
 Setup:         OK, K-PLAYBOOK.yaml vorhanden
 Struktur:      WARN, 2 Pfade fehlen
 Docs:          WARN, docs-Verzeichnis enthaelt noch keine Markdown-Dateien
@@ -126,6 +128,7 @@ Use these labels consistently:
 - `OK`: corresponding JSON object has `ok: true`.
 - `WARN`: corresponding JSON object has `ok: false`, but the project remains inspectable.
 - `FAIL`: the binary command failed, `K-PLAYBOOK.yaml` is missing/invalid, or a configured required path is missing.
+- `projectRoot.ok: false` is a failed configuration gate. Do not search for a Git root in `/k-status`; report the message from the JSON and recommend `/k-gui`.
 
 ## JSON Mode
 

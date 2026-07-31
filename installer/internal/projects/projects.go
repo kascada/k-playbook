@@ -1,9 +1,12 @@
 package projects
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,6 +15,24 @@ import (
 )
 
 const ConfigFileName = "K-PLAYBOOK.yaml"
+
+type ProjectVCS string
+
+const (
+	ProjectVCSGit  ProjectVCS = "git"
+	ProjectVCSNone ProjectVCS = "none"
+)
+
+type ProjectRootConfig struct {
+	RepoRoot string `json:"repoRoot"`
+	VCS      string `json:"vcs"`
+}
+
+type RepoRootCandidate struct {
+	RepoRoot string `json:"repoRoot"`
+	Path     string `json:"path"`
+	VCS      string `json:"vcs"`
+}
 
 const knownDecisionsTemplate = `# Known Decisions
 
@@ -156,7 +177,8 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 	}
 	defer file.Close()
 
-	if _, err := file.WriteString(MinimalConfig(time.Now(), remediationMode)); err != nil {
+	projectRoot := DefaultProjectRootConfig(normalized)
+	if _, err := file.WriteString(MinimalConfigForProject(time.Now(), remediationMode, projectRoot)); err != nil {
 		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
 	}
 
@@ -331,20 +353,81 @@ func UpdateRemediationMode(projectPath string, remediationMode RemediationMode) 
 	return nil
 }
 
+func UpdateProjectRoot(projectPath string, repoRoot string, vcs ProjectVCS) error {
+	path, err := configPath(projectPath)
+	if err != nil {
+		return err
+	}
+	projectPath = filepath.Dir(path)
+
+	repoRoot, err = normalizeRepoRoot(repoRoot)
+	if err != nil {
+		return err
+	}
+	if !IsValidProjectVCS(vcs) {
+		return fmt.Errorf("ungueltiges VCS: %s", vcs)
+	}
+
+	absRoot := filepath.Join(projectPath, filepath.FromSlash(strings.TrimPrefix(repoRoot, "./")))
+	info, err := os.Stat(absRoot)
+	if err != nil {
+		return fmt.Errorf("project.repo_root pruefen: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("project.repo_root ist kein Verzeichnis: %s", repoRoot)
+	}
+
+	if vcs == ProjectVCSGit {
+		gitRoot, err := gitTopLevel(absRoot)
+		if err != nil {
+			return fmt.Errorf("project.repo_root ist kein Git-Worktree: %w", err)
+		}
+		if !samePath(realPath(gitRoot), realPath(absRoot)) {
+			return fmt.Errorf("project.repo_root ist nicht der Git-Root: %s", repoRoot)
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("%s lesen: %w", ConfigFileName, err)
+	}
+
+	content := replaceProjectBlock(string(data), projectBlock(ProjectRootConfig{RepoRoot: repoRoot, VCS: string(vcs)}))
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
+	}
+	return nil
+}
+
 func MinimalConfig(updatedAt time.Time, remediationMode RemediationMode) string {
+	return MinimalConfigForProject(updatedAt, remediationMode, ProjectRootConfig{RepoRoot: ".", VCS: string(ProjectVCSGit)})
+}
+
+func MinimalConfigForProject(updatedAt time.Time, remediationMode RemediationMode, projectRoot ProjectRootConfig) string {
 	if remediationMode == "" {
 		remediationMode = RemediationModeDirectAllowed
 	}
+	projectRoot.RepoRoot = strings.TrimSpace(projectRoot.RepoRoot)
+	projectRoot.VCS = strings.TrimSpace(projectRoot.VCS)
 	return fmt.Sprintf(`schema_version: 1
 layout: fixed-project-k-playbook
 
 k_playbook:
   repo: ~/dev/k-playbook
 
+%s
+
 setup:
   updated_at: %s
 
-%s`, updatedAt.Format("2006-01-02"), remediationBlock(remediationMode))
+%s`, strings.TrimRight(projectBlock(projectRoot), "\n"), updatedAt.Format("2006-01-02"), remediationBlock(remediationMode))
+}
+
+func projectBlock(projectRoot ProjectRootConfig) string {
+	return fmt.Sprintf(`project:
+  repo_root: %s
+  vcs: %s
+`, projectRoot.RepoRoot, projectRoot.VCS)
 }
 
 func remediationBlock(remediationMode RemediationMode) string {
@@ -385,6 +468,15 @@ func IsValidRemediationMode(mode RemediationMode) bool {
 	}
 }
 
+func IsValidProjectVCS(vcs ProjectVCS) bool {
+	switch vcs {
+	case ProjectVCSGit, ProjectVCSNone:
+		return true
+	default:
+		return false
+	}
+}
+
 func configPath(projectPath string) (string, error) {
 	normalized, err := NormalizePath(projectPath)
 	if err != nil {
@@ -394,11 +486,19 @@ func configPath(projectPath string) (string, error) {
 }
 
 func replaceRemediationBlock(content string, block string) string {
+	return replaceTopLevelBlock(content, "remediation", block)
+}
+
+func replaceProjectBlock(content string, block string) string {
+	return replaceTopLevelBlock(content, "project", block)
+}
+
+func replaceTopLevelBlock(content string, blockName string, block string) string {
 	lines := strings.Split(content, "\n")
 	start := -1
 	end := len(lines)
 	for index, line := range lines {
-		if isTopLevelYAMLLine(line) && strings.TrimSpace(line) == "remediation:" {
+		if isTopLevelYAMLLine(line) && strings.TrimSpace(line) == blockName+":" {
 			start = index
 			break
 		}
@@ -427,6 +527,129 @@ func replaceRemediationBlock(content string, block string) string {
 	newLines = append(newLines, strings.Split(strings.TrimRight(block, "\n"), "\n")...)
 	newLines = append(newLines, lines[end:]...)
 	return strings.TrimRight(strings.Join(newLines, "\n"), "\n") + "\n"
+}
+
+func DefaultProjectRootConfig(projectPath string) ProjectRootConfig {
+	candidates, err := DiscoverRepoRootCandidates(projectPath)
+	if err == nil && len(candidates) == 1 {
+		return ProjectRootConfig{RepoRoot: candidates[0].RepoRoot, VCS: candidates[0].VCS}
+	}
+	return ProjectRootConfig{}
+}
+
+func DiscoverRepoRootCandidates(projectPath string) ([]RepoRootCandidate, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(normalized)
+	if err != nil {
+		return nil, fmt.Errorf("Projektpfad pruefen: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("Projektpfad ist kein Verzeichnis: %s", normalized)
+	}
+
+	found := map[string]RepoRootCandidate{}
+	addGitRoot := func(path string) {
+		gitRoot, err := gitTopLevel(path)
+		if err != nil {
+			return
+		}
+		if !pathIsInside(normalized, gitRoot) {
+			return
+		}
+		rel, err := filepath.Rel(normalized, gitRoot)
+		if err != nil {
+			return
+		}
+		repoRoot := displayRepoRoot(rel)
+		found[repoRoot] = RepoRootCandidate{RepoRoot: repoRoot, Path: gitRoot, VCS: string(ProjectVCSGit)}
+	}
+
+	addGitRoot(normalized)
+	err = filepath.WalkDir(normalized, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if path != normalized {
+			name := entry.Name()
+			if shouldSkipDir(name) || name == "k-playbook" {
+				return filepath.SkipDir
+			}
+		}
+		if depth(normalized, path) > 3 {
+			return filepath.SkipDir
+		}
+		if exists(filepath.Join(path, ".git")) {
+			addGitRoot(path)
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Git-Repos suchen: %w", err)
+	}
+
+	candidates := make([]RepoRootCandidate, 0, len(found))
+	for _, candidate := range found {
+		candidates = append(candidates, candidate)
+	}
+	sort.Slice(candidates, func(i int, j int) bool {
+		return candidates[i].RepoRoot < candidates[j].RepoRoot
+	})
+	return candidates, nil
+}
+
+func normalizeRepoRoot(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("project.repo_root ist leer")
+	}
+	value = filepath.ToSlash(value)
+	if filepath.IsAbs(value) {
+		return "", fmt.Errorf("project.repo_root muss relativ sein")
+	}
+	clean := filepath.ToSlash(filepath.Clean(value))
+	if clean == "." {
+		return ".", nil
+	}
+	if clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("project.repo_root darf nicht ausserhalb des Projektordners liegen")
+	}
+	return "./" + strings.TrimPrefix(clean, "./"), nil
+}
+
+func displayRepoRoot(rel string) string {
+	rel = filepath.ToSlash(filepath.Clean(rel))
+	if rel == "." {
+		return "."
+	}
+	return "./" + strings.TrimPrefix(rel, "./")
+}
+
+func gitTopLevel(path string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
+	cmd.Dir = path
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
+	}
+	return filepath.Clean(strings.TrimSpace(string(output))), nil
+}
+
+func pathIsInside(root string, candidate string) bool {
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil {
+		return false
+	}
+	rel = filepath.Clean(rel)
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
 }
 
 func isTopLevelYAMLLine(line string) bool {

@@ -1,7 +1,7 @@
 # K-PLAYBOOK.yaml Format
 
 `K-PLAYBOOK.yaml` ist die projektlokale Maschinen-Konfiguration fuer k-playbook.
-Sie liegt im Projekt-Root und ersetzt die bisherige Markdown-Konfiguration.
+Sie liegt im k-playbook-Projektordner und ersetzt die bisherige Markdown-Konfiguration.
 
 ## Grundentscheidung
 
@@ -10,7 +10,9 @@ Docs oder Enforcement.
 
 Stattdessen gilt:
 
-- Das Projekt-Root ist das Verzeichnis, in dem `K-PLAYBOOK.yaml` liegt.
+- Das k-playbook-Projektverzeichnis ist das Verzeichnis, in dem `K-PLAYBOOK.yaml` liegt.
+- Der eigentliche Code-/Repo-Root steht in `project.repo_root`, relativ zum
+  k-playbook-Projektverzeichnis.
 - Die projektlokale k-playbook-Struktur liegt fest unter `k-playbook/`.
 - Jedes Command kennt seine festen Unterverzeichnisse.
 - Die Config speichert Setup-Metadaten, Projekt-Policies und Tool-Entscheidungen.
@@ -49,6 +51,10 @@ layout: fixed-project-k-playbook
 k_playbook:
   repo: ~/dev/k-playbook
 
+project:
+  repo_root: .
+  vcs: git
+
 setup:
   updated_at: 2026-07-30
 
@@ -74,6 +80,10 @@ layout: fixed-project-k-playbook
 
 k_playbook:
   repo: ~/dev/k-playbook
+
+project:
+  repo_root: ./app
+  vcs: git
 
 setup:
   updated_at: 2026-07-30
@@ -122,6 +132,29 @@ Pflichtfeld. Erwarteter Wert: `~/dev/k-playbook`.
 Der Wert dient als sichtbarer Rueckverweis fuer globale Commands, Skills, Regeln,
 Reviews, Checks und Skripte. Er ist ein Pfadvertrag, keine Projektoption.
 
+### `project.repo_root`
+
+Pflichtfeld. Relativer Pfad vom Verzeichnis der `K-PLAYBOOK.yaml` zum tatsaechlichen
+Code-/Repo-Root.
+
+Typische Werte:
+
+- `.` fuer normale Projekte, bei denen `K-PLAYBOOK.yaml` im Git-/Code-Root liegt.
+- `./app` fuer Wrapper-/DevContainer-Projekte, bei denen der eigentliche Code in
+  einem Unterverzeichnis liegt.
+
+Commands duerfen diesen Pfad aus der YAML lesen und validieren, aber nicht selbst
+Git-Roots suchen oder raten. Wenn `project.repo_root` leer, ungueltig oder fehlend
+ist, muss `/k-status` einen Fehler melden und die GUI zur Korrektur empfehlen.
+
+### `project.vcs`
+
+Pflichtfeld. Aktuelle Werte:
+
+- `git` fuer Projekte mit Git-Worktree im `project.repo_root`.
+- `none` fuer Projekte ohne Git. Das ist eine explizite Projektentscheidung und
+  wird in der YAML gespeichert, statt in Commands geraten zu werden.
+
 ### `setup.updated_at`
 
 Pflichtfeld. ISO-Datum `YYYY-MM-DD`, an dem `/k-setup` die Datei zuletzt
@@ -139,7 +172,7 @@ Modus beim Einbinden auf `task-first` oder `task-branch-pr` gestellt werden.
 | Feld | Typ | Bedeutung |
 |---|---|---|
 | `mode` | enum | `task-branch-pr`, `task-first` oder `direct-allowed` |
-| `target` | string | Code-/Git-Root relativ zum Projekt-Root, z. B. `.` oder `./app` |
+| `target` | string | optionaler Remediation-Override relativ zum Projektverzeichnis; Default ist `project.repo_root` |
 | `grouping` | boolean | Findings vor Umsetzung zu sinnvollen Buendeln gruppieren |
 | `quick_wins` | boolean | einfache, wirkungsstarke Buendel hervorheben |
 | `branch_prefix` | string | empfohlener Prefix fuer Remediation-Branches |
@@ -176,8 +209,10 @@ oder `planned` ist.
 
 ## Schreibregeln
 
-- `/k-setup` besitzt `schema_version`, `layout`, `k_playbook` und `setup`.
+- `/k-setup` besitzt `schema_version`, `layout`, `k_playbook`, `project` und `setup`.
 - `/k-setup` besitzt ausserdem die Remediation-Policy, sofern sie gesetzt wird.
+- Die Installer-GUI besitzt `project.repo_root` und `project.vcs`. Sie darf
+  Git-Kandidaten suchen oder den Nutzer fragen; andere Commands duerfen das nicht.
 - `/k-setup-codeql` besitzt nur `tools.codeql`.
 - Commands duerfen unbekannte Top-Level-Felder erhalten, aber nicht ungefragt aendern.
 - Standardpfade duerfen nicht als konfigurierbarer `paths:`-Block eingefuehrt werden.

@@ -18,6 +18,10 @@ layout: fixed-project-k-playbook
 k_playbook:
   repo: ~/dev/k-playbook
 
+project:
+  repo_root: .
+  vcs: git
+
 setup:
   updated_at: 2026-07-30
 
@@ -69,6 +73,9 @@ func TestEnsureConfigCreatesMinimalConfig(t *testing.T) {
 		"schema_version: 1\n",
 		"layout: fixed-project-k-playbook\n",
 		"repo: ~/dev/k-playbook\n",
+		"project:\n",
+		"repo_root: ",
+		"vcs: ",
 		"setup:\n",
 		"updated_at: ",
 		"remediation:\n",
@@ -86,6 +93,53 @@ func TestEnsureConfigCreatesMinimalConfig(t *testing.T) {
 	}
 	if created {
 		t.Fatal("expected existing config to be left unchanged")
+	}
+}
+
+func TestMinimalConfigForProjectSupportsNoGit(t *testing.T) {
+	config := MinimalConfigForProject(
+		time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC),
+		RemediationModeDirectAllowed,
+		ProjectRootConfig{RepoRoot: ".", VCS: string(ProjectVCSNone)},
+	)
+	for _, expected := range []string{
+		"project:\n",
+		"repo_root: .\n",
+		"vcs: none\n",
+	} {
+		if !strings.Contains(config, expected) {
+			t.Fatalf("config does not contain %q:\n%s", expected, config)
+		}
+	}
+}
+
+func TestUpdateProjectRootWritesNoGitDecision(t *testing.T) {
+	root := t.TempDir()
+	if _, err := EnsureConfig(root, RemediationModeDirectAllowed); err != nil {
+		t.Fatalf("EnsureConfig failed: %v", err)
+	}
+
+	if err := UpdateProjectRoot(root, ".", ProjectVCSNone); err != nil {
+		t.Fatalf("UpdateProjectRoot failed: %v", err)
+	}
+	contentBytes, err := os.ReadFile(filepath.Join(root, ConfigFileName))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(contentBytes)
+	for _, expected := range []string{
+		"project:\n",
+		"repo_root: .\n",
+		"vcs: none\n",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("config does not contain %q:\n%s", expected, content)
+		}
+	}
+
+	status := CheckProjectRoot(root)
+	if !status.OK || status.VCS != string(ProjectVCSNone) || status.RepoRoot != "." {
+		t.Fatalf("unexpected project root status: %#v", status)
 	}
 }
 
@@ -291,6 +345,9 @@ func TestStatusReturnsGUIBackedProjectFields(t *testing.T) {
 	}
 	if !status.Remediation.OK || status.Remediation.Mode != string(RemediationModeTaskFirst) {
 		t.Fatalf("unexpected remediation status: %#v", status.Remediation)
+	}
+	if status.ProjectRoot.OK {
+		t.Fatalf("expected project root error while repo_root is unset: %#v", status.ProjectRoot)
 	}
 }
 

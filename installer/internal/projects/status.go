@@ -18,6 +18,7 @@ import (
 type ProjectStatus struct {
 	store.Project
 	Playbook        PlaybookStatus      `json:"playbook"`
+	ProjectRoot     ProjectRootStatus   `json:"projectRoot"`
 	Setup           CommandStatus       `json:"setup"`
 	Structure       StructureStatus     `json:"structure"`
 	Docs            CommandStatus       `json:"docs"`
@@ -41,6 +42,15 @@ type PlaybookStatus struct {
 	Repo          string `json:"repo"`
 	UpdatedAt     string `json:"updatedAt"`
 	Message       string `json:"message"`
+}
+
+type ProjectRootStatus struct {
+	OK       bool   `json:"ok"`
+	RepoRoot string `json:"repoRoot"`
+	VCS      string `json:"vcs"`
+	Path     string `json:"path"`
+	Message  string `json:"message"`
+	Severity string `json:"severity"`
 }
 
 type CommandStatus struct {
@@ -125,6 +135,7 @@ func StatusFromProject(project store.Project) ProjectStatus {
 	status := ProjectStatus{
 		Project:     project,
 		Playbook:    CheckPlaybook(project.Path),
+		ProjectRoot: CheckProjectRoot(project.Path),
 		Setup:       CheckSetup(project.Path),
 		Structure:   CheckStructure(project.Path),
 		Docs:        CheckDocs(project.Path),
@@ -210,6 +221,69 @@ func CheckSetup(projectPath string) CommandStatus {
 	status.Path = path
 	status.Severity = "error"
 	status.Message = "K-PLAYBOOK.yaml fehlt. Empfehlung: Projekt aus der Installer-Liste entfernen und neu einbinden."
+	return status
+}
+
+func CheckProjectRoot(projectPath string) ProjectRootStatus {
+	status := ProjectRootStatus{Severity: "error"}
+	path := filepath.Join(projectPath, ConfigFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		status.Message = "K-PLAYBOOK.yaml nicht lesbar; project.repo_root kann nicht geprueft werden."
+		return status
+	}
+	values := simpleYAMLValues(string(data))
+	status.RepoRoot = values["project.repo_root"]
+	status.VCS = values["project.vcs"]
+
+	if strings.TrimSpace(status.RepoRoot) == "" {
+		status.Message = "project.repo_root fehlt in K-PLAYBOOK.yaml. Commands sollen nicht suchen; bitte in der GUI setzen."
+		return status
+	}
+	if strings.TrimSpace(status.VCS) == "" {
+		status.Message = "project.vcs fehlt in K-PLAYBOOK.yaml."
+		return status
+	}
+	if !IsValidProjectVCS(ProjectVCS(status.VCS)) {
+		status.Message = "project.vcs ist ungueltig."
+		return status
+	}
+	repoRoot, err := normalizeRepoRoot(status.RepoRoot)
+	if err != nil {
+		status.Message = err.Error()
+		return status
+	}
+	status.RepoRoot = repoRoot
+	absRoot := filepath.Join(projectPath, filepath.FromSlash(strings.TrimPrefix(repoRoot, "./")))
+	status.Path = absRoot
+	info, err := os.Stat(absRoot)
+	if err != nil {
+		status.Message = "project.repo_root zeigt auf kein lesbares Verzeichnis."
+		return status
+	}
+	if !info.IsDir() {
+		status.Message = "project.repo_root ist kein Verzeichnis."
+		return status
+	}
+	if ProjectVCS(status.VCS) == ProjectVCSGit {
+		gitRoot, err := gitTopLevel(absRoot)
+		if err != nil {
+			status.Message = "project.repo_root ist als Git markiert, aber kein Git-Worktree."
+			return status
+		}
+		if !samePath(realPath(gitRoot), realPath(absRoot)) {
+			status.Message = "project.repo_root ist nicht der Git-Root."
+			return status
+		}
+	}
+
+	status.OK = true
+	status.Severity = "ok"
+	if ProjectVCS(status.VCS) == ProjectVCSNone {
+		status.Message = "Projekt ist bewusst als ohne Git konfiguriert."
+	} else {
+		status.Message = "Project-Root ist konfiguriert."
+	}
 	return status
 }
 
@@ -379,19 +453,30 @@ func CheckEnforcement(projectPath string) EnforcementStatus {
 }
 
 func CheckGit(projectPath string) GitStatus {
+	projectRoot := CheckProjectRoot(projectPath)
 	status := GitStatus{Path: projectPath}
+	if !projectRoot.OK {
+		status.Message = "Git-Status nicht geprueft: project.repo_root fehlt oder ist ungueltig."
+		return status
+	}
+	if ProjectVCS(projectRoot.VCS) == ProjectVCSNone {
+		status.Path = projectRoot.Path
+		status.Message = "Kein Git fuer dieses Projekt konfiguriert."
+		return status
+	}
+	status.Path = projectRoot.Path
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	inside, err := gitOutput(ctx, projectPath, "rev-parse", "--is-inside-work-tree")
+	inside, err := gitOutput(ctx, status.Path, "rev-parse", "--is-inside-work-tree")
 	if err != nil || strings.TrimSpace(inside) != "true" {
 		status.Message = "Kein Git-Worktree."
 		return status
 	}
 	status.Worktree = true
-	branch, _ := gitOutput(ctx, projectPath, "branch", "--show-current")
+	branch, _ := gitOutput(ctx, status.Path, "branch", "--show-current")
 	status.Branch = strings.TrimSpace(branch)
-	porcelain, err := gitOutput(ctx, projectPath, "status", "--porcelain")
+	porcelain, err := gitOutput(ctx, status.Path, "status", "--porcelain")
 	if err != nil {
 		status.Message = "Git-Status nicht lesbar."
 		return status
@@ -432,6 +517,9 @@ func Recommendations(status ProjectStatus) []string {
 
 	if !status.Playbook.OK || !status.Structure.OK {
 		add("/k-gui")
+	}
+	if !status.ProjectRoot.OK {
+		add("Project-Root in /k-gui setzen")
 	}
 	if status.Devcontainer != nil && !status.Devcontainer.OK {
 		add("Devcontainer-Integration reparieren")
