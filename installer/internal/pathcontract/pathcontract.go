@@ -184,8 +184,8 @@ func IsKPlaybookRoot(path string) bool {
 	markers := []string{
 		"AGENTS.md",
 		"README.md",
-		filepath.Join("commands", "k-install.md"),
 		filepath.Join("docs", "README.md"),
+		filepath.Join("installer", "go.mod"),
 	}
 
 	for _, marker := range markers {
@@ -193,6 +193,11 @@ func IsKPlaybookRoot(path string) bool {
 		if err != nil || info.IsDir() {
 			return false
 		}
+	}
+
+	commands, err := filepath.Glob(filepath.Join(path, "commands", "k-*.md"))
+	if err != nil || len(commands) == 0 {
+		return false
 	}
 
 	return true

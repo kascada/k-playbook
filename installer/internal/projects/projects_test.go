@@ -209,6 +209,39 @@ func TestCompleteProjectStructure(t *testing.T) {
 	}
 }
 
+func TestStatusReturnsGUIBackedProjectFields(t *testing.T) {
+	root := t.TempDir()
+	if _, err := EnsureConfig(root, RemediationModeTaskFirst); err != nil {
+		t.Fatalf("EnsureConfig failed: %v", err)
+	}
+	if _, err := CompleteProjectStructure(root); err != nil {
+		t.Fatalf("CompleteProjectStructure failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "k-playbook", "docs", "README.md"), []byte("# Docs\n"), 0o644); err != nil {
+		t.Fatalf("write docs: %v", err)
+	}
+
+	status, err := Status(root)
+	if err != nil {
+		t.Fatalf("Status failed: %v", err)
+	}
+	if status.Path != root {
+		t.Fatalf("expected path %s, got %s", root, status.Path)
+	}
+	if !status.Setup.OK {
+		t.Fatalf("expected setup OK: %#v", status.Setup)
+	}
+	if !status.Structure.OK {
+		t.Fatalf("expected structure OK: %#v", status.Structure)
+	}
+	if !status.Docs.OK {
+		t.Fatalf("expected docs OK: %#v", status.Docs)
+	}
+	if !status.Remediation.OK || status.Remediation.Mode != string(RemediationModeTaskFirst) {
+		t.Fatalf("unexpected remediation status: %#v", status.Remediation)
+	}
+}
+
 func TestDetectEnvironmentMapsPlainAndDevContainer(t *testing.T) {
 	plain := t.TempDir()
 	if err := os.WriteFile(filepath.Join(plain, "go.mod"), []byte("module example\n"), 0o644); err != nil {

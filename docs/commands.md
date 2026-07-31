@@ -10,27 +10,28 @@ Die empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer steh
 
 ## Grundregel: Install vs. Setup
 
-`/k-install*` und `/k-setup*` haben absichtlich unterschiedliche Zustaendigkeiten:
+Installer-GUI, host-lokale Tool-Commands und projektlokale Spezialcommands haben absichtlich unterschiedliche Zustaendigkeiten:
 
-- `/k-install` und `/k-install-security-tools` sind **host-global**. Sie machen Commands, Skills und Security-Tools auf diesem Server fuer alle Projekte verfuegbar.
+- Der k-playbook Installer ist **host-global** fuer Registrierung und Projekt-Onboarding: Pfadvertrag, OpenCode-/Claude-Registrierung, Projektliste, `K-PLAYBOOK.yaml`, feste Projektstruktur und Remediation-Default.
+- `/k-install-security-tools` ist **host-global** und installiert/prueft Security-Tools fuer alle Projekte.
 - `/k-install-codeql` ist Tooling-/Artefakt-orientiert. Es installiert oder prueft lokale CodeQL-Artefakte, schreibt aber keine Projektkonfiguration.
-- `/k-setup` und `/k-setup-codeql` sind **projektlokal**. `/k-setup` prueft oder aktualisiert Kernfelder in `K-PLAYBOOK.yaml`; die feste Projektstruktur wird vom Installer angelegt oder vervollstaendigt. `/k-setup-codeql` schreibt die CodeQL-Entscheidung.
+- `/k-setup-codeql` ist **projektlokal** und schreibt die CodeQL-Entscheidung.
 - Der globale k-playbook-Pfad ist fest `~/dev/k-playbook`. Wenn der physische Klon woanders liegt, wird ein Symlink nach `~/dev/k-playbook` angelegt; Projektkonfigurationen waehlen keinen eigenen Basis-Repo-Pfad.
-- Host-Installation schreibt keine Projektdateien.
+- Host-Registrierung schreibt keine Projektdateien ausser der lokalen Installer-Projektliste; Projekt-Onboarding schreibt bewusst ins Zielprojekt.
 - Projekt-Setup installiert keine host-globalen Tools.
-- `/k-install*` darf nicht in einem aktiven Projekt-venv laufen. Falls `VIRTUAL_ENV` gesetzt ist: zuerst `deactivate`.
+- `/k-install-security-tools` darf nicht in einem aktiven Projekt-venv laufen. Falls `VIRTUAL_ENV` gesetzt ist: zuerst `deactivate`.
 
 Neuer Host:
 
 ```text
-/k-install
-/k-install-security-tools --install missing
+k-playbook-installer
+/k-install-security-tools --install missing  # optional, wenn Pflicht-Tools fehlen
 ```
 
 Neues oder noch nicht registriertes Projekt:
 
 ```text
-/k-setup
+k-playbook Installer starten und Projekt hinzufuegen
 ```
 
 Projekt mit CodeQL-Entscheidung:
@@ -41,19 +42,18 @@ Projekt mit CodeQL-Entscheidung:
 
 ## Kurzuebersicht
 
-Aktueller Slash-Command-Bestand unter `commands/`: 19 Dateien (`k-*.md`). Neue Dateien werden auf dem Host erst sichtbar, nachdem `/k-install` die OpenCode-Symlinks aktualisiert hat.
+Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden auf dem Host erst sichtbar, nachdem die Installer-GUI die OpenCode-/Claude-Registrierung aktualisiert hat.
 
 | Command | Scope | Projekt-Konfig | Artefakte / Host |
 |---------|-------|----------------|------------------|
 | **Install** | | | |
-| `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
-| `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
+| `/k-install-security-tools` | host-lokale Security-Review-Tools aus `global/security-tools.tsv` installieren/pruefen | keine Aenderung | Pflicht-Scanner oder Docker-Images laut Tool-Matrix |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook-Projektkonfiguration pruefen | aktualisiert Kernfelder in `K-PLAYBOOK.yaml`, prueft Struktur/Docs/Memory read-only | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
+| `/k-gui` | lokale k-playbook Installer-GUI starten | keine Aenderung | startet `~/.local/bin/k-playbook-installer` im Vordergrund |
 | **Code-Review** | | | |
 | `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `k-playbook/reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `k-playbook/reviews` und `k-playbook/tasks` | schreibt `k-playbook/reviews/results/summary-YYYY-MM-DD.md` |
@@ -70,41 +70,37 @@ Aktueller Slash-Command-Bestand unter `commands/`: 19 Dateien (`k-*.md`). Neue D
 | `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | nutzt `enforcement` und `docs`, falls aktiv | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
 | `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | keine eigene Pfad-Konfig | startet Tests, macht Diagnose, fragt vor Fixes |
 
-## `/k-install`
+## Installer-GUI
 
-`/k-install` installiert oder aktualisiert die globale k-playbook-Registrierung auf dem aktuellen Server.
+Die Installer-GUI ist der normale Weg fuer Host-Registrierung und Projekt-Onboarding.
 
-Der Command:
-
-- legt Symlinks von `commands/k-*.md` nach `~/.config/opencode/command/` an
-- prueft, ob das k-playbook-Repo in `skills.paths` der OpenCode-Konfig registriert ist
-- fuehrt am Ende einen lesenden Security-Tool-Preflight aus
-- veraendert keine Projektdateien
-- schreibt kein `K-PLAYBOOK.yaml`
-
-Typische Nutzung:
-
-- einmal pro Server nach dem Klonen von `k-playbook`
-- erneut nach neuen oder umbenannten Dateien unter `commands/k-*.md`
-
-Aufrufort:
-
-- Bevorzugt im k-playbook-Repo nach Clone oder Pull.
-- Aus einem Zielprojekt ist erlaubt; der feste Pfadvertrag `~/dev/k-playbook` gilt trotzdem.
-- Der Effekt ist trotzdem immer host-global; das Zielprojekt wird nicht geaendert.
-- Wenn der Klon woanders liegt, soll `/k-install` vorschlagen, ihn nach `~/dev/k-playbook` zu legen oder nach Bestaetigung einen Symlink dorthin anzulegen.
-
-Wenn Pflicht-Tools fuer Security-Reviews fehlen, installiert `/k-install` sie nicht selbst, sondern nennt den Folge-Command:
+Sie wird ueber das installierte Binary gestartet:
 
 ```text
-/k-install-security-tools --install missing
+k-playbook-installer
 ```
+
+Oder aus OpenCode heraus:
+
+```text
+/k-gui
+```
+
+Die GUI:
+
+- prueft und repariert den Pfadvertrag `~/dev/k-playbook`,
+- registriert OpenCode- und Claude-Commands/Skills,
+- prueft Security-Tools read-only,
+- verwaltet die lokale Projektliste,
+- erzeugt `K-PLAYBOOK.yaml` und die feste Projektstruktur im Zielprojekt,
+- zeigt und aktualisiert Remediation-Policy pro Projekt,
+- verwaltet DevContainer-Integration pro Projekt.
 
 ## `/k-install-security-tools`
 
-`/k-install-security-tools` ist der host-lokale Installer/Preflight fuer Security-Review-Tools, die alle Projekte ueber das globale k-playbook verwenden.
+`/k-install-security-tools` ist der host-lokale Installer/Preflight fuer Security-Review-Tools, die alle Projekte ueber das globale k-playbook verwenden. Die kanonische Liste liegt in `global/security-tools.tsv` und wird auch von der Installer-GUI gelesen.
 
-Pflicht-Tools:
+Aktuelle Pflicht-Tools laut Matrix:
 
 - `gitleaks` und `trufflehog` fuer Secret-Scanning.
 - `pip-audit` fuer Python Dependency-CVEs.
@@ -141,24 +137,7 @@ Die zugehoerigen Review-Rezepte sind globale Report-Mode-Reviews:
 
 Jede dieser Familien erzeugt ein `assessment.md` mit bewerteter Liste und ein `findings.md` als statusfaehiges Arbeitsregister unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/`.
 
-Die Scanner selbst werden nicht als `global/checks/*.sh` aufgerufen. `k-check` bleibt fuer leichte generische Checks und Heuristiken; `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` und GitHub Dependabot Alerts laufen ueber die passenden `/k-review`-Report-Familien, damit Raw-Artefakte, Run-Metadaten, stabile Finding-IDs und Priorisierung erhalten bleiben.
-
-## `/k-setup`
-
-`/k-setup` installiert oder aktualisiert die k-playbook-Konfiguration in einem konkreten Projekt.
-
-Der Command:
-
-- legt oder aktualisiert `K-PLAYBOOK.yaml` im Projekt-Root
-- legt die vollstaendige projektlokale Struktur unter `k-playbook/` an
-- nutzt immer feste Pfade unter `k-playbook/`
-- erstellt bestaetigte Verzeichnisse oder Initialdateien
-- fuehrt keine Tasks, Reviews, Checks oder CodeQL-Analysen aus
-- veraendert keine globale OpenCode-Registrierung
-
-`K-PLAYBOOK.yaml` ist dabei eine Config-Datei. Spaetere Commands leiten ihre Pfade aus dem festen `k-playbook/`-Layout ab; Standardpfade werden nicht in der Datei gespeichert.
-
-`/k-setup` schreibt `k_playbook.repo: ~/dev/k-playbook`. Dieser Wert ist nicht interaktiv waehlbar; Abweichungen werden ueber Symlinks geloest.
+Die Scanner selbst werden nicht als `global/checks/*.sh` aufgerufen. `k-check` bleibt fuer leichte generische Checks und Heuristiken; die Security-Scanner aus `global/security-tools.tsv` und GitHub Dependabot Alerts laufen ueber die passenden `/k-review`-Report-Familien, damit Raw-Artefakte, Run-Metadaten, stabile Finding-IDs und Priorisierung erhalten bleiben.
 
 ## `/k-setup-codeql`
 
@@ -211,9 +190,9 @@ Dieser Full-Local-Modus ist fuer Projekte gedacht, die bewusst lokale CodeQL-Ana
 
 Die Trennung ist absichtlich:
 
-- `/k-install` ist host-global und macht Commands/Skills fuer OpenCode sichtbar.
+- Die Installer-GUI ist host-global und macht Commands/Skills fuer OpenCode und Claude sichtbar.
 - `/k-install-security-tools` ist host-global und macht Security-Review-Tools verfuegbar.
-- `/k-setup` ist projektlokal und schreibt die zentrale Projekt-Konfig.
+- Der k-playbook Installer schreibt die zentrale Projekt-Konfig und feste Projektstruktur.
 - `/k-setup-codeql` trifft und dokumentiert die CodeQL-Entscheidung.
 - `/k-install-codeql` installiert oder betreibt lokale CodeQL-Artefakte, ohne Projekt-Konfig zu schreiben.
 
@@ -227,7 +206,15 @@ Dadurch startet ein Setup-Command nicht versehentlich langlaufende Analysen oder
 - ob verwaiste k-playbook-Symlinks existieren.
 - ob `skills.paths` das k-playbook-Repo plausibel enthaelt.
 
-`/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist `/k-install` die naechste Aktion.
+`/k-status` repariert nichts. Wenn Symlinks oder Skill-Pfad unvollstaendig sind, ist die Installer-GUI die naechste Aktion.
+
+Fuer maschinenlesbaren Projektstatus kann `/k-status json` auf das Installer-Binary zurueckgreifen:
+
+```bash
+k-playbook-installer status <project-path>
+```
+
+Die Ausgabe ist JSON und enthaelt die in der Installer-GUI genutzten Projektfelder `setup`, `structure`, `docs`, `remediation` und optional `devcontainer`.
 
 ## Task-Commands: `/k-task-create`, `/k-run`, `/k-review-loop`, `/k-todo`
 

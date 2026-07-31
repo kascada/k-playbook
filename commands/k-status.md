@@ -26,7 +26,7 @@ Interpret `$ARGUMENTS` as one optional mode:
 - `full`: run the default report and additionally print `K-PLAYBOOK.yaml` in full when it exists; if it is long, summarize first and then include the full content under a separate heading.
 - `codeql`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `codeql` section plus recommendations relevant to CodeQL.
 - `reviews`: only run target resolution, `K-PLAYBOOK.yaml` loading, and the `reviews` section plus recommendations relevant to reviews.
-- `json`: best-effort machine-readable JSON output. If producing exact JSON without a script would be too fragile for the current shell environment, print the normal checks as a compact JSON-shaped object and clearly mark this mode as an extension point.
+- `json`: machine-readable JSON output. Prefer `k-playbook-installer status <TARGET_DIR>` when the binary is available; it returns the same read-only project status data used by the Installer GUI. If the binary is unavailable, fall back to best-effort JSON and clearly mark this as degraded output.
 - `strict`: run the same checks as default, but label warnings as failed health gates in the summary. Do not change exit behavior and do not modify the filesystem.
 
 If `$ARGUMENTS` is anything else, print the supported modes and stop without running deeper checks.
@@ -44,7 +44,7 @@ Set `PLAYBOOK_REPO` to the fixed logical path `~/dev/k-playbook`. Expand `~` aga
 
 Canonical path rule:
 
-- Require `k_playbook.repo: ~/dev/k-playbook` in project `K-PLAYBOOK.yaml`; `/k-setup` owns writing that value.
+- Require `k_playbook.repo: ~/dev/k-playbook` in project `K-PLAYBOOK.yaml`; `/k-gui` owns creating or completing that file.
 - Absolute host paths such as `/home/kleist/dev/k-playbook` are valid only on that host and should be reported as `WARN` in portable projects, especially when `/workspaces/k-playbook` exists.
 - In a Devcontainer, `k_playbook.repo: ~/dev/k-playbook` should resolve to `/home/vscode/dev/k-playbook`, usually a symlink to `/workspaces/k-playbook`.
 
@@ -87,7 +87,7 @@ Check the host-local OpenCode registration read-only:
 - Count files `<PLAYBOOK_REPO>/commands/k-*.md`.
 - For each repo command, check whether `<OPENCODE_COMMAND_DIR>/k-*.md` exists.
 - If the matching OpenCode entry is a symlink, resolve it and check whether it points to the repo command file.
-- If the matching OpenCode entry exists but is not a symlink, report it as `WARN` because `/k-install` cannot safely assume ownership.
+- If the matching OpenCode entry exists but is not a symlink, report it as `WARN` because the Installer-GUI cannot safely assume ownership.
 - Count broken or stale `k-*.md` symlinks in `OPENCODE_COMMAND_DIR` that point into the resolved `PLAYBOOK_REPO` but whose target no longer exists.
 - Check whether `PLAYBOOK_REPO` appears in `skills.paths` when the OpenCode config exists. If JSON/JSONC parsing is too fragile, use a conservative text search for the repo path and report `WARN` when unclear.
 
@@ -105,7 +105,7 @@ Suggested detail format:
 OpenCode:      WARN, commands 18/20 verlinkt, 1 falsch, 1 verwaist, skills.paths ok
 ```
 
-In `full` mode, include a short list of missing, wrong, non-symlink, and stale links, capped at a readable number. Recommend `/k-install` when this section is `WARN` or `FAIL` due to link/config registration issues.
+In `full` mode, include a short list of missing, wrong, non-symlink, and stale links, capped at a readable number. Recommend `/k-gui` when this section is `WARN` or `FAIL` due to link/config registration issues.
 
 ## Section: devcontainer
 
@@ -118,7 +118,7 @@ Check the Devcontainer path contract read-only:
 - If `~/dev/k-playbook` is a symlink, `readlink` or equivalent resolution points to `/workspaces/k-playbook`.
 - If `K-PLAYBOOK.yaml` has `k_playbook.repo: ~/dev/k-playbook`, the resolved path exists and points to the same physical directory as `/workspaces/k-playbook` when possible.
 - If `K-PLAYBOOK.yaml` has an absolute host path while the Devcontainer mount exists, report a portability `WARN` and recommend changing it to `~/dev/k-playbook` plus the symlink.
-- `~/.config/opencode/command/k-install.md` exists and resolves to a command file under the resolved playbook repo or under `/workspaces/k-playbook`.
+- `~/.config/opencode/command/k-gui.md` exists and resolves to a command file under the resolved playbook repo or under `/workspaces/k-playbook`.
 - `~/.config/opencode/opencode.jsonc` or `.json` contains `skills.paths` with `~/dev/k-playbook` or the resolved equivalent.
 
 Do not create the symlink and do not edit OpenCode config from `/k-status`.
@@ -356,10 +356,10 @@ Derive at most three next actions from the findings.
 
 Priority order:
 
-1. Missing or invalid `K-PLAYBOOK.yaml` → `/k-setup`.
-2. Missing required fixed-layout paths from `layout` → `/k-setup`.
-3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-setup` for this.
-4. OpenCode command symlinks or `skills.paths` incomplete → `/k-install`.
+1. Missing or invalid `K-PLAYBOOK.yaml` → `/k-gui`.
+2. Missing required fixed-layout paths from `layout` → `/k-gui`.
+3. Devcontainer mount/symlink missing while running in a Devcontainer → rebuild/fix the Devcontainer setup script; do not run `/k-gui` for this.
+4. OpenCode command symlinks or `skills.paths` incomplete → `/k-gui`.
 5. CodeQL active/planned with missing workflow → `/k-setup-codeql`.
 6. CodeQL local database active/planned with missing database or CLI → `/k-install-codeql`.
 7. Dependabot enabled with missing target/config/repo/auth → `/k-review dependabot-alerts` only after setup is corrected.
@@ -409,7 +409,30 @@ In `strict` mode, keep the same section lines but add a short health-gate summar
 Health-Gates: FAIL (2 warn gates, 1 fail gate)
 ```
 
-In `json` mode, produce best-effort JSON with these top-level keys when feasible:
+In `json` mode, first try the binary-backed project status:
+
+```bash
+k-playbook-installer status "<TARGET_DIR>"
+```
+
+The binary output is authoritative for the GUI-backed project fields and has this shape:
+
+```json
+{
+  "path": "/path/to/project",
+  "name": "project",
+  "environment": "plain",
+  "selected": true,
+  "detected": ["go.mod"],
+  "setup": {},
+  "structure": {},
+  "docs": {},
+  "remediation": {},
+  "devcontainer": {}
+}
+```
+
+If the binary is unavailable, produce best-effort JSON with these top-level keys when feasible:
 
 ```json
 {

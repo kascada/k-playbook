@@ -27,14 +27,16 @@ installer/
 ```bash
 go run ./cmd/k-playbook-installer status
 go run ./cmd/k-playbook-installer status --fix
+go run ./cmd/k-playbook-installer status <path>
 go run ./cmd/k-playbook-installer
 go run ./cmd/k-playbook-installer gui
 go run ./cmd/k-playbook-installer projects list
 go run ./cmd/k-playbook-installer projects scan
 go run ./cmd/k-playbook-installer projects add <path> --env plain
+go run ./cmd/k-playbook-installer projects status <path>
 ```
 
-Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten. `projects add` legt beim Speichern `K-PLAYBOOK.yaml` im Zielprojekt an, falls sie fehlt.
+Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die interaktive Oberflaeche ist jetzt die lokale Browser-GUI. Ohne Subcommand startet `k-playbook-installer` direkt die GUI; `gui` bleibt als expliziter Alias erhalten. Die skriptbaren CLI-Kommandos bleiben erhalten. `status <path>` gibt denselben read-only Projektstatus als JSON aus, den die GUI fuer Projektkarten nutzt. `projects status <path>` bleibt als strukturierter Alias erhalten. `projects add` legt beim Speichern `K-PLAYBOOK.yaml` im Zielprojekt an, falls sie fehlt.
 
 ## Designentscheidungen
 
@@ -60,6 +62,8 @@ Cobra-basierte CLI. Registriert aktuell:
 - `projects`
 
 `status` nutzt `pathcontract.Check()` und optional `pathcontract.Repair()`. `projects` nutzt `projects` und `store`. `gui` startet `webui.Run()`.
+
+Mit einem Projektpfad nutzt `status <path>` `projects.Status(path)` und schreibt eingeruecktes JSON nach stdout. Das JSON enthaelt Projekt-Metadaten plus `setup`, `structure`, `docs`, `remediation` und bei DevContainer-Projekten `devcontainer`.
 
 ### `internal/pathcontract`
 
@@ -90,6 +94,8 @@ Wichtige Funktionen:
 - `DetectEnvironment(path)`
 - `ScanDefaultDev()`
 - `Scan(root)`
+- `Status(path)`
+- `StatusFromProject(project)`
 
 Erkennung:
 
@@ -159,6 +165,7 @@ Aktuelle Endpunkte:
 | `GET` | `/api/projects` | Gespeicherte Projekt-Auswahl laden, inklusive Projekt-Setup-Status (`K-PLAYBOOK.yaml`) und projektlokalem `k-playbook/docs`-Status |
 | `DELETE` | `/api/projects` | Projekt nach bestaetigter GUI-Aktion aus der gespeicherten Installer-Liste entfernen; Projektdateien bleiben unveraendert |
 | `POST` | `/api/projects` | Einzelnes Projekt speichern und fehlende `K-PLAYBOOK.yaml` minimal anlegen |
+| `GET` | `/api/projects/config?path=...` | `K-PLAYBOOK.yaml` eines gespeicherten Projekts read-only fuer die Detailseite lesen |
 | `POST` | `/api/projects/preview` | Einzelnes manuelles Projekt normalisieren und Umgebung erkennen, ohne zu speichern |
 | `POST` | `/api/projects/structure` | Fehlende feste Projektstruktur und Initialdateien unter `k-playbook/` fuer ein gespeichertes Projekt anlegen |
 | `POST` | `/api/projects/remediation` | `remediation:`-Block eines gespeicherten Projekts in `K-PLAYBOOK.yaml` auf den gewaehlten Modus setzen |
@@ -186,17 +193,37 @@ Die Startseite zeigt:
 
 1. Header mit Button `Status neu laden`.
    Daneben liegt `k-playbook aktualisieren`; beim Start prueft die GUI read-only per `/api/git/status`, ob der Upstream-Branch einen anderen Commit zeigt. Wenn eine neue Version verfuegbar ist, wird der Button hervorgehoben und heisst `Zur neuen Version aktualisieren`. Der Button nutzt denselben `git pull --ff-only`-Flow wie der Repository-Block weiter unten.
+   Wenn die OpenCode-/Claude-Registrierung aktualisiert werden muss, zeigt der Header nach dem initialen `/api/opencode/status` zusaetzlich den hervorgehobenen Button `Registrierung aktualisieren`. Das ist dieselbe Aktion wie im Assistenten-Registrierungsblock und wird bei OK-Status ausgeblendet.
 2. Pfadvertrag.
 3. Wenn OK: Pfadvertrag nur als kompakter Einzeiler.
-4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert, ob die feste `k-playbook/`-Struktur vollstaendig ist, welcher `remediation.mode` gesetzt ist und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Projektblock einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen. Wenn die feste Struktur unvollstaendig ist, zeigt der Projektblock nur dann eine Zeile `Projektstruktur unvollstaendig` mit `Vervollstaendigen`. Wenn Docs fehlen oder leer sind, zeigt er `/k-code2docs`. Hinweise nutzen Kopierbutton und Hilfe-Button und werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
-   Jeder Projektblock bietet `Entfernen`; nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei. Wenn `K-PLAYBOOK.yaml` vorhanden ist, zeigt der Projektblock eine Remediation-Policy-Auswahl mit Hilfe-Button; Aenderungen schreiben nur den `remediation:`-Block der projektlokalen YAML.
-5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt der jeweilige Projektblock die Zeile `k-playbook im Container erreichbar`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Bei fehlenden Eintraegen zeigt diese Projektzeile `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
+4. Gespeicherte `Projekt-Auswahl` mit je einem gerahmten Block pro Projekt. Die Eyebrow lautet `Projekte`, nicht `Schritt 2`. Pro Projekt wird read-only geprueft, ob `K-PLAYBOOK.yaml` existiert, ob die feste `k-playbook/`-Struktur vollstaendig ist, welcher `remediation.mode` gesetzt ist und ob `k-playbook/docs/` Markdown-Dateien enthaelt. Die Startseite zeigt diese Werte nur als kurze Statusliste, z. B. `Remediation-Policy: Direkt erlaubt`, `Dokumentation: vorhanden/fehlt`, `Projektstruktur: vollstaendig/unvollstaendig`.
+   Jeder Projektblock ist als Ganzes anklickbar und wechselt auf die Detailseite; `Entfernen` bleibt eine separate Aktion. Nach Bestaetigung wird nur der Eintrag aus der lokalen Installer-Projektliste entfernt, keine Projektdatei. Bearbeitbare Werte und Hilfen liegen nicht in der Startseitenliste, sondern auf der Projekt-Detailseite.
+5. Nur fuer gespeicherte Projekte mit Umgebung `devcontainer` enthaelt die kompakte Statusliste den Punkt `Playbook im Container`. Dort wird geprueft, ob `.devcontainer/devcontainer.json` den Mount `source=${localEnv:HOME}/dev/k-playbook,target=/workspaces/k-playbook,type=bind`, `postCreateCommand`, `postStartCommand` und `.devcontainer/setup-k-playbook.sh` enthaelt. Fehlende Eintraege werden auf der Detailseite mit `Eintrag setzen` reparierbar gemacht.
 6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
 9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
 10. Docs-Block mit gerenderter Markdown-Anzeige.
 11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
+
+### Projekt-Detailseite
+
+Ein Klick auf einen Projektblock wechselt auf eine Projekt-Detailansicht.
+
+Die Detailseite zeigt:
+
+- Header mit Projektname, absolutem Pfad und `Zur Projektliste`.
+- Einen eigenen Projektstatus-/Editor-Block mit denselben zentral abgeleiteten Statuswerten wie die Startseite, aber mit Controls, Hilfe und kopierbaren Slash-Commands.
+- Wenn `K-PLAYBOOK.yaml` in einem gespeicherten Projekt fehlt, zeigt der Editor einen Fehler und empfiehlt, das Projekt aus der Installer-Liste zu entfernen und neu einzubinden, weil neue Einbindungen die Datei direkt anlegen.
+- Wenn `K-PLAYBOOK.yaml` vorhanden ist, zeigt der Editor eine Remediation-Policy-Auswahl mit Hilfe-Button; Aenderungen schreiben nur den `remediation:`-Block der projektlokalen YAML.
+- Wenn die feste Struktur unvollstaendig ist, zeigt der Editor `Vervollstaendigen`.
+- Wenn Docs fehlen oder leer sind, zeigt der Editor `/k-code2docs` mit Kopierbutton und Hilfe. Hinweise werden nicht durch die GUI ausgefuehrt, weil die Slash-Commands projektlokalen Kontext und Rueckfragen brauchen.
+- Bei fehlender DevContainer-Integration zeigt der Editor `Eintrag setzen` und nutzt das vorhandene Host-Script fuer genau dieses Projekt.
+- Darunter die komplette `K-PLAYBOOK.yaml` als read-only YAML-Anzeige.
+- `YAML neu laden` liest die Datei erneut ueber `/api/projects/config?path=...`.
+- `In VS Code oeffnen` nutzt einen `vscode://file/...`-Link auf die geladene `K-PLAYBOOK.yaml`; die GUI startet keinen Editor-Prozess selbst.
+
+Statusaktionen wie Remediation-Policy aendern oder Projektstruktur vervollstaendigen aktualisieren danach die Detailkarte und laden die YAML erneut.
 
 Der Client prueft periodisch `/api/health`. Wenn der lokale Server extern beendet wird, z. B. per `Ctrl+C`, erkennt der bereits geladene Browser-Tab den Verbindungsverlust und zeigt denselben Abschluss-Hinweis. Umgekehrt meldet der Browser beim Tab-/Fenster-Schliessen oder bei Navigation `/api/client-gone` per `sendBeacon`; der Server beendet sich danach mit kurzem Timeout. Falls diese Meldung nicht ankommt, beendet sich der Server nach ausbleibenden Heartbeats. Ein Reload bleibt moeglich, weil ein neuer Heartbeat die Abmeldung wieder aufhebt.
 
@@ -224,10 +251,14 @@ UI-Regel: Reine Statusanzeigen duerfen nicht wie Buttons aussehen. Fuer klickbar
 
 ### Security-Tool-Preflight
 
-Der Block bildet den read-only Teil von `/k-install` und `/k-install-security-tools --preflight` ab. Er nutzt eine zentrale Tool-Liste im Go-Backend:
+Der Block bildet den read-only Teil von `/k-install` und `/k-install-security-tools --preflight` ab. Er liest dieselbe kanonische Tool-Matrix wie das Shell-Installationsscript:
 
-- Pflicht: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`.
-- Optional angezeigt: `docker` als spaeterer Fallback-Kontext.
+```text
+global/security-tools.tsv
+```
+
+- Pflicht-Tools stehen in der Matrix und werden nicht im Go-Code dupliziert.
+- Optional angezeigt: `docker` als Fallback-Kontext, aber nicht als durch k-playbook installierbares Tool.
 
 Die GUI prueft pro Tool nur `exec.LookPath()` und eine kurze Versionsabfrage. Sie schreibt keine Dateien, installiert keine Tools und startet keine Scans. Wenn `VIRTUAL_ENV` gesetzt ist oder `PATH` typische Projekt-venv-Segmente wie `.venv`, `venv` oder `env` enthaelt, wird der Scope als Warnung angezeigt, damit Projekt-venvs nicht als host-globale Tool-Installation gewertet werden.
 
@@ -308,7 +339,7 @@ make install
 k-playbook-installer
 ```
 
-Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes Release-Artefakt aus `dist/`, falls vorhanden, und laedt sonst das passende Binary aus den GitHub Releases.
+Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes vorhandenes Binary aus `dist/`, `bin/` oder `installer/bin/` und laedt sonst das passende Binary aus den GitHub Releases.
 
 Wenn `~/.local/bin` noch nicht im PATH liegt, gibt das Script einen Hinweis aus. Alternativ kann direkt gestartet werden:
 
@@ -345,7 +376,7 @@ dist/k-playbook-installer-<os>-<arch>
 
 `make dist` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert. Das private Maintainer-Target `make -C priv release-artifacts` ruft dieses Root-Target auf.
 
-`make install` installiert ohne Go ein vorhandenes passendes `dist/`-Artefakt oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
+`make install` installiert ohne Go ein vorhandenes passendes Binary aus `dist/`, `bin/` oder `installer/bin/` oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten `dist/`-Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
 
 `make install-from-source` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
 
@@ -378,6 +409,35 @@ Standard-Entwicklung:
 cd installer
 go run ./cmd/k-playbook-installer
 ```
+
+### Lokale GUI debuggen
+
+Wenn ein bereits gestarteter Installer eine URL wie `http://127.0.0.1:34531/` ausgibt, kann die laufende Browser-GUI ohne sichtbaren Browser technisch geprueft werden:
+
+```bash
+curl -sS http://127.0.0.1:34531/api/status
+curl -sS http://127.0.0.1:34531/api/projects
+curl -sS http://127.0.0.1:34531/
+```
+
+`/api/status` ist der erste Check. Wenn dort `OK:false` bzw. ein Code wie `EXPECTED_NOT_K_PLAYBOOK` kommt, blendet das Frontend die Projektbereiche bewusst aus und die Seite wirkt wie eine neue Installation. Dann zuerst die Pfad-/Root-Erkennung reparieren, bevor Frontend-Rendering gesucht wird.
+
+Nach Go-Aenderungen am Installer den lokalen Entwickler-Build aktualisieren:
+
+```bash
+cd installer
+go build -o bin/k-playbook-installer ./cmd/k-playbook-installer
+./bin/k-playbook-installer status
+./bin/k-playbook-installer
+```
+
+Ein bereits laufender GUI-Server nutzt weiter den alten Code im Speicher. Nach Backend- oder Embed-Asset-Aenderungen die GUI neu starten. Wenn der Server noch laeuft, kann er ueber seinen lokalen Shutdown-Endpunkt beendet werden:
+
+```bash
+curl -sS -X POST http://127.0.0.1:34531/api/shutdown
+```
+
+Die Repo-Erkennung darf nicht an einen einzelnen Slash-Command wie `commands/k-install.md` gekoppelt sein, weil Commands umbenannt oder ersetzt werden koennen. Stabiler sind Repo-Marker wie `AGENTS.md`, `README.md`, `docs/README.md`, `installer/go.mod` plus mindestens ein `commands/k-*.md`.
 
 Pruefungen nach Aenderungen:
 

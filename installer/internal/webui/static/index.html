@@ -19,6 +19,7 @@
           <div class="hero-actions">
             <button id="refresh" class="secondary">Status neu laden</button>
             <button id="git-pull-top" class="secondary">k-playbook aktualisieren</button>
+            <button id="opencode-install-top" class="primary hidden">Registrierung aktualisieren</button>
             <button id="shutdown" class="secondary danger">Schliessen</button>
           </div>
         </div>
@@ -31,6 +32,15 @@
           <p class="lead">Projektkandidaten suchen, genau eines auswaehlen und die erkannte Art bestaetigen.</p>
         </div>
         <button id="back-home" class="secondary">Zur Startseite</button>
+      </section>
+
+      <section class="hero compact hidden" data-view="project-detail">
+        <div>
+          <p class="eyebrow">Projekt</p>
+          <h1 id="project-detail-title">Projekt</h1>
+          <p id="project-detail-path" class="lead"></p>
+        </div>
+        <button id="back-projects" class="secondary">Zur Projektliste</button>
       </section>
 
       <section class="card" id="status-card" data-view="home">
@@ -160,6 +170,32 @@
             </label>
             <button class="primary" type="submit">Projekt pruefen und hinzufuegen</button>
           </form>
+        </section>
+      </section>
+
+      <section data-view="project-detail" class="hidden">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Status</p>
+              <h2>Projektstatus</h2>
+            </div>
+          </div>
+          <div id="project-detail-status" class="project-list empty">Kein Projekt ausgewaehlt.</div>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">K-PLAYBOOK.yaml</p>
+              <h2>Projektkonfiguration</h2>
+            </div>
+            <div class="button-row inline-actions">
+              <a id="open-project-config" class="secondary link-button hidden" href="#" target="_blank" rel="noreferrer">In VS Code oeffnen</a>
+              <button id="reload-project-config" class="secondary">YAML neu laden</button>
+            </div>
+          </div>
+          <pre id="project-config" class="yaml-viewer empty">Keine YAML geladen.</pre>
         </section>
       </section>
 

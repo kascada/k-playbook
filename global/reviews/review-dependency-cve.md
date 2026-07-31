@@ -22,8 +22,9 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 ## Voraussetzungen
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Lies `<PLAYBOOK_REPO>/global/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `pip-audit`, `trivy` und `grype`.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `pip-audit --version`, `trivy --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 

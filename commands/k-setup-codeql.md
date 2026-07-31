@@ -11,9 +11,9 @@ Set up the project-local CodeQL decision for security, quality, and enforcement 
 
 CodeQL-specific rules live in `<PLAYBOOK_REPO>/global/rules/codeql.md` and must be treated as authoritative for this command.
 
-This command is the CodeQL-specific companion to `/k-setup`:
+This command is the CodeQL-specific companion to the project config created by `/k-gui`:
 
-- `/k-setup` owns the fixed complete `k-playbook/` project-local layout in `K-PLAYBOOK.yaml`.
+- `/k-gui` owns the fixed complete `k-playbook/` project-local layout in `K-PLAYBOOK.yaml`.
 - `/k-setup-codeql` owns only `tools.codeql` in `K-PLAYBOOK.yaml`.
 - GitHub CodeQL and local CodeQL databases are independent choices; ask for both separately.
 - If GitHub CodeQL is active or planned, offer only a local CodeQL CLI install for preflight/status checks. Use `scripts/install-codeql-local.sh --parent "<CODEQL_PARENT_DIR>" --cli-only`; this GitHub path must not create local databases, SARIF results, or run analysis.
@@ -38,8 +38,8 @@ Use `CODEQL_PARENT_DIR` for every `--parent` argument this command shows or runs
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to add the project with the k-playbook Installer first. This command writes only into an existing project config file.
-- If `CODEQL_PARENT_DIR` does not exist, stop and ask the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block. Do not create the playbook base from this command.
+- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to run `/k-gui` first. This command writes only into an existing project config file.
+- If `CODEQL_PARENT_DIR` does not exist, stop and ask the user to run `/k-gui`. Do not create the playbook base from this command.
 - Determine a CodeQL analysis target directory (`codeql target`) separately from `TARGET_DIR`. Default is `.` (the project root). If the project root is a wrapper and exactly one nested Git worktree contains the detected application manifests, suggest that nested worktree, e.g. `./app`. Normalize as a project-relative path. Do not infer outside-target paths without asking. Store the resolved path as `CODEQL_TARGET_DIR` and the display path as `CODEQL_TARGET_DISPLAY_PATH`.
 
 ## Step 2 — Detect current state
@@ -258,7 +258,7 @@ Update `K-PLAYBOOK.yaml`:
 - Replace only the `tools.codeql` object.
 - If `tools` does not exist, create it.
 - Preserve all other YAML keys, including setup fields and unrelated tool decisions.
-- Do not modify fields owned by `/k-setup` except if a valid YAML rewrite requires stable formatting.
+- Do not modify fields owned by `/k-gui` except if a valid YAML rewrite requires stable formatting.
 
 Then perform any explicitly confirmed optional file generation from Step 5.
 
@@ -291,4 +291,4 @@ Queries:        <queries>
 Hinweis: Es wurde keine Analyse ausgeführt und keine lokale CodeQL-Datenbank erzeugt.
 ```
 
-If the command file itself was just added to k-playbook, remind the user that `/k-install` must be run once on each host so `/k-setup-codeql` appears in OpenCode autocomplete.
+If the command file itself was just added to k-playbook, remind the user that `/k-gui` must refresh registration once on each host so `/k-setup-codeql` appears in OpenCode autocomplete.

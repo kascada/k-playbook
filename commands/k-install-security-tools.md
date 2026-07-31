@@ -1,5 +1,5 @@
 ---
-description: Host-local preflight and installer for shared security review tools. Checks gitleaks, trufflehog, pip-audit, trivy, syft, and grype; installs only after explicit confirmation. Uses scripts/install-security-tools.sh and writes no project files.
+description: Host-local preflight and installer for shared security review tools from global/security-tools.tsv. Installs only after explicit confirmation. Uses scripts/install-security-tools.sh and writes no project files.
 argument-hint: [--preflight|--install missing|--install all]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep]
@@ -17,9 +17,13 @@ Er nutzt:
 
 `<PLAYBOOK_REPO>/scripts/install-security-tools.sh`
 
+Die kanonische Tool-Matrix liegt in:
+
+`<PLAYBOOK_REPO>/global/security-tools.tsv`
+
 ## Tool-Scope
 
-Pflicht-Tools:
+Pflicht-Tools laut `global/security-tools.tsv`:
 
 - `gitleaks` - Secret-Scanning.
 - `trufflehog` - tieferes Secret-Scanning.
@@ -53,6 +57,7 @@ bash "<PLAYBOOK_REPO>/scripts/install-security-tools.sh" --preflight
 
 Zeige die Ausgabe kompakt. Sie muss enthalten:
 
+- verwendete Tool-Matrix.
 - Version/Pfad fuer vorhandene Tools.
 - Fehlende Pflicht-Tools.
 - Docker-Verfuegbarkeit.
@@ -76,7 +81,7 @@ Wenn der User Argumente nach dem Slash-Command angegeben hat:
   - `--install missing`
   - `--install required`
   - `--install all`
-  - `--install <tool>` fuer `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`
+  - `--install <tool>` fuer installierbare Tools aus `<PLAYBOOK_REPO>/global/security-tools.tsv`
   - optional `--method auto|native|docker|pipx|venv`
   - optional `--dry-run`
 - `--yes` darf nur weitergegeben werden, wenn der User es explizit im Slash-Command angegeben hat oder danach bestaetigt hat.

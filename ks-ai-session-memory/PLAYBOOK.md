@@ -276,5 +276,4 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
   auf denen dieses Playbook aufsetzt.
 - `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
   aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
-- `/k-setup` (Command) – prüft die Kernkonfiguration und am Ende, ob Docs + MEMORY vorhanden sind
-  (verweist bei Bedarf auf Installer-`Vervollstaendigen` und `/k-code2docs`).
+- k-playbook Installer – legt `K-PLAYBOOK.yaml` und die feste Struktur an oder vervollstaendigt sie.

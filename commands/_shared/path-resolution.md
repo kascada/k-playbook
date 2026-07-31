@@ -29,7 +29,7 @@ When a command says to read and apply this module, locate it as `<PLAYBOOK_REPO>
 Determine `PLAYBOOK_REPO`:
 
 - The canonical logical path is always `~/dev/k-playbook`; expand `~` against the current user.
-- If `<TARGET_DIR>/K-PLAYBOOK.yaml` contains `k_playbook.repo`, read it only as validation/documentation. Expected value is `~/dev/k-playbook`. If it differs, commands should warn and continue with `~/dev/k-playbook` when possible; `/k-setup` owns writing the canonical value.
+- If `<TARGET_DIR>/K-PLAYBOOK.yaml` contains `k_playbook.repo`, read it only as validation/documentation. Expected value is `~/dev/k-playbook`. If it differs, commands should warn and continue with `~/dev/k-playbook` when possible; `/k-gui` owns creating/completing the canonical project config.
 - If `~/dev/k-playbook` is missing but `/workspaces/k-playbook` exists, this is likely a Devcontainer with a missing symlink. Commands may report a setup error; setup/install flows may create `~/dev/k-playbook -> /workspaces/k-playbook`.
 - If `~/dev/k-playbook` is missing, do not ask for a different permanent path. Ask the user to clone/move the repo there or create a symlink there.
 
@@ -66,7 +66,7 @@ File-valued keys: `todo`.
 After resolving a requested key:
 
 - If the derived path exists, record it as usable.
-- If it does not exist, record it as missing; commands should ask the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block rather than creating the standard structure themselves.
+- If `K-PLAYBOOK.yaml` is missing or the derived path does not exist, stop and tell the user to run `/k-gui`. The GUI owns project onboarding and completing the fixed structure.
 - For file-valued keys, the calling command may instead check whether the parent directory exists and create the file lazily when that is part of the command's job, e.g. `/k-todo` may create `k-playbook/TODO.md`.
 
 ## Required Output From This Step

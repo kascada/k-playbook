@@ -48,35 +48,13 @@ type remediationRequest struct {
 }
 
 type projectsResponse struct {
-	Version  int           `json:"version"`
-	Projects []projectView `json:"projects"`
-}
-
-type projectView struct {
-	store.Project
-	Setup       projectCommandStatus     `json:"setup"`
-	Structure   projects.StructureStatus `json:"structure"`
-	Docs        projectCommandStatus     `json:"docs"`
-	Remediation remediationStatus        `json:"remediation"`
-}
-
-type remediationStatus struct {
-	OK      bool   `json:"ok"`
-	Mode    string `json:"mode"`
-	Message string `json:"message"`
+	Version  int                      `json:"version"`
+	Projects []projects.ProjectStatus `json:"projects"`
 }
 
 type projectConfigContent struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
-}
-
-type projectCommandStatus struct {
-	OK       bool   `json:"ok"`
-	Path     string `json:"path"`
-	Command  string `json:"command"`
-	Message  string `json:"message"`
-	Severity string `json:"severity"`
 }
 
 type gitPullResult struct {
@@ -169,15 +147,19 @@ type devcontainerInstallResult struct {
 }
 
 type securityToolSpec struct {
-	Name     string
-	Role     string
-	Required bool
+	Name        string
+	Role        string
+	Required    bool
+	Installable bool
+	DockerImage string
+	VersionArgs []string
 }
 
 type securityToolStatus struct {
 	OK              bool               `json:"ok"`
 	ScopeOK         bool               `json:"scopeOk"`
 	MissingRequired int                `json:"missingRequired"`
+	ToolMatrix      string             `json:"toolMatrix"`
 	Tools           []securityToolInfo `json:"tools"`
 	VirtualEnv      string             `json:"virtualEnv"`
 	PathWarnings    []string           `json:"pathWarnings"`
@@ -185,12 +167,14 @@ type securityToolStatus struct {
 }
 
 type securityToolInfo struct {
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	Required bool   `json:"required"`
-	Present  bool   `json:"present"`
-	Path     string `json:"path"`
-	Version  string `json:"version"`
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+	Required    bool   `json:"required"`
+	Installable bool   `json:"installable"`
+	DockerImage string `json:"dockerImage"`
+	Present     bool   `json:"present"`
+	Path        string `json:"path"`
+	Version     string `json:"version"`
 }
 
 type serverState struct {
@@ -201,21 +185,11 @@ type serverState struct {
 }
 
 const (
-	clientGoneShutdownDelay = 10 * time.Second
-	clientHeartbeatTimeout  = 30 * time.Second
+	clientGoneShutdownDelay = 3 * time.Second
+	clientHeartbeatTimeout  = 5 * time.Second
 	clientMonitorInterval   = 2 * time.Second
 	toolVersionTimeout      = 2 * time.Second
 )
-
-var securityToolSpecs = []securityToolSpec{
-	{Name: "gitleaks", Role: "Secret-Scanning", Required: true},
-	{Name: "trufflehog", Role: "Tiefes Secret-Scanning", Required: true},
-	{Name: "pip-audit", Role: "Python Dependency-CVEs", Required: true},
-	{Name: "trivy", Role: "Filesystem/Container/IaC-CVEs", Required: true},
-	{Name: "syft", Role: "SBOM-Erzeugung", Required: true},
-	{Name: "grype", Role: "SBOM-/Dependency-CVE-Auswertung", Required: true},
-	{Name: "docker", Role: "Optionaler Fallback fuer Container-Images", Required: false},
-}
 
 var markdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
@@ -386,7 +360,11 @@ func opencodeInstallHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func securityToolsStatusHandler(w http.ResponseWriter, r *http.Request) {
-	status := checkSecurityTools()
+	status, err := checkSecurityTools()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, status)
 }
 
@@ -863,100 +841,11 @@ func updateProjectRemediationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func projectResponse(file store.ProjectsFile) projectsResponse {
-	response := projectsResponse{Version: file.Version, Projects: make([]projectView, 0, len(file.Projects))}
+	response := projectsResponse{Version: file.Version, Projects: make([]projects.ProjectStatus, 0, len(file.Projects))}
 	for _, project := range file.Projects {
-		response.Projects = append(response.Projects, projectView{Project: project, Setup: checkProjectSetup(project.Path), Structure: checkProjectStructure(project.Path), Docs: checkProjectDocs(project.Path), Remediation: checkProjectRemediation(project.Path)})
+		response.Projects = append(response.Projects, projects.StatusFromProject(project))
 	}
 	return response
-}
-
-func checkProjectStructure(projectPath string) projects.StructureStatus {
-	status, err := projects.CheckProjectStructure(projectPath)
-	if err != nil {
-		return projects.StructureStatus{Message: "Projektstruktur nicht lesbar."}
-	}
-	return status
-}
-
-func checkProjectRemediation(projectPath string) remediationStatus {
-	mode, found, err := projects.ReadRemediationMode(projectPath)
-	if err != nil {
-		return remediationStatus{Message: "Remediation-Policy nicht lesbar."}
-	}
-	if !found {
-		return remediationStatus{Message: "Remediation-Policy fehlt."}
-	}
-	if !projects.IsValidRemediationMode(mode) {
-		return remediationStatus{Mode: string(mode), Message: "Remediation-Policy ist ungueltig."}
-	}
-	return remediationStatus{OK: true, Mode: string(mode), Message: "Remediation-Policy vorhanden."}
-}
-
-func checkProjectSetup(projectPath string) projectCommandStatus {
-	status := projectCommandStatus{Command: "/k-setup"}
-	path := filepath.Join(projectPath, projects.ConfigFileName)
-	info, err := os.Stat(path)
-	if err == nil && !info.IsDir() {
-		status.OK = true
-		status.Path = path
-		status.Severity = "ok"
-		status.Message = "K-PLAYBOOK.yaml vorhanden."
-		return status
-	}
-
-	status.Path = path
-	status.Severity = "error"
-	status.Message = "K-PLAYBOOK.yaml fehlt. Empfehlung: Projekt aus der Installer-Liste entfernen und neu einbinden."
-	return status
-}
-
-func checkProjectDocs(projectPath string) projectCommandStatus {
-	status := projectCommandStatus{Command: "/k-code2docs", Path: filepath.Join(projectPath, "k-playbook", "docs")}
-	hasDocs, err := hasMarkdownFiles(status.Path)
-	if err != nil {
-		status.Message = "docs-Verzeichnis fehlt oder ist nicht lesbar."
-		return status
-	}
-	if !hasDocs {
-		status.Message = "docs-Verzeichnis enthaelt noch keine Markdown-Dateien."
-		return status
-	}
-
-	status.OK = true
-	status.Message = "docs-Verzeichnis enthaelt Markdown-Dateien."
-	return status
-}
-
-func hasMarkdownFiles(root string) (bool, error) {
-	info, err := os.Stat(root)
-	if err != nil {
-		return false, err
-	}
-	if !info.IsDir() {
-		return false, fmt.Errorf("kein Verzeichnis: %s", root)
-	}
-
-	found := false
-	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return nil
-		}
-		if entry.IsDir() {
-			if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == ".venv" || entry.Name() == "venv" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.ToLower(filepath.Ext(path)) == ".md" {
-			found = true
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	if err != nil && !errors.Is(err, filepath.SkipAll) {
-		return false, err
-	}
-	return found, nil
 }
 
 func projectFromRequest(request projectRequest) (store.Project, error) {
@@ -1147,9 +1036,19 @@ func installOpenCode() (bool, error) {
 	return changed || configChanged, nil
 }
 
-func checkSecurityTools() securityToolStatus {
+func checkSecurityTools() (securityToolStatus, error) {
+	root, err := repoRoot()
+	if err != nil {
+		return securityToolStatus{}, err
+	}
+	specs, matrixPath, err := loadSecurityToolSpecs(root)
+	if err != nil {
+		return securityToolStatus{}, err
+	}
+
 	status := securityToolStatus{
 		ScopeOK:      true,
+		ToolMatrix:   matrixPath,
 		VirtualEnv:   os.Getenv("VIRTUAL_ENV"),
 		PathWarnings: projectVenvPathEntries(os.Getenv("PATH")),
 	}
@@ -1157,12 +1056,12 @@ func checkSecurityTools() securityToolStatus {
 		status.ScopeOK = false
 	}
 
-	for _, spec := range securityToolSpecs {
-		info := securityToolInfo{Name: spec.Name, Role: spec.Role, Required: spec.Required}
+	for _, spec := range specs {
+		info := securityToolInfo{Name: spec.Name, Role: spec.Role, Required: spec.Required, Installable: spec.Installable, DockerImage: spec.DockerImage}
 		if path, err := exec.LookPath(spec.Name); err == nil {
 			info.Present = true
 			info.Path = path
-			info.Version = securityToolVersion(spec.Name)
+			info.Version = securityToolVersion(spec)
 		} else if spec.Required {
 			status.MissingRequired++
 		}
@@ -1179,17 +1078,91 @@ func checkSecurityTools() securityToolStatus {
 		status.Message = "Alle Pflicht-Tools sind vorhanden."
 	}
 
-	return status
+	return status, nil
 }
 
-func securityToolVersion(tool string) string {
-	args := []string{"--version"}
-	if tool == "gitleaks" || tool == "syft" || tool == "grype" {
-		args = []string{"version"}
+func loadSecurityToolSpecs(root string) ([]securityToolSpec, string, error) {
+	matrixPath := filepath.Join(root, "global", "security-tools.tsv")
+	data, err := os.ReadFile(matrixPath)
+	if err != nil {
+		return nil, matrixPath, fmt.Errorf("Security-Tool-Matrix lesen: %w", err)
 	}
-	output, timedOut := securityToolVersionOutput(tool, args...)
-	if len(output) == 0 && len(args) == 1 && args[0] == "version" {
-		output, timedOut = securityToolVersionOutput(tool, "--version")
+
+	specs := []securityToolSpec{}
+	for index, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimRight(line, "\r")
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "name\t") {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) != 6 {
+			return nil, matrixPath, fmt.Errorf("Security-Tool-Matrix Zeile %d hat %d statt 6 Felder", index+1, len(fields))
+		}
+
+		required, err := parseTSVBool(fields[1])
+		if err != nil {
+			return nil, matrixPath, fmt.Errorf("Security-Tool-Matrix Zeile %d required: %w", index+1, err)
+		}
+		installable, err := parseTSVBool(fields[2])
+		if err != nil {
+			return nil, matrixPath, fmt.Errorf("Security-Tool-Matrix Zeile %d installable: %w", index+1, err)
+		}
+
+		specs = append(specs, securityToolSpec{
+			Name:        fields[0],
+			Required:    required,
+			Installable: installable,
+			Role:        fields[3],
+			DockerImage: fields[4],
+			VersionArgs: compactCSV(fields[5]),
+		})
+	}
+	if len(specs) == 0 {
+		return nil, matrixPath, errors.New("Security-Tool-Matrix enthaelt keine Tools")
+	}
+
+	return specs, matrixPath, nil
+}
+
+func parseTSVBool(value string) (bool, error) {
+	switch value {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("ungueltiger Boolean-Wert %q", value)
+	}
+}
+
+func compactCSV(value string) []string {
+	values := []string{}
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			values = append(values, item)
+		}
+	}
+	return values
+}
+
+func securityToolVersion(spec securityToolSpec) string {
+	args := spec.VersionArgs
+	if len(args) == 0 {
+		args = []string{"--version"}
+	}
+
+	var output []byte
+	timedOut := false
+	for _, arg := range args {
+		output, timedOut = securityToolVersionOutput(spec.Name, arg)
+		if timedOut || len(output) > 0 {
+			break
+		}
 	}
 	if timedOut {
 		return "Timeout bei Versionsabfrage"

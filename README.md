@@ -50,7 +50,7 @@ cd ~/dev/k-playbook
 k-playbook-installer
 ```
 
-Das Install-Script braucht kein lokal installiertes Go. Es nutzt ein passendes Binary aus `dist/`, falls vorhanden, oder laedt es aus den GitHub Releases.
+Das Install-Script braucht kein lokal installiertes Go. Es nutzt zuerst ein passendes vorhandenes Binary aus `dist/`, `bin/` oder `installer/bin/` und laedt sonst aus den GitHub Releases.
 
 Source-Builds fuer Entwickler brauchen Go:
 
@@ -62,23 +62,23 @@ make gui
 OpenCode-Kommandos bleiben zusaetzlich verfuegbar:
 
 ```text
-/k-install
+/k-gui
 /k-install-security-tools --install missing
 ```
 
-Nach einem frischen Clone ist `/k-install` eventuell noch nicht sichtbar. Fuer die einfache gefuehrte Installation nutze die Prompts unter [`prompts/installation/`](./prompts/installation/) oder folge [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
+Nach einem frischen Clone ist `/k-gui` eventuell noch nicht sichtbar. Fuer die einfache gefuehrte Installation nutze `make install`/`make gui` oder folge [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
 
 Die Command-Zustaendigkeiten und die empfohlene Reihenfolge stehen in [`docs/commands.md`](./docs/commands.md) und [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
 
-Wichtig: `/k-install*` nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
+Wichtig: `/k-install-security-tools` und host-globale Tool-Preflights nicht aus einem aktiven Projekt-venv starten. Falls `VIRTUAL_ENV` gesetzt ist, zuerst `deactivate` ausfuehren.
 
-In jedem Zielprojekt einmal:
+In jedem Zielprojekt ueber die GUI einbinden:
 
 ```text
-/k-setup
+/k-gui
 ```
 
-Merksatz: `/k-install*` ist host-global; `/k-setup*` ist projektlokal.
+Merksatz: `/k-gui` ist der Normalweg fuer Host-Registrierung und Projekt-Onboarding; Spezialcommands bleiben fuer Security-Tools und CodeQL.
 
 ## Dokumentation
 
@@ -87,7 +87,7 @@ Der Einstieg ist das Handbuch:
 - [`docs/handbuch.md`](./docs/handbuch.md) - Zweck, Konzepte, Standardablaeufe und Betriebsregeln.
 - [`docs/installation.md`](./docs/installation.md) - Installation fuer OpenCode, Security-Tools und optional Claude Code.
 - [`docs/multi-project-installation.md`](./docs/multi-project-installation.md) - empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer.
-- [`docs/faq.md`](./docs/faq.md) - Kurze Antworten zu `/k-install`, Aufrufort und Projekt-venvs.
+- [`docs/faq.md`](./docs/faq.md) - Kurze Antworten zu `/k-gui`, Aufrufort und Projekt-venvs.
 - [`docs/commands.md`](./docs/commands.md) - Zuständigkeiten, Gruppen und Details der `/k-*`-Commands.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Review-, Results- und Remediation-Flow.
 - [`prompts/README.md`](./prompts/README.md) - kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe.
@@ -106,13 +106,12 @@ Der Einstieg ist das Handbuch:
 
 ## Symlink-Struktur
 
-`/k-install` registriert dieses Repo host-lokal fuer OpenCode. Die Command-Dateien bleiben im Repo; OpenCode bekommt Symlinks:
+Die Installer-GUI registriert dieses Repo host-lokal fuer OpenCode. Die Command-Dateien bleiben im Repo; OpenCode bekommt Symlinks:
 
 ```text
 ~/.config/opencode/command/
-├── k-install.md          -> ~/dev/k-playbook/commands/k-install.md
+├── k-gui.md              -> ~/dev/k-playbook/commands/k-gui.md
 ├── k-status.md           -> ~/dev/k-playbook/commands/k-status.md
-├── k-setup.md            -> ~/dev/k-playbook/commands/k-setup.md
 └── k-*.md                -> ~/dev/k-playbook/commands/k-*.md
 ```
 

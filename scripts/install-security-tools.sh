@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Tool installation is host/user-local by policy. Do not install into project venvs.
-REQUIRED_TOOLS=(gitleaks trufflehog pip-audit trivy syft grype)
-OPTIONAL_TOOLS=()
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PLAYBOOK_REPO="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+TOOL_MATRIX_FILE="${K_SECURITY_TOOLS_MATRIX:-$PLAYBOOK_REPO/global/security-tools.tsv}"
+
+# Tool installation is host/user-local by policy. Do not install into project venvs.
+REQUIRED_TOOLS=()
+OPTIONAL_TOOLS=()
+STATUS_TOOLS=()
+declare -A TOOL_REQUIRED=()
+declare -A TOOL_INSTALLABLE=()
+declare -A TOOL_ROLE=()
+declare -A TOOL_DOCKER_IMAGE=()
+declare -A TOOL_VERSION_ARGS=()
 
 INSTALL_SPEC=""
 METHOD="auto"
@@ -32,7 +39,7 @@ default_bin_dir() {
 BIN_DIR="${K_SECURITY_TOOLS_BIN_DIR:-$(default_bin_dir)}"
 
 usage() {
-  cat <<'USAGE'
+  cat <<USAGE
 Usage: install-security-tools.sh [--preflight]
        install-security-tools.sh --install <missing|required|all|tool> [--method auto|native|docker|pipx|venv] [--yes]
 
@@ -40,7 +47,10 @@ Host-local security-tool preflight and installer for k-playbook.
 No project files are written.
 
 Required tools:
-  gitleaks, trufflehog, pip-audit, trivy, syft, grype
+  $(join_by ', ' "${REQUIRED_TOOLS[@]}")
+
+Tool matrix:
+  $TOOL_MATRIX_FILE
 
 Options:
   --preflight          Show tool status only. This is the default.
@@ -68,6 +78,57 @@ log() {
 die() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
+}
+
+join_by() {
+  local delimiter first item
+  delimiter="$1"
+  shift
+  first=1
+  for item in "$@"; do
+    if [[ "$first" -eq 1 ]]; then
+      first=0
+    else
+      printf '%s' "$delimiter"
+    fi
+    printf '%s' "$item"
+  done
+}
+
+load_tool_matrix() {
+  local name required installable role docker_image version_args
+
+  [[ -f "$TOOL_MATRIX_FILE" ]] || die "Security-Tool-Matrix fehlt: $TOOL_MATRIX_FILE"
+
+  while IFS=$'\t' read -r name required installable role docker_image version_args; do
+    [[ -z "${name:-}" ]] && continue
+    [[ "$name" == \#* ]] && continue
+    [[ "$name" == "name" ]] && continue
+
+    case "$required" in
+      true|false) ;;
+      *) die "Ungueltiger required-Wert fuer $name in $TOOL_MATRIX_FILE: $required" ;;
+    esac
+    case "$installable" in
+      true|false) ;;
+      *) die "Ungueltiger installable-Wert fuer $name in $TOOL_MATRIX_FILE: $installable" ;;
+    esac
+
+    STATUS_TOOLS+=("$name")
+    TOOL_REQUIRED["$name"]="$required"
+    TOOL_INSTALLABLE["$name"]="$installable"
+    TOOL_ROLE["$name"]="$role"
+    TOOL_DOCKER_IMAGE["$name"]="$docker_image"
+    TOOL_VERSION_ARGS["$name"]="$version_args"
+
+    if [[ "$required" == "true" ]]; then
+      REQUIRED_TOOLS+=("$name")
+    else
+      OPTIONAL_TOOLS+=("$name")
+    fi
+  done < "$TOOL_MATRIX_FILE"
+
+  [[ "${#REQUIRED_TOOLS[@]}" -gt 0 ]] || die "Security-Tool-Matrix enthaelt keine Pflicht-Tools: $TOOL_MATRIX_FILE"
 }
 
 has_cmd() {
@@ -127,35 +188,15 @@ run_or_print() {
 }
 
 tool_version() {
-  local tool output
+  local tool output args arg
   tool="$1"
 
-  case "$tool" in
-    gitleaks)
-      output="$(gitleaks version 2>/dev/null || gitleaks --version 2>/dev/null || true)"
-      ;;
-    trufflehog)
-      output="$(trufflehog --version 2>/dev/null || true)"
-      ;;
-    pip-audit)
-      output="$(pip-audit --version 2>/dev/null || true)"
-      ;;
-    trivy)
-      output="$(trivy --version 2>/dev/null || true)"
-      ;;
-    syft)
-      output="$(syft version 2>/dev/null || syft --version 2>/dev/null || true)"
-      ;;
-    grype)
-      output="$(grype version 2>/dev/null || grype --version 2>/dev/null || true)"
-      ;;
-    docker)
-      output="$(docker --version 2>/dev/null || true)"
-      ;;
-    *)
-      output=""
-      ;;
-  esac
+  IFS=',' read -r -a args <<< "${TOOL_VERSION_ARGS[$tool]:---version}"
+  for arg in "${args[@]}"; do
+    [[ -z "$arg" ]] && continue
+    output="$("$tool" "$arg" 2>/dev/null || true)"
+    [[ -n "$output" ]] && break
+  done
 
   if [[ -z "$output" ]]; then
     output="version unknown"
@@ -164,31 +205,15 @@ tool_version() {
 }
 
 tool_role() {
-  case "$1" in
-    gitleaks) printf 'secret scanning' ;;
-    trufflehog) printf 'deep secret scanning' ;;
-    pip-audit) printf 'Python dependency CVE' ;;
-    trivy) printf 'filesystem/container/IaC CVE' ;;
-    syft) printf 'SBOM generation' ;;
-    grype) printf 'SBOM/dependency CVE' ;;
-    *) printf '-' ;;
-  esac
+  printf '%s' "${TOOL_ROLE[$1]:--}"
 }
 
 docker_image() {
-  case "$1" in
-    gitleaks) printf 'ghcr.io/gitleaks/gitleaks:latest' ;;
-    trufflehog) printf 'trufflesecurity/trufflehog:latest' ;;
-    trivy) printf 'aquasec/trivy:latest' ;;
-    syft) printf 'anchore/syft:latest' ;;
-    grype) printf 'anchore/grype:latest' ;;
-    pip-audit) printf '-' ;;
-    *) printf '-' ;;
-  esac
+  printf '%s' "${TOOL_DOCKER_IMAGE[$1]:--}"
 }
 
 all_tools_for_status() {
-  printf '%s\n' "${REQUIRED_TOOLS[@]}" "${OPTIONAL_TOOLS[@]}"
+  printf '%s\n' "${STATUS_TOOLS[@]}"
 }
 
 is_required_tool() {
@@ -203,10 +228,13 @@ is_required_tool() {
 is_known_tool() {
   local tool
   tool="$1"
-  for item in "${REQUIRED_TOOLS[@]}" "${OPTIONAL_TOOLS[@]}"; do
-    [[ "$item" == "$tool" ]] && return 0
-  done
-  return 1
+  [[ -n "${TOOL_REQUIRED[$tool]+set}" ]]
+}
+
+is_installable_tool() {
+  local tool
+  tool="$1"
+  [[ "${TOOL_INSTALLABLE[$tool]:-false}" == "true" ]]
 }
 
 missing_required_count() {
@@ -228,13 +256,9 @@ print_preflight() {
   printf '/k-install-security-tools - Preflight\n'
   printf '%s\n' '------------------------------------'
   printf 'Repo:       %s\n' "$PLAYBOOK_REPO"
+  printf 'Toolliste:  %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
   printf 'pip-audit:  %s (dediziertes Tool-venv, nicht Projekt-venv)\n' "$VENV_DIR"
-  if has_cmd docker; then
-    printf 'Docker:     ok (%s)\n' "$(tool_version docker)"
-  else
-    printf 'Docker:     fehlt (Docker-Fallback nicht verfuegbar)\n'
-  fi
   printf '\n'
   printf '%-12s %-9s %-8s %-34s %s\n' 'Tool' 'Pflicht' 'Status' 'Version/Pfad' 'Docker-Fallback'
   printf '%-12s %-9s %-8s %-34s %s\n' '----' '-------' '------' '------------' '---------------'
@@ -517,30 +541,69 @@ selected_tools() {
   case "$INSTALL_SPEC" in
     missing)
       for tool in "${REQUIRED_TOOLS[@]}"; do
-        has_cmd "$tool" || printf '%s\n' "$tool"
+        if is_installable_tool "$tool" && ! has_cmd "$tool"; then
+          printf '%s\n' "$tool"
+        fi
       done
       if [[ "$INCLUDE_OPTIONAL" -eq 1 ]]; then
         for tool in "${OPTIONAL_TOOLS[@]}"; do
-          has_cmd "$tool" || printf '%s\n' "$tool"
+          if is_installable_tool "$tool" && ! has_cmd "$tool"; then
+            printf '%s\n' "$tool"
+          fi
         done
       fi
       ;;
     required)
-      printf '%s\n' "${REQUIRED_TOOLS[@]}"
+      installable_required_tools
       ;;
     optional)
-      return 0
+      installable_optional_tools
       ;;
     all)
-      printf '%s\n' "${REQUIRED_TOOLS[@]}" "${OPTIONAL_TOOLS[@]}"
-      ;;
-    gitleaks|trufflehog|pip-audit|trivy|syft|grype)
-      printf '%s\n' "$INSTALL_SPEC"
+      installable_required_tools
+      installable_optional_tools
       ;;
     *)
+      if is_known_tool "$INSTALL_SPEC" && is_installable_tool "$INSTALL_SPEC"; then
+        printf '%s\n' "$INSTALL_SPEC"
+        return 0
+      fi
+      if is_known_tool "$INSTALL_SPEC"; then
+        die "Tool ist in der Matrix enthalten, aber nicht installierbar: $INSTALL_SPEC"
+      fi
       die "Unknown --install target: $INSTALL_SPEC"
       ;;
   esac
+}
+
+validate_install_spec() {
+  case "$INSTALL_SPEC" in
+    missing|required|optional|all)
+      return 0
+      ;;
+  esac
+
+  if is_known_tool "$INSTALL_SPEC" && is_installable_tool "$INSTALL_SPEC"; then
+    return 0
+  fi
+  if is_known_tool "$INSTALL_SPEC"; then
+    die "Tool ist in der Matrix enthalten, aber nicht installierbar: $INSTALL_SPEC"
+  fi
+  die "Unknown --install target: $INSTALL_SPEC"
+}
+
+installable_optional_tools() {
+  local tool
+  for tool in "${OPTIONAL_TOOLS[@]}"; do
+    is_installable_tool "$tool" && printf '%s\n' "$tool"
+  done
+}
+
+installable_required_tools() {
+  local tool
+  for tool in "${REQUIRED_TOOLS[@]}"; do
+    is_installable_tool "$tool" && printf '%s\n' "$tool"
+  done
 }
 
 parse_args() {
@@ -605,6 +668,7 @@ parse_args() {
 
 main() {
   local tools tool count answer
+  load_tool_matrix
   parse_args "$@"
 
   print_preflight
@@ -612,6 +676,8 @@ main() {
   if [[ -z "$INSTALL_SPEC" ]]; then
     exit 0
   fi
+
+  validate_install_spec
 
   mapfile -t tools < <(selected_tools)
   count="${#tools[@]}"

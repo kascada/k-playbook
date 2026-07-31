@@ -1,0 +1,10 @@
+# Canonical security review tool matrix for /k-install-security-tools, /k-gui and review recipes.
+# Fields: name	required	installable	role	docker_image	version_args
+name	required	installable	role	docker_image	version_args
+gitleaks	true	true	Secret-Scanning	ghcr.io/gitleaks/gitleaks:latest	version,--version
+trufflehog	true	true	Tiefes Secret-Scanning	trufflesecurity/trufflehog:latest	--version
+pip-audit	true	true	Python Dependency-CVEs	-	--version
+trivy	true	true	Filesystem-/Container-/IaC-CVEs	aquasec/trivy:latest	--version
+syft	true	true	SBOM-Erzeugung	anchore/syft:latest	version,--version
+grype	true	true	SBOM-/Dependency-CVE-Auswertung	anchore/grype:latest	version,--version
+docker	false	false	Optionaler Fallback fuer Container-Images	-	--version

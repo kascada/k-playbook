@@ -397,4 +397,4 @@ Fehlende Pflicht-Tools installieren:
 /k-install-security-tools --install missing
 ```
 
-Pflicht-Tools: `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`.
+Pflicht-Tools stehen kanonisch in `global/security-tools.tsv`; `/k-install-security-tools` und die Installer-GUI lesen dieselbe Matrix.

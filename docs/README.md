@@ -17,6 +17,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 | [`../prompts/README.md`](../prompts/README.md) | Kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe. |
 | [`../global/checks/README.md`](../global/checks/README.md) | Schnittstelle und Nutzung von `global/bin/k-check`. |
 | [`../global/rules/README.md`](../global/rules/README.md) | Globale Enforcement-Regeln. |
+| [`../global/security-tools.tsv`](../global/security-tools.tsv) | Kanonische Security-Tool-Matrix fuer `/k-install-security-tools`, Installer-GUI und Security-Review-Rezepte. |
 
 ## Playbooks
 
@@ -46,4 +47,5 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Regeln in diesem Repo` -> [`../AGENTS.md`](../AGENTS.md), [`../global/rules/README.md`](../global/rules/README.md)
 - `Reviews` -> [`reviews-and-results.md`](./reviews-and-results.md)
 - `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
+- `Security-Tool-Matrix` -> [`../global/security-tools.tsv`](../global/security-tools.tsv)
 - `Tasks` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)

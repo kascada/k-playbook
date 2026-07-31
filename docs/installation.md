@@ -76,19 +76,19 @@ Das Script passt `.devcontainer/devcontainer.json` an:
 - Symlink `/home/vscode/dev/k-playbook` -> `/workspaces/k-playbook`.
 - Command-Links fuer alle `k-*.md` nach `/home/vscode/.config/opencode/command/` und `/home/vscode/.config/opencode/commands/`.
 - Minimale OpenCode-User-Config mit `skills.paths: ["~/dev/k-playbook"]`, falls noch keine Container-Config existiert.
-- Bei `--install-security-tools`: Installation fehlender Pflicht-Tools (`gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`) in das Home des Container-Users `vscode`, typischerweise unter `/home/vscode/.local/bin` und `/home/vscode/.local/share/k-playbook/`.
+- Bei `--install-security-tools`: Installation fehlender Pflicht-Tools laut `global/security-tools.tsv` in das Home des Container-Users `vscode`, typischerweise unter `/home/vscode/.local/bin` und `/home/vscode/.local/share/k-playbook/`.
 
 Danach den DevContainer neu bauen oder neu starten und OpenCode im Container neu starten. `/k-install` ist kein Shell-Executable, sondern eine OpenCode-Slash-Command-Datei; DevContainer-Lifecycle-Hooks fuehren deshalb nicht `/k-install` aus, sondern bereiten dessen Command-Datei und die Skill-Config direkt vor.
 
 `postStartCommand` fuehrt das Setup ohne `--install-security-tools` aus. Dadurch werden Links und OpenCode-Konfig bei jedem Start repariert, aber Downloads laufen nur beim Erzeugen/Rebuild des Containers.
 
-Wenn `/k-install` danach nicht sichtbar ist, im Container pruefen:
+Wenn `/k-gui` danach nicht sichtbar ist, im Container pruefen:
 
 ```bash
-ls -l /workspaces/k-playbook/commands/k-install.md
-ls -l ~/dev/k-playbook/commands/k-install.md
-ls -l ~/.config/opencode/command/k-install.md
-ls -l ~/.config/opencode/commands/k-install.md
+ls -l /workspaces/k-playbook/commands/k-gui.md
+ls -l ~/dev/k-playbook/commands/k-gui.md
+ls -l ~/.config/opencode/command/k-gui.md
+ls -l ~/.config/opencode/commands/k-gui.md
 ```
 
 Alle vier Pfade muessen existieren. Wenn der erste fehlt, ist der Bind-Mount nicht gesetzt. Wenn nur der zweite fehlt, fehlt der Symlink. Wenn nur die letzten Pfade fehlen, fehlt der OpenCode-Bootstrap im Container-Home.
@@ -105,19 +105,15 @@ Auf einem neuen Host sind zwei Dinge getrennt:
 Host-global:
 
 ```text
-/k-install
+/k-gui
 /k-install-security-tools --install missing
 ```
 
-Empfohlen wird der Aufruf direkt im k-playbook-Repo nach dem Klonen oder nach einem Pull. Aus einem Zielprojekt heraus ist `/k-install` ebenfalls moeglich; der Command nutzt dennoch den festen Pfad `~/dev/k-playbook` und aktualisiert nur die host-globale OpenCode-Registrierung.
+Empfohlen wird der Aufruf direkt im k-playbook-Repo nach dem Klonen oder nach einem Pull. Aus einem Zielprojekt heraus ist `/k-gui` ebenfalls moeglich; die GUI nutzt dennoch den festen Pfad `~/dev/k-playbook`.
 
 Danach OpenCode neu starten.
 
-Projektlokal pro Projekt:
-
-```text
-/k-setup
-```
+Projektlokal pro Projekt: Projekt in der GUI hinzufuegen oder vervollstaendigen. Die GUI erzeugt `K-PLAYBOOK.yaml` und die feste `k-playbook/`-Struktur.
 
 Optional pro Projekt:
 
@@ -125,21 +121,21 @@ Optional pro Projekt:
 /k-setup-codeql
 ```
 
-Merksatz: `/k-install*` gehoert zum Host, `/k-setup*` gehoert zum Projekt.
+Merksatz: `/k-gui` ist der Normalweg fuer Host-Registrierung und Projekt-Onboarding; Spezialcommands wie `/k-install-security-tools`, `/k-setup-codeql` und `/k-install-codeql` bleiben fuer ihre Fachaufgaben.
 
 Haeufige Fragen zum Aufrufort und zu Projekt-venvs stehen in [`faq.md`](./faq.md).
 
 ## OpenCode Setup
 
-### Empfohlen: `/k-install`
+### Empfohlen: `/k-gui`
 
-Wenn `/k-install` bereits im Slash-Command-Menue sichtbar ist:
+Wenn `/k-gui` bereits im Slash-Command-Menue sichtbar ist:
 
 ```text
-/k-install
+/k-gui
 ```
 
-Der Command erledigt host-lokal:
+Die GUI erledigt host-lokal:
 
 - `commands/k-*.md` nach `~/.config/opencode/command/` symlinken.
 - `skills.paths` in der OpenCode-Konfig pruefen oder ergaenzen.
@@ -147,20 +143,20 @@ Der Command erledigt host-lokal:
 - verwaiste alte Command-Links melden.
 - daran erinnern, OpenCode neu zu starten.
 
-Nach neuen Dateien unter `commands/k-*.md` auf jedem Host erneut `/k-install` ausfuehren.
+Nach neuen Dateien unter `commands/k-*.md` auf jedem Host die GUI-Registrierung aktualisieren.
 
-Wenn `/k-install` aus einem Projekt heraus gestartet wird, waehlt der Command keinen projektspezifischen Repo-Pfad. Er prueft `~/dev/k-playbook`. Falls der aktuelle Arbeitsordner selbst ein k-playbook-Klon ist, aber nicht unter `~/dev/k-playbook` liegt, soll der Command vorschlagen, den Klon dorthin zu verschieben oder nach Bestaetigung einen Symlink nach `~/dev/k-playbook` anzulegen.
+Wenn `/k-gui` aus einem Projekt heraus gestartet wird, waehlt die GUI keinen projektspezifischen Repo-Pfad. Sie prueft `~/dev/k-playbook`.
 
-### Bootstrap Wenn `/k-install` Noch Nicht Sichtbar Ist
+### Bootstrap Wenn `/k-gui` Noch Nicht Sichtbar Ist
 
-Minimal einmal den Install-Command direkt verlinken:
+Minimal einmal den GUI-Command direkt verlinken:
 
 ```bash
 mkdir -p ~/.config/opencode/command
-ln -sf ~/dev/k-playbook/commands/k-install.md ~/.config/opencode/command/k-install.md
+ln -sf ~/dev/k-playbook/commands/k-gui.md ~/.config/opencode/command/k-gui.md
 ```
 
-OpenCode neu starten und dann `/k-install` ausfuehren.
+OpenCode neu starten und dann `/k-gui` ausfuehren.
 
 ### Manuelle Referenz
 
@@ -202,7 +198,9 @@ deactivate
 
 Python-CLI-Tools werden bevorzugt mit `pipx` installiert. Falls `pipx` fehlt, nutzt der Installer ein dediziertes k-playbook Tool-venv unter `~/.local/share/k-playbook/`; dieses ist nicht das Projekt-venv.
 
-Pflicht-Tools:
+Die kanonische Tool-Matrix liegt in `global/security-tools.tsv`; sie wird von `/k-install-security-tools` und der Installer-GUI gelesen.
+
+Aktuelle Pflicht-Tools:
 
 - `gitleaks` und `trufflehog` fuer Secret-Scanning.
 - `pip-audit` fuer Python Dependency-CVEs.
@@ -214,13 +212,13 @@ Der Installer schreibt keine Projektdateien, installiert nichts in `.venv/`, `ve
 
 ## Projektlokales Setup
 
-Im Zielprojekt:
+Projekt in der Installer-GUI hinzufuegen oder vervollstaendigen:
 
 ```text
-/k-setup
+/k-gui
 ```
 
-Der Command:
+Die GUI:
 
 - legt oder aktualisiert `K-PLAYBOOK.yaml` im Projekt-Root.
 - legt die vollstaendige projektlokale Struktur unter `k-playbook/` an.
@@ -263,7 +261,7 @@ Checkliste fuer einen Host:
 - [ ] `~/dev/k-playbook/` existiert und ist ein Git-Repo.
 - [ ] `~/.config/opencode/opencode.jsonc` oder `.json` enthaelt `skills.paths` mit dem Repo-Pfad.
 - [ ] Symlinks unter `~/.config/opencode/command/` zeigen auf `commands/k-*.md`.
-- [ ] `/k-status` zeigt `OpenCode: OK` oder empfiehlt `/k-install` fuer fehlende/falsche Symlinks.
+- [ ] `/k-status` zeigt `OpenCode: OK` oder empfiehlt `/k-gui` fuer fehlende/falsche Symlinks.
 - [ ] OpenCode wurde neu gestartet.
 - [ ] Autocomplete zeigt `/k-*`-Commands.
 - [ ] Ein Test-Skill wird bei passendem Thema geladen.
@@ -283,7 +281,7 @@ Checkliste fuer einen Devcontainer:
 
 - [ ] `/workspaces/k-playbook/commands/` existiert durch den Bind-Mount.
 - [ ] `~/dev/k-playbook` existiert im Container und zeigt auf `/workspaces/k-playbook`.
-- [ ] `~/.config/opencode/command/k-install.md` ist ein Symlink auf `~/dev/k-playbook/commands/k-install.md` oder den aufgeloesten Bind-Mount-Pfad.
+- [ ] `~/.config/opencode/command/k-gui.md` ist ein Symlink auf `~/dev/k-playbook/commands/k-gui.md` oder den aufgeloesten Bind-Mount-Pfad.
 - [ ] `~/.config/opencode/opencode.jsonc` oder `.json` enthaelt `skills.paths` mit `~/dev/k-playbook`.
 - [ ] `/k-status` meldet die Devcontainer-Pfadstruktur nicht als Warnung.
 
@@ -306,5 +304,5 @@ Checkliste fuer einen Devcontainer:
 ### Projektpfade Stimmen Nicht
 
 - Im Projekt `/k-status` ausfuehren.
-- Wenn `K-PLAYBOOK.yaml` fehlt oder ungueltig ist, `/k-setup` ausfuehren.
-- Fehlende Verzeichnisse nicht manuell raten, sondern ueber `/k-setup` bestaetigt erzeugen oder migrieren.
+- Wenn `K-PLAYBOOK.yaml` fehlt oder ungueltig ist, `/k-gui` ausfuehren.
+- Fehlende Verzeichnisse nicht manuell raten, sondern ueber `/k-gui` vervollstaendigen.

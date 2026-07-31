@@ -29,8 +29,8 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 ## Voraussetzungen
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Lies optional `tools.dependabot` aus `K-PLAYBOOK.yaml`, falls vorhanden.
 - Wenn vorhanden, nutze `tools.dependabot.target` als Git-/App-Root und `tools.dependabot.repo` als GitHub `owner/repo`. Wenn `target` fehlt, gilt `.`. Wenn `repo` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
 - Wenn `tools.dependabot.config` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.

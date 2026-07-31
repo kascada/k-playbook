@@ -36,10 +36,10 @@ Dieses Review darf nur laufen, wenn das Zielprojekt CodeQL bereits ueber `/k-set
 Pfad- und Statusauflosung:
 
 - Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-setup` + `/k-setup-codeql` nennen.
+- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` + `/k-setup-codeql` nennen.
 - Wenn `tools.codeql` fehlt: abbrechen und `/k-setup-codeql` nennen.
 - Wenn weder `github.status` noch `local_database.status` `enabled` oder `planned` ist: abbrechen, weil CodeQL fuer dieses Projekt nicht aktiviert ist.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-setup` nennen; dieses Review braucht ein lokales `reviews`-Ziel fuer den Assessment-Report.
+- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel fuer den Assessment-Report.
 - `checks` ist fuer ausfuehrbare Pruefroutinen reserviert. SARIF- und Report-Ergebnisse gehoeren nicht dauerhaft nach `k-playbook/checks/`.
 
 Zu lesen aus `tools.codeql`:

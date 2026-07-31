@@ -44,18 +44,14 @@ Das genaue YAML-Format steht in [`k-playbook-format.md`](./k-playbook-format.md)
 
 ## Installation Und Setup
 
-Auf jedem Host wird k-playbook einmal global fuer OpenCode registriert:
+Auf jedem Host wird die Installer-GUI gestartet und fuehrt Registrierung plus Projekt-Onboarding:
 
 ```text
-/k-install
+/k-gui
 /k-install-security-tools --install missing
 ```
 
-In jedem Zielprojekt wird danach die lokale Konfiguration angelegt:
-
-```text
-/k-setup
-```
+Zielprojekte werden in der GUI hinzugefuegt; dort entstehen `K-PLAYBOOK.yaml` und die feste `k-playbook/`-Struktur.
 
 Optional pro Projekt:
 
@@ -76,10 +72,9 @@ Kurzuebersicht der wichtigsten Commands nach Arbeitsphase:
 | Command | Scope | Projekt-Konfig | Artefakte / Host |
 |---------|-------|----------------|------------------|
 | **Install** | | | |
-| `/k-install` | k-playbook auf diesem Host fuer OpenCode registrieren und Security-Tool-Preflight zeigen | keine Aenderung | OpenCode-Symlinks, ggf. Skill-Pfad, nur Tool-Status |
-| `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype` oder Docker-Images |
+| `/k-gui` | k-playbook Installer-GUI starten | keine Aenderung durch den Command selbst | Host-Registrierung, Projekt-Onboarding, Status und Docs in der GUI |
+| `/k-install-security-tools` | host-lokale Security-Review-Tools installieren/pruefen | keine Aenderung | Pflicht-Scanner laut `global/security-tools.tsv` oder Docker-Images |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
-| `/k-setup` | k-playbook-Projektkonfiguration pruefen | aktualisiert Kernfelder in `K-PLAYBOOK.yaml`, prueft Struktur/Docs/Memory read-only | keine Host-Aenderung |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |

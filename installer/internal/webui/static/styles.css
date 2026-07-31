@@ -303,7 +303,7 @@ button:disabled {
   background: var(--accent-strong);
 }
 
-button.update-available {
+button.attention-highlight {
   box-shadow: 0 0 0 3px rgba(47, 93, 80, 0.18), 0 14px 28px rgba(24, 61, 52, 0.22);
 }
 
@@ -445,6 +445,27 @@ button.update-available {
   line-height: 1.55;
 }
 
+.yaml-viewer {
+  min-height: 320px;
+  max-height: 620px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  background: #1f241f;
+  color: #f4f1e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.yaml-viewer.empty {
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
+}
+
 .doc-viewer h1,
 .doc-viewer h2,
 .doc-viewer h3 {
@@ -538,6 +559,56 @@ button.update-available {
   padding: 14px;
 }
 
+.clickable-project {
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.clickable-project:hover,
+.clickable-project:focus-visible {
+  border-color: rgba(47, 93, 80, 0.55);
+  background: rgba(255, 255, 255, 0.68);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.project-status-list {
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.project-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.project-status-item strong {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.project-status-item span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.project-status-item.ok span {
+  color: var(--accent);
+}
+
+.project-status-item.warn span {
+  color: var(--warn);
+}
+
+.project-status-item.error span {
+  color: var(--error);
+}
+
 .project-header,
 .project-check-row,
 .command-action-row {
@@ -552,6 +623,20 @@ button.update-available {
   align-items: center;
   gap: 10px;
   white-space: nowrap;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.inline-actions {
+  margin-top: 0;
 }
 
 .project-check-row,
@@ -711,6 +796,7 @@ select {
   .project-header,
   .project-check-row,
   .command-action-row,
+  .project-status-item,
   .project-check-action,
   .security-tool-row {
     align-items: stretch;

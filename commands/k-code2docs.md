@@ -31,7 +31,7 @@ Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind r
 
 **Preflight-Snapshot anzeigen:**
 
-Für den Snapshot `K-PLAYBOOK.yaml` in `TARGET_DIR` lesen, um `layout`, `k_playbook.repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-setup` aufrufen lassen.
+Für den Snapshot `K-PLAYBOOK.yaml` in `TARGET_DIR` lesen, um `layout`, `k_playbook.repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-gui` aufrufen lassen.
 
 ```text
 /k-code2docs — Preflight
@@ -66,8 +66,8 @@ For this command, resolve the fixed `docs` path:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first.
-- If `k-playbook/docs` is missing on disk: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block.
+- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
+- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-gui`.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
@@ -297,7 +297,6 @@ Kompakte Zusammenfassung:
 - Anzahl Q→Datei-Einträge.
 - MEMORY: `AGENTS.md` (neu / ergänzt / unverändert), `opencode.json` (neu / ergänzt / unverändert).
 - Restart-Hinweis.
-- Nächster Schritt: „`/k-setup` erneut aufrufen, um zu bestätigen dass alles registriert ist (optional)."
 - Folge-Command: **`/k-tools-scan`** — erzeugt `k-playbook/docs/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
 
 ## Wartungs-Hinweise (dem User beim ersten Lauf einmal zeigen)

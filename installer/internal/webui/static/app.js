@@ -11,11 +11,13 @@ const elements = {
   refresh: document.querySelector("#refresh"),
   shutdown: document.querySelector("#shutdown"),
   backHome: document.querySelector("#back-home"),
+  backProjects: document.querySelector("#back-projects"),
   openScan: document.querySelector("#open-scan"),
   cancelScan: document.querySelector("#cancel-scan"),
   gitPullTop: document.querySelector("#git-pull-top"),
   gitPull: document.querySelector("#git-pull"),
   gitOutput: document.querySelector("#git-output"),
+  opencodeInstallTop: document.querySelector("#opencode-install-top"),
   opencodeInstall: document.querySelector("#opencode-install"),
   opencodeRefresh: document.querySelector("#opencode-refresh"),
   opencodePill: document.querySelector("#opencode-pill"),
@@ -41,6 +43,12 @@ const elements = {
   scanRoot: document.querySelector("#scan-root"),
   scan: document.querySelector("#scan"),
   scanResults: document.querySelector("#scan-results"),
+  projectDetailTitle: document.querySelector("#project-detail-title"),
+  projectDetailPath: document.querySelector("#project-detail-path"),
+  projectDetailStatus: document.querySelector("#project-detail-status"),
+  openProjectConfig: document.querySelector("#open-project-config"),
+  reloadProjectConfig: document.querySelector("#reload-project-config"),
+  projectConfig: document.querySelector("#project-config"),
   manualForm: document.querySelector("#manual-form"),
   manualPath: document.querySelector("#manual-path"),
   manualEnv: document.querySelector("#manual-env"),
@@ -52,54 +60,78 @@ const elements = {
 };
 
 let serverAvailable = true;
+let currentProjectPath = "";
 
 elements.refresh.addEventListener("click", refreshAll);
 elements.shutdown.addEventListener("click", shutdownInstaller);
 elements.backHome.addEventListener("click", showHome);
+elements.backProjects.addEventListener("click", showHome);
 elements.openScan.addEventListener("click", showScan);
 elements.cancelScan.addEventListener("click", showHome);
 elements.gitPullTop.addEventListener("click", gitPull);
 elements.gitPull.addEventListener("click", gitPull);
+elements.opencodeInstallTop.addEventListener("click", installOpenCode);
 elements.opencodeInstall.addEventListener("click", installOpenCode);
 elements.opencodeRefresh.addEventListener("click", loadOpenCodeStatus);
 elements.securityToolsRefresh.addEventListener("click", loadSecurityToolsStatus);
 elements.reloadDocs.addEventListener("click", loadDocs);
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
+elements.reloadProjectConfig.addEventListener("click", () => loadProjectConfig(currentProjectPath));
 elements.manualForm.addEventListener("submit", addManualProject);
 
-refreshAll();
+startApp();
 showHome();
 startHealthChecks();
 window.addEventListener("pagehide", notifyClientGone);
 
 function showHome() {
-  for (const element of document.querySelectorAll("[data-view='home']")) {
-    element.classList.remove("hidden");
-  }
-  for (const element of document.querySelectorAll("[data-view='scan']")) {
-    element.classList.add("hidden");
-  }
+  showView("home");
 }
 
 function showScan() {
-  for (const element of document.querySelectorAll("[data-view='home']")) {
-    element.classList.add("hidden");
-  }
-  for (const element of document.querySelectorAll("[data-view='scan']")) {
-    element.classList.remove("hidden");
+  showView("scan");
+}
+
+function showProjectDetail() {
+  showView("project-detail");
+}
+
+function showView(name) {
+  for (const element of document.querySelectorAll("[data-view]")) {
+    element.classList.toggle("hidden", element.dataset.view !== name);
   }
 }
 
 async function refreshAll() {
   await refreshStatus();
-  if (state.status && state.status.OK) {
-    await loadGitStatus();
-    await refreshProjects();
-    await loadDevcontainerStatus();
-    await loadOpenCodeStatus();
-    await loadSecurityToolsStatus();
-    await loadDocs();
+  if (state.status && statusOK(state.status)) {
+    await loadInitialHomeStatus();
+  }
+}
+
+async function startApp() {
+  try {
+    await refreshAll();
+  } catch (error) {
+    showToast(`Initialer Status konnte nicht geladen werden: ${error.message}`, true);
+  }
+}
+
+async function loadInitialHomeStatus() {
+  await runOptionalInitialCheck(loadGitStatus);
+  await runOptionalInitialCheck(loadOpenCodeStatus);
+  await runOptionalInitialCheck(refreshProjects);
+  await runOptionalInitialCheck(loadDevcontainerStatus);
+  await runOptionalInitialCheck(loadSecurityToolsStatus);
+  await runOptionalInitialCheck(loadDocs);
+}
+
+async function runOptionalInitialCheck(callback) {
+  try {
+    await callback();
+  } catch (error) {
+    showToast(error.message, true);
   }
 }
 
@@ -133,7 +165,7 @@ function renderGitStatus(status, error = "") {
   for (const [button, defaultLabel] of buttons) {
     button.classList.toggle("primary", updateAvailable);
     button.classList.toggle("secondary", !updateAvailable);
-    button.classList.toggle("update-available", updateAvailable);
+    button.classList.toggle("attention-highlight", updateAvailable);
     button.textContent = updateAvailable ? "Zur neuen Version aktualisieren" : defaultLabel;
   }
 
@@ -212,6 +244,7 @@ async function loadDocs() {
 async function loadOpenCodeStatus() {
   await withBusy(elements.opencodeRefresh, async () => {
     const status = await api("/api/opencode/status");
+    state.opencode = status;
     renderOpenCode(status);
   });
 }
@@ -225,8 +258,9 @@ async function loadSecurityToolsStatus() {
 }
 
 async function installOpenCode() {
-  await withBusy(elements.opencodeInstall, async () => {
+  await withBusyMany([elements.opencodeInstall, elements.opencodeInstallTop], async () => {
     const result = await api("/api/opencode/install", { method: "POST" });
+    state.opencode = result.status;
     renderOpenCode(result.status);
     showToast(result.message || "OpenCode-Registrierung aktualisiert.");
   });
@@ -250,6 +284,9 @@ async function installDevcontainer(projectPath, button) {
     });
     state.devcontainers = result.status;
     renderProjects(state.projects);
+    if (currentProjectPath === projectPath) {
+      renderProjectDetailStatus(findProject(projectPath));
+    }
     showToast(result.message || "DevContainer-Integration aktualisiert.");
   });
 }
@@ -269,10 +306,9 @@ async function repairPath() {
     const status = await api("/api/repair-path", { method: "POST" });
     state.status = status;
     renderStatus(status);
-    if (status.OK) {
+    if (statusOK(status)) {
       showToast("Pfadvertrag repariert.");
-      await refreshProjects();
-      await loadDevcontainerStatus();
+      await loadInitialHomeStatus();
     }
   });
 }
@@ -333,29 +369,39 @@ async function saveProject(path, environment) {
 }
 
 function renderStatus(status) {
-  elements.expected.textContent = status.Expected || "-";
-  elements.current.textContent = status.Current || "nicht erkannt";
-  elements.symlink.textContent = status.ExpectedIsSymlink ? status.ExpectedSymlinkTarget : "-";
-  elements.statusMessage.textContent = status.Message || "";
-  elements.statusPill.textContent = status.Code || "UNKNOWN";
+  const ok = statusOK(status);
+  const fixable = Boolean(status.fixable || status.Fixable);
+  const expected = status.expected || status.Expected || "";
+  const current = status.current || status.Current || "";
+  const expectedIsSymlink = Boolean(status.expectedIsSymlink || status.ExpectedIsSymlink);
+  const expectedSymlinkTarget = status.expectedSymlinkTarget || status.ExpectedSymlinkTarget || "";
+  elements.expected.textContent = expected || "-";
+  elements.current.textContent = current || "nicht erkannt";
+  elements.symlink.textContent = expectedIsSymlink ? expectedSymlinkTarget : "-";
+  elements.statusMessage.textContent = status.message || status.Message || "";
+  elements.statusPill.textContent = status.code || status.Code || "UNKNOWN";
   elements.statusPill.className = "pill";
 
-  if (status.OK) {
+  if (ok) {
     elements.statusPill.classList.add("ok");
-  } else if (status.Fixable) {
+  } else if (fixable) {
     elements.statusPill.classList.add("warn");
   } else {
     elements.statusPill.classList.add("error");
   }
 
-  elements.repair.classList.toggle("hidden", status.OK || !status.Fixable);
-  elements.projectArea.classList.toggle("hidden", !status.OK);
-  elements.statusCard.classList.toggle("status-ok", status.OK);
-  elements.statusHead.classList.toggle("hidden", status.OK);
-  elements.statusCompact.classList.toggle("hidden", !status.OK);
-  elements.statusDetails.classList.toggle("hidden", status.OK);
-  elements.statusMessage.classList.toggle("hidden", status.OK);
-  elements.compactText.textContent = status.Expected ? `${status.Expected} ist bereit.` : "Pfadvertrag ist bereit.";
+  elements.repair.classList.toggle("hidden", ok || !fixable);
+  elements.projectArea.classList.toggle("hidden", !ok);
+  elements.statusCard.classList.toggle("status-ok", ok);
+  elements.statusHead.classList.toggle("hidden", ok);
+  elements.statusCompact.classList.toggle("hidden", !ok);
+  elements.statusDetails.classList.toggle("hidden", ok);
+  elements.statusMessage.classList.toggle("hidden", ok);
+  elements.compactText.textContent = expected ? `${expected} ist bereit.` : "Pfadvertrag ist bereit.";
+}
+
+function statusOK(status) {
+  return Boolean(status && (status.ok || status.OK));
 }
 
 function renderScanned(projects) {
@@ -445,74 +491,344 @@ function renderProjects(projects) {
   }
 
   for (const project of projects) {
-    const card = document.createElement("div");
-    card.className = "project-row";
-
-    const header = document.createElement("div");
-    header.className = "project-header";
-    const details = document.createElement("div");
-    const path = document.createElement("div");
-    path.className = "path";
-    path.textContent = project.path || project.Path;
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = detectedLabel(project);
-    details.append(path, meta);
-
-    const environment = document.createElement("span");
-    environment.className = "project-env";
-    environment.textContent = environmentLabel(project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
-    const headerActions = document.createElement("div");
-    headerActions.className = "project-header-actions";
-    headerActions.append(environment, removeProjectButton(project));
-    header.append(details, headerActions);
-    card.append(header);
-
-    const devcontainerRow = projectDevcontainerRow(project);
-    if (devcontainerRow) {
-      card.append(devcontainerRow);
-    }
-    const setupRow = projectSetupRow(project);
-    if (setupRow) {
-      card.append(setupRow);
-    }
-    const remediationRow = projectRemediationRow(project);
-    if (remediationRow) {
-      card.append(remediationRow);
-    }
-    const structureRow = projectStructureRow(project);
-    if (structureRow) {
-      card.append(structureRow);
-    }
-    const docsRow = projectDocsRow(project);
-    if (docsRow) {
-      card.append(docsRow);
-    }
-    elements.projects.append(card);
+    elements.projects.append(projectSummaryCard(project));
   }
 }
 
-function projectStructureRow(project) {
+function projectSummaryCard(project) {
+  const card = document.createElement("div");
+  const projectPath = project.path || project.Path;
+  card.className = "project-row clickable-project";
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `Details fuer ${projectPath} anzeigen`);
+  card.addEventListener("click", () => openProjectDetail(projectPath));
+  card.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openProjectDetail(projectPath);
+    }
+  });
+  card.append(projectHeader(project, { showDetails: false, showRemove: true }));
+  card.append(projectStatusList(projectStatus(project)));
+  return card;
+}
+
+function projectEditorCard(project) {
+  const card = document.createElement("div");
+  card.className = "project-row project-editor";
+  card.append(projectHeader(project, { showDetails: false, showRemove: false }));
+
+  for (const item of projectStatus(project)) {
+    card.append(projectEditorStatusRow(project, item));
+  }
+
+  return card;
+}
+
+function projectHeader(project, options = {}) {
+  const showDetails = options.showDetails !== false;
+  const showRemove = options.showRemove !== false;
+
+  const header = document.createElement("div");
+  header.className = "project-header";
+  const details = document.createElement("div");
+  const path = document.createElement("div");
+  path.className = "path";
+  path.textContent = project.path || project.Path;
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = detectedLabel(project);
+  details.append(path, meta);
+
+  const environment = document.createElement("span");
+  environment.className = "project-env";
+  environment.textContent = environmentLabel(project.environment || project.Environment || "unknown") + (project.selected === false || project.Selected === false ? " / off" : "");
+  const headerActions = document.createElement("div");
+  headerActions.className = "project-header-actions";
+  headerActions.append(environment);
+  if (showDetails) {
+    headerActions.append(projectDetailsButton(project));
+  }
+  if (showRemove) {
+    headerActions.append(removeProjectButton(project));
+  }
+  header.append(details, headerActions);
+  return header;
+}
+
+function projectStatusList(items) {
+  const list = document.createElement("div");
+  list.className = "project-status-list";
+
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = `project-status-item ${item.state}`;
+    const label = document.createElement("strong");
+    label.textContent = item.label;
+    const value = document.createElement("span");
+    value.textContent = item.value;
+    row.append(label, value);
+    list.append(row);
+  }
+
+  return list;
+}
+
+function projectDetailsButton(project) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary small-button";
+  button.textContent = "Details";
+  button.addEventListener("click", () => openProjectDetail(project.path || project.Path));
+  return button;
+}
+
+async function openProjectDetail(projectPath) {
+  currentProjectPath = projectPath;
+  const project = findProject(projectPath);
+  elements.projectDetailTitle.textContent = project ? (project.name || project.Name || "Projekt") : "Projekt";
+  elements.projectDetailPath.textContent = projectPath;
+  renderProjectDetailStatus(project);
+  showProjectDetail();
+  await loadProjectConfig(projectPath);
+}
+
+function findProject(projectPath) {
+  return state.projects.find((project) => (project.path || project.Path) === projectPath) || null;
+}
+
+function renderProjectDetailStatus(project) {
+  elements.projectDetailStatus.innerHTML = "";
+  if (!project) {
+    elements.projectDetailStatus.classList.add("empty");
+    elements.projectDetailStatus.textContent = "Projekt nicht gefunden.";
+    return;
+  }
+  elements.projectDetailStatus.classList.remove("empty");
+  elements.projectDetailStatus.append(projectEditorCard(project));
+}
+
+async function loadProjectConfig(projectPath) {
+  if (!projectPath) {
+    elements.projectConfig.classList.add("empty");
+    elements.openProjectConfig.classList.add("hidden");
+    elements.openProjectConfig.removeAttribute("href");
+    elements.projectConfig.textContent = "Keine YAML geladen.";
+    return;
+  }
+  await withBusy(elements.reloadProjectConfig, async () => {
+    const config = await api(`/api/projects/config?path=${encodeURIComponent(projectPath)}`);
+    const configPath = config.path || config.Path || "";
+    elements.projectConfig.classList.remove("empty");
+    elements.openProjectConfig.classList.toggle("hidden", !configPath);
+    if (configPath) {
+      elements.openProjectConfig.href = `vscode://file/${encodeURI(configPath)}`;
+    }
+    elements.projectConfig.textContent = config.content || config.Content || "";
+  });
+}
+
+function projectStatus(project) {
+  const items = [
+    projectSetupStatus(project),
+    projectRemediationStatus(project),
+    projectStructureStatus(project),
+    projectDocsStatus(project),
+  ];
+  const devcontainer = projectDevcontainerStatus(project);
+  if (devcontainer) {
+    items.push(devcontainer);
+  }
+  return items;
+}
+
+function projectSetupStatus(project) {
+  const setup = project.setup || project.Setup || {};
+  const ok = Boolean(setup.ok || setup.OK);
+  const severity = setup.severity || setup.Severity || "warn";
+  const command = setup.command || setup.Command || "/k-setup";
+  return {
+    key: "setup",
+    label: "K-PLAYBOOK.yaml",
+    value: ok ? "vorhanden" : "fehlt",
+    state: ok ? "ok" : severity === "error" ? "error" : "warn",
+    detail: setup.message || setup.Message || (ok ? "Projektkonfiguration ist vorhanden." : "Projektkonfiguration fehlt."),
+    command,
+  };
+}
+
+function projectRemediationStatus(project) {
+  const setup = project.setup || project.Setup || {};
+  const setupOK = Boolean(setup.ok || setup.OK);
+  const remediation = project.remediation || project.Remediation || {};
+  const rawMode = remediation.mode || remediation.Mode || "";
+  const mode = rawMode || "direct-allowed";
+  const ok = Boolean(remediation.ok || remediation.OK);
+  const value = ok ? remediationLabel(mode) : rawMode ? `ungueltig (${rawMode})` : "fehlt";
+  return {
+    key: "remediation",
+    label: "Remediation-Policy",
+    value,
+    state: ok ? "ok" : "warn",
+    detail: remediation.message || remediation.Message || "Steuert /k-remediation.",
+    mode,
+    setupOK,
+  };
+}
+
+function projectStructureStatus(project) {
   const structure = project.structure || project.Structure;
-  if (!structure || structure.ok || structure.OK) {
+  const ok = Boolean(structure && (structure.ok || structure.OK));
+  const missing = structure ? (structure.missing || structure.Missing || []) : [];
+  return {
+    key: "structure",
+    label: "Projektstruktur",
+    value: ok ? "vollstaendig" : "unvollstaendig",
+    state: ok ? "ok" : "warn",
+    detail: missing.length > 0
+      ? `Fehlt: ${compactList(missing)}`
+      : (structure && (structure.message || structure.Message)) || "Feste k-playbook-Struktur fehlt teilweise.",
+    missing,
+  };
+}
+
+function projectDocsStatus(project) {
+  const docs = project.docs || project.Docs || {};
+  const ok = Boolean(docs.ok || docs.OK);
+  const command = docs.command || docs.Command || "/k-code2docs";
+  return {
+    key: "docs",
+    label: "Dokumentation",
+    value: ok ? "vorhanden" : "fehlt",
+    state: ok ? "ok" : "warn",
+    detail: docs.message || docs.Message || (ok ? "Projekt-Dokumentation ist vorhanden." : "Projekt-Dokumentation fehlt."),
+    command,
+  };
+}
+
+function projectDevcontainerStatus(project) {
+  const environment = project.environment || project.Environment || "unknown";
+  if (environment !== "devcontainer") {
     return null;
   }
 
-  const projectPath = project.path || project.Path;
-  const missing = structure.missing || structure.Missing || [];
+  const missing = devcontainerMissing(project.path || project.Path);
+  const checked = missing !== null;
+  return {
+    key: "devcontainer",
+    label: "Playbook im Container",
+    value: !checked ? "wird geprueft" : missing.length === 0 ? "erreichbar" : "nicht erreichbar",
+    state: !checked ? "muted" : missing.length === 0 ? "ok" : "warn",
+    detail: !checked ? "Status wird geprueft." : missing.length > 0 ? `Fehlt: ${missing.join(", ")}` : "k-playbook ist im Container erreichbar.",
+    checked,
+    missing: missing || [],
+  };
+}
+
+function projectEditorStatusRow(project, item) {
+  switch (item.key) {
+    case "setup":
+      return projectSetupEditorRow(project, item);
+    case "remediation":
+      return projectRemediationEditorRow(project, item);
+    case "structure":
+      return projectStructureEditorRow(project, item);
+    case "docs":
+      return projectDocsEditorRow(project, item);
+    case "devcontainer":
+      return projectDevcontainerEditorRow(project, item);
+    default:
+      return projectReadonlyStatusRow(item);
+  }
+}
+
+function projectReadonlyStatusRow(item) {
+  return projectStatusRow(item, statusLabel(item));
+}
+
+function projectStatusRow(item, action) {
   const row = document.createElement("div");
   row.className = "project-check-row";
 
   const text = document.createElement("div");
   const title = document.createElement("span");
   title.className = "project-check-title";
-  title.textContent = "Projektstruktur unvollstaendig";
+  title.textContent = item.label;
   const detail = document.createElement("span");
-  detail.textContent = missing.length > 0
-    ? `Fehlt: ${compactList(missing)}`
-    : (structure.message || structure.Message || "Feste k-playbook-Struktur fehlt teilweise.");
+  detail.textContent = item.detail;
   text.append(title, detail);
 
+  if (action.classList && action.classList.contains("project-check-action")) {
+    row.append(text, action);
+  } else {
+    const actionWrap = document.createElement("div");
+    actionWrap.className = "project-check-action";
+    actionWrap.append(action);
+    row.append(text, actionWrap);
+  }
+  return row;
+}
+
+function statusLabel(item) {
+  const label = document.createElement("span");
+  label.className = "status-label " + item.state;
+  label.textContent = item.state === "ok" ? "OK ✓" : item.state === "error" ? "FEHLER !" : item.state === "muted" ? "Pruefen..." : "WARN !";
+  return label;
+}
+
+function projectSetupEditorRow(project, item) {
+  if (item.state === "ok") {
+    return projectReadonlyStatusRow(item);
+  }
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  action.append(statusLabel(item));
+  const help = document.createElement("button");
+  help.type = "button";
+  help.className = "secondary small-button";
+  help.textContent = "Hilfe";
+  help.addEventListener("click", () => {
+    window.alert([
+      "K-PLAYBOOK.yaml fehlt",
+      "",
+      item.detail,
+      "",
+      `Projekt: ${project.path || project.Path}`,
+      "",
+      "Empfohlen: Projekt aus der Installer-Liste entfernen und danach neu hinzufuegen. Neue Einbindungen legen die minimale K-PLAYBOOK.yaml direkt an.",
+    ].join("\n"));
+  });
+  action.append(help);
+  return projectStatusRow(item, action);
+}
+
+function projectRemediationEditorRow(project, item) {
+  if (!item.setupOK) {
+    return projectReadonlyStatusRow(item);
+  }
+
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  const select = remediationSelect(item.mode);
+  const help = document.createElement("button");
+  help.type = "button";
+  help.className = "secondary small-button";
+  help.textContent = "Hilfe";
+  select.addEventListener("change", () => updateProjectRemediation(project.path || project.Path, select.value, select));
+  help.addEventListener("click", () => showRemediationHelp(select.value));
+  action.append(select, help);
+
+  return projectStatusRow(item, action);
+}
+
+function projectStructureEditorRow(project, item) {
+  if (item.state === "ok") {
+    return projectReadonlyStatusRow(item);
+  }
+
+  const projectPath = project.path || project.Path;
   const action = document.createElement("div");
   action.className = "project-check-action";
   const button = document.createElement("button");
@@ -522,8 +838,7 @@ function projectStructureRow(project) {
   button.addEventListener("click", () => completeProjectStructure(projectPath, button));
   action.append(button);
 
-  row.append(text, action);
-  return row;
+  return projectStatusRow(item, action);
 }
 
 async function completeProjectStructure(projectPath, button) {
@@ -534,43 +849,12 @@ async function completeProjectStructure(projectPath, button) {
     });
     state.projects = file.projects || file.Projects || [];
     renderProjects(state.projects);
+    if (currentProjectPath === projectPath) {
+      renderProjectDetailStatus(findProject(projectPath));
+      await loadProjectConfig(projectPath);
+    }
     showToast("Projektstruktur vervollstaendigt.");
   });
-}
-
-function projectRemediationRow(project) {
-  const setup = project.setup || project.Setup;
-  if (!setup || !(setup.ok || setup.OK)) {
-    return null;
-  }
-
-  const remediation = project.remediation || project.Remediation || {};
-  const mode = remediation.mode || remediation.Mode || "direct-allowed";
-  const row = document.createElement("div");
-  row.className = "project-check-row";
-
-  const text = document.createElement("div");
-  const title = document.createElement("span");
-  title.className = "project-check-title";
-  title.textContent = "Remediation-Policy";
-  const detail = document.createElement("span");
-  detail.textContent = remediation.message || remediation.Message || "Steuert /k-remediation.";
-  text.append(title, detail);
-
-  const action = document.createElement("div");
-  action.className = "project-check-action";
-  const select = remediationSelect(mode);
-  const help = document.createElement("button");
-  help.type = "button";
-  help.className = "secondary small-button";
-  help.textContent = "?";
-  help.title = "Remediation-Policy erklaeren";
-  select.addEventListener("change", () => updateProjectRemediation(project.path || project.Path, select.value, select));
-  help.addEventListener("click", () => showRemediationHelp(select.value));
-  action.append(select, help);
-
-  row.append(text, action);
-  return row;
 }
 
 async function updateProjectRemediation(projectPath, mode, select) {
@@ -581,6 +865,10 @@ async function updateProjectRemediation(projectPath, mode, select) {
     });
     state.projects = file.projects || file.Projects || [];
     renderProjects(state.projects);
+    if (currentProjectPath === projectPath) {
+      renderProjectDetailStatus(findProject(projectPath));
+      await loadProjectConfig(projectPath);
+    }
     showToast("Remediation-Policy aktualisiert.");
   });
 }
@@ -591,7 +879,10 @@ function removeProjectButton(project) {
   button.type = "button";
   button.className = "secondary danger small-button";
   button.textContent = "Entfernen";
-  button.addEventListener("click", () => removeProject(projectPath, button));
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    removeProject(projectPath, button);
+  });
   return button;
 }
 
@@ -612,69 +903,40 @@ async function removeProject(projectPath, button) {
   });
 }
 
-function projectSetupRow(project) {
-  const setup = project.setup || project.Setup;
-  if (!setup || setup.ok || setup.OK) {
-    return null;
+function projectDocsEditorRow(project, item) {
+  if (item.state === "ok") {
+    return projectReadonlyStatusRow(item);
   }
 
   const projectPath = project.path || project.Path;
-  const command = setup.command || setup.Command || "/k-setup";
-  const severity = setup.severity || setup.Severity || "warn";
-  if (severity === "error") {
-    return projectSetupErrorRow(setup);
-  }
   return commandActionRow({
-    title: "Projekt-Setup fehlt",
-    detail: `${setup.message || setup.Message || "K-PLAYBOOK.yaml fehlt."} Im Projekt den Assistenten oeffnen und ${command} ausfuehren.`,
-    command,
-    helpTitle: "Projekt-Setup ausfuehren",
-    helpContextLabel: "Oeffne den Assistenten/OpenCode im Projekt",
-    helpContext: projectPath,
-    helpText: `Der Installer startet ${command} nicht selbst, weil der Slash-Command im Zielprojekt-Kontext Rueckfragen stellt und Dateien dort anlegt.`,
-  });
-}
-
-function projectSetupErrorRow(setup) {
-  const row = document.createElement("div");
-  row.className = "project-check-row";
-
-  const text = document.createElement("div");
-  const title = document.createElement("span");
-  title.className = "project-check-title";
-  title.textContent = "Fehler: K-PLAYBOOK.yaml fehlt";
-  const detail = document.createElement("span");
-  detail.textContent = setup.message || setup.Message || "Projekt aus der Installer-Liste entfernen und neu einbinden.";
-  text.append(title, detail);
-
-  const action = document.createElement("div");
-  action.className = "project-check-action";
-  const label = document.createElement("span");
-  label.className = "status-label error";
-  label.textContent = "FEHLER !";
-  action.append(label);
-
-  row.append(text, action);
-  return row;
-}
-
-function projectDocsRow(project) {
-  const docs = project.docs || project.Docs;
-  if (!docs || docs.ok || docs.OK) {
-    return null;
-  }
-
-  const projectPath = project.path || project.Path;
-  const command = docs.command || docs.Command || "/k-code2docs";
-  return commandActionRow({
-    title: "Dokumentation fehlt",
-    detail: `${docs.message || docs.Message || "docs-Verzeichnis ist leer."} Im Projekt ${command} ausfuehren.`,
-    command,
+    title: item.label,
+    detail: `${item.detail} Im Projekt ${item.command} ausfuehren.`,
+    command: item.command,
     helpTitle: "Projekt-Dokumentation erzeugen",
     helpContextLabel: "Oeffne den Assistenten/OpenCode im Projekt",
     helpContext: projectPath,
-    helpText: `${command} erzeugt bzw. aktualisiert projektlokale Dokumentation. Wenn zuerst die vorhandenen Projekt-Tools inventarisiert werden sollen, nutze vorher /k-tools-scan.`,
+    helpText: `${item.command} erzeugt bzw. aktualisiert projektlokale Dokumentation. Wenn zuerst die vorhandenen Projekt-Tools inventarisiert werden sollen, nutze vorher /k-tools-scan.`,
   });
+}
+
+function projectDevcontainerEditorRow(project, item) {
+  if (item.state === "ok" || !item.checked) {
+    return projectReadonlyStatusRow(item);
+  }
+
+  const projectPath = project.path || project.Path;
+  const action = document.createElement("div");
+  action.className = "project-check-action";
+  action.append(statusLabel(item));
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "primary";
+  button.textContent = "Eintrag setzen";
+  button.addEventListener("click", () => installDevcontainer(projectPath, button));
+  action.append(button);
+
+  return projectStatusRow(item, action);
 }
 
 function commandActionRow({ title, detail, command, helpTitle, helpContextLabel, helpContext, helpText, className = "project-check-row" }) {
@@ -733,54 +995,6 @@ function showCommandHelp({ title, command, contextLabel, context, text }) {
   window.alert(lines.join("\n"));
 }
 
-function projectDevcontainerRow(project) {
-  const environment = project.environment || project.Environment || "unknown";
-  if (environment !== "devcontainer") {
-    return null;
-  }
-
-  const projectPath = project.path || project.Path;
-  const missing = devcontainerMissing(projectPath);
-  const checked = missing !== null;
-  const row = document.createElement("div");
-  row.className = "project-check-row";
-
-  const text = document.createElement("div");
-  const title = document.createElement("span");
-  title.className = "project-check-title";
-  title.textContent = "k-playbook im Container erreichbar";
-  if (!checked) {
-    const detail = document.createElement("span");
-    detail.textContent = "Status wird geprueft.";
-    text.append(title, detail);
-  } else if (missing.length > 0) {
-    const detail = document.createElement("span");
-    detail.textContent = `Fehlt: ${missing.join(", ")}`;
-    text.append(title, detail);
-  } else {
-    text.append(title);
-  }
-
-  const action = document.createElement("div");
-  action.className = "project-check-action";
-  const stateLabel = document.createElement("span");
-  stateLabel.className = "status-label " + (!checked ? "muted" : missing.length === 0 ? "ok" : "warn");
-  stateLabel.textContent = !checked ? "Pruefen..." : missing.length === 0 ? "OK ✓" : "WARN !";
-  action.append(stateLabel);
-
-  if (checked && missing.length > 0) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "primary";
-    button.textContent = "Eintrag setzen";
-    button.addEventListener("click", () => installDevcontainer(projectPath, button));
-    action.append(button);
-  }
-
-  row.append(text, action);
-  return row;
-}
-
 function devcontainerMissing(projectPath) {
   const status = state.devcontainers;
   if (!status) {
@@ -795,9 +1009,15 @@ function devcontainerMissing(projectPath) {
 }
 
 function renderOpenCode(status) {
-  elements.opencodePill.textContent = status.ok ? "OK ✓" : "WARN !";
-  elements.opencodePill.className = "status-label " + (status.ok ? "ok" : "warn");
-  elements.opencodeInstall.disabled = status.ok;
+  const ok = Boolean(status.ok || status.OK);
+  const buttons = [elements.opencodeInstall, elements.opencodeInstallTop];
+  elements.opencodePill.textContent = ok ? "OK ✓" : "WARN !";
+  elements.opencodePill.className = "status-label " + (ok ? "ok" : "warn");
+  for (const button of buttons) {
+    button.disabled = ok;
+    button.classList.toggle("attention-highlight", !ok);
+  }
+  elements.opencodeInstallTop.classList.toggle("hidden", ok);
 
   const rows = [
     ["OpenCode Commands", `${status.linkedCommands || 0}/${status.repoCommands || 0} verlinkt`],
@@ -869,6 +1089,14 @@ function renderSecurityTools(status) {
   summaryText.textContent = status.message || status.Message || (ok ? "Alle Pflicht-Tools sind vorhanden." : `${missingRequired} Pflicht-Tools fehlen.`);
   summary.append(summaryText);
 
+  const toolMatrix = status.toolMatrix || status.ToolMatrix || "";
+  if (toolMatrix) {
+    const matrix = document.createElement("p");
+    matrix.className = "message subtle";
+    matrix.textContent = `Tool-Matrix: ${toolMatrix}`;
+    summary.append(matrix);
+  }
+
   if (!scopeOk) {
     const scope = document.createElement("p");
     scope.className = "message warn-text";
@@ -906,7 +1134,15 @@ function renderSecurityTools(status) {
     const role = tool.role || tool.Role || "";
     const path = tool.path || tool.Path || "";
     const version = tool.version || tool.Version || "";
-    detail.textContent = path ? `${role} - ${version} - ${path}` : role;
+    const dockerImage = tool.dockerImage || tool.DockerImage || "";
+    const parts = [role];
+    if (path) {
+      parts.push(version, path);
+    }
+    if (dockerImage && dockerImage !== "-") {
+      parts.push(`Docker: ${dockerImage}`);
+    }
+    detail.textContent = parts.filter(Boolean).join(" - ");
     info.append(name, detail);
 
     const present = tool.present || tool.Present;
@@ -1013,6 +1249,11 @@ function remediationOptions() {
     ["task-first", "Erst Tasks"],
     ["task-branch-pr", "Task + Branch/PR"],
   ];
+}
+
+function remediationLabel(value) {
+  const option = remediationOptions().find(([optionValue]) => optionValue === value);
+  return option ? option[1] : value;
 }
 
 function showRemediationHelp(mode) {

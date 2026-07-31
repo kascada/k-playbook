@@ -72,13 +72,13 @@ git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 
 ## 2. Host-OpenCode Registrieren
 
-OpenCode auf dem Host starten und den AI-Assistenten im k-playbook-Repo anweisen:
+OpenCode auf dem Host starten und die Installer-GUI oeffnen:
 
 ```text
-Lies ~/dev/k-playbook/commands/k-install.md und fuehre die Installationsanleitung darin aus.
+/k-gui
 ```
 
-Dieser Bootstrap registriert den Command; danach reicht fuer zukuenftige Aktualisierungen normal `/k-install`.
+Die GUI registriert Commands/Skills und fuehrt Projekt-Onboarding.
 
 Danach Security-Tools host-lokal installieren:
 
@@ -92,13 +92,13 @@ Danach pro Zielprojekt genau einen Pfad waehlen: `3A` fuer ein normales Projekt 
 
 ## 3A. Projekt ohne DevContainer einrichten
 
-Im vorhandenen Zielprojekt OpenCode starten und ausfuehren:
+Im vorhandenen Zielprojekt oder im k-playbook-Repo die GUI nutzen:
 
 ```text
-/k-setup
+/k-gui
 ```
 
-Der Installer legt `K-PLAYBOOK.yaml` und die feste projektlokale k-playbook-Struktur an oder vervollstaendigt sie. `/k-setup` prueft danach die Projektkonfiguration und aktualisiert bei Bedarf nur die Kernfelder in `K-PLAYBOOK.yaml`; der Command installiert keine Tools in das Projekt-venv.
+Der Installer legt `K-PLAYBOOK.yaml` und die feste projektlokale k-playbook-Struktur an oder vervollstaendigt sie. Er installiert keine Tools in das Projekt-venv.
 
 Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach ausfuehren:
 
@@ -147,10 +147,10 @@ Den DevContainer fuer `~/dev/example-python-project` neu bauen oder neu starten.
 Nach dem Start im Container pruefen:
 
 ```bash
-ls -l /workspaces/k-playbook/commands/k-install.md
-ls -l ~/dev/k-playbook/commands/k-install.md
-ls -l ~/.config/opencode/command/k-install.md
-ls -l ~/.config/opencode/commands/k-install.md
+ls -l /workspaces/k-playbook/commands/k-gui.md
+ls -l ~/dev/k-playbook/commands/k-gui.md
+ls -l ~/.config/opencode/command/k-gui.md
+ls -l ~/.config/opencode/commands/k-gui.md
 ```
 
 Alle Pfade muessen existieren.
@@ -158,7 +158,7 @@ Alle Pfade muessen existieren.
 OpenCode im Container neu starten, im Projektroot `/workspaces/example-python-project` oeffnen und ausfuehren:
 
 ```text
-/k-setup
+/k-gui
 ```
 
 Optional, wenn das Zielprojekt lokal mit CodeQL vorbereitet werden soll, direkt danach im Container ausfuehren:
@@ -173,13 +173,7 @@ Falls die lokale CodeQL-CLI noch fehlt, danach den Installationscommand nutzen:
 /k-install-codeql
 ```
 
-Nach `/k-setup` im Container einmal ausfuehren:
-
-```text
-/k-install
-```
-
-Grund: `/k-setup` richtet das Projekt ein, aber die Container-lokale OpenCode-Registrierung muss danach noch einmal sicherstellen, dass `skills.paths` und die Command-Symlinks im Container-Home korrekt sind.
+Die GUI stellt sicher, dass Projektstruktur, `skills.paths` und Command-Symlinks im Container-Home plausibel sind.
 
 Wenn `/k-install` danach noch fehlende Security-Tools meldet, ist der DevContainer vermutlich noch nicht mit der aktuellen `.devcontainer/setup-k-playbook.sh` neu erzeugt worden oder der automatische Installationslauf ist fehlgeschlagen. Dann im Container einmal manuell ausfuehren:
 
@@ -228,14 +222,14 @@ git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 ```
 
 ```text
-Lies ~/dev/k-playbook/commands/k-install.md und fuehre die Installationsanleitung darin aus.
+/k-gui
 /k-install-security-tools --install missing
 ```
 
 Ohne DevContainer im Zielprojekt:
 
 ```text
-/k-setup
+/k-gui
 /k-code2docs
 # optional:
 /k-setup-codeql
@@ -252,12 +246,12 @@ Mit DevContainer auf dem Host:
 DevContainer neu bauen, OpenCode im Container neu starten, dann:
 
 ```text
-/k-setup
+/k-gui
 /k-code2docs
 # optional:
 /k-setup-codeql
 /k-install-codeql
 /k-install-security-tools --install missing --yes
-/k-install
+/k-gui
 /k-status
 ```

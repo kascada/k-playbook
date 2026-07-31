@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -41,9 +42,17 @@ func newRootCommand() *cobra.Command {
 func newStatusCommand() *cobra.Command {
 	fix := false
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Prueft den ~/dev/k-playbook Pfadvertrag",
+		Use:   "status [path]",
+		Short: "Prueft den Pfadvertrag oder gibt Projektstatus als JSON aus",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				if fix {
+					return fmt.Errorf("--fix kann nur ohne Projektpfad verwendet werden")
+				}
+				return writeProjectStatusJSON(args[0])
+			}
+
 			result, err := pathcontract.Check()
 			if err != nil {
 				return err
@@ -120,6 +129,15 @@ func newProjectsCommand() *cobra.Command {
 		},
 	})
 
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status <path>",
+		Short: "Gibt den read-only Projektstatus als JSON aus",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return writeProjectStatusJSON(args[0])
+		},
+	})
+
 	addEnvironment := string(store.EnvironmentUnknown)
 	addCmd := &cobra.Command{
 		Use:   "add <path>",
@@ -174,6 +192,16 @@ func listProjects() error {
 
 	fmt.Print(ui.RenderProjects(file, false))
 	return nil
+}
+
+func writeProjectStatusJSON(projectPath string) error {
+	status, err := projects.Status(projectPath)
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(status)
 }
 
 func requirePathContract() error {

@@ -57,7 +57,7 @@ dist: ## Baut Installer-Artefakte nach ./dist/
 		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -ldflags="-s -w" -o "$$output" ./cmd/k-playbook-installer); \
 	done
 
-install: ## Installiert den Installer ohne Go aus dist/ oder GitHub Releases
+install: ## Installiert den Installer ohne Go aus vorhandenen Binaries oder GitHub Releases
 	./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
 
 install-from-source: build ## Baut das Binary und verlinkt es nach ~/.local/bin

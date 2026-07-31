@@ -7,8 +7,8 @@ Usage: install-installer.sh [--bin-dir <dir>] [--from-dist-only]
 
 Installs k-playbook-installer without requiring Go on the user machine.
 
-The script first looks for a matching local release artifact under dist/ and
-otherwise downloads it from the latest GitHub release.
+The script first looks for a matching local release artifact under dist/, then
+for an already built local binary, and otherwise downloads the latest release.
 
 Options:
   --bin-dir <dir>       Install directory. Default: ~/.local/bin.
@@ -91,8 +91,34 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -O "$dest" "$url"
   else
-    die "Need curl or wget to download $url. Alternatively run 'make dist' on a machine with Go and copy dist/."
+    die "Need curl or wget to download $url. Alternatively copy a matching binary to bin/ or dist/."
   fi
+}
+
+is_usable_local_binary() {
+  local candidate="$1"
+
+  [[ -f "$candidate" && -x "$candidate" ]] || return 1
+  if "$candidate" --help >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+first_usable_local_binary() {
+  local candidate
+
+  for candidate in \
+    "$PLAYBOOK_REPO/bin/$BINARY" \
+    "$PLAYBOOK_REPO/installer/bin/$BINARY" \
+    "$PLAYBOOK_REPO/installer/$BINARY"; do
+    if is_usable_local_binary "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 os="$(detect_os)"
@@ -111,13 +137,15 @@ trap cleanup EXIT
 if [[ -f "$local_asset" ]]; then
   source_binary="$local_asset"
   log "Nutze lokales Release-Artefakt: $local_asset"
+elif [[ "$FROM_DIST_ONLY" -eq 0 ]] && source_binary="$(first_usable_local_binary)"; then
+  log "Nutze vorhandenes lokales Binary: $source_binary"
 else
   [[ "$FROM_DIST_ONLY" -eq 0 ]] || die "Missing local release artifact: $local_asset"
   tmp_dir="$(mktemp -d)"
   source_binary="$tmp_dir/$asset"
   url="$RELEASE_BASE_URL/$asset"
   log "Lade Release-Binary: $url"
-  download "$url" "$source_binary" || die "Download fehlgeschlagen. Stelle sicher, dass das Release-Asset existiert, oder baue es mit 'make dist' und fuehre das Script erneut aus."
+  download "$url" "$source_binary" || die "Download fehlgeschlagen. Stelle sicher, dass das Release-Asset existiert, oder kopiere ein passendes Binary nach bin/ oder dist/."
 fi
 
 mkdir -p "$INSTALL_BIN"

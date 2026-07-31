@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 Execute task files. If `$ARGUMENTS` is empty, use `<project>/k-playbook/tasks`.
 
-`/k-run` does not guess project paths. A project without `K-PLAYBOOK.yaml` must be added with the k-playbook Installer first; a project without `k-playbook/tasks` must be completed with `Vervollstaendigen` in the Installer project block.
+`/k-run` does not guess project paths. If `K-PLAYBOOK.yaml` or `k-playbook/tasks` is missing, run `/k-gui` first.
 
 ## Step 1 - Resolve project config, target path and collect tasks
 
@@ -28,8 +28,8 @@ Command-specific policy:
   - If it does not exist: abort with a clear error.
   - If `K-PLAYBOOK.yaml` is missing: continue as an explicit one-off run, but announce that project k-playbook metadata could not be validated. If the task has `## Ausführungskontext` with a relative `Target repo`, stop and ask for the project root instead of guessing.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to add the project with the k-playbook Installer first, or pass an explicit file/directory argument for a one-off run.
-  - If `k-playbook/tasks` is missing on disk: abort and tell the user to open the k-playbook Installer and use `Vervollstaendigen` in the project block. Do not create it from `/k-run`; there are no tasks to execute.
+  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`, or pass an explicit file/directory argument for a one-off run.
+  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-run`; there are no tasks to execute.
   - If `k-playbook/tasks` exists: use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
