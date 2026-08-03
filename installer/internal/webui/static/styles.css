@@ -12,6 +12,17 @@
   --shadow: 0 24px 70px rgba(44, 34, 19, 0.14);
 }
 
+body.runtime-container {
+  background:
+    radial-gradient(circle at top left, rgba(23, 79, 128, 0.24), transparent 34rem),
+    linear-gradient(135deg, #e8f1f7 0%, #d7e4ef 100%);
+}
+
+body.runtime-container .hero,
+body.runtime-container .card {
+  border-color: rgba(128, 160, 186, 0.75);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -91,6 +102,17 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+}
+
+.runtime-banner {
+  border: 1px solid rgba(23, 79, 128, 0.28);
+  border-radius: 18px;
+  padding: 12px 14px;
+  color: #153d5f;
+  background: rgba(220, 237, 249, 0.9);
+  font-size: 0.92rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .app-header .eyebrow {
@@ -232,6 +254,7 @@ dd {
 .message {
   margin: 18px 0 0;
   color: var(--muted);
+  white-space: pre-line;
 }
 
 .pill {
@@ -331,8 +354,53 @@ button.attention-highlight {
 
 .project-list-footer {
   display: flex;
+  gap: 10px;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+.smoke-output {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.smoke-project {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.smoke-project-title {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.smoke-check {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.25fr) minmax(0, 0.75fr);
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.smoke-check.ok strong {
+  color: var(--accent);
+}
+
+.smoke-check.warn strong {
+  color: var(--warn);
+}
+
+.smoke-check.error strong {
+  color: var(--error);
 }
 
 .summary-item {
@@ -572,6 +640,17 @@ button.attention-highlight {
   outline: none;
 }
 
+.project-disabled {
+  opacity: 0.56;
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.disabled-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 .project-status-list {
   display: grid;
   gap: 7px;
@@ -723,6 +802,27 @@ select {
 
 .empty {
   color: var(--muted);
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--muted) 28%, transparent);
+  border-top-color: var(--muted);
+  border-radius: 999px;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .hidden {

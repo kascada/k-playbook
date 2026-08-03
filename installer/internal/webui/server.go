@@ -3,10 +3,12 @@ package webui
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"net/http"
@@ -55,7 +57,20 @@ type projectRootRequest struct {
 
 type projectsResponse struct {
 	Version  int                      `json:"version"`
+	Runtime  runtimeStatus            `json:"runtime"`
 	Projects []projects.ProjectStatus `json:"projects"`
+}
+
+type runtimeStatus struct {
+	InsideContainer    bool     `json:"insideContainer"`
+	InsideDevcontainer bool     `json:"insideDevcontainer"`
+	Home               string   `json:"home"`
+	Workdir            string   `json:"workdir"`
+	PlaybookRepo       string   `json:"playbookRepo"`
+	CurrentProject     string   `json:"currentProject"`
+	ProjectScope       string   `json:"projectScope"`
+	Markers            []string `json:"markers"`
+	Message            string   `json:"message"`
 }
 
 type projectConfigContent struct {
@@ -64,7 +79,11 @@ type projectConfigContent struct {
 }
 
 type gitPullResult struct {
-	Output string `json:"output"`
+	Output                   string `json:"output"`
+	InstallerBinaryChanged   bool   `json:"installerBinaryChanged"`
+	InstallerReinstalled     bool   `json:"installerReinstalled"`
+	InstallerRestartRequired bool   `json:"installerRestartRequired"`
+	InstallerMessage         string `json:"installerMessage"`
 }
 
 type gitStatusResult struct {
@@ -221,7 +240,11 @@ func Run() error {
 	fmt.Printf("k-playbook Installer GUI: %s\n", url)
 	fmt.Println("Zum Beenden Ctrl+C druecken.")
 	if err := openBrowser(url); err != nil {
-		fmt.Printf("Browser konnte nicht automatisch geoeffnet werden: %v\n", err)
+		if runtime := detectRuntime(); runtime.InsideContainer {
+			fmt.Printf("Browser wurde im Container nicht geoeffnet (%v). Oeffne die URL im Host-Browser oder nutze den DevContainer-Port-Forward.\n", err)
+		} else {
+			fmt.Printf("Browser konnte nicht automatisch geoeffnet werden: %v\n", err)
+		}
 	}
 
 	interrupt := make(chan os.Signal, 1)
@@ -259,6 +282,7 @@ func Run() error {
 func routes(state *serverState) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", statusHandler)
+	mux.HandleFunc("GET /api/runtime", runtimeHandler)
 	mux.HandleFunc("POST /api/repair-path", repairPathHandler)
 	mux.HandleFunc("GET /api/projects", projectsHandler)
 	mux.HandleFunc("DELETE /api/projects", removeProjectHandler)
@@ -270,6 +294,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/projects/remediation", updateProjectRemediationHandler)
 	mux.HandleFunc("GET /api/projects/repo-root-candidates", repoRootCandidatesHandler)
 	mux.HandleFunc("POST /api/projects/repo-root", updateProjectRootHandler)
+	mux.HandleFunc("POST /api/projects/smoke", projectSmokeHandler)
+	mux.HandleFunc("POST /api/projects/smoke-all", allProjectsSmokeHandler)
 	mux.HandleFunc("GET /api/git/status", gitStatusHandler)
 	mux.HandleFunc("POST /api/git/pull", gitPullHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
@@ -295,6 +321,10 @@ func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) 
 func (state *serverState) clientGoneHandler(w http.ResponseWriter, r *http.Request) {
 	state.noteClientGone()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func runtimeHandler(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, detectRuntime())
 }
 
 func (state *serverState) noteClientSeen() {
@@ -394,6 +424,21 @@ func devcontainerInstallHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if runtime := detectRuntime(); runtime.InsideContainer {
+		if strings.TrimSpace(request.Path) == "" {
+			writeError(w, http.StatusForbidden, fmt.Errorf("Installer laeuft im Container; DevContainer-Integration kann hier nicht fuer alle Host-Projekte repariert werden"))
+			return
+		}
+		projectPath, err := projects.NormalizePath(request.Path)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := requireProjectEditable(projectPath); err != nil {
+			writeError(w, http.StatusForbidden, err)
+			return
+		}
+	}
 
 	output, changed, err := installDevcontainers(r.Context(), request.Path)
 	if err != nil {
@@ -474,6 +519,10 @@ func removeProjectHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requireProjectEditable(path); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
 
 	file, err := store.LoadProjects()
 	if err != nil {
@@ -509,6 +558,16 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	asset := installerDistAsset(root)
+	beforeHash := ""
+	beforeExists := false
+	if asset != "" {
+		beforeHash, beforeExists, err = fileSHA256(asset)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
@@ -524,7 +583,113 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, gitPullResult{Output: strings.TrimSpace(string(output))})
+	result := gitPullResult{Output: strings.TrimSpace(string(output))}
+	if asset != "" {
+		afterHash, afterExists, err := fileSHA256(asset)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		if afterExists && (!beforeExists || beforeHash != afterHash) {
+			result.InstallerBinaryChanged = true
+			installPath, err := installInstallerBinary(asset)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+			result.InstallerReinstalled = true
+			result.InstallerRestartRequired = true
+			result.InstallerMessage = fmt.Sprintf("Installer-Binary wurde nach %s aktualisiert. GUI bitte neu starten, um die neue Version zu verwenden.", installPath)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+func installerDistAsset(root string) string {
+	osName := runtime.GOOS
+	if osName != "linux" && osName != "darwin" {
+		return ""
+	}
+
+	arch := runtime.GOARCH
+	if arch != "amd64" && arch != "arm64" {
+		return ""
+	}
+
+	return filepath.Join(root, "dist", fmt.Sprintf("k-playbook-installer-%s-%s", osName, arch))
+}
+
+func fileSHA256(path string) (string, bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("Datei lesen: %s: %w", path, err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", false, fmt.Errorf("Datei hashen: %s: %w", path, err)
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), true, nil
+}
+
+func installInstallerBinary(source string) (string, error) {
+	info, err := os.Stat(source)
+	if err != nil {
+		return "", fmt.Errorf("Installer-Artefakt pruefen: %w", err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("Installer-Artefakt ist ein Verzeichnis: %s", source)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("user home ermitteln: %w", err)
+	}
+	installDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return "", fmt.Errorf("Installationsverzeichnis anlegen: %w", err)
+	}
+
+	destination := filepath.Join(installDir, "k-playbook-installer")
+	tmp, err := os.CreateTemp(installDir, ".k-playbook-installer-*")
+	if err != nil {
+		return "", fmt.Errorf("temporaere Installer-Datei anlegen: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	sourceFile, err := os.Open(source)
+	if err != nil {
+		_ = tmp.Close()
+		return "", fmt.Errorf("Installer-Artefakt oeffnen: %w", err)
+	}
+	_, copyErr := io.Copy(tmp, sourceFile)
+	closeSourceErr := sourceFile.Close()
+	if copyErr != nil {
+		_ = tmp.Close()
+		return "", fmt.Errorf("Installer-Binary kopieren: %w", copyErr)
+	}
+	if closeSourceErr != nil {
+		_ = tmp.Close()
+		return "", fmt.Errorf("Installer-Artefakt schliessen: %w", closeSourceErr)
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		return "", fmt.Errorf("Installer-Binary ausfuehrbar machen: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("Installer-Binary schreiben: %w", err)
+	}
+	if err := os.Rename(tmpPath, destination); err != nil {
+		return "", fmt.Errorf("Installer-Binary installieren: %w", err)
+	}
+
+	return destination, nil
 }
 
 func checkGitStatus(parent context.Context) (gitStatusResult, error) {
@@ -708,6 +873,20 @@ func docFileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func scanProjectsHandler(w http.ResponseWriter, r *http.Request) {
+	if runtime := detectRuntime(); runtime.InsideContainer {
+		candidates := []store.Project{}
+		if runtime.CurrentProject != "" {
+			project, err := projects.ProjectFromPath(runtime.CurrentProject)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err)
+				return
+			}
+			candidates = append(candidates, project)
+		}
+		writeJSON(w, http.StatusOK, candidates)
+		return
+	}
+
 	candidates, err := scanProjects(r.URL.Query().Get("root"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -745,6 +924,10 @@ func projectPreviewHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requireProjectEditable(project.Path); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
 
 	writeJSON(w, http.StatusOK, project)
 }
@@ -759,6 +942,10 @@ func addProjectHandler(w http.ResponseWriter, r *http.Request) {
 	project, err := projectFromRequest(request)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := requireProjectEditable(project.Path); err != nil {
+		writeError(w, http.StatusForbidden, err)
 		return
 	}
 	if _, err := projects.EnsureConfig(project.Path, projects.RemediationModeDirectAllowed); err != nil {
@@ -811,6 +998,10 @@ func completeProjectStructureHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requireProjectEditable(projectPath); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
 	if _, err := projects.CompleteProjectStructure(projectPath); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -835,6 +1026,10 @@ func updateProjectRemediationHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requireProjectEditable(projectPath); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
 	if err := projects.UpdateRemediationMode(projectPath, projects.RemediationMode(request.Mode)); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -852,6 +1047,10 @@ func repoRootCandidatesHandler(w http.ResponseWriter, r *http.Request) {
 	projectPath, err := projects.NormalizePath(r.URL.Query().Get("path"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := requireProjectEditable(projectPath); err != nil {
+		writeError(w, http.StatusForbidden, err)
 		return
 	}
 	candidates, err := projects.DiscoverRepoRootCandidates(projectPath)
@@ -873,6 +1072,10 @@ func updateProjectRootHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := requireProjectEditable(projectPath); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
 	if err := projects.UpdateProjectRoot(projectPath, request.RepoRoot, projects.ProjectVCS(request.VCS)); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -886,13 +1089,79 @@ func updateProjectRootHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, projectResponse(file))
 }
 
+func projectSmokeHandler(w http.ResponseWriter, r *http.Request) {
+	var request projectRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("Request lesen: %w", err))
+		return
+	}
+	projectPath, err := projects.NormalizePath(request.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := requireProjectEditable(projectPath); err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
+	result, err := projects.Smoke(projectPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func allProjectsSmokeHandler(w http.ResponseWriter, r *http.Request) {
+	file, err := store.LoadProjects()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if runtime := detectRuntime(); runtime.InsideContainer {
+		if runtime.CurrentProject == "" {
+			writeError(w, http.StatusForbidden, fmt.Errorf("Installer laeuft im Container; kein aktuelles Projekt erkannt"))
+			return
+		}
+		filtered := store.ProjectsFile{Version: file.Version, Projects: []store.Project{}}
+		for _, project := range file.Projects {
+			if samePath(project.Path, runtime.CurrentProject) {
+				filtered.Projects = append(filtered.Projects, project)
+			}
+		}
+		file = filtered
+	}
+	writeJSON(w, http.StatusOK, projects.SmokeAll(file))
+}
+
 func projectResponse(file store.ProjectsFile) projectsResponse {
-	response := projectsResponse{Version: file.Version, Projects: make([]projects.ProjectStatus, 0, len(file.Projects))}
+	runtime := detectRuntime()
+	response := projectsResponse{Version: file.Version, Runtime: runtime, Projects: make([]projects.ProjectStatus, 0, len(file.Projects))}
 	for _, project := range file.Projects {
-		_, _ = projects.EnsureConfigDefaults(project.Path)
+		if canEditProject(runtime, project.Path) {
+			_, _ = projects.EnsureConfigDefaults(project.Path)
+		}
 		response.Projects = append(response.Projects, projects.StatusFromProject(project))
 	}
 	return response
+}
+
+func requireProjectEditable(projectPath string) error {
+	runtime := detectRuntime()
+	if canEditProject(runtime, projectPath) {
+		return nil
+	}
+	if runtime.CurrentProject == "" {
+		return fmt.Errorf("Installer laeuft im Container; kein aktuelles Projekt erkannt")
+	}
+	return fmt.Errorf("Installer laeuft im Container; bearbeitbar ist nur das aktuelle Projekt: %s", runtime.CurrentProject)
+}
+
+func canEditProject(runtime runtimeStatus, projectPath string) bool {
+	if !runtime.InsideContainer {
+		return true
+	}
+	return runtime.CurrentProject != "" && samePath(projectPath, runtime.CurrentProject)
 }
 
 func projectFromRequest(request projectRequest) (store.Project, error) {
@@ -944,6 +1213,112 @@ func repoRoot() (string, error) {
 	}
 
 	return root, nil
+}
+
+func detectRuntime() runtimeStatus {
+	home, _ := os.UserHomeDir()
+	workdir, _ := os.Getwd()
+	playbookRepo := ""
+	if root, err := repoRoot(); err == nil {
+		playbookRepo = root
+	}
+
+	status := runtimeStatus{
+		Home:         home,
+		Workdir:      workdir,
+		PlaybookRepo: playbookRepo,
+		ProjectScope: "all-projects",
+		Message:      "Installer laeuft im Host-Kontext.",
+	}
+
+	if existsPath("/.dockerenv") {
+		status.InsideContainer = true
+		status.Markers = append(status.Markers, "/.dockerenv")
+	}
+	if value := strings.TrimSpace(os.Getenv("REMOTE_CONTAINERS")); value != "" {
+		status.InsideContainer = true
+		status.InsideDevcontainer = true
+		status.Markers = append(status.Markers, "REMOTE_CONTAINERS")
+	}
+	if value := strings.TrimSpace(os.Getenv("DEVCONTAINER")); value != "" {
+		status.InsideContainer = true
+		status.InsideDevcontainer = true
+		status.Markers = append(status.Markers, "DEVCONTAINER")
+	}
+	if strings.HasPrefix(workdir, "/workspaces/") || existsPath("/workspaces/k-playbook") {
+		status.InsideContainer = true
+		status.InsideDevcontainer = true
+		status.Markers = append(status.Markers, "/workspaces")
+	}
+	if cgroupLooksContainerized() {
+		status.InsideContainer = true
+		status.Markers = append(status.Markers, "/proc/1/cgroup")
+	}
+
+	if status.InsideContainer {
+		status.ProjectScope = "current-project-only"
+		status.CurrentProject = currentProjectRoot(workdir, playbookRepo)
+		if status.InsideDevcontainer {
+			status.Message = "Installer laeuft im DevContainer-Kontext. Bearbeitbar ist nur das aktuelle Projekt."
+		} else {
+			status.Message = "Installer laeuft im Container-Kontext. Bearbeitbar ist nur das aktuelle Projekt."
+		}
+		if status.CurrentProject == "" {
+			status.Message += " Aktuelles Projekt konnte nicht sicher erkannt werden."
+		}
+	}
+
+	status.Markers = uniqueStrings(status.Markers)
+	return status
+}
+
+func existsPath(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func cgroupLooksContainerized() bool {
+	data, err := os.ReadFile("/proc/1/cgroup")
+	if err != nil {
+		return false
+	}
+	content := strings.ToLower(string(data))
+	return strings.Contains(content, "docker") || strings.Contains(content, "containerd") || strings.Contains(content, "kubepods") || strings.Contains(content, "libpod")
+}
+
+func currentProjectRoot(workdir string, playbookRepo string) string {
+	if workdir == "" || playbookRepo != "" && samePath(workdir, playbookRepo) {
+		return ""
+	}
+	for path := filepath.Clean(workdir); ; path = filepath.Dir(path) {
+		if path != playbookRepo && existsPath(filepath.Join(path, projects.ConfigFileName)) {
+			return path
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			break
+		}
+	}
+	if strings.HasPrefix(workdir, "/workspaces/") {
+		parts := strings.Split(filepath.Clean(workdir), string(os.PathSeparator))
+		if len(parts) >= 3 && parts[2] != "k-playbook" {
+			return filepath.Join(string(os.PathSeparator), parts[1], parts[2])
+		}
+	}
+	return ""
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	result := []string{}
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }
 
 func docTitle(path string) string {

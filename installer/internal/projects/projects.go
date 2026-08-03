@@ -15,6 +15,7 @@ import (
 )
 
 const ConfigFileName = "K-PLAYBOOK.yaml"
+const LegacyConfigMarkdownFileName = "K-PLAYBOOK.MD"
 
 type ProjectVCS string
 
@@ -166,6 +167,9 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 		if info.IsDir() {
 			return false, fmt.Errorf("%s ist ein Verzeichnis", path)
 		}
+		if _, err := RemoveLegacyMarkdownConfig(normalized); err != nil {
+			return false, err
+		}
 		return false, nil
 	} else if !os.IsNotExist(err) {
 		return false, fmt.Errorf("%s pruefen: %w", ConfigFileName, err)
@@ -181,6 +185,9 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 	if _, err := file.WriteString(MinimalConfigForProject(time.Now(), remediationMode, projectRoot)); err != nil {
 		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
 	}
+	if _, err := RemoveLegacyMarkdownConfig(normalized); err != nil {
+		return false, err
+	}
 
 	return true, nil
 }
@@ -194,6 +201,10 @@ func EnsureConfigDefaults(projectPath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("%s lesen: %w", ConfigFileName, err)
 	}
+	removedLegacyConfig, err := RemoveLegacyMarkdownConfig(filepath.Dir(path))
+	if err != nil {
+		return false, err
+	}
 
 	content := string(data)
 	updated := content
@@ -204,10 +215,33 @@ func EnsureConfigDefaults(projectPath string) (bool, error) {
 	}
 
 	if updated == content {
-		return false, nil
+		return removedLegacyConfig, nil
 	}
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return false, fmt.Errorf("%s schreiben: %w", ConfigFileName, err)
+	}
+	return true, nil
+}
+
+func RemoveLegacyMarkdownConfig(projectPath string) (bool, error) {
+	normalized, err := NormalizePath(projectPath)
+	if err != nil {
+		return false, err
+	}
+
+	path := filepath.Join(normalized, LegacyConfigMarkdownFileName)
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("%s pruefen: %w", LegacyConfigMarkdownFileName, err)
+	}
+	if info.IsDir() {
+		return false, fmt.Errorf("%s ist ein Verzeichnis", path)
+	}
+	if err := os.Remove(path); err != nil {
+		return false, fmt.Errorf("%s loeschen: %w", LegacyConfigMarkdownFileName, err)
 	}
 	return true, nil
 }

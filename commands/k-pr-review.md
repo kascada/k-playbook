@@ -1,20 +1,31 @@
 ---
-description: List open GitHub pull requests for the configured repo target or load a specific PR directly, then present a compact first-pass overview. Phase 1 only: selection plus overview, no deep review yet.
-argument-hint: [pr-number|#pr-number|github-pr-url]
+description: List open GitHub pull requests for the configured repo target or load a specific PR directly, then present a compact overview, a PR assessment, and an optional follow-up action: approve, merge, or create a local validation branch.
+argument-hint: [pr-number|#pr-number|github-pr-url] [quick|standard|deep]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, TodoWrite]
 ---
 
 # k-pr-review
 
-Liste offene GitHub-Pull-Requests fuer das passende Repo und lade einen PR fuer eine erste kompakte Einordnung.
+Liste offene GitHub-Pull-Requests fuer das passende Repo, lade einen PR und fuehre ihn durch drei Phasen mit einer optionalen Folgeaktion: approven, mergen oder einen lokalen Validierungs-Branch anlegen.
 
-Dieser Command ist bewusst **nur Phase 1**:
+- **Phase 1:** Auswahl plus kompakter PR-Ueberblick.
+- **Phase 2:** read-only PR-Bewertung in `quick`, `standard` oder `deep`.
+- **Phase 3:** Empfehlung plus optionaler Folgeaktion.
 
-- Ohne Argument: offene PRs laden und dem User zur Auswahl zeigen.
-- Mit Argument: den angegebenen PR direkt laden.
-- Danach den PR knapp vorstellen: Repo, Titel, URL, Autor, Branches, Status, Diff-Umfang, Dateien und Checks/Review-Signale.
-- **Keine** tiefe Code-Review, **keine** Merge-Empfehlung, **keine** Remediation und **keine** Schreibzugriffe.
+Der Command bleibt bewusst konservativ:
+
+- keine Produktcode-Aenderungen
+- keine Review-Artefakte unter `k-playbook/reviews/`
+- keine Remediation
+- keine Protokollierung angenommener PRs in diesem Schritt
+- kein automatischer Merge ohne explizite User-Anfrage
+
+Zulaessige schreibende Folgeaktionen nur nach expliziter User-Entscheidung:
+
+- PR auf GitHub approven
+- PR auf GitHub mergen
+- lokalen Validierungs-Branch fuer weitergehende Tests anlegen
 
 ## Invocation
 
@@ -22,21 +33,76 @@ Dieser Command ist bewusst **nur Phase 1**:
 - `/k-pr-review 443`
 - `/k-pr-review #443`
 - `/k-pr-review https://github.com/<owner>/<repo>/pull/443`
+- `/k-pr-review quick`
+- `/k-pr-review 443 quick`
+- `/k-pr-review #443 standard`
+- `/k-pr-review https://github.com/<owner>/<repo>/pull/443 deep`
+
+## Schritt 0 - Argumente normalisieren
+
+Der Command akzeptiert bis zu zwei optionale Argumente:
+
+1. PR-Selektor
+2. Bewertungsmodus
+
+Gueltige PR-Selektoren:
+
+- `443`
+- `#443`
+- `https://github.com/<owner>/<repo>/pull/443`
+
+Gueltige Bewertungsmodi:
+
+- `quick`
+- `standard`
+- `deep`
+
+Zulaessige Aufrufe:
+
+- kein Argument
+- nur PR-Selektor
+- nur Bewertungsmodus
+- PR-Selektor gefolgt von Bewertungsmodus
+
+Wenn mehr als zwei Argumente uebergeben werden: mit kurzer Fehlermeldung stoppen und die gueltigen Formen zeigen.
+
+Normalisierung:
+
+- `#443` -> `443`
+- GitHub-PR-URL unveraendert lassen
+- Modus immer in Kleinschreibung merken
+
+Wenn nur ein Argument uebergeben wird:
+
+- wenn es ein PR-Selektor ist: `PR_SELECTOR` setzen, `ASSESSMENT_MODE` offen lassen
+- wenn es ein Bewertungsmodus ist: `ASSESSMENT_MODE` setzen, `PR_SELECTOR` offen lassen
+- sonst mit kurzer Fehlermeldung stoppen
+
+Wenn zwei Argumente uebergeben werden:
+
+- das erste muss ein gueltiger PR-Selektor sein
+- das zweite muss ein gueltiger Bewertungsmodus sein
+- sonst mit kurzer Fehlermeldung stoppen
 
 ## Schritt 1 - Repo-Ziel aufloesen
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
+Fuer diesen Command werden zusaetzlich die festen Bloecke `enforcement` und `docs` aufgeloest, weil Phase 2 ihre Regeln und die Docs-Sync-Pflicht lesen muss.
+
 Danach bestimme das GitHub-Repo fuer den PR-Check in dieser Reihenfolge:
 
-1. Wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` existiert und `remediation.target` gesetzt ist:
+1. Wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` existiert und `project.repo_root` gesetzt ist:
+   - verwende `PROJECT_REPO_ROOT_DIR` aus der Shared Path Resolution
+   - das ist der bevorzugte Fall fuer Wrapper-Repos, bei denen das eigentliche Git-Repo nicht das Workspace-Root ist
+2. Sonst, wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` existiert und `remediation.target` gesetzt ist:
    - resolve `remediation.target` relativ zu `TARGET_DIR`
    - verwende diesen Pfad als `PR_TARGET_DIR`
-   - das ist der bevorzugte Fall fuer Wrapper-Repos, bei denen das eigentliche Git-Repo nicht das Workspace-Root ist
-2. Sonst, wenn `TARGET_DIR` selbst ein Git-Repo ist: verwende `TARGET_DIR` als `PR_TARGET_DIR`
-3. Sonst abbrechen mit einer klaren Meldung:
-    - entweder im echten Git-Repo starten
-   - oder `K-PLAYBOOK.yaml` mit `remediation.target` sauber konfigurieren
+   - das ist nur noch ein Legacy-Fallback fuer aeltere Projekte ohne `project.repo_root`
+3. Sonst, wenn `TARGET_DIR` selbst ein Git-Repo ist: verwende `TARGET_DIR` als `PR_TARGET_DIR`
+4. Sonst abbrechen mit einer klaren Meldung:
+     - entweder im echten Git-Repo starten
+    - oder `K-PLAYBOOK.yaml` mit `project.repo_root` sauber konfigurieren
 
 Vor dieser Zielwahl gilt zusaetzlich:
 
@@ -67,10 +133,13 @@ Merke:
 - `GH_REPO_URL`
 - `GH_DEFAULT_BRANCH`
 - `PR_TARGET_DISPLAY`
+- `PROJECT_ENFORCEMENT_DIR`
+- `DOCS_DIR`
+- `GLOBAL_ENFORCEMENT_DIR = <PLAYBOOK_REPO>/global/rules/`
 
 ## Schritt 2 - PR bestimmen
 
-### Fall A - `$ARGUMENTS` ist leer
+### Fall A - kein Argument uebergeben
 
 Lade die offenen PRs:
 
@@ -106,23 +175,16 @@ Antworte mit `443`, `#443` oder einer GitHub-PR-URL.
 
 - danach auf die Auswahl des Users warten
 
-### Fall B - `$ARGUMENTS` ist gesetzt
+### Fall B - Argument uebergeben
 
-Akzeptiere nur diese Formen:
+Wenn `PR_SELECTOR` aus Schritt 0 bereits gesetzt ist, diesen Wert verwenden.
 
-- `443`
-- `#443`
-- `https://github.com/<owner>/<repo>/pull/443`
+Wenn `PR_SELECTOR` nach Schritt 0 noch leer ist, aber der User gerade einen PR aus der Liste auswaehlt:
 
-Normalisierung:
-
-- `#443` -> `443`
+- dieselben drei PR-Formen akzeptieren
+- `#443` zu `443` normalisieren
 - URL unveraendert lassen
-
-Wenn das Argument keine dieser Formen hat:
-
-- mit kurzer Fehlermeldung stoppen
-- die gueltigen Formate zeigen
+- sonst mit kurzer Fehlermeldung stoppen
 
 Merke den normalisierten Wert als `PR_SELECTOR`.
 
@@ -161,7 +223,7 @@ Regeln:
 - Wenn `gh pr checks` keine Checks findet oder non-zero endet, das als `keine oder keine sauber abrufbaren Checks` behandeln, nicht als harten Command-Fehler.
 - Wenn `gh pr view` fehlschlaegt: abbrechen und die konkrete `PR_SELECTOR`-Form nennen, die nicht geladen werden konnte.
 - Nicht den kompletten Diff ausgeben.
-- Nicht automatisch eine Bewertung oder Merge-Freigabe ableiten.
+- Noch keine Merge-Freigabe ableiten.
 
 ## Schritt 4 - Kompakten PR-Ueberblick ausgeben
 
@@ -201,21 +263,435 @@ Keine weiteren Interpretationen in dieser Phase, ausser einer knappen Einordnung
 
 Diese Einordnung muss rein deskriptiv bleiben und darf noch keine Merge-Empfehlung enthalten.
 
-## Schritt 5 - Abschluss
+## Schritt 5 - Bewertungsmodus bestimmen
 
-Am Ende kurz sagen, dass Phase 1 abgeschlossen ist und der PR jetzt fuer den naechsten Schritt bereit ist.
+Wenn `ASSESSMENT_MODE` aus Schritt 0 bereits gesetzt ist: direkt verwenden.
+
+Wenn `ASSESSMENT_MODE` noch leer ist, frage den User nach genau einem Modus:
+
+```text
+Welchen Bewertungsmodus soll ich fuer diesen PR verwenden?
+
+- quick: GitHub-Signale, Diff-Scope und Enforcement-Einschaetzung
+- standard: quick plus `k-check --mode changed`
+- deep: standard plus gezielte lokale Validierung je nach PR-Scope
+```
+
+Akzeptiere nur `quick`, `standard` oder `deep`.
+
+## Schritt 6 - Read-only PR-Bewertung
+
+Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohne Review-Artefakte zu schreiben.
+
+### 6.1 Bewertungsquellen
+
+Lade fuer die Bewertung:
+
+- globale Regeln aus `<PLAYBOOK_REPO>/global/rules/*.md`
+- projektlokale Regeln aus `<TARGET_DIR>/k-playbook/enforcement/*.md`
+- projektlokale Docs aus `<TARGET_DIR>/k-playbook/docs/`, wenn sie fuer Docs-Sync sichtbar relevant sind
+
+Nutze diese Quellen als Constraints, nicht als Anlass fuer ein separates `/k-review`.
+
+Wichtig:
+
+- `global/reviews/*.md` und `k-playbook/reviews/` sind in diesem Command nur Referenz fuer moegliche Folge-Schritte, nicht der Default-Executor.
+- keine Dateien unter `k-playbook/reviews/` oder `k-playbook/tasks/` schreiben.
+- nur read-only Kommandos und Analyse.
+
+### 6.2 PR-Scope klassifizieren
+
+Ordne die geaenderten Dateien knapp ein, z. B.:
+
+- `docs-only`
+- `dependency-only`
+- `lockfile-only`
+- `django-runtime`
+- `django-models-migrations`
+- `auth-or-user-scope`
+- `logging-privacy`
+- `frontend-copy`
+- `multi-area`
+
+Nutze diese Klassifikation fuer die spaetere Relevanzbewertung der Regeln und Checks.
+
+### 6.3 Quick-Modus
+
+`quick` fuehrt nur leichte read-only Bewertung aus:
+
+- GitHub-Checks und Review-Signale aus Schritt 3 auswerten
+- Diff-Scope und Dateitypen einordnen
+- relevante Enforcement-Regeln benennen und gegen den Scope pruefen
+- insbesondere immer die globale Docs-Sync-Regel pruefen
+
+Fuer Enforcement gilt:
+
+- `docs-sync.md` immer pruefen, wenn Code-Dateien geaendert wurden
+- Django-Validierung nur dann als relevant markieren, wenn PR-Dateien Settings, Middleware, URLs, Models, Migrations, Storage, Redis, Celery, Helm oder Runtime-Startpfade beruehren
+- User-Data-Isolation, Logging-Privacy und i18n nur dann als relevant markieren, wenn die geaenderten Dateien plausibel in diesen Bereich fallen
+
+Es werden in `quick` keine zusaetzlichen lokalen Validierungsbefehle gestartet.
+
+### 6.4 Standard-Modus
+
+`standard` enthaelt alles aus `quick` und laesst zusaetzlich den globalen Check-Runner auf dem PR-Scope laufen.
+
+Vorgehen:
+
+1. Erzeuge eine temporaere Datei ausserhalb des Projekts, z. B. via `mktemp`, mit der newline-separierten PR-Dateiliste aus Schritt 3.
+2. Fuehre aus dem Projektkontext aus:
+
+```bash
+~/dev/k-playbook/global/bin/k-check \
+  --config-root <TARGET_DIR> \
+  --target-root <PR_TARGET_DIR> \
+  --mode changed \
+  --files-from <temp-file>
+```
+
+Regeln:
+
+- Keine `--output`- oder `--metadata-output`-Dateien verwenden; dieser Command bleibt read-only bezueglich Projektartefakten.
+- `exit 1` von `k-check` als fachliche Findings behandeln, nicht als technischen Command-Fehler.
+- `exit 2` oder fehlende Runner-Voraussetzungen als `k-check technisch nicht sauber ausfuehrbar` berichten.
+- Die temporaere Datei am Ende entfernen.
+
+### 6.5 Deep-Modus
+
+`deep` enthaelt alles aus `standard` und fuehrt zusaetzlich die kleinste sinnvolle lokale Validierung passend zum Scope aus.
+
+Nutze nur read-only Validierung und bleibe eng am PR-Scope. Beispiele:
+
+- Wenn Django-Runtime-Dateien geaendert wurden und `manage.py` vorhanden ist: `python manage.py check`
+- Wenn models-/migrationsrelevante Dateien geaendert wurden: `python manage.py makemigrations --check --dry-run`
+- Wenn der Scope offensichtliche fokussierte Tests hergibt: den schmalsten sinnvollen Testlauf nennen und nur in `deep` ausfuehren
+- Bei `docs-only`, `dependency-only` oder `lockfile-only` keine kuenstlichen Django- oder Testlaeufe erzwingen
+
+Wenn eine sinnvolle Deep-Validierung nicht sicher bestimmbar ist, nicht raten: kurz melden, dass `deep` keine zusaetzliche sichere lokale Validierung ableiten konnte.
+
+### 6.6 Bewertungslogik
+
+Bewerte den PR knapp und deskriptiv anhand dieser Signale:
+
+- GitHub-Checks
+- PR-Scope
+- `k-check`-Ergebnis, falls gelaufen
+- Enforcement-Relevanz und Enforcement-Offenpunkte
+- tiefe lokale Validierung, falls gelaufen
+
+Verwende eine einfache Risikoeinschaetzung:
+
+- `niedrig`
+- `mittel`
+- `hoch`
+- `unklar`
+
+Diese Risikoeinschaetzung ist keine Merge-Freigabe.
+
+Leite zusaetzlich eine Handlungsempfehlung ab:
+
+- `direkt annehmen`
+- `branch erstellen und weiter testen`
+
+Faustregeln fuer `direkt annehmen`:
+
+- Risiko `niedrig`
+- keine `k-check`-Fails oder technischen `error`
+- keine offenen Enforcement-Pflichten
+- kein Hinweis auf sensible oder breitflächige Runtime-/Auth-/Ownership-Aenderungen ohne ausreichende lokale Validierung
+
+Faustregeln fuer `branch erstellen und weiter testen`:
+
+- Risiko `mittel`, `hoch` oder `unklar`
+- `k-check` meldet `fail` oder `error`
+- Enforcement offen oder unklar
+- Branch-Checks fehlen und der Scope beruehrt sensible Bereiche wie Auth, Runtime, Models/Migrations, Ownership oder Logging/Privacy
+- es gibt eine sinnvolle weitergehende lokale Validierung, die ueber den aktuellen Modus hinausgeht
+
+## Schritt 7 - Bewertung ausgeben
+
+Stelle die Bewertung kompakt dar:
+
+```text
+PR-Bewertung
+────────────
+Modus:        <quick|standard|deep>
+Scope:        <klassifikation>
+Risiko:       <niedrig|mittel|hoch|unklar>
+GitHub:       <Kurzfassung Checks + Review-Signale>
+k-check:      <nicht gelaufen | Kurzfassung | technisch nicht sauber ausfuehrbar>
+Enforcement:  <relevante Regeln und Ergebnis in einem Satz>
+Validierung:  <nicht gelaufen | Liste der Deep-Checks mit Kurzresultat>
+Docs-Sync:    angepasst | nicht noetig (<Grund>) | fehlt | unklar
+```
+
+Danach knapp:
+
+- `Auffaellig:` wichtigste 1-3 Signale oder offene Punkte
+- `Empfehlung:` `direkt annehmen` oder `branch erstellen und weiter testen` mit kurzem Grund
+
+Noch nicht enthalten in diesem Schritt:
+
+- keine Protokollierung in `reviews/` oder anderswo
+- kein automatischer Handoff nach `/k-review` oder `/k-remediation`
+
+## Schritt 8 - Folgeaktion waehlen
+
+Nach der Bewertung frage den User nach genau einer Folgeaktion:
+
+```text
+Wie soll ich mit diesem PR weiter verfahren?
+
+- direkt annehmen
+- branch erstellen und weiter testen
+- nichts weiter
+```
+
+Wenn die Empfehlung `direkt annehmen` ist, nenne diese Option zuerst.
+Wenn die Empfehlung `branch erstellen und weiter testen` ist, nenne diese Option zuerst.
+
+## Schritt 9 - Folgeaktion ausfuehren
+
+### 9.1 Direkt annehmen
+
+Wenn der User `direkt annehmen` waehlt:
+
+1. Erzeuge fuer den Approval-Text eine temporaere Datei ausserhalb des Projekts, z. B. via `mktemp`, und schreibe den Text dort hinein.
+
+   Regel:
+
+   - Fuer `gh pr review`, `gh pr comment` oder aehnliche PR-Kommentare niemals mehrzeilige Texte inline per `-b "...\n..."` oder `--body "...\n..."` bauen.
+   - Stattdessen immer eine temporaere Datei und `--body-file <temp-file>` verwenden, damit Shell-Interpolation, Backticks und Newlines nicht zerbrechen.
+
+2. Fuehre ein GitHub-Approval aus:
+
+   - numerischer Selektor:
+
+   ```bash
+   gh pr review <PR_SELECTOR> --repo <GH_REPO> --approve --body-file <temp-file>
+   ```
+
+   - URL-Selektor:
+
+   ```bash
+   gh pr review <PR_SELECTOR> --approve --body-file <temp-file>
+   ```
+
+3. Approval-Text kurz und sachlich halten, z. B. Scope, Modus und wichtigste Signale.
+4. Die temporaere Datei am Ende entfernen.
+5. Danach kurz den User fragen, ob der PR nur approvt oder direkt gemerged werden soll.
+
+   Optionen:
+
+   - `nur approven`
+   - `jetzt mergen`
+
+6. Wenn der User nur approven will: keinen Merge per CLI ausfuehren und im Abschluss sagen, dass der Merge online auf GitHub erfolgen kann.
+7. Wenn der User `jetzt mergen` will: weiter mit Schritt 9.3.
+
+Wenn der Approval-Call fehlschlaegt:
+
+- den Grund kurz und klar berichten
+- insbesondere bei Self-Approval-Faellen knapp sagen, dass GitHub den eigenen PR nicht approven laesst
+- keinen automatischen Fallback-Merge versuchen
+- stattdessen einen kurzen Merge-Hinweis als kopierbaren Markdown-Block ausgeben, damit der User ihn bei Bedarf manuell auf GitHub einfuegen kann
+
+Beispiel fuer den auszugebenden Merge-Hinweis:
+
+```markdown
+k-playbook PR-Einschaetzung (`<mode>`):
+
+- Scope: `<scope>`
+- Risiko: `<risk>`
+- `k-check`: `<summary>`
+- Enforcement: `<summary>`
+- Validierung: `<summary>`
+
+Hinweis: CLI-Approval war nicht moeglich (`<kurzer Grund>`). Wenn Berechtigungen und Branch-Regeln es zulassen, kann der Merge bewusst online auf GitHub erfolgen.
+```
+
+### 9.2 Branch erstellen und weiter testen
+
+Wenn der User `branch erstellen und weiter testen` waehlt:
+
+1. Vor Branch-Wechsel den Worktree in `PR_TARGET_DIR` pruefen:
+
+   ```bash
+   git status --short
+   ```
+
+2. Wenn der Worktree nicht sauber ist: stoppen und den User bitten zu entscheiden. Nicht automatisch stashen, resetten oder fremde Aenderungen bewegen.
+
+3. Einen lokalen Validierungs-Branch vom PR-Head anlegen und auschecken.
+
+   Branch-Name:
+
+   ```text
+   pr-review/<PR-number>-<kurzer-slug>
+   ```
+
+   Beispiel:
+
+   ```text
+   pr-review/441-python-jose
+   ```
+
+4. Branch anlegen via GitHub-PR-Checkout:
+
+   - numerischer Selektor:
+
+   ```bash
+   gh pr checkout <PR_SELECTOR> --repo <GH_REPO> --branch <LOCAL_VALIDATION_BRANCH>
+   ```
+
+   - URL-Selektor:
+
+   ```bash
+   gh pr checkout <PR_SELECTOR> --branch <LOCAL_VALIDATION_BRANCH>
+   ```
+
+5. Danach den kleinsten sinnvollen erweiterten Testlauf passend zum Scope ausfuehren.
+
+Beispiele:
+
+- `dependency-only` fuer authnahe Python-Library: `pip install -r requirements.txt`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, fokussierte Auth-/Refresh-/JWT-nahe Tests
+- `django-runtime`: `python manage.py check` plus fokussierte Runtime-/Endpoint-Tests
+- `django-models-migrations`: `python manage.py makemigrations --check --dry-run` plus betroffene Model-/View-Tests
+- `docs-only`: kein kuenstlicher Testbranch noetig; wenn der User ihn trotzdem will, nur Branch anlegen und das so benennen
+
+6. Keine Produktcode-Aenderungen im Test-Branch machen, solange der User nicht explizit in einen Implementierungs-/Fix-Flow wechselt.
+7. Den Testbranch nicht automatisch pushen.
+
+8. Nach erfolgreichem Testlauf klar sagen:
+
+   - der lokale Validierungs-Branch ist nur ein Pruef-Branch
+   - merge-relevant bleibt der urspruengliche PR `<head> -> <base>`
+
+9. Danach erneut nach der Abschlussentscheidung fragen:
+
+```text
+Der erweiterte Testlauf ist durch. Wie soll ich mit dem urspruenglichen PR weiter verfahren?
+
+- PR approven
+- PR mergen
+- nichts weiter
+```
+
+Wenn der User `PR approven` oder `PR mergen` waehlt, weiter mit Schritt 9.3.
+Wenn der User `nichts weiter` waehlt, weiter mit Schritt 9.4 fuer Aufraeumen und Abschluss.
+
+### 9.3 PR mergen oder approven
+
+Dieser Schritt arbeitet immer auf dem urspruenglichen PR, nie auf dem lokalen Validierungs-Branch.
+
+#### 9.3.a Approven
+
+- Wenn noch kein Approval versucht wurde, fuehre denselben Approval-Flow wie in 9.1 aus.
+- Wenn Approval wegen Self-Approval nicht moeglich ist, klar sagen, dass GitHub den eigenen PR nicht approven laesst.
+- Wenn der User danach trotzdem `PR mergen` verlangt und der Repo-/Branch-Schutz es erlaubt, darf der Command den Merge auf ausdrueckliche Anweisung trotzdem ausfuehren.
+
+#### 9.3.b Mergen
+
+Merge nur wenn der User es ausdruecklich verlangt.
+
+Vor dem Merge:
+
+- PR noch einmal kurz pruefen: `state`, `mergeable`, `baseRefName`, `headRefName`
+- Wenn `mergeable` klar negativ ist oder der PR nicht mehr offen ist: sauber stoppen
+
+Merge-Befehl:
+
+- numerischer Selektor:
+
+```bash
+gh pr merge <PR_SELECTOR> --repo <GH_REPO> --merge
+```
+
+- URL-Selektor:
+
+```bash
+gh pr merge <PR_SELECTOR> --merge
+```
+
+Regeln:
+
+- keinen `--squash`, `--rebase`, `--admin` oder Force-Workaround raten oder automatisch nutzen
+- nur den Standard-Merge ausfuehren, sofern der User keinen anderen Merge-Typ explizit verlangt
+- wenn GitHub/Branch-Protection den Merge blockiert, den Grund klar berichten
+
+### 9.4 Lokalen Validierungs-Branch aufraeumen
+
+Wenn in 9.2 ein lokaler Validierungs-Branch angelegt wurde:
+
+1. Vor dem Loeschen pruefen:
+
+```bash
+git status --short
+```
+
+2. Wenn der Worktree nicht sauber ist: den Branch nicht automatisch loeschen; klar berichten und stoppen.
+
+3. Wenn sauber:
+
+   - auf einen sicheren Branch wechseln, bevorzugt den Base-Branch des PR (`<baseRefName>`), sonst den urspruenglichen Start-Branch
+   - lokalen Validierungs-Branch loeschen
+
+Beispiel:
+
+```bash
+git switch <baseRefName>
+git pull --ff-only origin <baseRefName>
+git branch -D <LOCAL_VALIDATION_BRANCH>
+```
+
+Wenn der urspruengliche Start-Branch der PR-Head-Branch war und der PR gemerged wurde, ist der Base-Branch der bevorzugte Rueckkehrpunkt.
+
+### 9.5 Nichts weiter
+
+Wenn der User `nichts weiter` waehlt: nur kompakt bestaetigen und keine Schreibaktion ausfuehren.
+
+## Schritt 10 - Abschluss und Sauberkeitspruefung
+
+Fuehre am Ende immer eine kurze Repo-Sauberkeitspruefung aus:
+
+```bash
+git status --short --branch
+```
+
+Wenn ein PR gemerged wurde und du bereits auf dem Base-Branch stehst, ziehe zusaetzlich den aktuellen Stand per Fast-Forward nach.
+
+Am Ende kurz sagen, was ausgefuehrt wurde:
+
+- nur Ueberblick plus Bewertung
+- oder Approval erfolgt, Merge bitte online auf GitHub
+- oder PR gemerged
+- oder lokaler Validierungs-Branch angelegt, erweiterter Testlauf ausgefuehrt und Branch wieder aufgeraeumt
 
 Beispiel:
 
 ```text
-Phase 1 abgeschlossen. Wenn du willst, beurteile ich als Naechstes Risiko, Checks, Diff-Scope und Merge-Eignung dieses PRs.
+PR bewertet und auf GitHub approvt. Bitte den Merge bewusst online auf GitHub ausfuehren.
+```
+
+Oder:
+
+```text
+PR gemerged. Lokaler Validierungs-Branch `pr-review/441-python-jose` wurde anschliessend entfernt und der Repo-Zustand ist sauber.
 ```
 
 ## Fehlerfaelle
 
 - `K-PLAYBOOK.yaml` fehlt -> sauber abbrechen und `/k-gui` nennen
-- `Remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
+- `project.repo_root` oder der Legacy-Fallback `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
 - `gh` fehlt oder ist nicht authentifiziert -> sauber abbrechen und das Problem klar benennen
+- mehr als zwei Argumente oder ungueltige Argument-Kombination -> gueltige Formen nennen und stoppen
 - offene PR-Liste ist leer -> melden und stoppen
-- ungueltiges Argument -> gueltige Formate nennen und stoppen
+- ungueltiger PR-Selektor -> gueltige Formate nennen und stoppen
+- ungueltiger Bewertungsmodus -> `quick`, `standard`, `deep` nennen und stoppen
 - PR nicht gefunden -> Repo + Selector nennen und stoppen
+- Approval fehlgeschlagen -> klar berichten, kein Merge-Fallback
+- PR-Kommentar-/Approval-Body waere inline shell-anfällig -> immer `--body-file` mit temp Datei verwenden
+- lokaler Worktree fuer Test-Branch nicht sauber -> stoppen und User entscheiden lassen
+- Branch-Name existiert bereits oder Checkout fehlgeschlagen -> klar berichten und nicht improvisieren
+- Merge von GitHub blockiert -> Grund klar berichten, keinen Workaround erzwingen
+- lokaler Validierungs-Branch kann wegen uncleanem Worktree nicht geloescht werden -> klar berichten

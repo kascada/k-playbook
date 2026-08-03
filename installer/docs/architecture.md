@@ -48,6 +48,7 @@ Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die in
 - Die Web-Assets sind per `embed` im Go-Binary enthalten.
 - Der Installer fuehrt keine Shell-Pipelines aus. Fachlogik ruft Go-Funktionen oder gezielte Prozesse wie `git pull --ff-only` auf.
 - Der Git-Pull ist absichtlich `--ff-only`, damit keine Merge-Commits oder interaktiven Konfliktzustaende entstehen.
+- Nach einem erfolgreichen Git-Pull vergleicht die GUI das passende Release-Artefakt unter `dist/k-playbook-installer-<os>-<arch>` per Hash vor/nach dem Pull. Nur wenn sich dieses Binary geaendert hat, wird es nach `~/.local/bin/k-playbook-installer` kopiert und die GUI zeigt einen Neustart-Hinweis.
 - Lokale Installer-Daten liegen unter `~/dev/k-playbook/.k-playbook-local/` und sind nicht versioniert.
 - Der Pfadvertrag ist Voraussetzung fuer Store-, Docs- und Pull-Funktionen.
 - Pfad- und Repo-Erkennung basiert auf k-playbook-Markerdateien, nicht nur auf `.git`.
@@ -66,7 +67,7 @@ Cobra-basierte CLI. Registriert aktuell:
 
 Der Projektstatus enthaelt nur leichte read-only Checks: Projekt-Metadaten plus `playbook`, `setup`, `structure`, `docs`, `remediation`, `tasks`, `todo`, `reviews`, `enforcement`, `git`, `recommendations` und bei DevContainer-Projekten `devcontainer`. Der Status-Command darf keine Tests, Builds, Smoke-Tests, Scanner, CodeQL-Analysen oder andere aufwendige Checks starten.
 
-Die GUI ergaenzt beim Laden gespeicherter Projekte sichere fehlende Defaults in vorhandener `K-PLAYBOOK.yaml`, bevor sie den Projektstatus bildet. Aktuell betrifft das den fehlenden `remediation:`-Block mit `direct-allowed`; bestehende Werte werden nicht ueberschrieben. Diese Schreiblogik liegt bewusst in `projects.EnsureConfigDefaults`, nicht im read-only Status selbst.
+Die GUI ergaenzt beim Laden gespeicherter Projekte sichere fehlende Defaults in vorhandener `K-PLAYBOOK.yaml`, bevor sie den Projektstatus bildet. Aktuell betrifft das den fehlenden `remediation:`-Block mit `direct-allowed`; bestehende Werte werden nicht ueberschrieben. Wenn eine kanonische `K-PLAYBOOK.yaml` gelesen oder angelegt wird, wird die alte Root-Datei `K-PLAYBOOK.MD` geloescht. Diese Schreiblogik liegt bewusst in `projects.EnsureConfigDefaults` bzw. `projects.EnsureConfig`, nicht im read-only Status selbst.
 
 ### `internal/pathcontract`
 
@@ -177,7 +178,7 @@ Aktuelle Endpunkte:
 | `POST` | `/api/projects/remediation` | `remediation:`-Block eines gespeicherten Projekts in `K-PLAYBOOK.yaml` auf den gewaehlten Modus setzen |
 | `GET` | `/api/projects/scan?root=dev|home` | Projektkandidaten scannen |
 | `GET` | `/api/git/status` | Read-only per `git ls-remote` pruefen, ob der Upstream-Branch von k-playbook einen anderen Commit zeigt |
-| `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren |
+| `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren; bei geaendertem passendem `dist`-Installer-Binary nach `~/.local/bin/k-playbook-installer` installieren und Neustartbedarf melden |
 | `GET` | `/api/docs` | Markdown-Dateien unter `docs/` listen |
 | `GET` | `/api/docs/file?path=docs/...md` | Markdown-Datei lesen und gerendert ausgeben |
 | `GET` | `/api/opencode/status` | OpenCode- und Claude-Command-/Skill-Registrierung pruefen |
@@ -208,7 +209,7 @@ Die Startseite zeigt:
 6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
-9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden.
+9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden. Wenn sich dabei das passende Installer-Binary unter `dist/` geaendert hat, installiert die GUI es nach `~/.local/bin/k-playbook-installer` und zeigt den Hinweis, dass die GUI neu gestartet werden muss.
 10. Docs-Block mit gerenderter Markdown-Anzeige.
 11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
 

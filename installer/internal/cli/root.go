@@ -33,6 +33,7 @@ func newRootCommand() *cobra.Command {
 	}
 
 	rootCmd.AddCommand(newStatusCommand())
+	rootCmd.AddCommand(newSmokeCommand())
 	rootCmd.AddCommand(newGUICommand())
 	rootCmd.AddCommand(newProjectsCommand())
 
@@ -64,6 +65,27 @@ func newStatusCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&fix, "fix", false, "legt den Symlink an, wenn ~/dev/k-playbook fehlt und das aktuelle Repo sicher erkannt wurde")
 	cmd.Flags().BoolVar(&pathContract, "path-contract", false, "prueft nur den ~/dev/k-playbook Pfadvertrag")
 
+	return cmd
+}
+
+func newSmokeCommand() *cobra.Command {
+	all := false
+	cmd := &cobra.Command{
+		Use:   "smoke [path]",
+		Short: "Fuehrt einen expliziten Smoke-Test aus, inklusive gh-Pruefung",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if all {
+				return writeAllSmokeJSON()
+			}
+			projectPath := "."
+			if len(args) == 1 {
+				projectPath = args[0]
+			}
+			return writeSmokeJSON(projectPath)
+		},
+	}
+	cmd.Flags().BoolVar(&all, "all", false, "fuehrt den Smoke-Test fuer alle gespeicherten Projekte aus")
 	return cmd
 }
 
@@ -192,6 +214,26 @@ func writeProjectStatusJSON(projectPath string) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(status)
+}
+
+func writeSmokeJSON(projectPath string) error {
+	result, err := projects.Smoke(projectPath)
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
+}
+
+func writeAllSmokeJSON() error {
+	file, err := store.LoadProjects()
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(projects.SmokeAll(file))
 }
 
 func runPathContractStatus(fix bool) error {

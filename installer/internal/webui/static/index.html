@@ -23,6 +23,7 @@
             <button id="shutdown" class="secondary danger">Schliessen</button>
           </div>
         </div>
+        <div id="runtime-banner" class="runtime-banner hidden"></div>
       </section>
 
       <section class="hero compact hidden" data-view="scan">
@@ -72,10 +73,13 @@
               <h2>Projekt-Auswahl</h2>
             </div>
           </div>
-          <div id="projects" class="project-list empty">Keine Projekte gespeichert.</div>
+          <div id="projects" class="project-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Projekt-Auswahl wird geladen...</span></div>
           <div class="project-list-footer">
+            <button id="smoke-all" class="secondary">Smoke-Test fuer alle</button>
             <button id="open-scan" class="primary">Projekt hinzufuegen</button>
           </div>
+          <p id="project-scope-note" class="message hidden"></p>
+          <div id="smoke-output" class="smoke-output empty hidden">Noch kein Smoke-Test ausgefuehrt.</div>
         </section>
 
         <section class="card" id="opencode-card">
@@ -86,7 +90,7 @@
             </div>
             <span id="opencode-pill" class="status-label muted">Pruefen...</span>
           </div>
-          <div id="opencode-summary" class="summary-list empty">Noch nicht geprueft.</div>
+          <div id="opencode-summary" class="summary-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Assistenten-Registrierung wird geprueft...</span></div>
           <div class="button-row">
             <button id="opencode-install" class="primary">Registrierung aktualisieren</button>
             <button id="opencode-refresh" class="secondary">Neu pruefen</button>
@@ -101,7 +105,7 @@
             </div>
             <span id="security-tools-pill" class="status-label muted">Pruefen...</span>
           </div>
-          <div id="security-tools-summary" class="summary-list empty">Noch nicht geprueft.</div>
+          <div id="security-tools-summary" class="summary-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Security-Tools werden geprueft...</span></div>
           <div class="button-row">
             <button id="security-tools-refresh" class="secondary">Neu pruefen</button>
           </div>
@@ -111,7 +115,7 @@
           <div>
             <p class="eyebrow">Repository</p>
             <h2>k-playbook aktualisieren</h2>
-            <p id="git-output" class="message">Fuehrt im k-playbook-Repo ein sicheres `git pull --ff-only` aus.</p>
+            <p id="git-output" class="message empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Update-Status wird geprueft...</span></p>
           </div>
           <button id="git-pull" class="secondary">Git pull</button>
         </section>
@@ -125,7 +129,7 @@
             <button id="reload-docs" class="secondary">Docs neu laden</button>
           </div>
           <div class="docs-layout">
-            <div id="docs-list" class="docs-list empty">Noch keine Docs geladen.</div>
+            <div id="docs-list" class="docs-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Docs werden geladen...</span></div>
             <article id="doc-viewer" class="doc-viewer empty">Waehle eine Markdown-Datei aus.</article>
           </div>
         </section>
@@ -182,6 +186,7 @@
             </div>
           </div>
           <div id="project-detail-status" class="project-list empty">Kein Projekt ausgewaehlt.</div>
+          <div id="project-smoke-output" class="smoke-output empty hidden">Noch kein Smoke-Test ausgefuehrt.</div>
         </section>
 
         <section class="card">
