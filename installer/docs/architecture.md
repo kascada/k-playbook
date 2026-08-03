@@ -319,6 +319,7 @@ Rendering:
 - Auto-Heading-IDs via `parser.WithAutoHeadingID()`.
 - Eingebettetes Raw-HTML in Markdown wird nicht per `html.WithUnsafe()` aktiviert. Dadurch wird Markdown gerendert, aber HTML nicht als aktives HTML durchgereicht.
 - Frontend setzt das vom Server erzeugte HTML mit `innerHTML` in den Viewer.
+- Mermaid-Codebloecke, z. B. ```` ```mermaid ````, werden nach dem Einsetzen clientseitig mit Mermaid gerendert. Mermaid wird nur bei Bedarf aus dem Browser geladen; wenn der Browser offline ist, Mermaid nicht geladen oder das Diagramm nicht geparst werden kann, bleibt der Quelltext bzw. eine Fehlermeldung sichtbar.
 
 Wichtige Abgrenzung: Weil nur lokale Markdown-Dateien unter `docs/` gelesen werden und Raw-HTML nicht aktiv erlaubt ist, bleibt der Viewer bewusst einfach. Wenn spaeter externe oder projektlokale Docs aus fremden Repos angezeigt werden, sollte zusaetzlich Sanitizing explizit bewertet werden.
 

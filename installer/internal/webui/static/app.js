@@ -9,6 +9,11 @@ const state = {
   currentDocPath: "",
 };
 
+const mermaidModuleURL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+let mermaidLoader = null;
+let mermaidDiagramID = 0;
+
 const elements = {
   refresh: document.querySelector("#refresh"),
   shutdown: document.querySelector("#shutdown"),
@@ -697,7 +702,10 @@ function projectEditorCard(project) {
   const card = document.createElement("div");
   const editable = isProjectEditablePath(project.path || project.Path);
   card.className = "project-row project-editor";
-  card.append(projectHeader(project, { showDetails: false, showRemove: editable, showSmoke: editable }));
+  card.append(projectHeader(project, { showDetails: false, showRemove: false, showSmoke: editable }));
+  if ((project.environment || project.Environment) === "devcontainer") {
+    card.append(projectDevcontainerSecurityNotice(project));
+  }
   if (!editable) {
     const note = document.createElement("div");
     note.className = "disabled-note";
@@ -707,6 +715,13 @@ function projectEditorCard(project) {
 
   for (const item of projectStatus(project)) {
     card.append(projectEditorStatusRow(project, item));
+  }
+
+  if (editable) {
+    const footer = document.createElement("div");
+    footer.className = "project-editor-footer";
+    footer.append(removeProjectButton(project));
+    card.append(footer);
   }
 
   return card;
@@ -745,6 +760,41 @@ function projectHeader(project, options = {}) {
   }
   header.append(details, headerActions);
   return header;
+}
+
+function projectDevcontainerSecurityNotice(project) {
+  const notice = document.createElement("div");
+  notice.className = "project-notice warn";
+
+  const title = document.createElement("strong");
+  title.textContent = "Security-Tools im DevContainer";
+
+  const detail = document.createElement("span");
+  const projectPath = project.path || project.Path || "das Projekt";
+  const runtime = state.runtime || {};
+  const insideCurrentDevcontainer = Boolean(runtime.insideDevcontainer || runtime.InsideDevcontainer)
+    && (runtime.currentProject || runtime.CurrentProject || "") === projectPath;
+  const command = "/k-install-security-tools --install missing";
+  detail.textContent = insideCurrentDevcontainer
+    ? "Du bist im Projekt-Container. Fehlende Tools hier installieren oder pruefen:"
+    : "Host-Tools gelten nicht fuer den Container. Die DevContainer-Integration installiert fehlende Pflicht-Tools beim Rebuild; danach den Container neu bauen oder im Container ausfuehren:";
+
+  const commandButton = document.createElement("button");
+  commandButton.type = "button";
+  commandButton.className = "inline-copy-command";
+  commandButton.title = `${command} in die Zwischenablage kopieren`;
+  commandButton.addEventListener("click", () => copyText(command));
+
+  const icon = document.createElement("span");
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "⧉";
+
+  const commandText = document.createElement("code");
+  commandText.textContent = command;
+  commandButton.append(icon, commandText);
+
+  notice.append(title, detail, commandButton);
+  return notice;
 }
 
 function projectStatusList(items) {
@@ -1660,6 +1710,13 @@ function renderSecurityTools(status) {
     summary.append(matrix);
   }
 
+  if (hasDevcontainerProjects()) {
+    const devcontainerNote = document.createElement("p");
+    devcontainerNote.className = "message warn-text";
+    devcontainerNote.textContent = "Achtung: Diese Pruefung gilt nur fuer die aktuelle Laufzeit. Bei DevContainer-Projekten muessen Security-Tools separat im Container installiert werden; Details stehen im jeweiligen Projektstatus.";
+    summary.append(devcontainerNote);
+  }
+
   if (!scopeOk) {
     const scope = document.createElement("p");
     scope.className = "message warn-text";
@@ -1684,39 +1741,59 @@ function renderSecurityTools(status) {
     }));
   }
 
-  const list = document.createElement("div");
-  list.className = "security-tool-list";
-  for (const tool of tools) {
-    const row = document.createElement("div");
-    row.className = "security-tool-row";
+  if (tools.length > 0) {
+    const details = document.createElement("details");
+    details.className = "security-tool-details";
+    const detailsSummary = document.createElement("summary");
+    detailsSummary.textContent = `Tool-Liste anzeigen (${tools.length})`;
+    details.append(detailsSummary);
 
-    const info = document.createElement("div");
-    const name = document.createElement("strong");
-    name.textContent = tool.name || tool.Name;
-    const detail = document.createElement("span");
-    const role = tool.role || tool.Role || "";
-    const path = tool.path || tool.Path || "";
-    const version = tool.version || tool.Version || "";
-    const dockerImage = tool.dockerImage || tool.DockerImage || "";
-    const parts = [role];
-    if (path) {
-      parts.push(version, path);
+    const list = document.createElement("div");
+    list.className = "security-tool-list";
+    for (const tool of tools) {
+      const row = document.createElement("div");
+      row.className = "security-tool-row";
+
+      const info = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = tool.name || tool.Name;
+      const detail = document.createElement("span");
+      const role = tool.role || tool.Role || "";
+      const path = tool.path || tool.Path || "";
+      const version = tool.version || tool.Version || "";
+      const dockerImage = tool.dockerImage || tool.DockerImage || "";
+      const parts = [role];
+      if (path) {
+        parts.push(version, path);
+      }
+      if (dockerImage && dockerImage !== "-") {
+        parts.push(`Docker: ${dockerImage}`);
+      }
+      detail.textContent = parts.filter(Boolean).join(" - ");
+      info.append(name, detail);
+
+      const present = tool.present || tool.Present;
+      const label = document.createElement("span");
+      label.className = "status-label " + (present ? "ok" : (tool.required || tool.Required) ? "warn" : "muted");
+      label.textContent = present ? "OK ✓" : (tool.required || tool.Required) ? "FEHLT !" : "OPTIONAL";
+
+      row.append(info, label);
+      list.append(row);
     }
-    if (dockerImage && dockerImage !== "-") {
-      parts.push(`Docker: ${dockerImage}`);
-    }
-    detail.textContent = parts.filter(Boolean).join(" - ");
-    info.append(name, detail);
-
-    const present = tool.present || tool.Present;
-    const label = document.createElement("span");
-    label.className = "status-label " + (present ? "ok" : (tool.required || tool.Required) ? "warn" : "muted");
-    label.textContent = present ? "OK ✓" : (tool.required || tool.Required) ? "FEHLT !" : "OPTIONAL";
-
-    row.append(info, label);
-    list.append(row);
+    details.append(list);
+    elements.securityToolsSummary.append(details);
   }
-  elements.securityToolsSummary.append(list);
+}
+
+function hasDevcontainerProjects() {
+  const devcontainerStatus = state.devcontainers || {};
+  if (devcontainerStatus.hasProjects || devcontainerStatus.HasProjects) {
+    return true;
+  }
+  return state.projects.some((project) => {
+    const selected = project.selected !== false && project.Selected !== false;
+    return selected && (project.environment || project.Environment) === "devcontainer";
+  });
 }
 
 function renderSecurityToolsLoading() {
@@ -1765,11 +1842,77 @@ async function loadDoc(path, title = "", selectedButton = null) {
     elements.docPath.textContent = doc.path || path;
     elements.docViewer.classList.remove("empty");
     elements.docViewer.innerHTML = doc.html || "";
+    renderMermaidDiagrams(elements.docViewer);
     setActiveDocButton(selectedButton);
   } catch (error) {
     renderInlineMessage(elements.docViewer, `Dokument konnte nicht geladen werden: ${error.message}`);
     throw error;
   }
+}
+
+async function renderMermaidDiagrams(container) {
+  const blocks = Array.from(container.querySelectorAll("pre > code.language-mermaid, pre > code.lang-mermaid"));
+  if (blocks.length === 0) {
+    return;
+  }
+
+  let mermaid;
+  try {
+    mermaid = await loadMermaid();
+  } catch (error) {
+    for (const block of blocks) {
+      const pre = block.closest("pre");
+      if (!pre || !pre.isConnected) {
+        continue;
+      }
+      const message = document.createElement("p");
+      message.className = "mermaid-message";
+      message.textContent = `Mermaid konnte nicht geladen werden; Diagramm bleibt als Quelltext sichtbar. ${error.message}`;
+      pre.before(message);
+    }
+    return;
+  }
+
+  for (const block of blocks) {
+    const pre = block.closest("pre");
+    if (!pre || !pre.isConnected) {
+      continue;
+    }
+
+    const source = block.textContent.trim();
+    const diagram = document.createElement("div");
+    diagram.className = "mermaid-diagram";
+    diagram.setAttribute("aria-label", "Mermaid-Diagramm");
+    pre.replaceWith(diagram);
+
+    try {
+      const { svg } = await mermaid.render(`doc-mermaid-${++mermaidDiagramID}`, source);
+      diagram.innerHTML = svg;
+    } catch (error) {
+      diagram.classList.add("mermaid-error");
+      diagram.textContent = `Mermaid-Diagramm konnte nicht gerendert werden: ${error.message}`;
+      const fallback = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = source;
+      fallback.append(code);
+      diagram.append(fallback);
+    }
+  }
+}
+
+async function loadMermaid() {
+  if (!mermaidLoader) {
+    mermaidLoader = import(mermaidModuleURL).then((module) => {
+      const mermaid = module.default;
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: "neutral",
+      });
+      return mermaid;
+    });
+  }
+  return mermaidLoader;
 }
 
 function setActiveDocButton(selectedButton) {

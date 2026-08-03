@@ -12,10 +12,8 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 | [`faq.md`](./faq.md) | Kurze Antworten zu `/k-gui`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
 | [`pr-review.md`](./pr-review.md) | Detailguide fuer PR-Reviews. |
-| [`review.md`](./review.md) | Detailguide fuer Review-Rezepte und Review-Handoffs. |
-| [`results.md`](./results.md) | Detailguide fuer projektweite Results-Summaries. |
-| [`remediation.md`](./remediation.md) | Detailguide fuer Remediation-Planung und Task-Handoff. |
-| [`task-flow.md`](./task-flow.md) | Detailguide fuer `/k-task-create`, `/k-review-loop`, `/k-run` und `/k-todo`. |
+| [`code-review.md`](./code-review.md) | Detailguide fuer `/k-review`, `/k-results`, `/k-remediation` und Handoffs. |
+| [`task-flow.md`](./task-flow.md) | Detailguide fuer `/k-task-create`, `/k-review-loop` und `/k-run`. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | YAML-Format der projektlokalen `K-PLAYBOOK.yaml`-Konfiguration. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Installer-Architektur, Browser-GUI, Web-API, Designentscheidungen und Session-Memory fuer weitere Installer-Arbeiten. |
@@ -37,7 +35,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `AGENTS.md` -> [`ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
 - `Basisinstallation` / `Base-Repo` -> [`../AGENTS.md`](../AGENTS.md), [`handbuch.md`](./handbuch.md)
 - `CodeQL` -> [`commands.md`](./commands.md), [`../global/rules/codeql.md`](../global/rules/codeql.md)
-- `Commands` -> [`handbuch.md`](./handbuch.md#commands), [`commands.md`](./commands.md)
+- `Commands` -> [`handbuch.md`](./handbuch.md#wichtige-commands), [`commands.md`](./commands.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md), [`../ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
 - `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
 - `Installation` -> [`installation.md`](./installation.md)
@@ -47,13 +45,12 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `k-gui` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
 - `Multi-Project` / `DevContainer-Installation` -> [`multi-project-installation.md`](./multi-project-installation.md), [`commands.md`](./commands.md)
-- `OKF` / `Open Knowledge Format` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
 - `PR-Review` -> [`pr-review.md`](./pr-review.md)
-- `Remediation` -> [`remediation.md`](./remediation.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `Remediation` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
 - `Regeln in diesem Repo` -> [`../AGENTS.md`](../AGENTS.md), [`../global/rules/README.md`](../global/rules/README.md)
-- `Reviews` -> [`review.md`](./review.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `Reviews` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
 - `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `Security-Tool-Matrix` -> [`../global/security-tools.tsv`](../global/security-tools.tsv)
-- `Results` -> [`results.md`](./results.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `Results` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
 - `Tasks` -> [`task-flow.md`](./task-flow.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
