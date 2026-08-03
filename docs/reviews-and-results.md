@@ -7,13 +7,15 @@ Diese Datei dokumentiert den aktuellen k-playbook-Flow fuer Review-Rezepte, Scan
 k-playbook trennt vier Arbeitsschritte:
 
 1. **Review-Familie ausfuehren**: `/k-review <review-name>` erzeugt oder bewertet Ergebnisse einer Scan-/Review-Familie.
-2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/`.
+2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `<paths.reviews>/results/<family>/YYYY-MM-DD/`.
 3. **Projektweit priorisieren**: `/k-results` fasst mehrere Result-Familien zusammen und dedupliziert sie.
 4. **Remediation ausfuehren**: `/k-remediation <result-or-summary>` arbeitet priorisierte, statusfaehige Findings ab.
 
 `/k-remediation` soll nicht erst alle Scannergebnisse aggregieren. Es soll mit einem bereits bewerteten Assessment oder einer priorisierten Summary starten. Innerhalb dieser Eingabe muss es aber vor der Umsetzung Findings zu sinnvollen Remediation-Buendeln gruppieren und nach Risiko, Aufwand, Quick-Win-Potential und gemeinsamer Verifikation sortieren.
 
 ## Verzeichnisse
+
+Projektlokale Review-Pfade kommen aus `K-PLAYBOOK.yaml`. `/k-review`, `/k-results` und `/k-remediation` lesen dafuer `paths.reviews`; sie duerfen den Pfad nicht aus dem Dateisystem oder aus historischen Defaults erraten. Fehlt `paths.reviews`, muss der ausfuehrende Command nachfragen, den bestaetigten projektrelativen Pfad in `K-PLAYBOOK.yaml` ergaenzen und danach erneut aufloesen. Die Beispiele unten verwenden den konventionellen Wert `k-playbook/reviews`.
 
 Globale Review-Rezepte:
 
@@ -24,7 +26,7 @@ Globale Review-Rezepte:
 Projektlokale Review-Ergebnisse:
 
 ```text
-<project>/k-playbook/reviews/results/<family>/YYYY-MM-DD/
+<project>/<paths.reviews>/results/<family>/YYYY-MM-DD/
 ```
 
 Beispiel:
@@ -38,7 +40,7 @@ k-playbook/reviews/results/k-check/2026-07-24/
     └── k-check-baseline.txt
 ```
 
-`k-playbook/checks/` bleibt fuer ausfuehrbare Checks und Check-Definitionen reserviert. Review-Ergebnisse gehoeren unter `k-playbook/reviews/`.
+`paths.checks` bleibt fuer ausfuehrbare Checks und Check-Definitionen reserviert. Review-Ergebnisse gehoeren unter `paths.reviews`.
 
 ## Artefakte pro Result-Familie
 
@@ -95,7 +97,7 @@ Grund:
 - Sie erzeugen eigene strukturierte Rohdaten wie JSON, SARIF-aehnliche Reports oder SBOMs.
 - Non-zero Exit-Codes bedeuten oft fachliche Findings, nicht technische Fehler.
 - Ergebnisse muessen dedupliziert, priorisiert und bewertet werden.
-- Raw-Artefakte muessen dauerhaft unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/raw/` landen.
+- Raw-Artefakte muessen dauerhaft unter `<paths.reviews>/results/<family>/YYYY-MM-DD/raw/` landen.
 - Remediation braucht stabile Finding-IDs, Statuswerte und Quellenbelege.
 
 Darum laufen diese Tools ueber Report-Mode Review-Familien:
@@ -135,7 +137,7 @@ Typische Artefakte:
 
 CodeQL bewertet CWE-/Code-Findings, nicht Dependency-CVEs. Dependency-CVEs gehoeren in eine eigene Result-Familie.
 
-Bei Wrapper-Repos soll `tools.codeql.target` in `K-PLAYBOOK.yaml` den tatsaechlichen Analyse-/Git-Root benennen, z. B. `./app`, waehrend Result-Artefakte weiterhin unter `k-playbook/reviews/` liegen.
+Bei Wrapper-Repos soll `tools.codeql.target` in `K-PLAYBOOK.yaml` den tatsaechlichen Analyse-/Git-Root benennen, z. B. `./app`, waehrend Result-Artefakte weiterhin unter `paths.reviews` liegen.
 
 ### k-check
 
@@ -265,7 +267,7 @@ Jede dieser Familien muss am Ende eine bewertete Liste in `assessment.md` erzeug
 
 ## Review-Log
 
-`/k-review` pflegt projektlokal:
+`/k-review` pflegt projektlokal den in `paths.reviews` konfigurierten Log-Pfad, konventionell:
 
 ```text
 k-playbook/reviews/log.md

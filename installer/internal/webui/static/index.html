@@ -130,7 +130,6 @@
           </div>
           <div class="docs-layout">
             <div id="docs-list" class="docs-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Docs werden geladen...</span></div>
-            <article id="doc-viewer" class="doc-viewer empty">Waehle eine Markdown-Datei aus.</article>
           </div>
         </section>
       </section>
@@ -203,6 +202,20 @@
           <pre id="project-config" class="yaml-viewer empty">Keine YAML geladen.</pre>
         </section>
       </section>
+
+      <div id="doc-overlay" class="doc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="doc-title">
+        <div class="doc-panel">
+          <header class="doc-panel-head">
+            <div>
+              <p class="eyebrow">Dokumentation</p>
+              <h2 id="doc-title">Markdown-Datei</h2>
+              <p id="doc-path" class="doc-path"></p>
+            </div>
+            <button id="close-doc" class="secondary">Schliessen</button>
+          </header>
+          <article id="doc-viewer" class="doc-viewer empty">Waehle eine Markdown-Datei aus.</article>
+        </div>
+      </div>
 
       <div id="toast" class="toast hidden"></div>
       <div id="closed" class="closed hidden">

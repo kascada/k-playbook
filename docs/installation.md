@@ -9,13 +9,13 @@ Primärumgebung ist OpenCode. Claude Code kann optional nur fuer Slash-Commands 
 Das Repo liegt standardmaessig unter `~/dev/k-playbook/`:
 
 ```bash
-gh repo clone kascada/k-playbook ~/dev/k-playbook
+git clone git@github.com:kascada/k-playbook.git ~/dev/k-playbook
 ```
 
 Alternative:
 
 ```bash
-git clone git@github.com:kascada/k-playbook.git ~/dev/k-playbook
+gh repo clone kascada/k-playbook ~/dev/k-playbook
 ```
 
 Dieser Pfad ist der verbindliche Pfadvertrag fuer k-playbook. Projektdateien wie `K-PLAYBOOK.yaml`, OpenCode `skills.paths` und Command-Symlinks zeigen auf `~/dev/k-playbook`, nicht auf einen host-spezifischen absoluten Pfad.
@@ -100,7 +100,7 @@ Wenn `k_playbook.repo: ~/dev/k-playbook` im Container steht, bedeutet das also *
 Auf einem neuen Host sind zwei Dinge getrennt:
 
 1. Host-global installieren: macht Commands, Skills und Security-Tools fuer alle Projekte verfuegbar.
-2. Projektlokal einrichten: erzeugt in jedem Zielprojekt `K-PLAYBOOK.yaml` und die feste Struktur ueber den Installer.
+2. Projektlokal einrichten: erzeugt in jedem Zielprojekt `K-PLAYBOOK.yaml` inklusive `paths.*` und die konfigurierte Struktur ueber den Installer.
 
 Host-global:
 
@@ -113,7 +113,7 @@ Empfohlen wird der Aufruf direkt im k-playbook-Repo nach dem Klonen oder nach ei
 
 Danach OpenCode neu starten.
 
-Projektlokal pro Projekt: Projekt in der GUI hinzufuegen oder vervollstaendigen. Die GUI erzeugt `K-PLAYBOOK.yaml` und die feste `k-playbook/`-Struktur.
+Projektlokal pro Projekt: Projekt in der GUI hinzufuegen oder vervollstaendigen. Die GUI erzeugt `K-PLAYBOOK.yaml` inklusive `paths.*` und die konfigurierte projektlokale Struktur.
 
 Optional pro Projekt:
 
@@ -221,12 +221,13 @@ Projekt in der Installer-GUI hinzufuegen oder vervollstaendigen:
 Die GUI:
 
 - legt oder aktualisiert `K-PLAYBOOK.yaml` im Projekt-Root.
-- legt die vollstaendige projektlokale Struktur unter `k-playbook/` an.
+- schreibt die projektlokalen Artefaktpfade unter `paths.*`.
+- legt die konfigurierte projektlokale Struktur an, konventionell unter `k-playbook/`.
 - erzeugt bestaetigte Verzeichnisse oder Initialdateien.
 - schreibt keine host-globale OpenCode-Konfiguration.
 - installiert keine host-globalen Tools.
 
-`K-PLAYBOOK.yaml` ist die zentrale Config-Datei. Spaetere Commands leiten ihre Pfade fest aus `k-playbook/` ab; Standardpfade werden nicht in der Datei gespeichert.
+`K-PLAYBOOK.yaml` ist die zentrale Config-Datei. Spaetere Commands lesen projektlokale Pfade aus `paths.*`. Fehlt ein benoetigter Pfad, muss der Command nachfragen und den bestaetigten Wert in `K-PLAYBOOK.yaml` ergaenzen; er darf nicht still aus `k-playbook/` oder dem Dateisystem raten.
 
 Der `k_playbook.repo`-Eintrag ist fest `~/dev/k-playbook`. Er ist sichtbar und wird von Commands gelesen, aber nicht als frei waehlbarer Pfad behandelt. Wenn der physische Klon woanders liegt, muss ein Symlink den Pfadvertrag erfuellen.
 
@@ -273,7 +274,7 @@ Checkliste fuer ein Projekt:
 - [ ] `K-PLAYBOOK.yaml` existiert im Projekt-Root.
 - [ ] `layout: fixed-project-k-playbook` ist gesetzt.
 - [ ] `k_playbook.repo` zeigt auf `~/dev/k-playbook`.
-- [ ] Die festen Pfade unter `k-playbook/` existieren.
+- [ ] Die benoetigten `paths.*`-Eintraege sind gesetzt und die konfigurierten Pfade existieren.
 - [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
 - [ ] Bei Docs existiert ein Docs-Index oder `/k-code2docs` ist als naechster Schritt geplant.
 

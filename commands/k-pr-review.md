@@ -288,15 +288,15 @@ Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohn
 Lade fuer die Bewertung:
 
 - globale Regeln aus `<PLAYBOOK_REPO>/global/rules/*.md`
-- projektlokale Regeln aus `<TARGET_DIR>/k-playbook/enforcement/*.md`
-- projektlokale Docs aus `<TARGET_DIR>/k-playbook/docs/`, wenn sie fuer Docs-Sync sichtbar relevant sind
+- projektlokale Regeln aus `<paths.enforcement>/*.md`, wenn in `K-PLAYBOOK.yaml` gesetzt
+- projektlokale Docs aus `<paths.docs>/`, wenn in `K-PLAYBOOK.yaml` gesetzt und fuer Docs-Sync sichtbar relevant
 
 Nutze diese Quellen als Constraints, nicht als Anlass fuer ein separates `/k-review`.
 
 Wichtig:
 
-- `global/reviews/*.md` und `k-playbook/reviews/` sind in diesem Command nur Referenz fuer moegliche Folge-Schritte, nicht der Default-Executor.
-- keine Dateien unter `k-playbook/reviews/` oder `k-playbook/tasks/` schreiben.
+- `global/reviews/*.md` und `<paths.reviews>/` sind in diesem Command nur Referenz fuer moegliche Folge-Schritte, nicht der Default-Executor.
+- keine Dateien unter `<paths.reviews>/` oder `<paths.tasks>/` schreiben.
 - nur read-only Kommandos und Analyse.
 
 ### 6.2 PR-Scope klassifizieren

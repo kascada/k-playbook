@@ -33,9 +33,9 @@ make install
 k-playbook-installer
 ```
 
-`make install` braucht kein lokal installiertes Go. Es ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes Release-Artefakt aus `dist/`, danach ein vorhandenes Source-Binary aus `bin/` und laedt sonst das passende Release-Binary von GitHub. Installiert wird standardmaessig nach `~/.local/bin/k-playbook-installer`.
+`make install` braucht kein lokal installiertes Go. Es ruft `scripts/install-installer.sh` auf; das Script spiegelt alle unterstuetzten Release-Artefakte aus `dist/` oder aus GitHub Releases nach `bin/`, installiert dort den Wrapper `bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper.
 
-Source-Builds fuer Entwickler brauchen Go. `make install-from-source` baut das Binary nach `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` per Symlink darauf. `make gui` startet immer das repo-lokale Binary aus `./bin/` und funktioniert deshalb auch, wenn `~/.local/bin` noch nicht im `PATH` liegt. Falls `~/.local/bin` noch nicht im `PATH` liegt, fragt `make install-from-source` interaktiv, ob das passende Shell-Profil automatisch ergaenzt werden soll. Unter macOS mit zsh ist das standardmaessig `~/.zprofile`, unter Linux meistens `~/.profile`.
+Source-Builds fuer Entwickler brauchen Go. `make install-from-source` baut alle plattformspezifischen Binaries nach `./bin/`, installiert den Wrapper `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` per Symlink darauf. `make gui` startet immer den repo-lokalen Wrapper aus `./bin/` und funktioniert deshalb auch, wenn `~/.local/bin` noch nicht im `PATH` liegt. Falls `~/.local/bin` noch nicht im `PATH` liegt, fragt `make install-from-source` interaktiv, ob das passende Shell-Profil automatisch ergaenzt werden soll. Unter macOS mit zsh ist das standardmaessig `~/.zprofile`, unter Linux meistens `~/.profile`.
 
 Entwicklungsaufrufe ohne Installation:
 

@@ -208,6 +208,10 @@ func EnsureConfigDefaults(projectPath string) (bool, error) {
 
 	content := string(data)
 	updated := content
+	values := simpleYAMLValues(content)
+	if !hasAllDefaultPathKeys(values) {
+		updated = replacePathsBlock(updated, pathsBlockFromValues(values))
+	}
 	if _, found, err := readRemediationModeFromContent(content); err != nil {
 		return false, err
 	} else if !found {
@@ -451,10 +455,40 @@ k_playbook:
 
 %s
 
+%s
+
 setup:
   updated_at: %s
 
-%s`, strings.TrimRight(projectBlock(projectRoot), "\n"), updatedAt.Format("2006-01-02"), remediationBlock(remediationMode))
+%s`, strings.TrimRight(pathsBlock(), "\n"), strings.TrimRight(projectBlock(projectRoot), "\n"), updatedAt.Format("2006-01-02"), remediationBlock(remediationMode))
+}
+
+func pathsBlock() string {
+	return pathsBlockFromValues(nil)
+}
+
+func pathsBlockFromValues(values map[string]string) string {
+	valueFor := func(key string, fallback string) string {
+		if values == nil {
+			return fallback
+		}
+		if value := strings.TrimSpace(values[key]); value != "" {
+			return value
+		}
+		return fallback
+	}
+
+	return `paths:
+  playbook: ` + valueFor("paths.playbook", "k-playbook") + `
+  tasks: ` + valueFor("paths.tasks", "k-playbook/tasks") + `
+  completed_tasks: ` + valueFor("paths.completed_tasks", "k-playbook/tasks/done") + `
+  todo: ` + valueFor("paths.todo", "k-playbook/TODO.md") + `
+  checks: ` + valueFor("paths.checks", "k-playbook/checks") + `
+  reviews: ` + valueFor("paths.reviews", "k-playbook/reviews") + `
+  guidelines: ` + valueFor("paths.guidelines", "k-playbook/guidelines") + `
+  enforcement: ` + valueFor("paths.enforcement", "k-playbook/enforcement") + `
+  docs: ` + valueFor("paths.docs", "k-playbook/docs") + `
+`
 }
 
 func projectBlock(projectRoot ProjectRootConfig) string {
@@ -525,6 +559,29 @@ func replaceRemediationBlock(content string, block string) string {
 
 func replaceProjectBlock(content string, block string) string {
 	return replaceTopLevelBlock(content, "project", block)
+}
+
+func replacePathsBlock(content string, block string) string {
+	return replaceTopLevelBlock(content, "paths", block)
+}
+
+func hasAllDefaultPathKeys(values map[string]string) bool {
+	for _, key := range []string{
+		"paths.playbook",
+		"paths.tasks",
+		"paths.completed_tasks",
+		"paths.todo",
+		"paths.checks",
+		"paths.reviews",
+		"paths.guidelines",
+		"paths.enforcement",
+		"paths.docs",
+	} {
+		if strings.TrimSpace(values[key]) == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func replaceTopLevelBlock(content string, blockName string, block string) string {

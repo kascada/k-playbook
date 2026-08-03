@@ -7,8 +7,10 @@ Usage: install-installer.sh [--bin-dir <dir>] [--from-dist-only]
 
 Installs k-playbook-installer without requiring Go on the user machine.
 
-The script first looks for a matching local release artifact under dist/, then
-for an already built source binary under bin/, and otherwise downloads the latest release.
+The script mirrors all supported release artifacts to bin/, installs the
+repo-local launcher wrapper, and links the global command to that wrapper.
+For each platform binary it first looks under dist/ and otherwise downloads
+the latest release.
 
 Options:
   --bin-dir <dir>       Install directory. Default: ~/.local/bin.
@@ -39,9 +41,12 @@ PLAYBOOK_REPO="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 BINARY="k-playbook-installer"
 DIST_DIR="$PLAYBOOK_REPO/dist"
+BIN_DIR="$PLAYBOOK_REPO/bin"
+WRAPPER_TEMPLATE="$PLAYBOOK_REPO/scripts/templates/k-playbook-installer-wrapper.sh"
 INSTALL_BIN="${INSTALL_BIN:-$HOME/.local/bin}"
 RELEASE_BASE_URL="${K_PLAYBOOK_RELEASE_BASE_URL:-https://github.com/kascada/k-playbook/releases/latest/download}"
 FROM_DIST_ONLY=0
+RELEASE_TARGETS=(linux-amd64 linux-arm64 darwin-amd64 darwin-arm64)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,22 +71,6 @@ done
 
 INSTALL_BIN="${INSTALL_BIN/#\~/$HOME}"
 
-detect_os() {
-  case "$(uname -s)" in
-    Linux) printf 'linux' ;;
-    Darwin) printf 'darwin' ;;
-    *) die "Unsupported OS: $(uname -s). Supported: Linux, macOS." ;;
-  esac
-}
-
-detect_arch() {
-  case "$(uname -m)" in
-    x86_64|amd64) printf 'amd64' ;;
-    arm64|aarch64) printf 'arm64' ;;
-    *) die "Unsupported architecture: $(uname -m). Supported: amd64, arm64." ;;
-  esac
-}
-
 download() {
   local url="$1"
   local dest="$2"
@@ -95,35 +84,7 @@ download() {
   fi
 }
 
-is_usable_local_binary() {
-  local candidate="$1"
-
-  [[ -f "$candidate" && -x "$candidate" ]] || return 1
-  if "$candidate" --help >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
-}
-
-first_usable_local_binary() {
-  local candidate
-
-  for candidate in \
-    "$PLAYBOOK_REPO/bin/$BINARY" \
-    "$PLAYBOOK_REPO/installer/$BINARY"; do
-    if is_usable_local_binary "$candidate"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-os="$(detect_os)"
-arch="$(detect_arch)"
-asset="$BINARY-$os-$arch"
-local_asset="$DIST_DIR/$asset"
+[[ -f "$WRAPPER_TEMPLATE" ]] || die "Missing wrapper template: $WRAPPER_TEMPLATE"
 tmp_dir=""
 
 cleanup() {
@@ -133,24 +94,32 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ -f "$local_asset" ]]; then
-  source_binary="$local_asset"
-  log "Nutze lokales Release-Artefakt: $local_asset"
-elif [[ "$FROM_DIST_ONLY" -eq 0 ]] && source_binary="$(first_usable_local_binary)"; then
-  log "Nutze vorhandenes lokales Binary: $source_binary"
-else
-  [[ "$FROM_DIST_ONLY" -eq 0 ]] || die "Missing local release artifact: $local_asset"
-  tmp_dir="$(mktemp -d)"
-  source_binary="$tmp_dir/$asset"
-  url="$RELEASE_BASE_URL/$asset"
-  log "Lade Release-Binary: $url"
-  download "$url" "$source_binary" || die "Download fehlgeschlagen. Stelle sicher, dass das Release-Asset existiert, oder kopiere ein passendes Binary nach bin/ oder dist/."
-fi
+mkdir -p "$BIN_DIR" "$INSTALL_BIN"
+install -m 0755 "$WRAPPER_TEMPLATE" "$BIN_DIR/$BINARY"
+log "Installiert: $BIN_DIR/$BINARY"
 
-mkdir -p "$INSTALL_BIN"
-install -m 0755 "$source_binary" "$INSTALL_BIN/$BINARY"
+for target in "${RELEASE_TARGETS[@]}"; do
+  asset="$BINARY-$target"
+  local_asset="$DIST_DIR/$asset"
+  if [[ -f "$local_asset" ]]; then
+    source_binary="$local_asset"
+    log "Nutze lokales Release-Artefakt: $local_asset"
+  else
+    [[ "$FROM_DIST_ONLY" -eq 0 ]] || die "Missing local release artifact: $local_asset"
+    if [[ -z "$tmp_dir" ]]; then
+      tmp_dir="$(mktemp -d)"
+    fi
+    source_binary="$tmp_dir/$asset"
+    url="$RELEASE_BASE_URL/$asset"
+    log "Lade Release-Binary: $url"
+    download "$url" "$source_binary" || die "Download fehlgeschlagen. Stelle sicher, dass das Release-Asset existiert: $asset."
+  fi
+  install -m 0755 "$source_binary" "$BIN_DIR/$asset"
+  log "Installiert: $BIN_DIR/$asset"
+done
 
-log "Installiert: $INSTALL_BIN/$BINARY"
+ln -sfn "$BIN_DIR/$BINARY" "$INSTALL_BIN/$BINARY"
+log "Verlinkt: $INSTALL_BIN/$BINARY -> $BIN_DIR/$BINARY"
 
 case ":$PATH:" in
   *":$INSTALL_BIN:"*)

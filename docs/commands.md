@@ -2,7 +2,7 @@
 
 Diese Datei beschreibt die aktuell vorhandenen Setup-, Install-, Workflow- und Hilfs-Commands und grenzt ihre Zustaendigkeiten ab.
 
-Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt unter dem festen `k-playbook/`-Layout; Projektentscheidungen werden ueber `K-PLAYBOOK.yaml` registriert.
+Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt unter den in `K-PLAYBOOK.yaml` konfigurierten `paths.*`; die konventionellen Werte zeigen auf `k-playbook/...`.
 
 Der Review-/Results-/Remediation-Flow ist in [`reviews-and-results.md`](./reviews-and-results.md) zusammengefasst.
 
@@ -12,7 +12,7 @@ Die empfohlene Reihenfolge fuer Host, mehrere Zielprojekte und DevContainer steh
 
 Installer-GUI, host-lokale Tool-Commands und projektlokale Spezialcommands haben absichtlich unterschiedliche Zustaendigkeiten:
 
-- Der k-playbook Installer ist **host-global** fuer Registrierung und Projekt-Onboarding: Pfadvertrag, OpenCode-/Claude-Registrierung, Projektliste, `K-PLAYBOOK.yaml`, feste Projektstruktur und Remediation-Default.
+- Der k-playbook Installer ist **host-global** fuer Registrierung und Projekt-Onboarding: Pfadvertrag, OpenCode-/Claude-Registrierung, Projektliste, `K-PLAYBOOK.yaml`, `paths.*`-Struktur und Remediation-Default.
 - `/k-install-security-tools` ist **host-global** und installiert/prueft Security-Tools fuer alle Projekte.
 - `/k-install-codeql` ist Tooling-/Artefakt-orientiert. Es installiert oder prueft lokale CodeQL-Artefakte, schreibt aber keine Projektkonfiguration.
 - `/k-setup-codeql` ist **projektlokal** und schreibt die CodeQL-Entscheidung.
@@ -50,25 +50,25 @@ Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden auf dem H
 | `/k-install-security-tools` | host-lokale Security-Review-Tools aus `global/security-tools.tsv` installieren/pruefen | keine Aenderung | Pflicht-Scanner oder Docker-Images laut Tool-Matrix |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | keine Aenderung an `K-PLAYBOOK.yaml` | optional `codeql-cli/`, `databases/`, `results/` |
 | `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt `tools.codeql` in `K-PLAYBOOK.yaml` | optional CLI-only Artefakt unter `codeql-cli/` |
-| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/*.md`, `k-playbook/docs/README.md`, `AGENTS.md`, `opencode.json` |
-| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `k-playbook/docs` | schreibt `k-playbook/docs/libs/*.md`, `libs/README.md`, aktualisiert Hauptindex |
+| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | nutzt `paths.docs` | schreibt Docs unter `<paths.docs>/`, `AGENTS.md`, `opencode.json` |
+| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `paths.docs` | schreibt Library-Docs unter `<paths.docs>/libs/`, aktualisiert Hauptindex |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
-| `/k-gui` | lokale k-playbook Installer-GUI starten | keine Aenderung | startet `~/.local/bin/k-playbook-installer` im Vordergrund |
+| `/k-gui` | lokale k-playbook Installer-GUI starten | keine Aenderung | startet `~/dev/k-playbook/bin/k-playbook-installer` im Vordergrund |
 | **Code-Review** | | | |
 | `/k-pr-review` | offene GitHub-PRs fuer das konfigurierte Repo listen, einen PR laden, bewerten und optional approven oder in einen lokalen Test-Branch ueberfuehren | nutzt `K-PLAYBOOK.yaml`, `enforcement` und `docs`; fragt Modus `quick|standard|deep` ab, wenn nicht gesetzt | standardmaessig read-only; schreibt nur nach expliziter Entscheidung via GitHub-Approval oder lokalem Validierungs-Branch |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `k-playbook/reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` |
-| `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `k-playbook/reviews` und `k-playbook/tasks` | schreibt `k-playbook/reviews/results/summary-YYYY-MM-DD.md` |
-| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | nutzt `k-playbook/reviews`, `k-playbook/tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `paths.reviews` und `known-decisions.md` aus `K-PLAYBOOK.yaml` | interaktive Aenderungen oder Report-Artefakte unter `<paths.reviews>/results/<family>/YYYY-MM-DD/` |
+| `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `paths.reviews` und `paths.tasks` aus `K-PLAYBOOK.yaml` | schreibt `<paths.reviews>/results/summary-YYYY-MM-DD.md` |
+| `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | nutzt `paths.reviews`, `paths.tasks` und Remediation-Policy aus `K-PLAYBOOK.yaml` | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
 | **Task-Flow** | | | |
-| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | nutzt `k-playbook/tasks` | schreibt `k-playbook/tasks/<NNN>-<slug>.md` nach Bestaetigung |
+| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | nutzt `paths.tasks` | schreibt `<paths.tasks>/<NNN>-<slug>.md` nach Bestaetigung |
 | `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | nutzt optional `tasks` | Moderator schreibt akzeptierte Task-Edits und Review-Log |
-| `/k-run` | Task-Dateien sequenziell ausfuehren | nutzt `k-playbook/tasks` und `K-PLAYBOOK.yaml`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `done/` |
+| `/k-run` | Task-Dateien sequenziell ausfuehren | nutzt `paths.tasks` und `K-PLAYBOOK.yaml`-Kontext | delegiert an Subagenten, schreibt Ausfuehrungsnotiz, verschiebt erfolgreiche Tasks nach `paths.completed_tasks` |
 | **Nuetzliches** | | | |
 | `/k-verlauf` | alte AI-Verlaeufe durchsuchen | keine Projektdatei noetig | liest Claude-JSONL bzw. OpenCode-Logs read-only |
 | `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | keine `K-PLAYBOOK.yaml`-Pflicht | schreibt/merged `.vscode/settings.json` |
 | **Weitere** | | | |
-| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `k-playbook/TODO.md` | schreibt/ergaenzt `k-playbook/TODO.md` |
-| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | nutzt `enforcement` und `docs`, falls aktiv | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
+| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `paths.todo` | schreibt/ergaenzt `<paths.todo>` |
+| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | nutzt `paths.enforcement` und `paths.docs`, falls aktiv | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
 | `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | keine eigene Pfad-Konfig | startet Tests, macht Diagnose, fragt vor Fixes |
 
 ## Installer-GUI
@@ -93,7 +93,7 @@ Die GUI:
 - registriert OpenCode- und Claude-Commands/Skills,
 - prueft Security-Tools read-only,
 - verwaltet die lokale Projektliste,
-- erzeugt `K-PLAYBOOK.yaml` und die feste Projektstruktur im Zielprojekt,
+- erzeugt `K-PLAYBOOK.yaml` inklusive `paths.*` und die konfigurierte Projektstruktur im Zielprojekt,
 - zeigt und aktualisiert Remediation-Policy pro Projekt,
 - verwaltet DevContainer-Integration pro Projekt.
 
@@ -136,7 +136,7 @@ Die zugehoerigen Review-Rezepte sind globale Report-Mode-Reviews:
 - `/k-review dependabot-alerts`
 - `/k-review iac-container`
 
-Jede dieser Familien erzeugt ein `assessment.md` mit bewerteter Liste und ein `findings.md` als statusfaehiges Arbeitsregister unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/`.
+Jede dieser Familien erzeugt ein `assessment.md` mit bewerteter Liste und ein `findings.md` als statusfaehiges Arbeitsregister unter `<paths.reviews>/results/<family>/YYYY-MM-DD/`.
 
 Die Scanner selbst werden nicht als `global/checks/*.sh` aufgerufen. `k-check` bleibt fuer leichte generische Checks und Heuristiken; die Security-Scanner aus `global/security-tools.tsv` und GitHub Dependabot Alerts laufen ueber die passenden `/k-review`-Report-Familien, damit Raw-Artefakte, Run-Metadaten, stabile Finding-IDs und Priorisierung erhalten bleiben.
 
@@ -193,7 +193,7 @@ Die Trennung ist absichtlich:
 
 - Die Installer-GUI ist host-global und macht Commands/Skills fuer OpenCode und Claude sichtbar.
 - `/k-install-security-tools` ist host-global und macht Security-Review-Tools verfuegbar.
-- Der k-playbook Installer schreibt die zentrale Projekt-Konfig und feste Projektstruktur.
+- Der k-playbook Installer schreibt die zentrale Projekt-Konfig inklusive `paths.*` und legt die konfigurierte Projektstruktur an.
 - `/k-setup-codeql` trifft und dokumentiert die CodeQL-Entscheidung.
 - `/k-install-codeql` installiert oder betreibt lokale CodeQL-Artefakte, ohne Projekt-Konfig zu schreiben.
 
@@ -256,15 +256,17 @@ Diese Commands bilden die Task-Pipeline. Sie raten keine Projektpfade, sondern l
 
 `/k-review [review-name]` orchestriert globale und projektlokale Review-Rezepte.
 
+Alle projektlokalen Pfade kommen aus `K-PLAYBOOK.yaml`. Fuer `/k-review` ist insbesondere `paths.reviews` massgeblich. Fehlt dieser Key, fragt der Command nach dem projektrelativen Reviews-Pfad, empfiehlt `k-playbook/reviews`, schreibt den bestaetigten Wert in `K-PLAYBOOK.yaml` und macht erst danach weiter. Er darf nicht still aus dem Dateisystem oder aus historischen Defaults raten.
+
 Der Command:
 
 - liest globale Rezepte aus `<PLAYBOOK_REPO>/global/reviews/`.
-- liest projektlokale Rezepte aus `k-playbook/reviews/`.
+- liest projektlokale Rezepte aus `<paths.reviews>/`.
 - laesst projektlokale Rezepte globale mit gleichem Namen ueberlagern.
 - laedt `known-decisions.md`, falls vorhanden, damit bewusste Entscheidungen nicht erneut als Findings gemeldet werden.
-- schreibt `k-playbook/reviews/log.md`.
+- schreibt `<paths.reviews>/log.md`.
 
-Interaktive Reviews moderieren Stelle fuer Stelle: Vorschlag zeigen, User-Freigabe abwarten, dann erst aendern. Report-Mode-Reviews mit `handoff` schreiben ein Ergebnisartefakt. Bei `result-family` landet es unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` mit typischer Struktur `assessment.md`, `findings.md`, `raw/` und Run-Metadaten.
+Interaktive Reviews moderieren Stelle fuer Stelle: Vorschlag zeigen, User-Freigabe abwarten, dann erst aendern. Report-Mode-Reviews mit `handoff` schreiben ein Ergebnisartefakt. Bei `result-family` landet es unter `<paths.reviews>/results/<family>/YYYY-MM-DD/` mit typischer Struktur `assessment.md`, `findings.md`, `raw/` und Run-Metadaten. Beispiele in dieser Doku verwenden den konventionellen Wert `paths.reviews: k-playbook/reviews`.
 
 Aktuelle globale Review-Rezepte:
 

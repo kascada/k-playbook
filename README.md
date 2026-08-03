@@ -15,7 +15,7 @@ make install
 k-playbook-installer
 ```
 
-`make install` baut nicht aus Source. Es installiert `~/.local/bin/k-playbook-installer` aus einem passenden Release-Artefakt unter `dist/`, aus einem vorhandenen `bin/k-playbook-installer` oder aus den GitHub Releases. Dafuer ist kein lokal installiertes Go noetig.
+`make install` baut nicht aus Source. Es installiert die plattformspezifischen Installer-Binaries nach `bin/`, legt dort den Wrapper `bin/k-playbook-installer` an und verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper. Quelle sind vorhandene Release-Artefakte unter `dist/` oder die GitHub Releases. Dafuer ist kein lokal installiertes Go noetig.
 
 Falls `~/.local/bin` noch nicht im `PATH` liegt, gibt das Script einen Hinweis aus. Die GUI kann dann auch direkt gestartet werden:
 
@@ -36,7 +36,7 @@ make install-from-source
 make gui
 ```
 
-`make install-from-source` ruft `make build` auf, baut `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf dieses Binary. Danach aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf ueber den Symlink.
+`make install-from-source` ruft `make build` auf, baut alle plattformspezifischen Binaries nach `./bin/`, installiert den Wrapper `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper. Danach aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf ueber den Symlink.
 
 ### Lokal testen als Entwickler
 
@@ -48,7 +48,7 @@ make build
 ./bin/k-playbook-installer
 ```
 
-`/k-status` sucht das Binary nicht nur im `PATH`, sondern auch unter `~/dev/k-playbook/bin/k-playbook-installer` und im DevContainer unter `/workspaces/k-playbook/bin/k-playbook-installer`. Ein `make build` auf dem Host reicht deshalb auch fuer DevContainer, wenn das Repo nach `/workspaces/k-playbook` gemountet ist.
+`/k-status` bevorzugt den kanonischen Launcher `~/dev/k-playbook/bin/k-playbook-installer` und nutzt im DevContainer denselben logischen Pfad ueber den Symlink nach `/workspaces/k-playbook`. Ein `make build` erzeugt alle unterstuetzten Plattform-Binaries und reicht deshalb auch fuer DevContainer, wenn das Repo nach `/workspaces/k-playbook` gemountet ist.
 
 Oder direkt GUI starten und vorher automatisch neu bauen:
 
@@ -57,6 +57,8 @@ make installer-run
 ```
 
 `make installer-run` ist ein Alias fuer `make gui`; `gui` haengt von `build` ab und startet danach `./bin/k-playbook-installer`.
+
+Details zum Binary-Vertrag stehen in [`docs/installer-binaries.md`](./docs/installer-binaries.md).
 
 Maintainer erzeugen Release-Artefakte mit:
 

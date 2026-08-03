@@ -1,21 +1,21 @@
 ---
-description: Start the local k-playbook installer GUI from the installed binary at ~/.local/bin/k-playbook-installer.
+description: Start the local k-playbook installer GUI from the canonical repo-local launcher.
 allowed-tools: [Bash, Read]
 ---
 
 # k-gui
 
-Starte die lokale k-playbook Installer-GUI ueber das installierte Binary.
+Starte die lokale k-playbook Installer-GUI ueber den kanonischen repo-lokalen Launcher.
 
 Dieser Command nutzt bewusst nicht `make`, sondern ruft direkt auf:
 
 ```bash
-~/.local/bin/k-playbook-installer
+~/dev/k-playbook/bin/k-playbook-installer
 ```
 
 ## Ablauf
 
-1. Pruefe, ob `~/.local/bin/k-playbook-installer` existiert und ausfuehrbar ist.
+1. Pruefe, ob `~/dev/k-playbook/bin/k-playbook-installer` existiert und ausfuehrbar ist.
 2. Wenn das Binary fehlt oder nicht ausfuehrbar ist, brich mit einem klaren Hinweis ab:
 
 ```text
@@ -26,7 +26,7 @@ make install
 3. Wenn das Binary vorhanden ist, starte es direkt:
 
 ```bash
-~/.local/bin/k-playbook-installer
+~/dev/k-playbook/bin/k-playbook-installer
 ```
 
 ## Hinweise

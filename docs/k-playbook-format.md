@@ -5,38 +5,43 @@ Sie liegt im k-playbook-Projektordner und ersetzt die bisherige Markdown-Konfigu
 
 ## Grundentscheidung
 
-Die Datei enthaelt keine konfigurierbaren Standardpfade fuer Tasks, Reviews, Checks,
-Docs oder Enforcement.
+Die Datei enthaelt die projektlokalen Pfade fuer Tasks, Reviews, Checks, Docs,
+Enforcement und weitere k-playbook-Artefakte.
 
 Stattdessen gilt:
 
 - Das k-playbook-Projektverzeichnis ist das Verzeichnis, in dem `K-PLAYBOOK.yaml` liegt.
 - Der eigentliche Code-/Repo-Root steht in `project.repo_root`, relativ zum
   k-playbook-Projektverzeichnis.
-- Die projektlokale k-playbook-Struktur liegt fest unter `k-playbook/`.
-- Jedes Command kennt seine festen Unterverzeichnisse.
-- Die Config speichert Setup-Metadaten, Projekt-Policies und Tool-Entscheidungen.
+- Projektlokale Artefaktpfade stehen unter `paths.*` und sind ebenfalls relativ
+  zum k-playbook-Projektverzeichnis.
+- Commands duerfen Pfade nicht raten. Fehlt ein benoetigter `paths.*`-Eintrag,
+  muss der Command nachfragen und den bestaetigten Wert in `K-PLAYBOOK.yaml`
+  ergaenzen.
+- Die Config speichert ausserdem Setup-Metadaten, Projekt-Policies und Tool-Entscheidungen.
 
-Damit bleiben Pfade konsistent, Tools koennen die Datei direkt parsen, und Commands
-muessen keine alternativen Layouts oder aktive/inaktive Bausteine interpretieren.
+Damit bleiben Pfade konsistent und explizit, Tools koennen die Datei direkt parsen,
+und Commands muessen keine Layouts aus dem Dateisystem erraten.
 
-## Feste Abgeleitete Pfade
+## Projektlokale Pfade
 
-Commands leiten diese Pfade aus dem Projekt-Root ab:
+Commands lesen diese Pfade aus `K-PLAYBOOK.yaml`:
 
-| Zweck | Pfad |
-|---|---|
-| Playbook-Basis | `k-playbook/` |
-| Tasks | `k-playbook/tasks/` |
-| erledigte Tasks | `k-playbook/tasks/done/` |
-| TODO | `k-playbook/TODO.md` |
-| Checks | `k-playbook/checks/` |
-| Reviews | `k-playbook/reviews/` |
-| Guidelines | `k-playbook/guidelines/` |
-| Enforcement-Regeln | `k-playbook/enforcement/` |
-| Docs | `k-playbook/docs/` |
+| Zweck | YAML-Key | Konventioneller Wert |
+|---|---|---|
+| Playbook-Basis | `paths.playbook` | `k-playbook` |
+| Tasks | `paths.tasks` | `k-playbook/tasks` |
+| erledigte Tasks | `paths.completed_tasks` | `k-playbook/tasks/done` |
+| TODO | `paths.todo` | `k-playbook/TODO.md` |
+| Checks | `paths.checks` | `k-playbook/checks` |
+| Reviews | `paths.reviews` | `k-playbook/reviews` |
+| Guidelines | `paths.guidelines` | `k-playbook/guidelines` |
+| Enforcement-Regeln | `paths.enforcement` | `k-playbook/enforcement` |
+| Docs | `paths.docs` | `k-playbook/docs` |
 
-Diese Werte gehoeren nicht als `paths:`-Block in `K-PLAYBOOK.yaml`.
+Alle Werte muessen relativ sein, duerfen nicht mit `/` beginnen und duerfen nicht
+aus dem Projektverzeichnis herausfuehren. Die konventionellen Werte sind die
+empfohlenen Defaults fuer GUI und Reparaturfragen, aber keine stillen Fallbacks.
 
 ## Minimalformat
 
@@ -50,6 +55,17 @@ layout: fixed-project-k-playbook
 
 k_playbook:
   repo: ~/dev/k-playbook
+
+paths:
+  playbook: k-playbook
+  tasks: k-playbook/tasks
+  completed_tasks: k-playbook/tasks/done
+  todo: k-playbook/TODO.md
+  checks: k-playbook/checks
+  reviews: k-playbook/reviews
+  guidelines: k-playbook/guidelines
+  enforcement: k-playbook/enforcement
+  docs: k-playbook/docs
 
 project:
   repo_root: .
@@ -80,6 +96,17 @@ layout: fixed-project-k-playbook
 
 k_playbook:
   repo: ~/dev/k-playbook
+
+paths:
+  playbook: k-playbook
+  tasks: k-playbook/tasks
+  completed_tasks: k-playbook/tasks/done
+  todo: k-playbook/TODO.md
+  checks: k-playbook/checks
+  reviews: k-playbook/reviews
+  guidelines: k-playbook/guidelines
+  enforcement: k-playbook/enforcement
+  docs: k-playbook/docs
 
 project:
   repo_root: ./app
@@ -122,8 +149,9 @@ Pflichtfeld. Aktuelle Version: `1`.
 
 Pflichtfeld. Aktueller Wert: `fixed-project-k-playbook`.
 
-Dieser Wert bestaetigt, dass Commands die feste `k-playbook/`-Struktur verwenden
-und keine Pfadliste aus der Config lesen.
+Dieser Wert bestaetigt das k-playbook-Projektmodell. Projektlokale Pfade stehen
+trotzdem explizit unter `paths.*`; alte Dateien mit diesem Layout ohne `paths.*`
+muessen beim naechsten GUI-/Command-Lauf um die benoetigten Keys ergaenzt werden.
 
 ### `k_playbook.repo`
 
@@ -131,6 +159,27 @@ Pflichtfeld. Erwarteter Wert: `~/dev/k-playbook`.
 
 Der Wert dient als sichtbarer Rueckverweis fuer globale Commands, Skills, Regeln,
 Reviews, Checks und Skripte. Er ist ein Pfadvertrag, keine Projektoption.
+
+### `paths`
+
+Pflichtblock fuer projektlokale k-playbook-Artefakte. Commands verwenden nur die
+jeweils benoetigten Keys, duerfen fehlende Keys aber nicht selbst erraten.
+
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `playbook` | string | Basisverzeichnis fuer projektlokale k-playbook-Artefakte |
+| `tasks` | string | Task-Dateien fuer `/k-task-create`, `/k-run`, `/k-review-loop` |
+| `completed_tasks` | string | Ablage fuer erledigte Tasks |
+| `todo` | string | Projekt-TODO-Datei |
+| `checks` | string | Projektlokale Checks |
+| `reviews` | string | Projektlokale Review-Rezepte, Logs, Decisions und Results |
+| `guidelines` | string | Projektlokale Guidelines |
+| `enforcement` | string | Projektlokale Enforcement-Regeln |
+| `docs` | string | Projektlokale Docs fuer Docs-First-AI-Sessions |
+
+Wenn ein Command einen benoetigten Key nicht findet, muss er den Nutzer nach dem
+projektrelativen Pfad fragen, den Wert validieren und `K-PLAYBOOK.yaml` ergaenzen.
+Er darf nicht still `k-playbook/...` verwenden, nur weil dieses Verzeichnis existiert.
 
 ### `project.repo_root`
 
@@ -210,12 +259,14 @@ oder `planned` ist.
 ## Schreibregeln
 
 - `/k-setup` besitzt `schema_version`, `layout`, `k_playbook`, `project` und `setup`.
+- `/k-setup` bzw. die Installer-GUI besitzt ausserdem den `paths`-Block.
 - `/k-setup` besitzt ausserdem die Remediation-Policy, sofern sie gesetzt wird.
 - Die Installer-GUI besitzt `project.repo_root` und `project.vcs`. Sie darf
   Git-Kandidaten suchen oder den Nutzer fragen; andere Commands duerfen das nicht.
 - `/k-setup-codeql` besitzt nur `tools.codeql`.
 - Commands duerfen unbekannte Top-Level-Felder erhalten, aber nicht ungefragt aendern.
-- Standardpfade duerfen nicht als konfigurierbarer `paths:`-Block eingefuehrt werden.
+- Commands duerfen benoetigte fehlende `paths.*`-Keys nach Rueckfrage ergaenzen.
+- Commands duerfen projektlokale Pfade nicht aus dem Dateisystem oder historischen Defaults raten.
 - Host-lokale Installationszustaende duerfen nicht in `K-PLAYBOOK.yaml` geschrieben werden.
 
 ## Dateiname

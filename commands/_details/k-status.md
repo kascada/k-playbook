@@ -42,16 +42,16 @@ Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md
 
 Resolve `INSTALLER_BIN` before running status. Try these candidates in order and use the first executable file:
 
-- `k-playbook-installer` from `PATH`.
-- `~/.local/bin/k-playbook-installer`.
 - `~/dev/k-playbook/bin/k-playbook-installer`.
 - `/workspaces/k-playbook/bin/k-playbook-installer`.
+- `k-playbook-installer` from `PATH`.
+- `~/.local/bin/k-playbook-installer`.
 
 Do not build the binary from `/k-status`. In particular, do not run `make build`, `go build`, or `go run` from this command. If no candidate is executable, report the binary as unavailable and recommend one of these explicit setup actions:
 
 - On a normal host: `make install` or `make install-from-source` in `~/dev/k-playbook`.
 - For local developer testing: `make build` in `~/dev/k-playbook`, then re-run `/k-status`.
-- In a DevContainer: ensure `/workspaces/k-playbook/bin/k-playbook-installer` exists by building it on the host or installing it inside the container.
+- In a DevContainer: ensure `/workspaces/k-playbook/bin/k-playbook-installer` exists via the mounted repo or run `make install` in `~/dev/k-playbook`.
 
 ## Step 3 - Binary Status
 

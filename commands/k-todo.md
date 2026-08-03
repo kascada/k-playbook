@@ -1,5 +1,5 @@
 ---
-description: "Add a todo item to the fixed project todo file, or list all todos. Uses k-playbook/TODO.md. Pass text directly to add; call without arguments to list."
+description: "Add a todo item to the project todo file from paths.todo, or list all todos. Pass text directly to add; call without arguments to list."
 argument-hint: [todo text]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob]
@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob]
 
 Manage the project todo file.
 
-`/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.yaml`. The todo file is always `<project>/k-playbook/TODO.md`.
+`/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the todo file comes from `paths.todo`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
 
 ## Step 1 — Resolve todo file
 
@@ -21,14 +21,15 @@ Determine `TARGET_DIR`:
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve the fixed `todo` path:
+For this command, resolve the configured `todo` path:
 
-- `TODO_PATH = <TARGET_DIR>/k-playbook/TODO.md`.
-- `TODO_DISPLAY_PATH = k-playbook/TODO.md`.
+- `TODO_PATH = <TARGET_DIR>/<paths.todo>`.
+- `TODO_DISPLAY_PATH = <paths.todo>`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
+- If `paths.todo` is missing: ask for the project-relative todo file, recommend `k-playbook/TODO.md`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If the parent directory of `TODO_PATH` does not exist: abort and tell the user to run `/k-gui`.
 - If the parent directory exists: use `TODO_PATH`.
 

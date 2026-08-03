@@ -11,7 +11,7 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; if it is missing, run `/k-gui`. Project-local rules are read from `k-playbook/enforcement`; docs checks use `k-playbook/docs`.
+`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; if it is missing, run `/k-gui`. Project-local rules are read from `paths.enforcement`; docs checks use `paths.docs`.
 
 ## Step 1 — Resolve target and paths
 
@@ -22,10 +22,10 @@ Determine `TARGET_DIR`:
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve fixed blocks:
+For this command, resolve configured blocks from `K-PLAYBOOK.yaml`:
 
-- `enforcement` → `PROJECT_ENFORCEMENT_DIR = <TARGET_DIR>/k-playbook/enforcement`.
-- `docs` → `DOCS_DIR = <TARGET_DIR>/k-playbook/docs`.
+- `enforcement` -> `PROJECT_ENFORCEMENT_DIR = <TARGET_DIR>/<paths.enforcement>`.
+- `docs` -> `DOCS_DIR = <TARGET_DIR>/<paths.docs>`.
 
 Also set:
 
@@ -35,6 +35,7 @@ Also set:
 Command-specific policy:
 
 - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
+- If `paths.enforcement` or `paths.docs` is missing: ask for the project-relative path, recommend the conventional value from the shared module, add it to `K-PLAYBOOK.yaml`, then continue.
 - If `PROJECT_ENFORCEMENT_DIR` is missing: warn and continue with global rules only.
 - If `DOCS_DIR` is missing: warn for docs-sync checks, but do not invent a default docs path.
 - If `GLOBAL_ENFORCEMENT_DIR` is missing: abort, because the global rule source cannot be found.

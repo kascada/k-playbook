@@ -11,10 +11,10 @@ Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die 
 
 Unterstützt zwei Formate:
 
-- Legacy-Ergebnisdateien wie `k-playbook/reviews/result-*.md` mit Statuszeichen-Tabellen.
-- Result-Familien wie `k-playbook/reviews/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. CodeQL oder k-check.
+- Legacy-Ergebnisdateien wie `<paths.reviews>/result-*.md` mit Statuszeichen-Tabellen.
+- Result-Familien wie `<paths.reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. CodeQL oder k-check.
 
-Die Verzeichnisse sind fest: `k-playbook/reviews` und `k-playbook/tasks`.
+Die Verzeichnisse kommen aus `K-PLAYBOOK.yaml`: `paths.reviews` und `paths.tasks`. Fehlt einer dieser Keys, fragt `/k-remediation` nach und ergaenzt die YAML; es wird kein Ersatzpfad geraten.
 
 Zusaetzlich liest `/k-remediation` den optionalen `remediation`-Block in `K-PLAYBOOK.yaml`:
 
@@ -28,7 +28,7 @@ Zusaetzlich liest `/k-remediation` den optionalen `remediation`-Block in `K-PLAY
 
 Wenn der Block fehlt, stoppe und bitte darum, `/k-gui` zu nutzen bzw. dort die Remediation-Policy zu setzen, oder frage fuer die aktuelle Session explizit.
 
-`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.yaml`, `k-playbook/reviews`, and `k-playbook/tasks` configured by the k-playbook Installer.
+`/k-remediation` does not guess project paths. The project must have `K-PLAYBOOK.yaml` with `paths.reviews` and `paths.tasks`; missing required path keys are clarified with the user and written back to the YAML before continuing.
 
 ---
 
@@ -36,10 +36,10 @@ Wenn der Block fehlt, stoppe und bitte darum, `/k-gui` zu nutzen bzw. dort die R
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve fixed blocks:
+For this command, resolve configured blocks from `K-PLAYBOOK.yaml`:
 
-- `reviews` → `PROJECT_REVIEWS_DIR = <TARGET_DIR>/k-playbook/reviews`.
-- `tasks` → `TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`.
+- `reviews` -> `PROJECT_REVIEWS_DIR = <TARGET_DIR>/<paths.reviews>`.
+- `tasks` -> `TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
 
 Daraus abgeleitet:
 
@@ -52,8 +52,8 @@ Daraus abgeleitet:
 Command-specific policy:
 
 - Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/reviews` nicht existiert: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/tasks` nicht existiert: abbrechen und `/k-gui` nennen.
+- Wenn `paths.reviews` oder `paths.tasks` fehlen: nachfragen, in `K-PLAYBOOK.yaml` ergaenzen und erneut aufloesen.
+- Wenn ein YAML-konfigurierter Pfad nicht existiert: fragen, ob genau dieser Pfad angelegt werden soll, oder `/k-gui` nennen. Keinen anderen Pfad verwenden.
 - Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct_fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
 - Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `TARGET_DIR`.
 - Wenn `mode: task-branch-pr` gilt und `target:` ein Git-Repo ist, pruefe vor Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine Branch-/Task-Policy raten: User informieren und bestaetigen lassen, ob Tasks trotzdem erzeugt werden sollen. `/k-remediation` wechselt selbst keinen Branch fuer spaetere Umsetzung; es schreibt den erforderlichen Ausfuehrungskontext in die Task-Dateien.
@@ -68,7 +68,7 @@ Akzeptierte direkte Argumente:
 
 - `<PROJECT_REVIEWS_DIR>/result-*.md`
 - `<PROJECT_REVIEWS_DIR>/results/<family>/<date>/assessment.md`
-- Projektrelative Varianten davon, z. B. `k-playbook/reviews/results/k-check/2026-07-23/assessment.md`
+- Projektrelative Varianten davon, z. B. `<paths.reviews>/results/k-check/2026-07-23/assessment.md`
 
 Wenn nicht:
 
@@ -78,7 +78,7 @@ Wenn nicht:
 4. Wenn keine: fragen:
     > "Welche Ergebnisdatei soll abgearbeitet werden?"
 
-**Result-Family-Erkennung:** Wenn die Datei `assessment.md` heisst und der Pfad auf `k-playbook/reviews/results/<family>/<date>/assessment.md` endet:
+**Result-Family-Erkennung:** Wenn die Datei `assessment.md` heisst und der Pfad auf `<PROJECT_REVIEWS_DIR>/results/<family>/<date>/assessment.md` endet:
 
 - Setze `RESULT_FORMAT=result-family`.
 - Setze `RESULT_FAMILY=<family>` und `RESULT_DATE=<date>`.
@@ -314,7 +314,7 @@ Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-
 2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/done/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
 3. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
 4. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
-    - Bei Result-Familien muss der Task enthalten: Quelle `k-playbook/reviews/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die urspruengliche `Ort`-/`Message`-Angabe.
+    - Bei Result-Familien muss der Task enthalten: Quelle `<REVIEWS_DISPLAY_PATH>/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die urspruengliche `Ort`-/`Message`-Angabe.
     - Bei Buendeln muss der Task enthalten: Buendelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root, vorgeschlagener Branch und PR-Pflicht aus der Remediation-Policy.
     - Bei `mode: task-branch-pr` muss der Task zusaetzlich diese Struktur enthalten:
 
@@ -447,7 +447,7 @@ Am Ende von `findings.md` einen nachvollziehbaren Abschnitt pflegen:
 
 Archivierung gilt nur fuer Legacy-Ergebnisdateien.
 
-Bei Result-Familien wird kein `assessment.md` nach `done/` verschoben. Das Result-Verzeichnis bleibt stabil unter `k-playbook/reviews/results/<family>/<date>/`; Abschluss erfolgt ueber Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`.
+Bei Result-Familien wird kein `assessment.md` nach `done/` verschoben. Das Result-Verzeichnis bleibt stabil unter `<REVIEWS_DISPLAY_PATH>/results/<family>/<date>/`; Abschluss erfolgt ueber Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`.
 
 Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 
@@ -489,4 +489,5 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<PROJECT_REVIEWS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
 - **`K-PLAYBOOK.yaml` fehlt**: abbrechen und `/k-gui` aufrufen lassen.
-- **`k-playbook/reviews` oder `k-playbook/tasks` fehlen**: abbrechen und `/k-gui` aufrufen lassen.
+- **`paths.reviews` oder `paths.tasks` fehlen**: User nach dem projektrelativen Pfad fragen, Empfehlung aus dem Shared-Modul anbieten, Wert in `K-PLAYBOOK.yaml` ergaenzen, dann erneut aufloesen.
+- **YAML-konfigurierte Reviews- oder Tasks-Pfade fehlen im Dateisystem**: User fragen, ob genau diese Pfade angelegt werden sollen oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

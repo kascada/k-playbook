@@ -1,5 +1,5 @@
 ---
-description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses k-playbook/docs.
+description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses paths.docs.
 argument-hint: [target-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -9,13 +9,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
-`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.yaml`. The docs directory is always `<project>/k-playbook/docs`.
+`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the docs directory comes from `paths.docs`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
 
 Produces:
-- `k-playbook/docs/<NN>-<slug>.md` — one file per coherent topic.
-- `k-playbook/docs/README.md` — TOC + alphabetical keyword index + question→file mapping.
+- `<paths.docs>/<NN>-<slug>.md` — one file per coherent topic.
+- `<paths.docs>/README.md` — TOC + alphabetical keyword index + question→file mapping.
 - `AGENTS.md` at project root — session-injected pointer to the configured docs path.
-- `opencode.json` at project root — registers `AGENTS.md` + `./k-playbook/docs`.
+- `opencode.json` at project root — registers `AGENTS.md` + the configured docs path.
 
 ## Step 0 — Target bestimmen und bestätigen
 
@@ -59,15 +59,16 @@ Bei „ja": weiter mit Step 1.
 
 Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
 
-For this command, resolve the fixed `docs` path:
+For this command, resolve the configured `docs` path:
 
-- `RESOLVED_DOCS_DIR = <TARGET_DIR>/k-playbook/docs`.
-- `DOCS_DISPLAY_PATH = k-playbook/docs`.
+- `RESOLVED_DOCS_DIR = <TARGET_DIR>/<paths.docs>`.
+- `DOCS_DISPLAY_PATH = <paths.docs>`.
 
 Command-specific policy:
 
 - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `k-playbook/docs` is missing on disk: abort and tell the user to run `/k-gui`.
+- If `paths.docs` is missing: ask for the project-relative docs directory, recommend `k-playbook/docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If the YAML-configured docs path is missing on disk: ask whether to create that exact directory now or run `/k-gui`; do not use any fallback path.
 
 `AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
@@ -75,10 +76,10 @@ Use `RESOLVED_DOCS_DIR` for all doc reads and writes.
 
 Derived paths for Memory registration:
 
-- `DOCS_DISPLAY_PATH` = `k-playbook/docs`.
-- `DOCS_README_FROM_AGENTS` = `k-playbook/docs/README.md`.
+- `DOCS_DISPLAY_PATH` = `<paths.docs>`.
+- `DOCS_README_FROM_AGENTS` = `<paths.docs>/README.md`.
 - `AGENTS_LINK_FROM_DOCS_README` = `../../AGENTS.md`.
-- `DOCS_REFERENCE_PATH` = `./k-playbook/docs`.
+- `DOCS_REFERENCE_PATH` = `./<paths.docs>`.
 
 ## Step 2 — Clarify scope
 
