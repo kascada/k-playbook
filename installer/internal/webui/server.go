@@ -84,6 +84,8 @@ type gitPullResult struct {
 	InstallerReinstalled     bool   `json:"installerReinstalled"`
 	InstallerRestartRequired bool   `json:"installerRestartRequired"`
 	InstallerMessage         string `json:"installerMessage"`
+	LauncherPathChanged      bool   `json:"launcherPathChanged"`
+	LauncherPathMessage      string `json:"launcherPathMessage"`
 }
 
 type gitStatusResult struct {
@@ -607,6 +609,13 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 		result.InstallerRestartRequired = true
 		result.InstallerMessage = fmt.Sprintf("Installer-Binaries wurden aktualisiert: %s. GUI bitte neu starten, um die neue Version zu verwenden.", strings.Join(installPaths, ", "))
 	}
+	pathChanged, pathMessage, err := ensureLauncherPath()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	result.LauncherPathChanged = pathChanged
+	result.LauncherPathMessage = pathMessage
 
 	writeJSON(w, http.StatusOK, result)
 }
@@ -820,6 +829,85 @@ func symlinkTargetChanged(target string, link string) (bool, error) {
 	return false, fmt.Errorf("Installer-Link pruefen: %w", err)
 }
 
+func ensureLauncherPath() (bool, string, error) {
+	pathBin, err := canonicalLauncherPathBin()
+	if err != nil {
+		return false, "", err
+	}
+	if pathContains(os.Getenv("PATH"), pathBin) {
+		return false, "", nil
+	}
+
+	profile, err := defaultPathProfile()
+	if err != nil {
+		return false, "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(profile), 0o755); err != nil {
+		return false, "", fmt.Errorf("PATH-Profilverzeichnis anlegen: %w", err)
+	}
+	data, err := os.ReadFile(profile)
+	if err != nil && !os.IsNotExist(err) {
+		return false, "", fmt.Errorf("PATH-Profil lesen: %w", err)
+	}
+
+	content := string(data)
+	if strings.Contains(content, pathBin) || strings.Contains(content, "$HOME/dev/k-playbook/bin") || strings.Contains(content, "${HOME}/dev/k-playbook/bin") || strings.Contains(content, "~/dev/k-playbook/bin") {
+		return false, fmt.Sprintf("PATH-Eintrag fuer %s existiert bereits in %s, ist aber in dieser Shell noch nicht aktiv.", pathBin, profile), nil
+	}
+
+	profilePathBin := "${HOME}/dev/k-playbook/bin"
+	line := fmt.Sprintf("\n# k-playbook installer PATH\nexport PATH=\"%s:$PATH\"\n", profilePathBin)
+	file, err := os.OpenFile(profile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return false, "", fmt.Errorf("PATH-Profil oeffnen: %w", err)
+	}
+	if _, err := file.WriteString(line); err != nil {
+		_ = file.Close()
+		return false, "", fmt.Errorf("PATH-Eintrag schreiben: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return false, "", fmt.Errorf("PATH-Profil schliessen: %w", err)
+	}
+
+	return true, fmt.Sprintf("PATH-Eintrag zu %s hinzugefuegt: %s. Neue Shell starten oder ausfuehren: . %s", profile, pathBin, profile), nil
+}
+
+func canonicalLauncherPathBin() (string, error) {
+	expected, err := pathcontract.ExpectedPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(expected, "bin"), nil
+}
+
+func pathContains(pathValue string, entry string) bool {
+	for _, current := range filepath.SplitList(pathValue) {
+		if current == entry {
+			return true
+		}
+	}
+	return false
+}
+
+func defaultPathProfile() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("Home-Verzeichnis ermitteln: %w", err)
+	}
+	shell := filepath.Base(os.Getenv("SHELL"))
+	switch shell {
+	case "zsh":
+		return filepath.Join(home, ".zprofile"), nil
+	case "bash":
+		if runtime.GOOS == "darwin" {
+			return filepath.Join(home, ".bash_profile"), nil
+		}
+		return filepath.Join(home, ".profile"), nil
+	default:
+		return filepath.Join(home, ".profile"), nil
+	}
+}
+
 func checkGitStatus(parent context.Context) (gitStatusResult, error) {
 	root, err := repoRoot()
 	if err != nil {
@@ -935,6 +1023,10 @@ func docsHandler(w http.ResponseWriter, r *http.Request) {
 
 	docsRoot := filepath.Join(root, "docs")
 	entries := []docEntry{}
+	readmePath := filepath.Join(root, "README.md")
+	if existsPath(readmePath) {
+		entries = append(entries, docEntry{Path: "README.md", Title: docTitle(readmePath)})
+	}
 	err = filepath.WalkDir(docsRoot, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return nil
@@ -975,7 +1067,7 @@ func docFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rel := filepath.Clean(r.URL.Query().Get("path"))
-	if rel == "." || filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") || !strings.HasPrefix(filepath.ToSlash(rel), "docs/") {
+	if !isAllowedDocPath(rel) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("ungueltiger Docs-Pfad"))
 		return
 	}
@@ -998,6 +1090,11 @@ func docFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, docContent{Path: filepath.ToSlash(rel), Title: docTitle(path), Content: string(data), HTML: rendered})
+}
+
+func isAllowedDocPath(rel string) bool {
+	rel = filepath.ToSlash(filepath.Clean(rel))
+	return rel == "README.md" || rel != "." && !filepath.IsAbs(rel) && !strings.HasPrefix(rel, "..") && strings.HasPrefix(rel, "docs/")
 }
 
 func scanProjectsHandler(w http.ResponseWriter, r *http.Request) {

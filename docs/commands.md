@@ -8,11 +8,11 @@ Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`.
 
 | Thema | Detailseite |
 |---|---|
-| PR-Review | [`k-pr-review.md`](./k-pr-review.md) |
-| Review-Rezepte | [`k-review.md`](./k-review.md) |
-| Results-Summary | [`k-results.md`](./k-results.md) |
-| Remediation | [`k-remediation.md`](./k-remediation.md) |
-| Task-Flow | [`k-task-flow.md`](./k-task-flow.md) |
+| PR-Review | [`pr-review.md`](./pr-review.md) |
+| Review-Rezepte | [`review.md`](./review.md) |
+| Results-Summary | [`results.md`](./results.md) |
+| Remediation | [`remediation.md`](./remediation.md) |
+| Task-Flow | [`task-flow.md`](./task-flow.md) |
 | Review-/Results-/Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Installation und DevContainer | [`multi-project-installation.md`](./multi-project-installation.md), [`installation.md`](./installation.md) |
 
@@ -32,14 +32,14 @@ Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden erst sich
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt unter `paths.docs`, plus `AGENTS.md` und `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | schreibt unter `<paths.docs>/libs/` und aktualisiert den Docs-Index |
 | **Code-Review** | | |
-| `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`k-pr-review.md`](./k-pr-review.md) |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | [`k-review.md`](./k-review.md) |
-| `/k-results` | vorhandene Review-Results projektweit priorisieren | [`k-results.md`](./k-results.md) |
-| `/k-remediation` | Review-Findings planen, gruppieren und in Tasks oder Fixes ueberfuehren | [`k-remediation.md`](./k-remediation.md) |
+| `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | [`review.md`](./review.md) |
+| `/k-results` | vorhandene Review-Results projektweit priorisieren | [`results.md`](./results.md) |
+| `/k-remediation` | Review-Findings planen, gruppieren und in Tasks oder Fixes ueberfuehren | [`remediation.md`](./remediation.md) |
 | **Task-Flow** | | |
-| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | [`k-task-flow.md`](./k-task-flow.md) |
-| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | [`k-task-flow.md`](./k-task-flow.md) |
-| `/k-run` | Task-Dateien sequenziell ausfuehren | [`k-task-flow.md`](./k-task-flow.md) |
+| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | [`task-flow.md`](./task-flow.md) |
+| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | [`task-flow.md`](./task-flow.md) |
+| `/k-run` | Task-Dateien sequenziell ausfuehren | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `paths.todo` |
 | **Checks und Hilfen** | | |
 | `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | read-only Bericht; Fixes nur nach expliziter User-Freigabe |

@@ -7,7 +7,7 @@ Diese Datei dokumentiert den aktuellen k-playbook-Flow fuer Review-Rezepte, Scan
 k-playbook trennt vier Arbeitsschritte:
 
 1. **Review-Familie ausfuehren**: `/k-review <review-name>` erzeugt oder bewertet Ergebnisse einer Scan-/Review-Familie.
-2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `<paths.reviews>/results/<family>/YYYY-MM-DD/`.
+2. **Result-Familien speichern**: Ergebnisse landen projektlokal unter `<paths.reviews>/results/<family>/YYYY-MM-DD/`; Report-Reviews ohne eigene `result-family` schreiben direkt eine Summary unter `<paths.reviews>/results/summary-YYYY-MM-DD.md`.
 3. **Projektweit priorisieren**: `/k-results` fasst mehrere Result-Familien zusammen und dedupliziert sie.
 4. **Remediation ausfuehren**: `/k-remediation <result-or-summary>` arbeitet priorisierte, statusfaehige Findings ab.
 
@@ -27,6 +27,7 @@ Projektlokale Review-Ergebnisse:
 
 ```text
 <project>/<paths.reviews>/results/<family>/YYYY-MM-DD/
+<project>/<paths.reviews>/results/summary-YYYY-MM-DD.md
 ```
 
 Beispiel:

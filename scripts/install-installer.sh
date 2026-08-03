@@ -19,6 +19,8 @@ Options:
 
 Environment:
   INSTALL_BIN                    Alternative install directory.
+  PATH_BIN                       PATH entry for the canonical launcher. Default: ~/dev/k-playbook/bin.
+  PATH_PROFILE                   Shell profile to update. Default depends on SHELL/OS.
   K_PLAYBOOK_RELEASE_BASE_URL    Release download base URL.
 
 Example:
@@ -44,6 +46,9 @@ DIST_DIR="$PLAYBOOK_REPO/dist"
 BIN_DIR="$PLAYBOOK_REPO/bin"
 WRAPPER_TEMPLATE="$PLAYBOOK_REPO/scripts/templates/k-playbook-installer-wrapper.sh"
 INSTALL_BIN="${INSTALL_BIN:-$HOME/.local/bin}"
+PATH_BIN="${PATH_BIN:-$HOME/dev/k-playbook/bin}"
+CANONICAL_PATH_BIN="$HOME/dev/k-playbook/bin"
+PATH_PROFILE="${PATH_PROFILE:-}"
 RELEASE_BASE_URL="${K_PLAYBOOK_RELEASE_BASE_URL:-https://github.com/kascada/k-playbook/releases/latest/download}"
 FROM_DIST_ONLY=0
 RELEASE_TARGETS=(linux-amd64 linux-arm64 darwin-amd64 darwin-arm64)
@@ -70,6 +75,71 @@ while [[ $# -gt 0 ]]; do
 done
 
 INSTALL_BIN="${INSTALL_BIN/#\~/$HOME}"
+PATH_BIN="${PATH_BIN/#\~/$HOME}"
+PATH_PROFILE="${PATH_PROFILE/#\~/$HOME}"
+
+default_path_profile() {
+  if [[ -n "$PATH_PROFILE" ]]; then
+    printf '%s\n' "$PATH_PROFILE"
+    return
+  fi
+
+  case "${SHELL##*/}" in
+    zsh)
+      printf '%s\n' "$HOME/.zprofile"
+      ;;
+    bash)
+      if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]; then
+        printf '%s\n' "$HOME/.bash_profile"
+      else
+        printf '%s\n' "$HOME/.profile"
+      fi
+      ;;
+    *)
+      printf '%s\n' "$HOME/.profile"
+      ;;
+  esac
+}
+
+path_contains() {
+  case ":$PATH:" in
+    *":$1:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ensure_launcher_path() {
+  local path_bin="$1"
+  local profile marker line profile_path_bin
+
+  if path_contains "$path_bin"; then
+    log "PATH OK: $path_bin ist im PATH."
+    return
+  fi
+
+  profile="$(default_path_profile)"
+  marker="# k-playbook installer PATH"
+  profile_path_bin="$path_bin"
+  if [[ "$path_bin" == "$CANONICAL_PATH_BIN" ]]; then
+    profile_path_bin='${HOME}/dev/k-playbook/bin'
+  fi
+  line="export PATH=\"$profile_path_bin:\$PATH\""
+
+  mkdir -p "$(dirname "$profile")"
+  touch "$profile"
+  if grep -Fq "$path_bin" "$profile" || grep -Fq '$HOME/dev/k-playbook/bin' "$profile" || grep -Fq '${HOME}/dev/k-playbook/bin' "$profile"; then
+    log "PATH-Eintrag existiert bereits in $profile, ist aber in dieser Shell noch nicht aktiv."
+  else
+    {
+      printf '\n%s\n' "$marker"
+      printf '%s\n' "$line"
+    } >>"$profile"
+    log "PATH-Eintrag zu $profile hinzugefuegt: $path_bin"
+  fi
+
+  log "Aktiviere ihn mit:"
+  log "  . $profile"
+}
 
 download() {
   local url="$1"
@@ -121,15 +191,4 @@ done
 ln -sfn "$BIN_DIR/$BINARY" "$INSTALL_BIN/$BINARY"
 log "Verlinkt: $INSTALL_BIN/$BINARY -> $BIN_DIR/$BINARY"
 
-case ":$PATH:" in
-  *":$INSTALL_BIN:"*)
-    log "PATH OK: $INSTALL_BIN ist im PATH."
-    ;;
-  *)
-    log "Hinweis: $INSTALL_BIN ist nicht im PATH."
-    log "Fuege z. B. diese Zeile zu deinem Shell-Profil hinzu:"
-    log "  export PATH=\"$INSTALL_BIN:\$PATH\""
-    log "Oder starte direkt:"
-    log "  $INSTALL_BIN/$BINARY"
-    ;;
-esac
+ensure_launcher_path "$PATH_BIN"

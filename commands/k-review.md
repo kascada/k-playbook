@@ -28,7 +28,8 @@ Also set:
 - `GLOBAL_REVIEWS_DIR` = `<PLAYBOOK_REPO>/global/reviews/`. If it does not exist, continue with project-local reviews only if configured; otherwise abort because no review catalog is available.
 - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
 - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
-- `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (for reviews that produce output files, e.g. tech-debt)
+- `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (base for reviews that produce output files)
+- `RESULTS_DIR` = `<PROJECT_REVIEWS_DIR>/results`
 
 Command-specific policy:
 
@@ -129,11 +130,11 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis schreiben. If `RESULT_DIR` is unset, abort and resolve `paths.reviews` from `K-PLAYBOOK.yaml`; do not pick a fallback directory.
-   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULT_DIR>/results/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
-   - Wenn `result-family` nicht gesetzt ist: Legacy-Pfad `<RESULT_DIR>/result-<name>.md` verwenden.
+2. Ergebnis schreiben. If `RESULTS_DIR` is unset, abort and resolve `paths.reviews` from `K-PLAYBOOK.yaml`; do not pick a fallback directory.
+   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
+   - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind ueberschreiben: nach Bestaetigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
-   `/k-remediation <RESULT_DIR>/result-review-tech.md` oder `/k-remediation <RESULT_DIR>/results/<result-family>/<YYYY-MM-DD>/assessment.md`
+   `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/assessment.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
 
 ## Step 6 — Log-Eintrag

@@ -56,6 +56,31 @@ func TestBrowserFallbackHintOnlyForDevcontainer(t *testing.T) {
 	}
 }
 
+func TestIsAllowedDocPathAllowsRootReadmeAndDocsOnly(t *testing.T) {
+	allowed := []string{
+		"README.md",
+		"docs/README.md",
+		"docs/commands.md",
+	}
+	for _, path := range allowed {
+		if !isAllowedDocPath(path) {
+			t.Fatalf("expected %s to be allowed", path)
+		}
+	}
+
+	rejected := []string{
+		".",
+		"../README.md",
+		"AGENTS.md",
+		"commands/k-gui.md",
+	}
+	for _, path := range rejected {
+		if isAllowedDocPath(path) {
+			t.Fatalf("expected %s to be rejected", path)
+		}
+	}
+}
+
 func TestInstallBinaryFileCopiesExecutableAtomically(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "source-binary")
@@ -161,5 +186,57 @@ func TestSyncInstallerBinariesMirrorsAllDistAssetsAndWrapper(t *testing.T) {
 	}
 	if changed || len(installed) != 0 {
 		t.Fatalf("expected second sync to be unchanged, got changed=%v installed=%v", changed, installed)
+	}
+}
+
+func TestEnsureLauncherPathAddsCanonicalRepoBinToProfile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv("PATH", "/usr/bin:/bin")
+
+	changed, message, err := ensureLauncherPath()
+	if err != nil {
+		t.Fatalf("ensure launcher path: %v", err)
+	}
+	if !changed {
+		t.Fatalf("expected profile to be changed, message=%q", message)
+	}
+
+	profile := filepath.Join(home, ".profile")
+	data, err := os.ReadFile(profile)
+	if err != nil {
+		t.Fatalf("read profile: %v", err)
+	}
+	expectedPath := "${HOME}/dev/k-playbook/bin"
+	if !strings.Contains(string(data), expectedPath) {
+		t.Fatalf("expected profile to contain %s, got %q", expectedPath, string(data))
+	}
+
+	changed, message, err = ensureLauncherPath()
+	if err != nil {
+		t.Fatalf("second ensure launcher path: %v", err)
+	}
+	if changed {
+		t.Fatalf("expected existing profile entry to be unchanged, message=%q", message)
+	}
+}
+
+func TestEnsureLauncherPathDoesNothingWhenPathAlreadyContainsRepoBin(t *testing.T) {
+	home := t.TempDir()
+	expectedPath := filepath.Join(home, "dev", "k-playbook", "bin")
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv("PATH", strings.Join([]string{"/usr/bin", expectedPath, "/bin"}, string(os.PathListSeparator)))
+
+	changed, message, err := ensureLauncherPath()
+	if err != nil {
+		t.Fatalf("ensure launcher path: %v", err)
+	}
+	if changed || message != "" {
+		t.Fatalf("expected no change and no message, got changed=%v message=%q", changed, message)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".profile")); !os.IsNotExist(err) {
+		t.Fatalf("expected profile to stay absent, stat err=%v", err)
 	}
 }

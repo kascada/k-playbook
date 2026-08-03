@@ -16,7 +16,7 @@ Der generische Rahmen wird von `/k-review` orchestriert. Diese Datei beschreibt 
 
 Dieses Review erzeugt keine interaktiven Freigaben pro Fund. Es produziert ein vollstaendiges Ergebnis-Dokument, das anschliessend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
 
-Der Command uebergibt der Analyse einen Pfad fuer die Ausgabe-Datei unter `k-playbook/reviews/`, ueblich: `k-playbook/reviews/result-review-tech.md`.
+Der Command uebergibt der Analyse einen Pfad fuer die Ausgabe-Datei unter `k-playbook/reviews/results/`, ueblich: `k-playbook/reviews/results/summary-YYYY-MM-DD.md`.
 
 ## Analyse
 
@@ -26,7 +26,7 @@ Nutze `/engineering:tech-debt` mit folgender Direktive:
 - Halte die Ausschluesse aus `scope-hint` ein.
 - Kategorisiere und priorisiere alle Tech-Debt-Kandidaten.
 - Keine Code-Aenderungen.
-- Schreibe das vollstaendige Ergebnis als Markdown in die vom Command uebergebene Ausgabe-Datei.
+- Schreibe das vollstaendige Ergebnis als Markdown in die vom Command uebergebene Summary-Datei.
 
 ## Handoff
 
