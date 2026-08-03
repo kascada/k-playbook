@@ -170,8 +170,26 @@ func ResolveStatusPath(value string) (string, error) {
 			return parent, nil
 		}
 	}
+	if exists(filepath.Join(normalized, ConfigFileName)) {
+		return normalized, nil
+	}
+	if parent := nearestConfigParent(normalized); parent != "" {
+		return parent, nil
+	}
 
 	return normalized, nil
+}
+
+func nearestConfigParent(path string) string {
+	for current := filepath.Dir(path); ; current = filepath.Dir(current) {
+		if exists(filepath.Join(current, ConfigFileName)) {
+			return current
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+	}
 }
 
 func CheckPlaybook(projectPath string) PlaybookStatus {
@@ -282,7 +300,7 @@ func CheckProjectRoot(projectPath string) ProjectRootStatus {
 	if ProjectVCS(status.VCS) == ProjectVCSNone {
 		status.Message = "Projekt ist bewusst als ohne Git konfiguriert."
 	} else {
-		status.Message = "Project-Root ist konfiguriert."
+		status.Message = "Git-Pfad ist konfiguriert."
 	}
 	return status
 }
@@ -519,7 +537,7 @@ func Recommendations(status ProjectStatus) []string {
 		add("/k-gui")
 	}
 	if !status.ProjectRoot.OK {
-		add("Project-Root in /k-gui setzen")
+		add("Git in /k-gui setzen")
 	}
 	if status.Devcontainer != nil && !status.Devcontainer.OK {
 		add("Devcontainer-Integration reparieren")

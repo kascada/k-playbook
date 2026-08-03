@@ -153,7 +153,7 @@ Wenn `opencode` im Container nicht verfuegbar ist, pruefe die deterministischen 
 
 - Lies `/home/vscode/dev/k-playbook/commands/k-install.md` und pruefe, ob die Container-Registrierung bereits erfuellt ist.
 - Lies `/home/vscode/dev/k-playbook/commands/k-setup.md` und dokumentiere, ob ein echtes `/k-setup` ohne interaktive Entscheidungen sinnvoll ist. Fuer den Smoke-Test reicht es, wenn die Voraussetzungen fuer `/k-setup` stimmen.
-- Lies `/home/vscode/dev/k-playbook/commands/k-status.md` und pruefe die dort relevanten Statuspunkte fuer `playbook`, `opencode` und `devcontainer`.
+- Lies `/home/vscode/dev/k-playbook/commands/_details/k-status.md` und pruefe die dort relevanten Statuspunkte fuer `playbook`, `opencode` und `devcontainer`.
 
 ## Ergebnisbericht
 

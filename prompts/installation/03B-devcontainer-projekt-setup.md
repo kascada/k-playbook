@@ -15,7 +15,7 @@ Fuehre danach aus:
 7. Installiere fehlende Security-Tools im Container als Teil der Standardinstallation mit `/k-install-security-tools --install missing --yes`. Wenn du Slash-Commands nicht selbst ausloesen kannst, lies `~/dev/k-playbook/commands/k-install-security-tools.md` direkt und fuehre die dort beschriebenen Schritte aus.
 8. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen.
 9. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
-10. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
+10. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/_details/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
 
 Berichte am Ende knapp:
 

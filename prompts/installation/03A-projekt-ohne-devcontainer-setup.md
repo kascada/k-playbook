@@ -13,7 +13,7 @@ Fuehre danach aus:
 5. Nutze `/k-setup` nur noch bei Bedarf, wenn die Kernfelder einer bestehenden `K-PLAYBOOK.yaml` normalisiert werden muessen. Der Command installiert keine Projekt-Dependencies und erzeugt keine Struktur.
 6. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen. `/k-install-codeql` nicht aus einem aktiven Projekt-venv starten.
 7. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
-8. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
+8. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/_details/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
 
 Berichte am Ende knapp:
 

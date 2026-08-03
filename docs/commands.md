@@ -55,6 +55,7 @@ Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden auf dem H
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
 | `/k-gui` | lokale k-playbook Installer-GUI starten | keine Aenderung | startet `~/.local/bin/k-playbook-installer` im Vordergrund |
 | **Code-Review** | | | |
+| `/k-pr-review` | offene GitHub-PRs fuer das konfigurierte Repo listen, einen PR laden, bewerten und optional approven oder in einen lokalen Test-Branch ueberfuehren | nutzt `K-PLAYBOOK.yaml`, `enforcement` und `docs`; fragt Modus `quick|standard|deep` ab, wenn nicht gesetzt | standardmaessig read-only; schreibt nur nach expliziter Entscheidung via GitHub-Approval oder lokalem Validierungs-Branch |
 | `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `k-playbook/reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `k-playbook/reviews/results/<family>/YYYY-MM-DD/` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `k-playbook/reviews` und `k-playbook/tasks` | schreibt `k-playbook/reviews/results/summary-YYYY-MM-DD.md` |
 | `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | nutzt `k-playbook/reviews`, `k-playbook/tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
@@ -216,6 +217,27 @@ k-playbook-installer status
 
 Die Ausgabe ist JSON und enthaelt die in der Installer-GUI genutzten Projektfelder plus leichte Statusbereiche wie `playbook`, `tasks`, `todo`, `reviews`, `enforcement`, `git` und `recommendations`. `/k-status` startet keine Tests, Builds, Smoke-Tests, Scanner oder Analysen; solche Pruefungen bleiben separaten Commands vorbehalten.
 
+## Installer-Smoke-Test
+
+Aufwendigere oder externe Pruefungen laufen explizit ueber den Installer-Smoke-Test, nicht ueber `/k-status`:
+
+```bash
+k-playbook-installer smoke [path]
+k-playbook-installer smoke --all
+```
+
+Der Smoke-Test prueft pro Projekt unter anderem die YAML-/Git-Konfiguration und ob `gh` verfuegbar und authentifiziert ist. In der GUI kann er pro Projekt in der Detailansicht oder fuer alle Projekte auf der Startseite gestartet werden.
+
+Der Smoke-Test ist der vorgesehene Erweiterungspunkt fuer bewusst aufwendigere oder externe Checks. Sinnvolle naechste Kandidaten sind:
+
+- GitHub-Repo-Aufloesung mit `gh repo view`, damit klar ist, ob lokale Remotes und GitHub-Zugriff zusammenpassen.
+- Bei DevContainer-Projekten ein Hinweis, ob `.devcontainer/devcontainer.json` die k-playbook-Mounts und Setup-Hooks enthaelt.
+- Optionaler Tool-Smoke fuer vorhandene Pflicht-Tools aus der Security-Tool-Matrix, aber ohne Scannerlaeufe zu starten.
+- Optionaler CodeQL-Smoke, der nur `codeql version` und konfigurierte Pfade prueft, keine Datenbank erzeugt.
+- Optionaler Docs-Smoke, der prueft, ob `k-playbook/docs/README.md` existiert und auf Markdown-Dateien verweist.
+
+Neue Smoke-Checks sollen kurz, begrenzt und erklaerbar bleiben: sie duerfen externe Tools aufrufen, aber keine Projektdateien aendern, keine langlaufenden Analysen starten und keine grossen Artefakte erzeugen.
+
 ## Task-Commands: `/k-task-create`, `/k-run`, `/k-review-loop`, `/k-todo`
 
 Diese Commands bilden die Task-Pipeline. Sie raten keine Projektpfade, sondern lesen `K-PLAYBOOK.yaml` als Projekt-Kontext und nutzen die festen Unterverzeichnisse.
@@ -254,6 +276,83 @@ Aktuelle globale Review-Rezepte:
 - `/k-review iac-container`
 - `/k-review tech`
 - `/k-review python-comment-hardspots`
+
+## `/k-pr-review`
+
+`/k-pr-review` ist der Einstieg fuer Pull Requests im ueber `K-PLAYBOOK.yaml` konfigurierten Ziel-Repo. Der Command loest zuerst das echte Git-Repo auf, listet offene GitHub-PRs oder laedt einen explizit angegebenen PR, fuehrt danach eine kompakte PR-Bewertung aus und kann anschliessend eine klar begrenzte Folgeaktion ausfuehren.
+
+Zulaessige Aufrufe:
+
+- `/k-pr-review`
+- `/k-pr-review 443`
+- `/k-pr-review #443`
+- `/k-pr-review https://github.com/<owner>/<repo>/pull/443`
+- `/k-pr-review quick`
+- `/k-pr-review 443 standard`
+- `/k-pr-review #443 deep`
+
+Argumente:
+
+- optionaler PR-Selektor als Nummer, `#Nummer` oder GitHub-PR-URL
+- optionaler Bewertungsmodus `quick`, `standard` oder `deep`
+- wenn der Modus nicht angegeben ist, fragt der Command ihn nach dem PR-Ueberblick ab
+
+Der Flow ist absichtlich dreistufig:
+
+1. Phase 1: PR-Auswahl und kompakter Ueberblick mit Repo, Titel, URL, Branches, Diff-Umfang, Dateiliste und GitHub-Check-Signalen.
+2. Phase 2: read-only PR-Bewertung im gewaehlten Modus.
+3. Phase 3: Empfehlung plus Folgeaktion `direkt annehmen`, `branch erstellen und weiter testen` oder `nichts weiter`.
+
+Die Bewertungsmodi sind:
+
+- `quick`: GitHub-Signale, Diff-Scope und Enforcement-Einschaetzung.
+- `standard`: `quick` plus `k-check --mode changed` auf dem PR-Dateiscope.
+- `deep`: `standard` plus kleinste sinnvolle lokale Validierung je nach Scope, z. B. `python manage.py check` oder `makemigrations --check --dry-run`.
+
+Aus der Bewertung leitet der Command eine Handlungsempfehlung ab:
+
+- `direkt annehmen`
+- `branch erstellen und weiter testen`
+
+Wenn der User `direkt annehmen` waehlt:
+
+- fuehrt der Command ein GitHub-Approval fuer den PR aus
+- verwendet er fuer Approval- oder Kommentartexte immer temporaere Dateien mit `--body-file`, nicht fragile Inline-Mehrzeiler
+- kann er danach auf ausdrueckliche User-Anfrage auch den PR per CLI mergen
+- ohne explizite Merge-Anfrage bleibt es beim Approval und der Merge erfolgt online auf GitHub
+
+Wenn das Approval nicht moeglich ist, z. B. weil GitHub keinen Self-Approval fuer den eigenen PR erlaubt:
+
+- meldet der Command den Grund kurz und klar
+- fuehrt keinen Merge-Fallback aus
+- gibt stattdessen einen knappen Merge-Hinweis als kopierbaren Markdown-Block aus, den der User bei Bedarf manuell auf GitHub einfuegen kann
+
+Wenn der User `branch erstellen und weiter testen` waehlt:
+
+- prueft der Command zuerst, ob der lokale Worktree sauber ist
+- legt dann einen lokalen Validierungs-Branch vom PR-Head an, z. B. `pr-review/441-python-jose`
+- fuehrt darauf den kleinsten sinnvollen erweiterten Testlauf passend zum Scope aus
+- pusht den Branch nicht automatisch und aendert keinen Produktcode
+- fuehrt danach den User wieder auf den urspruenglichen PR zurueck und kann diesen auf Wunsch approven oder mergen
+- raeumt den lokalen Validierungs-Branch am Ende wieder auf, wenn der Worktree sauber ist
+
+Fuer die Bewertung nutzt `/k-pr-review` bewusst dieselben Regelquellen wie die uebrigen k-playbook-Flows:
+
+- globale Regeln unter `<PLAYBOOK_REPO>/global/rules/`
+- projektlokale Regeln unter `k-playbook/enforcement/`
+- projektlokale Docs unter `k-playbook/docs/` fuer die Docs-Sync-Einschaetzung
+
+Wichtig ist die Abgrenzung:
+
+- `/k-pr-review` schreibt keine Artefakte unter `k-playbook/reviews/`.
+- Er fuehrt nicht automatisch `/k-review`-Reportfamilien aus.
+- Er erzeugt keine Tasks und keine Remediation.
+- Ein automatischer Merge ohne explizite User-Anfrage ist ausdruecklich nicht Teil des Commands.
+- Die Ausgabe ist eine kompakte Bewertung mit Scope, Risiko, Check-Signalen, Enforcement-Einordnung, Empfehlung und ggf. lokaler Validierung.
+
+Zum Abschluss prueft der Command den lokalen Repo-Zustand noch einmal, damit keine versehentlich liegen gebliebenen Branches oder unerklaerten Worktree-Aenderungen uebersehen werden.
+
+Dadurch eignet sich der Command fuer den schnellen PR-Preflight, bevor bei Bedarf tiefere Flows wie `/k-review ...` oder `/k-remediation ...` gestartet werden.
 
 ## `/k-remediation`
 

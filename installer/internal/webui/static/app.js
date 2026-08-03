@@ -1,5 +1,6 @@
 const state = {
   status: null,
+  runtime: null,
   scanned: [],
   devcontainers: null,
   securityTools: null,
@@ -13,6 +14,10 @@ const elements = {
   backHome: document.querySelector("#back-home"),
   backProjects: document.querySelector("#back-projects"),
   openScan: document.querySelector("#open-scan"),
+  smokeAll: document.querySelector("#smoke-all"),
+  smokeOutput: document.querySelector("#smoke-output"),
+  runtimeBanner: document.querySelector("#runtime-banner"),
+  projectScopeNote: document.querySelector("#project-scope-note"),
   cancelScan: document.querySelector("#cancel-scan"),
   gitPullTop: document.querySelector("#git-pull-top"),
   gitPull: document.querySelector("#git-pull"),
@@ -46,6 +51,7 @@ const elements = {
   projectDetailTitle: document.querySelector("#project-detail-title"),
   projectDetailPath: document.querySelector("#project-detail-path"),
   projectDetailStatus: document.querySelector("#project-detail-status"),
+  projectSmokeOutput: document.querySelector("#project-smoke-output"),
   openProjectConfig: document.querySelector("#open-project-config"),
   reloadProjectConfig: document.querySelector("#reload-project-config"),
   projectConfig: document.querySelector("#project-config"),
@@ -64,9 +70,10 @@ let currentProjectPath = "";
 
 elements.refresh.addEventListener("click", refreshAll);
 elements.shutdown.addEventListener("click", shutdownInstaller);
-elements.backHome.addEventListener("click", showHome);
-elements.backProjects.addEventListener("click", showHome);
+elements.backHome.addEventListener("click", goBackToHome);
+elements.backProjects.addEventListener("click", goBackToHome);
 elements.openScan.addEventListener("click", showScan);
+elements.smokeAll.addEventListener("click", smokeAllProjects);
 elements.cancelScan.addEventListener("click", showHome);
 elements.gitPullTop.addEventListener("click", gitPull);
 elements.gitPull.addEventListener("click", gitPull);
@@ -81,20 +88,25 @@ elements.reloadProjectConfig.addEventListener("click", () => loadProjectConfig(c
 elements.manualForm.addEventListener("submit", addManualProject);
 
 startApp();
-showHome();
+showHome({ replaceHistory: true });
 startHealthChecks();
+window.addEventListener("popstate", handleHistoryNavigation);
 window.addEventListener("pagehide", notifyClientGone);
 
-function showHome() {
+function showHome(options = {}) {
+  currentProjectPath = "";
   showView("home");
+  updateHistory({ view: "home" }, options);
 }
 
-function showScan() {
+function showScan(options = {}) {
   showView("scan");
+  updateHistory({ view: "scan" }, options);
 }
 
-function showProjectDetail() {
+function showProjectDetail(options = {}) {
   showView("project-detail");
+  updateHistory({ view: "project-detail", projectPath: currentProjectPath }, options);
 }
 
 function showView(name) {
@@ -103,7 +115,48 @@ function showView(name) {
   }
 }
 
+function goBackToHome() {
+  const current = window.history.state || {};
+  if (current.view === "scan" || current.view === "project-detail") {
+    window.history.back();
+    return;
+  }
+  showHome({ replaceHistory: true });
+}
+
+function handleHistoryNavigation(event) {
+  const viewState = event.state || { view: "home" };
+  if (viewState.view === "scan") {
+    showScan({ skipHistory: true });
+    return;
+  }
+  if (viewState.view === "project-detail" && viewState.projectPath) {
+    openProjectDetail(viewState.projectPath, { skipHistory: true });
+    return;
+  }
+  showHome({ skipHistory: true });
+}
+
+function updateHistory(viewState, options = {}) {
+  if (options.skipHistory || !window.history || !window.history.pushState) {
+    return;
+  }
+
+  const current = window.history.state || {};
+  if (!options.replaceHistory && sameHistoryState(current, viewState)) {
+    return;
+  }
+
+  const method = options.replaceHistory ? "replaceState" : "pushState";
+  window.history[method](viewState, "", window.location.href);
+}
+
+function sameHistoryState(left, right) {
+  return left.view === right.view && (left.projectPath || "") === (right.projectPath || "");
+}
+
 async function refreshAll() {
+  await loadRuntimeStatus();
   await refreshStatus();
   if (state.status && statusOK(state.status)) {
     await loadInitialHomeStatus();
@@ -137,16 +190,28 @@ async function runOptionalInitialCheck(callback) {
 
 async function gitPull() {
   await withBusyMany([elements.gitPull, elements.gitPullTop], async () => {
-    elements.gitOutput.textContent = "git pull laeuft...";
-    const result = await api("/api/git/pull", { method: "POST" });
-    elements.gitOutput.textContent = result.output || "Bereits aktuell.";
-    showToast("Repository aktualisiert.");
-    await refreshAll();
+    renderLoading(elements.gitOutput, "git pull laeuft...");
+    try {
+      const result = await api("/api/git/pull", { method: "POST" });
+      elements.gitOutput.classList.remove("empty");
+      const messages = [result.output || "Bereits aktuell."];
+      if (result.installerMessage) {
+        messages.push(result.installerMessage);
+      }
+      await refreshAll();
+      elements.gitOutput.classList.remove("empty");
+      elements.gitOutput.textContent = messages.join("\n\n");
+      showToast(result.installerRestartRequired ? "Repository aktualisiert. Installer bitte neu starten." : "Repository aktualisiert.");
+    } catch (error) {
+      renderInlineMessage(elements.gitOutput, `git pull fehlgeschlagen: ${error.message}`);
+      throw error;
+    }
   });
 }
 
 async function loadGitStatus() {
   try {
+    renderLoading(elements.gitOutput, "Update-Status wird geprueft...");
     const status = await api("/api/git/status");
     state.gitStatus = status;
     renderGitStatus(status);
@@ -157,6 +222,7 @@ async function loadGitStatus() {
 }
 
 function renderGitStatus(status, error = "") {
+  elements.gitOutput.classList.remove("empty");
   const updateAvailable = Boolean(status && (status.updateAvailable || status.UpdateAvailable));
   const buttons = [
     [elements.gitPullTop, "k-playbook aktualisieren"],
@@ -236,24 +302,76 @@ function notifyClientGone() {
 
 async function loadDocs() {
   await withBusy(elements.reloadDocs, async () => {
-    const docs = await api("/api/docs");
-    renderDocsList(docs);
+    renderLoading(elements.docsList, "Docs werden geladen...");
+    try {
+      const docs = await api("/api/docs");
+      renderDocsList(docs);
+    } catch (error) {
+      renderInlineMessage(elements.docsList, `Docs konnten nicht geladen werden: ${error.message}`);
+      throw error;
+    }
   });
 }
 
 async function loadOpenCodeStatus() {
   await withBusy(elements.opencodeRefresh, async () => {
-    const status = await api("/api/opencode/status");
-    state.opencode = status;
-    renderOpenCode(status);
+    renderOpenCodeLoading();
+    try {
+      const status = await api("/api/opencode/status");
+      state.opencode = status;
+      renderOpenCode(status);
+    } catch (error) {
+      renderInlineMessage(elements.opencodeSummary, `Registrierung konnte nicht geprueft werden: ${error.message}`);
+      throw error;
+    }
   });
+}
+
+async function loadRuntimeStatus() {
+  const runtime = await api("/api/runtime");
+  state.runtime = runtime;
+  renderRuntime(runtime);
+}
+
+function renderRuntime(runtime) {
+  const insideContainer = Boolean(runtime && (runtime.insideContainer || runtime.InsideContainer));
+  const insideDevcontainer = Boolean(runtime && (runtime.insideDevcontainer || runtime.InsideDevcontainer));
+  document.body.classList.toggle("runtime-container", insideContainer);
+
+  if (!insideContainer) {
+    elements.runtimeBanner.classList.add("hidden");
+    elements.runtimeBanner.textContent = "";
+    elements.projectScopeNote.classList.add("hidden");
+    elements.projectScopeNote.textContent = "";
+    elements.openScan.disabled = false;
+    elements.smokeAll.disabled = false;
+    return;
+  }
+
+  const currentProject = runtime.currentProject || runtime.CurrentProject || "";
+  const title = insideDevcontainer ? "DevContainer-Modus" : "Container-Modus";
+  const message = runtime.message || runtime.Message || "Installer laeuft im Container-Kontext.";
+  elements.runtimeBanner.classList.remove("hidden");
+  elements.runtimeBanner.textContent = currentProject ? `${title}: ${message} Aktuelles Projekt: ${currentProject}` : `${title}: ${message}`;
+  elements.projectScopeNote.classList.remove("hidden");
+  elements.projectScopeNote.textContent = currentProject
+    ? `Container-Modus: Nur ${currentProject} ist bearbeitbar. Andere gespeicherte Projekte sind Host-Kontext und hier deaktiviert.`
+    : "Container-Modus: Kein aktuelles Projekt erkannt. Gespeicherte Host-Projekte sind hier deaktiviert.";
+  elements.openScan.disabled = !currentProject;
+  elements.smokeAll.disabled = !currentProject;
 }
 
 async function loadSecurityToolsStatus() {
   await withBusy(elements.securityToolsRefresh, async () => {
-    const status = await api("/api/security-tools/status");
-    state.securityTools = status;
-    renderSecurityTools(status);
+    renderSecurityToolsLoading();
+    try {
+      const status = await api("/api/security-tools/status");
+      state.securityTools = status;
+      renderSecurityTools(status);
+    } catch (error) {
+      renderInlineMessage(elements.securityToolsSummary, `Security-Tools konnten nicht geprueft werden: ${error.message}`);
+      throw error;
+    }
   });
 }
 
@@ -314,16 +432,48 @@ async function repairPath() {
 }
 
 async function refreshProjects() {
-  const file = await api("/api/projects");
-  state.projects = file.projects || file.Projects || [];
-  renderProjects(state.projects);
+  renderLoading(elements.projects, "Projekt-Auswahl wird geladen...");
+  try {
+    const file = await api("/api/projects");
+    state.runtime = file.runtime || file.Runtime || state.runtime;
+    renderRuntime(state.runtime);
+    state.projects = file.projects || file.Projects || [];
+    renderProjects(state.projects);
+  } catch (error) {
+    renderInlineMessage(elements.projects, `Projekt-Auswahl konnte nicht geladen werden: ${error.message}`);
+    throw error;
+  }
+}
+
+function renderLoading(element, text) {
+  element.innerHTML = "";
+  element.classList.add("empty");
+  const loading = document.createElement("span");
+  loading.className = "loading-inline";
+  const spinner = document.createElement("span");
+  spinner.className = "loading-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  loading.append(spinner, text);
+  element.append(loading);
+}
+
+function renderInlineMessage(element, text) {
+  element.innerHTML = "";
+  element.classList.add("empty");
+  element.textContent = text;
 }
 
 async function scanProjects() {
   await withBusy(elements.scan, async () => {
-    const projects = await api(`/api/projects/scan?root=${encodeURIComponent(elements.scanRoot.value)}`);
-    state.scanned = projects;
-    renderScanned(projects);
+    renderLoading(elements.scanResults, "Projekte werden gesucht...");
+    try {
+      const projects = await api(`/api/projects/scan?root=${encodeURIComponent(elements.scanRoot.value)}`);
+      state.scanned = projects;
+      renderScanned(projects);
+    } catch (error) {
+      renderInlineMessage(elements.scanResults, `Scan fehlgeschlagen: ${error.message}`);
+      throw error;
+    }
   });
 }
 
@@ -357,7 +507,7 @@ async function addManualProject(event) {
     renderProjects(state.projects);
     await loadDevcontainerStatus();
     showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
-    showHome();
+    showHome({ replaceHistory: true });
   });
 }
 
@@ -476,7 +626,7 @@ async function addScannedProject(row, select, button) {
     renderProjects(state.projects);
     await loadDevcontainerStatus();
     showToast("Projekt gespeichert. K-PLAYBOOK.yaml ist vorhanden.");
-    showHome();
+    showHome({ replaceHistory: true });
   });
 }
 
@@ -498,26 +648,42 @@ function renderProjects(projects) {
 function projectSummaryCard(project) {
   const card = document.createElement("div");
   const projectPath = project.path || project.Path;
-  card.className = "project-row clickable-project";
-  card.tabIndex = 0;
-  card.setAttribute("role", "button");
-  card.setAttribute("aria-label", `Details fuer ${projectPath} anzeigen`);
-  card.addEventListener("click", () => openProjectDetail(projectPath));
-  card.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openProjectDetail(projectPath);
-    }
-  });
-  card.append(projectHeader(project, { showDetails: false, showRemove: false }));
+  const editable = isProjectEditablePath(projectPath);
+  card.className = editable ? "project-row clickable-project" : "project-row project-disabled";
+  if (editable) {
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `Details fuer ${projectPath} anzeigen`);
+    card.addEventListener("click", () => openProjectDetail(projectPath));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openProjectDetail(projectPath);
+      }
+    });
+  }
+  card.append(projectHeader(project, { showDetails: editable, showRemove: false }));
   card.append(projectStatusList(projectStatus(project)));
+  if (!editable) {
+    const note = document.createElement("div");
+    note.className = "disabled-note";
+    note.textContent = "Host-Projekt: im Container-Modus nicht bearbeitbar.";
+    card.append(note);
+  }
   return card;
 }
 
 function projectEditorCard(project) {
   const card = document.createElement("div");
+  const editable = isProjectEditablePath(project.path || project.Path);
   card.className = "project-row project-editor";
-  card.append(projectHeader(project, { showDetails: false, showRemove: true }));
+  card.append(projectHeader(project, { showDetails: false, showRemove: editable, showSmoke: editable }));
+  if (!editable) {
+    const note = document.createElement("div");
+    note.className = "disabled-note";
+    note.textContent = "Dieses Projekt gehoert nicht zum aktuellen Container-Kontext und ist hier nur sichtbar.";
+    card.append(note);
+  }
 
   for (const item of projectStatus(project)) {
     card.append(projectEditorStatusRow(project, item));
@@ -529,6 +695,7 @@ function projectEditorCard(project) {
 function projectHeader(project, options = {}) {
   const showDetails = options.showDetails !== false;
   const showRemove = options.showRemove !== false;
+  const showSmoke = options.showSmoke === true;
 
   const header = document.createElement("div");
   header.className = "project-header";
@@ -549,6 +716,9 @@ function projectHeader(project, options = {}) {
   headerActions.append(environment);
   if (showDetails) {
     headerActions.append(projectDetailsButton(project));
+  }
+  if (showSmoke) {
+    headerActions.append(projectSmokeButton(project));
   }
   if (showRemove) {
     headerActions.append(removeProjectButton(project));
@@ -584,18 +754,43 @@ function projectDetailsButton(project) {
   return button;
 }
 
-async function openProjectDetail(projectPath) {
+function projectSmokeButton(project) {
+  const projectPath = project.path || project.Path;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary small-button";
+  button.textContent = "Smoke-Test";
+  button.addEventListener("click", () => smokeProject(projectPath, button));
+  return button;
+}
+
+async function openProjectDetail(projectPath, options = {}) {
+  if (!isProjectEditablePath(projectPath)) {
+    showToast("Im Container-Modus ist nur das aktuelle Projekt bearbeitbar.", true);
+    return;
+  }
   currentProjectPath = projectPath;
   const project = findProject(projectPath);
   elements.projectDetailTitle.textContent = project ? (project.name || project.Name || "Projekt") : "Projekt";
   elements.projectDetailPath.textContent = projectPath;
   renderProjectDetailStatus(project);
-  showProjectDetail();
+  elements.projectSmokeOutput.classList.add("hidden");
+  showProjectDetail(options);
   await loadProjectConfig(projectPath);
 }
 
 function findProject(projectPath) {
   return state.projects.find((project) => (project.path || project.Path) === projectPath) || null;
+}
+
+function isProjectEditablePath(projectPath) {
+  const runtime = state.runtime || {};
+  const insideContainer = Boolean(runtime.insideContainer || runtime.InsideContainer);
+  if (!insideContainer) {
+    return true;
+  }
+  const currentProject = runtime.currentProject || runtime.CurrentProject || "";
+  return Boolean(currentProject && projectPath === currentProject);
 }
 
 function renderProjectDetailStatus(project) {
@@ -609,6 +804,75 @@ function renderProjectDetailStatus(project) {
   elements.projectDetailStatus.append(projectEditorCard(project));
 }
 
+async function smokeAllProjects() {
+  await withBusy(elements.smokeAll, async () => {
+    renderLoading(elements.smokeOutput, "Smoke-Test fuer alle Projekte laeuft...");
+    elements.smokeOutput.classList.remove("hidden");
+    try {
+      const result = await api("/api/projects/smoke-all", { method: "POST" });
+      renderSmokeAllResult(elements.smokeOutput, result);
+      showToast(result.message || result.Message || "Smoke-Test abgeschlossen.", !(result.ok || result.OK));
+    } catch (error) {
+      renderInlineMessage(elements.smokeOutput, `Smoke-Test fehlgeschlagen: ${error.message}`);
+      throw error;
+    }
+  });
+}
+
+async function smokeProject(projectPath, button) {
+  await withBusy(button, async () => {
+    const output = currentProjectPath === projectPath ? elements.projectSmokeOutput : elements.smokeOutput;
+    output.classList.remove("hidden");
+    renderLoading(output, `Smoke-Test laeuft: ${projectPath}`);
+    try {
+      const result = await api("/api/projects/smoke", {
+        method: "POST",
+        body: JSON.stringify({ path: projectPath }),
+      });
+      renderSmokeAllResult(output, { ok: result.ok || result.OK, message: result.message || result.Message, projects: [result] });
+      showToast(result.message || result.Message || "Smoke-Test abgeschlossen.", !(result.ok || result.OK));
+    } catch (error) {
+      renderInlineMessage(output, `Smoke-Test fehlgeschlagen: ${error.message}`);
+      throw error;
+    }
+  });
+}
+
+function renderSmokeAllResult(target, result) {
+  const projects = result.projects || result.Projects || [];
+  target.innerHTML = "";
+  target.classList.remove("empty", "hidden");
+  const title = document.createElement("strong");
+  title.textContent = result.message || result.Message || "Smoke-Test abgeschlossen.";
+  target.append(title);
+  for (const project of projects) {
+    target.append(renderSmokeProjectResult(project));
+  }
+}
+
+function renderSmokeProjectResult(project) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "smoke-project";
+  const title = document.createElement("div");
+  title.className = "smoke-project-title";
+  title.textContent = `${project.ok || project.OK ? "OK" : "WARN"} - ${project.path || project.Path || project.name || project.Name}`;
+  wrapper.append(title);
+  const checks = project.checks || project.Checks || [];
+  for (const check of checks) {
+    const row = document.createElement("div");
+    const severity = check.severity || check.Severity || "warn";
+    row.className = `smoke-check ${severity}`;
+    const name = document.createElement("strong");
+    name.textContent = check.name || check.Name || "check";
+    const message = document.createElement("span");
+    const output = check.output || check.Output || "";
+    message.textContent = [check.message || check.Message || "", output ? `(${output})` : ""].filter(Boolean).join(" ");
+    row.append(name, message);
+    wrapper.append(row);
+  }
+  return wrapper;
+}
+
 async function loadProjectConfig(projectPath) {
   if (!projectPath) {
     elements.projectConfig.classList.add("empty");
@@ -618,14 +882,21 @@ async function loadProjectConfig(projectPath) {
     return;
   }
   await withBusy(elements.reloadProjectConfig, async () => {
-    const config = await api(`/api/projects/config?path=${encodeURIComponent(projectPath)}`);
-    const configPath = config.path || config.Path || "";
-    elements.projectConfig.classList.remove("empty");
-    elements.openProjectConfig.classList.toggle("hidden", !configPath);
-    if (configPath) {
-      elements.openProjectConfig.href = `vscode://file/${encodeURI(configPath)}`;
+    renderLoading(elements.projectConfig, "YAML wird geladen...");
+    try {
+      const config = await api(`/api/projects/config?path=${encodeURIComponent(projectPath)}`);
+      const configPath = config.path || config.Path || "";
+      elements.projectConfig.classList.remove("empty");
+      elements.openProjectConfig.classList.toggle("hidden", !configPath);
+      if (configPath) {
+        elements.openProjectConfig.href = `vscode://file/${encodeURI(configPath)}`;
+      }
+      elements.projectConfig.textContent = config.content || config.Content || "";
+    } catch (error) {
+      elements.openProjectConfig.classList.add("hidden");
+      renderInlineMessage(elements.projectConfig, `YAML konnte nicht geladen werden: ${error.message}`);
+      throw error;
     }
-    elements.projectConfig.textContent = config.content || config.Content || "";
   });
 }
 
@@ -662,10 +933,10 @@ function projectRootStatus(project) {
   const candidates = root.candidates || root.Candidates || [];
   return {
     key: "project-root",
-    label: "Project-Root",
-    value: ok ? `${repoRoot} (${vcs})` : repoRoot ? "ungueltig" : "fehlt",
+    label: "Git",
+    value: ok ? (vcs === "none" ? "kein Git" : repoRoot) : repoRoot ? "ungueltig" : "fehlt",
     state: ok ? "ok" : "error",
-    detail: root.message || root.Message || "project.repo_root steuert, wo Commands Code/Git suchen.",
+    detail: root.message || root.Message || "Git-/Code-Pfad aus K-PLAYBOOK.yaml.",
     repoRoot,
     vcs,
     candidates,
@@ -876,6 +1147,9 @@ function numberValue(value) {
 }
 
 function projectEditorStatusRow(project, item) {
+  if (!isProjectEditablePath(project.path || project.Path)) {
+    return projectReadonlyStatusRow(item);
+  }
   switch (item.key) {
     case "project-root":
       return projectRootEditorRow(project, item);
@@ -1067,7 +1341,7 @@ async function chooseProjectRoot(projectPath, item, button) {
 
 async function chooseNoGitProjectRoot(projectPath, item, button) {
   const answer = window.prompt(
-    "Dieses Projekt hat kein Git. Welcher relative Pfad ist der Code-Root?",
+    "Dieses Projekt hat kein Git. Welcher relative Pfad ist der Code-Pfad?",
     item.repoRoot || ".",
   );
   if (answer === null || answer.trim() === "") {
@@ -1080,14 +1354,14 @@ function promptProjectRoot(projectPath, candidates, item) {
   const candidateList = Array.isArray(candidates) ? candidates : [];
   if (candidateList.length === 1) {
     const candidate = candidateList[0];
-    if (window.confirm(`Gefundenen Git-Root eintragen?\n\nProjekt: ${projectPath}\nGit-Root: ${candidate.repoRoot || candidate.RepoRoot}`)) {
+    if (window.confirm(`Gefundenen Git-Pfad eintragen?\n\nProjekt: ${projectPath}\nPfad: ${candidate.repoRoot || candidate.RepoRoot}`)) {
       return Promise.resolve({ repoRoot: candidate.repoRoot || candidate.RepoRoot, vcs: candidate.vcs || candidate.VCS || "git" });
     }
     return Promise.resolve(null);
   }
 
   const lines = [
-    "Project-Root relativ zum K-PLAYBOOK.yaml-Ordner eingeben.",
+    "Git-Pfad relativ zum K-PLAYBOOK.yaml-Ordner eingeben.",
     "",
   ];
   if (candidateList.length > 1) {
@@ -1126,7 +1400,7 @@ async function updateProjectRoot(projectPath, repoRoot, vcs, control) {
       renderProjectDetailStatus(findProject(projectPath));
       await loadProjectConfig(projectPath);
     }
-    showToast("Project-Root aktualisiert.");
+    showToast("Git-Konfiguration aktualisiert.");
   });
 }
 
@@ -1159,7 +1433,7 @@ async function removeProject(projectPath, button) {
     if (currentProjectPath === projectPath) {
       currentProjectPath = "";
       await loadProjectConfig("");
-      showHome();
+      showHome({ replaceHistory: true });
     }
     showToast("Projekt aus der Liste entfernt.");
   });
@@ -1333,6 +1607,13 @@ function renderOpenCode(status) {
   }
 }
 
+function renderOpenCodeLoading() {
+  elements.opencodePill.textContent = "Pruefen...";
+  elements.opencodePill.className = "status-label muted";
+  elements.opencodeInstallTop.classList.add("hidden");
+  renderLoading(elements.opencodeSummary, "Assistenten-Registrierung wird geprueft...");
+}
+
 function renderSecurityTools(status) {
   const ok = status.ok || status.OK;
   const scopeOk = status.scopeOk !== false && status.ScopeOK !== false;
@@ -1418,6 +1699,12 @@ function renderSecurityTools(status) {
   elements.securityToolsSummary.append(list);
 }
 
+function renderSecurityToolsLoading() {
+  elements.securityToolsPill.textContent = "Pruefen...";
+  elements.securityToolsPill.className = "status-label muted";
+  renderLoading(elements.securityToolsSummary, "Security-Tools werden geprueft...");
+}
+
 function compactList(values) {
   if (values.length <= 4) {
     return values.join(", ");
@@ -1452,9 +1739,15 @@ function renderDocsList(docs) {
 }
 
 async function loadDoc(path) {
-  const doc = await api(`/api/docs/file?path=${encodeURIComponent(path)}`);
-  elements.docViewer.classList.remove("empty");
-  elements.docViewer.innerHTML = doc.html || "";
+  renderLoading(elements.docViewer, "Dokument wird geladen...");
+  try {
+    const doc = await api(`/api/docs/file?path=${encodeURIComponent(path)}`);
+    elements.docViewer.classList.remove("empty");
+    elements.docViewer.innerHTML = doc.html || "";
+  } catch (error) {
+    renderInlineMessage(elements.docViewer, `Dokument konnte nicht geladen werden: ${error.message}`);
+    throw error;
+  }
 }
 
 function detectedLabel(project) {
