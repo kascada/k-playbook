@@ -9,9 +9,7 @@ Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`.
 | Thema | Detailseite |
 |---|---|
 | PR-Review | [`pr-review.md`](./pr-review.md) |
-| Review-Rezepte | [`review.md`](./review.md) |
-| Results-Summary | [`results.md`](./results.md) |
-| Remediation | [`remediation.md`](./remediation.md) |
+| Code-Review-Flow | [`code-review.md`](./code-review.md) |
 | Task-Flow | [`task-flow.md`](./task-flow.md) |
 | Review-/Results-/Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Installation und DevContainer | [`multi-project-installation.md`](./multi-project-installation.md), [`installation.md`](./installation.md) |
@@ -33,9 +31,9 @@ Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden erst sich
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | schreibt unter `<paths.docs>/libs/` und aktualisiert den Docs-Index |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | [`review.md`](./review.md) |
-| `/k-results` | vorhandene Review-Results projektweit priorisieren | [`results.md`](./results.md) |
-| `/k-remediation` | Review-Findings planen, gruppieren und in Tasks oder Fixes ueberfuehren | [`remediation.md`](./remediation.md) |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | [`code-review.md`](./code-review.md) |
+| `/k-results` | vorhandene Review-Results projektweit priorisieren | [`code-review.md`](./code-review.md) |
+| `/k-remediation` | Review-Findings planen, gruppieren und in Tasks oder Fixes ueberfuehren | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
 | `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | [`task-flow.md`](./task-flow.md) |
 | `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | [`task-flow.md`](./task-flow.md) |

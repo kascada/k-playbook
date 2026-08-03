@@ -64,7 +64,3 @@ Von `/k-remediation` erzeugte Tasks sind normale Task-Flow-Eingaben. Besonders w
 - Branch-/PR-Anforderungen aus der Remediation-Policy muessen im Ausfuehrungskontext stehen.
 - Vor Umsetzung laeuft `/k-review-loop`.
 - Umsetzung laeuft danach ueber `/k-run`.
-
-## /k-todo
-
-`/k-todo [todo text]` ist kein Ersatz fuer Task-Dateien. Es liest oder ergaenzt `paths.todo` und eignet sich fuer lose Merkpunkte. Sobald Arbeit ausgefuehrt werden soll, wird daraus ein Task.

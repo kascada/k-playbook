@@ -38,13 +38,25 @@ Die GUI prueft den Pfadvertrag, registriert OpenCode-/Claude-Commands und Skills
 
 ## Projekt-Onboarding
 
-Neue oder bestehende Zielprojekte werden ueber die GUI eingebunden. `/k-gui` wird dabei im Assistant als Slash-Command aufgerufen, nicht in der Shell:
+Neue oder bestehende Zielprojekte werden ueber die GUI eingebunden. Am schnellsten und sichersten startest du sie direkt in der Shell:
+
+```bash
+k-playbook-installer
+```
+
+Falls der Installer noch nicht im `PATH` liegt, nutze den direkten Pfad:
+
+```bash
+~/.local/bin/k-playbook-installer
+```
+
+Alternativ kann die GUI im Assistant per Slash-Command gestartet werden:
 
 ```text
 /k-gui
 ```
 
-Wenn `/k-gui` nach einer frischen Installation noch nicht im Assistant sichtbar ist, starte zuerst `k-playbook-installer` direkt. Nach der Registrierung OpenCode oder Claude neu starten.
+Der direkte Shell-Aufruf ist zu bevorzugen, weil er schneller und robuster ist. Wenn `/k-gui` nach einer frischen Installation noch nicht im Assistant sichtbar ist, starte zuerst `k-playbook-installer` direkt. Nach der Registrierung OpenCode oder Claude neu starten.
 
 Die GUI legt im Zielprojekt die konfigurierten lokalen Strukturen an, konventionell unter `k-playbook/`, und schreibt `K-PLAYBOOK.yaml`. Spaetere Commands lesen daraus alle projektlokalen Pfade.
 
@@ -60,9 +72,7 @@ Die Integration richtet die GUI pro Zielprojekt ein. Details stehen in [`docs/in
 - [`docs/installation.md`](./docs/installation.md) - Installation, Pfadvertrag, DevContainer und Installer-Binary.
 - [`docs/commands.md`](./docs/commands.md) - kompakter Command-Index.
 - [`docs/pr-review.md`](./docs/pr-review.md) - PR-Review-Flow.
-- [`docs/review.md`](./docs/review.md) - Review-Rezepte und Handoffs.
-- [`docs/results.md`](./docs/results.md) - Results-Summary.
-- [`docs/remediation.md`](./docs/remediation.md) - Remediation-Planung und Task-Handoff.
+- [`docs/code-review.md`](./docs/code-review.md) - Review-Rezepte, Results-Summary, Remediation und Handoffs.
 - [`docs/task-flow.md`](./docs/task-flow.md) - Task-Erzeugung, Review-Loop und Ausfuehrung.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Artefaktmodell fuer Reviews, Findings und Remediation.
 

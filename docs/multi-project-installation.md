@@ -6,7 +6,7 @@ Dieses Setup trennt deshalb eine zentrale, user-lokale k-playbook-Installation, 
 
 Diese Reihenfolge richtet k-playbook fuer den Host, ein Zielprojekt und optional den DevContainer ein.
 
-Die Zuständigkeiten der einzelnen Slash-Commands stehen in [`commands.md`](./commands.md); die kompakte Gesamtuebersicht steht im [`Handbuch`](./handbuch.md#commands).
+Die Zuständigkeiten der einzelnen Slash-Commands stehen in [`commands.md`](./commands.md); die kompakte Gesamtuebersicht steht im [`Handbuch`](./handbuch.md#wichtige-commands).
 
 ## Vereinfachte Prompt-Reihenfolge
 

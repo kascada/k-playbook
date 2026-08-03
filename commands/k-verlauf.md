@@ -62,7 +62,7 @@ Sonst frage den Nutzer:
 
 > Soll ich nur im aktuellen Projekt suchen (`<aktuelles Projekt>`) oder in allen Claude-Projekten?
 
-Zeige dabei den Namen des aktuellen Projekts (abgeleitet aus `$CWD`: Pfad → alle `/` durch `-` ersetzen, führendes `-` behalten). Beispiel: CWD `/home/kleist/dev/Aiva/kascada` → Projektordner `-home-kleist-dev-Aiva-kascada`.
+Zeige dabei den Namen des aktuellen Projekts (abgeleitet aus `$CWD`: Pfad → alle `/` durch `-` ersetzen, führendes `-` behalten). Beispiel: CWD `/home/user/dev/Aiva/kascada` → Projektordner `-home-user-dev-Aiva-kascada`.
 
 ## Schritt 4 — Claude-Dateien finden
 
