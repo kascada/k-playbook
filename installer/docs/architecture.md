@@ -210,7 +210,7 @@ Die Startseite zeigt:
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
 9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden. Wenn sich dabei mindestens ein Installer-Artefakt unter `dist/` geaendert hat, spiegelt die GUI alle vorhandenen `dist/k-playbook-installer-*` nach `bin/`, installiert den Wrapper, setzt den globalen Symlink und zeigt den Hinweis, dass die GUI neu gestartet werden muss.
-10. Docs-Block mit gerenderter Markdown-Anzeige.
+10. Docs-Block mit Markdown-Dateiliste. Ein Klick auf eine Datei oeffnet die gerenderte Markdown-Anzeige in einem Vollbild-Overlay, damit der Inhalt nicht durch die begrenzte Hauptspalte eingeengt wird. Das Overlay ist per `Schliessen`, Hintergrund-Klick oder `Escape` schliessbar.
 11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
 
 ### Projekt-Detailseite
@@ -310,7 +310,7 @@ Auswahlverhalten:
 
 ## Docs-Anzeige
 
-Die GUI listet Markdown-Dateien aus dem zentralen Repo-Verzeichnis `docs/`.
+Die GUI listet Markdown-Dateien aus dem zentralen Repo-Verzeichnis `docs/`. Die Dateiliste bleibt in der normalen Startseiten-Card; der gerenderte Inhalt wird in einem Vollbild-Overlay angezeigt, damit lange Markdown-Dateien, Tabellen und Codebloecke die verfuegbare Browserbreite besser ausnutzen.
 
 Rendering:
 

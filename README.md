@@ -58,7 +58,7 @@ make installer-run
 
 `make installer-run` ist ein Alias fuer `make gui`; `gui` haengt von `build` ab und startet danach `./bin/k-playbook-installer`.
 
-Details zum Binary-Vertrag stehen in [`docs/installer-binaries.md`](./docs/installer-binaries.md).
+Details zum Binary-Vertrag stehen in [`docs/installation.md`](./docs/installation.md#installer-binary-und-launcher).
 
 Maintainer erzeugen Release-Artefakte mit:
 

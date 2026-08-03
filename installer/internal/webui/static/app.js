@@ -1746,17 +1746,13 @@ function renderDocsList(docs) {
     button.title = doc.path;
     button.classList.toggle("active", doc.path === state.currentDocPath);
     button.addEventListener("click", async () => {
-      for (const active of document.querySelectorAll(".doc-link.active")) {
-        active.classList.remove("active");
-      }
-      button.classList.add("active");
-      await loadDoc(doc.path, doc.title || doc.path);
+      await loadDoc(doc.path, doc.title || doc.path, button);
     });
     elements.docsList.append(button);
   }
 }
 
-async function loadDoc(path, title = "") {
+async function loadDoc(path, title = "", selectedButton = null) {
   openDocOverlay(title || path, path);
   renderLoading(elements.docViewer, "Dokument wird geladen...");
   try {
@@ -1766,9 +1762,19 @@ async function loadDoc(path, title = "") {
     elements.docPath.textContent = doc.path || path;
     elements.docViewer.classList.remove("empty");
     elements.docViewer.innerHTML = doc.html || "";
+    setActiveDocButton(selectedButton);
   } catch (error) {
     renderInlineMessage(elements.docViewer, `Dokument konnte nicht geladen werden: ${error.message}`);
     throw error;
+  }
+}
+
+function setActiveDocButton(selectedButton) {
+  for (const active of document.querySelectorAll(".doc-link.active")) {
+    active.classList.remove("active");
+  }
+  if (selectedButton) {
+    selectedButton.classList.add("active");
   }
 }
 
