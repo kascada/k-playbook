@@ -214,6 +214,9 @@ async function gitPull() {
       if (result.installerMessage) {
         messages.push(result.installerMessage);
       }
+      if (result.launcherPathMessage) {
+        messages.push(result.launcherPathMessage);
+      }
       await refreshAll();
       elements.gitOutput.classList.remove("empty");
       elements.gitOutput.textContent = messages.join("\n\n");

@@ -40,6 +40,12 @@ Report-Mode-Reviews erzeugen Ergebnisartefakte:
 <paths.reviews>/results/<family>/<YYYY-MM-DD>/raw/
 ```
 
+Report-Mode-Reviews ohne eigene `result-family`, z. B. `tech`, schreiben direkt eine Summary:
+
+```text
+<paths.reviews>/results/summary-YYYY-MM-DD.md
+```
+
 Diese Artefakte sind der Input fuer `/k-results` und `/k-remediation`.
 
 ## Typische Review-Familien
@@ -59,6 +65,7 @@ Nach einem Report-Mode-Review nennt der Command den naechsten Handoff, typischer
 
 ```text
 /k-results
+/k-remediation <paths.reviews>/results/summary-YYYY-MM-DD.md
 /k-remediation <paths.reviews>/results/<family>/<YYYY-MM-DD>/assessment.md
 ```
 

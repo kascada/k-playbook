@@ -23,7 +23,7 @@
 
 ## Unterstuetzte Inputs
 
-- Result-Summaries von `/k-results`.
+- Result-Summaries von `/k-results` oder Report-Reviews ohne eigene `result-family`.
 - Result-Familien wie `<paths.reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
 - Legacy-Dateien wie `<paths.reviews>/result-*.md`.
 

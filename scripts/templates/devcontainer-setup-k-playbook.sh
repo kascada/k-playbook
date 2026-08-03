@@ -36,8 +36,8 @@ security_tools_script="${home_playbook}/scripts/install-security-tools.sh"
 ensure_user_tool_path() {
   local user_home shell_file marker path_line
   user_home="$1"
-  marker="# k-playbook security tools PATH"
-  path_line='export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"'
+  marker="# k-playbook PATH"
+  path_line='export PATH="$HOME/dev/k-playbook/bin:$HOME/.local/bin:$HOME/.opencode/bin:$PATH"'
 
   for shell_file in "${user_home}/.profile" "${user_home}/.bashrc" "${user_home}/.zshrc"; do
     touch "${shell_file}"
@@ -84,6 +84,13 @@ fi
 chown -h vscode:vscode "${home_playbook}" || true
 chown -R vscode:vscode "${opencode_config_dir}" || true
 
+if [[ "$(id -u)" -eq 0 ]]; then
+  ensure_user_tool_path /home/vscode
+  chown vscode:vscode /home/vscode/.profile /home/vscode/.bashrc /home/vscode/.zshrc 2>/dev/null || true
+else
+  ensure_user_tool_path "${HOME}"
+fi
+
 if [[ "${install_security_tools}" -eq 1 ]]; then
   if [[ ! -f "${security_tools_script}" ]]; then
     echo "k-playbook security tool installer missing: ${security_tools_script}" >&2
@@ -92,9 +99,7 @@ if [[ "${install_security_tools}" -eq 1 ]]; then
 
   if [[ "$(id -u)" -eq 0 ]]; then
     mkdir -p /home/vscode/.local/bin /home/vscode/.local/share/k-playbook/security-tools
-    ensure_user_tool_path /home/vscode
     chown -R vscode:vscode /home/vscode/.local
-    chown vscode:vscode /home/vscode/.profile /home/vscode/.bashrc /home/vscode/.zshrc 2>/dev/null || true
     sudo -H -u vscode env \
       HOME=/home/vscode \
       PATH="/home/vscode/.opencode/bin:/home/vscode/.local/bin:${PATH}" \
@@ -104,7 +109,6 @@ if [[ "${install_security_tools}" -eq 1 ]]; then
       bash "${security_tools_script}" --install missing --method auto --yes
   else
     mkdir -p "${HOME}/.local/bin" "${HOME}/.local/share/k-playbook/security-tools"
-    ensure_user_tool_path "${HOME}"
     env \
       PATH="${HOME}/.opencode/bin:${HOME}/.local/bin:${PATH}" \
       K_SECURITY_TOOLS_PREFIX="${HOME}/.local" \

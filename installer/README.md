@@ -30,12 +30,12 @@ git clone https://github.com/kascada/k-playbook.git ~/dev/k-playbook
 cd ~/dev/k-playbook
 make install
 # alternativ ohne make: ./scripts/install-installer.sh
-k-playbook-installer
+~/dev/k-playbook/bin/k-playbook-installer
 ```
 
-`make install` braucht kein lokal installiertes Go. Es ruft `scripts/install-installer.sh` auf; das Script spiegelt alle unterstuetzten Release-Artefakte aus `dist/` oder aus GitHub Releases nach `bin/`, installiert dort den Wrapper `bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper.
+`make install` braucht kein lokal installiertes Go. Es ruft `scripts/install-installer.sh` auf; das Script spiegelt alle unterstuetzten Release-Artefakte aus `dist/` oder aus GitHub Releases nach `bin/`, installiert dort den Wrapper `bin/k-playbook-installer`, verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper und ergaenzt das Shell-Profil um `~/dev/k-playbook/bin`.
 
-Source-Builds fuer Entwickler brauchen Go. `make install-from-source` baut alle plattformspezifischen Binaries nach `./bin/`, installiert den Wrapper `./bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` per Symlink darauf. `make gui` startet immer den repo-lokalen Wrapper aus `./bin/` und funktioniert deshalb auch, wenn `~/.local/bin` noch nicht im `PATH` liegt. Falls `~/.local/bin` noch nicht im `PATH` liegt, fragt `make install-from-source` interaktiv, ob das passende Shell-Profil automatisch ergaenzt werden soll. Unter macOS mit zsh ist das standardmaessig `~/.zprofile`, unter Linux meistens `~/.profile`.
+Source-Builds fuer Entwickler brauchen Go. `make install-from-source` baut alle plattformspezifischen Binaries nach `./bin/`, installiert den Wrapper `./bin/k-playbook-installer`, verlinkt `~/.local/bin/k-playbook-installer` per Symlink darauf und stellt ebenfalls `~/dev/k-playbook/bin` im Shell-Profil sicher. `make gui` startet immer den repo-lokalen Wrapper aus `./bin/` und funktioniert deshalb auch, wenn der neue PATH in der aktuellen Shell noch nicht aktiv ist. Unter macOS mit zsh ist das Profil standardmaessig `~/.zprofile`, unter Linux meistens `~/.profile`.
 
 Entwicklungsaufrufe ohne Installation:
 

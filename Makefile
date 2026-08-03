@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
 INSTALL_BIN ?= $(HOME)/.local/bin
+PATH_BIN ?= $(HOME)/dev/k-playbook/bin
+CANONICAL_PATH_BIN := $(HOME)/dev/k-playbook/bin
 OS_NAME ?= $(shell uname -s 2>/dev/null)
 USER_SHELL ?= $(notdir $(shell printf '%s' "$${SHELL:-}"))
 ifeq ($(USER_SHELL),zsh)
@@ -14,7 +16,11 @@ endif
 else
 PATH_PROFILE ?= $(HOME)/.profile
 endif
-PATH_EXPORT := export PATH="$(INSTALL_BIN):$$PATH"
+ifeq ($(PATH_BIN),$(CANONICAL_PATH_BIN))
+PATH_EXPORT := export PATH="$$HOME/dev/k-playbook/bin:$$PATH"
+else
+PATH_EXPORT := export PATH="$(PATH_BIN):$$PATH"
+endif
 INSTALLER_BINARY := k-playbook-installer
 INSTALLER_SOURCE := ./installer/cmd/k-playbook-installer
 INSTALLER_BUILD_DIR := bin
@@ -68,7 +74,7 @@ dist: ## Baut Installer-Artefakte nach ./dist/
 	done
 
 install: ## Installiert den Installer ohne Go aus vorhandenen Binaries oder GitHub Releases
-	./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
+	PATH_BIN="$(PATH_BIN)" PATH_PROFILE="$(PATH_PROFILE)" ./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
 
 install-from-source: build ## Baut das Binary und verlinkt es nach ~/.local/bin
 	@mkdir -p "$(INSTALL_BIN)"
@@ -107,39 +113,26 @@ installer-test: test ## Alias fuer test
 
 installer-clean: clean ## Alias fuer clean
 
-path-hint: ## Prueft, ob ~/.local/bin im PATH liegt
-	@if printf '%s' ":$$PATH:" | grep -q ":$(INSTALL_BIN):"; then \
-		echo "PATH OK: $(INSTALL_BIN) ist im PATH."; \
+path-hint: ## Prueft, ob ~/dev/k-playbook/bin im PATH liegt
+	@if printf '%s' ":$$PATH:" | grep -q ":$(PATH_BIN):"; then \
+		echo "PATH OK: $(PATH_BIN) ist im PATH."; \
 	else \
-		echo "Hinweis: $(INSTALL_BIN) ist nicht im PATH."; \
+		echo "Hinweis: $(PATH_BIN) ist nicht im PATH."; \
 		echo "Fuege z. B. diese Zeile zu $(PATH_PROFILE) hinzu:"; \
 		echo '  $(PATH_EXPORT)'; \
 	fi
 
-path-setup: ## Fragt interaktiv, ob ~/.local/bin ins Shell-Profil eingetragen werden soll
-	@if printf '%s' ":$$PATH:" | grep -q ":$(INSTALL_BIN):"; then \
-		echo "PATH OK: $(INSTALL_BIN) ist im PATH."; \
-	elif ! [ -t 0 ]; then \
-		$(MAKE) --no-print-directory path-hint; \
+path-setup: ## Stellt sicher, dass ~/dev/k-playbook/bin im Shell-Profil steht
+	@if printf '%s' ":$$PATH:" | grep -q ":$(PATH_BIN):"; then \
+		echo "PATH OK: $(PATH_BIN) ist im PATH."; \
 	else \
-		echo "Hinweis: $(INSTALL_BIN) ist nicht im PATH."; \
-		printf 'Soll $(PATH_PROFILE) automatisch ergaenzt werden? [y/N] '; \
-		read answer; \
-		case "$$answer" in \
-			y|Y|yes|YES|j|J|ja|JA) \
-				touch "$(PATH_PROFILE)"; \
-				if grep -Fq '$(PATH_EXPORT)' "$(PATH_PROFILE)"; then \
-					echo "PATH-Eintrag existiert bereits in $(PATH_PROFILE)."; \
-				else \
-					printf '\n# k-playbook installer\n$(PATH_EXPORT)\n' >> "$(PATH_PROFILE)"; \
-					echo "PATH-Eintrag zu $(PATH_PROFILE) hinzugefuegt."; \
-				fi; \
-				echo "Aktiviere ihn mit:"; \
-				echo "  . $(PATH_PROFILE)"; \
-				;; \
-			*) \
-				echo "Nicht geaendert. Fuege bei Bedarf manuell hinzu:"; \
-				echo '  $(PATH_EXPORT)'; \
-				;; \
-		esac; \
+		touch "$(PATH_PROFILE)"; \
+		if grep -Fq '$(PATH_BIN)' "$(PATH_PROFILE)" || grep -Fq '$$HOME/dev/k-playbook/bin' "$(PATH_PROFILE)" || grep -Fq '$${HOME}/dev/k-playbook/bin' "$(PATH_PROFILE)"; then \
+			echo "PATH-Eintrag existiert bereits in $(PATH_PROFILE), ist aber in dieser Shell noch nicht aktiv."; \
+		else \
+			printf '\n# k-playbook installer PATH\n$(PATH_EXPORT)\n' >> "$(PATH_PROFILE)"; \
+			echo "PATH-Eintrag zu $(PATH_PROFILE) hinzugefuegt."; \
+		fi; \
+		echo "Aktiviere ihn mit:"; \
+		echo "  . $(PATH_PROFILE)"; \
 	fi

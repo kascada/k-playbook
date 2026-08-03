@@ -9,8 +9,9 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus erzeugt hat. Vor der Umsetzung wird immer ein Remediation-Plan gebildet: welche Findings zusammen gehoeren, was zuerst kommt, was Quick-Win ist und was einen eigenen Task/Branch/PR braucht.
 
-Unterstützt zwei Formate:
+Unterstützt drei Formate:
 
+- Result-Summaries wie `<paths.reviews>/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
 - Legacy-Ergebnisdateien wie `<paths.reviews>/result-*.md` mit Statuszeichen-Tabellen.
 - Result-Familien wie `<paths.reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. CodeQL oder k-check.
 
@@ -67,12 +68,13 @@ Wenn `$ARGUMENTS` angegeben: diese Datei einlesen.
 Akzeptierte direkte Argumente:
 
 - `<PROJECT_REVIEWS_DIR>/result-*.md`
+- `<PROJECT_REVIEWS_DIR>/results/summary-*.md`
 - `<PROJECT_REVIEWS_DIR>/results/<family>/<date>/assessment.md`
 - Projektrelative Varianten davon, z. B. `<paths.reviews>/results/k-check/2026-07-23/assessment.md`
 
 Wenn nicht:
 
-1. In `<PROJECT_REVIEWS_DIR>` nach `result-*.md` suchen (nicht im `done/`-Unterordner) und nach `<PROJECT_REVIEWS_DIR>/results/*/*/assessment.md`.
+1. In `<PROJECT_REVIEWS_DIR>` nach `result-*.md` suchen (nicht im `done/`-Unterordner), nach `<PROJECT_REVIEWS_DIR>/results/summary-*.md` und nach `<PROJECT_REVIEWS_DIR>/results/*/*/assessment.md`.
 2. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
 3. Wenn mehrere: als Liste zeigen und den User wählen lassen.
 4. Wenn keine: fragen:
@@ -86,6 +88,12 @@ Wenn nicht:
 - Lies `findings.md` als primaeres Arbeitsregister.
 - `assessment.md` bleibt Quelle/Kurzbewertung und darf nur nachvollziehbar fuer Summary, Handoff-Status oder explizite Remediation-Abschnitte aktualisiert werden.
 - `raw/` und `run-metadata.*` im selben Verzeichnis sind auditierbar und duerfen nicht veraendert werden.
+
+**Summary-Erkennung:** Wenn die Datei `summary-*.md` heisst und direkt unter `<PROJECT_REVIEWS_DIR>/results/` liegt:
+
+- Setze `RESULT_FORMAT=summary`.
+- Die Summary-Datei ist die Quelle fuer priorisierte Remediation-Gruppen und die Arbeitsdatei fuer Handoff-/Task-Status.
+- Verlinkte `assessment.md`-/`findings.md`-Quellen aus der Summary duerfen mitgeladen werden. `findings.md` bleibt das Arbeitsregister der jeweiligen Result-Familie, wenn konkrete Finding-IDs aktualisiert werden.
 
 **Legacy-Format-Erkennung:** Sonst `RESULT_FORMAT=legacy` und die Ergebnisdatei selbst als Arbeitsregister verwenden.
 
@@ -205,7 +213,7 @@ Warte auf Antwort. Merke welche Kategorien autonom behandelt werden dürfen (`AU
 
 ## Schritt 5 — Befunde einlesen, gruppieren und sortieren
 
-Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Legacy ist die Arbeitsdatei die Ergebnisdatei. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
+Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Summary ist die Arbeitsdatei die Summary-Datei mit ihren priorisierten Gruppen. Bei Legacy ist die Arbeitsdatei die Ergebnisdatei. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
 
 Result-Family-Parsing:
 
@@ -235,16 +243,17 @@ Bei `mode: task-branch-pr`:
 1. Keine Produktcode-Dateien aendern.
 2. Pro bestaetigtem Buendel eine Task-Datei erzeugen.
 3. Task muss enthalten:
-   - alle Finding-IDs im Buendel.
-   - Result-Pfad und `findings.md`.
+    - alle Finding-IDs im Buendel.
+    - Result-Pfad und, falls vorhanden, `findings.md`.
     - Ziel-Root (`target:`), z. B. `./app`.
     - vorgeschlagener Branch: `<branch_prefix><NNN>-<slug>`.
     - Hinweis: PR erforderlich.
     - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
     - Abschnitt `## Branch-Preflight` vor `## Zu bauen` mit klarer Pflicht: zuerst im Target-Repo den Dirty-State pruefen, dann vom Base-Branch den Work-Branch erstellen oder auf bestehenden Work-Branch wechseln, und erst danach Dateien aendern.
     - Verifikationsplan fuer das Buendel.
-4. In `findings.md` bei allen Findings des Buendels `- Remediation: Task <NNN> - <tasks/...md>` ergaenzen oder aktualisieren. Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt ist.
-5. `assessment.md` bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Buendeln.
+4. Bei Result-Familien in `findings.md` bei allen Findings des Buendels `- Remediation: Task <NNN> - <tasks/...md>` ergaenzen oder aktualisieren. Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt ist.
+5. Bei Summary-Dateien die Summary selbst um Task-/Handoff-Status fuer das Buendel ergaenzen oder aktualisieren.
+6. `assessment.md` oder die Summary bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Buendeln.
 
 Bei `mode: task-first`: analog, aber direkte Fixes koennen nach expliziter Einzelfreigabe erlaubt sein.
 
@@ -439,6 +448,27 @@ Am Ende von `findings.md` einen nachvollziehbaren Abschnitt pflegen:
 - YYYY-MM-DD: Task(s) <...> fuer Finding(s) <...> angelegt.
 ```
 
+### Result-Summaries
+
+Bei `RESULT_FORMAT=summary` wird die Summary-Datei selbst aktualisiert:
+
+- Kategorie T mit Task-Datei: in der betroffenen Prioritaetsgruppe `Status` oder eine kurze `Remediation:`-Zeile auf `Task <NNN> - <tasks/...md>` setzen.
+- Kategorie K/A/X: Status mit knapper Begruendung direkt in der betroffenen Gruppe dokumentieren.
+- Kategorie S nach erfolgreichem Fix und Verifikation: Status auf `fixed` oder `behoben` setzen und Verifikation nennen.
+- Wenn die Summary auf konkrete `findings.md`-IDs verweist, die zugehoerigen `findings.md`-Eintraege nach den Result-Family-Regeln synchron aktualisieren.
+
+Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
+
+```markdown
+---
+
+## Remediation-Status
+
+| Datum | Gruppe/Finding | Kategorie | Aktion | Notiz |
+|---|---|---|---|---|
+| YYYY-MM-DD | P1-01 | Task | Task 018 | tasks/018-redact-upstream-log.md |
+```
+
 `raw/` und `run-metadata.*` niemals bearbeiten.
 
 ---
@@ -447,7 +477,7 @@ Am Ende von `findings.md` einen nachvollziehbaren Abschnitt pflegen:
 
 Archivierung gilt nur fuer Legacy-Ergebnisdateien.
 
-Bei Result-Familien wird kein `assessment.md` nach `done/` verschoben. Das Result-Verzeichnis bleibt stabil unter `<REVIEWS_DISPLAY_PATH>/results/<family>/<date>/`; Abschluss erfolgt ueber Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`.
+Bei Summary- und Result-Family-Dateien wird nichts nach `done/` verschoben. Summary-Dateien bleiben stabil unter `<REVIEWS_DISPLAY_PATH>/results/`; Result-Verzeichnisse bleiben stabil unter `<REVIEWS_DISPLAY_PATH>/results/<family>/<date>/`. Abschluss erfolgt ueber Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md` oder der Summary.
 
 Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
 

@@ -9,13 +9,13 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 | [`handbuch.md`](./handbuch.md) | Zentrale Beschreibung: Zweck, Konzepte, Standardablaeufe, Betriebsregeln. |
 | [`installation.md`](./installation.md) | Host-Installation, OpenCode-Setup, Security-Tools, optional Claude Code. |
 | [`multi-project-installation.md`](./multi-project-installation.md) | Zentrale Installation fuer mehrere Zielprojekte, Python-/venv- und DevContainer-Workflows. |
-| [`faq.md`](./faq.md) | Kurze Antworten zu `/k-install`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
+| [`faq.md`](./faq.md) | Kurze Antworten zu `/k-gui`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
-| [`k-pr-review.md`](./k-pr-review.md) | Detailguide fuer PR-Reviews. |
-| [`k-review.md`](./k-review.md) | Detailguide fuer Review-Rezepte und Review-Handoffs. |
-| [`k-results.md`](./k-results.md) | Detailguide fuer projektweite Results-Summaries. |
-| [`k-remediation.md`](./k-remediation.md) | Detailguide fuer Remediation-Planung und Task-Handoff. |
-| [`k-task-flow.md`](./k-task-flow.md) | Detailguide fuer `/k-task-create`, `/k-review-loop`, `/k-run` und `/k-todo`. |
+| [`pr-review.md`](./pr-review.md) | Detailguide fuer PR-Reviews. |
+| [`review.md`](./review.md) | Detailguide fuer Review-Rezepte und Review-Handoffs. |
+| [`results.md`](./results.md) | Detailguide fuer projektweite Results-Summaries. |
+| [`remediation.md`](./remediation.md) | Detailguide fuer Remediation-Planung und Task-Handoff. |
+| [`task-flow.md`](./task-flow.md) | Detailguide fuer `/k-task-create`, `/k-review-loop`, `/k-run` und `/k-todo`. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | YAML-Format der projektlokalen `K-PLAYBOOK.yaml`-Konfiguration. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Installer-Architektur, Browser-GUI, Web-API, Designentscheidungen und Session-Memory fuer weitere Installer-Arbeiten. |
@@ -44,16 +44,16 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Installer` / `Browser-GUI` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
 - `Installer-Binary` / `Wrapper` / `bin/k-playbook-installer` -> [`installation.md`](./installation.md#installer-binary-und-launcher)
 - `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
-- `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
+- `k-gui` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
 - `Multi-Project` / `DevContainer-Installation` -> [`multi-project-installation.md`](./multi-project-installation.md), [`commands.md`](./commands.md)
 - `OKF` / `Open Knowledge Format` -> [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
-- `PR-Review` -> [`k-pr-review.md`](./k-pr-review.md)
-- `Remediation` -> [`k-remediation.md`](./k-remediation.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `PR-Review` -> [`pr-review.md`](./pr-review.md)
+- `Remediation` -> [`remediation.md`](./remediation.md), [`reviews-and-results.md`](./reviews-and-results.md)
 - `Regeln in diesem Repo` -> [`../AGENTS.md`](../AGENTS.md), [`../global/rules/README.md`](../global/rules/README.md)
-- `Reviews` -> [`k-review.md`](./k-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `Reviews` -> [`review.md`](./review.md), [`reviews-and-results.md`](./reviews-and-results.md)
 - `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `Security-Tool-Matrix` -> [`../global/security-tools.tsv`](../global/security-tools.tsv)
-- `Results` -> [`k-results.md`](./k-results.md), [`reviews-and-results.md`](./reviews-and-results.md)
-- `Tasks` -> [`k-task-flow.md`](./k-task-flow.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
+- `Results` -> [`results.md`](./results.md), [`reviews-and-results.md`](./reviews-and-results.md)
+- `Tasks` -> [`task-flow.md`](./task-flow.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)

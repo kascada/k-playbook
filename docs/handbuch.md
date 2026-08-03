@@ -80,7 +80,7 @@ Kurzuebersicht der wichtigsten Commands nach Arbeitsphase:
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | nutzt `paths.docs` | schreibt Library-Docs unter `<paths.docs>/libs/`, aktualisiert Hauptindex |
 | `/k-status` | read-only Health-Check fuer Projekt und host-lokale OpenCode-Registrierung | keine Aenderung | prueft u. a. Command-Symlinks und `skills.paths` |
 | **Code-Review** | | | |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `paths.reviews` und `known-decisions.md` | interaktive Aenderungen oder Report-Artefakte unter `<paths.reviews>/results/<family>/YYYY-MM-DD/` |
+| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | nutzt `paths.reviews` und `known-decisions.md` | interaktive Aenderungen, Report-Artefakte unter `<paths.reviews>/results/<family>/YYYY-MM-DD/` oder Summary unter `<paths.reviews>/results/summary-YYYY-MM-DD.md` |
 | `/k-results` | vorhandene Review-Results projektweit priorisieren | nutzt `paths.reviews` und `paths.tasks` | schreibt `<paths.reviews>/results/summary-YYYY-MM-DD.md` |
 | `/k-remediation` | Review-Findings planen, gruppieren und abarbeiten | nutzt `paths.reviews`, `paths.tasks` und Remediation-Policy | erzeugt Tasks, aktualisiert Findings/Assessment oder macht freigegebene direkte Fixes |
 | **Task-Flow** | | | |
