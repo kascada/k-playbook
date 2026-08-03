@@ -17,9 +17,10 @@ endif
 PATH_EXPORT := export PATH="$(INSTALL_BIN):$$PATH"
 INSTALLER_BINARY := k-playbook-installer
 INSTALLER_SOURCE := ./installer/cmd/k-playbook-installer
-INSTALLER_BUILD_DIR := ./bin
-INSTALLER_BUILD_BINARY := $(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)
-INSTALLER_DIST_DIR := ./dist
+INSTALLER_BUILD_DIR := bin
+INSTALLER_WRAPPER := $(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)
+INSTALLER_WRAPPER_TEMPLATE := ./scripts/templates/k-playbook-installer-wrapper.sh
+INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 
 .PHONY: help build dist install install-from-source uninstall gui test clean installer-build installer-install installer-install-from-source installer-uninstall installer-run installer-test installer-clean path-hint path-setup
@@ -43,8 +44,17 @@ help: ## Zeigt diese Hilfe an
 	@echo "  k-playbook-installer"
 	@echo ""
 
-build: ## Baut das Installer-Binary nach ./bin/
-	cd installer && go build -o ../bin/$(INSTALLER_BINARY) ./cmd/k-playbook-installer
+build: ## Baut alle Installer-Binaries nach ./bin/
+	@mkdir -p "$(INSTALLER_BUILD_DIR)"
+	@set -eu; \
+	for target in $(INSTALLER_RELEASE_TARGETS); do \
+		os="$${target%-*}"; \
+		arch="$${target#*-}"; \
+		output="../$(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
+		echo "Baue $$output"; \
+		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -o "$$output" ./cmd/k-playbook-installer); \
+	done
+	install -m 0755 "$(INSTALLER_WRAPPER_TEMPLATE)" "$(INSTALLER_WRAPPER)"
 
 dist: ## Baut Installer-Artefakte nach ./dist/
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
@@ -62,8 +72,8 @@ install: ## Installiert den Installer ohne Go aus vorhandenen Binaries oder GitH
 
 install-from-source: build ## Baut das Binary und verlinkt es nach ~/.local/bin
 	@mkdir -p "$(INSTALL_BIN)"
-	ln -sfn "$(CURDIR)/$(INSTALLER_BUILD_BINARY)" "$(INSTALL_BIN)/$(INSTALLER_BINARY)"
-	@echo "Verlinkt: $(INSTALL_BIN)/$(INSTALLER_BINARY) -> $(CURDIR)/$(INSTALLER_BUILD_BINARY)"
+	ln -sfn "$(CURDIR)/$(INSTALLER_WRAPPER)" "$(INSTALL_BIN)/$(INSTALLER_BINARY)"
+	@echo "Verlinkt: $(INSTALL_BIN)/$(INSTALLER_BINARY) -> $(CURDIR)/$(INSTALLER_WRAPPER)"
 	@$(MAKE) --no-print-directory path-setup
 	@echo ""
 	@echo "Starten ohne PATH-Abhaengigkeit:"
@@ -75,7 +85,7 @@ uninstall: ## Entfernt den Installer-Symlink aus ~/.local/bin
 	@echo "Entfernt: $(INSTALL_BIN)/$(INSTALLER_BINARY)"
 
 gui: build ## Startet die Installer-GUI aus ./bin/
-	"$(INSTALLER_BUILD_BINARY)"
+	"$(INSTALLER_WRAPPER)"
 
 test: ## Fuehrt Installer-Tests aus
 	cd installer && go test ./...

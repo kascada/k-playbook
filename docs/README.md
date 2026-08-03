@@ -14,6 +14,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 | [`k-playbook-format.md`](./k-playbook-format.md) | YAML-Format der projektlokalen `K-PLAYBOOK.yaml`-Konfiguration. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Installer-Architektur, Browser-GUI, Web-API, Designentscheidungen und Session-Memory fuer weitere Installer-Arbeiten. |
+| [`installer-binaries.md`](./installer-binaries.md) | Vertrag fuer `dist/`, `bin/`, Wrapper und `~/.local/bin/k-playbook-installer`. |
 | [`../prompts/README.md`](../prompts/README.md) | Kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe. |
 | [`../global/checks/README.md`](../global/checks/README.md) | Schnittstelle und Nutzung von `global/bin/k-check`. |
 | [`../global/rules/README.md`](../global/rules/README.md) | Globale Enforcement-Regeln. |
@@ -37,6 +38,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
 - `Installation` -> [`installation.md`](./installation.md)
 - `Installer` / `Browser-GUI` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `Installer-Binary` / `Wrapper` / `bin/k-playbook-installer` -> [`installer-binaries.md`](./installer-binaries.md)
 - `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `k-install` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)

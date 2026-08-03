@@ -6,6 +6,7 @@ const state = {
   securityTools: null,
   gitStatus: null,
   projects: [],
+  currentDocPath: "",
 };
 
 const elements = {
@@ -32,6 +33,10 @@ const elements = {
   securityToolsSummary: document.querySelector("#security-tools-summary"),
   reloadDocs: document.querySelector("#reload-docs"),
   docsList: document.querySelector("#docs-list"),
+  docOverlay: document.querySelector("#doc-overlay"),
+  docTitle: document.querySelector("#doc-title"),
+  docPath: document.querySelector("#doc-path"),
+  closeDoc: document.querySelector("#close-doc"),
   docViewer: document.querySelector("#doc-viewer"),
   repair: document.querySelector("#repair"),
   statusCard: document.querySelector("#status-card"),
@@ -82,6 +87,12 @@ elements.opencodeInstall.addEventListener("click", installOpenCode);
 elements.opencodeRefresh.addEventListener("click", loadOpenCodeStatus);
 elements.securityToolsRefresh.addEventListener("click", loadSecurityToolsStatus);
 elements.reloadDocs.addEventListener("click", loadDocs);
+elements.closeDoc.addEventListener("click", closeDocOverlay);
+elements.docOverlay.addEventListener("click", (event) => {
+  if (event.target === elements.docOverlay) {
+    closeDocOverlay();
+  }
+});
 elements.repair.addEventListener("click", repairPath);
 elements.scan.addEventListener("click", scanProjects);
 elements.reloadProjectConfig.addEventListener("click", () => loadProjectConfig(currentProjectPath));
@@ -92,6 +103,11 @@ showHome({ replaceHistory: true });
 startHealthChecks();
 window.addEventListener("popstate", handleHistoryNavigation);
 window.addEventListener("pagehide", notifyClientGone);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !elements.docOverlay.classList.contains("hidden")) {
+    closeDocOverlay();
+  }
+});
 
 function showHome(options = {}) {
   currentProjectPath = "";
@@ -302,6 +318,7 @@ function notifyClientGone() {
 
 async function loadDocs() {
   await withBusy(elements.reloadDocs, async () => {
+    closeDocOverlay();
     renderLoading(elements.docsList, "Docs werden geladen...");
     try {
       const docs = await api("/api/docs");
@@ -1727,27 +1744,45 @@ function renderDocsList(docs) {
     button.type = "button";
     button.textContent = doc.title || doc.path;
     button.title = doc.path;
+    button.classList.toggle("active", doc.path === state.currentDocPath);
     button.addEventListener("click", async () => {
       for (const active of document.querySelectorAll(".doc-link.active")) {
         active.classList.remove("active");
       }
       button.classList.add("active");
-      await loadDoc(doc.path);
+      await loadDoc(doc.path, doc.title || doc.path);
     });
     elements.docsList.append(button);
   }
 }
 
-async function loadDoc(path) {
+async function loadDoc(path, title = "") {
+  openDocOverlay(title || path, path);
   renderLoading(elements.docViewer, "Dokument wird geladen...");
   try {
     const doc = await api(`/api/docs/file?path=${encodeURIComponent(path)}`);
+    state.currentDocPath = doc.path || path;
+    elements.docTitle.textContent = doc.title || title || path;
+    elements.docPath.textContent = doc.path || path;
     elements.docViewer.classList.remove("empty");
     elements.docViewer.innerHTML = doc.html || "";
   } catch (error) {
     renderInlineMessage(elements.docViewer, `Dokument konnte nicht geladen werden: ${error.message}`);
     throw error;
   }
+}
+
+function openDocOverlay(title, path) {
+  elements.docTitle.textContent = title;
+  elements.docPath.textContent = path;
+  elements.docOverlay.classList.remove("hidden");
+  document.body.classList.add("doc-overlay-open");
+  elements.closeDoc.focus({ preventScroll: true });
+}
+
+function closeDocOverlay() {
+  elements.docOverlay.classList.add("hidden");
+  document.body.classList.remove("doc-overlay-open");
 }
 
 function detectedLabel(project) {

@@ -18,6 +18,17 @@ layout: fixed-project-k-playbook
 k_playbook:
   repo: ~/dev/k-playbook
 
+paths:
+  playbook: k-playbook
+  tasks: k-playbook/tasks
+  completed_tasks: k-playbook/tasks/done
+  todo: k-playbook/TODO.md
+  checks: k-playbook/checks
+  reviews: k-playbook/reviews
+  guidelines: k-playbook/guidelines
+  enforcement: k-playbook/enforcement
+  docs: k-playbook/docs
+
 project:
   repo_root: .
   vcs: git
@@ -80,6 +91,8 @@ func TestEnsureConfigCreatesMinimalConfig(t *testing.T) {
 		"schema_version: 1\n",
 		"layout: fixed-project-k-playbook\n",
 		"repo: ~/dev/k-playbook\n",
+		"paths:\n",
+		"reviews: k-playbook/reviews\n",
 		"project:\n",
 		"repo_root: ",
 		"vcs: ",
@@ -302,6 +315,9 @@ custom:
 	}
 	content := string(contentBytes)
 	for _, expected := range []string{
+		"paths:\n",
+		"tasks: k-playbook/tasks\n",
+		"reviews: k-playbook/reviews\n",
 		"remediation:\n",
 		"mode: direct-allowed\n",
 		"direct_fixes: true\n",

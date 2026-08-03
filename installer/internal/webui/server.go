@@ -558,15 +558,10 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	asset := installerDistAsset(root)
-	beforeHash := ""
-	beforeExists := false
-	if asset != "" {
-		beforeHash, beforeExists, err = fileSHA256(asset)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err)
-			return
-		}
+	beforeHashes, err := installerDistHashes(root)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
@@ -584,40 +579,65 @@ func gitPullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := gitPullResult{Output: strings.TrimSpace(string(output))}
-	if asset != "" {
-		afterHash, afterExists, err := fileSHA256(asset)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-		if afterExists && (!beforeExists || beforeHash != afterHash) {
-			result.InstallerBinaryChanged = true
-			installPath, err := installInstallerBinary(asset)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, err)
-				return
-			}
-			result.InstallerReinstalled = true
-			result.InstallerRestartRequired = true
-			result.InstallerMessage = fmt.Sprintf("Installer-Binary wurde nach %s aktualisiert. GUI bitte neu starten, um die neue Version zu verwenden.", installPath)
-		}
+	afterHashes, err := installerDistHashes(root)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	result.InstallerBinaryChanged = installerDistChanged(beforeHashes, afterHashes)
+	installPaths, installerChanged, err := syncInstallerBinaries(root)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if installerChanged {
+		result.InstallerBinaryChanged = true
+		result.InstallerReinstalled = true
+		result.InstallerRestartRequired = true
+		result.InstallerMessage = fmt.Sprintf("Installer-Binaries wurden aktualisiert: %s. GUI bitte neu starten, um die neue Version zu verwenden.", strings.Join(installPaths, ", "))
 	}
 
 	writeJSON(w, http.StatusOK, result)
 }
 
-func installerDistAsset(root string) string {
-	osName := runtime.GOOS
-	if osName != "linux" && osName != "darwin" {
-		return ""
+func installerDistHashes(root string) (map[string]string, error) {
+	assets, err := installerDistAssets(root)
+	if err != nil {
+		return nil, err
 	}
-
-	arch := runtime.GOARCH
-	if arch != "amd64" && arch != "arm64" {
-		return ""
+	hashes := make(map[string]string, len(assets))
+	for _, asset := range assets {
+		hash, exists, err := fileSHA256(asset)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			hashes[filepath.Base(asset)] = hash
+		}
 	}
+	return hashes, nil
+}
 
-	return filepath.Join(root, "dist", fmt.Sprintf("k-playbook-installer-%s-%s", osName, arch))
+func installerDistAssets(root string) ([]string, error) {
+	pattern := filepath.Join(root, "dist", "k-playbook-installer-*-*")
+	assets, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("Installer-Artefakte suchen: %w", err)
+	}
+	sort.Strings(assets)
+	return assets, nil
+}
+
+func installerDistChanged(before map[string]string, after map[string]string) bool {
+	if len(before) != len(after) {
+		return true
+	}
+	for name, afterHash := range after {
+		if before[name] != afterHash {
+			return true
+		}
+	}
+	return false
 }
 
 func fileSHA256(path string) (string, bool, error) {
@@ -637,28 +657,94 @@ func fileSHA256(path string) (string, bool, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), true, nil
 }
 
-func installInstallerBinary(source string) (string, error) {
-	info, err := os.Stat(source)
+func syncInstallerBinaries(root string) ([]string, bool, error) {
+	assets, err := installerDistAssets(root)
 	if err != nil {
-		return "", fmt.Errorf("Installer-Artefakt pruefen: %w", err)
+		return nil, false, err
 	}
-	if info.IsDir() {
-		return "", fmt.Errorf("Installer-Artefakt ist ein Verzeichnis: %s", source)
+	if len(assets) == 0 {
+		return nil, false, nil
 	}
-
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("user home ermitteln: %w", err)
-	}
-	installDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		return "", fmt.Errorf("Installationsverzeichnis anlegen: %w", err)
+		return nil, false, fmt.Errorf("user home ermitteln: %w", err)
 	}
 
-	destination := filepath.Join(installDir, "k-playbook-installer")
+	binDir := filepath.Join(root, "bin")
+	wrapperTemplate := filepath.Join(root, "scripts", "templates", "k-playbook-installer-wrapper.sh")
+	installed := make([]string, 0, len(assets)+2)
+	for _, asset := range assets {
+		info, err := os.Stat(asset)
+		if err != nil {
+			return nil, false, fmt.Errorf("Installer-Artefakt pruefen: %w", err)
+		}
+		if info.IsDir() {
+			return nil, false, fmt.Errorf("Installer-Artefakt ist ein Verzeichnis: %s", asset)
+		}
+		destination := filepath.Join(binDir, filepath.Base(asset))
+		needsInstall, err := fileContentChanged(asset, destination)
+		if err != nil {
+			return nil, false, err
+		}
+		if needsInstall {
+			if err := installBinaryFile(asset, destination); err != nil {
+				return nil, false, err
+			}
+			installed = append(installed, destination)
+		}
+	}
+
+	wrapper := filepath.Join(binDir, "k-playbook-installer")
+	wrapperNeedsInstall, err := fileContentChanged(wrapperTemplate, wrapper)
+	if err != nil {
+		return nil, false, err
+	}
+	if wrapperNeedsInstall {
+		if err := installBinaryFile(wrapperTemplate, wrapper); err != nil {
+			return nil, false, err
+		}
+		installed = append(installed, wrapper)
+	}
+
+	globalLink := filepath.Join(home, ".local", "bin", "k-playbook-installer")
+	linkNeedsInstall, err := symlinkTargetChanged(wrapper, globalLink)
+	if err != nil {
+		return nil, false, err
+	}
+	if linkNeedsInstall {
+		if err := installSymlink(wrapper, globalLink); err != nil {
+			return nil, false, err
+		}
+		installed = append(installed, globalLink)
+	}
+
+	return installed, len(installed) > 0, nil
+}
+
+func fileContentChanged(source string, destination string) (bool, error) {
+	sourceHash, sourceExists, err := fileSHA256(source)
+	if err != nil {
+		return false, err
+	}
+	if !sourceExists {
+		return false, fmt.Errorf("Quelldatei fehlt: %s", source)
+	}
+	destinationHash, destinationExists, err := fileSHA256(destination)
+	if err != nil {
+		return false, err
+	}
+	return !destinationExists || sourceHash != destinationHash, nil
+}
+
+func installBinaryFile(source string, destination string) error {
+	installDir := filepath.Dir(destination)
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return fmt.Errorf("Installationsverzeichnis anlegen: %w", err)
+	}
+
 	tmp, err := os.CreateTemp(installDir, ".k-playbook-installer-*")
 	if err != nil {
-		return "", fmt.Errorf("temporaere Installer-Datei anlegen: %w", err)
+		return fmt.Errorf("temporaere Installer-Datei anlegen: %w", err)
 	}
 	tmpPath := tmp.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
@@ -666,30 +752,61 @@ func installInstallerBinary(source string) (string, error) {
 	sourceFile, err := os.Open(source)
 	if err != nil {
 		_ = tmp.Close()
-		return "", fmt.Errorf("Installer-Artefakt oeffnen: %w", err)
+		return fmt.Errorf("Installer-Artefakt oeffnen: %w", err)
 	}
 	_, copyErr := io.Copy(tmp, sourceFile)
 	closeSourceErr := sourceFile.Close()
 	if copyErr != nil {
 		_ = tmp.Close()
-		return "", fmt.Errorf("Installer-Binary kopieren: %w", copyErr)
+		return fmt.Errorf("Installer-Binary kopieren: %w", copyErr)
 	}
 	if closeSourceErr != nil {
 		_ = tmp.Close()
-		return "", fmt.Errorf("Installer-Artefakt schliessen: %w", closeSourceErr)
+		return fmt.Errorf("Installer-Artefakt schliessen: %w", closeSourceErr)
 	}
 	if err := tmp.Chmod(0o755); err != nil {
 		_ = tmp.Close()
-		return "", fmt.Errorf("Installer-Binary ausfuehrbar machen: %w", err)
+		return fmt.Errorf("Installer-Binary ausfuehrbar machen: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return "", fmt.Errorf("Installer-Binary schreiben: %w", err)
+		return fmt.Errorf("Installer-Binary schreiben: %w", err)
 	}
 	if err := os.Rename(tmpPath, destination); err != nil {
-		return "", fmt.Errorf("Installer-Binary installieren: %w", err)
+		return fmt.Errorf("Installer-Binary installieren: %w", err)
 	}
 
-	return destination, nil
+	return nil
+}
+
+func installSymlink(target string, link string) error {
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		return fmt.Errorf("Installationsverzeichnis anlegen: %w", err)
+	}
+	if err := os.Remove(link); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("bestehenden Link entfernen: %w", err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		return fmt.Errorf("Installer-Link anlegen: %w", err)
+	}
+	return nil
+}
+
+func symlinkTargetChanged(target string, link string) (bool, error) {
+	current, err := os.Readlink(link)
+	if err == nil {
+		return current != target, nil
+	}
+	if os.IsNotExist(err) {
+		return true, nil
+	}
+	info, statErr := os.Lstat(link)
+	if statErr != nil {
+		return false, fmt.Errorf("Installer-Link pruefen: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return true, nil
+	}
+	return false, fmt.Errorf("Installer-Link pruefen: %w", err)
 }
 
 func checkGitStatus(parent context.Context) (gitStatusResult, error) {

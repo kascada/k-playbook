@@ -1,5 +1,5 @@
 ---
-description: "Execute one or more task files. If no path is given, uses the fixed k-playbook/tasks path. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place."
+description: "Execute one or more task files. If no path is given, uses paths.tasks from K-PLAYBOOK.yaml. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place."
 argument-hint: "[file-or-directory]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
@@ -7,18 +7,18 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 # k-run
 
-Execute task files. If `$ARGUMENTS` is empty, use `<project>/k-playbook/tasks`.
+Execute task files. If `$ARGUMENTS` is empty, use the directory configured as `paths.tasks`.
 
-`/k-run` does not guess project paths. If `K-PLAYBOOK.yaml` or `k-playbook/tasks` is missing, run `/k-gui` first.
+`/k-run` does not guess project paths. If `K-PLAYBOOK.yaml` is missing, run `/k-gui` first. If `paths.tasks` is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
 
 ## Step 1 - Resolve project config, target path and collect tasks
 
 Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the execution target. This is a preflight even for explicit file/directory arguments, so task execution can resolve `## Ausführungskontext` paths relative to the project root and respect `K-PLAYBOOK.yaml`.
 
-For this command, resolve the fixed `tasks` path:
+For this command, resolve the configured `tasks` path:
 
-- `RESOLVED_TASKS_DIR = <TARGET_DIR>/k-playbook/tasks`.
-- `TASKS_DISPLAY_PATH = k-playbook/tasks`.
+- `RESOLVED_TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
+- `TASKS_DISPLAY_PATH = <paths.tasks>`.
 
 Command-specific policy:
 
@@ -29,8 +29,9 @@ Command-specific policy:
   - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`. Do not allow one-off runs without project config.
 - If `$ARGUMENTS` is empty:
   - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-  - If `k-playbook/tasks` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-run`; there are no tasks to execute.
-  - If `k-playbook/tasks` exists: use it as the execution target.
+  - If `paths.tasks` is missing: ask for the project-relative tasks directory, recommend `k-playbook/tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+  - If the YAML-configured tasks path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path. Do not create it from `/k-run`; there are no tasks to execute.
+  - If the YAML-configured tasks path exists: use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
 
@@ -48,7 +49,7 @@ Announce the list of tasks to be executed before starting. Check the **last** ta
 
 ```
 Tasks:
-  Pfad: k-playbook/tasks/
+  Pfad: <TASKS_DISPLAY_PATH>/
   1. 014-setup-tts.md
   2. 015-integrate-tts.md  <- letzte
 

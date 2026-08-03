@@ -3,6 +3,7 @@ package webui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/projects"
@@ -36,5 +37,113 @@ func TestCanEditProjectInContainerOnlyAllowsCurrentProject(t *testing.T) {
 	}
 	if canEditProject(runtime, other) {
 		t.Fatalf("expected other project to be read-only in container runtime")
+	}
+}
+
+func TestInstallBinaryFileCopiesExecutableAtomically(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source-binary")
+	destination := filepath.Join(root, "bin", "k-playbook-installer")
+
+	if err := os.WriteFile(source, []byte("installer"), 0o755); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if err := installBinaryFile(source, destination); err != nil {
+		t.Fatalf("install binary: %v", err)
+	}
+	data, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("read destination: %v", err)
+	}
+	if string(data) != "installer" {
+		t.Fatalf("expected destination content to match source, got %q", string(data))
+	}
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatalf("stat destination: %v", err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o755 {
+		t.Fatalf("expected destination mode 0755, got %v", info.Mode().Perm())
+	}
+}
+
+func TestInstallerDistChangedDetectsAddedAndChangedAssets(t *testing.T) {
+	if installerDistChanged(map[string]string{"a": "1"}, map[string]string{"a": "1"}) {
+		t.Fatalf("expected identical hashes to be unchanged")
+	}
+	if !installerDistChanged(map[string]string{"a": "1"}, map[string]string{"a": "2"}) {
+		t.Fatalf("expected changed hash to be detected")
+	}
+	if !installerDistChanged(map[string]string{"a": "1"}, map[string]string{"a": "1", "b": "2"}) {
+		t.Fatalf("expected added asset to be detected")
+	}
+}
+
+func TestSyncInstallerBinariesMirrorsAllDistAssetsAndWrapper(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink behavior is platform-specific")
+	}
+	root := t.TempDir()
+	oldHome := t.TempDir()
+	t.Setenv("HOME", oldHome)
+
+	distDir := filepath.Join(root, "dist")
+	templateDir := filepath.Join(root, "scripts", "templates")
+	if err := os.MkdirAll(distDir, 0o755); err != nil {
+		t.Fatalf("create dist dir: %v", err)
+	}
+	if err := os.MkdirAll(templateDir, 0o755); err != nil {
+		t.Fatalf("create template dir: %v", err)
+	}
+	assets := map[string]string{
+		"k-playbook-installer-linux-amd64":  "linux-amd64",
+		"k-playbook-installer-darwin-arm64": "darwin-arm64",
+	}
+	for name, content := range assets {
+		if err := os.WriteFile(filepath.Join(distDir, name), []byte(content), 0o755); err != nil {
+			t.Fatalf("write dist asset: %v", err)
+		}
+	}
+	wrapperTemplate := filepath.Join(templateDir, "k-playbook-installer-wrapper.sh")
+	if err := os.WriteFile(wrapperTemplate, []byte("#!/usr/bin/env bash\n"), 0o755); err != nil {
+		t.Fatalf("write wrapper template: %v", err)
+	}
+
+	installed, changed, err := syncInstallerBinaries(root)
+	if err != nil {
+		t.Fatalf("sync installer binaries: %v", err)
+	}
+	if !changed {
+		t.Fatalf("expected first sync to install files")
+	}
+	if len(installed) != 4 {
+		t.Fatalf("expected two assets, wrapper and global link to be installed, got %d: %v", len(installed), installed)
+	}
+	for name, content := range assets {
+		path := filepath.Join(root, "bin", name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read mirrored asset %s: %v", name, err)
+		}
+		if string(data) != content {
+			t.Fatalf("expected mirrored asset %s content %q, got %q", name, content, string(data))
+		}
+	}
+	link := filepath.Join(oldHome, ".local", "bin", "k-playbook-installer")
+	target, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("read global symlink: %v", err)
+	}
+	if target != filepath.Join(root, "bin", "k-playbook-installer") {
+		t.Fatalf("expected global link target to be repo wrapper, got %s", target)
+	}
+
+	installed, changed, err = syncInstallerBinaries(root)
+	if err != nil {
+		t.Fatalf("second sync installer binaries: %v", err)
+	}
+	if changed || len(installed) != 0 {
+		t.Fatalf("expected second sync to be unchanged, got changed=%v installed=%v", changed, installed)
 	}
 }

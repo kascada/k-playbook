@@ -48,7 +48,7 @@ Der fruehere interaktive Terminal-UI-Command `ui` wurde bewusst entfernt. Die in
 - Die Web-Assets sind per `embed` im Go-Binary enthalten.
 - Der Installer fuehrt keine Shell-Pipelines aus. Fachlogik ruft Go-Funktionen oder gezielte Prozesse wie `git pull --ff-only` auf.
 - Der Git-Pull ist absichtlich `--ff-only`, damit keine Merge-Commits oder interaktiven Konfliktzustaende entstehen.
-- Nach einem erfolgreichen Git-Pull vergleicht die GUI das passende Release-Artefakt unter `dist/k-playbook-installer-<os>-<arch>` per Hash vor/nach dem Pull. Nur wenn sich dieses Binary geaendert hat, wird es nach `~/.local/bin/k-playbook-installer` kopiert und die GUI zeigt einen Neustart-Hinweis.
+- Nach einem erfolgreichen Git-Pull vergleicht die GUI alle vorhandenen Release-Artefakte unter `dist/k-playbook-installer-*` per Hash vor/nach dem Pull. Wenn sich mindestens ein Artefakt geaendert hat, werden alle vorhandenen Artefakte nach `bin/k-playbook-installer-<os>-<arch>` gespiegelt, der Wrapper `bin/k-playbook-installer` installiert und `~/.local/bin/k-playbook-installer` als Symlink auf den Wrapper gesetzt. Die GUI zeigt dann einen Neustart-Hinweis.
 - Lokale Installer-Daten liegen unter `~/dev/k-playbook/.k-playbook-local/` und sind nicht versioniert.
 - Der Pfadvertrag ist Voraussetzung fuer Store-, Docs- und Pull-Funktionen.
 - Pfad- und Repo-Erkennung basiert auf k-playbook-Markerdateien, nicht nur auf `.git`.
@@ -178,7 +178,7 @@ Aktuelle Endpunkte:
 | `POST` | `/api/projects/remediation` | `remediation:`-Block eines gespeicherten Projekts in `K-PLAYBOOK.yaml` auf den gewaehlten Modus setzen |
 | `GET` | `/api/projects/scan?root=dev|home` | Projektkandidaten scannen |
 | `GET` | `/api/git/status` | Read-only per `git ls-remote` pruefen, ob der Upstream-Branch von k-playbook einen anderen Commit zeigt |
-| `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren; bei geaendertem passendem `dist`-Installer-Binary nach `~/.local/bin/k-playbook-installer` installieren und Neustartbedarf melden |
+| `POST` | `/api/git/pull` | `git pull --ff-only` im k-playbook-Repo ausfuehren; bei geaenderten `dist`-Installer-Binaries alle vorhandenen Artefakte nach `bin/` spiegeln, Wrapper und globalen Symlink installieren und Neustartbedarf melden |
 | `GET` | `/api/docs` | Markdown-Dateien unter `docs/` listen |
 | `GET` | `/api/docs/file?path=docs/...md` | Markdown-Datei lesen und gerendert ausgeben |
 | `GET` | `/api/opencode/status` | OpenCode- und Claude-Command-/Skill-Registrierung pruefen |
@@ -209,7 +209,7 @@ Die Startseite zeigt:
 6. Button `Projekt hinzufuegen`.
 7. Assistenten-Registrierungsblock fuer OpenCode und Claude.
 8. Security-Tool-Preflight mit einer Zeile pro Tool und Status `OK ✓`, `FEHLT !` oder `OPTIONAL`. Dieser Block prueft nur `PATH`, Versionen und Projekt-venv-Scope; er installiert nichts.
-9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden. Wenn sich dabei das passende Installer-Binary unter `dist/` geaendert hat, installiert die GUI es nach `~/.local/bin/k-playbook-installer` und zeigt den Hinweis, dass die GUI neu gestartet werden muss.
+9. Repository-Block mit `Git pull`; bei verfuegbarer neuer Version wird auch dieser Button hervorgehoben und zu `Zur neuen Version aktualisieren`. Nach erfolgreichem Pull laeuft `refreshAll()`, wodurch Git-Status, Pfadstatus, Projekt-Auswahl, DevContainer-Status, Assistenten-Registrierung, Security-Tools und Docs neu geprueft werden. Wenn sich dabei mindestens ein Installer-Artefakt unter `dist/` geaendert hat, spiegelt die GUI alle vorhandenen `dist/k-playbook-installer-*` nach `bin/`, installiert den Wrapper, setzt den globalen Symlink und zeigt den Hinweis, dass die GUI neu gestartet werden muss.
 10. Docs-Block mit gerenderter Markdown-Anzeige.
 11. Button `Schliessen`, der den lokalen Server beendet. Der Browser-Tab zeigt danach nur noch den Hinweis, dass das Fenster geschlossen werden kann.
 
@@ -347,7 +347,7 @@ make install
 k-playbook-installer
 ```
 
-Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script nutzt zuerst ein passendes Release-Artefakt aus `dist/`, danach ein vorhandenes Source-Binary aus `bin/` und laedt sonst das passende Binary aus den GitHub Releases.
+Dieser Weg braucht kein lokal installiertes Go. `make install` ruft `scripts/install-installer.sh` auf; das Script spiegelt alle unterstuetzten Release-Artefakte aus `dist/` oder aus GitHub Releases nach `bin/`, installiert dort den Wrapper `bin/k-playbook-installer` und verlinkt `~/.local/bin/k-playbook-installer` auf diesen Wrapper.
 
 Wenn `~/.local/bin` noch nicht im PATH liegt, gibt das Script einen Hinweis aus. Alternativ kann direkt gestartet werden:
 
@@ -377,16 +377,19 @@ Die alten laengeren Namen bleiben als Aliase erhalten: `make installer-build`, `
 Build- und Installationspfade:
 
 ```text
-bin/k-playbook-installer
 dist/k-playbook-installer-<os>-<arch>
+bin/k-playbook-installer-<os>-<arch>
+bin/k-playbook-installer
 ~/.local/bin/k-playbook-installer
 ```
 
 `make dist` baut plattformspezifische Artefakte nach `dist/` fuer `linux-amd64`, `linux-arm64`, `darwin-amd64` und `darwin-arm64`. Diese Artefakte sind fuer GitHub Releases gedacht und werden nicht versioniert. Das private Maintainer-Target `make -C priv release-artifacts` ruft dieses Root-Target auf.
 
-`make install` installiert ohne Go ein vorhandenes passendes Release-Artefakt aus `dist/`, ein vorhandenes Source-Binary aus `bin/` oder laedt das Asset von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten `dist/`-Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg kopiert das Binary nach `~/.local/bin`; er legt keinen Symlink ins Repo an.
+`make build` baut alle plattformspezifischen Binaries nach `bin/` und installiert `bin/k-playbook-installer` als Wrapper. Der Wrapper erkennt per `uname` die aktuelle Plattform und startet per `exec` das passende Binary im selben Verzeichnis.
 
-`make install-from-source` baut zuerst das repo-lokale Binary unter `bin/k-playbook-installer`, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf dieses Binary an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer das repo-lokale Binary und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
+`make install` installiert ohne Go alle unterstuetzten Release-Artefakte aus `dist/` oder laedt sie von `https://github.com/kascada/k-playbook/releases/latest/download/`. Die erwarteten `dist/`-Asset-Namen entsprechen den `make dist`-Dateinamen, z. B. `k-playbook-installer-linux-amd64`. Dieser Weg spiegelt die Binaries nach `bin/`, installiert den Wrapper und setzt `~/.local/bin/k-playbook-installer` als Symlink auf den Wrapper.
+
+`make install-from-source` baut zuerst alle repo-lokalen Binaries unter `bin/`, installiert den Wrapper, legt danach `~/.local/bin/k-playbook-installer` als Symlink auf diesen Wrapper an und prueft, ob `~/.local/bin` im `PATH` liegt. Dadurch aktualisiert ein spaeteres `make build` automatisch auch den globalen Aufruf. `make gui` startet immer den repo-lokalen Wrapper und funktioniert deshalb auch ohne frisch geladenen PATH. Diese Source-Targets brauchen Go auf dem Host. Falls `~/.local/bin` nicht im `PATH` ist und der Aufruf in einem normalen interaktiven Terminal laeuft, fragt `make path-setup`, ob das passende Shell-Profil automatisch ergaenzt werden soll. Nicht-interaktive Aufrufe bekommen nur den Hinweis.
 
 Profil-Auswahl im Root-`Makefile`:
 

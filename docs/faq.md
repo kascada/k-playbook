@@ -7,7 +7,7 @@
 - einmal pro Host nach dem Klonen von `k-playbook`.
 - nach einem Pull/Update, wenn neue oder geaenderte Dateien unter `commands/k-*.md` fuer OpenCode sichtbar werden sollen.
 - wenn OpenCode-Symlinks oder `skills.paths` auf diesem Host geprueft oder repariert werden sollen.
-- wenn ein Zielprojekt `K-PLAYBOOK.yaml` oder die feste `k-playbook/`-Struktur braucht.
+- wenn ein Zielprojekt `K-PLAYBOOK.yaml` oder die dort konfigurierte `paths.*`-Struktur braucht.
 
 Die GUI ersetzt den alten Normalablauf aus `/k-install` und `/k-setup`.
 
