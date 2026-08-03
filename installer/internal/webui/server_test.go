@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/projects"
@@ -37,6 +38,21 @@ func TestCanEditProjectInContainerOnlyAllowsCurrentProject(t *testing.T) {
 	}
 	if canEditProject(runtime, other) {
 		t.Fatalf("expected other project to be read-only in container runtime")
+	}
+}
+
+func TestBrowserFallbackHintOnlyForDevcontainer(t *testing.T) {
+	url := "http://127.0.0.1:12345/"
+
+	if got := browserFallbackHint(runtimeStatus{}, url); got != "" {
+		t.Fatalf("expected no host hint, got %q", got)
+	}
+	if got := browserFallbackHint(runtimeStatus{InsideContainer: true}, url); got != "" {
+		t.Fatalf("expected no generic container hint, got %q", got)
+	}
+	got := browserFallbackHint(runtimeStatus{InsideContainer: true, InsideDevcontainer: true}, url)
+	if !strings.Contains(got, "DevContainer erkannt") || !strings.Contains(got, url) {
+		t.Fatalf("expected DevContainer hint with URL, got %q", got)
 	}
 }
 

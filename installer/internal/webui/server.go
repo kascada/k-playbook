@@ -237,10 +237,14 @@ func Run() error {
 	go state.monitorClient(ctx)
 
 	url := "http://" + listener.Addr().String() + "/"
+	runtime := detectRuntime()
 	fmt.Printf("k-playbook Installer GUI: %s\n", url)
+	if hint := browserFallbackHint(runtime, url); hint != "" {
+		fmt.Println(hint)
+	}
 	fmt.Println("Zum Beenden Ctrl+C druecken.")
 	if err := openBrowser(url); err != nil {
-		if runtime := detectRuntime(); runtime.InsideContainer {
+		if runtime.InsideContainer {
 			fmt.Printf("Browser wurde im Container nicht geoeffnet (%v). Oeffne die URL im Host-Browser oder nutze den DevContainer-Port-Forward.\n", err)
 		} else {
 			fmt.Printf("Browser konnte nicht automatisch geoeffnet werden: %v\n", err)
@@ -277,6 +281,13 @@ func Run() error {
 	default:
 		return nil
 	}
+}
+
+func browserFallbackHint(runtime runtimeStatus, url string) string {
+	if !runtime.InsideDevcontainer {
+		return ""
+	}
+	return fmt.Sprintf("DevContainer erkannt. Wenn sich kein Browser oeffnet, diese URL im Host-Browser oeffnen: %s", url)
 }
 
 func routes(state *serverState) http.Handler {
