@@ -26,6 +26,7 @@ Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden erst sich
 | **Tool-Installation** | | |
 | `/k-install-security-tools` | host-lokale Security-Review-Tools aus `global/security-tools.tsv` installieren oder pruefen | spezielle `k-install-*`-Commands werden separat dokumentiert |
 | `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | aendert `K-PLAYBOOK.yaml` nicht |
+| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt nur `tools.codeql` in `K-PLAYBOOK.yaml` |
 | **Docs** | | |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt unter `paths.docs`, plus `AGENTS.md` und `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | schreibt unter `<paths.docs>/libs/` und aktualisiert den Docs-Index |

@@ -206,8 +206,7 @@ Pflichtfeld. Aktuelle Werte:
 
 ### `setup.updated_at`
 
-Pflichtfeld. ISO-Datum `YYYY-MM-DD`, an dem `/k-setup` die Datei zuletzt
-geschrieben oder aktualisiert hat.
+Pflichtfeld. ISO-Datum `YYYY-MM-DD`, an dem die Installer-GUI oder ein dafuer zustaendiger Command die Datei zuletzt geschrieben oder aktualisiert hat.
 
 ### `remediation`
 
@@ -258,9 +257,7 @@ oder `planned` ist.
 
 ## Schreibregeln
 
-- `/k-setup` besitzt `schema_version`, `layout`, `k_playbook`, `project` und `setup`.
-- `/k-setup` bzw. die Installer-GUI besitzt ausserdem den `paths`-Block.
-- `/k-setup` besitzt ausserdem die Remediation-Policy, sofern sie gesetzt wird.
+- Die Installer-GUI besitzt `schema_version`, `layout`, `k_playbook`, `project`, `setup`, `paths` und die Remediation-Policy.
 - Die Installer-GUI besitzt `project.repo_root` und `project.vcs`. Sie darf
   Git-Kandidaten suchen oder den Nutzer fragen; andere Commands duerfen das nicht.
 - `/k-setup-codeql` besitzt nur `tools.codeql`.
