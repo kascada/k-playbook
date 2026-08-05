@@ -28,27 +28,31 @@ Perspektivisch sollte der Flow ausserdem eine Schnittstelle zu Jira oder Conflue
 4. Empfehlung ableiten
 5. Folgeaktion ausfuehren
 
-## Mini-Schaubild
+## Schaubild
 
-```text
-/k-pr-review [selector] [mode]
-        |
-        v
-PR laden -> Ueberblick -> Bewertung -> Empfehlung
-                                 |
-              +------------------+------------------+
-              |                  |                  |
-              v                  v                  v
-         direkt approven    direkt mergen   branch erstellen und weiter testen
-              |                  |                  |
-              v                  v                  v
-      GitHub-Approval      GitHub-Merge     lokaler Pruef-Branch + Tests
-              \                  |                  /
-               \                 |                 /
-                +----------------+----------------+
-                                 |
-                                 v
-                 Abschluss + Repo-Sauberkeitspruefung
+```mermaid
+flowchart TD
+    A["/k-pr-review [selector] [mode]"] --> B["Repo und PR aufloesen"]
+    B --> C["PR-Ueberblick zeigen"]
+    C --> D{"Bewertungsmodus"}
+    D -->|quick| E["GitHub-Signale + Diff-Scope + Enforcement-Einschaetzung"]
+    D -->|standard| F["quick + k-check --mode changed"]
+    D -->|deep| G["standard + lokale Zusatzvalidierung"]
+    E --> H["Empfehlung ableiten"]
+    F --> H
+    G --> H
+    H --> I{"Folgeaktion"}
+    I -->|direkt annehmen| J["GitHub-Approval"]
+    I -->|explizit mergen| K["GitHub-Merge"]
+    I -->|weiter testen| L["lokalen PR-Head-Branch erstellen"]
+    I -->|nichts weiter| M["keine Aktion"]
+    L --> N["erweiterte Tests ausfuehren"]
+    N --> O["zum urspruenglichen PR zurueck"]
+    O --> H
+    J --> P["Repo-Sauberkeitspruefung"]
+    K --> P
+    M --> P
+    P --> Q["Abschluss melden"]
 ```
 
 ## Bewertungsmodi
@@ -59,15 +63,9 @@ PR laden -> Ueberblick -> Bewertung -> Empfehlung
 
 ## Folgeaktionen
 
-- `direkt annehmen`
-  - Approval auf GitHub
-  - optional auf ausdrueckliche Anfrage auch Merge
-- `branch erstellen und weiter testen`
-  - lokaler Validierungs-Branch vom PR-Head
-  - erweiterter Testlauf
-  - danach zurueck zum urspruenglichen PR
-  - optional approven oder mergen
-  - lokalen Pruef-Branch wieder aufraeumen
+- `direkt annehmen`: Approval auf GitHub.
+- `direkt mergen`: nur auf ausdrueckliche Anfrage.
+- `branch erstellen und weiter testen`: lokaler Validierungs-Branch vom PR-Head, erweiterter Testlauf, danach zurueck zum urspruenglichen PR.
 - `nichts weiter`
 
 ## Wichtige Regeln

@@ -85,7 +85,7 @@ flowchart TD
     M --> I
 ```
 
-Details stehen in [`installation.md`](./installation.md) und [`multi-project-installation.md`](./multi-project-installation.md).
+Details stehen in [`installation.md`](./installation.md).
 
 ## Wichtige Commands
 
@@ -219,7 +219,6 @@ Details stehen in [`../global/checks/README.md`](../global/checks/README.md) und
 |---|---|
 | Dokumentationsindex | [`README.md`](./README.md) |
 | Installation und Pfadvertrag | [`installation.md`](./installation.md) |
-| Mehrere Projekte und DevContainer | [`multi-project-installation.md`](./multi-project-installation.md) |
 | Commands | [`commands.md`](./commands.md) |
 | Projektkonfiguration | [`k-playbook-format.md`](./k-playbook-format.md) |
 | Code-Review-Flow | [`code-review.md`](./code-review.md) |

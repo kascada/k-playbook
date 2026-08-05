@@ -2,20 +2,19 @@
 
 Du arbeitest im DevContainer des Zielprojekts.
 
-Lies zuerst `~/dev/k-playbook/docs/multi-project-installation.md`, insbesondere Abschnitt `3B. Projekt mit DevContainer einrichten`.
+Lies zuerst `~/dev/k-playbook/docs/installation.md`, insbesondere Abschnitte `DevContainer-Pfadvertrag` und `Projekt-Onboarding`.
 
 Fuehre danach aus:
 
-1. Pruefe, ob `/workspaces/k-playbook/commands/k-install.md` existiert.
-2. Pruefe, ob `~/dev/k-playbook/commands/k-install.md` existiert.
-3. Pruefe, ob `~/.config/opencode/command/k-install.md` und `~/.config/opencode/commands/k-install.md` existieren oder plausibel repariert werden koennen.
-4. Wenn `/k-install` in OpenCode sichtbar ist, fuehre `/k-install` aus. Wenn du Slash-Commands in deiner Umgebung nicht selbst ausloesen kannst oder `/k-install` nicht sichtbar ist, lies `~/dev/k-playbook/commands/k-install.md` direkt und fuehre die dort beschriebenen Bootstrap-/Installationsschritte fuer den Container aus.
-5. Starte `/k-install*` nicht aus einem aktiven Projekt-venv. Wenn `VIRTUAL_ENV` gesetzt ist oder ein Projekt-venv im `PATH` liegt, fordere zuerst `deactivate` bzw. eine bereinigte Shell an.
-6. Stelle sicher, dass das Projekt im k-playbook Installer eingebunden ist; dort werden `K-PLAYBOOK.yaml` und die projektlokale Struktur angelegt bzw. vervollstaendigt. Nutze `/k-setup` nur noch bei Bedarf, wenn die Kernfelder einer bestehenden `K-PLAYBOOK.yaml` normalisiert werden muessen.
-7. Installiere fehlende Security-Tools im Container als Teil der Standardinstallation mit `/k-install-security-tools --install missing --yes`. Wenn du Slash-Commands nicht selbst ausloesen kannst, lies `~/dev/k-playbook/commands/k-install-security-tools.md` direkt und fuehre die dort beschriebenen Schritte aus.
-8. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen.
-9. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
-10. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/_details/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
+1. Pruefe, ob `/workspaces/k-playbook/commands/k-gui.md` existiert.
+2. Pruefe, ob `~/dev/k-playbook/commands/k-gui.md` existiert und auf den Bind-Mount zeigt.
+3. Pruefe, ob `~/.config/opencode/command/k-gui.md` und `~/.config/opencode/commands/k-gui.md` existieren oder plausibel repariert werden koennen.
+4. Starte `/k-install*` nicht aus einem aktiven Projekt-venv. Wenn `VIRTUAL_ENV` gesetzt ist oder ein Projekt-venv im `PATH` liegt, fordere zuerst `deactivate` bzw. eine bereinigte Shell an.
+5. Stelle sicher, dass das Projekt ueber die Installer-GUI eingebunden ist; dort werden `K-PLAYBOOK.yaml` und die projektlokale Struktur angelegt bzw. vervollstaendigt.
+6. Installiere fehlende Security-Tools im Container mit `/k-install-security-tools --install missing --yes`. Wenn du Slash-Commands nicht selbst ausloesen kannst, lies `~/dev/k-playbook/commands/k-install-security-tools.md` direkt und fuehre die dort beschriebenen Schritte aus.
+7. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen.
+8. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
+9. Fuehre am Ende `/k-status` aus oder starte `k-playbook-installer status`, wenn der Slash-Command nicht nutzbar ist.
 
 Berichte am Ende knapp:
 

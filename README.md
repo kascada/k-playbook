@@ -64,7 +64,7 @@ Die GUI legt im Zielprojekt die konfigurierten lokalen Strukturen an, konvention
 
 DevContainer verwenden denselben logischen Pfad. Das Host-Repo wird nach `/workspaces/k-playbook` gemountet; im Container zeigt `~/dev/k-playbook` per Symlink darauf. Dadurch muessen Host und Container nicht getrennt aktualisiert werden.
 
-Die Integration richtet die GUI pro Zielprojekt ein. Details stehen in [`docs/installation.md`](./docs/installation.md#devcontainer-pfadvertrag) und [`docs/multi-project-installation.md`](./docs/multi-project-installation.md).
+Die Integration richtet die GUI pro Zielprojekt ein. Details stehen in [`docs/installation.md`](./docs/installation.md#devcontainer-pfadvertrag).
 
 ## Dokumentation
 

@@ -12,7 +12,7 @@ Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`.
 | Code-Review-Flow | [`code-review.md`](./code-review.md) |
 | Task-Flow | [`task-flow.md`](./task-flow.md) |
 | Review-/Results-/Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
-| Installation und DevContainer | [`multi-project-installation.md`](./multi-project-installation.md), [`installation.md`](./installation.md) |
+| Installation und DevContainer | [`installation.md`](./installation.md) |
 
 ## Kurzuebersicht
 

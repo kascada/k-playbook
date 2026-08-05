@@ -2,18 +2,17 @@
 
 Du arbeitest im Zielprojekt auf dem Host, nicht in einem DevContainer.
 
-Lies zuerst `~/dev/k-playbook/docs/multi-project-installation.md`, insbesondere Abschnitt `3A. Projekt ohne DevContainer einrichten`.
+Lies zuerst `~/dev/k-playbook/docs/installation.md`, insbesondere Abschnitt `Projekt-Onboarding`.
 
 Fuehre danach aus:
 
 1. Pruefe, ob du im richtigen Projektroot bist. Wenn unklar ist, welches Zielprojekt eingerichtet werden soll, frage den User nach dem Pfad.
-2. Pruefe, ob `~/dev/k-playbook/commands/k-install.md` existiert.
-3. Pruefe, ob `~/.config/opencode/command/k-install.md` existiert und ob `skills.paths` `~/dev/k-playbook` enthaelt. Wenn nicht, fuehre zuerst Prompt `01-host-opencode-registrieren.md` bzw. die dort beschriebenen Bootstrap-Schritte aus.
-4. Stelle sicher, dass das Projekt im k-playbook Installer eingebunden ist; dort werden `K-PLAYBOOK.yaml` und die projektlokale Struktur angelegt bzw. vervollstaendigt.
-5. Nutze `/k-setup` nur noch bei Bedarf, wenn die Kernfelder einer bestehenden `K-PLAYBOOK.yaml` normalisiert werden muessen. Der Command installiert keine Projekt-Dependencies und erzeugt keine Struktur.
-6. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen. `/k-install-codeql` nicht aus einem aktiven Projekt-venv starten.
-7. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
-8. Fuehre am Ende `/k-status` aus oder, falls der Slash-Command nicht nutzbar ist, lies `~/dev/k-playbook/commands/_details/k-status.md` direkt und pruefe die dort beschriebenen Statuspunkte.
+2. Pruefe, ob `~/dev/k-playbook/bin/k-playbook-installer` und `~/dev/k-playbook/commands/k-gui.md` existieren.
+3. Pruefe, ob OpenCode `k-gui` registriert hat und ob `skills.paths` `~/dev/k-playbook` enthaelt. Wenn nicht, fuehre zuerst Prompt `01-host-opencode-registrieren.md` aus.
+4. Stelle sicher, dass das Projekt ueber die Installer-GUI eingebunden ist; dort werden `K-PLAYBOOK.yaml` und die projektlokale Struktur angelegt bzw. vervollstaendigt.
+5. Frage, ob CodeQL lokal oder fuer GitHub registriert werden soll. Nur bei Zustimmung `/k-setup-codeql` und danach bei Bedarf `/k-install-codeql` nutzen. `/k-install-codeql` nicht aus einem aktiven Projekt-venv starten.
+6. Frage, ob Dependabot eingerichtet oder geprueft werden soll. Nur bei Zustimmung entsprechende projektlokale Schritte ausfuehren; nichts automatisch an GitHub-/Dependabot-Konfiguration aendern.
+7. Fuehre am Ende `/k-status` aus oder starte `k-playbook-installer status`, wenn der Slash-Command nicht nutzbar ist.
 
 Berichte am Ende knapp:
 

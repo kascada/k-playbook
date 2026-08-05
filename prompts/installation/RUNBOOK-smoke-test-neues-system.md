@@ -80,9 +80,9 @@ Pfad:
 Pruefen:
 
 ```bash
-test -f "/tmp/opencode/k-playbook-install-smoke/host-home/dev/k-playbook/commands/k-install.md"
-test -L "/tmp/opencode/k-playbook-install-smoke/host-home/.config/opencode/command/k-install.md"
-test -L "/tmp/opencode/k-playbook-install-smoke/host-home/.config/opencode/commands/k-install.md"
+test -f "/tmp/opencode/k-playbook-install-smoke/host-home/dev/k-playbook/commands/k-gui.md"
+test -L "/tmp/opencode/k-playbook-install-smoke/host-home/.config/opencode/command/k-gui.md"
+test -L "/tmp/opencode/k-playbook-install-smoke/host-home/.config/opencode/commands/k-gui.md"
 grep -q "~/dev/k-playbook" "/tmp/opencode/k-playbook-install-smoke/host-home/.config/opencode/opencode.jsonc"
 ```
 
@@ -116,7 +116,7 @@ docker run --rm \
   -v "/tmp/opencode/k-playbook-install-smoke/host-home/dev/k-playbook:/workspaces/k-playbook" \
   -v "/tmp/opencode/k-playbook-install-smoke/host-home/dev/example-python-project:/workspaces/example-python-project" \
   mcr.microsoft.com/devcontainers/python:3.12 \
-  bash -lc 'bash /workspaces/example-python-project/.devcontainer/setup-k-playbook.sh && test -f /workspaces/k-playbook/commands/k-install.md && test -L /home/vscode/dev/k-playbook && test "$(readlink /home/vscode/dev/k-playbook)" = "/workspaces/k-playbook" && test -L /home/vscode/.config/opencode/command/k-install.md && test -L /home/vscode/.config/opencode/command/k-status.md && test -L /home/vscode/.config/opencode/commands/k-install.md && test -L /home/vscode/.config/opencode/commands/k-status.md && test -f /home/vscode/.config/opencode/opencode.jsonc && grep -q "~/dev/k-playbook" /home/vscode/.config/opencode/opencode.jsonc'
+  bash -lc 'bash /workspaces/example-python-project/.devcontainer/setup-k-playbook.sh && test -f /workspaces/k-playbook/commands/k-gui.md && test -L /home/vscode/dev/k-playbook && test "$(readlink /home/vscode/dev/k-playbook)" = "/workspaces/k-playbook" && test -L /home/vscode/.config/opencode/command/k-gui.md && test -L /home/vscode/.config/opencode/command/k-status.md && test -L /home/vscode/.config/opencode/commands/k-gui.md && test -L /home/vscode/.config/opencode/commands/k-status.md && test -f /home/vscode/.config/opencode/opencode.jsonc && grep -q "~/dev/k-playbook" /home/vscode/.config/opencode/opencode.jsonc'
 ```
 
 Erwartung: Der Befehl beendet sich mit Exit-Code `0`.
