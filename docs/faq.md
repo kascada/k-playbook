@@ -9,7 +9,7 @@
 - wenn OpenCode-Symlinks oder `skills.paths` auf diesem Host geprueft oder repariert werden sollen.
 - wenn ein Zielprojekt `K-PLAYBOOK.yaml` oder die dort konfigurierte `paths.*`-Struktur braucht.
 
-Die GUI ersetzt den alten Normalablauf aus `/k-install` und `/k-setup`.
+Die GUI ist der normale Ablauf fuer Host-Registrierung und Projekt-Onboarding.
 
 Wenn du nur pruefen willst, ob die OpenCode-Symlinks und `skills.paths` stimmen, nutze `/k-status`. Der Command ist read-only und empfiehlt `/k-gui`, wenn die host-lokale Registrierung repariert werden muss.
 
@@ -24,13 +24,13 @@ Der Effekt bleibt in beiden Faellen host-global:
 - OpenCode-Command-Symlinks werden aktualisiert.
 - `skills.paths` wird geprueft oder ergaenzt.
 - optional wird der Security-Tool-Preflight gezeigt.
-- Projektdateien werden nicht geaendert.
+- Projektdateien werden nur geaendert, wenn du in der GUI eine Projekt-Onboarding- oder Reparaturaktion bestaetigst.
 
 Wenn der k-playbook-Klon woanders liegt, soll er nach `~/dev/k-playbook` verschoben/geklont werden. Wenn du das nicht willst, kann die GUI einen Symlink nach `~/dev/k-playbook` anlegen.
 
 ## Warum ist `~/dev/k-playbook` fest?
 
-Damit Projektdateien, OpenCode-Config, Host und Devcontainer denselben logischen Pfad nutzen. Das echte Repo darf physisch woanders liegen, aber jede Umgebung muss `~/dev/k-playbook` bereitstellen.
+Damit Projektdateien, OpenCode-Config, Host und DevContainer denselben logischen Pfad nutzen. Das echte Repo darf physisch woanders liegen, aber jede Umgebung muss `~/dev/k-playbook` bereitstellen.
 
 Host-Beispiel:
 
@@ -39,7 +39,7 @@ mkdir -p ~/dev
 ln -sfn /anderer/pfad/k-playbook ~/dev/k-playbook
 ```
 
-Devcontainer-Beispiel:
+DevContainer-Beispiel:
 
 ```bash
 mkdir -p /home/vscode/dev
@@ -77,7 +77,7 @@ Python-CLI-Tools gehoeren in `pipx` oder in ein dediziertes k-playbook Tool-venv
 
 ## Wann rufe ich `/k-install-security-tools` auf?
 
-Nach `/k-install`, wenn Pflicht-Tools fehlen:
+Wenn die Installer-GUI oder `/k-status` fehlende Pflicht-Tools meldet:
 
 ```text
 /k-install-security-tools --install missing
