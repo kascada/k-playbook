@@ -2,7 +2,7 @@
 
 Du arbeitest auf dem Host, nicht im DevContainer.
 
-Lies zuerst `~/dev/k-playbook/docs/multi-project-installation.md`, insbesondere Abschnitt `3B. Projekt mit DevContainer einrichten`.
+Lies zuerst `~/dev/k-playbook/docs/installation.md`, insbesondere Abschnitt `DevContainer-Pfadvertrag`.
 
 Frage den User, in welchem Zielprojekt der DevContainer fuer k-playbook vorbereitet werden soll. Akzeptiere einen absoluten Pfad oder einen Pfad relativ zum aktuellen Arbeitsverzeichnis.
 

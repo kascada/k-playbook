@@ -6,7 +6,7 @@ Prompts sind fuer Situationen gedacht, in denen k-playbook noch nicht voll regis
 
 ## Installation
 
-Die vereinfachte Multi-Project-Installation ist in [`../docs/multi-project-installation.md`](../docs/multi-project-installation.md) beschrieben.
+Die Installation ist in [`../docs/installation.md`](../docs/installation.md) und im [`Handbuch`](../docs/handbuch.md#installation-und-projekt-onboarding) beschrieben.
 
 Prompts in empfohlener Reihenfolge:
 

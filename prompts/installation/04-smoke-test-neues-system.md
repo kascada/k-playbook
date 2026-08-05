@@ -57,12 +57,13 @@ Wenn `opencode run` sinnvoll verfuegbar ist, nutze:
 HOME="${HOST_HOME}" opencode run --dir "${HOST_HOME}/dev/k-playbook" --file "${HOST_HOME}/dev/k-playbook/prompts/installation/01-host-opencode-registrieren.md" "Fuehre den angehaengten Installations-Prompt als Smoke-Test aus. Security-Tool-Downloads duerfen fuer diesen Smoke-Test uebersprungen werden."
 ```
 
-Wenn `opencode run` nicht verfuegbar oder fuer den Test zu interaktiv ist, lies `commands/k-install.md` und fuehre die dort beschriebenen Bootstrap-Schritte deterministisch mit `HOME=${HOST_HOME}` aus.
+Wenn `opencode run` nicht verfuegbar oder fuer den Test zu interaktiv ist, fuehre die deterministischen Registrierungspruefungen mit `HOME=${HOST_HOME}` aus: Installer-Launcher vorhanden, Command-Symlinks angelegt, `skills.paths` gesetzt.
 
 Pruefe danach mindestens:
 
-- `${HOST_HOME}/dev/k-playbook/commands/k-install.md` existiert.
-- `${HOST_HOME}/.config/opencode/command/k-install.md` existiert und zeigt auf `${HOST_HOME}/dev/k-playbook/commands/k-install.md`.
+- `${HOST_HOME}/dev/k-playbook/bin/k-playbook-installer` existiert.
+- `${HOST_HOME}/dev/k-playbook/commands/k-gui.md` existiert.
+- `${HOST_HOME}/.config/opencode/command/k-gui.md` existiert und zeigt auf `${HOST_HOME}/dev/k-playbook/commands/k-gui.md` oder einen plausibel aufgeloesten Symlink.
 - `${HOST_HOME}/.config/opencode/opencode.jsonc` oder `.json` enthaelt `skills.paths` mit `~/dev/k-playbook` oder dem Testpfad.
 - Wenn Security-Tools uebersprungen wurden, ist das im Ergebnisbericht ausdruecklich dokumentiert.
 
@@ -108,7 +109,7 @@ docker run --rm \
   -v "${HOST_HOME}/dev/k-playbook:/workspaces/k-playbook" \
   -v "${DUMMY_PROJECT}:/workspaces/example-python-project" \
   mcr.microsoft.com/devcontainers/python:3.12 \
-  bash -lc 'bash /workspaces/example-python-project/.devcontainer/setup-k-playbook.sh && test -f /workspaces/k-playbook/commands/k-install.md && test -L /home/vscode/dev/k-playbook && test "$(readlink /home/vscode/dev/k-playbook)" = "/workspaces/k-playbook" && test -L /home/vscode/.config/opencode/command/k-install.md && test -L /home/vscode/.config/opencode/command/k-status.md && test -L /home/vscode/.config/opencode/commands/k-install.md && test -L /home/vscode/.config/opencode/commands/k-status.md && test -f /home/vscode/.config/opencode/opencode.jsonc && grep -q "~/dev/k-playbook" /home/vscode/.config/opencode/opencode.jsonc'
+  bash -lc 'bash /workspaces/example-python-project/.devcontainer/setup-k-playbook.sh && test -f /workspaces/k-playbook/commands/k-gui.md && test -L /home/vscode/dev/k-playbook && test "$(readlink /home/vscode/dev/k-playbook)" = "/workspaces/k-playbook" && test -L /home/vscode/.config/opencode/command/k-gui.md && test -L /home/vscode/.config/opencode/command/k-status.md && test -L /home/vscode/.config/opencode/commands/k-gui.md && test -L /home/vscode/.config/opencode/commands/k-status.md && test -f /home/vscode/.config/opencode/opencode.jsonc && grep -q "~/dev/k-playbook" /home/vscode/.config/opencode/opencode.jsonc'
 ```
 
 Fuer manuelles Debugging kannst du alternativ einen interaktiven Container starten mit:
@@ -135,10 +136,10 @@ bash /workspaces/example-python-project/.devcontainer/setup-k-playbook.sh
 
 Pruefe im Container:
 
-- `/workspaces/k-playbook/commands/k-install.md` existiert.
+- `/workspaces/k-playbook/commands/k-gui.md` existiert.
 - `/home/vscode/dev/k-playbook` zeigt auf `/workspaces/k-playbook`.
-- `/home/vscode/.config/opencode/command/k-install.md` und `/home/vscode/.config/opencode/command/k-status.md` existieren.
-- `/home/vscode/.config/opencode/commands/k-install.md` und `/home/vscode/.config/opencode/commands/k-status.md` existieren.
+- `/home/vscode/.config/opencode/command/k-gui.md` und `/home/vscode/.config/opencode/command/k-status.md` existieren.
+- `/home/vscode/.config/opencode/commands/k-gui.md` und `/home/vscode/.config/opencode/commands/k-status.md` existieren.
 - `/home/vscode/.config/opencode/opencode.jsonc` enthaelt `skills.paths` mit `~/dev/k-playbook`.
 
 ## Schritt 5 - Prompt 3 pruefen
@@ -151,8 +152,8 @@ opencode run --dir /workspaces/example-python-project --file /home/vscode/dev/k-
 
 Wenn `opencode` im Container nicht verfuegbar ist, pruefe die deterministischen Effekte aus Prompt 3 direkt:
 
-- Lies `/home/vscode/dev/k-playbook/commands/k-install.md` und pruefe, ob die Container-Registrierung bereits erfuellt ist.
-- Lies `/home/vscode/dev/k-playbook/commands/k-setup.md` und dokumentiere, ob ein echtes `/k-setup` ohne interaktive Entscheidungen sinnvoll ist. Fuer den Smoke-Test reicht es, wenn die Voraussetzungen fuer `/k-setup` stimmen.
+- Pruefe `/home/vscode/dev/k-playbook/commands/k-gui.md` und die OpenCode-Symlinks, um festzustellen, ob die Container-Registrierung bereits erfuellt ist.
+- Pruefe, ob das Zielprojekt ueber die Installer-GUI eingebunden werden kann oder bereits eine plausible `K-PLAYBOOK.yaml` besitzt.
 - Lies `/home/vscode/dev/k-playbook/commands/_details/k-status.md` und pruefe die dort relevanten Statuspunkte fuer `playbook`, `opencode` und `devcontainer`.
 
 ## Ergebnisbericht
