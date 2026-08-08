@@ -1,27 +1,34 @@
 # k-playbook Installation
 
-Die empfohlene automatische Installation steht im Root-[`README.md`](../README.md#installation). Fuer normale Nutzer ist das der einzige Installationsweg: Repo nach `~/dev/k-playbook` klonen, `make install` ausfuehren und die Installer-GUI starten.
+Der Installationsweg steht im Root-[`README.md`](../README.md#installation): Binary bauen, dann `k-playbook-installer init` im Zielprojekt.
 
-Diese Datei beschreibt die Details dahinter: Pfadvertrag, Source-Build fuer Entwickler, Launcher-/Binary-Struktur, DevContainer-Integration und Verifikation.
+Diese Datei beschreibt die Details dahinter: Uebergangsstand, Source-Build, Launcher-/Binary-Struktur, DevContainer-Integration und Verifikation.
 
 Primaerumgebung ist OpenCode. Claude Code kann optional fuer Slash-Commands angebunden werden.
 
 ## Status: Umstellung auf projektlokale Installation
 
-k-playbook wird auf ein Modell umgestellt, bei dem die Installation in ein Unterverzeichnis
-des Zielprojekts geschrieben wird (`<projekt>/k-playbook/_dist/`) statt in eine zentrale
-Basisinstallation unter `~/dev/k-playbook`. Der Pfadvertrag entfaellt damit ersatzlos.
+k-playbook wird in ein Unterverzeichnis des Zielprojekts installiert
+(`<projekt>/k-playbook/_dist/`) statt in eine zentrale Basisinstallation unter
+`~/dev/k-playbook`. Der Pfadvertrag ist damit entfallen.
 
-Was bereits gilt:
+Fertig und in Benutzung:
 
-- Der Konfigurationskontrakt `schema_version: 2` in [`k-playbook-format.md`](./k-playbook-format.md).
-- Die Aufloesungsregeln in `commands/_shared/path-resolution.md` und `commands/_shared/overlay-resolution.md`.
+- Konfigurationskontrakt `schema_version: 2`, siehe [`k-playbook-format.md`](./k-playbook-format.md).
+- Aufloesung in `commands/_shared/path-resolution.md` und `commands/_shared/overlay-resolution.md`.
+- Alle Commands, Skills, Review-Rezepte und `k-check`.
+- Die Installer-Kommandozeile: `init`, `update`, `restore`, `migrate`, `status`, `version`.
+  Die Payload steckt per `go:embed` im Binary.
 
-Was noch nicht umgesetzt ist:
+Noch offen:
 
-- Der Installer schreibt weiterhin das alte Modell. Alles unterhalb dieses Abschnitts
-  beschreibt diesen noch aktiven Stand und bleibt bis zum Installer-Umbau gueltig.
-- `k-playbook-installer init`, `update`, `restore` und `migrate` existieren noch nicht.
+- Die Browser-GUI bildet weiterhin das alte zentrale Modell ab. Sie laeuft, verweigert aber
+  jede schreibende Aktion auf einem Projekt mit `schema_version: 2`, damit sie eine
+  Migration nicht rueckgaengig macht.
+- Die DevContainer-Integration setzt noch auf den Bind-Mount des Basis-Repos.
+- `prompts/installation/` beschreibt noch das alte Verfahren.
+
+Alles unterhalb dieses Abschnitts beschreibt diesen noch nicht umgebauten Rest.
 
 ## Pfadvertrag (ausserlaufend)
 

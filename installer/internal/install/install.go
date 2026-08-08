@@ -194,6 +194,15 @@ func Restore(playbookDir string) (Result, error) {
 		return result, err
 	}
 
+	// Git does not track empty directories, so a clone is missing every artifact
+	// directory that happened to be empty at commit time. Recreating them is part
+	// of restoring a usable project, not an extra.
+	created, err := ensureStructure(playbookDir)
+	if err != nil {
+		return result, err
+	}
+	result.Created = created
+
 	projectRoot := filepath.Dir(playbookDir)
 	if config.RepoRoot != "" {
 		projectRoot = filepath.Clean(filepath.Join(playbookDir, config.RepoRoot))
