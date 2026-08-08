@@ -32,39 +32,36 @@ If `$ARGUMENTS` is anything else, print the supported modes and stop without run
 
 ## Step 1 - Target
 
-Determine `TARGET_DIR` with `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`:
+Discover `PLAYBOOK_DIR` and `DIST_DIR` with `<DIST_DIR>/commands/_shared/path-resolution.md`:
 
-- For the current argument set, modes are not target paths; use `TARGET_DIR = realpath(CWD)`.
-- Apply the fixed-layout guard from the shared module: if `TARGET_DIR` has no `K-PLAYBOOK.yaml`, but its parent has one and `TARGET_DIR` is named `k-playbook`, correct `TARGET_DIR` to the parent project root and show this correction in the compact report.
-- If `<TARGET_DIR>/K-PLAYBOOK.yaml` is still missing after that correction, abort and tell the user to run `/k-gui`.
+- For the current argument set, modes are not target paths; run discovery from `realpath(CWD)`.
+- If discovery finds no `K-PLAYBOOK.yaml`, report the directory as not a k-playbook project and stop.
+- If the config is `schema_version: 1`, report it as pre-migration and recommend `k-playbook-installer migrate`.
+- If `DIST_DIR` is missing, report the installation as incomplete and recommend `k-playbook-installer restore`. This is the expected state right after a `git clone`, because `_dist/` is gitignored.
 
 ## Step 2 - Resolve Installer Binary
 
-Resolve `INSTALLER_BIN` before running status. Try these candidates in order and use the first executable file:
+The installer is a host-wide binary, not part of the project-local installation under `_dist/`. Resolve `INSTALLER_BIN` before running status; take the first executable candidate:
 
-- `~/dev/k-playbook/bin/k-playbook-installer`.
-- `/workspaces/k-playbook/bin/k-playbook-installer`.
 - `k-playbook-installer` from `PATH`.
 - `~/.local/bin/k-playbook-installer`.
 
-Do not build the binary from `/k-status`. In particular, do not run `make build`, `go build`, or `go run` from this command. If no candidate is executable, report the binary as unavailable and recommend one of these explicit setup actions:
+Do not build the binary from `/k-status`. In particular, do not run `make build`, `go build`, or `go run` from this command. If no candidate is executable, report the binary as unavailable and tell the user to install it once per host.
 
-- On a normal host: `make install` or `make install-from-source` in `~/dev/k-playbook`.
-- For local developer testing: `make build` in `~/dev/k-playbook`, then re-run `/k-status`.
-- In a DevContainer: ensure `/workspaces/k-playbook/bin/k-playbook-installer` exists via the mounted repo or run `make install` in `~/dev/k-playbook`.
+The binary being unavailable does not make the project unusable: commands, rules, reviews, and checks all live under `_dist/` and work without it. Report it as a warning, not a failure.
 
 ## Step 3 - Binary Status
 
-Run the installer status command from `TARGET_DIR`:
+Run the installer status command from `PROJECT_REPO_ROOT_DIR`:
 
 ```bash
 "<INSTALLER_BIN>" status
 ```
 
-If the shell cannot reliably run with `TARGET_DIR` as working directory, use:
+If the shell cannot reliably run with `PROJECT_REPO_ROOT_DIR` as working directory, use:
 
 ```bash
-"<INSTALLER_BIN>" status "<TARGET_DIR>"
+"<INSTALLER_BIN>" status "<PROJECT_REPO_ROOT_DIR>"
 ```
 
 Expected JSON shape:
@@ -139,7 +136,7 @@ In `json` mode, print the `"<INSTALLER_BIN>" status` JSON unchanged. Do not prep
 In `full` mode:
 
 - Print the compact report.
-- If `<TARGET_DIR>/K-PLAYBOOK.yaml` exists, read and print it under a separate `K-PLAYBOOK.yaml` heading.
+- Read `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` and print it under a separate `K-PLAYBOOK.yaml` heading.
 - Do not print large generated files, diffs, logs, task contents, review contents, or docs contents.
 
 ## Strict Mode

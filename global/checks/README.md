@@ -1,23 +1,29 @@
-# Global Checks
+# Checks
 
-`global/bin/k-check` fuehrt wiederverwendbare Checks aus `global/checks/` und projektlokale Checks aus `k-playbook/checks/` aus, wenn das Verzeichnis existiert.
+`<DIST_DIR>/bin/k-check` fuehrt die effektive Check-Menge aus: mitgelieferte Checks aus
+`<DIST_DIR>/checks/` kombiniert mit projektlokalen Checks aus dem konfigurierten
+`paths.checks`. Die Kombination folgt `commands/_shared/overlay-resolution.md`:
+ein gleichnamiger lokaler Check ersetzt den mitgelieferten, und `overlay.checks.disabled`
+schaltet mitgelieferte Checks ab.
+
+Jeder Check wird mit seiner Herkunft ausgewiesen: `dist`, `local` oder `override`.
 
 Der Runner trennt zwei Roots:
 
-- `--config-root`: Root mit `K-PLAYBOOK.yaml`; darunter wird die feste lokale k-playbook-Struktur erwartet.
-- `--target-root`: Codebaum, der gescannt wird; relativ zu `--config-root`, wenn nicht absolut.
+- `--config-root`: das k-playbook-Verzeichnis mit `K-PLAYBOOK.yaml`, also `<projekt>/k-playbook`.
+- `--target-root`: Codebaum, der gescannt wird. Default ist `project.repo_root` aus der Config, normalerweise das Projektverzeichnis ueber dem k-playbook-Verzeichnis.
 
 ## Aufruf
 
 ```bash
-~/dev/k-playbook/global/bin/k-check --mode changed
-~/dev/k-playbook/global/bin/k-check --mode baseline
-~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --mode changed
-~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --target-root app --mode baseline
-~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
+<DIST_DIR>/bin/k-check --mode changed
+<DIST_DIR>/bin/k-check --mode baseline
+<DIST_DIR>/bin/k-check --config-root /path/to/project --mode changed
+<DIST_DIR>/bin/k-check --config-root /path/to/project --target-root app --mode baseline
+<DIST_DIR>/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/reviews/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.yaml` gelesen; lokale Checks liegen fest unter `k-playbook/checks/`. Der Target-Root ist standardmaessig identisch mit dem Config-Root. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
+Der Config-Root ist standardmaessig das aktuelle Arbeitsverzeichnis. Dort wird `K-PLAYBOOK.yaml` gelesen; der Ort lokaler Checks kommt aus `paths.checks` und wird nicht geraten. Der Target-Root ergibt sich aus `project.repo_root`. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
 
 `--output <file>` schreibt die vollstaendige Runner-Ausgabe zusaetzlich zu stdout/stderr in eine Raw-Datei. `--metadata-output <file>` schreibt Run-Metadaten als JSON, inklusive Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfuegbar. Beide Optionen verweigern vorhandene Ziel-Dateien, damit auditierbare Artefakte nicht still ueberschrieben werden. Fuer Review-Laeufe gehoeren diese Artefakte unter `<reviews>/results/k-check/YYYY-MM-DD/`.
 
@@ -56,7 +62,8 @@ Checks bekommen diese Umgebungsvariablen:
 - `K_CHECK_PROJECT_ROOT` — Kompatibilitaets-Alias fuer `K_CHECK_TARGET_ROOT`.
 - `K_CHECK_MODE` — `changed` oder `baseline`.
 - `K_CHECK_FILES_FROM` — newline-separierte Dateiliste im Target-Root.
-- `K_PLAYBOOK_REPO` — globales k-playbook-Repo.
+- `K_PLAYBOOK_DIST` — mitgelieferte Installation (`_dist`).
+- `K_PLAYBOOK_DIR` — k-playbook-Verzeichnis des Projekts (Ort der `K-PLAYBOOK.yaml`).
 
 ## Modi
 
@@ -74,13 +81,13 @@ Ist der Target-Root kein Git-Repo, scannt der globale Runner keine nested Repos 
 
 ## Global vs. Lokal
 
-Globale Checks muessen wiederverwendbar bleiben. Projektlokale Checks gehoeren in `<projekt>/k-playbook/checks` und werden genutzt, wenn das Verzeichnis existiert.
+Mitgelieferte Checks muessen wiederverwendbar bleiben. Projektlokale Checks gehoeren in das konfigurierte `paths.checks` und werden per Overlay dazugenommen.
 
 Domain-spezifische Begriffe, Modellnamen und Runtime-Dateien gehoeren nicht in globale Checks. Solche Regeln bleiben projektlokal; Test-Fixtures duerfen Domain-Begriffe nur als explizite Negativbeispiele markieren.
 
 ## Keine Scanner-Result-Familien
 
-`global/checks/*.sh` ist nicht der Ort fuer schwere Security-Scanner wie `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft` oder `grype` und auch nicht fuer GitHub-Alert-Imports wie Dependabot Alerts.
+`<DIST_DIR>/checks/*.sh` ist nicht der Ort fuer schwere Security-Scanner wie `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft` oder `grype` und auch nicht fuer GitHub-Alert-Imports wie Dependabot Alerts.
 
 Diese Tools liefern strukturierte Rohdaten und brauchen Review-Bewertung, Deduplizierung, stabile Finding-IDs und Artefakte unter `reviews/results/<family>/YYYY-MM-DD/`. Sie werden ueber globale Report-Mode Reviews gestartet:
 
@@ -89,4 +96,4 @@ Diese Tools liefern strukturierte Rohdaten und brauchen Review-Bewertung, Dedupl
 - `/k-review dependabot-alerts`
 - `/k-review iac-container`
 
-Zulaessig in `global/checks/*.sh` sind hoechstens leichte Preflight-Heuristiken, z. B. ob relevante Manifestdateien existieren oder ob ein Tool installiert ist. Der eigentliche Scan gehoert in die passende Review-Familie.
+Zulaessig in `<DIST_DIR>/checks/*.sh` sind hoechstens leichte Preflight-Heuristiken, z. B. ob relevante Manifestdateien existieren oder ob ein Tool installiert ist. Der eigentliche Scan gehoert in die passende Review-Familie.

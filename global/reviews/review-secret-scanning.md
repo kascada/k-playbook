@@ -21,10 +21,10 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 
 ## Voraussetzungen
 
-- Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Lies `<PLAYBOOK_REPO>/global/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `gitleaks` und `trufflehog`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
+- Lies `<DIST_DIR>/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `gitleaks` und `trufflehog`.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
+- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `gitleaks version` und `trufflehog --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -57,9 +57,9 @@ Frage vor Tool-Ausfuehrung, was passieren soll:
 Typische Befehle nach Bestaetigung:
 
 ```bash
-gitleaks git --report-format json --report-path <result>/raw/gitleaks-git.json <TARGET_DIR>
-gitleaks dir --report-format json --report-path <result>/raw/gitleaks-dir.json <TARGET_DIR>
-trufflehog git file://<TARGET_DIR> --json > <result>/raw/trufflehog.json
+gitleaks git --report-format json --report-path <result>/raw/gitleaks-git.json <PROJECT_REPO_ROOT_DIR>
+gitleaks dir --report-format json --report-path <result>/raw/gitleaks-dir.json <PROJECT_REPO_ROOT_DIR>
+trufflehog git file://<PROJECT_REPO_ROOT_DIR> --json > <result>/raw/trufflehog.json
 ```
 
 Exit-Codes von Secret-Scannern koennen Findings signalisieren. Ein non-zero Exit-Code ist nicht automatisch ein technischer Fehler; Bewertung anhand Rohdaten und Tool-Doku vornehmen.

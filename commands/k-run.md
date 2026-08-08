@@ -9,15 +9,15 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 Execute task files. If `$ARGUMENTS` is empty, use the directory configured as `paths.tasks`.
 
-`/k-run` does not guess project paths. If `K-PLAYBOOK.yaml` is missing, run `/k-gui` first. If `paths.tasks` is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
+`/k-run` does not guess project paths. If discovery finds no `K-PLAYBOOK.yaml`, run `k-playbook-installer init` first. If `paths.tasks` is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
 
 ## Step 1 - Resolve project config, target path and collect tasks
 
-Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the execution target. This is a preflight even for explicit file/directory arguments, so task execution can resolve `## Ausführungskontext` paths relative to the project root and respect `K-PLAYBOOK.yaml`.
+Always read and apply `<DIST_DIR>/commands/_shared/path-resolution.md` before choosing the execution target. This is a preflight even for explicit file/directory arguments, so task execution can resolve `## Ausführungskontext` paths relative to the project root and respect `K-PLAYBOOK.yaml`.
 
 For this command, resolve the configured `tasks` path:
 
-- `RESOLVED_TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
+- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
 - `TASKS_DISPLAY_PATH = <paths.tasks>`.
 
 Command-specific policy:
@@ -26,10 +26,10 @@ Command-specific policy:
   - If it is a single `.md` file: use that file as a one-item list.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`. Do not allow one-off runs without project config.
+  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`. Do not allow one-off runs without project config.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-  - If `paths.tasks` is missing: ask for the project-relative tasks directory, recommend `k-playbook/tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+  - If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
   - If the YAML-configured tasks path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path. Do not create it from `/k-run`; there are no tasks to execute.
   - If the YAML-configured tasks path exists: use it as the execution target.
 
@@ -116,7 +116,7 @@ If the task contains a `## Ausführungskontext` section, parse these fields when
 
 Also keep these parsed values for the success path. If `PR required` is true, the command must either open a PR after the local commit exists or report the exact missing step that prevents PR creation.
 
-Resolve `Target repo` relative to `TARGET_DIR` unless it is absolute. If no `Target repo` is present, use the current project root as execution root.
+Resolve `Target repo` relative to `PROJECT_REPO_ROOT_DIR` unless it is absolute. If no `Target repo` is present, use the current project root as execution root.
 
 Before delegating to a sub-agent, perform the branch preflight in the execution root:
 

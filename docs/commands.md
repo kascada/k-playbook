@@ -104,16 +104,16 @@ k-playbook-installer smoke [path]
 k-playbook-installer smoke --all
 ```
 
-## global/bin/k-check
+## k-check
 
-`global/bin/k-check` ist kein Slash-Command, sondern ein wiederverwendbarer CLI-Entry-Point fuer globale und projektlokale Checks.
+`<DIST_DIR>/bin/k-check` ist kein Slash-Command, sondern ein CLI-Entry-Point fuer die effektive Check-Menge aus mitgelieferten und projektlokalen Checks.
 
 Typische Nutzung aus einem Projekt-Root:
 
 ```bash
-~/dev/k-playbook/global/bin/k-check --mode changed
-~/dev/k-playbook/global/bin/k-check --mode baseline
-~/dev/k-playbook/global/bin/k-check --config-root /path/to/project --mode changed
+<DIST_DIR>/bin/k-check --mode changed
+<DIST_DIR>/bin/k-check --mode baseline
+<DIST_DIR>/bin/k-check --config-root /path/to/project --mode changed
 ```
 
 Der Runner liest `K-PLAYBOOK.yaml`, fuehrt `.sh`-Checks aus `global/checks/` und projektlokale `.sh`-Checks aus `k-playbook/checks/` aus. Die stabile Check-Schnittstelle ist `.sh`; einzelne Checks duerfen Python oder andere Tools intern verwenden, muessen aber am Ende genau eine Statuszeile `K_CHECK_STATUS=ok|skip|fail` und optional `K_CHECK_REASON=<text>` schreiben.

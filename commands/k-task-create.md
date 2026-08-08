@@ -13,17 +13,17 @@ Create a new task file based on what was discussed in the current conversation.
 
 ## Step 1 — Resolve task directory
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve the configured `tasks` path:
 
-- `RESOLVED_TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
+- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
 - `TASKS_DISPLAY_PATH = <paths.tasks>`.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.tasks` is missing: ask for the project-relative tasks directory, recommend `k-playbook/tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+- If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If the YAML-configured tasks path does not exist: ask whether to create that exact directory now or run `/k-gui`; do not use any fallback path.
 
 Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH`.

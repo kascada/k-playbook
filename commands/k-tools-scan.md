@@ -20,17 +20,17 @@ Produces:
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve the configured `docs` path:
 
-- `RESOLVED_DOCS_DIR = <TARGET_DIR>/<paths.docs>`.
+- `RESOLVED_DOCS_DIR = <PLAYBOOK_DIR>/<paths.docs>`.
 - `DOCS_DISPLAY_PATH = <paths.docs>`.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.docs` is missing: ask for the project-relative docs directory, recommend `k-playbook/docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+- If `paths.docs` is missing: ask for the docs directory relative to `PLAYBOOK_DIR`, recommend `docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If the YAML-configured docs path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path.
 - Use `RESOLVED_DOCS_DIR` for all reads and writes.
 

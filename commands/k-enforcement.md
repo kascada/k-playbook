@@ -1,5 +1,5 @@
 ---
-description: Load global and project-local enforcement rules, check the current work or target path against them, and report whether required follow-ups such as docs sync are done. Defaults to the current directory, or uses [target-dir] if given.
+description: Load the effective enforcement rules (shipped plus project-local, via overlay), check the current work or target path against them, and report whether required follow-ups such as docs sync are done. Defaults to the current directory, or uses [target-dir] if given.
 argument-hint: [target-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -11,67 +11,59 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; if it is missing, run `/k-gui`. Project-local rules are read from `paths.enforcement`; docs checks use `paths.docs`.
+`/k-enforcement` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; if it is missing, run `k-playbook-installer init`. Project-local rules are read from `paths.enforcement`; docs checks use `paths.docs`.
 
 ## Step 1 — Resolve target and paths
 
-Determine `TARGET_DIR`:
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
-- If `$ARGUMENTS` is set: treat it as the target directory, resolve with `realpath`, and abort if it does not exist.
-- If `$ARGUMENTS` is empty: `TARGET_DIR = realpath(CWD)`.
-
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+- If `$ARGUMENTS` is set, pass it as the explicit directory argument to discovery.
+- If `$ARGUMENTS` is empty, discovery starts at the current working directory.
 
 For this command, resolve configured blocks from `K-PLAYBOOK.yaml`:
 
-- `enforcement` -> `PROJECT_ENFORCEMENT_DIR = <TARGET_DIR>/<paths.enforcement>`.
-- `docs` -> `DOCS_DIR = <TARGET_DIR>/<paths.docs>`.
+- `enforcement` -> `RESOLVED_ENFORCEMENT_DIR = <PLAYBOOK_DIR>/<paths.enforcement>`.
+- `docs` -> `DOCS_DIR = <PLAYBOOK_DIR>/<paths.docs>`.
 
-Also set:
-
-- `GLOBAL_ENFORCEMENT_DIR` = `<PLAYBOOK_REPO>/global/rules/`
-- If `DOCS_DIR` is missing: warn for docs-sync checks, but do not default to any other docs path.
+The rules are checked against `PROJECT_REPO_ROOT_DIR`, not against `PLAYBOOK_DIR`.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.enforcement` or `paths.docs` is missing: ask for the project-relative path, recommend the conventional value from the shared module, add it to `K-PLAYBOOK.yaml`, then continue.
-- If `PROJECT_ENFORCEMENT_DIR` is missing: warn and continue with global rules only.
+- If `paths.enforcement` or `paths.docs` is missing: ask for the path relative to `PLAYBOOK_DIR`, recommend the conventional value from the shared module, add it to `K-PLAYBOOK.yaml`, then continue.
+- If `RESOLVED_ENFORCEMENT_DIR` is missing: warn and continue with the shipped rules only.
 - If `DOCS_DIR` is missing: warn for docs-sync checks, but do not invent a default docs path.
-- If `GLOBAL_ENFORCEMENT_DIR` is missing: abort, because the global rule source cannot be found.
 
 ## Step 2 — Load rule files
 
-Collect Markdown files:
+Read and apply `<DIST_DIR>/commands/_shared/overlay-resolution.md` for kind `rules`.
 
-- Global: `GLOBAL_ENFORCEMENT_DIR/*.md`
-- Project-local: `PROJECT_ENFORCEMENT_DIR/*.md`, if set and exists
+That module combines the shipped catalog `<DIST_DIR>/rules/` with
+`RESOLVED_ENFORCEMENT_DIR` and honours `overlay.rules.disabled`. Do not implement a
+separate merge here, and do not de-duplicate by path — the overlay key is the
+filename without extension, which already resolves collisions.
 
-Sort each group by filename. Project-local rules do not replace global rules unless a project rule explicitly says so.
+A project-local rule **replaces** the shipped rule with the same key; the shipped
+file is then not read at all. This is the supported way to deviate, because
+`<DIST_DIR>` is read-only and replaced on every update.
 
-De-duplicate rule files by canonical path (`realpath`):
-
-- Load global files first.
-- Then load project-local files only if their canonical path was not already loaded.
-- If `GLOBAL_ENFORCEMENT_DIR` and `PROJECT_ENFORCEMENT_DIR` resolve to the same directory, report project-local as `identisch mit global` and count each rule once.
-- If two different filenames point to the same file via symlink, count it once and mention the skipped duplicate in the startup summary.
-
-If no rule files are found: report this and stop.
+Load the effective set sorted by key. If it is empty, report this and stop; do not
+fall back to the shipped catalog.
 
 Print a compact startup summary:
 
 ```text
 Enforcement-Check
 ─────────────────────────────
-Ziel:       <TARGET_DIR>
-Global:     <N> Regeln aus <GLOBAL_ENFORCEMENT_DIR>
-Projekt:    <M> Regeln aus <PROJECT_ENFORCEMENT_DIR> | identisch mit global | —
+Ziel:       <PROJECT_REPO_ROOT_DIR>
+Regeln:     <N> aktiv  (<A> dist, <B> local, <C> override)
+Abgeschaltet: <D> via overlay.rules.disabled | —
+Projekt:    <ENFORCEMENT_DISPLAY_PATH> | fehlt
 Docs:       <DOCS_DISPLAY_PATH> | fehlt
 ```
 
 ## Step 3 — Determine current change scope
 
-If `TARGET_DIR` is a git repo or inside a git worktree:
+If `PROJECT_REPO_ROOT_DIR` is a git repo or inside a git worktree:
 
 1. Inspect `git status --short`.
 2. Inspect the current diff for tracked files (`git diff`) and staged files (`git diff --cached`) if present.
@@ -120,12 +112,12 @@ Output:
 ```text
 Enforcement
 ─────────────────────────────
-Regeln geladen:  <N global>, <M projektlokal>
+Regeln geladen:  <N> aktiv (<A> dist, <B> local, <C> override, <D> abgeschaltet)
 Geprüfter Scope: <files/dirs or "kein Diff">
 Relevant:        <rule filenames>
 
 Ergebnis:
-- <rule>: ok | offen | unklar | verletzt
+- <rule> [dist|local|override]: ok | offen | unklar | verletzt
 
 Docs-Sync:       angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Thema>) | unklar
 ```

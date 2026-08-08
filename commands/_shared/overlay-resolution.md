@@ -16,7 +16,7 @@ This module requires `PLAYBOOK_DIR`, `DIST_DIR`, and the relevant resolved path 
 |---|---|---|---|---|
 | `rules` | `<DIST_DIR>/rules/` | `RESOLVED_ENFORCEMENT_DIR` (`paths.enforcement`) | `overlay.rules.disabled` | `*.md` |
 | `reviews` | `<DIST_DIR>/reviews/` | `RESOLVED_REVIEWS_DIR` (`paths.reviews`) | `overlay.reviews.disabled` | `review-*.md` |
-| `checks` | `<DIST_DIR>/checks/` | `RESOLVED_CHECKS_DIR` (`paths.checks`) | `overlay.checks.disabled` | `check_*.sh` |
+| `checks` | `<DIST_DIR>/checks/` | `RESOLVED_CHECKS_DIR` (`paths.checks`) | `overlay.checks.disabled` | `*.sh` (top level only) |
 
 Note the asymmetry: the project-local directory for `rules` is `paths.enforcement`,
 not `paths.rules`. That name is historical and stays.
@@ -30,7 +30,7 @@ the same key are the same logical entry, regardless of which directory they came
 - `reviews`: filename without `.md` and without the leading `review-`.
   `review-codeql-security.md` -> `codeql-security`
 - `checks`: filename without the `.sh` extension. `check_no_obvious_secrets.sh` ->
-  `check_no_obvious_secrets`
+  `check_no_obvious_secrets`. The runner `<DIST_DIR>/bin/k-check` implements exactly this.
 
 Keys are compared case-sensitively.
 

@@ -8,17 +8,17 @@ Ein Review-Rezept beschreibt nur die reviewspezifischen Kriterien. Der generisch
 
 Globale Review-Rezepte liegen unter:
 
-`<PLAYBOOK_REPO>/global/reviews/`
+`<DIST_DIR>/reviews/`
 
 Projektlokale Review-Rezepte liegen unter dem in `K-PLAYBOOK.yaml` gesetzten `paths.reviews`, konventionell:
 
-`<TARGET_DIR>/k-playbook/reviews/`
+`<PLAYBOOK_DIR>/<paths.reviews>/`
 
 Review-Ergebnisse liegen unterhalb von `paths.reviews`, nicht unter `paths.checks`. `checks` ist fuer ausfuehrbare Pruefroutinen, Check-Skripte und Regeln reserviert.
 
 Konvention fuer Report-/Scan-Familien:
 
-`<TARGET_DIR>/<paths.reviews>/results/<scan-family>/YYYY-MM-DD/`
+`<PLAYBOOK_DIR>/<paths.reviews>/results/<scan-family>/YYYY-MM-DD/`
 
 Typische Dateien darin:
 

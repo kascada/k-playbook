@@ -35,12 +35,12 @@ Wenn der Block fehlt, stoppe und bitte darum, `/k-gui` zu nutzen bzw. dort die R
 
 ## Schritt 1 — Pfade aus K-PLAYBOOK.yaml auflösen
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve configured blocks from `K-PLAYBOOK.yaml`:
 
-- `reviews` -> `PROJECT_REVIEWS_DIR = <TARGET_DIR>/<paths.reviews>`.
-- `tasks` -> `TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
+- `reviews` -> `PROJECT_REVIEWS_DIR = <PLAYBOOK_DIR>/<paths.reviews>`.
+- `tasks` -> `TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
 
 Daraus abgeleitet:
 
@@ -52,11 +52,11 @@ Daraus abgeleitet:
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
 - Wenn `paths.reviews` oder `paths.tasks` fehlen: nachfragen, in `K-PLAYBOOK.yaml` ergaenzen und erneut aufloesen.
 - Wenn ein YAML-konfigurierter Pfad nicht existiert: fragen, ob genau dieser Pfad angelegt werden soll, oder `/k-gui` nennen. Keinen anderen Pfad verwenden.
 - Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, muessen Remediation-Schritte als Tasks/Buendel geplant werden. Direkte Code-Aenderungen sind nur erlaubt, wenn `direct_fixes: true` und der User den konkreten Fix nach Code-Sichtung bestaetigt.
-- Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `TARGET_DIR`.
+- Wenn `target:` gesetzt ist, muss der Pfad existieren. Code-Verifikation und Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf `PROJECT_REPO_ROOT_DIR`.
 - Wenn `mode: task-branch-pr` gilt und `target:` ein Git-Repo ist, pruefe vor Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine Branch-/Task-Policy raten: User informieren und bestaetigen lassen, ob Tasks trotzdem erzeugt werden sollen. `/k-remediation` wechselt selbst keinen Branch fuer spaetere Umsetzung; es schreibt den erforderlichen Ausfuehrungskontext in die Task-Dateien.
 
 ---
@@ -518,6 +518,6 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 ## Fehlerfälle
 
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<PROJECT_REVIEWS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
-- **`K-PLAYBOOK.yaml` fehlt**: abbrechen und `/k-gui` aufrufen lassen.
+- **`K-PLAYBOOK.yaml` nicht gefunden**: abbrechen und `k-playbook-installer init` empfehlen.
 - **`paths.reviews` oder `paths.tasks` fehlen**: User nach dem projektrelativen Pfad fragen, Empfehlung aus dem Shared-Modul anbieten, Wert in `K-PLAYBOOK.yaml` ergaenzen, dann erneut aufloesen.
 - **YAML-konfigurierte Reviews- oder Tasks-Pfade fehlen im Dateisystem**: User fragen, ob genau diese Pfade angelegt werden sollen oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.
