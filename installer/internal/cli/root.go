@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kascada/k-playbook/installer/internal/pathcontract"
 	"github.com/kascada/k-playbook/installer/internal/projects"
 	"github.com/kascada/k-playbook/installer/internal/store"
 	"github.com/kascada/k-playbook/installer/internal/ui"
@@ -32,29 +31,25 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 
+	rootCmd.AddCommand(newInitCommand())
+	rootCmd.AddCommand(newUpdateCommand())
+	rootCmd.AddCommand(newRestoreCommand())
+	rootCmd.AddCommand(newMigrateCommand())
 	rootCmd.AddCommand(newStatusCommand())
 	rootCmd.AddCommand(newSmokeCommand())
 	rootCmd.AddCommand(newGUICommand())
 	rootCmd.AddCommand(newProjectsCommand())
+	rootCmd.AddCommand(newVersionCommand())
 
 	return rootCmd
 }
 
 func newStatusCommand() *cobra.Command {
-	fix := false
-	pathContract := false
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "status [path]",
 		Short: "Gibt den read-only Projektstatus als JSON aus",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if fix && len(args) == 1 {
-				return fmt.Errorf("--fix kann nur ohne Projektpfad verwendet werden")
-			}
-			if fix || pathContract {
-				return runPathContractStatus(fix)
-			}
-
 			projectPath := "."
 			if len(args) == 1 {
 				projectPath = args[0]
@@ -62,10 +57,6 @@ func newStatusCommand() *cobra.Command {
 			return writeProjectStatusJSON(projectPath)
 		},
 	}
-	cmd.Flags().BoolVar(&fix, "fix", false, "legt den Symlink an, wenn ~/dev/k-playbook fehlt und das aktuelle Repo sicher erkannt wurde")
-	cmd.Flags().BoolVar(&pathContract, "path-contract", false, "prueft nur den ~/dev/k-playbook Pfadvertrag")
-
-	return cmd
 }
 
 func newSmokeCommand() *cobra.Command {
@@ -120,9 +111,6 @@ func newProjectsCommand() *cobra.Command {
 		Use:   "scan",
 		Short: "Sucht Projektkandidaten unter ~/dev und zeigt sie an",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := requirePathContract(); err != nil {
-				return err
-			}
 			candidates, err := projects.ScanDefaultDev()
 			if err != nil {
 				return err
@@ -193,10 +181,6 @@ func newProjectsCommand() *cobra.Command {
 }
 
 func listProjects() error {
-	if err := requirePathContract(); err != nil {
-		return err
-	}
-
 	file, err := store.LoadProjects()
 	if err != nil {
 		return err
@@ -234,42 +218,6 @@ func writeAllSmokeJSON() error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(projects.SmokeAll(file))
-}
-
-func runPathContractStatus(fix bool) error {
-	result, err := pathcontract.Check()
-	if err != nil {
-		return err
-	}
-
-	if fix && !result.OK {
-		if err := pathcontract.Repair(result); err != nil {
-			return err
-		}
-		result, err = pathcontract.Check()
-		if err != nil {
-			return err
-		}
-	}
-
-	fmt.Print(ui.RenderPathStatus(result, false))
-	if !result.OK {
-		return fmt.Errorf("Pfadvertrag nicht erfuellt: %s", result.Code)
-	}
-
-	return nil
-}
-
-func requirePathContract() error {
-	result, err := pathcontract.Check()
-	if err != nil {
-		return err
-	}
-	if !result.OK {
-		return fmt.Errorf("Pfadvertrag nicht erfuellt: %s", result.Code)
-	}
-
-	return nil
 }
 
 func isValidEnvironment(value string) bool {
