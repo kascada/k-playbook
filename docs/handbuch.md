@@ -6,6 +6,8 @@ Dieses Handbuch ist die kompakte Orientierung fuer k-playbook. Detailablaeufe st
 
 `k-playbook` ist ein zentraler Werkzeugkasten fuer AI-Assistant-Arbeit in mehreren Entwicklungsprojekten. Die Basisinstallation liegt einmal unter `~/dev/k-playbook`; Zielprojekte enthalten nur ihre eigene Konfiguration und Artefakte.
 
+> **Hinweis:** Dieses Modell wird auf eine projektlokale Installation umgestellt. Kuenftig traegt jedes Projekt seine eigene Installation unter `<projekt>/k-playbook/_dist/`; der Pfad `~/dev/k-playbook` entfaellt. Der neue Konfigurationskontrakt steht in [`k-playbook-format.md`](./k-playbook-format.md) (`schema_version: 2`), der Uebergangsstand in [`installation.md`](./installation.md#status-umstellung-auf-projektlokale-installation). Bis der Installer umgebaut ist, beschreibt dieses Handbuch den weiterhin aktiven Stand.
+
 Das Ziel ist kontrollierte, nachvollziehbare und wiederholbare Assistant-Arbeit:
 
 - Host-Installation und Projekt-Setup sauber trennen.

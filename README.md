@@ -1,8 +1,12 @@
 # k-playbook
 
-`k-playbook` ist ein zentraler Werkzeugkasten fuer mehrere Zielprojekte gleichzeitig. Statt Slash-Commands, Skills, Review-Rezepte, Regeln und Checks in jedes Projekt zu kopieren, liegt die Basisinstallation einmal unter `~/dev/k-playbook` und wird per Git aktualisiert. Jedes Zielprojekt bekommt nur seine eigene lokale Konfiguration und Artefakte wie `K-PLAYBOOK.yaml`, Tasks, Reviews und Docs. Das macht Updates, einheitliche Review-Flows und DevContainer-Nutzung ueber mehrere Projekte hinweg deutlich wartbarer.
+`k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts installiert, konventionell `<projekt>/k-playbook/`. Dort liegt die mitgelieferte Installation unter `_dist/`, daneben die projekteigenen Artefakte: `K-PLAYBOOK.yaml`, Tasks, Reviews, Ergebnisse und Docs. Ein Projekt ist damit selbstgenuegsam.
 
-## Installation
+> **Umstellung laeuft.** Das Zielmodell ist die projektlokale Installation; der Kontrakt dafuer steht in [`docs/k-playbook-format.md`](./docs/k-playbook-format.md) (`schema_version: 2`).
+> Der Installer setzt derzeit noch das alte Modell mit zentraler Basisinstallation unter `~/dev/k-playbook` um. Bis er umgebaut ist, gelten die Installationsanweisungen unten unveraendert.
+> Bestehende Projekte mit `schema_version: 1` werden spaeter per `k-playbook-installer migrate` umgestellt.
+
+## Installation (aktueller Stand)
 
 Repo an den Standardpfad klonen:
 
@@ -89,8 +93,9 @@ Die Integration richtet die GUI pro Zielprojekt ein. Details stehen in [`docs/in
 
 ## Grundprinzipien
 
-- Eine zentrale Basisinstallation bedient viele Zielprojekte.
-- Projektlokale Anpassungen bleiben im Zielprojekt, nicht im globalen Repo.
+- Jedes Projekt traegt seine eigene Installation in einem Unterverzeichnis. Kein fester Hostpfad, kein globaler Symlink.
+- Installation und Projekt-Eigentum sind strikt getrennt: `_dist/` wird bei jedem Update vollstaendig ersetzt, alles daneben nie angefasst.
+- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt, `overlay.<kind>.disabled` schaltet ab.
 - Pfade werden aus `K-PLAYBOOK.yaml` gelesen und nicht geraten.
 - Docs, Tasks, Reviews und Results bleiben projektlokale Artefakte.
-- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs.
+- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalitaet.

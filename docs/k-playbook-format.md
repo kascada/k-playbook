@@ -1,27 +1,70 @@
 # K-PLAYBOOK.yaml Format
 
 `K-PLAYBOOK.yaml` ist die projektlokale Maschinen-Konfiguration fuer k-playbook.
-Sie liegt im k-playbook-Projektordner und ersetzt die bisherige Markdown-Konfiguration.
+Sie liegt im k-playbook-Verzeichnis des Projekts, konventionell `<projekt>/k-playbook/`.
 
 ## Grundentscheidung
 
-Die Datei enthaelt die projektlokalen Pfade fuer Tasks, Reviews, Checks, Docs,
-Enforcement und weitere k-playbook-Artefakte.
+k-playbook wird in ein Unterverzeichnis des Zielprojekts installiert. Es gibt keine
+zentrale Basisinstallation und keinen festen Hostpfad mehr. Ein Projekt ist damit
+selbstgenuegsam: Commands, Regeln, Reviews und Checks liegen im Projekt selbst.
 
-Stattdessen gilt:
+Innerhalb des k-playbook-Verzeichnisses gilt eine harte Trennung:
 
-- Das k-playbook-Projektverzeichnis ist das Verzeichnis, in dem `K-PLAYBOOK.yaml` liegt.
-- Der eigentliche Code-/Repo-Root steht in `project.repo_root`, relativ zum
-  k-playbook-Projektverzeichnis.
-- Projektlokale Artefaktpfade stehen unter `paths.*` und sind ebenfalls relativ
-  zum k-playbook-Projektverzeichnis.
+- **Installation** liegt ausschliesslich unter `_dist/`. Sie wird mitgeliefert, ist
+  read-only und wird bei jedem Update **vollstaendig ersetzt**. Nichts darin darf
+  von Hand editiert werden.
+- **Projekt-Eigentum** ist alles andere: `K-PLAYBOOK.yaml`, Tasks, Reviews,
+  Ergebnisse, Docs, eigene Regeln, eigene Checks, eigene Commands. Ein Update
+  fasst diese Dateien nie an.
+
+Daraus folgt:
+
+- Das k-playbook-Verzeichnis ist das Verzeichnis, in dem `K-PLAYBOOK.yaml` liegt.
+- Projektlokale Artefaktpfade stehen unter `paths.*`, relativ zu diesem Verzeichnis.
+- Der eigentliche Code-/Repo-Root steht in `project.repo_root`, ebenfalls relativ
+  zu diesem Verzeichnis, und liegt normalerweise darueber (`..`).
 - Commands duerfen Pfade nicht raten. Fehlt ein benoetigter `paths.*`-Eintrag,
   muss der Command nachfragen und den bestaetigten Wert in `K-PLAYBOOK.yaml`
   ergaenzen.
-- Die Config speichert ausserdem Setup-Metadaten, Projekt-Policies und Tool-Entscheidungen.
+- Die Config speichert ausserdem Setup-Metadaten, Projekt-Policies, die
+  Overlay-Entscheidungen und Tool-Entscheidungen.
 
-Damit bleiben Pfade konsistent und explizit, Tools koennen die Datei direkt parsen,
-und Commands muessen keine Layouts aus dem Dateisystem erraten.
+## Verzeichnislayout
+
+```text
+mein-projekt/
+├── .claude/
+│   ├── commands -> ../k-playbook/_dist/commands
+│   └── skills   -> ../k-playbook/_dist/skills
+├── .gitignore                     enthaelt: k-playbook/_dist/
+├── k-playbook/
+│   ├── K-PLAYBOOK.yaml            Projekt
+│   ├── _dist/                     Installation, gitignored, read-only
+│   │   ├── VERSION
+│   │   ├── commands/
+│   │   ├── skills/
+│   │   ├── rules/
+│   │   ├── reviews/
+│   │   ├── checks/
+│   │   ├── scripts/
+│   │   ├── security-tools.tsv
+│   │   └── bin/k-check
+│   ├── commands/                  Projekt: eigene Commands
+│   ├── tasks/                     Projekt
+│   │   └── done/
+│   ├── reviews/                   Projekt: Logs, Decisions, Results, eigene Rezepte
+│   ├── checks/                    Projekt: eigene Checks
+│   ├── enforcement/               Projekt: eigene Regeln, Overrides
+│   ├── guidelines/                Projekt
+│   ├── docs/                      Projekt
+│   └── TODO.md                    Projekt
+└── src/
+```
+
+`_dist/` steht in der `.gitignore` des Zielprojekts. Nach einem `git clone` fehlt es
+und wird mit `k-playbook-installer restore` aus der in `k_playbook.version`
+gespeicherten Version wiederhergestellt.
 
 ## Projektlokale Pfade
 
@@ -29,50 +72,62 @@ Commands lesen diese Pfade aus `K-PLAYBOOK.yaml`:
 
 | Zweck | YAML-Key | Konventioneller Wert |
 |---|---|---|
-| Playbook-Basis | `paths.playbook` | `k-playbook` |
-| Tasks | `paths.tasks` | `k-playbook/tasks` |
-| erledigte Tasks | `paths.completed_tasks` | `k-playbook/tasks/done` |
-| TODO | `paths.todo` | `k-playbook/TODO.md` |
-| Checks | `paths.checks` | `k-playbook/checks` |
-| Reviews | `paths.reviews` | `k-playbook/reviews` |
-| Guidelines | `paths.guidelines` | `k-playbook/guidelines` |
-| Enforcement-Regeln | `paths.enforcement` | `k-playbook/enforcement` |
-| Docs | `paths.docs` | `k-playbook/docs` |
+| Tasks | `paths.tasks` | `tasks` |
+| erledigte Tasks | `paths.completed_tasks` | `tasks/done` |
+| TODO | `paths.todo` | `TODO.md` |
+| Checks | `paths.checks` | `checks` |
+| Reviews | `paths.reviews` | `reviews` |
+| Guidelines | `paths.guidelines` | `guidelines` |
+| Enforcement-Regeln | `paths.enforcement` | `enforcement` |
+| Docs | `paths.docs` | `docs` |
+| eigene Commands | `paths.commands` | `commands` |
 
 Alle Werte muessen relativ sein, duerfen nicht mit `/` beginnen und duerfen nicht
-aus dem Projektverzeichnis herausfuehren. Die konventionellen Werte sind die
+aus dem k-playbook-Verzeichnis herausfuehren. Die konventionellen Werte sind die
 empfohlenen Defaults fuer GUI und Reparaturfragen, aber keine stillen Fallbacks.
+
+Ein `paths.*`-Wert darf nicht auf `_dist` oder ein Unterverzeichnis davon zeigen.
+Installation und Projekt-Eigentum duerfen sich nicht ueberlappen.
 
 ## Minimalformat
 
 Dieses Minimalformat ist die kleinste gueltige `K-PLAYBOOK.yaml`. Der Installer
-legt genau diese Datei an, wenn ein Projekt neu eingebunden wird und die Datei
-noch fehlt.
+legt genau diese Datei an, wenn ein Projekt neu eingebunden wird.
 
 ```yaml
-schema_version: 1
-layout: fixed-project-k-playbook
+schema_version: 2
+layout: project-local
 
 k_playbook:
-  repo: ~/dev/k-playbook
+  dist: _dist
+  version: 0.4.0
+  installed_at: 2026-08-08
 
 paths:
-  playbook: k-playbook
-  tasks: k-playbook/tasks
-  completed_tasks: k-playbook/tasks/done
-  todo: k-playbook/TODO.md
-  checks: k-playbook/checks
-  reviews: k-playbook/reviews
-  guidelines: k-playbook/guidelines
-  enforcement: k-playbook/enforcement
-  docs: k-playbook/docs
+  tasks: tasks
+  completed_tasks: tasks/done
+  todo: TODO.md
+  checks: checks
+  reviews: reviews
+  guidelines: guidelines
+  enforcement: enforcement
+  docs: docs
+  commands: commands
 
 project:
-  repo_root: .
+  repo_root: ..
   vcs: git
 
+overlay:
+  rules:
+    disabled: []
+  reviews:
+    disabled: []
+  checks:
+    disabled: []
+
 setup:
-  updated_at: 2026-07-30
+  updated_at: 2026-08-08
 
 remediation:
   mode: direct-allowed
@@ -84,36 +139,44 @@ remediation:
   direct_fixes: true
 ```
 
-`k_playbook.repo` ist der feste logische Rueckverweis auf das globale Basis-Repo.
-Der Wert ist nicht projektweise frei waehlbar. Wenn der physische Klon woanders
-liegt, muss `~/dev/k-playbook` ein Symlink auf den echten Klon sein.
-
 ## Vollstaendiges Beispiel
 
 ```yaml
-schema_version: 1
-layout: fixed-project-k-playbook
+schema_version: 2
+layout: project-local
 
 k_playbook:
-  repo: ~/dev/k-playbook
+  dist: _dist
+  version: 0.4.0
+  installed_at: 2026-08-08
 
 paths:
-  playbook: k-playbook
-  tasks: k-playbook/tasks
-  completed_tasks: k-playbook/tasks/done
-  todo: k-playbook/TODO.md
-  checks: k-playbook/checks
-  reviews: k-playbook/reviews
-  guidelines: k-playbook/guidelines
-  enforcement: k-playbook/enforcement
-  docs: k-playbook/docs
+  tasks: tasks
+  completed_tasks: tasks/done
+  todo: TODO.md
+  checks: checks
+  reviews: reviews
+  guidelines: guidelines
+  enforcement: enforcement
+  docs: docs
+  commands: commands
 
 project:
-  repo_root: ./app
+  repo_root: ../app
   vcs: git
 
+overlay:
+  rules:
+    disabled:
+      - tool-install-scope
+  reviews:
+    disabled: []
+  checks:
+    disabled:
+      - check_django_baseline
+
 setup:
-  updated_at: 2026-07-30
+  updated_at: 2026-08-08
 
 remediation:
   mode: task-branch-pr
@@ -143,22 +206,37 @@ tools:
 
 ### `schema_version`
 
-Pflichtfeld. Aktuelle Version: `1`.
+Pflichtfeld. Aktuelle Version: `2`.
+
+Version `1` beschreibt das alte Modell mit zentraler Basisinstallation unter
+`~/dev/k-playbook`. Dateien mit `schema_version: 1` muessen mit
+`k-playbook-installer migrate` umgestellt werden; siehe [Migration](#migration-von-schema_version-1).
 
 ### `layout`
 
-Pflichtfeld. Aktueller Wert: `fixed-project-k-playbook`.
+Pflichtfeld. Aktueller Wert: `project-local`.
 
-Dieser Wert bestaetigt das k-playbook-Projektmodell. Projektlokale Pfade stehen
-trotzdem explizit unter `paths.*`; alte Dateien mit diesem Layout ohne `paths.*`
-muessen beim naechsten GUI-/Command-Lauf um die benoetigten Keys ergaenzt werden.
+Der Wert bestaetigt, dass k-playbook in einem Unterverzeichnis des Projekts
+installiert ist. Der Vorgaengerwert `fixed-project-k-playbook` gehoert zu
+`schema_version: 1` und ist nicht mehr gueltig.
 
-### `k_playbook.repo`
+### `k_playbook`
 
-Pflichtfeld. Erwarteter Wert: `~/dev/k-playbook`.
+Pflichtblock. Beschreibt die Installation.
 
-Der Wert dient als sichtbarer Rueckverweis fuer globale Commands, Skills, Regeln,
-Reviews, Checks und Skripte. Er ist ein Pfadvertrag, keine Projektoption.
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `dist` | string | Verzeichnisname der Installation, relativ zum k-playbook-Verzeichnis. Konventionell `_dist`. |
+| `version` | string | Version des installierten Werkzeugs. Quelle fuer `restore` nach einem `git clone`. |
+| `installed_at` | string | ISO-Datum `YYYY-MM-DD` des letzten `init`/`update`/`restore`. |
+
+`dist` ist konfigurierbar, damit ein Projekt bei einem Namenskonflikt ausweichen
+kann. Der Wert muss ein einzelnes Verzeichnissegment sein, darf nicht `.` oder `..`
+enthalten und darf mit keinem `paths.*`-Wert kollidieren.
+
+`version` ist Projekt-Eigentum und wird committet. Sie ist die einzige Information,
+die nach `git clone` noch verfuegbar ist, um die passende Installation
+wiederherzustellen.
 
 ### `paths`
 
@@ -167,30 +245,33 @@ jeweils benoetigten Keys, duerfen fehlende Keys aber nicht selbst erraten.
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
-| `playbook` | string | Basisverzeichnis fuer projektlokale k-playbook-Artefakte |
 | `tasks` | string | Task-Dateien fuer `/k-task-create`, `/k-run`, `/k-review-loop` |
 | `completed_tasks` | string | Ablage fuer erledigte Tasks |
 | `todo` | string | Projekt-TODO-Datei |
-| `checks` | string | Projektlokale Checks |
-| `reviews` | string | Projektlokale Review-Rezepte, Logs, Decisions und Results |
+| `checks` | string | Projektlokale Checks; Overlay ueber `_dist/checks` |
+| `reviews` | string | Projektlokale Review-Rezepte, Logs, Decisions und Results; Overlay ueber `_dist/reviews` |
 | `guidelines` | string | Projektlokale Guidelines |
-| `enforcement` | string | Projektlokale Enforcement-Regeln |
+| `enforcement` | string | Projektlokale Enforcement-Regeln; Overlay ueber `_dist/rules` |
 | `docs` | string | Projektlokale Docs fuer Docs-First-AI-Sessions |
+| `commands` | string | Projekteigene Slash-Commands; gewinnen bei Namensgleichheit gegen `_dist/commands` |
 
 Wenn ein Command einen benoetigten Key nicht findet, muss er den Nutzer nach dem
-projektrelativen Pfad fragen, den Wert validieren und `K-PLAYBOOK.yaml` ergaenzen.
-Er darf nicht still `k-playbook/...` verwenden, nur weil dieses Verzeichnis existiert.
+Pfad relativ zum k-playbook-Verzeichnis fragen, den Wert validieren und
+`K-PLAYBOOK.yaml` ergaenzen. Er darf keinen Wert aus dem Dateisystem raten.
 
 ### `project.repo_root`
 
-Pflichtfeld. Relativer Pfad vom Verzeichnis der `K-PLAYBOOK.yaml` zum tatsaechlichen
+Pflichtfeld. Relativer Pfad vom k-playbook-Verzeichnis zum tatsaechlichen
 Code-/Repo-Root.
 
 Typische Werte:
 
-- `.` fuer normale Projekte, bei denen `K-PLAYBOOK.yaml` im Git-/Code-Root liegt.
-- `./app` fuer Wrapper-/DevContainer-Projekte, bei denen der eigentliche Code in
+- `..` fuer normale Projekte, bei denen `k-playbook/` direkt im Git-/Code-Root liegt.
+- `../app` fuer Wrapper-/DevContainer-Projekte, bei denen der eigentliche Code in
   einem Unterverzeichnis liegt.
+
+Dies ist der einzige Pfad, der das k-playbook-Verzeichnis verlassen darf und muss.
+Er muss innerhalb des Git-Worktrees bleiben.
 
 Commands duerfen diesen Pfad aus der YAML lesen und validieren, aber nicht selbst
 Git-Roots suchen oder raten. Wenn `project.repo_root` leer, ungueltig oder fehlend
@@ -204,9 +285,39 @@ Pflichtfeld. Aktuelle Werte:
 - `none` fuer Projekte ohne Git. Das ist eine explizite Projektentscheidung und
   wird in der YAML gespeichert, statt in Commands geraten zu werden.
 
+### `overlay`
+
+Pflichtblock. Steuert, welche mitgelieferten Kataloge aktiv sind.
+
+`_dist/rules`, `_dist/reviews` und `_dist/checks` gelten grundsaetzlich. Ein Projekt
+kann davon auf zwei Wegen abweichen:
+
+1. **Ueberlagern**: Eine gleichnamige Datei im projektlokalen Verzeichnis ersetzt den
+   mitgelieferten Eintrag vollstaendig.
+2. **Abschalten**: Ein Eintrag in `overlay.<kind>.disabled` deaktiviert den
+   mitgelieferten Eintrag ersatzlos.
+
+| Feld | Typ | Basisverzeichnis | Projektverzeichnis |
+|---|---|---|---|
+| `overlay.rules.disabled` | list[string] | `_dist/rules` | `paths.enforcement` |
+| `overlay.reviews.disabled` | list[string] | `_dist/reviews` | `paths.reviews` |
+| `overlay.checks.disabled` | list[string] | `_dist/checks` | `paths.checks` |
+
+Die Listeneintraege sind Schluessel, keine Dateinamen: der Basisname ohne Endung,
+bei Reviews zusaetzlich ohne `review-`-Praefix. Also `tool-install-scope`, nicht
+`tool-install-scope.md`; `codeql-security`, nicht `review-codeql-security.md`.
+
+Ein Eintrag in `disabled`, der in `_dist` nicht existiert, ist kein Fehler, muss aber
+vom Command als veraltet gemeldet werden. Die Aufloesungsregel im Detail steht in
+`_dist/commands/_shared/overlay-resolution.md`.
+
+Projektlokale Dateien werden von `disabled` nicht betroffen. Wer eine eigene Regel
+nicht laden will, loescht sie.
+
 ### `setup.updated_at`
 
-Pflichtfeld. ISO-Datum `YYYY-MM-DD`, an dem die Installer-GUI oder ein dafuer zustaendiger Command die Datei zuletzt geschrieben oder aktualisiert hat.
+Pflichtfeld. ISO-Datum `YYYY-MM-DD`, an dem die Installer-GUI oder ein dafuer
+zustaendiger Command die Datei zuletzt geschrieben oder aktualisiert hat.
 
 ### `remediation`
 
@@ -220,7 +331,7 @@ Modus beim Einbinden auf `task-first` oder `task-branch-pr` gestellt werden.
 | Feld | Typ | Bedeutung |
 |---|---|---|
 | `mode` | enum | `task-branch-pr`, `task-first` oder `direct-allowed` |
-| `target` | string | optionaler Remediation-Override relativ zum Projektverzeichnis; Default ist `project.repo_root` |
+| `target` | string | optionaler Remediation-Override relativ zum k-playbook-Verzeichnis; Default ist `project.repo_root` |
 | `grouping` | boolean | Findings vor Umsetzung zu sinnvollen Buendeln gruppieren |
 | `quick_wins` | boolean | einfache, wirkungsstarke Buendel hervorheben |
 | `branch_prefix` | string | empfohlener Prefix fuer Remediation-Branches |
@@ -257,14 +368,39 @@ oder `planned` ist.
 
 ## Schreibregeln
 
-- Die Installer-GUI besitzt `schema_version`, `layout`, `k_playbook`, `project`, `setup`, `paths` und die Remediation-Policy.
-- Die Installer-GUI besitzt `project.repo_root` und `project.vcs`. Sie darf
-  Git-Kandidaten suchen oder den Nutzer fragen; andere Commands duerfen das nicht.
+- Der Installer besitzt `schema_version`, `layout`, `k_playbook`, `project`, `setup` und `paths`.
+- Der Installer besitzt `project.repo_root` und `project.vcs`. Er darf Git-Kandidaten
+  suchen oder den Nutzer fragen; andere Commands duerfen das nicht.
+- Der Installer besitzt die Remediation-Policy beim Einbinden; spaeter darf
+  `/k-remediation` sie nach Rueckfrage aendern.
 - `/k-setup-codeql` besitzt nur `tools.codeql`.
+- `overlay.*.disabled` gehoert dem Nutzer. Commands duerfen Eintraege vorschlagen und
+  nach ausdruecklicher Bestaetigung schreiben, aber nie still.
 - Commands duerfen unbekannte Top-Level-Felder erhalten, aber nicht ungefragt aendern.
 - Commands duerfen benoetigte fehlende `paths.*`-Keys nach Rueckfrage ergaenzen.
 - Commands duerfen projektlokale Pfade nicht aus dem Dateisystem oder historischen Defaults raten.
 - Host-lokale Installationszustaende duerfen nicht in `K-PLAYBOOK.yaml` geschrieben werden.
+- Nichts unterhalb von `k_playbook.dist` darf geschrieben werden. Das gilt auch fuer
+  Commands, die dort Regeln oder Rezepte lesen.
+
+## Migration von `schema_version: 1`
+
+Ausgefuehrt durch `k-playbook-installer migrate <pfad>`:
+
+1. `<root>/K-PLAYBOOK.yaml` nach `<root>/k-playbook/K-PLAYBOOK.yaml` verschieben.
+2. In allen `paths.*`-Werten das Praefix `k-playbook/` entfernen.
+3. `paths.playbook` loeschen. Das Verzeichnis der YAML ist die Playbook-Basis.
+4. `paths.commands` mit dem Default `commands` ergaenzen.
+5. `project.repo_root: .` nach `..` aendern; andere Werte `<w>` nach `../<w>`.
+6. `k_playbook.repo` entfernen; `k_playbook.dist`, `version` und `installed_at` setzen.
+7. `layout` auf `project-local`, `schema_version` auf `2` setzen.
+8. Leeren `overlay`-Block ergaenzen.
+9. `.gitignore` des Projekts um `k-playbook/_dist/` ergaenzen.
+
+Unbekannte Top-Level-Felder bleiben unveraendert erhalten.
+
+Die Migration ist rein mechanisch und aendert keine Projektinhalte. Tasks, Reviews,
+Ergebnisse und Docs liegen bereits unter `k-playbook/` und bleiben, wo sie sind.
 
 ## Dateiname
 

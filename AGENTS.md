@@ -4,13 +4,18 @@ Diese Datei wird von OpenCode als Projekt-Kontext geladen.
 
 ## Projektrolle
 
-Dieses Repo ist die globale k-playbook-Basisinstallation. Es enthaelt die wiederverwendbaren Commands, Skills, Playbooks, globalen Regeln, Reviews, Checks und Installationsskripte fuer Zielprojekte.
+Dieses Repo ist das Quell- und Entwickler-Repo fuer k-playbook. Es enthaelt zwei Dinge:
 
-Es ist selbst kein normales Zielprojekt mit projektlokaler `K-PLAYBOOK.yaml`-Konfiguration.
+- die **Payload**, die in Zielprojekte installiert wird: Commands, Skills, Regeln, Reviews, Checks, Skripte.
+- den **Installer**, der diese Payload in das Unterverzeichnis eines Zielprojekts schreibt.
+
+k-playbook wird pro Projekt in ein Unterverzeichnis installiert, konventionell `<projekt>/k-playbook/`. Die Payload landet dort unter `_dist/` und wird bei jedem Update vollstaendig ersetzt. Es gibt keine zentrale Basisinstallation und keinen festen Hostpfad mehr.
+
+Dieses Repo ist selbst kein Zielprojekt und hat keine eigene `K-PLAYBOOK.yaml`.
 
 ## Wichtige Memory-Regel
 
-Die k-playbook-Regeln gelten in diesem Repo nicht automatisch direkt als projektlokale Zielprojekt-Regeln. `global/rules/` ist hier Teil des Produkts bzw. der Basisinstallation.
+Die k-playbook-Regeln gelten in diesem Repo nicht automatisch als projektlokale Zielprojekt-Regeln. `global/rules/` ist hier Payload, nicht aktive Arbeitsregel.
 
 Wende Enforcement-Regeln in diesem Repo nur dann als aktive Arbeitsregel an, wenn der Nutzer das ausdruecklich verlangt, z. B. mit `/k-enforcement`, "Regeln beruecksichtigen" oder einem konkreten Review-/Check-Auftrag.
 

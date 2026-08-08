@@ -33,7 +33,9 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 ## Stichwort-Index
 
 - `AGENTS.md` -> [`ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
-- `Basisinstallation` / `Base-Repo` -> [`../AGENTS.md`](../AGENTS.md), [`handbuch.md`](./handbuch.md)
+- `Basisinstallation` / `Base-Repo` -> [`../AGENTS.md`](../AGENTS.md), [`handbuch.md`](./handbuch.md); wird durch die projektlokale Installation abgeloest
+- `_dist` / `projektlokale Installation` / `Payload` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#status-umstellung-auf-projektlokale-installation)
+- `Overlay` / `overlay.disabled` / `Regel ueberlagern` -> [`k-playbook-format.md`](./k-playbook-format.md#overlay), [`../commands/_shared/overlay-resolution.md`](../commands/_shared/overlay-resolution.md)
 - `CodeQL` -> [`commands.md`](./commands.md), [`../global/rules/codeql.md`](../global/rules/codeql.md)
 - `Commands` -> [`handbuch.md`](./handbuch.md#wichtige-commands), [`commands.md`](./commands.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md), [`../ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)

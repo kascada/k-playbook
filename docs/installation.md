@@ -6,7 +6,24 @@ Diese Datei beschreibt die Details dahinter: Pfadvertrag, Source-Build fuer Entw
 
 Primaerumgebung ist OpenCode. Claude Code kann optional fuer Slash-Commands angebunden werden.
 
-## Pfadvertrag
+## Status: Umstellung auf projektlokale Installation
+
+k-playbook wird auf ein Modell umgestellt, bei dem die Installation in ein Unterverzeichnis
+des Zielprojekts geschrieben wird (`<projekt>/k-playbook/_dist/`) statt in eine zentrale
+Basisinstallation unter `~/dev/k-playbook`. Der Pfadvertrag entfaellt damit ersatzlos.
+
+Was bereits gilt:
+
+- Der Konfigurationskontrakt `schema_version: 2` in [`k-playbook-format.md`](./k-playbook-format.md).
+- Die Aufloesungsregeln in `commands/_shared/path-resolution.md` und `commands/_shared/overlay-resolution.md`.
+
+Was noch nicht umgesetzt ist:
+
+- Der Installer schreibt weiterhin das alte Modell. Alles unterhalb dieses Abschnitts
+  beschreibt diesen noch aktiven Stand und bleibt bis zum Installer-Umbau gueltig.
+- `k-playbook-installer init`, `update`, `restore` und `migrate` existieren noch nicht.
+
+## Pfadvertrag (ausserlaufend)
 
 Der logische k-playbook-Pfad ist fest:
 
@@ -225,12 +242,24 @@ Checkliste fuer einen Host:
 - [ ] `/k-status` zeigt `OpenCode: OK` oder empfiehlt `/k-gui` fuer fehlende/falsche Symlinks.
 - [ ] OpenCode wurde neu gestartet.
 
-Checkliste fuer ein Projekt:
+Checkliste fuer ein Projekt (`schema_version: 1`, aktuell):
 
 - [ ] `K-PLAYBOOK.yaml` existiert im Projekt-Root.
 - [ ] `layout: fixed-project-k-playbook` ist gesetzt.
 - [ ] `k_playbook.repo` zeigt auf `~/dev/k-playbook`.
 - [ ] Die benoetigten `paths.*`-Eintraege sind gesetzt und die konfigurierten Pfade existieren.
+- [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
+
+Checkliste fuer ein Projekt (`schema_version: 2`, nach dem Installer-Umbau):
+
+- [ ] `K-PLAYBOOK.yaml` existiert unter `<projekt>/k-playbook/`.
+- [ ] `layout: project-local` ist gesetzt.
+- [ ] `k_playbook.dist` zeigt auf ein existierendes Verzeichnis, konventionell `_dist`.
+- [ ] `k_playbook.version` ist gesetzt, damit `restore` nach einem `git clone` funktioniert.
+- [ ] `k-playbook/_dist/` steht in der `.gitignore` des Projekts und ist nicht eingecheckt.
+- [ ] `project.repo_root` zeigt aus dem k-playbook-Verzeichnis heraus, normalerweise `..`.
+- [ ] Kein `paths.*`-Wert zeigt in `_dist/` hinein.
+- [ ] `.claude/commands` und `.claude/skills` zeigen auf die Verzeichnisse unter `_dist/`.
 - [ ] `/k-status` zeigt keine unerwarteten `FAIL`-Eintraege.
 
 Checkliste fuer einen DevContainer:
