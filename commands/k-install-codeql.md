@@ -9,7 +9,7 @@ allowed-tools: [Read, Bash, Glob, Grep]
 
 Install and verify local CodeQL for a project.
 
-CodeQL-specific rules live in `<PLAYBOOK_REPO>/global/rules/codeql.md` and must be treated as authoritative for this command.
+CodeQL-specific rules live in `<DIST_DIR>/rules/codeql.md` and must be treated as authoritative for this command.
 
 This command is local-only. It does not configure GitHub CodeQL and does not edit `K-PLAYBOOK.yaml`; `/k-setup-codeql` owns the project-local `tools.codeql` decision.
 
@@ -17,24 +17,24 @@ Use `--cli-only` when the project uses GitHub CodeQL but still wants a local CLI
 
 It calls:
 
-`<PLAYBOOK_REPO>/scripts/install-codeql-local.sh`
+`<DIST_DIR>/scripts/install-codeql-local.sh`
 
 ## Step 1 — Target and playbook paths
 
-Determine mode and `TARGET_DIR` from the slash-command argument string:
+Determine mode and the CodeQL project from the slash-command argument string. Resolve `PLAYBOOK_DIR`, `DIST_DIR`, and `PROJECT_REPO_ROOT_DIR` with `<DIST_DIR>/commands/_shared/path-resolution.md`:
 
-- If the argument string is exactly `--cli-only`, set `CLI_ONLY=true` and `TARGET_DIR = realpath(CWD)`.
+- If the argument string is exactly `--cli-only`, set `CLI_ONLY=true` and run discovery from the current working directory.
 - If the argument string contains a target directory and `--cli-only` in a future extension, resolve the target directory and set `CLI_ONLY=true`.
 - Otherwise set `CLI_ONLY=false`.
 - If the argument string is a target directory without `--cli-only`: resolve it with `realpath`, and abort if it does not exist.
-- If the argument string is empty or exactly `--cli-only`: `TARGET_DIR = realpath(CWD)`.
-- Before using that value, apply the fixed-layout guard from `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`: if the selected directory is `<project>/k-playbook`, correct `TARGET_DIR` to the parent project root and show that correction in preflight.
+- If the argument string is empty or exactly `--cli-only`: run discovery from the current working directory.
+- Discovery handles the case where the working directory is the k-playbook directory itself; do not implement a separate guard.
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
-Derive `PLAYBOOK_BASE_DIR = <TARGET_DIR>/k-playbook` and `PLAYBOOK_BASE_DISPLAY_PATH = k-playbook`.
+Use `PLAYBOOK_DIR` as the k-playbook directory; its display path relative to the project root is `k-playbook`.
 
-Also parse optional `tools.codeql` metadata from `<TARGET_DIR>/K-PLAYBOOK.yaml` when present.
+Also parse optional `tools.codeql` metadata from `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` when present.
 
 Extract when present:
 
@@ -46,19 +46,19 @@ Extract when present:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing, stop and ask the user to run `/k-gui` and then `/k-setup-codeql`.
-- If `PLAYBOOK_BASE_DIR` is missing, stop and ask the user to run `/k-gui`. Do not create the playbook base from this command.
-- Offer `PLAYBOOK_BASE_DIR` as the default parent directory for local CodeQL artifacts.
+- If discovery finds no `K-PLAYBOOK.yaml`, stop and ask the user to run `k-playbook-installer init` and then `/k-setup-codeql`.
+- If `PLAYBOOK_DIR` is missing, discovery already failed; stop. Do not create the playbook directory from this command.
+- Offer `PLAYBOOK_DIR` as the default parent directory for local CodeQL artifacts.
 - If `tools.codeql.local_database.path` is set, offer the parent of that path as the default parent directory.
-- In `CLI_ONLY=true`, `languages` and `local_database.path` are not required. Use `PLAYBOOK_BASE_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
-- If `target` is present, use it as the default project path for full local database mode. If missing, default to `TARGET_DIR`. The resolved CodeQL project path must exist.
+- In `CLI_ONLY=true`, `languages` and `local_database.path` are not required. Use `PLAYBOOK_DIR` as the parent for local CodeQL artifacts; do not ask for a separate parent unless the user explicitly requests a non-standard location.
+- If `target` is present, use it as the default project path for full local database mode. If missing, default to `PROJECT_REPO_ROOT_DIR`. The resolved CodeQL project path must exist.
 
 ## Step 2 — Preflight
 
 Check:
 
 - Script exists and is executable or can be run with `bash`:
-  - `<PLAYBOOK_REPO>/scripts/install-codeql-local.sh`
+  - `<DIST_DIR>/scripts/install-codeql-local.sh`
 - Existing CodeQL CLI:
   - `codeql version`
 - Basic download/extract prerequisites:
@@ -80,7 +80,7 @@ Show a compact preflight summary:
 ```text
 /k-install-codeql — Preflight
 ─────────────────────────────
-Projekt:       <TARGET_DIR>
+Projekt:       <PROJECT_REPO_ROOT_DIR>
 CodeQL Target: <CODEQL_PROJECT_DIR>
 Script:        <path> ok | fehlt
 CodeQL CLI:    ok (<version>) | fehlt, wird lokal installiert
@@ -103,12 +103,12 @@ Ask in one bundled interaction:
       - `databases/`
       - `results/`
 
-In `CLI_ONLY=true`, use `PLAYBOOK_BASE_DIR` as `PARENT_DIR`. Ask only for confirmation to install/check the CLI there. The script will create or reuse only `codeql-cli/` and will not create `databases/` or `results/`.
+In `CLI_ONLY=true`, use `PLAYBOOK_DIR` as `PARENT_DIR`. Ask only for confirmation to install/check the CLI there. The script will create or reuse only `codeql-cli/` and will not create `databases/` or `results/`.
 
 For `CLI_ONLY=true`, show this command:
 
 ```bash
-bash "<PLAYBOOK_REPO>/scripts/install-codeql-local.sh" \
+bash "<DIST_DIR>/scripts/install-codeql-local.sh" \
   --parent "<PARENT_DIR>" \
   --cli-only
 ```
@@ -136,7 +136,7 @@ For full local database mode, continue with the remaining choices:
 Then show the exact command that will be executed:
 
 ```bash
-bash "<PLAYBOOK_REPO>/scripts/install-codeql-local.sh" \
+bash "<DIST_DIR>/scripts/install-codeql-local.sh" \
   --project "<CODEQL_PROJECT_DIR>" \
   --parent "<PARENT_DIR>" \
   --languages "<LANGUAGES>" \
@@ -184,7 +184,7 @@ Print:
 Lokales CodeQL installiert/geprüft
 ─────────────────────────────────
 CLI:        <path> (<version>)
-Projekt:    <TARGET_DIR>
+Projekt:    <PROJECT_REPO_ROOT_DIR>
 CodeQL:     <CODEQL_PROJECT_DIR>
 Parent:     <PARENT_DIR>
 Sprachen:   <languages>
@@ -202,7 +202,7 @@ For `CLI_ONLY=true`, print:
 Lokale CodeQL CLI installiert/geprüft
 ────────────────────────────────────
 CLI:      <path> (<version>)
-Projekt:  <TARGET_DIR>
+Projekt:  <PROJECT_REPO_ROOT_DIR>
 Parent:   <PARENT_DIR>
 
 Hinweis: Es wurden keine lokalen Datenbanken erzeugt und keine Analyse ausgeführt.

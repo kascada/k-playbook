@@ -21,10 +21,10 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 
 ## Voraussetzungen
 
-- Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Lies `<PLAYBOOK_REPO>/global/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `trivy`, `syft` und `grype`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
+- Lies `<DIST_DIR>/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `trivy`, `syft` und `grype`.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
+- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `trivy --version`, `syft --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -59,8 +59,8 @@ Frage vor Tool-Ausfuehrung, was passieren soll:
 Typische Befehle nach Bestaetigung:
 
 ```bash
-trivy fs --format json --output <result>/raw/trivy-fs.json <TARGET_DIR>
-trivy config --format json --output <result>/raw/trivy-config.json <TARGET_DIR>
+trivy fs --format json --output <result>/raw/trivy-fs.json <PROJECT_REPO_ROOT_DIR>
+trivy config --format json --output <result>/raw/trivy-config.json <PROJECT_REPO_ROOT_DIR>
 trivy image --format json --output <result>/raw/trivy-image-<name>.json <image-ref>
 syft <target> -o json > <result>/raw/syft-<target>.json
 grype <target> -o json > <result>/raw/grype-<target>.json

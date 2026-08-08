@@ -32,11 +32,11 @@ Review task/instruction files before execution using a structured two-agent dial
 
 ### Step 1 — Resolve project config and target path
 
-Always read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.yaml` and its current directory layout instead of silently using historical defaults.
+Always read and apply `<DIST_DIR>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.yaml` and its current directory layout instead of silently using historical defaults.
 
 For this command, resolve the configured `tasks` path:
 
-- `RESOLVED_TASKS_DIR = <TARGET_DIR>/<paths.tasks>`.
+- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
 - `TASKS_DISPLAY_PATH = <paths.tasks>`.
 
 Ignore other config sections such as `remediation`, `tools.codeql`, or future `tools.dependabot` for target selection; they are command-specific config for other commands.
@@ -47,11 +47,11 @@ Command-specific policy:
   - If it is a file: use that file.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`. Do not allow one-off reviews without project config.
+  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`. Do not allow one-off reviews without project config.
   - If `paths.tasks` is configured and exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-  - If `paths.tasks` is missing: ask for the project-relative tasks directory, recommend `k-playbook/tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+  - If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
   - If the YAML-configured tasks path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path.
   - If the YAML-configured tasks path exists: use it as the review target.
 

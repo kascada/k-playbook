@@ -15,11 +15,11 @@ Er darf nicht in einem aktiven Projekt-venv laufen. Wenn `VIRTUAL_ENV` gesetzt i
 
 Er nutzt:
 
-`<PLAYBOOK_REPO>/scripts/install-security-tools.sh`
+`<DIST_DIR>/scripts/install-security-tools.sh`
 
 Die kanonische Tool-Matrix liegt in:
 
-`<PLAYBOOK_REPO>/global/security-tools.tsv`
+`<DIST_DIR>/security-tools.tsv`
 
 ## Tool-Scope
 
@@ -32,17 +32,17 @@ Pflicht-Tools laut `global/security-tools.tsv`:
 - `syft` - SBOM-Erzeugung.
 - `grype` - SBOM-/Dependency-CVE-Auswertung.
 
-## Schritt 1 - Playbook-Repo bestimmen
+## Schritt 1 - Installation bestimmen
 
-Bestimme `PLAYBOOK_REPO` wie in `/k-install`:
+Bestimme `DIST_DIR` mit `<DIST_DIR>/commands/_shared/path-resolution.md`. Es wird
+per Discovery aus dem Arbeitsverzeichnis gefunden, nicht aus einem Hostpfad.
 
-1. Fester logischer Pfad: `~/dev/k-playbook`.
-2. Wenn dieser Pfad fehlt, nicht nach einem alternativen Dauerpfad fragen. Den User auffordern, das Repo dorthin zu klonen/verschieben oder einen Symlink dorthin anzulegen.
-3. Wenn `/workspaces/k-playbook` existiert, aber `~/dev/k-playbook` fehlt, ist dies ein Devcontainer-Symlink-Problem; erst den Symlink `~/dev/k-playbook -> /workspaces/k-playbook` herstellen lassen.
+Wenn `DIST_DIR` fehlt, ist die Installation unvollstaendig; empfiehl
+`k-playbook-installer restore` und brich ab.
 
 Pruefe danach:
 
-- `<PLAYBOOK_REPO>/scripts/install-security-tools.sh` existiert.
+- `<DIST_DIR>/scripts/install-security-tools.sh` existiert.
 - Das Script ist ausfuehrbar oder kann mit `bash` gestartet werden.
 
 Wenn nicht: abbrechen mit klarer Fehlermeldung.
@@ -52,7 +52,7 @@ Wenn nicht: abbrechen mit klarer Fehlermeldung.
 Fuehre immer zuerst aus:
 
 ```bash
-bash "<PLAYBOOK_REPO>/scripts/install-security-tools.sh" --preflight
+bash "<DIST_DIR>/scripts/install-security-tools.sh" --preflight
 ```
 
 Zeige die Ausgabe kompakt. Sie muss enthalten:
@@ -81,7 +81,7 @@ Wenn der User Argumente nach dem Slash-Command angegeben hat:
   - `--install missing`
   - `--install required`
   - `--install all`
-  - `--install <tool>` fuer installierbare Tools aus `<PLAYBOOK_REPO>/global/security-tools.tsv`
+  - `--install <tool>` fuer installierbare Tools aus `<DIST_DIR>/security-tools.tsv`
   - optional `--method auto|native|docker|pipx|venv`
   - optional `--dry-run`
 - `--yes` darf nur weitergegeben werden, wenn der User es explizit im Slash-Command angegeben hat oder danach bestaetigt hat.
@@ -94,7 +94,7 @@ Wenn eine Installation gewuenscht ist, zeige vor Ausfuehrung den exakten Befehl.
 Default-Empfehlung:
 
 ```bash
-bash "<PLAYBOOK_REPO>/scripts/install-security-tools.sh" --install missing --method auto
+bash "<DIST_DIR>/scripts/install-security-tools.sh" --install missing --method auto
 ```
 
 Installationswege:

@@ -1,5 +1,5 @@
 ---
-description: Execute a review from the review catalog (global playbook or project-local). Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
+description: Execute a review from the effective review catalog (shipped plus project-local, via overlay). Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
 argument-hint: [review-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -7,25 +7,24 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-review
 
-Run a code review against the current project, using a review recipe either from the global review catalog (`<PLAYBOOK_REPO>/global/reviews/`) or from the project-local reviews directory configured in `K-PLAYBOOK.yaml`.
+Run a code review against the current project, using a review recipe from the effective catalog: the shipped recipes under `<DIST_DIR>/reviews/` combined by overlay with the project-local reviews directory configured in `K-PLAYBOOK.yaml`.
 
-This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<PLAYBOOK_REPO>/global/rules/review-authoring.md`.
+This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<DIST_DIR>/rules/review-authoring.md`.
 
 `/k-review` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; all project-local paths used by this command come from that YAML. If a required path key is missing, ask the user for the value, write it back to `K-PLAYBOOK.yaml`, and only then continue.
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve the configured `reviews` path:
 
 - Read `paths.reviews` from `K-PLAYBOOK.yaml`.
-- `PROJECT_REVIEWS_DIR = <TARGET_DIR>/<paths.reviews>`.
+- `PROJECT_REVIEWS_DIR = <PLAYBOOK_DIR>/<paths.reviews>`.
 - `REVIEWS_DISPLAY_PATH = <paths.reviews>`.
 
 Also set:
 
-- `GLOBAL_REVIEWS_DIR` = `<PLAYBOOK_REPO>/global/reviews/`. If it does not exist, continue with project-local reviews only if configured; otherwise abort because no review catalog is available.
 - `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
 - `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
 - `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (base for reviews that produce output files)
@@ -33,23 +32,27 @@ Also set:
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.reviews` is missing: ask for the project-relative reviews directory, recommend `k-playbook/reviews`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If `paths.reviews` is missing: ask for the reviews directory relative to `PLAYBOOK_DIR`, recommend `reviews`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If `PROJECT_REVIEWS_DIR` does not exist: ask whether to create that exact YAML-configured directory now or run `/k-gui`; do not use any fallback path.
 
 ## Step 2 — Determine the review to run
 
+Read and apply `<DIST_DIR>/commands/_shared/overlay-resolution.md` for kind `reviews`.
+It yields the effective catalog from `<DIST_DIR>/reviews/` plus `PROJECT_REVIEWS_DIR`,
+honouring `overlay.reviews.disabled`. The overlay key is the filename without `.md`
+and without the `review-` prefix, so `review-tech.md` has the key `tech`.
+
 If `$ARGUMENTS` is non-empty: treat it as the review name.
 
 **Name resolution:**
-- Try `<PROJECT_REVIEWS_DIR>/review-<name>.md` first (project-local wins on collision).
-- Fall back to `<GLOBAL_REVIEWS_DIR>/review-<name>.md`.
-- Also accept the bare filename (`review-<name>.md`) or the full name including the `review-` prefix.
+- Normalize the argument to an overlay key: strip a leading `review-` and a trailing `.md`.
+- Look the key up in the effective catalog. A project-local recipe already won there,
+  so no separate fallback is needed.
+- If the key is not in the effective catalog but is listed in `overlay.reviews.disabled`,
+  say so explicitly instead of reporting it as unknown.
 
-If `$ARGUMENTS` is empty: build a selection list.
+If `$ARGUMENTS` is empty: build a selection list from the effective catalog.
 
-- Collect all `review-*.md` from `<PROJECT_REVIEWS_DIR>` and `<GLOBAL_REVIEWS_DIR>`.
-- Merge by base filename. On collision: project-local wins; mark the global entry as *überlagert*.
 - For each entry, read its YAML frontmatter (`title`, `interval-weeks`) and, if available, the last log entry (see Step 6) to show `Letzter Lauf`.
 - Present as:
 
@@ -58,10 +61,10 @@ Verfügbare Reviews:
 
   [P] review-python-comment-hardspots — Python: Kommentare an Hardspots
        Letzter Lauf: 2025-11-04   Fällig ab: 2026-02-24
-  [G] review-tech                   — Tech-Debt-Analyse
+  [D] review-tech                   — Tech-Debt-Analyse
        Letzter Lauf: —              Fällig ab: —
 
-  P = projekt-lokal, G = global
+  P = projektlokal, D = mitgeliefert, Ü = überlagert eine mitgelieferte Vorlage
 
 Welches Review ausführen?
 ```
@@ -178,6 +181,6 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **`K-PLAYBOOK.yaml` fehlt**: abbrechen und `/k-gui` aufrufen lassen.
-- **`paths.reviews` fehlt**: User nach dem projektrelativen Pfad fragen, Empfehlung `k-playbook/reviews` anbieten, Wert in `K-PLAYBOOK.yaml` ergaenzen, dann erneut aufloesen.
+- **`K-PLAYBOOK.yaml` fehlt**: abbrechen; das Verzeichnis ist kein k-playbook-Projekt. `k-playbook-installer init` empfehlen.
+- **`paths.reviews` fehlt**: User nach dem Pfad relativ zu `PLAYBOOK_DIR` fragen, Empfehlung `reviews` anbieten, Wert in `K-PLAYBOOK.yaml` ergaenzen, dann erneut aufloesen.
 - **YAML-konfigurierter Reviews-Pfad fehlt im Dateisystem**: User fragen, ob genau dieser Pfad angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

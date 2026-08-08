@@ -42,11 +42,11 @@ Drei zusammenspielende Bausteine:
 Detaillierte Schritt-für-Schritt-Anleitung mit Prosa + abhakbarer
 Checkliste steht in:
 
-→ **`~/dev/k-playbook/ks-ai-session-memory/PLAYBOOK.md`**
+→ **`<DIST_DIR>/skills/ai-session-memory/PLAYBOOK.md`**
 
 Vorlagen zum Kopieren:
 
-→ **`~/dev/k-playbook/ks-ai-session-memory/vorlagen/`**
+→ **`<DIST_DIR>/skills/ai-session-memory/vorlagen/`**
 
 ## Wichtigste Regel
 

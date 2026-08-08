@@ -25,16 +25,16 @@ Dieses Artefakt ist der bevorzugte Handoff fuer Remediation:
 
 ## Schritt 1 — Pfade aufloesen
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve configured blocks from `K-PLAYBOOK.yaml`:
 
-- `reviews` -> `PROJECT_REVIEWS_DIR = <TARGET_DIR>/<paths.reviews>`.
-- `tasks` -> `TASKS_DIR = <TARGET_DIR>/<paths.tasks>`; optional aber hilfreich fuer existierende Remediation-Tasks.
+- `reviews` -> `PROJECT_REVIEWS_DIR = <PLAYBOOK_DIR>/<paths.reviews>`.
+- `tasks` -> `TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`; optional aber hilfreich fuer existierende Remediation-Tasks.
 
 Command-specific policy:
 
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
 - Wenn `paths.reviews` fehlt: nachfragen, in `K-PLAYBOOK.yaml` ergaenzen und erneut aufloesen.
 - Wenn der YAML-konfigurierte Reviews-Pfad nicht existiert: fragen, ob genau dieser Pfad angelegt werden soll, oder `/k-gui` nennen.
 - Wenn `paths.tasks` fehlt oder der YAML-konfigurierte Tasks-Pfad nicht existiert: warnen und auf Ergaenzung/Reparatur hinweisen, aber fortfahren; dann koennen existierende Tasks nicht abgeglichen werden.

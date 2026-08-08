@@ -19,26 +19,25 @@ Produces:
 
 ## Step 0 — Target bestimmen und bestätigen
 
-Bestimme zuerst das Projekt, in dem gearbeitet wird. Alle späteren Pfade sind relativ zu `TARGET_DIR`, nicht zwingend zum aktuellen Arbeitsverzeichnis. Nutze dafür die `TARGET_DIR`-Regeln aus `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Bestimme zuerst das Projekt, in dem gearbeitet wird. Der analysierte Code liegt in `PROJECT_REPO_ROOT_DIR`, die k-playbook-Artefakte unter `PLAYBOOK_DIR`. Wende dafür `<DIST_DIR>/commands/_shared/path-resolution.md` an.
 
 **Target-Auflösung:**
 
-- Wenn `$ARGUMENTS` gesetzt ist: als Zielverzeichnis behandeln.
-  - Existiert das Verzeichnis: `TARGET_DIR = realpath($ARGUMENTS)`.
-  - Existiert es nicht: abbrechen mit klarer Fehlermeldung.
-- Wenn `$ARGUMENTS` leer ist: `TARGET_DIR = realpath(CWD)`.
-- Danach vor dem Snapshot den fixed-layout guard aus `path-resolution.md` anwenden: Wenn `TARGET_DIR` versehentlich `<project>/k-playbook` ist, auf den Parent als Projekt-Root korrigieren und diese Korrektur im Preflight anzeigen.
+- Wenn `$ARGUMENTS` gesetzt ist: als explizites Verzeichnisargument an die Discovery übergeben. Existiert es nicht, abbrechen mit klarer Fehlermeldung.
+- Wenn `$ARGUMENTS` leer ist: Discovery ab dem aktuellen Arbeitsverzeichnis.
+- Die Discovery behandelt den Fall, dass das Arbeitsverzeichnis selbst das k-playbook-Verzeichnis ist; keinen eigenen Guard implementieren.
 
 **Preflight-Snapshot anzeigen:**
 
-Für den Snapshot `K-PLAYBOOK.yaml` in `TARGET_DIR` lesen, um `layout`, `k_playbook.repo` und Setup-Datum kompakt anzeigen zu können. Wenn die Datei fehlt, abbrechen und `/k-gui` aufrufen lassen.
+Für den Snapshot `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` lesen, um `layout`, `k_playbook.version` und Setup-Datum kompakt anzeigen zu können.
 
 ```text
 /k-code2docs — Preflight
 ─────────────────────────────────────
-Ziel:          <absolute TARGET_DIR>
+Ziel:          <absolute PROJECT_REPO_ROOT_DIR>
+Playbook:      <absolute PLAYBOOK_DIR>
 Quelle:        Argument | CWD
-K-PLAYBOOK.yaml: gefunden (layout: fixed-project-k-playbook) | fehlt
+K-PLAYBOOK.yaml: gefunden (layout: project-local, v<k_playbook.version>)
 Git-Repo:      ja (branch: <branch>) | nein
 Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt
 ```
@@ -57,20 +56,20 @@ Bei „ja": weiter mit Step 1.
 
 ## Step 1 — Resolve paths from K-PLAYBOOK.yaml
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 For this command, resolve the configured `docs` path:
 
-- `RESOLVED_DOCS_DIR = <TARGET_DIR>/<paths.docs>`.
+- `RESOLVED_DOCS_DIR = <PLAYBOOK_DIR>/<paths.docs>`.
 - `DOCS_DISPLAY_PATH = <paths.docs>`.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.docs` is missing: ask for the project-relative docs directory, recommend `k-playbook/docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+- If `paths.docs` is missing: ask for the docs directory relative to `PLAYBOOK_DIR`, recommend `docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If the YAML-configured docs path is missing on disk: ask whether to create that exact directory now or run `/k-gui`; do not use any fallback path.
 
-`AGENTS_FILE` = `<TARGET_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<TARGET_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
+`AGENTS_FILE` = `<PROJECT_REPO_ROOT_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<PROJECT_REPO_ROOT_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
 Use `RESOLVED_DOCS_DIR` for all doc reads and writes.
 
@@ -91,7 +90,7 @@ Ask the user (bundle in one message):
 **Exclusions — apply automatically, no need to ask:**
 
 - Default set: `.git/`, `venv/`, `.venv/`, `env/`, `node_modules/`, `dist/`, `build/`, `target/`, `_bases/`, `.next/`, `.nuxt/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `coverage/`, `htmlcov/`, `.tox/`, `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*`.
-- Additionally: everything matched by `.gitignore` under `TARGET_DIR` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
+- Additionally: everything matched by `.gitignore` under `PROJECT_REPO_ROOT_DIR` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
 
 Announce the final effective exclusion set before scanning, in one compact list. Give the user one chance to add more.
 
@@ -274,12 +273,12 @@ Der Kern dieses Schrittes: die entstandenen Docs sind wertlos, wenn Folge-Sessio
 
 **8a — `AGENTS.md`:**
 
-- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
+- Existiert nicht → aus `<DIST_DIR>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
 - Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
 
 **8b — `opencode.json` (oder `.jsonc` falls schon vorhanden):**
 
-- Existiert nicht → aus `<PLAYBOOK_REPO>/ks-ai-session-memory/vorlagen/opencode.json.template` erzeugen. `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
+- Existiert nicht → aus `<DIST_DIR>/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen. `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
 - Existiert → prüfen ob `instructions` `AGENTS.md` enthält, `references.docs.path` nach Auflösung relativ zur Config-Datei auf `RESOLVED_DOCS_DIR` zeigt, und die `description` konkret ist. Fehlendes ergänzen, falsche/alte Docs-Pfade korrigieren, konkret machen — mit Bestätigung.
 
 **8c — Restart-Hinweis:**

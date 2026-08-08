@@ -11,45 +11,51 @@ Beide verwenden dieselben Regelquellen und dieselbe Pfadauflösung.
 
 ## Regelquellen
 
-### Global
+Es gibt zwei Quellen, die per Overlay zu einer effektiven Regelmenge kombiniert werden.
 
-Global gelten alle Markdown-Dateien unter:
+### Mitgeliefert
 
-`<PLAYBOOK_REPO>/global/rules/*.md`
+Mitgelieferte Regeln liegen unter `<DIST_DIR>/rules/*.md`.
 
-`PLAYBOOK_REPO` folgt dem festen Pfadvertrag:
+`DIST_DIR` wird nicht geraten und folgt keinem Hostpfad. Es kommt aus der Discovery
+in `<DIST_DIR>/commands/_shared/path-resolution.md`: `PLAYBOOK_DIR` wird vom
+Arbeitsverzeichnis aus aufwärts gesucht, `DIST_DIR` ergibt sich aus
+`k_playbook.dist` in `K-PLAYBOOK.yaml`.
 
-- Erwartet ist `~/dev/k-playbook`.
-- `<TARGET_DIR>/K-PLAYBOOK.yaml` darf denselben Wert unter `k_playbook.repo` sichtbar enthalten.
-- Wenn das physische Repo woanders liegt, muss ein Symlink dafuer sorgen, dass `~/dev/k-playbook` funktioniert.
-- Wenn `~/dev/k-playbook` fehlt: warnen und den User auffordern, `/k-install` oder das Devcontainer-Setup auszufuehren.
+`<DIST_DIR>` ist read-only. Mitgelieferte Regeln werden nie editiert.
 
 ### Projektlokal
 
-Projektlokale Regeln liegen unter `<TARGET_DIR>/k-playbook/enforcement/`.
-
-Auflösung:
-
-- `<TARGET_DIR>/k-playbook/enforcement/` verwenden.
-- Wenn das Verzeichnis fehlt: warnen; für Checks grundsätzlich mit den globalen Regeln fortfahren.
+Projektlokale Regeln liegen im konfigurierten `paths.enforcement`.
 
 ## Ablauf
 
 ### Schritt 1: Ziel bestimmen
 
-`TARGET_DIR` ist das Projekt, auf das die Regeln angewendet werden.
+Wende `<DIST_DIR>/commands/_shared/path-resolution.md` an und löse `enforcement` auf.
 
-- Wenn explizit angegeben: diesen Pfad verwenden, sofern er existiert.
-- Sonst: aktuelles Arbeitsverzeichnis.
+Ergebnis: `PLAYBOOK_DIR`, `DIST_DIR`, `RESOLVED_ENFORCEMENT_DIR` und
+`PROJECT_REPO_ROOT_DIR`. Die Regeln werden auf `PROJECT_REPO_ROOT_DIR` angewendet.
 
 ### Schritt 2: Regeln laden
 
-Lade:
+Wende `<DIST_DIR>/commands/_shared/overlay-resolution.md` für die Art `rules` an.
 
-- alle globalen Enforcement-Dateien, sortiert nach Dateiname.
-- alle projektlokalen Enforcement-Dateien, sortiert nach Dateiname, falls vorhanden.
+Damit gilt:
 
-Wenn keine Regeln gefunden werden, nicht raten. Melde den Zustand und schlage vor, mit `/k-setup` bzw. einem ersten Eintrag unter `enforcement/` zu starten.
+- Jede projektlokale Regel ist aktiv.
+- Eine mitgelieferte Regel ist aktiv, außer eine projektlokale Regel trägt denselben
+  Schlüssel oder der Schlüssel steht in `overlay.rules.disabled`.
+- Eine projektlokale Regel **ersetzt** die gleichnamige mitgelieferte vollständig.
+  Die mitgelieferte Datei wird dann gar nicht gelesen.
+
+Berichte die effektive Menge mit Herkunft je Eintrag (`dist`, `local`, `override`)
+sowie abgeschaltete und veraltete `disabled`-Einträge, bevor du mit der Prüfung
+beginnst.
+
+Wenn die effektive Menge leer ist, nicht raten und nicht auf die mitgelieferten
+Regeln zurückfallen. Melde den Zustand; eine leere Menge ist eine bewusste
+Projektentscheidung.
 
 ### Schritt 3: Relevanz bestimmen
 

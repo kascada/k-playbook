@@ -86,17 +86,17 @@ Wenn zwei Argumente uebergeben werden:
 
 ## Schritt 1 - Repo-Ziel aufloesen
 
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
 
 Fuer diesen Command werden zusaetzlich die festen Bloecke `enforcement` und `docs` aufgeloest, weil Phase 2 ihre Regeln und die Docs-Sync-Pflicht lesen muss.
 
 Danach bestimme das GitHub-Repo fuer den PR-Check in dieser Reihenfolge:
 
-1. Wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` existiert und `project.repo_root` gesetzt ist:
+1. Wenn `project.repo_root` in `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` gesetzt ist:
    - verwende `PROJECT_REPO_ROOT_DIR` aus der Shared Path Resolution
    - das ist der bevorzugte Fall fuer Wrapper-Repos, bei denen das eigentliche Git-Repo nicht das Workspace-Root ist
-2. Sonst, wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` existiert und `remediation.target` gesetzt ist:
-   - resolve `remediation.target` relativ zu `TARGET_DIR`
+2. Sonst, wenn `remediation.target` gesetzt ist:
+   - resolve `remediation.target` relativ zu `PLAYBOOK_DIR`
    - verwende diesen Pfad als `PR_TARGET_DIR`
    - das ist nur noch ein Legacy-Fallback fuer aeltere Projekte ohne `project.repo_root`
 3. Sonst, wenn `TARGET_DIR` selbst ein Git-Repo ist: verwende `TARGET_DIR` als `PR_TARGET_DIR`
@@ -106,7 +106,7 @@ Danach bestimme das GitHub-Repo fuer den PR-Check in dieser Reihenfolge:
 
 Vor dieser Zielwahl gilt zusaetzlich:
 
-- Wenn `<TARGET_DIR>/K-PLAYBOOK.yaml` fehlt: sofort abbrechen und den User auf `/k-gui` verweisen.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: sofort abbrechen; das Verzeichnis ist kein k-playbook-Projekt.
 
 Validierung:
 
@@ -133,9 +133,9 @@ Merke:
 - `GH_REPO_URL`
 - `GH_DEFAULT_BRANCH`
 - `PR_TARGET_DISPLAY`
-- `PROJECT_ENFORCEMENT_DIR`
+- `RESOLVED_ENFORCEMENT_DIR`
 - `DOCS_DIR`
-- `GLOBAL_ENFORCEMENT_DIR = <PLAYBOOK_REPO>/global/rules/`
+- `EFFECTIVE_RULES` — die effektive Regelmenge aus `<DIST_DIR>/commands/_shared/overlay-resolution.md` (kind `rules`), inklusive Herkunft je Regel
 
 ## Schritt 2 - PR bestimmen
 
@@ -287,7 +287,7 @@ Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohn
 
 Lade fuer die Bewertung:
 
-- globale Regeln aus `<PLAYBOOK_REPO>/global/rules/*.md`
+- globale Regeln aus `<DIST_DIR>/rules/*.md`
 - projektlokale Regeln aus `<paths.enforcement>/*.md`, wenn in `K-PLAYBOOK.yaml` gesetzt
 - projektlokale Docs aus `<paths.docs>/`, wenn in `K-PLAYBOOK.yaml` gesetzt und fuer Docs-Sync sichtbar relevant
 
@@ -326,7 +326,8 @@ Nutze diese Klassifikation fuer die spaetere Relevanzbewertung der Regeln und Ch
 
 Fuer Enforcement gilt:
 
-- `docs-sync.md` immer pruefen, wenn Code-Dateien geaendert wurden
+- Nur Regeln aus `EFFECTIVE_RULES` heranziehen. Eine per `overlay.rules.disabled` abgeschaltete Regel wird nicht geprueft, auch wenn sie mitgeliefert wird.
+- `docs-sync.md` immer pruefen, wenn Code-Dateien geaendert wurden und die Regel in `EFFECTIVE_RULES` enthalten ist
 - Django-Validierung nur dann als relevant markieren, wenn PR-Dateien Settings, Middleware, URLs, Models, Migrations, Storage, Redis, Celery, Helm oder Runtime-Startpfade beruehren
 - User-Data-Isolation, Logging-Privacy und i18n nur dann als relevant markieren, wenn die geaenderten Dateien plausibel in diesen Bereich fallen
 
@@ -342,8 +343,8 @@ Vorgehen:
 2. Fuehre aus dem Projektkontext aus:
 
 ```bash
-~/dev/k-playbook/global/bin/k-check \
-  --config-root <TARGET_DIR> \
+<DIST_DIR>/bin/k-check \
+  --config-root <PLAYBOOK_DIR> \
   --target-root <PR_TARGET_DIR> \
   --mode changed \
   --files-from <temp-file>
@@ -681,7 +682,7 @@ PR gemerged. Lokaler Validierungs-Branch `pr-review/441-python-jose` wurde ansch
 
 ## Fehlerfaelle
 
-- `K-PLAYBOOK.yaml` fehlt -> sauber abbrechen und `/k-gui` nennen
+- `K-PLAYBOOK.yaml` nicht gefunden -> sauber abbrechen und `k-playbook-installer init` empfehlen
 - `project.repo_root` oder der Legacy-Fallback `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
 - `gh` fehlt oder ist nicht authentifiziert -> sauber abbrechen und das Problem klar benennen
 - mehr als zwei Argumente oder ungueltige Argument-Kombination -> gueltige Formen nennen und stoppen

@@ -38,11 +38,11 @@ Dateien:
 
 Pfad- und Statusaufloesung:
 
-- Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
-- Wenn `k-playbook/checks` leer ist, werden nur globale Checks ausgefuehrt.
-- Das Runner-Script ist `<PLAYBOOK_REPO>/global/bin/k-check`.
+- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
+- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Wenn der konfigurierte `paths.checks` leer ist, werden nur die mitgelieferten Checks ausgefuehrt.
+- Das Runner-Script ist `<DIST_DIR>/bin/k-check`.
 
 ## Ausfuehrungsarten
 
@@ -58,8 +58,8 @@ Optionen:
 Typischer Lauf:
 
 ```bash
-~/dev/k-playbook/global/bin/k-check \
-  --config-root <TARGET_DIR> \
+<DIST_DIR>/bin/k-check \
+  --config-root <PLAYBOOK_DIR> \
   --target-root <target-root> \
   --mode <changed|baseline> \
   --output k-playbook/reviews/results/k-check/YYYY-MM-DD/raw/k-check-<mode>.txt \

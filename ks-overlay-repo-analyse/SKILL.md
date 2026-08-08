@@ -35,7 +35,7 @@ Fünf Phasen:
 
 Details, Kommandos, Templates und Checkliste in:
 
-→ **`~/dev/k-playbook/ks-overlay-repo-analyse/PLAYBOOK.md`**
+→ **`<DIST_DIR>/skills/overlay-repo-analyse/PLAYBOOK.md`**
 
 ## Wichtigste Regel
 

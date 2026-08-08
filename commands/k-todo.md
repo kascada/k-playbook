@@ -13,23 +13,19 @@ Manage the project todo file.
 
 ## Step 1 — Resolve todo file
 
-Determine `TARGET_DIR`:
-
-- If the current working directory contains `K-PLAYBOOK.yaml`, use it as `TARGET_DIR`.
-- Else walk upward from the current working directory until a parent containing `K-PLAYBOOK.yaml` is found; use that parent as `TARGET_DIR`.
-- Else abort and tell the user to run `/k-gui`.
-
-Read and apply `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
+Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`. Its discovery step
+finds `PLAYBOOK_DIR` by walking upward from the current working directory; do not
+implement a separate search here.
 
 For this command, resolve the configured `todo` path:
 
-- `TODO_PATH = <TARGET_DIR>/<paths.todo>`.
+- `TODO_PATH = <PLAYBOOK_DIR>/<paths.todo>`.
 - `TODO_DISPLAY_PATH = <paths.todo>`.
 
 Command-specific policy:
 
-- If `K-PLAYBOOK.yaml` is missing: abort and tell the user to run `/k-gui`.
-- If `paths.todo` is missing: ask for the project-relative todo file, recommend `k-playbook/TODO.md`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
+- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
+- If `paths.todo` is missing: ask for the todo file relative to `PLAYBOOK_DIR`, recommend `TODO.md`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
 - If the parent directory of `TODO_PATH` does not exist: abort and tell the user to run `/k-gui`.
 - If the parent directory exists: use `TODO_PATH`.
 

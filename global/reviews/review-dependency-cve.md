@@ -21,10 +21,10 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 
 ## Voraussetzungen
 
-- Lies und verwende `<PLAYBOOK_REPO>/commands/_shared/path-resolution.md`.
-- Lies `<PLAYBOOK_REPO>/global/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `pip-audit`, `trivy` und `grype`.
-- Wenn `K-PLAYBOOK.yaml` fehlt: abbrechen und `/k-gui` nennen.
-- Wenn `k-playbook/reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
+- Lies `<DIST_DIR>/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `pip-audit`, `trivy` und `grype`.
+- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
+- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `pip-audit --version`, `trivy --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
 
@@ -57,9 +57,9 @@ Frage vor Tool-Ausfuehrung, was passieren soll:
 Typische Befehle nach Bestaetigung:
 
 ```bash
-pip-audit --format json --output <result>/raw/pip-audit.json --path <TARGET_DIR>
-trivy fs --format json --output <result>/raw/trivy-fs.json <TARGET_DIR>
-grype dir:<TARGET_DIR> -o json > <result>/raw/grype.json
+pip-audit --format json --output <result>/raw/pip-audit.json --path <PROJECT_REPO_ROOT_DIR>
+trivy fs --format json --output <result>/raw/trivy-fs.json <PROJECT_REPO_ROOT_DIR>
+grype dir:<PROJECT_REPO_ROOT_DIR> -o json > <result>/raw/grype.json
 ```
 
 `pip-audit` nur ausfuehren, wenn Python-Manifeste oder Python-Lockfiles gefunden wurden. `grype` gehoert zur Pflicht-Toolchain; ob der konkrete Grype-Scan in diesem Review sinnvoll ist, haengt vom Scope und den vorhandenen Manifests/SBOMs ab.

@@ -19,14 +19,20 @@ Immer wenn eine Arbeit Regeln verletzen könnte, insbesondere bei:
 
 ## Regelquellen
 
-Der Skill lädt zwei Regel-Ebenen:
+Der Skill lädt zwei Regel-Ebenen und kombiniert sie per Overlay:
 
-1. **Global:** `<PLAYBOOK_REPO>/global/rules/*.md`
-2. **Projektlokal:** `<TARGET_DIR>/k-playbook/enforcement/`
+1. **Mitgeliefert:** `<DIST_DIR>/rules/*.md` — read-only, wird bei Updates ersetzt.
+2. **Projektlokal:** das konfigurierte `paths.enforcement` — Eigentum des Projekts.
 
-`PLAYBOOK_REPO` und `TARGET_DIR` werden nach derselben Logik bestimmt wie in `commands/_shared/path-resolution.md`.
+`PLAYBOOK_DIR` und `DIST_DIR` werden per Discovery bestimmt, wie in
+`<DIST_DIR>/commands/_shared/path-resolution.md` beschrieben. Die Kombination der
+beiden Ebenen folgt `<DIST_DIR>/commands/_shared/overlay-resolution.md`: Eine
+projektlokale Regel ersetzt die gleichnamige mitgelieferte vollständig, und
+`overlay.rules.disabled` schaltet einzelne mitgelieferte Regeln ab.
 
-Wenn `K-PLAYBOOK.yaml` fehlt, gelten nur die globalen Regeln. Wenn `k-playbook/enforcement/` fehlt, den User kurz darauf hinweisen und mit den globalen Regeln fortfahren, sofern die Arbeit dadurch nicht blockiert ist.
+Wenn `K-PLAYBOOK.yaml` fehlt, ist das Verzeichnis kein k-playbook-Projekt; kurz
+darauf hinweisen und ohne Enforcement weiterarbeiten. Wenn das projektlokale
+Verzeichnis fehlt, mit den mitgelieferten Regeln fortfahren.
 
 ## Arbeitsweise
 
@@ -43,4 +49,4 @@ Für einen nachgelagerten, expliziten Check denselben Ablauf über den Command a
 
 Details und Prüfschritte stehen in:
 
-`~/dev/k-playbook/ks-enforcement/PLAYBOOK.md`
+`<DIST_DIR>/skills/enforcement/PLAYBOOK.md`

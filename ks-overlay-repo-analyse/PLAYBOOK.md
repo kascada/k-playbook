@@ -297,7 +297,7 @@ Beschreibung + konkreter Diff-Ausschnitt
 Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 ```
 
-Vorlage in `~/dev/k-playbook/ks-overlay-repo-analyse/vorlagen/overlay-doc.md.template`
+Vorlage in `<DIST_DIR>/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
 
 ### Alle Docs verlinken
 
