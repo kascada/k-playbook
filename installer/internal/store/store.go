@@ -8,10 +8,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kascada/k-playbook/installer/internal/pathcontract"
 )
 
-const LocalDirName = ".k-playbook-local"
+// LocalDirName is the per-user state directory. The project list used to live
+// inside the base installation at ~/dev/k-playbook/.k-playbook-local, which tied
+// every installer action to that path existing. It is user state, not repo
+// content, so it belongs under the XDG state directory.
+const LocalDirName = "k-playbook"
 
 type ProjectEnvironment string
 
@@ -38,15 +41,14 @@ type ProjectsFile struct {
 }
 
 func LocalDir() (string, error) {
-	result, err := pathcontract.Check()
+	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
+		return filepath.Join(dir, LocalDirName), nil
+	}
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("user home ermitteln: %w", err)
 	}
-	if !result.OK {
-		return "", fmt.Errorf("Pfadvertrag nicht erfuellt: %s", result.Code)
-	}
-
-	return filepath.Join(result.Expected, LocalDirName), nil
+	return filepath.Join(home, ".local", "state", LocalDirName), nil
 }
 
 func ProjectsPath() (string, error) {
