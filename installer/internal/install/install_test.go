@@ -164,6 +164,37 @@ func TestRestoreAfterClone(t *testing.T) {
 	}
 }
 
+// Git does not track empty directories, so after a clone the artifact directories
+// that were empty at commit time are gone. Restore has to bring them back, or the
+// first command that writes a task or a rule fails.
+func TestRestoreRecreatesEmptyArtifactDirs(t *testing.T) {
+	root := t.TempDir()
+	result, err := Init(root, Options{})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	// Simulate the clone: _dist is gitignored, empty directories were never committed.
+	if err := os.RemoveAll(result.DistDir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"enforcement", "guidelines", "docs", "checks", "commands", "tasks"} {
+		if err := os.RemoveAll(filepath.Join(result.PlaybookDir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := Restore(result.PlaybookDir); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	for _, name := range []string{"enforcement", "guidelines", "docs", "checks", "commands", "tasks", "tasks/done"} {
+		info, err := os.Stat(filepath.Join(result.PlaybookDir, filepath.FromSlash(name)))
+		if err != nil || !info.IsDir() {
+			t.Errorf("%s wurde von restore nicht wiederhergestellt", name)
+		}
+	}
+}
+
 // An existing real .claude/commands directory is project-owned and must survive.
 func TestLinkAssistantKeepsOwnCommands(t *testing.T) {
 	root := t.TempDir()

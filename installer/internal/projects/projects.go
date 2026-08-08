@@ -147,6 +147,9 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 	if err != nil {
 		return false, err
 	}
+	if err := guardProjectLocal(normalized); err != nil {
+		return false, err
+	}
 	if remediationMode == "" {
 		remediationMode = RemediationModeDirectAllowed
 	}
@@ -193,6 +196,9 @@ func EnsureConfig(projectPath string, remediationMode RemediationMode) (bool, er
 }
 
 func EnsureConfigDefaults(projectPath string) (bool, error) {
+	if err := guardProjectLocal(projectPath); err != nil {
+		return false, err
+	}
 	path, err := configPath(projectPath)
 	if err != nil {
 		return false, err
@@ -300,6 +306,9 @@ func CompleteProjectStructure(projectPath string) (StructureStatus, error) {
 	if err != nil {
 		return StructureStatus{}, err
 	}
+	if err := guardProjectLocal(normalized); err != nil {
+		return StructureStatus{}, err
+	}
 
 	for _, rel := range fixedProjectDirs() {
 		path := filepath.Join(normalized, filepath.FromSlash(rel))
@@ -368,6 +377,9 @@ func readRemediationModeFromContent(content string) (RemediationMode, bool, erro
 }
 
 func UpdateRemediationMode(projectPath string, remediationMode RemediationMode) error {
+	if err := guardProjectLocal(projectPath); err != nil {
+		return err
+	}
 	if remediationMode == "" {
 		remediationMode = RemediationModeDirectAllowed
 	}
@@ -392,6 +404,9 @@ func UpdateRemediationMode(projectPath string, remediationMode RemediationMode) 
 }
 
 func UpdateProjectRoot(projectPath string, repoRoot string, vcs ProjectVCS) error {
+	if err := guardProjectLocal(projectPath); err != nil {
+		return err
+	}
 	path, err := configPath(projectPath)
 	if err != nil {
 		return err
