@@ -8,6 +8,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 |---|---|
 | [`handbuch.md`](./handbuch.md) | Zentrale Beschreibung: Zweck, Konzepte, Standardablaeufe, Betriebsregeln. |
 | [`installation.md`](./installation.md) | Host-Installation, OpenCode-Setup, Security-Tools, optional Claude Code. |
+| [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys fuer `k-playbook` und `KamranApps`. |
 | [`faq.md`](./faq.md) | Kurze Antworten zu `/k-gui`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
 | [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
 | [`pr-review.md`](./pr-review.md) | Detailguide fuer PR-Reviews. |
@@ -40,6 +41,7 @@ Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Wo
 - `Installation` -> [`installation.md`](./installation.md)
 - `Installer` / `Browser-GUI` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
 - `Installer-Binary` / `Wrapper` / `bin/k-playbook-installer` -> [`installation.md`](./installation.md#installer-binary-und-launcher)
+- `GitHub SSH` / `Deploy-Key` / `KamranApps` -> [`local-github-ssh.md`](./local-github-ssh.md)
 - `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
 - `k-gui` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
 - `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
