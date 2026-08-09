@@ -74,7 +74,12 @@ passed explicitly.
 ## Canonical Path Keys
 
 `K-PLAYBOOK.yaml` stores project-local artifact paths under `paths:`. Values are
-relative to `PLAYBOOK_DIR`, must not be absolute, and must not escape it.
+relative to `PLAYBOOK_DIR` and must not be absolute.
+
+A value may leave `PLAYBOOK_DIR` with `../` as long as it stays inside
+`PROJECT_REPO_ROOT_DIR`. That is how a project keeps an already-established directory
+instead of moving it — most often `paths.docs`, when the project maintains its
+documentation elsewhere. A value must never resolve into `DIST_DIR`.
 
 | Artifact | YAML key | Conventional value |
 |---|---|---|
@@ -101,10 +106,13 @@ For every key requested by the calling command, e.g. `tasks`, `docs`, or `review
 - If `paths.<key>` is missing or empty, ask the user for the path relative to
   `PLAYBOOK_DIR`. Show the conventional value from the table as the recommended
   answer. After confirmation, write the value to `K-PLAYBOOK.yaml` before continuing.
-- Validate that the configured value is relative, normalized, and stays inside
-  `PLAYBOOK_DIR`.
+- Validate that the configured value is relative and normalized, and that it resolves
+  inside `PROJECT_REPO_ROOT_DIR`. It may sit outside `PLAYBOOK_DIR` via `../`.
+- Reject any value that resolves outside `PROJECT_REPO_ROOT_DIR`. Commands write only
+  within the project; report this as a configuration error.
 - Reject any value that resolves into `DIST_DIR`. Installation and project ownership
-  must not overlap; report this as a configuration error and recommend `/k-gui`.
+  must not overlap, because an update replaces `DIST_DIR` wholesale and would delete
+  the project's files with it.
 - Store the resolved absolute path as `RESOLVED_<KEY>_DIR` for directory-valued keys
   or `RESOLVED_<KEY>_PATH` for file-valued keys.
 - For compatibility with existing command text, a command may also use historical

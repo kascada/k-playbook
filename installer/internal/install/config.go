@@ -158,13 +158,62 @@ func (c Config) DistDir(playbookDir string) string {
 	return filepath.Join(playbookDir, dist)
 }
 
+// ProjectRoot resolves project.repo_root against the k-playbook directory. This is
+// the outer boundary for every configured path.
+func (c Config) ProjectRoot(playbookDir string) string {
+	if c.RepoRoot == "" {
+		return filepath.Dir(playbookDir)
+	}
+	return filepath.Clean(filepath.Join(playbookDir, c.RepoRoot))
+}
+
 // ResolvePath resolves a paths.* key against the k-playbook directory.
 func (c Config) ResolvePath(playbookDir string, key string) (string, bool) {
 	value, ok := c.Paths[key]
 	if !ok || value == "" {
 		return "", false
 	}
-	return filepath.Join(playbookDir, value), true
+	return filepath.Clean(filepath.Join(playbookDir, value)), true
+}
+
+// ValidatePath checks a configured path against the two boundaries from
+// docs/k-playbook-format.md.
+//
+// A path may leave the k-playbook directory with ../ — a project that already keeps
+// its docs elsewhere should not have to move them. It may not leave the project, and
+// it may never point into the installation, because an update replaces that directory
+// wholesale and would take the project's files with it.
+func (c Config) ValidatePath(playbookDir string, key string, value string) error {
+	if value == "" {
+		return fmt.Errorf("paths.%s ist leer", key)
+	}
+	if filepath.IsAbs(value) {
+		return fmt.Errorf("paths.%s muss relativ sein: %s", key, value)
+	}
+
+	resolved := filepath.Clean(filepath.Join(playbookDir, value))
+	projectRoot := c.ProjectRoot(playbookDir)
+	if !within(projectRoot, resolved) {
+		return fmt.Errorf("paths.%s fuehrt aus dem Projekt heraus: %s -> %s", key, value, resolved)
+	}
+
+	distDir := filepath.Clean(c.DistDir(playbookDir))
+	if resolved == distDir || within(distDir, resolved) {
+		return fmt.Errorf("paths.%s zeigt in die Installation (%s): %s", key, c.Dist, value)
+	}
+	return nil
+}
+
+// within reports whether path is root itself or below it.
+func within(root string, path string) bool {
+	if path == root {
+		return true
+	}
+	relative, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 // RenderConfig produces a fresh schema_version 2 config.

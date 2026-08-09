@@ -348,11 +348,27 @@ def unique_paths(paths) -> list[Path]:
 
 
 def local_checks_dir(config_root: Path, config: dict[str, object]) -> Path | None:
-    """Project-local checks directory from paths.checks. Never guessed."""
+    """Project-local checks directory from paths.checks. Never guessed.
+
+    The value may leave the k-playbook directory with ../ but must stay inside the
+    project, and it must never point into the shipped installation — that directory
+    is replaced wholesale on update.
+    """
     configured = config.get("paths.checks")
     if not isinstance(configured, str) or not configured:
         return None
-    return (config_root / configured).resolve()
+
+    resolved = (config_root / configured).resolve()
+    repo_root = config.get("project.repo_root")
+    project_root = (config_root / repo_root).resolve() if isinstance(repo_root, str) and repo_root else config_root.parent
+
+    if not (resolved == project_root or project_root in resolved.parents):
+        print(f"paths.checks fuehrt aus dem Projekt heraus: {configured}", file=sys.stderr)
+        return None
+    if resolved == DIST_DIR or DIST_DIR in resolved.parents:
+        print(f"paths.checks zeigt in die Installation: {configured}", file=sys.stderr)
+        return None
+    return resolved
 
 
 def disabled_checks(config: dict[str, object]) -> set[str]:

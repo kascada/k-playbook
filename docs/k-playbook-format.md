@@ -82,12 +82,22 @@ Commands lesen diese Pfade aus `K-PLAYBOOK.yaml`:
 | Docs | `paths.docs` | `docs` |
 | eigene Commands | `paths.commands` | `commands` |
 
-Alle Werte muessen relativ sein, duerfen nicht mit `/` beginnen und duerfen nicht
-aus dem k-playbook-Verzeichnis herausfuehren. Die konventionellen Werte sind die
-empfohlenen Defaults fuer GUI und Reparaturfragen, aber keine stillen Fallbacks.
+Alle Werte muessen relativ sein und duerfen nicht mit `/` beginnen. Die
+konventionellen Werte sind die empfohlenen Defaults fuer GUI und Reparaturfragen,
+aber keine stillen Fallbacks.
 
-Ein `paths.*`-Wert darf nicht auf `_dist` oder ein Unterverzeichnis davon zeigen.
-Installation und Projekt-Eigentum duerfen sich nicht ueberlappen.
+Zwei Grenzen gelten:
+
+- Ein Wert darf das k-playbook-Verzeichnis mit `../` verlassen, muss aber innerhalb
+  von `project.repo_root` bleiben. Das erlaubt es, ein bereits etabliertes
+  Projektverzeichnis weiterzuverwenden, statt es umziehen zu muessen — typisch fuer
+  `paths.docs`, wenn ein Projekt seine Doku schon woanders pflegt.
+- Ein Wert darf nie auf `k_playbook.dist` oder ein Unterverzeichnis davon zeigen.
+  Installation und Projekt-Eigentum duerfen sich nicht ueberlappen, sonst wuerde ein
+  Update Projektdateien loeschen.
+
+Ein Wert, der aus dem Projekt herausfuehrt, ist ein Fehler und keine Option. Commands
+schreiben ausschliesslich innerhalb des Projekts.
 
 ## Minimalformat
 
@@ -252,12 +262,20 @@ jeweils benoetigten Keys, duerfen fehlende Keys aber nicht selbst erraten.
 | `reviews` | string | Projektlokale Review-Rezepte, Logs, Decisions und Results; Overlay ueber `_dist/reviews` |
 | `guidelines` | string | Projektlokale Guidelines |
 | `enforcement` | string | Projektlokale Enforcement-Regeln; Overlay ueber `_dist/rules` |
-| `docs` | string | Projektlokale Docs fuer Docs-First-AI-Sessions |
+| `docs` | string | Projektlokale Docs fuer Docs-First-AI-Sessions. Haeufigster Fall fuer einen `../`-Wert, wenn das Projekt seine Doku bereits an anderer Stelle pflegt |
 | `commands` | string | Projekteigene Slash-Commands; gewinnen bei Namensgleichheit gegen `_dist/commands` |
 
 Wenn ein Command einen benoetigten Key nicht findet, muss er den Nutzer nach dem
 Pfad relativ zum k-playbook-Verzeichnis fragen, den Wert validieren und
 `K-PLAYBOOK.yaml` ergaenzen. Er darf keinen Wert aus dem Dateisystem raten.
+
+Ein Beispiel fuer einen Wert ausserhalb des k-playbook-Verzeichnisses:
+
+```yaml
+paths:
+  tasks: tasks       # <projekt>/k-playbook/tasks
+  docs: ../docs      # <projekt>/docs  — bestehende Projektdoku
+```
 
 ### `project.repo_root`
 

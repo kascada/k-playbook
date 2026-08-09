@@ -323,6 +323,85 @@ func TestExtractRefusesDangerousDestinations(t *testing.T) {
 	}
 }
 
+// A paths.* value may leave the k-playbook directory as long as it stays inside the
+// project. Aiva/kascada needs this: its docs/ predates k-playbook and stays put.
+func TestValidatePathBoundaries(t *testing.T) {
+	root := t.TempDir()
+	playbookDir := filepath.Join(root, PlaybookDirName)
+	config := Config{Dist: DistDirName, RepoRoot: ".."}
+
+	allowed := map[string]string{
+		"innerhalb":               "tasks",
+		"tiefer innerhalb":        "tasks/done",
+		"heraus, aber im Projekt": "../docs",
+		"heraus, tiefer":          "../priv/review",
+		"Projekt-Root selbst":     "..",
+	}
+	for name, value := range allowed {
+		if err := config.ValidatePath(playbookDir, "docs", value); err != nil {
+			t.Errorf("%s (%q) wurde abgelehnt: %v", name, value, err)
+		}
+	}
+
+	refused := map[string]string{
+		"aus dem Projekt heraus":        "../../woanders",
+		"absolut":                       "/etc",
+		"in die Installation":           "_dist",
+		"tief in die Installation":      "_dist/rules",
+		"ueber ../ in die Installation": "../k-playbook/_dist/checks",
+		"leer":                          "",
+	}
+	for name, value := range refused {
+		if err := config.ValidatePath(playbookDir, "docs", value); err == nil {
+			t.Errorf("%s (%q) wurde nicht abgelehnt", name, value)
+		}
+	}
+}
+
+// The boundary must follow project.repo_root, not just the parent directory.
+func TestValidatePathHonoursRepoRoot(t *testing.T) {
+	root := t.TempDir()
+	playbookDir := filepath.Join(root, PlaybookDirName)
+	// Wrapper layout: the code lives in ../app, so ../app/docs is inside the project
+	// but ../sibling is not.
+	config := Config{Dist: DistDirName, RepoRoot: "../app"}
+
+	if err := config.ValidatePath(playbookDir, "docs", "../app/docs"); err != nil {
+		t.Errorf("../app/docs wurde abgelehnt: %v", err)
+	}
+	if err := config.ValidatePath(playbookDir, "docs", "../sibling"); err == nil {
+		t.Error("../sibling liegt ausserhalb von repo_root und wurde nicht abgelehnt")
+	}
+}
+
+// A config that points a path outside the project must fail loudly at install time
+// rather than creating a directory somewhere unexpected.
+func TestInitRejectsEscapingPath(t *testing.T) {
+	root := t.TempDir()
+	playbookDir := filepath.Join(root, PlaybookDirName)
+	mustWrite(t, filepath.Join(playbookDir, ConfigFileName), `schema_version: 2
+layout: project-local
+
+k_playbook:
+  dist: _dist
+  version: 0.4.0
+
+paths:
+  docs: ../../ausserhalb
+
+project:
+  repo_root: ..
+  vcs: none
+`)
+
+	if _, err := Init(root, Options{}); err == nil {
+		t.Error("Init hat einen aus dem Projekt fuehrenden paths-Wert akzeptiert")
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(root), "ausserhalb")); err == nil {
+		t.Error("es wurde ein Verzeichnis ausserhalb des Projekts angelegt")
+	}
+}
+
 // Init on a non-existent directory must fail instead of creating a stray tree.
 func TestInitRequiresExistingProject(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "gibt-es-nicht")

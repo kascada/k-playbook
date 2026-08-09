@@ -231,7 +231,12 @@ func ensureStructure(playbookDir string) ([]string, error) {
 		if !ok || value == "" {
 			continue
 		}
-		target := filepath.Join(playbookDir, value)
+		// Validate before creating anything: a path that escapes the project or
+		// points into the installation must be reported, not silently created.
+		if err := config.ValidatePath(playbookDir, entry.Key, value); err != nil {
+			return created, err
+		}
+		target := filepath.Clean(filepath.Join(playbookDir, value))
 		if entry.Key == "todo" {
 			if !isFile(target) {
 				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
