@@ -262,6 +262,15 @@ func CheckProjectStructure(projectPath string) (StructureStatus, error) {
 		return StructureStatus{}, err
 	}
 
+	// A project-local project defines its own layout in paths.*, including values
+	// that legitimately sit outside the k-playbook directory. Checking it against
+	// the hardcoded v1 directory list would report correct projects as broken.
+	if status, ok, err := checkProjectLocalStructure(normalized); err != nil {
+		return StructureStatus{}, err
+	} else if ok {
+		return status, nil
+	}
+
 	missing := []string{}
 	for _, rel := range fixedProjectDirs() {
 		path := filepath.Join(normalized, filepath.FromSlash(rel))

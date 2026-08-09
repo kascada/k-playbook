@@ -127,3 +127,68 @@ func configHead(text string) string {
 	}
 	return text
 }
+
+// A project-local project defines its layout in paths.*, including values that
+// legitimately sit outside the k-playbook directory. Checking it against the
+// hardcoded v1 directory list reported correct projects as broken.
+func TestStructureCheckFollowsConfiguredPaths(t *testing.T) {
+	root := t.TempDir()
+	playbook := filepath.Join(root, "k-playbook")
+	for _, dir := range []string{
+		"k-playbook/_dist", "k-playbook/tasks/done", "k-playbook/checks",
+		"k-playbook/reviews", "k-playbook/guidelines", "k-playbook/enforcement",
+		"k-playbook/commands",
+		"docs", // ausserhalb des k-playbook-Verzeichnisses, wie in Aiva/kascada
+	} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(playbook, "TODO.md"), []byte("# TODO\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(playbook, "K-PLAYBOOK.yaml"), []byte(`schema_version: 2
+layout: project-local
+
+k_playbook:
+  dist: _dist
+  version: 0.4.0
+
+paths:
+  tasks: tasks
+  completed_tasks: tasks/done
+  todo: TODO.md
+  checks: checks
+  reviews: reviews
+  guidelines: guidelines
+  enforcement: enforcement
+  docs: ../docs
+  commands: commands
+
+project:
+  repo_root: ..
+  vcs: git
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := CheckProjectStructure(root)
+	if err != nil {
+		t.Fatalf("CheckProjectStructure: %v", err)
+	}
+	if !status.OK {
+		t.Errorf("korrektes project-local-Projekt als unvollstaendig gemeldet: %v", status.Missing)
+	}
+
+	// Ein fehlendes konfiguriertes Verzeichnis muss weiterhin auffallen.
+	if err := os.RemoveAll(filepath.Join(root, "docs")); err != nil {
+		t.Fatal(err)
+	}
+	status, err = CheckProjectStructure(root)
+	if err != nil {
+		t.Fatalf("CheckProjectStructure: %v", err)
+	}
+	if status.OK {
+		t.Error("fehlendes ../docs wurde nicht gemeldet")
+	}
+}
