@@ -1,56 +1,65 @@
 # k-playbook
 
-`k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts installiert, konventionell `<projekt>/k-playbook/`. Dort liegt die mitgelieferte Installation unter `_dist/`, daneben die projekteigenen Artefakte: `K-PLAYBOOK.yaml`, Tasks, Reviews, Ergebnisse und Docs. Ein Projekt ist damit selbstgenuegsam.
+`k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts geklont, `<projekt>/k-playbook/`. Daneben liegen die projekteigenen Artefakte. Ein Projekt ist damit selbstgenuegsam.
 
-> **Umstellung laeuft.** Die Kommandozeile setzt das projektlokale Modell vollstaendig um.
-> Die Browser-GUI bildet noch das alte zentrale Modell ab und wird spaeter umgebaut; sie
-> verweigert Schreibzugriffe auf bereits migrierte Projekte, damit sie die Migration nicht
-> rueckgaengig macht. Der Kontrakt steht in [`docs/k-playbook-format.md`](./docs/k-playbook-format.md).
+> **Umstellung laeuft.** Installation und Aktualisierung unten sind aktuell. Die
+> Abschnitte darunter beschreiben teilweise noch das abgeloeste Modell mit `_dist/` und
+> `k-playbook-installer`. Der Stand steht in [`docs/umbau.md`](./docs/umbau.md).
 
 ## Installation
 
-k-playbook braucht ein Binary pro Host. Es traegt die komplette Installation in sich,
-es gibt kein Repo zum Klonen und keinen festen Pfad mehr.
-
-```bash
-git clone git@github.com:kascada/k-playbook.git
-cd k-playbook
-make install
-```
-
-**Go wird dafuer nicht gebraucht.** `make install` nimmt die fertigen Binaries aus `dist/`
-und faellt auf die GitHub Releases zurueck, wenn dort keine passende Plattform liegt.
-Genau dafuer ist der Installer in Go geschrieben: ein Binary, keine Laufzeitumgebung.
-
-Das geklonte Repo wird danach nur noch fuer die Weiterentwicklung gebraucht. Zielprojekte
-haengen nicht daran, und der Ort spielt keine Rolle.
-
-Fuer Arbeit am Installer selbst gibt es `make install-from-source`; das braucht Go.
-
-## Projekt einbinden
-
-Im Zielprojekt:
+k-playbook wird in das Projekt geklont, das es begleiten soll. Es gibt keine zentrale
+Installation und keinen festen Hostpfad; jedes Projekt traegt seine eigene.
 
 ```bash
 cd /pfad/zum/projekt
-k-playbook-installer init
+git clone git@github.com:kascada/k-playbook.git k-playbook
+k-playbook/bin/k-playbook
 ```
 
-Das legt an:
+Das zweite Argument hinter der URL bestimmt den Verzeichnisnamen — er muss `k-playbook`
+lauten, denn Commands und Skills sprechen ihn so an.
+
+**Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
+passende Binary aus `dist/` startet; die Binaries liegen fertig im Repo. Fuer macOS und
+Linux gleichermassen, was auch den Fall abdeckt, dass Host und DevContainer
+unterschiedliche Plattformen sind.
+
+Der letzte Aufruf startet die Oberflaeche im Browser. Beim ersten Mal findet sie noch
+keine `K-PLAYBOOK.yaml` und schlaegt vor, wo sie angelegt wird: das Verzeichnis ueber dem
+Clone. Mitvorgeschlagen wird, wo das Projekt-Repository liegt — entweder das
+Hauptverzeichnis selbst oder ein Unterverzeichnis daneben, etwa wenn der Code parallel
+zum Playbook ausgecheckt ist. Geschrieben wird erst nach Bestaetigung:
 
 ```text
 projekt/
-├── .claude/commands -> ../k-playbook/_dist/commands
-├── .claude/skills   -> ../k-playbook/_dist/skills
-├── .gitignore                   (+ k-playbook/_dist/)
-└── k-playbook/
-    ├── K-PLAYBOOK.yaml          committed
-    ├── _dist/                   mitgeliefert, gitignored
-    ├── tasks/ reviews/ docs/ checks/ enforcement/ guidelines/ commands/
-    └── TODO.md
+├── K-PLAYBOOK.yaml     der Anker; sein Ort bestimmt das Hauptverzeichnis
+└── k-playbook/         die Installation
 ```
 
-`init` ist mehrfach ausfuehrbar und ueberschreibt eine vorhandene `K-PLAYBOOK.yaml` nie.
+Danach richtet dieselbe Oberflaeche die Verlinkung fuer die Assistenten ein
+(`.claude/commands` und `.claude/skills`).
+
+### Aktualisieren
+
+```bash
+cd /pfad/zum/projekt/k-playbook
+git pull
+```
+
+`k-playbook/` enthaelt nichts Projekteigenes und ist dadurch vollstaendig ersetzbar.
+
+### Selbst bauen
+
+Wer die Binaries lieber selbst erzeugt statt die mitgelieferten zu nehmen, braucht Go:
+
+```bash
+cd /pfad/zum/projekt/k-playbook
+make dist
+```
+
+`make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
+ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern.
 
 ## Weitere Kommandos
 

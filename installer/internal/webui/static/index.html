@@ -25,10 +25,29 @@
         </div>
       </section>
 
-      <section class="card" id="assistant-card">
+      <section class="card" id="config-card">
         <div class="section-head">
           <div>
             <p class="eyebrow">Schritt 1</p>
+            <h2>Projektkonfiguration</h2>
+          </div>
+          <span id="config-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <dl id="config-facts" class="facts"></dl>
+        <div id="config-form" class="form-row hidden">
+          <label for="config-project-dir">Hauptverzeichnis</label>
+          <input id="config-project-dir" type="text" spellcheck="false" autocomplete="off">
+          <label for="config-repo-root">Projekt-Repository, relativ dazu</label>
+          <input id="config-repo-root" type="text" spellcheck="false" autocomplete="off">
+        </div>
+        <p id="config-message" class="message"></p>
+        <button id="config-create" class="secondary" disabled>Anlegen</button>
+      </section>
+
+      <section class="card" id="assistant-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Schritt 2</p>
             <h2>Commands und Skills</h2>
           </div>
           <span id="assistant-pill" class="pill muted">Pruefen...</span>

@@ -199,6 +199,39 @@ body[data-mode="none"] .mode-badge {
   overflow-wrap: anywhere;
 }
 
+.form-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.form-row label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.form-row label:not(:first-child) {
+  margin-top: 10px;
+}
+
+.form-row input {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.7);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.form-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

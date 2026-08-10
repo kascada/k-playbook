@@ -9,6 +9,13 @@ const elements = {
   closed: document.getElementById("closed"),
   closedTitle: document.getElementById("closed-title"),
   closedMessage: document.getElementById("closed-message"),
+  configPill: document.getElementById("config-pill"),
+  configFacts: document.getElementById("config-facts"),
+  configForm: document.getElementById("config-form"),
+  configProjectDir: document.getElementById("config-project-dir"),
+  configRepoRoot: document.getElementById("config-repo-root"),
+  configMessage: document.getElementById("config-message"),
+  configCreate: document.getElementById("config-create"),
   assistantPill: document.getElementById("assistant-pill"),
   assistantFacts: document.getElementById("assistant-facts"),
   assistantMessage: document.getElementById("assistant-message"),
@@ -16,6 +23,8 @@ const elements = {
 };
 
 const HEALTH_INTERVAL = 1800;
+
+const CONFIG_LABELS = { doneLabel: "Angelegt", todoLabel: "Anlegen" };
 
 // Lesbare Beschreibung je Zustand aus dem Backend.
 const STATE_LABELS = {
@@ -28,10 +37,91 @@ const STATE_LABELS = {
 };
 
 elements.shutdown.addEventListener("click", shutdown);
+elements.configCreate.addEventListener("click", createConfig);
 elements.assistantApply.addEventListener("click", applyAssistant);
 window.addEventListener("pagehide", notifyClientGone);
 startHealthChecks();
+loadConfig();
 loadAssistant();
+
+// Legt eine Zeile in einer Faktenliste an.
+function addFact(list, term, detail) {
+  const row = document.createElement("div");
+  const dt = document.createElement("dt");
+  dt.textContent = term;
+  const dd = document.createElement("dd");
+  dd.textContent = detail;
+  row.append(dt, dd);
+  list.append(row);
+}
+
+async function loadConfig() {
+  setBlockState(elements.configPill, elements.configCreate, "busy");
+  try {
+    const response = await fetch("/api/config", { cache: "no-store" });
+    renderConfig(await response.json());
+  } catch {
+    elements.configMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+async function createConfig() {
+  setBlockState(elements.configPill, elements.configCreate, "busy");
+  const body = JSON.stringify({
+    projectDir: elements.configProjectDir.value.trim(),
+    repoRoot: elements.configRepoRoot.value.trim(),
+  });
+
+  try {
+    const response = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const data = await response.json();
+    renderConfig(data);
+    // Die Kopfzeile wird serverseitig gefuellt und muss den neuen Ort zeigen.
+    if (data.installed) {
+      window.setTimeout(() => window.location.reload(), 600);
+    }
+  } catch {
+    elements.configMessage.textContent = "Anlegen fehlgeschlagen.";
+    setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
+  }
+}
+
+function renderConfig(data) {
+  elements.configFacts.replaceChildren();
+  elements.configMessage.textContent = data.message || "";
+
+  if (data.installed) {
+    elements.configForm.classList.add("hidden");
+    addFact(elements.configFacts, "Konfiguration", data.configPath);
+    addFact(elements.configFacts, "Hauptverzeichnis", data.projectDir);
+    addFact(elements.configFacts, "Installation", data.playbookDir);
+    addFact(elements.configFacts, "Projekt-Repository", `${data.repoRoot} (${data.vcs || "unbekannt"})`);
+
+    setBlockState(elements.configPill, elements.configCreate, "ok", CONFIG_LABELS);
+    // Angelegt wird nur einmal; ein zweiter Aufruf wuerde ohnehin abgelehnt.
+    elements.configCreate.disabled = true;
+    return;
+  }
+
+  const suggestion = data.suggestion || {};
+  elements.configForm.classList.remove("hidden");
+  elements.configProjectDir.value = suggestion.projectDir || "";
+  elements.configRepoRoot.value = suggestion.repoRoot || ".";
+
+  const candidates = suggestion.repoCandidates || [];
+  if (candidates.length > 1) {
+    addFact(elements.configFacts, "Gefundene Repositories", candidates.join(", "));
+  }
+  if (!suggestion.derived) {
+    addFact(elements.configFacts, "Hinweis", "Ort nicht aus dem Programmpfad ableitbar, bitte pruefen");
+  }
+
+  setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
+}
 
 // Setzt Pill und Button eines Blocks aus einem Zustand. Einheitliche Regel fuer
 // alle Bloecke: der Button kann immer ausgeloest werden und tut immer dasselbe,
@@ -88,14 +178,8 @@ function renderAssistant(data) {
   elements.assistantFacts.replaceChildren();
 
   for (const entry of data.entries || []) {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    term.textContent = entry.path;
-    const detail = document.createElement("dd");
     const label = STATE_LABELS[entry.state] || entry.state;
-    detail.textContent = entry.detail ? `${label} (${entry.detail})` : label;
-    row.append(term, detail);
-    elements.assistantFacts.append(row);
+    addFact(elements.assistantFacts, entry.path, entry.detail ? `${label} (${entry.detail})` : label);
   }
 
   elements.assistantMessage.textContent = data.message || "";

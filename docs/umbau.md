@@ -84,6 +84,29 @@ Die Aufwärtssuche darf **nicht** am Git-Worktree-Root abbrechen. `<projekt>/k-p
 ist ein eigener Clone und damit ein eigener Worktree; wer von dort aus sucht, käme sonst
 nie an die Config eine Ebene darüber.
 
+## Anlegen, wenn nichts gefunden wird
+
+Nach `git clone` existiert noch keine Config — die Suche schlägt also fehl. Statt zu raten,
+schlägt das Werkzeug den Ort vor und lässt ihn bestätigen.
+
+Das Hauptverzeichnis muss dabei nicht geraten werden: der Aufruf erfolgt über
+`A/k-playbook/bin/`, das Binary liegt in `A/k-playbook/dist/`. Zwei Ebenen darüber liegt
+`A`. Geprüft wird, dass das Zwischenverzeichnis wirklich `k-playbook` heißt; sonst fällt
+der Vorschlag auf das Arbeitsverzeichnis zurück und wird als unsicher gekennzeichnet.
+
+Die `.git`-Suche beantwortet nicht, wo `A` liegt, sondern was in `project.repo_root`
+gehört:
+
+| Situation | Hauptverzeichnis | `repo_root` |
+|---|---|---|
+| `A/.git` vorhanden | `A` | `.` |
+| `A/G/.git`, `A` selbst ohne `.git` | `A` | `G` |
+| mehrere Kandidaten unter `A` | `A` | leer, der Nutzer wählt |
+
+Geschrieben wird ausschließlich auf Bestätigung. Eine vorhandene `K-PLAYBOOK.yaml` wird
+nie überschrieben — sie gehört dem Projekt und kann Werte tragen, die das Werkzeug nicht
+kennt.
+
 ## Stand
 
 Das Werkzeug ist auf ein leeres Gerüst zurückgesetzt: `bin/k-playbook` startet die lokale
