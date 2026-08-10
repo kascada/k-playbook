@@ -8,7 +8,8 @@ Diese Notiz dokumentiert die lokale SSH-/GitHub-Konfiguration auf dem Kleist-Dev
 
 ## k-playbook
 
-Das lokale `~/dev/k-playbook` nutzt diesen Remote:
+Das Entwicklungs-Repo unter `~/dev/k-playbook` nutzt diesen Remote. Derselbe Alias gilt
+fuer jeden Clone in ein Zielprojekt, denn jedes Projekt klont dasselbe Repo:
 
 ```text
 git@github-kamranbycloud:kascada/k-playbook.git

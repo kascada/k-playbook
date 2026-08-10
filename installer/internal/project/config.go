@@ -236,13 +236,14 @@ func renderConfig(repoRoot string, vcs string) string {
 # Die Installation liegt daneben unter %s/ und ist vollstaendig
 # ersetzbar; projekteigene Dateien gehoeren nicht hinein.
 
-schema_version: 2
+schema_version: 3
 
 project:
   # Ort des Projekt-Repositorys, relativ zu dieser Datei.
   repo_root: %s
   vcs: %s
-`, PlaybookDirName, repoRoot, vcs)
+
+%s`, PlaybookDirName, repoRoot, vcs, remediationBlock(DefaultRemediationMode))
 }
 
 func pathExists(path string) bool {

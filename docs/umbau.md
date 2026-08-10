@@ -4,7 +4,7 @@ Arbeitsdatei für die Dauer der Umstellung. Sie hält fest, was besprochen und f
 ist — nicht, was angedacht wurde. Wenn alles umgestellt ist, wird der bleibende Teil in
 die reguläre Doku eingearbeitet und diese Datei gelöscht.
 
-Stand: 2026-08-10, Branch `feat/project-local-install`.
+Stand: 2026-08-10, Branch `main`.
 
 ## Arbeitsteilung: Entwicklungsrepo vs. Installation
 
@@ -40,8 +40,9 @@ Beispielprojekt.
   Plattform-Binaries. Es gibt nur ein Build-Target, damit ein eigener Build und die
   Auslieferung dasselbe Ergebnis liefern.
 - Der Wrapper `bin/k-playbook` ruft die zur Plattform passende Version aus `dist/` auf.
-- Nach dem Clone wird darin `make install` aufgerufen. Das ruft `bin/k-playbook install`.
-- `install` legt das Parallelverzeichnis `k-playbook-local/` an.
+- Nach dem Clone wird `k-playbook/bin/k-playbook` aufgerufen. Es startet die Oberfläche,
+  die durch die Einrichtung führt; ein `install`-Unterkommando gibt es nicht.
+- Geschrieben wird ausschließlich auf Bestätigung, Schritt für Schritt.
 
 ## Verzeichnisaufteilung und Anker
 
@@ -89,10 +90,20 @@ nie an die Config eine Ebene darüber.
 Nach `git clone` existiert noch keine Config — die Suche schlägt also fehl. Statt zu raten,
 schlägt das Werkzeug den Ort vor und lässt ihn bestätigen.
 
-Das Hauptverzeichnis muss dabei nicht geraten werden: der Aufruf erfolgt über
-`A/k-playbook/bin/`, das Binary liegt in `A/k-playbook/dist/`. Zwei Ebenen darüber liegt
-`A`. Geprüft wird, dass das Zwischenverzeichnis wirklich `k-playbook` heißt; sonst fällt
-der Vorschlag auf das Arbeitsverzeichnis zurück und wird als unsicher gekennzeichnet.
+Der Vorschlag darf raten — anders als die Suche, denn geschrieben wird erst nach
+Bestätigung. Kandidaten in dieser Reihenfolge:
+
+1. **Das Git-Repository, in dem der Aufruf stattfindet.** Wer das Werkzeug startet, steht
+   in aller Regel in dem Projekt, das er meint. Das ist der stärkste Hinweis.
+2. **Aus dem Ort des Binaries.** Es liegt in `<X>/dist/`, also ist `X` die Installation.
+   Ob `X` selbst das Hauptverzeichnis ist oder eine Ebene darunter liegt, hängt daran, ob
+   die Installation geklont wurde oder das Repo selbst ist — beides kommt vor, deshalb
+   stehen beide Orte zur Auswahl.
+3. Das Arbeitsverzeichnis.
+
+Ein früherer Ansatz leitete das Hauptverzeichnis allein aus dem Binary-Pfad ab und prüfte,
+ob das Zwischenverzeichnis `k-playbook` heißt. Das ging im Entwicklungsrepo schief: dort
+heißt das Hauptverzeichnis selbst so, und der Vorschlag landete eine Ebene zu hoch.
 
 Die `.git`-Suche beantwortet nicht, wo `A` liegt, sondern was in `project.repo_root`
 gehört:
@@ -130,8 +141,8 @@ projekt/
     ├── reviews/          Overlay zu k-playbook/reviews/
     ├── checks/           Overlay zu k-playbook/checks/
     ├── results/          Review-Ergebnisse
+    ├── docs/             Projektwissen für AI-Sessions
     ├── guidelines/
-    ├── commands/         projekteigene Slash-Commands
     ├── tasks/done/
     ├── priv/             Inhalt gitignored, Verzeichnis versioniert
     └── TODO.md
@@ -147,44 +158,217 @@ kein Skill-Konzept. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, weil Claude Cod
 ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so landet jede
 Änderung in beiden. Fehlt `AGENTS.md`, wird nichts angelegt; die Datei gehört dem Projekt.
 
+**Commands und Skills gibt es nur mitgeliefert.** Es gibt kein
+`k-playbook-local/commands/` und kein `k-playbook-local/skills/`. Das ist auch der Grund,
+warum die Verlinkung so einfach bleiben kann: `.claude/commands` zeigt als einzelner
+Symlink auf `k-playbook/commands`, und ein Symlink kann nur auf eine Quelle zeigen. Gäbe
+es beide Verzeichnisse, müsste die Verlinkung pro Datei erfolgen und nach jedem Update
+nachgezogen werden.
+
+## Zusammenfassen: mitgeliefert und projekteigen
+
+Drei Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Seiten:
+
+| Sorte | mitgeliefert | projekteigen | Dateimuster |
+|---|---|---|---|
+| Regeln | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
+| Review-Rezepte | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
+| Checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, nur oberste Ebene |
+
+Die Vergleichseinheit ist der **Dateiname**. Beide Seiten benutzen dieselbe
+Namenskonvention, deshalb braucht es keinen abgeleiteten Schlüssel.
+
+**Bei gleichem Dateinamen gewinnt die projekteigene Datei, und zwar vollständig.** Die
+mitgelieferte wird dann gar nicht erst gelesen; es werden auch keine einzelnen Abschnitte
+daraus übernommen. Wer eine mitgelieferte Regel ändern will, kopiert sie und ändert die
+Kopie — mit dem bekannten Preis, dass spätere Verbesserungen am Original diese Kopie nicht
+mehr erreichen. Der Vorteil wiegt schwerer: was gilt, steht in genau einer Datei.
+
+`overlay.<kind>.disabled` schaltet eine mitgelieferte Datei ersatzlos ab. Die Einträge sind
+Dateinamen, passend zur Vergleichseinheit — also `tool-install-scope.md`, nicht
+`tool-install-scope`. Die Liste wirkt nur auf mitgelieferte Dateien; eine projekteigene
+Datei schaltet man ab, indem man sie löscht.
+
+`README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig irgendetwas unter
+`checks/lib/`.
+
+**Nur projekteigen, ohne Gegenstück:** `results/`, `docs/`, `guidelines/`, `tasks/`,
+`priv/`, `TODO.md`. **Nur mitgeliefert:** `commands/`, `skills/`, `docs/`, `scripts/`,
+`bin/`, `dist/`, `installer/`.
+
+`docs/` steht in beiden Listen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
+k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstände
+unter demselben Namen, nichts zusammenzufassen.
+
+## Ergebnisse liegen unter `results/`
+
+`k-playbook-local/reviews/` enthält ausschließlich Review-**Rezepte**. Alles, was ein
+Review erzeugt, liegt unter `k-playbook-local/results/`:
+
+```text
+k-playbook-local/
+├── reviews/                       nur review-<name>.md
+└── results/
+    ├── log.md                     wann welches Review lief
+    ├── known-decisions.md         bewusst getroffene Entscheidungen
+    ├── summary-YYYY-MM-DD.md      projektweite Priorisierung aus /k-results
+    └── <familie>/YYYY-MM-DD/
+        ├── assessment.md
+        ├── findings.md
+        ├── run-metadata.json
+        └── raw/
+```
+
+Damit bleibt `reviews/` ein reines Overlay-Verzeichnis, in dem jede Datei nach derselben
+Regel behandelt wird. Vorher lagen Rezepte, Log, Entscheidungen und Ergebnisse
+durcheinander unter `<paths.reviews>/`.
+
 ## Stand
 
 Das Werkzeug führt durch drei Schritte: Konfiguration anlegen, projekteigene Struktur
-anlegen, Assistenten verlinken. Der bisherige Go-Code liegt unter `installer/_old/` als
-Nachschlagewerk — von der Go-Toolchain ignoriert und nicht baubar.
+anlegen, Assistenten verlinken. Dazu kommt ein rein lesender Block für die Security-Tools.
+
+Der Go-Code liegt unter `installer/internal/`:
+
+| Paket | Inhalt |
+|---|---|
+| `project/discover.go` | Anker finden, aufwärts ab einem Startverzeichnis |
+| `project/config.go` | Config lesen und anlegen, Vorschlag für Ort und `repo_root` |
+| `project/local.go` | projekteigene Struktur prüfen und anlegen |
+| `project/links.go` | Assistenten-Verlinkung prüfen und herstellen |
+| `project/tools.go` | Security-Tool-Preflight über das Skript |
+| `webui/` | Server, Endpunkte, eingebettete Oberfläche |
+
+## Der alte Code als Nachschlagewerk
+
+`installer/_old/` enthält den vollständigen Stand vor dem Umbau, rund 7800 Zeilen Go.
+Verschoben per `git mv`, also in der Historie nachvollziehbar. Verzeichnisse mit
+`_`-Präfix ignoriert die Go-Toolchain vollständig: kein Build, keine Tests, keine
+Imports. Der Code ist dort **nicht baubar** — seine Imports zeigen auf Pfade, die es
+nicht mehr gibt. Er ist zum Lesen und Herüberkopieren da, nicht zum Ausführen.
+
+Was dort steht und noch gebraucht werden könnte:
+
+| Ort | Inhalt |
+|---|---|
+| `_old/internal/install/config.go` | vollständiger Config-Vertrag: `PathKeys`, `ValidatePath`, `RenderConfig` |
+| `_old/internal/install/migrate.go` | zeilenweise Migration, die Kommentare und unbekannte Blöcke erhält |
+| `_old/internal/projects/status.go` | die elf Statusprüfungen der alten Oberfläche |
+| `_old/internal/webui/server.go` | die alte GUI mit allen Bedienabläufen |
+| `_old/payload/payload.go` | `go:embed` samt Extract-Logik des abgelösten Modells |
+
+Als Referenz für eine gewachsene Konfiguration dient
+`/home/kleist/dev/Aiva/kascada/k-playbook/K-PLAYBOOK.yaml`.
+
+## Konfiguration
+
+**`paths.*` entfällt ersatzlos.** Die neun Schlüssel waren nötig, solange die Struktur
+frei wählbar war. Sie ist es nicht mehr: der Ort der `K-PLAYBOOK.yaml` bestimmt das
+Hauptverzeichnis, daneben liegen `k-playbook/` und `k-playbook-local/` mit fester
+Aufteilung. Ein Schlüssel, dessen Wert immer derselbe ist, wäre nur eine Fehlerquelle.
+Commands und Skills leiten ihre Ziele künftig aus der Position der Datei ab statt sie zu
+lesen; das ist ein eigener Umbauschritt.
+
+**`k_playbook.dist`, `version`, `installed_at` und `layout`** beschreiben das abgelöste
+Modell und entfallen ebenfalls. Eine Version ließe sich bei Bedarf aus
+`git -C k-playbook describe --always` gewinnen.
+
+**`schema_version` ist `3`.** Die `2` ist an das abgelöste Modell vergeben — Anker im
+k-playbook-Verzeichnis, `_dist/`, `layout: project-local`, `paths.*`. Eine eigene Nummer
+macht den Unterschied erkennbar, statt zwei unvereinbare Layouts unter derselben Zahl zu
+führen.
+
+Damit bleibt:
+
+```yaml
+schema_version: 3
+
+project:
+  repo_root: .                # Ort des Projekt-Repositorys, relativ zu dieser Datei
+  vcs: git
+
+overlay:                      # schaltet mitgelieferte Dateien ersatzlos ab
+  rules: { disabled: [] }
+  reviews: { disabled: [] }
+  checks: { disabled: [] }
+
+remediation:                  # wie Befunde abgearbeitet werden
+  mode: direct-allowed
+  target: .                   # relativ zum Hauptverzeichnis
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  pr_required: false
+  direct_fixes: true
+```
+
+`remediation.*` bleibt inhaltlich unangetastet; nur die Basis von `target` wechselt vom
+k-playbook-Verzeichnis auf das Hauptverzeichnis. Was `mode`, `pr_required` und
+`direct_fixes` künftig bedeuten sollen, ist noch nicht besprochen — die Docs beschreiben
+bis dahin den bestehenden Vertrag.
+
+## Entfallen
+
+**Der Pfadvertrag `~/dev/k-playbook`** und alles, was daran hing: der Symlink, seine
+Reparatur durch die Oberfläche, die Repo-Erkennung über Markerdateien und die Annahme
+einer zentralen Basisinstallation, die viele Projekte bedient.
+
+**Die host-globale Assistenten-Registrierung.** Es werden keine Symlinks mehr nach
+`~/.config/opencode/command/`, `~/.claude/commands/` oder `~/.claude/skills/` gelegt und
+kein `skills.paths` in der OpenCode-User-Config gepflegt. Verlinkt wird projektlokal, in
+`.claude/`, `.opencode/` und `.cursor/` des Projekts. Damit kann ein Host mehrere Projekte
+mit unterschiedlichen k-playbook-Ständen tragen, ohne dass sie sich gegenseitig
+überschreiben.
+
+**Die DevContainer-Integration.** Kein Bind-Mount nach `/workspaces/k-playbook`, kein
+Symlink `~/dev/k-playbook` im Container, kein `.devcontainer/setup-k-playbook.sh` und kein
+`install-devcontainer-k-playbook.sh`. Ein Container bekommt die Installation über das
+Projektverzeichnis mit, wie jede andere Datei des Projekts auch.
+
+**Der Command `k-install-security-tools`.** Status und Installationsbefehl kommen aus der
+Oberfläche, alles Weitere kann das Skript selbst: `--preflight` ist sein Standardverhalten,
+ohne `--yes` fragt es vor der Installation, und `--help` erklärt die Methoden. Der Command
+hätte das nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen gewesen.
+
+**Alle Subkommandos.** `k-playbook` startet ausschließlich die Oberfläche. `init`,
+`update`, `restore`, `migrate`, `status`, `smoke` und `projects …` gibt es nicht mehr, und
+damit auch keine lokale Projektliste unter `.k-playbook-local/projects.json`. Wo Commands
+oder Docs bisher auf `k-playbook-installer status` verwiesen, müssen sie den Status selbst
+ermitteln.
 
 ## Nachzuziehen
 
 Sammelstelle für alles, was der neuen Struktur noch folgen muss.
 
-**Ergebnisse liegen jetzt unter `k-playbook-local/results/`**, vorher unter
+**Commands und Skills** leiten ihre Ziele noch aus `paths.*` ab, das es nicht mehr gibt.
+Sie müssen künftig aus dem Ort der `K-PLAYBOOK.yaml` ableiten. Betroffen ist praktisch
+jeder Command, im Kern aber `commands/_shared/path-resolution.md`, das noch `_dist/` als
+Installation und die Config im k-playbook-Verzeichnis beschreibt.
+
+**Ergebnisse liegen unter `k-playbook-local/results/`**, vorher unter
 `<paths.reviews>/results/`. Umzustellen: `/k-results` sowie die Review-Rezepte, die dorthin
 schreiben — `review-secret-scanning`, `review-codeql-security`, `review-k-check-security`,
 `review-dependabot-alerts`, `review-dependency-cve`, `review-iac-container`, `review-tech`.
+Dasselbe gilt für `log.md` und `known-decisions.md`, die `/k-review` bisher unter
+`<paths.reviews>/` pflegte.
 
 **Der projektlokale Regelordner heißt `rules/`**, nicht mehr `enforcement/`. Umzustellen:
 `commands/_shared/overlay-resolution.md` (beschreibt die Asymmetrie als gewollt),
 `rules/README.md`, der Skill `enforcement` und der Command `k-enforcement`.
 
-**Pfade in Commands und Skills** zeigen noch auf das alte Layout: `k-playbook/docs/`,
-`k-playbook/tasks/`, `_dist/`. Betroffen sind unter anderem `k-code2docs`, `k-pr-review`,
-`k-setup-codeql`, `k-install-codeql` sowie die Skills `ai-session-memory` und
-`overlay-repo-analyse`, die `k-playbook/docs/` fest verdrahten.
-
-**`commands/_shared/path-resolution.md`** beschreibt noch `_dist/` als Installation und
-die Config im k-playbook-Verzeichnis. Der Anker liegt jetzt im Hauptverzeichnis.
+**`overlay.<kind>.disabled` führt jetzt Dateinamen**, nicht mehr abgeleitete Schlüssel.
+`commands/_shared/overlay-resolution.md` beschreibt noch die Schlüssel-Variante.
 
 **`checks/README.md` und `bin/k-check`** setzen den Env-Kontrakt `K_PLAYBOOK_DIST` und
 leiten das Verzeichnis aus der eigenen Lage ab.
 
-**`scripts/install-security-tools.sh` findet seine Tool-Matrix nicht mehr.** Der Default
-zeigt auf `$PLAYBOOK_REPO/global/security-tools.tsv`; ein `global/` gibt es seit dem
-Payload-Umzug nicht, die Datei liegt im Repo-Root. Ebenso verweist
-`commands/k-install-security-tools.md` auf `<DIST_DIR>/security-tools.tsv` und im Text auf
-`global/security-tools.tsv`.
+**Die Oberfläche** deckt bisher nur Konfiguration, projekteigene Struktur und
+Assistenten-Verlinkung ab. Was der Status je Projekt zeigen soll, nachdem der frühere
+Projekt-Store entfallen ist, ist offen.
 
-**`make install` und `scripts/install-installer.sh`** folgen dem alten Modell und suchen
-ein `k-playbook-installer`-Binary.
-
-**Der Abschnitt „Altes Modell" in `README.md`** wird geleert, sobald die Punkte darüber
-abgearbeitet sind.
+**Die Projekt-Dokumentation liegt fest unter `k-playbook-local/docs/`**, Tool-Steckbriefe
+darunter in `libs/`. `paths.docs` war früher der eine Pfad, der das k-playbook-Verzeichnis
+per `../` verlassen durfte — damit ein Projekt seine bereits vorhandene Doku
+weiterverwenden konnte. Dieser Sonderfall entfällt zugunsten eines festen Ortes.
+Umzustellen: `/k-code2docs`, `/k-tools-scan` und der Skill `ai-session-memory`, die alle
+noch `k-playbook/docs/` fest verdrahten.

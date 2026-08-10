@@ -14,11 +14,11 @@ Tasks koennen direkt aus dem Gespraech entstehen oder von `/k-remediation` erzeu
 
 ## /k-task-create
 
-`/k-task-create [short-name]` erzeugt eine strukturierte Task-Datei unter `paths.tasks`.
+`/k-task-create [short-name]` erzeugt eine strukturierte Task-Datei unter `k-playbook-local/tasks/`.
 
 Der Command:
 
-- liest `K-PLAYBOOK.yaml` und nutzt `paths.tasks`.
+- leitet den Ort aus der Lage der `K-PLAYBOOK.yaml` ab.
 - bestimmt die naechste freie Nummer aus offenen Tasks und `done/`.
 - erzeugt einen Dateinamen wie `014-audiosocket-server.md`.
 - nimmt relevante Referenzen und besondere Tools in die Task-Datei auf.
@@ -38,7 +38,7 @@ Der Command nutzt einen strukturierten Critic/Editor-Dialog:
 - Akzeptierte Edits und Entscheidungen werden im Review-Log festgehalten.
 - Am Ende wird gegen den angegebenen `## Intent` geprueft, falls vorhanden.
 
-Ohne Argument prueft der Command die offenen Task-Dateien unter `paths.tasks`.
+Ohne Argument prueft der Command die offenen Task-Dateien unter `k-playbook-local/tasks/`.
 
 ## /k-run
 
@@ -46,7 +46,7 @@ Ohne Argument prueft der Command die offenen Task-Dateien unter `paths.tasks`.
 
 Der Command:
 
-- nutzt ohne Argument `paths.tasks`.
+- nutzt ohne Argument `k-playbook-local/tasks/`.
 - sortiert Tasks nach numerischem Prefix.
 - fuehrt Tasks nie parallel aus.
 - klaert offene Fragen vor Delegation an Subagenten.

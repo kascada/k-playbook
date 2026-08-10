@@ -1,59 +1,74 @@
-# k-playbook Dokumentation
+# Dokumentation
 
-Diese Dokumentation beschreibt k-playbook als globales Repo fuer AI-Assistant-Workflows und als projektlokal registrierten Werkzeugkasten.
+k-playbook ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und
+Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten soll.
 
 ## Einstieg
 
 | Dokument | Inhalt |
 |---|---|
-| [`handbuch.md`](./handbuch.md) | Zentrale Beschreibung: Zweck, Konzepte, Standardablaeufe, Betriebsregeln. |
-| [`installation.md`](./installation.md) | Host-Installation, OpenCode-Setup, Security-Tools, optional Claude Code. |
-| [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys fuer `k-playbook` und `KamranApps`. |
-| [`faq.md`](./faq.md) | Kurze Antworten zu `/k-gui`, Aufrufort, Projekt-venvs und Setup-Abgrenzung. |
-| [`commands.md`](./commands.md) | Zuständigkeiten und Details der wichtigsten `/k-*`-Commands. |
-| [`pr-review.md`](./pr-review.md) | Detailguide fuer PR-Reviews. |
-| [`code-review.md`](./code-review.md) | Detailguide fuer `/k-review`, `/k-results`, `/k-remediation` und Handoffs. |
-| [`task-flow.md`](./task-flow.md) | Detailguide fuer `/k-task-create`, `/k-review-loop` und `/k-run`. |
-| [`k-playbook-format.md`](./k-playbook-format.md) | YAML-Format der projektlokalen `K-PLAYBOOK.yaml`-Konfiguration. |
-| [`reviews-and-results.md`](./reviews-and-results.md) | Review-Familien, Result-Artefakte, Findings, Priorisierung und Remediation. |
-| [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Installer-Architektur, Browser-GUI, Web-API, Designentscheidungen und Session-Memory fuer weitere Installer-Arbeiten. |
-| [`../prompts/README.md`](../prompts/README.md) | Kopierbare AI-Assistenten-Prompts fuer gefuehrte Ablaeufe. |
-| [`../global/checks/README.md`](../global/checks/README.md) | Schnittstelle und Nutzung von `global/bin/k-check`. |
-| [`../global/rules/README.md`](../global/rules/README.md) | Globale Enforcement-Regeln. |
-| [`../global/security-tools.tsv`](../global/security-tools.tsv) | Kanonische Security-Tool-Matrix fuer `/k-install-security-tools`, Installer-GUI und Security-Review-Rezepte. |
+| [`handbuch.md`](./handbuch.md) | Zweck, Grundmodell, Standardablaeufe, Betriebsregeln. Die zentrale Seite. |
+| [`installation.md`](./installation.md) | Clone, die drei Einrichtungsschritte, Security-Tools, Aktualisieren, Fehlersuche. |
+| [`k-playbook-format.md`](./k-playbook-format.md) | Der Kontrakt: `K-PLAYBOOK.yaml`, Verzeichnisaufteilung, Overlay-Regeln. |
+| [`commands.md`](./commands.md) | Index der Slash-Commands und ihrer Zustaendigkeiten. |
+| [`faq.md`](./faq.md) | Kurze Antworten zu Installation, Pfaden, Overlay und Security-Tools. |
 
-## Playbooks
+## Detailseiten
 
-| Playbook | Zweck |
+| Dokument | Inhalt |
 |---|---|
-| [`../ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md) | Docs als autoritative Quelle fuer AI-Sessions verankern. |
-| [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md) | Globale und projektlokale Regeln waehrend der Arbeit anwenden. |
-| [`../ks-overlay-repo-analyse/PLAYBOOK.md`](../ks-overlay-repo-analyse/PLAYBOOK.md) | Docker-Overlay-Repos systematisch analysieren und dokumentieren. |
+| [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-results`, `/k-remediation` und den Handoffs. |
+| [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
+| [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-review-loop`, `/k-run`. |
+| [`pr-review.md`](./pr-review.md) | `/k-pr-review` fuer konkrete GitHub-Pull-Requests. |
+| [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |
+
+## Werkzeug und Kataloge
+
+| Dokument | Inhalt |
+|---|---|
+| [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Architektur des Go-Werkzeugs: Anker finden, Verlinkung, Web-API, Designentscheidungen. |
+| [`../installer/README.md`](../installer/README.md) | Kurzeinstieg und Pruefungen fuer Arbeiten am Werkzeug. |
+| [`../checks/README.md`](../checks/README.md) | Schnittstelle und Nutzung von `bin/k-check`. |
+| [`../rules/README.md`](../rules/README.md) | Die mitgelieferten Regeln. |
+| [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv) | Kanonische Security-Tool-Matrix fuer Skript, Oberflaeche und Review-Rezepte. |
+
+## Skills
+
+| Skill | Zweck |
+|---|---|
+| [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md) | Docs als autoritative Quelle fuer AI-Sessions verankern. |
+| [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md) | Mitgelieferte und projekteigene Regeln waehrend der Arbeit anwenden. |
+| [`../skills/overlay-repo-analyse/PLAYBOOK.md`](../skills/overlay-repo-analyse/PLAYBOOK.md) | Docker-Overlay-Repos systematisch analysieren und dokumentieren. |
+
+## Umstellung
+
+[`umbau.md`](./umbau.md) ist die Arbeitsdatei zur laufenden Umstellung auf das
+projektlokale Modell. Sie haelt fest, was festgelegt ist, was ersatzlos entfallen ist und
+was noch nachzuziehen bleibt. Wenn alles umgestellt ist, wird sie geloescht.
 
 ## Stichwort-Index
 
-- `AGENTS.md` -> [`ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
-- `Basisinstallation` / `Base-Repo` -> [`../AGENTS.md`](../AGENTS.md), [`handbuch.md`](./handbuch.md); wird durch die projektlokale Installation abgeloest
-- `_dist` / `projektlokale Installation` / `Payload` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#status-umstellung-auf-projektlokale-installation)
-- `Overlay` / `overlay.disabled` / `Regel ueberlagern` -> [`k-playbook-format.md`](./k-playbook-format.md#overlay), [`../commands/_shared/overlay-resolution.md`](../commands/_shared/overlay-resolution.md)
-- `CodeQL` -> [`commands.md`](./commands.md), [`../global/rules/codeql.md`](../global/rules/codeql.md)
-- `Commands` -> [`handbuch.md`](./handbuch.md#wichtige-commands), [`commands.md`](./commands.md)
-- `Docs zuerst` -> [`handbuch.md`](./handbuch.md), [`../ks-ai-session-memory/PLAYBOOK.md`](../ks-ai-session-memory/PLAYBOOK.md)
-- `Enforcement` -> [`handbuch.md`](./handbuch.md), [`../ks-enforcement/PLAYBOOK.md`](../ks-enforcement/PLAYBOOK.md)
-- `Installation` -> [`installation.md`](./installation.md)
-- `Installer` / `Browser-GUI` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
-- `Installer-Binary` / `Wrapper` / `bin/k-playbook-installer` -> [`installation.md`](./installation.md#installer-binary-und-launcher)
-- `GitHub SSH` / `Deploy-Key` / `KamranApps` -> [`local-github-ssh.md`](./local-github-ssh.md)
-- `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
-- `k-gui` -> [`faq.md`](./faq.md), [`installation.md`](./installation.md), [`commands.md`](./commands.md)
-- `k-check` -> [`../global/checks/README.md`](../global/checks/README.md)
-- `Multi-Project` / `DevContainer-Installation` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
-- `Prompts` -> [`../prompts/README.md`](../prompts/README.md)
+- `Anker` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
+- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
+- `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
+- `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
+- `CodeQL` -> [`commands.md`](./commands.md), [`../rules/codeql.md`](../rules/codeql.md)
+- `Commands` -> [`commands.md`](./commands.md)
+- `Docs zuerst` -> [`handbuch.md`](./handbuch.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
+- `Enforcement` / `Regeln` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
+- `Findings` / `Statuswerte` -> [`reviews-and-results.md`](./reviews-and-results.md#statusmodell)
+- `GitHub SSH` / `Deploy-Key` -> [`local-github-ssh.md`](./local-github-ssh.md)
+- `Installation` / `git clone` -> [`installation.md`](./installation.md)
+- `k-playbook-local` / `projekteigen` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen)
+- `Oberflaeche` / `k-gui` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `Overlay` / `overlay.disabled` / `Regel ersetzen` -> [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen)
+- `Pfade` / `warum keine paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#keine-pfade-in-der-konfiguration)
 - `PR-Review` -> [`pr-review.md`](./pr-review.md)
-- `Remediation` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
-- `Regeln in diesem Repo` -> [`../AGENTS.md`](../AGENTS.md), [`../global/rules/README.md`](../global/rules/README.md)
-- `Reviews` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
-- `Security-Tools` -> [`installation.md`](./installation.md), [`commands.md`](./commands.md)
-- `Security-Tool-Matrix` -> [`../global/security-tools.tsv`](../global/security-tools.tsv)
-- `Results` -> [`code-review.md`](./code-review.md), [`reviews-and-results.md`](./reviews-and-results.md)
-- `Tasks` -> [`task-flow.md`](./task-flow.md), [`handbuch.md`](./handbuch.md), [`commands.md`](./commands.md)
+- `Remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)
+- `Results` / `Ergebnisse` -> [`reviews-and-results.md`](./reviews-and-results.md)
+- `Reviews` -> [`code-review.md`](./code-review.md)
+- `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
+- `Security-Tools` / `Tool-Matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
+- `Tasks` -> [`task-flow.md`](./task-flow.md)
+- `Update` / `git pull` -> [`installation.md`](./installation.md#aktualisieren)

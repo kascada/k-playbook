@@ -82,7 +82,7 @@ func TestCreateConfigSchreibtAuffindbareDatei(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Config lesen: %v", err)
 	}
-	for _, want := range []string{"schema_version: 2", "repo_root: .", "vcs: git"} {
+	for _, want := range []string{"schema_version: 3", "repo_root: .", "vcs: git"} {
 		if !strings.Contains(string(content), want) {
 			t.Errorf("Config enthaelt %q nicht:\n%s", want, content)
 		}
@@ -230,5 +230,26 @@ func TestAddUniqueHaeltReihenfolgeUndUeberspringtDoppelte(t *testing.T) {
 
 	if len(list) != 2 || list[0] != "a" || list[1] != "b" {
 		t.Errorf("list = %v, erwartet [a b]", list)
+	}
+}
+
+// Eine neue Konfiguration bringt den Remediation-Standard gleich mit, damit
+// nicht erst beim ersten Review entschieden werden muss.
+func TestCreateConfigSchreibtRemediationStandard(t *testing.T) {
+	root := t.TempDir()
+
+	if err := CreateConfig(root, "."); err != nil {
+		t.Fatalf("CreateConfig: %v", err)
+	}
+
+	remediation, err := ReadRemediation(root)
+	if err != nil {
+		t.Fatalf("ReadRemediation: %v", err)
+	}
+	if !remediation.Configured {
+		t.Error("Configured = false, der Block fehlt in der neuen Datei")
+	}
+	if remediation.Mode != DefaultRemediationMode {
+		t.Errorf("Mode = %q, erwartet %q", remediation.Mode, DefaultRemediationMode)
 	}
 }

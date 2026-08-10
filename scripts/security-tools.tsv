@@ -1,4 +1,4 @@
-# Canonical security review tool matrix for /k-install-security-tools, /k-gui and review recipes.
+# Kanonische Tool-Matrix fuer install-security-tools.sh, die Oberflaeche und die Review-Rezepte.
 # Fields: name	required	installable	role	docker_image	version_args
 name	required	installable	role	docker_image	version_args
 gitleaks	true	true	Secret-Scanning	ghcr.io/gitleaks/gitleaks:latest	version,--version

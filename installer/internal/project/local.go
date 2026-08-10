@@ -32,9 +32,9 @@ func LocalStructure() []LocalEntry {
 		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergaenzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
 		{Path: "reviews", Purpose: "Projekteigene Review-Rezepte, benannt als review-<name>.md."},
 		{Path: "checks", Purpose: "Projekteigene Checks als *.sh, ausgefuehrt ueber " + PlaybookDirName + "/bin/k-check."},
-		{Path: "results", Purpose: "Ergebnisse aus Reviews, je Review und Datum abgelegt."},
+		{Path: "results", Purpose: "Alles, was Reviews erzeugen: Ergebnisse je Familie und Datum, dazu log.md und known-decisions.md."},
+		{Path: "docs", Purpose: "Projektwissen fuer AI-Sessions, erzeugt von /k-code2docs; Tool-Steckbriefe unter libs/."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
-		{Path: "commands", Purpose: "Projekteigene Slash-Commands zusaetzlich zu den mitgelieferten."},
 		{Path: "tasks", Purpose: "Offene Tasks, nummeriert als <nummer>-<name>.md."},
 		{Path: filepath.Join("tasks", "done"), Purpose: "Erledigte Tasks, nach der Ausfuehrung hierher verschoben."},
 		{

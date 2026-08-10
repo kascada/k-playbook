@@ -33,7 +33,7 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "commands", "tasks"} {
+	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "tasks", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
 		}

@@ -141,7 +141,7 @@ has_cmd() {
 
 ensure_no_active_project_venv() {
   if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Deaktiviere es zuerst mit 'deactivate'. /k-install-security-tools installiert nur host-/user-lokale Tools, nie in ein Projekt-venv."
+    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Deaktiviere es zuerst mit 'deactivate'. Dieses Skript installiert nur host-/user-lokale Tools, nie in ein Projekt-venv."
   fi
 }
 

@@ -117,6 +117,10 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
+	mux.HandleFunc("GET /api/update", updateCheckHandler)
+	mux.HandleFunc("POST /api/update", applyUpdateHandler)
+	mux.HandleFunc("GET /api/remediation", remediationHandler)
+	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

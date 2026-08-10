@@ -232,6 +232,48 @@ body[data-mode="none"] .mode-badge {
   outline-offset: 1px;
 }
 
+.choices {
+  display: grid;
+  gap: 10px;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.choice:hover {
+  border-color: var(--accent);
+}
+
+/* Die gewaehlte Option muss auch ohne Farbwahrnehmung erkennbar sein. */
+.choice.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.choice input {
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.choice-label {
+  font-weight: 800;
+}
+
+.choice-description {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .command-row {
   margin-top: 16px;
 }

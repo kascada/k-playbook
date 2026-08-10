@@ -20,6 +20,7 @@
             {{if .Path}}{{.Path}}{{end}}
           </p>
           <div class="hero-actions">
+            <button id="update" class="secondary">Update pruefen</button>
             <button id="shutdown" class="secondary danger">Schliessen</button>
           </div>
         </div>
@@ -66,6 +67,18 @@
         <dl id="assistant-facts" class="facts"></dl>
         <p id="assistant-message" class="message"></p>
         <button id="assistant-apply" class="secondary" disabled>Aktualisieren</button>
+      </section>
+
+      <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
+        <div class="section-head">
+          <div>
+            <h2>Umgang mit Befunden</h2>
+          </div>
+          <span id="remediation-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <p class="hint">Wie Befunde aus Reviews abgearbeitet werden. Gilt fuer /k-remediation.</p>
+        <div id="remediation-choices" class="choices"></div>
+        <p id="remediation-message" class="message"></p>
       </section>
 
       <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">

@@ -6,12 +6,17 @@ let serverAvailable = true;
 
 const elements = {
   shutdown: document.getElementById("shutdown"),
+  update: document.getElementById("update"),
   closed: document.getElementById("closed"),
   closedTitle: document.getElementById("closed-title"),
   closedMessage: document.getElementById("closed-message"),
   configCard: document.getElementById("config-card"),
   localCard: document.getElementById("local-card"),
   assistantCard: document.getElementById("assistant-card"),
+  remediationCard: document.getElementById("remediation-card"),
+  remediationPill: document.getElementById("remediation-pill"),
+  remediationChoices: document.getElementById("remediation-choices"),
+  remediationMessage: document.getElementById("remediation-message"),
   toolsCard: document.getElementById("tools-card"),
   toolsPill: document.getElementById("tools-pill"),
   toolsFacts: document.getElementById("tools-facts"),
@@ -50,6 +55,7 @@ const STATE_LABELS = {
 };
 
 elements.shutdown.addEventListener("click", shutdown);
+elements.update.addEventListener("click", onUpdateClick);
 elements.configCreate.addEventListener("click", createConfig);
 elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
@@ -58,6 +64,72 @@ startHealthChecks();
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
 // blendet ihn dann ein und laedt ihn nach.
 loadConfig();
+// Die Update-Pruefung braucht das Netz. Sie laeuft nebenher, damit die Seite
+// nicht auf einen langsamen Remote wartet.
+checkUpdate();
+
+// updateAvailable steuert, was ein Klick auf den Button tut: pruefen oder
+// tatsaechlich aktualisieren.
+let updateAvailable = false;
+
+async function checkUpdate() {
+  elements.update.disabled = true;
+  elements.update.textContent = "Pruefe...";
+  try {
+    const response = await fetch("/api/update", { cache: "no-store" });
+    renderUpdate(await response.json());
+  } catch {
+    resetUpdateButton("Update pruefen");
+  }
+}
+
+async function onUpdateClick() {
+  if (!updateAvailable) {
+    await checkUpdate();
+    return;
+  }
+
+  elements.update.disabled = true;
+  elements.update.textContent = "Aktualisiere...";
+  try {
+    const response = await fetch("/api/update", { method: "POST" });
+    const data = await response.json();
+    renderUpdate(data);
+    if (data.restartRequired) {
+      showClosed(
+        "Das Programm wurde aktualisiert. Dieses Fenster schliessen und " +
+          "bin/k-playbook neu starten, um die neue Version zu verwenden."
+      );
+    }
+  } catch {
+    resetUpdateButton("Update pruefen");
+  }
+}
+
+function renderUpdate(data) {
+  updateAvailable = Boolean(data.available);
+
+  if (updateAvailable) {
+    // Hervorgehoben, solange etwas anliegt.
+    elements.update.className = "primary attention-highlight";
+    elements.update.textContent = "Update verfuegbar";
+    elements.update.title = `${data.local} -> ${data.remote} (${data.branch})`;
+    elements.update.disabled = false;
+    return;
+  }
+
+  // Ohne Meldung ist der Stand geprueft und gleich; mit Meldung konnte nicht
+  // geprueft werden, dann bleibt es bei der Aufforderung.
+  resetUpdateButton(data.message ? "Update pruefen" : "Version ist aktuell");
+  elements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
+}
+
+function resetUpdateButton(label) {
+  updateAvailable = false;
+  elements.update.className = "secondary";
+  elements.update.textContent = label;
+  elements.update.disabled = false;
+}
 
 // Legt eine Zeile in einer Faktenliste an.
 function addFact(list, term, detail) {
@@ -116,9 +188,11 @@ function renderConfig(data) {
     elements.configCard.classList.add("hidden");
     elements.localCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
+    elements.remediationCard.classList.remove("hidden");
     elements.toolsCard.classList.remove("hidden");
     loadLocal();
     loadAssistant();
+    loadRemediation();
     loadTools();
     return;
   }
@@ -127,6 +201,7 @@ function renderConfig(data) {
   elements.configCard.classList.remove("hidden");
   elements.localCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
+  elements.remediationCard.classList.add("hidden");
   elements.toolsCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
@@ -253,6 +328,78 @@ function renderAssistant(data) {
   const installed = data.environment && data.environment.installed;
   const state = !installed ? "blocked" : data.ok ? "ok" : "todo";
   setBlockState(elements.assistantPill, elements.assistantApply, state);
+}
+
+// Der Remediation-Block ist eine Einstellung, kein Einrichtungsschritt: die
+// Auswahl wird sofort gespeichert, ein eigener Button waere ein Zwischenschritt
+// ohne Nutzen.
+async function loadRemediation() {
+  elements.remediationPill.className = "pill muted";
+  elements.remediationPill.textContent = "Pruefen...";
+  try {
+    const response = await fetch("/api/remediation", { cache: "no-store" });
+    renderRemediation(await response.json());
+  } catch {
+    elements.remediationMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+async function setRemediation(mode) {
+  elements.remediationPill.className = "pill muted";
+  elements.remediationPill.textContent = "Speichern...";
+  try {
+    const response = await fetch("/api/remediation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    renderRemediation(await response.json());
+  } catch {
+    elements.remediationMessage.textContent = "Speichern fehlgeschlagen.";
+  }
+}
+
+function renderRemediation(data) {
+  elements.remediationChoices.replaceChildren();
+  elements.remediationMessage.textContent = data.message || "";
+
+  const current = data.current || {};
+  for (const choice of data.choices || []) {
+    // current.mode traegt auch ohne Eintrag in der Datei den Standard.
+    const selected = current.mode === choice.mode;
+
+    const label = document.createElement("label");
+    label.className = selected ? "choice selected" : "choice";
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "remediation-mode";
+    input.value = choice.mode;
+    input.checked = selected;
+    input.addEventListener("change", () => setRemediation(choice.mode));
+
+    const text = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "choice-label";
+    title.textContent = choice.label;
+    const description = document.createElement("p");
+    description.className = "choice-description";
+    description.textContent = choice.description;
+    text.append(title, description);
+
+    label.append(input, text);
+    elements.remediationChoices.append(label);
+  }
+
+  elements.remediationPill.className = "pill ok";
+  elements.remediationPill.textContent = current.prRequired ? "Nur ueber PR" : "Direkte Fixes moeglich";
+
+  // Der Standard gilt auch ohne Eintrag; das sollte sichtbar sein, damit
+  // niemand einen ausdruecklich gewaehlten Wert vermutet.
+  if (!current.configured && !data.message) {
+    elements.remediationMessage.textContent =
+      "Standard, noch nicht in der Konfiguration festgehalten. Eine Auswahl schreibt sie fest.";
+  }
 }
 
 // Der Tool-Block hat keinen Button: installiert wird im Terminal, weil das den

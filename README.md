@@ -62,13 +62,16 @@ projekt/
     ├── rules/            Overlay zu k-playbook/rules/
     ├── reviews/          Overlay zu k-playbook/reviews/
     ├── checks/           Overlay zu k-playbook/checks/
-    ├── results/          Review-Ergebnisse
+    ├── results/          alles, was Reviews erzeugen
+    ├── docs/             Projektwissen fuer AI-Sessions
     ├── guidelines/
-    ├── commands/         projekteigene Slash-Commands
     ├── tasks/done/
     ├── priv/             Inhalt gitignored, Verzeichnis versioniert
     └── TODO.md
 ```
+
+Gleicher Dateiname in `k-playbook-local/rules/`, `reviews/` oder `checks/` ersetzt die
+mitgelieferte Datei vollstaendig. Commands und Skills gibt es nur mitgeliefert.
 
 Verlinkt wird fuer Claude Code, OpenCode und Cursor. Skills stehen nur einmal unter
 `.claude/skills`, weil OpenCode dieses Verzeichnis mitdurchsucht und Cursor kein
@@ -91,29 +94,29 @@ Die mitgelieferten Binaries genuegen fuer den normalen Betrieb. Wer am Werkzeug 
 arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-make dist            # baut alle Plattformen nach dist/
-make installer-run   # baut und startet die Oberflaeche
+make dist   # baut alle Plattformen nach dist/
+make gui    # baut und startet die Oberflaeche
 ```
 
 `make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
-ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make installer-run`
-ist der Weg beim Entwickeln: es startet den frisch gebauten Stand statt der installierten
-Version.
+ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make gui` ist der
+Weg beim Entwickeln: es startet den frisch gebauten Stand.
 
 ## Grundprinzipien
 
 - Jedes Projekt traegt seine eigene Installation in einem Unterverzeichnis. Kein fester Hostpfad, kein globaler Symlink.
 - Installation und Projekt-Eigentum sind strikt getrennt: `k-playbook/` wird bei jedem Update vollstaendig ersetzt, alles daneben nie angefasst.
-- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt, `overlay.<kind>.disabled` schaltet ab.
-- Pfade werden aus `K-PLAYBOOK.yaml` gelesen und nicht geraten.
-- Docs, Tasks, Reviews und Results bleiben projektlokale Artefakte.
+- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt vollstaendig, `overlay.<kind>.disabled` schaltet ab.
+- Pfade stehen nicht in der Konfiguration. Sie ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`.
+- Tasks, Reviews und Ergebnisse bleiben projekteigene Artefakte unter `k-playbook-local/`.
 - Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalitaet.
+- Geschrieben wird ausschliesslich nach Bestaetigung, Schritt fuer Schritt.
 
 ## Dokumentation
 
-- [`docs/umbau.md`](./docs/umbau.md) - Stand der Umstellung, Festlegungen und offene Punkte.
 - [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
-- [`docs/pr-review.md`](./docs/pr-review.md) - PR-Review-Flow.
-- [`docs/code-review.md`](./docs/code-review.md) - Review-Rezepte, Results-Summary, Remediation und Handoffs.
-- [`docs/task-flow.md`](./docs/task-flow.md) - Task-Erzeugung, Review-Loop und Ausfuehrung.
-- [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Artefaktmodell fuer Reviews, Findings und Remediation.
+- [`docs/handbuch.md`](./docs/handbuch.md) - Zweck, Grundmodell und Standardablaeufe.
+- [`docs/k-playbook-format.md`](./docs/k-playbook-format.md) - der Kontrakt: `K-PLAYBOOK.yaml`, Struktur, Overlay.
+- [`docs/installation.md`](./docs/installation.md) - Clone, Einrichtungsschritte, Security-Tools.
+- [`docs/commands.md`](./docs/commands.md) - Index der Slash-Commands.
+- [`docs/umbau.md`](./docs/umbau.md) - Stand der Umstellung, Festlegungen und offene Punkte.

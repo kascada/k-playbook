@@ -39,7 +39,8 @@ Der Standardablauf fuer Report-Reviews ist:
 
 ## /k-review
 
-`/k-review` fuehrt globale oder projektlokale Review-Rezepte gegen das aktuelle Zielprojekt aus. Der Command ist der Einstieg fuer strukturierte Reviews ausserhalb eines konkreten GitHub-PRs.
+`/k-review` fuehrt Review-Rezepte gegen das aktuelle Projekt aus. Der Command ist der
+Einstieg fuer strukturierte Reviews ausserhalb eines konkreten GitHub-PRs.
 
 Aufrufe:
 
@@ -50,14 +51,15 @@ Aufrufe:
 /k-review secret-scanning
 ```
 
-Ohne Argument zeigt der Command die verfuegbaren Review-Rezepte aus dem globalen Katalog und aus dem projektlokalen Reviews-Verzeichnis.
+Ohne Argument zeigt der Command die effektive Rezeptmenge aus `k-playbook/reviews/` und
+`k-playbook-local/reviews/`.
 
 Der Command:
 
-- loest Projektpfade aus `K-PLAYBOOK.yaml` auf.
-- nutzt `paths.reviews` fuer Logs und Result-Artefakte.
+- leitet die Orte aus der Lage der `K-PLAYBOOK.yaml` ab.
+- schreibt Log und Ergebnisse nach `k-playbook-local/results/`.
 - trennt generischen Ablauf von konkreten Review-Kriterien.
-- erlaubt projektlokale Rezepte, die globale Rezepte mit gleichem Namen ueberlagern.
+- laesst projekteigene Rezepte mitgelieferte gleichen Dateinamens vollstaendig ersetzen.
 - beruecksichtigt `known-decisions.md`, damit bewusste Entscheidungen nicht wiederholt als neue Findings auftauchen.
 
 Interaktive Reviews moderieren Stelle fuer Stelle:
@@ -71,15 +73,15 @@ Interaktive Reviews moderieren Stelle fuer Stelle:
 Report-Mode-Reviews erzeugen Ergebnisartefakte:
 
 ```text
-<paths.reviews>/results/<family>/<YYYY-MM-DD>/assessment.md
-<paths.reviews>/results/<family>/<YYYY-MM-DD>/findings.md
-<paths.reviews>/results/<family>/<YYYY-MM-DD>/raw/
+k-playbook-local/results/<familie>/<YYYY-MM-DD>/assessment.md
+k-playbook-local/results/<familie>/<YYYY-MM-DD>/findings.md
+k-playbook-local/results/<familie>/<YYYY-MM-DD>/raw/
 ```
 
-Report-Mode-Reviews ohne eigene `result-family`, z. B. `tech`, schreiben direkt eine Summary:
+Report-Mode-Reviews ohne eigene Ergebnisfamilie, z. B. `tech`, schreiben direkt eine Summary:
 
 ```text
-<paths.reviews>/results/summary-YYYY-MM-DD.md
+k-playbook-local/results/summary-YYYY-MM-DD.md
 ```
 
 Typische Review-Familien:
@@ -107,12 +109,12 @@ Aufrufe:
 
 Der Command:
 
-- liest vorhandene `assessment.md`- und `findings.md`-Dateien unter `<paths.reviews>/results/`.
+- liest vorhandene `assessment.md`- und `findings.md`-Dateien unter `k-playbook-local/results/`.
 - startet keine Scanner.
 - veraendert keine Raw-Artefakte.
 - dedupliziert Findings ueber Familien hinweg.
 - beruecksichtigt `known-decisions.md` und vorhandene Tasks, soweit vorhanden.
-- schreibt eine Summary unter `<paths.reviews>/results/summary-YYYY-MM-DD.md`.
+- schreibt eine Summary unter `k-playbook-local/results/summary-YYYY-MM-DD.md`.
 
 Die Summary enthaelt:
 
@@ -132,15 +134,14 @@ Aufrufe:
 
 ```text
 /k-remediation
-/k-remediation k-playbook/reviews/results/summary-YYYY-MM-DD.md
-/k-remediation k-playbook/reviews/results/<family>/<date>/assessment.md
+/k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
+/k-remediation k-playbook-local/results/<familie>/<datum>/assessment.md
 ```
 
 Unterstuetzte Inputs:
 
-- Result-Summaries von `/k-results` oder Report-Reviews ohne eigene `result-family`.
-- Result-Familien wie `<paths.reviews>/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`.
-- Legacy-Dateien wie `<paths.reviews>/result-*.md`.
+- Summaries von `/k-results` oder von Report-Reviews ohne eigene Ergebnisfamilie.
+- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/assessment.md` mit zugehoerigem `findings.md`.
 
 Der Command:
 
@@ -158,12 +159,15 @@ Der Command:
 Die Policy steht in `K-PLAYBOOK.yaml` im Block `remediation:`. Wichtige Felder sind:
 
 - `mode`: `task-branch-pr`, `task-first` oder `direct-allowed`.
-- `target`: tatsaechlicher Code-/Git-Root.
+- `target`: Remediation-Ziel relativ zur `K-PLAYBOOK.yaml`; Default ist `project.repo_root`.
 - `grouping`: ob Findings vor der Umsetzung gebuendelt werden.
 - `quick_wins`: ob einfache wirkungsstarke Buendel hervorgehoben werden.
 - `branch_prefix`: empfohlener Prefix fuer Remediation-Branches.
-- `pr_required`: ob PR-Handoff erwartet wird.
-- `direct_fixes`: ob direkte Fixes ueberhaupt erlaubt sind.
+- `pr_required` und `direct_fixes`: aus `mode` abgeleitet und mitgeschrieben, damit
+  Commands sie lesen koennen, ohne den Modus deuten zu muessen.
+
+Default ist `task-first`: nichts wird ohne Zutun am Code geaendert, direkte Fixes bleiben
+nach Freigabe trotzdem moeglich.
 
 Im Modus `task-branch-pr` erzeugt `/k-remediation` keine direkten Code-Fixes. Bestaetigte Buendel werden als Task-Dateien mit Ausfuehrungskontext geschrieben.
 
@@ -195,8 +199,8 @@ Nach einem Report-Mode-Review nennt `/k-review` den naechsten Handoff, typischer
 
 ```text
 /k-results
-/k-remediation <paths.reviews>/results/summary-YYYY-MM-DD.md
-/k-remediation <paths.reviews>/results/<family>/<YYYY-MM-DD>/assessment.md
+/k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
+/k-remediation k-playbook-local/results/<familie>/<YYYY-MM-DD>/assessment.md
 ```
 
 Wenn `/k-remediation` Tasks erzeugt, ist der naechste Schritt nicht direkte Umsetzung im Chat, sondern der normale Task-Flow:

@@ -1,92 +1,148 @@
-# k-playbook FAQ
+# FAQ
 
 ## Wann rufe ich `/k-gui` auf?
 
-`/k-gui` startet die Installer-GUI. Rufe es auf:
+`/k-gui` startet die Oberflaeche. Sinnvoll ist das:
 
-- einmal pro Host nach dem Klonen von `k-playbook`.
-- nach einem Pull/Update, wenn neue oder geaenderte Dateien unter `commands/k-*.md` fuer OpenCode sichtbar werden sollen.
-- wenn OpenCode-Symlinks oder `skills.paths` auf diesem Host geprueft oder repariert werden sollen.
-- wenn ein Zielprojekt `K-PLAYBOOK.yaml` oder die dort konfigurierte `paths.*`-Struktur braucht.
+- nach dem Klonen von k-playbook in ein Projekt, fuer die drei Einrichtungsschritte.
+- nach einem `git pull`, wenn neue Commands oder Skills dazugekommen sind und die
+  Verlinkung nachgezogen werden soll.
+- wenn `/k-status` fehlende Teile der projekteigenen Struktur oder kaputte Symlinks meldet.
 
-Die GUI ist der normale Ablauf fuer Host-Registrierung und Projekt-Onboarding.
+Wenn du nur wissen willst, ob alles stimmt, nimm `/k-status`. Der Command ist read-only
+und repariert nichts.
 
-Wenn du nur pruefen willst, ob die OpenCode-Symlinks und `skills.paths` stimmen, nutze `/k-status`. Der Command ist read-only und empfiehlt `/k-gui`, wenn die host-lokale Registrierung repariert werden muss.
+## Muss ich `/k-gui` in einem bestimmten Verzeichnis aufrufen?
 
-## Muss ich `/k-gui` im k-playbook-Repo ausfuehren?
+Am besten im Projekt, das du meinst. Das Werkzeug sucht ab dem Arbeitsverzeichnis
+aufwaerts nach `K-PLAYBOOK.yaml` und nimmt den ersten Fund als Hauptverzeichnis.
 
-Bevorzugt ja: direkt im k-playbook-Repo, z. B. `~/dev/k-playbook`, nach Clone oder Pull. Dann ist eindeutig, welches Repo fuer OpenCode registriert wird.
+Findet es nichts — etwa direkt nach dem Clone — dann raet es nicht, sondern schlaegt
+einen Ort vor und laesst ihn bestaetigen. Der staerkste Hinweis ist dabei das
+Git-Repository, in dem der Aufruf stattfindet: wer das Werkzeug startet, steht in aller
+Regel in dem Projekt, das er meint.
 
-Aus einem Zielprojekt heraus ist `/k-gui` ebenfalls erlaubt. Die GUI nutzt trotzdem den festen Pfadvertrag `~/dev/k-playbook`; `K-PLAYBOOK.yaml` waehlt keinen alternativen Basis-Repo-Pfad.
+## Ich habe mehrere Projekte. Muss ich k-playbook mehrfach installieren?
 
-Der Effekt bleibt in beiden Faellen host-global:
+Ja, und das ist Absicht. Jedes Projekt bekommt seinen eigenen Clone unter
+`<projekt>/k-playbook/`.
 
-- OpenCode-Command-Symlinks werden aktualisiert.
-- `skills.paths` wird geprueft oder ergaenzt.
-- optional wird der Security-Tool-Preflight gezeigt.
-- Projektdateien werden nur geaendert, wenn du in der GUI eine Projekt-Onboarding- oder Reparaturaktion bestaetigst.
+Der Vorteil: Projekte koennen unterschiedliche Staende tragen. Ein Projekt, das gerade
+nicht angefasst wird, bleibt auf seinem Stand, und ein Update in einem anderen Projekt
+aendert daran nichts. Es gibt keine zentrale Installation, die alle gleichzeitig
+betrifft, und keinen Hostpfad, der auf allen Rechnern stimmen muss.
 
-Wenn der k-playbook-Klon woanders liegt, soll er nach `~/dev/k-playbook` verschoben/geklont werden. Wenn du das nicht willst, kann die GUI einen Symlink nach `~/dev/k-playbook` anlegen.
+## Das Verzeichnis muss `k-playbook` heissen?
 
-## Warum ist `~/dev/k-playbook` fest?
-
-Damit Projektdateien, OpenCode-Config, Host und DevContainer denselben logischen Pfad nutzen. Das echte Repo darf physisch woanders liegen, aber jede Umgebung muss `~/dev/k-playbook` bereitstellen.
-
-Host-Beispiel:
-
-```bash
-mkdir -p ~/dev
-ln -sfn /anderer/pfad/k-playbook ~/dev/k-playbook
-```
-
-DevContainer-Beispiel:
+Ja. Commands und Skills sprechen es so an. Wie das Projektverzeichnis darueber heisst,
+spielt dagegen keine Rolle.
 
 ```bash
-mkdir -p /home/vscode/dev
-ln -sfn /workspaces/k-playbook /home/vscode/dev/k-playbook
+git clone git@github.com:kascada/k-playbook.git k-playbook
 ```
 
-## Was ist der Unterschied zwischen `/k-gui` und den Spezialcommands?
+Das Argument hinter der URL bestimmt den Namen.
 
-- `/k-gui` ist der Normalweg fuer Host-Registrierung und Projekt-Onboarding.
-- `/k-install-security-tools` installiert host-lokale Security-Tools.
-- `/k-setup-codeql` schreibt die projektlokale CodeQL-Entscheidung.
-- `/k-install-codeql` installiert/prueft lokale CodeQL-Artefakte.
+## Warum liegt `K-PLAYBOOK.yaml` nicht in `k-playbook/`?
 
-Merksatz:
+Weil `k-playbook/` bei jedem Update vollstaendig ersetzt wird. Alles, was dem Projekt
+gehoert, muss daneben liegen — sonst waere es nach dem naechsten `git pull` weg.
+
+Deshalb liegen `K-PLAYBOOK.yaml` und `k-playbook-local/` im Hauptverzeichnis:
 
 ```text
-/k-gui                 = Registrierung + Projekt-Onboarding
-/k-install-security-*  = Host/User-Tooling
-/k-setup-codeql        = Projekt-Konfiguration fuer CodeQL
+projekt/
+├── K-PLAYBOOK.yaml        der Anker
+├── k-playbook/            ersetzbar
+└── k-playbook-local/      projekteigen
 ```
 
-## Darf `/k-install*` in einem aktiven Python-venv laufen?
+## Wo stehen die Pfade fuer Tasks, Reviews und Ergebnisse?
 
-Nein. Vor `/k-install-security-tools` und host-globalen Tool-Preflights darf kein Projekt-venv aktiv sein.
+Nirgends — sie ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`. Tasks liegen unter
+`k-playbook-local/tasks/`, Ergebnisse unter `k-playbook-local/results/`, mitgelieferte
+Regeln unter `k-playbook/rules/`.
 
-Wenn `VIRTUAL_ENV` gesetzt ist:
+Fruehere Versionen hatten dafuer einen `paths:`-Block mit neun Schluesseln. Der ist
+entfallen: die Struktur ist fest, und ein Schluessel mit immer demselben Wert waere nur
+eine Fehlerquelle. Die vollstaendige Zuordnung steht in
+[`k-playbook-format.md`](./k-playbook-format.md).
+
+## Wie aendere ich eine mitgelieferte Regel?
+
+Gar nicht — `k-playbook/` wird beim Update ersetzt. Stattdessen legst du eine Datei mit
+demselben Namen unter `k-playbook-local/` an:
+
+```text
+k-playbook/rules/docs-sync.md          wird dann nicht mehr gelesen
+k-playbook-local/rules/docs-sync.md    gilt allein
+```
+
+Die lokale Datei ersetzt die mitgelieferte **vollstaendig**. Sie muss die Regel also
+ganz enthalten; einzelne Abschnitte werden nicht aus dem Original uebernommen. Der Preis
+davon ist, dass spaetere Verbesserungen am Original diese Kopie nicht mehr erreichen.
+
+Dasselbe gilt fuer `reviews/` und `checks/`.
+
+## Wie schalte ich eine mitgelieferte Regel ab, ohne sie zu ersetzen?
+
+Ueber `overlay.<kind>.disabled` in `K-PLAYBOOK.yaml`, mit dem Dateinamen als Eintrag:
+
+```yaml
+overlay:
+  rules:
+    disabled:
+      - tool-install-scope.md
+```
+
+Beides zugleich — abschalten und ersetzen — ist redundant. Die lokale Datei gewinnt
+ohnehin.
+
+## Kann ich eigene Slash-Commands hinzufuegen?
+
+Derzeit nicht. Es gibt kein `k-playbook-local/commands/`.
+
+Der Grund ist die Verlinkung: `.claude/commands` ist ein einzelner Symlink auf
+`k-playbook/commands`, und ein Symlink kann nur auf eine Quelle zeigen. Gaebe es beide
+Verzeichnisse, muesste pro Datei verlinkt und nach jedem Update nachgezogen werden. Fuer
+Skills gilt dasselbe.
+
+## Darf beim Installieren von Security-Tools ein venv aktiv sein?
+
+Nein. Sonst wird ein Tool aus dem Projekt-venv faelschlich als host-global vorhanden
+erkannt. Wenn `VIRTUAL_ENV` gesetzt ist:
 
 ```bash
 deactivate
 ```
 
-Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` sind fuer `/k-install-security-tools` nicht erlaubt. Sonst koennte ein Tool aus einem Projekt-venv faelschlich als host-global vorhanden erkannt werden.
+Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` sind nicht erlaubt. Python-CLI-Tools
+gehoeren in `pipx` oder in ein dediziertes k-playbook-Tool-venv unter
+`~/.local/share/k-playbook/`, nicht in `<projekt>/.venv`.
 
-Python-CLI-Tools gehoeren in `pipx` oder in ein dediziertes k-playbook Tool-venv unter `~/.local/share/k-playbook/`, nicht in `<projekt>/.venv`.
+## Wie installiere ich fehlende Security-Tools?
 
-## Wann rufe ich `/k-install-security-tools` auf?
+Die Oberflaeche zeigt den Status read-only. Installiert wird ueber das Skript:
 
-Wenn die Installer-GUI oder `/k-status` fehlende Pflicht-Tools meldet:
-
-```text
-/k-install-security-tools --install missing
+```bash
+k-playbook/scripts/install-security-tools.sh --install missing
 ```
 
-Der Command installiert host-/user-lokale Review-Tools wie `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft` und `grype`. Er schreibt keine Projektdateien und startet keine Scans.
+Ohne `--yes` zeigt es den Plan und fragt. `--help` erklaert die Methoden `auto`,
+`native`, `docker`, `pipx` und `venv`. Es schreibt keine Projektdateien und startet keine
+Scans.
 
-## Wann muss ich `/k-gui` aus einem Projekt heraus aufrufen?
+Einen eigenen `/k-install-security-tools`-Command gibt es nicht mehr — er haette das
+Skript nur in Prosa gedoppelt und waere bei jeder Skriptaenderung nachzuziehen gewesen.
 
-Wenn dieses Projekt noch nicht in der GUI eingebunden ist, `K-PLAYBOOK.yaml` fehlt oder `/k-status` fehlende Registrierung meldet.
+## Brauche ich Go?
 
-Voraussetzung: `~/dev/k-playbook` funktioniert auf diesem Host bzw. im Container.
+Nein. `bin/k-playbook` ist ein Wrapper, der das zur Plattform passende Binary aus `dist/`
+startet; die Binaries liegen fertig im Repo, fuer macOS und Linux.
+
+Go brauchst du nur, wenn du am Werkzeug selbst arbeitest:
+
+```bash
+make dist
+make gui
+```

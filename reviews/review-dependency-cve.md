@@ -9,7 +9,7 @@ result-family: dependency-cve
 
 # Review: Dependency-CVE Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review nutzt host-lokal installierte Tools aus `/k-install-security-tools` und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
+Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review nutzt host-lokal installierte Security-Tools und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
 
 ## Zweck
 
@@ -26,7 +26,9 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 - Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
 - Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
 - Pruefe `pip-audit --version`, `trivy --version` und `grype --version`.
-- Wenn Pflicht-Tools fehlen: abbrechen und `/k-install-security-tools --install missing` nennen.
+- Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
+  `bash <PLAYBOOK_DIR>/scripts/install-security-tools.sh` nennt den passenden
+  Installationsbefehl.
 
 ## Ergebnisverzeichnis
 

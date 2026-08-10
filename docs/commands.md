@@ -1,8 +1,12 @@
-# k-playbook Commands
+# Commands
 
-Diese Datei ist der kompakte Index der aktuellen k-playbook-Commands. Detailablaeufe stehen in eigenen Themenseiten; `commands.md` soll keine langen Ablaufbeschreibungen duplizieren.
+Kompakter Index der Slash-Commands. Detailablaeufe stehen in eigenen Themenseiten; diese
+Seite dupliziert sie nicht.
 
-Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`. Projektlokale Regeln, Reviews, Checks, Tasks und Docs liegen im jeweiligen Projekt unter den in `K-PLAYBOOK.yaml` konfigurierten `paths.*`; die konventionellen Werte zeigen auf `k-playbook/...`.
+Mitgelieferte Commands, Skills, Regeln, Review-Rezepte und Checks liegen unter
+`k-playbook/`. Projekteigene Regeln, Reviews, Checks, Tasks und Ergebnisse liegen unter
+`k-playbook-local/`. Beide Orte ergeben sich aus der Lage der `K-PLAYBOOK.yaml`; es gibt
+keine konfigurierten Pfade mehr.
 
 ## Detailseiten
 
@@ -11,55 +15,61 @@ Globale Regeln, Review-Rezepte und Checks liegen in diesem Repo unter `global/`.
 | PR-Review | [`pr-review.md`](./pr-review.md) |
 | Code-Review-Flow | [`code-review.md`](./code-review.md) |
 | Task-Flow | [`task-flow.md`](./task-flow.md) |
-| Review-/Results-/Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
-| Installation und DevContainer | [`installation.md`](./installation.md) |
+| Review-, Results- und Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
+| Installation | [`installation.md`](./installation.md) |
+| Projektkonfiguration | [`k-playbook-format.md`](./k-playbook-format.md) |
 
-## Kurzuebersicht
+## Uebersicht
 
-Aktueller Slash-Command-Bestand unter `commands/`: neue Dateien werden erst sichtbar, nachdem die Installer-GUI die OpenCode-/Claude-Registrierung aktualisiert hat und der jeweilige Assistant neu gestartet wurde.
+Neue Commands werden erst sichtbar, nachdem die Verlinkung steht und der Assistent neu
+gestartet wurde.
 
 | Command | Zweck | Detail |
 |---|---|---|
-| **Projekt und GUI** | | |
-| `/k-gui` | lokale k-playbook Installer-GUI starten | GUI registriert Commands/Skills, verwaltet Projekte, DevContainer-Integration und Projektstruktur |
-| `/k-status` | read-only Health-Check fuer Projekt und host-lokale Assistant-Registrierung | nutzt Installer-Status, repariert nichts |
-| **Tool-Installation** | | |
-| `/k-install-security-tools` | host-lokale Security-Review-Tools aus `global/security-tools.tsv` installieren oder pruefen | spezielle `k-install-*`-Commands werden separat dokumentiert |
-| `/k-install-codeql` | lokale CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | aendert `K-PLAYBOOK.yaml` nicht |
-| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt registrieren | schreibt nur `tools.codeql` in `K-PLAYBOOK.yaml` |
+| **Projekt** | | |
+| `/k-gui` | Oberflaeche starten | fuehrt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
+| `/k-status` | read-only Zustandsbericht fuer das Projekt | repariert nichts |
+| **Tools** | | |
+| `/k-install-codeql` | CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | aendert `K-PLAYBOOK.yaml` nicht |
+| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt festhalten | schreibt nur `tools.codeql` |
 | **Docs** | | |
-| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt unter `paths.docs`, plus `AGENTS.md` und `opencode.json` |
-| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | schreibt unter `<paths.docs>/libs/` und aktualisiert den Docs-Index |
+| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
+| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | erzeugt je ausgewaehltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
-| `/k-review` | globale oder projektlokale Review-Rezepte ausfuehren | [`code-review.md`](./code-review.md) |
-| `/k-results` | vorhandene Review-Results projektweit priorisieren | [`code-review.md`](./code-review.md) |
-| `/k-remediation` | Review-Findings planen, gruppieren und in Tasks oder Fixes ueberfuehren | [`code-review.md`](./code-review.md) |
+| `/k-review` | Review-Rezepte ausfuehren | [`code-review.md`](./code-review.md) |
+| `/k-results` | vorhandene Ergebnisse projektweit priorisieren | [`code-review.md`](./code-review.md) |
+| `/k-remediation` | Findings buendeln und in Tasks oder Fixes ueberfuehren | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
-| `/k-task-create` | strukturierte Task-Datei aus Gespraechskontext erzeugen | [`task-flow.md`](./task-flow.md) |
-| `/k-review-loop` | Task-/Instruktionsdateien vor Ausfuehrung per Critic/Editor-Dialog pruefen | [`task-flow.md`](./task-flow.md) |
+| `/k-task-create` | Task-Datei aus dem Gespraechskontext erzeugen | [`task-flow.md`](./task-flow.md) |
+| `/k-review-loop` | Task-Dateien vor der Ausfuehrung per Critic/Editor-Dialog pruefen | [`task-flow.md`](./task-flow.md) |
 | `/k-run` | Task-Dateien sequenziell ausfuehren | [`task-flow.md`](./task-flow.md) |
-| `/k-todo` | Projekt-TODO anzeigen oder Eintrag ergaenzen | nutzt `paths.todo` |
-| **Checks und Hilfen** | | |
-| `/k-enforcement` | expliziter Check gegen globale und projektlokale Regeln | read-only Bericht; Fixes nur nach expliziter User-Freigabe |
-| `/k-test-check` | Tests ausfuehren, Fehlerursachen diagnostizieren und Fixes erst nach Rueckfrage angehen | startet bewusst Tests, nicht nur Statuschecks |
-| `/k-verlauf` | alte AI-Verlaeufe durchsuchen | liest Claude-JSONL bzw. OpenCode-Logs read-only |
-| `/k-vscode-project-color` | VS-Code-Fensterfarbe/-Titel pro Projekt setzen | schreibt oder merged `.vscode/settings.json` |
+| `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergaenzen | |
+| **Hilfen** | | |
+| `/k-enforcement` | expliziter Check gegen die effektive Regelmenge | read-only Bericht; Fixes nur nach Freigabe |
+| `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | startet bewusst Tests, nicht nur Statuschecks |
+| `/k-verlauf` | alte AI-Verlaeufe durchsuchen | read-only |
+| `/k-vscode-project-color` | VS-Code-Fensterfarbe und -Titel pro Projekt setzen | schreibt `.vscode/settings.json` |
+
+Einen Command `/k-install-security-tools` gibt es nicht mehr. Status und
+Installationsbefehl kommen aus der Oberflaeche, alles Weitere kann
+`k-playbook/scripts/install-security-tools.sh` selbst — siehe
+[`installation.md`](./installation.md#security-tools).
 
 ## Review-Flow
 
 Die Code-Review-Familie ist bewusst gestuft:
 
 1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmaessig read-only.
-2. `/k-review <name>` fuehrt ein Review-Rezept aus und erzeugt je nach Rezept interaktive Aenderungsvorschlaege oder Report-Artefakte.
-3. `/k-results` priorisiert vorhandene Result-Familien zu einer projektweiten Summary.
+2. `/k-review <name>` fuehrt ein Rezept aus und erzeugt je nach Rezept interaktive
+   Aenderungsvorschlaege oder Report-Artefakte.
+3. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
 4. `/k-remediation <result>` plant die Abarbeitung der Findings.
 
-Wenn `/k-remediation` Tasks erzeugt, gehoeren sie in den normalen Task-Flow: zuerst `/k-review-loop`, danach `/k-run`. Remediation soll keine groesseren Task-Inhalte direkt aus dem Chat heraus abarbeiten, wenn die Projekt-Policy Task/Branch/PR vorsieht.
+Wenn `/k-remediation` Tasks erzeugt, gehoeren sie in den normalen Task-Flow: erst
+`/k-review-loop`, dann `/k-run`.
 
 ## Task-Flow
-
-Der Standardablauf fuer geplante Arbeit ist:
 
 ```text
 /k-task-create
@@ -67,53 +77,69 @@ Der Standardablauf fuer geplante Arbeit ist:
 /k-run
 ```
 
-Tasks koennen direkt aus dem Gespraech entstehen oder von `/k-remediation` erzeugt werden. In beiden Faellen gilt: Task-Dateien werden vor der Ausfuehrung mit `/k-review-loop` gegengeprueft und danach mit `/k-run` sequenziell ausgefuehrt.
+Tasks entstehen direkt aus dem Gespraech oder aus `/k-remediation`. In beiden Faellen
+werden sie vor der Ausfuehrung gegengeprueft.
 
-## Installer-GUI
+## Wo Commands ihre Ziele finden
 
-Die Installer-GUI ist der normale Weg fuer Host-Registrierung und Projekt-Onboarding.
+Kein Command liest oder raet einen Pfad. Alles leitet sich aus dem Ort der
+`K-PLAYBOOK.yaml` ab:
 
-Start direkt:
+| Command | schreibt nach |
+|---|---|
+| `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
+| `/k-todo` | `k-playbook-local/TODO.md` |
+| `/k-review`, `/k-results` | `k-playbook-local/results/` |
+| `/k-setup-codeql` | `K-PLAYBOOK.yaml`, nur `tools.codeql` |
+| `/k-code2docs`, `/k-tools-scan` | `k-playbook-local/docs/`, Tool-Steckbriefe unter `libs/` |
+
+Gelesen wird zusaetzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
+Geschrieben wird dorthin nie.
+
+## Overlay
+
+`/k-review`, `/k-enforcement` und `k-check` arbeiten auf der effektiven Menge aus
+mitgelieferten und projekteigenen Dateien. Bei gleichem Dateinamen gewinnt die
+projekteigene Datei vollstaendig; `overlay.<kind>.disabled` schaltet eine mitgelieferte
+Datei ersatzlos ab.
+
+Jeder dieser Commands weist die Aufloesung vor der Arbeit aus, mit Herkunft je Eintrag:
 
 ```text
-k-playbook-installer
+Regeln: 4 aktiv
+  [mitgeliefert] codeql.md
+  [mitgeliefert] review-authoring.md
+  [ersetzt]      docs-sync.md          (statt k-playbook/rules/docs-sync.md)
+  [projekt]      my-api-rules.md
+  [abgeschaltet] tool-install-scope.md (via overlay.rules.disabled)
 ```
 
-Start aus OpenCode:
+Die Regeln im Detail stehen in
+[`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen).
 
-```text
-/k-gui
-```
+## Status
 
-Die GUI prueft und repariert den Pfadvertrag `~/dev/k-playbook`, registriert OpenCode- und Claude-Commands/Skills, verwaltet die lokale Projektliste, erzeugt `K-PLAYBOOK.yaml`, vervollstaendigt die konfigurierte Projektstruktur und verwaltet die DevContainer-Integration.
+`/k-status` ist read-only und prueft:
 
-## Status und Smoke
+- ob `K-PLAYBOOK.yaml` existiert, gueltig ist und `schema_version: 3` traegt,
+- ob `k-playbook-local/` vollstaendig ist,
+- ob die Symlinks fuer Claude Code, OpenCode und Cursor stimmen,
+- ob `project.repo_root` auf ein Repository zeigt und wie sauber es ist,
+- welche Tasks offen sind und ob Security-Tools fehlen.
 
-`/k-status` ist read-only. Neben Projektstatus aus `K-PLAYBOOK.yaml` prueft der Command auch die host-lokale OpenCode-Registrierung: Command-Symlinks, verwaiste k-playbook-Symlinks und `skills.paths`.
-
-Fuer maschinenlesbaren Projektstatus nutzt `/k-status json` bevorzugt das Installer-Binary im aktuellen Projekt:
-
-```bash
-k-playbook-installer status
-```
-
-Aufwendigere oder externe Pruefungen laufen explizit ueber den Installer-Smoke-Test, nicht ueber `/k-status`:
-
-```bash
-k-playbook-installer smoke [path]
-k-playbook-installer smoke --all
-```
+Der Command repariert nichts. Fuer Reparaturen ist `/k-gui` zustaendig.
 
 ## k-check
 
-`<DIST_DIR>/bin/k-check` ist kein Slash-Command, sondern ein CLI-Entry-Point fuer die effektive Check-Menge aus mitgelieferten und projektlokalen Checks.
-
-Typische Nutzung aus einem Projekt-Root:
+`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner fuer die
+effektive Check-Menge:
 
 ```bash
-<DIST_DIR>/bin/k-check --mode changed
-<DIST_DIR>/bin/k-check --mode baseline
-<DIST_DIR>/bin/k-check --config-root /path/to/project --mode changed
+k-playbook/bin/k-check --mode changed
+k-playbook/bin/k-check --mode baseline
 ```
 
-Der Runner liest `K-PLAYBOOK.yaml`, fuehrt `.sh`-Checks aus `global/checks/` und projektlokale `.sh`-Checks aus `k-playbook/checks/` aus. Die stabile Check-Schnittstelle ist `.sh`; einzelne Checks duerfen Python oder andere Tools intern verwenden, muessen aber am Ende genau eine Statuszeile `K_CHECK_STATUS=ok|skip|fail` und optional `K_CHECK_REASON=<text>` schreiben.
+Die stabile Check-Schnittstelle ist `.sh`. Ein Check darf Python oder anderes intern
+verwenden, muss aber genau eine Statuszeile `K_CHECK_STATUS=ok|skip|fail` und optional
+`K_CHECK_REASON=<text>` schreiben. Details stehen in
+[`../checks/README.md`](../checks/README.md).
