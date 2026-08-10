@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -73,9 +74,9 @@ func RepoRootDir(projectDir string, config Config) string {
 type Suggestion struct {
 	// ProjectDir ist das vorgeschlagene Hauptverzeichnis.
 	ProjectDir string `json:"projectDir"`
-	// Derived meldet, ob ProjectDir aus dem Ort des Binaries abgeleitet werden
-	// konnte. Ist es false, wurde auf das Arbeitsverzeichnis zurueckgegriffen.
-	Derived bool `json:"derived"`
+	// ProjectCandidates sind alle plausiblen Orte, ProjectDir zuerst. Kommt mehr
+	// als einer in Frage, zeigt die Oberflaeche sie zur Auswahl.
+	ProjectCandidates []string `json:"projectCandidates"`
 	// RepoRoot ist der Vorschlag fuer project.repo_root, relativ zu ProjectDir.
 	// Leer, wenn kein Repository gefunden wurde oder mehrere in Frage kommen.
 	RepoRoot string `json:"repoRoot"`
@@ -85,29 +86,45 @@ type Suggestion struct {
 
 // Suggest leitet einen Vorschlag ab, ohne etwas zu schreiben.
 //
-// Das Hauptverzeichnis muss nicht geraten werden: der Aufruf erfolgt aus
-// <A>/k-playbook/bin/, und das Binary liegt in <A>/k-playbook/dist/. Zwei Ebenen
-// darueber liegt A.
+// Anders als Discover darf das raten: geschrieben wird erst nach Bestaetigung.
+// Der staerkste Hinweis ist das Repository, in dem der Aufruf stattfindet — wer
+// das Werkzeug startet, steht in aller Regel in dem Projekt, das er meint.
+// Danach kommt der Ort des Binaries.
 func Suggest() Suggestion {
 	suggestion := Suggestion{}
+	workdir, _ := os.Getwd()
 
-	if dir, ok := projectDirFromExecutable(); ok {
-		suggestion.ProjectDir = dir
-		suggestion.Derived = true
-	} else if wd, err := os.Getwd(); err == nil {
-		suggestion.ProjectDir = wd
+	if workdir != "" {
+		if root, ok := gitWorktreeRoot(workdir); ok {
+			suggestion.ProjectCandidates = append(suggestion.ProjectCandidates, root)
+		}
 	}
 
-	if suggestion.ProjectDir != "" {
+	// Das Binary liegt in <X>/dist/; X ist die Installation. Ob X selbst das
+	// Hauptverzeichnis ist oder eine Ebene darunter liegt, haengt daran, ob die
+	// Installation geklont wurde oder das Repo selbst ist — beides ist moeglich,
+	// deshalb kommen beide Orte in die Auswahl.
+	if install, ok := installDir(); ok {
+		if filepath.Base(install) == PlaybookDirName {
+			suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, filepath.Dir(install))
+		}
+		suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, install)
+	}
+
+	if workdir != "" {
+		suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, workdir)
+	}
+
+	if len(suggestion.ProjectCandidates) > 0 {
+		suggestion.ProjectDir = suggestion.ProjectCandidates[0]
 		suggestion.RepoRoot, suggestion.RepoCandidates = suggestRepoRoot(suggestion.ProjectDir)
 	}
 	return suggestion
 }
 
-// projectDirFromExecutable leitet A aus <A>/k-playbook/dist/<binary> ab. Der
-// Name des Zwischenverzeichnisses wird geprueft, damit ein anderswohin
-// kopiertes Binary nicht auf ein beliebiges Verzeichnis zeigt.
-func projectDirFromExecutable() (string, bool) {
+// installDir liefert das Verzeichnis der Installation, abgeleitet aus
+// <X>/dist/<binary>.
+func installDir() (string, bool) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", false
@@ -116,11 +133,40 @@ func projectDirFromExecutable() (string, bool) {
 		exe = resolved
 	}
 
-	playbookDir := filepath.Dir(filepath.Dir(exe))
-	if filepath.Base(playbookDir) != PlaybookDirName {
+	dir := filepath.Dir(filepath.Dir(exe))
+	if !isDir(dir) {
 		return "", false
 	}
-	return filepath.Dir(playbookDir), true
+	return dir, true
+}
+
+// gitWorktreeRoot sucht ab dir aufwaerts das Repository, in dem dir liegt.
+func gitWorktreeRoot(dir string) (string, bool) {
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
+	home := homeDir()
+
+	for {
+		if pathExists(filepath.Join(dir, ".git")) {
+			return dir, true
+		}
+		if dir == home {
+			return "", false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
+func addUnique(list []string, value string) []string {
+	if value == "" || slices.Contains(list, value) {
+		return list
+	}
+	return append(list, value)
 }
 
 // suggestRepoRoot sucht das Projekt-Repository. Liegt es im Hauptverzeichnis
@@ -184,20 +230,19 @@ func CreateConfig(projectDir string, repoRoot string) error {
 }
 
 func renderConfig(repoRoot string, vcs string) string {
-	var out strings.Builder
-	out.WriteString("# k-playbook\n")
-	out.WriteString("#\n")
-	out.WriteString("# Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.\n")
-	out.WriteString("# Die Installation liegt daneben unter " + PlaybookDirName + "/ und ist\n")
-	out.WriteString("# vollstaendig ersetzbar; projekteigene Dateien gehoeren nicht hinein.\n")
-	out.WriteString("\n")
-	out.WriteString("schema_version: 2\n")
-	out.WriteString("\n")
-	out.WriteString("project:\n")
-	out.WriteString("  # Ort des Projekt-Repositorys, relativ zu dieser Datei.\n")
-	out.WriteString("  repo_root: " + repoRoot + "\n")
-	out.WriteString("  vcs: " + vcs + "\n")
-	return out.String()
+	return fmt.Sprintf(`# k-playbook
+#
+# Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.
+# Die Installation liegt daneben unter %s/ und ist vollstaendig
+# ersetzbar; projekteigene Dateien gehoeren nicht hinein.
+
+schema_version: 2
+
+project:
+  # Ort des Projekt-Repositorys, relativ zu dieser Datei.
+  repo_root: %s
+  vcs: %s
+`, PlaybookDirName, repoRoot, vcs)
 }
 
 func pathExists(path string) bool {

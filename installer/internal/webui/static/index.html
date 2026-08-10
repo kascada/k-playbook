@@ -25,7 +25,7 @@
         </div>
       </section>
 
-      <section class="card" id="config-card">
+      <section class="card{{if .Installed}} hidden{{end}}" id="config-card">
         <div class="section-head">
           <div>
             <p class="eyebrow">Schritt 1</p>
@@ -44,10 +44,21 @@
         <button id="config-create" class="secondary" disabled>Anlegen</button>
       </section>
 
-      <section class="card hidden" id="assistant-card">
+      <section class="card{{if not .Installed}} hidden{{end}}" id="local-card">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Schritt 2</p>
+            <h2>Projekteigene Struktur</h2>
+          </div>
+          <span id="local-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <dl id="local-facts" class="facts"></dl>
+        <p id="local-message" class="message"></p>
+        <button id="local-create" class="secondary" disabled>Anlegen</button>
+      </section>
+
+      <section class="card{{if not .Installed}} hidden{{end}}" id="assistant-card">
+        <div class="section-head">
+          <div>
             <h2>Commands und Skills</h2>
           </div>
           <span id="assistant-pill" class="pill muted">Pruefen...</span>
@@ -55,6 +66,21 @@
         <dl id="assistant-facts" class="facts"></dl>
         <p id="assistant-message" class="message"></p>
         <button id="assistant-apply" class="secondary" disabled>Aktualisieren</button>
+      </section>
+
+      <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
+        <div class="section-head">
+          <div>
+            <h2>Security-Tools</h2>
+          </div>
+          <span id="tools-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <dl id="tools-facts" class="facts"></dl>
+        <p id="tools-message" class="message"></p>
+        <div id="tools-command" class="command-row hidden">
+          <p class="hint">Installation veraendert den Host, nicht das Projekt. Diesen Befehl im Terminal ausfuehren:</p>
+          <code id="tools-command-text"></code>
+        </div>
       </section>
 
       <div id="closed" class="closed hidden">

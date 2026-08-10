@@ -10,7 +10,18 @@ const elements = {
   closedTitle: document.getElementById("closed-title"),
   closedMessage: document.getElementById("closed-message"),
   configCard: document.getElementById("config-card"),
+  localCard: document.getElementById("local-card"),
   assistantCard: document.getElementById("assistant-card"),
+  toolsCard: document.getElementById("tools-card"),
+  toolsPill: document.getElementById("tools-pill"),
+  toolsFacts: document.getElementById("tools-facts"),
+  toolsMessage: document.getElementById("tools-message"),
+  toolsCommand: document.getElementById("tools-command"),
+  toolsCommandText: document.getElementById("tools-command-text"),
+  localPill: document.getElementById("local-pill"),
+  localFacts: document.getElementById("local-facts"),
+  localMessage: document.getElementById("local-message"),
+  localCreate: document.getElementById("local-create"),
   configPill: document.getElementById("config-pill"),
   configFacts: document.getElementById("config-facts"),
   configForm: document.getElementById("config-form"),
@@ -40,6 +51,7 @@ const STATE_LABELS = {
 
 elements.shutdown.addEventListener("click", shutdown);
 elements.configCreate.addEventListener("click", createConfig);
+elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
 window.addEventListener("pagehide", notifyClientGone);
 startHealthChecks();
@@ -102,26 +114,36 @@ function renderConfig(data) {
   // alles liegt, zeigt die Kopfzeile.
   if (data.installed) {
     elements.configCard.classList.add("hidden");
+    elements.localCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
+    elements.toolsCard.classList.remove("hidden");
+    loadLocal();
     loadAssistant();
+    loadTools();
     return;
   }
 
   // Solange sie fehlt, ist dies der einzige Schritt, der zur Wahl steht.
   elements.configCard.classList.remove("hidden");
+  elements.localCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
+  elements.toolsCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
   elements.configForm.classList.remove("hidden");
   elements.configProjectDir.value = suggestion.projectDir || "";
   elements.configRepoRoot.value = suggestion.repoRoot || ".";
 
-  const candidates = suggestion.repoCandidates || [];
-  if (candidates.length > 1) {
-    addFact(elements.configFacts, "Gefundene Repositories", candidates.join(", "));
+  // Kommt mehr als ein Ort in Frage, muss der Nutzer sehen, welche das sind —
+  // der Vorschlag steht bereits im Feld.
+  const projectCandidates = suggestion.projectCandidates || [];
+  if (projectCandidates.length > 1) {
+    addFact(elements.configFacts, "Weitere moegliche Orte", projectCandidates.slice(1).join(", "));
   }
-  if (!suggestion.derived) {
-    addFact(elements.configFacts, "Hinweis", "Ort nicht aus dem Programmpfad ableitbar, bitte pruefen");
+
+  const repoCandidates = suggestion.repoCandidates || [];
+  if (repoCandidates.length > 1) {
+    addFact(elements.configFacts, "Gefundene Repositories", repoCandidates.join(", "));
   }
 
   setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
@@ -157,6 +179,44 @@ function setBlockState(pill, button, state, labels = {}) {
   button.textContent = ok ? doneLabel : todoLabel;
 }
 
+const LOCAL_LABELS = { doneLabel: "Ergaenzen", todoLabel: "Anlegen" };
+
+async function loadLocal() {
+  setBlockState(elements.localPill, elements.localCreate, "busy");
+  try {
+    const response = await fetch("/api/local", { cache: "no-store" });
+    renderLocal(await response.json());
+  } catch {
+    elements.localMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+async function createLocal() {
+  setBlockState(elements.localPill, elements.localCreate, "busy");
+  try {
+    const response = await fetch("/api/local", { method: "POST" });
+    renderLocal(await response.json());
+  } catch {
+    elements.localMessage.textContent = "Anlegen fehlgeschlagen.";
+    setBlockState(elements.localPill, elements.localCreate, "todo", LOCAL_LABELS);
+  }
+}
+
+function renderLocal(data) {
+  elements.localFacts.replaceChildren();
+  elements.localMessage.textContent = data.message || "";
+
+  const missing = (data.entries || []).filter((entry) => !entry.present);
+  if (data.dir) {
+    addFact(elements.localFacts, "Verzeichnis", data.dir);
+  }
+  if (missing.length > 0) {
+    addFact(elements.localFacts, "Fehlt", missing.map((entry) => entry.path).join(", "));
+  }
+
+  setBlockState(elements.localPill, elements.localCreate, data.ok ? "ok" : "todo", LOCAL_LABELS);
+}
+
 async function loadAssistant() {
   setBlockState(elements.assistantPill, elements.assistantApply, "busy");
   try {
@@ -183,7 +243,8 @@ function renderAssistant(data) {
 
   for (const entry of data.entries || []) {
     const label = STATE_LABELS[entry.state] || entry.state;
-    addFact(elements.assistantFacts, entry.path, entry.detail ? `${label} (${entry.detail})` : label);
+    const term = entry.assistant ? `${entry.path} — ${entry.assistant}` : entry.path;
+    addFact(elements.assistantFacts, term, entry.detail ? `${label} (${entry.detail})` : label);
   }
 
   elements.assistantMessage.textContent = data.message || "";
@@ -192,6 +253,53 @@ function renderAssistant(data) {
   const installed = data.environment && data.environment.installed;
   const state = !installed ? "blocked" : data.ok ? "ok" : "todo";
   setBlockState(elements.assistantPill, elements.assistantApply, state);
+}
+
+// Der Tool-Block hat keinen Button: installiert wird im Terminal, weil das den
+// Host veraendert. Die Pill zeigt nur den Zustand.
+async function loadTools() {
+  elements.toolsPill.className = "pill muted";
+  elements.toolsPill.textContent = "Pruefen...";
+  try {
+    const response = await fetch("/api/tools", { cache: "no-store" });
+    renderTools(await response.json());
+  } catch {
+    elements.toolsMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+function renderTools(data) {
+  elements.toolsFacts.replaceChildren();
+  elements.toolsMessage.textContent = data.message || "";
+  elements.toolsCommand.classList.add("hidden");
+
+  if (!data.available || data.message) {
+    elements.toolsPill.className = "pill muted";
+    elements.toolsPill.textContent = "Unbekannt";
+    return;
+  }
+
+  for (const tool of data.tools || []) {
+    const label = tool.required ? tool.name : `${tool.name} (optional)`;
+    const detail = tool.status === "ok" ? tool.version || "vorhanden" : `fehlt — ${tool.role}`;
+    addFact(elements.toolsFacts, label, detail);
+  }
+  if (data.binDir) {
+    addFact(elements.toolsFacts, "Installationsort", data.binDir);
+  }
+
+  if (data.ok) {
+    elements.toolsPill.className = "pill ok";
+    elements.toolsPill.textContent = "Vollstaendig";
+    return;
+  }
+
+  elements.toolsPill.className = "pill warn";
+  elements.toolsPill.textContent = `${data.missing} fehlt`;
+  if (data.command) {
+    elements.toolsCommandText.textContent = data.command;
+    elements.toolsCommand.classList.remove("hidden");
+  }
 }
 
 async function shutdown() {

@@ -184,3 +184,107 @@ func TestCheckLinksMeldetFehlendeQuelle(t *testing.T) {
 		t.Errorf("State = %q, erwartet %q", got, StateNoSource)
 	}
 }
+
+func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
+	root := newProject(t)
+
+	statuses, err := ApplyLinks(root)
+	if err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if !LinksOK(statuses) {
+		t.Fatalf("nicht vollstaendig eingerichtet: %+v", statuses)
+	}
+
+	// Alle Command-Verzeichnisse zeigen auf dieselbe Quelle in der Installation.
+	for _, path := range []string{
+		filepath.Join(".claude", "commands"),
+		filepath.Join(".opencode", "commands"),
+		filepath.Join(".cursor", "commands"),
+	} {
+		target := filepath.Join(root, path)
+		if _, err := os.Stat(filepath.Join(target, "k-test.md")); err != nil {
+			t.Errorf("%s: Datei nicht erreichbar: %v", path, err)
+		}
+	}
+
+	// Skills stehen nur einmal; OpenCode liest .claude/skills mit.
+	skillLinks := 0
+	for _, status := range statuses {
+		if status.Source == filepath.Join(PlaybookDirName, "skills") {
+			skillLinks++
+		}
+	}
+	if skillLinks != 1 {
+		t.Errorf("%d Skill-Links, erwartet genau einen", skillLinks)
+	}
+}
+
+// CLAUDE.md zeigt auf AGENTS.md; beide gehoeren dem Projekt.
+func TestApplyLinksVerknuepftClaudeMitAgents(t *testing.T) {
+	root := newProject(t)
+	agents := filepath.Join(root, "AGENTS.md")
+	if err := os.WriteFile(agents, []byte("# Projektregeln\n"), 0o644); err != nil {
+		t.Fatalf("AGENTS.md anlegen: %v", err)
+	}
+
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+
+	claude := filepath.Join(root, "CLAUDE.md")
+	destination, err := os.Readlink(claude)
+	if err != nil {
+		t.Fatalf("CLAUDE.md ist kein Symlink: %v", err)
+	}
+	if destination != "AGENTS.md" {
+		t.Errorf("Ziel = %q, erwartet %q", destination, "AGENTS.md")
+	}
+
+	// Ein Schreibzugriff auf CLAUDE.md muss in AGENTS.md ankommen.
+	if err := os.WriteFile(claude, []byte("# Geaendert\n"), 0o644); err != nil {
+		t.Fatalf("ueber den Link schreiben: %v", err)
+	}
+	content, err := os.ReadFile(agents)
+	if err != nil {
+		t.Fatalf("AGENTS.md lesen: %v", err)
+	}
+	if string(content) != "# Geaendert\n" {
+		t.Errorf("AGENTS.md = %q, Aenderung kam nicht an", content)
+	}
+}
+
+// Ohne AGENTS.md wird nichts angelegt: die Datei gehoert dem Projekt.
+func TestApplyLinksLegtKeineAgentsAn(t *testing.T) {
+	root := newProject(t)
+
+	statuses, err := ApplyLinks(root)
+	if err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "AGENTS.md")); err == nil {
+		t.Error("AGENTS.md wurde angelegt")
+	}
+	if _, err := os.Lstat(filepath.Join(root, "CLAUDE.md")); err == nil {
+		t.Error("CLAUDE.md wurde ohne Quelle angelegt")
+	}
+	if got := statusFor(t, statuses, "CLAUDE.md").State; got != StateNoSource {
+		t.Errorf("State = %q, erwartet %q", got, StateNoSource)
+	}
+}
+
+// Ein Editor, der "atomar" speichert, ersetzt den Symlink durch eine echte
+// Datei. Das muss auffallen, sonst laufen beide still auseinander.
+func TestCheckLinksMeldetErsetztenSymlink(t *testing.T) {
+	root := newProject(t)
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("# A\n"), 0o644); err != nil {
+		t.Fatalf("AGENTS.md anlegen: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "CLAUDE.md"), []byte("# eigenstaendig\n"), 0o644); err != nil {
+		t.Fatalf("CLAUDE.md anlegen: %v", err)
+	}
+
+	if got := statusFor(t, CheckLinks(root), "CLAUDE.md").State; got != StateBlocked {
+		t.Errorf("State = %q, erwartet %q", got, StateBlocked)
+	}
+}

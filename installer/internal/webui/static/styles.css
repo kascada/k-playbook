@@ -232,6 +232,28 @@ body[data-mode="none"] .mode-badge {
   outline-offset: 1px;
 }
 
+.command-row {
+  margin-top: 16px;
+}
+
+.hint {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.command-row code {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

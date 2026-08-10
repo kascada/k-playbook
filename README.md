@@ -2,9 +2,9 @@
 
 `k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts geklont, `<projekt>/k-playbook/`. Daneben liegen die projekteigenen Artefakte. Ein Projekt ist damit selbstgenuegsam.
 
-> **Umstellung laeuft.** Alles bis zum Abschnitt [Altes Modell](#altes-modell) ist
-> aktuell; was darunter steht, wird der Reihe nach ersetzt. Der Stand steht in
-> [`docs/umbau.md`](./docs/umbau.md).
+> **Umstellung laeuft.** Diese Datei beschreibt den Zielzustand. Einzelne Commands, Skills
+> und Doku-Seiten folgen noch dem abgeloesten Layout; was im Detail nachzuziehen ist, steht
+> unter „Nachzuziehen" in [`docs/umbau.md`](./docs/umbau.md).
 
 ## Installation
 
@@ -37,10 +37,46 @@ projekt/
 └── k-playbook/         die Installation
 ```
 
-Danach richtet dieselbe Oberflaeche die Verlinkung fuer die Assistenten ein
-(`.claude/commands` und `.claude/skills`).
+Danach legt dieselbe Oberflaeche die projekteigene Struktur an und richtet die Verlinkung
+fuer die Assistenten ein.
 
-### Aktualisieren
+## Verzeichnisstruktur
+
+```text
+projekt/
+├── K-PLAYBOOK.yaml       der Anker
+├── AGENTS.md             Instruktionen, eine Quelle fuer alle Assistenten
+├── CLAUDE.md             Symlink auf AGENTS.md
+├── .claude/
+│   ├── commands  ──┐     Symlink
+│   └── skills      │     Symlink; OpenCode liest hier mit
+├── .opencode/      │
+│   └── commands  ──┤     Symlink
+├── .cursor/        │
+│   └── commands  ──┤     Symlink
+├── k-playbook/   ←─┘     die Installation, vollstaendig ersetzbar
+│   ├── commands/ skills/ rules/ reviews/ checks/
+│   ├── bin/ dist/
+│   └── installer/ docs/
+└── k-playbook-local/     projekteigen, committed
+    ├── rules/            Overlay zu k-playbook/rules/
+    ├── reviews/          Overlay zu k-playbook/reviews/
+    ├── checks/           Overlay zu k-playbook/checks/
+    ├── results/          Review-Ergebnisse
+    ├── guidelines/
+    ├── commands/         projekteigene Slash-Commands
+    ├── tasks/done/
+    ├── priv/             Inhalt gitignored, Verzeichnis versioniert
+    └── TODO.md
+```
+
+Verlinkt wird fuer Claude Code, OpenCode und Cursor. Skills stehen nur einmal unter
+`.claude/skills`, weil OpenCode dieses Verzeichnis mitdurchsucht und Cursor kein
+Skill-Konzept hat. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`: Claude Code liest
+ausschliesslich `CLAUDE.md`, OpenCode bevorzugt `AGENTS.md` — so landet jede Aenderung in
+beiden.
+
+## Aktualisieren
 
 ```bash
 cd /pfad/zum/projekt/k-playbook
@@ -49,17 +85,20 @@ git pull
 
 `k-playbook/` enthaelt nichts Projekteigenes und ist dadurch vollstaendig ersetzbar.
 
-### Selbst bauen
+## Selbst bauen
 
-Wer die Binaries lieber selbst erzeugt statt die mitgelieferten zu nehmen, braucht Go:
+Die mitgelieferten Binaries genuegen fuer den normalen Betrieb. Wer am Werkzeug selbst
+arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-cd /pfad/zum/projekt/k-playbook
-make dist
+make dist            # baut alle Plattformen nach dist/
+make installer-run   # baut und startet die Oberflaeche
 ```
 
 `make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
-ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern.
+ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make installer-run`
+ist der Weg beim Entwickeln: es startet den frisch gebauten Stand statt der installierten
+Version.
 
 ## Grundprinzipien
 
@@ -78,73 +117,3 @@ ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern.
 - [`docs/code-review.md`](./docs/code-review.md) - Review-Rezepte, Results-Summary, Remediation und Handoffs.
 - [`docs/task-flow.md`](./docs/task-flow.md) - Task-Erzeugung, Review-Loop und Ausfuehrung.
 - [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Artefaktmodell fuer Reviews, Findings und Remediation.
-
----
-
-## Altes Modell
-
-**Alles ab hier beschreibt den abgeloesten Stand** mit zentraler Basisinstallation,
-`_dist/` und dem Binary `k-playbook-installer`. Keiner dieser Aufrufe funktioniert im
-aktuellen Stand. Die Abschnitte bleiben stehen, bis sie der Reihe nach ersetzt sind; was
-schon entschieden ist, steht in [`docs/umbau.md`](./docs/umbau.md).
-
-### Weitere Kommandos
-
-| Kommando | Zweck |
-|---|---|
-| `k-playbook-installer update` | ersetzt `_dist`; alles daneben bleibt unangetastet |
-| `k-playbook-installer restore` | stellt `_dist` nach einem `git clone` wieder her |
-| `k-playbook-installer migrate` | stellt ein Projekt von `schema_version: 1` auf `2` um |
-| `k-playbook-installer status` | read-only Projektstatus als JSON |
-| `k-playbook-installer version` | Payload-Version dieses Binaries |
-
-Alle Kommandos finden das Projekt selbst, indem sie vom Arbeitsverzeichnis aufwaerts nach
-`k-playbook/K-PLAYBOOK.yaml` suchen. Ein Pfad als Argument ist optional.
-
-`_dist/` steht in der `.gitignore` und fehlt darum nach einem frischen Clone. Die Version
-steht in `K-PLAYBOOK.yaml`, `restore` stellt den Zustand daraus wieder her.
-
-### Bestehende Projekte migrieren
-
-```bash
-cd /pfad/zum/projekt
-k-playbook-installer migrate --dry-run   # zeigt die Aenderungen
-k-playbook-installer migrate
-```
-
-Die Migration verschiebt `K-PLAYBOOK.yaml` nach `k-playbook/`, kuerzt die `paths.*`-Werte um
-das `k-playbook/`-Praefix und hebt `project.repo_root` eine Ebene an. Tasks, Reviews,
-Ergebnisse und Docs liegen bereits richtig und werden nicht bewegt. Unbekannte Felder
-bleiben erhalten.
-
-### Browser-GUI
-
-```bash
-k-playbook-installer gui
-```
-
-Die GUI bildet noch das alte zentrale Modell ab. Auf Projekten mit `schema_version: 2`
-verweigert sie jede schreibende Aktion mit einem klaren Hinweis, statt die Migration
-rueckgaengig zu machen. Fuer migrierte Projekte ist die Kommandozeile der Weg.
-
-### DevContainer
-
-Die DevContainer-Integration setzt noch auf den alten Bind-Mount des Basis-Repos und wird
-mit der GUI umgebaut. Im neuen Modell braucht sie ihn nicht mehr: `_dist/` liegt im Projekt
-und ist im Container dadurch automatisch vorhanden.
-
-### Bausteine
-
-Die Payload unter `installer/payload/` wird per `go:embed` ins Binary gepackt und im
-Zielprojekt nach `k-playbook/_dist/` entpackt.
-
-| Bereich | Zweck | Im Projekt unter |
-|---|---|---|
-| `installer/payload/commands/` | Slash-Commands `/k-<name>` | `_dist/commands/` |
-| `installer/payload/skills/` | Skills und Playbooks | `_dist/skills/` |
-| `installer/payload/rules/` | mitgelieferte Enforcement-Regeln | `_dist/rules/` |
-| `installer/payload/reviews/` | Review-Rezepte fuer `/k-review` | `_dist/reviews/` |
-| `installer/payload/checks/` | generische Checks | `_dist/checks/` |
-| `installer/payload/bin/k-check` | Check-Runner | `_dist/bin/k-check` |
-| `installer/` | Installer-Quellcode | nicht mitgeliefert |
-| `docs/`, `prompts/` | Doku und Auftraege fuer die Entwicklung | nicht mitgeliefert |

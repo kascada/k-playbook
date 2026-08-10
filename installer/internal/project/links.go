@@ -7,19 +7,53 @@ import (
 	"strings"
 )
 
-// Link beschreibt ein Verzeichnis, aus dem ein Assistent Commands oder Skills
-// liest. Beide Pfade sind relativ zur Projektwurzel.
+// Link beschreibt einen Symlink, den ein Assistent zum Lesen braucht. Beide
+// Pfade sind relativ zur Projektwurzel.
 type Link struct {
 	Path   string `json:"path"`
 	Source string `json:"source"`
+	// Assistant nennt, wer hier liest — nur fuer die Anzeige.
+	Assistant string `json:"assistant"`
+	// IsFile unterscheidet Datei- von Verzeichnis-Links. Bei Verzeichnissen
+	// darf ein projekteigenes Verzeichnis bestehen bleiben und wird per
+	// Einzeldatei-Links bestueckt; bei Dateien gibt es diesen Fall nicht.
+	IsFile bool `json:"isFile"`
+	// Optional markiert Links, deren Quelle dem Projekt gehoert. Fehlt sie,
+	// ist nichts zu tun — im Gegensatz zu einer fehlenden Quelle in der
+	// Installation, die auf eine beschaedigte Installation hindeutet.
+	Optional bool `json:"optional"`
 }
 
-// Links sind die Verzeichnisse, die ein Zielprojekt braucht.
+// Links sind die Symlinks, die ein Zielprojekt braucht.
+//
+// Skills stehen nur einmal: OpenCode durchsucht neben .opencode/skills/ auch
+// .claude/skills/, ein zweiter Link waere Dopplung. Cursor kennt kein
+// Skill-Konzept.
+//
+// CLAUDE.md zeigt auf AGENTS.md, weil Claude Code ausschliesslich CLAUDE.md
+// liest und OpenCode AGENTS.md bevorzugt. Ein Symlink statt eines Imports,
+// damit eine Aenderung immer in beiden ankommt — wer in CLAUDE.md schreibt,
+// schreibt durch den Link hindurch in AGENTS.md.
 func Links() []Link {
+	commands := filepath.Join(PlaybookDirName, "commands")
+	skills := filepath.Join(PlaybookDirName, "skills")
+
 	return []Link{
-		{Path: filepath.Join(".claude", "commands"), Source: filepath.Join(PlaybookDirName, "commands")},
-		{Path: filepath.Join(".claude", "skills"), Source: filepath.Join(PlaybookDirName, "skills")},
+		{Path: filepath.Join(".claude", "commands"), Source: commands, Assistant: "Claude Code"},
+		{Path: filepath.Join(".claude", "skills"), Source: skills, Assistant: "Claude Code, OpenCode"},
+		{Path: filepath.Join(".opencode", "commands"), Source: commands, Assistant: "OpenCode"},
+		{Path: filepath.Join(".cursor", "commands"), Source: commands, Assistant: "Cursor"},
+		{Path: "CLAUDE.md", Source: "AGENTS.md", Assistant: "Claude Code", IsFile: true, Optional: true},
 	}
+}
+
+// sourcePresent meldet, ob die Quelle in der erwarteten Form vorliegt.
+func (l Link) sourcePresent(projectRoot string) bool {
+	source := filepath.Join(projectRoot, l.Source)
+	if l.IsFile {
+		return fileExists(source)
+	}
+	return isDir(source)
 }
 
 // LinkState ist der Zustand einer einzelnen Verlinkung.
@@ -48,8 +82,18 @@ type LinkStatus struct {
 	Detail string    `json:"detail"`
 }
 
-// OK meldet, ob dieser Eintrag nichts mehr braucht.
+// OK meldet, ob der Symlink steht.
 func (s LinkStatus) OK() bool { return s.State == StateOK }
+
+// NeedsAction meldet, ob noch etwas einzurichten ist. Ein optionaler Link ohne
+// Quelle zaehlt nicht dazu: dort gibt es nichts zu tun, solange das Projekt die
+// Datei nicht selbst anlegt.
+func (s LinkStatus) NeedsAction() bool {
+	if s.State == StateOK {
+		return false
+	}
+	return !(s.Optional && s.State == StateNoSource)
+}
 
 // CheckLinks prueft den Zustand, ohne etwas zu veraendern.
 func CheckLinks(projectRoot string) []LinkStatus {
@@ -60,10 +104,10 @@ func CheckLinks(projectRoot string) []LinkStatus {
 	return statuses
 }
 
-// LinksOK meldet, ob alle Eintraege eingerichtet sind.
+// LinksOK meldet, ob nichts mehr einzurichten ist.
 func LinksOK(statuses []LinkStatus) bool {
 	for _, status := range statuses {
-		if !status.OK() {
+		if status.NeedsAction() {
 			return false
 		}
 	}
@@ -74,9 +118,14 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
 	source := filepath.Join(projectRoot, link.Source)
-	if !isDir(source) {
+	if !link.sourcePresent(projectRoot) {
 		status.State = StateNoSource
-		status.Detail = link.Source + " fehlt in der Installation"
+		if link.IsFile {
+			// Instruktionsdateien gehoeren dem Projekt; wir legen keine an.
+			status.Detail = link.Source + " fehlt im Projekt"
+		} else {
+			status.Detail = link.Source + " fehlt in der Installation"
+		}
 		return status
 	}
 
@@ -106,6 +155,10 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 			status.Detail = "zeigt auf " + destination
 		}
 
+	case info.IsDir() && link.IsFile:
+		status.State = StateBlocked
+		status.Detail = "Verzeichnis steht im Weg"
+
 	case info.IsDir():
 		missing := missingFileLinks(source, target)
 		if missing == 0 {
@@ -115,6 +168,12 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 			status.State = StateOwnDirectory
 			status.Detail = fmt.Sprintf("eigenes Verzeichnis, %d Eintraege fehlen", missing)
 		}
+
+	case link.IsFile:
+		// Typisch nach einem Editor, der "atomar" speichert: er ersetzt den
+		// Symlink durch eine echte Datei. Ab dann laufen beide auseinander.
+		status.State = StateBlocked
+		status.Detail = "echte Datei statt Symlink, Aenderungen erreichen " + link.Source + " nicht"
 
 	default:
 		status.State = StateBlocked
@@ -133,7 +192,7 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 	for _, link := range Links() {
 		source := filepath.Join(projectRoot, link.Source)
-		if !isDir(source) {
+		if !link.sourcePresent(projectRoot) {
 			continue
 		}
 
@@ -161,13 +220,14 @@ func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 				return CheckLinks(projectRoot), fmt.Errorf("%s verlinken: %w", link.Path, err)
 			}
 
-		case info.IsDir():
+		case info.IsDir() && !link.IsFile:
 			if err := linkFiles(source, target); err != nil {
 				return CheckLinks(projectRoot), err
 			}
 
 		default:
-			// Datei im Weg: gehoert dem Projekt, bleibt liegen.
+			// Etwas Echtes steht im Weg. Es gehoert dem Projekt und bleibt
+			// liegen; die Pruefung meldet den Zustand.
 		}
 	}
 

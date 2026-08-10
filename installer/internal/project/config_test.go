@@ -196,3 +196,39 @@ project:
 		t.Errorf("RepoRoot = %q, erwartet %q", config.RepoRoot, "richtig")
 	}
 }
+
+func TestGitWorktreeRootFindetRepoAufwaerts(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatalf(".git anlegen: %v", err)
+	}
+	deep := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatalf("Unterverzeichnis anlegen: %v", err)
+	}
+
+	found, ok := gitWorktreeRoot(deep)
+	if !ok {
+		t.Fatal("kein Repository gefunden")
+	}
+	if want, _ := filepath.EvalSymlinks(root); found != want {
+		t.Errorf("gitWorktreeRoot = %q, erwartet %q", found, want)
+	}
+}
+
+func TestGitWorktreeRootOhneRepo(t *testing.T) {
+	if _, ok := gitWorktreeRoot(t.TempDir()); ok {
+		t.Error("Repository gemeldet, obwohl keins vorhanden ist")
+	}
+}
+
+func TestAddUniqueHaeltReihenfolgeUndUeberspringtDoppelte(t *testing.T) {
+	list := addUnique(nil, "a")
+	list = addUnique(list, "b")
+	list = addUnique(list, "a")
+	list = addUnique(list, "")
+
+	if len(list) != 2 || list[0] != "a" || list[1] != "b" {
+		t.Errorf("list = %v, erwartet [a b]", list)
+	}
+}

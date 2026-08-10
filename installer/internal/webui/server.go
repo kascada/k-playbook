@@ -112,8 +112,11 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", createConfigHandler)
+	mux.HandleFunc("GET /api/local", localHandler)
+	mux.HandleFunc("POST /api/local", createLocalHandler)
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
+	mux.HandleFunc("GET /api/tools", toolsHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -138,7 +141,8 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		Mode      string
 		ModeLabel string
 		Path      string
-	}{}
+		Installed bool
+	}{Installed: environment.Installed}
 
 	if environment.Installed {
 		data.Mode = "project"

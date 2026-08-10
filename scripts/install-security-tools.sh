@@ -2,8 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PLAYBOOK_REPO="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-TOOL_MATRIX_FILE="${K_SECURITY_TOOLS_MATRIX:-$PLAYBOOK_REPO/global/security-tools.tsv}"
+PLAYBOOK_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# Die Matrix liegt neben diesem Skript, damit beide zusammen verschoben werden
+# koennen und kein Pfad ins uebergeordnete Verzeichnis noetig ist.
+TOOL_MATRIX_FILE="${K_SECURITY_TOOLS_MATRIX:-$SCRIPT_DIR/security-tools.tsv}"
 
 # Tool installation is host/user-local by policy. Do not install into project venvs.
 REQUIRED_TOOLS=()
@@ -16,6 +18,7 @@ declare -A TOOL_DOCKER_IMAGE=()
 declare -A TOOL_VERSION_ARGS=()
 
 INSTALL_SPEC=""
+JSON_OUTPUT=0
 METHOD="auto"
 INCLUDE_OPTIONAL=0
 YES=0
@@ -54,6 +57,7 @@ Tool matrix:
 
 Options:
   --preflight          Show tool status only. This is the default.
+  --json               Print the tool status as JSON and exit. Read-only.
   --install <target>   Install target: missing, required, all, or one tool name.
   --method <method>    auto, native, docker, pipx, or venv. Default: auto.
   --include-optional   Accepted for old command lines; currently no extra tools.
@@ -253,9 +257,9 @@ print_preflight() {
   ensure_host_tool_scope
   missing_required="$(missing_required_count)"
 
-  printf '/k-install-security-tools - Preflight\n'
-  printf '%s\n' '------------------------------------'
-  printf 'Repo:       %s\n' "$PLAYBOOK_REPO"
+  printf 'Security-Tools - Preflight\n'
+  printf '%s\n' '--------------------------'
+  printf 'Installation: %s\n' "$PLAYBOOK_DIR"
   printf 'Toolliste:  %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
   printf 'pip-audit:  %s (dediziertes Tool-venv, nicht Projekt-venv)\n' "$VENV_DIR"
@@ -293,6 +297,69 @@ print_preflight() {
     printf '  Native/user-local: bash "%s" --install missing --method auto\n' "$0"
     printf '  Docker-Fallback:   bash "%s" --install missing --method docker\n' "$0"
   fi
+}
+
+# json_escape maskiert die Zeichen, die in einem JSON-String nicht roh stehen
+# duerfen. Versionsausgaben und Pfade kommen von fremden Programmen, also wird
+# hier nichts vorausgesetzt.
+json_escape() {
+  local text="$1"
+  text="${text//\\/\\\\}"
+  text="${text//\"/\\\"}"
+  text="${text//$'\t'/\\t}"
+  text="${text//$'\r'/}"
+  text="${text//$'\n'/\\n}"
+  printf '%s' "$text"
+}
+
+# print_preflight_json gibt denselben Zustand wie print_preflight aus, nur
+# maschinenlesbar. Die GUI rendert daraus ihre Tabelle.
+print_preflight_json() {
+  local tool status version path image missing_required first
+  ensure_host_tool_scope
+  missing_required="$(missing_required_count)"
+
+  printf '{\n'
+  printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
+  printf '  "toolMatrix": "%s",\n' "$(json_escape "$TOOL_MATRIX_FILE")"
+  printf '  "binDir": "%s",\n' "$(json_escape "$BIN_DIR")"
+  printf '  "venvDir": "%s",\n' "$(json_escape "$VENV_DIR")"
+  printf '  "missingRequired": %s,\n' "$missing_required"
+  # Absoluter Pfad: der Befehl soll sich kopieren und von ueberall ausfuehren
+  # lassen, unabhaengig vom Arbeitsverzeichnis des Aufrufs.
+  printf '  "installCommand": "%s",\n' \
+    "$(json_escape "bash \"$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")\" --install missing --method auto")"
+  printf '  "tools": [\n'
+
+  first=1
+  while IFS= read -r tool; do
+    [[ -z "$tool" ]] && continue
+    if has_cmd "$tool"; then
+      status="ok"
+      version="$(tool_version "$tool")"
+      path="$(command -v "$tool")"
+    else
+      status="missing"
+      version=""
+      path=""
+    fi
+    image="$(docker_image "$tool")"
+    [[ "$image" == "-" ]] && image=""
+
+    [[ "$first" -eq 0 ]] && printf ',\n'
+    first=0
+    printf '    {"name": "%s", "required": %s, "status": "%s", "version": "%s", "path": "%s", "role": "%s", "dockerImage": "%s"}' \
+      "$(json_escape "$tool")" \
+      "$(is_required_tool "$tool" && printf 'true' || printf 'false')" \
+      "$status" \
+      "$(json_escape "$version")" \
+      "$(json_escape "$path")" \
+      "$(json_escape "$(tool_role "$tool")")" \
+      "$(json_escape "$image")"
+  done < <(all_tools_for_status)
+
+  printf '\n  ]\n'
+  printf '}\n'
 }
 
 ensure_bin_dir() {
@@ -612,6 +679,10 @@ parse_args() {
       --preflight)
         shift
         ;;
+      --json)
+        JSON_OUTPUT=1
+        shift
+        ;;
       --install)
         INSTALL_SPEC="${2:-}"
         [[ -n "$INSTALL_SPEC" ]] || die "--install requires a target."
@@ -670,6 +741,12 @@ main() {
   local tools tool count answer
   load_tool_matrix
   parse_args "$@"
+
+  # --json ist rein lesend: es beschreibt den Zustand und installiert nichts.
+  if [[ "$JSON_OUTPUT" -eq 1 ]]; then
+    print_preflight_json
+    exit 0
+  fi
 
   print_preflight
 

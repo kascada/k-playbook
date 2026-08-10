@@ -1,9 +1,16 @@
 # Private/local material
 priv/
 .priv/
-.k-playbook-local/
-/k-playbook/
 /installer/bin/
+
+# Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
+# unter k-playbook/, die Konfiguration daneben. Beides entsteht lokal beim
+# ersten Start und gehoert nicht ins Quell-Repo. In einem echten Zielprojekt
+# gilt das Gegenteil: dort werden K-PLAYBOOK.yaml und k-playbook-local/
+# committet.
+/K-PLAYBOOK.yaml
+/k-playbook/
+/k-playbook-local/
 
 # Secrets and local environment
 .env

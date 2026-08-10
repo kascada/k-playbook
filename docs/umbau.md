@@ -107,13 +107,84 @@ Geschrieben wird ausschließlich auf Bestätigung. Eine vorhandene `K-PLAYBOOK.y
 nie überschrieben — sie gehört dem Projekt und kann Werte tragen, die das Werkzeug nicht
 kennt.
 
+## Verzeichnisstruktur eines Projekts
+
+```text
+projekt/
+├── K-PLAYBOOK.yaml       der Anker; sein Ort bestimmt das Hauptverzeichnis
+├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
+├── CLAUDE.md             Symlink auf AGENTS.md
+├── .claude/
+│   ├── commands  ──┐     Symlink
+│   └── skills      │     Symlink; OpenCode liest hier mit
+├── .opencode/      │
+│   └── commands  ──┤     Symlink
+├── .cursor/        │
+│   └── commands  ──┤     Symlink
+├── k-playbook/   ←─┘     die Installation, vollständig ersetzbar
+│   ├── commands/ skills/ rules/ reviews/ checks/
+│   ├── bin/ dist/
+│   └── installer/ docs/
+└── k-playbook-local/     projekteigen, committed
+    ├── rules/            Overlay zu k-playbook/rules/
+    ├── reviews/          Overlay zu k-playbook/reviews/
+    ├── checks/           Overlay zu k-playbook/checks/
+    ├── results/          Review-Ergebnisse
+    ├── guidelines/
+    ├── commands/         projekteigene Slash-Commands
+    ├── tasks/done/
+    ├── priv/             Inhalt gitignored, Verzeichnis versioniert
+    └── TODO.md
+```
+
+Jedes Verzeichnis unter `k-playbook-local/` trägt eine `README.md` mit seinem Zweck —
+auch weil Git leere Verzeichnisse nicht speichert und sie sonst nach einem Clone des
+Projekts fehlen würden.
+
+**Assistenten.** Verlinkt wird für Claude Code, OpenCode und Cursor. Skills stehen nur
+einmal unter `.claude/skills`: OpenCode durchsucht dieses Verzeichnis mit, Cursor kennt
+kein Skill-Konzept. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, weil Claude Code
+ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so landet jede
+Änderung in beiden. Fehlt `AGENTS.md`, wird nichts angelegt; die Datei gehört dem Projekt.
+
 ## Stand
 
-Das Werkzeug ist auf ein leeres Gerüst zurückgesetzt: `bin/k-playbook` startet die lokale
-GUI und zeigt eine leere Seite mit Titel. Der bisherige Go-Code liegt unter
-`installer/_old/` als Nachschlagewerk — von der Go-Toolchain ignoriert und nicht baubar.
+Das Werkzeug führt durch drei Schritte: Konfiguration anlegen, projekteigene Struktur
+anlegen, Assistenten verlinken. Der bisherige Go-Code liegt unter `installer/_old/` als
+Nachschlagewerk — von der Go-Toolchain ignoriert und nicht baubar.
 
-## Offen
+## Nachzuziehen
 
-- `make install` und `scripts/install-installer.sh` folgen noch dem alten Modell und
-  suchen ein `k-playbook-installer`-Binary.
+Sammelstelle für alles, was der neuen Struktur noch folgen muss.
+
+**Ergebnisse liegen jetzt unter `k-playbook-local/results/`**, vorher unter
+`<paths.reviews>/results/`. Umzustellen: `/k-results` sowie die Review-Rezepte, die dorthin
+schreiben — `review-secret-scanning`, `review-codeql-security`, `review-k-check-security`,
+`review-dependabot-alerts`, `review-dependency-cve`, `review-iac-container`, `review-tech`.
+
+**Der projektlokale Regelordner heißt `rules/`**, nicht mehr `enforcement/`. Umzustellen:
+`commands/_shared/overlay-resolution.md` (beschreibt die Asymmetrie als gewollt),
+`rules/README.md`, der Skill `enforcement` und der Command `k-enforcement`.
+
+**Pfade in Commands und Skills** zeigen noch auf das alte Layout: `k-playbook/docs/`,
+`k-playbook/tasks/`, `_dist/`. Betroffen sind unter anderem `k-code2docs`, `k-pr-review`,
+`k-setup-codeql`, `k-install-codeql` sowie die Skills `ai-session-memory` und
+`overlay-repo-analyse`, die `k-playbook/docs/` fest verdrahten.
+
+**`commands/_shared/path-resolution.md`** beschreibt noch `_dist/` als Installation und
+die Config im k-playbook-Verzeichnis. Der Anker liegt jetzt im Hauptverzeichnis.
+
+**`checks/README.md` und `bin/k-check`** setzen den Env-Kontrakt `K_PLAYBOOK_DIST` und
+leiten das Verzeichnis aus der eigenen Lage ab.
+
+**`scripts/install-security-tools.sh` findet seine Tool-Matrix nicht mehr.** Der Default
+zeigt auf `$PLAYBOOK_REPO/global/security-tools.tsv`; ein `global/` gibt es seit dem
+Payload-Umzug nicht, die Datei liegt im Repo-Root. Ebenso verweist
+`commands/k-install-security-tools.md` auf `<DIST_DIR>/security-tools.tsv` und im Text auf
+`global/security-tools.tsv`.
+
+**`make install` und `scripts/install-installer.sh`** folgen dem alten Modell und suchen
+ein `k-playbook-installer`-Binary.
+
+**Der Abschnitt „Altes Modell" in `README.md`** wird geleert, sobald die Punkte darüber
+abgearbeitet sind.

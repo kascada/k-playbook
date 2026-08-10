@@ -43,12 +43,13 @@ type browserOpener struct {
 // browserOpeners liefert die Kandidaten in der Reihenfolge, in der sie
 // probiert werden. Welche davon vorhanden sind, unterscheidet sich je nach
 // Desktop, Distribution und WSL-Setup, deshalb wird nichts vorausgesetzt.
+//
+// Windows kommt nicht vor: der Einstiegspunkt bin/k-playbook ist ein
+// Bash-Skript, das Programm laeuft dort gar nicht erst an. Unter WSL greift
+// der Linux-Zweig.
 func browserOpeners() []browserOpener {
-	switch runtime.GOOS {
-	case "darwin":
+	if runtime.GOOS == "darwin" {
 		return []browserOpener{{command: "open"}}
-	case "windows":
-		return []browserOpener{{command: "rundll32", args: []string{"url.dll,FileProtocolHandler"}}}
 	}
 	return []browserOpener{
 		{command: "wslview"},                     // WSL: reicht an den Windows-Browser durch

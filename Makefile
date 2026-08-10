@@ -31,7 +31,7 @@ INSTALLER_WRAPPER := bin/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 
-.PHONY: help build dist install install-from-source uninstall gui test installer-build installer-install installer-install-from-source installer-uninstall installer-run installer-test path-hint path-setup
+.PHONY: help build dist install-from-source uninstall gui test installer-build installer-install-from-source installer-uninstall installer-run installer-test path-hint path-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfuegbare Targets:"
@@ -64,9 +64,6 @@ dist: ## Baut die Binaries aller Plattformen nach ./dist/
 
 build: dist ## Alias fuer dist
 
-install: ## Installiert den Installer ohne Go aus vorhandenen Binaries oder GitHub Releases
-	PATH_BIN="$(PATH_BIN)" PATH_PROFILE="$(PATH_PROFILE)" ./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
-
 install-from-source: build ## Baut das Binary und verlinkt es nach ~/.local/bin
 	@mkdir -p "$(INSTALL_BIN)"
 	ln -sfn "$(CURDIR)/$(INSTALLER_WRAPPER)" "$(INSTALL_BIN)/$(INSTALLER_BINARY)"
@@ -88,8 +85,6 @@ test: ## Fuehrt die Tests aus
 	cd installer && go test ./...
 
 installer-build: build ## Alias fuer build
-
-installer-install: install ## Alias fuer install
 
 installer-install-from-source: install-from-source ## Alias fuer install-from-source
 
