@@ -9,6 +9,8 @@ const elements = {
   closed: document.getElementById("closed"),
   closedTitle: document.getElementById("closed-title"),
   closedMessage: document.getElementById("closed-message"),
+  configCard: document.getElementById("config-card"),
+  assistantCard: document.getElementById("assistant-card"),
   configPill: document.getElementById("config-pill"),
   configFacts: document.getElementById("config-facts"),
   configForm: document.getElementById("config-form"),
@@ -41,8 +43,9 @@ elements.configCreate.addEventListener("click", createConfig);
 elements.assistantApply.addEventListener("click", applyAssistant);
 window.addEventListener("pagehide", notifyClientGone);
 startHealthChecks();
+// Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
+// blendet ihn dann ein und laedt ihn nach.
 loadConfig();
-loadAssistant();
 
 // Legt eine Zeile in einer Faktenliste an.
 function addFact(list, term, detail) {
@@ -79,11 +82,12 @@ async function createConfig() {
       body,
     });
     const data = await response.json();
-    renderConfig(data);
-    // Die Kopfzeile wird serverseitig gefuellt und muss den neuen Ort zeigen.
     if (data.installed) {
-      window.setTimeout(() => window.location.reload(), 600);
+      // Die Kopfzeile wird serverseitig gefuellt und muss den neuen Ort zeigen.
+      window.location.reload();
+      return;
     }
+    renderConfig(data);
   } catch {
     elements.configMessage.textContent = "Anlegen fehlgeschlagen.";
     setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
@@ -94,18 +98,18 @@ function renderConfig(data) {
   elements.configFacts.replaceChildren();
   elements.configMessage.textContent = data.message || "";
 
+  // Steht die Konfiguration, ist dieser Schritt erledigt und verschwindet. Wo
+  // alles liegt, zeigt die Kopfzeile.
   if (data.installed) {
-    elements.configForm.classList.add("hidden");
-    addFact(elements.configFacts, "Konfiguration", data.configPath);
-    addFact(elements.configFacts, "Hauptverzeichnis", data.projectDir);
-    addFact(elements.configFacts, "Installation", data.playbookDir);
-    addFact(elements.configFacts, "Projekt-Repository", `${data.repoRoot} (${data.vcs || "unbekannt"})`);
-
-    setBlockState(elements.configPill, elements.configCreate, "ok", CONFIG_LABELS);
-    // Angelegt wird nur einmal; ein zweiter Aufruf wuerde ohnehin abgelehnt.
-    elements.configCreate.disabled = true;
+    elements.configCard.classList.add("hidden");
+    elements.assistantCard.classList.remove("hidden");
+    loadAssistant();
     return;
   }
+
+  // Solange sie fehlt, ist dies der einzige Schritt, der zur Wahl steht.
+  elements.configCard.classList.remove("hidden");
+  elements.assistantCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
   elements.configForm.classList.remove("hidden");

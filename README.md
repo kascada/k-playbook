@@ -2,9 +2,9 @@
 
 `k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts geklont, `<projekt>/k-playbook/`. Daneben liegen die projekteigenen Artefakte. Ein Projekt ist damit selbstgenuegsam.
 
-> **Umstellung laeuft.** Installation und Aktualisierung unten sind aktuell. Die
-> Abschnitte darunter beschreiben teilweise noch das abgeloeste Modell mit `_dist/` und
-> `k-playbook-installer`. Der Stand steht in [`docs/umbau.md`](./docs/umbau.md).
+> **Umstellung laeuft.** Alles bis zum Abschnitt [Altes Modell](#altes-modell) ist
+> aktuell; was darunter steht, wird der Reihe nach ersetzt. Der Stand steht in
+> [`docs/umbau.md`](./docs/umbau.md).
 
 ## Installation
 
@@ -61,7 +61,34 @@ make dist
 `make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
 ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern.
 
-## Weitere Kommandos
+## Grundprinzipien
+
+- Jedes Projekt traegt seine eigene Installation in einem Unterverzeichnis. Kein fester Hostpfad, kein globaler Symlink.
+- Installation und Projekt-Eigentum sind strikt getrennt: `k-playbook/` wird bei jedem Update vollstaendig ersetzt, alles daneben nie angefasst.
+- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt, `overlay.<kind>.disabled` schaltet ab.
+- Pfade werden aus `K-PLAYBOOK.yaml` gelesen und nicht geraten.
+- Docs, Tasks, Reviews und Results bleiben projektlokale Artefakte.
+- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalitaet.
+
+## Dokumentation
+
+- [`docs/umbau.md`](./docs/umbau.md) - Stand der Umstellung, Festlegungen und offene Punkte.
+- [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
+- [`docs/pr-review.md`](./docs/pr-review.md) - PR-Review-Flow.
+- [`docs/code-review.md`](./docs/code-review.md) - Review-Rezepte, Results-Summary, Remediation und Handoffs.
+- [`docs/task-flow.md`](./docs/task-flow.md) - Task-Erzeugung, Review-Loop und Ausfuehrung.
+- [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Artefaktmodell fuer Reviews, Findings und Remediation.
+
+---
+
+## Altes Modell
+
+**Alles ab hier beschreibt den abgeloesten Stand** mit zentraler Basisinstallation,
+`_dist/` und dem Binary `k-playbook-installer`. Keiner dieser Aufrufe funktioniert im
+aktuellen Stand. Die Abschnitte bleiben stehen, bis sie der Reihe nach ersetzt sind; was
+schon entschieden ist, steht in [`docs/umbau.md`](./docs/umbau.md).
+
+### Weitere Kommandos
 
 | Kommando | Zweck |
 |---|---|
@@ -77,7 +104,7 @@ Alle Kommandos finden das Projekt selbst, indem sie vom Arbeitsverzeichnis aufwa
 `_dist/` steht in der `.gitignore` und fehlt darum nach einem frischen Clone. Die Version
 steht in `K-PLAYBOOK.yaml`, `restore` stellt den Zustand daraus wieder her.
 
-## Bestehende Projekte migrieren
+### Bestehende Projekte migrieren
 
 ```bash
 cd /pfad/zum/projekt
@@ -90,7 +117,7 @@ das `k-playbook/`-Praefix und hebt `project.repo_root` eine Ebene an. Tasks, Rev
 Ergebnisse und Docs liegen bereits richtig und werden nicht bewegt. Unbekannte Felder
 bleiben erhalten.
 
-## Browser-GUI
+### Browser-GUI
 
 ```bash
 k-playbook-installer gui
@@ -100,23 +127,13 @@ Die GUI bildet noch das alte zentrale Modell ab. Auf Projekten mit `schema_versi
 verweigert sie jede schreibende Aktion mit einem klaren Hinweis, statt die Migration
 rueckgaengig zu machen. Fuer migrierte Projekte ist die Kommandozeile der Weg.
 
-## DevContainer
+### DevContainer
 
 Die DevContainer-Integration setzt noch auf den alten Bind-Mount des Basis-Repos und wird
 mit der GUI umgebaut. Im neuen Modell braucht sie ihn nicht mehr: `_dist/` liegt im Projekt
 und ist im Container dadurch automatisch vorhanden.
 
-## Dokumentation
-
-- [`docs/README.md`](./docs/README.md) - kompletter Dokumentationsindex.
-- [`docs/installation.md`](./docs/installation.md) - Installationsdetails, Uebergangsstand und Installer-Binary.
-- [`docs/commands.md`](./docs/commands.md) - kompakter Command-Index.
-- [`docs/pr-review.md`](./docs/pr-review.md) - PR-Review-Flow.
-- [`docs/code-review.md`](./docs/code-review.md) - Review-Rezepte, Results-Summary, Remediation und Handoffs.
-- [`docs/task-flow.md`](./docs/task-flow.md) - Task-Erzeugung, Review-Loop und Ausfuehrung.
-- [`docs/reviews-and-results.md`](./docs/reviews-and-results.md) - Artefaktmodell fuer Reviews, Findings und Remediation.
-
-## Bausteine
+### Bausteine
 
 Die Payload unter `installer/payload/` wird per `go:embed` ins Binary gepackt und im
 Zielprojekt nach `k-playbook/_dist/` entpackt.
@@ -131,12 +148,3 @@ Zielprojekt nach `k-playbook/_dist/` entpackt.
 | `installer/payload/bin/k-check` | Check-Runner | `_dist/bin/k-check` |
 | `installer/` | Installer-Quellcode | nicht mitgeliefert |
 | `docs/`, `prompts/` | Doku und Auftraege fuer die Entwicklung | nicht mitgeliefert |
-
-## Grundprinzipien
-
-- Jedes Projekt traegt seine eigene Installation in einem Unterverzeichnis. Kein fester Hostpfad, kein globaler Symlink.
-- Installation und Projekt-Eigentum sind strikt getrennt: `_dist/` wird bei jedem Update vollstaendig ersetzt, alles daneben nie angefasst.
-- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt, `overlay.<kind>.disabled` schaltet ab.
-- Pfade werden aus `K-PLAYBOOK.yaml` gelesen und nicht geraten.
-- Docs, Tasks, Reviews und Results bleiben projektlokale Artefakte.
-- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalitaet.
