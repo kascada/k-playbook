@@ -189,7 +189,10 @@ func TestSyncInstallerBinariesMirrorsAllDistAssetsAndWrapper(t *testing.T) {
 	}
 }
 
-func TestEnsureLauncherPathAddsCanonicalRepoBinToProfile(t *testing.T) {
+// Der PATH-Eintrag ist der host-weite Installationsort. Ein Repo- oder Projektpfad
+// darf dort nie landen: ein Binary bedient alle Projekte, und deren Pfade sind
+// verschieden.
+func TestEnsureLauncherPathAddsInstallDirToProfile(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
@@ -208,7 +211,7 @@ func TestEnsureLauncherPathAddsCanonicalRepoBinToProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read profile: %v", err)
 	}
-	expectedPath := "${HOME}/dev/k-playbook/bin"
+	expectedPath := "${HOME}/.local/bin"
 	if !strings.Contains(string(data), expectedPath) {
 		t.Fatalf("expected profile to contain %s, got %q", expectedPath, string(data))
 	}
@@ -222,9 +225,9 @@ func TestEnsureLauncherPathAddsCanonicalRepoBinToProfile(t *testing.T) {
 	}
 }
 
-func TestEnsureLauncherPathDoesNothingWhenPathAlreadyContainsRepoBin(t *testing.T) {
+func TestEnsureLauncherPathDoesNothingWhenPathAlreadyContainsInstallDir(t *testing.T) {
 	home := t.TempDir()
-	expectedPath := filepath.Join(home, "dev", "k-playbook", "bin")
+	expectedPath := filepath.Join(home, ".local", "bin")
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
 	t.Setenv("PATH", strings.Join([]string{"/usr/bin", expectedPath, "/bin"}, string(os.PathListSeparator)))

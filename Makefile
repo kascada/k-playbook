@@ -1,8 +1,10 @@
 .DEFAULT_GOAL := help
 
+# Der Installer ist host-weit, nicht projekt- oder repo-gebunden: mehrere Projekte
+# teilen sich ein Binary. Deshalb ist ~/.local/bin der PATH-Eintrag, nicht das
+# bin/ eines Repos.
 INSTALL_BIN ?= $(HOME)/.local/bin
-PATH_BIN ?= $(HOME)/dev/k-playbook/bin
-CANONICAL_PATH_BIN := $(HOME)/dev/k-playbook/bin
+PATH_BIN ?= $(INSTALL_BIN)
 OS_NAME ?= $(shell uname -s 2>/dev/null)
 USER_SHELL ?= $(notdir $(shell printf '%s' "$${SHELL:-}"))
 ifeq ($(USER_SHELL),zsh)
@@ -16,8 +18,8 @@ endif
 else
 PATH_PROFILE ?= $(HOME)/.profile
 endif
-ifeq ($(PATH_BIN),$(CANONICAL_PATH_BIN))
-PATH_EXPORT := export PATH="$$HOME/dev/k-playbook/bin:$$PATH"
+ifeq ($(PATH_BIN),$(HOME)/.local/bin)
+PATH_EXPORT := export PATH="$$HOME/.local/bin:$$PATH"
 else
 PATH_EXPORT := export PATH="$(PATH_BIN):$$PATH"
 endif
@@ -113,7 +115,7 @@ installer-test: test ## Alias fuer test
 
 installer-clean: clean ## Alias fuer clean
 
-path-hint: ## Prueft, ob ~/dev/k-playbook/bin im PATH liegt
+path-hint: ## Prueft, ob der Installationsort im PATH liegt
 	@if printf '%s' ":$$PATH:" | grep -q ":$(PATH_BIN):"; then \
 		echo "PATH OK: $(PATH_BIN) ist im PATH."; \
 	else \
@@ -122,12 +124,12 @@ path-hint: ## Prueft, ob ~/dev/k-playbook/bin im PATH liegt
 		echo '  $(PATH_EXPORT)'; \
 	fi
 
-path-setup: ## Stellt sicher, dass ~/dev/k-playbook/bin im Shell-Profil steht
+path-setup: ## Stellt sicher, dass der Installationsort im Shell-Profil steht
 	@if printf '%s' ":$$PATH:" | grep -q ":$(PATH_BIN):"; then \
 		echo "PATH OK: $(PATH_BIN) ist im PATH."; \
 	else \
 		touch "$(PATH_PROFILE)"; \
-		if grep -Fq '$(PATH_BIN)' "$(PATH_PROFILE)" || grep -Fq '$$HOME/dev/k-playbook/bin' "$(PATH_PROFILE)" || grep -Fq '$${HOME}/dev/k-playbook/bin' "$(PATH_PROFILE)"; then \
+		if grep -Fq '$(PATH_BIN)' "$(PATH_PROFILE)" || grep -Fq '$$HOME/.local/bin' "$(PATH_PROFILE)" || grep -Fq '$${HOME}/.local/bin' "$(PATH_PROFILE)"; then \
 			echo "PATH-Eintrag existiert bereits in $(PATH_PROFILE), ist aber in dieser Shell noch nicht aktiv."; \
 		else \
 			printf '\n# k-playbook installer PATH\n$(PATH_EXPORT)\n' >> "$(PATH_PROFILE)"; \

@@ -19,7 +19,7 @@ Options:
 
 Environment:
   INSTALL_BIN                    Alternative install directory.
-  PATH_BIN                       PATH entry for the canonical launcher. Default: ~/dev/k-playbook/bin.
+  PATH_BIN                       PATH entry for the installed launcher. Default: the --bin-dir value.
   PATH_PROFILE                   Shell profile to update. Default depends on SHELL/OS.
   K_PLAYBOOK_RELEASE_BASE_URL    Release download base URL.
 
@@ -46,8 +46,12 @@ DIST_DIR="$PLAYBOOK_REPO/dist"
 BIN_DIR="$PLAYBOOK_REPO/bin"
 WRAPPER_TEMPLATE="$PLAYBOOK_REPO/scripts/templates/k-playbook-installer-wrapper.sh"
 INSTALL_BIN="${INSTALL_BIN:-$HOME/.local/bin}"
-PATH_BIN="${PATH_BIN:-$HOME/dev/k-playbook/bin}"
-CANONICAL_PATH_BIN="$HOME/dev/k-playbook/bin"
+# The installer is host-wide, shared by every project. Its PATH entry is therefore
+# the install directory (~/.local/bin by default), never the bin/ of some repo —
+# that was the retired fixed-path model and breaks as soon as there is more than
+# one project.
+PATH_BIN="${PATH_BIN:-}"
+CANONICAL_PATH_BIN="$HOME/.local/bin"
 PATH_PROFILE="${PATH_PROFILE:-}"
 RELEASE_BASE_URL="${K_PLAYBOOK_RELEASE_BASE_URL:-https://github.com/kascada/k-playbook/releases/latest/download}"
 FROM_DIST_ONLY=0
@@ -75,6 +79,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 INSTALL_BIN="${INSTALL_BIN/#\~/$HOME}"
+# Ohne expliziten PATH_BIN gilt das Installationsverzeichnis: dort liegt der
+# Launcher, den der Nutzer aufruft. Das repo-lokale bin/ haelt nur die
+# plattformspezifischen Binaries und gehoert nicht in den PATH.
+PATH_BIN="${PATH_BIN:-$INSTALL_BIN}"
 PATH_BIN="${PATH_BIN/#\~/$HOME}"
 PATH_PROFILE="${PATH_PROFILE/#\~/$HOME}"
 
@@ -121,13 +129,13 @@ ensure_launcher_path() {
   marker="# k-playbook installer PATH"
   profile_path_bin="$path_bin"
   if [[ "$path_bin" == "$CANONICAL_PATH_BIN" ]]; then
-    profile_path_bin='${HOME}/dev/k-playbook/bin'
+    profile_path_bin='${HOME}/.local/bin'
   fi
   line="export PATH=\"$profile_path_bin:\$PATH\""
 
   mkdir -p "$(dirname "$profile")"
   touch "$profile"
-  if grep -Fq "$path_bin" "$profile" || grep -Fq '$HOME/dev/k-playbook/bin' "$profile" || grep -Fq '${HOME}/dev/k-playbook/bin' "$profile"; then
+  if grep -Fq "$path_bin" "$profile" || grep -Fq '$HOME/.local/bin' "$profile" || grep -Fq '${HOME}/.local/bin' "$profile"; then
     log "PATH-Eintrag existiert bereits in $profile, ist aber in dieser Shell noch nicht aktiv."
   else
     {

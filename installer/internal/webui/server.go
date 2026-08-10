@@ -851,11 +851,11 @@ func ensureLauncherPath() (bool, string, error) {
 	}
 
 	content := string(data)
-	if strings.Contains(content, pathBin) || strings.Contains(content, "$HOME/dev/k-playbook/bin") || strings.Contains(content, "${HOME}/dev/k-playbook/bin") || strings.Contains(content, "~/dev/k-playbook/bin") {
+	if strings.Contains(content, pathBin) || strings.Contains(content, "$HOME/.local/bin") || strings.Contains(content, "${HOME}/.local/bin") || strings.Contains(content, "~/.local/bin") {
 		return false, fmt.Sprintf("PATH-Eintrag fuer %s existiert bereits in %s, ist aber in dieser Shell noch nicht aktiv.", pathBin, profile), nil
 	}
 
-	profilePathBin := "${HOME}/dev/k-playbook/bin"
+	profilePathBin := "${HOME}/.local/bin"
 	line := fmt.Sprintf("\n# k-playbook installer PATH\nexport PATH=\"%s:$PATH\"\n", profilePathBin)
 	file, err := os.OpenFile(profile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -872,12 +872,17 @@ func ensureLauncherPath() (bool, string, error) {
 	return true, fmt.Sprintf("PATH-Eintrag zu %s hinzugefuegt: %s. Neue Shell starten oder ausfuehren: . %s", profile, pathBin, profile), nil
 }
 
+// canonicalLauncherPathBin is the host-wide install directory for the launcher.
+//
+// It is deliberately not tied to any repository or project: one binary serves every
+// project, and the install path differs per project, so no project path may end up
+// in PATH. The retired fixed-path model put ~/dev/k-playbook/bin here.
 func canonicalLauncherPathBin() (string, error) {
-	expected, err := pathcontract.ExpectedPath()
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("user home ermitteln: %w", err)
 	}
-	return filepath.Join(expected, "bin"), nil
+	return filepath.Join(home, ".local", "bin"), nil
 }
 
 func pathContains(pathValue string, entry string) bool {
