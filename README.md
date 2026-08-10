@@ -15,15 +15,17 @@ es gibt kein Repo zum Klonen und keinen festen Pfad mehr.
 ```bash
 git clone git@github.com:kascada/k-playbook.git
 cd k-playbook
-make install-from-source
+make install
 ```
 
-Das baut das Binary aus der Quelle und verlinkt `~/.local/bin/k-playbook-installer`.
-Solange die Release-Artefakte unter `dist/` noch die alte Payload enthalten, ist der
-Source-Build der richtige Weg; dafuer wird Go gebraucht.
+**Go wird dafuer nicht gebraucht.** `make install` nimmt die fertigen Binaries aus `dist/`
+und faellt auf die GitHub Releases zurueck, wenn dort keine passende Plattform liegt.
+Genau dafuer ist der Installer in Go geschrieben: ein Binary, keine Laufzeitumgebung.
 
 Das geklonte Repo wird danach nur noch fuer die Weiterentwicklung gebraucht. Zielprojekte
 haengen nicht daran, und der Ort spielt keine Rolle.
+
+Fuer Arbeit am Installer selbst gibt es `make install-from-source`; das braucht Go.
 
 ## Projekt einbinden
 

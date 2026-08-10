@@ -18,7 +18,8 @@ Fertig und in Benutzung:
 - Aufloesung in `commands/_shared/path-resolution.md` und `commands/_shared/overlay-resolution.md`.
 - Alle Commands, Skills, Review-Rezepte und `k-check`.
 - Die Installer-Kommandozeile: `init`, `update`, `restore`, `migrate`, `status`, `version`.
-  Die Payload steckt per `go:embed` im Binary.
+  Die Payload steckt per `go:embed` im Binary; `dist/` enthaelt die aktuellen Artefakte,
+  `make install` braucht daher kein Go.
 
 Noch offen:
 
