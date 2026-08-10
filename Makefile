@@ -1,8 +1,7 @@
 .DEFAULT_GOAL := help
 
-# Der Installer ist host-weit, nicht projekt- oder repo-gebunden: mehrere Projekte
-# teilen sich ein Binary. Deshalb ist ~/.local/bin der PATH-Eintrag, nicht das
-# bin/ eines Repos.
+# Ziel fuer den optionalen host-weiten Symlink. Der Regelfall ist der Aufruf
+# ueber bin/k-playbook im jeweiligen Clone; ~/.local/bin ist nur Komfort.
 INSTALL_BIN ?= $(HOME)/.local/bin
 PATH_BIN ?= $(INSTALL_BIN)
 OS_NAME ?= $(shell uname -s 2>/dev/null)
@@ -23,15 +22,16 @@ PATH_EXPORT := export PATH="$$HOME/.local/bin:$$PATH"
 else
 PATH_EXPORT := export PATH="$(PATH_BIN):$$PATH"
 endif
-INSTALLER_BINARY := k-playbook-installer
-INSTALLER_SOURCE := ./installer/cmd/k-playbook-installer
-INSTALLER_BUILD_DIR := bin
-INSTALLER_WRAPPER := $(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)
-INSTALLER_WRAPPER_TEMPLATE := ./scripts/templates/k-playbook-installer-wrapper.sh
+INSTALLER_BINARY := k-playbook
+# Paketpfad relativ zum installer/-Verzeichnis, in dem go build laeuft.
+INSTALLER_PKG := ./cmd/k-playbook
+# Der Wrapper liegt versioniert im Repo, damit direkt nach dem Clone ein
+# Einstiegspunkt vorhanden ist. Er wird nicht gebaut.
+INSTALLER_WRAPPER := bin/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 
-.PHONY: help build dist install install-from-source uninstall gui test clean installer-build installer-install installer-install-from-source installer-uninstall installer-run installer-test installer-clean path-hint path-setup
+.PHONY: help build dist install install-from-source uninstall gui test installer-build installer-install installer-install-from-source installer-uninstall installer-run installer-test path-hint path-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfuegbare Targets:"
@@ -39,32 +39,19 @@ help: ## Zeigt diese Hilfe an
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Typischer Start:"
-	@echo "  make install"
-	@echo "  k-playbook-installer"
-	@echo "  # alternativ ohne make: ./scripts/install-installer.sh"
+	@echo "Direkt starten, ohne Go und ohne Installation:"
+	@echo "  bin/k-playbook"
 	@echo ""
-	@echo "Aus dem Source mit lokal installiertem Go:"
-	@echo "  make install-from-source"
+	@echo "Selbst bauen (braucht Go) und starten:"
+	@echo "  make dist"
 	@echo "  make gui"
 	@echo ""
-	@echo "Nach neu geladenem PATH auch direkt:"
-	@echo "  k-playbook-installer"
+	@echo "Host-weit verfuegbar machen:"
+	@echo "  make install-from-source"
+	@echo "  k-playbook"
 	@echo ""
 
-build: ## Baut alle Installer-Binaries nach ./bin/
-	@mkdir -p "$(INSTALLER_BUILD_DIR)"
-	@set -eu; \
-	for target in $(INSTALLER_RELEASE_TARGETS); do \
-		os="$${target%-*}"; \
-		arch="$${target#*-}"; \
-		output="../$(INSTALLER_BUILD_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
-		echo "Baue $$output"; \
-		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -o "$$output" ./cmd/k-playbook-installer); \
-	done
-	install -m 0755 "$(INSTALLER_WRAPPER_TEMPLATE)" "$(INSTALLER_WRAPPER)"
-
-dist: ## Baut Installer-Artefakte nach ./dist/
+dist: ## Baut die Binaries aller Plattformen nach ./dist/
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
 	for target in $(INSTALLER_RELEASE_TARGETS); do \
@@ -72,8 +59,10 @@ dist: ## Baut Installer-Artefakte nach ./dist/
 		arch="$${target#*-}"; \
 		output="../$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
 		echo "Baue $$output"; \
-		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -ldflags="-s -w" -o "$$output" ./cmd/k-playbook-installer); \
+		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -ldflags="-s -w" -o "$$output" "$(INSTALLER_PKG)"); \
 	done
+
+build: dist ## Alias fuer dist
 
 install: ## Installiert den Installer ohne Go aus vorhandenen Binaries oder GitHub Releases
 	PATH_BIN="$(PATH_BIN)" PATH_PROFILE="$(PATH_PROFILE)" ./scripts/install-installer.sh --bin-dir "$(INSTALL_BIN)"
@@ -92,14 +81,11 @@ uninstall: ## Entfernt den Installer-Symlink aus ~/.local/bin
 	rm -f "$(INSTALL_BIN)/$(INSTALLER_BINARY)"
 	@echo "Entfernt: $(INSTALL_BIN)/$(INSTALLER_BINARY)"
 
-gui: build ## Startet die Installer-GUI aus ./bin/
+gui: dist ## Baut und startet die GUI ueber den Wrapper
 	"$(INSTALLER_WRAPPER)"
 
-test: ## Fuehrt Installer-Tests aus
+test: ## Fuehrt die Tests aus
 	cd installer && go test ./...
-
-clean: ## Entfernt lokale Installer-Build-Artefakte
-	rm -rf "$(INSTALLER_BUILD_DIR)" "$(INSTALLER_DIST_DIR)"
 
 installer-build: build ## Alias fuer build
 
@@ -112,8 +98,6 @@ installer-uninstall: uninstall ## Alias fuer uninstall
 installer-run: gui ## Alias fuer gui
 
 installer-test: test ## Alias fuer test
-
-installer-clean: clean ## Alias fuer clean
 
 path-hint: ## Prueft, ob der Installationsort im PATH liegt
 	@if printf '%s' ":$$PATH:" | grep -q ":$(PATH_BIN):"; then \

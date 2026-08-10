@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Waehlt das zur Plattform passende Binary aus ../dist/ und ruft es auf.
+# Liegt im Repo und wird mitgeklont, damit direkt nach dem Clone ein
+# Einstiegspunkt vorhanden ist.
+
+source_path="${BASH_SOURCE[0]}"
+while [[ -L "${source_path}" ]]; do
+  source_dir="$(cd -P "$(dirname "${source_path}")" && pwd)"
+  link_target="$(readlink "${source_path}")"
+  if [[ "${link_target}" == /* ]]; then
+    source_path="${link_target}"
+  else
+    source_path="${source_dir}/${link_target}"
+  fi
+done
+script_dir="$(cd -P "$(dirname "${source_path}")" && pwd)"
+dist_dir="$(dirname "${script_dir}")/dist"
+
+case "$(uname -s)" in
+  Linux) os="linux" ;;
+  Darwin) os="darwin" ;;
+  *)
+    printf 'Nicht unterstuetztes Betriebssystem fuer k-playbook: %s\n' "$(uname -s)" >&2
+    exit 1
+    ;;
+esac
+
+case "$(uname -m)" in
+  x86_64|amd64) arch="amd64" ;;
+  arm64|aarch64) arch="arm64" ;;
+  *)
+    printf 'Nicht unterstuetzte Architektur fuer k-playbook: %s\n' "$(uname -m)" >&2
+    exit 1
+    ;;
+esac
+
+target="${dist_dir}/k-playbook-${os}-${arch}"
+if [[ ! -x "${target}" ]]; then
+  printf 'Binary fehlt: %s\n' "${target}" >&2
+  printf 'Mit "git pull" aktualisieren oder mit "make dist" selbst bauen.\n' >&2
+  exit 1
+fi
+
+exec "${target}" "$@"

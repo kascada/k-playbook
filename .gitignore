@@ -3,7 +3,6 @@ priv/
 .priv/
 .k-playbook-local/
 /k-playbook/
-/bin/
 /installer/bin/
 
 # Secrets and local environment

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>k-playbook Installer</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero app-header" data-view="home">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>k-playbook</h1>
+        </div>
+        <div class="hero-subrow">
+          <p class="eyebrow">Lokaler Installer</p>
+          <div class="hero-actions">
+            <button id="refresh" class="secondary">Status neu laden</button>
+            <button id="git-pull-top" class="secondary">k-playbook aktualisieren</button>
+            <button id="opencode-install-top" class="primary hidden">Registrierung aktualisieren</button>
+            <button id="shutdown" class="secondary danger">Schliessen</button>
+          </div>
+        </div>
+        <div id="runtime-banner" class="runtime-banner hidden"></div>
+      </section>
+
+      <section class="hero compact hidden" data-view="scan">
+        <div>
+          <p class="eyebrow">Projekt-Auswahl</p>
+          <h1>Projekt scannen</h1>
+          <p class="lead">Projektkandidaten suchen, genau eines auswaehlen und die erkannte Art bestaetigen.</p>
+        </div>
+        <button id="back-home" class="secondary">Zur Startseite</button>
+      </section>
+
+      <section class="hero compact hidden" data-view="project-detail">
+        <div>
+          <p class="eyebrow">Projekt</p>
+          <h1 id="project-detail-title">Projekt</h1>
+          <p id="project-detail-path" class="lead"></p>
+        </div>
+        <button id="back-projects" class="secondary">Zur Projektliste</button>
+      </section>
+
+      <section class="card" id="status-card" data-view="home">
+        <div id="status-head" class="section-head">
+          <div>
+            <p class="eyebrow">Schritt 1</p>
+            <h2>Pfadvertrag</h2>
+          </div>
+          <span id="status-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <div id="status-compact" class="status-compact hidden">
+          <span id="compact-text">~/dev/k-playbook ist bereit.</span>
+          <span class="status-check" aria-hidden="true">&#10003;</span>
+        </div>
+        <dl id="status-details" class="facts">
+          <div><dt>Erwartet</dt><dd id="expected">-</dd></div>
+          <div><dt>Aktuell</dt><dd id="current">-</dd></div>
+          <div><dt>Symlink</dt><dd id="symlink">-</dd></div>
+        </dl>
+        <p id="status-message" class="message"></p>
+        <button id="repair" class="primary hidden">Symlink anlegen</button>
+      </section>
+
+      <section id="project-area" data-view="home">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Projekte</p>
+              <h2>Projekt-Auswahl</h2>
+            </div>
+          </div>
+          <div id="projects" class="project-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Projekt-Auswahl wird geladen...</span></div>
+          <div class="project-list-footer">
+            <button id="smoke-all" class="secondary">Smoke-Test fuer alle</button>
+            <button id="open-scan" class="primary">Projekt hinzufuegen</button>
+          </div>
+          <p id="project-scope-note" class="message hidden"></p>
+          <div id="smoke-output" class="smoke-output empty hidden">Noch kein Smoke-Test ausgefuehrt.</div>
+        </section>
+
+        <section class="card" id="opencode-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Assistenten</p>
+              <h2>Commands und Skills registrieren</h2>
+            </div>
+            <span id="opencode-pill" class="status-label muted">Pruefen...</span>
+          </div>
+          <div id="opencode-summary" class="summary-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Assistenten-Registrierung wird geprueft...</span></div>
+          <div class="button-row">
+            <button id="opencode-install" class="primary">Registrierung aktualisieren</button>
+            <button id="opencode-refresh" class="secondary">Neu pruefen</button>
+          </div>
+        </section>
+
+        <section class="card" id="security-tools-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Security-Tool-Preflight</p>
+              <h2>Security-Tools pruefen</h2>
+            </div>
+            <span id="security-tools-pill" class="status-label muted">Pruefen...</span>
+          </div>
+          <div id="security-tools-summary" class="summary-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Security-Tools werden geprueft...</span></div>
+          <div class="button-row">
+            <button id="security-tools-refresh" class="secondary">Neu pruefen</button>
+          </div>
+        </section>
+
+        <section class="card actions-card">
+          <div>
+            <p class="eyebrow">Repository</p>
+            <h2>k-playbook aktualisieren</h2>
+            <p id="git-output" class="message empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Update-Status wird geprueft...</span></p>
+          </div>
+          <button id="git-pull" class="secondary">Git pull</button>
+        </section>
+
+        <section class="card docs-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Dokumentation</p>
+              <h2>Docs ansehen</h2>
+            </div>
+            <button id="reload-docs" class="secondary">Docs neu laden</button>
+          </div>
+          <div class="docs-layout">
+            <div id="docs-list" class="docs-list empty"><span class="loading-inline"><span class="loading-spinner" aria-hidden="true"></span>Docs werden geladen...</span></div>
+          </div>
+        </section>
+      </section>
+
+      <section data-view="scan" class="hidden">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Scan</p>
+              <h2>Ein Projekt scannen</h2>
+            </div>
+            <div class="scan-controls">
+              <select id="scan-root" aria-label="Scan-Root">
+                <option value="dev">~/dev</option>
+                <option value="home">~</option>
+              </select>
+              <button id="scan" class="secondary">Scannen</button>
+            </div>
+          </div>
+          <div id="scan-results" class="scan-results empty">Noch kein Scan ausgefuehrt.</div>
+          <div class="button-row">
+            <button id="cancel-scan" class="secondary">Abbrechen</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <p class="eyebrow">Optional</p>
+          <h2>Projekt manuell hinzufuegen</h2>
+          <form id="manual-form" class="form">
+            <label>
+              Projektpfad
+              <input id="manual-path" type="text" placeholder="~/dev/mein-projekt" autocomplete="off">
+            </label>
+            <label>
+              Umgebung
+              <select id="manual-env">
+                <option value="">Automatisch erkennen</option>
+                <option value="plain">Normal</option>
+                <option value="devcontainer">DevContainer</option>
+              </select>
+            </label>
+            <button class="primary" type="submit">Projekt pruefen und hinzufuegen</button>
+          </form>
+        </section>
+      </section>
+
+      <section data-view="project-detail" class="hidden">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Status</p>
+              <h2>Projektstatus</h2>
+            </div>
+          </div>
+          <div id="project-detail-status" class="project-list empty">Kein Projekt ausgewaehlt.</div>
+          <div id="project-smoke-output" class="smoke-output empty hidden">Noch kein Smoke-Test ausgefuehrt.</div>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">K-PLAYBOOK.yaml</p>
+              <h2>Projektkonfiguration</h2>
+            </div>
+            <div class="button-row inline-actions">
+              <a id="open-project-config" class="secondary link-button hidden" href="#" target="_blank" rel="noreferrer">In VS Code oeffnen</a>
+              <button id="reload-project-config" class="secondary">YAML neu laden</button>
+            </div>
+          </div>
+          <pre id="project-config" class="yaml-viewer empty">Keine YAML geladen.</pre>
+        </section>
+      </section>
+
+      <div id="doc-overlay" class="doc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="doc-title">
+        <div class="doc-panel">
+          <header class="doc-panel-head">
+            <div>
+              <p class="eyebrow">Dokumentation</p>
+              <h2 id="doc-title">Markdown-Datei</h2>
+              <p id="doc-path" class="doc-path"></p>
+            </div>
+            <button id="close-doc" class="secondary">Schliessen</button>
+          </header>
+          <article id="doc-viewer" class="doc-viewer empty">Waehle eine Markdown-Datei aus.</article>
+        </div>
+      </div>
+
+      <div id="toast" class="toast hidden"></div>
+      <div id="closed" class="closed hidden">
+        <div class="card">
+          <p class="eyebrow">Installer beendet</p>
+          <h2 id="closed-title">Dieses Browserfenster kann jetzt geschlossen werden.</h2>
+          <p id="closed-message" class="message hidden"></p>
+        </div>
+      </div>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
