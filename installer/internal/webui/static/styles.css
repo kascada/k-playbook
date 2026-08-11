@@ -274,6 +274,70 @@ body[data-mode="none"] .mode-badge {
   font-size: 0.9rem;
 }
 
+/* Aufklappbarer Block. Der eigene Marker ersetzt den des Browsers, weil der
+   bei display:flex im summary in einigen Browsern verschwindet. */
+summary.disclosure {
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.disclosure::-webkit-details-marker {
+  display: none;
+}
+
+summary.disclosure:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: 14px;
+}
+
+details[open] > summary.disclosure {
+  margin-bottom: 22px;
+}
+
+.disclosure-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.disclosure-marker {
+  display: inline-block;
+  color: var(--accent);
+  font-size: 0.9rem;
+  transition: transform 120ms ease;
+}
+
+details[open] > summary.disclosure .disclosure-marker {
+  transform: rotate(90deg);
+}
+
+.catalog-group {
+  margin-top: 22px;
+}
+
+.catalog-group h3 {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Ein abgeschalteter Eintrag steht mit, damit sichtbar bleibt, dass es ihn
+   gibt — nur eben leiser. */
+.facts > div.disabled dt {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+
 .command-row {
   margin-top: 16px;
 }

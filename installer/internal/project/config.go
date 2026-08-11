@@ -8,12 +8,40 @@ import (
 	"strings"
 )
 
+// SchemaVersion ist die Fassung, die dieses Werkzeug schreibt und versteht.
+//
+// Die 2 ist an das abgeloeste Layout vergeben: Konfiguration im
+// k-playbook-Verzeichnis, `_dist/`, `paths.*`. Eine Datei mit dieser Nummer
+// beschreibt etwas anderes als das, was hier gelesen wuerde.
+const SchemaVersion = "3"
+
 // Config sind die Werte aus der K-PLAYBOOK.yaml, soweit sie derzeit gebraucht
 // werden.
 type Config struct {
 	SchemaVersion string `json:"schemaVersion"`
 	RepoRoot      string `json:"repoRoot"`
 	VCS           string `json:"vcs"`
+}
+
+// CheckSchema meldet, wenn die Konfiguration nicht zu diesem Werkzeug passt.
+//
+// Stillschweigend weiterzumachen waere das Gefaehrlichste: die Datei liesse
+// sich lesen, ihre Werte bedeuteten aber etwas anderes.
+func CheckSchema(config Config) error {
+	switch config.SchemaVersion {
+	case SchemaVersion:
+		return nil
+	case "":
+		return fmt.Errorf("%s hat keine schema_version; erwartet wird %s",
+			ConfigFileName, SchemaVersion)
+	case "1", "2":
+		return fmt.Errorf("%s hat schema_version %s und beschreibt das abgeloeste Layout "+
+			"(Konfiguration im %s-Verzeichnis, _dist/, paths.*); dieses Werkzeug erwartet %s",
+			ConfigFileName, config.SchemaVersion, PlaybookDirName, SchemaVersion)
+	default:
+		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation aelter als die Konfiguration",
+			ConfigFileName, config.SchemaVersion, SchemaVersion)
+	}
 }
 
 // ReadConfig liest die Konfiguration eines Projekts.
@@ -236,14 +264,14 @@ func renderConfig(repoRoot string, vcs string) string {
 # Die Installation liegt daneben unter %s/ und ist vollstaendig
 # ersetzbar; projekteigene Dateien gehoeren nicht hinein.
 
-schema_version: 3
+schema_version: %s
 
 project:
   # Ort des Projekt-Repositorys, relativ zu dieser Datei.
   repo_root: %s
   vcs: %s
 
-%s`, PlaybookDirName, repoRoot, vcs, remediationBlock(DefaultRemediationMode))
+%s`, PlaybookDirName, SchemaVersion, repoRoot, vcs, remediationBlock(DefaultRemediationMode))
 }
 
 func pathExists(path string) bool {

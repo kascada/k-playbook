@@ -5,6 +5,13 @@ allowed-tools: [Bash, Read]
 
 # k-gui
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Starte die lokale k-playbook Installer-GUI.
 
 Der Installer ist ein host-weites Binary, kein Bestandteil der projektlokalen

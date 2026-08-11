@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 # k-vscode-project-color
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Create or update a project-specific VS Code workspace configuration for easier window recognition.
 
 ## Step 1 — Identify the target project

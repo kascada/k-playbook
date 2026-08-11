@@ -182,3 +182,13 @@ func TestContextForDirOhneInstallation(t *testing.T) {
 		t.Error("fehlende Installation wurde nicht gemeldet")
 	}
 }
+
+// Ein Kontext auf Basis einer fremden Fassung waere irrefuehrend.
+func TestBuildContextLehntFremdesSchemaAb(t *testing.T) {
+	root := newContextProject(t)
+	write(t, ConfigPath(root), "schema_version: 2\n\nproject:\n  repo_root: .\n")
+
+	if _, err := BuildContext(root); err == nil {
+		t.Error("Kontext wurde trotz fremder schema_version gebaut")
+	}
+}

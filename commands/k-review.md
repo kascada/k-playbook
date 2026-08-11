@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-review
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Run a code review against the current project, using a review recipe from the effective catalog: the shipped recipes under `<DIST_DIR>/reviews/` combined by overlay with the project-local reviews directory configured in `K-PLAYBOOK.yaml`.
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<DIST_DIR>/rules/review-authoring.md`.

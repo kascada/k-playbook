@@ -316,6 +316,18 @@ async function applyAssistant() {
 function renderAssistant(data) {
   elements.assistantFacts.replaceChildren();
 
+  // Die Wurzeldatei zuerst: sie ist der Einstiegspunkt, alles andere haengt
+  // daran.
+  const root = data.root || {};
+  if (root.path) {
+    const detail = !root.present
+      ? "nicht vorhanden"
+      : root.hasMarker
+        ? "enthaelt den Anstoss"
+        : "vorhanden, Anstoss fehlt";
+    addFact(elements.assistantFacts, "AGENTS.md — Einstieg", detail);
+  }
+
   for (const entry of data.entries || []) {
     const label = STATE_LABELS[entry.state] || entry.state;
     const term = entry.assistant ? `${entry.path} — ${entry.assistant}` : entry.path;

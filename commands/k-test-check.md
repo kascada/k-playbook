@@ -7,6 +7,13 @@ allowed-tools: [Read, Bash, Glob, Grep]
 
 # k-test-check
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Run unit tests, find the root cause of each failure, explain it briefly, then ask before making any changes.
 
 ## Invocation

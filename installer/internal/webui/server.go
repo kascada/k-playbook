@@ -121,6 +121,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/update", applyUpdateHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
+	mux.HandleFunc("GET /api/context", contextHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

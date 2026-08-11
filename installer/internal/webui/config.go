@@ -76,6 +76,11 @@ func configState(message string) configResponse {
 		response.Message = project.ConfigFileName + " nicht lesbar: " + err.Error()
 		return response
 	}
+	// Anders als bei `context` wird hier nicht abgebrochen: die Oberflaeche
+	// soll den Zustand zeigen koennen, gerade wenn etwas nicht stimmt.
+	if err := project.CheckSchema(config); err != nil && response.Message == "" {
+		response.Message = err.Error()
+	}
 	response.RepoRoot = project.RepoRootDir(environment.ProjectDir, config)
 	response.VCS = config.VCS
 	return response

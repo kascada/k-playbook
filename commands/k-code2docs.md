@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 # k-code2docs
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
 `/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the docs directory comes from `paths.docs`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

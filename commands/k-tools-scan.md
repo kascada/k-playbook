@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 
 # k-tools-scan
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
 
 `/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.yaml` and an existing docs directory from `paths.docs`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 
 # k-setup-codeql
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Set up the project-local CodeQL decision for security, quality, and enforcement checks.
 
 CodeQL-specific rules live in `<DIST_DIR>/rules/codeql.md` and must be treated as authoritative for this command.

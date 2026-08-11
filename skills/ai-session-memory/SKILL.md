@@ -5,6 +5,13 @@ description: Use when the user wants existing project documentation (k-playbook/
 
 # Skill: AI Session Memory
 
+## Erster Schritt
+
+Rufe zuerst `k-playbook/bin/k-playbook context` auf und lies die Dateien aus
+`instructions`. Sie tragen, was fuer dieses Projekt gilt; alle Pfade und
+Kataloge dieses Skills stammen aus derselben Ausgabe.
+
+
 **Kurzfassung.** Sorgt dafür, dass in einem Projekt vorhandene Dokumentation
 in jeder OpenCode-Session **automatisch als autoritative Quelle** genutzt
 wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.

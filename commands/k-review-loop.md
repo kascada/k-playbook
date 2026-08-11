@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Glob, Task]
 
 # k-review-loop
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. Critic and Editor are read-only advisors. The Moderator routes between them, decides on deadlocks, applies accepted edits, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
 
 `/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.yaml`; the task directory comes from `paths.tasks`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

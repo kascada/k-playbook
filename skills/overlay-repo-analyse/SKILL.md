@@ -5,6 +5,13 @@ description: Use when the user wants to systematically understand a project that
 
 # Skill: Overlay-Repo-Analyse
 
+## Erster Schritt
+
+Rufe zuerst `k-playbook/bin/k-playbook context` auf und lies die Dateien aus
+`instructions`. Sie tragen, was fuer dieses Projekt gilt; alle Pfade und
+Kataloge dieses Skills stammen aus derselben Ausgabe.
+
+
 **Kurzfassung.** Systematisches Vorgehen, um Projekte mit
 Docker-Overlay-Pattern (schlankes Overlay-Repo baut per `FROM base-image` +
 `COPY . .` auf ein größeres Base-Image auf) vollständig zu verstehen –

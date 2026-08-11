@@ -7,6 +7,13 @@ allowed-tools: [Bash, Read, Glob]
 
 # k-verlauf
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Durchsucht alte AI-Verläufe nach einem Begriff.
 
 Provider:

@@ -253,3 +253,35 @@ func TestCreateConfigSchreibtRemediationStandard(t *testing.T) {
 		t.Errorf("Mode = %q, erwartet %q", remediation.Mode, DefaultRemediationMode)
 	}
 }
+
+func TestCheckSchema(t *testing.T) {
+	if err := CheckSchema(Config{SchemaVersion: SchemaVersion}); err != nil {
+		t.Errorf("aktuelle Fassung wurde abgelehnt: %v", err)
+	}
+	if err := CheckSchema(Config{}); err == nil {
+		t.Error("fehlende schema_version wurde akzeptiert")
+	}
+	// Die 2 beschreibt das abgeloeste Layout; ihre Werte bedeuten etwas anderes.
+	if err := CheckSchema(Config{SchemaVersion: "2"}); err == nil {
+		t.Error("schema_version 2 wurde akzeptiert")
+	}
+	if err := CheckSchema(Config{SchemaVersion: "9"}); err == nil {
+		t.Error("unbekannte Fassung wurde akzeptiert")
+	}
+}
+
+// Eine neu erzeugte Konfiguration muss die eigene Pruefung bestehen.
+func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
+	root := t.TempDir()
+
+	if err := CreateConfig(root, "."); err != nil {
+		t.Fatalf("CreateConfig: %v", err)
+	}
+	config, err := ReadConfig(root)
+	if err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	if err := CheckSchema(config); err != nil {
+		t.Errorf("selbst erzeugte Konfiguration ist ungueltig: %v", err)
+	}
+}

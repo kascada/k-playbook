@@ -5,6 +5,13 @@ description: Use when code, docs, tests, tasks, reviews, checks, or implementati
 
 # Skill: Enforcement
 
+## Erster Schritt
+
+Rufe zuerst `k-playbook/bin/k-playbook context` auf und lies die Dateien aus
+`instructions`. Sie tragen, was fuer dieses Projekt gilt; alle Pfade und
+Kataloge dieses Skills stammen aus derselben Ausgabe.
+
+
 **Kurzfassung.** Sorgt dafür, dass globale und projektlokale Enforcement-Regeln während der Arbeit aktiv berücksichtigt werden, nicht erst in einem späteren Review.
 
 ## Wann anwenden

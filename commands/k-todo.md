@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob]
 
 # k-todo
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Manage the project todo file.
 
 `/k-todo` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the todo file comes from `paths.todo`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

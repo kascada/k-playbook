@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 # k-task-create
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Create a new task file based on what was discussed in the current conversation.
 
 `/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the task directory comes from `paths.tasks`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

@@ -9,10 +9,11 @@ import (
 // assistantResponse ist der Zustand der Verlinkung, wie ihn die Oberflaeche
 // braucht: Kontext, Einzelzustaende und ein Flag fuer die Button-Darstellung.
 type assistantResponse struct {
-	Environment project.Environment  `json:"environment"`
-	Entries     []project.LinkStatus `json:"entries"`
-	OK          bool                 `json:"ok"`
-	Message     string               `json:"message"`
+	Environment project.Environment           `json:"environment"`
+	Entries     []project.LinkStatus          `json:"entries"`
+	Root        project.RootInstructionsState `json:"root"`
+	OK          bool                          `json:"ok"`
+	Message     string                        `json:"message"`
 }
 
 func assistantHandler(w http.ResponseWriter, r *http.Request) {
@@ -31,8 +32,11 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Erst die Wurzeldatei: der Symlink CLAUDE.md braucht sie als Ziel.
 	message := "Verlinkung eingerichtet."
-	if _, err := project.ApplyLinks(environment.ProjectDir); err != nil {
+	if _, err := project.ApplyRootInstructions(environment.ProjectDir); err != nil {
+		message = "Nicht vollstaendig eingerichtet: " + err.Error()
+	} else if _, err := project.ApplyLinks(environment.ProjectDir); err != nil {
 		message = "Nicht vollstaendig eingerichtet: " + err.Error()
 	}
 	writeJSON(w, http.StatusOK, assistantState(message))
@@ -58,7 +62,8 @@ func assistantState(message string) assistantResponse {
 
 	default:
 		response.Entries = project.CheckLinks(environment.ProjectDir)
-		response.OK = project.LinksOK(response.Entries)
+		response.Root = project.CheckRootInstructions(environment.ProjectDir)
+		response.OK = project.LinksOK(response.Entries) && response.Root.OK()
 	}
 
 	return response

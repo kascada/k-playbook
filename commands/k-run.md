@@ -7,6 +7,13 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 # k-run
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Execute task files. If `$ARGUMENTS` is empty, use the directory configured as `paths.tasks`.
 
 `/k-run` does not guess project paths. If discovery finds no `K-PLAYBOOK.yaml`, run `k-playbook-installer init` first. If `paths.tasks` is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.

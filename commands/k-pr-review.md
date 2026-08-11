@@ -7,6 +7,13 @@ allowed-tools: [Read, Bash, TodoWrite]
 
 # k-pr-review
 
+## Erster Schritt
+
+Fuehre zuerst `commands/_shared/context.md` aus: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+
 Liste offene GitHub-Pull-Requests fuer das passende Repo, lade einen PR und fuehre ihn durch drei Phasen mit einer optionalen Folgeaktion: approven, mergen oder einen lokalen Validierungs-Branch anlegen.
 
 - **Phase 1:** Auswahl plus kompakter PR-Ueberblick.

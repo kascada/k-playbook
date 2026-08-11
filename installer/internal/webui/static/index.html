@@ -96,6 +96,20 @@
         </div>
       </section>
 
+      <details class="card{{if not .Installed}} hidden{{end}}" id="context-card">
+        <summary class="section-head disclosure">
+          <div class="disclosure-title">
+            <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+            <h2>Aufgeloester Kontext</h2>
+          </div>
+          <span id="context-pill" class="pill muted">Aufklappen</span>
+        </summary>
+        <p class="hint">Was ein Command sieht: Pfade und die effektiven Kataloge nach Overlay-Aufloesung. Entspricht <code>k-playbook context</code>.</p>
+        <dl id="context-facts" class="facts"></dl>
+        <div id="context-catalogs"></div>
+        <p id="context-message" class="message"></p>
+      </details>
+
       <div id="closed" class="closed hidden">
         <div class="card">
           <p class="eyebrow">k-playbook beendet</p>

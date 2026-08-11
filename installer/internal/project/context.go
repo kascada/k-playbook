@@ -16,13 +16,35 @@ import (
 // auf und dauert spuerbar; dieser Aufruf soll billig genug sein, um am Anfang
 // jedes Commands zu stehen.
 type Context struct {
-	SchemaVersion string                    `json:"schemaVersion"`
-	Project       ContextProject            `json:"project"`
-	Playbook      ContextDir                `json:"playbook"`
-	Local         ContextDir                `json:"local"`
-	Remediation   Remediation               `json:"remediation"`
-	Catalogs      map[string][]CatalogEntry `json:"catalogs"`
-	Guidelines    []string                  `json:"guidelines"`
+	SchemaVersion string `json:"schemaVersion"`
+	// Instructions sind die Dateien, die vor der Arbeit zu lesen sind, in
+	// dieser Reihenfolge: erst was fuer alle k-playbook-Projekte gilt, dann was
+	// dieses Projekt ergaenzt.
+	Instructions []string                  `json:"instructions"`
+	Project      ContextProject            `json:"project"`
+	Playbook     ContextDir                `json:"playbook"`
+	Local        ContextDir                `json:"local"`
+	Remediation  Remediation               `json:"remediation"`
+	Catalogs     map[string][]CatalogEntry `json:"catalogs"`
+	Guidelines   []string                  `json:"guidelines"`
+}
+
+// InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heisst bewusst
+// nicht AGENTS.md: diesen Namen lesen die Assistenten von sich aus, und er ist
+// dem Hauptverzeichnis vorbehalten.
+const InstructionsFileName = "k-playbook.md"
+
+// instructionFiles sammelt die vorhandenen Instruktionsdateien in Lesereihenfolge.
+// Was fehlt, faellt weg — ein Pfad ins Leere waere schlechter als keiner.
+func instructionFiles(playbookDir string, localDir string) []string {
+	files := []string{}
+	for _, dir := range []string{playbookDir, localDir} {
+		path := filepath.Join(dir, InstructionsFileName)
+		if fileExists(path) {
+			files = append(files, path)
+		}
+	}
+	return files
 }
 
 type ContextProject struct {
@@ -72,6 +94,11 @@ func BuildContext(projectDir string) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
+	// Bei unbekannter Fassung wird abgebrochen statt geraten: die Werte liessen
+	// sich lesen, bedeuteten aber etwas anderes.
+	if err := CheckSchema(config); err != nil {
+		return Context{}, err
+	}
 	remediation, err := ReadRemediation(projectDir)
 	if err != nil {
 		return Context{}, err
@@ -82,6 +109,7 @@ func BuildContext(projectDir string) (Context, error) {
 
 	context := Context{
 		SchemaVersion: config.SchemaVersion,
+		Instructions:  instructionFiles(playbookDir, localDir),
 		Project: ContextProject{
 			Dir:      projectDir,
 			RepoRoot: RepoRootDir(projectDir, config),

@@ -42,6 +42,7 @@ func LocalStructure() []LocalEntry {
 			Purpose: "Platz fuer eigene Notizen, Zwischenstaende und alles, was nur dich angeht.\n\nDer Inhalt bleibt aus der Versionskontrolle heraus: die .gitignore in diesem\nVerzeichnis schliesst alles aus, ausser sich selbst und dieser README. Du kannst\nhier also ablegen, was du willst, ohne es aus Versehen zu committen.",
 			Private: true,
 		},
+		{Path: InstructionsFileName, IsFile: true},
 		{Path: "TODO.md", IsFile: true},
 	}
 }
@@ -92,7 +93,7 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 		path := filepath.Join(root, entry.Path)
 
 		if entry.IsFile {
-			if err := writeIfMissing(path, todoTemplate()); err != nil {
+			if err := writeIfMissing(path, fileTemplate(entry)); err != nil {
 				return CheckLocal(projectDir), err
 			}
 			continue
@@ -140,6 +141,31 @@ func readmeTemplate(entry LocalEntry) string {
 // selbst aber im Repository sichtbar.
 func privateGitignore() string {
 	return "# Inhalt bleibt privat; das Verzeichnis selbst bleibt versioniert.\n*\n!.gitignore\n!README.md\n"
+}
+
+// fileTemplate liefert den Erstinhalt eines Datei-Eintrags.
+func fileTemplate(entry LocalEntry) string {
+	if entry.Path == InstructionsFileName {
+		return instructionsTemplate()
+	}
+	return todoTemplate()
+}
+
+// instructionsTemplate ist die projekteigene Instruktionsebene. Sie wird von
+// jedem Assistenten gelesen, der `k-playbook context` folgt — nach der
+// mitgelieferten Ebene, deren Aussagen sie ergaenzen oder ueberstimmen kann.
+func instructionsTemplate() string {
+	return `# Projektregeln
+
+Diese Datei gilt nur fuer dieses Projekt. Sie wird nach der mitgelieferten
+Ebene gelesen und kann deren Aussagen ergaenzen oder ueberstimmen.
+
+Was hier hineingehoert: Aufbau und Besonderheiten des Projekts, Konventionen,
+wiederkehrende Ablaeufe, alles was ein Assistent in jeder Sitzung wissen sollte.
+
+Was nicht: allgemeine k-playbook-Regeln — die stehen in der mitgelieferten
+Ebene und werden bei jedem Update aktualisiert.
+`
 }
 
 func todoTemplate() string {
