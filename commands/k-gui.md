@@ -7,8 +7,9 @@ allowed-tools: [Bash, Read]
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an: rufe
-`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
+auf und lies die Dateien aus `instructions`.
 
 Anders als bei allen anderen Commands ist ein Fehlschlag hier kein Abbruchgrund:
 `/k-gui` ist genau der Command, mit dem ein Projekt eingerichtet wird, also gibt es
