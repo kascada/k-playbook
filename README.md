@@ -106,7 +106,7 @@ Weg beim Entwickeln: es startet den frisch gebauten Stand.
 
 - Jedes Projekt traegt seine eigene Installation in einem Unterverzeichnis. Kein fester Hostpfad, kein globaler Symlink.
 - Installation und Projekt-Eigentum sind strikt getrennt: `k-playbook/` wird bei jedem Update vollstaendig ersetzt, alles daneben nie angefasst.
-- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: gleichnamige lokale Datei ersetzt vollstaendig, `overlay.<kind>.disabled` schaltet ab.
+- Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: eine gleichnamige lokale Datei ersetzt vollstaendig, eine leere schaltet ab.
 - Pfade stehen nicht in der Konfiguration. Sie ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`.
 - Tasks, Reviews und Ergebnisse bleiben projekteigene Artefakte unter `k-playbook-local/`.
 - Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalitaet.

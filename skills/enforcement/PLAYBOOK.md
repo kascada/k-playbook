@@ -45,9 +45,11 @@ Damit gilt:
 
 - Jede projektlokale Regel ist aktiv.
 - Eine mitgelieferte Regel ist aktiv, außer eine projektlokale Regel trägt denselben
-  Schlüssel oder der Schlüssel steht in `overlay.rules.disabled`.
+  Schlüssel.
 - Eine projektlokale Regel **ersetzt** die gleichnamige mitgelieferte vollständig.
   Die mitgelieferte Datei wird dann gar nicht gelesen.
+- Eine **leere** projektlokale Regel — nur Leerzeilen und Kommentare — schaltet die
+  mitgelieferte ab. Der Kommentar trägt den Grund.
 
 Berichte die effektive Menge mit Herkunft je Eintrag (`dist`, `local`, `override`)
 sowie abgeschaltete und veraltete `disabled`-Einträge, bevor du mit der Prüfung

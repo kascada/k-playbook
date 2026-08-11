@@ -38,7 +38,7 @@ Command-specific policy:
 Read and apply `<DIST_DIR>/commands/_shared/overlay-resolution.md` for kind `rules`.
 
 That module combines the shipped catalog `<DIST_DIR>/rules/` with
-`RESOLVED_ENFORCEMENT_DIR` and honours `overlay.rules.disabled`. Do not implement a
+`<LOCAL_DIR>/rules/`. Do not implement a
 separate merge here, and do not de-duplicate by path — the overlay key is the
 filename without extension, which already resolves collisions.
 
@@ -56,7 +56,7 @@ Enforcement-Check
 ─────────────────────────────
 Ziel:       <PROJECT_REPO_ROOT_DIR>
 Regeln:     <N> aktiv  (<A> dist, <B> local, <C> override)
-Abgeschaltet: <D> via overlay.rules.disabled | —
+Abgeschaltet: <D> (leere lokale Datei) | —
 Projekt:    <ENFORCEMENT_DISPLAY_PATH> | fehlt
 Docs:       <DOCS_DISPLAY_PATH> | fehlt
 ```

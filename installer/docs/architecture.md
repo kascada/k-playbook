@@ -17,7 +17,9 @@ Das Werkzeug ist ein eigenstaendiges Go-Modul unter `installer/`, wird aber als
 
 ```text
 installer/
-├── cmd/k-playbook/main.go       startet webui.Run(), sonst nichts
+├── cmd/k-playbook/main.go       raeumt Altlasten weg, startet webui.Run()
+├── internal/legacy/
+│   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/project/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
@@ -153,6 +155,34 @@ Zustaende in `LinkState`:
 
 `own-directory` faengt den Fall ab, dass ein Projekt bereits ein echtes `.claude/commands/`
 mit eigenen Dateien hat. Dann wird nicht ersetzt, sondern bestueckt.
+
+## Altlasten des globalen Modells
+
+`RemoveGlobalLinks()` in `legacy/global.go` laeuft bei jedem Programmstart, vor der
+Oberflaeche. Sie raeumt weg, was das abgeloeste host-globale Modell hinterlassen hat:
+
+| Ort | Alte Form |
+|---|---|
+| `~/.claude/commands` | Verzeichnis-Symlink auf `<repo>/commands`, sonst Einzel-Symlinks darin |
+| `~/.claude/skills` | Einzel-Symlinks auf die Skill-Verzeichnisse des Repos |
+| `~/.config/opencode/command` | Einzel-Symlinks auf `<repo>/commands/*.md` |
+| `~/.config/opencode/opencode.jsonc`, `.json` | `skills.paths` auf die Basisinstallation |
+
+Bleiben diese Links liegen, sieht ein Assistent in **jedem** Projekt zusaetzlich die
+Commands eines fremden Standes — genau das, was die projektlokale Installation aufloesen
+soll. Deshalb der Aufraeumschritt beim Start und nicht in der Oberflaeche.
+
+Erkannt wird an einem Pfadsegment `k-playbook` im Symlink-Ziel, unabhaengig davon, ob das
+Ziel noch existiert: der Repo-Pfad war frei waehlbar, das Verzeichnis hiess aber immer so,
+und ein toter Link ist genauso eine Altlast wie ein lebender. Echte Dateien und Symlinks,
+die woandershin zeigen, bleiben unberuehrt; ein Verzeichnis faellt nur weg, wenn danach
+nichts mehr darin steht. Aus der OpenCode-Config wird ausschliesslich der Top-Level-Key
+`skills` geschnitten, wenn sein Wert ein `k-playbook` nennt — der Rest der Datei bleibt
+Zeichen fuer Zeichen erhalten, Kommentare eingeschlossen. Deshalb ein eigener
+JSONC-Scanner statt Parsen und Neuschreiben.
+
+Gemeldet wird nur, wenn tatsaechlich etwas wegfaellt; auf einem sauberen Rechner ist der
+Schritt still. Ein Fehler dabei haelt den Start nicht auf.
 
 ## Security-Tool-Preflight
 

@@ -37,6 +37,9 @@ def discover_dist_dir() -> Path:
 DIST_DIR = discover_dist_dir()
 SHIPPED_CHECKS_DIR = DIST_DIR / "checks"
 
+# Alles Projekteigene liegt neben der Konfiguration, mit fester Aufteilung.
+LOCAL_DIR_NAME = "k-playbook-local"
+
 DEFAULT_EXCLUDES = {
     ".coverage",
     ".git",
@@ -135,8 +138,8 @@ def read_k_playbook(config_root: Path) -> dict[str, object]:
     uses plain nested mappings plus simple `- item` lists. Keeping this stdlib-only
     avoids a PyYAML dependency for a runner that must work in bare containers.
 
-    Nested keys are flattened with dots, so `paths.checks` and
-    `overlay.checks.disabled` are reachable directly.
+    Nested keys are flattened with dots, so `project.repo_root` is reachable
+    directly.
     """
     config_path = config_root / "K-PLAYBOOK.yaml"
     if not config_path.exists():
@@ -348,42 +351,42 @@ def unique_paths(paths) -> list[Path]:
 
 
 def local_checks_dir(config_root: Path, config: dict[str, object]) -> Path | None:
-    """Project-local checks directory from paths.checks. Never guessed.
+    """Project-local checks directory.
 
-    The value may leave the k-playbook directory with ../ but must stay inside the
-    project, and it must never point into the shipped installation — that directory
-    is replaced wholesale on update.
+    Its place is fixed by the layout: next to the K-PLAYBOOK.yaml, under
+    k-playbook-local/checks/. There is no configured path any more — a value that
+    is always the same would only be a source of error.
     """
-    configured = config.get("paths.checks")
-    if not isinstance(configured, str) or not configured:
-        return None
-
-    resolved = (config_root / configured).resolve()
-    repo_root = config.get("project.repo_root")
-    project_root = (config_root / repo_root).resolve() if isinstance(repo_root, str) and repo_root else config_root.parent
-
-    if not (resolved == project_root or project_root in resolved.parents):
-        print(f"paths.checks fuehrt aus dem Projekt heraus: {configured}", file=sys.stderr)
-        return None
-    if resolved == DIST_DIR or DIST_DIR in resolved.parents:
-        print(f"paths.checks zeigt in die Installation: {configured}", file=sys.stderr)
-        return None
-    return resolved
+    resolved = (config_root / LOCAL_DIR_NAME / "checks").resolve()
+    return resolved if resolved.is_dir() else None
 
 
-def disabled_checks(config: dict[str, object]) -> set[str]:
-    value = config.get("overlay.checks.disabled")
-    if isinstance(value, list):
-        return {str(entry) for entry in value}
-    return set()
+def is_empty_check(path: Path) -> bool:
+    """Report whether a check has no executable content.
+
+    An empty project-local check switches the shipped one off. Running it instead
+    would be worse than not having it: an empty script exits 0 and looks like a
+    passed check. Comments count as empty so a reason can be left behind.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        return False
+    return True
 
 
 def discover_checks(config_root: Path, config: dict[str, object]) -> list[tuple[str, Path]]:
     """Combine shipped and project-local checks per the overlay contract.
 
-    A project-local check replaces the shipped check with the same key; a key listed
-    in overlay.checks.disabled suppresses the shipped check. See
-    commands/_shared/overlay-resolution.md.
+    A project-local check replaces the shipped check with the same key. If that
+    local check is empty, the entry drops out entirely instead of running as an
+    empty script. See commands/_shared/overlay-resolution.md.
     """
 
     def entries(directory: Path | None) -> dict[str, Path]:
@@ -393,15 +396,28 @@ def discover_checks(config_root: Path, config: dict[str, object]) -> list[tuple[
 
     shipped = entries(SHIPPED_CHECKS_DIR)
     local = entries(local_checks_dir(config_root, config))
-    disabled = disabled_checks(config)
 
     checks: list[tuple[str, Path]] = []
     for key in sorted(set(shipped) | set(local)):
         if key in local:
+            if is_empty_check(local[key]):
+                continue
             checks.append(("override" if key in shipped else "local", local[key]))
-        elif key not in disabled:
+        else:
             checks.append(("dist", shipped[key]))
     return checks
+
+
+def disabled_check_keys(config_root: Path, config: dict[str, object]) -> list[str]:
+    """Keys switched off by an empty project-local check.
+
+    Reported separately so a missing check is distinguishable from one that was
+    switched off on purpose.
+    """
+    directory = local_checks_dir(config_root, config)
+    if directory is None or not directory.is_dir():
+        return []
+    return sorted(path.stem for path in directory.glob("*.sh") if is_empty_check(path))
 
 
 def command_line() -> list[str]:
@@ -427,7 +443,7 @@ def check_configuration(config_root: Path, config: dict[str, object], checks: li
     return {
         "shipped_checks_dir": str(SHIPPED_CHECKS_DIR),
         "local_checks_dir": str(local_dir) if local_dir else None,
-        "disabled": sorted(disabled_checks(config)),
+        "disabled": disabled_check_keys(config_root, config),
         "checks": [{"origin": origin, "path": str(path)} for origin, path in checks],
     }
 

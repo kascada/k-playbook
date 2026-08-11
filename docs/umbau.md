@@ -184,10 +184,17 @@ daraus übernommen. Wer eine mitgelieferte Regel ändern will, kopiert sie und �
 Kopie — mit dem bekannten Preis, dass spätere Verbesserungen am Original diese Kopie nicht
 mehr erreichen. Der Vorteil wiegt schwerer: was gilt, steht in genau einer Datei.
 
-`overlay.<kind>.disabled` schaltet eine mitgelieferte Datei ersatzlos ab. Die Einträge sind
-Dateinamen, passend zur Vergleichseinheit — also `tool-install-scope.md`, nicht
-`tool-install-scope`. Die Liste wirkt nur auf mitgelieferte Dateien; eine projekteigene
-Datei schaltet man ab, indem man sie löscht.
+**Abgeschaltet wird über eine leere Datei**, nicht über eine Liste in der Konfiguration.
+Da eine gleichnamige lokale Datei die mitgelieferte vollständig ersetzt, bleibt bei einer
+leeren nichts übrig. „Leer" heißt: nichts außer Leerzeilen und Kommentaren — so trägt die
+Datei ihren eigenen Grund.
+
+Der Unterschied zwischen den Sorten ist beabsichtigt: `rules` und `reviews` werden von
+einem Assistenten gelesen, dort spricht der Text für sich. Ein Check wird ausgeführt — ein
+leeres Skript liefe mit Exit 0 durch und sähe aus wie ein bestandener Check. Deshalb fällt
+er ganz aus dem Katalog, statt leer zu laufen.
+
+Eine projekteigene Datei schaltet man ab, indem man sie löscht.
 
 `README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig irgendetwas unter
 `checks/lib/`.
@@ -287,11 +294,6 @@ project:
   repo_root: .                # Ort des Projekt-Repositorys, relativ zu dieser Datei
   vcs: git
 
-overlay:                      # schaltet mitgelieferte Dateien ersatzlos ab
-  rules: { disabled: [] }
-  reviews: { disabled: [] }
-  checks: { disabled: [] }
-
 remediation:                  # wie Befunde abgearbeitet werden
   mode: direct-allowed
   target: .                   # relativ zum Hauptverzeichnis
@@ -319,6 +321,13 @@ kein `skills.paths` in der OpenCode-User-Config gepflegt. Verlinkt wird projektl
 `.claude/`, `.opencode/` und `.cursor/` des Projekts. Damit kann ein Host mehrere Projekte
 mit unterschiedlichen k-playbook-Ständen tragen, ohne dass sie sich gegenseitig
 überschreiben.
+
+Auf Rechnern mit einer alten Installation liegen diese globalen Links noch. Sie wirken
+weiter in jedes Projekt hinein, deshalb entfernt `k-playbook` sie bei jedem Start selbst
+(`installer/internal/legacy`): Symlinks unter den drei Verzeichnissen, deren Ziel ein
+Pfadsegment `k-playbook` enthält, und den `skills`-Block der OpenCode-User-Config, wenn er
+auf ein k-playbook zeigt. Entfernt der Schritt etwas, meldet er es im Terminal; sonst
+bleibt er still.
 
 **Die DevContainer-Integration.** Kein Bind-Mount nach `/workspaces/k-playbook`, kein
 Symlink `~/dev/k-playbook` im Container, kein `.devcontainer/setup-k-playbook.sh` und kein
@@ -353,11 +362,7 @@ Dasselbe gilt für `log.md` und `known-decisions.md`, die `/k-review` bisher unt
 `<paths.reviews>/` pflegte.
 
 **Der projektlokale Regelordner heißt `rules/`**, nicht mehr `enforcement/`. Umzustellen:
-`commands/_shared/overlay-resolution.md` (beschreibt die Asymmetrie als gewollt),
 `rules/README.md`, der Skill `enforcement` und der Command `k-enforcement`.
-
-**`overlay.<kind>.disabled` führt jetzt Dateinamen**, nicht mehr abgeleitete Schlüssel.
-`commands/_shared/overlay-resolution.md` beschreibt noch die Schlüssel-Variante.
 
 **`checks/README.md` und `bin/k-check`** setzen den Env-Kontrakt `K_PLAYBOOK_DIST` und
 leiten das Verzeichnis aus der eigenen Lage ab.

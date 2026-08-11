@@ -28,7 +28,7 @@ Der Skill lädt zwei Regel-Ebenen und kombiniert sie per Overlay:
 `<DIST_DIR>/commands/_shared/path-resolution.md` beschrieben. Die Kombination der
 beiden Ebenen folgt `<DIST_DIR>/commands/_shared/overlay-resolution.md`: Eine
 projektlokale Regel ersetzt die gleichnamige mitgelieferte vollständig, und
-`overlay.rules.disabled` schaltet einzelne mitgelieferte Regeln ab.
+Eine leere gleichnamige lokale Datei schaltet eine mitgelieferte Regel ab.
 
 Wenn `K-PLAYBOOK.yaml` fehlt, ist das Verzeichnis kein k-playbook-Projekt; kurz
 darauf hinweisen und ohne Enforcement weiterarbeiten. Wenn das projektlokale

@@ -326,7 +326,7 @@ Nutze diese Klassifikation fuer die spaetere Relevanzbewertung der Regeln und Ch
 
 Fuer Enforcement gilt:
 
-- Nur Regeln aus `EFFECTIVE_RULES` heranziehen. Eine per `overlay.rules.disabled` abgeschaltete Regel wird nicht geprueft, auch wenn sie mitgeliefert wird.
+- Nur Regeln aus `EFFECTIVE_RULES` heranziehen. Eine abgeschaltete Regel wird nicht geprueft, auch wenn sie mitgeliefert wird.
 - `docs-sync.md` immer pruefen, wenn Code-Dateien geaendert wurden und die Regel in `EFFECTIVE_RULES` enthalten ist
 - Django-Validierung nur dann als relevant markieren, wenn PR-Dateien Settings, Middleware, URLs, Models, Migrations, Storage, Redis, Celery, Helm oder Runtime-Startpfade beruehren
 - User-Data-Isolation, Logging-Privacy und i18n nur dann als relevant markieren, wenn die geaenderten Dateien plausibel in diesen Bereich fallen

@@ -12,27 +12,22 @@ This module requires `PLAYBOOK_DIR`, `DIST_DIR`, and the relevant resolved path 
 
 ## The Three Kinds
 
-| Kind | Shipped base | Project-local | Disable list | File pattern |
-|---|---|---|---|---|
-| `rules` | `<DIST_DIR>/rules/` | `RESOLVED_ENFORCEMENT_DIR` (`paths.enforcement`) | `overlay.rules.disabled` | `*.md` |
-| `reviews` | `<DIST_DIR>/reviews/` | `RESOLVED_REVIEWS_DIR` (`paths.reviews`) | `overlay.reviews.disabled` | `review-*.md` |
-| `checks` | `<DIST_DIR>/checks/` | `RESOLVED_CHECKS_DIR` (`paths.checks`) | `overlay.checks.disabled` | `*.sh` (top level only) |
+| Kind | Shipped base | Project-local | File pattern |
+|---|---|---|---|
+| `rules` | `<PLAYBOOK_DIR>/rules/` | `<LOCAL_DIR>/rules/` | `*.md` |
+| `reviews` | `<PLAYBOOK_DIR>/reviews/` | `<LOCAL_DIR>/reviews/` | `review-*.md` |
+| `checks` | `<PLAYBOOK_DIR>/checks/` | `<LOCAL_DIR>/checks/` | `*.sh` (top level only) |
 
-Note the asymmetry: the project-local directory for `rules` is `paths.enforcement`,
-not `paths.rules`. That name is historical and stays.
+## Comparison Unit
 
-## Entry Key
+Entries are matched by **filename**. Both sides use the same naming convention, so no
+derived key is needed. `docs-sync.md` in the local directory replaces `docs-sync.md`
+in the shipped one. Filenames are compared case-sensitively.
 
-Every catalog entry is identified by its **key**, not its filename. Two entries with
-the same key are the same logical entry, regardless of which directory they came from.
-
-- `rules`: filename without the `.md` extension. `docs-sync.md` -> `docs-sync`
-- `reviews`: filename without `.md` and without the leading `review-`.
-  `review-codeql-security.md` -> `codeql-security`
-- `checks`: filename without the `.sh` extension. `check_no_obvious_secrets.sh` ->
-  `check_no_obvious_secrets`. The runner `<DIST_DIR>/bin/k-check` implements exactly this.
-
-Keys are compared case-sensitively.
+Alongside the filename, every entry has a **key** for addressing it on the command
+line: the filename without its extension and without the kind's prefix, so
+`review-codeql-security.md` is called as `codeql-security`. The key is a label, not
+the comparison unit.
 
 ## Non-Entries
 
@@ -48,28 +43,44 @@ The following are never catalog entries and must be skipped in both directories:
 Given a kind:
 
 ```
-base     = entries in the shipped directory
-local    = entries in the project-local directory (empty if unset or missing)
-disabled = the kind's disable list from K-PLAYBOOK.yaml (empty if absent)
+base   = entries in the shipped directory
+local  = entries in the project-local directory (empty if missing)
 
-effective = local
-          ∪ { b ∈ base | key(b) ∉ keys(local) ∧ key(b) ∉ disabled }
+effective = local ∪ { b ∈ base | key(b) ∉ keys(local) }
 ```
 
 In words:
 
 1. Every project-local entry is active.
-2. A shipped entry is active unless a project-local entry has the same key, or the
-   key is listed in `disabled`.
+2. A shipped entry is active unless a project-local entry has the same key.
 
 Consequences that must hold:
 
 - A project-local entry **replaces** a shipped entry with the same key. It does not
   merge with it, and it is not partially applied. The shipped file is not read at all.
-- `disabled` only affects shipped entries. A project-local entry is never disabled by
-  it; to drop a local entry, delete the file.
-- A shipped entry that is both overlaid and listed in `disabled` is simply replaced by
-  the local one. Report the redundant `disabled` entry as stale.
+- To drop a project-local entry, delete the file.
+
+## Switching a Shipped Entry Off
+
+There is no disable list. A shipped entry is switched off by placing an **empty**
+project-local file with the same key next to it. Since a local entry replaces the
+shipped one completely, an empty file leaves nothing behind.
+
+Empty means: no content other than blank lines and comment lines. That way the file
+can carry the reason:
+
+```bash
+# Switched off: this project does not use Django.
+```
+
+| Kind | What the empty file does |
+|---|---|
+| `rules`, `reviews` | The entry stays in the catalog, but its content is what you read: a file saying it is switched off, and why. Mark it `disabled` when reporting. |
+| `checks` | The entry drops out of the catalog entirely and is never executed. |
+
+The difference is deliberate. `rules` and `reviews` are read by an assistant, so the
+text speaks for itself. A check is executed: an empty script would exit 0 and look
+like a check that passed, which is worse than no check at all.
 
 ## Origin Tracking
 
@@ -86,8 +97,7 @@ Also record, for reporting only:
 
 | State | Meaning |
 |---|---|
-| `disabled` | shipped, suppressed via `overlay.<kind>.disabled` |
-| `stale-disable` | key in `disabled` that matches no shipped entry |
+| `disabled` | switched off by an empty project-local file |
 
 ## Reporting
 
@@ -100,21 +110,19 @@ Regeln (rules): 4 aktiv
   [dist]     review-authoring
   [override] docs-sync            (ueberlagert _dist/rules/docs-sync.md)
   [local]    my-api-rules
-  [disabled] tool-install-scope   (via overlay.rules.disabled)
+  [disabled] tool-install-scope   (leere lokale Datei)
 ```
 
 If the effective set is empty, say so and stop; do not fall back to the shipped
-catalog. An empty set after a full `disabled` list is a deliberate project decision.
-
-Report `stale-disable` keys as a warning and offer to remove them from
-`K-PLAYBOOK.yaml`. Do not remove them silently.
+catalog. An empty set is a deliberate project decision.
 
 ## Writing Rules
 
 - Never write to `DIST_DIR`. To change a shipped entry, create a project-local file
   with the same key.
-- When a command offers to disable a shipped entry, it writes to
-  `overlay.<kind>.disabled` only after explicit confirmation.
+- When a command offers to switch a shipped entry off, it creates the empty
+  project-local file only after explicit confirmation, and puts the reason in a
+  comment line.
 - When a command offers to override a shipped entry, it copies the shipped file into
   the project-local directory as a starting point and tells the user that the copy is
   now frozen — later updates to the shipped file will not reach it.

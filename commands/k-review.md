@@ -39,7 +39,7 @@ Command-specific policy:
 
 Read and apply `<DIST_DIR>/commands/_shared/overlay-resolution.md` for kind `reviews`.
 It yields the effective catalog from `<DIST_DIR>/reviews/` plus `PROJECT_REVIEWS_DIR`,
-honouring `overlay.reviews.disabled`. The overlay key is the filename without `.md`
+including entries switched off by an empty local file. The overlay key is the filename without `.md`
 and without the `review-` prefix, so `review-tech.md` has the key `tech`.
 
 If `$ARGUMENTS` is non-empty: treat it as the review name.
@@ -48,7 +48,7 @@ If `$ARGUMENTS` is non-empty: treat it as the review name.
 - Normalize the argument to an overlay key: strip a leading `review-` and a trailing `.md`.
 - Look the key up in the effective catalog. A project-local recipe already won there,
   so no separate fallback is needed.
-- If the key is not in the effective catalog but is listed in `overlay.reviews.disabled`,
+- If the key is not in the effective catalog but a local file switches it off,
   say so explicitly instead of reporting it as unknown.
 
 If `$ARGUMENTS` is empty: build a selection list from the effective catalog.

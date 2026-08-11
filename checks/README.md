@@ -3,7 +3,7 @@
 `<DIST_DIR>/bin/k-check` fuehrt die effektive Check-Menge aus: mitgelieferte Checks aus
 `<DIST_DIR>/checks/` kombiniert mit projektlokalen Checks aus dem konfigurierten
 `paths.checks`. Die Kombination folgt `commands/_shared/overlay-resolution.md`:
-ein gleichnamiger lokaler Check ersetzt den mitgelieferten, und `overlay.checks.disabled`
+ein gleichnamiger lokaler Check ersetzt den mitgelieferten, eine leere lokale Datei
 schaltet mitgelieferte Checks ab.
 
 Jeder Check wird mit seiner Herkunft ausgewiesen: `dist`, `local` oder `override`.
