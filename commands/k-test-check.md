@@ -9,9 +9,10 @@ allowed-tools: [Read, Bash, Glob, Grep]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Run unit tests, find the root cause of each failure, explain it briefly, then ask before making any changes.

@@ -9,7 +9,7 @@ result-family: secret-scanning
 
 # Review: Secret-Scanning Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses Review nutzt host-lokal installierte Security-Tools und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
+Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses Review nutzt host-lokal installierte Security-Tools und schreibt projektlokale Review-Artefakte unter `k-playbook-local/results/`.
 
 ## Zweck
 
@@ -21,20 +21,20 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 
 ## Voraussetzungen
 
-- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
-- Lies `<DIST_DIR>/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `gitleaks` und `trufflehog`.
-- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
-- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
+- Lies `<playbook.dir>/scripts/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `gitleaks` und `trufflehog`.
+- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
 - Pruefe `gitleaks version` und `trufflehog --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
-  `bash <PLAYBOOK_DIR>/scripts/install-security-tools.sh` nennt den passenden
+  `bash <playbook.dir>/scripts/install-security-tools.sh` nennt den passenden
   Installationsbefehl.
 
 ## Ergebnisverzeichnis
 
 Dieses Review schreibt in:
 
-`k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/`
+`k-playbook-local/results/secret-scanning/YYYY-MM-DD/`
 
 Dateien:
 
@@ -116,7 +116,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 
 ## Handoff
 
-`/k-remediation k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -143,7 +143,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook/reviews/results/secret-scanning/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/assessment.md
 ```
 
 Remediation und Secret-Rotation sind ausdruecklich nicht Teil dieses Reviews.

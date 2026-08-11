@@ -9,9 +9,10 @@ allowed-tools: [Read, Bash, TodoWrite]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Liste offene GitHub-Pull-Requests fuer das passende Repo, lade einen PR und fuehre ihn durch drei Phasen mit einer optionalen Folgeaktion: approven, mergen oder einen lokalen Validierungs-Branch anlegen.
@@ -93,27 +94,16 @@ Wenn zwei Argumente uebergeben werden:
 
 ## Schritt 1 - Repo-Ziel aufloesen
 
-Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
+Aus der Context-Ausgabe:
 
-Fuer diesen Command werden zusaetzlich die festen Bloecke `enforcement` und `docs` aufgeloest, weil Phase 2 ihre Regeln und die Docs-Sync-Pflicht lesen muss.
+- `PR_TARGET_DIR` = `project.repoRoot`. Das deckt auch Wrapper-Repos ab, bei denen das eigentliche Git-Repo nicht das Hauptverzeichnis ist.
+- `DOCS_DIR` = `<local.dir>/docs` — Phase 2 braucht es fuer die Docs-Sync-Pflicht.
+- `EFFECTIVE_RULES` = `catalogs.rules`, inklusive Herkunft je Regel.
 
-Danach bestimme das GitHub-Repo fuer den PR-Check in dieser Reihenfolge:
+Wenn `remediation.target` gesetzt und nicht `.` ist, benennt es den engeren Code-Root
+innerhalb des Repos; nutze ihn fuer die Code-Sichtung, aber nicht als `PR_TARGET_DIR`.
 
-1. Wenn `project.repo_root` in `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` gesetzt ist:
-   - verwende `PROJECT_REPO_ROOT_DIR` aus der Shared Path Resolution
-   - das ist der bevorzugte Fall fuer Wrapper-Repos, bei denen das eigentliche Git-Repo nicht das Workspace-Root ist
-2. Sonst, wenn `remediation.target` gesetzt ist:
-   - resolve `remediation.target` relativ zu `PLAYBOOK_DIR`
-   - verwende diesen Pfad als `PR_TARGET_DIR`
-   - das ist nur noch ein Legacy-Fallback fuer aeltere Projekte ohne `project.repo_root`
-3. Sonst, wenn `TARGET_DIR` selbst ein Git-Repo ist: verwende `TARGET_DIR` als `PR_TARGET_DIR`
-4. Sonst abbrechen mit einer klaren Meldung:
-     - entweder im echten Git-Repo starten
-    - oder `K-PLAYBOOK.yaml` mit `project.repo_root` sauber konfigurieren
-
-Vor dieser Zielwahl gilt zusaetzlich:
-
-- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: sofort abbrechen; das Verzeichnis ist kein k-playbook-Projekt.
+Wenn `project.vcs` nicht `git` ist: abbrechen, ein PR-Review braucht ein Git-Repo.
 
 Validierung:
 
@@ -140,9 +130,8 @@ Merke:
 - `GH_REPO_URL`
 - `GH_DEFAULT_BRANCH`
 - `PR_TARGET_DISPLAY`
-- `RESOLVED_ENFORCEMENT_DIR`
 - `DOCS_DIR`
-- `EFFECTIVE_RULES` — die effektive Regelmenge aus `<DIST_DIR>/commands/_shared/overlay-resolution.md` (kind `rules`), inklusive Herkunft je Regel
+- `EFFECTIVE_RULES`
 
 ## Schritt 2 - PR bestimmen
 
@@ -294,16 +283,15 @@ Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohn
 
 Lade fuer die Bewertung:
 
-- globale Regeln aus `<DIST_DIR>/rules/*.md`
-- projektlokale Regeln aus `<paths.enforcement>/*.md`, wenn in `K-PLAYBOOK.yaml` gesetzt
-- projektlokale Docs aus `<paths.docs>/`, wenn in `K-PLAYBOOK.yaml` gesetzt und fuer Docs-Sync sichtbar relevant
+- die effektive Regelmenge `EFFECTIVE_RULES` aus `catalogs.rules`
+- projektlokale Docs aus `DOCS_DIR`, soweit fuer Docs-Sync sichtbar relevant
 
 Nutze diese Quellen als Constraints, nicht als Anlass fuer ein separates `/k-review`.
 
 Wichtig:
 
-- `global/reviews/*.md` und `<paths.reviews>/` sind in diesem Command nur Referenz fuer moegliche Folge-Schritte, nicht der Default-Executor.
-- keine Dateien unter `<paths.reviews>/` oder `<paths.tasks>/` schreiben.
+- `catalogs.reviews` ist in diesem Command nur Referenz fuer moegliche Folge-Schritte, nicht der Default-Executor.
+- keine Dateien unter `<local.dir>/results/` oder `<local.dir>/tasks/` schreiben.
 - nur read-only Kommandos und Analyse.
 
 ### 6.2 PR-Scope klassifizieren
@@ -350,8 +338,8 @@ Vorgehen:
 2. Fuehre aus dem Projektkontext aus:
 
 ```bash
-<DIST_DIR>/bin/k-check \
-  --config-root <PLAYBOOK_DIR> \
+<playbook.dir>/bin/k-check \
+  --config-root <project.dir> \
   --target-root <PR_TARGET_DIR> \
   --mode changed \
   --files-from <temp-file>
@@ -689,7 +677,7 @@ PR gemerged. Lokaler Validierungs-Branch `pr-review/441-python-jose` wurde ansch
 
 ## Fehlerfaelle
 
-- `K-PLAYBOOK.yaml` nicht gefunden -> sauber abbrechen und `k-playbook-installer init` empfehlen
+- Kein k-playbook-Projekt (Context-Aufruf schlaegt fehl) -> sauber abbrechen und `/k-gui` empfehlen
 - `project.repo_root` oder der Legacy-Fallback `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
 - `gh` fehlt oder ist nicht authentifiziert -> sauber abbrechen und das Problem klar benennen
 - mehr als zwei Argumente oder ungueltige Argument-Kombination -> gueltige Formen nennen und stoppen

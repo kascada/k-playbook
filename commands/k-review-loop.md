@@ -1,5 +1,5 @@
 ---
-description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses paths.tasks from K-PLAYBOOK.yaml. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
+description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses the project's task directory. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Glob, Task]
@@ -9,18 +9,17 @@ allowed-tools: [Read, Write, Edit, Glob, Task]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. Critic and Editor are read-only advisors. The Moderator routes between them, decides on deadlocks, applies accepted edits, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
 
-`/k-review-loop` does not guess project paths. Without an explicit path argument, the project must have `K-PLAYBOOK.yaml`; the task directory comes from `paths.tasks`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
-
 ## Invocation
 
-`/k-review-loop` — review open task files from `<paths.tasks>`.
+`/k-review-loop` — review open task files from `k-playbook-local/tasks/`.
 `/k-review-loop <path>` — review an explicit file or directory containing `.md` task/instruction files.
 
 ---
@@ -37,30 +36,26 @@ Review task/instruction files before execution using a structured two-agent dial
 
 ## Execution
 
-### Step 1 — Resolve project config and target path
+### Step 1 — Resolve target path
 
-Always read and apply `<DIST_DIR>/commands/_shared/path-resolution.md` before choosing the review target. This is a preflight even for explicit file/directory arguments, so the command respects the project-local `K-PLAYBOOK.yaml` and its current directory layout instead of silently using historical defaults.
+The context load from the first step is the preflight, even for explicit file or
+directory arguments: it establishes which project is being worked in.
 
-For this command, resolve the configured `tasks` path:
+From the context output:
 
-- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
-- `TASKS_DISPLAY_PATH = <paths.tasks>`.
-
-Ignore other config sections such as `remediation`, `tools.codeql`, or future `tools.dependabot` for target selection; they are command-specific config for other commands.
+- `RESOLVED_TASKS_DIR = <local.dir>/tasks`.
+- `TASKS_DISPLAY_PATH = k-playbook-local/tasks`.
 
 Command-specific policy:
 
-- If `$ARGUMENTS` is provided: treat it as the explicit review target after the `K-PLAYBOOK.yaml` preflight.
+- If `$ARGUMENTS` is provided: treat it as the explicit review target.
   - If it is a file: use that file.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`. Do not allow one-off reviews without project config.
-  - If `paths.tasks` is configured and exists, compare the explicit target to it. Continue if the target is outside it, but announce that this is an explicit one-off target rather than the standard task queue.
+  - If the target lies outside `RESOLVED_TASKS_DIR`, continue, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
-  - If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-  - If the YAML-configured tasks path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path.
-  - If the YAML-configured tasks path exists: use it as the review target.
+  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`.
+  - Otherwise use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
 
@@ -104,7 +99,7 @@ Review gestartet
 ─────────────────────────────
 Tasks:   <list of task filenames>
 Pfad:    <REVIEW_TARGET_DISPLAY>
-Config:  K-PLAYBOOK.yaml gefunden; tasks: <TASKS_DISPLAY_PATH or "—">
+Projekt: <project.dir>; Tasks: <TASKS_DISPLAY_PATH>
 Intent:  <list of intent filenames, or "— (kein Intent angegeben)">
 Runden:  max. 5
 ```

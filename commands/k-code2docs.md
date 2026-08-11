@@ -1,5 +1,5 @@
 ---
-description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given. Uses paths.docs.
+description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure, writes numbered topic docs plus an index README, and registers everything in MEMORY (AGENTS.md + opencode.json) so future AI sessions consult the docs first. Defaults to the current directory, or uses [target-dir] if given.
 argument-hint: [target-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -9,44 +9,40 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Turn an existing codebase into a curated, indexed documentation set that the AI can consult in ≤2 lookups. Explicitly **not** a grep replacement — the docs describe **meaning**, not surface facts.
 
-`/k-code2docs` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the docs directory comes from `paths.docs`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
-
 Produces:
-- `<paths.docs>/<NN>-<slug>.md` — one file per coherent topic.
-- `<paths.docs>/README.md` — TOC + alphabetical keyword index + question→file mapping.
-- `AGENTS.md` at project root — session-injected pointer to the configured docs path.
-- `opencode.json` at project root — registers `AGENTS.md` + the configured docs path.
+- `k-playbook-local/docs/<NN>-<slug>.md` — one file per coherent topic.
+- `k-playbook-local/docs/README.md` — TOC + alphabetical keyword index + question→file mapping.
+- `AGENTS.md` at project root — session-injected pointer to the docs directory.
+- `opencode.json` at project root — registers `AGENTS.md` + the docs directory.
 
 ## Step 0 — Target bestimmen und bestätigen
 
-Bestimme zuerst das Projekt, in dem gearbeitet wird. Der analysierte Code liegt in `PROJECT_REPO_ROOT_DIR`, die k-playbook-Artefakte unter `PLAYBOOK_DIR`. Wende dafür `<DIST_DIR>/commands/_shared/path-resolution.md` an.
+Der analysierte Code liegt in `project.repoRoot` aus der Context-Ausgabe, die
+Dokumentation entsteht unter `<local.dir>/docs`.
 
 **Target-Auflösung:**
 
-- Wenn `$ARGUMENTS` gesetzt ist: als explizites Verzeichnisargument an die Discovery übergeben. Existiert es nicht, abbrechen mit klarer Fehlermeldung.
-- Wenn `$ARGUMENTS` leer ist: Discovery ab dem aktuellen Arbeitsverzeichnis.
-- Die Discovery behandelt den Fall, dass das Arbeitsverzeichnis selbst das k-playbook-Verzeichnis ist; keinen eigenen Guard implementieren.
+- Wenn `$ARGUMENTS` gesetzt ist: es benennt das zu analysierende Verzeichnis. Existiert es nicht, abbrechen mit klarer Fehlermeldung. Liegt es ausserhalb von `project.repoRoot`, ist es ein anderes Projekt — abbrechen und darauf hinweisen, dass der Command dort aufgerufen werden muss.
+- Wenn `$ARGUMENTS` leer ist: das aktuelle Arbeitsverzeichnis.
 
 **Preflight-Snapshot anzeigen:**
-
-Für den Snapshot `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` lesen, um `layout`, `k_playbook.version` und Setup-Datum kompakt anzeigen zu können.
 
 ```text
 /k-code2docs — Preflight
 ─────────────────────────────────────
-Ziel:          <absolute PROJECT_REPO_ROOT_DIR>
-Playbook:      <absolute PLAYBOOK_DIR>
+Ziel:          <absolutes Analyseverzeichnis>
+Projekt:       <project.dir>
 Quelle:        Argument | CWD
-K-PLAYBOOK.yaml: gefunden (layout: project-local, v<k_playbook.version>)
 Git-Repo:      ja (branch: <branch>) | nein
-Doc-Dir:       <DOCS_DIR> (existiert, <N> Dateien) | fehlt
+Doc-Dir:       k-playbook-local/docs (existiert, <N> Dateien) | fehlt
 ```
 
 Wenn `$ARGUMENTS` gesetzt war: keine Rückfrage — das explizite Ziel gilt.
@@ -61,31 +57,25 @@ Bei „nein": abbrechen mit Hinweis:
 
 Bei „ja": weiter mit Step 1.
 
-## Step 1 — Resolve paths from K-PLAYBOOK.yaml
+## Step 1 — Resolve paths
 
-Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
+From the context output:
 
-For this command, resolve the configured `docs` path:
+- `RESOLVED_DOCS_DIR = <local.dir>/docs`.
+- `DOCS_DISPLAY_PATH = k-playbook-local/docs`.
 
-- `RESOLVED_DOCS_DIR = <PLAYBOOK_DIR>/<paths.docs>`.
-- `DOCS_DISPLAY_PATH = <paths.docs>`.
+If `RESOLVED_DOCS_DIR` is missing on disk: ask whether to create exactly that directory
+now or run `/k-gui`; do not use any fallback path.
 
-Command-specific policy:
-
-- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
-- If `paths.docs` is missing: ask for the docs directory relative to `PLAYBOOK_DIR`, recommend `docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-- If the YAML-configured docs path is missing on disk: ask whether to create that exact directory now or run `/k-gui`; do not use any fallback path.
-
-`AGENTS_FILE` = `<PROJECT_REPO_ROOT_DIR>/AGENTS.md` and `OPENCODE_CONFIG` = `<PROJECT_REPO_ROOT_DIR>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
+`AGENTS_FILE` = `<project.dir>/AGENTS.md` and `OPENCODE_CONFIG` = `<project.dir>/opencode.json` (or `.jsonc` if that variant already exists — do not create both).
 
 Use `RESOLVED_DOCS_DIR` for all doc reads and writes.
 
 Derived paths for Memory registration:
 
-- `DOCS_DISPLAY_PATH` = `<paths.docs>`.
-- `DOCS_README_FROM_AGENTS` = `<paths.docs>/README.md`.
+- `DOCS_README_FROM_AGENTS` = `k-playbook-local/docs/README.md`.
 - `AGENTS_LINK_FROM_DOCS_README` = `../../AGENTS.md`.
-- `DOCS_REFERENCE_PATH` = `./<paths.docs>`.
+- `DOCS_REFERENCE_PATH` = `./k-playbook-local/docs`.
 
 ## Step 2 — Clarify scope
 
@@ -280,12 +270,12 @@ Der Kern dieses Schrittes: die entstandenen Docs sind wertlos, wenn Folge-Sessio
 
 **8a — `AGENTS.md`:**
 
-- Existiert nicht → aus `<DIST_DIR>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
+- Existiert nicht → aus `<playbook.dir>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
 - Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
 
 **8b — `opencode.json` (oder `.jsonc` falls schon vorhanden):**
 
-- Existiert nicht → aus `<DIST_DIR>/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen. `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
+- Existiert nicht → aus `<playbook.dir>/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen. `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten Themen aus der Doc-Struktur + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
 - Existiert → prüfen ob `instructions` `AGENTS.md` enthält, `references.docs.path` nach Auflösung relativ zur Config-Datei auf `RESOLVED_DOCS_DIR` zeigt, und die `description` konkret ist. Fehlendes ergänzen, falsche/alte Docs-Pfade korrigieren, konkret machen — mit Bestätigung.
 
 **8c — Restart-Hinweis:**

@@ -43,18 +43,16 @@ flowchart LR
     Anchor["K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
     Anchor --> Local["k-playbook-local/"]
 
-    Playbook --> Cmds["commands/ · skills/"]
-    Playbook --> Base["rules/ · reviews/ · checks/"]
+    Playbook --> Base["rules/ · reviews/ · checks/<br>commands/ · skills/"]
     Playbook --> Tool["bin/ · dist/ · scripts/"]
 
-    Local --> Overlay["rules/ · reviews/ · checks/"]
+    Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
     Local --> Artifacts["results/ · docs/ · tasks/ · guidelines/ · TODO.md"]
 
     Base --> Effective["effektive Menge"]
     Overlay --> Effective
 
-    Cmds --> Assistant["Claude Code · OpenCode · Cursor"]
-    Effective --> Assistant
+    Effective --> Assistant["Claude Code · OpenCode · Cursor"]
 ```
 
 ### Pfade ergeben sich, sie stehen nicht in der Config
@@ -69,15 +67,18 @@ Die vollstaendige Zuordnung steht in [`k-playbook-format.md`](./k-playbook-forma
 
 ### Mitgeliefertes und Projekteigenes zusammenfassen
 
-Drei Verzeichnisse existieren doppelt: `rules/`, `reviews/` und `checks/`. Was gilt, ist
-die Vereinigung beider Seiten. **Bei gleichem Dateinamen gewinnt die projekteigene Datei,
-und zwar vollstaendig** — die mitgelieferte wird dann gar nicht erst gelesen.
+Fuenf Verzeichnisse existieren doppelt: `rules/`, `reviews/`, `checks/`, `commands/` und
+`skills/`. Was gilt, ist die Vereinigung beider Seiten. **Bei gleichem Namen gewinnt der
+projekteigene Eintrag, und zwar vollstaendig** — der mitgelieferte wird dann gar nicht
+erst gelesen.
 
-Abgeschaltet wird ueber eine **leere** lokale Datei: nichts ausser Leerzeilen und
+Abgeschaltet wird ueber einen **leeren** lokalen Eintrag: nichts ausser Leerzeilen und
 Kommentaren. Damit kann die Datei ihren eigenen Grund tragen, und es braucht keine Liste
 in der Konfiguration.
 
-Commands und Skills gibt es nur mitgeliefert.
+Bei Commands und Skills folgt daraus, wie die Assistenten verlinkt werden: `.claude/commands`
+und die drei anderen Ziele sind echte Verzeichnisse mit **einem Symlink je Eintrag**. Ein
+Verzeichnis-Symlink zeigt auf genau eine Quelle und koennte die zweite nie erreichen.
 
 ### Eine Antwort, nicht viele
 

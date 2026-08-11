@@ -1,5 +1,5 @@
 ---
-description: Fast read-only health overview for the current project, backed by k-playbook-installer status JSON.
+description: Fast read-only health overview for the current project, backed by the k-playbook context output.
 argument-hint: [full|codeql|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
@@ -11,106 +11,77 @@ Show a fast, read-only health overview for the current project.
 
 This command is a status preflight, not a repair command:
 
-- Start with the binary-backed project status: `k-playbook-installer status`.
-- Treat the binary JSON as the authoritative base for project health.
+- The context output from the first step is the authoritative base. Everything else is a
+  cheap existence or metadata check on top of it.
 - Prefer small existence and metadata checks over scans.
-- Do not create files, change config, install tools, run tests, run builds, run smoke tests, start scanners, create CodeQL databases, run CodeQL analysis, upload SARIF, call GitHub APIs, or print Git diffs.
-- If more checks are needed later, add them to the Go status implementation first where feasible, not as duplicated prompt logic.
+- Do not create files, change config, install tools, run tests, run builds, start
+  scanners, create CodeQL databases, run CodeQL analysis, upload SARIF, call GitHub APIs,
+  or print Git diffs.
+- Do not repair anything. Every problem this command finds ends in a recommendation,
+  normally `/k-gui`.
 
 ## Modes
 
 Interpret `$ARGUMENTS` as one optional mode:
 
-- Empty: compact human-readable report from the binary JSON.
-- `json`: print the binary JSON unchanged.
-- `full`: compact report plus `K-PLAYBOOK.yaml` content when present.
+- Empty: compact human-readable report.
+- `json`: print the context JSON unchanged.
+- `full`: compact report plus the effective catalogs listed entry by entry with origin.
 - `strict`: compact report plus a health-gate summary where warnings count as failed gates.
-- `codeql`: compact report plus lightweight CodeQL config metadata only when present in `K-PLAYBOOK.yaml`; do not run CodeQL.
-- `reviews`: compact report focused on review status from the binary JSON; do not run reviews.
+- `codeql`: compact report plus lightweight CodeQL config metadata; do not run CodeQL.
+- `reviews`: compact report focused on review status; do not run reviews.
 
-If `$ARGUMENTS` is anything else, print the supported modes and stop without running deeper checks.
+If `$ARGUMENTS` is anything else, print the supported modes and stop without running
+deeper checks.
 
-## Step 1 - Target
+## Step 1 - Base
 
-Discover `PLAYBOOK_DIR` and `DIST_DIR` with `<DIST_DIR>/commands/_shared/path-resolution.md`:
+Take the context output. If the call failed, the directory is not a k-playbook project —
+report that and stop. Modes are not target paths; there is nothing else to resolve.
 
-- For the current argument set, modes are not target paths; run discovery from `realpath(CWD)`.
-- If discovery finds no `K-PLAYBOOK.yaml`, report the directory as not a k-playbook project and stop.
-- If the config is `schema_version: 1`, report it as pre-migration and recommend `k-playbook-installer migrate`.
-- If `DIST_DIR` is missing, report the installation as incomplete and recommend `k-playbook-installer restore`. This is the expected state right after a `git clone`, because `_dist/` is gitignored.
+From it, take `project`, `playbook`, `local`, `instructions`, `catalogs`, `remediation`
+and `guidelines`.
 
-## Step 2 - Resolve Installer Binary
+## Step 2 - Cheap checks
 
-The installer is a host-wide binary, not part of the project-local installation under `_dist/`. Resolve `INSTALLER_BIN` before running status; take the first executable candidate:
+Check existence only — do not read contents beyond what a line count needs:
 
-- `k-playbook-installer` from `PATH`.
-- `~/.local/bin/k-playbook-installer`.
-
-Do not build the binary from `/k-status`. In particular, do not run `make build`, `go build`, or `go run` from this command. If no candidate is executable, report the binary as unavailable and tell the user to install it once per host.
-
-The binary being unavailable does not make the project unusable: commands, rules, reviews, and checks all live under `_dist/` and work without it. Report it as a warning, not a failure.
-
-## Step 3 - Binary Status
-
-Run the installer status command from `PROJECT_REPO_ROOT_DIR`:
-
-```bash
-"<INSTALLER_BIN>" status
-```
-
-If the shell cannot reliably run with `PROJECT_REPO_ROOT_DIR` as working directory, use:
-
-```bash
-"<INSTALLER_BIN>" status "<PROJECT_REPO_ROOT_DIR>"
-```
-
-Expected JSON shape:
-
-```json
-{
-  "path": "/path/to/project",
-  "name": "project",
-  "environment": "plain",
-  "selected": true,
-  "detected": ["go.mod"],
-  "playbook": {},
-  "projectRoot": {},
-  "setup": {},
-  "structure": {},
-  "docs": {},
-  "remediation": {},
-  "tasks": {},
-  "todo": {},
-  "reviews": {},
-  "enforcement": {},
-  "git": {},
-  "recommendations": [],
-  "devcontainer": {}
-}
-```
-
-If `INSTALLER_BIN` is missing, report that the binary is unavailable and include the candidate paths checked. Do not recreate the old manual status implementation as a fallback unless the user explicitly asks for degraded best-effort output.
+| Row | Check |
+|---|---|
+| Projekt | `project.dir`, and whether `project.repoRoot` differs from it |
+| Installation | `playbook.dir` exists and contains `bin/k-playbook` |
+| Projekteigenes | `local.dir` exists |
+| Instruktionen | how many files `instructions` names, and whether each exists |
+| Struktur | which of `tasks/`, `tasks/done/`, `docs/`, `results/`, `guidelines/`, `rules/`, `reviews/`, `checks/`, `priv/` are missing under `local.dir` |
+| Docs | `<local.dir>/docs/` — exists, and how many `*.md` besides `README.md` |
+| Tasks | `<local.dir>/tasks/*.md` — count, and the lowest-numbered file as the next one |
+| TODO | `<local.dir>/TODO.md` — exists, and how many unchecked `- [ ]` lines |
+| Reviews | count from `catalogs.reviews`, plus whether `<local.dir>/results/known-decisions.md` and `log.md` exist |
+| Regeln | count from `catalogs.rules`, split by origin |
+| Checks | count from `catalogs.checks`, split by origin |
+| Remediation | `remediation.mode`, and whether `remediation.configured` is true |
+| Git | `project.vcs`; if `git`, `git status --short` in `project.repoRoot` |
+| Assistenten | whether `.claude/commands`, `.claude/skills`, `.opencode/commands`, `.cursor/commands` exist under `project.dir` and point into `playbook.dir` or `local.dir` |
 
 ## Compact Output
-
-Default output should be short and derived from the JSON:
 
 ```text
 /k-status
 ------------------------
-Projekt:       /path/to/project
-K-PLAYBOOK:    OK, updated_at 2026-07-20
-Project-Root:  OK, . (git)
-Setup:         OK, K-PLAYBOOK.yaml vorhanden
-Struktur:      WARN, 2 Pfade fehlen
-Docs:          WARN, docs-Verzeichnis enthaelt noch keine Markdown-Dateien
-Remediation:   OK, direct-allowed
+Projekt:       /path/to/project (repo: ., git)
+Installation:  OK, k-playbook/
+Projekteigen:  OK, k-playbook-local/
+Instruktionen: OK, 2 Dateien
+Struktur:      WARN, 2 Verzeichnisse fehlen (priv, guidelines)
+Docs:          WARN, noch keine Markdown-Dateien
 Tasks:         WARN, 3 offen, naechste: 002-example.md
 TODO:          OK, 0 offen
-Reviews:       WARN, known-decisions fehlt
-Enforcement:   OK, 1 Regel
+Reviews:       WARN, 8 Rezepte, known-decisions fehlt
+Regeln:        OK, 4 aktiv (4 dist)
+Checks:        OK, 6 aktiv (6 dist)
+Remediation:   OK, task-first
 Git:           WARN, dirty (4 geaendert, 1 untracked)
-Devcontainer:  WARN, 2 Eintraege fehlen
+Assistenten:   WARN, .cursor/commands fehlt
 
 Naechste Aktionen:
 1. /k-gui
@@ -118,53 +89,56 @@ Naechste Aktionen:
 3. /k-code2docs
 ```
 
-Only show `Devcontainer` when the JSON contains `devcontainer`.
-
 Use these labels consistently:
 
-- `OK`: corresponding JSON object has `ok: true`.
-- `WARN`: corresponding JSON object has `ok: false`, but the project remains inspectable.
-- `FAIL`: the binary command failed, `K-PLAYBOOK.yaml` is missing/invalid, or a configured required path is missing.
-- `projectRoot.ok: false` is a failed configuration gate. Do not search for a Git root in `/k-status`; report the message from the JSON and recommend `/k-gui`.
+- `OK`: the row was checked and nothing is missing.
+- `WARN`: something is missing or empty, but the project remains usable.
+- `FAIL`: the context call failed, or `playbook.dir` / `local.dir` do not exist.
+
+Derive the recommended actions from the WARN and FAIL rows, most blocking first. Missing
+directories and missing assistant links are always `/k-gui`.
 
 ## JSON Mode
 
-In `json` mode, print the `"<INSTALLER_BIN>" status` JSON unchanged. Do not prepend warnings or prose unless the binary failed.
+Print the context JSON unchanged. Do not prepend warnings or prose unless the call
+failed.
 
 ## Full Mode
 
-In `full` mode:
+Print the compact report, then list the three catalogs entry by entry with origin and
+`disabled` marker, in the shape used by every other command:
 
-- Print the compact report.
-- Read `<PLAYBOOK_DIR>/K-PLAYBOOK.yaml` and print it under a separate `K-PLAYBOOK.yaml` heading.
-- Do not print large generated files, diffs, logs, task contents, review contents, or docs contents.
+```text
+Regeln (rules): 4 aktiv
+  [dist]     codeql
+  [override] docs-sync            (ueberlagert k-playbook/rules/docs-sync.md)
+  [disabled] tool-install-scope   (leere lokale Datei)
+```
+
+Do not print file contents, diffs, logs, task contents, review contents, or docs
+contents.
 
 ## Strict Mode
 
-In `strict` mode:
-
 - Print the compact report.
-- Add `Health-Gates: OK` only when every shown status object is OK.
-- Add `Health-Gates: FAIL (<warn> warn gates, <fail> fail gates)` when warnings or failures exist.
+- Add `Health-Gates: OK` only when every shown row is OK.
+- Add `Health-Gates: FAIL (<warn> warn gates, <fail> fail gates)` when warnings or
+  failures exist.
 - Do not change exit behavior and do not modify files.
 
 ## CodeQL Mode
 
-In `codeql` mode:
-
-- Start with the binary status JSON.
-- Read only lightweight `tools.codeql` metadata from `K-PLAYBOOK.yaml` when present.
-- Check configured paths only with existence metadata when needed.
-- Do not run `codeql version`, `codeql database create`, `codeql database analyze`, uploads, or GitHub API calls.
-
-If deeper CodeQL status is needed, add it to the installer binary as a lightweight status field first.
+- Print the compact report.
+- Read the optional `tools.codeql` block from `<project.dir>/K-PLAYBOOK.yaml` when
+  present. This is the one place where this command reads the config file directly: the
+  block is not part of the context output yet. Read nothing else from the file.
+- Check configured paths only with existence metadata.
+- Do not run `codeql version`, `codeql database create`, `codeql database analyze`,
+  uploads, or GitHub API calls.
 
 ## Reviews Mode
 
-In `reviews` mode:
-
-- Start with the binary status JSON.
-- Report the `reviews` object and recommendations relevant to reviews.
-- Do not run review recipes or read full review result contents.
-
-If due-date calculation or richer review metadata is needed, add it to the installer binary as lightweight status fields first.
+- Print the compact report.
+- List `catalogs.reviews` with origin, and report whether `<local.dir>/results/log.md`
+  and `known-decisions.md` exist.
+- Do not run review recipes and do not read full review result contents.

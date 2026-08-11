@@ -7,9 +7,10 @@ description: Use when the user wants to systematically understand a project that
 
 ## Erster Schritt
 
-Rufe zuerst `k-playbook/bin/k-playbook context` auf und lies die Dateien aus
-`instructions`. Sie tragen, was fuer dieses Projekt gilt; alle Pfade und
-Kataloge dieses Skills stammen aus derselben Ausgabe.
+Wende `k-playbook/commands/_shared/context.md` an: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 **Kurzfassung.** Systematisches Vorgehen, um Projekte mit
@@ -42,7 +43,7 @@ Fünf Phasen:
 
 Details, Kommandos, Templates und Checkliste in:
 
-→ **`<DIST_DIR>/skills/overlay-repo-analyse/PLAYBOOK.md`**
+→ **`<playbook.dir>/skills/overlay-repo-analyse/PLAYBOOK.md`**
 
 ## Wichtigste Regel
 

@@ -370,7 +370,10 @@ function renderLocal(data) {
     addFact(elements.localFacts, "Verzeichnis", data.dir);
   }
   if (missing.length > 0) {
-    addFact(elements.localFacts, "Fehlt", missing.map((entry) => entry.path).join(", "));
+    // "Fehlende Eintraege" statt "Fehlt": in dieser Liste steht links immer die
+    // Bezeichnung und rechts der Wert. Ein Statuswort links liest sich, als
+    // waere die Liste rechts der Zustand.
+    addFact(elements.localFacts, "Fehlende Eintraege", missing.map((entry) => entry.path).join(", "));
   }
 
   setBlockState(elements.localPill, elements.localCreate, data.ok ? "ok" : "todo", LOCAL_LABELS);

@@ -46,11 +46,11 @@ Die Vergleichseinheit ist der Name:
 |---|---|---|
 | `rules`, `reviews` | eine `*.md`-Datei | Dateiname |
 | `checks` | ein `*.sh`-Skript | Dateiname |
-| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/path-resolution.md` |
+| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/context.md` |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname |
 
 Commands werden bis in die Namensraeume hinein verglichen: eine lokale
-`commands/_shared/path-resolution.md` ersetzt genau diese Datei, der Rest des
+`commands/_shared/context.md` ersetzt genau diese Datei, der Rest des
 Namensraums bleibt mitgeliefert. Ein Skill wird dagegen als Ganzes ersetzt — `SKILL.md`,
 `PLAYBOOK.md` und Vorlagen muessen zueinander passen.
 

@@ -1,0 +1,1 @@
+../../k-playbook/commands/k-setup-codeql.md

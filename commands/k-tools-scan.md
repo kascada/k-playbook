@@ -1,5 +1,5 @@
 ---
-description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under <paths.docs>/libs/, plus an index. Uses paths.docs. Focuses on pitfalls and idioms, NOT copy-paste snippets.
+description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under k-playbook-local/docs/libs/, plus an index. Focuses on pitfalls and idioms, NOT copy-paste snippets.
 argument-hint: [scope-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
@@ -9,37 +9,30 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
 
-`/k-tools-scan` does not guess project paths. The project must have `K-PLAYBOOK.yaml` and an existing docs directory from `paths.docs`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
-
 Produces:
-- `<paths.docs>/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
-- `<paths.docs>/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
-- Ergänzt `<paths.docs>/README.md` um eine Sektion „Libs & Stack" mit Link auf `libs/README.md`.
+- `k-playbook-local/docs/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
+- `k-playbook-local/docs/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
+- Ergänzt `k-playbook-local/docs/README.md` um eine Sektion „Libs & Stack" mit Link auf `libs/README.md`.
 
 **Fokus:** Pitfalls, Auth-Quirks, Concurrency-Fallen, Version-Migrations-Notes, empfohlene Idiome. **Kein** Copy-Paste-Tutorial — dafür gibt es die offiziellen Docs.
 
-## Step 1 — Resolve paths from K-PLAYBOOK.yaml
+## Step 1 — Resolve paths
 
-Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
+From the context output:
 
-For this command, resolve the configured `docs` path:
+- `RESOLVED_DOCS_DIR = <local.dir>/docs`.
+- `DOCS_DISPLAY_PATH = k-playbook-local/docs`.
 
-- `RESOLVED_DOCS_DIR = <PLAYBOOK_DIR>/<paths.docs>`.
-- `DOCS_DISPLAY_PATH = <paths.docs>`.
-
-Command-specific policy:
-
-- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
-- If `paths.docs` is missing: ask for the docs directory relative to `PLAYBOOK_DIR`, recommend `docs`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-- If the YAML-configured docs path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path.
-- Use `RESOLVED_DOCS_DIR` for all reads and writes.
+If `RESOLVED_DOCS_DIR` is missing on disk: abort and tell the user to run `/k-gui`.
+Use `RESOLVED_DOCS_DIR` for all reads and writes.
 
 `LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.
 

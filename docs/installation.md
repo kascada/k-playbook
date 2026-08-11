@@ -198,6 +198,23 @@ startet die Oberflaeche danach einmal oder drueckt im Assistenten-Block auf Einr
 Damit die neuen Commands im Assistenten ankommen, muss dieser danach neu gestartet
 werden — Claude Code, OpenCode und Cursor erfassen sie beim Start.
 
+### Bestehende Projekte: zwei Dinge kommen dazu
+
+Wer ein Projekt aus einer Fassung bis 0.4 aktualisiert, findet nach dem Update zweierlei
+vor. Beides erledigt ein Klick, gelöscht oder überschrieben wird nichts:
+
+| Wo | Was die Oberflaeche meldet | Was zu tun ist |
+|---|---|---|
+| Projekteigene Struktur | `Fehlende Eintraege: commands, skills` | **Anlegen** — die beiden Overlay-Verzeichnisse entstehen mit ihrer README |
+| Assistenten-Verlinkung | `Verzeichnis-Symlink aus einer aelteren Fassung` | **Einrichten** — der Symlink wird durch Einzel-Links ersetzt |
+
+Der zweite Punkt ist die eigentliche Umstellung: aus `.claude/commands -> ../k-playbook/commands`
+wird ein echtes Verzeichnis mit einem Link je Command. Die Quelle in `k-playbook/` bleibt
+dabei unangetastet.
+
+Die Einzel-Links gehören ins Repository des Projekts und werden committet — dann hat ein
+frischer Clone die Commands sofort registriert.
+
 ## Host-weit aufrufbar
 
 Der tiefe Pfad `k-playbook/bin/k-playbook` ist nur beim ersten Mal noetig. Jeder Start der

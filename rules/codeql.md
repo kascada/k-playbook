@@ -16,7 +16,7 @@ CodeQL-Konfiguration, lokale CLI-Installation und lokale Analysen muessen getren
 Wenn GitHub CodeQL aktiv oder geplant ist:
 
 - Es darf hoechstens eine lokale CLI-only Installation angeboten werden.
-- Erlaubter Script-Aufruf: `scripts/install-codeql-local.sh --parent "<PLAYBOOK_DIR>" --cli-only`.
+- Erlaubter Script-Aufruf: `scripts/install-codeql-local.sh --parent "<playbook.dir>" --cli-only`.
 - Es duerfen keine lokalen Datenbanken erzeugt werden.
 - Es duerfen keine SARIF-Dateien erzeugt werden.
 - Es darf keine Analyse gestartet werden.

@@ -8,17 +8,17 @@ Ein Review-Rezept beschreibt nur die reviewspezifischen Kriterien. Der generisch
 
 Globale Review-Rezepte liegen unter:
 
-`<DIST_DIR>/reviews/`
+`<playbook.dir>/reviews/`
 
-Projektlokale Review-Rezepte liegen unter dem in `K-PLAYBOOK.yaml` gesetzten `paths.reviews`, konventionell:
+Projekteigene Review-Rezepte liegen unter:
 
-`<PLAYBOOK_DIR>/<paths.reviews>/`
+`<local.dir>/reviews/`
 
-Review-Ergebnisse liegen unterhalb von `paths.reviews`, nicht unter `paths.checks`. `checks` ist fuer ausfuehrbare Pruefroutinen, Check-Skripte und Regeln reserviert.
+Review-Ergebnisse liegen unter `<local.dir>/results/`, nicht bei den Rezepten und nicht unter `checks/`. `reviews/` enthaelt nur Rezepte, `checks/` nur ausfuehrbare Pruefroutinen.
 
 Konvention fuer Report-/Scan-Familien:
 
-`<PLAYBOOK_DIR>/<paths.reviews>/results/<scan-family>/YYYY-MM-DD/`
+`<local.dir>/results/<scan-family>/YYYY-MM-DD/`
 
 Typische Dateien darin:
 
@@ -53,7 +53,7 @@ handoff: /k-remediation
 result-family: <family-name>
 ```
 
-`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<paths.reviews>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten enthalten.
+`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten enthalten.
 
 ## Inhalt
 

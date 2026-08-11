@@ -126,21 +126,23 @@ projekt/
 ├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
 ├── CLAUDE.md             Symlink auf AGENTS.md
 ├── .claude/
-│   ├── commands  ──┐     Symlink
-│   └── skills      │     Symlink; OpenCode liest hier mit
+│   ├── commands/ ──┐     je ein Symlink pro Command
+│   └── skills/     │     je ein Symlink pro Skill; OpenCode liest hier mit
 ├── .opencode/      │
-│   └── commands  ──┤     Symlink
+│   └── commands/ ──┤
 ├── .cursor/        │
-│   └── commands  ──┤     Symlink
-├── k-playbook/   ←─┘     die Installation, vollständig ersetzbar
+│   └── commands/ ──┤
+├── k-playbook/   ←─┤     die Installation, vollständig ersetzbar
 │   ├── commands/ skills/ rules/ reviews/ checks/
 │   ├── bin/ dist/ scripts/
 │   ├── k-playbook.md     mitgelieferte Instruktionsebene
 │   └── installer/ docs/
-└── k-playbook-local/     projekteigen, committed
+└── k-playbook-local/ ←─┘ projekteigen, committed
     ├── rules/            Overlay zu k-playbook/rules/
     ├── reviews/          Overlay zu k-playbook/reviews/
     ├── checks/           Overlay zu k-playbook/checks/
+    ├── commands/         Overlay zu k-playbook/commands/
+    ├── skills/           Overlay zu k-playbook/skills/
     ├── results/          Review-Ergebnisse
     ├── docs/             Projektwissen für AI-Sessions
     ├── guidelines/
@@ -161,25 +163,37 @@ ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so land
 Änderung in beiden. `AGENTS.md` wird angelegt, falls sie fehlt, und sonst um einen kurzen
 Anstoß ergänzt; Näheres unter „Instruktionen".
 
-**Commands und Skills gibt es nur mitgeliefert.** Es gibt kein
-`k-playbook-local/commands/` und kein `k-playbook-local/skills/`. Das ist auch der Grund,
-warum die Verlinkung so einfach bleiben kann: `.claude/commands` zeigt als einzelner
-Symlink auf `k-playbook/commands`, und ein Symlink kann nur auf eine Quelle zeigen. Gäbe
-es beide Verzeichnisse, müsste die Verlinkung pro Datei erfolgen und nach jedem Update
-nachgezogen werden.
+**Commands und Skills gibt es auch projekteigen.** Ursprünglich war das ausgeschlossen:
+`.claude/commands` war ein einzelner Symlink auf `k-playbook/commands`, und ein Symlink
+zeigt auf genau eine Quelle. Der Preis dafür war, dass ein Projekt keine eigenen Commands
+haben konnte.
+
+Aufgelöst wird das, indem die vier Ziele **echte Verzeichnisse mit Einzel-Symlinks**
+werden — je ein Link pro Eintrag, auf die Fassung, die nach der Overlay-Regel gilt. Damit
+zieht nichts mehr von selbst nach: die Oberfläche vergleicht den aufgelösten Katalog mit
+dem, was registriert ist, und richtet ihn aus. Nach einem Update passiert das automatisch,
+siehe „Aktualisieren aus der Oberfläche".
 
 ## Zusammenfassen: mitgeliefert und projekteigen
 
-Drei Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Seiten:
+Fünf Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Seiten:
 
-| Sorte | mitgeliefert | projekteigen | Dateimuster |
+| Sorte | mitgeliefert | projekteigen | Einheit |
 |---|---|---|---|
 | Regeln | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
 | Review-Rezepte | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
 | Checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, nur oberste Ebene |
+| Commands | `k-playbook/commands/` | `k-playbook-local/commands/` | `*.md`, rekursiv |
+| Skills | `k-playbook/skills/` | `k-playbook-local/skills/` | Verzeichnis mit `SKILL.md` |
 
-Die Vergleichseinheit ist der **Dateiname**. Beide Seiten benutzen dieselbe
-Namenskonvention, deshalb braucht es keinen abgeleiteten Schlüssel.
+Die Vergleichseinheit ist der **Name**. Beide Seiten benutzen dieselbe Namenskonvention,
+deshalb braucht es keinen abgeleiteten Schlüssel.
+
+Bei Commands ist es der Pfad ab `commands/`, einschließlich Namensraum: eine lokale
+`commands/_shared/context.md` ersetzt genau diese Datei, der Rest von `_shared/`
+bleibt mitgeliefert. Ein Skill dagegen wird als Ganzes ersetzt — `SKILL.md`, `PLAYBOOK.md`
+und Vorlagen müssen zueinander passen, ein halb ersetzter Skill wäre nicht sinnvoll
+zusammensetzbar.
 
 **Bei gleichem Dateinamen gewinnt die projekteigene Datei, und zwar vollständig.** Die
 mitgelieferte wird dann gar nicht erst gelesen; es werden auch keine einzelnen Abschnitte
@@ -202,9 +216,12 @@ Eine projekteigene Datei schaltet man ab, indem man sie löscht.
 `README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig irgendetwas unter
 `checks/lib/`.
 
+Bei Skills entscheidet die `SKILL.md` über das Abschalten: ist sie leer, gilt der Skill
+als abgeschaltet und wird nicht registriert.
+
 **Nur projekteigen, ohne Gegenstück:** `results/`, `docs/`, `guidelines/`, `tasks/`,
-`priv/`, `TODO.md`. **Nur mitgeliefert:** `commands/`, `skills/`, `docs/`, `scripts/`,
-`bin/`, `dist/`, `installer/`.
+`priv/`, `TODO.md`. **Nur mitgeliefert:** `docs/`, `scripts/`, `bin/`, `dist/`,
+`installer/`.
 
 `docs/` steht in beiden Listen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
 k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstände
@@ -296,6 +313,16 @@ Vor und nach dem Pull werden die Binaries unter `dist/` gehasht. Nur wenn sich e
 geändert hat, wird ein Neustart verlangt — unter Linux behält der laufende Prozess seinen
 Inode, läuft also mit dem alten Code weiter, auch wenn die Datei ersetzt wurde.
 
+**Die Verlinkung wird dabei mitgezogen.** Solange `.claude/commands` ein
+Verzeichnis-Symlink war, kam ein neu mitgelieferter Command von selbst an. Seit die
+Einträge einzeln verlinkt sind, gilt das nicht mehr: nach dem Pull richtet die Oberfläche
+die Registrierung neu aus und meldet, was dazugekommen, entfernt oder auf eine andere
+Quelle umgesetzt wurde. Gezählt wird der Eintrag, nicht seine drei Kopien in `.claude/`,
+`.opencode/` und `.cursor/`.
+
+Schlägt das fehl, bleibt das Update gültig — der Pull ist durch, und die Verlinkung lässt
+sich über den Assistenten-Block nachholen.
+
 ## Stand
 
 Das Werkzeug führt durch drei Schritte: Konfiguration anlegen, projekteigene Struktur
@@ -310,12 +337,15 @@ Der Go-Code liegt unter `installer/internal/`:
 | `project/environment.go` | was am Aufrufort vorliegt |
 | `project/config.go` | Config lesen und anlegen, Schema prüfen, Vorschlag für Ort und `repo_root` |
 | `project/local.go` | projekteigene Struktur prüfen und anlegen |
+| `project/registry.go` | Commands und Skills aus beiden Quellen auflösen |
 | `project/links.go` | Assistenten-Verlinkung prüfen und herstellen |
 | `project/instructions.go` | `AGENTS.md` anlegen bzw. um den Anstoß ergänzen |
 | `project/context.go` | Kataloge auflösen, Arbeitsstand zusammenstellen |
 | `project/remediation.go` | `remediation:`-Block lesen und setzen |
 | `project/update.go` | Remote-Stand prüfen, per Fast-Forward nachziehen |
+| `project/docs.go` | mitgelieferte Doku auflisten und lesen |
 | `project/tools.go` | Security-Tool-Preflight über das Skript |
+| `hostinstall/mirror.go` | host-weite Kopie spiegeln, verlinken, `PATH` prüfen |
 | `legacy/global.go` | host-globale Verlinkung des alten Modells entfernen |
 | `webui/` | Server, Endpunkte, eingebettete Oberfläche |
 
@@ -426,31 +456,26 @@ Geblieben ist `context` — siehe unten.
 
 Sammelstelle für alles, was der neuen Struktur noch folgen muss.
 
-**Commands und Skills** leiten ihre Ziele noch aus `paths.*` ab, das es nicht mehr gibt.
-Sie müssen künftig aus dem Ort der `K-PLAYBOOK.yaml` ableiten. Betroffen ist praktisch
-jeder Command, im Kern aber `commands/_shared/path-resolution.md`, das noch `_dist/` als
-Installation und die Config im k-playbook-Verzeichnis beschreibt.
-
-**Ergebnisse liegen unter `k-playbook-local/results/`**, vorher unter
-`<paths.reviews>/results/`. Umzustellen: `/k-results` sowie die Review-Rezepte, die dorthin
-schreiben — `review-secret-scanning`, `review-codeql-security`, `review-k-check-security`,
-`review-dependabot-alerts`, `review-dependency-cve`, `review-iac-container`, `review-tech`.
-Dasselbe gilt für `log.md` und `known-decisions.md`, die `/k-review` bisher unter
-`<paths.reviews>/` pflegte.
-
-**Der projektlokale Regelordner heißt `rules/`**, nicht mehr `enforcement/`. Umzustellen:
-`rules/README.md`, der Skill `enforcement` und der Command `k-enforcement`.
-
-**`checks/README.md` und `bin/k-check`** setzen den Env-Kontrakt `K_PLAYBOOK_DIST` und
-leiten das Verzeichnis aus der eigenen Lage ab.
+**Erledigt: Commands, Skills, Reviews, Regeln und `checks/README.md`** leiten ihre Ziele
+nicht mehr aus `paths.*` ab. Jeder Command und jeder Skill beginnt mit
+`k-playbook/bin/k-playbook context` und nimmt Verzeichnisse und Kataloge aus dieser
+Ausgabe; die `K-PLAYBOOK.yaml` wird nicht mehr selbst gelesen. Die Module
+`commands/_shared/path-resolution.md` und `overlay-resolution.md` sind entfallen — die
+Pfadauflösung macht das Binary, die Overlay-Auflösung ebenfalls, und was übrig blieb,
+steht in `commands/_shared/context.md`. Dort steht auch die feste Aufteilung unter
+`k-playbook-local/`, die `paths.*` ersetzt hat.
 
 **Die Oberfläche** deckt bisher nur Konfiguration, projekteigene Struktur und
 Assistenten-Verlinkung ab. Was der Status je Projekt zeigen soll, nachdem der frühere
 Projekt-Store entfallen ist, ist offen.
 
-**Die Projekt-Dokumentation liegt fest unter `k-playbook-local/docs/`**, Tool-Steckbriefe
-darunter in `libs/`. `paths.docs` war früher der eine Pfad, der das k-playbook-Verzeichnis
-per `../` verlassen durfte — damit ein Projekt seine bereits vorhandene Doku
-weiterverwenden konnte. Dieser Sonderfall entfällt zugunsten eines festen Ortes.
-Umzustellen: `/k-code2docs`, `/k-tools-scan` und der Skill `ai-session-memory`, die alle
-noch `k-playbook/docs/` fest verdrahten.
+**Offen: der CodeQL-Zweig.** `/k-setup-codeql`, `/k-install-codeql` und der
+`codeql`-Modus von `/k-status` lesen und schreiben `tools.codeql` weiterhin direkt in der
+`K-PLAYBOOK.yaml` — der Block steht nicht in der `context`-Ausgabe. Ausserdem legen sie
+lokale CodeQL-Artefakte unter `k-playbook/` ab, also in der Installation, die bei jedem
+Update ersetzt wird; sie gehören nach `k-playbook-local/`. Beides ist ein eigener
+Umbauschritt.
+
+**Offen: `/k-status`.** Der Bericht steht jetzt auf der `context`-Ausgabe plus billigen
+Existenzprüfungen, weil das Subkommando `k-playbook-installer status` entfallen ist. Was
+davon in das Binary zurückwandern soll, hängt daran, was die Oberfläche künftig zeigt.

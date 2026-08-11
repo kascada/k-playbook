@@ -136,12 +136,36 @@ er ist dem Hauptverzeichnis vorbehalten. Dort steht nur ein kurzer Anstoss, der 
 
 ## Kann ich eigene Slash-Commands hinzufuegen?
 
-Derzeit nicht. Es gibt kein `k-playbook-local/commands/`.
+Ja. `k-playbook-local/commands/` nimmt sie auf, `k-playbook-local/skills/` die eigenen
+Skills. Es gilt dieselbe Regel wie bei Regeln und Reviews: gleicher Name ersetzt den
+mitgelieferten, ein leerer Eintrag schaltet ihn ab.
 
-Der Grund ist die Verlinkung: `.claude/commands` ist ein einzelner Symlink auf
-`k-playbook/commands`, und ein Symlink kann nur auf eine Quelle zeigen. Gaebe es beide
-Verzeichnisse, muesste pro Datei verlinkt und nach jedem Update nachgezogen werden. Fuer
-Skills gilt dasselbe.
+```text
+k-playbook-local/commands/k-eigen.md    neu, nur in diesem Projekt
+k-playbook-local/commands/k-todo.md     ersetzt den mitgelieferten
+k-playbook-local/skills/mein-skill/SKILL.md
+```
+
+Danach die Oberflaeche starten (`/k-gui`) und im Assistenten-Block auf **Einrichten**
+druecken — der neue Command wird nicht von selbst registriert. Anschliessend den
+Assistenten neu starten, der erfasst Commands beim Start.
+
+Bei Commands zaehlt der Pfad ab `commands/`: eine lokale `commands/_shared/x.md` ersetzt
+genau diese Datei, der Rest des Namensraums bleibt mitgeliefert. Ein Skill wird dagegen
+als Ganzes ersetzt — `SKILL.md` und Beiwerk muessen zueinander passen.
+
+## Warum sind `.claude/commands/` und `.opencode/commands/` voller Symlinks?
+
+Weil die Eintraege aus zwei Quellen kommen. Ein Verzeichnis-Symlink zeigt auf genau eine —
+damit kaeme entweder nur `k-playbook/` oder nur `k-playbook-local/` an. Deshalb ist das
+Ziel ein echtes Verzeichnis mit je einem Link pro Command bzw. Skill, der auf die Fassung
+zeigt, die nach der Overlay-Regel gilt.
+
+Aeltere Installationen haben dort noch einen einzelnen Verzeichnis-Symlink. Die
+Oberflaeche erkennt ihn und baut ihn beim Einrichten um.
+
+Eine **echte Datei**, die du selbst dort abgelegt hast, wird nie ersetzt. Sie gewinnt, und
+die Oberflaeche weist sie als projekteigen aus.
 
 ## Darf beim Installieren von Security-Tools ein venv aktiv sein?
 

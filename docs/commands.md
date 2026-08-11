@@ -4,9 +4,13 @@ Kompakter Index der Slash-Commands. Detailablaeufe stehen in eigenen Themenseite
 Seite dupliziert sie nicht.
 
 Mitgelieferte Commands, Skills, Regeln, Review-Rezepte und Checks liegen unter
-`k-playbook/`. Projekteigene Regeln, Reviews, Checks, Tasks und Ergebnisse liegen unter
-`k-playbook-local/`. Beide Orte ergeben sich aus der Lage der `K-PLAYBOOK.yaml`; es gibt
-keine konfigurierten Pfade mehr.
+`k-playbook/`. Unter `k-playbook-local/` liegt das Projekteigene — dieselben fuenf Sorten
+plus Tasks und Ergebnisse. Beide Orte ergeben sich aus der Lage der `K-PLAYBOOK.yaml`; es
+gibt keine konfigurierten Pfade mehr.
+
+Ein projekteigener Command mit dem Namen eines mitgelieferten **ersetzt** diesen; ein
+leerer schaltet ihn ab. Diese Seite listet die mitgelieferten — was in einem konkreten
+Projekt tatsaechlich gilt, zeigt die Oberflaeche im Assistenten-Block.
 
 ## Detailseiten
 

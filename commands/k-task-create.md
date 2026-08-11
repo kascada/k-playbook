@@ -1,5 +1,5 @@
 ---
-description: "Create a new task file from the current conversation. Uses paths.tasks from K-PLAYBOOK.yaml, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
+description: "Create a new task file from the current conversation. Writes to the project's task directory, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
 argument-hint: [short-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Bash, Glob]
@@ -9,31 +9,24 @@ allowed-tools: [Read, Write, Bash, Glob]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 Create a new task file based on what was discussed in the current conversation.
 
-`/k-task-create` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; the task directory comes from `paths.tasks`. If that key is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
-
 ## Step 1 — Resolve task directory
 
-Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
+From the context output:
 
-For this command, resolve the configured `tasks` path:
-
-- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
-- `TASKS_DISPLAY_PATH = <paths.tasks>`.
+- `RESOLVED_TASKS_DIR = <local.dir>/tasks`.
+- `TASKS_DISPLAY_PATH = k-playbook-local/tasks`.
 
 Command-specific policy:
 
-- If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
-- If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-- If the YAML-configured tasks path does not exist: ask whether to create that exact directory now or run `/k-gui`; do not use any fallback path.
-
-Remember the chosen absolute directory as `RESOLVED_TASKS_DIR` and the display path as `TASKS_DISPLAY_PATH`.
+- If `RESOLVED_TASKS_DIR` does not exist: ask whether to create exactly that directory now or run `/k-gui`; do not use any fallback path.
 
 ## Step 2 — Determine next number
 

@@ -28,9 +28,9 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 
 ## Voraussetzungen
 
-- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
-- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
-- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
+- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
 - Lies optional `tools.dependabot` aus `K-PLAYBOOK.yaml`, falls vorhanden.
 - Wenn vorhanden, nutze `tools.dependabot.target` als Git-/App-Root und `tools.dependabot.repo` als GitHub `owner/repo`. Wenn `target` fehlt, gilt `.`. Wenn `repo` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
 - Wenn `tools.dependabot.config` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
@@ -42,7 +42,7 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 
 Dieses Review schreibt in:
 
-`k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/`
+`k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/`
 
 Dateien:
 
@@ -154,7 +154,7 @@ Review-Status in `findings.md`:
 
 ## Handoff
 
-`/k-remediation k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -189,7 +189,7 @@ Review-Status in `findings.md`:
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook/reviews/results/dependabot-alerts/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/assessment.md
 ```
 
 Remediation, Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdruecklich nicht Teil dieses Reviews.

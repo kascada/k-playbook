@@ -123,9 +123,14 @@ Die Ausgabe fuehrt die zusammengefuehrten Kataloge mit Herkunft je Eintrag — `
 `local` oder `override` — und markiert Abgeschaltetes. Siehe [Der aufgeloeste
 Arbeitsstand](#der-aufgeloeste-arbeitsstand).
 
-**Commands und Skills gibt es nur mitgeliefert.** Es gibt kein
-`k-playbook-local/commands/` und kein `k-playbook-local/skills/`. Deshalb kann die
-Verlinkung fuer die Assistenten ein einzelner Verzeichnis-Symlink bleiben.
+**Commands und Skills folgen derselben Regel.** `k-playbook-local/commands/` und
+`k-playbook-local/skills/` ueberlagern die mitgelieferten; gleicher Name ersetzt, ein
+leerer Eintrag schaltet ab. Verglichen wird bei Commands der Pfad ab `commands/`
+einschliesslich Namensraum, bei Skills der Verzeichnisname als Ganzes.
+
+Deshalb sind die Assistenten-Ziele — `.claude/commands`, `.claude/skills`,
+`.opencode/commands`, `.cursor/commands` — echte Verzeichnisse mit **einem Symlink je
+Eintrag**, kein Verzeichnis-Symlink: der zeigte auf genau eine Quelle.
 
 Nichts unterhalb von `k-playbook/` darf geschrieben werden — auch nicht von Commands, die
 dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollstaendig.

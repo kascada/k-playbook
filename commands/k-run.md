@@ -1,5 +1,5 @@
 ---
-description: "Execute one or more task files. If no path is given, uses paths.tasks from K-PLAYBOOK.yaml. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place."
+description: "Execute one or more task files. If no path is given, uses the project's task directory. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place."
 argument-hint: "[file-or-directory]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
@@ -9,36 +9,34 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Execute task files. If `$ARGUMENTS` is empty, use the directory configured as `paths.tasks`.
+Execute task files. If `$ARGUMENTS` is empty, use the project's task directory.
 
-`/k-run` does not guess project paths. If discovery finds no `K-PLAYBOOK.yaml`, run `k-playbook-installer init` first. If `paths.tasks` is missing, ask for it, write it to `K-PLAYBOOK.yaml`, and then continue.
+## Step 1 - Resolve target path and collect tasks
 
-## Step 1 - Resolve project config, target path and collect tasks
+The context load from the first step is the preflight, even for explicit file or
+directory arguments: task execution resolves `## Ausführungskontext` paths relative to
+`project.repoRoot` from that output.
 
-Always read and apply `<DIST_DIR>/commands/_shared/path-resolution.md` before choosing the execution target. This is a preflight even for explicit file/directory arguments, so task execution can resolve `## Ausführungskontext` paths relative to the project root and respect `K-PLAYBOOK.yaml`.
+From the context output:
 
-For this command, resolve the configured `tasks` path:
-
-- `RESOLVED_TASKS_DIR = <PLAYBOOK_DIR>/<paths.tasks>`.
-- `TASKS_DISPLAY_PATH = <paths.tasks>`.
+- `RESOLVED_TASKS_DIR = <local.dir>/tasks`.
+- `TASKS_DISPLAY_PATH = k-playbook-local/tasks`.
 
 Command-specific policy:
 
-- If `$ARGUMENTS` is provided: treat it as the explicit execution target after the `K-PLAYBOOK.yaml` preflight.
+- If `$ARGUMENTS` is provided: treat it as the explicit execution target.
   - If it is a single `.md` file: use that file as a one-item list.
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
-  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`. Do not allow one-off runs without project config.
 - If `$ARGUMENTS` is empty:
-  - If discovery finds no `K-PLAYBOOK.yaml`: abort; the directory is not a k-playbook project. Recommend `k-playbook-installer init`.
-  - If `paths.tasks` is missing: ask for the tasks directory relative to `PLAYBOOK_DIR`, recommend `tasks`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-  - If the YAML-configured tasks path is missing on disk: abort and tell the user to run `/k-gui` or create exactly that configured path. Do not create it from `/k-run`; there are no tasks to execute.
-  - If the YAML-configured tasks path exists: use it as the execution target.
+  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-run`; there are no tasks to execute.
+  - Otherwise use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
 

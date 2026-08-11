@@ -23,7 +23,7 @@ Erzeuge eine kuratierte Security-Bewertung aus `k-check`-Ergebnissen. `k-check` 
 
 Dieses Review schreibt in:
 
-`k-playbook/reviews/results/k-check/YYYY-MM-DD/`
+`k-playbook-local/results/k-check/YYYY-MM-DD/`
 
 Dateien:
 
@@ -38,11 +38,11 @@ Dateien:
 
 Pfad- und Statusaufloesung:
 
-- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
-- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
-- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
-- Wenn der konfigurierte `paths.checks` leer ist, werden nur die mitgelieferten Checks ausgefuehrt.
-- Das Runner-Script ist `<DIST_DIR>/bin/k-check`.
+- Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
+- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
+- Wenn `<local.dir>/checks/` leer ist, werden nur die mitgelieferten Checks ausgefuehrt.
+- Das Runner-Script ist `<playbook.dir>/bin/k-check`.
 
 ## Ausfuehrungsarten
 
@@ -58,12 +58,12 @@ Optionen:
 Typischer Lauf:
 
 ```bash
-<DIST_DIR>/bin/k-check \
-  --config-root <PLAYBOOK_DIR> \
+<playbook.dir>/bin/k-check \
+  --config-root <project.dir> \
   --target-root <target-root> \
   --mode <changed|baseline> \
-  --output k-playbook/reviews/results/k-check/YYYY-MM-DD/raw/k-check-<mode>.txt \
-  --metadata-output k-playbook/reviews/results/k-check/YYYY-MM-DD/run-metadata.json
+  --output k-playbook-local/results/k-check/YYYY-MM-DD/raw/k-check-<mode>.txt \
+  --metadata-output k-playbook-local/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
 Das normale stdout/stderr-Verhalten bleibt erhalten; `--output` schreibt zusaetzlich den vollstaendigen Raw-Stream.
@@ -167,7 +167,7 @@ Neue IDs werden nur fuer neue semantische Findings vergeben. Wiedergefundene ode
 
 ## Handoff
 
-`/k-remediation k-playbook/reviews/results/k-check/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -194,7 +194,7 @@ Neue IDs werden nur fuer neue semantische Findings vergeben. Wiedergefundene ode
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook/reviews/results/k-check/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/assessment.md
 ```
 
 Remediation ist ausdruecklich nicht Teil dieses Reviews.

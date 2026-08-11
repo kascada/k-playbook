@@ -16,7 +16,7 @@ Der generische Rahmen wird von `/k-review` orchestriert. Diese Datei beschreibt 
 
 Dieses Review erzeugt keine interaktiven Freigaben pro Fund. Es produziert ein vollstaendiges Ergebnis-Dokument, das anschliessend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
 
-Der Command uebergibt der Analyse einen Pfad fuer die Ausgabe-Datei unter `k-playbook/reviews/results/`, ueblich: `k-playbook/reviews/results/summary-YYYY-MM-DD.md`.
+Der Command uebergibt der Analyse einen Pfad fuer die Ausgabe-Datei unter `k-playbook-local/results/`, ueblich: `k-playbook-local/results/summary-YYYY-MM-DD.md`.
 
 ## Analyse
 

@@ -297,7 +297,7 @@ Beschreibung + konkreter Diff-Ausschnitt
 Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 ```
 
-Vorlage in `<DIST_DIR>/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
+Vorlage in `<playbook.dir>/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
 
 ### Alle Docs verlinken
 
@@ -306,7 +306,7 @@ das Playbook `ks-ai-session-memory/` anwenden, damit die Docs für
 Folge-Sessions verankert werden.
 
 > **Pfad-Hinweis:** Projektlokale k-playbook-Dokumentation liegt fest unter
-> `k-playbook/docs/`; alternative Docs-Pfade werden nicht aus `K-PLAYBOOK.yaml` gelesen.
+> `k-playbook-local/docs/`; alternative Docs-Pfade gibt es nicht.
 
 ---
 

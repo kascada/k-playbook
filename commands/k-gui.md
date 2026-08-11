@@ -1,5 +1,5 @@
 ---
-description: Start the local k-playbook installer GUI.
+description: Start the local k-playbook GUI.
 allowed-tools: [Bash, Read]
 ---
 
@@ -7,12 +7,16 @@ allowed-tools: [Bash, Read]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+
+Anders als bei allen anderen Commands ist ein Fehlschlag hier kein Abbruchgrund:
+`/k-gui` ist genau der Command, mit dem ein Projekt eingerichtet wird, also gibt es
+die Konfiguration womoeglich noch gar nicht. Melde das kurz und starte die
+Oberflaeche trotzdem.
 
 
-Starte die lokale k-playbook Installer-GUI.
+Starte die lokale k-playbook Oberflaeche.
 
 Welches Projekt gemeint ist, leitet das Programm aus dem Arbeitsverzeichnis ab,
 nicht aus seinem eigenen Ort. Deshalb tut es dasselbe, egal ob es host-weit oder
@@ -22,7 +26,7 @@ Dieser Command nutzt bewusst nicht `make`.
 
 ## Ablauf
 
-1. Loese `INSTALLER_BIN` auf. Nimm den ersten ausfuehrbaren Treffer:
+1. Loese `K_PLAYBOOK_BIN` auf. Nimm den ersten ausfuehrbaren Treffer:
 
    - `k-playbook` aus dem `PATH`.
    - `~/.local/bin/k-playbook`.
@@ -38,12 +42,12 @@ Erwartet wird die Installation unter k-playbook/ im Projekt.
 3. Wenn das Binary vorhanden ist, starte es im aktuellen Projekt:
 
 ```bash
-"$INSTALLER_BIN"
+"$K_PLAYBOOK_BIN"
 ```
 
 ## Hinweise
 
 - Die GUI laeuft im Vordergrund, bis sie ueber den Browser-Button `Schliessen`, Browser-Tab-Schliessen, Heartbeat-Timeout oder `Ctrl+C` beendet wird.
-- Der Installer gibt die lokale URL aus, falls der Browser nicht automatisch startet.
+- Die Oberflaeche gibt die lokale URL aus, falls der Browser nicht automatisch startet.
 - Dieser Command veraendert keine Projektdateien.
 - Der Start haelt nebenbei die host-weite Kopie unter `~/.local/share/k-playbook/installation` aktuell. Nach dem ersten Mal genuegt in jedem Projekt ein blosses `k-playbook`.

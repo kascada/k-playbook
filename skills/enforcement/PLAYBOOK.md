@@ -7,57 +7,43 @@
 - Skill `ks-enforcement`: laufende Anwendung während der Erstellung.
 - Command `/k-enforcement`: expliziter Check danach oder zwischendurch.
 
-Beide verwenden dieselben Regelquellen und dieselbe Pfadauflösung.
+Beide verwenden dieselbe Regelquelle: die Context-Ausgabe von
+`k-playbook/bin/k-playbook context`.
 
 ## Regelquellen
 
-Es gibt zwei Quellen, die per Overlay zu einer effektiven Regelmenge kombiniert werden.
+Die effektive Regelmenge steht in `catalogs.rules` der Context-Ausgabe. Sie fuehrt die
+mitgelieferten Regeln aus `<playbook.dir>/rules/` und die projekteigenen aus
+`<local.dir>/rules/` bereits zusammen und haelt je Eintrag die Herkunft fest.
 
-### Mitgeliefert
-
-Mitgelieferte Regeln liegen unter `<DIST_DIR>/rules/*.md`.
-
-`DIST_DIR` wird nicht geraten und folgt keinem Hostpfad. Es kommt aus der Discovery
-in `<DIST_DIR>/commands/_shared/path-resolution.md`: `PLAYBOOK_DIR` wird vom
-Arbeitsverzeichnis aus aufwärts gesucht, `DIST_DIR` ergibt sich aus
-`k_playbook.dist` in `K-PLAYBOOK.yaml`.
-
-`<DIST_DIR>` ist read-only. Mitgelieferte Regeln werden nie editiert.
-
-### Projektlokal
-
-Projektlokale Regeln liegen im konfigurierten `paths.enforcement`.
+`<playbook.dir>` ist read-only. Mitgelieferte Regeln werden nie editiert; wer eine
+aendern will, legt eine gleichnamige Datei unter `<local.dir>/rules/` an.
 
 ## Ablauf
 
 ### Schritt 1: Ziel bestimmen
 
-Wende `<DIST_DIR>/commands/_shared/path-resolution.md` an und löse `enforcement` auf.
-
-Ergebnis: `PLAYBOOK_DIR`, `DIST_DIR`, `RESOLVED_ENFORCEMENT_DIR` und
-`PROJECT_REPO_ROOT_DIR`. Die Regeln werden auf `PROJECT_REPO_ROOT_DIR` angewendet.
+Die Regeln werden auf `project.repoRoot` aus der Context-Ausgabe angewendet, nicht auf
+das Playbook-Verzeichnis.
 
 ### Schritt 2: Regeln laden
 
-Wende `<DIST_DIR>/commands/_shared/overlay-resolution.md` für die Art `rules` an.
+Lies die Dateien aus `catalogs.rules` in der gegebenen Reihenfolge. Die Aufloesung ist
+bereits erfolgt:
 
-Damit gilt:
-
-- Jede projektlokale Regel ist aktiv.
-- Eine mitgelieferte Regel ist aktiv, außer eine projektlokale Regel trägt denselben
-  Schlüssel.
-- Eine projektlokale Regel **ersetzt** die gleichnamige mitgelieferte vollständig.
+- Jede projekteigene Regel ist aktiv.
+- Eine mitgelieferte Regel ist aktiv, ausser eine projekteigene traegt denselben
+  Schluessel.
+- Eine projekteigene Regel **ersetzt** die gleichnamige mitgelieferte vollstaendig.
   Die mitgelieferte Datei wird dann gar nicht gelesen.
-- Eine **leere** projektlokale Regel — nur Leerzeilen und Kommentare — schaltet die
-  mitgelieferte ab. Der Kommentar trägt den Grund.
+- Eine **leere** projekteigene Regel — nur Leerzeilen und Kommentare — schaltet die
+  mitgelieferte ab und ist als `disabled` markiert. Der Kommentar traegt den Grund.
 
-Berichte die effektive Menge mit Herkunft je Eintrag (`dist`, `local`, `override`)
-sowie abgeschaltete und veraltete `disabled`-Einträge, bevor du mit der Prüfung
-beginnst.
+Berichte die effektive Menge mit Herkunft je Eintrag (`dist`, `local`, `override`) sowie
+die abgeschalteten Eintraege, bevor du mit der Pruefung beginnst.
 
-Wenn die effektive Menge leer ist, nicht raten und nicht auf die mitgelieferten
-Regeln zurückfallen. Melde den Zustand; eine leere Menge ist eine bewusste
-Projektentscheidung.
+Wenn die effektive Menge leer ist, nicht raten und nicht auf die mitgelieferten Regeln
+zurueckfallen. Melde den Zustand; eine leere Menge ist eine bewusste Projektentscheidung.
 
 ### Schritt 3: Relevanz bestimmen
 

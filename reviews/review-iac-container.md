@@ -9,7 +9,7 @@ result-family: iac-container
 
 # Review: IaC and Container Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Security-Ergebnissen. Dieses Review nutzt host-lokal installierte Security-Tools und schreibt projektlokale Review-Artefakte unter `k-playbook/reviews/`.
+Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Security-Ergebnissen. Dieses Review nutzt host-lokal installierte Security-Tools und schreibt projektlokale Review-Artefakte unter `k-playbook-local/results/`.
 
 ## Zweck
 
@@ -21,20 +21,20 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 
 ## Voraussetzungen
 
-- Lies und verwende `<DIST_DIR>/commands/_shared/path-resolution.md`.
-- Lies `<DIST_DIR>/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `trivy`, `syft` und `grype`.
-- Wenn die Discovery kein `K-PLAYBOOK.yaml` findet: abbrechen und `k-playbook-installer init` empfehlen.
-- Wenn der konfigurierte `paths.reviews` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein lokales `reviews`-Ziel.
+- Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
+- Lies `<playbook.dir>/scripts/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `trivy`, `syft` und `grype`.
+- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
 - Pruefe `trivy --version`, `syft --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
-  `bash <PLAYBOOK_DIR>/scripts/install-security-tools.sh` nennt den passenden
+  `bash <playbook.dir>/scripts/install-security-tools.sh` nennt den passenden
   Installationsbefehl.
 
 ## Ergebnisverzeichnis
 
 Dieses Review schreibt in:
 
-`k-playbook/reviews/results/iac-container/YYYY-MM-DD/`
+`k-playbook-local/results/iac-container/YYYY-MM-DD/`
 
 Dateien:
 
@@ -129,7 +129,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Handoff
 
-`/k-remediation k-playbook/reviews/results/iac-container/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/assessment.md`
 ```
 
 ## Finding-Register-Format
@@ -157,7 +157,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook/reviews/results/iac-container/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/assessment.md
 ```
 
 Remediation und Infrastruktur-Aenderungen sind ausdruecklich nicht Teil dieses Reviews.

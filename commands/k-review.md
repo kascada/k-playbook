@@ -1,5 +1,5 @@
 ---
-description: Execute a review from the effective review catalog (shipped plus project-local, via overlay). Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
+description: Execute a review from the effective review catalog. Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
 argument-hint: [review-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -9,45 +9,36 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 ## Erster Schritt
 
-Fuehre zuerst `commands/_shared/context.md` aus: rufe
+Wende `k-playbook/commands/_shared/context.md` an: rufe
 `k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Run a code review against the current project, using a review recipe from the effective catalog: the shipped recipes under `<DIST_DIR>/reviews/` combined by overlay with the project-local reviews directory configured in `K-PLAYBOOK.yaml`.
+Run a code review against the current project, using a review recipe from the effective
+catalog in the context output.
 
-This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in `<DIST_DIR>/rules/review-authoring.md`.
+This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in the `review-authoring` entry of `catalogs.rules`.
 
-`/k-review` does not guess project paths. The project must have `K-PLAYBOOK.yaml`; all project-local paths used by this command come from that YAML. If a required path key is missing, ask the user for the value, write it back to `K-PLAYBOOK.yaml`, and only then continue.
+## Step 1 — Resolve paths
 
-## Step 1 — Resolve paths from K-PLAYBOOK.yaml
+Recipes come from `catalogs.reviews`; everything a review produces goes under
+`<local.dir>/results/`. From the context output:
 
-Read and apply `<DIST_DIR>/commands/_shared/path-resolution.md`.
+- `RESULTS_DIR` = `<local.dir>/results`
+- `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
+- `LOG_FILE` = `<RESULTS_DIR>/log.md`
+- `KNOWN_DECISIONS` = `<RESULTS_DIR>/known-decisions.md`
 
-For this command, resolve the configured `reviews` path:
-
-- Read `paths.reviews` from `K-PLAYBOOK.yaml`.
-- `PROJECT_REVIEWS_DIR = <PLAYBOOK_DIR>/<paths.reviews>`.
-- `REVIEWS_DISPLAY_PATH = <paths.reviews>`.
-
-Also set:
-
-- `LOG_FILE` = `<PROJECT_REVIEWS_DIR>/log.md`
-- `KNOWN_DECISIONS` = `<PROJECT_REVIEWS_DIR>/known-decisions.md`
-- `RESULT_DIR` = `<PROJECT_REVIEWS_DIR>/` (base for reviews that produce output files)
-- `RESULTS_DIR` = `<PROJECT_REVIEWS_DIR>/results`
-
-Command-specific policy:
-
-- If `paths.reviews` is missing: ask for the reviews directory relative to `PLAYBOOK_DIR`, recommend `reviews`, validate the answer, add it to `K-PLAYBOOK.yaml`, then continue.
-- If `PROJECT_REVIEWS_DIR` does not exist: ask whether to create that exact YAML-configured directory now or run `/k-gui`; do not use any fallback path.
+If `RESULTS_DIR` does not exist: ask whether to create it now or run `/k-gui`; do not
+use any fallback path.
 
 ## Step 2 — Determine the review to run
 
-Read and apply `<DIST_DIR>/commands/_shared/overlay-resolution.md` for kind `reviews`.
-It yields the effective catalog from `<DIST_DIR>/reviews/` plus `PROJECT_REVIEWS_DIR`,
-including entries switched off by an empty local file. The overlay key is the filename without `.md`
-and without the `review-` prefix, so `review-tech.md` has the key `tech`.
+Take `catalogs.reviews` from the context output. It already merges shipped and
+project-local recipes and marks entries switched off by an empty local file. Each entry
+carries its `key` — the filename without `.md` and without the `review-` prefix, so
+`review-tech.md` has the key `tech`.
 
 If `$ARGUMENTS` is non-empty: treat it as the review name.
 
@@ -88,7 +79,7 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
-- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `<REVIEWS_DISPLAY_PATH>/results/<result-family>/<YYYY-MM-DD>/`)
+- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`)
 
 If `KNOWN_DECISIONS` is set and the file exists:
 
@@ -140,7 +131,7 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis schreiben. If `RESULTS_DIR` is unset, abort and resolve `paths.reviews` from `K-PLAYBOOK.yaml`; do not pick a fallback directory.
+2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad waehlen.
    - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
    - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind ueberschreiben: nach Bestaetigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
@@ -162,7 +153,7 @@ Wenn `LOG_FILE` gesetzt ist:
    |---|---|---|---|
    | 2026-07-12 | review-python-comment-hardspots | src/upload.py, src/api.py | 3 Vorschläge / 2 übernommen / 1 skip |
 
-Wenn `LOG_FILE` nicht gesetzt ist: abbrechen und `paths.reviews` aus `K-PLAYBOOK.yaml` vervollstaendigen lassen. Nicht nach einem Ersatzpfad fuer nur diesen Lauf fragen; Projektpfade muessen dauerhaft in der YAML stehen.
+Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ersatzpfad fuer nur diesen Lauf fragen.
 
 **Log-Skelett** (nur beim ersten Anlegen):
 
@@ -188,6 +179,5 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **`K-PLAYBOOK.yaml` fehlt**: abbrechen; das Verzeichnis ist kein k-playbook-Projekt. `k-playbook-installer init` empfehlen.
-- **`paths.reviews` fehlt**: User nach dem Pfad relativ zu `PLAYBOOK_DIR` fragen, Empfehlung `reviews` anbieten, Wert in `K-PLAYBOOK.yaml` ergaenzen, dann erneut aufloesen.
-- **YAML-konfigurierter Reviews-Pfad fehlt im Dateisystem**: User fragen, ob genau dieser Pfad angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.
+- **Kein k-playbook-Projekt**: der Context-Aufruf schlaegt fehl; abbrechen und `/k-gui` empfehlen.
+- **`RESULTS_DIR` fehlt im Dateisystem**: User fragen, ob genau dieses Verzeichnis angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

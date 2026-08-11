@@ -1,15 +1,16 @@
 ---
 name: ks-ai-session-memory
-description: Use when the user wants existing project documentation (k-playbook/docs/, README, analysis notes) to be automatically loaded and prioritized by AI sessions instead of re-analyzed. Sets up AGENTS.md, opencode.json with instructions + references, and a keyword-indexed k-playbook/docs/README.md so future sessions consult docs first before reading code. Trigger keywords - "in memory", "damit du das nächste Mal weißt", "session context", "docs zuerst", "AGENTS.md", "OpenCode Konfig".
+description: Use when the user wants existing project documentation (k-playbook-local/docs/, README, analysis notes) to be automatically loaded and prioritized by AI sessions instead of re-analyzed. Sets up AGENTS.md, opencode.json with instructions + references, and a keyword-indexed k-playbook-local/docs/README.md so future sessions consult docs first before reading code. Trigger keywords - "in memory", "damit du das nächste Mal weißt", "session context", "docs zuerst", "AGENTS.md", "OpenCode Konfig".
 ---
 
 # Skill: AI Session Memory
 
 ## Erster Schritt
 
-Rufe zuerst `k-playbook/bin/k-playbook context` auf und lies die Dateien aus
-`instructions`. Sie tragen, was fuer dieses Projekt gilt; alle Pfade und
-Kataloge dieses Skills stammen aus derselben Ausgabe.
+Wende `k-playbook/commands/_shared/context.md` an: rufe
+`k-playbook/bin/k-playbook context` auf und lies die Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
 **Kurzfassung.** Sorgt dafür, dass in einem Projekt vorhandene Dokumentation
@@ -24,7 +25,7 @@ wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.
 
 Immer wenn:
 
-1. Recherche/Analyse-Arbeit gemacht wurde und in `k-playbook/docs/` abgelegt ist.
+1. Recherche/Analyse-Arbeit gemacht wurde und in `k-playbook-local/docs/` abgelegt ist.
 2. Der Nutzer merkt: „Warum durchsucht die AI jedes Mal wieder alles?"
 3. Ein neues Projekt eingerichtet wird, in dem später Docs entstehen werden.
 4. Der Nutzer explizit sagt: „das soll in dein Memory", „damit du das
@@ -38,9 +39,9 @@ Drei zusammenspielende Bausteine:
    injiziert. Sagt der AI: „Docs sind autoritativ, konsultiere sie
    ZUERST."
 2. **`opencode.json`** im Projekt-Root – bindet `AGENTS.md` als
-   `instructions` ein und registriert `k-playbook/docs/` als beschriebene
+   `instructions` ein und registriert `k-playbook-local/docs/` als beschriebene
    `references`.
-3. **`k-playbook/docs/README.md`** mit **Stichwort-Index** (A–Z) und
+3. **`k-playbook-local/docs/README.md`** mit **Stichwort-Index** (A–Z) und
    **„Häufige Fragen → Datei"**-Tabelle – damit die AI beim Nachschlagen
    in den Docs gezielt findet, was drin ist, ohne alle Files zu lesen.
 
@@ -49,11 +50,11 @@ Drei zusammenspielende Bausteine:
 Detaillierte Schritt-für-Schritt-Anleitung mit Prosa + abhakbarer
 Checkliste steht in:
 
-→ **`<DIST_DIR>/skills/ai-session-memory/PLAYBOOK.md`**
+→ **`<playbook.dir>/skills/ai-session-memory/PLAYBOOK.md`**
 
 Vorlagen zum Kopieren:
 
-→ **`<DIST_DIR>/skills/ai-session-memory/vorlagen/`**
+→ **`<playbook.dir>/skills/ai-session-memory/vorlagen/`**
 
 ## Wichtigste Regel
 
@@ -66,7 +67,7 @@ gestartet** werden, sonst greift die neue Session-Memory-Kette nicht.
 Nach Neustart eine Frage stellen, deren Antwort in den Docs steht und
 vorher nur durch Code-Recherche zu beantworten war. Die AI sollte:
 
-- den Stichwort-Index aus `k-playbook/docs/README.md` konsultieren,
+- den Stichwort-Index aus `k-playbook-local/docs/README.md` konsultieren,
 - direkt in die passende Doc-Datei springen,
 - ohne Grep über Repos zu antworten.
 
