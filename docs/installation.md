@@ -54,11 +54,14 @@ k-playbook-local/
 ├── rules/         Overlay zu k-playbook/rules/
 ├── reviews/       Overlay zu k-playbook/reviews/
 ├── checks/        Overlay zu k-playbook/checks/
+├── commands/      Overlay zu k-playbook/commands/
+├── skills/        Overlay zu k-playbook/skills/
 ├── results/       alles, was Reviews erzeugen
 ├── docs/          Projektwissen fuer AI-Sessions
 ├── guidelines/
 ├── tasks/done/
 ├── priv/          Inhalt gitignored, Verzeichnis versioniert
+├── k-playbook.md  projekteigene Instruktionsebene
 └── TODO.md
 ```
 
@@ -77,41 +80,174 @@ projekt/
 ├── AGENTS.md             Instruktionen, eine Quelle fuer alle Assistenten
 ├── CLAUDE.md             Symlink auf AGENTS.md
 ├── .claude/
-│   ├── commands  ──┐     Symlink
-│   └── skills      │     Symlink; OpenCode liest hier mit
-├── .opencode/      │
-│   └── commands  ──┤     Symlink
-└── .cursor/        │
-    └── commands  ──┘     Symlink
+│   ├── commands/         je ein Symlink pro Command
+│   └── skills/           je ein Symlink pro Skill; OpenCode liest hier mit
+├── .opencode/
+│   └── commands/
+└── .cursor/
+    └── commands/
 ```
+
+Die vier Ziele sind **echte Verzeichnisse mit Einzel-Symlinks**, kein Verzeichnis-Symlink.
+Ein Verzeichnis-Symlink zeigt auf genau eine Quelle; damit kaeme entweder nur die
+Installation oder nur `k-playbook-local/` an. Jeder Link zeigt auf die Fassung, die nach
+der Overlay-Regel gilt:
+
+```text
+.claude/commands/
+  k-todo.md    -> ../../k-playbook/commands/k-todo.md          mitgeliefert
+  k-review.md  -> ../../k-playbook-local/commands/k-review.md  projekteigen, ersetzt
+  k-eigen.md   -> ../../k-playbook-local/commands/k-eigen.md   nur projekteigen
+```
+
+Die Oberflaeche vergleicht diesen Soll-Stand mit dem, was tatsaechlich registriert ist,
+und meldet Abweichungen mit Namen: was fehlt, was auf die falsche Quelle zeigt, was
+verwaist ist, und was dem Projekt gehoert und deshalb liegen bleibt. Auf Knopfdruck wird
+es angeglichen. Eine echte Datei, die jemand selbst dort abgelegt hat, gewinnt immer und
+wird nie ersetzt.
 
 Skills stehen nur einmal unter `.claude/skills`: OpenCode durchsucht dieses Verzeichnis
 mit, Cursor kennt kein Skill-Konzept. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, weil
 Claude Code ausschliesslich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so
-landet jede Aenderung in beiden. Fehlt `AGENTS.md`, wird nichts angelegt; die Datei
-gehoert dem Projekt.
+landet jede Aenderung in beiden.
+
+`AGENTS.md` bekommt dabei einen kurzen **Anstoss**: einen Block, der auf
+`k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
+Block angehaengt und vorhandener Inhalt nicht angetastet. Ein Marker
+`<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhaengt.
+
+Was ein Assistent darueber hinaus lesen soll, steht nicht in `AGENTS.md`, sondern in
+`k-playbook.md` — je einmal pro Ebene:
+
+| Datei | Gilt fuer | Beim Update |
+|---|---|---|
+| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+
+Gelesen wird in dieser Reihenfolge; die projekteigene Ebene ergaenzt die mitgelieferte
+oder ueberstimmt sie.
 
 Die Verlinkung ist projektlokal. Es wird nichts in `~/.config/opencode/` oder
 `~/.claude/` geschrieben. Dadurch kann ein Rechner mehrere Projekte mit
 unterschiedlichen k-playbook-Staenden tragen, ohne dass sie sich gegenseitig
 ueberschreiben.
 
+**Altlasten werden entfernt.** Auf Rechnern mit einer Installation nach dem alten Modell
+liegen noch host-globale Symlinks unter `~/.claude/commands`, `~/.claude/skills` und
+`~/.config/opencode/command`, dazu ein `skills.paths`-Eintrag in der
+OpenCode-User-Config. Die wirken in jedes Projekt hinein — ein Assistent saehe dort
+zusaetzlich die Commands eines fremden Standes. `k-playbook` entfernt sie bei jedem Start,
+aber nur, was nachweislich zu einem k-playbook gehoert. Faellt etwas weg, meldet es das im
+Terminal; sonst bleibt es still.
+
 Nach Aenderungen an Commands oder Skills muss der jeweilige Assistent neu gestartet
 werden — beide erfassen sie beim Start.
 
+## Doku lesen
+
+Ueber dem Kontext-Block steht **Dokumentation**. Die Karte listet alle Markdown-Dateien
+aus `k-playbook/docs` — dieselbe Doku, die du gerade liest, in dem Stand, der im Projekt
+installiert ist. Ein Klick oeffnet die Datei in einem Fenster ueber der Seite; Verweise
+darin fuehren zur naechsten Datei, `Escape` oder ein Klick daneben schliesst.
+
+Mermaid-Diagramme werden gezeichnet, sofern der Rechner ins Netz kommt: die Library wird
+bei Bedarf geladen. Ohne Netz bleibt der Diagramm-Quelltext stehen, der Text ist
+weiterhin vollstaendig lesbar.
+
+## Nachsehen, was gilt
+
+Ganz unten steht der Block **Aufgelöster Kontext**. Aufgeklappt zeigt er, was ein
+Command sieht: die aufgeloesten Pfade, die Instruktionsdateien in Lesereihenfolge, die
+effektiven Kataloge fuer Regeln, Reviews und Checks samt Herkunft — mitgeliefert,
+projekteigen oder ersetzt — und die Guidelines. Abgeschaltete Eintraege stehen mit, damit
+sichtbar bleibt, dass es sie gibt.
+
+Es ist dieselbe Auskunft wie `k-playbook/bin/k-playbook context`, nur lesbar aufbereitet.
+Der Block laedt erst beim Aufklappen und veraendert nichts.
+
 ## Aktualisieren
+
+Der bequeme Weg ist die Oberflaeche. Sie prueft nach dem Start per `git ls-remote`, ob
+die Installation hinter dem Remote liegt, und zieht auf Knopfdruck per
+`git pull --ff-only` nach. Bewusst `ls-remote` statt `fetch`: die Pruefung laeuft
+ungefragt und darf den Zustand des Repositorys nicht anfassen. Bewusst `--ff-only`: ein
+Merge im Clone erzeugte eine lokale Historie, die niemand pflegt.
+
+Von Hand geht es genauso:
 
 ```bash
 cd /pfad/zum/projekt/k-playbook
-git pull
+git pull --ff-only
 ```
 
 `k-playbook/` enthaelt nichts Projekteigenes und ist dadurch vollstaendig ersetzbar —
 auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen
 daneben und bleiben unberuehrt.
 
-Nach einem Update mit neuen Commands die Oberflaeche noch einmal starten, damit die
-Verlinkung nachgezogen wird.
+Haben sich dabei die Binaries unter `dist/` geaendert, verlangt die Oberflaeche einen
+Neustart: unter Linux behaelt ein laufender Prozess seinen Inode und arbeitet mit dem
+alten Code weiter, auch wenn die Datei ersetzt wurde. Sind nur Commands, Regeln oder
+Rezepte neu, genuegt ein Neustart des Assistenten.
+
+**Die Verlinkung zieht die Oberflaeche dabei selbst nach.** Weil Commands und Skills
+einzeln verlinkt sind, kommt ein neu mitgelieferter Command nicht von allein an — nach
+dem Pull richtet sie die Registrierung neu aus und meldet, was sich geaendert hat
+(`Verlinkung nachgezogen: 3 dazugekommen, 1 entfernt.`). Wer von Hand `git pull` macht,
+startet die Oberflaeche danach einmal oder drueckt im Assistenten-Block auf Einrichten.
+
+Damit die neuen Commands im Assistenten ankommen, muss dieser danach neu gestartet
+werden — Claude Code, OpenCode und Cursor erfassen sie beim Start.
+
+## Host-weit aufrufbar
+
+Der tiefe Pfad `k-playbook/bin/k-playbook` ist nur beim ersten Mal noetig. Jeder Start der
+Oberflaeche legt eine host-weite Kopie an und verlinkt sie:
+
+```text
+~/.local/
+├── bin/k-playbook -> ../share/k-playbook/installation/bin/k-playbook
+└── share/k-playbook/
+    ├── installation/{bin,dist}   die gespiegelte Installation
+    └── security-tools/           Tool-venvs, davon unberuehrt
+```
+
+Danach genuegt ueberall:
+
+```bash
+cd /pfad/zum/projekt
+k-playbook
+```
+
+Es ist dasselbe Werkzeug fuer alle Projekte. Welches Projekt gemeint ist, ergibt sich aus
+dem Verzeichnis, in dem der Aufruf stattfindet — nicht aus dem Ort des Programms.
+
+Gespiegelt wird nur die eigene Plattform und nur, wenn der Clone einen neueren Stand
+mitbringt als die Kopie. Wer in einem Projekt `git pull` macht und dort startet, hebt die
+host-weite Kopie damit an. Umgekehrt ueberschreibt ein aelterer Clone sie nicht.
+
+Ein DevContainer bekommt seine eigene Kopie unter seinem eigenen Home; nach einem Rebuild
+stellt der naechste Start sie wieder her. Auf einem Mac mit Container liegen beide
+Plattformen nebeneinander, falls `~/.local` geteilt ist.
+
+**Zum PATH:** Auf Linux ist `~/.local/bin` meist schon drin. Auf macOS **nicht** —
+`/etc/paths` kennt es nicht und `path_helper` ergaenzt es nicht.
+
+Fehlt es, zeigt die Oberflaeche ganz oben die Karte **Aufruf von ueberall** mit der Zeile
+zum Kopieren:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Die Zeile gehoert ins Shell-Profil — `~/.zprofile` bei zsh (Standard seit Catalina),
+`~/.bashrc` bei bash. Danach eine neue Shell oeffnen; geprueft wird der `PATH` des
+laufenden Prozesses, eine gerade eingetragene Zeile sieht er noch nicht.
+
+**Geschrieben wird dort nichts von selbst.** Das Profil gehoert dir. Steht der Aufruf,
+verschwindet die Karte wieder — dieselbe Zeile steht ausserdem beim Start im Terminal.
+
+Der Aufruf ueber `k-playbook/bin/k-playbook` im Projekt bleibt jederzeit moeglich und
+gleichwertig. Die Commands nutzen ausschliesslich ihn, nie den `PATH`.
 
 ## Security-Tools
 
@@ -173,15 +309,6 @@ make gui    # baut und startet die Oberflaeche
 ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make gui` ist der
 Weg beim Entwickeln: es startet den frisch gebauten Stand.
 
-Optional laesst sich das Werkzeug host-weit verfuegbar machen:
-
-```bash
-make install-from-source   # verlinkt ~/.local/bin/k-playbook auf bin/k-playbook
-```
-
-Das ist reiner Komfort. Der Regelfall bleibt der Aufruf ueber `bin/k-playbook` im
-jeweiligen Clone, denn jedes Projekt hat seinen eigenen.
-
 ## Verifikation
 
 Checkliste fuer ein Projekt:
@@ -192,21 +319,36 @@ Checkliste fuer ein Projekt:
 - [ ] `k-playbook/` ist ein eigener Clone und enthaelt nichts Projekteigenes.
 - [ ] `k-playbook-local/` existiert vollstaendig und ist im Projekt-Repository committet.
 - [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands` und `.cursor/commands`
-      sind Symlinks nach `k-playbook/`.
-- [ ] `CLAUDE.md` ist ein Symlink auf `AGENTS.md`.
+      sind Verzeichnisse mit Einzel-Symlinks nach `k-playbook/` bzw. `k-playbook-local/`;
+      die Oberflaeche meldet sie als eingerichtet.
+- [ ] `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, und `AGENTS.md` traegt den Anstoss.
+- [ ] `k-playbook/bin/k-playbook context` laeuft durch und nennt die erwarteten Kataloge.
+
+Der letzte Punkt prueft alles Vorherige auf einmal: das Kommando bricht ab, wenn die
+Konfiguration fehlt oder eine andere `schema_version` traegt.
 
 ## Fehlersuche
 
-**Slash-Commands tauchen nicht auf.** Die Symlinks in `.claude/`, `.opencode/` bzw.
-`.cursor/` pruefen, danach den Assistenten neu starten. Wenn die Symlinks fehlen, die
-Oberflaeche noch einmal starten und die Verlinkung herstellen lassen.
+**Slash-Commands tauchen nicht auf.** Die Oberflaeche starten: sie vergleicht den
+Katalog mit dem, was registriert ist, und nennt die fehlenden Commands beim Namen.
+Nach dem Einrichten den Assistenten neu starten.
 
-**Skills werden nicht getriggert.** `.claude/skills` muss auf `k-playbook/skills` zeigen,
-und unter jedem Skill-Ordner muss `SKILL.md` liegen. Danach den Assistenten neu starten.
+**Ein neuer Command aus `k-playbook-local/commands/` fehlt.** Er wird nicht automatisch
+registriert — die Oberflaeche meldet ihn als fehlend und legt den Link auf Knopfdruck an.
+Dasselbe gilt, wenn eine projekteigene Datei einen mitgelieferten Command neuerdings
+ersetzt: dann zeigt der bestehende Link noch auf die alte Quelle.
+
+**Skills werden nicht getriggert.** Unter jedem Skill-Ordner muss `SKILL.md` liegen —
+ohne sie gilt das Verzeichnis nicht als Skill und wird nicht verlinkt. Danach den
+Assistenten neu starten.
 
 **Das Werkzeug findet kein Projekt.** Dann fehlt die `K-PLAYBOOK.yaml` oberhalb des
 Aufrufortes. Die Suche laeuft ab dem Arbeitsverzeichnis aufwaerts bis `$HOME` bzw. `/`
 und raet bewusst nicht. Die Oberflaeche schlaegt dann einen Ort vor.
+
+**Ein Assistent sieht fremde Commands.** Typisch nach einer Installation nach dem alten
+Modell: die host-globalen Symlinks wirken in jedes Projekt hinein. Die Oberflaeche einmal
+starten, sie raeumt sie weg und meldet, was entfernt wurde.
 
 **Das Binary fehlt.** `bin/k-playbook` meldet, welches Artefakt es unter `dist/` erwartet
 hat. Entweder `git pull` oder `make dist`.

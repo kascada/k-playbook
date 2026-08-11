@@ -25,13 +25,17 @@ type LocalEntry struct {
 
 // LocalStructure beschreibt, was ein Projekt braucht.
 //
-// rules, reviews und checks sind die drei Overlay-Sorten: eine gleichnamige
-// lokale Datei ersetzt die mitgelieferte, overlay.<kind>.disabled schaltet ab.
+// rules, reviews, checks, commands und skills sind die Overlay-Sorten: ein
+// gleichnamiger lokaler Eintrag ersetzt den mitgelieferten, ein leerer schaltet
+// ihn ab. Aufgeloest wird das in context.go (rules, reviews, checks) und in
+// registry.go (commands, skills).
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
 		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergaenzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
 		{Path: "reviews", Purpose: "Projekteigene Review-Rezepte, benannt als review-<name>.md."},
 		{Path: "checks", Purpose: "Projekteigene Checks als *.sh, ausgefuehrt ueber " + PlaybookDirName + "/bin/k-check."},
+		{Path: "commands", Purpose: "Projekteigene Commands als *.md. Ergaenzen die mitgelieferten aus " + PlaybookDirName + "/commands/; gleicher Name ersetzt, eine leere Datei schaltet ab. Unterverzeichnisse bilden Namensraeume und werden Datei fuer Datei verrechnet."},
+		{Path: "skills", Purpose: "Projekteigene Skills, je ein Verzeichnis mit SKILL.md darin. Ergaenzen die mitgelieferten aus " + PlaybookDirName + "/skills/; gleicher Verzeichnisname ersetzt den Skill als Ganzes, eine leere SKILL.md schaltet ihn ab."},
 		{Path: "results", Purpose: "Alles, was Reviews erzeugen: Ergebnisse je Familie und Datum, dazu log.md und known-decisions.md."},
 		{Path: "docs", Purpose: "Projektwissen fuer AI-Sessions, erzeugt von /k-code2docs; Tool-Steckbriefe unter libs/."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},

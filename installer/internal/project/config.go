@@ -132,7 +132,7 @@ func Suggest() Suggestion {
 	// Hauptverzeichnis ist oder eine Ebene darunter liegt, haengt daran, ob die
 	// Installation geklont wurde oder das Repo selbst ist — beides ist moeglich,
 	// deshalb kommen beide Orte in die Auswahl.
-	if install, ok := installDir(); ok {
+	if install, ok := InstallDir(); ok {
 		if filepath.Base(install) == PlaybookDirName {
 			suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, filepath.Dir(install))
 		}
@@ -150,9 +150,9 @@ func Suggest() Suggestion {
 	return suggestion
 }
 
-// installDir liefert das Verzeichnis der Installation, abgeleitet aus
+// InstallDir liefert das Verzeichnis der Installation, abgeleitet aus
 // <X>/dist/<binary>.
-func installDir() (string, bool) {
+func InstallDir() (string, bool) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", false

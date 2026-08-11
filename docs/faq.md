@@ -84,19 +84,55 @@ davon ist, dass spaetere Verbesserungen am Original diese Kopie nicht mehr errei
 
 Dasselbe gilt fuer `reviews/` und `checks/`.
 
-## Wie schalte ich eine mitgelieferte Regel ab, ohne sie zu ersetzen?
+## Wie schalte ich eine mitgelieferte Regel ab?
 
-Ueber `overlay.<kind>.disabled` in `K-PLAYBOOK.yaml`, mit dem Dateinamen als Eintrag:
+Mit einer **leeren** Datei desselben Namens. Da die lokale Datei die mitgelieferte
+vollstaendig ersetzt, bleibt bei einer leeren nichts uebrig.
 
-```yaml
-overlay:
-  rules:
-    disabled:
-      - tool-install-scope.md
+„Leer" heisst: nichts ausser Leerzeilen und Kommentaren. Damit kann die Datei ihren
+eigenen Grund tragen:
+
+```bash
+# k-playbook-local/checks/check_django_baseline.sh
+# Abgeschaltet: dieses Projekt nutzt kein Django.
 ```
 
-Beides zugleich — abschalten und ersetzen — ist redundant. Die lokale Datei gewinnt
-ohnehin.
+Bei `rules` und `reviews` bleibt der Eintrag im Katalog sichtbar, sein Inhalt sagt dann,
+dass er abgeschaltet ist. Ein Check faellt ganz aus dem Katalog — ein leeres Skript liefe
+mit Exit 0 durch und saehe aus wie ein bestandener Check.
+
+Eine Liste in der Konfiguration gibt es dafuer nicht.
+
+## Woher weiss ich, was am Ende gilt?
+
+```bash
+k-playbook/bin/k-playbook context
+```
+
+Gibt den aufgeloesten Arbeitsstand als JSON aus: Verzeichnisse, Instruktionsdateien in
+Lesereihenfolge, Remediation-Policy, Guidelines und die drei Kataloge — mitgeliefert und
+projekteigen bereits zusammengefuehrt, mit Herkunft je Eintrag und markierten
+Abschaltungen.
+
+Die Oberflaeche zeigt dasselbe lesbar aufbereitet, im Block `Aufgeloester Kontext`.
+
+## Was ist `k-playbook.md`?
+
+Die Instruktionsdatei — was ein Assistent vor der Arbeit lesen soll. Es gibt sie zweimal:
+
+| Datei | Gilt fuer | Beim Update |
+|---|---|---|
+| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+
+Gelesen wird in dieser Reihenfolge. In die projekteigene Ebene gehoert, was nur hier
+gilt: Aufbau und Besonderheiten des Projekts, Konventionen, wiederkehrende Ablaeufe.
+Allgemeine k-playbook-Regeln nicht — die stehen in der mitgelieferten Ebene und werden
+bei jedem Update aktualisiert.
+
+Sie heisst bewusst nicht `AGENTS.md`: diesen Namen lesen die Assistenten von sich aus, und
+er ist dem Hauptverzeichnis vorbehalten. Dort steht nur ein kurzer Anstoss, der auf
+`k-playbook context` verweist.
 
 ## Kann ich eigene Slash-Commands hinzufuegen?
 

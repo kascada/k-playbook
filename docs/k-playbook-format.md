@@ -48,6 +48,8 @@ mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 | erledigte Tasks | `k-playbook-local/tasks/done/` |
 | Projekt-TODO | `k-playbook-local/TODO.md` |
 | Privates | `k-playbook-local/priv/` |
+| Instruktionen, mitgeliefert | `k-playbook/k-playbook.md` |
+| Instruktionen, projekteigen | `k-playbook-local/k-playbook.md` |
 
 Ein Schluessel, dessen Wert immer derselbe ist, waere nur eine Fehlerquelle gewesen.
 Commands raten damit keinen Pfad mehr und lesen auch keinen: sie leiten ihn ab.
@@ -91,8 +93,35 @@ daraus uebernommen. Wer eine mitgelieferte Regel aendern will, kopiert sie und a
 Kopie — mit dem Preis, dass spaetere Verbesserungen am Original diese Kopie nicht mehr
 erreichen. Der Vorteil wiegt schwerer: was gilt, steht in genau einer Datei.
 
-`README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig irgendetwas unter
-`checks/lib/`.
+**Abgeschaltet wird ueber eine leere Datei**, nicht ueber eine Liste in der
+Konfiguration. Da eine gleichnamige lokale Datei die mitgelieferte vollstaendig ersetzt,
+bleibt bei einer leeren nichts uebrig. „Leer" heisst: nichts ausser Leerzeilen und
+Kommentaren — so kann die Datei ihren eigenen Grund tragen:
+
+```bash
+# Abgeschaltet: dieses Projekt nutzt kein Django.
+```
+
+Der Unterschied zwischen den Sorten ist beabsichtigt. `rules` und `reviews` werden
+gelesen; dort bleibt der Eintrag im Katalog sichtbar und sein Inhalt sagt, dass er
+abgeschaltet ist. Ein Check wird dagegen **ausgefuehrt** — ein leeres Skript liefe mit
+Exit 0 durch und saehe aus wie ein bestandener Check. Deshalb faellt er ganz aus dem
+Katalog.
+
+Eine projekteigene Datei schaltet man ab, indem man sie loescht.
+
+`README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig Dotfiles oder
+irgendetwas unter `checks/lib/`.
+
+Wer wissen will, was am Ende gilt, fragt nicht das Dateisystem, sondern das Werkzeug:
+
+```bash
+k-playbook/bin/k-playbook context
+```
+
+Die Ausgabe fuehrt die zusammengefuehrten Kataloge mit Herkunft je Eintrag — `dist`,
+`local` oder `override` — und markiert Abgeschaltetes. Siehe [Der aufgeloeste
+Arbeitsstand](#der-aufgeloeste-arbeitsstand).
 
 **Commands und Skills gibt es nur mitgeliefert.** Es gibt kein
 `k-playbook-local/commands/` und kein `k-playbook-local/skills/`. Deshalb kann die
@@ -100,6 +129,61 @@ Verlinkung fuer die Assistenten ein einzelner Verzeichnis-Symlink bleiben.
 
 Nichts unterhalb von `k-playbook/` darf geschrieben werden — auch nicht von Commands, die
 dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollstaendig.
+
+## Der aufgeloeste Arbeitsstand
+
+```bash
+k-playbook/bin/k-playbook context
+```
+
+Gibt als JSON aus, was ein Command sonst selbst aus Konfiguration und Dateisystem
+zusammenrechnen muesste:
+
+| Feld | Inhalt |
+|---|---|
+| `schemaVersion` | die gepruefte Fassung der Konfiguration |
+| `instructions` | die Instruktionsdateien in Lesereihenfolge |
+| `project` | Hauptverzeichnis, `repoRoot`, `vcs`, Ort der Konfiguration |
+| `playbook`, `local` | die beiden aufgeloesten Verzeichnisse |
+| `remediation` | die Policy, mit Default, falls der Block fehlt |
+| `catalogs` | `rules`, `reviews`, `checks` — zusammengefuehrt |
+| `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
+
+Jeder Katalogeintrag traegt `name` (den Dateinamen), `key` (den Aufrufnamen ohne Endung
+und Sortenpraefix), `path`, `origin` — `dist`, `local` oder `override` — und `disabled`,
+wo zutreffend.
+
+Damit muss kein Command die Overlay-Regeln selbst anwenden. Es gibt eine Antwort, und
+alle bekommen dieselbe.
+
+Der Aufruf ist bewusst billig: der Security-Tool-Preflight fehlt darin, weil er je Tool
+ein `--version` startet und spuerbar dauert. `context` soll am Anfang jedes Commands
+stehen koennen.
+
+Gesucht wird ab dem Arbeitsverzeichnis aufwaerts. Ohne `K-PLAYBOOK.yaml` bricht der
+Aufruf mit einer Meldung ab, ebenso bei einer `schema_version`, die nicht `3` ist.
+
+## Instruktionen
+
+Was ein Assistent vor der Arbeit lesen soll, steht in `k-playbook.md` — je einmal pro
+Ebene:
+
+| Datei | Gilt fuer | Beim Update |
+|---|---|---|
+| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+
+Gelesen wird in dieser Reihenfolge; die projekteigene Ebene kann die mitgelieferte
+ergaenzen oder ueberstimmen. `context` nennt unter `instructions` nur die Dateien, die
+tatsaechlich existieren — ein Pfad ins Leere waere schlechter als keiner.
+
+Die Datei heisst bewusst nicht `AGENTS.md`: diesen Namen lesen die Assistenten von sich
+aus, und er ist dem Hauptverzeichnis vorbehalten.
+
+`AGENTS.md` bekommt nur einen **Anstoss**: einen kurzen Block, der auf
+`k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
+Block angehaengt und vorhandener Inhalt nicht angetastet. Ein Marker
+`<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhaengt.
 
 ## Minimalformat
 
@@ -139,16 +223,6 @@ schema_version: 3
 project:
   repo_root: app
   vcs: git
-
-overlay:
-  rules:
-    disabled:
-      - tool-install-scope.md
-  reviews:
-    disabled: []
-  checks:
-    disabled:
-      - check_django_baseline.sh
 
 remediation:
   mode: task-branch-pr
@@ -190,8 +264,12 @@ Aeltere Werte gehoeren zu abgeloesten Modellen und werden nicht mehr unterstuetz
 | `1` | zentrale Basisinstallation unter `~/dev/k-playbook` |
 | `2` | Anker im k-playbook-Verzeichnis, Installation unter `_dist/`, `paths.*` |
 
-Wer eine `1` oder `2` findet, meldet das und stellt nicht auf gut Glueck um. Es gibt
-kein `migrate`-Kommando; die Umstellung ist ein bewusster Schritt.
+Das Werkzeug bricht bei jeder anderen Fassung ab, statt weiterzumachen. Stillschweigend
+weiterzulesen waere das Gefaehrlichste: die Werte liessen sich lesen, bedeuteten aber
+etwas anderes. Eine hoehere Zahl als `3` wird als „Installation aelter als die
+Konfiguration" gemeldet, eine fehlende `schema_version` ebenfalls als Fehler.
+
+Es gibt kein `migrate`-Kommando; die Umstellung ist ein bewusster Schritt.
 
 ### `project.repo_root`
 
@@ -211,32 +289,6 @@ Git-Roots suchen.
 
 Pflichtfeld. Entweder `git` oder `none`. `none` ist eine ausdrueckliche
 Projektentscheidung und steht deshalb in der Datei, statt in Commands geraten zu werden.
-
-### `overlay`
-
-Optionaler Block. Schaltet einzelne mitgelieferte Dateien **ersatzlos** ab.
-
-| Feld | Wirkt auf |
-|---|---|
-| `overlay.rules.disabled` | `k-playbook/rules/` |
-| `overlay.reviews.disabled` | `k-playbook/reviews/` |
-| `overlay.checks.disabled` | `k-playbook/checks/` |
-
-Die Eintraege sind **Dateinamen**, passend zur Vergleichseinheit beim Zusammenfassen:
-`tool-install-scope.md`, nicht `tool-install-scope`; `review-codeql-security.md`, nicht
-`codeql-security`.
-
-Abschalten und Ersetzen sind zwei verschiedene Dinge. Wer eine mitgelieferte Regel durch
-eine eigene ersetzen will, legt eine gleichnamige Datei unter `k-playbook-local/` an und
-traegt nichts in `disabled` ein. Beides zugleich ist redundant: die lokale Datei gewinnt,
-und der `disabled`-Eintrag ist als veraltet zu melden.
-
-Die Liste wirkt nur auf mitgelieferte Dateien. Eine projekteigene Datei schaltet man ab,
-indem man sie loescht.
-
-Ein Eintrag, der auf keine mitgelieferte Datei passt, ist kein Fehler, muss aber als
-veraltet gemeldet werden. Der Block gehoert dem Nutzer: Commands duerfen Eintraege
-vorschlagen und nach ausdruecklicher Bestaetigung schreiben, nie still.
 
 ### `remediation`
 
@@ -300,10 +352,10 @@ wenn mindestens ein relevanter Status `enabled` oder `planned` ist.
 - Geschrieben wird ausschliesslich nach Bestaetigung, Schritt fuer Schritt.
 - Das Werkzeug besitzt `schema_version` und `project.*`.
 - `/k-setup-codeql` besitzt nur `tools.codeql`.
-- `overlay.*.disabled` gehoert dem Nutzer.
 - Die Remediation-Policy wird beim Einbinden gesetzt; spaeter darf `/k-remediation` sie
-  nach Rueckfrage aendern.
+  nach Rueckfrage aendern. Geschrieben wird nur der `remediation:`-Block.
 - Unbekannte Top-Level-Felder bleiben erhalten und werden nicht ungefragt geaendert.
+  Geschrieben wird zeilenweise, damit Kommentare und Reihenfolge erhalten bleiben.
 - Host-lokale Installationszustaende gehoeren nicht in diese Datei.
 - Nichts unterhalb von `k-playbook/` darf geschrieben werden.
 

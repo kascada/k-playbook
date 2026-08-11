@@ -73,10 +73,34 @@ Drei Verzeichnisse existieren doppelt: `rules/`, `reviews/` und `checks/`. Was g
 die Vereinigung beider Seiten. **Bei gleichem Dateinamen gewinnt die projekteigene Datei,
 und zwar vollstaendig** — die mitgelieferte wird dann gar nicht erst gelesen.
 
-`overlay.<kind>.disabled` in `K-PLAYBOOK.yaml` schaltet eine mitgelieferte Datei
-ersatzlos ab. Abschalten und Ersetzen sind zwei verschiedene Wege.
+Abgeschaltet wird ueber eine **leere** lokale Datei: nichts ausser Leerzeilen und
+Kommentaren. Damit kann die Datei ihren eigenen Grund tragen, und es braucht keine Liste
+in der Konfiguration.
 
 Commands und Skills gibt es nur mitgeliefert.
+
+### Eine Antwort, nicht viele
+
+Was am Ende gilt, rechnet nicht jeder Command selbst aus:
+
+```bash
+k-playbook/bin/k-playbook context
+```
+
+Das Kommando gibt den aufgeloesten Arbeitsstand als JSON aus — Verzeichnisse,
+Instruktionsdateien in Lesereihenfolge, Remediation-Policy, Guidelines und die drei
+Kataloge, bereits zusammengefuehrt, mit Herkunft je Eintrag und markierten Abschaltungen.
+
+### Instruktionen in zwei Ebenen
+
+| Datei | Gilt fuer | Beim Update |
+|---|---|---|
+| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+
+Gelesen wird in dieser Reihenfolge; die projekteigene Ebene ergaenzt die mitgelieferte
+oder ueberstimmt sie. `AGENTS.md` im Hauptverzeichnis bekommt nur einen kurzen Anstoss,
+der auf `k-playbook context` verweist — vorhandener Inhalt bleibt unangetastet.
 
 ## Installation
 
@@ -207,7 +231,7 @@ Details stehen in [`../checks/README.md`](../checks/README.md) und
 - Jedes Projekt traegt seine eigene Installation. Kein fester Hostpfad, kein globaler Symlink.
 - `k-playbook/` wird bei jedem Update vollstaendig ersetzt; alles daneben nie angefasst.
 - Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per
-  Overlay ab: gleichnamige lokale Datei ersetzt, `overlay.<kind>.disabled` schaltet ab.
+  Overlay ab: gleichnamige lokale Datei ersetzt, eine leere schaltet ab.
 - Pfade werden abgeleitet, nicht geraten und nicht konfiguriert.
 - `K-PLAYBOOK.yaml` ist Konfiguration, keine Dokumentation. Eine vorhandene Datei wird
   nie ueberschrieben.

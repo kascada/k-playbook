@@ -96,25 +96,41 @@ Kein Command liest oder raet einen Pfad. Alles leitet sich aus dem Ort der
 Gelesen wird zusaetzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
 Geschrieben wird dorthin nie.
 
-## Overlay
+## Der aufgeloeste Arbeitsstand
 
-`/k-review`, `/k-enforcement` und `k-check` arbeiten auf der effektiven Menge aus
-mitgelieferten und projekteigenen Dateien. Bei gleichem Dateinamen gewinnt die
-projekteigene Datei vollstaendig; `overlay.<kind>.disabled` schaltet eine mitgelieferte
-Datei ersatzlos ab.
+Kein Command rechnet selbst aus, was gilt. Das macht das Werkzeug:
 
-Jeder dieser Commands weist die Aufloesung vor der Arbeit aus, mit Herkunft je Eintrag:
-
-```text
-Regeln: 4 aktiv
-  [mitgeliefert] codeql.md
-  [mitgeliefert] review-authoring.md
-  [ersetzt]      docs-sync.md          (statt k-playbook/rules/docs-sync.md)
-  [projekt]      my-api-rules.md
-  [abgeschaltet] tool-install-scope.md (via overlay.rules.disabled)
+```bash
+k-playbook/bin/k-playbook context
 ```
 
-Die Regeln im Detail stehen in
+Die JSON-Ausgabe nennt die aufgeloesten Verzeichnisse, die Instruktionsdateien in
+Lesereihenfolge, die Remediation-Policy, die Guidelines und die drei Kataloge —
+mitgeliefert und projekteigen bereits zusammengefuehrt:
+
+```json
+{
+  "instructions": [
+    "/projekt/k-playbook/k-playbook.md",
+    "/projekt/k-playbook-local/k-playbook.md"
+  ],
+  "catalogs": {
+    "rules": [
+      { "name": "codeql.md",             "key": "codeql",            "origin": "dist" },
+      { "name": "docs-sync.md",          "key": "docs-sync",         "origin": "override" },
+      { "name": "my-api-rules.md",       "key": "my-api-rules",      "origin": "local" },
+      { "name": "tool-install-scope.md", "key": "tool-install-scope","origin": "override",
+        "disabled": true }
+    ]
+  }
+}
+```
+
+`origin` ist `dist`, `local` oder `override`. `disabled` steht dort, wo die projekteigene
+Datei leer ist — das ist der Weg, einen mitgelieferten Eintrag abzuschalten.
+
+`/k-review`, `/k-enforcement` und `k-check` arbeiten auf dieser Menge und weisen sie vor
+der Arbeit aus. Die Regeln im Detail stehen in
 [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen).
 
 ## Status

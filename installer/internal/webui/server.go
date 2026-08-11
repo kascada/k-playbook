@@ -110,6 +110,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/health", state.healthHandler)
 	mux.HandleFunc("POST /api/client-gone", state.clientGoneHandler)
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
+	mux.HandleFunc("GET /api/path", hostPathHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", createConfigHandler)
 	mux.HandleFunc("GET /api/local", localHandler)
@@ -122,6 +123,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
 	mux.HandleFunc("GET /api/context", contextHandler)
+	mux.HandleFunc("GET /api/docs", docsHandler)
+	mux.HandleFunc("GET /api/docs/file", docFileHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {

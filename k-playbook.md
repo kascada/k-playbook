@@ -19,16 +19,17 @@ verloren. Wer eine mitgelieferte Datei anpassen will, legt eine gleichnamige in
 `k-playbook-local/` an.
 
 Alles, was das Projekt selbst hervorbringt, gehoert nach `k-playbook-local/`: eigene
-Regeln, Reviews und Checks, Ergebnisse, Tasks, Notizen.
+Regeln, Reviews, Checks, Commands und Skills, dazu Ergebnisse, Tasks, Notizen.
 
 ## Ueberlagern und Abschalten
 
-Fuer `rules`, `reviews` und `checks` gilt: Eine gleichnamige Datei in
-`k-playbook-local/` **ersetzt** die mitgelieferte vollstaendig. Die mitgelieferte wird
-dann gar nicht gelesen; es werden auch keine einzelnen Abschnitte uebernommen.
+Fuer `rules`, `reviews`, `checks`, `commands` und `skills` gilt: Ein gleichnamiger
+Eintrag in `k-playbook-local/` **ersetzt** den mitgelieferten vollstaendig. Der
+mitgelieferte wird dann gar nicht gelesen; es werden auch keine einzelnen Abschnitte
+uebernommen.
 
-Eine **leere** lokale Datei — nichts ausser Leerzeilen und Kommentaren — schaltet den
-mitgelieferten Eintrag ab. So kann die Datei ihren eigenen Grund tragen:
+Ein **leerer** lokaler Eintrag — nichts ausser Leerzeilen und Kommentaren — schaltet den
+mitgelieferten ab. So kann die Datei ihren eigenen Grund tragen:
 
 ```bash
 # Abgeschaltet: dieses Projekt nutzt kein Django.
@@ -36,7 +37,26 @@ mitgelieferten Eintrag ab. So kann die Datei ihren eigenen Grund tragen:
 
 Bei `rules` und `reviews` bleibt der Eintrag sichtbar, sein Inhalt sagt dann, dass er
 abgeschaltet ist. Ein Check faellt ganz aus dem Katalog: ein leeres Skript wuerde mit
-Exit 0 durchlaufen und wie ein bestandener Check aussehen.
+Exit 0 durchlaufen und wie ein bestandener Check aussehen. Ein abgeschalteter Command
+oder Skill wird nicht mehr beim Assistenten registriert.
+
+Die Vergleichseinheit ist der Name:
+
+| Sorte | Einheit | Name |
+|---|---|---|
+| `rules`, `reviews` | eine `*.md`-Datei | Dateiname |
+| `checks` | ein `*.sh`-Skript | Dateiname |
+| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/path-resolution.md` |
+| `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname |
+
+Commands werden bis in die Namensraeume hinein verglichen: eine lokale
+`commands/_shared/path-resolution.md` ersetzt genau diese Datei, der Rest des
+Namensraums bleibt mitgeliefert. Ein Skill wird dagegen als Ganzes ersetzt — `SKILL.md`,
+`PLAYBOOK.md` und Vorlagen muessen zueinander passen.
+
+Neue oder geaenderte Commands und Skills werden nicht von selbst wirksam: sie muessen
+beim Assistenten registriert werden. Die Oberflaeche (`k-playbook` ohne Argument)
+vergleicht den Katalog mit dem Registrierten und richtet die Verlinkung ein.
 
 ## Wo was liegt
 

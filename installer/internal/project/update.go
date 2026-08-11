@@ -42,7 +42,7 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
 	defer cancel()
 
-	branch, err := gitOutput(ctx, dir, "branch", "--show-current")
+	branch, err := GitOutput(ctx, dir, "branch", "--show-current")
 	if err != nil {
 		return UpdateStatus{}, err
 	}
@@ -50,22 +50,22 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 		return UpdateStatus{Message: "Kein aktiver Branch, vermutlich ein Detached HEAD."}, nil
 	}
 
-	remoteName, err := gitOutput(ctx, dir, "config", "--get", "branch."+branch+".remote")
+	remoteName, err := GitOutput(ctx, dir, "config", "--get", "branch."+branch+".remote")
 	if err != nil || remoteName == "" {
 		return UpdateStatus{Branch: branch, Message: "Kein Upstream fuer diesen Branch konfiguriert."}, nil
 	}
-	mergeRef, err := gitOutput(ctx, dir, "config", "--get", "branch."+branch+".merge")
+	mergeRef, err := GitOutput(ctx, dir, "config", "--get", "branch."+branch+".merge")
 	if err != nil || mergeRef == "" {
 		return UpdateStatus{Branch: branch, Message: "Kein Upstream fuer diesen Branch konfiguriert."}, nil
 	}
 
-	local, err := gitOutput(ctx, dir, "rev-parse", "HEAD")
+	local, err := GitOutput(ctx, dir, "rev-parse", "HEAD")
 	if err != nil {
 		return UpdateStatus{}, err
 	}
 
 	remoteBranch := strings.TrimPrefix(mergeRef, "refs/heads/")
-	line, err := gitOutput(ctx, dir, "ls-remote", "--heads", remoteName, remoteBranch)
+	line, err := GitOutput(ctx, dir, "ls-remote", "--heads", remoteName, remoteBranch)
 	if ctx.Err() == context.DeadlineExceeded {
 		return UpdateStatus{Branch: branch, Message: "Der Remote hat nicht rechtzeitig geantwortet."}, nil
 	}
@@ -164,7 +164,10 @@ func sameHashes(before map[string]string, after map[string]string) bool {
 	return true
 }
 
-func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+// GitOutput fuehrt ein Git-Kommando in dir aus und liefert die getrimmte
+// Ausgabe. Exportiert, weil auch hostinstall den Commit-Stand einer
+// Installation braucht.
+func GitOutput(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 	output, err := cmd.Output()

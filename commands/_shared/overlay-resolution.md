@@ -18,6 +18,12 @@ This module requires `PLAYBOOK_DIR`, `DIST_DIR`, and the relevant resolved path 
 | `reviews` | `<PLAYBOOK_DIR>/reviews/` | `<LOCAL_DIR>/reviews/` | `review-*.md` |
 | `checks` | `<PLAYBOOK_DIR>/checks/` | `<LOCAL_DIR>/checks/` | `*.sh` (top level only) |
 
+`commands/` and `skills/` follow the same overlay rule but are **not** resolved here.
+They are resolved by the installer and turned into per-entry symlinks under `.claude/`,
+`.opencode/` and `.cursor/`; by the time a command runs, the assistant has already
+loaded the effective set. Commands compare by path below `commands/` (so a namespace
+like `_shared/` is overlaid file by file), skills by directory name as a whole unit.
+
 ## Comparison Unit
 
 Entries are matched by **filename**. Both sides use the same naming convention, so no

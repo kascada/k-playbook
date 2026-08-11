@@ -26,6 +26,21 @@
         </div>
       </section>
 
+      <!-- Nur sichtbar, solange `k-playbook` nicht aus jedem Verzeichnis
+           aufrufbar ist. Betrifft den Host, nicht das Projekt. -->
+      <section class="card hidden" id="path-card">
+        <div class="section-head">
+          <div>
+            <h2>Aufruf von ueberall</h2>
+          </div>
+          <span id="path-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <p id="path-message" class="message"></p>
+        <div id="path-command" class="command-row hidden">
+          <code id="path-command-text"></code>
+        </div>
+      </section>
+
       <section class="card{{if .Installed}} hidden{{end}}" id="config-card">
         <div class="section-head">
           <div>
@@ -96,19 +111,45 @@
         </div>
       </section>
 
+      <section class="card{{if not .Installed}} hidden{{end}}" id="docs-card">
+        <div class="section-head">
+          <div>
+            <h2>Dokumentation</h2>
+          </div>
+          <span id="docs-pill" class="pill muted">Laden...</span>
+        </div>
+        <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick oeffnet die Datei.</p>
+        <div id="docs-list" class="docs-list"></div>
+        <p id="docs-message" class="message"></p>
+      </section>
+
       <details class="card{{if not .Installed}} hidden{{end}}" id="context-card">
         <summary class="section-head disclosure">
           <div class="disclosure-title">
             <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
-            <h2>Aufgeloester Kontext</h2>
+            <h2>Aufgelöster Kontext</h2>
           </div>
           <span id="context-pill" class="pill muted">Aufklappen</span>
         </summary>
-        <p class="hint">Was ein Command sieht: Pfade und die effektiven Kataloge nach Overlay-Aufloesung. Entspricht <code>k-playbook context</code>.</p>
+        <p class="hint">Was ein Command sieht: Pfade und die effektiven Kataloge nach Overlay-Auflösung. Entspricht <code>k-playbook context</code>.</p>
         <dl id="context-facts" class="facts"></dl>
         <div id="context-catalogs"></div>
         <p id="context-message" class="message"></p>
       </details>
+
+      <div id="doc-overlay" class="doc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="doc-title">
+        <div class="doc-panel">
+          <header class="doc-panel-head">
+            <div>
+              <p class="eyebrow">Dokumentation</p>
+              <h2 id="doc-title">Markdown-Datei</h2>
+              <p id="doc-path" class="doc-path"></p>
+            </div>
+            <button id="close-doc" class="secondary">Schliessen</button>
+          </header>
+          <article id="doc-viewer" class="doc-viewer"></article>
+        </div>
+      </div>
 
       <div id="closed" class="closed hidden">
         <div class="card">

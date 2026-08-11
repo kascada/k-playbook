@@ -48,30 +48,46 @@ projekt/
 ├── AGENTS.md             Instruktionen, eine Quelle fuer alle Assistenten
 ├── CLAUDE.md             Symlink auf AGENTS.md
 ├── .claude/
-│   ├── commands  ──┐     Symlink
-│   └── skills      │     Symlink; OpenCode liest hier mit
+│   ├── commands/ ──┐     je ein Symlink pro Command
+│   └── skills/     │     je ein Symlink pro Skill; OpenCode liest hier mit
 ├── .opencode/      │
-│   └── commands  ──┤     Symlink
+│   └── commands/ ──┤
 ├── .cursor/        │
-│   └── commands  ──┤     Symlink
-├── k-playbook/   ←─┘     die Installation, vollstaendig ersetzbar
+│   └── commands/ ──┤
+├── k-playbook/   ←─┤     die Installation, vollstaendig ersetzbar
 │   ├── commands/ skills/ rules/ reviews/ checks/
-│   ├── bin/ dist/
+│   ├── bin/ dist/ scripts/
+│   ├── k-playbook.md     mitgelieferte Instruktionsebene
 │   └── installer/ docs/
-└── k-playbook-local/     projekteigen, committed
+└── k-playbook-local/ ←─┘ projekteigen, committed
     ├── rules/            Overlay zu k-playbook/rules/
     ├── reviews/          Overlay zu k-playbook/reviews/
     ├── checks/           Overlay zu k-playbook/checks/
+    ├── commands/         Overlay zu k-playbook/commands/
+    ├── skills/           Overlay zu k-playbook/skills/
     ├── results/          alles, was Reviews erzeugen
     ├── docs/             Projektwissen fuer AI-Sessions
     ├── guidelines/
     ├── tasks/done/
     ├── priv/             Inhalt gitignored, Verzeichnis versioniert
+    ├── k-playbook.md     projekteigene Instruktionsebene
     └── TODO.md
 ```
 
-Gleicher Dateiname in `k-playbook-local/rules/`, `reviews/` oder `checks/` ersetzt die
-mitgelieferte Datei vollstaendig. Commands und Skills gibt es nur mitgeliefert.
+Gleicher Name in `k-playbook-local/` ersetzt den mitgelieferten Eintrag vollstaendig; ein
+leerer schaltet ihn ab. Das gilt fuer alle fuenf Sorten — `rules/`, `reviews/`, `checks/`,
+`commands/` und `skills/`.
+
+Deshalb sind `.claude/commands/` und die anderen drei Ziele **echte Verzeichnisse mit
+Einzel-Symlinks**, kein Verzeichnis-Symlink: nur so kommen beide Quellen an. Die
+Oberflaeche vergleicht den aufgeloesten Katalog mit dem, was registriert ist, nennt
+Abweichungen beim Namen und bietet an, sie zu beheben.
+
+Was am Ende gilt, rechnet kein Command selbst aus:
+
+```bash
+k-playbook/bin/k-playbook context
+```
 
 Verlinkt wird fuer Claude Code, OpenCode und Cursor. Skills stehen nur einmal unter
 `.claude/skills`, weil OpenCode dieses Verzeichnis mitdurchsucht und Cursor kein
@@ -81,9 +97,12 @@ beiden.
 
 ## Aktualisieren
 
+Die Oberflaeche prueft nach dem Start, ob die Installation hinter dem Remote liegt, und
+zieht auf Knopfdruck nach. Von Hand geht es genauso:
+
 ```bash
 cd /pfad/zum/projekt/k-playbook
-git pull
+git pull --ff-only
 ```
 
 `k-playbook/` enthaelt nichts Projekteigenes und ist dadurch vollstaendig ersetzbar.

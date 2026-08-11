@@ -134,7 +134,8 @@ projekt/
 │   └── commands  ──┤     Symlink
 ├── k-playbook/   ←─┘     die Installation, vollständig ersetzbar
 │   ├── commands/ skills/ rules/ reviews/ checks/
-│   ├── bin/ dist/
+│   ├── bin/ dist/ scripts/
+│   ├── k-playbook.md     mitgelieferte Instruktionsebene
 │   └── installer/ docs/
 └── k-playbook-local/     projekteigen, committed
     ├── rules/            Overlay zu k-playbook/rules/
@@ -145,6 +146,7 @@ projekt/
     ├── guidelines/
     ├── tasks/done/
     ├── priv/             Inhalt gitignored, Verzeichnis versioniert
+    ├── k-playbook.md     projekteigene Instruktionsebene
     └── TODO.md
 ```
 
@@ -156,7 +158,8 @@ Projekts fehlen würden.
 einmal unter `.claude/skills`: OpenCode durchsucht dieses Verzeichnis mit, Cursor kennt
 kein Skill-Konzept. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, weil Claude Code
 ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so landet jede
-Änderung in beiden. Fehlt `AGENTS.md`, wird nichts angelegt; die Datei gehört dem Projekt.
+Änderung in beiden. `AGENTS.md` wird angelegt, falls sie fehlt, und sonst um einen kurzen
+Anstoß ergänzt; Näheres unter „Instruktionen".
 
 **Commands und Skills gibt es nur mitgeliefert.** Es gibt kein
 `k-playbook-local/commands/` und kein `k-playbook-local/skills/`. Das ist auch der Grund,
@@ -230,20 +233,90 @@ Damit bleibt `reviews/` ein reines Overlay-Verzeichnis, in dem jede Datei nach d
 Regel behandelt wird. Vorher lagen Rezepte, Log, Entscheidungen und Ergebnisse
 durcheinander unter `<paths.reviews>/`.
 
+## Der aufgelöste Arbeitsstand: `k-playbook context`
+
+Das einzige Subkommando. Es gibt als JSON aus, was ein Command sonst selbst aus
+Konfiguration und Dateisystem zusammenrechnen müsste: die aufgelösten Verzeichnisse, die
+Instruktionsdateien in Lesereihenfolge, die Remediation-Policy, die Guidelines und die
+drei Kataloge — mitgeliefert und projekteigen bereits zusammengeführt, mit Herkunft je
+Eintrag (`dist`, `local`, `override`) und markierten Abschaltungen.
+
+```bash
+k-playbook/bin/k-playbook context
+```
+
+Das verschiebt die Overlay-Auflösung aus der Prosa in den Code. Bisher sollte jeder
+Command die Regeln selbst anwenden — beschrieben in `commands/_shared/overlay-resolution.md`,
+umgesetzt je nach Tagesform. Jetzt gibt es eine Antwort, und alle bekommen dieselbe.
+
+Der Aufruf ist bewusst billig: der Security-Tool-Preflight fehlt darin, weil er je Tool
+ein `--version` startet und spürbar dauert. `context` soll am Anfang jedes Commands
+stehen können.
+
+Gesucht wird ab dem Arbeitsverzeichnis aufwärts. Findet sich keine `K-PLAYBOOK.yaml`,
+bricht der Aufruf mit einer Meldung ab. Eine `schema_version`, die nicht `3` ist, führt
+ebenfalls zum Abbruch: die Werte ließen sich lesen, bedeuteten aber etwas anderes.
+
+## Instruktionen: zwei Ebenen plus Anstoß
+
+Was ein Assistent vor der Arbeit lesen soll, steht in `k-playbook.md` — je einmal pro
+Ebene:
+
+| Datei | Gilt für | Beim Update |
+|---|---|---|
+| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+
+Gelesen wird in dieser Reihenfolge; die projekteigene Ebene kann die mitgelieferte
+ergänzen oder überstimmen. `context` nennt beide unter `instructions`, und zwar nur die,
+die es tatsächlich gibt — ein Pfad ins Leere wäre schlechter als keiner.
+
+Die Datei heißt bewusst **nicht** `AGENTS.md`: diesen Namen lesen die Assistenten von
+sich aus, und er ist dem Hauptverzeichnis vorbehalten.
+
+**`AGENTS.md` bekommt nur einen Anstoß.** Früher galt: fehlt die Datei, wird nichts
+angelegt. Das hat nicht getragen — ohne Eintrag dort erfährt ein Assistent nie, dass es
+k-playbook gibt. Jetzt wird sie angelegt, falls sie fehlt, und sonst um einen kurzen Block
+ergänzt, der auf `k-playbook context` verweist. Vorhandener Inhalt bleibt unangetastet;
+ein Marker `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf den Block
+erneut anhängt.
+
+Der Anstoß nennt absichtlich keine Verzeichnisebene. Dieselbe Datei liegt im Projekt, in
+der Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwei dieser
+Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf.
+
+## Aktualisieren aus der Oberfläche
+
+Die Oberfläche prüft nach dem Start per `git ls-remote`, ob die Installation hinter dem
+Remote liegt, und kann per `git pull --ff-only` nachziehen. Bewusst `ls-remote` statt
+`fetch`: die Prüfung läuft ungefragt und darf den Zustand des Repositorys nicht anfassen.
+Bewusst `--ff-only`: ein Merge im Clone erzeugte eine lokale Historie, die niemand pflegt.
+
+Vor und nach dem Pull werden die Binaries unter `dist/` gehasht. Nur wenn sich etwas
+geändert hat, wird ein Neustart verlangt — unter Linux behält der laufende Prozess seinen
+Inode, läuft also mit dem alten Code weiter, auch wenn die Datei ersetzt wurde.
+
 ## Stand
 
 Das Werkzeug führt durch drei Schritte: Konfiguration anlegen, projekteigene Struktur
-anlegen, Assistenten verlinken. Dazu kommt ein rein lesender Block für die Security-Tools.
+anlegen, Assistenten verlinken. Dazu kommen ein rein lesender Block für die
+Security-Tools, die Remediation-Policy, der aufgelöste Kontext und das Aktualisieren.
 
 Der Go-Code liegt unter `installer/internal/`:
 
 | Paket | Inhalt |
 |---|---|
 | `project/discover.go` | Anker finden, aufwärts ab einem Startverzeichnis |
-| `project/config.go` | Config lesen und anlegen, Vorschlag für Ort und `repo_root` |
+| `project/environment.go` | was am Aufrufort vorliegt |
+| `project/config.go` | Config lesen und anlegen, Schema prüfen, Vorschlag für Ort und `repo_root` |
 | `project/local.go` | projekteigene Struktur prüfen und anlegen |
 | `project/links.go` | Assistenten-Verlinkung prüfen und herstellen |
+| `project/instructions.go` | `AGENTS.md` anlegen bzw. um den Anstoß ergänzen |
+| `project/context.go` | Kataloge auflösen, Arbeitsstand zusammenstellen |
+| `project/remediation.go` | `remediation:`-Block lesen und setzen |
+| `project/update.go` | Remote-Stand prüfen, per Fast-Forward nachziehen |
 | `project/tools.go` | Security-Tool-Preflight über das Skript |
+| `legacy/global.go` | host-globale Verlinkung des alten Modells entfernen |
 | `webui/` | Server, Endpunkte, eingebettete Oberfläche |
 
 ## Der alte Code als Nachschlagewerk
@@ -295,19 +368,24 @@ project:
   vcs: git
 
 remediation:                  # wie Befunde abgearbeitet werden
-  mode: direct-allowed
+  mode: task-first
   target: .                   # relativ zum Hauptverzeichnis
   grouping: true
   quick_wins: true
   branch_prefix: remediation/
-  pr_required: false
-  direct_fixes: true
+  pr_required: false          # aus mode abgeleitet
+  direct_fixes: true          # aus mode abgeleitet
 ```
 
-`remediation.*` bleibt inhaltlich unangetastet; nur die Basis von `target` wechselt vom
-k-playbook-Verzeichnis auf das Hauptverzeichnis. Was `mode`, `pr_required` und
-`direct_fixes` künftig bedeuten sollen, ist noch nicht besprochen — die Docs beschreiben
-bis dahin den bestehenden Vertrag.
+Beim `remediation`-Block hat sich zweierlei geändert. **Der Default ist `task-first`**,
+nicht mehr `direct-allowed`: Tasks als Standard sind die sichere Vorgabe, nichts wird ohne
+Zutun am Code geändert, und direkte Fixes bleiben nach Freigabe trotzdem möglich. Und
+**`pr_required` und `direct_fixes` werden aus `mode` abgeleitet** statt frei gepflegt. Sie
+stehen trotzdem in der Datei, damit ein Command sie lesen kann, ohne den Modus deuten zu
+müssen; geschrieben werden sie beim Setzen des Modus mit.
+
+Der Block wird bei einer neuen Konfiguration gleich mit angelegt, damit nicht erst beim
+ersten Review darüber entschieden werden muss.
 
 ## Entfallen
 
@@ -339,11 +417,10 @@ Oberfläche, alles Weitere kann das Skript selbst: `--preflight` ist sein Standa
 ohne `--yes` fragt es vor der Installation, und `--help` erklärt die Methoden. Der Command
 hätte das nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen gewesen.
 
-**Alle Subkommandos.** `k-playbook` startet ausschließlich die Oberfläche. `init`,
-`update`, `restore`, `migrate`, `status`, `smoke` und `projects …` gibt es nicht mehr, und
-damit auch keine lokale Projektliste unter `.k-playbook-local/projects.json`. Wo Commands
-oder Docs bisher auf `k-playbook-installer status` verwiesen, müssen sie den Status selbst
-ermitteln.
+**Die alten Subkommandos.** `init`, `update`, `restore`, `migrate`, `status`, `smoke` und
+`projects …` gibt es nicht mehr, und damit auch keine lokale Projektliste unter
+`.k-playbook-local/projects.json`. Ohne Argument startet `k-playbook` die Oberfläche.
+Geblieben ist `context` — siehe unten.
 
 ## Nachzuziehen
 

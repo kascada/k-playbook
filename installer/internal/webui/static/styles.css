@@ -26,6 +26,11 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Solange die Doku offen ist, scrollt nur sie und nicht die Seite darunter. */
+body.doc-overlay-open {
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -360,6 +365,187 @@ details[open] > summary.disclosure .disclosure-marker {
   white-space: pre;
 }
 
+/* Die Doku-Liste ist eine Kachelwand: viele kurze Titel, die nebeneinander
+   passen sollen, ohne dass eine Spalte die Breite bestimmt. */
+.docs-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-content: start;
+  gap: 6px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.docs-list.empty {
+  display: block;
+  padding: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.doc-link {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.doc-link.active,
+.doc-link:hover {
+  color: var(--accent-strong);
+  background: rgba(47, 93, 80, 0.1);
+}
+
+.doc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(244, 241, 232, 0.78);
+  backdrop-filter: blur(14px);
+}
+
+.doc-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1120px, calc(100vw - 48px));
+  height: min(920px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid rgba(222, 214, 200, 0.9);
+  border-radius: 28px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.doc-panel-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 20px 24px;
+}
+
+.doc-panel-head .eyebrow {
+  margin-bottom: 6px;
+}
+
+.doc-path {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.doc-viewer {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px clamp(20px, 4vw, 56px);
+  font-size: 1rem;
+  line-height: 1.62;
+  overflow-wrap: anywhere;
+}
+
+.doc-viewer.empty {
+  color: var(--muted);
+}
+
+.doc-viewer h1,
+.doc-viewer h2,
+.doc-viewer h3 {
+  margin: 1.1em 0 0.45em;
+  letter-spacing: -0.03em;
+}
+
+.doc-viewer h1:first-child,
+.doc-viewer h2:first-child,
+.doc-viewer h3:first-child {
+  margin-top: 0;
+}
+
+.doc-viewer p,
+.doc-viewer ul,
+.doc-viewer ol,
+.doc-viewer table,
+.doc-viewer pre {
+  margin: 0 0 1em;
+}
+
+.doc-viewer code,
+.doc-viewer pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.doc-viewer code {
+  border-radius: 6px;
+  padding: 0.12em 0.32em;
+  background: rgba(47, 93, 80, 0.1);
+}
+
+.doc-viewer pre {
+  overflow: auto;
+  border-radius: 14px;
+  padding: 14px;
+  color: #f4f1e8;
+  background: #1f241f;
+}
+
+.doc-viewer pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.doc-viewer table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doc-viewer th,
+.doc-viewer td {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.doc-viewer blockquote {
+  margin: 0 0 1em;
+  border-left: 4px solid var(--accent);
+  padding-left: 14px;
+  color: var(--muted);
+}
+
+.mermaid-diagram {
+  overflow: auto;
+  margin: 0 0 1.2em;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.mermaid-diagram.mermaid-error {
+  color: var(--error);
+}
+
+/* Bleibt Mermaid aus, sagt eine Zeile darueber warum; der Quelltext des
+   Diagramms bleibt darunter stehen. */
+.mermaid-message {
+  margin: 0 0 6px;
+  color: var(--warn);
+  font-size: 0.86rem;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -451,5 +637,31 @@ button.attention-highlight {
   .hero-subrow {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .docs-list {
+    grid-template-columns: 1fr;
+  }
+
+  /* Auf kleinen Schirmen nimmt die Doku die ganze Flaeche; ein gerahmtes
+     Fenster liesse zu wenig Text uebrig. */
+  .doc-overlay {
+    padding: 0;
+  }
+
+  .doc-panel {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .doc-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .doc-viewer {
+    padding: 20px 18px;
   }
 }

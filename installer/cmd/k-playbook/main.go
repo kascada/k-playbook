@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kascada/k-playbook/installer/internal/hostinstall"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/webui"
@@ -24,6 +25,7 @@ func main() {
 func run(args []string) error {
 	if len(args) == 0 {
 		cleanUpLegacy()
+		mirrorHostInstall()
 		return webui.Run()
 	}
 
@@ -86,5 +88,36 @@ func cleanUpLegacy() {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: alte globale Verlinkung nicht vollstaendig entfernt: %v\n", err)
+	}
+}
+
+// mirrorHostInstall haelt die host-weite Kopie auf dem Stand dieses Aufrufs,
+// damit `k-playbook` aus jedem Verzeichnis startbar ist.
+//
+// Nur hier, nicht bei `context`: dessen JSON darf keine Beigaben bekommen, und
+// die Spiegelung braucht ein Git-Kommando, das den haeufigen Kontextaufrufen
+// der Commands nichts bringt.
+//
+// Wie cleanUpLegacy meldet sie sich nur, wenn etwas passiert ist, und ein
+// Fehler haelt den Start nicht auf: die Oberflaeche laeuft auch ohne Kopie.
+func mirrorHostInstall() {
+	result, err := hostinstall.Mirror()
+	if len(result.Copied) > 0 {
+		fmt.Printf("Host-weite Kopie aktualisiert (%d):\n", len(result.Copied))
+		for _, copied := range result.Copied {
+			fmt.Printf("  - %s\n", copied)
+		}
+	}
+	if result.Link != "" {
+		fmt.Printf("Verlinkt: %s\n", result.Link)
+	}
+	// Ohne Bedingung auf result: der PATH stimmt auch dann noch nicht, wenn
+	// diesmal nichts zu spiegeln war. Sonst saehe man den Hinweis genau einmal.
+	if status := hostinstall.CheckPath(); status.Export != "" {
+		fmt.Printf("Hinweis: %s liegt nicht im PATH. Diese Zeile ins Shell-Profil:\n", status.Dir)
+		fmt.Printf("  %s\n", status.Export)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: host-weite Kopie nicht aktualisiert: %v\n", err)
 	}
 }
