@@ -184,6 +184,15 @@ git pull --ff-only
 auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen
 daneben und bleiben unberuehrt.
 
+**Wurde dort trotzdem lokal gearbeitet, sagt die Oberflaeche es und aktualisiert nicht.**
+Der Block `Installation` erscheint nur in diesem Fall, nennt die betroffenen Dateien und
+gibt den Befehl zum Zuruecksetzen aus; ausgefuehrt wird er nicht von selbst. Der Grund
+fuer die Pruefung ist, dass der Fehler sich sonst versteckt: aendert sich eine lokal
+veraenderte Datei upstream nicht mit, laeuft `git pull` sauber durch und laesst sie
+stehen — die Aenderung ueberlebt dann jedes Update, ohne je aufzufallen. Denselben Befund
+meldet `/k-status` in der Zeile `Installation:`, auch ohne dass jemand die Oberflaeche
+oeffnet.
+
 Haben sich dabei die Binaries unter `dist/` geaendert, verlangt die Oberflaeche einen
 Neustart: unter Linux behaelt ein laufender Prozess seinen Inode und arbeitet mit dem
 alten Code weiter, auch wenn die Datei ersetzt wurde. Sind nur Commands, Regeln oder

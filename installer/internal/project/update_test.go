@@ -146,6 +146,112 @@ func TestUpdateOhneBinaeraenderung(t *testing.T) {
 	}
 }
 
+func TestCheckCleanlinessSauber(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+
+	state := CheckCleanliness(projectDir)
+	if !state.Clean || state.Blocking() {
+		t.Errorf("frische Installation gilt als verschmutzt: %+v", state)
+	}
+}
+
+// Der Fall, der ohne diese Pruefung nie auffaellt: eine veraenderte Datei, die
+// sich upstream nicht mit aendert. `git pull` laeuft sauber durch und laesst
+// sie stehen.
+func TestCheckCleanlinessErkenntVeraenderteDatei(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+
+	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
+	if err := os.WriteFile(binary, []byte("kaputt"), 0o755); err != nil {
+		t.Fatalf("Binary aendern: %v", err)
+	}
+
+	state := CheckCleanliness(projectDir)
+	if state.Clean || !state.Blocking() {
+		t.Fatalf("veraenderte Datei nicht als blockierend gemeldet: %+v", state)
+	}
+	if len(state.Modified) != 1 || state.Modified[0] != "dist/k-playbook-linux-amd64" {
+		t.Errorf("Modified = %v, erwartet die geaenderte Datei", state.Modified)
+	}
+	if state.Message == "" {
+		t.Error("keine Meldung zum Zustand")
+	}
+}
+
+// Zusaetzliche Dateien sind auffaellig, stehen einem Fast-Forward aber nicht im
+// Weg. Sie duerfen das Update deshalb nicht verhindern.
+func TestCheckCleanlinessUntrackedBlockiertNicht(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+
+	extra := filepath.Join(PlaybookDir(projectDir), "notiz.txt")
+	if err := os.WriteFile(extra, []byte("x"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+
+	state := CheckCleanliness(projectDir)
+	if state.Clean {
+		t.Error("zusaetzliche Datei nicht gemeldet")
+	}
+	if state.Blocking() {
+		t.Errorf("zusaetzliche Datei blockiert das Update: %+v", state)
+	}
+	if len(state.Untracked) != 1 || state.Untracked[0] != "notiz.txt" {
+		t.Errorf("Untracked = %v, erwartet notiz.txt", state.Untracked)
+	}
+}
+
+func TestCheckCleanlinessErkenntLokaleCommits(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+	dir := PlaybookDir(projectDir)
+
+	if err := os.WriteFile(filepath.Join(dir, "eigen.md"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	run(t, dir, "git", "add", "-A")
+	run(t, dir, "git", "commit", "-m", "lokal")
+
+	state := CheckCleanliness(projectDir)
+	if state.Ahead != 1 || !state.Blocking() {
+		t.Errorf("lokaler Commit nicht als blockierend gemeldet: %+v", state)
+	}
+}
+
+// Vorher pruefen statt hinterher stolpern: das Update laeuft gar nicht erst an.
+func TestUpdateBrichtBeiVerschmutzterInstallationAb(t *testing.T) {
+	projectDir, remoteDir := newGitInstallation(t)
+
+	other := filepath.Join(t.TempDir(), "anderer")
+	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
+	run(t, other, "git", "config", "user.email", "test@example.com")
+	run(t, other, "git", "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(other, "doku.md"), []byte("neu"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	run(t, other, "git", "add", "-A")
+	run(t, other, "git", "commit", "-m", "neuer Stand")
+	run(t, other, "git", "push")
+
+	// Eine lokal veraenderte Datei, die mit dem neuen Stand gar nicht
+	// kollidiert. Ohne Vorabpruefung liefe der Pull hier sauber durch.
+	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
+	if err := os.WriteFile(binary, []byte("kaputt"), 0o755); err != nil {
+		t.Fatalf("Binary aendern: %v", err)
+	}
+
+	result, err := Update(projectDir)
+	if err == nil {
+		t.Fatal("Update lief trotz veraenderter Datei durch")
+	}
+	if !result.Cleanliness.Blocking() {
+		t.Errorf("Cleanliness nicht mitgeliefert: %+v", result.Cleanliness)
+	}
+
+	// Der Pull darf nicht stattgefunden haben.
+	if data, readErr := os.ReadFile(binary); readErr != nil || string(data) != "kaputt" {
+		t.Errorf("die lokale Aenderung wurde angetastet: %q, %v", data, readErr)
+	}
+}
+
 func TestCheckUpdateOhneGit(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(PlaybookDir(root), 0o755); err != nil {

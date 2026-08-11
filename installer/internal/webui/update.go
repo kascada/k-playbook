@@ -20,8 +20,13 @@ type updateResponse struct {
 	RestartRequired bool `json:"restartRequired"`
 	// Links nennt, was das Update an der Registrierung von Commands und Skills
 	// geaendert hat.
-	Links   project.LinkChanges `json:"links"`
-	Message string              `json:"message"`
+	Links project.LinkChanges `json:"links"`
+	// Cleanliness ist der lokale Zustand der Installation. Er wird bei jeder
+	// Pruefung mitgeliefert, auch ohne anstehendes Update: die Verschmutzung
+	// entsteht unabhaengig davon, und wer nie aktualisiert, bekaeme sie sonst
+	// nie zu sehen.
+	Cleanliness project.Cleanliness `json:"cleanliness"`
+	Message     string              `json:"message"`
 }
 
 // updateCheckHandler prueft den Remote-Stand. Rein lesend.
@@ -38,11 +43,12 @@ func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, updateResponse{
-		Available: status.Available,
-		Branch:    status.Branch,
-		Local:     shortCommit(status.Local),
-		Remote:    shortCommit(status.Remote),
-		Message:   status.Message,
+		Available:   status.Available,
+		Branch:      status.Branch,
+		Local:       shortCommit(status.Local),
+		Remote:      shortCommit(status.Remote),
+		Cleanliness: status.Cleanliness,
+		Message:     status.Message,
 	})
 }
 
@@ -59,8 +65,9 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	result, err := project.Update(environment.ProjectDir)
 	if err != nil {
 		writeJSON(w, http.StatusConflict, updateResponse{
-			Output:  result.Output,
-			Message: err.Error(),
+			Output:      result.Output,
+			Cleanliness: result.Cleanliness,
+			Message:     err.Error(),
 		})
 		return
 	}
@@ -75,12 +82,14 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 
-	// Nach dem Pull erneut pruefen, damit der Button den neuen Zustand zeigt.
+	// Nach dem Pull erneut pruefen, damit Button und Karte den neuen Zustand
+	// zeigen. Der Pull selbst kann den lokalen Zustand veraendert haben.
 	if status, err := project.CheckUpdate(environment.ProjectDir); err == nil {
 		response.Available = status.Available
 		response.Branch = status.Branch
 		response.Local = shortCommit(status.Local)
 		response.Remote = shortCommit(status.Remote)
+		response.Cleanliness = status.Cleanliness
 	}
 	writeJSON(w, http.StatusOK, response)
 }

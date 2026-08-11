@@ -15,6 +15,12 @@ const elements = {
   pathMessage: document.getElementById("path-message"),
   pathCommand: document.getElementById("path-command"),
   pathCommandText: document.getElementById("path-command-text"),
+  cleanCard: document.getElementById("clean-card"),
+  cleanPill: document.getElementById("clean-pill"),
+  cleanFacts: document.getElementById("clean-facts"),
+  cleanMessage: document.getElementById("clean-message"),
+  cleanCommand: document.getElementById("clean-command"),
+  cleanCommandText: document.getElementById("clean-command-text"),
   configCard: document.getElementById("config-card"),
   localCard: document.getElementById("local-card"),
   assistantCard: document.getElementById("assistant-card"),
@@ -154,6 +160,7 @@ async function onUpdateClick() {
 
 function renderUpdate(data) {
   updateAvailable = Boolean(data.available);
+  renderCleanliness(data.cleanliness);
 
   if (updateAvailable) {
     // Hervorgehoben, solange etwas anliegt.
@@ -175,6 +182,50 @@ function resetUpdateButton(label) {
   elements.update.className = "secondary";
   elements.update.textContent = label;
   elements.update.disabled = false;
+}
+
+// Die Karte erscheint nur, wenn in der Installation lokal gearbeitet wurde.
+// Sie kommt bei jeder Update-Pruefung mit, also auch ohne anstehendes Update —
+// die Verschmutzung entsteht unabhaengig davon.
+//
+// Bewusst kein Knopf, der zuruecksetzt: das waere `git checkout -- .` in einem
+// fremden Verzeichnis, und die Oberflaeche kann nicht wissen, ob dort jemand
+// absichtlich entwickelt. Der Befehl steht zum Kopieren da, ausgefuehrt wird er
+// vom Nutzer.
+function renderCleanliness(state) {
+  if (!state || state.clean) {
+    elements.cleanCard.classList.add("hidden");
+    return;
+  }
+
+  const blocking = (state.modified && state.modified.length > 0) || state.ahead > 0;
+  elements.cleanPill.className = "pill warn";
+  elements.cleanPill.textContent = blocking ? "Veraendert" : "Zusaetzliche Dateien";
+  elements.cleanMessage.textContent = state.message || "";
+
+  elements.cleanFacts.replaceChildren();
+  if (state.ahead > 0) {
+    addFact(elements.cleanFacts, "Lokale Commits", String(state.ahead));
+  }
+  for (const path of state.modified || []) {
+    addFact(elements.cleanFacts, "Veraendert", path);
+  }
+  for (const path of state.untracked || []) {
+    addFact(elements.cleanFacts, "Zusaetzlich", path);
+  }
+
+  // Lokale Commits sind mit Verwerfen nicht aufzuloesen; dafuer gibt es keinen
+  // Befehl, den man blind vorschlagen koennte.
+  if (state.ahead > 0) {
+    elements.cleanCommand.classList.add("hidden");
+  } else {
+    elements.cleanCommandText.textContent = state.modified && state.modified.length > 0
+      ? "git -C k-playbook checkout -- ."
+      : "git -C k-playbook clean -nd";
+    elements.cleanCommand.classList.remove("hidden");
+  }
+
+  elements.cleanCard.classList.remove("hidden");
 }
 
 // Legt eine Zeile in einer Faktenliste an und gibt sie zurueck, damit der

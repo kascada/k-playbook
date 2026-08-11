@@ -49,7 +49,7 @@ Check existence only — do not read contents beyond what a line count needs:
 | Row | Check |
 |---|---|
 | Projekt | `project.dir`, and whether `project.repoRoot` differs from it |
-| Installation | `playbook.dir` exists and contains `bin/k-playbook` |
+| Installation | `playbook.dir` exists, contains `bin/k-playbook`, and is unmodified — see below |
 | Projekteigenes | `local.dir` exists |
 | Instruktionen | how many files `instructions` names, and whether each exists |
 | Struktur | which of `tasks/`, `tasks/done/`, `docs/`, `results/`, `guidelines/`, `rules/`, `reviews/`, `checks/`, `priv/` are missing under `local.dir` |
@@ -63,13 +63,38 @@ Check existence only — do not read contents beyond what a line count needs:
 | Git | `project.vcs`; if `git`, `git status --short` in `project.repoRoot` |
 | Assistenten | whether `.claude/commands`, `.claude/skills`, `.opencode/commands`, `.cursor/commands` exist under `project.dir` and point into `playbook.dir` or `local.dir` |
 
+### The installation must be unmodified
+
+`playbook.dir` is a clone and is replaced on every update, so nothing may be written
+there. That rule does not enforce itself, and the failure is silent: if a locally changed
+file does not also change upstream, `git pull` runs through cleanly and leaves it in
+place. The change then survives every update without ever being reported.
+
+Run in `playbook.dir`:
+
+```bash
+git -C <playbook.dir> status --porcelain
+git -C <playbook.dir> rev-list --count @{u}..HEAD
+```
+
+- Tracked files changed or deleted → `FAIL`. Name them, and give
+  `git -C k-playbook checkout -- .` as the fix.
+- Untracked files → `WARN`. What the project produces belongs in `local.dir`.
+- Local commits (`@{u}..HEAD` greater than zero) → `FAIL`. They block `--ff-only` and
+  have to be resolved by hand; do not suggest a command for it.
+
+If the wrapper itself is the broken file, the documented `k-playbook/bin/k-playbook`
+call fails. Say so plainly rather than reporting the project as not a k-playbook
+project — the host-wide `k-playbook` from `PATH` resolves the same context and is the
+way out.
+
 ## Compact Output
 
 ```text
 /k-status
 ------------------------
 Projekt:       /path/to/project (repo: ., git)
-Installation:  OK, k-playbook/
+Installation:  FAIL, bin/k-playbook lokal veraendert
 Projekteigen:  OK, k-playbook-local/
 Instruktionen: OK, 2 Dateien
 Struktur:      WARN, 2 Verzeichnisse fehlen (priv, guidelines)
@@ -84,8 +109,8 @@ Git:           WARN, dirty (4 geaendert, 1 untracked)
 Assistenten:   WARN, .cursor/commands fehlt
 
 Naechste Aktionen:
-1. /k-gui
-2. /k-run
+1. git -C k-playbook checkout -- .
+2. /k-gui
 3. /k-code2docs
 ```
 
@@ -93,7 +118,8 @@ Use these labels consistently:
 
 - `OK`: the row was checked and nothing is missing.
 - `WARN`: something is missing or empty, but the project remains usable.
-- `FAIL`: the context call failed, or `playbook.dir` / `local.dir` do not exist.
+- `FAIL`: the context call failed, `playbook.dir` / `local.dir` do not exist, or the
+  installation carries local changes.
 
 Derive the recommended actions from the WARN and FAIL rows, most blocking first. Missing
 directories and missing assistant links are always `/k-gui`.

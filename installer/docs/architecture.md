@@ -153,12 +153,12 @@ und checks: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab
 
 | Sorte | Einheit | Schluessel | Abschalten durch |
 |---|---|---|---|
-| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/path-resolution.md` | leere Datei |
+| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/context.md` | leere Datei |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname | leere `SKILL.md` |
 
 Commands werden **rekursiv** aufgeloest. Namensraum-Verzeichnisse wie `_shared/` und
 `_details/` sind damit bis auf die einzelne Datei ueberlagerbar: ein Projekt ersetzt
-`_shared/path-resolution.md` und behaelt den Rest des Namensraums aus der Installation.
+`_shared/context.md` und behaelt den Rest des Namensraums aus der Installation.
 
 Skills werden als Ganzes ueberlagert, nicht Datei fuer Datei. `SKILL.md`, `PLAYBOOK.md`
 und `vorlagen/` muessen zueinander passen; ein halb ersetzter Skill waere nicht sinnvoll
@@ -201,7 +201,7 @@ Die vier Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Ein
   k-review.md  -> ../../k-playbook-local/commands/k-review.md  override
   k-eigen.md   -> ../../k-playbook-local/commands/k-eigen.md   local
   _shared/
-    path-resolution.md -> ../../../k-playbook/commands/_shared/path-resolution.md
+    context.md   -> ../../../k-playbook/commands/_shared/context.md
 ```
 
 Ein Verzeichnis-Symlink zeigt auf genau eine Quelle; damit kaeme entweder nur die
@@ -332,6 +332,39 @@ Oberflaeche blockiert.
 `Update()` holt den Stand per `git pull --ff-only`. Nur Fast-Forward: ein Merge im Clone
 erzeugte eine lokale Historie, die niemand pflegt. Wer dort committet hat, soll das selbst
 aufloesen.
+
+### Die Installation muss sauber sein
+
+`CheckCleanliness()` liest bei jeder Pruefung den lokalen Zustand des Clones mit — rein
+lokal, ohne Netz, deshalb billig genug fuer den ungefragten Lauf nach dem Start.
+
+Der Grund ist ein stiller Fehlerfall. Das Modell verlangt, dass in `k-playbook/` nie
+geschrieben wird, aber die Regel erzwingt sich nicht. Aendert sich eine lokal veraenderte
+Datei upstream nicht mit, laeuft `git pull` sauber durch und laesst sie stehen: die
+Aenderung ueberlebt dann jedes Update, ohne je gemeldet zu werden. Aendert sie sich doch
+mit, bricht git ab — mit einer Meldung, die im `output` verschwindet.
+
+Drei Zustaende, zwei Schweregrade:
+
+| Zustand | `Blocking()` | Warum |
+|---|---|---|
+| verfolgte Datei geaendert/geloescht | ja | geht beim Update verloren oder verhindert es |
+| zusaetzliche Datei | nein | steht einem Fast-Forward nicht im Weg, gehoert aber nach `k-playbook-local/` |
+| lokale Commits (`@{u}..HEAD`) | ja | blockieren `--ff-only`, nur von Hand aufloesbar |
+
+`Update()` prueft **vor** dem Pull und bricht bei `Blocking()` ab, statt hinterher zu
+stolpern. Das ist der Unterschied zwischen „irgendwas ging schief" und „`bin/k-playbook`
+ist veraendert".
+
+Die Oberflaeche zeigt den Befund in einer eigenen Karte, weil dort Dateinamen hinmuessen
+— der Update-Button hat nur Platz fuer einen Zustand. Bewusst **ohne** Knopf zum
+Zuruecksetzen: das waere `git checkout -- .` in einem fremden Verzeichnis, und die
+Oberflaeche kann nicht wissen, ob dort jemand absichtlich entwickelt. Der Befehl steht
+zum Kopieren da.
+
+Denselben Befund meldet `/k-status` in der Zeile `Installation:`. Das faengt den Fall ab,
+in dem ausgerechnet `bin/k-playbook` die veraenderte Datei ist: dann ist die Oberflaeche
+ueber den Wrapper gar nicht erreichbar.
 
 Vor und nach dem Pull werden die Dateien unter `dist/` per SHA-256 gehasht.
 `BinaryChanged` meldet, ob sich etwas geaendert hat — **nur dann** bringt ein Neustart
@@ -593,8 +626,8 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` pruefen, ob die Installation zurueckliegt |
-| `POST` | `/api/update` | `git pull --ff-only` ausfuehren |
+| `GET` | `/api/update` | per `git ls-remote` pruefen, ob die Installation zurueckliegt; liefert den lokalen Sauberkeitszustand mit |
+| `POST` | `/api/update` | `git pull --ff-only` ausfuehren; bricht bei lokal veraenderter Installation vorher ab |
 | `GET` | `/api/context` | aufgeloesten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -636,6 +669,7 @@ das und weist auf die Port-Weiterleitung hin.
   alle Commands bekommen dieselbe.
 - Abgeschaltet wird ueber eine leere Datei, nicht ueber eine Liste in der Konfiguration.
   Ein Mechanismus statt zweier.
+- `git status --porcelain` und `git rev-list --count @{u}..HEAD` fuer den lokalen Zustand.
 - `git ls-remote` zum Pruefen, `git pull --ff-only` zum Holen. Nichts, was den Zustand des
   Clones ungefragt veraendert.
 - Kein Projekt-Store. Es gibt keine Liste bekannter Projekte mehr — das Werkzeug arbeitet
