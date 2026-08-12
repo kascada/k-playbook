@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Waehlt das zur Plattform passende Binary aus ../dist/ und ruft es auf.
+# Wählt das zur Plattform passende Binary aus ../dist/ und ruft es auf.
 # Liegt im Repo und wird mitgeklont, damit direkt nach dem Clone ein
 # Einstiegspunkt vorhanden ist.
 
@@ -22,7 +22,7 @@ case "$(uname -s)" in
   Linux) os="linux" ;;
   Darwin) os="darwin" ;;
   *)
-    printf 'Nicht unterstuetztes Betriebssystem fuer k-playbook: %s\n' "$(uname -s)" >&2
+    printf 'Nicht unterstütztes Betriebssystem für k-playbook: %s\n' "$(uname -s)" >&2
     exit 1
     ;;
 esac
@@ -31,7 +31,7 @@ case "$(uname -m)" in
   x86_64|amd64) arch="amd64" ;;
   arm64|aarch64) arch="arm64" ;;
   *)
-    printf 'Nicht unterstuetzte Architektur fuer k-playbook: %s\n' "$(uname -m)" >&2
+    printf 'Nicht unterstützte Architektur für k-playbook: %s\n' "$(uname -m)" >&2
     exit 1
     ;;
 esac

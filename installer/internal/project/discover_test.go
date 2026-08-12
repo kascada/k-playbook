@@ -62,7 +62,7 @@ func TestDiscoverFindetAnkerAusTieferUnterebene(t *testing.T) {
 }
 
 // Die Installation ist ein eigener Clone und damit ein eigener Git-Worktree.
-// Ein Abbruch am Worktree-Root wuerde den Anker eine Ebene darueber verdecken.
+// Ein Abbruch am Worktree-Root würde den Anker eine Ebene darüber verdecken.
 func TestDiscoverLaeuftUeberGitWorktreeHinaus(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
@@ -137,7 +137,7 @@ func TestDetectFromOhneInstallation(t *testing.T) {
 }
 
 // Ein Verzeichnis wird als Anker nur anerkannt, wenn K-PLAYBOOK.yaml eine Datei
-// ist; ein gleichnamiges Verzeichnis darf nicht zaehlen.
+// ist; ein gleichnamiges Verzeichnis darf nicht zählen.
 func TestDiscoverIgnoriertGleichnamigesVerzeichnis(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(ConfigPath(root), 0o755); err != nil {

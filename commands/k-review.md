@@ -132,9 +132,9 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
 1. Analyse gemäß Review-Datei durchführen.
-2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad waehlen.
+2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad wählen.
    - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
-   - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind ueberschreiben: nach Bestaetigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
+   - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind überschreiben: nach Bestätigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
    `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/assessment.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
@@ -146,15 +146,15 @@ Wenn `LOG_FILE` gesetzt ist:
 1. Datei anlegen, falls sie noch nicht existiert (Skelett siehe unten).
 2. Sektion für das Review sicherstellen (`## <title>` — anlegen falls nicht vorhanden).
 3. Felder aktualisieren:
-   - `Letzter Lauf`: heute (`YYYY-MM-DD`).
-   - `Fällig ab`: heute + `interval-weeks` (als `YYYY-MM-DD`).
+   - `Letzter Lauf`: `now.date`.
+   - `Fällig ab`: `now.date` + `interval-weeks` (als `YYYY-MM-DD`).
 4. Eine Zeile ans Protokoll am Dateiende anhängen:
 
    | Datum | Review | Scope | Output |
    |---|---|---|---|
    | 2026-07-12 | review-python-comment-hardspots | src/upload.py, src/api.py | 3 Vorschläge / 2 übernommen / 1 skip |
 
-Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ersatzpfad fuer nur diesen Lauf fragen.
+Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ersatzpfad für nur diesen Lauf fragen.
 
 **Log-Skelett** (nur beim ersten Anlegen):
 
@@ -180,5 +180,5 @@ Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) we
 
 - **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
-- **Kein k-playbook-Projekt**: der Context-Aufruf schlaegt fehl; abbrechen und `/k-gui` empfehlen.
+- **Kein k-playbook-Projekt**: der Context-Aufruf schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` fehlt im Dateisystem**: User fragen, ob genau dieses Verzeichnis angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

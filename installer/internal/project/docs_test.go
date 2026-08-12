@@ -7,7 +7,7 @@ import (
 )
 
 // docsFixture legt ein Projekt mit Doku an und gibt dessen Hauptverzeichnis
-// zurueck.
+// zurück.
 func docsFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
 
@@ -45,22 +45,22 @@ func TestListDocsNimmtTitelUndUnterverzeichnisse(t *testing.T) {
 		titles[doc.Path] = doc.Title
 	}
 	if titles["handbuch.md"] != "Handbuch" {
-		t.Errorf("Titel aus Ueberschrift: %q", titles["handbuch.md"])
+		t.Errorf("Titel aus Überschrift: %q", titles["handbuch.md"])
 	}
 	if titles["libs/django.md"] != "Django" {
 		t.Errorf("Unterverzeichnis fehlt oder falscher Titel: %+v", titles)
 	}
-	// Ohne Ueberschrift bleibt nur der Dateiname.
+	// Ohne Überschrift bleibt nur der Dateiname.
 	if titles["ohne-titel.md"] != "ohne-titel" {
-		t.Errorf("Rueckfall auf den Dateinamen: %q", titles["ohne-titel.md"])
+		t.Errorf("Rückfall auf den Dateinamen: %q", titles["ohne-titel.md"])
 	}
 }
 
 // Die README ist der Einstieg und steht deshalb vor allem anderen, auch wenn
-// sie alphabetisch spaeter kaeme.
+// sie alphabetisch später käme.
 func TestListDocsStelltReadmeVoran(t *testing.T) {
 	root := docsFixture(t, map[string]string{
-		"README.md":   "# Uebersicht\n",
+		"README.md":   "# Übersicht\n",
 		"commands.md": "# Commands\n",
 	})
 
@@ -95,7 +95,7 @@ func TestReadDocLiefertInhalt(t *testing.T) {
 }
 
 // Der Pfad kommt aus dem Browser. Nichts davon darf aus dem Doku-Verzeichnis
-// herausfuehren oder etwas anderes als Markdown lesen.
+// herausführen oder etwas anderes als Markdown lesen.
 func TestReadDocWeistFremdePfadeAb(t *testing.T) {
 	root := docsFixture(t, map[string]string{"handbuch.md": "# Handbuch\n"})
 	if err := os.WriteFile(filepath.Join(root, "geheim.md"), []byte("# Geheim\n"), 0o644); err != nil {

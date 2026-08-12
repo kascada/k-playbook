@@ -9,25 +9,25 @@ import (
 
 // DefaultLanguages gilt, solange project.languages fehlt.
 //
-// Anders als bei tools.gh gibt es hier kein unknown: eine leere Auswahl waere
-// nicht dasselbe wie eine offene Frage, sondern hiesse "keine sprachgebundenen
+// Anders als bei tools.gh gibt es hier kein unknown: eine leere Auswahl wäre
+// nicht dasselbe wie eine offene Frage, sondern hieße "keine sprachgebundenen
 // Tools" — und das ist eine Aussage, die niemand getroffen hat. Python ist die
-// Vorauswahl, weil es die haeufigste Sprache in den Projekten ist, die
+// Vorauswahl, weil es die häufigste Sprache in den Projekten ist, die
 // k-playbook nutzen.
 var DefaultLanguages = []string{"python"}
 
 // languagePattern begrenzt, was als Sprachname in die Konfiguration darf. Der
 // Wert wandert als Kommandozeilenargument in das Preflight-Skript, also darf er
-// nichts enthalten, was dort eine eigene Bedeutung haette.
+// nichts enthalten, was dort eine eigene Bedeutung hätte.
 var languagePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9+#-]*$`)
 
-// ValidLanguage meldet, ob ein Sprachname zulaessig ist.
+// ValidLanguage meldet, ob ein Sprachname zulässig ist.
 func ValidLanguage(language string) bool {
 	return languagePattern.MatchString(language)
 }
 
 // ReadLanguages liest project.languages. Das zweite Ergebnis meldet, ob der
-// Schluessel ueberhaupt dastand — fehlt er, gilt DefaultLanguages.
+// Schlüssel überhaupt dastand — fehlt er, gilt DefaultLanguages.
 func ReadLanguages(projectDir string) ([]string, bool, error) {
 	data, err := os.ReadFile(ConfigPath(projectDir))
 	if err != nil {
@@ -102,7 +102,7 @@ func parseLanguages(content string) ([]string, bool, error) {
 	}
 	for _, language := range languages {
 		if !ValidLanguage(language) {
-			return DefaultLanguages, true, fmt.Errorf("project.languages enthaelt den unzulaessigen Wert %q; erlaubt sind Kleinbuchstaben, Ziffern und - + #", language)
+			return DefaultLanguages, true, fmt.Errorf("project.languages enthält den unzulässigen Wert %q; erlaubt sind Kleinbuchstaben, Ziffern und - + #", language)
 		}
 	}
 	return languages, true, nil
@@ -114,7 +114,7 @@ func cleanLanguage(value string) string {
 
 // SetLanguages schreibt project.languages.
 //
-// Ersetzt wird nur dieser Schluessel; repo_root, vcs und alles andere im
+// Ersetzt wird nur dieser Schlüssel; repo_root, vcs und alles andere im
 // project-Block bleiben unangetastet.
 func SetLanguages(projectDir string, languages []string) error {
 	cleaned := []string{}
@@ -124,7 +124,7 @@ func SetLanguages(projectDir string, languages []string) error {
 			continue
 		}
 		if !ValidLanguage(language) {
-			return fmt.Errorf("unzulaessiger Sprachname: %q", language)
+			return fmt.Errorf("unzulässiger Sprachname: %q", language)
 		}
 		if !containsString(cleaned, language) {
 			cleaned = append(cleaned, language)
@@ -141,11 +141,11 @@ func SetLanguages(projectDir string, languages []string) error {
 	return os.WriteFile(path, []byte(updated), 0o644)
 }
 
-// languagesBlock rendert den Schluessel samt Erklaerung.
+// languagesBlock rendert den Schlüssel samt Erklärung.
 //
-// Der Kommentar steht bewusst *innerhalb* des Blocks, unter dem Schluessel:
-// alles darueber liegt ausserhalb dessen, was beim Schreiben ersetzt wird, und
-// wuerde sich mit jedem Umschalten ein weiteres Mal ansammeln.
+// Der Kommentar steht bewusst *innerhalb* des Blocks, unter dem Schlüssel:
+// alles darüber liegt außerhalb dessen, was beim Schreiben ersetzt wird, und
+// würde sich mit jedem Umschalten ein weiteres Mal ansammeln.
 func languagesBlock(languages []string) string {
 	var builder strings.Builder
 	if len(languages) == 0 {
@@ -154,7 +154,7 @@ func languagesBlock(languages []string) string {
 	}
 	builder.WriteString("  languages:\n")
 	builder.WriteString("    # Sie entscheiden, welche Security-Tools gebraucht werden;\n")
-	builder.WriteString("    # sprachunabhaengige gelten immer.\n")
+	builder.WriteString("    # sprachunabhängige gelten immer.\n")
 	for _, language := range languages {
 		fmt.Fprintf(&builder, "    - %s\n", language)
 	}

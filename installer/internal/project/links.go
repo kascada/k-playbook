@@ -11,13 +11,13 @@ import (
 // Link beschreibt einen Ort, an dem ein Assistent liest.
 //
 // Es gibt zwei Sorten. Ein Katalog-Link ist ein Verzeichnis, das mit
-// Einzel-Symlinks aus dem aufgeloesten Katalog bestueckt wird — die Sorte steht
+// Einzel-Symlinks aus dem aufgelösten Katalog bestückt wird — die Sorte steht
 // in Kind. Ein Datei-Link ist ein einzelner Symlink auf eine Datei im Projekt;
 // dort steht Source statt Kind.
 type Link struct {
 	// Path ist relativ zur Projektwurzel.
 	Path string `json:"path"`
-	// Assistant nennt, wer hier liest — nur fuer die Anzeige.
+	// Assistant nennt, wer hier liest — nur für die Anzeige.
 	Assistant string `json:"assistant"`
 	// Kind nennt den Katalog hinter einem Verzeichnis. Leer bei Datei-Links.
 	Kind AssetKind `json:"kind,omitempty"`
@@ -25,26 +25,26 @@ type Link struct {
 	Source string `json:"source,omitempty"`
 	// IsFile unterscheidet Datei- von Katalog-Links.
 	IsFile bool `json:"isFile,omitempty"`
-	// Optional markiert Links, deren Quelle dem Projekt gehoert. Fehlt sie, ist
+	// Optional markiert Links, deren Quelle dem Projekt gehört. Fehlt sie, ist
 	// nichts zu tun — im Gegensatz zu einer fehlenden Quelle in der
-	// Installation, die auf eine beschaedigte Installation hindeutet.
+	// Installation, die auf eine beschädigte Installation hindeutet.
 	Optional bool `json:"optional,omitempty"`
 }
 
 // Links sind die Verlinkungen, die ein Zielprojekt braucht.
 //
-// Commands und Skills werden Eintrag fuer Eintrag verlinkt, nicht als
-// Verzeichnis. Nur so lassen sich zwei Quellen zusammenfuehren: die
+// Commands und Skills werden Eintrag für Eintrag verlinkt, nicht als
+// Verzeichnis. Nur so lassen sich zwei Quellen zusammenführen: die
 // mitgelieferten aus k-playbook/ und die projekteigenen aus
 // k-playbook-local/, wobei ein gleichnamiger projekteigener Eintrag gewinnt.
 //
 // Skills stehen nur einmal: OpenCode durchsucht neben .opencode/skills/ auch
-// .claude/skills/, ein zweiter Ort waere Dopplung. Cursor kennt kein
+// .claude/skills/, ein zweiter Ort wäre Dopplung. Cursor kennt kein
 // Skill-Konzept.
 //
-// CLAUDE.md zeigt auf AGENTS.md, weil Claude Code ausschliesslich CLAUDE.md
+// CLAUDE.md zeigt auf AGENTS.md, weil Claude Code ausschließlich CLAUDE.md
 // liest und OpenCode AGENTS.md bevorzugt. Ein Symlink statt eines Imports,
-// damit eine Aenderung immer in beiden ankommt — wer in CLAUDE.md schreibt,
+// damit eine Änderung immer in beiden ankommt — wer in CLAUDE.md schreibt,
 // schreibt durch den Link hindurch in AGENTS.md.
 func Links() []Link {
 	return []Link{
@@ -66,7 +66,7 @@ const (
 	StateMissing LinkState = "missing"
 	// StateStale: vorhanden, aber in einer Form, die nicht mehr gilt — ein
 	// Datei-Link auf ein falsches Ziel oder der Verzeichnis-Symlink aus einer
-	// aelteren Fassung.
+	// älteren Fassung.
 	StateStale LinkState = "stale"
 	// StateIncomplete: das Verzeichnis steht, sein Inhalt weicht vom Katalog ab.
 	StateIncomplete LinkState = "incomplete"
@@ -76,19 +76,19 @@ const (
 	StateNoSource LinkState = "no-source"
 )
 
-// LinkStatus ist der gepruefte Zustand einer Verlinkung.
+// LinkStatus ist der geprüfte Zustand einer Verlinkung.
 type LinkStatus struct {
 	Link
 	State  LinkState `json:"state"`
 	Detail string    `json:"detail"`
-	// Die folgenden Felder gelten nur fuer Katalog-Links und nennen die
-	// Eintraege beim Namen, damit die Oberflaeche zeigen kann, was nicht passt.
+	// Die folgenden Felder gelten nur für Katalog-Links und nennen die
+	// Einträge beim Namen, damit die Oberfläche zeigen kann, was nicht passt.
 	Expected int `json:"expected,omitempty"`
 	Linked   int `json:"linked,omitempty"`
 	// Missing: im Katalog, aber nicht registriert.
 	Missing []string `json:"missing,omitempty"`
 	// Wrong: registriert, zeigt aber auf die falsche Quelle. Typisch, wenn das
-	// Projekt einen mitgelieferten Eintrag neuerdings ueberschreibt.
+	// Projekt einen mitgelieferten Eintrag neuerdings überschreibt.
 	Wrong []string `json:"wrong,omitempty"`
 	// Stale: registriert, steht aber nicht mehr im Katalog — entfernt oder
 	// projekteigen abgeschaltet.
@@ -102,7 +102,7 @@ type LinkStatus struct {
 func (s LinkStatus) OK() bool { return s.State == StateOK }
 
 // NeedsAction meldet, ob noch etwas einzurichten ist. Ein optionaler Link ohne
-// Quelle zaehlt nicht dazu: dort gibt es nichts zu tun, solange das Projekt die
+// Quelle zählt nicht dazu: dort gibt es nichts zu tun, solange das Projekt die
 // Datei nicht selbst anlegt.
 func (s LinkStatus) NeedsAction() bool {
 	if s.State == StateOK {
@@ -111,7 +111,7 @@ func (s LinkStatus) NeedsAction() bool {
 	return !(s.Optional && s.State == StateNoSource)
 }
 
-// CheckLinks prueft den Zustand, ohne etwas zu veraendern.
+// CheckLinks prüft den Zustand, ohne etwas zu verändern.
 func CheckLinks(projectRoot string) []LinkStatus {
 	statuses := make([]LinkStatus, 0, len(Links()))
 	for _, link := range Links() {
@@ -130,11 +130,11 @@ func LinksOK(statuses []LinkStatus) bool {
 	return len(statuses) > 0
 }
 
-// LinkChanges fasst zusammen, was ein Einrichten an der Registrierung aendern
-// wuerde — ueber alle Ziele hinweg und ohne Dopplung.
+// LinkChanges fasst zusammen, was ein Einrichten an der Registrierung ändern
+// würde — über alle Ziele hinweg und ohne Dopplung.
 //
-// Ohne die Zusammenfassung waere die Zahl irrefuehrend: dieselben Commands
-// stehen in .claude/, .opencode/ und .cursor/, ein neuer Command zaehlte also
+// Ohne die Zusammenfassung wäre die Zahl irreführend: dieselben Commands
+// stehen in .claude/, .opencode/ und .cursor/, ein neuer Command zählte also
 // dreifach. Gemeint ist aber der Eintrag, nicht seine Kopien.
 type LinkChanges struct {
 	// Added kommen dazu, Removed fallen weg, Repointed wechseln die Quelle.
@@ -143,19 +143,19 @@ type LinkChanges struct {
 	Repointed []string `json:"repointed,omitempty"`
 }
 
-// Empty meldet, ob nichts zu tun waere.
+// Empty meldet, ob nichts zu tun wäre.
 func (c LinkChanges) Empty() bool {
 	return len(c.Added)+len(c.Removed)+len(c.Repointed) == 0
 }
 
-// PendingLinkChanges liest die Bilanz aus einem Pruefergebnis.
+// PendingLinkChanges liest die Bilanz aus einem Prüfergebnis.
 func PendingLinkChanges(statuses []LinkStatus) LinkChanges {
 	added, removed, repointed := map[string]bool{}, map[string]bool{}, map[string]bool{}
 
 	for _, status := range statuses {
 		// Steht das Zielverzeichnis noch gar nicht, sind die Listen leer und die
-		// Zahl saehe nach "nichts zu tun" aus. Der Fall gehoert nicht hierher:
-		// gemeint ist die Veraenderung an einer bestehenden Registrierung.
+		// Zahl sähe nach "nichts zu tun" aus. Der Fall gehört nicht hierher:
+		// gemeint ist die Veränderung an einer bestehenden Registrierung.
 		for _, name := range status.Missing {
 			added[name] = true
 		}
@@ -194,14 +194,14 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 	return checkRegistryLink(projectRoot, link)
 }
 
-// checkFileLink prueft einen einzelnen Symlink auf eine Datei im Projekt.
+// checkFileLink prüft einen einzelnen Symlink auf eine Datei im Projekt.
 func checkFileLink(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
 	source := filepath.Join(projectRoot, link.Source)
 	if !fileExists(source) {
 		status.State = StateNoSource
-		// Instruktionsdateien gehoeren dem Projekt; wir legen keine an.
+		// Instruktionsdateien gehören dem Projekt; wir legen keine an.
 		status.Detail = link.Source + " fehlt im Projekt"
 		return status
 	}
@@ -241,14 +241,14 @@ func checkFileLink(projectRoot string, link Link) LinkStatus {
 		// Typisch nach einem Editor, der "atomar" speichert: er ersetzt den
 		// Symlink durch eine echte Datei. Ab dann laufen beide auseinander.
 		status.State = StateBlocked
-		status.Detail = "echte Datei statt Symlink, Aenderungen erreichen " + link.Source + " nicht"
+		status.Detail = "echte Datei statt Symlink, Änderungen erreichen " + link.Source + " nicht"
 	}
 
 	return status
 }
 
-// checkRegistryLink vergleicht den aufgeloesten Katalog mit dem, was im
-// Zielverzeichnis tatsaechlich registriert ist.
+// checkRegistryLink vergleicht den aufgelösten Katalog mit dem, was im
+// Zielverzeichnis tatsächlich registriert ist.
 func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
@@ -264,9 +264,9 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 	target := filepath.Join(projectRoot, link.Path)
 	info, err := os.Lstat(target)
 	switch {
-	// Steht das Zielverzeichnis noch gar nicht, waere die Liste aller Namen nur
-	// Laerm — die Zahl sagt alles. Namen nennen wir erst, wenn einzelne
-	// Eintraege abweichen.
+	// Steht das Zielverzeichnis noch gar nicht, wäre die Liste aller Namen nur
+	// Lärm — die Zahl sagt alles. Namen nennen wir erst, wenn einzelne
+	// Einträge abweichen.
 	case err != nil && os.IsNotExist(err):
 		status.State = StateMissing
 		status.Detail = fmt.Sprintf("nicht vorhanden, %d einzurichten", len(wanted))
@@ -279,9 +279,9 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 
 	case info.Mode()&os.ModeSymlink != 0:
 		// Fassungen bis 0.4 haben das ganze Verzeichnis verlinkt. Damit gilt
-		// immer nur eine Quelle; projekteigene Eintraege kaemen nie an.
+		// immer nur eine Quelle; projekteigene Einträge kämen nie an.
 		status.State = StateStale
-		status.Detail = "Verzeichnis-Symlink aus einer aelteren Fassung, wird durch Einzel-Links ersetzt"
+		status.Detail = "Verzeichnis-Symlink aus einer älteren Fassung, wird durch Einzel-Links ersetzt"
 		return status
 
 	case !info.IsDir():
@@ -293,12 +293,12 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 	status.Linked, status.Missing, status.Wrong, status.Blocked = compareRegistry(target, wanted)
 	status.Stale = staleRegistryLinks(projectRoot, target, wanted)
 
-	// Blockierte Eintraege zaehlen nicht als offener Punkt: dort liegt eine
+	// Blockierte Einträge zählen nicht als offener Punkt: dort liegt eine
 	// echte Datei des Projekts, die absichtlich gewinnt. Sie bleiben in der
-	// Liste sichtbar, aber Einrichten kann und soll daran nichts aendern.
+	// Liste sichtbar, aber Einrichten kann und soll daran nichts ändern.
 	if len(status.Missing)+len(status.Wrong)+len(status.Stale) == 0 {
 		status.State = StateOK
-		status.Detail = fmt.Sprintf("%d Eintraege registriert", status.Linked)
+		status.Detail = fmt.Sprintf("%d Einträge registriert", status.Linked)
 		if n := len(status.Blocked); n > 0 {
 			status.Detail += fmt.Sprintf(", %d projekteigen", n)
 		}
@@ -329,7 +329,7 @@ func registryDetail(status LinkStatus) string {
 	return strings.Join(parts, ", ")
 }
 
-// compareRegistry prueft je Katalogeintrag, ob der passende Symlink steht.
+// compareRegistry prüft je Katalogeintrag, ob der passende Symlink steht.
 func compareRegistry(target string, wanted []RegistryEntry) (linked int, missing []string, wrong []string, blocked []string) {
 	missing, wrong, blocked = []string{}, []string{}, []string{}
 
@@ -342,7 +342,7 @@ func compareRegistry(target string, wanted []RegistryEntry) (linked int, missing
 			missing = append(missing, entry.Name)
 
 		case info.Mode()&os.ModeSymlink == 0:
-			// Etwas Echtes mit demselben Namen gehoert dem Projekt und gewinnt.
+			// Etwas Echtes mit demselben Namen gehört dem Projekt und gewinnt.
 			blocked = append(blocked, entry.Name)
 
 		default:
@@ -358,7 +358,7 @@ func compareRegistry(target string, wanted []RegistryEntry) (linked int, missing
 }
 
 // staleRegistryLinks findet Symlinks, die in eine unserer Quellen zeigen, dort
-// aber nicht mehr im Katalog stehen. Alles andere im Zielverzeichnis gehoert
+// aber nicht mehr im Katalog stehen. Alles andere im Zielverzeichnis gehört
 // dem Projekt und wird nicht bewertet.
 func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntry) []string {
 	inCatalog := map[string]bool{}
@@ -400,7 +400,7 @@ func ownedLinks(projectRoot string, dir string, prefix string) []string {
 			continue
 		}
 
-		// Reihenfolge zaehlt: ein Symlink auf ein Verzeichnis ist ein Eintrag,
+		// Reihenfolge zählt: ein Symlink auf ein Verzeichnis ist ein Eintrag,
 		// kein Verzeichnis zum Hineinlaufen.
 		if info.Mode()&os.ModeSymlink != 0 {
 			destination, err := os.Readlink(path)
@@ -446,8 +446,8 @@ func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 	return CheckLinks(projectRoot), nil
 }
 
-// applyFileLink setzt einen einzelnen Symlink. Etwas Echtes im Weg gehoert dem
-// Projekt und bleibt liegen; die Pruefung meldet den Zustand.
+// applyFileLink setzt einen einzelnen Symlink. Etwas Echtes im Weg gehört dem
+// Projekt und bleibt liegen; die Prüfung meldet den Zustand.
 func applyFileLink(projectRoot string, link Link) error {
 	source := filepath.Join(projectRoot, link.Source)
 	if !fileExists(source) {
@@ -464,7 +464,7 @@ func applyFileLink(projectRoot string, link Link) error {
 	case err != nil && os.IsNotExist(err):
 
 	case err != nil:
-		return fmt.Errorf("%s pruefen: %w", link.Path, err)
+		return fmt.Errorf("%s prüfen: %w", link.Path, err)
 
 	case info.Mode()&os.ModeSymlink != 0:
 		// Neu setzen: ein bestehender Link kann nach einem Umzug ins Leere zeigen.
@@ -484,7 +484,7 @@ func applyFileLink(projectRoot string, link Link) error {
 
 // applyRegistryLink bringt das Zielverzeichnis auf den Stand des Katalogs:
 // fehlende Links kommen dazu, falsch zeigende werden neu gesetzt, verwaiste
-// verschwinden. Echte Dateien des Projekts bleiben unberuehrt.
+// verschwinden. Echte Dateien des Projekts bleiben unberührt.
 func applyRegistryLink(projectRoot string, link Link) error {
 	if !RegistrySourcePresent(projectRoot, link.Kind) {
 		return nil
@@ -495,14 +495,14 @@ func applyRegistryLink(projectRoot string, link Link) error {
 		return err
 	}
 	if !isDir(target) {
-		// Etwas Echtes steht im Weg; die Pruefung meldet es.
+		// Etwas Echtes steht im Weg; die Prüfung meldet es.
 		return nil
 	}
 
 	wanted := ActiveRegistry(projectRoot, link.Kind)
 
-	// Erst raeumen, dann setzen: ein abgeschalteter Eintrag soll verschwinden,
-	// bevor ein gleichnamiger aus der anderen Quelle nachrueckt.
+	// Erst räumen, dann setzen: ein abgeschalteter Eintrag soll verschwinden,
+	// bevor ein gleichnamiger aus der anderen Quelle nachrückt.
 	for _, name := range staleRegistryLinks(projectRoot, target, wanted) {
 		if err := os.Remove(filepath.Join(target, filepath.FromSlash(name))); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("verwaisten Link %s entfernen: %w", name, err)
@@ -517,7 +517,7 @@ func applyRegistryLink(projectRoot string, link Link) error {
 
 		if info, err := os.Lstat(linkPath); err == nil {
 			if info.Mode()&os.ModeSymlink == 0 {
-				// Projekteigen und damit staerker als der Katalog.
+				// Projekteigen und damit stärker als der Katalog.
 				continue
 			}
 			if err := os.Remove(linkPath); err != nil {
@@ -534,15 +534,15 @@ func applyRegistryLink(projectRoot string, link Link) error {
 	return nil
 }
 
-// prepareRegistryDir sorgt dafuer, dass am Ziel ein echtes Verzeichnis steht.
-// Der Verzeichnis-Symlink aelterer Fassungen weicht dabei.
+// prepareRegistryDir sorgt dafür, dass am Ziel ein echtes Verzeichnis steht.
+// Der Verzeichnis-Symlink älterer Fassungen weicht dabei.
 func prepareRegistryDir(target string, displayPath string) error {
 	info, err := os.Lstat(target)
 	switch {
 	case err != nil && os.IsNotExist(err):
 
 	case err != nil:
-		return fmt.Errorf("%s pruefen: %w", displayPath, err)
+		return fmt.Errorf("%s prüfen: %w", displayPath, err)
 
 	case info.Mode()&os.ModeSymlink != 0:
 		if err := os.Remove(target); err != nil {
@@ -553,7 +553,7 @@ func prepareRegistryDir(target string, displayPath string) error {
 		return nil
 
 	default:
-		// Eine echte Datei gehoert dem Projekt und bleibt liegen.
+		// Eine echte Datei gehört dem Projekt und bleibt liegen.
 		return nil
 	}
 
@@ -563,7 +563,7 @@ func prepareRegistryDir(target string, displayPath string) error {
 	return nil
 }
 
-// removeEmptyDirs raeumt Namensraum-Verzeichnisse weg, die nach dem Entfernen
+// removeEmptyDirs räumt Namensraum-Verzeichnisse weg, die nach dem Entfernen
 // verwaister Links nichts mehr enthalten. Alles mit Inhalt bleibt.
 func removeEmptyDirs(dir string) {
 	entries, err := os.ReadDir(dir)
@@ -584,7 +584,7 @@ func removeEmptyDirs(dir string) {
 	}
 }
 
-// isWithin meldet, ob path in root liegt. Beide Pfade muessen bereinigt sein.
+// isWithin meldet, ob path in root liegt. Beide Pfade müssen bereinigt sein.
 func isWithin(path string, root string) bool {
 	if path == root {
 		return true

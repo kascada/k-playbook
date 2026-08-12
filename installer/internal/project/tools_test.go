@@ -8,7 +8,7 @@ import (
 )
 
 // newInstallationWithScript legt ein Projekt an, dessen Installation ein
-// Preflight-Skript mit vorgegebener Ausgabe enthaelt.
+// Preflight-Skript mit vorgegebener Ausgabe enthält.
 func newInstallationWithScript(t *testing.T, body string) string {
 	t.Helper()
 
@@ -83,8 +83,8 @@ func TestCheckToolsReichtFehlermeldungDurch(t *testing.T) {
 	}
 }
 
-// Binary und Skript koennen auseinanderlaufen, wenn das Binary aus der
-// host-weiten Kopie stammt und die Installation des Projekts aelter ist. "Unknown
+// Binary und Skript können auseinanderlaufen, wenn das Binary aus der
+// host-weiten Kopie stammt und die Installation des Projekts älter ist. "Unknown
 // argument" allein sagt nicht, dass ein Update fehlt.
 func TestCheckToolsErklaertVeralteteInstallation(t *testing.T) {
 	root := newInstallationWithScript(t, "echo 'ERROR: Unknown argument: --languages' >&2\nexit 1\n")
@@ -94,7 +94,7 @@ func TestCheckToolsErklaertVeralteteInstallation(t *testing.T) {
 		t.Fatal("Abbruch wurde nicht gemeldet")
 	}
 	got := err.Error()
-	for _, want := range []string{"aelter als dieses Werkzeug", "Update pruefen", "--languages"} {
+	for _, want := range []string{"älter als dieses Werkzeug", "Update prüfen", "--languages"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Fehler = %q, erwartet einen Hinweis auf %q", got, want)
 		}

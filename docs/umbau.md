@@ -17,7 +17,7 @@ Der Umbau auf das projektlokale Modell ist durch und in der Doku eingearbeitet:
 | Grundmodell und Standardabläufe | [`handbuch.md`](./handbuch.md) |
 | Commands, `context` einmal je Sitzung | [`commands.md`](./commands.md) |
 | Rezepte, Ergebnisse, Remediation-Policy | [`reviews-and-results.md`](./reviews-and-results.md) |
-| Entfallenes: CodeQL, `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
+| Entfallenes: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
 | Werkzeug: Anker finden, Verlinkung, Update, Spiegelung, Altlasten, Web-API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
 
 ## Arbeitsteilung: Entwicklungsrepo vs. Installation
@@ -76,8 +76,7 @@ denen jeder erst freischaltet, wenn der vorige steht:
 
 | Tool | Sprache | Zweck |
 |---|---|---|
-| `ruff` | Python | Qualität, dazu das `S`-Regelwerk (flake8-bandit) |
-| `bandit` | Python | Python-Security, tiefer als ruffs `S` |
+| `ruff` | Python | Qualität, dazu das `S`-Regelwerk (flake8-bandit); ersetzt bandit |
 | `semgrep` | Python, Go | generische Security-Regeln |
 | `gosec` | Go | Go-Security |
 | `golangci-lint` | Go | Go-Qualität, bündelt staticcheck und errcheck |

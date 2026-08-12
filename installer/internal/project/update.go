@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	// updateCheckTimeout begrenzt die Netzwerkabfrage. Sie laeuft im
-	// Hintergrund; ein haengender Remote darf die Oberflaeche nicht blockieren.
+	// updateCheckTimeout begrenzt die Netzwerkabfrage. Sie läuft im
+	// Hintergrund; ein hängender Remote darf die Oberfläche nicht blockieren.
 	updateCheckTimeout = 15 * time.Second
 	// pullTimeout: ein Clone mit Binaries kann etwas dauern.
 	pullTimeout = 2 * time.Minute
 	// cleanlinessTimeout: rein lokale Git-Aufrufe, die nur bei einem
-	// blockierten Index ueberhaupt haengen koennen.
+	// blockierten Index überhaupt hängen können.
 	cleanlinessTimeout = 10 * time.Second
 )
 
@@ -32,41 +32,41 @@ type UpdateStatus struct {
 	Remote    string `json:"remote"`
 	Message   string `json:"message"`
 	// Cleanliness ist der lokale Zustand des Clones. Er hat mit dem
-	// Remote-Stand nichts zu tun, gehoert aber hierher: beides zusammen
-	// beantwortet erst, ob ein Update ueberhaupt durchlaufen kann.
+	// Remote-Stand nichts zu tun, gehört aber hierher: beides zusammen
+	// beantwortet erst, ob ein Update überhaupt durchlaufen kann.
 	Cleanliness Cleanliness `json:"cleanliness"`
 }
 
 // Cleanliness meldet, ob in der Installation lokal gearbeitet wurde.
 //
 // Das Modell verlangt, dass dort nie geschrieben wird: das Verzeichnis ist ein
-// Clone und wird bei jedem Update ersetzt. Eine Abweichung faellt trotzdem
-// nicht von selbst auf — im Gegenteil. Aendert sich eine lokal veraenderte
-// Datei upstream nicht mit, laeuft `git pull` sauber durch und laesst sie
-// stehen; die Aenderung ueberlebt dann jedes Update, ohne je gemeldet zu
-// werden. Genau deshalb wird hier ungefragt geprueft.
+// Clone und wird bei jedem Update ersetzt. Eine Abweichung fällt trotzdem
+// nicht von selbst auf — im Gegenteil. Ändert sich eine lokal veränderte
+// Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
+// stehen; die Änderung überlebt dann jedes Update, ohne je gemeldet zu
+// werden. Genau deshalb wird hier ungefragt geprüft.
 type Cleanliness struct {
 	Clean bool `json:"clean"`
-	// Modified sind verfolgte Dateien, die geaendert oder geloescht wurden.
+	// Modified sind verfolgte Dateien, die geändert oder gelöscht wurden.
 	Modified []string `json:"modified"`
-	// Untracked sind zusaetzliche Dateien. Weniger scharf, aber auch nicht
-	// vorgesehen: was das Projekt hervorbringt, gehoert nach k-playbook-local/.
+	// Untracked sind zusätzliche Dateien. Weniger scharf, aber auch nicht
+	// vorgesehen: was das Projekt hervorbringt, gehört nach k-playbook-local/.
 	Untracked []string `json:"untracked"`
 	// Ahead sind lokale Commits. Sie blockieren `--ff-only` und lassen sich
-	// nicht durch Verwerfen von Dateien aufloesen.
+	// nicht durch Verwerfen von Dateien auflösen.
 	Ahead   int    `json:"ahead"`
 	Message string `json:"message"`
 }
 
 // Blocking sagt, ob ein Update in diesem Zustand scheitern oder still das
-// Falsche tun wuerde. Untracked Dateien zaehlen nicht dazu: sie stehen einem
+// Falsche tun würde. Untracked Dateien zählen nicht dazu: sie stehen einem
 // Fast-Forward nicht im Weg.
 func (c Cleanliness) Blocking() bool {
 	return len(c.Modified) > 0 || c.Ahead > 0
 }
 
 // maxReportedPaths begrenzt die gemeldete Dateiliste. Wer dort umfangreich
-// gearbeitet hat, braucht keine vollstaendige Aufzaehlung, sondern die
+// gearbeitet hat, braucht keine vollständige Aufzählung, sondern die
 // Erkenntnis, dass er es getan hat.
 const maxReportedPaths = 20
 
@@ -89,7 +89,7 @@ func CheckCleanliness(projectDir string) Cleanliness {
 	for _, line := range strings.Split(output, "\n") {
 		// Porcelain v1 ist `XY<Leerzeichen>PFAD`. Nicht nach fester Spalte
 		// schneiden: `GitOutput` trimmt die Gesamtausgabe, wodurch der ersten
-		// Zeile ein fuehrendes Leerzeichen fehlen kann.
+		// Zeile ein führendes Leerzeichen fehlen kann.
 		code, path, found := strings.Cut(strings.TrimSpace(line), " ")
 		if !found {
 			continue
@@ -105,8 +105,8 @@ func CheckCleanliness(projectDir string) Cleanliness {
 		state.Modified = append(state.Modified, path)
 	}
 
-	// `@{u}` schlaegt ohne Upstream fehl; das ist kein Fehlerfall, sondern
-	// heisst nur, dass sich die Frage nach lokalen Commits nicht stellt.
+	// `@{u}` schlägt ohne Upstream fehl; das ist kein Fehlerfall, sondern
+	// heißt nur, dass sich die Frage nach lokalen Commits nicht stellt.
 	if count, err := GitOutput(ctx, dir, "rev-list", "--count", "@{u}..HEAD"); err == nil {
 		if n, convErr := strconv.Atoi(count); convErr == nil {
 			state.Ahead = n
@@ -135,10 +135,10 @@ func describeCleanliness(state Cleanliness) string {
 
 	parts := []string{}
 	if n := len(state.Modified); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d veraenderte Datei(en)", n))
+		parts = append(parts, fmt.Sprintf("%d veränderte Datei(en)", n))
 	}
 	if n := len(state.Untracked); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d zusaetzliche Datei(en)", n))
+		parts = append(parts, fmt.Sprintf("%d zusätzliche Datei(en)", n))
 	}
 	if state.Ahead > 0 {
 		parts = append(parts, fmt.Sprintf("%d lokale(r) Commit(s)", state.Ahead))
@@ -146,17 +146,17 @@ func describeCleanliness(state Cleanliness) string {
 
 	message := "In der Installation wurde lokal gearbeitet: " + strings.Join(parts, ", ") + "."
 	if state.Ahead > 0 {
-		return message + " Lokale Commits muessen von Hand aufgeloest werden."
+		return message + " Lokale Commits müssen von Hand aufgelöst werden."
 	}
 	if len(state.Modified) > 0 {
-		return message + " Aenderungen dort gehen beim Update verloren oder verhindern es."
+		return message + " Änderungen dort gehen beim Update verloren oder verhindern es."
 	}
-	return message + " Projekteigene Dateien gehoeren nach " + LocalDirName + "/."
+	return message + " Projekteigene Dateien gehören nach " + LocalDirName + "/."
 }
 
-// CheckUpdate fragt den Remote-Stand ab, ohne etwas zu veraendern.
+// CheckUpdate fragt den Remote-Stand ab, ohne etwas zu verändern.
 //
-// Bewusst `git ls-remote` statt `git fetch`: die Pruefung laeuft ungefragt nach
+// Bewusst `git ls-remote` statt `git fetch`: die Prüfung läuft ungefragt nach
 // dem Start und darf den Zustand des Repositorys nicht anfassen.
 func CheckUpdate(projectDir string) (UpdateStatus, error) {
 	dir := PlaybookDir(projectDir)
@@ -178,11 +178,11 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 
 	remoteName, err := GitOutput(ctx, dir, "config", "--get", "branch."+branch+".remote")
 	if err != nil || remoteName == "" {
-		return UpdateStatus{Branch: branch, Message: "Kein Upstream fuer diesen Branch konfiguriert.", Cleanliness: cleanliness}, nil
+		return UpdateStatus{Branch: branch, Message: "Kein Upstream für diesen Branch konfiguriert.", Cleanliness: cleanliness}, nil
 	}
 	mergeRef, err := GitOutput(ctx, dir, "config", "--get", "branch."+branch+".merge")
 	if err != nil || mergeRef == "" {
-		return UpdateStatus{Branch: branch, Message: "Kein Upstream fuer diesen Branch konfiguriert.", Cleanliness: cleanliness}, nil
+		return UpdateStatus{Branch: branch, Message: "Kein Upstream für diesen Branch konfiguriert.", Cleanliness: cleanliness}, nil
 	}
 
 	local, err := GitOutput(ctx, dir, "rev-parse", "HEAD")
@@ -214,23 +214,23 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 // UpdateResult ist das Ergebnis eines Pull-Laufs.
 type UpdateResult struct {
 	Output string `json:"output"`
-	// BinaryChanged meldet, ob sich die ausgelieferten Binaries geaendert
+	// BinaryChanged meldet, ob sich die ausgelieferten Binaries geändert
 	// haben. Nur dann bringt ein Neustart eine andere Programmversion.
 	BinaryChanged bool   `json:"binaryChanged"`
 	Message       string `json:"message"`
-	// Cleanliness traegt den Grund, wenn das Update gar nicht erst lief.
+	// Cleanliness trägt den Grund, wenn das Update gar nicht erst lief.
 	Cleanliness Cleanliness `json:"cleanliness"`
 }
 
 // Update holt den neuen Stand per Fast-Forward.
 //
-// Nur `--ff-only`: ein Merge im Clone wuerde eine lokale Historie erzeugen, die
-// niemand pflegt. Wer dort committet hat, soll das selbst aufloesen.
+// Nur `--ff-only`: ein Merge im Clone würde eine lokale Historie erzeugen, die
+// niemand pflegt. Wer dort committet hat, soll das selbst auflösen.
 func Update(projectDir string) (UpdateResult, error) {
 	dir := PlaybookDir(projectDir)
 
-	// Vorher pruefen statt hinterher stolpern. `git pull` scheitert an einer
-	// kollidierenden Datei mit einer Meldung, die niemand liest, und laeuft an
+	// Vorher prüfen statt hinterher stolpern. `git pull` scheitert an einer
+	// kollidierenden Datei mit einer Meldung, die niemand liest, und läuft an
 	// einer nicht kollidierenden still vorbei. Beides ist schlechter als die
 	// Ansage, welche Datei im Weg ist.
 	if state := CheckCleanliness(projectDir); state.Blocking() {
@@ -259,8 +259,8 @@ func Update(projectDir string) (UpdateResult, error) {
 	return result, nil
 }
 
-// binaryHashes bildet die ausgelieferten Binaries ab. Aendern sie sich, laeuft
-// der aktuelle Prozess weiterhin mit dem alten Code: unter Linux behaelt er
+// binaryHashes bildet die ausgelieferten Binaries ab. Ändern sie sich, läuft
+// der aktuelle Prozess weiterhin mit dem alten Code: unter Linux behält er
 // seinen Inode, auch wenn die Datei ersetzt wurde.
 func binaryHashes(playbookDir string) map[string]string {
 	hashes := map[string]string{}
@@ -301,7 +301,7 @@ func sameHashes(before map[string]string, after map[string]string) bool {
 	return true
 }
 
-// GitOutput fuehrt ein Git-Kommando in dir aus und liefert die getrimmte
+// GitOutput führt ein Git-Kommando in dir aus und liefert die getrimmte
 // Ausgabe. Exportiert, weil auch hostinstall den Commit-Stand einer
 // Installation braucht.
 func GitOutput(ctx context.Context, dir string, args ...string) (string, error) {

@@ -13,7 +13,7 @@ func newGitInstallation(t *testing.T) (projectDir string, remoteDir string) {
 	t.Helper()
 
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git nicht verfuegbar")
+		t.Skip("git nicht verfügbar")
 	}
 
 	base := t.TempDir()
@@ -91,7 +91,7 @@ func TestCheckUpdateErkenntNeuenStand(t *testing.T) {
 	}
 }
 
-// Nur wenn sich die Binaries aendern, bringt ein Neustart eine andere Version.
+// Nur wenn sich die Binaries ändern, bringt ein Neustart eine andere Version.
 func TestUpdateMeldetGeaenderteBinaries(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
 
@@ -100,7 +100,7 @@ func TestUpdateMeldetGeaenderteBinaries(t *testing.T) {
 	run(t, other, "git", "config", "user.email", "test@example.com")
 	run(t, other, "git", "config", "user.name", "Test")
 	if err := os.WriteFile(filepath.Join(other, "dist", "k-playbook-linux-amd64"), []byte("neu"), 0o755); err != nil {
-		t.Fatalf("Binary aendern: %v", err)
+		t.Fatalf("Binary ändern: %v", err)
 	}
 	run(t, other, "git", "add", "-A")
 	run(t, other, "git", "commit", "-m", "neues Binary")
@@ -142,7 +142,7 @@ func TestUpdateOhneBinaeraenderung(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 	if result.BinaryChanged {
-		t.Error("BinaryChanged = true, obwohl sich nur Text geaendert hat")
+		t.Error("BinaryChanged = true, obwohl sich nur Text geändert hat")
 	}
 }
 
@@ -155,31 +155,31 @@ func TestCheckCleanlinessSauber(t *testing.T) {
 	}
 }
 
-// Der Fall, der ohne diese Pruefung nie auffaellt: eine veraenderte Datei, die
-// sich upstream nicht mit aendert. `git pull` laeuft sauber durch und laesst
+// Der Fall, der ohne diese Prüfung nie auffällt: eine veränderte Datei, die
+// sich upstream nicht mit ändert. `git pull` läuft sauber durch und lässt
 // sie stehen.
 func TestCheckCleanlinessErkenntVeraenderteDatei(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 
 	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
 	if err := os.WriteFile(binary, []byte("kaputt"), 0o755); err != nil {
-		t.Fatalf("Binary aendern: %v", err)
+		t.Fatalf("Binary ändern: %v", err)
 	}
 
 	state := CheckCleanliness(projectDir)
 	if state.Clean || !state.Blocking() {
-		t.Fatalf("veraenderte Datei nicht als blockierend gemeldet: %+v", state)
+		t.Fatalf("veränderte Datei nicht als blockierend gemeldet: %+v", state)
 	}
 	if len(state.Modified) != 1 || state.Modified[0] != "dist/k-playbook-linux-amd64" {
-		t.Errorf("Modified = %v, erwartet die geaenderte Datei", state.Modified)
+		t.Errorf("Modified = %v, erwartet die geänderte Datei", state.Modified)
 	}
 	if state.Message == "" {
 		t.Error("keine Meldung zum Zustand")
 	}
 }
 
-// Zusaetzliche Dateien sind auffaellig, stehen einem Fast-Forward aber nicht im
-// Weg. Sie duerfen das Update deshalb nicht verhindern.
+// Zusätzliche Dateien sind auffällig, stehen einem Fast-Forward aber nicht im
+// Weg. Sie dürfen das Update deshalb nicht verhindern.
 func TestCheckCleanlinessUntrackedBlockiertNicht(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 
@@ -190,10 +190,10 @@ func TestCheckCleanlinessUntrackedBlockiertNicht(t *testing.T) {
 
 	state := CheckCleanliness(projectDir)
 	if state.Clean {
-		t.Error("zusaetzliche Datei nicht gemeldet")
+		t.Error("zusätzliche Datei nicht gemeldet")
 	}
 	if state.Blocking() {
-		t.Errorf("zusaetzliche Datei blockiert das Update: %+v", state)
+		t.Errorf("zusätzliche Datei blockiert das Update: %+v", state)
 	}
 	if len(state.Untracked) != 1 || state.Untracked[0] != "notiz.txt" {
 		t.Errorf("Untracked = %v, erwartet notiz.txt", state.Untracked)
@@ -216,7 +216,7 @@ func TestCheckCleanlinessErkenntLokaleCommits(t *testing.T) {
 	}
 }
 
-// Vorher pruefen statt hinterher stolpern: das Update laeuft gar nicht erst an.
+// Vorher prüfen statt hinterher stolpern: das Update läuft gar nicht erst an.
 func TestUpdateBrichtBeiVerschmutzterInstallationAb(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
 
@@ -231,16 +231,16 @@ func TestUpdateBrichtBeiVerschmutzterInstallationAb(t *testing.T) {
 	run(t, other, "git", "commit", "-m", "neuer Stand")
 	run(t, other, "git", "push")
 
-	// Eine lokal veraenderte Datei, die mit dem neuen Stand gar nicht
-	// kollidiert. Ohne Vorabpruefung liefe der Pull hier sauber durch.
+	// Eine lokal veränderte Datei, die mit dem neuen Stand gar nicht
+	// kollidiert. Ohne Vorabprüfung liefe der Pull hier sauber durch.
 	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
 	if err := os.WriteFile(binary, []byte("kaputt"), 0o755); err != nil {
-		t.Fatalf("Binary aendern: %v", err)
+		t.Fatalf("Binary ändern: %v", err)
 	}
 
 	result, err := Update(projectDir)
 	if err == nil {
-		t.Fatal("Update lief trotz veraenderter Datei durch")
+		t.Fatal("Update lief trotz veränderter Datei durch")
 	}
 	if !result.Cleanliness.Blocking() {
 		t.Errorf("Cleanliness nicht mitgeliefert: %+v", result.Cleanliness)
@@ -248,7 +248,7 @@ func TestUpdateBrichtBeiVerschmutzterInstallationAb(t *testing.T) {
 
 	// Der Pull darf nicht stattgefunden haben.
 	if data, readErr := os.ReadFile(binary); readErr != nil || string(data) != "kaputt" {
-		t.Errorf("die lokale Aenderung wurde angetastet: %q, %v", data, readErr)
+		t.Errorf("die lokale Änderung wurde angetastet: %q, %v", data, readErr)
 	}
 }
 

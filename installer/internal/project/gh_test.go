@@ -28,7 +28,7 @@ func TestParseGHStatus(t *testing.T) {
 			configured: true,
 		},
 		{
-			name: "ein Nachbarblock stoert nicht",
+			name: "ein Nachbarblock stört nicht",
 			content: `tools:
   beispiel-tool:
     target: app
@@ -41,7 +41,7 @@ func TestParseGHStatus(t *testing.T) {
 			configured: true,
 		},
 		{
-			name: "status ausserhalb von gh zaehlt nicht",
+			name: "status außerhalb von gh zählt nicht",
 			content: `tools:
   beispiel-tool:
     report:
@@ -63,7 +63,7 @@ func TestParseGHStatus(t *testing.T) {
 			status, configured, err := parseGHStatus(testCase.content)
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("kein Fehler fuer %q", testCase.content)
+					t.Fatalf("kein Fehler für %q", testCase.content)
 				}
 				return
 			}
@@ -101,7 +101,7 @@ github.example.com:
 	if active != "zweitname" {
 		t.Errorf("active = %q, erwartet zweitname", active)
 	}
-	// Der aktive Account gehoert nach vorn, damit die Oberflaeche ihn nicht
+	// Der aktive Account gehört nach vorn, damit die Oberfläche ihn nicht
 	// heraussuchen muss.
 	want := []string{"zweitname", "erstname"}
 	if !slices.Equal(accounts, want) {
@@ -109,11 +109,11 @@ github.example.com:
 	}
 	// Ein anderer Host darf sich nicht einmischen.
 	if slices.Contains(accounts, "fremder") {
-		t.Errorf("Account eines anderen Hosts uebernommen: %v", accounts)
+		t.Errorf("Account eines anderen Hosts übernommen: %v", accounts)
 	}
 }
 
-// Aeltere gh-Fassungen kennen keinen users-Block. Dort ist `user` der einzige
+// Ältere gh-Fassungen kennen keinen users-Block. Dort ist `user` der einzige
 // Account und darf nicht verloren gehen.
 func TestParseGHHostsOhneUsersBlock(t *testing.T) {
 	active, accounts := parseGHHosts("github.com:\n    user: einziger\n    oauth_token: gho_geheim\n")
@@ -165,7 +165,7 @@ remediation:
 	}
 }
 
-// Der Nachbar im tools-Block gehoert einem anderen Tool und darf beim Schreiben
+// Der Nachbar im tools-Block gehört einem anderen Tool und darf beim Schreiben
 // nicht verlorengehen.
 func TestSetGHStatusLaesstNachbarblockStehen(t *testing.T) {
 	dir := writeConfig(t, `schema_version: 3
@@ -245,7 +245,7 @@ func TestDetectGHOhneAnmeldung(t *testing.T) {
 }
 
 // Ein Token in der Umgebung sticht die Konfigurationsdatei; ohne diesen Fall
-// meldete die Oberflaeche „nicht angemeldet", waehrend gh laeuft.
+// meldete die Oberfläche „nicht angemeldet", während gh läuft.
 func TestDetectGHMitTokenAusDerUmgebung(t *testing.T) {
 	t.Setenv("GH_CONFIG_DIR", t.TempDir())
 	t.Setenv("GH_TOKEN", "gho_geheim")

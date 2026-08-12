@@ -31,7 +31,7 @@ Dokumentation entsteht unter `<local.dir>/docs`.
 
 **Target-Auflösung:**
 
-- Wenn `$ARGUMENTS` gesetzt ist: es benennt das zu analysierende Verzeichnis. Existiert es nicht, abbrechen mit klarer Fehlermeldung. Liegt es ausserhalb von `project.repoRoot`, ist es ein anderes Projekt — abbrechen und darauf hinweisen, dass der Command dort aufgerufen werden muss.
+- Wenn `$ARGUMENTS` gesetzt ist: es benennt das zu analysierende Verzeichnis. Existiert es nicht, abbrechen mit klarer Fehlermeldung. Liegt es außerhalb von `project.repoRoot`, ist es ein anderes Projekt — abbrechen und darauf hinweisen, dass der Command dort aufgerufen werden muss.
 - Wenn `$ARGUMENTS` leer ist: das aktuelle Arbeitsverzeichnis.
 
 **Preflight-Snapshot anzeigen:**
@@ -151,7 +151,7 @@ Pro bestätigtem Thema eine Datei `<RESOLVED_DOCS_DIR>/<NN>-<slug>.md`. Rahmen p
 ---
 type: Project Concept
 title: <Titel>
-description: <Ein Satz: was diese Datei erklaert.>
+description: <Ein Satz: was diese Datei erklärt.>
 tags: [<kurze-tags>]
 status: stable
 generated: { by: k-code2docs, at: <ISO-8601-datetime> }
@@ -187,19 +187,19 @@ Aufruf-Pfad. Verweise auf konkrete Stellen im Code als `path/to/file.py:123`.>
 **Regeln:**
 
 - Jede Themen-Datei bekommt OKF-kompatibles YAML-Frontmatter: `type`, `title`, `description`, `tags`, `status`, `generated`. `type` ist typischerweise `Project Concept`; bei passenderem Inhalt sind auch sprechende Typen wie `Architecture`, `Data Model`, `API Surface`, `Runtime Configuration`, `Operational Playbook` erlaubt. Keine zentrale Typ-Liste erfinden.
-- `description` ist ein konkreter Ein-Satz-Summary fuer Index/Search/Agenten. `tags` sind kurz, lowercase, domänen- oder technikbezogen; keine Keyword-Flut.
-- Wenn belastbare Quellen ausser Code genutzt wurden, `sources:` im Frontmatter ergaenzen, jeweils als OKF-Objekt mit mindestens `resource`. Wenn ein Mensch eine Datei spaeter fachlich bestaetigt, darf `verified: { by: human:<id>, at: <ISO-8601-datetime> }` nachgetragen werden. Nicht automatisch Human-Review behaupten.
+- `description` ist ein konkreter Ein-Satz-Summary für Index/Search/Agenten. `tags` sind kurz, lowercase, domänen- oder technikbezogen; keine Keyword-Flut.
+- Wenn belastbare Quellen außer Code genutzt wurden, `sources:` im Frontmatter ergänzen, jeweils als OKF-Objekt mit mindestens `resource`. Wenn ein Mensch eine Datei später fachlich bestätigt, darf `verified: { by: human:<id>, at: <ISO-8601-datetime> }` nachgetragen werden. Nicht automatisch Human-Review behaupten.
 - Code-Referenzen konsequent als `pfad:zeile` — sonst kann die spätere Session nicht ohne Grep zurückspringen.
 - Verwandte Themen **immer** verlinken (relative Pfade). Isolierte Doku-Files sind ein Bug.
 - Keine erfundenen Erklärungen. Wenn eine Stelle unklar ist: **fragen, nicht raten.** Rückfragen bündeln (pro Doku-Datei ein Fragenblock).
 - Keine Fließtext-Wände — Struktur mit Zwischenüberschriften, Aufzählungen, kurzen Absätzen.
 - Sprache: **wie die AGENTS.md-Vorlage vorsieht** (i. d. R. Deutsch, wenn nichts anderes vereinbart).
 
-**OKF-Kompatibilitaet:**
+**OKF-Kompatibilität:**
 
-- Diese Docs bleiben normale Markdown-Dateien mit `README.md` als Hauptindex. Es wird **kein** OKF-`index.md` als Ersatz fuer `README.md` erzeugt.
-- Das Frontmatter folgt dem Open Knowledge Format leichtgewichtig, damit Menschen und Agenten Dateien nach Typ, Tags, Status und Erzeugungszeit sortieren koennen.
-- Bestehende Dateien ohne Frontmatter sind nicht kaputt. Bei Aktualisierung einer solchen Datei Frontmatter nur mit Bestätigung ergaenzen.
+- Diese Docs bleiben normale Markdown-Dateien mit `README.md` als Hauptindex. Es wird **kein** OKF-`index.md` als Ersatz für `README.md` erzeugt.
+- Das Frontmatter folgt dem Open Knowledge Format leichtgewichtig, damit Menschen und Agenten Dateien nach Typ, Tags, Status und Erzeugungszeit sortieren können.
+- Bestehende Dateien ohne Frontmatter sind nicht kaputt. Bei Aktualisierung einer solchen Datei Frontmatter nur mit Bestätigung ergänzen.
 
 Nach jeder geschriebenen Datei kurz melden welche Datei geschrieben wurde (Dateiname + Zeilen-Zahl, nicht Inhalt), damit der User Fortschritt sieht.
 
@@ -271,7 +271,7 @@ Der Kern dieses Schrittes: die entstandenen Docs sind wertlos, wenn Folge-Sessio
 
 **8a — `AGENTS.md`:**
 
-- Existiert nicht → aus `<playbook.dir>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwaehne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
+- Existiert nicht → aus `<playbook.dir>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus `00-overview.md` ableiten, Themenbereiche aus der geschriebenen Doc-Struktur füllen, Kurzverweis-Tabelle aus dem README-„Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart kodierten `docs/README.md`-Verweise stehen lassen. Erwähne knapp, dass die Doc-Dateien normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
 - Existiert → prüfen ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
 
 **8b — `opencode.json` (oder `.jsonc` falls schon vorhanden):**

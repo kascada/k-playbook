@@ -254,7 +254,7 @@ Append the following block to each modified task file:
 
 ```markdown
 ---
-## Review-Log (<date>)
+## Review-Log (<now.date>)
 
 **Pfad:** <REVIEW_TARGET_DISPLAY>
 **Intent:** <filenames or "—">

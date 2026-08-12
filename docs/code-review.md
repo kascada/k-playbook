@@ -1,15 +1,15 @@
 # Code-Review-Flow
 
-Diese Seite fasst den k-playbook-Flow fuer Review-Rezepte, Result-Summaries und Remediation zusammen. Sie beschreibt Reviews ausserhalb konkreter GitHub-PRs; PR-spezifische Reviews stehen in [`pr-review.md`](./pr-review.md).
+Diese Seite fasst den k-playbook-Flow für Review-Rezepte, Result-Summaries und Remediation zusammen. Sie beschreibt Reviews außerhalb konkreter GitHub-PRs; PR-spezifische Reviews stehen in [`pr-review.md`](./pr-review.md).
 
-## Ueberblick
+## Überblick
 
 ```mermaid
 flowchart TD
     A["/k-review <name>"] --> B{"Review-Modus"}
     B -->|interaktiv| C["Fundstellen zeigen"]
-    C --> D["Aenderungsvorschlaege bestaetigen"]
-    D --> E["Bestaetigte Edits ausfuehren"]
+    C --> D["Änderungsvorschläge bestätigen"]
+    D --> E["Bestätigte Edits ausführen"]
     B -->|Report-Mode| F["Result-Familie schreiben"]
     F --> G["assessment.md"]
     F --> H["findings.md"]
@@ -27,7 +27,7 @@ flowchart TD
     L --> R["findings.md / assessment.md Status pflegen"]
 ```
 
-Der Standardablauf fuer Report-Reviews ist:
+Der Standardablauf für Report-Reviews ist:
 
 ```text
 /k-review <name>
@@ -39,8 +39,8 @@ Der Standardablauf fuer Report-Reviews ist:
 
 ## /k-review
 
-`/k-review` fuehrt Review-Rezepte gegen das aktuelle Projekt aus. Der Command ist der
-Einstieg fuer strukturierte Reviews ausserhalb eines konkreten GitHub-PRs.
+`/k-review` führt Review-Rezepte gegen das aktuelle Projekt aus. Der Command ist der
+Einstieg für strukturierte Reviews außerhalb eines konkreten GitHub-PRs.
 
 Aufrufe:
 
@@ -58,16 +58,16 @@ Der Command:
 - leitet die Orte aus der Lage der `K-PLAYBOOK.yaml` ab.
 - schreibt Log und Ergebnisse nach `k-playbook-local/results/`.
 - trennt generischen Ablauf von konkreten Review-Kriterien.
-- laesst projekteigene Rezepte mitgelieferte gleichen Dateinamens vollstaendig ersetzen.
-- beruecksichtigt `known-decisions.md`, damit bewusste Entscheidungen nicht wiederholt als neue Findings auftauchen.
+- lässt projekteigene Rezepte mitgelieferte gleichen Dateinamens vollständig ersetzen.
+- berücksichtigt `known-decisions.md`, damit bewusste Entscheidungen nicht wiederholt als neue Findings auftauchen.
 
-Interaktive Reviews moderieren Stelle fuer Stelle:
+Interaktive Reviews moderieren Stelle für Stelle:
 
 - Kandidaten suchen.
 - kompakte Fundliste zeigen.
-- bei unklaren Punkten Rueckfragen gesammelt stellen.
+- bei unklaren Punkten Rückfragen gesammelt stellen.
 - pro Stelle Vorschlag zeigen und auf Freigabe warten.
-- nur bestaetigte Aenderungen ausfuehren.
+- nur bestätigte Änderungen ausführen.
 
 Report-Mode-Reviews erzeugen Ergebnisartefakte:
 
@@ -109,24 +109,24 @@ Der Command:
 
 - liest vorhandene `assessment.md`- und `findings.md`-Dateien unter `k-playbook-local/results/`.
 - startet keine Scanner.
-- veraendert keine Raw-Artefakte.
-- dedupliziert Findings ueber Familien hinweg.
-- beruecksichtigt `known-decisions.md` und vorhandene Tasks, soweit vorhanden.
+- verändert keine Raw-Artefakte.
+- dedupliziert Findings über Familien hinweg.
+- berücksichtigt `known-decisions.md` und vorhandene Tasks, soweit vorhanden.
 - schreibt eine Summary unter `k-playbook-local/results/summary-YYYY-MM-DD.md`.
 
-Die Summary enthaelt:
+Die Summary enthält:
 
 - verwendete Quellen.
-- priorisierte Uebersicht.
+- priorisierte Übersicht.
 - Dedupe-Entscheidungen.
 - konkrete Empfehlungen.
-- Handoff fuer Remediation.
+- Handoff für Remediation.
 
-Einzelne Result-Dateien koennen direkt an `/k-remediation` uebergeben werden. `/k-results` ist fuer die projektweite Priorisierung mehrerer Familien zustaendig.
+Einzelne Result-Dateien können direkt an `/k-remediation` übergeben werden. `/k-results` ist für die projektweite Priorisierung mehrerer Familien zuständig.
 
 ## /k-remediation
 
-`/k-remediation` arbeitet Findings aus Review-Ergebnissen strukturiert ab. Der Command plant zuerst sinnvolle Buendel und entscheidet danach anhand der Projekt-Policy, ob Tasks erzeugt oder kleine direkte Fixes erlaubt sind.
+`/k-remediation` arbeitet Findings aus Review-Ergebnissen strukturiert ab. Der Command plant zuerst sinnvolle Bündel und entscheidet danach anhand der Projekt-Policy, ob Tasks erzeugt oder kleine direkte Fixes erlaubt sind.
 
 Aufrufe:
 
@@ -136,21 +136,21 @@ Aufrufe:
 /k-remediation k-playbook-local/results/<familie>/<datum>/assessment.md
 ```
 
-Unterstuetzte Inputs:
+Unterstützte Inputs:
 
 - Summaries von `/k-results` oder von Report-Reviews ohne eigene Ergebnisfamilie.
-- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/assessment.md` mit zugehoerigem `findings.md`.
+- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/assessment.md` mit zugehörigem `findings.md`.
 
 Der Command:
 
-- laedt offene Findings.
-- beruecksichtigt `known-decisions.md`.
-- buendelt Findings nach Risiko, Aufwand, Kopplung und Verifikation.
+- lädt offene Findings.
+- berücksichtigt `known-decisions.md`.
+- bündelt Findings nach Risiko, Aufwand, Kopplung und Verifikation.
 - zeigt die Remediation-Policy aus `K-PLAYBOOK.yaml`.
-- ueberfuehrt bestaetigte Buendel in Tasks oder freigegebene direkte Fixes.
+- überführt bestätigte Bündel in Tasks oder freigegebene direkte Fixes.
 - pflegt Status und Task-Verweise nachvollziehbar in `findings.md` oder Summary.
 
-`raw/` und Run-Metadaten bleiben read-only. Sie sind auditierbare Belege und duerfen nicht umgeschrieben werden.
+`raw/` und Run-Metadaten bleiben read-only. Sie sind auditierbare Belege und dürfen nicht umgeschrieben werden.
 
 ## Remediation-Policy
 
@@ -158,42 +158,42 @@ Die Policy steht in `K-PLAYBOOK.yaml` im Block `remediation:`. Wichtige Felder s
 
 - `mode`: `task-branch-pr`, `task-first` oder `direct-allowed`.
 - `target`: Remediation-Ziel relativ zur `K-PLAYBOOK.yaml`; Default ist `project.repo_root`.
-- `grouping`: ob Findings vor der Umsetzung gebuendelt werden.
-- `quick_wins`: ob einfache wirkungsstarke Buendel hervorgehoben werden.
-- `branch_prefix`: empfohlener Prefix fuer Remediation-Branches.
+- `grouping`: ob Findings vor der Umsetzung gebündelt werden.
+- `quick_wins`: ob einfache wirkungsstarke Bündel hervorgehoben werden.
+- `branch_prefix`: empfohlener Prefix für Remediation-Branches.
 - `pr_required` und `direct_fixes`: aus `mode` abgeleitet und mitgeschrieben, damit
-  Commands sie lesen koennen, ohne den Modus deuten zu muessen.
+  Commands sie lesen können, ohne den Modus deuten zu müssen.
 
-Default ist `task-first`: nichts wird ohne Zutun am Code geaendert, direkte Fixes bleiben
-nach Freigabe trotzdem moeglich.
+Default ist `task-first`: nichts wird ohne Zutun am Code geändert, direkte Fixes bleiben
+nach Freigabe trotzdem möglich.
 
-Im Modus `task-branch-pr` erzeugt `/k-remediation` keine direkten Code-Fixes. Bestaetigte Buendel werden als Task-Dateien mit Ausfuehrungskontext geschrieben.
+Im Modus `task-branch-pr` erzeugt `/k-remediation` keine direkten Code-Fixes. Bestätigte Bündel werden als Task-Dateien mit Ausführungskontext geschrieben.
 
 ## Artefakte Und Status
 
 Jede Report-/Scan-Familie soll diese Dateien erzeugen:
 
 - `assessment.md`: kuratierte Gesamtbewertung, Kurzfazit, Priorisierung, Handoff.
-- `findings.md`: mutable, statusfaehige Arbeitsliste aller Findings oder bewusst gruppierter Baseline-Findings.
+- `findings.md`: mutable, statusfähige Arbeitsliste aller Findings oder bewusst gruppierter Baseline-Findings.
 - `raw/`: auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
-- `run-metadata.json` oder aequivalent: auditierbare Laufmetadaten.
+- `run-metadata.json` oder äquivalent: auditierbare Laufmetadaten.
 
 Standard-Statuswerte in `findings.md`:
 
 | Status | Bedeutung | Remediation-Relevanz |
 |---|---|---|
-| `open` | neu oder noch nicht geprueft | ja |
+| `open` | neu oder noch nicht geprüft | ja |
 | `confirmed` | validierter echter Befund | ja |
-| `context-needed` | weitere Kontextpruefung noetig | ja |
+| `context-needed` | weitere Kontextprüfung nötig | ja |
 | `likely-false-positive` | plausibler Fehlalarm | nur nach expliziter Auswahl |
 | `accepted` | bewusste Entscheidung oder akzeptiertes Restrisiko | nein |
 | `fixed` | behoben und verifiziert | nein |
 
-Finding-IDs muessen stabil bleiben. Einmal vergebene IDs duerfen bei Re-Runs, Statusaenderungen oder Remediation nicht umbenannt werden.
+Finding-IDs müssen stabil bleiben. Einmal vergebene IDs dürfen bei Re-Runs, Statusänderungen oder Remediation nicht umbenannt werden.
 
 ## Handoff
 
-Nach einem Report-Mode-Review nennt `/k-review` den naechsten Handoff, typischerweise:
+Nach einem Report-Mode-Review nennt `/k-review` den nächsten Handoff, typischerweise:
 
 ```text
 /k-results
@@ -201,20 +201,20 @@ Nach einem Report-Mode-Review nennt `/k-review` den naechsten Handoff, typischer
 /k-remediation k-playbook-local/results/<familie>/<YYYY-MM-DD>/assessment.md
 ```
 
-Wenn `/k-remediation` Tasks erzeugt, ist der naechste Schritt nicht direkte Umsetzung im Chat, sondern der normale Task-Flow:
+Wenn `/k-remediation` Tasks erzeugt, ist der nächste Schritt nicht direkte Umsetzung im Chat, sondern der normale Task-Flow:
 
 ```text
 /k-review-loop
 /k-run
 ```
 
-Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das verlangt. `/k-run` wertet den Abschnitt `## Ausfuehrungskontext` aus und fuehrt vor der Delegation Branch- und Dirty-Worktree-Preflights aus.
+Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das verlangt. `/k-run` wertet den Abschnitt `## Ausführungskontext` aus und führt vor der Delegation Branch- und Dirty-Worktree-Preflights aus.
 
 ## Abgrenzung
 
-- `/k-pr-review` ist fuer konkrete GitHub-PRs zustaendig.
-- `/k-review` bewertet oder erzeugt Findings, setzt groessere Remediation aber nicht direkt um.
-- `/k-results` ist read-mostly, erzeugt keine Tasks und fuehrt keine Remediation aus.
+- `/k-pr-review` ist für konkrete GitHub-PRs zuständig.
+- `/k-review` bewertet oder erzeugt Findings, setzt größere Remediation aber nicht direkt um.
+- `/k-results` ist read-mostly, erzeugt keine Tasks und führt keine Remediation aus.
 - `/k-remediation` startet keine Scanner und priorisiert nicht projektweit neu.
-- Groessere Umsetzung laeuft ueber Tasks, `/k-review-loop` und `/k-run`.
+- Größere Umsetzung läuft über Tasks, `/k-review-loop` und `/k-run`.
 - Direkte Fixes sind nur bei passender Policy und expliziter Freigabe erlaubt.

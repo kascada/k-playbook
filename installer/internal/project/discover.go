@@ -9,11 +9,11 @@ import (
 )
 
 // ConfigFileName ist der Anker. Er liegt im Hauptverzeichnis des Projekts, nicht
-// in der Installation — dadurch bleibt PlaybookDirName vollstaendig ersetzbar.
+// in der Installation — dadurch bleibt PlaybookDirName vollständig ersetzbar.
 const ConfigFileName = "K-PLAYBOOK.yaml"
 
 // PlaybookDirName ist der Name der Installation innerhalb des Projekts. Er ist
-// fest; wie das Projektverzeichnis selbst heisst, spielt keine Rolle.
+// fest; wie das Projektverzeichnis selbst heißt, spielt keine Rolle.
 const PlaybookDirName = "k-playbook"
 
 // ErrNotFound meldet, dass oberhalb des Startverzeichnisses keine Installation liegt.
@@ -22,10 +22,10 @@ var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 // Discover liefert das Hauptverzeichnis des Projekts, erkannt an der
 // K-PLAYBOOK.yaml darin.
 //
-// Gesucht wird ab startDir aufwaerts, ein Kandidat je Ebene. Die Suche bricht
+// Gesucht wird ab startDir aufwärts, ein Kandidat je Ebene. Die Suche bricht
 // bewusst nicht am Git-Worktree-Root ab: die Installation ist selbst ein Clone
-// und damit ein eigener Worktree, die Config liegt eine Ebene darueber. Ein
-// Abbruch dort wuerde sie unerreichbar machen.
+// und damit ein eigener Worktree, die Config liegt eine Ebene darüber. Ein
+// Abbruch dort würde sie unerreichbar machen.
 func Discover(startDir string) (string, error) {
 	dir, err := filepath.Abs(startDir)
 	if err != nil {
@@ -42,7 +42,7 @@ func Discover(startDir string) (string, error) {
 			return dir, nil
 		}
 
-		// $HOME und / werden noch geprueft, aber nicht ueberschritten.
+		// $HOME und / werden noch geprüft, aber nicht überschritten.
 		if dir == home {
 			return "", ErrNotFound
 		}
@@ -64,7 +64,7 @@ func ConfigPath(projectDir string) string {
 	return filepath.Join(projectDir, ConfigFileName)
 }
 
-// homeDir liefert das Home-Verzeichnis aufgeloest, damit der Vergleich in
+// homeDir liefert das Home-Verzeichnis aufgelöst, damit der Vergleich in
 // Discover auch bei verlinktem $HOME greift. Leer, wenn nicht ermittelbar.
 func homeDir() string {
 	home, err := os.UserHomeDir()

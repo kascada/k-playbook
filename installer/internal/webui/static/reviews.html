@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Neuer Review - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+      <section class="hero app-header">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>Neuer Review</h1>
+        </div>
+        <div class="hero-subrow">
+          <p class="eyebrow path">
+            <span class="path-entry">
+              <span class="path-key">{{.ModeLabel}}:</span>
+              {{if .Path}}{{.Path}}{{end}}
+            </span>
+            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
+              <span class="path-key">Installation:</span>
+              {{.PlaybookDir}}
+            </span>
+          </p>
+          <div class="hero-actions">
+            <a class="button-link secondary" href="/">Zurück</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="blocks">
+        <section class="card" id="pick-card">
+          <div class="section-head">
+            <div>
+              <h2>Was soll laufen?</h2>
+            </div>
+            <span id="pick-pill" class="pill muted">Laden...</span>
+          </div>
+
+          <p class="hint">
+            Werkzeuge laufen über ihre CLI, Reviews über einen Assistenten. Beide sind
+            Einträge desselben Laufs und schreiben in dasselbe Verzeichnis.
+          </p>
+
+          <h3 class="group-head">Werkzeuge</h3>
+          <p class="hint" id="tools-hint"></p>
+          <div id="pick-tools" class="choices choices-compact"></div>
+
+          <h3 class="group-head">Reviews</h3>
+          <p class="hint">Aus dem aufgelösten Katalog, mitgeliefert und projekteigen zusammengeführt.</p>
+          <div id="pick-reviews" class="choices choices-compact"></div>
+
+          <p id="pick-message" class="message"></p>
+          <button id="pick-create" class="secondary" disabled>Erstellen</button>
+        </section>
+
+        <section class="card" id="runs-card">
+          <div class="section-head">
+            <div>
+              <h2>Bisherige Läufe</h2>
+            </div>
+            <span id="runs-pill" class="pill muted">Laden...</span>
+          </div>
+          <dl id="runs-list" class="facts"></dl>
+          <p id="runs-message" class="message"></p>
+        </section>
+      </div>
+    </main>
+
+    <script src="/static/reviews.js"></script>
+  </body>
+</html>

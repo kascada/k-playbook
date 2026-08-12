@@ -176,7 +176,7 @@ If the sub-agent reports failure or the task must be aborted:
 ## Ausführung
 
 **Status:** Teilweise ausgeführt - abgebrochen  
-**Datum:** <today's date>  
+**Datum:** <now.date>  
 **Abgebrochen bei:** <step or action where it stopped>  
 **Grund:** <brief reason>
 ```
@@ -194,7 +194,7 @@ When the sub-agent reports success:
 ## Ausführung
 
 **Status:** Erfolgreich ausgeführt  
-**Datum:** <today's date>  
+**Datum:** <now.date>  
 **Zusammenfassung:** <2-3 sentences: what was created or done>
 ```
 

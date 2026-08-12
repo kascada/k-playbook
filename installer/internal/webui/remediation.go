@@ -23,7 +23,7 @@ func remediationHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, remediationState(""))
 }
 
-// setRemediationHandler schreibt den gewaehlten Modus samt abgeleiteter Flags.
+// setRemediationHandler schreibt den gewählten Modus samt abgeleiteter Flags.
 func setRemediationHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {

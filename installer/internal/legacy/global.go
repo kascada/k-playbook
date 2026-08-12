@@ -1,13 +1,13 @@
-// Package legacy raeumt weg, was das abgeloeste host-globale Installationsmodell
+// Package legacy räumt weg, was das abgelöste host-globale Installationsmodell
 // auf einem Rechner hinterlassen hat.
 //
-// Frueher hat der Installer die Commands und Skills einer zentralen
+// Früher hat der Installer die Commands und Skills einer zentralen
 // Basisinstallation in die User-Konfiguration der Assistenten verlinkt:
 // Symlinks unter ~/.claude/commands, ~/.claude/skills und
 // ~/.config/opencode/command sowie ein skills.paths-Eintrag in der
 // OpenCode-User-Config. Seit der Umstellung auf die projektlokale Installation
-// wird ausschliesslich innerhalb des Projekts verlinkt. Bleiben die alten
-// globalen Links liegen, sieht ein Assistent in jedem Projekt zusaetzlich die
+// wird ausschließlich innerhalb des Projekts verlinkt. Bleiben die alten
+// globalen Links liegen, sieht ein Assistent in jedem Projekt zusätzlich die
 // Commands eines fremden Standes.
 package legacy
 
@@ -21,7 +21,7 @@ import (
 )
 
 // playbookSegment ist das Pfadsegment, an dem eine alte Verlinkung erkannt
-// wird. Der Repo-Pfad war frei waehlbar, das Verzeichnis hiess aber immer so.
+// wird. Der Repo-Pfad war frei wählbar, das Verzeichnis hieß aber immer so.
 const playbookSegment = "k-playbook"
 
 // Removal ist eine entfernte Altlast.
@@ -46,7 +46,7 @@ func legacyLinkDirs(home string) []string {
 }
 
 // legacyConfigs sind die OpenCode-User-Configs, die einen skills.paths-Eintrag
-// auf eine zentrale Basisinstallation tragen koennen.
+// auf eine zentrale Basisinstallation tragen können.
 func legacyConfigs(home string) []string {
 	return []string{
 		filepath.Join(home, ".config", "opencode", "opencode.jsonc"),
@@ -57,11 +57,11 @@ func legacyConfigs(home string) []string {
 // RemoveGlobalLinks entfernt die host-globale Assistenten-Registrierung des
 // alten Modells und meldet, was entfernt wurde.
 //
-// Angefasst wird nur, was nachweislich zu einem k-playbook gehoert: Symlinks,
-// deren Ziel ein Pfadsegment k-playbook enthaelt, und der skills.paths-Eintrag,
+// Angefasst wird nur, was nachweislich zu einem k-playbook gehört: Symlinks,
+// deren Ziel ein Pfadsegment k-playbook enthält, und der skills.paths-Eintrag,
 // der auf ein solches Verzeichnis zeigt. Echte Dateien und fremde Symlinks
 // bleiben liegen. Ein Fehler an einer Stelle stoppt den Rest nicht; die bis
-// dahin entfernten Eintraege werden zusammen mit dem Fehler gemeldet.
+// dahin entfernten Einträge werden zusammen mit dem Fehler gemeldet.
 func RemoveGlobalLinks() ([]Removal, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -98,19 +98,19 @@ func removeGlobalLinks(home string) ([]Removal, error) {
 	return removals, nil
 }
 
-// removeLinkDir raeumt ein Verzeichnis der alten Registrierung.
+// removeLinkDir räumt ein Verzeichnis der alten Registrierung.
 //
-// Ist das Verzeichnis selbst ein Symlink in ein k-playbook, faellt es als
+// Ist das Verzeichnis selbst ein Symlink in ein k-playbook, fällt es als
 // Ganzes weg. Ist es ein echtes Verzeichnis, fallen nur die Symlinks weg, die
 // dorthin zeigen — projekteigene Dateien des Nutzers bleiben. Bleibt danach
-// nichts uebrig, verschwindet auch das leere Verzeichnis.
+// nichts übrig, verschwindet auch das leere Verzeichnis.
 func removeLinkDir(dir string) ([]Removal, error) {
 	info, err := os.Lstat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("%s pruefen: %w", dir, err)
+		return nil, fmt.Errorf("%s prüfen: %w", dir, err)
 	}
 
 	if info.Mode()&os.ModeSymlink != 0 {
@@ -175,14 +175,14 @@ func playbookLink(path string) (string, bool) {
 	return destination, hasPlaybookSegment(filepath.Clean(resolved))
 }
 
-// hasPlaybookSegment prueft, ob ein Pfad ein Verzeichnis k-playbook durchlaeuft.
+// hasPlaybookSegment prüft, ob ein Pfad ein Verzeichnis k-playbook durchläuft.
 func hasPlaybookSegment(path string) bool {
 	return slices.Contains(strings.Split(filepath.ToSlash(path), "/"), playbookSegment)
 }
 
 // removeSkillsPath entfernt aus einer OpenCode-User-Config den Top-Level-Key
 // skills, sofern sein Wert auf ein k-playbook zeigt. Alles andere in der Datei
-// bleibt Zeichen fuer Zeichen erhalten, Kommentare eingeschlossen.
+// bleibt Zeichen für Zeichen erhalten, Kommentare eingeschlossen.
 func removeSkillsPath(path string) (*Removal, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -207,7 +207,7 @@ func removeSkillsPath(path string) (*Removal, error) {
 	return &Removal{Path: path, Detail: "skills.paths auf ein k-playbook"}, nil
 }
 
-// stripSkillsBlock schneidet den skills-Eintrag samt zugehoerigem Komma heraus.
+// stripSkillsBlock schneidet den skills-Eintrag samt zugehörigem Komma heraus.
 func stripSkillsBlock(content string) (string, bool) {
 	start, end, ok := findSkillsEntry(content)
 	if !ok {
@@ -259,7 +259,7 @@ func findSkillsEntry(content string) (int, int, bool) {
 // cutEntry entfernt den Bereich und das Komma, das den Eintrag an seine
 // Nachbarn bindet: bevorzugt das nachfolgende, sonst das vorangehende. Steht in
 // den Randzeilen sonst nichts, fallen sie ganz weg, damit keine Zeile mit
-// Restweissraum stehen bleibt.
+// Restweißraum stehen bleibt.
 func cutEntry(content string, start int, end int) string {
 	comma := -1
 
@@ -312,7 +312,7 @@ func valueStart(content string, i int) int {
 	return skipGap(content, i+1)
 }
 
-// skipValue liest ueber einen Wert hinweg und liefert die Position dahinter.
+// skipValue liest über einen Wert hinweg und liefert die Position dahinter.
 func skipValue(content string, i int) int {
 	depth := 0
 	for i < len(content) {
@@ -347,7 +347,7 @@ func skipValue(content string, i int) int {
 	return i
 }
 
-// skipGap ueberliest Weissraum und Kommentare.
+// skipGap überliest Weißraum und Kommentare.
 func skipGap(content string, i int) int {
 	for i < len(content) {
 		switch {

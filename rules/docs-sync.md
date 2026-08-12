@@ -2,43 +2,43 @@
 
 ## Grundsatz
 
-Wenn Code geaendert wird, muss geprueft werden, ob die projektinterne Dokumentation dadurch veraltet, unvollstaendig oder irrefuehrend wird.
+Wenn Code geändert wird, muss geprüft werden, ob die projektinterne Dokumentation dadurch veraltet, unvollständig oder irreführend wird.
 
 ## Verpflichtung
 
-Bei jeder Code-Aenderung gilt:
+Bei jeder Code-Änderung gilt:
 
-- Relevante Docs muessen im selben Arbeitsgang angepasst werden.
-- Wenn unklar ist, welche Docs betroffen sind, muss nach passenden Docs gesucht werden, bevor die Aenderung abgeschlossen wird.
+- Relevante Docs müssen im selben Arbeitsgang angepasst werden.
+- Wenn unklar ist, welche Docs betroffen sind, muss nach passenden Docs gesucht werden, bevor die Änderung abgeschlossen wird.
 - Wenn weiterhin unklar ist, ob oder wie Docs angepasst werden sollen, muss der User gefragt werden.
-- Wenn bewusst keine Doc-Aenderung noetig ist, soll das im Abschluss kurz begruendet werden.
+- Wenn bewusst keine Doc-Änderung nötig ist, soll das im Abschluss kurz begründet werden.
 
-## Was zaehlt als relevante Doku
+## Was zählt als relevante Doku
 
 Relevant sind insbesondere:
 
 - Dateien unter `<projekt>/k-playbook/docs/`.
 - Architektur-, Betriebs-, Setup-, API- und Datenmodell-Dokumentation.
-- `README.md`, `AGENTS.md` oder andere Einstiegspunkte, wenn sie das geaenderte Verhalten beschreiben.
-- Projektinterne Guidelines oder Known-Decisions, wenn die Aenderung eine Konvention oder bewusste Entscheidung beruehrt.
+- `README.md`, `AGENTS.md` oder andere Einstiegspunkte, wenn sie das geänderte Verhalten beschreiben.
+- Projektinterne Guidelines oder Known-Decisions, wenn die Änderung eine Konvention oder bewusste Entscheidung berührt.
 
 ## Nicht automatisch dokumentieren
 
-Keine Doc-Aenderung ist normalerweise noetig bei:
+Keine Doc-Änderung ist normalerweise nötig bei:
 
-- Reinen Formatierungen ohne Verhaltensaenderung.
+- Reinen Formatierungen ohne Verhaltensänderung.
 - Tests, die nur bestehendes Verhalten absichern.
-- Internen Refactorings ohne geaenderte oeffentliche Semantik, sofern keine Doku diese interne Struktur beschreibt.
-- Experimentellen Zwischenschritten, solange die Aenderung nicht als Ergebnis bestehen bleibt.
+- Internen Refactorings ohne geänderte öffentliche Semantik, sofern keine Doku diese interne Struktur beschreibt.
+- Experimentellen Zwischenschritten, solange die Änderung nicht als Ergebnis bestehen bleibt.
 
-## Rueckfrage-Regel
+## Rückfrage-Regel
 
 Im Zweifel nicht raten. Stelle eine kurze Frage.
 
-## Pruefkriterium
+## Prüfkriterium
 
-Eine Aenderung gilt nur dann als vollstaendig abgeschlossen, wenn eines davon zutrifft:
+Eine Änderung gilt nur dann als vollständig abgeschlossen, wenn eines davon zutrifft:
 
 - Code und relevante Docs wurden gemeinsam aktualisiert.
-- Es wurde geprueft und begruendet, warum keine Doc-Aenderung noetig ist.
+- Es wurde geprüft und begründet, warum keine Doc-Änderung nötig ist.
 - Der User hat entschieden, wie mit fehlender oder unklarer Doku umzugehen ist.

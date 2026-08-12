@@ -18,7 +18,7 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Erzeuge eine projektweite, priorisierte Ergebnis-Zusammenfassung aus vorhandenen Review-Result-Familien.
 
-`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` und `/k-remediation`. Der Command startet keine Scanner, fuehrt keine Remediation aus und veraendert keine Raw-Artefakte. Er liest vorhandene `assessment.md`/`findings.md`-Dateien unter `k-playbook-local/results/` und schreibt eine einzelne priorisierte Summary.
+`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` und `/k-remediation`. Der Command startet keine Scanner, führt keine Remediation aus und verändert keine Raw-Artefakte. Er liest vorhandene `assessment.md`/`findings.md`-Dateien unter `k-playbook-local/results/` und schreibt eine einzelne priorisierte Summary.
 
 ## Zielartefakt
 
@@ -26,41 +26,41 @@ Erzeuge eine projektweite, priorisierte Ergebnis-Zusammenfassung aus vorhandenen
 k-playbook-local/results/summary-YYYY-MM-DD.md
 ```
 
-Dieses Artefakt ist der bevorzugte Handoff fuer Remediation:
+Dieses Artefakt ist der bevorzugte Handoff für Remediation:
 
 ```text
 /k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
 ```
 
-## Schritt 1 — Pfade aufloesen
+## Schritt 1 — Pfade auflösen
 
 Aus der Context-Ausgabe:
 
 - `RESULTS_DIR = <local.dir>/results`
 - `KNOWN_DECISIONS = <RESULTS_DIR>/known-decisions.md`
 - `LOG_FILE = <RESULTS_DIR>/log.md`
-- `TASKS_DIR = <local.dir>/tasks`; optional aber hilfreich fuer existierende Remediation-Tasks.
+- `TASKS_DIR = <local.dir>/tasks`; optional aber hilfreich für existierende Remediation-Tasks.
 
 Command-specific policy:
 
 - Wenn `RESULTS_DIR` nicht existiert: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen.
-- Wenn `TASKS_DIR` nicht existiert: warnen und auf `/k-gui` hinweisen, aber fortfahren; dann koennen existierende Tasks nicht abgeglichen werden.
+- Wenn `TASKS_DIR` nicht existiert: warnen und auf `/k-gui` hinweisen, aber fortfahren; dann können existierende Tasks nicht abgeglichen werden.
 
 ## Schritt 2 — Zieldatum bestimmen
 
 Wenn `$ARGUMENTS` leer oder `latest` ist:
 
-- Verwende das heutige Datum `YYYY-MM-DD` fuer die Summary-Datei.
+- Verwende `now.date` als Datum der Summary-Datei.
 - Lies alle vorhandenen Result-Familien unter `RESULTS_DIR`, nicht nur heutige, aber bevorzuge pro Familie das neueste `assessment.md`.
 
 Wenn `$ARGUMENTS` wie `YYYY-MM-DD` aussieht:
 
-- Nutze dieses Datum fuer die Summary-Datei.
-- Lies weiterhin pro Familie das neueste Assessment, ausser der User explizit einen anderen Scope angibt.
+- Nutze dieses Datum für die Summary-Datei.
+- Lies weiterhin pro Familie das neueste Assessment, außer der User explizit einen anderen Scope angibt.
 
 Wenn `$ARGUMENTS` eine Datei ist:
 
-- Abbrechen. `/k-results` akzeptiert keine Einzeldatei als Primaerinput; dafuer `/k-remediation` verwenden.
+- Abbrechen. `/k-results` akzeptiert keine Einzeldatei als Primärinput; dafür `/k-remediation` verwenden.
 
 ## Schritt 3 — Result-Familien finden
 
@@ -82,12 +82,12 @@ Erwarte optional im selben Verzeichnis:
 - `raw/`
 - `run-metadata.json` oder andere `run-metadata*.json`
 
-Ignoriere bestehende `summary-*.md` als Input, ausser der User fordert eine Vergleichszusammenfassung explizit an.
+Ignoriere bestehende `summary-*.md` als Input, außer der User fordert eine Vergleichszusammenfassung explizit an.
 
 Wenn mehrere Dates pro Family existieren:
 
 - Standard: neuestes Date pro Family verwenden.
-- Wenn ein aelteres Date benutzt wird, in der Summary klar nennen.
+- Wenn ein älteres Date benutzt wird, in der Summary klar nennen.
 
 Bekannte Familien und Standardreihenfolge:
 
@@ -103,7 +103,7 @@ Lade, falls vorhanden:
 
 - `KNOWN_DECISIONS`: Findings, die klar gedeckt sind, als `accepted` markieren oder in P3 verschieben.
 - `TASKS_DIR/*.md` und `TASKS_DIR/done/*.md`: bestehende Tasks erkennen, um doppelte Task-Erzeugung zu vermeiden.
-- Alle `assessment.md` und `findings.md` der ausgewaehlten Familien.
+- Alle `assessment.md` und `findings.md` der ausgewählten Familien.
 
 Wenn `known-decisions.md` leer ist, das in der Summary nennen.
 
@@ -120,7 +120,7 @@ Extrahiere aus `findings.md`:
 
 - Heading-ID, z. B. `### secret-001`.
 - `Status`.
-- `Prioritaet`.
+- `Priorität`.
 - `Quelle` / `Tool(s)` / `Package` / `Typ`.
 - `Ort` / `Target` / `CVE/GHSA` / `Message`.
 - `Raw-Quelle`.
@@ -134,36 +134,36 @@ Statusmodell:
 
 ## Schritt 6 — Deduplizieren und clustern
 
-Cluster Findings ueber Familien hinweg nach Thema, nicht nur nach identischer ID.
+Cluster Findings über Familien hinweg nach Thema, nicht nur nach identischer ID.
 
 Typische Dedupe-Regeln:
 
-- Secret-Funde aus `secret-scanning` und `k-check` zusammenfuehren.
-- CVE-Funde aus `dependency-cve` und `iac-container` nicht doppelt remediieren; `dependency-cve` ist primaere Quelle, `iac-container` liefert SBOM/Image-Kontext.
+- Secret-Funde aus `secret-scanning` und `k-check` zusammenführen.
+- CVE-Funde aus `dependency-cve` und `iac-container` nicht doppelt remediieren; `dependency-cve` ist primäre Quelle, `iac-container` liefert SBOM/Image-Kontext.
 - Dockerfile-/Image-Funde aus `iac-container` separat halten, auch wenn Secret-/Config-Themen in anderen Familien auftauchen.
 - False-positive-/Fixture-/Tooling-Artefakte als P3-Gruppe zusammenfassen.
 
 ## Schritt 7 — Priorisieren
 
-Prioritaet projektweit vergeben, nicht blind Tool-Severity uebernehmen.
+Priorität projektweit vergeben, nicht blind Tool-Severity übernehmen.
 
 P1:
 
 - echte produktive Secrets oder unklare Rotation produktiver Secrets.
-- bestaetigbare SSRF/RCE/Auth/JWT/SQLi/critical Runtime CVEs.
+- bestätigbare SSRF/RCE/Auth/JWT/SQLi/critical Runtime CVEs.
 - Secrets in Image-Layern oder Deployment-Konfiguration.
 - direkte Provider-/Exception-Leaks mit Secret-/Config-Risiko.
 
 P1/P2:
 
-- hochrelevante Runtime-CVEs ohne final bestaetigte Reachability.
+- hochrelevante Runtime-CVEs ohne final bestätigte Reachability.
 - user-facing Authz-/Ownership-Risiken.
 - sensitive Logging-Funde mit Provider-/User-Content-Risiko.
 
 P2:
 
 - High CVEs in zentralen Runtime-/SDK-Komponenten.
-- IaC-/Helm-Abdeckungsluecken im Production-Target.
+- IaC-/Helm-Abdeckungslücken im Production-Target.
 - Operational-Logging-/Monitoring-Kontraktverletzungen.
 
 P2/P3:
@@ -186,8 +186,8 @@ Schreibe oder aktualisiere:
 
 Wenn die Datei existiert:
 
-- Nicht blind ueberschreiben.
-- Entweder nach Bestaetigung aktualisieren oder eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
+- Nicht blind überschreiben.
+- Entweder nach Bestätigung aktualisieren oder eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 
 Pflichtstruktur:
 
@@ -201,7 +201,7 @@ Projekt: `<name>`
 - <family>: `k-playbook-local/results/<family>/<date>/assessment.md`
 - Known Decisions: `k-playbook-local/results/known-decisions.md` (<Status>)
 
-## Priorisierte Uebersicht
+## Priorisierte Übersicht
 
 | Prio | Thema | Quelle(n) | Finding-ID(s) | Empfehlung | Status |
 |---|---|---|---|---|---|
@@ -210,13 +210,13 @@ Projekt: `<name>`
 
 Kurzbeschreibung.
 
-Empfehlung: konkreter naechster Schritt.
+Empfehlung: konkreter nächster Schritt.
 
 Quellen:
 - `k-playbook-local/results/<family>/<date>/assessment.md`
 - `k-playbook-local/results/<family>/<date>/findings.md#<finding-id>`
 
-Was man zum Loesen braucht:
+Was man zum Lösen braucht:
 - betroffene Datei/Zeile
 - relevante Tests/Smokes
 - Akzeptanzkriterium
@@ -230,12 +230,12 @@ Was man zum Loesen braucht:
 `/k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md`
 ```
 
-Schreibe knapp, aber loesungsfaehig. Jede Top-Gruppe braucht:
+Schreibe knapp, aber lösungsfähig. Jede Top-Gruppe braucht:
 
 - Beschreibung in einem Absatz.
 - Empfehlung in einem Absatz.
 - Quellenliste.
-- Was man zum Loesen braucht.
+- Was man zum Lösen braucht.
 
 ## Schritt 9 — Review-Log aktualisieren
 
@@ -243,13 +243,13 @@ Wenn `LOG_FILE` existiert:
 
 - Sektion `## Security Results Summary` sicherstellen.
 - `Letzter Lauf` auf heute setzen.
-- Eine Protokollzeile anhaengen:
+- Eine Protokollzeile anhängen:
 
 ```markdown
 | YYYY-MM-DD | results-summary | alle Result-Familien | <N> priorisierte Themen -> `k-playbook-local/results/summary-YYYY-MM-DD.md`. Handoff: `/k-remediation ...` |
 ```
 
-Wenn `LOG_FILE` fehlt, zeige die Log-Zeile im Abschluss, aber lege keine Ersatzdatei ausserhalb von `RESULTS_DIR` an.
+Wenn `LOG_FILE` fehlt, zeige die Log-Zeile im Abschluss, aber lege keine Ersatzdatei außerhalb von `RESULTS_DIR` an.
 
 ## Schritt 10 — Abschluss
 
@@ -259,6 +259,6 @@ Berichte:
 - Welche Result-Familien verwendet wurden.
 - Anzahl priorisierter Themen.
 - Top 5 Themen.
-- Handoff-Befehl fuer `/k-remediation`.
+- Handoff-Befehl für `/k-remediation`.
 
 Keine Remediation starten.

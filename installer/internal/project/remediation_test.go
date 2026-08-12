@@ -87,7 +87,7 @@ func TestSetRemediationModeLegtBlockAn(t *testing.T) {
 }
 
 // Ein Wechsel ersetzt den Block samt abgeleiteter Flags, statt nur mode zu
-// aendern — sonst blieben widerspruechliche Werte stehen.
+// ändern — sonst blieben widersprüchliche Werte stehen.
 func TestSetRemediationModeErsetztFlagsMit(t *testing.T) {
 	root := writeConfig(t, `schema_version: 2
 
@@ -154,7 +154,7 @@ func TestRemediationPolicy(t *testing.T) {
 	}
 }
 
-// Ohne Block gilt der Standard, damit Commands nicht raten muessen.
+// Ohne Block gilt der Standard, damit Commands nicht raten müssen.
 func TestReadRemediationDefaultOhneBlock(t *testing.T) {
 	root := writeConfig(t, "schema_version: 3\n\nproject:\n  repo_root: .\n")
 
@@ -169,7 +169,7 @@ func TestReadRemediationDefaultOhneBlock(t *testing.T) {
 		t.Error("Configured = true, obwohl der Wert nur der Standard ist")
 	}
 
-	// Die Flags muessen zum Standardmodus passen.
+	// Die Flags müssen zum Standardmodus passen.
 	wantPR, wantDirect := RemediationPolicy(DefaultRemediationMode)
 	if remediation.PRRequired != wantPR || remediation.DirectFixes != wantDirect {
 		t.Errorf("Flags = %v/%v, erwartet %v/%v",

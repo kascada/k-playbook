@@ -18,14 +18,14 @@ type Environment struct {
 	ProjectDir string `json:"projectDir"`
 	// PlaybookDir ist die Installation darin. Leer, wenn nichts gefunden wurde.
 	PlaybookDir string `json:"playbookDir"`
-	// PlaybookPresent meldet, ob die Installation tatsaechlich vorliegt. Nach
+	// PlaybookPresent meldet, ob die Installation tatsächlich vorliegt. Nach
 	// einem frischen Clone des Projekts fehlt sie, die Config ist aber da.
 	PlaybookPresent bool `json:"playbookPresent"`
 	// SearchedFrom ist das Verzeichnis, ab dem gesucht wurde.
 	SearchedFrom string `json:"searchedFrom"`
 }
 
-// Detect sucht die Installation ab dem Arbeitsverzeichnis aufwaerts.
+// Detect sucht die Installation ab dem Arbeitsverzeichnis aufwärts.
 func Detect() Environment {
 	start, err := os.Getwd()
 	if err != nil {
@@ -34,7 +34,7 @@ func Detect() Environment {
 	return DetectFrom(start)
 }
 
-// DetectFrom sucht ab einem bestimmten Verzeichnis und ist dadurch pruefbar.
+// DetectFrom sucht ab einem bestimmten Verzeichnis und ist dadurch prüfbar.
 func DetectFrom(startDir string) Environment {
 	environment := Environment{SearchedFrom: startDir}
 
@@ -50,7 +50,7 @@ func DetectFrom(startDir string) Environment {
 	return environment
 }
 
-// DisplayPath kuerzt das Home-Verzeichnis zu ~, damit Pfade in der Oberflaeche
+// DisplayPath kürzt das Home-Verzeichnis zu ~, damit Pfade in der Oberfläche
 // lesbar bleiben.
 func DisplayPath(dir string) string {
 	if dir == "" {

@@ -19,9 +19,9 @@ stop and report it. Do not guess paths and do not create anything.
 
 ## Load it once per session
 
-The output does not change while you work, and it is the same for every command. If you
-already ran this command in this session and its output is still in the conversation,
-reuse that output — do not run it again, and do not re-read the files from
+The resolved state does not change while you work, and it is the same for every command.
+If you already ran this command in this session and its output is still in the
+conversation, reuse that output — do not run it again, and do not re-read the files from
 `instructions`. Chained commands share one load.
 
 Run it again only when one of these applies:
@@ -32,6 +32,9 @@ Run it again only when one of these applies:
 - The work moved to a different project. The command searches upwards for
   `K-PLAYBOOK.yaml`, so another working directory can resolve to another installation —
   check `project.dir` against the one you loaded.
+- `now` is the one field that ages: it is the moment of the call, not of the write. A
+  session that runs past midnight still carries yesterday's `now.date`. Load again when
+  that would put a wrong date into a file.
 
 When one of these applies, run it again and use the new output from then on. Never mix
 fields from two loads.
@@ -40,9 +43,11 @@ fields from two loads.
 
 | Field | Use |
 |---|---|
+| `now.date`, `now.timestamp` | The moment of this call, in the machine's time zone. `now.date` is `YYYY-MM-DD`, `now.timestamp` is RFC 3339. |
 | `instructions` | Files to read first, in that order: the shipped level, then this project's. |
 | `project.dir` | The main directory — where `K-PLAYBOOK.yaml` sits. |
 | `project.repoRoot`, `project.vcs` | The code repository for Git operations, and whether it is under version control. |
+| `project.languages` | The languages this project needs tools for. Always filled — a missing entry falls back to the default, so there is nothing to interpret. |
 | `playbook.dir` | The installation. Read-only; replaced on every update. |
 | `local.dir` | Everything the project owns. |
 | `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
@@ -99,6 +104,12 @@ not substitute another one; `/k-gui` restores the project-local structure.
   you already read them, work from what you have.
 - **Do not read `K-PLAYBOOK.yaml` yourself.** Its content reaches you through this
   output. Reading it directly means reading a second, possibly different answer.
+- **Take today's date from `now.date`.** Never guess it, and do not call `date` yourself.
+  Commands stamp dates into things that stay — review logs, result directories, summary
+  filenames — and not every assistant is told what day it is. A guessed date in a log is
+  worse than no log. Where a command writes `YYYY-MM-DD` or `<date>`, that is the value.
+  An installation older than this field has no `now` in its output: say so once, then
+  fall back to `date +%F`.
 - Use the catalogs as given. Shipped and project-local are already merged — do not list
   directories yourself and do not re-derive which entry wins.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.

@@ -23,12 +23,12 @@ func TestApplyRootInstructionsLegtDateiAn(t *testing.T) {
 		t.Fatalf("AGENTS.md lesen: %v", err)
 	}
 	if !strings.Contains(string(content), "bin/k-playbook context") {
-		t.Errorf("Anstoss fehlt:\n%s", content)
+		t.Errorf("Anstoß fehlt:\n%s", content)
 	}
 
 }
 
-// Eine vorhandene Datei gehoert dem Projekt: der Anstoss wird angehaengt.
+// Eine vorhandene Datei gehört dem Projekt: der Anstoß wird angehängt.
 func TestApplyRootInstructionsErgaenztVorhandene(t *testing.T) {
 	root := t.TempDir()
 	eigen := "# Unser Projekt\n\nHier stehen unsere eigenen Regeln.\n"
@@ -48,7 +48,7 @@ func TestApplyRootInstructionsErgaenztVorhandene(t *testing.T) {
 		t.Errorf("vorhandener Text verloren:\n%s", content)
 	}
 	if !strings.Contains(string(content), "bin/k-playbook context") {
-		t.Errorf("Anstoss fehlt:\n%s", content)
+		t.Errorf("Anstoß fehlt:\n%s", content)
 	}
 }
 
@@ -73,9 +73,9 @@ func TestApplyRootInstructionsIstIdempotent(t *testing.T) {
 	}
 
 	if string(first) != string(second) {
-		t.Errorf("zweiter Lauf hat die Datei veraendert:\n%s", second)
+		t.Errorf("zweiter Lauf hat die Datei verändert:\n%s", second)
 	}
 	if strings.Count(string(second), instructionsMarker) != 1 {
-		t.Errorf("Anstoss steht mehrfach:\n%s", second)
+		t.Errorf("Anstoß steht mehrfach:\n%s", second)
 	}
 }

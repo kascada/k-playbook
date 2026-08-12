@@ -1,12 +1,12 @@
-# Kanonische Tool-Matrix fuer install-security-tools.sh, die Oberflaeche und die Review-Rezepte.
+# Kanonische Tool-Matrix für install-security-tools.sh, die Oberfläche und die Review-Rezepte.
 # Fields: name	languages	required	installable	install_method	install_ref	asset_pattern	role	docker_image	version_args
 #
-# languages       Komma-Liste der Projektsprachen, fuer die das Tool zustaendig ist, oder *
-#                 fuer sprachunabhaengig. required gilt nur, wenn die Sprache zutrifft;
+# languages       Komma-Liste der Projektsprachen, für die das Tool zuständig ist, oder *
+#                 für sprachunabhängig. required gilt nur, wenn die Sprache zutrifft;
 #                 ohne bekannte Sprachen ist ein sprachgebundenes Tool optional.
 # install_method  github (Release-Asset), go (go install), pipx (pipx oder Tool-venv), none.
 # install_ref     Zur Methode passende Referenz: GitHub-Repo, Go-Modulpfad oder Paketname.
-# asset_pattern   Nur fuer github: regulaerer Ausdruck auf den Asset-Namen. Platzhalter
+# asset_pattern   Nur für github: regulärer Ausdruck auf den Asset-Namen. Platzhalter
 #                 {tool} {version} {os} {arch} decken den Normalfall ab; {arch_x64} ist
 #                 x64/arm64, {os_cap} ist Linux/macOS und {arch_bits} ist 64bit/ARM64.
 #                 Endet der Name nicht auf .tar.gz oder .tgz, gilt das Asset als blanke
@@ -25,7 +25,6 @@ semgrep	python,go	true	true	pipx	semgrep	-	Generische Security-Regeln	semgrep/se
 osv-scanner	python,go	true	true	github	google/osv-scanner	^{tool}_{os}_{arch}$	Dependency-CVEs mit SARIF	-	--version
 gosec	go	true	true	github	securego/gosec	^{tool}_{version}_{os}_{arch}\.tar\.gz$	Go-Security	-	--version
 govulncheck	go	true	true	go	golang.org/x/vuln/cmd/govulncheck@latest	-	Go-CVEs mit Reachability	-	--version
-ruff	python	false	true	pipx	ruff	-	Python-Qualitaet und flake8-bandit-Regeln	-	--version
-bandit	python	false	true	pipx	bandit[sarif]	-	Python-Security	-	--version
-golangci-lint	go	false	true	github	golangci/golangci-lint	^{tool}-{version}-{os}-{arch}\.tar\.gz$	Go-Qualitaet, buendelt staticcheck und errcheck	-	--version
-docker	*	false	false	none	-	-	Optionaler Fallback fuer Container-Images	-	--version
+ruff	python	true	true	pipx	ruff	-	Python-Qualität und flake8-bandit-Regeln	-	--version
+golangci-lint	go	false	true	github	golangci/golangci-lint	^{tool}-{version}-{os}-{arch}\.tar\.gz$	Go-Qualität, bündelt staticcheck und errcheck	-	--version
+docker	*	false	false	none	-	-	Optionaler Fallback für Container-Images	-	--version

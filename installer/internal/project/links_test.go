@@ -37,11 +37,11 @@ func statusFor(t *testing.T, statuses []LinkStatus, path string) LinkStatus {
 			return status
 		}
 	}
-	t.Fatalf("kein Status fuer %s", path)
+	t.Fatalf("kein Status für %s", path)
 	return LinkStatus{}
 }
 
-// claudeCommands ist der Pfad, an dem die meisten Faelle sichtbar werden.
+// claudeCommands ist der Pfad, an dem die meisten Fälle sichtbar werden.
 func claudeCommands() string { return filepath.Join(".claude", "commands") }
 
 func TestCheckLinksMeldetFehlend(t *testing.T) {
@@ -89,7 +89,7 @@ func TestApplyLinksLegtEinzelLinksAn(t *testing.T) {
 	}
 	content, err := os.ReadFile(link)
 	if err != nil || string(content) != "test\n" {
-		t.Errorf("Inhalt ueber den Link = %q, %v", content, err)
+		t.Errorf("Inhalt über den Link = %q, %v", content, err)
 	}
 
 	// Der Namensraum bleibt als Verzeichnis erhalten.
@@ -113,7 +113,7 @@ func TestApplyLinksIstIdempotent(t *testing.T) {
 	}
 }
 
-// Fassungen bis 0.4 haben das ganze Verzeichnis verlinkt. Damit kaeme nur eine
+// Fassungen bis 0.4 haben das ganze Verzeichnis verlinkt. Damit käme nur eine
 // Quelle an; der Link muss weichen.
 func TestApplyLinksErsetztVerzeichnisSymlink(t *testing.T) {
 	root := newProject(t)
@@ -147,7 +147,7 @@ func TestApplyLinksErsetztVerzeichnisSymlink(t *testing.T) {
 	}
 	// Die Quelle darf dabei nicht durch den Link hindurch geleert worden sein.
 	if _, err := os.Stat(filepath.Join(root, PlaybookDirName, "commands", "k-test.md")); err != nil {
-		t.Errorf("Quelle beschaedigt: %v", err)
+		t.Errorf("Quelle beschädigt: %v", err)
 	}
 }
 
@@ -187,7 +187,7 @@ func TestApplyLinksZiehtOverrideNach(t *testing.T) {
 	}
 }
 
-// Ein projekteigener Command ohne Gegenstueck kommt einfach dazu.
+// Ein projekteigener Command ohne Gegenstück kommt einfach dazu.
 func TestApplyLinksRegistriertLokaleCommands(t *testing.T) {
 	root := newProject(t)
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-eigen.md"), "eigen\n")
@@ -208,7 +208,7 @@ func TestApplyLinksRegistriertLokaleCommands(t *testing.T) {
 	}
 }
 
-// Faellt ein Command aus dem Katalog, muss sein Link verschwinden.
+// Fällt ein Command aus dem Katalog, muss sein Link verschwinden.
 func TestApplyLinksEntferntVerwaisteLinks(t *testing.T) {
 	root := newProject(t)
 
@@ -287,7 +287,7 @@ func TestApplyLinksErhaeltEigeneDatei(t *testing.T) {
 	}
 
 	// Eine projekteigene Datei ist ein gewollter Zustand, kein offener Punkt:
-	// Einrichten koennte daran nichts aendern.
+	// Einrichten könnte daran nichts ändern.
 	if status.State != StateOK {
 		t.Errorf("State = %q, erwartet %q", status.State, StateOK)
 	}
@@ -297,7 +297,7 @@ func TestApplyLinksErhaeltEigeneDatei(t *testing.T) {
 
 	// Der Rest des Katalogs wird trotzdem registriert.
 	if _, err := os.Stat(filepath.Join(target, "_shared", "geteilt.md")); err != nil {
-		t.Errorf("uebriger Katalog nicht registriert: %v", err)
+		t.Errorf("übriger Katalog nicht registriert: %v", err)
 	}
 }
 
@@ -320,7 +320,7 @@ func TestApplyLinksLaesstDateiImWegLiegen(t *testing.T) {
 		t.Fatalf("Datei lesen: %v", err)
 	}
 	if string(content) != "keine Verlinkung\n" {
-		t.Error("Datei wurde veraendert")
+		t.Error("Datei wurde verändert")
 	}
 }
 
@@ -341,7 +341,7 @@ func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
 		t.Fatalf("ApplyLinks: %v", err)
 	}
 	if !LinksOK(statuses) {
-		t.Fatalf("nicht vollstaendig eingerichtet: %+v", statuses)
+		t.Fatalf("nicht vollständig eingerichtet: %+v", statuses)
 	}
 
 	for _, path := range []string{
@@ -365,7 +365,7 @@ func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
 		t.Errorf("%d Skill-Links, erwartet genau einen", skillLinks)
 	}
 
-	// Ein Skill wird als Verzeichnis verlinkt, nicht Datei fuer Datei.
+	// Ein Skill wird als Verzeichnis verlinkt, nicht Datei für Datei.
 	skill := filepath.Join(root, ".claude", "skills", "beispiel")
 	info, err := os.Lstat(skill)
 	if err != nil {
@@ -379,7 +379,7 @@ func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
 	}
 }
 
-// CLAUDE.md zeigt auf AGENTS.md; beide gehoeren dem Projekt.
+// CLAUDE.md zeigt auf AGENTS.md; beide gehören dem Projekt.
 func TestApplyLinksVerknuepftClaudeMitAgents(t *testing.T) {
 	root := newProject(t)
 	agents := filepath.Join(root, "AGENTS.md")
@@ -399,19 +399,19 @@ func TestApplyLinksVerknuepftClaudeMitAgents(t *testing.T) {
 	}
 
 	// Ein Schreibzugriff auf CLAUDE.md muss in AGENTS.md ankommen.
-	if err := os.WriteFile(claude, []byte("# Geaendert\n"), 0o644); err != nil {
-		t.Fatalf("ueber den Link schreiben: %v", err)
+	if err := os.WriteFile(claude, []byte("# Geändert\n"), 0o644); err != nil {
+		t.Fatalf("über den Link schreiben: %v", err)
 	}
 	content, err := os.ReadFile(agents)
 	if err != nil {
 		t.Fatalf("AGENTS.md lesen: %v", err)
 	}
-	if string(content) != "# Geaendert\n" {
-		t.Errorf("AGENTS.md = %q, Aenderung kam nicht an", content)
+	if string(content) != "# Geändert\n" {
+		t.Errorf("AGENTS.md = %q, Änderung kam nicht an", content)
 	}
 }
 
-// Ohne AGENTS.md wird nichts angelegt: die Datei gehoert dem Projekt.
+// Ohne AGENTS.md wird nichts angelegt: die Datei gehört dem Projekt.
 func TestApplyLinksLegtKeineAgentsAn(t *testing.T) {
 	root := newProject(t)
 
@@ -435,14 +435,14 @@ func TestApplyLinksLegtKeineAgentsAn(t *testing.T) {
 func TestCheckLinksMeldetErsetztenSymlink(t *testing.T) {
 	root := newProject(t)
 	writeFile(t, filepath.Join(root, "AGENTS.md"), "# A\n")
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# eigenstaendig\n")
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# eigenständig\n")
 
 	if got := statusFor(t, CheckLinks(root), "CLAUDE.md").State; got != StateBlocked {
 		t.Errorf("State = %q, erwartet %q", got, StateBlocked)
 	}
 }
 
-// Was ein Update an der Registrierung aendern wuerde, muss den Eintrag zaehlen,
+// Was ein Update an der Registrierung ändern würde, muss den Eintrag zählen,
 // nicht seine Kopien in .claude/, .opencode/ und .cursor/.
 func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	root := newProject(t)
@@ -452,7 +452,7 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	}
 
 	// Ein Update bringt einen Command mit, nimmt einen weg, und das Projekt
-	// ueberschreibt einen dritten neuerdings selbst.
+	// überschreibt einen dritten neuerdings selbst.
 	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-neu.md"), "neu\n")
 	if err := os.Remove(filepath.Join(root, PlaybookDirName, "commands", "k-test.md")); err != nil {
 		t.Fatalf("Command entfernen: %v", err)

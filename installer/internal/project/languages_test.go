@@ -27,7 +27,7 @@ func TestReadLanguagesOhneEintragLiefertVorauswahl(t *testing.T) {
 		t.Fatalf("ReadLanguages: %v", err)
 	}
 	if configured {
-		t.Error("fehlender Schluessel wurde als konfiguriert gemeldet")
+		t.Error("fehlender Schlüssel wurde als konfiguriert gemeldet")
 	}
 	if !slices.Equal(languages, DefaultLanguages) {
 		t.Errorf("Languages = %v, erwartet %v", languages, DefaultLanguages)
@@ -54,14 +54,14 @@ tools:
 		t.Fatalf("ReadLanguages: %v", err)
 	}
 	if !configured {
-		t.Error("vorhandener Schluessel wurde nicht als konfiguriert gemeldet")
+		t.Error("vorhandener Schlüssel wurde nicht als konfiguriert gemeldet")
 	}
 	if !slices.Equal(languages, []string{"python", "go"}) {
 		t.Errorf("Languages = %v, erwartet [python go]", languages)
 	}
 }
 
-// Von Hand geschriebene Konfigurationen duerfen die Flussform nutzen, auch wenn
+// Von Hand geschriebene Konfigurationen dürfen die Flussform nutzen, auch wenn
 // das Werkzeug selbst die Blockform schreibt.
 func TestReadLanguagesFlussform(t *testing.T) {
 	root := writeConfig(t, "schema_version: 3\n\nproject:\n  languages: [python, go]\n  vcs: git\n")
@@ -91,12 +91,12 @@ func TestReadLanguagesLeereListe(t *testing.T) {
 }
 
 // Der Wert wandert als Kommandozeilenargument in das Preflight-Skript. Was dort
-// eine eigene Bedeutung haette, darf gar nicht erst gelesen werden.
+// eine eigene Bedeutung hätte, darf gar nicht erst gelesen werden.
 func TestReadLanguagesMeldetUnzulaessigenWert(t *testing.T) {
 	root := writeConfig(t, "schema_version: 3\n\nproject:\n  languages:\n    - \"go; rm -rf /\"\n")
 
 	if _, _, err := ReadLanguages(root); err == nil {
-		t.Error("unzulaessiger Sprachname wurde nicht gemeldet")
+		t.Error("unzulässiger Sprachname wurde nicht gemeldet")
 	}
 }
 
@@ -127,7 +127,7 @@ func TestSetLanguagesLaesstDenRestStehen(t *testing.T) {
 	}
 }
 
-// Zweimal Schreiben darf den Block ersetzen und nicht ein zweites Mal anhaengen.
+// Zweimal Schreiben darf den Block ersetzen und nicht ein zweites Mal anhängen.
 func TestSetLanguagesErsetztStattAnzuhaengen(t *testing.T) {
 	root := writeConfig(t, configWithoutLanguages)
 
@@ -140,7 +140,7 @@ func TestSetLanguagesErsetztStattAnzuhaengen(t *testing.T) {
 
 	data, _ := os.ReadFile(ConfigPath(root))
 	if count := strings.Count(string(data), "languages:"); count != 1 {
-		t.Errorf("%d languages-Bloecke, erwartet 1:\n%s", count, data)
+		t.Errorf("%d languages-Blöcke, erwartet 1:\n%s", count, data)
 	}
 
 	languages, _, err := ReadLanguages(root)
@@ -153,7 +153,7 @@ func TestSetLanguagesErsetztStattAnzuhaengen(t *testing.T) {
 }
 
 // Wiederholtes Umschalten darf die Datei nicht wachsen lassen: weder durch
-// gestapelte Kommentare noch durch das Aufzehren der Leerzeile vor dem naechsten
+// gestapelte Kommentare noch durch das Aufzehren der Leerzeile vor dem nächsten
 // Block. Beides ist beim Bauen der Sprachauswahl aufgefallen.
 func TestSetLanguagesBleibtStabilBeiWiederholtemSchreiben(t *testing.T) {
 	root := writeConfig(t, configWithoutLanguages)
@@ -177,15 +177,15 @@ func TestSetLanguagesBleibtStabilBeiWiederholtemSchreiben(t *testing.T) {
 	}
 
 	if string(first) != string(again) {
-		t.Errorf("Datei hat sich beim erneuten Schreiben veraendert:\n--- erst ---\n%s\n--- dann ---\n%s", first, again)
+		t.Errorf("Datei hat sich beim erneuten Schreiben verändert:\n--- erst ---\n%s\n--- dann ---\n%s", first, again)
 	}
 	if !strings.Contains(string(again), "\n\ntools:") {
-		t.Errorf("Leerzeile vor dem naechsten Block ging verloren:\n%s", again)
+		t.Errorf("Leerzeile vor dem nächsten Block ging verloren:\n%s", again)
 	}
 }
 
-// Die leere Auswahl wird als Flussform geschrieben. Sie muss beim naechsten Mal
-// wiedergefunden werden, sonst entstuende ein zweiter languages-Schluessel.
+// Die leere Auswahl wird als Flussform geschrieben. Sie muss beim nächsten Mal
+// wiedergefunden werden, sonst entstünde ein zweiter languages-Schlüssel.
 func TestSetLanguagesErsetztAuchDieLeereListe(t *testing.T) {
 	root := writeConfig(t, configWithoutLanguages)
 
@@ -198,7 +198,7 @@ func TestSetLanguagesErsetztAuchDieLeereListe(t *testing.T) {
 
 	data, _ := os.ReadFile(ConfigPath(root))
 	if count := strings.Count(string(data), "languages:"); count != 1 {
-		t.Errorf("%d languages-Schluessel, erwartet 1:\n%s", count, data)
+		t.Errorf("%d languages-Schlüssel, erwartet 1:\n%s", count, data)
 	}
 
 	languages, _, err := ReadLanguages(root)
@@ -214,7 +214,7 @@ func TestSetLanguagesWeistUnzulaessigenWertAb(t *testing.T) {
 	root := writeConfig(t, configWithoutLanguages)
 
 	if err := SetLanguages(root, []string{"go; rm -rf /"}); err == nil {
-		t.Error("unzulaessiger Sprachname wurde geschrieben")
+		t.Error("unzulässiger Sprachname wurde geschrieben")
 	}
 }
 

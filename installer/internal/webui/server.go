@@ -1,4 +1,4 @@
-// Package webui stellt die lokale Browser-Oberflaeche von k-playbook bereit.
+// Package webui stellt die lokale Browser-Oberfläche von k-playbook bereit.
 package webui
 
 import (
@@ -22,16 +22,16 @@ import (
 var staticFiles embed.FS
 
 const (
-	// Der Client meldet sich regelmaessig. Bleibt er laenger als
+	// Der Client meldet sich regelmäßig. Bleibt er länger als
 	// clientHeartbeatTimeout aus, ist das Browserfenster weg und der Server
 	// wird nicht mehr gebraucht.
 	clientHeartbeatTimeout = 5 * time.Second
-	// Nach einer ausdruecklichen Abmeldung wird kurz gewartet, damit ein
-	// Reload den Server nicht abraeumt.
+	// Nach einer ausdrücklichen Abmeldung wird kurz gewartet, damit ein
+	// Reload den Server nicht abräumt.
 	clientGoneShutdownDelay = 3 * time.Second
 	clientMonitorInterval   = 2 * time.Second
 	shutdownTimeout         = 5 * time.Second
-	// Verzoegerung, damit die Antwort auf /api/shutdown noch rausgeht,
+	// Verzögerung, damit die Antwort auf /api/shutdown noch rausgeht,
 	// bevor der Server zumacht.
 	shutdownResponseDelay = 150 * time.Millisecond
 )
@@ -45,11 +45,11 @@ type serverState struct {
 }
 
 // Run startet den lokalen Server und blockiert, bis der Client sich
-// abmeldet, verschwindet oder Ctrl+C gedrueckt wird.
+// abmeldet, verschwindet oder Ctrl+C gedrückt wird.
 func Run() error {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return fmt.Errorf("GUI-Port oeffnen: %w", err)
+		return fmt.Errorf("GUI-Port öffnen: %w", err)
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
@@ -89,20 +89,20 @@ func Run() error {
 	return nil
 }
 
-// announce gibt die URL aus und oeffnet den Browser, sofern das hier
-// ueberhaupt sinnvoll ist.
+// announce gibt die URL aus und öffnet den Browser, sofern das hier
+// überhaupt sinnvoll ist.
 func announce(url string) {
 	fmt.Printf("k-playbook: %s\n", url)
 
 	if marker, inside := containerMarker(); inside {
-		fmt.Printf("Container erkannt (%s), der Browser wird nicht geoeffnet.\n", marker)
+		fmt.Printf("Container erkannt (%s), der Browser wird nicht geöffnet.\n", marker)
 		fmt.Println("Obige URL im Browser auf dem Host eintragen; im DevContainer muss der Port weitergeleitet sein.")
 	} else if err := openBrowser(url); err != nil {
-		fmt.Printf("Browser konnte nicht automatisch geoeffnet werden: %v\n", err)
+		fmt.Printf("Browser konnte nicht automatisch geöffnet werden: %v\n", err)
 		fmt.Println("Obige URL bitte manuell im Browser eintragen.")
 	}
 
-	fmt.Println("Zum Beenden Ctrl+C druecken.")
+	fmt.Println("Zum Beenden Ctrl+C drücken.")
 }
 
 func routes(state *serverState) http.Handler {
@@ -119,6 +119,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
+	mux.HandleFunc("GET /api/reviews", reviewsHandler)
+	mux.HandleFunc("POST /api/reviews", createRunHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)
@@ -134,6 +136,7 @@ func routes(state *serverState) http.Handler {
 		panic(fmt.Sprintf("eingebettete Assets: %v", err))
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	mux.HandleFunc("GET /reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
 	return mux
@@ -141,12 +144,24 @@ func routes(state *serverState) http.Handler {
 
 var indexTemplate = template.Must(template.ParseFS(staticFiles, "static/index.html"))
 
+// reviewsTemplate ist die zweite Seite. Sie teilt den Kopf mit der Startseite,
+// deshalb dieselben Vorlagendaten.
+var reviewsTemplate = template.Must(template.ParseFS(staticFiles, "static/reviews.html"))
+
+func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, reviewsTemplate)
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
+	renderPage(w, indexTemplate)
+}
 
+// renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus.
+func renderPage(w http.ResponseWriter, tmpl *template.Template) {
 	environment := project.Detect()
 	data := struct {
 		Mode        string
@@ -162,24 +177,26 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		data.Path = project.DisplayPath(environment.ProjectDir)
 		// Aus diesem Verzeichnis kommen Skripte, Regeln, Reviews und Checks. Es
 		// ist ein eigener Clone und kann einen anderen Stand tragen als das
-		// Binary — deshalb gehoert es in den Kopf und nicht hinter einen Klick.
+		// Binary — deshalb gehört es in den Kopf und nicht hinter einen Klick.
 		data.PlaybookDir = project.DisplayPath(environment.PlaybookDir)
 	} else {
 		data.Mode = "none"
-		data.ModeLabel = "Nicht installiert"
+		// Als Beschriftung eines Pfades gelesen, nicht als Zustandsmarke: der
+		// Pfad daneben ist der Ort, ab dem gesucht wurde.
+		data.ModeLabel = "Nicht installiert, gesucht ab"
 		data.Path = project.DisplayPath(environment.SearchedFrom)
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := indexTemplate.Execute(w, data); err != nil {
-		// Die Antwort laeuft bereits; mehr als protokollieren geht nicht.
-		fmt.Fprintf(os.Stderr, "Startseite rendern: %v\n", err)
+	if err := tmpl.Execute(w, data); err != nil {
+		// Die Antwort läuft bereits; mehr als protokollieren geht nicht.
+		fmt.Fprintf(os.Stderr, "Seite rendern: %v\n", err)
 	}
 }
 
 // healthHandler dient dem Client als Lebenszeichen in beide Richtungen:
-// schlaegt der Aufruf fehl, weiss der Client, dass der Server weg ist;
-// bleibt er aus, weiss der Server, dass der Client weg ist.
+// schlägt der Aufruf fehl, weiß der Client, dass der Server weg ist;
+// bleibt er aus, weiß der Server, dass der Client weg ist.
 func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
 	state.noteClientSeen()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

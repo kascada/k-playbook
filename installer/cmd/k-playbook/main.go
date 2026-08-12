@@ -1,7 +1,7 @@
-// Command k-playbook ist das Werkzeug fuer die projektlokale k-playbook-Installation.
+// Command k-playbook ist das Werkzeug für die projektlokale k-playbook-Installation.
 //
-// Ohne Argument startet es die lokale Oberflaeche. Das Unterkommando `context`
-// gibt den aufgeloesten Arbeitsstand als JSON aus.
+// Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
+// gibt den aufgelösten Arbeitsstand als JSON aus.
 package main
 
 import (
@@ -31,7 +31,7 @@ func run(args []string) error {
 
 	switch args[0] {
 	case "context":
-		// Ohne cleanUpLegacy: dessen Ausgabe wuerde die JSON-Ausgabe stoeren.
+		// Ohne cleanUpLegacy: dessen Ausgabe würde die JSON-Ausgabe stören.
 		return printContext()
 	case "help", "-h", "--help":
 		printUsage()
@@ -43,7 +43,7 @@ func run(args []string) error {
 }
 
 // printContext gibt den Arbeitsstand aus: Pfade, Konfiguration und die
-// aufgeloesten Kataloge. Damit muss ein Command die Overlay-Regeln nicht selbst
+// aufgelösten Kataloge. Damit muss ein Command die Overlay-Regeln nicht selbst
 // anwenden.
 func printContext() error {
 	workdir, err := os.Getwd()
@@ -64,20 +64,20 @@ func printContext() error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `k-playbook
 
-Ohne Argument:  startet die lokale Oberflaeche im Browser.
+Ohne Argument:  startet die lokale Oberfläche im Browser.
 
 Unterkommandos:
-  context   Gibt den aufgeloesten Arbeitsstand als JSON aus: Pfade,
-            Konfiguration und die effektiven Kataloge fuer rules, reviews
-            und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwaerts.
-  help      Diese Uebersicht.
+  context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
+            Konfiguration und die effektiven Kataloge für rules, reviews
+            und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
+  help      Diese Übersicht.
 `)
 }
 
-// cleanUpLegacy raeumt die host-globale Registrierung des alten Modells weg.
-// Sie laeuft bei jedem Start und meldet sich nur, wenn tatsaechlich etwas
-// wegfaellt — auf einem sauberen Rechner bleibt sie still. Ein Fehler dabei
-// haelt den Start nicht auf: die Oberflaeche ist auch mit Altlasten bedienbar.
+// cleanUpLegacy räumt die host-globale Registrierung des alten Modells weg.
+// Sie läuft bei jedem Start und meldet sich nur, wenn tatsächlich etwas
+// wegfällt — auf einem sauberen Rechner bleibt sie still. Ein Fehler dabei
+// hält den Start nicht auf: die Oberfläche ist auch mit Altlasten bedienbar.
 func cleanUpLegacy() {
 	removals, err := legacy.RemoveGlobalLinks()
 	if len(removals) > 0 {
@@ -87,19 +87,19 @@ func cleanUpLegacy() {
 		}
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: alte globale Verlinkung nicht vollstaendig entfernt: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Hinweis: alte globale Verlinkung nicht vollständig entfernt: %v\n", err)
 	}
 }
 
-// mirrorHostInstall haelt die host-weite Kopie auf dem Stand dieses Aufrufs,
+// mirrorHostInstall hält die host-weite Kopie auf dem Stand dieses Aufrufs,
 // damit `k-playbook` aus jedem Verzeichnis startbar ist.
 //
 // Nur hier, nicht bei `context`: dessen JSON darf keine Beigaben bekommen, und
-// die Spiegelung braucht ein Git-Kommando, das den haeufigen Kontextaufrufen
+// die Spiegelung braucht ein Git-Kommando, das den häufigen Kontextaufrufen
 // der Commands nichts bringt.
 //
 // Wie cleanUpLegacy meldet sie sich nur, wenn etwas passiert ist, und ein
-// Fehler haelt den Start nicht auf: die Oberflaeche laeuft auch ohne Kopie.
+// Fehler hält den Start nicht auf: die Oberfläche läuft auch ohne Kopie.
 func mirrorHostInstall() {
 	result, err := hostinstall.Mirror()
 	if len(result.Copied) > 0 {
@@ -112,7 +112,7 @@ func mirrorHostInstall() {
 		fmt.Printf("Verlinkt: %s\n", result.Link)
 	}
 	// Ohne Bedingung auf result: der PATH stimmt auch dann noch nicht, wenn
-	// diesmal nichts zu spiegeln war. Sonst saehe man den Hinweis genau einmal.
+	// diesmal nichts zu spiegeln war. Sonst sähe man den Hinweis genau einmal.
 	if status := hostinstall.CheckPath(); status.Export != "" {
 		fmt.Printf("Hinweis: %s liegt nicht im PATH. Diese Zeile ins Shell-Profil:\n", status.Dir)
 		fmt.Printf("  %s\n", status.Export)

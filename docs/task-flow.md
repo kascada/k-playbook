@@ -1,6 +1,6 @@
 # Task-Flow
 
-Der Task-Flow ist der Standardweg fuer geplante Arbeit, die nicht direkt in einem kurzen Chat-Schritt erledigt werden soll.
+Der Task-Flow ist der Standardweg für geplante Arbeit, die nicht direkt in einem kurzen Chat-Schritt erledigt werden soll.
 
 ## Standardablauf
 
@@ -10,7 +10,7 @@ Der Task-Flow ist der Standardweg fuer geplante Arbeit, die nicht direkt in eine
 /k-run
 ```
 
-Tasks koennen direkt aus dem Gespraech entstehen oder von `/k-remediation` erzeugt werden. In beiden Faellen gilt: erst Task-Dateien pruefen, dann ausfuehren.
+Tasks können direkt aus dem Gespräch entstehen oder von `/k-remediation` erzeugt werden. In beiden Fällen gilt: erst Task-Dateien prüfen, dann ausführen.
 
 ## /k-task-create
 
@@ -19,48 +19,48 @@ Tasks koennen direkt aus dem Gespraech entstehen oder von `/k-remediation` erzeu
 Der Command:
 
 - leitet den Ort aus der Lage der `K-PLAYBOOK.yaml` ab.
-- bestimmt die naechste freie Nummer aus offenen Tasks und `done/`.
+- bestimmt die nächste freie Nummer aus offenen Tasks und `done/`.
 - erzeugt einen Dateinamen wie `014-audiosocket-server.md`.
 - nimmt relevante Referenzen und besondere Tools in die Task-Datei auf.
-- zeigt den Entwurf zuerst und speichert erst nach Bestaetigung.
+- zeigt den Entwurf zuerst und speichert erst nach Bestätigung.
 
-Tasks sollen so geschrieben sein, dass `/k-run` sie ohne weiteren Chatkontext ausfuehren kann.
+Tasks sollen so geschrieben sein, dass `/k-run` sie ohne weiteren Chatkontext ausführen kann.
 
 ## /k-review-loop
 
-`/k-review-loop [path]` prueft Task- oder Instruktionsdateien vor der Ausfuehrung.
+`/k-review-loop [path]` prüft Task- oder Instruktionsdateien vor der Ausführung.
 
 Der Command nutzt einen strukturierten Critic/Editor-Dialog:
 
 - Critic und Editor sind read-only.
 - Der Moderator ist der einzige Writer.
-- Tatsaechlicher Dateistand gewinnt nach jeder Aenderung.
+- Tatsächlicher Dateistand gewinnt nach jeder Änderung.
 - Akzeptierte Edits und Entscheidungen werden im Review-Log festgehalten.
-- Am Ende wird gegen den angegebenen `## Intent` geprueft, falls vorhanden.
+- Am Ende wird gegen den angegebenen `## Intent` geprüft, falls vorhanden.
 
-Ohne Argument prueft der Command die offenen Task-Dateien unter `k-playbook-local/tasks/`.
+Ohne Argument prüft der Command die offenen Task-Dateien unter `k-playbook-local/tasks/`.
 
 ## /k-run
 
-`/k-run [file-or-directory]` fuehrt Task-Dateien sequenziell aus.
+`/k-run [file-or-directory]` führt Task-Dateien sequenziell aus.
 
 Der Command:
 
 - nutzt ohne Argument `k-playbook-local/tasks/`.
 - sortiert Tasks nach numerischem Prefix.
-- fuehrt Tasks nie parallel aus.
-- klaert offene Fragen vor Delegation an Subagenten.
-- haengt eine Ausfuehrungsnotiz an.
+- führt Tasks nie parallel aus.
+- klärt offene Fragen vor Delegation an Subagenten.
+- hängt eine Ausführungsnotiz an.
 - verschiebt erfolgreich abgeschlossene Tasks nach `done/`.
-- laesst abgebrochene oder teilweise ausgefuehrte Tasks offen.
+- lässt abgebrochene oder teilweise ausgeführte Tasks offen.
 
-Wenn eine Task-Datei `## Ausfuehrungskontext` enthaelt, wertet `/k-run` daraus unter anderem `Target repo`, `Base branch`, `Work branch` und `PR required` aus. Dann gehoeren Branch-/Dirty-Worktree-Preflight und ggf. PR-Handoff zum Ablauf.
+Wenn eine Task-Datei `## Ausführungskontext` enthält, wertet `/k-run` daraus unter anderem `Target repo`, `Base branch`, `Work branch` und `PR required` aus. Dann gehören Branch-/Dirty-Worktree-Preflight und ggf. PR-Handoff zum Ablauf.
 
 ## Remediation-Tasks
 
 Von `/k-remediation` erzeugte Tasks sind normale Task-Flow-Eingaben. Besonders wichtig sind dabei:
 
-- Findings-IDs und Quellen muessen in der Task stehen.
-- Branch-/PR-Anforderungen aus der Remediation-Policy muessen im Ausfuehrungskontext stehen.
-- Vor Umsetzung laeuft `/k-review-loop`.
-- Umsetzung laeuft danach ueber `/k-run`.
+- Findings-IDs und Quellen müssen in der Task stehen.
+- Branch-/PR-Anforderungen aus der Remediation-Policy müssen im Ausführungskontext stehen.
+- Vor Umsetzung läuft `/k-review-loop`.
+- Umsetzung läuft danach über `/k-run`.

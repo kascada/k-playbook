@@ -1,16 +1,16 @@
 # Commands
 
-Kompakter Index der Slash-Commands. Detailablaeufe stehen in eigenen Themenseiten; diese
+Kompakter Index der Slash-Commands. Detailabläufe stehen in eigenen Themenseiten; diese
 Seite dupliziert sie nicht.
 
 Mitgelieferte Commands, Skills, Regeln, Review-Rezepte und Checks liegen unter
-`k-playbook/`. Unter `k-playbook-local/` liegt das Projekteigene — dieselben fuenf Sorten
+`k-playbook/`. Unter `k-playbook-local/` liegt das Projekteigene — dieselben fünf Sorten
 plus Tasks und Ergebnisse. Beide Orte ergeben sich aus der Lage der `K-PLAYBOOK.yaml`; es
 gibt keine konfigurierten Pfade mehr.
 
 Ein projekteigener Command mit dem Namen eines mitgelieferten **ersetzt** diesen; ein
 leerer schaltet ihn ab. Diese Seite listet die mitgelieferten — was in einem konkreten
-Projekt tatsaechlich gilt, zeigt die Oberflaeche im Assistenten-Block.
+Projekt tatsächlich gilt, zeigt die Oberfläche im Assistenten-Block.
 
 ## Detailseiten
 
@@ -23,7 +23,7 @@ Projekt tatsaechlich gilt, zeigt die Oberflaeche im Assistenten-Block.
 | Installation | [`installation.md`](./installation.md) |
 | Projektkonfiguration | [`k-playbook-format.md`](./k-playbook-format.md) |
 
-## Uebersicht
+## Übersicht
 
 Neue Commands werden erst sichtbar, nachdem die Verlinkung steht und der Assistent neu
 gestartet wurde.
@@ -31,29 +31,29 @@ gestartet wurde.
 | Command | Zweck | Detail |
 |---|---|---|
 | **Projekt** | | |
-| `/k-gui` | Oberflaeche starten | fuehrt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
-| `/k-status` | read-only Zustandsbericht fuer das Projekt | repariert nichts |
+| `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
+| `/k-status` | read-only Zustandsbericht für das Projekt | repariert nichts |
 | **Docs** | | |
-| `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
-| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | erzeugt je ausgewaehltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
+| `/k-code2docs` | semantische Projekt-Doku erzeugen und für AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
+| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
-| `/k-review` | Review-Rezepte ausfuehren | [`code-review.md`](./code-review.md) |
+| `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
 | `/k-results` | vorhandene Ergebnisse projektweit priorisieren | [`code-review.md`](./code-review.md) |
-| `/k-remediation` | Findings buendeln und in Tasks oder Fixes ueberfuehren | [`code-review.md`](./code-review.md) |
+| `/k-remediation` | Findings bündeln und in Tasks oder Fixes überführen | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
-| `/k-task-create` | Task-Datei aus dem Gespraechskontext erzeugen | [`task-flow.md`](./task-flow.md) |
-| `/k-review-loop` | Task-Dateien vor der Ausfuehrung per Critic/Editor-Dialog pruefen | [`task-flow.md`](./task-flow.md) |
-| `/k-run` | Task-Dateien sequenziell ausfuehren | [`task-flow.md`](./task-flow.md) |
-| `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergaenzen | |
+| `/k-task-create` | Task-Datei aus dem Gesprächskontext erzeugen | [`task-flow.md`](./task-flow.md) |
+| `/k-review-loop` | Task-Dateien vor der Ausführung per Critic/Editor-Dialog prüfen | [`task-flow.md`](./task-flow.md) |
+| `/k-run` | Task-Dateien sequenziell ausführen | [`task-flow.md`](./task-flow.md) |
+| `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergänzen | |
 | **Hilfen** | | |
 | `/k-enforcement` | expliziter Check gegen die effektive Regelmenge | read-only Bericht; Fixes nur nach Freigabe |
-| `/k-test-check` | Tests ausfuehren und Fehlerursachen diagnostizieren | startet bewusst Tests, nicht nur Statuschecks |
-| `/k-verlauf` | alte AI-Verlaeufe durchsuchen | read-only |
+| `/k-test-check` | Tests ausführen und Fehlerursachen diagnostizieren | startet bewusst Tests, nicht nur Statuschecks |
+| `/k-verlauf` | alte AI-Verläufe durchsuchen | read-only |
 | `/k-vscode-project-color` | VS-Code-Fensterfarbe und -Titel pro Projekt setzen | schreibt `.vscode/settings.json` |
 
 Einen Command `/k-install-security-tools` gibt es nicht mehr. Status und
-Installationsbefehl kommen aus der Oberflaeche, alles Weitere kann
+Installationsbefehl kommen aus der Oberfläche, alles Weitere kann
 `k-playbook/scripts/install-security-tools.sh` selbst — siehe
 [`installation.md`](./installation.md#security-tools).
 
@@ -61,13 +61,13 @@ Installationsbefehl kommen aus der Oberflaeche, alles Weitere kann
 
 Die Code-Review-Familie ist bewusst gestuft:
 
-1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmaessig read-only.
-2. `/k-review <name>` fuehrt ein Rezept aus und erzeugt je nach Rezept interaktive
-   Aenderungsvorschlaege oder Report-Artefakte.
+1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmäßig read-only.
+2. `/k-review <name>` führt ein Rezept aus und erzeugt je nach Rezept interaktive
+   Änderungsvorschläge oder Report-Artefakte.
 3. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
 4. `/k-remediation <result>` plant die Abarbeitung der Findings.
 
-Wenn `/k-remediation` Tasks erzeugt, gehoeren sie in den normalen Task-Flow: erst
+Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
 `/k-review-loop`, dann `/k-run`.
 
 ## Task-Flow
@@ -78,12 +78,12 @@ Wenn `/k-remediation` Tasks erzeugt, gehoeren sie in den normalen Task-Flow: ers
 /k-run
 ```
 
-Tasks entstehen direkt aus dem Gespraech oder aus `/k-remediation`. In beiden Faellen
-werden sie vor der Ausfuehrung gegengeprueft.
+Tasks entstehen direkt aus dem Gespräch oder aus `/k-remediation`. In beiden Fällen
+werden sie vor der Ausführung gegengeprüft.
 
 ## Wo Commands ihre Ziele finden
 
-Kein Command liest oder raet einen Pfad. Alles leitet sich aus dem Ort der
+Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
 `K-PLAYBOOK.yaml` ab:
 
 | Command | schreibt nach |
@@ -93,10 +93,10 @@ Kein Command liest oder raet einen Pfad. Alles leitet sich aus dem Ort der
 | `/k-review`, `/k-results` | `k-playbook-local/results/` |
 | `/k-code2docs`, `/k-tools-scan` | `k-playbook-local/docs/`, Tool-Steckbriefe unter `libs/` |
 
-Gelesen wird zusaetzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
+Gelesen wird zusätzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
 Geschrieben wird dorthin nie.
 
-## Der aufgeloeste Arbeitsstand
+## Der aufgelöste Arbeitsstand
 
 Kein Command rechnet selbst aus, was gilt. Das macht das Werkzeug:
 
@@ -104,9 +104,9 @@ Kein Command rechnet selbst aus, was gilt. Das macht das Werkzeug:
 k-playbook/bin/k-playbook context
 ```
 
-Die JSON-Ausgabe nennt die aufgeloesten Verzeichnisse, die Instruktionsdateien in
+Die JSON-Ausgabe nennt die aufgelösten Verzeichnisse, die Instruktionsdateien in
 Lesereihenfolge, die Remediation-Policy, die Guidelines und die drei Kataloge —
-mitgeliefert und projekteigen bereits zusammengefuehrt:
+mitgeliefert und projekteigen bereits zusammengeführt:
 
 ```json
 {
@@ -130,11 +130,11 @@ mitgeliefert und projekteigen bereits zusammengefuehrt:
 Datei leer ist — das ist der Weg, einen mitgelieferten Eintrag abzuschalten.
 
 Der Aufruf steht am Anfang jedes Commands, aber nur einmal je Sitzung. Die Ausgabe
-aendert sich waehrend der Arbeit nicht und ist fuer jeden Command dieselbe, also
+ändert sich während der Arbeit nicht und ist für jeden Command dieselbe, also
 verwenden nachfolgende Commands die vorhandene weiter — auch die Dateien aus
 `instructions` werden nur einmal gelesen. Neu geholt wird sie, wenn die
 `K-PLAYBOOK.yaml` geschrieben wurde, sich der Bestand an Regeln, Reviews, Checks oder
-Guidelines geaendert hat oder die Arbeit in ein anderes Projekt gewechselt ist.
+Guidelines geändert hat oder die Arbeit in ein anderes Projekt gewechselt ist.
 
 `/k-review`, `/k-enforcement` und `k-check` arbeiten auf dieser Menge und weisen sie vor
 der Arbeit aus. Die Regeln im Detail stehen in
@@ -142,19 +142,19 @@ der Arbeit aus. Die Regeln im Detail stehen in
 
 ## Status
 
-`/k-status` ist read-only und prueft:
+`/k-status` ist read-only und prüft:
 
-- ob `K-PLAYBOOK.yaml` existiert, gueltig ist und `schema_version: 3` traegt,
-- ob `k-playbook-local/` vollstaendig ist,
-- ob die Symlinks fuer Claude Code, OpenCode und Cursor stimmen,
+- ob `K-PLAYBOOK.yaml` existiert, gültig ist und `schema_version: 3` trägt,
+- ob `k-playbook-local/` vollständig ist,
+- ob die Symlinks für Claude Code, OpenCode und Cursor stimmen,
 - ob `project.repo_root` auf ein Repository zeigt und wie sauber es ist,
 - welche Tasks offen sind und ob Security-Tools fehlen.
 
-Der Command repariert nichts. Fuer Reparaturen ist `/k-gui` zustaendig.
+Der Command repariert nichts. Für Reparaturen ist `/k-gui` zuständig.
 
 ## k-check
 
-`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner fuer die
+`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner für die
 effektive Check-Menge:
 
 ```bash

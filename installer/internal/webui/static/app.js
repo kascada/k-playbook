@@ -1,7 +1,7 @@
 "use strict";
 
-// Haelt fest, ob das Backend noch antwortet. Sobald es weg ist, wird die
-// Oberflaeche gesperrt und nicht weiter gepollt.
+// Hält fest, ob das Backend noch antwortet. Sobald es weg ist, wird die
+// Oberfläche gesperrt und nicht weiter gepollt.
 let serverAvailable = true;
 
 const elements = {
@@ -64,6 +64,9 @@ const elements = {
   assistantMessage: document.getElementById("assistant-message"),
   assistantApply: document.getElementById("assistant-apply"),
   docsCard: document.getElementById("docs-card"),
+  reviewsPill: document.getElementById("reviews-pill"),
+  reviewsList: document.getElementById("reviews-list"),
+  reviewsMessage: document.getElementById("reviews-message"),
   docsPill: document.getElementById("docs-pill"),
   docsList: document.getElementById("docs-list"),
   docsMessage: document.getElementById("docs-message"),
@@ -91,7 +94,7 @@ const STATE_LABELS = {
 
 // Die Abweichungen eines Katalog-Eintrags, in der Reihenfolge, in der sie
 // jemanden interessieren: erst was fehlt, zuletzt was ohnehin dem Projekt
-// gehoert.
+// gehört.
 const REGISTRY_DEVIATIONS = [
   ["missing", "fehlt"],
   ["wrong", "zeigt woandershin"],
@@ -107,7 +110,7 @@ elements.assistantApply.addEventListener("click", applyAssistant);
 elements.contextCard.addEventListener("toggle", onContextToggle);
 elements.closeDoc.addEventListener("click", closeDocOverlay);
 elements.docViewer.addEventListener("click", onDocViewerClick);
-// Ein Klick neben das Fenster schliesst es; einer darin darf nicht durchgreifen.
+// Ein Klick neben das Fenster schließt es; einer darin darf nicht durchgreifen.
 elements.docOverlay.addEventListener("click", (event) => {
   if (event.target === elements.docOverlay) {
     closeDocOverlay();
@@ -118,33 +121,37 @@ document.addEventListener("keydown", (event) => {
     closeDocOverlay();
   }
 });
+// Ein Listener für alle Kopier-Knöpfe: sie stehen in Blöcken, die erst
+// später sichtbar werden, und einzeln gebundene Listener müssten nachgezogen
+// werden.
+document.addEventListener("click", onCopyClick);
 window.addEventListener("pagehide", notifyClientGone);
-// Muss vor den Ladefunktionen laufen: die blenden Bloecke ein, und das Menue
+// Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
 buildBlockNav();
 startHealthChecks();
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
-// blendet ihn dann ein und laedt ihn nach.
+// blendet ihn dann ein und lädt ihn nach.
 loadConfig();
-// Der PATH betrifft den Host, nicht das Projekt — deshalb unabhaengig davon,
+// Der PATH betrifft den Host, nicht das Projekt — deshalb unabhängig davon,
 // ob eine Konfiguration gefunden wurde.
 loadPath();
-// Die Update-Pruefung braucht das Netz. Sie laeuft nebenher, damit die Seite
+// Die Update-Prüfung braucht das Netz. Sie läuft nebenher, damit die Seite
 // nicht auf einen langsamen Remote wartet.
 checkUpdate();
 
-// updateAvailable steuert, was ein Klick auf den Button tut: pruefen oder
-// tatsaechlich aktualisieren.
+// updateAvailable steuert, was ein Klick auf den Button tut: prüfen oder
+// tatsächlich aktualisieren.
 let updateAvailable = false;
 
 async function checkUpdate() {
   elements.update.disabled = true;
-  elements.update.textContent = "Pruefe...";
+  elements.update.textContent = "Prüfe...";
   try {
     const response = await fetch("/api/update", { cache: "no-store" });
     renderUpdate(await response.json());
   } catch {
-    resetUpdateButton("Update pruefen");
+    resetUpdateButton("Update prüfen");
   }
 }
 
@@ -162,12 +169,12 @@ async function onUpdateClick() {
     renderUpdate(data);
     if (data.restartRequired) {
       showClosed(
-        "Das Programm wurde aktualisiert. Dieses Fenster schliessen und " +
+        "Das Programm wurde aktualisiert. Dieses Fenster schließen und " +
           "bin/k-playbook neu starten, um die neue Version zu verwenden."
       );
     }
   } catch {
-    resetUpdateButton("Update pruefen");
+    resetUpdateButton("Update prüfen");
   }
 }
 
@@ -178,15 +185,15 @@ function renderUpdate(data) {
   if (updateAvailable) {
     // Hervorgehoben, solange etwas anliegt.
     elements.update.className = "primary attention-highlight";
-    elements.update.textContent = "Update verfuegbar";
+    elements.update.textContent = "Update verfügbar";
     elements.update.title = `${data.local} -> ${data.remote} (${data.branch})`;
     elements.update.disabled = false;
     return;
   }
 
-  // Ohne Meldung ist der Stand geprueft und gleich; mit Meldung konnte nicht
-  // geprueft werden, dann bleibt es bei der Aufforderung.
-  resetUpdateButton(data.message ? "Update pruefen" : "Version ist aktuell");
+  // Ohne Meldung ist der Stand geprüft und gleich; mit Meldung konnte nicht
+  // geprüft werden, dann bleibt es bei der Aufforderung.
+  resetUpdateButton(data.message ? "Update prüfen" : "Version ist aktuell");
   elements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
 }
 
@@ -198,12 +205,12 @@ function resetUpdateButton(label) {
 }
 
 // Die Karte erscheint nur, wenn in der Installation lokal gearbeitet wurde.
-// Sie kommt bei jeder Update-Pruefung mit, also auch ohne anstehendes Update —
-// die Verschmutzung entsteht unabhaengig davon.
+// Sie kommt bei jeder Update-Prüfung mit, also auch ohne anstehendes Update —
+// die Verschmutzung entsteht unabhängig davon.
 //
-// Bewusst kein Knopf, der zuruecksetzt: das waere `git checkout -- .` in einem
-// fremden Verzeichnis, und die Oberflaeche kann nicht wissen, ob dort jemand
-// absichtlich entwickelt. Der Befehl steht zum Kopieren da, ausgefuehrt wird er
+// Bewusst kein Knopf, der zurücksetzt: das wäre `git checkout -- .` in einem
+// fremden Verzeichnis, und die Oberfläche kann nicht wissen, ob dort jemand
+// absichtlich entwickelt. Der Befehl steht zum Kopieren da, ausgeführt wird er
 // vom Nutzer.
 function renderCleanliness(state) {
   if (!state || state.clean) {
@@ -213,7 +220,7 @@ function renderCleanliness(state) {
 
   const blocking = (state.modified && state.modified.length > 0) || state.ahead > 0;
   elements.cleanPill.className = "pill warn";
-  elements.cleanPill.textContent = blocking ? "Veraendert" : "Zusaetzliche Dateien";
+  elements.cleanPill.textContent = blocking ? "Verändert" : "Zusätzliche Dateien";
   elements.cleanMessage.textContent = state.message || "";
 
   elements.cleanFacts.replaceChildren();
@@ -221,14 +228,14 @@ function renderCleanliness(state) {
     addFact(elements.cleanFacts, "Lokale Commits", String(state.ahead));
   }
   for (const path of state.modified || []) {
-    addFact(elements.cleanFacts, "Veraendert", path);
+    addFact(elements.cleanFacts, "Verändert", path);
   }
   for (const path of state.untracked || []) {
-    addFact(elements.cleanFacts, "Zusaetzlich", path);
+    addFact(elements.cleanFacts, "Zusätzlich", path);
   }
 
-  // Lokale Commits sind mit Verwerfen nicht aufzuloesen; dafuer gibt es keinen
-  // Befehl, den man blind vorschlagen koennte.
+  // Lokale Commits sind mit Verwerfen nicht aufzulösen; dafür gibt es keinen
+  // Befehl, den man blind vorschlagen könnte.
   if (state.ahead > 0) {
     elements.cleanCommand.classList.add("hidden");
   } else {
@@ -241,7 +248,7 @@ function renderCleanliness(state) {
   elements.cleanCard.classList.remove("hidden");
 }
 
-// Legt eine Zeile in einer Faktenliste an und gibt sie zurueck, damit der
+// Legt eine Zeile in einer Faktenliste an und gibt sie zurück, damit der
 // Aufrufer sie noch kennzeichnen kann.
 function addFact(list, term, detail) {
   const row = document.createElement("div");
@@ -254,8 +261,21 @@ function addFact(list, term, detail) {
   return row;
 }
 
+// Setzt einen drehenden Ring mit Text in ein Meldungsfeld. Aufgeräumt wird
+// nichts von Hand: jede render-Funktion beschreibt ihr Meldungsfeld als Erstes
+// und wirft den Ring damit hinaus.
+function renderLoading(element, text) {
+  const loading = document.createElement("span");
+  loading.className = "loading-inline";
+  const spinner = document.createElement("span");
+  spinner.className = "loading-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  loading.append(spinner, text);
+  element.replaceChildren(loading);
+}
+
 // Die Karte erscheint nur, solange etwas fehlt. Steht der Aufruf, ist sie
-// nichts, was man wissen muesste — und wuerde die Schritte nur verdecken.
+// nichts, was man wissen müsste — und würde die Schritte nur verdecken.
 async function loadPath() {
   let data;
   try {
@@ -308,7 +328,7 @@ async function createConfig() {
     });
     const data = await response.json();
     if (data.installed) {
-      // Die Kopfzeile wird serverseitig gefuellt und muss den neuen Ort zeigen.
+      // Die Kopfzeile wird serverseitig gefüllt und muss den neuen Ort zeigen.
       window.location.reload();
       return;
     }
@@ -341,6 +361,7 @@ function renderConfig(data) {
     loadRemediation();
     loadGH();
     loadTools();
+    loadReviews();
     loadDocs();
     return;
   }
@@ -364,7 +385,7 @@ function renderConfig(data) {
   // der Vorschlag steht bereits im Feld.
   const projectCandidates = suggestion.projectCandidates || [];
   if (projectCandidates.length > 1) {
-    addFact(elements.configFacts, "Weitere moegliche Orte", projectCandidates.slice(1).join(", "));
+    addFact(elements.configFacts, "Weitere mögliche Orte", projectCandidates.slice(1).join(", "));
   }
 
   const repoCandidates = suggestion.repoCandidates || [];
@@ -375,15 +396,15 @@ function renderConfig(data) {
   setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
 }
 
-// Setzt Pill und Button eines Blocks aus einem Zustand. Einheitliche Regel fuer
-// alle Bloecke: der Button kann immer ausgeloest werden und tut immer dasselbe,
+// Setzt Pill und Button eines Blocks aus einem Zustand. Einheitliche Regel für
+// alle Blöcke: der Button kann immer ausgelöst werden und tut immer dasselbe,
 // nur Beschriftung und Hervorhebung wechseln.
 function setBlockState(pill, button, state, labels = {}) {
   const { doneLabel = "Aktualisieren", todoLabel = "Einrichten" } = labels;
 
   if (state === "busy") {
     pill.className = "pill muted";
-    pill.textContent = "Pruefen...";
+    pill.textContent = "Prüfen...";
     button.disabled = true;
     return;
   }
@@ -405,7 +426,7 @@ function setBlockState(pill, button, state, labels = {}) {
   button.textContent = ok ? doneLabel : todoLabel;
 }
 
-const LOCAL_LABELS = { doneLabel: "Ergaenzen", todoLabel: "Anlegen" };
+const LOCAL_LABELS = { doneLabel: "Ergänzen", todoLabel: "Anlegen" };
 
 async function loadLocal() {
   setBlockState(elements.localPill, elements.localCreate, "busy");
@@ -437,10 +458,10 @@ function renderLocal(data) {
     addFact(elements.localFacts, "Verzeichnis", data.dir);
   }
   if (missing.length > 0) {
-    // "Fehlende Eintraege" statt "Fehlt": in dieser Liste steht links immer die
+    // "Fehlende Einträge" statt "Fehlt": in dieser Liste steht links immer die
     // Bezeichnung und rechts der Wert. Ein Statuswort links liest sich, als
-    // waere die Liste rechts der Zustand.
-    addFact(elements.localFacts, "Fehlende Eintraege", missing.map((entry) => entry.path).join(", "));
+    // wäre die Liste rechts der Zustand.
+    addFact(elements.localFacts, "Fehlende Einträge", missing.map((entry) => entry.path).join(", "));
   }
 
   setBlockState(elements.localPill, elements.localCreate, data.ok ? "ok" : "todo", LOCAL_LABELS);
@@ -470,15 +491,15 @@ async function applyAssistant() {
 function renderAssistant(data) {
   elements.assistantFacts.replaceChildren();
 
-  // Die Wurzeldatei zuerst: sie ist der Einstiegspunkt, alles andere haengt
+  // Die Wurzeldatei zuerst: sie ist der Einstiegspunkt, alles andere hängt
   // daran.
   const root = data.root || {};
   if (root.path) {
     const detail = !root.present
       ? "nicht vorhanden"
       : root.hasMarker
-        ? "enthaelt den Anstoss"
-        : "vorhanden, Anstoss fehlt";
+        ? "enthält den Anstoß"
+        : "vorhanden, Anstoß fehlt";
     addFact(elements.assistantFacts, "AGENTS.md — Einstieg", detail);
   }
 
@@ -487,7 +508,7 @@ function renderAssistant(data) {
     const term = entry.assistant ? `${entry.path} — ${entry.assistant}` : entry.path;
     addFact(elements.assistantFacts, term, entry.detail ? `${label} (${entry.detail})` : label);
 
-    // Bei einem Katalog-Eintrag zaehlt nicht nur, dass etwas nicht stimmt,
+    // Bei einem Katalog-Eintrag zählt nicht nur, dass etwas nicht stimmt,
     // sondern welcher Command oder Skill gemeint ist.
     for (const [field, description] of REGISTRY_DEVIATIONS) {
       const names = entry[field] || [];
@@ -506,11 +527,11 @@ function renderAssistant(data) {
 }
 
 // Der Remediation-Block ist eine Einstellung, kein Einrichtungsschritt: die
-// Auswahl wird sofort gespeichert, ein eigener Button waere ein Zwischenschritt
+// Auswahl wird sofort gespeichert, ein eigener Button wäre ein Zwischenschritt
 // ohne Nutzen.
 async function loadRemediation() {
   elements.remediationPill.className = "pill muted";
-  elements.remediationPill.textContent = "Pruefen...";
+  elements.remediationPill.textContent = "Prüfen...";
   try {
     const response = await fetch("/api/remediation", { cache: "no-store" });
     renderRemediation(await response.json());
@@ -540,7 +561,7 @@ function renderRemediation(data) {
 
   const current = data.current || {};
   for (const choice of data.choices || []) {
-    // current.mode traegt auch ohne Eintrag in der Datei den Standard.
+    // current.mode trägt auch ohne Eintrag in der Datei den Standard.
     const selected = current.mode === choice.mode;
 
     const label = document.createElement("label");
@@ -567,10 +588,10 @@ function renderRemediation(data) {
   }
 
   elements.remediationPill.className = "pill ok";
-  elements.remediationPill.textContent = current.prRequired ? "Nur ueber PR" : "Direkte Fixes moeglich";
+  elements.remediationPill.textContent = current.prRequired ? "Nur über PR" : "Direkte Fixes möglich";
 
   // Der Standard gilt auch ohne Eintrag; das sollte sichtbar sein, damit
-  // niemand einen ausdruecklich gewaehlten Wert vermutet.
+  // niemand einen ausdrücklich gewählten Wert vermutet.
   if (!current.configured && !data.message) {
     elements.remediationMessage.textContent =
       "Standard, noch nicht in der Konfiguration festgehalten. Eine Auswahl schreibt sie fest.";
@@ -583,7 +604,8 @@ function renderRemediation(data) {
 // Installation und Anmeldung bleiben im Terminal, wie bei den Security-Tools.
 async function loadGH() {
   elements.ghPill.className = "pill muted";
-  elements.ghPill.textContent = "Pruefen...";
+  elements.ghPill.textContent = "Prüfen...";
+  renderLoading(elements.ghMessage, "GitHub-CLI wird geprüft...");
   try {
     const response = await fetch("/api/gh", { cache: "no-store" });
     renderGH(await response.json());
@@ -671,26 +693,26 @@ function renderGH(data) {
   if (!current.installed) {
     elements.ghPill.className = "pill warn";
     elements.ghPill.textContent = "gh fehlt";
-    showGHCommand("gh ist auf diesem Rechner nicht installiert. Anleitung fuer den passenden Paketmanager:", commands.install);
+    showGHCommand("gh ist auf diesem Rechner nicht installiert. Anleitung für den passenden Paketmanager:", commands.install);
     return;
   }
 
   if (!current.loggedIn) {
     elements.ghPill.className = "pill warn";
     elements.ghPill.textContent = "Nicht angemeldet";
-    showGHCommand("Die Anmeldung laeuft ueber den Browser und gehoert ins Terminal:", commands.login);
+    showGHCommand("Die Anmeldung läuft über den Browser und gehört ins Terminal:", commands.login);
     return;
   }
 
   elements.ghPill.className = "pill ok";
   elements.ghPill.textContent = current.account ? `Angemeldet als ${current.account}` : "Angemeldet";
 
-  // Der Wechsel gilt fuer jedes Terminal und jedes Projekt auf diesem Rechner.
-  // Deshalb steht er hier als Befehl und nicht als Knopf: wer ihn ausfuehrt, tut
+  // Der Wechsel gilt für jedes Terminal und jedes Projekt auf diesem Rechner.
+  // Deshalb steht er hier als Befehl und nicht als Knopf: wer ihn ausführt, tut
   // es bewusst und sieht danach das Ergebnis in seiner Shell.
   if ((current.accounts || []).length > 1) {
     showGHCommand(
-      "Umschalten gilt fuer alle Terminals und Projekte auf diesem Rechner, nicht nur fuer dieses:",
+      "Umschalten gilt für alle Terminals und Projekte auf diesem Rechner, nicht nur für dieses:",
       commands.switch,
     );
   }
@@ -699,14 +721,14 @@ function renderGH(data) {
 function ghAccountLabel(current) {
   if (current.tokenFromEnv) {
     return current.account
-      ? `${current.account}; zusaetzlich ein Token in GH_TOKEN/GITHUB_TOKEN, das sticht`
-      : "ueber GH_TOKEN/GITHUB_TOKEN, ohne Accountnamen";
+      ? `${current.account}; zusätzlich ein Token in GH_TOKEN/GITHUB_TOKEN, das sticht`
+      : "über GH_TOKEN/GITHUB_TOKEN, ohne Accountnamen";
   }
   if (!current.loggedIn) {
     return "kein Account hinterlegt";
   }
-  // Gelesen aus der gh-Konfiguration, nicht beim Server geprueft.
-  return `${current.account || "unbekannt"} (aus der gh-Konfiguration, Token nicht geprueft)`;
+  // Gelesen aus der gh-Konfiguration, nicht beim Server geprüft.
+  return `${current.account || "unbekannt"} (aus der gh-Konfiguration, Token nicht geprüft)`;
 }
 
 function showGHCommand(hint, command) {
@@ -719,10 +741,13 @@ function showGHCommand(hint, command) {
 }
 
 // Der Tool-Block hat keinen Button: installiert wird im Terminal, weil das den
-// Host veraendert. Die Pill zeigt nur den Zustand.
+// Host verändert. Die Pill zeigt nur den Zustand.
 async function loadTools() {
   elements.toolsPill.className = "pill muted";
-  elements.toolsPill.textContent = "Pruefen...";
+  elements.toolsPill.textContent = "Prüfen...";
+  // Jedes Tool wird einzeln aufgerufen; das dauert lange genug, dass der leere
+  // Block sonst nach einem Ergebnis aussieht.
+  renderLoading(elements.toolsMessage, "Security-Tools werden geprüft...");
   try {
     const response = await fetch("/api/tools", { cache: "no-store" });
     renderTools(await response.json());
@@ -731,7 +756,7 @@ async function loadTools() {
   }
 }
 
-// Die Sprachauswahl ist das einzige Schreibbare in diesem Block. Sie gehoert dem
+// Die Sprachauswahl ist das einzige Schreibbare in diesem Block. Sie gehört dem
 // Projekt und landet in der K-PLAYBOOK.yaml; die Installation bleibt im Terminal.
 async function setLanguages(languages) {
   elements.toolsPill.className = "pill muted";
@@ -763,8 +788,8 @@ function renderTools(data) {
   }
 
   // Ein sprachgebundenes Tool, das nicht zur Auswahl passt, ist nicht optional
-  // im Sinne von "waere schoen", sondern schlicht nicht zustaendig. Das muss
-  // unterscheidbar bleiben, sonst sieht ein Python-Projekt lauter Luecken.
+  // im Sinne von "wäre schön", sondern schlicht nicht zuständig. Das muss
+  // unterscheidbar bleiben, sonst sieht ein Python-Projekt lauter Lücken.
   const selected = new Set(data.languages || []);
   for (const tool of data.tools || []) {
     const languages = (tool.languages || "*").split(",").map((entry) => entry.trim());
@@ -779,31 +804,62 @@ function renderTools(data) {
     }
 
     let detail;
+    let missing = false;
     if (tool.status === "ok") {
       detail = tool.version || "vorhanden";
     } else if (relevant) {
       detail = `fehlt — ${tool.role}`;
+      missing = true;
     } else {
       detail = `nicht gebraucht — ${tool.role}`;
     }
-    addFact(elements.toolsFacts, label, detail);
+    const row = addFact(elements.toolsFacts, label, detail);
+    if (missing) {
+      row.classList.add("missing");
+    }
   }
   if (data.binDir) {
     addFact(elements.toolsFacts, "Installationsort", data.binDir);
   }
 
+  // Optionale Tools blockieren nichts, dürfen aber nicht unerwähnt bleiben:
+  // sonst steht "fehlt" in der Liste und "Vollständig" darüber.
+  const optional = data.missingOptional || 0;
+
   if (data.ok) {
-    elements.toolsPill.className = "pill ok";
-    elements.toolsPill.textContent = "Vollstaendig";
+    elements.toolsPill.className = optional > 0 ? "pill warn" : "pill ok";
+    elements.toolsPill.textContent = optional > 0 ? "Pflicht vollständig" : "Vollständig";
+    if (optional > 0) {
+      elements.toolsMessage.textContent =
+        `Alle Pflicht-Tools sind da. ${optional} optionale${optional === 1 ? "s fehlt" : " fehlen"}.`;
+      // Sonst stünde hier kein Befehl: die Pflicht ist vollständig. Also der
+      // Weg, der die optionalen mitnimmt.
+      showToolsCommand(data.commandOptional);
+    }
     return;
   }
 
   elements.toolsPill.className = "pill warn";
   elements.toolsPill.textContent = `${data.missing} fehlt`;
-  if (data.command) {
-    elements.toolsCommandText.textContent = data.command;
-    elements.toolsCommand.classList.remove("hidden");
+  // Fehlt Pflicht, gilt der Weg dafür. Was optional fehlt, kommt in der Meldung
+  // dazu — zwei Befehle nebeneinander wären eine Wahl, die hier niemand treffen
+  // muss.
+  if (optional > 0) {
+    elements.toolsMessage.textContent =
+      `Dazu ${optional} optionale${optional === 1 ? "s Tool" : " Tools"}; die holt --include-optional mit.`;
   }
+  showToolsCommand(data.command);
+}
+
+// showToolsCommand zeigt den Befehl, wenn es einen gibt. Beide Fassungen kommen
+// fertig aus dem Preflight-Skript, samt Sprachauswahl — hier wird nichts
+// zusammengesetzt.
+function showToolsCommand(command) {
+  if (!command) {
+    return;
+  }
+  elements.toolsCommandText.textContent = command;
+  elements.toolsCommand.classList.remove("hidden");
 }
 
 function renderLanguageChoices(data) {
@@ -842,15 +898,63 @@ function renderLanguageChoices(data) {
   }
 
   // Die Vorauswahl gilt auch ohne Eintrag in der Datei; das sollte sichtbar
-  // sein, damit niemand eine ausdrueckliche Entscheidung vermutet.
+  // sein, damit niemand eine ausdrückliche Entscheidung vermutet.
   if (!data.configured && !data.message) {
     elements.toolsMessage.textContent =
       "Vorauswahl, noch nicht in der Konfiguration festgehalten. Eine Auswahl schreibt sie fest.";
   }
 }
 
+// Der Reviews-Block zeigt nur, was da ist. Zusammengestellt und angelegt wird
+// ein Lauf auf der eigenen Seite: dort ist Platz für zwei Auswahllisten.
+async function loadReviews() {
+  elements.reviewsPill.className = "pill muted";
+  elements.reviewsPill.textContent = "Laden...";
+  try {
+    const response = await fetch("/api/reviews", { cache: "no-store" });
+    renderReviews(await response.json());
+  } catch {
+    elements.reviewsMessage.textContent = "Läufe konnten nicht geladen werden.";
+  }
+}
+
+function renderReviews(data) {
+  elements.reviewsList.replaceChildren();
+  elements.reviewsMessage.textContent = data.message || "";
+
+  if (!data.available) {
+    elements.reviewsPill.className = "pill muted";
+    elements.reviewsPill.textContent = "Unbekannt";
+    return;
+  }
+
+  const runs = data.runs || [];
+  for (const run of runs) {
+    // Ein Verzeichnis ohne run.json stammt aus der Zeit vor diesem Modell.
+    const detail = run.hasRunFile
+      ? `${run.state} — ${run.entryCount} Einträge`
+      : "ohne run.json";
+    addFact(elements.reviewsList, run.name, detail);
+  }
+
+  if (runs.length === 0) {
+    elements.reviewsPill.className = "pill muted";
+    elements.reviewsPill.textContent = "keine";
+    if (!elements.reviewsMessage.textContent) {
+      elements.reviewsMessage.textContent = "Noch kein Lauf angelegt.";
+    }
+    return;
+  }
+
+  elements.reviewsPill.className = "pill ok";
+  elements.reviewsPill.textContent = `${runs.length}`;
+  if (!elements.reviewsMessage.textContent && data.exists) {
+    elements.reviewsMessage.textContent = `Für ${data.today} gibt es bereits einen Lauf.`;
+  }
+}
+
 // Der Doku-Block listet die mitgelieferten Markdown-Dateien; gelesen wird eine
-// davon erst auf Klick, in einem Fenster ueber der Seite.
+// davon erst auf Klick, in einem Fenster über der Seite.
 async function loadDocs() {
   elements.docsPill.className = "pill muted";
   elements.docsPill.textContent = "Laden...";
@@ -876,7 +980,7 @@ function renderDocs(data) {
   }
 
   // Fehlt das Verzeichnis, steht der Grund in der Meldung; eine leere Liste
-  // waere dafuer die falsche Auskunft.
+  // wäre dafür die falsche Auskunft.
   if (data.message) {
     elements.docsList.classList.add("empty");
     elements.docsPill.className = "pill warn";
@@ -898,7 +1002,7 @@ function renderDocs(data) {
     button.type = "button";
     button.className = "doc-link";
     button.textContent = doc.title || doc.path;
-    // Der Titel steht auf dem Knopf, der Dateiname gehoert trotzdem dazu.
+    // Der Titel steht auf dem Knopf, der Dateiname gehört trotzdem dazu.
     button.title = doc.path;
     button.dataset.path = doc.path;
     button.addEventListener("click", () => openDoc(doc.path, doc.title || doc.path));
@@ -909,7 +1013,7 @@ function renderDocs(data) {
   elements.docsPill.textContent = docs.length === 1 ? "1 Datei" : `${docs.length} Dateien`;
 }
 
-// Die offene Datei; Verweise darin werden relativ zu ihr aufgeloest.
+// Die offene Datei; Verweise darin werden relativ zu ihr aufgelöst.
 let currentDocPath = "";
 
 async function openDoc(path, title, anchor = "") {
@@ -922,7 +1026,7 @@ async function openDoc(path, title, anchor = "") {
   try {
     const response = await fetch(`/api/docs/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
     const data = await response.json();
-    // Wurde inzwischen etwas anderes geoeffnet, gehoert diese Antwort nicht
+    // Wurde inzwischen etwas anderes geöffnet, gehört diese Antwort nicht
     // mehr ins Fenster.
     if (currentDocPath !== path) {
       return;
@@ -952,9 +1056,9 @@ function setActiveDocPath(path) {
   }
 }
 
-// Verweise in der Doku zeigen ueberwiegend auf andere Dateien der Doku. Ohne
-// eigene Behandlung wuerde ein Klick die Oberflaeche verlassen — und mit ihr
-// den Server, der an ihr haengt.
+// Verweise in der Doku zeigen überwiegend auf andere Dateien der Doku. Ohne
+// eigene Behandlung würde ein Klick die Oberfläche verlassen — und mit ihr
+// den Server, der an ihr hängt.
 function onDocViewerClick(event) {
   const link = event.target.closest("a[href]");
   if (!link) {
@@ -968,7 +1072,7 @@ function onDocViewerClick(event) {
     return;
   }
 
-  // Ein Ziel mit Schema fuehrt aus der Doku heraus und gehoert in ein eigenes
+  // Ein Ziel mit Schema führt aus der Doku heraus und gehört in ein eigenes
   // Fenster.
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
     link.target = "_blank";
@@ -980,14 +1084,14 @@ function onDocViewerClick(event) {
   const [target, anchor] = splitAnchor(href);
 
   // Ein reiner Anker ohne Dateiname ist bereits oben abgefangen; bleibt ein
-  // Verweis auf eine Datei. Alles ausser Markdown kann diese Ansicht nicht
-  // zeigen, der Pfad steht aber im Text und laesst sich im Editor oeffnen.
+  // Verweis auf eine Datei. Alles außer Markdown kann diese Ansicht nicht
+  // zeigen, der Pfad steht aber im Text und lässt sich im Editor öffnen.
   if (target.toLowerCase().endsWith(".md")) {
     openDoc(resolveDocPath(currentDocPath, target), "", anchor);
   }
 }
 
-// Loest einen Verweis gegen das Verzeichnis der offenen Datei auf; die
+// Löst einen Verweis gegen das Verzeichnis der offenen Datei auf; die
 // URL-Klasse erledigt dabei "./" und "../".
 function resolveDocPath(base, href) {
   const resolved = new URL(href, `https://docs.invalid/${base}`);
@@ -999,7 +1103,7 @@ function splitAnchor(href) {
   return index === -1 ? [href, ""] : [href.slice(0, index), href.slice(index + 1)];
 }
 
-// Springt zu einer Ueberschrift der offenen Datei. Ohne Anker beginnt die
+// Springt zu einer Überschrift der offenen Datei. Ohne Anker beginnt die
 // Datei oben — sonst bliebe die Ansicht dort stehen, wo die vorige endete.
 function scrollToAnchor(anchor) {
   const target = anchor ? elements.docViewer.querySelector(`#${CSS.escape(anchor)}`) : null;
@@ -1023,7 +1127,7 @@ function closeDocOverlay() {
   document.body.classList.remove("doc-overlay-open");
 }
 
-// Mermaid ist zu gross, um es mitzuliefern, und wird deshalb nur bei Bedarf vom
+// Mermaid ist zu groß, um es mitzuliefern, und wird deshalb nur bei Bedarf vom
 // CDN geholt. Ohne Netz bleibt der Quelltext des Diagramms als Codeblock
 // stehen — die Datei ist dann immer noch lesbar.
 const MERMAID_MODULE_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
@@ -1087,7 +1191,7 @@ function loadMermaid() {
   return mermaidLoader;
 }
 
-// Der Kontext-Block ist der einzige, der nicht beim Seitenaufbau laedt: seine
+// Der Kontext-Block ist der einzige, der nicht beim Seitenaufbau lädt: seine
 // Ausgabe ist lang und wird nur gebraucht, wenn jemand nachsieht.
 let contextLoaded = false;
 
@@ -1106,7 +1210,7 @@ async function loadContext() {
     const response = await fetch("/api/context", { cache: "no-store" });
     renderContext(await response.json());
   } catch {
-    // Beim naechsten Aufklappen darf es wieder versucht werden.
+    // Beim nächsten Aufklappen darf es wieder versucht werden.
     contextLoaded = false;
     elements.contextPill.className = "pill warn";
     elements.contextPill.textContent = "Fehlgeschlagen";
@@ -1122,7 +1226,7 @@ const ORIGIN_LABELS = {
 };
 
 // Reihenfolge und Beschriftung der Katalogsorten. Die Antwort ist ein Objekt
-// und traegt die Sorten alphabetisch; hier steht die fachliche Reihenfolge.
+// und trägt die Sorten alphabetisch; hier steht die fachliche Reihenfolge.
 const CATALOG_LABELS = {
   rules: "Regeln",
   reviews: "Reviews",
@@ -1151,14 +1255,14 @@ function renderContext(data) {
   addFact(elements.contextFacts, "Projekteigen", display.local || context.local.dir);
   addFact(elements.contextFacts, "Umgang mit Befunden", context.remediation.mode || "unbekannt");
 
-  // Pfade werden gegen das Projektverzeichnis gekuerzt: der gemeinsame Anfang
-  // steht bereits oben und wuerde jede Zeile nur verlaengern.
+  // Pfade werden gegen das Projektverzeichnis gekürzt: der gemeinsame Anfang
+  // steht bereits oben und würde jede Zeile nur verlängern.
   const root = context.project.dir;
   addPathGroup("Instruktionen", context.instructions || [], root);
 
   const catalogs = context.catalogs || {};
   const kinds = Object.keys(CATALOG_LABELS).filter((kind) => kind in catalogs);
-  // Eine spaeter hinzukommende Sorte faellt nicht unter den Tisch.
+  // Eine später hinzukommende Sorte fällt nicht unter den Tisch.
   kinds.push(...Object.keys(catalogs).filter((kind) => !(kind in CATALOG_LABELS)));
 
   for (const kind of kinds) {
@@ -1171,7 +1275,7 @@ function renderContext(data) {
   elements.contextPill.textContent = `Schema ${context.schemaVersion || "?"}`;
 }
 
-// Legt eine benannte Gruppe an und gibt deren Faktenliste zurueck.
+// Legt eine benannte Gruppe an und gibt deren Faktenliste zurück.
 function addContextGroup(title) {
   const group = document.createElement("div");
   group.className = "catalog-group";
@@ -1198,7 +1302,7 @@ function addCatalogGroup(title, entries, root) {
     const origin = ORIGIN_LABELS[entry.origin] || entry.origin;
     const row = addFact(list, entry.key, entry.disabled ? `${origin} · abgeschaltet` : origin);
     row.classList.toggle("disabled", Boolean(entry.disabled));
-    // Welche Datei tatsaechlich gilt, ist die eigentliche Auskunft des Overlays.
+    // Welche Datei tatsächlich gilt, ist die eigentliche Auskunft des Overlays.
     row.title = relativePath(entry.path, root);
   }
 }
@@ -1222,6 +1326,61 @@ function relativePath(path, root) {
   return path || "";
 }
 
+// Wie lange ein Kopier-Knopf die Rückmeldung stehen lässt.
+const COPY_FEEDBACK_MS = 1500;
+
+async function onCopyClick(event) {
+  const button = event.target.closest("[data-copy]");
+  if (!button) {
+    return;
+  }
+
+  const source = document.getElementById(button.dataset.copy);
+  if (!source) {
+    return;
+  }
+
+  const done = await copyText(source.textContent);
+  const label = button.textContent;
+  button.textContent = done ? "Kopiert" : "Fehlgeschlagen";
+  button.disabled = true;
+  window.setTimeout(() => {
+    button.textContent = label;
+    button.disabled = false;
+  }, COPY_FEEDBACK_MS);
+}
+
+// Die Zwischenablage-API gibt es nur im sicheren Kontext. 127.0.0.1 zählt
+// dazu, aber nicht jeder Browser hält sich daran — deshalb der alte Weg als
+// Rückfallebene.
+async function copyText(text) {
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Weiter mit der Rückfallebene.
+    }
+  }
+
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+
+  let done = false;
+  try {
+    done = document.execCommand("copy");
+  } catch {
+    done = false;
+  }
+  field.remove();
+  return done;
+}
+
 async function shutdown() {
   elements.shutdown.disabled = true;
   try {
@@ -1236,7 +1395,7 @@ function startHealthChecks() {
   window.setInterval(checkHealth, HEALTH_INTERVAL);
 }
 
-// Erkennt ein weggefallenes Backend: schlaegt der Aufruf fehl, ist der Server
+// Erkennt ein weggefallenes Backend: schlägt der Aufruf fehl, ist der Server
 // beendet worden.
 async function checkHealth() {
   if (!serverAvailable) {
@@ -1250,8 +1409,8 @@ async function checkHealth() {
   }
 }
 
-// Meldet dem Backend, dass dieses Fenster verschwindet. sendBeacon ueberlebt
-// das Entladen der Seite, fetch nicht zuverlaessig.
+// Meldet dem Backend, dass dieses Fenster verschwindet. sendBeacon überlebt
+// das Entladen der Seite, fetch nicht zuverlässig.
 function notifyClientGone() {
   if (!serverAvailable) {
     return;
@@ -1265,9 +1424,9 @@ function notifyClientGone() {
   fetch("/api/client-gone", { method: "POST", keepalive: true }).catch(() => {});
 }
 
-// Baut das Menue aus den Bloecken selbst: Reihenfolge, Beschriftung und Status
+// Baut das Menü aus den Blöcken selbst: Reihenfolge, Beschriftung und Status
 // stehen bereits in den Karten, ein neuer Block braucht also nichts weiter als
-// eine ID und eine Ueberschrift.
+// eine ID und eine Überschrift.
 function buildBlockNav() {
   document.querySelectorAll(".blocks > .card").forEach((card) => {
     const heading = card.querySelector("h2");
@@ -1289,7 +1448,7 @@ function buildBlockNav() {
 
     // Ob ein Block sichtbar ist und wie es um ihn steht, entscheiden die
     // Render-Funktionen an der Karte. Beobachten ist billiger, als in jeder
-    // einzelnen zusaetzlich das Menue nachzuziehen.
+    // einzelnen zusätzlich das Menü nachzuziehen.
     const pill = card.querySelector(".section-head .pill");
     syncNavItem(card, item, dot, pill);
     const sync = () => syncNavItem(card, item, dot, pill);
@@ -1300,8 +1459,8 @@ function buildBlockNav() {
   });
 }
 
-// Ein verborgener Block hat auch keinen Eintrag; der Punkt uebernimmt die
-// Statusfarbe seiner Pill, alles ausserhalb von ok/warn/error bleibt neutral.
+// Ein verborgener Block hat auch keinen Eintrag; der Punkt übernimmt die
+// Statusfarbe seiner Pill, alles außerhalb von ok/warn/error bleibt neutral.
 function syncNavItem(card, item, dot, pill) {
   item.classList.toggle("hidden", card.classList.contains("hidden"));
   const state = pill && ["ok", "warn", "error"].find((name) => pill.classList.contains(name));
@@ -1311,8 +1470,8 @@ function syncNavItem(card, item, dot, pill) {
 // Markiert wird der angeklickte Eintrag — er zeigt, wohin gesprungen wurde,
 // und wandert beim Scrollen von Hand nicht mit.
 function goToBlock(card, item) {
-  // Ein zugeklappter Block waere nach dem Sprung nur eine Kopfzeile. Das
-  // Aufklappen loest ueber das toggle-Ereignis zugleich das Nachladen aus.
+  // Ein zugeklappter Block wäre nach dem Sprung nur eine Kopfzeile. Das
+  // Aufklappen löst über das toggle-Ereignis zugleich das Nachladen aus.
   if (card.tagName === "DETAILS") {
     card.open = true;
   }

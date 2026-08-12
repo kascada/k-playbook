@@ -37,7 +37,7 @@ select {
   font: inherit;
 }
 
-/* Breiter als die Kartenspalte, weil links das Menue mitlaeuft: 220 + 28 Gap
+/* Breiter als die Kartenspalte, weil links das Menü mitläuft: 220 + 28 Gap
    lassen den Karten wieder rund 1120px. */
 .shell {
   width: min(1368px, calc(100% - 32px));
@@ -52,8 +52,8 @@ select {
   gap: 28px;
 }
 
-/* Das Menue bleibt stehen, waehrend die Karten scrollen. Es ist kurz genug,
-   dass alle Eintraege ohne eigenes Scrollen sichtbar bleiben. */
+/* Das Menü bleibt stehen, während die Karten scrollen. Es ist kurz genug,
+   dass alle Einträge ohne eigenes Scrollen sichtbar bleiben. */
 .block-nav {
   position: sticky;
   top: 24px;
@@ -95,7 +95,7 @@ select {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-/* Der Punkt spiegelt die Pill des Blocks, damit das Menue zugleich zeigt, wo
+/* Der Punkt spiegelt die Pill des Blocks, damit das Menü zugleich zeigt, wo
    etwas fehlt. */
 .block-nav-dot {
   flex-shrink: 0;
@@ -122,8 +122,8 @@ select {
   scroll-margin-top: 20px;
 }
 
-/* Unter dieser Breite bliebe fuer die Karten zu wenig uebrig; das Menue
-   entfaellt, gescrollt wird dann von Hand. */
+/* Unter dieser Breite bliebe für die Karten zu wenig übrig; das Menü
+   entfällt, gescrollt wird dann von Hand. */
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
@@ -239,37 +239,22 @@ h2 {
   gap: 10px;
 }
 
-/* Kennzeichnet, ob eine Installation gefunden wurde. */
-.mode-badge {
+/* Projekt und Installation stehen als beschrifteter Text nebeneinander. Der
+   Abstand trennt sie; ein Umbruch mitten in einem Paar wäre irreführend. */
+.path-entry {
   display: inline-block;
-  margin-right: 8px;
-  border-radius: 999px;
-  padding: 3px 10px;
-  color: white;
-  background: var(--accent);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  margin-right: 22px;
 }
 
-/* Die Installation steht neben dem Projekt, aber zurueckgenommen: sie ist der
-   Ort, aus dem gelesen wird, und nicht der, den man gewaehlt hat. */
-.path-secondary {
-  display: inline-block;
-  margin-left: 14px;
-}
-
-.path-secondary .mode-badge {
-  margin-right: 6px;
+.path-key {
   color: var(--muted);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
 }
 
-body[data-mode="none"] .mode-badge {
-  background: var(--warn);
+/* Fehlt die Installation, ist die Beschriftung selbst der Befund. */
+body[data-mode="none"] .path-key {
+  color: var(--warn);
 }
 
 .section-head {
@@ -307,6 +292,13 @@ body[data-mode="none"] .mode-badge {
   font-size: 0.9rem;
   text-align: right;
   overflow-wrap: anywhere;
+}
+
+/* Was wirklich fehlt, soll beim Überfliegen auffallen — der graue Fließtext
+   der übrigen Fakten macht eine Lücke sonst leicht übersehbar. */
+.facts > div.missing dd {
+  color: var(--error);
+  font-weight: 600;
 }
 
 .form-row {
@@ -348,7 +340,7 @@ body[data-mode="none"] .mode-badge {
 }
 
 /* Mehrfachauswahl aus wenigen kurzen Werten, etwa die Sprachen: nebeneinander
-   statt untereinander, weil hier keine Beschreibung mitlaeuft. */
+   statt untereinander, weil hier keine Beschreibung mitläuft. */
 .choices-inline {
   grid-auto-flow: column;
   grid-auto-columns: max-content;
@@ -375,7 +367,7 @@ body[data-mode="none"] .mode-badge {
   border-color: var(--accent);
 }
 
-/* Die gewaehlte Option muss auch ohne Farbwahrnehmung erkennbar sein. */
+/* Die gewählte Option muss auch ohne Farbwahrnehmung erkennbar sein. */
 .choice.selected {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -481,6 +473,14 @@ details[open] > summary.disclosure .disclosure-marker {
   font-size: 0.86rem;
   overflow-x: auto;
   white-space: pre;
+}
+
+/* Unter dem Befehl statt darüber: der Block scrollt waagerecht, ein Knopf
+   darin würde den Text überdecken. */
+.command-row .copy {
+  margin-top: 8px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
 }
 
 /* Die Doku-Liste ist eine Kachelwand: viele kurze Titel, die nebeneinander
@@ -656,7 +656,7 @@ details[open] > summary.disclosure .disclosure-marker {
   color: var(--error);
 }
 
-/* Bleibt Mermaid aus, sagt eine Zeile darueber warum; der Quelltext des
+/* Bleibt Mermaid aus, sagt eine Zeile darüber warum; der Quelltext des
    Diagramms bleibt darunter stehen. */
 .mermaid-message {
   margin: 0 0 6px;
@@ -695,6 +695,39 @@ details[open] > summary.disclosure .disclosure-marker {
   white-space: pre-line;
 }
 
+/* Blocke, die ein Binary aufrufen, brauchen spürbar Zeit. Ein leerer Kartenrumpf
+   sieht in dieser Zeit aus wie ein Befund; der Ring sagt, dass noch gearbeitet
+   wird. */
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--muted) 28%, transparent);
+  border-top-color: var(--muted);
+  border-radius: 999px;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt den Ring stehend — er bleibt als Zeichen
+   lesbar, nur ohne Drehung. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+  }
+}
+
 button {
   border: 0;
   border-radius: 999px;
@@ -717,7 +750,7 @@ button:disabled {
   background: var(--accent-strong);
 }
 
-/* Hebt einen Button hervor, dessen Aktion jetzt faellig ist. */
+/* Hebt einen Button hervor, dessen Aktion jetzt fällig ist. */
 button.attention-highlight {
   box-shadow: 0 0 0 3px rgba(47, 93, 80, 0.18), 0 14px 28px rgba(24, 61, 52, 0.22);
 }
@@ -725,6 +758,55 @@ button.attention-highlight {
 .secondary {
   color: var(--accent-strong);
   background: #e5ded0;
+}
+
+/* Ein Link, der zu einer anderen Seite führt, sieht aus wie ein Button, bleibt
+   aber ein Link: mittlere Maustaste und "in neuem Tab" funktionieren dadurch. */
+.button-link {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 11px 16px;
+  color: white;
+  background: var(--accent);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.button-link:hover {
+  background: var(--accent-strong);
+}
+
+.button-link.secondary {
+  color: var(--accent-strong);
+  background: #e5ded0;
+}
+
+/* Überschrift einer Gruppe innerhalb einer Karte. */
+.group-head {
+  margin: 22px 0 4px;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+/* Viele kurze Einträge nebeneinander statt untereinander: bei zehn Werkzeugen
+   und acht Reviews wäre eine einspaltige Liste unnötig lang. */
+.choices-compact {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.choices-compact .choice {
+  padding: 10px 14px;
+}
+
+/* Ein fehlendes Werkzeug bleibt sichtbar, damit klar ist, was es gäbe — aber
+   es lässt sich nicht auswählen. */
+.choice.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.choice.disabled:hover {
+  border-color: var(--line);
 }
 
 .secondary.danger {
@@ -765,8 +847,8 @@ button.attention-highlight {
     grid-template-columns: 1fr;
   }
 
-  /* Auf kleinen Schirmen nimmt die Doku die ganze Flaeche; ein gerahmtes
-     Fenster liesse zu wenig Text uebrig. */
+  /* Auf kleinen Schirmen nimmt die Doku die ganze Fläche; ein gerahmtes
+     Fenster ließe zu wenig Text übrig. */
   .doc-overlay {
     padding: 0;
   }

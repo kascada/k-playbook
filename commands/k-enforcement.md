@@ -50,7 +50,7 @@ Print a compact startup summary:
 ```text
 Enforcement-Check
 ─────────────────────────────
-Ziel:         <geprueftes Verzeichnis>
+Ziel:         <geprüftes Verzeichnis>
 Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
 Abgeschaltet: <D> (leere lokale Datei) | —
 Docs:         k-playbook-local/docs | fehlt

@@ -2,7 +2,7 @@
 name: review-secret-scanning
 title: Secret-Scanning Assessment
 interval-weeks: 4
-scope-hint: gitleaks/trufflehog-Ergebnisse fuer Git-Historie und Arbeitsbaum; keine Remediation, keine Secret-Rotation aus diesem Review heraus
+scope-hint: gitleaks/trufflehog-Ergebnisse für Git-Historie und Arbeitsbaum; keine Remediation, keine Secret-Rotation aus diesem Review heraus
 handoff: /k-remediation
 result-family: secret-scanning
 ---
@@ -16,16 +16,16 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 - Echte Secrets, produktive Credentials und Token-Leaks priorisiert sichtbar machen.
 - Tool-Rohdaten von Review-Bewertung trennen.
 - False Positives, Test-Fixtures und bekannte Entscheidungen nachvollziehbar markieren.
-- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfaehiges `findings.md` erzeugen.
-- Keine Produktcode-Aenderungen und keine Secret-Rotation durch dieses Review.
+- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfähiges `findings.md` erzeugen.
+- Keine Produktcode-Änderungen und keine Secret-Rotation durch dieses Review.
 
 ## Voraussetzungen
 
 - Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
 - Lies `<playbook.dir>/scripts/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `gitleaks` und `trufflehog`.
-- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn der Context-Aufruf fehlschlägt: abbrechen und `/k-gui` empfehlen.
 - Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
-- Pruefe `gitleaks version` und `trufflehog --version`.
+- Prüfe `gitleaks version` und `trufflehog --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
   `bash <playbook.dir>/scripts/install-security-tools.sh` nennt den passenden
   Installationsbefehl.
@@ -39,24 +39,24 @@ Dieses Review schreibt in:
 Dateien:
 
 - `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollstaendiges, statusfaehiges Arbeitsregister.
-- `raw/gitleaks-git.json` - Gitleaks-Git-Historienrohdata, falls ausgefuehrt.
-- `raw/gitleaks-dir.json` - Gitleaks-Arbeitsbaumrohdata, falls ausgefuehrt.
-- `raw/trufflehog.json` - TruffleHog-Rohdata, falls ausgefuehrt.
+- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
+- `raw/gitleaks-git.json` - Gitleaks-Git-Historienrohdata, falls ausgeführt.
+- `raw/gitleaks-dir.json` - Gitleaks-Arbeitsbaumrohdata, falls ausgeführt.
+- `raw/trufflehog.json` - TruffleHog-Rohdata, falls ausgeführt.
 - `run-metadata.json` - Befehle, Exit-Codes, Zeitpunkt, Scope, Tool-Versionen.
 
-Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und duerfen nach dem Schreiben nicht gekuerzt oder ueberschrieben werden.
+Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und dürfen nach dem Schreiben nicht gekürzt oder überschrieben werden.
 
-## Ausfuehrungsentscheidung
+## Ausführungsentscheidung
 
-Frage vor Tool-Ausfuehrung, was passieren soll:
+Frage vor Tool-Ausführung, was passieren soll:
 
 - **Vorhandene Raw-Ausgaben auswerten (Default)**: Keine neuen Scans.
-- **Secret-Scan ausfuehren**: Nur nach Bestaetigung. Zeige vorher alle Befehle.
+- **Secret-Scan ausführen**: Nur nach Bestätigung. Zeige vorher alle Befehle.
 - **Nur Preflight**: Pfade, Tools und geplante Artefakte zeigen.
 - **Abbrechen**.
 
-Typische Befehle nach Bestaetigung:
+Typische Befehle nach Bestätigung:
 
 ```bash
 gitleaks git --report-format json --report-path <result>/raw/gitleaks-git.json <PROJECT_REPO_ROOT_DIR>
@@ -64,11 +64,11 @@ gitleaks dir --report-format json --report-path <result>/raw/gitleaks-dir.json <
 trufflehog git file://<PROJECT_REPO_ROOT_DIR> --json > <result>/raw/trufflehog.json
 ```
 
-Exit-Codes von Secret-Scannern koennen Findings signalisieren. Ein non-zero Exit-Code ist nicht automatisch ein technischer Fehler; Bewertung anhand Rohdaten und Tool-Doku vornehmen.
+Exit-Codes von Secret-Scannern können Findings signalisieren. Ein non-zero Exit-Code ist nicht automatisch ein technischer Fehler; Bewertung anhand Rohdaten und Tool-Doku vornehmen.
 
 ## Bewertungskriterien
 
-Prioritaet:
+Priorität:
 
 - P1: produktive Secrets, private Keys, Cloud-/Payment-/Database-Credentials, CI/CD-Tokens mit Schreibrechten.
 - P2: plausibel aktive Tokens mit begrenztem Scope, interne Service-Credentials, Secrets in Git-Historie ohne sichtbare Rotation.
@@ -76,9 +76,9 @@ Prioritaet:
 
 Review-Status in `findings.md`:
 
-- `open` - neu oder noch nicht geprueft.
+- `open` - neu oder noch nicht geprüft.
 - `confirmed` - echter Secret-Fund.
-- `context-needed` - Aktivitaet/Scope/Rotation unklar.
+- `context-needed` - Aktivität/Scope/Rotation unklar.
 - `likely-false-positive` - plausibler Fehlalarm.
 - `accepted` - bewusst akzeptiertes Restrisiko oder bekannte Entscheidung.
 - `fixed` - behoben und verifiziert.
@@ -87,7 +87,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 
 ## Assessment-Format
 
-`assessment.md` enthaelt mindestens:
+`assessment.md` enthält mindestens:
 
 ```markdown
 # Secret-Scanning Assessment - YYYY-MM-DD
@@ -107,7 +107,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 
 ## Bewertete Liste
 
-| Prio | Finding-ID | Status | Typ | Ort | Bewertung | Naechster Schritt |
+| Prio | Finding-ID | Status | Typ | Ort | Bewertung | Nächster Schritt |
 |---|---|---|---|---|---|---|
 
 ## Sofortige Triage-Reihenfolge
@@ -121,13 +121,13 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 
 ## Finding-Register-Format
 
-`findings.md` enthaelt pro dedupliziertem Befund:
+`findings.md` enthält pro dedupliziertem Befund:
 
 ```markdown
 ### secret-001
 
 - Status: `open`
-- Prioritaet: `P1|P2|P3`
+- Priorität: `P1|P2|P3`
 - Tool(s): `gitleaks`, `trufflehog`
 - Typ: ...
 - Ort: `path:line` oder Git-Commit
@@ -146,4 +146,4 @@ Nach Abschluss nennt `/k-review`:
 /k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/assessment.md
 ```
 
-Remediation und Secret-Rotation sind ausdruecklich nicht Teil dieses Reviews.
+Remediation und Secret-Rotation sind ausdrücklich nicht Teil dieses Reviews.

@@ -10,9 +10,9 @@ import (
 
 // SchemaVersion ist die Fassung, die dieses Werkzeug schreibt und versteht.
 //
-// Die 2 ist an das abgeloeste Layout vergeben: Konfiguration im
+// Die 2 ist an das abgelöste Layout vergeben: Konfiguration im
 // k-playbook-Verzeichnis, `_dist/`, `paths.*`. Eine Datei mit dieser Nummer
-// beschreibt etwas anderes als das, was hier gelesen wuerde.
+// beschreibt etwas anderes als das, was hier gelesen würde.
 const SchemaVersion = "3"
 
 // Config sind die Werte aus der K-PLAYBOOK.yaml, soweit sie derzeit gebraucht
@@ -25,7 +25,7 @@ type Config struct {
 
 // CheckSchema meldet, wenn die Konfiguration nicht zu diesem Werkzeug passt.
 //
-// Stillschweigend weiterzumachen waere das Gefaehrlichste: die Datei liesse
+// Stillschweigend weiterzumachen wäre das Gefährlichste: die Datei ließe
 // sich lesen, ihre Werte bedeuteten aber etwas anderes.
 func CheckSchema(config Config) error {
 	switch config.SchemaVersion {
@@ -35,11 +35,11 @@ func CheckSchema(config Config) error {
 		return fmt.Errorf("%s hat keine schema_version; erwartet wird %s",
 			ConfigFileName, SchemaVersion)
 	case "1", "2":
-		return fmt.Errorf("%s hat schema_version %s und beschreibt das abgeloeste Layout "+
+		return fmt.Errorf("%s hat schema_version %s und beschreibt das abgelöste Layout "+
 			"(Konfiguration im %s-Verzeichnis, _dist/, paths.*); dieses Werkzeug erwartet %s",
 			ConfigFileName, config.SchemaVersion, PlaybookDirName, SchemaVersion)
 	default:
-		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation aelter als die Konfiguration",
+		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration",
 			ConfigFileName, config.SchemaVersion, SchemaVersion)
 	}
 }
@@ -47,8 +47,8 @@ func CheckSchema(config Config) error {
 // ReadConfig liest die Konfiguration eines Projekts.
 //
 // Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare, und der
-// zeilenweise Zugriff laesst Kommentare, Reihenfolge und unbekannte Bloecke
-// unangetastet, wenn spaeter zurueckgeschrieben wird.
+// zeilenweise Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke
+// unangetastet, wenn später zurückgeschrieben wird.
 func ReadConfig(projectDir string) (Config, error) {
 	data, err := os.ReadFile(ConfigPath(projectDir))
 	if err != nil {
@@ -89,7 +89,7 @@ func ReadConfig(projectDir string) (Config, error) {
 	return config, nil
 }
 
-// RepoRootDir loest project.repo_root gegen das Hauptverzeichnis auf.
+// RepoRootDir löst project.repo_root gegen das Hauptverzeichnis auf.
 func RepoRootDir(projectDir string, config Config) string {
 	repoRoot := config.RepoRoot
 	if repoRoot == "" {
@@ -98,14 +98,14 @@ func RepoRootDir(projectDir string, config Config) string {
 	return filepath.Clean(filepath.Join(projectDir, repoRoot))
 }
 
-// Suggestion ist der Vorschlag fuer eine noch nicht angelegte Konfiguration.
+// Suggestion ist der Vorschlag für eine noch nicht angelegte Konfiguration.
 type Suggestion struct {
 	// ProjectDir ist das vorgeschlagene Hauptverzeichnis.
 	ProjectDir string `json:"projectDir"`
 	// ProjectCandidates sind alle plausiblen Orte, ProjectDir zuerst. Kommt mehr
-	// als einer in Frage, zeigt die Oberflaeche sie zur Auswahl.
+	// als einer in Frage, zeigt die Oberfläche sie zur Auswahl.
 	ProjectCandidates []string `json:"projectCandidates"`
-	// RepoRoot ist der Vorschlag fuer project.repo_root, relativ zu ProjectDir.
+	// RepoRoot ist der Vorschlag für project.repo_root, relativ zu ProjectDir.
 	// Leer, wenn kein Repository gefunden wurde oder mehrere in Frage kommen.
 	RepoRoot string `json:"repoRoot"`
 	// RepoCandidates sind alle gefundenen Repositories unterhalb von ProjectDir.
@@ -114,8 +114,8 @@ type Suggestion struct {
 
 // Suggest leitet einen Vorschlag ab, ohne etwas zu schreiben.
 //
-// Anders als Discover darf das raten: geschrieben wird erst nach Bestaetigung.
-// Der staerkste Hinweis ist das Repository, in dem der Aufruf stattfindet — wer
+// Anders als Discover darf das raten: geschrieben wird erst nach Bestätigung.
+// Der stärkste Hinweis ist das Repository, in dem der Aufruf stattfindet — wer
 // das Werkzeug startet, steht in aller Regel in dem Projekt, das er meint.
 // Danach kommt der Ort des Binaries.
 func Suggest() Suggestion {
@@ -129,8 +129,8 @@ func Suggest() Suggestion {
 	}
 
 	// Das Binary liegt in <X>/dist/; X ist die Installation. Ob X selbst das
-	// Hauptverzeichnis ist oder eine Ebene darunter liegt, haengt daran, ob die
-	// Installation geklont wurde oder das Repo selbst ist — beides ist moeglich,
+	// Hauptverzeichnis ist oder eine Ebene darunter liegt, hängt daran, ob die
+	// Installation geklont wurde oder das Repo selbst ist — beides ist möglich,
 	// deshalb kommen beide Orte in die Auswahl.
 	if install, ok := InstallDir(); ok {
 		if filepath.Base(install) == PlaybookDirName {
@@ -168,7 +168,7 @@ func InstallDir() (string, bool) {
 	return dir, true
 }
 
-// gitWorktreeRoot sucht ab dir aufwaerts das Repository, in dem dir liegt.
+// gitWorktreeRoot sucht ab dir aufwärts das Repository, in dem dir liegt.
 func gitWorktreeRoot(dir string) (string, bool) {
 	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = resolved
@@ -230,7 +230,7 @@ func suggestRepoRoot(projectDir string) (string, []string) {
 
 // CreateConfig legt die K-PLAYBOOK.yaml im Hauptverzeichnis an.
 //
-// Eine vorhandene Datei wird nie ueberschrieben: sie gehoert dem Projekt und
+// Eine vorhandene Datei wird nie überschrieben: sie gehört dem Projekt und
 // kann Werte enthalten, die hier nicht bekannt sind.
 func CreateConfig(projectDir string, repoRoot string) error {
 	if strings.TrimSpace(projectDir) == "" {
@@ -261,8 +261,8 @@ func renderConfig(repoRoot string, vcs string) string {
 	return fmt.Sprintf(`# k-playbook
 #
 # Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.
-# Die Installation liegt daneben unter %s/ und ist vollstaendig
-# ersetzbar; projekteigene Dateien gehoeren nicht hinein.
+# Die Installation liegt daneben unter %s/ und ist vollständig
+# ersetzbar; projekteigene Dateien gehören nicht hinein.
 
 schema_version: %s
 

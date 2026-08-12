@@ -31,13 +31,13 @@ func createLocalHandler(w http.ResponseWriter, r *http.Request) {
 
 	message := "Struktur angelegt."
 	if _, err := project.CreateLocal(environment.ProjectDir); err != nil {
-		message = "Nicht vollstaendig angelegt: " + err.Error()
+		message = "Nicht vollständig angelegt: " + err.Error()
 	}
 	writeJSON(w, http.StatusOK, localState(message))
 }
 
 // localState liest den aktuellen Zustand. Ohne Konfiguration ist noch nicht
-// bekannt, wo die Struktur hingehoert.
+// bekannt, wo die Struktur hingehört.
 func localState(message string) localResponse {
 	environment := project.Detect()
 	response := localResponse{Available: environment.Installed, Message: message}

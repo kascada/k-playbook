@@ -16,23 +16,25 @@
         </div>
         <div class="hero-subrow">
           <p class="eyebrow path">
-            <span class="mode-badge">{{.ModeLabel}}</span>
-            <span id="header-project">{{if .Path}}{{.Path}}{{end}}</span>
-            <span id="header-playbook" class="path-secondary{{if not .PlaybookDir}} hidden{{end}}"
-                  title="Installation: hieraus kommen Skripte, Regeln, Reviews und Checks">
-              <span class="mode-badge">Installation</span>
+            <span class="path-entry">
+              <span class="path-key">{{.ModeLabel}}:</span>
+              <span id="header-project">{{if .Path}}{{.Path}}{{end}}</span>
+            </span>
+            <span id="header-playbook" class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
+              <span class="path-key">Installation:</span>
               <span id="header-playbook-path">{{.PlaybookDir}}</span>
             </span>
           </p>
           <div class="hero-actions">
-            <button id="update" class="secondary">Update pruefen</button>
-            <button id="shutdown" class="secondary danger">Schliessen</button>
+            <button id="update" class="secondary">Update prüfen</button>
+            <button id="shutdown" class="secondary danger">Schließen</button>
           </div>
         </div>
       </section>
 
       <div class="layout">
-        <!-- Die Eintraege entstehen zur Laufzeit aus den Bloecken daneben, damit
+        <!-- Die Einträge entstehen zur Laufzeit aus den Blöcken daneben, damit
              ein neuer Block nicht an zwei Stellen gepflegt werden muss. -->
         <nav id="block-nav" class="block-nav" aria-label="Bereiche"></nav>
 
@@ -42,31 +44,33 @@
           <section class="card hidden" id="path-card">
             <div class="section-head">
               <div>
-                <h2>Aufruf von ueberall</h2>
+                <h2>Aufruf von überall</h2>
               </div>
-              <span id="path-pill" class="pill muted">Pruefen...</span>
+              <span id="path-pill" class="pill muted">Prüfen...</span>
             </div>
             <p id="path-message" class="message"></p>
             <div id="path-command" class="command-row hidden">
               <code id="path-command-text"></code>
+              <button class="copy secondary" data-copy="path-command-text">Kopieren</button>
             </div>
           </section>
 
           <!-- Nur sichtbar, wenn in der Installation lokal gearbeitet wurde. Das
                Verzeichnis ist ein Clone und wird bei jedem Update ersetzt; eine
-               Aenderung dort faellt sonst nie auf, weil git eine nicht
-               kollidierende Datei beim Pull einfach stehen laesst. -->
+               Änderung dort fällt sonst nie auf, weil git eine nicht
+               kollidierende Datei beim Pull einfach stehen lässt. -->
           <section class="card hidden" id="clean-card">
             <div class="section-head">
               <div>
                 <h2>Installation</h2>
               </div>
-              <span id="clean-pill" class="pill muted">Pruefen...</span>
+              <span id="clean-pill" class="pill muted">Prüfen...</span>
             </div>
             <p id="clean-message" class="message"></p>
             <dl id="clean-facts" class="facts"></dl>
             <div id="clean-command" class="command-row hidden">
               <code id="clean-command-text"></code>
+              <button class="copy secondary" data-copy="clean-command-text">Kopieren</button>
             </div>
           </section>
 
@@ -76,7 +80,7 @@
                 <p class="eyebrow">Schritt 1</p>
                 <h2>Projektkonfiguration</h2>
               </div>
-              <span id="config-pill" class="pill muted">Pruefen...</span>
+              <span id="config-pill" class="pill muted">Prüfen...</span>
             </div>
             <dl id="config-facts" class="facts"></dl>
             <div id="config-form" class="form-row hidden">
@@ -94,7 +98,7 @@
               <div>
                 <h2>Projekteigene Struktur</h2>
               </div>
-              <span id="local-pill" class="pill muted">Pruefen...</span>
+              <span id="local-pill" class="pill muted">Prüfen...</span>
             </div>
             <dl id="local-facts" class="facts"></dl>
             <p id="local-message" class="message"></p>
@@ -106,11 +110,54 @@
               <div>
                 <h2>Commands und Skills</h2>
               </div>
-              <span id="assistant-pill" class="pill muted">Pruefen...</span>
+              <span id="assistant-pill" class="pill muted">Prüfen...</span>
             </div>
             <dl id="assistant-facts" class="facts"></dl>
             <p id="assistant-message" class="message"></p>
             <button id="assistant-apply" class="secondary" disabled>Aktualisieren</button>
+          </section>
+
+          <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
+            <div class="section-head">
+              <div>
+                <h2>Security-Tools</h2>
+              </div>
+              <span id="tools-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">Sprachen dieses Projekts. Sie entscheiden, welche Tools gebraucht werden; sprachunabhängige gelten immer.</p>
+            <div id="tools-languages" class="choices choices-inline"></div>
+            <dl id="tools-facts" class="facts"></dl>
+            <p id="tools-message" class="message"></p>
+            <div id="tools-command" class="command-row hidden">
+              <p class="hint">Installation verändert den Host, nicht das Projekt. Diesen Befehl im Terminal ausführen:</p>
+              <code id="tools-command-text"></code>
+              <button class="copy secondary" data-copy="tools-command-text">Kopieren</button>
+            </div>
+          </section>
+
+          <section class="card{{if not .Installed}} hidden{{end}}" id="reviews-card">
+            <div class="section-head">
+              <div>
+                <h2>Reviews</h2>
+              </div>
+              <span id="reviews-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">Jeder Lauf ist ein Verzeichnis unter <code>k-playbook-local/results/</code>, benannt nach dem Tag.</p>
+            <a class="button-link" href="/reviews">Neuer Review</a>
+            <dl id="reviews-list" class="facts"></dl>
+            <p id="reviews-message" class="message"></p>
+          </section>
+
+          <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
+            <div class="section-head">
+              <div>
+                <h2>Umgang mit Befunden</h2>
+              </div>
+              <span id="remediation-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">Wie Befunde aus Reviews abgearbeitet werden. Gilt für /k-remediation.</p>
+            <div id="remediation-choices" class="choices"></div>
+            <p id="remediation-message" class="message"></p>
           </section>
 
           <section class="card{{if not .Installed}} hidden{{end}}" id="gh-card">
@@ -118,7 +165,7 @@
               <div>
                 <h2>GitHub CLI</h2>
               </div>
-              <span id="gh-pill" class="pill muted">Pruefen...</span>
+              <span id="gh-pill" class="pill muted">Prüfen...</span>
             </div>
             <p class="hint">Ob dieses Projekt <code>gh</code> nutzt. Gebraucht von /k-pr-review und dem Dependabot-Review.</p>
             <div id="gh-choices" class="choices"></div>
@@ -127,36 +174,8 @@
             <div id="gh-command" class="command-row hidden">
               <p id="gh-command-hint" class="hint"></p>
               <code id="gh-command-text"></code>
+              <button class="copy secondary" data-copy="gh-command-text">Kopieren</button>
             </div>
-          </section>
-
-          <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
-            <div class="section-head">
-              <div>
-                <h2>Security-Tools</h2>
-              </div>
-              <span id="tools-pill" class="pill muted">Pruefen...</span>
-            </div>
-            <p class="hint">Sprachen dieses Projekts. Sie entscheiden, welche Tools gebraucht werden; sprachunabhaengige gelten immer.</p>
-            <div id="tools-languages" class="choices choices-inline"></div>
-            <dl id="tools-facts" class="facts"></dl>
-            <p id="tools-message" class="message"></p>
-            <div id="tools-command" class="command-row hidden">
-              <p class="hint">Installation veraendert den Host, nicht das Projekt. Diesen Befehl im Terminal ausfuehren:</p>
-              <code id="tools-command-text"></code>
-            </div>
-          </section>
-
-          <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
-            <div class="section-head">
-              <div>
-                <h2>Umgang mit Befunden</h2>
-              </div>
-              <span id="remediation-pill" class="pill muted">Pruefen...</span>
-            </div>
-            <p class="hint">Wie Befunde aus Reviews abgearbeitet werden. Gilt fuer /k-remediation.</p>
-            <div id="remediation-choices" class="choices"></div>
-            <p id="remediation-message" class="message"></p>
           </section>
 
           <section class="card{{if not .Installed}} hidden{{end}}" id="docs-card">
@@ -166,7 +185,7 @@
               </div>
               <span id="docs-pill" class="pill muted">Laden...</span>
             </div>
-            <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick oeffnet die Datei.</p>
+            <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick öffnet die Datei.</p>
             <div id="docs-list" class="docs-list"></div>
             <p id="docs-message" class="message"></p>
           </section>
@@ -195,7 +214,7 @@
               <h2 id="doc-title">Markdown-Datei</h2>
               <p id="doc-path" class="doc-path"></p>
             </div>
-            <button id="close-doc" class="secondary">Schliessen</button>
+            <button id="close-doc" class="secondary">Schließen</button>
           </header>
           <article id="doc-viewer" class="doc-viewer"></article>
         </div>

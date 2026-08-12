@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // newContextProject baut ein Projekt mit Installation und lokalem Verzeichnis.
@@ -87,7 +88,7 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
-	write(t, filepath.Join(LocalDir(root), "checks", "check_secrets.sh"), "# Abgeschaltet: nicht noetig.\n")
+	write(t, filepath.Join(LocalDir(root), "checks", "check_secrets.sh"), "# Abgeschaltet: nicht nötig.\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -106,7 +107,7 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	}
 }
 
-// README und Unterverzeichnisse sind nie Eintraege.
+// README und Unterverzeichnisse sind nie Einträge.
 func TestBuildContextUeberspringtNichtEintraege(t *testing.T) {
 	root := newContextProject(t)
 
@@ -127,7 +128,7 @@ func TestBuildContextUeberspringtNichtEintraege(t *testing.T) {
 	}
 }
 
-// Reviews tragen ein Praefix; der Key ist der handliche Aufrufname.
+// Reviews tragen ein Präfix; der Key ist der handliche Aufrufname.
 func TestBuildContextBildetKeys(t *testing.T) {
 	root := newContextProject(t)
 
@@ -183,7 +184,28 @@ func TestContextForDirOhneInstallation(t *testing.T) {
 	}
 }
 
-// Ein Kontext auf Basis einer fremden Fassung waere irrefuehrend.
+// Das Datum kommt aus dem Kontext, damit ein Assistent es nicht raten muss.
+func TestBuildContextLiefertZeitpunkt(t *testing.T) {
+	root := newContextProject(t)
+
+	fixed := time.Date(2026, 8, 12, 14, 5, 0, 0, time.FixedZone("CEST", 2*60*60))
+	original := now
+	now = func() time.Time { return fixed }
+	t.Cleanup(func() { now = original })
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if context.Now.Date != "2026-08-12" {
+		t.Errorf("Now.Date = %q, erwartet %q", context.Now.Date, "2026-08-12")
+	}
+	if context.Now.Timestamp != "2026-08-12T14:05:00+02:00" {
+		t.Errorf("Now.Timestamp = %q", context.Now.Timestamp)
+	}
+}
+
+// Ein Kontext auf Basis einer fremden Fassung wäre irreführend.
 func TestBuildContextLehntFremdesSchemaAb(t *testing.T) {
 	root := newContextProject(t)
 	write(t, ConfigPath(root), "schema_version: 2\n\nproject:\n  repo_root: .\n")

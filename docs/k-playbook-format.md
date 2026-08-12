@@ -5,26 +5,26 @@ zugleich der **Anker**: ihr Ort bestimmt, was das Hauptverzeichnis des Projekts 
 
 ## Grundentscheidung
 
-Jedes Projekt traegt seine eigene Installation. Es gibt keine zentrale Basisinstallation
+Jedes Projekt trägt seine eigene Installation. Es gibt keine zentrale Basisinstallation
 und keinen festen Hostpfad. Die Installation liegt neben der Konfiguration:
 
 ```text
 <projekt>/                 beliebig benannt
 ├── K-PLAYBOOK.yaml        der Anker
-├── k-playbook/            die Installation, vollstaendig ersetzbar
+├── k-playbook/            die Installation, vollständig ersetzbar
 └── k-playbook-local/      projekteigen, committed
 ```
 
-Weil die Konfiguration **neben** und nicht **in** der Installation liegt, enthaelt
+Weil die Konfiguration **neben** und nicht **in** der Installation liegt, enthält
 `k-playbook/` nichts Projekteigenes. Das Verzeichnis ist dadurch komplett updatebar —
 per `git pull` ebenso wie per `rm -rf` und neuem Clone.
 
-Das Playbook-Verzeichnis heisst immer `k-playbook`. Wie das Projektverzeichnis darueber
-heisst, spielt keine Rolle.
+Das Playbook-Verzeichnis heißt immer `k-playbook`. Wie das Projektverzeichnis darüber
+heißt, spielt keine Rolle.
 
 ## Keine Pfade in der Konfiguration
 
-Fruehere Versionen trugen einen `paths:`-Block mit neun Schluesseln. Den gibt es nicht
+Frühere Versionen trugen einen `paths:`-Block mit neun Schlüsseln. Den gibt es nicht
 mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 
 | Was | Wo |
@@ -51,28 +51,28 @@ mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 | Instruktionen, mitgeliefert | `k-playbook/k-playbook.md` |
 | Instruktionen, projekteigen | `k-playbook-local/k-playbook.md` |
 
-Ein Schluessel, dessen Wert immer derselbe ist, waere nur eine Fehlerquelle gewesen.
+Ein Schlüssel, dessen Wert immer derselbe ist, wäre nur eine Fehlerquelle gewesen.
 Commands raten damit keinen Pfad mehr und lesen auch keinen: sie leiten ihn ab.
 
-Das gilt auch fuer die Projekt-Dokumentation. Frueher durfte `paths.docs` als einziger
+Das gilt auch für die Projekt-Dokumentation. Früher durfte `paths.docs` als einziger
 Wert mit `../` aus dem k-playbook-Verzeichnis herauszeigen, damit ein Projekt seine schon
-vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfaellt: `/k-code2docs`
+vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-code2docs`
 schreibt nach `k-playbook-local/docs/`. Was ein Projekt sonst noch an Dokumentation
-pflegt, bleibt davon unberuehrt — k-playbook beansprucht nur sein eigenes Verzeichnis.
+pflegt, bleibt davon unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
 
 ## Anker finden
 
-Der Ablauf gilt gleichermassen fuer das Werkzeug und fuer einen Assistenten:
+Der Ablauf gilt gleichermaßen für das Werkzeug und für einen Assistenten:
 
-1. Wurde ein Verzeichnis uebergeben, gilt dieses; geprueft wird `<arg>/K-PLAYBOOK.yaml`.
-2. Sonst ab `realpath(CWD)` aufwaerts, ein Kandidat je Ebene: `<dir>/K-PLAYBOOK.yaml`.
+1. Wurde ein Verzeichnis übergeben, gilt dieses; geprüft wird `<arg>/K-PLAYBOOK.yaml`.
+2. Sonst ab `realpath(CWD)` aufwärts, ein Kandidat je Ebene: `<dir>/K-PLAYBOOK.yaml`.
 3. Fund: `PROJECT_DIR = <dir>`, `PLAYBOOK_DIR = <dir>/k-playbook`.
-4. Grenze der Aufwaertssuche sind `$HOME` und `/`, jeweils einschliesslich.
+4. Grenze der Aufwärtssuche sind `$HOME` und `/`, jeweils einschließlich.
 5. Nichts gefunden: melden, dass keine Installation vorliegt. Nicht raten, nichts anlegen.
 
-Die Aufwaertssuche darf **nicht** am Git-Worktree-Root abbrechen. `<projekt>/k-playbook/`
-ist ein eigener Clone und damit ein eigener Worktree; wer von dort aus sucht, kaeme sonst
-nie an die Konfiguration eine Ebene darueber.
+Die Aufwärtssuche darf **nicht** am Git-Worktree-Root abbrechen. `<projekt>/k-playbook/`
+ist ein eigener Clone und damit ein eigener Worktree; wer von dort aus sucht, käme sonst
+nie an die Konfiguration eine Ebene darüber.
 
 ## Mitgeliefertes und Projekteigenes zusammenfassen
 
@@ -87,23 +87,23 @@ Fünf Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Sei
 | Skills | `k-playbook/skills/` | `k-playbook-local/skills/` | Verzeichnis mit `SKILL.md` |
 
 Die Vergleichseinheit ist der **Name**. Beide Seiten benutzen dieselbe
-Namenskonvention, deshalb braucht es keinen abgeleiteten Schluessel.
+Namenskonvention, deshalb braucht es keinen abgeleiteten Schlüssel.
 
-Bei Commands ist es der Pfad ab `commands/`, einschliesslich Namensraum: eine lokale
+Bei Commands ist es der Pfad ab `commands/`, einschließlich Namensraum: eine lokale
 `commands/_shared/context.md` ersetzt genau diese Datei, der Rest von `_shared/` bleibt
 mitgeliefert. Ein Skill dagegen wird als Ganzes ersetzt — `SKILL.md`, `PLAYBOOK.md` und
-Vorlagen muessen zueinander passen, ein halb ersetzter Skill waere nicht sinnvoll
+Vorlagen müssen zueinander passen, ein halb ersetzter Skill wäre nicht sinnvoll
 zusammensetzbar.
 
-**Bei gleichem Dateinamen gewinnt die projekteigene Datei, und zwar vollstaendig.** Die
+**Bei gleichem Dateinamen gewinnt die projekteigene Datei, und zwar vollständig.** Die
 mitgelieferte wird dann gar nicht erst gelesen; es werden auch keine einzelnen Abschnitte
-daraus uebernommen. Wer eine mitgelieferte Regel aendern will, kopiert sie und aendert die
-Kopie — mit dem Preis, dass spaetere Verbesserungen am Original diese Kopie nicht mehr
+daraus übernommen. Wer eine mitgelieferte Regel ändern will, kopiert sie und ändert die
+Kopie — mit dem Preis, dass spätere Verbesserungen am Original diese Kopie nicht mehr
 erreichen. Der Vorteil wiegt schwerer: was gilt, steht in genau einer Datei.
 
-**Abgeschaltet wird ueber eine leere Datei**, nicht ueber eine Liste in der
-Konfiguration. Da eine gleichnamige lokale Datei die mitgelieferte vollstaendig ersetzt,
-bleibt bei einer leeren nichts uebrig. „Leer" heisst: nichts ausser Leerzeilen und
+**Abgeschaltet wird über eine leere Datei**, nicht über eine Liste in der
+Konfiguration. Da eine gleichnamige lokale Datei die mitgelieferte vollständig ersetzt,
+bleibt bei einer leeren nichts übrig. „Leer" heißt: nichts außer Leerzeilen und
 Kommentaren — so kann die Datei ihren eigenen Grund tragen:
 
 ```bash
@@ -112,16 +112,16 @@ Kommentaren — so kann die Datei ihren eigenen Grund tragen:
 
 Der Unterschied zwischen den Sorten ist beabsichtigt. `rules` und `reviews` werden
 gelesen; dort bleibt der Eintrag im Katalog sichtbar und sein Inhalt sagt, dass er
-abgeschaltet ist. Ein Check wird dagegen **ausgefuehrt** — ein leeres Skript liefe mit
-Exit 0 durch und saehe aus wie ein bestandener Check. Deshalb faellt er ganz aus dem
+abgeschaltet ist. Ein Check wird dagegen **ausgeführt** — ein leeres Skript liefe mit
+Exit 0 durch und sähe aus wie ein bestandener Check. Deshalb fällt er ganz aus dem
 Katalog.
 
-Eine projekteigene Datei schaltet man ab, indem man sie loescht.
+Eine projekteigene Datei schaltet man ab, indem man sie löscht.
 
 `README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig Dotfiles oder
 irgendetwas unter `checks/lib/`.
 
-Bei Skills entscheidet die `SKILL.md` ueber das Abschalten: ist sie leer, gilt der Skill
+Bei Skills entscheidet die `SKILL.md` über das Abschalten: ist sie leer, gilt der Skill
 als abgeschaltet und wird nicht registriert.
 
 Wer wissen will, was am Ende gilt, fragt nicht das Dateisystem, sondern das Werkzeug:
@@ -130,9 +130,9 @@ Wer wissen will, was am Ende gilt, fragt nicht das Dateisystem, sondern das Werk
 k-playbook/bin/k-playbook context
 ```
 
-Die Ausgabe fuehrt die zusammengefuehrten Kataloge mit Herkunft je Eintrag — `dist`,
-`local` oder `override` — und markiert Abgeschaltetes. Siehe [Der aufgeloeste
-Arbeitsstand](#der-aufgeloeste-arbeitsstand).
+Die Ausgabe führt die zusammengeführten Kataloge mit Herkunft je Eintrag — `dist`,
+`local` oder `override` — und markiert Abgeschaltetes. Siehe [Der aufgelöste
+Arbeitsstand](#der-aufgelöste-arbeitsstand).
 
 Weil Commands und Skills damit aus zwei Quellen kommen, sind die Assistenten-Ziele —
 `.claude/commands`, `.claude/skills`, `.opencode/commands`, `.cursor/commands` — echte
@@ -141,7 +141,7 @@ genau eine Quelle.
 
 ### Was es nur einmal gibt
 
-Alles Uebrige hat kein Gegenstueck auf der anderen Seite:
+Alles Übrige hat kein Gegenstück auf der anderen Seite:
 
 | | Verzeichnisse |
 |---|---|
@@ -149,55 +149,62 @@ Alles Uebrige hat kein Gegenstueck auf der anderen Seite:
 | nur mitgeliefert | `docs/`, `scripts/`, `bin/`, `dist/`, `installer/` |
 
 `docs/` steht in beiden Zeilen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
-k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstaende
+k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstände
 unter demselben Namen, nichts zusammenzufassen.
 
 Nichts unterhalb von `k-playbook/` darf geschrieben werden — auch nicht von Commands, die
-dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollstaendig.
+dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollständig.
 
-## Der aufgeloeste Arbeitsstand
+## Der aufgelöste Arbeitsstand
 
 ```bash
 k-playbook/bin/k-playbook context
 ```
 
 Gibt als JSON aus, was ein Command sonst selbst aus Konfiguration und Dateisystem
-zusammenrechnen muesste:
+zusammenrechnen müsste:
 
 | Feld | Inhalt |
 |---|---|
-| `schemaVersion` | die gepruefte Fassung der Konfiguration |
+| `schemaVersion` | die geprüfte Fassung der Konfiguration |
+| `now` | der Zeitpunkt des Aufrufs: `date` als `YYYY-MM-DD`, `timestamp` nach RFC 3339 |
 | `instructions` | die Instruktionsdateien in Lesereihenfolge |
 | `project` | Hauptverzeichnis, `repoRoot`, `vcs`, Ort der Konfiguration |
-| `playbook`, `local` | die beiden aufgeloesten Verzeichnisse |
+| `playbook`, `local` | die beiden aufgelösten Verzeichnisse |
 | `remediation` | die Policy, mit Default, falls der Block fehlt |
 | `gh` | die Entscheidung zur GitHub CLI samt Host-Befund |
-| `catalogs` | `rules`, `reviews`, `checks` — zusammengefuehrt |
+| `catalogs` | `rules`, `reviews`, `checks` — zusammengeführt |
 | `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
 
-Jeder Katalogeintrag traegt `name` (den Dateinamen), `key` (den Aufrufnamen ohne Endung
-und Sortenpraefix), `path`, `origin` — `dist`, `local` oder `override` — und `disabled`,
+Jeder Katalogeintrag trägt `name` (den Dateinamen), `key` (den Aufrufnamen ohne Endung
+und Sortenpräfix), `path`, `origin` — `dist`, `local` oder `override` — und `disabled`,
 wo zutreffend.
 
 Damit muss kein Command die Overlay-Regeln selbst anwenden. Es gibt eine Antwort, und
 alle bekommen dieselbe.
 
-`gh` fuehrt zwei Dinge zusammen, die auseinandergehalten gehoeren: `status` und
+`now` steht aus einem anderen Grund dort: Commands stempeln Datumsangaben in Dateien, die
+bleiben — Review-Logs, Ergebnisverzeichnisse, Namen von Summary-Dateien. Nicht jedem
+Assistenten nennt sein Wirt das heutige Datum, und ein geratenes Datum in einem Protokoll
+ist schlechter als gar keines. Es ist das einzige Feld, das altert: es benennt den
+Zeitpunkt des Aufrufs, nicht den des Schreibens.
+
+`gh` führt zwei Dinge zusammen, die auseinandergehalten gehören: `status` und
 `configured` sind die Projektentscheidung aus `tools.gh` und stehen versioniert in der
 Datei; `installed`, `path`, `loggedIn`, `account`, `accounts` und `tokenFromEnv` sind ein
-Befund fuer genau diesen Rechner. `ready` fasst zusammen, was ein Command wissen muss:
+Befund für genau diesen Rechner. `ready` fasst zusammen, was ein Command wissen muss:
 gh ist da und ein Account ist hinterlegt.
 
-Der Befund ist aus der gh-Konfiguration gelesen, nicht beim Server geprueft — ein
+Der Befund ist aus der gh-Konfiguration gelesen, nicht beim Server geprüft — ein
 hinterlegter Token kann abgelaufen sein. Wer Gewissheit braucht, ruft `gh auth status`
-auf; das kostet einen Netzzugriff und gehoert deshalb nicht hierher.
+auf; das kostet einen Netzzugriff und gehört deshalb nicht hierher.
 
 Der Aufruf ist bewusst billig: der Security-Tool-Preflight fehlt darin, weil er je Tool
-ein `--version` startet und spuerbar dauert. `context` soll am Anfang jedes Commands
-stehen koennen. Der gh-Befund kostet nichts — ein Blick in den PATH und in
+ein `--version` startet und spürbar dauert. `context` soll am Anfang jedes Commands
+stehen können. Der gh-Befund kostet nichts — ein Blick in den PATH und in
 `~/.config/gh/hosts.yml`, kein Unterprozess.
 
-Gesucht wird ab dem Arbeitsverzeichnis aufwaerts. Ohne `K-PLAYBOOK.yaml` bricht der
+Gesucht wird ab dem Arbeitsverzeichnis aufwärts. Ohne `K-PLAYBOOK.yaml` bricht der
 Aufruf mit einer Meldung ab, ebenso bei einer `schema_version`, die nicht `3` ist.
 
 ## Instruktionen
@@ -205,22 +212,22 @@ Aufruf mit einer Meldung ab, ebenso bei einer `schema_version`, die nicht `3` is
 Was ein Assistent vor der Arbeit lesen soll, steht in `k-playbook.md` — je einmal pro
 Ebene:
 
-| Datei | Gilt fuer | Beim Update |
+| Datei | Gilt für | Beim Update |
 |---|---|---|
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
 
 Gelesen wird in dieser Reihenfolge; die projekteigene Ebene kann die mitgelieferte
-ergaenzen oder ueberstimmen. `context` nennt unter `instructions` nur die Dateien, die
-tatsaechlich existieren — ein Pfad ins Leere waere schlechter als keiner.
+ergänzen oder überstimmen. `context` nennt unter `instructions` nur die Dateien, die
+tatsächlich existieren — ein Pfad ins Leere wäre schlechter als keiner.
 
-Die Datei heisst bewusst nicht `AGENTS.md`: diesen Namen lesen die Assistenten von sich
+Die Datei heißt bewusst nicht `AGENTS.md`: diesen Namen lesen die Assistenten von sich
 aus, und er ist dem Hauptverzeichnis vorbehalten.
 
-`AGENTS.md` bekommt nur einen **Anstoss**: einen kurzen Block, der auf
+`AGENTS.md` bekommt nur einen **Anstoß**: einen kurzen Block, der auf
 `k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
-Block angehaengt und vorhandener Inhalt nicht angetastet. Ein Marker
-`<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhaengt.
+Block angehängt und vorhandener Inhalt nicht angetastet. Ein Marker
+`<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhängt.
 
 ## Minimalformat
 
@@ -230,8 +237,8 @@ Das legt das Werkzeug an, wenn ein Projekt neu eingebunden wird:
 # k-playbook
 #
 # Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.
-# Die Installation liegt daneben unter k-playbook/ und ist vollstaendig
-# ersetzbar; projekteigene Dateien gehoeren nicht hinein.
+# Die Installation liegt daneben unter k-playbook/ und ist vollständig
+# ersetzbar; projekteigene Dateien gehören nicht hinein.
 
 schema_version: 3
 
@@ -252,7 +259,7 @@ remediation:
   direct_fixes: true
 ```
 
-## Vollstaendiges Beispiel
+## Vollständiges Beispiel
 
 ```yaml
 schema_version: 3
@@ -284,7 +291,7 @@ Pflichtfeld. Aktuelle Version: `3`.
 `3` beschreibt das hier dokumentierte Modell: Anker im Hauptverzeichnis,
 `k-playbook/` und `k-playbook-local/` daneben, keine Pfade in der Konfiguration.
 
-Aeltere Werte gehoeren zu abgeloesten Modellen und werden nicht mehr unterstuetzt:
+Ältere Werte gehören zu abgelösten Modellen und werden nicht mehr unterstützt:
 
 | Wert | Modell |
 |---|---|
@@ -292,8 +299,8 @@ Aeltere Werte gehoeren zu abgeloesten Modellen und werden nicht mehr unterstuetz
 | `2` | Anker im k-playbook-Verzeichnis, Installation unter `_dist/`, `paths.*` |
 
 Das Werkzeug bricht bei jeder anderen Fassung ab, statt weiterzumachen. Stillschweigend
-weiterzulesen waere das Gefaehrlichste: die Werte liessen sich lesen, bedeuteten aber
-etwas anderes. Eine hoehere Zahl als `3` wird als „Installation aelter als die
+weiterzulesen wäre das Gefährlichste: die Werte ließen sich lesen, bedeuteten aber
+etwas anderes. Eine höhere Zahl als `3` wird als „Installation älter als die
 Konfiguration" gemeldet, eine fehlende `schema_version` ebenfalls als Fehler.
 
 Es gibt kein `migrate`-Kommando; die Umstellung ist ein bewusster Schritt.
@@ -309,25 +316,25 @@ Typische Werte:
   ausgecheckt ist — etwa in einem DevContainer.
 
 Das Repo steht bewusst in der Konfiguration und wird nicht aus dem Dateisystem
-abgeleitet. Commands duerfen den Wert lesen und pruefen, aber nicht selbst nach
+abgeleitet. Commands dürfen den Wert lesen und prüfen, aber nicht selbst nach
 Git-Roots suchen.
 
 ### `project.vcs`
 
-Pflichtfeld. Entweder `git` oder `none`. `none` ist eine ausdrueckliche
+Pflichtfeld. Entweder `git` oder `none`. `none` ist eine ausdrückliche
 Projektentscheidung und steht deshalb in der Datei, statt in Commands geraten zu werden.
 
 ### `remediation`
 
-Block fuer `/k-remediation`. Das Werkzeug legt ihn bei neuen Projekten gleich mit an.
+Block für `/k-remediation`. Das Werkzeug legt ihn bei neuen Projekten gleich mit an.
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
 | `mode` | enum | `task-branch-pr`, `task-first` oder `direct-allowed` |
 | `target` | string | Remediation-Ziel relativ zur `K-PLAYBOOK.yaml`; Default ist `project.repo_root` |
-| `grouping` | boolean | Findings vor der Umsetzung zu sinnvollen Buendeln gruppieren |
-| `quick_wins` | boolean | einfache, wirkungsstarke Buendel hervorheben |
-| `branch_prefix` | string | empfohlener Prefix fuer Remediation-Branches |
+| `grouping` | boolean | Findings vor der Umsetzung zu sinnvollen Bündeln gruppieren |
+| `quick_wins` | boolean | einfache, wirkungsstarke Bündel hervorheben |
+| `branch_prefix` | string | empfohlener Prefix für Remediation-Branches |
 | `pr_required` | boolean | aus `mode` abgeleitet |
 | `direct_fixes` | boolean | aus `mode` abgeleitet |
 
@@ -335,26 +342,26 @@ Die Modi, vom striktesten zum offensten:
 
 | Modus | Bedeutung | `pr_required` | `direct_fixes` |
 |---|---|---|---|
-| `task-branch-pr` | Keine direkten Fixes. Jedes bestaetigte Buendel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird spaeter ueber `/k-run`. | `true` | `false` |
-| `task-first` | Tasks sind der Standard. Direkte Fixes nur, wenn sie fuer einzelne kleine Buendel ausdruecklich freigegeben werden. | `false` | `true` |
-| `direct-allowed` | Kleine, sichere Befunde duerfen nach Code-Sichtung sofort behoben werden, wenn die Kategorien freigegeben sind. | `false` | `true` |
+| `task-branch-pr` | Keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird später über `/k-run`. | `true` | `false` |
+| `task-first` | Tasks sind der Standard. Direkte Fixes nur, wenn sie für einzelne kleine Bündel ausdrücklich freigegeben werden. | `false` | `true` |
+| `direct-allowed` | Kleine, sichere Befunde dürfen nach Code-Sichtung sofort behoben werden, wenn die Kategorien freigegeben sind. | `false` | `true` |
 
 **Default ist `task-first`.** Tasks als Standard sind die sichere Vorgabe: nichts wird
-ohne Zutun am Code geaendert, direkte Fixes bleiben nach Freigabe trotzdem moeglich.
+ohne Zutun am Code geändert, direkte Fixes bleiben nach Freigabe trotzdem möglich.
 
-`pr_required` und `direct_fixes` stehen zusaetzlich in der Datei, damit Commands sie
-lesen koennen, ohne den Modus deuten zu muessen. Sie werden beim Setzen des Modus
-mitgeschrieben und nicht unabhaengig davon gepflegt.
+`pr_required` und `direct_fixes` stehen zusätzlich in der Datei, damit Commands sie
+lesen können, ohne den Modus deuten zu müssen. Sie werden beim Setzen des Modus
+mitgeschrieben und nicht unabhängig davon gepflegt.
 
-Fehlt der Block, soll `/k-remediation` nicht raten, sondern fuer die aktuelle Sitzung
-ausdruecklich fragen.
+Fehlt der Block, soll `/k-remediation` nicht raten, sondern für die aktuelle Sitzung
+ausdrücklich fragen.
 
 ### `tools`
 
-Optionaler Block fuer projektlokale Tool-Entscheidungen.
+Optionaler Block für projektlokale Tool-Entscheidungen.
 
 Wichtig: hier stehen Projektentscheidungen, keine Host-Fakten. Ob `gitleaks` oder
-`trivy` auf diesem Rechner installiert sind, gehoert in einen Preflight-Bericht,
+`trivy` auf diesem Rechner installiert sind, gehört in einen Preflight-Bericht,
 nicht in eine versionierte Projektkonfiguration.
 
 #### `tools.gh`
@@ -366,35 +373,35 @@ nicht in eine versionierte Projektkonfiguration.
 Ob dieses Projekt die GitHub CLI nutzt. Gebraucht wird sie von `/k-pr-review` und vom
 Dependabot-Review.
 
-**Default ist `unknown`.** Das ist ein ausdruecklicher Zustand und kein
-stillschweigendes Nein: ohne Entscheidung weiss ein Command nicht, ob ein fehlendes `gh`
-ein Problem oder gewollt ist. Die Oberflaeche zeigt `unknown` deshalb als offenen Punkt,
+**Default ist `unknown`.** Das ist ein ausdrücklicher Zustand und kein
+stillschweigendes Nein: ohne Entscheidung weiß ein Command nicht, ob ein fehlendes `gh`
+ein Problem oder gewollt ist. Die Oberfläche zeigt `unknown` deshalb als offenen Punkt,
 und Commands, die `gh` brauchen, brechen darauf ab. Ein anderer Wert als die drei
-genannten ist ein Fehler und laesst `context` abbrechen — ein Tippfehler soll nicht wie
+genannten ist ein Fehler und lässt `context` abbrechen — ein Tippfehler soll nicht wie
 eine Entscheidung aussehen.
 
-Der Block sagt nichts darueber, ob `gh` auf diesem Rechner liegt. Das ist ein Host-Befund
+Der Block sagt nichts darüber, ob `gh` auf diesem Rechner liegt. Das ist ein Host-Befund
 und steht nur in der Kontextausgabe. Ebenso gibt es hier keinen Host: die Entscheidung
-gilt fuer `github.com`.
+gilt für `github.com`.
 
 ## Schreibregeln
 
-- Eine vorhandene `K-PLAYBOOK.yaml` wird nie ueberschrieben. Sie gehoert dem Projekt und
+- Eine vorhandene `K-PLAYBOOK.yaml` wird nie überschrieben. Sie gehört dem Projekt und
   kann Werte tragen, die das Werkzeug nicht kennt.
-- Geschrieben wird ausschliesslich nach Bestaetigung, Schritt fuer Schritt.
+- Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt.
 - Das Werkzeug besitzt `schema_version` und `project.*`.
-- Die Oberflaeche besitzt nur `tools.gh`. Geschrieben wird der `gh:`-Unterblock; ein
+- Die Oberfläche besitzt nur `tools.gh`. Geschrieben wird der `gh:`-Unterblock; ein
   danebenliegender Block eines anderen Tools bleibt unangetastet. Bei neuen Projekten
   wird er gleich mit `unknown` angelegt, damit die offene Entscheidung in der Datei
   sichtbar ist.
-- Die Remediation-Policy wird beim Einbinden gesetzt; spaeter darf `/k-remediation` sie
-  nach Rueckfrage aendern. Geschrieben wird nur der `remediation:`-Block.
-- Unbekannte Top-Level-Felder bleiben erhalten und werden nicht ungefragt geaendert.
+- Die Remediation-Policy wird beim Einbinden gesetzt; später darf `/k-remediation` sie
+  nach Rückfrage ändern. Geschrieben wird nur der `remediation:`-Block.
+- Unbekannte Top-Level-Felder bleiben erhalten und werden nicht ungefragt geändert.
   Geschrieben wird zeilenweise, damit Kommentare und Reihenfolge erhalten bleiben.
-- Host-lokale Installationszustaende gehoeren nicht in diese Datei.
+- Host-lokale Installationszustände gehören nicht in diese Datei.
 - Nichts unterhalb von `k-playbook/` darf geschrieben werden.
 
 ## Dateiname
 
 Der kanonische Dateiname ist `K-PLAYBOOK.yaml`. `K-PLAYBOOK.yml` soll nicht erzeugt
-werden, damit Werkzeug und Commands nur einen Namen pruefen muessen.
+werden, damit Werkzeug und Commands nur einen Namen prüfen müssen.

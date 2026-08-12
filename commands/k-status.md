@@ -16,6 +16,6 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Fuehre den Status-Check fuer das aktuelle Projekt aus.
+Führe den Status-Check für das aktuelle Projekt aus.
 
-Lies dafuer `<playbook.dir>/commands/_details/k-status.md` und befolge diese Anleitung mit `$ARGUMENTS`. Gib nicht den Inhalt der Detail-Datei aus.
+Lies dafür `<playbook.dir>/commands/_details/k-status.md` und befolge diese Anleitung mit `$ARGUMENTS`. Gib nicht den Inhalt der Detail-Datei aus.

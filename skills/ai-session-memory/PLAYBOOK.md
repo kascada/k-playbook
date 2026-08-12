@@ -30,7 +30,7 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 - Projekt-Verzeichnis mit Doku-Verzeichnis `k-playbook-local/docs/`.
 - Docs sollten mindestens einen Einstiegspunkt haben (`k-playbook-local/docs/README.md`).
 
-> **Pfad-Hinweis:** `/k-gui` legt `k-playbook-local/docs/` an oder vervollstaendigt die Struktur. Keine alternativen Docs-Pfade verwenden.
+> **Pfad-Hinweis:** `/k-gui` legt `k-playbook-local/docs/` an oder vervollständigt die Struktur. Keine alternativen Docs-Pfade verwenden.
 
 ## Konzept
 
@@ -119,7 +119,7 @@ Alphabetisch. Format: Stichwort → Datei-Nr. + Abschnitt.
 - Verweist präzise auf Datei UND Abschnitt (nicht nur Datei)
 - Wächst mit den Docs mit (Regel: neue Doc-Datei → Index-Einträge nachziehen)
 
-Neue Themen- und Tool-Referenzdateien sollten normales Markdown mit leichtgewichtig OKF-kompatiblem YAML-Frontmatter sein. Minimal sinnvoll sind `type`, `title`, `description`, `tags`, `status` und `generated`; `sources` wird nur eingetragen, wenn tatsaechlich externe Quellen genutzt wurden.
+Neue Themen- und Tool-Referenzdateien sollten normales Markdown mit leichtgewichtig OKF-kompatiblem YAML-Frontmatter sein. Minimal sinnvoll sind `type`, `title`, `description`, `tags`, `status` und `generated`; `sources` wird nur eingetragen, wenn tatsächlich externe Quellen genutzt wurden.
 
 Vorlage: `vorlagen/docs-README.md.template`
 
@@ -276,4 +276,4 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
   auf denen dieses Playbook aufsetzt.
 - `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
   aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
-- `/k-gui` – legt `K-PLAYBOOK.yaml` und die feste Struktur an oder vervollstaendigt sie.
+- `/k-gui` – legt `K-PLAYBOOK.yaml` und die feste Struktur an oder vervollständigt sie.

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PLAYBOOK_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 # Die Matrix liegt neben diesem Skript, damit beide zusammen verschoben werden
-# koennen und kein Pfad ins uebergeordnete Verzeichnis noetig ist.
+# können und kein Pfad ins übergeordnete Verzeichnis nötig ist.
 TOOL_MATRIX_FILE="${K_SECURITY_TOOLS_MATRIX:-$SCRIPT_DIR/security-tools.tsv}"
 
 # Tool installation is host/user-local by policy. Do not install into project venvs.
@@ -21,9 +21,9 @@ declare -A TOOL_INSTALL_METHOD=()
 declare -A TOOL_INSTALL_REF=()
 declare -A TOOL_ASSET_PATTERN=()
 
-# Die Sprachen des Projekts, komma-getrennt. Leer heisst unbekannt: dann gilt ein
+# Die Sprachen des Projekts, komma-getrennt. Leer heißt unbekannt: dann gilt ein
 # sprachgebundenes Tool als optional, weil sich ohne diese Angabe nicht verlangen
-# laesst, was vielleicht gar nicht gebraucht wird.
+# lässt, was vielleicht gar nicht gebraucht wird.
 LANGUAGES=""
 
 INSTALL_SPEC=""
@@ -33,9 +33,9 @@ INCLUDE_OPTIONAL=0
 YES=0
 DRY_RUN=0
 PREFIX="${K_SECURITY_TOOLS_PREFIX:-$HOME/.local}"
-# Wurzel der Tool-venvs, je pip-Tool eines darunter. Frueher stand hier genau ein
-# venv fuer pip-audit; mit mehreren pip-Tools braucht jedes seinen eigenen Ort,
-# damit sich ihre Abhaengigkeiten nicht in die Quere kommen.
+# Wurzel der Tool-venvs, je pip-Tool eines darunter. Früher stand hier genau ein
+# venv für pip-audit; mit mehreren pip-Tools braucht jedes seinen eigenen Ort,
+# damit sich ihre Abhängigkeiten nicht in die Quere kommen.
 VENV_ROOT="${K_SECURITY_TOOLS_VENV_ROOT:-$HOME/.local/share/k-playbook/security-tools}"
 
 default_bin_dir() {
@@ -72,7 +72,8 @@ Options:
   --json               Print the tool status as JSON and exit. Read-only.
   --install <target>   Install target: missing, required, all, or one tool name.
   --method <method>    auto, native, docker, pipx, or venv. Default: auto.
-  --include-optional   Accepted for old command lines; currently no extra tools.
+  --include-optional   With --install missing, also install the optional tools that apply
+                       to the selected languages, not only the required ones.
   --prefix <dir>       User-local prefix for native binaries. Default: ~/.local.
   --bin-dir <dir>      Binary directory. Default: first PATH-visible of ~/.opencode/bin or ~/.local/bin, else <prefix>/bin.
   --languages <list>   Comma-separated project languages, e.g. python,go. A tool bound to a
@@ -129,19 +130,19 @@ load_tool_matrix() {
 
     case "$required" in
       true|false) ;;
-      *) die "Ungueltiger required-Wert fuer $name in $TOOL_MATRIX_FILE: $required" ;;
+      *) die "Ungültiger required-Wert für $name in $TOOL_MATRIX_FILE: $required" ;;
     esac
     case "$installable" in
       true|false) ;;
-      *) die "Ungueltiger installable-Wert fuer $name in $TOOL_MATRIX_FILE: $installable" ;;
+      *) die "Ungültiger installable-Wert für $name in $TOOL_MATRIX_FILE: $installable" ;;
     esac
     case "$install_method" in
       github|go|pipx|none) ;;
-      *) die "Ungueltiger install_method-Wert fuer $name in $TOOL_MATRIX_FILE: $install_method" ;;
+      *) die "Ungültiger install_method-Wert für $name in $TOOL_MATRIX_FILE: $install_method" ;;
     esac
-    [[ -n "${languages:-}" ]] || die "Leeres languages-Feld fuer $name in $TOOL_MATRIX_FILE. Nutze * fuer sprachunabhaengig."
+    [[ -n "${languages:-}" ]] || die "Leeres languages-Feld für $name in $TOOL_MATRIX_FILE. Nutze * für sprachunabhängig."
     if [[ "$install_method" == "github" ]]; then
-      [[ -n "${asset_pattern:-}" && "$asset_pattern" != "-" ]] || die "install_method github ohne asset_pattern fuer $name in $TOOL_MATRIX_FILE."
+      [[ -n "${asset_pattern:-}" && "$asset_pattern" != "-" ]] || die "install_method github ohne asset_pattern für $name in $TOOL_MATRIX_FILE."
     fi
 
     STATUS_TOOLS+=("$name")
@@ -162,7 +163,7 @@ load_tool_matrix() {
     fi
   done < "$TOOL_MATRIX_FILE"
 
-  [[ "${#REQUIRED_TOOLS[@]}" -gt 0 ]] || die "Security-Tool-Matrix enthaelt keine Pflicht-Tools: $TOOL_MATRIX_FILE"
+  [[ "${#REQUIRED_TOOLS[@]}" -gt 0 ]] || die "Security-Tool-Matrix enthält keine Pflicht-Tools: $TOOL_MATRIX_FILE"
 }
 
 has_cmd() {
@@ -181,7 +182,7 @@ ensure_no_project_venv_in_path() {
   for entry in "${path_entries[@]}"; do
     [[ -z "$entry" ]] && continue
     if is_project_venv_path "$entry"; then
-      die "PATH enthaelt ein typisches Projekt-venv ($entry). Entferne es zuerst aus PATH bzw. fuehre 'deactivate' aus, damit der Preflight nur host-/user-lokale Tools bewertet."
+      die "PATH enthält ein typisches Projekt-venv ($entry). Entferne es zuerst aus PATH bzw. führe 'deactivate' aus, damit der Preflight nur host-/user-lokale Tools bewertet."
     fi
   done
 }
@@ -255,9 +256,9 @@ all_tools_for_status() {
   printf '%s\n' "${STATUS_TOOLS[@]}"
 }
 
-# tool_applies meldet, ob ein Tool fuer die gewaehlten Projektsprachen zustaendig
-# ist. Ohne --languages gilt nur Sprachunabhaengiges (*) als zustaendig: was an eine
-# Sprache gebunden ist, laesst sich ohne diese Angabe nicht verlangen.
+# tool_applies meldet, ob ein Tool für die gewählten Projektsprachen zuständig
+# ist. Ohne --languages gilt nur Sprachunabhängiges (*) als zuständig: was an eine
+# Sprache gebunden ist, lässt sich ohne diese Angabe nicht verlangen.
 tool_applies() {
   local tool languages entry wanted
   local -a tool_languages project_languages
@@ -278,8 +279,8 @@ tool_applies() {
 }
 
 # is_required_tool ist die einzige Stelle, an der die Sprachregel angewendet wird:
-# Pflicht ist ein Tool nur, wenn die Matrix es so fuehrt und es fuer die gewaehlten
-# Sprachen zustaendig ist.
+# Pflicht ist ein Tool nur, wenn die Matrix es so führt und es für die gewählten
+# Sprachen zuständig ist.
 is_required_tool() {
   local tool item
   tool="$1"
@@ -329,6 +330,42 @@ missing_required_count() {
   printf '%s' "$count"
 }
 
+# missing_optional_tools listet die optionalen Tools, die für die gewählten
+# Sprachen zuständig sind und fehlen.
+#
+# Sie zählen nicht als Pflicht, dürfen aber nicht unerwähnt bleiben: sonst
+# steht in der Tabelle zweimal "fehlt" und darunter "Alle Pflicht-Tools sind
+# installiert" — richtig, aber irreführend.
+missing_optional_tools() {
+  local tool
+  for tool in "${OPTIONAL_TOOLS[@]}"; do
+    if tool_applies "$tool" && is_installable_tool "$tool" && ! has_cmd "$tool"; then
+      printf '%s\n' "$tool"
+    fi
+  done
+}
+
+# install_hint baut den Befehl so, wie er wieder aufzurufen wäre — mitsamt der
+# Sprachen, sonst gälte beim nächsten Lauf eine andere Auswahl.
+#
+# Der Programmpfad ist ein Parameter, weil er sich unterscheidet: im Terminal
+# genügt der Aufruf, wie er getippt wurde; die Oberfläche zeigt einen Befehl zum
+# Kopieren, der aus jedem Verzeichnis laufen muss.
+install_hint() {
+  local program="$1" extra="${2:-}"
+  if [[ -n "$LANGUAGES" ]]; then
+    printf 'bash "%s" --languages %s --install missing%s' "$program" "$LANGUAGES" "$extra"
+  else
+    printf 'bash "%s" --install missing%s' "$program" "$extra"
+  fi
+}
+
+# script_path ist der absolute Ort dieses Skripts, unabhaengig davon, wie es
+# aufgerufen wurde.
+script_path() {
+  printf '%s/%s' "$SCRIPT_DIR" "$(basename "${BASH_SOURCE[0]}")"
+}
+
 print_preflight() {
   local tool kind status version path image missing_required
   ensure_host_tool_scope
@@ -369,20 +406,36 @@ print_preflight() {
     fi
   done < <(all_tools_for_status)
 
+  local -a optional_missing
+  mapfile -t optional_missing < <(missing_optional_tools)
+
   printf '\n'
   if [[ "$missing_required" -eq 0 ]]; then
     printf 'Status: Alle Pflicht-Tools sind installiert.\n'
   else
     printf 'Status: %s Pflicht-Tool(s) fehlen.\n' "$missing_required"
-    printf '\n'
-    printf 'Installationswege:\n'
-    printf '  Native/user-local: bash "%s" --install missing --method auto\n' "$0"
-    printf '  Docker-Fallback:   bash "%s" --install missing --method docker\n' "$0"
   fi
+  if [[ "${#optional_missing[@]}" -gt 0 ]]; then
+    printf 'Optional und nicht installiert: %s\n' "$(join_by ', ' "${optional_missing[@]}")"
+  fi
+
+  if [[ "$missing_required" -eq 0 && "${#optional_missing[@]}" -eq 0 ]]; then
+    return
+  fi
+
+  printf '\n'
+  printf 'Installationswege:\n'
+  if [[ "$missing_required" -gt 0 ]]; then
+    printf '  Nur die Pflicht:    %s --method auto\n' "$(install_hint "$0")"
+  fi
+  if [[ "${#optional_missing[@]}" -gt 0 ]]; then
+    printf '  Mit den optionalen: %s --method auto\n' "$(install_hint "$0" ' --include-optional')"
+  fi
+  printf '  Docker-Fallback:    %s --method docker\n' "$(install_hint "$0")"
 }
 
 # json_escape maskiert die Zeichen, die in einem JSON-String nicht roh stehen
-# duerfen. Versionsausgaben und Pfade kommen von fremden Programmen, also wird
+# dürfen. Versionsausgaben und Pfade kommen von fremden Programmen, also wird
 # hier nichts vorausgesetzt.
 json_escape() {
   local text="$1"
@@ -398,8 +451,10 @@ json_escape() {
 # maschinenlesbar. Die GUI rendert daraus ihre Tabelle.
 print_preflight_json() {
   local tool status version path image missing_required first
+  local -a optional_missing
   ensure_host_tool_scope
   missing_required="$(missing_required_count)"
+  mapfile -t optional_missing < <(missing_optional_tools)
 
   printf '{\n'
   printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
@@ -408,10 +463,14 @@ print_preflight_json() {
   printf '  "venvRoot": "%s",\n' "$(json_escape "$VENV_ROOT")"
   printf '  "languages": "%s",\n' "$(json_escape "$LANGUAGES")"
   printf '  "missingRequired": %s,\n' "$missing_required"
-  # Absoluter Pfad: der Befehl soll sich kopieren und von ueberall ausfuehren
-  # lassen, unabhaengig vom Arbeitsverzeichnis des Aufrufs.
+  printf '  "missingOptional": %s,\n' "${#optional_missing[@]}"
+  # Absoluter Pfad: der Befehl soll sich kopieren und von überall ausführen
+  # lassen, unabhängig vom Arbeitsverzeichnis des Aufrufs. Beide Fassungen
+  # entstehen hier, damit die Oberfläche keine Befehle zusammensetzen muss.
   printf '  "installCommand": "%s",\n' \
-    "$(json_escape "bash \"$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")\" --install missing --method auto")"
+    "$(json_escape "$(install_hint "$(script_path)" ' --method auto')")"
+  printf '  "installCommandOptional": "%s",\n' \
+    "$(json_escape "$(install_hint "$(script_path)" ' --include-optional --method auto')")"
   printf '  "tools": [\n'
 
   first=1
@@ -470,7 +529,7 @@ download_file() {
   elif has_cmd wget; then
     run_or_print wget -O "$dest" "$url"
   else
-    die "curl oder wget ist fuer native Downloads erforderlich."
+    die "curl oder wget ist für native Downloads erforderlich."
   fi
 }
 
@@ -507,7 +566,7 @@ import urllib.request
 repo, tool, os_name, arch, pattern = sys.argv[1:]
 
 # Die Platzhalter decken die drei Namenskonventionen ab, die unter den Tools
-# tatsaechlich vorkommen. Alles andere im Muster ist regulaerer Ausdruck und
+# tatsächlich vorkommen. Alles andere im Muster ist regulärer Ausdruck und
 # steht so in der Matrix.
 placeholders = {
     "{tool}": re.escape(tool),
@@ -551,8 +610,8 @@ install_github_binary() {
   tool="$1"
   repo="$(install_ref "$tool")"
   pattern="$(asset_pattern "$tool")"
-  [[ -n "$repo" && "$repo" != "-" ]] || die "Kein GitHub-Repo in der Matrix fuer $tool. Spalte install_ref pruefen."
-  [[ -n "$pattern" && "$pattern" != "-" ]] || die "Kein asset_pattern in der Matrix fuer $tool."
+  [[ -n "$repo" && "$repo" != "-" ]] || die "Kein GitHub-Repo in der Matrix für $tool. Spalte install_ref prüfen."
+  [[ -n "$pattern" && "$pattern" != "-" ]] || die "Kein asset_pattern in der Matrix für $tool."
 
   has_cmd python3 || die "python3 is required to resolve latest GitHub releases."
   has_cmd tar || die "tar is required to extract release archives."
@@ -579,7 +638,7 @@ install_github_binary() {
   mkdir -p "$extract_dir"
   download_file "$url" "$archive"
 
-  # Nicht jedes Projekt packt seine Binary ein: osv-scanner etwa laedt sie blank
+  # Nicht jedes Projekt packt seine Binary ein: osv-scanner etwa lädt sie blank
   # aus. Entschieden wird am Namen des Assets, nicht am Muster.
   case "$asset" in
     *.tar.gz|*.tgz)
@@ -612,14 +671,14 @@ install_github_binary() {
 
 # install_pipx_tool installiert ein pip-Paket host-lokal: bevorzugt mit pipx, sonst
 # in ein dediziertes Tool-venv. Der Paketname kommt aus der Matrix und kann Extras
-# tragen, etwa bandit[sarif]; die Binary heisst trotzdem wie die Tool-Spalte.
+# tragen, etwa paket[extra]; die Binary heißt trotzdem wie die Tool-Spalte.
 install_pipx_tool() {
   local tool method package venv_dir
   tool="$1"
   method="$2"
   package="$(install_ref "$tool")"
   venv_dir="$(tool_venv_dir "$tool")"
-  [[ -n "$package" && "$package" != "-" ]] || die "Kein pip-Paket in der Matrix fuer $tool. Spalte install_ref pruefen."
+  [[ -n "$package" && "$package" != "-" ]] || die "Kein pip-Paket in der Matrix für $tool. Spalte install_ref prüfen."
   ensure_bin_dir
 
   if [[ "$method" == "auto" || "$method" == "pipx" ]]; then
@@ -649,14 +708,14 @@ install_pipx_tool() {
 }
 
 # install_go_binary installiert ein Go-Werkzeug mit `go install`. GOBIN zeigt auf
-# dasselbe Bin-Verzeichnis wie die uebrigen Methoden, damit alle Tools an einem Ort
-# liegen und der PATH-Hinweis fuer alle gilt.
+# dasselbe Bin-Verzeichnis wie die übrigen Methoden, damit alle Tools an einem Ort
+# liegen und der PATH-Hinweis für alle gilt.
 install_go_binary() {
   local tool module
   tool="$1"
   module="$(install_ref "$tool")"
-  [[ -n "$module" && "$module" != "-" ]] || die "Kein Go-Modulpfad in der Matrix fuer $tool. Spalte install_ref pruefen."
-  has_cmd go || die "Go ist nicht installiert, wird fuer $tool aber gebraucht. Installiere Go oder nutze --method docker, falls die Matrix ein Image nennt."
+  [[ -n "$module" && "$module" != "-" ]] || die "Kein Go-Modulpfad in der Matrix für $tool. Spalte install_ref prüfen."
+  has_cmd go || die "Go ist nicht installiert, wird für $tool aber gebraucht. Installiere Go oder nutze --method docker, falls die Matrix ein Image nennt."
   ensure_bin_dir
 
   log "Installing $tool with go install into $BIN_DIR: $module"
@@ -669,7 +728,7 @@ install_docker_image() {
   image="$(docker_image "$tool")"
 
   if [[ "$image" == "-" ]]; then
-    log "Docker-Fallback fuer $tool ist nicht definiert; nutze pipx/venv/native."
+    log "Docker-Fallback für $tool ist nicht definiert; nutze pipx/venv/native."
     return 1
   fi
   has_cmd docker || die "Docker ist nicht installiert."
@@ -682,8 +741,8 @@ install_tool() {
   tool="$1"
   method="$2"
 
-  # Verzweigt wird ueber die Matrix-Spalte install_method, nicht ueber den
-  # Tool-Namen: ein neues Tool ist damit eine Zeile in der TSV und keine Aenderung
+  # Verzweigt wird über die Matrix-Spalte install_method, nicht über den
+  # Tool-Namen: ein neues Tool ist damit eine Zeile in der TSV und keine Änderung
   # an diesem Skript.
   case "$(install_method "$tool")" in
     pipx)
@@ -702,7 +761,7 @@ install_tool() {
       case "$method" in
         auto|native) install_go_binary "$tool" ;;
         docker) install_docker_image "$tool" ;;
-        pipx|venv) die "$method gilt nur fuer pip-Tools, $tool wird mit go install geholt." ;;
+        pipx|venv) die "$method gilt nur für pip-Tools, $tool wird mit go install geholt." ;;
         *) die "Unknown install method: $method" ;;
       esac
       ;;
@@ -713,7 +772,7 @@ install_tool() {
           install_github_binary "$tool"
           ;;
         docker) install_docker_image "$tool" ;;
-        pipx|venv) die "$method gilt nur fuer pip-Tools, $tool kommt aus einem GitHub-Release." ;;
+        pipx|venv) die "$method gilt nur für pip-Tools, $tool kommt aus einem GitHub-Release." ;;
         *) die "Unknown install method: $method" ;;
       esac
       ;;
@@ -731,19 +790,17 @@ selected_tools() {
   case "$INSTALL_SPEC" in
     missing)
       # Folgt derselben Sprachregel wie die Statuszeile: was der Preflight nicht als
-      # fehlende Pflicht zaehlt, wird hier auch nicht installiert. Die expliziten
-      # Ziele required und all bleiben davon unberuehrt.
+      # fehlende Pflicht zählt, wird hier auch nicht installiert. Die expliziten
+      # Ziele required und all bleiben davon unberührt.
       for tool in "${REQUIRED_TOOLS[@]}"; do
         if is_required_tool "$tool" && is_installable_tool "$tool" && ! has_cmd "$tool"; then
           printf '%s\n' "$tool"
         fi
       done
       if [[ "$INCLUDE_OPTIONAL" -eq 1 ]]; then
-        for tool in "${OPTIONAL_TOOLS[@]}"; do
-          if is_installable_tool "$tool" && ! has_cmd "$tool"; then
-            printf '%s\n' "$tool"
-          fi
-        done
+        # Auch die optionalen folgen der Sprachregel: ein Go-Projekt soll sich
+        # kein Python-Werkzeug einhandeln, nur weil es die optionalen mitnimmt.
+        missing_optional_tools
       fi
       ;;
     required)
@@ -891,7 +948,7 @@ main() {
   count="${#tools[@]}"
 
   if [[ "$count" -eq 0 ]]; then
-    printf '\nNichts zu installieren fuer Auswahl: %s\n' "$INSTALL_SPEC"
+    printf '\nNichts zu installieren für Auswahl: %s\n' "$INSTALL_SPEC"
     exit 0
   fi
 

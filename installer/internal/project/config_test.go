@@ -52,7 +52,7 @@ func TestSuggestRepoRootBleibtBeiMehrerenLeer(t *testing.T) {
 		t.Errorf("repoRoot = %q, erwartet leer", repoRoot)
 	}
 	if len(candidates) != 2 {
-		t.Errorf("candidates = %v, erwartet zwei Eintraege", candidates)
+		t.Errorf("candidates = %v, erwartet zwei Einträge", candidates)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestCreateConfigSchreibtAuffindbareDatei(t *testing.T) {
 	}
 	for _, want := range []string{"schema_version: 3", "repo_root: .", "vcs: git"} {
 		if !strings.Contains(string(content), want) {
-			t.Errorf("Config enthaelt %q nicht:\n%s", want, content)
+			t.Errorf("Config enthält %q nicht:\n%s", want, content)
 		}
 	}
 
@@ -130,7 +130,7 @@ func TestCreateConfigUeberschreibtNicht(t *testing.T) {
 		t.Fatalf("Config lesen: %v", err)
 	}
 	if string(content) != original {
-		t.Error("vorhandene Config wurde veraendert")
+		t.Error("vorhandene Config wurde verändert")
 	}
 }
 
@@ -173,7 +173,7 @@ project:
 	}
 }
 
-// Ein gleichnamiger Schluessel in einer anderen Sektion darf nicht durchschlagen.
+// Ein gleichnamiger Schlüssel in einer anderen Sektion darf nicht durchschlagen.
 func TestReadConfigTrenntSektionen(t *testing.T) {
 	root := t.TempDir()
 	content := `schema_version: 2
@@ -261,7 +261,7 @@ func TestCheckSchema(t *testing.T) {
 	if err := CheckSchema(Config{}); err == nil {
 		t.Error("fehlende schema_version wurde akzeptiert")
 	}
-	// Die 2 beschreibt das abgeloeste Layout; ihre Werte bedeuten etwas anderes.
+	// Die 2 beschreibt das abgelöste Layout; ihre Werte bedeuten etwas anderes.
 	if err := CheckSchema(Config{SchemaVersion: "2"}); err == nil {
 		t.Error("schema_version 2 wurde akzeptiert")
 	}
@@ -270,7 +270,7 @@ func TestCheckSchema(t *testing.T) {
 	}
 }
 
-// Eine neu erzeugte Konfiguration muss die eigene Pruefung bestehen.
+// Eine neu erzeugte Konfiguration muss die eigene Prüfung bestehen.
 func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
 	root := t.TempDir()
 
@@ -282,6 +282,6 @@ func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
 		t.Fatalf("ReadConfig: %v", err)
 	}
 	if err := CheckSchema(config); err != nil {
-		t.Errorf("selbst erzeugte Konfiguration ist ungueltig: %v", err)
+		t.Errorf("selbst erzeugte Konfiguration ist ungültig: %v", err)
 	}
 }

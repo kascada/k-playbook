@@ -19,17 +19,17 @@ type updateResponse struct {
 	// arbeitet aber weiter mit dem alten Code.
 	RestartRequired bool `json:"restartRequired"`
 	// Links nennt, was das Update an der Registrierung von Commands und Skills
-	// geaendert hat.
+	// geändert hat.
 	Links project.LinkChanges `json:"links"`
 	// Cleanliness ist der lokale Zustand der Installation. Er wird bei jeder
-	// Pruefung mitgeliefert, auch ohne anstehendes Update: die Verschmutzung
-	// entsteht unabhaengig davon, und wer nie aktualisiert, bekaeme sie sonst
+	// Prüfung mitgeliefert, auch ohne anstehendes Update: die Verschmutzung
+	// entsteht unabhängig davon, und wer nie aktualisiert, bekäme sie sonst
 	// nie zu sehen.
 	Cleanliness project.Cleanliness `json:"cleanliness"`
 	Message     string              `json:"message"`
 }
 
-// updateCheckHandler prueft den Remote-Stand. Rein lesend.
+// updateCheckHandler prüft den Remote-Stand. Rein lesend.
 func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -39,7 +39,7 @@ func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	status, err := project.CheckUpdate(environment.ProjectDir)
 	if err != nil {
-		writeJSON(w, http.StatusOK, updateResponse{Message: "Pruefung fehlgeschlagen: " + err.Error()})
+		writeJSON(w, http.StatusOK, updateResponse{Message: "Prüfung fehlgeschlagen: " + err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, updateResponse{
@@ -78,12 +78,12 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		Message:         "Aktualisiert.",
 	}
 	if result.BinaryChanged {
-		response.Message = "Aktualisiert. Das Programm wurde ersetzt und laeuft bis zum Neustart mit dem bisherigen Stand."
+		response.Message = "Aktualisiert. Das Programm wurde ersetzt und läuft bis zum Neustart mit dem bisherigen Stand."
 	}
 	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 
-	// Nach dem Pull erneut pruefen, damit Button und Karte den neuen Zustand
-	// zeigen. Der Pull selbst kann den lokalen Zustand veraendert haben.
+	// Nach dem Pull erneut prüfen, damit Button und Karte den neuen Zustand
+	// zeigen. Der Pull selbst kann den lokalen Zustand verändert haben.
 	if status, err := project.CheckUpdate(environment.ProjectDir); err == nil {
 		response.Available = status.Available
 		response.Branch = status.Branch
@@ -95,15 +95,15 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // relinkAfterUpdate zieht die Assistenten-Verlinkung auf den neuen Stand nach
-// und meldet, was sich dabei geaendert hat.
+// und meldet, was sich dabei geändert hat.
 //
-// Das gehoert zum Update, nicht in einen zweiten Schritt: seit Commands und
+// Das gehört zum Update, nicht in einen zweiten Schritt: seit Commands und
 // Skills einzeln verlinkt werden, kommt ein neu mitgelieferter Command nicht
-// mehr von selbst an. Ein Update, das den Katalog aendert, ihn aber nicht
-// registriert, waere halb erledigt — und zwar unsichtbar.
+// mehr von selbst an. Ein Update, das den Katalog ändert, ihn aber nicht
+// registriert, wäre halb erledigt — und zwar unsichtbar.
 //
-// Ein Fehler dabei laesst das Update selbst gueltig: der Pull ist durch, und
-// die Verlinkung kann ueber die Assistenten-Karte nachgeholt werden.
+// Ein Fehler dabei lässt das Update selbst gültig: der Pull ist durch, und
+// die Verlinkung kann über die Assistenten-Karte nachgeholt werden.
 func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, string) {
 	changes := project.PendingLinkChanges(project.CheckLinks(projectDir))
 
@@ -134,7 +134,7 @@ func describeLinkChanges(changes project.LinkChanges) string {
 	return "Verlinkung nachgezogen: " + strings.Join(parts, ", ") + "."
 }
 
-// shortCommit kuerzt einen Commit-Hash auf die uebliche Anzeigelaenge.
+// shortCommit kürzt einen Commit-Hash auf die übliche Anzeigelänge.
 func shortCommit(hash string) string {
 	if len(hash) > 7 {
 		return hash[:7]

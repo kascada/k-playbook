@@ -12,7 +12,7 @@ func TestCheckLocalMeldetFehlendeStruktur(t *testing.T) {
 
 	statuses := CheckLocal(root)
 	if LocalOK(statuses) {
-		t.Fatal("leeres Projekt gilt als vollstaendig")
+		t.Fatal("leeres Projekt gilt als vollständig")
 	}
 	for _, status := range statuses {
 		if status.Present {
@@ -29,7 +29,7 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 	if !LocalOK(statuses) {
-		t.Fatalf("nach CreateLocal unvollstaendig: %+v", statuses)
+		t.Fatalf("nach CreateLocal unvollständig: %+v", statuses)
 	}
 
 	local := LocalDir(root)
@@ -46,7 +46,7 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 }
 
-// Git speichert keine leeren Verzeichnisse; ohne README waeren sie nach einem
+// Git speichert keine leeren Verzeichnisse; ohne README wären sie nach einem
 // Clone des Projekts verschwunden.
 func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	root := t.TempDir()
@@ -95,7 +95,7 @@ func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 			t.Fatalf("%s lesen: %v", path, err)
 		}
 		if string(content) != want {
-			t.Errorf("%s wurde veraendert: %q", path, content)
+			t.Errorf("%s wurde verändert: %q", path, content)
 		}
 	}
 }
@@ -111,12 +111,12 @@ func TestCreateLocalIstIdempotent(t *testing.T) {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
 	if !LocalOK(statuses) {
-		t.Errorf("zweiter Lauf unvollstaendig: %+v", statuses)
+		t.Errorf("zweiter Lauf unvollständig: %+v", statuses)
 	}
 }
 
-// Die drei Overlay-Sorten muessen ein lokales Gegenstueck haben, sonst greift
-// die Overlay-Aufloesung ins Leere.
+// Die drei Overlay-Sorten müssen ein lokales Gegenstück haben, sonst greift
+// die Overlay-Auflösung ins Leere.
 func TestLocalStructureDecktOverlaySortenAb(t *testing.T) {
 	vorhanden := map[string]bool{}
 	for _, entry := range LocalStructure() {
@@ -150,12 +150,12 @@ func TestCreateLocalSchuetztPrivVerzeichnis(t *testing.T) {
 	}
 	for _, want := range []string{"*", "!.gitignore", "!README.md"} {
 		if !strings.Contains(string(content), want) {
-			t.Errorf(".gitignore enthaelt %q nicht:\n%s", want, content)
+			t.Errorf(".gitignore enthält %q nicht:\n%s", want, content)
 		}
 	}
 }
 
-// Nur priv/ bekommt eine .gitignore; die uebrigen Verzeichnisse sind normaler
+// Nur priv/ bekommt eine .gitignore; die übrigen Verzeichnisse sind normaler
 // Projektinhalt.
 func TestCreateLocalSchuetztNurPriv(t *testing.T) {
 	root := t.TempDir()

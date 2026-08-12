@@ -12,12 +12,12 @@ Beide verwenden dieselbe Regelquelle: die Context-Ausgabe von
 
 ## Regelquellen
 
-Die effektive Regelmenge steht in `catalogs.rules` der Context-Ausgabe. Sie fuehrt die
+Die effektive Regelmenge steht in `catalogs.rules` der Context-Ausgabe. Sie führt die
 mitgelieferten Regeln aus `<playbook.dir>/rules/` und die projekteigenen aus
-`<local.dir>/rules/` bereits zusammen und haelt je Eintrag die Herkunft fest.
+`<local.dir>/rules/` bereits zusammen und hält je Eintrag die Herkunft fest.
 
 `<playbook.dir>` ist read-only. Mitgelieferte Regeln werden nie editiert; wer eine
-aendern will, legt eine gleichnamige Datei unter `<local.dir>/rules/` an.
+ändern will, legt eine gleichnamige Datei unter `<local.dir>/rules/` an.
 
 ## Ablauf
 
@@ -28,22 +28,22 @@ das Playbook-Verzeichnis.
 
 ### Schritt 2: Regeln laden
 
-Lies die Dateien aus `catalogs.rules` in der gegebenen Reihenfolge. Die Aufloesung ist
+Lies die Dateien aus `catalogs.rules` in der gegebenen Reihenfolge. Die Auflösung ist
 bereits erfolgt:
 
 - Jede projekteigene Regel ist aktiv.
-- Eine mitgelieferte Regel ist aktiv, ausser eine projekteigene traegt denselben
-  Schluessel.
-- Eine projekteigene Regel **ersetzt** die gleichnamige mitgelieferte vollstaendig.
+- Eine mitgelieferte Regel ist aktiv, außer eine projekteigene trägt denselben
+  Schlüssel.
+- Eine projekteigene Regel **ersetzt** die gleichnamige mitgelieferte vollständig.
   Die mitgelieferte Datei wird dann gar nicht gelesen.
 - Eine **leere** projekteigene Regel — nur Leerzeilen und Kommentare — schaltet die
-  mitgelieferte ab und ist als `disabled` markiert. Der Kommentar traegt den Grund.
+  mitgelieferte ab und ist als `disabled` markiert. Der Kommentar trägt den Grund.
 
 Berichte die effektive Menge mit Herkunft je Eintrag (`dist`, `local`, `override`) sowie
-die abgeschalteten Eintraege, bevor du mit der Pruefung beginnst.
+die abgeschalteten Einträge, bevor du mit der Prüfung beginnst.
 
 Wenn die effektive Menge leer ist, nicht raten und nicht auf die mitgelieferten Regeln
-zurueckfallen. Melde den Zustand; eine leere Menge ist eine bewusste Projektentscheidung.
+zurückfallen. Melde den Zustand; eine leere Menge ist eine bewusste Projektentscheidung.
 
 ### Schritt 3: Relevanz bestimmen
 

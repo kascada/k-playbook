@@ -13,11 +13,11 @@ auf und lies die Dateien aus `instructions`.
 
 Anders als bei allen anderen Commands ist ein Fehlschlag hier kein Abbruchgrund:
 `/k-gui` ist genau der Command, mit dem ein Projekt eingerichtet wird, also gibt es
-die Konfiguration womoeglich noch gar nicht. Melde das kurz und starte die
-Oberflaeche trotzdem.
+die Konfiguration womöglich noch gar nicht. Melde das kurz und starte die
+Oberfläche trotzdem.
 
 
-Starte die lokale k-playbook Oberflaeche.
+Starte die lokale k-playbook Oberfläche.
 
 Welches Projekt gemeint ist, leitet das Programm aus dem Arbeitsverzeichnis ab,
 nicht aus seinem eigenen Ort. Deshalb tut es dasselbe, egal ob es host-weit oder
@@ -27,13 +27,13 @@ Dieser Command nutzt bewusst nicht `make`.
 
 ## Ablauf
 
-1. Loese `K_PLAYBOOK_BIN` auf. Nimm den ersten ausfuehrbaren Treffer:
+1. Löse `K_PLAYBOOK_BIN` auf. Nimm den ersten ausführbaren Treffer:
 
    - `k-playbook` aus dem `PATH`.
    - `~/.local/bin/k-playbook`.
    - `k-playbook/bin/k-playbook` im Projekt.
 
-2. Wenn kein Kandidat ausfuehrbar ist, brich mit einem klaren Hinweis ab:
+2. Wenn kein Kandidat ausführbar ist, brich mit einem klaren Hinweis ab:
 
 ```text
 k-playbook nicht gefunden.
@@ -48,7 +48,7 @@ Erwartet wird die Installation unter k-playbook/ im Projekt.
 
 ## Hinweise
 
-- Die GUI laeuft im Vordergrund, bis sie ueber den Browser-Button `Schliessen`, Browser-Tab-Schliessen, Heartbeat-Timeout oder `Ctrl+C` beendet wird.
-- Die Oberflaeche gibt die lokale URL aus, falls der Browser nicht automatisch startet.
-- Dieser Command veraendert keine Projektdateien.
-- Der Start haelt nebenbei die host-weite Kopie unter `~/.local/share/k-playbook/installation` aktuell. Nach dem ersten Mal genuegt in jedem Projekt ein blosses `k-playbook`.
+- Die GUI läuft im Vordergrund, bis sie über den Browser-Button `Schließen`, Browser-Tab-Schließen, Heartbeat-Timeout oder `Ctrl+C` beendet wird.
+- Die Oberfläche gibt die lokale URL aus, falls der Browser nicht automatisch startet.
+- Dieser Command verändert keine Projektdateien.
+- Der Start hält nebenbei die host-weite Kopie unter `~/.local/share/k-playbook/installation` aktuell. Nach dem ersten Mal genügt in jedem Projekt ein bloßes `k-playbook`.

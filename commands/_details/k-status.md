@@ -92,21 +92,21 @@ way out.
 /k-status
 ------------------------
 Projekt:       /path/to/project (repo: ., git)
-Installation:  FAIL, bin/k-playbook lokal veraendert
+Installation:  FAIL, bin/k-playbook lokal verändert
 Projekteigen:  OK, k-playbook-local/
 Instruktionen: OK, 2 Dateien
 Struktur:      WARN, 2 Verzeichnisse fehlen (priv, guidelines)
 Docs:          WARN, noch keine Markdown-Dateien
-Tasks:         WARN, 3 offen, naechste: 002-example.md
+Tasks:         WARN, 3 offen, nächste: 002-example.md
 TODO:          OK, 0 offen
 Reviews:       WARN, 8 Rezepte, known-decisions fehlt
 Regeln:        OK, 4 aktiv (4 dist)
 Checks:        OK, 6 aktiv (6 dist)
 Remediation:   OK, task-first
-Git:           WARN, dirty (4 geaendert, 1 untracked)
+Git:           WARN, dirty (4 geändert, 1 untracked)
 Assistenten:   WARN, .cursor/commands fehlt
 
-Naechste Aktionen:
+Nächste Aktionen:
 1. git -C k-playbook checkout -- .
 2. /k-gui
 3. /k-code2docs
@@ -135,7 +135,7 @@ Print the compact report, then list the three catalogs entry by entry with origi
 ```text
 Regeln (rules): 4 aktiv
   [dist]     review-authoring
-  [override] docs-sync            (ueberlagert k-playbook/rules/docs-sync.md)
+  [override] docs-sync            (überlagert k-playbook/rules/docs-sync.md)
   [disabled] tool-install-scope   (leere lokale Datei)
 ```
 

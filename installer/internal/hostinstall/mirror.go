@@ -1,14 +1,14 @@
-// Package hostinstall haelt eine host-weite Kopie der Installation aktuell.
+// Package hostinstall hält eine host-weite Kopie der Installation aktuell.
 //
 // Die Installation selbst liegt pro Projekt (`<projekt>/k-playbook/`). Damit die
-// Oberflaeche nicht ueber diesen tiefen Pfad gestartet werden muss, spiegelt
+// Oberfläche nicht über diesen tiefen Pfad gestartet werden muss, spiegelt
 // jeder Start seine eigenen Dateien nach ~/.local/share/k-playbook/installation
 // und verlinkt sie nach ~/.local/bin. Wer aus einem aktuelleren Clone startet,
 // hebt die host-weite Kopie damit von selbst an.
 //
 // Gespiegelt wird der Wrapper zusammen mit dem Binary, nicht das Binary allein:
-// Host und Container teilen sich unter Umstaenden dasselbe Home, brauchen aber
-// verschiedene Plattformen. Erst der Wrapper waehlt zur Laufzeit aus.
+// Host und Container teilen sich unter Umständen dasselbe Home, brauchen aber
+// verschiedene Plattformen. Erst der Wrapper wählt zur Laufzeit aus.
 package hostinstall
 
 import (
@@ -34,10 +34,10 @@ const (
 	// ~/.local/share/k-playbook/ ebenfalls zuhause sind. Ein venv bringt ein
 	// eigenes bin/ mit; ohne diese Ebene kollidierten beide.
 	installDirName = "installation"
-	// stampSuffix haelt den Commit-Stand neben dem gespiegelten Binary fest.
+	// stampSuffix hält den Commit-Stand neben dem gespiegelten Binary fest.
 	stampSuffix = ".stamp"
-	// stampTimeout begrenzt die Git-Abfrage. Sie laeuft lokal und ist schnell;
-	// ein haengendes Git darf den Start trotzdem nicht aufhalten.
+	// stampTimeout begrenzt die Git-Abfrage. Sie läuft lokal und ist schnell;
+	// ein hängendes Git darf den Start trotzdem nicht aufhalten.
 	stampTimeout = 5 * time.Second
 )
 
@@ -58,7 +58,7 @@ func (r Result) Empty() bool {
 	return len(r.Copied) == 0 && r.Link == "" && r.PathHint == ""
 }
 
-// request buendelt die aufgeloesten Pfade eines Spiegellaufs.
+// request bündelt die aufgelösten Pfade eines Spiegellaufs.
 type request struct {
 	// source ist die Installation, aus der der laufende Prozess stammt.
 	source string
@@ -70,14 +70,14 @@ type request struct {
 	platform string
 	// stamp ist der Commit-Stand der Quelle. Leer, wenn nicht ermittelbar.
 	stamp string
-	// pathValue ist der PATH, gegen den linkDir geprueft wird.
+	// pathValue ist der PATH, gegen den linkDir geprüft wird.
 	pathValue string
 }
 
 // Mirror spiegelt die laufende Installation host-weit.
 //
-// Laeuft der Prozess bereits aus der host-weiten Kopie, passiert nichts. Fehlt
-// das Home-Verzeichnis oder laesst sich die Installation nicht bestimmen, wird
+// Läuft der Prozess bereits aus der host-weiten Kopie, passiert nichts. Fehlt
+// das Home-Verzeichnis oder lässt sich die Installation nicht bestimmen, wird
 // still aufgegeben: die Spiegelung ist Komfort und darf nichts erzwingen.
 func Mirror() (Result, error) {
 	source, ok := project.InstallDir()
@@ -107,7 +107,7 @@ func Mirror() (Result, error) {
 
 // PlatformBinary bildet den Dateinamen in dist/. GOOS und GOARCH tragen bereits
 // die Schreibweise, die beim Bauen verwendet wird — anders als `uname`, das der
-// Wrapper erst uebersetzen muss.
+// Wrapper erst übersetzen muss.
 func PlatformBinary(goos string, goarch string) string {
 	return fmt.Sprintf("%s-%s-%s", WrapperName, goos, goarch)
 }
@@ -116,21 +116,21 @@ func PlatformBinary(goos string, goarch string) string {
 type PathStatus struct {
 	// Dir ist das Verzeichnis, in das verlinkt wird.
 	Dir string `json:"dir"`
-	// Linked: der Symlink liegt tatsaechlich dort.
+	// Linked: der Symlink liegt tatsächlich dort.
 	Linked bool `json:"linked"`
 	// InPath: das Verzeichnis steht in der PATH-Variablen dieses Prozesses.
 	InPath bool `json:"inPath"`
-	// Export ist die Zeile fuers Shell-Profil. Leer, wenn nichts zu tun ist.
+	// Export ist die Zeile fürs Shell-Profil. Leer, wenn nichts zu tun ist.
 	Export string `json:"export"`
 }
 
 // OK meldet, ob nichts mehr zu tun ist.
 func (s PathStatus) OK() bool { return s.Linked && s.InPath }
 
-// CheckPath prueft, ohne etwas zu veraendern.
+// CheckPath prüft, ohne etwas zu verändern.
 //
-// Geprueft wird der PATH **dieses** Prozesses. Wer die Zeile gerade erst ins
-// Profil geschrieben hat, sieht die Aenderung deshalb erst in einer neuen Shell.
+// Geprüft wird der PATH **dieses** Prozesses. Wer die Zeile gerade erst ins
+// Profil geschrieben hat, sieht die Änderung deshalb erst in einer neuen Shell.
 func CheckPath() PathStatus {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
@@ -149,7 +149,7 @@ func CheckPath() PathStatus {
 	return status
 }
 
-// ExportLine baut die Zeile fuers Shell-Profil. Wenn das Verzeichnis unter dem
+// ExportLine baut die Zeile fürs Shell-Profil. Wenn das Verzeichnis unter dem
 // Home liegt, wird `$HOME` eingesetzt: die Zeile bleibt dann auch dann richtig,
 // wenn dasselbe Profil auf einem anderen Rechner oder im Container gelesen wird.
 func ExportLine(dir string, home string) string {
@@ -161,14 +161,14 @@ func ExportLine(dir string, home string) string {
 }
 
 // linkExists meldet, ob dort ein Eintrag liegt — auch ein Symlink, dessen Ziel
-// gerade fehlt. Genau der waere sonst unsichtbar und der Zustand irrefuehrend.
+// gerade fehlt. Genau der wäre sonst unsichtbar und der Zustand irreführend.
 func linkExists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
 }
 
-// mirrorInto arbeitet auf ausdruecklich uebergebenen Pfaden und ist dadurch
-// pruefbar.
+// mirrorInto arbeitet auf ausdrücklich übergebenen Pfaden und ist dadurch
+// prüfbar.
 func mirrorInto(req request) (Result, error) {
 	result := Result{}
 
@@ -196,8 +196,8 @@ func mirrorInto(req request) (Result, error) {
 		}
 		result.Copied = append(result.Copied, filepath.Join(distDirName, req.platform))
 
-		// Ohne Stempel bleibt die Datei weg: ein leerer Wert wuerde beim
-		// naechsten Start wie "unbekannt" gelesen und nichts aendern.
+		// Ohne Stempel bleibt die Datei weg: ein leerer Wert würde beim
+		// nächsten Start wie "unbekannt" gelesen und nichts ändern.
 		if req.stamp != "" {
 			if err := writeStamp(stampPath, req.stamp); err != nil {
 				return result, err
@@ -219,9 +219,9 @@ func mirrorInto(req request) (Result, error) {
 
 // needsCopy entscheidet, ob gespiegelt wird.
 //
-// Der Stempel allein reicht nicht: die Kopie traegt nur die Plattformen, von
+// Der Stempel allein reicht nicht: die Kopie trägt nur die Plattformen, von
 // denen aus sie schon einmal aufgerufen wurde. Startet ein Container aus
-// demselben Clone, den zuvor der Host gespiegelt hat, sind die Staende gleich —
+// demselben Clone, den zuvor der Host gespiegelt hat, sind die Stände gleich —
 // sein Binary fehlt trotzdem.
 func needsCopy(sourceStamp string, stampPath string, targetWrapper string, targetBinary string) bool {
 	if !fileExists(targetBinary) || !fileExists(targetWrapper) {
@@ -234,7 +234,7 @@ func needsCopy(sourceStamp string, stampPath string, targetWrapper string, targe
 //
 // Bewusst nicht die mtime der Dateien: Git setzt sie beim Auschecken auf den
 // Zeitpunkt des Clones, nicht des Commits. Ein frisch geklonter alter Stand
-// saehe damit neuer aus als eine korrekte Installation.
+// sähe damit neuer aus als eine korrekte Installation.
 func newer(source string, target string) bool {
 	sourceValue, err := strconv.ParseInt(source, 10, 64)
 	if err != nil {
@@ -279,7 +279,7 @@ func writeStamp(path string, stamp string) error {
 // copyExecutable schreibt erst daneben und benennt dann um.
 //
 // Das Umbenennen ist atomar und umgeht ETXTBSY: eine parallel laufende Instanz
-// haelt die alte Datei offen, waehrend der Name schon auf die neue zeigt.
+// hält die alte Datei offen, während der Name schon auf die neue zeigt.
 func copyExecutable(source string, target string) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -306,7 +306,7 @@ func copyExecutable(source string, target string) error {
 		os.Remove(temporary)
 		return err
 	}
-	// Explizit, weil eine vorhandene Datei ihre alten Rechte behaelt.
+	// Explizit, weil eine vorhandene Datei ihre alten Rechte behält.
 	if err := os.Chmod(temporary, 0o755); err != nil {
 		os.Remove(temporary)
 		return err
@@ -320,8 +320,8 @@ func copyExecutable(source string, target string) error {
 }
 
 // ensureLink legt den Symlink an oder richtet ihn neu aus. Liegt dort eine
-// echte Datei, gewinnt sie und bleibt unberuehrt — dieselbe Regel wie bei den
-// Assistenten-Verlinkungen. Rueckgabe ist der Pfad, wenn etwas geschrieben
+// echte Datei, gewinnt sie und bleibt unberührt — dieselbe Regel wie bei den
+// Assistenten-Verlinkungen. Rückgabe ist der Pfad, wenn etwas geschrieben
 // wurde, sonst leer.
 func ensureLink(linkDir string, targetWrapper string) (string, error) {
 	if err := os.MkdirAll(linkDir, 0o755); err != nil {
@@ -329,7 +329,7 @@ func ensureLink(linkDir string, targetWrapper string) (string, error) {
 	}
 
 	linkPath := filepath.Join(linkDir, WrapperName)
-	// Relativ, damit der Link ein verschobenes oder gemountetes Home ueberlebt.
+	// Relativ, damit der Link ein verschobenes oder gemountetes Home überlebt.
 	want, err := filepath.Rel(linkDir, targetWrapper)
 	if err != nil {
 		want = targetWrapper
@@ -338,7 +338,7 @@ func ensureLink(linkDir string, targetWrapper string) (string, error) {
 	info, err := os.Lstat(linkPath)
 	switch {
 	case os.IsNotExist(err):
-		// faellt durch zum Anlegen
+		// fällt durch zum Anlegen
 	case err != nil:
 		return "", err
 	case info.Mode()&os.ModeSymlink == 0:
@@ -372,7 +372,7 @@ func inPath(pathValue string, dir string) bool {
 	return false
 }
 
-// samePath vergleicht zwei Pfade und loest dabei Symlinks auf, soweit sie
+// samePath vergleicht zwei Pfade und löst dabei Symlinks auf, soweit sie
 // existieren. Ein verlinktes Home soll nicht als anderer Ort gelten.
 func samePath(left string, right string) bool {
 	return resolve(left) == resolve(right)

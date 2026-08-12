@@ -9,16 +9,16 @@ import (
 	"strings"
 )
 
-// DocsDirName ist das Doku-Verzeichnis innerhalb der Installation. Es gehoert
+// DocsDirName ist das Doku-Verzeichnis innerhalb der Installation. Es gehört
 // zur mitgelieferten Ebene und wird bei jedem Update ersetzt; projekteigene
 // Doku liegt getrennt davon unter k-playbook-local/docs.
 const DocsDirName = "docs"
 
 // Doc ist eine Markdown-Datei der mitgelieferten Doku.
 type Doc struct {
-	// Path ist der Ort relativ zum Doku-Verzeichnis, immer mit Schraegstrich.
+	// Path ist der Ort relativ zum Doku-Verzeichnis, immer mit Schrägstrich.
 	Path string `json:"path"`
-	// Title ist die erste Ueberschrift der Datei, ersatzweise der Dateiname.
+	// Title ist die erste Überschrift der Datei, ersatzweise der Dateiname.
 	Title string `json:"title"`
 }
 
@@ -33,13 +33,13 @@ func DocsDir(projectDir string) string {
 func ListDocs(projectDir string) ([]Doc, error) {
 	root := DocsDir(projectDir)
 	if !isDir(root) {
-		return nil, fmt.Errorf("%s fehlt; die Installation ist unvollstaendig", root)
+		return nil, fmt.Errorf("%s fehlt; die Installation ist unvollständig", root)
 	}
 
 	docs := []Doc{}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			// Ein unlesbarer Teilbaum darf die uebrige Liste nicht verhindern.
+			// Ein unlesbarer Teilbaum darf die übrige Liste nicht verhindern.
 			return nil
 		}
 		if entry.IsDir() {
@@ -92,9 +92,9 @@ func ReadDoc(projectDir string, rel string) (Doc, []byte, error) {
 	return Doc{Path: filepath.ToSlash(cleaned), Title: docTitle(path)}, content, nil
 }
 
-// docFilePath loest einen angefragten Pfad im Doku-Verzeichnis auf. Der Pfad
+// docFilePath löst einen angefragten Pfad im Doku-Verzeichnis auf. Der Pfad
 // kommt aus dem Browser: er muss relativ bleiben, im Verzeichnis liegen und
-// eine Markdown-Datei meinen. Alles andere waere ein Weg, beliebige Dateien des
+// eine Markdown-Datei meinen. Alles andere wäre ein Weg, beliebige Dateien des
 // Rechners zu lesen.
 func docFilePath(root string, rel string) (string, error) {
 	if strings.TrimSpace(rel) == "" {
@@ -114,8 +114,8 @@ func docFilePath(root string, rel string) (string, error) {
 	return path, nil
 }
 
-// docTitle nimmt die erste Ueberschrift der Datei. Sie beschreibt den Inhalt
-// besser als der Dateiname, der nur der Rueckfall ist.
+// docTitle nimmt die erste Überschrift der Datei. Sie beschreibt den Inhalt
+// besser als der Dateiname, der nur der Rückfall ist.
 func docTitle(path string) string {
 	fallback := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 

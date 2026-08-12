@@ -14,18 +14,18 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 ## Zweck
 
 - Bekannte CVEs in direkten und relevanten transitiven Dependencies sichtbar machen.
-- Tool-Severity von projektspezifischer Review-Prioritaet trennen.
-- Exploitability, Reachability-Hinweise und Upgrade-Aufwand fuer die Triage erfassen.
-- Ein `assessment.md` mit priorisierter Liste und ein statusfaehiges `findings.md` erzeugen.
+- Tool-Severity von projektspezifischer Review-Priorität trennen.
+- Exploitability, Reachability-Hinweise und Upgrade-Aufwand für die Triage erfassen.
+- Ein `assessment.md` mit priorisierter Liste und ein statusfähiges `findings.md` erzeugen.
 - Keine Dependency-Upgrades durch dieses Review.
 
 ## Voraussetzungen
 
 - Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
 - Lies `<playbook.dir>/scripts/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `pip-audit`, `trivy` und `grype`.
-- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn der Context-Aufruf fehlschlägt: abbrechen und `/k-gui` empfehlen.
 - Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
-- Pruefe `pip-audit --version`, `trivy --version` und `grype --version`.
+- Prüfe `pip-audit --version`, `trivy --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
   `bash <playbook.dir>/scripts/install-security-tools.sh` nennt den passenden
   Installationsbefehl.
@@ -39,24 +39,24 @@ Dieses Review schreibt in:
 Dateien:
 
 - `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollstaendiges, statusfaehiges Arbeitsregister.
+- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
 - `raw/pip-audit.json` - Python-CVE-Rohdaten, falls anwendbar.
 - `raw/trivy-fs.json` - Trivy-Filesystem-/Dependency-Rohdaten.
-- `raw/grype.json` - Grype-Rohdaten, falls ausgefuehrt.
+- `raw/grype.json` - Grype-Rohdaten, falls ausgeführt.
 - `run-metadata.json` - Befehle, Exit-Codes, Zeitpunkt, Scope, Tool-Versionen.
 
-Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und duerfen nach dem Schreiben nicht gekuerzt oder ueberschrieben werden.
+Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und dürfen nach dem Schreiben nicht gekürzt oder überschrieben werden.
 
-## Ausfuehrungsentscheidung
+## Ausführungsentscheidung
 
-Frage vor Tool-Ausfuehrung, was passieren soll:
+Frage vor Tool-Ausführung, was passieren soll:
 
 - **Vorhandene Raw-Ausgaben auswerten (Default)**: Keine neuen Scans.
-- **Dependency-CVE-Scan ausfuehren**: Nur nach Bestaetigung. Zeige vorher alle Befehle.
+- **Dependency-CVE-Scan ausführen**: Nur nach Bestätigung. Zeige vorher alle Befehle.
 - **Nur Preflight**: Pfade, Tools, erkannte Manifest-/Lockfiles und geplante Artefakte zeigen.
 - **Abbrechen**.
 
-Typische Befehle nach Bestaetigung:
+Typische Befehle nach Bestätigung:
 
 ```bash
 pip-audit --format json --output <result>/raw/pip-audit.json --path <PROJECT_REPO_ROOT_DIR>
@@ -64,17 +64,17 @@ trivy fs --format json --output <result>/raw/trivy-fs.json <PROJECT_REPO_ROOT_DI
 grype dir:<PROJECT_REPO_ROOT_DIR> -o json > <result>/raw/grype.json
 ```
 
-`pip-audit` nur ausfuehren, wenn Python-Manifeste oder Python-Lockfiles gefunden wurden. `grype` gehoert zur Pflicht-Toolchain; ob der konkrete Grype-Scan in diesem Review sinnvoll ist, haengt vom Scope und den vorhandenen Manifests/SBOMs ab.
+`pip-audit` nur ausführen, wenn Python-Manifeste oder Python-Lockfiles gefunden wurden. `grype` gehört zur Pflicht-Toolchain; ob der konkrete Grype-Scan in diesem Review sinnvoll ist, hängt vom Scope und den vorhandenen Manifests/SBOMs ab.
 
 ## Bewertungskriterien
 
-Tool-Severity allein ist nicht die Review-Prioritaet. Priorisiere nach:
+Tool-Severity allein ist nicht die Review-Priorität. Priorisiere nach:
 
 - P1: kritisch/hoch, remote ausnutzbar, produktionsnah, direkt erreichbar oder in Auth/Parsing/Network-Pfad.
 - P2: hohe oder mittlere CVEs in direkt genutzten Dependencies oder in zentralen Runtime-Komponenten.
 - P3: transitive CVEs ohne sichtbare Nutzung, Dev-/Test-only Dependencies, unklare oder niedrige Ausnutzbarkeit.
 
-Beruecksichtige:
+Berücksichtige:
 
 - Direkt vs. transitiv.
 - Manifest-/Lockfile-Quelle.
@@ -84,7 +84,7 @@ Beruecksichtige:
 
 Review-Status in `findings.md`:
 
-- `open` - neu oder noch nicht geprueft.
+- `open` - neu oder noch nicht geprüft.
 - `confirmed` - CVE betrifft eine relevante Dependency im Produktkontext.
 - `context-needed` - Reachability oder Laufzeitpfad unklar.
 - `likely-false-positive` - Tool-Mapping oder Umgebung wahrscheinlich nicht zutreffend.
@@ -95,7 +95,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 
 ## Assessment-Format
 
-`assessment.md` enthaelt mindestens:
+`assessment.md` enthält mindestens:
 
 ```markdown
 # Dependency-CVE Assessment - YYYY-MM-DD
@@ -116,7 +116,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 
 ## Bewertete Liste
 
-| Prio | Finding-ID | Status | Package | CVE | Betroffene Version | Fix-Version | Bewertung | Naechster Schritt |
+| Prio | Finding-ID | Status | Package | CVE | Betroffene Version | Fix-Version | Bewertung | Nächster Schritt |
 |---|---|---|---|---|---|---|---|---|
 
 ## Sofortige Triage-Reihenfolge
@@ -130,13 +130,13 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 
 ## Finding-Register-Format
 
-`findings.md` enthaelt pro dedupliziertem Befund:
+`findings.md` enthält pro dedupliziertem Befund:
 
 ```markdown
 ### depcve-001
 
 - Status: `open`
-- Prioritaet: `P1|P2|P3`
+- Priorität: `P1|P2|P3`
 - Package: ...
 - Version: ...
 - CVE/GHSA: ...
@@ -157,4 +157,4 @@ Nach Abschluss nennt `/k-review`:
 /k-remediation k-playbook-local/results/dependency-cve/YYYY-MM-DD/assessment.md
 ```
 
-Remediation und Dependency-Upgrades sind ausdruecklich nicht Teil dieses Reviews.
+Remediation und Dependency-Upgrades sind ausdrücklich nicht Teil dieses Reviews.

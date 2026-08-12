@@ -167,7 +167,7 @@ Feste Vorlage. Nichts erfinden was nicht da ist.
 ---
 type: Tool Reference
 title: <Name>
-description: Projektrelevante Pitfalls und Idiome fuer <Name>.
+description: Projektrelevante Pitfalls und Idiome für <Name>.
 tags: [library, <ecosystem>, <name>]
 status: stable
 generated: { by: k-tools-scan, at: <ISO-8601-datetime> }
@@ -223,8 +223,8 @@ sources:
 ```
 
 **Regeln:**
-- Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben fuer `/k-tools-scan` erhalten.
-- `sources` im Frontmatter nur fuer tatsaechlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
+- Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-tools-scan` erhalten.
+- `sources` im Frontmatter nur für tatsächlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
 - **Keine** Tutorials, keine „Getting Started"-Snippets.
 - Pitfalls sind **konkret** (mit Ursache und Symptom), nicht allgemein („kann Fehler werfen").
 - Wenn kein Pitfall gefunden — dann ehrliche Aussage: „Kein projektrelevanter Pitfall bekannt in dieser Version." Nicht Pitfalls erfinden.

@@ -3,10 +3,10 @@
 <!-- k-playbook:anstoss -->
 ## k-playbook
 
-Fuer dieses Projekt gilt k-playbook. Rufe zu Beginn
+Für dieses Projekt gilt k-playbook. Rufe zu Beginn
 
     k-playbook/bin/k-playbook context
 
 auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,
-bevor du arbeitest. Die Ausgabe nennt ausserdem die aufgeloesten Verzeichnisse und
-die effektiven Kataloge fuer Regeln, Reviews und Checks.
+bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
+die effektiven Kataloge für Regeln, Reviews und Checks.

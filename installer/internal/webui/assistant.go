@@ -6,8 +6,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// assistantResponse ist der Zustand der Verlinkung, wie ihn die Oberflaeche
-// braucht: Kontext, Einzelzustaende und ein Flag fuer die Button-Darstellung.
+// assistantResponse ist der Zustand der Verlinkung, wie ihn die Oberfläche
+// braucht: Kontext, Einzelzustände und ein Flag für die Button-Darstellung.
 type assistantResponse struct {
 	Environment project.Environment           `json:"environment"`
 	Entries     []project.LinkStatus          `json:"entries"`
@@ -21,7 +21,7 @@ func assistantHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // applyAssistantHandler richtet die Verlinkung ein. Ohne gefundene Config gibt
-// es kein Projekt, auf das sich die Aktion beziehen koennte.
+// es kein Projekt, auf das sich die Aktion beziehen könnte.
 func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -35,9 +35,9 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 	// Erst die Wurzeldatei: der Symlink CLAUDE.md braucht sie als Ziel.
 	message := "Verlinkung eingerichtet."
 	if _, err := project.ApplyRootInstructions(environment.ProjectDir); err != nil {
-		message = "Nicht vollstaendig eingerichtet: " + err.Error()
+		message = "Nicht vollständig eingerichtet: " + err.Error()
 	} else if _, err := project.ApplyLinks(environment.ProjectDir); err != nil {
-		message = "Nicht vollstaendig eingerichtet: " + err.Error()
+		message = "Nicht vollständig eingerichtet: " + err.Error()
 	}
 	writeJSON(w, http.StatusOK, assistantState(message))
 }
@@ -51,7 +51,7 @@ func assistantState(message string) assistantResponse {
 	case !environment.Installed:
 		if response.Message == "" {
 			response.Message = "Keine " + project.ConfigFileName + " gefunden (gesucht ab " +
-				project.DisplayPath(environment.SearchedFrom) + " aufwaerts)."
+				project.DisplayPath(environment.SearchedFrom) + " aufwärts)."
 		}
 
 	case !environment.PlaybookPresent:

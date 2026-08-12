@@ -44,7 +44,7 @@ Sie sind autoritativ für strukturelle Fragen – aber sie müssen aktuell bleib
 Die Doc-Dateien sind normales Markdown. Themen- und Tool-Referenzdateien nutzen
 leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`,
 `description`, `tags`, `status`, `generated`), damit Menschen und Agenten die
-Dateien nach Bedeutung, Status und Herkunft einordnen koennen. Der Einstieg
+Dateien nach Bedeutung, Status und Herkunft einordnen können. Der Einstieg
 bleibt `docs/README.md`.
 
 ## Sprache

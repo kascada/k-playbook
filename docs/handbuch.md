@@ -1,12 +1,12 @@
 # Handbuch
 
-Dieses Handbuch ist die kompakte Orientierung fuer k-playbook. Es beschreibt das
-Gesamtmodell und die normale Reihenfolge; Detailablaeufe stehen in den verlinkten
+Dieses Handbuch ist die kompakte Orientierung für k-playbook. Es beschreibt das
+Gesamtmodell und die normale Reihenfolge; Detailabläufe stehen in den verlinkten
 Themenseiten.
 
 ## Zweck
 
-`k-playbook` ist ein Werkzeugkasten fuer AI-Assistant-Arbeit: Slash-Commands, Skills,
+`k-playbook` ist ein Werkzeugkasten für AI-Assistant-Arbeit: Slash-Commands, Skills,
 Review-Rezepte, Regeln und Checks. Er wird in ein Unterverzeichnis des Projekts geklont,
 das er begleiten soll, und liegt dort neben den projekteigenen Artefakten.
 
@@ -16,26 +16,26 @@ Das Ziel ist kontrollierte, nachvollziehbare und wiederholbare Assistant-Arbeit:
 - Commands, Skills, Review-Rezepte, Regeln und Checks per `git pull` aktualisieren.
 - Tasks, Reviews und Ergebnisse an festen Orten ablegen.
 - Review-, Task- und Remediation-Flows auditierbar machen.
-- Docs als erste Quelle fuer spaetere AI-Sessions verankern.
+- Docs als erste Quelle für spätere AI-Sessions verankern.
 
 ## Grundmodell
 
-Ein Projekt besteht aus drei Teilen, die sich nie ueberlappen:
+Ein Projekt besteht aus drei Teilen, die sich nie überlappen:
 
 ```text
 projekt/
 ├── K-PLAYBOOK.yaml       der Anker; sein Ort bestimmt das Hauptverzeichnis
-├── k-playbook/           die Installation, vollstaendig ersetzbar
+├── k-playbook/           die Installation, vollständig ersetzbar
 └── k-playbook-local/     projekteigen, committed
 ```
 
-| Teil | Wem gehoert es | Was passiert beim Update |
+| Teil | Wem gehört es | Was passiert beim Update |
 |---|---|---|
-| `K-PLAYBOOK.yaml` | dem Projekt | bleibt unberuehrt |
-| `k-playbook/` | k-playbook | wird vollstaendig ersetzt |
-| `k-playbook-local/` | dem Projekt | bleibt unberuehrt |
+| `K-PLAYBOOK.yaml` | dem Projekt | bleibt unberührt |
+| `k-playbook/` | k-playbook | wird vollständig ersetzt |
+| `k-playbook-local/` | dem Projekt | bleibt unberührt |
 
-Weil die Konfiguration **neben** und nicht **in** der Installation liegt, enthaelt
+Weil die Konfiguration **neben** und nicht **in** der Installation liegt, enthält
 `k-playbook/` nichts Projekteigenes. Genau deshalb ist es komplett updatebar.
 
 ```mermaid
@@ -60,25 +60,25 @@ flowchart LR
 Es gibt keinen `paths:`-Block mehr. Jeder Ort leitet sich aus der Lage der
 `K-PLAYBOOK.yaml` ab: Tasks liegen unter `k-playbook-local/tasks/`, Ergebnisse unter
 `k-playbook-local/results/`, Projektwissen unter `k-playbook-local/docs/`, mitgelieferte
-Regeln unter `k-playbook/rules/`. Ein Command raet damit keinen Pfad und liest auch
+Regeln unter `k-playbook/rules/`. Ein Command rät damit keinen Pfad und liest auch
 keinen — er leitet ihn ab.
 
-Die vollstaendige Zuordnung steht in [`k-playbook-format.md`](./k-playbook-format.md).
+Die vollständige Zuordnung steht in [`k-playbook-format.md`](./k-playbook-format.md).
 
 ### Mitgeliefertes und Projekteigenes zusammenfassen
 
-Fuenf Verzeichnisse existieren doppelt: `rules/`, `reviews/`, `checks/`, `commands/` und
+Fünf Verzeichnisse existieren doppelt: `rules/`, `reviews/`, `checks/`, `commands/` und
 `skills/`. Was gilt, ist die Vereinigung beider Seiten. **Bei gleichem Namen gewinnt der
-projekteigene Eintrag, und zwar vollstaendig** — der mitgelieferte wird dann gar nicht
+projekteigene Eintrag, und zwar vollständig** — der mitgelieferte wird dann gar nicht
 erst gelesen.
 
-Abgeschaltet wird ueber einen **leeren** lokalen Eintrag: nichts ausser Leerzeilen und
+Abgeschaltet wird über einen **leeren** lokalen Eintrag: nichts außer Leerzeilen und
 Kommentaren. Damit kann die Datei ihren eigenen Grund tragen, und es braucht keine Liste
 in der Konfiguration.
 
 Bei Commands und Skills folgt daraus, wie die Assistenten verlinkt werden: `.claude/commands`
 und die drei anderen Ziele sind echte Verzeichnisse mit **einem Symlink je Eintrag**. Ein
-Verzeichnis-Symlink zeigt auf genau eine Quelle und koennte die zweite nie erreichen.
+Verzeichnis-Symlink zeigt auf genau eine Quelle und könnte die zweite nie erreichen.
 
 ### Eine Antwort, nicht viele
 
@@ -88,25 +88,25 @@ Was am Ende gilt, rechnet nicht jeder Command selbst aus:
 k-playbook/bin/k-playbook context
 ```
 
-Das Kommando gibt den aufgeloesten Arbeitsstand als JSON aus — Verzeichnisse,
+Das Kommando gibt den aufgelösten Arbeitsstand als JSON aus — Verzeichnisse,
 Instruktionsdateien in Lesereihenfolge, Remediation-Policy, Guidelines und die drei
-Kataloge, bereits zusammengefuehrt, mit Herkunft je Eintrag und markierten Abschaltungen.
+Kataloge, bereits zusammengeführt, mit Herkunft je Eintrag und markierten Abschaltungen.
 
-Eine Antwort heisst auch: einmal je Sitzung. Die Ausgabe aendert sich waehrend der Arbeit
-nicht, also holt der naechste Command sie nicht erneut, sondern arbeitet mit der
+Eine Antwort heißt auch: einmal je Sitzung. Die Ausgabe ändert sich während der Arbeit
+nicht, also holt der nächste Command sie nicht erneut, sondern arbeitet mit der
 vorhandenen weiter. Neu geholt wird sie erst, wenn die `K-PLAYBOOK.yaml` geschrieben
-wurde, sich der Bestand an Regeln, Reviews, Checks oder Guidelines geaendert hat oder die
+wurde, sich der Bestand an Regeln, Reviews, Checks oder Guidelines geändert hat oder die
 Arbeit in ein anderes Projekt gewechselt ist.
 
 ### Instruktionen in zwei Ebenen
 
-| Datei | Gilt fuer | Beim Update |
+| Datei | Gilt für | Beim Update |
 |---|---|---|
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
 
-Gelesen wird in dieser Reihenfolge; die projekteigene Ebene ergaenzt die mitgelieferte
-oder ueberstimmt sie. `AGENTS.md` im Hauptverzeichnis bekommt nur einen kurzen Anstoss,
+Gelesen wird in dieser Reihenfolge; die projekteigene Ebene ergänzt die mitgelieferte
+oder überstimmt sie. `AGENTS.md` im Hauptverzeichnis bekommt nur einen kurzen Anstoß,
 der auf `k-playbook context` verweist — vorhandener Inhalt bleibt unangetastet.
 
 ## Installation
@@ -118,8 +118,8 @@ k-playbook/bin/k-playbook
 ```
 
 Go wird nicht gebraucht — die Binaries liegen fertig im Repo. Der letzte Aufruf startet
-die Oberflaeche, die durch drei Schritte fuehrt: Konfiguration anlegen, projekteigene
-Struktur anlegen, Assistenten verlinken. Geschrieben wird jeweils erst nach Bestaetigung.
+die Oberfläche, die durch drei Schritte führt: Konfiguration anlegen, projekteigene
+Struktur anlegen, Assistenten verlinken. Geschrieben wird jeweils erst nach Bestätigung.
 
 ```mermaid
 flowchart TD
@@ -134,17 +134,17 @@ Details stehen in [`installation.md`](./installation.md).
 
 ## Wichtige Commands
 
-Der vollstaendige Index steht in [`commands.md`](./commands.md). Die Gruppen:
+Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 
 | Gruppe | Commands | Zweck |
 |---|---|---|
-| Projekt | `/k-gui`, `/k-status` | Oberflaeche starten, Projektzustand pruefen |
-| Docs | `/k-code2docs`, `/k-tools-scan` | Projektwissen fuer AI-Sessions dokumentieren |
-| Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausfuehren, Findings priorisieren und abarbeiten |
-| Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, pruefen und ausfuehren |
-| Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln pruefen, Tests diagnostizieren, Verlaeufe lesen, VS Code markieren |
+| Projekt | `/k-gui`, `/k-status` | Oberfläche starten, Projektzustand prüfen |
+| Docs | `/k-code2docs`, `/k-tools-scan` | Projektwissen für AI-Sessions dokumentieren |
+| Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausführen, Findings priorisieren und abarbeiten |
+| Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, prüfen und ausführen |
+| Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
 
-Neue oder geaenderte Commands werden erst nach einem Neustart des Assistenten sichtbar.
+Neue oder geänderte Commands werden erst nach einem Neustart des Assistenten sichtbar.
 
 ## Arbeitsflows
 
@@ -172,7 +172,7 @@ flowchart TD
 
 ### Task-Flow
 
-Fuer geplante Arbeit, die nicht in einem kurzen Chat-Schritt erledigt werden soll:
+Für geplante Arbeit, die nicht in einem kurzen Chat-Schritt erledigt werden soll:
 
 ```text
 /k-task-create
@@ -180,12 +180,12 @@ Fuer geplante Arbeit, die nicht in einem kurzen Chat-Schritt erledigt werden sol
 /k-run
 ```
 
-Tasks entstehen direkt aus dem Gespraech oder aus `/k-remediation`. Details stehen in
+Tasks entstehen direkt aus dem Gespräch oder aus `/k-remediation`. Details stehen in
 [`task-flow.md`](./task-flow.md).
 
 ### Code-Review-Flow
 
-Report-Reviews erzeugen auditierbare Artefakte und fuehren bei Bedarf in Remediation:
+Report-Reviews erzeugen auditierbare Artefakte und führen bei Bedarf in Remediation:
 
 ```text
 /k-review <name>
@@ -200,7 +200,7 @@ Der komplette Flow steht in [`code-review.md`](./code-review.md), das Artefaktmo
 
 ### Docs-First
 
-Projektwissen soll dokumentiert und fuer AI-Sessions registriert sein:
+Projektwissen soll dokumentiert und für AI-Sessions registriert sein:
 
 ```text
 /k-code2docs
@@ -212,16 +212,16 @@ Docs-Index und registriert `AGENTS.md`. `/k-tools-scan` legt Tool-Steckbriefe un
 `k-playbook-local/docs/libs/` ab. Danach den Assistenten neu starten, damit die neue
 Session-Memory greift.
 
-Was ein Projekt sonst noch an Dokumentation pflegt, bleibt davon unberuehrt — k-playbook
+Was ein Projekt sonst noch an Dokumentation pflegt, bleibt davon unberührt — k-playbook
 beansprucht nur sein eigenes Verzeichnis.
 
 ## Regeln und Checks
 
 Mitgelieferte Regeln liegen unter `k-playbook/rules/`, projekteigene unter
 `k-playbook-local/rules/`. Sie werden nicht automatisch auf jede Arbeit angewendet: der
-Skill `enforcement` oder der Command `/k-enforcement` zieht sie ausdruecklich heran.
+Skill `enforcement` oder der Command `/k-enforcement` zieht sie ausdrücklich heran.
 
-`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner fuer die
+`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner für die
 effektive Check-Menge aus mitgelieferten und projekteigenen `.sh`-Checks:
 
 ```bash
@@ -234,19 +234,19 @@ Details stehen in [`../checks/README.md`](../checks/README.md) und
 
 ## Betriebsregeln
 
-- Jedes Projekt traegt seine eigene Installation. Kein fester Hostpfad, kein globaler Symlink.
-- `k-playbook/` wird bei jedem Update vollstaendig ersetzt; alles daneben nie angefasst.
+- Jedes Projekt trägt seine eigene Installation. Kein fester Hostpfad, kein globaler Symlink.
+- `k-playbook/` wird bei jedem Update vollständig ersetzt; alles daneben nie angefasst.
 - Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per
   Overlay ab: gleichnamige lokale Datei ersetzt, eine leere schaltet ab.
 - Pfade werden abgeleitet, nicht geraten und nicht konfiguriert.
 - `K-PLAYBOOK.yaml` ist Konfiguration, keine Dokumentation. Eine vorhandene Datei wird
-  nie ueberschrieben.
+  nie überschrieben.
 - Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs.
-- Review-Rohdaten und Run-Metadaten sind auditierbar und werden nicht still ueberschrieben.
-- Groessere Remediation laeuft ueber Tasks, wenn die Projekt-Policy das verlangt.
-- Nach Aenderungen an Commands oder Skills den Assistenten neu starten.
+- Review-Rohdaten und Run-Metadaten sind auditierbar und werden nicht still überschrieben.
+- Größere Remediation läuft über Tasks, wenn die Projekt-Policy das verlangt.
+- Nach Änderungen an Commands oder Skills den Assistenten neu starten.
 
-## Weiterfuehrende Docs
+## Weiterführende Docs
 
 | Thema | Dokument |
 |---|---|

@@ -2,7 +2,7 @@
 name: review-iac-container
 title: IaC and Container Assessment
 interval-weeks: 4
-scope-hint: Trivy-/Syft-/Grype-Ergebnisse fuer Containerfiles, IaC, Compose, Images und Filesystem; keine Remediation aus diesem Review heraus
+scope-hint: Trivy-/Syft-/Grype-Ergebnisse für Containerfiles, IaC, Compose, Images und Filesystem; keine Remediation aus diesem Review heraus
 handoff: /k-remediation
 result-family: iac-container
 ---
@@ -16,16 +16,16 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 - Container-, IaC- und OS-/Image-Risiken priorisiert sichtbar machen.
 - Tool-Meldungen von projektspezifischer Review-Bewertung trennen.
 - Fehlkonfigurationen, kritische Base-Image-CVEs und riskante Dockerfile-/Compose-Muster bewerten.
-- Ein `assessment.md` mit priorisierter Liste und ein statusfaehiges `findings.md` erzeugen.
-- Keine Infrastruktur- oder Container-Aenderungen durch dieses Review.
+- Ein `assessment.md` mit priorisierter Liste und ein statusfähiges `findings.md` erzeugen.
+- Keine Infrastruktur- oder Container-Änderungen durch dieses Review.
 
 ## Voraussetzungen
 
 - Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
 - Lies `<playbook.dir>/scripts/security-tools.tsv` als kanonische Security-Tool-Matrix; dieses Review nutzt daraus `trivy`, `syft` und `grype`.
-- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn der Context-Aufruf fehlschlägt: abbrechen und `/k-gui` empfehlen.
 - Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
-- Pruefe `trivy --version`, `syft --version` und `grype --version`.
+- Prüfe `trivy --version`, `syft --version` und `grype --version`.
 - Wenn Pflicht-Tools fehlen: abbrechen und auf den Preflight verweisen:
   `bash <playbook.dir>/scripts/install-security-tools.sh` nennt den passenden
   Installationsbefehl.
@@ -39,26 +39,26 @@ Dieses Review schreibt in:
 Dateien:
 
 - `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollstaendiges, statusfaehiges Arbeitsregister.
+- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
 - `raw/trivy-fs.json` - Filesystem-/Dependency-/Secret-/Misconfig-Rohdaten, falls genutzt.
 - `raw/trivy-config.json` - IaC-/Config-Rohdaten, falls separat genutzt.
 - `raw/trivy-image-<name>.json` - Image-Rohdaten, falls Images gescannt wurden.
-- `raw/syft-<target>.json` - SBOM-Rohdaten, falls ausgefuehrt.
-- `raw/grype-<target>.json` - Grype-Rohdaten, falls ausgefuehrt.
+- `raw/syft-<target>.json` - SBOM-Rohdaten, falls ausgeführt.
+- `raw/grype-<target>.json` - Grype-Rohdaten, falls ausgeführt.
 - `run-metadata.json` - Befehle, Exit-Codes, Zeitpunkt, Scope, Tool-Versionen.
 
-Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und duerfen nach dem Schreiben nicht gekuerzt oder ueberschrieben werden.
+Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und dürfen nach dem Schreiben nicht gekürzt oder überschrieben werden.
 
-## Ausfuehrungsentscheidung
+## Ausführungsentscheidung
 
-Frage vor Tool-Ausfuehrung, was passieren soll:
+Frage vor Tool-Ausführung, was passieren soll:
 
 - **Vorhandene Raw-Ausgaben auswerten (Default)**: Keine neuen Scans.
-- **IaC/Container-Scan ausfuehren**: Nur nach Bestaetigung. Zeige vorher alle Befehle.
+- **IaC/Container-Scan ausführen**: Nur nach Bestätigung. Zeige vorher alle Befehle.
 - **Nur Preflight**: Pfade, Tools, erkannte Docker-/IaC-Dateien, Images und geplante Artefakte zeigen.
 - **Abbrechen**.
 
-Typische Befehle nach Bestaetigung:
+Typische Befehle nach Bestätigung:
 
 ```bash
 trivy fs --format json --output <result>/raw/trivy-fs.json <PROJECT_REPO_ROOT_DIR>
@@ -68,17 +68,17 @@ syft <target> -o json > <result>/raw/syft-<target>.json
 grype <target> -o json > <result>/raw/grype-<target>.json
 ```
 
-Image-Scans nur fuer explizit erkannte oder vom User bestaetigte Image-Refs ausfuehren. Keine Images bauen, pullen oder pushen, ausser der User bestaetigt genau diesen Schritt.
+Image-Scans nur für explizit erkannte oder vom User bestätigte Image-Refs ausführen. Keine Images bauen, pullen oder pushen, außer der User bestätigt genau diesen Schritt.
 
 ## Bewertungskriterien
 
-Prioritaet:
+Priorität:
 
 - P1: kritische Runtime-/Base-Image-CVEs mit produktionsnaher Exposition, Secrets in Image/Config, privilegierte Container, hostPath-/Docker-Socket-Mounts, Public-Exposure mit schwacher Auth.
 - P2: hohe CVEs in Runtime-Layern, root User ohne Grund, fehlende Read-only-/Capability-Reduktion, unsichere IaC-Defaults.
 - P3: Dev-only Images, Build-Stage-only CVEs, niedrigere Misconfig-Findings, fehlende Labels/Metadata ohne Sicherheitswirkung.
 
-Beruecksichtige:
+Berücksichtige:
 
 - Runtime vs. Build-only.
 - Produktivpfad vs. lokales Dev-Setup.
@@ -88,7 +88,7 @@ Beruecksichtige:
 
 Review-Status in `findings.md`:
 
-- `open` - neu oder noch nicht geprueft.
+- `open` - neu oder noch nicht geprüft.
 - `confirmed` - relevanter IaC-/Container-Befund.
 - `context-needed` - Deployment-Kontext oder Image-Nutzung unklar.
 - `likely-false-positive` - Tool-Mapping oder Zielkontext wahrscheinlich nicht zutreffend.
@@ -99,7 +99,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Assessment-Format
 
-`assessment.md` enthaelt mindestens:
+`assessment.md` enthält mindestens:
 
 ```markdown
 # IaC and Container Assessment - YYYY-MM-DD
@@ -120,7 +120,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Bewertete Liste
 
-| Prio | Finding-ID | Status | Typ | Target | Ort/Layer | Bewertung | Naechster Schritt |
+| Prio | Finding-ID | Status | Typ | Target | Ort/Layer | Bewertung | Nächster Schritt |
 |---|---|---|---|---|---|---|---|
 
 ## Sofortige Triage-Reihenfolge
@@ -134,13 +134,13 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Finding-Register-Format
 
-`findings.md` enthaelt pro dedupliziertem Befund:
+`findings.md` enthält pro dedupliziertem Befund:
 
 ```markdown
 ### iaccont-001
 
 - Status: `open`
-- Prioritaet: `P1|P2|P3`
+- Priorität: `P1|P2|P3`
 - Typ: `cve|misconfig|secret|license|sbom`
 - Tool(s): `trivy`, `syft`, `grype`
 - Target: ...
@@ -160,4 +160,4 @@ Nach Abschluss nennt `/k-review`:
 /k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/assessment.md
 ```
 
-Remediation und Infrastruktur-Aenderungen sind ausdruecklich nicht Teil dieses Reviews.
+Remediation und Infrastruktur-Änderungen sind ausdrücklich nicht Teil dieses Reviews.

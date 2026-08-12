@@ -7,8 +7,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// configResponse beschreibt den Konfigurationszustand fuer die Oberflaeche.
-// Ist noch nichts angelegt, traegt Suggestion die Vorbelegung des Formulars.
+// configResponse beschreibt den Konfigurationszustand für die Oberfläche.
+// Ist noch nichts angelegt, trägt Suggestion die Vorbelegung des Formulars.
 type configResponse struct {
 	Installed   bool                `json:"installed"`
 	ProjectDir  string              `json:"projectDir"`
@@ -30,7 +30,7 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, configState(""))
 }
 
-// createConfigHandler legt die K-PLAYBOOK.yaml an dem vom Nutzer bestaetigten
+// createConfigHandler legt die K-PLAYBOOK.yaml an dem vom Nutzer bestätigten
 // Ort an.
 func createConfigHandler(w http.ResponseWriter, r *http.Request) {
 	var request createConfigRequest
@@ -48,7 +48,7 @@ func createConfigHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // configState ermittelt den aktuellen Zustand. Gesucht wird ab dem
-// Arbeitsverzeichnis aufwaerts; erst wenn nichts gefunden wird, greift der
+// Arbeitsverzeichnis aufwärts; erst wenn nichts gefunden wird, greift der
 // aus dem Ort des Binaries abgeleitete Vorschlag.
 func configState(message string) configResponse {
 	environment := project.Detect()
@@ -62,7 +62,7 @@ func configState(message string) configResponse {
 		response.Suggestion = &suggestion
 		if response.Message == "" {
 			response.Message = "Noch keine " + project.ConfigFileName +
-				". Ort bestaetigen, dann wird sie angelegt."
+				". Ort bestätigen, dann wird sie angelegt."
 		}
 		return response
 	}
@@ -76,8 +76,8 @@ func configState(message string) configResponse {
 		response.Message = project.ConfigFileName + " nicht lesbar: " + err.Error()
 		return response
 	}
-	// Anders als bei `context` wird hier nicht abgebrochen: die Oberflaeche
-	// soll den Zustand zeigen koennen, gerade wenn etwas nicht stimmt.
+	// Anders als bei `context` wird hier nicht abgebrochen: die Oberfläche
+	// soll den Zustand zeigen können, gerade wenn etwas nicht stimmt.
 	if err := project.CheckSchema(config); err != nil && response.Message == "" {
 		response.Message = err.Error()
 	}

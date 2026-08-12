@@ -2,45 +2,45 @@
 name: review-dependabot-alerts
 title: GitHub Dependabot Alerts Assessment
 interval-weeks: 1
-scope-hint: Offene GitHub Dependabot Security Alerts fuer das aktuelle Repository; keine Dependency-Upgrades, keine Dependabot-PRs aus diesem Review heraus
+scope-hint: Offene GitHub Dependabot Security Alerts für das aktuelle Repository; keine Dependency-Upgrades, keine Dependabot-PRs aus diesem Review heraus
 handoff: /k-remediation
 result-family: dependabot-alerts
 ---
 
 # Review: GitHub Dependabot Alerts Assessment
 
-Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. Dieses Review ist fuer Projekte gedacht, bei denen GitHub/Dependabot die relevante Quelle fuer Dependency-Warnungen ist oder lokale Dependency-Scanner bewusst nicht genutzt werden.
+Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. Dieses Review ist für Projekte gedacht, bei denen GitHub/Dependabot die relevante Quelle für Dependency-Warnungen ist oder lokale Dependency-Scanner bewusst nicht genutzt werden.
 
 ## Zweck
 
 - GitHub Dependabot Alerts dauerhaft als Review-Artefakte sichern.
-- GitHub-/Advisory-Severity von projektspezifischer Review-Prioritaet trennen.
+- GitHub-/Advisory-Severity von projektspezifischer Review-Priorität trennen.
 - Viele Alerts zu handhabbaren Remediation-Clustern gruppieren, ohne einzelne Alert-IDs zu verlieren.
-- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfaehiges `findings.md` erzeugen.
-- Keine Dependency-Upgrades, keine Lockfile-Aenderungen und keine Dependabot-PR-Erzeugung durch dieses Review.
+- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfähiges `findings.md` erzeugen.
+- Keine Dependency-Upgrades, keine Lockfile-Änderungen und keine Dependabot-PR-Erzeugung durch dieses Review.
 
 ## Abgrenzung
 
-- Dieses Review konsumiert GitHub Dependabot Alerts ueber `gh api`.
-- Es ersetzt lokale Scans mit `pip-audit`, `trivy` oder `grype` nicht; diese gehoeren zu `/k-review dependency-cve`.
-- Wenn fuer ein Projekt GitHub Dependabot als Quelle der Wahrheit reicht, darf dieses Review statt lokaler Dependency-CVE-Scans genutzt werden.
+- Dieses Review konsumiert GitHub Dependabot Alerts über `gh api`.
+- Es ersetzt lokale Scans mit `pip-audit`, `trivy` oder `grype` nicht; diese gehören zu `/k-review dependency-cve`.
+- Wenn für ein Projekt GitHub Dependabot als Quelle der Wahrheit reicht, darf dieses Review statt lokaler Dependency-CVE-Scans genutzt werden.
 - `open-pull-requests-limit: 0` in `.github/dependabot.yml` ist kein Fehler, wenn das Projekt Alerts zuerst manuell triagieren will. Dieses Review darf das nicht als Finding melden.
 
 ## Voraussetzungen
 
 - Pfade kommen aus der Context-Ausgabe, die `/k-review` bereits geladen hat: `RESULTS_DIR` = `<local.dir>/results`.
-- Wenn der Context-Aufruf fehlschlaegt: abbrechen und `/k-gui` empfehlen.
+- Wenn der Context-Aufruf fehlschlägt: abbrechen und `/k-gui` empfehlen.
 - Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` nennen; dieses Review braucht ein Ergebnisverzeichnis.
 - Lies optional `tools.dependabot` aus `K-PLAYBOOK.yaml`, falls vorhanden.
 - Wenn vorhanden, nutze `tools.dependabot.target` als Git-/App-Root und `tools.dependabot.repo` als GitHub `owner/repo`. Wenn `target` fehlt, gilt `.`. Wenn `repo` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
-- Wenn `tools.dependabot.config` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
-- Pruefe `gh` aus der Context-Ausgabe, bevor der erste `gh api`-Aufruf ansteht: bei
+- Wenn `tools.dependabot.config` gesetzt ist, prüfe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
+- Prüfe `gh` aus der Context-Ausgabe, bevor der erste `gh api`-Aufruf ansteht: bei
   `gh.status: disabled` abbrechen mit dem Hinweis, dass dieses Projekt gh nicht nutzt;
-  bei `gh.status: unknown` abbrechen und `/k-gui` nennen, wo die Entscheidung faellt;
+  bei `gh.status: unknown` abbrechen und `/k-gui` nennen, wo die Entscheidung fällt;
   bei `gh.ready: false` abbrechen und benennen, was fehlt — Installation oder
   `gh auth login --hostname github.com`.
-- Pruefe, dass das Ziel ein Git-Repo mit GitHub-Remote ist oder der User `owner/repo` explizit vorgibt.
-- Wenn die Dependabot-Alerts-API `404` liefert: nicht als "keine Alerts" werten. Moegliche Ursachen dokumentieren: fehlende Berechtigung, Dependabot Alerts nicht aktiviert, falsches Repository oder private-Repo-Policy.
+- Prüfe, dass das Ziel ein Git-Repo mit GitHub-Remote ist oder der User `owner/repo` explizit vorgibt.
+- Wenn die Dependabot-Alerts-API `404` liefert: nicht als "keine Alerts" werten. Mögliche Ursachen dokumentieren: fehlende Berechtigung, Dependabot Alerts nicht aktiviert, falsches Repository oder private-Repo-Policy.
 
 ## Ergebnisverzeichnis
 
@@ -51,23 +51,23 @@ Dieses Review schreibt in:
 Dateien:
 
 - `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste und Remediation-Clustern.
-- `findings.md` - vollstaendiges, statusfaehiges Arbeitsregister aller importierten Alert-Findings.
+- `findings.md` - vollständiges, statusfähiges Arbeitsregister aller importierten Alert-Findings.
 - `raw/dependabot-alerts-open.jsonl` - auditierbare Original-Alerts, ein GitHub-Alert pro JSON-Zeile.
-- `raw/dependabot-alerts-summary.tsv` - optionale tabellarische Arbeitskopie fuer schnelle Sichtung.
+- `raw/dependabot-alerts-summary.tsv` - optionale tabellarische Arbeitskopie für schnelle Sichtung.
 - `run-metadata.json` - Repo, Branch, API-Endpoint, Befehle, Exit-Codes, Zeitpunkt, `gh`-Account und Filter.
 
-Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und duerfen nach dem Schreiben nicht gekuerzt oder ueberschrieben werden. Bei erneutem Lauf am selben Tag eindeutige Dateinamen verwenden, z. B. `dependabot-alerts-open-2.jsonl` und `run-metadata-2.json`.
+Raw-Artefakte und Run-Metadaten sind append-only/auditierbar und dürfen nach dem Schreiben nicht gekürzt oder überschrieben werden. Bei erneutem Lauf am selben Tag eindeutige Dateinamen verwenden, z. B. `dependabot-alerts-open-2.jsonl` und `run-metadata-2.json`.
 
-## Ausfuehrungsentscheidung
+## Ausführungsentscheidung
 
 Frage vor GitHub-API-Aufrufen, was passieren soll:
 
 - **Vorhandene Raw-Ausgaben auswerten (Default)**: Nutzt `raw/dependabot-alerts-*.jsonl` oder explizit angegebene JSON/JSONL-Dateien. Keine neue GitHub-Abfrage.
-- **GitHub Dependabot Alerts importieren**: Nur nach Bestaetigung. Zeige vorher Repo-Slug, State-Filter und Befehle.
+- **GitHub Dependabot Alerts importieren**: Nur nach Bestätigung. Zeige vorher Repo-Slug, State-Filter und Befehle.
 - **Nur Preflight**: Pfade, GitHub-Repo, `gh`-Auth und geplante Artefakte zeigen.
 - **Abbrechen**.
 
-Typische Befehle nach Bestaetigung:
+Typische Befehle nach Bestätigung:
 
 ```bash
 gh repo view <owner>/<repo> --json owner,name,url,defaultBranchRef
@@ -83,13 +83,13 @@ Wenn der User explizit dismissed/fixed Alerts einbeziehen will, `state=all` verw
 
 ## Bewertungskriterien
 
-GitHub-Severity allein ist nicht die Review-Prioritaet. Priorisiere nach:
+GitHub-Severity allein ist nicht die Review-Priorität. Priorisiere nach:
 
 - P1: `critical` oder remote ausnutzbare `high` Alerts in Runtime-/Produktionsdependencies, Auth/Crypto/Parser/Network-Pfaden oder direkt genutzten Paketen.
 - P2: hohe Alerts in direkten Dependencies, produktionsnahen transitiven Dependencies oder zentralen Build-/Runtime-Komponenten mit klarem Fix.
 - P3: Dev-only, Build-only oder transitive Alerts ohne sichtbaren Produktpfad, niedrige Severity, aggregierte Altlasten ohne akute Exposition.
 
-Beruecksichtige:
+Berücksichtige:
 
 - Manifest-/Lockfile-Quelle.
 - Ecosystem (`pip`, `npm`, `github-actions`, ...).
@@ -101,7 +101,7 @@ Beruecksichtige:
 
 Review-Status in `findings.md`:
 
-- `open` - neu oder noch nicht geprueft.
+- `open` - neu oder noch nicht geprüft.
 - `confirmed` - Alert betrifft eine relevante Dependency im Projektkontext.
 - `context-needed` - Reachability, Runtime-Pfad oder Upgrade-Auswirkung unklar.
 - `likely-false-positive` - Alert-Mapping oder Zielkontext wahrscheinlich nicht zutreffend.
@@ -111,14 +111,14 @@ Review-Status in `findings.md`:
 ## Deduplizierung und Cluster
 
 - Finding-ID ist stabil aus der GitHub-Alert-Nummer: `depbot-<alert-number>`, z. B. `depbot-81`.
-- Einzelne GitHub-Alerts werden im `findings.md` nicht zusammengelegt, weil Alert-Nummern, GHSA/CVE und GitHub-URLs fuer Audit und Status wichtig sind.
+- Einzelne GitHub-Alerts werden im `findings.md` nicht zusammengelegt, weil Alert-Nummern, GHSA/CVE und GitHub-URLs für Audit und Status wichtig sind.
 - Das `assessment.md` darf Alerts zu Remediation-Clustern gruppieren, z. B. `Django in requirements.txt auf 5.2.15+`, `Pillow auf 12.3.0+`, `Vite/PostCSS im Frontend-Lockfile`.
 - Wenn mehrere Alerts dasselbe Paket, Manifest und dieselbe Fix-Version betreffen, im Assessment als ein Upgrade-/Triage-Punkt behandeln und alle `depbot-*` IDs referenzieren.
 - Alerts ohne Fix-Version bleiben eigene Cluster mit `context-needed`, sofern kein bekannter Workaround oder akzeptiertes Restrisiko dokumentiert ist.
 
 ## Assessment-Format
 
-`assessment.md` enthaelt mindestens:
+`assessment.md` enthält mindestens:
 
 ```markdown
 # GitHub Dependabot Alerts Assessment - YYYY-MM-DD
@@ -144,10 +144,10 @@ Review-Status in `findings.md`:
 
 ## Bewertete Remediation-Cluster
 
-| Prio | Cluster | Alert-IDs | Package(s) | Manifest(e) | Fix-Version(en) | Bewertung | Naechster Schritt |
+| Prio | Cluster | Alert-IDs | Package(s) | Manifest(e) | Fix-Version(en) | Bewertung | Nächster Schritt |
 |---|---|---|---|---|---|---|---|
 
-## Einzelalert-Uebersicht
+## Einzelalert-Übersicht
 
 | Alert | Prio | Status | Severity | Package | Manifest | Scope | Direct/Transitive | GHSA/CVE | Fix | URL |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -163,13 +163,13 @@ Review-Status in `findings.md`:
 
 ## Finding-Register-Format
 
-`findings.md` enthaelt pro GitHub-Alert:
+`findings.md` enthält pro GitHub-Alert:
 
 ```markdown
 ### depbot-81
 
 - Status: `open`
-- Prioritaet: `P1|P2|P3`
+- Priorität: `P1|P2|P3`
 - GitHub Alert: `81`
 - URL: `https://github.com/<owner>/<repo>/security/dependabot/81`
 - Ecosystem: `pip|npm|...`
@@ -196,4 +196,4 @@ Nach Abschluss nennt `/k-review`:
 /k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/assessment.md
 ```
 
-Remediation, Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdruecklich nicht Teil dieses Reviews.
+Remediation, Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdrücklich nicht Teil dieses Reviews.

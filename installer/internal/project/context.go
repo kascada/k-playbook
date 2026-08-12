@@ -6,20 +6,26 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
-// Context ist der aufgeloeste Arbeitsstand eines Projekts: alles, was ein
+// Context ist der aufgelöste Arbeitsstand eines Projekts: alles, was ein
 // Command sonst selbst aus Konfiguration und Dateisystem zusammenrechnen
-// muesste.
+// müsste.
 //
 // Die Security-Tools fehlen bewusst. Ihr Preflight ruft je Tool ein --version
-// auf und dauert spuerbar; dieser Aufruf soll billig genug sein, um am Anfang
+// auf und dauert spürbar; dieser Aufruf soll billig genug sein, um am Anfang
 // jedes Commands zu stehen.
 type Context struct {
 	SchemaVersion string `json:"schemaVersion"`
+	// Now ist der Zeitpunkt dieses Aufrufs. Er steht hier, weil Commands Daten
+	// in Dateien schreiben, die bleiben — Review-Logs, Ergebnisverzeichnisse.
+	// Ein Assistent, dem sein Wirt kein Datum nennt, müsste sonst raten, und
+	// ein geratenes Datum in einem Protokoll ist schlechter als keines.
+	Now ContextNow `json:"now"`
 	// Instructions sind die Dateien, die vor der Arbeit zu lesen sind, in
-	// dieser Reihenfolge: erst was fuer alle k-playbook-Projekte gilt, dann was
-	// dieses Projekt ergaenzt.
+	// dieser Reihenfolge: erst was für alle k-playbook-Projekte gilt, dann was
+	// dieses Projekt ergänzt.
 	Instructions []string       `json:"instructions"`
 	Project      ContextProject `json:"project"`
 	Playbook     ContextDir     `json:"playbook"`
@@ -33,13 +39,13 @@ type Context struct {
 	Guidelines []string                  `json:"guidelines"`
 }
 
-// InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heisst bewusst
+// InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heißt bewusst
 // nicht AGENTS.md: diesen Namen lesen die Assistenten von sich aus, und er ist
 // dem Hauptverzeichnis vorbehalten.
 const InstructionsFileName = "k-playbook.md"
 
 // instructionFiles sammelt die vorhandenen Instruktionsdateien in Lesereihenfolge.
-// Was fehlt, faellt weg — ein Pfad ins Leere waere schlechter als keiner.
+// Was fehlt, fällt weg — ein Pfad ins Leere wäre schlechter als keiner.
 func instructionFiles(playbookDir string, localDir string) []string {
 	files := []string{}
 	for _, dir := range []string{playbookDir, localDir} {
@@ -56,18 +62,43 @@ type ContextProject struct {
 	RepoRoot string `json:"repoRoot"`
 	VCS      string `json:"vcs"`
 	Config   string `json:"config"`
+	// Languages sind die Sprachen, für die dieses Projekt Werkzeuge braucht.
+	// Steht nichts in der Konfiguration, gilt DefaultLanguages — der Wert ist
+	// also immer belegt und muss nicht ausgelegt werden.
+	Languages []string `json:"languages"`
 }
 
 type ContextDir struct {
 	Dir string `json:"dir"`
 }
 
-// CatalogEntry ist ein aufgeloester Eintrag einer der drei Overlay-Sorten.
+// ContextNow ist der Zeitpunkt des Aufrufs in der Zeitzone des Rechners.
+//
+// Date ist der häufige Fall und deshalb fertig ausgeschnitten: Datumsstempel
+// in Protokollen und Namen von Ergebnisverzeichnissen. Timestamp trägt
+// zusätzlich Uhrzeit und Zeitzonenversatz, für alles Genauere.
+type ContextNow struct {
+	Date      string `json:"date"`
+	Timestamp string `json:"timestamp"`
+}
+
+// now ist ausgelagert, damit Tests einen festen Zeitpunkt setzen können.
+var now = time.Now
+
+func buildNow() ContextNow {
+	at := now()
+	return ContextNow{
+		Date:      at.Format("2006-01-02"),
+		Timestamp: at.Format(time.RFC3339),
+	}
+}
+
+// CatalogEntry ist ein aufgelöster Eintrag einer der drei Overlay-Sorten.
 type CatalogEntry struct {
 	// Name ist der Dateiname und zugleich die Vergleichseinheit zwischen
 	// mitgeliefert und projekteigen.
 	Name string `json:"name"`
-	// Key ist der handliche Aufrufname: ohne Endung und ohne Sortenpraefix.
+	// Key ist der handliche Aufrufname: ohne Endung und ohne Sortenpräfix.
 	Key  string `json:"key"`
 	Path string `json:"path"`
 	// Origin: dist, local oder override.
@@ -98,7 +129,7 @@ func BuildContext(projectDir string) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
-	// Bei unbekannter Fassung wird abgebrochen statt geraten: die Werte liessen
+	// Bei unbekannter Fassung wird abgebrochen statt geraten: die Werte ließen
 	// sich lesen, bedeuteten aber etwas anderes.
 	if err := CheckSchema(config); err != nil {
 		return Context{}, err
@@ -108,8 +139,14 @@ func BuildContext(projectDir string) (Context, error) {
 		return Context{}, err
 	}
 	// Ein unbekannter Wert bricht ab, statt als „nicht entschieden" durchzugehen:
-	// ein Tippfehler wuerde sonst wie eine Entscheidung aussehen.
+	// ein Tippfehler würde sonst wie eine Entscheidung aussehen.
 	gh, err := GHState(projectDir)
+	if err != nil {
+		return Context{}, err
+	}
+	// Aus demselben Grund: ein unzulässiger Sprachname bricht ab, statt still
+	// zu verschwinden und die Werkzeugauswahl unbemerkt zu verschieben.
+	languages, _, err := ReadLanguages(projectDir)
 	if err != nil {
 		return Context{}, err
 	}
@@ -119,12 +156,14 @@ func BuildContext(projectDir string) (Context, error) {
 
 	context := Context{
 		SchemaVersion: config.SchemaVersion,
+		Now:           buildNow(),
 		Instructions:  instructionFiles(playbookDir, localDir),
 		Project: ContextProject{
-			Dir:      projectDir,
-			RepoRoot: RepoRootDir(projectDir, config),
-			VCS:      config.VCS,
-			Config:   ConfigPath(projectDir),
+			Dir:       projectDir,
+			RepoRoot:  RepoRootDir(projectDir, config),
+			VCS:       config.VCS,
+			Config:    ConfigPath(projectDir),
+			Languages: languages,
 		},
 		Playbook:    ContextDir{Dir: playbookDir},
 		Local:       ContextDir{Dir: localDir},
@@ -144,11 +183,11 @@ func BuildContext(projectDir string) (Context, error) {
 	return context, nil
 }
 
-// resolveCatalog fuehrt mitgelieferte und projekteigene Eintraege zusammen.
+// resolveCatalog führt mitgelieferte und projekteigene Einträge zusammen.
 //
 // Vergleichseinheit ist der Dateiname: beide Seiten benutzen dieselbe
 // Namenskonvention. Ein projekteigener Eintrag ersetzt den gleichnamigen
-// mitgelieferten vollstaendig; ist er leer, gilt der Eintrag als abgeschaltet.
+// mitgelieferten vollständig; ist er leer, gilt der Eintrag als abgeschaltet.
 func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []CatalogEntry {
 	shipped := catalogFiles(shippedDir, kind)
 	local := catalogFiles(localDir, kind)
@@ -183,7 +222,7 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 	return entries
 }
 
-// catalogFiles liest ein Katalogverzeichnis, ohne Nicht-Eintraege.
+// catalogFiles liest ein Katalogverzeichnis, ohne Nicht-Einträge.
 func catalogFiles(dir string, kind catalogKind) map[string]string {
 	files := map[string]string{}
 
@@ -193,7 +232,7 @@ func catalogFiles(dir string, kind catalogKind) map[string]string {
 	}
 	for _, entry := range entries {
 		name := entry.Name()
-		// Unterverzeichnisse wie lib/ enthalten Hilfscode, keine Eintraege.
+		// Unterverzeichnisse wie lib/ enthalten Hilfscode, keine Einträge.
 		if entry.IsDir() || !isCatalogEntry(name, kind) {
 			continue
 		}
@@ -214,13 +253,13 @@ func isCatalogEntry(name string, kind catalogKind) bool {
 	return kind.prefix == "" || strings.HasPrefix(name, kind.prefix)
 }
 
-// catalogKey bildet den Aufrufnamen: ohne Endung, ohne Sortenpraefix.
+// catalogKey bildet den Aufrufnamen: ohne Endung, ohne Sortenpräfix.
 func catalogKey(name string, kind catalogKind) string {
 	return strings.TrimPrefix(strings.TrimSuffix(name, kind.suffix), kind.prefix)
 }
 
-// isEmptyFile meldet, ob eine Datei ausser Leerzeilen und Kommentaren nichts
-// enthaelt. So kann eine abgeschaltete Datei ihren Grund tragen.
+// isEmptyFile meldet, ob eine Datei außer Leerzeilen und Kommentaren nichts
+// enthält. So kann eine abgeschaltete Datei ihren Grund tragen.
 func isEmptyFile(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -260,7 +299,7 @@ func listFiles(dir string) []string {
 func ContextForDir(startDir string) (Context, error) {
 	projectDir, err := Discover(startDir)
 	if err != nil {
-		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwaerts)", ConfigFileName, startDir)
+		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
 	}
 	return BuildContext(projectDir)
 }

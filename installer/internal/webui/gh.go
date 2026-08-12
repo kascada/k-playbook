@@ -10,8 +10,8 @@ import (
 // ghResponse ist die Entscheidung zur GitHub CLI samt Host-Befund.
 //
 // Geschrieben wird hier nur die Entscheidung. Installation und Anmeldung bleiben
-// im Terminal: beides veraendert den Host und nicht das Projekt, und `gh auth
-// login` will ohnehin einen Browser. Die Oberflaeche zeigt dafuer den Befehl.
+// im Terminal: beides verändert den Host und nicht das Projekt, und `gh auth
+// login` will ohnehin einen Browser. Die Oberfläche zeigt dafür den Befehl.
 type ghResponse struct {
 	Available bool               `json:"available"`
 	Current   project.GH         `json:"current"`
@@ -81,8 +81,8 @@ func ghState(message string) ghResponse {
 	return response
 }
 
-// ghCommandSet nennt fuer jeden Zustand den passenden Befehl. Der
-// Installationsbefehl haengt am Paketmanager des Rechners; statt zu raten,
+// ghCommandSet nennt für jeden Zustand den passenden Befehl. Der
+// Installationsbefehl hängt am Paketmanager des Rechners; statt zu raten,
 // verweist er auf die Anleitung.
 func ghCommandSet() ghCommands {
 	return ghCommands{

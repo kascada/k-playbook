@@ -9,16 +9,16 @@ import (
 )
 
 // GHHost ist der Host, um den es geht. Bewusst nur einer: Enterprise-Instanzen
-// haetten eigene Accounts je Host und eine eigene Entscheidung je Projekt; das
-// waere ein anderes Feature als das hier.
+// hätten eigene Accounts je Host und eine eigene Entscheidung je Projekt; das
+// wäre ein anderes Feature als das hier.
 const GHHost = "github.com"
 
 // GHStatus ist die Projektentscheidung zur GitHub CLI.
 type GHStatus string
 
 const (
-	// GHUnknown: noch nicht entschieden. Ausdruecklicher Zustand, kein
-	// stillschweigendes Nein — die Oberflaeche zeigt ihn als offenen Punkt.
+	// GHUnknown: noch nicht entschieden. Ausdrücklicher Zustand, kein
+	// stillschweigendes Nein — die Oberfläche zeigt ihn als offenen Punkt.
 	GHUnknown GHStatus = "unknown"
 	// GHEnabled: das Projekt setzt gh voraus.
 	GHEnabled GHStatus = "enabled"
@@ -29,21 +29,21 @@ const (
 // DefaultGHStatus gilt, solange nichts in der Datei steht.
 const DefaultGHStatus = GHUnknown
 
-// GHChoice beschreibt eine Entscheidung fuer die Auswahl in der Oberflaeche.
+// GHChoice beschreibt eine Entscheidung für die Auswahl in der Oberfläche.
 type GHChoice struct {
 	Status      GHStatus `json:"status"`
 	Label       string   `json:"label"`
 	Description string   `json:"description"`
 }
 
-// GHChoices sind die waehlbaren Entscheidungen. `unknown` fehlt bewusst: es ist
+// GHChoices sind die wählbaren Entscheidungen. `unknown` fehlt bewusst: es ist
 // der Ausgangszustand, keine Wahl.
 func GHChoices() []GHChoice {
 	return []GHChoice{
 		{
 			Status:      GHEnabled,
 			Label:       "gh wird genutzt",
-			Description: "Commands wie /k-pr-review und das Dependabot-Review duerfen gh voraussetzen und brechen ab, wenn es fehlt oder keine Anmeldung besteht.",
+			Description: "Commands wie /k-pr-review und das Dependabot-Review dürfen gh voraussetzen und brechen ab, wenn es fehlt oder keine Anmeldung besteht.",
 		},
 		{
 			Status:      GHDisabled,
@@ -62,31 +62,31 @@ func ValidGHStatus(status GHStatus) bool {
 	return false
 }
 
-// GH ist der zusammengefuehrte Zustand: die Projektentscheidung aus der
+// GH ist der zusammengeführte Zustand: die Projektentscheidung aus der
 // Konfiguration und der Host-Befund.
 //
-// Beides gehoert zusammen in eine Antwort, aber nicht in dieselbe Datei: die
-// Entscheidung ist versioniert, der Befund gilt nur fuer diesen Rechner.
+// Beides gehört zusammen in eine Antwort, aber nicht in dieselbe Datei: die
+// Entscheidung ist versioniert, der Befund gilt nur für diesen Rechner.
 type GH struct {
 	Host string `json:"host"`
 	// Status ist die Projektentscheidung aus tools.gh.status.
 	Status GHStatus `json:"status"`
 	// Configured meldet, ob der Wert in der Datei stand. Ohne Eintrag gilt
-	// unknown, und die Oberflaeche kann das als offenen Punkt zeigen.
+	// unknown, und die Oberfläche kann das als offenen Punkt zeigen.
 	Configured bool `json:"configured"`
 	// Installed und Path sind der Host-Befund.
 	Installed bool   `json:"installed"`
 	Path      string `json:"path"`
-	// LoggedIn ist aus der gh-Konfiguration gelesen, nicht geprueft: ein
-	// hinterlegter Token kann abgelaufen oder zurueckgezogen sein. Wer Gewissheit
+	// LoggedIn ist aus der gh-Konfiguration gelesen, nicht geprüft: ein
+	// hinterlegter Token kann abgelaufen oder zurückgezogen sein. Wer Gewissheit
 	// braucht, ruft `gh auth status` auf — das kostet einen Netzzugriff.
 	LoggedIn bool `json:"loggedIn"`
-	// Account ist der aktive Account fuer Host. Leer bei Anmeldung ueber die
+	// Account ist der aktive Account für Host. Leer bei Anmeldung über die
 	// Umgebung: dort steht nur ein Token, kein Name.
 	Account string `json:"account"`
 	// Accounts sind alle hinterlegten Accounts, der aktive zuerst.
 	Accounts []string `json:"accounts"`
-	// TokenFromEnv meldet eine Anmeldung ueber GH_TOKEN oder GITHUB_TOKEN. Die
+	// TokenFromEnv meldet eine Anmeldung über GH_TOKEN oder GITHUB_TOKEN. Die
 	// sticht die Konfigurationsdatei, deshalb steht sie hier eigens.
 	TokenFromEnv bool `json:"tokenFromEnv"`
 	// Ready fasst zusammen, was ein Command wissen muss: gh ist da und angemeldet.
@@ -104,8 +104,8 @@ func ReadGH(projectDir string) (GHStatus, bool, error) {
 
 // parseGHStatus liest tools.gh.status zeilenweise. Wie beim Rest der
 // Konfiguration bewusst ohne YAML-Parser: gelesen wird ein Skalar, und
-// Kommentare, Reihenfolge und unbekannte Bloecke bleiben unangetastet, wenn
-// spaeter zurueckgeschrieben wird.
+// Kommentare, Reihenfolge und unbekannte Blöcke bleiben unangetastet, wenn
+// später zurückgeschrieben wird.
 func parseGHStatus(content string) (GHStatus, bool, error) {
 	inTools := false
 	toolsIndent := -1
@@ -133,7 +133,7 @@ func parseGHStatus(content string) (GHStatus, bool, error) {
 		if !inTools {
 			continue
 		}
-		// Zurueck auf die Ebene der Tool-Namen: der gh-Block ist zu Ende.
+		// Zurück auf die Ebene der Tool-Namen: der gh-Block ist zu Ende.
 		if ghIndent >= 0 && indent <= ghIndent {
 			ghIndent = -1
 		}
@@ -157,7 +157,7 @@ func parseGHStatus(content string) (GHStatus, bool, error) {
 // SetGHStatus schreibt die Projektentscheidung nach tools.gh.status.
 //
 // Ersetzt wird nur der gh-Block. Ein danebenliegender Block eines anderen Tools
-// bleibt unberuehrt.
+// bleibt unberührt.
 func SetGHStatus(projectDir string, status GHStatus) error {
 	if !ValidGHStatus(status) {
 		return fmt.Errorf("unbekannter gh-Status: %s", status)
@@ -177,7 +177,7 @@ func ghBlock(status GHStatus) string {
 	return fmt.Sprintf(`  gh:
     # Soll die GitHub CLI genutzt werden? unknown, enabled oder disabled.
     # Ob gh auf diesem Rechner liegt, steht bewusst nicht hier: das ist ein
-    # Host-Befund und gehoert in die Kontextausgabe.
+    # Host-Befund und gehört in die Kontextausgabe.
     status: %s
 `, status)
 }
@@ -185,7 +185,7 @@ func ghBlock(status GHStatus) string {
 // DetectGH liest den Host-Befund: liegt gh im PATH, und ist ein Account
 // hinterlegt.
 //
-// Bewusst ohne Aufruf von `gh auth status`: der prueft den Token beim Server und
+// Bewusst ohne Aufruf von `gh auth status`: der prüft den Token beim Server und
 // kostet einen Netzzugriff. Dieser Befund soll billig genug sein, um in der
 // Kontextausgabe zu stehen.
 func DetectGH() GH {
@@ -202,7 +202,7 @@ func DetectGH() GH {
 	state.LoggedIn = len(accounts) > 0
 
 	// Ein Token in der Umgebung sticht die Konfigurationsdatei. Ohne diesen Fall
-	// meldete die Oberflaeche „nicht angemeldet", waehrend gh laeuft.
+	// meldete die Oberfläche „nicht angemeldet", während gh läuft.
 	if ghTokenFromEnv() {
 		state.TokenFromEnv = true
 		state.LoggedIn = true
@@ -212,7 +212,7 @@ func DetectGH() GH {
 	return state
 }
 
-// GHState fuehrt Entscheidung und Befund zusammen.
+// GHState führt Entscheidung und Befund zusammen.
 func GHState(projectDir string) (GH, error) {
 	state := DetectGH()
 	status, configured, err := ReadGH(projectDir)
@@ -245,10 +245,10 @@ func ghConfigDir() string {
 	return filepath.Join(home, ".config", "gh")
 }
 
-// readGHHosts liest die Accounts fuer GHHost aus hosts.yml.
+// readGHHosts liest die Accounts für GHHost aus hosts.yml.
 //
 // Gelesen werden nur `user` und die Namen unter `users`. Die Token-Zeilen daneben
-// werden uebergangen und tauchen nirgends in einer Antwort auf.
+// werden übergangen und tauchen nirgends in einer Antwort auf.
 func readGHHosts(configDir string) (string, []string) {
 	if configDir == "" {
 		return "", []string{}
@@ -292,7 +292,7 @@ func parseGHHosts(content string) (string, []string) {
 		}
 
 		// Innerhalb von `users` stehen die Accountnamen; alles tiefer darunter
-		// gehoert zum jeweiligen Account und interessiert hier nicht.
+		// gehört zum jeweiligen Account und interessiert hier nicht.
 		if usersIndent >= 0 {
 			if indent > usersIndent {
 				if accountIndent < 0 {
@@ -315,8 +315,8 @@ func parseGHHosts(content string) (string, []string) {
 		}
 	}
 
-	// Aeltere gh-Fassungen kennen keinen users-Block; dort ist `user` der einzige
-	// Account. Und der aktive gehoert nach vorn, damit die Oberflaeche ihn nicht
+	// Ältere gh-Fassungen kennen keinen users-Block; dort ist `user` der einzige
+	// Account. Und der aktive gehört nach vorn, damit die Oberfläche ihn nicht
 	// eigens heraussuchen muss.
 	if active != "" {
 		accounts = addUnique(accounts, active)
@@ -335,10 +335,10 @@ func lineIndent(line string) int {
 }
 
 // replaceNestedBlock tauscht einen Unterblock innerhalb eines Blocks auf oberster
-// Ebene aus. Fehlt der Unterblock, wird er angehaengt; fehlt der aeussere Block,
+// Ebene aus. Fehlt der Unterblock, wird er angehängt; fehlt der äußere Block,
 // entsteht er neu.
 //
-// Zeilenweise statt ueber einen YAML-Parser, aus demselben Grund wie
+// Zeilenweise statt über einen YAML-Parser, aus demselben Grund wie
 // replaceTopLevelBlock: Kommentare, Reihenfolge und unbekannte Nachbarn bleiben
 // erhalten.
 func replaceNestedBlock(content string, parent string, child string, block string) string {
@@ -380,9 +380,9 @@ func replaceNestedBlock(content string, parent string, child string, block strin
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		// Auch ein Schluessel mit Wert in derselben Zeile zaehlt, etwa
-		// "languages: []". Sonst faende der zweite Aufruf seinen eigenen ersten
-		// nicht wieder und haengte einen zweiten Block an.
+		// Auch ein Schlüssel mit Wert in derselben Zeile zählt, etwa
+		// "languages: []". Sonst fände der zweite Aufruf seinen eigenen ersten
+		// nicht wieder und hängte einen zweiten Block an.
 		if trimmed == child+":" || strings.HasPrefix(trimmed, child+": ") {
 			childStart = index
 			childIndent = lineIndent(lines[index])
@@ -391,8 +391,8 @@ func replaceNestedBlock(content string, parent string, child string, block strin
 	}
 
 	if childStart == -1 {
-		// Angehaengt wird hinter der letzten inhaltlichen Zeile des Blocks, nicht
-		// hinter etwaigen Leerzeilen davor: die trennen den naechsten Block ab.
+		// Angehängt wird hinter der letzten inhaltlichen Zeile des Blocks, nicht
+		// hinter etwaigen Leerzeilen davor: die trennen den nächsten Block ab.
 		insert := parentStart + 1
 		for index := parentStart + 1; index < parentEnd; index++ {
 			if strings.TrimSpace(lines[index]) != "" {
@@ -416,9 +416,9 @@ func replaceNestedBlock(content string, parent string, child string, block strin
 			break
 		}
 	}
-	// Leerzeilen am Ende gehoeren nicht mehr zum Unterblock, sondern trennen ihn
-	// vom naechsten ab. Wuerden sie mitersetzt, klebte der Rest der Datei nach
-	// jedem Schreiben eine Zeile naeher.
+	// Leerzeilen am Ende gehören nicht mehr zum Unterblock, sondern trennen ihn
+	// vom nächsten ab. Würden sie mitersetzt, klebte der Rest der Datei nach
+	// jedem Schreiben eine Zeile näher.
 	for childEnd > childStart+1 && strings.TrimSpace(lines[childEnd-1]) == "" {
 		childEnd--
 	}

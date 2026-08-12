@@ -12,24 +12,29 @@ import (
 // toolsResponse ist der Zustand der Security-Tools.
 //
 // Rein lesend, was die Installation angeht: installiert wird im Terminal, weil
-// das den Host veraendert und nicht das Projekt. Die Oberflaeche zeigt dafuer den
-// fertigen Befehl. Die Sprachauswahl dagegen gehoert dem Projekt und wird hier
+// das den Host verändert und nicht das Projekt. Die Oberfläche zeigt dafür den
+// fertigen Befehl. Die Sprachauswahl dagegen gehört dem Projekt und wird hier
 // gesetzt.
 type toolsResponse struct {
 	Available bool           `json:"available"`
 	Tools     []project.Tool `json:"tools"`
 	BinDir    string         `json:"binDir"`
 	Command   string         `json:"command"`
-	Missing   int            `json:"missing"`
-	OK        bool           `json:"ok"`
-	Message   string         `json:"message"`
+	// CommandOptional nimmt die optionalen mit. Beide kommen fertig aus dem
+	// Preflight-Skript.
+	CommandOptional string `json:"commandOptional"`
+	Missing         int    `json:"missing"`
+	// MissingOptional blockiert nichts, gehört aber gesagt.
+	MissingOptional int    `json:"missingOptional"`
+	OK              bool   `json:"ok"`
+	Message         string `json:"message"`
 	// Languages ist die aktuelle Auswahl, Available... die Liste, aus der
-	// gewaehlt werden kann. Letztere kommt aus der Tool-Matrix selbst, damit sie
+	// gewählt werden kann. Letztere kommt aus der Tool-Matrix selbst, damit sie
 	// nicht ein zweites Mal gepflegt werden muss.
 	Languages          []string `json:"languages"`
 	AvailableLanguages []string `json:"availableLanguages"`
 	// Configured meldet, ob project.languages in der Konfiguration steht. Ist es
-	// das nicht, zeigt die Oberflaeche die Vorauswahl als noch nicht getroffen.
+	// das nicht, zeigt die Oberfläche die Vorauswahl als noch nicht getroffen.
 	Configured bool `json:"configured"`
 }
 
@@ -96,8 +101,10 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		Available:          true,
 		Tools:              preflight.Tools,
 		BinDir:             preflight.BinDir,
-		Command:            installCommand(preflight.InstallCommand, languages),
+		Command:            preflight.InstallCommand,
+		CommandOptional:    preflight.InstallCommandOptional,
 		Missing:            preflight.MissingRequired,
+		MissingOptional:    preflight.MissingOptional,
 		OK:                 preflight.MissingRequired == 0,
 		Languages:          languages,
 		AvailableLanguages: languagesFromMatrix(preflight.Tools),
@@ -105,24 +112,9 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 	}
 }
 
-// installCommand ergaenzt den Befehl aus dem Skript um die Sprachauswahl, damit
-// der kopierte Befehl genau das installiert, was die Karte als fehlend zeigt.
-func installCommand(command string, languages []string) string {
-	joined := strings.Join(languages, ",")
-	if command == "" || joined == "" {
-		return command
-	}
-	// Vor --install, damit die Sprachen auch dann gelten, wenn jemand das Ziel
-	// dahinter noch von Hand aendert.
-	if index := strings.Index(command, " --install "); index >= 0 {
-		return command[:index] + " --languages " + joined + command[index:]
-	}
-	return command + " --languages " + joined
-}
-
-// languagesFromMatrix sammelt die waehlbaren Sprachen aus der Tool-Matrix: alles,
-// was ein Tool als Zustaendigkeit nennt, ausser dem sprachunabhaengigen *. Damit
-// bringt ein kuenftiges Tool seine Sprache von allein mit.
+// languagesFromMatrix sammelt die wählbaren Sprachen aus der Tool-Matrix: alles,
+// was ein Tool als Zuständigkeit nennt, außer dem sprachunabhängigen *. Damit
+// bringt ein künftiges Tool seine Sprache von allein mit.
 func languagesFromMatrix(tools []project.Tool) []string {
 	seen := map[string]bool{}
 	for _, tool := range tools {

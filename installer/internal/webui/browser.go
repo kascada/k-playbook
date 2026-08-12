@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-// Zeitfenster, in dem ein gestarteter Browser-Oeffner noch als gescheitert
+// Zeitfenster, in dem ein gestarteter Browser-Öffner noch als gescheitert
 // gilt, wenn er sich mit Fehler beendet.
 const openerGrace = 300 * time.Millisecond
 
-// containerMarker meldet, ob der Prozess in einem Container laeuft, und woran
+// containerMarker meldet, ob der Prozess in einem Container läuft, und woran
 // das erkannt wurde. Dort ist ein Browserstart sinnlos: er liefe im Container
 // und nicht auf dem Rechner vor dem Nutzer.
 func containerMarker() (string, bool) {
@@ -33,8 +33,8 @@ func containerMarker() (string, bool) {
 	return "", false
 }
 
-// browserOpener ist ein Kommando, das eine URL im Browser oeffnen kann.
-// Die URL wird beim Aufruf an args angehaengt.
+// browserOpener ist ein Kommando, das eine URL im Browser öffnen kann.
+// Die URL wird beim Aufruf an args angehängt.
 type browserOpener struct {
 	command string
 	args    []string
@@ -45,7 +45,7 @@ type browserOpener struct {
 // Desktop, Distribution und WSL-Setup, deshalb wird nichts vorausgesetzt.
 //
 // Windows kommt nicht vor: der Einstiegspunkt bin/k-playbook ist ein
-// Bash-Skript, das Programm laeuft dort gar nicht erst an. Unter WSL greift
+// Bash-Skript, das Programm läuft dort gar nicht erst an. Unter WSL greift
 // der Linux-Zweig.
 func browserOpeners() []browserOpener {
 	if runtime.GOOS == "darwin" {
@@ -60,7 +60,7 @@ func browserOpeners() []browserOpener {
 		{command: "gnome-open"},
 		{command: "x-www-browser"},    // Debian-Alternativensystem
 		{command: "sensible-browser"}, // dito
-		// Letzter Ausweg in WSL ohne wslu: ueber die Windows-Seite oeffnen.
+		// Letzter Ausweg in WSL ohne wslu: über die Windows-Seite öffnen.
 		{command: "powershell.exe", args: []string{"-NoProfile", "-Command", "Start-Process"}},
 	}
 }
@@ -95,7 +95,7 @@ func openBrowser(url string) error {
 }
 
 // startOpener startet das Kommando und wartet kurz ab. Beendet es sich in
-// dieser Zeit mit einem Fehler, gilt der Versuch als gescheitert. Oeffner, die
+// dieser Zeit mit einem Fehler, gilt der Versuch als gescheitert. Öffner, die
 // im Vordergrund weiterlaufen, gelten als Erfolg.
 func startOpener(path string, args []string) error {
 	cmd := exec.Command(path, args...)

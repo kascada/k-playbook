@@ -60,7 +60,7 @@ func TestEntferntEinzelLinksUndLeeresVerzeichnis(t *testing.T) {
 	home, playbook := newHome(t)
 	dir := filepath.Join(home, ".config", "opencode", "command")
 	symlink(t, filepath.Join(playbook, "commands", "k-test.md"), filepath.Join(dir, "k-test.md"))
-	// Ein toter Link zaehlt genauso: die Datei gibt es im Repo nicht mehr.
+	// Ein toter Link zählt genauso: die Datei gibt es im Repo nicht mehr.
 	symlink(t, filepath.Join(playbook, "commands", "k-weg.md"), filepath.Join(dir, "k-weg.md"))
 
 	removals, err := removeGlobalLinks(home)
@@ -162,7 +162,7 @@ func TestStripSkillsBlock(t *testing.T) {
 			changed: true,
 		},
 		{
-			name:    "nachtraeglich eingefuegte Form",
+			name:    "nachträglich eingefügte Form",
 			content: "{\n  \"theme\": \"dark\"\n  ,\"skills\": {\n    \"paths\": [\"~/dev/k-playbook\"]\n  }\n}\n",
 			want:    "{\n  \"theme\": \"dark\"\n}\n",
 			changed: true,

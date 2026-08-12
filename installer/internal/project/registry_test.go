@@ -26,7 +26,7 @@ func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 3 {
-		t.Fatalf("%d Eintraege, erwartet 3: %+v", len(entries), entries)
+		t.Fatalf("%d Einträge, erwartet 3: %+v", len(entries), entries)
 	}
 
 	if got := entryFor(t, entries, "k-a.md").Origin; got != "dist" {
@@ -46,7 +46,7 @@ func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 	}
 }
 
-// Namensraeume werden Datei fuer Datei verrechnet: ein Projekt kann eine
+// Namensräume werden Datei für Datei verrechnet: ein Projekt kann eine
 // einzelne Datei aus _shared/ ersetzen, ohne den Rest zu kopieren.
 func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 	root := t.TempDir()
@@ -56,7 +56,7 @@ func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 2 {
-		t.Fatalf("%d Eintraege, erwartet 2: %+v", len(entries), entries)
+		t.Fatalf("%d Einträge, erwartet 2: %+v", len(entries), entries)
 	}
 	if got := entryFor(t, entries, "_shared/a.md").Origin; got != "dist" {
 		t.Errorf("_shared/a.md Origin = %q, erwartet dist", got)
@@ -74,7 +74,7 @@ func TestResolveRegistryUebergehtReadme(t *testing.T) {
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 1 {
-		t.Errorf("%d Eintraege, erwartet 1: %+v", len(entries), entries)
+		t.Errorf("%d Einträge, erwartet 1: %+v", len(entries), entries)
 	}
 }
 
@@ -87,12 +87,12 @@ func TestResolveRegistryLeereDateiSchaltetAb(t *testing.T) {
 		t.Error("leere projekteigene Datei hat den Eintrag nicht abgeschaltet")
 	}
 	if got := len(ActiveRegistry(root, KindCommands)); got != 0 {
-		t.Errorf("%d aktive Eintraege, erwartet 0", got)
+		t.Errorf("%d aktive Einträge, erwartet 0", got)
 	}
 }
 
 // Ein Skill ist eine Einheit: erst die SKILL.md macht ein Verzeichnis dazu, und
-// ueberlagert wird das ganze Verzeichnis.
+// überlagert wird das ganze Verzeichnis.
 func TestResolveRegistrySkills(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "alpha", skillFileName), "# Alpha\n")
@@ -103,7 +103,7 @@ func TestResolveRegistrySkills(t *testing.T) {
 
 	entries := ResolveRegistry(root, KindSkills)
 	if len(entries) != 3 {
-		t.Fatalf("%d Skills, erwartet 3 (kein-skill zaehlt nicht): %+v", len(entries), entries)
+		t.Fatalf("%d Skills, erwartet 3 (kein-skill zählt nicht): %+v", len(entries), entries)
 	}
 
 	beta := entryFor(t, entries, "beta")
@@ -136,6 +136,6 @@ func TestRegistrySourcePresent(t *testing.T) {
 
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "projekteigen\n")
 	if !RegistrySourcePresent(root, KindCommands) {
-		t.Error("das lokale Verzeichnis allein muss als Quelle zaehlen")
+		t.Error("das lokale Verzeichnis allein muss als Quelle zählen")
 	}
 }

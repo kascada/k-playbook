@@ -12,18 +12,18 @@ import (
 )
 
 // markdown rendert die Doku. GFM deckt Tabellen und Aufgabenlisten ab, die in
-// den mitgelieferten Dateien vorkommen; Ueberschriften bekommen eine ID, damit
+// den mitgelieferten Dateien vorkommen; Überschriften bekommen eine ID, damit
 // Verweise innerhalb einer Datei funktionieren.
 //
 // Rohes HTML aus der Quelle bleibt bewusst abgeschaltet — das ist die
-// Voreinstellung von goldmark und genau richtig fuer Text, der einfach im
+// Voreinstellung von goldmark und genau richtig für Text, der einfach im
 // Browser landet.
 var markdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 )
 
-// docsResponse ist die Liste der verfuegbaren Dateien.
+// docsResponse ist die Liste der verfügbaren Dateien.
 type docsResponse struct {
 	Available bool          `json:"available"`
 	Docs      []project.Doc `json:"docs"`

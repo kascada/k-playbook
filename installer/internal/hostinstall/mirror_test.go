@@ -77,13 +77,13 @@ func TestMirrorLegtZielAn(t *testing.T) {
 		t.Errorf("Stempel = %q, erwartet 1000", got)
 	}
 
-	// Der Wrapper leitet ueber ../dist ab; nur ein ausfuehrbares Binary hilft.
+	// Der Wrapper leitet über ../dist ab; nur ein ausführbares Binary hilft.
 	info, err := os.Stat(binary)
 	if err != nil {
-		t.Fatalf("Binary pruefen: %v", err)
+		t.Fatalf("Binary prüfen: %v", err)
 	}
 	if info.Mode().Perm()&0o111 == 0 {
-		t.Errorf("Binary ist nicht ausfuehrbar: %v", info.Mode())
+		t.Errorf("Binary ist nicht ausführbar: %v", info.Mode())
 	}
 }
 
@@ -140,7 +140,7 @@ func TestMirrorUeberspringtAelterenStand(t *testing.T) {
 		t.Fatalf("erster Lauf: %v", err)
 	}
 
-	// Derselbe Host, aber gestartet aus einem Clone mit aelterem Stand.
+	// Derselbe Host, aber gestartet aus einem Clone mit älterem Stand.
 	alt := req
 	alt.source = newSource(t, "binary-alt")
 	alt.stamp = "1000"
@@ -150,7 +150,7 @@ func TestMirrorUeberspringtAelterenStand(t *testing.T) {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
 	if len(result.Copied) != 0 {
-		t.Errorf("aelterer Stand hat ueberschrieben: %v", result.Copied)
+		t.Errorf("älterer Stand hat überschrieben: %v", result.Copied)
 	}
 	if got := readFile(t, filepath.Join(req.target, distDirName, testPlatform)); got != "binary-neu" {
 		t.Errorf("Binary = %q, erwartet binary-neu", got)
@@ -201,7 +201,7 @@ func TestMirrorErgaenztFehlendePlattform(t *testing.T) {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
 	if len(result.Copied) != 2 {
-		t.Fatalf("fehlende Plattform nicht ergaenzt: %v", result.Copied)
+		t.Fatalf("fehlende Plattform nicht ergänzt: %v", result.Copied)
 	}
 	if got := readFile(t, filepath.Join(req.target, distDirName, andere.platform)); got != "darwin" {
 		t.Errorf("zweites Binary = %q, erwartet darwin", got)
@@ -221,7 +221,7 @@ func TestMirrorOhneStempelNurWennZielFehlt(t *testing.T) {
 		t.Fatalf("erster Lauf: %v", err)
 	}
 	if len(result.Copied) != 2 {
-		t.Fatalf("fehlendes Ziel nicht befuellt: %v", result.Copied)
+		t.Fatalf("fehlendes Ziel nicht befüllt: %v", result.Copied)
 	}
 	if fileExists(filepath.Join(req.target, distDirName, testPlatform) + stampSuffix) {
 		t.Error("ohne Stempel darf keine Stempeldatei entstehen")
@@ -235,7 +235,7 @@ func TestMirrorOhneStempelNurWennZielFehlt(t *testing.T) {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
 	if len(result.Copied) != 0 {
-		t.Errorf("ohne Stempel wurde ueberschrieben: %v", result.Copied)
+		t.Errorf("ohne Stempel wurde überschrieben: %v", result.Copied)
 	}
 }
 
@@ -252,7 +252,7 @@ func TestMirrorLaesstEchteDateiInRuhe(t *testing.T) {
 		t.Errorf("echte Datei wurde angefasst: %q", result.Link)
 	}
 	if got := readFile(t, eigene); !strings.Contains(got, "von Hand abgelegt") {
-		t.Errorf("echte Datei ueberschrieben: %q", got)
+		t.Errorf("echte Datei überschrieben: %q", got)
 	}
 }
 
@@ -326,7 +326,7 @@ func TestNewer(t *testing.T) {
 		want   bool
 	}{
 		{"neuer", "2000", "1000", true},
-		{"aelter", "1000", "2000", false},
+		{"älter", "1000", "2000", false},
 		{"gleich", "1000", "1000", false},
 		{"Ziel unbekannt", "1000", "", true},
 		{"Quelle unbekannt", "", "1000", false},
@@ -348,7 +348,7 @@ func TestExportLineSetztHomeEin(t *testing.T) {
 	}
 }
 
-// Liegt das Verzeichnis ausserhalb des Homes, waere $HOME falsch.
+// Liegt das Verzeichnis außerhalb des Homes, wäre $HOME falsch.
 func TestExportLineBehaeltFremdenPfad(t *testing.T) {
 	line := ExportLine("/opt/bin", "/home/jemand")
 	if want := `export PATH="/opt/bin:$PATH"`; line != want {
@@ -360,7 +360,7 @@ func TestPathStatusOK(t *testing.T) {
 	if (PathStatus{Linked: true, InPath: true}).OK() != true {
 		t.Error("verlinkt und im PATH muss ok sein")
 	}
-	// Ein Symlink, den niemand findet, nuetzt nichts.
+	// Ein Symlink, den niemand findet, nützt nichts.
 	if (PathStatus{Linked: true}).OK() {
 		t.Error("ohne PATH darf es nicht ok sein")
 	}
