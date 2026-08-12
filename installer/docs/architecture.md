@@ -531,6 +531,61 @@ die nur erscheint, solange etwas fehlt —, gehandelt wird im Terminal.
 Geprüft wird der `PATH` **dieses** Prozesses. Wer die Zeile gerade eingetragen hat, sieht
 die Änderung erst in einer neuen Shell; die Meldung sagt das dazu.
 
+## Woher Binary und Dateien kommen
+
+Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
+
+**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Skripte, Tool-Matrix, Regeln,
+Reviews, Checks — kommen dagegen **immer** aus `PlaybookDir(projektDir)`, also aus
+`<projekt>/k-playbook/`. Das Binary liest nie neben sich.
+
+Das ist Absicht. In einem Zielprojekt liegt das Binary in `<projekt>/k-playbook/dist/`,
+also *innerhalb* der Installation — „neben dem Binary" und „die Installation" fallen dort
+zusammen. Für die host-weite Kopie wäre „neben dem Binary" sogar falsch: dort liegen nur
+Wrapper und Binary, kein `scripts/`, keine `rules/`.
+
+| Ort | Was | Wird aktualisiert durch |
+|---|---|---|
+| `<projekt>/k-playbook/bin|dist/` | Installation | `git pull` im Clone, also „Update prüfen" |
+| `~/.local/share/k-playbook/installation/bin|dist/` | host-weite Kopie | `Mirror()` bei jedem Start — mit Einschränkung, siehe unten |
+| `~/.local/bin/k-playbook` | Symlink auf den Wrapper der Kopie | `Mirror()` |
+| `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` |
+
+**Die host-weite Kopie erneuert sich nicht beim lokalen Bauen.** `needsCopy()` vergleicht
+den Commit-Zeitpunkt des letzten Commits, der `dist/` angefasst hat — bewusst nicht die
+Dateizeit, weil Git die beim Auschecken auf den Zeitpunkt des Clones setzt. `make dist`
+ändert diesen Stempel nicht, die Kopie bleibt also stehen.
+
+Daraus folgt für den Aufruf:
+
+| Start | Binary aus | Dateien aus | kann driften |
+|---|---|---|---|
+| `<projekt>/k-playbook/bin/k-playbook` | dem Clone | dem Clone | nein |
+| `k-playbook` aus dem `PATH` | der host-weiten Kopie | der Installation des aktuellen Projekts | ja |
+| `make installer-run` im Entwicklungsrepo | dem Arbeitsstand | siehe „Entwicklungsstand" | ohne Sync ja |
+
+### Entwicklungsstand
+
+Im Entwicklungsrepo fallen Quelle und Installation auseinander: `~/dev/k-playbook/` ist
+der Arbeitsstand, `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zuletzt
+gepushten Commit. Ein frisch gebautes Binary läse also weiterhin alte Dateien.
+
+`make installer-sync` spielt deshalb den verfolgten Dateisatz — `git ls-files`, per
+Definition das, was ein Clone enthält — in die Installation ein und legt dort
+`.k-playbook-devsync` ab. `make installer-run` tut das mit, `make installer-reset` stellt
+den unberührten Clone wieder her.
+
+Die Markierung ist nötig, weil Git die eingespielten Dateien zwangsläufig als Änderungen
+sieht. Verbergen lässt sich das nicht: `.git/info/exclude` wirkt nur auf Unverfolgtes,
+`--assume-unchanged` ist unverbindlich, und `--skip-worktree` bricht den Checkout. Also
+wird der Zustand benannt statt versteckt — `CheckCleanliness()` prüft die Markierung vor
+dem `git status` und meldet `DevSync` statt einer Liste einzelner Dateien. `Blocking()`
+bleibt trotzdem wahr: ein Pull in einen eingespielten Stand wäre falsch.
+
+Ohne diese Unterscheidung stünde in der Installations-Karte dauerhaft „lokal gearbeitet" —
+also genau der Alarm, der echte Handarbeit im Clone melden soll, und der damit wertlos
+würde.
+
 ## Altlasten des globalen Modells
 
 `RemoveGlobalLinks()` in `legacy/global.go` läuft bei jedem Programmstart, vor der
@@ -687,6 +742,9 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 | `GET` | `/api/assistant` | Verlinkung prüfen |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
+| `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
+| `GET` | `/api/reviews` | Läufe auflisten, dazu die wählbaren Werkzeuge und Rezepte |
+| `POST` | `/api/reviews` | Lauf anlegen; startet nichts |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |

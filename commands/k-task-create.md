@@ -63,6 +63,24 @@ Derive the Intent from the conversation: what frame or outcome do the task(s) as
 
 If the Intent cannot be meaningfully derived from the conversation (e.g. purely mechanical task with no outcome criteria), omit the section.
 
+**Zuschnitt: im Zweifel eine Datei.**
+
+Umfang allein ist kein Grund zu teilen. Ein Task, der in Etappen zerfällt, wird eine
+Datei mit `### Etappe N — Titel` unter `## Zu bauen` — `/k-run` verfolgt den Fortschritt
+etappenweise und setzt nach einem Abbruch dort wieder an. Der frühere Grund zu teilen,
+nämlich den Stand über Dateigrenzen sichtbar zu machen, ist damit weg.
+
+Geteilt wird nur, wenn die Teile **sachlich** auseinanderfallen:
+
+- Sie brauchen unterschiedlichen Kontext. Müsste derselbe Kontextblock in beide Dateien,
+  gehören sie zusammen — drei Kopien einer Entscheidung driften auseinander.
+- Sie stehen einzeln für sich. Ein Teil, der ohne den anderen sinnlos ist, ist keine
+  eigene Datei, sondern eine Etappe.
+- Sie können unabhängig verifiziert werden.
+
+Trifft das nicht klar zu: eine Datei. Viele kleine Tasks zersplittern den Intent — nur
+die letzte Datei trägt ihn, und die ersten laufen ohne Erfolgskriterium.
+
 ## Step 6 — Draft the task
 
 Write a task draft from the conversation context. Structure:
@@ -103,9 +121,25 @@ Write a task draft from the conversation context. Structure:
 ## Zu bauen
 
 <Concrete list of files, modules, configs, or steps to be created or changed.>
+
+### Etappe 1 — <Titel>
+
+<Schritte dieser Etappe.>
+
+### Etappe 2 — <Titel>
+
+<Schritte dieser Etappe.>
 ```
 
 Omit any section that is empty or not applicable.
+
+**Etappen:** Nur gliedern, wenn die Arbeit wirklich in Abschnitte zerfällt, die
+nacheinander abgeschlossen werden können — vier bis acht Etappen sind ein sinnvoller
+Rahmen. Jede Etappe muss für sich fertig werden können; eine, die nur zusammen mit der
+nächsten Sinn ergibt, gehört mit dieser zusammengelegt. `/k-run` legt daraus eine
+`## Fortschritt`-Tabelle an und setzt nach einem Abbruch bei der ersten offenen Etappe
+wieder an. Ohne `### Etappe`-Überschriften läuft der Task als Ganzes, ohne
+Fortschrittsverfolgung.
 
 ## Step 7 — Confirm
 

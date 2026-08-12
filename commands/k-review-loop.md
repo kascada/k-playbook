@@ -30,7 +30,7 @@ Review task/instruction files before execution using a structured two-agent dial
 - **Subagents are read-only.** Critic and Editor must not modify files, run formatters, or call write/edit tools. They only return findings, reasoning, and proposed file contents.
 - **The Moderator is the only writer.** Apply changes only after checking that they address routed issues and do not introduce unrelated edits.
 - **Actual file state wins.** After every Moderator-applied edit, reread modified files and use that content for follow-up Critic rounds and the final alignment check.
-- **Keep an audit trail.** Record all Critic issues, Moderator routing decisions, Editor decisions, skipped items, deadlocks, and final alignment in the Review-Log.
+- **Keep an audit trail.** Record all Critic issues, Moderator routing decisions, Editor decisions, skipped items, deadlocks, and final alignment in the Review-Log. Every reviewed file gets a log, including files that needed no change — the log is the only evidence that a review happened at all.
 - **Use the fast path when possible.** If one Critic round yields only clear, non-controversial fixes and the Editor proposal is clean, apply once, reread, run the final alignment check, and stop.
 
 ---
@@ -250,7 +250,16 @@ If alignment is NO → Moderator decides: one more targeted Editor round or ask 
 
 ### Step 11 — Discussion log
 
-Append the following block to each modified task file:
+Append the following block to **each reviewed task file** — not only to the ones that
+were changed.
+
+Eine Datei, an der nichts zu korrigieren war, ist trotzdem geprüft worden, und diese
+Prüfung muss sichtbar bleiben. `/k-run` Step 1.2 erkennt an genau diesem Block, ob ein
+Task jemals gegengelesen wurde; fehlt er auf einer ungeänderten Datei, meldet `/k-run`
+sie später als ungeprüft und fragt unnötig nach.
+
+Ergab die Prüfung keine Änderung, wird derselbe Block angehängt: Tabellen ohne Zeilen
+und unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`.
 
 ```markdown
 ---
@@ -280,6 +289,7 @@ Append the following block to each modified task file:
 
 ### Geänderte Dateien
 - <filename>: <what changed> (FEHLER-01, FEHLER-03)
+- oder: — keine Änderungen
 
 ### Offen (nicht gefixt)
 - <ID>: <reason>

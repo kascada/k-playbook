@@ -24,13 +24,10 @@ K_CHECK_VERSION = "2026-08-08"
 def discover_dist_dir() -> Path:
     """Locate the shipped catalog this runner belongs to.
 
-    Normal case: the runner lives at <playbook>/_dist/bin/k-check, so the dist
-    directory is two levels up. K_PLAYBOOK_DIST overrides this, which is what the
-    k-playbook source repo uses when running the runner in place.
+    The runner lives at <playbook>/bin/k-check, so the installation is one level
+    up. Deliberately without an override: the installation is the directory the
+    runner sits in, and a second source for that path could only disagree.
     """
-    override = os.environ.get("K_PLAYBOOK_DIST")
-    if override:
-        return Path(override).expanduser().resolve()
     return Path(__file__).resolve().parents[1]
 
 
@@ -503,8 +500,6 @@ def run_check(
             "K_CHECK_PROJECT_ROOT": str(target_root),
             "K_CHECK_MODE": mode,
             "K_CHECK_FILES_FROM": str(files_path),
-            "K_PLAYBOOK_DIST": str(DIST_DIR),
-            "K_PLAYBOOK_DIR": str(config_root),
         }
     )
 

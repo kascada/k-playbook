@@ -67,40 +67,53 @@ Tools (zusätzlich): ...
 
 If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 
-## Step 1.5 - k-run-Config aus CLAUDE.md
+## Step 1.2 - Review-Loop-Status prüfen
 
-Collect all CLAUDE.md files that apply to this project (`.claude/CLAUDE.md` in the working directory, plus any `CLAUDE.md` in parent directories up to the repo root). Then run:
+Ein Task, der nie durch `/k-review-loop` gegangen ist, wurde nie gegengelesen. Prüfe für
+jede gesammelte Task-Datei, ob sie eine `## Review-Log`-Sektion enthält.
 
-```bash
-rg -l "## k-run" <collected CLAUDE.md paths>
-```
+Wenn **alle** Dateien ein Review-Log tragen: weiter, ohne Rückfrage.
 
-**If the command exits with a non-zero code (no match found):**
-
-Print this hint to the user - exactly as shown, no modifications:
+Wenn mindestens eine keines hat: die betroffenen Dateien in **einer** Nachricht nennen
+und fragen:
 
 ```
-Hinweis: In CLAUDE.md kann ein `## k-run`-Abschnitt eingetragen werden,
-um Vor- und Nach-Ausführung automatisch Befehle zu rufen (z. B. Backup)
-und den Git-Diff automatisch zu erstellen. Beispiel:
+Ohne Review-Loop:
+  - 014-setup-tts.md
+  - 015-integrate-tts.md
 
-  ## k-run
-
-  before: make sichern
-  after: make sichern
+Diese Tasks wurden nicht mit /k-review-loop gegengelesen.
+Trotzdem ausführen? (ja / nein / zuerst reviewen)
 ```
 
-Set `DIFF_ENABLED=false`, `BEFORE_CMD=`, `AFTER_CMD=`. Continue.
+- `ja` — weiter mit Step 1.5.
+- `nein` — abbrechen, nichts ausführen.
+- `zuerst reviewen` — abbrechen und wörtlich `/k-review-loop <RUN_TARGET_DISPLAY>`
+  nennen, danach `/k-run` erneut starten. Den Review-Loop nicht selbst aufrufen.
 
-**If the command exits with 0 (match found) - read that file and extract the `## k-run` section:**
+Bei explizitem Datei-Argument gilt dieselbe Prüfung, nur für die eine Datei.
 
-- Extract `before:` value -> `BEFORE_CMD` (empty if not present)
-- Extract `after:` value -> `AFTER_CMD` (empty if not present)
-- Check for a git repo: `git -C <working-dir> rev-parse --git-dir 2>/dev/null`
-  - If found: record `BASELINE_HASH=$(git rev-parse HEAD)`, set `DIFF_ENABLED=true`
-  - If not found: set `DIFF_ENABLED=false`
+`/k-review-loop` hängt sein Log an **jede geprüfte** Datei an, auch an die, an der nichts
+zu ändern war (dort mit dem Vermerk „keine Änderungen"). Ein fehlender Block heißt
+deshalb: diese Datei war nie im Review-Loop.
 
-**If `BEFORE_CMD` is set:** run it now before executing any tasks. If it fails, stop and report the error to the user - do not proceed.
+Trotzdem bleibt es eine Rückfrage und kein Abbruch. Eine von Hand geschriebene oder aus
+einem anderen Projekt übernommene Task-Datei kann sachlich in Ordnung sein, ohne je
+durch den Loop gegangen zu sein — das zu entscheiden ist Sache des Users, nicht des
+Commands.
+
+## Step 1.5 - Diff-Baseline setzen
+
+Whether the run can produce a diff follows from `project.vcs` in the context output —
+nothing to configure and nothing to search for.
+
+- `project.vcs` is `git`: record `BASELINE_HASH=$(git rev-parse HEAD)` in the execution
+  root and set `DIFF_ENABLED=true`.
+- Anything else: set `DIFF_ENABLED=false` and continue silently.
+
+The baseline is the commit, not the worktree. If the worktree is dirty when the run
+starts, say so once — the later diff will show those changes as if the task had made
+them.
 
 ## Step 2 - Execute each task
 
@@ -122,7 +135,7 @@ If the task contains a `## Ausführungskontext` section, parse these fields when
 
 Also keep these parsed values for the success path. If `PR required` is true, the command must either open a PR after the local commit exists or report the exact missing step that prevents PR creation.
 
-Resolve `Target repo` relative to `PROJECT_REPO_ROOT_DIR` unless it is absolute. If no `Target repo` is present, use the current project root as execution root.
+Resolve `Target repo` relative to `project.repoRoot` from the context output unless it is absolute. If no `Target repo` is present, use the current project root as execution root.
 
 Before delegating to a sub-agent, perform the branch preflight in the execution root:
 
@@ -138,6 +151,45 @@ Before delegating to a sub-agent, perform the branch preflight in the execution 
 6. Record the preflight result and pass it to the sub-agent. The sub-agent must treat the selected execution root and branch as mandatory context.
 
 If the task does not contain `## Ausführungskontext`, continue with the existing behavior.
+
+### 2a.2 - Etappen-Fortschritt prüfen
+
+Ein Task darf seine Arbeit in `## Zu bauen` als `### Etappe N — Titel` gliedern. Nur
+dann greift die Fortschrittsverfolgung; ein Task ohne Etappen läuft wie bisher als
+Ganzes.
+
+Enthält die Task-Datei Etappen:
+
+1. Lies eine vorhandene `## Fortschritt`-Sektion. Sie ist die einzige Quelle für den
+   Stand — nicht der Code, nicht `git log`.
+2. Fehlt sie, lege sie an: eine Zeile je Etappe, alle auf `offen`.
+
+```
+## Fortschritt
+
+| Etappe | Status | Datum | Notiz |
+|---|---|---|---|
+| 1 — Struktur festschreiben | erledigt | 2026-08-12 | local.go + Test gruen |
+| 2 — Command-Authoring-Regel | erledigt | 2026-08-12 | |
+| 3 — /k-docs-index | offen | | |
+```
+
+3. Stehen bereits Etappen auf `erledigt`, den Stand zeigen und fragen:
+
+```
+014-docs-umbau.md: Etappen 1-2 von 6 erledigt (zuletzt 2026-08-12).
+
+Wie weiter?
+  (a) ab Etappe 3 fortsetzen   (Default)
+  (b) von vorn beginnen        - erledigte Etappen erneut ausführen
+  (c) diesen Task überspringen
+```
+
+Bei `(b)` alle Zeilen auf `offen` zurücksetzen, bevor delegiert wird.
+
+Der Stand wird **nicht** aus einem Abbruch heraus geraten. Steht eine Etappe auf `offen`,
+gilt sie als nicht ausgeführt, auch wenn Teile davon im Code sichtbar sind — der
+Sub-Agent prüft zu Beginn der Etappe selbst, was schon da ist.
 
 ### 2b - Clarify before delegating
 
@@ -157,6 +209,13 @@ Spawn a `general` sub-agent to carry out the task. Pass it:
 - Instruction to read all `CLAUDE.md` files in the project tree before starting
 - All clarifications from Step 2b as additional context
 - If `DIFF_ENABLED=true`: the baseline commit hash, with instruction to run `git diff <hash>` after completion and return the diff in its result
+- If the task has `### Etappe` sections: which stages are still `offen`, and the instruction to update the `## Fortschritt` row **immediately after finishing each stage** — before starting the next one, not at the end of the run
+
+Die Fortschrittszeile schreibt der Sub-Agent selbst, nicht der Hauptkontext. Nur so
+überlebt der Stand einen harten Abbruch: bricht die Sitzung mitten in Etappe 4 ab, stehen
+die Etappen 1 bis 3 bereits in der Datei. Ein Fortschritt, den erst der Hauptkontext nach
+Rückkehr des Sub-Agenten schreibt, wäre genau in dem Fall verloren, für den er gedacht
+ist.
 
 The sub-agent must not ask the user questions - by this point all ambiguities are resolved. If the sub-agent encounters an unexpected blocker or decision it cannot cleanly resolve, it must **not** make a quick-and-dirty decision - instead it must stop and report the issue clearly in its result summary so the main agent can escalate to the user.
 
@@ -182,6 +241,10 @@ If the sub-agent reports failure or the task must be aborted:
 ```
 
 - Leave the file in its current location (do not move to `done/`)
+- If the task has `### Etappe` sections: leave the `## Fortschritt` table exactly as the
+  sub-agent left it. It is the resume point for the next `/k-run` — never reset it, never
+  delete it, and never mark a stage as done that the sub-agent did not mark itself. Add
+  `**Etappen erledigt:** <n> von <m>` to the `## Ausführung` note above.
 - Stop processing further tasks
 
 ### 2f - On success
@@ -226,8 +289,11 @@ Append the review result to `## Ausführung`:
 <findings from engineering:code-review, based solely on the diff>
 ```
 
-2. **If `AFTER_CMD` is set:** run it now. If it fails, report the error but do **not** undo the task - it already completed successfully. Just note the failure in the `## Ausführung` section.
-
+2. If the task has `### Etappe` sections: verify every row in `## Fortschritt` is
+   `erledigt`. If any is still `offen`, the run is **not** successful — treat it as
+   Step 2e (partial execution) instead, keep the file in place, and report which stage is
+   missing. A sub-agent reporting success while a stage stands open is a contradiction
+   worth surfacing, not smoothing over.
 3. Ensure `done/` subdirectory exists in the same directory as the task file
 4. Move the task file into `done/`
 

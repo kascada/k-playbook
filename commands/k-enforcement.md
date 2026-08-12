@@ -24,12 +24,12 @@ This command is the explicit after-the-fact or mid-work check. The matching Skil
 
 From the context output:
 
-- `PROJECT_REPO_ROOT_DIR = project.repoRoot` — the rules are checked against the code,
-  not against the playbook directory.
+- The code to check is `project.repoRoot` — the rules apply to the code, not to the
+  playbook directory.
 - `DOCS_DIR = <local.dir>/docs`.
 
 - If `$ARGUMENTS` is set, it names the directory to check. It must lie inside
-  `PROJECT_REPO_ROOT_DIR`; otherwise stop and say so.
+  `project.repoRoot`; otherwise stop and say so.
 - If `$ARGUMENTS` is empty, check the current working directory.
 
 If `DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
@@ -58,7 +58,7 @@ Docs:         k-playbook-local/docs | fehlt
 
 ## Step 3 — Determine current change scope
 
-If `PROJECT_REPO_ROOT_DIR` is a git repo or inside a git worktree:
+If `project.repoRoot` is a git repo or inside a git worktree:
 
 1. Inspect `git status --short`.
 2. Inspect the current diff for tracked files (`git diff`) and staged files (`git diff --cached`) if present.

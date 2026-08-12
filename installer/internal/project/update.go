@@ -24,6 +24,17 @@ const (
 	cleanlinessTimeout = 10 * time.Second
 )
 
+// DevSyncMarker liegt in der Installation, wenn dort ein Arbeitsstand
+// eingespielt wurde statt eines Clones.
+//
+// Nötig, weil Git die eingespielten Dateien zwangsläufig als Änderungen sieht
+// und sich das nicht verbergen lässt: .git/info/exclude wirkt nur auf
+// Unverfolgtes, --assume-unchanged ist unverbindlich, und --skip-worktree
+// bricht den Checkout. Statt die Änderungen zu verstecken, wird der Zustand
+// benannt — sonst stünde dauerhaft ein Alarm da, der eigentlich echte Handarbeit
+// im Clone melden soll.
+const DevSyncMarker = ".k-playbook-devsync"
+
 // UpdateStatus beschreibt, ob die Installation hinter dem Remote liegt.
 type UpdateStatus struct {
 	Available bool   `json:"available"`
@@ -54,7 +65,10 @@ type Cleanliness struct {
 	Untracked []string `json:"untracked"`
 	// Ahead sind lokale Commits. Sie blockieren `--ff-only` und lassen sich
 	// nicht durch Verwerfen von Dateien auflösen.
-	Ahead   int    `json:"ahead"`
+	Ahead int `json:"ahead"`
+	// DevSync: in der Installation liegt ein eingespielter Arbeitsstand. Kein
+	// Versehen, sondern ein gewollter Zustand — er blockiert das Update trotzdem.
+	DevSync bool   `json:"devSync"`
 	Message string `json:"message"`
 }
 
@@ -62,7 +76,7 @@ type Cleanliness struct {
 // Falsche tun würde. Untracked Dateien zählen nicht dazu: sie stehen einem
 // Fast-Forward nicht im Weg.
 func (c Cleanliness) Blocking() bool {
-	return len(c.Modified) > 0 || c.Ahead > 0
+	return len(c.Modified) > 0 || c.Ahead > 0 || c.DevSync
 }
 
 // maxReportedPaths begrenzt die gemeldete Dateiliste. Wer dort umfangreich
@@ -73,6 +87,17 @@ const maxReportedPaths = 20
 // CheckCleanliness liest den lokalen Zustand des Clones. Rein lesend, ohne Netz.
 func CheckCleanliness(projectDir string) Cleanliness {
 	dir := PlaybookDir(projectDir)
+
+	// Vor dem git status: was hier steht, erklärt jede Abweichung, die der
+	// Vergleich danach fände. Sie einzeln aufzuzählen wäre nur Lärm.
+	if fileExists(filepath.Join(dir, DevSyncMarker)) {
+		return Cleanliness{
+			DevSync: true,
+			Message: "Entwicklungsstand: hier liegt ein eingespielter Arbeitsstand, kein Clone. " +
+				"`make installer-reset` stellt den Clone wieder her.",
+		}
+	}
+
 	if !isDir(filepath.Join(dir, ".git")) {
 		return Cleanliness{Clean: true, Message: "Die Installation ist kein Git-Repository."}
 	}

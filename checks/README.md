@@ -62,8 +62,10 @@ Checks bekommen diese Umgebungsvariablen:
 - `K_CHECK_PROJECT_ROOT` — Kompatibilitäts-Alias für `K_CHECK_TARGET_ROOT`.
 - `K_CHECK_MODE` — `changed` oder `baseline`.
 - `K_CHECK_FILES_FROM` — newline-separierte Dateiliste im Target-Root.
-- `K_PLAYBOOK_DIST` — mitgelieferte Installation (`k-playbook/`).
-- `K_PLAYBOOK_DIR` — Hauptverzeichnis des Projekts (Ort der `K-PLAYBOOK.yaml`).
+
+Das ist die vollstaendige Schnittstelle. Ein Check bekommt seine Pfade aus dieser
+Umgebung und ruft `k-playbook context` **nicht** auf: er laeuft als Unterprozess des
+Runners, der die Pfade bereits aufgeloest hat.
 
 ## Modi
 

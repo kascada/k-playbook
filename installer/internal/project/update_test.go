@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -197,6 +198,55 @@ func TestCheckCleanlinessUntrackedBlockiertNicht(t *testing.T) {
 	}
 	if len(state.Untracked) != 1 || state.Untracked[0] != "notiz.txt" {
 		t.Errorf("Untracked = %v, erwartet notiz.txt", state.Untracked)
+	}
+}
+
+// Ein eingespielter Arbeitsstand ist gewollt. Er blockiert das Update trotzdem —
+// aber er darf nicht als Handarbeit im Clone gemeldet werden, sonst stünde der
+// Alarm dauerhaft da und würde wertlos.
+func TestCheckCleanlinessErkenntEntwicklungsstand(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+
+	// Zusätzlich eine echte Änderung: die Markierung muss sie überstimmen,
+	// nicht neben ihr stehen.
+	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
+	if err := os.WriteFile(binary, []byte("eingespielt"), 0o755); err != nil {
+		t.Fatalf("Binary ändern: %v", err)
+	}
+	marker := filepath.Join(PlaybookDir(projectDir), DevSyncMarker)
+	if err := os.WriteFile(marker, []byte("Arbeitsstand\n"), 0o644); err != nil {
+		t.Fatalf("Markierung anlegen: %v", err)
+	}
+
+	state := CheckCleanliness(projectDir)
+	if !state.DevSync {
+		t.Fatalf("Entwicklungsstand nicht erkannt: %+v", state)
+	}
+	if !state.Blocking() {
+		t.Error("Entwicklungsstand blockiert das Update nicht")
+	}
+	if len(state.Modified) > 0 || len(state.Untracked) > 0 {
+		t.Errorf("einzelne Dateien gemeldet statt des Zustands: %+v", state)
+	}
+	if !strings.Contains(state.Message, "installer-reset") {
+		t.Errorf("Message nennt den Rückweg nicht: %q", state.Message)
+	}
+}
+
+// Ohne Markierung bleibt es beim bisherigen Verhalten.
+func TestUpdateLehntEntwicklungsstandAb(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+	marker := filepath.Join(PlaybookDir(projectDir), DevSyncMarker)
+	if err := os.WriteFile(marker, []byte("Arbeitsstand\n"), 0o644); err != nil {
+		t.Fatalf("Markierung anlegen: %v", err)
+	}
+
+	result, err := Update(projectDir)
+	if err == nil {
+		t.Fatal("Update lief trotz Entwicklungsstand")
+	}
+	if !result.Cleanliness.DevSync {
+		t.Errorf("Grund nicht durchgereicht: %+v", result.Cleanliness)
 	}
 }
 

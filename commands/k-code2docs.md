@@ -88,7 +88,7 @@ Ask the user (bundle in one message):
 **Exclusions — apply automatically, no need to ask:**
 
 - Default set: `.git/`, `venv/`, `.venv/`, `env/`, `node_modules/`, `dist/`, `build/`, `target/`, `_bases/`, `.next/`, `.nuxt/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `coverage/`, `htmlcov/`, `.tox/`, `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*`.
-- Additionally: everything matched by `.gitignore` under `PROJECT_REPO_ROOT_DIR` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
+- Additionally: everything matched by `.gitignore` under `project.repoRoot` (parse the file if present; treat entries as glob patterns; respect nested `.gitignore` files as best-effort).
 
 Announce the final effective exclusion set before scanning, in one compact list. Give the user one chance to add more.
 

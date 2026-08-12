@@ -218,12 +218,25 @@ function renderCleanliness(state) {
     return;
   }
 
+  elements.cleanFacts.replaceChildren();
+  elements.cleanMessage.textContent = state.message || "";
+
+  // Ein eingespielter Arbeitsstand ist gewollt, kein Versehen. Deshalb keine
+  // Warnfarbe und kein Befehl zum Verwerfen — der stünde hier für „mach die
+  // Arbeit rückgängig, die du gerade ansehen willst".
+  if (state.devSync) {
+    elements.cleanPill.className = "pill muted";
+    elements.cleanPill.textContent = "Entwicklungsstand";
+    elements.cleanCommandText.textContent = "make installer-reset";
+    elements.cleanCommand.classList.remove("hidden");
+    elements.cleanCard.classList.remove("hidden");
+    return;
+  }
+
   const blocking = (state.modified && state.modified.length > 0) || state.ahead > 0;
   elements.cleanPill.className = "pill warn";
   elements.cleanPill.textContent = blocking ? "Verändert" : "Zusätzliche Dateien";
-  elements.cleanMessage.textContent = state.message || "";
 
-  elements.cleanFacts.replaceChildren();
   if (state.ahead > 0) {
     addFact(elements.cleanFacts, "Lokale Commits", String(state.ahead));
   }
