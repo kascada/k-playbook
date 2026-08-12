@@ -255,6 +255,11 @@ Ein DevContainer bekommt seine eigene Kopie unter seinem eigenen Home; nach eine
 stellt der naechste Start sie wieder her. Auf einem Mac mit Container liegen beide
 Plattformen nebeneinander, falls `~/.local` geteilt ist.
 
+**Eine eigene DevContainer-Integration gibt es nicht mehr** — keinen Bind-Mount nach
+`/workspaces/k-playbook`, keinen Symlink im Container und kein Setup-Skript in
+`.devcontainer/`. Die Installation liegt im Projektverzeichnis und kommt mit ihm in den
+Container, wie jede andere Projektdatei auch.
+
 **Zum PATH:** Auf Linux ist `~/.local/bin` meist schon drin. Auf macOS **nicht** —
 `/etc/paths` kennt es nicht und `path_helper` ergaenzt es nicht.
 
@@ -329,17 +334,32 @@ zusaetzlich im Go-Code.
 
 Pflicht-Tools:
 
-| Tool | Rolle |
-|---|---|
-| `gitleaks` | Secret-Scanning |
-| `trufflehog` | tiefes Secret-Scanning |
-| `pip-audit` | Python Dependency-CVEs |
-| `trivy` | Filesystem-, Container- und IaC-CVEs |
-| `syft` | SBOM-Erzeugung |
-| `grype` | SBOM-/Dependency-CVE-Auswertung |
+| Tool | Sprachen | Rolle |
+|---|---|---|
+| `gitleaks` | alle | Secret-Scanning |
+| `trufflehog` | alle | tiefes Secret-Scanning |
+| `trivy` | alle | Filesystem-, Container- und IaC-CVEs |
+| `syft` | alle | SBOM-Erzeugung |
+| `grype` | alle | SBOM-/Dependency-CVE-Auswertung |
+| `pip-audit` | Python | Python Dependency-CVEs |
+| `semgrep` | Python, Go | generische Security-Regeln |
+| `osv-scanner` | Python, Go | Dependency-CVEs mit SARIF |
+| `gosec` | Go | Go-Security |
+| `govulncheck` | Go | Go-CVEs mit Reachability |
 
-`docker` ist optional und wird als Fallback-Kontext angezeigt, aber nicht durch
-k-playbook installiert.
+Optional, weil sie sich mit anderen ueberschneiden oder eine projekteigene Konfiguration
+brauchen: `ruff` (Python-Qualitaet; sein `S`-Regelwerk *ist* flake8-bandit), `bandit`
+(Python-Security) und `golangci-lint` (Go-Qualitaet). `docker` ist ebenfalls optional und
+wird als Fallback-Kontext angezeigt, aber nicht durch k-playbook installiert.
+
+**Pflicht gilt je Sprache.** Ein sprachgebundenes Tool zaehlt nur dann als fehlende
+Pflicht, wenn seine Sprache gefragt war — und ohne Angabe gilt gar keine Sprachbindung als
+Pflicht, weil sich ohne diese Information nicht verlangen laesst, was vielleicht nicht
+gebraucht wird:
+
+```bash
+k-playbook/scripts/install-security-tools.sh --languages python,go --preflight
+```
 
 Die Oberflaeche zeigt den Status read-only und installiert nichts. Alles Weitere macht
 das Skript selbst:
@@ -353,6 +373,19 @@ k-playbook/scripts/install-security-tools.sh --help                # erklaert di
 `--method` waehlt zwischen `auto`, `native`, `docker`, `pipx` und `venv`. Ohne `--yes`
 zeigt das Skript den Plan und fragt.
 
+Woher ein Tool kommt, steht in der Matrix und nicht im Skript: die Spalte
+`install_method` nennt `github` (Release-Asset), `go` (`go install`), `pipx` (pipx oder
+ein dediziertes Tool-venv) oder `none`, die Spalte `install_ref` die passende Referenz und
+`asset_pattern` bei GitHub-Releases das Namensmuster des Assets. Ein neues Tool ist damit
+eine Zeile in der TSV.
+
+**`go install` bleibt den Tools vorbehalten, die Go ohnehin brauchen.** Sonst muesste ein
+reines Python-Projekt Go installieren, nur um an einen Scanner zu kommen. Betroffen ist
+allein `govulncheck`: es analysiert Go-Quellen und braucht die Toolchain zur Laufzeit, hat
+aber keine Release-Binaries. `gosec`, `golangci-lint` und `osv-scanner` kommen deshalb aus
+GitHub-Releases — `osv-scanner` als blanke Binary ohne Archiv, was das Skript am
+Asset-Namen erkennt.
+
 **Vor der Installation darf kein Projekt-venv aktiv sein.** Sonst wird ein Tool aus dem
 venv faelschlich als host-global vorhanden erkannt. Falls `VIRTUAL_ENV` gesetzt ist:
 
@@ -361,7 +394,9 @@ deactivate
 ```
 
 Python-CLI-Tools gehoeren in `pipx` oder in ein dediziertes k-playbook-Tool-venv unter
-`~/.local/share/k-playbook/`, nicht in `<projekt>/.venv`.
+`~/.local/share/k-playbook/security-tools/<tool>-venv`, nicht in `<projekt>/.venv`. Je
+Tool ein eigenes venv, damit sich ihre Abhaengigkeiten nicht in die Quere kommen; die
+Wurzel laesst sich mit `--venv-root` verlegen.
 
 ## Selbst bauen
 

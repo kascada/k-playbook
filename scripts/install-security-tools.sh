@@ -16,6 +16,15 @@ declare -A TOOL_INSTALLABLE=()
 declare -A TOOL_ROLE=()
 declare -A TOOL_DOCKER_IMAGE=()
 declare -A TOOL_VERSION_ARGS=()
+declare -A TOOL_LANGUAGES=()
+declare -A TOOL_INSTALL_METHOD=()
+declare -A TOOL_INSTALL_REF=()
+declare -A TOOL_ASSET_PATTERN=()
+
+# Die Sprachen des Projekts, komma-getrennt. Leer heisst unbekannt: dann gilt ein
+# sprachgebundenes Tool als optional, weil sich ohne diese Angabe nicht verlangen
+# laesst, was vielleicht gar nicht gebraucht wird.
+LANGUAGES=""
 
 INSTALL_SPEC=""
 JSON_OUTPUT=0
@@ -24,7 +33,10 @@ INCLUDE_OPTIONAL=0
 YES=0
 DRY_RUN=0
 PREFIX="${K_SECURITY_TOOLS_PREFIX:-$HOME/.local}"
-VENV_DIR="${K_SECURITY_TOOLS_VENV:-$HOME/.local/share/k-playbook/security-tools/pip-audit-venv}"
+# Wurzel der Tool-venvs, je pip-Tool eines darunter. Frueher stand hier genau ein
+# venv fuer pip-audit; mit mehreren pip-Tools braucht jedes seinen eigenen Ort,
+# damit sich ihre Abhaengigkeiten nicht in die Quere kommen.
+VENV_ROOT="${K_SECURITY_TOOLS_VENV_ROOT:-$HOME/.local/share/k-playbook/security-tools}"
 
 default_bin_dir() {
   local candidate
@@ -49,7 +61,7 @@ Usage: install-security-tools.sh [--preflight]
 Host-local security-tool preflight and installer for k-playbook.
 No project files are written.
 
-Required tools:
+Required tools (a language-bound one counts only with a matching --languages):
   $(join_by ', ' "${REQUIRED_TOOLS[@]}")
 
 Tool matrix:
@@ -63,13 +75,17 @@ Options:
   --include-optional   Accepted for old command lines; currently no extra tools.
   --prefix <dir>       User-local prefix for native binaries. Default: ~/.local.
   --bin-dir <dir>      Binary directory. Default: first PATH-visible of ~/.opencode/bin or ~/.local/bin, else <prefix>/bin.
-  --venv <dir>         Dedicated pip-audit tool venv path for --method venv/auto fallback.
+  --languages <list>   Comma-separated project languages, e.g. python,go. A tool bound to a
+                       language counts as required only when that language is listed;
+                       without this flag, only language-independent tools are required.
+  --venv-root <dir>    Root for the dedicated pip tool venvs, one per tool.
   --yes                Do not ask for confirmation after printing the install plan.
   --dry-run            Print what would happen, but do not install.
   -h, --help           Show this help.
 
 Examples:
   scripts/install-security-tools.sh --preflight
+  scripts/install-security-tools.sh --languages python,go --preflight
   scripts/install-security-tools.sh --install missing --method auto
   scripts/install-security-tools.sh --install all --yes
 USAGE
@@ -100,11 +116,13 @@ join_by() {
 }
 
 load_tool_matrix() {
-  local name required installable role docker_image version_args
+  local name languages required installable install_method install_ref asset_pattern role docker_image version_args
 
   [[ -f "$TOOL_MATRIX_FILE" ]] || die "Security-Tool-Matrix fehlt: $TOOL_MATRIX_FILE"
 
-  while IFS=$'\t' read -r name required installable role docker_image version_args; do
+  # Die Leseliste muss alle Spalten nennen: read schiebt sonst jede weitere Spalte
+  # stillschweigend in die letzte Variable.
+  while IFS=$'\t' read -r name languages required installable install_method install_ref asset_pattern role docker_image version_args; do
     [[ -z "${name:-}" ]] && continue
     [[ "$name" == \#* ]] && continue
     [[ "$name" == "name" ]] && continue
@@ -117,6 +135,14 @@ load_tool_matrix() {
       true|false) ;;
       *) die "Ungueltiger installable-Wert fuer $name in $TOOL_MATRIX_FILE: $installable" ;;
     esac
+    case "$install_method" in
+      github|go|pipx|none) ;;
+      *) die "Ungueltiger install_method-Wert fuer $name in $TOOL_MATRIX_FILE: $install_method" ;;
+    esac
+    [[ -n "${languages:-}" ]] || die "Leeres languages-Feld fuer $name in $TOOL_MATRIX_FILE. Nutze * fuer sprachunabhaengig."
+    if [[ "$install_method" == "github" ]]; then
+      [[ -n "${asset_pattern:-}" && "$asset_pattern" != "-" ]] || die "install_method github ohne asset_pattern fuer $name in $TOOL_MATRIX_FILE."
+    fi
 
     STATUS_TOOLS+=("$name")
     TOOL_REQUIRED["$name"]="$required"
@@ -124,6 +150,10 @@ load_tool_matrix() {
     TOOL_ROLE["$name"]="$role"
     TOOL_DOCKER_IMAGE["$name"]="$docker_image"
     TOOL_VERSION_ARGS["$name"]="$version_args"
+    TOOL_LANGUAGES["$name"]="$languages"
+    TOOL_INSTALL_METHOD["$name"]="$install_method"
+    TOOL_INSTALL_REF["$name"]="$install_ref"
+    TOOL_ASSET_PATTERN["$name"]="$asset_pattern"
 
     if [[ "$required" == "true" ]]; then
       REQUIRED_TOOLS+=("$name")
@@ -173,9 +203,14 @@ ensure_host_tool_scope() {
   if is_project_venv_path "$BIN_DIR"; then
     die "Installationsziel liegt in einem typischen Projekt-venv: $BIN_DIR. Nutze ein user-lokales Bin-Verzeichnis wie ~/.opencode/bin oder ~/.local/bin."
   fi
-  if is_project_venv_path "$VENV_DIR"; then
-    die "pip-audit Tool-venv darf kein Projekt-venv sein: $VENV_DIR. Nutze pipx oder ein dediziertes Tool-venv unter ~/.local/share/k-playbook/."
+  if is_project_venv_path "$VENV_ROOT"; then
+    die "Die Wurzel der Tool-venvs darf kein Projekt-venv sein: $VENV_ROOT. Nutze pipx oder ein dediziertes Verzeichnis unter ~/.local/share/k-playbook/."
   fi
+}
+
+# tool_venv_dir ist der Ort des dedizierten venv eines pip-Tools.
+tool_venv_dir() {
+  printf '%s' "$VENV_ROOT/$1-venv"
 }
 
 run_or_print() {
@@ -220,13 +255,55 @@ all_tools_for_status() {
   printf '%s\n' "${STATUS_TOOLS[@]}"
 }
 
-is_required_tool() {
-  local tool
+# tool_applies meldet, ob ein Tool fuer die gewaehlten Projektsprachen zustaendig
+# ist. Ohne --languages gilt nur Sprachunabhaengiges (*) als zustaendig: was an eine
+# Sprache gebunden ist, laesst sich ohne diese Angabe nicht verlangen.
+tool_applies() {
+  local tool languages entry wanted
+  local -a tool_languages project_languages
   tool="$1"
+  languages="${TOOL_LANGUAGES[$tool]:-*}"
+
+  [[ "$languages" == "*" ]] && return 0
+  [[ -z "$LANGUAGES" ]] && return 1
+
+  IFS=',' read -r -a tool_languages <<< "$languages"
+  IFS=',' read -r -a project_languages <<< "$LANGUAGES"
+  for entry in "${tool_languages[@]}"; do
+    for wanted in "${project_languages[@]}"; do
+      [[ -n "$entry" && "$entry" == "$wanted" ]] && return 0
+    done
+  done
+  return 1
+}
+
+# is_required_tool ist die einzige Stelle, an der die Sprachregel angewendet wird:
+# Pflicht ist ein Tool nur, wenn die Matrix es so fuehrt und es fuer die gewaehlten
+# Sprachen zustaendig ist.
+is_required_tool() {
+  local tool item
+  tool="$1"
+  tool_applies "$tool" || return 1
   for item in "${REQUIRED_TOOLS[@]}"; do
     [[ "$item" == "$tool" ]] && return 0
   done
   return 1
+}
+
+tool_languages() {
+  printf '%s' "${TOOL_LANGUAGES[$1]:-*}"
+}
+
+install_method() {
+  printf '%s' "${TOOL_INSTALL_METHOD[$1]:-none}"
+}
+
+install_ref() {
+  printf '%s' "${TOOL_INSTALL_REF[$1]:--}"
+}
+
+asset_pattern() {
+  printf '%s' "${TOOL_ASSET_PATTERN[$1]:--}"
 }
 
 is_known_tool() {
@@ -245,7 +322,7 @@ missing_required_count() {
   local count tool
   count=0
   for tool in "${REQUIRED_TOOLS[@]}"; do
-    if ! has_cmd "$tool"; then
+    if is_required_tool "$tool" && ! has_cmd "$tool"; then
       count=$((count + 1))
     fi
   done
@@ -262,10 +339,15 @@ print_preflight() {
   printf 'Installation: %s\n' "$PLAYBOOK_DIR"
   printf 'Toolliste:  %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
-  printf 'pip-audit:  %s (dediziertes Tool-venv, nicht Projekt-venv)\n' "$VENV_DIR"
+  printf 'Tool-venvs: %s (dediziert, nie ein Projekt-venv)\n' "$VENV_ROOT"
+  if [[ -n "$LANGUAGES" ]]; then
+    printf 'Sprachen:   %s\n' "$LANGUAGES"
+  else
+    printf 'Sprachen:   nicht angegeben - sprachgebundene Tools gelten als optional\n'
+  fi
   printf '\n'
-  printf '%-12s %-9s %-8s %-34s %s\n' 'Tool' 'Pflicht' 'Status' 'Version/Pfad' 'Docker-Fallback'
-  printf '%-12s %-9s %-8s %-34s %s\n' '----' '-------' '------' '------------' '---------------'
+  printf '%-14s %-10s %-9s %-8s %-32s %s\n' 'Tool' 'Sprachen' 'Pflicht' 'Status' 'Version/Pfad' 'Docker-Fallback'
+  printf '%-14s %-10s %-9s %-8s %-32s %s\n' '----' '--------' '-------' '------' '------------' '---------------'
 
   while IFS= read -r tool; do
     [[ -z "$tool" ]] && continue
@@ -279,11 +361,11 @@ print_preflight() {
       status="ok"
       version="$(tool_version "$tool")"
       path="$(command -v "$tool")"
-      printf '%-12s %-9s %-8s %-34s %s\n' "$tool" "$kind" "$status" "${version:0:33}" "$image"
-      printf '%-12s %-9s %-8s %-34s %s\n' '' '' '' "$path" ''
+      printf '%-14s %-10s %-9s %-8s %-32s %s\n' "$tool" "$(tool_languages "$tool")" "$kind" "$status" "${version:0:31}" "$image"
+      printf '%-14s %-10s %-9s %-8s %-32s %s\n' '' '' '' '' "$path" ''
     else
       status="fehlt"
-      printf '%-12s %-9s %-8s %-34s %s\n' "$tool" "$kind" "$status" "$(tool_role "$tool")" "$image"
+      printf '%-14s %-10s %-9s %-8s %-32s %s\n' "$tool" "$(tool_languages "$tool")" "$kind" "$status" "$(tool_role "$tool")" "$image"
     fi
   done < <(all_tools_for_status)
 
@@ -323,7 +405,8 @@ print_preflight_json() {
   printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
   printf '  "toolMatrix": "%s",\n' "$(json_escape "$TOOL_MATRIX_FILE")"
   printf '  "binDir": "%s",\n' "$(json_escape "$BIN_DIR")"
-  printf '  "venvDir": "%s",\n' "$(json_escape "$VENV_DIR")"
+  printf '  "venvRoot": "%s",\n' "$(json_escape "$VENV_ROOT")"
+  printf '  "languages": "%s",\n' "$(json_escape "$LANGUAGES")"
   printf '  "missingRequired": %s,\n' "$missing_required"
   # Absoluter Pfad: der Befehl soll sich kopieren und von ueberall ausfuehren
   # lassen, unabhaengig vom Arbeitsverzeichnis des Aufrufs.
@@ -348,9 +431,11 @@ print_preflight_json() {
 
     [[ "$first" -eq 0 ]] && printf ',\n'
     first=0
-    printf '    {"name": "%s", "required": %s, "status": "%s", "version": "%s", "path": "%s", "role": "%s", "dockerImage": "%s"}' \
+    printf '    {"name": "%s", "languages": "%s", "required": %s, "installMethod": "%s", "status": "%s", "version": "%s", "path": "%s", "role": "%s", "dockerImage": "%s"}' \
       "$(json_escape "$tool")" \
+      "$(json_escape "$(tool_languages "$tool")")" \
       "$(is_required_tool "$tool" && printf 'true' || printf 'false')" \
+      "$(json_escape "$(install_method "$tool")")" \
       "$status" \
       "$(json_escape "$version")" \
       "$(json_escape "$path")" \
@@ -407,18 +492,35 @@ platform_key() {
 }
 
 latest_asset() {
-  local tool repo os arch
+  local tool repo pattern os arch
   tool="$1"
   repo="$2"
+  pattern="$3"
   read -r os arch < <(platform_key)
 
-  python3 - "$repo" "$tool" "$os" "$arch" <<'PY'
+  python3 - "$repo" "$tool" "$os" "$arch" "$pattern" <<'PY'
 import json
 import re
 import sys
 import urllib.request
 
-repo, tool, os_name, arch = sys.argv[1:]
+repo, tool, os_name, arch, pattern = sys.argv[1:]
+
+# Die Platzhalter decken die drei Namenskonventionen ab, die unter den Tools
+# tatsaechlich vorkommen. Alles andere im Muster ist regulaerer Ausdruck und
+# steht so in der Matrix.
+placeholders = {
+    "{tool}": re.escape(tool),
+    "{version}": r".*",
+    "{os}": os_name,
+    "{arch}": arch,
+    "{arch_x64}": "x64" if arch == "amd64" else "arm64",
+    "{os_cap}": "Linux" if os_name == "linux" else "macOS",
+    "{arch_bits}": "64bit" if arch == "amd64" else "ARM64",
+}
+for key, value in placeholders.items():
+    pattern = pattern.replace(key, value)
+
 url = f"https://api.github.com/repos/{repo}/releases/latest"
 req = urllib.request.Request(
     url,
@@ -430,57 +532,32 @@ with urllib.request.urlopen(req, timeout=30) as response:
 assets = data.get("assets", [])
 tag = data.get("tag_name", "latest")
 
-patterns = []
-if tool == "gitleaks":
-    gitleaks_arch = "x64" if arch == "amd64" else "arm64"
-    patterns.append(rf"^gitleaks_.*_{os_name}_{gitleaks_arch}\.tar\.gz$")
-elif tool == "trufflehog":
-    patterns.append(rf"^trufflehog_.*_{os_name}_{arch}\.tar\.gz$")
-elif tool == "trivy":
-    if os_name != "linux":
-        raise SystemExit("trivy native GitHub-release install is supported here only on Linux; use Homebrew or Docker on macOS")
-    trivy_arch = "64bit" if arch == "amd64" else "ARM64"
-    patterns.append(rf"^trivy_.*_Linux-{trivy_arch}\.tar\.gz$")
-elif tool in {"syft", "grype"}:
-    patterns.append(rf"^{tool}_.*_{os_name}_{arch}\.tar\.gz$")
-else:
-    raise SystemExit(f"no GitHub release mapping for {tool}")
-
-for pattern in patterns:
-    regex = re.compile(pattern)
-    for asset in assets:
-        name = asset.get("name", "")
-        if regex.match(name):
-            print(tag)
-            print(asset["browser_download_url"])
-            print(name)
-            raise SystemExit(0)
+regex = re.compile(pattern)
+for asset in assets:
+    name = asset.get("name", "")
+    if regex.match(name):
+        print(tag)
+        print(asset["browser_download_url"])
+        print(name)
+        raise SystemExit(0)
 
 names = ", ".join(asset.get("name", "") for asset in assets)
-raise SystemExit(f"no matching release asset for {tool}; looked for {patterns}; available: {names}")
+raise SystemExit(f"no matching release asset for {tool}; pattern {pattern}; available: {names}")
 PY
 }
 
-github_repo_for_tool() {
-  case "$1" in
-    gitleaks) printf 'gitleaks/gitleaks' ;;
-    trufflehog) printf 'trufflesecurity/trufflehog' ;;
-    trivy) printf 'aquasecurity/trivy' ;;
-    syft) printf 'anchore/syft' ;;
-    grype) printf 'anchore/grype' ;;
-    *) die "No GitHub repo mapping for $1" ;;
-  esac
-}
-
 install_github_binary() {
-  local tool repo tmp_dir asset_info tag url asset archive extract_dir candidate installed asset_lines
+  local tool repo pattern tmp_dir asset_info tag url asset archive extract_dir candidate installed asset_lines
   tool="$1"
-  repo="$(github_repo_for_tool "$tool")"
+  repo="$(install_ref "$tool")"
+  pattern="$(asset_pattern "$tool")"
+  [[ -n "$repo" && "$repo" != "-" ]] || die "Kein GitHub-Repo in der Matrix fuer $tool. Spalte install_ref pruefen."
+  [[ -n "$pattern" && "$pattern" != "-" ]] || die "Kein asset_pattern in der Matrix fuer $tool."
 
   has_cmd python3 || die "python3 is required to resolve latest GitHub releases."
   has_cmd tar || die "tar is required to extract release archives."
 
-  asset_info="$(latest_asset "$tool" "$repo")"
+  asset_info="$(latest_asset "$tool" "$repo" "$pattern")"
   mapfile -t asset_lines <<< "$asset_info"
   tag="${asset_lines[0]:-}"
   url="${asset_lines[1]:-}"
@@ -501,7 +578,19 @@ install_github_binary() {
   extract_dir="$tmp_dir/extract"
   mkdir -p "$extract_dir"
   download_file "$url" "$archive"
-  tar -xzf "$archive" -C "$extract_dir"
+
+  # Nicht jedes Projekt packt seine Binary ein: osv-scanner etwa laedt sie blank
+  # aus. Entschieden wird am Namen des Assets, nicht am Muster.
+  case "$asset" in
+    *.tar.gz|*.tgz)
+      tar -xzf "$archive" -C "$extract_dir"
+      ;;
+    *)
+      install -m 0755 "$archive" "$BIN_DIR/$tool"
+      rm -rf "$tmp_dir"
+      return
+      ;;
+  esac
 
   installed=0
   shopt -s globstar nullglob
@@ -521,15 +610,22 @@ install_github_binary() {
   fi
 }
 
-install_pip_audit() {
-  local method
-  method="$1"
+# install_pipx_tool installiert ein pip-Paket host-lokal: bevorzugt mit pipx, sonst
+# in ein dediziertes Tool-venv. Der Paketname kommt aus der Matrix und kann Extras
+# tragen, etwa bandit[sarif]; die Binary heisst trotzdem wie die Tool-Spalte.
+install_pipx_tool() {
+  local tool method package venv_dir
+  tool="$1"
+  method="$2"
+  package="$(install_ref "$tool")"
+  venv_dir="$(tool_venv_dir "$tool")"
+  [[ -n "$package" && "$package" != "-" ]] || die "Kein pip-Paket in der Matrix fuer $tool. Spalte install_ref pruefen."
   ensure_bin_dir
 
   if [[ "$method" == "auto" || "$method" == "pipx" ]]; then
     if has_cmd pipx; then
-      log "Installing pip-audit with pipx"
-      run_or_print pipx install --force pip-audit
+      log "Installing $tool with pipx: $package"
+      run_or_print pipx install --force "$package"
       return
     fi
     if [[ "$method" == "pipx" ]]; then
@@ -537,19 +633,34 @@ install_pip_audit() {
     fi
   fi
 
-  has_cmd python3 || die "python3 is required for pip-audit tool-venv install."
-  log "Installing pip-audit into dedicated tool venv: $VENV_DIR"
+  has_cmd python3 || die "python3 is required for the $tool tool-venv install."
+  log "Installing $tool into dedicated tool venv: $venv_dir"
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    printf 'DRY-RUN: python3 -m venv %q\n' "$VENV_DIR" >&2
-    printf 'DRY-RUN: %q -m pip install --upgrade pip pip-audit\n' "$VENV_DIR/bin/python" >&2
-    printf 'DRY-RUN: ln -sfn %q %q\n' "$VENV_DIR/bin/pip-audit" "$BIN_DIR/pip-audit" >&2
+    printf 'DRY-RUN: python3 -m venv %q\n' "$venv_dir" >&2
+    printf 'DRY-RUN: %q -m pip install --upgrade pip %q\n' "$venv_dir/bin/python" "$package" >&2
+    printf 'DRY-RUN: ln -sfn %q %q\n' "$venv_dir/bin/$tool" "$BIN_DIR/$tool" >&2
     return
   fi
 
-  python3 -m venv "$VENV_DIR"
-  "$VENV_DIR/bin/python" -m pip install --upgrade pip pip-audit
-  ln -sfn "$VENV_DIR/bin/pip-audit" "$BIN_DIR/pip-audit"
+  python3 -m venv "$venv_dir"
+  "$venv_dir/bin/python" -m pip install --upgrade pip "$package"
+  ln -sfn "$venv_dir/bin/$tool" "$BIN_DIR/$tool"
+}
+
+# install_go_binary installiert ein Go-Werkzeug mit `go install`. GOBIN zeigt auf
+# dasselbe Bin-Verzeichnis wie die uebrigen Methoden, damit alle Tools an einem Ort
+# liegen und der PATH-Hinweis fuer alle gilt.
+install_go_binary() {
+  local tool module
+  tool="$1"
+  module="$(install_ref "$tool")"
+  [[ -n "$module" && "$module" != "-" ]] || die "Kein Go-Modulpfad in der Matrix fuer $tool. Spalte install_ref pruefen."
+  has_cmd go || die "Go ist nicht installiert, wird fuer $tool aber gebraucht. Installiere Go oder nutze --method docker, falls die Matrix ein Image nennt."
+  ensure_bin_dir
+
+  log "Installing $tool with go install into $BIN_DIR: $module"
+  GOBIN="$BIN_DIR" run_or_print go install "$module"
 }
 
 install_docker_image() {
@@ -571,31 +682,43 @@ install_tool() {
   tool="$1"
   method="$2"
 
-  case "$tool" in
-    pip-audit)
+  # Verzweigt wird ueber die Matrix-Spalte install_method, nicht ueber den
+  # Tool-Namen: ein neues Tool ist damit eine Zeile in der TSV und keine Aenderung
+  # an diesem Skript.
+  case "$(install_method "$tool")" in
+    pipx)
       case "$method" in
-        auto|native|pipx|venv) install_pip_audit "$method" ;;
+        auto|native|pipx|venv) install_pipx_tool "$tool" "$method" ;;
         docker)
-          log "Docker-Fallback fuer pip-audit ist nicht definiert; installiere pip-audit stattdessen in einem dedizierten Tool-venv."
-          install_pip_audit venv
+          if ! install_docker_image "$tool"; then
+            log "Installiere $tool stattdessen in einem dedizierten Tool-venv."
+            install_pipx_tool "$tool" venv
+          fi
           ;;
-        *) die "Unknown install method for pip-audit: $method" ;;
+        *) die "Unknown install method for $tool: $method" ;;
       esac
       ;;
-    gitleaks|trufflehog|trivy|syft|grype)
+    go)
+      case "$method" in
+        auto|native) install_go_binary "$tool" ;;
+        docker) install_docker_image "$tool" ;;
+        pipx|venv) die "$method gilt nur fuer pip-Tools, $tool wird mit go install geholt." ;;
+        *) die "Unknown install method: $method" ;;
+      esac
+      ;;
+    github)
       case "$method" in
         auto|native)
           ensure_bin_dir
           install_github_binary "$tool"
           ;;
-        docker)
-          install_docker_image "$tool"
-          ;;
-        pipx|venv)
-          die "$method is only supported for pip-audit."
-          ;;
+        docker) install_docker_image "$tool" ;;
+        pipx|venv) die "$method gilt nur fuer pip-Tools, $tool kommt aus einem GitHub-Release." ;;
         *) die "Unknown install method: $method" ;;
       esac
+      ;;
+    none)
+      die "$tool ist laut Matrix nicht installierbar."
       ;;
     *)
       die "Unknown tool: $tool"
@@ -607,8 +730,11 @@ selected_tools() {
   local tool
   case "$INSTALL_SPEC" in
     missing)
+      # Folgt derselben Sprachregel wie die Statuszeile: was der Preflight nicht als
+      # fehlende Pflicht zaehlt, wird hier auch nicht installiert. Die expliziten
+      # Ziele required und all bleiben davon unberuehrt.
       for tool in "${REQUIRED_TOOLS[@]}"; do
-        if is_installable_tool "$tool" && ! has_cmd "$tool"; then
+        if is_required_tool "$tool" && is_installable_tool "$tool" && ! has_cmd "$tool"; then
           printf '%s\n' "$tool"
         fi
       done
@@ -708,9 +834,14 @@ parse_args() {
         [[ -n "$BIN_DIR" ]] || die "--bin-dir requires a path."
         shift 2
         ;;
-      --venv)
-        VENV_DIR="${2:-}"
-        [[ -n "$VENV_DIR" ]] || die "--venv requires a path."
+      --languages)
+        LANGUAGES="${2:-}"
+        [[ -n "$LANGUAGES" ]] || die "--languages requires a comma-separated list."
+        shift 2
+        ;;
+      --venv-root)
+        VENV_ROOT="${2:-}"
+        [[ -n "$VENV_ROOT" ]] || die "--venv-root requires a path."
         shift 2
         ;;
       --yes)

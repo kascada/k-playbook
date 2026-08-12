@@ -43,9 +43,10 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 
 ## Umstellung
 
-[`umbau.md`](./umbau.md) ist die Arbeitsdatei zur laufenden Umstellung auf das
-projektlokale Modell. Sie haelt fest, was festgelegt ist, was ersatzlos entfallen ist und
-was noch nachzuziehen bleibt. Wenn alles umgestellt ist, wird sie geloescht.
+[`umbau.md`](./umbau.md) ist die Arbeitsdatei zur Umstellung. Das projektlokale Modell ist
+umgesetzt und in den Seiten oben beschrieben; in der Arbeitsdatei steht nur noch, was
+festgelegt, aber noch nicht umgesetzt ist — derzeit der Umbau der Scan-Reviews auf SARIF.
+Wenn nichts mehr offen ist, wird sie geloescht.
 
 ## Stichwort-Index
 
@@ -53,6 +54,7 @@ was noch nachzuziehen bleibt. Wenn alles umgestellt ist, wird sie geloescht.
 - `AGENTS.md` / `CLAUDE.md` / `Verlinkung` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
 - `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
+- `CodeQL` -> [`faq.md`](./faq.md#was-ist-mit-codeql)
 - `Commands` -> [`commands.md`](./commands.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
 - `Enforcement` / `Regeln` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)

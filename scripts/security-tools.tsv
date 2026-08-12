@@ -1,10 +1,31 @@
 # Kanonische Tool-Matrix fuer install-security-tools.sh, die Oberflaeche und die Review-Rezepte.
-# Fields: name	required	installable	role	docker_image	version_args
-name	required	installable	role	docker_image	version_args
-gitleaks	true	true	Secret-Scanning	ghcr.io/gitleaks/gitleaks:latest	version,--version
-trufflehog	true	true	Tiefes Secret-Scanning	trufflesecurity/trufflehog:latest	--version
-pip-audit	true	true	Python Dependency-CVEs	-	--version
-trivy	true	true	Filesystem-/Container-/IaC-CVEs	aquasec/trivy:latest	--version
-syft	true	true	SBOM-Erzeugung	anchore/syft:latest	version,--version
-grype	true	true	SBOM-/Dependency-CVE-Auswertung	anchore/grype:latest	version,--version
-docker	false	false	Optionaler Fallback fuer Container-Images	-	--version
+# Fields: name	languages	required	installable	install_method	install_ref	asset_pattern	role	docker_image	version_args
+#
+# languages       Komma-Liste der Projektsprachen, fuer die das Tool zustaendig ist, oder *
+#                 fuer sprachunabhaengig. required gilt nur, wenn die Sprache zutrifft;
+#                 ohne bekannte Sprachen ist ein sprachgebundenes Tool optional.
+# install_method  github (Release-Asset), go (go install), pipx (pipx oder Tool-venv), none.
+# install_ref     Zur Methode passende Referenz: GitHub-Repo, Go-Modulpfad oder Paketname.
+# asset_pattern   Nur fuer github: regulaerer Ausdruck auf den Asset-Namen. Platzhalter
+#                 {tool} {version} {os} {arch} decken den Normalfall ab; {arch_x64} ist
+#                 x64/arm64, {os_cap} ist Linux/macOS und {arch_bits} ist 64bit/ARM64.
+#                 Endet der Name nicht auf .tar.gz oder .tgz, gilt das Asset als blanke
+#                 Binary und wird direkt installiert.
+#
+# go als install_method bleibt den Tools vorbehalten, die Go ohnehin zur Analyse brauchen.
+# Alles andere kommt aus einem Release, damit ein Python-Projekt kein Go braucht.
+name	languages	required	installable	install_method	install_ref	asset_pattern	role	docker_image	version_args
+gitleaks	*	true	true	github	gitleaks/gitleaks	^{tool}_{version}_{os}_{arch_x64}\.tar\.gz$	Secret-Scanning	ghcr.io/gitleaks/gitleaks:latest	version,--version
+trufflehog	*	true	true	github	trufflesecurity/trufflehog	^{tool}_{version}_{os}_{arch}\.tar\.gz$	Tiefes Secret-Scanning	trufflesecurity/trufflehog:latest	--version
+trivy	*	true	true	github	aquasecurity/trivy	^{tool}_{version}_{os_cap}-{arch_bits}\.tar\.gz$	Filesystem-/Container-/IaC-CVEs	aquasec/trivy:latest	--version
+syft	*	true	true	github	anchore/syft	^{tool}_{version}_{os}_{arch}\.tar\.gz$	SBOM-Erzeugung	anchore/syft:latest	version,--version
+grype	*	true	true	github	anchore/grype	^{tool}_{version}_{os}_{arch}\.tar\.gz$	SBOM-/Dependency-CVE-Auswertung	anchore/grype:latest	version,--version
+pip-audit	python	true	true	pipx	pip-audit	-	Python Dependency-CVEs	-	--version
+semgrep	python,go	true	true	pipx	semgrep	-	Generische Security-Regeln	semgrep/semgrep:latest	--version
+osv-scanner	python,go	true	true	github	google/osv-scanner	^{tool}_{os}_{arch}$	Dependency-CVEs mit SARIF	-	--version
+gosec	go	true	true	github	securego/gosec	^{tool}_{version}_{os}_{arch}\.tar\.gz$	Go-Security	-	--version
+govulncheck	go	true	true	go	golang.org/x/vuln/cmd/govulncheck@latest	-	Go-CVEs mit Reachability	-	--version
+ruff	python	false	true	pipx	ruff	-	Python-Qualitaet und flake8-bandit-Regeln	-	--version
+bandit	python	false	true	pipx	bandit[sarif]	-	Python-Security	-	--version
+golangci-lint	go	false	true	github	golangci/golangci-lint	^{tool}-{version}-{os}-{arch}\.tar\.gz$	Go-Qualitaet, buendelt staticcheck und errcheck	-	--version
+docker	*	false	false	none	-	-	Optionaler Fallback fuer Container-Images	-	--version

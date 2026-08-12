@@ -195,6 +195,23 @@ Scans.
 Einen eigenen `/k-install-security-tools`-Command gibt es nicht mehr — er haette das
 Skript nur in Prosa gedoppelt und waere bei jeder Skriptaenderung nachzuziehen gewesen.
 
+## Was ist mit CodeQL?
+
+Der Zweig ist vollstaendig entfallen: die Commands `/k-setup-codeql` und
+`/k-install-codeql`, das Skript `install-codeql-local.sh`, die Regel `rules/codeql.md`,
+das Rezept `review-codeql-security.md`, der `codeql`-Modus von `/k-status` und der Block
+`tools.codeql`.
+
+Er passte nicht mehr zur Struktur: er schrieb `tools.codeql` direkt in die
+`K-PLAYBOOK.yaml` statt ueber die `context`-Ausgabe zu gehen, und er legte CLI,
+Datenbanken und SARIF unter `k-playbook/` ab — also in dem Verzeichnis, das jedes Update
+ersetzt. Ein Umbau haette die CLI-Beschaffung an `tools.gh` haengen, das Scannen in ein
+eigenes Subkommando verlagern, der Datenbank einen Ort samt Aktualitaetspruefung geben und
+ihren Zustand in `context` melden muessen. Solange die uebrigen Scan-Familien noch nicht
+umgestellt sind, steht dieser Aufwand in keinem Verhaeltnis zum Nutzen.
+
+Ein spaeterer Wiedereinstieg ist ueber die Git-Historie moeglich.
+
 ## Brauche ich Go?
 
 Nein. `bin/k-playbook` ist ein Wrapper, der das zur Plattform passende Binary aus `dist/`

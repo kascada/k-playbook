@@ -118,6 +118,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
+	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)

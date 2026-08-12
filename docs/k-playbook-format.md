@@ -76,16 +76,24 @@ nie an die Konfiguration eine Ebene darueber.
 
 ## Mitgeliefertes und Projekteigenes zusammenfassen
 
-Drei Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Seiten:
+Fünf Verzeichnisse existieren doppelt. Was gilt, ist die Vereinigung beider Seiten:
 
-| Sorte | mitgeliefert | projekteigen | Dateimuster |
+| Sorte | mitgeliefert | projekteigen | Einheit |
 |---|---|---|---|
 | Regeln | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
 | Review-Rezepte | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
 | Checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, nur oberste Ebene |
+| Commands | `k-playbook/commands/` | `k-playbook-local/commands/` | `*.md`, rekursiv |
+| Skills | `k-playbook/skills/` | `k-playbook-local/skills/` | Verzeichnis mit `SKILL.md` |
 
-Die Vergleichseinheit ist der **Dateiname**. Beide Seiten benutzen dieselbe
+Die Vergleichseinheit ist der **Name**. Beide Seiten benutzen dieselbe
 Namenskonvention, deshalb braucht es keinen abgeleiteten Schluessel.
+
+Bei Commands ist es der Pfad ab `commands/`, einschliesslich Namensraum: eine lokale
+`commands/_shared/context.md` ersetzt genau diese Datei, der Rest von `_shared/` bleibt
+mitgeliefert. Ein Skill dagegen wird als Ganzes ersetzt — `SKILL.md`, `PLAYBOOK.md` und
+Vorlagen muessen zueinander passen, ein halb ersetzter Skill waere nicht sinnvoll
+zusammensetzbar.
 
 **Bei gleichem Dateinamen gewinnt die projekteigene Datei, und zwar vollstaendig.** Die
 mitgelieferte wird dann gar nicht erst gelesen; es werden auch keine einzelnen Abschnitte
@@ -113,6 +121,9 @@ Eine projekteigene Datei schaltet man ab, indem man sie loescht.
 `README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig Dotfiles oder
 irgendetwas unter `checks/lib/`.
 
+Bei Skills entscheidet die `SKILL.md` ueber das Abschalten: ist sie leer, gilt der Skill
+als abgeschaltet und wird nicht registriert.
+
 Wer wissen will, was am Ende gilt, fragt nicht das Dateisystem, sondern das Werkzeug:
 
 ```bash
@@ -123,14 +134,23 @@ Die Ausgabe fuehrt die zusammengefuehrten Kataloge mit Herkunft je Eintrag — `
 `local` oder `override` — und markiert Abgeschaltetes. Siehe [Der aufgeloeste
 Arbeitsstand](#der-aufgeloeste-arbeitsstand).
 
-**Commands und Skills folgen derselben Regel.** `k-playbook-local/commands/` und
-`k-playbook-local/skills/` ueberlagern die mitgelieferten; gleicher Name ersetzt, ein
-leerer Eintrag schaltet ab. Verglichen wird bei Commands der Pfad ab `commands/`
-einschliesslich Namensraum, bei Skills der Verzeichnisname als Ganzes.
+Weil Commands und Skills damit aus zwei Quellen kommen, sind die Assistenten-Ziele —
+`.claude/commands`, `.claude/skills`, `.opencode/commands`, `.cursor/commands` — echte
+Verzeichnisse mit **einem Symlink je Eintrag**, kein Verzeichnis-Symlink: der zeigte auf
+genau eine Quelle.
 
-Deshalb sind die Assistenten-Ziele — `.claude/commands`, `.claude/skills`,
-`.opencode/commands`, `.cursor/commands` — echte Verzeichnisse mit **einem Symlink je
-Eintrag**, kein Verzeichnis-Symlink: der zeigte auf genau eine Quelle.
+### Was es nur einmal gibt
+
+Alles Uebrige hat kein Gegenstueck auf der anderen Seite:
+
+| | Verzeichnisse |
+|---|---|
+| nur projekteigen | `results/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `TODO.md` |
+| nur mitgeliefert | `docs/`, `scripts/`, `bin/`, `dist/`, `installer/` |
+
+`docs/` steht in beiden Zeilen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
+k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstaende
+unter demselben Namen, nichts zusammenzufassen.
 
 Nichts unterhalb von `k-playbook/` darf geschrieben werden — auch nicht von Commands, die
 dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollstaendig.

@@ -380,7 +380,10 @@ func replaceNestedBlock(content string, parent string, child string, block strin
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if trimmed == child+":" {
+		// Auch ein Schluessel mit Wert in derselben Zeile zaehlt, etwa
+		// "languages: []". Sonst faende der zweite Aufruf seinen eigenen ersten
+		// nicht wieder und haengte einen zweiten Block an.
+		if trimmed == child+":" || strings.HasPrefix(trimmed, child+": ") {
 			childStart = index
 			childIndent = lineIndent(lines[index])
 			break
@@ -412,6 +415,12 @@ func replaceNestedBlock(content string, parent string, child string, block strin
 			childEnd = index
 			break
 		}
+	}
+	// Leerzeilen am Ende gehoeren nicht mehr zum Unterblock, sondern trennen ihn
+	// vom naechsten ab. Wuerden sie mitersetzt, klebte der Rest der Datei nach
+	// jedem Schreiben eine Zeile naeher.
+	for childEnd > childStart+1 && strings.TrimSpace(lines[childEnd-1]) == "" {
+		childEnd--
 	}
 
 	result := append([]string{}, lines[:childStart]...)

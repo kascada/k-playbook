@@ -242,6 +242,19 @@ body[data-mode="none"] .mode-badge {
   gap: 10px;
 }
 
+/* Mehrfachauswahl aus wenigen kurzen Werten, etwa die Sprachen: nebeneinander
+   statt untereinander, weil hier keine Beschreibung mitlaeuft. */
+.choices-inline {
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: start;
+}
+
+.choices-inline .choice {
+  align-items: center;
+  padding: 8px 16px;
+}
+
 .choice {
   display: flex;
   align-items: flex-start;

@@ -40,6 +40,8 @@ installer/
 ├── cmd/k-playbook/main.go       raeumt Altlasten weg, startet webui.Run()
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
+├── internal/hostinstall/
+│   └── mirror.go                host-weite Kopie spiegeln, verlinken, PATH pruefen
 ├── internal/project/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
@@ -50,6 +52,8 @@ installer/
 │   ├── remediation.go           remediation:-Block lesen und setzen
 │   ├── context.go               Arbeitsstand aufloesen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis pruefen und ergaenzen
+│   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
+│   ├── update.go                Remote-Stand pruefen, Sauberkeit, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   └── tools.go                 Security-Tool-Preflight ueber das Skript
 ├── internal/webui/
@@ -58,6 +62,7 @@ installer/
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── hostpath.go              PATH-Zustand melden, read-only
 │   ├── config.go local.go assistant.go tools.go remediation.go context.go
+│   ├── gh.go update.go
 │   └── static/                  index.html, app.js, styles.css
 ├── go.mod
 └── README.md
@@ -84,6 +89,12 @@ die Konfiguration eine Ebene darueber. Das ist der haeufigste Fall, nicht der So
 Es gibt **keine Fallunterscheidung** zwischen Entwicklungsrepo und Zielprojekt. Beide
 tragen ihre eigene `K-PLAYBOOK.yaml` und werden gleich behandelt. Der einzige Unterschied
 ist installiert oder nicht — siehe `Environment` in `project/environment.go`.
+
+Fuer das Entwicklungsrepo heisst das: der Anker ist `<repo>/K-PLAYBOOK.yaml`, die
+Installation liegt darunter in `<repo>/k-playbook/` und ist ein eigener Clone. Es gibt das
+Playbook dort also zweimal — den Arbeitsstand im Repo und die installierte Fassung
+daneben. Dass beide auseinanderlaufen koennen, wird bewusst in Kauf genommen; gearbeitet
+wird am Repo-Stand, aufgeloest wird gegen die Installation.
 
 ## Ort vorschlagen, wenn nichts gefunden wurde
 
@@ -554,7 +565,15 @@ Schritt still. Ein Fehler dabei haelt den Start nicht auf.
 `k-playbook/scripts/install-security-tools.sh --json` auf und liest dessen JSON.
 
 Die Tool-Liste steht **nicht** im Go-Code. Sie kommt aus `scripts/security-tools.tsv`,
-derselben Matrix, die auch das Skript und die Review-Rezepte lesen.
+derselben Matrix, die auch das Skript und die Review-Rezepte lesen. Dort steht auch, wie
+ein Tool auf den Host kommt (`install_method`, `install_ref`) und fuer welche
+Projektsprachen es zustaendig ist (`languages`) — ein neues Tool ist eine Zeile in der
+TSV, keine Aenderung an Skript oder Go-Code.
+
+`Tool.Required` traegt die Sprachregel bereits: ein sprachgebundenes Tool ist nur Pflicht,
+wenn seine Sprache im Aufruf stand. Ohne `--languages` gilt nur Sprachunabhaengiges als
+Pflicht — was nicht gefragt wurde, kann auch nicht fehlen. Go reicht die Antwort
+unveraendert durch und rechnet nichts nach.
 
 Der Aufruf ist ausschliesslich lesend: `--json` prueft nur, ob die Binaries vorhanden
 sind. Installiert wird bewusst im Terminal, weil das den Host veraendert und nicht das
@@ -755,7 +774,9 @@ Lesen und Herueberkopieren da.
 ## Offene Punkte
 
 - Was der Projektstatus in der Oberflaeche zeigen soll, nachdem der Projekt-Store
-  entfallen ist.
+  entfallen ist. Daran haengt, was von `/k-status` ins Binary zurueckwandert: der Bericht
+  steht derzeit auf der `context`-Ausgabe plus billigen Existenzpruefungen, weil das alte
+  Subkommando `status` entfallen ist.
 - Keine automatisierten Tests fuer die HTTP-Handler; getestet ist bisher nur
   `internal/project`.
 - Release-Artefakte gibt es fuer macOS und Linux. Windows ist offen.

@@ -38,6 +38,7 @@ const elements = {
   ghCommandText: document.getElementById("gh-command-text"),
   toolsCard: document.getElementById("tools-card"),
   toolsPill: document.getElementById("tools-pill"),
+  toolsLanguages: document.getElementById("tools-languages"),
   toolsFacts: document.getElementById("tools-facts"),
   toolsMessage: document.getElementById("tools-message"),
   toolsCommand: document.getElementById("tools-command"),
@@ -726,10 +727,30 @@ async function loadTools() {
   }
 }
 
+// Die Sprachauswahl ist das einzige Schreibbare in diesem Block. Sie gehoert dem
+// Projekt und landet in der K-PLAYBOOK.yaml; die Installation bleibt im Terminal.
+async function setLanguages(languages) {
+  elements.toolsPill.className = "pill muted";
+  elements.toolsPill.textContent = "Speichern...";
+  try {
+    const response = await fetch("/api/languages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ languages }),
+    });
+    renderTools(await response.json());
+  } catch {
+    elements.toolsMessage.textContent = "Speichern fehlgeschlagen.";
+  }
+}
+
 function renderTools(data) {
   elements.toolsFacts.replaceChildren();
+  elements.toolsLanguages.replaceChildren();
   elements.toolsMessage.textContent = data.message || "";
   elements.toolsCommand.classList.add("hidden");
+
+  renderLanguageChoices(data);
 
   if (!data.available || data.message) {
     elements.toolsPill.className = "pill muted";
@@ -737,9 +758,30 @@ function renderTools(data) {
     return;
   }
 
+  // Ein sprachgebundenes Tool, das nicht zur Auswahl passt, ist nicht optional
+  // im Sinne von "waere schoen", sondern schlicht nicht zustaendig. Das muss
+  // unterscheidbar bleiben, sonst sieht ein Python-Projekt lauter Luecken.
+  const selected = new Set(data.languages || []);
   for (const tool of data.tools || []) {
-    const label = tool.required ? tool.name : `${tool.name} (optional)`;
-    const detail = tool.status === "ok" ? tool.version || "vorhanden" : `fehlt — ${tool.role}`;
+    const languages = (tool.languages || "*").split(",").map((entry) => entry.trim());
+    const universal = languages.includes("*");
+    const relevant = universal || languages.some((entry) => selected.has(entry));
+
+    let label = tool.name;
+    if (!relevant) {
+      label = `${tool.name} (${languages.join(", ")})`;
+    } else if (!tool.required) {
+      label = `${tool.name} (optional)`;
+    }
+
+    let detail;
+    if (tool.status === "ok") {
+      detail = tool.version || "vorhanden";
+    } else if (relevant) {
+      detail = `fehlt — ${tool.role}`;
+    } else {
+      detail = `nicht gebraucht — ${tool.role}`;
+    }
     addFact(elements.toolsFacts, label, detail);
   }
   if (data.binDir) {
@@ -757,6 +799,49 @@ function renderTools(data) {
   if (data.command) {
     elements.toolsCommandText.textContent = data.command;
     elements.toolsCommand.classList.remove("hidden");
+  }
+}
+
+function renderLanguageChoices(data) {
+  const available = data.availableLanguages || [];
+  if (available.length === 0) {
+    return;
+  }
+  const selected = new Set(data.languages || []);
+
+  for (const language of available) {
+    const isOn = selected.has(language);
+
+    const label = document.createElement("label");
+    label.className = isOn ? "choice selected" : "choice";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = language;
+    input.checked = isOn;
+    input.addEventListener("change", () => {
+      const next = new Set(selected);
+      if (input.checked) {
+        next.add(language);
+      } else {
+        next.delete(language);
+      }
+      setLanguages(available.filter((entry) => next.has(entry)));
+    });
+
+    const title = document.createElement("div");
+    title.className = "choice-label";
+    title.textContent = language;
+
+    label.append(input, title);
+    elements.toolsLanguages.append(label);
+  }
+
+  // Die Vorauswahl gilt auch ohne Eintrag in der Datei; das sollte sichtbar
+  // sein, damit niemand eine ausdrueckliche Entscheidung vermutet.
+  if (!data.configured && !data.message) {
+    elements.toolsMessage.textContent =
+      "Vorauswahl, noch nicht in der Konfiguration festgehalten. Eine Auswahl schreibt sie fest.";
   }
 }
 
