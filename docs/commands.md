@@ -33,9 +33,6 @@ gestartet wurde.
 | **Projekt** | | |
 | `/k-gui` | Oberflaeche starten | fuehrt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
 | `/k-status` | read-only Zustandsbericht fuer das Projekt | repariert nichts |
-| **Tools** | | |
-| `/k-install-codeql` | CodeQL CLI installieren/pruefen, optional lokale DBs analysieren | aendert `K-PLAYBOOK.yaml` nicht |
-| `/k-setup-codeql` | CodeQL-Entscheidung im Projekt festhalten | schreibt nur `tools.codeql` |
 | **Docs** | | |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und fuer AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergaenzen | erzeugt je ausgewaehltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
@@ -94,7 +91,6 @@ Kein Command liest oder raet einen Pfad. Alles leitet sich aus dem Ort der
 | `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
 | `/k-review`, `/k-results` | `k-playbook-local/results/` |
-| `/k-setup-codeql` | `K-PLAYBOOK.yaml`, nur `tools.codeql` |
 | `/k-code2docs`, `/k-tools-scan` | `k-playbook-local/docs/`, Tool-Steckbriefe unter `libs/` |
 
 Gelesen wird zusaetzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
@@ -120,7 +116,7 @@ mitgeliefert und projekteigen bereits zusammengefuehrt:
   ],
   "catalogs": {
     "rules": [
-      { "name": "codeql.md",             "key": "codeql",            "origin": "dist" },
+      { "name": "review-authoring.md",   "key": "review-authoring",  "origin": "dist" },
       { "name": "docs-sync.md",          "key": "docs-sync",         "origin": "override" },
       { "name": "my-api-rules.md",       "key": "my-api-rules",      "origin": "local" },
       { "name": "tool-install-scope.md", "key": "tool-install-scope","origin": "override",
@@ -132,6 +128,13 @@ mitgeliefert und projekteigen bereits zusammengefuehrt:
 
 `origin` ist `dist`, `local` oder `override`. `disabled` steht dort, wo die projekteigene
 Datei leer ist — das ist der Weg, einen mitgelieferten Eintrag abzuschalten.
+
+Der Aufruf steht am Anfang jedes Commands, aber nur einmal je Sitzung. Die Ausgabe
+aendert sich waehrend der Arbeit nicht und ist fuer jeden Command dieselbe, also
+verwenden nachfolgende Commands die vorhandene weiter — auch die Dateien aus
+`instructions` werden nur einmal gelesen. Neu geholt wird sie, wenn die
+`K-PLAYBOOK.yaml` geschrieben wurde, sich der Bestand an Regeln, Reviews, Checks oder
+Guidelines geaendert hat oder die Arbeit in ein anderes Projekt gewechselt ist.
 
 `/k-review`, `/k-enforcement` und `k-check` arbeiten auf dieser Menge und weisen sie vor
 der Arbeit aus. Die Regeln im Detail stehen in

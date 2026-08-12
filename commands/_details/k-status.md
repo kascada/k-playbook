@@ -1,6 +1,6 @@
 ---
 description: Fast read-only health overview for the current project, backed by the k-playbook context output.
-argument-hint: [full|codeql|reviews|json|strict]
+argument-hint: [full|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
 ---
@@ -15,8 +15,7 @@ This command is a status preflight, not a repair command:
   cheap existence or metadata check on top of it.
 - Prefer small existence and metadata checks over scans.
 - Do not create files, change config, install tools, run tests, run builds, start
-  scanners, create CodeQL databases, run CodeQL analysis, upload SARIF, call GitHub APIs,
-  or print Git diffs.
+  scanners, upload scan results, call GitHub APIs, or print Git diffs.
 - Do not repair anything. Every problem this command finds ends in a recommendation,
   normally `/k-gui`.
 
@@ -28,7 +27,6 @@ Interpret `$ARGUMENTS` as one optional mode:
 - `json`: print the context JSON unchanged.
 - `full`: compact report plus the effective catalogs listed entry by entry with origin.
 - `strict`: compact report plus a health-gate summary where warnings count as failed gates.
-- `codeql`: compact report plus lightweight CodeQL config metadata; do not run CodeQL.
 - `reviews`: compact report focused on review status; do not run reviews.
 
 If `$ARGUMENTS` is anything else, print the supported modes and stop without running
@@ -136,7 +134,7 @@ Print the compact report, then list the three catalogs entry by entry with origi
 
 ```text
 Regeln (rules): 4 aktiv
-  [dist]     codeql
+  [dist]     review-authoring
   [override] docs-sync            (ueberlagert k-playbook/rules/docs-sync.md)
   [disabled] tool-install-scope   (leere lokale Datei)
 ```
@@ -151,16 +149,6 @@ contents.
 - Add `Health-Gates: FAIL (<warn> warn gates, <fail> fail gates)` when warnings or
   failures exist.
 - Do not change exit behavior and do not modify files.
-
-## CodeQL Mode
-
-- Print the compact report.
-- Read the optional `tools.codeql` block from `<project.dir>/K-PLAYBOOK.yaml` when
-  present. This is the one place where this command reads the config file directly: the
-  block is not part of the context output yet. Read nothing else from the file.
-- Check configured paths only with existence metadata.
-- Do not run `codeql version`, `codeql database create`, `codeql database analyze`,
-  uploads, or GitHub API calls.
 
 ## Reviews Mode
 

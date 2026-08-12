@@ -80,7 +80,7 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
-- `result-family` (optional; e.g. `codeql` — for report-mode reviews that use `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`)
+- `result-family` (optional; e.g. `dependency-cve` — for report-mode reviews that use `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`)
 
 If `KNOWN_DECISIONS` is set and the file exists:
 

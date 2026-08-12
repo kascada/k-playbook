@@ -22,7 +22,7 @@ Unterstützt drei Formate:
 
 - Result-Summaries wie `k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
 - Legacy-Ergebnisdateien wie `k-playbook-local/results/result-*.md` mit Statuszeichen-Tabellen.
-- Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. CodeQL oder k-check.
+- Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehoerigem `findings.md`, z. B. `dependency-cve` oder `k-check`.
 
 Der `remediation`-Block der Context-Ausgabe legt fest, wie gearbeitet wird:
 

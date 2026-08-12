@@ -285,7 +285,7 @@ Drei Sorten, definiert in `catalogKinds()`:
 
 Die Vergleichseinheit ist der **Dateiname** — beide Seiten benutzen dieselbe
 Namenskonvention, ein abgeleiteter Schluessel waere unnoetiger Zwischenschritt. `key` gibt
-es trotzdem: den Aufrufnamen ohne Endung und Sortenpraefix, damit `/k-review codeql-security`
+es trotzdem: den Aufrufnamen ohne Endung und Sortenpraefix, damit `/k-review secret-scanning`
 funktioniert.
 
 Die Vereinigung beider Seiten, mit `origin` je Eintrag:
@@ -564,6 +564,35 @@ Projekt. Ein Timeout von 30 Sekunden begrenzt den Aufruf, weil der Preflight je 
 Bricht das Skript ab — etwa bei aktivem Projekt-venv — landet die erste stderr-Zeile in
 der Fehlermeldung.
 
+## GitHub CLI
+
+`project/gh.go` haelt zwei Dinge auseinander, die in einer Karte zusammen erscheinen.
+
+Die Projektentscheidung steht in `K-PLAYBOOK.yaml` unter `tools.gh.status` und wird
+zeilenweise gelesen und geschrieben, wie der Rest der Konfiguration. `SetGHStatus()`
+ersetzt nur den `gh:`-Unterblock; `replaceNestedBlock()` laesst einen danebenliegenden
+Block eines anderen Tools stehen. Der Default ist `unknown` und
+kein `disabled`: ohne Entscheidung weiss ein Command nicht, ob ein fehlendes `gh` ein
+Problem oder gewollt ist, und die Oberflaeche zeigt den offenen Punkt rot. Ein unbekannter
+Wert laesst `BuildContext()` abbrechen, damit ein Tippfehler nicht wie eine Entscheidung
+aussieht.
+
+Der Host-Befund kommt aus `DetectGH()`: ein `exec.LookPath("gh")` und ein Blick in
+`hosts.yml` im gh-Konfigurationsverzeichnis, dazu `GH_TOKEN`/`GITHUB_TOKEN`, die die
+Datei stechen. Gelesen werden dort nur `user` und die Namen unter `users`; die
+Token-Zeilen daneben werden uebergangen und tauchen in keiner Antwort auf.
+
+**Kein Aufruf von `gh auth status`.** Der prueft den Token beim Server und kostet einen
+Netzzugriff. Deshalb steht der Befund anders als der Security-Preflight im Kontext: er
+kostet nichts. Der Preis ist, dass ein abgelaufener Token als Anmeldung gilt — das sagen
+Karte und Doku ausdruecklich.
+
+Geschrieben wird nur die Entscheidung. Installation und Anmeldung bleiben im Terminal,
+aus demselben Grund wie bei den Security-Tools; `gh auth login` will ohnehin einen
+Browser. Auch das Umschalten zwischen Accounts steht nur als Befehl da: es gilt
+maschinenweit fuer jedes Terminal und jedes Projekt, und ein Approve laeuft danach unter
+dem neuen Namen. Ein Knopf in einer Projektoberflaeche wuerde diese Reichweite verdecken.
+
 ## Aufgelöster Kontext in der Oberflaeche
 
 Der unterste Block der Startseite zeigt, was `BuildContext()` liefert — dasselbe, was
@@ -624,6 +653,8 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 | `GET` | `/api/assistant` | Verlinkung pruefen |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
+| `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
+| `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` pruefen, ob die Installation zurueckliegt; liefert den lokalen Sauberkeitszustand mit |

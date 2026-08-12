@@ -447,6 +447,20 @@ Oberfläche, alles Weitere kann das Skript selbst: `--preflight` ist sein Standa
 ohne `--yes` fragt es vor der Installation, und `--help` erklärt die Methoden. Der Command
 hätte das nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen gewesen.
 
+**CodeQL, vollständig.** Die Commands `/k-setup-codeql` und `/k-install-codeql`, das
+Skript `install-codeql-local.sh`, die Regel `rules/codeql.md`, das Rezept
+`review-codeql-security.md`, der `codeql`-Modus von `/k-status` und der Block
+`tools.codeql` sind ersatzlos entfallen.
+
+Der Zweig hätte der neuen Struktur ohnehin folgen müssen: er las und schrieb
+`tools.codeql` direkt in der `K-PLAYBOOK.yaml` statt über die `context`-Ausgabe, und er
+legte CLI, Datenbanken und SARIF unter `k-playbook/` ab — in der Installation, die bei
+jedem Update ersetzt wird. Der Umbau wäre teuer geworden: die CLI-Beschaffung müsste an
+`tools.gh` hängen, das Scannen in ein zweites Subkommando wandern, die Datenbank bräuchte
+einen Ort samt Aktualitätsprüfung, und `context` müsste ihren Zustand melden. Solange die
+übrigen Scan-Familien noch nicht umgestellt sind, steht dieser Aufwand in keinem
+Verhältnis zum Nutzen. Ein späterer Wiedereinstieg ist über die Historie möglich.
+
 **Die alten Subkommandos.** `init`, `update`, `restore`, `migrate`, `status`, `smoke` und
 `projects …` gibt es nicht mehr, und damit auch keine lokale Projektliste unter
 `.k-playbook-local/projects.json`. Ohne Argument startet `k-playbook` die Oberfläche.
@@ -465,16 +479,23 @@ Pfadauflösung macht das Binary, die Overlay-Auflösung ebenfalls, und was übri
 steht in `commands/_shared/context.md`. Dort steht auch die feste Aufteilung unter
 `k-playbook-local/`, die `paths.*` ersetzt hat.
 
+**Erledigt: der Context wird einmal je Sitzung geladen.** Die Ausgabe ändert sich während
+der Arbeit nicht und ist für jeden Command dieselbe. `commands/_shared/context.md` hält
+deshalb fest, dass eine bereits vorliegende Ausgabe wiederverwendet wird, statt sie neu zu
+erzeugen, und dass auch die Dateien aus `instructions` nur einmal gelesen werden. Einen
+neuen Aufruf verlangen drei Fälle: eine seither geschriebene `K-PLAYBOOK.yaml`, ein
+geänderter Bestand an Regeln, Reviews, Checks oder Guidelines beziehungsweise ein Update,
+und ein Wechsel in ein anderes Projekt — erkennbar an `project.dir`. Felder aus zwei Läufen
+werden nicht gemischt.
+
+Der Einstiegsblock in Commands und Skills ist entsprechend konditional formuliert: er
+nennt die Wiederverwendung vor dem Aufruf. Vorher stand dort ein unbedingtes „rufe
+`context` auf", das die Regel im gemeinsamen Modul praktisch ausgehebelt hat. Der Anlass
+ist Aufwand — Modul plus Ausgabe fielen sonst bei jedem Command erneut an.
+
 **Die Oberfläche** deckt bisher nur Konfiguration, projekteigene Struktur und
 Assistenten-Verlinkung ab. Was der Status je Projekt zeigen soll, nachdem der frühere
 Projekt-Store entfallen ist, ist offen.
-
-**Offen: der CodeQL-Zweig.** `/k-setup-codeql`, `/k-install-codeql` und der
-`codeql`-Modus von `/k-status` lesen und schreiben `tools.codeql` weiterhin direkt in der
-`K-PLAYBOOK.yaml` — der Block steht nicht in der `context`-Ausgabe. Ausserdem legen sie
-lokale CodeQL-Artefakte unter `k-playbook/` ab, also in der Installation, die bei jedem
-Update ersetzt wird; sie gehören nach `k-playbook-local/`. Beides ist ein eigener
-Umbauschritt.
 
 **Offen: `/k-status`.** Der Bericht steht jetzt auf der `context`-Ausgabe plus billigen
 Existenzprüfungen, weil das Subkommando `k-playbook-installer status` entfallen ist. Was

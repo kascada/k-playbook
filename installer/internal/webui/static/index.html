@@ -114,6 +114,23 @@
         <p id="remediation-message" class="message"></p>
       </section>
 
+      <section class="card{{if not .Installed}} hidden{{end}}" id="gh-card">
+        <div class="section-head">
+          <div>
+            <h2>GitHub CLI</h2>
+          </div>
+          <span id="gh-pill" class="pill muted">Pruefen...</span>
+        </div>
+        <p class="hint">Ob dieses Projekt <code>gh</code> nutzt. Gebraucht von /k-pr-review und dem Dependabot-Review.</p>
+        <div id="gh-choices" class="choices"></div>
+        <dl id="gh-facts" class="facts"></dl>
+        <p id="gh-message" class="message"></p>
+        <div id="gh-command" class="command-row hidden">
+          <p id="gh-command-hint" class="hint"></p>
+          <code id="gh-command-text"></code>
+        </div>
+      </section>
+
       <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
         <div class="section-head">
           <div>

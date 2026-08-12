@@ -110,7 +110,14 @@ Validierung:
 
 - `PR_TARGET_DIR` muss existieren.
 - `PR_TARGET_DIR` muss ein Git-Repo sein.
-- `gh` muss verfuegbar sein.
+- `gh` muss nutzbar sein. Das steht in `gh` aus der Context-Ausgabe und wird nicht selbst
+  ermittelt:
+  - `gh.status: disabled` — abbrechen; dieses Projekt hat sich gegen gh entschieden, ein
+    PR-Review ist damit nicht vorgesehen.
+  - `gh.status: unknown` — abbrechen und `/k-gui` nennen; dort faellt die Entscheidung.
+  - `gh.ready: false` — abbrechen und benennen, was fehlt: Installation von `gh` oder
+    `gh auth login --hostname github.com`. Beides gehoert ins Terminal des Users.
+- Merke `GH_ACCOUNT` = `gh.account`. Schritt 9 nennt ihn vor jeder Schreibaktion.
 
 Ermittle dann das GitHub-Repo:
 
@@ -448,6 +455,18 @@ Wenn die Empfehlung `direkt annehmen` ist, nenne diese Option zuerst.
 Wenn die Empfehlung `branch erstellen und weiter testen` ist, nenne diese Option zuerst.
 
 ## Schritt 9 - Folgeaktion ausfuehren
+
+Approve, Merge und Kommentar sind nach aussen sichtbar und laufen unter dem Account, der
+auf diesem Rechner gerade aktiv ist — der gilt maschinenweit und kann seit dem letzten
+Mal in einem anderen Projekt umgeschaltet worden sein. Nenne deshalb vor der ersten
+Schreibaktion `GH_ACCOUNT` in einer Zeile, etwa:
+
+```
+Ausgefuehrt wird als GitHub-Account <GH_ACCOUNT>.
+```
+
+Ist `GH_ACCOUNT` leer, laeuft die Anmeldung ueber `GH_TOKEN`/`GITHUB_TOKEN`; sag das
+genauso, statt einen Namen zu erfinden.
 
 ### 9.1 Direkt annehmen
 

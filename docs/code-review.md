@@ -47,7 +47,6 @@ Aufrufe:
 ```text
 /k-review
 /k-review tech
-/k-review codeql-security
 /k-review secret-scanning
 ```
 
@@ -86,7 +85,6 @@ k-playbook-local/results/summary-YYYY-MM-DD.md
 
 Typische Review-Familien:
 
-- `/k-review codeql-security`
 - `/k-review k-check-security`
 - `/k-review secret-scanning`
 - `/k-review dependency-cve`

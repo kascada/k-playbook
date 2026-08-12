@@ -47,7 +47,14 @@ fields from two loads.
 | `local.dir` | Everything the project owns. |
 | `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
 | `remediation` | How findings are to be worked off. |
+| `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
 | `guidelines` | Project guideline files. |
+
+`gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
+`disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. `gh.installed`, `gh.loggedIn`,
+`gh.account` and `gh.ready` are a host finding for this machine only. `gh.ready` means
+both: the CLI is there and an account is on file. It is read from gh's own configuration,
+not verified against the server, so a token can still be expired.
 
 ## Where the rest lives
 
@@ -97,3 +104,12 @@ not substitute another one; `/k-gui` restores the project-local structure.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
 - Never write into `playbook.dir`. It is replaced on every update. Everything a command
   produces goes into `local.dir`.
+- **Before calling `gh`, check `gh` from this output.** Stop and report instead of
+  calling it when `gh.status` is `disabled` (the project decided against it), when
+  `gh.status` is `unknown` (nobody decided yet — point to `/k-gui`), or when `gh.ready`
+  is false. In the last case name which half is missing: install `gh`, or run
+  `gh auth login --hostname github.com`. Never install and never sign in yourself —
+  both change the host, and signing in needs a browser.
+- **Name `gh.account` before writing to GitHub.** Approving, merging or commenting is
+  externally visible and acts as whoever is signed in. The active account is machine-wide
+  and may have been switched in another project since.

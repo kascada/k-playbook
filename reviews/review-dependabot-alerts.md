@@ -34,7 +34,11 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 - Lies optional `tools.dependabot` aus `K-PLAYBOOK.yaml`, falls vorhanden.
 - Wenn vorhanden, nutze `tools.dependabot.target` als Git-/App-Root und `tools.dependabot.repo` als GitHub `owner/repo`. Wenn `target` fehlt, gilt `.`. Wenn `repo` fehlt, leite den Repo-Slug aus dem GitHub-Remote des Targets ab oder frage den User.
 - Wenn `tools.dependabot.config` gesetzt ist, pruefe, ob die Dependabot-Konfig existiert. `pull_requests: false` oder `open-pull-requests-limit: 0` ist kein Fehler, wenn Alerts manuell triagiert werden sollen.
-- Pruefe `gh auth status`.
+- Pruefe `gh` aus der Context-Ausgabe, bevor der erste `gh api`-Aufruf ansteht: bei
+  `gh.status: disabled` abbrechen mit dem Hinweis, dass dieses Projekt gh nicht nutzt;
+  bei `gh.status: unknown` abbrechen und `/k-gui` nennen, wo die Entscheidung faellt;
+  bei `gh.ready: false` abbrechen und benennen, was fehlt — Installation oder
+  `gh auth login --hostname github.com`.
 - Pruefe, dass das Ziel ein Git-Repo mit GitHub-Remote ist oder der User `owner/repo` explizit vorgibt.
 - Wenn die Dependabot-Alerts-API `404` liefert: nicht als "keine Alerts" werten. Moegliche Ursachen dokumentieren: fehlende Berechtigung, Dependabot Alerts nicht aktiviert, falsches Repository oder private-Repo-Policy.
 

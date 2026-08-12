@@ -151,6 +151,7 @@ zusammenrechnen muesste:
 | `project` | Hauptverzeichnis, `repoRoot`, `vcs`, Ort der Konfiguration |
 | `playbook`, `local` | die beiden aufgeloesten Verzeichnisse |
 | `remediation` | die Policy, mit Default, falls der Block fehlt |
+| `gh` | die Entscheidung zur GitHub CLI samt Host-Befund |
 | `catalogs` | `rules`, `reviews`, `checks` — zusammengefuehrt |
 | `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
 
@@ -161,9 +162,20 @@ wo zutreffend.
 Damit muss kein Command die Overlay-Regeln selbst anwenden. Es gibt eine Antwort, und
 alle bekommen dieselbe.
 
+`gh` fuehrt zwei Dinge zusammen, die auseinandergehalten gehoeren: `status` und
+`configured` sind die Projektentscheidung aus `tools.gh` und stehen versioniert in der
+Datei; `installed`, `path`, `loggedIn`, `account`, `accounts` und `tokenFromEnv` sind ein
+Befund fuer genau diesen Rechner. `ready` fasst zusammen, was ein Command wissen muss:
+gh ist da und ein Account ist hinterlegt.
+
+Der Befund ist aus der gh-Konfiguration gelesen, nicht beim Server geprueft — ein
+hinterlegter Token kann abgelaufen sein. Wer Gewissheit braucht, ruft `gh auth status`
+auf; das kostet einen Netzzugriff und gehoert deshalb nicht hierher.
+
 Der Aufruf ist bewusst billig: der Security-Tool-Preflight fehlt darin, weil er je Tool
 ein `--version` startet und spuerbar dauert. `context` soll am Anfang jedes Commands
-stehen koennen.
+stehen koennen. Der gh-Befund kostet nichts — ein Blick in den PATH und in
+`~/.config/gh/hosts.yml`, kein Unterprozess.
 
 Gesucht wird ab dem Arbeitsverzeichnis aufwaerts. Ohne `K-PLAYBOOK.yaml` bricht der
 Aufruf mit einer Meldung ab, ebenso bei einer `schema_version`, die nicht `3` ist.
@@ -239,18 +251,8 @@ remediation:
   direct_fixes: false
 
 tools:
-  codeql:
-    target: app
-    languages:
-      - python
-      - javascript-typescript
-    queries: security-extended
-    github:
-      status: enabled
-      workflow: ./.github/workflows/codeql.yml
-    local_database:
-      status: disabled
-      path: null
+  gh:
+    status: enabled
 ```
 
 ## Felder
@@ -331,24 +333,29 @@ ausdruecklich fragen.
 
 Optionaler Block fuer projektlokale Tool-Entscheidungen.
 
-Wichtig: hier stehen Projektentscheidungen, keine Host-Fakten. Ob `codeql`, `gitleaks`
-oder `trivy` auf diesem Rechner installiert sind, gehoert in einen Preflight-Bericht,
+Wichtig: hier stehen Projektentscheidungen, keine Host-Fakten. Ob `gitleaks` oder
+`trivy` auf diesem Rechner installiert sind, gehoert in einen Preflight-Bericht,
 nicht in eine versionierte Projektkonfiguration.
 
-#### `tools.codeql`
+#### `tools.gh`
 
 | Feld | Typ | Bedeutung |
 |---|---|---|
-| `target` | string | CodeQL-Analyse-Root relativ zur `K-PLAYBOOK.yaml` |
-| `languages` | list[string] | registrierte CodeQL-Sprachen |
-| `queries` | string | Query-Suite oder Query-Pack |
-| `github.status` | enum | `enabled`, `disabled` oder `planned` |
-| `github.workflow` | string/null | projektrelativer Workflow-Pfad oder `null` |
-| `local_database.status` | enum | `enabled`, `disabled` oder `planned` |
-| `local_database.path` | string/null | projektrelativer Datenbankpfad oder `null` |
+| `status` | enum | `unknown`, `enabled` oder `disabled` |
 
-Ein zusaetzliches `enabled`-Feld gibt es nicht. Ein Tool gilt als aktiv oder geplant,
-wenn mindestens ein relevanter Status `enabled` oder `planned` ist.
+Ob dieses Projekt die GitHub CLI nutzt. Gebraucht wird sie von `/k-pr-review` und vom
+Dependabot-Review.
+
+**Default ist `unknown`.** Das ist ein ausdruecklicher Zustand und kein
+stillschweigendes Nein: ohne Entscheidung weiss ein Command nicht, ob ein fehlendes `gh`
+ein Problem oder gewollt ist. Die Oberflaeche zeigt `unknown` deshalb als offenen Punkt,
+und Commands, die `gh` brauchen, brechen darauf ab. Ein anderer Wert als die drei
+genannten ist ein Fehler und laesst `context` abbrechen — ein Tippfehler soll nicht wie
+eine Entscheidung aussehen.
+
+Der Block sagt nichts darueber, ob `gh` auf diesem Rechner liegt. Das ist ein Host-Befund
+und steht nur in der Kontextausgabe. Ebenso gibt es hier keinen Host: die Entscheidung
+gilt fuer `github.com`.
 
 ## Schreibregeln
 
@@ -356,7 +363,10 @@ wenn mindestens ein relevanter Status `enabled` oder `planned` ist.
   kann Werte tragen, die das Werkzeug nicht kennt.
 - Geschrieben wird ausschliesslich nach Bestaetigung, Schritt fuer Schritt.
 - Das Werkzeug besitzt `schema_version` und `project.*`.
-- `/k-setup-codeql` besitzt nur `tools.codeql`.
+- Die Oberflaeche besitzt nur `tools.gh`. Geschrieben wird der `gh:`-Unterblock; ein
+  danebenliegender Block eines anderen Tools bleibt unangetastet. Bei neuen Projekten
+  wird er gleich mit `unknown` angelegt, damit die offene Entscheidung in der Datei
+  sichtbar ist.
 - Die Remediation-Policy wird beim Einbinden gesetzt; spaeter darf `/k-remediation` sie
   nach Rueckfrage aendern. Geschrieben wird nur der `remediation:`-Block.
 - Unbekannte Top-Level-Felder bleiben erhalten und werden nicht ungefragt geaendert.

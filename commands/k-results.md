@@ -91,12 +91,11 @@ Wenn mehrere Dates pro Family existieren:
 
 Bekannte Familien und Standardreihenfolge:
 
-1. `codeql`
-2. `k-check`
-3. `secret-scanning`
-4. `dependency-cve`
-5. `iac-container`
-6. weitere Familien alphabetisch
+1. `k-check`
+2. `secret-scanning`
+3. `dependency-cve`
+4. `iac-container`
+5. weitere Familien alphabetisch
 
 ## Schritt 4 — Kontext laden
 
@@ -141,7 +140,6 @@ Typische Dedupe-Regeln:
 
 - Secret-Funde aus `secret-scanning` und `k-check` zusammenfuehren.
 - CVE-Funde aus `dependency-cve` und `iac-container` nicht doppelt remediieren; `dependency-cve` ist primaere Quelle, `iac-container` liefert SBOM/Image-Kontext.
-- Logging-Funde aus CodeQL und k-check zusammenfuehren, wenn gleicher Pfad oder gleicher Logging-Kontrakt betroffen ist.
 - Dockerfile-/Image-Funde aus `iac-container` separat halten, auch wenn Secret-/Config-Themen in anderen Familien auftauchen.
 - False-positive-/Fixture-/Tooling-Artefakte als P3-Gruppe zusammenfassen.
 

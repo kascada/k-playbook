@@ -1,6 +1,6 @@
 ---
 description: Fast read-only health overview for the current project, backed by the k-playbook context output.
-argument-hint: [full|codeql|reviews|json|strict]
+argument-hint: [full|reviews|json|strict]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
 ---

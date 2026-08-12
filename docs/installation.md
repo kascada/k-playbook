@@ -275,6 +275,48 @@ verschwindet die Karte wieder — dieselbe Zeile steht ausserdem beim Start im T
 Der Aufruf ueber `k-playbook/bin/k-playbook` im Projekt bleibt jederzeit moeglich und
 gleichwertig. Die Commands nutzen ausschliesslich ihn, nie den `PATH`.
 
+## GitHub CLI
+
+`/k-pr-review` und das Dependabot-Review arbeiten ueber `gh`. Die Karte **GitHub CLI**
+haelt zwei Dinge auseinander, die leicht durcheinandergeraten.
+
+Das eine ist die **Entscheidung des Projekts**: nutzt es `gh` oder nicht. Sie wird hier
+gesetzt und landet in `K-PLAYBOOK.yaml` unter `tools.gh.status`. Bis sie faellt, steht sie
+auf `unknown`, und die Karte zeigt das rot — nicht als Schoenheitsfehler, sondern weil ein
+Command sonst nicht weiss, ob ein fehlendes `gh` ein Problem oder gewollt ist. Commands,
+die `gh` brauchen, brechen bei `unknown` ab.
+
+Das andere ist der **Befund fuer diesen Rechner**: liegt `gh` im PATH, und ist ein Account
+hinterlegt. Der steht nur in der Karte und in der Kontextausgabe, nie in der
+Konfiguration — auf dem naechsten Rechner ist er ein anderer.
+
+Installiert und angemeldet wird im Terminal, wie bei den Security-Tools: beides veraendert
+den Host, und `gh auth login` will einen Browser. Die Karte zeigt dafuer den passenden
+Befehl.
+
+```bash
+gh auth login --hostname github.com   # anmelden
+gh auth status                        # Token beim Server pruefen
+```
+
+Der Befund ist aus `~/.config/gh/hosts.yml` gelesen und **nicht beim Server geprueft**:
+ein hinterlegter Token kann abgelaufen oder zurueckgezogen sein. Wer Gewissheit braucht,
+ruft `gh auth status` auf.
+
+Sind mehrere Accounts hinterlegt, nennt die Karte sie und zeigt den Umschaltbefehl:
+
+```bash
+gh auth switch --hostname github.com --user <account>
+```
+
+Bewusst als Befehl und nicht als Knopf. Der Wechsel gilt fuer jedes Terminal und jedes
+Projekt auf diesem Rechner, nicht nur fuer dieses — und ein Approve oder Merge laeuft
+danach unter dem neuen Namen. `/k-pr-review` nennt den aktiven Account deshalb vor jeder
+Schreibaktion.
+
+Nur `github.com`. Enterprise-Instanzen haetten eigene Accounts je Host und eine eigene
+Entscheidung je Projekt; das waere etwas anderes als das hier.
+
 ## Security-Tools
 
 Security-Tools werden host- oder user-lokal installiert, nie in ein Projekt-venv. Sie

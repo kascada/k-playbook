@@ -92,6 +92,12 @@ Das Kommando gibt den aufgeloesten Arbeitsstand als JSON aus — Verzeichnisse,
 Instruktionsdateien in Lesereihenfolge, Remediation-Policy, Guidelines und die drei
 Kataloge, bereits zusammengefuehrt, mit Herkunft je Eintrag und markierten Abschaltungen.
 
+Eine Antwort heisst auch: einmal je Sitzung. Die Ausgabe aendert sich waehrend der Arbeit
+nicht, also holt der naechste Command sie nicht erneut, sondern arbeitet mit der
+vorhandenen weiter. Neu geholt wird sie erst, wenn die `K-PLAYBOOK.yaml` geschrieben
+wurde, sich der Bestand an Regeln, Reviews, Checks oder Guidelines geaendert hat oder die
+Arbeit in ein anderes Projekt gewechselt ist.
+
 ### Instruktionen in zwei Ebenen
 
 | Datei | Gilt fuer | Beim Update |
@@ -133,7 +139,6 @@ Der vollstaendige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 | Gruppe | Commands | Zweck |
 |---|---|---|
 | Projekt | `/k-gui`, `/k-status` | Oberflaeche starten, Projektzustand pruefen |
-| Tools | `/k-install-codeql`, `/k-setup-codeql` | CodeQL installieren bzw. die Projektentscheidung festhalten |
 | Docs | `/k-code2docs`, `/k-tools-scan` | Projektwissen fuer AI-Sessions dokumentieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausfuehren, Findings priorisieren und abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, pruefen und ausfuehren |

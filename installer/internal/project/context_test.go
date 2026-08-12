@@ -51,7 +51,7 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "rules", "docs-sync.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(PlaybookDir(root), "rules", "codeql.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(PlaybookDir(root), "rules", "review-authoring.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(LocalDir(root), "rules", "docs-sync.md"), "# eigene Fassung\n")
 	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# nur lokal\n")
 
@@ -66,9 +66,9 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	}
 
 	cases := map[string]string{
-		"docs-sync.md": "override",
-		"codeql.md":    "dist",
-		"eigene.md":    "local",
+		"docs-sync.md":        "override",
+		"review-authoring.md": "dist",
+		"eigene.md":           "local",
 	}
 	for name, origin := range cases {
 		entry, ok := entryByName(rules, name)

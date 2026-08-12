@@ -20,13 +20,17 @@ type Context struct {
 	// Instructions sind die Dateien, die vor der Arbeit zu lesen sind, in
 	// dieser Reihenfolge: erst was fuer alle k-playbook-Projekte gilt, dann was
 	// dieses Projekt ergaenzt.
-	Instructions []string                  `json:"instructions"`
-	Project      ContextProject            `json:"project"`
-	Playbook     ContextDir                `json:"playbook"`
-	Local        ContextDir                `json:"local"`
-	Remediation  Remediation               `json:"remediation"`
-	Catalogs     map[string][]CatalogEntry `json:"catalogs"`
-	Guidelines   []string                  `json:"guidelines"`
+	Instructions []string       `json:"instructions"`
+	Project      ContextProject `json:"project"`
+	Playbook     ContextDir     `json:"playbook"`
+	Local        ContextDir     `json:"local"`
+	Remediation  Remediation    `json:"remediation"`
+	// GH ist die Entscheidung zur GitHub CLI samt Host-Befund. Anders als der
+	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
+	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
+	GH         GH                        `json:"gh"`
+	Catalogs   map[string][]CatalogEntry `json:"catalogs"`
+	Guidelines []string                  `json:"guidelines"`
 }
 
 // InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heisst bewusst
@@ -103,6 +107,12 @@ func BuildContext(projectDir string) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
+	// Ein unbekannter Wert bricht ab, statt als „nicht entschieden" durchzugehen:
+	// ein Tippfehler wuerde sonst wie eine Entscheidung aussehen.
+	gh, err := GHState(projectDir)
+	if err != nil {
+		return Context{}, err
+	}
 
 	playbookDir := PlaybookDir(projectDir)
 	localDir := LocalDir(projectDir)
@@ -119,6 +129,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Playbook:    ContextDir{Dir: playbookDir},
 		Local:       ContextDir{Dir: localDir},
 		Remediation: remediation,
+		GH:          gh,
 		Catalogs:    map[string][]CatalogEntry{},
 		Guidelines:  listFiles(filepath.Join(localDir, "guidelines")),
 	}

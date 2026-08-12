@@ -103,7 +103,8 @@ kcheck-<area>-NNN
 
 Beispiele: `kcheck-logging-003`, `kcheck-secrets-001`, `kcheck-user-scope-014`.
 
-CodeQL darf native Tool-Praefixe behalten, z. B. `py/full-ssrf-001`.
+Scanner-Familien duerfen die nativen Regel-Praefixe ihres Tools behalten, damit ein
+Finding zu seiner Rohmeldung zurueckverfolgbar bleibt.
 
 ## Scanner-Tools vs. k-check
 
@@ -135,23 +136,6 @@ Checks reserviert. Kleine Tool-Verfuegbarkeitschecks duerfen dort liegen, aber n
 eigentliche Scannerlauf mit dauerhafter Bewertung.
 
 ## Die Familien im Einzelnen
-
-### CodeQL
-
-| | |
-|---|---|
-| Rezept | `k-playbook/reviews/review-codeql-security.md` |
-| Ergebnisse | `k-playbook-local/results/codeql/YYYY-MM-DD/` |
-
-Typische Artefakte: `assessment.md`, `findings.md`, `raw/codeql-python.sarif`,
-`raw/codeql-javascript-typescript.sarif`.
-
-CodeQL bewertet CWE-/Code-Findings, nicht Dependency-CVEs. Die gehoeren in eine eigene
-Familie.
-
-Bei Projekten, deren Code nicht im Hauptverzeichnis liegt, benennt `tools.codeql.target`
-in `K-PLAYBOOK.yaml` den tatsaechlichen Analyse-Root. Die Ergebnisse liegen trotzdem unter
-`k-playbook-local/results/`.
 
 ### k-check
 
@@ -307,7 +291,7 @@ Modi, vom striktesten zum offensten:
 k-playbook-local/results/summary-YYYY-MM-DD.md
 ```
 
-Die Summary fasst mehrere Familien zusammen — CodeQL, k-check, Secret-Scanning,
+Die Summary fasst mehrere Familien zusammen — k-check, Secret-Scanning,
 Dependency-CVE, IaC/Container und spaetere.
 
 Aufgaben von `/k-results`:

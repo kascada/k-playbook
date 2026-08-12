@@ -271,7 +271,10 @@ project:
   repo_root: %s
   vcs: %s
 
-%s`, PlaybookDirName, SchemaVersion, repoRoot, vcs, remediationBlock(DefaultRemediationMode))
+%s
+tools:
+%s`, PlaybookDirName, SchemaVersion, repoRoot, vcs,
+		remediationBlock(DefaultRemediationMode), ghBlock(DefaultGHStatus))
 }
 
 func pathExists(path string) bool {

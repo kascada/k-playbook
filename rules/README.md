@@ -7,7 +7,6 @@ Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zi
 ## Dateien
 
 - `review-authoring.md` - Regeln fuer neue oder geaenderte Review-Rezepte.
-- `codeql.md` - Regeln fuer CodeQL-Setup, lokale CLI, Datenbanken und Analysen.
 - `docs-sync.md` - Regel: Code- und Doku-Aenderungen synchron halten.
 - `tool-install-scope.md` - Regel: `/k-install*`, host-lokale Tools und Projekt-venvs trennen.
 
