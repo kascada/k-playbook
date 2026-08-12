@@ -72,6 +72,7 @@ const elements = {
   docPath: document.getElementById("doc-path"),
   docViewer: document.getElementById("doc-viewer"),
   closeDoc: document.getElementById("close-doc"),
+  blockNav: document.getElementById("block-nav"),
 };
 
 const HEALTH_INTERVAL = 1800;
@@ -118,6 +119,9 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("pagehide", notifyClientGone);
+// Muss vor den Ladefunktionen laufen: die blenden Bloecke ein, und das Menue
+// zieht das nur mit, wenn es die Karten schon beobachtet.
+buildBlockNav();
 startHealthChecks();
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
 // blendet ihn dann ein und laedt ihn nach.
@@ -1259,6 +1263,68 @@ function notifyClientGone() {
   }
 
   fetch("/api/client-gone", { method: "POST", keepalive: true }).catch(() => {});
+}
+
+// Baut das Menue aus den Bloecken selbst: Reihenfolge, Beschriftung und Status
+// stehen bereits in den Karten, ein neuer Block braucht also nichts weiter als
+// eine ID und eine Ueberschrift.
+function buildBlockNav() {
+  document.querySelectorAll(".blocks > .card").forEach((card) => {
+    const heading = card.querySelector("h2");
+    if (!card.id || !heading) {
+      return;
+    }
+
+    const dot = document.createElement("span");
+    dot.className = "block-nav-dot";
+    const label = document.createElement("span");
+    label.textContent = heading.textContent;
+
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "block-nav-item";
+    item.append(dot, label);
+    item.addEventListener("click", () => goToBlock(card, item));
+    elements.blockNav.append(item);
+
+    // Ob ein Block sichtbar ist und wie es um ihn steht, entscheiden die
+    // Render-Funktionen an der Karte. Beobachten ist billiger, als in jeder
+    // einzelnen zusaetzlich das Menue nachzuziehen.
+    const pill = card.querySelector(".section-head .pill");
+    syncNavItem(card, item, dot, pill);
+    const sync = () => syncNavItem(card, item, dot, pill);
+    new MutationObserver(sync).observe(card, { attributes: true, attributeFilter: ["class"] });
+    if (pill) {
+      new MutationObserver(sync).observe(pill, { attributes: true, attributeFilter: ["class"] });
+    }
+  });
+}
+
+// Ein verborgener Block hat auch keinen Eintrag; der Punkt uebernimmt die
+// Statusfarbe seiner Pill, alles ausserhalb von ok/warn/error bleibt neutral.
+function syncNavItem(card, item, dot, pill) {
+  item.classList.toggle("hidden", card.classList.contains("hidden"));
+  const state = pill && ["ok", "warn", "error"].find((name) => pill.classList.contains(name));
+  dot.className = state ? `block-nav-dot ${state}` : "block-nav-dot";
+}
+
+// Markiert wird der angeklickte Eintrag — er zeigt, wohin gesprungen wurde,
+// und wandert beim Scrollen von Hand nicht mit.
+function goToBlock(card, item) {
+  // Ein zugeklappter Block waere nach dem Sprung nur eine Kopfzeile. Das
+  // Aufklappen loest ueber das toggle-Ereignis zugleich das Nachladen aus.
+  if (card.tagName === "DETAILS") {
+    card.open = true;
+  }
+
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  elements.blockNav.querySelectorAll(".block-nav-item.active").forEach((other) => {
+    other.classList.remove("active");
+    other.removeAttribute("aria-current");
+  });
+  item.classList.add("active");
+  item.setAttribute("aria-current", "true");
 }
 
 function showClosed(message = "") {

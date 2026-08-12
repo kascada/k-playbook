@@ -65,7 +65,8 @@ Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `
 If `REVIEW_TARGET` is a directory:
 - Collect all `.md` files directly in that directory (not subdirectories).
 - Exclude `done/`, `old/`, and any archived/completed task subdirectories.
-- Sort by leading number if present (`001-...`, `014-...`), otherwise alphabetically after numbered files.
+- Sort by the leading number in the filename (`001-...`, `014-...`; also accept `_`).
+- Skip files without a leading number. `README.md` and other notes in the task directory are not task files.
 - If no `.md` files are found: report „Keine offenen Task-Dateien gefunden" and stop.
 
 If `REVIEW_TARGET` is a file: use that file.

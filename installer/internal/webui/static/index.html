@@ -17,7 +17,12 @@
         <div class="hero-subrow">
           <p class="eyebrow path">
             <span class="mode-badge">{{.ModeLabel}}</span>
-            {{if .Path}}{{.Path}}{{end}}
+            <span id="header-project">{{if .Path}}{{.Path}}{{end}}</span>
+            <span id="header-playbook" class="path-secondary{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Installation: hieraus kommen Skripte, Regeln, Reviews und Checks">
+              <span class="mode-badge">Installation</span>
+              <span id="header-playbook-path">{{.PlaybookDir}}</span>
+            </span>
           </p>
           <div class="hero-actions">
             <button id="update" class="secondary">Update pruefen</button>
@@ -26,153 +31,161 @@
         </div>
       </section>
 
-      <!-- Nur sichtbar, solange `k-playbook` nicht aus jedem Verzeichnis
-           aufrufbar ist. Betrifft den Host, nicht das Projekt. -->
-      <section class="card hidden" id="path-card">
-        <div class="section-head">
-          <div>
-            <h2>Aufruf von ueberall</h2>
-          </div>
-          <span id="path-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <p id="path-message" class="message"></p>
-        <div id="path-command" class="command-row hidden">
-          <code id="path-command-text"></code>
-        </div>
-      </section>
+      <div class="layout">
+        <!-- Die Eintraege entstehen zur Laufzeit aus den Bloecken daneben, damit
+             ein neuer Block nicht an zwei Stellen gepflegt werden muss. -->
+        <nav id="block-nav" class="block-nav" aria-label="Bereiche"></nav>
 
-      <!-- Nur sichtbar, wenn in der Installation lokal gearbeitet wurde. Das
-           Verzeichnis ist ein Clone und wird bei jedem Update ersetzt; eine
-           Aenderung dort faellt sonst nie auf, weil git eine nicht
-           kollidierende Datei beim Pull einfach stehen laesst. -->
-      <section class="card hidden" id="clean-card">
-        <div class="section-head">
-          <div>
-            <h2>Installation</h2>
-          </div>
-          <span id="clean-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <p id="clean-message" class="message"></p>
-        <dl id="clean-facts" class="facts"></dl>
-        <div id="clean-command" class="command-row hidden">
-          <code id="clean-command-text"></code>
-        </div>
-      </section>
+        <div class="blocks">
+          <!-- Nur sichtbar, solange `k-playbook` nicht aus jedem Verzeichnis
+               aufrufbar ist. Betrifft den Host, nicht das Projekt. -->
+          <section class="card hidden" id="path-card">
+            <div class="section-head">
+              <div>
+                <h2>Aufruf von ueberall</h2>
+              </div>
+              <span id="path-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <p id="path-message" class="message"></p>
+            <div id="path-command" class="command-row hidden">
+              <code id="path-command-text"></code>
+            </div>
+          </section>
 
-      <section class="card{{if .Installed}} hidden{{end}}" id="config-card">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Schritt 1</p>
-            <h2>Projektkonfiguration</h2>
-          </div>
-          <span id="config-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <dl id="config-facts" class="facts"></dl>
-        <div id="config-form" class="form-row hidden">
-          <label for="config-project-dir">Hauptverzeichnis</label>
-          <input id="config-project-dir" type="text" spellcheck="false" autocomplete="off">
-          <label for="config-repo-root">Projekt-Repository, relativ dazu</label>
-          <input id="config-repo-root" type="text" spellcheck="false" autocomplete="off">
-        </div>
-        <p id="config-message" class="message"></p>
-        <button id="config-create" class="secondary" disabled>Anlegen</button>
-      </section>
+          <!-- Nur sichtbar, wenn in der Installation lokal gearbeitet wurde. Das
+               Verzeichnis ist ein Clone und wird bei jedem Update ersetzt; eine
+               Aenderung dort faellt sonst nie auf, weil git eine nicht
+               kollidierende Datei beim Pull einfach stehen laesst. -->
+          <section class="card hidden" id="clean-card">
+            <div class="section-head">
+              <div>
+                <h2>Installation</h2>
+              </div>
+              <span id="clean-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <p id="clean-message" class="message"></p>
+            <dl id="clean-facts" class="facts"></dl>
+            <div id="clean-command" class="command-row hidden">
+              <code id="clean-command-text"></code>
+            </div>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="local-card">
-        <div class="section-head">
-          <div>
-            <h2>Projekteigene Struktur</h2>
-          </div>
-          <span id="local-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <dl id="local-facts" class="facts"></dl>
-        <p id="local-message" class="message"></p>
-        <button id="local-create" class="secondary" disabled>Anlegen</button>
-      </section>
+          <section class="card{{if .Installed}} hidden{{end}}" id="config-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Schritt 1</p>
+                <h2>Projektkonfiguration</h2>
+              </div>
+              <span id="config-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <dl id="config-facts" class="facts"></dl>
+            <div id="config-form" class="form-row hidden">
+              <label for="config-project-dir">Hauptverzeichnis</label>
+              <input id="config-project-dir" type="text" spellcheck="false" autocomplete="off">
+              <label for="config-repo-root">Projekt-Repository, relativ dazu</label>
+              <input id="config-repo-root" type="text" spellcheck="false" autocomplete="off">
+            </div>
+            <p id="config-message" class="message"></p>
+            <button id="config-create" class="secondary" disabled>Anlegen</button>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="assistant-card">
-        <div class="section-head">
-          <div>
-            <h2>Commands und Skills</h2>
-          </div>
-          <span id="assistant-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <dl id="assistant-facts" class="facts"></dl>
-        <p id="assistant-message" class="message"></p>
-        <button id="assistant-apply" class="secondary" disabled>Aktualisieren</button>
-      </section>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="local-card">
+            <div class="section-head">
+              <div>
+                <h2>Projekteigene Struktur</h2>
+              </div>
+              <span id="local-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <dl id="local-facts" class="facts"></dl>
+            <p id="local-message" class="message"></p>
+            <button id="local-create" class="secondary" disabled>Anlegen</button>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
-        <div class="section-head">
-          <div>
-            <h2>Umgang mit Befunden</h2>
-          </div>
-          <span id="remediation-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <p class="hint">Wie Befunde aus Reviews abgearbeitet werden. Gilt fuer /k-remediation.</p>
-        <div id="remediation-choices" class="choices"></div>
-        <p id="remediation-message" class="message"></p>
-      </section>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="assistant-card">
+            <div class="section-head">
+              <div>
+                <h2>Commands und Skills</h2>
+              </div>
+              <span id="assistant-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <dl id="assistant-facts" class="facts"></dl>
+            <p id="assistant-message" class="message"></p>
+            <button id="assistant-apply" class="secondary" disabled>Aktualisieren</button>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="gh-card">
-        <div class="section-head">
-          <div>
-            <h2>GitHub CLI</h2>
-          </div>
-          <span id="gh-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <p class="hint">Ob dieses Projekt <code>gh</code> nutzt. Gebraucht von /k-pr-review und dem Dependabot-Review.</p>
-        <div id="gh-choices" class="choices"></div>
-        <dl id="gh-facts" class="facts"></dl>
-        <p id="gh-message" class="message"></p>
-        <div id="gh-command" class="command-row hidden">
-          <p id="gh-command-hint" class="hint"></p>
-          <code id="gh-command-text"></code>
-        </div>
-      </section>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="gh-card">
+            <div class="section-head">
+              <div>
+                <h2>GitHub CLI</h2>
+              </div>
+              <span id="gh-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <p class="hint">Ob dieses Projekt <code>gh</code> nutzt. Gebraucht von /k-pr-review und dem Dependabot-Review.</p>
+            <div id="gh-choices" class="choices"></div>
+            <dl id="gh-facts" class="facts"></dl>
+            <p id="gh-message" class="message"></p>
+            <div id="gh-command" class="command-row hidden">
+              <p id="gh-command-hint" class="hint"></p>
+              <code id="gh-command-text"></code>
+            </div>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
-        <div class="section-head">
-          <div>
-            <h2>Security-Tools</h2>
-          </div>
-          <span id="tools-pill" class="pill muted">Pruefen...</span>
-        </div>
-        <p class="hint">Sprachen dieses Projekts. Sie entscheiden, welche Tools gebraucht werden; sprachunabhaengige gelten immer.</p>
-        <div id="tools-languages" class="choices choices-inline"></div>
-        <dl id="tools-facts" class="facts"></dl>
-        <p id="tools-message" class="message"></p>
-        <div id="tools-command" class="command-row hidden">
-          <p class="hint">Installation veraendert den Host, nicht das Projekt. Diesen Befehl im Terminal ausfuehren:</p>
-          <code id="tools-command-text"></code>
-        </div>
-      </section>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="tools-card">
+            <div class="section-head">
+              <div>
+                <h2>Security-Tools</h2>
+              </div>
+              <span id="tools-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <p class="hint">Sprachen dieses Projekts. Sie entscheiden, welche Tools gebraucht werden; sprachunabhaengige gelten immer.</p>
+            <div id="tools-languages" class="choices choices-inline"></div>
+            <dl id="tools-facts" class="facts"></dl>
+            <p id="tools-message" class="message"></p>
+            <div id="tools-command" class="command-row hidden">
+              <p class="hint">Installation veraendert den Host, nicht das Projekt. Diesen Befehl im Terminal ausfuehren:</p>
+              <code id="tools-command-text"></code>
+            </div>
+          </section>
 
-      <section class="card{{if not .Installed}} hidden{{end}}" id="docs-card">
-        <div class="section-head">
-          <div>
-            <h2>Dokumentation</h2>
-          </div>
-          <span id="docs-pill" class="pill muted">Laden...</span>
-        </div>
-        <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick oeffnet die Datei.</p>
-        <div id="docs-list" class="docs-list"></div>
-        <p id="docs-message" class="message"></p>
-      </section>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
+            <div class="section-head">
+              <div>
+                <h2>Umgang mit Befunden</h2>
+              </div>
+              <span id="remediation-pill" class="pill muted">Pruefen...</span>
+            </div>
+            <p class="hint">Wie Befunde aus Reviews abgearbeitet werden. Gilt fuer /k-remediation.</p>
+            <div id="remediation-choices" class="choices"></div>
+            <p id="remediation-message" class="message"></p>
+          </section>
 
-      <details class="card{{if not .Installed}} hidden{{end}}" id="context-card">
-        <summary class="section-head disclosure">
-          <div class="disclosure-title">
-            <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
-            <h2>Aufgelöster Kontext</h2>
-          </div>
-          <span id="context-pill" class="pill muted">Aufklappen</span>
-        </summary>
-        <p class="hint">Was ein Command sieht: Pfade und die effektiven Kataloge nach Overlay-Auflösung. Entspricht <code>k-playbook context</code>.</p>
-        <dl id="context-facts" class="facts"></dl>
-        <div id="context-catalogs"></div>
-        <p id="context-message" class="message"></p>
-      </details>
+          <section class="card{{if not .Installed}} hidden{{end}}" id="docs-card">
+            <div class="section-head">
+              <div>
+                <h2>Dokumentation</h2>
+              </div>
+              <span id="docs-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick oeffnet die Datei.</p>
+            <div id="docs-list" class="docs-list"></div>
+            <p id="docs-message" class="message"></p>
+          </section>
+
+          <details class="card{{if not .Installed}} hidden{{end}}" id="context-card">
+            <summary class="section-head disclosure">
+              <div class="disclosure-title">
+                <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+                <h2>Aufgelöster Kontext</h2>
+              </div>
+              <span id="context-pill" class="pill muted">Aufklappen</span>
+            </summary>
+            <p class="hint">Was ein Command sieht: Pfade und die effektiven Kataloge nach Overlay-Auflösung. Entspricht <code>k-playbook context</code>.</p>
+            <dl id="context-facts" class="facts"></dl>
+            <div id="context-catalogs"></div>
+            <p id="context-message" class="message"></p>
+          </details>
+        </div>
+      </div>
 
       <div id="doc-overlay" class="doc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="doc-title">
         <div class="doc-panel">

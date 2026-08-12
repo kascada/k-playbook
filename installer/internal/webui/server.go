@@ -149,16 +149,21 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 	environment := project.Detect()
 	data := struct {
-		Mode      string
-		ModeLabel string
-		Path      string
-		Installed bool
+		Mode        string
+		ModeLabel   string
+		Path        string
+		PlaybookDir string
+		Installed   bool
 	}{Installed: environment.Installed}
 
 	if environment.Installed {
 		data.Mode = "project"
 		data.ModeLabel = "Projekt"
 		data.Path = project.DisplayPath(environment.ProjectDir)
+		// Aus diesem Verzeichnis kommen Skripte, Regeln, Reviews und Checks. Es
+		// ist ein eigener Clone und kann einen anderen Stand tragen als das
+		// Binary — deshalb gehoert es in den Kopf und nicht hinter einen Klick.
+		data.PlaybookDir = project.DisplayPath(environment.PlaybookDir)
 	} else {
 		data.Mode = "none"
 		data.ModeLabel = "Nicht installiert"
