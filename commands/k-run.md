@@ -2,7 +2,7 @@
 description: "Execute one or more task files. If no path is given, uses the project's task directory. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. On success, appends an execution summary and moves the file to done/. On partial execution or error, appends a status note and leaves the file in place."
 argument-hint: "[file-or-directory]"
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent]
 ---
 
 # k-run
@@ -201,7 +201,8 @@ Only proceed once all open questions are resolved.
 
 ### 2c - Delegate to sub-agent
 
-Spawn a `general` sub-agent to carry out the task. Pass it:
+Spawn a general-purpose sub-agent (OpenCode: `general`, Claude Code: `general-purpose`)
+to carry out the task. Pass it:
 
 - The full content of the task file
 - The working directory path
@@ -340,7 +341,8 @@ Proceed to the next task in the list. If a task failed (Step 2e), stop - do not 
 
 If all tasks completed successfully AND the last task file contains an `## Intent` section: check whether the executed work actually achieves the stated Intent.
 
-Spawn a `general` subagent (Critic) with this prompt:
+Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
+as Critic with this prompt:
 
 ```
 You are doing a final alignment check after a set of tasks was executed.

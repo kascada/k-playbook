@@ -18,10 +18,9 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus erzeugt hat. Vor der Umsetzung wird immer ein Remediation-Plan gebildet: welche Findings zusammen gehören, was zuerst kommt, was Quick-Win ist und was einen eigenen Task/Branch/PR braucht.
 
-Unterstützt drei Formate:
+Unterstützt zwei Formate:
 
 - Result-Summaries wie `k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
-- Legacy-Ergebnisdateien wie `k-playbook-local/results/result-*.md` mit Statuszeichen-Tabellen.
 - Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, z. B. `dependency-cve` oder `k-check`.
 
 Der `remediation`-Block der Context-Ausgabe legt fest, wie gearbeitet wird:
@@ -45,7 +44,7 @@ Aus der Context-Ausgabe:
 - `RESULTS_DIR` = `<local.dir>/results`
 - `TASKS_DIR` = `<local.dir>/tasks` — Zielverzeichnis für neue Task-Dateien.
 - `KNOWN_DECISIONS` = `<RESULTS_DIR>/known-decisions.md`
-- `DONE_DIR` = `<RESULTS_DIR>/done/`
+- `LOG_FILE` = `<RESULTS_DIR>/log.md`
 - `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`, `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`, `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus dem optionalen Remediation-Block.
 - `REMEDIATION_BASE_BRANCH` = aktueller Branch im Target-Repo, falls `target:` ein Git-Repo ist; sonst unset. Bestimme ihn mit `git branch --show-current` im Target-Root. Wenn leer: nutze keinen geratenen Wert, sondern schreibe `Base branch: <manual>` in erzeugte Tasks.
 
@@ -64,14 +63,13 @@ Wenn `$ARGUMENTS` angegeben: diese Datei einlesen.
 
 Akzeptierte direkte Argumente:
 
-- `<RESULTS_DIR>/result-*.md`
 - `<RESULTS_DIR>/summary-*.md`
 - `<RESULTS_DIR>/<family>/<date>/assessment.md`
 - Projektrelative Varianten davon, z. B. `k-playbook-local/results/k-check/2026-07-23/assessment.md`
 
 Wenn nicht:
 
-1. In `<RESULTS_DIR>` nach `result-*.md` und `summary-*.md` suchen (nicht im `done/`-Unterordner) sowie nach `<RESULTS_DIR>/*/*/assessment.md`.
+1. In `<RESULTS_DIR>` nach `summary-*.md` suchen sowie nach `<RESULTS_DIR>/*/*/assessment.md`.
 2. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
 3. Wenn mehrere: als Liste zeigen und den User wählen lassen.
 4. Wenn keine: fragen:
@@ -92,13 +90,9 @@ Wenn nicht:
 - Die Summary-Datei ist die Quelle für priorisierte Remediation-Gruppen und die Arbeitsdatei für Handoff-/Task-Status.
 - Verlinkte `assessment.md`-/`findings.md`-Quellen aus der Summary dürfen mitgeladen werden. `findings.md` bleibt das Arbeitsregister der jeweiligen Result-Familie, wenn konkrete Finding-IDs aktualisiert werden.
 
-**Legacy-Format-Erkennung:** Sonst `RESULT_FORMAT=legacy` und die Ergebnisdatei selbst als Arbeitsregister verwenden.
-
-**Format-Check Legacy:** Die Datei sollte eine Befundtabelle mit Statuszeichen (`☐` für offen, sonst `✓`, `~`, `✗`) enthalten, üblicherweise mit Priorität. Wenn das Format nicht plausibel erkennbar ist: sauber abbrechen mit Hinweis, was erwartet wurde, statt zu raten.
+**Sonst:** kein unterstütztes Format — sauber abbrechen mit Hinweis, welche beiden Formate erwartet werden, statt zu raten.
 
 **Format-Check Result-Family:** `findings.md` muss Markdown-Headings für einzelne Findings enthalten und darunter mindestens ein Statusfeld in der Form `- Status: `<wert>``. Wenn `findings.md` fehlt oder kein Statusfeld erkennbar ist: sauber abbrechen. Nicht aus `assessment.md` neue Finding-IDs erraten.
-
-Offene Punkte im Legacy-Format sind mit `☐` markiert (oder haben keine Statusspalte). Alle anderen (✓, ~, ✗) überspringen.
 
 Offene Punkte im Result-Family-Format sind Findings mit Status `open`, `confirmed` oder `context-needed`. `likely-false-positive` ist review-relevant, aber nur nach expliziter User-Auswahl remediation-relevant. `accepted` und `fixed` sind Endzustände und dürfen nicht automatisch in neue Fix-Tasks überführt werden.
 
@@ -210,7 +204,7 @@ Warte auf Antwort. Merke welche Kategorien autonom behandelt werden dürfen (`AU
 
 ## Schritt 5 — Befunde einlesen, gruppieren und sortieren
 
-Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Summary ist die Arbeitsdatei die Summary-Datei mit ihren priorisierten Gruppen. Bei Legacy ist die Arbeitsdatei die Ergebnisdatei. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
+Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Summary ist die Arbeitsdatei die Summary-Datei mit ihren priorisierten Gruppen. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
 
 Result-Family-Parsing:
 
@@ -233,7 +227,7 @@ Autonom: <liste der freigegebenen Kategorien>
 
 ## Schritt 6 — Bündel oder Befunde abarbeiten
 
-Wenn `grouping: true`, arbeite die bestätigten Bündel ab. Innerhalb eines Bündels dürfen mehrere Finding-IDs in einer Task zusammengefasst werden, wenn sie denselben Fix-/Verifikationspfad haben. Wenn `grouping: false`, arbeite einzelne Findings wie im Legacy-Flow ab.
+Wenn `grouping: true`, arbeite die bestätigten Bündel ab. Innerhalb eines Bündels dürfen mehrere Finding-IDs in einer Task zusammengefasst werden, wenn sie denselben Fix-/Verifikationspfad haben. Wenn `grouping: false`, arbeite die einzelnen Findings der Reihe nach ab.
 
 Bei `mode: task-branch-pr`:
 
@@ -254,7 +248,7 @@ Bei `mode: task-branch-pr`:
 
 Bei `mode: task-first`: analog, aber direkte Fixes können nach expliziter Einzelfreigabe erlaubt sein.
 
-Bei `mode: direct-allowed`: legacy Flow für `S` bleibt erlaubt.
+Bei `mode: direct-allowed`: direkte Fixes für `S` bleiben erlaubt.
 
 Für jede bestätigte Einheit der Reihe nach — also je nach Policy ein Bündel oder ein einzelner Befund:
 
@@ -289,8 +283,8 @@ Dieser Zweig ist nur erlaubt, wenn `REMEDIATION_DIRECT_FIXES=true` und der Modus
 **Kategorie S — in `AUTO_CATEGORIES` und direkte Fixes erlaubt:**
 1. Fix direkt anwenden
 2. Build/Tests prüfen
-3. Status in Ergebnisdatei auf `✓ behoben` setzen
-4. Im Änderungslog (Schritt 7) eintragen
+3. Status in der Arbeitsdatei nach den Regeln aus Schritt 7 setzen
+4. Im Remediation-Log (Schritt 7) eintragen
 
 **Kategorie S — NICHT in `AUTO_CATEGORIES`, aber direkte Fixes wären erlaubt:**
 
@@ -342,8 +336,8 @@ Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-
 - Only after this preflight, update code, dependencies, lockfiles, generated files, or review status files.
 ```
 
-5. Status in Ergebnisdatei auf `✓ Task NNN` setzen.
-6. Im Änderungslog eintragen.
+5. Status in der Arbeitsdatei nach den Regeln aus Schritt 7 setzen.
+6. Im Remediation-Log eintragen.
 
 **Kategorie T — NICHT in `AUTO_CATEGORIES`:**
 Befund vorstellen und fragen ob Task anlegen.
@@ -361,7 +355,7 @@ Immer vorstellen und fragen — auch wenn `AUTO_CATEGORIES` alles enthält.
 > "Das ist eine Funktionserweiterung. Soll ich dafür einen Task anlegen?"
 
 **Kategorie A (Akzeptiert) — in `AUTO_CATEGORIES`:**
-Status auf `~ akzeptiert` setzen. Kurzen Grund in den Änderungslog schreiben.
+Status nach den Regeln aus Schritt 7 auf akzeptiert setzen. Kurzen Grund in das Remediation-Log schreiben.
 
 Danach — sofern `KNOWN_DECISIONS` vorhanden ist und der Befund *nicht* durch einen KD-Treffer automatisch geschlossen wurde — fragen:
 > "Soll diese Entscheidung in `known-decisions.md` eingetragen werden, damit sie bei zukünftigen Reviews automatisch als 'Akzeptiert' gilt?"
@@ -378,40 +372,13 @@ Wenn ja: nächste freie ID bestimmen (KD-NNN), Eintrag am Ende der Datei ergänz
 Kurz bestätigen: „KD-NNN eingetragen."
 
 **Kategorie X (Falsch) — in `AUTO_CATEGORIES`:**
-Status auf `✗ falsch` setzen. Kurze Begründung notieren.
+Status nach den Regeln aus Schritt 7 auf falsch-positiv setzen. Kurze Begründung notieren.
 
 ---
 
 ## Schritt 7 — Ergebnisdatei aktualisieren
 
 Nach jedem bearbeiteten Befund:
-
-### Legacy-Dateien
-
-**Statusspalte:** Falls die Tabelle noch keine `**Status**`-Spalte hat, diese hinzufügen.
-
-Statuswerte:
-| Symbol | Bedeutung |
-|--------|-----------|
-| `✓ behoben` | Direkt gefixt |
-| `✓ Task NNN` | Task-Datei angelegt |
-| `~ akzeptiert` | Bekannt/bewusst, kein Handlungsbedarf |
-| `✗ falsch` | Befund nicht korrekt |
-| `☐` | Noch offen |
-
-**Änderungslog:** Am Ende der Datei einen Abschnitt pflegen (anlegen wenn nicht vorhanden):
-
-```markdown
----
-
-## Änderungslog
-
-| Datum | # | Kategorie | Aktion | Notiz |
-|-------|---|-----------|--------|-------|
-| YYYY-MM-DD | 12 | Sofort | ✓ behoben | TLS MinVersion 1.2 → 1.3 |
-| YYYY-MM-DD | 3  | Task   | ✓ Task 002 | Log-Streaming, tasks/002-log-streaming.md |
-| YYYY-MM-DD | 13 | Akzeptiert | ~ | Rate-Limiting extern behandelt (SecurityConfig) |
-```
 
 ### Result-Familien
 
@@ -470,25 +437,25 @@ Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
 
 ---
 
-## Schritt 8 — Ergebnisdatei archivieren
+## Schritt 8 — Log-Eintrag
 
-Archivierung gilt nur für Legacy-Ergebnisdateien.
+Nichts wird archiviert oder verschoben. Summary-Dateien bleiben stabil unter `k-playbook-local/results/`; Result-Verzeichnisse bleiben stabil unter `k-playbook-local/results/<family>/<date>/`. Abschluss erfolgt über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md` oder der Summary.
 
-Bei Summary- und Result-Family-Dateien wird nichts nach `done/` verschoben. Summary-Dateien bleiben stabil unter `k-playbook-local/results/`; Result-Verzeichnisse bleiben stabil unter `k-playbook-local/results/<family>/<date>/`. Abschluss erfolgt über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md` oder der Summary.
+Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auch dann, wenn er keinen einzigen Befund geändert hat:
 
-Wenn alle Befunde abgearbeitet sind (keine ☐ mehr offen):
+1. Datei anlegen, falls sie noch nicht existiert (Skelett wie in `/k-review`).
+2. Eine Zeile ans Protokoll am Dateiende anhängen:
 
-1. Ziel-Verzeichnis bestimmen:
-   - Wenn `DONE_DIR` (`<RESULTS_DIR>/done/`) gesetzt ist: dort archivieren. Verzeichnis bei Bedarf anlegen.
-   - Wenn nicht gesetzt (kein `RESULTS_DIR`): abbrechen und `/k-gui` nennen.
+   | Datum | Review | Scope | Output |
+   |---|---|---|---|
+   | 2026-07-12 | remediation | k-check/2026-07-12/findings.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
 
-2. Datei verschieben:
-   - Neuer Name: `YYYY-MM-DD-<originalname>` (`now.date` voranstellen)
-   - Beispiel: `result-review-tech.md` → `<DONE_DIR>/2026-07-12-result-review-tech.md`
+- `Datum`: `now.date`.
+- `Review`: `remediation`.
+- `Scope`: die abgearbeitete Ergebnisdatei, projektrelativ.
+- `Output`: die Zahlen aus der Abschlusszusammenfassung in einem Satz.
 
-3. Kurz bestätigen: „Archiviert: `<DONE_DIR>/YYYY-MM-DD-<name>`"
-
-Wenn noch offene Befunde (☐) vorhanden: Datei **nicht** verschieben — sie bleibt offen.
+Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ersatzpfad für nur diesen Lauf fragen.
 
 ---
 
@@ -505,7 +472,6 @@ Bearbeitet:   <N>
 ~ akzeptiert: <n>
 ✗ falsch:     <n>
 ☐ offen:      <n>  (K/F — warten auf Klärung)
-Archiviert:   <DONE_DIR>/YYYY-MM-DD-<name>  (oder: — offen, nicht archiviert)
 ```
 
 Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründung warum sie offen blieben.
@@ -514,7 +480,6 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 
 ## Fehlerfälle
 
-- **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `result-*.md` in `<RESULTS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
+- **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `summary-*.md` und `<family>/<date>/assessment.md` in `<RESULTS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
 - **Kein k-playbook-Projekt**: der Context-Aufruf schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` oder `TASKS_DIR` fehlt im Dateisystem**: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen.
-- **YAML-konfigurierte Reviews- oder Tasks-Pfade fehlen im Dateisystem**: User fragen, ob genau diese Pfade angelegt werden sollen oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

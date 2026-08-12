@@ -125,6 +125,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/gh", setGHHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)
 	mux.HandleFunc("POST /api/update", applyUpdateHandler)
+	mux.HandleFunc("POST /api/update/discard", discardDevSyncHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
 	mux.HandleFunc("GET /api/context", contextHandler)

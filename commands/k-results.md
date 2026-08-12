@@ -239,8 +239,9 @@ Schreibe knapp, aber lösungsfähig. Jede Top-Gruppe braucht:
 
 ## Schritt 9 — Review-Log aktualisieren
 
-Wenn `LOG_FILE` existiert:
+Wenn `LOG_FILE` gesetzt ist:
 
+- Datei anlegen, falls sie noch nicht existiert (Skelett wie in `/k-review`).
 - Sektion `## Security Results Summary` sicherstellen.
 - `Letzter Lauf` auf heute setzen.
 - Eine Protokollzeile anhängen:
@@ -249,7 +250,7 @@ Wenn `LOG_FILE` existiert:
 | YYYY-MM-DD | results-summary | alle Result-Familien | <N> priorisierte Themen -> `k-playbook-local/results/summary-YYYY-MM-DD.md`. Handoff: `/k-remediation ...` |
 ```
 
-Wenn `LOG_FILE` fehlt, zeige die Log-Zeile im Abschluss, aber lege keine Ersatzdatei außerhalb von `RESULTS_DIR` an.
+Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Keine Ersatzdatei außerhalb von `RESULTS_DIR` anlegen.
 
 ## Schritt 10 — Abschluss
 

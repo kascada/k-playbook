@@ -32,7 +32,6 @@ gestartet wurde.
 |---|---|---|
 | **Projekt** | | |
 | `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
-| `/k-status` | read-only Zustandsbericht für das Projekt | repariert nichts |
 | **Docs** | | |
 | `/k-code2docs` | semantische Projekt-Doku erzeugen und für AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
 | `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
@@ -139,18 +138,6 @@ Guidelines geändert hat oder die Arbeit in ein anderes Projekt gewechselt ist.
 `/k-review`, `/k-enforcement` und `k-check` arbeiten auf dieser Menge und weisen sie vor
 der Arbeit aus. Die Regeln im Detail stehen in
 [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen).
-
-## Status
-
-`/k-status` ist read-only und prüft:
-
-- ob `K-PLAYBOOK.yaml` existiert, gültig ist und `schema_version: 3` trägt,
-- ob `k-playbook-local/` vollständig ist,
-- ob die Symlinks für Claude Code, OpenCode und Cursor stimmen,
-- ob `project.repo_root` auf ein Repository zeigt und wie sauber es ist,
-- welche Tasks offen sind und ob Security-Tools fehlen.
-
-Der Command repariert nichts. Für Reparaturen ist `/k-gui` zuständig.
 
 ## k-check
 

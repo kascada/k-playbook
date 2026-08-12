@@ -2,7 +2,7 @@
 description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses the project's task directory. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Glob, Task]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Task, Agent]
 ---
 
 # k-review-loop
@@ -110,7 +110,8 @@ Runden:  max. 5
 
 ### Step 4 — Critic round
 
-Spawn a `general` subagent (Critic) with this prompt:
+Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
+as Critic with this prompt:
 
 ```
 You are the Critic in a structured review of task/instruction files before they are executed by an AI agent.
@@ -149,7 +150,8 @@ Skip WARNUNGs and FEHLENDs unless they block execution. Store the routing table 
 
 ### Step 6 — Editor round
 
-Spawn a `general` subagent (Editor) with this prompt:
+Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
+as Editor with this prompt:
 
 ```
 You are the Editor in a structured review loop. The Critic has identified issues in these task/instruction files.
@@ -224,7 +226,8 @@ Output:
 
 ### Step 10 — Intent alignment check (only if Intent was provided)
 
-Spawn a final `general` Critic subagent with this prompt:
+Spawn a final general-purpose Critic subagent (OpenCode: `general`, Claude Code:
+`general-purpose`) with this prompt:
 
 ```
 You are doing a final alignment check. Below is the Intent (the goal the task must achieve) and the current state of the task files after review.

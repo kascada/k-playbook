@@ -141,8 +141,10 @@ loadPath();
 checkUpdate();
 
 // updateAvailable steuert, was ein Klick auf den Button tut: prüfen oder
-// tatsächlich aktualisieren.
+// tatsächlich aktualisieren. devSyncActive geht beidem vor: solange ein
+// Arbeitsstand eingespielt ist, gibt es nichts zu ziehen.
 let updateAvailable = false;
+let devSyncActive = false;
 
 async function checkUpdate() {
   elements.update.disabled = true;
@@ -156,6 +158,14 @@ async function checkUpdate() {
 }
 
 async function onUpdateClick() {
+  // Ein eingespielter Arbeitsstand wird zuerst verworfen, und zwar allein: der
+  // Zustand, den man gerade ansieht, verschwindet dabei. Ob danach ein Update
+  // ansteht, zeigt die Antwort — das zieht dann ein zweiter Klick.
+  if (devSyncActive) {
+    await discardDevSync();
+    return;
+  }
+
   if (!updateAvailable) {
     await checkUpdate();
     return;
@@ -180,7 +190,20 @@ async function onUpdateClick() {
 
 function renderUpdate(data) {
   updateAvailable = Boolean(data.available);
+  devSyncActive = Boolean(data.cleanliness && data.cleanliness.devSync);
   renderCleanliness(data.cleanliness);
+
+  // Der eingespielte Arbeitsstand geht vor: er verdeckt, was upstream liegt,
+  // und muss erst weg. Der Knopf sagt, was er tut — was man ansieht,
+  // verschwindet dabei.
+  if (devSyncActive) {
+    elements.update.className = "secondary";
+    elements.update.textContent = "Arbeitsstand verwerfen";
+    elements.update.title =
+      "Stellt den unberührten Clone wieder her. Danach lässt sich auf ein Update prüfen.";
+    elements.update.disabled = false;
+    return;
+  }
 
   if (updateAvailable) {
     // Hervorgehoben, solange etwas anliegt.
@@ -195,6 +218,17 @@ function renderUpdate(data) {
   // geprüft werden, dann bleibt es bei der Aufforderung.
   resetUpdateButton(data.message ? "Update prüfen" : "Version ist aktuell");
   elements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
+}
+
+async function discardDevSync() {
+  elements.update.disabled = true;
+  elements.update.textContent = "Verwerfe...";
+  try {
+    const response = await fetch("/api/update/discard", { method: "POST" });
+    renderUpdate(await response.json());
+  } catch {
+    resetUpdateButton("Arbeitsstand verwerfen");
+  }
 }
 
 function resetUpdateButton(label) {
@@ -227,8 +261,9 @@ function renderCleanliness(state) {
   if (state.devSync) {
     elements.cleanPill.className = "pill muted";
     elements.cleanPill.textContent = "Entwicklungsstand";
-    elements.cleanCommandText.textContent = "make installer-reset";
-    elements.cleanCommand.classList.remove("hidden");
+    // Kein Befehl zum Kopieren: dafür gibt es oben den Knopf. Der Befehl
+    // stünde nur als zweiter Weg daneben, der dasselbe tut.
+    elements.cleanCommand.classList.add("hidden");
     elements.cleanCard.classList.remove("hidden");
     return;
   }

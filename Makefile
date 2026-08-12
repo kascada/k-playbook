@@ -19,7 +19,7 @@ INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 PLAYBOOK_DIR := k-playbook
 DEV_MARKER := .k-playbook-devsync
 
-.PHONY: help build dist gui test installer-build installer-run installer-test installer-sync installer-reset
+.PHONY: help build dist gui test installer-build installer-run installer-test installer-sync
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -84,16 +84,9 @@ installer-sync: ## Spielt den Arbeitsstand in die Installation ein (nur Entwickl
 	@# Repository wird deshalb ueber den Pfad ausgeschlossen, nicht abgeschnitten.
 	@find "$(PLAYBOOK_DIR)" -depth -type d -empty \
 	  ! -path "$(PLAYBOOK_DIR)/.git" ! -path "$(PLAYBOOK_DIR)/.git/*" -delete
-	@printf 'Eingespielter Arbeitsstand, kein Clone.\nEntstanden durch "make installer-sync".\n"make installer-reset" stellt den Clone wieder her.\n' \
+	@printf 'Eingespielter Arbeitsstand, kein Clone.\nEntstanden durch "make installer-sync".\nZurueck: in der Oberflaeche "Arbeitsstand verwerfen".\n' \
 	  > "$(PLAYBOOK_DIR)/$(DEV_MARKER)"
 	@echo "Arbeitsstand eingespielt nach $(PLAYBOOK_DIR)/"
-
-installer-reset: ## Stellt den unberührten Clone wieder her
-	$(require_dev_repo)
-	@rm -f "$(PLAYBOOK_DIR)/$(DEV_MARKER)"
-	@git -C "$(PLAYBOOK_DIR)" checkout -- .
-	@git -C "$(PLAYBOOK_DIR)" clean -qfd
-	@echo "$(PLAYBOOK_DIR)/ ist wieder der unberührte Clone."
 
 gui: dist installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
 	"$(INSTALLER_WRAPPER)"

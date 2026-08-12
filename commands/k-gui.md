@@ -10,11 +10,14 @@ allowed-tools: [Bash, Read]
 Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
 auf und lies die Dateien aus `instructions`.
+Alle Pfade dieses Commands stammen aus dieser Ausgabe; die `K-PLAYBOOK.yaml` wird
+nicht selbst gelesen.
 
-Anders als bei allen anderen Commands ist ein Fehlschlag hier kein Abbruchgrund:
-`/k-gui` ist genau der Command, mit dem ein Projekt eingerichtet wird, also gibt es
-die Konfiguration womöglich noch gar nicht. Melde das kurz und starte die
-Oberfläche trotzdem.
+Die Ersteinrichtung eines Projekts läuft nicht über diesen Command, sondern über
+`k-playbook/bin/k-playbook` in der Shell. Erst deren dritter Schritt verlinkt die
+Commands beim Assistenten — wer `/k-gui` aufrufen kann, hat also bereits eine
+Installation. Ein fehlgeschlagener Context-Aufruf ist deshalb hier wie überall ein
+Abbruchgrund.
 
 
 Starte die lokale k-playbook Oberfläche.
@@ -27,23 +30,12 @@ Dieser Command nutzt bewusst nicht `make`.
 
 ## Ablauf
 
-1. Löse `K_PLAYBOOK_BIN` auf. Nimm den ersten ausführbaren Treffer:
-
-   - `k-playbook` aus dem `PATH`.
-   - `~/.local/bin/k-playbook`.
-   - `k-playbook/bin/k-playbook` im Projekt.
-
-2. Wenn kein Kandidat ausführbar ist, brich mit einem klaren Hinweis ab:
-
-```text
-k-playbook nicht gefunden.
-Erwartet wird die Installation unter k-playbook/ im Projekt.
-```
-
-3. Wenn das Binary vorhanden ist, starte es im aktuellen Projekt:
+Der Wrapper liegt unter `<playbook.dir>/bin/k-playbook` — derselbe, den der erste
+Schritt schon für `context` aufgerufen hat. Es ist nichts zu suchen und nichts zu
+raten; starte ihn ohne Argument im aktuellen Projekt:
 
 ```bash
-"$K_PLAYBOOK_BIN"
+<playbook.dir>/bin/k-playbook
 ```
 
 ## Hinweise

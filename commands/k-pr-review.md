@@ -25,7 +25,7 @@ Liste offene GitHub-Pull-Requests für das passende Repo, lade einen PR und füh
 Der Command bleibt bewusst konservativ:
 
 - keine Produktcode-Änderungen
-- keine Review-Artefakte unter `k-playbook/reviews/`
+- keine Review-Artefakte unter `k-playbook-local/results/`
 - keine Remediation
 - keine Protokollierung angenommener PRs in diesem Schritt
 - kein automatischer Merge ohne explizite User-Anfrage
@@ -436,7 +436,7 @@ Danach knapp:
 
 Noch nicht enthalten in diesem Schritt:
 
-- keine Protokollierung in `reviews/` oder anderswo
+- keine Protokollierung in `k-playbook-local/results/` oder anderswo
 - kein automatischer Handoff nach `/k-review` oder `/k-remediation`
 
 ## Schritt 8 - Folgeaktion wählen

@@ -93,8 +93,8 @@ func CheckCleanliness(projectDir string) Cleanliness {
 	if fileExists(filepath.Join(dir, DevSyncMarker)) {
 		return Cleanliness{
 			DevSync: true,
-			Message: "Entwicklungsstand: hier liegt ein eingespielter Arbeitsstand, kein Clone. " +
-				"`make installer-reset` stellt den Clone wieder her.",
+			Message: "Hier liegt ein eingespielter Arbeitsstand, kein Clone. Solange das so ist, " +
+				"wird nicht aktualisiert — \"Arbeitsstand verwerfen\" stellt den Clone wieder her.",
 		}
 	}
 
@@ -245,6 +245,48 @@ type UpdateResult struct {
 	Message       string `json:"message"`
 	// Cleanliness trägt den Grund, wenn das Update gar nicht erst lief.
 	Cleanliness Cleanliness `json:"cleanliness"`
+}
+
+// DiscardDevSync verwirft einen eingespielten Arbeitsstand und stellt den
+// unberuehrten Clone wieder her.
+//
+// Es gibt dafuer bewusst kein Make-Target mehr: `make installer-sync` spielt
+// beim naechsten Lauf ohnehin wieder ein, ein Zurueck im Terminal waere also nur
+// ein zweiter Weg zu demselben Ergebnis.
+//
+// Anders als bei Handarbeit im Clone darf die Oberflaeche das hier selbst: die
+// Markierung sagt, woher der Inhalt kommt — aus `make installer-sync`, also aus
+// dem Arbeitsstand. Verworfen wird eine Kopie, keine Arbeit. Ohne Markierung
+// bleibt es bei der Verweigerung, denn dann laesst sich das nicht wissen.
+func DiscardDevSync(projectDir string) error {
+	dir := PlaybookDir(projectDir)
+	if !fileExists(filepath.Join(dir, DevSyncMarker)) {
+		return fmt.Errorf("in %s liegt kein eingespielter Arbeitsstand", DisplayPath(dir))
+	}
+	if !isDir(filepath.Join(dir, ".git")) {
+		return fmt.Errorf("%s ist kein Git-Repository", DisplayPath(dir))
+	}
+
+	// Zuerst die Markierung: bricht ein Git-Aufruf danach ab, steht der
+	// Zustand wenigstens nicht mehr als Entwicklungsstand da, waehrend er
+	// halb zurueckgesetzt ist.
+	if err := os.Remove(filepath.Join(dir, DevSyncMarker)); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cleanlinessTimeout)
+	defer cancel()
+
+	if _, err := GitOutput(ctx, dir, "checkout", "--", "."); err != nil {
+		return fmt.Errorf("Zuruecksetzen fehlgeschlagen: %w", err)
+	}
+	// Nimmt auch mit, was jemand von Hand danebengelegt hat. Bei einem
+	// eingespielten Arbeitsstand ist das folgerichtig — dort gehoert nichts hin,
+	// was nicht aus dem Arbeitsstand kommt.
+	if _, err := GitOutput(ctx, dir, "clean", "-qfd"); err != nil {
+		return fmt.Errorf("Aufraeumen fehlgeschlagen: %w", err)
+	}
+	return nil
 }
 
 // Update holt den neuen Stand per Fast-Forward.

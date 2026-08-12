@@ -295,7 +295,7 @@ Kompakte Zusammenfassung:
 - Anzahl Q→Datei-Einträge.
 - MEMORY: `AGENTS.md` (neu / ergänzt / unverändert), `opencode.json` (neu / ergänzt / unverändert).
 - Restart-Hinweis.
-- Folge-Command: **`/k-tools-scan`** — erzeugt `k-playbook/docs/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
+- Folge-Command: **`/k-tools-scan`** — erzeugt `k-playbook-local/docs/libs/` mit einer pitfall-fokussierten Datei je nicht-trivialer Library. Empfohlen als zweiter Schritt nach diesem Command.
 
 ## Wartungs-Hinweise (dem User beim ersten Lauf einmal zeigen)
 

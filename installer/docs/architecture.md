@@ -167,9 +167,14 @@ und checks: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab
 | `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/context.md` | leere Datei |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname | leere `SKILL.md` |
 
-Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_shared/` und
-`_details/` sind damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt
-`_shared/context.md` und behält den Rest des Namensraums aus der Installation.
+Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_shared/` sind
+damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt `_shared/context.md`
+und behält den Rest des Namensraums aus der Installation.
+
+Der Preis der Rekursion: Jede Datei in einem solchen Verzeichnis wird auch **registriert**
+und erscheint beim Assistenten als `_shared:context`. Das Frontmatter ändert daran
+nichts — `collectCommands()` überspringt nur Dotfiles, Symlinks und `README.md`. Wer ein
+reines Include will, das nicht als Command auftaucht, muss den Ausschluss dort ergänzen.
 
 Skills werden als Ganzes überlagert, nicht Datei für Datei. `SKILL.md`, `PLAYBOOK.md`
 und `vorlagen/` müssen zueinander passen; ein halb ersetzter Skill wäre nicht sinnvoll
@@ -572,8 +577,10 @@ gepushten Commit. Ein frisch gebautes Binary läse also weiterhin alte Dateien.
 
 `make installer-sync` spielt deshalb den verfolgten Dateisatz — `git ls-files`, per
 Definition das, was ein Clone enthält — in die Installation ein und legt dort
-`.k-playbook-devsync` ab. `make installer-run` tut das mit, `make installer-reset` stellt
-den unberührten Clone wieder her.
+`.k-playbook-devsync` ab. `make installer-run` tut das mit. Zurück geht es über die
+Oberfläche, siehe unten — ein Make-Target dafür gibt es bewusst nicht: der nächste
+`installer-sync` spielt ohnehin wieder ein, ein zweiter Weg im Terminal führte nur zum
+selben Ergebnis.
 
 Die Markierung ist nötig, weil Git die eingespielten Dateien zwangsläufig als Änderungen
 sieht. Verbergen lässt sich das nicht: `.git/info/exclude` wirkt nur auf Unverfolgtes,
@@ -585,6 +592,20 @@ bleibt trotzdem wahr: ein Pull in einen eingespielten Stand wäre falsch.
 Ohne diese Unterscheidung stünde in der Installations-Karte dauerhaft „lokal gearbeitet" —
 also genau der Alarm, der echte Handarbeit im Clone melden soll, und der damit wertlos
 würde.
+
+**Verworfen wird aus der Oberfläche.** Der Update-Knopf heißt im Entwicklungsstand
+„Arbeitsstand verwerfen" und ruft `/api/update/discard` auf; dahinter steht
+`DiscardDevSync()` mit `git checkout -- .` und `git clean -fd`. Danach zeigt die Antwort
+den neuen Stand, aus dem wie gewohnt „Update verfügbar" werden kann — **zwei Klicks, nicht
+einer.** Der Zustand, den man ansieht, verschwindet beim Verwerfen; das gehört angesagt und
+nicht in dieselbe Aktion wie das Aktualisieren gepackt.
+
+Dass die Oberfläche hier von sich aus `git checkout -- .` und `git clean -fd` ausführt, ist
+die einzige Ausnahme von der Regel, dass sie fremde Verzeichnisse nicht zurücksetzt. Sie
+trägt: die Markierung sagt, woher der Inhalt kommt, nämlich aus dem Arbeitsstand. Verworfen
+wird eine Kopie, keine Arbeit. **Ohne Markierung lehnt `DiscardDevSync()` ab** — dann lässt
+sich nicht wissen, ob dort jemand absichtlich entwickelt hat, und es bleibt beim Befehl zum
+Kopieren.
 
 ## Altlasten des globalen Modells
 
@@ -751,6 +772,7 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt; liefert den lokalen Sauberkeitszustand mit |
 | `POST` | `/api/update` | `git pull --ff-only` ausführen; bricht bei lokal veränderter Installation vorher ab |
+| `POST` | `/api/update/discard` | eingespielten Arbeitsstand verwerfen; nur bei vorhandener Markierung |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |

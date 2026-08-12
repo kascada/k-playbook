@@ -80,6 +80,7 @@ from the output above — never from configuration, and never by searching.
 | unversioned working files | `<local.dir>/priv/` |
 | project-local commands | `<local.dir>/commands/` |
 | project-local skills | `<local.dir>/skills/` |
+| the wrapper itself | `<playbook.dir>/bin/k-playbook` |
 | check runner | `<playbook.dir>/bin/k-check` |
 | scripts | `<playbook.dir>/scripts/` |
 | security tool matrix | `<playbook.dir>/scripts/security-tools.tsv` |

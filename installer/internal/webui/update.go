@@ -52,6 +52,37 @@ func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// discardDevSyncHandler verwirft einen eingespielten Arbeitsstand.
+//
+// Bewusst getrennt vom Aktualisieren, statt beides in einem Klick zu tun: der
+// Zustand, den man gerade ansieht, verschwindet dabei. Nach dem Verwerfen zeigt
+// die Antwort den neuen Stand, aus dem dann wie gewohnt „Update verfügbar"
+// werden kann.
+func discardDevSyncHandler(w http.ResponseWriter, r *http.Request) {
+	environment := project.Detect()
+	if !environment.Installed {
+		writeJSON(w, http.StatusConflict, updateResponse{
+			Message: "Keine " + project.ConfigFileName + " gefunden.",
+		})
+		return
+	}
+
+	if err := project.DiscardDevSync(environment.ProjectDir); err != nil {
+		writeJSON(w, http.StatusConflict, updateResponse{Message: err.Error()})
+		return
+	}
+
+	response := updateResponse{Message: "Arbeitsstand verworfen, die Installation ist wieder der Clone."}
+	if status, err := project.CheckUpdate(environment.ProjectDir); err == nil {
+		response.Available = status.Available
+		response.Branch = status.Branch
+		response.Local = shortCommit(status.Local)
+		response.Remote = shortCommit(status.Remote)
+		response.Cleanliness = status.Cleanliness
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 // applyUpdateHandler holt den neuen Stand.
 func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()

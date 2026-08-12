@@ -228,7 +228,7 @@ func TestCheckCleanlinessErkenntEntwicklungsstand(t *testing.T) {
 	if len(state.Modified) > 0 || len(state.Untracked) > 0 {
 		t.Errorf("einzelne Dateien gemeldet statt des Zustands: %+v", state)
 	}
-	if !strings.Contains(state.Message, "installer-reset") {
+	if !strings.Contains(state.Message, "Arbeitsstand verwerfen") {
 		t.Errorf("Message nennt den Rückweg nicht: %q", state.Message)
 	}
 }
@@ -247,6 +247,68 @@ func TestUpdateLehntEntwicklungsstandAb(t *testing.T) {
 	}
 	if !result.Cleanliness.DevSync {
 		t.Errorf("Grund nicht durchgereicht: %+v", result.Cleanliness)
+	}
+}
+
+func TestDiscardDevSyncStelltDenCloneWiederHer(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+	playbookDir := PlaybookDir(projectDir)
+
+	binary := filepath.Join(playbookDir, "dist", "k-playbook-linux-amd64")
+	original, err := os.ReadFile(binary)
+	if err != nil {
+		t.Fatalf("Binary lesen: %v", err)
+	}
+	if err := os.WriteFile(binary, []byte("eingespielt"), 0o755); err != nil {
+		t.Fatalf("Binary ändern: %v", err)
+	}
+	// Auch das Danebengelegte muss weg: bei einem eingespielten Arbeitsstand
+	// gehört dort nichts hin, was nicht aus dem Arbeitsstand kommt.
+	extra := filepath.Join(playbookDir, "notiz.txt")
+	if err := os.WriteFile(extra, []byte("x"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	marker := filepath.Join(playbookDir, DevSyncMarker)
+	if err := os.WriteFile(marker, []byte("Arbeitsstand\n"), 0o644); err != nil {
+		t.Fatalf("Markierung anlegen: %v", err)
+	}
+
+	if err := DiscardDevSync(projectDir); err != nil {
+		t.Fatalf("DiscardDevSync: %v", err)
+	}
+
+	if restored, err := os.ReadFile(binary); err != nil || string(restored) != string(original) {
+		t.Errorf("Binary nicht zurückgesetzt: %q, erwartet %q", restored, original)
+	}
+	if fileExists(extra) {
+		t.Error("danebengelegte Datei blieb liegen")
+	}
+	if fileExists(marker) {
+		t.Error("Markierung blieb liegen")
+	}
+
+	state := CheckCleanliness(projectDir)
+	if !state.Clean || state.Blocking() {
+		t.Errorf("Installation nach dem Verwerfen nicht sauber: %+v", state)
+	}
+}
+
+// Ohne Markierung darf nichts verworfen werden: dann laesst sich nicht wissen,
+// ob dort jemand absichtlich gearbeitet hat.
+func TestDiscardDevSyncOhneMarkierung(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+	binary := filepath.Join(PlaybookDir(projectDir), "dist", "k-playbook-linux-amd64")
+	if err := os.WriteFile(binary, []byte("handarbeit"), 0o755); err != nil {
+		t.Fatalf("Binary ändern: %v", err)
+	}
+
+	if err := DiscardDevSync(projectDir); err == nil {
+		t.Fatal("ohne Markierung wurde verworfen")
+	}
+
+	content, err := os.ReadFile(binary)
+	if err != nil || string(content) != "handarbeit" {
+		t.Errorf("Handarbeit wurde angetastet: %q", content)
 	}
 }
 

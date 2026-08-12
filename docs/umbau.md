@@ -88,16 +88,44 @@ und `grype`; `trufflehog` und `pip-audit` nicht. `syft` erzeugt eine SBOM und da
 überhaupt keine Befunde — es ist der Zulieferer für `grype` und bleibt außerhalb des
 Merge.
 
+**Erledigt.**
+
+- Die Tool-Matrix trägt `languages`, `install_method`, `install_ref` und `asset_pattern`.
+  `go install` bleibt den Werkzeugen vorbehalten, die Go ohnehin brauchen — ein reines
+  Python-Projekt braucht deshalb kein Go.
+- Die Sprachen stehen unter `project.languages`, in der `context`-Ausgabe und als Auswahl
+  im Security-Tools-Block. Vorauswahl ist `python`.
+- Das Laufmodell steht in [`review-runs.md`](./review-runs.md): ein Lauf je Tag,
+  `run.json` plus `entries/`, Werkzeuge und Reviews als Einträge desselben Laufs. Die
+  Oberfläche legt Läufe an, startet aber nichts.
+
+**Gemessen, gehört in die Scan-Jobs.** An `~/dev/Aiva/kascada` (351 Dateien, 59.000 Zeilen)
+verglichen:
+
+- **95,3 % aller Python-Befunde sind `S101`/`B101`** — schlichtes `assert`. Ein Job, der
+  das nicht ausschließt, verschüttet die übrigen 170 Funde unter 3500. Testverzeichnisse
+  ebenso: dort steckt der Großteil der `S105`-Treffer (`{"secret": "read-secret"}`).
+- **`ruff` braucht `--select S --isolated`.** Seine Standardauswahl ist `E`/`F`; ohne die
+  Angabe findet es keinen einzigen Security-Fund, und mit der Projektkonfiguration fände es
+  etwas anderes als beabsichtigt.
+- **`bandit` ist entfallen**, ruff deckt es ab: 97,7 % identische Funde, und die Differenz
+  waren überwiegend Falschpositive und bereits per `# noqa` abgehakte Fälle, die bandit
+  nicht sieht.
+- **`semgrep --config auto` holt die Regeln vom Semgrep-Server** und schaltet damit den
+  Versand von Nutzungsmetriken ein (`--metrics` steht per Default auf `auto`). Der Job
+  braucht mindestens `--metrics=off`, und ein fester Regelsatz statt `auto` wäre besser:
+  sonst liefert derselbe Lauf zweimal womöglich andere Regeln.
+
 **Offen.** Wird einzeln besprochen, bevor daran gearbeitet wird:
 
-- Wie die Sprachen in der `K-PLAYBOOK.yaml`, in der `context`-Ausgabe und in der Oberfläche
-  stehen.
-- Das Ergebnisverzeichnis: ein Laufverzeichnis mit Tagesdatum unter
-  `k-playbook-local/results/`, und was daraufhin aus `<familie>/YYYY-MM-DD/` wird.
-- Die Ausführung durch das Werkzeug: Scan-Jobs, Parallelität, ein neues Subkommando.
+- Die Ausführung durch das Werkzeug: Scan-Jobs, Parallelität, ein neues Subkommando, und
+  wie ein Eintrag seinen Fortschritt nach `entries/<name>.json` schreibt.
 - Das Merge-Werkzeug. Der naheliegende Kandidat, der Microsoft SARIF Multitool, gibt es nur
   als .NET-Tool oder npm-Paket und zöge damit eine Laufzeitumgebung nach, die die
   Installation bisher nicht braucht.
 - Was mit `trufflehog` und `pip-audit` geschieht, die kein SARIF können: umwandeln oder
   ersetzen.
+- Eine Tabelle Regel → Schwere. `ruff` stuft im SARIF alles als `level: error` ein; bandit
+  hätte Severity und Confidence geliefert. Statt das von einem einzelnen Scanner abhängig
+  zu machen, soll die Zuordnung einmal in k-playbook stehen und für alle Werkzeuge gelten.
 - Der Umbau der Rezepte auf reine Bewertung, und wo die Bewertung des Assistenten landet.
