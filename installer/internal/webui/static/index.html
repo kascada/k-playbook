@@ -105,6 +105,23 @@
             <button id="local-create" class="secondary" disabled>Anlegen</button>
           </section>
 
+          <!-- Nur der Weg zu den beiden Arbeitsseiten. Aufgelistet wird dort:
+               hier stünde eine Liste, die man ohnehin auf der nächsten Seite
+               noch einmal sieht. -->
+          <section class="card{{if not .Installed}} hidden{{end}}" id="workflows-card">
+            <div class="section-head">
+              <div>
+                <h2>Workflows</h2>
+              </div>
+            </div>
+            <p class="hint">Reviews liegen unter <code>k-playbook-local/results/</code>, Tasks unter <code>k-playbook-local/tasks/</code>.</p>
+            <div class="link-row">
+              <a class="button-link" href="/reviews">Reviews<span id="workflows-reviews" class="link-count">…</span></a>
+              <a class="button-link" href="/tasks">Tasks<span id="workflows-tasks" class="link-count">…</span></a>
+            </div>
+            <p id="workflows-message" class="message"></p>
+          </section>
+
           <section class="card{{if not .Installed}} hidden{{end}}" id="assistant-card">
             <div class="section-head">
               <div>
@@ -133,19 +150,6 @@
               <code id="tools-command-text"></code>
               <button class="copy secondary" data-copy="tools-command-text">Kopieren</button>
             </div>
-          </section>
-
-          <section class="card{{if not .Installed}} hidden{{end}}" id="reviews-card">
-            <div class="section-head">
-              <div>
-                <h2>Reviews</h2>
-              </div>
-              <span id="reviews-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">Jeder Lauf ist ein Verzeichnis unter <code>k-playbook-local/results/</code>, benannt nach dem Tag.</p>
-            <a class="button-link" href="/reviews">Neuer Review</a>
-            <dl id="reviews-list" class="facts"></dl>
-            <p id="reviews-message" class="message"></p>
           </section>
 
           <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
@@ -228,6 +232,7 @@
         </div>
       </div>
     </main>
+    <script src="/static/session.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

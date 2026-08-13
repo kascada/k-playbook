@@ -49,21 +49,26 @@ installer/
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen und herstellen
+│   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
+│   ├── instructions_layout.go   CLAUDE.md/AGENTS.md als Paar einordnen und auflösen
 │   ├── remediation.go           remediation:-Block lesen und setzen
 │   ├── context.go               Arbeitsstand auflösen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
 │   ├── update.go                Remote-Stand prüfen, Sauberkeit, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
+│   ├── tasks.go                 offene Tasks auflisten und lesen
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Lebenszyklus
 │   ├── browser.go               Browser öffnen, Container erkennen
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
+│   ├── tasks.go                 Task-Endpunkte und die Zahlen des Workflow-Blocks
 │   ├── hostpath.go              PATH-Zustand melden, read-only
 │   ├── config.go local.go assistant.go tools.go remediation.go context.go
-│   ├── gh.go update.go
-│   └── static/                  index.html, app.js, styles.css
+│   ├── gh.go update.go reviews.go
+│   └── static/                  index.html, reviews.html, tasks.html,
+│                                session.js, app.js, reviews.js, tasks.js, styles.css
 ├── go.mod
 └── README.md
 ```
@@ -204,8 +209,43 @@ OpenCode `AGENTS.md` bevorzugt. Ein Symlink statt eines Imports, damit eine Änd
 immer in beiden ankommt — wer in `CLAUDE.md` schreibt, schreibt durch den Link hindurch.
 Der Link ist `Optional`, weil seine Quelle dem Projekt gehört und nicht der Installation.
 
-Deshalb läuft `ApplyRootInstructions()` **vor** `ApplyLinks()`: der Symlink braucht
-`AGENTS.md` als Ziel. Siehe [Instruktionen](#instruktionen).
+Die Richtung ist eine Konstante, keine projektabhängige Variable: ein umgedrehter Link
+müsste in Prüfung, Oberfläche und Doku dauerhaft mitgedacht werden. Deshalb wird eine
+mitgebrachte echte `CLAUDE.md` einmalig **umbenannt** statt der Link umgedreht. Siehe
+[Instruktionsdateien einordnen](#instruktionsdateien-einordnen).
+
+Die Reihenfolge — einordnen, `ApplyRootInstructions()`, `ApplyLinks()` — steckt in
+`ApplyAssistantSetup()` (`project/setup.go`) und nicht mehr im Handler: der Symlink
+braucht `AGENTS.md` als Ziel, und die Umbenennung muss vor dem Anlegen aus der Vorlage
+laufen. Siehe [Instruktionen](#instruktionen).
+
+### Instruktionsdateien einordnen
+
+`project/instructions_layout.go` ordnet das **Paar** (`CLAUDE.md`, `AGENTS.md`) ein,
+bevor irgendetwas geschrieben wird. Abgelesen wird mit `Lstat` und `Readlink`, nie mit
+`os.Stat`: das folgt Symlinks, und die verdrehte Richtung — `AGENTS.md` als Link auf
+`CLAUDE.md` — bliebe damit unsichtbar. Verglichen wird das aufgelöste Ziel, nicht der
+Rohstring aus `Readlink`.
+
+Jede der beiden Dateien steht in genau einem von acht Zuständen (fehlt, echte Datei,
+Verzeichnis, Link auf die andere, Link auf ein fremdes vorhandenes Ziel, Rest-Link,
+unlesbar, sonstiges). Die Fallmatrix daraus wird von oben nach unten geprüft, die erste
+passende Zeile gewinnt, und die letzte fängt alles Übrige auf — kein Zustand fällt durch.
+Aufgelöst werden nur die Zeilen, bei denen nichts verloren geht: Umbenennen und das
+Entfernen eines irreführenden Symlinks an `AGENTS.md`.
+
+Alles andere wird als `StateConflict` gemeldet und **nicht angefasst** — auch nicht
+angelegt. Der Detailtext nennt die Ursache, den Ausweg und die Folge: bis zur Handarbeit
+sieht Claude Code den Anstoß nicht. Prüfung und Einrichten benutzen dieselbe
+Klassifikation; zwei Implementierungen liefen auseinander. `checkFileLink()` ordnet
+deshalb in dieser Reihenfolge ein: Konflikt, `blocked`, `no-source`, Zielzustand.
+
+Ein einziger Vorbehalt blockiert eine sonst mögliche Umbenennung: steht in der
+`K-PLAYBOOK.yaml` `project.vcs: git` und meldet `git check-ignore --quiet AGENTS.md`
+(bewusst **ohne** `--no-index`, damit eine getrackte Datei als nicht ignoriert gilt)
+Exit 0, nähme die Umbenennung versionierten Inhalt still aus der Versionskontrolle. Ein
+Gate auf einen sauberen git-Zustand gibt es dagegen nicht — ein Arbeitsverzeichnis mit
+Änderungen ist der Normalfall.
 
 ### Einzel-Links statt Verzeichnis-Symlink
 
@@ -261,6 +301,7 @@ Zustände in `LinkState`:
 | `incomplete` | das Verzeichnis steht, sein Inhalt weicht vom Katalog ab |
 | `blocked` | etwas Echtes steht im Weg; wird nicht angefasst |
 | `no-source` | es gibt nichts zu verlinken |
+| `conflict` | `CLAUDE.md` und `AGENTS.md` lassen sich nicht auflösen, ohne Inhalt zu verlieren oder zu verdoppeln; der Detailtext nennt die Auflösungen |
 
 ## Instruktionen
 
@@ -281,6 +322,12 @@ sich aus, und er ist dem Hauptverzeichnis vorbehalten.
 kurzen Anstoß an, der auf `k-playbook context` verweist. Vorhandener Inhalt wird nie
 überschrieben. Der Marker `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf
 den Block erneut anhängt; `CheckRootInstructions()` prüft darauf.
+
+Intern nimmt die Funktion einen Schalter: `applyRootInstructions(projectDir, mayCreate)`.
+Im Konfliktfall ruft `ApplyAssistantSetup()` sie **ohne** Anlegen. Zu verhindern ist
+ausschließlich das Anlegen — es erzeugte neben dem echten Inhalt eine zweite, fast leere
+Instruktionsquelle und folgte bei einem Rest-Link sogar dessen totem Ziel. Das Anhängen
+bleibt richtig, wo bereits eine Instruktionsdatei steht.
 
 Der Anstoß nennt **keine Verzeichnisebene**. Dieselbe Datei liegt im Projekt, in der
 Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwei dieser
@@ -378,9 +425,9 @@ Zurücksetzen: das wäre `git checkout -- .` in einem fremden Verzeichnis, und d
 Oberfläche kann nicht wissen, ob dort jemand absichtlich entwickelt. Der Befehl steht
 zum Kopieren da.
 
-Denselben Befund meldet `/k-status` in der Zeile `Installation:`. Das fängt den Fall ab,
-in dem ausgerechnet `bin/k-playbook` die veränderte Datei ist: dann ist die Oberfläche
-über den Wrapper gar nicht erreichbar.
+Ist ausgerechnet `bin/k-playbook` die veränderte Datei, ist die Oberfläche über den
+Wrapper nicht mehr erreichbar. Dann führt der host-weite `k-playbook` aus dem `PATH` zum
+selben Ergebnis.
 
 Vor und nach dem Pull werden die Dateien unter `dist/` per SHA-256 gehasht.
 `BinaryChanged` meldet, ob sich etwas geändert hat — **nur dann** bringt ein Neustart
@@ -389,11 +436,18 @@ arbeitet mit dem alten Code weiter, auch wenn die Datei ersetzt wurde.
 
 ### Die Verlinkung wird mitgezogen
 
-`relinkAfterUpdate()` in `webui/update.go` ruft nach erfolgreichem Pull `ApplyLinks()`
-auf. Das ist kein Komfort, sondern nötig: seit Commands und Skills **einzeln** verlinkt
-werden, kommt ein neu mitgelieferter Command nicht mehr von selbst an. Ein
-Verzeichnis-Symlink hatte das automatisch getan; ein Update, das den Katalog ändert, ihn
-aber nicht registriert, wäre halb erledigt — und zwar unsichtbar.
+`relinkAfterUpdate()` in `webui/update.go` ruft nach erfolgreichem Pull
+`ApplyAssistantSetup()` auf. Das ist kein Komfort, sondern nötig: seit Commands und
+Skills **einzeln** verlinkt werden, kommt ein neu mitgelieferter Command nicht mehr von
+selbst an. Ein Verzeichnis-Symlink hatte das automatisch getan; ein Update, das den
+Katalog ändert, ihn aber nicht registriert, wäre halb erledigt — und zwar unsichtbar.
+
+Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß `ApplyLinks()`. Zwei
+Änderungen an diesem Einstieg sind gewollt und stehen deshalb im Antworttext: das
+Aktualisieren bringt jetzt den Anstoß mit — der Marker macht das idempotent —, und in
+einem Projekt ohne `AGENTS.md` legt es die Datei erstmals aus der Vorlage an. Sonst
+bliebe ein Projekt mit nur echter `CLAUDE.md` über „Aktualisieren" für immer unverändert.
+Umbenennung und Konflikt gehören ebenfalls in den Antworttext.
 
 `PendingLinkChanges()` liest vorher die Bilanz und meldet sie: dazugekommen, entfernt,
 auf eine andere Quelle umgesetzt. Die Namen werden **über alle Ziele zusammengefasst**,
@@ -748,6 +802,46 @@ Mermaid-Blöcke rendert der Browser nach. Die Library kommt bei Bedarf vom CDN �
 zu groß, um sie mitzuliefern. Ohne Netz bleibt der Quelltext des Diagramms als
 Codeblock stehen, die Datei ist also weiterhin lesbar.
 
+## Workflows: Reviews und Tasks
+
+Beides sind Arbeitsvorräte, beides hat eine eigene Seite. Auf der Startseite steht
+deshalb nur der Block **Workflows** mit zwei Knöpfen, je einem pro Seite, und der Zahl
+dessen, was dort liegt. Eine Liste an dieser Stelle wäre dieselbe Liste, die die nächste
+Seite noch einmal zeigt.
+
+Die Zahlen kommen aus `/api/workflows` und nicht aus den Endpunkten der Seiten:
+`/api/reviews` stellt einen ganzen Lauf zusammen und prüft dafür jedes Werkzeug — viel
+zu viel Arbeit für eine Zahl auf einem Knopf.
+
+Gezählt werden die Lauf-Verzeichnisse unter `k-playbook-local/results/` und die offenen
+Tasks. Offen heißt: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte liegen
+in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine Aufgabe und
+zählt nicht mit, in der Liste wie im Zähler.
+
+`project.ListTasks()` sortiert nach Dateinamen; die Nummer steht vorn und ordnet damit
+bereits richtig. Als Titel dient die erste Überschrift, ersatzweise der Dateiname —
+dieselbe Regel wie bei der Doku.
+
+Jede Zeile sagt außerdem, ob der Task schon gegengelesen wurde. Erkannt wird das an der
+`## Review-Log`-Sektion, die `/k-review-loop` an **jede** geprüfte Datei anhängt, auch an
+die unveränderte — dieselbe Spur, an der `/k-run` Step 1.2 das prüft. Nennt die
+Überschrift ein Datum, steht es dabei; mehrere Runden hängen mehrere Logs an, gezeigt
+wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als
+Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-run` vor der
+Ausführung nachfragt — deshalb steht er in Warnfarbe. Ein fehlendes Task-Verzeichnis ist anders als bei der
+Doku **kein** Befund: die projekteigene Struktur wird erst angelegt, und "noch keine
+Tasks" ist dieselbe Auskunft wie ein leeres Verzeichnis.
+
+Die Seite `/tasks` listet die offenen Tasks untereinander — die Zeile trägt Dateinamen
+und Titel, das liest sich nebeneinander schlecht. Ein Klick zeigt den Task als Markdown
+in einer Karte **unter** der Liste, nicht in einem Fenster darüber: die Liste bleibt
+sichtbar, der nächste Task ist einen Klick entfernt. Gerendert wird wie bei der Doku mit
+Goldmark, rohes HTML aus der Quelle bleibt abgeschaltet.
+
+`taskFilePath()` prüft den angefragten Namen: eine Datei unmittelbar im Task-Verzeichnis,
+Endung `.md`. Tasks liegen flach, deshalb genügt der Vergleich mit `filepath.Base()` —
+alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
+
 ## Web-API
 
 | Methode | Pfad | Zweck |
@@ -776,10 +870,13 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
+| `GET` | `/api/workflows` | Läufe und offene Tasks zählen, read-only |
+| `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
+| `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
 
-Statische Assets liegen unter `/static/`, die Startseite unter `/`. `indexHandler`
-rendert `static/index.html` als Template und liefert vorab mit, ob eine Installation
-gefunden wurde.
+Statische Assets liegen unter `/static/`, die Startseite unter `/`; daneben stehen die
+Seiten `/reviews` und `/tasks`. Alle drei rendert `renderPage()` aus derselben Vorlage
+für den Kopf und liefert vorab mit, ob eine Installation gefunden wurde.
 
 ## Lebenszyklus
 
@@ -795,6 +892,16 @@ Beenden funktioniert in beide Richtungen:
 - Solange sich **nie** ein Client gemeldet hat, bleibt der Server stehen: der Browser kann
   noch unterwegs sein, oder die URL wird von Hand eingetragen.
 - `Ctrl+C` und der `Schließen`-Button gehen ebenfalls.
+
+Weil die Oberfläche mehrere Seiten hat, gilt das für **jede** von ihnen: `session.js`
+trägt Heartbeat und Abmeldung und wird von `index.html`, `reviews.html` und `tasks.html`
+vor der jeweiligen Seitenlogik geladen. Eine Seite ohne Lebenszeichen beendete den Server
+wenige Sekunden nach dem Wechsel zu ihr — der Weg zurück führte dann auf eine tote Seite.
+
+Ein Klick auf einen Verweis dieser Oberfläche meldet gar nicht erst ab: `session.js`
+merkt sich, dass das Fenster zur nächsten eigenen Seite geht. Der Zurück-Knopf löst
+keinen Klick aus und meldet deshalb weiterhin ab — die nächste Seite ist innerhalb der
+3 Sekunden da und hebt die Abmeldung mit ihrem ersten Lebenszeichen wieder auf.
 
 Der Browser wird nicht automatisch geschlossen, wenn der Server endet. Browser blockieren
 das in vielen Fällen, und `open`/`xdg-open` liefern keinen verlässlichen Tab-Handle.
@@ -869,9 +976,10 @@ Lesen und Herüberkopieren da.
 ## Offene Punkte
 
 - Was der Projektstatus in der Oberfläche zeigen soll, nachdem der Projekt-Store
-  entfallen ist. Daran hängt, was von `/k-status` ins Binary zurückwandert: der Bericht
-  steht derzeit auf der `context`-Ausgabe plus billigen Existenzprüfungen, weil das alte
-  Subkommando `status` entfallen ist.
+  entfallen ist. Der Slash-Command `/k-status` ist gelöscht: sein Kern — die Prüfung, ob
+  die Installation unverändert ist — war eine Nachbildung von `CheckCleanliness()` in
+  Prosa, der Rest billige Existenzprüfungen auf der `context`-Ausgabe. Der Zustand kommt
+  jetzt aus der Oberfläche.
 - Keine automatisierten Tests für die HTTP-Handler; getestet ist bisher nur
   `internal/project`.
 - Release-Artefakte gibt es für macOS und Linux. Windows ist offen.

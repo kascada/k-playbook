@@ -52,7 +52,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 ## Stichwort-Index
 
 - `Anker` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
-- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
+- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
 - `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `Commands` -> [`commands.md`](./commands.md)

@@ -1,8 +1,7 @@
 "use strict";
 
-// Hält fest, ob das Backend noch antwortet. Sobald es weg ist, wird die
-// Oberfläche gesperrt und nicht weiter gepollt.
-let serverAvailable = true;
+// Heartbeat, Abmeldung und serverAvailable stehen in session.js — sie gelten
+// für jede Seite gleich und werden vor dieser Datei geladen.
 
 const elements = {
   shutdown: document.getElementById("shutdown"),
@@ -64,9 +63,10 @@ const elements = {
   assistantMessage: document.getElementById("assistant-message"),
   assistantApply: document.getElementById("assistant-apply"),
   docsCard: document.getElementById("docs-card"),
-  reviewsPill: document.getElementById("reviews-pill"),
-  reviewsList: document.getElementById("reviews-list"),
-  reviewsMessage: document.getElementById("reviews-message"),
+  workflowsCard: document.getElementById("workflows-card"),
+  workflowsReviews: document.getElementById("workflows-reviews"),
+  workflowsTasks: document.getElementById("workflows-tasks"),
+  workflowsMessage: document.getElementById("workflows-message"),
   docsPill: document.getElementById("docs-pill"),
   docsList: document.getElementById("docs-list"),
   docsMessage: document.getElementById("docs-message"),
@@ -78,8 +78,6 @@ const elements = {
   blockNav: document.getElementById("block-nav"),
 };
 
-const HEALTH_INTERVAL = 1800;
-
 const CONFIG_LABELS = { doneLabel: "Angelegt", todoLabel: "Anlegen" };
 
 // Lesbare Beschreibung je Zustand aus dem Backend.
@@ -90,6 +88,7 @@ const STATE_LABELS = {
   incomplete: "weicht vom Katalog ab",
   blocked: "blockiert",
   "no-source": "Quelle fehlt",
+  conflict: "Konflikt, Handarbeit nötig",
 };
 
 // Die Abweichungen eines Katalog-Eintrags, in der Reihenfolge, in der sie
@@ -125,11 +124,11 @@ document.addEventListener("keydown", (event) => {
 // später sichtbar werden, und einzeln gebundene Listener müssten nachgezogen
 // werden.
 document.addEventListener("click", onCopyClick);
-window.addEventListener("pagehide", notifyClientGone);
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
 buildBlockNav();
-startHealthChecks();
+// Die Startseite hat für den beendeten Server ein eigenes Fenster.
+startSession(showClosed);
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
 // blendet ihn dann ein und lädt ihn nach.
 loadConfig();
@@ -396,6 +395,7 @@ function renderConfig(data) {
   if (data.installed) {
     elements.configCard.classList.add("hidden");
     elements.localCard.classList.remove("hidden");
+    elements.workflowsCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
     elements.remediationCard.classList.remove("hidden");
     elements.ghCard.classList.remove("hidden");
@@ -409,7 +409,7 @@ function renderConfig(data) {
     loadRemediation();
     loadGH();
     loadTools();
-    loadReviews();
+    loadWorkflows();
     loadDocs();
     return;
   }
@@ -417,6 +417,7 @@ function renderConfig(data) {
   // Solange sie fehlt, ist dies der einzige Schritt, der zur Wahl steht.
   elements.configCard.classList.remove("hidden");
   elements.localCard.classList.add("hidden");
+  elements.workflowsCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
   elements.remediationCard.classList.add("hidden");
   elements.ghCard.classList.add("hidden");
@@ -953,52 +954,24 @@ function renderLanguageChoices(data) {
   }
 }
 
-// Der Reviews-Block zeigt nur, was da ist. Zusammengestellt und angelegt wird
-// ein Lauf auf der eigenen Seite: dort ist Platz für zwei Auswahllisten.
-async function loadReviews() {
-  elements.reviewsPill.className = "pill muted";
-  elements.reviewsPill.textContent = "Laden...";
+// Der Workflow-Block führt nur weiter. Aufgelistet wird auf den Zielseiten;
+// hier steht je Ziel bloß, wie viel dort liegt.
+async function loadWorkflows() {
   try {
-    const response = await fetch("/api/reviews", { cache: "no-store" });
-    renderReviews(await response.json());
+    const response = await fetch("/api/workflows", { cache: "no-store" });
+    renderWorkflows(await response.json());
   } catch {
-    elements.reviewsMessage.textContent = "Läufe konnten nicht geladen werden.";
+    elements.workflowsMessage.textContent = "Stand konnte nicht geladen werden.";
   }
 }
 
-function renderReviews(data) {
-  elements.reviewsList.replaceChildren();
-  elements.reviewsMessage.textContent = data.message || "";
-
-  if (!data.available) {
-    elements.reviewsPill.className = "pill muted";
-    elements.reviewsPill.textContent = "Unbekannt";
-    return;
-  }
-
-  const runs = data.runs || [];
-  for (const run of runs) {
-    // Ein Verzeichnis ohne run.json stammt aus der Zeit vor diesem Modell.
-    const detail = run.hasRunFile
-      ? `${run.state} — ${run.entryCount} Einträge`
-      : "ohne run.json";
-    addFact(elements.reviewsList, run.name, detail);
-  }
-
-  if (runs.length === 0) {
-    elements.reviewsPill.className = "pill muted";
-    elements.reviewsPill.textContent = "keine";
-    if (!elements.reviewsMessage.textContent) {
-      elements.reviewsMessage.textContent = "Noch kein Lauf angelegt.";
-    }
-    return;
-  }
-
-  elements.reviewsPill.className = "pill ok";
-  elements.reviewsPill.textContent = `${runs.length}`;
-  if (!elements.reviewsMessage.textContent && data.exists) {
-    elements.reviewsMessage.textContent = `Für ${data.today} gibt es bereits einen Lauf.`;
-  }
+function renderWorkflows(data) {
+  elements.workflowsMessage.textContent = data.message || "";
+  // Ohne belastbare Zahl bleibt der Knopf ein Knopf: er führt weiter, auch
+  // wenn nicht feststeht, was dort liegt.
+  const count = (value) => (data.available && !data.message ? `${value}` : "");
+  elements.workflowsReviews.textContent = count(data.reviews);
+  elements.workflowsTasks.textContent = count(data.tasks);
 }
 
 // Der Doku-Block listet die mitgelieferten Markdown-Dateien; gelesen wird eine
@@ -1437,39 +1410,6 @@ async function shutdown() {
     // Das Backend darf die Antwort schuldig bleiben, wenn es sofort zumacht.
   }
   showClosed();
-}
-
-function startHealthChecks() {
-  window.setInterval(checkHealth, HEALTH_INTERVAL);
-}
-
-// Erkennt ein weggefallenes Backend: schlägt der Aufruf fehl, ist der Server
-// beendet worden.
-async function checkHealth() {
-  if (!serverAvailable) {
-    return;
-  }
-
-  try {
-    await fetch("/api/health", { cache: "no-store" });
-  } catch {
-    showClosed("Verbindung zu k-playbook verloren.");
-  }
-}
-
-// Meldet dem Backend, dass dieses Fenster verschwindet. sendBeacon überlebt
-// das Entladen der Seite, fetch nicht zuverlässig.
-function notifyClientGone() {
-  if (!serverAvailable) {
-    return;
-  }
-
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/client-gone");
-    return;
-  }
-
-  fetch("/api/client-gone", { method: "POST", keepalive: true }).catch(() => {});
 }
 
 // Baut das Menü aus den Blöcken selbst: Reihenfolge, Beschriftung und Status

@@ -47,11 +47,27 @@ func CheckRootInstructions(projectDir string) RootInstructionsState {
 // Eine vorhandene Datei wird nie überschrieben — sie gehört dem Projekt. Der
 // Anstoß wird angehängt und per Marker gegen Dopplung geschützt.
 func ApplyRootInstructions(projectDir string) (RootInstructionsState, error) {
+	return applyRootInstructions(projectDir, true)
+}
+
+// applyRootInstructions kennt zusätzlich den Konfliktfall: dort darf nichts
+// angelegt werden.
+//
+// Zu verhindern ist ausschließlich das Anlegen. Steht bereits eine echte Datei,
+// ist das Anhängen richtig und schadet nichts; zeigt AGENTS.md bewusst auf ein
+// fremdes Ziel, lebt der Fall geradezu davon, dass der Anstoß durch den Link
+// dort ankommt. Das Anlegen dagegen erzeugte neben dem echten Inhalt eine
+// zweite, fast leere Instruktionsquelle — und folgte bei einem Rest-Link sogar
+// dessen totem Ziel, weil os.WriteFile den Link öffnet.
+func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsState, error) {
 	path := filepath.Join(projectDir, RootInstructionsFile)
 
 	data, err := os.ReadFile(path)
 	switch {
 	case err != nil && os.IsNotExist(err):
+		if !mayCreate {
+			return CheckRootInstructions(projectDir), nil
+		}
 		if err := os.WriteFile(path, []byte(rootInstructionsTemplate()), 0o644); err != nil {
 			return CheckRootInstructions(projectDir), fmt.Errorf("%s anlegen: %w", RootInstructionsFile, err)
 		}

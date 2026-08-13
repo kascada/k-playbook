@@ -33,7 +33,7 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "tasks", "priv"} {
+	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "tasks", "priv", "material"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
 		}
@@ -41,8 +41,27 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	if !isDir(filepath.Join(local, "tasks", "done")) {
 		t.Error("tasks/done fehlt")
 	}
+	if !isDir(filepath.Join(local, "docs", "manual")) {
+		t.Error("docs/manual fehlt")
+	}
 	if !fileExists(filepath.Join(local, "TODO.md")) {
 		t.Error("TODO.md fehlt")
+	}
+}
+
+// docs/code/, docs/libs/ und docs/extracted/ gehören je einem Erzeuger und
+// entstehen beim ersten Lauf des jeweiligen Commands, nicht beim Einrichten.
+func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	for _, name := range []string{"code", "libs", "extracted"} {
+		if pathExists(filepath.Join(LocalDir(root), "docs", name)) {
+			t.Errorf("docs/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", name)
+		}
 	}
 }
 
@@ -155,8 +174,36 @@ func TestCreateLocalSchuetztPrivVerzeichnis(t *testing.T) {
 	}
 }
 
-// Nur priv/ bekommt eine .gitignore; die übrigen Verzeichnisse sind normaler
-// Projektinhalt.
+// material/ bleibt versioniert, sein Inhalt nicht: Rohmaterial enthält
+// typischerweise Tokens, Pfade und Namen.
+func TestCreateLocalSchuetztMaterialVerzeichnis(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	material := filepath.Join(LocalDir(root), "material")
+	if !isDir(material) {
+		t.Fatal("material/ fehlt")
+	}
+	if !fileExists(filepath.Join(material, "README.md")) {
+		t.Error("material/README.md fehlt")
+	}
+
+	content, err := os.ReadFile(filepath.Join(material, ".gitignore"))
+	if err != nil {
+		t.Fatalf(".gitignore fehlt: %v", err)
+	}
+	for _, want := range []string{"*", "!.gitignore", "!README.md"} {
+		if !strings.Contains(string(content), want) {
+			t.Errorf(".gitignore enthält %q nicht:\n%s", want, content)
+		}
+	}
+}
+
+// Nur priv/ und material/ bekommen eine .gitignore; die übrigen Verzeichnisse
+// sind normaler Projektinhalt.
 func TestCreateLocalSchuetztNurPriv(t *testing.T) {
 	root := t.TempDir()
 
@@ -164,7 +211,7 @@ func TestCreateLocalSchuetztNurPriv(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	for _, name := range []string{"rules", "reviews", "checks", "results"} {
+	for _, name := range []string{"rules", "reviews", "checks", "results", "docs", filepath.Join("docs", "manual")} {
 		if pathExists(filepath.Join(LocalDir(root), name, ".gitignore")) {
 			t.Errorf("%s hat eine .gitignore, sollte aber versioniert sein", name)
 		}

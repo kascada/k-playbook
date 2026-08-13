@@ -53,6 +53,7 @@ fields from two loads.
 | `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
+| `cleanliness` | The local state of the installation: `clean`, `modified`, `untracked`, `ahead`, `devSync`, `message`. |
 | `guidelines` | Project guideline files. |
 
 `gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
@@ -72,7 +73,12 @@ from the output above — never from configuration, and never by searching.
 | completed tasks | `<local.dir>/tasks/done/` |
 | todo | `<local.dir>/TODO.md` |
 | project documentation | `<local.dir>/docs/` |
-| tool profiles | `<local.dir>/docs/libs/` |
+| documentation index | `<local.dir>/docs/README.md` |
+| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-code2docs` |
+| tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-tools-scan` |
+| extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
+| hand-written documentation | `<local.dir>/docs/manual/` |
+| raw material, never indexed | `<local.dir>/material/` |
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
 | known decisions | `<local.dir>/results/known-decisions.md` |
@@ -85,6 +91,16 @@ from the output above — never from configuration, and never by searching.
 | scripts | `<playbook.dir>/scripts/` |
 | security tool matrix | `<playbook.dir>/scripts/security-tools.tsv` |
 
+Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. Ein Command schreibt
+ausschließlich in sein eigenes Verzeichnis. `docs/README.md` gehört allein
+`/k-docs-index`. In `docs/manual/` schreibt kein Command Doc-Dateien; die
+Struktur-README aus dem Einrichten ist davon ausgenommen. Flache `docs/*.md` aus der
+Zeit vor dieser Struktur haben keinen Erzeuger: sie werden nur gelistet, geschrieben
+werden sie von keinem Command.
+
+`<local.dir>/material/` is the source side: raw notes, chat transcripts and hand-offs. It
+is never indexed and no command writes into it.
+
 `<local.dir>/rules/`, `reviews/`, `checks/` and `guidelines/` are the project-local side
 of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain
 the merged result.
@@ -95,8 +111,12 @@ runs, the effective set is already in place. They matter only when you **write**
 put it there, never into `playbook.dir`, and note that it takes effect after `/k-gui`
 has linked it and the assistant has been restarted.
 
-If a directory listed here is missing, say so and stop. Do not create it silently and do
-not substitute another one; `/k-gui` restores the project-local structure.
+If a directory listed here is missing, ask whether to create exactly that directory or to
+run `/k-gui`, which restores the project-local structure. Do not stop hard, do not create
+it silently, and never substitute another path. This applies only to the directories that
+setting up creates — those in `LocalStructure()`. The rows marked „entsteht beim ersten
+Lauf von …" are exempt: there, a missing directory is the normal state before the first
+run, and the producing command creates its own directory without asking.
 
 ## Rules
 
@@ -115,7 +135,11 @@ not substitute another one; `/k-gui` restores the project-local structure.
   directories yourself and do not re-derive which entry wins.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
 - Never write into `playbook.dir`. It is replaced on every update. Everything a command
-  produces goes into `local.dir`.
+  produces goes into `local.dir`. `cleanliness` reports whether that rule has held: it is
+  the one field that looks backwards. Do not re-derive it with your own `git` calls, and
+  do not repair what it reports — name it and point to `/k-gui`. `modified` or `ahead`
+  means an update will fail or silently keep the wrong file; `devSync` means someone put
+  a working copy there on purpose.
 - **Before calling `gh`, check `gh` from this output.** Stop and report instead of
   calling it when `gh.status` is `disabled` (the project decided against it), when
   `gh.status` is `unknown` (nobody decided yet — point to `/k-gui`), or when `gh.ready`

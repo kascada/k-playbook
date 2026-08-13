@@ -46,7 +46,7 @@ für die Assistenten ein.
 projekt/
 ├── K-PLAYBOOK.yaml       der Anker
 ├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
-├── CLAUDE.md             Symlink auf AGENTS.md
+├── CLAUDE.md             Symlink auf AGENTS.md; die Richtung ist fest
 ├── .claude/
 │   ├── commands/ ──┐     je ein Symlink pro Command
 │   └── skills/     │     je ein Symlink pro Skill; OpenCode liest hier mit
@@ -94,6 +94,13 @@ Verlinkt wird für Claude Code, OpenCode und Cursor. Skills stehen nur einmal un
 Skill-Konzept hat. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`: Claude Code liest
 ausschließlich `CLAUDE.md`, OpenCode bevorzugt `AGENTS.md` — so landet jede Änderung in
 beiden.
+
+Die Richtung ist überall dieselbe. Bringt ein Projekt nur eine echte `CLAUDE.md` mit,
+wird sie beim Einrichten nach `AGENTS.md` **umbenannt** und `CLAUDE.md` neu als Symlink
+gesetzt; der Inhalt bleibt erhalten und wird nicht verdoppelt. Was sich nicht
+automatisch auflösen lässt — zwei echte Dateien, eine bewusst gesetzte Verlinkung auf
+ein anderes Ziel, ein git-ignoriertes `AGENTS.md` — wird als **Konflikt** gemeldet und
+nicht angefasst. Solange der steht, sieht Claude Code vom Playbook nichts.
 
 ## Aktualisieren
 

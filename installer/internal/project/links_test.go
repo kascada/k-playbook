@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -432,13 +433,27 @@ func TestApplyLinksLegtKeineAgentsAn(t *testing.T) {
 
 // Ein Editor, der "atomar" speichert, ersetzt den Symlink durch eine echte
 // Datei. Das muss auffallen, sonst laufen beide still auseinander.
+//
+// Dieselbe Lage entsteht, wenn das Projekt eine eigene CLAUDE.md mitbringt. Der
+// Detailtext muss beide Auflösungen nennen, sonst leitet er in einem der Fälle
+// falsch an.
 func TestCheckLinksMeldetErsetztenSymlink(t *testing.T) {
 	root := newProject(t)
 	writeFile(t, filepath.Join(root, "AGENTS.md"), "# A\n")
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# eigenständig\n")
 
-	if got := statusFor(t, CheckLinks(root), "CLAUDE.md").State; got != StateBlocked {
-		t.Errorf("State = %q, erwartet %q", got, StateBlocked)
+	status := statusFor(t, CheckLinks(root), "CLAUDE.md")
+	if status.State != StateConflict {
+		t.Errorf("State = %q, erwartet %q", status.State, StateConflict)
+	}
+	for _, phrase := range []string{
+		"zusammenführen",
+		"neu einrichten",
+		"sieht Claude Code den Anstoß nicht",
+	} {
+		if !strings.Contains(status.Detail, phrase) {
+			t.Errorf("Detailtext nennt %q nicht: %s", phrase, status.Detail)
+		}
 	}
 }
 

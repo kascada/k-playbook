@@ -43,6 +43,8 @@ mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 | Review-Ergebnisse | `k-playbook-local/results/` |
 | Projekt-Dokumentation | `k-playbook-local/docs/` |
 | Tool-Steckbriefe | `k-playbook-local/docs/libs/` |
+| Handgepflegte Doku | `k-playbook-local/docs/manual/` |
+| Rohmaterial | `k-playbook-local/material/` |
 | Guidelines | `k-playbook-local/guidelines/` |
 | offene Tasks | `k-playbook-local/tasks/` |
 | erledigte Tasks | `k-playbook-local/tasks/done/` |
@@ -59,6 +61,25 @@ Wert mit `../` aus dem k-playbook-Verzeichnis herauszeigen, damit ein Projekt se
 vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-code2docs`
 schreibt nach `k-playbook-local/docs/`. Was ein Projekt sonst noch an Dokumentation
 pflegt, bleibt davon unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
+
+Innerhalb von `k-playbook-local/docs/` ist die Herkunft am Verzeichnis ablesbar, und
+daran hängt die Eigentümerregel:
+
+Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. Ein Command schreibt
+ausschließlich in sein eigenes Verzeichnis. `docs/README.md` gehört allein
+`/k-docs-index`. In `docs/manual/` schreibt kein Command Doc-Dateien; die
+Struktur-README aus dem Einrichten ist davon ausgenommen. Flache `docs/*.md` aus der
+Zeit vor dieser Struktur haben keinen Erzeuger: sie werden nur gelistet, geschrieben
+werden sie von keinem Command.
+
+`docs/code/`, `docs/libs/` und `docs/extracted/` legt beim ersten Lauf ihr jeweiliger
+Erzeuger an — `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract`. Das Einrichten legt sie
+nicht an; es legt `docs/manual/` und `material/` an.
+
+`k-playbook-local/material/` ist die Quellseite: Rohmaterial wie Chat-Mitschnitte und
+Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt bleibt wie
+bei `priv/` aus der Versionskontrolle heraus, denn Rohmaterial enthält typischerweise
+Tokens, Pfade und Namen.
 
 ## Anker finden
 
@@ -145,7 +166,7 @@ Alles Übrige hat kein Gegenstück auf der anderen Seite:
 
 | | Verzeichnisse |
 |---|---|
-| nur projekteigen | `results/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `TODO.md` |
+| nur projekteigen | `results/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `material/`, `TODO.md` |
 | nur mitgeliefert | `docs/`, `scripts/`, `bin/`, `dist/`, `installer/` |
 
 `docs/` steht in beiden Zeilen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
@@ -173,6 +194,7 @@ zusammenrechnen müsste:
 | `playbook`, `local` | die beiden aufgelösten Verzeichnisse |
 | `remediation` | die Policy, mit Default, falls der Block fehlt |
 | `gh` | die Entscheidung zur GitHub CLI samt Host-Befund |
+| `cleanliness` | der lokale Zustand der Installation: geänderte und zusätzliche Dateien, lokale Commits, eingespielter Arbeitsstand |
 | `catalogs` | `rules`, `reviews`, `checks` — zusammengeführt |
 | `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
 
@@ -182,6 +204,12 @@ wo zutreffend.
 
 Damit muss kein Command die Overlay-Regeln selbst anwenden. Es gibt eine Antwort, und
 alle bekommen dieselbe.
+
+`cleanliness` steht dort, weil die Regel „in `k-playbook/` wird nie geschrieben" sich
+nicht selbst durchsetzt und ihr Bruch still bleibt: Ändert sich eine lokal veränderte
+Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie stehen. Zwei
+`git`-Aufrufe im lokalen Clone, ohne Netz — dieselbe Prüfung, die auch die Oberfläche vor
+einem Update anstellt. Damit gibt es eine Antwort auf die Frage statt zwei.
 
 `now` steht aus einem anderen Grund dort: Commands stempeln Datumsangaben in Dateien, die
 bleiben — Review-Logs, Ergebnisverzeichnisse, Namen von Summary-Dateien. Nicht jedem

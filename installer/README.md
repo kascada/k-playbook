@@ -43,7 +43,7 @@ dieselben Flags und liefern dasselbe Ergebnis.
 |---|---|
 | Konfiguration anlegen | `K-PLAYBOOK.yaml` im Hauptverzeichnis |
 | Projekteigene Struktur anlegen | `k-playbook-local/` mit READMEs je Verzeichnis |
-| Assistenten verlinken | `.claude/`, `.opencode/`, `.cursor/`, `CLAUDE.md`, Anstoß in `AGENTS.md` |
+| Assistenten verlinken | `.claude/`, `.opencode/`, `.cursor/`, `CLAUDE.md`, Anstoß in `AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die
 mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren per

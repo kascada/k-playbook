@@ -2,6 +2,7 @@ package webui
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -32,14 +33,40 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Erst die Wurzeldatei: der Symlink CLAUDE.md braucht sie als Ziel.
+	// Ein Ablauf für alles: Einordnen und Auflösen der Instruktionsdateien, der
+	// Anstoß, dann die Verlinkung. Die Reihenfolge steckt in der Funktion.
+	setup, err := project.ApplyAssistantSetup(environment.ProjectDir)
+
 	message := "Verlinkung eingerichtet."
-	if _, err := project.ApplyRootInstructions(environment.ProjectDir); err != nil {
-		message = "Nicht vollständig eingerichtet: " + err.Error()
-	} else if _, err := project.ApplyLinks(environment.ProjectDir); err != nil {
-		message = "Nicht vollständig eingerichtet: " + err.Error()
+	if note := describeSetup(setup); note != "" {
+		message += " " + note
+	}
+	if err != nil {
+		message += " Nicht vollständig eingerichtet: " + err.Error()
 	}
 	writeJSON(w, http.StatusOK, assistantState(message))
+}
+
+// describeSetup nennt im Klartext, was das Einrichten an den
+// Instruktionsdateien getan hat — oder warum es nichts tun konnte.
+//
+// Der Konfliktfall gehört ausdrücklich in den Text: er ist kein
+// Schönheitsfehler, sondern bedeutet, dass Claude Code das Playbook bis zur
+// Handarbeit nicht kennt. Genau das steht im Detailtext.
+func describeSetup(setup project.AssistantSetup) string {
+	parts := []string{}
+	if detail := setup.Instructions.Detail; detail != "" {
+		parts = append(parts, detail)
+	}
+
+	switch {
+	case setup.RootCreated:
+		parts = append(parts, project.RootInstructionsFile+" aus der Vorlage angelegt.")
+	case setup.RootExtended:
+		parts = append(parts, "Der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
+	}
+
+	return strings.Join(parts, " ")
 }
 
 // assistantState liest den aktuellen Zustand.

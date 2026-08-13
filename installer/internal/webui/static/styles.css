@@ -579,6 +579,12 @@ details[open] > summary.disclosure .disclosure-marker {
   color: var(--muted);
 }
 
+/* Derselbe Fließtext, aber in einer Karte statt im Fenster darüber: die Karte
+   bringt ihren Rand schon mit. */
+.doc-viewer.inline {
+  padding: 0;
+}
+
 .doc-viewer h1,
 .doc-viewer h2,
 .doc-viewer h3 {
@@ -779,6 +785,89 @@ button.attention-highlight {
 .button-link.secondary {
   color: var(--accent-strong);
   background: #e5ded0;
+}
+
+/* Mehrere Knöpfe nebeneinander, die auf schmalen Fenstern umbrechen dürfen. */
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Die Zahl gehört zum Knopf, ist aber nicht seine Beschriftung: sie sitzt
+   abgesetzt dahinter und verschwindet, solange sie nicht feststeht. */
+.link-count {
+  margin-left: 10px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.85em;
+}
+
+.link-count:empty {
+  display: none;
+}
+
+/* Tasks stehen untereinander: die Zeile trägt Dateiname und Titel, das liest
+   sich nebeneinander schlecht. */
+.task-list {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.task-list.empty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.task-link {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.task-link.active,
+.task-link:hover {
+  color: var(--accent-strong);
+  background: rgba(47, 93, 80, 0.1);
+}
+
+.task-name {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.task-link .task-title {
+  flex: 1;
+  color: var(--muted);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* Rechts am Rand: ob der Task schon gegengelesen wurde. Ungeprüft ist kein
+   Fehler, aber der Grund, warum /k-run vor der Ausführung nachfragt. */
+.task-review {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.task-review.open {
+  color: var(--warn);
 }
 
 /* Überschrift einer Gruppe innerhalb einer Karte. */

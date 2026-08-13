@@ -125,7 +125,7 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-// relinkAfterUpdate zieht die Assistenten-Verlinkung auf den neuen Stand nach
+// relinkAfterUpdate zieht die Assistenten-Einrichtung auf den neuen Stand nach
 // und meldet, was sich dabei geändert hat.
 //
 // Das gehört zum Update, nicht in einen zweiten Schritt: seit Commands und
@@ -133,18 +133,32 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 // mehr von selbst an. Ein Update, das den Katalog ändert, ihn aber nicht
 // registriert, wäre halb erledigt — und zwar unsichtbar.
 //
+// Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß ApplyLinks.
+// Zwei Änderungen an diesem Einstieg sind gewollt und stehen deshalb im
+// Antworttext: das Aktualisieren bringt jetzt den Anstoß mit — der Marker macht
+// das idempotent und überschreibt vorhandenen Inhalt nie —, und in einem
+// Projekt ohne AGENTS.md legt es die Datei erstmals aus der Vorlage an. Sonst
+// bliebe ein Projekt mit nur echter CLAUDE.md über „Aktualisieren" für immer
+// unverändert.
+//
 // Ein Fehler dabei lässt das Update selbst gültig: der Pull ist durch, und
 // die Verlinkung kann über die Assistenten-Karte nachgeholt werden.
 func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, string) {
 	changes := project.PendingLinkChanges(project.CheckLinks(projectDir))
 
-	if _, err := project.ApplyLinks(projectDir); err != nil {
+	setup, err := project.ApplyAssistantSetup(projectDir)
+	if err != nil {
 		return changes, message + " Die Verlinkung konnte nicht nachgezogen werden: " + err.Error()
 	}
-	if changes.Empty() {
-		return changes, message
+
+	parts := []string{message}
+	if note := describeSetup(setup); note != "" {
+		parts = append(parts, note)
 	}
-	return changes, message + " " + describeLinkChanges(changes)
+	if !changes.Empty() {
+		parts = append(parts, describeLinkChanges(changes))
+	}
+	return changes, strings.Join(parts, " ")
 }
 
 // describeLinkChanges formuliert die Bilanz als Satz.

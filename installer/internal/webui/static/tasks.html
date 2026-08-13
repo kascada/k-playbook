@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Neuer Review - k-playbook</title>
+    <title>Tasks - k-playbook</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
@@ -12,7 +12,7 @@
       <section class="hero app-header">
         <div class="brand-row">
           <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
-          <h1>Neuer Review</h1>
+          <h1>Tasks</h1>
         </div>
         <div class="hero-subrow">
           <p class="eyebrow path">
@@ -33,45 +33,37 @@
       </section>
 
       <div class="blocks">
-        <section class="card" id="pick-card">
+        <section class="card" id="list-card">
           <div class="section-head">
             <div>
-              <h2>Was soll laufen?</h2>
+              <h2>Offene Tasks</h2>
             </div>
-            <span id="pick-pill" class="pill muted">Laden...</span>
+            <span id="tasks-pill" class="pill muted">Laden...</span>
           </div>
-
           <p class="hint">
-            Werkzeuge laufen über ihre CLI, Reviews über einen Assistenten. Beide sind
-            Einträge desselben Laufs und schreiben in dasselbe Verzeichnis.
+            Aus <code>k-playbook-local/tasks/</code>, nach Nummer geordnet. Erledigte liegen in
+            <code>done/</code> und stehen hier nicht mehr.
           </p>
-
-          <h3 class="group-head">Werkzeuge</h3>
-          <p class="hint" id="tools-hint"></p>
-          <div id="pick-tools" class="choices choices-compact"></div>
-
-          <h3 class="group-head">Reviews</h3>
-          <p class="hint">Aus dem aufgelösten Katalog, mitgeliefert und projekteigen zusammengeführt.</p>
-          <div id="pick-reviews" class="choices choices-compact"></div>
-
-          <p id="pick-message" class="message"></p>
-          <button id="pick-create" class="secondary" disabled>Erstellen</button>
+          <div id="tasks-list" class="task-list empty"></div>
+          <p id="tasks-message" class="message"></p>
         </section>
 
-        <section class="card" id="runs-card">
+        <!-- Der Inhalt steht unter der Liste statt in einem Fenster darüber:
+             die Liste bleibt dadurch sichtbar, und der nächste Task ist einen
+             Klick entfernt. -->
+        <section class="card hidden" id="task-card">
           <div class="section-head">
             <div>
-              <h2>Bisherige Läufe</h2>
+              <p class="eyebrow" id="task-path"></p>
+              <h2 id="task-title">Task</h2>
             </div>
-            <span id="runs-pill" class="pill muted">Laden...</span>
           </div>
-          <dl id="runs-list" class="facts"></dl>
-          <p id="runs-message" class="message"></p>
+          <article id="task-viewer" class="doc-viewer inline"></article>
         </section>
       </div>
     </main>
 
     <script src="/static/session.js"></script>
-    <script src="/static/reviews.js"></script>
+    <script src="/static/tasks.js"></script>
   </body>
 </html>

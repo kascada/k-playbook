@@ -698,7 +698,7 @@ PR gemerged. Lokaler Validierungs-Branch `pr-review/441-python-jose` wurde ansch
 ## Fehlerfälle
 
 - Kein k-playbook-Projekt (Context-Aufruf schlägt fehl) -> sauber abbrechen und `/k-gui` empfehlen
-- `project.repo_root` oder der Legacy-Fallback `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
+- `project.repoRoot` oder das engere `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
 - `gh` fehlt oder ist nicht authentifiziert -> sauber abbrechen und das Problem klar benennen
 - mehr als zwei Argumente oder ungültige Argument-Kombination -> gültige Formen nennen und stoppen
 - offene PR-Liste ist leer -> melden und stoppen

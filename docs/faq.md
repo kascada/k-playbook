@@ -7,10 +7,10 @@
 - nach dem Klonen von k-playbook in ein Projekt, für die drei Einrichtungsschritte.
 - nach einem `git pull`, wenn neue Commands oder Skills dazugekommen sind und die
   Verlinkung nachgezogen werden soll.
-- wenn `/k-status` fehlende Teile der projekteigenen Struktur oder kaputte Symlinks meldet.
+- wenn Teile der projekteigenen Struktur fehlen oder Symlinks kaputt sind.
 
-Wenn du nur wissen willst, ob alles stimmt, nimm `/k-status`. Der Command ist read-only
-und repariert nichts.
+Wenn du nur wissen willst, ob alles stimmt, öffne die Oberfläche und schau, ohne einen
+der Schritte zu bestätigen — geschrieben wird erst nach Bestätigung.
 
 ## Muss ich `/k-gui` in einem bestimmten Verzeichnis aufrufen?
 

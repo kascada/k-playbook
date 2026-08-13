@@ -131,6 +131,9 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/context", contextHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
+	mux.HandleFunc("GET /api/workflows", workflowsHandler)
+	mux.HandleFunc("GET /api/tasks", tasksHandler)
+	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -138,6 +141,7 @@ func routes(state *serverState) http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /reviews", reviewsPageHandler)
+	mux.HandleFunc("GET /tasks", tasksPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
 	return mux
@@ -151,6 +155,13 @@ var reviewsTemplate = template.Must(template.ParseFS(staticFiles, "static/review
 
 func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, reviewsTemplate)
+}
+
+// tasksTemplate ist die Seite der Tasks, ebenfalls mit dem gemeinsamen Kopf.
+var tasksTemplate = template.Must(template.ParseFS(staticFiles, "static/tasks.html"))
+
+func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, tasksTemplate)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {

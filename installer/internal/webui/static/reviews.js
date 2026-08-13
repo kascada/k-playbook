@@ -186,4 +186,9 @@ function renderRuns(data) {
 }
 
 elements.pickCreate.addEventListener("click", create);
+// Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
+// nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.
+startSession((message) => {
+  elements.pickMessage.textContent = message;
+});
 load();

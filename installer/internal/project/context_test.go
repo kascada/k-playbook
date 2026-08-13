@@ -205,6 +205,25 @@ func TestBuildContextLiefertZeitpunkt(t *testing.T) {
 	}
 }
 
+// Der Zustand der Installation gehört in die Ausgabe: die Regel, dass dort nicht
+// geschrieben wird, setzt sich nicht selbst durch.
+func TestBuildContextLiefertSauberkeit(t *testing.T) {
+	root := newContextProject(t)
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	// Ohne .git in der Installation ist nichts zu prüfen — gemeldet wird das als
+	// sauber, mit Begründung, nicht als Fehler.
+	if !context.Cleanliness.Clean {
+		t.Errorf("Cleanliness.Clean = false, erwartet true: %+v", context.Cleanliness)
+	}
+	if context.Cleanliness.Message == "" {
+		t.Error("Cleanliness.Message ist leer")
+	}
+}
+
 // Ein Kontext auf Basis einer fremden Fassung wäre irreführend.
 func TestBuildContextLehntFremdesSchemaAb(t *testing.T) {
 	root := newContextProject(t)

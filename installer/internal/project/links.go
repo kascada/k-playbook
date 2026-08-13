@@ -46,14 +46,28 @@ type Link struct {
 // liest und OpenCode AGENTS.md bevorzugt. Ein Symlink statt eines Imports,
 // damit eine Änderung immer in beiden ankommt — wer in CLAUDE.md schreibt,
 // schreibt durch den Link hindurch in AGENTS.md.
+//
+// Die Richtung ist überall dieselbe. Bringt ein Projekt nur eine echte
+// CLAUDE.md mit, wird sie beim Einrichten nach AGENTS.md umbenannt statt
+// ignoriert; sonst stünden zwei Instruktionsdateien mit verschiedenem Inhalt
+// nebeneinander. Was sich nicht automatisch auflösen lässt — eine bewusst
+// gesetzte Verlinkung auf ein fremdes Ziel, zwei echte Dateien, ein
+// git-ignoriertes AGENTS.md — wird als StateConflict gemeldet und nicht
+// angefasst. Die Fallmatrix dazu steht in instructions_layout.go.
 func Links() []Link {
 	return []Link{
 		{Path: filepath.Join(".claude", "commands"), Kind: KindCommands, Assistant: "Claude Code"},
 		{Path: filepath.Join(".claude", "skills"), Kind: KindSkills, Assistant: "Claude Code, OpenCode"},
 		{Path: filepath.Join(".opencode", "commands"), Kind: KindCommands, Assistant: "OpenCode"},
 		{Path: filepath.Join(".cursor", "commands"), Kind: KindCommands, Assistant: "Cursor"},
-		{Path: "CLAUDE.md", Source: "AGENTS.md", Assistant: "Claude Code", IsFile: true, Optional: true},
+		{Path: ClaudeInstructionsFile, Source: RootInstructionsFile, Assistant: "Claude Code", IsFile: true, Optional: true},
 	}
+}
+
+// isRootInstructionsLink erkennt den einen Datei-Link, hinter dem das Paar
+// (CLAUDE.md, AGENTS.md) steht.
+func isRootInstructionsLink(link Link) bool {
+	return link.IsFile && link.Path == ClaudeInstructionsFile && link.Source == RootInstructionsFile
 }
 
 // LinkState ist der Zustand einer einzelnen Verlinkung.
@@ -74,6 +88,11 @@ const (
 	StateBlocked LinkState = "blocked"
 	// StateNoSource: es gibt nichts zu verlinken.
 	StateNoSource LinkState = "no-source"
+	// StateConflict: die Lage lässt sich nicht automatisch auflösen, ohne
+	// Inhalt zu verlieren oder zu verdoppeln. Anders als StateBlocked steht
+	// nicht bloß etwas im Weg — es gibt zwei plausible Auflösungen, und die
+	// Wahl gehört dem Projekt. Der Detailtext nennt sie.
+	StateConflict LinkState = "conflict"
 )
 
 // LinkStatus ist der geprüfte Zustand einer Verlinkung.
@@ -104,6 +123,10 @@ func (s LinkStatus) OK() bool { return s.State == StateOK }
 // NeedsAction meldet, ob noch etwas einzurichten ist. Ein optionaler Link ohne
 // Quelle zählt nicht dazu: dort gibt es nichts zu tun, solange das Projekt die
 // Datei nicht selbst anlegt.
+//
+// Die Ausnahme gilt nur bei StateNoSource und wird bewusst nicht ausgeweitet:
+// ein Konflikt ist ein offener Punkt, auch am optionalen Link CLAUDE.md. Sonst
+// bliebe LinksOK dabei true, und die Oberfläche meldete „eingerichtet".
 func (s LinkStatus) NeedsAction() bool {
 	if s.State == StateOK {
 		return false
@@ -195,8 +218,28 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 }
 
 // checkFileLink prüft einen einzelnen Symlink auf eine Datei im Projekt.
+//
+// Die Reihenfolge ist festgelegt: Konflikt, Blockade, fehlende Quelle,
+// Zielzustand. Käme die Quellprüfung zuerst, bliebe der Konflikt gerade dort
+// unsichtbar, wo er am meisten zählt — bei einem CLAUDE.md, das auf ein fremdes
+// Ziel zeigt, während AGENTS.md fehlt. Der Detailtext nennte dann mit
+// „AGENTS.md fehlt im Projekt" die falsche Ursache.
 func checkFileLink(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
+
+	if isRootInstructionsLink(link) {
+		switch plan := classifyInstructions(projectRoot); {
+		case plan.conflict:
+			status.State = StateConflict
+			status.Detail = plan.detail
+			return status
+
+		case plan.blocked:
+			status.State = StateBlocked
+			status.Detail = plan.detail
+			return status
+		}
+	}
 
 	source := filepath.Join(projectRoot, link.Source)
 	if !fileExists(source) {
@@ -449,6 +492,15 @@ func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 // applyFileLink setzt einen einzelnen Symlink. Etwas Echtes im Weg gehört dem
 // Projekt und bleibt liegen; die Prüfung meldet den Zustand.
 func applyFileLink(projectRoot string, link Link) error {
+	if isRootInstructionsLink(link) {
+		// Ein gemeldeter Konflikt bleibt unangetastet — auch der Fall, in dem
+		// CLAUDE.md auf ein fremdes Ziel zeigt und sonst unten in den
+		// Symlink-Zweig fiele und still umgebogen würde.
+		if plan := classifyInstructions(projectRoot); plan.conflict || plan.blocked {
+			return nil
+		}
+	}
+
 	source := filepath.Join(projectRoot, link.Source)
 	if !fileExists(source) {
 		return nil

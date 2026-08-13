@@ -138,7 +138,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 
 | Gruppe | Commands | Zweck |
 |---|---|---|
-| Projekt | `/k-gui`, `/k-status` | Oberfläche starten, Projektzustand prüfen |
+| Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
 | Docs | `/k-code2docs`, `/k-tools-scan` | Projektwissen für AI-Sessions dokumentieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausführen, Findings priorisieren und abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, prüfen und ausführen |

@@ -104,8 +104,9 @@ Probleme findet, ist `done` — das ist seine Aufgabe.
 
 ## Die Oberfläche
 
-Der Block **Reviews** auf der Startseite listet die vorhandenen Läufe und verweist auf die
-Seite `/reviews`. Dort wird ein neuer Lauf zusammengestellt:
+Der Block **Workflows** auf der Startseite führt mit einem Knopf zur Seite `/reviews`; die
+Zahl darauf ist die der vorhandenen Läufe. Aufgelistet werden sie auf der Seite selbst.
+Dort wird auch ein neuer Lauf zusammengestellt:
 
 - **Werkzeuge** aus der Tool-Matrix, gefiltert nach `project.languages`. Was nicht
   installiert ist, steht da, lässt sich aber nicht auswählen — mit dem Hinweis, wie es

@@ -78,7 +78,7 @@ Verlinkt wird für Claude Code, OpenCode und Cursor:
 ```text
 projekt/
 ├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
-├── CLAUDE.md             Symlink auf AGENTS.md
+├── CLAUDE.md             Symlink auf AGENTS.md; die Richtung ist fest
 ├── .claude/
 │   ├── commands/         je ein Symlink pro Command
 │   └── skills/           je ein Symlink pro Skill; OpenCode liest hier mit
@@ -116,6 +116,30 @@ landet jede Änderung in beiden.
 Block angehängt und vorhandener Inhalt nicht angetastet. Ein Marker
 `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhängt.
 
+### Eine vorhandene CLAUDE.md
+
+Die Richtung des Symlinks ist fest. Damit daneben keine zweite, abweichende
+Instruktionsdatei entsteht, ordnet das Einrichten das Paar `CLAUDE.md`/`AGENTS.md`
+zuerst ein und löst auf, was sich auflösen lässt:
+
+| Ausgangslage | Was geschieht |
+|---|---|
+| nur eine echte `CLAUDE.md` | sie wird nach `AGENTS.md` **umbenannt**, der Anstoß an den erhaltenen Inhalt angehängt, `CLAUDE.md` neu als Symlink gesetzt |
+| `AGENTS.md` ist ein Symlink auf `CLAUDE.md` | die verdrehte Richtung wird aufgelöst: Symlink weg, umbenennen, neu verlinken |
+| `AGENTS.md` ist ein toter Symlink | er wird entfernt, damit die Datei nicht an seinem Ziel landet |
+| beide sind echte Dateien | **Konflikt** — von Hand zusammenführen und `CLAUDE.md` löschen; oder, wenn ein Editor beim Speichern den Symlink ersetzt hat, `CLAUDE.md` löschen und neu einrichten |
+| `CLAUDE.md` oder `AGENTS.md` zeigt bewusst auf ein anderes Ziel | **Konflikt** — der Link des Projekts bleibt stehen |
+| `AGENTS.md` ist in git ignoriert | **Konflikt** — sonst fiele der Inhalt still aus der Versionskontrolle; Ignore-Regel entfernen und neu einrichten |
+
+Bei einem Konflikt wird nichts verschoben, nichts gelöscht, nichts gesichert und auch
+kein `AGENTS.md` angelegt. Das ist kein Schönheitsfehler: solange er steht, sieht Claude
+Code vom Einrichten nichts, weil er ausschließlich `CLAUDE.md` liest. Die
+Assistenten-Karte meldet den Zustand als `Konflikt` und nennt den Ausweg im Detailtext.
+
+Derselbe Ablauf läuft beim **Aktualisieren**. Ein Projekt, das nur eine echte
+`CLAUDE.md` hat, wird also auch darüber eingerichtet, und ein Projekt ganz ohne
+`AGENTS.md` bekommt sie dabei erstmals.
+
 Was ein Assistent darüber hinaus lesen soll, steht nicht in `AGENTS.md`, sondern in
 `k-playbook.md` — je einmal pro Ebene:
 
@@ -142,6 +166,24 @@ Terminal; sonst bleibt es still.
 
 Nach Änderungen an Commands oder Skills muss der jeweilige Assistent neu gestartet
 werden — beide erfassen sie beim Start.
+
+## Reviews und Tasks
+
+Der Block **Workflows** führt zu den beiden Arbeitsvorräten. Auf jedem Knopf steht, wie
+viel dort liegt: die Zahl der Review-Läufe unter `k-playbook-local/results/` und die der
+offenen Tasks unter `k-playbook-local/tasks/`.
+
+Aufgelistet wird auf den Seiten selbst. `/reviews` zeigt die bisherigen Läufe und stellt
+einen neuen zusammen. `/tasks` listet die offenen Tasks nach ihrer Nummer; ein Klick
+zeigt den Task als Markdown unter der Liste. Erledigte liegen in `tasks/done/` und
+stehen dort nicht mehr.
+
+Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-review-loop` gegangen ist —
+mit Datum, sofern das Review-Log eines nennt. „ohne Review-Loop" ist kein Fehler, aber
+der Grund, warum `/k-run` vor der Ausführung nachfragt.
+
+Gelesen wird nur. Angelegt und ausgeführt werden Tasks über `/k-task-create` und
+`/k-run` im Assistenten.
 
 ## Doku lesen
 
@@ -189,9 +231,7 @@ Der Block `Installation` erscheint nur in diesem Fall, nennt die betroffenen Dat
 gibt den Befehl zum Zurücksetzen aus; ausgeführt wird er nicht von selbst. Der Grund
 für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine lokal
 veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
-stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen. Denselben Befund
-meldet `/k-status` in der Zeile `Installation:`, auch ohne dass jemand die Oberfläche
-öffnet.
+stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
 
 Haben sich dabei die Binaries unter `dist/` geändert, verlangt die Oberfläche einen
 Neustart: unter Linux behält ein laufender Prozess seinen Inode und arbeitet mit dem
@@ -425,6 +465,9 @@ Checkliste für ein Projekt:
       sind Verzeichnisse mit Einzel-Symlinks nach `k-playbook/` bzw. `k-playbook-local/`;
       die Oberfläche meldet sie als eingerichtet.
 - [ ] `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, und `AGENTS.md` trägt den Anstoß.
+      Eine mitgebrachte echte `CLAUDE.md` wurde dabei nach `AGENTS.md` umbenannt; steht
+      stattdessen ein `Konflikt`, ist er von Hand aufzulösen — bis dahin sieht Claude
+      Code den Anstoß nicht.
 - [ ] `k-playbook/bin/k-playbook context` läuft durch und nennt die erwarteten Kataloge.
 
 Der letzte Punkt prüft alles Vorherige auf einmal: das Kommando bricht ab, wenn die

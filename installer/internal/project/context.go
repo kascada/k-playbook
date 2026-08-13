@@ -34,9 +34,15 @@ type Context struct {
 	// GH ist die Entscheidung zur GitHub CLI samt Host-Befund. Anders als der
 	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
 	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
-	GH         GH                        `json:"gh"`
-	Catalogs   map[string][]CatalogEntry `json:"catalogs"`
-	Guidelines []string                  `json:"guidelines"`
+	GH GH `json:"gh"`
+	// Cleanliness ist der lokale Zustand der Installation. Sie steht hier, weil
+	// die Regel „in k-playbook/ wird nie geschrieben" sich nicht selbst
+	// durchsetzt und ihr Bruch still bleibt: Ändert sich eine lokal veränderte
+	// Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
+	// stehen. Zwei git-Aufrufe im lokalen Clone, ohne Netz.
+	Cleanliness Cleanliness               `json:"cleanliness"`
+	Catalogs    map[string][]CatalogEntry `json:"catalogs"`
+	Guidelines  []string                  `json:"guidelines"`
 }
 
 // InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heißt bewusst
@@ -169,6 +175,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Local:       ContextDir{Dir: localDir},
 		Remediation: remediation,
 		GH:          gh,
+		Cleanliness: CheckCleanliness(projectDir),
 		Catalogs:    map[string][]CatalogEntry{},
 		Guidelines:  listFiles(filepath.Join(localDir, "guidelines")),
 	}
