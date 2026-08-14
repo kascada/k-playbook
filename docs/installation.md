@@ -60,7 +60,7 @@ k-playbook-local/
 ├── docs/          Projektwissen für AI-Sessions
 ├── guidelines/
 ├── tasks/done/
-├── priv/          Inhalt gitignored, Verzeichnis versioniert
+├── priv/          eigene Notizen, siehe unten
 ├── k-playbook.md  projekteigene Instruktionsebene
 └── TODO.md
 ```
@@ -69,7 +69,13 @@ Jedes Verzeichnis trägt eine `README.md` mit seinem Zweck — auch weil Git lee
 Verzeichnisse nicht speichert und sie sonst nach einem Clone des Projekts fehlen würden.
 Vorhandene Dateien bleiben unberührt, auch READMEs mit eigenem Text.
 
-`k-playbook-local/` gehört ins Repository des Projekts und wird committet.
+`k-playbook-local/` gehört ins Repository des Projekts und wird committet. Das
+gilt auch für `priv/` und `material/`, obwohl dort typischerweise Privates und
+Rohmaterial liegt: k-playbook schreibt keine `.gitignore` und entscheidet nicht,
+was ein Projekt versioniert. Wer den Inhalt heraushalten will, legt im
+betreffenden Verzeichnis selbst eine an — die jeweilige `README.md` nennt den
+Inhalt. Bereits committete Dateien nimmt erst ein `git rm --cached` heraus; eine
+`.gitignore` allein wirkt auf getrackte Dateien nicht.
 
 ### 3. Assistenten verlinken
 

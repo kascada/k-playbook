@@ -151,9 +151,13 @@ tasks/  tasks/done/  priv/  k-playbook.md  TODO.md
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
-würden. `priv/` bekommt zusätzlich eine eigene `.gitignore`, die den Inhalt ausschließt
-und das Verzeichnis selbst versioniert lässt; so muss die Projekt-`.gitignore` nicht
-angefasst werden.
+würden. Mehr schreibt `CreateLocal()` nicht: insbesondere keine `.gitignore`. Was ein
+Projekt versioniert, entscheidet das Projekt.
+
+Das Feld `Private` an einem `LocalEntry` markiert daher nur noch, für welche
+Verzeichnisse diese Wahl überhaupt ansteht — `priv/` und `material/`. Ihre README
+beschreibt, wie man den Inhalt heraushält, falls gewünscht. Das Feld geht als JSON an
+die Oberfläche und ist dort der Ansatzpunkt, die Wahl sichtbar zu machen.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.

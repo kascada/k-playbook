@@ -149,71 +149,52 @@ func TestLocalStructureDecktOverlaySortenAb(t *testing.T) {
 	}
 }
 
-// priv/ bleibt versioniert, sein Inhalt nicht. Die .gitignore liegt im
-// Verzeichnis selbst, damit die Projekt-.gitignore unangetastet bleibt.
-func TestCreateLocalSchuetztPrivVerzeichnis(t *testing.T) {
+// priv/ und material/ werden angelegt wie jedes andere Verzeichnis. Dass ihr
+// Inhalt oft privat bleiben soll, steht in ihrer README — entschieden wird es
+// vom Projekt, nicht von k-playbook.
+func TestCreateLocalLegtPrivateVerzeichnisseAn(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	priv := filepath.Join(LocalDir(root), "priv")
-	if !isDir(priv) {
-		t.Fatal("priv/ fehlt")
-	}
-
-	content, err := os.ReadFile(filepath.Join(priv, ".gitignore"))
-	if err != nil {
-		t.Fatalf(".gitignore fehlt: %v", err)
-	}
-	for _, want := range []string{"*", "!.gitignore", "!README.md"} {
-		if !strings.Contains(string(content), want) {
-			t.Errorf(".gitignore enthält %q nicht:\n%s", want, content)
+	for _, name := range []string{"priv", "material"} {
+		dir := filepath.Join(LocalDir(root), name)
+		if !isDir(dir) {
+			t.Errorf("%s/ fehlt", name)
+			continue
+		}
+		readme := filepath.Join(dir, "README.md")
+		if !fileExists(readme) {
+			t.Errorf("%s/README.md fehlt", name)
+			continue
+		}
+		content, err := os.ReadFile(readme)
+		if err != nil {
+			t.Fatalf("%s/README.md lesen: %v", name, err)
+		}
+		if !strings.Contains(string(content), ".gitignore") {
+			t.Errorf("%s/README.md erklärt den .gitignore-Weg nicht:\n%s", name, content)
 		}
 	}
 }
 
-// material/ bleibt versioniert, sein Inhalt nicht: Rohmaterial enthält
-// typischerweise Tokens, Pfade und Namen.
-func TestCreateLocalSchuetztMaterialVerzeichnis(t *testing.T) {
+// CreateLocal legt in keinem Verzeichnis eine .gitignore an. Was versioniert
+// wird, entscheidet allein das Projekt.
+func TestCreateLocalSchreibtKeineGitignore(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	material := filepath.Join(LocalDir(root), "material")
-	if !isDir(material) {
-		t.Fatal("material/ fehlt")
-	}
-	if !fileExists(filepath.Join(material, "README.md")) {
-		t.Error("material/README.md fehlt")
-	}
-
-	content, err := os.ReadFile(filepath.Join(material, ".gitignore"))
-	if err != nil {
-		t.Fatalf(".gitignore fehlt: %v", err)
-	}
-	for _, want := range []string{"*", "!.gitignore", "!README.md"} {
-		if !strings.Contains(string(content), want) {
-			t.Errorf(".gitignore enthält %q nicht:\n%s", want, content)
+	for _, entry := range LocalStructure() {
+		if entry.IsFile {
+			continue
 		}
-	}
-}
-
-// Nur priv/ und material/ bekommen eine .gitignore; die übrigen Verzeichnisse
-// sind normaler Projektinhalt.
-func TestCreateLocalSchuetztNurPriv(t *testing.T) {
-	root := t.TempDir()
-
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal: %v", err)
-	}
-
-	for _, name := range []string{"rules", "reviews", "checks", "results", "docs", filepath.Join("docs", "manual")} {
-		if pathExists(filepath.Join(LocalDir(root), name, ".gitignore")) {
-			t.Errorf("%s hat eine .gitignore, sollte aber versioniert sein", name)
+		if pathExists(filepath.Join(LocalDir(root), entry.Path, ".gitignore")) {
+			t.Errorf("%s hat eine .gitignore, die CreateLocal nicht schreiben darf", entry.Path)
 		}
 	}
 }

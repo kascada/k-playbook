@@ -13,12 +13,14 @@ Installation und keinen festen Hostpfad; jedes Projekt trägt seine eigene.
 
 ```bash
 cd /pfad/zum/projekt
-git clone git@github.com:kascada/k-playbook.git k-playbook
+git clone git@github.com:kascada/k-playbook.git
 k-playbook/bin/k-playbook
 ```
 
-Das zweite Argument hinter der URL bestimmt den Verzeichnisnamen — er muss `k-playbook`
-lauten, denn Commands und Skills sprechen ihn so an.
+Das Zielverzeichnis muss `k-playbook` heißen, denn Commands und Skills sprechen es so an.
+Ohne Zielargument ergibt sich der Name aus dem Repo-Namen; gib keinen anderen an. Nur
+wenn du aus einem Fork oder Mirror unter abweichendem Namen klonst, hänge `k-playbook`
+als zweites Argument an.
 
 **Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
 passende Binary aus `dist/` startet; die Binaries liegen fertig im Repo. Für macOS und

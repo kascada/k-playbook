@@ -17,9 +17,12 @@ type LocalEntry struct {
 	Path    string `json:"path"`
 	IsFile  bool   `json:"isFile"`
 	Purpose string `json:"purpose"`
-	// Private hält den Inhalt aus der Versionskontrolle heraus, über eine
-	// .gitignore im Verzeichnis selbst. Das Verzeichnis bleibt dadurch
-	// auffindbar, ohne dass die Projekt-.gitignore angefasst werden muss.
+	// Private markiert Verzeichnisse, deren Inhalt üblicherweise nicht ins
+	// Repository gehört. k-playbook erzwingt das nicht: ob der Inhalt
+	// versioniert wird, entscheidet das Projekt. Wer ihn heraushalten will,
+	// legt eine .gitignore im Verzeichnis selbst an — die README sagt, wie.
+	// Das Feld bleibt, weil es genau die Verzeichnisse benennt, für die diese
+	// Wahl überhaupt zur Debatte steht.
 	Private bool `json:"private"`
 }
 
@@ -44,12 +47,12 @@ func LocalStructure() []LocalEntry {
 		{Path: filepath.Join("tasks", "done"), Purpose: "Erledigte Tasks, nach der Ausführung hierher verschoben."},
 		{
 			Path:    "priv",
-			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt bleibt aus der Versionskontrolle heraus: die .gitignore in diesem\nVerzeichnis schließt alles aus, außer sich selbst und dieser README. Du kannst\nhier also ablegen, was du willst, ohne es aus Versehen zu committen.",
+			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Soll er das nicht, lege in diesem\nVerzeichnis eine .gitignore mit diesem Inhalt an:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht.",
 			Private: true,
 		},
 		{
 			Path:    "material",
-			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert und von keinem Command geschrieben — gelesen wird es von\n/k-docs-extract, geschrieben nach docs/extracted/.\n\nDer Inhalt bleibt aus der Versionskontrolle heraus: Rohmaterial enthält\ntypischerweise Tokens, Pfade und Namen. Die .gitignore in diesem Verzeichnis\nschließt alles aus, außer sich selbst und dieser README.",
+			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert und von keinem Command geschrieben — gelesen wird es von\n/k-docs-extract, geschrieben nach docs/extracted/.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, lege in diesem\nVerzeichnis eine .gitignore mit diesem Inhalt an:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus.",
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},
@@ -116,12 +119,6 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 		if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
 			return CheckLocal(projectDir), err
 		}
-
-		if entry.Private {
-			if err := writeIfMissing(filepath.Join(path, ".gitignore"), privateGitignore()); err != nil {
-				return CheckLocal(projectDir), err
-			}
-		}
 	}
 
 	return CheckLocal(projectDir), nil
@@ -145,12 +142,6 @@ func writeIfMissing(path string, content string) error {
 func readmeTemplate(entry LocalEntry) string {
 	return fmt.Sprintf("# %s\n\n%s\n\nDieses Verzeichnis gehört dem Projekt und wird von einem Update nie angefasst.\n",
 		entry.Path, entry.Purpose)
-}
-
-// privateGitignore schließt den gesamten Inhalt aus, lässt das Verzeichnis
-// selbst aber im Repository sichtbar.
-func privateGitignore() string {
-	return "# Inhalt bleibt privat; das Verzeichnis selbst bleibt versioniert.\n*\n!.gitignore\n!README.md\n"
 }
 
 // fileTemplate liefert den Erstinhalt eines Datei-Eintrags.
