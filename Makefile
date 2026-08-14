@@ -38,6 +38,10 @@ help: ## Zeigt diese Hilfe an
 	@echo "  danach genügt überall:  k-playbook"
 	@echo ""
 
+# -buildvcs=false ist kein Detail: ohne das stempelt Go den Commit-Hash ins
+# Binary. Jeder Commit ergäbe dann vier neue Binaries à 12 MB, die der nächste
+# `git add -A` mitnimmt — auch wenn sich am Code nichts geändert hat. Gelesen
+# wird die Revision von niemandem.
 dist: ## Baut die Binaries aller Plattformen nach ./dist/
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
@@ -46,7 +50,7 @@ dist: ## Baut die Binaries aller Plattformen nach ./dist/
 		arch="$${target#*-}"; \
 		output="../$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
 		echo "Baue $$output"; \
-		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -ldflags="-s -w" -o "$$output" "$(INSTALLER_PKG)"); \
+		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$$output" "$(INSTALLER_PKG)"); \
 	done
 
 build: dist ## Alias für dist
