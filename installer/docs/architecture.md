@@ -47,6 +47,7 @@ installer/
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
+│   ├── local_private.go         messen und umschalten, ob priv/ und material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen und herstellen
 │   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
@@ -65,7 +66,8 @@ installer/
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── tasks.go                 Task-Endpunkte und die Zahlen des Workflow-Blocks
 │   ├── hostpath.go              PATH-Zustand melden, read-only
-│   ├── config.go local.go assistant.go tools.go remediation.go context.go
+│   ├── config.go local.go local_private.go assistant.go tools.go
+│   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   └── static/                  index.html, reviews.html, tasks.html,
 │                                session.js, app.js, reviews.js, tasks.js, styles.css
@@ -157,13 +159,103 @@ Projekt versioniert, entscheidet das Projekt.
 Das Feld `Private` an einem `LocalEntry` markiert daher nur noch, für welche
 Verzeichnisse diese Wahl überhaupt ansteht — `priv/` und `material/`. Ihre README
 beschreibt, wie man den Inhalt heraushält, falls gewünscht. Das Feld geht als JSON an
-die Oberfläche und ist dort der Ansatzpunkt, die Wahl sichtbar zu machen.
+die Oberfläche und ist dort die Whitelist des Blocks
+[Lokale Einstellungen](#lokale-einstellungen).
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
 
 `commands/` und `skills/` sind darin die zwei Sorten, die ein Assistent direkt liest.
 Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
+
+## Lokale Einstellungen
+
+Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
+stillschweigend erzwingt. Erster und bisher einziger Eintrag: ob der **Inhalt** von
+`priv/` und `material/` aus der Versionskontrolle bleibt. `project/local_private.go`
+misst das und schaltet es um, `webui/local_private.go` reicht es an die Oberfläche.
+
+**Gemessen, nicht geraten.** Gefragt wird `git check-ignore -v --no-index` auf einen Pfad
+*innerhalb* des Verzeichnisses; das eigene Parsen von `.gitignore`-Dateien fiele über
+alle Ebenen, die globale Konfiguration und `.git/info/exclude` her, die git ohnehin schon
+kennt. Der Pfad muss innen liegen, weil eine `.gitignore` **im** Verzeichnis mit `*`
+dessen Inhalt ignoriert und nicht den Verzeichniseintrag — auf `priv` selbst gefragt
+meldete check-ignore „nicht ignoriert". Ist das Verzeichnis von einer höheren Ebene
+ignoriert, ist sein Inhalt es ebenfalls; dieser gleichwertige Weg fällt damit
+automatisch mit ab.
+
+`--no-index` ist Pflicht: per Default zieht git den Index heran und meldet eine getrackte
+Datei als nicht ignoriert. Für genau die Zustände, die privat aussehen und keiner sind,
+gäbe es dann gar keine Aussage.
+
+Vier Zustände beschreiben ein Repository, nicht zwei:
+
+| Zustand | Erkennung | Anzeige |
+|---|---|---|
+| `private` | Regel greift, weder Index noch HEAD tragen erfasste Dateien | privat |
+| `public` | keine Regel | wird versioniert |
+| `partial` | Regel greift, Dateien stehen im Index | teilweise privat: N Dateien stehen weiterhin im Repository |
+| `pending-commit` | Regel greift, Index leer, HEAD trägt noch Dateien | privat erst nach dem nächsten Commit |
+
+Die letzten beiden sind der Grund für den Block: beide sehen privat aus und sind es
+nicht. Nach einem `git rm --cached` ist die Löschung nur gestaget; ohne Commit trägt jeder
+Clone die Dateien weiter. Deshalb wird getrennt gegen den Index (`ls-files`) **und** gegen
+`HEAD` (`ls-tree`) gehalten. Und was schon gepusht ist, bleibt in der Historie — kein
+Zustand dieser Oberfläche macht das rückgängig; die Abfrage vor dem Umschalten sagt es.
+
+Beide Listen laufen durch `check-ignore --stdin`, bevor sie zählen: der verwaltete Inhalt
+lässt `README.md` und die `.gitignore` selbst ausdrücklich drin, ungefiltert stünde jedes
+verwaltete Verzeichnis dauerhaft als `partial` da.
+
+Der **Repo-Root** (`rev-parse --show-toplevel`) gehört zum Zustand und in die Anzeige:
+`git -C <verzeichnis>` findet das nächstgelegene Repository, und liegt in
+`k-playbook-local/` ein eigenes, gilt die Aussage für dieses. Ohne die Angabe wäre sie
+mehrdeutig.
+
+Drei Zustände sagen, dass es nichts zu messen gab, und sind trotzdem kein Fehler:
+`no-vcs` (`project.vcs` ist nicht `git`), `missing` (Verzeichnis noch nicht angelegt) und
+`unknown` mit Grund (kein git, kein Repository, Timeout, Exit 128). Vorbedingungen und
+Timeout folgen `agentsIgnored`, mit einer bewussten Abweichung: **Exit 1 wird nicht wie
+jeder andere Nicht-Null-Ausgang behandelt.** Er ist die reguläre Antwort „keine Regel",
+während 128 heißt, dass die Frage gar nicht beantwortet wurde — sonst stünde ein kaputter
+git-Aufruf als „nicht privat" da. Ein Repository ohne Commits wird vorher abgefangen:
+`ls-tree HEAD` scheitert dort mit Exit 128, und ein frisch initialisiertes Repository
+stünde ohne diesen Vorabtest als `unknown` statt als `private` da.
+
+### Gemessen wird über alle Ebenen, geschrieben nur eine Datei
+
+Umschalten wird **nur angeboten, wenn die von `check-ignore -v` gemeldete Quelle genau die
+verwaltete `.gitignore` im Verzeichnis mit genau ihrem Inhalt ist** (`*`, `!.gitignore`,
+`!README.md`). Stammt die Regel von woanders — Projekt-Root-`.gitignore`,
+`.git/info/exclude`, globale Konfiguration — oder trägt die Datei eigenen Inhalt, wird
+nichts geschrieben: der Zustand wird angezeigt und die fremde Quelle benannt. Sonst wäre
+ein Ausschalten entweder wirkungslos oder es löschte eine Datei, die dem Projekt gehört.
+
+`SetPrivate()` schreibt die Datei und nimmt die davon erfassten Dateien mit
+`git rm --cached` aus dem Index — als Teil derselben Operation, sonst bliebe genau der
+Zwischenzustand stehen, den der Block sichtbar machen soll. Welche Dateien das sind,
+beantwortet nach dem Schreiben eine erneute Messung, keine eigene Ableitung aus dem
+Dateiinhalt. Zurück kommt der neue Zustand plus die Liste der genommenen Dateien und der
+Hinweis auf den ausstehenden Commit. Der Aufruf ist idempotent.
+
+### Kontrakt des POST
+
+Eingabe ist ein **Eintrag plus Zielzustand**, kein freier Pfad — der Handler führt
+schreibende git-Operationen aus. Zulässig ist nur, was in `LocalStructure()` steht und
+dort `Private` trägt; alles andere wird mit 400 abgelehnt. Kein Projekt konfiguriert:
+dieselbe Behandlung wie in `createLocalHandler`.
+
+### Abgrenzung zum Block „Projekteigene Struktur"
+
+Der zeigt weiterhin, welche Verzeichnisse es gibt und wozu sie da sind, `private`-Flag als
+Eigenschaft des Eintrags eingeschlossen. „Lokale Einstellungen" zeigt ausschließlich den
+gemessenen Ist-Zustand dieser Entscheidung im Repository. Der Zustand hat nur eine Quelle:
+`PrivacyStatuses()`. Die Struktur-Liste bleibt unverändert.
+
+Die Handanleitung selbst steht in den `Purpose`-Texten in `project/local.go`, aus denen
+die READMEs entstehen; sie verweisen auf den Block. `writeIfMissing()` überschreibt eine
+vorhandene README nie — in bestehenden Projekten bleibt der alte Text stehen. Das bleibt
+so und wird nicht umgangen.
 
 ## Commands und Skills auflösen
 
@@ -858,6 +950,8 @@ alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
 | `GET` | `/api/local` | projekteigene Struktur prüfen |
 | `POST` | `/api/local` | fehlende Teile anlegen |
+| `GET` | `/api/local/private` | messen, ob der Inhalt von `priv/` und `material/` privat ist |
+| `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
 | `GET` | `/api/assistant` | Verlinkung prüfen |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
@@ -984,6 +1078,8 @@ Lesen und Herüberkopieren da.
   die Installation unverändert ist — war eine Nachbildung von `CheckCleanliness()` in
   Prosa, der Rest billige Existenzprüfungen auf der `context`-Ausgabe. Der Zustand kommt
   jetzt aus der Oberfläche.
-- Keine automatisierten Tests für die HTTP-Handler; getestet ist bisher nur
-  `internal/project`.
+- Kaum automatisierte Tests für die HTTP-Handler; getestet ist im Wesentlichen
+  `internal/project`. Ausnahme sind die schreibenden Endpunkte unter
+  `/api/local/private` — dort hängt an der Whitelist eine git-Operation, deshalb steht
+  sie in `webui/local_private_test.go` unter Test.
 - Release-Artefakte gibt es für macOS und Linux. Windows ist offen.

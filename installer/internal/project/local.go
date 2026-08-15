@@ -47,12 +47,12 @@ func LocalStructure() []LocalEntry {
 		{Path: filepath.Join("tasks", "done"), Purpose: "Erledigte Tasks, nach der Ausführung hierher verschoben."},
 		{
 			Path:    "priv",
-			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Soll er das nicht, lege in diesem\nVerzeichnis eine .gitignore mit diesem Inhalt an:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht.",
+			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Ob er das soll, entscheidet das\nProjekt: Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen\nIst-Zustand dieses Verzeichnisses und schaltet ihn um — er legt die .gitignore\nan und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in\nder Historie; das macht kein Schalter rückgängig.",
 			Private: true,
 		},
 		{
 			Path:    "material",
-			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert und von keinem Command geschrieben — gelesen wird es von\n/k-docs-extract, geschrieben nach docs/extracted/.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, lege in diesem\nVerzeichnis eine .gitignore mit diesem Inhalt an:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus.",
+			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert und von keinem Command geschrieben — gelesen wird es von\n/k-docs-extract, geschrieben nach docs/extracted/.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n.gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\nwas schon gepusht wurde, bleibt in der Historie.",
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},

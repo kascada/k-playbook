@@ -64,6 +64,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `Installation` / `git clone` -> [`installation.md`](./installation.md)
 - `k-playbook-local` / `projekteigen` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen)
 - `Oberfläche` / `k-gui` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `priv` / `material` / `privat` / `Lokale Einstellungen` -> [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
 - `Doku lesen` / `Markdown-Ansicht` / `Mermaid` -> [`installation.md`](./installation.md#doku-lesen), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
 - `Overlay` / `Regel ersetzen` / `abschalten` -> [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen), [`faq.md`](./faq.md)
 - `context` / `aufgelöster Arbeitsstand` -> [`k-playbook-format.md`](./k-playbook-format.md#der-aufgelöste-arbeitsstand), [`commands.md`](./commands.md#der-aufgelöste-arbeitsstand)

@@ -701,6 +701,65 @@ details[open] > summary.disclosure .disclosure-marker {
   white-space: pre-line;
 }
 
+/* Eine lokale Entscheidung je Kasten: oben Verzeichnis, Zustand und Schalter,
+   darunter die Belege, auf denen der Zustand beruht. */
+.settings {
+  display: grid;
+  gap: 12px;
+}
+
+.setting {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.setting-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.setting-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+}
+
+.setting-state {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Ein Zustand, der privat aussieht und keiner ist, muss beim Überfliegen
+   auffallen — er ist der Grund für diesen Block. */
+.setting-state.warn,
+.setting-note.warn {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.setting-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+/* Steht statt des Schalters die fremde Regelquelle, braucht sie Breite — sonst
+   drängt sie die Zustandszeile daneben zusammen. */
+.setting-blocked {
+  max-width: 46ch;
+  margin: 0;
+  text-align: right;
+}
+
+.setting .facts {
+  margin-top: 12px;
+}
+
 /* Blocke, die ein Binary aufrufen, brauchen spürbar Zeit. Ein leerer Kartenrumpf
    sieht in dieser Zeit aus wie ein Befund; der Ring sagt, dass noch gearbeitet
    wird. */

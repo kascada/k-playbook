@@ -42,6 +42,10 @@ const elements = {
   toolsMessage: document.getElementById("tools-message"),
   toolsCommand: document.getElementById("tools-command"),
   toolsCommandText: document.getElementById("tools-command-text"),
+  privateCard: document.getElementById("private-card"),
+  privatePill: document.getElementById("private-pill"),
+  privateEntries: document.getElementById("private-entries"),
+  privateMessage: document.getElementById("private-message"),
   localPill: document.getElementById("local-pill"),
   localFacts: document.getElementById("local-facts"),
   localMessage: document.getElementById("local-message"),
@@ -395,6 +399,7 @@ function renderConfig(data) {
   if (data.installed) {
     elements.configCard.classList.add("hidden");
     elements.localCard.classList.remove("hidden");
+    elements.privateCard.classList.remove("hidden");
     elements.workflowsCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
     elements.remediationCard.classList.remove("hidden");
@@ -405,6 +410,7 @@ function renderConfig(data) {
     // beim Aufklappen.
     elements.contextCard.classList.remove("hidden");
     loadLocal();
+    loadPrivate();
     loadAssistant();
     loadRemediation();
     loadGH();
@@ -417,6 +423,7 @@ function renderConfig(data) {
   // Solange sie fehlt, ist dies der einzige Schritt, der zur Wahl steht.
   elements.configCard.classList.remove("hidden");
   elements.localCard.classList.add("hidden");
+  elements.privateCard.classList.add("hidden");
   elements.workflowsCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
   elements.remediationCard.classList.add("hidden");
@@ -514,6 +521,187 @@ function renderLocal(data) {
   }
 
   setBlockState(elements.localPill, elements.localCreate, data.ok ? "ok" : "todo", LOCAL_LABELS);
+}
+
+// Wie die gemessenen Zustände heißen. Die Namen sagen, was jemand ohne
+// git-Kenntnisse wissen muss — nicht, was git dazu getan hat.
+const PRIVACY_LABELS = {
+  private: "privat",
+  public: "wird versioniert",
+  partial: "teilweise privat",
+  "pending-commit": "privat erst nach dem nächsten Commit",
+  "no-vcs": "ohne Versionskontrolle",
+  missing: "Verzeichnis nicht vorhanden",
+  unknown: "nicht ermittelbar",
+};
+
+// Die beiden Zustände, die privat aussehen und keiner sind. Sie sind der Grund
+// für diesen Block und werden deshalb als Warnung dargestellt.
+const PRIVACY_WARNINGS = ["partial", "pending-commit"];
+
+async function loadPrivate() {
+  elements.privatePill.className = "pill muted";
+  elements.privatePill.textContent = "Prüfen...";
+  renderLoading(elements.privateMessage, "Zustand wird gemessen...");
+  try {
+    const response = await fetch("/api/local/private", { cache: "no-store" });
+    renderPrivate(await response.json());
+  } catch {
+    elements.privateMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+async function setPrivate(path, wantPrivate) {
+  elements.privatePill.className = "pill muted";
+  elements.privatePill.textContent = "Umschalten...";
+  try {
+    const response = await fetch("/api/local/private", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, private: wantPrivate }),
+    });
+    renderPrivate(await response.json());
+  } catch {
+    elements.privateMessage.textContent = "Umschalten fehlgeschlagen.";
+  }
+}
+
+function renderPrivate(data) {
+  elements.privateEntries.replaceChildren();
+  elements.privateMessage.textContent = data.message || "";
+
+  const entries = data.entries || [];
+  for (const entry of entries) {
+    elements.privateEntries.append(privateEntryBox(entry));
+  }
+
+  if (entries.some((entry) => PRIVACY_WARNINGS.includes(entry.state))) {
+    elements.privatePill.className = "pill warn";
+    elements.privatePill.textContent = "Nicht wirklich privat";
+    return;
+  }
+  elements.privatePill.className = "pill ok";
+  elements.privatePill.textContent = "Gemessen";
+}
+
+// Ein Verzeichnis: Zustand, das Repository, auf das er sich bezieht, die
+// auslösende Regel samt Quelle — und der Schalter, sofern k-playbook ihn
+// einlösen kann.
+function privateEntryBox(entry) {
+  const box = document.createElement("div");
+  box.className = "setting";
+
+  const head = document.createElement("div");
+  head.className = "setting-head";
+
+  const titles = document.createElement("div");
+  const title = document.createElement("div");
+  title.className = "setting-title";
+  title.textContent = `${entry.path}/`;
+  const state = document.createElement("div");
+  state.className = PRIVACY_WARNINGS.includes(entry.state) ? "setting-state warn" : "setting-state";
+  state.textContent = privacyStateText(entry);
+  titles.append(title, state);
+
+  head.append(titles, privateAction(entry));
+  box.append(head);
+
+  // Ohne das Repository wäre die Aussage mehrdeutig: git nimmt das
+  // nächstgelegene, und k-playbook-local kann ein eigenes sein.
+  const facts = document.createElement("dl");
+  facts.className = "facts";
+  if (entry.repoRoot) {
+    addFact(facts, "Repository", entry.repoRoot);
+  }
+  if (entry.rule) {
+    const place = entry.rule.line ? `${entry.rule.source}:${entry.rule.line}` : entry.rule.source;
+    addFact(facts, "Regel", `${entry.rule.pattern} — ${place}`);
+  }
+  if (facts.childElementCount > 0) {
+    box.append(facts);
+  }
+
+  const note = privacyNote(entry);
+  if (note) {
+    const paragraph = document.createElement("p");
+    paragraph.className = PRIVACY_WARNINGS.includes(entry.state) ? "setting-note warn" : "setting-note";
+    paragraph.textContent = note;
+    box.append(paragraph);
+  }
+  return box;
+}
+
+function privacyStateText(entry) {
+  const label = PRIVACY_LABELS[entry.state] || entry.state;
+  if (entry.state !== "partial") {
+    return label;
+  }
+
+  const count = (entry.tracked || []).length;
+  const files = count === 1 ? "1 Datei steht" : `${count} Dateien stehen`;
+  return `${label}: ${files} weiterhin im Repository`;
+}
+
+// Was der Zustand für den Inhalt bedeutet. Bei den beiden unfertigen Zuständen
+// stehen die betroffenen Dateien dabei — sie sind der Grund für die Warnung.
+function privacyNote(entry) {
+  switch (entry.state) {
+    case "partial":
+      return `Die Regel wirkt nur für neue Dateien. Im Repository stehen weiterhin: ${(entry.tracked || []).join(", ")}.`;
+    case "pending-commit":
+      return `Aus dem Index genommen, aber noch nicht committet — bis dahin bekommt jeder Clone: ${(entry.inHead || []).join(", ")}.`;
+    default:
+      return entry.reason || "";
+  }
+}
+
+// Der Schalter steht nur da, wo k-playbook ihn einlösen kann. Stammt die Regel
+// von woanders, steht an seiner Stelle die Quelle: geschrieben wird nur die
+// eine verwaltete Datei.
+function privateAction(entry) {
+  if (!entry.canToggle) {
+    const hint = document.createElement("p");
+    hint.className = "hint setting-blocked";
+    hint.textContent = entry.blocked || "";
+    return hint;
+  }
+
+  const wantPrivate = entry.state === "public" || entry.state === "partial";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = entry.state === "partial" ? "primary attention-highlight" : "secondary";
+  button.textContent = wantPrivate ? "Privat machen" : "Wieder versionieren";
+  button.addEventListener("click", () => {
+    if (window.confirm(privateConfirmText(entry, wantPrivate))) {
+      setPrivate(entry.path, wantPrivate);
+    }
+  });
+  return button;
+}
+
+// Vor dem Umschalten steht, was mit den Dateien passiert. Der Hinweis auf die
+// Historie gehört dazu: kein Schalter dieser Oberfläche macht rückgängig, was
+// bereits gepusht ist.
+function privateConfirmText(entry, wantPrivate) {
+  if (!wantPrivate) {
+    return (
+      `${entry.path}/ wird wieder versioniert: die von k-playbook verwaltete .gitignore wird entfernt.\n\n` +
+      "Dateien, die früher aus dem Index genommen wurden, kommen dadurch nicht von selbst zurück."
+    );
+  }
+
+  const parts = [
+    `${entry.path}/ wird privat: k-playbook legt dort eine .gitignore an, die alles außer sich selbst und README.md heraushält.`,
+  ];
+  const tracked = entry.tracked || [];
+  if (tracked.length > 0) {
+    parts.push(`Aus dem Index genommen werden dabei: ${tracked.join(", ")}.`);
+  } else {
+    parts.push("Was dort bereits versioniert ist, wird aus dem Index genommen.");
+  }
+  parts.push("Die Dateien bleiben auf der Platte. Wirksam wird das erst mit dem nächsten Commit.");
+  parts.push("Was bereits gepusht wurde, bleibt in der Historie — das macht kein Schalter rückgängig.");
+  return parts.join("\n\n");
 }
 
 async function loadAssistant() {

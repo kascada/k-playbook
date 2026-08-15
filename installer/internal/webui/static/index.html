@@ -105,6 +105,22 @@
             <button id="local-create" class="secondary" disabled>Anlegen</button>
           </section>
 
+          <!-- Was für dieses Projekt lokal entschieden ist. Der Block darüber
+               zeigt, welche Verzeichnisse es gibt und wozu sie da sind; hier
+               steht ausschließlich der gemessene Ist-Zustand dieser
+               Entscheidung im Repository. -->
+          <section class="card{{if not .Installed}} hidden{{end}}" id="private-card">
+            <div class="section-head">
+              <div>
+                <h2>Lokale Einstellungen</h2>
+              </div>
+              <span id="private-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">Ob der Inhalt von <code>priv/</code> und <code>material/</code> aus der Versionskontrolle bleibt. Gemessen mit <code>git check-ignore</code>, nicht geraten.</p>
+            <div id="private-entries" class="settings"></div>
+            <p id="private-message" class="message"></p>
+          </section>
+
           <!-- Nur der Weg zu den beiden Arbeitsseiten. Aufgelistet wird dort:
                hier stünde eine Liste, die man ohnehin auf der nächsten Seite
                noch einmal sieht. -->

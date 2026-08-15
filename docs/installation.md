@@ -71,11 +71,34 @@ Vorhandene Dateien bleiben unberührt, auch READMEs mit eigenem Text.
 
 `k-playbook-local/` gehört ins Repository des Projekts und wird committet. Das
 gilt auch für `priv/` und `material/`, obwohl dort typischerweise Privates und
-Rohmaterial liegt: k-playbook schreibt keine `.gitignore` und entscheidet nicht,
-was ein Projekt versioniert. Wer den Inhalt heraushalten will, legt im
-betreffenden Verzeichnis selbst eine an — die jeweilige `README.md` nennt den
-Inhalt. Bereits committete Dateien nimmt erst ein `git rm --cached` heraus; eine
-`.gitignore` allein wirkt auf getrackte Dateien nicht.
+Rohmaterial liegt: k-playbook schreibt von sich aus keine `.gitignore` und
+entscheidet nicht, was ein Projekt versioniert.
+
+Sichtbar und umschaltbar ist diese Wahl im Block **Lokale Einstellungen** der
+Oberfläche. Er misst je Verzeichnis mit `git check-ignore`, ob der Inhalt
+wirklich draußen ist, und nennt das Repository, auf das sich die Aussage
+bezieht — liegt in `k-playbook-local/` ein eigenes, gilt sie für dieses.
+Angezeigt wird einer von vier Zuständen:
+
+| Zustand | Bedeutung |
+|---|---|
+| privat | der Inhalt bleibt draußen |
+| wird versioniert | keine Regel, der Inhalt kommt mit ins Repository |
+| teilweise privat | eine Regel greift, es stehen aber Dateien im Repository — die Regel wirkt nur für neue |
+| privat erst nach dem nächsten Commit | die Dateien sind aus dem Index genommen, aber noch nicht committet |
+
+Die beiden letzten sehen privat aus und sind es nicht; sie stehen deshalb als
+Warnung da und nennen die betroffenen Dateien. Das Umschalten auf privat legt
+die `.gitignore` an und nimmt bereits versionierte Dateien mit
+`git rm --cached` aus dem Index — wirksam wird das erst mit dem nächsten
+Commit, und was schon gepusht wurde, bleibt in der Historie.
+
+Stammt die Ignore-Regel von woanders — der `.gitignore` im Projekt-Root,
+`.git/info/exclude`, der globalen Konfiguration — oder trägt die Datei im
+Verzeichnis eigenen Inhalt, wird nichts geschrieben: der Block zeigt dann den
+Zustand und benennt die Quelle. Von Hand geht der Weg weiterhin über eine
+`.gitignore` im betreffenden Verzeichnis; die jeweilige `README.md` nennt den
+Inhalt.
 
 ### 3. Assistenten verlinken
 

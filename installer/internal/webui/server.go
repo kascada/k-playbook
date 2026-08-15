@@ -115,6 +115,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/config", createConfigHandler)
 	mux.HandleFunc("GET /api/local", localHandler)
 	mux.HandleFunc("POST /api/local", createLocalHandler)
+	mux.HandleFunc("GET /api/local/private", localPrivateHandler)
+	mux.HandleFunc("POST /api/local/private", setLocalPrivateHandler)
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
