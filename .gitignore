@@ -12,6 +12,11 @@ priv/
 /k-playbook/
 /k-playbook-local/
 
+# Registrierung des MCP-Servers für den Handtest. Ihr Kommando ist relativ und
+# hängt damit am Arbeitsverzeichnis des Clients — was hier passt, passt anderswo
+# nicht. Wer sie braucht, legt sie selbst an; docs/installation.md nennt den Weg.
+/.mcp.json
+
 # Secrets and local environment
 .env
 .env.*

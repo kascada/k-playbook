@@ -1,16 +1,19 @@
 // Command k-playbook ist das Werkzeug für die projektlokale k-playbook-Installation.
 //
 // Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
-// gibt den aufgelösten Arbeitsstand als JSON aus.
+// gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
+// einem Assistenten als MCP-Werkzeug an.
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/hostinstall"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
+	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
@@ -33,6 +36,12 @@ func run(args []string) error {
 	case "context":
 		// Ohne cleanUpLegacy: dessen Ausgabe würde die JSON-Ausgabe stören.
 		return printContext()
+	case "mcp":
+		// Ohne cleanUpLegacy und mirrorHostInstall, aus demselben Grund wie bei
+		// context — hier sogar zwingend: stdout trägt den JSON-RPC-Strom, und der
+		// bleibt über die ganze Sitzung offen. Eine einzige Zeile daneben macht
+		// die Verbindung unbrauchbar.
+		return mcpserver.Run(context.Background())
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -70,6 +79,9 @@ Unterkommandos:
   context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
             Konfiguration und die effektiven Kataloge für rules, reviews
             und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
+  mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
+            als Werkzeug anbietet. Gedacht für den Aufruf durch einen
+            Assistenten, nicht für die Hand.
   help      Diese Übersicht.
 `)
 }

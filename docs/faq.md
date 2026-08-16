@@ -38,10 +38,12 @@ Ja. Commands und Skills sprechen es so an. Wie das Projektverzeichnis darüber h
 spielt dagegen keine Rolle.
 
 ```bash
-git clone git@github.com:kascada/k-playbook.git k-playbook
+git clone git@github.com:kascada/k-playbook.git
 ```
 
-Das Argument hinter der URL bestimmt den Namen.
+Ohne Zielargument ergibt sich der Name aus dem Repo-Namen — richtig ist er damit von
+selbst. Ein eigenes Argument brauchst du nur bei einem Fork oder Mirror unter
+abweichendem Namen; dann lautet es `k-playbook`.
 
 ## Warum liegt `K-PLAYBOOK.yaml` nicht in `k-playbook/`?
 

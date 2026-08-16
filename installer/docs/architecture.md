@@ -8,7 +8,8 @@ bevor der Code erneut analysiert wird.
 `k-playbook` hat zwei Aufgaben. Es **richtet ein**: Anker finden, Konfiguration und
 projekteigene Struktur anlegen, Assistenten verlinken. Und es **beantwortet, was gilt**:
 `context` löst Verzeichnisse, Instruktionen und Kataloge auf, damit kein Command das
-selbst tun muss.
+selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — siehe
+„Der MCP-Server".
 
 Alles Weitere — Reviews, Tasks, Checks — machen Commands und Skills im Assistenten, nicht
 dieses Programm.
@@ -16,7 +17,7 @@ dieses Programm.
 Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`, wird aber als
 `bin/k-playbook` aus dem Repo-Root heraus aufgerufen.
 
-## Zwei Einstiege
+## Drei Einstiege
 
 ```go
 if len(args) == 0 {
@@ -26,8 +27,11 @@ if len(args) == 0 {
 ```
 
 Ohne Argument die Oberfläche, davor das Aufräumen der Altlasten. Mit `context` die
-JSON-Ausgabe — und dort **ohne** `cleanUpLegacy()`: dessen Meldungen würden das JSON
-stören.
+JSON-Ausgabe, mit `mcp` der Server für einen Assistenten — und beide **ohne**
+`cleanUpLegacy()` und `mirrorHostInstall()`: deren Meldungen gehen nach stdout und
+würden die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt
+stdout einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige
+fremde Zeile macht ihn unbrauchbar.
 
 Mehr Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
 `smoke` und `projects …` des alten Stands sind entfallen, samt der lokalen Projektliste
@@ -71,12 +75,15 @@ installer/
 │   ├── gh.go update.go reviews.go
 │   └── static/                  index.html, reviews.html, tasks.html,
 │                                session.js, app.js, reviews.js, tasks.js, styles.css
+├── internal/mcpserver/
+│   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── go.mod
 └── README.md
 ```
 
 `internal/project` kennt kein HTTP, `internal/webui` keine Dateisystem-Details. Die
-Trennung hält die Fachlogik testbar.
+Trennung hält die Fachlogik testbar. `internal/mcpserver` steht neben `webui`: beide
+sind Fassaden auf `project`, die eine über HTTP, die andere über JSON-RPC.
 
 ## Anker finden
 
@@ -975,6 +982,53 @@ alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
 Statische Assets liegen unter `/static/`, die Startseite unter `/`; daneben stehen die
 Seiten `/reviews` und `/tasks`. Alle drei rendert `renderPage()` aus derselben Vorlage
 für den Kopf und liefert vorab mit, ob eine Installation gefunden wurde.
+
+## Der MCP-Server
+
+`k-playbook mcp` bietet den aufgelösten Arbeitsstand einem Assistenten als Werkzeug an,
+über stdin und stdout. Es ist die dritte Fassade auf `project.BuildContext`, neben dem
+Subkommando `context` und `GET /api/context`. Wer eine vierte Quelle aufmacht, bekommt
+zwangsläufig eine abweichende Antwort.
+
+Ein Werkzeug, `k_playbook_context`. Es gibt dasselbe JSON zurück wie das Subkommando —
+dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen lassen.
+
+**Maßgeblich ist die Spec-Fassung [`2026-07-28`](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture).**
+Die Clients sprechen sie allerdings noch nicht: Claude Code trägt den Pfad zwar im
+Programm, aber hinter abgeschalteten Schaltern, und benutzt voreingestellt den älteren
+`initialize`-Handshake mit `2025-11-25`; OpenCode kann über sein SDK ohnehin nicht mehr.
+Das ist der Grund für das offizielle Go-SDK: es bedient beide Fassungen über dieselbe
+API, sonst müsste hier jeder Dialekt selbst gebaut werden.
+
+Drei Regeln gelten:
+
+- **stdout gehört dem Protokoll.** Dort läuft der JSON-RPC-Strom, und er bleibt über die
+  ganze Sitzung offen. Diagnose geht nach stderr — die Spec hat ihr Logging-Primitiv
+  abgekündigt und empfiehlt für stdio genau das. Deshalb laufen im `mcp`-Zweig weder
+  `cleanUpLegacy()` noch `mirrorHostInstall()`.
+- **Zustand läuft über einen expliziten Bezeichner, nie über die Verbindung.** Die Spec
+  verlangt das ausdrücklich, und für einen stdio-Server ist es keine Formalie: er wird
+  einmal gestartet und behält das Arbeitsverzeichnis des Clients über die ganze Sitzung.
+  Deshalb hat das Werkzeug den optionalen Parameter `dir` — ohne ihn könnte es nicht
+  sagen, welches Projekt es überhaupt beschreibt.
+- **Keine Tasks-Extension**, solange die Clients sie nicht deklarieren. Sie wäre das
+  passende Muster für lange Läufe, aber Claude Code schaltet sie ab, OpenCode hat sie
+  auskommentiert, und das Go-SDK hat sie nicht. Die Spec verbietet, einem Client ohne
+  Deklaration einen Task zu schicken. Ein späterer Scan-Lauf bekommt deshalb gewöhnliche
+  Werkzeuge nach dem Muster start/status/collect.
+
+Das Ende einer Sitzung meldet das SDK als Fehler, obwohl es der Normalfall ist: der
+Client schließt stdin, und `Run` liefert „server is closing: EOF". Ein Sentinel dafür
+fehlt — der Typ liegt im `internal`-Paket des SDK, und weder `io.EOF` noch
+`mcp.ErrConnectionClosed` greifen über `errors.Is`. `isSessionEnd()` prüft deshalb den
+Text. Ohne diese Unterscheidung endete der Prozess bei jedem normalen Sitzungsende mit
+Exit 1, was für den Client wie ein Absturz aussieht.
+
+Geprüft wird das in `cmd/k-playbook/mcp_test.go`, und zwar gegen einen echten Prozess:
+das Test-Binary ruft sich mit einem Umgebungsmarker selbst auf. In-process ließe sich die
+stdout-Reinheit nicht abgreifen, und genau sie ist die Invariante — ein `fmt.Print` in
+einem transitiv genutzten Paket würde die Verbindung unbrauchbar machen, ohne dass
+irgendwo ein Fehler auftaucht.
 
 ## Lebenszyklus
 

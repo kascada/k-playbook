@@ -92,6 +92,11 @@ Das Kommando gibt den aufgelösten Arbeitsstand als JSON aus — Verzeichnisse,
 Instruktionsdateien in Lesereihenfolge, Remediation-Policy, Guidelines und die drei
 Kataloge, bereits zusammengeführt, mit Herkunft je Eintrag und markierten Abschaltungen.
 
+Dieselbe Auskunft gibt es für einen Assistenten auch als Werkzeug:
+`k-playbook/bin/k-playbook mcp` startet einen MCP-Server, dessen einziges Werkzeug den
+Arbeitsstand zurückgibt. Gedacht ist das für den Aufruf durch den Assistenten, nicht für
+die Hand — auf der Kommandozeile bleibt `context` der Weg.
+
 Eine Antwort heißt auch: einmal je Sitzung. Die Ausgabe ändert sich während der Arbeit
 nicht, also holt der nächste Command sie nicht erneut, sondern arbeitet mit der
 vorhandenen weiter. Neu geholt wird sie erst, wenn die `K-PLAYBOOK.yaml` geschrieben
@@ -113,7 +118,7 @@ der auf `k-playbook context` verweist — vorhandener Inhalt bleibt unangetastet
 
 ```bash
 cd /pfad/zum/projekt
-git clone git@github.com:kascada/k-playbook.git k-playbook
+git clone git@github.com:kascada/k-playbook.git
 k-playbook/bin/k-playbook
 ```
 
@@ -123,7 +128,7 @@ Struktur anlegen, Assistenten verlinken. Geschrieben wird jeweils erst nach Best
 
 ```mermaid
 flowchart TD
-    A["git clone ... k-playbook"] --> B["k-playbook/bin/k-playbook"]
+    A["git clone ..."] --> B["k-playbook/bin/k-playbook"]
     B --> C["K-PLAYBOOK.yaml anlegen"]
     C --> D["k-playbook-local/ anlegen"]
     D --> E["Assistenten verlinken"]

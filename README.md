@@ -71,10 +71,17 @@ projekt/
     ├── docs/             Projektwissen für AI-Sessions
     ├── guidelines/
     ├── tasks/done/
-    ├── priv/             Inhalt gitignored, Verzeichnis versioniert
+    ├── priv/             Notizen und Zwischenstände
+    ├── material/         Rohmaterial als Quelle für Docs
     ├── k-playbook.md     projekteigene Instruktionsebene
     └── TODO.md
 ```
+
+`k-playbook-local/` gehört ins Repository des Projekts, `priv/` und `material/`
+eingeschlossen: k-playbook schreibt keine `.gitignore` und entscheidet nicht, was ein
+Projekt versioniert. Ob der Inhalt dieser beiden draußen bleibt, zeigt und schaltet der
+Block **Lokale Einstellungen** der Oberfläche — gemessen mit `git check-ignore`, nicht
+geraten.
 
 Gleicher Name in `k-playbook-local/` ersetzt den mitgelieferten Eintrag vollständig; ein
 leerer schaltet ihn ab. Das gilt für alle fünf Sorten — `rules/`, `reviews/`, `checks/`,

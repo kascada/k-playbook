@@ -77,9 +77,13 @@ Erzeuger an — `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract`. Das Einricht
 nicht an; es legt `docs/manual/` und `material/` an.
 
 `k-playbook-local/material/` ist die Quellseite: Rohmaterial wie Chat-Mitschnitte und
-Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt bleibt wie
-bei `priv/` aus der Versionskontrolle heraus, denn Rohmaterial enthält typischerweise
-Tokens, Pfade und Namen.
+Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt wird wie
+bei `priv/` ganz normal mitversioniert — k-playbook schreibt dafür keine `.gitignore`.
+Rohmaterial enthält typischerweise Tokens, Pfade und Namen; ob es deshalb draußen bleiben
+soll, entscheidet das Projekt. Der Block **Lokale Einstellungen** der Oberfläche zeigt für
+beide Verzeichnisse den gemessenen Ist-Zustand und schaltet ihn um; von Hand geht es über
+eine `.gitignore` im Verzeichnis selbst, deren Inhalt die jeweilige `README.md` nennt.
+Details in [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen).
 
 ## Anker finden
 
