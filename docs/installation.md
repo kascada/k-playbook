@@ -19,9 +19,9 @@ passende Binary aus `dist/` startet; die Binaries liegen fertig im Repo. Für ma
 Linux gleichermaßen, was auch den Fall abdeckt, dass Host und Container unterschiedliche
 Plattformen sind.
 
-## Die drei Schritte
+## Die vier Schritte
 
-Der letzte Aufruf startet die Oberfläche im Browser. Sie führt durch drei Schritte und
+Der letzte Aufruf startet die Oberfläche im Browser. Sie führt durch vier Schritte und
 schreibt jeden erst nach Bestätigung.
 
 ### 1. Konfiguration anlegen
@@ -102,7 +102,33 @@ Zustand und benennt die Quelle. Von Hand geht der Weg weiterhin über eine
 `.gitignore` im betreffenden Verzeichnis; die jeweilige `README.md` nennt den
 Inhalt.
 
-### 3. Assistenten verlinken
+### 3. MCP-Server registrieren
+
+Der Block **k-playbook-MCP** trägt den mitgelieferten MCP-Server bei den drei Assistenten
+ein. Damit bekommt ein Assistent den aufgelösten Arbeitsstand als Werkzeug, statt ihn über
+die Kommandozeile zu holen:
+
+```text
+projekt/
+├── .mcp.json          Claude Code:  mcpServers -> k-playbook
+├── .cursor/mcp.json   Cursor:       dasselbe Schema
+└── opencode.json      OpenCode:     mcp -> k-playbook
+```
+
+Eingetragen wird `k-playbook/bin/k-playbook mcp` — der projekteigene Wrapper, **relativ**
+zum Hauptverzeichnis. Nur so lässt sich der Eintrag einchecken und gilt im DevContainer
+genauso. Der Preis ist eine Bedingung: der Eintrag wirkt nur, wenn der Assistent im
+Hauptverzeichnis geöffnet ist — dort, wo `K-PLAYBOOK.yaml` liegt.
+
+Die drei Dateien gehören dem Projekt. Angefasst wird genau der Schlüssel `k-playbook`,
+fremde Einträge bleiben stehen. Fertig ist die Registrierung erst nach einem Neustart des
+Assistenten; Claude Code fragt dabei einmal nach der Freigabe.
+
+Alles Weitere — die beiden Schemata, der Umgang mit fremden Werten, das Entfernen von
+Hand und die Seite `/mcp` mit den tatsächlich angebotenen Werkzeugen — steht in
+[`mcp.md`](./mcp.md).
+
+### 4. Assistenten verlinken
 
 Verlinkt wird für Claude Code, OpenCode und Cursor:
 
@@ -239,8 +265,10 @@ Es ist dieselbe Auskunft wie `k-playbook/bin/k-playbook context`, nur lesbar auf
 Der Block lädt erst beim Aufklappen und verändert nichts.
 
 Ein Assistent kann dieselbe Auskunft als Werkzeug bekommen, statt sie über die
-Kommandozeile zu holen: `k-playbook/bin/k-playbook mcp` startet dafür einen MCP-Server
-über stdin und stdout.
+Kommandozeile zu holen. Dafür ist der MCP-Server da; eingerichtet wird er im Block
+**k-playbook-MCP**, und die Seite `/mcp` zeigt den Registrierungszustand samt den
+Werkzeugen, die der Server tatsächlich anbietet. Alles dazu steht in
+[`mcp.md`](./mcp.md).
 
 ## Aktualisieren
 

@@ -8,7 +8,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 | Dokument | Inhalt |
 |---|---|
 | [`handbuch.md`](./handbuch.md) | Zweck, Grundmodell, Standardabläufe, Betriebsregeln. Die zentrale Seite. |
-| [`installation.md`](./installation.md) | Clone, die drei Einrichtungsschritte, Security-Tools, Aktualisieren, Fehlersuche. |
+| [`installation.md`](./installation.md) | Clone, die vier Einrichtungsschritte, Security-Tools, Aktualisieren, Fehlersuche. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | Der Kontrakt: `K-PLAYBOOK.yaml`, Verzeichnisaufteilung, Overlay-Regeln. |
 | [`commands.md`](./commands.md) | Index der Slash-Commands und ihrer Zuständigkeiten. |
 | [`faq.md`](./faq.md) | Kurze Antworten zu Installation, Pfaden, Overlay und Security-Tools. |
@@ -21,6 +21,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 | [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-review-loop`, `/k-run`. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
+| [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag relativ ist. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |
 | [`schreibweise.md`](./schreibweise.md) | Umlaute statt ASCII-Umschreibung, und wo ASCII bleibt. Gilt für alle Texte des Repos. |
 
@@ -52,8 +53,8 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 ## Stichwort-Index
 
 - `Anker` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
-- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
-- `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
+- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
+- `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `Commands` -> [`commands.md`](./commands.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
@@ -62,6 +63,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `Deploy-Key` -> [`local-github-ssh.md`](./local-github-ssh.md)
 - `Installation` / `git clone` -> [`installation.md`](./installation.md)
+- `MCP` / `.mcp.json` / `mcpServers` / `Freigabe` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
 - `k-playbook-local` / `projekteigen` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen)
 - `Oberfläche` / `k-gui` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
 - `priv` / `material` / `privat` / `Lokale Einstellungen` -> [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
@@ -69,7 +71,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `Overlay` / `Regel ersetzen` / `abschalten` -> [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen), [`faq.md`](./faq.md)
 - `context` / `aufgelöster Arbeitsstand` -> [`k-playbook-format.md`](./k-playbook-format.md#der-aufgelöste-arbeitsstand), [`commands.md`](./commands.md#der-aufgelöste-arbeitsstand)
 - `k-playbook.md` / `Instruktionen` / `Anstoß` -> [`k-playbook-format.md`](./k-playbook-format.md#instruktionen), [`faq.md`](./faq.md)
-- `Altlasten` / `alte globale Verlinkung` -> [`installation.md`](./installation.md#3-assistenten-verlinken)
+- `Altlasten` / `alte globale Verlinkung` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `Pfade` / `warum keine paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#keine-pfade-in-der-konfiguration)
 - `PR-Review` -> [`pr-review.md`](./pr-review.md)
 - `Remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)

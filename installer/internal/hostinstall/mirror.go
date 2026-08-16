@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	// WrapperName ist der Name des Wrappers in bin/ und des Symlinks.
-	WrapperName = "k-playbook"
-	binDirName  = "bin"
+	// Der Name des Wrappers und sein Verzeichnis stehen in internal/project:
+	// dort werden sie auch für die MCP-Registrierung gebraucht, und die
+	// Importrichtung geht von hier nach dort.
 	distDirName = "dist"
 	// installDirName trennt die Spiegelung von den Tool-venvs, die unter
 	// ~/.local/share/k-playbook/ ebenfalls zuhause sind. Ein venv bringt ein
@@ -90,7 +90,7 @@ func Mirror() (Result, error) {
 		return Result{}, nil
 	}
 
-	target := filepath.Join(home, ".local", "share", WrapperName, installDirName)
+	target := filepath.Join(home, ".local", "share", project.WrapperName, installDirName)
 	if samePath(source, target) {
 		return Result{}, nil
 	}
@@ -98,7 +98,7 @@ func Mirror() (Result, error) {
 	return mirrorInto(request{
 		source:    source,
 		target:    target,
-		linkDir:   filepath.Join(home, ".local", binDirName),
+		linkDir:   filepath.Join(home, ".local", project.BinDirName),
 		platform:  PlatformBinary(runtime.GOOS, runtime.GOARCH),
 		stamp:     sourceStamp(source),
 		pathValue: os.Getenv("PATH"),
@@ -109,7 +109,7 @@ func Mirror() (Result, error) {
 // die Schreibweise, die beim Bauen verwendet wird — anders als `uname`, das der
 // Wrapper erst übersetzen muss.
 func PlatformBinary(goos string, goarch string) string {
-	return fmt.Sprintf("%s-%s-%s", WrapperName, goos, goarch)
+	return fmt.Sprintf("%s-%s-%s", project.WrapperName, goos, goarch)
 }
 
 // PathStatus meldet, ob `k-playbook` ohne Pfadangabe aufrufbar ist.
@@ -137,10 +137,10 @@ func CheckPath() PathStatus {
 		return PathStatus{}
 	}
 
-	dir := filepath.Join(home, ".local", binDirName)
+	dir := filepath.Join(home, ".local", project.BinDirName)
 	status := PathStatus{
 		Dir:    dir,
-		Linked: linkExists(filepath.Join(dir, WrapperName)),
+		Linked: linkExists(filepath.Join(dir, project.WrapperName)),
 		InPath: inPath(os.Getenv("PATH"), dir),
 	}
 	if !status.InPath {
@@ -172,9 +172,9 @@ func linkExists(path string) bool {
 func mirrorInto(req request) (Result, error) {
 	result := Result{}
 
-	sourceWrapper := filepath.Join(req.source, binDirName, WrapperName)
+	sourceWrapper := filepath.Join(req.source, project.BinDirName, project.WrapperName)
 	sourceBinary := filepath.Join(req.source, distDirName, req.platform)
-	targetWrapper := filepath.Join(req.target, binDirName, WrapperName)
+	targetWrapper := filepath.Join(req.target, project.BinDirName, project.WrapperName)
 	targetBinary := filepath.Join(req.target, distDirName, req.platform)
 	stampPath := targetBinary + stampSuffix
 
@@ -189,7 +189,7 @@ func mirrorInto(req request) (Result, error) {
 		if err := copyExecutable(sourceWrapper, targetWrapper); err != nil {
 			return result, err
 		}
-		result.Copied = append(result.Copied, filepath.Join(binDirName, WrapperName))
+		result.Copied = append(result.Copied, filepath.Join(project.BinDirName, project.WrapperName))
 
 		if err := copyExecutable(sourceBinary, targetBinary); err != nil {
 			return result, err
@@ -328,7 +328,7 @@ func ensureLink(linkDir string, targetWrapper string) (string, error) {
 		return "", err
 	}
 
-	linkPath := filepath.Join(linkDir, WrapperName)
+	linkPath := filepath.Join(linkDir, project.WrapperName)
 	// Relativ, damit der Link ein verschobenes oder gemountetes Home überlebt.
 	want, err := filepath.Rel(linkDir, targetWrapper)
 	if err != nil {

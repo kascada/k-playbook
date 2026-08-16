@@ -123,16 +123,18 @@ k-playbook/bin/k-playbook
 ```
 
 Go wird nicht gebraucht — die Binaries liegen fertig im Repo. Der letzte Aufruf startet
-die Oberfläche, die durch drei Schritte führt: Konfiguration anlegen, projekteigene
-Struktur anlegen, Assistenten verlinken. Geschrieben wird jeweils erst nach Bestätigung.
+die Oberfläche, die durch vier Schritte führt: Konfiguration anlegen, projekteigene
+Struktur anlegen, MCP-Server registrieren, Assistenten verlinken. Geschrieben wird jeweils
+erst nach Bestätigung.
 
 ```mermaid
 flowchart TD
     A["git clone ..."] --> B["k-playbook/bin/k-playbook"]
     B --> C["K-PLAYBOOK.yaml anlegen"]
     C --> D["k-playbook-local/ anlegen"]
-    D --> E["Assistenten verlinken"]
-    E --> F["Assistent neu starten"]
+    D --> E["MCP-Server registrieren"]
+    E --> F["Assistenten verlinken"]
+    F --> G["Assistent neu starten"]
 ```
 
 Details stehen in [`installation.md`](./installation.md).

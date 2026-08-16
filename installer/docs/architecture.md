@@ -6,7 +6,8 @@ bevor der Code erneut analysiert wird.
 ## Ziel
 
 `k-playbook` hat zwei Aufgaben. Es **richtet ein**: Anker finden, Konfiguration und
-projekteigene Struktur anlegen, Assistenten verlinken. Und es **beantwortet, was gilt**:
+projekteigene Struktur anlegen, den MCP-Server registrieren, Assistenten verlinken. Und es
+**beantwortet, was gilt**:
 `context` löst Verzeichnisse, Instruktionen und Kataloge auf, damit kein Command das
 selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — siehe
 „Der MCP-Server".
@@ -54,6 +55,7 @@ installer/
 │   ├── local_private.go         messen und umschalten, ob priv/ und material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen und herstellen
+│   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
 │   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
 │   ├── instructions_layout.go   CLAUDE.md/AGENTS.md als Paar einordnen und auflösen
 │   ├── remediation.go           remediation:-Block lesen und setzen
@@ -70,11 +72,13 @@ installer/
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── tasks.go                 Task-Endpunkte und die Zahlen des Workflow-Blocks
 │   ├── hostpath.go              PATH-Zustand melden, read-only
+│   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, reviews.html, tasks.html,
-│                                session.js, app.js, reviews.js, tasks.js, styles.css
+│   └── static/                  index.html, reviews.html, tasks.html, mcp.html,
+│                                session.js, app.js, reviews.js, tasks.js, mcp.js,
+│                                styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── go.mod
@@ -961,6 +965,9 @@ alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
 | `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
 | `GET` | `/api/assistant` | Verlinkung prüfen |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
+| `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
+| `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |
+| `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Wrapper als Subprozess |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/reviews` | Läufe auflisten, dazu die wählbaren Werkzeuge und Rezepte |
@@ -980,8 +987,8 @@ alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
 
 Statische Assets liegen unter `/static/`, die Startseite unter `/`; daneben stehen die
-Seiten `/reviews` und `/tasks`. Alle drei rendert `renderPage()` aus derselben Vorlage
-für den Kopf und liefert vorab mit, ob eine Installation gefunden wurde.
+Seiten `/reviews`, `/tasks` und `/mcp`. Alle vier rendert `renderPage()` aus derselben
+Vorlage für den Kopf und liefert vorab mit, ob eine Installation gefunden wurde.
 
 ## Der MCP-Server
 
@@ -1030,6 +1037,93 @@ stdout-Reinheit nicht abgreifen, und genau sie ist die Invariante — ein `fmt.P
 einem transitiv genutzten Paket würde die Verbindung unbrauchbar machen, ohne dass
 irgendwo ein Fehler auftaucht.
 
+### Registrierung
+
+`project/mcp.go` ist der vierte Einrichtungspunkt neben der Verlinkung, nach demselben
+Muster: `CheckMCP()` misst, `ApplyMCP()` stellt her, `MCPStatus` trägt Zustand und
+Detailtext. Drei Ziele, zwei Schemata:
+
+| Assistent | Datei | Schlüssel | Form |
+|---|---|---|---|
+| Claude Code | `.mcp.json` | `mcpServers` | `{"command": …, "args": ["mcp"]}` |
+| Cursor | `.cursor/mcp.json` | `mcpServers` | dasselbe |
+| OpenCode | `opencode.json` | `mcp` | `{"type": "local", "command": […, "mcp"], "enabled": true}` |
+
+Bei OpenCode ist `command` ein **Array** aus Kommando und Argumenten, nicht zwei Felder.
+
+**Hineinschreiben statt anlegen.** Anders als bei der Verlinkung, wo `ownedLinks()` das
+eigene Werk wiedererkennt, gehören diese drei Dateien vollständig dem Projekt: sie können
+fremde MCP-Server tragen, und `opencode.json` daneben ganz andere Einstellungen. Gesetzt
+wird deshalb genau der Schlüssel `k-playbook`; alles andere bleibt inhaltlich unberührt.
+Nicht erhalten bleibt die **Formatierung** — gelesen und geschrieben wird mit
+`encoding/json` über `map[string]any`, und dieser Round-Trip sortiert die Schlüssel
+alphabetisch und setzt die Einrückung auf zwei Leerzeichen. Ordnungserhaltendes Schreiben
+wäre ein eigener Parser.
+
+Der Schlüssel gehört k-playbook. Ein abweichender Wert darunter ist kein Konflikt,
+sondern ein falscher Stand: `MCPStateStale` meldet ihn, `ApplyMCP()` überschreibt ihn. Als
+echter, unangetasteter Fall bleibt nur `MCPStateUnreadable` — eine Datei, die sich nicht
+als JSON-Objekt lesen lässt, wird gemeldet und nicht angefasst, damit keine Handarbeit
+eines Projekts verlorengeht.
+
+**Registriert wird der projekteigene Wrapper**, `project.WrapperPath()` — relativ zum
+Hauptverzeichnis, nicht die host-weite Kopie. Die wäre bequemer und trüge sogar immer den
+neuesten Stand, scheitert aber am Container: dort ist `$HOME` ein anderes,
+`~/.local/bin/k-playbook` existiert nicht, während das Projekt gemountet ist. Dazu kommt,
+dass nur ein relativer Eintrag teilbar ist und dass der Wrapper die Plattform selbst über
+`uname` wählt. `WrapperName` und `BinDirName` stehen deshalb in `internal/project`;
+`hostinstall` benutzt sie von dort, die umgekehrte Richtung wäre ein Import-Zyklus.
+
+Der Preis ist eine **Bedingung**: ein relativer Eintrag wird gegen das Arbeitsverzeichnis
+des Assistenten aufgelöst, nicht gegen den Ort der Konfigurationsdatei. Er gilt nur, wenn
+der Assistent im Hauptverzeichnis geöffnet ist. Das wird nicht umgangen, sondern gesagt —
+im Block und in [`docs/mcp.md`](../../docs/mcp.md). Weicht `Environment.SearchedFrom` von
+`Environment.ProjectDir` ab, wurde schon die Oberfläche nicht dort gestartet; dann zeigt
+`GET /api/mcp` `workdirMismatch` und der Hinweis wird deutlich statt beiläufig.
+
+**Fehlt der Wrapper**, meldet jedes Ziel `MCPStateNoWrapper` und `ApplyMCP()` schreibt
+nichts. Sonst meldete ein frischer Clone ohne `k-playbook/` eine Registrierung als „steht
+richtig", die auf nichts zeigt. Ein **Entfernen** gibt es nicht: die Oberfläche richtet
+ein, sie räumt nicht ab.
+
+### Die Seite /mcp
+
+`webui/mcp.go` bedient neben `GET`/`POST /api/mcp` noch `GET /api/mcp/tools` — den
+Werkzeug-Selbsttest. Er ist ein eigener Endpunkt, weil dahinter ein Subprozess steht: als
+Teil von `GET /api/mcp` bremste er die Startseite aus. Aufgerufen wird er nur von
+`mcp.js`, also erst beim Öffnen der Seite.
+
+Gestartet wird der **registrierte Wrapper** mit dem Hauptverzeichnis als
+Arbeitsverzeichnis, nicht der laufende Prozess: nur so misst die Seite das, was der
+Assistent später bekommt, Binary-Auswahl inbegriffen. Die Mechanik ist dieselbe wie in
+`cmd/k-playbook/mcp_test.go` — `initialize`, `notifications/initialized`, `tools/list`,
+und stdin bleibt offen, bis die Antworten da sind.
+
+Fehlender Wrapper, keine Antwort, kein verwertbares JSON: alles davon ist ein **Ergebnis**
+der Seite, keine Störung — sie zeigt „Server antwortet nicht" samt Grund. Der Handler darf
+unter keinen Umständen hängen bleiben und die Seite mitnehmen.
+
+Genau das ist die Stelle, an der es einmal nicht gereicht hat. `exec.CommandContext` mit 10
+Sekunden und ein `defer`, das den Prozess beendet, sehen nach der vollständigen Antwort aus
+— sie sind es nicht. Gemessen an einem Wrapper, der ein Kindeskind hinterlässt: das Enkelkind
+erbt die Rohre und lebt weiter, der abgelaufene Kontext beendet nur den Wrapper selbst, und
+der Handler hing über 30 Sekunden in einem `Read`, das niemand mehr bedienen wollte. Ein Lesen
+auf einem offenen Rohr lässt sich durch kein Zeitlimit unterbrechen.
+
+Drei Dinge zusammen lösen es, und keines davon ist entbehrlich:
+
+- Der Dialog läuft in einer eigenen Goroutine und meldet sein Ergebnis über einen gepufferten
+  Kanal. Der Handler wartet mit `select` auf das Ergebnis **oder** auf `ctx.Done()` — dadurch
+  greift das Zeitlimit auch dann, wenn niemand antwortet.
+- `cmd.WaitDelay` begrenzt, wie lange `Wait()` danach noch auf die Rohre wartet. Ohne das
+  hinge das Aufräumen an genau dem Enkelkind, dem der Handler eben entkommen ist.
+- Das `defer` schließt stdin, cancelt, schließt stdout und wartet erst dann. Das Schließen ist
+  das, was den Leser aus seiner Blockade löst; sich darauf zu verlassen, dass der Prozess von
+  selbst geht, wäre die Wette, die schon einmal verloren ging.
+
+Wer hier vereinfacht, bekommt einen Handler zurück, der im Normalfall funktioniert und im
+Fehlerfall die Seite mitnimmt — also in dem Fall, für den er gebaut ist.
+
 ## Lebenszyklus
 
 Der Server bindet auf `127.0.0.1:0`, nimmt also einen freien Port, und gibt die URL im
@@ -1046,8 +1140,8 @@ Beenden funktioniert in beide Richtungen:
 - `Ctrl+C` und der `Schließen`-Button gehen ebenfalls.
 
 Weil die Oberfläche mehrere Seiten hat, gilt das für **jede** von ihnen: `session.js`
-trägt Heartbeat und Abmeldung und wird von `index.html`, `reviews.html` und `tasks.html`
-vor der jeweiligen Seitenlogik geladen. Eine Seite ohne Lebenszeichen beendete den Server
+trägt Heartbeat und Abmeldung und wird von `index.html`, `reviews.html`, `tasks.html` und
+`mcp.html` vor der jeweiligen Seitenlogik geladen. Eine Seite ohne Lebenszeichen beendete den Server
 wenige Sekunden nach dem Wechsel zu ihr — der Weg zurück führte dann auf eine tote Seite.
 
 Ein Klick auf einen Verweis dieser Oberfläche meldet gar nicht erst ab: `session.js`

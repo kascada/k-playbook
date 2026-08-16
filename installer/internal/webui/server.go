@@ -119,6 +119,11 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/local/private", setLocalPrivateHandler)
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
+	mux.HandleFunc("GET /api/mcp", mcpHandler)
+	mux.HandleFunc("POST /api/mcp", applyMCPHandler)
+	// Eigener Endpunkt, weil dahinter ein Subprozess steht: nur die Seite /mcp
+	// fragt ihn, die Startseite bliebe sonst daran hängen.
+	mux.HandleFunc("GET /api/mcp/tools", mcpToolsHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
 	mux.HandleFunc("GET /api/reviews", reviewsHandler)
@@ -144,6 +149,7 @@ func routes(state *serverState) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /tasks", tasksPageHandler)
+	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
 	return mux
@@ -164,6 +170,13 @@ var tasksTemplate = template.Must(template.ParseFS(staticFiles, "static/tasks.ht
 
 func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, tasksTemplate)
+}
+
+// mcpTemplate ist die Seite des MCP-Servers, ebenfalls mit dem gemeinsamen Kopf.
+var mcpTemplate = template.Must(template.ParseFS(staticFiles, "static/mcp.html"))
+
+func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, mcpTemplate)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {

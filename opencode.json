@@ -3,10 +3,20 @@
   "instructions": [
     "AGENTS.md"
   ],
+  "mcp": {
+    "k-playbook": {
+      "command": [
+        "k-playbook/bin/k-playbook",
+        "mcp"
+      ],
+      "enabled": true,
+      "type": "local"
+    }
+  },
   "references": {
     "docs": {
-      "path": "./docs",
-      "description": "Autoritative k-playbook-Dokumentation. Zuerst docs/README.md lesen. Hinweis: Dieses Repo ist die k-playbook-Basisinstallation, kein normales Zielprojekt; k-playbook-Enforcement-Regeln gelten hier nicht automatisch direkt als projektlokale Regeln."
+      "description": "Autoritative k-playbook-Dokumentation. Zuerst docs/README.md lesen. Hinweis: Dieses Repo ist die k-playbook-Basisinstallation, kein normales Zielprojekt; k-playbook-Enforcement-Regeln gelten hier nicht automatisch direkt als projektlokale Regeln.",
+      "path": "./docs"
     }
   }
 }

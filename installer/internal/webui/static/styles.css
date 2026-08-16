@@ -463,6 +463,13 @@ details[open] > summary.disclosure .disclosure-marker {
   font-size: 0.9rem;
 }
 
+/* Ein Hinweis, der beim Überfliegen auffallen muss: die Bedingung, unter der
+   ein relativer Eintrag überhaupt greift. */
+.hint.warn {
+  color: var(--warn);
+  font-weight: 700;
+}
+
 .command-row code {
   display: block;
   border: 1px solid var(--line);

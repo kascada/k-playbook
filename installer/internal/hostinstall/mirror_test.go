@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
 const testPlatform = "k-playbook-linux-amd64"
@@ -14,7 +16,7 @@ func newSource(t *testing.T, binaryContent string) string {
 	t.Helper()
 
 	source := t.TempDir()
-	writeFile(t, filepath.Join(source, binDirName, WrapperName), "#!/usr/bin/env bash\n")
+	writeFile(t, filepath.Join(source, project.BinDirName, project.WrapperName), "#!/usr/bin/env bash\n")
 	writeFile(t, filepath.Join(source, distDirName, testPlatform), binaryContent)
 	return source
 }
@@ -26,11 +28,11 @@ func newRequest(t *testing.T, source string, stamp string) request {
 	home := t.TempDir()
 	return request{
 		source:    source,
-		target:    filepath.Join(home, ".local", "share", WrapperName, installDirName),
-		linkDir:   filepath.Join(home, ".local", binDirName),
+		target:    filepath.Join(home, ".local", "share", project.WrapperName, installDirName),
+		linkDir:   filepath.Join(home, ".local", project.BinDirName),
 		platform:  testPlatform,
 		stamp:     stamp,
-		pathValue: filepath.Join(home, ".local", binDirName),
+		pathValue: filepath.Join(home, ".local", project.BinDirName),
 	}
 }
 
@@ -70,7 +72,7 @@ func TestMirrorLegtZielAn(t *testing.T) {
 	if got := readFile(t, binary); got != "binary-v1" {
 		t.Errorf("Binary nicht gespiegelt: %q", got)
 	}
-	if !fileExists(filepath.Join(req.target, binDirName, WrapperName)) {
+	if !fileExists(filepath.Join(req.target, project.BinDirName, project.WrapperName)) {
 		t.Error("Wrapper fehlt im Ziel")
 	}
 	if got := readStamp(binary + stampSuffix); got != "1000" {
@@ -95,7 +97,7 @@ func TestMirrorVerlinktRelativ(t *testing.T) {
 		t.Fatalf("mirrorInto: %v", err)
 	}
 
-	linkPath := filepath.Join(req.linkDir, WrapperName)
+	linkPath := filepath.Join(req.linkDir, project.WrapperName)
 	if result.Link != linkPath {
 		t.Errorf("Link = %q, erwartet %q", result.Link, linkPath)
 	}
@@ -193,7 +195,7 @@ func TestMirrorErgaenztFehlendePlattform(t *testing.T) {
 	andere := req
 	andere.platform = "k-playbook-darwin-arm64"
 	andere.source = t.TempDir()
-	writeFile(t, filepath.Join(andere.source, binDirName, WrapperName), "#!/usr/bin/env bash\n")
+	writeFile(t, filepath.Join(andere.source, project.BinDirName, project.WrapperName), "#!/usr/bin/env bash\n")
 	writeFile(t, filepath.Join(andere.source, distDirName, andere.platform), "darwin")
 
 	result, err := mirrorInto(andere)
@@ -241,7 +243,7 @@ func TestMirrorOhneStempelNurWennZielFehlt(t *testing.T) {
 
 func TestMirrorLaesstEchteDateiInRuhe(t *testing.T) {
 	req := newRequest(t, newSource(t, "binary-v1"), "1000")
-	eigene := filepath.Join(req.linkDir, WrapperName)
+	eigene := filepath.Join(req.linkDir, project.WrapperName)
 	writeFile(t, eigene, "#!/usr/bin/env bash\n# von Hand abgelegt\n")
 
 	result, err := mirrorInto(req)
@@ -261,7 +263,7 @@ func TestMirrorRichtetFalschenLinkAus(t *testing.T) {
 	if err := os.MkdirAll(req.linkDir, 0o755); err != nil {
 		t.Fatalf("linkDir anlegen: %v", err)
 	}
-	linkPath := filepath.Join(req.linkDir, WrapperName)
+	linkPath := filepath.Join(req.linkDir, project.WrapperName)
 	if err := os.Symlink("/woanders/k-playbook", linkPath); err != nil {
 		t.Fatalf("Symlink anlegen: %v", err)
 	}

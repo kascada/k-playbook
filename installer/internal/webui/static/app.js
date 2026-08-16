@@ -66,6 +66,13 @@ const elements = {
   assistantFacts: document.getElementById("assistant-facts"),
   assistantMessage: document.getElementById("assistant-message"),
   assistantApply: document.getElementById("assistant-apply"),
+  mcpCard: document.getElementById("mcp-card"),
+  mcpPill: document.getElementById("mcp-pill"),
+  mcpCommand: document.getElementById("mcp-command"),
+  mcpFacts: document.getElementById("mcp-facts"),
+  mcpWorkdir: document.getElementById("mcp-workdir"),
+  mcpMessage: document.getElementById("mcp-message"),
+  mcpApply: document.getElementById("mcp-apply"),
   docsCard: document.getElementById("docs-card"),
   workflowsCard: document.getElementById("workflows-card"),
   workflowsReviews: document.getElementById("workflows-reviews"),
@@ -110,6 +117,7 @@ elements.update.addEventListener("click", onUpdateClick);
 elements.configCreate.addEventListener("click", createConfig);
 elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
+elements.mcpApply.addEventListener("click", applyMCP);
 elements.contextCard.addEventListener("toggle", onContextToggle);
 elements.closeDoc.addEventListener("click", closeDocOverlay);
 elements.docViewer.addEventListener("click", onDocViewerClick);
@@ -400,6 +408,7 @@ function renderConfig(data) {
     elements.configCard.classList.add("hidden");
     elements.localCard.classList.remove("hidden");
     elements.privateCard.classList.remove("hidden");
+    elements.mcpCard.classList.remove("hidden");
     elements.workflowsCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
     elements.remediationCard.classList.remove("hidden");
@@ -411,6 +420,7 @@ function renderConfig(data) {
     elements.contextCard.classList.remove("hidden");
     loadLocal();
     loadPrivate();
+    loadMCP();
     loadAssistant();
     loadRemediation();
     loadGH();
@@ -424,6 +434,7 @@ function renderConfig(data) {
   elements.configCard.classList.remove("hidden");
   elements.localCard.classList.add("hidden");
   elements.privateCard.classList.add("hidden");
+  elements.mcpCard.classList.add("hidden");
   elements.workflowsCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
   elements.remediationCard.classList.add("hidden");
@@ -761,6 +772,68 @@ function renderAssistant(data) {
   const installed = data.environment && data.environment.installed;
   const state = !installed ? "blocked" : data.ok ? "ok" : "todo";
   setBlockState(elements.assistantPill, elements.assistantApply, state);
+}
+
+// Wie die Zustände einer Registrierung heißen. Die ausführliche Fassung steht
+// auf der Seite /mcp; hier genügt der Halbsatz neben dem Dateinamen.
+const MCP_STATE_LABELS = {
+  ok: "eingetragen",
+  "no-wrapper": "Wrapper fehlt",
+  "missing-file": "Datei nicht vorhanden",
+  "missing-entry": "Eintrag fehlt",
+  stale: "zeigt woandershin",
+  unreadable: "kein lesbares JSON, bleibt unangetastet",
+};
+
+const MCP_LABELS = { doneLabel: "Erneut eintragen", todoLabel: "Einrichten" };
+
+async function loadMCP() {
+  setBlockState(elements.mcpPill, elements.mcpApply, "busy", MCP_LABELS);
+  try {
+    const response = await fetch("/api/mcp", { cache: "no-store" });
+    renderMCP(await response.json());
+  } catch {
+    elements.mcpMessage.textContent = "Status konnte nicht geladen werden.";
+  }
+}
+
+async function applyMCP() {
+  setBlockState(elements.mcpPill, elements.mcpApply, "busy", MCP_LABELS);
+  try {
+    const response = await fetch("/api/mcp", { method: "POST" });
+    renderMCP(await response.json());
+  } catch {
+    elements.mcpMessage.textContent = "Einrichten fehlgeschlagen.";
+    setBlockState(elements.mcpPill, elements.mcpApply, "todo", MCP_LABELS);
+  }
+}
+
+function renderMCP(data) {
+  elements.mcpFacts.replaceChildren();
+  elements.mcpMessage.textContent = data.message || "";
+
+  if (data.command) {
+    elements.mcpCommand.textContent = data.command;
+  }
+
+  for (const entry of data.entries || []) {
+    const label = MCP_STATE_LABELS[entry.state] || entry.state;
+    const term = entry.assistant ? `${entry.path} — ${entry.assistant}` : entry.path;
+    addFact(elements.mcpFacts, term, entry.detail ? `${label} (${entry.detail})` : label);
+  }
+
+  // Die Bedingung steht immer im Text; deutlich wird sie erst, wenn schon die
+  // Oberfläche nicht im Hauptverzeichnis gestartet wurde. Dann ist der Verdacht
+  // messbar und keine Vorsichtsformel mehr.
+  elements.mcpWorkdir.classList.toggle("hidden", !data.workdirMismatch);
+  elements.mcpWorkdir.classList.toggle("warn", Boolean(data.workdirMismatch));
+
+  // Ohne Installation gibt es nichts einzurichten, der Button bleibt grau —
+  // ohne k-playbook/ ebenso: der eingetragene Wrapper existierte dann nicht.
+  const environment = data.environment || {};
+  const usable = environment.installed && environment.playbookPresent;
+  const state = !usable ? "blocked" : data.ok ? "ok" : "todo";
+  setBlockState(elements.mcpPill, elements.mcpApply, state, MCP_LABELS);
 }
 
 // Der Remediation-Block ist eine Einstellung, kein Einrichtungsschritt: die

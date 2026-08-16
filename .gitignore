@@ -12,10 +12,15 @@ priv/
 /k-playbook/
 /k-playbook-local/
 
-# Registrierung des MCP-Servers für den Handtest. Ihr Kommando ist relativ und
-# hängt damit am Arbeitsverzeichnis des Clients — was hier passt, passt anderswo
-# nicht. Wer sie braucht, legt sie selbst an; docs/installation.md nennt den Weg.
+# Registrierung des MCP-Servers. Ihr Kommando ist relativ und hängt damit am
+# Arbeitsverzeichnis des Clients — was hier passt, passt anderswo nicht. Dazu
+# kommt: /k-playbook/ ist hier selbst ignoriert, der eingetragene Wrapper
+# entsteht also erst lokal. Ein eingecheckter Eintrag zeigte nach einem frischen
+# Clone ins Leere. Wer die Registrierung braucht, legt sie in der Oberfläche an;
+# docs/mcp.md nennt den Weg. In einem echten Zielprojekt gehören beide Dateien
+# dagegen ins Repository.
 /.mcp.json
+/.cursor/mcp.json
 
 # Secrets and local environment
 .env

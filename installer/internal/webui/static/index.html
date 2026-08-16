@@ -138,6 +138,29 @@
             <p id="workflows-message" class="message"></p>
           </section>
 
+          <!-- Der vierte Einrichtungspunkt, unmittelbar vor der Verlinkung:
+               beide richten denselben Assistenten ein, und beide wirken erst
+               nach dessen Neustart. Der Eintrag ist relativ und damit teilbar
+               und containerfest — er wirkt aber nur, wenn der Assistent im
+               Hauptverzeichnis geöffnet ist. -->
+          <section class="card{{if not .Installed}} hidden{{end}}" id="mcp-card">
+            <div class="section-head">
+              <div>
+                <h2>k-playbook-MCP</h2>
+              </div>
+              <span id="mcp-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">Trägt <code id="mcp-command">k-playbook/bin/k-playbook mcp</code> in <code>.mcp.json</code>, <code>.cursor/mcp.json</code> und <code>opencode.json</code> ein. Der Assistent bekommt damit den aufgelösten Arbeitsstand als Werkzeug. Fremde Einträge derselben Dateien bleiben unberührt.</p>
+            <dl id="mcp-facts" class="facts"></dl>
+            <p id="mcp-workdir" class="hint hidden">Der Eintrag ist relativ und wirkt nur, wenn der Assistent im Hauptverzeichnis geöffnet ist — dort, wo <code>K-PLAYBOOK.yaml</code> liegt.</p>
+            <p class="hint">Fertig ist die Registrierung erst nach einem Neustart des Assistenten; Claude Code fragt beim ersten Start einmal nach der Freigabe.</p>
+            <p id="mcp-message" class="message"></p>
+            <div class="link-row">
+              <a class="button-link secondary" href="/mcp">Zustand und Werkzeuge</a>
+            </div>
+            <button id="mcp-apply" class="secondary" disabled>Einrichten</button>
+          </section>
+
           <section class="card{{if not .Installed}} hidden{{end}}" id="assistant-card">
             <div class="section-head">
               <div>

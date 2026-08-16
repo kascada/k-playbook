@@ -4,7 +4,7 @@
 
 `/k-gui` startet die Oberfläche. Sinnvoll ist das:
 
-- nach dem Klonen von k-playbook in ein Projekt, für die drei Einrichtungsschritte.
+- nach dem Klonen von k-playbook in ein Projekt, für die vier Einrichtungsschritte.
 - nach einem `git pull`, wenn neue Commands oder Skills dazugekommen sind und die
   Verlinkung nachgezogen werden soll.
 - wenn Teile der projekteigenen Struktur fehlen oder Symlinks kaputt sind.
