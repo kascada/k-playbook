@@ -2,10 +2,6 @@
 
 `k-playbook` ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und Checks. Er wird in ein Unterverzeichnis des Zielprojekts geklont, `<projekt>/k-playbook/`. Daneben liegen die projekteigenen Artefakte. Ein Projekt ist damit selbstgenügsam.
 
-> **Umstellung.** Das projektlokale Modell ist umgesetzt und in der Doku beschrieben.
-> Offen ist noch der Umbau der Scan-Reviews auf SARIF; er steht in
-> [`docs/umbau.md`](./docs/umbau.md).
-
 ## Installation
 
 k-playbook wird in das Projekt geklont, das es begleiten soll. Es gibt keine zentrale
