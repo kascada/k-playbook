@@ -23,26 +23,81 @@ type Config struct {
 	VCS           string `json:"vcs"`
 }
 
+// SchemaStatus benennt, wie die gefundene schema_version zum Werkzeug steht.
+//
+// Der Fehlertext allein genügt dafür nicht: die Oberfläche muss die Fälle
+// auseinanderhalten können. Bei einer zu alten Datei ist Zurücksetzen die
+// Lösung, bei einer zu neuen wäre es genau falsch — dort ist die Installation
+// hinterher, und ein Zurücksetzen würde die neuere Konfiguration wegwerfen.
+type SchemaStatus string
+
+const (
+	// SchemaOK: die Fassung ist die, die dieses Werkzeug schreibt.
+	SchemaOK SchemaStatus = "ok"
+	// SchemaMissing: die Datei trägt gar keine schema_version.
+	SchemaMissing SchemaStatus = "missing"
+	// SchemaOutdated: die Fassung gehört zu einem abgelösten Modell.
+	SchemaOutdated SchemaStatus = "outdated"
+	// SchemaNewer: die Fassung ist neuer als das Werkzeug.
+	SchemaNewer SchemaStatus = "newer"
+)
+
+// Resettable sagt, ob der Zustand sich durch Zurücksetzen der Konfiguration
+// auflösen lässt.
+func (s SchemaStatus) Resettable() bool {
+	return s == SchemaOutdated || s == SchemaMissing
+}
+
+// SchemaState ordnet die gefundene Fassung ein.
+func SchemaState(config Config) SchemaStatus {
+	switch config.SchemaVersion {
+	case SchemaVersion:
+		return SchemaOK
+	case "":
+		return SchemaMissing
+	case "1", "2":
+		return SchemaOutdated
+	default:
+		return SchemaNewer
+	}
+}
+
+// LegacyModels beschreibt, wofür die abgelösten Fassungen standen. Wer eine
+// solche Datei vor sich hat, braucht vor allem die Auskunft, welches Modell
+// sie beschreibt — daran hängt, wo seine Inhalte liegen.
+var LegacyModels = map[string]string{
+	"1": "zentrale Basisinstallation unter ~/dev/k-playbook, paths.*, Projekteigenes im " +
+		PlaybookDirName + "-Verzeichnis",
+	"2": "Anker im " + PlaybookDirName + "-Verzeichnis, Installation unter _dist/, paths.*",
+}
+
 // CheckSchema meldet, wenn die Konfiguration nicht zu diesem Werkzeug passt.
 //
 // Stillschweigend weiterzumachen wäre das Gefährlichste: die Datei ließe
 // sich lesen, ihre Werte bedeuteten aber etwas anderes.
 func CheckSchema(config Config) error {
-	switch config.SchemaVersion {
-	case SchemaVersion:
+	switch SchemaState(config) {
+	case SchemaOK:
 		return nil
-	case "":
-		return fmt.Errorf("%s hat keine schema_version; erwartet wird %s",
-			ConfigFileName, SchemaVersion)
-	case "1", "2":
-		return fmt.Errorf("%s hat schema_version %s und beschreibt das abgelöste Layout "+
-			"(Konfiguration im %s-Verzeichnis, _dist/, paths.*); dieses Werkzeug erwartet %s",
-			ConfigFileName, config.SchemaVersion, PlaybookDirName, SchemaVersion)
+	case SchemaMissing:
+		return fmt.Errorf("%s hat keine schema_version; erwartet wird %s — %s",
+			ConfigFileName, SchemaVersion, resetHint)
+	case SchemaOutdated:
+		return fmt.Errorf("%s hat schema_version %s und beschreibt ein abgelöstes Modell (%s); "+
+			"dieses Werkzeug erwartet %s — %s",
+			ConfigFileName, config.SchemaVersion, LegacyModels[config.SchemaVersion],
+			SchemaVersion, resetHint)
 	default:
-		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration",
-			ConfigFileName, config.SchemaVersion, SchemaVersion)
+		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration; hilft `git pull` im %s-Verzeichnis nicht weiter, gehört die Datei zu einem anderen Projekt",
+			ConfigFileName, config.SchemaVersion, SchemaVersion, PlaybookDirName)
 	}
 }
+
+// resetHint nennt den Ausweg. Ohne ihn endete die Meldung bei der Diagnose:
+// von Hand ist der Weg nicht zu erraten, und `CreateConfig` verweigert, solange
+// die alte Datei liegt.
+const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\" " +
+	"sichert die alte Datei weg und legt sie neu an"
 
 // ReadConfig liest die Konfiguration eines Projekts.
 //

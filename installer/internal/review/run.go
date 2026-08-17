@@ -85,8 +85,9 @@ type Summary struct {
 	// Name ist der Verzeichnisname, üblich das Datum.
 	Name string `json:"name"`
 	Dir  string `json:"dir"`
-	// State und EntryCount stammen aus run.json. Fehlt sie, bleiben sie leer:
-	// unter results/ können auch Verzeichnisse aus der Zeit davor liegen.
+	// EntryCount stammt aus run.json, State wird aus entries/ abgeleitet.
+	// Fehlt run.json, bleiben beide leer: unter results/ können auch
+	// Verzeichnisse aus der Zeit davor liegen.
 	State      State `json:"state"`
 	EntryCount int   `json:"entryCount"`
 	HasRunFile bool  `json:"hasRunFile"`
@@ -143,7 +144,10 @@ func ListRuns(localDir string) ([]Summary, error) {
 		}
 		if run, err := ReadRun(summary.Dir); err == nil {
 			summary.HasRunFile = true
-			summary.State = run.State
+			// Der Zustand kommt aus entries/, nicht aus run.json: die Datei
+			// hält fest, was ausgewählt wurde, den Fortschritt führen die
+			// Einträge. Weichen beide ab, gilt entries/.
+			summary.State = DeriveRunState(summary.Dir, run)
 			summary.EntryCount = len(run.Entries)
 		}
 		runs = append(runs, summary)

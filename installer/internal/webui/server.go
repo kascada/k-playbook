@@ -113,6 +113,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/path", hostPathHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", createConfigHandler)
+	mux.HandleFunc("POST /api/config/reset", resetConfigHandler)
 	mux.HandleFunc("GET /api/local", localHandler)
 	mux.HandleFunc("POST /api/local", createLocalHandler)
 	mux.HandleFunc("GET /api/local/private", localPrivateHandler)

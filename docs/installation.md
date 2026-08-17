@@ -327,6 +327,51 @@ dabei unangetastet.
 Die Einzel-Links gehören ins Repository des Projekts und werden committet — dann hat ein
 frischer Clone die Commands sofort registriert.
 
+### Eine Konfiguration aus einem abgelösten Modell
+
+Wer ein Projekt aus einer der ersten Fassungen weiterträgt, stößt irgendwann auf:
+
+```text
+K-PLAYBOOK.yaml hat schema_version 1 und beschreibt ein abgelöstes Modell …
+```
+
+Das ist kein Fehler im Projekt, sondern die Folge einer bewussten Aufteilung: die
+Installation aktualisiert sich per `git pull`, die `K-PLAYBOOK.yaml` liegt daneben und
+wird nie überschrieben — sie gehört dem Projekt. Irgendwann ist das Werkzeug drei
+Modelle weiter und die Datei noch beim ersten. Umgerechnet wird nicht
+([`k-playbook-format.md`](./k-playbook-format.md#schema_version) sagt, warum);
+zurückgesetzt schon.
+
+Die Oberfläche starten: der Block **Projektkonfiguration** steht dann wieder da, nennt
+die gefundene Fassung und das Modell, das sie beschreibt, und bietet **Zurücksetzen und
+neu anlegen** an. Dabei wird
+
+- die alte Datei als `K-PLAYBOOK.yaml.v1-alt` daneben gelegt — nicht gelöscht, denn
+  `remediation`, `tools` und `project.repo_root` stehen nur dort,
+- eine frische `K-PLAYBOOK.yaml` mit `schema_version: 3` geschrieben, mit dem alten
+  `project.repo_root` vorbelegt,
+- eine bereits vorhandene Sicherung nie überschrieben; sie bekommt `-2`, `-3` angehängt.
+
+Danach die restlichen Blöcke wie bei einer neuen Installation durchgehen und die eigenen
+Werte aus der Sicherung zurückholen.
+
+**Vorher zieht das Projekteigene um.** Unter Modell 1 lagen Tasks, Checks, Reviews,
+Guidelines, Docs und die `TODO.md` **innerhalb** von `k-playbook/` — genau dem
+Verzeichnis, das heute der ersetzbare Clone ist. Nur die Konfiguration zu erneuern
+hinterließe eine stille Falle: alles sähe gesund aus, und das nächste Update nähme die
+Inhalte mit. Findet die Oberfläche dort Projekteigenes, schreibt sie deshalb nichts,
+nennt die Pfade und bleibt bei „Veraltet" stehen:
+
+```bash
+cd /pfad/zum/projekt
+git mv k-playbook/tasks     k-playbook-local/tasks
+git mv k-playbook/reviews   k-playbook-local/reviews
+git mv k-playbook/TODO.md   k-playbook-local/TODO.md
+```
+
+Welche Pfade es sind, steht im `paths.`-Block der alten Datei. Sind sie umgezogen, wird
+der Knopf frei.
+
 ## Host-weit aufrufbar
 
 Der tiefe Pfad `k-playbook/bin/k-playbook` ist nur beim ersten Mal nötig. Jeder Start der
@@ -550,6 +595,12 @@ ersetzt: dann zeigt der bestehende Link noch auf die alte Quelle.
 **Skills werden nicht getriggert.** Unter jedem Skill-Ordner muss `SKILL.md` liegen —
 ohne sie gilt das Verzeichnis nicht als Skill und wird nicht verlinkt. Danach den
 Assistenten neu starten.
+
+**`schema_version` passt nicht.** Ist die Zahl kleiner als `3` oder fehlt sie, ist die
+Konfiguration älter als das Werkzeug — die Oberfläche setzt sie zurück, siehe
+[Eine Konfiguration aus einem abgelösten Modell](#eine-konfiguration-aus-einem-abgelösten-modell).
+Ist sie größer, liegt es umgekehrt: die Installation ist hinterher. Dann hilft `git pull`
+in `k-playbook/`, kein Zurücksetzen — das würde die neuere Datei wegwerfen.
 
 **Das Werkzeug findet kein Projekt.** Dann fehlt die `K-PLAYBOOK.yaml` oberhalb des
 Aufrufortes. Die Suche läuft ab dem Arbeitsverzeichnis aufwärts bis `$HOME` bzw. `/`

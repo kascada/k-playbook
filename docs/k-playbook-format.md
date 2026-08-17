@@ -335,7 +335,12 @@ weiterzulesen wäre das Gefährlichste: die Werte ließen sich lesen, bedeuteten
 etwas anderes. Eine höhere Zahl als `3` wird als „Installation älter als die
 Konfiguration" gemeldet, eine fehlende `schema_version` ebenfalls als Fehler.
 
-Es gibt kein `migrate`-Kommando; die Umstellung ist ein bewusster Schritt.
+Es gibt kein `migrate`-Kommando: die Modelle beschreiben verschiedene
+Verzeichnis-Aufteilungen, und die Felder ineinander umzurechnen hieße, eine Übersetzung
+zu pflegen, die mit jedem Modell wächst. Stattdessen setzt die Oberfläche zurück — sie
+sichert die alte Datei als `K-PLAYBOOK.yaml.v1-alt` weg und legt eine frische an. Wie
+das abläuft, steht in
+[`installation.md`](./installation.md#eine-konfiguration-aus-einem-abgelösten-modell).
 
 ### `project.repo_root`
 

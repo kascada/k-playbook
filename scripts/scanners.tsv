@@ -1,0 +1,80 @@
+# Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
+# Fields: job	tool	languages	sarif	output	timeout	args
+#
+# Der Eintrag eines Laufs ist das Werkzeug, der Job ist der Aufruf. Ein Werkzeug kann
+# mehrere Jobs haben (trivy, gitleaks), einen (ruff) oder keinen (syft). In
+# security-tools.tsv ginge das nicht: dort ist name der Schlüssel, zwei Zeilen trivy
+# überschrieben sich.
+#
+# job        Eindeutiger Name, wird zum Dateinamen raw/<job>.sarif. Beginnt mit dem
+#            Tool-Namen und muss review.ValidEntryName() genügen; hat ein Werkzeug nur
+#            einen Job, ist der Name der Tool-Name selbst.
+# tool       Eintrag aus security-tools.tsv. Von dort kommt, ob das Werkzeug vorhanden
+#            ist, und über diese Spalte hängt der Job an seinem Eintrag im Lauf.
+# languages  Komma-Liste der Projektsprachen wie in der Tool-Matrix, oder * für
+#            sprachunabhängig. Passt keine zur Auswahl des Laufs, wird der Job
+#            übersprungen — nicht als Fehlschlag gewertet.
+# sarif      native (das Werkzeug kann SARIF selbst), convert (braucht einen Konverter)
+#            oder none (erzeugt kein SARIF). Es läuft ausschließlich native; die
+#            anderen werden mit Grund übersprungen, solange die Konverter fehlen.
+#            Sonst läge unter raw/ rohes JSON mit der Endung .sarif.
+# output     file, wenn das Werkzeug selbst nach {out} schreibt; stdout, wenn der
+#            Ausführer den Strom dorthin umleiten muss. govulncheck ist dieser Fall.
+# timeout    Obergrenze je Job als Go-Dauer (10m, 90s). Ohne sie hielte ein hängender
+#            Scanner den ganzen Lauf auf.
+# args       Der Aufruf ohne das Programm selbst, an Leerzeichen getrennt. Ein
+#            einzelnes Argument darf deshalb kein Leerzeichen enthalten; die
+#            Platzhalter werden erst nach dem Trennen ersetzt und dürfen welche tragen.
+#
+# Platzhalter:
+#   {out}      Zieldatei unter raw/, absolut. Pflicht bei output file, verboten bei
+#              output stdout.
+#   {target}   project.repo_root aus der context-Ausgabe, absolut — und zugleich das
+#              Arbeitsverzeichnis des Jobs. Nicht das Verzeichnis, in dem jemand
+#              gerade steht: sonst hinge das Ergebnis daran, wo der Lauf gestartet wurde.
+#   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml).
+#
+# Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
+# schreibt sie anders — ruff --exclude, trivy --skip-dirs, gosec -exclude-dir, grype
+# --exclude — und gitleaks kennt dafür überhaupt kein Flag, sondern nur eine Allowlist
+# in seiner Konfiguration (gitleaks.toml daneben). Eine eigene Spalte könnte deshalb
+# nur dieselben werkzeugeigenen Bruchstücke tragen wie args: Struktur ohne Bedeutung.
+# Trüge sie stattdessen allgemeine Muster, müsste der Ausführer sie je Werkzeug
+# übersetzen — dann stünde der Aufruf wieder halb im Go-Code, und genau das soll diese
+# Datei verhindern. Dazu kommt, dass die Stelle im Aufruf zum Aufruf gehört; beim
+# Zusammensetzen aus zwei Spalten entschiede sie der Ausführer.
+#
+# Ausgeschlossen wird überall dort, wo das Werkzeug es zulässt:
+#   k-playbook/                die Installationskopie. Ihr ausgeliefertes Beispiel-
+#                              material ist kein Code des Projekts.
+#   k-playbook-local/results/  die Ergebnisse früherer Läufe. Ohne den Ausschluss
+#                              fänden gitleaks und trufflehog im nächsten Lauf die
+#                              Funde des vorigen in dessen eigenem SARIF wieder.
+# Dazu für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
+# gemessen 97,3 % der Befunde, siehe docs/umbau.md, „Gemessen".
+#
+# Die gitleaks-Jobs nennen als Ziel . statt {target}, obwohl beides dasselbe
+# Verzeichnis meint. Grund: gitleaks kann Pfade nur über reguläre Ausdrücke ausnehmen,
+# und die laufen gegen den gemeldeten Pfad. Bei absolutem Ziel ist der absolut — in
+# einem Projekt, das selbst k-playbook heißt, träfe ein Muster für die
+# Installationskopie dann die ganze Projektwurzel, und der Lauf fände nichts mehr.
+# Mit . sind die gemeldeten Pfade relativ zur Wurzel, und die Muster in gitleaks.toml
+# greifen mit ^ genau dort, wo sie sollen.
+#
+# syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
+# Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
+# ein Fallback für Container-Images, kein Scanner.
+job	tool	languages	sarif	output	timeout	args
+gitleaks-git	gitleaks	*	native	file	10m	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+gitleaks-dir	gitleaks	*	native	file	10m	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+ruff	ruff	python	native	file	10m	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go	native	file	20m	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	native	file	15m	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+trivy-config	trivy	*	native	file	15m	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+gosec	gosec	go	native	file	15m	-fmt=sarif -out={out} -exclude-dir=k-playbook -exclude-dir=k-playbook-local ./...
+govulncheck	govulncheck	go	native	stdout	15m	-format sarif ./...
+osv-scanner	osv-scanner	python,go	native	file	15m	scan source --recursive --format sarif --output-file {out} {target}
+grype	grype	*	native	file	15m	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
+golangci-lint	golangci-lint	go	native	file	15m	run --output.sarif.path {out} --output.text.path stderr ./...
+trufflehog-git	trufflehog	*	convert	stdout	15m	git file://{target} --json --no-update
+pip-audit	pip-audit	python	convert	file	15m	--format json --output {out} --progress-spinner off

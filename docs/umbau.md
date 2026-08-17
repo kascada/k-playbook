@@ -98,6 +98,11 @@ Merge.
 - Das Laufmodell steht in [`review-runs.md`](./review-runs.md): ein Lauf je Tag,
   `run.json` plus `entries/`, Werkzeuge und Reviews als Einträge desselben Laufs. Die
   Oberfläche legt Läufe an, startet aber nichts.
+- Die Ausführung durch das Werkzeug steht ebenfalls dort: `scripts/scanners.tsv` hält je
+  Job den Aufruf samt Ausschlüssen, `k-playbook scan <lauf> [eintrag …]` führt die
+  Werkzeug-Einträge parallel aus, schreibt SARIF nach `raw/` und den Fortschritt nach
+  `entries/<name>.json`. Der Eintrag bleibt dabei das Werkzeug; dass eines aus mehreren
+  Jobs besteht, muss beim Zusammenstellen niemand wissen.
 
 **Gemessen, gehört in die Scan-Jobs.** An `~/dev/Aiva/kascada` (351 Dateien, 59.000 Zeilen)
 verglichen:
@@ -111,15 +116,28 @@ verglichen:
 - **`bandit` ist entfallen**, ruff deckt es ab: 97,7 % identische Funde, und die Differenz
   waren überwiegend Falschpositive und bereits per `# noqa` abgehakte Fälle, die bandit
   nicht sieht.
-- **`semgrep --config auto` holt die Regeln vom Semgrep-Server** und schaltet damit den
-  Versand von Nutzungsmetriken ein (`--metrics` steht per Default auf `auto`). Der Job
-  braucht mindestens `--metrics=off`, und ein fester Regelsatz statt `auto` wäre besser:
-  sonst liefert derselbe Lauf zweimal womöglich andere Regeln.
+- **`semgrep --config auto` ist ausgeschlossen, nicht bloß unerwünscht.** Die Kombination
+  mit abgeschalteten Metriken verweigert das Werkzeug selbst: „Cannot create auto config
+  when metrics are off. Please allow metrics or run with a specific config." Entweder
+  Nutzungsdaten senden oder ein benannter Regelsatz — dazwischen gibt es nichts, und
+  Ersteres kommt für ein Werkzeug, das in fremden Projekten läuft, nicht in Frage.
+  (`~/.semgrep/settings.yml` trägt dafür eine `anonymous_user_id`.)
+
+  Gemessen mit Semgrep OSS 1.172.0 an je einer Python- und einer Go-Datei:
+  `--config p/security-audit --metrics=off` läuft sauber, **ein Job deckt beide Sprachen
+  ab** — 79 Regeln bei nur Python, 107 bei Python und Go, weil semgrep die Auswahl nach
+  den gefundenen Dateitypen trifft. Getrennte Sprach-Jobs braucht es nicht.
+
+  Die Regeln kommen dabei bei **jedem** Lauf vom Server; `~/.semgrep/` hält keinen
+  Regel-Cache. Der Job braucht also Netz, und der Regelsatz kann sich zwischen zwei Läufen
+  ändern — träger als bei `auto`, aber nicht ausgeschlossen. Ein eigener Regelsatz aus
+  lokalen YAML-Dateien wäre der Ausweg, hieße aber, ihn selbst zu pflegen; dagegen steht,
+  dass das SARIF die gelaufenen Regeln vollständig dokumentiert: 225 Einträge unter
+  `tool.driver.rules` mit ID, Beschreibung und `helpUri`, dazu die Werkzeugversion. Was in
+  einem Lauf galt, bleibt damit aus `raw/` ablesbar — wofür das Verzeichnis auditierbar ist.
 
 **Offen.** Wird einzeln besprochen, bevor daran gearbeitet wird:
 
-- Die Ausführung durch das Werkzeug: Scan-Jobs, Parallelität, ein neues Subkommando, und
-  wie ein Eintrag seinen Fortschritt nach `entries/<name>.json` schreibt.
 - Das Merge-Werkzeug. Der naheliegende Kandidat, der Microsoft SARIF Multitool, gibt es nur
   als .NET-Tool oder npm-Paket und zöge damit eine Laufzeitumgebung nach, die die
   Installation bisher nicht braucht.
@@ -129,3 +147,24 @@ verglichen:
   hätte Severity und Confidence geliefert. Statt das von einem einzelnen Scanner abhängig
   zu machen, soll die Zuordnung einmal in k-playbook stehen und für alle Werkzeuge gelten.
 - Der Umbau der Rezepte auf reine Bewertung, und wo die Bewertung des Assistenten landet.
+- **`k-check` als MCP-Werkzeug.** Der Runner gibt heute Terminaltext aus; `review-k-check-security`
+  sichert ihn als `raw/k-check-<mode>.txt`, und der Assistent liest und deutet ihn. Seine
+  Parameter — `--mode changed|baseline`, `--files-from`, `--base-ref`, `--exclude`,
+  `--timeout` — stehen dabei als Prosa im Rezept. Ein Werkzeug könnte sie als Schema führen
+  und statt der Rohausgabe zurückgeben, welche Checks liefen und welche mit Datei und Zeile
+  angeschlagen haben. `--metadata-output` schreibt bereits JSON; die Struktur ist also da,
+  sie erreicht den Assistenten nur nicht. Die Rohausgabe bleibt für `raw/` erhalten — sie ist
+  auditierbar und wird nicht ersetzt.
+- **Der geänderte Stand als MCP-Werkzeug.** Was bei einer Bewertung zählt und was nicht,
+  steht heute als Prosa in `commands/k-run.md` („omit generated files, lockfiles, and binary
+  files"; bei über ~100 Zeilen zusammenfassen) und fällt damit bei jedem Lauf neu aus.
+  Mechanisch daran ist: Bezugspunkt über `git merge-base`, Dateien und Zeilen über
+  `git diff --numstat`, binär meldet git selbst, `linguist-generated` und `-diff` stehen in
+  `.gitattributes`, Lockfiles erkennt eine gepflegte Namensliste. Das gehört ins Programm —
+  nach demselben Grundsatz wie bei den lokalen Einstellungen: gemessen, nicht geraten.
+  Beurteilung bleibt beim Assistenten: welche Hunks zählen, was zusammengefasst wird, ob
+  eine als generiert markierte Datei doch interessant ist.
+  Den **Diff-Text soll das Werkzeug nicht liefern** — mit der Pfadliste holt der Assistent
+  ihn gezielt selbst. Sonst bräuchte das Werkzeug Größengrenzen und Kürzungsregeln, und das
+  sind wieder Urteile. Die Antwort trägt damit keinen Inhalt, bleibt auch bei 200 geänderten
+  Dateien klein und kann nichts still verschlucken.

@@ -18,7 +18,7 @@ dieses Programm.
 Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`, wird aber als
 `bin/k-playbook` aus dem Repo-Root heraus aufgerufen.
 
-## Drei Einstiege
+## Vier Einstiege
 
 ```go
 if len(args) == 0 {
@@ -28,11 +28,18 @@ if len(args) == 0 {
 ```
 
 Ohne Argument die Oberfläche, davor das Aufräumen der Altlasten. Mit `context` die
-JSON-Ausgabe, mit `mcp` der Server für einen Assistenten — und beide **ohne**
-`cleanUpLegacy()` und `mirrorHostInstall()`: deren Meldungen gehen nach stdout und
-würden die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt
-stdout einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige
-fremde Zeile macht ihn unbrauchbar.
+JSON-Ausgabe, mit `mcp` der Server für einen Assistenten, mit `scan` die Ausführung
+eines Review-Laufs — und alle drei **ohne** `cleanUpLegacy()` und `mirrorHostInstall()`:
+deren Meldungen gehen nach stdout und würden die Ausgabe stören. Bei `mcp` wiegt das
+schwerer als bei `context`: dort trägt stdout einen JSON-RPC-Strom, der über die ganze
+Sitzung offen bleibt, und eine einzige fremde Zeile macht ihn unbrauchbar. Bei `scan`
+zählt ein anderer Grund: ein Scan liest nur und soll den Host nicht nebenbei anfassen.
+
+`scan <lauf> [eintrag …]` führt die Werkzeug-Einträge eines Laufs aus und blockiert, bis
+sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
+Preflight, Konfiguration — und reicht es an `internal/review` weiter; dort steht die
+Ausführung selbst, ohne eigene Suche nach Pfaden oder Binaries. Wie der Lauf aussieht,
+den es ausführt, steht in [`../../docs/review-runs.md`](../../docs/review-runs.md).
 
 Mehr Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
 `smoke` und `projects …` des alten Stands sind entfallen, samt der lokalen Projektliste
@@ -42,7 +49,9 @@ unter `.k-playbook-local/projects.json`.
 
 ```text
 installer/
-├── cmd/k-playbook/main.go       räumt Altlasten weg, startet webui.Run()
+├── cmd/k-playbook/
+│   ├── main.go                  räumt Altlasten weg, startet webui.Run()
+│   └── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/hostinstall/
@@ -81,6 +90,11 @@ installer/
 │                                styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
+├── internal/review/
+│   ├── run.go                   Läufe anlegen und auflisten, run.json
+│   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
+│   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
+│   └── execute.go               Jobs starten, SARIF zählen, Fortschritt fortschreiben
 ├── go.mod
 └── README.md
 ```
@@ -88,6 +102,11 @@ installer/
 `internal/project` kennt kein HTTP, `internal/webui` keine Dateisystem-Details. Die
 Trennung hält die Fachlogik testbar. `internal/mcpserver` steht neben `webui`: beide
 sind Fassaden auf `project`, die eine über HTTP, die andere über JSON-RPC.
+
+`internal/review` bekommt seine Vorgaben ebenfalls von außen — Laufverzeichnis, Ziel,
+Sprachen, Katalog und die aufgelösten Werkzeuge stehen in `review.Options`. Deshalb
+lässt sich ein Lauf mit Attrappen prüfen, ohne dass eine Installation, ein Preflight
+oder ein echter Scanner vorhanden sein müsste.
 
 ## Anker finden
 
@@ -151,6 +170,23 @@ zurückgeschrieben wird. Die Datei gehört dem Projekt und kann Werte tragen, di
 Werkzeug nicht kennt.
 
 `CreateConfig()` schreibt nie über eine vorhandene Datei. `schema_version` ist `3`.
+
+`SchemaState()` ordnet die gefundene Fassung ein — `ok`, `missing`, `outdated`, `newer`.
+Die Oberfläche braucht den Fall und nicht nur den Fehlertext von `CheckSchema()`: nur
+bei `outdated`/`missing` steht das Zurücksetzen zur Wahl. Bei `newer` wäre es genau
+falsch, dort ist die Installation hinterher.
+
+`ResetConfig()` in `project/reset.go` ist der einzige Weg, der eine vorhandene
+Konfiguration ersetzt. Der Ablauf: Fassung prüfen, `LegacyContent()` prüfen, alte Datei
+umbenennen, `CreateConfig()`. Scheitert der letzte Schritt, wird die Sicherung
+zurückbenannt — sonst stünde das Projekt ohne Konfiguration da, und die Oberfläche böte
+das Anlegen an, als wäre nie eine dagewesen.
+
+`LegacyContent()` sucht Projektinhalte im Installationsverzeichnis, weil Modell 1 sie
+dort ablegte und dieses Verzeichnis heute ersetzbar ist. Zwei Wege, weil keiner allein
+reicht: der `paths.`-Block der alten Datei nennt die Orte genau, und der Zustand des
+Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projekt, mit
+`.git` ist es das Untracked. Gemeldet wird die Vereinigung; verschoben wird nichts.
 
 ## Projekteigene Struktur
 

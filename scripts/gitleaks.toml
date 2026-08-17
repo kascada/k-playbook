@@ -1,0 +1,28 @@
+# Beigabe zu scanners.tsv: die Ausschlüsse der gitleaks-Jobs.
+#
+# gitleaks kennt kein Flag, mit dem sich ein Pfad vom Scan ausnehmen ließe — Pfade
+# lassen sich nur über eine Allowlist in der Konfiguration ausnehmen. Deshalb diese
+# Datei; die beiden Jobs verweisen mit --config {scripts}/gitleaks.toml darauf.
+#
+# useDefault übernimmt den mitgelieferten Regelsatz von gitleaks vollständig. Hier
+# stehen nur die Ausschlüsse, keine eigenen Regeln: welche Muster als Secret gelten,
+# soll das Werkzeug entscheiden und nicht k-playbook.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "k-playbook: Installationskopie und die Ergebnisse früherer Läufe"
+# Die Installationskopie unter <projekt>/k-playbook/ ist ausgeliefertes Material und
+# kein Code des Projekts. k-playbook-local/results/ trägt die Rohdaten früherer Läufe:
+# ohne diesen Ausschluss fände der nächste Lauf die Funde des vorigen in dessen
+# eigenem SARIF wieder und meldete sie als neue Treffer.
+#
+# Beide Muster sind mit ^ an der Projektwurzel verankert, und die Jobs scannen deshalb
+# . statt eines absoluten Pfades: ohne Anker griffe (^|/)k-playbook/ in einem Projekt,
+# das selbst k-playbook heißt, auf jeden Pfad unterhalb der Wurzel — der Lauf schlösse
+# dann alles aus und meldete stumm null Befunde.
+paths = [
+  '''^k-playbook/''',
+  '''^k-playbook-local/results/''',
+]

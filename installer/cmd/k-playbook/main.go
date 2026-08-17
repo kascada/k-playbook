@@ -2,7 +2,8 @@
 //
 // Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
-// einem Assistenten als MCP-Werkzeug an.
+// einem Assistenten als MCP-Werkzeug an, und `scan` führt die Werkzeug-Einträge
+// eines Review-Laufs aus.
 package main
 
 import (
@@ -42,6 +43,11 @@ func run(args []string) error {
 		// bleibt über die ganze Sitzung offen. Eine einzige Zeile daneben macht
 		// die Verbindung unbrauchbar.
 		return mcpserver.Run(context.Background())
+	case "scan":
+		// Ohne cleanUpLegacy und mirrorHostInstall: beides gehört zum Start der
+		// Oberfläche. Ein Scan liest nur und soll den Host nicht nebenbei
+		// anfassen, während er läuft.
+		return runScan(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -82,6 +88,11 @@ Unterkommandos:
   mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
             als Werkzeug anbietet. Gedacht für den Aufruf durch einen
             Assistenten, nicht für die Hand.
+  scan      Führt die Werkzeug-Einträge eines Review-Laufs aus:
+            k-playbook scan <lauf> [eintrag …]. Ohne Eintragsangabe alle, die
+            noch nicht gelaufen sind. Die Namen sind die der Werkzeuge. Das
+            Kommando kehrt zurück, wenn alle Einträge durch sind; der
+            Fortschritt steht währenddessen unter entries/.
   help      Diese Übersicht.
 `)
 }

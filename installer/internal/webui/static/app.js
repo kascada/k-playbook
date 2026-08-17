@@ -90,6 +90,13 @@ const elements = {
 };
 
 const CONFIG_LABELS = { doneLabel: "Angelegt", todoLabel: "Anlegen" };
+// Beide Beschriftungen gleich: der Knopf tut hier nur eines, und im
+// blockierten Fall wechselte er sonst auf die Beschriftung des erledigten
+// Zustands, ohne dass etwas erledigt wäre.
+const RESET_LABELS = {
+  doneLabel: "Zurücksetzen und neu anlegen",
+  todoLabel: "Zurücksetzen und neu anlegen",
+};
 
 // Lesbare Beschreibung je Zustand aus dem Backend.
 const STATE_LABELS = {
@@ -114,7 +121,7 @@ const REGISTRY_DEVIATIONS = [
 
 elements.shutdown.addEventListener("click", shutdown);
 elements.update.addEventListener("click", onUpdateClick);
-elements.configCreate.addEventListener("click", createConfig);
+elements.configCreate.addEventListener("click", onConfigClick);
 elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
 elements.mcpApply.addEventListener("click", applyMCP);
@@ -372,7 +379,16 @@ async function loadConfig() {
   }
 }
 
-async function createConfig() {
+// Liegt eine Konfiguration aus einem abgelösten Modell vor, schreibt derselbe
+// Knopf über einen anderen Endpunkt: `POST /api/config` geht nie über eine
+// vorhandene Datei, und diese Grenze soll auch hier sichtbar bleiben.
+let configOutdated = false;
+
+async function onConfigClick() {
+  await createConfig(configOutdated ? "/api/config/reset" : "/api/config");
+}
+
+async function createConfig(endpoint) {
   setBlockState(elements.configPill, elements.configCreate, "busy");
   const body = JSON.stringify({
     projectDir: elements.configProjectDir.value.trim(),
@@ -380,7 +396,7 @@ async function createConfig() {
   });
 
   try {
-    const response = await fetch("/api/config", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
@@ -401,11 +417,20 @@ async function createConfig() {
 function renderConfig(data) {
   elements.configFacts.replaceChildren();
   elements.configMessage.textContent = data.message || "";
+  configOutdated = false;
 
   // Steht die Konfiguration, ist dieser Schritt erledigt und verschwindet. Wo
   // alles liegt, zeigt die Kopfzeile.
   if (data.installed) {
-    elements.configCard.classList.add("hidden");
+    // Ausnahme: eine Konfiguration, die neuer ist als das Werkzeug. Sie ist
+    // nichts, was sich hier einrichten ließe — die Installation ist hinterher.
+    // Die Karte bleibt deshalb als Warnung stehen, statt die Meldung in einem
+    // ausgeblendeten Block zu verstecken.
+    if (data.schema === "newer") {
+      renderNewerConfig(data);
+    } else {
+      elements.configCard.classList.add("hidden");
+    }
     elements.localCard.classList.remove("hidden");
     elements.privateCard.classList.remove("hidden");
     elements.mcpCard.classList.remove("hidden");
@@ -448,6 +473,15 @@ function renderConfig(data) {
   elements.configProjectDir.value = suggestion.projectDir || "";
   elements.configRepoRoot.value = suggestion.repoRoot || ".";
 
+  configOutdated = data.schema === "outdated" || data.schema === "missing";
+  // Beim Zurücksetzen steht das Hauptverzeichnis fest — es ist der Ort der
+  // Datei, die ersetzt wird. Nur das Repository bleibt zur Wahl.
+  elements.configProjectDir.readOnly = configOutdated;
+  if (configOutdated) {
+    renderOutdatedConfig(data);
+    return;
+  }
+
   // Kommt mehr als ein Ort in Frage, muss der Nutzer sehen, welche das sind —
   // der Vorschlag steht bereits im Feld.
   const projectCandidates = suggestion.projectCandidates || [];
@@ -461,6 +495,49 @@ function renderConfig(data) {
   }
 
   setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
+}
+
+// Die vorhandene Datei beschreibt ein abgelöstes Modell. Der Block erklärt,
+// was sie beschreibt und was mit ihr geschieht — beides braucht es, weil hier
+// als Einziges in der Oberfläche etwas Vorhandenes ersetzt wird.
+function renderOutdatedConfig(data) {
+  addFact(elements.configFacts, "Gefundene Datei", data.configPath || "");
+  addFact(
+    elements.configFacts,
+    "schema_version",
+    data.schemaVersion ? `${data.schemaVersion} — ${data.legacyModel || "abgelöst"}` : "fehlt",
+  );
+
+  const legacy = data.legacyContent || [];
+  if (legacy.length > 0) {
+    // Der Umzug geht vor: das Installationsverzeichnis wird beim nächsten
+    // Update ersetzt, und was dort liegt, wäre danach weg.
+    addFact(elements.configFacts, "Zuerst umziehen nach k-playbook-local/", legacy.join(", "));
+    setBlockState(elements.configPill, elements.configCreate, "blocked", RESET_LABELS);
+    elements.configPill.textContent = "Veraltet";
+    return;
+  }
+
+  addFact(elements.configFacts, "Die alte Datei", "wird daneben gesichert, nicht gelöscht");
+  setBlockState(elements.configPill, elements.configCreate, "todo", RESET_LABELS);
+  elements.configPill.textContent = "Veraltet";
+}
+
+// Der umgekehrte Fall: die Datei ist neuer als das Werkzeug. Zurücksetzen wäre
+// hier genau falsch — es würde die neuere Konfiguration wegwerfen. Was hilft,
+// ist ein Update der Installation, und das steht im Block darüber.
+function renderNewerConfig(data) {
+  elements.configCard.classList.remove("hidden");
+  elements.configForm.classList.add("hidden");
+  addFact(elements.configFacts, "Gefundene Datei", data.configPath || "");
+  addFact(
+    elements.configFacts,
+    "schema_version",
+    `${data.schemaVersion || "?"} — neuer als diese Installation`,
+  );
+  addFact(elements.configFacts, "Was hilft", `git pull in ${data.playbookDir || "k-playbook/"}`);
+  setBlockState(elements.configPill, elements.configCreate, "blocked", CONFIG_LABELS);
+  elements.configPill.textContent = "Installation zu alt";
 }
 
 // Setzt Pill und Button eines Blocks aus einem Zustand. Einheitliche Regel für

@@ -26,15 +26,28 @@ landet für beide im selben Verzeichnis und damit später in derselben Zusammenf
 ```text
 k-playbook-local/results/
 └── 2026-08-12/                  der Lauf, benannt nach dem Tag
-    ├── run.json                 die Festlegung und der Gesamtzustand
-    └── entries/
-        ├── semgrep.json         Fortschritt und Probleme je Eintrag
-        └── review-secret-scanning.json
+    ├── run.json                 die Festlegung: was ausgewählt wurde
+    ├── entries/
+    │   ├── semgrep.json         Fortschritt und Probleme je Eintrag
+    │   └── review-secret-scanning.json
+    └── raw/                     die SARIF-Dateien der Scan-Jobs
+        ├── semgrep.sarif
+        └── gitleaks-git.sarif
 ```
 
 Der Name ist das Datum, `YYYY-MM-DD`. **Existiert das Verzeichnis bereits, bricht das
 Anlegen ab** statt einen zweiten Lauf danebenzustellen: ein Tag, ein Lauf. Wer erneut
 starten will, räumt das vorhandene Verzeichnis weg oder benennt es um.
+
+**`raw/` legt der Ausführer an**, beim ersten Job, den er startet. Das Anlegen eines
+Laufs kennt das Verzeichnis nicht: ein Lauf ohne Werkzeug-Eintrag braucht es nicht.
+
+**Es gibt vorerst zwei Orte für Rohdaten.** Die Ergebnisfamilien unter
+`k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` bleiben, wie sie sind, und
+`/k-results` liest weiter sie; `ListRuns()` zeigt sie ohnehin mit an. Das
+Laufverzeichnis ist dagegen familienlos, weil ein Lauf gerade über die Familien hinweg
+klammert. Wann beides zusammengeht, entscheidet der Umbau der Rezepte auf reine
+Bewertung ([`umbau.md`](./umbau.md), „Offen").
 
 ## Wer was schreibt
 
@@ -43,16 +56,27 @@ in eine fremde Datei.**
 
 | Datei | Schreiber |
 |---|---|
-| `run.json` | nur das Werkzeug |
+| `run.json` | nur das Anlegen des Laufs; danach niemand |
 | `entries/<name>.json` | nur der Eintrag, dem sie gehört |
+| `raw/<job>.sarif` | nur der Job, der sie erzeugt |
 
 Damit können Werkzeuge parallel laufen, ohne sich gegenseitig zu überschreiben. Eine
 einzelne gemeinsame Datei wäre einfacher zu lesen, aber der zweite Schreiber löschte den
 Fortschritt des ersten — bei parallelen Scans ist das kein Randfall, sondern der Normalfall.
+Geschrieben wird **atomar**: erst eine Temp-Datei im selben Verzeichnis, dann `rename`.
+Sonst sähe ein Leser, der während des Laufs nachschaut, irgendwann eine halbe Datei.
 
-Wer den Gesamtstand wissen will, liest `run.json` für die Festlegung und die Dateien unter
-`entries/` für den Fortschritt. Der Zustand in `run.json` ist der des Laufs, nicht die
-Summe der Einträge.
+Dass das Ausführen `run.json` nicht anfasst, erspart eine Sperre je Lauf. Zwei
+gleichzeitige Aufrufe kollidieren nur, wenn sie denselben Eintrag nennen — das ist
+derselbe Fall wie der wiederholte Aufruf, und er gilt als überschreibend, nicht als
+ergänzend.
+
+**Der Gesamtzustand wird beim Lesen abgeleitet**, aus den Dateien unter `entries/`;
+eine fehlende Datei zählt als `start`. Sind alle Einträge `start`, ist der Lauf
+`created`; sind alle in einem Endzustand, ist er `done`; sonst `running`.
+
+**Vorrangregel:** Weichen der Zustand in `run.json` und der unter `entries/` voneinander
+ab, gilt `entries/`. `run.json` hält fest, was ausgewählt wurde, nicht, wie weit es ist.
 
 ## `run.json`
 
@@ -87,7 +111,9 @@ Für den Lauf:
 | `created` | angelegt, noch nichts gestartet |
 | `running` | mindestens ein Eintrag läuft oder ist fertig |
 | `done` | alle Einträge sind durch |
-| `failed` | der Lauf wurde abgebrochen |
+
+Einen Laufzustand `failed` gibt es nicht: ein technischer Fehlschlag steht am Eintrag,
+nicht am Lauf. Ein Lauf, in dem ein Werkzeug scheitert, ist trotzdem durch.
 
 Für einen Eintrag:
 
@@ -100,7 +126,97 @@ Für einen Eintrag:
 | `skipped` | übersprungen, etwa weil das Werkzeug fehlt |
 
 `failed` meint immer den **technischen** Fehlschlag, nie einen Befund. Ein Scanner, der
-Probleme findet, ist `done` — das ist seine Aufgabe.
+Probleme findet, ist `done` — das ist seine Aufgabe. Fast alle Scanner enden mit einem
+Exit-Code ungleich 0, sobald sie etwas gefunden haben; maßgeblich ist deshalb nicht der
+Code, sondern ob lesbares SARIF vorliegt.
+
+## Einen Eintrag ausführen
+
+```text
+k-playbook scan <lauf> [eintrag …]
+```
+
+Ohne Eintragsangabe laufen alle Werkzeug-Einträge, die unter `entries/` auf `start`
+stehen. Das Kommando **blockiert**, bis alle ausgewählten Einträge durch sind; der
+Fortschritt wird währenddessen allein aus `entries/` gelesen.
+
+**Nur `kind: tool`.** Ein `ai`-Eintrag bleibt unangetastet auf `start` — ihn führt ein
+Assistent über seinen Command aus, und dabei entsteht auch erst seine Datei. Wird er
+ausdrücklich genannt, sagt das Kommando das auf stderr und lässt ihn stehen.
+
+### Der Eintrag ist das Werkzeug, der Job ist der Aufruf
+
+Ein Eintrag ist ein Werkzeug aus der Matrix. Wie dieses Werkzeug aufgerufen wird, steht
+in [`scripts/scanners.tsv`](../scripts/scanners.tsv) — eine Zeile je **Job**, mit
+Sprachen, Zeitgrenze und dem Aufruf samt Platzhaltern. Ein Werkzeug kann mehrere Jobs
+haben, einen oder gar keinen:
+
+| Ebene | Name | Datei |
+|---|---|---|
+| Eintrag | `trivy` | `entries/trivy.json` |
+| Job | `trivy-fs`, `trivy-config` | `raw/trivy-fs.sarif`, `raw/trivy-config.sarif` |
+
+Wer einen Lauf zusammenstellt, sieht davon nichts: die Oberfläche bietet Werkzeuge an,
+keine Jobs. Ein Job, dessen Sprache nicht gewählt ist, dessen Werkzeug fehlt oder der
+kein SARIF liefern kann, wird `skipped` mit Grund — nicht `failed`.
+
+Das Programm eines Jobs kommt aus dem Preflight (`install-security-tools.sh --json`),
+nicht aus einer eigenen PATH-Auflösung: sonst griffe der Lauf in einem Python-Projekt
+mit aktivem venv dessen `ruff` und prüfte damit ein anderes Werkzeug als der Preflight
+([`rules/tool-install-scope.md`](../rules/tool-install-scope.md)).
+
+Jobs laufen parallel, mit einer Obergrenze über den ganzen Lauf. **Sie schreiben nicht
+selbst**: sie melden ihr Ergebnis an ihren Eintrag, und der schreibt seine Datei. Damit
+bleibt es bei einem Schreiber je Datei.
+
+### Aus n Jobs wird ein Eintragszustand
+
+Zuerst die Frage, ob der Eintrag überhaupt durch ist; erst danach die nach dem Ausgang:
+
+0. Läuft noch ein Job oder steht einer aus → `running`.
+1. Sonst mindestens ein Job `failed` → `failed`.
+2. Sonst mindestens ein Job `done` → `done`.
+3. Sonst → `skipped`.
+
+Regel 0 steht voran, weil ein laufender Eintrag sonst über Regel 3 als `skipped` gälte —
+und der Lauf daraus ein `done` machte, während er noch läuft. `done` steht über
+`skipped`, weil ein streng schlechtester Ausgang `gitleaks` zu `skipped` machte, sobald
+`gitleaks-dir` übersprungen wird, und damit die Datei versteckte, die `gitleaks-git`
+tatsächlich geschrieben hat. `skipped` heißt deshalb genau eins: der Eintrag ist durch,
+und kein einziger Job ist gelaufen — auch der Fall „gar kein Job", wie bei `syft`, das
+eine SBOM erzeugt und keine Befunde.
+
+### `entries/<name>.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "trivy",
+  "kind": "tool",
+  "state": "done",
+  "started": "2026-08-13T09:12:04+02:00",
+  "finished": "2026-08-13T09:13:41+02:00",
+  "jobs": [
+    { "job": "trivy-fs",     "state": "done",    "exitCode": 1, "sarif": "raw/trivy-fs.sarif",
+      "findings": 12, "started": "…", "finished": "…" },
+    { "job": "trivy-config", "state": "skipped", "reason": "Sprache nicht gewählt" }
+  ]
+}
+```
+
+Der Eintrag trägt seinen abgeleiteten Zustand, darunter bleiben die Jobs einzeln
+sichtbar: Der Gesamtzustand ist die Kurzfassung, nicht die einzige Auskunft. `exitCode`
+und `findings` fehlen, wo nichts gemessen wurde — 0 hieße hier „gemessen und null".
+`reason` steht bei `skipped` und `failed`; ein Werkzeug ohne Job trägt ihn am Eintrag,
+weil es keinen Job gibt, an dem er stehen könnte.
+
+**Geschrieben wird schon beim Start**, mit dem Zustand `running`, und danach bei jeder
+Zustandsänderung eines Jobs. Läge die Datei erst am Ende, wäre der Fortschritt während
+des Laufs nicht lesbar, und der abgeleitete Laufzustand spränge von `created` direkt auf
+`done`.
+
+**Wiederholbar.** Ein zweiter Aufruf über denselben Eintrag überschreibt seine Dateien,
+statt danebenzuschreiben oder abzubrechen.
 
 ## Die Oberfläche
 
@@ -115,4 +231,5 @@ Dort wird auch ein neuer Lauf zusammengestellt:
   Abgeschaltete Einträge fehlen.
 
 „Erstellen" legt das Verzeichnis und `run.json` an. Mehr nicht: **das Anlegen startet
-nichts.** Wie ein einzelner Eintrag läuft, ist ein eigener Schritt.
+nichts.** Gestartet wird im Terminal, mit `k-playbook scan` — einen Knopf dafür gibt es
+in der Oberfläche bewusst noch nicht.
