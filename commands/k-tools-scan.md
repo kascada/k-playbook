@@ -1,5 +1,5 @@
 ---
-description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under k-playbook-local/docs/libs/, plus an index. Focuses on pitfalls and idioms, NOT copy-paste snippets.
+description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under k-playbook-local/docs/libs/. Focuses on pitfalls and idioms, NOT copy-paste snippets.
 argument-hint: [scope-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
@@ -16,30 +16,42 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Second step after `/k-code2docs`. Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one per non-trivial tool.
+Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one
+per non-trivial tool. The index over these files is built by `/k-docs-index`; this command
+does not write it.
 
 Produces:
 - `k-playbook-local/docs/libs/<name>.md` — pro Tool eine Datei mit Frontmatter (`lib`, `version`, `severity`, `last-reviewed`).
-- `k-playbook-local/docs/libs/README.md` — Index-Datei für Libs (Übersichtstabelle + Kurzbeschreibung).
-- Ergänzt `k-playbook-local/docs/README.md` um eine Sektion „Libs & Stack" mit Link auf `libs/README.md`.
+- `k-playbook-local/docs/libs/README.md` — nur der kurze Erklärtext des Verzeichnisses, und nur wenn die Datei fehlt. Keine Übersichtstabelle: die steht im Index.
+
+Nothing else. This command writes only inside its own directory `docs/libs/`.
 
 **Fokus:** Pitfalls, Auth-Quirks, Concurrency-Fallen, Version-Migrations-Notes, empfohlene Idiome. **Kein** Copy-Paste-Tutorial — dafür gibt es die offiziellen Docs.
 
-## Step 1 — Resolve paths
+## Schritt 1 — Pfade auflösen
 
 From the context output:
 
-- `RESOLVED_DOCS_DIR = <local.dir>/docs`.
-- `DOCS_DISPLAY_PATH = k-playbook-local/docs`.
+- `RESOLVED_DOCS_DIR = <local.dir>/docs`
+- `DOCS_DISPLAY_PATH = k-playbook-local/docs`
+- `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs`
+- `LIBS_DISPLAY_PATH = k-playbook-local/docs/libs`
 
-If `RESOLVED_DOCS_DIR` is missing on disk: abort and tell the user to run `/k-gui`.
-Use `RESOLVED_DOCS_DIR` for all reads and writes.
+Use `LIBS_DIR` for all doc writes.
 
-`LIBS_DIR` = `<RESOLVED_DOCS_DIR>/libs`.
+Command-specific policy:
 
-If `<RESOLVED_DOCS_DIR>/README.md` does not exist or is unpopulated: warnen und dem User empfehlen, zuerst `/k-code2docs` zu laufen — dann bricht die Lib-Doku in eine leere Index-Struktur ein und wird schlechter auffindbar. Weiter nur nach ausdrücklicher Bestätigung.
+- If `RESOLVED_DOCS_DIR` is missing on disk: ask whether to create exactly that directory
+  now or to run `/k-gui`. Do not use a fallback path and do not abort hard.
+- `LIBS_DIR` is this command's own producer directory. Create it without asking if it is
+  missing — before the first run that is the normal state, not a broken installation.
+- There is no precondition on `/k-code2docs` and none on the main index. The index is
+  built separately by `/k-docs-index`, so this command runs standalone.
+- Write nothing outside `LIBS_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
+  belong to `/k-docs-index`; `docs/code/`, `docs/extracted/` and `docs/manual/` belong to
+  other producers and are not touched here.
 
-## Step 2 — Scope klären
+## Schritt 2 — Scope klären
 
 Ask (bundled, one message):
 
@@ -47,7 +59,7 @@ Ask (bundled, one message):
 2. Zusätzliche Quellen einbeziehen? (Default an: `Dockerfile*`, `docker-compose*.y{a,}ml`, `.github/workflows/*.yml`, `.gitlab-ci.yml`. Signal: welche System-Tools/Runtimes/Services sind implizit dabei.)
 3. Ausschlüsse — wie in `/k-code2docs`: gleiches Default-Set + `.gitignore`.
 
-## Step 3 — Detect (automatisch, still)
+## Schritt 3 — Erkennen (automatisch, still)
 
 Sammle für **jedes** gefundene Paket / Tool:
 
@@ -58,11 +70,11 @@ Sammle für **jedes** gefundene Paket / Tool:
 - **Nutzung im Code** — grep nach Import-Statement (Sprache-passend: Python `import <name>|from <name>`, JS `require\(['"]<name>|from ['"]<name>`, Go `"<pfad>"` in `import`, …). Zähle:
   - `file_count` — wie viele Dateien importieren
   - `import_count` — Gesamtvorkommen
-- **Doku-Signale** — README/Doku im Repo, das ausdrücklich das Tool erwähnt (best-effort grep im `<RESOLVED_DOCS_DIR>` und `README.md`).
+- **Doku-Signale** — Doku im Repo, die ausdrücklich das Tool erwähnt (best-effort grep im Projekt-`README.md` und in `<RESOLVED_DOCS_DIR>/code/`; nur lesend).
 
 **Nicht** ins Detail gehen bei transitiven Paketen und bei Standard-Test/Lint/Format-Tools — die werden gleich als `C` klassifiziert.
 
-## Step 4 — Score & Classify
+## Schritt 4 — Score und Klassifikation
 
 Pro Kandidat einen Score berechnen (Heuristik, transparent halten):
 
@@ -85,7 +97,7 @@ Daraus die Klassifikation:
 
 Die Known-Pitfall-Liste ist eine **eingebettete Konstante** dieses Commands — sie darf hier ergänzt werden, aber nicht projektspezifisch ausgehebelt werden. Ergänzungen bewusst pflegen.
 
-## Step 5 — Präsentation & User-Auswahl
+## Schritt 5 — Präsentation und Auswahl
 
 **Kompakte** Tabelle. Nur A und B einzeln, C als aggregierte Zeile. Format:
 
@@ -120,9 +132,9 @@ Kommandos:
 
 Kein Ping-Pong pro Tool — der User macht seine Auswahl in einer Nachricht, dann weiter.
 
-## Step 6 — Re-Run-Verhalten klären (falls Dateien existieren)
+## Schritt 6 — Re-Run-Verhalten klären
 
-Bevor recherchiert wird: prüfen welche `<LIBS_DIR>/<name>.md` bereits existieren, für die jetzt eine Auswahl steht. Wenn ≥ 1 Kollision: **einmalig global** fragen (nicht pro Datei):
+Nur wenn Dateien existieren. Bevor recherchiert wird: prüfen welche `<LIBS_DIR>/<name>.md` bereits existieren, für die jetzt eine Auswahl steht. Wenn ≥ 1 Kollision: **einmalig global** fragen (nicht pro Datei):
 
 ```
 Für <N> ausgewählte Tools existiert bereits eine Doku-Datei:
@@ -139,14 +151,14 @@ Wie vorgehen?
 
 Bei `(a)` und `(c)`: **immer vor dem Überschreiben Diff zeigen**, User bestätigt Übernahme.
 
-## Step 7 — Recherche pro Tool (gestaffelt)
+## Schritt 7 — Recherche pro Tool
 
-Für jedes ausgewählte Tool (in Batches, damit der User Fortschritt sieht; ~3 pro Zwischen-Nachricht):
+Für jedes ausgewählte Tool gestaffelt (in Batches, damit der User Fortschritt sieht; ~3 pro Zwischen-Nachricht):
 
 **Basis (immer):**
 - Rolle im Projekt aus Code-Nutzung + LLM-Wissen ableiten.
 - 2–3 Kernstellen im Code identifizieren (`pfad:zeile`).
-- Version-Klassifikation aus Step 3 übernehmen.
+- Version-Klassifikation aus Schritt 3 übernehmen.
 
 **Klassifikation A — zusätzlich Web-Recherche (gezielt, sparsam):**
 - `WebFetch` auf **offizielle Doku-Startseite** der Version.
@@ -159,9 +171,9 @@ Für jedes ausgewählte Tool (in Batches, damit der User Fortschritt sieht; ~3 p
 
 **Keine breite Web-Recherche.** Timeout / begrenzt / gezielt. Ein A-Tool sollte insgesamt ≤ 3 WebFetch-Aufrufe brauchen.
 
-## Step 8 — Datei-Struktur pro Tool
+## Schritt 8 — Dateien schreiben
 
-Feste Vorlage. Nichts erfinden was nicht da ist.
+Feste Vorlage pro Tool, `<LIBS_DIR>/<name>.md`. Nichts erfinden was nicht da ist.
 
 ```markdown
 ---
@@ -214,7 +226,7 @@ sources:
 
 ## Verwandte Docs
 
-- [../<NN>-<slug>.md](../<NN>-<slug>.md) — <in welchem Zusammenhang>
+- [../code/<NN>-<slug>.md](../code/<NN>-<slug>.md) — <in welchem Zusammenhang>
 - [./<other-lib>.md](./<other-lib>.md)
 
 ## Offene Fragen
@@ -224,15 +236,15 @@ sources:
 
 **Regeln:**
 - Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-tools-scan` erhalten.
+- `generated.by` ist immer `k-tools-scan`. Der Index prüft das gegen das Verzeichnis; ein anderer Wert in `docs/libs/` ist ein Befund.
+- `version`, `severity` und `last-reviewed` sind Pflicht: `/k-docs-index` baut daraus die Übersichtstabelle „Libs & Stack". Fehlt eines, fehlt die Zeile im Index.
 - `sources` im Frontmatter nur für tatsächlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
 - **Keine** Tutorials, keine „Getting Started"-Snippets.
 - Pitfalls sind **konkret** (mit Ursache und Symptom), nicht allgemein („kann Fehler werfen").
 - Wenn kein Pitfall gefunden — dann ehrliche Aussage: „Kein projektrelevanter Pitfall bekannt in dieser Version." Nicht Pitfalls erfinden.
 - **Severity im Frontmatter** ist projektspezifisch: wie kritisch das Tool für dieses Projekt ist, nicht wie riskant die Lib generell.
 
-## Step 9 — `libs/README.md` bauen
-
-Nach Fertigstellung aller Lib-Files:
+**Erklärtext des Verzeichnisses.** Fehlt `<LIBS_DIR>/README.md`, lege sie mit genau diesem Inhalt an. Existiert sie, bleibt sie unangetastet — auch dann, wenn sie noch eine alte Übersichtstabelle enthält; die räumt `/k-docs-index` nach Bestätigung auf.
 
 ```markdown
 # Libs & Stack
@@ -240,55 +252,31 @@ Nach Fertigstellung aller Lib-Files:
 Kuratierte Referenz zu den nicht-trivialen Libraries und Tools dieses Projekts.
 Fokus: Pitfalls und Idiome — kein Ersatz für offizielle Doku.
 
-Erzeugt / aktualisiert von `/k-tools-scan`.
-
-## Übersicht
-
-| Lib | Version | Severity | Letzter Review |
-|-----|---------|----------|----------------|
-| [fastapi](fastapi.md) | 0.115.0 | high | 2026-07-12 |
-| [sqlalchemy](sqlalchemy.md) | 2.0.35 | high | 2026-07-12 |
-| ... | ... | ... | ... |
-
-## Nicht dokumentiert (bewusste Auswahl)
-
-Standard-Test/Lint/Format sowie Trivial-Utilities werden nicht gesondert
-dokumentiert. Falls doch ein Pitfall auftaucht: Datei per `/k-tools-scan add`
-nachziehen.
-
-Übersprungen bei letztem Lauf (Ausschnitt): pytest, ruff, black, mypy,
-click, python-dotenv, colorama, isort, pre-commit, coverage, hypothesis,
-requests.
+Erzeugt von `/k-tools-scan`. Die Übersichtstabelle steht im Index unter
+[`../README.md`](../README.md).
 ```
 
-## Step 10 — `<RESOLVED_DOCS_DIR>/README.md` verlinken
-
-Im Haupt-Index eine Sektion **„Libs & Stack"** anlegen oder aktualisieren:
-
-```markdown
-## Libs & Stack
-
-Kuratierte Referenz zu Libraries und Tools. Fokus: Pitfalls, nicht Tutorials.
-
-→ [libs/README.md](libs/README.md)
-```
-
-Und im Stichwort-Index Einträge für die Lib-Namen ergänzen (`fastapi`, `sqlalchemy`, …) → `libs/<name>.md`.
-
-**Beim Ändern des Haupt-Index:** wie überall im Playbook — Bestehendes nicht schweigend überschreiben. Ergänze punktuell und zeige dem User was hinzukommt / sich ändert.
-
-## Step 11 — Abschluss
+## Schritt 9 — Abschluss
 
 Kompakte Zusammenfassung:
 
 - Erkannt: N direkte + M transitive Pakete.
 - Klassifiziert: A=x, B=y, C=z.
 - Ausgewählt für Recherche: k Tools.
-- Geschrieben / aktualisiert: `<LIBS_DIR>/` (Liste).
-- `<LIBS_DIR>/README.md` (neu / aktualisiert).
-- `<RESOLVED_DOCS_DIR>/README.md` — Sektion „Libs & Stack" (neu / aktualisiert), Stichwort-Index um x Einträge ergänzt.
+- Geschrieben / aktualisiert in `LIBS_DISPLAY_PATH` (Liste).
+- `<LIBS_DIR>/README.md`: neu angelegt / unverändert vorhanden.
 - Offene Fragen: Zusammenfassung, wenn welche in den Files stehen.
-- Hinweis: Bei größeren Upgrades später erneut `/k-tools-scan` laufen — Re-Run-Verhalten ist in Step 6 dokumentiert.
+- Ausdrücklich: außerhalb von `LIBS_DISPLAY_PATH` wurde nichts geschrieben.
+- Hinweis: Bei größeren Upgrades später erneut `/k-tools-scan` laufen — das Re-Run-Verhalten steht in Schritt 6.
+- Folge-Command: **`/k-docs-index`** — nimmt `version`, `severity` und `last-reviewed` aus den geschriebenen Dateien und baut daraus die Sektion „Libs & Stack" im einzigen Index `k-playbook-local/docs/README.md`. Ohne diesen Lauf tauchen die neuen Lib-Dateien nirgends auf.
+
+## Fehlerfälle
+
+- `RESOLVED_DOCS_DIR` fehlt → fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen. Kein Ersatzpfad, kein harter Abbruch.
+- Kein Manifest gefunden → melden, welche Dateinamen gesucht wurden, und stoppen. Keine Dependencies aus Import-Statements erfinden.
+- Alle Kandidaten fallen in Klasse C → das sagen und stoppen. Ein Lib-Doc über `click` ist keine Arbeit wert.
+- `WebFetch` schlägt fehl oder liefert nichts Brauchbares → die Datei aus LLM-Wissen schreiben, die Lücke im Fragen-Block benennen und `sources` nicht mit einer nicht gelesenen URL füllen.
+- Diff bestätigt der User nicht → Datei unverändert lassen, im Abschluss als übersprungen führen.
 
 ## Anti-Muster (nicht tun)
 
@@ -299,3 +287,5 @@ Kompakte Zusammenfassung:
 - **Silent overwrite.** Existierende Files nur mit Diff-Anzeige und Bestätigung ersetzen.
 - **C-Liste einzeln durchgehen.** C ist per Definition „nicht gesondert dokumentiert" — außer der User pickt bewusst raus.
 - **Trivial-Recherche für Framework.** Wenn ein A-Tool nur einen Standard-Absatz bekommt: entweder Recherche vertiefen oder auf B herabstufen.
+- **Eine zweite Übersichtstabelle bauen.** `libs/README.md` ist ein Erklärtext, kein Index. Es gibt genau einen Index, und den schreibt `/k-docs-index`.
+- **Den Haupt-Index anfassen.** `docs/README.md` gehört einem anderen Command; eine hier eingefügte Sektion ist beim nächsten `/k-docs-index` weg.
