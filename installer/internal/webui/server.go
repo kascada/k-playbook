@@ -47,6 +47,8 @@ type serverState struct {
 // Run startet den lokalen Server und blockiert, bis der Client sich
 // abmeldet, verschwindet oder Ctrl+C gedrückt wird.
 func Run() error {
+	protectProjectInstallation()
+
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return fmt.Errorf("GUI-Port öffnen: %w", err)
@@ -87,6 +89,16 @@ func Run() error {
 		return fmt.Errorf("GUI-Server stoppen: %w", err)
 	}
 	return nil
+}
+
+func protectProjectInstallation() {
+	environment := project.Detect()
+	if !environment.Installed || !environment.PlaybookPresent {
+		return
+	}
+	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Installation konnte nicht read-only gesetzt werden: %v\n", err)
+	}
 }
 
 // announce gibt die URL aus und öffnet den Browser, sofern das hier

@@ -258,7 +258,7 @@ type UpdateResult struct {
 // Markierung sagt, woher der Inhalt kommt — aus `make installer-sync`, also aus
 // dem Arbeitsstand. Verworfen wird eine Kopie, keine Arbeit. Ohne Markierung
 // bleibt es bei der Verweigerung, denn dann laesst sich das nicht wissen.
-func DiscardDevSync(projectDir string) error {
+func DiscardDevSync(projectDir string) (err error) {
 	dir := PlaybookDir(projectDir)
 	if !fileExists(filepath.Join(dir, DevSyncMarker)) {
 		return fmt.Errorf("in %s liegt kein eingespielter Arbeitsstand", DisplayPath(dir))
@@ -266,6 +266,10 @@ func DiscardDevSync(projectDir string) error {
 	if !isDir(filepath.Join(dir, ".git")) {
 		return fmt.Errorf("%s ist kein Git-Repository", DisplayPath(dir))
 	}
+	if err := setInstallationWritable(projectDir); err != nil {
+		return fmt.Errorf("Installation beschreibbar machen: %w", err)
+	}
+	defer keepInstallationReadOnly(projectDir, &err)
 
 	// Zuerst die Markierung: bricht ein Git-Aufruf danach ab, steht der
 	// Zustand wenigstens nicht mehr als Entwicklungsstand da, waehrend er
@@ -293,7 +297,7 @@ func DiscardDevSync(projectDir string) error {
 //
 // Nur `--ff-only`: ein Merge im Clone würde eine lokale Historie erzeugen, die
 // niemand pflegt. Wer dort committet hat, soll das selbst auflösen.
-func Update(projectDir string) (UpdateResult, error) {
+func Update(projectDir string) (result UpdateResult, err error) {
 	dir := PlaybookDir(projectDir)
 
 	// Vorher prüfen statt hinterher stolpern. `git pull` scheitert an einer
@@ -305,6 +309,10 @@ func Update(projectDir string) (UpdateResult, error) {
 	}
 
 	before := binaryHashes(dir)
+	if err := setInstallationWritable(projectDir); err != nil {
+		return UpdateResult{}, fmt.Errorf("Installation beschreibbar machen: %w", err)
+	}
+	defer keepInstallationReadOnly(projectDir, &err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
 	defer cancel()
@@ -321,7 +329,7 @@ func Update(projectDir string) (UpdateResult, error) {
 		return UpdateResult{Output: text}, fmt.Errorf("git pull --ff-only fehlgeschlagen")
 	}
 
-	result := UpdateResult{Output: text}
+	result = UpdateResult{Output: text}
 	result.BinaryChanged = !sameHashes(before, binaryHashes(dir))
 	return result, nil
 }
@@ -374,6 +382,7 @@ func sameHashes(before map[string]string, after map[string]string) bool {
 func GitOutput(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err

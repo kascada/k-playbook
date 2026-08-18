@@ -111,11 +111,12 @@ nicht angefasst. Solange der steht, sieht Claude Code vom Playbook nichts.
 ## Aktualisieren
 
 Die Oberfläche prüft nach dem Start, ob die Installation hinter dem Remote liegt, und
-zieht auf Knopfdruck nach. Von Hand geht es genauso:
+zieht auf Knopfdruck nach. Dabei wird `k-playbook/` nur für den Pull beschreibbar gemacht
+und danach wieder read-only gesetzt. Von Hand geht es genauso:
 
 ```bash
-cd /pfad/zum/projekt/k-playbook
-git pull --ff-only
+cd /pfad/zum/projekt
+make -C k-playbook installer-update
 ```
 
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar.

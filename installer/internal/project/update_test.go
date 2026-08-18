@@ -23,6 +23,9 @@ func newGitInstallation(t *testing.T) (projectDir string, remoteDir string) {
 
 	projectDir = filepath.Join(base, "projekt")
 	dir := PlaybookDir(projectDir)
+	t.Cleanup(func() {
+		_ = setInstallationWritable(projectDir)
+	})
 	if err := os.MkdirAll(filepath.Join(dir, "dist"), 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
@@ -50,6 +53,18 @@ func run(t *testing.T, dir string, name string, args ...string) {
 	}
 }
 
+func assertNotWritable(t *testing.T, path string) {
+	t.Helper()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("%s stat: %v", path, err)
+	}
+	if info.Mode().Perm()&0o222 != 0 {
+		t.Fatalf("%s ist beschreibbar: %o", path, info.Mode().Perm())
+	}
+}
+
 func TestCheckUpdateOhneNeuerung(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 
@@ -67,6 +82,9 @@ func TestCheckUpdateOhneNeuerung(t *testing.T) {
 
 func TestCheckUpdateErkenntNeuenStand(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
+	if err := SetInstallationReadOnly(projectDir); err != nil {
+		t.Fatalf("Installation sperren: %v", err)
+	}
 
 	// Ein zweiter Clone schiebt einen Commit ins Remote.
 	other := filepath.Join(t.TempDir(), "anderer")
@@ -90,6 +108,48 @@ func TestCheckUpdateErkenntNeuenStand(t *testing.T) {
 	if status.Local == status.Remote {
 		t.Error("Local und Remote sind gleich, obwohl ein Commit dazukam")
 	}
+}
+
+func TestSetInstallationReadOnlyEntziehtSchreibrechte(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+	dir := PlaybookDir(projectDir)
+
+	if err := SetInstallationReadOnly(projectDir); err != nil {
+		t.Fatalf("SetInstallationReadOnly: %v", err)
+	}
+
+	assertNotWritable(t, filepath.Join(dir, "dist", "k-playbook-linux-amd64"))
+	assertNotWritable(t, filepath.Join(dir, ".git", "config"))
+}
+
+func TestUpdateMachtReadOnlyInstallationTemporärBeschreibbar(t *testing.T) {
+	projectDir, remoteDir := newGitInstallation(t)
+	dir := PlaybookDir(projectDir)
+
+	other := filepath.Join(t.TempDir(), "anderer")
+	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
+	run(t, other, "git", "config", "user.email", "test@example.com")
+	run(t, other, "git", "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(other, "doku.md"), []byte("neu"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	run(t, other, "git", "add", "-A")
+	run(t, other, "git", "commit", "-m", "neuer Stand")
+	run(t, other, "git", "push")
+
+	if err := SetInstallationReadOnly(projectDir); err != nil {
+		t.Fatalf("Installation sperren: %v", err)
+	}
+	result, err := Update(projectDir)
+	if err != nil {
+		t.Fatalf("Update: %v\n%s", err, result.Output)
+	}
+
+	if !fileExists(filepath.Join(dir, "doku.md")) {
+		t.Error("Update hat den neuen Stand nicht eingespielt")
+	}
+	assertNotWritable(t, filepath.Join(dir, "doku.md"))
+	assertNotWritable(t, filepath.Join(dir, ".git", "config"))
 }
 
 // Nur wenn sich die Binaries ändern, bringt ein Neustart eine andere Version.

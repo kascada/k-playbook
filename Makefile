@@ -17,9 +17,10 @@ INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 # Stand, nicht den, an dem gerade gearbeitet wird — und die Oberflaeche liest
 # Skripte, Regeln und Reviews immer von dort.
 PLAYBOOK_DIR := k-playbook
+INSTALLATION_DIR := $(if $(wildcard $(PLAYBOOK_DIR)/.git),$(PLAYBOOK_DIR),.)
 DEV_MARKER := .k-playbook-devsync
 
-.PHONY: help build dist gui test installer-build installer-run installer-test installer-sync
+.PHONY: help build dist gui test installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -71,26 +72,35 @@ endef
 # .claude/settings.local.json.
 installer-sync: ## Spielt den Arbeitsstand in die Installation ein (nur Entwicklungsrepo)
 	$(require_dev_repo)
-	@git -C "$(PLAYBOOK_DIR)" checkout -- .
-	@git -C "$(PLAYBOOK_DIR)" clean -qfd
-	@git ls-files -z | rsync -a --from0 --files-from=- --delete-missing-args ./ "$(PLAYBOOK_DIR)/"
-	@# `git checkout` oben stellt wieder her, was im Arbeitsstand bereits
-	@# entfernt wurde. Was git nicht mehr fuehrt, muss auch hier verschwinden —
-	@# sonst zeigt die Oberflaeche eine geloeschte Regel weiter an.
 	@set -eu; \
+	  trap 'chmod -R a-w "$(PLAYBOOK_DIR)"' EXIT; \
+	  chmod -R u+w "$(PLAYBOOK_DIR)"; \
+	  git -C "$(PLAYBOOK_DIR)" checkout -- .; \
+	  git -C "$(PLAYBOOK_DIR)" clean -qfd; \
+	  git ls-files -z | rsync -a --from0 --files-from=- --delete-missing-args ./ "$(PLAYBOOK_DIR)/"; \
 	  soll="$$(mktemp)"; ist="$$(mktemp)"; \
 	  git ls-files | sort > "$$soll"; \
 	  (cd "$(PLAYBOOK_DIR)" && find . -path ./.git -prune -o \( -type f -o -type l \) -print) \
 	    | sed 's|^\./||' | grep -vx '$(DEV_MARKER)' | sort > "$$ist"; \
 	  comm -13 "$$soll" "$$ist" | while IFS= read -r path; do rm -f "$(PLAYBOOK_DIR)/$$path"; done; \
-	  rm -f "$$soll" "$$ist"
-	@# -delete schaltet -depth ein, und damit wirkt -prune nicht mehr. Das
-	@# Repository wird deshalb ueber den Pfad ausgeschlossen, nicht abgeschnitten.
-	@find "$(PLAYBOOK_DIR)" -depth -type d -empty \
-	  ! -path "$(PLAYBOOK_DIR)/.git" ! -path "$(PLAYBOOK_DIR)/.git/*" -delete
-	@printf 'Eingespielter Arbeitsstand, kein Clone.\nEntstanden durch "make installer-sync".\nZurueck: in der Oberflaeche "Arbeitsstand verwerfen".\n' \
-	  > "$(PLAYBOOK_DIR)/$(DEV_MARKER)"
+	  rm -f "$$soll" "$$ist"; \
+	  find "$(PLAYBOOK_DIR)" -depth -type d -empty \
+	    ! -path "$(PLAYBOOK_DIR)/.git" ! -path "$(PLAYBOOK_DIR)/.git/*" -delete; \
+	  printf 'Eingespielter Arbeitsstand, kein Clone.\nEntstanden durch "make installer-sync".\nZurück: in der Oberfläche "Arbeitsstand verwerfen".\n' \
+	    > "$(PLAYBOOK_DIR)/$(DEV_MARKER)"
 	@echo "Arbeitsstand eingespielt nach $(PLAYBOOK_DIR)/"
+
+installer-writable: ## Macht die lokale Installation temporär beschreibbar
+	@chmod -R u+w "$(INSTALLATION_DIR)"
+
+installer-readonly: ## Sperrt Schreibzugriffe auf die lokale Installation
+	@chmod -R a-w "$(INSTALLATION_DIR)"
+
+installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
+	@set -eu; \
+	  trap 'chmod -R a-w "$(INSTALLATION_DIR)"' EXIT; \
+	  chmod -R u+w "$(INSTALLATION_DIR)"; \
+	  git -C "$(INSTALLATION_DIR)" pull --ff-only
 
 gui: dist installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
 	"$(INSTALLER_WRAPPER)"

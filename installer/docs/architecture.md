@@ -553,12 +553,21 @@ Oberfläche blockiert.
 
 `Update()` holt den Stand per `git pull --ff-only`. Nur Fast-Forward: ein Merge im Clone
 erzeugte eine lokale Historie, die niemand pflegt. Wer dort committet hat, soll das selbst
-auflösen.
+auflösen. Die Installation ist normalerweise read-only; `Update()` macht sie unmittelbar
+vor dem Pull für den Eigentümer beschreibbar und setzt sie per `defer` danach wieder
+read-only.
+
+Beim Start der Oberfläche ruft `protectProjectInstallation()` denselben Schutz auf. Das
+ist keine Sicherheitsgrenze gegen den Besitzer des Verzeichnisses, sondern eine wirksame
+Barriere gegen versehentliche Schreibwerkzeuge: in `k-playbook/` wird nur noch in
+gezielten Wartungswegen geschrieben.
 
 ### Die Installation muss sauber sein
 
 `CheckCleanliness()` liest bei jeder Prüfung den lokalen Zustand des Clones mit — rein
-lokal, ohne Netz, deshalb billig genug für den ungefragten Lauf nach dem Start.
+lokal, ohne Netz, deshalb billig genug für den ungefragten Lauf nach dem Start. Die
+Git-Aufrufe laufen mit `GIT_OPTIONAL_LOCKS=0`, damit die rein lesende Prüfung auch in
+einem read-only gesetzten Clone nicht am Index-Lock scheitert.
 
 Der Grund ist ein stiller Fehlerfall. Das Modell verlangt, dass in `k-playbook/` nie
 geschrieben wird, aber die Regel erzwingt sich nicht. Ändert sich eine lokal veränderte

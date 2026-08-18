@@ -61,6 +61,10 @@ func createConfigHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, configState("Nicht angelegt: "+err.Error()))
 		return
 	}
+	if err := project.SetInstallationReadOnly(request.ProjectDir); err != nil {
+		writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt. Hinweis: Installation konnte nicht read-only gesetzt werden: "+err.Error()))
+		return
+	}
 
 	writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt."))
 }
@@ -93,6 +97,9 @@ func resetConfigHandler(w http.ResponseWriter, r *http.Request) {
 	state := configState(project.ConfigFileName + " neu angelegt, die alte Datei liegt als " +
 		filepath.Base(result.BackupPath) + " daneben.")
 	state.BackupPath = result.BackupPath
+	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
+		state.Message += " Hinweis: Installation konnte nicht read-only gesetzt werden: " + err.Error()
+	}
 	writeJSON(w, http.StatusOK, state)
 }
 

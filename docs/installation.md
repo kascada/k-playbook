@@ -306,20 +306,27 @@ Werkzeugen, die der Server tatsächlich anbietet. Alles dazu steht in
 
 Der bequeme Weg ist die Oberfläche. Sie prüft nach dem Start per `git ls-remote`, ob
 die Installation hinter dem Remote liegt, und zieht auf Knopfdruck per
-`git pull --ff-only` nach. Bewusst `ls-remote` statt `fetch`: die Prüfung läuft
+`git pull --ff-only` nach. Dafür macht sie `k-playbook/` kurz beschreibbar und setzt es
+danach wieder read-only. Bewusst `ls-remote` statt `fetch`: die Prüfung läuft
 ungefragt und darf den Zustand des Repositorys nicht anfassen. Bewusst `--ff-only`: ein
 Merge im Clone erzeugte eine lokale Historie, die niemand pflegt.
 
 Von Hand geht es genauso:
 
 ```bash
-cd /pfad/zum/projekt/k-playbook
-git pull --ff-only
+cd /pfad/zum/projekt
+make -C k-playbook installer-update
 ```
+
+Das Make-Target entspricht `chmod -R u+w k-playbook && git -C k-playbook pull --ff-only && chmod -R a-w k-playbook` und sperrt die Installation auch dann wieder, wenn der Pull fehlschlägt. Im Entwicklungsrepo funktioniert zusätzlich `make installer-update`, weil dort der Installations-Clone unter `./k-playbook/` liegt.
 
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar —
 auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen
 daneben und bleiben unberührt.
+
+Bei jedem Start der Oberfläche wird eine vorhandene Installation ebenfalls read-only
+gesetzt. Das ist nur eine lokale Schutzschicht gegen versehentliche Schreibzugriffe; das
+Update hebt sie gezielt und temporär auf.
 
 **Wurde dort trotzdem lokal gearbeitet, sagt die Oberfläche es und aktualisiert nicht.**
 Der Block `Installation` erscheint nur in diesem Fall, nennt die betroffenen Dateien und

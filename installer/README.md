@@ -47,7 +47,9 @@ dieselben Flags und liefern dasselbe Ergebnis.
 
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die
 mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren per
-`git pull --ff-only`.
+`git pull --ff-only`. Die Installation wird dabei als read-only Vendor-Clone behandelt:
+der Start der Oberfläche sperrt Schreibrechte, ein Update macht sie nur für den Pull
+temporär beschreibbar.
 
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.
