@@ -191,8 +191,10 @@ func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
 		}
 	}
 
-	// Die drei Go-Jobs: govulncheck und golangci-lint brauchen das Modul,
-	// gosec sucht seine Verzeichnisse selbst und bleibt projektweit.
+	// Die drei Go-Jobs brauchen alle das Modul. gosec stand zunächst auf
+	// target, weil es seine Verzeichnisse selbst sucht — nachgemessen prüft es
+	// so aber nichts: ohne Modulkontext kommt es über das Importieren nicht
+	// hinaus und schreibt ein leeres SARIF (0 Befunde gegen 154 im Modul).
 	workdirs := map[string]WorkdirMode{}
 	for _, scanner := range scanners {
 		workdirs[scanner.Job] = scanner.Workdir
@@ -200,7 +202,7 @@ func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
 	for job, want := range map[string]WorkdirMode{
 		"govulncheck":   WorkdirModule,
 		"golangci-lint": WorkdirModule,
-		"gosec":         WorkdirTarget,
+		"gosec":         WorkdirModule,
 	} {
 		if workdirs[job] != want {
 			t.Errorf("Job %s hat workdir %q, erwartet %q", job, workdirs[job], want)
