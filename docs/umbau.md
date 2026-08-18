@@ -103,6 +103,13 @@ Merge.
   Werkzeug-Einträge parallel aus, schreibt SARIF nach `raw/` und den Fortschritt nach
   `entries/<name>.json`. Der Eintrag bleibt dabei das Werkzeug; dass eines aus mehreren
   Jobs besteht, muss beim Zusammenstellen niemand wissen.
+- Modulgebundene Jobs lösen ihr Verzeichnis selbst auf: `workdir: module` in
+  `scanners.tsv` lässt den Ausführer die Manifeste unter dem Ziel suchen und den Job je
+  Modul einmal starten. Damit laufen `govulncheck`, `golangci-lint` und `gosec` auch in
+  Projekten, deren `go.mod` nicht in der Wurzel liegt. `gosec` stand dabei zunächst auf
+  `target` — nachgemessen prüfte es so nichts (0 statt 154 Befunde) und steht seither
+  ebenfalls auf `module`; seine Ausschlüsse für `k-playbook/` entfielen dabei ersatzlos,
+  weil die Modulsuche diese Verzeichnisse ohnehin übergeht.
 
 **Gemessen, gehört in die Scan-Jobs.** An `~/dev/Aiva/kascada` (351 Dateien, 59.000 Zeilen)
 verglichen:
@@ -168,28 +175,26 @@ verglichen:
   ihn gezielt selbst. Sonst bräuchte das Werkzeug Größengrenzen und Kürzungsregeln, und das
   sind wieder Urteile. Die Antwort trägt damit keinen Inhalt, bleibt auch bei 200 geänderten
   Dateien klein und kann nichts still verschlucken.
-- **`gosec` prüft von der Projektwurzel aus nichts.** Sein Katalog-Eintrag läuft mit
-  `workdir: target` und `./...` — Task 010 beließ ihn bewusst dort, gestützt auf die
-  Beobachtung, dass er „durchläuft, weil er seine Verzeichnisse selbst sucht". Nachgemessen
-  in diesem Repo, dessen Modul unter `installer/` liegt, stimmt das nur zur Hälfte:
+- **Ein leeres Ergebnis ist nicht von keinem Ergebnis zu unterscheiden.** Der Ausgang eines
+  Jobs hängt daran, ob lesbares SARIF vorliegt — bewusst so, weil fast alle Scanner mit
+  einem Code ungleich 0 enden, sobald sie etwas gefunden haben. Ein Werkzeug, das gar
+  nichts prüfen konnte, schreibt aber dieselbe Datei wie eines, das nichts gefunden hat:
+  Exit 0, valides SARIF, leeres `results`. Beide sind `done`.
 
-  | Aufruf | Ergebnisse |
-  |---|---|
-  | `gosec … ./...`, Arbeitsverzeichnis Projektwurzel (der Katalog-Aufruf) | **0** |
-  | `gosec -fmt=sarif -out=… ./...`, Arbeitsverzeichnis `installer/` | **154** |
+  Zweimal aufgetreten, in zwei Sprachen: `gitleaks` hätte in einem Projekt namens
+  `k-playbook` stumm 0 Befunde gemeldet, weil das Ausschlussmuster ohne Anker die ganze
+  Projektwurzel traf (in Task 004 beim Verifizieren gefunden und dort behoben). `gosec`
+  meldete aus der Projektwurzel 0 statt 154, weil ihm der Modulkontext fehlte (Task 010).
+  Beide Male fiel es nur auf, weil jemand nachgemessen hat.
 
-  gosec importiert die Verzeichnisse tatsächlich selbst — 14 Zeilen „Import directory" auf
-  stderr —, kommt ohne Modulkontext aber über das Importieren nicht hinaus: kein einziges
-  „Checking file", keine Warnung, keine Fehlermeldung, Exit 0 und valides SARIF mit einem
-  leeren `results`-Array. Der Job gilt damit zu Recht als `done`, und der Eintrag ist in
-  einem Projekt wie diesem trotzdem wertlos.
+  **Der naheliegende Weg ist versperrt.** SARIF hat mit `runs[].artifacts` und
+  `invocations` Felder für „was habe ich angefasst"; gemessen an den Dateien dieses Repos
+  füllt sie kein Werkzeug: `gosec`, `ruff`, `gitleaks` und `golangci-lint` lassen beide
+  leer, `semgrep` schreibt ein `invocations` mit nichts als `executionSuccessful: true`.
+  Aus dem SARIF selbst ist es also nicht abzulesen.
 
-  Zu klären ist zweierlei. Erstens der Aufruf: `workdir: module` würde gosec in dieselbe
-  Auffächerung nehmen wie `govulncheck` und `golangci-lint` und seine Sonderrolle
-  ersatzlos auflösen — zu prüfen ist, ob er dann in einem Projekt mit Modul in der Wurzel
-  dasselbe findet wie heute, und was aus dem Ausschluss von `k-playbook/` wird, der bei
-  modulweisem Arbeitsverzeichnis ins Leere zielt. Zweitens die allgemeinere Frage
-  dahinter: ein Werkzeug, das nichts prüfen konnte, ist hier von einem, das nichts gefunden
-  hat, nicht zu unterscheiden — beide schreiben ein leeres SARIF. Solange der Ausgang eines
-  Jobs allein an „lesbares SARIF vorhanden" hängt, bleibt diese Verwechslung möglich, und
-  sie trifft nicht nur gosec.
+  Was bleibt, steht auf der Eingangsseite: der Ausführer weiß vor dem Start, was da ist —
+  er kennt das Ziel und die Sprachauswahl des Laufs. „0 Befunde bei 40 Go-Dateien" ist
+  etwas anderes als „0 bei 0", und diese Unterscheidung braucht keine werkzeugspezifische
+  Regel. Zu klären ist, ob daraus ein Zustand wird oder eine Auskunft neben dem Zustand:
+  ein Job kann legitim nichts finden, und ein `failed` dafür wäre falsch.

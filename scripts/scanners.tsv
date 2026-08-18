@@ -37,9 +37,10 @@
 #            alles wie bisher — ein Job, unveränderter Name; bei mehreren entsteht je
 #            Modul ein Job mit abgeleitetem Namen (govulncheck-installer). Welches Modul
 #            geprüft wurde, steht in jedem Fall am Job in entries/<tool>.json.
-#            gosec behält bewusst target: es sucht seine Verzeichnisse selbst, statt Go
-#            nach dem Modul zu fragen. Seine eine SARIF-Datei trägt deshalb keine
-#            Modulzuordnung, auch wenn im Mehrmodul-Fall modulscharfe daneben liegen.
+#            gosec stand zunächst auf target, weil es seine Verzeichnisse selbst sucht.
+#            Nachgemessen prüft es so aber nichts: ohne Modulkontext kommt es über das
+#            Importieren nicht hinaus und schreibt ein valides SARIF mit leerem
+#            results-Array — 0 Befunde aus der Projektwurzel gegen 154 im Modul selbst.
 # args       Der Aufruf ohne das Programm selbst, an Leerzeichen getrennt. Ein
 #            einzelnes Argument darf deshalb kein Leerzeichen enthalten; die
 #            Platzhalter werden erst nach dem Trennen ersetzt und dürfen welche tragen.
@@ -61,7 +62,7 @@
 #   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml).
 #
 # Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
-# schreibt sie anders — ruff --exclude, trivy --skip-dirs, gosec -exclude-dir, grype
+# schreibt sie anders — ruff --exclude, trivy --skip-dirs, semgrep --exclude, grype
 # --exclude — und gitleaks kennt dafür überhaupt kein Flag, sondern nur eine Allowlist
 # in seiner Konfiguration (gitleaks.toml daneben). Eine eigene Spalte könnte deshalb
 # nur dieselben werkzeugeigenen Bruchstücke tragen wie args: Struktur ohne Bedeutung.
@@ -105,7 +106,7 @@ ruff	ruff	python	native	file	10m	target	check --isolated --select S --ignore S10
 semgrep	semgrep	python,go	native	file	20m	target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
 trivy-fs	trivy	*	native	file	15m	target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
 trivy-config	trivy	*	native	file	15m	target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-gosec	gosec	go	native	file	15m	target	-fmt=sarif -out={out} -exclude-dir=k-playbook -exclude-dir=k-playbook-local ./...
+gosec	gosec	go	native	file	15m	module	-fmt=sarif -out={out} ./...
 govulncheck	govulncheck	go	native	stdout	15m	module	-format sarif ./...
 osv-scanner	osv-scanner	python,go	native	file	15m	target	scan source --recursive --format sarif --output-file {out} {target}
 grype	grype	*	native	file	15m	target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**

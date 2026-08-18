@@ -1,6 +1,5 @@
 ---
 description: Build the single documentation index at k-playbook-local/docs/README.md from every origin — code/, libs/, extracted/, manual/ and unsorted flat files — check consistency, verify findability in at most two lookups, and register the docs in MEMORY (AGENTS.md + opencode.json). Takes no argument and always covers the whole docs directory.
-argument-hint: []
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
@@ -74,8 +73,8 @@ Per origin, collect all `*.md` except `README.md`:
 | Unsortiert | flache `<RESOLVED_DOCS_DIR>/*.md` | kein Erzeuger |
 
 Read the YAML frontmatter of every file: `title`, `description`, `tags`, `type`,
-`generated.by`. For files under `LIBS_DIR` also `version`, `version-pin`, `severity` and
-`last-reviewed`.
+`generated.by`. For files under `LIBS_DIR` also `lib`, `version`, `severity` and
+`last-reviewed` — exactly the fields the table in Schritt 5 is built from.
 
 Show a compact overview per origin — count plus one line per file (`Datei — title`), not
 the content:

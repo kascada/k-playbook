@@ -237,7 +237,7 @@ sources:
 **Regeln:**
 - Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-tools-scan` erhalten.
 - `generated.by` ist immer `k-tools-scan`. Der Index prüft das gegen das Verzeichnis; ein anderer Wert in `docs/libs/` ist ein Befund.
-- `version`, `severity` und `last-reviewed` sind Pflicht: `/k-docs-index` baut daraus die Übersichtstabelle „Libs & Stack". Fehlt eines, fehlt die Zeile im Index.
+- `lib`, `version`, `severity` und `last-reviewed` sind Pflicht: `/k-docs-index` baut daraus die Übersichtstabelle „Libs & Stack". Fehlt eines, kommt die Datei trotzdem in den Index — die Lücke wird dort als Konsistenz-Befund gemeldet, nicht stillschweigend übergangen.
 - `sources` im Frontmatter nur für tatsächlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
 - **Keine** Tutorials, keine „Getting Started"-Snippets.
 - Pitfalls sind **konkret** (mit Ursache und Symptom), nicht allgemein („kann Fehler werfen").
