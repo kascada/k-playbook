@@ -94,10 +94,22 @@ func Run() error {
 func announce(url string) {
 	fmt.Printf("k-playbook: %s\n", url)
 
-	if marker, inside := containerMarker(); inside {
+	marker, inContainer := containerMarker()
+	openers := browserOpeners()
+	if inContainer {
+		// Im Container zählt allein ein ausdrücklich gesetzter $BROWSER: dort
+		// steht ein Helfer, der die URL an den Host durchreicht — so richtet es
+		// der DevContainer von VS Code ein. Die geratenen Kandidaten leisten das
+		// nicht und können schaden: in schlanken Images zeigen x-www-browser und
+		// sensible-browser gern auf einen Terminal-Browser, der dann das
+		// Terminal übernimmt.
+		openers = envOpeners()
+	}
+
+	if len(openers) == 0 {
 		fmt.Printf("Container erkannt (%s), der Browser wird nicht geöffnet.\n", marker)
 		fmt.Println("Obige URL im Browser auf dem Host eintragen; im DevContainer muss der Port weitergeleitet sein.")
-	} else if err := openBrowser(url); err != nil {
+	} else if err := openBrowser(url, openers); err != nil {
 		fmt.Printf("Browser konnte nicht automatisch geöffnet werden: %v\n", err)
 		fmt.Println("Obige URL bitte manuell im Browser eintragen.")
 	}

@@ -226,6 +226,36 @@ Terminal; sonst bleibt es still.
 Nach Änderungen an Commands oder Skills muss der jeweilige Assistent neu gestartet
 werden — beide erfassen sie beim Start.
 
+## Browser beim Start
+
+Beim Start der Oberfläche steht die URL im Terminal, und der Browser wird geöffnet.
+Welches Programm das tut, entscheidet sich in dieser Reihenfolge:
+
+1. **`$BROWSER`**, sofern gesetzt. Die freedesktop-Konvention: eine mit `:` getrennte
+   Liste von Kommandos, in denen `%s` für die URL steht. Fehlt der Platzhalter, wird die
+   URL angehängt.
+2. Andernfalls die üblichen Verdächtigen der Plattform — `open` auf macOS, sonst
+   `wslview`, `xdg-open`, `gio open` und weitere, bis eines startet.
+
+**Im Container zählt allein `$BROWSER`.** Dort liefe jeder geratene Kandidat im Container
+statt auf dem Rechner vor dem Nutzer; schlimmer noch, `x-www-browser` und
+`sensible-browser` zeigen in schlanken Images gern auf einen Terminal-Browser, der dann
+das Terminal übernimmt. Ein ausdrücklich gesetzter `$BROWSER` weiß es dagegen besser: Er
+zeigt auf einen Helfer, der die URL an den Host durchreicht.
+
+Der DevContainer von VS Code richtet genau das von selbst ein — die Variable zeigt dort
+auf ein Skript, das `code --openExternal` aufruft und damit den Browser auf dem Host
+öffnet. Der weitergeleitete Port kommt ebenfalls von VS Code. Es ist derselbe Weg, über
+den auch `gh auth login` seinen Browser öffnet.
+
+Ist `$BROWSER` im Container nicht gesetzt, bleibt es beim bisherigen Verhalten: das
+Terminal nennt den erkannten Container-Marker und die URL zum Selbsteintragen. Wer den
+Helfer nachrüsten will, setzt die Variable selbst:
+
+```bash
+export BROWSER=/pfad/zum/helfer.sh   # bekommt die URL als Argument
+```
+
 ## Reviews und Tasks
 
 Der Block **Workflows** führt zu den beiden Arbeitsvorräten. Auf jedem Knopf steht, wie

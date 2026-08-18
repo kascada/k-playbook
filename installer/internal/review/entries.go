@@ -33,8 +33,21 @@ type JobStatus struct {
 	// SARIF ist der Ort der Datei, relativ zum Laufverzeichnis.
 	SARIF    string `json:"sarif,omitempty"`
 	Findings *int   `json:"findings,omitempty"`
-	Started  string `json:"started,omitempty"`
-	Finished string `json:"finished,omitempty"`
+	// Candidates ist die Zahl der Dateien, die unter dem Bezugspunkt des Jobs
+	// als Gegenstand in Frage kamen — die Auskunft, ohne die ein leeres
+	// Ergebnis nicht von einem ungeprüften zu unterscheiden ist. Welche Dateien
+	// zählen, sagt die Spalte candidates im Katalog.
+	//
+	// Zeiger wie Findings, und aus demselben Grund: 0 heißt „gemessen und
+	// null", also „hier gab es nichts zu prüfen". Nicht gemessen wurde, wo das
+	// Feld fehlt — bei einem übersprungenen Job, bei der Sorte none und dann,
+	// wenn der Baumlauf selbst gescheitert ist.
+	//
+	// Die Zahl ist eine Obergrenze und keine Abdeckungsmessung: die
+	// werkzeugeigenen Ausschlüsse kennt die Zählung nicht.
+	Candidates *int   `json:"candidates,omitempty"`
+	Started    string `json:"started,omitempty"`
+	Finished   string `json:"finished,omitempty"`
 	// Reason nennt bei skipped und failed den Grund im Klartext.
 	Reason string `json:"reason,omitempty"`
 }

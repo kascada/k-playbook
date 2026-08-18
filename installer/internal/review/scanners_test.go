@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const scannerHeader = "job\ttool\tlanguages\tsarif\toutput\ttimeout\tworkdir\targs\n"
+const scannerHeader = "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tworkdir\targs\n"
 
 func parseLine(t *testing.T, line string) ([]Scanner, error) {
 	t.Helper()
@@ -16,7 +16,7 @@ func parseLine(t *testing.T, line string) ([]Scanner, error) {
 }
 
 func TestParseScannersLiestZeile(t *testing.T) {
-	scanners, err := parseLine(t, "trivy-fs\ttrivy\t*\tnative\tfile\t15m\ttarget\tfs --output {out} {target}")
+	scanners, err := parseLine(t, "trivy-fs\ttrivy\t*\tmanifest\tnative\tfile\t15m\ttarget\tfs --output {out} {target}")
 	if err != nil {
 		t.Fatalf("ParseScanners: %v", err)
 	}
@@ -44,21 +44,21 @@ func TestParseScannersLiestZeile(t *testing.T) {
 
 // Ein Job, der ein Modulverzeichnis braucht, und der Platzhalter dazu.
 func TestParseScannersLiestWorkdirModule(t *testing.T) {
-	scanners, err := parseLine(t, "govulncheck	govulncheck	go	native	stdout	15m	module	-format sarif ./...")
+	scanners, err := parseLine(t, "govulncheck	govulncheck	go	manifest	native	stdout	15m	module	-format sarif ./...")
 	if err != nil {
 		t.Fatalf("ParseScanners: %v", err)
 	}
 	if scanners[0].Workdir != WorkdirModule {
 		t.Errorf("workdir = %q, erwartet %q", scanners[0].Workdir, WorkdirModule)
 	}
-	if _, err := parseLine(t, "gosec	gosec	go	native	file	15m	module	-out={out} {module}"); err != nil {
+	if _, err := parseLine(t, "gosec	gosec	go	source	native	file	15m	module	-out={out} {module}"); err != nil {
 		t.Errorf("{module} bei workdir module wurde abgewiesen: %v", err)
 	}
 }
 
 // Kommentare und die Kopfzeile sind keine Jobs.
 func TestParseScannersUeberspringtKommentare(t *testing.T) {
-	content := "# Kommentar\n" + scannerHeader + "\nruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\n"
+	content := "# Kommentar\n" + scannerHeader + "\nruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\n"
 	scanners, err := ParseScanners(content, "test.tsv")
 	if err != nil {
 		t.Fatalf("ParseScanners: %v", err)
@@ -70,23 +70,25 @@ func TestParseScannersUeberspringtKommentare(t *testing.T) {
 
 func TestParseScannersWeistFehlerhafteZeilenAb(t *testing.T) {
 	fälle := map[string]string{
-		"zu wenige Spalten":     "ruff\truff\tpython\tnative\tfile\t10m",
-		"Job führt aus raw/":    "../ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
-		"Job ohne Tool-Präfix":  "prüfung\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
-		"leeres languages":      "ruff\truff\t\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
-		"unbekanntes sarif":     "ruff\truff\tpython\tvielleicht\tfile\t10m\ttarget\tcheck -o {out} {target}",
-		"unbekanntes output":    "ruff\truff\tpython\tnative\tirgendwohin\t10m\ttarget\tcheck -o {out} {target}",
-		"unlesbares timeout":    "ruff\truff\tpython\tnative\tfile\tbald\ttarget\tcheck -o {out} {target}",
-		"timeout null":          "ruff\truff\tpython\tnative\tfile\t0s\ttarget\tcheck -o {out} {target}",
-		"file ohne {out}":       "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck {target}",
-		"stdout mit {out}":      "ruff\truff\tpython\tnative\tstdout\t10m\ttarget\tcheck -o {out} {target}",
-		"keine Argumente":       "ruff\truff\tpython\tnative\tstdout\t10m\ttarget\t",
-		"doppelter Job im Satz": "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\nruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
-		"unbekanntes workdir":   "ruff\truff\tpython\tnative\tfile\t10m\tirgendwo\tcheck -o {out} {target}",
-		"leeres workdir":        "ruff\truff\tpython\tnative\tfile\t10m\t\tcheck -o {out} {target}",
+		"zu wenige Spalten":      "ruff\truff\tpython\tnative\tfile\t10m",
+		"Job führt aus raw/":     "../ruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"Job ohne Tool-Präfix":   "prüfung\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"leeres languages":       "ruff\truff\t\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"leeres candidates":      "ruff\truff\tpython\t\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes candidates": "ruff\truff\tpython\tvielleicht\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes sarif":      "ruff\truff\tpython\tsource\tvielleicht\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes output":     "ruff\truff\tpython\tsource\tnative\tirgendwohin\t10m\ttarget\tcheck -o {out} {target}",
+		"unlesbares timeout":     "ruff\truff\tpython\tsource\tnative\tfile\tbald\ttarget\tcheck -o {out} {target}",
+		"timeout null":           "ruff\truff\tpython\tsource\tnative\tfile\t0s\ttarget\tcheck -o {out} {target}",
+		"file ohne {out}":        "ruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck {target}",
+		"stdout mit {out}":       "ruff\truff\tpython\tsource\tnative\tstdout\t10m\ttarget\tcheck -o {out} {target}",
+		"keine Argumente":        "ruff\truff\tpython\tsource\tnative\tstdout\t10m\ttarget\t",
+		"doppelter Job im Satz":  "ruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\nruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes workdir":    "ruff\truff\tpython\tsource\tnative\tfile\t10m\tirgendwo\tcheck -o {out} {target}",
+		"leeres workdir":         "ruff\truff\tpython\tsource\tnative\tfile\t10m\t\tcheck -o {out} {target}",
 		// {module} ohne Modulsuche: der Platzhalter bliebe stehen und landete
 		// wörtlich im Aufruf.
-		"{module} bei workdir target": "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {module}",
+		"{module} bei workdir target": "ruff\truff\tpython\tsource\tnative\tfile\t10m\ttarget\tcheck -o {out} {module}",
 	}
 
 	for name, line := range fälle {
@@ -166,6 +168,27 @@ func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
 	}
 	if count := len(ScannersFor(scanners, "syft")); count != 0 {
 		t.Errorf("syft hat %d Jobs, erwartet 0 — es erzeugt eine SBOM, keine Befunde", count)
+	}
+
+	// Jede Zeile trägt eine Kandidatensorte — ohne sie wäre ein Ergebnis mit 0
+	// Befunden nicht zu lesen. Geprüft wird die Zuordnung an je einem Vertreter
+	// der vier Sorten; dass der Wert überhaupt bekannt ist, weist ParseScanners
+	// schon beim Lesen ab.
+	kinds := map[string]CandidateKind{}
+	for _, scanner := range scanners {
+		kinds[scanner.Job] = scanner.Candidates
+	}
+	for job, want := range map[string]CandidateKind{
+		"gosec":        CandidateSource,
+		"gitleaks-dir": CandidateAny,
+		"osv-scanner":  CandidateManifest,
+		// Die ausdrückliche Ausnahme: IaC-Konfigurationen lassen sich ohne
+		// trivys eigene Erkennungslogik nicht abgrenzen.
+		"trivy-config": CandidateNone,
+	} {
+		if kinds[job] != want {
+			t.Errorf("Job %s hat candidates %q, erwartet %q", job, kinds[job], want)
+		}
 	}
 
 	// Die drei Go-Jobs: govulncheck und golangci-lint brauchen das Modul,

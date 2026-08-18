@@ -70,6 +70,11 @@ type Options struct {
 	// Progress meldet jede Zustandsänderung eines Jobs, auch den Start. Darf
 	// fehlen; wird aus mehreren Goroutinen aufgerufen.
 	Progress func(entry string, job JobStatus)
+	// candidates zählt je Bezugspunkt und Sorte höchstens einmal über den
+	// ganzen Lauf. Execute legt ihn an und reicht ihn an alle Einträge weiter;
+	// ein von außen gesetzter bleibt stehen — das nutzt nur der Test, um die
+	// Zählung zu ersetzen und mitzuzählen, wie oft sie läuft.
+	candidates *candidateCache
 }
 
 // Execute führt die angegebenen Einträge aus und liefert ihren Endstand.
@@ -108,6 +113,14 @@ func Execute(ctx context.Context, entries []Entry, options Options) ([]EntryStat
 	// Über den ganzen Lauf gezählt, nicht je Eintrag: sonst liefen bei acht
 	// Einträgen acht mal so viele Jobs wie erlaubt.
 	tokens := make(chan struct{}, parallel)
+
+	// Ebenfalls über den ganzen Lauf: derselbe Baumlauf über dasselbe Ziel
+	// ergibt für jeden Job derselben Sorte dasselbe. Angelegt wird er vor den
+	// Goroutinen — Options geht als Kopie hinein, der Zeiger darin bleibt
+	// derselbe.
+	if options.candidates == nil {
+		options.candidates = newCandidateCache(countCandidates)
+	}
 
 	results := make([]EntryStatus, len(entries))
 	failures := make([]error, len(entries))
@@ -167,10 +180,11 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 	runnable := []int{}
 	for index, plan := range plans {
 		status.Jobs[index] = JobStatus{
-			Job:    plan.name,
-			State:  plan.state,
-			Module: plan.module,
-			Reason: plan.reason,
+			Job:        plan.name,
+			State:      plan.state,
+			Module:     plan.module,
+			Candidates: plan.candidates,
+			Reason:     plan.reason,
 		}
 		if plan.state == StateStart {
 			runnable = append(runnable, index)
@@ -265,6 +279,9 @@ type jobPlan struct {
 	// schon vor dem Aufruf fest und reason nennt ihn.
 	state  State
 	reason string
+	// candidates ist die Zahl der Dateien unter dem Bezugspunkt, die als
+	// Gegenstand in Frage kamen; nil heißt „nicht gezählt".
+	candidates *int
 }
 
 // planJobs macht aus den Katalogzeilen eines Werkzeugs die Aufrufe dieses Laufs.
@@ -341,6 +358,24 @@ func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known
 			}
 		}
 	}
+
+	// Zuletzt, wenn die Bezugspunkte feststehen: was hätte dieser Job prüfen
+	// können? Nur für Jobs, die wirklich laufen — ein übersprungener Job hat
+	// keinen Gegenstand, und 0 hieße dort fälschlich „gemessen und null".
+	//
+	// Ein Fehler beim Baumlauf macht keinen Job zum Fehlschlag: die Zählung ist
+	// eine Zusatzauskunft, kein Ergebnis. Sie bleibt dann ungesetzt, heißt also
+	// „nicht gemessen" — of() gibt dafür nil zurück.
+	for index := range plans {
+		if plans[index].state != StateStart {
+			continue
+		}
+		plans[index].candidates = options.candidates.of(
+			candidateRoot(options.Target, plans[index].module),
+			plans[index].scanner.Candidates,
+			plans[index].scanner.Languages,
+		)
+	}
 	return plans
 }
 
@@ -379,48 +414,59 @@ func clearEntryOutputs(runDir string, entry string) error {
 
 // previousJobFiles sind die Dateien unter raw/, die dem Eintrag gehören.
 //
-// Maßgeblich ist die vorige entries/<tool>.json: sie nennt die Job-Namen samt
-// sarif-Pfad. Fehlt oder bricht sie, greift die Namensregel aus checkScanner()
-// als Rückfall — der Job-Name beginnt mit dem Tool-Namen. Der Rückfall bleibt
-// auf *.sarif beschränkt, damit spätere Konverter-Zwischendateien nicht
-// mitgehen.
+// Maßgeblich ist die vorige entries/<tool>.json, und zwar über den Job-Namen:
+// raw/<job>.sarif ist die Namensregel, nach der runJob() seinen outPath bildet,
+// und der Name steht bei jedem Ausgang in der Datei. Das sarif-Feld täte es
+// nicht — runJob() setzt es nur im Erfolgsfall, failJob() gar nicht, und ein
+// beim vorigen Aufruf gescheiterter Job kann trotzdem eine Datei hinterlassen
+// haben.
+//
+// Fehlt oder bricht die Datei, wird raw/ selbst gelesen; angenommen wird
+// dieselbe Namensregel, beschränkt auf *.sarif, damit spätere
+// Konverter-Zwischendateien nicht mitgehen.
 func previousJobFiles(runDir string, rawDir string, entry string) ([]string, error) {
 	if status, err := ReadEntryStatus(runDir, entry); err == nil {
 		files := []string{}
 		for _, job := range status.Jobs {
-			if name, ok := rawFileName(job.SARIF); ok {
-				files = append(files, filepath.Join(rawDir, name))
+			// Ein skipped-Job hat nie eine Datei geschrieben; sein Name geht
+			// trotzdem mit, weil os.Remove eine fehlende Datei ohnehin nicht
+			// als Fehler wertet.
+			if belongsToEntry(entry, job.Job) {
+				files = append(files, filepath.Join(rawDir, job.Job+".sarif"))
 			}
 		}
 		return files, nil
 	}
 
+	listing, err := os.ReadDir(rawDir)
+	if err != nil {
+		return nil, err
+	}
 	files := []string{}
-	for _, pattern := range []string{entry + ".sarif", entry + "-*.sarif"} {
-		matches, err := filepath.Glob(filepath.Join(rawDir, pattern))
-		if err != nil {
-			return nil, err
+	for _, item := range listing {
+		job, found := strings.CutSuffix(item.Name(), ".sarif")
+		if !found || !belongsToEntry(entry, job) {
+			continue
 		}
-		files = append(files, matches...)
+		files = append(files, filepath.Join(rawDir, item.Name()))
 	}
 	return files, nil
 }
 
-// rawFileName prüft den Ort, den die vorige Datei nennt, und liefert den
-// Dateinamen daraus.
+// belongsToEntry meldet, ob ein Job-Name zu diesem Eintrag gehört und als
+// Dateiname unter raw/ taugt.
 //
-// Geschrieben hat den Pfad zwar der Ausführer selbst, gelesen wird er aber von
-// der Platte: ein Löschen soll nicht davon abhängen, was in der Datei steht.
-// Angenommen wird deshalb nur, was auch als Job-Datei entstehen konnte.
-func rawFileName(sarif string) (string, bool) {
-	rest, found := strings.CutPrefix(sarif, RawDirName+"/")
-	if !found || !strings.HasSuffix(rest, ".sarif") {
-		return "", false
+// Es ist die Namensregel aus checkScanner(): der Job-Name ist der Tool-Name
+// selbst oder beginnt mit <tool>-. Sie gilt auch für die abgeleiteten Namen der
+// Auffächerung, weil die das Präfix erben. Geprüft wird beides, weil der Name
+// von der Platte gelesen wird und ein os.Remove steuert: ein Löschen soll weder
+// aus dem Verzeichnis herausführen noch eine fremde Datei treffen, was auch
+// immer in der gelesenen Datei steht.
+func belongsToEntry(entry string, job string) bool {
+	if !ValidEntryName(job) {
+		return false
 	}
-	if !ValidEntryName(strings.TrimSuffix(rest, ".sarif")) {
-		return "", false
-	}
-	return rest, true
+	return job == entry || strings.HasPrefix(job, entry+"-")
 }
 
 // runJob startet ein Werkzeug und wertet den Ausgang aus.

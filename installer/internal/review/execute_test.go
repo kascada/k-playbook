@@ -845,3 +845,370 @@ func TestExecuteRaeumtOhneVorigeEintragsdateiAuf(t *testing.T) {
 		t.Errorf("der Lauf hat seine eigene Datei nicht geschrieben: %v", err)
 	}
 }
+
+// Ein Job, der beim vorigen Aufruf gescheitert ist, hinterlässt bei
+// output: stdout trotzdem eine Datei — os.Create legt sie an, bevor der Scanner
+// überhaupt schreibt. Sein Ausgang steht in der vorigen Eintragsdatei ohne
+// sarif-Feld; weggeräumt wird er trotzdem, denn der Job-Name steht dort.
+func TestExecuteRaeumtDateiEinesGescheitertenJobsWeg(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	scanner := nativeScanner("govulncheck", "govulncheck", "{out}")
+	scanner.Output = OutputStdout
+
+	// Die Attrappe schreibt ein halbes SARIF nach stdout und endet mit 3.
+	halbfertig := fakeTool(t, "govulncheck", `printf '{"version":"2.1.0","runs":[' ; exit 3`)
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"govulncheck": {Path: halbfertig}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed {
+		t.Fatalf("Job = %q, erwartet %q: %+v", job.State, StateFailed, job)
+	}
+	if job.SARIF != "" {
+		t.Fatalf("sarif = %q, erwartet leer — sonst trifft der Test den Befund nicht", job.SARIF)
+	}
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "govulncheck.sarif")); err != nil {
+		t.Fatalf("der gescheiterte Job hat keine Datei hinterlassen: %v", err)
+	}
+
+	// Diesmal fehlt das Werkzeug: der Job läuft nicht mehr unter seinem Namen,
+	// und nur der Eintrag kann seine Datei noch wegräumen.
+	statuses = führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"govulncheck": {Reason: "Werkzeug govulncheck ist nicht installiert"}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if statuses[0].State != StateSkipped {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateSkipped)
+	}
+	if dateien := rawDateien(t, runDir); len(dateien) != 0 {
+		t.Errorf("Dateien unter raw/ = %v, erwartet keine — die Datei stammt aus einem gescheiterten Job des vorigen Aufrufs", dateien)
+	}
+}
+
+// Der Job-Name wird von der Platte gelesen und steuert ein os.Remove: nennt die
+// vorige Eintragsdatei einen Job, der nicht zu diesem Eintrag gehört, bleibt
+// dessen Datei stehen.
+func TestExecuteRaeumtKeineFremdenJobDateienWeg(t *testing.T) {
+	runDir := neuerLauf(t,
+		Entry{Name: "govulncheck", Kind: KindTool},
+		Entry{Name: "gitleaks", Kind: KindTool},
+	)
+	target := modulBaum(t, "installer/go.mod")
+
+	rawDir := filepath.Join(runDir, RawDirName)
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatalf("raw/ anlegen: %v", err)
+	}
+	for _, name := range []string{"gitleaks.sarif", "govulncheck-werkzeuge.sarif"} {
+		if err := os.WriteFile(filepath.Join(rawDir, name), []byte("{}"), 0o644); err != nil {
+			t.Fatalf("%s anlegen: %v", name, err)
+		}
+	}
+
+	// Eine vorige Eintragsdatei, die neben dem eigenen Job einen fremden nennt.
+	if err := WriteEntryStatus(runDir, EntryStatus{
+		Name:  "govulncheck",
+		Kind:  KindTool,
+		State: StateFailed,
+		Jobs: []JobStatus{
+			{Job: "gitleaks", State: StateDone, SARIF: RawDirName + "/gitleaks.sarif"},
+			{Job: "govulncheck-werkzeuge", State: StateFailed},
+		},
+	}); err != nil {
+		t.Fatalf("vorige Eintragsdatei schreiben: %v", err)
+	}
+
+	führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 1, 0)}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if _, err := os.Stat(filepath.Join(rawDir, "gitleaks.sarif")); err != nil {
+		t.Errorf("die Datei eines fremden Eintrags wurde weggeräumt: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(rawDir, "govulncheck-werkzeuge.sarif")); !os.IsNotExist(err) {
+		t.Errorf("die eigene Datei des vorigen Aufrufs liegt noch da")
+	}
+	if _, err := os.Stat(filepath.Join(rawDir, "govulncheck.sarif")); err != nil {
+		t.Errorf("der Lauf hat seine eigene Datei nicht geschrieben: %v", err)
+	}
+}
+
+// kandidatenScanner ist ein Job mit Kandidatensorte: daraus entsteht die Zahl,
+// die ein leeres Ergebnis einzuordnen erlaubt.
+func kandidatenScanner(job string, tool string, kind CandidateKind, languages string, args ...string) Scanner {
+	scanner := nativeScanner(job, tool, args...)
+	scanner.Candidates = kind
+	scanner.Languages = languages
+	return scanner
+}
+
+// dateienAnlegen legt unter root die angegebenen Dateien an; der Pfad ist mit /
+// getrennt.
+func dateienAnlegen(t *testing.T, root string, dateien ...string) {
+	t.Helper()
+	for _, pfad := range dateien {
+		voll := filepath.Join(root, filepath.FromSlash(pfad))
+		if err := os.MkdirAll(filepath.Dir(voll), 0o755); err != nil {
+			t.Fatalf("%s anlegen: %v", pfad, err)
+		}
+		if err := os.WriteFile(voll, []byte("inhalt\n"), 0o644); err != nil {
+			t.Fatalf("%s schreiben: %v", pfad, err)
+		}
+	}
+}
+
+func kandidaten(t *testing.T, job JobStatus) int {
+	t.Helper()
+	if job.Candidates == nil {
+		t.Fatalf("Job %s trägt keine Kandidatenzahl: %+v", job.Job, job)
+	}
+	return *job.Candidates
+}
+
+// Der gosec-Fall, nachgestellt: 0 Befunde, während unter dem Bezugspunkt
+// Dateien der Sorte liegen. Ohne die Kandidatenzahl läse sich das wie „geprüft
+// und sauber".
+func TestExecuteZaehltKandidatenBeiLeeremErgebnis(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "haupt.go", "unten/tief.go", "liesmich.md")
+	runDir := neuerLauf(t, Entry{Name: "gosec", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{kandidatenScanner("gosec", "gosec", CandidateSource, "go", "{out}")},
+		Tools:    map[string]Tool{"gosec": {Path: schreibtSARIF(t, "gosec", 0, 0)}},
+	}, Entry{Name: "gosec", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateDone {
+		t.Fatalf("Job = %q, erwartet %q (Grund: %s)", job.State, StateDone, job.Reason)
+	}
+	if job.Findings == nil || *job.Findings != 0 {
+		t.Fatalf("Befunde = %v, erwartet 0", job.Findings)
+	}
+	if got := kandidaten(t, job); got != 2 {
+		t.Errorf("Kandidaten = %d, erwartet 2", got)
+	}
+}
+
+// Der B-Fall: dasselbe ohne passende Dateien. 0 Kandidaten heißt „nichts zu
+// prüfen" — gemessen und null, nicht ungemessen.
+func TestExecuteKandidatenNullOhneGegenstand(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "liesmich.md", "skript.py")
+	runDir := neuerLauf(t, Entry{Name: "gosec", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{kandidatenScanner("gosec", "gosec", CandidateSource, "go", "{out}")},
+		Tools:    map[string]Tool{"gosec": {Path: schreibtSARIF(t, "gosec", 0, 0)}},
+	}, Entry{Name: "gosec", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateDone {
+		t.Fatalf("Job = %q, erwartet %q (Grund: %s)", job.State, StateDone, job.Reason)
+	}
+	if got := kandidaten(t, job); got != 0 {
+		t.Errorf("Kandidaten = %d, erwartet 0", got)
+	}
+}
+
+// Die Manifest-Sorte in einem Projekt ohne Manifest: 0 ist hier der Normalfall
+// und kein Falschalarm — der Job bleibt done.
+func TestExecuteKandidatenManifestOhneManifest(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "haupt.go", "skript.py")
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{kandidatenScanner("osv-scanner", "osv-scanner", CandidateManifest, "python,go", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: schreibtSARIF(t, "osv-scanner", 0, 0)}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	if statuses[0].State != StateDone {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateDone)
+	}
+	if got := kandidaten(t, statuses[0].Jobs[0]); got != 0 {
+		t.Errorf("Kandidaten = %d, erwartet 0", got)
+	}
+}
+
+// Ein übersprungener Job hat keinen Gegenstand: 0 hieße dort fälschlich
+// „gemessen und null". Ein Job der Sorte none ebenso wenig.
+func TestExecuteOhneZaehlungBleibtDasFeldLeer(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "haupt.go")
+	runDir := neuerLauf(t, Entry{Name: "trivy", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir: runDir,
+		Target: target,
+		Scanners: []Scanner{
+			kandidatenScanner("trivy-config", "trivy", CandidateNone, "*", "{out}"),
+			kandidatenScanner("trivy-fs", "trivy", CandidateManifest, "*", "{out}"),
+		},
+		Tools: map[string]Tool{},
+	}, Entry{Name: "trivy", Kind: KindTool})
+
+	for _, job := range statuses[0].Jobs {
+		if job.State != StateSkipped {
+			t.Fatalf("Job %s = %q, erwartet %q", job.Job, job.State, StateSkipped)
+		}
+		if job.Candidates != nil {
+			t.Errorf("Job %s trägt %d Kandidaten, erwartet keine Angabe", job.Job, *job.Candidates)
+		}
+	}
+}
+
+// Die Sorte none läuft, zählt aber nicht: das Feld bleibt ungesetzt, obwohl es
+// unter dem Bezugspunkt Dateien gibt.
+func TestExecuteSorteNoneZaehltNicht(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "Dockerfile", "haupt.go")
+	runDir := neuerLauf(t, Entry{Name: "trivy", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{kandidatenScanner("trivy-config", "trivy", CandidateNone, "*", "{out}")},
+		Tools:    map[string]Tool{"trivy": {Path: schreibtSARIF(t, "trivy", 0, 0)}},
+	}, Entry{Name: "trivy", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateDone {
+		t.Fatalf("Job = %q, erwartet %q (Grund: %s)", job.State, StateDone, job.Reason)
+	}
+	if job.Candidates != nil {
+		t.Errorf("Kandidaten = %d, erwartet keine Angabe", *job.Candidates)
+	}
+}
+
+// Ein technischer Fehlschlag sagt über den Gegenstand nichts aus: die Zahl
+// steht auch dort, wo für den Bezugspunkt gezählt wurde.
+func TestExecuteKandidatenAuchBeiFehlschlag(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "haupt.go", "unten/tief.go")
+	runDir := neuerLauf(t, Entry{Name: "gosec", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{kandidatenScanner("gosec", "gosec", CandidateSource, "go", "{out}")},
+		Tools:    map[string]Tool{"gosec": {Path: fakeTool(t, "gosec", "echo kaputt >&2\nexit 2")}},
+	}, Entry{Name: "gosec", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed {
+		t.Fatalf("Job = %q, erwartet %q", job.State, StateFailed)
+	}
+	if got := kandidaten(t, job); got != 2 {
+		t.Errorf("Kandidaten = %d, erwartet 2", got)
+	}
+}
+
+// Bei workdir module ist der Bezugspunkt das Modul, nicht das Projekt: sonst
+// zählte ein aufgefächerter Job die Dateien des ganzen Projekts gegen die
+// Befunde eines einzelnen Moduls.
+func TestExecuteKandidatenJeModul(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target,
+		"a/go.mod", "a/haupt.go",
+		"b/go.mod", "b/haupt.go", "b/unten/tief.go", "b/weiter.go",
+	)
+	runDir := neuerLauf(t, Entry{Name: "gosec", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleKandidatenScanner("gosec", "gosec", CandidateSource, "go", "{out}")},
+		Tools:    map[string]Tool{"gosec": {Path: schreibtSARIF(t, "gosec", 0, 0)}},
+	}, Entry{Name: "gosec", Kind: KindTool})
+
+	want := map[string]int{"gosec-a": 1, "gosec-b": 3}
+	if len(statuses[0].Jobs) != len(want) {
+		t.Fatalf("%d Jobs, erwartet %d: %+v", len(statuses[0].Jobs), len(want), statuses[0].Jobs)
+	}
+	for _, job := range statuses[0].Jobs {
+		erwartet, bekannt := want[job.Job]
+		if !bekannt {
+			t.Fatalf("unerwarteter Job %s", job.Job)
+		}
+		if got := kandidaten(t, job); got != erwartet {
+			t.Errorf("Job %s hat %d Kandidaten, erwartet %d", job.Job, got, erwartet)
+		}
+	}
+}
+
+// moduleKandidatenScanner ist ein Job mit Kandidatensorte, der ein
+// Modulverzeichnis braucht.
+func moduleKandidatenScanner(job string, tool string, kind CandidateKind, languages string, args ...string) Scanner {
+	scanner := kandidatenScanner(job, tool, kind, languages, args...)
+	scanner.Workdir = WorkdirModule
+	return scanner
+}
+
+// Gezählt wird je Bezugspunkt und Sorte einmal über den ganzen Lauf — nicht je
+// Job, nicht je Eintrag. Bei acht Werkzeugen liefe derselbe Baumlauf sonst
+// achtmal.
+func TestExecuteZaehltJeBezugspunktUndSorteEinmal(t *testing.T) {
+	target := t.TempDir()
+	dateienAnlegen(t, target, "a/go.mod", "a/haupt.go", "b/go.mod", "b/haupt.go")
+	entries := []Entry{
+		{Name: "gosec", Kind: KindTool},
+		{Name: "semgrep", Kind: KindTool},
+		{Name: "gitleaks", Kind: KindTool},
+	}
+	runDir := neuerLauf(t, entries...)
+
+	var mutex sync.Mutex
+	läufe := map[string]int{}
+	cache := newCandidateCache(func(root string, kind CandidateKind, languages string) (int, error) {
+		mutex.Lock()
+		läufe[root+" "+string(kind)+" "+languages]++
+		mutex.Unlock()
+		return countCandidates(root, kind, languages)
+	})
+
+	options := Options{
+		RunDir:     runDir,
+		Target:     target,
+		candidates: cache,
+		Scanners: []Scanner{
+			// Zwei Werkzeuge derselben Sorte über demselben Ziel …
+			kandidatenScanner("semgrep", "semgrep", CandidateSource, "go", "{out}"),
+			kandidatenScanner("gitleaks-git", "gitleaks", CandidateAny, "*", "{out}"),
+			kandidatenScanner("gitleaks-dir", "gitleaks", CandidateAny, "*", "{out}"),
+			// … und einer, der je Modul aufgefächert wird.
+			moduleKandidatenScanner("gosec", "gosec", CandidateSource, "go", "{out}"),
+		},
+		Tools: map[string]Tool{
+			"gosec":    {Path: schreibtSARIF(t, "gosec", 0, 0)},
+			"semgrep":  {Path: schreibtSARIF(t, "semgrep", 0, 0)},
+			"gitleaks": {Path: schreibtSARIF(t, "gitleaks", 0, 0)},
+		},
+	}
+	führeAus(t, options, entries...)
+
+	// Vier Schlüssel: das Ziel als source und als any, dazu je ein Modul.
+	if len(läufe) != 4 {
+		t.Errorf("%d Bezugspunkte gezählt, erwartet 4: %v", len(läufe), läufe)
+	}
+	for schlüssel, count := range läufe {
+		if count != 1 {
+			t.Errorf("%s wurde %d mal gezählt, erwartet einmal", schlüssel, count)
+		}
+	}
+}

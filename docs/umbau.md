@@ -196,5 +196,13 @@ verglichen:
   Was bleibt, steht auf der Eingangsseite: der Ausführer weiß vor dem Start, was da ist —
   er kennt das Ziel und die Sprachauswahl des Laufs. „0 Befunde bei 40 Go-Dateien" ist
   etwas anderes als „0 bei 0", und diese Unterscheidung braucht keine werkzeugspezifische
-  Regel. Zu klären ist, ob daraus ein Zustand wird oder eine Auskunft neben dem Zustand:
-  ein Job kann legitim nichts finden, und ein `failed` dafür wäre falsch.
+  Regel.
+
+  **Entschieden: eine Auskunft neben dem Zustand.** Ein Job kann legitim nichts finden, ein
+  `failed` dafür wäre falsch, und ein vierter Zustand verschöbe das Urteil bloß. Jeder Job
+  trägt deshalb `candidates` — die Zahl der Dateien, die unter seinem Bezugspunkt als
+  Gegenstand in Frage kamen. Was als Gegenstand zählt, sagt die gleichnamige Spalte in
+  `scripts/scanners.tsv` (`source`, `any`, `manifest`, `none`), damit im Code kein
+  Sonderfall je Werkzeugname entsteht. Die Zahl ist eine Obergrenze, keine
+  Abdeckungsmessung; beurteilt wird sie im Bewertungsschritt. Einzelheiten in
+  [`review-runs.md`](./review-runs.md), „`candidates` — was der Job hätte prüfen können".

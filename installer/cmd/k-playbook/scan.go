@@ -189,6 +189,12 @@ func describeJob(job review.JobStatus) string {
 		if job.Findings != nil {
 			findings = *job.Findings
 		}
+		// Die Kandidatenzahl steht dort, wo sie etwas bedeutet: bei 0 Befunden
+		// trennt sie „nichts zu prüfen" von „nichts geprüft". Bei Befunden ist
+		// sie Rauschen — dass geprüft wurde, steht schon in der Zahl davor.
+		if findings == 0 && job.Candidates != nil {
+			return fmt.Sprintf("fertig, 0 Befunde bei %d Kandidaten → %s", *job.Candidates, job.SARIF)
+		}
 		return fmt.Sprintf("fertig, %d Befunde → %s", findings, job.SARIF)
 	default:
 		if job.Reason != "" {

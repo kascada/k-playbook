@@ -13,7 +13,7 @@ const ScannerCatalogName = "scripts/scanners.tsv"
 
 // scannerColumns ist die Spaltenzahl einer Zeile. Sie steht fest, damit eine
 // vergessene Spalte auffällt, statt still in der letzten zu landen.
-const scannerColumns = 8
+const scannerColumns = 9
 
 // SARIFMode sagt, ob ein Job SARIF liefert und auf welchem Weg.
 type SARIFMode string
@@ -54,12 +54,16 @@ const (
 // Der Eintrag eines Laufs ist das Werkzeug, nicht der Job — Tool ist deshalb
 // die Spalte, über die ein Job an seinem Eintrag hängt.
 type Scanner struct {
-	Job       string        `json:"job"`
-	Tool      string        `json:"tool"`
-	Languages string        `json:"languages"`
-	SARIF     SARIFMode     `json:"sarif"`
-	Output    OutputMode    `json:"output"`
-	Timeout   time.Duration `json:"timeout"`
+	Job       string `json:"job"`
+	Tool      string `json:"tool"`
+	Languages string `json:"languages"`
+	// Candidates sagt, was unter dem Bezugspunkt als Gegenstand in Frage kommt.
+	// Daraus entsteht die Kandidatenzahl am Job — die Auskunft, ohne die ein
+	// leeres Ergebnis nicht von einem ungeprüften zu unterscheiden ist.
+	Candidates CandidateKind `json:"candidates"`
+	SARIF      SARIFMode     `json:"sarif"`
+	Output     OutputMode    `json:"output"`
+	Timeout    time.Duration `json:"timeout"`
 	// Workdir ist das Arbeitsverzeichnis des Aufrufs. module fächert den Job
 	// zusätzlich auf: einen Aufruf je gefundenem Modul.
 	Workdir WorkdirMode `json:"workdir"`
@@ -108,16 +112,17 @@ func ParseScanners(content string, source string) ([]Scanner, error) {
 		}
 
 		scanner := Scanner{
-			Job:       strings.TrimSpace(fields[0]),
-			Tool:      strings.TrimSpace(fields[1]),
-			Languages: strings.TrimSpace(fields[2]),
-			SARIF:     SARIFMode(strings.TrimSpace(fields[3])),
-			Output:    OutputMode(strings.TrimSpace(fields[4])),
-			Workdir:   WorkdirMode(strings.TrimSpace(fields[6])),
-			Args:      strings.Fields(fields[7]),
+			Job:        strings.TrimSpace(fields[0]),
+			Tool:       strings.TrimSpace(fields[1]),
+			Languages:  strings.TrimSpace(fields[2]),
+			Candidates: CandidateKind(strings.TrimSpace(fields[3])),
+			SARIF:      SARIFMode(strings.TrimSpace(fields[4])),
+			Output:     OutputMode(strings.TrimSpace(fields[5])),
+			Workdir:    WorkdirMode(strings.TrimSpace(fields[7])),
+			Args:       strings.Fields(fields[8]),
 		}
 
-		if err := checkScanner(&scanner, strings.TrimSpace(fields[5]), where); err != nil {
+		if err := checkScanner(&scanner, strings.TrimSpace(fields[6]), where); err != nil {
 			return nil, err
 		}
 		if seen[scanner.Job] {
@@ -149,6 +154,11 @@ func checkScanner(scanner *Scanner, timeout string, where string) error {
 		return fmt.Errorf("%s: Job %s hat kein languages-Feld; nutze * für sprachunabhängig", where, scanner.Job)
 	}
 
+	switch scanner.Candidates {
+	case CandidateSource, CandidateAny, CandidateManifest, CandidateNone:
+	default:
+		return fmt.Errorf("%s: Job %s hat unbekannten candidates-Wert %q", where, scanner.Job, scanner.Candidates)
+	}
 	switch scanner.SARIF {
 	case SARIFNative, SARIFConvert, SARIFNone:
 	default:

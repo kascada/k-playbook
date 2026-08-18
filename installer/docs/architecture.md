@@ -94,6 +94,8 @@ installer/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
 │   ├── modules.go               Modulverzeichnisse suchen, Job-Namen daraus ableiten
+│   ├── candidates.go            zählen, was ein Job hätte prüfen können — je
+│   │                            Bezugspunkt und Sorte einmal im Lauf
 │   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
 │   └── execute.go               Jobs starten, je Modul auffächern, SARIF zählen,
 │                                Fortschritt fortschreiben
@@ -704,7 +706,8 @@ container-eigene Kopie. Nach einem Rebuild ist sie weg und wird vom nächsten St
 wiederhergestellt — genau der Vorzug gegenüber dem alten Symlink.
 
 `containerMarker()` in `webui/browser.go` bleibt davon unberührt und dient weiterhin
-allein dazu, den Browserstart zu unterdrücken.
+allein dazu, die geratenen Browser-Kandidaten auszusortieren — siehe
+[Browser öffnen](#browser-öffnen).
 
 ### Nur beim Start der Oberfläche
 
@@ -1202,8 +1205,31 @@ keinen Klick aus und meldet deshalb weiterhin ab — die nächste Seite ist inne
 Der Browser wird nicht automatisch geschlossen, wenn der Server endet. Browser blockieren
 das in vielen Fällen, und `open`/`xdg-open` liefern keinen verlässlichen Tab-Handle.
 
-In einem Container wird der Browser gar nicht erst geöffnet; `containerMarker()` erkennt
-das und weist auf die Port-Weiterleitung hin.
+### Browser öffnen
+
+`announce()` in `webui/server.go` gibt die URL aus und öffnet den Browser. Die Kandidaten
+liefert `browserOpeners()` in `webui/browser.go`, in dieser Reihenfolge:
+
+1. **`$BROWSER`**, zerlegt von `envOpeners()` nach der freedesktop-Konvention: `:`-getrennte
+   Liste, `%s` als Platzhalter für die URL, sonst wird sie angehängt.
+2. Die geratenen Kandidaten der Plattform — `open` auf macOS, sonst `wslview`, `xdg-open`,
+   `gio open` und weitere bis hin zu `powershell.exe Start-Process` als letztem Ausweg in
+   WSL ohne `wslu`.
+
+Probiert wird der Reihe nach; wer startet, ohne binnen `openerGrace` mit Fehler
+zurückzukommen, gilt als Erfolg.
+
+**Im Container fallen die geratenen Kandidaten weg.** Meldet `containerMarker()` einen
+Container, bleiben nur die aus `$BROWSER`. Der Grund ist nicht nur, dass ein Browser im
+Container am Nutzer vorbeiliefe: `x-www-browser` und `sensible-browser` zeigen in
+schlanken Images gern auf einen Terminal-Browser. Der startet erfolgreich, überlebt die
+Wartezeit und übernimmt danach das Terminal.
+
+Ein ausdrücklich gesetzter `$BROWSER` ist dagegen kein Ratespiel — im DevContainer von VS
+Code zeigt er auf einen Helfer, der `code --openExternal` aufruft und die URL damit an den
+Host durchreicht. Denselben Weg nimmt `gh auth login`. Ist die Variable im Container nicht
+gesetzt, bleibt keine Kandidatenliste übrig, und das Terminal nennt Marker, URL und den
+Hinweis auf die Port-Weiterleitung.
 
 ## Designentscheidungen
 

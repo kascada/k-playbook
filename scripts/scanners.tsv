@@ -1,5 +1,5 @@
 # Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
-# Fields: job	tool	languages	sarif	output	timeout	workdir	args
+# Fields: job	tool	languages	candidates	sarif	output	timeout	workdir	args
 #
 # Katalog und Binary werden gemeinsam ausgerollt (make installer-sync überträgt beides in
 # einem Schritt). Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen
@@ -19,6 +19,33 @@
 # languages  Komma-Liste der Projektsprachen wie in der Tool-Matrix, oder * für
 #            sprachunabhängig. Passt keine zur Auswahl des Laufs, wird der Job
 #            übersprungen — nicht als Fehlschlag gewertet.
+# candidates Was unter dem Bezugspunkt des Jobs als Gegenstand in Frage kommt. Der
+#            Ausführer zählt danach vor dem Aufruf die Kandidaten und schreibt die Zahl
+#            an den Job in entries/<tool>.json. Ohne sie ist ein Ergebnis mit 0 Befunden
+#            nicht zu lesen: „geprüft und sauber" und „gar nichts geprüft" schreiben
+#            dieselbe Datei.
+#              source    Dateien mit den Endungen der Sprachen aus languages.
+#              any       alle Dateien unter dem Bezugspunkt. Ein Secret kann überall
+#                        stehen.
+#              manifest  Abhängigkeits-Manifeste (go.mod, requirements*.txt,
+#                        pyproject.toml …), ebenfalls nach languages. Hier ist 0 die
+#                        richtige Aussage „nichts zu prüfen" und kein Alarm.
+#              none      keine Zählung; das Feld am Job bleibt ungesetzt.
+#            Bezugspunkt ist der des Jobs: bei workdir module das Modul, sonst {target}.
+#            Gezählt wird je Bezugspunkt und Sorte einmal im ganzen Lauf. Die Zahl ist
+#            eine Obergrenze und keine Abdeckungsmessung: die werkzeugeigenen Ausschlüsse
+#            aus args kennt die Zählung nicht, die generischen (k-playbook/,
+#            k-playbook-local/results/) schon — verankert am Bezugspunkt, sonst fiele
+#            installer/cmd/k-playbook/ mit heraus.
+#            Warum eine eigene Spalte: die Sorte steht in keiner vorhandenen. languages
+#            ist der Sprachfilter des Laufs, ihr * heißt „sprachunabhängig" und gerade
+#            nicht „alle Dateien". Im Go-Code stünde die Zuordnung als Sonderfall je
+#            Werkzeugname — genau das, was diese Auskunft vermeiden soll.
+#            trivy-config ist die ausdrückliche Ausnahme und steht auf none: sein
+#            Gegenstand sind IaC-Konfigurationen (Dockerfile, Terraform,
+#            Kubernetes-Manifeste). Sie ohne trivys eigene Erkennungslogik abzugrenzen
+#            wäre eine Näherung nach Dateinamensmuster, die eher Falschalarme erzeugte,
+#            als dass sie einordnete.
 # sarif      native (das Werkzeug kann SARIF selbst), convert (braucht einen Konverter)
 #            oder none (erzeugt kein SARIF). Es läuft ausschließlich native; die
 #            anderen werden mit Grund übersprungen, solange die Konverter fehlen.
@@ -79,6 +106,12 @@
 # gibt keinen Aufruf, in dem sie stehen könnte, und keine werkzeugeigene Schreibweise,
 # die sie tragen müsste.
 #
+# Dasselbe gilt für die Kandidatenzählung hinter candidates: auch ihre Ausschlüsse stehen
+# im Go-Code (installer/internal/review/candidates.go). Sie ruft ebenfalls kein Werkzeug
+# auf, und sie kann nur die generischen Ausschlüsse anwenden — die werkzeugeigenen aus
+# args sind ihr nicht zugänglich. Deshalb gilt: Kandidaten ≥ tatsächlich geprüfte
+# Dateien.
+#
 # Ausgeschlossen wird überall dort, wo das Werkzeug es zulässt:
 #   k-playbook/                die Installationskopie. Ihr ausgeliefertes Beispiel-
 #                              material ist kein Code des Projekts.
@@ -99,17 +132,17 @@
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
 # ein Fallback für Container-Images, kein Scanner.
-job	tool	languages	sarif	output	timeout	workdir	args
-gitleaks-git	gitleaks	*	native	file	10m	target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-gitleaks-dir	gitleaks	*	native	file	10m	target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-ruff	ruff	python	native	file	10m	target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go	native	file	20m	target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
-trivy-fs	trivy	*	native	file	15m	target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-trivy-config	trivy	*	native	file	15m	target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-gosec	gosec	go	native	file	15m	module	-fmt=sarif -out={out} ./...
-govulncheck	govulncheck	go	native	stdout	15m	module	-format sarif ./...
-osv-scanner	osv-scanner	python,go	native	file	15m	target	scan source --recursive --format sarif --output-file {out} {target}
-grype	grype	*	native	file	15m	target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
-golangci-lint	golangci-lint	go	native	file	15m	module	run --output.sarif.path {out} --output.text.path stderr ./...
-trufflehog-git	trufflehog	*	convert	stdout	15m	target	git file://{target} --json --no-update
-pip-audit	pip-audit	python	convert	file	15m	target	--format json --output {out} --progress-spinner off
+job	tool	languages	candidates	sarif	output	timeout	workdir	args
+gitleaks-git	gitleaks	*	any	native	file	10m	target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+gitleaks-dir	gitleaks	*	any	native	file	10m	target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+ruff	ruff	python	source	native	file	10m	target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go	source	native	file	20m	target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	manifest	native	file	15m	target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+trivy-config	trivy	*	none	native	file	15m	target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+gosec	gosec	go	source	native	file	15m	module	-fmt=sarif -out={out} ./...
+govulncheck	govulncheck	go	manifest	native	stdout	15m	module	-format sarif ./...
+osv-scanner	osv-scanner	python,go	manifest	native	file	15m	target	scan source --recursive --format sarif --output-file {out} {target}
+grype	grype	*	manifest	native	file	15m	target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
+golangci-lint	golangci-lint	go	source	native	file	15m	module	run --output.sarif.path {out} --output.text.path stderr ./...
+trufflehog-git	trufflehog	*	any	convert	stdout	15m	target	git file://{target} --json --no-update
+pip-audit	pip-audit	python	manifest	convert	file	15m	target	--format json --output {out} --progress-spinner off

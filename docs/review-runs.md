@@ -134,6 +134,16 @@ Probleme findet, ist `done` — das ist seine Aufgabe. Fast alle Scanner enden m
 Exit-Code ungleich 0, sobald sie etwas gefunden haben; maßgeblich ist deshalb nicht der
 Code, sondern ob lesbares SARIF vorliegt.
 
+**Ein leeres Ergebnis ist ohne die Kandidatenzahl nicht zu lesen.** `done` mit 0 Befunden
+heißt nur, dass lesbares SARIF vorliegt — nicht, dass etwas geprüft wurde. „Geprüft und
+sauber" und „gar nichts geprüft" schreiben dieselbe Datei, und der zweite Fall ist der
+schädliche: er reicht einen falsch negativen Befund als Entlastung weiter. Deshalb trägt
+jeder Job, für den gezählt werden konnte, die Zahl der Dateien, die als Gegenstand in
+Frage kamen (`candidates`, siehe unten). Ein neuer Zustand entsteht daraus nicht: die
+Zählung trennt „nichts zu prüfen" von den beiden anderen Fällen, nicht „geprüft und
+sauber" von „nichts geprüft". Das Werkzeug stellt fest, beurteilt wird im
+Bewertungsschritt.
+
 ## Einen Eintrag ausführen
 
 ```text
@@ -233,22 +243,73 @@ eine SBOM erzeugt und keine Befunde.
   "finished": "2026-08-13T09:13:41+02:00",
   "jobs": [
     { "job": "trivy-fs",     "state": "done",    "exitCode": 1, "sarif": "raw/trivy-fs.sarif",
-      "findings": 12, "started": "…", "finished": "…" },
+      "findings": 12, "candidates": 3, "started": "…", "finished": "…" },
     { "job": "trivy-config", "state": "skipped", "reason": "Sprache nicht gewählt" },
     { "job": "govulncheck",  "state": "done",    "module": "installer", "exitCode": 0,
-      "sarif": "raw/govulncheck.sarif", "findings": 0, "started": "…", "finished": "…" }
+      "sarif": "raw/govulncheck.sarif", "findings": 0, "candidates": 2,
+      "started": "…", "finished": "…" }
   ]
 }
 ```
 
 Der Eintrag trägt seinen abgeleiteten Zustand, darunter bleiben die Jobs einzeln
-sichtbar: Der Gesamtzustand ist die Kurzfassung, nicht die einzige Auskunft. `exitCode`
-und `findings` fehlen, wo nichts gemessen wurde — 0 hieße hier „gemessen und null".
+sichtbar: Der Gesamtzustand ist die Kurzfassung, nicht die einzige Auskunft. `exitCode`,
+`findings` und `candidates` fehlen, wo nichts gemessen wurde — 0 hieße hier „gemessen und
+null".
 `reason` steht bei `skipped` und `failed`; ein Werkzeug ohne Job trägt ihn am Eintrag,
 weil es keinen Job gibt, an dem er stehen könnte. `module` nennt das geprüfte Modul,
 relativ zum Ziel des Laufs, die Wurzel selbst als `.`; bei `workdir: target` fehlt es —
 dort gibt es kein Modul, auf das es zeigen könnte. Das Beispiel mischt bewusst: die
 `trivy`-Jobs laufen projektweit, `govulncheck` an einem Modul.
+
+#### `candidates` — was der Job hätte prüfen können
+
+`candidates` ist die Zahl der Dateien, die unter dem **Bezugspunkt** des Jobs als
+Gegenstand in Frage kamen: bei `workdir: module` das Modul, sonst das Ziel des Laufs.
+Welche Dateien zählen, sagt die Spalte `candidates` in
+[`scripts/scanners.tsv`](../scripts/scanners.tsv):
+
+| Sorte | Kandidat ist | Für |
+|---|---|---|
+| `source` | eine Datei mit der Endung einer Sprache aus `languages` | `gosec`, `ruff`, `golangci-lint`, `semgrep` |
+| `any` | jede Datei | `gitleaks`, `trufflehog` |
+| `manifest` | ein Abhängigkeits-Manifest, ebenfalls nach `languages` | `trivy fs`, `govulncheck`, `osv-scanner`, `grype`, `pip-audit` |
+| `none` | nichts; das Feld bleibt ungesetzt | `trivy config` |
+
+Die Sorte steht im Katalog und nicht im Code: eine Regel, die auf einen Werkzeugnamen
+prüft, wäre genau der Sonderfall, den diese Auskunft vermeiden soll. `none` ist die
+ausdrückliche Ausnahme — `trivy config` sucht IaC-Konfigurationen, und die ohne trivys
+eigene Erkennungslogik abzugrenzen erzeugte eher Falschalarme, als dass es einordnete.
+
+Gezählt wird **je Bezugspunkt und Sorte einmal im ganzen Lauf**, nicht je Job: derselbe
+Baumlauf über dasselbe Ziel ergibt für jeden Job derselben Sorte dasselbe. Ausgelassen
+werden dabei die Verzeichnisse, die ohnehin kein Job sieht — `k-playbook/` und
+`k-playbook-local/results/`, beide **am Bezugspunkt verankert**, dazu alles mit führendem
+Punkt. Die Verankerung ist kein Detail: `installer/cmd/k-playbook/` ist Code dieses
+Projekts, und ein Ausschluss über den bloßen Namen fräße ihn mit — derselbe Fehler wie in
+Task 004, wo ein Muster ohne Anker die ganze Projektwurzel traf. Die Liste steht im Code
+([`installer/internal/review/candidates.go`](../installer/internal/review/candidates.go)),
+aus demselben Grund wie die der Modulsuche, und sie ist nicht dieselbe: die Modulsuche
+fragt, wo ein Modul des Projekts liegt, die Zählung, was ein Werkzeug hätte sehen können —
+`vendor/`, `node_modules/` und `testdata/` zählen deshalb mit.
+
+**Die Zahl ist eine Obergrenze, keine Abdeckungsmessung.** Die werkzeugeigenen
+Ausschlüsse stehen in `args`, und jedes Werkzeug schreibt sie anders; die Zählung kennt
+sie nicht. Es gilt deshalb nur: Kandidaten ≥ tatsächlich geprüfte Dateien. `0` heißt
+sicher „nichts zu tun", eine hohe Zahl heißt „hier hätte etwas sein können".
+
+Das Feld fehlt, wo nicht gezählt wurde: bei einem `skipped`-Job, bei der Sorte `none` und
+dann, wenn der Baumlauf selbst gescheitert ist. Ein Fehler dabei macht **keinen** Job zum
+Fehlschlag — die Zählung ist eine Zusatzauskunft, kein Ergebnis. Ein `failed`-Job trägt
+die Zahl dagegen, wenn für seinen Bezugspunkt gezählt wurde: sein Fehlschlag sagt über den
+Gegenstand nichts aus.
+
+`k-playbook scan` nennt die Zahl nur bei 0 Befunden — dort trennt sie „nichts zu prüfen"
+von „nichts geprüft", sonst ist sie Rauschen:
+
+```text
+  ruff             ruff             fertig, 0 Befunde bei 12 Kandidaten → raw/ruff.sarif
+```
 
 **Geschrieben wird schon beim Start**, mit dem Zustand `running`, und danach bei jeder
 Zustandsänderung eines Jobs. Läge die Datei erst am Ende, wäre der Fortschritt während
@@ -261,9 +322,13 @@ weil Job-Namen am Modulbestand hängen können, räumt der Eintrag vorher weg, w
 vorigen Aufruf unter `raw/` geschrieben hat — auch dann, wenn diesmal kein einziger Job
 läuft. Sonst bliebe `raw/govulncheck.sarif` liegen, sobald ein zweites Modul den Job in
 `govulncheck-installer` umbenennt, und gälte weiter als Ergebnis. Welche Dateien es sind,
-sagt die vorige `entries/<tool>.json`; fehlt sie, greift die Namensregel (der Job-Name
-beginnt mit dem Tool-Namen) als Rückfall, beschränkt auf `*.sarif`. Die Dateien anderer
-Einträge bleiben stehen.
+sagt die vorige `entries/<tool>.json` — und zwar über den **Job-Namen**, nicht über den
+`sarif`-Pfad: `raw/<job>.sarif` ist die Namensregel, und der Name steht dort bei jedem
+Ausgang. Deshalb gilt die Zusage ohne Ausnahme, auch für die Datei eines Jobs, der beim
+vorigen Aufruf gescheitert ist. Fehlt die Datei, greift die Namensregel (der Job-Name
+beginnt mit dem Tool-Namen) als Rückfall, beschränkt auf `*.sarif`; dieselbe Regel prüft
+auch jeden gelesenen Job-Namen, bevor er ein Löschen steuert. Die Dateien anderer Einträge
+bleiben stehen.
 
 ## Die Oberfläche
 
