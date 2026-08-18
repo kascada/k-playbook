@@ -33,8 +33,10 @@ gestartet wurde.
 | **Projekt** | | |
 | `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
 | **Docs** | | |
-| `/k-code2docs` | semantische Projekt-Doku erzeugen und für AI-Sessions registrieren | schreibt nach `k-playbook-local/docs/`, dazu `AGENTS.md` und `opencode.json` |
-| `/k-tools-scan` | Library-/Tool-Doku nach `/k-code2docs` ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
+| `/k-code2docs` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/` |
+| `/k-tools-scan` | Library-/Tool-Doku ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
+| `/k-docs-extract` | Rohmaterial aus `k-playbook-local/material/` zu Doku verdichten | schreibt je Thema eine Datei nach `k-playbook-local/docs/extracted/`, mit Quelle und Konfidenz |
+| `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
@@ -90,7 +92,10 @@ Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
 | `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
 | `/k-review`, `/k-results` | `k-playbook-local/results/` |
-| `/k-code2docs`, `/k-tools-scan` | `k-playbook-local/docs/`, Tool-Steckbriefe unter `libs/` |
+| `/k-code2docs` | `k-playbook-local/docs/code/` |
+| `/k-tools-scan` | `k-playbook-local/docs/libs/` |
+| `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
+| `/k-docs-index` | `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` im Hauptverzeichnis |
 
 Gelesen wird zusätzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
 Geschrieben wird dorthin nie.

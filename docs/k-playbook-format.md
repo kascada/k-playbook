@@ -59,8 +59,10 @@ Commands raten damit keinen Pfad mehr und lesen auch keinen: sie leiten ihn ab.
 Das gilt auch für die Projekt-Dokumentation. Früher durfte `paths.docs` als einziger
 Wert mit `../` aus dem k-playbook-Verzeichnis herauszeigen, damit ein Projekt seine schon
 vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-code2docs`
-schreibt nach `k-playbook-local/docs/`. Was ein Projekt sonst noch an Dokumentation
-pflegt, bleibt davon unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
+schreibt nach `k-playbook-local/docs/code/`. Auf `docs/` als Ganzes schreiben vier
+Commands, jeder in sein eigenes Unterverzeichnis. Was ein Projekt sonst noch an
+Dokumentation pflegt, bleibt davon unberührt — k-playbook beansprucht nur sein eigenes
+Verzeichnis.
 
 Innerhalb von `k-playbook-local/docs/` ist die Herkunft am Verzeichnis ablesbar, und
 daran hängt die Eigentümerregel:

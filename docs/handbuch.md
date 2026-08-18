@@ -146,7 +146,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 | Gruppe | Commands | Zweck |
 |---|---|---|
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
-| Docs | `/k-code2docs`, `/k-tools-scan` | Projektwissen für AI-Sessions dokumentieren |
+| Docs | `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft dokumentieren und für AI-Sessions registrieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausführen, Findings priorisieren und abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, prüfen und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
@@ -207,20 +207,28 @@ Der komplette Flow steht in [`code-review.md`](./code-review.md), das Artefaktmo
 
 ### Docs-First
 
-Projektwissen soll dokumentiert und für AI-Sessions registriert sein:
+Projektwissen soll dokumentiert und für AI-Sessions registriert sein. Der Ablauf ist
+vierstufig, und jede Stufe schreibt ausschließlich in ihr eigenes Verzeichnis:
 
 ```text
-/k-code2docs
-/k-tools-scan
+/k-code2docs      → k-playbook-local/docs/code/
+/k-tools-scan     → k-playbook-local/docs/libs/
+/k-docs-extract   → k-playbook-local/docs/extracted/
+/k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json
 ```
 
-`/k-code2docs` schreibt nach `k-playbook-local/docs/`, erzeugt oder aktualisiert den
-Docs-Index und registriert `AGENTS.md`. `/k-tools-scan` legt Tool-Steckbriefe unter
-`k-playbook-local/docs/libs/` ab. Danach den Assistenten neu starten, damit die neue
-Session-Memory greift.
+Die ersten drei erzeugen Inhalt: `/k-code2docs` liest den Code, `/k-tools-scan` die
+Libraries, `/k-docs-extract` das Rohmaterial aus `k-playbook-local/material/`. Wer nichts
+davon hat, lässt die Stufe aus.
 
-Was ein Projekt sonst noch an Dokumentation pflegt, bleibt davon unberührt — k-playbook
-beansprucht nur sein eigenes Verzeichnis.
+`/k-docs-index` ist der letzte Schritt und der einzige, der `docs/README.md` schreibt —
+den einen Index über alle Herkünfte, `docs/manual/` eingeschlossen. Er registriert die
+Docs außerdem in `AGENTS.md` und `opencode.json`. Danach den Assistenten neu starten,
+damit die neue Session-Memory greift.
+
+Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. In `docs/manual/` schreibt
+kein Command Doc-Dateien; was ein Projekt sonst noch an Dokumentation pflegt, bleibt
+ebenfalls unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
 
 ## Regeln und Checks
 

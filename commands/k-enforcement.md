@@ -27,13 +27,18 @@ From the context output:
 - The code to check is `project.repoRoot` — the rules apply to the code, not to the
   playbook directory.
 - `DOCS_DIR = <local.dir>/docs`.
+- `CODE_DOCS_DIR = <DOCS_DIR>/code` — the only origin that follows the code. `libs/`
+  follows the libraries, `manual/` and `extracted/` follow nothing; they are outside the
+  docs-sync duty. `DOCS_DIR/README.md` is the generated index and belongs to
+  `/k-docs-index`.
 
 - If `$ARGUMENTS` is set, it names the directory to check. It must lie inside
   `project.repoRoot`; otherwise stop and say so.
 - If `$ARGUMENTS` is empty, check the current working directory.
 
-If `DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
-docs path.
+If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
+docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-code2docs` is not a
+finding by itself — name it and move on.
 
 ## Step 2 — Load rule files
 
@@ -53,7 +58,7 @@ Enforcement-Check
 Ziel:         <geprüftes Verzeichnis>
 Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
 Abgeschaltet: <D> (leere lokale Datei) | —
-Docs:         k-playbook-local/docs | fehlt
+Docs:         k-playbook-local/docs/code | fehlt
 ```
 
 ## Step 3 — Determine current change scope
@@ -88,7 +93,8 @@ Always perform this check when code files changed.
 Use the loaded rules, especially `docs-sync.md`, and inspect:
 
 - Changed source/config/schema/API files.
-- Docs under `DOCS_DIR`, if it exists.
+- Docs under `CODE_DOCS_DIR`, if it exists. Do not report `libs/`, `manual/`,
+  `extracted/` or the generated `README.md` as out of sync — they do not follow the code.
 - `README.md`, `AGENTS.md`, and obvious architecture/setup/API docs.
 
 Decide one of:

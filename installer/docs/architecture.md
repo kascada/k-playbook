@@ -204,8 +204,8 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-rules/  reviews/  checks/  commands/  skills/  results/  docs/  guidelines/
-tasks/  tasks/done/  priv/  k-playbook.md  TODO.md
+rules/  reviews/  checks/  commands/  skills/  results/  docs/  docs/manual/
+guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md  TODO.md
 ```
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
@@ -214,10 +214,14 @@ würden. Mehr schreibt `CreateLocal()` nicht: insbesondere keine `.gitignore`. W
 Projekt versioniert, entscheidet das Projekt.
 
 Das Feld `Private` an einem `LocalEntry` markiert daher nur noch, für welche
-Verzeichnisse diese Wahl überhaupt ansteht — `priv/` und `material/`. Ihre README
-beschreibt, wie man den Inhalt heraushält, falls gewünscht. Das Feld geht als JSON an
-die Oberfläche und ist dort die Whitelist des Blocks
-[Lokale Einstellungen](#lokale-einstellungen).
+Verzeichnisse diese Wahl überhaupt ansteht — `priv/` **und** `material/`. Bei `priv/` ist
+der Grund offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/`
+ist er derselbe und wird leicht übersehen: Rohmaterial sind Chat-Mitschnitte, Notizen und
+Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Beide bekommen
+über dasselbe `Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt
+ausschließt und das Verzeichnis selbst versioniert lässt. Ihre README beschreibt, wie man
+den Inhalt heraushält, falls gewünscht. Das Feld geht als JSON an die Oberfläche und ist
+dort die Whitelist des Blocks [Lokale Einstellungen](#lokale-einstellungen).
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.

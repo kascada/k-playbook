@@ -18,8 +18,12 @@ Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
 in jeder OpenCode-Session **automatisch als autoritative Quelle** genutzt
 wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.
 
-> **Ausführung:** Die operative Umsetzung (Docs schreiben, `AGENTS.md` und
-> `opencode.json` erzeugen/ergänzen) macht der Command **`/k-code2docs`**.
+> **Ausführung:** Die operative Umsetzung machen vier Docs-Commands, jeder in
+> seinem eigenen Verzeichnis: **`/k-code2docs`** schreibt nach `docs/code/`,
+> **`/k-tools-scan`** nach `docs/libs/`, **`/k-docs-extract`** nach
+> `docs/extracted/`. Den Index `docs/README.md` und die Registrierung
+> (`AGENTS.md`, `opencode.json`) macht allein **`/k-docs-index`** — er ist der
+> letzte Schritt und der einzige, der die Session-Memory-Kette schließt.
 > Dieser Skill liefert das *Konzept* und die zugrundeliegenden Vorlagen.
 
 ## Wann anwenden
@@ -44,7 +48,9 @@ Drei zusammenspielende Bausteine:
    `references`.
 3. **`k-playbook-local/docs/README.md`** mit **Stichwort-Index** (A–Z) und
    **„Häufige Fragen → Datei"**-Tabelle – damit die AI beim Nachschlagen
-   in den Docs gezielt findet, was drin ist, ohne alle Files zu lesen.
+   in den Docs gezielt findet, was drin ist, ohne alle Files zu lesen. Es ist
+   der einzige Index, und er deckt alle Herkünfte ab: `code/`, `libs/`,
+   `extracted/` und `manual/`.
 
 ## Ausführung
 

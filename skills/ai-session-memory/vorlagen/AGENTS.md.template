@@ -15,7 +15,8 @@ Beispiel:
 ## KRITISCHE REGEL: Docs zuerst
 
 **Bevor du Code liest, Repos durchsuchst oder Struktur analysierst,
-konsultiere IMMER zuerst `docs/`.** Dort steht bereits ausformuliert:
+konsultiere IMMER zuerst `k-playbook-local/docs/`.** Dort steht bereits
+ausformuliert:
 
 - <Themenbereich 1>
 - <Themenbereich 2>
@@ -24,7 +25,7 @@ konsultiere IMMER zuerst `docs/`.** Dort steht bereits ausformuliert:
 
 Der **Einstieg** ist immer:
 ```
-docs/README.md   ← Inhaltsverzeichnis + Stichwort-Index
+k-playbook-local/docs/README.md   ← Inhaltsverzeichnis + Stichwort-Index
 ```
 
 ## Wann DOCH in den Code schauen?
@@ -38,6 +39,7 @@ Nur wenn:
 
 **Wenn du im Code etwas findest, das den Docs widerspricht: Docs updaten.**
 Sie sind autoritativ für strukturelle Fragen – aber sie müssen aktuell bleiben.
+Geändert wird über den Erzeuger des jeweiligen Verzeichnisses, nicht von Hand.
 
 ## Doc-Format
 
@@ -45,7 +47,11 @@ Die Doc-Dateien sind normales Markdown. Themen- und Tool-Referenzdateien nutzen
 leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`,
 `description`, `tags`, `status`, `generated`), damit Menschen und Agenten die
 Dateien nach Bedeutung, Status und Herkunft einordnen können. Der Einstieg
-bleibt `docs/README.md`.
+bleibt `k-playbook-local/docs/README.md`.
+
+Die Herkunft steht am Verzeichnis: `code/` erzeugt `/k-code2docs`, `libs/`
+erzeugt `/k-tools-scan`, `extracted/` erzeugt `/k-docs-extract`, `manual/` ist
+handgepflegt. Den Index `README.md` schreibt `/k-docs-index`.
 
 ## Sprache
 
@@ -59,13 +65,17 @@ wie der Nutzer (i.d.R. <Standard-Sprache>).
 ├── AGENTS.md                          diese Datei
 ├── opencode.json                      OpenCode-Konfig (bindet AGENTS.md ein)
 ├── <verzeichnisse/repos>
-└── docs/                              ★ die autoritative Dokumentation
+└── k-playbook-local/
+    ├── docs/                          ★ die autoritative Dokumentation
+    │   ├── README.md                  Index über alle Herkünfte
+    │   ├── code/  libs/  extracted/  manual/
+    └── material/                      Rohmaterial, nie indiziert
 ```
 
 ## Kurzverweise auf wichtige Docs
 
 | Frage | Datei |
 |-------|-------|
-| Was macht das Projekt insgesamt? | `docs/00-overview.md` |
-| Welcher Stack? | `docs/01-stack.md` |
+| Was macht das Projekt insgesamt? | `k-playbook-local/docs/code/00-overview.md` |
+| Welcher Stack? | `k-playbook-local/docs/code/01-stack.md` |
 | <Weitere häufige Einstiegspunkte> | ... |

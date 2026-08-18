@@ -275,11 +275,9 @@ automatisch als autoritativ behandeln.
   `<playbook.dir>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und
   Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus der Übersichts-Doku
   ableiten, Themenbereiche aus den gefundenen Herkünften füllen, Kurzverweis-Tabelle aus
-  dem „Häufige Fragen"-Block spiegeln). Ersetze dabei alle template-seitigen
-  `docs/`-Beispiele durch `DOCS_DISPLAY_PATH` bzw. `DOCS_README_FROM_AGENTS`; keine hart
-  kodierten `docs/README.md`-Verweise stehen lassen. Erwähne knapp, dass die Doc-Dateien
-  normales Markdown mit OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der
-  Einstieg.
+  dem „Häufige Fragen"-Block spiegeln). Die Pfade der Vorlage stimmen bereits mit
+  `DOCS_DISPLAY_PATH` und `DOCS_README_FROM_AGENTS` überein — weicht ein aufgelöster Pfad
+  davon ab, gilt der aufgelöste.
 - Existiert → prüfen, ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf
   `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad
   zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.
@@ -288,10 +286,9 @@ automatisch als autoritativ behandeln.
 
 - Existiert nicht → aus
   `<playbook.dir>/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen.
-  `references.docs.path` auf `DOCS_REFERENCE_PATH` setzen, nicht auf den Template-Default
-  `./docs`. `description` **konkret** befüllen: Projektname + Liste der wichtigsten
-  Themen + Hinweis auf `DOCS_README_FROM_AGENTS` als Index (nicht die
-  Template-Platzhalter stehen lassen).
+  `references.docs.path` muss `DOCS_REFERENCE_PATH` sein. `description` **konkret**
+  befüllen: Projektname + Liste der wichtigsten Themen + Hinweis auf
+  `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
 - Existiert → prüfen, ob `instructions` `AGENTS.md` enthält, ob `references.docs.path`
   nach Auflösung relativ zur Config-Datei auf `RESOLVED_DOCS_DIR` zeigt, und ob die
   `description` konkret ist. Fehlendes ergänzen, falsche/alte Docs-Pfade korrigieren,

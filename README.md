@@ -64,11 +64,12 @@ projekt/
     ├── commands/         Overlay zu k-playbook/commands/
     ├── skills/           Overlay zu k-playbook/skills/
     ├── results/          alles, was Reviews erzeugen
-    ├── docs/             Projektwissen für AI-Sessions
+    ├── docs/             Projektwissen für AI-Sessions, nach Herkunft getrennt
+    │   └── manual/       handgepflegte Doku; kein Command schreibt hier hinein
     ├── guidelines/
     ├── tasks/done/
     ├── priv/             Notizen und Zwischenstände
-    ├── material/         Rohmaterial als Quelle für Docs
+    ├── material/         Rohmaterial als Quelle für Docs, nie indiziert
     ├── k-playbook.md     projekteigene Instruktionsebene
     └── TODO.md
 ```

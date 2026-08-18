@@ -5,8 +5,8 @@
   ],
   "references": {
     "docs": {
-      "path": "./docs",
-      "description": "Autoritative Projektdokumentation von <Projektname>. IMMER zuerst konsultieren (docs/README.md als Index), bevor Code gelesen oder analysiert wird. Enthält: <konkrete Themen listen, z.B. System-Overview, Tech-Stack, Detailanalysen der Repos, bekannte Bugs, Test-Anleitung>."
+      "path": "./k-playbook-local/docs",
+      "description": "Autoritative Projektdokumentation von <Projektname>. IMMER zuerst konsultieren (k-playbook-local/docs/README.md als Index), bevor Code gelesen oder analysiert wird. Enthält: <konkrete Themen listen, z.B. System-Overview, Tech-Stack, Detailanalysen der Repos, bekannte Bugs, Test-Anleitung>."
     }
   }
 }

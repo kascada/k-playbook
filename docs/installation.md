@@ -59,10 +59,12 @@ k-playbook-local/
 ├── commands/      Overlay zu k-playbook/commands/
 ├── skills/        Overlay zu k-playbook/skills/
 ├── results/       alles, was Reviews erzeugen
-├── docs/          Projektwissen für AI-Sessions
+├── docs/          Projektwissen für AI-Sessions, nach Herkunft getrennt
+│   └── manual/    handgepflegte Doku; kein Command schreibt hier hinein
 ├── guidelines/
 ├── tasks/done/
 ├── priv/          eigene Notizen, siehe unten
+├── material/      Rohmaterial als Quelle für Docs, siehe unten
 ├── k-playbook.md  projekteigene Instruktionsebene
 └── TODO.md
 ```

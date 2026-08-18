@@ -9,11 +9,19 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 
 **Nachprüfbar:** Ja – siehe Checkliste am Ende und Verifikations-Test.
 
-> **Ausführungs-Hinweis:** Die konkrete Umsetzung (Docs erzeugen, `AGENTS.md`
-> und `opencode.json` schreiben, Templates befüllen) macht heute der Command
-> **`/k-code2docs`** in einem Rutsch. Dieses PLAYBOOK beschreibt weiterhin
-> das *Modell* — nützlich, wenn jemand konzeptionell verstehen will, was
-> passiert, oder das Setup manuell (ohne Command) machen möchte.
+> **Ausführungs-Hinweis:** Die konkrete Umsetzung machen heute vier Commands,
+> nacheinander und jeder in seinem eigenen Verzeichnis:
+>
+> 1. **`/k-code2docs`** — Doku aus dem Code nach `docs/code/`.
+> 2. **`/k-tools-scan`** — Library- und Tool-Steckbriefe nach `docs/libs/`.
+> 3. **`/k-docs-extract`** — Rohmaterial aus `material/` nach `docs/extracted/`.
+> 4. **`/k-docs-index`** — baut `docs/README.md` über alle Herkünfte und
+>    schreibt `AGENTS.md` und `opencode.json`.
+>
+> Nur der letzte Schritt schließt die Session-Memory-Kette; die drei davor
+> erzeugen nur Inhalt. Dieses PLAYBOOK beschreibt weiterhin das *Modell* —
+> nützlich, wenn jemand konzeptionell verstehen will, was passiert, oder das
+> Setup manuell (ohne Command) machen möchte.
 
 ---
 
@@ -38,11 +46,16 @@ Drei Bausteine wirken zusammen:
 
 ```
 Projekt-Root/
-├── AGENTS.md            (1) meta-Instruktion für jede Session
-├── opencode.json        (2) sorgt dafür, dass (1) und (3) wirksam sind
-└── k-playbook/
-    └── docs/
-    └── README.md        (3) Stichwort-Index in den Docs selbst
+├── AGENTS.md                    (1) meta-Instruktion für jede Session
+├── opencode.json                (2) sorgt dafür, dass (1) und (3) wirksam sind
+└── k-playbook-local/
+    ├── docs/
+    │   ├── README.md            (3) Stichwort-Index über alle Herkünfte
+    │   ├── code/                    erzeugt von /k-code2docs
+    │   ├── libs/                    erzeugt von /k-tools-scan
+    │   ├── extracted/               erzeugt von /k-docs-extract
+    │   └── manual/                  von Hand gepflegt
+    └── material/                Rohmaterial, nie indiziert
 ```
 
 - **`AGENTS.md`** = „Regel": Docs sind autoritativ.
@@ -62,26 +75,34 @@ Ohne alle drei Bausteine funktioniert der Mechanismus nicht:
 
 ## Ausführung – Schritt für Schritt
 
-### Schritt 1: Docs-Bestand aufnehmen
+### Schritt 1: Docs-Bestand je Herkunft aufnehmen
 
 ```bash
 cd <projekt-root>
 ls k-playbook-local/docs/
+ls k-playbook-local/docs/code/ k-playbook-local/docs/libs/ \
+   k-playbook-local/docs/extracted/ k-playbook-local/docs/manual/
 ```
 
 Identifiziere:
 
-- Welche Doc-Dateien existieren?
-- Ist es eine flache Struktur oder gibt es Präfixe/Nummern?
-- Gibt es bereits einen Index/TOC (in `README.md` oder `INDEX.md`)?
+- Welche Doc-Dateien existieren, und **in welcher Herkunft**? Die Herkunft ist
+  am Verzeichnis ablesbar, und daran hängt, wer die Datei pflegt.
+- Ein fehlendes `code/`, `libs/` oder `extracted/` ist der Normalzustand: es
+  entsteht erst beim ersten Lauf seines Erzeugers.
+- Liegen flache `docs/*.md` direkt im Docs-Verzeichnis? Das sind Dateien aus
+  der Zeit vor dieser Struktur; sie haben keinen Erzeuger. `/k-docs-index`
+  bietet an, sie nach `docs/code/` zu verschieben.
+- Gibt es bereits einen Index in `docs/README.md`?
 
 Wenn keine Docs existieren: dieses Playbook ist noch nicht anwendbar –
 zuerst Docs schreiben (siehe `ks-overlay-repo-analyse/` oder eigene
 Recherche).
 
-### Schritt 2: `k-playbook-local/docs/README.md` mit Stichwort-Index erweitern
+### Schritt 2: `k-playbook-local/docs/README.md` als einzigen Index aufbauen
 
-Grundstruktur:
+Es gibt genau einen Index, und er deckt alle Herkünfte ab. Ausgeführt schreibt
+ihn `/k-docs-index`; von Hand sieht die Grundstruktur so aus:
 
 ```markdown
 # <Projektname> – Dokumentation
@@ -89,20 +110,42 @@ Grundstruktur:
 <Ein-Absatz-Beschreibung des Projekts>
 
 > **Für AI-Sessions:** Diese Docs sind **autoritativ**. Nutze sie zuerst,
-> bevor du Code liest. Siehe [`AGENTS.md`](../AGENTS.md) im Workspace-Root.
+> bevor du Code liest. Siehe [`AGENTS.md`](../../AGENTS.md) im Projekt-Root.
 
 ## Übersicht der Dokumente
+
+### Code (`code/`) — erzeugt von `/k-code2docs`
 
 | Datei | Inhalt |
 |-------|--------|
 | ... | ... |
 
+### Extrahiert (`extracted/`) — erzeugt von `/k-docs-extract`
+
+| Datei | Inhalt | Konfidenz |
+|-------|--------|-----------|
+| ... | ... | ... |
+
+### Handgepflegt (`manual/`)
+
+| Datei | Inhalt |
+|-------|--------|
+| ... | ... |
+
+## Libs & Stack
+
+Erzeugt von `/k-tools-scan` unter `libs/`.
+
+| Lib | Version | Severity | Letzter Review |
+|-----|---------|----------|----------------|
+| ... | ... | ... | ... |
+
 ## Stichwort-Index
 
-Alphabetisch. Format: Stichwort → Datei-Nr. + Abschnitt.
+Alphabetisch. Format: Stichwort → Datei + Abschnitt.
 
 ### A
-- **<Begriff>** → `<datei>` §<abschnitt>
+- **<Begriff>** → `<herkunft>/<datei>.md` §<abschnitt>
 ...
 
 ## Häufige Fragen → Direkter Sprung
@@ -114,10 +157,15 @@ Alphabetisch. Format: Stichwort → Datei-Nr. + Abschnitt.
 
 **Kriterien für einen guten Index:**
 
-- Deckt alle in den Docs behandelten Konzepte/Begriffe ab
+- Deckt alle in den Docs behandelten Konzepte/Begriffe ab, über alle Herkünfte
+  hinweg — ein Index über nur eine Herkunft ist kein Index
+- Jeder Link trägt das Herkunftsverzeichnis im Pfad (`code/00-overview.md`,
+  nicht `00-overview.md`)
 - Nutzt konkrete Begriffe (auch Fachwörter, Bug-Namen, Env-Variablen)
 - Verweist präzise auf Datei UND Abschnitt (nicht nur Datei)
 - Wächst mit den Docs mit (Regel: neue Doc-Datei → Index-Einträge nachziehen)
+- Ein zweiter Index — etwa eine Übersichtstabelle in `libs/README.md` — ist ein
+  Fehler; die Lib-Tabelle steht im Index selbst
 
 Neue Themen- und Tool-Referenzdateien sollten normales Markdown mit leichtgewichtig OKF-kompatiblem YAML-Frontmatter sein. Minimal sinnvoll sind `type`, `title`, `description`, `tags`, `status` und `generated`; `sources` wird nur eingetragen, wenn tatsächlich externe Quellen genutzt wurden.
 
@@ -274,6 +322,9 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 
 - `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
-- `/k-code2docs` (Command) – führt das hier beschriebene Setup automatisch
-  aus (Docs erzeugen + `AGENTS.md` + `opencode.json`).
+- `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract` (Commands) – erzeugen die
+  Doku je Herkunft unter `docs/code/`, `docs/libs/` und `docs/extracted/`.
+- `/k-docs-index` (Command) – letzter Schritt der Kette: baut `docs/README.md`
+  über alle Herkünfte und schreibt `AGENTS.md` und `opencode.json`. Erst
+  danach greift die hier beschriebene Session-Memory.
 - `/k-gui` – legt `K-PLAYBOOK.yaml` und die feste Struktur an oder vervollständigt sie.

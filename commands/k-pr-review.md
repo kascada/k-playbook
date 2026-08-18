@@ -98,7 +98,10 @@ Wenn zwei Argumente übergeben werden:
 Aus der Context-Ausgabe:
 
 - `PR_TARGET_DIR` = `project.repoRoot`. Das deckt auch Wrapper-Repos ab, bei denen das eigentliche Git-Repo nicht das Hauptverzeichnis ist.
-- `DOCS_DIR` = `<local.dir>/docs` — Phase 2 braucht es für die Docs-Sync-Pflicht.
+- `DOCS_DIR` = `<local.dir>/docs`.
+- `CODE_DOCS_DIR` = `<DOCS_DIR>/code` — Phase 2 braucht es für die Docs-Sync-Pflicht. Nur
+  diese Herkunft folgt dem Code; `libs/`, `manual/` und `extracted/` sind davon
+  ausgenommen, und `DOCS_DIR/README.md` ist der erzeugte Index von `/k-docs-index`.
 - `EFFECTIVE_RULES` = `catalogs.rules`, inklusive Herkunft je Regel.
 
 Wenn `remediation.target` gesetzt und nicht `.` ist, benennt es den engeren Code-Root
@@ -139,6 +142,7 @@ Merke:
 - `GH_DEFAULT_BRANCH`
 - `PR_TARGET_DISPLAY`
 - `DOCS_DIR`
+- `CODE_DOCS_DIR`
 - `EFFECTIVE_RULES`
 
 ## Schritt 2 - PR bestimmen
@@ -292,7 +296,7 @@ Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohn
 Lade für die Bewertung:
 
 - die effektive Regelmenge `EFFECTIVE_RULES` aus `catalogs.rules`
-- projektlokale Docs aus `DOCS_DIR`, soweit für Docs-Sync sichtbar relevant
+- projektlokale Docs aus `CODE_DOCS_DIR`, soweit für Docs-Sync sichtbar relevant
 
 Nutze diese Quellen als Constraints, nicht als Anlass für ein separates `/k-review`.
 

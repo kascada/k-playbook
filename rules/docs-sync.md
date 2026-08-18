@@ -17,10 +17,23 @@ Bei jeder Code-Änderung gilt:
 
 Relevant sind insbesondere:
 
-- Dateien unter `<projekt>/k-playbook/docs/`.
+- Dateien unter `k-playbook-local/docs/code/` — die aus dem Code erzeugte Projekt-Doku. Sie folgt dem Code und veraltet mit ihm.
 - Architektur-, Betriebs-, Setup-, API- und Datenmodell-Dokumentation.
 - `README.md`, `AGENTS.md` oder andere Einstiegspunkte, wenn sie das geänderte Verhalten beschreiben.
 - Projektinterne Guidelines oder Known-Decisions, wenn die Änderung eine Konvention oder bewusste Entscheidung berührt.
+
+Geschrieben wird nur neben die Installation. Das Installationsverzeichnis selbst wird bei jedem Update vollständig ersetzt; Doku darin wäre beim nächsten Mal weg.
+
+## Was von der Sync-Pflicht ausgenommen ist
+
+Unter `k-playbook-local/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, und nur eine davon folgt dem Code:
+
+- `docs/libs/` folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
+- `docs/manual/` ist handgepflegt und folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst.
+- `docs/extracted/` hält fest, was aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage.
+- `docs/README.md` ist der erzeugte Index. Er wird nicht von Hand nachgezogen, sondern von `/k-docs-index` neu geschrieben.
+
+Ändert sich dort tatsächlich etwas, ist der Weg der jeweilige Erzeuger — nicht die Handkorrektur im selben Arbeitsgang.
 
 ## Nicht automatisch dokumentieren
 
