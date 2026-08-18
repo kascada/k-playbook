@@ -20,8 +20,15 @@ const (
 // gemessen und null, oder gar nicht gemessen. Ein übersprungener Job hat
 // keinen Exit-Code, und das soll man ihm ansehen.
 type JobStatus struct {
-	Job      string `json:"job"`
-	State    State  `json:"state"`
+	Job   string `json:"job"`
+	State State  `json:"state"`
+	// Module ist das geprüfte Modul, relativ zum Ziel des Laufs; die Wurzel
+	// selbst steht als „.". Gesetzt wird es unabhängig von der Auffächerung:
+	// bei genau einem Modul heißt der Job wie im Katalog, und ohne das Feld
+	// sähe man dem fertigen Lauf ausgerechnet im Normalfall nicht an, was
+	// geprüft wurde. Leer bei workdir target — dort gibt es kein Modul, auf
+	// das es zeigen könnte.
+	Module   string `json:"module,omitempty"`
 	ExitCode *int   `json:"exitCode,omitempty"`
 	// SARIF ist der Ort der Datei, relativ zum Laufverzeichnis.
 	SARIF    string `json:"sarif,omitempty"`

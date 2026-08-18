@@ -168,3 +168,28 @@ verglichen:
   ihn gezielt selbst. Sonst bräuchte das Werkzeug Größengrenzen und Kürzungsregeln, und das
   sind wieder Urteile. Die Antwort trägt damit keinen Inhalt, bleibt auch bei 200 geänderten
   Dateien klein und kann nichts still verschlucken.
+- **`gosec` prüft von der Projektwurzel aus nichts.** Sein Katalog-Eintrag läuft mit
+  `workdir: target` und `./...` — Task 010 beließ ihn bewusst dort, gestützt auf die
+  Beobachtung, dass er „durchläuft, weil er seine Verzeichnisse selbst sucht". Nachgemessen
+  in diesem Repo, dessen Modul unter `installer/` liegt, stimmt das nur zur Hälfte:
+
+  | Aufruf | Ergebnisse |
+  |---|---|
+  | `gosec … ./...`, Arbeitsverzeichnis Projektwurzel (der Katalog-Aufruf) | **0** |
+  | `gosec -fmt=sarif -out=… ./...`, Arbeitsverzeichnis `installer/` | **154** |
+
+  gosec importiert die Verzeichnisse tatsächlich selbst — 14 Zeilen „Import directory" auf
+  stderr —, kommt ohne Modulkontext aber über das Importieren nicht hinaus: kein einziges
+  „Checking file", keine Warnung, keine Fehlermeldung, Exit 0 und valides SARIF mit einem
+  leeren `results`-Array. Der Job gilt damit zu Recht als `done`, und der Eintrag ist in
+  einem Projekt wie diesem trotzdem wertlos.
+
+  Zu klären ist zweierlei. Erstens der Aufruf: `workdir: module` würde gosec in dieselbe
+  Auffächerung nehmen wie `govulncheck` und `golangci-lint` und seine Sonderrolle
+  ersatzlos auflösen — zu prüfen ist, ob er dann in einem Projekt mit Modul in der Wurzel
+  dasselbe findet wie heute, und was aus dem Ausschluss von `k-playbook/` wird, der bei
+  modulweisem Arbeitsverzeichnis ins Leere zielt. Zweitens die allgemeinere Frage
+  dahinter: ein Werkzeug, das nichts prüfen konnte, ist hier von einem, das nichts gefunden
+  hat, nicht zu unterscheiden — beide schreiben ein leeres SARIF. Solange der Ausgang eines
+  Jobs allein an „lesbares SARIF vorhanden" hängt, bleibt diese Verwechslung möglich, und
+  sie trifft nicht nur gosec.

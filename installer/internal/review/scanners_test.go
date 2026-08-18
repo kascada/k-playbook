@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const scannerHeader = "job\ttool\tlanguages\tsarif\toutput\ttimeout\targs\n"
+const scannerHeader = "job\ttool\tlanguages\tsarif\toutput\ttimeout\tworkdir\targs\n"
 
 func parseLine(t *testing.T, line string) ([]Scanner, error) {
 	t.Helper()
@@ -16,7 +16,7 @@ func parseLine(t *testing.T, line string) ([]Scanner, error) {
 }
 
 func TestParseScannersLiestZeile(t *testing.T) {
-	scanners, err := parseLine(t, "trivy-fs\ttrivy\t*\tnative\tfile\t15m\tfs --output {out} {target}")
+	scanners, err := parseLine(t, "trivy-fs\ttrivy\t*\tnative\tfile\t15m\ttarget\tfs --output {out} {target}")
 	if err != nil {
 		t.Fatalf("ParseScanners: %v", err)
 	}
@@ -34,14 +34,31 @@ func TestParseScannersLiestZeile(t *testing.T) {
 	if scanner.Timeout != 15*time.Minute {
 		t.Errorf("Timeout = %s, erwartet 15m", scanner.Timeout)
 	}
+	if scanner.Workdir != WorkdirTarget {
+		t.Errorf("workdir falsch gelesen: %+v", scanner)
+	}
 	if len(scanner.Args) != 4 {
 		t.Errorf("Args = %v, erwartet vier Argumente", scanner.Args)
 	}
 }
 
+// Ein Job, der ein Modulverzeichnis braucht, und der Platzhalter dazu.
+func TestParseScannersLiestWorkdirModule(t *testing.T) {
+	scanners, err := parseLine(t, "govulncheck	govulncheck	go	native	stdout	15m	module	-format sarif ./...")
+	if err != nil {
+		t.Fatalf("ParseScanners: %v", err)
+	}
+	if scanners[0].Workdir != WorkdirModule {
+		t.Errorf("workdir = %q, erwartet %q", scanners[0].Workdir, WorkdirModule)
+	}
+	if _, err := parseLine(t, "gosec	gosec	go	native	file	15m	module	-out={out} {module}"); err != nil {
+		t.Errorf("{module} bei workdir module wurde abgewiesen: %v", err)
+	}
+}
+
 // Kommentare und die Kopfzeile sind keine Jobs.
 func TestParseScannersUeberspringtKommentare(t *testing.T) {
-	content := "# Kommentar\n" + scannerHeader + "\nruff\truff\tpython\tnative\tfile\t10m\tcheck -o {out} {target}\n"
+	content := "# Kommentar\n" + scannerHeader + "\nruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\n"
 	scanners, err := ParseScanners(content, "test.tsv")
 	if err != nil {
 		t.Fatalf("ParseScanners: %v", err)
@@ -54,17 +71,22 @@ func TestParseScannersUeberspringtKommentare(t *testing.T) {
 func TestParseScannersWeistFehlerhafteZeilenAb(t *testing.T) {
 	fälle := map[string]string{
 		"zu wenige Spalten":     "ruff\truff\tpython\tnative\tfile\t10m",
-		"Job führt aus raw/":    "../ruff\truff\tpython\tnative\tfile\t10m\tcheck -o {out} {target}",
-		"Job ohne Tool-Präfix":  "prüfung\truff\tpython\tnative\tfile\t10m\tcheck -o {out} {target}",
-		"leeres languages":      "ruff\truff\t\tnative\tfile\t10m\tcheck -o {out} {target}",
-		"unbekanntes sarif":     "ruff\truff\tpython\tvielleicht\tfile\t10m\tcheck -o {out} {target}",
-		"unbekanntes output":    "ruff\truff\tpython\tnative\tirgendwohin\t10m\tcheck -o {out} {target}",
-		"unlesbares timeout":    "ruff\truff\tpython\tnative\tfile\tbald\tcheck -o {out} {target}",
-		"timeout null":          "ruff\truff\tpython\tnative\tfile\t0s\tcheck -o {out} {target}",
-		"file ohne {out}":       "ruff\truff\tpython\tnative\tfile\t10m\tcheck {target}",
-		"stdout mit {out}":      "ruff\truff\tpython\tnative\tstdout\t10m\tcheck -o {out} {target}",
-		"keine Argumente":       "ruff\truff\tpython\tnative\tstdout\t10m\t",
-		"doppelter Job im Satz": "ruff\truff\tpython\tnative\tfile\t10m\tcheck -o {out} {target}\nruff\truff\tpython\tnative\tfile\t10m\tcheck -o {out} {target}",
+		"Job führt aus raw/":    "../ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"Job ohne Tool-Präfix":  "prüfung\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"leeres languages":      "ruff\truff\t\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes sarif":     "ruff\truff\tpython\tvielleicht\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes output":    "ruff\truff\tpython\tnative\tirgendwohin\t10m\ttarget\tcheck -o {out} {target}",
+		"unlesbares timeout":    "ruff\truff\tpython\tnative\tfile\tbald\ttarget\tcheck -o {out} {target}",
+		"timeout null":          "ruff\truff\tpython\tnative\tfile\t0s\ttarget\tcheck -o {out} {target}",
+		"file ohne {out}":       "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck {target}",
+		"stdout mit {out}":      "ruff\truff\tpython\tnative\tstdout\t10m\ttarget\tcheck -o {out} {target}",
+		"keine Argumente":       "ruff\truff\tpython\tnative\tstdout\t10m\ttarget\t",
+		"doppelter Job im Satz": "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}\nruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {target}",
+		"unbekanntes workdir":   "ruff\truff\tpython\tnative\tfile\t10m\tirgendwo\tcheck -o {out} {target}",
+		"leeres workdir":        "ruff\truff\tpython\tnative\tfile\t10m\t\tcheck -o {out} {target}",
+		// {module} ohne Modulsuche: der Platzhalter bliebe stehen und landete
+		// wörtlich im Aufruf.
+		"{module} bei workdir target": "ruff\truff\tpython\tnative\tfile\t10m\ttarget\tcheck -o {out} {module}",
 	}
 
 	for name, line := range fälle {
@@ -75,10 +97,10 @@ func TestParseScannersWeistFehlerhafteZeilenAb(t *testing.T) {
 }
 
 func TestScannerCommandErsetztPlatzhalter(t *testing.T) {
-	scanner := Scanner{Args: []string{"dir:{target}", "--file", "{out}", "-c", "{scripts}/gitleaks.toml"}}
-	args := scanner.Command("/lauf/raw/x.sarif", "/mit platz/repo", "/skripte")
+	scanner := Scanner{Args: []string{"dir:{target}", "--file", "{out}", "-c", "{scripts}/gitleaks.toml", "{module}"}}
+	args := scanner.Command("/lauf/raw/x.sarif", "/mit platz/repo", "/mit platz/repo/installer", "/skripte")
 
-	want := []string{"dir:/mit platz/repo", "--file", "/lauf/raw/x.sarif", "-c", "/skripte/gitleaks.toml"}
+	want := []string{"dir:/mit platz/repo", "--file", "/lauf/raw/x.sarif", "-c", "/skripte/gitleaks.toml", "/mit platz/repo/installer"}
 	for index, value := range want {
 		if args[index] != value {
 			t.Errorf("Argument %d = %q, erwartet %q", index, args[index], value)
@@ -144,5 +166,21 @@ func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
 	}
 	if count := len(ScannersFor(scanners, "syft")); count != 0 {
 		t.Errorf("syft hat %d Jobs, erwartet 0 — es erzeugt eine SBOM, keine Befunde", count)
+	}
+
+	// Die drei Go-Jobs: govulncheck und golangci-lint brauchen das Modul,
+	// gosec sucht seine Verzeichnisse selbst und bleibt projektweit.
+	workdirs := map[string]WorkdirMode{}
+	for _, scanner := range scanners {
+		workdirs[scanner.Job] = scanner.Workdir
+	}
+	for job, want := range map[string]WorkdirMode{
+		"govulncheck":   WorkdirModule,
+		"golangci-lint": WorkdirModule,
+		"gosec":         WorkdirTarget,
+	} {
+		if workdirs[job] != want {
+			t.Errorf("Job %s hat workdir %q, erwartet %q", job, workdirs[job], want)
+		}
 	}
 }

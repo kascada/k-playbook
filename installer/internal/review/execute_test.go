@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -45,9 +46,18 @@ func nativeScanner(job string, tool string, args ...string) Scanner {
 		Languages: "*",
 		SARIF:     SARIFNative,
 		Output:    OutputFile,
+		Workdir:   WorkdirTarget,
 		Timeout:   30 * time.Second,
 		Args:      args,
 	}
+}
+
+// moduleScanner ist ein Job, der ein Modulverzeichnis braucht: er läuft je
+// gefundenem Modul einmal.
+func moduleScanner(job string, tool string, args ...string) Scanner {
+	scanner := nativeScanner(job, tool, args...)
+	scanner.Workdir = WorkdirModule
+	return scanner
 }
 
 func neuerLauf(t *testing.T, entries ...Entry) string {
@@ -484,5 +494,354 @@ func TestExecuteLeitetStdoutUm(t *testing.T) {
 	job := statuses[0].Jobs[0]
 	if job.State != StateDone || job.Findings == nil || *job.Findings != 4 {
 		t.Fatalf("Job = %+v, erwartet done mit 4 Befunden", job)
+	}
+}
+
+// prueftArbeitsverzeichnis ist eine Attrappe, die nach ihrem ersten Argument
+// schreibt und nur dann mit 0 endet, wenn sie im zweiten Argument steht. So
+// hängt das Ergebnis am Arbeitsverzeichnis und nicht an einer Zusicherung.
+func prueftArbeitsverzeichnis(t *testing.T, name string) string {
+	t.Helper()
+	return fakeTool(t, name, fmt.Sprintf("cat > \"$1\" <<'SARIF'\n%s\nSARIF\ntest \"$(pwd -P)\" = \"$(cd \"$2\" && pwd -P)\"", sarifMit(1)))
+}
+
+// rawDateien sind die Namen der Dateien unter raw/, sortiert.
+func rawDateien(t *testing.T, runDir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(runDir, RawDirName))
+	if err != nil {
+		t.Fatalf("raw/ lesen: %v", err)
+	}
+	names := []string{}
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+	return names
+}
+
+// Ein Modul in der Wurzel: der Job heißt wie im Katalog, die Datei ebenso —
+// sichtbar ist das geprüfte Modul trotzdem, nämlich am Job.
+func TestExecuteEinModulLaesstDenNamen(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "go.mod")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}", "{module}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: prueftArbeitsverzeichnis(t, "govulncheck")}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if len(statuses[0].Jobs) != 1 {
+		t.Fatalf("%d Jobs, erwartet 1: %+v", len(statuses[0].Jobs), statuses[0].Jobs)
+	}
+	job := statuses[0].Jobs[0]
+	if job.Job != "govulncheck" || job.SARIF != "raw/govulncheck.sarif" {
+		t.Errorf("Name oder Datei haben sich geändert: %+v", job)
+	}
+	if job.Module != "." {
+		t.Errorf("Modul = %q, erwartet \".\"", job.Module)
+	}
+	if job.State != StateDone || job.ExitCode == nil || *job.ExitCode != 0 {
+		t.Errorf("der Job lief nicht im Modulverzeichnis: %+v", job)
+	}
+}
+
+// Liegt das Modul unter der Wurzel, bleibt der Name ebenfalls unverändert —
+// und das Feld am Job nennt es. Das ist der Fall dieses Repos.
+func TestExecuteModulUnterDerWurzelStehtAmJob(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "installer/go.mod")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}", "{module}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: prueftArbeitsverzeichnis(t, "govulncheck")}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.Job != "govulncheck" {
+		t.Errorf("Job = %q, erwartet den Namen aus dem Katalog", job.Job)
+	}
+	if job.Module != "installer" {
+		t.Errorf("Modul = %q, erwartet installer", job.Module)
+	}
+	if job.State != StateDone || job.ExitCode == nil || *job.ExitCode != 0 {
+		t.Errorf("der Job lief nicht im Modulverzeichnis: %+v", job)
+	}
+	// Die gelesene Datei ist die Auskunft, die bleibt.
+	gelesen, err := ReadEntryStatus(runDir, "govulncheck")
+	if err != nil {
+		t.Fatalf("entries/govulncheck.json: %v", err)
+	}
+	if gelesen.Jobs[0].Module != "installer" {
+		t.Errorf("in entries/govulncheck.json steht Modul %q", gelesen.Jobs[0].Module)
+	}
+}
+
+// Mehrere Module: ein Job je Modul, mit abgeleitetem Namen und eigener Datei.
+func TestExecuteFaechertJeModulAuf(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "installer/go.mod", "werkzeuge/prüfer/go.mod")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}", "{module}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: prueftArbeitsverzeichnis(t, "govulncheck")}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if len(statuses[0].Jobs) != 2 {
+		t.Fatalf("%d Jobs, erwartet 2: %+v", len(statuses[0].Jobs), statuses[0].Jobs)
+	}
+	namen := map[string]string{}
+	for _, job := range statuses[0].Jobs {
+		if job.State != StateDone || job.ExitCode == nil || *job.ExitCode != 0 {
+			t.Errorf("Job %s lief nicht in seinem Modul: %+v", job.Job, job)
+		}
+		namen[job.Job] = job.Module
+	}
+	if namen["govulncheck-installer"] != "installer" {
+		t.Errorf("Jobs = %+v, erwartet govulncheck-installer für das Modul installer", namen)
+	}
+	// Der Name muss als Dateiname taugen: das ü fällt weg.
+	if namen["govulncheck-werkzeuge-prfer"] != "werkzeuge/prüfer" {
+		t.Errorf("Jobs = %+v, erwartet einen abgeleiteten Namen für werkzeuge/prüfer", namen)
+	}
+
+	dateien := rawDateien(t, runDir)
+	if len(dateien) != 2 {
+		t.Errorf("Dateien unter raw/ = %v, erwartet zwei", dateien)
+	}
+}
+
+// Zwei Module können auf denselben abgeleiteten Namen führen. Ohne
+// Unterscheidung überschriebe der zweite Job die Datei des ersten.
+func TestExecuteKollidierendeModulnamen(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "dienst/api/go.mod", "dienst-api/go.mod")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}", "{module}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: prueftArbeitsverzeichnis(t, "govulncheck")}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	namen := map[string]bool{}
+	module := map[string]bool{}
+	for _, job := range statuses[0].Jobs {
+		namen[job.Job] = true
+		module[job.Module] = true
+		if job.State != StateDone {
+			t.Errorf("Job %s = %q (%s)", job.Job, job.State, job.Reason)
+		}
+	}
+	if len(namen) != 2 || len(module) != 2 {
+		t.Errorf("Jobs = %+v, erwartet zwei Namen für zwei Module", statuses[0].Jobs)
+	}
+	if dateien := rawDateien(t, runDir); len(dateien) != 2 {
+		t.Errorf("Dateien unter raw/ = %v, erwartet zwei", dateien)
+	}
+}
+
+// Kein Modul: es fehlt der Gegenstand, nicht das Werkzeug.
+func TestExecuteOhneModulIstUebersprungen(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   modulBaum(t, "quelle/beispiel.py"),
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 0, 0)}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if statuses[0].State != StateSkipped {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateSkipped)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateSkipped || !strings.Contains(job.Reason, ManifestGoModule) {
+		t.Errorf("Job = %+v, erwartet übersprungen mit Grund", job)
+	}
+	if job.Module != "" {
+		t.Errorf("Modul = %q, erwartet leer — es wurde keins geprüft", job.Module)
+	}
+}
+
+// Eine nicht durchführbare Suche ist etwas anderes als kein Modul: hier ist
+// gerade unbekannt, ob es eins gibt.
+func TestExecuteNichtDurchfuehrbareSucheIstFehlschlag(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "gesperrt/go.mod")
+	gesperrt := filepath.Join(target, "gesperrt")
+	if err := os.Chmod(gesperrt, 0o000); err != nil {
+		t.Fatalf("Rechte setzen: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gesperrt, 0o755) })
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 0, 0)}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if statuses[0].State != StateFailed {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateFailed)
+	}
+	if job := statuses[0].Jobs[0]; job.State != StateFailed || !strings.Contains(job.Reason, "nicht durchführbar") {
+		t.Errorf("Job = %+v, erwartet einen Fehlschlag mit Grund", job)
+	}
+}
+
+// workdir target bleibt, wie es war: ein Job, Arbeitsverzeichnis {target},
+// kein Modul am Job. Das ist der Fall gosec.
+func TestExecuteWorkdirTargetOhneModul(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "gosec", Kind: KindTool})
+	target := modulBaum(t, "installer/go.mod", "werkzeuge/go.mod")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{nativeScanner("gosec", "gosec", "{out}", target)},
+		Tools:    map[string]Tool{"gosec": {Path: prueftArbeitsverzeichnis(t, "gosec")}},
+	}, Entry{Name: "gosec", Kind: KindTool})
+
+	if len(statuses[0].Jobs) != 1 {
+		t.Fatalf("%d Jobs, erwartet 1 — gosec bleibt projektweit: %+v", len(statuses[0].Jobs), statuses[0].Jobs)
+	}
+	job := statuses[0].Jobs[0]
+	if job.Job != "gosec" || job.Module != "" {
+		t.Errorf("Job = %+v, erwartet den Katalognamen ohne Modul", job)
+	}
+	if job.State != StateDone || job.ExitCode == nil || *job.ExitCode != 0 {
+		t.Errorf("der Job lief nicht im Zielverzeichnis: %+v", job)
+	}
+}
+
+// Wechselt der Modulbestand, wechseln die Job-Namen — und die Datei des alten
+// Namens bliebe sonst als vermeintliches Ergebnis liegen.
+func TestExecuteRaeumtDateienDesVorigenLaufsWeg(t *testing.T) {
+	runDir := neuerLauf(t,
+		Entry{Name: "govulncheck", Kind: KindTool},
+		Entry{Name: "gitleaks", Kind: KindTool},
+	)
+	target := modulBaum(t, "installer/go.mod")
+	scanner := moduleScanner("govulncheck", "govulncheck", "{out}")
+	tools := map[string]Tool{
+		"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 1, 0)},
+		"gitleaks":    {Path: schreibtSARIF(t, "gitleaks", 1, 0)},
+	}
+	entry := Entry{Name: "govulncheck", Kind: KindTool}
+
+	options := Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{scanner, nativeScanner("gitleaks", "gitleaks", "{out}")},
+		Tools:    tools,
+	}
+	führeAus(t, options, entry, Entry{Name: "gitleaks", Kind: KindTool})
+
+	if dateien := rawDateien(t, runDir); len(dateien) != 2 {
+		t.Fatalf("nach dem ersten Lauf: %v, erwartet govulncheck.sarif und gitleaks.sarif", dateien)
+	}
+
+	// Ein zweites Modul kommt hinzu: aus govulncheck werden zwei Jobs mit
+	// anderen Namen.
+	if err := os.MkdirAll(filepath.Join(target, "werkzeuge"), 0o755); err != nil {
+		t.Fatalf("zweites Modul anlegen: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "werkzeuge", "go.mod"), []byte("module w\n"), 0o644); err != nil {
+		t.Fatalf("zweites Modul anlegen: %v", err)
+	}
+
+	führeAus(t, options, entry)
+
+	dateien := rawDateien(t, runDir)
+	want := []string{"gitleaks.sarif", "govulncheck-installer.sarif", "govulncheck-werkzeuge.sarif"}
+	if strings.Join(dateien, ",") != strings.Join(want, ",") {
+		t.Errorf("Dateien unter raw/ = %v, erwartet %v", dateien, want)
+	}
+	// Gegenprobe: der selektive Aufruf hat die Datei des anderen Eintrags
+	// stehen lassen.
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "gitleaks.sarif")); err != nil {
+		t.Errorf("die Datei eines fremden Eintrags wurde mit weggeräumt: %v", err)
+	}
+}
+
+// Der Auslöser hängt am Eintrag, nicht am ersten Job: startet diesmal keiner,
+// bliebe die alte Datei liegen, während entries/<tool>.json skipped meldet.
+func TestExecuteRaeumtAuchOhneLaufendenJobAuf(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "installer/go.mod")
+	scanner := moduleScanner("govulncheck", "govulncheck", "{out}")
+
+	führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 1, 0)}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "govulncheck.sarif")); err != nil {
+		t.Fatalf("der erste Lauf hat nichts geschrieben: %v", err)
+	}
+
+	// Diesmal fehlt das Werkzeug: kein Job läuft.
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"govulncheck": {Reason: "Werkzeug govulncheck ist nicht installiert"}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	if statuses[0].State != StateSkipped {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateSkipped)
+	}
+	if dateien := rawDateien(t, runDir); len(dateien) != 0 {
+		t.Errorf("Dateien unter raw/ = %v, erwartet keine — der Eintrag meldet skipped", dateien)
+	}
+}
+
+// Fehlt die vorige entries/<tool>.json, greift die Namensregel als Rückfall:
+// der Job-Name beginnt mit dem Tool-Namen. Der Rückfall bleibt auf *.sarif
+// beschränkt und trifft keinen fremden Eintrag.
+func TestExecuteRaeumtOhneVorigeEintragsdateiAuf(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "govulncheck", Kind: KindTool})
+	target := modulBaum(t, "installer/go.mod")
+
+	rawDir := filepath.Join(runDir, RawDirName)
+	if err := os.MkdirAll(rawDir, 0o755); err != nil {
+		t.Fatalf("raw/ anlegen: %v", err)
+	}
+	weg := []string{"govulncheck-werkzeuge.sarif"}
+	bleibt := []string{"govulncheck-alt.txt", "govulnchecker.sarif", "gitleaks.sarif"}
+	for _, name := range append(append([]string{}, weg...), bleibt...) {
+		if err := os.WriteFile(filepath.Join(rawDir, name), []byte("{}"), 0o644); err != nil {
+			t.Fatalf("%s anlegen: %v", name, err)
+		}
+	}
+
+	führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{moduleScanner("govulncheck", "govulncheck", "{out}")},
+		Tools:    map[string]Tool{"govulncheck": {Path: schreibtSARIF(t, "govulncheck", 1, 0)}},
+	}, Entry{Name: "govulncheck", Kind: KindTool})
+
+	for _, name := range weg {
+		if _, err := os.Stat(filepath.Join(rawDir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s liegt noch da", name)
+		}
+	}
+	for _, name := range bleibt {
+		if _, err := os.Stat(filepath.Join(rawDir, name)); err != nil {
+			t.Errorf("%s wurde weggeräumt, gehört aber nicht zu den Job-Dateien dieses Eintrags: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(rawDir, "govulncheck.sarif")); err != nil {
+		t.Errorf("der Lauf hat seine eigene Datei nicht geschrieben: %v", err)
 	}
 }

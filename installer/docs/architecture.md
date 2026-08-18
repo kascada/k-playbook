@@ -93,8 +93,10 @@ installer/
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
+│   ├── modules.go               Modulverzeichnisse suchen, Job-Namen daraus ableiten
 │   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
-│   └── execute.go               Jobs starten, SARIF zählen, Fortschritt fortschreiben
+│   └── execute.go               Jobs starten, je Modul auffächern, SARIF zählen,
+│                                Fortschritt fortschreiben
 ├── go.mod
 └── README.md
 ```
@@ -107,6 +109,14 @@ sind Fassaden auf `project`, die eine über HTTP, die andere über JSON-RPC.
 Sprachen, Katalog und die aufgelösten Werkzeuge stehen in `review.Options`. Deshalb
 lässt sich ein Lauf mit Attrappen prüfen, ohne dass eine Installation, ein Preflight
 oder ein echter Scanner vorhanden sein müsste.
+
+Die eine Ausnahme ist `modules.go`: es sieht selbst auf die Platte. Eine Katalogzeile mit
+`workdir: module` nennt kein Verzeichnis, sondern verlangt eins, und wo die Module eines
+Projekts liegen, steht in keiner Konfiguration — `go.mod` ist die Tatsache im
+Dateisystem. `FindModules()` nimmt das gesuchte Manifest als Parameter, damit `pip-audit`
+denselben Mechanismus benutzen kann; angewandt wird er bisher nur auf Go. Aus dem
+Ergebnis macht `execute.go` die Jobs: einer je Modul, bei genau einem Modul mit
+unverändertem Namen ([`docs/review-runs.md`](../../docs/review-runs.md)).
 
 ## Anker finden
 

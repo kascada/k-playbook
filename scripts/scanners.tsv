@@ -1,5 +1,10 @@
 # Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
-# Fields: job	tool	languages	sarif	output	timeout	args
+# Fields: job	tool	languages	sarif	output	timeout	workdir	args
+#
+# Katalog und Binary werden gemeinsam ausgerollt (make installer-sync überträgt beides in
+# einem Schritt). Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen
+# wird: ein altes Binary läse einen um eine Spalte erweiterten Katalog gar nicht mehr und
+# brächte keinen Lauf mehr zustande.
 #
 # Der Eintrag eines Laufs ist das Werkzeug, der Job ist der Aufruf. Ein Werkzeug kann
 # mehrere Jobs haben (trivy, gitleaks), einen (ruff) oder keinen (syft). In
@@ -22,6 +27,19 @@
 #            Ausführer den Strom dorthin umleiten muss. govulncheck ist dieser Fall.
 # timeout    Obergrenze je Job als Go-Dauer (10m, 90s). Ohne sie hielte ein hängender
 #            Scanner den ganzen Lauf auf.
+# workdir    target oder module. Bei target ist das Arbeitsverzeichnis {target}, die
+#            Projektwurzel — der Regelfall. Bei module braucht der Job ein
+#            Modulverzeichnis: der Ausführer sucht die Module unter {target} und startet
+#            den Job je gefundenem Modul einmal, mit dem Modul als Arbeitsverzeichnis.
+#            Nötig ist das für Aufrufe wie govulncheck -format sarif ./..., die gar kein
+#            Pfad-Argument haben: ./... wirkt relativ zum Arbeitsverzeichnis, und ein
+#            Platzhalter in args bliebe dort unsichtbar. Bei genau einem Modul bleibt
+#            alles wie bisher — ein Job, unveränderter Name; bei mehreren entsteht je
+#            Modul ein Job mit abgeleitetem Namen (govulncheck-installer). Welches Modul
+#            geprüft wurde, steht in jedem Fall am Job in entries/<tool>.json.
+#            gosec behält bewusst target: es sucht seine Verzeichnisse selbst, statt Go
+#            nach dem Modul zu fragen. Seine eine SARIF-Datei trägt deshalb keine
+#            Modulzuordnung, auch wenn im Mehrmodul-Fall modulscharfe daneben liegen.
 # args       Der Aufruf ohne das Programm selbst, an Leerzeichen getrennt. Ein
 #            einzelnes Argument darf deshalb kein Leerzeichen enthalten; die
 #            Platzhalter werden erst nach dem Trennen ersetzt und dürfen welche tragen.
@@ -29,9 +47,17 @@
 # Platzhalter:
 #   {out}      Zieldatei unter raw/, absolut. Pflicht bei output file, verboten bei
 #              output stdout.
-#   {target}   project.repo_root aus der context-Ausgabe, absolut — und zugleich das
-#              Arbeitsverzeichnis des Jobs. Nicht das Verzeichnis, in dem jemand
-#              gerade steht: sonst hinge das Ergebnis daran, wo der Lauf gestartet wurde.
+#   {target}   project.repo_root aus der context-Ausgabe, absolut: die Projektwurzel.
+#              Nicht das Verzeichnis, in dem jemand gerade steht — sonst hinge das
+#              Ergebnis daran, wo der Lauf gestartet wurde. Bei workdir target ist es
+#              zugleich das Arbeitsverzeichnis, bei workdir module fallen beide
+#              auseinander und {target} meint weiter die Wurzel.
+#   {module}   Das Modulverzeichnis dieses Jobs, absolut. Nur bei workdir module
+#              zulässig; bei workdir target weist ParseScanners die Zeile ab, weil es
+#              kein Modul gäbe, auf das der Platzhalter zeigen könnte. Pflicht ist er
+#              nicht: govulncheck und golangci-lint brauchen ihn gerade nicht, weil das
+#              Arbeitsverzeichnis schon stimmt. Er ist für Werkzeuge da, die den Pfad
+#              als Argument nehmen.
 #   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml).
 #
 # Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
@@ -43,6 +69,14 @@
 # übersetzen — dann stünde der Aufruf wieder halb im Go-Code, und genau das soll diese
 # Datei verhindern. Dazu kommt, dass die Stelle im Aufruf zum Aufruf gehört; beim
 # Zusammensetzen aus zwei Spalten entschiede sie der Ausführer.
+#
+# Die Modulsuche hinter workdir module trägt eine eigene Ausschlussliste, und die steht
+# im Go-Code (installer/internal/review/modules.go), nicht hier. Das widerspricht dem
+# Abschnitt oben nicht: dort geht es um den Werkzeugausschluss, der in args bleibt, weil
+# er zum Aufruf gehört und jedes Werkzeug ihn anders schreibt. Die Modulsuche ruft kein
+# Werkzeug auf — sie sucht die Gegenstände, über die anschließend aufgefächert wird. Es
+# gibt keinen Aufruf, in dem sie stehen könnte, und keine werkzeugeigene Schreibweise,
+# die sie tragen müsste.
 #
 # Ausgeschlossen wird überall dort, wo das Werkzeug es zulässt:
 #   k-playbook/                die Installationskopie. Ihr ausgeliefertes Beispiel-
@@ -64,17 +98,17 @@
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
 # ein Fallback für Container-Images, kein Scanner.
-job	tool	languages	sarif	output	timeout	args
-gitleaks-git	gitleaks	*	native	file	10m	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-gitleaks-dir	gitleaks	*	native	file	10m	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-ruff	ruff	python	native	file	10m	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go	native	file	20m	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
-trivy-fs	trivy	*	native	file	15m	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-trivy-config	trivy	*	native	file	15m	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-gosec	gosec	go	native	file	15m	-fmt=sarif -out={out} -exclude-dir=k-playbook -exclude-dir=k-playbook-local ./...
-govulncheck	govulncheck	go	native	stdout	15m	-format sarif ./...
-osv-scanner	osv-scanner	python,go	native	file	15m	scan source --recursive --format sarif --output-file {out} {target}
-grype	grype	*	native	file	15m	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
-golangci-lint	golangci-lint	go	native	file	15m	run --output.sarif.path {out} --output.text.path stderr ./...
-trufflehog-git	trufflehog	*	convert	stdout	15m	git file://{target} --json --no-update
-pip-audit	pip-audit	python	convert	file	15m	--format json --output {out} --progress-spinner off
+job	tool	languages	sarif	output	timeout	workdir	args
+gitleaks-git	gitleaks	*	native	file	10m	target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+gitleaks-dir	gitleaks	*	native	file	10m	target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+ruff	ruff	python	native	file	10m	target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go	native	file	20m	target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	native	file	15m	target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+trivy-config	trivy	*	native	file	15m	target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+gosec	gosec	go	native	file	15m	target	-fmt=sarif -out={out} -exclude-dir=k-playbook -exclude-dir=k-playbook-local ./...
+govulncheck	govulncheck	go	native	stdout	15m	module	-format sarif ./...
+osv-scanner	osv-scanner	python,go	native	file	15m	target	scan source --recursive --format sarif --output-file {out} {target}
+grype	grype	*	native	file	15m	target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
+golangci-lint	golangci-lint	go	native	file	15m	module	run --output.sarif.path {out} --output.text.path stderr ./...
+trufflehog-git	trufflehog	*	convert	stdout	15m	target	git file://{target} --json --no-update
+pip-audit	pip-audit	python	convert	file	15m	target	--format json --output {out} --progress-spinner off

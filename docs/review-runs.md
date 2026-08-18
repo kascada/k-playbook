@@ -58,7 +58,11 @@ in eine fremde Datei.**
 |---|---|
 | `run.json` | nur das Anlegen des Laufs; danach niemand |
 | `entries/<name>.json` | nur der Eintrag, dem sie gehört |
-| `raw/<job>.sarif` | nur der Job, der sie erzeugt |
+| `raw/<job>.sarif` | nur der Job, der sie erzeugt; weggeräumt wird sie vom Eintrag, dem er gehört |
+
+Schreiber ist der Job, Aufräumer der Eintrag — und der räumt nur seine eigenen Dateien
+weg, die aus der vorigen `entries/<tool>.json`. „Niemand schreibt in eine fremde Datei"
+bleibt davon unangetastet.
 
 Damit können Werkzeuge parallel laufen, ohne sich gegenseitig zu überschreiben. Eine
 einzelne gemeinsame Datei wäre einfacher zu lesen, aber der zweite Schreiber löschte den
@@ -160,6 +164,37 @@ Wer einen Lauf zusammenstellt, sieht davon nichts: die Oberfläche bietet Werkze
 keine Jobs. Ein Job, dessen Sprache nicht gewählt ist, dessen Werkzeug fehlt oder der
 kein SARIF liefern kann, wird `skipped` mit Grund — nicht `failed`.
 
+**Der Name kommt aus dem Katalog — außer bei mehreren Modulen.** Eine Katalogzeile mit
+`workdir: module` nennt kein festes Arbeitsverzeichnis, sondern verlangt eins: der
+Ausführer sucht die Module unter dem Ziel und startet den Job je gefundenem Modul einmal,
+mit dem Modul als Arbeitsverzeichnis. Nötig ist das für Aufrufe wie `govulncheck -format
+sarif ./...`, die überhaupt kein Pfad-Argument haben.
+
+| Gefundene Module | Jobs | Name |
+|---|---|---|
+| keins | einer, `skipped` mit Grund | aus dem Katalog |
+| genau eins | einer | aus dem Katalog, unverändert |
+| mehrere | einer je Modul | Katalogname plus abgeleitetes Suffix, `govulncheck-installer` |
+
+Das Suffix entsteht aus dem Pfad des Moduls relativ zum Ziel: Pfadtrenner werden zu `-`,
+was als Dateiname nicht taugt, fällt weg. Zwei Module können dabei auf denselben Namen
+führen; der zweite bekommt dann eine Ziffer angehängt, sonst überschriebe sein Job die
+Datei des ersten.
+
+Kein auffindbares Modul ist `skipped`: es fehlt der Gegenstand, nicht das Werkzeug. Eine
+Suche, die selbst nicht durchführbar ist — Lesefehler, fehlende Rechte —, ist dagegen
+`failed`: dann ist gerade unbekannt, ob es ein Modul gibt, und `skipped` behauptete, es
+gebe nichts zu tun.
+
+Die Suche übergeht die Installationskopie `k-playbook/`, das projekteigene
+`k-playbook-local/`, dazu `vendor/`, `testdata/`, `node_modules/` und alles mit führendem
+Punkt: dort liegt kein Modul des Projekts. Diese Liste steht im Code und nicht im Katalog
+— anders als der Werkzeugausschluss gehört sie zu keinem Aufruf.
+
+**Welches Modul geprüft wurde, steht am Job**, auch im Ein-Modul-Fall, wo Job- und
+Dateiname unverändert bleiben. Der Name allein trüge die Auskunft sonst nur dann, wenn
+aufgefächert wurde — also gerade nicht im Regelfall.
+
 Das Programm eines Jobs kommt aus dem Preflight (`install-security-tools.sh --json`),
 nicht aus einer eigenen PATH-Auflösung: sonst griffe der Lauf in einem Python-Projekt
 mit aktivem venv dessen `ruff` und prüfte damit ein anderes Werkzeug als der Preflight
@@ -199,7 +234,9 @@ eine SBOM erzeugt und keine Befunde.
   "jobs": [
     { "job": "trivy-fs",     "state": "done",    "exitCode": 1, "sarif": "raw/trivy-fs.sarif",
       "findings": 12, "started": "…", "finished": "…" },
-    { "job": "trivy-config", "state": "skipped", "reason": "Sprache nicht gewählt" }
+    { "job": "trivy-config", "state": "skipped", "reason": "Sprache nicht gewählt" },
+    { "job": "govulncheck",  "state": "done",    "module": "installer", "exitCode": 0,
+      "sarif": "raw/govulncheck.sarif", "findings": 0, "started": "…", "finished": "…" }
   ]
 }
 ```
@@ -208,7 +245,10 @@ Der Eintrag trägt seinen abgeleiteten Zustand, darunter bleiben die Jobs einzel
 sichtbar: Der Gesamtzustand ist die Kurzfassung, nicht die einzige Auskunft. `exitCode`
 und `findings` fehlen, wo nichts gemessen wurde — 0 hieße hier „gemessen und null".
 `reason` steht bei `skipped` und `failed`; ein Werkzeug ohne Job trägt ihn am Eintrag,
-weil es keinen Job gibt, an dem er stehen könnte.
+weil es keinen Job gibt, an dem er stehen könnte. `module` nennt das geprüfte Modul,
+relativ zum Ziel des Laufs, die Wurzel selbst als `.`; bei `workdir: target` fehlt es —
+dort gibt es kein Modul, auf das es zeigen könnte. Das Beispiel mischt bewusst: die
+`trivy`-Jobs laufen projektweit, `govulncheck` an einem Modul.
 
 **Geschrieben wird schon beim Start**, mit dem Zustand `running`, und danach bei jeder
 Zustandsänderung eines Jobs. Läge die Datei erst am Ende, wäre der Fortschritt während
@@ -216,7 +256,14 @@ des Laufs nicht lesbar, und der abgeleitete Laufzustand spränge von `created` d
 `done`.
 
 **Wiederholbar.** Ein zweiter Aufruf über denselben Eintrag überschreibt seine Dateien,
-statt danebenzuschreiben oder abzubrechen.
+statt danebenzuschreiben oder abzubrechen. Überschreiben allein genügt dafür aber nicht:
+weil Job-Namen am Modulbestand hängen können, räumt der Eintrag vorher weg, was er beim
+vorigen Aufruf unter `raw/` geschrieben hat — auch dann, wenn diesmal kein einziger Job
+läuft. Sonst bliebe `raw/govulncheck.sarif` liegen, sobald ein zweites Modul den Job in
+`govulncheck-installer` umbenennt, und gälte weiter als Ergebnis. Welche Dateien es sind,
+sagt die vorige `entries/<tool>.json`; fehlt sie, greift die Namensregel (der Job-Name
+beginnt mit dem Tool-Namen) als Rückfall, beschränkt auf `*.sarif`. Die Dateien anderer
+Einträge bleiben stehen.
 
 ## Die Oberfläche
 

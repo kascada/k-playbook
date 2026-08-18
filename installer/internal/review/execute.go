@@ -137,7 +137,7 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 		Name:          entry.Name,
 		Kind:          entry.Kind,
 		Started:       timestamp(),
-		Jobs:          make([]JobStatus, len(scanners)),
+		Jobs:          []JobStatus{},
 	}
 	if len(scanners) == 0 {
 		// syft ist der Fall: es erzeugt eine SBOM und damit keine Befunde. Ohne
@@ -146,25 +146,35 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 		status.Reason = fmt.Sprintf("kein Scan-Job für %s: das Werkzeug erzeugt keine Befunde", entry.Name)
 	}
 
+	// Vor allem anderen: weg mit dem, was dieser Eintrag beim vorigen Aufruf
+	// geschrieben hat. Der Auslöser hängt am Eintrag und nicht am ersten Job —
+	// startet diesmal keiner, bliebe sonst eine alte Datei liegen, während
+	// entries/<tool>.json skipped meldet.
+	if err := clearEntryOutputs(options.RunDir, entry.Name); err != nil {
+		status.State = StateFailed
+		status.Reason = err.Error()
+		status.Finished = timestamp()
+		if writeErr := writeProgress(options, status); writeErr != nil {
+			return status, writeErr
+		}
+		return status, fmt.Errorf("%s: %w", entry.Name, err)
+	}
+
 	// Erst alles einsortieren, was ohne Aufruf feststeht. Was übrig bleibt,
 	// läuft wirklich.
+	plans := planJobs(scanners, entry, options, tool, known)
+	status.Jobs = make([]JobStatus, len(plans))
 	runnable := []int{}
-	for index, scanner := range scanners {
-		job := JobStatus{Job: scanner.Job, State: StateSkipped}
-		switch {
-		case scanner.SARIF == SARIFConvert:
-			job.Reason = "SARIF-Konverter nicht gebaut"
-		case scanner.SARIF == SARIFNone:
-			job.Reason = "erzeugt kein SARIF"
-		case !scanner.AppliesTo(options.Languages):
-			job.Reason = "Sprache nicht gewählt"
-		case !known || tool.Path == "":
-			job.Reason = missingToolReason(entry.Name, known, tool)
-		default:
-			job.State = StateStart
+	for index, plan := range plans {
+		status.Jobs[index] = JobStatus{
+			Job:    plan.name,
+			State:  plan.state,
+			Module: plan.module,
+			Reason: plan.reason,
+		}
+		if plan.state == StateStart {
 			runnable = append(runnable, index)
 		}
-		status.Jobs[index] = job
 	}
 
 	// Geschrieben wird schon beim Start, mit dem Zustand nach Regel 0: läge die
@@ -186,7 +196,7 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 		var group sync.WaitGroup
 		for _, index := range runnable {
 			group.Add(1)
-			go func(scanner Scanner, job JobStatus) {
+			go func(plan jobPlan, job JobStatus) {
 				defer group.Done()
 				tokens <- struct{}{}
 				defer func() { <-tokens }()
@@ -194,8 +204,8 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 				job.State = StateRunning
 				job.Started = timestamp()
 				updates <- job
-				updates <- runJob(ctx, scanner, job, options)
-			}(scanners[index], status.Jobs[index])
+				updates <- runJob(ctx, plan, job, options)
+			}(plans[index], status.Jobs[index])
 		}
 		go func() {
 			group.Wait()
@@ -242,15 +252,187 @@ func missingToolReason(name string, known bool, tool Tool) string {
 	return fmt.Sprintf("Werkzeug %s ist nicht installiert", name)
 }
 
+// jobPlan ist ein geplanter Aufruf: eine Katalogzeile, bei workdir module an
+// genau ein Modul gebunden.
+type jobPlan struct {
+	scanner Scanner
+	// name ist der Job-Name und damit der Dateiname unter raw/. Er weicht vom
+	// Katalog nur ab, wenn aufgefächert wurde.
+	name string
+	// module ist das geprüfte Modul, relativ zum Ziel; leer bei workdir target.
+	module string
+	// state ist start, wenn der Job wirklich läuft; sonst steht der Ausgang
+	// schon vor dem Aufruf fest und reason nennt ihn.
+	state  State
+	reason string
+}
+
+// planJobs macht aus den Katalogzeilen eines Werkzeugs die Aufrufe dieses Laufs.
+//
+// Was ohne Aufruf feststeht, wird zuerst geprüft: eine Suche im Dateisystem
+// lohnt nicht für einen Job, dessen Sprache gar nicht gewählt ist — und
+// „Sprache nicht gewählt" ist auch die genauere Auskunft als „kein Modul
+// gefunden".
+func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known bool) []jobPlan {
+	plans := []jobPlan{}
+
+	// Höchstens eine Suche je Eintrag, auch wenn mehrere Jobs Module brauchen:
+	// sie liefe über denselben Baum und ergäbe dasselbe.
+	var modules []string
+	var searchErr error
+	searched := false
+
+	// Die Namen aus dem Katalog sind schon vergeben — ein abgeleiteter Name
+	// darf keinen davon treffen.
+	taken := map[string]bool{}
+	for _, scanner := range scanners {
+		taken[scanner.Job] = true
+	}
+
+	for _, scanner := range scanners {
+		plan := jobPlan{scanner: scanner, name: scanner.Job, state: StateStart}
+		switch {
+		case scanner.SARIF == SARIFConvert:
+			plan.state, plan.reason = StateSkipped, "SARIF-Konverter nicht gebaut"
+		case scanner.SARIF == SARIFNone:
+			plan.state, plan.reason = StateSkipped, "erzeugt kein SARIF"
+		case !scanner.AppliesTo(options.Languages):
+			plan.state, plan.reason = StateSkipped, "Sprache nicht gewählt"
+		case !known || tool.Path == "":
+			plan.state, plan.reason = StateSkipped, missingToolReason(entry.Name, known, tool)
+		}
+		if plan.state != StateStart || scanner.Workdir != WorkdirModule {
+			plans = append(plans, plan)
+			continue
+		}
+
+		if !searched {
+			// go.mod fest an dieser Stelle: die Suche selbst ist sprachneutral,
+			// angewandt wird sie bisher nur auf Go.
+			modules, searchErr = FindModules(options.Target, ManifestGoModule)
+			searched = true
+		}
+
+		switch {
+		case searchErr != nil:
+			// Nicht skipped: nach einer abgebrochenen Suche ist gerade
+			// unbekannt, ob es ein Modul gibt, und skipped behauptete, es gebe
+			// nichts zu tun.
+			plan.state = StateFailed
+			plan.reason = fmt.Sprintf("Suche nach %s nicht durchführbar: %v", ManifestGoModule, searchErr)
+			plans = append(plans, plan)
+		case len(modules) == 0:
+			// Es fehlt der Gegenstand, nicht das Werkzeug.
+			plan.state = StateSkipped
+			plan.reason = fmt.Sprintf("kein %s unter dem Ziel gefunden", ManifestGoModule)
+			plans = append(plans, plan)
+		case len(modules) == 1:
+			// Ein Modul heißt: alles bleibt, wie es war. Der Name kommt aus dem
+			// Katalog, die Datei unter raw/ heißt wie bisher — sichtbar ist das
+			// geprüfte Modul trotzdem, nämlich am Job.
+			plan.module = modules[0]
+			plans = append(plans, plan)
+		default:
+			for _, module := range modules {
+				fanned := plan
+				fanned.module = module
+				fanned.name = jobNameForModule(taken, scanner.Job, module)
+				plans = append(plans, fanned)
+			}
+		}
+	}
+	return plans
+}
+
+// clearEntryOutputs räumt weg, was dieser Eintrag beim vorigen Aufruf unter
+// raw/ geschrieben hat.
+//
+// runJob entfernt nur die eine Datei, die es selbst gleich anlegt. Das genügte,
+// solange die Job-Namen fest im Katalog standen; jetzt hängen sie am
+// Modulbestand: kommt ein zweites Modul hinzu, heißt der Job nicht mehr
+// govulncheck, sondern govulncheck-installer — und raw/govulncheck.sarif des
+// vorigen Aufrufs bliebe daneben liegen und gälte weiter als Ergebnis.
+//
+// Weggeräumt wird ausschließlich Eigenes: die Dateien anderer Einträge bleiben
+// stehen, auch bei einem selektiven Aufruf.
+func clearEntryOutputs(runDir string, entry string) error {
+	rawDir := filepath.Join(runDir, RawDirName)
+	// raw/ entsteht erst beim ersten Job. Fehlt es, gibt es nichts wegzuräumen.
+	if _, err := os.Stat(rawDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	files, err := previousJobFiles(runDir, rawDir, entry)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("%s ließ sich nicht entfernen: %v", file, err)
+		}
+	}
+	return nil
+}
+
+// previousJobFiles sind die Dateien unter raw/, die dem Eintrag gehören.
+//
+// Maßgeblich ist die vorige entries/<tool>.json: sie nennt die Job-Namen samt
+// sarif-Pfad. Fehlt oder bricht sie, greift die Namensregel aus checkScanner()
+// als Rückfall — der Job-Name beginnt mit dem Tool-Namen. Der Rückfall bleibt
+// auf *.sarif beschränkt, damit spätere Konverter-Zwischendateien nicht
+// mitgehen.
+func previousJobFiles(runDir string, rawDir string, entry string) ([]string, error) {
+	if status, err := ReadEntryStatus(runDir, entry); err == nil {
+		files := []string{}
+		for _, job := range status.Jobs {
+			if name, ok := rawFileName(job.SARIF); ok {
+				files = append(files, filepath.Join(rawDir, name))
+			}
+		}
+		return files, nil
+	}
+
+	files := []string{}
+	for _, pattern := range []string{entry + ".sarif", entry + "-*.sarif"} {
+		matches, err := filepath.Glob(filepath.Join(rawDir, pattern))
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, matches...)
+	}
+	return files, nil
+}
+
+// rawFileName prüft den Ort, den die vorige Datei nennt, und liefert den
+// Dateinamen daraus.
+//
+// Geschrieben hat den Pfad zwar der Ausführer selbst, gelesen wird er aber von
+// der Platte: ein Löschen soll nicht davon abhängen, was in der Datei steht.
+// Angenommen wird deshalb nur, was auch als Job-Datei entstehen konnte.
+func rawFileName(sarif string) (string, bool) {
+	rest, found := strings.CutPrefix(sarif, RawDirName+"/")
+	if !found || !strings.HasSuffix(rest, ".sarif") {
+		return "", false
+	}
+	if !ValidEntryName(strings.TrimSuffix(rest, ".sarif")) {
+		return "", false
+	}
+	return rest, true
+}
+
 // runJob startet ein Werkzeug und wertet den Ausgang aus.
-func runJob(ctx context.Context, scanner Scanner, job JobStatus, options Options) JobStatus {
+func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) JobStatus {
+	scanner := plan.scanner
 	tool := options.Tools[scanner.Tool]
 
 	rawDir := filepath.Join(options.RunDir, RawDirName)
 	if err := os.MkdirAll(rawDir, 0o755); err != nil {
 		return failJob(job, fmt.Sprintf("%s ließ sich nicht anlegen: %v", RawDirName, err))
 	}
-	outPath := filepath.Join(rawDir, scanner.Job+".sarif")
+	outPath := filepath.Join(rawDir, plan.name+".sarif")
 	// Ein zweiter Aufruf überschreibt. Die alte Datei muss vorher weg, sonst
 	// gälte sie als Ergebnis, wenn der Scanner diesmal nichts schreibt.
 	if err := os.Remove(outPath); err != nil && !os.IsNotExist(err) {
@@ -260,9 +442,21 @@ func runJob(ctx context.Context, scanner Scanner, job JobStatus, options Options
 	jobCtx, cancel := context.WithTimeout(ctx, scanner.Timeout)
 	defer cancel()
 
-	args := scanner.Command(outPath, options.Target, options.ScriptsDir)
+	// {target} bleibt die Projektwurzel, auch wenn der Job in einem Modul
+	// darunter arbeitet: sonst hätte ein Aufruf keine Möglichkeit mehr, auf das
+	// Projekt als Ganzes zu zeigen.
+	moduleDir := ""
+	if plan.module != "" {
+		moduleDir = filepath.Join(options.Target, plan.module)
+	}
+	workDir := options.Target
+	if scanner.Workdir == WorkdirModule {
+		workDir = moduleDir
+	}
+
+	args := scanner.Command(outPath, options.Target, moduleDir, options.ScriptsDir)
 	command := exec.CommandContext(jobCtx, tool.Path, args...)
-	command.Dir = options.Target
+	command.Dir = workDir
 	// Ohne WaitDelay liefe das Timeout ins Leere, sobald ein Scanner selbst
 	// Prozesse startet: der Abbruch trifft nur ihn, seine Kinder halten das
 	// Ende der Ausgabepipe offen, und Run wartete weiter auf sie. Die Frist
@@ -313,7 +507,7 @@ func runJob(ctx context.Context, scanner Scanner, job JobStatus, options Options
 
 	job.State = StateDone
 	job.Findings = &findings
-	job.SARIF = RawDirName + "/" + scanner.Job + ".sarif"
+	job.SARIF = RawDirName + "/" + plan.name + ".sarif"
 	job.Reason = ""
 	return job
 }

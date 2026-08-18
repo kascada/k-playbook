@@ -13,7 +13,7 @@ const ScannerCatalogName = "scripts/scanners.tsv"
 
 // scannerColumns ist die Spaltenzahl einer Zeile. Sie steht fest, damit eine
 // vergessene Spalte auffällt, statt still in der letzten zu landen.
-const scannerColumns = 7
+const scannerColumns = 8
 
 // SARIFMode sagt, ob ein Job SARIF liefert und auf welchem Weg.
 type SARIFMode string
@@ -26,6 +26,17 @@ const (
 	SARIFConvert SARIFMode = "convert"
 	// SARIFNone: das Werkzeug erzeugt überhaupt kein SARIF.
 	SARIFNone SARIFMode = "none"
+)
+
+// WorkdirMode sagt, worin ein Job arbeitet.
+type WorkdirMode string
+
+const (
+	// WorkdirTarget: Arbeitsverzeichnis ist {target}, die Projektwurzel.
+	WorkdirTarget WorkdirMode = "target"
+	// WorkdirModule: der Job braucht ein Modulverzeichnis. Er läuft je
+	// gefundenem Modul einmal, mit dem Modul als Arbeitsverzeichnis.
+	WorkdirModule WorkdirMode = "module"
 )
 
 // OutputMode sagt, wer die Datei unter raw/ schreibt.
@@ -49,6 +60,9 @@ type Scanner struct {
 	SARIF     SARIFMode     `json:"sarif"`
 	Output    OutputMode    `json:"output"`
 	Timeout   time.Duration `json:"timeout"`
+	// Workdir ist das Arbeitsverzeichnis des Aufrufs. module fächert den Job
+	// zusätzlich auf: einen Aufruf je gefundenem Modul.
+	Workdir WorkdirMode `json:"workdir"`
 	// Args ist der Aufruf ohne das Programm selbst, bereits in einzelne
 	// Argumente zerlegt. Die Platzhalter stehen noch darin.
 	Args []string `json:"args"`
@@ -99,7 +113,8 @@ func ParseScanners(content string, source string) ([]Scanner, error) {
 			Languages: strings.TrimSpace(fields[2]),
 			SARIF:     SARIFMode(strings.TrimSpace(fields[3])),
 			Output:    OutputMode(strings.TrimSpace(fields[4])),
-			Args:      strings.Fields(fields[6]),
+			Workdir:   WorkdirMode(strings.TrimSpace(fields[6])),
+			Args:      strings.Fields(fields[7]),
 		}
 
 		if err := checkScanner(&scanner, strings.TrimSpace(fields[5]), where); err != nil {
@@ -144,6 +159,11 @@ func checkScanner(scanner *Scanner, timeout string, where string) error {
 	default:
 		return fmt.Errorf("%s: Job %s hat unbekannten output-Wert %q", where, scanner.Job, scanner.Output)
 	}
+	switch scanner.Workdir {
+	case WorkdirTarget, WorkdirModule:
+	default:
+		return fmt.Errorf("%s: Job %s hat unbekannten workdir-Wert %q", where, scanner.Job, scanner.Workdir)
+	}
 
 	duration, err := time.ParseDuration(timeout)
 	if err != nil {
@@ -166,12 +186,19 @@ func checkScanner(scanner *Scanner, timeout string, where string) error {
 	if scanner.Output == OutputStdout && uses {
 		return fmt.Errorf("%s: Job %s wird umgeleitet und darf %s nicht nennen", where, scanner.Job, placeholderOut)
 	}
+	// Ohne Modulsuche gibt es kein Modul, auf das {module} zeigen könnte. Der
+	// Platzhalter bliebe stehen und landete wörtlich im Aufruf — das soll beim
+	// Lesen auffallen, nicht als unverständliche Meldung des Werkzeugs.
+	if scanner.Workdir != WorkdirModule && usesPlaceholder(scanner.Args, placeholderModule) {
+		return fmt.Errorf("%s: Job %s nennt %s, läuft aber mit workdir %s", where, scanner.Job, placeholderModule, scanner.Workdir)
+	}
 	return nil
 }
 
 const (
 	placeholderOut     = "{out}"
 	placeholderTarget  = "{target}"
+	placeholderModule  = "{module}"
 	placeholderScripts = "{scripts}"
 )
 
@@ -197,10 +224,16 @@ func ScannersFor(scanners []Scanner, tool string) []Scanner {
 
 // Command setzt die Argumente eines Aufrufs zusammen. Ersetzt wird erst nach
 // dem Zerlegen, damit ein Pfad mit Leerzeichen ein Argument bleibt.
-func (s Scanner) Command(out string, target string, scriptsDir string) []string {
+//
+// module ist das Modulverzeichnis dieses Aufrufs, absolut; bei workdir target
+// ist es leer, und dort weist checkScanner den Platzhalter ohnehin ab. target
+// bleibt in beiden Fällen die Projektwurzel — bei workdir module fällt sie mit
+// dem Arbeitsverzeichnis auseinander.
+func (s Scanner) Command(out string, target string, module string, scriptsDir string) []string {
 	replacer := strings.NewReplacer(
 		placeholderOut, out,
 		placeholderTarget, target,
+		placeholderModule, module,
 		placeholderScripts, scriptsDir,
 	)
 	args := make([]string, 0, len(s.Args))

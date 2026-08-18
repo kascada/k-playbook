@@ -25,10 +25,16 @@ Produces:
 
 Nothing else. This command writes only inside its own directory `docs/code/`.
 
-## Schritt 1 — Target bestimmen und bestätigen
+## Schritt 1 — Pfade auflösen und Target bestätigen
 
-Der analysierte Code liegt in `project.repoRoot` aus der Context-Ausgabe, die
-Dokumentation entsteht unter `<local.dir>/docs/code`.
+From the context output:
+
+- `RESOLVED_DOCS_DIR = <local.dir>/docs`
+- `DOCS_DISPLAY_PATH = k-playbook-local/docs`
+- `CODE_DIR = <RESOLVED_DOCS_DIR>/code`
+- `CODE_DISPLAY_PATH = k-playbook-local/docs/code`
+
+Use `CODE_DIR` for all doc writes.
 
 **Target-Auflösung** — aus der Context-Ausgabe und dem Argument, nicht geraten:
 
@@ -39,6 +45,16 @@ Das Ergebnis wird gebunden als:
 
 - `TARGET_DIR` — das absolute Analyseverzeichnis.
 - `TARGET_DISPLAY_PATH` — derselbe Pfad relativ zu `project.dir`.
+
+Command-specific policy:
+
+- If `RESOLVED_DOCS_DIR` is missing on disk: ask whether to create exactly that directory
+  now or to run `/k-gui`. Do not use a fallback path and do not abort hard.
+- `CODE_DIR` is this command's own producer directory. Create it without asking if it is
+  missing — before the first run that is the normal state, not a broken installation.
+- Write nothing outside `CODE_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
+  belong to `/k-docs-index`; `docs/libs/`, `docs/extracted/` and `docs/manual/` belong to
+  other producers and are not touched here — not even read for repair.
 
 **Preflight-Snapshot anzeigen:**
 
@@ -64,28 +80,7 @@ Bei „nein": abbrechen mit Hinweis:
 
 Bei „ja": weiter mit Schritt 2.
 
-## Schritt 2 — Pfade auflösen
-
-From the context output:
-
-- `RESOLVED_DOCS_DIR = <local.dir>/docs`
-- `DOCS_DISPLAY_PATH = k-playbook-local/docs`
-- `CODE_DIR = <RESOLVED_DOCS_DIR>/code`
-- `CODE_DISPLAY_PATH = k-playbook-local/docs/code`
-
-Use `CODE_DIR` for all doc writes.
-
-Command-specific policy:
-
-- If `RESOLVED_DOCS_DIR` is missing on disk: ask whether to create exactly that directory
-  now or to run `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR` is this command's own producer directory. Create it without asking if it is
-  missing — before the first run that is the normal state, not a broken installation.
-- Write nothing outside `CODE_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
-  belong to `/k-docs-index`; `docs/libs/`, `docs/extracted/` and `docs/manual/` belong to
-  other producers and are not touched here — not even read for repair.
-
-## Schritt 3 — Scope klären
+## Schritt 2 — Scope klären
 
 Ask the user (bundle in one message):
 
@@ -99,7 +94,7 @@ Ask the user (bundle in one message):
 
 Announce the final effective exclusion set before scanning, in one compact list. Give the user one chance to add more.
 
-## Schritt 4 — Semantischer Scan
+## Schritt 3 — Semantischer Scan
 
 **Explicit rule of engagement:** do **not** produce a file-by-file dump. The output of this phase is an internal understanding organized by **meaning**, not by directory layout.
 
@@ -121,7 +116,7 @@ Look for:
 
 **Bei sehr großen Repos:** in Sub-Agents parallelisieren (einer pro Top-Level-Subsystem-Kandidat), Ergebnisse mergen. Für jeden Sub-Agent explizite Ausschlüsse + „nur Bedeutung, keine Zeilenlisten"-Regel mitgeben.
 
-## Schritt 5 — Thematische Struktur vorschlagen
+## Schritt 4 — Thematische Struktur vorschlagen
 
 Zeige dem User eine **kompakte** Themenliste (nicht die Doku selbst). Format:
 
@@ -150,7 +145,7 @@ Warte auf Bestätigung. **Nichts schreiben bevor die Struktur bestätigt ist.**
 
 Nummeriert wird in Einer-Schritten mit bewussten Lücken (`00`, `01`, …, `90`) — die Nummer ist Sortier-Hilfe, keine lückenlose Zählung. Ein neues Thema kommt später in eine freie Nummer, ohne dass umsortiert wird. Der Nummernkreis gilt nur innerhalb von `CODE_DIR`; andere Herkünfte zählen eigenständig.
 
-## Schritt 6 — Docs schreiben
+## Schritt 5 — Docs schreiben
 
 Pro bestätigtem Thema eine Datei `<CODE_DIR>/<NN>-<slug>.md`. Rahmen pro Datei:
 
@@ -213,7 +208,7 @@ Bei einem erneuten Lauf pro Themen-Vorschlag bestätigen lassen, ob neu / aktual
 
 Nach jeder geschriebenen Datei kurz melden welche Datei geschrieben wurde (Dateiname + Zeilen-Zahl, nicht Inhalt), damit der User Fortschritt sieht.
 
-## Schritt 7 — Abschluss
+## Schritt 6 — Abschluss
 
 Kompakte Zusammenfassung:
 
