@@ -207,9 +207,13 @@ async function onUpdateClick() {
 }
 
 function renderUpdate(data) {
-  updateAvailable = Boolean(data.available);
-  devSyncActive = Boolean(data.cleanliness && data.cleanliness.devSync);
-  renderCleanliness(data.cleanliness);
+  const cleanliness = data.cleanliness || {};
+  const blockingCleanliness = Boolean(
+    (cleanliness.modified && cleanliness.modified.length > 0) || cleanliness.ahead > 0,
+  );
+  updateAvailable = Boolean(data.available) && !blockingCleanliness;
+  devSyncActive = Boolean(cleanliness.devSync);
+  renderCleanliness(cleanliness);
 
   // Der eingespielte Arbeitsstand geht vor: er verdeckt, was upstream liegt,
   // und muss erst weg. Der Knopf sagt, was er tut — was man ansieht,
@@ -219,6 +223,14 @@ function renderUpdate(data) {
     elements.update.textContent = "Arbeitsstand verwerfen";
     elements.update.title =
       "Stellt den unberührten Clone wieder her. Danach lässt sich auf ein Update prüfen.";
+    elements.update.disabled = false;
+    return;
+  }
+
+  if (data.available && blockingCleanliness) {
+    elements.update.className = "secondary";
+    elements.update.textContent = "Update blockiert";
+    elements.update.title = cleanliness.message || `${data.local} -> ${data.remote} (${data.branch})`;
     elements.update.disabled = false;
     return;
   }

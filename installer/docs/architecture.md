@@ -578,11 +578,12 @@ Drei Zustände, zwei Schweregrade:
 stolpern. Das ist der Unterschied zwischen „irgendwas ging schief" und „`bin/k-playbook`
 ist verändert".
 
-Die Oberfläche zeigt den Befund in einer eigenen Karte, weil dort Dateinamen hinmüssen
-— der Update-Button hat nur Platz für einen Zustand. Bewusst **ohne** Knopf zum
-Zurücksetzen: das wäre `git checkout -- .` in einem fremden Verzeichnis, und die
-Oberfläche kann nicht wissen, ob dort jemand absichtlich entwickelt. Der Befehl steht
-zum Kopieren da.
+Die Oberfläche zeigt den Befund in einer eigenen Karte, weil dort Dateinamen hinmüssen.
+Ist ein Remote-Update verfügbar und der Zustand blockierend, heißt der Kopfknopf
+„Update blockiert" statt „Update verfügbar"; ein Klick prüft erneut, startet aber keinen
+Pull. Bewusst **ohne** Knopf zum Zurücksetzen: das wäre `git checkout -- .` in einem
+fremden Verzeichnis, und die Oberfläche kann nicht wissen, ob dort jemand absichtlich
+entwickelt. Der Befehl steht zum Kopieren da.
 
 Ist ausgerechnet `bin/k-playbook` die veränderte Datei, ist die Oberfläche über den
 Wrapper nicht mehr erreichbar. Dann führt der host-weite `k-playbook` aus dem `PATH` zum
