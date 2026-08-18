@@ -1,3 +1,12 @@
+---
+type: Architecture
+title: <Overlay-Repo-Name>
+description: <Ein Satz: was dieses Overlay ist und über welcher Base es liegt.>
+tags: [<kurze-tags>]
+status: stable
+generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }
+---
+
 # <Overlay-Repo-Name>
 
 **Pfad:** `<absoluter-pfad>`
@@ -6,7 +15,7 @@
 alles andere kommt aus der Base.
 
 > Für die Base (die die eigentliche Anwendung enthält), siehe
-> [`<base-doc>.md`](./<base-doc>.md).
+> [`<NN>-<slug>.md`](./<NN>-<slug>.md) im selben Verzeichnis `docs/code/`.
 
 ---
 
@@ -80,7 +89,7 @@ Kommentar zu den Details (Base gepinnt auf welchen Tag, was macht COPY, ...)
 docker compose up --build
 ```
 
-Env-Variablen: siehe Base-Doku (`<base-doc>.md`).
+Env-Variablen: siehe Base-Doku (`<NN>-<slug>.md` in `docs/code/`).
 
 ## 8. Tests
 

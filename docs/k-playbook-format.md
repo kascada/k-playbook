@@ -59,24 +59,27 @@ Commands raten damit keinen Pfad mehr und lesen auch keinen: sie leiten ihn ab.
 Das gilt auch für die Projekt-Dokumentation. Früher durfte `paths.docs` als einziger
 Wert mit `../` aus dem k-playbook-Verzeichnis herauszeigen, damit ein Projekt seine schon
 vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-code2docs`
-schreibt nach `k-playbook-local/docs/code/`. Auf `docs/` als Ganzes schreiben vier
-Commands, jeder in sein eigenes Unterverzeichnis. Was ein Projekt sonst noch an
-Dokumentation pflegt, bleibt davon unberührt — k-playbook beansprucht nur sein eigenes
-Verzeichnis.
+schreibt nach `k-playbook-local/docs/code/`. `docs/` gliedert sich in Unterverzeichnisse
+nach Herkunft; wie viele Werkzeuge in eine Herkunft schreiben, sagt das Verzeichnis nicht.
+Was ein Projekt sonst noch an Dokumentation pflegt, bleibt davon unberührt — k-playbook
+beansprucht nur sein eigenes Verzeichnis.
 
 Innerhalb von `k-playbook-local/docs/` ist die Herkunft am Verzeichnis ablesbar, und
 daran hängt die Eigentümerregel:
 
-Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. Ein Command schreibt
-ausschließlich in sein eigenes Verzeichnis. `docs/README.md` gehört allein
-`/k-docs-index`. In `docs/manual/` schreibt kein Command Doc-Dateien; die
-Struktur-README aus dem Einrichten ist davon ausgenommen. Flache `docs/*.md` aus der
-Zeit vor dieser Struktur haben keinen Erzeuger: sie werden nur gelistet, geschrieben
-werden sie von keinem Command.
+Jedes Unterverzeichnis von `docs/` steht für eine Herkunft, nicht für ein einzelnes
+Werkzeug. Ein Werkzeug schreibt ausschließlich in Verzeichnisse seiner eigenen Herkunft;
+welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
+`generated.by`. `docs/README.md` gehört allein `/k-docs-index`. In `docs/manual/`
+schreibt kein Command Doc-Dateien; die Struktur-README aus dem Einrichten ist davon
+ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Erzeuger:
+sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
-`docs/code/`, `docs/libs/` und `docs/extracted/` legt beim ersten Lauf ihr jeweiliger
-Erzeuger an — `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract`. Das Einrichten legt sie
-nicht an; es legt `docs/manual/` und `material/` an.
+`docs/code/`, `docs/libs/` und `docs/extracted/` entstehen beim ersten Lauf eines
+Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-code2docs` und der Skill
+`ks-overlay-repo-analyse`, in `docs/libs/` `/k-tools-scan`, in `docs/extracted/`
+`/k-docs-extract`. Das Einrichten legt sie nicht an; es legt `docs/manual/` und
+`material/` an.
 
 `k-playbook-local/material/` ist die Quellseite: Rohmaterial wie Chat-Mitschnitte und
 Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt wird wie

@@ -9,14 +9,18 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 
 **Nachprüfbar:** Ja – siehe Checkliste am Ende und Verifikations-Test.
 
-> **Ausführungs-Hinweis:** Die konkrete Umsetzung machen heute vier Commands,
-> nacheinander und jeder in seinem eigenen Verzeichnis:
+> **Ausführungs-Hinweis:** Die konkrete Umsetzung machen heute die Docs-Commands,
+> nacheinander und jedes Werkzeug nur in Verzeichnissen seiner eigenen Herkunft:
 >
 > 1. **`/k-code2docs`** — Doku aus dem Code nach `docs/code/`.
 > 2. **`/k-tools-scan`** — Library- und Tool-Steckbriefe nach `docs/libs/`.
 > 3. **`/k-docs-extract`** — Rohmaterial aus `material/` nach `docs/extracted/`.
 > 4. **`/k-docs-index`** — baut `docs/README.md` über alle Herkünfte und
 >    schreibt `AGENTS.md` und `opencode.json`.
+>
+> Nach `docs/code/` schreibt außerdem der Skill `ks-overlay-repo-analyse`;
+> welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem
+> Frontmatter unter `generated.by`.
 >
 > Nur der letzte Schritt schließt die Session-Memory-Kette; die drei davor
 > erzeugen nur Inhalt. Dieses PLAYBOOK beschreibt weiterhin das *Modell* —
@@ -51,7 +55,7 @@ Projekt-Root/
 └── k-playbook-local/
     ├── docs/
     │   ├── README.md            (3) Stichwort-Index über alle Herkünfte
-    │   ├── code/                    erzeugt von /k-code2docs
+    │   ├── code/                    aus dem Code abgeleitet
     │   ├── libs/                    erzeugt von /k-tools-scan
     │   ├── extracted/               erzeugt von /k-docs-extract
     │   └── manual/                  von Hand gepflegt
@@ -114,7 +118,7 @@ ihn `/k-docs-index`; von Hand sieht die Grundstruktur so aus:
 
 ## Übersicht der Dokumente
 
-### Code (`code/`) — erzeugt von `/k-code2docs`
+### Code (`code/`) — aus dem Code abgeleitet
 
 | Datei | Inhalt |
 |-------|--------|
@@ -323,7 +327,8 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 - `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
 - `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract` (Commands) – erzeugen die
-  Doku je Herkunft unter `docs/code/`, `docs/libs/` und `docs/extracted/`.
+  Doku je Herkunft unter `docs/code/`, `docs/libs/` und `docs/extracted/`; nach
+  `docs/code/` schreibt außerdem `ks-overlay-repo-analyse` (siehe oben).
 - `/k-docs-index` (Command) – letzter Schritt der Kette: baut `docs/README.md`
   über alle Herkünfte und schreibt `AGENTS.md` und `opencode.json`. Erst
   danach greift die hier beschriebene Session-Memory.

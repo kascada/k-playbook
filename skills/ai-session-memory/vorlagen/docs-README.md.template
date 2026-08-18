@@ -10,7 +10,7 @@ Dies ist der einzige Index. Er deckt alle Herkünfte ab; geschrieben wird er von
 
 ## Übersicht der Dokumente
 
-### Code (`code/`) — erzeugt von `/k-code2docs`
+### Code (`code/`) — aus dem Code abgeleitet
 
 | Datei | Inhalt |
 |-------|--------|
@@ -92,7 +92,7 @@ das Herkunftsverzeichnis im Pfad.
 └── k-playbook-local/
     ├── docs/                  diese Doku
     │   ├── README.md          dieser Index
-    │   ├── code/              erzeugt von /k-code2docs
+    │   ├── code/              aus dem Code abgeleitet
     │   ├── libs/              erzeugt von /k-tools-scan
     │   ├── extracted/         erzeugt von /k-docs-extract
     │   └── manual/            von Hand gepflegt

@@ -50,8 +50,11 @@ Command-specific policy:
 
 - If `RESOLVED_DOCS_DIR` is missing on disk: ask whether to create exactly that directory
   now or to run `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR` is this command's own producer directory. Create it without asking if it is
-  missing — before the first run that is the normal state, not a broken installation.
+- `CODE_DIR` is the directory of the origin „Code", not this command's private
+  directory: the skill `ks-overlay-repo-analyse` writes its Overlay- and Base-Docs there
+  too. Files from that producer are the normal case, not leftovers. Create the directory
+  without asking if it is missing — before the first run that is the normal state, not a
+  broken installation.
 - Write nothing outside `CODE_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
   belong to `/k-docs-index`; `docs/libs/`, `docs/extracted/` and `docs/manual/` belong to
   other producers and are not touched here — not even read for repair.
@@ -189,7 +192,7 @@ Aufruf-Pfad. Verweise auf konkrete Stellen im Code als `path/to/file.py:123`.>
 **Regeln:**
 
 - Jede Themen-Datei bekommt OKF-kompatibles YAML-Frontmatter: `type`, `title`, `description`, `tags`, `status`, `generated`. `type` ist typischerweise `Project Concept`; bei passenderem Inhalt sind auch sprechende Typen wie `Architecture`, `Data Model`, `API Surface`, `Runtime Configuration`, `Operational Playbook` erlaubt. Keine zentrale Typ-Liste erfinden.
-- `generated.by` ist immer `k-code2docs`. Der Index prüft das gegen das Verzeichnis; ein anderer Wert in `docs/code/` ist ein Befund.
+- `generated.by` nennt das schreibende Werkzeug; dieser Command trägt `k-code2docs` ein. In `docs/code/` sind beide Erzeuger der Herkunft „Code" gültig: `k-code2docs` und `ks-overlay-repo-analyse`. Der Index prüft den Wert gegen die Herkunft des Verzeichnisses; ein Wert, der zu einer anderen Herkunft gehört, ist ein Befund.
 - `description` ist ein konkreter Ein-Satz-Summary für Index/Search/Agenten. `tags` sind kurz, lowercase, domänen- oder technikbezogen; keine Keyword-Flut.
 - Wenn belastbare Quellen außer Code genutzt wurden, `sources:` im Frontmatter ergänzen, jeweils als OKF-Objekt mit mindestens `resource`. Wenn ein Mensch eine Datei später fachlich bestätigt, darf `verified: { by: human:<id>, at: <ISO-8601-datetime> }` nachgetragen werden. Nicht automatisch Human-Review behaupten.
 - Code-Referenzen konsequent als `pfad:zeile` — sonst kann die spätere Session nicht ohne Grep zurückspringen.
@@ -202,9 +205,9 @@ Aufruf-Pfad. Verweise auf konkrete Stellen im Code als `path/to/file.py:123`.>
 
 - Diese Docs bleiben normale Markdown-Dateien. Es wird **kein** OKF-`index.md` erzeugt; der Index über alle Herkünfte entsteht in `/k-docs-index`.
 - Das Frontmatter folgt dem Open Knowledge Format leichtgewichtig, damit Menschen und Agenten Dateien nach Typ, Tags, Status und Erzeugungszeit sortieren können.
-- Bestehende Dateien ohne Frontmatter sind nicht kaputt. Bei Aktualisierung einer solchen Datei Frontmatter nur mit Bestätigung ergänzen.
+- Bestehende Dateien ohne Frontmatter sind nicht kaputt. Bei Aktualisierung einer solchen Datei Frontmatter nur mit Bestätigung ergänzen. Eine Datei ohne `generated.by` gilt als unbekannte Herkunft und wird wie eine fremde behandelt — also nur mit Bestätigung überschrieben.
 
-Bei einem erneuten Lauf pro Themen-Vorschlag bestätigen lassen, ob neu / aktualisieren / überspringen. Existierende Dateien werden nicht ohne Bestätigung überschrieben.
+Bei einem erneuten Lauf pro Themen-Vorschlag bestätigen lassen, ob neu / aktualisieren / überspringen. Existierende Dateien werden nicht ohne Bestätigung überschrieben. Eine Datei mit fremdem `generated.by` — etwa `ks-overlay-repo-analyse` — ist dabei kein Altbestand aus einem früheren Lauf, sondern gehört einem anderen Erzeuger derselben Herkunft: sie wird nie ohne Bestätigung überschrieben.
 
 Nach jeder geschriebenen Datei kurz melden welche Datei geschrieben wurde (Dateiname + Zeilen-Zahl, nicht Inhalt), damit der User Fortschritt sieht.
 

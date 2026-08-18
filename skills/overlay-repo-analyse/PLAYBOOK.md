@@ -61,7 +61,9 @@ done
 - Welche Repos gibt es? Bilden sie Paare (`*-ui` + `*-api`)?
 - Welches Repo hat `FROM ghcr.io/…` (= Overlay)? Welches nicht (= Base)?
 - Welche `docker-compose.yaml`-Services sind wo definiert?
-- Gibt es bereits einen `docs/`-Ordner?
+- Gibt es bereits einen `k-playbook-local/docs/`-Baum mit seinen
+  Herkunfts-Unterverzeichnissen (`code/`, `libs/`, `extracted/`, `manual/`)?
+  Was liegt schon in `docs/code/`? Dieser Bestand bestimmt in Phase 5 die freien Nummern.
 
 ### Ergebnis
 
@@ -257,6 +259,29 @@ Notiere: „Overlay ergänzt X um Feature Y (+N Zeilen)".
 Jetzt die Erkenntnisse in strukturierte Docs überführen. Wenn nach Phase 2
 schon Zwischen-Docs existieren, jetzt revidieren.
 
+### Wohin die Docs gehen
+
+Alle Docs dieses Skills — Overlay-Docs **und** Base-Docs — gehen nach
+`k-playbook-local/docs/code/`. Das Verzeichnis trägt die Herkunft „aus Code
+abgeleitet", nicht ein einzelnes Werkzeug: `/k-code2docs` schreibt ebenfalls
+dorthin. Dass eine Base-Doc fremden Code beschreibt, der gar nicht im Projekt
+liegt, ändert an der Herkunft nichts.
+
+Existiert `k-playbook-local/docs/code/` noch nicht, legt dieser Lauf es an —
+das Verzeichnis gehört der Herkunft, nicht `/k-code2docs`.
+
+Dateiname: `<NN>-<slug>.md`, nach derselben Konvention wie `/k-code2docs`.
+Nummeriert wird in Einer-Schritten mit bewussten Lücken (`00`, `01`, …, `90`);
+die Nummer ist Sortier-Hilfe, keine lückenlose Zählung, und der Nummernkreis
+gilt nur innerhalb von `docs/code/`. **Vor dem Schreiben den vorhandenen
+Bestand in `k-playbook-local/docs/code/` sichten** und die nächsten freien
+Nummern vergeben, statt blind bei `00` zu beginnen — dort können schon Dateien
+aus `/k-code2docs`-Läufen liegen.
+
+Jede Datei bekommt das Frontmatter aus der Vorlage, mit
+`generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }` — daran
+liest der Index Titel und Herkunft ab.
+
 ### Wichtigste Regel
 
 **Sauber trennen zwischen „Base liefert" und „Overlay ergänzt".**
@@ -299,14 +324,15 @@ Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 
 Vorlage in `<playbook.dir>/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
 
-### Alle Docs verlinken
+### Index bauen
 
-In `docs/README.md` alle Doc-Dateien listen. Idealerweise anschließend
-das Playbook `ks-ai-session-memory/` anwenden, damit die Docs für
-Folge-Sessions verankert werden.
+Der Index gehört `/k-docs-index` — dieser Skill schreibt und pflegt ihn nicht.
+Ein Lauf von `/k-docs-index` bildet den Abschluss: er nimmt die neuen Dateien
+aus `docs/code/` mit Titel und Herkunft auf und verankert sie für Folge-Sessions.
 
 > **Pfad-Hinweis:** Projektlokale k-playbook-Dokumentation liegt fest unter
-> `k-playbook-local/docs/`; alternative Docs-Pfade gibt es nicht.
+> `k-playbook-local/docs/`, die Docs dieses Skills unter
+> `k-playbook-local/docs/code/`; alternative Docs-Pfade gibt es nicht.
 
 ---
 
@@ -365,12 +391,12 @@ diff -rq --exclude=node_modules --exclude=.git "$BASE" "$OVR"
 - [ ] Doc-Struktur trennt sauber Base-Verhalten von Overlay-Delta
 - [ ] Falls Zwischen-Docs aus Phase 2 existierten: revidiert
 - [ ] `_bases/`-Verzeichnis ggf. in `.gitignore` (falls Workspace unter Git)
-- [ ] Anschließend Playbook `ks-ai-session-memory/` angewendet
+- [ ] Docs liegen in `k-playbook-local/docs/code/` und `/k-docs-index` ist anschließend gelaufen
 
 ---
 
 ## Verwandte Playbooks
 
-- `ks-ai-session-memory/` – wendet man **nach** diesem Playbook an, damit
-  die entstandenen Docs für Folge-Sessions als autoritativ verankert
-  werden.
+- `/k-docs-index` (Command) – läuft **nach** diesem Playbook: baut den Index
+  über alle Herkünfte und verankert die entstandenen Docs für Folge-Sessions
+  als autoritativ.

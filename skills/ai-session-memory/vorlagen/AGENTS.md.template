@@ -39,7 +39,8 @@ Nur wenn:
 
 **Wenn du im Code etwas findest, das den Docs widerspricht: Docs updaten.**
 Sie sind autoritativ für strukturelle Fragen – aber sie müssen aktuell bleiben.
-Geändert wird über den Erzeuger des jeweiligen Verzeichnisses, nicht von Hand.
+Geändert wird über den Erzeuger des jeweiligen Verzeichnisses, nicht von Hand —
+ausgenommen `manual/`: dort ist die Handkorrektur der vorgesehene Weg.
 
 ## Doc-Format
 
@@ -49,9 +50,11 @@ leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`,
 Dateien nach Bedeutung, Status und Herkunft einordnen können. Der Einstieg
 bleibt `k-playbook-local/docs/README.md`.
 
-Die Herkunft steht am Verzeichnis: `code/` erzeugt `/k-code2docs`, `libs/`
-erzeugt `/k-tools-scan`, `extracted/` erzeugt `/k-docs-extract`, `manual/` ist
-handgepflegt. Den Index `README.md` schreibt `/k-docs-index`.
+Die Herkunft steht am Verzeichnis: nach `code/` schreiben `/k-code2docs` und
+der Skill `ks-overlay-repo-analyse`, `libs/` erzeugt `/k-tools-scan`,
+`extracted/` erzeugt `/k-docs-extract`, `manual/` ist handgepflegt. Welches
+Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
+`generated.by`. Den Index `README.md` schreibt `/k-docs-index`.
 
 ## Sprache
 
@@ -68,7 +71,7 @@ wie der Nutzer (i.d.R. <Standard-Sprache>).
 └── k-playbook-local/
     ├── docs/                          ★ die autoritative Dokumentation
     │   ├── README.md                  Index über alle Herkünfte
-    │   ├── code/  libs/  extracted/  manual/
+    │   └── code/  libs/  extracted/  manual/
     └── material/                      Rohmaterial, nie indiziert
 ```
 

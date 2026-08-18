@@ -40,7 +40,7 @@ Fünf Phasen:
 2. **Overlay-Analyse** – was steht wirklich im Repo.
 3. **Base beschaffen** – per Git-Clone oder Docker-Extract.
 4. **Diff Base ↔ Overlay** – quantifizieren welche Zeilen wirklich Custom sind.
-5. **Docs schreiben** – klar trennen zwischen Base-Verhalten und Overlay-Delta.
+5. **Docs schreiben** – nach `k-playbook-local/docs/code/`, klar getrennt zwischen Base-Verhalten und Overlay-Delta.
 
 Details, Kommandos, Templates und Checkliste in:
 
@@ -54,5 +54,5 @@ in der Doku explizit vermerken „konnte nicht mit Base verglichen werden".
 
 ## Verwandte Playbooks
 
-- `ks-ai-session-memory/` – die im letzten Schritt geschriebenen Docs
-  dauerhaft für AI-Sessions verankern.
+- `/k-docs-index` (Command) – nimmt die im letzten Schritt geschriebenen Docs
+  in den Index auf und verankert sie dauerhaft für AI-Sessions.

@@ -66,7 +66,7 @@ Per origin, collect all `*.md` except `README.md`:
 
 | Herkunft | Verzeichnis | Erzeuger |
 |---|---|---|
-| Code | `CODE_DIR` | `/k-code2docs` |
+| Code | `CODE_DIR` | `/k-code2docs`, Skill `ks-overlay-repo-analyse` |
 | Libs | `LIBS_DIR` | `/k-tools-scan` |
 | Extrahiert | `EXTRACTED_DIR` | `/k-docs-extract` |
 | Manuell | `MANUAL_DIR` | Mensch |
@@ -145,8 +145,9 @@ Check and **report**; do not repair silently and do not rewrite a doc file.
 - **Tote Cross-Links** — relative Markdown links inside doc files that point to a file
   that does not exist. Name source file, line and target.
 - **`generated.by` passt nicht zum Verzeichnis** — e.g. `generated: { by: k-code2docs }`
-  in `EXTRACTED_DIR`. That means a producer wrote outside its own directory, which the
-  ownership rule forbids.
+  in `EXTRACTED_DIR`. Every directory stands for an origin; only a value from a *foreign*
+  origin is a finding. `CODE_DIR` (`docs/code/`) has two valid producers: `k-code2docs`
+  and `ks-overlay-repo-analyse`.
 
 Print the findings as a short list. If there are none, say so in one line. Ask nothing
 here — the index is built either way; the user decides later what to fix and with which
@@ -166,7 +167,7 @@ Write `INDEX_FILE` with these blocks:
 
 ## Übersicht der Dokumente
 
-### Code (`code/`) — erzeugt von `/k-code2docs`
+### Code (`code/`) — aus dem Code abgeleitet
 
 | Datei | Inhalt |
 |-------|--------|
@@ -277,7 +278,8 @@ automatisch als autoritativ behandeln.
   ableiten, Themenbereiche aus den gefundenen Herkünften füllen, Kurzverweis-Tabelle aus
   dem „Häufige Fragen"-Block spiegeln). Die Pfade der Vorlage stimmen bereits mit
   `DOCS_DISPLAY_PATH` und `DOCS_README_FROM_AGENTS` überein — weicht ein aufgelöster Pfad
-  davon ab, gilt der aufgelöste.
+  davon ab, gilt der aufgelöste. Erwähne knapp, dass die Doc-Dateien normales Markdown mit
+  OKF-kompatiblem YAML-Frontmatter sind; `README.md` bleibt der Einstieg.
 - Existiert → prüfen, ob folgende Punkte enthalten sind: „Docs zuerst", Verweis auf
   `DOCS_README_FROM_AGENTS`, Ausnahmen-Regel. Fehlende oder auf einen alten Docs-Pfad
   zeigende Punkte **mit Bestätigung** einfügen/korrigieren. Rest unangetastet lassen.

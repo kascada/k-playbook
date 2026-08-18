@@ -18,10 +18,14 @@ Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
 in jeder OpenCode-Session **automatisch als autoritative Quelle** genutzt
 wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.
 
-> **Ausführung:** Die operative Umsetzung machen vier Docs-Commands, jeder in
-> seinem eigenen Verzeichnis: **`/k-code2docs`** schreibt nach `docs/code/`,
-> **`/k-tools-scan`** nach `docs/libs/`, **`/k-docs-extract`** nach
-> `docs/extracted/`. Den Index `docs/README.md` und die Registrierung
+> **Ausführung:** Die Docs gliedern sich in vier Herkünfte, und die operative
+> Umsetzung machen die Werkzeuge der jeweiligen Herkunft: **`/k-code2docs`**
+> schreibt nach `docs/code/`, **`/k-tools-scan`** nach `docs/libs/`,
+> **`/k-docs-extract`** nach `docs/extracted/`, `docs/manual/` ist
+> handgepflegt. Nach `docs/code/` schreibt außerdem der Skill
+> `ks-overlay-repo-analyse` — welches Werkzeug eine einzelne Datei geschrieben
+> hat, steht in ihrem Frontmatter unter `generated.by`. Den Index
+> `docs/README.md` und die Registrierung
 > (`AGENTS.md`, `opencode.json`) macht allein **`/k-docs-index`** — er ist der
 > letzte Schritt und der einzige, der die Session-Memory-Kette schließt.
 > Dieser Skill liefert das *Konzept* und die zugrundeliegenden Vorlagen.

@@ -207,8 +207,9 @@ Der komplette Flow steht in [`code-review.md`](./code-review.md), das Artefaktmo
 
 ### Docs-First
 
-Projektwissen soll dokumentiert und für AI-Sessions registriert sein. Der Ablauf ist
-vierstufig, und jede Stufe schreibt ausschließlich in ihr eigenes Verzeichnis:
+Projektwissen soll dokumentiert und für AI-Sessions registriert sein. Der Ablauf folgt
+den Herkünften der Docs; jedes Werkzeug schreibt ausschließlich in Verzeichnisse seiner
+eigenen Herkunft:
 
 ```text
 /k-code2docs      → k-playbook-local/docs/code/
@@ -226,9 +227,10 @@ den einen Index über alle Herkünfte, `docs/manual/` eingeschlossen. Er registr
 Docs außerdem in `AGENTS.md` und `opencode.json`. Danach den Assistenten neu starten,
 damit die neue Session-Memory greift.
 
-Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. In `docs/manual/` schreibt
-kein Command Doc-Dateien; was ein Projekt sonst noch an Dokumentation pflegt, bleibt
-ebenfalls unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
+Jedes Unterverzeichnis von `docs/` steht für eine Herkunft; welches Werkzeug eine Datei
+geschrieben hat, steht in ihrem Frontmatter unter `generated.by`. In `docs/manual/`
+schreibt kein Command Doc-Dateien; was ein Projekt sonst noch an Dokumentation pflegt,
+bleibt ebenfalls unberührt — k-playbook beansprucht nur sein eigenes Verzeichnis.
 
 ## Regeln und Checks
 

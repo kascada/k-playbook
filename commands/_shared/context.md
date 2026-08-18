@@ -74,7 +74,7 @@ from the output above — never from configuration, and never by searching.
 | todo | `<local.dir>/TODO.md` |
 | project documentation | `<local.dir>/docs/` |
 | documentation index | `<local.dir>/docs/README.md` |
-| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-code2docs` |
+| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-code2docs` oder des Skills `ks-overlay-repo-analyse` |
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-tools-scan` |
 | extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
 | hand-written documentation | `<local.dir>/docs/manual/` |
@@ -91,12 +91,13 @@ from the output above — never from configuration, and never by searching.
 | scripts | `<playbook.dir>/scripts/` |
 | security tool matrix | `<playbook.dir>/scripts/security-tools.tsv` |
 
-Jedes Unterverzeichnis von `docs/` hat genau einen Erzeuger. Ein Command schreibt
-ausschließlich in sein eigenes Verzeichnis. `docs/README.md` gehört allein
-`/k-docs-index`. In `docs/manual/` schreibt kein Command Doc-Dateien; die
-Struktur-README aus dem Einrichten ist davon ausgenommen. Flache `docs/*.md` aus der
-Zeit vor dieser Struktur haben keinen Erzeuger: sie werden nur gelistet, geschrieben
-werden sie von keinem Command.
+Jedes Unterverzeichnis von `docs/` steht für eine Herkunft, nicht für ein einzelnes
+Werkzeug. Ein Werkzeug schreibt ausschließlich in Verzeichnisse seiner eigenen Herkunft;
+welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
+`generated.by`. `docs/README.md` gehört allein `/k-docs-index`. In `docs/manual/`
+schreibt kein Command Doc-Dateien; die Struktur-README aus dem Einrichten ist davon
+ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Erzeuger:
+sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
 `<local.dir>/material/` is the source side: raw notes, chat transcripts and hand-offs. It
 is never indexed and no command writes into it.

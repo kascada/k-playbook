@@ -33,7 +33,7 @@ gestartet wurde.
 | **Projekt** | | |
 | `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
 | **Docs** | | |
-| `/k-code2docs` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/` |
+| `/k-code2docs` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/`; dorthin schreibt auch der Skill `ks-overlay-repo-analyse` |
 | `/k-tools-scan` | Library-/Tool-Doku ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | Rohmaterial aus `k-playbook-local/material/` zu Doku verdichten | schreibt je Thema eine Datei nach `k-playbook-local/docs/extracted/`, mit Quelle und Konfidenz |
 | `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` |
@@ -92,7 +92,7 @@ Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
 | `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
 | `/k-review`, `/k-results` | `k-playbook-local/results/` |
-| `/k-code2docs` | `k-playbook-local/docs/code/` |
+| `/k-code2docs`, Skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
 | `/k-tools-scan` | `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
 | `/k-docs-index` | `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` im Hauptverzeichnis |
