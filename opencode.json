@@ -3,6 +3,7 @@
   "instructions": [
     "AGENTS.md"
   ],
+  "lsp": true,
   "mcp": {
     "k-playbook": {
       "command": [

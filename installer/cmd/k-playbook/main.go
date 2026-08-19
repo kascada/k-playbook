@@ -2,8 +2,8 @@
 //
 // Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
-// einem Assistenten als MCP-Werkzeug an, und `scan` führt die Werkzeug-Einträge
-// eines Review-Laufs aus.
+// einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
+// eines Review-Laufs aus, und `merge` fasst einen Lauf als Review-Input zusammen.
 package main
 
 import (
@@ -48,6 +48,10 @@ func run(args []string) error {
 		// Oberfläche. Ein Scan liest nur und soll den Host nicht nebenbei
 		// anfassen, während er läuft.
 		return runScan(args[1:])
+	case "merge":
+		// Wie scan: ein Merge arbeitet auf einem vorhandenen Lauf und fasst dessen
+		// Artefakte zusammen, ohne die Host-Installation anzufassen.
+		return runMerge(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -93,6 +97,9 @@ Unterkommandos:
             noch nicht gelaufen sind. Die Namen sind die der Werkzeuge. Das
             Kommando kehrt zurück, wenn alle Einträge durch sind; der
             Fortschritt steht währenddessen unter entries/.
+  merge     Fasst einen bestehenden Review-Lauf zusammen:
+            k-playbook merge <lauf>. Das Ergebnis wird als Review-Input in das
+            Laufverzeichnis geschrieben.
   help      Diese Übersicht.
 `)
 }

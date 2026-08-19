@@ -18,6 +18,7 @@ const elements = {
 // Die Auswahl lebt hier und nicht im DOM: nach dem Anlegen wird alles neu
 // gezeichnet, und was angehakt war, soll dabei nicht verlorengehen.
 const picked = new Set();
+let toolsPickedInitially = false;
 
 function key(name, kind) {
   return `${kind}:${name}`;
@@ -70,6 +71,7 @@ function render(data) {
   }
 
   renderRuns(data);
+  pickToolsInitially(data.tools || []);
   renderGroup(elements.pickTools, data.tools || []);
   renderGroup(elements.pickReviews, data.reviews || []);
 
@@ -101,6 +103,18 @@ function render(data) {
   }
 
   syncCreateButton(data);
+}
+
+function pickToolsInitially(tools) {
+  if (toolsPickedInitially) {
+    return;
+  }
+  toolsPickedInitially = true;
+  for (const tool of tools) {
+    if (tool.available) {
+      picked.add(key(tool.name, tool.kind));
+    }
+  }
 }
 
 function syncCreateButton(data) {
