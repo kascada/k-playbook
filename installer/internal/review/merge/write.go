@@ -68,21 +68,21 @@ func markdown(result Result) string {
 		fmt.Fprintf(&builder, "- %s\n", line)
 	}
 	fmt.Fprintf(&builder, "\n### Tools\n\n")
-	for _, line := range countLines(countTools(result.Findings)) {
+	for _, line := range countLines(countTools(result)) {
 		fmt.Fprintf(&builder, "- %s\n", line)
 	}
 	fmt.Fprintf(&builder, "\n")
 
 	fmt.Fprintf(&builder, "## Findings nach Gruppe\n\n")
-	fmt.Fprintf(&builder, "| Gruppe | Schwere | Ort | Befunde | Belege | Hinweis |\n")
-	fmt.Fprintf(&builder, "|---|---|---|---:|---|---|\n")
+	fmt.Fprintf(&builder, "| Gruppe | Stable-ID | Schwere | Ort | Befunde | Belege | Hinweis |\n")
+	fmt.Fprintf(&builder, "|---|---|---|---|---:|---|---|\n")
 	limit := len(result.Groups)
 	if limit > markdownGroupLimit {
 		limit = markdownGroupLimit
 	}
 	for _, group := range result.Groups[:limit] {
-		fmt.Fprintf(&builder, "| %s | %s | %s | %d | %s | %s |\n",
-			group.ID, tableText(group.Level), tableText(locationText(group.Location)), len(group.FindingIDs),
+		fmt.Fprintf(&builder, "| %s | `%s` | %s | %s | %d | %s | %s |\n",
+			group.ID, group.StableID, tableText(group.DerivedSeverity), tableText(locationText(group.Location)), len(group.FindingIDs),
 			tableText(evidenceText(group.Evidence)), tableText(groupHint(group)))
 	}
 	if len(result.Groups) > limit {
@@ -109,18 +109,23 @@ func countEntries(entries []EntrySummary) map[string]int {
 func countSeverity(findings []Finding) map[string]int {
 	counts := map[string]int{}
 	for _, finding := range findings {
-		level := finding.Level
+		level := finding.DerivedSeverity
 		if level == "" {
-			level = "unknown"
+			level = "unmapped"
 		}
 		counts[level]++
 	}
 	return counts
 }
 
-func countTools(findings []Finding) map[string]int {
+func countTools(result Result) map[string]int {
 	counts := map[string]int{}
-	for _, finding := range findings {
+	for _, entry := range result.Entries {
+		if entry.State == "done" {
+			counts[entry.Name] = 0
+		}
+	}
+	for _, finding := range result.Findings {
 		counts[finding.Evidence.Tool]++
 	}
 	return counts

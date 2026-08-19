@@ -25,8 +25,25 @@ ersetzt die mitgelieferte vollständig, eine leere Datei schaltet den Command ab
 
 Geschrieben wird nie nach `<playbook.dir>/` — ein Update ersetzt das Verzeichnis.
 
-`commands/_shared/` ist kein Namensraum für Commands, sondern für Module, die Commands
-einbinden. Dort liegt heute genau eine Datei: `context.md`.
+`commands/_<name>/` ist ein Namensraum für **Module**, die von einem oder mehreren
+Commands eingebunden werden — keine Commands selbst. Es gibt drei Sorten Namensraum:
+
+- `commands/_shared/` für Module, die für alle Commands gedacht sind. Heute liegt dort
+  genau eine Datei: `context.md`.
+- `commands/_<command-name>/` für Module, die zu genau einem Command gehören, z. B.
+  `commands/_review-run/` als Modulverzeichnis von `/k-review-run`.
+- `commands/_<familie>/` für Module, die eine Command-Familie teilt, z. B. `commands/_docs/`
+  für gemeinsame Bausteine der Docs-Commands.
+
+Overlay und Assistenten-Verlinkung folgen für Module derselben Regel wie für Commands:
+Pfad ab `commands/`, gleicher Dateiname ersetzt vollständig, leere Datei schaltet ab. Der
+Rest des Namensraums bleibt mitgeliefert. Namensraum-Verzeichnisse werden beim Verlinken
+erhalten (`.claude/commands/_review-run/…`), damit Module über ihren stabilen Pfad
+eingebunden werden können.
+
+Ein Modul entsteht dort, wo eine Anleitung länger als ein Absatz ist **und** zusammen
+mit einem Command verwendet wird. Ein Rezept, das eigenständig aus dem Review-Katalog
+laufen soll, gehört weiter in `reviews/`, nicht in einen Command-Namensraum.
 
 ## Name
 

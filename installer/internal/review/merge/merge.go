@@ -26,6 +26,9 @@ type Options struct {
 	RunDir string
 	// KPlaybookVersion ist die Version des Werkzeugs, wenn sie bekannt ist.
 	KPlaybookVersion string
+	// SeverityMappingPath ist der optionale Pfad zur Fallback-Tabelle für
+	// abgeleitete Schwere. Fehlt er, bleibt nur SARIF-/Metadaten-Ableitung.
+	SeverityMappingPath string
 	// Now liefert die Erzeugungszeit. Fehlt es, wird time.Now verwendet.
 	Now func() time.Time
 }
@@ -50,16 +53,15 @@ type RunContext struct {
 // EntrySummary hält den tatsächlichen Status eines ausgewählten Eintrags. Fehlt
 // entries/<name>.json, bleibt Present false und State steht auf start.
 type EntrySummary struct {
-	Name          string             `json:"name"`
-	Kind          review.Kind        `json:"kind"`
-	SelectedState review.State       `json:"selectedState,omitempty"`
-	State         review.State       `json:"state"`
-	Present       bool               `json:"present"`
-	Started       string             `json:"started,omitempty"`
-	Finished      string             `json:"finished,omitempty"`
-	Reason        string             `json:"reason,omitempty"`
-	Jobs          []JobSummary       `json:"jobs"`
-	Source        review.EntryStatus `json:"source,omitempty"`
+	Name          string       `json:"name"`
+	Kind          review.Kind  `json:"kind"`
+	SelectedState review.State `json:"selectedState,omitempty"`
+	State         review.State `json:"state"`
+	Present       bool         `json:"present"`
+	Started       string       `json:"started,omitempty"`
+	Finished      string       `json:"finished,omitempty"`
+	Reason        string       `json:"reason,omitempty"`
+	Jobs          []JobSummary `json:"jobs"`
 }
 
 // JobSummary übernimmt den Status eines einzelnen Scan-Jobs.
@@ -121,6 +123,8 @@ type Finding struct {
 	RuleName            string            `json:"ruleName,omitempty"`
 	RuleDescription     string            `json:"ruleDescription,omitempty"`
 	Level               string            `json:"level,omitempty"`
+	DerivedSeverity     string            `json:"derivedSeverity"`
+	SeveritySource      string            `json:"severitySource"`
 	Message             string            `json:"message,omitempty"`
 	Location            Location          `json:"location,omitempty"`
 	Fingerprints        map[string]string `json:"fingerprints,omitempty"`
@@ -131,12 +135,16 @@ type Finding struct {
 // Group ist eine Dedupe-Gruppe. Sie löscht keine Findings: alle Belege und die
 // Finding-IDs bleiben erhalten.
 type Group struct {
-	ID                 string     `json:"id"`
+	ID                 string     `json:"displayId,omitempty"`
+	StableID           string     `json:"stableId"`
+	StableKey          string     `json:"stableKey"`
 	DedupeRules        []string   `json:"dedupeRules,omitempty"`
 	PossibleDuplicates []string   `json:"possibleDuplicates,omitempty"`
 	Title              string     `json:"title,omitempty"`
 	RuleID             string     `json:"ruleId,omitempty"`
 	Level              string     `json:"level,omitempty"`
+	DerivedSeverity    string     `json:"derivedSeverity,omitempty"`
+	SeveritySource     string     `json:"severitySource,omitempty"`
 	Location           Location   `json:"location,omitempty"`
 	Dependency         Dependency `json:"dependency,omitempty"`
 	FindingIDs         []string   `json:"findingIds"`
@@ -189,11 +197,15 @@ func Build(options Options) (Result, error) {
 		context.Finished = status.Finished
 		context.Reason = status.Reason
 		context.Jobs = summarizeJobs(status.Jobs)
-		context.Source = status
 		entries = append(entries, context)
 	}
 
-	findings, err := loadFindings(options.RunDir, entries)
+	severityMapping, err := LoadSeverityMapping(options.SeverityMappingPath)
+	if err != nil {
+		return Result{}, err
+	}
+
+	findings, err := loadFindings(options.RunDir, entries, severityMapping)
 	if err != nil {
 		return Result{}, err
 	}
@@ -354,17 +366,17 @@ type sarifObject map[string]any
 
 var dependencyIDPattern = regexp.MustCompile(`(?i)\b(CVE-\d{4}-\d{4,}|GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|OSV-[0-9A-Z-]+|PYSEC-\d{4}-\d+)\b`)
 
-func loadFindings(runDir string, entries []EntrySummary) ([]Finding, error) {
+func loadFindings(runDir string, entries []EntrySummary, severityMapping SeverityMapping) ([]Finding, error) {
 	findings := []Finding{}
 	for _, entry := range entries {
 		if entry.State != review.StateDone {
 			continue
 		}
-		for _, job := range entry.Source.Jobs {
+		for _, job := range entry.Jobs {
 			if job.State != review.StateDone || job.SARIF == "" {
 				continue
 			}
-			jobFindings, err := readSARIF(filepath.Join(runDir, job.SARIF), entry.Name, job)
+			jobFindings, err := readSARIF(filepath.Join(runDir, job.SARIF), entry.Name, job, severityMapping)
 			if err != nil {
 				return nil, err
 			}
@@ -374,7 +386,7 @@ func loadFindings(runDir string, entries []EntrySummary) ([]Finding, error) {
 	return findings, nil
 }
 
-func readSARIF(path string, tool string, job review.JobStatus) ([]Finding, error) {
+func readSARIF(path string, tool string, job JobSummary, severityMapping SeverityMapping) ([]Finding, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -408,6 +420,7 @@ func readSARIF(path string, tool string, job review.JobStatus) ([]Finding, error
 				PartialFingerprints: cloneMap(result.PartialFingerprints),
 			}
 			finding.Dependency = extractDependency(finding, result, rule)
+			finding.DerivedSeverity, finding.SeveritySource = deriveSeverity(finding, result, rule, severityMapping)
 			findings = append(findings, finding)
 		}
 	}

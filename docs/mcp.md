@@ -6,9 +6,9 @@ Instruktionsdateien in Lesereihenfolge, die Remediation-Policy, die Guidelines u
 effektiven Kataloge für Regeln, Reviews und Checks — mitgeliefert und projekteigen bereits
 zusammengeführt.
 
-Ein Werkzeug, `k_playbook_context`, mit einem optionalen Parameter `dir`. Mehr tut der
-Server nicht: er führt keine Reviews aus, legt nichts an und verändert nichts am Projekt.
-Das machen Commands und Skills im Assistenten.
+Der Server bietet den Arbeitsstand und die Review-Lauf-Werkzeuge an. `k_playbook_context`
+hat den optionalen Parameter `dir`; alle Review-Werkzeuge verlangen `projectDir`, weil ein
+stdio-Server nicht annehmen darf, dass sein Prozess-Arbeitsverzeichnis das Zielprojekt ist.
 
 Die Innensicht — Protokollfassungen, stdout-Regel, Sitzungsende — steht in
 [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server).
@@ -90,6 +90,113 @@ Hauptverzeichnis — nicht die host-weite Kopie unter `~/.local/bin`. Drei Grün
 
 Der Server selbst ist ortsunabhängig: er löst das Projekt zur Laufzeit über die
 Aufwärtssuche nach `K-PLAYBOOK.yaml` auf, nicht über seinen eigenen Ort.
+
+## Werkzeuge
+
+| Werkzeug | Zweck |
+|---|---|
+| `k_playbook_context` | aufgelösten Arbeitsstand wie `k-playbook context` zurückgeben |
+| `k_playbook_review_status` | Auswahlbasis für neue Läufe oder Status eines bestehenden Laufs lesen |
+| `k_playbook_review_create` | Review-Lauf anlegen oder im Dry-Run die validierte `run.json` zurückgeben |
+| `k_playbook_review_scan` | Tool-Einträge eines Laufs über `review.Execute` ausführen |
+| `k_playbook_review_merge` | Lauf über `merge.Run` zu `review-input.json` und `review-input.md` zusammenführen |
+| `k_playbook_review_write_ai_entry` | Status und Ergebnis eines AI-Review-Eintrags schreiben |
+
+Ein `k_playbook_review_next_steps`-Werkzeug gibt es bewusst noch nicht. Der orchestrierende
+Command liest den Status und entscheidet daraus selbst.
+
+### Review-Response-Vertrag
+
+Alle Review-Werkzeuge liefern dieselbe Hülle. Erfolgreich:
+
+```json
+{
+  "ok": true,
+  "tool": "k_playbook_review_status",
+  "project": {
+    "inputDir": "/uebergebener/pfad",
+    "root": "/projekt",
+    "playbookDir": "/projekt/k-playbook",
+    "localDir": "/projekt/k-playbook-local",
+    "reviewRunsDir": "/projekt/k-playbook-local/results",
+    "languages": ["go"]
+  },
+  "data": {},
+  "warnings": []
+}
+```
+
+Fachlicher Fehler:
+
+```json
+{
+  "ok": false,
+  "tool": "k_playbook_review_status",
+  "project": { "inputDir": "/uebergebener/pfad" },
+  "error": {
+    "code": "project_not_found",
+    "message": "Kein k-playbook-Projekt gefunden.",
+    "details": {}
+  },
+  "warnings": []
+}
+```
+
+Fachliche Fehler bleiben Werkzeugergebnisse mit `ok: false`; der MCP-Server bleibt für den
+nächsten Aufruf ansprechbar. MCP-Protokollfehler sind kaputten JSON-RPC-/MCP-Nachrichten
+vorbehalten. Fehlercodes sind stabil und in `snake_case`, unter anderem
+`project_not_found`, `run_not_found`, `run_exists`, `invalid_mode`, `invalid_selection`,
+`selection_unknown`, `selection_unavailable`, `entry_not_found`, `entry_kind_invalid`,
+`entry_state_invalid`, `result_required`, `result_path_invalid`, `read_failed`,
+`write_failed`, `preflight_failed`, `execution_failed` und `merge_failed`.
+
+### Auswahlvalidierung
+
+`k_playbook_review_status` im Modus `available` und `k_playbook_review_create` benutzen
+dieselbe Auswahlbasis. Kandidaten enthalten mindestens `name`, `kind`, `title`,
+`selectable`, `defaultSelected` und `unavailableReason`.
+
+Tool-Kandidaten kommen aus der Tool-Matrix und dem Preflight, gefiltert nach
+`project.languages`. Nicht installierte oder sprachlich unpassende Tools bleiben sichtbar,
+sind aber nicht `defaultSelected`. AI-Kandidaten kommen aus dem effektiven Review-Katalog;
+abgeschaltete lokale Review-Dateien und Rezepte mit `reviewRun.enabled: false` fehlen.
+
+Ohne `entries` wählt `k_playbook_review_create` alle Kandidaten mit
+`defaultSelected: true`. Unbekannte Namen ergeben `selection_unknown`, ausdrücklich
+angeforderte nicht auswählbare Kandidaten `selection_unavailable`, doppelte oder falsch
+typisierte Einträge `invalid_selection`.
+
+### Scan-Semantik
+
+`k_playbook_review_scan` shellt nicht die `k-playbook`-CLI. Es ruft die Go-Fachlogik
+`review.Execute` direkt auf; nur diese darf die konfigurierten externen Scanner-Binaries
+starten. Der MCP-Input enthält keine Shell-Kommandos und kann Scanner-Befehlszeilen nicht
+überschreiben.
+
+Ein Scanner-Fehlschlag ist normalerweise ein Entry-Status in `data.entries[]`; der
+Werkzeugaufruf bleibt `ok: true`, wenn Lauf, Auswahl und Statusdateien konsistent gelesen
+und geschrieben wurden. `ok: false` steht für Orchestrierungsfehler wie fehlende Läufe,
+ungültige Auswahl, nicht lesbare Laufdateien, nicht schreibbare Entry-Dateien oder einen
+globalen Preflight-Abbruch.
+
+### AI-Rezeptmetadaten
+
+Review-Rezepte können am Dateianfang `reviewRun`-Frontmatter tragen:
+
+```yaml
+---
+reviewRun:
+  enabled: true
+  title: "Technischer Review"
+  resultRequired: true
+  defaultResult: "review-tech.md"
+---
+```
+
+Beim Anlegen eines Laufs werden `recipeKey`, `recipePath`, `recipeOrigin`, `title`,
+`resultRequired` und `defaultResult` in `run.json` kopiert. Das Schreibwerkzeug für
+AI-Einträge validiert später gegen diese Kopie, nicht gegen den eventuell geänderten
+Rezepttext.
 
 ### Die Bedingung, die daraus folgt
 

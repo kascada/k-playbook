@@ -92,7 +92,17 @@ ab, gilt `entries/`. `run.json` hält fest, was ausgewählt wurde, nicht, wie we
   "languages": ["python", "go"],
   "entries": [
     { "name": "semgrep",                "kind": "tool", "state": "start" },
-    { "name": "review-secret-scanning", "kind": "ai",   "state": "start" }
+    {
+      "name": "tech",
+      "kind": "ai",
+      "state": "start",
+      "recipeKey": "tech",
+      "recipePath": "/projekt/k-playbook/reviews/review-tech.md",
+      "recipeOrigin": "dist",
+      "title": "Technischer Review",
+      "resultRequired": true,
+      "defaultResult": "review-tech.md"
+    }
   ]
 }
 ```
@@ -105,6 +115,25 @@ danach ändern; was gelaufen ist, soll trotzdem nachvollziehbar bleiben.
 
 Die `entries` in `run.json` tragen den Zustand mit, den der Lauf **festgelegt** hat. Den
 tatsächlichen Fortschritt führt die Datei unter `entries/`.
+
+AI-Einträge kopieren beim Anlegen die Metadaten aus dem Review-Rezept in `run.json`.
+Spätere Änderungen am Rezept ändern den Lauf nicht mehr. Die optionalen Metadaten stehen
+im YAML-Frontmatter des Rezepts:
+
+```yaml
+---
+reviewRun:
+  enabled: true
+  title: "Technischer Review"
+  resultRequired: true
+  defaultResult: "review-tech.md"
+---
+```
+
+`enabled` ist standardmäßig `true`; `false` entfernt das Rezept aus der Auswahlbasis.
+`title` fällt ohne Angabe auf die erste Überschrift oder den Katalog-Schlüssel zurück.
+`resultRequired` ist standardmäßig `true` und bestimmt, ob ein `done`-Status ein Ergebnis
+braucht. `defaultResult` ist ein relativer Vorschlag im Laufverzeichnis.
 
 ## Zustände
 
@@ -343,6 +372,28 @@ beginnt mit dem Tool-Namen) als Rückfall, beschränkt auf `*.sarif`; dieselbe R
 auch jeden gelesenen Job-Namen, bevor er ein Löschen steuert. Die Dateien anderer Einträge
 bleiben stehen.
 
+### AI-Entry-Status
+
+AI-Einträge schreiben ihre eigene Datei ebenfalls unter `entries/<name>.json`, aber mit
+einem schlanken Schema:
+
+```json
+{
+  "name": "tech",
+  "kind": "ai",
+  "state": "done",
+  "result": "review-tech.md",
+  "reason": "",
+  "startedAt": "2026-08-19T10:00:00Z",
+  "finishedAt": "2026-08-19T10:15:00Z"
+}
+```
+
+`result` ist relativ zum Laufverzeichnis. Wenn `resultRequired` in der kopierten
+`run.json`-Metadatenstruktur `true` ist, braucht `state: done` dieses Ergebnis und die
+Datei muss existieren. `failed` und `skipped` brauchen einen `reason`; `running` darf kein
+`finishedAt` tragen.
+
 ## Die Oberfläche
 
 Der Block **Workflows** auf der Startseite führt mit einem Knopf zur Seite `/reviews`; die
@@ -358,6 +409,23 @@ Dort wird auch ein neuer Lauf zusammengestellt:
 „Erstellen" legt das Verzeichnis und `run.json` an. Mehr nicht: **das Anlegen startet
 nichts.** Gestartet wird im Terminal, mit `k-playbook scan` — einen Knopf dafür gibt es
 in der Oberfläche bewusst noch nicht.
+
+## MCP-Werkzeuge
+
+Der MCP-Server bietet dieselbe Fachlogik maschinenlesbar an. Die CLI bleibt der manuelle
+Weg; MCP ist für die Chat-Orchestrierung ohne Shell-Out zur `k-playbook`-CLI gedacht.
+
+| Werkzeug | Zweck | CLI-Äquivalent |
+|---|---|---|
+| `k_playbook_review_status` | Auswahlbasis oder bestehenden Laufstatus lesen | keines, nahe an Oberfläche `/reviews` |
+| `k_playbook_review_create` | Lauf anlegen oder Dry-Run der `run.json`-Struktur erzeugen | Oberfläche „Erstellen" |
+| `k_playbook_review_scan` | Tool-Einträge blockierend ausführen | `k-playbook scan <lauf>` |
+| `k_playbook_review_merge` | `review-input.json` und `review-input.md` schreiben | `k-playbook merge <lauf>` |
+| `k_playbook_review_write_ai_entry` | Status eines AI-Eintrags schreiben | kein CLI-Äquivalent |
+
+Alle Werkzeuge verlangen `projectDir`, suchen von dort aufwärts nach `K-PLAYBOOK.yaml` und
+geben strukturierte JSON-Hüllen zurück. Fehler sind fachliche Werkzeugergebnisse mit
+`ok: false`, keine MCP-Protokollfehler.
 
 ## Zusammenfassen mit `k-playbook merge`
 

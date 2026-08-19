@@ -10,8 +10,9 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
 ## Status dieses Commands
 
 Arbeitsentwurf. Der Command beschreibt den Zielablauf für einen zusammenhängenden
-Review-Lauf über MCP. Solange die MCP-Werkzeuge noch fehlen, führt er keine Scanner aus,
-sondern dokumentiert den geplanten nächsten Schritt und nennt die vorhandenen CLI-Wege.
+Review-Lauf über MCP. Die MCP-Werkzeuge liegen an; der Command bleibt bis Task 018 ein
+Arbeitsentwurf, weil das Bewertungs-Rezept und die endgültige Orchestrierung noch nicht
+scharfgeschaltet sind.
 
 ## Erster Schritt
 
@@ -52,7 +53,7 @@ Entry-Dateien und den Merge-Artefakten.
 
 ## Geplante MCP-Werkzeuge
 
-Diese Werkzeuge sind die Zieloberfläche; ihre Namen sind Arbeitstitel:
+Diese Werkzeuge sind die MCP-Oberfläche des Laufmodells:
 
 | Werkzeug | Zweck |
 |---|---|
@@ -61,10 +62,10 @@ Diese Werkzeuge sind die Zieloberfläche; ihre Namen sind Arbeitstitel:
 | `k_playbook_review_scan` | Werkzeug-Einträge eines Laufs starten, fachlich `k-playbook scan <lauf>` |
 | `k_playbook_review_write_ai_entry` | Status und Ergebnis eines AI-Review-Eintrags schreiben |
 | `k_playbook_review_merge` | fachlich `k-playbook merge <lauf>`, schreibt `review-input.*` |
-| `k_playbook_review_next_steps` | optional: serverseitig berechneter nächster Schritt |
+| `k_playbook_review_next_steps` | bewusst nicht umgesetzt; der Command leitet den nächsten Schritt aus dem Status ab |
 
-Bis diese Werkzeuge existieren, darf der Command die CLI nennen, aber keine eigene
-Ersatzlogik nachbauen.
+Der Command darf die Werkzeuge verwenden, sobald Task 018 ihn scharfschaltet. Bis dahin
+keine eigene Ersatzlogik nachbauen.
 
 ## Schritt 1 — Lauf bestimmen
 
@@ -119,7 +120,8 @@ Technische Fehler sind Entry-Zustände, nicht Laufzustände. Ein `failed`-Tool s
 Command nicht automatisch; der Nutzer entscheidet, ob trotz Fehlern weitergemacht wird.
 Fehlergründe stehen in `entries/<tool>.json` und werden im Chat kurz zitiert.
 
-Solange MCP fehlt, den vorhandenen CLI-Weg nennen:
+Wenn das MCP-Werkzeug in der laufenden Assistenzsitzung nicht verfügbar ist, den
+vorhandenen CLI-Weg nennen:
 
 ```bash
 k-playbook/bin/k-playbook scan <lauf>
@@ -139,8 +141,9 @@ Wenn AI-Einträge auf `start` stehen:
 Subtasks dürfen parallel laufen, wenn sie nur lesen oder jeweils ihre eigene Entry-Datei
 schreiben. Sie dürfen keine fremden Entry-Dateien ändern.
 
-Solange das Schreibwerkzeug fehlt, nicht improvisieren. Stattdessen sagen, dass der
-AI-Entry noch nicht maschinenfest ausführbar ist, und den geplanten Review nennen.
+Wenn das Schreibwerkzeug in der laufenden Assistenzsitzung nicht verfügbar ist, nicht
+improvisieren. Stattdessen sagen, dass der AI-Entry in dieser Sitzung nicht
+maschinenfest ausführbar ist, und den geplanten Review nennen.
 
 ## Schritt 5 — Merge starten
 
@@ -179,9 +182,9 @@ klar trennen:
 - [x] Entscheidung: GUI ist für diese Alternative nicht nötig.
 - [x] Entscheidung: MCP orchestriert Scanner und Merge; KI bewertet im Assistenten.
 - [x] Entscheidung: `run.json` bleibt Festlegung, Fortschritt steht in Entry-Dateien.
-- [ ] MCP-Werkzeuge fachlich genau spezifizieren.
-- [ ] MCP-Werkzeuge implementieren.
-- [ ] AI-Entry-Dateiformat festlegen.
+- [x] MCP-Werkzeuge fachlich genau spezifizieren.
+- [x] MCP-Werkzeuge implementieren.
+- [x] AI-Entry-Dateiformat festlegen.
 - [ ] Bewertungsartefakt festlegen.
 - [ ] Diese Skizze nach Umsetzung in normale Doku überführen.
 
@@ -192,4 +195,5 @@ klar trennen:
 - `run.json` unlesbar: nicht reparieren; Fehler und Pfad nennen.
 - Entry-Datei unlesbar: nicht überschreiben; Fehler und Pfad nennen.
 - Scanner technisch fehlgeschlagen: als Tool-Fehler melden, nicht als Befund bewerten.
-- MCP-Werkzeug fehlt: geplanten Schritt nennen und vorhandenen CLI-Fallback anzeigen.
+- MCP-Werkzeug in der Sitzung nicht verfügbar: geplanten Schritt nennen und vorhandenen
+  CLI-Fallback anzeigen, wo es einen gibt.

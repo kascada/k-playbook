@@ -66,9 +66,15 @@ const (
 
 // Entry ist ein einzelner Punkt eines Laufs.
 type Entry struct {
-	Name  string `json:"name"`
-	Kind  Kind   `json:"kind"`
-	State State  `json:"state"`
+	Name           string `json:"name"`
+	Kind           Kind   `json:"kind"`
+	State          State  `json:"state"`
+	RecipeKey      string `json:"recipeKey,omitempty"`
+	RecipePath     string `json:"recipePath,omitempty"`
+	RecipeOrigin   string `json:"recipeOrigin,omitempty"`
+	Title          string `json:"title,omitempty"`
+	ResultRequired *bool  `json:"resultRequired,omitempty"`
+	DefaultResult  string `json:"defaultResult,omitempty"`
 }
 
 // Run ist der Inhalt von run.json.
@@ -237,7 +243,8 @@ func CreateRun(localDir string, day time.Time, languages []string, entries []Ent
 
 	prepared := make([]Entry, 0, len(entries))
 	for _, entry := range entries {
-		prepared = append(prepared, Entry{Name: entry.Name, Kind: entry.Kind, State: StateStart})
+		entry.State = StateStart
+		prepared = append(prepared, entry)
 	}
 
 	run := Run{

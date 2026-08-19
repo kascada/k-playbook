@@ -62,6 +62,7 @@ func Run(ctx context.Context) error {
 		Name:        "k_playbook_context",
 		Description: toolDescription,
 	}, contextTool)
+	addReviewTools(server)
 
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil && !isSessionEnd(err) {
 		return fmt.Errorf("MCP-Server: %w", err)

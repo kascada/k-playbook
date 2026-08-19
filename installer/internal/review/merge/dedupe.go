@@ -52,6 +52,7 @@ func GroupFindings(findings []Finding) []Group {
 		applyRepresentative(&groups[index], findingsByID(findings)[groups[index].FindingIDs[0]])
 	}
 	markPossibleDuplicates(groups)
+	assignStableIDs(groups, findings)
 	return groups
 }
 
@@ -64,6 +65,9 @@ func hardKeys(finding Finding) []string {
 		keys = append(keys, key)
 	}
 	if key := dependencyKey(finding); key != "" {
+		keys = append(keys, key)
+	}
+	if key := sameLocationToolKey(finding); key != "" {
 		keys = append(keys, key)
 	}
 	return keys
@@ -105,6 +109,15 @@ func dependencyKey(finding Finding) string {
 		strings.ToLower(dependency.Version) + ":" + normalizePath(dependency.Manifest)
 }
 
+func sameLocationToolKey(finding Finding) string {
+	if finding.Evidence.Tool == "" || finding.Evidence.Job == "" || finding.Location.URI == "" || finding.Location.StartLine == 0 {
+		return ""
+	}
+	return fmt.Sprintf("same-location-tool:%s:%s:%s:%d",
+		strings.ToLower(finding.Evidence.Tool), strings.ToLower(finding.Evidence.Job),
+		normalizePath(finding.Location.URI), finding.Location.StartLine)
+}
+
 func dedupeRules(findings []Finding) []string {
 	if len(findings) < 2 {
 		return nil
@@ -119,6 +132,9 @@ func dedupeRules(findings []Finding) []string {
 		}
 		if dependencyKey(finding) != "" {
 			rules["dependency"] = true
+		}
+		if sameLocationToolKey(finding) != "" {
+			rules["same-location-tool"] = true
 		}
 	}
 	list := make([]string, 0, len(rules))
@@ -150,6 +166,8 @@ func applyRepresentative(group *Group, finding Finding) {
 	group.Title = firstNonEmpty(finding.RuleName, finding.RuleID, trimLength(finding.Message, 120))
 	group.RuleID = finding.RuleID
 	group.Level = finding.Level
+	group.DerivedSeverity = finding.DerivedSeverity
+	group.SeveritySource = finding.SeveritySource
 	group.Location = finding.Location
 	group.Dependency = finding.Dependency
 }

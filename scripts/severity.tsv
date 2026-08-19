@@ -1,0 +1,19 @@
+# Fallback-Tabelle für abgeleitete Schwere im Merge-Schritt.
+# Fields: tool	rule_prefix	severity	notes
+#
+# Der Merge nutzt diese Tabelle nur, wenn SARIF kein starkes Signal liefert:
+# native Level mit error/note gewinnen, CVSS- oder Tool-Metadaten gewinnen vor
+# der Tabelle; Mapping darf fehlende sowie nur none/warning gesetzte Level
+# überschreiben. Unbekannte Regeln bleiben sichtbar als unmapped.
+tool	rule_prefix	severity	notes
+gitleaks	azure-ad-client-secret	error	Secret-Fund; reale Unknown-Regel aus OMNI 2026-08-19.
+gitleaks	generic-api-key	error	Secret-Fund; reale Unknown-Regel aus OMNI 2026-08-19.
+semgrep	generic.html-templates.security.var-in-href	warning	XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	generic.html-templates.security.var-in-script-tag	warning	XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.django.security.audit.avoid-mark-safe	warning	Django-XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.django.security.audit.csrf-exempt	warning	CSRF-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.django.security.audit.xss.template-blocktranslate-no-escape	warning	Django-XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.django.security.audit.xss.template-translate-as-no-escape	warning	Django-XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.flask.security.xss.audit.template-unescaped-with-safe	warning	Flask-XSS-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1	warning	Hash-Audit-Regel aus OMNI 2026-08-19.
+semgrep	python.lang.security.use-defused-xml.use-defused-xml	warning	XML-Sicherheitsregel aus OMNI 2026-08-19.

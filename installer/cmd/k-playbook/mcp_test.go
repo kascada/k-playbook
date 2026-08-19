@@ -11,6 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
 // childEnv schaltet das Test-Binary in den Serverbetrieb. Der Server muss als
@@ -191,6 +195,11 @@ func callContext(id int, dir string) string {
 	return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"k_playbook_context","arguments":%s}}`, id, arguments)
 }
 
+func callTool(id int, name string, arguments map[string]any) string {
+	encoded, _ := json.Marshal(arguments)
+	return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":%q,"arguments":%s}}`, id, name, encoded)
+}
+
 // toolText holt den Text aus einem Werkzeugergebnis.
 func toolText(t *testing.T, response map[string]any) string {
 	t.Helper()
@@ -226,12 +235,26 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 1 {
-		t.Fatalf("tools/list meldet nicht genau ein Werkzeug: %v", responses[1])
+	if !ok || len(tools) != 6 {
+		t.Fatalf("tools/list meldet nicht genau sechs Werkzeuge: %v", responses[1])
 	}
-	tool, _ := tools[0].(map[string]any)
-	if got := tool["name"]; got != "k_playbook_context" {
-		t.Errorf("Werkzeug heißt %v, erwartet k_playbook_context", got)
+	found := map[string]bool{}
+	for _, item := range tools {
+		tool, _ := item.(map[string]any)
+		name, _ := tool["name"].(string)
+		found[name] = true
+	}
+	for _, name := range []string{
+		"k_playbook_context",
+		"k_playbook_review_status",
+		"k_playbook_review_create",
+		"k_playbook_review_scan",
+		"k_playbook_review_merge",
+		"k_playbook_review_write_ai_entry",
+	} {
+		if !found[name] {
+			t.Errorf("tools/list meldet %s nicht: %v", name, found)
+		}
 	}
 
 	var built map[string]any
@@ -243,6 +266,51 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	}
 	if project, ok := built["project"].(map[string]any); !ok || project["dir"] != root {
 		t.Errorf("Arbeitsstand beschreibt nicht %s: %v", root, built["project"])
+	}
+}
+
+func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
+	root := newMCPReviewProject(t)
+	runDir := mustCreateMCPRun(t, root)
+	mustWriteMCPFile(t, filepath.Join(runDir, "review-tech.md"), "# Ergebnis\n")
+
+	stdout := speak(t, root, 2,
+		initialize(1),
+		initialized,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
+	)
+	responses := decodeResponses(t, stdout, 1, 2)
+
+	tools, ok := result(t, responses[1])["tools"].([]any)
+	if !ok || len(tools) != 6 {
+		t.Fatalf("tools/list meldet nicht sechs Werkzeuge: %v", responses[1])
+	}
+
+	for id, call := range []struct {
+		name string
+		args map[string]any
+	}{
+		{name: "k_playbook_review_status", args: map[string]any{"projectDir": root}},
+		{name: "k_playbook_review_create", args: map[string]any{"projectDir": root, "day": "2026-08-20", "dryRun": true}},
+		{name: "k_playbook_review_scan", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
+		{name: "k_playbook_review_write_ai_entry", args: map[string]any{"projectDir": root, "run": "2026-08-19", "entry": "tech", "state": "done", "result": "review-tech.md"}},
+		{name: "k_playbook_review_merge", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
+	} {
+		initID := 10 + id*2
+		callID := initID + 1
+		stdout := speak(t, root, 2, initialize(initID), initialized, callTool(callID, call.name, call.args))
+		responses := decodeResponses(t, stdout, initID, callID)
+		var envelope struct {
+			OK    bool   `json:"ok"`
+			Tool  string `json:"tool"`
+			Error any    `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(toolText(t, responses[1])), &envelope); err != nil {
+			t.Fatalf("%s Antwort ist kein Envelope-JSON: %v", call.name, err)
+		}
+		if !envelope.OK {
+			t.Fatalf("%s schlug fehl: %v", envelope.Tool, envelope.Error)
+		}
 	}
 }
 
@@ -341,5 +409,64 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 				t.Errorf("Der Aufruf nach dem Fehler schlug ebenfalls fehl: %v", recovered)
 			}
 		})
+	}
+}
+
+func newMCPReviewProject(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, dir := range []string{
+		filepath.Join(root, "k-playbook", "scripts"),
+		filepath.Join(root, "k-playbook", "reviews"),
+		filepath.Join(root, "k-playbook", "rules"),
+		filepath.Join(root, "k-playbook", "checks"),
+		filepath.Join(root, "k-playbook-local", "reviews"),
+		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("%s anlegen: %v", dir, err)
+		}
+	}
+	mustWriteMCPFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\nreviewRun:\n  title: Technischer Review\n  resultRequired: true\n  defaultResult: review-tech.md\n---\n# Fallback\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+cat <<JSON
+{"playbookDir":"$root/k-playbook","languages":"go","tools":[{"name":"mockscan","languages":"go","status":"ok","path":"$root/mockscan","role":"Mock-Scanner"}]}
+JSON
+`)
+	if err := os.Chmod(filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), 0o755); err != nil {
+		t.Fatalf("Preflight chmod: %v", err)
+	}
+	mustWriteMCPFile(t, filepath.Join(root, "mockscan"), "#!/usr/bin/env bash\nprintf '%s' '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"mockscan\",\"rules\":[{\"id\":\"R1\",\"name\":\"Regel\"}]}},\"results\":[{\"ruleId\":\"R1\",\"level\":\"warning\",\"message\":{\"text\":\"Fund\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"main.go\"},\"region\":{\"startLine\":1}}}]}]}]}'\n")
+	if err := os.Chmod(filepath.Join(root, "mockscan"), 0o755); err != nil {
+		t.Fatalf("mockscan chmod: %v", err)
+	}
+	mustWriteMCPFile(t, filepath.Join(root, "main.go"), "package main\n")
+	return root
+}
+
+func mustCreateMCPRun(t *testing.T, root string) string {
+	t.Helper()
+	required := true
+	runDir, err := review.CreateRun(project.LocalDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, []review.Entry{
+		{Name: "mockscan", Kind: review.KindTool},
+		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md"},
+	})
+	if err != nil {
+		t.Fatalf("Lauf anlegen: %v", err)
+	}
+	return runDir
+}
+
+func mustWriteMCPFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("%s Verzeichnis anlegen: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("%s schreiben: %v", path, err)
 	}
 }

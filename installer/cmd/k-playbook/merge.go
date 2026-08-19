@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"runtime/debug"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
@@ -26,10 +28,11 @@ func runMerge(args []string) error {
 
 	runDir := review.RunDir(project.LocalDir(environment.ProjectDir), runName)
 	_, output, err := merge.Run(merge.Options{
-		ProjectDir:       environment.ProjectDir,
-		RunName:          runName,
-		RunDir:           runDir,
-		KPlaybookVersion: "unknown",
+		ProjectDir:          environment.ProjectDir,
+		RunName:             runName,
+		RunDir:              runDir,
+		KPlaybookVersion:    kPlaybookVersion(),
+		SeverityMappingPath: merge.SeverityCatalog(environment.PlaybookDir),
 	})
 	if err != nil {
 		return err
@@ -39,4 +42,42 @@ func runMerge(args []string) error {
 	fmt.Printf("Geschrieben: %s\n", project.DisplayPath(output.JSON))
 	fmt.Printf("Geschrieben: %s\n", project.DisplayPath(output.Markdown))
 	return nil
+}
+
+func kPlaybookVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	settings := map[string]string{}
+	for _, setting := range info.Settings {
+		settings[setting.Key] = setting.Value
+	}
+	return formatBuildVersion(info.Main.Version, settings)
+}
+
+func formatBuildVersion(version string, settings map[string]string) string {
+	version = strings.TrimSpace(version)
+	revision := strings.TrimSpace(settings["vcs.revision"])
+	dirty := settings["vcs.modified"] == "true"
+	if version != "" && version != "(devel)" {
+		if dirty {
+			return version + "-dirty"
+		}
+		return version
+	}
+	if revision == "" {
+		return "unknown"
+	}
+	short := revision
+	if len(short) > 7 {
+		short = short[:7]
+	}
+	if version == "(devel)" {
+		short = "(devel)+" + short
+	}
+	if dirty {
+		short += "-dirty"
+	}
+	return short
 }
