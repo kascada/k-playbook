@@ -206,6 +206,15 @@ ebenso. Details in
   den Assistenten. Während ein Scan läuft, darf der GUI-Server nicht wegen eines verlorenen
   Browserfensters beenden. Fortschritt wird aus `entries/*.json` gelesen; zusätzlich gibt
   der Server grobe Statuszeilen zu Lauf, Tool/Job-Zuständen und Abschluss auf stdout aus.
+- **Alternative 2: Command orchestriert über MCP.** Die GUI ist für diesen Weg nicht nötig.
+  `/k-review-run` legt einen Lauf an oder setzt ihn fort, startet die Scanner über MCP,
+  führt offene `ai`-Einträge als Subtasks aus, startet den Merge wieder über MCP und
+  bewertet danach den Review-Input im Assistenten. Jeder Schritt schreibt in die
+  vorgesehenen Laufartefakte, damit ein späterer Chat aus dem Laufverzeichnis fortsetzen
+  kann: `run.json` bleibt die unveränderte Festlegung, Fortschritt steht in
+  `entries/*.json`, Merge-Artefakte in `review-input.json` und `review-input.md`. Die
+  Skizze liegt als Arbeits-Command unter [`../commands/k-review-run.md`](../commands/k-review-run.md)
+  und soll nach Umsetzung in normale Doku überführt werden.
 - Was mit `trufflehog` und `pip-audit` geschieht, die kein SARIF können: umwandeln oder
   ersetzen.
 - Eine Tabelle Regel → Schwere. `ruff` stuft im SARIF alles als `level: error` ein; bandit

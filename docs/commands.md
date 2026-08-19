@@ -40,6 +40,7 @@ gestartet wurde.
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
+| `/k-review-run` | zusammenhängenden Review-Lauf über MCP anlegen oder fortsetzen | Arbeitsentwurf in [`../commands/k-review-run.md`](../commands/k-review-run.md) |
 | `/k-results` | vorhandene Ergebnisse projektweit priorisieren | [`code-review.md`](./code-review.md) |
 | `/k-remediation` | Findings bündeln und in Tasks oder Fixes überführen | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
@@ -65,8 +66,10 @@ Die Code-Review-Familie ist bewusst gestuft:
 1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmäßig read-only.
 2. `/k-review <name>` führt ein Rezept aus und erzeugt je nach Rezept interaktive
    Änderungsvorschläge oder Report-Artefakte.
-3. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
-4. `/k-remediation <result>` plant die Abarbeitung der Findings.
+3. `/k-review-run` ist der geplante Orchestrator für das neue Laufmodell: Lauf anlegen
+   oder fortsetzen, Scanner und Merge über MCP starten, KI-Reviews als Subtasks führen.
+4. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
+5. `/k-remediation <result>` plant die Abarbeitung der Findings.
 
 Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
 `/k-review-loop`, dann `/k-run`.
