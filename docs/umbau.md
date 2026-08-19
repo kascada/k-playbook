@@ -192,6 +192,21 @@ ebenso. Details in
 [`review-runs.md`](./review-runs.md#zustände) und der Kopfzeile von
 [`scripts/scanners.tsv`](../scripts/scanners.tsv).
 
+**Erledigt: Alternative 2, Command orchestriert über MCP.** Aus Task 018
+(`k-playbook-local/tasks/018-review-run-und-triage.md`). `/k-review-run` ist jetzt
+scharfgeschaltet: Der Command legt Läufe über MCP an oder setzt sie fort, liest vor jedem
+Schritt den Status, startet Scanner, führt AI-Review-Einträge, startet den Merge und ruft
+danach das Bewertungsmodul `review-scan-triage` auf. Die Auswahlbasis kommt aus
+`k_playbook_review_status` im Modus `available`: Werkzeuge, aktive Review-Rezepte und der
+Command-Moduleintrag `scan-triage` werden vor `create` bestätigt.
+
+**Erledigt: Bewertung als Command-Modul statt Katalog-Rezept.** Aus Task 018. Die
+Bewertung eines Laufs liegt unter `commands/_review-run/review-scan-triage.md`, liest
+`review-input.json` und `review-input.md`, berücksichtigt `known-decisions.md` über einen
+festen Suchpfad und schreibt `review-triage.md` direkt in den Laufordner. Der AI-Eintrag
+`scan-triage` wird über den MCP-Vertrag geführt, obwohl er nicht in `catalogs.reviews`
+steht; ein leeres lokales Overlay des Moduls schaltet ihn ab.
+
 **Offen.** Wird einzeln besprochen, bevor daran gearbeitet wird:
 
 - **Alternative 1: GUI startet nur die Werkzeug-Scans.** Die Oberfläche startet nach dem
@@ -206,52 +221,20 @@ ebenso. Details in
   den Assistenten. Während ein Scan läuft, darf der GUI-Server nicht wegen eines verlorenen
   Browserfensters beenden. Fortschritt wird aus `entries/*.json` gelesen; zusätzlich gibt
   der Server grobe Statuszeilen zu Lauf, Tool/Job-Zuständen und Abschluss auf stdout aus.
-- **Alternative 2: Command orchestriert über MCP.** Die GUI ist für diesen Weg nicht nötig.
-  `/k-review-run` legt einen Lauf an oder setzt ihn fort, startet die Scanner über MCP,
-  führt offene `ai`-Einträge als Subtasks aus, startet den Merge wieder über MCP und
-  bewertet danach den Review-Input im Assistenten. Jeder Schritt schreibt in die
-  vorgesehenen Laufartefakte, damit ein späterer Chat aus dem Laufverzeichnis fortsetzen
-  kann: `run.json` bleibt die unveränderte Festlegung, Fortschritt steht in
-  `entries/*.json`, Merge-Artefakte in `review-input.json` und `review-input.md`. Die
-  Skizze liegt als Arbeits-Command unter [`../commands/k-review-run.md`](../commands/k-review-run.md)
-  und soll nach Umsetzung in normale Doku überführt werden. **Task 017 erledigt:** Die
-  dafür nötigen MCP-Werkzeuge liegen jetzt an (`status`, `create`, `scan`, `merge`,
-  `write_ai_entry`). Offen bleibt das Scharfschalten des Commands und das
-  Bewertungs-Rezept in Task 018.
 - Was mit `trufflehog` und `pip-audit` geschieht, die kein SARIF können: umwandeln oder
   ersetzen.
 - Eine Tabelle Regel → Schwere. `ruff` stuft im SARIF alles als `level: error` ein; bandit
   hätte Severity und Confidence geliefert. Statt das von einem einzelnen Scanner abhängig
   zu machen, soll die Zuordnung einmal in k-playbook stehen und für alle Werkzeuge gelten.
   In Arbeit im Rahmen von Task 016, Etappe 2.
-- **Der Umbau der Rezepte auf reine Bewertung, und wo die Bewertung des Assistenten
-  landet.** Entschieden: Die Bewertung eines Laufs kommt als **Modul** in den
-  Command-Namensraum, nicht als eigenständiges Katalog-Rezept.
-  `commands/_review-run/review-scan-triage.md` liest `review-input.json` und
-  `review-input.md` aus dem Lauf, wendet `known-decisions.md` an, bündelt Gruppen zu
-  Bewertungseinheiten und schreibt sein Ergebnis nach `review-triage.md` neben die
-  Merge-Artefakte im selben Lauf-Ordner. Das Modul ist Endprodukt der Bewertung: ein
-  separater `assessment.md`/`findings.md`-Kurationsschritt wird erst eingezogen, wenn er
-  sich als nötig erweist. Aufgerufen wird das Modul ausschließlich von `/k-review-run` in
-  Schritt 6; kein eigenständiger Katalog-Aufruf. Als Bezeichner für Gruppen nutzt es die
-  stabile ID aus Task 016, Etappe 7.
 - **Namensraum-Konvention für Command-Module.** Zusammen mit dieser Entscheidung
   festgelegt: `commands/_<name>/` trägt Module (kein Command). `_shared/` bleibt für
   Module, die alle Commands teilen. `_<command-name>/` sammelt command-eigene Module
-  (`_review-run/`), `_<familie>/` sammelt Module einer Command-Familie (`_docs/`, sobald
-  die Docs-Commands gemeinsame Module bekommen). Overlay funktioniert per Datei-Pfad ab
-  `commands/`; leere Datei schaltet ab. Regel steht in
+  (`_review-run/`), `_<familie>/` sammelt Module einer Command-Familie. `_docs/` enthält
+  die nachladbaren Abläufe für `/k-docs-code` und `/k-docs-tools`; `/k-docs` ist der
+  sichtbare Einstieg, der Bestand prüft und diese Module anbieten kann. Overlay
+  funktioniert per Datei-Pfad ab `commands/`; leere Datei schaltet ab. Regel steht in
   [`../rules/command-authoring.md`](../rules/command-authoring.md#ablage).
-- **Auswahl der Werkzeuge und Reviews ohne GUI.** Wenn `/k-review-run` einen Lauf ohne
-  Oberfläche anlegt, muss der Chat wissen, was ausgewählt werden kann: verfügbare
-  Werkzeuge (nach `project.languages` gefiltert, Installationsstatus berücksichtigt),
-  aktive AI-Review-Rezepte im aufgelösten Katalog, dazu Standard-Auswahl und leere
-  Restmenge. Diese Auskunft gehört zur MCP-Oberfläche des Laufs — entweder als
-  Rückgabewert eines Dry-Run-Modus von `k_playbook_review_create` oder als eigenes
-  Auflistungswerkzeug. Der Command präsentiert die Kandidaten kompakt, lässt den Nutzer
-  eingrenzen und legt den Lauf erst mit der bestätigten Auswahl an. Standardvorbelegung
-  bleibt: alle verfügbaren Tool-Einträge plus alle aktiven AI-Einträge; abweichende
-  Auswahl wird ausdrücklich bestätigt.
 - **`k-check` als MCP-Werkzeug.** Der Runner gibt heute Terminaltext aus; `review-k-check-security`
   sichert ihn als `raw/k-check-<mode>.txt`, und der Assistent liest und deutet ihn. Seine
   Parameter — `--mode changed|baseline`, `--files-from`, `--base-ref`, `--exclude`,

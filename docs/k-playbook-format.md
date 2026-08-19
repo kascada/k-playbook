@@ -58,7 +58,7 @@ Commands raten damit keinen Pfad mehr und lesen auch keinen: sie leiten ihn ab.
 
 Das gilt auch für die Projekt-Dokumentation. Früher durfte `paths.docs` als einziger
 Wert mit `../` aus dem k-playbook-Verzeichnis herauszeigen, damit ein Projekt seine schon
-vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-code2docs`
+vorhandene Doku weiterverwenden konnte. Dieser Sonderfall entfällt: `/k-docs-code`
 schreibt nach `k-playbook-local/docs/code/`. `docs/` gliedert sich in Unterverzeichnisse
 nach Herkunft; wie viele Werkzeuge in eine Herkunft schreiben, sagt das Verzeichnis nicht.
 Was ein Projekt sonst noch an Dokumentation pflegt, bleibt davon unberührt — k-playbook
@@ -76,8 +76,8 @@ ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Er
 sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
 `docs/code/`, `docs/libs/` und `docs/extracted/` entstehen beim ersten Lauf eines
-Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-code2docs` und der Skill
-`ks-overlay-repo-analyse`, in `docs/libs/` `/k-tools-scan`, in `docs/extracted/`
+Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-docs-code` und der Skill
+`ks-overlay-repo-analyse`, in `docs/libs/` `/k-docs-tools`, in `docs/extracted/`
 `/k-docs-extract`. Das Einrichten legt sie nicht an; es legt `docs/manual/` und
 `material/` an.
 

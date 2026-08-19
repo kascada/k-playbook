@@ -12,8 +12,8 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 > **Ausführungs-Hinweis:** Die konkrete Umsetzung machen heute die Docs-Commands,
 > nacheinander und jedes Werkzeug nur in Verzeichnissen seiner eigenen Herkunft:
 >
-> 1. **`/k-code2docs`** — Doku aus dem Code nach `docs/code/`.
-> 2. **`/k-tools-scan`** — Library- und Tool-Steckbriefe nach `docs/libs/`.
+> 1. **`/k-docs-code`** — Doku aus dem Code nach `docs/code/`.
+> 2. **`/k-docs-tools`** — Library- und Tool-Steckbriefe nach `docs/libs/`.
 > 3. **`/k-docs-extract`** — Rohmaterial aus `material/` nach `docs/extracted/`.
 > 4. **`/k-docs-index`** — baut `docs/README.md` über alle Herkünfte und
 >    schreibt `AGENTS.md` und `opencode.json`.
@@ -56,7 +56,7 @@ Projekt-Root/
     ├── docs/
     │   ├── README.md            (3) Stichwort-Index über alle Herkünfte
     │   ├── code/                    aus dem Code abgeleitet
-    │   ├── libs/                    erzeugt von /k-tools-scan
+    │   ├── libs/                    erzeugt von /k-docs-tools
     │   ├── extracted/               erzeugt von /k-docs-extract
     │   └── manual/                  von Hand gepflegt
     └── material/                Rohmaterial, nie indiziert
@@ -138,7 +138,7 @@ ihn `/k-docs-index`; von Hand sieht die Grundstruktur so aus:
 
 ## Libs & Stack
 
-Erzeugt von `/k-tools-scan` unter `libs/`.
+Erzeugt von `/k-docs-tools` unter `libs/`.
 
 | Lib | Version | Severity | Letzter Review |
 |-----|---------|----------|----------------|
@@ -326,7 +326,7 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 
 - `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
-- `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract` (Commands) – erzeugen die
+- `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract` (Commands) – erzeugen die
   Doku je Herkunft unter `docs/code/`, `docs/libs/` und `docs/extracted/`; nach
   `docs/code/` schreibt außerdem `ks-overlay-repo-analyse` (siehe oben).
 - `/k-docs-index` (Command) – letzter Schritt der Kette: baut `docs/README.md`

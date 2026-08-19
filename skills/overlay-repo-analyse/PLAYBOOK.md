@@ -263,20 +263,20 @@ schon Zwischen-Docs existieren, jetzt revidieren.
 
 Alle Docs dieses Skills — Overlay-Docs **und** Base-Docs — gehen nach
 `k-playbook-local/docs/code/`. Das Verzeichnis trägt die Herkunft „aus Code
-abgeleitet", nicht ein einzelnes Werkzeug: `/k-code2docs` schreibt ebenfalls
+abgeleitet", nicht ein einzelnes Werkzeug: `/k-docs-code` schreibt ebenfalls
 dorthin. Dass eine Base-Doc fremden Code beschreibt, der gar nicht im Projekt
 liegt, ändert an der Herkunft nichts.
 
 Existiert `k-playbook-local/docs/code/` noch nicht, legt dieser Lauf es an —
-das Verzeichnis gehört der Herkunft, nicht `/k-code2docs`.
+das Verzeichnis gehört der Herkunft, nicht `/k-docs-code`.
 
-Dateiname: `<NN>-<slug>.md`, nach derselben Konvention wie `/k-code2docs`.
+Dateiname: `<NN>-<slug>.md`, nach derselben Konvention wie `/k-docs-code`.
 Nummeriert wird in Einer-Schritten mit bewussten Lücken (`00`, `01`, …, `90`);
 die Nummer ist Sortier-Hilfe, keine lückenlose Zählung, und der Nummernkreis
 gilt nur innerhalb von `docs/code/`. **Vor dem Schreiben den vorhandenen
 Bestand in `k-playbook-local/docs/code/` sichten** und die nächsten freien
 Nummern vergeben, statt blind bei `00` zu beginnen — dort können schon Dateien
-aus `/k-code2docs`-Läufen liegen.
+aus `/k-docs-code`-Läufen liegen.
 
 Jede Datei bekommt das Frontmatter aus der Vorlage, mit
 `generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }` — daran

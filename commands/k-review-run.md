@@ -1,199 +1,243 @@
 ---
-description: Orchestrate a complete review run through MCP: create or resume a run, start tool scans, execute AI review entries, merge evidence, and guide the final assessment. Draft command while the MCP tools are being defined.
+description: Führt einen Review-Lauf über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
 argument-hint: [YYYY-MM-DD|latest|new]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
 # k-review-run
 
-## Status dieses Commands
-
-Arbeitsentwurf. Der Command beschreibt den Zielablauf für einen zusammenhängenden
-Review-Lauf über MCP. Die MCP-Werkzeuge liegen an; der Command bleibt bis Task 018 ein
-Arbeitsentwurf, weil das Bewertungs-Rezept und die endgültige Orchestrierung noch nicht
-scharfgeschaltet sind.
-
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser Sitzung
-schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context` auf und lies die
-Dateien aus `instructions`.
+Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
+auf und lies die Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
-## Ziel
+`/k-review-run` ist der Chat-Einstieg für das Laufmodell. Der Command hält keinen
+eigenen Zustand: Jeder Aufruf liest den Ist-Zustand über die MCP-Werkzeuge aus dem
+Laufverzeichnis und setzt genau dort fort.
 
-`/k-review-run` ist der Chat-Einstieg für das neue Laufmodell:
+Ergebnisse dieses Commands:
 
-1. Lauf anlegen oder fortsetzen.
-2. Werkzeug-Scanner über MCP starten.
-3. Offene KI-Review-Einträge als Subtasks ausführen.
-4. Merge über MCP starten.
-5. Review-Input bewerten und den Handoff nennen.
+- ein Review-Lauf unter `k-playbook-local/results/YYYY-MM-DD/`, wenn ein neuer Lauf
+  bestätigt und angelegt wird,
+- Scanner-Fortschritt und AI-Entry-Fortschritt unter `entries/`,
+- `review-input.json` und `review-input.md` nach dem Merge,
+- `review-triage.md` nach Anwendung des Moduls
+  `commands/_review-run/review-scan-triage.md`.
 
-Der Command vertraut nicht auf Chat-Gedächtnis. Nach jedem Schritt liest er den Zustand aus
-dem Laufverzeichnis und entscheidet daraus, was als Nächstes möglich ist.
+## Schritt 1 — Pfade und Lauf bestimmen
 
-## Artefakte und Schreibhoheit
+Löse aus der Context-Ausgabe:
 
-Der bestehende Dateikontrakt bleibt erhalten:
+- `RESOLVED_PROJECT_DIR` = `project.dir`
+- `RESOLVED_LOCAL_DIR` = `local.dir`
+- `RESOLVED_RESULTS_DIR` = `<local.dir>/results`
+- `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
+- `TODAY` = `now.date`
 
-| Datei | Schreiber | Rolle |
-|---|---|---|
-| `run.json` | nur das Anlegen des Laufs | Auswahl und Sprachen, danach unverändert |
-| `entries/<tool>.json` | Scanner-Ausführer | Fortschritt, Jobs, Fehler und SARIF-Verweise eines Werkzeugs |
-| `entries/<review>.json` | KI-Review-Subtask über MCP | Fortschritt und Ergebnisverweise eines AI-Review-Eintrags |
-| `raw/*.sarif` | Scanner-Jobs | Rohbelege |
-| `review-input.json` | Merge-Werkzeug | vollständiger Audit-Beleg |
-| `review-input.md` | Merge-Werkzeug | kompakte Ansicht für die Bewertung |
+Command-specific policy:
 
-`run.json` wird nach dem Anlegen nicht aktualisiert. Fortsetzen entsteht aus den
-Entry-Dateien und den Merge-Artefakten.
-
-## Geplante MCP-Werkzeuge
-
-Diese Werkzeuge sind die MCP-Oberfläche des Laufmodells:
-
-| Werkzeug | Zweck |
-|---|---|
-| `k_playbook_review_create` | Lauf mit ausgewählten Tool- und AI-Einträgen anlegen |
-| `k_playbook_review_status` | Lauf, Einträge, offene Schritte und Artefakte lesen |
-| `k_playbook_review_scan` | Werkzeug-Einträge eines Laufs starten, fachlich `k-playbook scan <lauf>` |
-| `k_playbook_review_write_ai_entry` | Status und Ergebnis eines AI-Review-Eintrags schreiben |
-| `k_playbook_review_merge` | fachlich `k-playbook merge <lauf>`, schreibt `review-input.*` |
-| `k_playbook_review_next_steps` | bewusst nicht umgesetzt; der Command leitet den nächsten Schritt aus dem Status ab |
-
-Der Command darf die Werkzeuge verwenden, sobald Task 018 ihn scharfschaltet. Bis dahin
-keine eigene Ersatzlogik nachbauen.
-
-## Schritt 1 — Lauf bestimmen
-
-Aus der Context-Ausgabe:
-
-- `RESULTS_DIR = <local.dir>/results`
-- `RUNS_DISPLAY_DIR = k-playbook-local/results`
-- `TODAY = now.date`
-
-Wenn `RESULTS_DIR` fehlt: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder
-`/k-gui` nennen. Keinen Ersatzpfad verwenden.
+- Das Laufverzeichnis wird nie geraten. Für bestehende Läufe kommt es aus
+  `k_playbook_review_status`, für neue Läufe aus `k_playbook_review_create`.
+- `scan-triage` ist ein AI-Eintrag aus dem Command-Modul
+  `commands/_review-run/review-scan-triage.md`, kein Eintrag aus
+  `catalogs.reviews`.
+- `review-triage.md` wird direkt in den vom MCP-Status gelieferten Laufordner
+  geschrieben. `k_playbook_review_write_ai_entry` schreibt danach nur
+  `entries/scan-triage.json`.
+- Fehlt `RESOLVED_RESULTS_DIR`, frage, ob genau dieses Verzeichnis angelegt werden
+  soll oder ob `/k-gui` die Struktur reparieren soll. Kein Ersatzpfad.
 
 Argumente:
 
-- `new` oder leer: heutigen Lauf anlegen, wenn noch keiner existiert; sonst den vorhandenen
-  heutigen Lauf anbieten.
-- `latest`: jüngsten Lauf mit `run.json` verwenden.
-- `YYYY-MM-DD`: diesen Lauf verwenden oder, wenn er fehlt, anbieten, ihn anzulegen.
-
-Beim Anlegen werden standardmäßig alle verfügbaren Werkzeug-Einträge und alle aktiven
-AI-Review-Einträge ausgewählt. Wenn der Nutzer eine Teilmenge nennt, diese Teilmenge
-verwenden und im Abschluss wiederholen.
+- Leer oder `new`: den heutigen Lauf `TODAY` verwenden. Existiert er nicht, nach
+  Schritt 3 einen neuen Lauf anlegen.
+- `latest`: den jüngsten Lauf mit `run.json` verwenden.
+- `YYYY-MM-DD`: genau diesen Lauf verwenden. Existiert er nicht, nach Schritt 3
+  anbieten, ihn mit diesem Datum anzulegen.
 
 ## Schritt 2 — Status lesen
 
-Immer zuerst den Laufstatus lesen:
+Rufe immer zuerst `k_playbook_review_status` auf.
 
-- ausgewählte Einträge aus `run.json`
-- Ist-Zustand je Eintrag aus `entries/*.json`, fehlend = `start`
-- vorhandene `raw/*.sarif`
-- vorhandene `review-input.json` und `review-input.md`
+- Für bestehende Läufe: `projectDir: RESOLVED_PROJECT_DIR`, `mode: existing`,
+  `run: <lauf>`.
+- Wenn noch kein Lauf feststeht oder ein neuer Lauf entstehen soll:
+  `projectDir: RESOLVED_PROJECT_DIR`, `mode: available`.
 
-Kompakt melden:
+Melde kompakt:
 
 ```text
 Lauf: 2026-08-19
 Werkzeuge: 5 done, 1 failed, 0 running, 0 start
-KI-Reviews: 0 done, 3 start
-Merge: fehlt
-Nächster Schritt: KI-Reviews ausführen
+AI-Einträge: 1 done, 0 failed, 0 running, 3 start
+Merge: review-input.json vorhanden / fehlt
+Triage: review-triage.md vorhanden / fehlt
+Nächster Schritt: <konkret>
 ```
 
-## Schritt 3 — Scanner starten
+Wenn der Status einen inkonsistenten `scan-triage`-Eintrag zeigt, gilt Schritt 7:
 
-Wenn Tool-Einträge auf `start` stehen:
+- `done` mit `result: review-triage.md` und vorhandener Datei ist erledigt.
+- `done` ohne vorhandene Ergebnisdatei ist reparaturbedürftig; führe die Bewertung
+  erneut aus und schreibe den Eintrag danach neu.
+- Vorhandenes gültiges `review-triage.md` bei fehlendem oder gestarteten Eintrag
+  wird durch `k_playbook_review_write_ai_entry` repariert.
 
-1. Über MCP `k_playbook_review_scan` starten.
-2. Während der Lauf läuft, Fortschritt aus MCP-Antworten oder erneutem Statuslesen melden.
-3. Nach Abschluss Status erneut lesen.
+## Schritt 3 — Auswahl für einen neuen Lauf klären
 
-Technische Fehler sind Entry-Zustände, nicht Laufzustände. Ein `failed`-Tool stoppt den
-Command nicht automatisch; der Nutzer entscheidet, ob trotz Fehlern weitergemacht wird.
-Fehlergründe stehen in `entries/<tool>.json` und werden im Chat kurz zitiert.
+Wenn ein neuer Lauf angelegt werden soll, verwende die Auswahlbasis aus
+`k_playbook_review_status` im Modus `available`.
 
-Wenn das MCP-Werkzeug in der laufenden Assistenzsitzung nicht verfügbar ist, den
-vorhandenen CLI-Weg nennen:
+Zeige kompakt:
 
-```bash
-k-playbook/bin/k-playbook scan <lauf>
-```
+- verfügbare Werkzeuge, gruppiert nach Sprache und Installationsstatus,
+- aktive AI-Review-Rezepte aus `catalogs.reviews`,
+- den Command-Moduleintrag `scan-triage`, wenn er im effektiven
+  Command-Namensraum vorhanden und nicht durch leeres Overlay abgeschaltet ist,
+- die Standardvorbelegung aus `selection.defaultEntries`.
 
-## Schritt 4 — KI-Review-Einträge ausführen
-
-Wenn AI-Einträge auf `start` stehen:
-
-1. Je AI-Eintrag den passenden Review-Katalogeintrag laden.
-2. Einen Subtask starten, der genau diesen Review-Eintrag bewertet.
-3. Der Subtask schreibt sein Ergebnis nicht frei irgendwohin, sondern über
-   `k_playbook_review_write_ai_entry` in den Eintrag oder in ein vom Eintrag referenziertes
-   Artefakt.
-4. Danach Status erneut lesen.
-
-Subtasks dürfen parallel laufen, wenn sie nur lesen oder jeweils ihre eigene Entry-Datei
-schreiben. Sie dürfen keine fremden Entry-Dateien ändern.
-
-Wenn das Schreibwerkzeug in der laufenden Assistenzsitzung nicht verfügbar ist, nicht
-improvisieren. Stattdessen sagen, dass der AI-Entry in dieser Sitzung nicht
-maschinenfest ausführbar ist, und den geplanten Review nennen.
-
-## Schritt 5 — Merge starten
-
-Wenn alle gewünschten Tool- und AI-Einträge in einem Endzustand sind, Merge anbieten.
-
-Nicht automatisch mergen, wenn noch AI-Einträge auf `start` stehen. Dann zuerst fragen:
-
-- offene AI-Reviews ausführen,
-- bewusst nur die Tool-Belege mergen,
-- oder abbrechen und später fortsetzen.
-
-Bei Freigabe über MCP `k_playbook_review_merge` starten. Danach Status erneut lesen und die
-Pfade nennen:
+Frage genau einmal nach Einschränkungen:
 
 ```text
-Geschrieben:
-- k-playbook-local/results/<lauf>/review-input.json
-- k-playbook-local/results/<lauf>/review-input.md
+Soll die Standardauswahl vollständig laufen? Leere Antwort bedeutet ja; nenne sonst
+die Einträge, die laufen sollen oder wegfallen sollen.
 ```
 
-## Schritt 6 — Bewertung
+Bei leerer Antwort oder ausdrücklicher Bestätigung lege den Lauf mit der vollen
+Standardauswahl über `k_playbook_review_create` an. Nennt der Nutzer Einschränkungen,
+zeige die daraus entstehende Auswahl und hole vor `k_playbook_review_create` eine
+ausdrückliche Bestätigung ein.
 
-Nach dem Merge liest der Command `review-input.md` und bei Bedarf `review-input.json`.
-Bewertet wird im Chat durch den Assistenten, nicht durch das Merge-Werkzeug.
+`scan-triage` gehört zur Standardauswahl, wenn das Modul verfügbar ist. Es darf nicht
+aus `catalogs.reviews` abgeleitet oder in der GUI-Auswahl für Review-Rezepte erwartet
+werden.
 
-Ergebnisziel ist noch offen. Bis ein eigener Bewertungs-Kontrakt festgelegt ist, im Chat
-klar trennen:
+## Schritt 4 — Scanner starten
 
-- technische Ausführung und Belege,
-- bewertete Findings,
-- empfohlener Handoff, z. B. `/k-remediation <pfad>`.
+Wenn Tool-Einträge auf `start` stehen, rufe `k_playbook_review_scan` auf:
 
-## Fortschritt dieses Entwurfs
+```json
+{ "projectDir": "RESOLVED_PROJECT_DIR", "run": "<lauf>" }
+```
 
-- [x] Entscheidung: als Command, nicht als Skill.
-- [x] Entscheidung: GUI ist für diese Alternative nicht nötig.
-- [x] Entscheidung: MCP orchestriert Scanner und Merge; KI bewertet im Assistenten.
-- [x] Entscheidung: `run.json` bleibt Festlegung, Fortschritt steht in Entry-Dateien.
-- [x] MCP-Werkzeuge fachlich genau spezifizieren.
-- [x] MCP-Werkzeuge implementieren.
-- [x] AI-Entry-Dateiformat festlegen.
-- [ ] Bewertungsartefakt festlegen.
-- [ ] Diese Skizze nach Umsetzung in normale Doku überführen.
+Danach lies den Status erneut. Technische Fehler bleiben Entry-Zustände: Ein
+`failed`-Tool stoppt den Command nicht automatisch. Melde den Grund und frage, ob trotz
+Fehlern weitergemacht, der Scan wiederholt oder abgebrochen werden soll.
+
+Wenn nur bestimmte Tool-Einträge wiederholt werden sollen, übergib sie in `entries`.
+AI-Einträge werden nie an `k_playbook_review_scan` übergeben.
+
+## Schritt 5 — AI-Review-Einträge ausführen
+
+Für AI-Einträge aus `catalogs.reviews` mit Zustand `start` oder `running`:
+
+1. Lade den im Lauf gespeicherten `recipePath`.
+2. Führe den Review als eigenen Arbeitsschritt aus.
+3. Schreibe das Ergebnis in den im Eintrag genannten `defaultResult` oder einen
+   bestätigten relativen Ergebnisnamen im Laufordner.
+4. Setze den Eintrag mit `k_playbook_review_write_ai_entry` auf `done`, oder bei
+   technischem Abbruch auf `failed` mit Grund.
+5. Lies danach den Status erneut.
+
+Der Eintrag `scan-triage` wird hier noch nicht ausgeführt. Er gehört zu Schritt 7,
+weil er `review-input.*` aus dem Merge braucht.
+
+## Schritt 6 — Merge starten
+
+Wenn alle gewünschten Tool-Einträge und alle AI-Review-Rezepte in einem Endzustand
+stehen, starte den Merge über `k_playbook_review_merge`:
+
+```json
+{ "projectDir": "RESOLVED_PROJECT_DIR", "run": "<lauf>" }
+```
+
+Sind noch AI-Review-Rezepte offen, frage vor dem Merge:
+
+- offene AI-Reviews zuerst ausführen,
+- bewusst nur die vorhandenen Tool-Belege mergen,
+- oder abbrechen und später fortsetzen.
+
+Nach dem Merge lies den Status erneut und nenne:
+
+- `<lauf>/review-input.json`,
+- `<lauf>/review-input.md`.
+
+Rohdaten, `run.json` und vorhandene Entry-Dateien werden durch den Merge nicht
+verändert.
+
+## Schritt 7 — Bewertung schreiben
+
+Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` im
+Laufordner vorhanden sind.
+
+Wende `commands/_review-run/review-scan-triage.md` wortlaut-treu an:
+
+- Verwende `review-input.json` als Audit-Beleg und `review-input.md` als Ansicht.
+- Suche `known-decisions.md` nur an den dort genannten deterministischen Pfaden.
+- Bündele Gruppen nach gemeinsamer Root-Cause.
+- Vergib Priorität `P1`/`P2`/`P3` und Kategorie `S`/`T`/`K`/`F`/`A`/`X`.
+- Verweise auf stabile Gruppen-IDs.
+- Schreibe ausschließlich `<RUN_DIR>/review-triage.md`.
+
+Danach rufe `k_playbook_review_write_ai_entry` auf:
+
+```json
+{
+  "projectDir": "RESOLVED_PROJECT_DIR",
+  "run": "<lauf>",
+  "entry": "scan-triage",
+  "state": "done",
+  "result": "review-triage.md",
+  "startedAt": "<RFC3339>",
+  "finishedAt": "<RFC3339>"
+}
+```
+
+Wenn `review-triage.md` bereits existiert, prüfe die Pflichtabschnitte aus dem Modul.
+Ist die Datei gültig und fehlt nur der Eintragszustand, repariere ausschließlich den
+Eintrag über `k_playbook_review_write_ai_entry`. Ist die Datei ungültig oder zeigt der
+Eintrag auf ein fehlendes Ergebnis, führe die Bewertung erneut aus.
+
+## Schritt 8 — Abschluss und Handoff
+
+Lies zum Abschluss den Status erneut und melde:
+
+- Lauf und Laufordner,
+- Tool-Zustände,
+- AI-Entry-Zustände,
+- Pfad zu `review-input.json`, `review-input.md` und `review-triage.md`,
+- offene technische Fehler oder bewusst übersprungene Einträge,
+- den nächsten fachlichen Schritt.
+
+Handoff: Der Nachfolger für `review-triage.md` ist noch nicht endgültig definiert.
+Bis dahin endet der Command ausdrücklich mit dem Pfad zu
+`k-playbook-local/results/<lauf>/review-triage.md` und dem Hinweis, dass daraus später
+Tasks oder Remediation-Bündel abgeleitet werden.
 
 ## Fehlerfälle
 
 - Kein k-playbook-Projekt: abbrechen und die fehlende Installation nennen.
-- Lauf fehlt: anbieten, ihn anzulegen, wenn das Argument ein Datum oder `new` ist.
+- `k_playbook_review_status` meldet `project_not_found`: kein Ersatzpfad, stattdessen
+  `/k-gui` nennen.
+- Lauf fehlt: bei `new` oder Datum nach Auswahlklärung anlegen; bei `latest` die
+  verfügbaren Läufe zeigen.
 - `run.json` unlesbar: nicht reparieren; Fehler und Pfad nennen.
 - Entry-Datei unlesbar: nicht überschreiben; Fehler und Pfad nennen.
-- Scanner technisch fehlgeschlagen: als Tool-Fehler melden, nicht als Befund bewerten.
-- MCP-Werkzeug in der Sitzung nicht verfügbar: geplanten Schritt nennen und vorhandenen
-  CLI-Fallback anzeigen, wo es einen gibt.
+- `scan-triage` fehlt in der Auswahlbasis: sagen, dass das Command-Modul im effektiven
+  Namensraum fehlt oder abgeschaltet ist; Bewertung nicht improvisieren.
+- `review-input.*` fehlt: zuerst Schritt 6 ausführen.
+- `done` für `scan-triage` ohne vorhandenes `review-triage.md`: Zustand als
+  reparaturbedürftig melden und Schritt 7 erneut ausführen.
+
+## Anti-Muster (nicht tun)
+
+- Keinen Laufzustand aus Chat-Gedächtnis ableiten; immer MCP-Status lesen.
+- `scan-triage` nicht als Review-Katalog-Rezept behandeln.
+- `review-triage.md` nicht über `k_playbook_review_write_ai_entry` schreiben; das
+  Werkzeug schreibt nur den Entry-Zustand.
+- Keine freien Suchpfade für `known-decisions.md` verwenden.
+- Nicht nach `k-playbook/` schreiben.

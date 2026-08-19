@@ -30,11 +30,33 @@ func TestReviewStatusAvailable(t *testing.T) {
 	}
 	selection := data["selection"].(map[string]any)
 	candidates := selection["candidates"].([]any)
-	if len(candidates) != 3 {
+	if len(candidates) != 4 {
 		t.Fatalf("candidates = %v", candidates)
 	}
-	if defaults := selection["defaultEntries"].([]any); len(defaults) != 2 {
+	if !hasCandidate(candidates, scanTriageEntry) {
+		t.Fatalf("scan-triage fehlt in candidates: %v", candidates)
+	}
+	if defaults := selection["defaultEntries"].([]any); len(defaults) != 3 {
 		t.Fatalf("defaultEntries = %v", defaults)
+	}
+}
+
+func TestReviewStatusAvailableOhneScanTriageBeiLeeremOverlay(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, project.LocalDirName, "commands", filepath.FromSlash(scanTriageModule)), "# abgeschaltet\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+	candidates := selection["candidates"].([]any)
+	if hasCandidate(candidates, scanTriageEntry) {
+		t.Fatalf("scan-triage trotz leerem Overlay enthalten: %v", candidates)
 	}
 }
 
@@ -56,6 +78,10 @@ func TestReviewStatusExisting(t *testing.T) {
 	data := envelope.Data.(map[string]any)
 	if data["state"] != string(review.StateRunning) {
 		t.Fatalf("state = %v", data["state"])
+	}
+	entries := data["entries"].([]any)
+	if !hasStatusEntry(entries, scanTriageEntry) {
+		t.Fatalf("synthetischer scan-triage fehlt: %v", entries)
 	}
 	if len(data["rawSarif"].([]any)) != 1 {
 		t.Fatalf("rawSarif = %v", data["rawSarif"])
@@ -102,8 +128,42 @@ func TestReviewCreateDryRunUndEcht(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run.json lesen: %v", err)
 	}
-	if len(written.Entries) != 2 || written.Entries[1].RecipeKey != "tech" {
+	if len(written.Entries) != 3 || written.Entries[1].RecipeKey != scanTriageEntry || written.Entries[2].RecipeKey != "tech" {
 		t.Fatalf("entries = %#v", written.Entries)
+	}
+	if _, err := os.Stat(review.EntryFile(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"), scanTriageEntry)); err != nil {
+		t.Fatalf("scan-triage Entry fehlt: %v", err)
+	}
+}
+
+func TestReviewCreateAkzeptiertScanTriageAuswahl(t *testing.T) {
+	root := newReviewProject(t)
+	result, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Day:             "2026-08-19",
+		Entries:         []reviewSelectionInput{{Name: scanTriageEntry, Kind: review.KindAI}},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("create fehlgeschlagen: %#v", envelope.Error)
+	}
+	runDir := filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19")
+	written, err := review.ReadRun(runDir)
+	if err != nil {
+		t.Fatalf("run.json lesen: %v", err)
+	}
+	if len(written.Entries) != 1 || written.Entries[0].Name != scanTriageEntry || written.Entries[0].RecipePath == "" {
+		t.Fatalf("entries = %#v", written.Entries)
+	}
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, scanTriageEntry, &status); err != nil {
+		t.Fatalf("scan-triage Status lesen: %v", err)
+	}
+	if status.State != review.StateStart {
+		t.Fatalf("scan-triage Status = %#v", status)
 	}
 }
 
@@ -230,6 +290,80 @@ func TestReviewWriteAIEntry(t *testing.T) {
 	}
 }
 
+func TestReviewWriteAIEntryScanTriageDoneUndStatus(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: scanTriageEntry, Kind: review.KindAI, RecipeKey: scanTriageEntry, RecipePath: filepath.Join(root, project.PlaybookDirName, "commands", filepath.FromSlash(scanTriageModule)), RecipeOrigin: "dist", Title: "Review-Triage", ResultRequired: boolPtr(true), DefaultResult: scanTriageResult}})
+	mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           scanTriageEntry,
+		State:           review.StateDone,
+		Result:          scanTriageResult,
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+
+	result, _, err = reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	entry := statusEntry(t, envelope.Data.(map[string]any)["entries"].([]any), scanTriageEntry)
+	if entry["state"] != string(review.StateDone) || entry["result"] != scanTriageResult {
+		t.Fatalf("scan-triage Status = %#v", entry)
+	}
+}
+
+func TestReviewWriteAIEntryScanTriageDoneOhneDateiAbgelehnt(t *testing.T) {
+	root := newReviewProject(t)
+	mustCreateRun(t, root, []review.Entry{{Name: scanTriageEntry, Kind: review.KindAI, RecipeKey: scanTriageEntry, ResultRequired: boolPtr(true), DefaultResult: scanTriageResult}})
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           scanTriageEntry,
+		State:           review.StateDone,
+		Result:          scanTriageResult,
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	assertToolErrorCode(t, result, "result_path_invalid")
+}
+
+func TestReviewWriteAIEntryRepariertFehlendenScanTriageEintrag(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}})
+	mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           scanTriageEntry,
+		State:           review.StateDone,
+		Result:          scanTriageResult,
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, scanTriageEntry, &status); err != nil {
+		t.Fatalf("scan-triage Status lesen: %v", err)
+	}
+	if status.State != review.StateDone || status.Result != scanTriageResult {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
 func TestReviewWriteAIEntryFehler(t *testing.T) {
 	root := newReviewProject(t)
 	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
@@ -261,9 +395,11 @@ func newReviewProject(t *testing.T) string {
 	root := t.TempDir()
 	dirs := []string{
 		filepath.Join(root, "k-playbook", "scripts"),
+		filepath.Join(root, "k-playbook", "commands", "_review-run"),
 		filepath.Join(root, "k-playbook", "reviews"),
 		filepath.Join(root, "k-playbook", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
+		filepath.Join(root, "k-playbook-local", "commands", "_review-run"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
 	}
@@ -273,6 +409,7 @@ func newReviewProject(t *testing.T) string {
 		}
 	}
 	mustWriteFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\nreviewRun:\n  title: Technischer Review\n  resultRequired: true\n  defaultResult: review-tech.md\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
@@ -348,6 +485,38 @@ func assertToolErrorCode(t *testing.T, result *mcp.CallToolResult, code string) 
 	}
 }
 
+func hasCandidate(candidates []any, name string) bool {
+	for _, raw := range candidates {
+		candidate := raw.(map[string]any)
+		if candidate["name"] == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStatusEntry(entries []any, name string) bool {
+	for _, raw := range entries {
+		entry := raw.(map[string]any)
+		if entry["name"] == name {
+			return true
+		}
+	}
+	return false
+}
+
+func statusEntry(t *testing.T, entries []any, name string) map[string]any {
+	t.Helper()
+	for _, raw := range entries {
+		entry := raw.(map[string]any)
+		if entry["name"] == name {
+			return entry
+		}
+	}
+	t.Fatalf("kein Entry %s in %v", name, entries)
+	return nil
+}
+
 func mustWriteFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -371,4 +540,10 @@ func minimalSARIF() string {
 	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"mockscan","rules":[{"id":"R1","name":"Regel"}]}},"results":[{"ruleId":"R1","level":"warning","message":{"text":"Fund"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"main.go"},"region":{"startLine":1}}}]}]}]}`
 }
 
+func minimalTriage() string {
+	return "# Review-Triage\n\n## Bündel\n\n## Bündel-Details\n\n## Nicht gebündelt\n\n## Deckung aus known-decisions\n"
+}
+
 func intPtr(value int) *int { return &value }
+
+func boolPtr(value bool) *bool { return &value }

@@ -85,7 +85,7 @@ already there rather than duplicating it.
 
 ## Schritt 3 — Themen vorschlagen
 
-Read the source and cluster it **by meaning**, exactly as `/k-code2docs` does in its
+Read the source and cluster it **by meaning**, exactly as `/k-docs-code` does in its
 semantic scan — not by the order of the transcript. A chat jumps back and forth; three
 passages about the same subsystem belong in one topic, and one long passage may carry
 three.
@@ -243,5 +243,5 @@ Kompakte Zusammenfassung:
 - **Vor dem Gate schreiben.** Eine halb angelegte Datei aus einem abgebrochenen Lauf
   sieht später aus wie bestätigtes Wissen.
 - **In `docs/code/` schreiben.** Auch wenn ein Extrakt dort thematisch hinpasst: das
-  Verzeichnis gehört `/k-code2docs` und wird beim nächsten Lauf ohne Rücksicht neu
+  Verzeichnis gehört `/k-docs-code` und wird beim nächsten Lauf ohne Rücksicht neu
   geschrieben.

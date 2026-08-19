@@ -37,7 +37,7 @@ From the context output:
 - If `$ARGUMENTS` is empty, check the current working directory.
 
 If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
-docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-code2docs` is not a
+docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
 finding by itself — name it and move on.
 
 ## Step 2 — Load rule files

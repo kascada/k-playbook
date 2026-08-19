@@ -77,6 +77,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `PR-Review` -> [`pr-review.md`](./pr-review.md)
 - `Remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)
 - `Results` / `Ergebnisse` -> [`reviews-and-results.md`](./reviews-and-results.md)
+- `/k-review-run` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#bewerten-mit-review-scan-triage), [`commands.md`](./commands.md#review-flow)
 - `review-input` / `merge` / `Zusammenfassen` -> [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge)
 - `Schreibweise` / `Umlaute` / `Rechtschreibung` -> [`schreibweise.md`](./schreibweise.md)
 - `Reviews` -> [`code-review.md`](./code-review.md)

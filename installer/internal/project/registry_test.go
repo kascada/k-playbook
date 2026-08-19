@@ -66,6 +66,41 @@ func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 	}
 }
 
+func TestResolveRegistryErhaeltReviewRunNamensraumUndOverlaySchaltetAb(t *testing.T) {
+	root := t.TempDir()
+	name := "_review-run/review-scan-triage.md"
+	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", filepath.FromSlash(name)), "# Modul\n")
+
+	active := ActiveRegistry(root, KindCommands)
+	if len(active) != 1 || active[0].Name != name {
+		t.Fatalf("aktive Commands = %+v, erwartet %s", active, name)
+	}
+
+	writeFile(t, filepath.Join(root, LocalDirName, "commands", filepath.FromSlash(name)), "# abgeschaltet\n")
+	entry := entryFor(t, ResolveRegistry(root, KindCommands), name)
+	if !entry.Disabled || entry.Origin != "override" {
+		t.Fatalf("Overlay = %+v, erwartet abgeschalteten Override", entry)
+	}
+	if got := len(ActiveRegistry(root, KindCommands)); got != 0 {
+		t.Fatalf("%d aktive Commands, erwartet 0", got)
+	}
+}
+
+func TestResolveRegistryErhaeltDocsNamensraum(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-docs.md"), "# k-docs\n")
+	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-docs-code.md"), "# k-docs-code\n")
+	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_docs", "code.md"), "# Docs-Modul: Code\n")
+	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_docs", "tools.md"), "# Docs-Modul: Tools\n")
+
+	entries := ResolveRegistry(root, KindCommands)
+	for _, name := range []string{"k-docs.md", "k-docs-code.md", "_docs/code.md", "_docs/tools.md"} {
+		if got := entryFor(t, entries, name).Origin; got != "dist" {
+			t.Errorf("%s Origin = %q, erwartet dist", name, got)
+		}
+	}
+}
+
 // README.md beschreibt das Verzeichnis und ist kein Command.
 func TestResolveRegistryUebergehtReadme(t *testing.T) {
 	root := t.TempDir()

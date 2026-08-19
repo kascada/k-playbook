@@ -74,8 +74,8 @@ from the output above — never from configuration, and never by searching.
 | todo | `<local.dir>/TODO.md` |
 | project documentation | `<local.dir>/docs/` |
 | documentation index | `<local.dir>/docs/README.md` |
-| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-code2docs` oder des Skills `ks-overlay-repo-analyse` |
-| tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-tools-scan` |
+| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |
+| tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
 | extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
 | hand-written documentation | `<local.dir>/docs/manual/` |
 | raw material, never indexed | `<local.dir>/material/` |

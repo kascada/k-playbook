@@ -85,6 +85,13 @@ Sie fassen `raw/` und `entries/` zusammen und dienen als Eingabe für die Bewert
 den Assistenten. Details in
 [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge).
 
+Bis das Family-Modell und der Handoff-Satz vollständig auf das Laufmodell umgestellt
+sind, ist das kuratierbare Endprodukt eines Laufmodell-Laufs
+`k-playbook-local/results/YYYY-MM-DD/review-triage.md`. Es entsteht durch das
+Command-Modul `review-scan-triage`, nicht durch ein Review-Rezept aus `reviews/`.
+`assessment.md` und `findings.md` bleiben vorerst Artefakte der älteren
+Ergebnisfamilien.
+
 ## Statusmodell
 
 Standard-Statuswerte in `findings.md`:

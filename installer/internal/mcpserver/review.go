@@ -144,6 +144,9 @@ const (
 	reviewToolScan         = "k_playbook_review_scan"
 	reviewToolMerge        = "k_playbook_review_merge"
 	reviewToolWriteAIEntry = "k_playbook_review_write_ai_entry"
+	scanTriageEntry        = "scan-triage"
+	scanTriageModule       = "_review-run/review-scan-triage.md"
+	scanTriageResult       = "review-triage.md"
 )
 
 func addReviewTools(server *mcp.Server) {
@@ -343,6 +346,9 @@ func createReviewRun(env reviewEnvironment, input reviewCreateInput) (map[string
 		}
 		return nil, wrapError(err, code, message, map[string]any{"run": runName, "runDir": runDirFor(env, runName)})
 	}
+	if err := writeInitialScanTriageEntry(runDir, selected); err != nil {
+		return nil, wrapError(err, "write_failed", "Scan-Triage-Eintrag konnte nicht angelegt werden.", map[string]any{"run": runName, "path": review.EntryFile(runDir, scanTriageEntry)})
+	}
 	written, err := review.ReadRun(runDir)
 	if err != nil {
 		return nil, wrapError(err, "read_failed", "Geschriebener Lauf ist nicht lesbar.", map[string]any{"run": runName, "path": filepath.Join(runDir, review.RunFileName)})
@@ -441,10 +447,14 @@ func writeAIEntry(env reviewEnvironment, input reviewWriteAIEntryInput) (map[str
 	}
 	entry, found := findRunEntry(run, input.Entry)
 	if !found {
-		return nil, reviewToolError{
-			Code:    "entry_not_found",
-			Message: "Eintrag ist nicht im Lauf enthalten.",
-			Details: map[string]any{"entry": input.Entry, "run": input.Run, "known": runEntryNames(run)},
+		var ok bool
+		entry, ok = repairableScanTriageEntry(env, input.Entry)
+		if !ok {
+			return nil, reviewToolError{
+				Code:    "entry_not_found",
+				Message: "Eintrag ist nicht im Lauf enthalten.",
+				Details: map[string]any{"entry": input.Entry, "run": input.Run, "known": runEntryNames(run)},
+			}
 		}
 	}
 	if entry.Kind != review.KindAI {
@@ -475,8 +485,33 @@ func writeAIEntry(env reviewEnvironment, input reviewWriteAIEntryInput) (map[str
 		"entry":    input.Entry,
 		"path":     review.EntryFile(runDir, input.Entry),
 		"status":   aiStatus,
-		"runState": review.DeriveRunState(runDir, run),
+		"runState": review.DeriveRunState(runDir, effectiveRunForStatus(env, run)),
 	}, reviewToolError{}
+}
+
+func writeInitialScanTriageEntry(runDir string, entries []review.Entry) error {
+	for _, entry := range entries {
+		if entry.Name != scanTriageEntry || entry.Kind != review.KindAI {
+			continue
+		}
+		return writeAIEntryStatusFile(runDir, aiEntryStatus{
+			Name:  scanTriageEntry,
+			Kind:  review.KindAI,
+			State: review.StateStart,
+		})
+	}
+	return nil
+}
+
+func repairableScanTriageEntry(env reviewEnvironment, name string) (review.Entry, bool) {
+	if name != scanTriageEntry {
+		return review.Entry{}, false
+	}
+	candidate, ok := scanTriageCandidate(env)
+	if !ok {
+		return review.Entry{}, false
+	}
+	return entryFromCandidate(candidate), true
 }
 
 func findRunEntry(run review.Run, name string) (review.Entry, bool) {
@@ -731,7 +766,8 @@ func reviewExistingStatus(env reviewEnvironment, runName string) (map[string]any
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
-	entries, toolErr := statusEntries(runDir, run)
+	effectiveRun := effectiveRunForStatus(env, run)
+	entries, toolErr := statusEntries(runDir, effectiveRun)
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
@@ -739,7 +775,7 @@ func reviewExistingStatus(env reviewEnvironment, runName string) (map[string]any
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
-	artifacts, toolErr := listExistingArtifacts(runDir, []string{"review-input.json", "review-input.md"})
+	artifacts, toolErr := listExistingArtifacts(runDir, []string{"review-input.json", "review-input.md", scanTriageResult})
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
@@ -748,11 +784,24 @@ func reviewExistingStatus(env reviewEnvironment, runName string) (map[string]any
 		"run":         runName,
 		"runDir":      runDir,
 		"runJSON":     run,
-		"state":       review.DeriveRunState(runDir, run),
+		"state":       review.DeriveRunState(runDir, effectiveRun),
 		"entries":     entries,
 		"rawSarif":    raw,
 		"reviewInput": artifacts,
 	}, reviewToolError{}
+}
+
+func effectiveRunForStatus(env reviewEnvironment, run review.Run) review.Run {
+	if _, found := findRunEntry(run, scanTriageEntry); found {
+		return run
+	}
+	candidate, ok := scanTriageCandidate(env)
+	if !ok {
+		return run
+	}
+	effective := run
+	effective.Entries = append(append([]review.Entry{}, run.Entries...), entryFromCandidate(candidate))
+	return effective
 }
 
 func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolError) {
@@ -815,6 +864,9 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 			DefaultResult:   metadata.DefaultResult,
 		})
 	}
+	if candidate, ok := scanTriageCandidate(env); ok {
+		candidates = append(candidates, candidate)
+	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		if candidates[i].Kind != candidates[j].Kind {
 			return candidates[i].Kind == review.KindTool
@@ -839,6 +891,30 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		DefaultEntries:        defaults,
 		Preflight:             preflight,
 	}, reviewToolError{}
+}
+
+func scanTriageCandidate(env reviewEnvironment) (reviewCandidate, bool) {
+	for _, entry := range project.ActiveRegistry(env.Root, project.KindCommands) {
+		if entry.Name != scanTriageModule {
+			continue
+		}
+		resultRequired := true
+		return reviewCandidate{
+			Name:            scanTriageEntry,
+			Kind:            review.KindAI,
+			Title:           "Review-Triage",
+			Selectable:      true,
+			DefaultSelected: true,
+			Detail:          "Command-Modul " + scanTriageModule,
+			Path:            entry.Path,
+			RecipeKey:       scanTriageEntry,
+			RecipePath:      entry.Path,
+			RecipeOrigin:    entry.Origin,
+			ResultRequired:  &resultRequired,
+			DefaultResult:   scanTriageResult,
+		}, true
+	}
+	return reviewCandidate{}, false
 }
 
 func validateCreateSelection(base reviewSelectionBase, requested []reviewSelectionInput) ([]review.Entry, reviewToolError) {

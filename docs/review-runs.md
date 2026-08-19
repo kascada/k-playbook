@@ -16,10 +16,13 @@ Ein Lauf besteht aus **Einträgen**, und ein Eintrag hat eine **Art**:
 | Art | Was es ist | Wer führt es aus |
 |---|---|---|
 | `tool` | ein Security-Tool aus der Matrix | das Werkzeug, über eine CLI |
-| `ai` | ein Review-Rezept aus dem Katalog | ein Assistent, über einen Command |
+| `ai` | ein Review-Rezept aus dem Katalog oder ein Command-Moduleintrag | ein Assistent, über einen Command |
 
 Beide sind Einträge desselben Laufs. Nur der Weg dorthin unterscheidet sich — das Ergebnis
 landet für beide im selben Verzeichnis und damit später in derselben Zusammenfassung.
+Der Standard-Moduleintrag `scan-triage` kommt aus
+`commands/_review-run/review-scan-triage.md`; er gehört bewusst nicht zu
+`catalogs.reviews` und erscheint deshalb nicht in der GUI-Auswahl für Review-Rezepte.
 
 ## Das Laufverzeichnis
 
@@ -134,6 +137,13 @@ reviewRun:
 `title` fällt ohne Angabe auf die erste Überschrift oder den Katalog-Schlüssel zurück.
 `resultRequired` ist standardmäßig `true` und bestimmt, ob ein `done`-Status ein Ergebnis
 braucht. `defaultResult` ist ein relativer Vorschlag im Laufverzeichnis.
+
+Der Moduleintrag `scan-triage` erhält dieselben Laufmetadaten aus dem effektiven
+Command-Namensraum: `recipePath` zeigt auf
+`commands/_review-run/review-scan-triage.md`, `defaultResult` ist
+`review-triage.md`, `resultRequired` ist `true`. Ein leeres lokales Overlay unter
+`k-playbook-local/commands/_review-run/review-scan-triage.md` schaltet diesen
+Eintrag ab.
 
 ## Zustände
 
@@ -426,6 +436,12 @@ Weg; MCP ist für die Chat-Orchestrierung ohne Shell-Out zur `k-playbook`-CLI ge
 Alle Werkzeuge verlangen `projectDir`, suchen von dort aufwärts nach `K-PLAYBOOK.yaml` und
 geben strukturierte JSON-Hüllen zurück. Fehler sind fachliche Werkzeugergebnisse mit
 `ok: false`, keine MCP-Protokollfehler.
+Im Modus `available` liefert `k_playbook_review_status` neben Werkzeugen und
+Katalog-Rezepten auch den Command-Moduleintrag `scan-triage`, sofern er im effektiven
+Command-Namensraum aktiv ist. `k_playbook_review_create`,
+`k_playbook_review_status` im bestehenden Lauf und
+`k_playbook_review_write_ai_entry` akzeptieren diesen Eintrag, obwohl er nicht in
+`catalogs.reviews` steht.
 
 ## Zusammenfassen mit `k-playbook merge`
 
@@ -469,3 +485,34 @@ JSON, sobald sie das Limit überschreitet.
 **Wiederholbar.** Ein erneuter Aufruf überschreibt beide Artefakte. Bei fehlenden
 Entry-Dateien für einen in `run.json` ausgewählten Eintrag gilt der Zustand `start`;
 kein Fehler, sondern eine sichtbare Auskunft im Statusblock.
+
+## Bewerten mit `review-scan-triage`
+
+Nach dem Merge bewertet `/k-review-run` den Lauf über das Command-Modul
+`commands/_review-run/review-scan-triage.md`. Das Modul ist kein Review-Rezept und
+wird nicht aus `reviews/` geladen. Es gehört zum Command-Namensraum von
+`/k-review-run` und wird als AI-Eintrag `scan-triage` im Lauf geführt.
+
+Eingaben sind ausschließlich Dateien im Laufkontext:
+
+- `review-input.json` mit vollständigen Belegen, Provenienz und stabilen Gruppen-IDs,
+- `review-input.md` als kompakte Ansicht,
+- optional `known-decisions.md`, zuerst aus dem Laufordner, sonst aus
+  `k-playbook-local/results/known-decisions.md`.
+
+Das Modul schreibt genau ein neues Markdown-Artefakt direkt in den Laufordner:
+
+```text
+k-playbook-local/results/<lauf>/review-triage.md
+```
+
+`review-triage.md` bündelt Gruppen nach gemeinsamer Ursache, vergibt Priorität
+`P1`/`P2`/`P3`, Kategorie `S`/`T`/`K`/`F`/`A`/`X`, verweist auf die stabilen
+Gruppen-IDs und nennt den nächsten Schritt je Bündel. Gruppen, die durch
+`known-decisions.md` gedeckt sind, bleiben sichtbar und werden als gedeckt markiert.
+
+Nach dem Schreiben setzt `/k-review-run` den AI-Eintrag mit
+`k_playbook_review_write_ai_entry` auf `done` und `result: review-triage.md`.
+Das Werkzeug schreibt dabei nur `entries/scan-triage.json`; der Markdown-Inhalt
+bleibt ein direktes Artefakt im Laufordner. Ein `done`-Status ist nur konsistent,
+wenn der relative Ergebnispfad im Laufordner bleibt und die Datei existiert.

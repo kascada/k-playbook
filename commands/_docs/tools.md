@@ -1,20 +1,8 @@
----
-description: Detect the tools/libraries/stacks used in a project, rank them by "worth researching", let the user pick, then produce a curated pitfall-focused file per selected tool under k-playbook-local/docs/libs/. Focuses on pitfalls and idioms, NOT copy-paste snippets.
-argument-hint: [scope-dir]
-# model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
----
+# Docs-Modul: Tools
 
-# k-tools-scan
-
-## Erster Schritt
-
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
-auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
-
+Dieses Modul wird von `/k-docs` und `/k-docs-tools` nach dem Shared Context angewendet.
+Es ist kein eigenständiger Einstieg, sondern der nachladbare Ablauf für die Herkunft
+`docs/libs/`.
 
 Turns a raw dependency list into a curated set of **pitfall-focused** reference docs, one
 per non-trivial tool. The index over these files is built by `/k-docs-index`; this command
@@ -45,7 +33,7 @@ Command-specific policy:
   now or to run `/k-gui`. Do not use a fallback path and do not abort hard.
 - `LIBS_DIR` is this command's own producer directory. Create it without asking if it is
   missing — before the first run that is the normal state, not a broken installation.
-- There is no precondition on `/k-code2docs` and none on the main index. The index is
+- There is no precondition on `/k-docs-code` and none on the main index. The index is
   built separately by `/k-docs-index`, so this command runs standalone.
 - Write nothing outside `LIBS_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
   belong to `/k-docs-index`; `docs/code/`, `docs/extracted/` and `docs/manual/` belong to
@@ -57,7 +45,7 @@ Ask (bundled, one message):
 
 1. Welche Package-/Manifest-Files sollen ausgewertet werden? (Default: alle gefundenen — `pyproject.toml`, `requirements*.txt`, `setup.py`, `Pipfile*`, `package.json`, `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`, `pom.xml`, `build.gradle*`, `mix.exs`.)
 2. Zusätzliche Quellen einbeziehen? (Default an: `Dockerfile*`, `docker-compose*.y{a,}ml`, `.github/workflows/*.yml`, `.gitlab-ci.yml`. Signal: welche System-Tools/Runtimes/Services sind implizit dabei.)
-3. Ausschlüsse — wie in `/k-code2docs`: gleiches Default-Set + `.gitignore`.
+3. Ausschlüsse — wie in `/k-docs-code`: gleiches Default-Set + `.gitignore`.
 
 ## Schritt 3 — Erkennen (automatisch, still)
 
@@ -182,7 +170,7 @@ title: <Name>
 description: Projektrelevante Pitfalls und Idiome für <Name>.
 tags: [library, <ecosystem>, <name>]
 status: stable
-generated: { by: k-tools-scan, at: <ISO-8601-datetime> }
+generated: { by: k-docs-tools, at: <ISO-8601-datetime> }
 lib: <name>
 version: "<version-string>"
 version-pin: <exact|range|floating>
@@ -235,8 +223,8 @@ sources:
 ```
 
 **Regeln:**
-- Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-tools-scan` erhalten.
-- `generated.by` ist immer `k-tools-scan`. Der Index prüft das gegen das Verzeichnis; ein anderer Wert in `docs/libs/` ist ein Befund.
+- Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-docs-tools` erhalten.
+- `generated.by` ist immer `k-docs-tools`. Der Index akzeptiert außerdem den Altwert `k-tools-scan`; ein anderer Wert in `docs/libs/` ist ein Befund.
 - `lib`, `version`, `severity` und `last-reviewed` sind Pflicht: `/k-docs-index` baut daraus die Übersichtstabelle „Libs & Stack". Fehlt eines, kommt die Datei trotzdem in den Index — die Lücke wird dort als Konsistenz-Befund gemeldet, nicht stillschweigend übergangen.
 - `sources` im Frontmatter nur für tatsächlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
 - **Keine** Tutorials, keine „Getting Started"-Snippets.
@@ -252,7 +240,7 @@ sources:
 Kuratierte Referenz zu den nicht-trivialen Libraries und Tools dieses Projekts.
 Fokus: Pitfalls und Idiome — kein Ersatz für offizielle Doku.
 
-Erzeugt von `/k-tools-scan`. Die Übersichtstabelle steht im Index unter
+Erzeugt von `/k-docs-tools`. Die Übersichtstabelle steht im Index unter
 [`../README.md`](../README.md).
 ```
 
@@ -267,7 +255,7 @@ Kompakte Zusammenfassung:
 - `<LIBS_DIR>/README.md`: neu angelegt / unverändert vorhanden.
 - Offene Fragen: Zusammenfassung, wenn welche in den Files stehen.
 - Ausdrücklich: außerhalb von `LIBS_DISPLAY_PATH` wurde nichts geschrieben.
-- Hinweis: Bei größeren Upgrades später erneut `/k-tools-scan` laufen — das Re-Run-Verhalten steht in Schritt 6.
+- Hinweis: Bei größeren Upgrades später erneut `/k-docs-tools` laufen — das Re-Run-Verhalten steht in Schritt 6.
 - Folge-Command: **`/k-docs-index`** — nimmt `version`, `severity` und `last-reviewed` aus den geschriebenen Dateien und baut daraus die Sektion „Libs & Stack" im einzigen Index `k-playbook-local/docs/README.md`. Ohne diesen Lauf tauchen die neuen Lib-Dateien nirgends auf.
 
 ## Fehlerfälle

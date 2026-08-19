@@ -32,8 +32,8 @@ From the context output:
 
 - `RESOLVED_DOCS_DIR = <local.dir>/docs`
 - `DOCS_DISPLAY_PATH = k-playbook-local/docs`
-- `CODE_DIR = <RESOLVED_DOCS_DIR>/code` — written by `/k-code2docs`
-- `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs` — written by `/k-tools-scan`
+- `CODE_DIR = <RESOLVED_DOCS_DIR>/code` — written by `/k-docs-code`
+- `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs` — written by `/k-docs-tools`
 - `EXTRACTED_DIR = <RESOLVED_DOCS_DIR>/extracted` — written by `/k-docs-extract`
 - `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual` — written by hand
 - `INDEX_FILE = <RESOLVED_DOCS_DIR>/README.md`
@@ -66,8 +66,8 @@ Per origin, collect all `*.md` except `README.md`:
 
 | Herkunft | Verzeichnis | Erzeuger |
 |---|---|---|
-| Code | `CODE_DIR` | `/k-code2docs`, Skill `ks-overlay-repo-analyse` |
-| Libs | `LIBS_DIR` | `/k-tools-scan` |
+| Code | `CODE_DIR` | `/k-docs-code`, Skill `ks-overlay-repo-analyse` |
+| Libs | `LIBS_DIR` | `/k-docs-tools` |
 | Extrahiert | `EXTRACTED_DIR` | `/k-docs-extract` |
 | Manuell | `MANUAL_DIR` | Mensch |
 | Unsortiert | flache `<RESOLVED_DOCS_DIR>/*.md` | kein Erzeuger |
@@ -113,7 +113,7 @@ On „ja":
 - Determine per file whether it is tracked: only if `project.vcs` says the project is
   under version control **and** `git ls-files --error-unmatch <datei>` succeeds, use
   `git mv`. Otherwise use plain `mv`. Do not call `git mv` blindly.
-- Create `CODE_DIR` if it does not exist — that is `/k-code2docs`'s directory, and
+- Create `CODE_DIR` if it does not exist — that is `/k-docs-code`'s directory, and
   creating it here for the move is the one exception.
 - If a file of the same name already exists in `CODE_DIR`: do not overwrite. Report the
   collision, leave the flat file where it is and continue.
@@ -132,7 +132,7 @@ to the short explanatory text, then do it only after confirmation:
 Kuratierte Referenz zu den nicht-trivialen Libraries und Tools dieses Projekts.
 Fokus: Pitfalls und Idiome — kein Ersatz für offizielle Doku.
 
-Erzeugt von `/k-tools-scan`. Die Übersichtstabelle steht im Index unter
+Erzeugt von `/k-docs-tools`. Die Übersichtstabelle steht im Index unter
 [`../README.md`](../README.md).
 ```
 
@@ -144,10 +144,11 @@ Check and **report**; do not repair silently and do not rewrite a doc file.
   file still goes into the index, with the file name as fallback title and a marker.
 - **Tote Cross-Links** — relative Markdown links inside doc files that point to a file
   that does not exist. Name source file, line and target.
-- **`generated.by` passt nicht zum Verzeichnis** — e.g. `generated: { by: k-code2docs }`
+- **`generated.by` passt nicht zum Verzeichnis** — e.g. `generated: { by: k-docs-code }`
   in `EXTRACTED_DIR`. Every directory stands for an origin; only a value from a *foreign*
-  origin is a finding. `CODE_DIR` (`docs/code/`) has two valid producers: `k-code2docs`
-  and `ks-overlay-repo-analyse`.
+  origin is a finding. `CODE_DIR` (`docs/code/`) accepts `k-docs-code`, legacy
+  `k-code2docs` and `ks-overlay-repo-analyse`; `LIBS_DIR` accepts `k-docs-tools` and
+  legacy `k-tools-scan`.
 
 Print the findings as a short list. If there are none, say so in one line. Ask nothing
 here — the index is built either way; the user decides later what to fix and with which
@@ -194,7 +195,7 @@ Write `INDEX_FILE` with these blocks:
 ## Libs & Stack
 
 Kuratierte Referenz zu Libraries und Tools. Fokus: Pitfalls, nicht Tutorials.
-Erzeugt von `/k-tools-scan`.
+Erzeugt von `/k-docs-tools`.
 
 | Lib | Version | Severity | Letzter Review |
 |-----|---------|----------|----------------|
@@ -325,7 +326,7 @@ Kompakte Zusammenfassung:
 
 - `RESOLVED_DOCS_DIR` fehlt → fragen, ob genau dieses Verzeichnis angelegt werden soll,
   oder `/k-gui` nennen. Kein Ersatzpfad, kein harter Abbruch.
-- Keine einzige Doc-Datei in irgendeiner Herkunft → melden, `/k-code2docs` nennen und
+- Keine einzige Doc-Datei in irgendeiner Herkunft → melden, `/k-docs-code` nennen und
   stoppen. Ein Index über nichts ist kein Ergebnis.
 - `opencode.json` **und** `opencode.jsonc` liegen beide vor → stoppen und den User
   entscheiden lassen, welche gilt. Nicht raten und nicht beide schreiben.

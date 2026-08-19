@@ -1,20 +1,8 @@
----
-description: Initial code-to-docs analysis. Scans a project semantically (by meaning/subsystem, not file-by-file), proposes a thematic doc structure and writes one numbered topic doc per theme into k-playbook-local/docs/code/. Defaults to the current directory, or uses [target-dir] if given.
-argument-hint: [target-dir]
-# model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
----
+# Docs-Modul: Code
 
-# k-code2docs
-
-## Erster Schritt
-
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
-auf und lies die Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
-
+Dieses Modul wird von `/k-docs` und `/k-docs-code` nach dem Shared Context angewendet.
+Es ist kein eigenständiger Einstieg, sondern der nachladbare Ablauf für die Herkunft
+`docs/code/`.
 
 Turn an existing codebase into a curated set of topic docs that describe **meaning**, not
 surface facts — explicitly not a grep replacement. The index over these docs is built by
@@ -62,7 +50,7 @@ Command-specific policy:
 **Preflight-Snapshot anzeigen:**
 
 ```text
-/k-code2docs — Preflight
+/k-docs-code — Preflight
 ─────────────────────────────────────
 Ziel:          <TARGET_DIR>
 Projekt:       <project.dir>
@@ -79,7 +67,7 @@ Wenn `$ARGUMENTS` leer war: frage:
 
 Bei „nein": abbrechen mit Hinweis:
 
-> "Abgebrochen. In das gewünschte Repo wechseln (`cd <pfad>`) oder Ziel als Argument angeben: `/k-code2docs <pfad>`."
+> "Abgebrochen. In das gewünschte Repo wechseln (`cd <pfad>`) oder Ziel als Argument angeben: `/k-docs-code <pfad>`."
 
 Bei „ja": weiter mit Schritt 2.
 
@@ -159,7 +147,7 @@ title: <Titel>
 description: <Ein Satz: was diese Datei erklärt.>
 tags: [<kurze-tags>]
 status: stable
-generated: { by: k-code2docs, at: <ISO-8601-datetime> }
+generated: { by: k-docs-code, at: <ISO-8601-datetime> }
 ---
 
 # <Titel>
@@ -192,7 +180,7 @@ Aufruf-Pfad. Verweise auf konkrete Stellen im Code als `path/to/file.py:123`.>
 **Regeln:**
 
 - Jede Themen-Datei bekommt OKF-kompatibles YAML-Frontmatter: `type`, `title`, `description`, `tags`, `status`, `generated`. `type` ist typischerweise `Project Concept`; bei passenderem Inhalt sind auch sprechende Typen wie `Architecture`, `Data Model`, `API Surface`, `Runtime Configuration`, `Operational Playbook` erlaubt. Keine zentrale Typ-Liste erfinden.
-- `generated.by` nennt das schreibende Werkzeug; dieser Command trägt `k-code2docs` ein. In `docs/code/` sind beide Erzeuger der Herkunft „Code" gültig: `k-code2docs` und `ks-overlay-repo-analyse`. Der Index prüft den Wert gegen die Herkunft des Verzeichnisses; ein Wert, der zu einer anderen Herkunft gehört, ist ein Befund.
+- `generated.by` nennt das schreibende Werkzeug; dieser Command trägt `k-docs-code` ein. In `docs/code/` sind die Erzeuger der Herkunft „Code" gültig: `k-docs-code`, der Altwert `k-code2docs` und `ks-overlay-repo-analyse`. Der Index prüft den Wert gegen die Herkunft des Verzeichnisses; ein Wert, der zu einer anderen Herkunft gehört, ist ein Befund.
 - `description` ist ein konkreter Ein-Satz-Summary für Index/Search/Agenten. `tags` sind kurz, lowercase, domänen- oder technikbezogen; keine Keyword-Flut.
 - Wenn belastbare Quellen außer Code genutzt wurden, `sources:` im Frontmatter ergänzen, jeweils als OKF-Objekt mit mindestens `resource`. Wenn ein Mensch eine Datei später fachlich bestätigt, darf `verified: { by: human:<id>, at: <ISO-8601-datetime> }` nachgetragen werden. Nicht automatisch Human-Review behaupten.
 - Code-Referenzen konsequent als `pfad:zeile` — sonst kann die spätere Session nicht ohne Grep zurückspringen.

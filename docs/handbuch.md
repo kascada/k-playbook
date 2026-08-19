@@ -146,7 +146,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 | Gruppe | Commands | Zweck |
 |---|---|---|
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
-| Docs | `/k-code2docs`, `/k-tools-scan`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft dokumentieren und für AI-Sessions registrieren |
+| Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausführen, Findings priorisieren und abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, prüfen und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
@@ -212,13 +212,16 @@ den Herkünften der Docs; jedes Werkzeug schreibt ausschließlich in Verzeichnis
 eigenen Herkunft:
 
 ```text
-/k-code2docs      → k-playbook-local/docs/code/
-/k-tools-scan     → k-playbook-local/docs/libs/
+/k-docs           → Bestand prüfen und mögliche Docs-Aktionen anbieten
+/k-docs-code      → k-playbook-local/docs/code/
+/k-docs-tools     → k-playbook-local/docs/libs/
 /k-docs-extract   → k-playbook-local/docs/extracted/
 /k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json
 ```
 
-Die ersten drei erzeugen Inhalt: `/k-code2docs` liest den Code, `/k-tools-scan` die
+`/k-docs` ist der geführte Einstieg: er prüft Bestand, Konsistenz und Session-Memory und
+bietet an, welcher nächste Schritt möglich ist. Die drei Produzenten erzeugen Inhalt:
+`/k-docs-code` liest den Code, `/k-docs-tools` die
 Libraries, `/k-docs-extract` das Rohmaterial aus `k-playbook-local/material/`. Wer nichts
 davon hat, lässt die Stufe aus.
 
