@@ -143,11 +143,69 @@ verglichen:
   `tool.driver.rules` mit ID, Beschreibung und `helpUri`, dazu die Werkzeugversion. Was in
   einem Lauf galt, bleibt damit aus `raw/` ablesbar — wofür das Verzeichnis auditierbar ist.
 
+**Erledigt: Merge-Werkzeug.** Aus Task 014 (`k-playbook-local/tasks/done/014-sarif-merge-review-input.md`).
+Ein eigenes Unterkommando statt einer fremden Runtime: `k-playbook merge <lauf>` liest
+`run.json`, `entries/*.json` und `raw/*.sarif`, normalisiert die Findings, dedupliziert
+sie und schreibt zwei Artefakte: `review-input.json` als vollständigen Audit-Beleg und
+`review-input.md` als kompakte Ansicht. Details in
+[`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge). Externe
+Kandidaten wurden dabei ausgeschlossen: der Microsoft SARIF Multitool zöge .NET oder
+npm nach, und `sarif-tools` (PyPI) deckt Cross-Tool-Deduplizierung und `entries`-Kontext
+nicht ab.
+
+Erster Realdurchlauf (2026-08-19, dieses Repo): 347 Findings, 227 Gruppen. Rohdaten
+blieben unangetastet. Zweiter Realdurchlauf am selben Tag am Projekt OMNI
+(`~/dev/squad-km-dev-setup/k-playbook-local/results/2026-08-19/`): 327 Findings, 141
+Gruppen — die Dedupe-Wirkung ist dort deutlich stärker, weil Lockfile-Zeilen viele
+CVEs bündeln.
+
+Offene Kosmetik-Punkte, nicht blockierend:
+
+- `entries[].source` verdoppelt die Entry-Daten im JSON (Nebenwirkung von `omitempty`
+  auf einem Nicht-Pointer-Struct); JSON größer, sonst harmlos.
+- Gleiche Datei/Zeile innerhalb desselben Tools mit unterschiedlicher Rule-ID bleibt
+  getrennt. Am OMNI-Lauf sehr deutlich: `requirements.txt:29` erzeugt 17 Trivy-Gruppen
+  (G004–G020), alle wechselseitig als `possible-duplicate` markiert, dazu ähnliche
+  Kaskaden an mehreren `package-lock.json`-Zeilen. Für die spätere KI-Bewertung Rauschen —
+  Kandidat für ein „same-location bundle" auf Tool-Ebene, unterhalb der harten
+  Dedupe-Regeln.
+- Fehlende SARIF-Schwere schlägt bis in die Ausgabe durch: der OMNI-Lauf zählt
+  `unknown: 167` neben `error: 127`, `warning: 27`, `note: 6`. Das ist der Punkt „Tabelle
+  Regel → Schwere, einmal in k-playbook zentral" aus der Offen-Liste; die Auswirkung ist
+  jetzt am Realdatum messbar.
+- `kPlaybookVersion` steht hart auf `"unknown"`; nachziehen über `runtime/debug.ReadBuildInfo`.
+- Zahlen-Block im Markdown listet nur Tools mit >0 Findings; Tools mit 0 sind über die
+  Entry-Tabelle sichtbar, würden im Zahlen-Block aber auch nicht schaden.
+
+**Erledigt: Soft-Skip aus dem Katalog.** Aus Task 015
+(`k-playbook-local/tasks/done/015-scanner-soft-skip.md`). Auslöser war `osv-scanner` im
+OMNI-Lauf am 2026-08-19: Exit 128 plus „No package sources found", ohne SARIF — vom
+Ausführer als technischer `failed` gewertet, obwohl das Werkzeug selbst gemeldet hatte,
+dass es unter dem Bezugspunkt nichts zu prüfen gab. Statt für jeden Scanner einen
+Sonderfall in den Ausführer zu schreiben, steht das Signal jetzt im Katalog: eine
+Spalte `soft_skip` in `scripts/scanners.tsv` trägt Regeln der Form `<Exit-Code>:<Regex>`,
+mehrere durch `;` getrennt. Passen Prozess-Exit-Code und Muster in stderr oder stdout,
+führt der Ausführer den Job als `skipped` mit der passenden Zeile als Grund; `failed`
+bleibt technischen Fehlern vorbehalten. Vorrang bleibt eindeutig: lesbares SARIF gewinnt
+und bleibt `done`, kaputtes nicht leeres SARIF bleibt `failed`, Timeouts und Runner-Abbruch
+ebenso. Details in
+[`review-runs.md`](./review-runs.md#zustände) und der Kopfzeile von
+[`scripts/scanners.tsv`](../scripts/scanners.tsv).
+
 **Offen.** Wird einzeln besprochen, bevor daran gearbeitet wird:
 
-- Das Merge-Werkzeug. Der naheliegende Kandidat, der Microsoft SARIF Multitool, gibt es nur
-  als .NET-Tool oder npm-Paket und zöge damit eine Laufzeitumgebung nach, die die
-  Installation bisher nicht braucht.
+- **Alternative 1: GUI startet nur die Werkzeug-Scans.** Die Oberfläche startet nach dem
+  Anlegen eines Laufs die Werkzeug-Einträge im Hintergrund, fachlich also
+  `k-playbook scan <lauf>`. Der Merge läuft danach nicht automatisch. Nach Abschluss der
+  Werkzeug-Scans prüft die Oberfläche den Lauf: Gibt es noch `ai`-Einträge auf `start`,
+  zeigt sie an, dass diese durch einen Assistenten auszuführen sind, und nennt die dafür
+  vorgesehenen nächsten Schritte. Gibt es keine offenen KI-Einträge mehr, oder sollen die
+  vorhandenen Tool-Ergebnisse trotzdem verdichtet werden, bietet die Oberfläche einen Knopf
+  für `k-playbook merge <lauf>` an. Nach dem Merge zeigt sie die geschriebenen Artefakte
+  (`review-input.json`, `review-input.md`) und den nächsten Schritt für die Bewertung durch
+  den Assistenten. Während ein Scan läuft, darf der GUI-Server nicht wegen eines verlorenen
+  Browserfensters beenden. Fortschritt wird aus `entries/*.json` gelesen; zusätzlich gibt
+  der Server grobe Statuszeilen zu Lauf, Tool/Job-Zuständen und Abschluss auf stdout aus.
 - Was mit `trufflehog` und `pip-audit` geschieht, die kein SARIF können: umwandeln oder
   ersetzen.
 - Eine Tabelle Regel → Schwere. `ruff` stuft im SARIF alles als `level: error` ein; bandit
@@ -206,3 +264,15 @@ verglichen:
   Sonderfall je Werkzeugname entsteht. Die Zahl ist eine Obergrenze, keine
   Abdeckungsmessung; beurteilt wird sie im Bewertungsschritt. Einzelheiten in
   [`review-runs.md`](./review-runs.md), „`candidates` — was der Job hätte prüfen können".
+
+  **Ergänzender Fall: Werkzeug erklärt selbst, dass es nichts zu prüfen gibt.** `candidates`
+  greift, wenn der Ausführer vor dem Aufruf zählen kann, was es gäbe. Ein Werkzeug kann
+  aber auch **selbst** entscheiden, dass es unter dem Bezugspunkt nichts zu prüfen gibt —
+  wenn es Kandidaten sieht, sie aber nicht als Gegenstand akzeptiert. `osv-scanner` fand am
+  2026-08-19 im OMNI-Lauf ein Kandidatenmanifest (`candidates: 1`), akzeptierte es aber
+  selbst nicht und endete mit Exit 128 „No package sources found" und leerem SARIF. Die
+  Kandidatenzählung allein reichte nicht: sie sagte, dass etwas da war; ob der Scanner es
+  als Quelle nahm, wusste sie nicht. Deshalb steht die Auskunft jetzt neben `candidates`
+  im Katalog: die Spalte `soft_skip` in `scripts/scanners.tsv` erlaubt je Zeile
+  Kombinationen aus Exit-Code und Regex, unter denen der Job als `skipped` mit Grund gilt.
+  Details oben unter „Erledigt: Soft-Skip aus dem Katalog".

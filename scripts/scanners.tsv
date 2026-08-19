@@ -1,5 +1,5 @@
 # Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
-# Fields: job	tool	languages	candidates	sarif	output	timeout	workdir	args
+# Fields: job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 #
 # Katalog und Binary werden gemeinsam ausgerollt (make installer-sync überträgt beides in
 # einem Schritt). Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen
@@ -54,6 +54,25 @@
 #            Ausführer den Strom dorthin umleiten muss. govulncheck ist dieser Fall.
 # timeout    Obergrenze je Job als Go-Dauer (10m, 90s). Ohne sie hielte ein hängender
 #            Scanner den ganzen Lauf auf.
+# soft_skip  Kombinationen aus Exit-Code und Meldung, unter denen der Job als skipped
+#            mit Grund gilt statt als failed. Für den Fall, dass ein Werkzeug selbst
+#            erklärt „unter dem Bezugspunkt gab es nichts zu prüfen" — etwa osv-scanner
+#            mit Exit 128 und „No package sources found". So bleibt failed technischen
+#            Fehlern vorbehalten (Absturz, Timeout, unlesbares SARIF trotz Quellen),
+#            während der legitime „nichts zu prüfen"-Ausgang als skipped mit sichtbarem
+#            Grund geführt wird.
+#              leer                 kein Soft-Skip.
+#              <Exit>:<Regex>       eine Regel: der Prozess ist regulär mit diesem
+#                                   Exit-Code beendet und der Regex trifft in stderr
+#                                   oder stdout.
+#              …;…                  mehrere Regeln, durch ; getrennt.
+#            Der Regex nutzt den Go-`regexp`-Dialekt. Da ; als Trenner der Regeln
+#            reserviert ist, wird ; im Regex in dieser Fassung nicht unterstützt.
+#            Ausgewertet wird der Marker nur, wenn kein lesbares SARIF vorliegt: wo
+#            der Scanner ein Ergebnis geschrieben hat, gilt weiter done; kaputtes,
+#            nicht leeres SARIF bleibt failed. Der Ausführer prüft den Marker außerdem
+#            nur, wenn der Prozess regulär mit einem Exit-Code beendet ist — nicht bei
+#            Zeitüberschreitung, Runner-Stopp oder Startfehlern.
 # workdir    target oder module. Bei target ist das Arbeitsverzeichnis {target}, die
 #            Projektwurzel — der Regelfall. Bei module braucht der Job ein
 #            Modulverzeichnis: der Ausführer sucht die Module unter {target} und startet
@@ -132,17 +151,17 @@
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
 # ein Fallback für Container-Images, kein Scanner.
-job	tool	languages	candidates	sarif	output	timeout	workdir	args
-gitleaks-git	gitleaks	*	any	native	file	10m	target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-gitleaks-dir	gitleaks	*	any	native	file	10m	target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-ruff	ruff	python	source	native	file	10m	target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go	source	native	file	20m	target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
-trivy-fs	trivy	*	manifest	native	file	15m	target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-trivy-config	trivy	*	none	native	file	15m	target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-gosec	gosec	go	source	native	file	15m	module	-fmt=sarif -out={out} ./...
-govulncheck	govulncheck	go	manifest	native	stdout	15m	module	-format sarif ./...
-osv-scanner	osv-scanner	python,go	manifest	native	file	15m	target	scan source --recursive --format sarif --output-file {out} {target}
-grype	grype	*	manifest	native	file	15m	target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
-golangci-lint	golangci-lint	go	source	native	file	15m	module	run --output.sarif.path {out} --output.text.path stderr ./...
-trufflehog-git	trufflehog	*	any	convert	stdout	15m	target	git file://{target} --json --no-update
-pip-audit	pip-audit	python	manifest	convert	file	15m	target	--format json --output {out} --progress-spinner off
+job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
+gitleaks-git	gitleaks	*	any	native	file	10m		target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+gitleaks-dir	gitleaks	*	any	native	file	10m		target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
+ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+gosec	gosec	go	source	native	file	15m		module	-fmt=sarif -out={out} ./...
+govulncheck	govulncheck	go	manifest	native	stdout	15m		module	-format sarif ./...
+osv-scanner	osv-scanner	python,go	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --format sarif --output-file {out} {target}
+grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
+golangci-lint	golangci-lint	go	source	native	file	15m		module	run --output.sarif.path {out} --output.text.path stderr ./...
+trufflehog-git	trufflehog	*	any	convert	stdout	15m		target	git file://{target} --json --no-update
+pip-audit	pip-audit	python	manifest	convert	file	15m		target	--format json --output {out} --progress-spinner off

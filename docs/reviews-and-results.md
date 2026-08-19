@@ -79,6 +79,12 @@ Remediation-Verweise und Akzeptierungen.
 `assessment.md` ist kuratiert. Es darf nachvollziehbar aktualisiert werden, z. B. um einen
 Abschnitt `## Remediation-Status`, aber die ursprünglichen Raw-Belege bleiben unverändert.
 
+Für Läufe im neuen Laufmodell (`k-playbook-local/results/YYYY-MM-DD/`) tritt ein zweites
+Artefaktpaar daneben: `review-input.json` und `review-input.md` aus `k-playbook merge`.
+Sie fassen `raw/` und `entries/` zusammen und dienen als Eingabe für die Bewertung durch
+den Assistenten. Details in
+[`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge).
+
 ## Statusmodell
 
 Standard-Statuswerte in `findings.md`:

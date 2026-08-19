@@ -134,6 +134,19 @@ Probleme findet, ist `done` — das ist seine Aufgabe. Fast alle Scanner enden m
 Exit-Code ungleich 0, sobald sie etwas gefunden haben; maßgeblich ist deshalb nicht der
 Code, sondern ob lesbares SARIF vorliegt.
 
+`skipped` deckt auch den Fall ab, dass ein Werkzeug **selbst** signalisiert, dass es
+unter dem Bezugspunkt nichts zu prüfen gab — nicht als Zufall aus einem Exit-Code, sondern
+als bewusste Meldung. Der Katalog trägt in der Spalte `soft_skip` je Zeile eine oder
+mehrere Regeln der Form `<Exit-Code>:<Regex>`, durch `;` getrennt. Passen Prozess-Exit-Code
+und Muster in stderr oder stdout, führt der Ausführer den Job als `skipped` mit der
+passenden Zeile als Grund, statt ihn als technischen Fehlschlag zu deuten. Der Marker
+greift nur, wenn der Prozess regulär mit einem Exit-Code beendet ist und keine SARIF-Datei
+geschrieben wurde oder die Datei leer ist. **Lesbares SARIF gewinnt** und bleibt `done`;
+**kaputtes, nicht leeres SARIF bleibt `failed`**. Timeouts, Runner-Abbruch und Startfehler
+bleiben ebenfalls `failed` — der Marker meint einen bewussten Ausgang, keinen technischen.
+Der bisher auslösende Fall ist `osv-scanner`: Exit 128 plus „No package sources found",
+ohne SARIF-Datei.
+
 **Ein leeres Ergebnis ist ohne die Kandidatenzahl nicht zu lesen.** `done` mit 0 Befunden
 heißt nur, dass lesbares SARIF vorliegt — nicht, dass etwas geprüft wurde. „Geprüft und
 sauber" und „gar nichts geprüft" schreiben dieselbe Datei, und der zweite Fall ist der
@@ -345,3 +358,46 @@ Dort wird auch ein neuer Lauf zusammengestellt:
 „Erstellen" legt das Verzeichnis und `run.json` an. Mehr nicht: **das Anlegen startet
 nichts.** Gestartet wird im Terminal, mit `k-playbook scan` — einen Knopf dafür gibt es
 in der Oberfläche bewusst noch nicht.
+
+## Zusammenfassen mit `k-playbook merge`
+
+Wenn ein Lauf durch ist, verdichtet ein zweiter Schritt seine Rohdaten zu einem
+kuratierbaren Review-Input:
+
+```text
+k-playbook merge <lauf>
+```
+
+Das Kommando liest `run.json`, `entries/*.json` und die `raw/*.sarif` der `done`-Jobs,
+normalisiert die Findings, gruppiert erkennbare Dubletten und schreibt zwei Artefakte
+neben die Rohdaten:
+
+```text
+k-playbook-local/results/<lauf>/
+├── review-input.json    vollständiger Audit-Beleg, JSON
+└── review-input.md      kompakte Ansicht, Markdown
+```
+
+**Was das Kommando ausdrücklich nicht tut.** Es fasst keine Rohdateien an: `raw/*.sarif`,
+`run.json` und `entries/*.json` bleiben unverändert. Es bewertet auch nicht — dafür ist
+der Assistent zuständig, der `review-input.json` als Eingabe bekommt.
+
+**Dedupe-Modell.** Findings werden nie stumm entfernt. Drei Regeln fassen zusammen:
+
+- gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle,
+- gleiche Datei, Zeile, Regel-ID und normalisierte Message,
+- gleiche Dependency-ID (CVE/GHSA/OSV) plus Package plus Version bzw. Manifest.
+
+Gleiche Datei/Zeile mit ähnlicher Regel-Familie wird nicht zusammengefasst, sondern
+wechselseitig als `possible-duplicate` markiert. Der Assistent entscheidet, ob er die
+Belege bündelt.
+
+**Zwei Artefakte, klare Rollen.** `review-input.json` trägt Provenienz (`schemaVersion`,
+`generated`, `kPlaybookVersion`, Laufkontext, Entries, Findings, Gruppen) und alle
+Belege — deshalb darf es groß werden. `review-input.md` bleibt bewusst kompakt:
+Gruppen werden gebündelt, die Detailliste ist hart gedeckelt und verweist auf die
+JSON, sobald sie das Limit überschreitet.
+
+**Wiederholbar.** Ein erneuter Aufruf überschreibt beide Artefakte. Bei fehlenden
+Entry-Dateien für einen in `run.json` ausgewählten Eintrag gilt der Zustand `start`;
+kein Fehler, sondern eine sichtbare Auskunft im Statusblock.

@@ -547,15 +547,56 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 	// enden mit einem Code ungleich 0, wenn sie etwas gefunden haben. Das ist
 	// ihr Ergebnis und kein Fehler. Liegt lesbares SARIF vor, ist der Job done.
 	findings, err := countFindings(outPath)
-	if err != nil {
-		return failJob(job, describeRunFailure(scanner, exitCode, runErr, err, errOutput.String(), outOutput.String()))
+	if err == nil {
+		job.State = StateDone
+		job.Findings = &findings
+		job.SARIF = RawDirName + "/" + plan.name + ".sarif"
+		job.Reason = ""
+		return job
 	}
 
-	job.State = StateDone
-	job.Findings = &findings
-	job.SARIF = RawDirName + "/" + plan.name + ".sarif"
-	job.Reason = ""
-	return job
+	// SARIF ist nicht lesbar. Zwei Fälle unterscheiden sich für den Ausgang:
+	//   1. Die Datei fehlt oder ist leer — der Scanner hat kein Ergebnis
+	//      hinterlassen. Hier greift ein Soft-Skip aus dem Katalog, wenn Exit-
+	//      Code und Ausgabe zueinander passen; dann hat das Werkzeug selbst
+	//      erklärt, dass es unter dem Bezugspunkt nichts zu prüfen gab, und
+	//      der Job wird skipped mit Grund statt failed.
+	//   2. Die Datei liegt vor, ist aber nicht lesbar (kaputtes SARIF, JSON-
+	//      Fehler bei nicht leerer Datei) — das bleibt ein technischer
+	//      Fehlschlag. Kaputtes, nicht leeres SARIF gewinnt vor jedem Marker.
+	//
+	// Der Soft-Skip greift nur, wenn der Prozess überhaupt regulär mit einem
+	// Exit-Code beendet ist. Fehlt ProcessState, ist der Start selbst
+	// misslungen; dort gibt es keinen Exit-Code, und die Marker meinen einen
+	// Fall, den der Katalog gar nicht abbilden kann.
+	if command.ProcessState != nil && sarifMissingOrEmpty(outPath) {
+		if rule, match := scanner.MatchSoftSkip(exitCode, errOutput.String(), outOutput.String()); rule != nil {
+			return skipJob(job, describeSoftSkip(scanner.Tool, rule, match))
+		}
+	}
+
+	return failJob(job, describeRunFailure(scanner, exitCode, runErr, err, errOutput.String(), outOutput.String()))
+}
+
+// sarifMissingOrEmpty meldet, ob unter path keine oder eine leere Datei liegt.
+// Beides zählt als „nichts geschrieben"; nur dann darf ein Soft-Skip überhaupt
+// greifen — sobald der Scanner Bytes hinterlassen hat, gewinnt ihre Auswertung.
+func sarifMissingOrEmpty(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return os.IsNotExist(err)
+	}
+	return info.Size() == 0
+}
+
+// describeSoftSkip fasst Grund und Herkunft eines Soft-Skips zusammen. Der
+// Grund kommt aus der getroffenen Zeile der Werkzeugausgabe — nicht die ganze
+// Ausgabe, sondern nur der Match, damit entries/<tool>.json lesbar bleibt.
+func describeSoftSkip(tool string, rule *SoftSkipRule, match string) string {
+	if match == "" {
+		return fmt.Sprintf("%s: soft_skip (Exit %d, /%s/)", tool, rule.ExitCode, rule.Raw)
+	}
+	return fmt.Sprintf("%s: %s (Exit %d, /%s/)", tool, match, rule.ExitCode, rule.Raw)
 }
 
 // describeRunFailure setzt die Begründung eines technischen Fehlschlags
@@ -580,6 +621,21 @@ func failJob(job JobStatus, reason string) JobStatus {
 	if job.Finished == "" {
 		job.Finished = timestamp()
 	}
+	return job
+}
+
+// skipJob ist das Gegenstück zu failJob für den Soft-Skip: derselbe Weg, sicher
+// zu setzen, dass Zeit und Grund am Job stehen — nur der Zustand ist skipped.
+func skipJob(job JobStatus, reason string) JobStatus {
+	job.State = StateSkipped
+	job.Reason = reason
+	if job.Finished == "" {
+		job.Finished = timestamp()
+	}
+	// Ohne Findings-Feld: ein übersprungener Job hat kein Ergebnis, und 0
+	// hieße dort fälschlich „gemessen und null".
+	job.Findings = nil
+	job.SARIF = ""
 	return job
 }
 

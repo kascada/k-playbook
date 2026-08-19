@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -138,6 +139,150 @@ func TestExecuteOhneSARIFIstFehlschlag(t *testing.T) {
 	job := statuses[0].Jobs[0]
 	if job.State != StateFailed || !strings.Contains(job.Reason, "unknown flag") {
 		t.Errorf("Grund nennt die Meldung des Werkzeugs nicht: %+v", job)
+	}
+}
+
+// softSkipScanner ist ein Job mit hinterlegtem soft_skip-Marker: <Exit>:<Regex>
+// im Katalog wird beim Lesen zu SoftSkipRule; im Test wird die Grammatik über
+// ParseScanners geprüft, hier bauen wir die Regel direkt.
+func softSkipScanner(t *testing.T, job string, tool string, exitCode int, pattern string, args ...string) Scanner {
+	t.Helper()
+	scanner := nativeScanner(job, tool, args...)
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		t.Fatalf("Testregex %q: %v", pattern, err)
+	}
+	scanner.SoftSkip = []SoftSkipRule{{ExitCode: exitCode, Pattern: compiled, Raw: pattern}}
+	return scanner
+}
+
+// Der Auslöser: osv-scanner meldet mit Exit 128 „No package sources found" und
+// schreibt kein SARIF. Statt failed wird der Job skipped mit Grund geführt.
+func TestExecuteSoftSkipOhneSARIFIstSkipped(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+	tool := fakeTool(t, "osv-scanner", "echo 'No package sources found' >&2\nexit 128")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{softSkipScanner(t, "osv-scanner", "osv-scanner", 128, "No package sources found", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: tool}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	if statuses[0].State != StateSkipped {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateSkipped)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateSkipped {
+		t.Errorf("Job = %q, erwartet %q (Grund: %s)", job.State, StateSkipped, job.Reason)
+	}
+	if !strings.Contains(job.Reason, "No package sources found") {
+		t.Errorf("Grund nennt den Match nicht: %q", job.Reason)
+	}
+	if job.Findings != nil {
+		t.Errorf("Findings = %v, erwartet nil — der Job hat nichts gemessen", job.Findings)
+	}
+	if job.SARIF != "" {
+		t.Errorf("SARIF = %q, erwartet leer — es wurde nichts geschrieben", job.SARIF)
+	}
+	if job.ExitCode == nil || *job.ExitCode != 128 {
+		t.Errorf("ExitCode = %v, erwartet 128", job.ExitCode)
+	}
+}
+
+// Derselbe Exit-Code ohne den Marker-Text bleibt failed: ein technischer Fehler
+// darf sich nicht als Soft-Skip tarnen.
+func TestExecuteSoftSkipOhneMarkerBleibtFailed(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+	tool := fakeTool(t, "osv-scanner", "echo 'segfault' >&2\nexit 128")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{softSkipScanner(t, "osv-scanner", "osv-scanner", 128, "No package sources found", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: tool}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	if statuses[0].State != StateFailed {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateFailed)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed {
+		t.Errorf("Job = %q, erwartet %q (Grund: %s)", job.State, StateFailed, job.Reason)
+	}
+	if !strings.Contains(job.Reason, "segfault") {
+		t.Errorf("Grund nennt die Werkzeugmeldung nicht: %q", job.Reason)
+	}
+}
+
+// SARIF gewinnt: hat der Scanner ein lesbares Ergebnis geschrieben, ist der
+// Job done — auch wenn Exit-Code und stderr auf einen Soft-Skip zeigten.
+func TestExecuteSoftSkipVerlierGegenSARIF(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+	// Attrappe: sowohl SARIF als auch die Marker-Meldung, dazu der passende
+	// Exit-Code. Der Job muss trotzdem als done gelten.
+	body := fmt.Sprintf("cat > \"$1\" <<'SARIF'\n%s\nSARIF\necho 'No package sources found' >&2\nexit 128", sarifMit(0))
+	tool := fakeTool(t, "osv-scanner", body)
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{softSkipScanner(t, "osv-scanner", "osv-scanner", 128, "No package sources found", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: tool}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateDone {
+		t.Fatalf("Job = %q, erwartet %q (Grund: %s) — SARIF muss vor dem Marker gewinnen", job.State, StateDone, job.Reason)
+	}
+	if job.Findings == nil || *job.Findings != 0 {
+		t.Errorf("Findings = %v, erwartet 0", job.Findings)
+	}
+	if job.SARIF != "raw/osv-scanner.sarif" {
+		t.Errorf("SARIF = %q, erwartet raw/osv-scanner.sarif", job.SARIF)
+	}
+}
+
+// Kaputtes, nicht leeres SARIF bleibt failed — Soft-Skip darf einen technischen
+// Fehler nicht zudecken, sobald der Scanner Bytes hinterlassen hat.
+func TestExecuteSoftSkipVerlierGegenKaputtesSARIF(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+	// Die Attrappe schreibt halbes SARIF nach {out} und meldet den Marker in
+	// stderr. Datei existiert und ist nicht leer — der Marker darf nicht
+	// greifen.
+	body := "printf '{\"version\":\"2.1.0\",\"runs\":[' > \"$1\"\necho 'No package sources found' >&2\nexit 128"
+	tool := fakeTool(t, "osv-scanner", body)
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{softSkipScanner(t, "osv-scanner", "osv-scanner", 128, "No package sources found", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: tool}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed {
+		t.Fatalf("Job = %q, erwartet %q — kaputtes SARIF muss vor dem Marker gewinnen (Grund: %s)", job.State, StateFailed, job.Reason)
+	}
+	if !strings.Contains(job.Reason, "SARIF") && !strings.Contains(job.Reason, "JSON") {
+		t.Errorf("Grund nennt den SARIF-Fehler nicht: %q", job.Reason)
+	}
+}
+
+// Ein Exit-Code, der keiner Regel entspricht, ändert nichts am bisherigen
+// Verhalten: kein SARIF → failed.
+func TestExecuteSoftSkipFremderExitCodeBleibtWieVorher(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "osv-scanner", Kind: KindTool})
+	tool := fakeTool(t, "osv-scanner", "echo 'No package sources found' >&2\nexit 2")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{softSkipScanner(t, "osv-scanner", "osv-scanner", 128, "No package sources found", "{out}")},
+		Tools:    map[string]Tool{"osv-scanner": {Path: tool}},
+	}, Entry{Name: "osv-scanner", Kind: KindTool})
+
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed {
+		t.Errorf("Job = %q, erwartet %q — fremder Exit-Code darf den Marker nicht auslösen", job.State, StateFailed)
+	}
+	if job.ExitCode == nil || *job.ExitCode != 2 {
+		t.Errorf("ExitCode = %v, erwartet 2", job.ExitCode)
 	}
 }
 
