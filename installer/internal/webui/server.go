@@ -219,6 +219,7 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template) {
 		Mode        string
 		ModeLabel   string
 		Path        string
+		RepoRoot    string
 		PlaybookDir string
 		Installed   bool
 	}{Installed: environment.Installed}
@@ -227,6 +228,9 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template) {
 		data.Mode = "project"
 		data.ModeLabel = "Projekt"
 		data.Path = project.DisplayPath(environment.ProjectDir)
+		if config, err := project.ReadConfig(environment.ProjectDir); err == nil {
+			data.RepoRoot = project.DisplayPath(project.RepoRootDir(environment.ProjectDir, config))
+		}
 		// Aus diesem Verzeichnis kommen Skripte, Regeln, Reviews und Checks. Es
 		// ist ein eigener Clone und kann einen anderen Stand tragen als das
 		// Binary — deshalb gehört es in den Kopf und nicht hinter einen Klick.

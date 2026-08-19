@@ -20,6 +20,10 @@
               <span class="path-key">{{.ModeLabel}}:</span>
               <span id="header-project">{{if .Path}}{{.Path}}{{end}}</span>
             </span>
+            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
+              <span class="path-key">Repository:</span>
+              <span id="header-repo-root">{{.RepoRoot}}</span>
+            </span>
             <span id="header-playbook" class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
                   title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
               <span class="path-key">Installation:</span>
