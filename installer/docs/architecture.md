@@ -251,11 +251,11 @@ automatisch mit ab.
 Datei als nicht ignoriert. Für genau die Zustände, die privat aussehen und keiner sind,
 gäbe es dann gar keine Aussage.
 
-Vor der Messung wird geprüft, ob `k-playbook-local/` innerhalb von `project.repo_root`
-liegt. Bei Wrapper-Layouts kann der Anker über dem eigentlichen Repository stehen; liegt
-die lokale Struktur dann daneben, kann dieses Repository den Inhalt weder versionieren
-noch ignorieren. Der Block meldet diesen Layoutfehler gezielt statt den rohen
-`fatal: not a git repository`- oder `outside repository`-Text von Git anzuzeigen.
+Gemessen wird am nächstgelegenen Repository des jeweiligen Verzeichnisses, nicht zwingend
+an `project.repo_root`: `project.repo_root` ist der Code-Zielbaum, während
+`k-playbook-local/` auch in einem eigenen oder übergeordneten Repository liegen kann. Gibt
+es dort kein Repository, meldet der Block das gezielt statt den rohen
+`fatal: not a git repository`-Text von Git anzuzeigen.
 
 Vier Zustände beschreiben ein Repository, nicht zwei:
 

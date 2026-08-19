@@ -191,6 +191,8 @@ select {
 
 /* Pfade vertragen weder Versalien noch gesperrte Laufweite. */
 .eyebrow.path {
+  display: grid;
+  gap: 4px;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.86rem;
   font-weight: 600;
@@ -239,11 +241,11 @@ h2 {
   gap: 10px;
 }
 
-/* Projekt und Installation stehen als beschrifteter Text nebeneinander. Der
-   Abstand trennt sie; ein Umbruch mitten in einem Paar wäre irreführend. */
+/* Projekt, Repository und Installation stehen als eigene Zeilen links. So
+   bleibt erkennbar, dass Projektanker und Git-Repository verschieden sein
+   können. */
 .path-entry {
-  display: inline-block;
-  margin-right: 22px;
+  display: block;
 }
 
 .path-key {

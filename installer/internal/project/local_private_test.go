@@ -2,7 +2,6 @@ package project
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -263,28 +262,6 @@ func TestPrivacyStatusOhneRepository(t *testing.T) {
 	}
 	if status.CanToggle {
 		t.Error("umschaltbar, obwohl es kein Repository gibt")
-	}
-}
-
-func TestPrivacyStatusLokaleStrukturAusserhalbVonRepoRoot(t *testing.T) {
-	root := t.TempDir()
-	repo := filepath.Join(root, "omni-gw")
-	if err := os.MkdirAll(repo, 0o755); err != nil {
-		t.Fatalf("Repository-Verzeichnis anlegen: %v", err)
-	}
-	gitInit(t, repo)
-	writeFile(t, ConfigPath(root), "schema_version: "+SchemaVersion+"\n\nproject:\n  repo_root: omni-gw\n  vcs: git\n")
-	writeFile(t, filepath.Join(LocalDir(root), "priv", "README.md"), "# priv\n")
-
-	status := privStatus(t, root)
-	if status.State != PrivacyUnknown {
-		t.Fatalf("State = %q, erwartet %q", status.State, PrivacyUnknown)
-	}
-	if !strings.Contains(status.Reason, LocalDirName) || !strings.Contains(status.Reason, repo) {
-		t.Errorf("Reason benennt Layout und Repository nicht: %q", status.Reason)
-	}
-	if status.CanToggle {
-		t.Error("umschaltbar, obwohl k-playbook-local außerhalb des Repositories liegt")
 	}
 }
 

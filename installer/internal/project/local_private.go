@@ -158,15 +158,10 @@ func privacyStatus(projectDir string, entry LocalEntry) PrivacyStatus {
 		status.Reason = "Das Projekt ist nicht als git-Projekt konfiguriert; es gibt nichts, wovor der Inhalt zu schützen wäre."
 		return status
 	}
-	repoRoot := RepoRootDir(projectDir, config)
 	if !isDir(status.Dir) {
 		status.State = PrivacyMissing
 		status.Reason = "Das Verzeichnis ist noch nicht angelegt."
 		return status
-	}
-	if !pathWithin(status.Dir, repoRoot) {
-		return unmeasured(status, LocalDirName+" liegt außerhalb des konfigurierten Projekt-Repositorys "+repoRoot+
-			". Der Inhalt kann so nicht durch dieses Repository versioniert oder ignoriert werden.")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), privateGitTimeout)
@@ -174,6 +169,10 @@ func privacyStatus(projectDir string, entry LocalEntry) PrivacyStatus {
 
 	root, code, detail := runGit(ctx, status.Dir, "rev-parse", "--show-toplevel")
 	if code != 0 {
+		if strings.Contains(detail, "not a git repository") {
+			detail = status.Dir + " liegt in keinem Git-Repository; k-playbook kann den Inhalt verwalten, " +
+				"aber ohne Repository gibt es nichts mit git check-ignore zu messen."
+		}
 		return unmeasured(status, detail)
 	}
 	status.RepoRoot = strings.TrimSpace(root)
@@ -536,26 +535,6 @@ func samePath(left string, right string) bool {
 		return false
 	}
 	return resolvedLeft == resolvedRight
-}
-
-// pathWithin meldet, ob path innerhalb von root liegt. Symlinks werden soweit
-// möglich aufgelöst, weil Discover und git ebenfalls mit aufgelösten Pfaden
-// arbeiten.
-func pathWithin(path string, root string) bool {
-	path = resolvedOrClean(path)
-	root = resolvedOrClean(root)
-	if path == root {
-		return true
-	}
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-func resolvedOrClean(path string) string {
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		return filepath.Clean(resolved)
-	}
-	return filepath.Clean(path)
 }
 
 // hasManagedContent meldet, ob die Datei genau den verwalteten Inhalt trägt.
