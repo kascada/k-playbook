@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/kascada/k-playbook/installer/internal/knowndecisions"
 )
 
 const markdownGroupLimit = 80
@@ -52,7 +54,24 @@ func markdown(result Result) string {
 	fmt.Fprintf(&builder, "- Einträge: %d (%s)\n", len(result.Entries), formatCounts(statusCounts))
 	fmt.Fprintf(&builder, "- Findings: %d\n", len(result.Findings))
 	fmt.Fprintf(&builder, "- Gruppen: %d\n", len(result.Groups))
+	fullCoverage, partialCoverage := countGroupCoverage(result.Groups)
+	fmt.Fprintf(&builder, "- Gruppen mit vollständiger Deckung: %d von %d\n", fullCoverage, len(result.Groups))
+	if partialCoverage > 0 {
+		fmt.Fprintf(&builder, "- Gruppen mit Teildeckung: %d\n", partialCoverage)
+	}
 	fmt.Fprintf(&builder, "- Vollständige Belege: `review-input.json`\n\n")
+	if len(result.KnownDecisions.Decisions) == 0 {
+		fmt.Fprintf(&builder, "Known-Decisions: keine known-decisions geladen.\n\n")
+	} else {
+		fmt.Fprintf(&builder, "Known-Decisions: %d geladen.\n\n", len(result.KnownDecisions.Decisions))
+	}
+	if expired := expiredDecisionLines(result.KnownDecisions.Decisions); len(expired) > 0 {
+		fmt.Fprintf(&builder, "Abgelaufene Known-Decisions:\n")
+		for _, line := range expired {
+			fmt.Fprintf(&builder, "- %s\n", line)
+		}
+		fmt.Fprintf(&builder, "\n")
+	}
 
 	fmt.Fprintf(&builder, "## Tool- und Job-Status\n\n")
 	fmt.Fprintf(&builder, "| Eintrag | Zustand | Jobs | Hinweis |\n")
@@ -74,16 +93,16 @@ func markdown(result Result) string {
 	fmt.Fprintf(&builder, "\n")
 
 	fmt.Fprintf(&builder, "## Findings nach Gruppe\n\n")
-	fmt.Fprintf(&builder, "| Gruppe | Stable-ID | Schwere | Ort | Befunde | Belege | Hinweis |\n")
-	fmt.Fprintf(&builder, "|---|---|---|---|---:|---|---|\n")
+	fmt.Fprintf(&builder, "| Gruppe | Stable-ID | Schwere | Ort | Befunde | Belege | Known-Decision | Hinweis |\n")
+	fmt.Fprintf(&builder, "|---|---|---|---|---:|---|---|---|\n")
 	limit := len(result.Groups)
 	if limit > markdownGroupLimit {
 		limit = markdownGroupLimit
 	}
 	for _, group := range result.Groups[:limit] {
-		fmt.Fprintf(&builder, "| %s | `%s` | %s | %s | %d | %s | %s |\n",
+		fmt.Fprintf(&builder, "| %s | `%s` | %s | %s | %d | %s | %s | %s |\n",
 			group.ID, group.StableID, tableText(group.DerivedSeverity), tableText(locationText(group.Location)), len(group.FindingIDs),
-			tableText(evidenceText(group.Evidence)), tableText(groupHint(group)))
+			tableText(evidenceText(group.Evidence)), tableText(knownDecisionCoverageText(group)), tableText(groupHint(group)))
 	}
 	if len(result.Groups) > limit {
 		fmt.Fprintf(&builder, "\n%d weitere Gruppen sind nur im vollständigen JSON aufgeführt.\n", len(result.Groups)-limit)
@@ -96,6 +115,31 @@ func markdown(result Result) string {
 	fmt.Fprintf(&builder, "- SARIF-Rohdaten, `run.json` und `entries/*.json` bleiben unverändert.\n")
 	fmt.Fprintf(&builder, "- Sehr große Detailblöcke stehen ausschließlich in `review-input.json`.\n")
 	return builder.String()
+}
+
+func countGroupCoverage(groups []Group) (int, int) {
+	full, partial := 0, 0
+	for _, group := range groups {
+		if group.CoveredByKnownDecision != nil {
+			full++
+			continue
+		}
+		if group.PartialCoverage {
+			partial++
+		}
+	}
+	return full, partial
+}
+
+func expiredDecisionLines(decisions []knowndecisions.DecisionReport) []string {
+	lines := []string{}
+	for _, decision := range decisions {
+		if decision.Expired {
+			lines = append(lines, fmt.Sprintf("%s (%s), Ablaufdatum %s", decision.ID, decision.Category, decision.Expires))
+		}
+	}
+	sort.Strings(lines)
+	return lines
 }
 
 func countEntries(entries []EntrySummary) map[string]int {

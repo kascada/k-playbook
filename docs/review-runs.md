@@ -486,6 +486,70 @@ JSON, sobald sie das Limit überschreitet.
 Entry-Dateien für einen in `run.json` ausgewählten Eintrag gilt der Zustand `start`;
 kein Fehler, sondern eine sichtbare Auskunft im Statusblock.
 
+## Wirkung von `known-decisions.md`
+
+Bewusste Entscheidungen werden vor der Bewertung zentral im Merge-Schritt angewendet. Das
+Matching passiert also nicht im Chat: `k-playbook merge` lädt `known-decisions.md`, markiert
+gedeckte Findings in `review-input.json` und schreibt dieselbe Information in die
+Gruppen- und Markdown-Sicht. Rohdaten, `run.json` und `entries/*.json` bleiben dabei
+unverändert.
+
+Format je Eintrag:
+
+````markdown
+## kd-beispiel
+
+```yaml
+id: kd-beispiel
+category: wontfix
+expires: 2026-11-30
+owner: team
+match:
+  - pathGlob: _old/**
+```
+
+Begründung als Fließtext.
+````
+
+Der `##`-Header muss der `id` entsprechen. Pflichtfelder sind `id`, `category` und
+`match`; erlaubte Kategorien sind `false-positive`, `accepted-risk`, `deferred` und
+`wontfix`. `expires` ist ein ISO-Datum; abgelaufene Decisions werden sichtbar gemeldet,
+aber nicht angewendet.
+
+Unterstützte Match-Kriterien:
+
+- `stableId` für eine stabile Gruppe aus `review-input.json`.
+- `ruleId` plus `location`; `ruleId` allein ist verboten.
+- `cveId`, `ghsaId` oder `osvId` plus Scope über `package`, `version`, `manifestGlob` oder
+  `stableId`.
+- `pathGlob` für ganze Bäume wie `_old/**`.
+
+Pfade werden als projektrelative Slash-Pfade ohne führendes `./` verglichen. Bei mehreren
+Locations reicht ein Treffer; der Match-Report nennt die getroffene Location.
+
+Suchpfad:
+
+- `RUN_DIR/known-decisions.md` für laufspezifische Decisions.
+- `k-playbook-local/results/known-decisions.md` für projektweite Decisions.
+- Beide Dateien werden kombiniert. Bei gleicher `id` gewinnt die laufspezifische Decision;
+  die verdrängte projektweite Fassung steht sichtbar im Metablock.
+- Wenn keine Datei existiert, meldet der Merge sichtbar „keine known-decisions geladen".
+
+JSON-Wirkung:
+
+- Gedeckte Findings tragen `coveredByKnownDecision` mit `id`, `category` und `matchedBy`.
+- Gruppen tragen `coveredByKnownDecision` nur, wenn alle Findings derselben primären
+  Decision unterliegen.
+- Teils gedeckte Gruppen tragen `partialCoverage: true` und `knownDecisionCoverage` mit
+  IDs, Kategorien und Finding-Zahlen.
+- Der Metablock `knownDecisions` nennt Quellen, geladene IDs, Herkunft, Ablauf,
+  `applied`, `notAppliedReason` und Loader-Warnungen.
+
+`review-input.md` zeigt die Anzahl vollständig und teilweise gedeckter Gruppen, eine
+Known-Decision-Spalte in der Gruppentabelle und abgelaufene Decisions als eigenen Hinweis.
+Das Bewertungsmodul `review-scan-triage` liest diese Deckung anschließend ausschließlich
+aus `review-input.json`.
+
 ## Bewerten mit `review-scan-triage`
 
 Nach dem Merge bewertet `/k-review-run` den Lauf über das Command-Modul
@@ -497,8 +561,8 @@ Eingaben sind ausschließlich Dateien im Laufkontext:
 
 - `review-input.json` mit vollständigen Belegen, Provenienz und stabilen Gruppen-IDs,
 - `review-input.md` als kompakte Ansicht,
-- optional `known-decisions.md`, zuerst aus dem Laufordner, sonst aus
-  `k-playbook-local/results/known-decisions.md`.
+- die vom Merge berechnete Deckung unter `knownDecisions`,
+  `coveredByKnownDecision`, `partialCoverage` und `knownDecisionCoverage`.
 
 Das Modul schreibt genau ein neues Markdown-Artefakt direkt in den Laufordner:
 
@@ -509,7 +573,8 @@ k-playbook-local/results/<lauf>/review-triage.md
 `review-triage.md` bündelt Gruppen nach gemeinsamer Ursache, vergibt Priorität
 `P1`/`P2`/`P3`, Kategorie `S`/`T`/`K`/`F`/`A`/`X`, verweist auf die stabilen
 Gruppen-IDs und nennt den nächsten Schritt je Bündel. Gruppen, die durch
-`known-decisions.md` gedeckt sind, bleiben sichtbar und werden als gedeckt markiert.
+`known-decisions.md` gedeckt sind, bleiben sichtbar und werden als gedeckt markiert; die
+Zuordnung kommt ausschließlich aus `review-input.json`.
 
 Nach dem Schreiben setzt `/k-review-run` den AI-Eintrag mit
 `k_playbook_review_write_ai_entry` auf `done` und `result: review-triage.md`.

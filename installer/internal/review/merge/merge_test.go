@@ -213,6 +213,70 @@ func TestWriteSchreibtArtefakte(t *testing.T) {
 	}
 }
 
+func TestBuildSchreibtKnownDecisionCoverageUndLaesstRawUnveraendert(t *testing.T) {
+	projectDir := t.TempDir()
+	localResultsDir := filepath.Join(projectDir, review.ResultsDirName)
+	runDir := filepath.Join(localResultsDir, "2026-08-19")
+	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
+		SchemaVersion: review.SchemaVersion,
+		Created:       "2026-08-19T12:00:00Z",
+		State:         review.StateCreated,
+		Languages:     []string{"go"},
+		Entries:       []review.Entry{{Name: "gosec", Kind: review.KindTool, State: review.StateStart}},
+	})
+	writeJSON(t, review.EntryFile(runDir, "gosec"), review.EntryStatus{
+		SchemaVersion: review.EntrySchemaVersion,
+		Name:          "gosec",
+		Kind:          review.KindTool,
+		State:         review.StateDone,
+		Jobs:          []review.JobStatus{{Job: "gosec", State: review.StateDone, SARIF: "raw/gosec.sarif", Findings: intPtr(1)}},
+	})
+	rawPath := filepath.Join(runDir, "raw", "gosec.sarif")
+	rawContent := `{
+  "version": "2.1.0",
+  "runs": [{
+    "tool": {"driver": {"name": "gosec", "rules": [{"id": "G304", "name": "File path"}]}},
+    "results": [{
+      "ruleId": "G304",
+      "level": "warning",
+      "message": {"text": "Potential file inclusion"},
+      "locations": [{"physicalLocation": {"artifactLocation": {"uri": "_old/internal/app.go"}, "region": {"startLine": 7}}}]
+    }]
+  }]
+}`
+	writeText(t, rawPath, rawContent)
+	writeText(t, filepath.Join(localResultsDir, "known-decisions.md"), "## kd-old-tree\n\n```yaml\nid: kd-old-tree\ncategory: wontfix\nmatch:\n  - pathGlob: _old/**\n```\n\nBegründung.\n")
+	before, err := os.ReadFile(rawPath)
+	if err != nil {
+		t.Fatalf("Raw lesen: %v", err)
+	}
+
+	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-19", RunDir: runDir, LocalResultsDir: localResultsDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	after, err := os.ReadFile(rawPath)
+	if err != nil {
+		t.Fatalf("Raw nach Run lesen: %v", err)
+	}
+	if string(before) != string(after) {
+		t.Fatalf("Raw wurde verändert")
+	}
+	if len(result.Findings) != 1 || result.Findings[0].CoveredByKnownDecision == nil || result.Findings[0].CoveredByKnownDecision.ID != "kd-old-tree" {
+		t.Fatalf("Finding-Deckung fehlt: %+v", result.Findings)
+	}
+	if len(result.Groups) != 1 || result.Groups[0].CoveredByKnownDecision == nil || result.Groups[0].PartialCoverage {
+		t.Fatalf("Gruppen-Deckung falsch: %+v", result.Groups)
+	}
+	markdownData, err := os.ReadFile(output.Markdown)
+	if err != nil {
+		t.Fatalf("Markdown lesen: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "Gruppen mit vollständiger Deckung: 1 von 1") || !strings.Contains(string(markdownData), "kd-old-tree (wontfix)") {
+		t.Fatalf("Markdown-Deckung fehlt: %s", markdownData)
+	}
+}
+
 func TestSeverityMappingLeitetSchwereAb(t *testing.T) {
 	mapping, err := ParseSeverityMapping("tool\trule_prefix\tseverity\tnotes\nsemgrep\tpython.django.security.audit\twarning\tTest\n", "test.tsv")
 	if err != nil {

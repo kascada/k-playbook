@@ -4,7 +4,7 @@ Arbeitsdatei für die Dauer der Umstellung. Sie hält fest, was besprochen und f
 ist — nicht, was angedacht wurde. Was umgesetzt ist, steht nicht mehr hier, sondern in der
 regulären Doku; wenn nichts mehr offen ist, wird diese Datei gelöscht.
 
-Stand: 2026-08-12, Branch `main`.
+Stand: 2026-08-20, Branch `main`.
 
 ## Was schon umgestellt ist
 
@@ -159,23 +159,27 @@ blieben unangetastet. Zweiter Realdurchlauf am selben Tag am Projekt OMNI
 Gruppen — die Dedupe-Wirkung ist dort deutlich stärker, weil Lockfile-Zeilen viele
 CVEs bündeln.
 
-Offene Kosmetik-Punkte, nicht blockierend:
+**Erledigt: Merge-Nachbesserungen aus dem Realdurchlauf.** Aus Task 016
+(`k-playbook-local/tasks/done/016-merge-nachbesserungen.md`). Sechs Punkte, die aus den
+beiden ersten Realläufen kamen, sind sauber im Merge angekommen:
 
-- `entries[].source` verdoppelt die Entry-Daten im JSON (Nebenwirkung von `omitempty`
-  auf einem Nicht-Pointer-Struct); JSON größer, sonst harmlos.
-- Gleiche Datei/Zeile innerhalb desselben Tools mit unterschiedlicher Rule-ID bleibt
-  getrennt. Am OMNI-Lauf sehr deutlich: `requirements.txt:29` erzeugt 17 Trivy-Gruppen
-  (G004–G020), alle wechselseitig als `possible-duplicate` markiert, dazu ähnliche
-  Kaskaden an mehreren `package-lock.json`-Zeilen. Für die spätere KI-Bewertung Rauschen —
-  Kandidat für ein „same-location bundle" auf Tool-Ebene, unterhalb der harten
-  Dedupe-Regeln.
-- Fehlende SARIF-Schwere schlägt bis in die Ausgabe durch: der OMNI-Lauf zählt
-  `unknown: 167` neben `error: 127`, `warning: 27`, `note: 6`. Das ist der Punkt „Tabelle
-  Regel → Schwere, einmal in k-playbook zentral" aus der Offen-Liste; die Auswirkung ist
-  jetzt am Realdatum messbar.
-- `kPlaybookVersion` steht hart auf `"unknown"`; nachziehen über `runtime/debug.ReadBuildInfo`.
-- Zahlen-Block im Markdown listet nur Tools mit >0 Findings; Tools mit 0 sind über die
-  Entry-Tabelle sichtbar, würden im Zahlen-Block aber auch nicht schaden.
+- Same-Location-Bundle innerhalb desselben Entry/Job/Tools zieht mehrere Rule-IDs an
+  einer Stelle in eine Gruppe, ohne Belege zu verlieren.
+- Zentrale Zuordnung Regel → Schwere in `scripts/severity.tsv`; native und CVSS-Werte
+  gehen vor, das Mapping deckt den Rest. Der OMNI-Lauf zeigt es klar: die 167 vorher
+  `unknown` gemeldeten Findings sind jetzt einer normalen Schwere zugeordnet.
+- `entries[].source` verdoppelt die Entry-Daten nicht mehr; die Rückführbarkeit läuft
+  über Entry-/Job-ID, Tool-Name und Rohdatenpfad.
+- `kPlaybookVersion` kommt aus `runtime/debug.ReadBuildInfo` (Release-Version,
+  Dev-Version, Dirty-Suffix) statt hart `"unknown"`.
+- Markdown-Zahlen-Block führt auch `done`-Tools mit 0 Findings.
+- Stabile Gruppen-IDs (`stableId`/`stableKey`) mit sprechendem Präfix (`scan-<tool>-…`
+  oder `scan-cve-<id>-…`) und deterministischer Kollisionsauflösung. Zwei aufeinander
+  folgende Merges desselben Laufs produzieren dieselbe ID-Menge.
+
+Realdurchlauf nach 016: k-playbook-Repo 347/173, OMNI 327/110. Fanout-Stellen aus dem
+`_old/`-Baum und `requirements.txt:29` sind sichtbar gebündelt; `unknown` verschwindet.
+Rohdaten in beiden Läufen `sha256`-identisch vor und nach dem Merge.
 
 **Erledigt: Soft-Skip aus dem Katalog.** Aus Task 015
 (`k-playbook-local/tasks/done/015-scanner-soft-skip.md`). Auslöser war `osv-scanner` im
@@ -193,12 +197,20 @@ ebenso. Details in
 [`scripts/scanners.tsv`](../scripts/scanners.tsv).
 
 **Erledigt: Alternative 2, Command orchestriert über MCP.** Aus Task 018
-(`k-playbook-local/tasks/018-review-run-und-triage.md`). `/k-review-run` ist jetzt
+(`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-review-run` ist jetzt
 scharfgeschaltet: Der Command legt Läufe über MCP an oder setzt sie fort, liest vor jedem
 Schritt den Status, startet Scanner, führt AI-Review-Einträge, startet den Merge und ruft
 danach das Bewertungsmodul `review-scan-triage` auf. Die Auswahlbasis kommt aus
 `k_playbook_review_status` im Modus `available`: Werkzeuge, aktive Review-Rezepte und der
 Command-Moduleintrag `scan-triage` werden vor `create` bestätigt.
+
+**Erledigt: MCP-Werkzeuge für Review-Läufe.** Aus Task 017
+(`k-playbook-local/tasks/done/017-mcp-review-werkzeuge.md`). Der MCP-Server bietet fünf
+Werkzeuge mit einheitlicher Response-/Fehlerhülle und verpflichtendem `projectDir`:
+`k_playbook_review_status`, `_create`, `_scan`, `_merge` und `_write_ai_entry`. Sie
+rufen die bestehende Fachlogik unter `installer/internal/review/*` und
+`installer/internal/review/merge/*` direkt auf; kein Shell-Out zur CLI. Details in
+[`mcp.md`](./mcp.md).
 
 **Erledigt: Bewertung als Command-Modul statt Katalog-Rezept.** Aus Task 018. Die
 Bewertung eines Laufs liegt unter `commands/_review-run/review-scan-triage.md`, liest
@@ -207,8 +219,127 @@ festen Suchpfad und schreibt `review-triage.md` direkt in den Laufordner. Der AI
 `scan-triage` wird über den MCP-Vertrag geführt, obwohl er nicht in `catalogs.reviews`
 steht; ein leeres lokales Overlay des Moduls schaltet ihn ab.
 
-**Offen.** Wird einzeln besprochen, bevor daran gearbeitet wird:
+**Erledigt: `known-decisions.md` wirkt projektweit.** Aus Task 019
+(`k-playbook-local/tasks/019-known-decisions.md`). Das Format ist festgelegt: ein
+`##`-Eintrag je Decision, genau ein fenced `yaml`-Block mit Pflichtfeldern und danach
+Begründung. `k-playbook merge` kombiniert die projektweite Datei
+`k-playbook-local/results/known-decisions.md` mit einer optionalen Laufdatei,
+markiert gedeckte Findings und Gruppen in `review-input.json` und zeigt vollständige
+oder teilweise Deckung in `review-input.md`. Das Bewertungsmodul matcht nicht mehr selbst,
+sondern übernimmt `knownDecisions` und `coveredByKnownDecision` aus dem JSON. Der
+Realdurchlauf vom 2026-08-19 deckt die 74 `_old/`-Gruppen über `kd-old-tree`; `raw/`,
+`run.json` und `entries/*.json` blieben per SHA256 unverändert.
 
+**Erledigt: Namensraum-Konvention für Command-Module.** Zusammen mit Task 018 festgelegt
+und in `rules/command-authoring.md` verankert: `commands/_<name>/` trägt Module (kein
+Command). `_shared/` bleibt für Module, die alle Commands teilen; `_<command-name>/`
+sammelt command-eigene Module (`_review-run/`), `_<familie>/` sammelt Module einer
+Command-Familie (z. B. `_docs/`, sobald die Docs-Commands gemeinsame Module bekommen).
+Overlay funktioniert per Datei-Pfad ab `commands/`; leere Datei schaltet ab. Regel in
+[`../rules/command-authoring.md`](../rules/command-authoring.md#ablage).
+
+**Erster Realtriage-Lauf.** 2026-08-19, dieses Repo, `review-triage.md` unter
+`k-playbook-local/results/2026-08-19/`. 173 Gruppen wurden zu sechs Bündeln plus einer
+Restgruppe verdichtet: B1 Dependency-Upgrade Go (P1/S), B2 Pfadvalidierung (P2/S), B3
+Prozessaufrufe (P2/K), B4 Dateirechte und ignorierte Cleanup-Fehler (P2/T), B5 `_old/`
+aus dem Scope nehmen (P3/X), B6 Staticcheck-Aufräumen (P3/T). Der Bündel-Schnitt bildet
+den Nutzen der ganzen Pipeline zum ersten Mal ab: aus 347 SARIF-Findings entstehen sechs
+handhabbare Bewertungseinheiten, jede mit konkretem nächsten Schritt.
+
+## Als Nächstes
+
+Stand 2026-08-20. Diese Punkte sind besprochen, sitzen im aktuellen Ergebnis fest und
+werden in dieser Reihenfolge angegangen:
+
+1. **`_old/`-Cleanup.** Bündel B5 zeigt sichtbar: 74 Gruppen aus `_old/internal/*` sind
+   archivierter Legacy-Code. Sobald `known-decisions.md` deren Deckung trägt, entscheiden
+   wir mit ruhiger Übersicht: löschen, verschieben oder ausschließen. Danach neuer Merge
+   und Triage zur Kontrolle.
+2. **End-to-End-Test des `/k-review-run`-Flows.** Der Command ist scharf, MCP-Werkzeuge
+   liegen an, Modul und Merge sind erledigt, `known-decisions.md` wirkt. Was noch fehlt,
+   ist der Durchlauf am Stück in einer Chat-Sitzung — neuer Lauf, Auswahl bestätigen,
+   Scan, Merge, Triage, `review-triage.md` lesen. Erste Zielprojekte: dieses Repo und
+   OMNI. Nach dem Testlauf notieren wir, was am Command, am Modul und an der Auswahl
+   auffällt.
+3. **Handoff nach der Triage.** Was passiert mit `review-triage.md` nach der Bewertung?
+   `/k-remediation` versteht heute zwei Formate; `review-triage.md` ist keins davon. Zwei
+   Wege: `/k-remediation` als drittes Format erweitern, oder ein eigenes Nachfolgemodul
+   `remediate-triage.md` unter `_review-run/`, das aus jedem Bündel eine Task-Datei nach
+   `k-playbook-local/tasks/` erzeugt. Entscheidung erst nach dem End-to-End-Test aus
+   Punkt 3, damit die konkrete Übergabe-Erfahrung die Wahl trägt.
+
+**Kleiner Aufräumpunkt: Installations-Sync.** Die zwei letzten Merges brauchten einen
+`chmod u+w` auf den Installations-Clone, damit `scripts/severity.tsv` (aus Task 016)
+verfügbar war. Sobald der aktuelle Stand in den Remote gepusht und die Installationen
+über den regulären `git pull`-Weg aktualisiert sind, entfällt der Workaround. Trotzdem
+prüfen wir, ob es einen bequemeren Weg gibt, den Installations-Clone gegen den Dev-Stand
+zu synchronisieren — heute wäre das ein Handgriff, morgen ein wiederkehrendes Detail.
+
+## Offen, ohne konkreten Termin
+
+Wird einzeln besprochen, bevor daran gearbeitet wird:
+
+- **OpenCode-Usage als MCP-Werkzeug.** OpenCode speichert die Sitzungsnutzung bereits
+  lokal in SQLite: `~/.local/share/opencode/opencode.db`. Die Tabelle `session` trägt
+  aggregierte Werte je Sitzung: `cost`, `tokens_input`, `tokens_output`,
+  `tokens_reasoning`, `tokens_cache_read`, `tokens_cache_write`, dazu `model`, `agent`,
+  `directory`, `title`, `time_created` und `time_updated`. Feinere Werte je
+  Assistant-Antwort liegen zusätzlich als JSON in `event.data`, vor allem bei
+  `message.updated.1`; `session.updated.1` enthält fortlaufende Sitzungs-Snapshots mit
+  denselben Summen.
+
+  Für eine manuelle Abfrage reicht OpenCodes eigenes DB-Kommando, z. B.:
+
+  ```bash
+  opencode db "select id,title,directory,agent,model,cost,tokens_input,tokens_output,tokens_reasoning,tokens_cache_read,tokens_cache_write,time_updated from session order by time_updated desc limit 10" --format json
+  ```
+
+  Ein MCP-Werkzeug dafür darf nicht die ganze Datenbank freigeben. Dieselbe DB und das
+  danebenliegende Datenverzeichnis enthalten auch sensible Daten wie Accounts,
+  Credentials, `auth.json` und `mcp-auth.json`. Der sichere Zuschnitt wäre deshalb:
+  read-only öffnen (`mode=ro`), nur Whitelist-Queries erlauben und nur `session` sowie
+  optional `event` lesen. Mögliche Tools: `opencode_usage_recent_sessions(limit,
+  directory?)`, `opencode_usage_session(session_id)`, `opencode_usage_daily_totals(days?)`
+  und `opencode_usage_message_events(session_id)`. Antworten geben nur Usage-Metadaten
+  zurück, nie Prompts, Tool-Ausgaben oder Credential-Tabellen.
+
+  Die Kernabfrage wäre:
+
+  ```sql
+  select
+    id,
+    title,
+    directory,
+    agent,
+    json_extract(model, '$.providerID') as provider,
+    json_extract(model, '$.id') as model,
+    json_extract(model, '$.variant') as variant,
+    cost,
+    tokens_input,
+    tokens_output,
+    tokens_reasoning,
+    tokens_cache_read,
+    tokens_cache_write,
+    datetime(time_created / 1000, 'unixepoch', 'localtime') as created_at,
+    datetime(time_updated / 1000, 'unixepoch', 'localtime') as updated_at
+  from session
+  order by time_updated desc
+  limit ?;
+  ```
+
+  Für Claude Code gibt es ein ähnliches Nutzsignal, aber anders zugeschnitten. In
+  nichtinteraktiven Läufen (`claude --print --output-format json` beziehungsweise
+  `stream-json`) liefert der finale Result-Output beziehungsweise die SDK-`ResultMessage`
+  aggregierte `usage` und `total_cost_usd`. Die Usage-Felder folgen dem Anthropic-Schema:
+  `input_tokens`, `output_tokens`, `cache_read_input_tokens` und
+  `cache_creation_input_tokens`. Hooks bekommen außerdem `session_id` und
+  `transcript_path`; das Transcript ist JSONL und kann als Beleg gelesen werden. Lokal ist
+  aber kein OpenCode-ähnliches, dokumentiertes SQLite-Schema mit Session-Summen zu sehen;
+  auf diesem Rechner liegt `~/.claude/sessions/` leer und die CLI ist in der Shell nicht
+  eingeloggt. Für Claude Code wäre deshalb eher ein Hook- oder Wrapper-Export sinnvoll:
+  Result-JSON bei `--print` speichern oder über Hooks den `transcript_path` erfassen und
+  nur Usage-Metadaten extrahieren. Ein MCP-Werkzeug sollte auch dort nicht pauschal
+  Transcripts ausliefern, weil darin Prompts, Antworten und Tool-Ergebnisse stehen können.
 - **Alternative 1: GUI startet nur die Werkzeug-Scans.** Die Oberfläche startet nach dem
   Anlegen eines Laufs die Werkzeug-Einträge im Hintergrund, fachlich also
   `k-playbook scan <lauf>`. Der Merge läuft danach nicht automatisch. Nach Abschluss der
@@ -223,18 +354,6 @@ steht; ein leeres lokales Overlay des Moduls schaltet ihn ab.
   der Server grobe Statuszeilen zu Lauf, Tool/Job-Zuständen und Abschluss auf stdout aus.
 - Was mit `trufflehog` und `pip-audit` geschieht, die kein SARIF können: umwandeln oder
   ersetzen.
-- Eine Tabelle Regel → Schwere. `ruff` stuft im SARIF alles als `level: error` ein; bandit
-  hätte Severity und Confidence geliefert. Statt das von einem einzelnen Scanner abhängig
-  zu machen, soll die Zuordnung einmal in k-playbook stehen und für alle Werkzeuge gelten.
-  In Arbeit im Rahmen von Task 016, Etappe 2.
-- **Namensraum-Konvention für Command-Module.** Zusammen mit dieser Entscheidung
-  festgelegt: `commands/_<name>/` trägt Module (kein Command). `_shared/` bleibt für
-  Module, die alle Commands teilen. `_<command-name>/` sammelt command-eigene Module
-  (`_review-run/`), `_<familie>/` sammelt Module einer Command-Familie. `_docs/` enthält
-  die nachladbaren Abläufe für `/k-docs-code` und `/k-docs-tools`; `/k-docs` ist der
-  sichtbare Einstieg, der Bestand prüft und diese Module anbieten kann. Overlay
-  funktioniert per Datei-Pfad ab `commands/`; leere Datei schaltet ab. Regel steht in
-  [`../rules/command-authoring.md`](../rules/command-authoring.md#ablage).
 - **`k-check` als MCP-Werkzeug.** Der Runner gibt heute Terminaltext aus; `review-k-check-security`
   sichert ihn als `raw/k-check-<mode>.txt`, und der Assistent liest und deutet ihn. Seine
   Parameter — `--mode changed|baseline`, `--files-from`, `--base-ref`, `--exclude`,

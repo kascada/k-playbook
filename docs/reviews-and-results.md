@@ -108,6 +108,13 @@ Standard-Statuswerte in `findings.md`:
 Finding-IDs müssen stabil bleiben. Einmal vergebene IDs dürfen bei Re-Runs,
 Statusänderungen oder Remediation nicht umbenannt werden.
 
+Bewusste projektweite oder laufspezifische Entscheidungen stehen im Laufmodell in
+`known-decisions.md` und werden von `k-playbook merge` als Deckung an Findings und Gruppen
+geschrieben. Das Format, der Suchpfad und die Ablaufregel stehen in
+[`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd). Eine Decision ersetzt
+keinen Statuswert und filtert nichts aus den Rohdaten; sie macht nur sichtbar, dass ein
+Befund durch eine dokumentierte Entscheidung gedeckt ist.
+
 Schema für k-check:
 
 ```text
@@ -245,9 +252,10 @@ Beispiel-Handoff:
 /k-remediation k-playbook-local/results/k-check/2026-07-24/assessment.md
 ```
 
-`known-decisions.md` liegt daneben und hält fest, was bewusst so entschieden wurde. Jedes
-Review liest die Datei, damit dieselbe Stelle nicht bei jedem Lauf erneut als Finding
-auftaucht.
+`known-decisions.md` liegt daneben und hält fest, was bewusst so entschieden wurde. Im
+Laufmodell liest der Merge-Schritt die projektweite Datei und eine optionale laufspezifische
+Datei, kombiniert beide Ebenen und schreibt die Wirkung sichtbar in `review-input.json` und
+`review-input.md`; die Bewertung übernimmt diese Information anschließend aus dem JSON.
 
 ## Remediation
 

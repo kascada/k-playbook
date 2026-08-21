@@ -414,6 +414,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 		RunDir:              runDir,
 		KPlaybookVersion:    mcpKPlaybookVersion(),
 		SeverityMappingPath: merge.SeverityCatalog(env.PlaybookDir),
+		LocalResultsDir:     review.ResultsDir(env.LocalDir),
 	})
 	if err != nil {
 		code := "merge_failed"

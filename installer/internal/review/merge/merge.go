@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/knowndecisions"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
@@ -29,6 +30,8 @@ type Options struct {
 	// SeverityMappingPath ist der optionale Pfad zur Fallback-Tabelle für
 	// abgeleitete Schwere. Fehlt er, bleibt nur SARIF-/Metadaten-Ableitung.
 	SeverityMappingPath string
+	// LocalResultsDir ist k-playbook-local/results für projektweite known-decisions.
+	LocalResultsDir string
 	// Now liefert die Erzeugungszeit. Fehlt es, wird time.Now verwendet.
 	Now func() time.Time
 }
@@ -87,6 +90,7 @@ type Result struct {
 	Entries          []EntrySummary `json:"entries"`
 	Findings         []Finding      `json:"findings"`
 	Groups           []Group        `json:"groups"`
+	KnownDecisions   KnownDecisions `json:"knownDecisions"`
 }
 
 // Location ist die primäre Stelle eines SARIF-Results.
@@ -115,40 +119,66 @@ type Evidence struct {
 	ResultIndex int    `json:"resultIndex"`
 }
 
+// KnownDecisionCoverage ist der sichtbare Marker für gedeckte Findings und Gruppen.
+type KnownDecisionCoverage struct {
+	ID        string `json:"id"`
+	Category  string `json:"category"`
+	MatchedBy string `json:"matchedBy,omitempty"`
+}
+
+// KnownDecisionCoverageCount zählt Deckung in einer Gruppe.
+type KnownDecisionCoverageCount struct {
+	ID       string `json:"id"`
+	Category string `json:"category"`
+	Findings int    `json:"findings"`
+}
+
+// KnownDecisions beschreibt geladene und angewendete Decisions im Merge-Ergebnis.
+type KnownDecisions struct {
+	Sources   []knowndecisions.SourceReport   `json:"sources"`
+	Decisions []knowndecisions.DecisionReport `json:"decisions"`
+	Warnings  []string                        `json:"warnings,omitempty"`
+}
+
 // Finding ist die normalisierte Form eines SARIF-Results.
 type Finding struct {
-	ID                  string            `json:"id"`
-	Evidence            Evidence          `json:"evidence"`
-	RuleID              string            `json:"ruleId,omitempty"`
-	RuleName            string            `json:"ruleName,omitempty"`
-	RuleDescription     string            `json:"ruleDescription,omitempty"`
-	Level               string            `json:"level,omitempty"`
-	DerivedSeverity     string            `json:"derivedSeverity"`
-	SeveritySource      string            `json:"severitySource"`
-	Message             string            `json:"message,omitempty"`
-	Location            Location          `json:"location,omitempty"`
-	Fingerprints        map[string]string `json:"fingerprints,omitempty"`
-	PartialFingerprints map[string]string `json:"partialFingerprints,omitempty"`
-	Dependency          Dependency        `json:"dependency,omitempty"`
+	ID                     string                 `json:"id"`
+	Evidence               Evidence               `json:"evidence"`
+	RuleID                 string                 `json:"ruleId,omitempty"`
+	RuleName               string                 `json:"ruleName,omitempty"`
+	RuleDescription        string                 `json:"ruleDescription,omitempty"`
+	Level                  string                 `json:"level,omitempty"`
+	DerivedSeverity        string                 `json:"derivedSeverity"`
+	SeveritySource         string                 `json:"severitySource"`
+	Message                string                 `json:"message,omitempty"`
+	Location               Location               `json:"location,omitempty"`
+	Locations              []Location             `json:"locations,omitempty"`
+	Fingerprints           map[string]string      `json:"fingerprints,omitempty"`
+	PartialFingerprints    map[string]string      `json:"partialFingerprints,omitempty"`
+	Dependency             Dependency             `json:"dependency,omitempty"`
+	CoveredByKnownDecision *KnownDecisionCoverage `json:"coveredByKnownDecision,omitempty"`
 }
 
 // Group ist eine Dedupe-Gruppe. Sie löscht keine Findings: alle Belege und die
 // Finding-IDs bleiben erhalten.
 type Group struct {
-	ID                 string     `json:"displayId,omitempty"`
-	StableID           string     `json:"stableId"`
-	StableKey          string     `json:"stableKey"`
-	DedupeRules        []string   `json:"dedupeRules,omitempty"`
-	PossibleDuplicates []string   `json:"possibleDuplicates,omitempty"`
-	Title              string     `json:"title,omitempty"`
-	RuleID             string     `json:"ruleId,omitempty"`
-	Level              string     `json:"level,omitempty"`
-	DerivedSeverity    string     `json:"derivedSeverity,omitempty"`
-	SeveritySource     string     `json:"severitySource,omitempty"`
-	Location           Location   `json:"location,omitempty"`
-	Dependency         Dependency `json:"dependency,omitempty"`
-	FindingIDs         []string   `json:"findingIds"`
-	Evidence           []Evidence `json:"evidence"`
+	ID                     string                       `json:"displayId,omitempty"`
+	StableID               string                       `json:"stableId"`
+	StableKey              string                       `json:"stableKey"`
+	DedupeRules            []string                     `json:"dedupeRules,omitempty"`
+	PossibleDuplicates     []string                     `json:"possibleDuplicates,omitempty"`
+	Title                  string                       `json:"title,omitempty"`
+	RuleID                 string                       `json:"ruleId,omitempty"`
+	Level                  string                       `json:"level,omitempty"`
+	DerivedSeverity        string                       `json:"derivedSeverity,omitempty"`
+	SeveritySource         string                       `json:"severitySource,omitempty"`
+	Location               Location                     `json:"location,omitempty"`
+	Dependency             Dependency                   `json:"dependency,omitempty"`
+	FindingIDs             []string                     `json:"findingIds"`
+	Evidence               []Evidence                   `json:"evidence"`
+	CoveredByKnownDecision *KnownDecisionCoverage       `json:"coveredByKnownDecision,omitempty"`
+	PartialCoverage        bool                         `json:"partialCoverage,omitempty"`
+	KnownDecisionCoverage  []KnownDecisionCoverageCount `json:"knownDecisionCoverage,omitempty"`
 }
 
 // Build liest Lauf- und Entry-Kontext. Fehlende Entry-Dateien sind der Zustand
@@ -205,16 +235,24 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
+	now := time.Now
+	if options.Now != nil {
+		now = options.Now
+	}
+
+	decisions, loadReport, err := knowndecisions.LoadForRun(options.RunDir, options.LocalResultsDir)
+	if err != nil {
+		return Result{}, err
+	}
+	knownMeta := KnownDecisions{Sources: loadReport.Sources, Decisions: loadReport.Decisions, Warnings: loadReport.Warnings}
+
 	findings, err := loadFindings(options.RunDir, entries, severityMapping)
 	if err != nil {
 		return Result{}, err
 	}
 	groups := GroupFindings(findings)
+	applyKnownDecisions(findings, groups, decisions, &knownMeta, now())
 
-	now := time.Now
-	if options.Now != nil {
-		now = options.Now
-	}
 	version := options.KPlaybookVersion
 	if version == "" {
 		version = "unknown"
@@ -227,6 +265,7 @@ func Build(options Options) (Result, error) {
 		Entries:          entries,
 		Findings:         findings,
 		Groups:           groups,
+		KnownDecisions:   knownMeta,
 	}, nil
 }
 
@@ -416,6 +455,7 @@ func readSARIF(path string, tool string, job JobSummary, severityMapping Severit
 				Level:               result.Level,
 				Message:             result.Message.text(),
 				Location:            primaryLocation(result.Locations),
+				Locations:           allLocations(result.Locations),
 				Fingerprints:        cloneMap(result.Fingerprints),
 				PartialFingerprints: cloneMap(result.PartialFingerprints),
 			}
@@ -466,6 +506,23 @@ func primaryLocation(locations []sarifLocation) Location {
 		StartLine:   physical.Region.StartLine,
 		StartColumn: physical.Region.StartColumn,
 	}
+}
+
+func allLocations(locations []sarifLocation) []Location {
+	if len(locations) == 0 {
+		return nil
+	}
+	output := make([]Location, 0, len(locations))
+	for _, location := range locations {
+		physical := location.PhysicalLocation
+		item := Location{
+			URI:         physical.ArtifactLocation.URI,
+			StartLine:   physical.Region.StartLine,
+			StartColumn: physical.Region.StartColumn,
+		}
+		output = append(output, item)
+	}
+	return output
 }
 
 func cloneMap(input map[string]string) map[string]string {
