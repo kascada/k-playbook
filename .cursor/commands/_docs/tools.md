@@ -1,0 +1,1 @@
+../../../k-playbook/commands/_docs/tools.md
