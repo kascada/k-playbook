@@ -254,6 +254,9 @@ func executeEntry(ctx context.Context, entry Entry, options Options, tokens chan
 	if err := writeProgress(options, status); err != nil {
 		return status, err
 	}
+	if len(status.Jobs) == 0 {
+		report(options, entry.Name, JobStatus{Job: entry.Name, State: status.State, Finished: status.Finished, Reason: status.Reason})
+	}
 	return status, nil
 }
 

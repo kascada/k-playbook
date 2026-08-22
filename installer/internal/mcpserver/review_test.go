@@ -3,8 +3,11 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -274,6 +277,128 @@ func TestReviewScan(t *testing.T) {
 	}
 }
 
+func TestReviewScanSendetProgressMitToken(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nalpha\talpha\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\nbeta\tbeta\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\ngamma\tgamma\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), multiPreflightScript(root, "alpha", "beta", "gamma"))
+	if err := os.Chmod(filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), 0o755); err != nil {
+		t.Fatalf("Preflight chmod: %v", err)
+	}
+	mustWriteScanner(t, root, "alpha", 1200*time.Millisecond)
+	mustWriteScanner(t, root, "beta", 2400*time.Millisecond)
+	mustWriteScanner(t, root, "gamma", 3600*time.Millisecond)
+	mustCreateRun(t, root, []review.Entry{{Name: "alpha", Kind: review.KindTool}, {Name: "beta", Kind: review.KindTool}, {Name: "gamma", Kind: review.KindTool}})
+
+	ctx := context.Background()
+	server := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
+	addReviewTools(server)
+	clientTransport, serverTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatalf("Server verbinden: %v", err)
+	}
+	defer serverSession.Close()
+
+	var mutex sync.Mutex
+	progressEvents := []*mcp.ProgressNotificationParams{}
+	client := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0.0.1"}, &mcp.ClientOptions{
+		ProgressNotificationHandler: func(_ context.Context, req *mcp.ProgressNotificationClientRequest) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			progressEvents = append(progressEvents, req.Params)
+		},
+	})
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatalf("Client verbinden: %v", err)
+	}
+	defer clientSession.Close()
+
+	params := &mcp.CallToolParams{
+		Name: reviewToolScan,
+		Arguments: reviewScanInput{
+			reviewBaseInput: reviewBaseInput{ProjectDir: root},
+			Run:             "2026-08-19",
+		},
+	}
+	params.SetProgressToken("scan-token")
+	result, err := clientSession.CallTool(ctx, params)
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("scan fehlgeschlagen: %#v", envelope.Error)
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+	if len(progressEvents) < 4 {
+		t.Fatalf("Progress-Events = %d, erwartet mindestens 4: %+v", len(progressEvents), progressEvents)
+	}
+	seen := map[string]bool{}
+	for _, event := range progressEvents {
+		if event.ProgressToken != "scan-token" {
+			t.Fatalf("ProgressToken = %v", event.ProgressToken)
+		}
+		if event.Total != 3 {
+			t.Fatalf("Total = %.0f, erwartet 3", event.Total)
+		}
+		for _, name := range []string{"alpha", "beta", "gamma"} {
+			if strings.Contains(event.Message, name) {
+				seen[name] = true
+			}
+		}
+	}
+	for _, name := range []string{"alpha", "beta", "gamma"} {
+		if !seen[name] {
+			t.Fatalf("kein Progress-Event für %s in %+v", name, progressEvents)
+		}
+	}
+}
+
+func TestReviewScanOhneProgressTokenSendetKeineNotifications(t *testing.T) {
+	root := newReviewProject(t)
+	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}})
+	ctx := context.Background()
+	server := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
+	addReviewTools(server)
+	clientTransport, serverTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatalf("Server verbinden: %v", err)
+	}
+	defer serverSession.Close()
+
+	var count int
+	client := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0.0.1"}, &mcp.ClientOptions{
+		ProgressNotificationHandler: func(context.Context, *mcp.ProgressNotificationClientRequest) {
+			count++
+		},
+	})
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatalf("Client verbinden: %v", err)
+	}
+	defer clientSession.Close()
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: reviewToolScan,
+		Arguments: reviewScanInput{
+			reviewBaseInput: reviewBaseInput{ProjectDir: root},
+			Run:             "2026-08-19",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("scan fehlgeschlagen: %#v", envelope.Error)
+	}
+	if count != 0 {
+		t.Fatalf("Progress-Notifications ohne Token = %d, erwartet 0", count)
+	}
+}
+
 func TestReviewScanFehler(t *testing.T) {
 	root := newReviewProject(t)
 	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
@@ -494,6 +619,31 @@ cat <<JSON
 }
 JSON
 `
+}
+
+func multiPreflightScript(root string, names ...string) string {
+	tools := []string{}
+	for _, name := range names {
+		tools = append(tools, `    {"name":"`+name+`","languages":"go","status":"ok","path":"`+filepath.ToSlash(filepath.Join(root, name))+`","role":"Mock-Scanner"}`)
+	}
+	return "#!/usr/bin/env bash\ncat <<JSON\n{\n  \"playbookDir\": \"" + filepath.ToSlash(filepath.Join(root, "k-playbook")) + "\",\n  \"languages\": \"go\",\n  \"tools\": [\n" + strings.Join(tools, ",\n") + "\n  ]\n}\nJSON\n"
+}
+
+func mustWriteScanner(t *testing.T, root string, name string, delay time.Duration) {
+	t.Helper()
+	body := ""
+	if delay > 0 {
+		body += "sleep " + fmtDurationSeconds(delay) + "\n"
+	}
+	body += "printf '%s' '" + minimalSARIF() + "'\n"
+	mustWriteFile(t, filepath.Join(root, name), "#!/usr/bin/env bash\n"+body)
+	if err := os.Chmod(filepath.Join(root, name), 0o755); err != nil {
+		t.Fatalf("%s chmod: %v", name, err)
+	}
+}
+
+func fmtDurationSeconds(duration time.Duration) string {
+	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.3f", duration.Seconds()), "0"), ".")
 }
 
 func mustCreateRun(t *testing.T, root string, entries []review.Entry) string {

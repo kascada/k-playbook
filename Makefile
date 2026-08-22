@@ -105,9 +105,16 @@ installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	@set -eu; \
 	  trap 'chmod -R a-w "$(INSTALLATION_DIR)"' EXIT; \
 	  chmod -R u+w "$(INSTALLATION_DIR)"; \
+	  before="$$(git -C "$(INSTALLATION_DIR)" rev-parse HEAD)"; \
 	  git -C "$(INSTALLATION_DIR)" fetch --quiet origin; \
 	  git -C "$(INSTALLATION_DIR)" reset --hard --quiet origin/main; \
-	  git -C "$(INSTALLATION_DIR)" clean -qfd
+	  git -C "$(INSTALLATION_DIR)" clean -qfd; \
+	  after="$$(git -C "$(INSTALLATION_DIR)" rev-parse HEAD)"; \
+	  if [ "$$before" = "$$after" ]; then \
+	    echo "Installation bereits aktuell ($$after)"; \
+	  else \
+	    echo "Installation aktualisiert: $$before -> $$after"; \
+	  fi
 
 gui: dist installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
 	"$(INSTALLER_WRAPPER)"

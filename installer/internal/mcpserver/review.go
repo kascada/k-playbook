@@ -227,7 +227,7 @@ func reviewCreateTool(ctx context.Context, req *mcp.CallToolRequest, input revie
 
 func reviewScanTool(ctx context.Context, req *mcp.CallToolRequest, input reviewScanInput) (*mcp.CallToolResult, any, error) {
 	return wrapReviewTool(reviewToolScan, input.ProjectDir, func(env reviewEnvironment) *mcp.CallToolResult {
-		data, toolErr := scanReviewRun(ctx, env, input)
+		data, toolErr := scanReviewRun(ctx, req, env, input)
 		if toolErr.Code != "" {
 			return reviewErrorResult(reviewToolScan, env.projectEnvelope(), toolErr)
 		}
@@ -361,7 +361,7 @@ func createReviewRun(env reviewEnvironment, input reviewCreateInput) (map[string
 	return data, reviewToolError{}
 }
 
-func scanReviewRun(ctx context.Context, env reviewEnvironment, input reviewScanInput) (map[string]any, reviewToolError) {
+func scanReviewRun(ctx context.Context, req *mcp.CallToolRequest, env reviewEnvironment, input reviewScanInput) (map[string]any, reviewToolError) {
 	runDir, run, toolErr := requireRun(env, input.Run)
 	if toolErr.Code != "" {
 		return nil, toolErr
@@ -387,6 +387,13 @@ func scanReviewRun(ctx context.Context, env reviewEnvironment, input reviewScanI
 	if err != nil {
 		return nil, wrapError(err, "preflight_failed", "Tool-Preflight fehlgeschlagen.", map[string]any{"projectDir": env.Root, "languages": run.Languages})
 	}
+	emitter := newReviewProgressEmitter(ctx, req, runDir, entries)
+	finishMessage := "scan complete"
+	var progress func(string, review.JobStatus)
+	if emitter != nil {
+		progress = emitter.Report
+		defer func() { emitter.Stop(finishMessage) }()
+	}
 	statuses, err := review.Execute(ctx, entries, review.Options{
 		RunDir:     runDir,
 		Target:     env.TargetDir,
@@ -394,8 +401,10 @@ func scanReviewRun(ctx context.Context, env reviewEnvironment, input reviewScanI
 		Languages:  run.Languages,
 		Scanners:   scanners,
 		Tools:      resolveReviewTools(preflight),
+		Progress:   progress,
 	})
 	if err != nil {
+		finishMessage = "scan failed"
 		return nil, wrapError(err, "execution_failed", "Scan-Ausführung ist abgebrochen.", map[string]any{"run": input.Run})
 	}
 	return map[string]any{

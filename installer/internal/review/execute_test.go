@@ -400,6 +400,42 @@ func TestExecuteZeitueberschreitung(t *testing.T) {
 	}
 }
 
+func TestExecuteExpliziterCancelPersistiertAbgebrochen(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "semgrep", Kind: KindTool})
+	tool := fakeTool(t, "semgrep", "sleep 30")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	statuses, err := Execute(ctx, []Entry{{Name: "semgrep", Kind: KindTool}}, Options{
+		RunDir:   runDir,
+		Target:   t.TempDir(),
+		Scanners: []Scanner{nativeScanner("semgrep", "semgrep", "{out}")},
+		Tools:    map[string]Tool{"semgrep": {Path: tool}},
+		Progress: func(_ string, job JobStatus) {
+			if job.State == StateRunning {
+				cancel()
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if len(statuses) != 1 || statuses[0].State != StateFailed {
+		t.Fatalf("Status = %+v, erwartet failed", statuses)
+	}
+	if reason := statuses[0].Jobs[0].Reason; reason != "abgebrochen" {
+		t.Fatalf("Grund = %q, erwartet abgebrochen", reason)
+	}
+
+	written, err := ReadEntryStatus(runDir, "semgrep")
+	if err != nil {
+		t.Fatalf("Entry-Status lesen: %v", err)
+	}
+	if written.State != StateFailed || len(written.Jobs) != 1 || written.Jobs[0].Reason != "abgebrochen" {
+		t.Fatalf("persistierter Status = %+v, erwartet failed/abgebrochen", written)
+	}
+}
+
 // Der Ausgang des Eintrags ist die Kurzfassung; welcher Job was hatte, steht
 // weiterhin je Job in der Datei.
 func TestExecuteEintragszustandAusJobs(t *testing.T) {
