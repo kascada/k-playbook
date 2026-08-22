@@ -5,6 +5,13 @@ interval-weeks: 4
 scope-hint: Trivy-/Syft-/Grype-Ergebnisse für Containerfiles, IaC, Compose, Images und Filesystem; keine Remediation aus diesem Review heraus
 handoff: /k-remediation
 result-family: iac-container
+audit:
+  enabled: true
+  title: IaC and Container Assessment
+  resultRequired: true
+  defaultResult: review-iac-container.md
+review:
+  enabled: true
 ---
 
 # Review: IaC and Container Assessment
@@ -16,7 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus IaC-, Container- und Filesystem-Sec
 - Container-, IaC- und OS-/Image-Risiken priorisiert sichtbar machen.
 - Tool-Meldungen von projektspezifischer Review-Bewertung trennen.
 - Fehlkonfigurationen, kritische Base-Image-CVEs und riskante Dockerfile-/Compose-Muster bewerten.
-- Ein `assessment.md` mit priorisierter Liste und ein statusfähiges `findings.md` erzeugen.
+- `review-input.json` als Belegvertrag und `review-triage.md` als Handoff erzeugen.
 - Keine Infrastruktur- oder Container-Änderungen durch dieses Review.
 
 ## Voraussetzungen
@@ -38,8 +45,8 @@ Dieses Review schreibt in:
 
 Dateien:
 
-- `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
+- `review-input.json` - strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` - kuratierte Gesamtbewertung mit Bündeln, nicht gebündelten Findings und Handoff.
 - `raw/trivy-fs.json` - Filesystem-/Dependency-/Secret-/Misconfig-Rohdaten, falls genutzt.
 - `raw/trivy-config.json` - IaC-/Config-Rohdaten, falls separat genutzt.
 - `raw/trivy-image-<name>.json` - Image-Rohdaten, falls Images gescannt wurden.
@@ -86,7 +93,7 @@ Berücksichtige:
 - Exponierte Ports, Volumes, Privilegien, Capabilities und Netzwerkmodus.
 - Bekannte Entscheidungen aus `known-decisions.md`.
 
-Review-Status in `findings.md`:
+Review-Status im Remediation-Status von `review-triage.md`:
 
 - `open` - neu oder noch nicht geprüft.
 - `confirmed` - relevanter IaC-/Container-Befund.
@@ -97,9 +104,9 @@ Review-Status in `findings.md`:
 
 Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene Komponente gleich sind.
 
-## Assessment-Format
+## Review-Triage-Format
 
-`assessment.md` enthält mindestens:
+`review-triage.md` enthält mindestens die Pflichtabschnitte aus `commands/_audit/review-scan-triage.md`:
 
 ```markdown
 # IaC and Container Assessment - YYYY-MM-DD
@@ -109,7 +116,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 - Trivy FS/Config/Image: `raw/trivy-*.json`
 - Syft: `raw/syft-*.json`
 - Grype: `raw/grype-*.json`
-- Finding-Register: `findings.md`
+- Quelle: `review-input.json`
 
 ## Kurzfazit
 
@@ -129,27 +136,38 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 
 ## Handoff
 
-`/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/review-triage.md`
 ```
 
-## Finding-Register-Format
+## Review-Input-Format
 
-`findings.md` enthält pro dedupliziertem Befund:
+`review-input.json` enthält pro dedupliziertem Befund Evidence mit Datei, Zeile, Quelle und Tool:
 
-```markdown
-### iaccont-001
-
-- Status: `open`
-- Priorität: `P1|P2|P3`
-- Typ: `cve|misconfig|secret|license|sbom`
-- Tool(s): `trivy`, `syft`, `grype`
-- Target: ...
-- Ort/Layer: ...
-- Regel/CVE: ...
-- Raw-Quelle: `raw/...`
-- Review-Bewertung: _offen_
-- Deployment-Kontext: _offen_
-- Remediation: _offen_
+```json
+{
+  "scope": { "type": "review", "family": "iac-container" },
+  "groups": [
+    {
+      "id": "iaccont-001",
+      "title": "<Typ> in <Target>",
+      "priority": "P1|P2|P3",
+      "findings": ["iaccont-001"],
+      "evidence": [
+        {
+          "file": "<Dockerfile|compose|IaC-Datei|Image>",
+          "line": null,
+          "source": "tool:trivy|syft|grype",
+          "message": "<Typ>, Ort/Layer, Regel/CVE, Raw-Quelle raw/..."
+        }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
 ```
 
 ## Handoff
@@ -157,7 +175,7 @@ Findings deduplizieren, wenn Tool-Regel/CVE, Target, Layer/Datei und betroffene 
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/iac-container/YYYY-MM-DD/review-triage.md
 ```
 
 Remediation und Infrastruktur-Änderungen sind ausdrücklich nicht Teil dieses Reviews.

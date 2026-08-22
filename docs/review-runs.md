@@ -21,7 +21,7 @@ Ein Lauf besteht aus **Einträgen**, und ein Eintrag hat eine **Art**:
 Beide sind Einträge desselben Laufs. Nur der Weg dorthin unterscheidet sich — das Ergebnis
 landet für beide im selben Verzeichnis und damit später in derselben Zusammenfassung.
 Der Standard-Moduleintrag `scan-triage` kommt aus
-`commands/_review-run/review-scan-triage.md`; er gehört bewusst nicht zu
+`commands/_audit/review-scan-triage.md`; er gehört bewusst nicht zu
 `catalogs.reviews` und erscheint deshalb nicht in der GUI-Auswahl für Review-Rezepte.
 
 ## Das Laufverzeichnis
@@ -125,24 +125,27 @@ im YAML-Frontmatter des Rezepts:
 
 ```yaml
 ---
-reviewRun:
+audit:
   enabled: true
   title: "Technischer Review"
   resultRequired: true
   defaultResult: "review-tech.md"
+review:
+  enabled: true
 ---
 ```
 
-`enabled` ist standardmäßig `true`; `false` entfernt das Rezept aus der Auswahlbasis.
+`audit.enabled` ist standardmäßig `false`; nur `true` nimmt das Rezept in `/k-audit`-/MCP-Läufe auf.
+`review.enabled` ist standardmäßig `true`; `false` entfernt das Rezept aus der `/k-review`-Auswahl.
 `title` fällt ohne Angabe auf die erste Überschrift oder den Katalog-Schlüssel zurück.
 `resultRequired` ist standardmäßig `true` und bestimmt, ob ein `done`-Status ein Ergebnis
 braucht. `defaultResult` ist ein relativer Vorschlag im Laufverzeichnis.
 
 Der Moduleintrag `scan-triage` erhält dieselben Laufmetadaten aus dem effektiven
 Command-Namensraum: `recipePath` zeigt auf
-`commands/_review-run/review-scan-triage.md`, `defaultResult` ist
+`commands/_audit/review-scan-triage.md`, `defaultResult` ist
 `review-triage.md`, `resultRequired` ist `true`. Ein leeres lokales Overlay unter
-`k-playbook-local/commands/_review-run/review-scan-triage.md` schaltet diesen
+`k-playbook-local/commands/_audit/review-scan-triage.md` schaltet diesen
 Eintrag ab.
 
 ## Zustände
@@ -414,7 +417,7 @@ Dort wird auch ein neuer Lauf zusammengestellt:
   installiert ist, steht da, lässt sich aber nicht auswählen — mit dem Hinweis, wie es
   installiert wird.
 - **Reviews** aus dem aufgelösten Katalog, mitgeliefert und projekteigen zusammengeführt.
-  Abgeschaltete Einträge fehlen.
+  Abgeschaltete und nicht audit-aktivierte Einträge (`audit.enabled: false`) fehlen.
 
 „Erstellen" legt das Verzeichnis und `run.json` an. Mehr nicht: **das Anlegen startet
 nichts.** Gestartet wird im Terminal, mit `k-playbook scan` — einen Knopf dafür gibt es
@@ -552,10 +555,12 @@ aus `review-input.json`.
 
 ## Bewerten mit `review-scan-triage`
 
-Nach dem Merge bewertet `/k-review-run` den Lauf über das Command-Modul
-`commands/_review-run/review-scan-triage.md`. Das Modul ist kein Review-Rezept und
+Nach dem Merge bewertet `/k-audit` den Lauf über das Command-Modul
+`commands/_audit/review-scan-triage.md`. Das Modul ist kein Review-Rezept und
 wird nicht aus `reviews/` geladen. Es gehört zum Command-Namensraum von
-`/k-review-run` und wird als AI-Eintrag `scan-triage` im Lauf geführt.
+`/k-audit` und wird als AI-Eintrag `scan-triage` im Lauf geführt. Der
+`/k-review`-Report-Modus nutzt dasselbe Eingabe- und Ausgabeformat, schreibt aber keinen
+MCP-Entry-Status.
 
 Eingaben sind ausschließlich Dateien im Laufkontext:
 
@@ -576,7 +581,7 @@ Gruppen-IDs und nennt den nächsten Schritt je Bündel. Gruppen, die durch
 `known-decisions.md` gedeckt sind, bleiben sichtbar und werden als gedeckt markiert; die
 Zuordnung kommt ausschließlich aus `review-input.json`.
 
-Nach dem Schreiben setzt `/k-review-run` den AI-Eintrag mit
+Nach dem Schreiben setzt `/k-audit` den AI-Eintrag mit
 `k_playbook_review_write_ai_entry` auf `done` und `result: review-triage.md`.
 Das Werkzeug schreibt dabei nur `entries/scan-triage.json`; der Markdown-Inhalt
 bleibt ein direktes Artefakt im Laufordner. Ein `done`-Status ist nur konsistent,

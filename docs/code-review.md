@@ -11,20 +11,19 @@ flowchart TD
     C --> D["Änderungsvorschläge bestätigen"]
     D --> E["Bestätigte Edits ausführen"]
     B -->|Report-Mode| F["Result-Familie schreiben"]
-    F --> G["assessment.md"]
-    F --> H["findings.md"]
+    F --> G["review-input.json"]
+    F --> H["review-triage.md"]
     F --> I["raw/ und run-metadata"]
-    G --> J["/k-results"]
-    H --> J
+    H --> J["/k-results"]
     J --> K["summary-YYYY-MM-DD.md"]
-    G --> L["/k-remediation <assessment-or-summary>"]
+    H --> L["/k-remediation <review-triage-or-summary>"]
     K --> L
     L --> M{"Remediation-Policy"}
     M -->|task-branch-pr oder task-first| N["Task-Dateien erzeugen"]
-    N --> O["/k-review-loop"]
+    N --> O["/k-task-refine"]
     O --> P["/k-run"]
     M -->|direct-allowed| Q["kleine freigegebene Fixes"]
-    L --> R["findings.md / assessment.md Status pflegen"]
+    L --> R["review-triage.md / Summary Status pflegen"]
 ```
 
 Der Standardablauf für Report-Reviews ist:
@@ -33,7 +32,7 @@ Der Standardablauf für Report-Reviews ist:
 /k-review <name>
 /k-results
 /k-remediation <summary-or-assessment>
-/k-review-loop
+/k-task-refine
 /k-run
 ```
 
@@ -72,10 +71,14 @@ Interaktive Reviews moderieren Stelle für Stelle:
 Report-Mode-Reviews erzeugen Ergebnisartefakte:
 
 ```text
-k-playbook-local/results/<familie>/<YYYY-MM-DD>/assessment.md
-k-playbook-local/results/<familie>/<YYYY-MM-DD>/findings.md
+k-playbook-local/results/<familie>/<YYYY-MM-DD>/review-input.json
+k-playbook-local/results/<familie>/<YYYY-MM-DD>/review-triage.md
 k-playbook-local/results/<familie>/<YYYY-MM-DD>/raw/
 ```
+
+`assessment.md` und `findings.md` sind nur noch Legacy-Artefakte bestehender
+historischer Ergebnisordner. Neue Report-Reviews mit `result-family` schreiben
+`review-input.json` als Belegvertrag und `review-triage.md` als Handoff.
 
 Report-Mode-Reviews ohne eigene Ergebnisfamilie, z. B. `tech`, schreiben direkt eine Summary:
 
@@ -107,7 +110,7 @@ Aufrufe:
 
 Der Command:
 
-- liest vorhandene `assessment.md`- und `findings.md`-Dateien unter `k-playbook-local/results/`.
+- liest vorhandene `review-triage.md`-Dateien unter `k-playbook-local/results/<datum>/` und `k-playbook-local/results/<familie>/<datum>/`; historische `assessment.md`/`findings.md` nur als Legacy-Fallback, wenn kein `review-triage.md` vorhanden ist.
 - startet keine Scanner.
 - verändert keine Raw-Artefakte.
 - dedupliziert Findings über Familien hinweg.
@@ -133,13 +136,15 @@ Aufrufe:
 ```text
 /k-remediation
 /k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
-/k-remediation k-playbook-local/results/<familie>/<datum>/assessment.md
+/k-remediation k-playbook-local/results/<datum>/review-triage.md
+/k-remediation k-playbook-local/results/<familie>/<datum>/review-triage.md
 ```
 
 Unterstützte Inputs:
 
 - Summaries von `/k-results` oder von Report-Reviews ohne eigene Ergebnisfamilie.
-- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/assessment.md` mit zugehörigem `findings.md`.
+- Audit-Läufe wie `k-playbook-local/results/<datum>/review-triage.md`.
+- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/review-triage.md`; Legacy-Ordner mit `assessment.md` und `findings.md` nur, wenn kein `review-triage.md` vorhanden ist.
 
 Der Command:
 
@@ -148,7 +153,7 @@ Der Command:
 - bündelt Findings nach Risiko, Aufwand, Kopplung und Verifikation.
 - zeigt die Remediation-Policy aus `K-PLAYBOOK.yaml`.
 - überführt bestätigte Bündel in Tasks oder freigegebene direkte Fixes.
-- pflegt Status und Task-Verweise nachvollziehbar in `findings.md` oder Summary.
+- pflegt Status und Task-Verweise nachvollziehbar in `review-triage.md` oder Summary; bei Legacy-Inputs weiter in `findings.md`.
 
 `raw/` und Run-Metadaten bleiben read-only. Sie sind auditierbare Belege und dürfen nicht umgeschrieben werden.
 
@@ -171,14 +176,17 @@ Im Modus `task-branch-pr` erzeugt `/k-remediation` keine direkten Code-Fixes. Be
 
 ## Artefakte Und Status
 
-Jede Report-/Scan-Familie soll diese Dateien erzeugen:
+Jede neue Report-/Scan-Familie soll diese Dateien erzeugen:
 
-- `assessment.md`: kuratierte Gesamtbewertung, Kurzfazit, Priorisierung, Handoff.
-- `findings.md`: mutable, statusfähige Arbeitsliste aller Findings oder bewusst gruppierter Baseline-Findings.
+- `review-input.json`: strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md`: kuratierte Gesamtbewertung, Bündel, Nicht-gebündelt-Liste, Deckung aus Known-Decisions und Handoff.
 - `raw/`: auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
 - `run-metadata.json` oder äquivalent: auditierbare Laufmetadaten.
 
-Standard-Statuswerte in `findings.md`:
+`assessment.md` und `findings.md` bleiben nur als Legacy-Fallback für historische
+Ergebnisse lesbar. Neue Downstream-Handoffs zeigen auf `review-triage.md`.
+
+Standard-Statuswerte für Legacy-`findings.md`:
 
 | Status | Bedeutung | Remediation-Relevanz |
 |---|---|---|
@@ -198,13 +206,13 @@ Nach einem Report-Mode-Review nennt `/k-review` den nächsten Handoff, typischer
 ```text
 /k-results
 /k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
-/k-remediation k-playbook-local/results/<familie>/<YYYY-MM-DD>/assessment.md
+/k-remediation k-playbook-local/results/<familie>/<YYYY-MM-DD>/review-triage.md
 ```
 
 Wenn `/k-remediation` Tasks erzeugt, ist der nächste Schritt nicht direkte Umsetzung im Chat, sondern der normale Task-Flow:
 
 ```text
-/k-review-loop
+/k-task-refine
 /k-run
 ```
 
@@ -216,5 +224,5 @@ Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das ve
 - `/k-review` bewertet oder erzeugt Findings, setzt größere Remediation aber nicht direkt um.
 - `/k-results` ist read-mostly, erzeugt keine Tasks und führt keine Remediation aus.
 - `/k-remediation` startet keine Scanner und priorisiert nicht projektweit neu.
-- Größere Umsetzung läuft über Tasks, `/k-review-loop` und `/k-run`.
+- Größere Umsetzung läuft über Tasks, `/k-task-refine` und `/k-run`.
 - Direkte Fixes sind nur bei passender Policy und expliziter Freigabe erlaubt.

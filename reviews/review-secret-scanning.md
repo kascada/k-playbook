@@ -5,6 +5,13 @@ interval-weeks: 4
 scope-hint: gitleaks/trufflehog-Ergebnisse für Git-Historie und Arbeitsbaum; keine Remediation, keine Secret-Rotation aus diesem Review heraus
 handoff: /k-remediation
 result-family: secret-scanning
+audit:
+  enabled: true
+  title: Secret-Scanning Assessment
+  resultRequired: true
+  defaultResult: review-secret-scanning.md
+review:
+  enabled: true
 ---
 
 # Review: Secret-Scanning Assessment
@@ -16,7 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Secret-Scanning-Ergebnissen. Dieses
 - Echte Secrets, produktive Credentials und Token-Leaks priorisiert sichtbar machen.
 - Tool-Rohdaten von Review-Bewertung trennen.
 - False Positives, Test-Fixtures und bekannte Entscheidungen nachvollziehbar markieren.
-- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfähiges `findings.md` erzeugen.
+- `review-input.json` als Belegvertrag und `review-triage.md` als Handoff erzeugen.
 - Keine Produktcode-Änderungen und keine Secret-Rotation durch dieses Review.
 
 ## Voraussetzungen
@@ -38,8 +45,8 @@ Dieses Review schreibt in:
 
 Dateien:
 
-- `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
+- `review-input.json` - strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` - kuratierte Gesamtbewertung mit Bündeln, nicht gebündelten Findings und Handoff.
 - `raw/gitleaks-git.json` - Gitleaks-Git-Historienrohdata, falls ausgeführt.
 - `raw/gitleaks-dir.json` - Gitleaks-Arbeitsbaumrohdata, falls ausgeführt.
 - `raw/trufflehog.json` - TruffleHog-Rohdata, falls ausgeführt.
@@ -74,7 +81,7 @@ Priorität:
 - P2: plausibel aktive Tokens mit begrenztem Scope, interne Service-Credentials, Secrets in Git-Historie ohne sichtbare Rotation.
 - P3: Test-Fixtures, Beispielwerte, low-confidence Findings, bereits rotierte oder offensichtlich deaktivierte Werte.
 
-Review-Status in `findings.md`:
+Review-Status im Remediation-Status von `review-triage.md`:
 
 - `open` - neu oder noch nicht geprüft.
 - `confirmed` - echter Secret-Fund.
@@ -85,57 +92,72 @@ Review-Status in `findings.md`:
 
 Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint oder semantischer Credential-Typ gleich sind.
 
-## Assessment-Format
+## Review-Triage-Format
 
-`assessment.md` enthält mindestens:
+`review-triage.md` enthält die Pflichtabschnitte aus `commands/_audit/review-scan-triage.md`:
 
 ```markdown
-# Secret-Scanning Assessment - YYYY-MM-DD
+# Review-Triage secret-scanning/YYYY-MM-DD
 
 ## Quellen
 
 - Gitleaks: `raw/gitleaks-*.json`
 - TruffleHog: `raw/trufflehog.json`
-- Finding-Register: `findings.md`
+- Quelle: `review-input.json`
 
-## Kurzfazit
+## Bündel
 
-- Rohmeldungen: <n>
-- Deduplizierte Findings: <n>
-- P1/P2/P3: <counts>
-- Wichtigster Befund: <kurz>
+| ID | Priorität | Kategorie | Kurzbegründung | Gruppen |
+|---|---|---|---|---|
 
-## Bewertete Liste
+## Bündel-Details
 
-| Prio | Finding-ID | Status | Typ | Ort | Bewertung | Nächster Schritt |
-|---|---|---|---|---|---|---|
+### B1 — <Titel>
 
-## Sofortige Triage-Reihenfolge
+Begründung: ...
 
-1. ...
+Betroffene Belege: ...
+
+Nächster Schritt: ...
+
+## Nicht gebündelt
+
+## Deckung aus known-decisions
 
 ## Handoff
 
-`/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/review-triage.md`
 ```
 
-## Finding-Register-Format
+## Review-Input-Format
 
-`findings.md` enthält pro dedupliziertem Befund:
+`review-input.json` enthält pro dedupliziertem Befund Evidence mit Datei, Zeile, Quelle und Tool:
 
-```markdown
-### secret-001
-
-- Status: `open`
-- Priorität: `P1|P2|P3`
-- Tool(s): `gitleaks`, `trufflehog`
-- Typ: ...
-- Ort: `path:line` oder Git-Commit
-- Fingerprint: ...
-- Raw-Quelle: `raw/...`
-- Review-Bewertung: _offen_
-- Rotation/Revocation: _offen_
-- Remediation: _offen_
+```json
+{
+  "scope": { "type": "review", "family": "secret-scanning" },
+  "groups": [
+    {
+      "id": "secret-001",
+      "title": "<Credential-Typ> in <Ort>",
+      "priority": "P1|P2|P3",
+      "findings": ["secret-001"],
+      "evidence": [
+        {
+          "file": "path",
+          "line": 12,
+          "source": "tool:gitleaks|trufflehog",
+          "message": "<Secret-Typ>, Fingerprint, Raw-Quelle raw/..."
+        }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
 ```
 
 ## Handoff
@@ -143,7 +165,7 @@ Findings aus mehreren Tools deduplizieren, wenn Datei, Zeile, Secret-Fingerprint
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/secret-scanning/YYYY-MM-DD/review-triage.md
 ```
 
 Remediation und Secret-Rotation sind ausdrücklich nicht Teil dieses Reviews.

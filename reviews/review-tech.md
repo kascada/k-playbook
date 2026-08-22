@@ -4,6 +4,13 @@ title: Tech-Debt-Analyse
 interval-weeks: 24
 scope-hint: Quell- und Infrastruktur-Verzeichnisse; Ausschluss - priv/, secure/, tasks/, virtuelle Umgebungen
 handoff: /k-remediation
+audit:
+  enabled: false
+  title: Tech-Debt-Analyse
+  resultRequired: true
+  defaultResult: review-tech.md
+review:
+  enabled: true
 ---
 
 # Review: Tech-Debt

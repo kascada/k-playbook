@@ -66,9 +66,9 @@ func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 	}
 }
 
-func TestResolveRegistryErhaeltReviewRunNamensraumUndOverlaySchaltetAb(t *testing.T) {
+func TestResolveRegistryErhaeltAuditNamensraumUndOverlaySchaltetAb(t *testing.T) {
 	root := t.TempDir()
-	name := "_review-run/review-scan-triage.md"
+	name := "_audit/review-scan-triage.md"
 	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", filepath.FromSlash(name)), "# Modul\n")
 
 	active := ActiveRegistry(root, KindCommands)

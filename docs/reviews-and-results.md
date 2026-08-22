@@ -8,7 +8,8 @@ liegen und welchen Status sie tragen. Der Ablauf der Commands steht in
 
 k-playbook trennt vier Schritte:
 
-1. **Review ausführen** — `/k-review <name>` erzeugt oder bewertet Ergebnisse einer Familie.
+1. **Review oder Audit ausführen** — `/k-review <name>` bewertet gezielt eine Familie,
+   `/k-audit` führt einen vollständigen Sweep aus.
 2. **Ergebnisse ablegen** — je Familie und Datum unter `k-playbook-local/results/`.
 3. **Projektweit priorisieren** — `/k-results` fasst mehrere Familien zusammen und dedupliziert.
 4. **Abarbeiten** — `/k-remediation` arbeitet priorisierte, statusfähige Findings ab.
@@ -40,8 +41,8 @@ k-playbook-local/results/
 ├── known-decisions.md            bewusst getroffene Entscheidungen
 ├── summary-YYYY-MM-DD.md         projektweite Priorisierung aus /k-results
 └── <familie>/YYYY-MM-DD/
-    ├── assessment.md
-    ├── findings.md
+    ├── review-input.json
+    ├── review-triage.md
     ├── run-metadata.json
     └── raw/
 ```
@@ -50,8 +51,8 @@ Beispiel:
 
 ```text
 k-playbook-local/results/k-check/2026-07-24/
-├── assessment.md
-├── findings.md
+├── review-input.json
+├── review-triage.md
 ├── run-metadata.json
 └── raw/
     └── k-check-baseline.txt
@@ -62,10 +63,12 @@ nie dorthin.
 
 ## Artefakte pro Familie
 
-Jede Report-/Scan-Familie erzeugt diese Dateien:
+Jede neue Report-/Scan-Familie erzeugt diese Dateien:
 
-- `assessment.md` — kuratierte Gesamtbewertung, Kurzfazit, Priorisierung, Handoff.
-- `findings.md` — mutable, statusfähige Arbeitsliste aller Findings.
+- `review-input.json` — strukturierter Belegvertrag mit Scope, Gruppen, Evidence,
+  nicht gebündelten Findings und Known-Decision-Coverage.
+- `review-triage.md` — einheitliches Endartefakt mit Kopf, Bündel-Tabelle,
+  Bündel-Details, Nicht gebündelt und Deckung aus known-decisions.
 - `raw/` — auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
 - `run-metadata.json` oder äquivalent — auditierbare Laufmetadaten.
 
@@ -73,11 +76,10 @@ Raw-Artefakte und Run-Metadaten sind auditierbar. Sie dürfen nach dem Schreiben
 gekürzt, überschrieben oder inhaltlich korrigiert werden. Korrekturen erfolgen über
 neue Raw-Dateien plus aktualisierte Bewertung.
 
-`findings.md` ist das mutable Arbeitsregister für Status, Owner, Triage-Notizen,
-Remediation-Verweise und Akzeptierungen.
-
-`assessment.md` ist kuratiert. Es darf nachvollziehbar aktualisiert werden, z. B. um einen
-Abschnitt `## Remediation-Status`, aber die ursprünglichen Raw-Belege bleiben unverändert.
+`review-triage.md` ist kuratiert. Es darf nachvollziehbar aktualisiert werden, z. B. um
+einen Abschnitt `## Remediation-Status`, aber die ursprünglichen Raw-Belege bleiben
+unverändert. `assessment.md` und `findings.md` sind Legacy-Artefakte älterer
+Ergebnisfamilien und werden nur gelesen, wenn kein `review-triage.md` vorhanden ist.
 
 Für Läufe im neuen Laufmodell (`k-playbook-local/results/YYYY-MM-DD/`) tritt ein zweites
 Artefaktpaar daneben: `review-input.json` und `review-input.md` aus `k-playbook merge`.
@@ -85,16 +87,16 @@ Sie fassen `raw/` und `entries/` zusammen und dienen als Eingabe für die Bewert
 den Assistenten. Details in
 [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge).
 
-Bis das Family-Modell und der Handoff-Satz vollständig auf das Laufmodell umgestellt
-sind, ist das kuratierbare Endprodukt eines Laufmodell-Laufs
-`k-playbook-local/results/YYYY-MM-DD/review-triage.md`. Es entsteht durch das
-Command-Modul `review-scan-triage`, nicht durch ein Review-Rezept aus `reviews/`.
-`assessment.md` und `findings.md` bleiben vorerst Artefakte der älteren
-Ergebnisfamilien.
+Das kuratierbare Endprodukt beider Bewertungswege ist `review-triage.md`: beim Audit
+direkt unter `k-playbook-local/results/YYYY-MM-DD/`, beim gezielten Report-Review unter
+`k-playbook-local/results/<familie>/YYYY-MM-DD/`. Nur der Scope unterscheidet sich.
+`/k-results` und `/k-remediation` akzeptieren beide aktuellen Pfadformen; Legacy-
+`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
+`review-triage.md`.
 
 ## Statusmodell
 
-Standard-Statuswerte in `findings.md`:
+Statuswerte in Legacy-`findings.md`:
 
 | Status | Bedeutung | Remediation-Relevanz |
 |---|---|---|
@@ -188,8 +190,7 @@ eindeutige Namen verwenden, z. B. `k-check-baseline-e2e.txt` und `run-metadata-e
 | Rezept | `k-playbook/reviews/review-secret-scanning.md` |
 | Ergebnisse | `k-playbook-local/results/secret-scanning/YYYY-MM-DD/` |
 
-Typische Artefakte: `assessment.md` mit bewerteter Liste und Triage-Reihenfolge,
-`findings.md` mit statusfähigen deduplizierten Findings, `raw/gitleaks-*.json`,
+Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json`,
 `raw/trufflehog.json`.
 
 Die Tools kommen host-lokal aus
@@ -203,8 +204,7 @@ installiert.
 | Rezept | `k-playbook/reviews/review-dependency-cve.md` |
 | Ergebnisse | `k-playbook-local/results/dependency-cve/YYYY-MM-DD/` |
 
-Typische Artefakte: `assessment.md` mit Bewertung nach Projektpriorität statt nur
-Tool-Severity, `findings.md` mit statusfähigen CVE-/GHSA-Findings, `raw/pip-audit.json`,
+Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/pip-audit.json`,
 `raw/trivy-fs.json`, bei Bedarf `raw/grype.json`.
 
 ### GitHub Dependabot Alerts
@@ -214,8 +214,7 @@ Tool-Severity, `findings.md` mit statusfähigen CVE-/GHSA-Findings, `raw/pip-aud
 | Rezept | `k-playbook/reviews/review-dependabot-alerts.md` |
 | Ergebnisse | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
 
-Typische Artefakte: `assessment.md` mit Remediation-Clustern und Einzelalert-Übersicht,
-`findings.md` mit einem Register je GitHub-Alert (`depbot-<alert-number>`),
+Typische Artefakte: `review-input.json`, `review-triage.md`,
 `raw/dependabot-alerts-open.jsonl` als auditierbarer Import,
 `raw/dependabot-alerts-summary.tsv` für schnelle Triage.
 
@@ -231,8 +230,8 @@ kein Finding.
 | Rezept | `k-playbook/reviews/review-iac-container.md` |
 | Ergebnisse | `k-playbook-local/results/iac-container/YYYY-MM-DD/` |
 
-Typische Artefakte: `assessment.md` für Container-, Image-, IaC- und
-Filesystem-Findings, `findings.md` mit statusfähigen deduplizierten Findings,
+Typische Artefakte: `review-input.json`, `review-triage.md` für Container-, Image-, IaC- und
+Filesystem-Findings,
 `raw/trivy-*.json`, bei Bedarf `raw/syft-*.json` und `raw/grype-*.json`.
 
 ## Review-Log
@@ -249,7 +248,7 @@ Fokus sowie eine Protokollzeile mit Scope, Output und Handoff.
 Beispiel-Handoff:
 
 ```text
-/k-remediation k-playbook-local/results/k-check/2026-07-24/assessment.md
+/k-remediation k-playbook-local/results/k-check/2026-07-24/review-triage.md
 ```
 
 `known-decisions.md` liegt daneben und hält fest, was bewusst so entschieden wurde. Im
@@ -262,17 +261,17 @@ Datei, kombiniert beide Ebenen und schreibt die Wirkung sichtbar in `review-inpu
 `/k-remediation` versteht zwei Eingaben:
 
 - eine Summary, `k-playbook-local/results/summary-YYYY-MM-DD.md`,
-- eine Familie, `k-playbook-local/results/<familie>/<datum>/assessment.md` mit
-  zugehörigem `findings.md`.
+- eine Familie, `k-playbook-local/results/<familie>/<datum>/review-triage.md`.
 
-Bei einer Familie ist `findings.md` die primäre Arbeitsdatei; `assessment.md` liefert
-Kontext und Kurzbewertung. `raw/` und `run-metadata.*` sind read-only.
+Bei einer Familie ist `review-triage.md` die primäre Arbeitsdatei. Legacy-Familien mit
+`assessment.md` und `findings.md` bleiben lesbar, wenn kein `review-triage.md` vorhanden
+ist. `raw/` und `run-metadata.*` sind read-only.
 
 Ein erzeugter Remediation-Task muss enthalten:
 
-- die Quelle, `k-playbook-local/results/<familie>/<datum>/assessment.md`,
-- die Finding-IDs aus `findings.md`,
-- das Arbeitsregister `findings.md`,
+- die Quelle, `k-playbook-local/results/<familie>/<datum>/review-triage.md`,
+- die Bündel- oder Gruppen-IDs aus `review-triage.md`,
+- das Arbeitsregister `review-triage.md`,
 - die Raw-Quelle, falls vorhanden,
 - die ursprüngliche Ort-/Message-Angabe,
 - alle Findings, die zusammen gelöst werden sollen, wenn es einen gemeinsamen
@@ -317,7 +316,8 @@ Dependency-CVE, IaC/Container und spätere.
 
 Aufgaben von `/k-results`:
 
-- `assessment.md` und `findings.md` aus allen Familien lesen,
+- `review-triage.md` aus allen Familien lesen; Legacy-`assessment.md`/`findings.md` nur,
+  wenn kein `review-triage.md` vorhanden ist,
 - Befunde über Familien hinweg deduplizieren,
 - `known-decisions.md` berücksichtigen,
 - existierende Tasks berücksichtigen,
@@ -341,8 +341,7 @@ Kurzbeschreibung.
 Empfehlung: konkreter nächster Schritt.
 
 Quellen:
-- `k-playbook-local/results/<familie>/<datum>/assessment.md`
-- `k-playbook-local/results/<familie>/<datum>/findings.md#<finding-id>`
+- `k-playbook-local/results/<familie>/<datum>/review-triage.md#<buendel-id>`
 
 Was man zum Lösen braucht:
 - betroffene Datei/Zeile

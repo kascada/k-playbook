@@ -67,9 +67,9 @@ Tools (zusätzlich): ...
 
 If any task file contains a `## Tools` section: collect all listed tools across all tasks and show them to the user upfront before executing anything. This allows the user to grant additional permissions before the run starts.
 
-## Step 1.2 - Review-Loop-Status prüfen
+## Step 1.2 - Task-Refine-Status prüfen
 
-Ein Task, der nie durch `/k-review-loop` gegangen ist, wurde nie gegengelesen. Prüfe für
+Ein Task, der nie durch `/k-task-refine` gegangen ist, wurde nie gegengelesen. Prüfe für
 jede gesammelte Task-Datei, ob sie eine `## Review-Log`-Sektion enthält.
 
 Wenn **alle** Dateien ein Review-Log tragen: weiter, ohne Rückfrage.
@@ -78,28 +78,28 @@ Wenn mindestens eine keines hat: die betroffenen Dateien in **einer** Nachricht 
 und fragen:
 
 ```
-Ohne Review-Loop:
+Ohne Task-Refine:
   - 014-setup-tts.md
   - 015-integrate-tts.md
 
-Diese Tasks wurden nicht mit /k-review-loop gegengelesen.
+Diese Tasks wurden nicht mit /k-task-refine gegengelesen.
 Trotzdem ausführen? (ja / nein / zuerst reviewen)
 ```
 
 - `ja` — weiter mit Step 1.5.
 - `nein` — abbrechen, nichts ausführen.
-- `zuerst reviewen` — abbrechen und wörtlich `/k-review-loop <RUN_TARGET_DISPLAY>`
-  nennen, danach `/k-run` erneut starten. Den Review-Loop nicht selbst aufrufen.
+- `zuerst reviewen` — abbrechen und wörtlich `/k-task-refine <RUN_TARGET_DISPLAY>`
+  nennen, danach `/k-run` erneut starten. Den Task-Refine-Command nicht selbst aufrufen.
 
 Bei explizitem Datei-Argument gilt dieselbe Prüfung, nur für die eine Datei.
 
-`/k-review-loop` hängt sein Log an **jede geprüfte** Datei an, auch an die, an der nichts
+`/k-task-refine` hängt sein Log an **jede geprüfte** Datei an, auch an die, an der nichts
 zu ändern war (dort mit dem Vermerk „keine Änderungen"). Ein fehlender Block heißt
 deshalb: diese Datei war nie im Review-Loop.
 
 Trotzdem bleibt es eine Rückfrage und kein Abbruch. Eine von Hand geschriebene oder aus
 einem anderen Projekt übernommene Task-Datei kann sachlich in Ordnung sein, ohne je
-durch den Loop gegangen zu sein — das zu entscheiden ist Sache des Users, nicht des
+durch Task-Refine gegangen zu sein — das zu entscheiden ist Sache des Users, nicht des
 Commands.
 
 ## Step 1.5 - Diff-Baseline setzen

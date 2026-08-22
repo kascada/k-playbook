@@ -19,6 +19,7 @@ Der Umbau auf das projektlokale Modell ist durch und in der Doku eingearbeitet:
 | Rezepte, Ergebnisse, Remediation-Policy | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Entfallenes: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
 | Werkzeug: Anker finden, Verlinkung, Update, Spiegelung, Altlasten, Web-API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
+| Command-Namen und Review-Handoff: `/k-audit`, `/k-review`, `/k-task-refine`, einheitliches `review-triage.md` | [`commands.md`](./commands.md), [`code-review.md`](./code-review.md), [`review-runs.md`](./review-runs.md) |
 
 ## Arbeitsteilung: Entwicklungsrepo vs. Installation
 
@@ -197,7 +198,7 @@ ebenso. Details in
 [`scripts/scanners.tsv`](../scripts/scanners.tsv).
 
 **Erledigt: Alternative 2, Command orchestriert über MCP.** Aus Task 018
-(`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-review-run` ist jetzt
+(`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-audit` ist jetzt
 scharfgeschaltet: Der Command legt Läufe über MCP an oder setzt sie fort, liest vor jedem
 Schritt den Status, startet Scanner, führt AI-Review-Einträge, startet den Merge und ruft
 danach das Bewertungsmodul `review-scan-triage` auf. Die Auswahlbasis kommt aus
@@ -213,7 +214,7 @@ rufen die bestehende Fachlogik unter `installer/internal/review/*` und
 [`mcp.md`](./mcp.md).
 
 **Erledigt: Bewertung als Command-Modul statt Katalog-Rezept.** Aus Task 018. Die
-Bewertung eines Laufs liegt unter `commands/_review-run/review-scan-triage.md`, liest
+Bewertung eines Laufs liegt unter `commands/_audit/review-scan-triage.md`, liest
 `review-input.json` und `review-input.md`, berücksichtigt `known-decisions.md` über einen
 festen Suchpfad und schreibt `review-triage.md` direkt in den Laufordner. Der AI-Eintrag
 `scan-triage` wird über den MCP-Vertrag geführt, obwohl er nicht in `catalogs.reviews`
@@ -233,7 +234,7 @@ Realdurchlauf vom 2026-08-19 deckt die 74 `_old/`-Gruppen über `kd-old-tree`; `
 **Erledigt: Namensraum-Konvention für Command-Module.** Zusammen mit Task 018 festgelegt
 und in `rules/command-authoring.md` verankert: `commands/_<name>/` trägt Module (kein
 Command). `_shared/` bleibt für Module, die alle Commands teilen; `_<command-name>/`
-sammelt command-eigene Module (`_review-run/`), `_<familie>/` sammelt Module einer
+sammelt command-eigene Module (`_audit/`), `_<familie>/` sammelt Module einer
 Command-Familie (z. B. `_docs/`, sobald die Docs-Commands gemeinsame Module bekommen).
 Overlay funktioniert per Datei-Pfad ab `commands/`; leere Datei schaltet ab. Regel in
 [`../rules/command-authoring.md`](../rules/command-authoring.md#ablage).
@@ -255,18 +256,16 @@ werden in dieser Reihenfolge angegangen:
    archivierter Legacy-Code. Sobald `known-decisions.md` deren Deckung trägt, entscheiden
    wir mit ruhiger Übersicht: löschen, verschieben oder ausschließen. Danach neuer Merge
    und Triage zur Kontrolle.
-2. **End-to-End-Test des `/k-review-run`-Flows.** Der Command ist scharf, MCP-Werkzeuge
+2. **End-to-End-Test des `/k-audit`-Flows.** Der Command ist scharf, MCP-Werkzeuge
    liegen an, Modul und Merge sind erledigt, `known-decisions.md` wirkt. Was noch fehlt,
    ist der Durchlauf am Stück in einer Chat-Sitzung — neuer Lauf, Auswahl bestätigen,
    Scan, Merge, Triage, `review-triage.md` lesen. Erste Zielprojekte: dieses Repo und
    OMNI. Nach dem Testlauf notieren wir, was am Command, am Modul und an der Auswahl
    auffällt.
 3. **Handoff nach der Triage.** Was passiert mit `review-triage.md` nach der Bewertung?
-   `/k-remediation` versteht heute zwei Formate; `review-triage.md` ist keins davon. Zwei
-   Wege: `/k-remediation` als drittes Format erweitern, oder ein eigenes Nachfolgemodul
-   `remediate-triage.md` unter `_review-run/`, das aus jedem Bündel eine Task-Datei nach
-   `k-playbook-local/tasks/` erzeugt. Entscheidung erst nach dem End-to-End-Test aus
-   Punkt 3, damit die konkrete Übergabe-Erfahrung die Wahl trägt.
+   `/k-remediation` versteht `review-triage.md` als aktuelles Format; historische
+   `assessment.md`/`findings.md` bleiben Legacy-Fallback. Offen ist nur noch die konkrete
+   Qualität der Task-Erzeugung aus Bündeln im End-to-End-Test.
 
 **Kleiner Aufräumpunkt: Installations-Sync.** Die zwei letzten Merges brauchten einen
 `chmod u+w` auf den Installations-Clone, damit `scripts/severity.tsv` (aus Task 016)

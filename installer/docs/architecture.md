@@ -999,7 +999,7 @@ bereits richtig. Als Titel dient die erste Überschrift, ersatzweise der Dateina
 dieselbe Regel wie bei der Doku.
 
 Jede Zeile sagt außerdem, ob der Task schon gegengelesen wurde. Erkannt wird das an der
-`## Review-Log`-Sektion, die `/k-review-loop` an **jede** geprüfte Datei anhängt, auch an
+`## Review-Log`-Sektion, die `/k-task-refine` an **jede** geprüfte Datei anhängt, auch an
 die unveränderte — dieselbe Spur, an der `/k-run` Step 1.2 das prüft. Nennt die
 Überschrift ein Datum, steht es dabei; mehrere Runden hängen mehrere Logs an, gezeigt
 wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als

@@ -110,7 +110,13 @@ type CatalogEntry struct {
 	// Origin: dist, local oder override.
 	Origin string `json:"origin"`
 	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab.
-	Disabled bool `json:"disabled,omitempty"`
+	Disabled bool         `json:"disabled,omitempty"`
+	Audit    *CatalogMode `json:"audit,omitempty"`
+	Review   *CatalogMode `json:"review,omitempty"`
+}
+
+type CatalogMode struct {
+	Enabled bool `json:"enabled"`
 }
 
 // catalogKind beschreibt eine der drei Sorten.
@@ -222,11 +228,106 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 			entry.Path = shipped[name]
 			entry.Origin = "dist"
 		}
+		if kind.name == "reviews" && !entry.Disabled {
+			modes := readReviewModes(entry.Path)
+			entry.Audit = &CatalogMode{Enabled: modes.AuditEnabled}
+			entry.Review = &CatalogMode{Enabled: modes.ReviewEnabled}
+		}
 		entries = append(entries, entry)
 	}
 
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	return entries
+}
+
+type reviewModes struct {
+	AuditEnabled  bool
+	ReviewEnabled bool
+}
+
+func readReviewModes(path string) reviewModes {
+	modes := reviewModes{AuditEnabled: false, ReviewEnabled: true}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return modes
+	}
+	content := string(data)
+	if !(strings.HasPrefix(content, "---\n") || strings.HasPrefix(content, "---\r\n")) {
+		return modes
+	}
+	end := markdownFrontmatterEnd(content)
+	if end < 0 {
+		return modes
+	}
+	parseReviewModeFrontmatter(content[:end], &modes)
+	return modes
+}
+
+func parseReviewModeFrontmatter(frontmatter string, modes *reviewModes) {
+	inAudit := false
+	inReview := false
+	blockIndent := -1
+	for _, line := range strings.Split(frontmatter, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if strings.HasSuffix(trimmed, ":") {
+			key := strings.TrimSuffix(trimmed, ":")
+			if indent <= blockIndent {
+				inAudit = false
+				inReview = false
+			}
+			if key == "audit" || key == "review" {
+				inAudit = key == "audit"
+				inReview = key == "review"
+				blockIndent = indent
+				continue
+			}
+		}
+		if (!inAudit && !inReview) || indent <= blockIndent {
+			continue
+		}
+		key, value, found := strings.Cut(trimmed, ":")
+		if !found || strings.TrimSpace(key) != "enabled" {
+			continue
+		}
+		value = strings.TrimSpace(strings.Trim(strings.TrimSpace(value), `"'`))
+		if inAudit {
+			modes.AuditEnabled = value != "false"
+		}
+		if inReview {
+			modes.ReviewEnabled = value != "false"
+		}
+	}
+}
+
+func markdownFrontmatterEnd(content string) int {
+	startEnd := strings.Index(content, "\n")
+	if startEnd < 0 {
+		return -1
+	}
+	offset := startEnd + 1
+	for offset <= len(content) {
+		next := strings.Index(content[offset:], "\n")
+		lineEnd := len(content)
+		if next >= 0 {
+			lineEnd = offset + next
+		}
+		line := strings.TrimSpace(strings.TrimSuffix(content[offset:lineEnd], "\r"))
+		if line == "---" {
+			if next >= 0 {
+				return lineEnd + 1
+			}
+			return lineEnd
+		}
+		if next < 0 {
+			break
+		}
+		offset = lineEnd + 1
+	}
+	return -1
 }
 
 // catalogFiles liest ein Katalogverzeichnis, ohne Nicht-Einträge.

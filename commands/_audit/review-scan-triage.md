@@ -1,20 +1,25 @@
 # review-scan-triage
 
-Dieses Modul ist kein Review-Katalog-Rezept. Es wird ausschließlich von
-`/k-review-run` eingebunden und beschreibt den AI-Eintrag `scan-triage` eines
-Review-Laufs. Der Eintrag gehört nicht zu `catalogs.reviews`; er entsteht aus dem
-effektiven Command-Namensraum `commands/_review-run/review-scan-triage.md`.
+Dieses Modul ist kein Review-Katalog-Rezept. Es wird von `/k-audit` und vom
+`/k-review`-Report-Modus eingebunden und beschreibt die einheitliche Triage auf Basis
+von `review-input.json`. Der Audit-Eintrag `scan-triage` gehört nicht zu
+`catalogs.reviews`; er entsteht aus dem effektiven Command-Namensraum
+`commands/_audit/review-scan-triage.md`.
 
 ## Eingaben
 
-Der aufrufende Command liefert den Laufstatus aus `k_playbook_review_status`.
-Verwende daraus ausschließlich den gemeldeten Laufordner als `RUN_DIR`.
+Der aufrufende Command liefert entweder den Laufstatus aus `k_playbook_review_status`
+(`/k-audit`) oder das Ergebnisverzeichnis des Report-Reviews (`/k-review`). Verwende
+daraus ausschließlich den gemeldeten Ordner als `RUN_DIR`.
 
 Lies aus `RUN_DIR`:
 
-- `review-input.json` als vollständigen Audit-Beleg mit Provenienz, Belegen und
-  stabilen Gruppen-IDs sowie `knownDecisions` und `coveredByKnownDecision`.
-- `review-input.md` als kompakte Ansicht.
+- `review-input.json` als vollständigen Beleg mit `scope.type` (`audit` oder `review`),
+  Provenienz, Evidence-Einträgen, stabilen Gruppen-IDs sowie `knownDecisions` und
+  `coveredByKnownDecision`. `ungroupedFindings` sind Findings ohne sinnvolle
+  Gruppen-Zuordnung und müssen im Triage-Dokument sichtbar bleiben.
+- `review-input.md` als kompakte Ansicht, falls vorhanden. Im `/k-review`-Report-Modus
+  darf die Markdown-Ansicht fehlen; dann verlinke Gruppen-IDs nur als Code-Spans.
 
 Suche keine `known-decisions.md` und führe kein eigenes Matching aus. Die Deckung ist
 bereits im Merge-Artefakt entschieden: Nutze ausschließlich `review-input.json`, dort
@@ -27,14 +32,15 @@ Schreibe genau eine Datei direkt:
 
 - `RUN_DIR/review-triage.md`
 
-`RUN_DIR` ist der Laufordner aus dem MCP-Status des aktuellen Laufs. Schreibe nicht
-nach `raw/`, nicht nach `run.json`, nicht nach `entries/*.json` und nicht nach
-`review-input.*`.
+`RUN_DIR` ist der Laufordner aus dem MCP-Status des aktuellen Audit-Laufs oder das
+Family-Date-Verzeichnis eines Report-Reviews. Schreibe nicht nach `raw/`, nicht nach
+`run.json`, nicht nach `entries/*.json` und nicht nach `review-input.*`.
 
-Nach erfolgreichem Schreiben ruft `/k-review-run`
+Nach erfolgreichem Schreiben ruft `/k-audit`
 `k_playbook_review_write_ai_entry` auf und setzt den Eintrag `scan-triage` auf
 `done` mit `result: review-triage.md`. Dieses MCP-Werkzeug schreibt nur den
-Eintragszustand, nicht den Markdown-Inhalt.
+Eintragszustand, nicht den Markdown-Inhalt. Im `/k-review`-Report-Modus gibt es keinen
+Audit-Entry; dort entfällt dieser MCP-Schritt.
 
 ## Bewertung
 
@@ -52,7 +58,8 @@ Verdichte die Gruppen aus `review-input.json` zu Bewertungs-Bündeln.
   nicht stillschweigend und lege sie nicht in offene Bündel.
 - Gruppen mit `partialCoverage: true` bleiben offen sichtbar; nenne die Teildeckung aus
   `knownDecisionCoverage`.
-- Liste Gruppen ohne sinnvolle Bündel-Zuordnung im Abschnitt `Nicht gebündelt`.
+- Liste Gruppen ohne sinnvolle Bündel-Zuordnung und alle `ungroupedFindings` aus
+  `review-input.json` im Abschnitt `Nicht gebündelt`.
 
 Priorisierung:
 
@@ -77,10 +84,11 @@ Kategorien:
 `review-triage.md` hat diese Abschnitte in dieser Reihenfolge:
 
 ```markdown
-# Review-Triage <lauf>
+# Review-Triage <lauf-oder-family-date>
 
 Erzeugt: <RFC3339-Zeitstempel>
-Lauf: `<RUN_DIR_DISPLAY>`
+Scope: `<audit YYYY-MM-DD | review <family>/YYYY-MM-DD>`
+Ordner: `<RUN_DIR_DISPLAY>`
 Quelle: `review-input.json`
 Known-Decisions: <Kurzstatus aus `knownDecisions`, keine eigene Suche>
 
@@ -101,7 +109,7 @@ Nächster Schritt: ...
 
 ## Nicht gebündelt
 
-| Priorität | Kategorie | Kurzbegründung | Gruppen |
+| Priorität | Kategorie | Kurzbegründung | Gruppen/Findings |
 |---|---|---|---|
 
 ## Deckung aus known-decisions
@@ -111,7 +119,7 @@ Nächster Schritt: ...
 ```
 
 Stabile Gruppen-IDs werden als Links in den Laufbeleg geschrieben, zum Beispiel
-`` `scan-gosec-b94401` `` oder, wenn ein Anker vorhanden ist,
+`` `scan-gosec-b94401` `` oder `` `review-secret-scanning-001` ``, wenn ein Anker vorhanden ist,
 `[scan-gosec-b94401](review-input.md#...)`.
 
 ## Abschluss
@@ -121,8 +129,10 @@ Melde nach dem Schreiben:
 - den Pfad `RUN_DIR/review-triage.md`,
 - die Anzahl der Bündel,
 - Restgruppen im Abschnitt `Nicht gebündelt`,
-- ob `known-decisions.md` verwendet wurde,
+- den Known-Decisions-Status aus `review-input.json`,
 - wie viele Gruppen durch `knownDecisions` aus `review-input.json` vollständig oder
   teilweise gedeckt sind,
-- dass `k_playbook_review_write_ai_entry` als nächster Schritt den Eintrag
-  `scan-triage` auf `done` mit `result: review-triage.md` setzen muss.
+- bei `/k-audit`: dass `k_playbook_review_write_ai_entry` als nächster Schritt den
+  Eintrag `scan-triage` auf `done` mit `result: review-triage.md` setzen muss.
+- bei `/k-review`: den Handoff `/k-remediation RUN_DIR/review-triage.md` oder zuerst
+  `/k-results`, wenn mehrere Familien projektweit priorisiert werden sollen.

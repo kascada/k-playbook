@@ -5,6 +5,13 @@ interval-weeks: 4
 scope-hint: Dependency-CVE-Ergebnisse aus Manifesten und Lockfiles; keine Upgrades oder Remediation aus diesem Review heraus
 handoff: /k-remediation
 result-family: dependency-cve
+audit:
+  enabled: true
+  title: Dependency-CVE Assessment
+  resultRequired: true
+  defaultResult: review-dependency-cve.md
+review:
+  enabled: true
 ---
 
 # Review: Dependency-CVE Assessment
@@ -16,7 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus Dependency-CVE-Scans. Dieses Review
 - Bekannte CVEs in direkten und relevanten transitiven Dependencies sichtbar machen.
 - Tool-Severity von projektspezifischer Review-Priorität trennen.
 - Exploitability, Reachability-Hinweise und Upgrade-Aufwand für die Triage erfassen.
-- Ein `assessment.md` mit priorisierter Liste und ein statusfähiges `findings.md` erzeugen.
+- `review-input.json` als Belegvertrag und `review-triage.md` als Handoff erzeugen.
 - Keine Dependency-Upgrades durch dieses Review.
 
 ## Voraussetzungen
@@ -38,8 +45,8 @@ Dieses Review schreibt in:
 
 Dateien:
 
-- `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste.
-- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
+- `review-input.json` - strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` - kuratierte Gesamtbewertung mit Bündeln, nicht gebündelten Findings und Handoff.
 - `raw/pip-audit.json` - Python-CVE-Rohdaten, falls anwendbar.
 - `raw/trivy-fs.json` - Trivy-Filesystem-/Dependency-Rohdaten.
 - `raw/grype.json` - Grype-Rohdaten, falls ausgeführt.
@@ -82,7 +89,7 @@ Berücksichtige:
 - Ob die betroffene Komponente im Produktpfad genutzt wird.
 - Bekannte Entscheidungen aus `known-decisions.md`.
 
-Review-Status in `findings.md`:
+Review-Status im Remediation-Status von `review-triage.md`:
 
 - `open` - neu oder noch nicht geprüft.
 - `confirmed` - CVE betrifft eine relevante Dependency im Produktkontext.
@@ -93,9 +100,9 @@ Review-Status in `findings.md`:
 
 Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Quelle gleich sind.
 
-## Assessment-Format
+## Review-Triage-Format
 
-`assessment.md` enthält mindestens:
+`review-triage.md` enthält mindestens die Pflichtabschnitte aus `commands/_audit/review-scan-triage.md`:
 
 ```markdown
 # Dependency-CVE Assessment - YYYY-MM-DD
@@ -105,7 +112,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 - pip-audit: `raw/pip-audit.json`
 - Trivy: `raw/trivy-fs.json`
 - Grype: `raw/grype.json`
-- Finding-Register: `findings.md`
+- Quelle: `review-input.json`
 
 ## Kurzfazit
 
@@ -125,28 +132,38 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 
 ## Handoff
 
-`/k-remediation k-playbook-local/results/dependency-cve/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/dependency-cve/YYYY-MM-DD/review-triage.md`
 ```
 
-## Finding-Register-Format
+## Review-Input-Format
 
-`findings.md` enthält pro dedupliziertem Befund:
+`review-input.json` enthält pro dedupliziertem Befund Evidence mit Datei, Zeile, Quelle und Tool:
 
-```markdown
-### depcve-001
-
-- Status: `open`
-- Priorität: `P1|P2|P3`
-- Package: ...
-- Version: ...
-- CVE/GHSA: ...
-- Severity: ...
-- Fix-Version: ...
-- Quelle: `pyproject.toml`, `requirements.txt`, `package-lock.json`, ...
-- Raw-Quelle: `raw/...`
-- Review-Bewertung: _offen_
-- Upgrade-Hinweis: _offen_
-- Remediation: _offen_
+```json
+{
+  "scope": { "type": "review", "family": "dependency-cve" },
+  "groups": [
+    {
+      "id": "depcve-001",
+      "title": "<package> <version> - <CVE/GHSA>",
+      "priority": "P1|P2|P3",
+      "findings": ["depcve-001"],
+      "evidence": [
+        {
+          "file": "pyproject.toml|requirements.txt|package-lock.json|...",
+          "line": null,
+          "source": "tool:<tool-name>",
+          "message": "<CVE/GHSA>, Severity, Fix-Version, Raw-Quelle raw/..."
+        }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
 ```
 
 ## Handoff
@@ -154,7 +171,7 @@ Findings deduplizieren, wenn CVE-ID, Package, Version und Manifest-/Lockfile-Que
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook-local/results/dependency-cve/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/dependency-cve/YYYY-MM-DD/review-triage.md
 ```
 
 Remediation und Dependency-Upgrades sind ausdrücklich nicht Teil dieses Reviews.

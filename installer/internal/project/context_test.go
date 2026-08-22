@@ -152,6 +152,40 @@ func TestBuildContextBildetKeys(t *testing.T) {
 	}
 }
 
+func TestBuildContextZeigtReviewModi(t *testing.T) {
+	root := newContextProject(t)
+
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\nreview:\n  enabled: false\n---\n# Audit\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	defaultEntry, ok := entryByName(context.Catalogs["reviews"], "review-default.md")
+	if !ok {
+		t.Fatal("review-default.md fehlt")
+	}
+	if defaultEntry.Audit == nil || defaultEntry.Audit.Enabled {
+		t.Fatalf("default audit = %#v, erwartet false", defaultEntry.Audit)
+	}
+	if defaultEntry.Review == nil || !defaultEntry.Review.Enabled {
+		t.Fatalf("default review = %#v, erwartet true", defaultEntry.Review)
+	}
+
+	auditEntry, ok := entryByName(context.Catalogs["reviews"], "review-audit-only.md")
+	if !ok {
+		t.Fatal("review-audit-only.md fehlt")
+	}
+	if auditEntry.Audit == nil || !auditEntry.Audit.Enabled {
+		t.Fatalf("audit = %#v, erwartet true", auditEntry.Audit)
+	}
+	if auditEntry.Review == nil || auditEntry.Review.Enabled {
+		t.Fatalf("review = %#v, erwartet false", auditEntry.Review)
+	}
+}
+
 func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 	root := newContextProject(t)
 	write(t, filepath.Join(LocalDir(root), "guidelines", "stil.md"), "# Vorgabe\n")

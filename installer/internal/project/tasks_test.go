@@ -67,7 +67,7 @@ func TestListTasksOhneVerzeichnis(t *testing.T) {
 	}
 }
 
-// Der Review-Status hängt am Log, das /k-review-loop an jede geprüfte Datei
+// Der Review-Status hängt am Log, das /k-task-refine an jede geprüfte Datei
 // anhängt — dieselbe Erkennung, die /k-run Step 1.2 benutzt.
 func TestListTasksErkenntReviewLog(t *testing.T) {
 	root := tasksFixture(t, map[string]string{

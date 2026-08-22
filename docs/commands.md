@@ -41,12 +41,12 @@ gestartet wurde.
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
-| `/k-review-run` | zusammenhängenden Review-Lauf über MCP anlegen oder fortsetzen und nach dem Merge triagieren | [`review-runs.md`](./review-runs.md) |
+| `/k-audit` | vollständigen Audit-Sweep über MCP anlegen oder fortsetzen und nach dem Merge triagieren | [`review-runs.md`](./review-runs.md) |
 | `/k-results` | vorhandene Ergebnisse projektweit priorisieren | [`code-review.md`](./code-review.md) |
 | `/k-remediation` | Findings bündeln und in Tasks oder Fixes überführen | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
 | `/k-task-create` | Task-Datei aus dem Gesprächskontext erzeugen | [`task-flow.md`](./task-flow.md) |
-| `/k-review-loop` | Task-Dateien vor der Ausführung per Critic/Editor-Dialog prüfen | [`task-flow.md`](./task-flow.md) |
+| `/k-task-refine` | Task-Dateien vor der Ausführung per Critic/Editor-Dialog härten | [`task-flow.md`](./task-flow.md) |
 | `/k-run` | Task-Dateien sequenziell ausführen | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergänzen | |
 | **Hilfen** | | |
@@ -64,23 +64,29 @@ Installationsbefehl kommen aus der Oberfläche, alles Weitere kann
 
 Die Code-Review-Familie ist bewusst gestuft:
 
+| Anlass | Command | Ergebnis |
+|---|---|---|
+| vollständiger Sicherheits-Sweep über passende Werkzeuge und Audit-Rezepte | `/k-audit` | `k-playbook-local/results/YYYY-MM-DD/review-input.json`, `review-input.md`, `review-triage.md` |
+| gezieltes einzelnes Review-Rezept, interaktiv oder als Report | `/k-review <name>` | interaktive Änderungsvorschläge oder `<family>/YYYY-MM-DD/review-input.json` und `review-triage.md` |
+| Task-/Instruction-Datei vor Ausführung härten | `/k-task-refine [path]` | Review-Log direkt in der geprüften Task-/Instruction-Datei |
+
 1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmäßig read-only.
 2. `/k-review <name>` führt ein Rezept aus und erzeugt je nach Rezept interaktive
-   Änderungsvorschläge oder Report-Artefakte.
-3. `/k-review-run` orchestriert das neue Laufmodell: Lauf anlegen oder fortsetzen,
+   Änderungsvorschläge oder `review-triage.md` als Report-Handoff.
+3. `/k-audit` orchestriert das Laufmodell: Lauf anlegen oder fortsetzen,
    Scanner und Merge über MCP starten, KI-Reviews als Subtasks führen und
    `review-triage.md` schreiben.
 4. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
 5. `/k-remediation <result>` plant die Abarbeitung der Findings.
 
 Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
-`/k-review-loop`, dann `/k-run`.
+`/k-task-refine`, dann `/k-run`.
 
 ## Task-Flow
 
 ```text
 /k-task-create
-/k-review-loop
+/k-task-refine
 /k-run
 ```
 

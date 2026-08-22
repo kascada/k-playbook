@@ -176,6 +176,9 @@ func reviewChoices(projectDir string) []choice {
 		if entry.Disabled {
 			continue
 		}
+		if entry.Audit == nil || !entry.Audit.Enabled {
+			continue
+		}
 		choices = append(choices, choice{
 			Name:      entry.Key,
 			Kind:      review.KindAI,

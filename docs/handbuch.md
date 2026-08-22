@@ -147,8 +147,8 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 |---|---|---|
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
-| Code-Review | `/k-pr-review`, `/k-review`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews ausführen, Findings priorisieren und abarbeiten |
-| Task-Flow | `/k-task-create`, `/k-review-loop`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, prüfen und ausführen |
+| Code-Review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews und Audits ausführen, Findings priorisieren und abarbeiten |
+| Task-Flow | `/k-task-create`, `/k-task-refine`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, härten und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
 
 Neue oder geänderte Commands werden erst nach einem Neustart des Assistenten sichtbar.
@@ -160,14 +160,14 @@ flowchart TD
     Start["Arbeit im Projekt"] --> Small{"Kurzer direkter Fix?"}
     Small -->|ja| Direct["direkt im Chat bearbeiten und verifizieren"]
     Small -->|nein| Task["/k-task-create"]
-    Task --> ReviewLoop["/k-review-loop"]
+    Task --> ReviewLoop["/k-task-refine"]
     ReviewLoop --> Run["/k-run"]
     Run --> Done["Task nach tasks/done/ verschieben"]
 
     Start --> Review["/k-review <name>"]
     Review --> Mode{"Review-Modus"}
     Mode -->|interaktiv| Direct
-    Mode -->|Report| Artifacts["assessment.md + findings.md + raw/"]
+    Mode -->|Report| Artifacts["review-input.json + review-triage.md + raw/"]
     Artifacts --> Results["/k-results"]
     Results --> Summary["summary-YYYY-MM-DD.md"]
     Summary --> Remediation["/k-remediation"]
@@ -183,7 +183,7 @@ Für geplante Arbeit, die nicht in einem kurzen Chat-Schritt erledigt werden sol
 
 ```text
 /k-task-create
-/k-review-loop
+/k-task-refine
 /k-run
 ```
 
@@ -197,8 +197,8 @@ Report-Reviews erzeugen auditierbare Artefakte und führen bei Bedarf in Remedia
 ```text
 /k-review <name>
 /k-results
-/k-remediation <summary-oder-assessment>
-/k-review-loop
+/k-remediation <summary-oder-review-triage>
+/k-task-refine
 /k-run
 ```
 

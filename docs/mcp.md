@@ -159,7 +159,7 @@ dieselbe Auswahlbasis. Kandidaten enthalten mindestens `name`, `kind`, `title`,
 Tool-Kandidaten kommen aus der Tool-Matrix und dem Preflight, gefiltert nach
 `project.languages`. Nicht installierte oder sprachlich unpassende Tools bleiben sichtbar,
 sind aber nicht `defaultSelected`. AI-Kandidaten kommen aus dem effektiven Review-Katalog;
-abgeschaltete lokale Review-Dateien und Rezepte mit `reviewRun.enabled: false` fehlen.
+abgeschaltete lokale Review-Dateien und Rezepte mit `audit.enabled: false` fehlen.
 
 Ohne `entries` wählt `k_playbook_review_create` alle Kandidaten mit
 `defaultSelected: true`. Unbekannte Namen ergeben `selection_unknown`, ausdrücklich
@@ -181,17 +181,23 @@ globalen Preflight-Abbruch.
 
 ### AI-Rezeptmetadaten
 
-Review-Rezepte können am Dateianfang `reviewRun`-Frontmatter tragen:
+Review-Rezepte können am Dateianfang getrenntes `audit`-/`review`-Frontmatter tragen:
 
 ```yaml
 ---
-reviewRun:
+audit:
   enabled: true
   title: "Technischer Review"
   resultRequired: true
   defaultResult: "review-tech.md"
+review:
+  enabled: true
 ---
 ```
+
+Die MCP-Werkzeuge heißen weiter `k_playbook_review_*`, weil sie die technische
+Review-Katalog-/Run-API bilden. Die sichtbare Nutzerrolle des vollständigen Sweeps ist
+trotzdem `/k-audit`.
 
 Beim Anlegen eines Laufs werden `recipeKey`, `recipePath`, `recipeOrigin`, `title`,
 `resultRequired` und `defaultResult` in `run.json` kopiert. Das Schreibwerkzeug für

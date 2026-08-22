@@ -1,11 +1,11 @@
 ---
-description: Führt einen Review-Lauf über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
+description: Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
 argument-hint: [YYYY-MM-DD|latest|new]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
-# k-review-run
+# k-audit
 
 ## Erster Schritt
 
@@ -15,7 +15,7 @@ auf und lies die Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
-`/k-review-run` ist der Chat-Einstieg für das Laufmodell. Der Command hält keinen
+`/k-audit` ist der Chat-Einstieg für den vollständigen Scan-und-Bewertungs-Sweep. Der Command hält keinen
 eigenen Zustand: Jeder Aufruf liest den Ist-Zustand über die MCP-Werkzeuge aus dem
 Laufverzeichnis und setzt genau dort fort.
 
@@ -26,7 +26,7 @@ Ergebnisse dieses Commands:
 - Scanner-Fortschritt und AI-Entry-Fortschritt unter `entries/`,
 - `review-input.json` und `review-input.md` nach dem Merge,
 - `review-triage.md` nach Anwendung des Moduls
-  `commands/_review-run/review-scan-triage.md`.
+  `commands/_audit/review-scan-triage.md`.
 
 ## Schritt 1 — Pfade und Lauf bestimmen
 
@@ -43,7 +43,7 @@ Command-specific policy:
 - Das Laufverzeichnis wird nie geraten. Für bestehende Läufe kommt es aus
   `k_playbook_review_status`, für neue Läufe aus `k_playbook_review_create`.
 - `scan-triage` ist ein AI-Eintrag aus dem Command-Modul
-  `commands/_review-run/review-scan-triage.md`, kein Eintrag aus
+  `commands/_audit/review-scan-triage.md`, kein Eintrag aus
   `catalogs.reviews`.
 - `review-triage.md` wird direkt in den vom MCP-Status gelieferten Laufordner
   geschrieben. `k_playbook_review_write_ai_entry` schreibt danach nur
@@ -174,10 +174,11 @@ verändert.
 Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` im
 Laufordner vorhanden sind.
 
-Wende `commands/_review-run/review-scan-triage.md` wortlaut-treu an:
+Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an:
 
 - Verwende `review-input.json` als Audit-Beleg und `review-input.md` als Ansicht.
-- Suche `known-decisions.md` nur an den dort genannten deterministischen Pfaden.
+- Suche `known-decisions.md` nicht selbst; nutze nur die Deckung aus
+  `review-input.json`.
 - Bündele Gruppen nach gemeinsamer Root-Cause.
 - Vergib Priorität `P1`/`P2`/`P3` und Kategorie `S`/`T`/`K`/`F`/`A`/`X`.
 - Verweise auf stabile Gruppen-IDs.
@@ -211,12 +212,16 @@ Lies zum Abschluss den Status erneut und melde:
 - AI-Entry-Zustände,
 - Pfad zu `review-input.json`, `review-input.md` und `review-triage.md`,
 - offene technische Fehler oder bewusst übersprungene Einträge,
-- den nächsten fachlichen Schritt.
+- den nächsten fachlichen Schritt: `/k-results` für eine projektweite priorisierte
+  Summary oder `/k-remediation k-playbook-local/results/<lauf>/review-triage.md` für
+  direkte Abarbeitung der Triage.
 
-Handoff: Der Nachfolger für `review-triage.md` ist noch nicht endgültig definiert.
-Bis dahin endet der Command ausdrücklich mit dem Pfad zu
-`k-playbook-local/results/<lauf>/review-triage.md` und dem Hinweis, dass daraus später
-Tasks oder Remediation-Bündel abgeleitet werden.
+Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
+
+```text
+/k-results latest
+/k-remediation k-playbook-local/results/<lauf>/review-triage.md
+```
 
 ## Fehlerfälle
 

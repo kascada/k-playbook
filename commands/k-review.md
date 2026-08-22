@@ -1,5 +1,5 @@
 ---
-description: Execute a review from the effective review catalog. Handles all generic orchestration - known-decisions lookup, one-by-one moderation, log update - so review files only describe review-specific content. Pass a review name as argument, or omit to pick from a list.
+description: Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
 argument-hint: [review-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -16,14 +16,17 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Run a code review against the current project, using a review recipe from the effective
-catalog in the context output.
+Führe ein gezieltes Review gegen das aktuelle Projekt aus, anhand eines Review-Rezepts
+aus dem effektiven Katalog der Context-Ausgabe.
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in the `review-authoring` entry of `catalogs.rules`.
 
 ## Step 1 — Resolve paths
 
-Recipes come from `catalogs.reviews`; everything a review produces goes under
+Recipes come from `catalogs.reviews`; `/k-review` darf nur Einträge mit
+`review.enabled: true` auswählen oder explizit ausführen. Fehlt der Block, gilt
+`review.enabled: true`; `audit.enabled` steuert ausschließlich `/k-audit` und MCP-Läufe.
+Everything a review produces goes under
 `<local.dir>/results/`. From the context output:
 
 - `RESULTS_DIR` = `<local.dir>/results`
@@ -49,8 +52,11 @@ If `$ARGUMENTS` is non-empty: treat it as the review name.
   so no separate fallback is needed.
 - If the key is not in the effective catalog but a local file switches it off,
   say so explicitly instead of reporting it as unknown.
+- If the key resolves to a recipe with `review.enabled: false`, abort with: Dieses
+  Rezept ist für `/k-review` deaktiviert; es kann höchstens im Audit-Modus aktiv sein.
 
-If `$ARGUMENTS` is empty: build a selection list from the effective catalog.
+If `$ARGUMENTS` is empty: build a selection list from the effective catalog and include
+only recipes with `review.enabled: true`. Do not show audit-only recipes as selectable.
 
 - For each entry, read its YAML frontmatter (`title`, `interval-weeks`) and, if available, the last log entry (see Step 6) to show `Letzter Lauf`.
 - Present as:
@@ -81,6 +87,8 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
 - `result-family` (optional; e.g. `dependency-cve` — for report-mode reviews that use `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`)
+- `review.enabled` (optional; default `true` for this command)
+- `audit.enabled` (optional; default `false`, ignored by this command)
 
 If `KNOWN_DECISIONS` is set and the file exists:
 
@@ -133,11 +141,44 @@ Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu mod
 
 1. Analyse gemäß Review-Datei durchführen.
 2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad wählen.
-   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Das Review-Rezept bestimmt die konkreten Dateien, typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten. Der Handoff zeigt immer auf `assessment.md` in diesem Verzeichnis.
+   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis.
    - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind überschreiben: nach Bestätigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
-   `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/assessment.md`
+   `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
+
+`review-input.json` im Report-Modus ist der Eingabevertrag für `review-triage.md` und
+entspricht strukturell dem Audit-Merge:
+
+```json
+{
+  "scope": { "type": "review", "family": "<result-family>" },
+  "groups": [
+    {
+      "id": "review-<family>-001",
+      "title": "...",
+      "findings": ["..."],
+      "evidence": [
+        { "file": "path", "line": 12, "source": "review:<name>", "message": "..." }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
+```
+
+Stabile Bündel-IDs dürfen bei Re-Runs nicht ohne Grund wechseln. Jede Gruppe braucht
+mindestens einen Evidence-Eintrag mit Datei, optionaler Zeile und Quelle. Findings ohne
+sinnvolle Bündelung bleiben in `ungroupedFindings`, nicht in einer improvisierten Gruppe.
+
+`review-triage.md` im Report-Modus verwendet dieselben Pflichtabschnitte wie das
+Audit-Modul `commands/_audit/review-scan-triage.md`: Kopf, `## Bündel`,
+`## Bündel-Details`, `## Nicht gebündelt`, `## Deckung aus known-decisions`.
+Abschnitte ohne Treffer bleiben vorhanden und enthalten eine kurze Begründung.
 
 ## Step 6 — Log-Eintrag
 

@@ -31,14 +31,14 @@ Commands eingebunden werden — keine Commands selbst. Es gibt drei Sorten Namen
 - `commands/_shared/` für Module, die für alle Commands gedacht sind. Heute liegt dort
   genau eine Datei: `context.md`.
 - `commands/_<command-name>/` für Module, die zu genau einem Command gehören, z. B.
-  `commands/_review-run/` als Modulverzeichnis von `/k-review-run`.
+  `commands/_audit/` als Modulverzeichnis von `/k-audit`.
 - `commands/_<familie>/` für Module, die eine Command-Familie teilt, z. B. `commands/_docs/`
   für gemeinsame Bausteine der Docs-Commands.
 
 Overlay und Assistenten-Verlinkung folgen für Module derselben Regel wie für Commands:
 Pfad ab `commands/`, gleicher Dateiname ersetzt vollständig, leere Datei schaltet ab. Der
 Rest des Namensraums bleibt mitgeliefert. Namensraum-Verzeichnisse werden beim Verlinken
-erhalten (`.claude/commands/_review-run/…`), damit Module über ihren stabilen Pfad
+erhalten (`.claude/commands/_audit/…`), damit Module über ihren stabilen Pfad
 eingebunden werden können.
 
 Ein Modul entsteht dort, wo eine Anleitung länger als ein Absatz ist **und** zusammen

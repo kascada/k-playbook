@@ -78,6 +78,8 @@ type reviewCandidate struct {
 	RecipeKey         string      `json:"recipeKey,omitempty"`
 	RecipePath        string      `json:"recipePath,omitempty"`
 	RecipeOrigin      string      `json:"recipeOrigin,omitempty"`
+	AuditEnabled      *bool       `json:"auditEnabled,omitempty"`
+	ReviewEnabled     *bool       `json:"reviewEnabled,omitempty"`
 	ResultRequired    *bool       `json:"resultRequired,omitempty"`
 	DefaultResult     string      `json:"defaultResult,omitempty"`
 }
@@ -92,6 +94,7 @@ type reviewSelectionBase struct {
 
 type aiRecipeMetadata struct {
 	Enabled        bool
+	ReviewEnabled  bool
 	Title          string
 	ResultRequired bool
 	DefaultResult  string
@@ -145,7 +148,7 @@ const (
 	reviewToolMerge        = "k_playbook_review_merge"
 	reviewToolWriteAIEntry = "k_playbook_review_write_ai_entry"
 	scanTriageEntry        = "scan-triage"
-	scanTriageModule       = "_review-run/review-scan-triage.md"
+	scanTriageModule       = "_audit/review-scan-triage.md"
 	scanTriageResult       = "review-triage.md"
 )
 
@@ -851,6 +854,8 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 			continue
 		}
 		resultRequired := metadata.ResultRequired
+		auditEnabled := metadata.Enabled
+		reviewEnabled := metadata.ReviewEnabled
 		candidates = append(candidates, reviewCandidate{
 			Name:            entry.Key,
 			Kind:            review.KindAI,
@@ -861,6 +866,8 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 			RecipeKey:       entry.Key,
 			RecipePath:      entry.Path,
 			RecipeOrigin:    entry.Origin,
+			AuditEnabled:    &auditEnabled,
+			ReviewEnabled:   &reviewEnabled,
 			ResultRequired:  &resultRequired,
 			DefaultResult:   metadata.DefaultResult,
 		})
@@ -1022,13 +1029,13 @@ func readAIRecipeMetadata(key string, path string) (aiRecipeMetadata, error) {
 	if err != nil {
 		return aiRecipeMetadata{}, err
 	}
-	metadata := aiRecipeMetadata{Enabled: true, ResultRequired: true}
+	metadata := aiRecipeMetadata{Enabled: false, ReviewEnabled: true, ResultRequired: true}
 	content := string(data)
 	body := content
 	if strings.HasPrefix(content, "---\n") || strings.HasPrefix(content, "---\r\n") {
 		end := frontmatterEnd(content)
 		if end >= 0 {
-			parseReviewRunFrontmatter(content[:end], &metadata)
+			parseAIRecipeFrontmatter(content[:end], &metadata)
 			body = content[end:]
 		}
 	}
@@ -1068,9 +1075,10 @@ func frontmatterEnd(content string) int {
 	return -1
 }
 
-func parseReviewRunFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
-	inReviewRun := false
-	reviewRunIndent := -1
+func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
+	inAudit := false
+	inReview := false
+	blockIndent := -1
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
@@ -1079,24 +1087,38 @@ func parseReviewRunFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
 		if strings.HasSuffix(trimmed, ":") {
 			key := strings.TrimSuffix(trimmed, ":")
-			if key == "reviewRun" {
-				inReviewRun = true
-				reviewRunIndent = indent
+			if indent <= blockIndent {
+				inAudit = false
+				inReview = false
+			}
+			if key == "audit" || key == "review" {
+				inAudit = key == "audit"
+				inReview = key == "review"
+				blockIndent = indent
 				continue
 			}
-			if indent <= reviewRunIndent {
-				inReviewRun = false
-			}
-		}
-		if !inReviewRun || indent <= reviewRunIndent {
-			continue
 		}
 		key, value, found := strings.Cut(trimmed, ":")
 		if !found {
 			continue
 		}
 		value = strings.TrimSpace(strings.Trim(strings.TrimSpace(value), `"'`))
-		switch strings.TrimSpace(key) {
+		field := strings.TrimSpace(key)
+		if !inAudit && !inReview && indent == 0 && field == "title" && metadata.Title == "" {
+			metadata.Title = value
+			continue
+		}
+		if (!inAudit && !inReview) || indent <= blockIndent {
+			continue
+		}
+		if inReview && field == "enabled" {
+			metadata.ReviewEnabled = value != "false"
+			continue
+		}
+		if !inAudit {
+			continue
+		}
+		switch field {
 		case "enabled":
 			metadata.Enabled = value != "false"
 		case "title":

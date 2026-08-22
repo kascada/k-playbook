@@ -18,10 +18,11 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die `/k-review` im Report-Modus erzeugt hat. Vor der Umsetzung wird immer ein Remediation-Plan gebildet: welche Findings zusammen gehören, was zuerst kommt, was Quick-Win ist und was einen eigenen Task/Branch/PR braucht.
 
-Unterstützt zwei Formate:
+Unterstützt aktuelle und historische Formate:
 
 - Result-Summaries wie `k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
-- Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, z. B. `dependency-cve` oder `k-check`.
+- Aktuelle Result-Familien wie `k-playbook-local/results/<family>/<date>/review-triage.md` mit optionalem `review-input.json`.
+- Legacy-Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, nur wenn im selben Ordner kein `review-triage.md` vorhanden ist.
 
 Der `remediation`-Block der Context-Ausgabe legt fest, wie gearbeitet wird:
 
@@ -64,21 +65,42 @@ Wenn `$ARGUMENTS` angegeben: diese Datei einlesen.
 Akzeptierte direkte Argumente:
 
 - `<RESULTS_DIR>/summary-*.md`
-- `<RESULTS_DIR>/<family>/<date>/assessment.md`
-- Projektrelative Varianten davon, z. B. `k-playbook-local/results/k-check/2026-07-23/assessment.md`
+- `<RESULTS_DIR>/<date>/review-triage.md`
+- `<RESULTS_DIR>/<family>/<date>/review-triage.md`
+- Legacy: `<RESULTS_DIR>/<family>/<date>/assessment.md`, wenn dort kein `review-triage.md` liegt
+- Projektrelative Varianten davon, z. B. `k-playbook-local/results/2026-07-23/review-triage.md` oder `k-playbook-local/results/k-check/2026-07-23/review-triage.md`
 
 Wenn nicht:
 
-1. In `<RESULTS_DIR>` nach `summary-*.md` suchen sowie nach `<RESULTS_DIR>/*/*/assessment.md`.
-2. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
-3. Wenn mehrere: als Liste zeigen und den User wählen lassen.
-4. Wenn keine: fragen:
+1. In `<RESULTS_DIR>` nach `summary-*.md`, `<RESULTS_DIR>/*/review-triage.md` und `<RESULTS_DIR>/*/*/review-triage.md` suchen.
+2. Legacy-Fallback: Nur Family-Ordner ohne `review-triage.md` zusätzlich über `<RESULTS_DIR>/*/*/assessment.md` anbieten.
+3. Wenn genau eine: sie vorschlagen und Bestätigung abwarten.
+4. Wenn mehrere: als Liste zeigen und den User wählen lassen.
+5. Wenn keine: fragen:
     > "Welche Ergebnisdatei soll abgearbeitet werden?"
 
-**Result-Family-Erkennung:** Wenn die Datei `assessment.md` heißt und der Pfad auf `<RESULTS_DIR>/<family>/<date>/assessment.md` endet:
+**Aktuelle Audit-Erkennung:** Wenn die Datei `review-triage.md` heißt und der Pfad auf `<RESULTS_DIR>/<date>/review-triage.md` endet:
+
+- Setze `RESULT_FORMAT=audit-run`.
+- Setze `RESULT_DATE=<date>`.
+- Lies `review-triage.md` als primäre Arbeitsdatei. Bündel aus `## Bündel` und `## Bündel-Details` sind die Remediation-Einheiten.
+- Lade `review-input.json`, wenn vorhanden, für Evidence-Details und stabile Gruppen-IDs.
+- `review-triage.md` darf nur nachvollziehbar um `## Remediation-Status` oder Statushinweise ergänzt werden; die ursprünglichen Belege bleiben unverändert.
+- `raw/`, `entries/` und `run.json` im selben Verzeichnis sind auditierbar und dürfen nicht verändert werden.
+
+**Aktuelle Result-Family-Erkennung:** Wenn die Datei `review-triage.md` heißt und der Pfad auf `<RESULTS_DIR>/<family>/<date>/review-triage.md` endet:
 
 - Setze `RESULT_FORMAT=result-family`.
 - Setze `RESULT_FAMILY=<family>` und `RESULT_DATE=<date>`.
+- Lies `review-triage.md` als primäre Arbeitsdatei. Bündel aus `## Bündel` und `## Bündel-Details` sind die Remediation-Einheiten.
+- Lade `review-input.json`, wenn vorhanden, für Evidence-Details und stabile Gruppen-IDs.
+- `review-triage.md` darf nur nachvollziehbar um `## Remediation-Status` oder Statushinweise ergänzt werden; die ursprünglichen Belege bleiben unverändert.
+- `raw/` und `run-metadata.*` im selben Verzeichnis sind auditierbar und dürfen nicht verändert werden.
+
+**Legacy-Result-Family-Erkennung:** Wenn die Datei `assessment.md` heißt und der Pfad auf `<RESULTS_DIR>/<family>/<date>/assessment.md` endet:
+
+- Prüfe zuerst, ob im selben Ordner `review-triage.md` existiert. Wenn ja, nutze diese Datei und ignoriere `assessment.md` als Primärinput.
+- Andernfalls setze `RESULT_FORMAT=legacy-result-family`.
 - Erwarte `findings.md` im selben Verzeichnis.
 - Lies `findings.md` als primäres Arbeitsregister.
 - `assessment.md` bleibt Quelle/Kurzbewertung und darf nur nachvollziehbar für Summary, Handoff-Status oder explizite Remediation-Abschnitte aktualisiert werden.
@@ -88,13 +110,15 @@ Wenn nicht:
 
 - Setze `RESULT_FORMAT=summary`.
 - Die Summary-Datei ist die Quelle für priorisierte Remediation-Gruppen und die Arbeitsdatei für Handoff-/Task-Status.
-- Verlinkte `assessment.md`-/`findings.md`-Quellen aus der Summary dürfen mitgeladen werden. `findings.md` bleibt das Arbeitsregister der jeweiligen Result-Familie, wenn konkrete Finding-IDs aktualisiert werden.
+- Verlinkte `review-triage.md`-Quellen aus der Summary dürfen mitgeladen werden. Legacy-`assessment.md`-/`findings.md`-Quellen dürfen nur geladen werden, wenn kein `review-triage.md` vorhanden ist.
 
-**Sonst:** kein unterstütztes Format — sauber abbrechen mit Hinweis, welche beiden Formate erwartet werden, statt zu raten.
+**Sonst:** kein unterstütztes Format — sauber abbrechen mit Hinweis auf `review-triage.md`, `summary-*.md` und Legacy-`assessment.md`, statt zu raten.
 
-**Format-Check Result-Family:** `findings.md` muss Markdown-Headings für einzelne Findings enthalten und darunter mindestens ein Statusfeld in der Form `- Status: `<wert>``. Wenn `findings.md` fehlt oder kein Statusfeld erkennbar ist: sauber abbrechen. Nicht aus `assessment.md` neue Finding-IDs erraten.
+**Format-Check aktuelle Audit- und Result-Family-Triage:** `review-triage.md` muss die Pflichtabschnitte `## Bündel`, `## Bündel-Details`, `## Nicht gebündelt` und `## Deckung aus known-decisions` enthalten. Wenn sie fehlen: sauber abbrechen, nicht aus Rohdaten improvisieren.
 
-Offene Punkte im Result-Family-Format sind Findings mit Status `open`, `confirmed` oder `context-needed`. `likely-false-positive` ist review-relevant, aber nur nach expliziter User-Auswahl remediation-relevant. `accepted` und `fixed` sind Endzustände und dürfen nicht automatisch in neue Fix-Tasks überführt werden.
+**Format-Check Legacy-Result-Family:** `findings.md` muss Markdown-Headings für einzelne Findings enthalten und darunter mindestens ein Statusfeld in der Form `- Status: `<wert>``. Wenn `findings.md` fehlt oder kein Statusfeld erkennbar ist: sauber abbrechen. Nicht aus `assessment.md` neue Finding-IDs erraten.
+
+Offene Punkte im aktuellen Audit- oder Result-Family-Format sind Bündel aus `review-triage.md`, die nicht in `## Deckung aus known-decisions` vollständig gedeckt sind und keinen erledigten Remediation-Status tragen. Im Legacy-Format sind offene Punkte Findings mit Status `open`, `confirmed` oder `context-needed`. `likely-false-positive` ist review-relevant, aber nur nach expliziter User-Auswahl remediation-relevant. `accepted` und `fixed` sind Endzustände und dürfen nicht automatisch in neue Fix-Tasks überführt werden.
 
 ---
 
@@ -204,9 +228,16 @@ Warte auf Antwort. Merke welche Kategorien autonom behandelt werden dürfen (`AU
 
 ## Schritt 5 — Befunde einlesen, gruppieren und sortieren
 
-Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Summary ist die Arbeitsdatei die Summary-Datei mit ihren priorisierten Gruppen. Bei Result-Familien ist die Arbeitsdatei `findings.md`; `assessment.md` wird als Quelle mitgeladen.
+Alle offenen Befunde aus der Arbeitsdatei sammeln. Bei Summary ist die Arbeitsdatei die Summary-Datei mit ihren priorisierten Gruppen. Bei aktuellen Result-Familien ist die Arbeitsdatei `review-triage.md`; `review-input.json` wird, falls vorhanden, als Evidence-Quelle mitgeladen. Bei Legacy-Result-Familien bleibt `findings.md` die Arbeitsdatei; `assessment.md` wird als Quelle mitgeladen.
 
-Result-Family-Parsing:
+Aktuelles Result-Family-Parsing:
+
+- Bündel-ID ist die Markdown-Heading-ID aus `## Bündel-Details`, z. B. `### B1 — Dependency-Upgrade`.
+- Erfasse Priorität, Kategorie, Kurzbegründung, betroffene Gruppen, Belege und nächsten Schritt aus `review-triage.md`.
+- Wenn `review-input.json` vorhanden ist, nutze die dortigen Evidence-Einträge zur Code-Sichtung; erfinde keine Evidence aus der Triage-Prosa.
+- Vollständig durch `## Deckung aus known-decisions` gedeckte Gruppen sind nicht automatisch remediation-relevant; teilgedeckte Gruppen bleiben sichtbar.
+
+Legacy-Result-Family-Parsing:
 
 - Finding-ID ist die Markdown-Heading-ID, z. B. `### kcheck-logging-003` oder `### py/full-ssrf-001`.
 - Die ID muss aus `findings.md` stammen; Task-Erzeugung darf keine neue ID für ein bestehendes Finding erzeugen.
@@ -235,16 +266,16 @@ Bei `mode: task-branch-pr`:
 2. Pro bestätigtem Bündel eine Task-Datei erzeugen.
 3. Task muss enthalten:
     - alle Finding-IDs im Bündel.
-    - Result-Pfad und, falls vorhanden, `findings.md`.
+    - Result-Pfad und, falls vorhanden, `review-input.json` oder Legacy-`findings.md`.
     - Ziel-Root (`target:`), z. B. `./app`.
     - vorgeschlagener Branch: `<branch_prefix><NNN>-<slug>`.
     - Hinweis: PR erforderlich.
     - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
     - Abschnitt `## Branch-Preflight` vor `## Zu bauen` mit klarer Pflicht: zuerst im Target-Repo den Dirty-State prüfen, dann vom Base-Branch den Work-Branch erstellen oder auf bestehenden Work-Branch wechseln, und erst danach Dateien ändern.
     - Verifikationsplan für das Bündel.
-4. Bei Result-Familien in `findings.md` bei allen Findings des Bündels `- Remediation: Task <NNN> - <tasks/...md>` ergänzen oder aktualisieren. Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt ist.
+4. Bei aktuellen Result-Familien `review-triage.md` um `## Remediation-Status` mit Task-Verweis ergänzen oder aktualisieren. Bei Legacy-Result-Familien in `findings.md` bei allen Findings des Bündels `- Remediation: Task <NNN> - <tasks/...md>` ergänzen oder aktualisieren. Status bleibt offen, bis der Fix wirklich umgesetzt ist.
 5. Bei Summary-Dateien die Summary selbst um Task-/Handoff-Status für das Bündel ergänzen oder aktualisieren.
-6. `assessment.md` oder die Summary bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Bündeln.
+6. `review-triage.md`, Legacy-`assessment.md` oder die Summary bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Bündeln.
 
 Bei `mode: task-first`: analog, aber direkte Fixes können nach expliziter Einzelfreigabe erlaubt sein.
 
@@ -314,7 +345,8 @@ Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-
 2. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/done/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
 3. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
 4. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
-    - Bei Result-Familien muss der Task enthalten: Quelle `k-playbook-local/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
+    - Bei aktuellen Result-Familien muss der Task enthalten: Quelle `k-playbook-local/results/<family>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
+    - Bei Legacy-Result-Familien muss der Task enthalten: Quelle `k-playbook-local/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
     - Bei Bündeln muss der Task enthalten: Bündelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root, vorgeschlagener Branch und PR-Pflicht aus der Remediation-Policy.
     - Bei `mode: task-branch-pr` muss der Task zusätzlich diese Struktur enthalten:
 
@@ -382,7 +414,27 @@ Nach jedem bearbeiteten Befund:
 
 ### Result-Familien
 
-Bei `RESULT_FORMAT=result-family` wird primär `findings.md` aktualisiert:
+Bei `RESULT_FORMAT=result-family` wird primär `review-triage.md` aktualisiert:
+
+- Kategorie S nach erfolgreichem Fix und Verifikation: im betroffenen Bündel oder `## Remediation-Status` als `fixed` dokumentieren.
+- Kategorie T mit Task-Datei: `## Remediation-Status` um Task-Verweis, Bündel-ID und betroffene Gruppen ergänzen. Das Bündel bleibt offen, bis der Fix wirklich umgesetzt und verifiziert ist.
+- Kategorie K: Kontextbedarf mit klarer `Triage-Notiz` im Bündel oder Statusabschnitt dokumentieren.
+- Kategorie A: Akzeptierungsgrund und optional Known-Decision-Verweis dokumentieren.
+- Kategorie X: Ausschluss oder falsch-positive Einordnung mit Begründung dokumentieren.
+
+Am Ende von `review-triage.md` einen nachvollziehbaren Abschnitt pflegen:
+
+```markdown
+---
+
+## Remediation-Status
+
+| Datum | Bündel/Gruppe | Kategorie | Aktion | Notiz |
+|---|---|---|---|---|
+| YYYY-MM-DD | B1 | Task | Task 018 | tasks/018-redact-upstream-log.md |
+```
+
+Bei `RESULT_FORMAT=legacy-result-family` wird primär `findings.md` aktualisiert:
 
 - Kategorie S nach erfolgreichem Fix und Verifikation: `- Status: `fixed``.
 - Kategorie T mit Task-Datei: Status bleibt `open` oder `confirmed`, bis der Fix wirklich umgesetzt und verifiziert ist; ergänze aber `- Remediation: Task <NNN> - <tasks/...md>` oder aktualisiere ein vorhandenes Remediation-Feld.
@@ -403,7 +455,7 @@ Am Ende von `findings.md` einen nachvollziehbaren Abschnitt pflegen:
 | YYYY-MM-DD | kcheck-logging-003 | Task | Task 018 | tasks/018-redact-upstream-log.md |
 ```
 
-`assessment.md` darf optional einen Abschnitt `## Remediation-Status` bekommen oder aktualisieren:
+Legacy-`assessment.md` darf optional einen Abschnitt `## Remediation-Status` bekommen oder aktualisieren:
 
 ```markdown
 ## Remediation-Status
@@ -419,7 +471,7 @@ Bei `RESULT_FORMAT=summary` wird die Summary-Datei selbst aktualisiert:
 - Kategorie T mit Task-Datei: in der betroffenen Prioritätsgruppe `Status` oder eine kurze `Remediation:`-Zeile auf `Task <NNN> - <tasks/...md>` setzen.
 - Kategorie K/A/X: Status mit knapper Begründung direkt in der betroffenen Gruppe dokumentieren.
 - Kategorie S nach erfolgreichem Fix und Verifikation: Status auf `fixed` oder `behoben` setzen und Verifikation nennen.
-- Wenn die Summary auf konkrete `findings.md`-IDs verweist, die zugehörigen `findings.md`-Einträge nach den Result-Family-Regeln synchron aktualisieren.
+- Wenn die Summary auf konkrete `review-triage.md`-Bündel oder Legacy-`findings.md`-IDs verweist, die zugehörigen Arbeitsdateien nach den jeweiligen Result-Family-Regeln synchron aktualisieren.
 
 Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
 
@@ -439,7 +491,7 @@ Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
 
 ## Schritt 8 — Log-Eintrag
 
-Nichts wird archiviert oder verschoben. Summary-Dateien bleiben stabil unter `k-playbook-local/results/`; Result-Verzeichnisse bleiben stabil unter `k-playbook-local/results/<family>/<date>/`. Abschluss erfolgt über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md` oder der Summary.
+Nichts wird archiviert oder verschoben. Summary-Dateien bleiben stabil unter `k-playbook-local/results/`; Result-Verzeichnisse bleiben stabil unter `k-playbook-local/results/<family>/<date>/`. Abschluss erfolgt bei aktuellen Result-Familien über `## Remediation-Status` in `review-triage.md`, bei Legacy-Familien über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`, oder bei Summaries direkt in der Summary.
 
 Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auch dann, wenn er keinen einzigen Befund geändert hat:
 
@@ -448,7 +500,7 @@ Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auc
 
    | Datum | Review | Scope | Output |
    |---|---|---|---|
-   | 2026-07-12 | remediation | k-check/2026-07-12/findings.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
+   | 2026-07-12 | remediation | k-check/2026-07-12/review-triage.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
 
 - `Datum`: `now.date`.
 - `Review`: `remediation`.
@@ -480,6 +532,6 @@ Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründ
 
 ## Fehlerfälle
 
-- **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `summary-*.md` und `<family>/<date>/assessment.md` in `<RESULTS_DIR>` auflisten, User wählen lassen. Bei Formatabweichung: abbrechen statt raten.
+- **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `summary-*.md` und `<family>/<date>/review-triage.md` in `<RESULTS_DIR>` auflisten; Legacy-`assessment.md` nur anbieten, wenn kein `review-triage.md` im selben Ordner existiert. Bei Formatabweichung: abbrechen statt raten.
 - **Kein k-playbook-Projekt**: der Context-Aufruf schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` oder `TASKS_DIR` fehlt im Dateisystem**: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen.

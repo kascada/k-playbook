@@ -5,6 +5,13 @@ interval-weeks: 4
 scope-hint: k-check Runner-Ergebnisse für globale und projektlokale Checks; keine Remediation, keine Produktcode-Änderungen
 handoff: /k-remediation
 result-family: k-check
+audit:
+  enabled: false
+  title: k-check Security Assessment
+  resultRequired: true
+  defaultResult: review-k-check-security.md
+review:
+  enabled: true
 ---
 
 # Review: k-check Security Assessment
@@ -27,12 +34,12 @@ Dieses Review schreibt in:
 
 Dateien:
 
-- `assessment.md` - kuratierte Gesamtbewertung.
-- `findings.md` - vollständiges, statusfähiges Arbeitsregister.
+- `review-input.json` - strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` - kuratierte Gesamtbewertung mit Bündeln, nicht gebündelten Findings und Handoff.
 - `raw/k-check-<mode>.txt` - auditierbare Originalausgabe des Runners.
 - `run-metadata.json` - auditierbare Laufmetadaten.
 
-`raw/` und `run-metadata.json` sind append-only/auditierbar: nach dem Schreiben nicht kürzen, überschreiben oder inhaltlich korrigieren. Korrekturen erfolgen durch neue Raw-Dateien und eine aktualisierte Bewertung. `findings.md` ist das mutable Arbeitsregister für Status, Owner, Remediation-Notizen, Akzeptierungen und Fix-Verweise. `assessment.md` ist kuratiert und darf später nur nachvollziehbar aktualisiert werden, z. B. für Summary, Handoff-Status oder explizite Remediation-Abschnitte.
+`raw/` und `run-metadata.json` sind append-only/auditierbar: nach dem Schreiben nicht kürzen, überschreiben oder inhaltlich korrigieren. Korrekturen erfolgen durch neue Raw-Dateien plus aktualisierte `review-input.json` und `review-triage.md`. `review-triage.md` darf später nur nachvollziehbar aktualisiert werden, z. B. für Handoff-Status oder explizite Remediation-Abschnitte.
 
 ## Voraussetzungen
 
@@ -78,7 +85,7 @@ Raw-k-check-Ausgaben werden nach diesen Regeln ausgewertet:
 - Alles zwischen Abschnittsheader und Status/Summary als Check-Ausgabe behandeln.
 - Die Summary beginnt bei `K_CHECK_SUMMARY` und enthält `config_root`, `target_root`, `mode`, `file_source`, `files`, `ok`, `skip`, `fail`, `error`.
 - Summary-Zeilen `OK|SKIP|FAIL|ERROR <scope>:<check.sh> reason=...` als Check-Gesamtstatus erfassen.
-- `ok` und `skip` in `assessment.md` separat dokumentieren; `skip` mit Reason und Wiedervorlage.
+- `ok` und `skip` in `review-triage.md` separat dokumentieren; `skip` mit Reason und Wiedervorlage.
 - `fail`-Findings nach Check-Familie gruppieren.
 - Technische `error`-Fälle sind keine Security-Findings, aber blockieren die Bewertbarkeit des betroffenen Checks.
 
@@ -92,7 +99,7 @@ Lokale Legacy-Runner können Sammelzeilen oder abweichende Formate liefern. Wenn
 
 ## Status-Lifecycle
 
-Statuswerte in `findings.md`:
+Statuswerte im Remediation-Status von `review-triage.md`:
 
 - `open` - neu oder noch nicht geprüft.
 - `confirmed` - validierter echter Befund.
@@ -126,9 +133,9 @@ Neue IDs werden nur für neue semantische Findings vergeben. Wiedergefundene ode
 - P2: sensitive Logging, Operational-Event-Kontraktverletzungen.
 - P3: Legacy-Baseline, Test-Fixtures, wahrscheinliche Heuristik-False-Positives.
 
-## Assessment-Format
+## Review-Triage-Format
 
-`assessment.md` enthält mindestens:
+`review-triage.md` enthält mindestens die Pflichtabschnitte aus `commands/_audit/review-scan-triage.md`:
 
 ```markdown
 # k-check Assessment - YYYY-MM-DD
@@ -138,7 +145,7 @@ Neue IDs werden nur für neue semantische Findings vergeben. Wiedergefundene ode
 - Runner: `<befehl>`
 - Raw: `raw/k-check-<mode>.txt`
 - Run-Metadaten: `run-metadata.json`
-- Finding-Register: `findings.md`
+- Quelle: `review-input.json`
 
 ## Run-Metadaten Kurzfassung
 
@@ -167,26 +174,38 @@ Neue IDs werden nur für neue semantische Findings vergeben. Wiedergefundene ode
 
 ## Handoff
 
-`/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/review-triage.md`
 ```
 
-## Finding-Register-Format
+## Review-Input-Format
 
-`findings.md` enthält alle remediation-fähigen Findings oder bewusst gruppierte Legacy-Baselines:
+`review-input.json` enthält remediation-fähige Findings oder bewusst gruppierte Legacy-Baselines:
 
-```markdown
-### kcheck-logging-003
-
-- Status: `open`
-- Priorität: `P1|P2|P3`
-- Quelle: `global:check_logging_privacy_generic.sh`
-- Ort: `path:line`
-- Message: ...
-- Raw-Quelle: `raw/k-check-baseline.txt`
-- Review-Bewertung: _offen_
-- Triage-Notiz: _offen_
-- Owner: _offen_
-- Remediation: _offen_
+```json
+{
+  "scope": { "type": "review", "family": "k-check" },
+  "groups": [
+    {
+      "id": "kcheck-logging-003",
+      "title": "<Check-Familie> - <Kurzproblem>",
+      "priority": "P1|P2|P3",
+      "findings": ["kcheck-logging-003"],
+      "evidence": [
+        {
+          "file": "path",
+          "line": 12,
+          "source": "global:check_logging_privacy_generic.sh",
+          "message": "<Check-Message>, Raw-Quelle raw/k-check-baseline.txt"
+        }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
 ```
 
 ## Handoff
@@ -194,7 +213,7 @@ Neue IDs werden nur für neue semantische Findings vergeben. Wiedergefundene ode
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/k-check/YYYY-MM-DD/review-triage.md
 ```
 
 Remediation ist ausdrücklich nicht Teil dieses Reviews.

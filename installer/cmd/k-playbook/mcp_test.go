@@ -154,6 +154,7 @@ func decodeResponses(t *testing.T, stdout string, wantIDs ...int) []map[string]a
 	}
 
 	responses := make([]map[string]any, 0, len(lines))
+	byID := map[float64]map[string]any{}
 	for i, line := range lines {
 		var response map[string]any
 		if err := json.Unmarshal([]byte(line), &response); err != nil {
@@ -162,11 +163,20 @@ func decodeResponses(t *testing.T, stdout string, wantIDs ...int) []map[string]a
 		if response["jsonrpc"] != "2.0" {
 			t.Errorf("Zeile %d ist kein JSON-RPC 2.0: %q", i+1, line)
 		}
-		if got, want := response["id"], float64(wantIDs[i]); got != want {
-			t.Errorf("Zeile %d hat id %v, erwartet %v", i+1, got, want)
+		id, ok := response["id"].(float64)
+		if !ok {
+			t.Errorf("Zeile %d hat keine numerische id: %q", i+1, line)
 		}
 		if errField, isError := response["error"]; isError {
 			t.Errorf("Zeile %d ist eine Fehlerantwort: %v", i+1, errField)
+		}
+		byID[id] = response
+	}
+	for _, wantID := range wantIDs {
+		response, ok := byID[float64(wantID)]
+		if !ok {
+			t.Errorf("Antwort mit id %d fehlt in %v", wantID, lines)
+			continue
 		}
 		responses = append(responses, response)
 	}
@@ -314,6 +324,42 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	}
 }
 
+func TestReviewStatusMeldetAuditModulUndFiltertAuditRezepte(t *testing.T) {
+	root := newMCPReviewProject(t)
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "commands", "_audit", "review-scan-triage.md"), "# Triage\n\nAktiv.\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-review-only.md"), "---\ntitle: Review Only\naudit:\n  enabled: false\nreview:\n  enabled: true\n---\n# Review Only\n")
+
+	stdout := speak(t, root, 2,
+		initialize(1),
+		initialized,
+		callTool(2, "k_playbook_review_status", map[string]any{"projectDir": root, "mode": "available"}),
+	)
+	responses := decodeResponses(t, stdout, 1, 2)
+	envelope := map[string]any{}
+	if err := json.Unmarshal([]byte(toolText(t, responses[1])), &envelope); err != nil {
+		t.Fatalf("Status-Antwort ist kein JSON: %v", err)
+	}
+	if envelope["ok"] != true {
+		t.Fatalf("Status fehlgeschlagen: %v", envelope)
+	}
+	data := envelope["data"].(map[string]any)
+	selection := data["selection"].(map[string]any)
+	candidates := selection["candidates"].([]any)
+	if !candidateNamed(candidates, "scan-triage") {
+		t.Fatalf("scan-triage fehlt in Kandidaten: %v", candidates)
+	}
+	if candidateNamed(candidates, "review-only") {
+		t.Fatalf("audit-deaktiviertes Rezept ist Audit-Kandidat: %v", candidates)
+	}
+	triage := candidateMap(t, candidates, "scan-triage")
+	if origin := triage["recipeOrigin"]; origin != "dist" {
+		t.Fatalf("scan-triage Origin = %v, erwartet dist", origin)
+	}
+	if path := triage["recipePath"].(string); filepath.Base(filepath.Dir(path)) != "_audit" {
+		t.Fatalf("scan-triage Pfad = %s, erwartet _audit", path)
+	}
+}
+
 // TestOhneDirGiltDasArbeitsverzeichnis prüft den zweiten Auflösungsweg: kein
 // Parameter, dafür der Serverprozess im Projekt.
 func TestOhneDirGiltDasArbeitsverzeichnis(t *testing.T) {
@@ -383,15 +429,8 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 				callContext(3, healthy),
 			)
 
-			lines := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n")
-			if len(lines) != 3 {
-				t.Fatalf("stdout hat %d Zeilen, erwartet 3\n%s", len(lines), stdout)
-			}
-
-			var failed map[string]any
-			if err := json.Unmarshal([]byte(lines[1]), &failed); err != nil {
-				t.Fatalf("Fehlerantwort ist kein JSON: %v", err)
-			}
+			responses := decodeResponses(t, stdout, 1, 2, 3)
+			failed := responses[1]
 			// Werkzeugfehler, nicht Protokollfehler: das Ergebnis trägt isError,
 			// die Antwort selbst kein error-Feld.
 			if _, isProtocolError := failed["error"]; isProtocolError {
@@ -401,10 +440,7 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 				t.Errorf("Werkzeugergebnis ist nicht als Fehler markiert: %v", failed)
 			}
 
-			var recovered map[string]any
-			if err := json.Unmarshal([]byte(lines[2]), &recovered); err != nil {
-				t.Fatalf("Antwort nach dem Fehler ist kein JSON: %v", err)
-			}
+			recovered := responses[2]
 			if isError := result(t, recovered)["isError"]; isError == true {
 				t.Errorf("Der Aufruf nach dem Fehler schlug ebenfalls fehl: %v", recovered)
 			}
@@ -428,7 +464,7 @@ func newMCPReviewProject(t *testing.T) string {
 		}
 	}
 	mustWriteMCPFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\nreviewRun:\n  title: Technischer Review\n  resultRequired: true\n  defaultResult: review-tech.md\n---\n# Fallback\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
@@ -469,4 +505,26 @@ func mustWriteMCPFile(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("%s schreiben: %v", path, err)
 	}
+}
+
+func candidateNamed(candidates []any, name string) bool {
+	for _, raw := range candidates {
+		candidate := raw.(map[string]any)
+		if candidate["name"] == name {
+			return true
+		}
+	}
+	return false
+}
+
+func candidateMap(t *testing.T, candidates []any, name string) map[string]any {
+	t.Helper()
+	for _, raw := range candidates {
+		candidate := raw.(map[string]any)
+		if candidate["name"] == name {
+			return candidate
+		}
+	}
+	t.Fatalf("kein Kandidat %s in %v", name, candidates)
+	return nil
 }

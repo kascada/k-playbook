@@ -4,6 +4,13 @@ title: Python - Nicht-rekonstruierbare Entscheidungen kommentieren
 language: python
 interval-weeks: 16
 scope-hint: Python-Quellen; Ausschluss: virtuelle Umgebungen, tests/fixtures
+audit:
+  enabled: false
+  title: Python - Nicht-rekonstruierbare Entscheidungen kommentieren
+  resultRequired: false
+  defaultResult: review-python-comment-hardspots.md
+review:
+  enabled: true
 ---
 
 # Review: Python-Comment-Hardspots

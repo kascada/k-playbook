@@ -20,10 +20,11 @@ Konvention für Report-/Scan-Familien:
 
 `<local.dir>/results/<scan-family>/YYYY-MM-DD/`
 
-Typische Dateien darin:
+Typische aktuelle Dateien darin:
 
-- `assessment.md` — kuratierte Gesamtbewertung.
-- `findings.md` — vollständiges Finding-Register.
+- `review-input.json` — strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` — einheitliches Endartefakt mit Kopf, Bündel-Tabelle,
+  Bündel-Details, Nicht gebündelt und Deckung aus known-decisions.
 - `raw/` — maschinenlesbare Rohdaten wie SARIF, JSON oder Tool-Logs.
 
 ## Dateinamen
@@ -51,9 +52,13 @@ Optional:
 language: python
 handoff: /k-remediation
 result-family: <family-name>
+audit:
+  enabled: <true|false>
+review:
+  enabled: <true|false>
 ```
 
-`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `assessment.md`, `findings.md`, `raw/` und ggf. Run-Metadaten enthalten.
+`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `review-input.json`, `review-triage.md`, `raw/` und ggf. Run-Metadaten enthalten. `audit.enabled` steuert Kandidaten für `/k-audit`-/MCP-Läufe; `review.enabled` steuert die gezielte `/k-review`-Auswahl.
 
 ## Inhalt
 

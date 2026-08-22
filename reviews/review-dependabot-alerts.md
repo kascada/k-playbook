@@ -5,6 +5,13 @@ interval-weeks: 1
 scope-hint: Offene GitHub Dependabot Security Alerts für das aktuelle Repository; keine Dependency-Upgrades, keine Dependabot-PRs aus diesem Review heraus
 handoff: /k-remediation
 result-family: dependabot-alerts
+audit:
+  enabled: false
+  title: GitHub Dependabot Alerts Assessment
+  resultRequired: true
+  defaultResult: review-dependabot-alerts.md
+review:
+  enabled: true
 ---
 
 # Review: GitHub Dependabot Alerts Assessment
@@ -16,7 +23,7 @@ Erzeuge eine kuratierte, bewertete Liste aus GitHub Dependabot Security Alerts. 
 - GitHub Dependabot Alerts dauerhaft als Review-Artefakte sichern.
 - GitHub-/Advisory-Severity von projektspezifischer Review-Priorität trennen.
 - Viele Alerts zu handhabbaren Remediation-Clustern gruppieren, ohne einzelne Alert-IDs zu verlieren.
-- Ein `assessment.md` mit priorisierter Triage-Reihenfolge und ein statusfähiges `findings.md` erzeugen.
+- `review-input.json` als Belegvertrag und `review-triage.md` als Handoff erzeugen.
 - Keine Dependency-Upgrades, keine Lockfile-Änderungen und keine Dependabot-PR-Erzeugung durch dieses Review.
 
 ## Abgrenzung
@@ -50,8 +57,8 @@ Dieses Review schreibt in:
 
 Dateien:
 
-- `assessment.md` - kuratierte Gesamtbewertung mit priorisierter Liste und Remediation-Clustern.
-- `findings.md` - vollständiges, statusfähiges Arbeitsregister aller importierten Alert-Findings.
+- `review-input.json` - strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-triage.md` - kuratierte Gesamtbewertung mit Bündeln, nicht gebündelten Findings und Handoff.
 - `raw/dependabot-alerts-open.jsonl` - auditierbare Original-Alerts, ein GitHub-Alert pro JSON-Zeile.
 - `raw/dependabot-alerts-summary.tsv` - optionale tabellarische Arbeitskopie für schnelle Sichtung.
 - `run-metadata.json` - Repo, Branch, API-Endpoint, Befehle, Exit-Codes, Zeitpunkt, `gh`-Account und Filter.
@@ -99,7 +106,7 @@ Berücksichtige:
 - Ob Dependabot-PRs absichtlich deaktiviert sind, um die Alert-Menge manuell abzuarbeiten.
 - Bekannte Entscheidungen aus `known-decisions.md`.
 
-Review-Status in `findings.md`:
+Review-Status im Remediation-Status von `review-triage.md`:
 
 - `open` - neu oder noch nicht geprüft.
 - `confirmed` - Alert betrifft eine relevante Dependency im Projektkontext.
@@ -111,14 +118,14 @@ Review-Status in `findings.md`:
 ## Deduplizierung und Cluster
 
 - Finding-ID ist stabil aus der GitHub-Alert-Nummer: `depbot-<alert-number>`, z. B. `depbot-81`.
-- Einzelne GitHub-Alerts werden im `findings.md` nicht zusammengelegt, weil Alert-Nummern, GHSA/CVE und GitHub-URLs für Audit und Status wichtig sind.
-- Das `assessment.md` darf Alerts zu Remediation-Clustern gruppieren, z. B. `Django in requirements.txt auf 5.2.15+`, `Pillow auf 12.3.0+`, `Vite/PostCSS im Frontend-Lockfile`.
+- Einzelne GitHub-Alerts werden in `review-input.json` nicht still zusammengelegt, weil Alert-Nummern, GHSA/CVE und GitHub-URLs für Audit und Status wichtig sind.
+- `review-triage.md` darf Alerts zu Remediation-Clustern gruppieren, z. B. `Django in requirements.txt auf 5.2.15+`, `Pillow auf 12.3.0+`, `Vite/PostCSS im Frontend-Lockfile`.
 - Wenn mehrere Alerts dasselbe Paket, Manifest und dieselbe Fix-Version betreffen, im Assessment als ein Upgrade-/Triage-Punkt behandeln und alle `depbot-*` IDs referenzieren.
 - Alerts ohne Fix-Version bleiben eigene Cluster mit `context-needed`, sofern kein bekannter Workaround oder akzeptiertes Restrisiko dokumentiert ist.
 
-## Assessment-Format
+## Review-Triage-Format
 
-`assessment.md` enthält mindestens:
+`review-triage.md` enthält mindestens die Pflichtabschnitte aus `commands/_audit/review-scan-triage.md`:
 
 ```markdown
 # GitHub Dependabot Alerts Assessment - YYYY-MM-DD
@@ -132,7 +139,7 @@ Review-Status in `findings.md`:
 - Raw: `raw/dependabot-alerts-open.jsonl`
 - Summary: `raw/dependabot-alerts-summary.tsv`
 - Run-Metadaten: `run-metadata.json`
-- Finding-Register: `findings.md`
+- Quelle: `review-input.json`
 
 ## Kurzfazit
 
@@ -158,34 +165,38 @@ Review-Status in `findings.md`:
 
 ## Handoff
 
-`/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/assessment.md`
+`/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/review-triage.md`
 ```
 
-## Finding-Register-Format
+## Review-Input-Format
 
-`findings.md` enthält pro GitHub-Alert:
+`review-input.json` enthält pro GitHub-Alert:
 
-```markdown
-### depbot-81
-
-- Status: `open`
-- Priorität: `P1|P2|P3`
-- GitHub Alert: `81`
-- URL: `https://github.com/<owner>/<repo>/security/dependabot/81`
-- Ecosystem: `pip|npm|...`
-- Package: ...
-- Manifest: ...
-- Scope: `runtime|development|unknown`
-- Relationship: `direct|transitive|unknown`
-- GHSA/CVE: ...
-- Severity: ...
-- Vulnerable Range: ...
-- Fix-Version: ...
-- Remediation-Cluster: ...
-- Raw-Quelle: `raw/dependabot-alerts-open.jsonl`
-- Review-Bewertung: _offen_
-- Reachability/Produktpfad: _offen_
-- Remediation: _offen_
+```json
+{
+  "scope": { "type": "review", "family": "dependabot-alerts" },
+  "groups": [
+    {
+      "id": "depbot-81",
+      "title": "<package> in <manifest>",
+      "priority": "P1|P2|P3",
+      "findings": ["depbot-81"],
+      "evidence": [
+        {
+          "file": "<manifest>",
+          "line": null,
+          "source": "dependabot:81",
+          "message": "<GHSA/CVE>, Severity, vulnerable range, fix version, URL"
+        }
+      ],
+      "coveredByKnownDecision": false,
+      "partialCoverage": false,
+      "knownDecisionCoverage": []
+    }
+  ],
+  "ungroupedFindings": [],
+  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
+}
 ```
 
 ## Handoff
@@ -193,7 +204,7 @@ Review-Status in `findings.md`:
 Nach Abschluss nennt `/k-review`:
 
 ```text
-/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/assessment.md
+/k-remediation k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/review-triage.md
 ```
 
 Remediation, Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdrücklich nicht Teil dieses Reviews.

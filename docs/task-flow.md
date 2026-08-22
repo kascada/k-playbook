@@ -6,7 +6,7 @@ Der Task-Flow ist der Standardweg für geplante Arbeit, die nicht direkt in eine
 
 ```text
 /k-task-create
-/k-review-loop
+/k-task-refine
 /k-run
 ```
 
@@ -30,9 +30,9 @@ Tasks sollen so geschrieben sein, dass `/k-run` sie ohne weiteren Chatkontext au
 
 Umfangreiche Arbeit wird nicht auf viele kleine Dateien verteilt, sondern in einer Datei unter `## Zu bauen` als `### Etappe N — Titel` gegliedert. Geteilt wird nur, was sachlich auseinanderfällt: unterschiedlicher Kontext, einzeln sinnvoll, einzeln verifizierbar. Der Grund, allein wegen des Umfangs zu teilen, entfällt durch die Fortschrittsverfolgung in `/k-run`.
 
-## /k-review-loop
+## /k-task-refine
 
-`/k-review-loop [path]` prüft Task- oder Instruktionsdateien vor der Ausführung.
+`/k-task-refine [path]` härtet Task- oder Instruktionsdateien vor der Ausführung.
 
 Der Command nutzt einen strukturierten Critic/Editor-Dialog:
 
@@ -55,7 +55,7 @@ Der Command:
 - nutzt ohne Argument `k-playbook-local/tasks/`.
 - sortiert Tasks nach numerischem Prefix.
 - führt Tasks nie parallel aus.
-- fragt nach, wenn eine Task-Datei kein Review-Log trägt, also nie durch `/k-review-loop` gegangen ist.
+- fragt nach, wenn eine Task-Datei kein Review-Log trägt, also nie durch `/k-task-refine` gegangen ist.
 - klärt offene Fragen vor Delegation an Subagenten.
 - hängt eine Ausführungsnotiz an.
 - verschiebt erfolgreich abgeschlossene Tasks nach `done/`.
@@ -71,5 +71,5 @@ Von `/k-remediation` erzeugte Tasks sind normale Task-Flow-Eingaben. Besonders w
 
 - Findings-IDs und Quellen müssen in der Task stehen.
 - Branch-/PR-Anforderungen aus der Remediation-Policy müssen im Ausführungskontext stehen.
-- Vor Umsetzung läuft `/k-review-loop`.
+- Vor Umsetzung läuft `/k-task-refine`.
 - Umsetzung läuft danach über `/k-run`.

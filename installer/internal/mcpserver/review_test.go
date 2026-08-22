@@ -41,6 +41,38 @@ func TestReviewStatusAvailable(t *testing.T) {
 	}
 }
 
+func TestReviewStatusAvailableTrenntAuditUndReviewAktivierung(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-review-only.md"), "---\ntitle: Review Only\nreview:\n  enabled: true\n---\n# Review Only\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-disabled.md"), "---\naudit:\n  enabled: false\nreview:\n  enabled: false\n---\n# Disabled\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+	candidates := selection["candidates"].([]any)
+	if !hasCandidate(candidates, "tech") {
+		t.Fatalf("audit-aktiviertes Rezept fehlt: %v", candidates)
+	}
+	if hasCandidate(candidates, "review-only") || hasCandidate(candidates, "disabled") {
+		t.Fatalf("nicht audit-aktivierte Rezepte in Audit-Auswahl: %v", candidates)
+	}
+
+	context, err := project.BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	entry := reviewCatalogEntry(t, context.Catalogs["reviews"], "review-review-only.md")
+	if entry.Audit == nil || entry.Audit.Enabled || entry.Review == nil || !entry.Review.Enabled {
+		t.Fatalf("review-only Modi = audit:%#v review:%#v", entry.Audit, entry.Review)
+	}
+}
+
 func TestReviewStatusAvailableOhneScanTriageBeiLeeremOverlay(t *testing.T) {
 	root := newReviewProject(t)
 	mustWriteFile(t, filepath.Join(root, project.LocalDirName, "commands", filepath.FromSlash(scanTriageModule)), "# abgeschaltet\n")
@@ -57,6 +89,28 @@ func TestReviewStatusAvailableOhneScanTriageBeiLeeremOverlay(t *testing.T) {
 	candidates := selection["candidates"].([]any)
 	if hasCandidate(candidates, scanTriageEntry) {
 		t.Fatalf("scan-triage trotz leerem Overlay enthalten: %v", candidates)
+	}
+}
+
+func TestReviewStatusAvailableScanTriageOverlayOverride(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, project.LocalDirName, "commands", filepath.FromSlash(scanTriageModule)), "# Lokales Modul\n\nAktiv.\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+	candidate := candidateByName(t, selection["candidates"].([]any), scanTriageEntry)
+	if candidate["recipeOrigin"] != "override" {
+		t.Fatalf("scan-triage Origin = %v, erwartet override", candidate["recipeOrigin"])
+	}
+	if path := candidate["recipePath"].(string); filepath.Base(filepath.Dir(path)) != "_audit" {
+		t.Fatalf("scan-triage Pfad = %s, erwartet _audit", path)
 	}
 }
 
@@ -395,11 +449,11 @@ func newReviewProject(t *testing.T) string {
 	root := t.TempDir()
 	dirs := []string{
 		filepath.Join(root, "k-playbook", "scripts"),
-		filepath.Join(root, "k-playbook", "commands", "_review-run"),
+		filepath.Join(root, "k-playbook", "commands", "_audit"),
 		filepath.Join(root, "k-playbook", "reviews"),
 		filepath.Join(root, "k-playbook", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
-		filepath.Join(root, "k-playbook-local", "commands", "_review-run"),
+		filepath.Join(root, "k-playbook-local", "commands", "_audit"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
 	}
@@ -410,7 +464,7 @@ func newReviewProject(t *testing.T) string {
 	}
 	mustWriteFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\nreviewRun:\n  title: Technischer Review\n  resultRequired: true\n  defaultResult: review-tech.md\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), preflightScript(t))
@@ -493,6 +547,29 @@ func hasCandidate(candidates []any, name string) bool {
 		}
 	}
 	return false
+}
+
+func candidateByName(t *testing.T, candidates []any, name string) map[string]any {
+	t.Helper()
+	for _, raw := range candidates {
+		candidate := raw.(map[string]any)
+		if candidate["name"] == name {
+			return candidate
+		}
+	}
+	t.Fatalf("kein Candidate %s in %v", name, candidates)
+	return nil
+}
+
+func reviewCatalogEntry(t *testing.T, entries []project.CatalogEntry, name string) project.CatalogEntry {
+	t.Helper()
+	for _, entry := range entries {
+		if entry.Name == name {
+			return entry
+		}
+	}
+	t.Fatalf("kein Review-Katalogeintrag %s in %+v", name, entries)
+	return project.CatalogEntry{}
 }
 
 func hasStatusEntry(entries []any, name string) bool {

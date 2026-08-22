@@ -8,7 +8,7 @@ import (
 )
 
 func TestReviewScanTriageNutztCoverageAusJSON(t *testing.T) {
-	path := filepath.Clean(filepath.Join("..", "..", "..", "..", "commands", "_review-run", "review-scan-triage.md"))
+	path := filepath.Clean(filepath.Join("..", "..", "..", "..", "commands", "_audit", "review-scan-triage.md"))
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("Command-Modul lesen: %v", err)

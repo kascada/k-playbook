@@ -1,5 +1,5 @@
 ---
-description: Build a project-wide prioritized security results summary from existing review result families. Reads k-playbook-local/results/*/*/{assessment,findings}.md, deduplicates and ranks findings, then writes k-playbook-local/results/summary-YYYY-MM-DD.md. Does not run scanners or remediation.
+description: Erzeugt eine projektweite priorisierte Summary aus Review-Triage-Ergebnissen; liest neue review-triage.md-Dateien und Legacy assessment/findings nur als Fallback.
 argument-hint: [YYYY-MM-DD|latest]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -18,7 +18,7 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Erzeuge eine projektweite, priorisierte Ergebnis-Zusammenfassung aus vorhandenen Review-Result-Familien.
 
-`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` und `/k-remediation`. Der Command startet keine Scanner, führt keine Remediation aus und verändert keine Raw-Artefakte. Er liest vorhandene `assessment.md`/`findings.md`-Dateien unter `k-playbook-local/results/` und schreibt eine einzelne priorisierte Summary.
+`/k-results` ist der Zwischenschritt zwischen `/k-review <family>` oder `/k-audit` und `/k-remediation`. Der Command startet keine Scanner, führt keine Remediation aus und verändert keine Raw-Artefakte. Er liest neue `review-triage.md`-Dateien unter `k-playbook-local/results/` und nutzt `assessment.md`/`findings.md` nur als Legacy-Fallback, wenn im selben Ergebnisordner kein `review-triage.md` vorhanden ist.
 
 ## Zielartefakt
 
@@ -51,12 +51,12 @@ Command-specific policy:
 Wenn `$ARGUMENTS` leer oder `latest` ist:
 
 - Verwende `now.date` als Datum der Summary-Datei.
-- Lies alle vorhandenen Result-Familien unter `RESULTS_DIR`, nicht nur heutige, aber bevorzuge pro Familie das neueste `assessment.md`.
+- Lies alle vorhandenen Audit- und Result-Family-Triages unter `RESULTS_DIR`, nicht nur heutige, aber bevorzuge pro Scope das neueste `review-triage.md`.
 
 Wenn `$ARGUMENTS` wie `YYYY-MM-DD` aussieht:
 
 - Nutze dieses Datum für die Summary-Datei.
-- Lies weiterhin pro Familie das neueste Assessment, außer der User explizit einen anderen Scope angibt.
+- Lies weiterhin pro Scope die neueste Triage, außer der User explizit einen anderen Scope angibt.
 
 Wenn `$ARGUMENTS` eine Datei ist:
 
@@ -67,13 +67,21 @@ Wenn `$ARGUMENTS` eine Datei ist:
 Suche unter:
 
 ```text
+<RESULTS_DIR>/*/review-triage.md
+<RESULTS_DIR>/*/*/review-triage.md
+```
+
+Legacy-Fallback nur, wenn im selben Ordner kein `review-triage.md` existiert:
+
+```text
 <RESULTS_DIR>/*/*/assessment.md
 ```
 
-Erkenne Family und Date aus dem Pfad:
+Erkenne Scope und Date aus dem Pfad:
 
 ```text
-<RESULTS_DIR>/<family>/<date>/assessment.md
+<RESULTS_DIR>/<date>/review-triage.md
+<RESULTS_DIR>/<family>/<date>/review-triage.md
 ```
 
 Erwarte optional im selben Verzeichnis:
@@ -81,21 +89,23 @@ Erwarte optional im selben Verzeichnis:
 - `findings.md`
 - `raw/`
 - `run-metadata.json` oder andere `run-metadata*.json`
+- `review-input.json`
 
 Ignoriere bestehende `summary-*.md` als Input, außer der User fordert eine Vergleichszusammenfassung explizit an.
 
-Wenn mehrere Dates pro Family existieren:
+Wenn mehrere Dates pro Scope existieren:
 
-- Standard: neuestes Date pro Family verwenden.
+- Standard: neuestes Date pro Scope verwenden.
 - Wenn ein älteres Date benutzt wird, in der Summary klar nennen.
 
-Bekannte Familien und Standardreihenfolge:
+Bekannte Scopes und Standardreihenfolge:
 
-1. `k-check`
-2. `secret-scanning`
-3. `dependency-cve`
-4. `iac-container`
-5. weitere Familien alphabetisch
+1. Audit-Läufe
+2. `k-check`
+3. `secret-scanning`
+4. `dependency-cve`
+5. `iac-container`
+6. weitere Familien alphabetisch
 
 ## Schritt 4 — Kontext laden
 
@@ -103,20 +113,23 @@ Lade, falls vorhanden:
 
 - `KNOWN_DECISIONS`: Findings, die klar gedeckt sind, als `accepted` markieren oder in P3 verschieben.
 - `TASKS_DIR/*.md` und `TASKS_DIR/done/*.md`: bestehende Tasks erkennen, um doppelte Task-Erzeugung zu vermeiden.
-- Alle `assessment.md` und `findings.md` der ausgewählten Familien.
+- Alle `review-triage.md` der ausgewählten Scopes. Nur bei Legacy-Familien ohne
+  `review-triage.md`: `assessment.md` und `findings.md` mitladen.
 
 Wenn `known-decisions.md` leer ist, das in der Summary nennen.
 
 ## Schritt 5 — Findings extrahieren
 
-Extrahiere aus `assessment.md`:
+Extrahiere aus `review-triage.md`:
 
-- Kurzfazit / wichtigste Befunde.
-- Bewertete Tabellen.
-- Handoff-Pfade.
-- Sofortige Triage-Reihenfolge.
+- Kopf mit Scope, Quelle und Known-Decisions-Status.
+- Bündel-Tabelle.
+- Bündel-Details inklusive Begründung, Belege und nächstem Schritt.
+- Nicht gebündelte Gruppen.
+- Deckung aus known-decisions.
 
-Extrahiere aus `findings.md`:
+Extrahiere aus Legacy-`assessment.md` und `findings.md` nur, wenn kein `review-triage.md`
+vorhanden ist. Aus `findings.md`:
 
 - Heading-ID, z. B. `### secret-001`.
 - `Status`.
@@ -198,7 +211,7 @@ Projekt: `<name>`
 
 ## Quellen
 
-- <family>: `k-playbook-local/results/<family>/<date>/assessment.md`
+- <family>: `k-playbook-local/results/<family>/<date>/review-triage.md`
 - Known Decisions: `k-playbook-local/results/known-decisions.md` (<Status>)
 
 ## Priorisierte Übersicht
@@ -213,8 +226,8 @@ Kurzbeschreibung.
 Empfehlung: konkreter nächster Schritt.
 
 Quellen:
-- `k-playbook-local/results/<family>/<date>/assessment.md`
-- `k-playbook-local/results/<family>/<date>/findings.md#<finding-id>`
+- `k-playbook-local/results/<family>/<date>/review-triage.md#<buendel-id>`
+- Legacy-Fallback: `k-playbook-local/results/<family>/<date>/findings.md#<finding-id>`
 
 Was man zum Lösen braucht:
 - betroffene Datei/Zeile

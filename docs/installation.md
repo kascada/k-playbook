@@ -267,8 +267,8 @@ einen neuen zusammen. `/tasks` listet die offenen Tasks nach ihrer Nummer; ein K
 zeigt den Task als Markdown unter der Liste. Erledigte liegen in `tasks/done/` und
 stehen dort nicht mehr.
 
-Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-review-loop` gegangen ist —
-mit Datum, sofern das Review-Log eines nennt. „ohne Review-Loop" ist kein Fehler, aber
+Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-task-refine` gegangen ist —
+mit Datum, sofern das Review-Log eines nennt. „ohne Task-Refine" ist kein Fehler, aber
 der Grund, warum `/k-run` vor der Ausführung nachfragt.
 
 Gelesen wird nur. Angelegt und ausgeführt werden Tasks über `/k-task-create` und

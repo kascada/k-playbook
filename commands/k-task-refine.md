@@ -1,11 +1,11 @@
 ---
-description: "Review task/instruction files using a read-only Critic/Editor dialogue before execution. If no path is given, uses the project's task directory. Subagents advise; the Moderator routes, applies accepted edits, and appends a discussion log. Final intent alignment check at the end."
+description: Härtet Task- und Instruction-Dateien vor Ausführung mit einem read-only Critic/Editor-Dialog; ohne Argument wird das Task-Verzeichnis verwendet.
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Task, Agent]
 ---
 
-# k-review-loop
+# k-task-refine
 
 ## Erster Schritt
 
@@ -16,12 +16,12 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 
-Review task/instruction files before execution using a structured two-agent dialogue between a **Critic** and an **Editor**. Critic and Editor are read-only advisors. The Moderator routes between them, decides on deadlocks, applies accepted edits, and appends a discussion log. A final alignment check verifies the result against the stated Intent.
+Härtet Task-/Instruction-Dateien vor Ausführung über einen strukturierten Zwei-Agenten-Dialog zwischen **Critic** und **Editor**. Critic und Editor sind read-only Advisors. Der Moderator routet zwischen ihnen, entscheidet Deadlocks, wendet akzeptierte Edits an und hängt ein Discussion Log an. Ein finaler Alignment-Check prüft das Ergebnis gegen den angegebenen Intent.
 
 ## Invocation
 
-`/k-review-loop` — review open task files from `k-playbook-local/tasks/`.
-`/k-review-loop <path>` — review an explicit file or directory containing `.md` task/instruction files.
+`/k-task-refine` — offene Task-Dateien aus `k-playbook-local/tasks/` härten.
+`/k-task-refine <path>` — eine explizite Datei oder ein Verzeichnis mit `.md`-Task-/Instruction-Dateien härten.
 
 ---
 

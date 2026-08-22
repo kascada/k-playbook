@@ -18,7 +18,7 @@ type Task struct {
 	Path string `json:"path"`
 	// Title ist die erste Überschrift der Datei, ersatzweise der Dateiname.
 	Title string `json:"title"`
-	// Reviewed: die Datei ist durch /k-review-loop gegangen.
+	// Reviewed: die Datei ist durch /k-task-refine gegangen.
 	Reviewed bool `json:"reviewed"`
 	// ReviewedAt ist das Datum des jüngsten Logs, sofern es eines nennt.
 	ReviewedAt string `json:"reviewedAt"`
@@ -81,7 +81,7 @@ func ReadTask(projectDir string, name string) (Task, []byte, error) {
 	return readTaskFacts(path), content, nil
 }
 
-// reviewLogHeading ist die Spur, die /k-review-loop in jeder geprüften Datei
+// reviewLogHeading ist die Spur, die /k-task-refine in jeder geprüften Datei
 // hinterlässt — auch dann, wenn nichts zu ändern war. /k-run erkennt daran
 // dasselbe: ob ein Task jemals gegengelesen wurde.
 const reviewLogHeading = "## Review-Log"
