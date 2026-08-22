@@ -318,7 +318,7 @@ cd /pfad/zum/projekt
 make -C k-playbook installer-update
 ```
 
-Das Make-Target entspricht `chmod -R u+w k-playbook && git -C k-playbook pull --ff-only && chmod -R a-w k-playbook` und sperrt die Installation auch dann wieder, wenn der Pull fehlschlägt. Im Entwicklungsrepo funktioniert zusätzlich `make installer-update`, weil dort der Installations-Clone unter `./k-playbook/` liegt.
+Das Make-Target entspricht `chmod -R u+w k-playbook && git -C k-playbook fetch origin && git -C k-playbook reset --hard origin/main && git -C k-playbook clean -fd && chmod -R a-w k-playbook` und sperrt die Installation auch dann wieder, wenn der Pull fehlschlägt. Der harte Reset ist bewusst: `k-playbook/` trägt per Vertrag keine lokalen Änderungen; alles darin darf nur durch Pull entstehen. Wurde zwischenzeitlich per `installer-sync` ein Arbeitsstand eingespielt, wird er beim nächsten Update automatisch aufgeräumt. Im Entwicklungsrepo funktioniert zusätzlich `make installer-update`, weil dort der Installations-Clone unter `./k-playbook/` liegt.
 
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar —
 auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen

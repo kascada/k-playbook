@@ -96,11 +96,18 @@ installer-writable: ## Macht die lokale Installation temporär beschreibbar
 installer-readonly: ## Sperrt Schreibzugriffe auf die lokale Installation
 	@chmod -R a-w "$(INSTALLATION_DIR)"
 
+# Kein pull --ff-only: dieses Ziel laeuft auch, wenn zwischenzeitlich ein
+# installer-sync in die Installation geschrieben hat. Der Vertrag von
+# INSTALLATION_DIR (nie schreiben) macht reset --hard sicher; Sync-Reste und
+# der Marker werden dabei entfernt und die Installation ist wieder ein
+# sauberer Clone.
 installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	@set -eu; \
 	  trap 'chmod -R a-w "$(INSTALLATION_DIR)"' EXIT; \
 	  chmod -R u+w "$(INSTALLATION_DIR)"; \
-	  git -C "$(INSTALLATION_DIR)" pull --ff-only
+	  git -C "$(INSTALLATION_DIR)" fetch --quiet origin; \
+	  git -C "$(INSTALLATION_DIR)" reset --hard --quiet origin/main; \
+	  git -C "$(INSTALLATION_DIR)" clean -qfd
 
 gui: dist installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
 	"$(INSTALLER_WRAPPER)"
