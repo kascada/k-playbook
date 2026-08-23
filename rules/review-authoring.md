@@ -54,11 +54,15 @@ handoff: /k-remediation
 result-family: <family-name>
 audit:
   enabled: <true|false>
+  defaultResult: review-<name>.md
+  resultRequired: <true|false>
+  scope:
+    tools: [<tool>, <tool>]
 review:
   enabled: <true|false>
 ```
 
-`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `review-input.json`, `review-triage.md`, `raw/` und ggf. Run-Metadaten enthalten. `audit.enabled` steuert Kandidaten für `/k-audit`-/MCP-Läufe; `review.enabled` steuert die gezielte `/k-review`-Auswahl.
+`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `review-input.json`, `review-triage.md`, `raw/` und ggf. Run-Metadaten enthalten. `audit.enabled` steuert Kandidaten für `/k-audit`-/MCP-Läufe; `review.enabled` steuert die gezielte `/k-review`-Auswahl. Aktive Audit-Rezepte brauchen `defaultResult`, `resultRequired` und `scope.tools`; sie laufen als Perspektive auf `review-input.json`, nicht als eigener Scanner.
 
 ## Inhalt
 

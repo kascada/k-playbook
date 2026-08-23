@@ -886,9 +886,10 @@ sind. Installiert wird bewusst im Terminal, weil das die Arbeitsumgebung veränd
 nicht die Projekt-Abhängigkeiten. Ein Timeout von 30 Sekunden begrenzt den Aufruf, weil
 der Preflight je Tool ein `--version` startet und eines davon hängen kann.
 
-Bricht das Skript ab — etwa bei aktivem Projekt-venv — landet die erste stderr-Zeile in
-der Fehlermeldung. Die Oberfläche soll dabei klarstellen: Das Projekt darf mit venv
-laufen; nur der Security-Tool-Preflight darf nicht aus diesem venv messen.
+Ein aktives Projekt-venv ist für diesen read-only Aufruf erlaubt. Das JSON meldet dann
+`toolScope: "project-venv"`, damit die Oberfläche den Status nicht als host-/user-lokale
+Tool-Installation ausgibt. Bricht das Skript aus anderen Gründen ab, landet die erste
+stderr-Zeile in der Fehlermeldung.
 
 ## GitHub CLI
 

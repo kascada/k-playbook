@@ -90,8 +90,11 @@ den Assistenten. Details in
 Das kuratierbare Endprodukt beider Bewertungswege ist `review-triage.md`: beim Audit
 direkt unter `k-playbook-local/results/YYYY-MM-DD/`, beim gezielten Report-Review unter
 `k-playbook-local/results/<familie>/YYYY-MM-DD/`. Nur der Scope unterscheidet sich.
-`/k-results` und `/k-remediation` akzeptieren beide aktuellen Pfadformen; Legacy-
-`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
+Aktive Audit-Katalog-Rezepte können zusätzlich je eine Perspektiven-Datei direkt im
+Laufordner schreiben, etwa `review-secret-scanning.md`. Diese Perspektiven lesen denselben
+Merge-Beleg, filtern über ihren gespeicherten `scope.tools` und dienen `scan-triage` nur
+als Kontext. `/k-results` und `/k-remediation` arbeiten weiter gegen `review-triage.md`;
+Legacy-`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
 `review-triage.md`.
 
 ## Statusmodell
@@ -189,6 +192,8 @@ eindeutige Namen verwenden, z. B. `k-check-baseline-e2e.txt` und `run-metadata-e
 |---|---|
 | Rezept | `k-playbook/reviews/review-secret-scanning.md` |
 | Ergebnisse | `k-playbook-local/results/secret-scanning/YYYY-MM-DD/` |
+| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-secret-scanning.md` |
+| Audit-Scope | `gitleaks`, `trufflehog` |
 
 Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json`,
 `raw/trufflehog.json`.
@@ -203,9 +208,14 @@ installiert.
 |---|---|
 | Rezept | `k-playbook/reviews/review-dependency-cve.md` |
 | Ergebnisse | `k-playbook-local/results/dependency-cve/YYYY-MM-DD/` |
+| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-dependency-cve.md` |
+| Audit-Scope | `pip-audit`, `trivy`, `grype`, `osv-scanner`, `govulncheck` |
 
 Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/pip-audit.json`,
 `raw/trivy-fs.json`, bei Bedarf `raw/grype.json`.
+
+Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
+`review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
 
 ### GitHub Dependabot Alerts
 
@@ -213,6 +223,7 @@ Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/pip-audit.json
 |---|---|
 | Rezept | `k-playbook/reviews/review-dependabot-alerts.md` |
 | Ergebnisse | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
+| Audit-Laufmodell | deaktiviert, bis Dependabot-Alerts als Tool-Evidence im Merge vorliegen |
 
 Typische Artefakte: `review-input.json`, `review-triage.md`,
 `raw/dependabot-alerts-open.jsonl` als auditierbarer Import,
@@ -229,10 +240,28 @@ kein Finding.
 |---|---|
 | Rezept | `k-playbook/reviews/review-iac-container.md` |
 | Ergebnisse | `k-playbook-local/results/iac-container/YYYY-MM-DD/` |
+| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-iac-container.md` |
+| Audit-Scope | `trivy`, `syft`, `grype` |
 
 Typische Artefakte: `review-input.json`, `review-triage.md` für Container-, Image-, IaC- und
 Filesystem-Findings,
 `raw/trivy-*.json`, bei Bedarf `raw/syft-*.json` und `raw/grype-*.json`.
+
+Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
+`review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
+
+### Family-only-Rezepte im Audit-Laufmodell
+
+Einige Katalog-Rezepte bleiben über `/k-review` auswählbar, sind aber für `/k-audit`
+deaktiviert, bis ihre Eingaben als Evidence in `review-input.json` vorliegen oder ein
+separater Scope-Vertrag existiert:
+
+| Rezept | Grund |
+|---|---|
+| `review-python-comment-hardspots.md` | Bewertet Code-Hotspots ohne Scan-Belege in `review-input.json`. |
+| `review-k-check-security.md` | `k-check`-Ergebnisse sind noch nicht als Evidence im Merge modelliert. |
+| `review-dependabot-alerts.md` | Der Input kommt extern über `gh api` und ist noch kein Tool-Eintrag im Lauf-Merge. |
+| `review-tech.md` | Zu breit für eine klar abgegrenzte `scope.tools`-Perspektive. |
 
 ## Review-Log
 
@@ -354,11 +383,11 @@ projektweit priorisiert ist.
 
 ## Security-Tools
 
-Projekt-venvs sind für Projekt-Abhängigkeiten normal. Tool-Installation und
-Docker-Fallbacks sind davon getrennt host-/user-lokal; vor Installation und Preflight darf
-kein Projekt-venv aktiv sein, damit dort liegende ältere Tools nicht als
-Arbeitsumgebungs-Tools zählen. Python-CLI-Tools kommen empfohlen über `pipx` oder, mit
-`--method venv`, in dedizierte k-playbook-Tool-venvs.
+Projekt-venvs sind für Projekt-Abhängigkeiten normal. Der read-only Status darf ein
+aktives Projekt-venv messen und kennzeichnet diesen Messkontext. Tool-Installation und
+Docker-Fallbacks bleiben davon getrennt host-/user-lokal; vor Installation darf kein
+Projekt-venv aktiv sein. Python-CLI-Tools kommen empfohlen über `pipx` oder, mit `--method
+venv`, in dedizierte k-playbook-Tool-venvs.
 
 ```bash
 k-playbook/scripts/install-security-tools.sh                    # Status

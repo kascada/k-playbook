@@ -9,7 +9,7 @@ Host-lokale k-playbook Tools dürfen nicht versehentlich in Projekt-venvs instal
 - `/k-install*` installiert oder prüft host-/user-lokales Tooling.
 - `/k-setup*` konfiguriert einzelne Projekte.
 - Projekt-venvs gehören dem jeweiligen Projekt und enthalten nur dessen Runtime-, Test- und Entwicklungsabhängigkeiten.
-- Projekte dürfen mit aktivem venv arbeiten; verboten ist nur, dass `/k-install*` dieses venv als Tool-Installations- oder Preflight-Kontext benutzt.
+- Projekte dürfen mit aktivem venv arbeiten. Read-only-Preflights dürfen dieses venv als Messkontext nutzen, müssen es aber als solchen kennzeichnen.
 
 ## Erlaubte Installationsziele
 
@@ -24,14 +24,14 @@ Host-lokale CLI-Tools dürfen verwendet werden über:
 
 - Kein `/k-install*` darf in ein Projekt-venv wie `.venv/`, `venv/` oder `env/` installieren.
 - Kein `/k-install*` darf ein aktives `VIRTUAL_ENV` als Installationskontext nutzen.
-- Preflights dürfen Tools aus einem aktiven Projekt-venv nicht als host-global vorhanden werten.
+- Preflights dürfen Tools aus einem aktiven Projekt-venv nicht als host-global vorhanden werten; wenn sie sie messen, muss der Kontext sichtbar sein.
 - Projekt-Dependencies dürfen nicht über `/k-install*` in Projekt-venvs nachinstalliert werden.
 
 ## Konsequenz für Erweiterungen
 
 Neue Installer oder neue Tools müssen vor Installation und Preflight prüfen:
 
-- ob `VIRTUAL_ENV` gesetzt ist und dann abbrechen oder den User zum `deactivate` auffordern.
+- ob `VIRTUAL_ENV` gesetzt ist und dann Installationen abbrechen oder den User zum `deactivate` auffordern.
 - ob Zielpfade in typischen Projekt-venvs liegen und dann abbrechen.
 - ob Python-CLI-Tools bevorzugt via `pipx` oder dediziertem Tool-venv installiert werden.
 

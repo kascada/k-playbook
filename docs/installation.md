@@ -573,11 +573,10 @@ aber keine Release-Binaries. `gosec`, `golangci-lint` und `osv-scanner` kommen d
 GitHub-Releases — `osv-scanner` als blanke Binary ohne Archiv, was das Skript am
 Asset-Namen erkennt.
 
-Ein Projekt darf selbstverständlich mit `.venv` arbeiten. **Nur vor der Installation und
-dem Preflight der Security-Tools darf kein Projekt-venv aktiv sein.** Sonst wird ein Tool
-aus dem venv fälschlich als Arbeitsumgebungs-Tool erkannt; außerdem können dort ältere
-Versionen liegen, als k-playbook für seine Reviews erwartet. Falls `VIRTUAL_ENV` gesetzt
-ist:
+Ein Projekt darf selbstverständlich mit `.venv` arbeiten. Der read-only Preflight misst
+dann genau dieses aktive venv und kennzeichnet den Messkontext in der Oberfläche. **Nur vor
+der Installation der Security-Tools darf kein Projekt-venv aktiv sein**, damit nichts ins
+Projekt-venv geschrieben wird. Falls `VIRTUAL_ENV` gesetzt ist und installiert werden soll:
 
 ```bash
 deactivate

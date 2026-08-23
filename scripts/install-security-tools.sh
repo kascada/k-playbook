@@ -174,7 +174,7 @@ has_cmd() {
 
 ensure_no_active_project_venv() {
   if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Das Projekt darf dieses venv nutzen; nur für den Security-Tool-Preflight und die Installation bitte zuerst 'deactivate' ausführen, damit ältere Tools aus dem Projekt-venv nicht als Arbeitsumgebungs-Tools zählen. Wer Python-Tools in venvs kapseln will, kann danach --method venv nutzen; das verwendet dedizierte k-playbook-Tool-venvs."
+    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Der Status darf dieses venv messen; Installationen bleiben aber geschützt. Führe vor --install bitte 'deactivate' aus. Wer Python-Tools in venvs kapseln will, kann danach --method venv nutzen; das verwendet dedizierte k-playbook-Tool-venvs."
   fi
 }
 
@@ -184,9 +184,26 @@ ensure_no_project_venv_in_path() {
   for entry in "${path_entries[@]}"; do
     [[ -z "$entry" ]] && continue
     if is_project_venv_path "$entry"; then
-      die "PATH enthält ein typisches Projekt-venv ($entry). Das Projekt darf dieses venv nutzen; nur für den Security-Tool-Preflight bitte zuerst 'deactivate' ausführen bzw. PATH bereinigen, damit ältere Tools aus dem Projekt-venv nicht als Arbeitsumgebungs-Tools zählen."
+      die "PATH enthält ein typisches Projekt-venv ($entry). Der Status darf dieses venv messen; Installationen bleiben aber geschützt. Führe vor --install bitte 'deactivate' aus bzw. bereinige PATH."
     fi
   done
+}
+
+active_project_venv_path() {
+  local entry
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    printf '%s' "$VIRTUAL_ENV"
+    return 0
+  fi
+  IFS=':' read -r -a path_entries <<< "$PATH"
+  for entry in "${path_entries[@]}"; do
+    [[ -z "$entry" ]] && continue
+    if is_project_venv_path "$entry"; then
+      printf '%s' "$entry"
+      return 0
+    fi
+  done
+  return 1
 }
 
 is_project_venv_path() {
@@ -369,8 +386,7 @@ script_path() {
 }
 
 print_preflight() {
-  local tool kind status version path image missing_required
-  ensure_host_tool_scope
+  local tool kind status version path image missing_required scope_path
   missing_required="$(missing_required_count)"
 
   printf 'Security-Tools - Preflight\n'
@@ -379,6 +395,11 @@ print_preflight() {
   printf 'Toolliste:  %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
   printf 'Tool-venvs: %s (dediziert, nie ein Projekt-venv)\n' "$VENV_ROOT"
+  if scope_path="$(active_project_venv_path)"; then
+    printf 'Messkontext: aktives Projekt-venv (%s)\n' "$scope_path"
+  else
+    printf 'Messkontext: Host-/User-PATH\n'
+  fi
   if [[ -n "$LANGUAGES" ]]; then
     printf 'Sprachen:   %s\n' "$LANGUAGES"
   else
@@ -427,7 +448,7 @@ print_preflight() {
 
   printf '\n'
   printf 'Installationswege:\n'
-  printf '  Hinweis: Projekt-venvs sind erlaubt, aber nicht als Installationsziel für diese Tools.\n'
+  printf '  Hinweis: Projekt-venvs sind als Messkontext erlaubt, aber nicht als Installationsziel für diese Tools.\n'
   if [[ "$missing_required" -gt 0 ]]; then
     printf '  Nur die Pflicht:    %s --method auto\n' "$(install_hint "$0")"
     printf '  Tool-venvs:         %s --method venv\n' "$(install_hint "$0")"
@@ -455,17 +476,25 @@ json_escape() {
 # print_preflight_json gibt denselben Zustand wie print_preflight aus, nur
 # maschinenlesbar. Die GUI rendert daraus ihre Tabelle.
 print_preflight_json() {
-  local tool status version path image missing_required first
+  local tool status version path image missing_required first scope_path tool_scope tool_scope_message
   local -a optional_missing
-  ensure_host_tool_scope
   missing_required="$(missing_required_count)"
   mapfile -t optional_missing < <(missing_optional_tools)
+  tool_scope="host"
+  tool_scope_message="Host-/User-PATH"
+  if scope_path="$(active_project_venv_path)"; then
+    tool_scope="project-venv"
+    tool_scope_message="Aktives Projekt-venv: $scope_path"
+  fi
 
   printf '{\n'
   printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
   printf '  "toolMatrix": "%s",\n' "$(json_escape "$TOOL_MATRIX_FILE")"
   printf '  "binDir": "%s",\n' "$(json_escape "$BIN_DIR")"
   printf '  "venvRoot": "%s",\n' "$(json_escape "$VENV_ROOT")"
+  printf '  "toolScope": "%s",\n' "$(json_escape "$tool_scope")"
+  printf '  "toolScopePath": "%s",\n' "$(json_escape "${scope_path:-}")"
+  printf '  "toolScopeMessage": "%s",\n' "$(json_escape "$tool_scope_message")"
   printf '  "languages": "%s",\n' "$(json_escape "$LANGUAGES")"
   printf '  "missingRequired": %s,\n' "$missing_required"
   printf '  "missingOptional": %s,\n' "${#optional_missing[@]}"
@@ -955,6 +984,8 @@ main() {
   if [[ -z "$INSTALL_SPEC" ]]; then
     exit 0
   fi
+
+  ensure_host_tool_scope
 
   validate_install_spec
 

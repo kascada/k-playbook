@@ -25,7 +25,8 @@ Ergebnisse dieses Commands:
   bestätigt und angelegt wird,
 - Scanner-Fortschritt und AI-Entry-Fortschritt unter `entries/`,
 - `review-input.json` und `review-input.md` nach dem Merge,
-- `review-triage.md` nach Anwendung des Moduls
+- Perspektiven-Reports aktiver Katalog-Rezepte im Laufordner,
+- optional `review-triage.md` nach Anwendung des Moduls
   `commands/_audit/review-scan-triage.md`.
 
 ## Schritt 1 — Pfade und Lauf bestimmen
@@ -79,13 +80,13 @@ Triage: review-triage.md vorhanden / fehlt
 Nächster Schritt: <konkret>
 ```
 
-Wenn der Status einen inkonsistenten `scan-triage`-Eintrag zeigt, gilt Schritt 7:
+Wenn der Status einen inkonsistenten AI-Eintrag zeigt, gilt je nach Eintrag Schritt 6 oder 7:
 
-- `done` mit `result: review-triage.md` und vorhandener Datei ist erledigt.
-- `done` ohne vorhandene Ergebnisdatei ist reparaturbedürftig; führe die Bewertung
-  erneut aus und schreibe den Eintrag danach neu.
-- Vorhandenes gültiges `review-triage.md` bei fehlendem oder gestarteten Eintrag
-  wird durch `k_playbook_review_write_ai_entry` repariert.
+- `done` mit `result` und vorhandener, nicht leerer Datei ist erledigt.
+- `done` ohne vorhandene Ergebnisdatei ist inkonsistent; führe den AI-Eintrag erneut aus
+  und schreibe den Eintrag danach neu.
+- Vorhandene gültige Ergebnisdatei bei fehlendem oder offenem Entry-Status darf durch
+  `k_playbook_review_write_ai_entry` repariert werden.
 
 ## Schritt 3 — Auswahl für einen neuen Lauf klären
 
@@ -131,48 +132,71 @@ Fehlern weitergemacht, der Scan wiederholt oder abgebrochen werden soll.
 Wenn nur bestimmte Tool-Einträge wiederholt werden sollen, übergib sie in `entries`.
 AI-Einträge werden nie an `k_playbook_review_scan` übergeben.
 
-## Schritt 5 — AI-Review-Einträge ausführen
+## Schritt 5 — Merge starten
 
-Für AI-Einträge aus `catalogs.reviews` mit Zustand `start` oder `running`:
-
-1. Lade den im Lauf gespeicherten `recipePath`.
-2. Führe den Review als eigenen Arbeitsschritt aus.
-3. Schreibe das Ergebnis in den im Eintrag genannten `defaultResult` oder einen
-   bestätigten relativen Ergebnisnamen im Laufordner.
-4. Setze den Eintrag mit `k_playbook_review_write_ai_entry` auf `done`, oder bei
-   technischem Abbruch auf `failed` mit Grund.
-5. Lies danach den Status erneut.
-
-Der Eintrag `scan-triage` wird hier noch nicht ausgeführt. Er gehört zu Schritt 7,
-weil er `review-input.*` aus dem Merge braucht.
-
-## Schritt 6 — Merge starten
-
-Wenn alle gewünschten Tool-Einträge und alle AI-Review-Rezepte in einem Endzustand
-stehen, starte den Merge über `k_playbook_review_merge`:
+Wenn die gewünschten Tool-Einträge in einem Endzustand stehen, starte den Merge über
+`k_playbook_review_merge`:
 
 ```json
 { "projectDir": "RESOLVED_PROJECT_DIR", "run": "<lauf>" }
 ```
 
-Sind noch AI-Review-Rezepte offen, frage vor dem Merge:
-
-- offene AI-Reviews zuerst ausführen,
-- bewusst nur die vorhandenen Tool-Belege mergen,
-- oder abbrechen und später fortsetzen.
-
-Nach dem Merge lies den Status erneut und nenne:
+Offene, fehlgeschlagene oder noch nicht ausgeführte AI-Einträge blockieren den Merge
+nicht. Der Merge nutzt ausschließlich Tool-Einträge, deren Roh- und Statusdaten im Lauf
+vorliegen, und schreibt danach:
 
 - `<lauf>/review-input.json`,
 - `<lauf>/review-input.md`.
 
 Rohdaten, `run.json` und vorhandene Entry-Dateien werden durch den Merge nicht
-verändert.
+verändert. Lies danach den Status erneut.
+
+## Schritt 6 — Katalog-Perspektiven ausführen
+
+Führe diesen Schritt erst aus, wenn `review-input.json` im Laufordner vorhanden ist.
+
+Für AI-Einträge aus `catalogs.reviews` mit Zustand `start` oder `running`:
+
+1. Lade den im Lauf gespeicherten `recipePath`.
+2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.tools`.
+3. Führe den Review als Perspektive auf `review-input.json` aus: Gruppen gehören in die
+   Perspektive, wenn mindestens eine Evidence ein `evidence.tool` aus `scope.tools`
+   trägt; fremde Evidence bleibt Kontext und wird als außerhalb des Scopes markiert.
+4. Schreibe das Ergebnis in den im Eintrag genannten `defaultResult` oder einen
+   bestätigten relativen Ergebnisnamen im Laufordner.
+5. Setze den Eintrag mit `k_playbook_review_write_ai_entry` auf `done`, oder bei
+   technischem Abbruch auf `failed` mit Grund.
+6. Lies danach den Status erneut.
+
+Leere Scope-Ergebnisse sind gültig: Das Ergebnisdokument sagt dann klar „keine scoped
+Findings" und der Eintrag kann auf `done` gesetzt werden. Katalog-Perspektiven schreiben
+keinen Family-Ordner, keine `raw/`-Artefakte und kein zweites `review-input.*`.
+
+Reparaturvertrag für Katalog-Perspektiven:
+
+- Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry ist offen: Status bleibt
+  offen; Rerun führt den AI-Eintrag erneut aus und schreibt die Ergebnisdatei.
+- Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry steht auf abgeschlossen:
+  Statusausgabe markiert den Eintrag als inkonsistent und `resultRequired` nicht erfüllt;
+  Rerun schreibt die Ergebnisdatei neu und repariert den Status.
+- Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry-Status fehlt oder ist
+  offen: Statusausgabe darf den Eintrag als reparabel markieren; Rerun muss keine neue
+  Datei erzwingen, sondern darf den Status über `k_playbook_review_write_ai_entry` auf
+  abgeschlossen setzen, wenn die Datei nicht leer ist.
+- Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry ist abgeschlossen: keine
+  Reparatur nötig.
+- Rezept wurde nach Laufstart deaktiviert oder geändert: Der bestehende Lauf nutzt weiter
+  den Snapshot aus `run.json`.
+- Alter Lauf enthält keinen Eintrag für ein später hinzugefügtes Rezept: keine
+  automatische nachträgliche Ergänzung der alten `run.json`.
+
+Der Eintrag `scan-triage` wird hier noch nicht ausgeführt. Er gehört zu Schritt 7.
 
 ## Schritt 7 — Bewertung schreiben
 
 Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` im
-Laufordner vorhanden sind.
+Laufordner vorhanden sind. `scan-triage` darf vorhandene Perspektiven-Reports als Kontext
+nutzen, aggregiert sie aber nicht in einem zweiten Merge-Schritt.
 
 Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an:
 
@@ -198,10 +222,10 @@ Danach rufe `k_playbook_review_write_ai_entry` auf:
 }
 ```
 
-Wenn `review-triage.md` bereits existiert, prüfe die Pflichtabschnitte aus dem Modul.
-Ist die Datei gültig und fehlt nur der Eintragszustand, repariere ausschließlich den
-Eintrag über `k_playbook_review_write_ai_entry`. Ist die Datei ungültig oder zeigt der
-Eintrag auf ein fehlendes Ergebnis, führe die Bewertung erneut aus.
+Wenn `review-triage.md` bereits existiert, prüfe die Pflichtabschnitte aus dem Modul. Ist
+die Datei gültig und fehlt nur der Eintragszustand, repariere ausschließlich den Eintrag
+über `k_playbook_review_write_ai_entry`. Ist die Datei ungültig oder zeigt der Eintrag auf
+ein fehlendes Ergebnis, führe die Bewertung erneut aus.
 
 ## Schritt 8 — Abschluss und Handoff
 

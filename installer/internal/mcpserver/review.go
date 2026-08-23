@@ -573,6 +573,13 @@ func validateAIEntryInput(runDir string, entry review.Entry, input reviewWriteAI
 				Details: map[string]any{"entry": input.Entry, "result": input.Result, "path": path},
 			}
 		}
+		if info.Size() == 0 {
+			return reviewToolError{
+				Code:    "result_path_invalid",
+				Message: "Ergebnisartefakt ist leer.",
+				Details: map[string]any{"entry": input.Entry, "result": input.Result, "path": path},
+			}
+		}
 	}
 	if input.State == review.StateRunning && input.FinishedAt != "" {
 		return reviewToolError{
@@ -1274,7 +1281,7 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			err := readAIEntryStatus(runDir, entry.Name, &status)
 			if err != nil {
 				if os.IsNotExist(err) {
-					markAIRepairStatus(item, entry, review.StateStart, defaultResultState)
+					markAIRepairStatus(item, entry, review.StateStart, "", defaultResultState)
 					entries = append(entries, item)
 					continue
 				}
@@ -1290,7 +1297,7 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			if status.Result != "" {
 				resultState = aiResultStateFor(runDir, status.Result)
 			}
-			markAIRepairStatus(item, entry, status.State, resultState)
+			markAIRepairStatus(item, entry, status.State, status.Result, resultState)
 			entries = append(entries, item)
 			continue
 		}
@@ -1338,7 +1345,7 @@ func aiResultStateFor(runDir string, result string) aiResultState {
 	return state
 }
 
-func markAIRepairStatus(item map[string]any, entry review.Entry, state review.State, result aiResultState) {
+func markAIRepairStatus(item map[string]any, entry review.Entry, state review.State, statusResult string, result aiResultState) {
 	if result.Result != "" && result.Exists {
 		item["resultExists"] = true
 	}
@@ -1347,7 +1354,7 @@ func markAIRepairStatus(item map[string]any, entry review.Entry, state review.St
 		item["inconsistent"] = true
 	}
 	if state == review.StateDone && entryResultRequired(entry) {
-		if result.Result == "" || !result.Exists || !result.NonEmpty {
+		if strings.TrimSpace(statusResult) == "" || result.Result == "" || !result.Exists || !result.NonEmpty {
 			item["resultMissing"] = true
 			item["inconsistent"] = true
 		}

@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
 
 // ToolScriptPath ist der Preflight, relativ zur Installation.
 const ToolScriptPath = "scripts/install-security-tools.sh"
+
+// ToolMatrixPath ist die kanonische Tool-Matrix, relativ zur Installation.
+const ToolMatrixPath = "scripts/security-tools.tsv"
 
 // toolPreflightTimeout begrenzt den Aufruf. Der Preflight ruft je Tool ein
 // --version auf; hängt eines davon, darf die Oberfläche nicht mitwarten.
@@ -40,6 +45,11 @@ type ToolPreflight struct {
 	ToolMatrix  string `json:"toolMatrix"`
 	BinDir      string `json:"binDir"`
 	VenvRoot    string `json:"venvRoot"`
+	// ToolScope benennt, ob der Status den Host-/User-PATH oder ein aktives
+	// Projekt-venv gemessen hat.
+	ToolScope        string `json:"toolScope"`
+	ToolScopePath    string `json:"toolScopePath"`
+	ToolScopeMessage string `json:"toolScopeMessage"`
 	// Languages ist die Sprachliste, mit der der Preflight gerechnet hat. Leer
 	// heißt: keine übergeben, also gilt nur Sprachunabhängiges als Pflicht.
 	Languages       string `json:"languages"`
@@ -63,6 +73,47 @@ type ToolPreflight struct {
 // ToolScript ist der Ort des Preflight-Skripts in einer Installation.
 func ToolScript(projectDir string) string {
 	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(ToolScriptPath))
+}
+
+// ToolMatrix ist der Ort der Tool-Matrix in einer Installation.
+func ToolMatrix(projectDir string) string {
+	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(ToolMatrixPath))
+}
+
+// ReadToolLanguages liest nur die Sprachliste aus der Tool-Matrix. Das braucht
+// die Oberfläche auch dann, wenn der eigentliche Preflight wegen eines aktiven
+// Projekt-venv abbricht.
+func ReadToolLanguages(projectDir string) ([]string, error) {
+	data, err := os.ReadFile(ToolMatrix(projectDir))
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 2 || fields[0] == "name" {
+			continue
+		}
+		for _, language := range strings.Split(fields[1], ",") {
+			language = strings.TrimSpace(language)
+			if language == "" || language == "*" {
+				continue
+			}
+			seen[language] = true
+		}
+	}
+
+	languages := make([]string, 0, len(seen))
+	for language := range seen {
+		languages = append(languages, language)
+	}
+	sort.Strings(languages)
+	return languages, nil
 }
 
 // describePreflightError übersetzt die Skriptmeldung, wo sie für sich genommen

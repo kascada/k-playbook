@@ -171,17 +171,17 @@ die Oberfläche weist sie als projekteigen aus.
 
 ## Darf ein Projekt mit venv laufen?
 
-Ja. Ein Projekt-venv ist für Projekt-Abhängigkeiten normal. Nur beim Installieren und
-Prüfen der k-playbook-Security-Tools darf kein Projekt-venv aktiv sein. Sonst wird ein
-Tool aus dem Projekt-venv fälschlich als Arbeitsumgebungs-Tool erkannt; dort kann außerdem
-eine ältere Version liegen. Wenn `VIRTUAL_ENV` gesetzt ist:
+Ja. Ein Projekt-venv ist für Projekt-Abhängigkeiten normal. Der read-only Status der
+k-playbook-Security-Tools darf dieses aktive venv messen und kennzeichnet das in der
+Oberfläche. Nur beim Installieren darf kein Projekt-venv aktiv sein, damit nichts ins
+Projekt-venv geschrieben wird. Wenn `VIRTUAL_ENV` gesetzt ist und installiert werden soll:
 
 ```bash
 deactivate
 ```
 
-Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` sind für diesen Preflight nicht
-erlaubt. Empfohlen ist `--method auto`. Wenn Python-CLI-Tools ausdrücklich in venvs
+Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` blockieren deshalb nur
+Installationen, nicht die Statusanzeige. Empfohlen ist `--method auto`. Wenn Python-CLI-Tools ausdrücklich in venvs
 isoliert werden sollen, dann mit dedizierten k-playbook-Tool-venvs:
 
 ```bash

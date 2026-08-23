@@ -16,10 +16,12 @@ import (
 // fertigen Befehl. Die Sprachauswahl dagegen gehört dem Projekt und wird hier
 // gesetzt.
 type toolsResponse struct {
-	Available bool           `json:"available"`
-	Tools     []project.Tool `json:"tools"`
-	BinDir    string         `json:"binDir"`
-	Command   string         `json:"command"`
+	Available        bool           `json:"available"`
+	Tools            []project.Tool `json:"tools"`
+	BinDir           string         `json:"binDir"`
+	ToolScope        string         `json:"toolScope"`
+	ToolScopeMessage string         `json:"toolScopeMessage"`
+	Command          string         `json:"command"`
 	// CommandVenv installiert Python-CLI-Tools in dedizierte k-playbook-Tool-venvs.
 	CommandVenv string `json:"commandVenv"`
 	// CommandOptional nimmt die optionalen mit. Beide kommen fertig aus dem
@@ -101,6 +103,9 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		if preflightBlockedByVenv(err.Error()) {
 			response.Command = fallbackToolInstallCommand(projectDir, languages, " --method auto")
 			response.CommandVenv = fallbackToolInstallCommand(projectDir, languages, " --method venv")
+			if available, languagesErr := project.ReadToolLanguages(projectDir); languagesErr == nil {
+				response.AvailableLanguages = available
+			}
 		}
 		return response
 	}
@@ -109,6 +114,8 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		Available:           true,
 		Tools:               preflight.Tools,
 		BinDir:              preflight.BinDir,
+		ToolScope:           preflight.ToolScope,
+		ToolScopeMessage:    preflight.ToolScopeMessage,
 		Command:             preflight.InstallCommand,
 		CommandVenv:         preflight.InstallCommandVenv,
 		CommandOptional:     preflight.InstallCommandOptional,

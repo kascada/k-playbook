@@ -646,10 +646,14 @@ func TestReviewWriteAIEntryFehler(t *testing.T) {
 		{name: "tool", input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "mockscan", State: review.StateDone, Result: "x.md"}, code: "entry_kind_invalid"},
 		{name: "done ohne Result", input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "tech", State: review.StateDone}, code: "result_required"},
 		{name: "Pfad", input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "tech", State: review.StateDone, Result: "../x.md"}, code: "result_path_invalid"},
+		{name: "leeres Result", input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "tech", State: review.StateDone, Result: "empty.md"}, code: "result_path_invalid"},
 		{name: "failed ohne Grund", input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "tech", State: review.StateFailed}, code: "entry_state_invalid"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.input.Result == "empty.md" {
+				mustWriteFile(t, filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19", "empty.md"), "")
+			}
 			test.input.reviewBaseInput = reviewBaseInput{ProjectDir: root}
 			result, _, err := reviewWriteAIEntryTool(context.Background(), nil, test.input)
 			if err != nil {

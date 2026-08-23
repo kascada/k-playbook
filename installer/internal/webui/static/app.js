@@ -1224,14 +1224,26 @@ function renderTools(data) {
   if (data.binDir) {
     addFact(elements.toolsFacts, "Installationsort", data.binDir);
   }
+  if (data.toolScopeMessage) {
+    addFact(elements.toolsFacts, "Messkontext", data.toolScopeMessage);
+  }
 
   // Optionale Tools blockieren nichts, dürfen aber nicht unerwähnt bleiben:
   // sonst steht "fehlt" in der Liste und "Vollständig" darüber.
   const optional = data.missingOptional || 0;
 
   if (data.ok) {
-    elements.toolsPill.className = optional > 0 ? "pill warn" : "pill ok";
+    elements.toolsPill.className = optional > 0 || data.toolScope === "project-venv" ? "pill warn" : "pill ok";
     elements.toolsPill.textContent = optional > 0 ? "Pflicht vollständig" : "Vollständig";
+    if (data.toolScope === "project-venv") {
+      elements.toolsPill.textContent = optional > 0 ? "Pflicht im venv da" : "Im venv vollständig";
+      elements.toolsMessage.textContent = "Gemessen wurde das aktive Projekt-venv. Zum Installieren vorher deactivate ausführen; empfohlen bleibt host-/user-lokal oder dedizierte Tool-venvs.";
+      if (optional > 0) {
+        elements.toolsMessage.textContent += ` ${optional} optionale${optional === 1 ? "s fehlt" : " fehlen"}.`;
+        showToolsCommand(data.commandOptional, data.commandOptionalVenv);
+      }
+      return;
+    }
     if (optional > 0) {
       elements.toolsMessage.textContent =
         `Alle Pflicht-Tools sind da. ${optional} optionale${optional === 1 ? "s fehlt" : " fehlen"}.`;

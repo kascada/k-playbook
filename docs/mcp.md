@@ -190,6 +190,8 @@ audit:
   title: "Technischer Review"
   resultRequired: true
   defaultResult: "review-tech.md"
+  scope:
+    tools: [semgrep, gosec]
 review:
   enabled: true
 ---
@@ -200,9 +202,10 @@ Review-Katalog-/Run-API bilden. Die sichtbare Nutzerrolle des vollständigen Swe
 trotzdem `/k-audit`.
 
 Beim Anlegen eines Laufs werden `recipeKey`, `recipePath`, `recipeOrigin`, `title`,
-`resultRequired` und `defaultResult` in `run.json` kopiert. Das Schreibwerkzeug für
-AI-Einträge validiert später gegen diese Kopie, nicht gegen den eventuell geänderten
-Rezepttext.
+`resultRequired`, `defaultResult` und `scope` in `run.json` kopiert. Das Schreibwerkzeug
+für AI-Einträge validiert später gegen diese Kopie, nicht gegen den eventuell geänderten
+Rezepttext. `scope.tools` ist damit ein Snapshot: bestehende Läufe behalten ihren Scope,
+auch wenn das Rezept später geändert wird.
 
 ### Timeouts und Progress-Notifications
 

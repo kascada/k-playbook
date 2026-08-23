@@ -27,7 +27,7 @@ func newInstallationWithScript(t *testing.T, body string) string {
 func TestCheckToolsLiestPreflight(t *testing.T) {
 	root := newInstallationWithScript(t, `cat <<'JSON'
 {"playbookDir":"/x","toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
- "venvRoot":"/x/venv","languages":"go","missingRequired":1,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
+ "venvRoot":"/x/venv","toolScope":"host","toolScopeMessage":"Host-/User-PATH","languages":"go","missingRequired":1,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
  "tools":[{"name":"gitleaks","languages":"*","required":true,"installMethod":"github","status":"ok","version":"8.30.1","path":"/x/gitleaks","role":"Secret-Scanning","dockerImage":"img"},
           {"name":"gosec","languages":"go","required":true,"installMethod":"go","status":"missing","version":"","path":"","role":"Go-Security","dockerImage":""}]}
 JSON
@@ -45,6 +45,9 @@ JSON
 	}
 	if preflight.VenvRoot != "/x/venv" {
 		t.Errorf("VenvRoot = %q, erwartet %q", preflight.VenvRoot, "/x/venv")
+	}
+	if preflight.ToolScope != "host" {
+		t.Errorf("ToolScope = %q, erwartet host", preflight.ToolScope)
 	}
 	if preflight.InstallCommandVenv != "bash x --install missing --method venv" {
 		t.Errorf("InstallCommandVenv = %q, erwartet venv-Installationsbefehl", preflight.InstallCommandVenv)
@@ -66,9 +69,51 @@ JSON
 	}
 }
 
+func TestCheckToolsErlaubtReadOnlyPreflightMitAktivemVenv(t *testing.T) {
+	root := newInstallationWithScript(t, `cat <<'JSON'
+{"playbookDir":"/x","toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
+ "venvRoot":"/x/venv","toolScope":"project-venv","toolScopePath":"/tmp/projekt/.venv","toolScopeMessage":"Aktives Projekt-venv: /tmp/projekt/.venv","languages":"python","missingRequired":0,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
+ "tools":[{"name":"ruff","languages":"python","required":true,"installMethod":"pipx","status":"ok","version":"ruff 0.1.0","path":"/tmp/projekt/.venv/bin/ruff","role":"Python","dockerImage":""}]}
+JSON
+`)
+	t.Setenv("VIRTUAL_ENV", "/tmp/projekt/.venv")
+
+	preflight, err := CheckTools(root, []string{"python"})
+	if err != nil {
+		t.Fatalf("CheckTools: %v", err)
+	}
+	if preflight.ToolScope != "project-venv" {
+		t.Errorf("ToolScope = %q, erwartet project-venv", preflight.ToolScope)
+	}
+	if preflight.Tools[0].Path != "/tmp/projekt/.venv/bin/ruff" {
+		t.Errorf("Tool-Pfad = %q, erwartet venv-Pfad", preflight.Tools[0].Path)
+	}
+}
+
 func TestCheckToolsOhneSkript(t *testing.T) {
 	if _, err := CheckTools(t.TempDir(), nil); err == nil {
 		t.Error("fehlendes Skript wurde nicht gemeldet")
+	}
+}
+
+func TestReadToolLanguagesLiestMatrix(t *testing.T) {
+	root := newInstallationWithScript(t, "echo '{}'")
+	matrix := filepath.Join(PlaybookDir(root), filepath.FromSlash(ToolMatrixPath))
+	if err := os.WriteFile(matrix, []byte(`# Kommentar
+name	languages	required	installable	install_method	install_ref	asset_pattern	role	docker_image	version_args
+gitleaks	*	true	true	github	gitleaks/gitleaks	-	Secret	-	--version
+pip-audit	python	true	true	pipx	pip-audit	-	Python	-	--version
+semgrep	python,go	true	true	pipx	semgrep	-	Semgrep	-	--version
+`), 0o644); err != nil {
+		t.Fatalf("Matrix schreiben: %v", err)
+	}
+
+	languages, err := ReadToolLanguages(root)
+	if err != nil {
+		t.Fatalf("ReadToolLanguages: %v", err)
+	}
+	if got, want := strings.Join(languages, ","), "go,python"; got != want {
+		t.Errorf("Sprachen = %q, erwartet %q", got, want)
 	}
 }
 

@@ -6,24 +6,24 @@ scope-hint: Quell- und Infrastruktur-Verzeichnisse; Ausschluss - priv/, secure/,
 handoff: /k-remediation
 audit:
   enabled: false
-  title: Tech-Debt-Analyse
-  resultRequired: true
-  defaultResult: review-tech.md
 review:
   enabled: true
 ---
 
 # Review: Tech-Debt
 
-Vollständige Analyse aller Tech-Debt-Kandidaten im Projekt mit anschließender Übergabe an `/k-remediation`.
+Vollständige Analyse aller Tech-Debt-Kandidaten im Projekt mit anschließender Übergabe an
+`/k-remediation`.
 
-Der generische Rahmen wird von `/k-review` orchestriert. Diese Datei beschreibt nur die reviewspezifische Analyse.
+Der generische Rahmen wird von `/k-review` orchestriert. Dieses Rezept bleibt im
+Audit-Laufmodell deaktiviert, weil es zu breit für eine klar abgegrenzte
+`scope.tools`-Perspektive ist und bis zu einem separaten Zuschnitt Family-only bleibt.
 
 ## Ablauf-Besonderheit
 
-Dieses Review erzeugt keine interaktiven Freigaben pro Fund. Es produziert ein vollständiges Ergebnis-Dokument, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
-
-Der Command übergibt der Analyse einen Pfad für die Ausgabe-Datei unter `k-playbook-local/results/`, üblich: `k-playbook-local/results/summary-YYYY-MM-DD.md`.
+Dieses Review erzeugt keine interaktiven Freigaben pro Fund. Es produziert ein
+vollständiges Ergebnis-Dokument, das anschließend im Rahmen von `/k-remediation` einzeln
+durchgegangen wird.
 
 ## Analyse
 
@@ -33,10 +33,10 @@ Nutze `/engineering:tech-debt` mit folgender Direktive:
 - Halte die Ausschlüsse aus `scope-hint` ein.
 - Kategorisiere und priorisiere alle Tech-Debt-Kandidaten.
 - Keine Code-Änderungen.
-- Schreibe das vollständige Ergebnis als Markdown in die vom Command übergebene Summary-Datei.
+- Schreibe das vollständige Ergebnis als Markdown in die vom Command übergebene Datei.
 
 ## Handoff
 
-Nach Abschluss der Analyse und dem Log-Eintrag nennt `/k-review` Pfad und exakten Handoff-Befehl:
-
-`/k-remediation <ausgabe-datei>`
+Nach Abschluss der Analyse und dem Log-Eintrag nennt `/k-review` Pfad und exakten
+Handoff-Befehl auf `review-triage.md`. Remediation ist ausdrücklich nicht Teil dieses
+Reviews.

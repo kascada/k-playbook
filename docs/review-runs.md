@@ -45,12 +45,12 @@ starten will, räumt das vorhandene Verzeichnis weg oder benennt es um.
 **`raw/` legt der Ausführer an**, beim ersten Job, den er startet. Das Anlegen eines
 Laufs kennt das Verzeichnis nicht: ein Lauf ohne Werkzeug-Eintrag braucht es nicht.
 
-**Es gibt vorerst zwei Orte für Rohdaten.** Die Ergebnisfamilien unter
+**Es gibt zwei Orte für Rohdaten.** Die Ergebnisfamilien unter
 `k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` bleiben, wie sie sind, und
 `/k-results` liest weiter sie; `ListRuns()` zeigt sie ohnehin mit an. Das
 Laufverzeichnis ist dagegen familienlos, weil ein Lauf gerade über die Familien hinweg
-klammert. Wann beides zusammengeht, entscheidet der Umbau der Rezepte auf reine
-Bewertung ([`umbau.md`](./umbau.md), „Offen").
+klammert. Katalog-Perspektiven im Laufmodell legen keine eigene Rohdatenablage an; sie
+lesen den gemeinsamen Merge-Beleg aus diesem Laufordner.
 
 ## Wer was schreibt
 
@@ -104,7 +104,10 @@ ab, gilt `entries/`. `run.json` hält fest, was ausgewählt wurde, nicht, wie we
       "recipeOrigin": "dist",
       "title": "Technischer Review",
       "resultRequired": true,
-      "defaultResult": "review-tech.md"
+      "defaultResult": "review-tech.md",
+      "scope": {
+        "tools": ["semgrep", "gosec"]
+      }
     }
   ]
 }
@@ -130,6 +133,8 @@ audit:
   title: "Technischer Review"
   resultRequired: true
   defaultResult: "review-tech.md"
+  scope:
+    tools: [semgrep, gosec]
 review:
   enabled: true
 ---
@@ -140,6 +145,8 @@ review:
 `title` fällt ohne Angabe auf die erste Überschrift oder den Katalog-Schlüssel zurück.
 `resultRequired` ist standardmäßig `true` und bestimmt, ob ein `done`-Status ein Ergebnis
 braucht. `defaultResult` ist ein relativer Vorschlag im Laufverzeichnis.
+`scope.tools` ist der beim Anlegen eingefrorene Tool-Scope des AI-Eintrags. Spätere
+Rezeptänderungen ändern bestehende Läufe nicht.
 
 Der Moduleintrag `scan-triage` erhält dieselben Laufmetadaten aus dem effektiven
 Command-Namensraum: `recipePath` zeigt auf
@@ -147,6 +154,86 @@ Command-Namensraum: `recipePath` zeigt auf
 `review-triage.md`, `resultRequired` ist `true`. Ein leeres lokales Overlay unter
 `k-playbook-local/commands/_audit/review-scan-triage.md` schaltet diesen
 Eintrag ab.
+
+## Katalog-Rezepte als Perspektiven
+
+Aktive Katalog-Rezepte laufen im Audit-Laufmodell nicht als eigene Scanner. Sie sind
+Perspektiven auf den Merge-Output `review-input.json` und schreiben genau eine
+Markdown-Datei direkt in den Laufordner, z. B. `review-secret-scanning.md`. Das
+vollständige Beispiel für diesen Vertrag steht im Rezept
+[`review-secret-scanning.md`](../reviews/review-secret-scanning.md).
+
+Frontmatter-Vertrag:
+
+```yaml
+---
+name: review-<key>
+title: <Titel>
+audit:
+  enabled: true
+  defaultResult: review-<key>.md
+  resultRequired: true
+  scope:
+    tools: [<tool>, <tool>]
+review:
+  enabled: true
+---
+```
+
+Der `audit`-Block ist optional. Fehlt er, bleibt das Rezept im Audit-Laufmodell inaktiv.
+`audit.enabled: false` deaktiviert nur die `/k-audit`-/MCP-Auswahl; `review.enabled`
+steuert weiterhin die gezielte `/k-review`-Auswahl.
+
+Reihenfolge in `/k-audit`:
+
+1. Tool-Einträge laufen und schreiben `entries/<tool>.json` sowie `raw/<job>.sarif`.
+2. Der Merge schreibt `review-input.json` und `review-input.md` aus den Tool-Einträgen.
+3. Aktive Katalog-Rezepte lesen `review-input.json` als Perspektiven.
+4. Optional läuft danach `scan-triage` und darf Perspektiven-Reports als Kontext nutzen.
+
+Offene, fehlgeschlagene oder noch nicht ausgeführte Perspektiven blockieren den Merge
+nicht. Sie können den AI-Teil offen lassen, aber `review-input.json` muss aus den
+Tool-Scans erzeugbar bleiben.
+
+Scope-Semantik:
+
+- `scope.tools` filtert auf Evidence-Ebene von `review-input.json`.
+- Eine Gruppe gehört zur Perspektive, wenn mindestens eine Evidence dieser Gruppe ein
+  `evidence.tool` aus `scope.tools` trägt.
+- Die originale Gruppen-ID bleibt unverändert. Das Rezept dedupliziert, splittet und
+  nummeriert Gruppen nicht neu.
+- Die Perspektive bewertet nur Evidence aus `scope.tools` als primären Befund.
+- Evidence aus anderen Tools bleibt als Kontext sichtbar, muss aber im Report eindeutig als
+  „außerhalb des Scopes" markiert werden.
+- Ein Finding kann in mehreren Perspektiven auftauchen. Das ist gewollt und kein
+  Dedupe-Fehler.
+- Leere Scope-Ergebnisse sind gültig. Das Rezept schreibt dann eine Ergebnisdatei mit
+  Status „keine scoped Findings" statt eigene Scans nachzuholen.
+
+Reparaturmatrix für AI-Einträge:
+
+| Zustand | Verhalten |
+|---|---|
+| Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry ist offen | Status bleibt offen; Rerun führt den AI-Eintrag erneut aus und schreibt die Ergebnisdatei. |
+| Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry steht auf abgeschlossen | Statusausgabe markiert den Eintrag als inkonsistent und `resultRequired` nicht erfüllt; Rerun schreibt die Ergebnisdatei neu und repariert den Status. |
+| Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry-Status fehlt oder ist offen | Statusausgabe darf den Eintrag als reparabel markieren; Rerun muss keine neue Datei erzwingen, sondern darf den Status über `k_playbook_review_write_ai_entry` auf abgeschlossen setzen, wenn die Datei nicht leer ist. |
+| Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry ist abgeschlossen | Keine Reparatur nötig. |
+| Rezept wurde nach Laufstart deaktiviert oder geändert | Der bestehende Lauf nutzt weiter den Snapshot aus `run.json`. |
+| Alter Lauf enthält keinen Eintrag für ein später hinzugefügtes Rezept | Keine automatische nachträgliche Ergänzung der alten `run.json`. Neue Rezept-Einträge entstehen nur beim Erzeugen eines neuen Laufs. |
+
+Manuelle Verifikation nach Änderungen am Perspektivenmodell:
+
+1. `/k-audit 2026-08-21` in einer neuen Assistenten-Session starten und Status lesen.
+2. Prüfen, dass `secret-scanning` nach dem Merge `review-secret-scanning.md` ohne
+   Alignment-Hinweis erzeugt und den Scope `gitleaks`, `trufflehog` nennt.
+3. Prüfen, dass `python-comment-hardspots` nicht als aktiver Audit-Eintrag ausgewählt wird
+   und im Rezept als Family-only begründet ist.
+4. In einem CVE-lastigen Ziel einen kleinen Lauf mit Dependency-Tools anlegen und prüfen,
+   dass `dependency-cve` als Perspektive über `review-input.json` läuft.
+5. In Statusausgabe und Create-Dry-Run prüfen, dass aktive Rezept-Einträge ihren
+   gespeicherten `scope` zeigen.
+6. Je einen beschädigten AI-Eintrag aus der Reparaturmatrix simulieren und prüfen, dass
+   Status oder Rerun die erwartete Reparatur zeigt.
 
 ## Zustände
 

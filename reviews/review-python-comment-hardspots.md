@@ -6,18 +6,20 @@ interval-weeks: 16
 scope-hint: Python-Quellen; Ausschluss: virtuelle Umgebungen, tests/fixtures
 audit:
   enabled: false
-  title: Python - Nicht-rekonstruierbare Entscheidungen kommentieren
-  resultRequired: false
-  defaultResult: review-python-comment-hardspots.md
 review:
   enabled: true
 ---
 
 # Review: Python-Comment-Hardspots
 
-Finde in Python-Code Stellen, an denen selbst ein erfahrener Reviewer mit Projektkenntnis nicht erkennen kann, warum der Code so geschrieben wurde wie er ist. Kläre den Grund, notfalls per Rückfrage, und schlage dort einen aussagekräftigen Kommentar vor.
+Finde in Python-Code Stellen, an denen selbst ein erfahrener Reviewer mit
+Projektkenntnis nicht erkennen kann, warum der Code so geschrieben wurde wie er ist.
+Kläre den Grund, notfalls per Rückfrage, und schlage dort einen aussagekräftigen
+Kommentar vor.
 
-Der generische Ablauf wird von `/k-review` orchestriert. Diese Datei beschreibt nur die reviewspezifischen Kriterien, Stil-Wahl und Beispiele.
+Der generische Ablauf wird von `/k-review` orchestriert. Dieses Rezept bleibt im
+Audit-Laufmodell deaktiviert, weil Code-Hotspots derzeit nicht als Evidence in
+`review-input.json` vorliegen und dieser Task keinen alternativen Scope-Typ einführt.
 
 ## Zielgruppe des Codes
 
@@ -27,11 +29,14 @@ Sehr erfahrene Programmierer, die das Projekt kennen.
 - Domänenwissen ist vorausgesetzt.
 - Python-Idiome werden verstanden.
 
-Es bleibt eine eng umrissene Restmenge: Stellen, an denen der Code anders aussieht als die naheliegende Lösung und der Grund dafür nicht aus Code, Kontext oder Domänenwissen ableitbar ist.
+Es bleibt eine eng umrissene Restmenge: Stellen, an denen der Code anders aussieht als
+die naheliegende Lösung und der Grund dafür nicht aus Code, Kontext oder Domänenwissen
+ableitbar ist.
 
 ## Was kommentiert werden soll
 
-Kandidaten sind Stellen, an denen die Antwort auf "warum nicht einfach so?" außerhalb des sichtbaren Universums liegt.
+Kandidaten sind Stellen, an denen die Antwort auf „warum nicht einfach so?" außerhalb
+des sichtbaren Universums liegt.
 
 Typische Fälle:
 
@@ -57,9 +62,11 @@ Bei begründetem Zweifel: nicht aufnehmen. Eine leere Fundliste ist ein gültige
 ## Stil-Wahl beim Kommentar
 
 - Inline am Zeilenende für sehr kurze Hinweise an einer einzelnen Zeile oder Konstante.
-- Einzeiliger Kommentar darüber, wenn der Hinweis kurz ist und sich auf wenige Zeilen bezieht.
+- Einzeiliger Kommentar darüber, wenn der Hinweis kurz ist und sich auf wenige Zeilen
+  bezieht.
 - Block-Kommentar über dem Abschnitt, wenn mehrere Sätze nötig sind.
-- Docstring nur, wenn die nicht-rekonstruierbare Entscheidung das Wesen der gesamten Funktion betrifft.
+- Docstring nur, wenn die nicht-rekonstruierbare Entscheidung das Wesen der gesamten
+  Funktion betrifft.
 
 ## Kommentar-Qualitätskriterien
 
@@ -77,3 +84,9 @@ Bei begründetem Zweifel: nicht aufnehmen. Eine leere Fundliste ist ein gültige
 - Leere Liste vermeiden wollen.
 - Vermutungen als Fakten formulieren.
 - Das Was erklären statt das Warum.
+
+## Handoff
+
+Dieses Rezept bleibt über `/k-review python-comment-hardspots` auswählbar. Eine spätere
+Aktivierung im Audit-Laufmodell braucht einen separaten Vertrag, der Code-Hotspots als
+Evidence in `review-input.json` bringt.
