@@ -75,6 +75,13 @@ type Entry struct {
 	Title          string `json:"title,omitempty"`
 	ResultRequired *bool  `json:"resultRequired,omitempty"`
 	DefaultResult  string `json:"defaultResult,omitempty"`
+	Scope          *Scope `json:"scope,omitempty"`
+}
+
+// Scope ist der beim Erzeugen eines Laufs eingefrorene Bewertungs-Scope eines
+// AI-Eintrags.
+type Scope struct {
+	Tools []string `json:"tools,omitempty"`
 }
 
 // Run ist der Inhalt von run.json.
@@ -244,6 +251,7 @@ func CreateRun(localDir string, day time.Time, languages []string, entries []Ent
 	prepared := make([]Entry, 0, len(entries))
 	for _, entry := range entries {
 		entry.State = StateStart
+		entry.Scope = cloneScope(entry.Scope)
 		prepared = append(prepared, entry)
 	}
 
@@ -262,6 +270,17 @@ func CreateRun(localDir string, day time.Time, languages []string, entries []Ent
 		return "", err
 	}
 	return runDir, nil
+}
+
+func cloneScope(scope *Scope) *Scope {
+	if scope == nil {
+		return nil
+	}
+	cloned := &Scope{}
+	if scope.Tools != nil {
+		cloned.Tools = append([]string{}, scope.Tools...)
+	}
+	return cloned
 }
 
 func writeRun(runDir string, run Run) error {

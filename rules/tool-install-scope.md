@@ -9,6 +9,7 @@ Host-lokale k-playbook Tools dürfen nicht versehentlich in Projekt-venvs instal
 - `/k-install*` installiert oder prüft host-/user-lokales Tooling.
 - `/k-setup*` konfiguriert einzelne Projekte.
 - Projekt-venvs gehören dem jeweiligen Projekt und enthalten nur dessen Runtime-, Test- und Entwicklungsabhängigkeiten.
+- Projekte dürfen mit aktivem venv arbeiten; verboten ist nur, dass `/k-install*` dieses venv als Tool-Installations- oder Preflight-Kontext benutzt.
 
 ## Erlaubte Installationsziele
 
@@ -16,7 +17,7 @@ Host-lokale CLI-Tools dürfen verwendet werden über:
 
 - native/user-lokale Binaries, z. B. `~/.opencode/bin` oder `~/.local/bin`.
 - `pipx` für Python-CLI-Tools.
-- dedizierte k-playbook Tool-venvs unter `~/.local/share/k-playbook/`, wenn `pipx` nicht verfügbar oder nicht passend ist.
+- dedizierte k-playbook Tool-venvs unter `~/.local/share/k-playbook/`, wenn `pipx` nicht verfügbar, nicht passend oder explizit unerwünscht ist.
 - Docker-Images als explizite Fallbacks.
 
 ## Verboten

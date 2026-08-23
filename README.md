@@ -142,7 +142,7 @@ Weg beim Entwickeln: es startet den frisch gebauten Stand.
 - Mitgelieferte Regeln, Reviews und Checks werden nicht editiert. Ein Projekt weicht per Overlay ab: eine gleichnamige lokale Datei ersetzt vollständig, eine leere schaltet ab.
 - Pfade stehen nicht in der Konfiguration. Sie ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`.
 - Tasks, Reviews und Ergebnisse bleiben projekteigene Artefakte unter `k-playbook-local/`.
-- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs. Sie sind die eine bewusste Ausnahme von der Projektlokalität.
+- Projekte dürfen ihre eigenen venvs nutzen. Security-Tools werden davon getrennt host-/user-lokal oder in dedizierte k-playbook-Tool-venvs installiert; sie sind die eine bewusste Ausnahme von der Projektlokalität.
 - Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt.
 
 ## Dokumentation

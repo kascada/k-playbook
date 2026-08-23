@@ -882,12 +882,13 @@ Pflicht — was nicht gefragt wurde, kann auch nicht fehlen. Go reicht die Antwo
 unverändert durch und rechnet nichts nach.
 
 Der Aufruf ist ausschließlich lesend: `--json` prüft nur, ob die Binaries vorhanden
-sind. Installiert wird bewusst im Terminal, weil das den Host verändert und nicht das
-Projekt. Ein Timeout von 30 Sekunden begrenzt den Aufruf, weil der Preflight je Tool ein
-`--version` startet und eines davon hängen kann.
+sind. Installiert wird bewusst im Terminal, weil das die Arbeitsumgebung verändert und
+nicht die Projekt-Abhängigkeiten. Ein Timeout von 30 Sekunden begrenzt den Aufruf, weil
+der Preflight je Tool ein `--version` startet und eines davon hängen kann.
 
 Bricht das Skript ab — etwa bei aktivem Projekt-venv — landet die erste stderr-Zeile in
-der Fehlermeldung.
+der Fehlermeldung. Die Oberfläche soll dabei klarstellen: Das Projekt darf mit venv
+laufen; nur der Security-Tool-Preflight darf nicht aus diesem venv messen.
 
 ## GitHub CLI
 

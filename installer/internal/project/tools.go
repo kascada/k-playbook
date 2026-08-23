@@ -50,11 +50,14 @@ type ToolPreflight struct {
 	// "Vollständig" darüber.
 	MissingOptional int `json:"missingOptional"`
 	// InstallCommand holt die fehlende Pflicht, InstallCommandOptional zusätzlich
-	// die optionalen. Beide kommen fertig aus dem Skript, samt Sprachauswahl —
-	// zusammengesetzt würden sie sonst an zwei Orten gepflegt.
-	InstallCommand         string `json:"installCommand"`
-	InstallCommandOptional string `json:"installCommandOptional"`
-	Tools                  []Tool `json:"tools"`
+	// die optionalen. Die Venv-Varianten erzwingen dedizierte k-playbook-Tool-venvs.
+	// Alle kommen fertig aus dem Skript, samt Sprachauswahl — zusammengesetzt
+	// würden sie sonst an zwei Orten gepflegt.
+	InstallCommand             string `json:"installCommand"`
+	InstallCommandVenv         string `json:"installCommandVenv"`
+	InstallCommandOptional     string `json:"installCommandOptional"`
+	InstallCommandOptionalVenv string `json:"installCommandOptionalVenv"`
+	Tools                      []Tool `json:"tools"`
 }
 
 // ToolScript ist der Ort des Preflight-Skripts in einer Installation.

@@ -27,7 +27,7 @@ func newInstallationWithScript(t *testing.T, body string) string {
 func TestCheckToolsLiestPreflight(t *testing.T) {
 	root := newInstallationWithScript(t, `cat <<'JSON'
 {"playbookDir":"/x","toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
- "venvRoot":"/x/venv","languages":"go","missingRequired":1,"installCommand":"bash x --install missing",
+ "venvRoot":"/x/venv","languages":"go","missingRequired":1,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
  "tools":[{"name":"gitleaks","languages":"*","required":true,"installMethod":"github","status":"ok","version":"8.30.1","path":"/x/gitleaks","role":"Secret-Scanning","dockerImage":"img"},
           {"name":"gosec","languages":"go","required":true,"installMethod":"go","status":"missing","version":"","path":"","role":"Go-Security","dockerImage":""}]}
 JSON
@@ -45,6 +45,9 @@ JSON
 	}
 	if preflight.VenvRoot != "/x/venv" {
 		t.Errorf("VenvRoot = %q, erwartet %q", preflight.VenvRoot, "/x/venv")
+	}
+	if preflight.InstallCommandVenv != "bash x --install missing --method venv" {
+		t.Errorf("InstallCommandVenv = %q, erwartet venv-Installationsbefehl", preflight.InstallCommandVenv)
 	}
 	if len(preflight.Tools) != 2 {
 		t.Fatalf("%d Tools, erwartet 2", len(preflight.Tools))

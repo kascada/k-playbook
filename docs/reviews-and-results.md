@@ -354,13 +354,16 @@ projektweit priorisiert ist.
 
 ## Security-Tools
 
-Tool-Installation und Docker-Fallbacks sind host- oder user-lokal, nie projektlokal. Vor
-der Installation darf kein Projekt-venv aktiv sein; Python-CLI-Tools gehören in `pipx`
-oder ein dediziertes k-playbook-Tool-venv.
+Projekt-venvs sind für Projekt-Abhängigkeiten normal. Tool-Installation und
+Docker-Fallbacks sind davon getrennt host-/user-lokal; vor Installation und Preflight darf
+kein Projekt-venv aktiv sein, damit dort liegende ältere Tools nicht als
+Arbeitsumgebungs-Tools zählen. Python-CLI-Tools kommen empfohlen über `pipx` oder, mit
+`--method venv`, in dedizierte k-playbook-Tool-venvs.
 
 ```bash
 k-playbook/scripts/install-security-tools.sh                    # Status
 k-playbook/scripts/install-security-tools.sh --install missing  # fragt vor der Installation
+k-playbook/scripts/install-security-tools.sh --install missing --method venv  # dedizierte Tool-venvs
 ```
 
 Die Pflicht-Tools stehen kanonisch in

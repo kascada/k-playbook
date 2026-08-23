@@ -204,6 +204,48 @@ Beim Anlegen eines Laufs werden `recipeKey`, `recipePath`, `recipeOrigin`, `titl
 AI-Einträge validiert später gegen diese Kopie, nicht gegen den eventuell geänderten
 Rezepttext.
 
+### Timeouts und Progress-Notifications
+
+`k_playbook_review_scan` läuft in echten Läufen mehrere Minuten. Der Server sendet
+während der Ausführung MCP-Progress-Notifications an den aufrufenden Client, sofern
+dessen `CallTool`-Aufruf ein `progressToken` mitbringt. Ohne Token bleibt der Server
+still; die finale Antwort ist in beiden Fällen dieselbe.
+
+Ein Progress-Event wird bei jeder Zustandsänderung eines Jobs oder Eintrags gesendet
+und zusätzlich als Heartbeat spätestens alle 15 Sekunden, damit auch ein einzelner
+lange laufender Scanner nachweislich noch am Leben ist. Ein Debounce von einer
+Sekunde verhindert, dass ein schneller Scanner mehrere Events auslöst.
+
+Was die MCP-Spezifikation garantiert: das Standardformat `notifications/progress` mit
+`progressToken`, `progress`, `total` und optionaler `message`.
+
+Was die MCP-Spezifikation **nicht** garantiert: dass ein Client sein Request-Timeout
+beim Empfang einer solchen Notification zurücksetzt. Das ist Client-Verhalten und muss
+je Ziel-Client verifiziert werden.
+
+Für **OpenCode** ist das Verhalten am 2026-08-22 mit dem in dieser Fassung mitgelieferten
+Server verifiziert: ein Scan-Lauf von 158 Sekunden lief in einem OpenCode-Client mit
+`mcp.k-playbook.timeout: 90000` (90 Sekunden) vollständig durch, ohne dass der Tool-Call
+abgebrochen wurde; kein Scanner persistierte `reason: "abgebrochen"`. Der Nachweis stützt
+sich auf die persistierten Entry-Zustände (`k-playbook-local/results/<lauf>/entries/*.json`).
+`opencode.json` in diesem Repo trägt diesen Wert deshalb als expliziten Eintrag.
+
+Für Clients mit `progressToken`-Support und geprüftem Timeout-Reset ist ein moderater
+Anfrage-Timeout (60–90 Sekunden) sinnvoll: er begrenzt einen wirklich hängenden Server
+auf eine spürbare Wartezeit, ohne einen normalen langen Lauf zu killen.
+
+Für Clients **ohne** `progressToken` gibt es keine Alive-Garantie. Der Server sendet
+ihnen keine Notifications, ihr Timeout schlägt ohne Vorwarnung. Empfehlungen:
+
+- höherer Anfrage-Timeout (fünf bis zehn Minuten je nach Scanner-Zoo), oder
+- CLI-Weg (`k-playbook scan <lauf>`), der von Client-Timeouts entkoppelt ist, oder
+- eine spätere Background-Scan-/Polling-Lösung.
+
+Ein expliziter Client-Cancel nach Scan-Start bricht die Scanner weiterhin hart ab;
+der zuletzt laufende Scanner persistiert `reason: "abgebrochen"`. Progress-Notifications
+ändern daran nichts — sie zielen ausschließlich auf den Timeout-Fehlermodus, nicht auf
+Cancellation.
+
 ### Die Bedingung, die daraus folgt
 
 Ein relativer Eintrag wird vom Assistenten gegen dessen **Arbeitsverzeichnis** aufgelöst,

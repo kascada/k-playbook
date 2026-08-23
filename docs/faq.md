@@ -169,18 +169,27 @@ Oberfläche erkennt ihn und baut ihn beim Einrichten um.
 Eine **echte Datei**, die du selbst dort abgelegt hast, wird nie ersetzt. Sie gewinnt, und
 die Oberfläche weist sie als projekteigen aus.
 
-## Darf beim Installieren von Security-Tools ein venv aktiv sein?
+## Darf ein Projekt mit venv laufen?
 
-Nein. Sonst wird ein Tool aus dem Projekt-venv fälschlich als host-global vorhanden
-erkannt. Wenn `VIRTUAL_ENV` gesetzt ist:
+Ja. Ein Projekt-venv ist für Projekt-Abhängigkeiten normal. Nur beim Installieren und
+Prüfen der k-playbook-Security-Tools darf kein Projekt-venv aktiv sein. Sonst wird ein
+Tool aus dem Projekt-venv fälschlich als Arbeitsumgebungs-Tool erkannt; dort kann außerdem
+eine ältere Version liegen. Wenn `VIRTUAL_ENV` gesetzt ist:
 
 ```bash
 deactivate
 ```
 
-Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` sind nicht erlaubt. Python-CLI-Tools
-gehören in `pipx` oder in ein dediziertes k-playbook-Tool-venv unter
-`~/.local/share/k-playbook/`, nicht in `<projekt>/.venv`.
+Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` sind für diesen Preflight nicht
+erlaubt. Empfohlen ist `--method auto`. Wenn Python-CLI-Tools ausdrücklich in venvs
+isoliert werden sollen, dann mit dedizierten k-playbook-Tool-venvs:
+
+```bash
+k-playbook/scripts/install-security-tools.sh --install missing --method venv
+```
+
+Das Ziel ist `~/.local/share/k-playbook/security-tools/<tool>-venv`, nicht
+`<projekt>/.venv`.
 
 ## Wie installiere ich fehlende Security-Tools?
 

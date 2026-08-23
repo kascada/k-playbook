@@ -42,6 +42,8 @@ const elements = {
   toolsMessage: document.getElementById("tools-message"),
   toolsCommand: document.getElementById("tools-command"),
   toolsCommandText: document.getElementById("tools-command-text"),
+  toolsCommandVenv: document.getElementById("tools-command-venv"),
+  toolsCommandVenvText: document.getElementById("tools-command-venv-text"),
   privateCard: document.getElementById("private-card"),
   privatePill: document.getElementById("private-pill"),
   privateEntries: document.getElementById("private-entries"),
@@ -1177,12 +1179,14 @@ function renderTools(data) {
   elements.toolsLanguages.replaceChildren();
   elements.toolsMessage.textContent = data.message || "";
   elements.toolsCommand.classList.add("hidden");
+  elements.toolsCommandVenv.classList.add("hidden");
 
   renderLanguageChoices(data);
 
   if (!data.available || data.message) {
     elements.toolsPill.className = "pill muted";
     elements.toolsPill.textContent = "Unbekannt";
+    showToolsCommand(data.command, data.commandVenv);
     return;
   }
 
@@ -1233,7 +1237,7 @@ function renderTools(data) {
         `Alle Pflicht-Tools sind da. ${optional} optionale${optional === 1 ? "s fehlt" : " fehlen"}.`;
       // Sonst stünde hier kein Befehl: die Pflicht ist vollständig. Also der
       // Weg, der die optionalen mitnimmt.
-      showToolsCommand(data.commandOptional);
+      showToolsCommand(data.commandOptional, data.commandOptionalVenv);
     }
     return;
   }
@@ -1247,18 +1251,22 @@ function renderTools(data) {
     elements.toolsMessage.textContent =
       `Dazu ${optional} optionale${optional === 1 ? "s Tool" : " Tools"}; die holt --include-optional mit.`;
   }
-  showToolsCommand(data.command);
+  showToolsCommand(data.command, data.commandVenv);
 }
 
-// showToolsCommand zeigt den Befehl, wenn es einen gibt. Beide Fassungen kommen
+// showToolsCommand zeigt die Befehle, wenn es sie gibt. Beide Fassungen kommen
 // fertig aus dem Preflight-Skript, samt Sprachauswahl — hier wird nichts
 // zusammengesetzt.
-function showToolsCommand(command) {
+function showToolsCommand(command, venvCommand) {
   if (!command) {
     return;
   }
   elements.toolsCommandText.textContent = command;
   elements.toolsCommand.classList.remove("hidden");
+  if (venvCommand) {
+    elements.toolsCommandVenvText.textContent = venvCommand;
+    elements.toolsCommandVenv.classList.remove("hidden");
+  }
 }
 
 function renderLanguageChoices(data) {

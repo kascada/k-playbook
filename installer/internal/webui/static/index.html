@@ -189,9 +189,15 @@
             <dl id="tools-facts" class="facts"></dl>
             <p id="tools-message" class="message"></p>
             <div id="tools-command" class="command-row hidden">
-              <p class="hint">Installation verändert den Host, nicht das Projekt. Diesen Befehl im Terminal ausführen:</p>
+              <p class="hint">Das Projekt darf mit aktivem <code>.venv</code> laufen. Für das Prüfen oder Installieren der Security-Tools vorher <code>deactivate</code> ausführen, damit ältere Tools aus dem Projekt-venv nicht als aktuelle Arbeitsumgebungs-Tools zählen.</p>
+              <p class="hint"><strong>Empfohlen:</strong> host-/user-lokal installieren, nicht ins Projekt-venv:</p>
               <code id="tools-command-text"></code>
               <button class="copy secondary" data-copy="tools-command-text">Kopieren</button>
+              <div id="tools-command-venv" class="command-alt hidden">
+                <p class="hint">Wenn du Python-Tools grundsätzlich in venvs kapseln willst: dedizierte k-playbook-Tool-venvs nutzen, ebenfalls nach <code>deactivate</code>:</p>
+                <code id="tools-command-venv-text"></code>
+                <button class="copy secondary" data-copy="tools-command-venv-text">Kopieren</button>
+              </div>
             </div>
           </section>
 

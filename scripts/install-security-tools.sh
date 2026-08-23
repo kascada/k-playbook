@@ -72,6 +72,8 @@ Options:
   --json               Print the tool status as JSON and exit. Read-only.
   --install <target>   Install target: missing, required, all, or one tool name.
   --method <method>    auto, native, docker, pipx, or venv. Default: auto.
+                       venv betrifft Python-CLI-Tools; andere Tools nutzen ihren
+                       nativen Installationsweg.
   --include-optional   With --install missing, also install the optional tools that apply
                        to the selected languages, not only the required ones.
   --prefix <dir>       User-local prefix for native binaries. Default: ~/.local.
@@ -172,7 +174,7 @@ has_cmd() {
 
 ensure_no_active_project_venv() {
   if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Deaktiviere es zuerst mit 'deactivate'. Dieses Skript installiert nur host-/user-lokale Tools, nie in ein Projekt-venv."
+    die "Ein Python-venv ist aktiv ($VIRTUAL_ENV). Das Projekt darf dieses venv nutzen; nur für den Security-Tool-Preflight und die Installation bitte zuerst 'deactivate' ausführen, damit ältere Tools aus dem Projekt-venv nicht als Arbeitsumgebungs-Tools zählen. Wer Python-Tools in venvs kapseln will, kann danach --method venv nutzen; das verwendet dedizierte k-playbook-Tool-venvs."
   fi
 }
 
@@ -182,7 +184,7 @@ ensure_no_project_venv_in_path() {
   for entry in "${path_entries[@]}"; do
     [[ -z "$entry" ]] && continue
     if is_project_venv_path "$entry"; then
-      die "PATH enthält ein typisches Projekt-venv ($entry). Entferne es zuerst aus PATH bzw. führe 'deactivate' aus, damit der Preflight nur host-/user-lokale Tools bewertet."
+      die "PATH enthält ein typisches Projekt-venv ($entry). Das Projekt darf dieses venv nutzen; nur für den Security-Tool-Preflight bitte zuerst 'deactivate' ausführen bzw. PATH bereinigen, damit ältere Tools aus dem Projekt-venv nicht als Arbeitsumgebungs-Tools zählen."
     fi
   done
 }
@@ -425,11 +427,14 @@ print_preflight() {
 
   printf '\n'
   printf 'Installationswege:\n'
+  printf '  Hinweis: Projekt-venvs sind erlaubt, aber nicht als Installationsziel für diese Tools.\n'
   if [[ "$missing_required" -gt 0 ]]; then
     printf '  Nur die Pflicht:    %s --method auto\n' "$(install_hint "$0")"
+    printf '  Tool-venvs:         %s --method venv\n' "$(install_hint "$0")"
   fi
   if [[ "${#optional_missing[@]}" -gt 0 ]]; then
     printf '  Mit den optionalen: %s --method auto\n' "$(install_hint "$0" ' --include-optional')"
+    printf '  Tool-venvs plus opt: %s --method venv\n' "$(install_hint "$0" ' --include-optional')"
   fi
   printf '  Docker-Fallback:    %s --method docker\n' "$(install_hint "$0")"
 }
@@ -465,12 +470,16 @@ print_preflight_json() {
   printf '  "missingRequired": %s,\n' "$missing_required"
   printf '  "missingOptional": %s,\n' "${#optional_missing[@]}"
   # Absoluter Pfad: der Befehl soll sich kopieren und von überall ausführen
-  # lassen, unabhängig vom Arbeitsverzeichnis des Aufrufs. Beide Fassungen
+  # lassen, unabhängig vom Arbeitsverzeichnis des Aufrufs. Die Fassungen
   # entstehen hier, damit die Oberfläche keine Befehle zusammensetzen muss.
   printf '  "installCommand": "%s",\n' \
     "$(json_escape "$(install_hint "$(script_path)" ' --method auto')")"
+  printf '  "installCommandVenv": "%s",\n' \
+    "$(json_escape "$(install_hint "$(script_path)" ' --method venv')")"
   printf '  "installCommandOptional": "%s",\n' \
     "$(json_escape "$(install_hint "$(script_path)" ' --include-optional --method auto')")"
+  printf '  "installCommandOptionalVenv": "%s",\n' \
+    "$(json_escape "$(install_hint "$(script_path)" ' --include-optional --method venv')")"
   printf '  "tools": [\n'
 
   first=1
@@ -760,8 +769,9 @@ install_tool() {
     go)
       case "$method" in
         auto|native) install_go_binary "$tool" ;;
+        venv) install_go_binary "$tool" ;;
         docker) install_docker_image "$tool" ;;
-        pipx|venv) die "$method gilt nur für pip-Tools, $tool wird mit go install geholt." ;;
+        pipx) die "$method gilt nur für pip-Tools, $tool wird mit go install geholt." ;;
         *) die "Unknown install method: $method" ;;
       esac
       ;;
@@ -771,8 +781,12 @@ install_tool() {
           ensure_bin_dir
           install_github_binary "$tool"
           ;;
+        venv)
+          ensure_bin_dir
+          install_github_binary "$tool"
+          ;;
         docker) install_docker_image "$tool" ;;
-        pipx|venv) die "$method gilt nur für pip-Tools, $tool kommt aus einem GitHub-Release." ;;
+        pipx) die "$method gilt nur für pip-Tools, $tool kommt aus einem GitHub-Release." ;;
         *) die "Unknown install method: $method" ;;
       esac
       ;;

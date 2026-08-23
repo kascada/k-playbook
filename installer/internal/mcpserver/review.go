@@ -82,6 +82,7 @@ type reviewCandidate struct {
 	ReviewEnabled     *bool       `json:"reviewEnabled,omitempty"`
 	ResultRequired    *bool       `json:"resultRequired,omitempty"`
 	DefaultResult     string      `json:"defaultResult,omitempty"`
+	Scope             *review.Scope `json:"scope,omitempty"`
 }
 
 type reviewSelectionBase struct {
@@ -98,6 +99,7 @@ type aiRecipeMetadata struct {
 	Title          string
 	ResultRequired bool
 	DefaultResult  string
+	Scope          *review.Scope
 }
 
 type reviewProjectEnvelope struct {
@@ -879,6 +881,7 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 			ReviewEnabled:   &reviewEnabled,
 			ResultRequired:  &resultRequired,
 			DefaultResult:   metadata.DefaultResult,
+			Scope:           cloneReviewScope(metadata.Scope),
 		})
 	}
 	if candidate, ok := scanTriageCandidate(env); ok {
@@ -1029,8 +1032,20 @@ func entryFromCandidate(candidate reviewCandidate) review.Entry {
 		entry.Title = candidate.Title
 		entry.ResultRequired = candidate.ResultRequired
 		entry.DefaultResult = candidate.DefaultResult
+		entry.Scope = cloneReviewScope(candidate.Scope)
 	}
 	return entry
+}
+
+func cloneReviewScope(scope *review.Scope) *review.Scope {
+	if scope == nil {
+		return nil
+	}
+	cloned := &review.Scope{}
+	if scope.Tools != nil {
+		cloned.Tools = append([]string{}, scope.Tools...)
+	}
+	return cloned
 }
 
 func readAIRecipeMetadata(key string, path string) (aiRecipeMetadata, error) {

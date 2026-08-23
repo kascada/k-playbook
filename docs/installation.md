@@ -511,9 +511,9 @@ Entscheidung je Projekt; das wäre etwas anderes als das hier.
 
 ## Security-Tools
 
-Security-Tools werden host- oder user-lokal installiert, nie in ein Projekt-venv. Sie
-sind die eine bewusste Ausnahme von der Projektlokalität: ein Scanner gehört zur
-Arbeitsumgebung, nicht zum Projekt.
+Projekte dürfen mit eigenem `.venv` arbeiten. Security-Tools werden davon getrennt host-
+oder user-lokal installiert, nie in ein Projekt-venv. Sie sind die eine bewusste Ausnahme
+von der Projektlokalität: ein Scanner gehört zur Arbeitsumgebung, nicht zum Projekt.
 
 Die kanonische Matrix liegt in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv).
 Sie wird vom Installationsskript und von der Oberfläche gelesen; die Liste steht nicht
@@ -573,17 +573,29 @@ aber keine Release-Binaries. `gosec`, `golangci-lint` und `osv-scanner` kommen d
 GitHub-Releases — `osv-scanner` als blanke Binary ohne Archiv, was das Skript am
 Asset-Namen erkennt.
 
-**Vor der Installation darf kein Projekt-venv aktiv sein.** Sonst wird ein Tool aus dem
-venv fälschlich als host-global vorhanden erkannt. Falls `VIRTUAL_ENV` gesetzt ist:
+Ein Projekt darf selbstverständlich mit `.venv` arbeiten. **Nur vor der Installation und
+dem Preflight der Security-Tools darf kein Projekt-venv aktiv sein.** Sonst wird ein Tool
+aus dem venv fälschlich als Arbeitsumgebungs-Tool erkannt; außerdem können dort ältere
+Versionen liegen, als k-playbook für seine Reviews erwartet. Falls `VIRTUAL_ENV` gesetzt
+ist:
 
 ```bash
 deactivate
 ```
 
-Python-CLI-Tools gehören in `pipx` oder in ein dediziertes k-playbook-Tool-venv unter
-`~/.local/share/k-playbook/security-tools/<tool>-venv`, nicht in `<projekt>/.venv`. Je
-Tool ein eigenes venv, damit sich ihre Abhängigkeiten nicht in die Quere kommen; die
-Wurzel lässt sich mit `--venv-root` verlegen.
+Empfohlen ist `--method auto`: native Binaries, Go-Tools und Python-CLI-Tools über `pipx`
+oder dedizierte Tool-venvs. Wer Python-CLI-Tools grundsätzlich in venvs kapseln will,
+nutzt explizit:
+
+```bash
+k-playbook/scripts/install-security-tools.sh --install missing --method venv
+```
+
+Auch das installiert nicht in `<projekt>/.venv`, sondern in dedizierte k-playbook-Tool-venvs
+unter `~/.local/share/k-playbook/security-tools/<tool>-venv`. `--method venv` betrifft nur
+Python-CLI-Tools; GitHub-Release- und Go-Tools nutzen weiterhin ihren nativen
+Installationsweg. Je Python-Tool gibt es ein eigenes venv, damit sich ihre Abhängigkeiten
+nicht in die Quere kommen; die Wurzel lässt sich mit `--venv-root` verlegen.
 
 ## Selbst bauen
 

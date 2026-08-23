@@ -20,10 +20,13 @@ type toolsResponse struct {
 	Tools     []project.Tool `json:"tools"`
 	BinDir    string         `json:"binDir"`
 	Command   string         `json:"command"`
+	// CommandVenv installiert Python-CLI-Tools in dedizierte k-playbook-Tool-venvs.
+	CommandVenv string `json:"commandVenv"`
 	// CommandOptional nimmt die optionalen mit. Beide kommen fertig aus dem
 	// Preflight-Skript.
-	CommandOptional string `json:"commandOptional"`
-	Missing         int    `json:"missing"`
+	CommandOptional     string `json:"commandOptional"`
+	CommandOptionalVenv string `json:"commandOptionalVenv"`
+	Missing             int    `json:"missing"`
 	// MissingOptional blockiert nichts, gehört aber gesagt.
 	MissingOptional int    `json:"missingOptional"`
 	OK              bool   `json:"ok"`
@@ -89,27 +92,50 @@ func setLanguagesHandler(w http.ResponseWriter, r *http.Request) {
 func buildToolsResponse(projectDir string, languages []string, configured bool) toolsResponse {
 	preflight, err := project.CheckTools(projectDir, languages)
 	if err != nil {
-		return toolsResponse{
+		response := toolsResponse{
 			Available:  true,
 			Message:    err.Error(),
 			Languages:  languages,
 			Configured: configured,
 		}
+		if preflightBlockedByVenv(err.Error()) {
+			response.Command = fallbackToolInstallCommand(projectDir, languages, " --method auto")
+			response.CommandVenv = fallbackToolInstallCommand(projectDir, languages, " --method venv")
+		}
+		return response
 	}
 
 	return toolsResponse{
-		Available:          true,
-		Tools:              preflight.Tools,
-		BinDir:             preflight.BinDir,
-		Command:            preflight.InstallCommand,
-		CommandOptional:    preflight.InstallCommandOptional,
-		Missing:            preflight.MissingRequired,
-		MissingOptional:    preflight.MissingOptional,
-		OK:                 preflight.MissingRequired == 0,
-		Languages:          languages,
-		AvailableLanguages: languagesFromMatrix(preflight.Tools),
-		Configured:         configured,
+		Available:           true,
+		Tools:               preflight.Tools,
+		BinDir:              preflight.BinDir,
+		Command:             preflight.InstallCommand,
+		CommandVenv:         preflight.InstallCommandVenv,
+		CommandOptional:     preflight.InstallCommandOptional,
+		CommandOptionalVenv: preflight.InstallCommandOptionalVenv,
+		Missing:             preflight.MissingRequired,
+		MissingOptional:     preflight.MissingOptional,
+		OK:                  preflight.MissingRequired == 0,
+		Languages:           languages,
+		AvailableLanguages:  languagesFromMatrix(preflight.Tools),
+		Configured:          configured,
 	}
+}
+
+func preflightBlockedByVenv(message string) bool {
+	return strings.Contains(message, "Python-venv ist aktiv") || strings.Contains(message, "Projekt-venv")
+}
+
+func fallbackToolInstallCommand(projectDir string, languages []string, extra string) string {
+	command := "bash " + shellQuote(project.ToolScript(projectDir))
+	if len(languages) > 0 {
+		command += " --languages " + strings.Join(languages, ",")
+	}
+	return command + " --install missing" + extra
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // languagesFromMatrix sammelt die wählbaren Sprachen aus der Tool-Matrix: alles,

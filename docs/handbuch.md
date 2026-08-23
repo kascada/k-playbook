@@ -261,7 +261,7 @@ Details stehen in [`../checks/README.md`](../checks/README.md) und
 - Pfade werden abgeleitet, nicht geraten und nicht konfiguriert.
 - `K-PLAYBOOK.yaml` ist Konfiguration, keine Dokumentation. Eine vorhandene Datei wird
   nie überschrieben.
-- Security-Tools werden host- oder user-lokal installiert, nie in Projekt-venvs.
+- Projekte dürfen ihre eigenen venvs nutzen; Security-Tools laufen davon getrennt host-/user-lokal oder in dedizierten k-playbook-Tool-venvs.
 - Review-Rohdaten und Run-Metadaten sind auditierbar und werden nicht still überschrieben.
 - Größere Remediation läuft über Tasks, wenn die Projekt-Policy das verlangt.
 - Nach Änderungen an Commands oder Skills den Assistenten neu starten.

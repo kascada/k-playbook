@@ -492,6 +492,10 @@ details[open] > summary.disclosure .disclosure-marker {
   font-size: 0.82rem;
 }
 
+.command-alt {
+  margin-top: 14px;
+}
+
 /* Die Doku-Liste ist eine Kachelwand: viele kurze Titel, die nebeneinander
    passen sollen, ohne dass eine Spalte die Breite bestimmt. */
 .docs-list {
