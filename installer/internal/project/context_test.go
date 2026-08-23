@@ -156,7 +156,7 @@ func TestBuildContextZeigtReviewModi(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\nreview:\n  enabled: false\n---\n# Audit\n")
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-audit-only.md\n  scope:\n    tools: [gitleaks, trufflehog]\nreview:\n  enabled: false\n---\n# Audit\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -183,6 +183,37 @@ func TestBuildContextZeigtReviewModi(t *testing.T) {
 	}
 	if auditEntry.Review == nil || auditEntry.Review.Enabled {
 		t.Fatalf("review = %#v, erwartet false", auditEntry.Review)
+	}
+	if auditEntry.Audit.ResultRequired == nil || !*auditEntry.Audit.ResultRequired {
+		t.Fatalf("resultRequired = %#v, erwartet true", auditEntry.Audit.ResultRequired)
+	}
+	if auditEntry.Audit.DefaultResult != "review-audit-only.md" {
+		t.Fatalf("defaultResult = %q", auditEntry.Audit.DefaultResult)
+	}
+	if auditEntry.Audit.Scope == nil || len(auditEntry.Audit.Scope.Tools) != 2 || auditEntry.Audit.Scope.Tools[0] != "gitleaks" || auditEntry.Audit.Scope.Tools[1] != "trufflehog" {
+		t.Fatalf("scope = %#v", auditEntry.Audit.Scope)
+	}
+}
+
+func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
+	root := newContextProject(t)
+
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-scope.md"), "---\naudit:\n  enabled: true\n  scope:\n    tools:\n      - pip-audit\n      - trivy\nreview:\n  enabled: true\n---\n# Scope\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	entry, ok := entryByName(context.Catalogs["reviews"], "review-scope.md")
+	if !ok {
+		t.Fatal("review-scope.md fehlt")
+	}
+	if entry.Audit == nil || entry.Audit.Scope == nil || len(entry.Audit.Scope.Tools) != 2 {
+		t.Fatalf("scope = %#v", entry.Audit)
+	}
+	if entry.Audit.Scope.Tools[0] != "pip-audit" || entry.Audit.Scope.Tools[1] != "trivy" {
+		t.Fatalf("tools = %#v", entry.Audit.Scope.Tools)
 	}
 }
 

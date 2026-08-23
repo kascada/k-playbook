@@ -145,6 +145,44 @@ func TestReviewStatusExisting(t *testing.T) {
 	}
 }
 
+func TestReviewStatusExistingMarkiertAIDoneOhneResultAlsInkonsistent(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
+	mustWriteJSON(t, review.EntryFile(runDir, "tech"), aiEntryStatus{Name: "tech", Kind: review.KindAI, State: review.StateDone, Result: "review-tech.md"})
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	entry := statusEntry(t, envelope.Data.(map[string]any)["entries"].([]any), "tech")
+	if entry["resultMissing"] != true || entry["inconsistent"] != true {
+		t.Fatalf("AI-Status = %#v", entry)
+	}
+}
+
+func TestReviewStatusExistingMarkiertVorhandenesAIResultAlsReparabel(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
+	mustWriteFile(t, filepath.Join(runDir, "review-tech.md"), "# Ergebnis\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	entry := statusEntry(t, envelope.Data.(map[string]any)["entries"].([]any), "tech")
+	if entry["repairable"] != true || entry["resultExists"] != true {
+		t.Fatalf("AI-Status = %#v", entry)
+	}
+}
+
 func TestReviewStatusProjectFehltUndModeInvalid(t *testing.T) {
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: t.TempDir()}, Mode: "available"})
 	if err != nil {
@@ -188,8 +226,61 @@ func TestReviewCreateDryRunUndEcht(t *testing.T) {
 	if len(written.Entries) != 3 || written.Entries[1].RecipeKey != scanTriageEntry || written.Entries[2].RecipeKey != "tech" {
 		t.Fatalf("entries = %#v", written.Entries)
 	}
+	if written.Entries[2].Scope == nil || len(written.Entries[2].Scope.Tools) != 1 || written.Entries[2].Scope.Tools[0] != "mockscan" {
+		t.Fatalf("Scope-Snapshot = %#v", written.Entries[2].Scope)
+	}
 	if _, err := os.Stat(review.EntryFile(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"), scanTriageEntry)); err != nil {
 		t.Fatalf("scan-triage Entry fehlt: %v", err)
+	}
+}
+
+func TestReviewCreateDryRunZeigtScopeSnapshot(t *testing.T) {
+	root := newReviewProject(t)
+	result, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Day: "2026-08-19", DryRun: true})
+	if err != nil {
+		t.Fatalf("create dry-run: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("dry-run fehlgeschlagen: %#v", envelope.Error)
+	}
+	data := envelope.Data.(map[string]any)
+	runJSON := data["runJSON"].(map[string]any)
+	entries := runJSON["entries"].([]any)
+	tech := statusEntry(t, entries, "tech")
+	scope := tech["scope"].(map[string]any)
+	tools := scope["tools"].([]any)
+	if len(tools) != 1 || tools[0] != "mockscan" {
+		t.Fatalf("runJSON Scope = %#v", scope)
+	}
+	candidate := candidateByName(t, data["validatedCandidates"].([]any), "tech")
+	candidateScope := candidate["scope"].(map[string]any)
+	candidateTools := candidateScope["tools"].([]any)
+	if len(candidateTools) != 1 || candidateTools[0] != "mockscan" {
+		t.Fatalf("Candidate Scope = %#v", candidateScope)
+	}
+}
+
+func TestReviewStatusExistingZeigtGespeichertenScopeSnapshot(t *testing.T) {
+	root := newReviewProject(t)
+	entry := aiEntry("tech")
+	entry.Scope = &review.Scope{Tools: []string{"old-tool"}}
+	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, entry})
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [new-tool]\nreview:\n  enabled: true\n---\n# Fallback\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	entryStatus := statusEntry(t, envelope.Data.(map[string]any)["entries"].([]any), "tech")
+	scope := entryStatus["scope"].(map[string]any)
+	tools := scope["tools"].([]any)
+	if len(tools) != 1 || tools[0] != "old-tool" {
+		t.Fatalf("Status Scope = %#v", scope)
 	}
 }
 
@@ -589,7 +680,7 @@ func newReviewProject(t *testing.T) string {
 	}
 	mustWriteFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), preflightScript(t))
@@ -657,7 +748,7 @@ func mustCreateRun(t *testing.T, root string, entries []review.Entry) string {
 
 func aiEntry(name string) review.Entry {
 	required := true
-	return review.Entry{Name: name, Kind: review.KindAI, RecipeKey: name, RecipePath: "/review-" + name + ".md", RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-" + name + ".md"}
+	return review.Entry{Name: name, Kind: review.KindAI, RecipeKey: name, RecipePath: "/review-" + name + ".md", RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-" + name + ".md", Scope: &review.Scope{Tools: []string{"mockscan"}}}
 }
 
 func decodeReviewEnvelope(t *testing.T, result *mcp.CallToolResult) reviewEnvelope {

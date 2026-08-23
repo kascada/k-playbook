@@ -464,7 +464,7 @@ func newMCPReviewProject(t *testing.T) string {
 		}
 	}
 	mustWriteMCPFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
@@ -489,7 +489,7 @@ func mustCreateMCPRun(t *testing.T, root string) string {
 	required := true
 	runDir, err := review.CreateRun(project.LocalDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, []review.Entry{
 		{Name: "mockscan", Kind: review.KindTool},
-		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md"},
+		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md", Scope: &review.Scope{Tools: []string{"mockscan"}}},
 	})
 	if err != nil {
 		t.Fatalf("Lauf anlegen: %v", err)

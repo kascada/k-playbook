@@ -116,7 +116,14 @@ type CatalogEntry struct {
 }
 
 type CatalogMode struct {
-	Enabled bool `json:"enabled"`
+	Enabled        bool          `json:"enabled"`
+	ResultRequired *bool         `json:"resultRequired,omitempty"`
+	DefaultResult  string        `json:"defaultResult,omitempty"`
+	Scope          *CatalogScope `json:"scope,omitempty"`
+}
+
+type CatalogScope struct {
+	Tools []string `json:"tools,omitempty"`
 }
 
 // catalogKind beschreibt eine der drei Sorten.
@@ -230,7 +237,7 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 		}
 		if kind.name == "reviews" && !entry.Disabled {
 			modes := readReviewModes(entry.Path)
-			entry.Audit = &CatalogMode{Enabled: modes.AuditEnabled}
+			entry.Audit = &CatalogMode{Enabled: modes.AuditEnabled, ResultRequired: modes.ResultRequired, DefaultResult: modes.DefaultResult, Scope: cloneCatalogScope(modes.Scope)}
 			entry.Review = &CatalogMode{Enabled: modes.ReviewEnabled}
 		}
 		entries = append(entries, entry)
@@ -241,8 +248,11 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 }
 
 type reviewModes struct {
-	AuditEnabled  bool
-	ReviewEnabled bool
+	AuditEnabled   bool
+	ReviewEnabled  bool
+	ResultRequired *bool
+	DefaultResult  string
+	Scope          *CatalogScope
 }
 
 func readReviewModes(path string) reviewModes {
@@ -266,41 +276,146 @@ func readReviewModes(path string) reviewModes {
 func parseReviewModeFrontmatter(frontmatter string, modes *reviewModes) {
 	inAudit := false
 	inReview := false
+	inScope := false
+	inTools := false
 	blockIndent := -1
+	scopeIndent := -1
+	toolsIndent := -1
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if inTools && indent <= toolsIndent {
+			inTools = false
+		}
+		if inScope && indent <= scopeIndent {
+			inScope = false
+			inTools = false
+		}
+		if (inAudit || inReview) && indent <= blockIndent {
+			inAudit = false
+			inReview = false
+			inScope = false
+			inTools = false
+		}
+		if inTools && strings.HasPrefix(trimmed, "- ") {
+			modes.Scope = appendCatalogScopeTools(modes.Scope, strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+			continue
+		}
 		if strings.HasSuffix(trimmed, ":") {
 			key := strings.TrimSuffix(trimmed, ":")
-			if indent <= blockIndent {
-				inAudit = false
-				inReview = false
-			}
 			if key == "audit" || key == "review" {
 				inAudit = key == "audit"
 				inReview = key == "review"
 				blockIndent = indent
 				continue
 			}
-		}
-		if (!inAudit && !inReview) || indent <= blockIndent {
-			continue
+			if inAudit && indent > blockIndent && key == "scope" {
+				inScope = true
+				scopeIndent = indent
+				if modes.Scope == nil {
+					modes.Scope = &CatalogScope{}
+				}
+				continue
+			}
 		}
 		key, value, found := strings.Cut(trimmed, ":")
-		if !found || strings.TrimSpace(key) != "enabled" {
+		if !found {
 			continue
 		}
 		value = strings.TrimSpace(strings.Trim(strings.TrimSpace(value), `"'`))
-		if inAudit {
-			modes.AuditEnabled = value != "false"
+		field := strings.TrimSpace(key)
+		if (!inAudit && !inReview) || indent <= blockIndent {
+			continue
 		}
-		if inReview {
+		if inAudit {
+			switch field {
+			case "enabled":
+				modes.AuditEnabled = value != "false"
+			case "resultRequired":
+				required := value != "false"
+				modes.ResultRequired = &required
+			case "defaultResult":
+				modes.DefaultResult = value
+			case "tools":
+				if inScope && indent > scopeIndent {
+					if value == "" {
+						inTools = true
+						toolsIndent = indent
+						continue
+					}
+					modes.Scope = appendCatalogScopeTools(modes.Scope, value)
+				}
+			}
+		}
+		if inReview && field == "enabled" {
 			modes.ReviewEnabled = value != "false"
 		}
 	}
+}
+
+func cloneCatalogScope(scope *CatalogScope) *CatalogScope {
+	if scope == nil {
+		return nil
+	}
+	cloned := &CatalogScope{}
+	if scope.Tools != nil {
+		cloned.Tools = append([]string{}, scope.Tools...)
+	}
+	return cloned
+}
+
+func appendCatalogScopeTools(scope *CatalogScope, value string) *CatalogScope {
+	tools := parseYAMLStringList(value)
+	if len(tools) == 0 {
+		return scope
+	}
+	if scope == nil {
+		scope = &CatalogScope{}
+	}
+	seen := map[string]bool{}
+	for _, tool := range scope.Tools {
+		seen[tool] = true
+	}
+	for _, tool := range tools {
+		if seen[tool] {
+			continue
+		}
+		scope.Tools = append(scope.Tools, tool)
+		seen[tool] = true
+	}
+	return scope
+}
+
+func parseYAMLStringList(value string) []string {
+	value = strings.TrimSpace(strings.Trim(value, `"'`))
+	if value == "" {
+		return nil
+	}
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		value = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(value, "["), "]"))
+		if value == "" {
+			return []string{}
+		}
+		parts := strings.Split(value, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(strings.Trim(strings.TrimSpace(part), `"'`))
+			if part != "" {
+				values = append(values, part)
+			}
+		}
+		return values
+	}
+	if strings.HasPrefix(value, "- ") {
+		value = strings.TrimSpace(strings.TrimPrefix(value, "- "))
+	}
+	if value == "" {
+		return nil
+	}
+	return []string{value}
 }
 
 func markdownFrontmatterEnd(content string) int {

@@ -65,23 +65,23 @@ type reviewWriteAIEntryInput struct {
 }
 
 type reviewCandidate struct {
-	Name              string      `json:"name"`
-	Kind              review.Kind `json:"kind"`
-	Title             string      `json:"title"`
-	Selectable        bool        `json:"selectable"`
-	DefaultSelected   bool        `json:"defaultSelected"`
-	UnavailableReason string      `json:"unavailableReason"`
-	Detail            string      `json:"detail,omitempty"`
-	Languages         string      `json:"languages,omitempty"`
-	Status            string      `json:"status,omitempty"`
-	Path              string      `json:"path,omitempty"`
-	RecipeKey         string      `json:"recipeKey,omitempty"`
-	RecipePath        string      `json:"recipePath,omitempty"`
-	RecipeOrigin      string      `json:"recipeOrigin,omitempty"`
-	AuditEnabled      *bool       `json:"auditEnabled,omitempty"`
-	ReviewEnabled     *bool       `json:"reviewEnabled,omitempty"`
-	ResultRequired    *bool       `json:"resultRequired,omitempty"`
-	DefaultResult     string      `json:"defaultResult,omitempty"`
+	Name              string        `json:"name"`
+	Kind              review.Kind   `json:"kind"`
+	Title             string        `json:"title"`
+	Selectable        bool          `json:"selectable"`
+	DefaultSelected   bool          `json:"defaultSelected"`
+	UnavailableReason string        `json:"unavailableReason"`
+	Detail            string        `json:"detail,omitempty"`
+	Languages         string        `json:"languages,omitempty"`
+	Status            string        `json:"status,omitempty"`
+	Path              string        `json:"path,omitempty"`
+	RecipeKey         string        `json:"recipeKey,omitempty"`
+	RecipePath        string        `json:"recipePath,omitempty"`
+	RecipeOrigin      string        `json:"recipeOrigin,omitempty"`
+	AuditEnabled      *bool         `json:"auditEnabled,omitempty"`
+	ReviewEnabled     *bool         `json:"reviewEnabled,omitempty"`
+	ResultRequired    *bool         `json:"resultRequired,omitempty"`
+	DefaultResult     string        `json:"defaultResult,omitempty"`
 	Scope             *review.Scope `json:"scope,omitempty"`
 }
 
@@ -1102,23 +1102,48 @@ func frontmatterEnd(content string) int {
 func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 	inAudit := false
 	inReview := false
+	inScope := false
+	inTools := false
 	blockIndent := -1
+	scopeIndent := -1
+	toolsIndent := -1
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if inTools && indent <= toolsIndent {
+			inTools = false
+		}
+		if inScope && indent <= scopeIndent {
+			inScope = false
+			inTools = false
+		}
+		if (inAudit || inReview) && indent <= blockIndent {
+			inAudit = false
+			inReview = false
+			inScope = false
+			inTools = false
+		}
+		if inTools && strings.HasPrefix(trimmed, "- ") {
+			metadata.Scope = appendScopeTools(metadata.Scope, strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+			continue
+		}
 		if strings.HasSuffix(trimmed, ":") {
 			key := strings.TrimSuffix(trimmed, ":")
-			if indent <= blockIndent {
-				inAudit = false
-				inReview = false
-			}
 			if key == "audit" || key == "review" {
 				inAudit = key == "audit"
 				inReview = key == "review"
 				blockIndent = indent
+				continue
+			}
+			if inAudit && indent > blockIndent && key == "scope" {
+				inScope = true
+				scopeIndent = indent
+				if metadata.Scope == nil {
+					metadata.Scope = &review.Scope{}
+				}
 				continue
 			}
 		}
@@ -1139,6 +1164,15 @@ func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 			metadata.ReviewEnabled = value != "false"
 			continue
 		}
+		if inAudit && inScope && indent > scopeIndent && field == "tools" {
+			if value == "" {
+				inTools = true
+				toolsIndent = indent
+				continue
+			}
+			metadata.Scope = appendScopeTools(metadata.Scope, value)
+			continue
+		}
 		if !inAudit {
 			continue
 		}
@@ -1153,6 +1187,54 @@ func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 			metadata.DefaultResult = value
 		}
 	}
+}
+
+func appendScopeTools(scope *review.Scope, value string) *review.Scope {
+	tools := parseFrontmatterStringList(value)
+	if len(tools) == 0 {
+		return scope
+	}
+	if scope == nil {
+		scope = &review.Scope{}
+	}
+	seen := stringsSet(scope.Tools)
+	for _, tool := range tools {
+		if seen[tool] {
+			continue
+		}
+		scope.Tools = append(scope.Tools, tool)
+		seen[tool] = true
+	}
+	return scope
+}
+
+func parseFrontmatterStringList(value string) []string {
+	value = strings.TrimSpace(strings.Trim(value, `"'`))
+	if value == "" {
+		return nil
+	}
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		value = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(value, "["), "]"))
+		if value == "" {
+			return []string{}
+		}
+		parts := strings.Split(value, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(strings.Trim(strings.TrimSpace(part), `"'`))
+			if part != "" {
+				values = append(values, part)
+			}
+		}
+		return values
+	}
+	if strings.HasPrefix(value, "- ") {
+		value = strings.TrimSpace(strings.TrimPrefix(value, "- "))
+	}
+	if value == "" {
+		return nil
+	}
+	return []string{value}
 }
 
 func firstHeading(content string) string {
@@ -1181,13 +1263,18 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			item["recipeOrigin"] = entry.RecipeOrigin
 			item["title"] = entry.Title
 			item["resultRequired"] = entryResultRequired(entry)
+			if entry.Scope != nil {
+				item["scope"] = cloneReviewScope(entry.Scope)
+			}
 			if entry.DefaultResult != "" {
 				item["defaultResult"] = entry.DefaultResult
 			}
+			defaultResultState := aiResultStateFor(runDir, entry.DefaultResult)
 			status := aiEntryStatus{}
 			err := readAIEntryStatus(runDir, entry.Name, &status)
 			if err != nil {
 				if os.IsNotExist(err) {
+					markAIRepairStatus(item, entry, review.StateStart, defaultResultState)
 					entries = append(entries, item)
 					continue
 				}
@@ -1199,9 +1286,11 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			item["reason"] = status.Reason
 			item["startedAt"] = status.StartedAt
 			item["finishedAt"] = status.FinishedAt
-			if status.State == review.StateDone && entryResultRequired(entry) && status.Result == "" {
-				item["resultMissing"] = true
+			resultState := defaultResultState
+			if status.Result != "" {
+				resultState = aiResultStateFor(runDir, status.Result)
 			}
+			markAIRepairStatus(item, entry, status.State, resultState)
 			entries = append(entries, item)
 			continue
 		}
@@ -1222,6 +1311,53 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 		entries = append(entries, item)
 	}
 	return entries, reviewToolError{}
+}
+
+type aiResultState struct {
+	Result   string
+	Exists   bool
+	NonEmpty bool
+	Invalid  bool
+}
+
+func aiResultStateFor(runDir string, result string) aiResultState {
+	state := aiResultState{Result: result}
+	if strings.TrimSpace(result) == "" {
+		return state
+	}
+	if err := validateResultPath(runDir, result); err.Code != "" {
+		state.Invalid = true
+		return state
+	}
+	info, err := os.Stat(filepath.Join(runDir, filepath.FromSlash(result)))
+	if err != nil || !info.Mode().IsRegular() {
+		return state
+	}
+	state.Exists = true
+	state.NonEmpty = info.Size() > 0
+	return state
+}
+
+func markAIRepairStatus(item map[string]any, entry review.Entry, state review.State, result aiResultState) {
+	if result.Result != "" && result.Exists {
+		item["resultExists"] = true
+	}
+	if result.Invalid {
+		item["resultInvalid"] = true
+		item["inconsistent"] = true
+	}
+	if state == review.StateDone && entryResultRequired(entry) {
+		if result.Result == "" || !result.Exists || !result.NonEmpty {
+			item["resultMissing"] = true
+			item["inconsistent"] = true
+		}
+	}
+	if state == review.StateStart || state == review.StateRunning {
+		if result.Exists && result.NonEmpty {
+			item["repairable"] = true
+			item["repairReason"] = "Ergebnisdatei vorhanden, Entry-Status offen oder fehlt."
+		}
+	}
 }
 
 type aiEntryStatus struct {
