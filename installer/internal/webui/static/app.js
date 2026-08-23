@@ -1320,7 +1320,7 @@ function renderLanguageChoices(data) {
   // sein, damit niemand eine ausdrückliche Entscheidung vermutet.
   if (!data.configured && !data.message) {
     elements.toolsMessage.textContent =
-      "Vorauswahl, noch nicht in der Konfiguration festgehalten. Eine Auswahl schreibt sie fest.";
+      "Noch nicht gespeichert: Bis project.languages in K-PLAYBOOK.yaml steht, nutzt k-playbook die Standardauswahl. Eine Sprachänderung speichert die Auswahl.";
   }
 }
 
