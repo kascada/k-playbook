@@ -1,4 +1,5 @@
-// Seite "Tasks": die offenen Aufgaben untereinander, eine davon gelesen.
+// Seite "Tasks": die offenen Aufgaben untereinander, darunter die erledigten,
+// eine davon gelesen.
 //
 // Gelesen wird nur. Angelegt und ausgeführt werden Tasks über die Commands,
 // nicht über die Oberfläche.
@@ -7,6 +8,10 @@ const elements = {
   tasksPill: document.getElementById("tasks-pill"),
   tasksList: document.getElementById("tasks-list"),
   tasksMessage: document.getElementById("tasks-message"),
+  doneCard: document.getElementById("done-card"),
+  donePill: document.getElementById("done-pill"),
+  doneList: document.getElementById("done-list"),
+  doneMessage: document.getElementById("done-message"),
   taskCard: document.getElementById("task-card"),
   taskPath: document.getElementById("task-path"),
   taskTitle: document.getElementById("task-title"),
@@ -17,12 +22,21 @@ const elements = {
 // Reihenfolge antworten; nur die Antwort zum offenen Task gehört ins Fenster.
 let currentTask = "";
 
+// Die erledigten werden einmal je Seitenaufruf geholt, beim ersten Aufklappen.
+// Sie ändern sich nur durch einen /k-run, und der läuft nicht im Browser.
+let doneRequested = false;
+
+// Ob der Block aufgeklappt war, überlebt den Seitenwechsel. Wer die Erledigten
+// sucht, sucht sie meist mehrmals hintereinander.
+const doneOpenKey = "k-playbook.tasks.done-open";
+
 // Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
 // nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.
 startSession((message) => {
   elements.tasksMessage.textContent = message;
 });
 load();
+setUpDone();
 
 async function load() {
   try {
@@ -61,36 +75,7 @@ function render(data) {
     return;
   }
 
-  for (const task of tasks) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "task-link";
-    button.dataset.path = task.path;
-
-    // Der Dateiname trägt die Nummer und ist die Ordnung der Liste; der Titel
-    // sagt, worum es geht. Beides gehört auf den Knopf.
-    const name = document.createElement("span");
-    name.className = "task-name";
-    name.textContent = task.path;
-    const title = document.createElement("span");
-    title.className = "task-title";
-    title.textContent = task.title || "";
-
-    // Ein Task ohne Review-Log ist nie gegengelesen worden. /k-run fragt dann
-    // vor der Ausführung nach — das soll man vorher sehen können.
-    const review = document.createElement("span");
-    review.className = task.reviewed ? "task-review" : "task-review open";
-    review.textContent = task.reviewed
-      ? task.reviewedAt
-        ? `gereviewt ${task.reviewedAt}`
-        : "gereviewt"
-      : "ohne Review-Loop";
-
-    button.append(name, title, review);
-
-    button.addEventListener("click", () => openTask(task.path, task.title));
-    elements.tasksList.append(button);
-  }
+  fillList(elements.tasksList, tasks, true);
 
   elements.tasksPill.className = "pill ok";
   elements.tasksPill.textContent = tasks.length === 1 ? "1 offen" : `${tasks.length} offen`;
@@ -102,6 +87,117 @@ function render(data) {
         ? "Ein Task ist noch nicht durch /k-review-loop gegangen."
         : `${unreviewed} Tasks sind noch nicht durch /k-review-loop gegangen.`;
   }
+}
+
+// fillList baut die Zeilen einer Liste. Der Review-Stand gehört nur zu den
+// offenen: nach der Ausführung sagt er nichts mehr aus.
+function fillList(container, tasks, withReview) {
+  for (const task of tasks) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "task-link";
+    button.dataset.path = task.path;
+
+    // Der Dateiname trägt die Nummer und ist die Ordnung der Liste; der Titel
+    // sagt, worum es geht. Beides gehört auf den Knopf.
+    const name = document.createElement("span");
+    name.className = "task-name";
+    name.textContent = task.path.replace(/^done\//, "");
+    const title = document.createElement("span");
+    title.className = "task-title";
+    title.textContent = task.title || "";
+    button.append(name, title);
+
+    // Ein Task ohne Review-Log ist nie gegengelesen worden. /k-run fragt dann
+    // vor der Ausführung nach — das soll man vorher sehen können.
+    if (withReview) {
+      const review = document.createElement("span");
+      review.className = task.reviewed ? "task-review" : "task-review open";
+      review.textContent = task.reviewed
+        ? task.reviewedAt
+          ? `gereviewt ${task.reviewedAt}`
+          : "gereviewt"
+        : "ohne Review-Loop";
+      button.append(review);
+    }
+
+    button.addEventListener("click", () => openTask(task.path, task.title));
+    container.append(button);
+  }
+}
+
+function setUpDone() {
+  elements.doneCard.addEventListener("toggle", () => {
+    remember(doneOpenKey, elements.doneCard.open);
+    if (elements.doneCard.open) {
+      loadDone();
+    }
+  });
+
+  // Ein wiederhergestelltes "offen" löst das Ereignis oben nicht verlässlich
+  // aus, deshalb wird hier selbst geladen. loadDone() läuft trotzdem nur
+  // einmal.
+  if (recall(doneOpenKey)) {
+    elements.doneCard.open = true;
+    loadDone();
+  }
+}
+
+async function loadDone() {
+  if (doneRequested) {
+    return;
+  }
+  doneRequested = true;
+
+  elements.donePill.className = "pill muted";
+  elements.donePill.textContent = "Laden...";
+
+  try {
+    const response = await fetch("/api/tasks/done", { cache: "no-store" });
+    renderDone(await response.json());
+  } catch {
+    // Beim nächsten Aufklappen darf es wieder versucht werden.
+    doneRequested = false;
+    elements.donePill.className = "pill warn";
+    elements.donePill.textContent = "Fehler";
+    elements.doneMessage.textContent = "Erledigte Tasks konnten nicht geladen werden.";
+  }
+}
+
+function renderDone(data) {
+  elements.doneList.replaceChildren();
+  elements.doneMessage.textContent = data.message || "";
+
+  if (!data.available) {
+    elements.doneList.classList.add("empty");
+    elements.doneList.textContent = "Keine Projektkonfiguration gefunden.";
+    elements.donePill.className = "pill muted";
+    elements.donePill.textContent = "Unbekannt";
+    return;
+  }
+
+  if (data.message) {
+    elements.doneList.classList.add("empty");
+    elements.donePill.className = "pill warn";
+    elements.donePill.textContent = "Nicht lesbar";
+    return;
+  }
+
+  const tasks = data.tasks || [];
+  elements.doneList.classList.toggle("empty", tasks.length === 0);
+  if (tasks.length === 0) {
+    elements.doneList.textContent = "Noch nichts erledigt.";
+    elements.donePill.className = "pill muted";
+    elements.donePill.textContent = "keine";
+    return;
+  }
+
+  fillList(elements.doneList, tasks, false);
+  elements.donePill.className = "pill muted";
+  elements.donePill.textContent = tasks.length === 1 ? "1 erledigt" : `${tasks.length} erledigt`;
+
+  // Die eben gebaute Liste kennt den offenen Task noch nicht.
+  setActiveTask(currentTask);
 }
 
 async function openTask(path, title) {
@@ -136,7 +232,25 @@ async function openTask(path, title) {
 }
 
 function setActiveTask(path) {
-  for (const button of elements.tasksList.querySelectorAll(".task-link")) {
+  for (const button of document.querySelectorAll(".task-link")) {
     button.classList.toggle("active", button.dataset.path === path);
+  }
+}
+
+// Der Merkspeicher ist eine Bequemlichkeit, kein Zustand der Anwendung: ist er
+// gesperrt, arbeitet die Seite ohne ihn weiter.
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // Kein Speicher, keine Erinnerung.
+  }
+}
+
+function recall(key) {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
   }
 }

@@ -12,7 +12,7 @@ Der Task-Flow ist der Standardweg für geplante Arbeit, die nicht direkt in eine
 
 Tasks können direkt aus dem Gespräch entstehen oder von `/k-remediation` erzeugt werden. In beiden Fällen gilt: erst Task-Dateien prüfen, dann ausführen.
 
-Nachlesen lassen sich die offenen Tasks auch in der Oberfläche: der Block **Workflows** auf der Startseite führt nach `/tasks` und nennt ihre Zahl. Dort wird nur gelesen — angelegt und ausgeführt wird über die Commands.
+Nachlesen lassen sich die Tasks auch in der Oberfläche: der Block **Workflows** auf der Startseite führt nach `/tasks` und nennt die Zahl der offenen. Die erledigten stehen dort in einem zugeklappten Block darunter. Gelesen wird nur — angelegt und ausgeführt wird über die Commands.
 
 ## /k-task-create
 

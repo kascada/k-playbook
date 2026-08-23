@@ -17,7 +17,7 @@ type workflowsResponse struct {
 	Message   string `json:"message"`
 }
 
-// tasksResponse ist die Liste der offenen Tasks.
+// tasksResponse ist eine Liste von Tasks — offene oder erledigte.
 type tasksResponse struct {
 	Available bool           `json:"available"`
 	Tasks     []project.Task `json:"tasks"`
@@ -68,6 +68,25 @@ func tasksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tasks, err := project.ListTasks(environment.ProjectDir)
+	if err != nil {
+		writeJSON(w, http.StatusOK, tasksResponse{Available: true, Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tasksResponse{Available: true, Tasks: tasks})
+}
+
+// doneTasksHandler liefert die erledigten Tasks. Eigener Endpunkt, weil die
+// Seite sie erst beim Aufklappen holt: jede Datei wird für die Liste einmal
+// gelesen, und done/ wächst mit jedem Lauf weiter.
+func doneTasksHandler(w http.ResponseWriter, r *http.Request) {
+	environment := project.Detect()
+	if !environment.Installed {
+		writeJSON(w, http.StatusOK, tasksResponse{})
+		return
+	}
+
+	tasks, err := project.ListDoneTasks(environment.ProjectDir)
 	if err != nil {
 		writeJSON(w, http.StatusOK, tasksResponse{Available: true, Message: err.Error()})
 		return

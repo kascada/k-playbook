@@ -112,12 +112,82 @@ func TestReadTaskLiefertInhalt(t *testing.T) {
 	}
 }
 
+// Erledigte liegen eine Ebene tiefer und werden für sich gelistet — die
+// jüngste Nummer zuerst, weil dort der letzte Stand zählt.
+func TestListDoneTasksNimmtNurErledigteJuengsteZuerst(t *testing.T) {
+	root := tasksFixture(t, map[string]string{
+		"001-offen.md":        "# Offen\n",
+		"done/002-zweiter.md": "# Zweiter\n",
+		"done/001-erster.md":  "# Erster\n",
+		"done/README.md":      "# Erledigt\n",
+		"done/notiz.txt":      "keine Task\n",
+	})
+
+	tasks, err := ListDoneTasks(root)
+	if err != nil {
+		t.Fatalf("ListDoneTasks: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("erwartet 2 erledigte Tasks, bekommen %d: %+v", len(tasks), tasks)
+	}
+	if tasks[0].Path != "done/002-zweiter.md" || tasks[1].Path != "done/001-erster.md" {
+		t.Errorf("jüngste Nummer zuerst, mit done/ im Namen: %+v", tasks)
+	}
+	if tasks[0].Title != "Zweiter" {
+		t.Errorf("Titel aus Überschrift: %q", tasks[0].Title)
+	}
+}
+
+// Ohne done/ ist die Liste leer, nicht fehlerhaft.
+func TestListDoneTasksOhneVerzeichnis(t *testing.T) {
+	root := tasksFixture(t, map[string]string{"001-offen.md": "# Offen\n"})
+
+	tasks, err := ListDoneTasks(root)
+	if err != nil {
+		t.Fatalf("ListDoneTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("erwartet keine erledigten Tasks, bekommen %+v", tasks)
+	}
+}
+
+// Der Name aus der Liste muss wieder anfragbar sein, sonst wäre ein erledigter
+// Task zwar sichtbar, aber nicht lesbar.
+func TestReadTaskLiestErledigte(t *testing.T) {
+	root := tasksFixture(t, map[string]string{"done/001-fertig.md": "# Fertig\n\nText\n"})
+
+	task, content, err := ReadTask(root, "done/001-fertig.md")
+	if err != nil {
+		t.Fatalf("ReadTask: %v", err)
+	}
+	if task.Path != "done/001-fertig.md" {
+		t.Errorf("Name behält done/: %q", task.Path)
+	}
+	if task.Title != "Fertig" {
+		t.Errorf("Titel: %q", task.Title)
+	}
+	if len(content) == 0 {
+		t.Error("kein Inhalt gelesen")
+	}
+}
+
 // Der Pfad kommt aus dem Browser: alles, was aus dem Task-Verzeichnis
-// herausführt oder keine Markdown-Datei meint, muss abgewiesen werden.
+// herausführt oder keine Markdown-Datei meint, muss abgewiesen werden. Erlaubt
+// ist genau eine Ebene tiefer, und nur done/.
 func TestReadTaskWeistFremdePfadeAb(t *testing.T) {
 	root := tasksFixture(t, map[string]string{"001-erster.md": "# Erster Task\n"})
 
-	for _, name := range []string{"", "../../etc/passwd.md", "done/000-fertig.md", "/etc/passwd.md", "001-erster.txt"} {
+	for _, name := range []string{
+		"",
+		"../../etc/passwd.md",
+		"/etc/passwd.md",
+		"001-erster.txt",
+		"done/../001-erster.md",
+		"done/../../etc/passwd.md",
+		"done/tiefer/001.md",
+		"priv/001.md",
+		"done/",
+	} {
 		if _, _, err := ReadTask(root, name); err == nil {
 			t.Errorf("%q wurde angenommen", name)
 		}

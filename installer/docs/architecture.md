@@ -73,7 +73,7 @@ installer/
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
 │   ├── update.go                Remote-Stand prüfen, Sauberkeit, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
-│   ├── tasks.go                 offene Tasks auflisten und lesen
+│   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Lebenszyklus
@@ -1016,9 +1016,19 @@ in einer Karte **unter** der Liste, nicht in einem Fenster darüber: die Liste b
 sichtbar, der nächste Task ist einen Klick entfernt. Gerendert wird wie bei der Doku mit
 Goldmark, rohes HTML aus der Quelle bleibt abgeschaltet.
 
-`taskFilePath()` prüft den angefragten Namen: eine Datei unmittelbar im Task-Verzeichnis,
-Endung `.md`. Tasks liegen flach, deshalb genügt der Vergleich mit `filepath.Base()` —
-alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
+Darunter steht ein zugeklappter Block mit den **erledigten** Tasks aus `done/`. Sie
+werden nie weniger, deshalb liegen sie nicht in der Hauptliste; geholt werden sie erst
+beim ersten Aufklappen über `/api/tasks/done`, denn für die Liste wird jede Datei einmal
+gelesen. Ob der Block offen war, merkt sich die Seite im `localStorage` — die Erledigten
+sucht man meist mehrmals hintereinander. `project.ListDoneTasks()` dreht die Ordnung um:
+bei Abgearbeitetem zählt der letzte Stand, die jüngste Nummer steht oben. Den
+Review-Stand trägt die Zeile dort nicht — nach der Ausführung sagt er nichts mehr aus.
+
+`taskFilePath()` prüft den angefragten Namen: eine Datei unmittelbar im Task-Verzeichnis
+oder als `done/<datei>.md` eine erledigte, Endung `.md`. Erledigte sind der einzige
+Grund, den flachen Vergleich mit `filepath.Base()` zu verlassen; genau dieses eine
+Verzeichnis, genau eine Ebene tiefer — alles andere fällt weiterhin weg. Die Namen aus
+beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
 ## Web-API
 
@@ -1055,6 +1065,7 @@ alles mit Verzeichnisanteil fällt damit weg, `done/` eingeschlossen.
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
 | `GET` | `/api/workflows` | Läufe und offene Tasks zählen, read-only |
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
+| `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
 
 Statische Assets liegen unter `/static/`, die Startseite unter `/`; daneben stehen die

@@ -46,11 +46,30 @@
           </div>
           <p class="hint">
             Aus <code>k-playbook-local/tasks/</code>, nach Nummer geordnet. Erledigte liegen in
-            <code>done/</code> und stehen hier nicht mehr.
+            <code>done/</code> und stehen darunter.
           </p>
           <div id="tasks-list" class="task-list empty"></div>
           <p id="tasks-message" class="message"></p>
         </section>
+
+        <!-- Erledigte sammeln sich an und werden nie weniger. Sie stehen
+             deshalb zugeklappt und werden erst beim Aufklappen geholt: für die
+             Liste wird jede Datei einmal gelesen. -->
+        <details class="card" id="done-card">
+          <summary class="section-head disclosure">
+            <div class="disclosure-title">
+              <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+              <h2>Erledigte Tasks</h2>
+            </div>
+            <span id="done-pill" class="pill muted">Aufklappen</span>
+          </summary>
+          <p class="hint">
+            Aus <code>k-playbook-local/tasks/done/</code>, dorthin verschoben von <code>/k-run</code>.
+            Die zuletzt abgearbeitete Nummer steht oben.
+          </p>
+          <div id="done-list" class="task-list empty"></div>
+          <p id="done-message" class="message"></p>
+        </details>
 
         <!-- Der Inhalt steht unter der Liste statt in einem Fenster darüber:
              die Liste bleibt dadurch sichtbar, und der nächste Task ist einen

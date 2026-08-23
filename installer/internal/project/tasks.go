@@ -11,10 +11,14 @@ import (
 // TasksDirName ist das Verzeichnis der Tasks unterhalb von LocalDirName.
 const TasksDirName = "tasks"
 
-// Task ist eine offene Aufgabe.
+// DoneDirName ist das Verzeichnis der erledigten Tasks unterhalb von
+// TasksDirName. /k-run verschiebt eine Datei nach der Ausführung dorthin.
+const DoneDirName = "done"
+
+// Task ist eine Aufgabe, offen oder erledigt.
 type Task struct {
-	// Path ist der Dateiname im Task-Verzeichnis. Tasks liegen flach, deshalb
-	// ohne Verzeichnisanteil.
+	// Path ist der Name im Task-Verzeichnis. Offene Tasks liegen flach,
+	// erledigte tragen das Präfix "done/".
 	Path string `json:"path"`
 	// Title ist die erste Überschrift der Datei, ersatzweise der Dateiname.
 	Title string `json:"title"`
@@ -29,22 +33,48 @@ func TasksDir(projectDir string) string {
 	return filepath.Join(LocalDir(projectDir), TasksDirName)
 }
 
+// DoneDir ist das Verzeichnis der erledigten Tasks eines Projekts.
+func DoneDir(projectDir string) string {
+	return filepath.Join(TasksDir(projectDir), DoneDirName)
+}
+
 // ListTasks sammelt die offenen Tasks, nach ihrer Nummer sortiert.
 //
 // Erledigte liegen in done/ und bleiben draußen; Unterverzeichnisse fallen
 // damit von selbst weg. Die README beschreibt das Verzeichnis und ist keine
 // Aufgabe.
+func ListTasks(projectDir string) ([]Task, error) {
+	root := TasksDir(projectDir)
+	return listTasksIn(root, root)
+}
+
+// ListDoneTasks sammelt die erledigten Tasks aus done/, die jüngste Nummer
+// zuerst.
+//
+// Anders als bei den offenen zählt hier der letzte Stand: was zuletzt
+// abgearbeitet wurde, steht oben.
+func ListDoneTasks(projectDir string) ([]Task, error) {
+	tasks, err := listTasksIn(TasksDir(projectDir), DoneDir(projectDir))
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(tasks, func(i int, j int) bool { return tasks[i].Path > tasks[j].Path })
+	return tasks, nil
+}
+
+// listTasksIn liest die Markdown-Dateien unmittelbar in dir. Die Namen der
+// gefundenen Tasks werden relativ zu root gebildet, damit erledigte ihr
+// "done/" behalten und damit wieder angefragt werden können.
 //
 // Ein fehlendes Verzeichnis ist kein Fehler: die projekteigene Struktur wird
 // erst angelegt, und "noch keine Tasks" ist dieselbe Auskunft wie ein leeres
 // Verzeichnis.
-func ListTasks(projectDir string) ([]Task, error) {
-	root := TasksDir(projectDir)
-	if !isDir(root) {
+func listTasksIn(root string, dir string) ([]Task, error) {
+	if !isDir(dir) {
 		return []Task{}, nil
 	}
 
-	entries, err := os.ReadDir(root)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("Tasks lesen: %w", err)
 	}
@@ -58,7 +88,7 @@ func ListTasks(projectDir string) ([]Task, error) {
 		if !strings.EqualFold(filepath.Ext(name), ".md") || strings.EqualFold(name, "README.md") {
 			continue
 		}
-		tasks = append(tasks, readTaskFacts(filepath.Join(root, name)))
+		tasks = append(tasks, readTaskFacts(root, filepath.Join(dir, name)))
 	}
 
 	// Die Nummer steht vorn, deshalb ordnet der Dateiname bereits richtig.
@@ -66,7 +96,8 @@ func ListTasks(projectDir string) ([]Task, error) {
 	return tasks, nil
 }
 
-// ReadTask liefert eine einzelne Task als Rohtext.
+// ReadTask liefert eine einzelne Task als Rohtext. Der Name meint eine Datei
+// unmittelbar im Task-Verzeichnis oder eine erledigte als "done/<datei>.md".
 func ReadTask(projectDir string, name string) (Task, []byte, error) {
 	root := TasksDir(projectDir)
 	path, err := taskFilePath(root, name)
@@ -78,7 +109,7 @@ func ReadTask(projectDir string, name string) (Task, []byte, error) {
 	if err != nil {
 		return Task{}, nil, fmt.Errorf("%s lesen: %w", name, err)
 	}
-	return readTaskFacts(path), content, nil
+	return readTaskFacts(root, path), content, nil
 }
 
 // reviewLogHeading ist die Spur, die /k-task-refine in jeder geprüften Datei
@@ -87,10 +118,16 @@ func ReadTask(projectDir string, name string) (Task, []byte, error) {
 const reviewLogHeading = "## Review-Log"
 
 // readTaskFacts liest die Datei einmal und holt daraus alles, was die Liste
-// über einen Task zeigt.
-func readTaskFacts(path string) Task {
+// über einen Task zeigt. Der Name ist der Weg ab root, in Schrägstrichen —
+// derselbe Name, unter dem die Datei wieder angefragt wird.
+func readTaskFacts(root string, path string) Task {
+	name := filepath.Base(path)
+	if relative, err := filepath.Rel(root, path); err == nil {
+		name = filepath.ToSlash(relative)
+	}
+
 	task := Task{
-		Path:  filepath.Base(path),
+		Path:  name,
 		Title: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
 	}
 
@@ -143,16 +180,28 @@ func headingDate(line string) string {
 
 // taskFilePath löst einen angefragten Namen im Task-Verzeichnis auf. Der Name
 // kommt aus dem Browser: er darf nur eine Datei unmittelbar in diesem
-// Verzeichnis meinen, sonst wäre er ein Weg zu beliebigen Dateien des Rechners.
+// Verzeichnis oder in dessen done/ meinen, sonst wäre er ein Weg zu beliebigen
+// Dateien des Rechners.
 func taskFilePath(root string, name string) (string, error) {
-	if strings.TrimSpace(name) == "" {
+	name = strings.TrimSpace(name)
+	if name == "" {
 		return "", fmt.Errorf("kein Task angegeben")
 	}
-	if name != filepath.Base(name) || name == "." || name == ".." {
-		return "", fmt.Errorf("nur Dateien unmittelbar in %s", TasksDirName)
+
+	// Genau eine Ebene tiefer, und genau dieses eine Verzeichnis: erledigte
+	// Tasks sind der einzige Grund, den flachen Vergleich zu verlassen.
+	dir := root
+	file := name
+	if rest, found := strings.CutPrefix(name, DoneDirName+"/"); found {
+		dir = filepath.Join(root, DoneDirName)
+		file = rest
 	}
-	if !strings.EqualFold(filepath.Ext(name), ".md") {
+
+	if file != filepath.Base(file) || file == "." || file == ".." {
+		return "", fmt.Errorf("nur Dateien in %s oder %s/%s", TasksDirName, TasksDirName, DoneDirName)
+	}
+	if !strings.EqualFold(filepath.Ext(file), ".md") {
 		return "", fmt.Errorf("nur Markdown-Dateien")
 	}
-	return filepath.Join(root, name), nil
+	return filepath.Join(dir, file), nil
 }

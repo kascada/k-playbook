@@ -264,8 +264,9 @@ offenen Tasks unter `k-playbook-local/tasks/`.
 
 Aufgelistet wird auf den Seiten selbst. `/reviews` zeigt die bisherigen Läufe und stellt
 einen neuen zusammen. `/tasks` listet die offenen Tasks nach ihrer Nummer; ein Klick
-zeigt den Task als Markdown unter der Liste. Erledigte liegen in `tasks/done/` und
-stehen dort nicht mehr.
+zeigt den Task als Markdown unter der Liste. Die erledigten aus `tasks/done/` stehen
+darunter in einem zugeklappten Block — die jüngste Nummer oben — und lassen sich genauso
+lesen.
 
 Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-task-refine` gegangen ist —
 mit Datum, sofern das Review-Log eines nennt. „ohne Task-Refine" ist kein Fehler, aber
