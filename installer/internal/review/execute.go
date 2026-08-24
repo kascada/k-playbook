@@ -13,7 +13,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kascada/k-playbook/installer/internal/review/sarifconvert"
 )
+
+// sarifConverters ordnet einem Werkzeug mit sarif: convert im Katalog seine
+// Konverterfunktion zu. Fehlt ein Werkzeug hier, bleibt sein Job skipped mit
+// dem Grund „SARIF-Konverter nicht gebaut" (planJobs) — so lange, bis eine
+// Folge-Task (z. B. für pip-audit) den nächsten Eintrag ergänzt.
+var sarifConverters = map[string]func([]byte) ([]byte, error){
+	"trufflehog": sarifconvert.TruffleHog,
+}
 
 // DefaultParallel ist die Obergrenze gleichzeitiger Jobs, gezählt über den
 // ganzen Lauf.
@@ -285,6 +295,11 @@ type jobPlan struct {
 	// candidates ist die Zahl der Dateien unter dem Bezugspunkt, die als
 	// Gegenstand in Frage kamen; nil heißt „nicht gezählt".
 	candidates *int
+	// converter ist gesetzt, wenn scanner.SARIF == SARIFConvert und für
+	// scanner.Tool ein Konverter existiert (sarifConverters). runJob schreibt
+	// dann den nativen Output zunächst in eine Zwischendatei und schickt sie
+	// durch converter, statt sie unverändert als raw/<job>.sarif zu führen.
+	converter func([]byte) ([]byte, error)
 }
 
 // planJobs macht aus den Katalogzeilen eines Werkzeugs die Aufrufe dieses Laufs.
@@ -311,8 +326,9 @@ func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known
 
 	for _, scanner := range scanners {
 		plan := jobPlan{scanner: scanner, name: scanner.Job, state: StateStart}
+		converter, hasConverter := sarifConverters[scanner.Tool]
 		switch {
-		case scanner.SARIF == SARIFConvert:
+		case scanner.SARIF == SARIFConvert && !hasConverter:
 			plan.state, plan.reason = StateSkipped, "SARIF-Konverter nicht gebaut"
 		case scanner.SARIF == SARIFNone:
 			plan.state, plan.reason = StateSkipped, "erzeugt kein SARIF"
@@ -320,6 +336,12 @@ func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known
 			plan.state, plan.reason = StateSkipped, "Sprache nicht gewählt"
 		case !known || tool.Path == "":
 			plan.state, plan.reason = StateSkipped, missingToolReason(entry.Name, known, tool)
+		}
+		// Ein convert-Job mit vorhandenem Konverter durchläuft dieselben
+		// Sprach- und Werkzeug-Prüfungen wie ein nativer — nur der Grund „kein
+		// Konverter" entfällt für ihn.
+		if plan.state == StateStart && scanner.SARIF == SARIFConvert {
+			plan.converter = converter
 		}
 		if plan.state != StateStart || scanner.Workdir != WorkdirModule {
 			plans = append(plans, plan)
@@ -518,13 +540,30 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 
 	var outOutput tailBuffer
 	outOutput.limit = stderrKeep
+	// rawPath ist nur bei einem Konverter-Job gesetzt (plan.converter != nil):
+	// dort schreibt der Prozess zunächst hierher, und der native Text wird
+	// erst danach nach outPath konvertiert. Ohne Konverter schreibt der
+	// Prozess wie bisher direkt nach outPath — eine Datei existiert dann auch,
+	// wenn er nichts liefert (siehe TestExecuteRaeumtDateiEinesGescheitertenJobsWeg).
+	rawPath := ""
 	if scanner.Output == OutputStdout {
-		file, err := os.Create(outPath)
+		target := outPath
+		if plan.converter != nil {
+			rawPath = filepath.Join(rawDir, plan.name+".raw.jsonl")
+			target = rawPath
+		}
+		file, err := os.Create(target)
 		if err != nil {
-			return failJob(job, fmt.Sprintf("%s ließ sich nicht anlegen: %v", outPath, err))
+			return failJob(job, fmt.Sprintf("%s ließ sich nicht anlegen: %v", target, err))
 		}
 		command.Stdout = file
 		defer file.Close()
+		if rawPath != "" {
+			// Die Zwischendatei kann den nativen Text ungekürzt enthalten —
+			// bei trufflehog potenziell mit Rohsecrets (Raw/RawV2). Sie darf
+			// über das Ende dieses Jobs hinaus nicht liegen bleiben.
+			defer os.Remove(rawPath)
+		}
 	} else {
 		command.Stdout = &outOutput
 	}
@@ -544,6 +583,31 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 	}
 	if ctx.Err() != nil {
 		return failJob(job, "abgebrochen")
+	}
+
+	// Konvertiert wird unabhängig vom Exit-Code — aus demselben Grund wie bei
+	// countFindings gleich: das Ergebnis zählt, nicht der Exit-Code.
+	//
+	// Vorausgesetzt ist aber, dass der Prozess überhaupt gestartet ist:
+	// command.ProcessState == nil heißt, der Start selbst ist misslungen (z. B.
+	// falscher Pfad, keine Ausführungsrechte). Ohne diese Prüfung würde eine
+	// leere Zwischendatei (von os.Create vor command.Run angelegt) klaglos zu
+	// validem, leerem SARIF konvertiert — ein echter Fehlschlag sähe dann wie
+	// ein sauberer Scan ohne Funde aus. Bei fehlendem ProcessState bleibt die
+	// Konvertierung deshalb aus; der Job fällt in den bestehenden
+	// Soft-Skip/Fehlschlag-Pfad unten, der genau diesen Fall schon abdeckt.
+	if rawPath != "" && command.ProcessState != nil {
+		nativeOutput, err := os.ReadFile(rawPath)
+		if err != nil {
+			return failJob(job, fmt.Sprintf("%s ließ sich nicht lesen: %v", rawPath, err))
+		}
+		converted, err := plan.converter(nativeOutput)
+		if err != nil {
+			return failJob(job, fmt.Sprintf("Konvertierung nach SARIF fehlgeschlagen: %v", err))
+		}
+		if err := os.WriteFile(outPath, converted, 0o644); err != nil {
+			return failJob(job, fmt.Sprintf("%s ließ sich nicht schreiben: %v", outPath, err))
+		}
 	}
 
 	// Der Ausgang hängt am Ergebnis, nicht am Exit-Code: fast alle Scanner

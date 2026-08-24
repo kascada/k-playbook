@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -350,12 +351,15 @@ func TestExecuteWerkzeugOhneJob(t *testing.T) {
 }
 
 // convert und none laufen nicht, solange die Konverter fehlen: sonst läge
-// unter raw/ rohes JSON mit der Endung .sarif.
+// unter raw/ rohes JSON mit der Endung .sarif. pip-audit steht hier
+// stellvertretend für „convert ohne Konverter" — trufflehog hat inzwischen
+// einen (sarifconvert.TruffleHog) und läuft, siehe
+// TestExecuteTruffleHogJobKonvertiertZuLesbaremSARIF.
 func TestExecuteUeberspringtNichtNativeUndFremdeSprachen(t *testing.T) {
-	runDir := neuerLauf(t, Entry{Name: "trufflehog", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
+	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
 	tool := schreibtSARIF(t, "egal", 0, 0)
 
-	convert := nativeScanner("trufflehog-git", "trufflehog", "{out}")
+	convert := nativeScanner("pip-audit", "pip-audit", "{out}")
 	convert.SARIF = SARIFConvert
 	fremd := nativeScanner("gosec", "gosec", "{out}")
 	fremd.Languages = "go"
@@ -364,11 +368,11 @@ func TestExecuteUeberspringtNichtNativeUndFremdeSprachen(t *testing.T) {
 		RunDir:    runDir,
 		Languages: []string{"python"},
 		Scanners:  []Scanner{convert, fremd},
-		Tools:     map[string]Tool{"trufflehog": {Path: tool}, "gosec": {Path: tool}},
-	}, Entry{Name: "trufflehog", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
+		Tools:     map[string]Tool{"pip-audit": {Path: tool}, "gosec": {Path: tool}},
+	}, Entry{Name: "pip-audit", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
 
 	if reason := statuses[0].Jobs[0].Reason; !strings.Contains(reason, "Konverter") {
-		t.Errorf("trufflehog-Grund = %q", reason)
+		t.Errorf("pip-audit-Grund = %q", reason)
 	}
 	if reason := statuses[1].Jobs[0].Reason; !strings.Contains(reason, "Sprache") {
 		t.Errorf("gosec-Grund = %q", reason)
@@ -377,6 +381,159 @@ func TestExecuteUeberspringtNichtNativeUndFremdeSprachen(t *testing.T) {
 		if status.State != StateSkipped {
 			t.Errorf("%s = %q, erwartet %q", status.Name, status.State, StateSkipped)
 		}
+	}
+}
+
+// realTruffleHogLogZeile ist eine echte Log-Zeile von trufflehog 3.97.0 (im
+// tatsächlichen Aufrufpfad läuft sie über stderr, nie über das stdout, das
+// runJob umleitet — siehe Task 024, Abschnitt „Kontext"). Sie steht hier
+// trotzdem mit im NDJSON, um zu prüfen, dass der Konverter sie verwirft.
+const realTruffleHogLogZeile = `{"level":"info-0","ts":"2026-08-24T14:40:27+02:00","logger":"trufflehog","msg":"finished scanning","chunks":2,"bytes":145,"verified_secrets":0,"unverified_secrets":1}`
+
+// realTruffleHogFundZeile ist eine echte Fund-Zeile von trufflehog 3.97.0
+// (Katalog-Aufruf `git file://{target} --json --no-update`, Detektor
+// SlackWebhook, gegen ein Testrepo mit einem Fake-Webhook als Secret). Der
+// Secret-Wert ist entschärft (hooks.slack.invalid statt des echten Hosts),
+// sonst blockt GitHubs Push Protection jeden Push, der diese Datei anfasst.
+const realTruffleHogFundZeile = `{"SourceMetadata":{"Data":{"Git":{"commit":"cc31cbf991892f3ff02416f39b4dffa9421f22a6","file":"secret.txt","email":"test <test@test.com>","repository":"file:///tmp/thtest3","timestamp":"2026-08-24 12:40:24 +0000","line":1}}},"SourceID":1,"SourceType":16,"SourceName":"trufflehog - git","DetectorType":30,"DetectorName":"SlackWebhook","DetectorDescription":"Slack webhooks are used to send messages from external sources into Slack channels.","DecoderName":"PLAIN","Verified":false,"VerificationFromCache":false,"Raw":"https://hooks.slack.invalid/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX","RawV2":"","Redacted":"","ExtraData":null,"StructuredData":null}`
+
+// Der trufflehog-Job hat jetzt einen Konverter (sarifconvert.TruffleHog) und
+// läuft durch: raw/trufflehog-git.sarif entsteht und ist gegen die
+// SARIF-2.1.0-Struktur lesbar, die auch merge.readSARIF erwartet
+// (review/merge/merge.go) — Log-Zeile verworfen, kein Rohsecret im Ergebnis.
+func TestExecuteTruffleHogJobKonvertiertZuLesbaremSARIF(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "trufflehog", Kind: KindTool})
+	tool := fakeTool(t, "trufflehog", fmt.Sprintf("cat <<'EOF'\n%s\n%s\nEOF", realTruffleHogLogZeile, realTruffleHogFundZeile))
+
+	scanner := nativeScanner("trufflehog-git", "trufflehog", "--json")
+	scanner.SARIF = SARIFConvert
+	scanner.Output = OutputStdout
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"trufflehog": {Path: tool}},
+	}, Entry{Name: "trufflehog", Kind: KindTool})
+
+	status := statuses[0]
+	if status.State != StateDone {
+		t.Fatalf("Eintrag = %q, erwartet %q: %+v", status.State, StateDone, status.Jobs)
+	}
+	job := status.Jobs[0]
+	if job.State != StateDone {
+		t.Fatalf("Job = %q, erwartet %q (Grund: %s)", job.State, StateDone, job.Reason)
+	}
+	if job.SARIF != "raw/trufflehog-git.sarif" {
+		t.Errorf("SARIF = %q, erwartet raw/trufflehog-git.sarif", job.SARIF)
+	}
+	if job.Findings == nil || *job.Findings != 1 {
+		t.Errorf("Befunde = %v, erwartet 1 (Log-Zeile zählt nicht mit)", job.Findings)
+	}
+	// Die Zwischendatei mit dem nativen Text (potenziell Rohsecrets) darf
+	// nicht liegen bleiben.
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "trufflehog-git.raw.jsonl")); !os.IsNotExist(err) {
+		t.Errorf("Zwischendatei raw/trufflehog-git.raw.jsonl wurde nicht aufgeräumt: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(runDir, RawDirName, "trufflehog-git.sarif"))
+	if err != nil {
+		t.Fatalf("SARIF-Datei lesen: %v", err)
+	}
+
+	// Nur so viel wie merge.readSARIF selbst braucht.
+	var document struct {
+		Version string `json:"version"`
+		Runs    []struct {
+			Tool struct {
+				Driver struct {
+					Name  string `json:"name"`
+					Rules []struct {
+						ID string `json:"id"`
+					} `json:"rules"`
+				} `json:"driver"`
+			} `json:"tool"`
+			Results []struct {
+				RuleID  string `json:"ruleId"`
+				Level   string `json:"level"`
+				Message struct {
+					Text string `json:"text"`
+				} `json:"message"`
+				Locations []struct {
+					PhysicalLocation struct {
+						ArtifactLocation struct {
+							URI string `json:"uri"`
+						} `json:"artifactLocation"`
+						Region struct {
+							StartLine int `json:"startLine"`
+						} `json:"region"`
+					} `json:"physicalLocation"`
+				} `json:"locations"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("SARIF ist kein lesbares JSON: %v", err)
+	}
+	if document.Version != "2.1.0" {
+		t.Errorf("version = %q, erwartet 2.1.0", document.Version)
+	}
+	if len(document.Runs) != 1 || document.Runs[0].Tool.Driver.Name != "trufflehog" {
+		t.Fatalf("runs = %+v, erwartet genau einen Run mit driver trufflehog", document.Runs)
+	}
+	if len(document.Runs[0].Results) != 1 {
+		t.Fatalf("results = %+v, erwartet genau einen Befund", document.Runs[0].Results)
+	}
+	result := document.Runs[0].Results[0]
+	if result.RuleID != "SlackWebhook" {
+		t.Errorf("ruleId = %q, erwartet SlackWebhook", result.RuleID)
+	}
+	if result.Level != "warning" {
+		t.Errorf("level = %q, erwartet warning (unverifiziert)", result.Level)
+	}
+	if strings.Contains(result.Message.Text, "hooks.slack.invalid") {
+		t.Errorf("message.text enthält das Rohsecret: %q", result.Message.Text)
+	}
+	if len(result.Locations) != 1 || result.Locations[0].PhysicalLocation.ArtifactLocation.URI != "secret.txt" {
+		t.Errorf("locations = %+v, erwartet secret.txt", result.Locations)
+	}
+	if result.Locations[0].PhysicalLocation.Region.StartLine != 1 {
+		t.Errorf("startLine = %d, erwartet 1", result.Locations[0].PhysicalLocation.Region.StartLine)
+	}
+}
+
+// Schlägt der Prozessstart selbst fehl (hier: Tool.Path zeigt ins Leere), darf
+// ein Konverter-Job nicht trotzdem als done mit 0 Funden durchgehen — sonst
+// sähe ein Werkzeug, das nie gelaufen ist, wie ein sauberer Scan aus. Die
+// Zwischendatei existiert dann zwar (leer, von os.Create vor command.Run
+// angelegt), command.ProcessState bleibt aber nil; genau das muss die
+// Konvertierung verhindern und stattdessen den bestehenden Fehlschlag-Pfad
+// greifen lassen.
+func TestExecuteTruffleHogProzessstartFehlerIstFehlschlag(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "trufflehog", Kind: KindTool})
+
+	scanner := nativeScanner("trufflehog-git", "trufflehog", "--json")
+	scanner.SARIF = SARIFConvert
+	scanner.Output = OutputStdout
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"trufflehog": {Path: filepath.Join(t.TempDir(), "existiert-nicht")}},
+	}, Entry{Name: "trufflehog", Kind: KindTool})
+
+	status := statuses[0]
+	if status.State != StateFailed {
+		t.Fatalf("Eintrag = %q, erwartet %q: %+v", status.State, StateFailed, status.Jobs)
+	}
+	job := status.Jobs[0]
+	if job.State != StateFailed {
+		t.Errorf("Job = %q, erwartet %q — ein nie gestarteter Scan darf nicht als done mit 0 Funden erscheinen", job.State, StateFailed)
+	}
+	if job.SARIF != "" {
+		t.Errorf("SARIF = %q, erwartet leer bei einem Fehlschlag", job.SARIF)
+	}
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "trufflehog-git.raw.jsonl")); !os.IsNotExist(err) {
+		t.Errorf("Zwischendatei raw/trufflehog-git.raw.jsonl wurde nicht aufgeräumt: %v", err)
 	}
 }
 
