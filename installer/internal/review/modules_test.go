@@ -152,3 +152,102 @@ func TestJobNameForModuleHaeltNamenAuseinander(t *testing.T) {
 		t.Errorf("zweiter Name %q taugt nicht als Dateiname", zweiter)
 	}
 }
+
+// Der Punkt der dateibasierten Suche: zwei Manifeste im selben Verzeichnis
+// bleiben zwei Gegenstände. Über Verzeichnisse aufgefächert verdeckte das eine
+// das andere.
+func TestFindPythonManifestsLiefertDateienSortiert(t *testing.T) {
+	root := modulBaum(t,
+		"requirements.txt", "requirements-dev.txt", "constraints.txt",
+		"dienste/b/requirements.txt", "dienste/a/requirements-test.txt",
+	)
+
+	manifeste, err := FindPythonManifests(root)
+	if err != nil {
+		t.Fatalf("FindPythonManifests: %v", err)
+	}
+	want := []string{
+		"constraints.txt",
+		"dienste/a/requirements-test.txt",
+		"dienste/b/requirements.txt",
+		"requirements-dev.txt",
+		"requirements.txt",
+	}
+	if strings.Join(manifeste, ",") != strings.Join(want, ",") {
+		t.Errorf("Manifeste = %v, erwartet %v", manifeste, want)
+	}
+}
+
+// pyproject.toml & Co. bleiben außen vor: pip-audit -r erwartet eine Datei im
+// requirements.txt-Format, ein pyproject.toml-Projekt liefe über den
+// positionalen project_path-Parameter — ein anderer Aufrufpfad.
+func TestFindPythonManifestsNimmtNurRequirementsUndConstraints(t *testing.T) {
+	root := modulBaum(t, "pyproject.toml", "setup.py", "setup.cfg", "Pipfile", "poetry.lock", "requirements.txt")
+
+	manifeste, err := FindPythonManifests(root)
+	if err != nil {
+		t.Fatalf("FindPythonManifests: %v", err)
+	}
+	if len(manifeste) != 1 || manifeste[0] != "requirements.txt" {
+		t.Errorf("Manifeste = %v, erwartet nur requirements.txt", manifeste)
+	}
+}
+
+// Ausgeschlossen wird über moduleSearchExcluded — dieselbe Liste wie bei der
+// Go-Suche, nicht die engere aus candidates.go.
+func TestFindPythonManifestsUeberspringtAusschluesse(t *testing.T) {
+	root := modulBaum(t,
+		"requirements.txt",
+		"k-playbook/requirements.txt",
+		"k-playbook-local/requirements.txt",
+		"vendor/requirements.txt",
+		"node_modules/requirements.txt",
+		"testdata/requirements.txt",
+		".venv/requirements.txt",
+	)
+
+	manifeste, err := FindPythonManifests(root)
+	if err != nil {
+		t.Fatalf("FindPythonManifests: %v", err)
+	}
+	if len(manifeste) != 1 || manifeste[0] != "requirements.txt" {
+		t.Errorf("Manifeste = %v, erwartet nur das Manifest der Wurzel", manifeste)
+	}
+}
+
+// Ein Verzeichnis, das wie ein Manifest heißt, ist keins.
+func TestFindPythonManifestsIgnoriertVerzeichnisAlsManifest(t *testing.T) {
+	root := modulBaum(t, "requirements.txt/liste.txt")
+
+	manifeste, err := FindPythonManifests(root)
+	if err != nil {
+		t.Fatalf("FindPythonManifests: %v", err)
+	}
+	if len(manifeste) != 0 {
+		t.Errorf("Manifeste = %v, erwartet keins", manifeste)
+	}
+}
+
+// Ein Lesefehler wird durchgereicht: nach einer abgebrochenen Suche ist
+// unbekannt, ob es ein Manifest gibt.
+func TestFindPythonManifestsMeldetLesefehler(t *testing.T) {
+	root := modulBaum(t, "gesperrt/requirements.txt")
+	gesperrt := filepath.Join(root, "gesperrt")
+	if err := os.Chmod(gesperrt, 0o000); err != nil {
+		t.Fatalf("Rechte setzen: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gesperrt, 0o755) })
+
+	if _, err := FindPythonManifests(root); err == nil {
+		t.Error("die abgebrochene Suche wurde als leeres Ergebnis gemeldet")
+	}
+}
+
+func TestFindPythonManifestsBrauchtVerzeichnis(t *testing.T) {
+	if _, err := FindPythonManifests(""); err == nil {
+		t.Error("ohne Verzeichnis angenommen")
+	}
+	if _, err := FindPythonManifests(filepath.Join(t.TempDir(), "gibtesnicht")); err == nil {
+		t.Error("ein fehlendes Verzeichnis wurde als leeres Ergebnis gemeldet")
+	}
+}

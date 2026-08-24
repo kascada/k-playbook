@@ -351,15 +351,19 @@ func TestExecuteWerkzeugOhneJob(t *testing.T) {
 }
 
 // convert und none laufen nicht, solange die Konverter fehlen: sonst läge
-// unter raw/ rohes JSON mit der Endung .sarif. pip-audit steht hier
-// stellvertretend für „convert ohne Konverter" — trufflehog hat inzwischen
-// einen (sarifconvert.TruffleHog) und läuft, siehe
-// TestExecuteTruffleHogJobKonvertiertZuLesbaremSARIF.
+// unter raw/ rohes JSON mit der Endung .sarif.
+//
+// Stellvertretend steht hier safety, ein Werkzeug ohne Zeile im Katalog: die
+// beiden convert-Jobs des ausgelieferten Katalogs haben inzwischen beide einen
+// Konverter (trufflehog aus Task 024, pip-audit aus Task 026) und laufen
+// deshalb — siehe TestExecuteTruffleHogJobKonvertiertZuLesbaremSARIF und
+// TestExecutePipAuditJeManifestKonvertiertZuLesbaremSARIF. Der Weg für das
+// nächste convert-Werkzeug bleibt derselbe, und genau den prüft dieser Fall.
 func TestExecuteUeberspringtNichtNativeUndFremdeSprachen(t *testing.T) {
-	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
+	runDir := neuerLauf(t, Entry{Name: "safety", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
 	tool := schreibtSARIF(t, "egal", 0, 0)
 
-	convert := nativeScanner("pip-audit", "pip-audit", "{out}")
+	convert := nativeScanner("safety", "safety", "{out}")
 	convert.SARIF = SARIFConvert
 	fremd := nativeScanner("gosec", "gosec", "{out}")
 	fremd.Languages = "go"
@@ -368,11 +372,11 @@ func TestExecuteUeberspringtNichtNativeUndFremdeSprachen(t *testing.T) {
 		RunDir:    runDir,
 		Languages: []string{"python"},
 		Scanners:  []Scanner{convert, fremd},
-		Tools:     map[string]Tool{"pip-audit": {Path: tool}, "gosec": {Path: tool}},
-	}, Entry{Name: "pip-audit", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
+		Tools:     map[string]Tool{"safety": {Path: tool}, "gosec": {Path: tool}},
+	}, Entry{Name: "safety", Kind: KindTool}, Entry{Name: "gosec", Kind: KindTool})
 
 	if reason := statuses[0].Jobs[0].Reason; !strings.Contains(reason, "Konverter") {
-		t.Errorf("pip-audit-Grund = %q", reason)
+		t.Errorf("safety-Grund = %q", reason)
 	}
 	if reason := statuses[1].Jobs[0].Reason; !strings.Contains(reason, "Sprache") {
 		t.Errorf("gosec-Grund = %q", reason)
@@ -1548,5 +1552,245 @@ func TestExecuteZaehltJeBezugspunktUndSorteEinmal(t *testing.T) {
 		if count != 1 {
 			t.Errorf("%s wurde %d mal gezählt, erwartet einmal", schlüssel, count)
 		}
+	}
+}
+
+// realePipAuditAusgabe ist echte Ausgabe von pip-audit 2.10.0 (Katalog-Aufruf
+// `--format json --progress-spinner off -r <datei>`), gekürzt auf zwei der
+// aufgelösten Pakete: eines mit einer bekannten Lücke, eines ohne. pip-audit
+// schreibt sie über stdout, das runJob umleitet.
+const realePipAuditAusgabe = `{"dependencies": [{"name": "requests", "version": "2.19.0", "vulns": [{"id": "PYSEC-2018-28", "fix_versions": ["2.20.0"], "aliases": ["GHSA-x84v-xcm2-53pg", "CVE-2018-18074"], "description": "The Requests package before 2.20.0 for Python sends an HTTP Authorization header to an http URI upon receiving a same-hostname https-to-http redirect, which makes it easier for remote attackers to discover credentials by sniffing the network."}]}, {"name": "chardet", "version": "3.0.4", "vulns": []}], "fixes": []}`
+
+// dateiModulScanner ist ein Job, der je gefundener Manifestdatei einmal läuft:
+// die Suche und Auffächerung von workdir module, aber ohne Wechsel hinein.
+func dateiModulScanner(job string, tool string, args ...string) Scanner {
+	scanner := nativeScanner(job, tool, args...)
+	scanner.Workdir = WorkdirModuleFile
+	return scanner
+}
+
+// Der ganze Weg für pip-audit: zwei Manifeste im selben Verzeichnis ergeben
+// zwei Jobs — über Verzeichnisse aufgefächert verdeckte eines das andere —,
+// und jeder schreibt lesbares SARIF mit seinem eigenen Manifest daran.
+func TestExecutePipAuditJeManifestKonvertiertZuLesbaremSARIF(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool})
+	target := modulBaum(t, "requirements.txt", "requirements-dev.txt")
+	// Wie das echte Werkzeug: JSON über stdout, Exit 1, weil es etwas gefunden
+	// hat. Der Ausgang hängt am Ergebnis, nicht am Exit-Code.
+	tool := fakeTool(t, "pip-audit", fmt.Sprintf("cat <<'EOF'\n%s\nEOF\nexit 1", realePipAuditAusgabe))
+
+	scanner := dateiModulScanner("pip-audit", "pip-audit", "--format", "json", "-r", "{module}")
+	scanner.SARIF = SARIFConvert
+	scanner.Output = OutputStdout
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{scanner},
+		Tools:    map[string]Tool{"pip-audit": {Path: tool}},
+	}, Entry{Name: "pip-audit", Kind: KindTool})
+
+	if statuses[0].State != StateDone {
+		t.Fatalf("Eintrag = %q, erwartet %q: %+v", statuses[0].State, StateDone, statuses[0].Jobs)
+	}
+	if len(statuses[0].Jobs) != 2 {
+		t.Fatalf("%d Jobs, erwartet 2 — je Manifest einen: %+v", len(statuses[0].Jobs), statuses[0].Jobs)
+	}
+
+	module := map[string]string{}
+	for _, job := range statuses[0].Jobs {
+		if job.State != StateDone {
+			t.Errorf("Job %s = %q (%s)", job.Job, job.State, job.Reason)
+		}
+		if job.Findings == nil || *job.Findings != 1 {
+			t.Errorf("Job %s hat %v Befunde, erwartet 1 — chardet ist sauber", job.Job, job.Findings)
+		}
+		module[job.Job] = job.Module
+	}
+	if module["pip-audit-requirements.txt"] != "requirements.txt" {
+		t.Errorf("Jobs = %+v, erwartet einen Job für requirements.txt", module)
+	}
+	if module["pip-audit-requirements-dev.txt"] != "requirements-dev.txt" {
+		t.Errorf("Jobs = %+v, erwartet einen Job für requirements-dev.txt", module)
+	}
+	if dateien := rawDateien(t, runDir); len(dateien) != 2 {
+		t.Errorf("Dateien unter raw/ = %v, erwartet zwei", dateien)
+	}
+
+	// Das geprüfte Manifest steht an jedem Result — pip-audit selbst nennt es
+	// nicht, der Job weiß es. Ohne die Property stünde am zusammengeführten
+	// Befund nicht, welches Manifest betroffen ist.
+	data, err := os.ReadFile(filepath.Join(runDir, RawDirName, "pip-audit-requirements-dev.txt.sarif"))
+	if err != nil {
+		t.Fatalf("SARIF-Datei lesen: %v", err)
+	}
+	var document struct {
+		Version string `json:"version"`
+		Runs    []struct {
+			Tool struct {
+				Driver struct {
+					Name string `json:"name"`
+				} `json:"driver"`
+			} `json:"tool"`
+			Results []struct {
+				RuleID     string            `json:"ruleId"`
+				Level      string            `json:"level"`
+				Properties map[string]string `json:"properties"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("SARIF ist kein lesbares JSON: %v", err)
+	}
+	if document.Version != "2.1.0" || len(document.Runs) != 1 || document.Runs[0].Tool.Driver.Name != "pip-audit" {
+		t.Fatalf("SARIF-Kopf = %+v, erwartet 2.1.0 mit driver pip-audit", document)
+	}
+	if len(document.Runs[0].Results) != 1 {
+		t.Fatalf("results = %+v, erwartet genau einen Befund", document.Runs[0].Results)
+	}
+	result := document.Runs[0].Results[0]
+	if result.RuleID != "CVE-2018-18074" {
+		t.Errorf("ruleId = %q, erwartet die CVE-Alias", result.RuleID)
+	}
+	for key, want := range map[string]string{
+		"package":  "requests",
+		"version":  "2.19.0",
+		"manifest": "requirements-dev.txt",
+	} {
+		if result.Properties[key] != want {
+			t.Errorf("properties[%s] = %q, erwartet %q", key, result.Properties[key], want)
+		}
+	}
+	if result.Level != "" {
+		t.Errorf("level = %q, erwartet leer — pip-audit liefert keine Schwere", result.Level)
+	}
+	// Die Zwischendatei trägt den nativen Text und darf nicht liegen bleiben.
+	if _, err := os.Stat(filepath.Join(runDir, RawDirName, "pip-audit-requirements-dev.txt.raw.jsonl")); !os.IsNotExist(err) {
+		t.Errorf("Zwischendatei wurde nicht aufgeräumt: %v", err)
+	}
+}
+
+// prueftDateiModul ist eine Attrappe für workdir module-file: sie schreibt
+// SARIF nach $1 und endet nur mit 0, wenn das Arbeitsverzeichnis $2 ist und $3
+// auf eine Datei zeigt.
+func prueftDateiModul(t *testing.T, name string) string {
+	t.Helper()
+	return fakeTool(t, name, fmt.Sprintf(
+		"cat > \"$1\" <<'SARIF'\n%s\nSARIF\ntest \"$(pwd -P)\" = \"$(cd \"$2\" && pwd -P)\" && test -f \"$3\"",
+		sarifMit(1)))
+}
+
+// In eine Datei ließe sich kein Prozess starten: bei workdir module-file bleibt
+// {target} das Arbeitsverzeichnis, und der Pfad geht als Argument mit.
+func TestExecuteDateiModulLaeuftImZielverzeichnis(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool})
+	target := modulBaum(t, "requirements.txt")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{dateiModulScanner("pip-audit", "pip-audit", "{out}", "{target}", "{module}")},
+		Tools:    map[string]Tool{"pip-audit": {Path: prueftDateiModul(t, "pip-audit")}},
+	}, Entry{Name: "pip-audit", Kind: KindTool})
+
+	if len(statuses[0].Jobs) != 1 {
+		t.Fatalf("%d Jobs, erwartet 1: %+v", len(statuses[0].Jobs), statuses[0].Jobs)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateDone || job.ExitCode == nil || *job.ExitCode != 0 {
+		t.Errorf("der Job lief nicht im Zielverzeichnis oder bekam keinen Dateipfad: %+v", job)
+	}
+	if job.Job != "pip-audit" {
+		t.Errorf("Job = %q, erwartet den Katalognamen — ein Manifest lässt ihn stehen", job.Job)
+	}
+	if job.Module != "requirements.txt" {
+		t.Errorf("Modul = %q, erwartet requirements.txt", job.Module)
+	}
+}
+
+// Ein Eintrag kann Jobs mit unterschiedlichem workdir führen. Jeder Modus
+// braucht seine eigene Suche: eine einzelne gecachte Liste gäbe dem zweiten
+// das Ergebnis des ersten — Verzeichnisse statt Dateien oder umgekehrt.
+func TestExecuteGemischteWorkdirModiSuchenGetrennt(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "beispiel", Kind: KindTool})
+	target := modulBaum(t, "go.mod", "requirements.txt")
+
+	verzeichnis := moduleScanner("beispiel", "beispiel", "{out}")
+	datei := dateiModulScanner("beispiel-manifest", "beispiel", "{out}", "{module}")
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{verzeichnis, datei},
+		Tools:    map[string]Tool{"beispiel": {Path: schreibtSARIF(t, "beispiel", 0, 0)}},
+	}, Entry{Name: "beispiel", Kind: KindTool})
+
+	module := map[string]string{}
+	for _, job := range statuses[0].Jobs {
+		if job.State != StateDone {
+			t.Errorf("Job %s = %q (%s)", job.Job, job.State, job.Reason)
+		}
+		module[job.Job] = job.Module
+	}
+	if module["beispiel"] != "." {
+		t.Errorf("workdir module = %q, erwartet das Verzeichnis des go.mod (\".\"): %+v", module["beispiel"], module)
+	}
+	if module["beispiel-manifest"] != "requirements.txt" {
+		t.Errorf("workdir module-file = %q, erwartet die Manifestdatei: %+v", module["beispiel-manifest"], module)
+	}
+}
+
+// Kein Python-Manifest: der Grund muss nennen, wonach gesucht wurde. Die
+// bestehenden Meldungen waren fest mit go.mod formatiert — hier wäre das
+// schlicht falsch.
+func TestExecuteOhnePythonManifestNenntDasGesuchteMuster(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool})
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   modulBaum(t, "go.mod", "pyproject.toml"),
+		Scanners: []Scanner{dateiModulScanner("pip-audit", "pip-audit", "{out}", "{module}")},
+		Tools:    map[string]Tool{"pip-audit": {Path: schreibtSARIF(t, "pip-audit", 0, 0)}},
+	}, Entry{Name: "pip-audit", Kind: KindTool})
+
+	if statuses[0].State != StateSkipped {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateSkipped)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateSkipped || !strings.Contains(job.Reason, "requirements*.txt") {
+		t.Errorf("Grund = %q, erwartet das gesuchte Muster", job.Reason)
+	}
+	if strings.Contains(job.Reason, ManifestGoModule) {
+		t.Errorf("Grund = %q, erwartet keinen Verweis auf go.mod", job.Reason)
+	}
+}
+
+// Auch der Fehlschlag nennt das richtige Muster — und bleibt ein Fehlschlag:
+// nach einer abgebrochenen Suche ist unbekannt, ob es ein Manifest gibt.
+func TestExecuteNichtDurchfuehrbareManifestsucheIstFehlschlag(t *testing.T) {
+	runDir := neuerLauf(t, Entry{Name: "pip-audit", Kind: KindTool})
+	target := modulBaum(t, "gesperrt/requirements.txt")
+	gesperrt := filepath.Join(target, "gesperrt")
+	if err := os.Chmod(gesperrt, 0o000); err != nil {
+		t.Fatalf("Rechte setzen: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gesperrt, 0o755) })
+
+	statuses := führeAus(t, Options{
+		RunDir:   runDir,
+		Target:   target,
+		Scanners: []Scanner{dateiModulScanner("pip-audit", "pip-audit", "{out}", "{module}")},
+		Tools:    map[string]Tool{"pip-audit": {Path: schreibtSARIF(t, "pip-audit", 0, 0)}},
+	}, Entry{Name: "pip-audit", Kind: KindTool})
+
+	if statuses[0].State != StateFailed {
+		t.Fatalf("Eintrag = %q, erwartet %q", statuses[0].State, StateFailed)
+	}
+	job := statuses[0].Jobs[0]
+	if job.State != StateFailed || !strings.Contains(job.Reason, "nicht durchführbar") {
+		t.Fatalf("Job = %+v, erwartet einen Fehlschlag mit Grund", job)
+	}
+	if !strings.Contains(job.Reason, "requirements*.txt") || strings.Contains(job.Reason, ManifestGoModule) {
+		t.Errorf("Grund = %q, erwartet das gesuchte Muster statt go.mod", job.Reason)
 	}
 }

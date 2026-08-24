@@ -238,3 +238,27 @@ func TestCandidateCacheFehlerBleibtUngesetzt(t *testing.T) {
 		t.Errorf("%d Zählungen, erwartet keine", gezählt)
 	}
 }
+
+// Bei workdir module-file ist der Bezugspunkt eine Datei, kein Verzeichnis.
+// filepath.WalkDir ruft die Walk-Funktion dann genau einmal für diesen einen
+// Eintrag auf: die Zählung ergibt 1 — die Manifestdatei trifft ihr eigenes
+// Muster — und keinen Fehler. Die 1 bedeutet dort etwas anderes als bei einem
+// Verzeichnis („alle passenden Dateien darunter"), bleibt aber eine stimmige
+// Lesart derselben Zahl.
+func TestCountCandidatesMitDateiAlsBezugspunkt(t *testing.T) {
+	root := dateiBaum(t, "requirements.txt", "requirements-dev.txt", "haupt.py")
+
+	manifest := candidateRoot(root, "requirements.txt")
+	if manifest != filepath.Join(root, "requirements.txt") {
+		t.Fatalf("candidateRoot = %q, erwartet den Pfad der Manifestdatei", manifest)
+	}
+	if got := zähle(t, manifest, CandidateManifest, "python"); got != 1 {
+		t.Errorf("Kandidaten = %d, erwartet 1 — die Datei selbst", got)
+	}
+
+	// Eine Datei, die das Muster nicht trifft, zählt auch als Bezugspunkt
+	// nicht mit. Ein Fehler ist sie trotzdem nicht.
+	if got := zähle(t, candidateRoot(root, "haupt.py"), CandidateManifest, "python"); got != 0 {
+		t.Errorf("Kandidaten = %d, erwartet 0 — haupt.py ist kein Manifest", got)
+	}
+}

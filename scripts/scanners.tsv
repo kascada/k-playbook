@@ -73,8 +73,8 @@
 #            nicht leeres SARIF bleibt failed. Der Ausführer prüft den Marker außerdem
 #            nur, wenn der Prozess regulär mit einem Exit-Code beendet ist — nicht bei
 #            Zeitüberschreitung, Runner-Stopp oder Startfehlern.
-# workdir    target oder module. Bei target ist das Arbeitsverzeichnis {target}, die
-#            Projektwurzel — der Regelfall. Bei module braucht der Job ein
+# workdir    target, module oder module-file. Bei target ist das Arbeitsverzeichnis
+#            {target}, die Projektwurzel — der Regelfall. Bei module braucht der Job ein
 #            Modulverzeichnis: der Ausführer sucht die Module unter {target} und startet
 #            den Job je gefundenem Modul einmal, mit dem Modul als Arbeitsverzeichnis.
 #            Nötig ist das für Aufrufe wie govulncheck -format sarif ./..., die gar kein
@@ -87,6 +87,17 @@
 #            Nachgemessen prüft es so aber nichts: ohne Modulkontext kommt es über das
 #            Importieren nicht hinaus und schreibt ein valides SARIF mit leerem
 #            results-Array — 0 Befunde aus der Projektwurzel gegen 154 im Modul selbst.
+#            module-file ist derselbe Such- und Auffächerweg für Werkzeuge, deren
+#            Gegenstand eine Datei ist: der Ausführer sucht unter {target} die
+#            Python-Manifeste (requirements*.txt, constraints*.txt) und startet den Job
+#            je gefundener Datei einmal — aber ohne hineinzuwechseln, denn in eine Datei
+#            ließe sich kein Prozess starten. Arbeitsverzeichnis bleibt {target}, der
+#            Pfad geht über {module} als Argument mit (pip-audit -r {module}). Eigener
+#            Wert und kein Sonderfall von module: über Verzeichnisse aufgefächert
+#            verdeckte in einem Verzeichnis mit requirements.txt und
+#            requirements-dev.txt das eine Manifest das andere. Findet die Suche nichts,
+#            wird der Job wie bei module übersprungen, mit dem gesuchten Muster als
+#            Grund.
 # args       Der Aufruf ohne das Programm selbst, an Leerzeichen getrennt. Ein
 #            einzelnes Argument darf deshalb kein Leerzeichen enthalten; die
 #            Platzhalter werden erst nach dem Trennen ersetzt und dürfen welche tragen.
@@ -99,12 +110,14 @@
 #              Ergebnis daran, wo der Lauf gestartet wurde. Bei workdir target ist es
 #              zugleich das Arbeitsverzeichnis, bei workdir module fallen beide
 #              auseinander und {target} meint weiter die Wurzel.
-#   {module}   Das Modulverzeichnis dieses Jobs, absolut. Nur bei workdir module
-#              zulässig; bei workdir target weist ParseScanners die Zeile ab, weil es
-#              kein Modul gäbe, auf das der Platzhalter zeigen könnte. Pflicht ist er
-#              nicht: govulncheck und golangci-lint brauchen ihn gerade nicht, weil das
-#              Arbeitsverzeichnis schon stimmt. Er ist für Werkzeuge da, die den Pfad
-#              als Argument nehmen.
+#   {module}   Der Gegenstand dieses Jobs, absolut: bei workdir module das
+#              Modulverzeichnis, bei workdir module-file der Pfad der Manifestdatei. Nur
+#              bei diesen beiden zulässig; bei workdir target weist ParseScanners die
+#              Zeile ab, weil es kein Modul gäbe, auf das der Platzhalter zeigen könnte.
+#              Pflicht ist er bei module nicht: govulncheck und golangci-lint brauchen
+#              ihn gerade nicht, weil das Arbeitsverzeichnis schon stimmt. Er ist für
+#              Werkzeuge da, die den Pfad als Argument nehmen — bei module-file ist das
+#              der Sinn der Sache, dort trägt ihn jede Zeile.
 #   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml).
 #
 # Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
@@ -117,13 +130,13 @@
 # Datei verhindern. Dazu kommt, dass die Stelle im Aufruf zum Aufruf gehört; beim
 # Zusammensetzen aus zwei Spalten entschiede sie der Ausführer.
 #
-# Die Modulsuche hinter workdir module trägt eine eigene Ausschlussliste, und die steht
-# im Go-Code (installer/internal/review/modules.go), nicht hier. Das widerspricht dem
-# Abschnitt oben nicht: dort geht es um den Werkzeugausschluss, der in args bleibt, weil
-# er zum Aufruf gehört und jedes Werkzeug ihn anders schreibt. Die Modulsuche ruft kein
-# Werkzeug auf — sie sucht die Gegenstände, über die anschließend aufgefächert wird. Es
-# gibt keinen Aufruf, in dem sie stehen könnte, und keine werkzeugeigene Schreibweise,
-# die sie tragen müsste.
+# Die Modulsuche hinter workdir module und module-file trägt eine eigene
+# Ausschlussliste, und die steht im Go-Code (installer/internal/review/modules.go),
+# nicht hier. Das widerspricht dem Abschnitt oben nicht: dort geht es um den
+# Werkzeugausschluss, der in args bleibt, weil er zum Aufruf gehört und jedes Werkzeug
+# ihn anders schreibt. Die Modulsuche ruft kein Werkzeug auf — sie sucht die
+# Gegenstände, über die anschließend aufgefächert wird. Es gibt keinen Aufruf, in dem
+# sie stehen könnte, und keine werkzeugeigene Schreibweise, die sie tragen müsste.
 #
 # Dasselbe gilt für die Kandidatenzählung hinter candidates: auch ihre Ausschlüsse stehen
 # im Go-Code (installer/internal/review/candidates.go). Sie ruft ebenfalls kein Werkzeug
@@ -164,4 +177,4 @@ osv-scanner	osv-scanner	python,go	manifest	native	file	15m	128:No package source
 grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
 golangci-lint	golangci-lint	go	source	native	file	15m		module	run --output.sarif.path {out} --output.text.path stderr ./...
 trufflehog-git	trufflehog	*	any	convert	stdout	15m		target	git file://{target} --json --no-update
-pip-audit	pip-audit	python	manifest	convert	file	15m		target	--format json --output {out} --progress-spinner off
+pip-audit	pip-audit	python	manifest	convert	stdout	15m		module-file	--format json --progress-spinner off -r {module}

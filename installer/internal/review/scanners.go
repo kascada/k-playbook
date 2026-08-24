@@ -39,6 +39,18 @@ const (
 	// WorkdirModule: der Job braucht ein Modulverzeichnis. Er läuft je
 	// gefundenem Modul einmal, mit dem Modul als Arbeitsverzeichnis.
 	WorkdirModule WorkdirMode = "module"
+	// WorkdirModuleFile: der Job läuft je gefundener Manifestdatei einmal —
+	// dieselbe Suche und Auffächerung wie WorkdirModule, aber ohne Wechsel
+	// hinein: in eine Datei ließe sich kein Prozess starten. Das
+	// Arbeitsverzeichnis bleibt {target}, der Pfad geht über {module} als
+	// Argument mit.
+	//
+	// Sinnvoll nur für Werkzeuge, die den Pfad selbst als Argument nehmen
+	// (pip-audit -r <requirements-datei>) — nicht für solche, die ihn relativ
+	// zum Arbeitsverzeichnis erwarten (govulncheck ./...). Getrennt von
+	// WorkdirModule und nicht als dessen Sonderfall, damit die Go-Semantik
+	// (Verzeichnis, cd hinein) unverändert bleibt.
+	WorkdirModuleFile WorkdirMode = "module-file"
 )
 
 // OutputMode sagt, wer die Datei unter raw/ schreibt.
@@ -96,8 +108,9 @@ type Scanner struct {
 	// Katalog steuern, statt für jeden Scanner einen Sonderfall in den
 	// Ausführer zu schreiben.
 	SoftSkip []SoftSkipRule `json:"softSkip,omitempty"`
-	// Workdir ist das Arbeitsverzeichnis des Aufrufs. module fächert den Job
-	// zusätzlich auf: einen Aufruf je gefundenem Modul.
+	// Workdir ist das Arbeitsverzeichnis des Aufrufs. module und module-file
+	// fächern den Job zusätzlich auf: einen Aufruf je gefundenem Modul
+	// beziehungsweise je gefundener Manifestdatei.
 	Workdir WorkdirMode `json:"workdir"`
 	// Args ist der Aufruf ohne das Programm selbst, bereits in einzelne
 	// Argumente zerlegt. Die Platzhalter stehen noch darin.
@@ -202,7 +215,7 @@ func checkScanner(scanner *Scanner, timeout string, softSkip string, where strin
 		return fmt.Errorf("%s: Job %s hat unbekannten output-Wert %q", where, scanner.Job, scanner.Output)
 	}
 	switch scanner.Workdir {
-	case WorkdirTarget, WorkdirModule:
+	case WorkdirTarget, WorkdirModule, WorkdirModuleFile:
 	default:
 		return fmt.Errorf("%s: Job %s hat unbekannten workdir-Wert %q", where, scanner.Job, scanner.Workdir)
 	}
@@ -236,8 +249,10 @@ func checkScanner(scanner *Scanner, timeout string, softSkip string, where strin
 	}
 	// Ohne Modulsuche gibt es kein Modul, auf das {module} zeigen könnte. Der
 	// Platzhalter bliebe stehen und landete wörtlich im Aufruf — das soll beim
-	// Lesen auffallen, nicht als unverständliche Meldung des Werkzeugs.
-	if scanner.Workdir != WorkdirModule && usesPlaceholder(scanner.Args, placeholderModule) {
+	// Lesen auffallen, nicht als unverständliche Meldung des Werkzeugs. Beide
+	// Modul-Modi suchen und fächern auf und tragen ihn deshalb: bei module
+	// zeigt er auf ein Verzeichnis, bei module-file auf eine Datei.
+	if scanner.Workdir != WorkdirModule && scanner.Workdir != WorkdirModuleFile && usesPlaceholder(scanner.Args, placeholderModule) {
 		return fmt.Errorf("%s: Job %s nennt %s, läuft aber mit workdir %s", where, scanner.Job, placeholderModule, scanner.Workdir)
 	}
 	return nil
@@ -355,10 +370,12 @@ func ScannersFor(scanners []Scanner, tool string) []Scanner {
 // Command setzt die Argumente eines Aufrufs zusammen. Ersetzt wird erst nach
 // dem Zerlegen, damit ein Pfad mit Leerzeichen ein Argument bleibt.
 //
-// module ist das Modulverzeichnis dieses Aufrufs, absolut; bei workdir target
-// ist es leer, und dort weist checkScanner den Platzhalter ohnehin ab. target
-// bleibt in beiden Fällen die Projektwurzel — bei workdir module fällt sie mit
-// dem Arbeitsverzeichnis auseinander.
+// module ist der Gegenstand dieses Aufrufs, absolut: bei workdir module das
+// Modulverzeichnis, bei workdir module-file der Pfad der Manifestdatei; bei
+// workdir target ist es leer, und dort weist checkScanner den Platzhalter
+// ohnehin ab. target bleibt in allen Fällen die Projektwurzel — bei workdir
+// module fällt sie mit dem Arbeitsverzeichnis auseinander, bei module-file
+// bleibt sie es.
 func (s Scanner) Command(out string, target string, module string, scriptsDir string) []string {
 	replacer := strings.NewReplacer(
 		placeholderOut, out,

@@ -17,6 +17,11 @@ const (
 
 // sarifLog ist so viel von SARIF 2.1.0, wie ein Konverter zum Schreiben
 // braucht. Das Gegenstück beim Lesen ist merge.readSARIF (review/merge/merge.go).
+//
+// Die Typen gehören dem Paket und nicht diesem Konverter: sie tragen die
+// Ausgabe aller Konverter hier (trufflehog.go, pipaudit.go). Was ein einzelner
+// Konverter nicht setzt, fällt über omitempty aus dem Dokument — ein Feld mit
+// leerem Wert wäre in SARIF stellenweise ungültig.
 type sarifLog struct {
 	Schema  string     `json:"$schema"`
 	Version string     `json:"version"`
@@ -48,10 +53,19 @@ type sarifText struct {
 }
 
 type sarifResult struct {
-	RuleID    string          `json:"ruleId"`
-	Level     string          `json:"level"`
+	RuleID string `json:"ruleId"`
+	// Level bleibt weg, wenn das Werkzeug keine Schwere liefert (pip-audit):
+	// SARIF kennt für level nur none/note/warning/error, "" wäre keiner davon.
+	// deriveSeverity (merge/severity.go) liest ein fehlendes level als „nicht
+	// angegeben" und fällt auf unmapped zurück — die richtige Auskunft.
+	Level     string          `json:"level,omitempty"`
 	Message   sarifText       `json:"message"`
 	Locations []sarifLocation `json:"locations,omitempty"`
+	// Properties trägt die Konvention, an der merge.extractDependency eine
+	// Abhängigkeit erkennt: package, version, manifest. Nur Zeichenketten —
+	// mehr braucht keiner der Konverter, und stringProperty() liest ohnehin
+	// nur solche.
+	Properties map[string]string `json:"properties,omitempty"`
 }
 
 type sarifLocation struct {

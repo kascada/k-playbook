@@ -17,12 +17,24 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/review/sarifconvert"
 )
 
-// sarifConverters ordnet einem Werkzeug mit sarif: convert im Katalog seine
-// Konverterfunktion zu. Fehlt ein Werkzeug hier, bleibt sein Job skipped mit
-// dem Grund „SARIF-Konverter nicht gebaut" (planJobs) — so lange, bis eine
-// Folge-Task (z. B. für pip-audit) den nächsten Eintrag ergänzt.
-var sarifConverters = map[string]func([]byte) ([]byte, error){
-	"trufflehog": sarifconvert.TruffleHog,
+// sarifConverters ordnet einem Werkzeug mit sarif: convert im Katalog seinen
+// Konverter zu. Fehlt ein Werkzeug hier, bleibt sein Job skipped mit dem Grund
+// „SARIF-Konverter nicht gebaut" (planJobs).
+//
+// Der Eintrag ist ein Bauer und nicht der Konverter selbst: nicht jedes
+// Werkzeug schreibt den geprüften Gegenstand in seine eigene Ausgabe.
+// pip-audit --format json nennt Paket, Version und Schwachstellen, aber nicht
+// die Requirements-Datei, gegen die es gelaufen ist — und ohne sie stünde am
+// zusammengeführten Befund nicht, welches Manifest betroffen ist
+// (merge.extractDependency, properties.manifest). Der Bauer bekommt deshalb
+// das Modul des Jobs: bei workdir module-file der Pfad des Manifests relativ
+// zum Ziel, sonst leer. Wer ihn nicht braucht, nimmt ihn nicht (trufflehog —
+// seine Fundstellen stehen in seiner Ausgabe).
+var sarifConverters = map[string]func(module string) func([]byte) ([]byte, error){
+	"trufflehog": func(string) func([]byte) ([]byte, error) { return sarifconvert.TruffleHog },
+	"pip-audit": func(manifest string) func([]byte) ([]byte, error) {
+		return func(raw []byte) ([]byte, error) { return sarifconvert.PipAudit(raw, manifest) }
+	},
 }
 
 // DefaultParallel ist die Obergrenze gleichzeitiger Jobs, gezählt über den
@@ -298,8 +310,12 @@ type jobPlan struct {
 	// converter ist gesetzt, wenn scanner.SARIF == SARIFConvert und für
 	// scanner.Tool ein Konverter existiert (sarifConverters). runJob schreibt
 	// dann den nativen Output zunächst in eine Zwischendatei und schickt sie
-	// durch converter, statt sie unverändert als raw/<job>.sarif zu führen.
-	converter func([]byte) ([]byte, error)
+	// durch den Konverter, statt sie unverändert als raw/<job>.sarif zu führen.
+	//
+	// Gehalten wird der Bauer und nicht der fertige Konverter: er bekommt das
+	// Modul dieses Jobs (siehe sarifConverters), und das steht hier erst nach
+	// der Auffächerung fest. runJob bindet ihn, wenn es das Modul kennt.
+	converter func(module string) func([]byte) ([]byte, error)
 }
 
 // planJobs macht aus den Katalogzeilen eines Werkzeugs die Aufrufe dieses Laufs.
@@ -311,11 +327,15 @@ type jobPlan struct {
 func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known bool) []jobPlan {
 	plans := []jobPlan{}
 
-	// Höchstens eine Suche je Eintrag, auch wenn mehrere Jobs Module brauchen:
-	// sie liefe über denselben Baum und ergäbe dasselbe.
-	var modules []string
-	var searchErr error
-	searched := false
+	// Höchstens eine Suche je Eintrag und Modus, auch wenn mehrere Jobs Module
+	// brauchen: sie liefe über denselben Baum und ergäbe dasselbe.
+	//
+	// Je Modus und nicht je Eintrag: ein Eintrag kann Jobs mit
+	// unterschiedlichem workdir führen, und die beiden Modul-Modi suchen
+	// Verschiedenes — Verzeichnisse mit go.mod (module) gegen Manifestdateien
+	// (module-file). Ein einziger Zwischenspeicher gäbe dem zweiten Modus das
+	// Ergebnis des ersten.
+	searches := map[WorkdirMode]*moduleSearch{}
 
 	// Die Namen aus dem Katalog sind schon vergeben — ein abgeleiteter Name
 	// darf keinen davon treffen.
@@ -343,39 +363,38 @@ func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known
 		if plan.state == StateStart && scanner.SARIF == SARIFConvert {
 			plan.converter = converter
 		}
-		if plan.state != StateStart || scanner.Workdir != WorkdirModule {
+		if plan.state != StateStart || !fansOutOverModules(scanner.Workdir) {
 			plans = append(plans, plan)
 			continue
 		}
 
-		if !searched {
-			// go.mod fest an dieser Stelle: die Suche selbst ist sprachneutral,
-			// angewandt wird sie bisher nur auf Go.
-			modules, searchErr = FindModules(options.Target, ManifestGoModule)
-			searched = true
-		}
+		// Ab hier laufen beide Modul-Modi denselben Weg: gesucht wird
+		// Verschiedenes, aufgefächert wird gleich. Auseinander gehen sie erst
+		// in runJob, beim Arbeitsverzeichnis.
+		search := searchModules(searches, scanner.Workdir, options.Target)
+		searched := searchedManifest(scanner.Workdir)
 
 		switch {
-		case searchErr != nil:
+		case search.err != nil:
 			// Nicht skipped: nach einer abgebrochenen Suche ist gerade
 			// unbekannt, ob es ein Modul gibt, und skipped behauptete, es gebe
 			// nichts zu tun.
 			plan.state = StateFailed
-			plan.reason = fmt.Sprintf("Suche nach %s nicht durchführbar: %v", ManifestGoModule, searchErr)
+			plan.reason = fmt.Sprintf("Suche nach %s nicht durchführbar: %v", searched, search.err)
 			plans = append(plans, plan)
-		case len(modules) == 0:
+		case len(search.modules) == 0:
 			// Es fehlt der Gegenstand, nicht das Werkzeug.
 			plan.state = StateSkipped
-			plan.reason = fmt.Sprintf("kein %s unter dem Ziel gefunden", ManifestGoModule)
+			plan.reason = fmt.Sprintf("kein %s unter dem Ziel gefunden", searched)
 			plans = append(plans, plan)
-		case len(modules) == 1:
+		case len(search.modules) == 1:
 			// Ein Modul heißt: alles bleibt, wie es war. Der Name kommt aus dem
 			// Katalog, die Datei unter raw/ heißt wie bisher — sichtbar ist das
 			// geprüfte Modul trotzdem, nämlich am Job.
-			plan.module = modules[0]
+			plan.module = search.modules[0]
 			plans = append(plans, plan)
 		default:
-			for _, module := range modules {
+			for _, module := range search.modules {
 				fanned := plan
 				fanned.module = module
 				fanned.name = jobNameForModule(taken, scanner.Job, module)
@@ -402,6 +421,65 @@ func planJobs(scanners []Scanner, entry Entry, options Options, tool Tool, known
 		)
 	}
 	return plans
+}
+
+// fansOutOverModules meldet, ob ein workdir-Modus die Modulsuche auslöst und
+// den Job über ihr Ergebnis auffächert.
+//
+// Beide Modul-Modi tun das; sie unterscheiden sich erst danach — module
+// wechselt in seinen Gegenstand hinein, module-file reicht ihn als Argument
+// weiter (runJob).
+func fansOutOverModules(mode WorkdirMode) bool {
+	return mode == WorkdirModule || mode == WorkdirModuleFile
+}
+
+// moduleSearch ist das Ergebnis einer Modulsuche: die gefundenen Gegenstände
+// oder der Fehler, an dem sie abgebrochen ist. Beides gehört zusammen und wird
+// deshalb gemeinsam zwischengespeichert — ein leeres Ergebnis nach einem
+// Fehler hieße sonst „nichts gefunden".
+type moduleSearch struct {
+	modules []string
+	err     error
+}
+
+// searchModules sucht die Gegenstände, über die ein Modus auffächert, und hebt
+// das Ergebnis für den Eintrag auf. Welche Suche das ist, hängt am Modus: bei
+// module die Go-Modulverzeichnisse, bei module-file die Python-Manifestdateien.
+func searchModules(searches map[WorkdirMode]*moduleSearch, mode WorkdirMode, target string) *moduleSearch {
+	if found := searches[mode]; found != nil {
+		return found
+	}
+
+	search := &moduleSearch{}
+	switch mode {
+	case WorkdirModule:
+		// go.mod fest an dieser Stelle: die Suche selbst ist sprachneutral,
+		// angewandt wird sie bisher nur auf Go.
+		search.modules, search.err = FindModules(target, ManifestGoModule)
+	case WorkdirModuleFile:
+		search.modules, search.err = FindPythonManifests(target)
+	default:
+		// Unerreichbar, solange nur fansOutOverModules() hierher führt. Ein
+		// Fehler und keine leere Liste, weil die Liste „unter dem Ziel gibt es
+		// keinen Gegenstand" hieße — und das wäre gerade nicht gemessen.
+		search.err = fmt.Errorf("workdir %s fächert nicht über Module auf", mode)
+	}
+	searches[mode] = search
+	return search
+}
+
+// searchedManifest benennt, wonach ein Modus gesucht hat — für den Grund am
+// Job.
+//
+// Nötig, weil die Gründe („kein %s unter dem Ziel gefunden", „Suche nach %s
+// nicht durchführbar") bis hierher fest mit ManifestGoModule formatiert waren:
+// ein Job mit workdir module-file meldete sonst „kein go.mod …", obwohl nach
+// Python-Manifesten gesucht wurde.
+func searchedManifest(mode WorkdirMode) string {
+	if mode == WorkdirModuleFile {
+		return strings.Join(pythonManifestPatterns, "/")
+	}
+	return ManifestGoModule
 }
 
 // clearEntryOutputs räumt weg, was dieser Eintrag beim vorigen Aufruf unter
@@ -521,6 +599,10 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 		moduleDir = filepath.Join(options.Target, plan.module)
 	}
 	workDir := options.Target
+	// Genau auf WorkdirModule und nicht auf „hat ein Modul": bei
+	// WorkdirModuleFile ist plan.module eine Datei, und in eine Datei ließe
+	// sich kein Prozess starten. Dort bleibt {target} das Arbeitsverzeichnis,
+	// und der Pfad geht über {module} als Argument mit.
 	if scanner.Workdir == WorkdirModule {
 		workDir = moduleDir
 	}
@@ -540,6 +622,14 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 
 	var outOutput tailBuffer
 	outOutput.limit = stderrKeep
+	// Der Konverter dieses Jobs, an seinen Gegenstand gebunden: pip-audit
+	// nennt in seiner Ausgabe nicht, gegen welches Manifest es gelaufen ist,
+	// und der Job weiß es (plan.module). Ohne Konverter bleibt es bei nil, und
+	// die Prüfungen unten führen wie bisher am Konverterweg vorbei.
+	var convert func([]byte) ([]byte, error)
+	if plan.converter != nil {
+		convert = plan.converter(plan.module)
+	}
 	// rawPath ist nur bei einem Konverter-Job gesetzt (plan.converter != nil):
 	// dort schreibt der Prozess zunächst hierher, und der native Text wird
 	// erst danach nach outPath konvertiert. Ohne Konverter schreibt der
@@ -601,7 +691,7 @@ func runJob(ctx context.Context, plan jobPlan, job JobStatus, options Options) J
 		if err != nil {
 			return failJob(job, fmt.Sprintf("%s ließ sich nicht lesen: %v", rawPath, err))
 		}
-		converted, err := plan.converter(nativeOutput)
+		converted, err := convert(nativeOutput)
 		if err != nil {
 			return failJob(job, fmt.Sprintf("Konvertierung nach SARIF fehlgeschlagen: %v", err))
 		}

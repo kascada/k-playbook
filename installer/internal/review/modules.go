@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -98,6 +99,92 @@ func FindModules(root string, manifest string) ([]string, error) {
 
 	sort.Strings(found)
 	return found, nil
+}
+
+// pythonManifestPatterns sind die Dateinamensmuster, an denen ein
+// Python-Manifest für pip-audit erkannt wird. Sie laufen gegen den Dateinamen,
+// nicht gegen den Pfad (path.Match), und decken damit requirements.txt und
+// requirements-dev.txt gemeinsam ab — die Namen sind nicht abzählbar.
+//
+// pyproject.toml, setup.py, Pipfile und poetry.lock stehen bewusst nicht
+// dabei: pip-audit -r erwartet eine Datei im requirements.txt-Format, während
+// ein pyproject.toml-Projekt über den positionalen project_path-Parameter
+// geprüft wird. Das ist ein anderer Aufrufpfad, der pip installieren und
+// auflösen lässt — Netzwerkzugriff und eine andere Laufzeit als bei -r — und
+// verdient eine eigene Abwägung (Task 026, Abschnitt „Kontext").
+var pythonManifestPatterns = []string{"requirements*.txt", "constraints*.txt"}
+
+// FindPythonManifests liefert die Python-Manifeste unter root — relativ zu
+// root, mit / getrennt und sortiert.
+//
+// Anders als FindModules liefert sie Dateien und keine Verzeichnisse, und das
+// ist der Unterschied, um den es geht: Go kennt ein go.mod je Verzeichnis, in
+// einem Python-Verzeichnis liegen requirements.txt und requirements-dev.txt
+// nebeneinander. Über Verzeichnisse aufgefächert verdeckte das eine das
+// andere; über Dateien bekommt jedes Manifest seinen eigenen Job.
+//
+// Deshalb ist das hier eine eigene Funktion und kein Parameter von
+// FindModules: dort ist der Rückgabewert ein Verzeichnis, in das ein Job
+// hineinwechselt (WorkdirModule), hier ist er ein Pfad, den das Werkzeug als
+// Argument bekommt (WorkdirModuleFile, siehe scanners.go).
+//
+// Ausgeschlossen wird wie bei der Go-Suche über moduleSearchExcluded und
+// skipModuleDir — nicht über die engere Liste aus candidates.go: gesucht
+// werden die Gegenstände des Projekts, nicht was ein Werkzeug hätte sehen
+// können.
+//
+// Ein Lesefehler wird durchgereicht und nicht übergangen — aus demselben
+// Grund wie bei FindModules: nach einer abgebrochenen Suche ist gerade
+// unbekannt, ob es ein Manifest gibt, und ein leeres Ergebnis behauptete, es
+// gebe keins.
+func FindPythonManifests(root string) ([]string, error) {
+	if root == "" {
+		return nil, errors.New("kein Verzeichnis angegeben")
+	}
+
+	found := []string{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if path != root && skipModuleDir(entry.Name()) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		// Nur reguläre Dateien: ein Symlink zeigt entweder auf etwas, das
+		// ohnehin schon gefunden ist, oder aus dem Ziel heraus.
+		if !entry.Type().IsRegular() || !matchesPythonManifest(entry.Name()) {
+			return nil
+		}
+
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		found = append(found, filepath.ToSlash(relative))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(found)
+	return found, nil
+}
+
+// matchesPythonManifest meldet, ob ein Dateiname eines der Muster trifft.
+//
+// Der Fehler von path.Match trifft nur ein fehlerhaftes Muster; die Muster
+// stehen hier im Code und werden vom Test abgedeckt.
+func matchesPythonManifest(name string) bool {
+	for _, pattern := range pythonManifestPatterns {
+		if matched, err := path.Match(pattern, name); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 // skipModuleDir meldet, ob ein Verzeichnis für die Modulsuche ausfällt.

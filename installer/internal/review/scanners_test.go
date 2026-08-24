@@ -318,3 +318,22 @@ func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
 		}
 	}
 }
+
+// workdir module-file ist der dritte Wert: dieselbe Suche und Auffächerung wie
+// module, aber ohne Wechsel hinein — der Pfad geht über {module} als Argument
+// mit. Ohne den Platzhalter wäre die Zeile sinnlos, deshalb steht er hier.
+func TestParseScannersLiestWorkdirModuleFile(t *testing.T) {
+	scanners, err := parseLine(t, "pip-audit\tpip-audit\tpython\tmanifest\tconvert\tstdout\t15m\t\tmodule-file\t--format json -r {module}")
+	if err != nil {
+		t.Fatalf("ParseScanners: %v", err)
+	}
+	if scanners[0].Workdir != WorkdirModuleFile {
+		t.Errorf("workdir = %q, erwartet %q", scanners[0].Workdir, WorkdirModuleFile)
+	}
+
+	// Die Gegenprobe steht in TestParseScannersWeistFehlerhafteZeilenAb:
+	// {module} bei workdir target bleibt abgewiesen.
+	if _, err := parseLine(t, "ruff\truff\tpython\tsource\tnative\tfile\t10m\t\ttarget\tcheck -o {out} {module}"); err == nil {
+		t.Error("{module} bei workdir target wurde angenommen")
+	}
+}
