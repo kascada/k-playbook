@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,281 @@ func TestGroupFindingsGleicherCVEAusZweiTools(t *testing.T) {
 	})
 	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
 		t.Fatalf("Dependency-Dublette nicht gruppiert: %+v", groups)
+	}
+}
+
+// Der realistische Fall: dieselbe Schwachstelle, aber jedes Werkzeug nennt eine
+// andere Aliasmenge und schreibt den Manifest-Pfad anders. Gemessen an einem
+// echten Lauf (Task 027, Etappe 1): pip-audit nennt CVE, GHSA und PYSEC,
+// osv-scanner CVE und GHSA, grype ausschließlich die GHSA.
+func TestGroupFindingsGleicheSchwachstelleUnterschiedlicheAliasmengen(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1234", "tmp/requirements.txt", 0, "requests 2.19.0", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "tmp/requirements.txt",
+			IDs:    []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-1"},
+			KeyIDs: []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-1"},
+		}),
+		finding("b", "grype", "GHSA-aaaa-bbbb-cccc-requests", "/tmp/requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "/tmp/requirements.txt",
+			IDs:    []string{"GHSA-AAAA-BBBB-CCCC"},
+			KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"},
+		}),
+		finding("c", "osv-scanner", "CVE-2026-1234", "file:///abs/tmp/requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "file:///abs/tmp/requirements.txt",
+			IDs:    []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-1"},
+			KeyIDs: []string{"CVE-2026-1234"},
+		}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 3 || len(groups[0].Evidence) != 3 {
+		t.Fatalf("werkzeugübergreifend nicht gruppiert: %+v", groups)
+	}
+	want := []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-1"}
+	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {
+		t.Errorf("Alias-Union falsch: %+v, erwartet %v", groups[0].Dependency.IDs, want)
+	}
+	if groups[0].Dependency.Manifest != "tmp/requirements.txt" || groups[0].Dependency.Package != "requests" {
+		t.Errorf("Package und Manifest nicht vom ersten Finding: %+v", groups[0].Dependency)
+	}
+	if !contains(groups[0].DedupeRules, "dependency") {
+		t.Errorf("Dedupe-Regel dependency fehlt: %+v", groups[0].DedupeRules)
+	}
+}
+
+// Gegentest 1: dieselbe CVE in zwei verschiedenen Paketen — etwa eine vendored
+// Kopie. Sie darf nicht zu einer Gruppe verschmelzen.
+func TestGroupFindingsGleicheCVEVerschiedenePaketeBleibenGetrennt(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1234", "requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"}, KeyIDs: []string{"CVE-2026-1234"},
+		}),
+		finding("b", "pip-audit", "CVE-2026-1234", "requirements.txt", 0, "urllib3", Dependency{
+			Package: "urllib3", Version: "1.24.1", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"}, KeyIDs: []string{"CVE-2026-1234"},
+		}),
+	})
+	if len(groups) != 2 {
+		t.Fatalf("gleiche CVE in zwei Paketen verschmolzen: %+v", groups)
+	}
+	// Bewusst in Kauf genommen: aus zwei verschiedenen Paketnamen ist nicht zu
+	// lesen, ob es zwei Pakete sind oder zwei Schreibweisen desselben. Der
+	// weiche Zweig stellt sie deshalb nebeneinander — verschmolzen wird nichts.
+	if len(groups[0].PossibleDuplicates) != 1 || len(groups[1].PossibleDuplicates) != 1 {
+		t.Errorf("abweichendes Paket nicht als possible-duplicate markiert: %+v", groups)
+	}
+}
+
+// Etappe-4-Fall 1: gleiche Kennung, gleiches Paket, aber abweichende
+// Versionsschreibweise. Hart trennt das die Funde; weich stehen sie nebeneinander.
+func TestGroupFindingsAbweichendeVersionAlsPossibleDuplicate(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1234", "requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"}, KeyIDs: []string{"CVE-2026-1234"},
+		}),
+		finding("b", "trivy", "CVE-2026-1234", "requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0-r1", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"}, KeyIDs: []string{"CVE-2026-1234"},
+		}),
+	})
+	if len(groups) != 2 {
+		t.Fatalf("abweichende Version hart zusammengelegt: %+v", groups)
+	}
+	if len(groups[0].PossibleDuplicates) != 1 || len(groups[1].PossibleDuplicates) != 1 {
+		t.Fatalf("abweichende Version nicht als possible-duplicate markiert: %+v", groups)
+	}
+}
+
+// Etappe-4-Fall 2: ein Werkzeug ohne package-Property hat gar keinen harten
+// Schlüssel. Es darf trotzdem nicht beziehungslos danebenstehen, wenn es sich
+// in den Kennungen mit einer Gruppe überschneidet. Das Manifest wird nicht
+// verlangt — der weiche Zweig ist nie strenger als der harte.
+func TestGroupFindingsOhneHartenSchluesselAlsPossibleDuplicate(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1234", "requirements.txt", 0, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
+			IDs:    []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC"},
+			KeyIDs: []string{"CVE-2026-1234", "GHSA-AAAA-BBBB-CCCC"},
+		}),
+		// grype-Fall: kein package, kein version, Pfad anders geschrieben.
+		finding("b", "grype", "GHSA-aaaa-bbbb-cccc-requests", "/abs/requirements.txt", 0, "requests", Dependency{
+			Manifest: "/abs/requirements.txt",
+			IDs:      []string{"GHSA-AAAA-BBBB-CCCC"},
+			KeyIDs:   []string{"GHSA-AAAA-BBBB-CCCC"},
+		}),
+	})
+	if len(groups) != 2 {
+		t.Fatalf("Fund ohne Paketangabe hart zusammengelegt: %+v", groups)
+	}
+	if len(groups[0].PossibleDuplicates) != 1 || len(groups[1].PossibleDuplicates) != 1 {
+		t.Fatalf("Fund ohne harten Schlüssel bleibt beziehungslos: %+v", groups)
+	}
+}
+
+// Gegentest 2: zwei verschiedene CVEs im selben Paket und derselben Version,
+// wobei der eine Fund die fremde Kennung im Freitext und in den Properties
+// nennt. Sie dürfen weder verschmelzen noch als possible-duplicate gelten:
+// Paket und Version stimmen überein, also greift auch der weiche Zweig nicht.
+func TestGroupFindingsZweiCVEsImSelbenPaketBleibenGetrennt(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1111", "requirements.txt", 0,
+			"lib 1.0: CVE-2026-1111 — siehe auch CVE-2026-2222", Dependency{
+				Package: "lib", Version: "1.0", Manifest: "requirements.txt",
+				IDs:    []string{"CVE-2026-1111", "CVE-2026-2222"},
+				KeyIDs: []string{"CVE-2026-1111"},
+			}),
+		finding("b", "pip-audit", "CVE-2026-2222", "requirements.txt", 0, "lib 1.0: CVE-2026-2222", Dependency{
+			Package: "lib", Version: "1.0", Manifest: "requirements.txt",
+			IDs:    []string{"CVE-2026-2222"},
+			KeyIDs: []string{"CVE-2026-2222"},
+		}),
+	})
+	if len(groups) != 2 {
+		t.Fatalf("zwei verschiedene CVEs verkettet: %+v", groups)
+	}
+	if len(groups[0].PossibleDuplicates) != 0 || len(groups[1].PossibleDuplicates) != 0 {
+		t.Fatalf("verschiedene CVEs als possible-duplicate markiert: %+v", groups)
+	}
+}
+
+// Steht die einzige Kennung eines Werkzeugs im Freitext, füllt extractDependency
+// KeyIDs aus der breiten Menge. Ohne diesen Rückfall verlöre der Fund seinen
+// harten Schlüssel ganz — schlechter als vor der Einengung.
+func TestGroupFindingsRueckfallAufBreiteIDMenge(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "pip-audit", "CVE-2026-1234", "requirements.txt", 0, "lib", Dependency{
+			Package: "lib", Version: "1.0", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"}, KeyIDs: []string{"CVE-2026-1234"},
+		}),
+		// Kein KeyIDs: das Werkzeug nennt die Kennung nur in der Message.
+		finding("b", "freitext-tool", "generic-rule", "requirements.txt", 0, "CVE-2026-1234 in lib", Dependency{
+			Package: "lib", Version: "1.0", Manifest: "requirements.txt",
+			IDs: []string{"CVE-2026-1234"},
+		}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("Rückfall auf die breite ID-Menge greift nicht: %+v", groups)
+	}
+}
+
+// Die Einengung selbst: IDs bleibt breit, KeyIDs nimmt nur RuleID und die
+// benannten Kennungsfelder. Die im Advisory-Text und in der Referenzliste
+// beiläufig genannten Fremd-Kennungen dürfen nicht in den Schlüssel gelangen.
+func TestExtractDependencyEngtSchluesselKennungenEin(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "CVE-2026-1111",
+		Message: sarifText{Text: "lib 1.0: CVE-2026-1111 — behoben in 1.1, siehe auch CVE-2026-2222"},
+		Properties: sarifObject{
+			"package":     "lib",
+			"version":     "1.0",
+			"manifest":    "requirements.txt",
+			"id":          "PYSEC-2026-9",
+			"aliases":     "CVE-2026-1111, GHSA-aaaa-bbbb-cccc",
+			"fixVersions": "1.1",
+			"references":  "CVE-2026-3333",
+		},
+	}
+	rule := sarifRule{ID: "CVE-2026-1111", FullDescription: sarifText{Text: "Verwandt: CVE-2026-4444"}}
+	finding := Finding{
+		RuleID:          "CVE-2026-1111",
+		RuleDescription: rule.FullDescription.Text,
+		Message:         result.Message.Text,
+	}
+
+	dependency := extractDependency(finding, result, rule)
+
+	wantIDs := []string{"CVE-2026-1111", "CVE-2026-2222", "CVE-2026-3333", "CVE-2026-4444", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-9"}
+	if !reflect.DeepEqual(dependency.IDs, wantIDs) {
+		t.Errorf("breite ID-Menge falsch: %v, erwartet %v", dependency.IDs, wantIDs)
+	}
+	wantKeyIDs := []string{"CVE-2026-1111", "GHSA-AAAA-BBBB-CCCC", "PYSEC-2026-9"}
+	if !reflect.DeepEqual(dependency.KeyIDs, wantKeyIDs) {
+		t.Errorf("eingeengte ID-Menge falsch: %v, erwartet %v", dependency.KeyIDs, wantKeyIDs)
+	}
+}
+
+// Kein benanntes Kennungsfeld und eine RuleID ohne Kennung: KeyIDs fällt auf die
+// breite Menge zurück, damit das Werkzeug überhaupt einen Schlüssel behält.
+func TestExtractDependencyRueckfallWennKennungNurImFreitextSteht(t *testing.T) {
+	result := sarifResult{
+		RuleID:     "generic-dependency-rule",
+		Message:    sarifText{Text: "CVE-2026-1111 in lib 1.0"},
+		Properties: sarifObject{"package": "lib", "version": "1.0"},
+	}
+	finding := Finding{RuleID: result.RuleID, Message: result.Message.Text}
+
+	dependency := extractDependency(finding, result, sarifRule{})
+
+	want := []string{"CVE-2026-1111"}
+	if !reflect.DeepEqual(dependency.KeyIDs, want) {
+		t.Errorf("Rückfall auf die breite Menge fehlt: %v", dependency.KeyIDs)
+	}
+}
+
+func TestNormalizePathNormiertZielfrei(t *testing.T) {
+	cases := map[string]string{
+		"requirements.txt":                      "requirements.txt",
+		"/requirements.txt":                     "requirements.txt",
+		"./requirements.txt":                    "requirements.txt",
+		"file:///home/x/requirements.txt":       "home/x/requirements.txt",
+		"file://host/pfad/requirements.txt":     "pfad/requirements.txt",
+		"FILE:///Home/X/Requirements.txt":       "home/x/requirements.txt",
+		"file://requirements.txt":               "requirements.txt",
+		`src\pkg\App.go`:                        "src/pkg/app.go",
+		"src//pkg/./app.go":                     "src/pkg/app.go",
+		"src/pkg/../app.go":                     "src/app.go",
+		"../a/b.txt":                            "../a/b.txt",
+		"/../a.txt":                             "a.txt",
+		"":                                      "",
+		"/abs/projekt/tmp/requirements.txt":     "abs/projekt/tmp/requirements.txt",
+		"file:///abs/projekt/requirements.txt/": "abs/projekt/requirements.txt",
+	}
+	for input, want := range cases {
+		if got := normalizePath(input); got != want {
+			t.Errorf("normalizePath(%q) = %q, erwartet %q", input, got, want)
+		}
+	}
+}
+
+// normalizePath bedient nicht nur Dependencies: exactKey, sameLine und
+// sameLocationToolKey nutzen dieselbe Funktion. Die drei Wirkungen werden hier
+// festgeschrieben, damit die erweiterte Normierung nicht unbemerkt zurückfällt.
+func TestGroupFindingsExactKeyUeberPfadschreibweisen(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "semgrep", "sql-injection", "app.go", 12, "Gefahr hier", Dependency{}),
+		finding("b", "gosec", "sql-injection", "/app.go", 12, "Gefahr hier", Dependency{}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("exakte Dublette über Pfadschreibweisen nicht gruppiert: %+v", groups)
+	}
+	if !contains(groups[0].DedupeRules, "exact-location-message") {
+		t.Errorf("Dedupe-Regel fehlt: %+v", groups[0].DedupeRules)
+	}
+}
+
+func TestGroupFindingsSameLocationToolUeberPfadschreibweisen(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		findingWithJob("a", "trivy", "trivy-fs", "CVE-2026-1111", "requirements.txt", 1, "A", Dependency{}),
+		findingWithJob("b", "trivy", "trivy-fs", "CVE-2026-2222", "/requirements.txt", 1, "B", Dependency{}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("Same-Location-Bundle über Pfadschreibweisen fehlt: %+v", groups)
+	}
+	if !contains(groups[0].DedupeRules, "same-location-tool") {
+		t.Errorf("Dedupe-Regel fehlt: %+v", groups[0].DedupeRules)
+	}
+}
+
+func TestGroupFindingsSameLineUeberPfadschreibweisen(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "semgrep", "path-traversal-a", "file://host/src/app.go", 12, "A", Dependency{}),
+		finding("b", "gosec", "path-traversal-b", "/src/app.go", 12, "B", Dependency{}),
+	})
+	if len(groups) != 2 {
+		t.Fatalf("unsichere Lage hart zusammengelegt: %+v", groups)
+	}
+	if len(groups[0].PossibleDuplicates) != 1 || len(groups[1].PossibleDuplicates) != 1 {
+		t.Fatalf("possible-duplicate über Pfadschreibweisen fehlt: %+v", groups)
 	}
 }
 
@@ -402,6 +678,55 @@ func TestStableIDKollisionVerlaengertHashDeterministisch(t *testing.T) {
 
 func fixedNow() time.Time {
 	return time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC)
+}
+
+// Eine Gruppe entsteht nicht zwangsläufig über den Dependency-Schlüssel. Bildet
+// sie sameLocationToolKey — bei Manifest-Funden der Regelfall, weil alle Funde
+// eines Werkzeugs auf dieselbe Zeile zeigen —, stehen darin verschiedene
+// Schwachstellen nebeneinander. Deren Kennungen dürfen nicht in einen
+// dependency-Block wandern, dessen Package und Version vom ersten Finding
+// stammen.
+func TestApplyRepresentativeVereinigtNurDieselbeDependency(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "grype", "GHSA-AAAA-BBBB-CCCC", "requirements.txt", 1, "requests", Dependency{
+			Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
+			IDs: []string{"GHSA-AAAA-BBBB-CCCC"}, KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"},
+		}),
+		finding("b", "grype", "GHSA-DDDD-EEEE-FFFF", "requirements.txt", 1, "jinja2", Dependency{
+			Package: "jinja2", Version: "2.10", Manifest: "requirements.txt",
+			IDs: []string{"GHSA-DDDD-EEEE-FFFF"}, KeyIDs: []string{"GHSA-DDDD-EEEE-FFFF"},
+		}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("same-location-tool gruppiert nicht wie erwartet: %+v", groups)
+	}
+	want := []string{"GHSA-AAAA-BBBB-CCCC"}
+	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {
+		t.Errorf("fremde Kennung in die Union geraten: %+v, erwartet %v", groups[0].Dependency.IDs, want)
+	}
+}
+
+// Ohne Paket gibt es keinen harten Dependency-Schlüssel und damit nichts, was
+// eine Vereinigung rechtfertigte. Genau so treten grype, osv-scanner und trivy
+// im gemessenen Lauf auf.
+func TestApplyRepresentativeOhnePaketKeineUnion(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		finding("a", "osv-scanner", "CVE-2026-1111", "requirements.txt", 1, "CVE-2026-1111", Dependency{
+			Manifest: "requirements.txt",
+			IDs:      []string{"CVE-2026-1111"}, KeyIDs: []string{"CVE-2026-1111"},
+		}),
+		finding("b", "osv-scanner", "CVE-2026-2222", "requirements.txt", 1, "CVE-2026-2222", Dependency{
+			Manifest: "requirements.txt",
+			IDs:      []string{"CVE-2026-2222"}, KeyIDs: []string{"CVE-2026-2222"},
+		}),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("same-location-tool gruppiert nicht wie erwartet: %+v", groups)
+	}
+	want := []string{"CVE-2026-1111"}
+	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {
+		t.Errorf("Union trotz fehlendem Paket: %+v, erwartet %v", groups[0].Dependency.IDs, want)
+	}
 }
 
 func finding(id string, tool string, rule string, uri string, line int, message string, dependency Dependency) Finding {

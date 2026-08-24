@@ -560,11 +560,26 @@ der Assistent zuständig, der `review-input.json` als Eingabe bekommt.
 
 - gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle,
 - gleiche Datei, Zeile, Regel-ID und normalisierte Message,
-- gleiche Dependency-ID (CVE/GHSA/OSV) plus Package plus Version bzw. Manifest.
+- **eine** gemeinsame Dependency-ID (CVE/GHSA/OSV/PYSEC) plus gleiches Package und
+  gleiche Version.
 
-Gleiche Datei/Zeile mit ähnlicher Regel-Familie wird nicht zusammengefasst, sondern
-wechselseitig als `possible-duplicate` markiert. Der Assistent entscheidet, ob er die
-Belege bündelt.
+Bei der Dependency-Regel zählt jede Kennung einzeln: zwei Werkzeuge finden zusammen,
+sobald sie sich eine Kennung teilen, auch wenn das eine drei Aliase nennt und das
+andere nur einen. In den Schlüssel gehen dabei nur Kennungen, die den Fund benennen —
+`ruleId` und benannte Alias-Felder —, nicht solche, die im Advisory-Text nebenbei
+vorkommen. Das Manifest steht **nicht** im Schlüssel: Werkzeuge schreiben denselben
+Pfad zu verschieden (`requirements.txt`, `/requirements.txt`,
+`file:///abs/pfad/requirements.txt`). Der Preis ist im Monorepo sichtbar — gleiches
+Paket mit gleicher CVE unter `services/a/` und `services/b/` wird eine Gruppe.
+
+Zwei Fälle werden nicht zusammengefasst, sondern wechselseitig als
+`possible-duplicate` markiert:
+
+- gleiche Datei und Zeile mit ähnlicher Regel-Familie,
+- gemeinsame Dependency-ID, aber Package oder Version fehlt oder weicht ab — oder eine
+  Seite nennt gar kein Package und hat damit keinen harten Schlüssel.
+
+Der Assistent entscheidet, ob er die Belege bündelt.
 
 **Zwei Artefakte, klare Rollen.** `review-input.json` trägt Provenienz (`schemaVersion`,
 `generated`, `kPlaybookVersion`, Laufkontext, Entries, Findings, Gruppen) und alle

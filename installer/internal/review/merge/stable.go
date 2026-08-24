@@ -16,11 +16,7 @@ var stableDigest = func(key string) string {
 func assignStableIDs(groups []Group, findings []Finding) {
 	byID := findingsByID(findings)
 	for index := range groups {
-		groupFindings := make([]Finding, 0, len(groups[index].FindingIDs))
-		for _, id := range groups[index].FindingIDs {
-			groupFindings = append(groupFindings, byID[id])
-		}
-		prefix, key := stablePrefixAndKey(groupFindings)
+		prefix, key := stablePrefixAndKey(findingsForGroup(byID, groups[index]))
 		groups[index].StableKey = key
 		groups[index].StableID = prefix + stableDigest(key)
 	}

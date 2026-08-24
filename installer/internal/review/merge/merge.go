@@ -102,11 +102,19 @@ type Location struct {
 
 // Dependency beschreibt einen Dependency-Befund, soweit er aus SARIF erkennbar
 // ist.
+//
+// IDs und KeyIDs trennen zwei verschiedene Fragen. IDs ist alles, was im Text
+// des Befunds an Kennungen vorkommt — die Menge für Anzeige, Bericht und
+// known-decisions, und sie darf großzügig sein. KeyIDs ist die Teilmenge, die
+// den Befund *identifiziert*: sie geht in den harten Dedupe-Schlüssel, und dort
+// wäre eine im Advisory beiläufig genannte Fremd-Kennung schädlich, weil
+// Union-Find transitiv gruppiert (siehe dependencyKeys in dedupe.go).
 type Dependency struct {
 	Package  string   `json:"package,omitempty"`
 	Version  string   `json:"version,omitempty"`
 	Manifest string   `json:"manifest,omitempty"`
 	IDs      []string `json:"ids,omitempty"`
+	KeyIDs   []string `json:"keyIds,omitempty"`
 }
 
 // Evidence nennt die Quelle eines Findings. Sie bleibt auch nach Dedupe
@@ -563,6 +571,23 @@ func extractDependency(finding Finding, result sarifResult, rule sarifRule) Depe
 	if dependency.Manifest == "" {
 		dependency.Manifest = finding.Location.URI
 	}
+
+	// Die enge Menge für den harten Schlüssel: RuleID plus die benannten
+	// Kennungsfelder der Properties. Der Freitext bleibt draußen — Message,
+	// Beschreibung und das Properties-JSON als Ganzes tragen regelmäßig
+	// Fremd-Kennungen aus Referenz- und Fixed-in-Listen mit sich.
+	dependency.KeyIDs = extractIDs(strings.Join([]string{
+		finding.RuleID,
+		propertyIDText(result.Properties),
+		propertyIDText(rule.Properties),
+	}, "\n"))
+	if len(dependency.KeyIDs) == 0 {
+		// Rückfall auf die breite Menge. Ohne ihn gruppierte ein Werkzeug,
+		// dessen einzige Kennung in Message oder Beschreibung steht, nach der
+		// Einengung schlechter als vorher — es hätte gar keinen Schlüssel mehr.
+		dependency.KeyIDs = dependency.IDs
+	}
+
 	if dependency.Package == "" && len(dependency.IDs) == 0 && dependency.Version == "" {
 		return Dependency{}
 	}
@@ -582,6 +607,37 @@ func extractIDs(text string) []string {
 	}
 	sort.Strings(ids)
 	return ids
+}
+
+// dependencyKeyIDProperties sind die Property-Namen, unter denen ein Werkzeug
+// die Kennungen des Befunds selbst ablegt — im Unterschied zu Kennungen, die im
+// Advisory-Text nebenbei vorkommen.
+//
+// Erhoben an einem echten Lauf (Task 027, Etappe 1): pip-audit schreibt seine
+// eigene Kennung nach id und die Aliase nach aliases, während grype,
+// osv-scanner und trivy ihre Hauptkennung ausschließlich in ruleId tragen. Die
+// übrigen Namen sind gebräuchliche Schreibweisen derselben Sache; sie kosten
+// nichts, solange sie benannte Felder bleiben und nicht der Freitext.
+var dependencyKeyIDProperties = []string{
+	"id", "ids", "alias", "aliases", "identifiers",
+	"cve", "cveId", "ghsa", "osv",
+	"vulnerabilityId", "vulnId", "advisoryId",
+}
+
+// propertyIDText sammelt den Text der benannten Kennungsfelder eines
+// Properties-Objekts. Anders als propertiesText gibt es nicht das ganze JSON
+// heraus, sondern nur die Felder, deren Inhalt den Befund benennt.
+func propertyIDText(properties sarifObject) string {
+	if len(properties) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(dependencyKeyIDProperties))
+	for _, key := range dependencyKeyIDProperties {
+		if value := stringProperty(properties, key); value != "" {
+			parts = append(parts, value)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func propertiesText(properties sarifObject) string {
