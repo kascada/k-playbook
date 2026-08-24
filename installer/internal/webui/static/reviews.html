@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Neuer Review - k-playbook</title>
+    <title>Reviews - k-playbook</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
@@ -12,7 +12,7 @@
       <section class="hero app-header">
         <div class="brand-row">
           <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
-          <h1>Neuer Review</h1>
+          <h1>Reviews</h1>
         </div>
         <div class="hero-subrow">
           <p class="eyebrow path">
@@ -37,29 +37,26 @@
       </section>
 
       <div class="blocks">
-        <section class="card" id="pick-card">
+        <!-- Gestartet wird ein Review nicht hier, sondern im Assistenten: die
+             Oberfläche zeigt nur, was bereits vorliegt. -->
+        <section class="card" id="intro-card">
           <div class="section-head">
             <div>
-              <h2>Was soll laufen?</h2>
+              <h2>Reviews starten</h2>
             </div>
-            <span id="pick-pill" class="pill muted">Laden...</span>
           </div>
-
           <p class="hint">
-            Werkzeuge laufen über ihre CLI, Reviews über einen Assistenten. Beide sind
-            Einträge desselben Laufs und schreiben in dasselbe Verzeichnis.
+            Ein neuer Lauf entsteht im Assistenten, nicht auf dieser Seite. Zwei Einstiege:
           </p>
-
-          <h3 class="group-head">Werkzeuge</h3>
-          <p class="hint" id="tools-hint"></p>
-          <div id="pick-tools" class="choices choices-compact"></div>
-
-          <h3 class="group-head">Reviews</h3>
-          <p class="hint">Aus dem aufgelösten Katalog, mitgeliefert und projekteigen zusammengeführt.</p>
-          <div id="pick-reviews" class="choices choices-compact"></div>
-
-          <p id="pick-message" class="message"></p>
-          <button id="pick-create" class="secondary" disabled>Erstellen</button>
+          <p class="hint">
+            <code>/k-audit</code> führt einen vollständigen Audit-Sweep an oder setzt ihn
+            fort — optional mit <code>new</code>, <code>latest</code> oder einem Datum
+            <code>YYYY-MM-DD</code>.
+          </p>
+          <p class="hint">
+            <code>/k-review &lt;name&gt;</code> führt ein einzelnes Review-Rezept aus. Ohne
+            Argument zeigt der Befehl die Auswahl der aktivierten Rezepte.
+          </p>
         </section>
 
         <section class="card" id="runs-card">
@@ -69,6 +66,7 @@
             </div>
             <span id="runs-pill" class="pill muted">Laden...</span>
           </div>
+          <p class="hint">Aus <code>k-playbook-local/results/</code>.</p>
           <dl id="runs-list" class="facts"></dl>
           <p id="runs-message" class="message"></p>
         </section>

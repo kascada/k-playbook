@@ -942,32 +942,75 @@ button.attention-highlight {
   color: var(--warn);
 }
 
-/* Überschrift einer Gruppe innerhalb einer Karte. */
-.group-head {
-  margin: 22px 0 4px;
-  font-size: 1rem;
-  letter-spacing: -0.02em;
+/* Eine schmale Liste von Beispielformulierungen im Kopf der Todos-Seite —
+   keine eigene Karte wert, aber mehr als ein Fließtextsatz. */
+.example-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
-/* Viele kurze Einträge nebeneinander statt untereinander: bei zehn Werkzeugen
-   und acht Reviews wäre eine einspaltige Liste unnötig lang. */
-.choices-compact {
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+.example-list li {
+  margin-bottom: 4px;
 }
 
-.choices-compact .choice {
-  padding: 10px 14px;
+/* Todos stehen wie Tasks untereinander, aber ohne Klick-Ziel: der Eintrag
+   selbst ist der Inhalt, keine Detailseite dahinter. */
+.todo-list {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.52);
 }
 
-/* Ein fehlendes Werkzeug bleibt sichtbar, damit klar ist, was es gäbe — aber
-   es lässt sich nicht auswählen. */
-.choice.disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
+.todo-list.empty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
-.choice.disabled:hover {
-  border-color: var(--line);
+.todo-item {
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.todo-item.done {
+  color: var(--muted);
+}
+
+.todo-item.done .todo-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+
+.todo-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+/* Der Umschalter hängt am Textende, nicht daneben: /k-todo trägt oft einen
+   einzigen, langen Fließtextsatz ein, und eine eigene Spalte dafür würde die
+   Zeile unnötig aufspalten. */
+.todo-toggle {
+  display: inline;
+  margin-left: 6px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.86em;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.todo-toggle:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
 }
 
 .secondary.danger {

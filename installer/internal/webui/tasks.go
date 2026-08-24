@@ -8,12 +8,13 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
-// workflowsResponse sind die beiden Zahlen des Workflow-Blocks. Er verweist nur
+// workflowsResponse sind die drei Zahlen des Workflow-Blocks. Er verweist nur
 // weiter, deshalb genügt je Ziel, wie viel dort liegt.
 type workflowsResponse struct {
 	Available bool   `json:"available"`
 	Reviews   int    `json:"reviews"`
 	Tasks     int    `json:"tasks"`
+	Todos     int    `json:"todos"`
 	Message   string `json:"message"`
 }
 
@@ -56,6 +57,12 @@ func workflowsHandler(w http.ResponseWriter, r *http.Request) {
 		response.Message = err.Error()
 	}
 	response.Tasks = len(tasks)
+
+	todos, err := project.ListTodos(environment.ProjectDir)
+	if err != nil && response.Message == "" {
+		response.Message = err.Error()
+	}
+	response.Todos = len(todos)
 
 	writeJSON(w, http.StatusOK, response)
 }

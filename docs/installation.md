@@ -603,13 +603,22 @@ Die mitgelieferten Binaries genügen für den normalen Betrieb. Wer am Werkzeug 
 arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-make dist   # baut alle Plattformen nach dist/
-make gui    # baut und startet die Oberfläche
+make -C k-playbook dist        # alle Plattformen nach dist/
+make -C k-playbook dist-host   # nur die Plattform dieses Rechners
+k-playbook/bin/k-playbook      # startet den gebauten Stand
 ```
 
-`make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
-ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make gui` ist der
-Weg beim Entwickeln: es startet den frisch gebauten Stand.
+Beide Build-Targets verwenden dieselben Flags wie die ausgelieferten Artefakte, damit
+jeder Weg dasselbe Ergebnis liefert. `dist-host` spart die drei fremden Plattformen und
+genügt, wenn nur dieser Rechner den Stand starten soll.
+
+Die Installation ist schreibgeschützt; zum Bauen gibt `make -C k-playbook
+installer-writable` sie frei, `installer-readonly` sperrt sie wieder. Ein Update setzt
+sie ohnehin auf den Clone-Stand zurück.
+
+`make gui` erscheint zwar in der Hilfe, gilt aber nur im Entwicklungsrepo von
+k-playbook: es spielt vor dem Start einen Arbeitsstand in die Installation ein, den es
+in einem Zielprojekt nicht gibt.
 
 ## Verifikation
 

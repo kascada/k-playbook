@@ -11,8 +11,7 @@
         "mcp"
       ],
       "enabled": true,
-      "type": "local",
-      "timeout": 90000
+      "type": "local"
     }
   },
   "references": {

@@ -74,20 +74,22 @@ installer/
 │   ├── update.go                Remote-Stand prüfen, Sauberkeit, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
+│   ├── todos.go                 TODO.md parsen: offene und abgehakte Einträge
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Lebenszyklus
 │   ├── browser.go               Browser öffnen, Container erkennen
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── tasks.go                 Task-Endpunkte und die Zahlen des Workflow-Blocks
+│   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
 │   ├── hostpath.go              PATH-Zustand melden, read-only
 │   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, reviews.html, tasks.html, mcp.html,
-│                                session.js, app.js, reviews.js, tasks.js, mcp.js,
-│                                styles.css
+│   └── static/                  index.html, reviews.html, tasks.html, todos.html,
+│                                mcp.html, session.js, app.js, reviews.js, tasks.js,
+│                                todos.js, mcp.js, styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── internal/review/

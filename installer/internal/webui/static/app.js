@@ -79,6 +79,7 @@ const elements = {
   workflowsCard: document.getElementById("workflows-card"),
   workflowsReviews: document.getElementById("workflows-reviews"),
   workflowsTasks: document.getElementById("workflows-tasks"),
+  workflowsTodos: document.getElementById("workflows-todos"),
   workflowsMessage: document.getElementById("workflows-message"),
   docsPill: document.getElementById("docs-pill"),
   docsList: document.getElementById("docs-list"),
@@ -1342,6 +1343,7 @@ function renderWorkflows(data) {
   const count = (value) => (data.available && !data.message ? `${value}` : "");
   elements.workflowsReviews.textContent = count(data.reviews);
   elements.workflowsTasks.textContent = count(data.tasks);
+  elements.workflowsTodos.textContent = count(data.todos);
 }
 
 // Der Doku-Block listet die mitgelieferten Markdown-Dateien; gelesen wird eine

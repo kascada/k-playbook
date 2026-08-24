@@ -65,15 +65,19 @@ Argumente:
 - `$ARGUMENTS` ist `latest`: den jüngsten Lauf mit `run.json` verwenden.
 - `$ARGUMENTS` sieht aus wie `YYYY-MM-DD`: genau diesen Lauf verwenden. Existiert
   er nicht, nach Schritt 3 anbieten, ihn mit diesem Datum anzulegen.
+- `$ARGUMENTS` passt auf keinen dieser Fälle: nicht raten. Den Wert wörtlich
+  zurückgeben, sagen, dass er keinem Fall entspricht, und nach dem gemeinten Lauf
+  fragen. Kein Statusaufruf, bis die Rückfrage beantwortet ist. Auch ein Wert, der
+  ein Datum enthält, aber zusätzlichen Text trägt, fällt hierunter.
 
 ## Schritt 2 — Status lesen
 
 Melde vor dem ersten `k_playbook_review_status` Teil 1 des Argument-Meldeblocks:
 
 ```text
-Argument: <leer|new|latest|YYYY-MM-DD>
-Absicht: <Lauf TODAY (YYYY-MM-DD) | jüngster Lauf | Lauf YYYY-MM-DD>
-Erster Statusaufruf: <mode: existing, run: YYYY-MM-DD | mode: available>
+Argument: <der Wert wörtlich, oder `leer`>
+Absicht: <Lauf TODAY (YYYY-MM-DD) | jüngster Lauf | Lauf YYYY-MM-DD | unbestimmt>
+Erster Statusaufruf: <mode: existing, run: YYYY-MM-DD | mode: available | keiner>
 ```
 
 Rufe danach `k_playbook_review_status` auf. Welcher erste Statusaufruf zu welchem
@@ -294,7 +298,8 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 - Entry-Datei unlesbar: nicht überschreiben; Fehler und Pfad nennen.
 - `scan-triage` fehlt in der Auswahlbasis: sagen, dass das Command-Modul im effektiven
   Namensraum fehlt oder abgeschaltet ist; Bewertung nicht improvisieren.
-- `review-input.*` fehlt: zuerst Schritt 6 ausführen.
+- `review-input.*` fehlt: zuerst Schritt 5 ausführen, den Merge. Schritt 6 setzt
+  `review-input.json` voraus und kann es nicht erzeugen.
 - `done` für `scan-triage` ohne vorhandenes `review-triage.md`: Zustand als
   reparaturbedürftig melden und Schritt 7 erneut ausführen.
 
@@ -302,6 +307,8 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 
 - Keinen Laufzustand aus Chat-Gedächtnis ableiten; immer MCP-Status lesen.
 - Argument nicht stillschweigend durch `new` oder `today` ersetzen.
+- Bei einem Argument, das auf keinen der vier Fälle passt, nicht den
+  wahrscheinlichsten Fall wählen, sondern nachfragen.
 - Ohne Teil 1 des Argument-Meldeblocks nicht den ersten Statusaufruf machen.
 - `scan-triage` nicht als Review-Katalog-Rezept behandeln.
 - `review-triage.md` nicht über `k_playbook_review_write_ai_entry` schreiben; das

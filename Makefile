@@ -17,12 +17,15 @@ INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 INSTALLER_HOST_TARGET = $(shell go env GOOS)-$(shell go env GOARCH)
 
 # Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
-# darunter und ist ein eigener Clone. Sie traegt deshalb den zuletzt gepushten
-# Stand, nicht den, an dem gerade gearbeitet wird — und die Oberflaeche liest
+# darunter und ist ein eigener Clone. Sie trägt deshalb den zuletzt gepushten
+# Stand, nicht den, an dem gerade gearbeitet wird — und die Oberfläche liest
 # Skripte, Regeln und Reviews immer von dort.
 PLAYBOOK_DIR := k-playbook
 INSTALLATION_DIR := $(if $(wildcard $(PLAYBOOK_DIR)/.git),$(PLAYBOOK_DIR),.)
 DEV_MARKER := .k-playbook-devsync
+# Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
+# greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
+GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
 .PHONY: help build dist dist-host gui test installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
 
@@ -48,6 +51,7 @@ help: ## Zeigt diese Hilfe an
 # `git add -A` mitnimmt — auch wenn sich am Code nichts geändert hat. Gelesen
 # wird die Revision von niemandem.
 define build_binaries
+	$(require_writable)
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
 	for target in $(1); do \
@@ -70,17 +74,52 @@ dist-host: ## Baut nur das Binary dieser Plattform nach ./dist/
 
 build: dist ## Alias für dist
 
+# Beide Prüfungen unten schlagen bei derselben Verwechslung an — Aufruf in der
+# Installation statt im Arbeitsstand —, scheitern aber an verschiedenen Stellen:
+# der Build an der Schreibsperre, der Sync am fehlenden Arbeitsstand. Der
+# Hinweis ist deshalb geteilt: gleicher Rat im Entwicklungsrepo, eigener
+# Fallback für ein Zielprojekt, wo jede Prüfung etwas anderes bedeutet.
+define in_dev_installation
+test -d "../installer" -a -d "../$(PLAYBOOK_DIR)/.git"
+endef
+
+define hint_use_workspace
+	    printf 'Hier läuft die Makefile-Kopie in der Installation. Gebaut und\n' >&2; \
+	    printf 'eingespielt wird aus dem Arbeitsstand eine Ebene höher:\n\n' >&2; \
+	    printf '  make -C %s %s\n\n' "$(abspath ..)" "$(GOAL)" >&2
+endef
+
 # Nur im Entwicklungsrepo sinnvoll: in einem Zielprojekt gibt es keinen
 # Arbeitsstand, aus dem gesynct werden könnte, und ein rsync über die
 # Installation wäre dort schlicht Datenverlust.
 define require_dev_repo
 	@test -d "$(PLAYBOOK_DIR)/.git" -a -d installer || { \
-	  echo "installer-sync gilt nur im Entwicklungsrepo: $(PLAYBOOK_DIR)/ muss ein Clone sein und installer/ vorhanden." >&2; \
+	  if $(in_dev_installation); then \
+	    $(hint_use_workspace); \
+	  else \
+	    printf '%s gilt nur im Entwicklungsrepo: %s/ muss ein Clone sein und installer/ vorhanden.\n' \
+	      "$(GOAL)" "$(PLAYBOOK_DIR)" >&2; \
+	  fi; \
 	  exit 1; \
 	}
 endef
 
-# Uebertragen wird genau der verfolgte Dateisatz — das ist per Definition, was
+# Vor dem Build, nicht mittendrin: sonst bricht `go build` erst beim Schreiben
+# des Binaries ab, und zwar mit "permission denied" auf einen Pfad in /tmp.
+define require_writable
+	@test -w . || { \
+	  if $(in_dev_installation); then \
+	    $(hint_use_workspace); \
+	  else \
+	    printf 'Schreibgeschützt: %s\n' "$(CURDIR)" >&2; \
+	    printf 'Eine Installation wird nicht überschrieben. Zum Bauen freigeben:\n' >&2; \
+	    printf '  make installer-writable\n' >&2; \
+	  fi; \
+	  exit 1; \
+	}
+endef
+
+# Übertragen wird genau der verfolgte Dateisatz — das ist per Definition, was
 # ein Clone enthaelt. Ein Filter auf .gitignore waere nur eine Naeherung: er
 # schleppt unverfolgte, aber nicht ignorierte Dateien mit, etwa
 # .claude/settings.local.json.

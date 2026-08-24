@@ -152,7 +152,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
 	mux.HandleFunc("GET /api/reviews", reviewsHandler)
-	mux.HandleFunc("POST /api/reviews", createRunHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)
@@ -167,6 +166,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/tasks", tasksHandler)
 	mux.HandleFunc("GET /api/tasks/done", doneTasksHandler)
 	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
+	mux.HandleFunc("GET /api/todos", todosHandler)
+	mux.HandleFunc("GET /api/todos/done", doneTodosHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -175,6 +176,7 @@ func routes(state *serverState) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /tasks", tasksPageHandler)
+	mux.HandleFunc("GET /todos", todosPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
@@ -196,6 +198,13 @@ var tasksTemplate = template.Must(template.ParseFS(staticFiles, "static/tasks.ht
 
 func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, tasksTemplate)
+}
+
+// todosTemplate ist die Seite der Todos, ebenfalls mit dem gemeinsamen Kopf.
+var todosTemplate = template.Must(template.ParseFS(staticFiles, "static/todos.html"))
+
+func todosPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, todosTemplate)
 }
 
 // mcpTemplate ist die Seite des MCP-Servers, ebenfalls mit dem gemeinsamen Kopf.
