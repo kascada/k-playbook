@@ -11,6 +11,10 @@ INSTALLER_PKG := ./cmd/k-playbook
 INSTALLER_WRAPPER := bin/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
+# Bewusst mit = statt := : `go env` darf erst laufen, wenn ein Target es
+# wirklich braucht. In einem Zielprojekt ohne Go würde die sofortige Auswertung
+# sonst schon bei `make help` eine Fehlermeldung ausgeben.
+INSTALLER_HOST_TARGET = $(shell go env GOOS)-$(shell go env GOARCH)
 
 # Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
 # darunter und ist ein eigener Clone. Sie traegt deshalb den zuletzt gepushten
@@ -20,7 +24,7 @@ PLAYBOOK_DIR := k-playbook
 INSTALLATION_DIR := $(if $(wildcard $(PLAYBOOK_DIR)/.git),$(PLAYBOOK_DIR),.)
 DEV_MARKER := .k-playbook-devsync
 
-.PHONY: help build dist gui test installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host gui test installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -32,8 +36,8 @@ help: ## Zeigt diese Hilfe an
 	@echo "  bin/k-playbook"
 	@echo ""
 	@echo "Selbst bauen (braucht Go) und starten:"
-	@echo "  make dist"
-	@echo "  make gui"
+	@echo "  make dist        alle Plattformen, für ein Release"
+	@echo "  make gui         nur diese Plattform, dann starten"
 	@echo ""
 	@echo "Host-weit verfügbar: richtet der erste Start selbst ein."
 	@echo "  danach genügt überall:  k-playbook"
@@ -43,16 +47,26 @@ help: ## Zeigt diese Hilfe an
 # Binary. Jeder Commit ergäbe dann vier neue Binaries à 12 MB, die der nächste
 # `git add -A` mitnimmt — auch wenn sich am Code nichts geändert hat. Gelesen
 # wird die Revision von niemandem.
-dist: ## Baut die Binaries aller Plattformen nach ./dist/
+define build_binaries
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
-	for target in $(INSTALLER_RELEASE_TARGETS); do \
+	for target in $(1); do \
 		os="$${target%-*}"; \
 		arch="$${target#*-}"; \
 		output="../$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
 		echo "Baue $$output"; \
 		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$$output" "$(INSTALLER_PKG)"); \
 	done
+endef
+
+dist: ## Baut die Binaries aller Plattformen nach ./dist/
+	$(call build_binaries,$(INSTALLER_RELEASE_TARGETS))
+
+# Für den Entwicklungs-Loop: die drei fremden Plattformen kostet jeder Durchlauf
+# Zeit, gestartet wird ohnehin nur diese. Die anderen Binaries bleiben auf dem
+# committeten Stand — `make dist` baut vor einem Release alle vier.
+dist-host: ## Baut nur das Binary dieser Plattform nach ./dist/
+	$(call build_binaries,$(INSTALLER_HOST_TARGET))
 
 build: dist ## Alias für dist
 
@@ -116,7 +130,7 @@ installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	    echo "Installation aktualisiert: $$before -> $$after"; \
 	  fi
 
-gui: dist installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
+gui: dist-host installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
 	"$(INSTALLER_WRAPPER)"
 
 test: ## Führt die Tests aus
