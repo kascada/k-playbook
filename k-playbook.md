@@ -64,6 +64,43 @@ Verlass dich nicht auf Annahmen über Pfade. `k-playbook/bin/k-playbook context`
 liefert die aufgelösten Verzeichnisse und die effektiven Kataloge — mitgeliefert und
 projekteigen bereits zusammengeführt, abgeschaltete Einträge markiert.
 
+## Wie gearbeitet wird
+
+Eine Umsetzung, die über einen trivialen Einzelschritt hinausgeht, bleibt nicht als
+Plan-Text im Gespräch stehen, wird nicht als Plan-Datei abgelegt und nicht einfach
+begonnen — sie wird eine Task: `/k-task-create` anbieten oder nutzen, danach
+`/k-task-refine`, dann `/k-run`. Das betrifft, wo das Ergebnis einer Planung landet,
+nicht wie es entsteht; im Plan-Modus des Assistenten zu entwerfen bleibt richtig. Für
+Befunde aus Reviews gilt zusätzlich der nächste Abschnitt.
+
+Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/commands.md`:
+
+- **Projekt** — `/k-gui` startet die Oberfläche.
+- **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
+  `/k-docs-tools` und `/k-docs-extract` erzeugen Doku, `/k-docs-index` baut den Index.
+- **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
+  vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-results`
+  priorisiert projektweit, `/k-remediation` überführt Befunde in Tasks oder Fixes.
+- **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-run`; `/k-todo` pflegt
+  `k-playbook-local/TODO.md`.
+- **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`
+  führt Tests aus und diagnostiziert Fehler, `/k-verlauf` durchsucht alte AI-Verläufe,
+  `/k-vscode-project-color` setzt Fensterfarbe und Titel.
+
+Was in einem konkreten Projekt davon gilt, steht im Katalog aus `context` — ein
+projekteigener Command ersetzt den gleichnamigen mitgelieferten oder schaltet ihn ab.
+
+Die Oberfläche startet ohne Argument:
+
+```bash
+k-playbook/bin/k-playbook
+```
+
+Das ist der Weg, den ein Nutzer selbst geht: Konfiguration, Status der projekteigenen
+Struktur, Assistenten-Verlinkung und weitere Hilfe stehen dort. `/k-gui` startet
+dieselbe Oberfläche aus dem Assistenten heraus — der Weg, auf dem die KI sie von sich
+aus anbieten und bei Bedarf öffnen kann, wenn sie das für sinnvoll hält.
+
 ## Umgang mit Befunden
 
 `remediation.mode` in der `K-PLAYBOOK.yaml` legt fest, wie Befunde aus Reviews
