@@ -71,6 +71,11 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
   Modell der Command entworfen wurde, ohne einem Assistenten ein Modell vorzuschreiben.
 - `argument-hint` entfällt nur bei Commands ohne Argument.
 - `allowed-tools` nennt genau das, was der Command wirklich braucht.
+- MCP-Werkzeuge stehen dort unter dem Namen, den der Assistent vergibt: in Claude Code
+  `mcp__<server>__<werkzeug>`. Der Servername ist der Registrierungsschlüssel aus
+  `docs/mcp.md` und lautet in jedem eingerichteten Projekt `k-playbook`. Ein Assistent mit
+  anderer Namensbildung ignoriert den Eintrag folgenlos — `allowed-tools` erklärt eine
+  Erlaubnis und setzt keine Sperre.
 
 ## Erster Schritt
 

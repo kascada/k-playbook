@@ -2,7 +2,7 @@
 description: Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
 argument-hint: [YYYY-MM-DD|latest|new]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_review_status, mcp__k-playbook__k_playbook_review_create, mcp__k-playbook__k_playbook_review_scan, mcp__k-playbook__k_playbook_review_merge, mcp__k-playbook__k_playbook_review_write_ai_entry]
 ---
 
 # k-audit
@@ -29,6 +29,9 @@ Ergebnisse dieses Commands:
 - optional `review-triage.md` nach Anwendung des Moduls
   `commands/_audit/review-scan-triage.md`.
 
+Argument-Behandlung ist Pflicht: der Command darf nie eigenmächtig ein anderes
+Datum wählen als angegeben.
+
 ## Schritt 1 — Pfade und Lauf bestimmen
 
 Löse aus der Context-Ausgabe:
@@ -52,22 +55,55 @@ Command-specific policy:
 - Fehlt `RESOLVED_RESULTS_DIR`, frage, ob genau dieses Verzeichnis angelegt werden
   soll oder ob `/k-gui` die Struktur reparieren soll. Kein Ersatzpfad.
 
+Das Argument steht in `$ARGUMENTS`. Lies es wörtlich; ein leerer Wert ist ein
+eigener Fall und kein Freibrief für ein anderes Datum.
+
 Argumente:
 
-- Leer oder `new`: den heutigen Lauf `TODAY` verwenden. Existiert er nicht, nach
-  Schritt 3 einen neuen Lauf anlegen.
-- `latest`: den jüngsten Lauf mit `run.json` verwenden.
-- `YYYY-MM-DD`: genau diesen Lauf verwenden. Existiert er nicht, nach Schritt 3
-  anbieten, ihn mit diesem Datum anzulegen.
+- `$ARGUMENTS` ist leer oder `new`: den heutigen Lauf `TODAY` verwenden.
+  Existiert er nicht, nach Schritt 3 einen neuen Lauf anlegen.
+- `$ARGUMENTS` ist `latest`: den jüngsten Lauf mit `run.json` verwenden.
+- `$ARGUMENTS` sieht aus wie `YYYY-MM-DD`: genau diesen Lauf verwenden. Existiert
+  er nicht, nach Schritt 3 anbieten, ihn mit diesem Datum anzulegen.
 
 ## Schritt 2 — Status lesen
 
-Rufe immer zuerst `k_playbook_review_status` auf.
+Melde vor dem ersten `k_playbook_review_status` Teil 1 des Argument-Meldeblocks:
 
-- Für bestehende Läufe: `projectDir: RESOLVED_PROJECT_DIR`, `mode: existing`,
-  `run: <lauf>`.
-- Wenn noch kein Lauf feststeht oder ein neuer Lauf entstehen soll:
-  `projectDir: RESOLVED_PROJECT_DIR`, `mode: available`.
+```text
+Argument: <leer|new|latest|YYYY-MM-DD>
+Absicht: <Lauf TODAY (YYYY-MM-DD) | jüngster Lauf | Lauf YYYY-MM-DD>
+Erster Statusaufruf: <mode: existing, run: YYYY-MM-DD | mode: available>
+```
+
+Rufe danach `k_playbook_review_status` auf. Welcher erste Statusaufruf zu welchem
+Argument gehört:
+
+- `$ARGUMENTS` sieht aus wie `YYYY-MM-DD`: `projectDir: RESOLVED_PROJECT_DIR`,
+  `mode: existing`, `run: <dieses Datum>`. Bei `run_not_found` erst dann
+  `mode: available`, um die Auswahlbasis für Schritt 3 zu holen — der Ziel-Lauf
+  bleibt dabei das genannte Datum, nicht `TODAY`.
+- `$ARGUMENTS` ist leer oder `new`: `projectDir: RESOLVED_PROJECT_DIR`,
+  `mode: available`; dessen `todayExists` beantwortet bestehend oder neu in einem
+  Aufruf.
+- `$ARGUMENTS` ist `latest`: `projectDir: RESOLVED_PROJECT_DIR`,
+  `mode: available`; die Liste `runs` liefert die Auswahl, danach `mode: existing`
+  auf den jüngsten Lauf mit `run.json`.
+
+Nicht tun:
+
+- Steht im Argument ein Datum, nicht `mode: available` als ersten Statusaufruf
+  verwenden. Erst `mode: existing` mit genau diesem Datum; nur bei
+  `run_not_found` in den Neuanlage-Pfad wechseln, wo `mode: available` die
+  Auswahlbasis für Schritt 3 liefert.
+
+Melde direkt nach dem ersten Statusaufruf und vor der Statusmeldung Teil 2 des
+Argument-Meldeblocks:
+
+```text
+Ziel-Lauf: <YYYY-MM-DD>
+Modus: bestehend | neu
+```
 
 Melde kompakt:
 
@@ -265,6 +301,8 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 ## Anti-Muster (nicht tun)
 
 - Keinen Laufzustand aus Chat-Gedächtnis ableiten; immer MCP-Status lesen.
+- Argument nicht stillschweigend durch `new` oder `today` ersetzen.
+- Ohne Teil 1 des Argument-Meldeblocks nicht den ersten Statusaufruf machen.
 - `scan-triage` nicht als Review-Katalog-Rezept behandeln.
 - `review-triage.md` nicht über `k_playbook_review_write_ai_entry` schreiben; das
   Werkzeug schreibt nur den Entry-Zustand.
