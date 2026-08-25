@@ -246,8 +246,9 @@ bewusst **kein** Eintrag in `LocalStructure()` geblieben: `CreateLocal()` legt
 Datei-Einträge per `writeIfMissing` an, der neue Ort existierte danach immer — und die
 Übergangslesung des alten Orts liefe nie mehr an. `/k-gui` legt sie deshalb nicht an, ihr
 Zweck steht in [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd). Der alte
-Ort wird befristet weiter gelesen und der Umzug sichtbar gemeldet; der Ausbau hängt an
-Task 031.
+Ort wird bis zum 2027-02-28 weiter gelesen und der Umzug sichtbar gemeldet; der Ausbau
+steht als Eintrag in `k-playbook-local/TODO.md`, ausgelöst wird er durch den Kommentar an
+`legacyResultsDirName`.
 
 **Erledigt: Namensraum-Konvention für Command-Module.** Zusammen mit Task 018 festgelegt
 und in `rules/command-authoring.md` verankert: `commands/_<name>/` trägt Module (kein
