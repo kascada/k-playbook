@@ -62,27 +62,45 @@ type reviewWriteAIEntryInput struct {
 	Reason     string       `json:"reason,omitempty"`
 	StartedAt  string       `json:"startedAt,omitempty"`
 	FinishedAt string       `json:"finishedAt,omitempty"`
+	// Job ist die Fertigmeldung eines Evidence-Eintrags: der Ort des SARIF und
+	// die Zeiten seines Laufs. Er gehört zu mode: evidence und zu state: done —
+	// für eine Perspektive gibt es keinen Job, und ein noch laufender Eintrag
+	// hat sein Artefakt noch nicht.
+	Job *reviewAIJobInput `json:"job,omitempty"`
+}
+
+// reviewAIJobInput ist der Job-Teil der Ergebnismeldung. Er trägt dieselben
+// Angaben wie review.JobStatus, soweit ein Assistent sie kennt: Zustand,
+// Fundzahl und Job-Name entstehen beim Melden und werden nicht entgegengenommen.
+type reviewAIJobInput struct {
+	SARIF    string `json:"sarif" jsonschema:"Pflicht. Ort des SARIF, relativ zum Laufverzeichnis und unterhalb von raw/. Für einen Evidence-Eintrag ist das raw/<entry>.sarif."`
+	Started  string `json:"started,omitempty" jsonschema:"Optionale Startzeit des Rezeptlaufs im RFC3339-Format."`
+	Finished string `json:"finished,omitempty" jsonschema:"Optionale Endzeit des Rezeptlaufs im RFC3339-Format."`
 }
 
 type reviewCandidate struct {
-	Name              string        `json:"name"`
-	Kind              review.Kind   `json:"kind"`
-	Title             string        `json:"title"`
-	Selectable        bool          `json:"selectable"`
-	DefaultSelected   bool          `json:"defaultSelected"`
-	UnavailableReason string        `json:"unavailableReason"`
-	Detail            string        `json:"detail,omitempty"`
-	Languages         string        `json:"languages,omitempty"`
-	Status            string        `json:"status,omitempty"`
-	Path              string        `json:"path,omitempty"`
-	RecipeKey         string        `json:"recipeKey,omitempty"`
-	RecipePath        string        `json:"recipePath,omitempty"`
-	RecipeOrigin      string        `json:"recipeOrigin,omitempty"`
-	AuditEnabled      *bool         `json:"auditEnabled,omitempty"`
-	ReviewEnabled     *bool         `json:"reviewEnabled,omitempty"`
-	ResultRequired    *bool         `json:"resultRequired,omitempty"`
-	DefaultResult     string        `json:"defaultResult,omitempty"`
-	Scope             *review.Scope `json:"scope,omitempty"`
+	Name              string      `json:"name"`
+	Kind              review.Kind `json:"kind"`
+	Title             string      `json:"title"`
+	Selectable        bool        `json:"selectable"`
+	DefaultSelected   bool        `json:"defaultSelected"`
+	UnavailableReason string      `json:"unavailableReason"`
+	Detail            string      `json:"detail,omitempty"`
+	Languages         string      `json:"languages,omitempty"`
+	Status            string      `json:"status,omitempty"`
+	Path              string      `json:"path,omitempty"`
+	RecipeKey         string      `json:"recipeKey,omitempty"`
+	RecipePath        string      `json:"recipePath,omitempty"`
+	RecipeOrigin      string      `json:"recipeOrigin,omitempty"`
+	// Mode ist die Betriebsart eines AI-Rezepts: perspective oder evidence.
+	// Leer bei Tool-Kandidaten.
+	Mode           review.Mode   `json:"mode,omitempty"`
+	AuditEnabled   *bool         `json:"auditEnabled,omitempty"`
+	ReviewEnabled  *bool         `json:"reviewEnabled,omitempty"`
+	ResultRequired *bool         `json:"resultRequired,omitempty"`
+	DefaultResult  string        `json:"defaultResult,omitempty"`
+	RuleIDs        []string      `json:"ruleIds,omitempty"`
+	Scope          *review.Scope `json:"scope,omitempty"`
 }
 
 type reviewSelectionBase struct {
@@ -90,16 +108,43 @@ type reviewSelectionBase struct {
 	Candidates            []reviewCandidate `json:"candidates"`
 	UnavailableCandidates []reviewCandidate `json:"unavailableCandidates"`
 	DefaultEntries        []review.Entry    `json:"defaultEntries"`
-	Preflight             any               `json:"preflight,omitempty"`
+	// EvidenceCandidates und PerspectiveCandidates trennen die auswählbaren
+	// AI-Rezepte nach Betriebsart. Beide Listen stehen neben Candidates und
+	// nicht an deren Stelle: Evidence läuft vor dem Merge, Perspektiven danach,
+	// und diese Reihenfolge soll aus der Ausgabe ablesbar sein, ohne dass ein
+	// Command sie aus den Rezepten neu ableitet.
+	EvidenceCandidates    []string `json:"evidenceCandidates"`
+	PerspectiveCandidates []string `json:"perspectiveCandidates"`
+	Preflight             any      `json:"preflight,omitempty"`
 }
 
 type aiRecipeMetadata struct {
-	Enabled        bool
-	ReviewEnabled  bool
-	Title          string
+	Enabled       bool
+	ReviewEnabled bool
+	Title         string
+	// Mode ist audit.mode aus dem Rezept, normalisiert auf perspective oder
+	// evidence.
+	Mode           review.Mode
 	ResultRequired bool
-	DefaultResult  string
-	Scope          *review.Scope
+	// ResultRequiredSet meldet, ob audit.resultRequired im Rezept steht.
+	// ResultRequired allein sagt das nicht: sein Vorgabewert ist true.
+	ResultRequiredSet bool
+	DefaultResult     string
+	// RuleIDs ist die abschließende Rule-ID-Liste eines Evidence-Rezepts.
+	RuleIDs []string
+	Scope   *review.Scope
+}
+
+// auditContract macht aus den gelesenen Metadaten die Form, über die
+// review.ValidateAuditContract entscheidet.
+func (m aiRecipeMetadata) auditContract() review.AuditContract {
+	return review.AuditContract{
+		Mode:              m.Mode,
+		Scope:             m.Scope,
+		RuleIDs:           m.RuleIDs,
+		ResultRequiredSet: m.ResultRequiredSet,
+		DefaultResult:     m.DefaultResult,
+	}
 }
 
 type reviewProjectEnvelope struct {
@@ -152,6 +197,8 @@ const (
 	scanTriageEntry        = "scan-triage"
 	scanTriageModule       = "_audit/review-scan-triage.md"
 	scanTriageResult       = "review-triage.md"
+	reviewInputJSON        = "review-input.json"
+	reviewInputMarkdown    = "review-input.md"
 )
 
 func addReviewTools(server *mcp.Server) {
@@ -495,17 +542,188 @@ func writeAIEntry(env reviewEnvironment, input reviewWriteAIEntryInput) (map[str
 		StartedAt:  input.StartedAt,
 		FinishedAt: input.FinishedAt,
 	}
+	outcome, toolErr := evaluateEvidenceJob(runDir, entry, input)
+	if toolErr.Code != "" {
+		return nil, toolErr
+	}
+	if outcome.Present {
+		aiStatus.Jobs = []review.JobStatus{outcome.Job}
+		aiStatus.State = outcome.State
+		aiStatus.Reason = joinReason(input.Reason, outcome.Note)
+	}
 	if err := writeAIEntryStatusFile(runDir, aiStatus); err != nil {
 		return nil, wrapError(err, "write_failed", "AI-Entry-Status konnte nicht geschrieben werden.", map[string]any{"entry": input.Entry, "path": review.EntryFile(runDir, input.Entry)})
 	}
-	return map[string]any{
+	data := map[string]any{
 		"run":      input.Run,
 		"runDir":   runDir,
 		"entry":    input.Entry,
 		"path":     review.EntryFile(runDir, input.Entry),
 		"status":   aiStatus,
 		"runState": review.DeriveRunState(runDir, effectiveRunForStatus(env, run)),
-	}, reviewToolError{}
+	}
+	if outcome.Present {
+		data["evidence"] = map[string]any{
+			"sarif":           outcome.Job.SARIF,
+			"findings":        outcome.Report.Kept,
+			"droppedFindings": outcome.Report.Dropped,
+			"droppedPaths":    outcome.Report.DroppedPaths,
+			"sarifRewritten":  outcome.Rewritten,
+		}
+		// Der abweichende Zustand wird ausdrücklich gemeldet: das Werkzeug hat
+		// etwas anderes geschrieben als verlangt, und wer done gemeldet hat,
+		// soll das nicht erst im nächsten Status erfahren.
+		if outcome.State != input.State {
+			data["stateOverridden"] = true
+			data["requestedState"] = input.State
+		}
+	}
+	return data, reviewToolError{}
+}
+
+// evidenceOutcome ist das Ergebnis der SARIF-Prüfung beim Melden.
+type evidenceOutcome struct {
+	// Present meldet, ob überhaupt ein Job zu prüfen war.
+	Present bool
+	// State ist der Zustand, der in die Entry-Datei geht. Er weicht von der
+	// Meldung ab, wenn das SARIF ungültig ist.
+	State review.State
+	Job   review.JobStatus
+	// Note ist der Zusatz für den Grund: die Zahl der verworfenen Funde oder
+	// der Grund der Ungültigkeit.
+	Note      string
+	Report    review.EvidenceReport
+	Rewritten bool
+}
+
+// evaluateEvidenceJob prüft das gemeldete SARIF eines Evidence-Eintrags und
+// bereinigt es um Funde außerhalb des Pfad-Scopes.
+//
+// Die Fehler teilen sich in zwei Gruppen, und die Grenze verläuft dort, wo auch
+// die Zuständigkeit wechselt:
+//
+//   - Fehler des Aufrufs — ein Pfad außerhalb von raw/, eine fehlende oder leere
+//     Datei, ein Rezept ohne gültigen Evidence-Vertrag — werden abgewiesen, und
+//     es wird nichts geschrieben. Der Melder kann sie im nächsten Aufruf
+//     beheben, ohne das Rezept erneut laufen zu lassen.
+//   - Fehler des Artefakts — unlesbares SARIF, fremder Werkzeugname, eine
+//     Rule-ID außerhalb der Liste des Rezepts — machen den Eintrag failed und
+//     nennen den Grund. Sie bedeuten, dass das Rezept etwas Falsches erzeugt
+//     hat; repariert wird das über einen erneuten Lauf und nicht über einen
+//     zweiten Statusaufruf. Ein stilles done gibt es dafür nicht.
+//
+// Der Scope wirkt dazwischen als Teilannahme: verworfene Funde verschwinden aus
+// dem SARIF, ihre Zahl und die ersten Pfade stehen im Grund, der Eintrag bleibt
+// gültig.
+func evaluateEvidenceJob(runDir string, entry review.Entry, input reviewWriteAIEntryInput) (evidenceOutcome, reviewToolError) {
+	if input.Job == nil {
+		return evidenceOutcome{}, reviewToolError{}
+	}
+	relative := filepath.ToSlash(filepath.Clean(filepath.FromSlash(strings.TrimSpace(input.Job.SARIF))))
+	outcome := evidenceOutcome{
+		Present: true,
+		State:   input.State,
+		Job: review.JobStatus{
+			Job:      entry.Name,
+			State:    review.StateDone,
+			SARIF:    relative,
+			Started:  input.Job.Started,
+			Finished: input.Job.Finished,
+		},
+	}
+
+	sarifPath := filepath.Join(runDir, filepath.FromSlash(relative))
+	info, err := os.Stat(sarifPath)
+	if err != nil {
+		return evidenceOutcome{}, wrapError(err, "sarif_path_invalid", "SARIF-Artefakt existiert nicht.", map[string]any{"entry": input.Entry, "sarif": relative, "path": sarifPath})
+	}
+	if !info.Mode().IsRegular() || info.Size() == 0 {
+		return evidenceOutcome{}, reviewToolError{
+			Code:    "sarif_path_invalid",
+			Message: "SARIF-Artefakt ist keine nutzbare Datei.",
+			Details: map[string]any{"entry": input.Entry, "sarif": relative, "path": sarifPath},
+		}
+	}
+	ruleIDs, toolErr := evidenceRuleIDs(entry)
+	if toolErr.Code != "" {
+		return evidenceOutcome{}, toolErr
+	}
+	data, err := os.ReadFile(sarifPath)
+	if err != nil {
+		return evidenceOutcome{}, wrapError(err, "read_failed", "SARIF-Artefakt ist nicht lesbar.", map[string]any{"entry": input.Entry, "sarif": relative, "path": sarifPath})
+	}
+
+	report, err := review.CheckEvidenceSARIF(data, entry.Name, ruleIDs, entryScopePaths(entry))
+	if err != nil {
+		outcome.State = review.StateFailed
+		outcome.Note = err.Error()
+		outcome.Job.State = review.StateFailed
+		outcome.Job.Reason = err.Error()
+		return outcome, reviewToolError{}
+	}
+	if report.Cleaned != nil {
+		if err := writeFileAtomic(sarifPath, report.Cleaned); err != nil {
+			return evidenceOutcome{}, wrapError(err, "write_failed", "Bereinigtes SARIF konnte nicht geschrieben werden.", map[string]any{"entry": input.Entry, "sarif": relative, "path": sarifPath})
+		}
+		outcome.Rewritten = true
+	}
+	findings := report.Kept
+	outcome.Job.Findings = &findings
+	outcome.Job.Reason = report.ScopeNote()
+	outcome.Note = report.ScopeNote()
+	outcome.Report = report
+	return outcome, reviewToolError{}
+}
+
+// evidenceRuleIDs holt die Rule-ID-Liste aus dem Rezept des Eintrags.
+//
+// Nachgeladen statt im Lauf eingefroren: die Liste ist der Vertrag des Rezepts
+// und keine Festlegung des Laufs. Wer sie ändert, ändert sie für alle Läufe —
+// und ein Rezept, das seinen Evidence-Vertrag inzwischen nicht mehr erfüllt,
+// soll beim Melden auffallen und nicht mit einer halben Prüfung durchgehen.
+func evidenceRuleIDs(entry review.Entry) ([]string, reviewToolError) {
+	if strings.TrimSpace(entry.RecipePath) == "" {
+		return nil, reviewToolError{
+			Code:    "recipe_contract_invalid",
+			Message: "Evidence-Eintrag ohne Rezeptpfad — die Rule-ID-Liste ist nicht prüfbar.",
+			Details: map[string]any{"entry": entry.Name},
+		}
+	}
+	metadata, err := readAIRecipeMetadata(entry.RecipeKey, entry.RecipePath)
+	if err != nil {
+		return nil, wrapError(err, "read_failed", "Review-Rezept ist nicht lesbar.", map[string]any{"entry": entry.Name, "path": entry.RecipePath})
+	}
+	contract := metadata.auditContract()
+	contract.Mode = review.ModeEvidence
+	if err := review.ValidateAuditContract(contract); err != nil {
+		return nil, reviewToolError{
+			Code:    "recipe_contract_invalid",
+			Message: "Rezept erfüllt den Evidence-Vertrag nicht mehr.",
+			Details: map[string]any{"entry": entry.Name, "path": entry.RecipePath, "reason": err.Error()},
+		}
+	}
+	return metadata.RuleIDs, reviewToolError{}
+}
+
+func entryScopePaths(entry review.Entry) []string {
+	if entry.Scope == nil {
+		return nil
+	}
+	return entry.Scope.Paths
+}
+
+// joinReason hängt den Zusatz an den gemeldeten Grund an, ohne ihn zu ersetzen.
+func joinReason(reason string, note string) string {
+	reason = strings.TrimSpace(reason)
+	note = strings.TrimSpace(note)
+	switch {
+	case note == "":
+		return reason
+	case reason == "":
+		return note
+	default:
+		return reason + " — " + note
+	}
 }
 
 func writeInitialScanTriageEntry(runDir string, entries []review.Entry) error {
@@ -551,6 +769,9 @@ func validateAIEntryInput(runDir string, entry review.Entry, input reviewWriteAI
 			Message: "Eintragszustand ist ungültig.",
 			Details: map[string]any{"entry": input.Entry, "state": input.State, "allowed": []string{"running", "done", "failed", "skipped"}},
 		}
+	}
+	if toolErr := validateAIEntryJob(runDir, entry, input); toolErr.Code != "" {
+		return toolErr
 	}
 	if input.Result != "" {
 		if toolErr := validateResultPath(runDir, input.Result); toolErr.Code != "" {
@@ -614,6 +835,98 @@ func validateAIEntryInput(runDir string, entry review.Entry, input reviewWriteAI
 	return reviewToolError{}
 }
 
+// validateAIEntryJob prüft die Form der Ergebnismeldung an den beiden
+// Betriebsarten.
+//
+// mode: perspective bleibt unverändert: keine Jobs, das Markdown-Ergebnis ist
+// das Artefakt. mode: evidence kehrt das um — das SARIF ist Pflicht, eine
+// zweite Ergebnisdatei gibt es nicht. Der Job gehört dabei zur Fertigmeldung:
+// vorher ist das Artefakt noch nicht da, bei failed und skipped erklärt der
+// Grund den Ausgang.
+func validateAIEntryJob(runDir string, entry review.Entry, input reviewWriteAIEntryInput) reviewToolError {
+	evidence := review.EntryMode(entry) == review.ModeEvidence
+	if input.Job != nil {
+		if !evidence {
+			return reviewToolError{
+				Code:    "entry_job_invalid",
+				Message: "Ein Job gehört zu mode: evidence.",
+				Details: map[string]any{"entry": input.Entry, "mode": review.EntryMode(entry)},
+			}
+		}
+		if input.State != review.StateDone {
+			return reviewToolError{
+				Code:    "entry_job_invalid",
+				Message: "Ein Job gehört zur Fertigmeldung eines Evidence-Eintrags.",
+				Details: map[string]any{"entry": input.Entry, "state": input.State, "expectedState": review.StateDone},
+			}
+		}
+		if toolErr := validateSARIFPath(runDir, input.Entry, input.Job.SARIF); toolErr.Code != "" {
+			return toolErr
+		}
+		for field, value := range map[string]string{"job.started": input.Job.Started, "job.finished": input.Job.Finished} {
+			if value == "" {
+				continue
+			}
+			if _, err := time.Parse(time.RFC3339, value); err != nil {
+				return reviewToolError{
+					Code:    "entry_state_invalid",
+					Message: "Zeitstempel ist ungültig.",
+					Details: map[string]any{"entry": input.Entry, "field": field, "value": value, "layout": time.RFC3339},
+				}
+			}
+		}
+	}
+	if !evidence {
+		return reviewToolError{}
+	}
+	if input.Result != "" {
+		return reviewToolError{
+			Code:    "entry_result_invalid",
+			Message: "Ein Evidence-Eintrag hat keine Ergebnisdatei — Pflichtartefakt ist raw/<entry>.sarif.",
+			Details: map[string]any{"entry": input.Entry, "result": input.Result, "sarif": review.EvidenceSARIFPath(input.Entry)},
+		}
+	}
+	if input.State == review.StateDone && input.Job == nil {
+		return reviewToolError{
+			Code:    "sarif_required",
+			Message: "Ein fertiger Evidence-Eintrag braucht einen Job mit SARIF-Pfad.",
+			Details: map[string]any{"entry": input.Entry, "sarif": review.EvidenceSARIFPath(input.Entry)},
+		}
+	}
+	return reviewToolError{}
+}
+
+// validateSARIFPath prüft den gemeldeten SARIF-Pfad auf seine Form: relativ zum
+// Laufverzeichnis, innerhalb davon und unterhalb von raw/. Das Verzeichnis ist
+// der Ort der Rohdaten, und der Merge sammelt von dort ein — ein Artefakt
+// daneben würde nie gelesen.
+func validateSARIFPath(runDir string, entry string, value string) reviewToolError {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return reviewToolError{
+			Code:    "sarif_path_invalid",
+			Message: "Der Job braucht einen SARIF-Pfad.",
+			Details: map[string]any{"entry": entry, "sarif": review.EvidenceSARIFPath(entry)},
+		}
+	}
+	if toolErr := validateResultPath(runDir, trimmed); toolErr.Code != "" {
+		return reviewToolError{
+			Code:    "sarif_path_invalid",
+			Message: "SARIF-Pfad muss relativ zum Laufverzeichnis sein und darf es nicht verlassen.",
+			Details: map[string]any{"entry": entry, "sarif": value},
+		}
+	}
+	cleaned := filepath.ToSlash(filepath.Clean(filepath.FromSlash(trimmed)))
+	if !strings.HasPrefix(cleaned, review.RawDirName+"/") {
+		return reviewToolError{
+			Code:    "sarif_path_invalid",
+			Message: "SARIF-Pfad muss unterhalb von " + review.RawDirName + "/ liegen.",
+			Details: map[string]any{"entry": entry, "sarif": value, "expected": review.EvidenceSARIFPath(entry)},
+		}
+	}
+	return reviewToolError{}
+}
+
 func validateResultPath(runDir string, value string) reviewToolError {
 	if filepath.IsAbs(value) || filepath.Clean(value) == "." {
 		return reviewToolError{
@@ -647,13 +960,19 @@ func writeAIEntryStatusFile(runDir string, status aiEntryStatus) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
-	target := review.EntryFile(runDir, status.Name)
-	dir := filepath.Dir(target)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(review.EntryFile(runDir, status.Name)), 0o755); err != nil {
 		return err
 	}
-	temp, err := os.CreateTemp(dir, "."+status.Name+".*.json")
+	return writeFileAtomic(review.EntryFile(runDir, status.Name), append(data, '\n'))
+}
+
+// writeFileAtomic ersetzt eine Datei über eine Temp-Datei im selben
+// Verzeichnis. Ein Leser, der während des Schreibens nachschaut, sieht die alte
+// Fassung oder die neue, nie eine halbe — das gilt für die Entry-Datei wie für
+// das bereinigte SARIF, das an die Stelle des gemeldeten tritt.
+func writeFileAtomic(target string, data []byte) error {
+	dir := filepath.Dir(target)
+	temp, err := os.CreateTemp(dir, "."+filepath.Base(target)+".*")
 	if err != nil {
 		return err
 	}
@@ -801,20 +1120,115 @@ func reviewExistingStatus(env reviewEnvironment, runName string) (map[string]any
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
-	artifacts, toolErr := listExistingArtifacts(runDir, []string{"review-input.json", "review-input.md", scanTriageResult})
+	artifacts, modified, toolErr := listExistingArtifacts(runDir, []string{reviewInputJSON, reviewInputMarkdown, scanTriageResult})
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
+	evidence, perspectives := entriesByMode(effectiveRun)
 	return map[string]any{
-		"mode":        "existing",
-		"run":         runName,
-		"runDir":      runDir,
-		"runJSON":     run,
-		"state":       review.DeriveRunState(runDir, effectiveRun),
-		"entries":     entries,
-		"rawSarif":    raw,
-		"reviewInput": artifacts,
+		"mode":    "existing",
+		"run":     runName,
+		"runDir":  runDir,
+		"runJSON": run,
+		"state":   review.DeriveRunState(runDir, effectiveRun),
+		"entries": entries,
+		// Die beiden Listen halten die Reihenfolge des Laufs fest:
+		// Evidence-Einträge liefern Rohdaten und laufen vor dem Merge,
+		// Perspektiven bewerten review-input.json und laufen danach.
+		"evidenceEntries":    evidence,
+		"perspectiveEntries": perspectives,
+		"rawSarif":           raw,
+		"reviewInput":        artifacts,
+		"triage":             triageFreshness(artifacts, modified, entryFinishedAt(entries, scanTriageEntry)),
 	}, reviewToolError{}
+}
+
+// Zustände der Bewertung eines Laufs. Sie stehen neben dem Eintragszustand von
+// scan-triage und ersetzen ihn nicht: der Eintrag sagt, ob die Bewertung
+// geschrieben wurde, diese drei sagen, ob sie noch gilt.
+const (
+	triageStateMissing = "missing"
+	triageStateCurrent = "current"
+	triageStateStale   = "stale"
+)
+
+// triageFreshness vergleicht die Änderungszeit von review-input.json mit der
+// Endzeit des Eintrags scan-triage.
+//
+// Der Grund für den Vergleich: markAIRepairStatus misst an review-triage.md nur
+// Existenz und Größe. Ein erneuter Merge — der reguläre Weg, wenn Evidence
+// nachträglich eintrifft — lässt den Eintrag deshalb done und konsistent, obwohl
+// die Bewertung einen Stand beschreibt, den es nicht mehr gibt.
+//
+// Nicht belegbar heißt hier stale und nicht current: fehlt review-input.json
+// oder nennt der Eintrag keine brauchbare Endzeit, lässt sich die Aktualität
+// nicht zeigen, und eine unbelegte Bewertung darf einen Lauf nicht vollständig
+// aussehen lassen. Der Grund sagt jeweils, welcher Fall vorlag.
+//
+// Gleiche Zeiten gelten als aktuell: die Bewertung entsteht nach dem Merge, und
+// ein Merge danach hinterlässt eine echt spätere Änderungszeit.
+func triageFreshness(artifacts map[string]string, modified map[string]time.Time, finishedAt string) map[string]any {
+	status := map[string]any{"result": scanTriageResult, "state": triageStateMissing}
+	if _, found := artifacts[scanTriageResult]; !found {
+		return status
+	}
+	status["finishedAt"] = finishedAt
+	mergedAt, found := modified[reviewInputJSON]
+	if !found {
+		status["state"] = triageStateStale
+		status["reason"] = reviewInputJSON + " fehlt — die Aktualität der Bewertung ist nicht belegbar."
+		return status
+	}
+	status["reviewInputModified"] = mergedAt.Format(timeLayout)
+	finished, err := time.Parse(timeLayout, strings.TrimSpace(finishedAt))
+	if err != nil {
+		status["state"] = triageStateStale
+		if strings.TrimSpace(finishedAt) == "" {
+			status["reason"] = "Der Eintrag " + scanTriageEntry + " nennt keine Endzeit — die Aktualität der Bewertung ist nicht belegbar."
+			return status
+		}
+		status["reason"] = "Die Endzeit des Eintrags " + scanTriageEntry + " ist kein " + timeLayout + "-Zeitstempel — die Aktualität der Bewertung ist nicht belegbar."
+		return status
+	}
+	if mergedAt.After(finished) {
+		status["state"] = triageStateStale
+		status["reason"] = reviewInputJSON + " ist jünger als die Bewertung — der Merge lief danach."
+		return status
+	}
+	status["state"] = triageStateCurrent
+	return status
+}
+
+// entryFinishedAt liest die Endzeit eines AI-Eintrags aus der Statusliste, die
+// gerade gebaut wurde — nicht aus einem zweiten Dateizugriff. Der Vergleich soll
+// genau die Zeit benutzen, die der Status auch meldet.
+func entryFinishedAt(entries []map[string]any, name string) string {
+	for _, item := range entries {
+		if item["name"] != name {
+			continue
+		}
+		finished, _ := item["finishedAt"].(string)
+		return finished
+	}
+	return ""
+}
+
+// entriesByMode trennt die AI-Einträge eines Laufs nach Betriebsart.
+// Tool-Einträge stehen in keiner der beiden Listen: sie haben keine.
+func entriesByMode(run review.Run) ([]string, []string) {
+	evidence := []string{}
+	perspectives := []string{}
+	for _, entry := range run.Entries {
+		if entry.Kind != review.KindAI {
+			continue
+		}
+		if review.EntryMode(entry) == review.ModeEvidence {
+			evidence = append(evidence, entry.Name)
+			continue
+		}
+		perspectives = append(perspectives, entry.Name)
+	}
+	return evidence, perspectives
 }
 
 func effectiveRunForStatus(env reviewEnvironment, run review.Run) review.Run {
@@ -878,13 +1292,14 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		resultRequired := metadata.ResultRequired
 		auditEnabled := metadata.Enabled
 		reviewEnabled := metadata.ReviewEnabled
-		candidates = append(candidates, reviewCandidate{
+		candidate := reviewCandidate{
 			Name:            entry.Key,
 			Kind:            review.KindAI,
 			Title:           metadata.Title,
 			Selectable:      true,
 			DefaultSelected: true,
 			Detail:          originLabel(entry.Origin),
+			Mode:            metadata.Mode,
 			RecipeKey:       entry.Key,
 			RecipePath:      entry.Path,
 			RecipeOrigin:    entry.Origin,
@@ -892,8 +1307,22 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 			ReviewEnabled:   &reviewEnabled,
 			ResultRequired:  &resultRequired,
 			DefaultResult:   metadata.DefaultResult,
+			RuleIDs:         append([]string{}, metadata.RuleIDs...),
 			Scope:           cloneReviewScope(metadata.Scope),
-		})
+		}
+		if len(candidate.RuleIDs) == 0 {
+			candidate.RuleIDs = nil
+		}
+		// Ein Rezept mit widersprüchlichem audit-Block wird nicht
+		// stillschweigend zurechtgebogen, sondern fällt aus der Auswahl: es
+		// bliebe sonst offen, welche Hälfte des Vertrags gilt. Der Grund steht
+		// am Kandidaten und ist damit im Status sichtbar.
+		if err := review.ValidateAuditContract(metadata.auditContract()); err != nil {
+			candidate.Selectable = false
+			candidate.DefaultSelected = false
+			candidate.UnavailableReason = "Audit-Vertrag ungültig: " + err.Error()
+		}
+		candidates = append(candidates, candidate)
 	}
 	if candidate, ok := scanTriageCandidate(env); ok {
 		candidates = append(candidates, candidate)
@@ -906,10 +1335,19 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 	})
 	unavailable := []reviewCandidate{}
 	defaults := []review.Entry{}
+	evidence := []string{}
+	perspectives := []string{}
 	for _, candidate := range candidates {
 		if !candidate.Selectable {
 			unavailable = append(unavailable, candidate)
 			continue
+		}
+		if candidate.Kind == review.KindAI {
+			if review.NormalizeMode(candidate.Mode) == review.ModeEvidence {
+				evidence = append(evidence, candidate.Name)
+			} else {
+				perspectives = append(perspectives, candidate.Name)
+			}
 		}
 		if candidate.DefaultSelected {
 			defaults = append(defaults, entryFromCandidate(candidate))
@@ -920,6 +1358,8 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		Candidates:            candidates,
 		UnavailableCandidates: unavailable,
 		DefaultEntries:        defaults,
+		EvidenceCandidates:    evidence,
+		PerspectiveCandidates: perspectives,
 		Preflight:             preflight,
 	}, reviewToolError{}
 }
@@ -1041,6 +1481,11 @@ func entryFromCandidate(candidate reviewCandidate) review.Entry {
 		entry.RecipePath = candidate.RecipePath
 		entry.RecipeOrigin = candidate.RecipeOrigin
 		entry.Title = candidate.Title
+		// Die Betriebsart wird ausgeschrieben und nicht bei perspective
+		// weggelassen: der Lauf soll aus sich heraus sagen, wie ein Eintrag
+		// gemeint war. Das leere Feld bleibt trotzdem lesbar — es ist die Form
+		// der Läufe von vor der Evidence-Betriebsart.
+		entry.Mode = review.NormalizeMode(candidate.Mode)
 		entry.ResultRequired = candidate.ResultRequired
 		entry.DefaultResult = candidate.DefaultResult
 		entry.Scope = cloneReviewScope(candidate.Scope)
@@ -1055,6 +1500,9 @@ func cloneReviewScope(scope *review.Scope) *review.Scope {
 	cloned := &review.Scope{}
 	if scope.Tools != nil {
 		cloned.Tools = append([]string{}, scope.Tools...)
+	}
+	if scope.Paths != nil {
+		cloned.Paths = append([]string{}, scope.Paths...)
 	}
 	return cloned
 }
@@ -1073,6 +1521,20 @@ func readAIRecipeMetadata(key string, path string) (aiRecipeMetadata, error) {
 			parseAIRecipeFrontmatter(content[:end], &metadata)
 			body = content[end:]
 		}
+	}
+	metadata.Mode = review.NormalizeMode(metadata.Mode)
+	// Für mode: evidence ist raw/<entry>.sarif das Pflichtartefakt; eine
+	// Ergebnisdatei gibt es nicht. ResultRequired wird deshalb hart auf false
+	// gesetzt und nicht bloß nicht gelesen: seine Vorgabe ist true, und mit ihr
+	// meldete review_status jeden erfolgreichen Evidence-Eintrag als
+	// resultMissing und inconsistent.
+	//
+	// ResultRequiredSet und DefaultResult bleiben dagegen so stehen, wie sie im
+	// Rezept stehen. Sie sind die Eingabe für ValidateAuditContract, das genau
+	// diese beiden Felder neben mode: evidence als Fehler meldet — überschrieben
+	// wären sie dort nicht mehr zu sehen.
+	if metadata.Mode == review.ModeEvidence {
+		metadata.ResultRequired = false
 	}
 	if metadata.Title == "" {
 		metadata.Title = firstHeading(body)
@@ -1114,31 +1576,43 @@ func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 	inAudit := false
 	inReview := false
 	inScope := false
-	inTools := false
+	// listKey ist der Name der zuletzt geöffneten Blockliste — tools, paths
+	// oder ruleIds. Ein einzelnes Flag reichte, solange nur scope.tools eine
+	// Liste war; mit scope.paths und audit.ruleIds muss beim Einsammeln
+	// bekannt sein, wohin die Einträge gehören.
+	listKey := ""
 	blockIndent := -1
 	scopeIndent := -1
-	toolsIndent := -1
+	listIndent := -1
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-		if inTools && indent <= toolsIndent {
-			inTools = false
+		if listKey != "" && indent <= listIndent {
+			listKey = ""
 		}
 		if inScope && indent <= scopeIndent {
 			inScope = false
-			inTools = false
+			listKey = ""
 		}
 		if (inAudit || inReview) && indent <= blockIndent {
 			inAudit = false
 			inReview = false
 			inScope = false
-			inTools = false
+			listKey = ""
 		}
-		if inTools && strings.HasPrefix(trimmed, "- ") {
-			metadata.Scope = appendScopeTools(metadata.Scope, strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+		if listKey != "" && strings.HasPrefix(trimmed, "- ") {
+			item := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			switch listKey {
+			case "tools":
+				metadata.Scope = appendScopeTools(metadata.Scope, item)
+			case "paths":
+				metadata.Scope = appendScopePaths(metadata.Scope, item)
+			case "ruleIds":
+				metadata.RuleIDs = appendUniqueValues(metadata.RuleIDs, parseFrontmatterStringList(item))
+			}
 			continue
 		}
 		if strings.HasSuffix(trimmed, ":") {
@@ -1175,13 +1649,17 @@ func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 			metadata.ReviewEnabled = value != "false"
 			continue
 		}
-		if inAudit && inScope && indent > scopeIndent && field == "tools" {
+		if inAudit && inScope && indent > scopeIndent && (field == "tools" || field == "paths") {
 			if value == "" {
-				inTools = true
-				toolsIndent = indent
+				listKey = field
+				listIndent = indent
 				continue
 			}
-			metadata.Scope = appendScopeTools(metadata.Scope, value)
+			if field == "tools" {
+				metadata.Scope = appendScopeTools(metadata.Scope, value)
+			} else {
+				metadata.Scope = appendScopePaths(metadata.Scope, value)
+			}
 			continue
 		}
 		if !inAudit {
@@ -1192,10 +1670,20 @@ func parseAIRecipeFrontmatter(frontmatter string, metadata *aiRecipeMetadata) {
 			metadata.Enabled = value != "false"
 		case "title":
 			metadata.Title = value
+		case "mode":
+			metadata.Mode = review.Mode(value)
 		case "resultRequired":
 			metadata.ResultRequired = value != "false"
+			metadata.ResultRequiredSet = true
 		case "defaultResult":
 			metadata.DefaultResult = value
+		case "ruleIds":
+			if value == "" {
+				listKey = "ruleIds"
+				listIndent = indent
+				continue
+			}
+			metadata.RuleIDs = appendUniqueValues(metadata.RuleIDs, parseFrontmatterStringList(value))
 		}
 	}
 }
@@ -1208,15 +1696,34 @@ func appendScopeTools(scope *review.Scope, value string) *review.Scope {
 	if scope == nil {
 		scope = &review.Scope{}
 	}
-	seen := stringsSet(scope.Tools)
-	for _, tool := range tools {
-		if seen[tool] {
+	scope.Tools = appendUniqueValues(scope.Tools, tools)
+	return scope
+}
+
+func appendScopePaths(scope *review.Scope, value string) *review.Scope {
+	paths := parseFrontmatterStringList(value)
+	if len(paths) == 0 {
+		return scope
+	}
+	if scope == nil {
+		scope = &review.Scope{}
+	}
+	scope.Paths = appendUniqueValues(scope.Paths, paths)
+	return scope
+}
+
+// appendUniqueValues hängt an, was noch nicht dasteht. Ein Rezept, das eine
+// Liste zweimal schreibt, soll den Eintrag nicht zweimal in den Lauf tragen.
+func appendUniqueValues(existing []string, values []string) []string {
+	seen := stringsSet(existing)
+	for _, value := range values {
+		if seen[value] {
 			continue
 		}
-		scope.Tools = append(scope.Tools, tool)
-		seen[tool] = true
+		existing = append(existing, value)
+		seen[value] = true
 	}
-	return scope
+	return existing
 }
 
 func parseFrontmatterStringList(value string) []string {
@@ -1273,6 +1780,7 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			item["recipePath"] = entry.RecipePath
 			item["recipeOrigin"] = entry.RecipeOrigin
 			item["title"] = entry.Title
+			item["mode"] = review.EntryMode(entry)
 			item["resultRequired"] = entryResultRequired(entry)
 			if entry.Scope != nil {
 				item["scope"] = cloneReviewScope(entry.Scope)
@@ -1280,12 +1788,13 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			if entry.DefaultResult != "" {
 				item["defaultResult"] = entry.DefaultResult
 			}
-			defaultResultState := aiResultStateFor(runDir, entry.DefaultResult)
+			defaultResultState := aiArtifactStateFor(runDir, entry.DefaultResult)
 			status := aiEntryStatus{}
 			err := readAIEntryStatus(runDir, entry.Name, &status)
 			if err != nil {
 				if os.IsNotExist(err) {
-					markAIRepairStatus(item, entry, review.StateStart, "", defaultResultState)
+					sarif, sarifJob := evidenceArtifact(runDir, entry, nil)
+					markAIRepairStatus(item, entry, aiStatusView{State: review.StateStart, ResultFile: defaultResultState, SARIF: sarif, SARIFJob: sarifJob})
 					entries = append(entries, item)
 					continue
 				}
@@ -1297,11 +1806,15 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 			item["reason"] = status.Reason
 			item["startedAt"] = status.StartedAt
 			item["finishedAt"] = status.FinishedAt
+			if len(status.Jobs) > 0 {
+				item["jobs"] = status.Jobs
+			}
 			resultState := defaultResultState
 			if status.Result != "" {
-				resultState = aiResultStateFor(runDir, status.Result)
+				resultState = aiArtifactStateFor(runDir, status.Result)
 			}
-			markAIRepairStatus(item, entry, status.State, status.Result, resultState)
+			sarif, sarifJob := evidenceArtifact(runDir, entry, status.Jobs)
+			markAIRepairStatus(item, entry, aiStatusView{State: status.State, Result: status.Result, ResultFile: resultState, SARIF: sarif, SARIFJob: sarifJob})
 			entries = append(entries, item)
 			continue
 		}
@@ -1324,23 +1837,27 @@ func statusEntries(runDir string, run review.Run) ([]map[string]any, reviewToolE
 	return entries, reviewToolError{}
 }
 
-type aiResultState struct {
-	Result   string
+// aiArtifactState ist der Zustand eines Pflichtartefakts im Laufordner — der
+// Ergebnisdatei einer Perspektive oder des SARIF einer Evidence-Quelle. Beide
+// werden gleich befragt: liegt die Datei da, hat sie Inhalt, ist ihr Pfad
+// überhaupt zulässig.
+type aiArtifactState struct {
+	Path     string
 	Exists   bool
 	NonEmpty bool
 	Invalid  bool
 }
 
-func aiResultStateFor(runDir string, result string) aiResultState {
-	state := aiResultState{Result: result}
-	if strings.TrimSpace(result) == "" {
+func aiArtifactStateFor(runDir string, relative string) aiArtifactState {
+	state := aiArtifactState{Path: relative}
+	if strings.TrimSpace(relative) == "" {
 		return state
 	}
-	if err := validateResultPath(runDir, result); err.Code != "" {
+	if err := validateResultPath(runDir, relative); err.Code != "" {
 		state.Invalid = true
 		return state
 	}
-	info, err := os.Stat(filepath.Join(runDir, filepath.FromSlash(result)))
+	info, err := os.Stat(filepath.Join(runDir, filepath.FromSlash(relative)))
 	if err != nil || !info.Mode().IsRegular() {
 		return state
 	}
@@ -1349,26 +1866,89 @@ func aiResultStateFor(runDir string, result string) aiResultState {
 	return state
 }
 
-func markAIRepairStatus(item map[string]any, entry review.Entry, state review.State, statusResult string, result aiResultState) {
-	if result.Result != "" && result.Exists {
+// aiStatusView ist, was über einen AI-Eintrag auf der Platte bekannt ist: sein
+// gemeldeter Zustand und der Zustand seiner Artefakte.
+type aiStatusView struct {
+	State  review.State
+	Result string
+	// ResultFile ist die Ergebnisdatei einer Perspektive.
+	ResultFile aiArtifactState
+	// SARIF ist das Pflichtartefakt einer Evidence-Quelle.
+	SARIF aiArtifactState
+	// SARIFJob meldet, ob der Eintrag einen fertigen Job mit SARIF-Pfad führt.
+	// Ohne ihn liest der Merge die Datei nicht ein, auch wenn sie dasteht.
+	SARIFJob bool
+}
+
+// markAIRepairStatus setzt die Marker, an denen /k-audit einen Eintrag als
+// inkonsistent oder reparierbar erkennt.
+//
+// Für mode: evidence entscheidet dabei das SARIF und nicht die Ergebnisdatei:
+// konsistent ist done mit Job und vorhandenem raw/<entry>.sarif. Ohne diese
+// Unterscheidung wäre jeder erfolgreiche Evidence-Eintrag resultMissing — er
+// schreibt ja gerade keine Ergebnisdatei.
+func markAIRepairStatus(item map[string]any, entry review.Entry, view aiStatusView) {
+	if review.EntryMode(entry) == review.ModeEvidence {
+		markEvidenceRepairStatus(item, view)
+		return
+	}
+	if view.ResultFile.Path != "" && view.ResultFile.Exists {
 		item["resultExists"] = true
 	}
-	if result.Invalid {
+	if view.ResultFile.Invalid {
 		item["resultInvalid"] = true
 		item["inconsistent"] = true
 	}
-	if state == review.StateDone && entryResultRequired(entry) {
-		if strings.TrimSpace(statusResult) == "" || result.Result == "" || !result.Exists || !result.NonEmpty {
+	if view.State == review.StateDone && entryResultRequired(entry) {
+		if strings.TrimSpace(view.Result) == "" || view.ResultFile.Path == "" || !view.ResultFile.Exists || !view.ResultFile.NonEmpty {
 			item["resultMissing"] = true
 			item["inconsistent"] = true
 		}
 	}
-	if state == review.StateStart || state == review.StateRunning {
-		if result.Exists && result.NonEmpty {
+	if view.State == review.StateStart || view.State == review.StateRunning {
+		if view.ResultFile.Exists && view.ResultFile.NonEmpty {
 			item["repairable"] = true
 			item["repairReason"] = "Ergebnisdatei vorhanden, Entry-Status offen oder fehlt."
 		}
 	}
+}
+
+func markEvidenceRepairStatus(item map[string]any, view aiStatusView) {
+	item["sarif"] = view.SARIF.Path
+	if view.SARIF.Exists {
+		item["sarifExists"] = true
+	}
+	if view.SARIF.Invalid {
+		item["sarifInvalid"] = true
+		item["inconsistent"] = true
+	}
+	if view.State == review.StateDone && (!view.SARIFJob || !view.SARIF.Exists || !view.SARIF.NonEmpty) {
+		item["sarifMissing"] = true
+		item["inconsistent"] = true
+	}
+	// Gültiges SARIF bei offenem oder fehlendem Entry-Status ist über
+	// k_playbook_review_write_ai_entry reparierbar — der Lauf des Rezepts muss
+	// dafür nicht wiederholt werden.
+	if view.State == review.StateStart || view.State == review.StateRunning {
+		if view.SARIF.Exists && view.SARIF.NonEmpty {
+			item["repairable"] = true
+			item["repairReason"] = "SARIF vorhanden, Entry-Status offen oder fehlt."
+		}
+	}
+}
+
+// evidenceArtifact ist der Ort des SARIF eines Evidence-Eintrags: der gemeldete
+// Job-Pfad, sonst der Ort aus dem Vertrag. Der Rückfall trägt den Reparaturfall
+// — ohne Entry-Datei gibt es keinen Job, und trotzdem soll ein dort liegendes
+// SARIF sichtbar sein.
+func evidenceArtifact(runDir string, entry review.Entry, jobs []review.JobStatus) (aiArtifactState, bool) {
+	for _, job := range jobs {
+		if strings.TrimSpace(job.SARIF) == "" {
+			continue
+		}
+		return aiArtifactStateFor(runDir, job.SARIF), job.State == review.StateDone
+	}
+	return aiArtifactStateFor(runDir, review.EvidenceSARIFPath(entry.Name)), false
 }
 
 type aiEntryStatus struct {
@@ -1379,6 +1959,13 @@ type aiEntryStatus struct {
 	Reason     string       `json:"reason,omitempty"`
 	StartedAt  string       `json:"startedAt,omitempty"`
 	FinishedAt string       `json:"finishedAt,omitempty"`
+	// Jobs ist dieselbe Darstellung wie in review.EntryStatus und keine zweite
+	// daneben: der Merge liest die Entry-Dateien über review.ReadEntryStatus,
+	// und ein eigenes Job-Format wäre dort unsichtbar. Weggelassen wird das
+	// Feld, wo es keinen Job gibt — die Dateien der Perspektiven behalten damit
+	// genau die Form, die sie bisher hatten, und Dateien aus der Zeit davor
+	// bleiben lesbar.
+	Jobs []review.JobStatus `json:"jobs,omitempty"`
 }
 
 func readAIEntryStatus(runDir string, name string, status *aiEntryStatus) error {
@@ -1395,7 +1982,18 @@ func readAIEntryStatus(runDir string, name string, status *aiEntryStatus) error 
 	return nil
 }
 
+// entryResultRequired meldet, ob ein Eintrag eine Ergebnisdatei braucht.
+//
+// Für mode: evidence ist die Antwort nein, und zwar unabhängig davon, was im
+// Lauf steht: das Pflichtartefakt ist raw/<entry>.sarif. Der Wert in run.json
+// wird beim Anlegen zwar schon auf false gesetzt (readAIRecipeMetadata), aber
+// die Vorgabe dieser Funktion ist true — ein Altlauf oder eine von Hand
+// geschriebene run.json meldete sonst jeden erfolgreichen Evidence-Eintrag als
+// resultMissing und inconsistent.
 func entryResultRequired(entry review.Entry) bool {
+	if review.EntryMode(entry) == review.ModeEvidence {
+		return false
+	}
 	if entry.ResultRequired == nil {
 		return true
 	}
@@ -1421,8 +2019,16 @@ func listRunFiles(dir string, suffix string) ([]string, reviewToolError) {
 	return files, reviewToolError{}
 }
 
-func listExistingArtifacts(runDir string, names []string) (map[string]string, reviewToolError) {
+// listExistingArtifacts sammelt die Artefakte, die im Laufordner wirklich
+// liegen, samt ihren Änderungszeiten.
+//
+// Die Zeiten stehen neben der Pfadzuordnung und nicht in ihr: reviewInput bleibt
+// damit die Zuordnung Name → Pfad, die es bisher war, und der Zeitvergleich der
+// Bewertung bekommt trotzdem seine Grundlage, ohne dieselben Dateien ein zweites
+// Mal zu statten.
+func listExistingArtifacts(runDir string, names []string) (map[string]string, map[string]time.Time, reviewToolError) {
 	artifacts := map[string]string{}
+	modified := map[string]time.Time{}
 	for _, name := range names {
 		path := filepath.Join(runDir, name)
 		info, err := os.Stat(path)
@@ -1430,13 +2036,14 @@ func listExistingArtifacts(runDir string, names []string) (map[string]string, re
 			if os.IsNotExist(err) {
 				continue
 			}
-			return nil, wrapError(err, "read_failed", "Artefakt ist nicht lesbar.", map[string]any{"path": path})
+			return nil, nil, wrapError(err, "read_failed", "Artefakt ist nicht lesbar.", map[string]any{"path": path})
 		}
 		if info.Mode().IsRegular() {
 			artifacts[name] = path
+			modified[name] = info.ModTime()
 		}
 	}
-	return artifacts, reviewToolError{}
+	return artifacts, modified, reviewToolError{}
 }
 
 func isNotExist(err error) bool {

@@ -150,6 +150,17 @@ vorbehalten. Fehlercodes sind stabil und in `snake_case`, unter anderem
 `entry_state_invalid`, `result_required`, `result_path_invalid`, `read_failed`,
 `write_failed`, `preflight_failed`, `execution_failed` und `merge_failed`.
 
+Dazu die Codes der Evidence-Betriebsart, alle aus `k_playbook_review_write_ai_entry`:
+`entry_job_invalid` (ein Job an einer Perspektive oder an einer Meldung, die nicht
+`done` ist), `entry_result_invalid` (`result` an einem Evidence-Eintrag, der keine
+Ergebnisdatei hat), `sarif_required` (`done` ohne Job), `sarif_path_invalid` (Pfad
+außerhalb von `raw/`, Datei fehlt oder ist leer) und `recipe_contract_invalid` (das
+Rezept erfüllt den Evidence-Vertrag nicht mehr, die Rule-ID-Liste ist damit nicht
+prüfbar). Sie alle sind **Fehler des Aufrufs**: das Werkzeug schreibt nichts, und der
+Rezeptlauf muss nicht wiederholt werden. Ein ungültiges **Artefakt** — unlesbares SARIF,
+falscher `tool.driver.name`, fremde Rule-ID — ist dagegen kein Fehlercode, sondern ein
+geschriebener Entry-Status `failed` mit Grund und `stateOverridden: true` in der Antwort.
+
 ### Auswahlvalidierung
 
 `k_playbook_review_status` im Modus `available` und `k_playbook_review_create` benutzen
@@ -159,7 +170,15 @@ dieselbe Auswahlbasis. Kandidaten enthalten mindestens `name`, `kind`, `title`,
 Tool-Kandidaten kommen aus der Tool-Matrix und dem Preflight, gefiltert nach
 `project.languages`. Nicht installierte oder sprachlich unpassende Tools bleiben sichtbar,
 sind aber nicht `defaultSelected`. AI-Kandidaten kommen aus dem effektiven Review-Katalog;
-abgeschaltete lokale Review-Dateien und Rezepte mit `audit.enabled: false` fehlen.
+abgeschaltete lokale Review-Dateien und Rezepte mit `audit.enabled: false` fehlen. Ein
+Rezept mit widersprüchlichem `audit`-Block — etwa `mode: evidence` ohne `ruleIds` oder mit
+`scope.tools` — wird nicht zurechtgebogen: es steht unter `unavailableCandidates` mit
+`selectable: false` und einem `unavailableReason`, der die verletzte Regel nennt.
+
+AI-Kandidaten tragen zusätzlich `mode`. Die Auswahlbasis stellt daneben
+`evidenceCandidates` und `perspectiveCandidates`, im bestehenden Lauf `evidenceEntries`
+und `perspectiveEntries` — die Reihenfolge des Laufs soll aus der Ausgabe ablesbar sein,
+ohne dass ein Command sie aus den Rezepten neu ableitet.
 
 Ohne `entries` wählt `k_playbook_review_create` alle Kandidaten mit
 `defaultSelected: true`. Unbekannte Namen ergeben `selection_unknown`, ausdrücklich
@@ -187,11 +206,30 @@ Review-Rezepte können am Dateianfang getrenntes `audit`-/`review`-Frontmatter t
 ---
 audit:
   enabled: true
-  title: "Technischer Review"
+  mode: perspective
+  title: "Secret-Scanning Assessment"
   resultRequired: true
-  defaultResult: "review-tech.md"
+  defaultResult: "review-secret-scanning.md"
   scope:
-    tools: [semgrep, gosec]
+    tools: [gitleaks, trufflehog]
+review:
+  enabled: true
+---
+```
+
+`audit.mode` entscheidet, welche der übrigen Felder gelten. Ohne Angabe ist es
+`perspective`. Für `mode: evidence` treten `ruleIds` und `scope.paths` an die Stelle von
+`scope.tools`, `resultRequired` und `defaultResult`:
+
+```yaml
+---
+audit:
+  enabled: true
+  mode: evidence
+  title: "Tech-Debt-Analyse"
+  ruleIds: [tech-swallowed-error, tech-duplicated-logic]
+  scope:
+    paths: ["**/*.go", "**/*.py"]
 review:
   enabled: true
 ---
@@ -202,10 +240,28 @@ Review-Katalog-/Run-API bilden. Die sichtbare Nutzerrolle des vollständigen Swe
 trotzdem `/k-audit`.
 
 Beim Anlegen eines Laufs werden `recipeKey`, `recipePath`, `recipeOrigin`, `title`,
-`resultRequired`, `defaultResult` und `scope` in `run.json` kopiert. Das Schreibwerkzeug
-für AI-Einträge validiert später gegen diese Kopie, nicht gegen den eventuell geänderten
-Rezepttext. `scope.tools` ist damit ein Snapshot: bestehende Läufe behalten ihren Scope,
-auch wenn das Rezept später geändert wird.
+`mode`, `resultRequired`, `defaultResult` und `scope` in `run.json` kopiert. Das
+Schreibwerkzeug für AI-Einträge validiert später gegen diese Kopie, nicht gegen den
+eventuell geänderten Rezepttext. `scope.tools` und `scope.paths` sind damit ein Snapshot:
+bestehende Läufe behalten ihren Scope, auch wenn das Rezept später geändert wird. `mode`
+wird ausgeschrieben, auch für `perspective`, damit der Lauf aus sich heraus sagt, wie ein
+Eintrag gemeint war; ein leeres Feld in einem Altlauf liest sich als `perspective`.
+
+Für `mode: evidence` wird `resultRequired` hart auf `false` gesetzt — Pflichtartefakt ist
+`raw/<entry>.sarif`, und mit der Vorgabe `true` meldete `k_playbook_review_status` jeden
+erfolgreichen Evidence-Eintrag als `resultMissing` und `inconsistent`.
+
+`ruleIds` ist die eine Ausnahme von der Snapshot-Regel: die Liste wird **nicht** kopiert,
+sondern beim Melden frisch aus dem Rezept gelesen. Sie ist der Vertrag des Rezepts und
+keine Festlegung des Laufs — wer sie ändert, ändert sie für alle Läufe, und ein Rezept,
+das seinen Evidence-Vertrag inzwischen nicht mehr erfüllt, soll beim Melden auffallen
+statt mit einer halben Prüfung durchzugehen.
+
+`k_playbook_review_write_ai_entry` nimmt für einen Evidence-Eintrag zusätzlich `job` mit
+`sarif` (relativ zum Laufverzeichnis, unterhalb von `raw/`) und optional `started` und
+`finished`. Zustand, Fundzahl und Job-Name entstehen beim Melden. Die Antwort trägt unter
+`evidence` die Zahl der übernommenen Funde, die außerhalb des Scopes verworfenen samt
+ihrer ersten Pfade und ob das SARIF bereinigt zurückgeschrieben wurde.
 
 ### Timeouts und Progress-Notifications
 

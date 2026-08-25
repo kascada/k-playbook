@@ -66,6 +66,11 @@ type EntrySummary struct {
 	Finished      string       `json:"finished,omitempty"`
 	Reason        string       `json:"reason,omitempty"`
 	Jobs          []JobSummary `json:"jobs"`
+	// Mode ist die eingefrorene Betriebsart eines AI-Eintrags aus run.json.
+	// Sie bleibt intern: die Gruppierung braucht sie, das Schema von
+	// review-input.json ändert sich dafür nicht. Bei Tool-Einträgen bleibt sie
+	// leer — eine Betriebsart haben nur AI-Einträge.
+	Mode review.Mode `json:"-"`
 }
 
 // JobSummary übernimmt den Status eines einzelnen Scan-Jobs.
@@ -166,6 +171,11 @@ type Finding struct {
 	PartialFingerprints    map[string]string      `json:"partialFingerprints,omitempty"`
 	Dependency             Dependency             `json:"dependency,omitempty"`
 	CoveredByKnownDecision *KnownDecisionCoverage `json:"coveredByKnownDecision,omitempty"`
+	// Mode ist die Betriebsart des Eintrags, aus dem der Fund stammt. Sie
+	// entscheidet über Gruppierung und Schlüsselklasse — siehe aiPathRuleKey in
+	// dedupe.go und stableClass in stable.go. Wie bei EntrySummary bleibt sie
+	// intern: das Schema von review-input.json ändert sich nicht.
+	Mode review.Mode `json:"-"`
 }
 
 // Group ist eine Dedupe-Gruppe. Sie löscht keine Findings: alle Belege und die
@@ -218,6 +228,7 @@ func Build(options Options) (Result, error) {
 			SelectedState: entry.State,
 			State:         review.StateStart,
 			Jobs:          []JobSummary{},
+			Mode:          entryMode(entry),
 		}
 		status, err := review.ReadEntryStatus(options.RunDir, entry.Name)
 		if err != nil {
@@ -328,6 +339,18 @@ func runContext(options Options, run review.Run) RunContext {
 	}
 }
 
+// entryMode liefert die Betriebsart eines Eintrags für den Merge.
+//
+// Nur AI-Einträge haben eine: review.EntryMode macht aus dem leeren Feld die
+// Vorgabe perspective, und die einem Tool-Eintrag zuzuschreiben behauptete eine
+// Betriebsart, die es dort nicht gibt.
+func entryMode(entry review.Entry) review.Mode {
+	if entry.Kind != review.KindAI {
+		return ""
+	}
+	return review.EntryMode(entry)
+}
+
 func summarizeJobs(jobs []review.JobStatus) []JobSummary {
 	if jobs == nil {
 		return []JobSummary{}
@@ -424,7 +447,7 @@ func loadFindings(runDir string, entries []EntrySummary, severityMapping Severit
 			if job.State != review.StateDone || job.SARIF == "" {
 				continue
 			}
-			jobFindings, err := readSARIF(filepath.Join(runDir, job.SARIF), entry.Name, job, severityMapping)
+			jobFindings, err := readSARIF(filepath.Join(runDir, job.SARIF), entry.Name, entry.Mode, job, severityMapping)
 			if err != nil {
 				return nil, err
 			}
@@ -434,7 +457,7 @@ func loadFindings(runDir string, entries []EntrySummary, severityMapping Severit
 	return findings, nil
 }
 
-func readSARIF(path string, tool string, job JobSummary, severityMapping SeverityMapping) ([]Finding, error) {
+func readSARIF(path string, tool string, mode review.Mode, job JobSummary, severityMapping SeverityMapping) ([]Finding, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -450,7 +473,8 @@ func readSARIF(path string, tool string, job JobSummary, severityMapping Severit
 		for resultIndex, result := range run.Results {
 			rule := ruleForResult(run.Tool.Driver.Rules, rules, result)
 			finding := Finding{
-				ID: fmt.Sprintf("%s:%d:%d", job.SARIF, runIndex, resultIndex),
+				ID:   fmt.Sprintf("%s:%d:%d", job.SARIF, runIndex, resultIndex),
+				Mode: mode,
 				Evidence: Evidence{
 					Tool:        tool,
 					Job:         job.Job,

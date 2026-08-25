@@ -2,6 +2,7 @@ package merge
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -758,4 +759,443 @@ func contains(list []string, value string) bool {
 		}
 	}
 	return false
+}
+
+// --- KI-Evidence: Gruppierung und stabile IDs ---------------------------------
+
+// aiFinding ist ein Fund aus einem Evidence-Eintrag. Werkzeug und Job tragen
+// beide den Eintragsnamen — so schreibt der Melde-Schritt den Job.
+func aiFinding(id string, entry string, rule string, uri string, line int, message string) Finding {
+	item := findingWithJob(id, entry, entry, rule, uri, line, message, Dependency{})
+	item.Mode = review.ModeEvidence
+	return item
+}
+
+// sarifFixture baut ein SARIF-Dokument. Bei einem Evidence-Eintrag ist der
+// Werkzeugname der Eintragsname — so verlangt es review.CheckEvidenceSARIF, und
+// so trägt der Merge ihn als evidence.tool ein.
+func sarifFixture(tool string, results ...string) string {
+	return `{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "` + tool + `"}}, "results": [` +
+		strings.Join(results, ", ") + `]}]}`
+}
+
+func sarifResultFixture(ruleID string, level string, uri string, line int, message string) string {
+	return fmt.Sprintf(`{"ruleId": %q, "level": %q, "message": {"text": %q}, `+
+		`"locations": [{"physicalLocation": {"artifactLocation": {"uri": %q}, "region": {"startLine": %d}}}]}`,
+		ruleID, level, message, uri, line)
+}
+
+// fixtureEntry ist ein Eintrag eines gebauten Laufordners: Name, Art,
+// Betriebsart und das SARIF, das sein Job hinterlässt.
+type fixtureEntry struct {
+	name  string
+	kind  review.Kind
+	mode  review.Mode
+	sarif string
+}
+
+func toolEntry(name string, sarif string) fixtureEntry {
+	return fixtureEntry{name: name, kind: review.KindTool, sarif: sarif}
+}
+
+func evidenceEntry(name string, sarif string) fixtureEntry {
+	return fixtureEntry{name: name, kind: review.KindAI, mode: review.ModeEvidence, sarif: sarif}
+}
+
+// runDirWithEntries legt einen fertigen Laufordner an: run.json mit der
+// Auswahl, je Eintrag die Datei unter entries/ mit einem abgeschlossenen Job und
+// das zugehörige SARIF unter raw/.
+func runDirWithEntries(t *testing.T, projectDir string, name string, entries ...fixtureEntry) string {
+	t.Helper()
+	runDir := filepath.Join(projectDir, review.ResultsDirName, name)
+	selected := make([]review.Entry, 0, len(entries))
+	for _, item := range entries {
+		entry := review.Entry{Name: item.name, Kind: item.kind, State: review.StateStart, Mode: item.mode}
+		if item.mode == review.ModeEvidence {
+			entry.Scope = &review.Scope{Paths: []string{"installer/**"}}
+		}
+		selected = append(selected, entry)
+	}
+	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
+		SchemaVersion: review.SchemaVersion,
+		Created:       "2026-08-25T12:00:00Z",
+		State:         review.StateCreated,
+		Languages:     []string{"go"},
+		Entries:       selected,
+	})
+	for _, item := range entries {
+		sarifPath := review.EvidenceSARIFPath(item.name)
+		writeJSON(t, review.EntryFile(runDir, item.name), review.EntryStatus{
+			SchemaVersion: review.EntrySchemaVersion,
+			Name:          item.name,
+			Kind:          item.kind,
+			State:         review.StateDone,
+			Jobs:          []review.JobStatus{{Job: item.name, State: review.StateDone, SARIF: sarifPath}},
+		})
+		writeText(t, filepath.Join(runDir, filepath.FromSlash(sarifPath)), item.sarif)
+	}
+	return runDir
+}
+
+func evidenceRunDir(t *testing.T, projectDir string, name string, entry string, sarif string) string {
+	t.Helper()
+	return runDirWithEntries(t, projectDir, name, evidenceEntry(entry, sarif))
+}
+
+func TestAIPathRuleKeyNurFuerEvidence(t *testing.T) {
+	evidence := aiFinding("a", "review-tech", "tech.Altlast", "installer/App.go", 12, "Text")
+	if key := aiPathRuleKey(evidence); key != "ai:review-tech:installer/app.go:tech.altlast" {
+		t.Fatalf("KI-Schlüssel falsch: %q", key)
+	}
+
+	perspective := evidence
+	perspective.Mode = review.ModePerspective
+	if key := aiPathRuleKey(perspective); key != "" {
+		t.Errorf("Perspektive bekommt einen KI-Schlüssel: %q", key)
+	}
+	scanner := finding("b", "semgrep", "rule", "installer/app.go", 12, "Text", Dependency{})
+	if key := aiPathRuleKey(scanner); key != "" {
+		t.Errorf("Scanner-Fund bekommt einen KI-Schlüssel: %q", key)
+	}
+}
+
+// Der Schlüssel ai:<tool>:<pfad>:<ruleId> hält die Gruppierung mit der
+// Schlüsselklasse zusammen: class=ai kennt keine Zeile, zwei Funde derselben
+// Rule-ID in derselben Datei hätten sonst denselben stabilen Schlüssel.
+func TestGroupFindingsKIEvidenceBuendeltRegelJeDatei(t *testing.T) {
+	groups := GroupFindings([]Finding{
+		aiFinding("a", "review-tech", "tech.altlast", "installer/app.go", 12, "Erste Stelle"),
+		aiFinding("b", "review-tech", "tech.altlast", "installer/app.go", 240, "Zweite Stelle"),
+		aiFinding("c", "review-tech", "tech.altlast", "installer/other.go", 3, "Andere Datei"),
+		aiFinding("d", "review-tech", "tech.kopplung", "installer/app.go", 12, "Andere Regel"),
+	})
+	if len(groups) != 3 {
+		t.Fatalf("%d Gruppen, erwartet 3: %+v", len(groups), groups)
+	}
+	if len(groups[0].FindingIDs) != 2 || !contains(groups[0].FindingIDs, "a") || !contains(groups[0].FindingIDs, "b") {
+		t.Fatalf("zwei Instanzen derselben Regel in derselben Datei nicht gebündelt: %+v", groups[0])
+	}
+	if !contains(groups[0].DedupeRules, "ai-path-rule") {
+		t.Errorf("Dedupe-Regel fehlt: %+v", groups[0].DedupeRules)
+	}
+	// „a" und „d" stehen in derselben Zeile. Für einen Scanner wäre das eine
+	// Gruppe; für Evidence darf es keine sein, sonst hinge die Gruppen-ID doch
+	// wieder an der Zeile.
+	if contains(groups[0].DedupeRules, "same-location-tool") {
+		t.Errorf("Zeilen-Schlüssel greift für Evidence: %+v", groups[0].DedupeRules)
+	}
+	if len(groups[2].FindingIDs) != 1 || groups[2].FindingIDs[0] != "d" {
+		t.Fatalf("zweite Rule-ID in derselben Zeile nicht getrennt: %+v", groups[2])
+	}
+	seen := map[string]bool{}
+	for _, group := range groups {
+		if seen[group.StableID] {
+			t.Fatalf("kollidierende stableId: %s", group.StableID)
+		}
+		seen[group.StableID] = true
+		if !strings.HasPrefix(group.StableID, "ai-review-tech-") {
+			t.Errorf("KI-Präfix fehlt: %s", group.StableID)
+		}
+		if !strings.HasPrefix(group.StableKey, "class=ai\n") {
+			t.Errorf("Klasse falsch: %q", group.StableKey)
+		}
+	}
+}
+
+// Gemischte Gruppen bleiben location. Setzte ein einzelner KI-Fund die Klasse,
+// wechselte eine bestehende Scanner-Gruppe beim Hinzukommen dieses Funds von
+// scan- auf ai- und verlöre Ort und Meldung aus ihrem Schlüssel.
+func TestStableIDGemischteGruppeBleibtLocation(t *testing.T) {
+	scanner := finding("s", "semgrep", "shared.rule", "installer/app.go", 12, "Derselbe Wortlaut", Dependency{})
+	evidence := aiFinding("a", "review-tech", "shared.rule", "installer/app.go", 12, "Derselbe Wortlaut")
+
+	mixed := GroupFindings([]Finding{scanner, evidence})
+	if len(mixed) != 1 || len(mixed[0].FindingIDs) != 2 {
+		t.Fatalf("Scanner und KI an derselben Stelle nicht gebündelt: %+v", mixed)
+	}
+	if !strings.HasPrefix(mixed[0].StableKey, "class=location\n") {
+		t.Fatalf("gemischte Gruppe nicht in class=location: %q", mixed[0].StableKey)
+	}
+	if !strings.Contains(mixed[0].StableKey, "locations=") || !strings.Contains(mixed[0].StableKey, "messages=") {
+		t.Errorf("Ort und Meldung fehlen im Schlüssel: %q", mixed[0].StableKey)
+	}
+	if !strings.HasPrefix(mixed[0].StableID, "scan-") {
+		t.Errorf("gemischte Gruppe trägt kein Scanner-Präfix: %s", mixed[0].StableID)
+	}
+
+	// Der Kontrast: derselbe Fund allein ist class=ai.
+	alone := GroupFindings([]Finding{evidence})
+	if !strings.HasPrefix(alone[0].StableKey, "class=ai\n") {
+		t.Fatalf("reine KI-Gruppe nicht in class=ai: %q", alone[0].StableKey)
+	}
+}
+
+// Der Test aus Etappe 4 des Tasks: zwei Läufe über dieselbe Datei, im zweiten
+// die Zeile verschoben und der Meldungstext umformuliert. Die Gruppen-ID bleibt
+// gleich, und eine stableId-Decision aus Lauf 1 greift in Lauf 2.
+func TestStableIDFuerKIEvidenceUeberlebtZeileUndMeldung(t *testing.T) {
+	projectDir := t.TempDir()
+	firstDir := evidenceRunDir(t, projectDir, "2026-08-25", "review-tech",
+		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
+			"installer/internal/app.go", 12, "Veraltete Abhängigkeit an dieser Stelle")))
+	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Build Lauf 1: %v", err)
+	}
+	if len(first.Groups) != 1 {
+		t.Fatalf("Lauf 1: %d Gruppen, erwartet 1", len(first.Groups))
+	}
+
+	secondDir := evidenceRunDir(t, projectDir, "2026-08-26", "review-tech",
+		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
+			"installer/internal/app.go", 87, "Diese Stelle hängt an einer Bibliothek, die niemand mehr pflegt")))
+	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Build Lauf 2: %v", err)
+	}
+	if len(second.Groups) != 1 {
+		t.Fatalf("Lauf 2: %d Gruppen, erwartet 1", len(second.Groups))
+	}
+	if first.Groups[0].StableKey != second.Groups[0].StableKey {
+		t.Fatalf("Schlüssel verschoben:\n%q\n%q", first.Groups[0].StableKey, second.Groups[0].StableKey)
+	}
+	if first.Groups[0].StableID != second.Groups[0].StableID {
+		t.Fatalf("stableId nicht stabil: %s / %s", first.Groups[0].StableID, second.Groups[0].StableID)
+	}
+	if !strings.HasPrefix(first.Groups[0].StableID, "ai-review-tech-") {
+		t.Fatalf("KI-Präfix fehlt: %s", first.Groups[0].StableID)
+	}
+
+	writeText(t, filepath.Join(projectDir, "known-decisions.md"),
+		"## kd-ai-altlast\n\n```yaml\nid: kd-ai-altlast\ncategory: wontfix\nmatch:\n  - stableId: "+
+			first.Groups[0].StableID+"\n```\n\nBewusst so gelassen.\n")
+	covered, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Build Lauf 2 mit Decision: %v", err)
+	}
+	if len(covered.Groups) != 1 || covered.Groups[0].CoveredByKnownDecision == nil {
+		t.Fatalf("Decision aus Lauf 1 greift in Lauf 2 nicht: %+v", covered.Groups)
+	}
+	if covered.Groups[0].CoveredByKnownDecision.ID != "kd-ai-altlast" || covered.Groups[0].CoveredByKnownDecision.MatchedBy != "stableId" {
+		t.Fatalf("Deckung falsch: %+v", covered.Groups[0].CoveredByKnownDecision)
+	}
+}
+
+// --- KI-Evidence: Merge-Integration ------------------------------------------
+
+// Der Grundfall aus Etappe 5: ein Evidence-Eintrag neben einem Scanner. Beide
+// Quellen landen in denselben Artefakten, ihre Gruppen bekommen eigene IDs, und
+// review-input.json bekommt kein neues Feld dafür.
+func TestBuildSammeltEvidenceEintragNebenScannerEin(t *testing.T) {
+	projectDir := t.TempDir()
+	runDir := runDirWithEntries(t, projectDir, "2026-08-25",
+		toolEntry("gosec", sarifFixture("gosec",
+			sarifResultFixture("G304", "warning", "installer/internal/app.go", 12, "Potential file inclusion"))),
+		evidenceEntry("review-tech", sarifFixture("review-tech",
+			sarifResultFixture("tech.altlast", "error", "installer/internal/app.go", 88, "Nicht mehr gepflegte Bibliothek"))),
+	)
+
+	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(result.Findings) != 2 {
+		t.Fatalf("%d Findings, erwartet 2: %+v", len(result.Findings), result.Findings)
+	}
+	tools := map[string]string{}
+	for _, item := range result.Findings {
+		tools[item.Evidence.Tool] = item.Evidence.SARIF
+	}
+	if tools["review-tech"] != "raw/review-tech.sarif" {
+		t.Fatalf("evidence.tool trägt den Rezeptnamen nicht: %+v", tools)
+	}
+	if _, ok := tools["gosec"]; !ok {
+		t.Fatalf("Scanner-Fund fehlt: %+v", tools)
+	}
+
+	if len(result.Groups) != 2 {
+		t.Fatalf("%d Gruppen, erwartet 2: %+v", len(result.Groups), result.Groups)
+	}
+	if result.Groups[0].StableID == result.Groups[1].StableID {
+		t.Fatalf("Tool- und KI-Gruppe teilen sich eine stableId: %+v", result.Groups)
+	}
+	prefixes := map[string]bool{}
+	for _, group := range result.Groups {
+		prefixes[stablePrefixFromID(group.StableID)] = true
+	}
+	if !prefixes["scan-gosec-"] || !prefixes["ai-review-tech-"] {
+		t.Fatalf("Präfixe trennen Tool- und KI-Evidence nicht: %+v", prefixes)
+	}
+
+	// entries[] und findings[] bekommen kein mode-Feld: der Modus bleibt intern.
+	// Unter run.selectedEntries steht er sehr wohl — das ist die unveränderte
+	// Spiegelung von run.json aus Etappe 1 und kein neues Merge-Feld.
+	data, err := os.ReadFile(output.JSON)
+	if err != nil {
+		t.Fatalf("JSON lesen: %v", err)
+	}
+	var document struct {
+		Entries  []map[string]any `json:"entries"`
+		Findings []map[string]any `json:"findings"`
+		Run      struct {
+			SelectedEntries []map[string]any `json:"selectedEntries"`
+		} `json:"run"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatalf("JSON lesen: %v", err)
+	}
+	for _, item := range append(append([]map[string]any{}, document.Entries...), document.Findings...) {
+		if _, found := item["mode"]; found {
+			t.Fatalf("mode ist im Schema von review-input.json gelandet: %+v", item)
+		}
+	}
+	selected := document.Run.SelectedEntries
+	if len(selected) != 2 || selected[1]["mode"] != string(review.ModeEvidence) {
+		t.Fatalf("run.selectedEntries spiegelt run.json nicht mehr: %+v", selected)
+	}
+
+	// Unterscheidbar bleibt die Herkunft über evidence.tool — im JSON wie in der
+	// Belege-Spalte des Markdowns. Ein eigenes Schemafeld gibt es dafür nicht.
+	markdownData, err := os.ReadFile(output.Markdown)
+	if err != nil {
+		t.Fatalf("Markdown lesen: %v", err)
+	}
+	if !strings.Contains(string(markdownData), "review-tech/review-tech") {
+		t.Fatalf("KI-Evidence im Markdown nicht als solche erkennbar: %s", markdownData)
+	}
+}
+
+// Severity: für KI-Evidence ist das level aus dem SARIF maßgeblich. Das Mapping
+// greift nur, wo level warning oder none sagt — und legt damit fest, dass die
+// Rule-ID-Liste im Rezept das level je Rule-ID mitbringen muss.
+func TestEvidenceSeverityFolgtDemLevel(t *testing.T) {
+	projectDir := t.TempDir()
+	runDir := evidenceRunDir(t, projectDir, "2026-08-25", "review-tech",
+		sarifFixture("review-tech",
+			sarifResultFixture("tech.altlast", "error", "installer/internal/a.go", 3, "Schwer"),
+			sarifResultFixture("tech.kopplung", "warning", "installer/internal/b.go", 4, "Mittel"),
+			sarifResultFixture("tech.stilblüte", "note", "installer/internal/c.go", 5, "Leicht"),
+		))
+	mappingPath := filepath.Join(projectDir, "severity.tsv")
+	writeText(t, mappingPath, "tool\trule_prefix\tseverity\tnotes\nreview-tech\ttech.\tnote\tRückfall\n")
+
+	result, err := Build(Options{
+		ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir,
+		SeverityMappingPath: mappingPath, Now: fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	want := map[string][2]string{
+		"tech.altlast":   {"error", "native"},
+		"tech.kopplung":  {"note", "mapping"},
+		"tech.stilblüte": {"note", "native"},
+	}
+	if len(result.Findings) != len(want) {
+		t.Fatalf("%d Findings, erwartet %d", len(result.Findings), len(want))
+	}
+	for _, item := range result.Findings {
+		expected, ok := want[item.RuleID]
+		if !ok {
+			t.Fatalf("unerwartete Rule-ID: %s", item.RuleID)
+		}
+		if item.DerivedSeverity != expected[0] || item.SeveritySource != expected[1] {
+			t.Errorf("%s: Schwere %s/%s, erwartet %s/%s",
+				item.RuleID, item.DerivedSeverity, item.SeveritySource, expected[0], expected[1])
+		}
+	}
+}
+
+// Re-Run: findet der Folgelauf einen entschiedenen Fund nicht wieder, bleibt die
+// Decision bestehen und erscheint als nicht angewendet. Das ist kein
+// Erledigt-Signal — die Triage muss es so benennen.
+func TestEvidenceDecisionOhneWiederfundBleibtNichtAngewendet(t *testing.T) {
+	projectDir := t.TempDir()
+	firstDir := evidenceRunDir(t, projectDir, "2026-08-25", "review-tech",
+		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
+			"installer/internal/app.go", 12, "Nicht mehr gepflegte Bibliothek")))
+	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Build Lauf 1: %v", err)
+	}
+	if len(first.Groups) != 1 {
+		t.Fatalf("Lauf 1: %d Gruppen, erwartet 1", len(first.Groups))
+	}
+	writeText(t, filepath.Join(projectDir, "known-decisions.md"),
+		"## kd-ai-altlast\n\n```yaml\nid: kd-ai-altlast\ncategory: wontfix\nmatch:\n  - stableId: "+
+			first.Groups[0].StableID+"\n```\n\nBewusst so gelassen.\n")
+
+	// Derselbe Auftrag, andere Fundmenge: ein leeres SARIF ist ein gültiges
+	// Ergebnis, kein Fehler.
+	secondDir := evidenceRunDir(t, projectDir, "2026-08-26", "review-tech", sarifFixture("review-tech"))
+	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	if err != nil {
+		t.Fatalf("Build Lauf 2: %v", err)
+	}
+	if len(second.Findings) != 0 || len(second.Groups) != 0 {
+		t.Fatalf("leeres SARIF liefert Funde: %+v", second.Findings)
+	}
+	if len(second.KnownDecisions.Decisions) != 1 {
+		t.Fatalf("Decision verschwunden: %+v", second.KnownDecisions.Decisions)
+	}
+	report := second.KnownDecisions.Decisions[0]
+	if report.ID != "kd-ai-altlast" || report.Applied || report.Expired {
+		t.Fatalf("Decision falsch gemeldet: %+v", report)
+	}
+	if report.NotAppliedReason != "kein Finding getroffen" {
+		t.Fatalf("Grund fehlt oder ist falsch: %q", report.NotAppliedReason)
+	}
+}
+
+// Die Deckungswege für KI-Evidence, nebeneinander gemessen:
+//
+//   - pathGlob ist die grobe Ausnahme. Er trifft jeden Fund an diesem Pfad, auch
+//     den Scanner-Fund eines fremden Werkzeugs mit fremder Regel.
+//   - ruleId + location ist enger, aber location ist ein **Pfad**-Glob und keine
+//     Zeile: derselbe Fund an anderer Zeile bleibt gedeckt.
+func TestEvidenceDeckungPathGlobUndRuleIDLocation(t *testing.T) {
+	build := func(t *testing.T, decision string, line int) Result {
+		t.Helper()
+		projectDir := t.TempDir()
+		runDir := runDirWithEntries(t, projectDir, "2026-08-25",
+			toolEntry("gosec", sarifFixture("gosec",
+				sarifResultFixture("G304", "warning", "installer/internal/app.go", 12, "Potential file inclusion"))),
+			evidenceEntry("review-tech", sarifFixture("review-tech",
+				sarifResultFixture("tech.altlast", "warning", "installer/internal/app.go", line, "Nicht mehr gepflegte Bibliothek"))),
+		)
+		writeText(t, filepath.Join(projectDir, "known-decisions.md"), decision)
+		result, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		return result
+	}
+	coveredTools := func(result Result) map[string]string {
+		covered := map[string]string{}
+		for _, item := range result.Findings {
+			if item.CoveredByKnownDecision != nil {
+				covered[item.Evidence.Tool] = item.CoveredByKnownDecision.MatchedBy
+			}
+		}
+		return covered
+	}
+
+	broad := build(t, "## kd-pfad\n\n```yaml\nid: kd-pfad\ncategory: accepted-risk\nmatch:\n"+
+		"  - pathGlob: installer/internal/app.go\n```\n\nGrobe Ausnahme.\n", 88)
+	if got := coveredTools(broad); len(got) != 2 || got["review-tech"] != "pathGlob" || got["gosec"] != "pathGlob" {
+		t.Fatalf("pathGlob deckt nicht auch den Scanner-Fund: %+v", got)
+	}
+
+	narrow := build(t, "## kd-regel\n\n```yaml\nid: kd-regel\ncategory: accepted-risk\nmatch:\n"+
+		"  - ruleId: tech.altlast\n    location: installer/internal/app.go\n```\n\nEnger Weg.\n", 88)
+	if got := coveredTools(narrow); len(got) != 1 || got["review-tech"] != "ruleId+location" {
+		t.Fatalf("ruleId+location deckt die falsche Menge: %+v", got)
+	}
+
+	// location ist ein Pfad-Glob: die verschobene Zeile ändert die Deckung nicht.
+	moved := build(t, "## kd-regel\n\n```yaml\nid: kd-regel\ncategory: accepted-risk\nmatch:\n"+
+		"  - ruleId: tech.altlast\n    location: installer/internal/app.go\n```\n\nEnger Weg.\n", 401)
+	if got := coveredTools(moved); len(got) != 1 || got["review-tech"] != "ruleId+location" {
+		t.Fatalf("ruleId+location hängt an der Zeile: %+v", got)
+	}
 }

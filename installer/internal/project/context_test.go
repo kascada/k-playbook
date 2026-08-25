@@ -215,6 +215,72 @@ func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
 	if entry.Audit.Scope.Tools[0] != "pip-audit" || entry.Audit.Scope.Tools[1] != "trivy" {
 		t.Fatalf("tools = %#v", entry.Audit.Scope.Tools)
 	}
+	// Ein Rezept ohne mode bleibt eine Perspektive: das Feld fehlt und keine
+	// Evidence-Angabe entsteht daneben.
+	if entry.Audit.Mode != "" {
+		t.Errorf("mode = %q, erwartet leer", entry.Audit.Mode)
+	}
+	if len(entry.Audit.Scope.Paths) != 0 || len(entry.Audit.RuleIDs) != 0 {
+		t.Errorf("Evidence-Felder gesetzt: %#v", entry.Audit)
+	}
+}
+
+func TestBuildContextLiestEvidenceVertragAlsBlocklisten(t *testing.T) {
+	root := newContextProject(t)
+
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-evidence.md"),
+		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds:\n    - tech-veraltet\n    - tech-kopplung\n  scope:\n    paths:\n      - installer/**\n      - commands/**\nreview:\n  enabled: true\n---\n# Evidence\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	entry, ok := entryByName(context.Catalogs["reviews"], "review-evidence.md")
+	if !ok {
+		t.Fatal("review-evidence.md fehlt")
+	}
+	if entry.Audit == nil || entry.Audit.Mode != "evidence" {
+		t.Fatalf("mode = %#v", entry.Audit)
+	}
+	if entry.Audit.Scope == nil || len(entry.Audit.Scope.Paths) != 2 {
+		t.Fatalf("paths = %#v", entry.Audit.Scope)
+	}
+	if entry.Audit.Scope.Paths[0] != "installer/**" || entry.Audit.Scope.Paths[1] != "commands/**" {
+		t.Fatalf("paths = %#v", entry.Audit.Scope.Paths)
+	}
+	if len(entry.Audit.Scope.Tools) != 0 {
+		t.Errorf("tools = %#v, erwartet leer", entry.Audit.Scope.Tools)
+	}
+	if len(entry.Audit.RuleIDs) != 2 || entry.Audit.RuleIDs[0] != "tech-veraltet" || entry.Audit.RuleIDs[1] != "tech-kopplung" {
+		t.Fatalf("ruleIds = %#v", entry.Audit.RuleIDs)
+	}
+}
+
+func TestBuildContextLiestEvidenceVertragAlsInlineListen(t *testing.T) {
+	root := newContextProject(t)
+
+	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-evidence-inline.md"),
+		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds: [tech-veraltet, tech-kopplung]\n  scope:\n    paths: [\"installer/**\"]\nreview:\n  enabled: false\n---\n# Evidence\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	entry, ok := entryByName(context.Catalogs["reviews"], "review-evidence-inline.md")
+	if !ok {
+		t.Fatal("review-evidence-inline.md fehlt")
+	}
+	if entry.Audit == nil || entry.Audit.Mode != "evidence" {
+		t.Fatalf("mode = %#v", entry.Audit)
+	}
+	if entry.Audit.Scope == nil || len(entry.Audit.Scope.Paths) != 1 || entry.Audit.Scope.Paths[0] != "installer/**" {
+		t.Fatalf("paths = %#v", entry.Audit.Scope)
+	}
+	if len(entry.Audit.RuleIDs) != 2 {
+		t.Fatalf("ruleIds = %#v", entry.Audit.RuleIDs)
+	}
 }
 
 func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {

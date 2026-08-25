@@ -19,6 +19,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 |---|---|
 | [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-results`, `/k-remediation` und den Handoffs. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
+| [`review-runs.md`](./review-runs.md) | Das Laufmodell: `run.json`, Einträge, Betriebsarten der Katalog-Rezepte, Merge, known-decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-run`. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
 | [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag relativ ist. |
@@ -80,6 +81,8 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#bewerten-mit-review-scan-triage), [`commands.md`](./commands.md#review-flow)
 - `/k-task-refine` / `Task-Härtung` -> [`task-flow.md`](./task-flow.md)
 - `review-input` / `merge` / `Zusammenfassen` -> [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge)
+- `audit.mode` / `Perspektive` / `Evidence-Rezept` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#katalog-rezepte-im-lauf), [`../rules/review-authoring.md`](../rules/review-authoring.md)
+- `known-decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd)
 - `Schreibweise` / `Umlaute` / `Rechtschreibung` -> [`schreibweise.md`](./schreibweise.md)
 - `Reviews` -> [`code-review.md`](./code-review.md)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)

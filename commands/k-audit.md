@@ -24,6 +24,7 @@ Ergebnisse dieses Commands:
 - ein Review-Lauf unter `k-playbook-local/results/YYYY-MM-DD/`, wenn ein neuer Lauf
   bestätigt und angelegt wird,
 - Scanner-Fortschritt und AI-Entry-Fortschritt unter `entries/`,
+- SARIF der Evidence-Rezepte unter `raw/<entry>.sarif`,
 - `review-input.json` und `review-input.md` nach dem Merge,
 - Perspektiven-Reports aktiver Katalog-Rezepte im Laufordner,
 - optional `review-triage.md` nach Anwendung des Moduls
@@ -114,19 +115,36 @@ Melde kompakt:
 ```text
 Lauf: 2026-08-19
 Werkzeuge: 5 done, 1 failed, 0 running, 0 start
-AI-Einträge: 1 done, 0 failed, 0 running, 3 start
+Evidence-Quellen: 1 done, 0 failed, 0 running, 1 start — offen: tech
+Perspektiven: 1 done, 0 failed, 0 running, 2 start
 Merge: review-input.json vorhanden / fehlt
-Triage: review-triage.md vorhanden / fehlt
+Triage: review-triage.md aktuell / veraltet / fehlt
 Nächster Schritt: <konkret>
 ```
 
-Wenn der Status einen inkonsistenten AI-Eintrag zeigt, gilt je nach Eintrag Schritt 6 oder 7:
+Die beiden AI-Zeilen kommen aus `evidenceEntries` und `perspectiveEntries` der
+Statusausgabe; jeder AI-Eintrag trägt seine Betriebsart zusätzlich als `mode`. Offene
+Evidence-Quellen werden namentlich genannt: sie blockieren den Merge nicht und fehlen
+sonst unbemerkt in `review-input.json`.
+
+Die Triage-Zeile kommt aus `triage.state` der Statusausgabe: `current`, `stale` oder
+`missing`. Den Vergleich rechnet das Werkzeug, nicht der Command — ermittle keine
+Änderungszeiten selbst. Bei `stale` nennt `triage.reason` den Fall; Schritt 6 erklärt ihn.
+
+Wenn der Status einen inkonsistenten AI-Eintrag zeigt, gilt je nach Betriebsart Schritt
+5, 7 oder 8. Der Status trennt beide Fälle bereits: eine Perspektive wird an ihrer
+Ergebnisdatei gemessen, eine Evidence-Quelle an ihrem SARIF.
+
+Perspektiven (`mode: perspective`, Schritt 7; `scan-triage` in Schritt 8):
 
 - `done` mit `result` und vorhandener, nicht leerer Datei ist erledigt.
-- `done` ohne vorhandene Ergebnisdatei ist inkonsistent; führe den AI-Eintrag erneut aus
-  und schreibe den Eintrag danach neu.
+- `done` ohne vorhandene Ergebnisdatei ist inkonsistent (`resultMissing`); führe den
+  AI-Eintrag erneut aus und schreibe den Eintrag danach neu.
 - Vorhandene gültige Ergebnisdatei bei fehlendem oder offenem Entry-Status darf durch
-  `k_playbook_review_write_ai_entry` repariert werden.
+  `k_playbook_review_write_ai_entry` repariert werden (`repairable`).
+
+Evidence-Quellen (`mode: evidence`) messen an `raw/<entry>.sarif` statt an einer
+Ergebnisdatei; ihr Reparaturvertrag steht in Schritt 5.
 
 ## Schritt 3 — Auswahl für einen neuen Lauf klären
 
@@ -136,10 +154,22 @@ Wenn ein neuer Lauf angelegt werden soll, verwende die Auswahlbasis aus
 Zeige kompakt:
 
 - verfügbare Werkzeuge, gruppiert nach Sprache und Installationsstatus,
-- aktive AI-Review-Rezepte aus `catalogs.reviews`,
+- aktive AI-Review-Rezepte aus `catalogs.reviews`, getrennt nach Betriebsart:
+  Evidence-Quellen aus `selection.evidenceCandidates` je mit ihrem Pfad-Scope
+  `scope.paths`, Perspektiven aus `selection.perspectiveCandidates` je mit ihrem
+  Tool-Scope `scope.tools`,
 - den Command-Moduleintrag `scan-triage`, wenn er im effektiven
   Command-Namensraum vorhanden und nicht durch leeres Overlay abgeschaltet ist,
 - die Standardvorbelegung aus `selection.defaultEntries`.
+
+Beide Scopes werden mit dem Lauf eingefroren und im Lauf nicht mehr verhandelt: sie
+kommen aus dem Rezept und stehen danach in `run.json`. Passt ein Pfad-Scope nicht, wird
+das Rezept geändert und danach ein neuer Lauf angelegt — der Scope im Lauf wird nicht
+gebogen. `scope-hint` bleibt Freitext für `/k-review` und erweitert `scope.paths` nicht.
+
+Rezepte mit widersprüchlichem `audit`-Block stehen in `selection.unavailableCandidates`
+mit `unavailableReason` und sind nicht auswählbar. Nenne den Grund, statt sie
+stillschweigend wegzulassen.
 
 Frage genau einmal nach Einschränkungen:
 
@@ -172,7 +202,95 @@ Fehlern weitergemacht, der Scan wiederholt oder abgebrochen werden soll.
 Wenn nur bestimmte Tool-Einträge wiederholt werden sollen, übergib sie in `entries`.
 AI-Einträge werden nie an `k_playbook_review_scan` übergeben.
 
-## Schritt 5 — Merge starten
+## Schritt 5 — Evidence-Rezepte ausführen
+
+Führe diesen Schritt **vor** dem Merge aus. Evidence-Rezepte lesen `review-input.json`
+nicht — sie liefern einen Teil davon.
+
+Betroffen sind die AI-Einträge mit `mode: evidence` — in der Statusausgabe die Liste
+`evidenceEntries` — im Zustand `start` oder `running`. Je Eintrag:
+
+1. Lade den im Lauf gespeicherten `recipePath`.
+2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.paths`. Der
+   Pfad-Scope ist verbindlich und wird nicht aus dem Chat-Gedächtnis erweitert; innerhalb
+   der Globs gelten zusätzlich die zentralen Ausschlüsse der Modulsuche (`k-playbook`,
+   `k-playbook-local`, `vendor`, `node_modules`, `testdata`, Punkt-Verzeichnisse).
+3. Führe das Rezept auf dem Code in diesem Scope aus. Die zulässigen Rule-IDs stehen im
+   Rezept unter `audit.ruleIds`; sie kommen aus dem Rezept und nicht aus `run.json`.
+4. Schreibe das Ergebnis als SARIF nach `raw/<entry>.sarif`: `tool.driver.name` ist der
+   Eintragsname, jeder Fund trägt eine `ruleId` aus `audit.ruleIds`, einen Fundort im
+   Scope und das im Rezept je Rule-ID festgelegte `level`. Ein Ergebnisdokument in
+   Markdown entsteht nicht.
+5. Melde den Eintrag mit `k_playbook_review_write_ai_entry`:
+
+   ```json
+   {
+     "projectDir": "RESOLVED_PROJECT_DIR",
+     "run": "<lauf>",
+     "entry": "<entry>",
+     "state": "done",
+     "job": {
+       "sarif": "raw/<entry>.sarif",
+       "started": "<RFC3339>",
+       "finished": "<RFC3339>"
+     }
+   }
+   ```
+
+6. Lies danach den Status erneut.
+
+`result` bleibt leer: das Pflichtartefakt ist das SARIF. Der Job gehört zur
+Fertigmeldung — bei `state: running` wird er abgewiesen. Ein SARIF ohne Ergebnisse ist ein
+gültiges `done`: ein leerer Scope-Befund ist ein Ergebnis, kein Fehler.
+
+Evidence-Quellen schreiben `raw/<entry>.sarif` und sonst nichts: keinen Family-Ordner,
+kein zweites `review-input.*` und keine Bewertung. Priorität und Kategorie vergibt allein
+Schritt 8.
+
+Lies die Antwort des Werkzeugs, statt `done` zu unterstellen:
+
+- `evidence.findings` ist die Zahl der übernommenen Funde.
+- `evidence.droppedFindings` und `evidence.droppedPaths` nennen die Funde außerhalb von
+  `scope.paths`. Sie werden verworfen, `raw/<entry>.sarif` wird bereinigt
+  zurückgeschrieben (`evidence.sarifRewritten`), der Eintrag bleibt gültig. Melde die
+  Zahl — sie sagt, dass das Rezept über seinen Scope hinausgegriffen hat.
+- `stateOverridden: true` mit `requestedState: done` heißt: das Artefakt war ungültig,
+  geschrieben wurde `failed` mit Grund.
+
+Zwei Fehlerklassen, die auseinandergehalten werden:
+
+- **Fehler des Aufrufs** — SARIF-Pfad außerhalb von `raw/`, Datei fehlt oder ist leer,
+  `result` an einem Evidence-Eintrag, Job bei `state: running`, Rezept ohne gültigen
+  Evidence-Vertrag. Das Werkzeug schreibt dann **nichts**. Korrigiere den Aufruf; das
+  Rezept muss dafür nicht erneut laufen.
+- **Fehler des Artefakts** — unlesbares SARIF, `tool.driver.name` ungleich Eintragsname,
+  eine Rule-ID außerhalb von `audit.ruleIds`. Der Eintrag wird `failed` mit Grund
+  geschrieben. Nur ein erneuter Rezeptlauf behebt das; ein zweiter Statusaufruf nicht.
+
+Reparaturvertrag für Evidence-Quellen:
+
+- Eintrag ist `done`, Job vorhanden, `raw/<entry>.sarif` existiert und ist nicht leer:
+  konsistent, keine Reparatur nötig.
+- Eintrag ist `done`, aber ohne Job oder ohne vorhandenes SARIF: Der Status meldet
+  `sarifMissing` und `inconsistent`. Führe das Rezept erneut aus und melde neu. Ein
+  nachgeschriebener Status ohne Artefakt bleibt eine leere Zusage — der Merge liest die
+  Datei, nicht den Zustand.
+- Gültiges SARIF bei fehlendem oder offenem Entry-Status: Der Status meldet `repairable`.
+  Hier genügt `k_playbook_review_write_ai_entry` mit dem Job; ein erneuter Rezeptlauf ist
+  nicht nötig.
+- Eintrag ist `failed`: durch einen erneuten Rezeptlauf ersetzen, nicht durch
+  Nachschreiben des Status.
+- Rezept nach Laufstart geändert: Der Lauf behält seinen `scope`-Snapshot, die
+  Rule-ID-Liste wird beim Melden aber frisch aus dem Rezept gelesen. Erfüllt das Rezept
+  den Evidence-Vertrag nicht mehr, scheitert das Melden mit `recipe_contract_invalid` —
+  ein Fehler des Aufrufs, es wird nichts geschrieben.
+- Alter Lauf ohne Eintrag für ein später hinzugefügtes Rezept: keine nachträgliche
+  Ergänzung der alten `run.json`.
+
+Ein Evidence-Eintrag, der offen bleibt oder scheitert, blockiert den Merge nicht. Nenne
+ihn namentlich und mache weiter; Schritt 6 sagt, was dann gilt.
+
+## Schritt 6 — Merge starten
 
 Wenn die gewünschten Tool-Einträge in einem Endzustand stehen, starte den Merge über
 `k_playbook_review_merge`:
@@ -182,8 +300,10 @@ Wenn die gewünschten Tool-Einträge in einem Endzustand stehen, starte den Merg
 ```
 
 Offene, fehlgeschlagene oder noch nicht ausgeführte AI-Einträge blockieren den Merge
-nicht. Der Merge nutzt ausschließlich Tool-Einträge, deren Roh- und Statusdaten im Lauf
-vorliegen, und schreibt danach:
+nicht. Der Merge sammelt Tool-Einträge **und** Evidence-Einträge in einem Endzustand ein:
+gelesen wird, wessen Eintrag auf `done` steht und wessen Job ein SARIF im Laufordner
+nennt. Perspektiven haben kein SARIF und tragen deshalb nichts bei — sie lesen das
+Ergebnis, statt es zu liefern. Der Merge schreibt danach:
 
 - `<lauf>/review-input.json`,
 - `<lauf>/review-input.md`.
@@ -191,11 +311,33 @@ vorliegen, und schreibt danach:
 Rohdaten, `run.json` und vorhandene Entry-Dateien werden durch den Merge nicht
 verändert. Lies danach den Status erneut.
 
-## Schritt 6 — Katalog-Perspektiven ausführen
+Nenne dabei ausdrücklich, welche Evidence-Quellen noch offen sind: ihre Funde fehlen in
+`review-input.json`. Ein erneuter Merge, nachdem die Evidence eingetroffen ist, ist der
+reguläre Weg und kein Reparaturfall — `k_playbook_review_merge` rechnet beide Artefakte
+neu und überschreibt sie.
+
+Ein erneuter Merge entwertet eine bereits geschriebene Bewertung: `review-triage.md`
+beschreibt dann einen Stand, den es nicht mehr gibt. Der Eintragszustand zeigt das nicht
+— er misst nur, ob die Ergebnisdatei da und nicht leer ist, und bleibt deshalb `done` und
+konsistent. `k_playbook_review_status` vergleicht darum die Änderungszeit von
+`review-input.json` mit `finishedAt` des Eintrags `scan-triage` und meldet das Ergebnis
+unter `triage`:
+
+- `current` — die Bewertung ist nach dem letzten Merge entstanden.
+- `stale` — `review-input.json` ist jünger, oder die Aktualität ist nicht belegbar, weil
+  `review-input.json` fehlt oder der Eintrag keine brauchbare Endzeit nennt.
+  `triage.reason` sagt, welcher Fall vorlag.
+- `missing` — es gibt noch keine `review-triage.md`.
+
+Bei `stale` melde die Bewertung als veraltet und führe Schritt 8 erneut aus. Ein Lauf mit
+veralteter Bewertung ist nicht vollständig.
+
+## Schritt 7 — Katalog-Perspektiven ausführen
 
 Führe diesen Schritt erst aus, wenn `review-input.json` im Laufordner vorhanden ist.
 
-Für AI-Einträge aus `catalogs.reviews` mit Zustand `start` oder `running`:
+Für AI-Einträge mit `mode: perspective` aus `catalogs.reviews` — in der Statusausgabe die
+Liste `perspectiveEntries` — mit Zustand `start` oder `running`:
 
 1. Lade den im Lauf gespeicherten `recipePath`.
 2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.tools`.
@@ -211,6 +353,9 @@ Für AI-Einträge aus `catalogs.reviews` mit Zustand `start` oder `running`:
 Leere Scope-Ergebnisse sind gültig: Das Ergebnisdokument sagt dann klar „keine scoped
 Findings" und der Eintrag kann auf `done` gesetzt werden. Katalog-Perspektiven schreiben
 keinen Family-Ordner, keine `raw/`-Artefakte und kein zweites `review-input.*`.
+
+Dieses Verbot gilt der Betriebsart, nicht dem Lauf: Evidence-Quellen schreiben
+`raw/<entry>.sarif`, und genau das ist ihr Pflichtartefakt (Schritt 5).
 
 Reparaturvertrag für Katalog-Perspektiven:
 
@@ -230,9 +375,9 @@ Reparaturvertrag für Katalog-Perspektiven:
 - Alter Lauf enthält keinen Eintrag für ein später hinzugefügtes Rezept: keine
   automatische nachträgliche Ergänzung der alten `run.json`.
 
-Der Eintrag `scan-triage` wird hier noch nicht ausgeführt. Er gehört zu Schritt 7.
+Der Eintrag `scan-triage` wird hier noch nicht ausgeführt. Er gehört zu Schritt 8.
 
-## Schritt 7 — Bewertung schreiben
+## Schritt 8 — Bewertung schreiben
 
 Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` im
 Laufordner vorhanden sind. `scan-triage` darf vorhandene Perspektiven-Reports als Kontext
@@ -244,6 +389,7 @@ Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an:
 - Suche `known-decisions.md` nicht selbst; nutze nur die Deckung aus
   `review-input.json`.
 - Bündele Gruppen nach gemeinsamer Root-Cause.
+- Belege KI-Evidence am Code, bevor du sie priorisierst; die Gewichtung steht im Modul.
 - Vergib Priorität `P1`/`P2`/`P3` und Kategorie `S`/`T`/`K`/`F`/`A`/`X`.
 - Verweise auf stabile Gruppen-IDs.
 - Schreibe ausschließlich `<RUN_DIR>/review-triage.md`.
@@ -267,18 +413,27 @@ die Datei gültig und fehlt nur der Eintragszustand, repariere ausschließlich d
 über `k_playbook_review_write_ai_entry`. Ist die Datei ungültig oder zeigt der Eintrag auf
 ein fehlendes Ergebnis, führe die Bewertung erneut aus.
 
-## Schritt 8 — Abschluss und Handoff
+Meldet der Status `triage.state: stale`, ist die Bewertung veraltet oder ihre Aktualität
+nicht belegbar: führe sie erneut aus und melde den Eintrag neu. Das Reparieren des
+Eintragszustands genügt hier nicht — der Zustand war nie falsch, der Inhalt ist es.
+
+## Schritt 9 — Abschluss und Handoff
 
 Lies zum Abschluss den Status erneut und melde:
 
 - Lauf und Laufordner,
 - Tool-Zustände,
-- AI-Entry-Zustände,
+- AI-Entry-Zustände, getrennt nach Evidence-Quellen und Perspektiven,
 - Pfad zu `review-input.json`, `review-input.md` und `review-triage.md`,
 - offene technische Fehler oder bewusst übersprungene Einträge,
 - den nächsten fachlichen Schritt: `/k-results` für eine projektweite priorisierte
   Summary oder `/k-remediation k-playbook-local/results/<lauf>/review-triage.md` für
   direkte Abarbeitung der Triage.
+
+Ein Lauf ist nicht vollständig, solange eine Evidence-Quelle offen ist oder `triage.state`
+nicht auf `current` steht. Sage das ausdrücklich, statt den Lauf als fertig zu melden: der
+erste Fall wird über Schritt 5 und einen erneuten Merge geschlossen, der zweite über
+Schritt 8.
 
 Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 
@@ -298,10 +453,19 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 - Entry-Datei unlesbar: nicht überschreiben; Fehler und Pfad nennen.
 - `scan-triage` fehlt in der Auswahlbasis: sagen, dass das Command-Modul im effektiven
   Namensraum fehlt oder abgeschaltet ist; Bewertung nicht improvisieren.
-- `review-input.*` fehlt: zuerst Schritt 5 ausführen, den Merge. Schritt 6 setzt
+- `review-input.*` fehlt: zuerst Schritt 6 ausführen, den Merge. Schritt 7 setzt
   `review-input.json` voraus und kann es nicht erzeugen.
 - `done` für `scan-triage` ohne vorhandenes `review-triage.md`: Zustand als
-  reparaturbedürftig melden und Schritt 7 erneut ausführen.
+  reparaturbedürftig melden und Schritt 8 erneut ausführen.
+- `triage.state: stale`: Bewertung als veraltet melden, `triage.reason` mit nennen und
+  Schritt 8 erneut ausführen. Kein Reparieren des Eintragszustands.
+- `sarif_path_invalid`, `sarif_required`, `entry_result_invalid`, `entry_job_invalid`
+  oder `recipe_contract_invalid` beim Melden einer Evidence-Quelle: Fehler des Aufrufs,
+  es wurde nichts geschrieben. Aufruf korrigieren, Rezept nicht erneut laufen lassen.
+- Antwort mit `stateOverridden: true`: Das SARIF war ungültig, der Eintrag steht auf
+  `failed`. Grund nennen und das Rezept erneut ausführen; den Status nicht überschreiben.
+- Evidence-Quelle bleibt offen oder ist `failed`: Merge nicht blockieren. Den Eintrag
+  namentlich melden und sagen, dass `review-input.json` seine Funde nicht enthält.
 
 ## Anti-Muster (nicht tun)
 
@@ -314,4 +478,15 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
 - `review-triage.md` nicht über `k_playbook_review_write_ai_entry` schreiben; das
   Werkzeug schreibt nur den Entry-Zustand.
 - Keine freien Suchpfade für `known-decisions.md` verwenden.
+- `scope.paths` einer Evidence-Quelle nicht aus dem Chat-Gedächtnis erweitern und nicht
+  durch `scope-hint` überstimmen; der Snapshot aus `run.json` gilt.
+- Keine Rule-IDs erfinden, die nicht in `audit.ruleIds` des Rezepts stehen — der Fund
+  wäre über Läufe hinweg nicht mehr vergleichbar und das Melden schlägt fehl.
+- Ein `failed` einer Evidence-Quelle nicht durch erneutes Schreiben des Status auf `done`
+  heben; nur ein erneuter Rezeptlauf behebt ein ungültiges Artefakt.
+- Evidence-Funde nicht im Rezeptlauf priorisieren oder kategorisieren; das ist Schritt 8.
+- Einen Lauf nicht als vollständig melden, solange eine Evidence-Quelle offen ist oder
+  `triage.state` nicht `current` ist.
+- Den Zeitvergleich der Bewertung nicht selbst nachrechnen; `triage.state` aus dem Status
+  ist die Antwort.
 - Nicht nach `k-playbook/` schreiben.

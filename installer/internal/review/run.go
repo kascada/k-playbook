@@ -64,24 +64,82 @@ const (
 	StateSkipped State = "skipped"
 )
 
+// Mode ist die Betriebsart eines AI-Eintrags im Lauf.
+//
+// Sie steht im Rezept und nicht im Command: derselbe Lauf führt Perspektiven
+// und Evidence-Quellen nebeneinander, und welche Art ein Rezept ist, gehört
+// zum Rezept.
+type Mode string
+
+const (
+	// ModePerspective ist die Vorgabe: der Eintrag läuft nach dem Merge und
+	// bewertet die Gruppen aus review-input.json, gefiltert über scope.tools.
+	// Sein Ergebnis ist ein Markdown-Dokument im Laufordner.
+	ModePerspective Mode = "perspective"
+	// ModeEvidence: der Eintrag läuft vor dem Merge, liest Code im
+	// eingefrorenen Pfad-Scope und schreibt SARIF nach raw/<entry>.sarif. Der
+	// Merge sammelt es wie Scanner-Rohdaten ein.
+	ModeEvidence Mode = "evidence"
+)
+
+// ValidMode meldet, ob eine Betriebsart bekannt ist. Das leere Feld gilt als
+// bekannt: es ist die Vorgabe perspective.
+func ValidMode(mode Mode) bool {
+	return mode == "" || mode == ModePerspective || mode == ModeEvidence
+}
+
+// NormalizeMode macht aus dem leeren Feld die Vorgabe perspective.
+//
+// Läufe aus der Zeit vor dieser Betriebsart tragen kein mode-Feld. Sie sind
+// Perspektiven-Läufe und sollen es bleiben — deshalb wird das leere Feld
+// gelesen und nicht abgewiesen, und deshalb bleibt schemaVersion unverändert:
+// das Feld kommt hinzu, keines ändert seine Bedeutung.
+func NormalizeMode(mode Mode) Mode {
+	if mode == "" {
+		return ModePerspective
+	}
+	return mode
+}
+
 // Entry ist ein einzelner Punkt eines Laufs.
 type Entry struct {
-	Name           string `json:"name"`
-	Kind           Kind   `json:"kind"`
-	State          State  `json:"state"`
-	RecipeKey      string `json:"recipeKey,omitempty"`
-	RecipePath     string `json:"recipePath,omitempty"`
-	RecipeOrigin   string `json:"recipeOrigin,omitempty"`
-	Title          string `json:"title,omitempty"`
+	Name         string `json:"name"`
+	Kind         Kind   `json:"kind"`
+	State        State  `json:"state"`
+	RecipeKey    string `json:"recipeKey,omitempty"`
+	RecipePath   string `json:"recipePath,omitempty"`
+	RecipeOrigin string `json:"recipeOrigin,omitempty"`
+	Title        string `json:"title,omitempty"`
+	// Mode ist die beim Anlegen des Laufs eingefrorene Betriebsart eines
+	// AI-Eintrags. Leer bei Tool-Einträgen und in Läufen von vor der
+	// Evidence-Betriebsart; EntryMode macht daraus perspective.
+	Mode           Mode   `json:"mode,omitempty"`
 	ResultRequired *bool  `json:"resultRequired,omitempty"`
 	DefaultResult  string `json:"defaultResult,omitempty"`
 	Scope          *Scope `json:"scope,omitempty"`
 }
 
+// EntryMode liefert die Betriebsart eines Eintrags mit der Vorgabe für
+// Altläufe.
+func EntryMode(entry Entry) Mode {
+	return NormalizeMode(entry.Mode)
+}
+
 // Scope ist der beim Erzeugen eines Laufs eingefrorene Bewertungs-Scope eines
 // AI-Eintrags.
+//
+// Tools gehört zu mode: perspective und filtert die Gruppen aus
+// review-input.json über evidence.tool. Paths gehört zu mode: evidence und
+// begrenzt, welchen Code der Eintrag lesen darf. Beides zusammen ergibt keinen
+// Sinn und wird von ValidateAuditContract abgewiesen.
 type Scope struct {
 	Tools []string `json:"tools,omitempty"`
+	// Paths sind Globs relativ zur Projektwurzel. Sie sind der verbindliche
+	// Scope eines Evidence-Laufs: scope-hint bleibt Freitext für /k-review und
+	// darf sie weder erweitern noch überstimmen. Innerhalb der Globs gelten
+	// zusätzlich die zentralen Ausschlüsse der Modulsuche — siehe
+	// PathExcludedFromScope.
+	Paths []string `json:"paths,omitempty"`
 }
 
 // Run ist der Inhalt von run.json.
@@ -223,6 +281,9 @@ func CreateRun(localDir string, day time.Time, languages []string, entries []Ent
 		if !ValidKind(entry.Kind) {
 			return "", fmt.Errorf("unbekannte Art für %s: %q", entry.Name, entry.Kind)
 		}
+		if !ValidMode(entry.Mode) {
+			return "", fmt.Errorf("unbekannte Betriebsart für %s: %q", entry.Name, entry.Mode)
+		}
 		if seen[entry.Name] {
 			return "", fmt.Errorf("Eintrag doppelt ausgewählt: %s", entry.Name)
 		}
@@ -279,6 +340,9 @@ func cloneScope(scope *Scope) *Scope {
 	cloned := &Scope{}
 	if scope.Tools != nil {
 		cloned.Tools = append([]string{}, scope.Tools...)
+	}
+	if scope.Paths != nil {
+		cloned.Paths = append([]string{}, scope.Paths...)
 	}
 	return cloned
 }

@@ -119,6 +119,7 @@ func markdown(result Result) string {
 	fmt.Fprintf(&builder, "## Dedupe-Hinweise\n\n")
 	fmt.Fprintf(&builder, "- Harte Dedupe-Gruppen entstehen aus Fingerprints, exakter Datei/Zeile/Rule/Message oder Dependency-IDs.\n")
 	fmt.Fprintf(&builder, "- Bei Dependency-Funden genügt **eine** gemeinsame Kennung, wenn Package und Version übereinstimmen.\n")
+	fmt.Fprintf(&builder, "- KI-Evidence (Stable-ID `ai-…`) wird je Rule-ID und Datei gebündelt, ohne Zeile und Meldung; die Zahl der Befunde nennt die Instanzen.\n")
 	fmt.Fprintf(&builder, "- Gleiche Datei/Zeile mit ähnlicher Rule-Familie wird nur als `possible-duplicate` markiert.\n")
 	fmt.Fprintf(&builder, "- Ebenso Dependency-Funde mit gemeinsamer Kennung, deren Package oder Version fehlt oder abweicht.\n")
 	fmt.Fprintf(&builder, "- SARIF-Rohdaten, `run.json` und `entries/*.json` bleiben unverändert.\n")

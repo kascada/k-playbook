@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
 var (
@@ -70,7 +72,34 @@ func hardKeys(finding Finding) []string {
 	if key := sameLocationToolKey(finding); key != "" {
 		keys = append(keys, key)
 	}
+	if key := aiPathRuleKey(finding); key != "" {
+		keys = append(keys, key)
+	}
 	return keys
+}
+
+// aiPathRuleKey ist der harte Schlüssel für KI-Evidence: eine Rule-ID in einer
+// Datei ist eine Gruppe.
+//
+// Er hält die Gruppierung mit der Schlüsselklasse zusammen. class=ai kennt weder
+// Zeile noch Meldung (siehe aiKeyLines in stable.go); ohne diesen Schlüssel
+// blieben zwei Funde derselben Rule-ID in derselben Datei zwei Gruppen mit
+// identischem stabilem Schlüssel — also kollidierenden stableIds.
+//
+// Die Grobkörnigkeit ist gewollt: alle Instanzen bleiben als findingIds und
+// evidence erhalten, der Repräsentant nennt eine Stelle, die Triage liest die
+// Anzahl mit. Eine Decision auf diese Gruppe deckt die Datei für diese Rule-ID
+// ganz; eine Abweisung je Instanz gibt es nicht.
+func aiPathRuleKey(finding Finding) string {
+	if finding.Mode != review.ModeEvidence {
+		return ""
+	}
+	if finding.Evidence.Tool == "" || finding.Location.URI == "" || finding.RuleID == "" {
+		return ""
+	}
+	return fmt.Sprintf("ai:%s:%s:%s",
+		strings.ToLower(finding.Evidence.Tool), normalizePath(finding.Location.URI),
+		strings.ToLower(finding.RuleID))
 }
 
 func fingerprintKeys(finding Finding) []string {
@@ -143,7 +172,20 @@ func dependencyKeys(finding Finding) []string {
 	return keys
 }
 
+// sameLocationToolKey fasst zusammen, was ein Werkzeug in einem Lauf an
+// derselben Zeile meldet — bei Manifest-Funden der Regelfall, weil dort alle
+// Funde auf dieselbe Zeile zeigen.
+//
+// Für KI-Evidence gilt er nicht. class=ai kennt keine Zeile (siehe aiKeyLines in
+// stable.go); ein Schlüssel über die Zeile zöge Funde verschiedener Rule-IDs
+// zusammen, sobald sie zufällig in derselben stehen, und im nächsten Lauf
+// stünden sie woanders — die Gruppe zerfiele, und mit ihr die stableId. An
+// seine Stelle tritt aiPathRuleKey; „dieselbe Regel in derselben Zeile" ist
+// darin als Teilfall enthalten.
 func sameLocationToolKey(finding Finding) string {
+	if finding.Mode == review.ModeEvidence {
+		return ""
+	}
 	if finding.Evidence.Tool == "" || finding.Evidence.Job == "" || finding.Location.URI == "" || finding.Location.StartLine == 0 {
 		return ""
 	}
@@ -169,6 +211,9 @@ func dedupeRules(findings []Finding) []string {
 		}
 		if sameLocationToolKey(finding) != "" {
 			rules["same-location-tool"] = true
+		}
+		if aiPathRuleKey(finding) != "" {
+			rules["ai-path-rule"] = true
 		}
 	}
 	list := make([]string, 0, len(rules))

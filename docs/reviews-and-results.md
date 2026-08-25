@@ -117,10 +117,14 @@ den Assistenten. Details in
 Das kuratierbare Endprodukt beider Bewertungswege ist `review-triage.md`: beim Audit
 direkt unter `k-playbook-local/results/YYYY-MM-DD/`, beim gezielten Report-Review unter
 `k-playbook-local/results/<familie>/YYYY-MM-DD/`. Nur der Scope unterscheidet sich.
-Aktive Audit-Katalog-Rezepte können zusätzlich je eine Perspektiven-Datei direkt im
-Laufordner schreiben, etwa `review-secret-scanning.md`. Diese Perspektiven lesen denselben
-Merge-Beleg, filtern über ihren gespeicherten `scope.tools` und dienen `scan-triage` nur
-als Kontext. `/k-results` und `/k-remediation` arbeiten weiter gegen `review-triage.md`;
+Aktive Audit-Katalog-Rezepte tragen je nach `audit.mode` unterschiedlich bei. Eine
+**Perspektive** (`mode: perspective`) schreibt zusätzlich je eine Perspektiven-Datei direkt
+im Laufordner, etwa `review-secret-scanning.md`; sie liest denselben Merge-Beleg, filtert
+über ihren gespeicherten `scope.tools` und dient `scan-triage` nur als Kontext. Eine
+**Evidence-Quelle** (`mode: evidence`) schreibt gar kein Markdown, sondern läuft vor dem
+Merge und legt `raw/<entry>.sarif` ab; ihre Funde stehen danach als Gruppen mit dem Präfix
+`ai-<entry>-` in `review-input.json` und gehen damit denselben Weg wie Scanner-Funde.
+`/k-results` und `/k-remediation` arbeiten weiter gegen `review-triage.md`;
 Legacy-`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
 `review-triage.md`.
 
@@ -277,6 +281,21 @@ Filesystem-Findings,
 Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
 `review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
 
+### Rezepte als Evidence-Quelle
+
+Zwei Katalog-Rezepte liefern im Lauf eigene Belege aus dem Code, statt vorhandene zu
+filtern. Sie laufen vor dem Merge, lesen ausschließlich in ihrem eingefrorenen
+`scope.paths` und schreiben SARIF nach `raw/<entry>.sarif`:
+
+| Rezept | Eintrag | Was es liest |
+|---|---|---|
+| `review-tech.md` | `tech` | Quell- und Infrastrukturdateien; Tech-Debt-Kandidaten mit `tech-*`-Rule-IDs. |
+| `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python-Quellen; Stellen ohne rekonstruierbare Begründung, mit `hardspot-*`-Rule-IDs. |
+
+Beide bleiben daneben über `/k-review` auswählbar — `review-tech` im Report-Modus,
+`review-python-comment-hardspots` interaktiv. Die Prüfkriterien sind in beiden
+Betriebsarten dieselben; unterschiedlich ist nur die Ergebnisform.
+
 ### Family-only-Rezepte im Audit-Laufmodell
 
 Einige Katalog-Rezepte bleiben über `/k-review` auswählbar, sind aber für `/k-audit`
@@ -285,10 +304,8 @@ separater Scope-Vertrag existiert:
 
 | Rezept | Grund |
 |---|---|
-| `review-python-comment-hardspots.md` | Bewertet Code-Hotspots ohne Scan-Belege in `review-input.json`. |
 | `review-k-check-security.md` | `k-check`-Ergebnisse sind noch nicht als Evidence im Merge modelliert. |
 | `review-dependabot-alerts.md` | Der Input kommt extern über `gh api` und ist noch kein Tool-Eintrag im Lauf-Merge. |
-| `review-tech.md` | Zu breit für eine klar abgegrenzte `scope.tools`-Perspektive. |
 
 ## Review-Log
 

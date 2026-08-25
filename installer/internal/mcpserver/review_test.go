@@ -869,3 +869,857 @@ func minimalTriage() string {
 func intPtr(value int) *int { return &value }
 
 func boolPtr(value bool) *bool { return &value }
+
+// evidenceRecipe ist ein Rezept, das den Evidence-Vertrag erfüllt: Betriebsart,
+// Pfad-Scope und Rule-ID-Liste, kein defaultResult und kein resultRequired.
+func evidenceRecipe() string {
+	return "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds:\n    - tech-veraltet\n    - tech-kopplung\n  scope:\n    paths:\n      - installer/**\n      - commands/**\nreview:\n  enabled: true\n---\n# Technischer Review\n"
+}
+
+func TestReadAIRecipeMetadataLiestEvidenceVertrag(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "review-tech.md")
+	mustWriteFile(t, path, evidenceRecipe())
+
+	metadata, err := readAIRecipeMetadata("review-tech", path)
+	if err != nil {
+		t.Fatalf("readAIRecipeMetadata: %v", err)
+	}
+	if metadata.Mode != review.ModeEvidence {
+		t.Errorf("Mode = %q, erwartet %q", metadata.Mode, review.ModeEvidence)
+	}
+	if metadata.Scope == nil || len(metadata.Scope.Paths) != 2 || metadata.Scope.Paths[0] != "installer/**" {
+		t.Fatalf("Pfad-Scope = %#v", metadata.Scope)
+	}
+	if len(metadata.Scope.Tools) != 0 {
+		t.Errorf("Tools = %#v, erwartet leer", metadata.Scope.Tools)
+	}
+	if len(metadata.RuleIDs) != 2 || metadata.RuleIDs[1] != "tech-kopplung" {
+		t.Fatalf("RuleIDs = %#v", metadata.RuleIDs)
+	}
+	// Der Ergebnisvertrag: Pflichtartefakt ist raw/<entry>.sarif, deshalb darf
+	// resultRequired nicht als true in den Lauf geraten.
+	if metadata.ResultRequired {
+		t.Error("ResultRequired = true, erwartet false")
+	}
+	if metadata.DefaultResult != "" {
+		t.Errorf("DefaultResult = %q, erwartet leer", metadata.DefaultResult)
+	}
+	if err := review.ValidateAuditContract(metadata.auditContract()); err != nil {
+		t.Fatalf("Vertrag ungültig: %v", err)
+	}
+}
+
+func TestReadAIRecipeMetadataHaeltPerspektiveUnveraendert(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "review-tech.md")
+	mustWriteFile(t, path, "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
+
+	metadata, err := readAIRecipeMetadata("review-tech", path)
+	if err != nil {
+		t.Fatalf("readAIRecipeMetadata: %v", err)
+	}
+	if metadata.Mode != review.ModePerspective {
+		t.Errorf("Mode = %q, erwartet %q", metadata.Mode, review.ModePerspective)
+	}
+	if !metadata.ResultRequired || !metadata.ResultRequiredSet {
+		t.Errorf("ResultRequired = %v/%v, erwartet true/true", metadata.ResultRequired, metadata.ResultRequiredSet)
+	}
+	if metadata.DefaultResult != "review-tech.md" {
+		t.Errorf("DefaultResult = %q", metadata.DefaultResult)
+	}
+	if metadata.Scope == nil || len(metadata.Scope.Tools) != 1 || len(metadata.Scope.Paths) != 0 {
+		t.Fatalf("Scope = %#v", metadata.Scope)
+	}
+	if err := review.ValidateAuditContract(metadata.auditContract()); err != nil {
+		t.Fatalf("Vertrag ungültig: %v", err)
+	}
+}
+
+func TestReadAIRecipeMetadataMeldetUnzulaessigeEvidenceKombination(t *testing.T) {
+	cases := map[string]string{
+		"resultRequired neben evidence": "---\naudit:\n  enabled: true\n  mode: evidence\n  resultRequired: true\n  ruleIds: [tech-x]\n  scope:\n    paths: [installer/**]\n---\n# X\n",
+		"defaultResult neben evidence":  "---\naudit:\n  enabled: true\n  mode: evidence\n  defaultResult: review-tech.md\n  ruleIds: [tech-x]\n  scope:\n    paths: [installer/**]\n---\n# X\n",
+		"tools neben evidence":          "---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds: [tech-x]\n  scope:\n    tools: [mockscan]\n    paths: [installer/**]\n---\n# X\n",
+		"evidence ohne paths":           "---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds: [tech-x]\n---\n# X\n",
+		"evidence ohne ruleIds":         "---\naudit:\n  enabled: true\n  mode: evidence\n  scope:\n    paths: [installer/**]\n---\n# X\n",
+		"paths neben perspective":       "---\naudit:\n  enabled: true\n  scope:\n    paths: [installer/**]\n---\n# X\n",
+		"unbekannte Betriebsart":        "---\naudit:\n  enabled: true\n  mode: scanner\n---\n# X\n",
+	}
+	for name, recipe := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "review-x.md")
+			mustWriteFile(t, path, recipe)
+			metadata, err := readAIRecipeMetadata("review-x", path)
+			if err != nil {
+				t.Fatalf("readAIRecipeMetadata: %v", err)
+			}
+			if err := review.ValidateAuditContract(metadata.auditContract()); err == nil {
+				t.Fatalf("Vertrag gilt als gültig: %#v", metadata)
+			}
+		})
+	}
+}
+
+func TestReviewStatusAvailableTrenntEvidenceVonPerspektiven(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-hardspots.md"), evidenceRecipe())
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+
+	candidate := candidateByName(t, selection["candidates"].([]any), "hardspots")
+	if candidate["mode"] != string(review.ModeEvidence) {
+		t.Fatalf("mode = %v", candidate["mode"])
+	}
+	if candidate["selectable"] != true {
+		t.Fatalf("selectable = %v", candidate["selectable"])
+	}
+	scope := candidate["scope"].(map[string]any)
+	if paths := scope["paths"].([]any); len(paths) != 2 || paths[0] != "installer/**" {
+		t.Fatalf("paths = %#v", scope)
+	}
+	if ruleIDs := candidate["ruleIds"].([]any); len(ruleIDs) != 2 {
+		t.Fatalf("ruleIds = %#v", candidate["ruleIds"])
+	}
+	// Ein Evidence-Rezept schreibt kein Ergebnisdokument: resultRequired darf
+	// nicht als true in die Auswahlbasis geraten.
+	if candidate["resultRequired"] != false {
+		t.Fatalf("resultRequired = %v", candidate["resultRequired"])
+	}
+	if _, found := candidate["defaultResult"]; found {
+		t.Fatalf("defaultResult = %v", candidate["defaultResult"])
+	}
+
+	evidence := selection["evidenceCandidates"].([]any)
+	if len(evidence) != 1 || evidence[0] != "hardspots" {
+		t.Fatalf("evidenceCandidates = %#v", evidence)
+	}
+	perspectives := selection["perspectiveCandidates"].([]any)
+	if len(perspectives) != 2 || !containsValue(perspectives, "tech") || !containsValue(perspectives, scanTriageEntry) {
+		t.Fatalf("perspectiveCandidates = %#v", perspectives)
+	}
+
+	tech := candidateByName(t, selection["candidates"].([]any), "tech")
+	if tech["mode"] != string(review.ModePerspective) {
+		t.Fatalf("tech mode = %v", tech["mode"])
+	}
+}
+
+func TestReviewStatusAvailableHaeltUngueltigenAuditVertragAusDerAuswahl(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-broken.md"),
+		"---\ntitle: Kaputt\naudit:\n  enabled: true\n  mode: evidence\n  resultRequired: true\n  ruleIds: [x]\n  scope:\n    paths: [installer/**]\n---\n# Kaputt\n")
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+	candidate := candidateByName(t, selection["candidates"].([]any), "broken")
+	if candidate["selectable"] != false {
+		t.Fatalf("selectable = %v", candidate["selectable"])
+	}
+	if reason, _ := candidate["unavailableReason"].(string); !strings.Contains(reason, "Audit-Vertrag") {
+		t.Fatalf("unavailableReason = %q", reason)
+	}
+	if !hasCandidate(selection["unavailableCandidates"].([]any), "broken") {
+		t.Fatalf("broken fehlt in unavailableCandidates")
+	}
+	if containsValue(selection["evidenceCandidates"].([]any), "broken") {
+		t.Fatalf("broken steht in evidenceCandidates")
+	}
+
+	// Ausdrücklich ausgewählt wird das Rezept abgewiesen statt still übergangen.
+	created, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Day:             "2026-08-19",
+		Entries:         []reviewSelectionInput{{Name: "broken", Kind: review.KindAI}},
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	assertToolErrorCode(t, created, "selection_unavailable")
+}
+
+func TestReviewCreateFriertModusUndPfadScopeEin(t *testing.T) {
+	root := newReviewProject(t)
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-hardspots.md"), evidenceRecipe())
+
+	result, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Day: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("create fehlgeschlagen: %#v", envelope.Error)
+	}
+
+	written, err := review.ReadRun(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"))
+	if err != nil {
+		t.Fatalf("run.json lesen: %v", err)
+	}
+	evidence, ok := runEntry(written, "hardspots")
+	if !ok {
+		t.Fatalf("hardspots fehlt: %#v", written.Entries)
+	}
+	if evidence.Mode != review.ModeEvidence {
+		t.Errorf("Mode = %q", evidence.Mode)
+	}
+	if evidence.Scope == nil || len(evidence.Scope.Paths) != 2 || evidence.Scope.Paths[0] != "installer/**" {
+		t.Fatalf("Pfad-Scope = %#v", evidence.Scope)
+	}
+	if len(evidence.Scope.Tools) != 0 {
+		t.Errorf("Tools = %#v, erwartet leer", evidence.Scope.Tools)
+	}
+	if evidence.ResultRequired == nil || *evidence.ResultRequired {
+		t.Errorf("ResultRequired = %#v, erwartet false", evidence.ResultRequired)
+	}
+	if evidence.DefaultResult != "" {
+		t.Errorf("DefaultResult = %q, erwartet leer", evidence.DefaultResult)
+	}
+
+	perspective, ok := runEntry(written, "tech")
+	if !ok {
+		t.Fatalf("tech fehlt: %#v", written.Entries)
+	}
+	if perspective.Mode != review.ModePerspective {
+		t.Errorf("tech Mode = %q", perspective.Mode)
+	}
+}
+
+func TestReviewStatusExistingTrenntEvidenceVonPerspektiven(t *testing.T) {
+	root := newReviewProject(t)
+	evidence := aiEntry("hardspots")
+	evidence.Mode = review.ModeEvidence
+	evidence.ResultRequired = boolPtr(false)
+	evidence.DefaultResult = ""
+	evidence.Scope = &review.Scope{Paths: []string{"installer/**"}}
+	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech"), evidence})
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	data := envelope.Data.(map[string]any)
+
+	evidenceNames := data["evidenceEntries"].([]any)
+	if len(evidenceNames) != 1 || evidenceNames[0] != "hardspots" {
+		t.Fatalf("evidenceEntries = %#v", evidenceNames)
+	}
+	perspectiveNames := data["perspectiveEntries"].([]any)
+	if len(perspectiveNames) != 2 || !containsValue(perspectiveNames, "tech") || !containsValue(perspectiveNames, scanTriageEntry) {
+		t.Fatalf("perspectiveEntries = %#v", perspectiveNames)
+	}
+
+	entries := data["entries"].([]any)
+	if mode := statusEntry(t, entries, "hardspots")["mode"]; mode != string(review.ModeEvidence) {
+		t.Fatalf("hardspots mode = %v", mode)
+	}
+	if mode := statusEntry(t, entries, "tech")["mode"]; mode != string(review.ModePerspective) {
+		t.Fatalf("tech mode = %v", mode)
+	}
+	if _, found := statusEntry(t, entries, "mockscan")["mode"]; found {
+		t.Fatal("Tool-Eintrag trägt eine Betriebsart")
+	}
+}
+
+// Ein Lauf aus der Zeit vor der Evidence-Betriebsart hat kein mode-Feld. Der
+// Status muss ihn unverändert als Perspektiven-Lauf zeigen.
+func TestReviewStatusExistingZeigtAltlaufAlsPerspektive(t *testing.T) {
+	root := newReviewProject(t)
+	entry := aiEntry("tech")
+	entry.Mode = ""
+	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, entry})
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	data := envelope.Data.(map[string]any)
+	if evidenceNames := data["evidenceEntries"].([]any); len(evidenceNames) != 0 {
+		t.Fatalf("evidenceEntries = %#v", evidenceNames)
+	}
+	entries := data["entries"].([]any)
+	if mode := statusEntry(t, entries, "tech")["mode"]; mode != string(review.ModePerspective) {
+		t.Fatalf("tech mode = %v", mode)
+	}
+	if statusEntry(t, entries, "tech")["resultRequired"] != true {
+		t.Fatal("resultRequired eines Altlaufs verändert")
+	}
+}
+
+func runEntry(run review.Run, name string) (review.Entry, bool) {
+	for _, entry := range run.Entries {
+		if entry.Name == name {
+			return entry, true
+		}
+	}
+	return review.Entry{}, false
+}
+
+func containsValue(values []any, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+// evidenceRun legt einen Lauf mit einem Evidence-Eintrag an: Rezept im
+// Katalog, Betriebsart und Pfad-Scope im Eintrag eingefroren.
+func evidenceRun(t *testing.T, root string, name string) (string, review.Entry) {
+	t.Helper()
+	recipePath := filepath.Join(root, "k-playbook", "reviews", "review-"+name+".md")
+	mustWriteFile(t, recipePath, evidenceRecipe())
+	entry := review.Entry{
+		Name:           name,
+		Kind:           review.KindAI,
+		RecipeKey:      name,
+		RecipePath:     recipePath,
+		RecipeOrigin:   "dist",
+		Title:          "Technischer Review",
+		Mode:           review.ModeEvidence,
+		ResultRequired: boolPtr(false),
+		Scope:          &review.Scope{Paths: []string{"installer/**", "commands/**"}},
+	}
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, entry})
+	return runDir, entry
+}
+
+func evidenceSARIF(tool string, results ...string) string {
+	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"` + tool + `","rules":[{"id":"tech-veraltet"},{"id":"tech-kopplung"}]}},"results":[` + strings.Join(results, ",") + `]}]}`
+}
+
+func evidenceResult(ruleID string, uri string) string {
+	return `{"ruleId":"` + ruleID + `","level":"error","message":{"text":"Fund"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"` + uri + `"},"region":{"startLine":7}}}]}`
+}
+
+func writeEvidenceEntry(t *testing.T, root string, entry string, sarif string) reviewEnvelope {
+	t.Helper()
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           entry,
+		State:           review.StateDone,
+		Job:             &reviewAIJobInput{SARIF: sarif, Started: "2026-08-19T10:00:00Z", Finished: "2026-08-19T10:05:00Z"},
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	return decodeReviewEnvelope(t, result)
+}
+
+// Ein Fund außerhalb von scope.paths kostet den Fund, nicht den Eintrag: das
+// SARIF wird bereinigt zurückgeschrieben, die Zahl steht im Grund.
+func TestReviewWriteAIEntryEvidenceTeilannahmeBeiScopeVerstoss(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+	sarifPath := filepath.Join(runDir, review.RawDirName, "hardspots.sarif")
+	mustWriteFile(t, sarifPath, evidenceSARIF("hardspots",
+		evidenceResult("tech-veraltet", "installer/internal/review/run.go"),
+		evidenceResult("tech-kopplung", "docs/handbuch.md"),
+		evidenceResult("tech-kopplung", "k-playbook/reviews/review-tech.md"),
+	))
+
+	envelope := writeEvidenceEntry(t, root, "hardspots", "raw/hardspots.sarif")
+	if !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	data := envelope.Data.(map[string]any)
+	evidence := data["evidence"].(map[string]any)
+	if evidence["findings"] != float64(1) || evidence["droppedFindings"] != float64(2) {
+		t.Fatalf("evidence = %#v", evidence)
+	}
+	if evidence["sarifRewritten"] != true {
+		t.Error("bereinigtes SARIF wurde nicht zurückgeschrieben")
+	}
+	if _, overridden := data["stateOverridden"]; overridden {
+		t.Error("Teilannahme darf den Zustand nicht ändern")
+	}
+
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, "hardspots", &status); err != nil {
+		t.Fatalf("Status lesen: %v", err)
+	}
+	if status.State != review.StateDone {
+		t.Fatalf("state = %q", status.State)
+	}
+	if len(status.Jobs) != 1 || status.Jobs[0].SARIF != "raw/hardspots.sarif" || status.Jobs[0].State != review.StateDone {
+		t.Fatalf("jobs = %#v", status.Jobs)
+	}
+	if status.Jobs[0].Findings == nil || *status.Jobs[0].Findings != 1 {
+		t.Fatalf("findings = %#v", status.Jobs[0].Findings)
+	}
+	if status.Jobs[0].Started != "2026-08-19T10:00:00Z" || status.Jobs[0].Finished != "2026-08-19T10:05:00Z" {
+		t.Fatalf("Job-Zeiten = %#v", status.Jobs[0])
+	}
+	if !strings.Contains(status.Reason, "2 Fund") || !strings.Contains(status.Reason, "docs/handbuch.md") {
+		t.Fatalf("reason = %q", status.Reason)
+	}
+
+	raw, err := os.ReadFile(sarifPath)
+	if err != nil {
+		t.Fatalf("SARIF lesen: %v", err)
+	}
+	if strings.Contains(string(raw), "docs/handbuch.md") || strings.Contains(string(raw), "k-playbook/reviews") {
+		t.Fatalf("SARIF wurde nicht bereinigt: %s", raw)
+	}
+	if !strings.Contains(string(raw), "installer/internal/review/run.go") {
+		t.Fatalf("Fund im Scope fehlt: %s", raw)
+	}
+}
+
+// Eine Rule-ID außerhalb der Liste macht den Eintrag failed — kein stilles done.
+func TestReviewWriteAIEntryEvidenceRuleIDAusserhalbDerListe(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+	mustWriteFile(t, filepath.Join(runDir, review.RawDirName, "hardspots.sarif"), evidenceSARIF("hardspots", evidenceResult("tech-erfunden", "installer/main.go")))
+
+	envelope := writeEvidenceEntry(t, root, "hardspots", "raw/hardspots.sarif")
+	if !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	data := envelope.Data.(map[string]any)
+	if data["stateOverridden"] != true || data["requestedState"] != string(review.StateDone) {
+		t.Fatalf("data = %#v", data)
+	}
+
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, "hardspots", &status); err != nil {
+		t.Fatalf("Status lesen: %v", err)
+	}
+	if status.State != review.StateFailed {
+		t.Fatalf("state = %q, erwartet failed", status.State)
+	}
+	if !strings.Contains(status.Reason, "tech-erfunden") {
+		t.Fatalf("reason = %q", status.Reason)
+	}
+	if len(status.Jobs) != 1 || status.Jobs[0].State != review.StateFailed || status.Jobs[0].Reason == "" {
+		t.Fatalf("jobs = %#v", status.Jobs)
+	}
+}
+
+// Ein fremder Werkzeugname im SARIF wird genauso behandelt.
+func TestReviewWriteAIEntryEvidenceFremderWerkzeugname(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+	mustWriteFile(t, filepath.Join(runDir, review.RawDirName, "hardspots.sarif"), evidenceSARIF("semgrep", evidenceResult("tech-veraltet", "installer/main.go")))
+
+	envelope := writeEvidenceEntry(t, root, "hardspots", "raw/hardspots.sarif")
+	if !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, "hardspots", &status); err != nil {
+		t.Fatalf("Status lesen: %v", err)
+	}
+	if status.State != review.StateFailed || !strings.Contains(status.Reason, "semgrep") {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
+// Ein leerer Scope-Befund ist ein Ergebnis: done ohne Funde, ohne Inkonsistenz.
+func TestReviewWriteAIEntryEvidenceLeeresSARIFIstDone(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+	mustWriteFile(t, filepath.Join(runDir, review.RawDirName, "hardspots.sarif"), evidenceSARIF("hardspots"))
+
+	envelope := writeEvidenceEntry(t, root, "hardspots", "raw/hardspots.sarif")
+	if !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	evidence := envelope.Data.(map[string]any)["evidence"].(map[string]any)
+	if evidence["findings"] != float64(0) || evidence["droppedFindings"] != float64(0) {
+		t.Fatalf("evidence = %#v", evidence)
+	}
+	var status aiEntryStatus
+	if err := readAIEntryStatus(runDir, "hardspots", &status); err != nil {
+		t.Fatalf("Status lesen: %v", err)
+	}
+	if status.State != review.StateDone || status.Reason != "" {
+		t.Fatalf("status = %#v", status)
+	}
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	entry := statusEntry(t, decodeReviewEnvelope(t, result).Data.(map[string]any)["entries"].([]any), "hardspots")
+	if _, found := entry["inconsistent"]; found {
+		t.Fatalf("leeres SARIF gilt als inkonsistent: %#v", entry)
+	}
+	if entry["resultRequired"] != false {
+		t.Errorf("resultRequired = %#v, erwartet false", entry["resultRequired"])
+	}
+}
+
+func TestReviewWriteAIEntryEvidenceFormfehler(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+	mustWriteFile(t, filepath.Join(runDir, review.RawDirName, "hardspots.sarif"), evidenceSARIF("hardspots"))
+	mustWriteFile(t, filepath.Join(runDir, "daneben.sarif"), evidenceSARIF("hardspots"))
+
+	tests := []struct {
+		name  string
+		input reviewWriteAIEntryInput
+		code  string
+	}{
+		{
+			name:  "done ohne Job",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone},
+			code:  "sarif_required",
+		},
+		{
+			name:  "Ergebnisdatei statt SARIF",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone, Result: "review-hardspots.md"},
+			code:  "entry_result_invalid",
+		},
+		{
+			name:  "SARIF neben raw",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone, Job: &reviewAIJobInput{SARIF: "daneben.sarif"}},
+			code:  "sarif_path_invalid",
+		},
+		{
+			name:  "SARIF außerhalb des Laufs",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone, Job: &reviewAIJobInput{SARIF: "../raw/hardspots.sarif"}},
+			code:  "sarif_path_invalid",
+		},
+		{
+			name:  "SARIF fehlt",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone, Job: &reviewAIJobInput{SARIF: "raw/fehlt.sarif"}},
+			code:  "sarif_path_invalid",
+		},
+		{
+			name:  "Job bei running",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateRunning, Job: &reviewAIJobInput{SARIF: "raw/hardspots.sarif"}},
+			code:  "entry_job_invalid",
+		},
+		{
+			name:  "Job an einer Perspektive",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: scanTriageEntry, State: review.StateDone, Job: &reviewAIJobInput{SARIF: "raw/hardspots.sarif"}},
+			code:  "entry_job_invalid",
+		},
+		{
+			name:  "ungültige Job-Zeit",
+			input: reviewWriteAIEntryInput{Run: "2026-08-19", Entry: "hardspots", State: review.StateDone, Job: &reviewAIJobInput{SARIF: "raw/hardspots.sarif", Started: "gestern"}},
+			code:  "entry_state_invalid",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.input.reviewBaseInput = reviewBaseInput{ProjectDir: root}
+			result, _, err := reviewWriteAIEntryTool(context.Background(), nil, test.input)
+			if err != nil {
+				t.Fatalf("write_ai_entry: %v", err)
+			}
+			assertToolErrorCode(t, result, test.code)
+		})
+	}
+}
+
+// Der Reparaturvertrag eines Evidence-Eintrags hängt am SARIF und nicht an
+// einer Ergebnisdatei.
+func TestReviewStatusExistingEvidenceReparaturvertrag(t *testing.T) {
+	root := newReviewProject(t)
+	runDir, _ := evidenceRun(t, root, "hardspots")
+
+	// done ohne SARIF: inkonsistent.
+	mustWriteJSON(t, review.EntryFile(runDir, "hardspots"), aiEntryStatus{Name: "hardspots", Kind: review.KindAI, State: review.StateDone})
+	entry := evidenceStatusEntry(t, root, "hardspots")
+	if entry["sarifMissing"] != true || entry["inconsistent"] != true {
+		t.Fatalf("done ohne SARIF = %#v", entry)
+	}
+	if _, found := entry["resultMissing"]; found {
+		t.Error("Evidence-Eintrag wird an der Ergebnisdatei gemessen")
+	}
+
+	// SARIF vorhanden, Entry-Status offen: reparierbar.
+	mustWriteFile(t, filepath.Join(runDir, review.RawDirName, "hardspots.sarif"), evidenceSARIF("hardspots"))
+	if err := os.Remove(review.EntryFile(runDir, "hardspots")); err != nil {
+		t.Fatalf("Entry-Datei entfernen: %v", err)
+	}
+	entry = evidenceStatusEntry(t, root, "hardspots")
+	if entry["repairable"] != true || entry["sarifExists"] != true {
+		t.Fatalf("offener Eintrag mit SARIF = %#v", entry)
+	}
+
+	// Gemeldeter Eintrag mit Job: konsistent.
+	writeEvidenceEntry(t, root, "hardspots", "raw/hardspots.sarif")
+	entry = evidenceStatusEntry(t, root, "hardspots")
+	if _, found := entry["inconsistent"]; found {
+		t.Fatalf("gemeldeter Eintrag gilt als inkonsistent: %#v", entry)
+	}
+	jobs, ok := entry["jobs"].([]any)
+	if !ok || len(jobs) != 1 {
+		t.Fatalf("jobs = %#v", entry["jobs"])
+	}
+}
+
+func evidenceStatusEntry(t *testing.T, root string, name string) map[string]any {
+	t.Helper()
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	return statusEntry(t, envelope.Data.(map[string]any)["entries"].([]any), name)
+}
+
+// Eine Entry-Datei aus der Zeit vor dem Job-Teil hat kein jobs-Feld. Sie bleibt
+// lesbar, und die Perspektive verhält sich unverändert.
+func TestReviewWriteAIEntryPerspektiveBleibtUnveraendert(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
+	mustWriteFile(t, review.EntryFile(runDir, "tech"), `{"schemaVersion":1,"name":"tech","kind":"ai","state":"running","startedAt":"2026-08-19T10:00:00Z"}`+"\n")
+
+	entry := evidenceStatusEntry(t, root, "tech")
+	if entry["state"] != string(review.StateRunning) || entry["present"] != true {
+		t.Fatalf("Altdatei = %#v", entry)
+	}
+	if _, found := entry["jobs"]; found {
+		t.Error("Altdatei bekommt Jobs untergeschoben")
+	}
+
+	mustWriteFile(t, filepath.Join(runDir, "review-tech.md"), "# Ergebnis\n")
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           "tech",
+		State:           review.StateDone,
+		Result:          "review-tech.md",
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+	written, err := os.ReadFile(review.EntryFile(runDir, "tech"))
+	if err != nil {
+		t.Fatalf("Entry-Datei lesen: %v", err)
+	}
+	if strings.Contains(string(written), "\"jobs\"") {
+		t.Fatalf("Perspektive schreibt ein jobs-Feld: %s", written)
+	}
+}
+
+// TestReviewStatusTriageZustand prüft den Zeitvergleich, mit dem der Status eine
+// Bewertung als veraltet meldet.
+//
+// Der Eintragszustand allein trägt das nicht: markAIRepairStatus misst an
+// review-triage.md nur Existenz und Größe und bleibt nach einem erneuten Merge
+// unverändert done und konsistent.
+func TestReviewStatusTriageZustand(t *testing.T) {
+	merged := time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		setup      func(t *testing.T, root string, runDir string)
+		state      string
+		wantReason bool
+	}{
+		{
+			name: "aktuell: Bewertung nach dem Merge geschrieben",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteMergeArtifact(t, runDir, merged)
+				mustWriteTriageEntry(t, root, runDir, merged.Add(5*time.Minute).Format(timeLayout))
+			},
+			state: triageStateCurrent,
+		},
+		{
+			name: "aktuell: gleiche Zeiten",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteMergeArtifact(t, runDir, merged)
+				mustWriteTriageEntry(t, root, runDir, merged.Format(timeLayout))
+			},
+			state: triageStateCurrent,
+		},
+		{
+			name: "veraltet: Merge lief nach der Bewertung",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteTriageEntry(t, root, runDir, merged.Format(timeLayout))
+				mustWriteMergeArtifact(t, runDir, merged.Add(10*time.Minute))
+			},
+			state:      triageStateStale,
+			wantReason: true,
+		},
+		{
+			name: "veraltet: scan-triage nennt keine Endzeit",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteMergeArtifact(t, runDir, merged)
+				mustWriteTriageEntry(t, root, runDir, "")
+			},
+			state:      triageStateStale,
+			wantReason: true,
+		},
+		{
+			name: "veraltet: Endzeit ist kein Zeitstempel",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteMergeArtifact(t, runDir, merged)
+				mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
+				mustWriteJSON(t, review.EntryFile(runDir, scanTriageEntry), aiEntryStatus{
+					Name:       scanTriageEntry,
+					Kind:       review.KindAI,
+					State:      review.StateDone,
+					Result:     scanTriageResult,
+					FinishedAt: "gestern",
+				})
+			},
+			state:      triageStateStale,
+			wantReason: true,
+		},
+		{
+			name: "veraltet: Bewertung ohne Eintrag ist nicht belegbar",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteMergeArtifact(t, runDir, merged)
+				mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
+			},
+			state:      triageStateStale,
+			wantReason: true,
+		},
+		{
+			name: "veraltet: review-input.json fehlt",
+			setup: func(t *testing.T, root string, runDir string) {
+				mustWriteTriageEntry(t, root, runDir, merged.Format(timeLayout))
+			},
+			state:      triageStateStale,
+			wantReason: true,
+		},
+		{
+			name:  "fehlt: keine Bewertung im Laufordner",
+			setup: func(t *testing.T, root string, runDir string) { mustWriteMergeArtifact(t, runDir, merged) },
+			state: triageStateMissing,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := newReviewProject(t)
+			runDir := mustCreateRun(t, root, []review.Entry{scanTriageRunEntry(root)})
+			test.setup(t, root, runDir)
+			triage := triageStatus(t, root, "2026-08-19")
+			if triage["state"] != test.state {
+				t.Fatalf("state = %v, erwartet %s (%#v)", triage["state"], test.state, triage)
+			}
+			reason, _ := triage["reason"].(string)
+			if test.wantReason != (strings.TrimSpace(reason) != "") {
+				t.Fatalf("reason = %q, erwartet vorhanden = %v", reason, test.wantReason)
+			}
+		})
+	}
+}
+
+// TestReviewStatusTriageVeraltetNachErneutemMerge ist der Fall, für den der
+// Vergleich da ist: der Eintrag bleibt done und konsistent, die Bewertung ist
+// trotzdem nicht mehr die zu diesem review-input.json.
+func TestReviewStatusTriageVeraltetNachErneutemMerge(t *testing.T) {
+	root := newReviewProject(t)
+	runDir := mustCreateRun(t, root, []review.Entry{scanTriageRunEntry(root)})
+	merged := time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC)
+	mustWriteMergeArtifact(t, runDir, merged)
+	mustWriteTriageEntry(t, root, runDir, merged.Add(5*time.Minute).Format(timeLayout))
+	if state := triageStatus(t, root, "2026-08-19")["state"]; state != triageStateCurrent {
+		t.Fatalf("vor dem erneuten Merge: state = %v", state)
+	}
+
+	mustWriteMergeArtifact(t, runDir, merged.Add(30*time.Minute))
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	data := decodeReviewEnvelope(t, result).Data.(map[string]any)
+	entry := statusEntry(t, data["entries"].([]any), scanTriageEntry)
+	if entry["state"] != string(review.StateDone) || entry["inconsistent"] != nil {
+		t.Fatalf("Eintrag sollte done und konsistent bleiben: %#v", entry)
+	}
+	triage := data["triage"].(map[string]any)
+	if triage["state"] != triageStateStale {
+		t.Fatalf("Bewertung sollte veraltet sein: %#v", triage)
+	}
+}
+
+// scanTriageRunEntry ist der Laufeintrag des Bewertungsmoduls.
+func scanTriageRunEntry(root string) review.Entry {
+	return review.Entry{
+		Name:           scanTriageEntry,
+		Kind:           review.KindAI,
+		RecipeKey:      scanTriageEntry,
+		RecipePath:     filepath.Join(root, project.PlaybookDirName, "commands", filepath.FromSlash(scanTriageModule)),
+		RecipeOrigin:   "dist",
+		Title:          "Review-Triage",
+		ResultRequired: boolPtr(true),
+		DefaultResult:  scanTriageResult,
+	}
+}
+
+// mustWriteMergeArtifact legt review-input.json mit einer festen Änderungszeit
+// an. Die Zeit wird gesetzt und nicht abgewartet: der Vergleich hängt an ihr.
+func mustWriteMergeArtifact(t *testing.T, runDir string, modified time.Time) {
+	t.Helper()
+	path := filepath.Join(runDir, reviewInputJSON)
+	mustWriteFile(t, path, "{}\n")
+	if err := os.Chtimes(path, modified, modified); err != nil {
+		t.Fatalf("Änderungszeit setzen: %v", err)
+	}
+}
+
+// mustWriteTriageEntry schreibt review-triage.md und meldet den Eintrag über das
+// Werkzeug, damit die Endzeit denselben Weg nimmt wie im Lauf.
+func mustWriteTriageEntry(t *testing.T, root string, runDir string, finishedAt string) {
+	t.Helper()
+	mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
+	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
+		reviewBaseInput: reviewBaseInput{ProjectDir: root},
+		Run:             "2026-08-19",
+		Entry:           scanTriageEntry,
+		State:           review.StateDone,
+		Result:          scanTriageResult,
+		FinishedAt:      finishedAt,
+	})
+	if err != nil {
+		t.Fatalf("write_ai_entry: %v", err)
+	}
+	if envelope := decodeReviewEnvelope(t, result); !envelope.OK {
+		t.Fatalf("write_ai_entry fehlgeschlagen: %#v", envelope.Error)
+	}
+}
+
+// triageStatus liest den Bewertungszustand aus dem Laufstatus.
+func triageStatus(t *testing.T, root string, run string) map[string]any {
+	t.Helper()
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: run})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	triage, ok := envelope.Data.(map[string]any)["triage"].(map[string]any)
+	if !ok {
+		t.Fatalf("kein triage-Block im Status: %#v", envelope.Data)
+	}
+	return triage
+}

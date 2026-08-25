@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
 var stableDigest = func(key string) string {
@@ -24,13 +26,95 @@ func assignStableIDs(groups []Group, findings []Finding) {
 	rewritePossibleDuplicatesToStableIDs(groups)
 }
 
+// stablePrefixAndKey bildet Präfix und stabilen Schlüssel einer Gruppe.
+//
+// Die Klasse entscheidet, woraus der Schlüssel besteht: location und dependency
+// nehmen alles, was einen Fund beschreibt, class=ai nur das, was der Vertrag des
+// Rezepts festhält — siehe stableClass und aiKeyLines.
 func stablePrefixAndKey(findings []Finding) (string, string) {
-	class := "location"
-	if dependencyPrimaryID(findings) != "" {
-		class = "dependency"
+	class := stableClass(findings)
+	lines := append([]string{"class=" + class}, stableKeyLines(class, findings)...)
+	sort.Strings(lines[1:])
+	return stablePrefix(class, findings), strings.Join(lines, "\n")
+}
+
+// stableClass ordnet eine Gruppe einer Schlüsselklasse zu.
+//
+// ai steht vor dependency und nicht dahinter: die Klasse folgt der Herkunft der
+// Funde, und die ist eindeutig. Die Dependency-Klasse entsteht dagegen aus
+// Kennungen, die aus dem Freitext gelesen werden — ein KI-Fund, der eine CVE
+// nur erwähnt, bekäme sonst den Dependency-Schlüssel mit Ort und Meldung darin
+// und verlöre genau die Stabilität, für die class=ai gebaut ist.
+//
+// ai gilt nur, wenn *jeder* Fund der Gruppe aus einem Evidence-Eintrag stammt.
+// Findet ein Scanner dieselbe Stelle, zieht exactKey beide zusammen und die
+// Gruppe bleibt location: sonst verlöre eine bestehende Scanner-Gruppe ihre ID,
+// sobald ein KI-Fund hinzukommt. Anders als bei dependency, wo eine einzelne
+// Kennung die Klasse setzt, wiegt hier die Rückwärtskompatibilität der
+// Scanner-IDs schwerer.
+func stableClass(findings []Finding) string {
+	if aiClassApplies(findings) {
+		return "ai"
 	}
-	lines := []string{"class=" + class}
-	lines = append(lines, stableList("tools", stableValues(findings, func(f Finding) string { return f.Evidence.Tool }))...)
+	if dependencyPrimaryID(findings) != "" {
+		return "dependency"
+	}
+	return "location"
+}
+
+// aiClassApplies meldet, ob die Gruppe vollständig aus KI-Evidence besteht und
+// die Bestandteile des KI-Schlüssels mitbringt.
+//
+// Ohne Dateipfad und Rule-ID bliebe von class=ai nur der Rezeptname übrig, und
+// zwei verschiedene Funde bekämen denselben Schlüssel — eine Kollision, die
+// shortenStableIDs nicht auflösen kann, weil sie schon im Digest steckt. Solche
+// Funde fallen auf location zurück, wo Ort und Meldung sie wieder
+// unterscheiden. Auf dem regulären Weg tritt der Fall nicht auf:
+// review.CheckEvidenceSARIF verwirft Funde ohne Ort und weist Funde ohne
+// Rule-ID ab.
+func aiClassApplies(findings []Finding) bool {
+	if len(findings) == 0 {
+		return false
+	}
+	for _, finding := range findings {
+		if finding.Mode != review.ModeEvidence {
+			return false
+		}
+		if normalizePath(finding.Location.URI) == "" || strings.TrimSpace(finding.RuleID) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func stableKeyLines(class string, findings []Finding) []string {
+	if class == "ai" {
+		return aiKeyLines(findings)
+	}
+	return locationKeyLines(findings)
+}
+
+// aiKeyLines ist der Schlüssel für KI-Evidence: Rezeptname, Rule-ID und
+// normalisierter Dateipfad.
+//
+// Ohne startLine/startColumn, ohne Meldung, ohne Fingerprints und ohne
+// Dependency-Teile. KI-Funde kommen im nächsten Lauf mit verschobener Zeile und
+// umformuliertem Text zurück; stünde beides im Schlüssel, hätte die Gruppe jedes
+// Mal eine neue ID und keine stableId-Decision griffe je ein zweites Mal.
+//
+// Auch der Job bleibt draußen: bei einem Evidence-Eintrag heißt er wie der
+// Eintrag selbst und trüge nichts bei, was tools nicht schon sagt.
+func aiKeyLines(findings []Finding) []string {
+	lines := stableList("tools", stableValues(findings, func(f Finding) string { return f.Evidence.Tool }))
+	lines = append(lines, stableList("rules", stableValues(findings, func(f Finding) string { return strings.ToLower(f.RuleID) }))...)
+	lines = append(lines, stableList("paths", stableValues(findings, func(f Finding) string {
+		return normalizePath(f.Location.URI)
+	}))...)
+	return lines
+}
+
+func locationKeyLines(findings []Finding) []string {
+	lines := stableList("tools", stableValues(findings, func(f Finding) string { return f.Evidence.Tool }))
 	lines = append(lines, stableList("jobs", stableValues(findings, func(f Finding) string { return f.Evidence.Job }))...)
 	lines = append(lines, stableList("locations", stableValues(findings, func(f Finding) string {
 		if f.Location.URI == "" && f.Location.StartLine == 0 {
@@ -60,10 +144,15 @@ func stablePrefixAndKey(findings []Finding) (string, string) {
 			normalizePath(dependency.Manifest),
 		}, "|")
 	}))...)
-	sort.Strings(lines[1:])
-	return stablePrefix(class, findings), strings.Join(lines, "\n")
+	return lines
 }
 
+// stablePrefix ist der lesbare Teil der Anzeige-ID.
+//
+// Für class=ai heißt er ai-<eintrag>- statt scan-<werkzeug>-: KI-Evidence ist
+// damit schon an der ID als solche erkennbar. stablePrefixFromID trennt am
+// letzten Bindestrich und trägt ihn mit, weil der Digest hexadezimal ist —
+// Kürzung und Eindeutigkeit rechnen weiter je Präfix.
 func stablePrefix(class string, findings []Finding) string {
 	if class == "dependency" {
 		id := strings.ToLower(dependencyPrimaryID(findings))
@@ -76,6 +165,9 @@ func stablePrefix(class string, findings []Finding) string {
 	tool := "multi"
 	if len(tools) == 1 {
 		tool = tools[0]
+	}
+	if class == "ai" {
+		return "ai-" + stableSegment(tool) + "-"
 	}
 	return "scan-" + stableSegment(tool) + "-"
 }

@@ -116,14 +116,25 @@ type CatalogEntry struct {
 }
 
 type CatalogMode struct {
-	Enabled        bool          `json:"enabled"`
-	ResultRequired *bool         `json:"resultRequired,omitempty"`
-	DefaultResult  string        `json:"defaultResult,omitempty"`
-	Scope          *CatalogScope `json:"scope,omitempty"`
+	Enabled bool `json:"enabled"`
+	// Mode ist die Betriebsart eines Audit-Rezepts: perspective oder evidence.
+	// Leer heißt perspective — Rezepte ohne das Feld bleiben gültig.
+	Mode           string `json:"mode,omitempty"`
+	ResultRequired *bool  `json:"resultRequired,omitempty"`
+	DefaultResult  string `json:"defaultResult,omitempty"`
+	// RuleIDs ist die abschließende Rule-ID-Liste eines Evidence-Rezepts.
+	RuleIDs []string      `json:"ruleIds,omitempty"`
+	Scope   *CatalogScope `json:"scope,omitempty"`
 }
 
+// CatalogScope ist der Bewertungs-Scope eines Audit-Rezepts.
+//
+// Tools gehört zu mode: perspective und filtert die Gruppen aus
+// review-input.json. Paths gehört zu mode: evidence und begrenzt, welchen Code
+// der Eintrag lesen darf.
 type CatalogScope struct {
 	Tools []string `json:"tools,omitempty"`
+	Paths []string `json:"paths,omitempty"`
 }
 
 // catalogKind beschreibt eine der drei Sorten.
@@ -237,7 +248,17 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 		}
 		if kind.name == "reviews" && !entry.Disabled {
 			modes := readReviewModes(entry.Path)
-			entry.Audit = &CatalogMode{Enabled: modes.AuditEnabled, ResultRequired: modes.ResultRequired, DefaultResult: modes.DefaultResult, Scope: cloneCatalogScope(modes.Scope)}
+			entry.Audit = &CatalogMode{
+				Enabled:        modes.AuditEnabled,
+				Mode:           modes.Mode,
+				ResultRequired: modes.ResultRequired,
+				DefaultResult:  modes.DefaultResult,
+				RuleIDs:        append([]string{}, modes.RuleIDs...),
+				Scope:          cloneCatalogScope(modes.Scope),
+			}
+			if len(entry.Audit.RuleIDs) == 0 {
+				entry.Audit.RuleIDs = nil
+			}
 			entry.Review = &CatalogMode{Enabled: modes.ReviewEnabled}
 		}
 		entries = append(entries, entry)
@@ -250,8 +271,10 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 type reviewModes struct {
 	AuditEnabled   bool
 	ReviewEnabled  bool
+	Mode           string
 	ResultRequired *bool
 	DefaultResult  string
+	RuleIDs        []string
 	Scope          *CatalogScope
 }
 
@@ -277,31 +300,43 @@ func parseReviewModeFrontmatter(frontmatter string, modes *reviewModes) {
 	inAudit := false
 	inReview := false
 	inScope := false
-	inTools := false
+	// listKey ist der Name der zuletzt geöffneten Blockliste — tools, paths
+	// oder ruleIds. Ein einzelnes Flag reichte, solange nur scope.tools eine
+	// Liste war; mit scope.paths und audit.ruleIds muss beim Einsammeln
+	// bekannt sein, wohin die Einträge gehören.
+	listKey := ""
 	blockIndent := -1
 	scopeIndent := -1
-	toolsIndent := -1
+	listIndent := -1
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || trimmed == "---" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-		if inTools && indent <= toolsIndent {
-			inTools = false
+		if listKey != "" && indent <= listIndent {
+			listKey = ""
 		}
 		if inScope && indent <= scopeIndent {
 			inScope = false
-			inTools = false
+			listKey = ""
 		}
 		if (inAudit || inReview) && indent <= blockIndent {
 			inAudit = false
 			inReview = false
 			inScope = false
-			inTools = false
+			listKey = ""
 		}
-		if inTools && strings.HasPrefix(trimmed, "- ") {
-			modes.Scope = appendCatalogScopeTools(modes.Scope, strings.TrimSpace(strings.TrimPrefix(trimmed, "- ")))
+		if listKey != "" && strings.HasPrefix(trimmed, "- ") {
+			item := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			switch listKey {
+			case "tools":
+				modes.Scope = appendCatalogScopeTools(modes.Scope, item)
+			case "paths":
+				modes.Scope = appendCatalogScopePaths(modes.Scope, item)
+			case "ruleIds":
+				modes.RuleIDs = appendUniqueStrings(modes.RuleIDs, parseYAMLStringList(item))
+			}
 			continue
 		}
 		if strings.HasSuffix(trimmed, ":") {
@@ -334,19 +369,32 @@ func parseReviewModeFrontmatter(frontmatter string, modes *reviewModes) {
 			switch field {
 			case "enabled":
 				modes.AuditEnabled = value != "false"
+			case "mode":
+				modes.Mode = value
 			case "resultRequired":
 				required := value != "false"
 				modes.ResultRequired = &required
 			case "defaultResult":
 				modes.DefaultResult = value
-			case "tools":
+			case "ruleIds":
+				if value == "" {
+					listKey = "ruleIds"
+					listIndent = indent
+					continue
+				}
+				modes.RuleIDs = appendUniqueStrings(modes.RuleIDs, parseYAMLStringList(value))
+			case "tools", "paths":
 				if inScope && indent > scopeIndent {
 					if value == "" {
-						inTools = true
-						toolsIndent = indent
+						listKey = field
+						listIndent = indent
 						continue
 					}
-					modes.Scope = appendCatalogScopeTools(modes.Scope, value)
+					if field == "tools" {
+						modes.Scope = appendCatalogScopeTools(modes.Scope, value)
+					} else {
+						modes.Scope = appendCatalogScopePaths(modes.Scope, value)
+					}
 				}
 			}
 		}
@@ -364,6 +412,9 @@ func cloneCatalogScope(scope *CatalogScope) *CatalogScope {
 	if scope.Tools != nil {
 		cloned.Tools = append([]string{}, scope.Tools...)
 	}
+	if scope.Paths != nil {
+		cloned.Paths = append([]string{}, scope.Paths...)
+	}
 	return cloned
 }
 
@@ -375,18 +426,38 @@ func appendCatalogScopeTools(scope *CatalogScope, value string) *CatalogScope {
 	if scope == nil {
 		scope = &CatalogScope{}
 	}
-	seen := map[string]bool{}
-	for _, tool := range scope.Tools {
-		seen[tool] = true
+	scope.Tools = appendUniqueStrings(scope.Tools, tools)
+	return scope
+}
+
+func appendCatalogScopePaths(scope *CatalogScope, value string) *CatalogScope {
+	paths := parseYAMLStringList(value)
+	if len(paths) == 0 {
+		return scope
 	}
-	for _, tool := range tools {
-		if seen[tool] {
+	if scope == nil {
+		scope = &CatalogScope{}
+	}
+	scope.Paths = appendUniqueStrings(scope.Paths, paths)
+	return scope
+}
+
+// appendUniqueStrings hängt an, was noch nicht dasteht. Doppelte Einträge
+// entstehen leicht, wenn ein Rezept eine Liste zweimal schreibt; sie doppelt zu
+// führen brächte nichts und machte jede Ausgabe unruhig.
+func appendUniqueStrings(existing []string, values []string) []string {
+	seen := map[string]bool{}
+	for _, value := range existing {
+		seen[value] = true
+	}
+	for _, value := range values {
+		if seen[value] {
 			continue
 		}
-		scope.Tools = append(scope.Tools, tool)
-		seen[tool] = true
+		existing = append(existing, value)
+		seen[value] = true
 	}
-	return scope
+	return existing
 }
 
 func parseYAMLStringList(value string) []string {

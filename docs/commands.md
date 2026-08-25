@@ -73,8 +73,8 @@ Die Code-Review-Familie ist bewusst gestuft:
 1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmäßig read-only.
 2. `/k-review <name>` führt ein Rezept aus und erzeugt je nach Rezept interaktive
    Änderungsvorschläge oder `review-triage.md` als Report-Handoff.
-3. `/k-audit` orchestriert das Laufmodell: Lauf anlegen oder fortsetzen,
-   Scanner und Merge über MCP starten, KI-Reviews als Subtasks führen und
+3. `/k-audit` orchestriert das Laufmodell: Lauf anlegen oder fortsetzen, Scanner starten,
+   Evidence-Rezepte vor dem Merge ausführen, Merge starten, Perspektiven danach führen und
    `review-triage.md` schreiben.
 4. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
 5. `/k-remediation <result>` plant die Abarbeitung der Findings.

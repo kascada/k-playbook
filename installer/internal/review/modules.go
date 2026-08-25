@@ -196,6 +196,33 @@ func skipModuleDir(name string) bool {
 	return strings.HasPrefix(name, ".") || moduleSearchExcluded[name]
 }
 
+// PathExcludedFromScope meldet, ob eine Datei in einem Verzeichnis liegt, das
+// aus jedem Pfad-Scope herausfällt.
+//
+// Der Pfad benennt eine Datei, ist relativ zur Projektwurzel und mit /
+// getrennt. Geprüft werden seine Verzeichnissegmente, denn der Ausschluss gilt
+// über den Verzeichnisnamen und nicht über die Ebene: k-playbook/reviews/ ist
+// genauso ausgeschlossen wie installer/testdata/. Das letzte Segment ist der
+// Dateiname und entscheidet nicht mit — .golangci.yml ist eine Datei des
+// Projekts, kein Werkzeug-Cache.
+//
+// Damit erbt Scope.Paths dieselben Ausschlüsse wie die Modulsuche — dieselbe
+// Liste, dieselbe Punkt-Regel. Ein Evidence-Rezept, dessen Glob weiter greift,
+// bekommt sie nicht etwa erlassen: die Ausschlüsse sind der engere Rahmen,
+// scope.paths der weitere.
+func PathExcludedFromScope(path string) bool {
+	segments := strings.Split(strings.Trim(filepath.ToSlash(path), "/"), "/")
+	for _, segment := range segments[:max(len(segments)-1, 0)] {
+		if segment == "" || segment == "." {
+			continue
+		}
+		if skipModuleDir(segment) {
+			return true
+		}
+	}
+	return false
+}
+
 // jobNameForModule leitet den Job-Namen eines aufgefächerten Aufrufs ab und
 // hält ihn von den schon vergebenen frei.
 //

@@ -35,7 +35,8 @@ k-playbook-local/results/
     │   └── review-secret-scanning.json
     └── raw/                     die SARIF-Dateien der Scan-Jobs
         ├── semgrep.sarif
-        └── gitleaks-git.sarif
+        ├── gitleaks-git.sarif
+        └── tech.sarif            das Artefakt einer Evidence-Quelle
 ```
 
 Der Name ist das Datum, `YYYY-MM-DD`. **Existiert das Verzeichnis bereits, bricht das
@@ -43,14 +44,17 @@ Anlegen ab** statt einen zweiten Lauf danebenzustellen: ein Tag, ein Lauf. Wer e
 starten will, räumt das vorhandene Verzeichnis weg oder benennt es um.
 
 **`raw/` legt der Ausführer an**, beim ersten Job, den er startet. Das Anlegen eines
-Laufs kennt das Verzeichnis nicht: ein Lauf ohne Werkzeug-Eintrag braucht es nicht.
+Laufs kennt das Verzeichnis nicht: ein Lauf ohne Werkzeug-Eintrag braucht es nicht. Eine
+Evidence-Quelle schreibt ebenfalls hierhin, nach `raw/<entry>.sarif`, und legt das
+Verzeichnis an, wenn vor ihr kein Werkzeug lief.
 
 **Es gibt zwei Orte für Rohdaten.** Die Ergebnisfamilien unter
 `k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` bleiben, wie sie sind, und
 `/k-results` liest weiter sie; `ListRuns()` zeigt sie ohnehin mit an. Das
 Laufverzeichnis ist dagegen familienlos, weil ein Lauf gerade über die Familien hinweg
-klammert. Katalog-Perspektiven im Laufmodell legen keine eigene Rohdatenablage an; sie
-lesen den gemeinsamen Merge-Beleg aus diesem Laufordner.
+klammert. Katalog-Rezepte im Laufmodell legen keine eigene Rohdatenablage an: eine
+Perspektive liest den gemeinsamen Merge-Beleg aus diesem Laufordner, eine Evidence-Quelle
+schreibt ihr SARIF in dessen `raw/` — kein Rezept öffnet dafür einen Family-Ordner.
 
 ## Wer was schreibt
 
@@ -96,17 +100,32 @@ ab, gilt `entries/`. `run.json` hält fest, was ausgewählt wurde, nicht, wie we
   "entries": [
     { "name": "semgrep",                "kind": "tool", "state": "start" },
     {
+      "name": "secret-scanning",
+      "kind": "ai",
+      "state": "start",
+      "recipeKey": "secret-scanning",
+      "recipePath": "/projekt/k-playbook/reviews/review-secret-scanning.md",
+      "recipeOrigin": "dist",
+      "title": "Secret-Scanning Assessment",
+      "mode": "perspective",
+      "resultRequired": true,
+      "defaultResult": "review-secret-scanning.md",
+      "scope": {
+        "tools": ["gitleaks", "trufflehog"]
+      }
+    },
+    {
       "name": "tech",
       "kind": "ai",
       "state": "start",
       "recipeKey": "tech",
       "recipePath": "/projekt/k-playbook/reviews/review-tech.md",
       "recipeOrigin": "dist",
-      "title": "Technischer Review",
-      "resultRequired": true,
-      "defaultResult": "review-tech.md",
+      "title": "Tech-Debt-Analyse",
+      "mode": "evidence",
+      "resultRequired": false,
       "scope": {
-        "tools": ["semgrep", "gosec"]
+        "paths": ["**/*.go", "**/*.py"]
       }
     }
   ]
@@ -130,11 +149,26 @@ im YAML-Frontmatter des Rezepts:
 ---
 audit:
   enabled: true
-  title: "Technischer Review"
+  mode: perspective
+  title: "Secret-Scanning Assessment"
   resultRequired: true
-  defaultResult: "review-tech.md"
+  defaultResult: "review-secret-scanning.md"
   scope:
-    tools: [semgrep, gosec]
+    tools: [gitleaks, trufflehog]
+review:
+  enabled: true
+---
+```
+
+```yaml
+---
+audit:
+  enabled: true
+  mode: evidence
+  title: "Tech-Debt-Analyse"
+  ruleIds: [tech-swallowed-error, tech-duplicated-logic]
+  scope:
+    paths: ["**/*.go", "**/*.py"]
 review:
   enabled: true
 ---
@@ -143,10 +177,28 @@ review:
 `audit.enabled` ist standardmäßig `false`; nur `true` nimmt das Rezept in `/k-audit`-/MCP-Läufe auf.
 `review.enabled` ist standardmäßig `true`; `false` entfernt das Rezept aus der `/k-review`-Auswahl.
 `title` fällt ohne Angabe auf die erste Überschrift oder den Katalog-Schlüssel zurück.
-`resultRequired` ist standardmäßig `true` und bestimmt, ob ein `done`-Status ein Ergebnis
-braucht. `defaultResult` ist ein relativer Vorschlag im Laufverzeichnis.
-`scope.tools` ist der beim Anlegen eingefrorene Tool-Scope des AI-Eintrags. Spätere
-Rezeptänderungen ändern bestehende Läufe nicht.
+`audit.mode` ist standardmäßig `perspective`; Rezepte ohne das Feld bleiben unverändert
+gültig. Welche weiteren Felder gelten, hängt daran — der ganze Vertrag steht unter
+[Katalog-Rezepte im Lauf](#katalog-rezepte-im-lauf).
+
+Für `mode: perspective`: `resultRequired` ist standardmäßig `true` und bestimmt, ob ein
+`done`-Status ein Ergebnis braucht. `defaultResult` ist ein relativer Vorschlag im
+Laufverzeichnis. `scope.tools` ist der beim Anlegen eingefrorene Tool-Scope.
+
+Für `mode: evidence`: `scope.paths` ist der beim Anlegen eingefrorene Pfad-Scope.
+`resultRequired` wird hart auf `false` gesetzt und steht so in `run.json` — nicht weil das
+Rezept es so schriebe, sondern weil es das dort gar nicht darf: Pflichtartefakt ist
+`raw/<entry>.sarif`, und mit der Vorgabe `true` meldete `review_status` jeden
+erfolgreichen Evidence-Eintrag als `resultMissing` und `inconsistent`. `defaultResult`
+fehlt aus demselben Grund.
+
+`audit.ruleIds` wird **nicht** in `run.json` eingefroren. Der Scope hält fest, worüber der
+Eintrag gelaufen ist; die Rule-ID-Liste dagegen ist der Vertrag, an dem sein Artefakt beim
+Melden gemessen wird, und der wird frisch aus dem Rezept gelesen. Ein Rezept, das die
+Liste nach Laufstart ändert, ändert damit die Prüfung — erfüllt es den Evidence-Vertrag
+gar nicht mehr, scheitert das Melden mit `recipe_contract_invalid`.
+
+Spätere Rezeptänderungen ändern bestehende Läufe im Übrigen nicht.
 
 Der Moduleintrag `scan-triage` erhält dieselben Laufmetadaten aus dem effektiven
 Command-Namensraum: `recipePath` zeigt auf
@@ -155,12 +207,27 @@ Command-Namensraum: `recipePath` zeigt auf
 `k-playbook-local/commands/_audit/review-scan-triage.md` schaltet diesen
 Eintrag ab.
 
-## Katalog-Rezepte als Perspektiven
+## Katalog-Rezepte im Lauf
 
-Aktive Katalog-Rezepte laufen im Audit-Laufmodell nicht als eigene Scanner. Sie sind
-Perspektiven auf den Merge-Output `review-input.json` und schreiben genau eine
-Markdown-Datei direkt in den Laufordner, z. B. `review-secret-scanning.md`. Das
-vollständige Beispiel für diesen Vertrag steht im Rezept
+Ein aktives Katalog-Rezept arbeitet im Lauf in einer von zwei Betriebsarten. Welche es
+ist, sagt `audit.mode` im Rezept und nicht der Command; ohne Angabe gilt `perspective`,
+Rezepte von vor der zweiten Betriebsart bleiben also unverändert gültig.
+
+Der `audit`-Block ist optional. Fehlt er, bleibt das Rezept im Audit-Laufmodell inaktiv.
+`audit.enabled: false` deaktiviert nur die `/k-audit`-/MCP-Auswahl; `review.enabled`
+steuert weiterhin die gezielte `/k-review`-Auswahl.
+
+Die Felder des Blocks gehören jeweils zu genau einer Betriebsart. Ein Rezept, das sie
+mischt, wird nicht stillschweigend zurechtgebogen: es erscheint in der Auswahlbasis unter
+`unavailableCandidates` mit `selectable: false` und einem `unavailableReason`, der die
+verletzte Regel nennt.
+
+### Perspektive (`mode: perspective`)
+
+Eine Perspektive läuft **nach** dem Merge und ist kein eigener Scanner. Sie liest den
+Merge-Output `review-input.json` und schreibt genau eine Markdown-Datei direkt in den
+Laufordner, z. B. `review-secret-scanning.md`. Das vollständige Beispiel für diesen
+Vertrag steht im Rezept
 [`review-secret-scanning.md`](../reviews/review-secret-scanning.md).
 
 Frontmatter-Vertrag:
@@ -171,6 +238,7 @@ name: review-<key>
 title: <Titel>
 audit:
   enabled: true
+  mode: perspective
   defaultResult: review-<key>.md
   resultRequired: true
   scope:
@@ -180,22 +248,7 @@ review:
 ---
 ```
 
-Der `audit`-Block ist optional. Fehlt er, bleibt das Rezept im Audit-Laufmodell inaktiv.
-`audit.enabled: false` deaktiviert nur die `/k-audit`-/MCP-Auswahl; `review.enabled`
-steuert weiterhin die gezielte `/k-review`-Auswahl.
-
-Reihenfolge in `/k-audit`:
-
-1. Tool-Einträge laufen und schreiben `entries/<tool>.json` sowie `raw/<job>.sarif`.
-2. Der Merge schreibt `review-input.json` und `review-input.md` aus den Tool-Einträgen.
-3. Aktive Katalog-Rezepte lesen `review-input.json` als Perspektiven.
-4. Optional läuft danach `scan-triage` und darf Perspektiven-Reports als Kontext nutzen.
-
-Offene, fehlgeschlagene oder noch nicht ausgeführte Perspektiven blockieren den Merge
-nicht. Sie können den AI-Teil offen lassen, aber `review-input.json` muss aus den
-Tool-Scans erzeugbar bleiben.
-
-Scope-Semantik:
+Scope-Semantik bei `mode: perspective`:
 
 - `scope.tools` filtert auf Evidence-Ebene von `review-input.json`.
 - Eine Gruppe gehört zur Perspektive, wenn mindestens eine Evidence dieser Gruppe ein
@@ -210,30 +263,130 @@ Scope-Semantik:
 - Leere Scope-Ergebnisse sind gültig. Das Rezept schreibt dann eine Ergebnisdatei mit
   Status „keine scoped Findings" statt eigene Scans nachzuholen.
 
-Reparaturmatrix für AI-Einträge:
+### Evidence-Quelle (`mode: evidence`)
 
-| Zustand | Verhalten |
-|---|---|
-| Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry ist offen | Status bleibt offen; Rerun führt den AI-Eintrag erneut aus und schreibt die Ergebnisdatei. |
-| Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry steht auf abgeschlossen | Statusausgabe markiert den Eintrag als inkonsistent und `resultRequired` nicht erfüllt; Rerun schreibt die Ergebnisdatei neu und repariert den Status. |
-| Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry-Status fehlt oder ist offen | Statusausgabe darf den Eintrag als reparabel markieren; Rerun muss keine neue Datei erzwingen, sondern darf den Status über `k_playbook_review_write_ai_entry` auf abgeschlossen setzen, wenn die Datei nicht leer ist. |
-| Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry ist abgeschlossen | Keine Reparatur nötig. |
-| Rezept wurde nach Laufstart deaktiviert oder geändert | Der bestehende Lauf nutzt weiter den Snapshot aus `run.json`. |
-| Alter Lauf enthält keinen Eintrag für ein später hinzugefügtes Rezept | Keine automatische nachträgliche Ergänzung der alten `run.json`. Neue Rezept-Einträge entstehen nur beim Erzeugen eines neuen Laufs. |
+Eine Evidence-Quelle läuft **vor** dem Merge. Sie liest Code im eingefrorenen Pfad-Scope
+und liefert einen Teil von `review-input.json`, statt ihn zu lesen. Ihr Pflichtartefakt
+ist SARIF unter `raw/<entry>.sarif`; ein Markdown-Ergebnis entsteht nicht. Die beiden
+umgestellten Beispiele sind [`review-tech.md`](../reviews/review-tech.md) und
+[`review-python-comment-hardspots.md`](../reviews/review-python-comment-hardspots.md).
 
-Manuelle Verifikation nach Änderungen am Perspektivenmodell:
+Frontmatter-Vertrag:
+
+```yaml
+---
+name: review-<key>
+title: <Titel>
+audit:
+  enabled: true
+  mode: evidence
+  ruleIds: [<rule-id>, <rule-id>]
+  scope:
+    paths: ["<glob>", "<glob>"]
+review:
+  enabled: true
+---
+```
+
+`scope.paths` und `ruleIds` sind beide Pflicht. Ohne Pfad-Scope läse der Eintrag das ganze
+Repo; ohne Rule-ID-Liste wären seine Funde von Lauf zu Lauf nicht vergleichbar.
+`scope.tools`, `resultRequired` und `defaultResult` sind hier verboten: das erste
+beschreibt einen Filter auf `review-input.json`, den der Eintrag gar nicht liest, die
+beiden anderen eine Ergebnisdatei, die es nicht gibt.
+
+Ergebnisvertrag, geprüft beim Melden über `k_playbook_review_write_ai_entry`:
+
+- `tool.driver.name` im SARIF entspricht dem Eintragsnamen. Steht dort etwas anderes,
+  behauptet das Artefakt eine Herkunft, die es nicht hat.
+- Jede Rule-ID des SARIF steht in `audit.ruleIds`. Eine fremde macht den Eintrag `failed`
+  mit Grund — kein stilles `done`.
+- Funde außerhalb von `scope.paths` oder innerhalb der geerbten Ausschlüsse werden
+  verworfen und gezählt, `raw/<entry>.sarif` wird bereinigt zurückgeschrieben. Der Eintrag
+  bleibt gültig; die Zahl und die ersten Pfade stehen im `reason`. Ein einzelner Ausreißer
+  vernichtet damit nicht das ganze Artefakt.
+- Ein SARIF ohne Ergebnisse ist ein gültiges `done`. Ein leerer Scope-Befund ist ein
+  Ergebnis, kein Fehler — dieselbe Regel wie „Leere Scope-Ergebnisse sind gültig" bei
+  Perspektiven.
+
+`level` je Fund ist die Wertung, die das Rezept vergibt, und der Merge nimmt sie ernst:
+`error` und `note` gelten unverändert (`severitySource: native`), `warning` und `none`
+laufen weiter über CVSS, Tool-Metadaten und `scripts/severity.tsv`. Das Rezept legt das
+`level` je Rule-ID fest — Näheres in [`rules/review-authoring.md`](../rules/review-authoring.md).
+
+Scope-Semantik bei `mode: evidence`:
+
+- `scope.paths` sind Globs relativ zur Projektwurzel. Verglichen wird Segment für
+  Segment; `**` überspringt beliebig viele Segmente, `*` und `?` gelten innerhalb eines
+  Segments. Ein Muster trifft eine Datei auch dann, wenn es ihr Verzeichnis trifft:
+  `installer` und `installer/**` decken beide `installer/internal/review/run.go`.
+- Innerhalb der Globs gelten zusätzlich die zentralen Ausschlüsse der Modulsuche —
+  `k-playbook/`, `k-playbook-local/`, `vendor/`, `node_modules/`, `testdata/` und
+  Punkt-Verzeichnisse. Sie werden geerbt und gehören nicht noch einmal ins Rezept.
+- Der Pfad-Scope ist verbindlich und wird beim Melden erzwungen. `scope-hint` bleibt
+  Freitext für `/k-review` und darf ihn weder erweitern noch überstimmen.
+- Die Gruppen-ID entsteht im Merge und nicht im Rezept: KI-Funde bilden eine Gruppe je
+  Rule-ID und Datei, ohne Zeile und ohne Meldung, mit dem Präfix `ai-<entry>-`. Mehrere
+  Instanzen desselben Problems in einer Datei sind deshalb eine Gruppe; ihre Zahl steht in
+  `findingIds`. Das Rezept fasst nicht selbst zusammen.
+- Eine Gruppe, in der Scanner- und KI-Belege zusammenliegen, behält die Scanner-ID.
+
+### Reihenfolge im Lauf
+
+Ein `/k-audit`-Lauf arbeitet die Einträge in dieser Reihenfolge ab:
+
+1. Tool-Einträge laufen und schreiben `entries/<tool>.json` sowie `raw/<job>.sarif`.
+2. AI-Einträge mit `mode: evidence` laufen im eingefrorenen Pfad-Scope und schreiben
+   `raw/<entry>.sarif`.
+3. Der Merge schreibt `review-input.json` und `review-input.md` aus den Tool-Einträgen
+   **und** den Evidence-Einträgen in einem Endzustand: gelesen wird, wessen Eintrag auf
+   `done` steht und wessen Job ein SARIF im Laufordner nennt.
+4. Aktive Katalog-Rezepte mit `mode: perspective` lesen `review-input.json` als
+   Perspektiven.
+5. Optional läuft danach `scan-triage` und darf Perspektiven-Reports als Kontext nutzen.
+
+Offene, fehlgeschlagene oder noch nicht ausgeführte AI-Einträge blockieren den Merge
+nicht — Perspektiven so wenig wie Evidence-Quellen. Sie können den AI-Teil offen lassen,
+aber `review-input.json` muss aus den Tool-Scans erzeugbar bleiben. Trifft die Evidence
+später ein, ist ein erneuter Merge der reguläre Weg und kein Reparaturfall; eine
+`review-triage.md`, die vor diesem Merge geschrieben wurde, ist danach veraltet und wird
+neu geschrieben.
+
+### Reparatur und Verifikation
+
+Reparaturmatrix für AI-Einträge. Woran ein Eintrag gemessen wird, hängt an seiner
+Betriebsart: bei `mode: perspective` an der Ergebnisdatei, bei `mode: evidence` am SARIF.
+
+| Betriebsart | Zustand | Verhalten |
+|---|---|---|
+| `perspective` | Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry ist offen | Status bleibt offen; Rerun führt den AI-Eintrag erneut aus und schreibt die Ergebnisdatei. |
+| `perspective` | Eintrag existiert in `run.json`, Ergebnisdatei fehlt, Entry steht auf abgeschlossen | Statusausgabe markiert den Eintrag als inkonsistent und `resultRequired` nicht erfüllt; Rerun schreibt die Ergebnisdatei neu und repariert den Status. |
+| `perspective` | Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry-Status fehlt oder ist offen | Statusausgabe darf den Eintrag als reparabel markieren; Rerun muss keine neue Datei erzwingen, sondern darf den Status über `k_playbook_review_write_ai_entry` auf abgeschlossen setzen, wenn die Datei nicht leer ist. |
+| `perspective` | Eintrag existiert in `run.json`, Ergebnisdatei existiert, Entry ist abgeschlossen | Keine Reparatur nötig. |
+| `evidence` | Entry ist `done`, Job vorhanden, `raw/<entry>.sarif` existiert und ist nicht leer | Keine Reparatur nötig. |
+| `evidence` | Entry ist `done`, aber ohne Job oder ohne vorhandenes SARIF | Statusausgabe meldet `sarifMissing` und `inconsistent`; nur ein erneuter Rezeptlauf repariert das. Ein nachgeschriebener Status ohne Artefakt bleibt eine leere Zusage — der Merge liest die Datei, nicht den Zustand. |
+| `evidence` | Gültiges SARIF, Entry-Status fehlt oder ist offen | Statusausgabe meldet `repairable`; `k_playbook_review_write_ai_entry` mit dem Job genügt, ein erneuter Rezeptlauf ist nicht nötig. |
+| `evidence` | Entry ist `failed` | Durch einen erneuten Rezeptlauf ersetzen, nicht durch Nachschreiben des Status. |
+| `evidence` | Funde außerhalb von `scope.paths` gemeldet | Teilannahme: die Funde werden verworfen, `raw/<entry>.sarif` bereinigt zurückgeschrieben, der Eintrag bleibt gültig. Zahl und erste Pfade stehen im `reason`. |
+| beide | Rezept wurde nach Laufstart deaktiviert oder geändert | Der bestehende Lauf nutzt weiter den `scope`-Snapshot aus `run.json`. Die Rule-ID-Liste wird beim Melden dagegen frisch aus dem Rezept gelesen; erfüllt es den Evidence-Vertrag nicht mehr, scheitert das Melden mit `recipe_contract_invalid` und schreibt nichts. |
+| beide | Alter Lauf enthält keinen Eintrag für ein später hinzugefügtes Rezept | Keine automatische nachträgliche Ergänzung der alten `run.json`. Neue Rezept-Einträge entstehen nur beim Erzeugen eines neuen Laufs. |
+
+Manuelle Verifikation nach Änderungen am Laufmodell der Katalog-Rezepte:
 
 1. `/k-audit 2026-08-21` in einer neuen Assistenten-Session starten und Status lesen.
 2. Prüfen, dass `secret-scanning` nach dem Merge `review-secret-scanning.md` ohne
    Alignment-Hinweis erzeugt und den Scope `gitleaks`, `trufflehog` nennt.
-3. Prüfen, dass `python-comment-hardspots` nicht als aktiver Audit-Eintrag ausgewählt wird
-   und im Rezept als Family-only begründet ist.
+3. Prüfen, dass `tech` und `python-comment-hardspots` vor dem Merge als Evidence-Einträge
+   laufen, ihr SARIF nach `raw/<entry>.sarif` schreiben und danach als Gruppen mit dem
+   Präfix `ai-<entry>-` in `review-input.json` stehen.
 4. In einem CVE-lastigen Ziel einen kleinen Lauf mit Dependency-Tools anlegen und prüfen,
    dass `dependency-cve` als Perspektive über `review-input.json` läuft.
 5. In Statusausgabe und Create-Dry-Run prüfen, dass aktive Rezept-Einträge ihren
-   gespeicherten `scope` zeigen.
+   gespeicherten `scope` und ihr `mode` zeigen und die Listen `evidenceCandidates` und
+   `perspectiveCandidates` die Reihenfolge des Laufs wiedergeben.
 6. Je einen beschädigten AI-Eintrag aus der Reparaturmatrix simulieren und prüfen, dass
    Status oder Rerun die erwartete Reparatur zeigt.
+7. Ein Rezept mit widersprüchlichem `audit`-Block anlegen und prüfen, dass es unter
+   `unavailableCandidates` mit Grund erscheint, statt still zu wirken.
 
 ## Zustände
 
@@ -475,14 +628,14 @@ bleiben stehen.
 ### AI-Entry-Status
 
 AI-Einträge schreiben ihre eigene Datei ebenfalls unter `entries/<name>.json`, aber mit
-einem schlanken Schema:
+einem schlanken Schema. Eine Perspektive meldet ihre Ergebnisdatei:
 
 ```json
 {
-  "name": "tech",
+  "name": "secret-scanning",
   "kind": "ai",
   "state": "done",
-  "result": "review-tech.md",
+  "result": "review-secret-scanning.md",
   "reason": "",
   "startedAt": "2026-08-19T10:00:00Z",
   "finishedAt": "2026-08-19T10:15:00Z"
@@ -493,6 +646,30 @@ einem schlanken Schema:
 `run.json`-Metadatenstruktur `true` ist, braucht `state: done` dieses Ergebnis und die
 Datei muss existieren. `failed` und `skipped` brauchen einen `reason`; `running` darf kein
 `finishedAt` tragen.
+
+Eine Evidence-Quelle meldet stattdessen ihr Artefakt, und zwar als `jobs`:
+
+```json
+{
+  "name": "tech",
+  "kind": "ai",
+  "state": "done",
+  "reason": "3 Funde außerhalb von scope.paths verworfen: docs/review-runs.md, …",
+  "startedAt": "2026-08-19T10:00:00Z",
+  "finishedAt": "2026-08-19T10:15:00Z",
+  "jobs": [
+    { "job": "tech", "state": "done", "sarif": "raw/tech.sarif", "findings": 17,
+      "started": "…", "finished": "…" }
+  ]
+}
+```
+
+`result` bleibt leer — Pflichtartefakt ist das SARIF. `jobs` ist dieselbe Darstellung wie
+bei Tool-Einträgen und keine zweite daneben: der Merge liest beide über denselben Weg, und
+ein eigenes Job-Format wäre dort unsichtbar. Der Job heißt wie der Eintrag; `findings` ist
+die Zahl der **übernommenen** Funde. Das Feld fehlt, wo es keinen Job gibt — die Dateien
+der Perspektiven behalten damit genau die Form, die sie vorher hatten, und Dateien aus der
+Zeit vor `jobs` bleiben lesbar.
 
 ## Die Oberfläche
 
@@ -533,6 +710,72 @@ Command-Namensraum aktiv ist. `k_playbook_review_create`,
 `k_playbook_review_write_ai_entry` akzeptieren diesen Eintrag, obwohl er nicht in
 `catalogs.reviews` steht.
 
+### Ergebnis eines AI-Eintrags melden
+
+`k_playbook_review_write_ai_entry` nimmt `run`, `entry`, `state` und wahlweise `result`,
+`reason`, `startedAt` und `finishedAt`. Für eine Evidence-Quelle kommt `job` dazu:
+
+```json
+{
+  "projectDir": "…",
+  "run": "2026-08-19",
+  "entry": "tech",
+  "state": "done",
+  "job": {
+    "sarif": "raw/tech.sarif",
+    "started": "2026-08-19T10:00:00Z",
+    "finished": "2026-08-19T10:15:00Z"
+  }
+}
+```
+
+`job.sarif` liegt relativ zum Laufverzeichnis unter `raw/`; `started` und `finished` sind
+optional. Zustand, Fundzahl und Job-Name entstehen beim Melden und werden nicht
+entgegengenommen. Der Job gehört zur **Fertigmeldung**: bei `state: running` wird er
+abgewiesen, und für `mode: perspective` gibt es ihn nicht.
+
+Die Antwort ist zu lesen, statt `done` zu unterstellen. Sie trägt unter `evidence` die
+Zahl der übernommenen Funde (`findings`), die verworfenen (`droppedFindings`,
+`droppedPaths`) und ob das SARIF bereinigt zurückgeschrieben wurde (`sarifRewritten`).
+`stateOverridden: true` neben `requestedState: done` heißt: das Artefakt war ungültig,
+geschrieben wurde `failed` mit Grund.
+
+Zwei Fehlerklassen bleiben getrennt. **Fehler des Aufrufs** — SARIF-Pfad außerhalb von
+`raw/`, Datei fehlt oder ist leer, `result` an einem Evidence-Eintrag, Job bei
+`state: running`, Rezept ohne gültigen Evidence-Vertrag — schreiben **nichts**; korrigiert
+wird der Aufruf. **Fehler des Artefakts** — unlesbares SARIF, falscher
+`tool.driver.name`, fremde Rule-ID — schreiben `failed` mit Grund; nur ein erneuter
+Rezeptlauf behebt sie.
+
+### Aktualität der Bewertung
+
+Der Laufstatus meldet neben den Einträgen einen Block `triage`:
+
+```json
+{
+  "triage": {
+    "result": "review-triage.md",
+    "state": "stale",
+    "finishedAt": "2026-08-19T11:00:00Z",
+    "reviewInputModified": "2026-08-19T12:30:00Z",
+    "reason": "review-input.json ist jünger als die Bewertung — der Merge lief danach."
+  }
+}
+```
+
+`state` ist `missing`, `current` oder `stale`. Der Block steht **neben** dem Zustand des
+Eintrags `scan-triage` und ersetzt ihn nicht: der Eintrag sagt, ob die Bewertung
+geschrieben wurde, dieser Block, ob sie noch gilt. Nötig ist er, weil die Reparaturprüfung
+an `review-triage.md` nur Existenz und Größe misst — ein erneuter Merge, der reguläre Weg
+bei nachträglich eintreffender Evidence, ließe den Eintrag sonst `done` und konsistent,
+obwohl die Bewertung einen Stand beschreibt, den es nicht mehr gibt.
+
+Verglichen wird die Änderungszeit von `review-input.json` mit `finishedAt` des Eintrags
+`scan-triage`. Gleiche Zeiten gelten als aktuell. Nicht belegbare Fälle — `review-input.json`
+fehlt, der Eintrag nennt keine oder keine lesbare Endzeit — gelten als `stale` und nie als
+`current`: eine unbelegte Bewertung darf einen Lauf nicht vollständig aussehen lassen. Ein
+Lauf mit `state: stale` ist nicht fertig; der Triage-Schritt läuft erneut.
+
 ## Zusammenfassen mit `k-playbook merge`
 
 Wenn ein Lauf durch ist, verdichtet ein zweiter Schritt seine Rohdaten zu einem
@@ -556,12 +799,24 @@ k-playbook-local/results/<lauf>/
 `run.json` und `entries/*.json` bleiben unverändert. Es bewertet auch nicht — dafür ist
 der Assistent zuständig, der `review-input.json` als Eingabe bekommt.
 
-**Dedupe-Modell.** Findings werden nie stumm entfernt. Drei Regeln fassen zusammen:
+**Dedupe-Modell.** Findings werden nie stumm entfernt. Vier Regeln fassen zusammen:
 
 - gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle,
 - gleiche Datei, Zeile, Regel-ID und normalisierte Message,
 - **eine** gemeinsame Dependency-ID (CVE/GHSA/OSV/PYSEC) plus gleiches Package und
-  gleiche Version.
+  gleiche Version,
+- bei KI-Evidence (`ai-path-rule`): gleiches Rezept, gleiche Datei und gleiche Regel-ID —
+  ohne Zeile und ohne Message.
+
+Die vierte Regel gehört zur Schlüsselklasse `ai` und ist beabsichtigt: zwei KI-Funde
+derselben Rule-ID in derselben Datei sind eine Gruppe. Alle Instanzen bleiben als
+`findingIds` und `evidence` erhalten, der Repräsentant nennt aber nur **eine** Stelle —
+die Zahl ist mitzulesen. Der Grund liegt in der Stabilität: der stabile Schlüssel einer
+KI-Gruppe enthält weder Zeile noch Meldung, damit eine verschobene Zeile oder ein
+umformulierter Text die Gruppen-ID nicht ändert. Ohne die vierte Regel bekämen zwei Funde
+derselben Rule-ID in derselben Datei zwei Gruppen mit demselben Schlüssel — also
+kollidierende `stableId`s. Eine Decision auf eine solche Gruppe deckt Datei und Rule-ID
+ganz; eine Abweisung je Instanz gibt es nicht.
 
 Bei der Dependency-Regel zählt jede Kennung einzeln: zwei Werkzeuge finden zusammen,
 sobald sie sich eine Kennung teilen, auch wenn das eine drei Aliase nennt und das
@@ -637,6 +892,22 @@ Unterstützte Match-Kriterien:
 
 Pfade werden als projektrelative Slash-Pfade ohne führendes `./` verglichen. Bei mehreren
 Locations reicht ein Treffer; der Match-Report nennt die getroffene Location.
+
+Welches Kriterium wofür taugt — der Unterschied ist größer, als die Liste vermuten lässt:
+
+- **`stableId`** deckt genau eine Gruppe und ist der Regelweg. Für KI-Evidence gilt das
+  besonders: die Gruppen-ID einer KI-Gruppe hängt nur an Rezept, Rule-ID und Datei, bleibt
+  also über Re-Runs stabil, auch wenn sich Zeilen verschieben oder der Text sich ändert.
+- **`ruleId` plus `location`** ist der brauchbare zweite Weg. `location` ist dabei ein
+  **Pfad-Glob und keine Zeile**: verglichen wird der Dateipfad des Funds, Zeile und Spalte
+  gehen nicht ein. `ruleId: tech-magic-value` mit `location: installer/**` deckt damit
+  diese eine Regel in diesem einen Baum — und nichts sonst. Genau deshalb ist `ruleId`
+  ohne `location` verboten: allein deckte es die Regel im ganzen Projekt.
+- **`pathGlob`** ist die grobe Ausnahme für ganze Bäume, die nicht mehr gepflegt werden.
+  Er trifft **jeden** Fund an diesem Pfad — auch Scanner-Funde fremder Werkzeuge und
+  fremder Regeln, die es dort heute noch gar nicht gibt. Wer `pathGlob: services/legacy/**`
+  schreibt, schaltet dort auch den nächsten Secret-Fund stumm. Diese Nebenwirkung ist der
+  Grund, ihn nicht als Ersatz für die beiden anderen Wege zu benutzen.
 
 Ort:
 
