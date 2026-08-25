@@ -79,9 +79,9 @@ from the output above — never from configuration, and never by searching.
 | extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
 | hand-written documentation | `<local.dir>/docs/manual/` |
 | raw material, never indexed | `<local.dir>/material/` |
+| known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
-| known decisions | `<local.dir>/results/known-decisions.md` |
 | results summary | `<local.dir>/results/summary-YYYY-MM-DD.md` |
 | unversioned working files | `<local.dir>/priv/` |
 | project-local commands | `<local.dir>/commands/` |

@@ -54,18 +54,29 @@ func writeManagedIgnore(t *testing.T, root string) {
 	writeFile(t, filepath.Join(LocalDir(root), "priv", PrivateIgnoreFile), managedIgnoreContent())
 }
 
-// Beide privaten Verzeichnisse stehen zur Wahl — und nur sie.
-func TestPrivateEntriesNenntPrivUndMaterial(t *testing.T) {
+// Die drei privaten Verzeichnisse stehen zur Wahl — und nur sie. results/ ist
+// als einziges bei der Installation vorbelegt, umschaltbar bleibt es trotzdem.
+func TestPrivateEntriesNenntResultsPrivUndMaterial(t *testing.T) {
 	paths := []string{}
 	for _, entry := range PrivateEntries() {
 		paths = append(paths, entry.Path)
 	}
 
-	if len(paths) != 2 || paths[0] != "priv" || paths[1] != "material" {
-		t.Errorf("PrivateEntries = %v, erwartet [priv material]", paths)
+	if len(paths) != 3 || paths[0] != "results" || paths[1] != "priv" || paths[2] != "material" {
+		t.Errorf("PrivateEntries = %v, erwartet [results priv material]", paths)
 	}
 	if _, ok := PrivateEntry("rules"); ok {
 		t.Error("rules gilt als privates Verzeichnis")
+	}
+
+	vorbelegt := []string{}
+	for _, entry := range PrivateEntries() {
+		if entry.PrivateByDefault {
+			vorbelegt = append(vorbelegt, entry.Path)
+		}
+	}
+	if len(vorbelegt) != 1 || vorbelegt[0] != "results" {
+		t.Errorf("vorbelegt = %v, erwartet [results]", vorbelegt)
 	}
 }
 

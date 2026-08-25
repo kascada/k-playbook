@@ -26,14 +26,15 @@ func runMerge(args []string) error {
 			project.ConfigFileName, project.DisplayPath(environment.SearchedFrom))
 	}
 
-	runDir := review.RunDir(project.LocalDir(environment.ProjectDir), runName)
-	_, output, err := merge.Run(merge.Options{
+	localDir := project.LocalDir(environment.ProjectDir)
+	runDir := review.RunDir(localDir, runName)
+	result, output, err := merge.Run(merge.Options{
 		ProjectDir:          environment.ProjectDir,
 		RunName:             runName,
 		RunDir:              runDir,
 		KPlaybookVersion:    kPlaybookVersion(),
 		SeverityMappingPath: merge.SeverityCatalog(environment.PlaybookDir),
-		LocalResultsDir:     review.ResultsDir(project.LocalDir(environment.ProjectDir)),
+		LocalDir:            localDir,
 	})
 	if err != nil {
 		return err
@@ -42,6 +43,9 @@ func runMerge(args []string) error {
 	fmt.Printf("Lauf %s in %s zusammengeführt.\n", runName, project.DisplayPath(filepath.Clean(runDir)))
 	fmt.Printf("Geschrieben: %s\n", project.DisplayPath(output.JSON))
 	fmt.Printf("Geschrieben: %s\n", project.DisplayPath(output.Markdown))
+	for _, warning := range merge.KnownDecisionWarnings(result) {
+		fmt.Printf("Hinweis: %s\n", warning)
+	}
 	return nil
 }
 

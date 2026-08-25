@@ -221,15 +221,33 @@ festen Suchpfad und schreibt `review-triage.md` direkt in den Laufordner. Der AI
 steht; ein leeres lokales Overlay des Moduls schaltet ihn ab.
 
 **Erledigt: `known-decisions.md` wirkt projektweit.** Aus Task 019
-(`k-playbook-local/tasks/019-known-decisions.md`). Das Format ist festgelegt: ein
+(`k-playbook-local/tasks/done/019-known-decisions.md`). Das Format ist festgelegt: ein
 `##`-Eintrag je Decision, genau ein fenced `yaml`-Block mit Pflichtfeldern und danach
-Begründung. `k-playbook merge` kombiniert die projektweite Datei
-`k-playbook-local/results/known-decisions.md` mit einer optionalen Laufdatei,
-markiert gedeckte Findings und Gruppen in `review-input.json` und zeigt vollständige
-oder teilweise Deckung in `review-input.md`. Das Bewertungsmodul matcht nicht mehr selbst,
-sondern übernimmt `knownDecisions` und `coveredByKnownDecision` aus dem JSON. Der
-Realdurchlauf vom 2026-08-19 deckt die 74 `_old/`-Gruppen über `kd-old-tree`; `raw/`,
-`run.json` und `entries/*.json` blieben per SHA256 unverändert.
+Begründung. `k-playbook merge` liest die Datei, markiert gedeckte Findings und Gruppen in
+`review-input.json` und zeigt vollständige oder teilweise Deckung in `review-input.md`.
+Das Bewertungsmodul matcht nicht mehr selbst, sondern übernimmt `knownDecisions` und
+`coveredByKnownDecision` aus dem JSON. Der Realdurchlauf vom 2026-08-19 deckt die 74
+`_old/`-Gruppen über `kd-old-tree`; `raw/`, `run.json` und `entries/*.json` blieben per
+SHA256 unverändert.
+
+**Nachtrag aus Task 030: die Zwei-Ebenen-Regel ist zurückgenommen.** Task 019 hatte zwei
+Suchpfade festgelegt — eine laufspezifische `RUN_DIR/known-decisions.md` vor der
+projektweiten Datei, bei gleicher `id` gewinnt die laufspezifische Fassung. Beides ist
+entfallen. Die laufspezifische Fassung hatte keinen Erzeuger: kein Command, kein Skill und
+kein Oberflächenelement legte sie an, in keinem Lauf dieses Repos hat es sie gegeben. Sie
+trägt konzeptionell auch nicht — eine bewusste Entscheidung ist nicht laufgebunden, dafür
+gibt es `expires` — und sie hatte einen stillen Nebeneffekt: eine Datei, die niemand
+erwartet, konnte eine projektweite Entscheidung vollständig aushebeln.
+
+Zugleich ist die projektweite Datei von `k-playbook-local/results/` eine Ebene hoch nach
+`k-playbook-local/known-decisions.md` gezogen. `results/` ist „alles, was Reviews
+erzeugen"; diese Datei wird von Hand gepflegt und ist Eingabe, keine Ausgabe. Sie ist
+bewusst **kein** Eintrag in `LocalStructure()` geblieben: `CreateLocal()` legt
+Datei-Einträge per `writeIfMissing` an, der neue Ort existierte danach immer — und die
+Übergangslesung des alten Orts liefe nie mehr an. `/k-gui` legt sie deshalb nicht an, ihr
+Zweck steht in [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd). Der alte
+Ort wird befristet weiter gelesen und der Umzug sichtbar gemeldet; der Ausbau hängt an
+Task 031.
 
 **Erledigt: Namensraum-Konvention für Command-Module.** Zusammen mit Task 018 festgelegt
 und in `rules/command-authoring.md` verankert: `commands/_<name>/` trägt Module (kein

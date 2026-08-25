@@ -58,7 +58,7 @@ Der Command:
 - schreibt Log und Ergebnisse nach `k-playbook-local/results/`.
 - trennt generischen Ablauf von konkreten Review-Kriterien.
 - lässt projekteigene Rezepte mitgelieferte gleichen Dateinamens vollständig ersetzen.
-- berücksichtigt `known-decisions.md`, damit bewusste Entscheidungen nicht wiederholt als neue Findings auftauchen.
+- berücksichtigt `k-playbook-local/known-decisions.md`, damit bewusste Entscheidungen nicht wiederholt als neue Findings auftauchen. Die Datei liegt neben `results/`, nicht darin: sie wird von Hand gepflegt und von keinem Review erzeugt.
 
 Interaktive Reviews moderieren Stelle für Stelle:
 

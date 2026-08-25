@@ -180,9 +180,10 @@ func TestCreateLocalLegtPrivateVerzeichnisseAn(t *testing.T) {
 	}
 }
 
-// CreateLocal legt in keinem Verzeichnis eine .gitignore an. Was versioniert
-// wird, entscheidet allein das Projekt.
-func TestCreateLocalSchreibtKeineGitignore(t *testing.T) {
+// CreateLocal schreibt eine .gitignore nur für Einträge mit PrivateByDefault.
+// Für alle anderen gilt weiterhin: was versioniert wird, entscheidet allein das
+// Projekt.
+func TestCreateLocalSchreibtGitignoreNurFuerVorbelegteEintraege(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
@@ -190,11 +191,72 @@ func TestCreateLocalSchreibtKeineGitignore(t *testing.T) {
 	}
 
 	for _, entry := range LocalStructure() {
-		if entry.IsFile {
+		if entry.IsFile || entry.PrivateByDefault {
 			continue
 		}
-		if pathExists(filepath.Join(LocalDir(root), entry.Path, ".gitignore")) {
+		if pathExists(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)) {
 			t.Errorf("%s hat eine .gitignore, die CreateLocal nicht schreiben darf", entry.Path)
+		}
+	}
+}
+
+// Ein frisch angelegter vorbelegter Eintrag bekommt genau den verwalteten
+// Inhalt — nicht mehr und nicht weniger.
+func TestCreateLocalLegtVorbelegteGitignoreAn(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	vorbelegt := 0
+	for _, entry := range LocalStructure() {
+		if !entry.PrivateByDefault {
+			continue
+		}
+		vorbelegt++
+		if !entry.Private {
+			t.Errorf("%s ist vorbelegt, aber nicht als privat geführt", entry.Path)
+		}
+		ignore := filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)
+		if !hasManagedContent(ignore) {
+			content, _ := os.ReadFile(ignore)
+			t.Errorf("%s trägt nicht den verwalteten Inhalt:\n%s", entry.Path, content)
+		}
+	}
+	if vorbelegt == 0 {
+		t.Fatalf("kein vorbelegter Eintrag in der Struktur")
+	}
+}
+
+// Zweiter Lauf über ein bestehendes Verzeichnis ohne .gitignore: nichts wird
+// geschrieben. Sonst käme der Default nach jedem makePublic() still zurück, und
+// Bestandsprojekte mit getrackten Dateien landeten in PrivacyPartial.
+func TestCreateLocalBringtEntfernteGitignoreNichtZurueck(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+	for _, entry := range LocalStructure() {
+		if !entry.PrivateByDefault {
+			continue
+		}
+		if err := os.Remove(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)); err != nil {
+			t.Fatalf("%s/.gitignore entfernen: %v", entry.Path, err)
+		}
+	}
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal, zweiter Lauf: %v", err)
+	}
+
+	for _, entry := range LocalStructure() {
+		if !entry.PrivateByDefault {
+			continue
+		}
+		if pathExists(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)) {
+			t.Errorf("%s hat die .gitignore still zurückbekommen", entry.Path)
 		}
 	}
 }

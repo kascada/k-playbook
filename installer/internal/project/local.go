@@ -24,6 +24,21 @@ type LocalEntry struct {
 	// Das Feld bleibt, weil es genau die Verzeichnisse benennt, für die diese
 	// Wahl überhaupt zur Debatte steht.
 	Private bool `json:"private"`
+	// PrivateByDefault ist die eine Ausnahme davon: der Eintrag wird bei der
+	// Installation schon privat angelegt, statt die Wahl offen zu lassen. Nur
+	// results/ trägt das.
+	//
+	// Begründung: Bei priv/ und material/ geht es um Geschmack, dort ist die
+	// Zurückhaltung richtig. Ein Werkzeug, das gefundene Secrets im Klartext
+	// ins Repository des Nutzers schreibt, ist dagegen ein Fehler von
+	// k-playbook und keine Projektentscheidung — und die Rohausgaben sind nur
+	// der schärfste Fall: ein Review ist aus dem Code wiederholbar, sein
+	// Ergebnis ist ein Stand von einem Rechner.
+	//
+	// Eine Erzwingung ist es trotzdem nicht: der Zustand bleibt in der
+	// Oberfläche umschaltbar, und geschrieben wird die verwaltete .gitignore
+	// nur beim erstmaligen Anlegen des Verzeichnisses (siehe CreateLocal).
+	PrivateByDefault bool `json:"privateByDefault"`
 }
 
 // LocalStructure beschreibt, was ein Projekt braucht.
@@ -39,7 +54,23 @@ func LocalStructure() []LocalEntry {
 		{Path: "checks", Purpose: "Projekteigene Checks als *.sh, ausgeführt über " + PlaybookDirName + "/bin/k-check."},
 		{Path: "commands", Purpose: "Projekteigene Commands als *.md. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/commands/; gleicher Name ersetzt, eine leere Datei schaltet ab. Unterverzeichnisse bilden Namensräume und werden Datei für Datei verrechnet."},
 		{Path: "skills", Purpose: "Projekteigene Skills, je ein Verzeichnis mit SKILL.md darin. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/skills/; gleicher Verzeichnisname ersetzt den Skill als Ganzes, eine leere SKILL.md schaltet ihn ab."},
-		{Path: "results", Purpose: "Alles, was Reviews erzeugen: Ergebnisse je Familie und Datum, dazu log.md und known-decisions.md."},
+		{
+			Path:             "results",
+			Private:          true,
+			PrivateByDefault: true,
+			Purpose: "Alles, was Reviews erzeugen: Ergebnisse je Familie und Datum, dazu log.md.\n\n" +
+				"Der Inhalt bleibt aus der Versionskontrolle. Ein Review ist aus dem Code wiederholbar —\n" +
+				"sein Ergebnis ist ein Stand von diesem Rechner und kein Projektwissen; log.md sagt\n" +
+				"außerdem, wer wann was gescannt hat. Was vom Ergebnis Projektwissen ist, wandert ohnehin\n" +
+				"heraus: in known-decisions.md und in die Tasks einer Remediation.\n\n" +
+				"k-playbook legt dafür beim erstmaligen Anlegen dieses Verzeichnisses eine .gitignore mit\n" +
+				"diesem Inhalt an:\n\n" +
+				"    *\n    !.gitignore\n    !README.md\n\n" +
+				"Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen Ist-Zustand und\n" +
+				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei. Was bereits\n" +
+				"committet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore allein\n" +
+				"wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in der Historie.",
+		},
 		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-code2docs, libs/ von /k-tools-scan, extracted/ von /k-docs-extract, manual/ von Hand. Die drei erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu."},
 		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
@@ -99,6 +130,19 @@ func LocalOK(statuses []LocalEntryStatus) bool {
 
 // CreateLocal legt fehlende Teile der Struktur an. Vorhandenes bleibt
 // unberührt, auch READMEs mit eigenem Text.
+//
+// Für Einträge mit PrivateByDefault schreibt CreateLocal zusätzlich die
+// verwaltete .gitignore — aber nur, wenn das Verzeichnis in genau diesem Lauf
+// entsteht. Deshalb wird vor os.MkdirAll geprüft, ob es schon da ist; MkdirAll
+// selbst meldet das nicht. Zwei Gründe:
+//
+//   - makePublic() entfernt die verwaltete Datei bewusst. Ein späterer
+//     CreateLocal()-Lauf — jeder /k-gui-Start, jedes „Struktur anlegen" —
+//     brächte sie sonst still zurück und überginge die Entscheidung des
+//     Projekts.
+//   - Bestandsprojekte mit getrackten Dateien unter results/ landeten sonst im
+//     Zustand PrivacyPartial: Regel greift, Dateien stehen im Index. Wer nur
+//     aktualisiert, soll davon nichts merken.
 func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 	root := LocalDir(projectDir)
 
@@ -112,12 +156,19 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 			continue
 		}
 
+		fresh := !pathExists(path)
 		if err := os.MkdirAll(path, 0o755); err != nil {
 			return CheckLocal(projectDir), fmt.Errorf("%s anlegen: %w", entry.Path, err)
 		}
 		readme := filepath.Join(path, "README.md")
 		if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
 			return CheckLocal(projectDir), err
+		}
+		if fresh && entry.PrivateByDefault {
+			ignore := filepath.Join(path, PrivateIgnoreFile)
+			if err := writeIfMissing(ignore, managedIgnoreContent()); err != nil {
+				return CheckLocal(projectDir), err
+			}
 		}
 	}
 

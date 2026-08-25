@@ -26,7 +26,7 @@ Ein Projekt besteht aus drei Teilen, die sich nie überlappen:
 projekt/
 ├── K-PLAYBOOK.yaml       der Anker; sein Ort bestimmt das Hauptverzeichnis
 ├── k-playbook/           die Installation, vollständig ersetzbar
-└── k-playbook-local/     projekteigen, committed
+└── k-playbook-local/     projekteigen, committed (Inhalt von results/ ausgenommen)
 ```
 
 | Teil | Wem gehört es | Was passiert beim Update |

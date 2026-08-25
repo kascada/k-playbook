@@ -30,8 +30,9 @@ type Options struct {
 	// SeverityMappingPath ist der optionale Pfad zur Fallback-Tabelle für
 	// abgeleitete Schwere. Fehlt er, bleibt nur SARIF-/Metadaten-Ableitung.
 	SeverityMappingPath string
-	// LocalResultsDir ist k-playbook-local/results für projektweite known-decisions.
-	LocalResultsDir string
+	// LocalDir ist k-playbook-local; dort liegt die projektweite
+	// known-decisions.md.
+	LocalDir string
 	// Now liefert die Erzeugungszeit. Fehlt es, wird time.Now verwendet.
 	Now func() time.Time
 }
@@ -248,7 +249,7 @@ func Build(options Options) (Result, error) {
 		now = options.Now
 	}
 
-	decisions, loadReport, err := knowndecisions.LoadForRun(options.RunDir, options.LocalResultsDir)
+	decisions, loadReport, err := knowndecisions.Load(options.LocalDir)
 	if err != nil {
 		return Result{}, err
 	}

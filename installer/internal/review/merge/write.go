@@ -72,6 +72,13 @@ func markdown(result Result) string {
 		}
 		fmt.Fprintf(&builder, "\n")
 	}
+	if warnings := KnownDecisionWarnings(result); len(warnings) > 0 {
+		fmt.Fprintf(&builder, "Hinweise zu Known-Decisions:\n")
+		for _, line := range warnings {
+			fmt.Fprintf(&builder, "- %s\n", line)
+		}
+		fmt.Fprintf(&builder, "\n")
+	}
 
 	fmt.Fprintf(&builder, "## Tool- und Job-Status\n\n")
 	fmt.Fprintf(&builder, "| Eintrag | Zustand | Jobs | Hinweis |\n")

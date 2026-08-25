@@ -214,18 +214,34 @@ guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md  TODO.md
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
-würden. Mehr schreibt `CreateLocal()` nicht: insbesondere keine `.gitignore`. Was ein
-Projekt versioniert, entscheidet das Projekt.
+würden. Mehr schreibt `CreateLocal()` nicht — mit **einer** Ausnahme: Einträge mit
+`PrivateByDefault` bekommen die verwaltete `.gitignore`, und zwar nur, wenn das
+Verzeichnis in genau diesem Lauf entsteht. Deshalb wird vor `os.MkdirAll` geprüft, ob es
+schon da ist; `MkdirAll` selbst meldet das nicht. Die Bedingung löst zwei Fälle auf
+einmal: `makePublic()` entfernt die Datei bewusst, ein späterer `CreateLocal()`-Lauf —
+jeder `/k-gui`-Start, jedes „Struktur anlegen" — dürfte sie nicht still zurückbringen;
+und Bestandsprojekte mit getrackten Dateien unter `results/` landeten sonst im Zustand
+`PrivacyPartial`. Ansonsten gilt weiter: was ein Projekt versioniert, entscheidet das
+Projekt.
 
-Das Feld `Private` an einem `LocalEntry` markiert daher nur noch, für welche
-Verzeichnisse diese Wahl überhaupt ansteht — `priv/` **und** `material/`. Bei `priv/` ist
-der Grund offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/`
-ist er derselbe und wird leicht übersehen: Rohmaterial sind Chat-Mitschnitte, Notizen und
-Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Beide bekommen
+Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
+überhaupt ansteht — `results/`, `priv/` **und** `material/`. Bei `priv/` ist der Grund
+offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/` ist er
+derselbe und wird leicht übersehen: Rohmaterial sind Chat-Mitschnitte, Notizen und
+Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Alle bekommen
 über dasselbe `Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt
-ausschließt und das Verzeichnis selbst versioniert lässt. Ihre README beschreibt, wie man
-den Inhalt heraushält, falls gewünscht. Das Feld geht als JSON an die Oberfläche und ist
-dort die Whitelist des Blocks [Lokale Einstellungen](#lokale-einstellungen).
+ausschließt und das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg.
+Das Feld geht als JSON an die Oberfläche und ist dort die Whitelist des Blocks
+[Lokale Einstellungen](#lokale-einstellungen).
+
+`results/` unterscheidet sich in einem Punkt: es trägt zusätzlich `PrivateByDefault` und
+ist damit das einzige Verzeichnis, das bei der Installation schon privat angelegt wird.
+Bei `priv/` und `material/` geht es um Geschmack, dort ist Zurückhaltung richtig. Bei
+`results/` nicht: ein Werkzeug, das gefundene Secrets im Klartext ins Repository des
+Nutzers schreibt, ist ein Fehler von k-playbook und keine Projektentscheidung — und die
+Rohausgaben sind nur der schärfste Fall. Ein Review ist aus dem Code wiederholbar, sein
+Ergebnis ist ein Stand von einem Rechner. Umschaltbar bleibt es trotzdem, in beide
+Richtungen, und einmal umgeschaltet bleibt es dabei.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
@@ -236,9 +252,15 @@ Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
 ## Lokale Einstellungen
 
 Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
-stillschweigend erzwingt. Erster und bisher einziger Eintrag: ob der **Inhalt** von
-`priv/` und `material/` aus der Versionskontrolle bleibt. `project/local_private.go`
-misst das und schaltet es um, `webui/local_private.go` reicht es an die Oberfläche.
+stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für drei Verzeichnisse:
+ob der **Inhalt** von `results/`, `priv/` und `material/` aus der Versionskontrolle
+bleibt. `project/local_private.go` misst das und schaltet es um,
+`webui/local_private.go` reicht es an die Oberfläche.
+
+„Statt dass k-playbook es stillschweigend erzwingt" trägt auch für `results/`: dort ist
+die Antwort bei einer Neuinstallation zwar vorbelegt, aber sichtbar im selben Block und
+in beide Richtungen umschaltbar — und `CreateLocal()` nimmt eine Umschaltung nie zurück.
+Vorbelegt ist nicht erzwungen.
 
 **Gemessen, nicht geraten.** Gefragt wird `git check-ignore -v --no-index` auf einen Pfad
 *innerhalb* des Verzeichnisses; das eigene Parsen von `.gitignore`-Dateien fiele über

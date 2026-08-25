@@ -58,7 +58,7 @@ k-playbook-local/
 ├── checks/        Overlay zu k-playbook/checks/
 ├── commands/      Overlay zu k-playbook/commands/
 ├── skills/        Overlay zu k-playbook/skills/
-├── results/       alles, was Reviews erzeugen
+├── results/       alles, was Reviews erzeugen; siehe unten
 ├── docs/          Projektwissen für AI-Sessions, nach Herkunft getrennt
 │   └── manual/    handgepflegte Doku; kein Command schreibt hier hinein
 ├── guidelines/
@@ -73,10 +73,18 @@ Jedes Verzeichnis trägt eine `README.md` mit seinem Zweck — auch weil Git lee
 Verzeichnisse nicht speichert und sie sonst nach einem Clone des Projekts fehlen würden.
 Vorhandene Dateien bleiben unberührt, auch READMEs mit eigenem Text.
 
-`k-playbook-local/` gehört ins Repository des Projekts und wird committet. Das
-gilt auch für `priv/` und `material/`, obwohl dort typischerweise Privates und
-Rohmaterial liegt: k-playbook schreibt von sich aus keine `.gitignore` und
-entscheidet nicht, was ein Projekt versioniert.
+`k-playbook-local/` gehört ins Repository des Projekts und wird committet — bis auf den
+**Inhalt** von drei Verzeichnissen, für die diese Wahl ansteht: `results/`, `priv/` und
+`material/`. Für `priv/` und `material/` gilt weiterhin, dass k-playbook von sich aus
+keine `.gitignore` schreibt und nicht entscheidet, was ein Projekt versioniert.
+
+`results/` ist die Ausnahme: es wird beim erstmaligen Anlegen schon privat angelegt.
+Ein Review ist aus dem Code wiederholbar, sein Ergebnis ist ein Stand von diesem Rechner
+— und die Rohausgaben eines Secret-Scanners gehören ohnehin nicht ins Repository. Auch
+das bleibt umschaltbar, und einmal umgeschaltet nimmt k-playbook es nicht zurück: die
+verwaltete `.gitignore` entsteht nur beim erstmaligen Anlegen des Verzeichnisses, nicht
+bei jedem Lauf. Bestandsprojekte, die `results/` bisher versioniert haben, merken vom
+Update also nichts.
 
 Sichtbar und umschaltbar ist diese Wahl im Block **Lokale Einstellungen** der
 Oberfläche. Er misst je Verzeichnis mit `git check-ignore`, ob der Inhalt
@@ -628,7 +636,9 @@ Checkliste für ein Projekt:
 - [ ] `schema_version: 3` ist gesetzt.
 - [ ] `project.repo_root` zeigt auf das Projekt-Repository, `project.vcs` ist `git` oder `none`.
 - [ ] `k-playbook/` ist ein eigener Clone und enthält nichts Projekteigenes.
-- [ ] `k-playbook-local/` existiert vollständig und ist im Projekt-Repository committet.
+- [ ] `k-playbook-local/` existiert vollständig und ist im Projekt-Repository committet —
+      der Inhalt von `results/` ausgenommen, der bei einer Neuinstallation von vornherein
+      draußen bleibt.
 - [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands` und `.cursor/commands`
       sind Verzeichnisse mit Einzel-Symlinks nach `k-playbook/` bzw. `k-playbook-local/`;
       die Oberfläche meldet sie als eingerichtet.

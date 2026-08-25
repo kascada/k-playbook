@@ -3,6 +3,7 @@ package knowndecisions
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -41,28 +42,94 @@ func TestExpired(t *testing.T) {
 	}
 }
 
-func TestLoadForRunKombiniertUndLaufVerdraengt(t *testing.T) {
+func TestLoadLiestProjektweiteDatei(t *testing.T) {
+	root := t.TempDir()
+	writeKnownDecision(t, filepath.Join(root, fileName), "kd-shared", "wontfix", "project/**")
+
+	decisions, report, err := Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].ID != "kd-shared" || decisions[0].Source != "project" {
+		t.Fatalf("projektweite Decision nicht geladen: %+v", decisions)
+	}
+	if len(report.Sources) != 1 || report.Sources[0].Scope != "project" || !report.Sources[0].Loaded {
+		t.Fatalf("Quellenbericht falsch: %+v", report.Sources)
+	}
+	if report.Sources[0].Path != filepath.Join(root, fileName) {
+		t.Fatalf("falscher Ort gelesen: %s", report.Sources[0].Path)
+	}
+	if len(report.Warnings) != 0 {
+		t.Fatalf("unerwartete Warnung: %+v", report.Warnings)
+	}
+}
+
+// Eine known-decisions.md im Laufverzeichnis gibt es nicht mehr: sie wird weder
+// gelesen noch als Quelle gemeldet.
+func TestLoadIgnoriertLaufverzeichnis(t *testing.T) {
 	root := t.TempDir()
 	runDir := filepath.Join(root, "results", "2026-08-21")
-	resultsDir := filepath.Join(root, "results")
-	writeKnownDecision(t, filepath.Join(resultsDir, fileName), "kd-shared", "wontfix", "project/**")
-	writeKnownDecision(t, filepath.Join(runDir, fileName), "kd-shared", "accepted-risk", "run/**")
+	writeKnownDecision(t, filepath.Join(root, fileName), "kd-shared", "wontfix", "project/**")
+	writeKnownDecision(t, filepath.Join(runDir, fileName), "kd-run", "accepted-risk", "run/**")
 
-	decisions, report, err := LoadForRun(runDir, resultsDir)
+	decisions, report, err := Load(root)
 	if err != nil {
-		t.Fatalf("LoadForRun: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-	if len(decisions) != 1 || decisions[0].Category != "accepted-risk" || decisions[0].Source != "run" {
-		t.Fatalf("Lauf-Decision verdrängt nicht: %+v", decisions)
-	}
-	foundDisplaced := false
-	for _, item := range report.Decisions {
-		if item.DisplacedBy == "kd-shared" && item.Source == "project" {
-			foundDisplaced = true
+	for _, decision := range decisions {
+		if decision.ID == "kd-run" {
+			t.Fatalf("Decision aus dem Laufverzeichnis geladen: %+v", decisions)
 		}
 	}
-	if !foundDisplaced {
-		t.Fatalf("Verdrängung nicht im Report: %+v", report.Decisions)
+	for _, source := range report.Sources {
+		if source.Path == filepath.Join(runDir, fileName) {
+			t.Fatalf("Laufverzeichnis steht noch im Quellenbericht: %+v", report.Sources)
+		}
+	}
+}
+
+// Übergang: liegt die Datei nur noch am alten Ort, wird sie gelesen und der
+// Umzug gemeldet. Entfällt mit dem Ausbau zum 2027-02-28.
+func TestLoadLiestAltenOrtUndMeldetUmzug(t *testing.T) {
+	root := t.TempDir()
+	legacy := filepath.Join(root, "results", fileName)
+	writeKnownDecision(t, legacy, "kd-alt", "wontfix", "project/**")
+
+	decisions, report, err := Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].ID != "kd-alt" {
+		t.Fatalf("Decision vom alten Ort nicht geladen: %+v", decisions)
+	}
+	if report.Sources[0].Path != legacy || !report.Sources[0].Loaded {
+		t.Fatalf("alter Ort nicht als Quelle gemeldet: %+v", report.Sources)
+	}
+	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], filepath.Join(root, fileName)) {
+		t.Fatalf("Umzugswarnung nennt den neuen Ort nicht: %+v", report.Warnings)
+	}
+}
+
+// Übergang: liegen beide Orte vor, gewinnt der neue; der alte wird als ignoriert
+// gemeldet. Entfällt mit dem Ausbau zum 2027-02-28.
+func TestLoadBevorzugtNeuenOrtUndMeldetAlten(t *testing.T) {
+	root := t.TempDir()
+	legacy := filepath.Join(root, "results", fileName)
+	writeKnownDecision(t, filepath.Join(root, fileName), "kd-neu", "wontfix", "project/**")
+	writeKnownDecision(t, legacy, "kd-alt", "accepted-risk", "alt/**")
+
+	decisions, report, err := Load(root)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].ID != "kd-neu" {
+		t.Fatalf("neuer Ort gewinnt nicht: %+v", decisions)
+	}
+	if report.Sources[0].Path != filepath.Join(root, fileName) {
+		t.Fatalf("falsche Quelle: %+v", report.Sources)
+	}
+	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], legacy) {
+		t.Fatalf("alter Ort nicht als ignoriert gemeldet: %+v", report.Warnings)
 	}
 }
 
@@ -102,7 +169,7 @@ func TestMatchSortiertePrimaerUndSekundaer(t *testing.T) {
 		{ID: "kd-b", Category: "wontfix", Match: []Criterion{{PathGlob: "_old/**"}}},
 		{ID: "kd-a", Category: "false-positive", Match: []Criterion{{PathGlob: "_old/**"}}},
 	}
-	// LoadForRun sortiert; Match selbst nutzt die gegebene Reihenfolge.
+	// Load sortiert; Match selbst nutzt die gegebene Reihenfolge.
 	decisions[0], decisions[1] = decisions[1], decisions[0]
 	match := Match(finding, decisions, time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC))
 	if match == nil || match.Decision.ID != "kd-a" || len(match.Secondary) != 1 || match.Secondary[0].ID != "kd-b" {

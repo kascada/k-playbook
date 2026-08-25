@@ -85,10 +85,15 @@ Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-docs-code` und der Sk
 Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt wird wie
 bei `priv/` ganz normal mitversioniert — k-playbook schreibt dafür keine `.gitignore`.
 Rohmaterial enthält typischerweise Tokens, Pfade und Namen; ob es deshalb draußen bleiben
-soll, entscheidet das Projekt. Der Block **Lokale Einstellungen** der Oberfläche zeigt für
-beide Verzeichnisse den gemessenen Ist-Zustand und schaltet ihn um; von Hand geht es über
-eine `.gitignore` im Verzeichnis selbst, deren Inhalt die jeweilige `README.md` nennt.
-Details in [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen).
+soll, entscheidet das Projekt.
+
+Drei Verzeichnisse stehen so zur Wahl: `results/`, `priv/` und `material/`. `results/`
+ist das einzige, das bei der Installation schon privat angelegt wird — Review-Ergebnisse
+sind ein Stand von einem Rechner, kein Projektwissen. Umschaltbar sind alle drei. Der
+Block **Lokale Einstellungen** der Oberfläche zeigt für **alle drei** Verzeichnisse den
+gemessenen Ist-Zustand und schaltet ihn um; von Hand geht es über eine `.gitignore` im
+Verzeichnis selbst, deren Inhalt die jeweilige `README.md` nennt. Details in
+[`installation.md`](./installation.md#2-projekteigene-struktur-anlegen).
 
 ## Anker finden
 

@@ -56,7 +56,21 @@ func postPrivate(t *testing.T, body string) (int, privateResponse) {
 	return recorder.Code, response
 }
 
-func TestLocalPrivateHandlerLiefertBeideVerzeichnisse(t *testing.T) {
+// privateEntry sucht einen Eintrag der Antwort nach seinem Pfad. Die Reihenfolge
+// folgt LocalStructure() und ist kein Vertrag der Oberfläche.
+func privateEntry(t *testing.T, response privateResponse, path string) project.PrivacyStatus {
+	t.Helper()
+
+	for _, entry := range response.Entries {
+		if entry.Path == path {
+			return entry
+		}
+	}
+	t.Fatalf("Eintrag %q fehlt in der Antwort: %+v", path, response.Entries)
+	return project.PrivacyStatus{}
+}
+
+func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	privateProject(t)
 
 	recorder := httptest.NewRecorder()
@@ -66,12 +80,14 @@ func TestLocalPrivateHandlerLiefertBeideVerzeichnisse(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
 	}
-	if !response.Available || len(response.Entries) != 2 {
-		t.Fatalf("Available = %v, Einträge = %d, erwartet 2", response.Available, len(response.Entries))
+	if !response.Available || len(response.Entries) != 3 {
+		t.Fatalf("Available = %v, Einträge = %d, erwartet 3", response.Available, len(response.Entries))
 	}
-	if response.Entries[0].Path != "priv" || response.Entries[0].State != project.PrivacyPublic {
-		t.Errorf("erster Eintrag = %+v, erwartet priv als %q", response.Entries[0], project.PrivacyPublic)
+	if entry := privateEntry(t, response, "priv"); entry.State != project.PrivacyPublic {
+		t.Errorf("priv = %+v, erwartet %q", entry, project.PrivacyPublic)
 	}
+	privateEntry(t, response, "results")
+	privateEntry(t, response, "material")
 }
 
 // Der schreibende Weg: einschalten, danach ändert ein zweiter Aufruf nichts.
@@ -82,16 +98,16 @@ func TestSetLocalPrivateHandlerSchaltetUmUndIstIdempotent(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("Status = %d, erwartet 200 — %s", status, response.Message)
 	}
-	if response.Entries[0].State != project.PrivacyPrivate {
-		t.Fatalf("State = %q, erwartet %q — %s", response.Entries[0].State, project.PrivacyPrivate, response.Message)
+	if entry := privateEntry(t, response, "priv"); entry.State != project.PrivacyPrivate {
+		t.Fatalf("State = %q, erwartet %q — %s", entry.State, project.PrivacyPrivate, response.Message)
 	}
 
 	ignore := filepath.Join(project.LocalDir(root), "priv", project.PrivateIgnoreFile)
 	content := readFile(t, ignore)
 
 	status, response = postPrivate(t, `{"path":"priv","private":true}`)
-	if status != http.StatusOK || response.Entries[0].State != project.PrivacyPrivate {
-		t.Errorf("zweiter Aufruf: Status = %d, State = %q", status, response.Entries[0].State)
+	if entry := privateEntry(t, response, "priv"); status != http.StatusOK || entry.State != project.PrivacyPrivate {
+		t.Errorf("zweiter Aufruf: Status = %d, State = %q", status, entry.State)
 	}
 	if readFile(t, ignore) != content {
 		t.Error("der zweite Aufruf hat die Datei verändert")

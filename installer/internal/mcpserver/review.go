@@ -239,11 +239,11 @@ func reviewScanTool(ctx context.Context, req *mcp.CallToolRequest, input reviewS
 
 func reviewMergeTool(ctx context.Context, req *mcp.CallToolRequest, input reviewMergeInput) (*mcp.CallToolResult, any, error) {
 	return wrapReviewTool(reviewToolMerge, input.ProjectDir, func(env reviewEnvironment) *mcp.CallToolResult {
-		data, toolErr := mergeReviewRun(env, input)
+		data, warnings, toolErr := mergeReviewRun(env, input)
 		if toolErr.Code != "" {
 			return reviewErrorResult(reviewToolMerge, env.projectEnvelope(), toolErr)
 		}
-		return reviewSuccessResult(reviewToolMerge, env.projectEnvelope(), data, nil)
+		return reviewSuccessResult(reviewToolMerge, env.projectEnvelope(), data, warnings)
 	}), nil, nil
 }
 
@@ -417,10 +417,14 @@ func scanReviewRun(ctx context.Context, req *mcp.CallToolRequest, env reviewEnvi
 	}, reviewToolError{}
 }
 
-func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]any, reviewToolError) {
+// mergeReviewRun gibt neben den Daten die Warnungen zum Laden der
+// known-decisions.md zurück. Sie gehören in den Warnings-Slot des Envelopes:
+// /k-audit mergt ausschließlich über MCP, hier ist der einzige Weg, auf dem sie
+// den Agenten erreichen.
+func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]any, []string, reviewToolError) {
 	runDir, run, toolErr := requireRun(env, input.Run)
 	if toolErr.Code != "" {
-		return nil, toolErr
+		return nil, nil, toolErr
 	}
 	result, output, err := merge.Run(merge.Options{
 		ProjectDir:          env.Root,
@@ -428,7 +432,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 		RunDir:              runDir,
 		KPlaybookVersion:    mcpKPlaybookVersion(),
 		SeverityMappingPath: merge.SeverityCatalog(env.PlaybookDir),
-		LocalResultsDir:     review.ResultsDir(env.LocalDir),
+		LocalDir:            env.LocalDir,
 	})
 	if err != nil {
 		code := "merge_failed"
@@ -437,7 +441,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 			code = "read_failed"
 			message = "Merge-Eingabe ist nicht lesbar."
 		}
-		return nil, wrapError(err, code, message, map[string]any{"run": input.Run, "runDir": runDir})
+		return nil, nil, wrapError(err, code, message, map[string]any{"run": input.Run, "runDir": runDir})
 	}
 	return map[string]any{
 		"run":    input.Run,
@@ -452,7 +456,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 			"entryStates": countStatusEntries(result.Entries),
 			"state":       review.DeriveRunState(runDir, run),
 		},
-	}, reviewToolError{}
+	}, result.KnownDecisions.Warnings, reviewToolError{}
 }
 
 func writeAIEntry(env reviewEnvironment, input reviewWriteAIEntryInput) (map[string]any, reviewToolError) {

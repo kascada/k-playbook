@@ -26,6 +26,7 @@ Rezepte und Ergebnisse sind strikt getrennt:
 ```text
 k-playbook/reviews/                    mitgelieferte Rezepte
 k-playbook-local/reviews/              projekteigene Rezepte, Overlay
+k-playbook-local/known-decisions.md    bewusst getroffene Entscheidungen, von Hand gepflegt
 k-playbook-local/results/              alles, was Reviews erzeugen
 ```
 
@@ -33,12 +34,13 @@ k-playbook-local/results/              alles, was Reviews erzeugen
 Overlay-Verzeichnis, in dem jede Datei nach derselben Regel behandelt wird: gleicher
 Dateiname, lokale Datei gewinnt vollständig.
 
-Alles Erzeugte liegt daneben:
+`known-decisions.md` steht bewusst eine Ebene höher, neben `rules/` und `guidelines/`:
+Sie wird von Hand gepflegt und von keinem Review erzeugt — sie ist Eingabe, keine
+Ausgabe. Alles Erzeugte liegt daneben:
 
 ```text
 k-playbook-local/results/
 ├── log.md                        wann welches Review lief
-├── known-decisions.md            bewusst getroffene Entscheidungen
 ├── summary-YYYY-MM-DD.md         projektweite Priorisierung aus /k-results
 └── <familie>/YYYY-MM-DD/
     ├── review-input.json
@@ -60,6 +62,31 @@ k-playbook-local/results/k-check/2026-07-24/
 
 `k-playbook-local/checks/` bleibt für ausführbare Checks reserviert. Ergebnisse gehören
 nie dorthin.
+
+### `results/` wird nicht versioniert
+
+Der **gesamte** Inhalt von `results/` gilt als lokal — nicht nur, was Scanner roh
+ausgeben. `raw/` und `entries/`, die erzeugten Dokumente `review-input.md`,
+`review-input.json`, `run.json` und `review-triage.md`, die Review-Dokumente je Familie,
+dazu `summary-YYYY-MM-DD.md` und `log.md`.
+
+Der Grund ist derselbe für alle: Ein Review ist aus dem Code wiederholbar. Sein Ergebnis
+ist ein Stand von einem Rechner zu einem Zeitpunkt, kein Projektwissen. Bei `log.md`
+kommt hinzu, dass es persönlich ist — wer wann auf seinem Rechner gescannt hat, geht das
+Projekt nichts an. Und die Rohausgaben eines Secret-Scanners enthalten gefundene Secrets
+im Klartext; die gehören unter keinen Umständen ins Repository.
+
+Was vom Ergebnis wirklich Projektwissen ist, wandert ohnehin heraus: in
+`k-playbook-local/known-decisions.md` — die genau deshalb eine Ebene höher liegt — und in
+die Tasks, die aus einer Remediation entstehen. Der Preis ist bewusst in Kauf genommen:
+AI-Bewertungen sind nicht mehr im Repository nachlesbar.
+
+Weil der Zuschnitt damit homogen ist, reicht der übliche verwaltete Ignore-Inhalt (`*`,
+`!.gitignore`, `!README.md`) unverändert. `results/` ist deshalb das einzige Verzeichnis,
+das k-playbook bei der Installation schon privat anlegt; umschaltbar bleibt es wie
+`priv/` und `material/` über den Block **Lokale Einstellungen** der Oberfläche. Für
+Bestandsprojekte ändert sich nichts von selbst — die verwaltete `.gitignore` entsteht nur
+beim erstmaligen Anlegen des Verzeichnisses.
 
 ## Artefakte pro Familie
 
@@ -113,9 +140,9 @@ Statuswerte in Legacy-`findings.md`:
 Finding-IDs müssen stabil bleiben. Einmal vergebene IDs dürfen bei Re-Runs,
 Statusänderungen oder Remediation nicht umbenannt werden.
 
-Bewusste projektweite oder laufspezifische Entscheidungen stehen im Laufmodell in
-`known-decisions.md` und werden von `k-playbook merge` als Deckung an Findings und Gruppen
-geschrieben. Das Format, der Suchpfad und die Ablaufregel stehen in
+Bewusste projektweite Entscheidungen stehen in `k-playbook-local/known-decisions.md` und
+werden von `k-playbook merge` als Deckung an Findings und Gruppen geschrieben. Das Format,
+der Ort und die Ablaufregel stehen in
 [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd). Eine Decision ersetzt
 keinen Statuswert und filtert nichts aus den Rohdaten; sie macht nur sichtbar, dass ein
 Befund durch eine dokumentierte Entscheidung gedeckt ist.
@@ -280,10 +307,10 @@ Beispiel-Handoff:
 /k-remediation k-playbook-local/results/k-check/2026-07-24/review-triage.md
 ```
 
-`known-decisions.md` liegt daneben und hält fest, was bewusst so entschieden wurde. Im
-Laufmodell liest der Merge-Schritt die projektweite Datei und eine optionale laufspezifische
-Datei, kombiniert beide Ebenen und schreibt die Wirkung sichtbar in `review-input.json` und
-`review-input.md`; die Bewertung übernimmt diese Information anschließend aus dem JSON.
+`k-playbook-local/known-decisions.md` hält daneben fest, was bewusst so entschieden wurde.
+Der Merge-Schritt liest diese eine Datei und schreibt ihre Wirkung sichtbar in
+`review-input.json` und `review-input.md`; die Bewertung übernimmt diese Information
+anschließend aus dem JSON.
 
 ## Remediation
 
@@ -307,6 +334,13 @@ Ein erzeugter Remediation-Task muss enthalten:
   Fix-/Verifikationspfad gibt,
 - den Remediation-Modus aus `K-PLAYBOOK.yaml`,
 - konkrete Verifikationsschritte.
+
+Der Result-Pfad in einem committeten Task ist dabei eine **Herkunftsangabe, keine
+auflösbare Referenz**: `results/` wird nicht versioniert, Tasks werden es. Wer den Task
+aus dem Repository liest, hat die Ergebnisdatei nicht — und selbst auf dem Rechner, der
+sie erzeugt hat, ist sie nach dem nächsten Lauf überschrieben. Deshalb bleibt die
+Inline-Evidence Pflicht: Gruppen-IDs, Ort und Message gehören in den Task selbst, nicht
+nur als Verweis.
 
 Projektweite Policy:
 

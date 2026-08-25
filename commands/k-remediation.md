@@ -44,7 +44,7 @@ Aus der Context-Ausgabe:
 
 - `RESULTS_DIR` = `<local.dir>/results`
 - `TASKS_DIR` = `<local.dir>/tasks` — Zielverzeichnis für neue Task-Dateien.
-- `KNOWN_DECISIONS` = `<RESULTS_DIR>/known-decisions.md`
+- `KNOWN_DECISIONS` = `<local.dir>/known-decisions.md`
 - `LOG_FILE` = `<RESULTS_DIR>/log.md`
 - `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`, `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`, `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus dem optionalen Remediation-Block.
 - `REMEDIATION_BASE_BRANCH` = aktueller Branch im Target-Repo, falls `target:` ein Git-Repo ist; sonst unset. Bestimme ihn mit `git branch --show-current` im Target-Root. Wenn leer: nutze keinen geratenen Wert, sondern schreibe `Base branch: <manual>` in erzeugte Tasks.
@@ -131,7 +131,7 @@ Wenn `KNOWN_DECISIONS` existiert:
 
 Wenn die Datei nicht existiert:
 
-- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird über `/k-gui` initialisiert."
+- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird von Hand angelegt; ihr Format steht in `docs/review-runs.md`."
 - Weiter — kein automatisches Anlegen an dieser Stelle.
 
 ---

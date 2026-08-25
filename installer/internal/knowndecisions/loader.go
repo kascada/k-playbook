@@ -15,6 +15,15 @@ import (
 
 const fileName = "known-decisions.md"
 
+// legacyResultsDirName ist der alte Ort: k-playbook-local/results/known-decisions.md.
+// Die Datei ist eine handgepflegte Eingabe und kein Review-Ergebnis, deshalb liegt
+// sie jetzt eine Ebene höher, direkt in k-playbook-local/.
+//
+// Der alte Ort wird nur übergangsweise weiter gelesen. Diese Konstante, resolvePath
+// und die beiden Warnungen darin werden zum 2027-02-28 ersatzlos entfernt; der
+// Ausbau steht als Eintrag in k-playbook-local/TODO.md.
+const legacyResultsDirName = "results"
+
 var validCategories = map[string]bool{
 	"false-positive": true,
 	"accepted-risk":  true,
@@ -65,10 +74,9 @@ type DecisionReport struct {
 	Expired          bool   `json:"expired"`
 	Applied          bool   `json:"applied"`
 	NotAppliedReason string `json:"notAppliedReason,omitempty"`
-	DisplacedBy      string `json:"displacedBy,omitempty"`
 }
 
-// LoadReport ist das sichtbare Ergebnis des Ladens beider Ebenen.
+// LoadReport ist das sichtbare Ergebnis des Ladens.
 type LoadReport struct {
 	Sources   []SourceReport
 	Decisions []DecisionReport
@@ -112,18 +120,16 @@ type sourceDecision struct {
 	path     string
 }
 
-// LoadForRun kombiniert projektweite und laufspezifische known-decisions.md.
-// Bei gleicher ID gewinnt die laufspezifische Fassung vollständig.
-func LoadForRun(runDir string, localResultsDir string) ([]Decision, LoadReport, error) {
-	projectPath := ""
-	if localResultsDir != "" {
-		projectPath = filepath.Join(localResultsDir, fileName)
+// Load liest die projektweite known-decisions.md aus k-playbook-local/.
+//
+// Sources bleibt eine Liste, obwohl heute nur eine Quelle darin steht: der
+// Report ist auf mehrere Quellen ausgelegt und soll das bleiben.
+func Load(localDir string) ([]Decision, LoadReport, error) {
+	projectPath, transitionWarnings := resolvePath(localDir)
+	report := LoadReport{
+		Sources:  []SourceReport{{Path: projectPath, Scope: "project"}},
+		Warnings: transitionWarnings,
 	}
-	runPath := filepath.Join(runDir, fileName)
-	report := LoadReport{Sources: []SourceReport{
-		{Path: projectPath, Scope: "project"},
-		{Path: runPath, Scope: "run"},
-	}}
 
 	byID := map[string]sourceDecision{}
 	for index, source := range report.Sources {
@@ -138,19 +144,6 @@ func LoadForRun(runDir string, localResultsDir string) ([]Decision, LoadReport, 
 			continue
 		}
 		for _, decision := range decisions {
-			if existing, ok := byID[decision.ID]; ok && source.Scope == "run" && existing.decision.Source == "project" {
-				report.Decisions = append(report.Decisions, DecisionReport{
-					ID:               existing.decision.ID,
-					Category:         existing.decision.Category,
-					Source:           existing.decision.Source,
-					Path:             existing.path,
-					Expires:          existing.decision.Expires,
-					NotAppliedReason: "durch laufspezifische Decision verdrängt",
-					DisplacedBy:      decision.ID,
-				})
-				byID[decision.ID] = sourceDecision{decision: decision, path: source.Path}
-				continue
-			}
 			if existing, ok := byID[decision.ID]; ok {
 				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: doppelte Decision-ID %q verdrängt nicht %s", source.Path, decision.ID, existing.path))
 				continue
@@ -178,6 +171,39 @@ func LoadForRun(runDir string, localResultsDir string) ([]Decision, LoadReport, 
 		return report.Decisions[left].ID < report.Decisions[right].ID
 	})
 	return decisions, report, nil
+}
+
+// resolvePath wählt den zu lesenden Ort und meldet den Umzug.
+//
+// Übergangscode bis 2027-02-28: existiert nur der alte Ort, wird er gelesen und
+// der Umzug gemeldet. Existieren beide, gewinnt der neue Ort und der alte wird
+// als ignoriert gemeldet. Der Warntext nennt bewusst kein Datum — durchsetzbar
+// ist die Frist nicht, und ein sichtbares Datum würde zur Falschaussage, sobald
+// der Ausbau verrutscht.
+func resolvePath(localDir string) (string, []string) {
+	if localDir == "" {
+		return "", nil
+	}
+	current := filepath.Join(localDir, fileName)
+	legacy := filepath.Join(localDir, legacyResultsDirName, fileName)
+
+	currentExists := fileExists(current)
+	legacyExists := fileExists(legacy)
+	switch {
+	case currentExists && legacyExists:
+		return current, []string{fmt.Sprintf(
+			"%s wird gelesen; %s liegt am alten Ort und wird ignoriert.", current, legacy)}
+	case legacyExists:
+		return legacy, []string{fmt.Sprintf(
+			"%s liegt am alten Ort und wird künftig nicht mehr gelesen. Verschiebe die Datei nach %s.", legacy, current)}
+	default:
+		return current, nil
+	}
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func loadFile(path string, source string) ([]Decision, bool, []string, error) {

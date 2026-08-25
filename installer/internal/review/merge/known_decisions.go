@@ -116,9 +116,6 @@ func sortedCoverageCounts(counts map[string]KnownDecisionCoverageCount) []KnownD
 
 func markKnownDecisionReasons(meta *KnownDecisions, applied map[string]bool, now time.Time) {
 	for index := range meta.Decisions {
-		if meta.Decisions[index].DisplacedBy != "" {
-			continue
-		}
 		decision := knowndecisions.Decision{ID: meta.Decisions[index].ID, Expires: meta.Decisions[index].Expires}
 		if knowndecisions.Expired(decision, now) {
 			meta.Decisions[index].Expired = true
@@ -136,8 +133,26 @@ func markKnownDecisionReasons(meta *KnownDecisions, applied map[string]bool, now
 		}
 	}
 	if len(meta.Decisions) == 0 {
-		meta.Warnings = append(meta.Warnings, "keine known-decisions geladen")
+		meta.Warnings = append(meta.Warnings, knownDecisionsEmptyWarning)
 	}
+}
+
+// knownDecisionsEmptyWarning ist der Sentinel, den markKnownDecisionReasons bei
+// leerem Ergebnis anhängt.
+const knownDecisionsEmptyWarning = "keine known-decisions geladen"
+
+// KnownDecisionWarnings sind die Warnungen zum Laden der known-decisions.md ohne
+// diesen Sentinel. Dass keine Decisions geladen wurden, steht in jedem Bericht
+// bereits an eigener Stelle; im Warnungsblock stünde der Satz ein zweites Mal.
+func KnownDecisionWarnings(result Result) []string {
+	warnings := make([]string, 0, len(result.KnownDecisions.Warnings))
+	for _, warning := range result.KnownDecisions.Warnings {
+		if warning == knownDecisionsEmptyWarning {
+			continue
+		}
+		warnings = append(warnings, warning)
+	}
+	return warnings
 }
 
 func knownDecisionLabel(coverage *KnownDecisionCoverage) string {

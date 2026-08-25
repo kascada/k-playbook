@@ -37,7 +37,7 @@ Dieses Artefakt ist der bevorzugte Handoff für Remediation:
 Aus der Context-Ausgabe:
 
 - `RESULTS_DIR = <local.dir>/results`
-- `KNOWN_DECISIONS = <RESULTS_DIR>/known-decisions.md`
+- `KNOWN_DECISIONS = <local.dir>/known-decisions.md`
 - `LOG_FILE = <RESULTS_DIR>/log.md`
 - `TASKS_DIR = <local.dir>/tasks`; optional aber hilfreich für existierende Remediation-Tasks.
 
@@ -212,7 +212,7 @@ Projekt: `<name>`
 ## Quellen
 
 - <family>: `k-playbook-local/results/<family>/<date>/review-triage.md`
-- Known Decisions: `k-playbook-local/results/known-decisions.md` (<Status>)
+- Known Decisions: `k-playbook-local/known-decisions.md` (<Status>)
 
 ## Priorisierte Übersicht
 

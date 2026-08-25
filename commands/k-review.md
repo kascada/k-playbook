@@ -27,12 +27,13 @@ Recipes come from `catalogs.reviews`; `/k-review` darf nur Einträge mit
 `review.enabled: true` auswählen oder explizit ausführen. Fehlt der Block, gilt
 `review.enabled: true`; `audit.enabled` steuert ausschließlich `/k-audit` und MCP-Läufe.
 Everything a review produces goes under
-`<local.dir>/results/`. From the context output:
+`<local.dir>/results/`. `known-decisions.md` is not produced by a review — it is a
+hand-maintained input and lives one level up. From the context output:
 
 - `RESULTS_DIR` = `<local.dir>/results`
 - `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
 - `LOG_FILE` = `<RESULTS_DIR>/log.md`
-- `KNOWN_DECISIONS` = `<RESULTS_DIR>/known-decisions.md`
+- `KNOWN_DECISIONS` = `<local.dir>/known-decisions.md`
 
 If `RESULTS_DIR` does not exist: ask whether to create it now or run `/k-gui`; do not
 use any fallback path.

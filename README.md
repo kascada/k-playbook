@@ -63,7 +63,7 @@ projekt/
     ├── checks/           Overlay zu k-playbook/checks/
     ├── commands/         Overlay zu k-playbook/commands/
     ├── skills/           Overlay zu k-playbook/skills/
-    ├── results/          alles, was Reviews erzeugen
+    ├── results/          alles, was Reviews erzeugen; nicht versioniert
     ├── docs/             Projektwissen für AI-Sessions, nach Herkunft getrennt
     │   └── manual/       handgepflegte Doku; kein Command schreibt hier hinein
     ├── guidelines/
@@ -74,11 +74,13 @@ projekt/
     └── TODO.md
 ```
 
-`k-playbook-local/` gehört ins Repository des Projekts, `priv/` und `material/`
-eingeschlossen: k-playbook schreibt keine `.gitignore` und entscheidet nicht, was ein
-Projekt versioniert. Ob der Inhalt dieser beiden draußen bleibt, zeigt und schaltet der
-Block **Lokale Einstellungen** der Oberfläche — gemessen mit `git check-ignore`, nicht
-geraten.
+`k-playbook-local/` gehört ins Repository des Projekts. Drei Verzeichnisse stehen darin
+zur Wahl — `results/`, `priv/` und `material/`; eines davon, `results/`, wird bei der
+Einrichtung schon privat angelegt, alle drei bleiben umschaltbar. Review-Ergebnisse sind
+ein Stand von einem Rechner und können gefundene Secrets im Klartext enthalten; bei
+`priv/` und `material/` entscheidet das Projekt, und k-playbook schreibt dort von sich
+aus keine `.gitignore`. Was gilt, zeigt und schaltet der Block **Lokale Einstellungen**
+der Oberfläche — gemessen mit `git check-ignore`, nicht geraten.
 
 Gleicher Name in `k-playbook-local/` ersetzt den mitgelieferten Eintrag vollständig; ein
 leerer schaltet ihn ab. Das gilt für alle fünf Sorten — `rules/`, `reviews/`, `checks/`,

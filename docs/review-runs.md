@@ -593,6 +593,12 @@ kein Fehler, sondern eine sichtbare Auskunft im Statusblock.
 
 ## Wirkung von `known-decisions.md`
 
+`k-playbook-local/known-decisions.md` hält fest, welche Befunde bewusst nicht mehr als
+Befund gelten sollen: Falschpositive, akzeptierte Risiken, Zurückgestelltes, Verworfenes.
+Sie ist eine handgepflegte **Eingabe** und kein Review-Ergebnis — deshalb liegt sie
+direkt in `k-playbook-local/`, neben `rules/`, `reviews/` und `guidelines/`, und nicht in
+`results/`. Kein Command legt sie an; sie wird von Hand geschrieben und ist optional.
+
 Bewusste Entscheidungen werden vor der Bewertung zentral im Merge-Schritt angewendet. Das
 Matching passiert also nicht im Chat: `k-playbook merge` lädt `known-decisions.md`, markiert
 gedeckte Findings in `review-input.json` und schreibt dieselbe Information in die
@@ -632,13 +638,17 @@ Unterstützte Match-Kriterien:
 Pfade werden als projektrelative Slash-Pfade ohne führendes `./` verglichen. Bei mehreren
 Locations reicht ein Treffer; der Match-Report nennt die getroffene Location.
 
-Suchpfad:
+Ort:
 
-- `RUN_DIR/known-decisions.md` für laufspezifische Decisions.
-- `k-playbook-local/results/known-decisions.md` für projektweite Decisions.
-- Beide Dateien werden kombiniert. Bei gleicher `id` gewinnt die laufspezifische Decision;
-  die verdrängte projektweite Fassung steht sichtbar im Metablock.
-- Wenn keine Datei existiert, meldet der Merge sichtbar „keine known-decisions geladen".
+- `k-playbook-local/known-decisions.md` — die eine projektweite Datei. Es gibt keinen
+  zweiten Suchpfad und keine laufspezifische Fassung: eine bewusste Entscheidung ist
+  nicht an einen Lauf gebunden, dafür gibt es `expires`.
+- Wenn die Datei nicht existiert, meldet der Merge sichtbar „keine known-decisions geladen".
+- Übergang: Projekte, die die Datei noch unter `k-playbook-local/results/` liegen haben,
+  werden von dort weiter gelesen — der Merge meldet dann den Umzug als Hinweis, in
+  `review-input.md`, in der CLI-Ausgabe und im Ergebnis des MCP-Werkzeugs
+  `k_playbook_review_merge`. Liegen beide vor, gewinnt der neue Ort und der alte wird als
+  ignoriert gemeldet. Diese Lesung des alten Orts ist befristet und wird wieder entfernt.
 
 JSON-Wirkung:
 
@@ -647,11 +657,12 @@ JSON-Wirkung:
   Decision unterliegen.
 - Teils gedeckte Gruppen tragen `partialCoverage: true` und `knownDecisionCoverage` mit
   IDs, Kategorien und Finding-Zahlen.
-- Der Metablock `knownDecisions` nennt Quellen, geladene IDs, Herkunft, Ablauf,
+- Der Metablock `knownDecisions` nennt die Quelle, geladene IDs, Herkunft, Ablauf,
   `applied`, `notAppliedReason` und Loader-Warnungen.
 
 `review-input.md` zeigt die Anzahl vollständig und teilweise gedeckter Gruppen, eine
-Known-Decision-Spalte in der Gruppentabelle und abgelaufene Decisions als eigenen Hinweis.
+Known-Decision-Spalte in der Gruppentabelle, abgelaufene Decisions als eigenen Hinweis und
+die Loader-Warnungen unter „Hinweise zu Known-Decisions".
 Das Bewertungsmodul `review-scan-triage` liest diese Deckung anschließend ausschließlich
 aus `review-input.json`.
 

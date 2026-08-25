@@ -521,13 +521,13 @@ func TestBuildSchreibtKnownDecisionCoverageUndLaesstRawUnveraendert(t *testing.T
   }]
 }`
 	writeText(t, rawPath, rawContent)
-	writeText(t, filepath.Join(localResultsDir, "known-decisions.md"), "## kd-old-tree\n\n```yaml\nid: kd-old-tree\ncategory: wontfix\nmatch:\n  - pathGlob: _old/**\n```\n\nBegründung.\n")
+	writeText(t, filepath.Join(projectDir, "known-decisions.md"), "## kd-old-tree\n\n```yaml\nid: kd-old-tree\ncategory: wontfix\nmatch:\n  - pathGlob: _old/**\n```\n\nBegründung.\n")
 	before, err := os.ReadFile(rawPath)
 	if err != nil {
 		t.Fatalf("Raw lesen: %v", err)
 	}
 
-	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-19", RunDir: runDir, LocalResultsDir: localResultsDir, Now: fixedNow})
+	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-19", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
