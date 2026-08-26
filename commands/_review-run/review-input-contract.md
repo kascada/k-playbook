@@ -90,7 +90,7 @@ Was die Felder tragen:
 | `generated` | Erzeugungszeit der Datei, RFC3339. |
 | `run.name` | Name des Laufs. Im Audit das Laufdatum, im Report-Weg `<result-family>/<YYYY-MM-DD>`. |
 | `run.dir` | Ordner der Datei, relativ zur Projektwurzel. |
-| `run.selectedEntries[]` | Die Einträge, die zu diesem Beleg beigetragen haben, mit `name`, `kind` (`tool` oder `ai`), `state` und — bei `kind: ai` — `mode` (`evidence` oder `perspective`). Im Report-Weg ist das genau ein Eintrag: das ausgeführte Rezept, `kind: ai`, `mode: evidence`. |
+| `run.selectedEntries[]` | Die Einträge, die zu diesem Beleg beigetragen haben, mit `name`, `kind` (`tool` oder `ai`), `state` und — bei `kind: ai` — `mode` (`evidence` oder `perspective`). `mode` beschreibt die Rolle **in diesem Beleg**: `evidence`, wenn der Eintrag die Funde erhoben hat, `perspective`, wenn er einen fertigen Beleg bewertet. Im Audit kommt der Wert aus `audit.mode` des Rezepts; fehlt er dort, normalisiert `review.NormalizeMode` ihn zu `perspective`. Im Report-Weg gibt es genau einen Eintrag — das ausgeführte Rezept, `kind: ai` —, und er trägt `evidence`, weil er die Funde selbst erhoben hat. Das ist unabhängig davon, was `audit.mode` desselben Rezepts für den Audit-Lauf festlegt; ein Rezept mit `audit.enabled: false` hat gar keines. |
 | `findings[].id` | In der Datei eindeutig. Der Merge bildet ihn als `<sarif>:<runIndex>:<resultIndex>`; der Report-Weg nimmt den stabilen Schlüssel der Quelle, z. B. die Alert-Nummer. |
 | `findings[].evidence.tool` | Bei Scanner-Belegen der Werkzeugname (`gosec`), bei Rezept-Belegen der Eintragsname (`tech`). Es gibt kein zweites Feld für die Quelle: `source` existiert nicht. |
 | `findings[].evidence.job` | Der Scan-Job. Bei einem Rezept-Beleg heißt er wie der Eintrag. |
@@ -137,7 +137,7 @@ ihr Vorhandensein und arbeitet ohne sie weiter, statt sie zu erfinden.
 | `groups[].derivedSeverity`, `severitySource` | Wie beim Finding, für den Repräsentanten. | Wie beim Finding: `level` gilt unmittelbar. |
 | `groups[].dependency` | Dependency-Angaben des Repräsentanten. | Steht bei den Findings, sofern die Quelle sie kennt. |
 | `knownDecisions` | Geladene Quellen, Decisions mit `applied` / `notAppliedReason` / `expired` und Warnungen. | Es gab kein zentrales Matching. Im Report-Weg lädt `/k-review` `known-decisions.md` in Step 3 selbst und meldet gedeckte Funde gar nicht erst als Fund. |
-| `findings[].coveredByKnownDecision`, `groups[].coveredByKnownDecision`, `partialCoverage`, `knownDecisionCoverage` | Ergebnis des Matchings je Fund und je Gruppe, mit `matchedBy`. | Keine Deckungsmarker im Beleg. Der Abschnitt `## Deckung aus known-decisions` bleibt stehen und sagt in einem Satz, dass der Beleg kein Matching trägt und warum. |
+| `findings[].coveredByKnownDecision`, `groups[].coveredByKnownDecision`, `groups[].partialCoverage`, `groups[].knownDecisionCoverage` | Ergebnis des Matchings je Fund und je Gruppe, mit `matchedBy`. | Keine Deckungsmarker im Beleg. Der Abschnitt `## Deckung aus known-decisions` bleibt stehen und sagt in einem Satz, dass der Beleg kein Matching trägt und warum. |
 
 ## Stabile Gruppen-IDs
 
@@ -171,7 +171,9 @@ ai-<eintrag>-<schlüssel>
 
 - `<eintrag>` ist der Eintragsname des Rezepts — der Katalog-Schlüssel ohne `review-`.
   Das Präfix ist `ai-`, weil der Beleg aus einem Rezept kommt und nicht aus einem
-  Scan-Job; genau diese Gruppe bekäme im Audit-Lauf dasselbe Präfix.
+  Scan-Job. Es sagt die Herkunft an, nicht die Gleichheit mit einer Audit-ID: dieselbe
+  Gruppe bekäme im Audit-Lauf einen anderen Digest, und ein Rezept, das dort als
+  Perspektive läuft, brächte überhaupt keine eigene Gruppe in den Beleg.
 - `<schlüssel>` ist die kleinste Kennung, die die Quelle selbst vergibt und die einen
   Re-Run überlebt: die Alert- oder Ticket-Nummer, die CVE-/GHSA-Kennung, sonst Rule-ID
   und Pfad. Kleinbuchstaben, `a`–`z` und `0`–`9`; alles andere wird zu einem Bindestrich,
