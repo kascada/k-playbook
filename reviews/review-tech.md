@@ -4,6 +4,7 @@ title: Tech-Debt-Analyse
 interval-weeks: 24
 scope-hint: Quell- und Infrastruktur-Verzeichnisse; Ausschluss - priv/, secure/, tasks/, virtuelle Umgebungen
 handoff: /k-remediation
+result-family: tech
 audit:
   enabled: true
   mode: evidence
@@ -107,11 +108,17 @@ dort würde beim Melden verworfen.
 ## Ergebnisform in `/k-review` (Report-Modus)
 
 Dieses Review moderiert keine Freigaben pro Fund. Es erzeugt ein vollständiges
-Ergebnis-Dokument, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen
-wird.
+Ergebnis, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
 
-- Das Dokument nennt jeden Fund mit Ort, Rule-ID, `level` und dem Satz, der ihn trägt.
-- Bündelung und Reihenfolge der Abarbeitung gehören in dieses Dokument, nicht in die
+Die Ergebnisfamilie ist `tech`; der Lauf schreibt in den Family-Ordner
+`k-playbook-local/results/tech/<datum>/` und dort genau zwei Dateien — `review-input.json`
+nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
+`/k-review`, Step 5b; rezeptspezifisch ist:
+
+- Jeder Fund geht mit Ort, Rule-ID, `level` und dem Satz, der ihn trägt, in
+  `review-input.json`. Die Rule-IDs sind dieselben wie im Audit-Lauf.
+- Bündelung, Priorität und Kategorie vergibt das Triage-Modul beim Schreiben von
+  `review-triage.md`, nicht dieses Rezept. Auch hier gilt: keine eigene Reihenfolge in der
   Fundliste.
 - Keine Code-Änderungen aus diesem Review heraus.
 
@@ -154,3 +161,23 @@ Auswahlregel bei Überschreitung:
 Nach Abschluss der Analyse und dem Log-Eintrag nennt `/k-review` Pfad und exakten
 Handoff-Befehl. Remediation ist ausdrücklich nicht Teil dieses Reviews. Im Audit-Lauf gibt
 es keinen Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage.
+
+**Eigenständiger `/k-review`-Lauf nach dem Umbau.** Dieses Rezept läuft im Audit als
+Evidence-Quelle mit; dort steckt sein Beleg schon im gemeinsamen Merge. Über
+`review.enabled: true` bleibt es daneben einzeln aufrufbar, und ein solcher Lauf legt
+einen eigenen Family-Ordner **außerhalb** jedes Laufordners an:
+
+```text
+k-playbook-local/results/tech/<datum>/
+```
+
+Sein `review-triage.md` geht direkt an `/k-remediation`:
+
+```text
+/k-remediation k-playbook-local/results/tech/<datum>/review-triage.md
+```
+
+Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen
+Befunde**. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Befund, den derselbe Tag
+auch im Audit-Lauf trägt, steht dann in beiden Ergebnissen einmal. Wer beide Seiten
+zusammen sehen will, nimmt den Audit-Lauf — dort und nur dort sitzt die Zusammenführung.

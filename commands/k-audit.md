@@ -423,19 +423,19 @@ Lies zum Abschluss den Status erneut und melde:
 - AI-Entry-Zustände, getrennt nach Evidence-Quellen und Perspektiven,
 - Pfad zu `review-input.json`, `review-input.md` und `review-triage.md`,
 - offene technische Fehler oder bewusst übersprungene Einträge,
-- den nächsten fachlichen Schritt: `/k-results` für eine projektweite priorisierte
-  Summary oder `/k-remediation k-playbook-local/results/<lauf>/review-triage.md` für
-  direkte Abarbeitung der Triage.
+- den nächsten fachlichen Schritt:
+  `/k-remediation k-playbook-local/results/<lauf>/review-triage.md` für die Abarbeitung
+  der Triage.
 
 Ein Lauf ist nicht vollständig, solange eine Evidence-Quelle offen ist oder `triage.state`
 nicht auf `current` steht. Sage das ausdrücklich, statt den Lauf als fertig zu melden: der
 erste Fall wird über Schritt 5 und einen erneuten Merge geschlossen, der zweite über
 Schritt 8.
 
-Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt. Nenne wörtlich:
+Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt und geht direkt in die
+Abarbeitung — einen Zwischenschritt gibt es nicht. Nenne wörtlich:
 
 ```text
-/k-results latest
 /k-remediation k-playbook-local/results/<lauf>/review-triage.md
 ```
 

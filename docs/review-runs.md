@@ -49,8 +49,9 @@ Evidence-Quelle schreibt ebenfalls hierhin, nach `raw/<entry>.sarif`, und legt d
 Verzeichnis an, wenn vor ihr kein Werkzeug lief.
 
 **Es gibt zwei Orte für Rohdaten.** Die Ergebnisfamilien unter
-`k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` bleiben, wie sie sind, und
-`/k-results` liest weiter sie; `ListRuns()` zeigt sie ohnehin mit an. Das
+`k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` bleiben, wie sie sind: Ein gezielter
+`/k-review`-Lauf legt sie weiter an, und `/k-remediation` arbeitet die Triage daneben ab;
+`ListRuns()` zeigt sie ohnehin mit an. Das
 Laufverzeichnis ist dagegen familienlos, weil ein Lauf gerade über die Familien hinweg
 klammert. Katalog-Rezepte im Laufmodell legen keine eigene Rohdatenablage an: eine
 Perspektive liest den gemeinsamen Merge-Beleg aus diesem Laufordner, eine Evidence-Quelle

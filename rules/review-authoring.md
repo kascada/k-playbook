@@ -47,7 +47,10 @@ scope-hint: <kurzer Scope-Hinweis>
 ---
 ```
 
-Optional:
+Optional, mit einer Kopplung: `handoff` und `result-family` gehören zusammen. Wer
+`handoff` setzt, macht das Rezept zum Report-Rezept — und ein Report-Rezept **braucht**
+eine `result-family`, sonst hat sein Ergebnis keinen Ort. `/k-review` bricht dann ab,
+statt einen Ersatzpfad zu wählen.
 
 ```yaml
 language: python
@@ -60,7 +63,7 @@ review:
   enabled: <true|false>
 ```
 
-`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `review-input.json`, `review-triage.md`, `raw/` und ggf. Run-Metadaten enthalten. `audit.enabled` steuert Kandidaten für `/k-audit`-/MCP-Läufe; `review.enabled` steuert die gezielte `/k-review`-Auswahl. Welche weiteren Felder der `audit`-Block trägt, hängt an `audit.mode` und steht im nächsten Abschnitt.
+`result-family` kennzeichnet Report-/Scan-Familien, deren Ergebnisse unter `<local.dir>/results/<family-name>/YYYY-MM-DD/` liegen und typischerweise `review-input.json`, `review-triage.md`, `raw/` und ggf. Run-Metadaten enthalten. Einen zweiten Ergebnisweg daneben gibt es nicht: Der Family-Ordner ist der einzige Ort, an den ein Report-Rezept schreibt, und sein `review-triage.md` geht direkt an `/k-remediation` — ohne Zusammenführung mit anderen Familien oder mit einem Audit-Lauf. `audit.enabled` steuert Kandidaten für `/k-audit`-/MCP-Läufe; `review.enabled` steuert die gezielte `/k-review`-Auswahl. Welche weiteren Felder der `audit`-Block trägt, hängt an `audit.mode` und steht im nächsten Abschnitt.
 
 ## Zwei Betriebsarten im Audit-Lauf
 

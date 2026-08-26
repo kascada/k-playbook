@@ -17,7 +17,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 
 | Dokument | Inhalt |
 |---|---|
-| [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-results`, `/k-remediation` und den Handoffs. |
+| [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-remediation` und den Handoffs. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
 | [`review-runs.md`](./review-runs.md) | Das Laufmodell: `run.json`, Einträge, Betriebsarten der Katalog-Rezepte, Merge, known-decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-run`. |

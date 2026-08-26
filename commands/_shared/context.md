@@ -82,7 +82,6 @@ from the output above — never from configuration, and never by searching.
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
-| results summary | `<local.dir>/results/summary-YYYY-MM-DD.md` |
 | unversioned working files | `<local.dir>/priv/` |
 | project-local commands | `<local.dir>/commands/` |
 | project-local skills | `<local.dir>/skills/` |
@@ -127,8 +126,8 @@ run, and the producing command creates its own directory without asking.
 - **Do not read `K-PLAYBOOK.yaml` yourself.** Its content reaches you through this
   output. Reading it directly means reading a second, possibly different answer.
 - **Take today's date from `now.date`.** Never guess it, and do not call `date` yourself.
-  Commands stamp dates into things that stay — review logs, result directories, summary
-  filenames — and not every assistant is told what day it is. A guessed date in a log is
+  Commands stamp dates into things that stay — review logs, result and run directories —
+  and not every assistant is told what day it is. A guessed date in a log is
   worse than no log. Where a command writes `YYYY-MM-DD` or `<date>`, that is the value.
   An installation older than this field has no `now` in its output: say so once, then
   fall back to `date +%F`.

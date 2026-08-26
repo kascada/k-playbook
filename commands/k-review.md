@@ -87,7 +87,7 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
 - `handoff` (optional; e.g. `/k-remediation` — see Step 5)
-- `result-family` (optional; e.g. `dependency-cve` — for report-mode reviews that use `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`)
+- `result-family` (Pflicht, sobald `handoff` gesetzt ist; e.g. `dependency-cve` — report-mode reviews write to `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`. Fehlt sie bei einem Report-Rezept: sauber abbrechen, siehe Step 5b)
 - `review.enabled` (optional; default `true` for this command)
 - `audit.enabled` (optional; default `false`, ignored by this command)
 
@@ -140,21 +140,22 @@ Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
 
 Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
 
+**`result-family` ist Pflicht.** Ein Report-Rezept ohne `result-family` hat keinen Ort,
+an den sein Ergebnis gehört: Es gibt genau einen Ergebnisweg, den Family-Ordner mit
+`review-input.json` und `review-triage.md`. Fehlt die Angabe im Frontmatter, brich sauber
+ab und nenne das Rezept samt fehlendem Feld — kein Ersatzpfad, keine projektweite
+Sammeldatei. Wer ein neues Report-Rezept schreibt, vergibt eine Familie.
+
 1. Analyse gemäß Review-Datei durchführen.
 2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad wählen.
-   - Wenn `result-family` gesetzt ist: `RUN_DIR` = `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis. Wie beide Dateien entstehen, sagt der Abschnitt unten.
-   - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind überschreiben: nach Bestätigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
-3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
-   `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
+   `RUN_DIR` = `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis. Wie beide Dateien entstehen, sagt der Abschnitt unten.
+3. Am Ende: dem User exakten Handoff-Befehl nennen:
+   `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
 
-#### Zweig mit `result-family` — zwei Module
+#### Zwei Module
 
-Alles in diesem Abschnitt gilt **ausschließlich** für den Zweig mit `result-family`.
-Der Zweig ohne `result-family` schreibt eine Summary; er erzeugt weder
-`review-input.json` noch `review-triage.md`, und `RUN_DIR` ist für ihn nicht definiert.
-
-`RUN_DIR` ist in diesem Zweig das Family-Date-Verzeichnis
+`RUN_DIR` ist das Family-Date-Verzeichnis
 `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Unter diesem Namen arbeiten beide Module.
 
 1. **Belegvertrag.** Wende `commands/_review-run/review-input-contract.md` an und
@@ -172,8 +173,8 @@ sonst. Hier steht nur, was das Modul nicht wissen kann: welcher Ordner `RUN_DIR`
 dass im Report-Modus kein Audit-Eintrag zu melden ist — `k_playbook_review_write_ai_entry`
 entfällt.
 
-**Nur `review-triage.md`.** Dieser Zweig schreibt genau zwei Dateien: `review-input.json`
-und `review-triage.md`. Ein zusätzliches `review-<name>.md` entsteht nicht. Der Abschnitt
+**Nur `review-triage.md`.** Der Report-Modus schreibt genau zwei Dateien:
+`review-input.json` und `review-triage.md`. Ein zusätzliches `review-<name>.md` entsteht nicht. Der Abschnitt
 `## Perspektiven-Report-Format` der Family-Rezepte — `review-dependency-cve`,
 `review-iac-container`, `review-secret-scanning` — verlangt „die im `run.json`-Eintrag
 genannte Datei"; `run.json` gibt es nur im Audit-Lauf. Der Abschnitt ist damit

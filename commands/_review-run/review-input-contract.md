@@ -10,8 +10,8 @@ Eingebunden wird es von den beiden Lauf-Commands:
 - `/k-audit` — mittelbar über `commands/_audit/review-scan-triage.md`, das es in
   Schritt 8 wortlaut-treu anwendet. Geschrieben wird die Datei dort nicht vom Command,
   sondern in Schritt 6 vom Go-Merge.
-- `/k-review` — unmittelbar in Step 5b, im Zweig **mit** `result-family`. Dort schreibt
-  der Agent die Datei von Hand.
+- `/k-review` — unmittelbar in Step 5b, dem Report-Modus. Dort schreibt der Agent die
+  Datei von Hand, in den Family-Ordner aus `result-family`.
 
 Es liegt deshalb im Familien-Namensraum `commands/_review-run/` und nicht im
 Modulverzeichnis eines einzelnen Commands.

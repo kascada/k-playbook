@@ -213,5 +213,4 @@ Melde nach dem Schreiben:
   teilweise gedeckt sind,
 - bei `/k-audit`: dass `k_playbook_review_write_ai_entry` als nächster Schritt den
   Eintrag `scan-triage` auf `done` mit `result: review-triage.md` setzen muss.
-- bei `/k-review`: den Handoff `/k-remediation RUN_DIR/review-triage.md` oder zuerst
-  `/k-results`, wenn mehrere Familien projektweit priorisiert werden sollen.
+- bei `/k-review`: den Handoff `/k-remediation RUN_DIR/review-triage.md`.

@@ -42,7 +42,6 @@ gestartet wurde.
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
 | `/k-audit` | vollständigen Audit-Sweep über MCP anlegen oder fortsetzen und nach dem Merge triagieren | [`review-runs.md`](./review-runs.md) |
-| `/k-results` | vorhandene Ergebnisse projektweit priorisieren | [`code-review.md`](./code-review.md) |
 | `/k-remediation` | Findings bündeln und in Tasks oder Fixes überführen | [`code-review.md`](./code-review.md) |
 | **Task-Flow** | | |
 | `/k-task-create` | Task-Datei aus dem Gesprächskontext erzeugen | [`task-flow.md`](./task-flow.md) |
@@ -76,8 +75,8 @@ Die Code-Review-Familie ist bewusst gestuft:
 3. `/k-audit` orchestriert das Laufmodell: Lauf anlegen oder fortsetzen, Scanner starten,
    Evidence-Rezepte vor dem Merge ausführen, Merge starten, Perspektiven danach führen und
    `review-triage.md` schreiben.
-4. `/k-results` priorisiert vorhandene Ergebnisfamilien zu einer projektweiten Summary.
-5. `/k-remediation <result>` plant die Abarbeitung der Findings.
+4. `/k-remediation <result>` plant die Abarbeitung der Findings. Er nimmt genau eine
+   Ergebnisdatei; zusammengeführt wird ausschließlich im Audit-Lauf.
 
 Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
 `/k-task-refine`, dann `/k-run`.
@@ -102,7 +101,7 @@ Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
 |---|---|
 | `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
-| `/k-review`, `/k-results` | `k-playbook-local/results/` |
+| `/k-review`, `/k-audit` | `k-playbook-local/results/` |
 | `/k-docs-code`, Skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
 | `/k-docs-tools` | `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | `k-playbook-local/docs/extracted/` |

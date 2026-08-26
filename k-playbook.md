@@ -79,8 +79,8 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 - **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
   `/k-docs-tools` und `/k-docs-extract` erzeugen Doku, `/k-docs-index` baut den Index.
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
-  vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-results`
-  priorisiert projektweit, `/k-remediation` überführt Befunde in Tasks oder Fixes.
+  vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
+  überführt Befunde in Tasks oder Fixes.
 - **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-run`; `/k-todo` pflegt
   `k-playbook-local/TODO.md`.
 - **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`

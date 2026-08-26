@@ -43,7 +43,7 @@ im Rezept, ausgeführt vom Assistenten. `review-dependency-cve`, `review-iac-con
 `review-secret-scanning` tragen je einen eigenen Preflight, eigene Aufrufzeilen und ein
 eigenes Findings-Format. Dieselbe Orchestrierung steht mehrfach da, und die Formate laufen
 auseinander: die Feldnamen wechseln zwischen `Quelle`, `Tool(s)`, `Package` und `Target`,
-sodass `/k-results` beim Lesen die Vereinigung aller Varianten raten muss.
+sodass jeder nachgelagerte Leser die Vereinigung aller Varianten raten muss.
 
 **Das Zielbild: Tools startet das Werkzeug, bewerten tut der Assistent.** Alle Tools
 erzeugen SARIF und schreiben es in ein gemeinsames Ergebnisverzeichnis. Ein Merge-Schritt
@@ -230,6 +230,47 @@ Zweig mit `result-family` dieses Modul und `commands/_audit/review-scan-triage.m
 wortlaut-treu an, statt beide zu paraphrasieren. Drei Felder, die nur in Prosa existierten
 — das Top-Level-`scope`, `ungroupedFindings` und `groups[].id` —, sind gestrichen; am
 Merge-Code hat sich dafür nichts geändert.
+
+**Erledigt aus Task 033: ein Ergebnisweg statt zwei.** Der nachgelagerte Command, der die
+Triage mehrerer Familien noch einmal eine Ebene höher zu einer projektweiten Summary
+zusammenfasste, ist entfallen. Was er wirklich leistete, machen inzwischen andere: die
+Dedupe über Werkzeuge hinweg der Merge, die Deckung aus `known-decisions.md` ebenfalls der
+Merge, die Priorisierung `P1`–`P3` das Bewertungsmodul. Der Abgleich gegen bestehende
+Tasks — das Einzige, was nur dort stand — sitzt jetzt in `/k-remediation`, also dort, wo
+die Tasks entstehen: vor der Erzeugung, mit dem Kriterium Quelle plus Bündel-/Gruppen-ID,
+und ein Treffer in `tasks/done/` wird gemeldet, schließt den Befund aber nicht. Damit gilt:
+`review-triage.md` geht direkt an `/k-remediation`, und zusammengeführt wird ausschließlich
+im Audit-Lauf.
+
+Mitentschieden: **Jedes Report-Rezept braucht eine `result-family`.** Der Zweig ohne
+Familie schrieb bisher `summary-YYYY-MM-DD.md`; er ist weg, und `review-tech` hat die
+Familie `tech` bekommen. Summaries werden damit von nichts mehr erzeugt — `/k-remediation`
+liest vorhandene aber weiter als Legacy-Eingabe.
+
+Zwei Rezepte bleiben aus dem Audit-Lauf heraus, `dependabot-alerts` und
+`k-check-security`. Beide wurden ernsthaft auf `audit.mode: evidence` geprüft; woran es
+scheitert, steht im jeweiligen Rezept unter **Stellung im Audit-Laufmodell** und braucht je
+einen eigenen Task. Bis dahin geht ihr `review-triage.md` direkt an `/k-remediation` —
+ohne familienübergreifende Zusammenführung und ohne Dedupe gegen andere Quellen. Dasselbe
+gilt für jeden eigenständigen `/k-review`-Lauf eines Familienrezepts. Das ist die bewusste
+Folge des Umbaus: `/k-remediation` nimmt genau eine Ergebnisdatei und wird nicht um
+Mehrfachquellen erweitert.
+
+**Was der Wegfall für bereits eingerichtete Projekte bedeutet.** In einem Zielprojekt, das
+den Clone aktualisiert, heißt das dreierlei:
+
+- Vorhandene `summary-*.md` unter `k-playbook-local/results/` bleiben liegen. Erzeugt
+  werden sie von nichts mehr; `/k-remediation` liest sie weiter als Legacy-Eingabe. Wer
+  sie nicht mehr braucht, löscht sie von Hand — `results/` ist ohnehin nicht versioniert.
+- Der Command fällt mit dem Update aus dem Katalog, und die Symlinks unter
+  `.claude/commands/`, `.opencode/commands/` und `.cursor/commands/` sind danach verwaist.
+  Das Einrichten in der Oberfläche entfernt sie selbst. Die Reihenfolge ist nicht
+  umkehrbar: erst den Clone aktualisieren, dann einrichten. Umgekehrt löst das Einrichten
+  den Katalog noch aus dem alten Stand auf und legt die Links neu an.
+- **Ein projektlokales Overlay lebt sonst weiter.** Eine gleichnamige Datei unter
+  `k-playbook-local/commands/` überlagerte bisher den mitgelieferten Command. Fällt der
+  mitgelieferte weg, überlagert sie nichts mehr, sondern gilt als eigenständiger
+  projekteigener Command und bleibt registriert. Sie muss im Zielprojekt gelöscht werden.
 
 **Erledigt: `known-decisions.md` wirkt projektweit.** Aus Task 019
 (`k-playbook-local/tasks/done/019-known-decisions.md`). Das Format ist festgelegt: ein

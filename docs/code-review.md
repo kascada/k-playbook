@@ -1,6 +1,6 @@
 # Code-Review-Flow
 
-Diese Seite fasst den k-playbook-Flow für Review-Rezepte, Result-Summaries und Remediation zusammen. Sie beschreibt Reviews außerhalb konkreter GitHub-PRs; PR-spezifische Reviews stehen in [`pr-review.md`](./pr-review.md).
+Diese Seite fasst den k-playbook-Flow für Review-Rezepte, Ergebnisfamilien und Remediation zusammen. Sie beschreibt Reviews außerhalb konkreter GitHub-PRs; PR-spezifische Reviews stehen in [`pr-review.md`](./pr-review.md).
 
 ## Überblick
 
@@ -14,27 +14,27 @@ flowchart TD
     F --> G["review-input.json"]
     F --> H["review-triage.md"]
     F --> I["raw/ und run-metadata"]
-    H --> J["/k-results"]
-    J --> K["summary-YYYY-MM-DD.md"]
-    H --> L["/k-remediation <review-triage-or-summary>"]
-    K --> L
+    H --> L["/k-remediation <review-triage>"]
     L --> M{"Remediation-Policy"}
     M -->|task-branch-pr oder task-first| N["Task-Dateien erzeugen"]
     N --> O["/k-task-refine"]
     O --> P["/k-run"]
     M -->|direct-allowed| Q["kleine freigegebene Fixes"]
-    L --> R["review-triage.md / Summary Status pflegen"]
+    L --> R["review-triage.md Status pflegen"]
 ```
 
 Der Standardablauf für Report-Reviews ist:
 
 ```text
 /k-review <name>
-/k-results
-/k-remediation <summary-or-assessment>
+/k-remediation <review-triage>
 /k-task-refine
 /k-run
 ```
+
+Zwischen Review und Remediation steht kein weiterer Schritt. `review-triage.md` ist das
+Endartefakt beider Bewertungswege und zugleich der Primärinput von `/k-remediation`.
+Zusammengeführt werden Befunde an genau einer Stelle: im Audit-Lauf, über den Merge.
 
 ## /k-review
 
@@ -82,11 +82,8 @@ historischer Ergebnisordner. Neue Report-Reviews mit `result-family` schreiben
 selbst steht in `commands/_review-run/review-input-contract.md`; er gilt für den
 Audit-Weg und den Report-Weg gleichermaßen und benennt, was nur der Merge füllt.
 
-Report-Mode-Reviews ohne eigene Ergebnisfamilie, z. B. `tech`, schreiben direkt eine Summary:
-
-```text
-k-playbook-local/results/summary-YYYY-MM-DD.md
-```
+Jedes Report-Rezept braucht eine `result-family`; einen Weg daneben gibt es nicht. Fehlt
+sie im Frontmatter, bricht `/k-review` ab, statt ein Ergebnis an einem Ersatzort abzulegen.
 
 Typische Review-Familien:
 
@@ -98,37 +95,6 @@ Typische Review-Familien:
 - `/k-review tech`
 - `/k-review python-comment-hardspots`
 
-## /k-results
-
-`/k-results` erzeugt aus vorhandenen Review-Result-Familien eine projektweite, priorisierte Summary. Der Command ist der Zwischenschritt zwischen Report-Reviews und Remediation.
-
-Aufrufe:
-
-```text
-/k-results
-/k-results latest
-/k-results 2026-08-03
-```
-
-Der Command:
-
-- liest vorhandene `review-triage.md`-Dateien unter `k-playbook-local/results/<datum>/` und `k-playbook-local/results/<familie>/<datum>/`; historische `assessment.md`/`findings.md` nur als Legacy-Fallback, wenn kein `review-triage.md` vorhanden ist.
-- startet keine Scanner.
-- verändert keine Raw-Artefakte.
-- dedupliziert Findings über Familien hinweg.
-- berücksichtigt `known-decisions.md` und vorhandene Tasks, soweit vorhanden.
-- schreibt eine Summary unter `k-playbook-local/results/summary-YYYY-MM-DD.md`.
-
-Die Summary enthält:
-
-- verwendete Quellen.
-- priorisierte Übersicht.
-- Dedupe-Entscheidungen.
-- konkrete Empfehlungen.
-- Handoff für Remediation.
-
-Einzelne Result-Dateien können direkt an `/k-remediation` übergeben werden. `/k-results` ist für die projektweite Priorisierung mehrerer Familien zuständig.
-
 ## /k-remediation
 
 `/k-remediation` arbeitet Findings aus Review-Ergebnissen strukturiert ab. Der Command plant zuerst sinnvolle Bündel und entscheidet danach anhand der Projekt-Policy, ob Tasks erzeugt oder kleine direkte Fixes erlaubt sind.
@@ -137,16 +103,20 @@ Aufrufe:
 
 ```text
 /k-remediation
-/k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
 /k-remediation k-playbook-local/results/<datum>/review-triage.md
 /k-remediation k-playbook-local/results/<familie>/<datum>/review-triage.md
 ```
 
 Unterstützte Inputs:
 
-- Summaries von `/k-results` oder von Report-Reviews ohne eigene Ergebnisfamilie.
-- Audit-Läufe wie `k-playbook-local/results/<datum>/review-triage.md`.
-- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/review-triage.md`; Legacy-Ordner mit `assessment.md` und `findings.md` nur, wenn kein `review-triage.md` vorhanden ist.
+- Audit-Läufe wie `k-playbook-local/results/<datum>/review-triage.md` — der Hauptweg.
+- Ergebnisfamilien wie `k-playbook-local/results/<familie>/<datum>/review-triage.md`.
+- Legacy: vorhandene `k-playbook-local/results/summary-YYYY-MM-DD.md` aus der Zeit, als es noch einen nachgelagerten Priorisierungsschritt gab. Sie werden gelesen und abgearbeitet, aber von nichts mehr erzeugt.
+- Legacy: Ordner mit `assessment.md` und `findings.md`, nur wenn kein `review-triage.md` vorhanden ist.
+
+Der Command nimmt genau **eine** Ergebnisdatei. Er führt keine zweite Quelle hinzu und
+dedupliziert nicht gegen andere Läufe; wer eine Zusammenführung braucht, bringt seine
+Belege in den Audit-Lauf.
 
 Der Command:
 
@@ -155,7 +125,8 @@ Der Command:
 - bündelt Findings nach Risiko, Aufwand, Kopplung und Verifikation.
 - zeigt die Remediation-Policy aus `K-PLAYBOOK.yaml`.
 - überführt bestätigte Bündel in Tasks oder freigegebene direkte Fixes.
-- pflegt Status und Task-Verweise nachvollziehbar in `review-triage.md` oder Summary; bei Legacy-Inputs weiter in `findings.md`.
+- gleicht Befunde vor der Task-Erzeugung gegen bestehende Tasks ab: Quelle plus Bündel-/Gruppen-ID müssen übereinstimmen. Ein Treffer in `tasks/` verhindert einen zweiten Task; ein Treffer in `tasks/done/` wird gemeldet, schließt den Befund aber nicht.
+- pflegt Status und Task-Verweise nachvollziehbar in `review-triage.md`; bei Legacy-Inputs weiter in der Summary bzw. in `findings.md`.
 
 `raw/` und Run-Metadaten bleiben read-only. Sie sind auditierbare Belege und dürfen nicht umgeschrieben werden.
 
@@ -206,8 +177,6 @@ Finding-IDs müssen stabil bleiben. Einmal vergebene IDs dürfen bei Re-Runs, St
 Nach einem Report-Mode-Review nennt `/k-review` den nächsten Handoff, typischerweise:
 
 ```text
-/k-results
-/k-remediation k-playbook-local/results/summary-YYYY-MM-DD.md
 /k-remediation k-playbook-local/results/<familie>/<YYYY-MM-DD>/review-triage.md
 ```
 
@@ -224,7 +193,7 @@ Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das ve
 
 - `/k-pr-review` ist für konkrete GitHub-PRs zuständig.
 - `/k-review` bewertet oder erzeugt Findings, setzt größere Remediation aber nicht direkt um.
-- `/k-results` ist read-mostly, erzeugt keine Tasks und führt keine Remediation aus.
-- `/k-remediation` startet keine Scanner und priorisiert nicht projektweit neu.
+- `/k-audit` ist der einzige Ort, an dem Befunde mehrerer Quellen zusammengeführt und dedupliziert werden.
+- `/k-remediation` startet keine Scanner, nimmt genau eine Ergebnisdatei und priorisiert nicht projektweit neu.
 - Größere Umsetzung läuft über Tasks, `/k-task-refine` und `/k-run`.
 - Direkte Fixes sind nur bei passender Policy und expliziter Freigabe erlaubt.

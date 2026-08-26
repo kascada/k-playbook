@@ -17,9 +17,52 @@ Erzeuge eine kuratierte Security-Bewertung aus `k-check`-Ergebnissen. `k-check` 
 Runner/Executor; Review, Priorisierung und Remediation-Handoff gehören in diese
 Review-Familie und danach in `/k-remediation`.
 
-Dieses Rezept bleibt im Audit-Laufmodell deaktiviert, solange `k-check`-Ergebnisse nicht
-als Evidence mit einem kanonischen Tool-Schlüssel in `review-input.json` aufgenommen
-werden. Über `/k-review k-check-security` bleibt es gezielt auswählbar.
+## Stellung im Audit-Laufmodell
+
+Dieses Rezept bleibt im Audit-Laufmodell deaktiviert (`audit.enabled: false`). Über
+`/k-review k-check-security` bleibt es gezielt auswählbar.
+
+**Geprüft und verworfen: Umstellung auf `audit.mode: evidence`.** Der Check-Lauf selbst
+liefe ohne Go-Änderung — ein Evidence-Rezept darf `bin/k-check` aufrufen und sein SARIF
+nach `raw/k-check.sarif` schreiben. Am Evidence-Vertrag scheitert es trotzdem, an drei
+Stellen:
+
+1. **`audit.ruleIds` ist eine abgeschlossene Liste, die Check-Menge ist ein
+   Overlay-Katalog.** Jede Rule-ID muss in `audit.ruleIds` stehen; eine unbekannte macht
+   das ganze Artefakt ungültig, nicht nur den einzelnen Fund. Die natürliche Rule-ID eines
+   k-check-Funds ist sein Check — und welche Checks laufen, entscheidet jedes Projekt
+   selbst über `k-playbook-local/checks/`. Ein mitgeliefertes Rezept kann projekteigene
+   Checks nicht aufzählen; der erste davon ließe den ganzen Lauf des Eintrags scheitern.
+2. **Funde ohne Ort fielen heraus.** Ein Evidence-Fund braucht einen Fundort im
+   Pfad-Scope; ein Fund ohne Ort liegt nie im Scope und wird verworfen. Die Parser-Regeln
+   unten halten ausdrücklich fest, dass nicht jede Ausgabe `path:line: message` ist —
+   „Lokale Legacy-Runner können Sammelzeilen oder abweichende Formate liefern". Genau
+   diese Funde verschwänden stillschweigend.
+3. **`ok`, `skip` und technische `error`-Fälle haben in SARIF keinen Platz.** Dieses
+   Rezept verlangt, sie getrennt zu dokumentieren — `skip` mit Reason und Wiedervorlage,
+   `error` als blockierte Bewertbarkeit. Ein SARIF trägt Funde, keine Nicht-Funde mit
+   Grund. Der Zustandsteil des Check-Laufs ginge verloren.
+
+Der bereits vorgesehene Weg ist ein anderer und größerer: `k-check` gibt heute
+Terminaltext aus, seine Parameter stehen als Prosa in diesem Rezept, und
+`--metadata-output` schreibt bereits JSON. Ein MCP-Werkzeug, das statt der Rohausgabe
+zurückgibt, welche Checks liefen und welche mit Datei und Zeile angeschlagen haben, macht
+die Evidence-Frage erst beantwortbar. Das ist Arbeit am Go-Werkzeug und braucht einen
+eigenen Task; die Rohausgabe bleibt dabei für `raw/` erhalten.
+
+**Was das für den Weg dieses Rezepts bedeutet.** Ein `/k-review k-check-security`-Lauf
+legt einen Family-Ordner außerhalb jedes Laufordners an; sein `review-triage.md` geht
+direkt an `/k-remediation`:
+
+```text
+/k-remediation k-playbook-local/results/k-check/<datum>/review-triage.md
+```
+
+Es gibt dabei **keine familienübergreifende Zusammenführung und keine Dedupe gegen andere
+Quellen** mehr. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Secret-Fund, den
+daneben auch `gitleaks` im Audit-Lauf gemeldet hat, steht in beiden Ergebnissen einmal.
+Das ist die bewusste Folge des Umbaus, kein Fehler: Wer eine Zusammenführung braucht,
+bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
 
 ## Zweck
 

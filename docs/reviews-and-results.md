@@ -6,18 +6,24 @@ liegen und welchen Status sie tragen. Der Ablauf der Commands steht in
 
 ## Grundmodell
 
-k-playbook trennt vier Schritte:
+k-playbook trennt drei Schritte:
 
 1. **Review oder Audit ausführen** — `/k-review <name>` bewertet gezielt eine Familie,
    `/k-audit` führt einen vollständigen Sweep aus.
-2. **Ergebnisse ablegen** — je Familie und Datum unter `k-playbook-local/results/`.
-3. **Projektweit priorisieren** — `/k-results` fasst mehrere Familien zusammen und dedupliziert.
-4. **Abarbeiten** — `/k-remediation` arbeitet priorisierte, statusfähige Findings ab.
+2. **Ergebnisse ablegen** — je Lauf beziehungsweise je Familie und Datum unter
+   `k-playbook-local/results/`.
+3. **Abarbeiten** — `/k-remediation` arbeitet die bewerteten Bündel aus genau einer
+   Ergebnisdatei ab.
 
-`/k-remediation` aggregiert nicht selbst. Es startet mit einem bereits bewerteten
-Assessment oder einer priorisierten Summary, gruppiert die Findings darin aber vor der
-Umsetzung zu Bündeln — nach Risiko, Aufwand, Quick-Win-Potential und gemeinsamer
-Verifikation.
+Zusammengeführt wird an **einer** Stelle: im Audit-Lauf. Der Merge dedupliziert über
+Werkzeuge hinweg, schreibt die Deckung aus `known-decisions.md` mit, und die Triage
+vergibt Priorität und Kategorie. Einen nachgelagerten Schritt, der dasselbe eine Ebene
+höher noch einmal täte, gibt es nicht.
+
+`/k-remediation` aggregiert deshalb nicht selbst und nimmt genau eine Ergebnisdatei. Es
+gruppiert die Findings darin vor der Umsetzung zu Bündeln — nach Risiko, Aufwand,
+Quick-Win-Potential und gemeinsamer Verifikation — und gleicht sie vor der Task-Erzeugung
+gegen bestehende Tasks ab.
 
 ## Verzeichnisse
 
@@ -41,7 +47,7 @@ Ausgabe. Alles Erzeugte liegt daneben:
 ```text
 k-playbook-local/results/
 ├── log.md                        wann welches Review lief
-├── summary-YYYY-MM-DD.md         projektweite Priorisierung aus /k-results
+├── YYYY-MM-DD/                   ein Audit-Lauf
 └── <familie>/YYYY-MM-DD/
     ├── review-input.json
     ├── review-triage.md
@@ -68,7 +74,7 @@ nie dorthin.
 Der **gesamte** Inhalt von `results/` gilt als lokal — nicht nur, was Scanner roh
 ausgeben. `raw/` und `entries/`, die erzeugten Dokumente `review-input.md`,
 `review-input.json`, `run.json` und `review-triage.md`, die Review-Dokumente je Familie,
-dazu `summary-YYYY-MM-DD.md` und `log.md`.
+dazu `log.md` und, wo noch vorhanden, alte `summary-YYYY-MM-DD.md`.
 
 Der Grund ist derselbe für alle: Ein Review ist aus dem Code wiederholbar. Sein Ergebnis
 ist ein Stand von einem Rechner zu einem Zeitpunkt, kein Projektwissen. Bei `log.md`
@@ -125,7 +131,7 @@ im Laufordner, etwa `review-secret-scanning.md`; sie liest denselben Merge-Beleg
 **Evidence-Quelle** (`mode: evidence`) schreibt gar kein Markdown, sondern läuft vor dem
 Merge und legt `raw/<entry>.sarif` ab; ihre Funde stehen danach als Gruppen mit dem Präfix
 `ai-<entry>-` in `review-input.json` und gehen damit denselben Weg wie Scanner-Funde.
-`/k-results` und `/k-remediation` arbeiten weiter gegen `review-triage.md`;
+`/k-remediation` arbeitet gegen `review-triage.md`;
 Legacy-`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
 `review-triage.md`.
 
@@ -255,7 +261,7 @@ Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
 |---|---|
 | Rezept | `k-playbook/reviews/review-dependabot-alerts.md` |
 | Ergebnisse | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
-| Audit-Laufmodell | deaktiviert, bis Dependabot-Alerts als Tool-Evidence im Merge vorliegen |
+| Audit-Laufmodell | deaktiviert; Begründung und geprüfte Alternativen im Rezept |
 
 Typische Artefakte: `review-input.json`, `review-triage.md`,
 `raw/dependabot-alerts-open.jsonl` als auditierbarer Import,
@@ -282,6 +288,18 @@ Filesystem-Findings,
 Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
 `review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
 
+### Tech-Debt
+
+| | |
+|---|---|
+| Rezept | `k-playbook/reviews/review-tech.md` |
+| Ergebnisse | `k-playbook-local/results/tech/YYYY-MM-DD/` |
+| Audit-Eintrag | Evidence-Quelle `tech`, SARIF unter `k-playbook-local/results/YYYY-MM-DD/raw/tech.sarif` |
+
+Typische Artefakte im Report-Modus: `review-input.json` und `review-triage.md`. Dieses
+Rezept arbeitet in zwei Betriebsarten mit denselben Prüfkriterien; unterschiedlich ist
+allein die Ergebnisform. Siehe auch **Rezepte als Evidence-Quelle** weiter unten.
+
 ### Rezepte als Evidence-Quelle
 
 Zwei Katalog-Rezepte liefern im Lauf eigene Belege aus dem Code, statt vorhandene zu
@@ -293,9 +311,9 @@ filtern. Sie laufen vor dem Merge, lesen ausschließlich in ihrem eingefrorenen
 | `review-tech.md` | `tech` | Quell- und Infrastrukturdateien; Tech-Debt-Kandidaten mit `tech-*`-Rule-IDs. |
 | `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python-Quellen; Stellen ohne rekonstruierbare Begründung, mit `hardspot-*`-Rule-IDs. |
 
-Beide bleiben daneben über `/k-review` auswählbar — `review-tech` im Report-Modus,
-`review-python-comment-hardspots` interaktiv. Die Prüfkriterien sind in beiden
-Betriebsarten dieselben; unterschiedlich ist nur die Ergebnisform.
+Beide bleiben daneben über `/k-review` auswählbar — `review-tech` im Report-Modus mit der
+Ergebnisfamilie `tech`, `review-python-comment-hardspots` interaktiv. Die Prüfkriterien
+sind in beiden Betriebsarten dieselben; unterschiedlich ist nur die Ergebnisform.
 
 ### Family-only-Rezepte im Audit-Laufmodell
 
@@ -307,6 +325,14 @@ separater Scope-Vertrag existiert:
 |---|---|
 | `review-k-check-security.md` | `k-check`-Ergebnisse sind noch nicht als Evidence im Merge modelliert. |
 | `review-dependabot-alerts.md` | Der Input kommt extern über `gh api` und ist noch kein Tool-Eintrag im Lauf-Merge. |
+
+Beide Rezepte tragen die ausführliche Prüfung selbst — welcher Teil des Evidence-Vertrags
+sie hindert und was eine Umstellung bräuchte, steht in ihrem Abschnitt **Stellung im
+Audit-Laufmodell**. Für den Weg dieser beiden gilt bis dahin: Ihr `review-triage.md` geht
+direkt an `/k-remediation`, **ohne** familienübergreifende Zusammenführung und **ohne**
+Dedupe gegen andere Quellen. Dasselbe gilt für jeden eigenständigen `/k-review`-Lauf eines
+Familienrezepts: Der Family-Ordner liegt außerhalb jedes Laufordners und wird mit dem
+Audit-Lauf nicht verrechnet.
 
 ## Review-Log
 
@@ -332,14 +358,27 @@ anschließend aus dem JSON.
 
 ## Remediation
 
-`/k-remediation` versteht zwei Eingaben:
+`/k-remediation` versteht diese Eingaben:
 
-- eine Summary, `k-playbook-local/results/summary-YYYY-MM-DD.md`,
-- eine Familie, `k-playbook-local/results/<familie>/<datum>/review-triage.md`.
+- einen Audit-Lauf, `k-playbook-local/results/<datum>/review-triage.md` — der Hauptweg,
+- eine Familie, `k-playbook-local/results/<familie>/<datum>/review-triage.md`,
+- Legacy: eine vorhandene Summary, `k-playbook-local/results/summary-YYYY-MM-DD.md`,
+- Legacy: eine Familie mit `assessment.md` und `findings.md`, wenn dort kein
+  `review-triage.md` liegt.
 
-Bei einer Familie ist `review-triage.md` die primäre Arbeitsdatei. Legacy-Familien mit
-`assessment.md` und `findings.md` bleiben lesbar, wenn kein `review-triage.md` vorhanden
-ist. `raw/` und `run-metadata.*` sind read-only.
+`review-triage.md` ist überall die primäre Arbeitsdatei. `raw/` und `run-metadata.*` sind
+read-only.
+
+**Summaries werden nicht mehr erzeugt.** Mit dem nachgelagerten Priorisierungsschritt ist
+auch ihr Erzeuger entfallen; weder `/k-audit` noch `/k-review` schreiben sie. Was in einem bereits eingerichteten
+Projekt noch liegt, bleibt für `/k-remediation` lesbar — als Eingabe aus der Vergangenheit,
+nicht als Ausgabe eines Laufs.
+
+Vor der Task-Erzeugung gleicht `/k-remediation` jeden Befund gegen `tasks/` und
+`tasks/done/` ab. Ein bestehender Task deckt einen Befund ab, wenn **Quelle und
+Bündel-/Gruppen-ID** übereinstimmen — Titelähnlichkeit allein reicht nicht. Ein Treffer in
+`tasks/` verhindert den zweiten Task; ein Treffer in `tasks/done/` wird gemeldet, schließt
+den Befund aber nicht: dass er erneut im Ergebnis steht, heißt, dass er wieder da ist.
 
 Ein erzeugter Remediation-Task muss enthalten:
 
@@ -383,55 +422,6 @@ Modi, vom striktesten zum offensten:
   werden, wenn die Kategorien freigegeben sind.
 
 `pr_required` und `direct_fixes` werden aus `mode` abgeleitet und mitgeschrieben.
-
-## Priorisierte Gesamtzusammenfassung
-
-`/k-results` erzeugt:
-
-```text
-k-playbook-local/results/summary-YYYY-MM-DD.md
-```
-
-Die Summary fasst mehrere Familien zusammen — k-check, Secret-Scanning,
-Dependency-CVE, IaC/Container und spätere.
-
-Aufgaben von `/k-results`:
-
-- `review-triage.md` aus allen Familien lesen; Legacy-`assessment.md`/`findings.md` nur,
-  wenn kein `review-triage.md` vorhanden ist,
-- Befunde über Familien hinweg deduplizieren,
-- `known-decisions.md` berücksichtigen,
-- existierende Tasks berücksichtigen,
-- eine priorisierte Tabelle der wichtigsten Punkte schreiben,
-- je Top-Punkt Beschreibung, Empfehlung, Quellen und Lösungskontext ergänzen.
-
-Format:
-
-```markdown
-# Security Results Summary - YYYY-MM-DD
-
-## Priorisierte Übersicht
-
-| Prio | Thema | Quelle(n) | Finding-ID(s) | Empfehlung | Status |
-|---|---|---|---|---|---|
-
-## P1-01 <Titel>
-
-Kurzbeschreibung.
-
-Empfehlung: konkreter nächster Schritt.
-
-Quellen:
-- `k-playbook-local/results/<familie>/<datum>/review-triage.md#<buendel-id>`
-
-Was man zum Lösen braucht:
-- betroffene Datei/Zeile
-- relevante Tests
-- Akzeptanzkriterium
-```
-
-`/k-remediation` kann gegen diese Summary laufen, damit die Reihenfolge der Bearbeitung
-projektweit priorisiert ist.
 
 ## Security-Tools
 

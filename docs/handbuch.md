@@ -147,7 +147,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 |---|---|---|
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
-| Code-Review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-results`, `/k-remediation` | PRs bewerten, Reviews und Audits ausführen, Findings priorisieren und abarbeiten |
+| Code-Review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-remediation` | PRs bewerten, Reviews und Audits ausführen, Findings abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-task-refine`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, härten und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
 
@@ -168,10 +168,7 @@ flowchart TD
     Review --> Mode{"Review-Modus"}
     Mode -->|interaktiv| Direct
     Mode -->|Report| Artifacts["review-input.json + review-triage.md + raw/"]
-    Artifacts --> Results["/k-results"]
-    Results --> Summary["summary-YYYY-MM-DD.md"]
-    Summary --> Remediation["/k-remediation"]
-    Artifacts --> Remediation
+    Artifacts --> Remediation["/k-remediation"]
     Remediation --> Policy{"Policy"}
     Policy -->|Tasks| Task
     Policy -->|direkt erlaubt| Direct
@@ -196,11 +193,15 @@ Report-Reviews erzeugen auditierbare Artefakte und führen bei Bedarf in Remedia
 
 ```text
 /k-review <name>
-/k-results
-/k-remediation <summary-oder-review-triage>
+/k-remediation <review-triage>
 /k-task-refine
 /k-run
 ```
+
+Zwischen Bewertung und Abarbeitung steht kein weiterer Schritt: `review-triage.md` ist
+das Ergebnis und zugleich die Eingabe von `/k-remediation`. Wer mehrere Quellen
+zusammengeführt sehen will, nimmt `/k-audit` — dort und nur dort werden Befunde
+zusammengelegt.
 
 Der komplette Flow steht in [`code-review.md`](./code-review.md), das Artefaktmodell in
 [`reviews-and-results.md`](./reviews-and-results.md).
