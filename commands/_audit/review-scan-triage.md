@@ -6,6 +6,10 @@ von `review-input.json`. Der Audit-Eintrag `scan-triage` gehört nicht zu
 `catalogs.reviews`; er entsteht aus dem effektiven Command-Namensraum
 `commands/_audit/review-scan-triage.md`.
 
+Der Ort `_audit/` ist Herkunft, nicht Zuständigkeit: an ihm hängen die Konstante
+`scanTriageModule`, der Eintragsname `scan-triage` und bestehende projektlokale Overlays.
+Das Modul ist nicht audit-exklusiv — beide Wege wenden denselben Wortlaut an.
+
 ## Eingaben
 
 Der aufrufende Command liefert entweder den Laufstatus aus `k_playbook_review_status`
@@ -14,32 +18,23 @@ daraus ausschließlich den gemeldeten Ordner als `RUN_DIR`.
 
 Lies aus `RUN_DIR`:
 
-- `review-input.json` als vollständigen Beleg mit `scope.type` (`audit` oder `review`),
-  Provenienz, Evidence-Einträgen, stabilen Gruppen-IDs sowie `knownDecisions` und
-  `coveredByKnownDecision`. `ungroupedFindings` sind Findings ohne sinnvolle
-  Gruppen-Zuordnung und müssen im Triage-Dokument sichtbar bleiben.
+- `review-input.json` als vollständigen Beleg. Was darin steht, beschreibt
+  `commands/_review-run/review-input-contract.md`. Wende dieses Modul an;
+  Feldnamen und die Bildung der stabilen Gruppen-IDs werden hier nicht wiederholt.
 - `review-input.md` als kompakte Ansicht, falls vorhanden. Im `/k-review`-Report-Modus
   darf die Markdown-Ansicht fehlen; dann verlinke Gruppen-IDs nur als Code-Spans.
 
-Die Belege kommen aus zwei Quellen — Scannern und KI-Rezepten, die im Lauf als
-Evidence-Quelle arbeiten. `review-input.json` unterscheidet sie ohne eigenes Schemafeld,
-an drei Stellen:
+Der Vertrag ist zweigeteilt. Auf den Kern ist Verlass; die merge-only-Felder fehlen im
+Report-Weg, und der Vertrag sagt je Feld, was dann gilt. Prüfe ihr Vorhandensein, statt
+sie vorauszusetzen, und erfinde keines nach.
 
-- `evidence.tool` trägt bei KI-Evidence den Eintragsnamen des Rezepts (z. B. `tech` für
-  `review-tech.md`), bei
-  Scanner-Evidence den Werkzeugnamen (z. B. `gosec`).
-- Die stabile Gruppen-ID beginnt bei KI-Evidence mit `ai-<entry>-`, bei Scanner-Evidence
-  mit `scan-<tool>-` oder `scan-cve-<id>-`.
-- `run.selectedEntries[].mode` nennt je Eintrag die Betriebsart `evidence` oder
-  `perspective`.
+Woran Scanner- und Rezept-Belege zu unterscheiden sind, steht im Vertrag unter
+`Herkunft der Belege`. Was die Unterscheidung für die Bewertung bedeutet, steht unten in
+`Bewertung`.
 
-Eine Gruppe, in der Scanner- und KI-Belege zusammenliegen, behält bewusst die
-Scanner-ID; ihre gemischte Herkunft steht dann in den Belegen und nicht in der ID.
-
-Suche keine `known-decisions.md` und führe kein eigenes Matching aus. Die Deckung ist
-bereits im Merge-Artefakt entschieden: Nutze ausschließlich `review-input.json`, dort
-`groups[].coveredByKnownDecision`, `groups[].partialCoverage`,
-`groups[].knownDecisionCoverage` und den Metablock `knownDecisions`.
+Suche keine `known-decisions.md` und führe kein eigenes Matching aus. Wo die Deckung
+bereits entschieden ist, steht sie im Beleg; wo sie fehlt, hat der aufrufende Command
+sie vor der Triage berücksichtigt.
 
 ## Schreibweg
 
@@ -73,8 +68,11 @@ Verdichte die Gruppen aus `review-input.json` zu Bewertungs-Bündeln.
   nicht stillschweigend und lege sie nicht in offene Bündel.
 - Gruppen mit `partialCoverage: true` bleiben offen sichtbar; nenne die Teildeckung aus
   `knownDecisionCoverage`.
-- Liste Gruppen ohne sinnvolle Bündel-Zuordnung und alle `ungroupedFindings` aus
-  `review-input.json` im Abschnitt `Nicht gebündelt`.
+- Trägt der Beleg keine Deckungsmarker, gibt es nichts zu markieren. Das ist kein
+  Hinweis darauf, dass nichts gedeckt wäre — der Vertrag sagt, was dann gilt.
+- Liste Gruppen, die du keinem Bündel zugeordnet hast, im Abschnitt `Nicht gebündelt`.
+  Eine andere Quelle hat der Abschnitt nicht: im Beleg gehört jedes Finding zu genau
+  einer Gruppe, gruppenlose Findings gibt es nicht.
 
 KI-Evidence gewichten:
 
@@ -95,7 +93,9 @@ KI-Evidence gewichten:
 - `severity` aus KI-Evidence kommt aus dem `level` im SARIF, das das Rezept je Rule-ID
   festlegt: `error` und `note` gelten unverändert (`severitySource: native`), `warning`
   und `none` laufen weiter über CVSS, Tool-Metadaten und das Severity-Mapping. Ein
-  `warning` ist damit die schwächste Aussage des Rezepts und kein Urteil.
+  `warning` ist damit die schwächste Aussage des Rezepts und kein Urteil. Fehlen
+  `derivedSeverity` und `severitySource`, gilt `level` unmittelbar — dieselbe Lesart
+  ohne den abgeleiteten Zwischenschritt.
 
 Priorisierung:
 
@@ -117,8 +117,8 @@ Kategorien:
 
 ## Deckung aus known-decisions
 
-Die Deckung ist im Merge bereits entschieden und steht vollständig in
-`review-input.json`. Wie sie zu lesen ist:
+Trägt der Beleg das Matching, ist die Deckung bereits entschieden und steht vollständig
+in `review-input.json`. Wie sie zu lesen ist:
 
 - Eine Decision mit `applied: false` und `notAppliedReason: "kein Finding getroffen"` hat
   in diesem Lauf nichts gedeckt. Der Grund sagt nicht, warum: er steht wortgleich an
@@ -147,6 +147,10 @@ Welches Kriterium getroffen hat, steht je Finding in `coveredByKnownDecision.mat
   eine per `pathGlob` gedeckte Datei ist für alle Werkzeuge gedeckt, nicht nur für das
   gemeinte.
 
+Trägt der Beleg kein Matching, bleibt der Abschnitt trotzdem stehen. Er sagt dann in
+einem Satz, dass der Beleg keine Deckungsmarker trägt und wer die bekannten
+Entscheidungen stattdessen berücksichtigt hat. Führe kein eigenes Matching nach.
+
 ## Ausgabeformat
 
 `review-triage.md` hat diese Abschnitte in dieser Reihenfolge:
@@ -155,10 +159,10 @@ Welches Kriterium getroffen hat, steht je Finding in `coveredByKnownDecision.mat
 # Review-Triage <lauf-oder-family-date>
 
 Erzeugt: <RFC3339-Zeitstempel>
-Scope: `<audit YYYY-MM-DD | review <family>/YYYY-MM-DD>`
+Scope: `<run.name>` in `<run.dir>`
 Ordner: `<RUN_DIR_DISPLAY>`
 Quelle: `review-input.json`
-Known-Decisions: <Kurzstatus aus `knownDecisions`, keine eigene Suche>
+Known-Decisions: <Kurzstatus aus dem Beleg, keine eigene Suche>
 
 ## Bündel
 
@@ -177,7 +181,7 @@ Nächster Schritt: ...
 
 ## Nicht gebündelt
 
-| Priorität | Kategorie | Kurzbegründung | Gruppen/Findings |
+| Priorität | Kategorie | Kurzbegründung | Gruppen |
 |---|---|---|---|
 
 ## Deckung aus known-decisions
@@ -186,10 +190,15 @@ Nächster Schritt: ...
 |---|---|---:|---:|---|---|---|
 ```
 
+Die `Scope:`-Zeile kommt aus `run.name` und `run.dir` des Belegs; ein eigenes
+Scope-Feld gibt es nicht. Fehlt `RUN_DIR_DISPLAY`, nimm den projektrelativen Pfad des
+Ordners.
+
 Stabile Gruppen-IDs werden als Links in den Laufbeleg geschrieben, zum Beispiel
 `` `scan-gosec-b94401` ``, `` `ai-tech-4f2a91` `` oder
-`` `review-secret-scanning-001` ``, wenn ein Anker vorhanden ist,
-`[scan-gosec-b94401](review-input.md#...)`.
+`` `ai-dependabot-alerts-81` ``, wenn ein Anker vorhanden ist,
+`[scan-gosec-b94401](review-input.md#...)`. Übernimm die IDs wörtlich aus
+`review-input.json` und bilde keine eigenen.
 
 ## Abschluss
 
@@ -199,7 +208,7 @@ Melde nach dem Schreiben:
 - die Anzahl der Bündel,
 - Restgruppen im Abschnitt `Nicht gebündelt`,
 - wie viele Bündel auf KI-Evidence beruhen und ob sie am Code belegt wurden,
-- den Known-Decisions-Status aus `review-input.json`,
+- den Known-Decisions-Status aus `review-input.json`, oder dass der Beleg keinen trägt,
 - wie viele Gruppen durch `knownDecisions` aus `review-input.json` vollständig oder
   teilweise gedeckt sind,
 - bei `/k-audit`: dass `k_playbook_review_write_ai_entry` als nächster Schritt den

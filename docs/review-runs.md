@@ -836,9 +836,10 @@ Zwei Fälle werden nicht zusammengefasst, sondern wechselseitig als
 
 Der Assistent entscheidet, ob er die Belege bündelt.
 
-**Zwei Artefakte, klare Rollen.** `review-input.json` trägt Provenienz (`schemaVersion`,
-`generated`, `kPlaybookVersion`, Laufkontext, Entries, Findings, Gruppen) und alle
-Belege — deshalb darf es groß werden. `review-input.md` bleibt bewusst kompakt:
+**Zwei Artefakte, klare Rollen.** `review-input.json` trägt Provenienz und alle Belege —
+deshalb darf es groß werden. Welche Felder es hat, steht in
+`commands/_review-run/review-input-contract.md` und nur dort.
+`review-input.md` bleibt bewusst kompakt:
 Gruppen werden gebündelt, die Detailliste ist hart gedeckelt und verweist auf die
 JSON, sobald sie das Limit überschreitet.
 
@@ -941,17 +942,16 @@ aus `review-input.json`.
 
 Nach dem Merge bewertet `/k-audit` den Lauf über das Command-Modul
 `commands/_audit/review-scan-triage.md`. Das Modul ist kein Review-Rezept und
-wird nicht aus `reviews/` geladen. Es gehört zum Command-Namensraum von
-`/k-audit` und wird als AI-Eintrag `scan-triage` im Lauf geführt. Der
-`/k-review`-Report-Modus nutzt dasselbe Eingabe- und Ausgabeformat, schreibt aber keinen
+wird nicht aus `reviews/` geladen. Es liegt im Namensraum `_audit/`, weil die Konstante
+`scanTriageModule` und der Eintragsname `scan-triage` an diesem Pfad hängen; audit-exklusiv
+ist es nicht. Im Lauf wird es als AI-Eintrag `scan-triage` geführt. Der
+`/k-review`-Report-Modus wendet denselben Wortlaut an, schreibt aber keinen
 MCP-Entry-Status.
 
-Eingaben sind ausschließlich Dateien im Laufkontext:
-
-- `review-input.json` mit vollständigen Belegen, Provenienz und stabilen Gruppen-IDs,
-- `review-input.md` als kompakte Ansicht,
-- die vom Merge berechnete Deckung unter `knownDecisions`,
-  `coveredByKnownDecision`, `partialCoverage` und `knownDecisionCoverage`.
+Eingaben sind ausschließlich Dateien im Laufkontext: `review-input.json` als Beleg und
+`review-input.md` als kompakte Ansicht. Was im Beleg steht — Kern, merge-only-Teil und
+die Bildung der stabilen Gruppen-IDs —, beschreibt
+`commands/_review-run/review-input-contract.md`.
 
 Das Modul schreibt genau ein neues Markdown-Artefakt direkt in den Laufordner:
 

@@ -22,7 +22,8 @@ Konvention für Report-/Scan-Familien:
 
 Typische aktuelle Dateien darin:
 
-- `review-input.json` — strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-input.json` — der Belegvertrag. Sein Schema steht in
+  `commands/_review-run/review-input-contract.md` und wird hier nicht wiederholt.
 - `review-triage.md` — einheitliches Endartefakt mit Kopf, Bündel-Tabelle,
   Bündel-Details, Nicht gebündelt und Deckung aus known-decisions.
 - `raw/` — maschinenlesbare Rohdaten wie SARIF, JSON oder Tool-Logs.
@@ -121,6 +122,11 @@ Ein Review-Rezept darf nicht duplizieren:
 - Generischen Ablauf Scan, Rückfragen, Freigabe, Änderung, Abschluss.
 
 Diese Punkte gehören in `/k-review`.
+
+Zwei weitere Beschreibungen gehören ebenfalls nicht ins Rezept: das Schema von
+`review-input.json` steht in `commands/_review-run/review-input-contract.md`, die Triage
+mit Bündelung, Priorität und Kategorie in `commands/_audit/review-scan-triage.md`. Ein
+Rezept verweist darauf und schreibt keine zweite Fassung — auch nicht als Auszug.
 
 Bedient dieselbe Datei zwei Betriebsarten, darf sie **nur nach der Ergebnisform** zweigeteilt werden: ein gemeinsamer Teil mit Prüfkriterien, Rule-IDs, `level` und Ausschlüssen, darunter je Betriebsart das Stück, das nur dort gilt — der Kommentarvorschlag im interaktiven Modus, das Ergebnisdokument im Report-Modus, das SARIF im Evidence-Lauf. Der generische Ablauf wird auch dann nicht wiederholt, und die Kriterien werden nicht je Betriebsart neu geschrieben: zwei Fassungen derselben Kriterien laufen auseinander, und dann findet dasselbe Rezept je nach Aufruf etwas anderes.
 

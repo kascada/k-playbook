@@ -81,6 +81,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#bewerten-mit-review-scan-triage), [`commands.md`](./commands.md#review-flow)
 - `/k-task-refine` / `Task-Härtung` -> [`task-flow.md`](./task-flow.md)
 - `review-input` / `merge` / `Zusammenfassen` -> [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge)
+- `Belegvertrag` / `review-input.json`-Schema / `stableId`-Bildung -> [`../commands/_review-run/review-input-contract.md`](../commands/_review-run/review-input-contract.md)
 - `audit.mode` / `Perspektive` / `Evidence-Rezept` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#katalog-rezepte-im-lauf), [`../rules/review-authoring.md`](../rules/review-authoring.md)
 - `known-decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd)
 - `Schreibweise` / `Umlaute` / `Rechtschreibung` -> [`schreibweise.md`](./schreibweise.md)

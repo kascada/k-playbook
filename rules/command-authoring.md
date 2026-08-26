@@ -33,13 +33,25 @@ Commands eingebunden werden — keine Commands selbst. Es gibt drei Sorten Namen
 - `commands/_<command-name>/` für Module, die zu genau einem Command gehören, z. B.
   `commands/_audit/` als Modulverzeichnis von `/k-audit`.
 - `commands/_<familie>/` für Module, die eine Command-Familie teilt, z. B. `commands/_docs/`
-  für gemeinsame Bausteine der Docs-Commands.
+  für gemeinsame Bausteine der Docs-Commands und `commands/_review-run/` für das, was sich
+  `/k-audit` und `/k-review` teilen.
+
+Der Namensraum folgt der Menge der einbindenden Commands, nicht der Herkunft des Moduls:
+Ein Modul, das ein zweiter Command mitbenutzt, gehört in einen Familien-Namensraum. Ein
+bestehendes Modul zieht dafür nicht zwingend um — hängen an seinem Pfad eine Konstante im
+Werkzeug, ein Eintragsname oder projektlokale Overlays, wiegt der stabile Pfad schwerer
+als der passende Ordner. Dann sagt der Modulkopf, wer es einbindet.
 
 Overlay und Assistenten-Verlinkung folgen für Module derselben Regel wie für Commands:
 Pfad ab `commands/`, gleicher Dateiname ersetzt vollständig, leere Datei schaltet ab. Der
 Rest des Namensraums bleibt mitgeliefert. Namensraum-Verzeichnisse werden beim Verlinken
 erhalten (`.claude/commands/_audit/…`), damit Module über ihren stabilen Pfad
 eingebunden werden können.
+
+Ein Modul darf ein anderes einbinden. Es gilt dieselbe Form wie beim Command: das
+eingebundene Modul wird über seinen Namensraumpfad genannt, gelesen und befolgt, und
+seine Regeln werden nicht wiederholt. Ein Zyklus ist ausgeschlossen — wer A aus B
+einbindet, bindet nicht B aus A ein.
 
 Ein Modul entsteht dort, wo eine Anleitung länger als ein Absatz ist **und** zusammen
 mit einem Command verwendet wird. Ein Rezept, das eigenständig aus dem Review-Katalog

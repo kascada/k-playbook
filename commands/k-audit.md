@@ -383,16 +383,13 @@ Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` i
 Laufordner vorhanden sind. `scan-triage` darf vorhandene Perspektiven-Reports als Kontext
 nutzen, aggregiert sie aber nicht in einem zweiten Merge-Schritt.
 
-Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an:
+Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an: das Modul lesen und
+befolgen, ohne seine Regeln hier zu wiederholen. Welche Belege es liest, wie es bündelt,
+wie es KI-Evidence gewichtet und welche Prioritäten und Kategorien es vergibt, steht im
+Modul und nirgends sonst. Hier steht nur, was das Modul nicht wissen kann:
 
-- Verwende `review-input.json` als Audit-Beleg und `review-input.md` als Ansicht.
-- Suche `known-decisions.md` nicht selbst; nutze nur die Deckung aus
-  `review-input.json`.
-- Bündele Gruppen nach gemeinsamer Root-Cause.
-- Belege KI-Evidence am Code, bevor du sie priorisierst; die Gewichtung steht im Modul.
-- Vergib Priorität `P1`/`P2`/`P3` und Kategorie `S`/`T`/`K`/`F`/`A`/`X`.
-- Verweise auf stabile Gruppen-IDs.
-- Schreibe ausschließlich `<RUN_DIR>/review-triage.md`.
+- `RUN_DIR` ist der Laufordner aus dem MCP-Status. Er wird nicht geraten.
+- Geschrieben wird ausschließlich `<RUN_DIR>/review-triage.md`.
 
 Danach rufe `k_playbook_review_write_ai_entry` auf:
 

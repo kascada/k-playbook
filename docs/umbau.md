@@ -220,6 +220,17 @@ festen Suchpfad und schreibt `review-triage.md` direkt in den Laufordner. Der AI
 `scan-triage` wird über den MCP-Vertrag geführt, obwohl er nicht in `catalogs.reviews`
 steht; ein leeres lokales Overlay des Moduls schaltet ihn ab.
 
+**Nachtrag aus Task 032: der Belegvertrag ist ein eigenes Modul.** Das Schema von
+`review-input.json` steht jetzt in `commands/_review-run/review-input-contract.md` — dem
+Familien-Namensraum von `/k-audit` und `/k-review` — und nirgends sonst; Commands, Rezepte,
+Regeln und diese Doku verweisen darauf. Der Vertrag ist zweigeteilt: ein Kern, den beide
+Wege schulden, und ein merge-only-Teil, den nur der Audit-Weg füllt, weil `/k-review` keine
+MCP-Werkzeuge führt und den Merge nie aufrufen kann. Der `/k-review`-Report-Modus wendet im
+Zweig mit `result-family` dieses Modul und `commands/_audit/review-scan-triage.md`
+wortlaut-treu an, statt beide zu paraphrasieren. Drei Felder, die nur in Prosa existierten
+— das Top-Level-`scope`, `ungroupedFindings` und `groups[].id` —, sind gestrichen; am
+Merge-Code hat sich dafür nichts geändert.
+
 **Erledigt: `known-decisions.md` wirkt projektweit.** Aus Task 019
 (`k-playbook-local/tasks/done/019-known-decisions.md`). Das Format ist festgelegt: ein
 `##`-Eintrag je Decision, genau ein fenced `yaml`-Block mit Pflichtfeldern und danach

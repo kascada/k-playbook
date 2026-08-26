@@ -78,7 +78,9 @@ k-playbook-local/results/<familie>/<YYYY-MM-DD>/raw/
 
 `assessment.md` und `findings.md` sind nur noch Legacy-Artefakte bestehender
 historischer Ergebnisordner. Neue Report-Reviews mit `result-family` schreiben
-`review-input.json` als Belegvertrag und `review-triage.md` als Handoff.
+`review-input.json` als Belegvertrag und `review-triage.md` als Handoff. Der Vertrag
+selbst steht in `commands/_review-run/review-input-contract.md`; er gilt für den
+Audit-Weg und den Report-Weg gleichermaßen und benennt, was nur der Merge füllt.
 
 Report-Mode-Reviews ohne eigene Ergebnisfamilie, z. B. `tech`, schreiben direkt eine Summary:
 
@@ -178,7 +180,7 @@ Im Modus `task-branch-pr` erzeugt `/k-remediation` keine direkten Code-Fixes. Be
 
 Jede neue Report-/Scan-Familie soll diese Dateien erzeugen:
 
-- `review-input.json`: strukturierter Belegvertrag mit Scope, Gruppen, Evidence und Known-Decision-Coverage.
+- `review-input.json`: der Belegvertrag; sein Schema steht in `commands/_review-run/review-input-contract.md`.
 - `review-triage.md`: kuratierte Gesamtbewertung, Bündel, Nicht-gebündelt-Liste, Deckung aus Known-Decisions und Handoff.
 - `raw/`: auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
 - `run-metadata.json` oder äquivalent: auditierbare Laufmetadaten.

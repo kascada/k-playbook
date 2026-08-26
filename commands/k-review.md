@@ -142,44 +142,42 @@ Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu mod
 
 1. Analyse gemäß Review-Datei durchführen.
 2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad wählen.
-   - Wenn `result-family` gesetzt ist: Ergebnisverzeichnis `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/` verwenden. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis.
+   - Wenn `result-family` gesetzt ist: `RUN_DIR` = `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis. Wie beide Dateien entstehen, sagt der Abschnitt unten.
    - Wenn `result-family` nicht gesetzt ist: Summary-Pfad `<RESULTS_DIR>/summary-YYYY-MM-DD.md` verwenden. `RESULTS_DIR` bei Bedarf anlegen. Wenn die Datei existiert, nicht blind überschreiben: nach Bestätigung aktualisieren oder einen eindeutigen Namen vorschlagen, z. B. `summary-YYYY-MM-DD-2.md`.
 3. Am Ende: dem User exakten Handoff-Befehl nennen, z. B.:
    `/k-remediation <RESULTS_DIR>/summary-YYYY-MM-DD.md` oder `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
 4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
 
-`review-input.json` im Report-Modus ist der Eingabevertrag für `review-triage.md` und
-entspricht strukturell dem Audit-Merge:
+#### Zweig mit `result-family` — zwei Module
 
-```json
-{
-  "scope": { "type": "review", "family": "<result-family>" },
-  "groups": [
-    {
-      "id": "review-<family>-001",
-      "title": "...",
-      "findings": ["..."],
-      "evidence": [
-        { "file": "path", "line": 12, "source": "review:<name>", "message": "..." }
-      ],
-      "coveredByKnownDecision": false,
-      "partialCoverage": false,
-      "knownDecisionCoverage": []
-    }
-  ],
-  "ungroupedFindings": [],
-  "knownDecisions": { "status": "loaded|missing|empty", "coverage": [] }
-}
-```
+Alles in diesem Abschnitt gilt **ausschließlich** für den Zweig mit `result-family`.
+Der Zweig ohne `result-family` schreibt eine Summary; er erzeugt weder
+`review-input.json` noch `review-triage.md`, und `RUN_DIR` ist für ihn nicht definiert.
 
-Stabile Bündel-IDs dürfen bei Re-Runs nicht ohne Grund wechseln. Jede Gruppe braucht
-mindestens einen Evidence-Eintrag mit Datei, optionaler Zeile und Quelle. Findings ohne
-sinnvolle Bündelung bleiben in `ungroupedFindings`, nicht in einer improvisierten Gruppe.
+`RUN_DIR` ist in diesem Zweig das Family-Date-Verzeichnis
+`<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Unter diesem Namen arbeiten beide Module.
 
-`review-triage.md` im Report-Modus verwendet dieselben Pflichtabschnitte wie das
-Audit-Modul `commands/_audit/review-scan-triage.md`: Kopf, `## Bündel`,
-`## Bündel-Details`, `## Nicht gebündelt`, `## Deckung aus known-decisions`.
-Abschnitte ohne Treffer bleiben vorhanden und enthalten eine kurze Begründung.
+1. **Belegvertrag.** Wende `commands/_review-run/review-input-contract.md` an und
+   schreibe `RUN_DIR/review-input.json` nach dem dort beschriebenen **Kern**. Die
+   merge-only-Felder bleiben weg: `/k-review` führt keine MCP-Werkzeuge, der Go-Merge
+   steht hier nie zur Verfügung. Für die stabilen Gruppen-IDs gilt die Report-Regel des
+   Vertrags; laufende Nummern sind ausgeschlossen.
+2. **Triage.** Wende danach `commands/_audit/review-scan-triage.md` wortlaut-treu an und
+   schreibe `RUN_DIR/review-triage.md`.
+
+**Wortlaut-treu anwenden** heißt: das Modul lesen und befolgen, ohne seine Regeln hier zu
+wiederholen. Pflichtabschnitte, Bündelung, Gewichtung von KI-Evidence, die Prioritäten
+`P1`/`P2`/`P3` und die Kategorien `S`/`T`/`K`/`F`/`A`/`X` stehen im Modul und nirgends
+sonst. Hier steht nur, was das Modul nicht wissen kann: welcher Ordner `RUN_DIR` ist und
+dass im Report-Modus kein Audit-Eintrag zu melden ist — `k_playbook_review_write_ai_entry`
+entfällt.
+
+**Nur `review-triage.md`.** Dieser Zweig schreibt genau zwei Dateien: `review-input.json`
+und `review-triage.md`. Ein zusätzliches `review-<name>.md` entsteht nicht. Der Abschnitt
+`## Perspektiven-Report-Format` der Family-Rezepte — `review-dependency-cve`,
+`review-iac-container`, `review-secret-scanning` — verlangt „die im `run.json`-Eintrag
+genannte Datei"; `run.json` gibt es nur im Audit-Lauf. Der Abschnitt ist damit
+audit-gebunden und greift im Report-Modus nicht. Das gilt für alle Family-Rezepte gleich.
 
 ## Step 6 — Log-Eintrag
 

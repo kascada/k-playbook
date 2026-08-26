@@ -92,8 +92,9 @@ beim erstmaligen Anlegen des Verzeichnisses.
 
 Jede neue Report-/Scan-Familie erzeugt diese Dateien:
 
-- `review-input.json` — strukturierter Belegvertrag mit Scope, Gruppen, Evidence,
-  nicht gebündelten Findings und Known-Decision-Coverage.
+- `review-input.json` — der Belegvertrag. Sein Schema steht an genau einer Stelle:
+  `commands/_review-run/review-input-contract.md`. Dort ist auch beschrieben, welche
+  Felder nur der Merge füllt und was gilt, wenn sie fehlen.
 - `review-triage.md` — einheitliches Endartefakt mit Kopf, Bündel-Tabelle,
   Bündel-Details, Nicht gebündelt und Deckung aus known-decisions.
 - `raw/` — auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
