@@ -115,12 +115,30 @@ type Location struct {
 // den Befund *identifiziert*: sie geht in den harten Dedupe-Schlüssel, und dort
 // wäre eine im Advisory beiläufig genannte Fremd-Kennung schädlich, weil
 // Union-Find transitiv gruppiert (siehe dependencyKeys in dedupe.go).
+//
+// Package/Version und TextPackage/TextVersion trennen dieselbe Frage für das
+// Paket, nur andersherum benannt: Package und Version tragen ausschließlich
+// **strukturiert** gelesene Werte — eine benannte Property oder ein purl — und
+// nur sie gehen in den harten Schlüssel. TextPackage und TextVersion sind aus
+// dem Freitext geparst (Message, Rule-Beschreibung) und ausdrücklich **nur**
+// für Anzeige und Bericht da. Sie füllen sich nur, wo der strukturierte Wert
+// fehlt.
+//
+// Anders als bei KeyIDs gibt es hier **keinen** Rückfall von der engen auf die
+// breite Seite. KeyIDs darf bei leerer enger Menge auf IDs zurückfallen, weil
+// eine Kennung den Befund auch dann benennt, wenn sie im Text steht. Ein aus
+// Fließtext geratener Paketname tut das nicht: liegt er daneben, verschmilzt er
+// zwei verschiedene Befunde, und Paket und Version sind im Schlüssel das
+// Einzige, was dieselbe Kennung in zwei Paketen auseinanderhält (vendored
+// libs). Ohne strukturierten Wert bleibt der harte Schlüssel deshalb aus.
 type Dependency struct {
-	Package  string   `json:"package,omitempty"`
-	Version  string   `json:"version,omitempty"`
-	Manifest string   `json:"manifest,omitempty"`
-	IDs      []string `json:"ids,omitempty"`
-	KeyIDs   []string `json:"keyIds,omitempty"`
+	Package     string   `json:"package,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Manifest    string   `json:"manifest,omitempty"`
+	IDs         []string `json:"ids,omitempty"`
+	KeyIDs      []string `json:"keyIds,omitempty"`
+	TextPackage string   `json:"textPackage,omitempty"`
+	TextVersion string   `json:"textVersion,omitempty"`
 }
 
 // Evidence nennt die Quelle eines Findings. Sie bleibt auch nach Dedupe
@@ -597,6 +615,44 @@ func extractDependency(finding Finding, result sarifResult, rule sarifRule) Depe
 		dependency.Manifest = finding.Location.URI
 	}
 
+	// Rückfall 1, strukturiert: der purl. grype ist das einzige Werkzeug des
+	// Messlaufs aus Task 028, das Paket und Version überhaupt in einem Feld
+	// nennt, und es tut es unter rule.properties.purls — als Array. Der Wert
+	// bleibt damit ein Feld mit einem Wert je Eintrag und darf in den harten
+	// Schlüssel.
+	if dependency.Package == "" {
+		for _, properties := range []sarifObject{result.Properties, rule.Properties} {
+			for _, purl := range stringListProperty(properties, "purl", "purls") {
+				name, version := parsePurl(purl)
+				if name == "" {
+					continue
+				}
+				dependency.Package = name
+				dependency.Version = firstNonEmpty(dependency.Version, version)
+				break
+			}
+			if dependency.Package != "" {
+				break
+			}
+		}
+	}
+
+	// Rückfall 2, Freitext: nur für die Anzeige. osv-scanner und trivy nennen
+	// Paket und Version ausschließlich in der Meldung ("Package 'requests@2.19.0'
+	// is vulnerable …", "Package: requests\nInstalled Version: 2.19.0"). Beide
+	// Quellen liegen bereits in der Finding-Struktur; rule.help wird bewusst
+	// nicht gelesen, es trüge nichts bei, was die Meldung nicht schon nennt, und
+	// verlangte eine Erweiterung der SARIF-Structs.
+	if dependency.Package == "" || dependency.Version == "" {
+		name, version := packageFromText(finding.Message, finding.RuleDescription)
+		if dependency.Package == "" {
+			dependency.TextPackage = name
+		}
+		if dependency.Version == "" {
+			dependency.TextVersion = version
+		}
+	}
+
 	// Die enge Menge für den harten Schlüssel: RuleID plus die benannten
 	// Kennungsfelder der Properties. Der Freitext bleibt draußen — Message,
 	// Beschreibung und das Properties-JSON als Ganzes tragen regelmäßig
@@ -689,6 +745,92 @@ func stringProperty(properties sarifObject, key string) string {
 	default:
 		return fmt.Sprint(typed)
 	}
+}
+
+// stringListProperty liest ein Property, das eine Liste sein darf, als Liste
+// von Strings.
+//
+// Nötig, weil stringProperty für alles, was kein String und keine Zahl ist, auf
+// fmt.Sprint zurückfällt: aus ["pkg:pypi/requests@2.19.0"] würde dort
+// `[pkg:pypi/requests@2.19.0]` samt Klammern, und der purl-Zerleger bekäme
+// einen Wert, den kein Werkzeug je geschrieben hat.
+func stringListProperty(properties sarifObject, keys ...string) []string {
+	values := []string{}
+	for _, key := range keys {
+		value, ok := properties[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			if typed != "" {
+				values = append(values, typed)
+			}
+		case []any:
+			for _, entry := range typed {
+				if text, ok := entry.(string); ok && text != "" {
+					values = append(values, text)
+				}
+			}
+		case []string:
+			for _, text := range typed {
+				if text != "" {
+					values = append(values, text)
+				}
+			}
+		}
+	}
+	return values
+}
+
+// textPackageVersionPattern trifft die Form, in der osv-scanner Paket und
+// Version zusammen nennt: `Package 'requests@2.19.0' is vulnerable to …`.
+var textPackageVersionPattern = regexp.MustCompile(`(?i)\bpackages?\b[\s:='"]*([A-Za-z0-9][A-Za-z0-9._/-]*)@v?([0-9][0-9A-Za-z._+-]*)`)
+
+// textPackagePattern trifft die getrennte Form, in der trivy das Paket nennt:
+// `Package: requests`.
+var textPackagePattern = regexp.MustCompile(`(?i)\bpackages?\b[\s:='"]*([A-Za-z0-9][A-Za-z0-9._/-]*)`)
+
+// textVersionPattern trifft `Installed Version: 2.19.0` und `version 2.19.0`.
+//
+// Die erste Gruppe fängt ein vorangestelltes „fixed", „fix", „patched" oder
+// „affected" mit ab. Sie wird nicht verworfen, sondern ausgewertet: RE2 kennt
+// keinen Lookbehind, und ohne diese Unterscheidung läse der Rückfall aus trivys
+// Meldung die *behobene* Version statt der installierten.
+var textVersionPattern = regexp.MustCompile(`(?i)\b(fixed|fix|patched|affected)?\s*(?:installed\s+)?versions?\b[\s:='"]*v?([0-9][0-9A-Za-z._+-]*)`)
+
+// packageFromText liest Paketnamen und Version aus Fließtext. Das Ergebnis ist
+// ausdrücklich **nicht** identitätstragend: es füllt TextPackage/TextVersion
+// und darf nie in den harten Dedupe-Schlüssel (siehe Dependency).
+//
+// Gelesen wird der erste Text, der überhaupt etwas hergibt — in der Praxis die
+// Meldung; die Rule-Beschreibung ist der Rückfall für Werkzeuge, die ihre
+// Meldung knapp halten.
+func packageFromText(texts ...string) (string, string) {
+	for _, text := range texts {
+		if text == "" {
+			continue
+		}
+		if match := textPackageVersionPattern.FindStringSubmatch(text); match != nil {
+			return normalizePackageName(match[1]), strings.ToLower(match[2])
+		}
+		name := ""
+		if match := textPackagePattern.FindStringSubmatch(text); match != nil {
+			name = normalizePackageName(match[1])
+		}
+		version := ""
+		for _, match := range textVersionPattern.FindAllStringSubmatch(text, -1) {
+			if match[1] != "" {
+				continue
+			}
+			version = strings.ToLower(match[2])
+			break
+		}
+		if name != "" || version != "" {
+			return name, version
+		}
+	}
+	return "", ""
 }
 
 func firstNonEmpty(values ...string) string {

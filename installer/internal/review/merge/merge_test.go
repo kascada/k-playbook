@@ -357,6 +357,270 @@ func TestExtractDependencyRueckfallWennKennungNurImFreitextSteht(t *testing.T) {
 	}
 }
 
+// grype legt Paket und Version strukturiert ab: rule.properties.purls, ein
+// JSON-Array. Gekürzt aus raw/grype.sarif des Messlaufs 2026-08-27.
+func TestExtractDependencyPaketAusPurl(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "GHSA-x84v-xcm2-53pg-requests",
+		Message: sarifText{Text: "A high vulnerability in python package: requests, version 2.19.0 was found at: /tmp-cve-probe/requirements.txt"},
+	}
+	rule := sarifRule{
+		ID:               "GHSA-x84v-xcm2-53pg-requests",
+		Name:             "PythonMatcherExactDirectMatch",
+		ShortDescription: sarifText{Text: "GHSA-x84v-xcm2-53pg high vulnerability for requests package"},
+		FullDescription:  sarifText{Text: "Insufficiently Protected Credentials in Requests"},
+		Properties: sarifObject{
+			"purls":             []any{"pkg:pypi/requests@2.19.0"},
+			"security-severity": "7.5",
+		},
+	}
+	finding := Finding{
+		RuleID:          result.RuleID,
+		RuleName:        rule.Name,
+		RuleDescription: rule.FullDescription.Text,
+		Message:         result.Message.Text,
+		Location:        Location{URI: "/tmp-cve-probe/requirements.txt", StartLine: 1},
+	}
+
+	dependency := extractDependency(finding, result, rule)
+
+	if dependency.Package != "requests" || dependency.Version != "2.19.0" {
+		t.Fatalf("purl nicht zerlegt: %q / %q", dependency.Package, dependency.Version)
+	}
+	if dependency.TextPackage != "" || dependency.TextVersion != "" {
+		t.Errorf("Freitextfelder trotz strukturiertem Wert gefüllt: %q / %q",
+			dependency.TextPackage, dependency.TextVersion)
+	}
+	keys := dependencyKeys(Finding{Dependency: dependency})
+	if !contains(keys, "dependency:GHSA-X84V-XCM2-53PG:requests:2.19.0") {
+		t.Errorf("harter Schlüssel fehlt: %v", keys)
+	}
+}
+
+// osv-scanner nennt Paket und Version ausschließlich in der Meldung. Gekürzt
+// aus raw/osv-scanner.sarif des Messlaufs 2026-08-27.
+func TestExtractDependencyPaketNurImFreitextOsvScanner(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "CVE-2018-18074",
+		Message: sarifText{Text: "Package 'requests@2.19.0' is vulnerable to 'CVE-2018-18074' (also known as 'PYSEC-2018-28', 'GHSA-x84v-xcm2-53pg')."},
+	}
+	rule := sarifRule{
+		ID:         "CVE-2018-18074",
+		Properties: sarifObject{"security-severity": "7.5"},
+	}
+	finding := Finding{
+		RuleID:   result.RuleID,
+		Message:  result.Message.Text,
+		Location: Location{URI: "file:///home/kleist/dev/k-playbook/tmp-cve-probe/requirements.txt"},
+	}
+
+	dependency := extractDependency(finding, result, rule)
+
+	if dependency.Package != "" || dependency.Version != "" {
+		t.Errorf("Freitextwert im engen Feld: %q / %q", dependency.Package, dependency.Version)
+	}
+	if dependency.TextPackage != "requests" || dependency.TextVersion != "2.19.0" {
+		t.Errorf("Anzeige-Rückfall falsch: %q / %q", dependency.TextPackage, dependency.TextVersion)
+	}
+	if keys := dependencyKeys(Finding{Dependency: dependency}); len(keys) != 0 {
+		t.Errorf("harter Schlüssel ohne strukturierten Wert: %v", keys)
+	}
+}
+
+// trivy nennt neben der installierten auch die behobene Version. Der Rückfall
+// muss die installierte lesen. Gekürzt aus raw/trivy-fs.sarif des Messlaufs
+// 2026-08-27.
+func TestExtractDependencyPaketNurImFreitextTrivy(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "CVE-2018-18074",
+		Message: sarifText{Text: "Package: requests\nInstalled Version: 2.19.0\nVulnerability CVE-2018-18074\nSeverity: HIGH\nFixed Version: 2.20.0\nLink: [CVE-2018-18074](https://avd.aquasec.com/nvd/cve-2018-18074)"},
+	}
+	rule := sarifRule{
+		ID:   "CVE-2018-18074",
+		Name: "LanguageSpecificPackageVulnerability",
+		Properties: sarifObject{
+			"precision":         "very-high",
+			"security-severity": "7.5",
+			"tags":              []any{"vulnerability", "security", "HIGH"},
+		},
+	}
+	finding := Finding{
+		RuleID:   result.RuleID,
+		RuleName: rule.Name,
+		Message:  result.Message.Text,
+		Location: Location{URI: "tmp-cve-probe/requirements.txt", StartLine: 1},
+	}
+
+	dependency := extractDependency(finding, result, rule)
+
+	if dependency.Package != "" || dependency.Version != "" {
+		t.Errorf("Freitextwert im engen Feld: %q / %q", dependency.Package, dependency.Version)
+	}
+	if dependency.TextPackage != "requests" {
+		t.Errorf("Paket aus der Meldung falsch: %q", dependency.TextPackage)
+	}
+	if dependency.TextVersion != "2.19.0" {
+		t.Errorf("installierte Version erwartet, gelesen wurde %q", dependency.TextVersion)
+	}
+	if keys := dependencyKeys(Finding{Dependency: dependency}); len(keys) != 0 {
+		t.Errorf("harter Schlüssel ohne strukturierten Wert: %v", keys)
+	}
+}
+
+// pip-audit trägt die benannten Properties und braucht keinen Rückfall; die
+// Freitextfelder bleiben leer.
+func TestExtractDependencyBenanntePropertyBleibtVorrangig(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "CVE-2018-18074",
+		Message: sarifText{Text: "requests 2.19.0: CVE-2018-18074 — behoben in 2.20.0"},
+		Properties: sarifObject{
+			"package": "requests", "version": "2.19.0",
+			"manifest": "tmp-cve-probe/requirements.txt",
+			"id":       "PYSEC-2018-28", "aliases": "CVE-2018-18074, GHSA-x84v-xcm2-53pg",
+		},
+	}
+	finding := Finding{RuleID: result.RuleID, Message: result.Message.Text}
+
+	dependency := extractDependency(finding, result, sarifRule{})
+
+	if dependency.Package != "requests" || dependency.Version != "2.19.0" {
+		t.Fatalf("benannte Property nicht gelesen: %q / %q", dependency.Package, dependency.Version)
+	}
+	if dependency.TextPackage != "" || dependency.TextVersion != "" {
+		t.Errorf("Freitextfelder trotz benannter Property gefüllt: %q / %q",
+			dependency.TextPackage, dependency.TextVersion)
+	}
+}
+
+// Pflicht-Gegentest: ein aus Freitext gelesenes Paket darf nicht in den harten
+// Schlüssel. Beide Funde nennen dieselbe Kennung und dasselbe Paket in
+// derselben Version — der eine strukturiert, der andere nur in der Meldung.
+// Zusammengeführt werden dürfen sie trotzdem nicht; der weiche Zweig nimmt sie
+// auf.
+func TestGroupFindingsFreitextPaketKommtNichtInDenHartenSchluessel(t *testing.T) {
+	strukturiert := sarifResult{
+		RuleID:     "CVE-2026-1111",
+		Message:    sarifText{Text: "lib 1.0: CVE-2026-1111"},
+		Properties: sarifObject{"package": "lib", "version": "1.0"},
+	}
+	freitext := sarifResult{
+		RuleID:  "CVE-2026-1111",
+		Message: sarifText{Text: "Package: lib\nInstalled Version: 1.0\nVulnerability CVE-2026-1111"},
+	}
+	links := Finding{
+		ID: "a", Evidence: Evidence{Tool: "pip-audit", Job: "pip-audit"},
+		RuleID: strukturiert.RuleID, Message: strukturiert.Message.Text,
+	}
+	links.Dependency = extractDependency(links, strukturiert, sarifRule{})
+	rechts := Finding{
+		ID: "b", Evidence: Evidence{Tool: "trivy", Job: "trivy-fs"},
+		RuleID: freitext.RuleID, Message: freitext.Message.Text,
+	}
+	rechts.Dependency = extractDependency(rechts, freitext, sarifRule{})
+
+	if rechts.Dependency.TextPackage != "lib" {
+		t.Fatalf("Vorbedingung: Freitextpaket nicht gelesen, %q", rechts.Dependency.TextPackage)
+	}
+	if keys := dependencyKeys(rechts); len(keys) != 0 {
+		t.Fatalf("Freitextpaket im harten Schlüssel: %v", keys)
+	}
+
+	groups := GroupFindings([]Finding{links, rechts})
+	if len(groups) != 2 {
+		t.Fatalf("erwartet zwei Gruppen, bekommen %d", len(groups))
+	}
+	if len(groups[0].PossibleDuplicates) == 0 || len(groups[1].PossibleDuplicates) == 0 {
+		t.Errorf("weicher Zweig greift nicht: %v / %v",
+			groups[0].PossibleDuplicates, groups[1].PossibleDuplicates)
+	}
+}
+
+// Der Fall, für den der purl-Rückfall gebaut ist: grype nennt nur die GHSA und
+// legt das Paket im purl ab, pip-audit nennt alle drei Kennungen und die
+// benannten Properties. Sie gehören in eine Gruppe.
+func TestGroupFindingsPurlUndPropertyFindenZusammen(t *testing.T) {
+	grypeResult := sarifResult{
+		RuleID:  "GHSA-x84v-xcm2-53pg-requests",
+		Message: sarifText{Text: "A high vulnerability in python package: requests, version 2.19.0 was found at: /tmp-cve-probe/requirements.txt"},
+	}
+	grypeRule := sarifRule{
+		ID:         "GHSA-x84v-xcm2-53pg-requests",
+		Properties: sarifObject{"purls": []any{"pkg:pypi/requests@2.19.0"}},
+	}
+	grype := Finding{
+		ID: "grype", Evidence: Evidence{Tool: "grype", Job: "grype"},
+		RuleID:   grypeResult.RuleID,
+		Message:  grypeResult.Message.Text,
+		Location: Location{URI: "/tmp-cve-probe/requirements.txt", StartLine: 1},
+	}
+	grype.Dependency = extractDependency(grype, grypeResult, grypeRule)
+
+	pipResult := sarifResult{
+		RuleID:  "CVE-2018-18074",
+		Message: sarifText{Text: "requests 2.19.0: CVE-2018-18074"},
+		Properties: sarifObject{
+			"package": "requests", "version": "2.19.0",
+			"id": "PYSEC-2018-28", "aliases": "CVE-2018-18074, GHSA-x84v-xcm2-53pg",
+		},
+	}
+	pipAudit := Finding{
+		ID: "pip-audit", Evidence: Evidence{Tool: "pip-audit", Job: "pip-audit"},
+		RuleID:   pipResult.RuleID,
+		Message:  pipResult.Message.Text,
+		Location: Location{URI: "tmp-cve-probe/requirements.txt"},
+	}
+	pipAudit.Dependency = extractDependency(pipAudit, pipResult, sarifRule{})
+
+	groups := GroupFindings([]Finding{grype, pipAudit})
+	if len(groups) != 1 {
+		t.Fatalf("erwartet eine Gruppe, bekommen %d", len(groups))
+	}
+	if len(groups[0].FindingIDs) != 2 {
+		t.Errorf("Gruppe unvollständig: %v", groups[0].FindingIDs)
+	}
+}
+
+func TestParsePurlZerlegtNameUndVersion(t *testing.T) {
+	cases := []struct {
+		purl    string
+		name    string
+		version string
+	}{
+		{"pkg:pypi/requests@2.19.0", "requests", "2.19.0"},
+		{"pkg:pypi/Requests@2.19.0", "requests", "2.19.0"},
+		{"pkg:golang/golang.org/x/sys@v0.41.0", "golang.org/x/sys", "v0.41.0"},
+		{"pkg:golang/stdlib@1.26.4", "stdlib", "1.26.4"},
+		{"pkg:deb/debian/curl@7.50.3-1?arch=i386", "debian/curl", "7.50.3-1"},
+		{"pkg:pypi/requests", "requests", ""},
+		{"requests@2.19.0", "", ""},
+		{"", "", ""},
+	}
+	for _, testCase := range cases {
+		name, version := parsePurl(testCase.purl)
+		if name != testCase.name || version != testCase.version {
+			t.Errorf("%q → %q / %q, erwartet %q / %q",
+				testCase.purl, name, version, testCase.name, testCase.version)
+		}
+	}
+}
+
+// stringProperty fiele für ein Array auf fmt.Sprint zurück und lieferte den
+// Wert samt Klammern; stringListProperty muss die Einträge einzeln herausgeben.
+func TestStringListPropertyLiestArrayUndString(t *testing.T) {
+	properties := sarifObject{
+		"purls": []any{"pkg:pypi/requests@2.19.0", "pkg:pypi/urllib3@1.24.1"},
+		"purl":  "pkg:pypi/flask@0.12.2",
+	}
+	got := stringListProperty(properties, "purl", "purls")
+	want := []string{"pkg:pypi/flask@0.12.2", "pkg:pypi/requests@2.19.0", "pkg:pypi/urllib3@1.24.1"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Liste falsch gelesen: %v, erwartet %v", got, want)
+	}
+	if value := stringProperty(properties, "purls"); !strings.HasPrefix(value, "[") {
+		t.Errorf("Vorbedingung entfallen: stringProperty liefert %q", value)
+	}
+}
+
 func TestNormalizePathNormiertZielfrei(t *testing.T) {
 	cases := map[string]string{
 		"requirements.txt":                      "requirements.txt",
@@ -455,6 +719,40 @@ func TestGroupFindingsSameLocationInnerhalbEinesJobs(t *testing.T) {
 	}
 	if len(groups[1].PossibleDuplicates) == 0 || len(groups[2].PossibleDuplicates) == 0 {
 		t.Fatalf("Cross-Job/Cross-Tool nicht als possible markiert: %+v", groups)
+	}
+}
+
+// Zwei verschiedene CVEs desselben Werkzeugs auf derselben Manifest-Zeile:
+// same-location-tool darf sie nicht mehr bündeln, sobald eine Dependency
+// erkannt ist. Der weiche Zweig darf sie verbinden, die harte Gruppe nicht.
+func TestGroupFindingsSameLocationToolNichtFuerDependencyFunde(t *testing.T) {
+	links := findingWithJob("a", "grype", "grype", "GHSA-aaaa-bbbb-cccc", "requirements.txt", 1, "A",
+		Dependency{Package: "requests", Version: "2.19.0", IDs: []string{"GHSA-AAAA-BBBB-CCCC"}, KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"}})
+	rechts := findingWithJob("b", "grype", "grype", "GHSA-dddd-eeee-ffff", "requirements.txt", 1, "B",
+		Dependency{Package: "jinja2", Version: "2.10", IDs: []string{"GHSA-DDDD-EEEE-FFFF"}, KeyIDs: []string{"GHSA-DDDD-EEEE-FFFF"}})
+
+	if key := sameLocationToolKey(links); key != "" {
+		t.Errorf("same-location-tool greift trotz erkannter Dependency: %q", key)
+	}
+	groups := GroupFindings([]Finding{links, rechts})
+	if len(groups) != 2 {
+		t.Fatalf("verschiedene Befunde auf derselben Zeile zusammengelegt: %+v", groups)
+	}
+	for _, group := range groups {
+		if contains(group.DedupeRules, "same-location-tool") {
+			t.Errorf("Regel bei Dependency-Funden noch gemeldet: %v", group.DedupeRules)
+		}
+	}
+}
+
+// Auch der reine Anzeige-Rückfall zählt als erkannte Dependency: trivy und
+// osv-scanner haben kein strukturiertes Paket, melden aber ebenfalls jeden Fund
+// auf derselben Manifest-Zeile.
+func TestSameLocationToolKeyEntfaelltAuchBeiFreitextDependency(t *testing.T) {
+	finding := findingWithJob("a", "trivy", "trivy-fs", "CVE-2026-1111", "requirements.txt", 1, "A",
+		Dependency{IDs: []string{"CVE-2026-1111"}, TextPackage: "requests", TextVersion: "2.19.0"})
+	if key := sameLocationToolKey(finding); key != "" {
+		t.Errorf("same-location-tool greift trotz Freitext-Dependency: %q", key)
 	}
 }
 
@@ -687,19 +985,25 @@ func fixedNow() time.Time {
 // Schwachstellen nebeneinander. Deren Kennungen dürfen nicht in einen
 // dependency-Block wandern, dessen Package und Version vom ersten Finding
 // stammen.
+// Eine Gruppe kann verschiedene Dependencies enthalten, sobald sie nicht über
+// den Dependency-Schlüssel entstanden ist. Seit Task 028 bündelt
+// same-location-tool Dependency-Funde nicht mehr; den Fall stellt hier ein
+// gemeinsamer Fingerprint desselben Werkzeugs her.
 func TestApplyRepresentativeVereinigtNurDieselbeDependency(t *testing.T) {
-	groups := GroupFindings([]Finding{
-		finding("a", "grype", "GHSA-AAAA-BBBB-CCCC", "requirements.txt", 1, "requests", Dependency{
-			Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
-			IDs: []string{"GHSA-AAAA-BBBB-CCCC"}, KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"},
-		}),
-		finding("b", "grype", "GHSA-DDDD-EEEE-FFFF", "requirements.txt", 1, "jinja2", Dependency{
-			Package: "jinja2", Version: "2.10", Manifest: "requirements.txt",
-			IDs: []string{"GHSA-DDDD-EEEE-FFFF"}, KeyIDs: []string{"GHSA-DDDD-EEEE-FFFF"},
-		}),
+	links := finding("a", "grype", "GHSA-AAAA-BBBB-CCCC", "requirements.txt", 1, "requests", Dependency{
+		Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
+		IDs: []string{"GHSA-AAAA-BBBB-CCCC"}, KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"},
 	})
+	links.Fingerprints = map[string]string{"grype/v1": "gemeinsam"}
+	rechts := finding("b", "grype", "GHSA-DDDD-EEEE-FFFF", "requirements.txt", 1, "jinja2", Dependency{
+		Package: "jinja2", Version: "2.10", Manifest: "requirements.txt",
+		IDs: []string{"GHSA-DDDD-EEEE-FFFF"}, KeyIDs: []string{"GHSA-DDDD-EEEE-FFFF"},
+	})
+	rechts.Fingerprints = map[string]string{"grype/v1": "gemeinsam"}
+
+	groups := GroupFindings([]Finding{links, rechts})
 	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
-		t.Fatalf("same-location-tool gruppiert nicht wie erwartet: %+v", groups)
+		t.Fatalf("Fingerprint gruppiert nicht wie erwartet: %+v", groups)
 	}
 	want := []string{"GHSA-AAAA-BBBB-CCCC"}
 	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {
@@ -711,18 +1015,20 @@ func TestApplyRepresentativeVereinigtNurDieselbeDependency(t *testing.T) {
 // eine Vereinigung rechtfertigte. Genau so treten grype, osv-scanner und trivy
 // im gemessenen Lauf auf.
 func TestApplyRepresentativeOhnePaketKeineUnion(t *testing.T) {
-	groups := GroupFindings([]Finding{
-		finding("a", "osv-scanner", "CVE-2026-1111", "requirements.txt", 1, "CVE-2026-1111", Dependency{
-			Manifest: "requirements.txt",
-			IDs:      []string{"CVE-2026-1111"}, KeyIDs: []string{"CVE-2026-1111"},
-		}),
-		finding("b", "osv-scanner", "CVE-2026-2222", "requirements.txt", 1, "CVE-2026-2222", Dependency{
-			Manifest: "requirements.txt",
-			IDs:      []string{"CVE-2026-2222"}, KeyIDs: []string{"CVE-2026-2222"},
-		}),
+	links := finding("a", "osv-scanner", "CVE-2026-1111", "requirements.txt", 1, "CVE-2026-1111", Dependency{
+		Manifest: "requirements.txt",
+		IDs:      []string{"CVE-2026-1111"}, KeyIDs: []string{"CVE-2026-1111"},
 	})
+	links.Fingerprints = map[string]string{"osv/v1": "gemeinsam"}
+	rechts := finding("b", "osv-scanner", "CVE-2026-2222", "requirements.txt", 1, "CVE-2026-2222", Dependency{
+		Manifest: "requirements.txt",
+		IDs:      []string{"CVE-2026-2222"}, KeyIDs: []string{"CVE-2026-2222"},
+	})
+	rechts.Fingerprints = map[string]string{"osv/v1": "gemeinsam"}
+
+	groups := GroupFindings([]Finding{links, rechts})
 	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
-		t.Fatalf("same-location-tool gruppiert nicht wie erwartet: %+v", groups)
+		t.Fatalf("Fingerprint gruppiert nicht wie erwartet: %+v", groups)
 	}
 	want := []string{"CVE-2026-1111"}
 	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {

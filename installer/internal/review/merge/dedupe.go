@@ -173,8 +173,7 @@ func dependencyKeys(finding Finding) []string {
 }
 
 // sameLocationToolKey fasst zusammen, was ein Werkzeug in einem Lauf an
-// derselben Zeile meldet — bei Manifest-Funden der Regelfall, weil dort alle
-// Funde auf dieselbe Zeile zeigen.
+// derselben Zeile meldet.
 //
 // Für KI-Evidence gilt er nicht. class=ai kennt keine Zeile (siehe aiKeyLines in
 // stable.go); ein Schlüssel über die Zeile zöge Funde verschiedener Rule-IDs
@@ -182,8 +181,23 @@ func dependencyKeys(finding Finding) []string {
 // stünden sie woanders — die Gruppe zerfiele, und mit ihr die stableId. An
 // seine Stelle tritt aiPathRuleKey; „dieselbe Regel in derselben Zeile" ist
 // darin als Teilfall enthalten.
+//
+// Für Dependency-Funde gilt er seit Task 028 ebenfalls nicht. Bei
+// Manifest-Funden zeigt jeder Fund eines Werkzeugs auf dieselbe Zeile der
+// Manifest-Datei; die Regel gruppierte dort nach Fundort statt nach Identität.
+// Gemessen am Lauf 2026-08-27: neun Gruppen entstanden über sie, und in jeder
+// steckten so viele verschiedene Rule-IDs wie Findings — bis zu 18 verschiedene
+// GHSA in einer Gruppe, weil grype für jeden Fund auf requirements.txt:1 zeigt.
+// Zusammen mit dem Paket-Rückfall aus derselben Task wurde daraus eine Gruppe
+// aus 39 Findings mit 36 verschiedenen Rule-IDs: die Regel verkettete über den
+// Fundort alles, was der Dependency-Schlüssel korrekt zusammengeführt hatte, mit
+// allem übrigen desselben Werkzeugs. Für Nicht-Dependency-Funde bleibt sie
+// unverändert — dort ist dieselbe Zeile eine Aussage über den Fund.
 func sameLocationToolKey(finding Finding) string {
 	if finding.Mode == review.ModeEvidence {
+		return ""
+	}
+	if hasDependency(finding.Dependency) {
 		return ""
 	}
 	if finding.Evidence.Tool == "" || finding.Evidence.Job == "" || finding.Location.URI == "" || finding.Location.StartLine == 0 {
@@ -192,6 +206,17 @@ func sameLocationToolKey(finding Finding) string {
 	return fmt.Sprintf("same-location-tool:%s:%s:%s:%d",
 		strings.ToLower(finding.Evidence.Tool), strings.ToLower(finding.Evidence.Job),
 		normalizePath(finding.Location.URI), finding.Location.StartLine)
+}
+
+// hasDependency meldet, ob aus dem Fund überhaupt eine Dependency erkannt
+// wurde — gleich ob strukturiert oder nur aus dem Freitext für die Anzeige.
+//
+// Die Bedingung ist dieselbe, an der extractDependency entscheidet, ob es eine
+// Dependency herausgibt oder die leere Struktur, um die beiden Stellen nicht
+// auseinanderlaufen zu lassen.
+func hasDependency(dependency Dependency) bool {
+	return len(dependency.IDs) > 0 || dependency.Package != "" || dependency.Version != "" ||
+		dependency.TextPackage != "" || dependency.TextVersion != ""
 }
 
 func dedupeRules(findings []Finding) []string {
@@ -454,6 +479,57 @@ func normalizeMessage(message string) string {
 	message = strings.ToLower(strings.TrimSpace(message))
 	message = messageKeepPattern.ReplaceAllString(message, " ")
 	return spacePattern.ReplaceAllString(strings.TrimSpace(message), " ")
+}
+
+// parsePurl zerlegt einen Package-URL in Namen und Version.
+//
+//	pkg:pypi/requests@2.19.0            → requests, 2.19.0
+//	pkg:golang/golang.org/x/sys@v0.41.0 → golang.org/x/sys, v0.41.0
+//
+// Der Typ (`pypi`, `golang`) fällt weg, der Namensteil bleibt vollständig: er
+// darf selbst Slashes enthalten, und am ersten Slash zu trennen verstümmelte
+// jeden Go-Modulpfad. Getrennt wird deshalb am ersten Slash **nach** dem Typ
+// und an der letzten `@`.
+//
+// Die Version bleibt bis auf Kleinschreibung, wie sie steht — ein `v`-Präfix
+// wird nicht abgeschnitten. Es abzuschneiden würde `v0.41.0` und `0.41.0`
+// verschmelzen, und die Messung aus Task 028 zeigt keinen Fall, in dem zwei
+// Werkzeuge dieselbe Version verschieden schreiben.
+//
+// Die Funktion ist rein und einparametrig wie normalizePath; sie liest nur den
+// übergebenen String.
+func parsePurl(purl string) (string, string) {
+	value := strings.TrimSpace(purl)
+	if len(value) < len("pkg:") || !strings.EqualFold(value[:len("pkg:")], "pkg:") {
+		return "", ""
+	}
+	value = value[len("pkg:"):]
+	// Qualifier (`?arch=…`) und Subpath (`#pfad`) gehören nicht zum Namen.
+	if cut := strings.IndexAny(value, "?#"); cut >= 0 {
+		value = value[:cut]
+	}
+	slash := strings.Index(value, "/")
+	if slash < 0 {
+		// Ohne Typ/Name-Trennung ist kein Name zu benennen.
+		return "", ""
+	}
+	value = value[slash+1:]
+	version := ""
+	if at := strings.LastIndex(value, "@"); at >= 0 {
+		version = value[at+1:]
+		value = value[:at]
+	}
+	return normalizePackageName(value), strings.ToLower(strings.TrimSpace(version))
+}
+
+// normalizePackageName bringt Paketnamen aus verschiedenen Quellen auf eine
+// Schreibweise: Rand-Leerzeichen und Rand-Slashes weg, Kleinschreibung.
+//
+// Absichtlich **kein** Abschneiden am Slash: `golang.org/x/sys` ist ein Name,
+// kein Präfix samt Name. Das Ecosystem-Präfix entfernt parsePurl, das als
+// einziges weiß, wo es aufhört.
+func normalizePackageName(name string) string {
+	return strings.ToLower(strings.Trim(strings.TrimSpace(name), "/"))
 }
 
 // normalizePath bringt Pfadangaben verschiedener Werkzeuge auf eine

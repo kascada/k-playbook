@@ -800,16 +800,25 @@ k-playbook-local/results/<lauf>/
 `run.json` und `entries/*.json` bleiben unverändert. Es bewertet auch nicht — dafür ist
 der Assistent zuständig, der `review-input.json` als Eingabe bekommt.
 
-**Dedupe-Modell.** Findings werden nie stumm entfernt. Vier Regeln fassen zusammen:
+**Dedupe-Modell.** Findings werden nie stumm entfernt. Fünf Regeln fassen zusammen:
 
 - gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle,
 - gleiche Datei, Zeile, Regel-ID und normalisierte Message,
 - **eine** gemeinsame Dependency-ID (CVE/GHSA/OSV/PYSEC) plus gleiches Package und
   gleiche Version,
+- bei Nicht-Dependency-Funden (`same-location-tool`): dasselbe Werkzeug im selben Job an
+  derselben Datei und Zeile,
 - bei KI-Evidence (`ai-path-rule`): gleiches Rezept, gleiche Datei und gleiche Regel-ID —
   ohne Zeile und ohne Message.
 
-Die vierte Regel gehört zur Schlüsselklasse `ai` und ist beabsichtigt: zwei KI-Funde
+Die vierte Regel greift für Dependency-Funde **nicht**. Bei Manifest-Funden zeigt jeder
+Fund eines Werkzeugs auf dieselbe Zeile der Manifest-Datei; die Regel gruppierte dort
+nach Fundort statt nach Identität und legte durchweg verschiedene Schwachstellen
+zusammen — in einem gemessenen Lauf 18 verschiedene GHSA in einer Gruppe. Für Funde ohne
+erkannte Dependency bleibt sie unverändert: dort ist dieselbe Zeile eine Aussage über den
+Fund.
+
+Die fünfte Regel gehört zur Schlüsselklasse `ai` und ist beabsichtigt: zwei KI-Funde
 derselben Rule-ID in derselben Datei sind eine Gruppe. Alle Instanzen bleiben als
 `findingIds` und `evidence` erhalten, der Repräsentant nennt aber nur **eine** Stelle —
 die Zahl ist mitzulesen. Der Grund liegt in der Stabilität: der stabile Schlüssel einer
@@ -826,7 +835,29 @@ andere nur einen. In den Schlüssel gehen dabei nur Kennungen, die den Fund bene
 vorkommen. Das Manifest steht **nicht** im Schlüssel: Werkzeuge schreiben denselben
 Pfad zu verschieden (`requirements.txt`, `/requirements.txt`,
 `file:///abs/pfad/requirements.txt`). Der Preis ist im Monorepo sichtbar — gleiches
-Paket mit gleicher CVE unter `services/a/` und `services/b/` wird eine Gruppe.
+Paket mit gleicher CVE unter `services/a/` und `services/b/` wird eine Gruppe. Die
+Version bleibt dagegen im Schlüssel: die Werkzeuge, die überhaupt eine strukturierte
+Angabe machen, schreiben sie gleich.
+
+**Woher Package und Version kommen — und woher nicht.** In den harten Schlüssel darf nur,
+was **strukturiert** gelesen wurde. Zwei Quellen zählen dazu:
+
+- eine benannte Property des Results oder der Rule (`package`, `packageName`, `version`,
+  `installedVersion`, …) — so schreibt es pip-audit,
+- ein purl in `purls` oder `purl`, auch als JSON-Array — so schreibt es grype
+  (`pkg:pypi/requests@2.19.0`). Der Ecosystem-Teil fällt weg, der Namensteil bleibt
+  vollständig, damit ein Go-Modulpfad wie `golang.org/x/sys` nicht verstümmelt wird.
+
+Nennt ein Werkzeug Paket und Version nur im Fließtext, wird der Wert gelesen, landet aber
+in `textPackage` / `textVersion` und **nicht** im harten Schlüssel. So ist es bei
+osv-scanner (`Package 'requests@2.19.0' is vulnerable to …`) und bei trivy
+(`Package: requests` / `Installed Version: …`). Der Grund ist die Trennschärfe: Paket und
+Version sind im Schlüssel das Einzige, was dieselbe Kennung in zwei verschiedenen Paketen
+auseinanderhält (vendored libs); ein danebenliegender Textwert verschmelzte genau die
+Befunde, die getrennt bleiben müssen. Anders als bei den Kennungen gibt es hier deshalb
+**keinen** Rückfall von der engen auf die breite Seite — ohne strukturierten Wert bleibt
+der harte Schlüssel aus, und die Funde von osv-scanner und trivy stehen als
+`possible-duplicate` daneben.
 
 Zwei Fälle werden nicht zusammengefasst, sondern wechselseitig als
 `possible-duplicate` markiert:

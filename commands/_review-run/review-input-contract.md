@@ -65,7 +65,7 @@ zulässig und bedeuten nicht, dass die Datei unvollständig ist.
       "level": "error|warning|note|none",
       "message": "<einzeilige Meldung>",
       "location": { "uri": "<pfad>", "startLine": 12 },
-      "dependency": { "package": "…", "version": "…", "ids": ["CVE-…"] }
+      "dependency": { "package": "…", "version": "…", "ids": ["CVE-…"], "keyIds": ["CVE-…"] }
     }
   ],
   "groups": [
@@ -98,7 +98,7 @@ Was die Felder tragen:
 | `findings[].level` | Der SARIF-Level. Er ist die einzige Wertung, die ein Rezept vergibt. |
 | `findings[].message` | Die Meldung des Fundes. |
 | `findings[].location` | `uri` als projektrelativer Pfad, `startLine` und `startColumn` optional. |
-| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. |
+| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. Im Merge kommen zwei enge Teilmengen dazu: `keyIds` sind die Kennungen, die den Fund *benennen* (`ruleId` und benannte Alias-Felder) — nur sie gehen in den harten Dedupe-Schlüssel; `package` und `version` tragen dort ausschließlich **strukturiert** gelesene Werte, also eine benannte Property oder einen purl. Was nur im Fließtext des Werkzeugs steht, steht in `textPackage` / `textVersion` und ist ausdrücklich nur für die Anzeige — es bildet keinen harten Schlüssel und rechtfertigt kein Zusammenlegen. Fehlen `package` und `version`, ist der Fund nicht schlechter belegt; sein Werkzeug nennt sie nur nicht als Feld (osv-scanner, trivy). |
 | `groups[].displayId` | Laufende Anzeige-ID `G001`, `G002`, … Sie ist nicht stabil und taugt nicht als Referenz über Läufe hinweg. |
 | `groups[].stableId` | Die stabile Gruppen-ID. Sie ist die Referenz, die in `review-triage.md` und in `known-decisions.md` steht. |
 | `groups[].title`, `ruleId`, `level`, `location` | Der Repräsentant der Gruppe. |
@@ -135,7 +135,7 @@ ihr Vorhandensein und arbeitet ohne sie weiter, statt sie zu erfinden.
 | `groups[].stableKey` | Der Klartext-Schlüssel, aus dem der Digest der stabilen ID gebildet wurde. | Die stabile ID ist nach der Report-Regel gebildet und nicht aus einem Digest herleitbar. |
 | `groups[].dedupeRules`, `possibleDuplicates` | Welche Regel zusammengefasst hat und welche Gruppen unsichere Dubletten sind. | Keine maschinelle Dedupe-Herleitung. Die Bündelung ist Sache der Triage. |
 | `groups[].derivedSeverity`, `severitySource` | Wie beim Finding, für den Repräsentanten. | Wie beim Finding: `level` gilt unmittelbar. |
-| `groups[].dependency` | Dependency-Angaben des Repräsentanten. | Steht bei den Findings, sofern die Quelle sie kennt. |
+| `groups[].dependency` | Dependency-Angaben des Repräsentanten. `ids` und `keyIds` sind die Vereinigung über die Findings der Gruppe, die dieselbe Dependency beschreiben; `package`, `version`, `manifest` und die Freitextfelder bleiben die des Repräsentanten und lassen sich nicht vereinigen. | Steht bei den Findings, sofern die Quelle sie kennt. |
 | `knownDecisions` | Geladene Quellen, Decisions mit `applied` / `notAppliedReason` / `expired` und Warnungen. | Es gab kein zentrales Matching. Im Report-Weg lädt `/k-review` `known-decisions.md` in Step 3 selbst und meldet gedeckte Funde gar nicht erst als Fund. |
 | `findings[].coveredByKnownDecision`, `groups[].coveredByKnownDecision`, `groups[].partialCoverage`, `groups[].knownDecisionCoverage` | Ergebnis des Matchings je Fund und je Gruppe, mit `matchedBy`. | Keine Deckungsmarker im Beleg. Der Abschnitt `## Deckung aus known-decisions` bleibt stehen und sagt in einem Satz, dass der Beleg kein Matching trägt und warum. |
 
