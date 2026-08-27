@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/pathnorm"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
@@ -98,7 +99,7 @@ func aiPathRuleKey(finding Finding) string {
 		return ""
 	}
 	return fmt.Sprintf("ai:%s:%s:%s",
-		strings.ToLower(finding.Evidence.Tool), normalizePath(finding.Location.URI),
+		strings.ToLower(finding.Evidence.Tool), pathnorm.Normalize(finding.Location.URI),
 		strings.ToLower(finding.RuleID))
 }
 
@@ -123,8 +124,24 @@ func exactKey(finding Finding) string {
 		return ""
 	}
 	return fmt.Sprintf("exact:%s:%d:%s:%s",
-		normalizePath(finding.Location.URI), finding.Location.StartLine,
+		pathnorm.Normalize(finding.Location.URI), finding.Location.StartLine,
 		strings.ToLower(finding.RuleID), normalizeMessage(finding.Message))
+}
+
+// dependencyKeyIDs ist die enge Kennungsmenge eines Fundes: KeyIDs, mit
+// Rückfall auf IDs, wenn ein Werkzeug seine einzige Kennung nur im Freitext
+// nennt und die enge Menge deshalb leer bliebe.
+//
+// Sie steht hier als eine Funktion, weil zwei Stellen sie brauchen und
+// auseinanderlaufen dürfen sie nicht: dependencyKeys bildet daraus den harten
+// Dedupe-Schlüssel, stable.go den stabilen Gruppenschlüssel samt Präfix und
+// Klasse. Nennt ein Werkzeug eine Kennung mehr, die nur im Advisory-Text
+// vorkommt, ändert das seit Task 029 weder die Gruppe noch ihre Stable-ID.
+func dependencyKeyIDs(dependency Dependency) []string {
+	if len(dependency.KeyIDs) > 0 {
+		return dependency.KeyIDs
+	}
+	return dependency.IDs
 }
 
 // dependencyKeys liefert einen Schlüssel **je Kennung** statt eines Schlüssels
@@ -145,7 +162,7 @@ func exactKey(finding Finding) string {
 //   - Manifest: **nicht** drin. Die Messung aus Task 027 zeigt dieselbe Datei in
 //     drei Schreibweisen (`requirements.txt`, `/requirements.txt`,
 //     `file:///abs/pfad/requirements.txt`), und auch nach der zielfreien
-//     Normierung in normalizePath fällt der absolute Pfad noch auseinander. Der
+//     Normierung in pathnorm.Normalize fällt der absolute Pfad noch auseinander. Der
 //     Preis ist bekannt: im Monorepo bleiben gleiches Paket und gleiche CVE in
 //     services/a und services/b nicht mehr getrennt.
 //
@@ -156,10 +173,7 @@ func dependencyKeys(finding Finding) []string {
 	if dependency.Package == "" {
 		return nil
 	}
-	ids := dependency.KeyIDs
-	if len(ids) == 0 {
-		ids = dependency.IDs
-	}
+	ids := dependencyKeyIDs(dependency)
 	if len(ids) == 0 {
 		return nil
 	}
@@ -205,7 +219,7 @@ func sameLocationToolKey(finding Finding) string {
 	}
 	return fmt.Sprintf("same-location-tool:%s:%s:%s:%d",
 		strings.ToLower(finding.Evidence.Tool), strings.ToLower(finding.Evidence.Job),
-		normalizePath(finding.Location.URI), finding.Location.StartLine)
+		pathnorm.Normalize(finding.Location.URI), finding.Location.StartLine)
 }
 
 // hasDependency meldet, ob aus dem Fund überhaupt eine Dependency erkannt
@@ -442,7 +456,7 @@ func markPossiblePair(groups []Group, left int, right int) {
 
 func sameLine(left Location, right Location) bool {
 	return left.URI != "" && right.URI != "" && left.StartLine != 0 && right.StartLine != 0 &&
-		normalizePath(left.URI) == normalizePath(right.URI) && left.StartLine == right.StartLine
+		pathnorm.Normalize(left.URI) == pathnorm.Normalize(right.URI) && left.StartLine == right.StartLine
 }
 
 func similarRuleFamily(left Group, right Group) bool {
@@ -496,8 +510,8 @@ func normalizeMessage(message string) string {
 // verschmelzen, und die Messung aus Task 028 zeigt keinen Fall, in dem zwei
 // Werkzeuge dieselbe Version verschieden schreiben.
 //
-// Die Funktion ist rein und einparametrig wie normalizePath; sie liest nur den
-// übergebenen String.
+// Die Funktion ist rein und einparametrig wie pathnorm.Normalize; sie liest nur
+// den übergebenen String.
 func parsePurl(purl string) (string, string) {
 	value := strings.TrimSpace(purl)
 	if len(value) < len("pkg:") || !strings.EqualFold(value[:len("pkg:")], "pkg:") {
@@ -530,80 +544,6 @@ func parsePurl(purl string) (string, string) {
 // einziges weiß, wo es aufhört.
 func normalizePackageName(name string) string {
 	return strings.ToLower(strings.Trim(strings.TrimSpace(name), "/"))
-}
-
-// normalizePath bringt Pfadangaben verschiedener Werkzeuge auf eine
-// Schreibweise. Sie bleibt rein und einparametrig: das Scan-Ziel wird bewusst
-// nicht durchgereicht — GroupFindings als einzige Einstiegsstelle kennt es
-// nicht, und alle vier Aufrufer (exactKey, sameLine, sameLocationToolKey,
-// stablePrefixAndKey) hängen an dieser Signatur.
-//
-// Normiert wird deshalb nur, was ohne Zielkenntnis geht:
-//
-//   - Backslashes zu `/`,
-//   - `file://` weg, mit und ohne Host-Teil (`file:///pfad`, `file://host/pfad`),
-//   - `.`- und `..`-Segmente sowie doppelte Slashes auflösen,
-//   - führendes `/` entfernen (`/requirements.txt` → `requirements.txt`),
-//   - Groß-/Kleinschreibung angleichen.
-//
-// Was damit ausdrücklich **nicht** zusammenfindet: ein absoluter Pfad
-// unterhalb des Scan-Ziels und derselbe Pfad relativ dazu. `/abs/projekt/a.txt`
-// und `a.txt` bleiben verschieden, weil ohne das Ziel nicht zu entscheiden ist,
-// wo der gemeinsame Teil aufhört. Genau daran scheitert im gemessenen Lauf die
-// Zusammenführung von osv-scanner mit den übrigen Werkzeugen — der Grund, aus
-// dem das Manifest nicht mehr im harten Dependency-Schlüssel steht.
-func normalizePath(path string) string {
-	path = strings.ReplaceAll(path, "\\", "/")
-	path = trimFileScheme(path)
-	return strings.ToLower(collapsePath(path))
-}
-
-// trimFileScheme schneidet ein `file://`-Präfix ab. Der Teil zwischen den
-// Doppelslashes und dem nächsten `/` ist die Authority und gehört nicht zum
-// Pfad; bei `file:///pfad` ist sie leer, bei `file://host/pfad` steht dort ein
-// Rechnername. Fehlt ein weiterer `/`, ist die ganze Restzeichenkette der Pfad
-// — eine formal falsche, aber vorkommende Schreibweise, bei der Wegwerfen mehr
-// schadete als Behalten.
-func trimFileScheme(path string) string {
-	if len(path) < len("file://") || !strings.EqualFold(path[:len("file://")], "file://") {
-		return path
-	}
-	rest := path[len("file://"):]
-	if slash := strings.Index(rest, "/"); slash >= 0 {
-		return rest[slash:]
-	}
-	return rest
-}
-
-// collapsePath löst `.`, `..` und doppelte Slashes auf und liefert den Pfad
-// ohne führenden `/`.
-//
-// Kein filepath.Clean: das arbeitet mit dem Trennzeichen des laufenden Systems
-// und ließe eine unter Windows erzeugte SARIF-Datei anders normieren als
-// dieselbe unter Linux. Hier ist `/` gesetzt, gleich auf welchem System.
-func collapsePath(path string) string {
-	rooted := strings.HasPrefix(path, "/")
-	segments := []string{}
-	for _, segment := range strings.Split(path, "/") {
-		switch segment {
-		case "", ".":
-			continue
-		case "..":
-			if len(segments) > 0 && segments[len(segments)-1] != ".." {
-				segments = segments[:len(segments)-1]
-				continue
-			}
-			// Über die Wurzel hinaus führt kein Weg; ein relativer Pfad behält
-			// sein `..`, weil es dort etwas bezeichnet.
-			if rooted {
-				continue
-			}
-			segments = append(segments, "..")
-		default:
-			segments = append(segments, segment)
-		}
-	}
-	return strings.Join(segments, "/")
 }
 
 func trimLength(text string, limit int) string {

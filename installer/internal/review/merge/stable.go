@@ -80,7 +80,7 @@ func aiClassApplies(findings []Finding) bool {
 		if finding.Mode != review.ModeEvidence {
 			return false
 		}
-		if normalizePath(finding.Location.URI) == "" || strings.TrimSpace(finding.RuleID) == "" {
+		if stablePath(finding.Location.URI) == "" || strings.TrimSpace(finding.RuleID) == "" {
 			return false
 		}
 	}
@@ -108,7 +108,7 @@ func aiKeyLines(findings []Finding) []string {
 	lines := stableList("tools", stableValues(findings, func(f Finding) string { return f.Evidence.Tool }))
 	lines = append(lines, stableList("rules", stableValues(findings, func(f Finding) string { return strings.ToLower(f.RuleID) }))...)
 	lines = append(lines, stableList("paths", stableValues(findings, func(f Finding) string {
-		return normalizePath(f.Location.URI)
+		return stablePath(f.Location.URI)
 	}))...)
 	return lines
 }
@@ -120,7 +120,7 @@ func locationKeyLines(findings []Finding) []string {
 		if f.Location.URI == "" && f.Location.StartLine == 0 {
 			return ""
 		}
-		return fmt.Sprintf("%s:%d:%d", normalizePath(f.Location.URI), f.Location.StartLine, f.Location.StartColumn)
+		return fmt.Sprintf("%s:%d:%d", stablePath(f.Location.URI), f.Location.StartLine, f.Location.StartColumn)
 	}))...)
 	lines = append(lines, stableList("rules", stableValues(findings, func(f Finding) string { return strings.ToLower(f.RuleID) }))...)
 	lines = append(lines, stableList("messages", stableValues(findings, func(f Finding) string { return normalizeMessage(f.Message) }))...)
@@ -135,13 +135,16 @@ func locationKeyLines(findings []Finding) []string {
 		if len(dependency.IDs) == 0 && dependency.Package == "" && dependency.Version == "" && dependency.Manifest == "" {
 			return ""
 		}
-		ids := append([]string{}, dependency.IDs...)
+		// Die **enge** Menge, nicht die breite: sonst bräche die Stable-ID,
+		// sobald ein Werkzeug im Advisory-Text eine Kennung mehr nennt —
+		// derselbe Befund, andere ID. Genau davor soll eine Stable-ID schützen.
+		ids := append([]string{}, dependencyKeyIDs(dependency)...)
 		sort.Strings(ids)
 		return strings.Join([]string{
 			strings.ToLower(strings.Join(ids, ",")),
 			strings.ToLower(dependency.Package),
 			strings.ToLower(dependency.Version),
-			normalizePath(dependency.Manifest),
+			stablePath(dependency.Manifest),
 		}, "|")
 	}))...)
 	return lines
@@ -172,10 +175,22 @@ func stablePrefix(class string, findings []Finding) string {
 	return "scan-" + stableSegment(tool) + "-"
 }
 
+// dependencyPrimaryID ist die alphabetisch erste Kennung der Gruppe. Sie
+// entscheidet zweierlei: das lesbare Präfix scan-cve-<kennung>- und, über
+// stableClass, ob die Gruppe überhaupt als dependency zählt.
+//
+// Sie sammelt die **enge** Menge je Fund, mit demselben Rückfall auf die breite,
+// den dependencyKeys nutzt. Über die breite Menge zu sortieren hieße, dass eine
+// beiläufig im Advisory-Text genannte Fremd-Kennung das Präfix bestimmen kann,
+// sobald sie alphabetisch vorne liegt — und dass eine Kennung mehr die ID
+// verschiebt, obwohl sich am Befund nichts geändert hat.
+//
+// An der Klasse ändert der Wechsel nichts: die enge Menge fällt bei Leere auf
+// die breite zurück, ist also genau dann leer, wenn auch die breite leer ist.
 func dependencyPrimaryID(findings []Finding) string {
 	ids := []string{}
 	for _, finding := range findings {
-		ids = append(ids, finding.Dependency.IDs...)
+		ids = append(ids, dependencyKeyIDs(finding.Dependency)...)
 	}
 	if len(ids) == 0 {
 		return ""

@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/kascada/k-playbook/installer/internal/pathnorm"
 )
 
 const fileName = "known-decisions.md"
@@ -415,11 +417,15 @@ func setDecisionField(decision *Decision, key string, value string) {
 func setCriterionField(criterion *Criterion, key string, value string) {
 	switch key {
 	case "stableId":
-		criterion.StableID = normalizePath(value)
+		// Kein Pfad, aber dieselbe Normierung: eine Stable-ID besteht aus
+		// [a-z0-9-] und trägt weder Slash noch Schema, für sie wirkt die
+		// Funktion also nur als Kleinschreibung. Eigene Normierung wäre eine
+		// vierte Fassung für nichts.
+		criterion.StableID = pathnorm.Normalize(value)
 	case "ruleId":
 		criterion.RuleID = value
 	case "location":
-		criterion.Location = normalizePath(value)
+		criterion.Location = pathnorm.Normalize(value)
 	case "cveId":
 		criterion.CVEID = normalizeID(value)
 	case "ghsaId":
@@ -431,9 +437,9 @@ func setCriterionField(criterion *Criterion, key string, value string) {
 	case "version":
 		criterion.Version = value
 	case "manifestGlob":
-		criterion.ManifestGlob = normalizePath(value)
+		criterion.ManifestGlob = pathnorm.Normalize(value)
 	case "pathGlob":
-		criterion.PathGlob = normalizePath(value)
+		criterion.PathGlob = pathnorm.Normalize(value)
 	}
 }
 
@@ -498,7 +504,7 @@ func matchDecision(finding Finding, decision Decision) (string, string) {
 		}
 		if criterion.PathGlob != "" {
 			for _, location := range finding.Locations {
-				path := normalizePath(location.Path)
+				path := pathnorm.Normalize(location.Path)
 				if globMatch(criterion.PathGlob, path) {
 					return "pathGlob", path
 				}
@@ -506,14 +512,14 @@ func matchDecision(finding Finding, decision Decision) (string, string) {
 		}
 		if criterion.RuleID != "" && criterion.RuleID == finding.RuleID {
 			for _, location := range finding.Locations {
-				path := normalizePath(location.Path)
+				path := pathnorm.Normalize(location.Path)
 				if globMatch(criterion.Location, path) {
 					return "ruleId+location", path
 				}
 			}
 		}
 		if dependencyIDMatches(criterion, finding.Dependency.IDs) && dependencyScopeMatches(criterion, finding) {
-			return dependencyMatchedBy(criterion), normalizePath(finding.Dependency.Manifest)
+			return dependencyMatchedBy(criterion), pathnorm.Normalize(finding.Dependency.Manifest)
 		}
 	}
 	return "", ""
@@ -554,7 +560,7 @@ func dependencyScopeMatches(criterion Criterion, finding Finding) bool {
 	if criterion.Version != "" && criterion.Version != dependency.Version {
 		return false
 	}
-	if criterion.ManifestGlob != "" && !globMatch(criterion.ManifestGlob, normalizePath(dependency.Manifest)) {
+	if criterion.ManifestGlob != "" && !globMatch(criterion.ManifestGlob, pathnorm.Normalize(dependency.Manifest)) {
 		return false
 	}
 	return criterion.Package != "" || criterion.Version != "" || criterion.ManifestGlob != "" || criterion.StableID != ""
@@ -571,8 +577,8 @@ func dependencyMatchedBy(criterion Criterion) string {
 }
 
 func globMatch(pattern string, value string) bool {
-	pattern = normalizePath(pattern)
-	value = normalizePath(value)
+	pattern = pathnorm.Normalize(pattern)
+	value = pathnorm.Normalize(value)
 	if pattern == "" || value == "" {
 		return false
 	}
@@ -597,12 +603,4 @@ func matchSegments(pattern []string, value []string) bool {
 		return false
 	}
 	return matchSegments(pattern[1:], value[1:])
-}
-
-func normalizePath(path string) string {
-	path = strings.ReplaceAll(path, "\\", "/")
-	path = strings.TrimPrefix(path, "file://")
-	path = strings.TrimPrefix(path, "./")
-	path = strings.TrimPrefix(path, "/")
-	return strings.ToLower(path)
 }

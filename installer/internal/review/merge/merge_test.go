@@ -621,34 +621,11 @@ func TestStringListPropertyLiestArrayUndString(t *testing.T) {
 	}
 }
 
-func TestNormalizePathNormiertZielfrei(t *testing.T) {
-	cases := map[string]string{
-		"requirements.txt":                      "requirements.txt",
-		"/requirements.txt":                     "requirements.txt",
-		"./requirements.txt":                    "requirements.txt",
-		"file:///home/x/requirements.txt":       "home/x/requirements.txt",
-		"file://host/pfad/requirements.txt":     "pfad/requirements.txt",
-		"FILE:///Home/X/Requirements.txt":       "home/x/requirements.txt",
-		"file://requirements.txt":               "requirements.txt",
-		`src\pkg\App.go`:                        "src/pkg/app.go",
-		"src//pkg/./app.go":                     "src/pkg/app.go",
-		"src/pkg/../app.go":                     "src/app.go",
-		"../a/b.txt":                            "../a/b.txt",
-		"/../a.txt":                             "a.txt",
-		"":                                      "",
-		"/abs/projekt/tmp/requirements.txt":     "abs/projekt/tmp/requirements.txt",
-		"file:///abs/projekt/requirements.txt/": "abs/projekt/requirements.txt",
-	}
-	for input, want := range cases {
-		if got := normalizePath(input); got != want {
-			t.Errorf("normalizePath(%q) = %q, erwartet %q", input, got, want)
-		}
-	}
-}
-
-// normalizePath bedient nicht nur Dependencies: exactKey, sameLine und
-// sameLocationToolKey nutzen dieselbe Funktion. Die drei Wirkungen werden hier
-// festgeschrieben, damit die erweiterte Normierung nicht unbemerkt zurückfällt.
+// Die Pfadnormierung selbst wird in internal/pathnorm getestet; sie ist seit
+// Task 029 dort und wird mit knowndecisions geteilt. Hier stehen ihre
+// **Wirkungen** im Merge: exactKey, sameLine und sameLocationToolKey rufen sie,
+// und die drei Wirkungen werden festgeschrieben, damit die erweiterte Normierung
+// nicht unbemerkt zurückfällt.
 func TestGroupFindingsExactKeyUeberPfadschreibweisen(t *testing.T) {
 	groups := GroupFindings([]Finding{
 		finding("a", "semgrep", "sql-injection", "app.go", 12, "Gefahr hier", Dependency{}),
@@ -1033,6 +1010,108 @@ func TestApplyRepresentativeOhnePaketKeineUnion(t *testing.T) {
 	want := []string{"CVE-2026-1111"}
 	if !reflect.DeepEqual(groups[0].Dependency.IDs, want) {
 		t.Errorf("Union trotz fehlendem Paket: %+v, erwartet %v", groups[0].Dependency.IDs, want)
+	}
+}
+
+// TestStableIDHaeltBeiBreitererAliasmenge ist die Zusage aus dem Intent von
+// Task 029: dieselbe Gruppe mit breiterer Aliasmenge behält Schlüssel, Präfix
+// und class.
+//
+// Der Zuschnitt ist eng und mit Absicht: die zusätzliche Kennung steht **nur**
+// im Advisory-Freitext und damit in IDs, nicht in KeyIDs — sie käme aus keinem
+// der dependencyKeyIDProperties-Felder. Nur dieser Fall ist über die Einengung
+// auf KeyIDs überhaupt lösbar. Nennt ein Werkzeug die zusätzliche Kennung in
+// einem benannten Alias-Feld, zählt sie zur engen Menge und die ID verschiebt
+// sich weiterhin; das ist eine bewusst offene Restinstabilität, siehe
+// docs/review-runs.md.
+func TestStableIDHaeltBeiBreitererAliasmenge(t *testing.T) {
+	schmal := Dependency{
+		Package:  "requests",
+		Version:  "2.19.0",
+		Manifest: "requirements.txt",
+		IDs:      []string{"CVE-2018-18074"},
+		KeyIDs:   []string{"CVE-2018-18074"},
+	}
+	// Dasselbe Werkzeug, derselbe Befund — der Advisory-Text nennt zusätzlich
+	// eine Fremd-Kennung. KeyIDs bleibt unberührt.
+	breit := schmal
+	breit.IDs = []string{"CVE-2018-18074", "CVE-2099-99999"}
+
+	pruefeGleicheStabileGruppe(t, schmal, breit)
+}
+
+// TestStableIDHaeltBeiAlphabetischFruehererFremdkennung deckt den Präfix-Pfad
+// ab: dependencyPrimaryID sortiert und nimmt ids[0], also entscheidet die
+// alphabetisch erste Kennung über scan-cve-<kennung>-. Läuft die Funktion über
+// die breite Menge, kippt das Präfix, sobald eine beiläufig genannte Kennung
+// vorne einsortiert. Nur dieser Fall prüft das wirklich.
+func TestStableIDHaeltBeiAlphabetischFruehererFremdkennung(t *testing.T) {
+	schmal := Dependency{
+		Package:  "requests",
+		Version:  "2.19.0",
+		Manifest: "requirements.txt",
+		IDs:      []string{"GHSA-x84v-xcm2-53pg"},
+		KeyIDs:   []string{"GHSA-x84v-xcm2-53pg"},
+	}
+	breit := schmal
+	// CVE-… sortiert vor GHSA-… und wäre über die breite Menge die Primärkennung.
+	breit.IDs = []string{"CVE-2000-0001", "GHSA-x84v-xcm2-53pg"}
+
+	prefix, _ := stablePrefixAndKey([]Finding{dependencyFinding("a", schmal)})
+	if prefix != "scan-cve-ghsa-x84v-xcm2-53pg-" {
+		t.Fatalf("Vorbedingung entfallen: Präfix ist %q", prefix)
+	}
+	pruefeGleicheStabileGruppe(t, schmal, breit)
+}
+
+// TestStableIDNutztBreiteMengeOhneEngeMenge hält den Rückfall fest: ohne
+// KeyIDs bleibt es bei IDs, sonst hätte eine Gruppe, deren Werkzeug seine
+// Kennung nur im Freitext nennt, gar keinen Dependency-Schlüssel mehr — und
+// verlöre Präfix und Klasse.
+func TestStableIDNutztBreiteMengeOhneEngeMenge(t *testing.T) {
+	ohne := Dependency{
+		Package:  "requests",
+		Version:  "2.19.0",
+		Manifest: "requirements.txt",
+		IDs:      []string{"CVE-2018-18074"},
+	}
+	findings := []Finding{dependencyFinding("a", ohne)}
+	if class := stableClass(findings); class != "dependency" {
+		t.Fatalf("class = %q, erwartet dependency", class)
+	}
+	prefix, _ := stablePrefixAndKey(findings)
+	if prefix != "scan-cve-cve-2018-18074-" {
+		t.Fatalf("Präfix = %q, erwartet scan-cve-cve-2018-18074-", prefix)
+	}
+}
+
+func pruefeGleicheStabileGruppe(t *testing.T, schmal Dependency, breit Dependency) {
+	t.Helper()
+	schmalFindings := []Finding{dependencyFinding("a", schmal)}
+	breitFindings := []Finding{dependencyFinding("a", breit)}
+
+	if got, want := stableClass(breitFindings), stableClass(schmalFindings); got != want {
+		t.Errorf("class verschoben: %q statt %q", got, want)
+	}
+	schmalPrefix, schmalKey := stablePrefixAndKey(schmalFindings)
+	breitPrefix, breitKey := stablePrefixAndKey(breitFindings)
+	if breitPrefix != schmalPrefix {
+		t.Errorf("Präfix verschoben: %q statt %q", breitPrefix, schmalPrefix)
+	}
+	if breitKey != schmalKey {
+		t.Errorf("stableKey verschoben:\n breit:  %s\n schmal: %s", breitKey, schmalKey)
+	}
+}
+
+func dependencyFinding(id string, dependency Dependency) Finding {
+	return Finding{
+		ID:         id,
+		Evidence:   Evidence{Tool: "pip-audit", Job: "pip-audit"},
+		RuleID:     "PYSEC-2018-28",
+		Level:      "warning",
+		Message:    "requests 2.19.0 ist verwundbar",
+		Location:   Location{URI: "requirements.txt", StartLine: 1},
+		Dependency: dependency,
 	}
 }
 

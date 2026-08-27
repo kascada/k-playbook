@@ -65,7 +65,10 @@ zulässig und bedeuten nicht, dass die Datei unvollständig ist.
       "level": "error|warning|note|none",
       "message": "<einzeilige Meldung>",
       "location": { "uri": "<pfad>", "startLine": 12 },
-      "dependency": { "package": "…", "version": "…", "ids": ["CVE-…"], "keyIds": ["CVE-…"] }
+      "dependency": {
+        "package": "…", "version": "…", "manifest": "…", "ids": ["CVE-…"],
+        "keyIds": ["CVE-…"], "textPackage": "…", "textVersion": "…"
+      }
     }
   ],
   "groups": [
@@ -98,7 +101,7 @@ Was die Felder tragen:
 | `findings[].level` | Der SARIF-Level. Er ist die einzige Wertung, die ein Rezept vergibt. |
 | `findings[].message` | Die Meldung des Fundes. |
 | `findings[].location` | `uri` als projektrelativer Pfad, `startLine` und `startColumn` optional. |
-| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. Im Merge kommen zwei enge Teilmengen dazu: `keyIds` sind die Kennungen, die den Fund *benennen* (`ruleId` und benannte Alias-Felder) — nur sie gehen in den harten Dedupe-Schlüssel; `package` und `version` tragen dort ausschließlich **strukturiert** gelesene Werte, also eine benannte Property oder einen purl. Was nur im Fließtext des Werkzeugs steht, steht in `textPackage` / `textVersion` und ist ausdrücklich nur für die Anzeige — es bildet keinen harten Schlüssel und rechtfertigt kein Zusammenlegen. Fehlen `package` und `version`, ist der Fund nicht schlechter belegt; sein Werkzeug nennt sie nur nicht als Feld (osv-scanner, trivy). |
+| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. Drei weitere Felder schreibt **nur** der Merge; der Report-Weg lässt sie weg. `keyIds` sind die Kennungen, die den Fund *benennen* (`ruleId` und benannte Alias-Felder) — nur sie gehen in den harten Dedupe-Schlüssel und in die stabile Gruppen-ID. Sie sind kein bloßes Schlüsseldetail, sondern die Antwort auf „worum geht dieser Fund?" gegenüber `ids`, das auch nennt, was das Advisory nur *erwähnt*: wer zwei Belege inhaltlich zusammenfasst, weil sie eine Kennung teilen, muss die beiden Mengen auseinanderhalten können. `package` und `version` tragen dort ausschließlich **strukturiert** gelesene Werte, also eine benannte Property oder einen purl. Was nur im Fließtext des Werkzeugs steht, steht in `textPackage` / `textVersion` und ist ausdrücklich nur für die Anzeige — es bildet keinen harten Schlüssel und rechtfertigt kein Zusammenlegen. Fehlen `package` und `version`, ist der Fund nicht schlechter belegt; sein Werkzeug nennt sie nur nicht als Feld (osv-scanner, trivy) — dann sind `textPackage` / `textVersion` die einzige Auskunft darüber, welches Paket gemeint ist, und ohne sie müsste jeder Leser die Meldung noch einmal selbst zerlegen. Genau deshalb stehen sie im Beleg und nicht nur im Merge. |
 | `groups[].displayId` | Laufende Anzeige-ID `G001`, `G002`, … Sie ist nicht stabil und taugt nicht als Referenz über Läufe hinweg. |
 | `groups[].stableId` | Die stabile Gruppen-ID. Sie ist die Referenz, die in `review-triage.md` und in `known-decisions.md` steht. |
 | `groups[].title`, `ruleId`, `level`, `location` | Der Repräsentant der Gruppe. |
@@ -154,8 +157,31 @@ gekürzter SHA256-Digest über normalisierte Attribute der Funde:
   Der Schlüssel besteht nur aus Eintragsname, Rule-ID und normalisiertem Pfad; Zeile,
   Meldung und Fingerprints bleiben draußen, damit die ID über Läufe hinweg hält.
 - `scan-cve-<kennung>-<digest>` — die Gruppe trägt eine Dependency-Kennung.
+  `<kennung>` ist die alphabetisch erste aus der **engen** Kennungsmenge der Gruppe:
+  aus den Kennungen, die den Fund selbst benennen (`ruleId` und benannte Alias-Felder,
+  siehe `findings[].dependency.keyIds`), nicht aus denen, die im Advisory-Text nebenbei
+  vorkommen. Nennt ein Werkzeug seine einzige Kennung nur im Freitext, fällt die Bildung
+  auf die breite Menge `ids` zurück. Dieselbe enge Menge steht auch in der
+  `dependencies`-Zeile des Schlüssels.
 - `scan-<werkzeug>-<digest>` — alles Übrige; `<werkzeug>` ist `multi`, wenn mehrere
   Werkzeuge beteiligt sind.
+
+**Pfade im Schlüssel sind eingefroren normiert.** Überall, wo ein Pfad in den Schlüssel
+oder in die Klassenentscheidung eingeht — die Zeilen `locations`, `dependencies` und
+`paths` —, läuft er über eine eigene, festgeschriebene Normierung und **nicht** über die
+der Gruppierung: Backslashes zu `/`, `file://` samt Authority weg, `.`- und
+`..`-Segmente sowie doppelte Slashes aufgelöst, führendes `/` weg, Kleinschreibung. Die
+Trennung ist Absicht: die Dedupe-Normierung darf besser werden, ohne die IDs zu bewegen.
+Ändert sich dagegen die eingefrorene Fassung, verschieben sich Stable-IDs — Begründung
+und Folgen für `known-decisions.md` stehen in `docs/review-runs.md`.
+
+Die Einengung auf die enge Menge gilt für Präfix und Digest gemeinsam und ist Absicht:
+über die breite Menge bestimmte eine beiläufig im Advisory-Text genannte Fremd-Kennung
+das Präfix, sobald sie alphabetisch vorne lag, und **jede** zusätzlich genannte Kennung
+verschob die ID, obwohl sich am Befund nichts geändert hatte. Dieselbe Gruppe mit
+breiterer Aliasmenge behält jetzt Schlüssel, Präfix und Klasse — solange die zusätzliche
+Kennung außerhalb der engen Menge liegt. An der Klasse ändert die Einengung nichts: die
+enge Menge ist genau dann leer, wenn auch die breite leer ist.
 
 Der Digest wird auf sechs Zeichen gekürzt und nur so weit verlängert, wie er je Präfix
 eindeutig sein muss. Eine Gruppe, in der Scanner- und Rezept-Belege zusammenliegen,
@@ -220,8 +246,28 @@ Ebenso gibt es kein `evidence[].source`, `evidence[].file`, `evidence[].line` od
 
 ## Bestandsartefakte
 
-An den geschriebenen Dateien ändert sich nichts: Die Streichungen und Umbenennungen
-betreffen ausschließlich Prosa, die nie ein Feld beschrieb, das der Merge schreibt.
 Bestehende `review-input.json` unter `k-playbook-local/results/<YYYY-MM-DD>/` bleiben
-unverändert lesbar, und Known-Decisions-Kriterien, die auf `stableId` matchen, treffen
-weiter dieselben Gruppen — `merge/stable.go` bleibt unangetastet.
+unverändert lesbar: Felder sind nur hinzugekommen, keines ist entfallen oder umbenannt
+worden, und `schemaVersion` bleibt `1`.
+
+**Die stabilen Gruppen-IDs sind dagegen verschoben.** Ein Lauf, der mit dem heutigen
+Merge neu zusammengeführt wird, vergibt für dieselben Funde andere `stableId` als eine
+ältere Fassung des Werkzeugs. Vier Änderungen wirken zusammen: die erweiterte
+Pfadnormierung, der Dedupe-Schlüssel je Kennung, das aus purl-Quellen nachgeholte Paket
+samt der dafür geänderten Gruppenzusammensetzung, und die Einengung von Präfix und
+`dependencies`-Zeile auf die enge Kennungsmenge. An einem Messlauf mit 74 Gruppen tragen
+am Ende 12 ihre alte ID.
+
+Was daraus folgt:
+
+- **Known-Decisions-Kriterien, die auf `stableId` matchen, treffen nicht mehr dieselben
+  Gruppen.** Sie sind einmal neu abzuleiten, aus einem mit dieser Fassung erzeugten
+  `review-input.json`. Kriterien mit `pathGlob`, `ruleId` oder `fingerprint` sind nicht
+  betroffen.
+- **Alte und neue Artefakte desselben Laufs sind über `stableId` nicht vergleichbar.**
+  Wer zwei Läufe gegeneinander hält, muss beide mit derselben Werkzeugfassung
+  zusammengeführt haben.
+- Ab dieser Fassung ist die Bildung gegen Änderungen an der Pfadnormierung der
+  Gruppierung abgedichtet und gegen zusätzliche Kennungen außerhalb der engen Menge
+  unempfindlich. Was weiterhin verschiebt — eine geänderte Gruppenzusammensetzung —,
+  steht in `docs/review-runs.md`, dort auch die Begründung der Entscheidung.

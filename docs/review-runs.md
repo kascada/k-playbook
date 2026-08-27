@@ -875,9 +875,110 @@ deshalb darf es groß werden. Welche Felder es hat, steht in
 Gruppen werden gebündelt, die Detailliste ist hart gedeckelt und verweist auf die
 JSON, sobald sie das Limit überschreitet.
 
+**Wann `schemaVersion` steigt.** Nur bei **brechenden** Änderungen: ein Feld entfällt,
+wird umbenannt, wechselt den Typ, oder die Bedeutung eines bestehenden Feldes ändert sich
+so, dass ein Leser der alten Fassung es falsch versteht. Ein **neues** Feld lässt sie
+stehen. Der Grund ist die Rolle der Zahl: sie sagt einem Leser, ob er die Datei noch so
+verarbeiten darf wie bisher — und das darf er, denn alle Felder sind optional, der
+Vertrag hält für jedes fest, was gilt, wenn es fehlt, und ein Leser überspringt, was er
+nicht kennt. Stiege sie bei jedem Feld, wäre sie ein Änderungszähler, und jeder Konsument
+müsste seine Prüfung nachziehen, ohne dass sich für ihn etwas geändert hätte.
+
+**Geänderte Werte sind keine Schemaänderung.** Verschieben sich die `stableId` — siehe
+„Stabile Gruppen-IDs hängen an einer eingefrorenen Pfadnormierung" weiter unten —, bleibt
+`schemaVersion` stehen: das Feld heißt weiter dasselbe und bedeutet weiter dasselbe, nur
+sein Wert wird anders gerechnet. Wer wissen
+muss, mit welcher Fassung ein Beleg entstanden ist, liest `kPlaybookVersion`; die steht
+genau dafür in jedem Merge-Artefakt. Die Zahl steht derzeit auf `1` und ist seit ihrer
+Einführung nicht gestiegen — auch nicht für die Dependency-Felder, die seither
+hinzugekommen sind.
+
 **Wiederholbar.** Ein erneuter Aufruf überschreibt beide Artefakte. Bei fehlenden
 Entry-Dateien für einen in `run.json` ausgewählten Eintrag gilt der Zustand `start`;
 kein Fehler, sondern eine sichtbare Auskunft im Statusblock.
+
+### Stabile Gruppen-IDs hängen an einer eingefrorenen Pfadnormierung
+
+Ein Pfad geht an vier Stellen in Schlüssel und Klasse einer Gruppe ein. Diese vier
+Stellen rufen **nicht** dieselbe Normierung wie die Gruppierung, sondern eine
+eigene, festgeschriebene Kopie (`stablePath` in `merge/stable_path.go`). Die
+Gruppierungs-Normierung (`pathnorm.Normalize`, geteilt mit `knowndecisions`) darf sich
+weiterentwickeln, ohne die IDs zu bewegen.
+
+**Warum getrennt.** Genau das ist einmal schiefgegangen. Beim Umbau der
+Dedupe-Schlüssel wurde die Gruppierungs-Normierung verbessert — Backslashes, `file://` samt
+Authority, `.`/`..`, doppelte Slashes, führendes `/` —, und weil die ID-Bildung
+dieselbe Funktion rief, verschoben sich die Stable-IDs als unbeabsichtigter
+Nebeneffekt. Die Messung an einem Lauf mit 74 Gruppen: **38 Gruppen verschoben,
+alle 38 allein durch die Pfadform**, in jedem einzelnen Fall durch das entfernte
+führende `/` (`/dist/…` → `dist/…`). Betroffen waren grype und osv-scanner
+vollständig, pip-audit und trivy gar nicht — wer relative Pfade schreibt, merkte
+nichts. Eine Verschiebung, die niemand wollte, die nirgends fehlschlug und die
+jeden `stableId`-Eintrag in `known-decisions.md` still ins Leere laufen ließ.
+
+Eine Stable-ID ist der Bezugspunkt, unter dem eine Triage-Entscheidung einen Lauf
+überdauert. Sie darf sich ändern, wenn sich der Befund ändert — nicht, wenn ein
+Werkzeug seine Pfade anders schreibt oder die Normierung dazulernt. Der Preis der
+Trennung ist eine doppelt gepflegte Funktion; er ist niedriger als eine Kennung,
+die bei jeder Verbesserung an anderer Stelle bricht.
+
+**Warum nicht die alte Normierung zurück.** Sie hätte die IDs von vor dem Umbau
+nicht wiedergebracht. Zwischen damals und heute liegt eine zweite Verschiebung —
+gefülltes Paket aus purl-Quellen und die geänderte Gruppenzusammensetzung — die
+den Pfadanteil überlagert: von 74 Gruppen tragen am Ende noch 12 ihre alte ID, und
+davon bringt eine Rücknahme der Pfadform keine zurück. Zurück käme allein die
+schlechtere Normierung, dauerhaft eingefroren in der ID-Bildung, während die
+Gruppierung die bessere benutzt. Eine Migrationstabelle wäre ebenfalls nur ein
+Stichtagsdokument gewesen; sie wird mit der nächsten Verschiebung wertlos, und
+es gibt keinen Bestand, der sie rechtfertigte.
+
+**Was das für `known-decisions.md` heißt.** Einträge mit dem Kriterium `stableId` sind
+**einmal** neu abzuleiten: aus einem Lauf, der mit dieser Fassung zusammengeführt wurde.
+Der einfachste Weg ist, den betroffenen Lauf neu zu mergen und die `stableId` der Gruppe
+aus `review-input.json` oder `review-input.md` zu übernehmen. Die vier Änderungen —
+erweiterte Pfadnormierung, Dedupe-Schlüssel je Kennung, nachgeholtes Paket samt
+geänderter Gruppenzusammensetzung und die Einengung auf die enge Kennungsmenge — sind
+bewusst in **einem** Schritt zusammengelegt, damit diese Ableitung einmal anfällt und
+nicht viermal. Einträge mit `pathGlob`, `ruleId` oder `fingerprint` sind nicht betroffen
+— sie matchen nicht über die ID. Wer eine Decision langfristig halten will, ist mit
+diesen Kriterien besser bedient.
+
+**Eine Kennung mehr verschiebt die ID nicht mehr.** Präfix und `dependencies`-Zeile des
+Schlüssels entstehen aus der **engen** Kennungsmenge — den Kennungen, die den Fund selbst
+benennen (`ruleId` und benannte Alias-Felder) —, nicht aus allen Kennungen, die im
+Advisory-Text vorkommen. Vorher genügte eine beiläufig genannte Fremd-Kennung, um die ID
+zu verschieben, und sie konnte sogar das Präfix bestimmen: im Messlauf hieß die
+pyyaml-Gruppe um CVE-2019-20477 `scan-cve-cve-2017-18342-…`, nach einem anderen
+pyyaml-Advisory, das der Beschreibungstext nur erwähnt. Nennt ein Werkzeug seine einzige
+Kennung ausschließlich im Freitext, fällt die Bildung auf die breite Menge zurück — sonst
+verlöre so ein Fund Präfix und Klasse ganz.
+
+**Was die Entkopplung nicht leistet.** Sie deckt die Pfadform ab, nicht die
+Gruppenzusammensetzung. Drei Restinstabilitäten bleiben, und sie sind bewusst in
+Kauf genommen:
+
+- Der Schlüssel entsteht über **alle** Findings einer Gruppe — Werkzeuge, Jobs,
+  Fundorte, Regeln, Meldungen, Fingerprints. Kommt ein Fund hinzu, weil ein
+  weiteres Werkzeug denselben Befund meldet oder dieselbe Sache an zweiter Stelle
+  auftaucht, ändert sich die ID. Das ist der Regelfall bei jeder Änderung am
+  Werkzeugsatz eines Laufs.
+- Trägt eine Gruppe keine Kennung in der engen Menge, fällt die ID-Bildung auf
+  die breite zurück. Für solche Gruppen hängt die ID weiter an der vollständigen
+  Aliasliste und bricht, sobald ein Werkzeug eine Kennung mehr nennt.
+- Auch mit enger Menge hilft die Einengung nur, wenn die zusätzliche Kennung
+  **außerhalb** davon auftaucht. Nennt ein Werkzeug sie in einem benannten
+  Alias-Feld — pip-audit schreibt seine Aliase genau dorthin —, zählt sie zur
+  engen Menge und die ID verschiebt sich trotzdem.
+
+Wer diese Fälle ausschließen muss, benutzt in `known-decisions.md` `pathGlob`
+oder `ruleId` statt `stableId`.
+
+**Wann sich das wieder ändern darf.** `stablePath` wird nicht nebenbei
+angefasst. Eine Änderung dort verschiebt jede Stable-ID, deren Pfad davon berührt
+wird, und entwertet die zugehörigen Decisions. Sie ist eine eigene Entscheidung,
+die hier dokumentiert und in `commands/_review-run/review-input-contract.md`
+nachgezogen wird; ein Test im Merge-Paket hält den Stand fest und schlägt fehl,
+wenn jemand sie unbemerkt verschiebt.
 
 ## Wirkung von `known-decisions.md`
 
@@ -925,6 +1026,15 @@ Unterstützte Match-Kriterien:
 
 Pfade werden als projektrelative Slash-Pfade ohne führendes `./` verglichen. Bei mehreren
 Locations reicht ein Treffer; der Match-Report nennt die getroffene Location.
+
+**Es ist dieselbe Normierung, mit der der Merge gruppiert.** Muster und Fundort laufen
+beide durch sie: Backslashes werden zu `/`, ein `file://`-Präfix fällt samt Rechnername
+weg, `.`- und `..`-Segmente und doppelte Slashes werden aufgelöst, das führende `/`
+entfällt, verglichen wird in Kleinschreibung. Vorher hatten Merge und Matching je eine
+eigene Kopie, und die waren auseinandergelaufen — eine Decision traf dann nur einen Teil
+einer Gruppe, die der Merge über genau diese Schreibweisen zusammengezogen hatte, und das
+zeigte sich nur als Teildeckung. Geteilt wird ausdrücklich diese eine Frage; die
+Normierung der Stable-IDs ist eine andere und eingefroren (siehe oben).
 
 Welches Kriterium wofür taugt — der Unterschied ist größer, als die Liste vermuten lässt:
 
