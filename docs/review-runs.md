@@ -802,14 +802,30 @@ der Assistent zuständig, der `review-input.json` als Eingabe bekommt.
 
 **Dedupe-Modell.** Findings werden nie stumm entfernt. Fünf Regeln fassen zusammen:
 
-- gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle,
+- gleiche `fingerprint` oder `partialFingerprint` innerhalb vergleichbarer Quelle — bei
+  Dependency-Funden nur noch für Fingerprints, die auf der Zulassungsliste stehen,
 - gleiche Datei, Zeile, Regel-ID und normalisierte Message,
-- **eine** gemeinsame Dependency-ID (CVE/GHSA/OSV/PYSEC) plus gleiches Package und
+- **eine** gemeinsame Dependency-ID (CVE/GHSA/OSV/PYSEC/GO) plus gleiches Package und
   gleiche Version,
 - bei Nicht-Dependency-Funden (`same-location-tool`): dasselbe Werkzeug im selben Job an
   derselben Datei und Zeile,
 - bei KI-Evidence (`ai-path-rule`): gleiches Rezept, gleiche Datei und gleiche Regel-ID —
   ohne Zeile und ohne Message.
+
+Die erste Regel greift für Dependency-Funde nur noch namentlich. Ein Fingerprint *kann*
+den Fund benennen — SARIF sieht ihn dafür vor —, aber er kann auch nur seinen Ort hashen,
+und dann gruppiert er Dependency-Funde nach Fundort statt nach Identität. Beides kommt im
+selben Feldnamen vor: grype und osv-scanner schreiben beide
+`partialFingerprints.primaryLocationLineHash`, und in einem gemessenen Lauf war grypes
+Wert je Paket gleich — acht seiner neun Werte deckten je 3 bis 6 verschiedene
+Schwachstellen ab —, während osv-scanners Wert eine Bijektion zu den Kennungen bildete.
+Deshalb gilt eine **Zulassungsliste über Paaren aus Werkzeug und Fingerprint-Name**
+(`namingFingerprints` in `merge/dedupe.go`): für einen Fund mit erkannter Dependency
+bildet nur ein geführtes Paar einen Schlüssel, jedes andere keinen. Geführt wird derzeit
+`osv-scanner` / `primaryLocationLineHash`. Die Liste ist bewusst eine Zulassungs- und
+keine Sperrliste: ein Fingerprint-Name, den erst ein Werkzeug-Update mitbringt, steht
+nicht darauf und kann die Ortsgruppierung nicht still wiederherstellen — der Preis ist
+die Pflege je Werkzeug. Für Funde ohne erkannte Dependency bleibt die Regel unverändert.
 
 Die vierte Regel greift für Dependency-Funde **nicht**. Bei Manifest-Funden zeigt jeder
 Fund eines Werkzeugs auf dieselbe Zeile der Manifest-Datei; die Regel gruppierte dort
@@ -827,6 +843,17 @@ umformulierter Text die Gruppen-ID nicht ändert. Ohne die vierte Regel bekämen
 derselben Rule-ID in derselben Datei zwei Gruppen mit demselben Schlüssel — also
 kollidierende `stableId`s. Eine Decision auf eine solche Gruppe deckt Datei und Rule-ID
 ganz; eine Abweisung je Instanz gibt es nicht.
+
+**Welche Kennungsformen zählen.** Als Dependency-Kennung gelesen werden `CVE-…`,
+`GHSA-…`, `OSV-…`, `PYSEC-…` und `GO-…` — letztere die Kennung der Go Vulnerability
+Database, unter der grype seine Go-Funde ausschließlich führt; ohne sie hatten diese Funde
+gar keine Kennung und blieben ohne harten Schlüssel. Die Nummer muss dabei mindestens
+vierstellig sein, wie sie die Go-Datenbank vergibt (`GO-2026-5024`): das Muster läuft
+schreibungsunabhängig über Freitext, und eine kürzere Form läse Datumsangaben wie
+`go-2026-08` als Kennung und verkettete darüber fremde Funde. Aus demselben Grund fehlen
+Formen, die kein Werkzeug selbst *vergibt* und die nur als Alias im Advisory-Text
+auftauchen — etwa `SNYK-…`; sie verbinden nichts, was die übrigen Formen nicht schon
+verbinden, und brächten allein das Verkettungsrisiko.
 
 Bei der Dependency-Regel zählt jede Kennung einzeln: zwei Werkzeuge finden zusammen,
 sobald sie sich eine Kennung teilen, auch wenn das eine drei Aliase nennt und das
@@ -925,8 +952,9 @@ die bei jeder Verbesserung an anderer Stelle bricht.
 **Warum nicht die alte Normierung zurück.** Sie hätte die IDs von vor dem Umbau
 nicht wiedergebracht. Zwischen damals und heute liegt eine zweite Verschiebung —
 gefülltes Paket aus purl-Quellen und die geänderte Gruppenzusammensetzung — die
-den Pfadanteil überlagert: von 74 Gruppen tragen am Ende noch 12 ihre alte ID, und
-davon bringt eine Rücknahme der Pfadform keine zurück. Zurück käme allein die
+den Pfadanteil überlagert: am damaligen Messlauf mit 74 Gruppen trugen am Ende noch
+12 ihre alte ID, und davon bringt eine Rücknahme der Pfadform keine zurück. Zurück
+käme allein die
 schlechtere Normierung, dauerhaft eingefroren in der ID-Bildung, während die
 Gruppierung die bessere benutzt. Eine Migrationstabelle wäre ebenfalls nur ein
 Stichtagsdokument gewesen; sie wird mit der nächsten Verschiebung wertlos, und
@@ -935,13 +963,19 @@ es gibt keinen Bestand, der sie rechtfertigte.
 **Was das für `known-decisions.md` heißt.** Einträge mit dem Kriterium `stableId` sind
 **einmal** neu abzuleiten: aus einem Lauf, der mit dieser Fassung zusammengeführt wurde.
 Der einfachste Weg ist, den betroffenen Lauf neu zu mergen und die `stableId` der Gruppe
-aus `review-input.json` oder `review-input.md` zu übernehmen. Die vier Änderungen —
-erweiterte Pfadnormierung, Dedupe-Schlüssel je Kennung, nachgeholtes Paket samt
-geänderter Gruppenzusammensetzung und die Einengung auf die enge Kennungsmenge — sind
-bewusst in **einem** Schritt zusammengelegt, damit diese Ableitung einmal anfällt und
-nicht viermal. Einträge mit `pathGlob`, `ruleId` oder `fingerprint` sind nicht betroffen
-— sie matchen nicht über die ID. Wer eine Decision langfristig halten will, ist mit
-diesen Kriterien besser bedient.
+aus `review-input.json` oder `review-input.md` zu übernehmen.
+
+Angefallen ist das bislang **zweimal**, in zwei bewusst gebündelten Schritten. Das erste
+Bündel legt vier Änderungen zusammen — erweiterte Pfadnormierung, Dedupe-Schlüssel je
+Kennung, nachgeholtes Paket samt geänderter Gruppenzusammensetzung und die Einengung auf
+die enge Kennungsmenge —, damit dafür eine Ableitung genügt und nicht vier. Das zweite
+kommt **danach** und trägt zwei weitere: die Zulassungsliste für Fingerprints bei
+Dependency-Funden und die Kennungsform `GO-…`, die über die enge Menge auch Klasse und
+Präfix einer Gruppe setzen kann. Wer schon einmal abgeleitet hat, leitet für das zweite
+Bündel ein zweites Mal ab — an einem Messlauf mit 73 Gruppen behielten dabei 64 ihre alte
+ID. Einträge mit `pathGlob`, `ruleId` oder `fingerprint` sind nicht betroffen — sie
+matchen nicht über die ID. Wer eine Decision langfristig halten will, ist mit diesen
+Kriterien besser bedient.
 
 **Eine Kennung mehr verschiebt die ID nicht mehr.** Präfix und `dependencies`-Zeile des
 Schlüssels entstehen aus der **engen** Kennungsmenge — den Kennungen, die den Fund selbst
@@ -952,6 +986,15 @@ pyyaml-Gruppe um CVE-2019-20477 `scan-cve-cve-2017-18342-…`, nach einem andere
 pyyaml-Advisory, das der Beschreibungstext nur erwähnt. Nennt ein Werkzeug seine einzige
 Kennung ausschließlich im Freitext, fällt die Bildung auf die breite Menge zurück — sonst
 verlöre so ein Fund Präfix und Klasse ganz.
+
+**Was als Kennung *zählt*, verschiebt die ID dagegen sehr wohl.** Der Satz oben sagt, dass
+eine zusätzliche Kennung **außerhalb** der engen Menge folgenlos bleibt. Wächst dagegen
+die enge Menge selbst — weil eine Kennungsform neu erkannt wird —, ändern sich Präfix und
+Schlüssel. Genau das hat die Aufnahme von `GO-…` getan: grypes Go-Funde trugen vorher gar
+keine Kennung, ihre Gruppen waren `class=location` mit dem Präfix `scan-grype-`; seither
+sind sie `class=dependency` mit `scan-cve-go-…-`. Eine Erweiterung der Kennungsformen ist
+deshalb eine ID-verschiebende Änderung und gehört in ein Bündel, nicht nebenbei
+hineingereicht.
 
 **Was die Entkopplung nicht leistet.** Sie deckt die Pfadform ab, nicht die
 Gruppenzusammensetzung. Drei Restinstabilitäten bleiben, und sie sind bewusst in

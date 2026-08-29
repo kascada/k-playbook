@@ -103,11 +103,66 @@ func aiPathRuleKey(finding Finding) string {
 		strings.ToLower(finding.RuleID))
 }
 
+// namingFingerprints ist die Zulassungsliste für Dependency-Funde: nur diese
+// Fingerprints benennen den Fund und dürfen ihn deshalb gruppieren. Jeder nicht
+// geführte Fingerprint bildet für einen Fund mit erkannter Dependency keinen
+// Schlüssel mehr.
+//
+// Geführt werden **Paare aus Werkzeug und Name**, nicht bloße Namen. Der Name
+// allein trägt nicht: grype und osv-scanner nennen ihren Eintrag beide
+// primaryLocationLineHash und meinen etwas anderes damit. Bei grype ist er ein
+// Hash über die Manifest-Zeile und je Paket gleich — im Lauf 2026-08-28 decken
+// acht seiner neun Werte je 3 bis 6 verschiedene Schwachstellen ab. Bei
+// osv-scanner unterscheidet er Schwachstellen innerhalb derselben Zeile: 32
+// Werte für 32 Rule-IDs, eine Bijektion, und dieselben Pakete tragen mehrere
+// Schwachstellen mit verschiedenen Werten (urllib3@1.23.0 unter drei Werten).
+// Eine Liste über den Namen allein ließe grypes Ortsgruppierung bestehen.
+//
+// Die Liste ist eine Zulassungs-, keine Sperrliste, und irrt damit im Zweifel
+// konservativ: ein Name, den erst ein Werkzeug-Update mitbringt, steht nicht
+// darauf und kann die Ortsgruppierung nicht still wiederherstellen. Der Preis
+// ist die Pflege je Werkzeug — ein neuer benennender Fingerprint wirkt erst,
+// wenn er am Roh-SARIF belegt und hier eingetragen ist.
+//
+// Werkzeug- und Fingerprint-Name stehen kleingeschrieben; verglichen wird
+// kleingeschrieben.
+var namingFingerprints = map[string]map[string]bool{
+	"osv-scanner": {"primarylocationlinehash": true},
+}
+
+// namesFinding meldet, ob ein Fingerprint dieses Werkzeugs den Fund benennt und
+// damit auch für Dependency-Funde einen Schlüssel bilden darf.
+func namesFinding(tool string, name string) bool {
+	names, ok := namingFingerprints[strings.ToLower(strings.TrimSpace(tool))]
+	if !ok {
+		return false
+	}
+	return names[strings.ToLower(strings.TrimSpace(name))]
+}
+
+// fingerprintKeys bildet je Fingerprint einen harten Schlüssel — für
+// Dependency-Funde nur noch aus der Zulassungsliste namingFingerprints.
+//
+// Der Grund ist derselbe wie bei sameLocationToolKey seit Task 028: ein
+// Fingerprint, der nur den Fundort hasht, gruppiert Dependency-Funde nach Ort
+// statt nach Identität. Bei grype ist genau das der Fall, und im Lauf
+// 2026-08-28 zog es alle sechs jinja2-Schwachstellen in eine Gruppe und alle
+// sechs stdlib-Funde je Binary in eine weitere. Anders als der Ort *kann* ein
+// Fingerprint den Fund aber benennen — SARIF sieht ihn dafür vor, und
+// osv-scanner vergibt ihn so. Pauschal abzuschalten verlöre diese Gruppierung;
+// deshalb die namentliche Zulassung statt einer Regel.
+//
+// Für Funde ohne erkannte Dependency bleibt alles, wie es war: dort ist kein
+// Manifest im Spiel, das alle Funde eines Werkzeugs auf dieselbe Zeile legt.
 func fingerprintKeys(finding Finding) []string {
+	dependency := hasDependency(finding.Dependency)
 	keys := []string{}
 	for _, fingerprints := range []map[string]string{finding.Fingerprints, finding.PartialFingerprints} {
 		for name, value := range fingerprints {
 			if value == "" {
+				continue
+			}
+			if dependency && !namesFinding(finding.Evidence.Tool, name) {
 				continue
 			}
 			// Fingerprints sind nicht werkzeugübergreifend normiert. Vergleichbar

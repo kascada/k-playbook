@@ -58,6 +58,12 @@ trägt daneben ganz andere Einstellungen. Angefasst wird deshalb genau der Schl�
 sortiert die Schlüssel alphabetisch und setzt die Einrückung auf zwei Leerzeichen. Wer
 eine handformatierte Datei hat, sieht sie danach normalisiert.
 
+Entsteht `opencode.json` dabei **neu**, wird der Schema-Verweis
+`"$schema": "https://opencode.ai/config.json"` gleich mitgeschrieben. OpenCode trägt ihn
+sonst beim nächsten Start selbst nach und schreibt die Datei dafür zurück; mit dem
+Eintrag bleibt sie so liegen, wie das Einrichten sie hinterlassen hat. In eine bereits
+vorhandene Datei wird er **nicht** nachgetragen — die gehört dem Projekt.
+
 Der Schlüssel `k-playbook` gehört k-playbook. Steht dort etwas anderes — ein absoluter
 Pfad, ein fremdes Kommando —, ist das kein Konflikt, sondern ein falscher Stand: die
 Oberfläche meldet „zeigt woandershin" und überschreibt ihn beim Einrichten. Nur eine

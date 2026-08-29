@@ -114,6 +114,44 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 	}
 }
 
+func TestApplyMCPSetztSchemaNurBeiNeuanlage(t *testing.T) {
+	root := newMCPProject(t)
+
+	if _, err := ApplyMCP(root); err != nil {
+		t.Fatalf("ApplyMCP: %v", err)
+	}
+
+	// Neu angelegt: OpenCode findet den Schema-Verweis vor und muss die Datei
+	// nicht selbst umschreiben.
+	opencode := readJSON(t, filepath.Join(root, "opencode.json"))
+	if opencode[opencodeSchemaKey] != opencodeSchemaURL {
+		t.Errorf("$schema = %v, erwartet %q", opencode[opencodeSchemaKey], opencodeSchemaURL)
+	}
+
+	// Die Dateien der anderen Assistenten kennen den Schlüssel nicht.
+	claude := readJSON(t, filepath.Join(root, ".mcp.json"))
+	if _, ok := claude[opencodeSchemaKey]; ok {
+		t.Errorf(".mcp.json hat einen $schema-Eintrag bekommen: %v", claude)
+	}
+
+	// Vorgefunden ohne $schema: der Schlüssel bleibt aus. Was dem Projekt
+	// gehört, wird nicht um ungefragte Einträge ergänzt.
+	bestand := newMCPProject(t)
+	writeFile(t, filepath.Join(bestand, "opencode.json"), `{"instructions":["AGENTS.md"]}`+"\n")
+
+	if _, err := ApplyMCP(bestand); err != nil {
+		t.Fatalf("ApplyMCP: %v", err)
+	}
+
+	vorhanden := readJSON(t, filepath.Join(bestand, "opencode.json"))
+	if _, ok := vorhanden[opencodeSchemaKey]; ok {
+		t.Errorf("$schema in eine bestehende Datei geschrieben: %v", vorhanden)
+	}
+	if _, ok := vorhanden["mcp"].(map[string]any)[MCPServerKey]; !ok {
+		t.Errorf("eigener Eintrag fehlt: %v", vorhanden)
+	}
+}
+
 func TestApplyMCPLaesstFremdeEintraegeStehen(t *testing.T) {
 	root := newMCPProject(t)
 	writeFile(t, filepath.Join(root, ".mcp.json"),

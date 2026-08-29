@@ -101,7 +101,7 @@ Was die Felder tragen:
 | `findings[].level` | Der SARIF-Level. Er ist die einzige Wertung, die ein Rezept vergibt. |
 | `findings[].message` | Die Meldung des Fundes. |
 | `findings[].location` | `uri` als projektrelativer Pfad, `startLine` und `startColumn` optional. |
-| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. Drei weitere Felder schreibt **nur** der Merge; der Report-Weg lässt sie weg. `keyIds` sind die Kennungen, die den Fund *benennen* (`ruleId` und benannte Alias-Felder) — nur sie gehen in den harten Dedupe-Schlüssel und in die stabile Gruppen-ID. Sie sind kein bloßes Schlüsseldetail, sondern die Antwort auf „worum geht dieser Fund?" gegenüber `ids`, das auch nennt, was das Advisory nur *erwähnt*: wer zwei Belege inhaltlich zusammenfasst, weil sie eine Kennung teilen, muss die beiden Mengen auseinanderhalten können. `package` und `version` tragen dort ausschließlich **strukturiert** gelesene Werte, also eine benannte Property oder einen purl. Was nur im Fließtext des Werkzeugs steht, steht in `textPackage` / `textVersion` und ist ausdrücklich nur für die Anzeige — es bildet keinen harten Schlüssel und rechtfertigt kein Zusammenlegen. Fehlen `package` und `version`, ist der Fund nicht schlechter belegt; sein Werkzeug nennt sie nur nicht als Feld (osv-scanner, trivy) — dann sind `textPackage` / `textVersion` die einzige Auskunft darüber, welches Paket gemeint ist, und ohne sie müsste jeder Leser die Meldung noch einmal selbst zerlegen. Genau deshalb stehen sie im Beleg und nicht nur im Merge. |
+| `findings[].dependency` | Nur bei Dependency-Befunden: `package`, `version`, `manifest`, `ids`. Fehlt sonst. Drei weitere Felder schreibt **nur** der Merge; der Report-Weg lässt sie weg. `keyIds` sind die Kennungen, die den Fund *benennen* (`ruleId` und benannte Alias-Felder) — nur sie gehen in den harten Dedupe-Schlüssel und in die stabile Gruppen-ID. Sie sind kein bloßes Schlüsseldetail, sondern die Antwort auf „worum geht dieser Fund?" gegenüber `ids`, das auch nennt, was das Advisory nur *erwähnt*: wer zwei Belege inhaltlich zusammenfasst, weil sie eine Kennung teilen, muss die beiden Mengen auseinanderhalten können. In **beiden** Mengen stehen dieselben Kennungsformen: `CVE-…`, `GHSA-…`, `OSV-…`, `PYSEC-…` und `GO-…` — letztere die Kennung der Go Vulnerability Database mit mindestens vierstelliger Nummer (`GO-2026-5024`), unter der grype seine Go-Funde ausschließlich führt. Was in keiner dieser Formen steht, taucht in keiner der beiden Mengen auf; ein Alias wie `SNYK-…`, das nur im Advisory-Text vorkommt, wird bewusst nicht gelesen. Der Kreis der Formen ist Teil des Vertrags, nicht Implementierungsdetail: eine Form mehr kann einen Fund erstmals zum Dependency-Befund machen und über `keyIds` Klasse und Präfix seiner Gruppe setzen. `package` und `version` tragen dort ausschließlich **strukturiert** gelesene Werte, also eine benannte Property oder einen purl. Was nur im Fließtext des Werkzeugs steht, steht in `textPackage` / `textVersion` und ist ausdrücklich nur für die Anzeige — es bildet keinen harten Schlüssel und rechtfertigt kein Zusammenlegen. Fehlen `package` und `version`, ist der Fund nicht schlechter belegt; sein Werkzeug nennt sie nur nicht als Feld (osv-scanner, trivy) — dann sind `textPackage` / `textVersion` die einzige Auskunft darüber, welches Paket gemeint ist, und ohne sie müsste jeder Leser die Meldung noch einmal selbst zerlegen. Genau deshalb stehen sie im Beleg und nicht nur im Merge. |
 | `groups[].displayId` | Laufende Anzeige-ID `G001`, `G002`, … Sie ist nicht stabil und taugt nicht als Referenz über Läufe hinweg. |
 | `groups[].stableId` | Die stabile Gruppen-ID. Sie ist die Referenz, die in `review-triage.md` und in `known-decisions.md` steht. |
 | `groups[].title`, `ruleId`, `level`, `location` | Der Repräsentant der Gruppe. |
@@ -162,7 +162,10 @@ gekürzter SHA256-Digest über normalisierte Attribute der Funde:
   siehe `findings[].dependency.keyIds`), nicht aus denen, die im Advisory-Text nebenbei
   vorkommen. Nennt ein Werkzeug seine einzige Kennung nur im Freitext, fällt die Bildung
   auf die breite Menge `ids` zurück. Dieselbe enge Menge steht auch in der
-  `dependencies`-Zeile des Schlüssels.
+  `dependencies`-Zeile des Schlüssels. Das Segment `cve` im Präfix ist ein fester
+  Bestandteil des Namens, keine Aussage über die Form: `<kennung>` trägt jede
+  Kennungsform, die `keyIds` kennt — eine Go-Gruppe heißt deshalb
+  `scan-cve-go-2026-5024-<digest>`.
 - `scan-<werkzeug>-<digest>` — alles Übrige; `<werkzeug>` ist `multi`, wenn mehrere
   Werkzeuge beteiligt sind.
 
@@ -252,11 +255,15 @@ worden, und `schemaVersion` bleibt `1`.
 
 **Die stabilen Gruppen-IDs sind dagegen verschoben.** Ein Lauf, der mit dem heutigen
 Merge neu zusammengeführt wird, vergibt für dieselben Funde andere `stableId` als eine
-ältere Fassung des Werkzeugs. Vier Änderungen wirken zusammen: die erweiterte
+ältere Fassung des Werkzeugs. Sechs Änderungen wirken zusammen: die erweiterte
 Pfadnormierung, der Dedupe-Schlüssel je Kennung, das aus purl-Quellen nachgeholte Paket
-samt der dafür geänderten Gruppenzusammensetzung, und die Einengung von Präfix und
-`dependencies`-Zeile auf die enge Kennungsmenge. An einem Messlauf mit 74 Gruppen tragen
-am Ende 12 ihre alte ID.
+samt der dafür geänderten Gruppenzusammensetzung, die Einengung von Präfix und
+`dependencies`-Zeile auf die enge Kennungsmenge, die Zulassungsliste für Fingerprints bei
+Dependency-Funden und die zusätzlich erkannte Kennungsform `GO-…`. Gemessen wurde in zwei
+Schritten: die ersten vier an einem Messlauf mit 74 Gruppen, von denen am Ende 12 ihre
+alte ID trugen; die beiden letzten an einem Messlauf mit 73 Gruppen, von denen 64 ihre
+alte ID behielten. Beide Zahlen sind der Stand ihres jeweiligen Laufs, keine Vorhersage
+für einen anderen.
 
 Was daraus folgt:
 
@@ -269,5 +276,8 @@ Was daraus folgt:
   zusammengeführt haben.
 - Ab dieser Fassung ist die Bildung gegen Änderungen an der Pfadnormierung der
   Gruppierung abgedichtet und gegen zusätzliche Kennungen außerhalb der engen Menge
-  unempfindlich. Was weiterhin verschiebt — eine geänderte Gruppenzusammensetzung —,
+  unempfindlich. Unempfindlich gegen Kennungen **außerhalb** der engen Menge bleibt sie;
+  was **in** die enge Menge fällt, ist damit aber nicht festgeschrieben: eine zusätzlich
+  erkannte Kennungsform — zuletzt `GO-…` — erweitert genau diese Menge und verschiebt die
+  ID. Was ebenfalls weiterhin verschiebt — eine geänderte Gruppenzusammensetzung —,
   steht in `docs/review-runs.md`, dort auch die Begründung der Entscheidung.

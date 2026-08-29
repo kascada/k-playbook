@@ -18,6 +18,21 @@ import (
 // bleiben unberührt.
 const MCPServerKey = "k-playbook"
 
+// opencodeSchemaKey und opencodeSchemaURL sind der Verweis auf das Config-Schema,
+// den OpenCode in jeder Projektkonfiguration erwartet.
+//
+// Fehlt er, trägt OpenCode ihn beim nächsten Start selbst nach und schreibt die
+// Datei dabei zurück. Eine Datei, die hier neu entsteht, bekommt ihn deshalb
+// gleich mit: dann bleibt sie so liegen, wie k-playbook sie hinterlassen hat.
+//
+// Nachgetragen wird er ausschließlich bei Neuanlage. Eine Datei, die schon dem
+// Projekt gehört, wird nicht um Schlüssel ergänzt, die niemand angefordert hat —
+// auch nicht um diesen.
+const (
+	opencodeSchemaKey = "$schema"
+	opencodeSchemaURL = "https://opencode.ai/config.json"
+)
+
 // MCPSchema unterscheidet die beiden Schreibweisen, in denen ein Assistent
 // seine MCP-Server notiert.
 type MCPSchema string
@@ -256,7 +271,8 @@ func describeMCPEntry(value any) string {
 }
 
 // applyMCPTarget setzt den eigenen Eintrag und lässt alles andere in der Datei
-// stehen. Eine fehlende Datei entsteht dabei neu.
+// stehen. Eine fehlende Datei entsteht dabei neu — bei OpenCode samt $schema,
+// damit der Assistent sie nicht seinerseits umschreiben muss.
 //
 // Nicht erhalten bleibt die Formatierung: gelesen und geschrieben wird über
 // map[string]any, und ein solcher Round-Trip sortiert die Schlüssel
@@ -265,10 +281,14 @@ func describeMCPEntry(value any) string {
 func applyMCPTarget(projectRoot string, target MCPTarget) error {
 	path := filepath.Join(projectRoot, target.Path)
 
-	content, _, err := readJSONObject(path)
+	content, exists, err := readJSONObject(path)
 	if err != nil {
 		// Nicht lesbar heißt: nicht anfassen. Die Prüfung meldet es.
 		return nil
+	}
+
+	if !exists && target.Schema == MCPSchemaOpenCode {
+		content[opencodeSchemaKey] = opencodeSchemaURL
 	}
 
 	section, ok := mcpSection(content, target.Schema)

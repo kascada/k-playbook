@@ -397,6 +397,85 @@ func TestExtractDependencyPaketAusPurl(t *testing.T) {
 	}
 }
 
+// grype führt seine Go-Funde ausschließlich unter der Kennung der Go
+// Vulnerability Database. Gekürzt aus raw/grype.sarif des Messlaufs 2026-08-28.
+//
+// Der Fund trägt damit erstmals eine Kennung — und weil das Paket schon aus dem
+// purl kommt, auch einen harten Dependency-Schlüssel.
+func TestExtractDependencyGoKennungAusGrype(t *testing.T) {
+	result := sarifResult{
+		RuleID:  "GO-2026-5024-golang.org/x/sys",
+		Message: sarifText{Text: "A low vulnerability in go-module package: golang.org/x/sys, version v0.41.0 was found at: /installer/go.mod"},
+	}
+	rule := sarifRule{
+		ID:               "GO-2026-5024-golang.org/x/sys",
+		Name:             "GoModuleMatcherExactDirectMatch",
+		ShortDescription: sarifText{Text: "GO-2026-5024 low vulnerability for golang.org/x/sys package"},
+		FullDescription:  sarifText{Text: "NewNTUnicodeString does not check for string length overflow."},
+		Properties: sarifObject{
+			"purls":             []any{"pkg:golang/golang.org/x/sys@v0.41.0"},
+			"security-severity": "3.3",
+		},
+	}
+	finding := Finding{
+		RuleID:          result.RuleID,
+		RuleName:        rule.Name,
+		RuleDescription: rule.FullDescription.Text,
+		Message:         result.Message.Text,
+		Location:        Location{URI: "/installer/go.mod", StartLine: 1},
+	}
+
+	dependency := extractDependency(finding, result, rule)
+
+	if !reflect.DeepEqual(dependency.KeyIDs, []string{"GO-2026-5024"}) {
+		t.Fatalf("Go-Kennung nicht in der engen Menge: %v", dependency.KeyIDs)
+	}
+	if dependency.Package != "golang.org/x/sys" || dependency.Version != "v0.41.0" {
+		t.Fatalf("purl nicht zerlegt: %q / %q", dependency.Package, dependency.Version)
+	}
+	keys := dependencyKeys(Finding{Dependency: dependency})
+	if !contains(keys, "dependency:GO-2026-5024:golang.org/x/sys:v0.41.0") {
+		t.Errorf("harter Schlüssel fehlt: %v", keys)
+	}
+}
+
+// Die vier Binaries unter dist/ melden dieselben stdlib-Schwachstellen. Über die
+// Go-Kennung und das purl-Paket finden sie zu einer Gruppe je Schwachstelle
+// zusammen statt zu einer je Fundort — genau die Umkehrung, um die es diesem
+// Task geht. Das Manifest steht seit Task 027 nicht mehr im Schlüssel.
+func TestGroupFindingsGoFundeGruppierenNachSchwachstelle(t *testing.T) {
+	stdlib := func(id string, rule string, uri string) Finding {
+		return finding(id, "grype", rule, uri, 1, "stdlib", Dependency{
+			Package: "stdlib", Version: "1.26.4", Manifest: uri,
+			IDs: []string{"GO-2026-5972"}, KeyIDs: []string{"GO-2026-5972"},
+		})
+	}
+	groups := GroupFindings([]Finding{
+		stdlib("a", "GO-2026-5972-stdlib", "/dist/k-playbook-linux-amd64"),
+		stdlib("b", "GO-2026-5972-stdlib", "/dist/k-playbook-darwin-arm64"),
+	})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("dieselbe Go-Schwachstelle in zwei Binaries nicht zusammengeführt: %+v", groups)
+	}
+	if !strings.HasPrefix(groups[0].StableID, "scan-cve-go-2026-5972-") {
+		t.Errorf("Präfix folgt der Go-Kennung nicht: %q", groups[0].StableID)
+	}
+}
+
+// Gegentest zur Go-Kennung: eine Zeichenfolge aus gewöhnlichem Text ist keine
+// Kennung. Die Go-Datenbank vergibt vierstellige, nullgefüllte Nummern; ohne
+// diese Untergrenze läse das case-insensitive Muster jede Datumsangabe der Form
+// go-2026-08 als Kennung und verkettete darüber fremde Funde.
+func TestExtractIDsLiestGewoehnlichenTextNichtAlsKennung(t *testing.T) {
+	text := "Siehe go-2026-08 im Änderungsprotokoll, dazu GO-26-1234 und den Branch go-2026-1 von gestern."
+	if ids := extractIDs(text); len(ids) != 0 {
+		t.Errorf("gewöhnlicher Text als Kennung gelesen: %v", ids)
+	}
+	if ids := extractIDs("Behoben laut GO-2026-5024."); !reflect.DeepEqual(ids, []string{"GO-2026-5024"}) {
+		t.Errorf("echte Go-Kennung nicht gelesen: %v", ids)
+	}
+}
+
 // osv-scanner nennt Paket und Version ausschließlich in der Meldung. Gekürzt
 // aus raw/osv-scanner.sarif des Messlaufs 2026-08-27.
 func TestExtractDependencyPaketNurImFreitextOsvScanner(t *testing.T) {
@@ -733,6 +812,85 @@ func TestSameLocationToolKeyEntfaelltAuchBeiFreitextDependency(t *testing.T) {
 	}
 }
 
+// Der Ausschluss aus Task 034: grypes partialFingerprints.primaryLocationLineHash
+// ist je Paket und Datei gleich, nicht je Schwachstelle. Für Dependency-Funde
+// bildet er deshalb keinen Schlüssel mehr — grype steht nicht auf der
+// Zulassungsliste namingFingerprints.
+//
+// Die Werte stammen aus dem Lauf 2026-08-28: `1249092561d58ae3…` trug dort alle
+// sechs jinja2-Funde von grype.
+func TestGroupFindingsFingerprintNichtFuerDependencyFundeOhneZulassung(t *testing.T) {
+	links := finding("a", "grype", "GHSA-462w-v97r-4m45-jinja2", "/tmp-cve-probe/requirements.txt", 1, "A",
+		Dependency{Package: "jinja2", Version: "2.10", IDs: []string{"GHSA-462W-V97R-4M45"}, KeyIDs: []string{"GHSA-462W-V97R-4M45"}})
+	links.PartialFingerprints = map[string]string{"primaryLocationLineHash": "1249092561d58ae3"}
+	rechts := finding("b", "grype", "GHSA-cpwx-vrp4-4pq7-jinja2", "/tmp-cve-probe/requirements.txt", 1, "B",
+		Dependency{Package: "jinja2", Version: "2.10", IDs: []string{"GHSA-CPWX-VRP4-4PQ7"}, KeyIDs: []string{"GHSA-CPWX-VRP4-4PQ7"}})
+	rechts.PartialFingerprints = map[string]string{"primaryLocationLineHash": "1249092561d58ae3"}
+
+	if keys := fingerprintKeys(links); len(keys) != 0 {
+		t.Errorf("Fingerprint bildet trotz erkannter Dependency einen Schlüssel: %v", keys)
+	}
+	groups := GroupFindings([]Finding{links, rechts})
+	if len(groups) != 2 {
+		t.Fatalf("zwei Schwachstellen desselben Pakets über den Ortshash zusammengelegt: %+v", groups)
+	}
+	for _, group := range groups {
+		if contains(group.DedupeRules, "fingerprint") {
+			t.Errorf("Regel bei Dependency-Funden noch gemeldet: %v", group.DedupeRules)
+		}
+	}
+}
+
+// Die Gegenprobe: osv-scanner vergibt denselben Namen, aber je Schwachstelle
+// einen eigenen Wert. Es steht auf der Zulassungsliste, und seine zwei
+// deckungsgleichen Meldungen desselben CVE finden weiter zusammen — genau die
+// Gruppierung, die eine pauschale Regel verloren hätte.
+func TestGroupFindingsFingerprintZulassungslisteGruppiertWeiter(t *testing.T) {
+	links := finding("a", "osv-scanner", "CVE-2018-18074", "requirements.txt", 0, "A",
+		Dependency{IDs: []string{"CVE-2018-18074"}, KeyIDs: []string{"CVE-2018-18074"}, TextPackage: "requests"})
+	links.PartialFingerprints = map[string]string{"primaryLocationLineHash": "3949d8b838308400"}
+	rechts := finding("b", "osv-scanner", "CVE-2018-18074", "requirements.txt", 0, "B",
+		Dependency{IDs: []string{"CVE-2018-18074"}, KeyIDs: []string{"CVE-2018-18074"}, TextPackage: "requests"})
+	rechts.PartialFingerprints = map[string]string{"primaryLocationLineHash": "3949d8b838308400"}
+
+	if keys := fingerprintKeys(links); len(keys) != 1 {
+		t.Fatalf("zugelassener Fingerprint bildet keinen Schlüssel: %v", keys)
+	}
+	groups := GroupFindings([]Finding{links, rechts})
+	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
+		t.Fatalf("zugelassener Fingerprint gruppiert nicht mehr: %+v", groups)
+	}
+}
+
+// Für Funde ohne erkannte Dependency bleibt fingerprintKeys unverändert; das
+// ist hier nicht Gegenstand.
+func TestFingerprintKeysOhneDependencyUnveraendert(t *testing.T) {
+	plain := finding("a", "semgrep", "go.security", "main.go", 7, "A", Dependency{})
+	plain.Fingerprints = map[string]string{"match": "fp1"}
+	keys := fingerprintKeys(plain)
+	if len(keys) != 1 || keys[0] != "fingerprint:semgrep:match:fp1" {
+		t.Errorf("Fingerprint für Nicht-Dependency-Fund verändert: %v", keys)
+	}
+}
+
+// Ein Name, den erst ein Werkzeug-Update mitbringt, steht nicht auf der
+// Zulassungsliste und stellt die Ortsgruppierung nicht wieder her. Das ist der
+// Grund, aus dem die Liste eine Zulassungs- und keine Sperrliste ist.
+func TestNamesFindingKenntNurBelegtePaare(t *testing.T) {
+	if !namesFinding("osv-scanner", "primaryLocationLineHash") {
+		t.Error("belegtes Paar nicht zugelassen")
+	}
+	if !namesFinding("OSV-Scanner", "PRIMARYLOCATIONLINEHASH") {
+		t.Error("Vergleich ist nicht schreibungsunabhängig")
+	}
+	if namesFinding("grype", "primaryLocationLineHash") {
+		t.Error("derselbe Name eines anderen Werkzeugs zugelassen")
+	}
+	if namesFinding("osv-scanner", "neuerHashAusEinemUpdate") {
+		t.Error("unbekannter Name zugelassen")
+	}
+}
+
 func TestGroupFindingsKeineZusammenlegungBeiUnsichererLage(t *testing.T) {
 	groups := GroupFindings([]Finding{
 		finding("a", "semgrep", "sql-injection", "app.go", 12, "A", Dependency{}),
@@ -966,17 +1124,21 @@ func fixedNow() time.Time {
 // den Dependency-Schlüssel entstanden ist. Seit Task 028 bündelt
 // same-location-tool Dependency-Funde nicht mehr; den Fall stellt hier ein
 // gemeinsamer Fingerprint desselben Werkzeugs her.
+//
+// Seit Task 034 muss es dafür ein Paar aus der Zulassungsliste
+// namingFingerprints sein — nur die bilden für Dependency-Funde überhaupt noch
+// einen Schlüssel.
 func TestApplyRepresentativeVereinigtNurDieselbeDependency(t *testing.T) {
-	links := finding("a", "grype", "GHSA-AAAA-BBBB-CCCC", "requirements.txt", 1, "requests", Dependency{
+	links := finding("a", "osv-scanner", "GHSA-AAAA-BBBB-CCCC", "requirements.txt", 1, "requests", Dependency{
 		Package: "requests", Version: "2.19.0", Manifest: "requirements.txt",
 		IDs: []string{"GHSA-AAAA-BBBB-CCCC"}, KeyIDs: []string{"GHSA-AAAA-BBBB-CCCC"},
 	})
-	links.Fingerprints = map[string]string{"grype/v1": "gemeinsam"}
-	rechts := finding("b", "grype", "GHSA-DDDD-EEEE-FFFF", "requirements.txt", 1, "jinja2", Dependency{
+	links.Fingerprints = map[string]string{"primaryLocationLineHash": "gemeinsam"}
+	rechts := finding("b", "osv-scanner", "GHSA-DDDD-EEEE-FFFF", "requirements.txt", 1, "jinja2", Dependency{
 		Package: "jinja2", Version: "2.10", Manifest: "requirements.txt",
 		IDs: []string{"GHSA-DDDD-EEEE-FFFF"}, KeyIDs: []string{"GHSA-DDDD-EEEE-FFFF"},
 	})
-	rechts.Fingerprints = map[string]string{"grype/v1": "gemeinsam"}
+	rechts.Fingerprints = map[string]string{"primaryLocationLineHash": "gemeinsam"}
 
 	groups := GroupFindings([]Finding{links, rechts})
 	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {
@@ -996,12 +1158,12 @@ func TestApplyRepresentativeOhnePaketKeineUnion(t *testing.T) {
 		Manifest: "requirements.txt",
 		IDs:      []string{"CVE-2026-1111"}, KeyIDs: []string{"CVE-2026-1111"},
 	})
-	links.Fingerprints = map[string]string{"osv/v1": "gemeinsam"}
+	links.Fingerprints = map[string]string{"primaryLocationLineHash": "gemeinsam"}
 	rechts := finding("b", "osv-scanner", "CVE-2026-2222", "requirements.txt", 1, "CVE-2026-2222", Dependency{
 		Manifest: "requirements.txt",
 		IDs:      []string{"CVE-2026-2222"}, KeyIDs: []string{"CVE-2026-2222"},
 	})
-	rechts.Fingerprints = map[string]string{"osv/v1": "gemeinsam"}
+	rechts.Fingerprints = map[string]string{"primaryLocationLineHash": "gemeinsam"}
 
 	groups := GroupFindings([]Finding{links, rechts})
 	if len(groups) != 1 || len(groups[0].FindingIDs) != 2 {

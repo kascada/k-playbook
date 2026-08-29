@@ -453,7 +453,26 @@ type sarifLocation struct {
 
 type sarifObject map[string]any
 
-var dependencyIDPattern = regexp.MustCompile(`(?i)\b(CVE-\d{4}-\d{4,}|GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|OSV-[0-9A-Z-]+|PYSEC-\d{4}-\d+)\b`)
+// dependencyIDPattern trifft die Kennungsformen, die die Werkzeuge eines Laufs
+// für einen Dependency-Befund vergeben.
+//
+// GO-… ist seit Task 034 dabei: grype führt seine Go-Funde ausschließlich unter
+// der Kennung der Go Vulnerability Database, im Lauf 2026-08-28 waren das 25 von
+// 43 Funden. Ohne sie hatten sie gar keine Kennung, keinen harten
+// Dependency-Schlüssel und fielen aus der werkzeugübergreifenden Gruppierung.
+//
+// Die Nummer verlangt **mindestens vier** Stellen, wie bei CVE. Die Go-Datenbank
+// vergibt sie vierstellig und nullgefüllt (GO-2020-0001), und das Muster läuft
+// case-insensitiv über Freitext: ohne die Untergrenze läse es „go-2026-08" aus
+// einer gewöhnlichen Datumsangabe als Kennung und verkettete darüber fremde
+// Funde.
+//
+// Nicht aufgenommen ist SNYK-… . osv-scanner nennt es im Advisory-Freitext als
+// Alias (SNYK-PYTHON-JINJA2-1012994), aber kein Werkzeug des Laufs *vergibt* es:
+// es steht in keiner Rule-ID und in keinem benannten Kennungsfeld, käme also nur
+// in die breite Menge und verbände dort nichts, was nicht schon über CVE, GHSA
+// oder PYSEC verbunden wäre.
+var dependencyIDPattern = regexp.MustCompile(`(?i)\b(CVE-\d{4}-\d{4,}|GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|OSV-[0-9A-Z-]+|PYSEC-\d{4}-\d+|GO-\d{4}-\d{4,})\b`)
 
 func loadFindings(runDir string, entries []EntrySummary, severityMapping SeverityMapping) ([]Finding, error) {
 	findings := []Finding{}
