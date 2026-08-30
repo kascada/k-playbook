@@ -205,9 +205,22 @@ func Suggest() Suggestion {
 	return suggestion
 }
 
-// InstallDir liefert das Verzeichnis der Installation, abgeleitet aus
-// <X>/dist/<binary>.
+// InstallDir liefert das Verzeichnis der Installation.
+//
+// Vorrang hat, was der Wrapper sagt: er kennt seinen eigenen Ort und ist die
+// einzige Stelle, die ihn noch kennt, seit das Binary auch aus dem Cache
+// kommen kann. Die Ableitung aus dem Ort des Binaries bleibt Rückfall für
+// direkt gestartete Binaries.
 func InstallDir() (string, bool) {
+	if dir := strings.TrimSpace(os.Getenv(InstallDirEnv)); dir != "" {
+		if absolute, err := filepath.Abs(dir); err == nil {
+			dir = absolute
+		}
+		if isDir(dir) {
+			return dir, true
+		}
+	}
+
 	exe, err := os.Executable()
 	if err != nil {
 		return "", false
@@ -216,8 +229,16 @@ func InstallDir() (string, bool) {
 		exe = resolved
 	}
 
+	// Das Binary liegt in <X>/dist/; X wäre die Installation. Für ein Binary
+	// aus dem Cache (<cache>/bin/<version>/<binary>) trifft das nicht zu, und
+	// <cache>/bin existiert trotzdem — ein bloßes isDir lieferte dann ein
+	// falsches Verzeichnis statt eines Fehlers. Deshalb muss darunter auch
+	// wirklich eine Installation liegen.
 	dir := filepath.Dir(filepath.Dir(exe))
 	if !isDir(dir) {
+		return "", false
+	}
+	if !fileExists(filepath.Join(dir, BinDirName, WrapperName)) && !fileExists(filepath.Join(dir, ConfigFileName)) {
 		return "", false
 	}
 	return dir, true

@@ -23,6 +23,16 @@ const (
 	BinDirName = "bin"
 )
 
+// VersionFileName koppelt einen Clone-Stand an ein Binary. Die Datei liegt im
+// Wurzelverzeichnis der Installation und nennt den Release-Tag, dessen Assets
+// zu diesem Stand gehören. Content-Commits ändern sie nicht.
+const VersionFileName = "VERSION"
+
+// InstallDirEnv nennt die Variable, mit der der Wrapper seine eigene
+// Installation benennt. Seit das Binary aus einem Cache außerhalb der
+// Installation kommen kann, ist das die einzige verlässliche Quelle.
+const InstallDirEnv = "K_PLAYBOOK_INSTALL_DIR"
+
 // ErrNotFound meldet, dass oberhalb des Startverzeichnisses keine Installation liegt.
 var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 

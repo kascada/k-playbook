@@ -285,3 +285,30 @@ func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
 		t.Errorf("selbst erzeugte Konfiguration ist ungültig: %v", err)
 	}
 }
+
+// Der Wrapper nennt die Installation ausdrücklich; das schlägt jede Ableitung
+// aus dem Ort des Binaries.
+func TestInstallDirFolgtDerUmgebungsvariablen(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(InstallDirEnv, root)
+
+	dir, ok := InstallDir()
+	if !ok {
+		t.Fatal("InstallDir meldet kein Ergebnis, obwohl " + InstallDirEnv + " gesetzt ist")
+	}
+	if !samePath(dir, root) {
+		t.Errorf("InstallDir = %q, erwartet %q", dir, root)
+	}
+}
+
+// Zeigt die Variable ins Leere, gilt sie nicht: sonst würde ein Tippfehler
+// stillschweigend ein nicht existierendes Verzeichnis zur Installation erklären.
+func TestInstallDirIgnoriertUngueltigeUmgebungsvariable(t *testing.T) {
+	t.Setenv(InstallDirEnv, filepath.Join(t.TempDir(), "gibt-es-nicht"))
+
+	// Der Rückfall auf den Ort des Testbinaries liefert kein Verzeichnis mit
+	// bin/k-playbook darin — genau das soll er nicht als Installation ausgeben.
+	if dir, ok := InstallDir(); ok {
+		t.Errorf("InstallDir = %q, erwartet kein Ergebnis", dir)
+	}
+}

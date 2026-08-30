@@ -22,6 +22,11 @@ const (
 	// cleanlinessTimeout: rein lokale Git-Aufrufe, die nur bei einem
 	// blockierten Index überhaupt hängen können.
 	cleanlinessTimeout = 10 * time.Second
+	// prefetchTimeout begrenzt den Nachladeversuch nach einem
+	// VERSION-Wechsel. Bewusst ein eigener Timeout und nicht der Kontext des
+	// Pulls: der Pull ist zu diesem Zeitpunkt schon durch, und ein hängender
+	// Download darf ihn nicht nachträglich zum Fehler machen.
+	prefetchTimeout = 3 * time.Minute
 )
 
 // DevSyncMarker liegt in der Installation, wenn dort ein Arbeitsstand
@@ -308,6 +313,7 @@ func Update(projectDir string) (result UpdateResult, err error) {
 		return UpdateResult{Cleanliness: state}, fmt.Errorf("%s", state.Message)
 	}
 
+	versionBefore := InstalledVersion(dir)
 	before := binaryHashes(dir)
 	if err := setInstallationWritable(projectDir); err != nil {
 		return UpdateResult{}, fmt.Errorf("Installation beschreibbar machen: %w", err)
@@ -330,8 +336,72 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	}
 
 	result = UpdateResult{Output: text}
-	result.BinaryChanged = !sameHashes(before, binaryHashes(dir))
+
+	versionAfter := InstalledVersion(dir)
+	versionChanged := versionBefore != versionAfter
+	// Übergangsregel, solange dist/ versioniert ist: auch ein ersetztes Binary
+	// meldet den Neustart. Ohne diese Hälfte fiele der Hinweis zwischen dem
+	// Go-Umbau und dem ersten Release still aus, weil es noch keine VERSION
+	// gibt. Mit dist/ fällt sie weg.
+	result.BinaryChanged = versionChanged || !sameHashes(before, binaryHashes(dir))
+
+	if versionChanged {
+		output, err := prefetchBinary(dir)
+		if output != "" {
+			result.Output = strings.TrimSpace(result.Output + "\n" + output)
+		}
+		if err != nil {
+			hint := fmt.Sprintf("Neue Version %s: das Binary konnte nicht vorab geladen werden (%v). Der nächste Start lädt es nach oder nennt den Ausweg.", versionAfter, err)
+			result.Message = hint
+			result.Output = strings.TrimSpace(result.Output + "\n" + hint)
+		}
+	}
 	return result, nil
+}
+
+// InstalledVersion liest die VERSION der Installation. Leer, wenn es keine
+// gibt — dann gehört zu diesem Stand kein Release.
+func InstalledVersion(playbookDir string) string {
+	content, err := os.ReadFile(filepath.Join(playbookDir, VersionFileName))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(content))
+}
+
+// prefetchBinary legt das Binary der eigenen Plattform gleich nach dem Pull in
+// den Cache. Ohne das wartet der Nutzer beim Neustart auf den Download.
+//
+// Aufgerufen wird ausdrücklich der Wrapper dieser Installation, nicht der aus
+// InstallDir(): das laufende Binary kann eine fremde Installation
+// aktualisieren, und nur der frisch gezogene Clone trägt die neue VERSION und
+// die dazu passenden Prüfsummen.
+//
+// Best effort. Der Rückgabefehler von Update() trägt über
+// keepInstallationReadOnly das Ergebnis des ganzen Laufs; ein gescheiterter
+// Download ließe ein erfolgreiches git pull als gescheitertes Update
+// erscheinen — offline, hinter einem Proxy und genau im Release-Fenster.
+func prefetchBinary(playbookDir string) (string, error) {
+	wrapper := filepath.Join(playbookDir, BinDirName, WrapperName)
+	if !fileExists(wrapper) {
+		return "", fmt.Errorf("%s fehlt", DisplayPath(wrapper))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), prefetchTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, wrapper, "--prefetch")
+	cmd.Dir = playbookDir
+	output, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(output))
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return text, fmt.Errorf("--prefetch hat nach %s nicht geantwortet", prefetchTimeout)
+	}
+	if err != nil {
+		return text, fmt.Errorf("--prefetch fehlgeschlagen")
+	}
+	return text, nil
 }
 
 // binaryHashes bildet die ausgelieferten Binaries ab. Ändern sie sich, läuft
