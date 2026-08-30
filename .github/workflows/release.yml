@@ -40,10 +40,22 @@ jobs:
 
       # Liest die toolchain-Zeile aus installer/go.mod. Damit steht die Version
       # an genau einer Stelle — derselben, die `make release` lokal prüft.
+      #
+      # Nicht go-version-file: das nimmt die go-Direktive (1.26) und installiert
+      # die neueste 1.26.x. Gebraucht wird exakt die toolchain-Version, sonst
+      # bauen CI und Release-Commit verschiedene Binaries.
+      - name: Toolchain-Version lesen
+        id: toolchain
+        run: |
+          set -eu
+          version="$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' installer/go.mod)"
+          test -n "$version" || { echo "In installer/go.mod fehlt die toolchain-Zeile." >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Go einrichten
         uses: actions/setup-go@v5
         with:
-          go-version-file: installer/go.mod
+          go-version: ${{ steps.toolchain.outputs.version }}
           cache-dependency-path: installer/go.sum
 
       - name: Toolchain prüfen
