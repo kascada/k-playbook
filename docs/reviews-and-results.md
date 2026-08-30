@@ -415,7 +415,7 @@ remediation:
 Modi, vom striktesten zum offensten:
 
 - `task-branch-pr` — keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit
-  Branch- und PR-Hinweis; umgesetzt wird später über `/k-run`.
+  Branch- und PR-Hinweis; umgesetzt wird später über `/k-task-run`.
 - `task-first` — Tasks sind der Standard. Direkte Fixes nur nach ausdrücklicher Freigabe
   für einzelne kleine Bündel. **Das ist der Default.**
 - `direct-allowed` — kleine, sichere Befunde dürfen nach Code-Sichtung sofort behoben

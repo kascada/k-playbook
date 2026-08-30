@@ -257,8 +257,8 @@ Append the following block to **each reviewed task file** — not only to the on
 were changed.
 
 Eine Datei, an der nichts zu korrigieren war, ist trotzdem geprüft worden, und diese
-Prüfung muss sichtbar bleiben. `/k-run` Step 1.2 erkennt an genau diesem Block, ob ein
-Task jemals gegengelesen wurde; fehlt er auf einer ungeänderten Datei, meldet `/k-run`
+Prüfung muss sichtbar bleiben. `/k-task-run` Step 1.2 erkennt an genau diesem Block, ob ein
+Task jemals gegengelesen wurde; fehlt er auf einer ungeänderten Datei, meldet `/k-task-run`
 sie später als ungeprüft und fragt unnötig nach.
 
 Ergab die Prüfung keine Änderung, wird derselbe Block angehängt: Tabellen ohne Zeilen

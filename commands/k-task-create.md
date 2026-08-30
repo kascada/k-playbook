@@ -31,7 +31,7 @@ Command-specific policy:
 
 ## Step 2 — Determine next number
 
-Scan `.md` files in **both** `RESOLVED_TASKS_DIR/` and `RESOLVED_TASKS_DIR/done/` (completed tasks land there via `/k-run`). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
+Scan `.md` files in **both** `RESOLVED_TASKS_DIR/` and `RESOLVED_TASKS_DIR/done/` (completed tasks land there via `/k-task-run`). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
 
 If neither directory has numbered files, start at `001`.
 
@@ -49,7 +49,7 @@ Look at the current conversation for:
 - File paths or documentation files relevant to the task → add to `## Referenzen`
 - Tools beyond the standard set (Read, Write, Edit, Bash, Glob, Grep) that will likely be needed → add to `## Tools`
 
-Standard tools (Read, Write, Edit, Bash, Glob, Grep) do not need to be listed — they are always pre-approved in `/k-run`. Only list extras like MCP tools or special permissions.
+Standard tools (Read, Write, Edit, Bash, Glob, Grep) do not need to be listed — they are always pre-approved in `/k-task-run`. Only list extras like MCP tools or special permissions.
 
 ## Step 5 — Determine Intent
 
@@ -66,7 +66,7 @@ If the Intent cannot be meaningfully derived from the conversation (e.g. purely 
 **Zuschnitt: im Zweifel eine Datei.**
 
 Umfang allein ist kein Grund zu teilen. Ein Task, der in Etappen zerfällt, wird eine
-Datei mit `### Etappe N — Titel` unter `## Zu bauen` — `/k-run` verfolgt den Fortschritt
+Datei mit `### Etappe N — Titel` unter `## Zu bauen` — `/k-task-run` verfolgt den Fortschritt
 etappenweise und setzt nach einem Abbruch dort wieder an. Der frühere Grund zu teilen,
 nämlich den Stand über Dateigrenzen sichtbar zu machen, ist damit weg.
 
@@ -136,7 +136,7 @@ Omit any section that is empty or not applicable.
 **Etappen:** Nur gliedern, wenn die Arbeit wirklich in Abschnitte zerfällt, die
 nacheinander abgeschlossen werden können — vier bis acht Etappen sind ein sinnvoller
 Rahmen. Jede Etappe muss für sich fertig werden können; eine, die nur zusammen mit der
-nächsten Sinn ergibt, gehört mit dieser zusammengelegt. `/k-run` legt daraus eine
+nächsten Sinn ergibt, gehört mit dieser zusammengelegt. `/k-task-run` legt daraus eine
 `## Fortschritt`-Tabelle an und setzt nach einem Abbruch bei der ersten offenen Etappe
 wieder an. Ohne `### Etappe`-Überschriften läuft der Task als Ganzes, ohne
 Fortschrittsverfolgung.

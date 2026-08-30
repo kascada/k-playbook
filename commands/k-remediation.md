@@ -165,7 +165,7 @@ Direct fixes: true | false
 
 Modus-Semantik:
 
-- `task-branch-pr`: Keine direkten Code-Fixes aus `/k-remediation`. Findings werden zu Remediation-Bündeln gruppiert; jedes akzeptierte Bündel erzeugt eine Task-Datei mit Branch-/PR-Hinweis. Umsetzung erfolgt später über `/k-run` oder einen dedizierten Dev-Flow auf Branch + PR.
+- `task-branch-pr`: Keine direkten Code-Fixes aus `/k-remediation`. Findings werden zu Remediation-Bündeln gruppiert; jedes akzeptierte Bündel erzeugt eine Task-Datei mit Branch-/PR-Hinweis. Umsetzung erfolgt später über `/k-task-run` oder einen dedizierten Dev-Flow auf Branch + PR.
 - `task-first`: Standard ist Task-Erzeugung pro Bündel; direkte Fixes nur nach expliziter User-Freigabe für einzelne kleine Bündel.
 - `direct-allowed`: Kleine sichere `S`-Findings dürfen nach Code-Sichtung direkt behoben werden, wenn der User die Kategorien freigibt.
 

@@ -22,7 +22,7 @@ trägt den Server in allen drei Dateien ein:
 |---|---|---|
 | Claude Code | `.mcp.json` im Hauptverzeichnis | `mcpServers` → `k-playbook` |
 | Cursor | `.cursor/mcp.json` | dasselbe Schema, derselbe Schlüssel |
-| OpenCode | `opencode.json` | `mcp` → `k-playbook` |
+| OpenCode | `opencode.json`, oder `opencode.jsonc`, wenn nur die existiert | `mcp` → `k-playbook` |
 
 Registriert wird immer dasselbe Kommando, nur in zwei Schreibweisen:
 
@@ -51,14 +51,28 @@ Registriert wird immer dasselbe Kommando, nur in zwei Schreibweisen:
 
 Bei OpenCode ist `command` ein **Array** aus Kommando und Argumenten, nicht zwei Felder.
 
-Die drei Dateien gehören dem Projekt und können fremde Einträge tragen; `opencode.json`
-trägt daneben ganz andere Einstellungen. Angefasst wird deshalb genau der Schlüssel
-`k-playbook`, alles andere bleibt inhaltlich unberührt. Nicht erhalten bleibt die
-**Formatierung**: gelesen und geschrieben wird als JSON, und ein solcher Round-Trip
-sortiert die Schlüssel alphabetisch und setzt die Einrückung auf zwei Leerzeichen. Wer
-eine handformatierte Datei hat, sieht sie danach normalisiert.
+Die drei Dateien gehören dem Projekt und können fremde Einträge tragen; die
+OpenCode-Konfiguration trägt daneben ganz andere Einstellungen. Angefasst wird deshalb
+genau der Schlüssel `k-playbook`, alles andere bleibt unberührt — **Kommentare und
+Trailing Commas eingeschlossen**. Gelesen wird im JWCC-Format (JSON mit Kommas und
+Kommentaren), und in eine vorhandene Datei wird nicht ihr Inhalt zurückgeschrieben,
+sondern nur dieser eine Schlüssel gepatcht. Fremde Einträge, ihre Reihenfolge und die
+Kommentare stehen danach unverändert da.
 
-Entsteht `opencode.json` dabei **neu**, wird der Schema-Verweis
+Eine Nebenwirkung bleibt sichtbar: nach dem Patch wird die Datei einmal **neu
+eingerückt**, mit Tabs. Bei einer eingecheckten Konfiguration mit Leerzeichen-Einrückung
+ist das ein Diff über die ganze Datei. Das passiert einmal, beim ersten Einrichten —
+steht der Eintrag danach richtig, wird gar nicht mehr geschrieben.
+
+**Zwei Endungen, eine Datei.** OpenCode liest `opencode.json` und `opencode.jsonc` und
+führt beide tief zusammen, wenn sie nebeneinander liegen. Deshalb legt das Einrichten nie
+eine zweite an: `opencode.jsonc` ist das Ziel, wenn sie existiert und `opencode.json`
+fehlt — sonst `opencode.json`. Liegen wirklich beide vor, wird nur `opencode.json`
+gepflegt, und die Oberfläche meldet „zwei Konfigurationen" statt „eingetragen": was beim
+Zusammenführen gewinnt, ist von außen nicht zu sehen, und eine der beiden gehört
+aufgelöst.
+
+Entsteht die OpenCode-Konfiguration dabei **neu**, wird der Schema-Verweis
 `"$schema": "https://opencode.ai/config.json"` gleich mitgeschrieben. OpenCode trägt ihn
 sonst beim nächsten Start selbst nach und schreibt die Datei dafür zurück; mit dem
 Eintrag bleibt sie so liegen, wie das Einrichten sie hinterlassen hat. In eine bereits
@@ -67,7 +81,8 @@ vorhandene Datei wird er **nicht** nachgetragen — die gehört dem Projekt.
 Der Schlüssel `k-playbook` gehört k-playbook. Steht dort etwas anderes — ein absoluter
 Pfad, ein fremdes Kommando —, ist das kein Konflikt, sondern ein falscher Stand: die
 Oberfläche meldet „zeigt woandershin" und überschreibt ihn beim Einrichten. Nur eine
-Datei, die sich nicht als JSON lesen lässt, wird gemeldet und **nicht** angefasst.
+Datei, die sich auch als JWCC nicht lesen lässt — eine fehlende Klammer, ein Fragment —,
+wird gemeldet und **nicht** angefasst. Kommentare allein sind kein solcher Fall.
 
 In einem Zielprojekt gehören alle drei Dateien ins Repository, damit das Team denselben
 Server bekommt.
@@ -353,7 +368,8 @@ Er spricht dann JSON-RPC über stdin und stdout und wartet auf einen Client.
 
 **Entfernen geht nur von Hand.** Die Oberfläche richtet ein, sie räumt nicht ab. Wer den
 Server loswerden will, löscht den Eintrag `k-playbook` aus `.mcp.json`,
-`.cursor/mcp.json` und `opencode.json` — und startet den Assistenten neu.
+`.cursor/mcp.json` und `opencode.json` beziehungsweise `opencode.jsonc` — und startet den
+Assistenten neu.
 
 ## In diesem Repo
 

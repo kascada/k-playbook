@@ -12,7 +12,7 @@ import (
 const TasksDirName = "tasks"
 
 // DoneDirName ist das Verzeichnis der erledigten Tasks unterhalb von
-// TasksDirName. /k-run verschiebt eine Datei nach der Ausführung dorthin.
+// TasksDirName. /k-task-run verschiebt eine Datei nach der Ausführung dorthin.
 const DoneDirName = "done"
 
 // Task ist eine Aufgabe, offen oder erledigt.
@@ -113,7 +113,7 @@ func ReadTask(projectDir string, name string) (Task, []byte, error) {
 }
 
 // reviewLogHeading ist die Spur, die /k-task-refine in jeder geprüften Datei
-// hinterlässt — auch dann, wenn nichts zu ändern war. /k-run erkennt daran
+// hinterlässt — auch dann, wenn nichts zu ändern war. /k-task-run erkennt daran
 // dasselbe: ob ein Task jemals gegengelesen wurde.
 const reviewLogHeading = "## Review-Log"
 

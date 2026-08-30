@@ -1026,10 +1026,10 @@ dieselbe Regel wie bei der Doku.
 
 Jede Zeile sagt außerdem, ob der Task schon gegengelesen wurde. Erkannt wird das an der
 `## Review-Log`-Sektion, die `/k-task-refine` an **jede** geprüfte Datei anhängt, auch an
-die unveränderte — dieselbe Spur, an der `/k-run` Step 1.2 das prüft. Nennt die
+die unveränderte — dieselbe Spur, an der `/k-task-run` Step 1.2 das prüft. Nennt die
 Überschrift ein Datum, steht es dabei; mehrere Runden hängen mehrere Logs an, gezeigt
 wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als
-Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-run` vor der
+Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-task-run` vor der
 Ausführung nachfragt — deshalb steht er in Warnfarbe. Ein fehlendes Task-Verzeichnis ist anders als bei der
 Doku **kein** Befund: die projekteigene Struktur wird erst angelegt, und "noch keine
 Tasks" ist dieselbe Auskunft wie ein leeres Verzeichnis.
@@ -1153,24 +1153,41 @@ Detailtext. Drei Ziele, zwei Schemata:
 |---|---|---|---|
 | Claude Code | `.mcp.json` | `mcpServers` | `{"command": …, "args": ["mcp"]}` |
 | Cursor | `.cursor/mcp.json` | `mcpServers` | dasselbe |
-| OpenCode | `opencode.json` | `mcp` | `{"type": "local", "command": […, "mcp"], "enabled": true}` |
+| OpenCode | `opencode.json` oder `opencode.jsonc` | `mcp` | `{"type": "local", "command": […, "mcp"], "enabled": true}` |
 
 Bei OpenCode ist `command` ein **Array** aus Kommando und Argumenten, nicht zwei Felder.
 
+**Zielwahl statt fester Liste.** Deshalb bekommt `MCPTargets()` den `projectRoot`: das
+OpenCode-Ziel steht nicht fest, sondern folgt einer Regel. `opencode.jsonc` gilt, wenn sie
+existiert und `opencode.json` fehlt — sonst `opencode.json`. Angelegt wird nie eine
+zweite: OpenCode führt beide Endungen im Projekt-Root tief zusammen, und bei
+kollidierenden Schlüsseln entscheidet die Merge-Reihenfolge, ein Implementierungsdetail.
+Liegen trotzdem beide vor, wird nur `opencode.json` geschrieben, und der Zustand ist nie
+`MCPStateOK`, sondern `MCPStateAmbiguousTarget`: was am Ende wirkt, ist von außen nicht
+mehr zu sehen, und ein `ok` wäre eine Behauptung ohne Deckung.
+
 **Hineinschreiben statt anlegen.** Anders als bei der Verlinkung, wo `ownedLinks()` das
-eigene Werk wiedererkennt, gehören diese drei Dateien vollständig dem Projekt: sie können
-fremde MCP-Server tragen, und `opencode.json` daneben ganz andere Einstellungen. Gesetzt
-wird deshalb genau der Schlüssel `k-playbook`; alles andere bleibt inhaltlich unberührt.
-Nicht erhalten bleibt die **Formatierung** — gelesen und geschrieben wird mit
-`encoding/json` über `map[string]any`, und dieser Round-Trip sortiert die Schlüssel
-alphabetisch und setzt die Einrückung auf zwei Leerzeichen. Ordnungserhaltendes Schreiben
-wäre ein eigener Parser.
+eigene Werk wiedererkennt, gehören diese Dateien vollständig dem Projekt: sie können
+fremde MCP-Server tragen, und die OpenCode-Konfiguration daneben ganz andere
+Einstellungen. Gesetzt wird deshalb genau der Schlüssel `k-playbook`; alles andere bleibt
+unberührt. Gelesen und geschrieben wird über `github.com/tailscale/hujson`: eine
+vorhandene Datei wird als JWCC geparst und per JSON-Patch (RFC 6902) auf
+`/<schema>/k-playbook` verändert, statt über `map[string]any` neu serialisiert zu werden.
+Kommentare, Trailing Commas und die Schlüsselreihenfolge überleben das. Nur eine neu
+entstehende Datei geht weiter über `json.MarshalIndent` — dort gibt es nichts zu erhalten.
+
+Sichtbar bleibt eine Nebenwirkung: nach dem Patch läuft `Value.Format()` und rückt die
+Datei einheitlich mit Tabs ein. Bei einer eingecheckten Konfiguration mit
+Leerzeichen-Einrückung ist das ein Diff über die ganze Datei. Es passiert einmal:
+`applyMCPTarget()` schreibt gar nicht, wenn der Eintrag schon gleich ist — sonst
+formatierte jeder Lauf eine fremde Datei erneut um.
 
 Der Schlüssel gehört k-playbook. Ein abweichender Wert darunter ist kein Konflikt,
 sondern ein falscher Stand: `MCPStateStale` meldet ihn, `ApplyMCP()` überschreibt ihn. Als
-echter, unangetasteter Fall bleibt nur `MCPStateUnreadable` — eine Datei, die sich nicht
-als JSON-Objekt lesen lässt, wird gemeldet und nicht angefasst, damit keine Handarbeit
-eines Projekts verlorengeht.
+echter, unangetasteter Fall bleibt nur `MCPStateUnreadable` — und der ist seit dem
+JWCC-Parser eng: Kommentare und Trailing Commas sind lesbar, gemeldet und nicht angefasst
+wird nur noch, was auch als JWCC kein JSON-Objekt ergibt (kaputte Syntax, ein Array, ein
+`null`). So geht keine Handarbeit eines Projekts verloren.
 
 **Registriert wird der projekteigene Wrapper**, `project.WrapperPath()` — relativ zum
 Hauptverzeichnis, nicht die host-weite Kopie. Die wäre bequemer und trüge sogar immer den

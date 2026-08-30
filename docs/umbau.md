@@ -433,7 +433,7 @@ Wird einzeln besprochen, bevor daran gearbeitet wird:
   sie erreicht den Assistenten nur nicht. Die Rohausgabe bleibt für `raw/` erhalten — sie ist
   auditierbar und wird nicht ersetzt.
 - **Der geänderte Stand als MCP-Werkzeug.** Was bei einer Bewertung zählt und was nicht,
-  steht heute als Prosa in `commands/k-run.md` („omit generated files, lockfiles, and binary
+  steht heute als Prosa in `commands/k-task-run.md` („omit generated files, lockfiles, and binary
   files"; bei über ~100 Zeilen zusammenfassen) und fällt damit bei jedem Lauf neu aus.
   Mechanisch daran ist: Bezugspunkt über `git merge-base`, Dateien und Zeilen über
   `git diff --numstat`, binär meldet git selbst, `linguist-generated` und `-diff` stehen in

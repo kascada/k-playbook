@@ -39,7 +39,7 @@ func RemediationModes() []RemediationChoice {
 		{
 			Mode:        ModeTaskBranchPR,
 			Label:       "Task, Branch und PR",
-			Description: "Keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird später über /k-run.",
+			Description: "Keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird später über /k-task-run.",
 		},
 		{
 			Mode:        ModeTaskFirst,

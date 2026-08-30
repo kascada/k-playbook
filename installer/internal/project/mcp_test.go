@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/tailscale/hujson"
 )
 
 // newMCPProject legt ein Projekt mit dem Wrapper an, den die Registrierung
@@ -274,7 +277,7 @@ func TestMCPOhneWrapperWirdNichtsGeschrieben(t *testing.T) {
 	if _, err := ApplyMCP(root); err != nil {
 		t.Fatalf("ApplyMCP: %v", err)
 	}
-	for _, target := range MCPTargets() {
+	for _, target := range MCPTargets(root) {
 		if _, err := os.Stat(filepath.Join(root, target.Path)); !os.IsNotExist(err) {
 			t.Errorf("%s wurde ohne Wrapper angelegt", target.Path)
 		}
@@ -306,5 +309,163 @@ func TestApplyMCPIstIdempotent(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Errorf("zweiter Lauf hat die Datei verändert:\n%s\n%s", first, second)
+	}
+}
+
+// readJSONC liest eine geschriebene Datei zurück und akzeptiert dabei
+// Kommentare und Trailing Commas — sonst ließe sich eine gepflegte Config gar
+// nicht prüfen.
+func readJSONC(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s lesen: %v", path, err)
+	}
+	standard, err := hujson.Standardize(raw)
+	if err != nil {
+		t.Fatalf("%s ist kein JWCC: %v", path, err)
+	}
+	var content map[string]any
+	if err := json.Unmarshal(standard, &content); err != nil {
+		t.Fatalf("%s ist kein JSON: %v", path, err)
+	}
+	return content
+}
+
+// kommentierteConfig ist eine von Hand gepflegte OpenCode-Konfiguration:
+// Zeilen- und Blockkommentar, ein fremder MCP-Server, ein Trailing Comma.
+const kommentierteConfig = `{
+  // Von Hand gepflegt.
+  "$schema": "https://opencode.ai/config.json",
+  /* Der eigene Server des Projekts. */
+  "mcp": {
+    "fremd": {
+      "type": "local",
+      "command": ["anderes", "dienen"],
+      "enabled": true,
+    },
+  },
+}
+`
+
+// Eine kommentierte Datei ist lesbar, beschreibbar und behält ihre Kommentare.
+// Der Round-Trip über map[string]any hätte beides vernichtet.
+func TestApplyMCPErhaeltKommentareInJSONC(t *testing.T) {
+	root := newMCPProject(t)
+	pfad := filepath.Join(root, "opencode.jsonc")
+	writeFile(t, pfad, kommentierteConfig)
+
+	status := mcpStatusFor(t, CheckMCP(root), "opencode.jsonc")
+	if status.State != MCPStateMissingEntry {
+		t.Fatalf("State = %q, erwartet %q", status.State, MCPStateMissingEntry)
+	}
+
+	statuses, err := ApplyMCP(root)
+	if err != nil {
+		t.Fatalf("ApplyMCP: %v", err)
+	}
+	if status := mcpStatusFor(t, statuses, "opencode.jsonc"); !status.OK() {
+		t.Fatalf("nach ApplyMCP nicht registriert: %+v", status)
+	}
+
+	raw, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatalf("opencode.jsonc lesen: %v", err)
+	}
+	for _, kommentar := range []string{"// Von Hand gepflegt.", "/* Der eigene Server des Projekts. */"} {
+		if !strings.Contains(string(raw), kommentar) {
+			t.Errorf("Kommentar %q verloren:\n%s", kommentar, raw)
+		}
+	}
+
+	// Der fremde Server steht unverändert daneben.
+	block := readJSONC(t, pfad)["mcp"].(map[string]any)
+	fremd, ok := block["fremd"].(map[string]any)
+	if !ok {
+		t.Fatalf("fremder Server verloren: %v", block)
+	}
+	command, ok := fremd["command"].([]any)
+	if !ok || len(command) != 2 || command[0] != "anderes" || command[1] != "dienen" {
+		t.Errorf("fremder Server verändert: %v", fremd)
+	}
+	if _, ok := block[MCPServerKey]; !ok {
+		t.Error("eigener Eintrag fehlt")
+	}
+
+	// Keine zweite Config: OpenCode würde beide zusammenführen.
+	if _, err := os.Stat(filepath.Join(root, "opencode.json")); !os.IsNotExist(err) {
+		t.Errorf("opencode.json wurde zusätzlich angelegt: %v", err)
+	}
+}
+
+// OpenCode liest jede Config mit dem JSONC-Parser — die Endung sagt nichts.
+// Eine kommentierte opencode.json ist deshalb gültig und nicht unlesbar.
+func TestCheckMCPLiestKommentierteJSON(t *testing.T) {
+	root := newMCPProject(t)
+	pfad := filepath.Join(root, "opencode.json")
+	writeFile(t, pfad, kommentierteConfig)
+
+	status := mcpStatusFor(t, CheckMCP(root), "opencode.json")
+	if status.State == MCPStateUnreadable {
+		t.Fatalf("kommentierte opencode.json gilt als unlesbar: %s", status.Detail)
+	}
+	if status.State != MCPStateMissingEntry {
+		t.Fatalf("State = %q, erwartet %q", status.State, MCPStateMissingEntry)
+	}
+
+	if _, err := ApplyMCP(root); err != nil {
+		t.Fatalf("ApplyMCP: %v", err)
+	}
+
+	raw, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatalf("opencode.json lesen: %v", err)
+	}
+	if !strings.Contains(string(raw), "// Von Hand gepflegt.") {
+		t.Errorf("Kommentar verloren:\n%s", raw)
+	}
+	if _, ok := readJSONC(t, pfad)["mcp"].(map[string]any)[MCPServerKey]; !ok {
+		t.Error("eigener Eintrag fehlt")
+	}
+}
+
+// Liegen beide Endungen nebeneinander, führt OpenCode sie zusammen. Dann wird
+// nur opencode.json gepflegt, und der Zustand meldet die Doppelung — nie "ok",
+// denn was am Ende wirkt, ist von außen nicht zu sehen.
+func TestMCPZielwahlBeiBeidenDateien(t *testing.T) {
+	root := newMCPProject(t)
+	jsonc := filepath.Join(root, "opencode.jsonc")
+	writeFile(t, jsonc, kommentierteConfig)
+	writeFile(t, filepath.Join(root, "opencode.json"), `{"instructions":["AGENTS.md"]}`+"\n")
+
+	targets := MCPTargets(root)
+	if got := targets[len(targets)-1].Path; got != "opencode.json" {
+		t.Fatalf("Ziel = %q, erwartet opencode.json", got)
+	}
+
+	statuses, err := ApplyMCP(root)
+	if err != nil {
+		t.Fatalf("ApplyMCP: %v", err)
+	}
+
+	status := mcpStatusFor(t, statuses, "opencode.json")
+	if status.State != MCPStateAmbiguousTarget {
+		t.Errorf("State = %q, erwartet %q", status.State, MCPStateAmbiguousTarget)
+	}
+	if MCPOK(statuses) {
+		t.Error("zwei Configs gelten als vollständig registriert")
+	}
+
+	// Geschrieben wurde nur die eine Datei.
+	if _, ok := readJSONC(t, filepath.Join(root, "opencode.json"))["mcp"].(map[string]any)[MCPServerKey]; !ok {
+		t.Error("eigener Eintrag fehlt in opencode.json")
+	}
+	unveraendert, err := os.ReadFile(jsonc)
+	if err != nil {
+		t.Fatalf("opencode.jsonc lesen: %v", err)
+	}
+	if string(unveraendert) != kommentierteConfig {
+		t.Errorf("opencode.jsonc wurde angefasst:\n%s", unveraendert)
 	}
 }

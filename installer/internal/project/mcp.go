@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+
+	"github.com/tailscale/hujson"
 )
 
 // MCPServerKey ist der Schlüssel, unter dem k-playbook seinen Server registriert
@@ -58,17 +60,59 @@ type MCPTarget struct {
 	Schema MCPSchema `json:"schema"`
 }
 
+// opencodeConfigJSON und opencodeConfigJSONC sind die beiden Endungen, unter
+// denen OpenCode seine Projektkonfiguration liest. Beide gelten gleichzeitig:
+// liegen sie nebeneinander, führt OpenCode sie tief zusammen.
+const (
+	opencodeConfigJSON  = "opencode.json"
+	opencodeConfigJSONC = "opencode.jsonc"
+)
+
 // MCPTargets sind die drei Registrierungen, die ein Zielprojekt braucht.
 //
 // Anders als bei der Verlinkung gehören diese Dateien vollständig dem Projekt:
-// sie können fremde MCP-Server tragen, und opencode.json trägt daneben noch
-// ganz andere Einstellungen. Angefasst wird deshalb nur der eigene Eintrag.
-func MCPTargets() []MCPTarget {
+// sie können fremde MCP-Server tragen, und die OpenCode-Konfiguration trägt
+// daneben noch ganz andere Einstellungen. Angefasst wird deshalb nur der eigene
+// Eintrag.
+//
+// Das OpenCode-Ziel hängt davon ab, was im Projekt liegt — deshalb der
+// projectRoot: es gibt keine feste Liste, sondern eine Regel.
+func MCPTargets(projectRoot string) []MCPTarget {
 	return []MCPTarget{
 		{Path: ".mcp.json", Assistant: "Claude Code", Schema: MCPSchemaServers},
 		{Path: filepath.Join(".cursor", "mcp.json"), Assistant: "Cursor", Schema: MCPSchemaServers},
-		{Path: "opencode.json", Assistant: "OpenCode", Schema: MCPSchemaOpenCode},
+		{Path: opencodeTarget(projectRoot), Assistant: "OpenCode", Schema: MCPSchemaOpenCode},
 	}
+}
+
+// opencodeTarget wählt die Datei, in die der OpenCode-Eintrag geht:
+// opencode.jsonc nur, wenn sie da ist und opencode.json fehlt — sonst
+// opencode.json.
+//
+// Die Regel entscheidet immer eindeutig und legt nie eine zweite Datei an. Wer
+// seine Konfiguration mit Kommentaren pflegt, behält sie; wer keine hat,
+// bekommt die gebräuchlichere Endung.
+func opencodeTarget(projectRoot string) string {
+	if opencodeConfigExists(projectRoot, opencodeConfigJSONC) &&
+		!opencodeConfigExists(projectRoot, opencodeConfigJSON) {
+		return opencodeConfigJSONC
+	}
+	return opencodeConfigJSON
+}
+
+// opencodeAmbiguous meldet, ob beide Endungen nebeneinander liegen.
+//
+// Dann ist der wirksame Zustand aus keiner der beiden Dateien ablesbar: was
+// hier eingetragen wird, kann der Eintrag in der anderen Datei beim Merge
+// überstimmen. Geschrieben wird trotzdem nur in opencode.json — gemeldet wird
+// die Doppelung.
+func opencodeAmbiguous(projectRoot string) bool {
+	return opencodeConfigExists(projectRoot, opencodeConfigJSON) &&
+		opencodeConfigExists(projectRoot, opencodeConfigJSONC)
+}
+
+func opencodeConfigExists(projectRoot, name string) bool {
+	return fileExists(filepath.Join(projectRoot, name))
 }
 
 // MCPState ist der Zustand einer einzelnen Registrierung.
@@ -89,7 +133,14 @@ const (
 	MCPStateStale MCPState = "stale"
 	// MCPStateUnreadable: die Datei lässt sich nicht als JSON-Objekt lesen. Sie
 	// wird nicht angefasst — sonst ginge die Handarbeit eines Projekts verloren.
+	// Kommentare und Trailing Commas sind kein Grund dafür; die werden gelesen.
 	MCPStateUnreadable MCPState = "unreadable"
+	// MCPStateAmbiguousTarget: opencode.json und opencode.jsonc liegen beide
+	// vor. Der Eintrag steht in opencode.json, aber OpenCode führt beide Dateien
+	// zusammen — was dabei gewinnt, ist von außen nicht zu sehen. Solange das so
+	// ist, gilt die Registrierung nicht als in Ordnung: hier muss jemand eine
+	// der beiden Dateien auflösen.
+	MCPStateAmbiguousTarget MCPState = "ambiguous-target"
 )
 
 // MCPStatus ist der geprüfte Zustand einer Registrierung.
@@ -114,7 +165,7 @@ func MCPCommand() (string, []string) {
 
 // CheckMCP prüft den Zustand, ohne etwas zu verändern.
 func CheckMCP(projectRoot string) []MCPStatus {
-	targets := MCPTargets()
+	targets := MCPTargets(projectRoot)
 	statuses := make([]MCPStatus, 0, len(targets))
 	for _, target := range targets {
 		statuses = append(statuses, checkMCPTarget(projectRoot, target))
@@ -149,7 +200,7 @@ func ApplyMCP(projectRoot string) ([]MCPStatus, error) {
 	}
 
 	var failures []error
-	for _, target := range MCPTargets() {
+	for _, target := range MCPTargets(projectRoot) {
 		if err := applyMCPTarget(projectRoot, target); err != nil {
 			failures = append(failures, err)
 		}
@@ -197,7 +248,7 @@ func checkMCPTarget(projectRoot string, target MCPTarget) MCPStatus {
 		return status
 	}
 
-	content, exists, err := readJSONObject(filepath.Join(projectRoot, target.Path))
+	doc, exists, err := readJSONObject(filepath.Join(projectRoot, target.Path))
 	switch {
 	case err != nil:
 		status.State = MCPStateUnreadable
@@ -210,7 +261,7 @@ func checkMCPTarget(projectRoot string, target MCPTarget) MCPStatus {
 		return status
 	}
 
-	section, ok := mcpSection(content, target.Schema)
+	section, ok := mcpSection(doc.content, target.Schema)
 	if !ok {
 		status.State = MCPStateUnreadable
 		status.Detail = string(target.Schema) + " ist kein Objekt"
@@ -224,6 +275,13 @@ func checkMCPTarget(projectRoot string, target MCPTarget) MCPStatus {
 		status.Detail = "Eintrag " + MCPServerKey + " fehlt"
 
 	case reflect.DeepEqual(found, mcpEntry(target.Schema)):
+		// Der Eintrag steht — aber bei zwei OpenCode-Configs sagt das nichts
+		// darüber, was am Ende wirkt.
+		if target.Schema == MCPSchemaOpenCode && opencodeAmbiguous(projectRoot) {
+			status.State = MCPStateAmbiguousTarget
+			status.Detail = opencodeConfigJSON + " und " + opencodeConfigJSONC + " liegen nebeneinander"
+			return status
+		}
 		command, _ := MCPCommand()
 		status.State = MCPStateOK
 		status.Detail = "-> " + command
@@ -274,32 +332,38 @@ func describeMCPEntry(value any) string {
 // stehen. Eine fehlende Datei entsteht dabei neu — bei OpenCode samt $schema,
 // damit der Assistent sie nicht seinerseits umschreiben muss.
 //
-// Nicht erhalten bleibt die Formatierung: gelesen und geschrieben wird über
-// map[string]any, und ein solcher Round-Trip sortiert die Schlüssel
-// alphabetisch und setzt die Einrückung auf zwei Leerzeichen. Ordnungserhaltend
-// zu schreiben wäre ein eigener Parser.
+// In eine vorhandene Datei wird nicht der ganze Inhalt zurückgeschrieben,
+// sondern nur der eine Schlüssel gepatcht. Kommentare, Trailing Commas,
+// Schlüsselreihenfolge und fremde Einträge bleiben damit erhalten. Sichtbar
+// bleibt eine Nebenwirkung: der abschließende Format() rückt die Datei
+// einheitlich mit Tabs ein. Das geschieht einmal, beim ersten Schreiben.
+//
+// Steht der Eintrag bereits richtig, wird gar nicht geschrieben. Sonst würde
+// jeder Lauf eine fremde Datei erneut umformatieren.
 func applyMCPTarget(projectRoot string, target MCPTarget) error {
 	path := filepath.Join(projectRoot, target.Path)
 
-	content, exists, err := readJSONObject(path)
+	doc, exists, err := readJSONObject(path)
 	if err != nil {
 		// Nicht lesbar heißt: nicht anfassen. Die Prüfung meldet es.
 		return nil
 	}
 
-	if !exists && target.Schema == MCPSchemaOpenCode {
-		content[opencodeSchemaKey] = opencodeSchemaURL
-	}
-
-	section, ok := mcpSection(content, target.Schema)
+	section, ok := mcpSection(doc.content, target.Schema)
 	if !ok {
 		return nil
 	}
+	if found, present := section[MCPServerKey]; present && reflect.DeepEqual(found, mcpEntry(target.Schema)) {
+		return nil
+	}
 
-	section[MCPServerKey] = mcpEntry(target.Schema)
-	content[string(target.Schema)] = section
-
-	encoded, err := json.MarshalIndent(content, "", "  ")
+	var encoded []byte
+	if exists {
+		_, sectionPresent := doc.content[string(target.Schema)]
+		encoded, err = patchMCPFile(doc.raw, target, sectionPresent)
+	} else {
+		encoded, err = newMCPFile(target)
+	}
 	if err != nil {
 		return fmt.Errorf("%s kodieren: %w", target.Path, err)
 	}
@@ -307,31 +371,126 @@ func applyMCPTarget(projectRoot string, target MCPTarget) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("%s anlegen: %w", filepath.Dir(target.Path), err)
 	}
-	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(path, encoded, 0o644); err != nil {
 		return fmt.Errorf("%s schreiben: %w", target.Path, err)
 	}
 	return nil
 }
 
-// readJSONObject liest eine Datei als JSON-Objekt. Eine fehlende Datei ist kein
-// Fehler: der Aufrufer bekommt ein leeres Objekt und exists false.
-func readJSONObject(path string) (content map[string]any, exists bool, err error) {
+// newMCPFile baut eine Datei, die es noch nicht gab: nur der eigene Eintrag,
+// bei OpenCode zusätzlich der Schema-Verweis. Hier gibt es nichts zu erhalten,
+// deshalb genügt gewöhnliches JSON mit zwei Leerzeichen Einrückung.
+func newMCPFile(target MCPTarget) ([]byte, error) {
+	content := map[string]any{}
+	if target.Schema == MCPSchemaOpenCode {
+		content[opencodeSchemaKey] = opencodeSchemaURL
+	}
+	content[string(target.Schema)] = map[string]any{MCPServerKey: mcpEntry(target.Schema)}
+
+	encoded, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(encoded, '\n'), nil
+}
+
+// jsonPatchOp ist eine einzelne Operation eines JSON Patch nach RFC 6902.
+type jsonPatchOp struct {
+	Op    string          `json:"op"`
+	Path  string          `json:"path"`
+	Value json.RawMessage `json:"value"`
+}
+
+// patchMCPFile setzt den eigenen Eintrag im Rohtext einer vorhandenen Datei.
+//
+// Gepatcht wird auf /<schema>/k-playbook. Der Abschnitt selbst muss dafür
+// existieren; fehlt er, wird er in derselben Patch-Folge zuerst als leeres
+// Objekt angelegt. Beide Pfadbestandteile sind Konstanten ohne "/" und "~",
+// deshalb braucht der JSON-Pointer keine Maskierung.
+func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool) ([]byte, error) {
+	value, err := hujson.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := json.Marshal(mcpEntry(target.Schema))
+	if err != nil {
+		return nil, err
+	}
+
+	ops := make([]jsonPatchOp, 0, 2)
+	if !sectionPresent {
+		ops = append(ops, jsonPatchOp{
+			Op:    "add",
+			Path:  "/" + string(target.Schema),
+			Value: json.RawMessage("{}"),
+		})
+	}
+	ops = append(ops, jsonPatchOp{
+		Op:    "add",
+		Path:  "/" + string(target.Schema) + "/" + MCPServerKey,
+		Value: entry,
+	})
+
+	patch, err := json.Marshal(ops)
+	if err != nil {
+		return nil, err
+	}
+	if err := value.Patch(patch); err != nil {
+		return nil, err
+	}
+
+	value.Format()
+	packed := value.Pack()
+	if len(packed) == 0 || packed[len(packed)-1] != '\n' {
+		packed = append(packed, '\n')
+	}
+	return packed, nil
+}
+
+// jsonDocument ist eine gelesene Konfigurationsdatei: der ausgewertete Inhalt
+// zum Prüfen und Vergleichen, dazu der Rohtext, auf dem gepatcht wird.
+type jsonDocument struct {
+	content map[string]any
+	raw     []byte
+}
+
+// readJSONObject liest eine Datei als JSON-Objekt und führt den Rohtext mit.
+//
+// Gelesen wird im JWCC-Format: Kommentare und Trailing Commas sind erlaubt.
+// OpenCode wertet jede seiner Config-Dateien so aus, unabhängig von der Endung
+// — eine kommentierte opencode.json ist also gültig und kein Grund, die Datei
+// für unlesbar zu erklären.
+//
+// Eine fehlende Datei ist kein Fehler: der Aufrufer bekommt ein leeres Objekt
+// und exists false.
+func readJSONObject(path string) (doc jsonDocument, exists bool, err error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return map[string]any{}, false, nil
+			return jsonDocument{content: map[string]any{}}, false, nil
 		}
-		return nil, false, fmt.Errorf("nicht lesbar: %w", err)
+		return jsonDocument{}, false, fmt.Errorf("nicht lesbar: %w", err)
 	}
 
+	value, err := hujson.Parse(raw)
+	if err != nil {
+		return jsonDocument{}, true, fmt.Errorf("kein gültiges JSON: %w", err)
+	}
+
+	// Standardisiert wird auf einer Kopie: der Rohtext bleibt so, wie er auf
+	// der Platte steht, und nur er wird später gepatcht.
+	standard := value.Clone()
+	standard.Standardize()
+
 	var decoded map[string]any
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		return nil, true, fmt.Errorf("kein gültiges JSON: %w", err)
+	if err := json.Unmarshal(standard.Pack(), &decoded); err != nil {
+		return jsonDocument{}, true, fmt.Errorf("kein gültiges JSON: %w", err)
 	}
 	if decoded == nil {
 		// `null` ist gültiges JSON, aber kein Objekt, in das sich etwas
 		// eintragen ließe.
-		return nil, true, fmt.Errorf("kein JSON-Objekt")
+		return jsonDocument{}, true, fmt.Errorf("kein JSON-Objekt")
 	}
-	return decoded, true, nil
+	return jsonDocument{content: decoded, raw: raw}, true, nil
 }

@@ -389,7 +389,7 @@ Die Modi, vom striktesten zum offensten:
 
 | Modus | Bedeutung | `pr_required` | `direct_fixes` |
 |---|---|---|---|
-| `task-branch-pr` | Keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird später über `/k-run`. | `true` | `false` |
+| `task-branch-pr` | Keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit Branch- und PR-Hinweis; umgesetzt wird später über `/k-task-run`. | `true` | `false` |
 | `task-first` | Tasks sind der Standard. Direkte Fixes nur, wenn sie für einzelne kleine Bündel ausdrücklich freigegeben werden. | `false` | `true` |
 | `direct-allowed` | Kleine, sichere Befunde dürfen nach Code-Sichtung sofort behoben werden, wenn die Kategorien freigegeben sind. | `false` | `true` |
 

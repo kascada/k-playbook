@@ -25,6 +25,7 @@ const STATE_TEXTS = {
   "missing-entry": "Eintrag fehlt",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON",
+  "ambiguous-target": "zwei Konfigurationen",
 };
 
 const STATE_NOTES = {
@@ -36,12 +37,14 @@ const STATE_NOTES = {
   stale:
     "Der Schlüssel k-playbook gehört k-playbook. Ein abweichender Wert ist kein Konflikt, sondern ein falscher Stand — er wird beim Einrichten überschrieben.",
   unreadable:
-    "Die Datei wird nicht angefasst, damit keine Handarbeit verlorengeht. Erst reparieren, dann einrichten.",
+    "Die Datei wird nicht angefasst, damit keine Handarbeit verlorengeht. Erst reparieren, dann einrichten. Kommentare und Trailing Commas sind kein Grund dafür — die werden gelesen.",
+  "ambiguous-target":
+    "opencode.json und opencode.jsonc liegen nebeneinander. OpenCode führt beide zusammen; welcher Eintrag am Ende wirkt, ist von außen nicht zu sehen. Geschrieben wird nur opencode.json — eine der beiden Dateien gehört aufgelöst.",
 };
 
-// Die beiden Zustände, bei denen jemand eingreifen muss statt nur einen Knopf
-// zu drücken.
-const STATE_WARNINGS = ["unreadable", "no-wrapper"];
+// Die Zustände, bei denen jemand eingreifen muss statt nur einen Knopf zu
+// drücken.
+const STATE_WARNINGS = ["unreadable", "no-wrapper", "ambiguous-target"];
 
 // Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
 // nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.

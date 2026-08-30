@@ -69,7 +69,7 @@ projekteigen bereits zusammengeführt, abgeschaltete Einträge markiert.
 Eine Umsetzung, die über einen trivialen Einzelschritt hinausgeht, bleibt nicht als
 Plan-Text im Gespräch stehen, wird nicht als Plan-Datei abgelegt und nicht einfach
 begonnen — sie wird eine Task: `/k-task-create` anbieten oder nutzen, danach
-`/k-task-refine`, dann `/k-run`. Das betrifft, wo das Ergebnis einer Planung landet,
+`/k-task-refine`, dann `/k-task-run`. Das betrifft, wo das Ergebnis einer Planung landet,
 nicht wie es entsteht; im Plan-Modus des Assistenten zu entwerfen bleibt richtig. Für
 Befunde aus Reviews gilt zusätzlich der nächste Abschnitt.
 
@@ -81,7 +81,7 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
   vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
   überführt Befunde in Tasks oder Fixes.
-- **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-run`; `/k-todo` pflegt
+- **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-task-run`; `/k-todo` pflegt
   `k-playbook-local/TODO.md`.
 - **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`
   führt Tests aus und diagnostiziert Fehler, `/k-verlauf` durchsucht alte AI-Verläufe,

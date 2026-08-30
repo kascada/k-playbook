@@ -875,6 +875,7 @@ const MCP_STATE_LABELS = {
   "missing-entry": "Eintrag fehlt",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON, bleibt unangetastet",
+  "ambiguous-target": "zwei Konfigurationen, nur opencode.json wird gepflegt",
 };
 
 const MCP_LABELS = { doneLabel: "Erneut eintragen", todoLabel: "Einrichten" };

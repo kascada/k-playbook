@@ -18,7 +18,7 @@ flowchart TD
     L --> M{"Remediation-Policy"}
     M -->|task-branch-pr oder task-first| N["Task-Dateien erzeugen"]
     N --> O["/k-task-refine"]
-    O --> P["/k-run"]
+    O --> P["/k-task-run"]
     M -->|direct-allowed| Q["kleine freigegebene Fixes"]
     L --> R["review-triage.md Status pflegen"]
 ```
@@ -29,7 +29,7 @@ Der Standardablauf für Report-Reviews ist:
 /k-review <name>
 /k-remediation <review-triage>
 /k-task-refine
-/k-run
+/k-task-run
 ```
 
 Zwischen Review und Remediation steht kein weiterer Schritt. `review-triage.md` ist das
@@ -184,10 +184,10 @@ Wenn `/k-remediation` Tasks erzeugt, ist der nächste Schritt nicht direkte Umse
 
 ```text
 /k-task-refine
-/k-run
+/k-task-run
 ```
 
-Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das verlangt. `/k-run` wertet den Abschnitt `## Ausführungskontext` aus und führt vor der Delegation Branch- und Dirty-Worktree-Preflights aus.
+Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das verlangt. `/k-task-run` wertet den Abschnitt `## Ausführungskontext` aus und führt vor der Delegation Branch- und Dirty-Worktree-Preflights aus.
 
 ## Abgrenzung
 
@@ -195,5 +195,5 @@ Die erzeugten Tasks sollen Branch-/PR-Hinweise enthalten, wenn die Policy das ve
 - `/k-review` bewertet oder erzeugt Findings, setzt größere Remediation aber nicht direkt um.
 - `/k-audit` ist der einzige Ort, an dem Befunde mehrerer Quellen zusammengeführt und dedupliziert werden.
 - `/k-remediation` startet keine Scanner, nimmt genau eine Ergebnisdatei und priorisiert nicht projektweit neu.
-- Größere Umsetzung läuft über Tasks, `/k-task-refine` und `/k-run`.
+- Größere Umsetzung läuft über Tasks, `/k-task-refine` und `/k-task-run`.
 - Direkte Fixes sind nur bei passender Policy und expliziter Freigabe erlaubt.

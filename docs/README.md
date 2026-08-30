@@ -20,7 +20,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 | [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-remediation` und den Handoffs. |
 | [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
 | [`review-runs.md`](./review-runs.md) | Das Laufmodell: `run.json`, Einträge, Betriebsarten der Katalog-Rezepte, Merge, known-decisions. |
-| [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-run`. |
+| [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
 | [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag relativ ist. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |

@@ -23,7 +23,7 @@ const elements = {
 let currentTask = "";
 
 // Die erledigten werden einmal je Seitenaufruf geholt, beim ersten Aufklappen.
-// Sie ändern sich nur durch einen /k-run, und der läuft nicht im Browser.
+// Sie ändern sich nur durch einen /k-task-run, und der läuft nicht im Browser.
 let doneRequested = false;
 
 // Ob der Block aufgeklappt war, überlebt den Seitenwechsel. Wer die Erledigten
@@ -108,7 +108,7 @@ function fillList(container, tasks, withReview) {
     title.textContent = task.title || "";
     button.append(name, title);
 
-    // Ein Task ohne Review-Log ist nie gegengelesen worden. /k-run fragt dann
+    // Ein Task ohne Review-Log ist nie gegengelesen worden. /k-task-run fragt dann
     // vor der Ausführung nach — das soll man vorher sehen können.
     if (withReview) {
       const review = document.createElement("span");

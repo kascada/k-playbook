@@ -140,8 +140,9 @@ For dispatched actions, use the dispatched module's or command's own Abschluss.
 - Unknown argument → show valid arguments: `status`, `code`, `tools`, `extract`, `index`.
 - A required module under `commands/_docs/` is missing → abort that action and report an
   incomplete or outdated k-playbook installation. Do not reconstruct the module in chat.
-- `opencode.json` and `opencode.jsonc` both exist → report the ambiguity; only
-  `/k-docs-index` may ask the user which one to use.
+- `opencode.json` and `opencode.jsonc` both exist → report the ambiguity. The target rule
+  still decides and `opencode.json` is the one that gets written; do not ask which one to
+  use.
 
 ## Anti-Muster (nicht tun)
 

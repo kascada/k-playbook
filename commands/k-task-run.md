@@ -5,7 +5,7 @@ argument-hint: "[file-or-directory]"
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent]
 ---
 
-# k-run
+# k-task-run
 
 ## Erster Schritt
 
@@ -36,7 +36,7 @@ Command-specific policy:
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
 - If `$ARGUMENTS` is empty:
-  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-run`; there are no tasks to execute.
+  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-task-run`; there are no tasks to execute.
   - Otherwise use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
@@ -89,7 +89,7 @@ Trotzdem ausführen? (ja / nein / zuerst reviewen)
 - `ja` — weiter mit Step 1.5.
 - `nein` — abbrechen, nichts ausführen.
 - `zuerst reviewen` — abbrechen und wörtlich `/k-task-refine <RUN_TARGET_DISPLAY>`
-  nennen, danach `/k-run` erneut starten. Den Task-Refine-Command nicht selbst aufrufen.
+  nennen, danach `/k-task-run` erneut starten. Den Task-Refine-Command nicht selbst aufrufen.
 
 Bei explizitem Datei-Argument gilt dieselbe Prüfung, nur für die eine Datei.
 
@@ -243,7 +243,7 @@ If the sub-agent reports failure or the task must be aborted:
 
 - Leave the file in its current location (do not move to `done/`)
 - If the task has `### Etappe` sections: leave the `## Fortschritt` table exactly as the
-  sub-agent left it. It is the resume point for the next `/k-run` — never reset it, never
+  sub-agent left it. It is the resume point for the next `/k-task-run` — never reset it, never
   delete it, and never mark a stage as done that the sub-agent did not mark itself. Add
   `**Etappen erledigt:** <n> von <m>` to the `## Ausführung` note above.
 - Stop processing further tasks
@@ -312,7 +312,7 @@ Preflight:
 PR body generation:
 
 - Build the PR body as real multiline Markdown in a temporary file, not as a quoted CLI string with `\n` escapes.
-- Use `/tmp/k-run-pr-body-<task-number-or-branch-slug>.md` unless a better existing temp path is already available.
+- Use `/tmp/k-task-run-pr-body-<task-number-or-branch-slug>.md` unless a better existing temp path is already available.
 - Include:
   - short summary of the change.
   - finding IDs or task reference if present.
@@ -326,7 +326,7 @@ gh pr create \
   --base <Base branch> \
   --head <Work branch> \
   --title "<concise title>" \
-  --body-file /tmp/k-run-pr-body-<slug>.md
+  --body-file /tmp/k-task-run-pr-body-<slug>.md
 ```
 
 Do not use `--body "...\n..."`; Bash will pass literal backslash-n in normal double quotes. If a one-off inline body is unavoidable, use a shell-safe multiline mechanism such as a here-document or ANSI-C quoting, but prefer `--body-file`.

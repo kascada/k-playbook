@@ -930,7 +930,7 @@ button.attention-highlight {
 }
 
 /* Rechts am Rand: ob der Task schon gegengelesen wurde. Ungeprüft ist kein
-   Fehler, aber der Grund, warum /k-run vor der Ausführung nachfragt. */
+   Fehler, aber der Grund, warum /k-task-run vor der Ausführung nachfragt. */
 .task-review {
   flex-shrink: 0;
   color: var(--muted);

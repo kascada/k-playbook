@@ -148,7 +148,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-remediation` | PRs bewerten, Reviews und Audits ausführen, Findings abarbeiten |
-| Task-Flow | `/k-task-create`, `/k-task-refine`, `/k-run`, `/k-todo` | geplante Arbeit erstellen, härten und ausführen |
+| Task-Flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | geplante Arbeit erstellen, härten und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
 
 Neue oder geänderte Commands werden erst nach einem Neustart des Assistenten sichtbar.
@@ -161,7 +161,7 @@ flowchart TD
     Small -->|ja| Direct["direkt im Chat bearbeiten und verifizieren"]
     Small -->|nein| Task["/k-task-create"]
     Task --> ReviewLoop["/k-task-refine"]
-    ReviewLoop --> Run["/k-run"]
+    ReviewLoop --> Run["/k-task-run"]
     Run --> Done["Task nach tasks/done/ verschieben"]
 
     Start --> Review["/k-review <name>"]
@@ -181,7 +181,7 @@ Für geplante Arbeit, die nicht in einem kurzen Chat-Schritt erledigt werden sol
 ```text
 /k-task-create
 /k-task-refine
-/k-run
+/k-task-run
 ```
 
 Tasks entstehen direkt aus dem Gespräch oder aus `/k-remediation`. Details stehen in
@@ -195,7 +195,7 @@ Report-Reviews erzeugen auditierbare Artefakte und führen bei Bedarf in Remedia
 /k-review <name>
 /k-remediation <review-triage>
 /k-task-refine
-/k-run
+/k-task-run
 ```
 
 Zwischen Bewertung und Abarbeitung steht kein weiterer Schritt: `review-triage.md` ist
@@ -228,7 +228,8 @@ davon hat, lässt die Stufe aus.
 
 `/k-docs-index` ist der letzte Schritt und der einzige, der `docs/README.md` schreibt —
 den einen Index über alle Herkünfte, `docs/manual/` eingeschlossen. Er registriert die
-Docs außerdem in `AGENTS.md` und `opencode.json`. Danach den Assistenten neu starten,
+Docs außerdem in `AGENTS.md` und `opencode.json` — oder `opencode.jsonc`, wenn nur die
+vorhanden ist; eine zweite Datei legt er nie an. Danach den Assistenten neu starten,
 damit die neue Session-Memory greift.
 
 Jedes Unterverzeichnis von `docs/` steht für eine Herkunft; welches Werkzeug eine Datei

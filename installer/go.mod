@@ -1,9 +1,10 @@
 module github.com/kascada/k-playbook/installer
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/yuin/goldmark v1.8.5
 )
 

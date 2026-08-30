@@ -278,10 +278,10 @@ lesen.
 
 Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-task-refine` gegangen ist —
 mit Datum, sofern das Review-Log eines nennt. „ohne Task-Refine" ist kein Fehler, aber
-der Grund, warum `/k-run` vor der Ausführung nachfragt.
+der Grund, warum `/k-task-run` vor der Ausführung nachfragt.
 
 Gelesen wird nur. Angelegt und ausgeführt werden Tasks über `/k-task-create` und
-`/k-run` im Assistenten.
+`/k-task-run` im Assistenten.
 
 ## Doku lesen
 

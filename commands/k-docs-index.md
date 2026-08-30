@@ -38,8 +38,10 @@ From the context output:
 - `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual` — written by hand
 - `INDEX_FILE = <RESOLVED_DOCS_DIR>/README.md`
 - `AGENTS_FILE = <project.dir>/AGENTS.md`
-- `OPENCODE_CONFIG = <project.dir>/opencode.json`, or `<project.dir>/opencode.jsonc` if
-  that variant already exists. Never create both.
+- `OPENCODE_CONFIG` — the same target rule the installer applies: `<project.dir>/opencode.jsonc`
+  only if it exists **and** `<project.dir>/opencode.json` does not; otherwise
+  `<project.dir>/opencode.json`. Never create a second one. OpenCode merges both
+  extensions, so a second file makes the effective state unreadable.
 
 Derived paths for the index and for MEMORY registration:
 
@@ -328,8 +330,10 @@ Kompakte Zusammenfassung:
   oder `/k-gui` nennen. Kein Ersatzpfad, kein harter Abbruch.
 - Keine einzige Doc-Datei in irgendeiner Herkunft → melden, `/k-docs-code` nennen und
   stoppen. Ein Index über nichts ist kein Ergebnis.
-- `opencode.json` **und** `opencode.jsonc` liegen beide vor → stoppen und den User
-  entscheiden lassen, welche gilt. Nicht raten und nicht beide schreiben.
+- `opencode.json` **und** `opencode.jsonc` liegen beide vor → nicht stoppen und nicht
+  fragen. Die Zielwahlregel entscheidet: geschrieben wird `opencode.json`, die andere
+  Datei bleibt unangetastet. Die Doppelung im Abschluss melden — OpenCode führt beide
+  zusammen, deshalb gehört eine davon aufgelöst.
 - Template unter `<playbook.dir>/skills/ai-session-memory/vorlagen/` fehlt → melden und
   die MEMORY-Registrierung überspringen; der Index ist davon unabhängig fertig.
 - `git mv` schlägt fehl (Datei ungetrackt, Index gesperrt) → die Datei liegen lassen, den

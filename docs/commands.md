@@ -37,7 +37,7 @@ gestartet wurde.
 | `/k-docs-code` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/`; dorthin schreibt auch der Skill `ks-overlay-repo-analyse` |
 | `/k-docs-tools` | Library-/Tool-Doku ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | Rohmaterial aus `k-playbook-local/material/` zu Doku verdichten | schreibt je Thema eine Datei nach `k-playbook-local/docs/extracted/`, mit Quelle und Konfidenz |
-| `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` |
+| `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` (oder `opencode.jsonc`, wenn nur die existiert) |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
@@ -46,7 +46,7 @@ gestartet wurde.
 | **Task-Flow** | | |
 | `/k-task-create` | Task-Datei aus dem Gesprächskontext erzeugen | [`task-flow.md`](./task-flow.md) |
 | `/k-task-refine` | Task-Dateien vor der Ausführung per Critic/Editor-Dialog härten | [`task-flow.md`](./task-flow.md) |
-| `/k-run` | Task-Dateien sequenziell ausführen | [`task-flow.md`](./task-flow.md) |
+| `/k-task-run` | Task-Dateien sequenziell ausführen | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergänzen | |
 | **Hilfen** | | |
 | `/k-enforcement` | expliziter Check gegen die effektive Regelmenge | read-only Bericht; Fixes nur nach Freigabe |
@@ -79,14 +79,14 @@ Die Code-Review-Familie ist bewusst gestuft:
    Ergebnisdatei; zusammengeführt wird ausschließlich im Audit-Lauf.
 
 Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
-`/k-task-refine`, dann `/k-run`.
+`/k-task-refine`, dann `/k-task-run`.
 
 ## Task-Flow
 
 ```text
 /k-task-create
 /k-task-refine
-/k-run
+/k-task-run
 ```
 
 Tasks entstehen direkt aus dem Gespräch oder aus `/k-remediation`. In beiden Fällen
@@ -99,13 +99,13 @@ Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
 
 | Command | schreibt nach |
 |---|---|
-| `/k-task-create`, `/k-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
+| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
 | `/k-review`, `/k-audit` | `k-playbook-local/results/` |
 | `/k-docs-code`, Skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
 | `/k-docs-tools` | `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
-| `/k-docs-index` | `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` im Hauptverzeichnis |
+| `/k-docs-index` | `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` (oder `opencode.jsonc`) im Hauptverzeichnis |
 
 Gelesen wird zusätzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
 Geschrieben wird dorthin nie.
