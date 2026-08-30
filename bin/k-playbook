@@ -14,6 +14,10 @@ set -euo pipefail
 #
 # Der Wrapper liegt versioniert im Repo, damit direkt nach dem Clone ein
 # Einstiegspunkt vorhanden ist. Er wird nicht gebaut und braucht kein Go.
+#
+# `--prefetch [--all]` füllt den Cache, ohne zu starten: für den Rechner ohne
+# Netz, für den Mac, der zusätzlich einen Linux-Container bedient, und für den
+# Update-Pfad, der nach einem VERSION-Wechsel gleich nachlädt.
 
 release_base_url="https://github.com/kascada/k-playbook/releases/download"
 
@@ -56,6 +60,14 @@ case "$(uname -m)" in
 esac
 
 binary_name="k-playbook-${os}-${arch}"
+
+# Die vier Targets, die ein Release trägt — dieselbe Liste wie im Makefile.
+all_binaries=(
+  "k-playbook-linux-amd64"
+  "k-playbook-linux-arm64"
+  "k-playbook-darwin-amd64"
+  "k-playbook-darwin-arm64"
+)
 
 # VERSION koppelt den Clone-Stand an ein Binary. Fehlt die Datei, gibt es zu
 # diesem Stand kein Release — dann bleibt es bei dist/ und Cache.
@@ -184,6 +196,51 @@ missing_binary_help() {
   printf '      baut das Binary selbst (braucht Go)\n' >&2
   exit 1
 }
+
+# prefetch lädt vorab in den Cache, ohne das Programm zu starten. Der
+# Rückgabewert meldet, ob alles Verlangte danach dort liegt.
+prefetch() {
+  local wanted=("${binary_name}")
+  case "${1:-}" in
+    "") ;;
+    --all) wanted=("${all_binaries[@]}") ;;
+    *)
+      fail "Unbekannte Option für --prefetch: $1" "Erlaubt ist nur --all."
+      ;;
+  esac
+  if [[ $# -gt 1 ]]; then
+    fail "Zu viele Argumente für --prefetch."
+  fi
+
+  if [[ -z "${version}" ]]; then
+    printf 'Keine VERSION in %s — zu diesem Stand gibt es kein Release.\n' "${root_dir}" >&2
+    return 1
+  fi
+  if [[ -z "${cache_dir}" ]]; then
+    printf 'Kein Cache-Ort bestimmbar: weder K_PLAYBOOK_CACHE noch HOME ist gesetzt.\n' >&2
+    return 1
+  fi
+
+  local failed=0 name
+  for name in "${wanted[@]}"; do
+    if [[ -x "${cache_dir}/${name}" ]]; then
+      printf 'Bereits im Cache: %s\n' "${cache_dir}/${name}"
+      continue
+    fi
+    if fetch_binary "${name}"; then
+      printf 'Geladen: %s\n' "${cache_dir}/${name}"
+    else
+      failed=1
+    fi
+  done
+  return "${failed}"
+}
+
+if [[ "${1:-}" == "--prefetch" ]]; then
+  shift
+  prefetch "$@"
+  exit $?
+fi
 
 # Die Auflösungskette. Erfolg schreibt den Pfad nach resolved_binary.
 resolved_binary=""
