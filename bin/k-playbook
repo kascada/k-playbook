@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Wählt das zur Plattform passende Binary aus ../dist/ und ruft es auf.
-# Liegt im Repo und wird mitgeklont, damit direkt nach dem Clone ein
-# Einstiegspunkt vorhanden ist.
+# Startet k-playbook mit dem Binary der eigenen Plattform. Gesucht wird in
+# dieser Reihenfolge:
+#
+#   1. $K_PLAYBOOK_BINARY   ausdrücklich gesetzt, gewinnt immer
+#   2. <repo>/dist/         lokal gebaut; im Repo-Checkout hat das Vorrang,
+#                           damit der Entwicklungs-Loop netzfrei bleibt
+#   3. Cache                außerhalb der Installation, von allen Projekten
+#                           desselben Rechners geteilt
+#   4. Download             Release-Asset zu der Version aus <repo>/VERSION,
+#                           geprüft gegen <repo>/SHA256SUMS
+#
+# Der Wrapper liegt versioniert im Repo, damit direkt nach dem Clone ein
+# Einstiegspunkt vorhanden ist. Er wird nicht gebaut und braucht kein Go.
+
+release_base_url="https://github.com/kascada/k-playbook/releases/download"
 
 source_path="${BASH_SOURCE[0]}"
 while [[ -L "${source_path}" ]]; do
@@ -16,14 +28,22 @@ while [[ -L "${source_path}" ]]; do
   fi
 done
 script_dir="$(cd -P "$(dirname "${source_path}")" && pwd)"
-dist_dir="$(dirname "${script_dir}")/dist"
+root_dir="$(dirname "${script_dir}")"
+
+# Ohne diese Variable leitet der Go-Code die Installation aus dem Ort des
+# Binaries ab. Aus dem Cache gestartet führte das in die Irre.
+export K_PLAYBOOK_INSTALL_DIR="${root_dir}"
+
+fail() {
+  printf '%s\n' "$@" >&2
+  exit 1
+}
 
 case "$(uname -s)" in
   Linux) os="linux" ;;
   Darwin) os="darwin" ;;
   *)
-    printf 'Nicht unterstütztes Betriebssystem für k-playbook: %s\n' "$(uname -s)" >&2
-    exit 1
+    fail "Nicht unterstütztes Betriebssystem für k-playbook: $(uname -s)"
     ;;
 esac
 
@@ -31,16 +51,169 @@ case "$(uname -m)" in
   x86_64|amd64) arch="amd64" ;;
   arm64|aarch64) arch="arm64" ;;
   *)
-    printf 'Nicht unterstützte Architektur für k-playbook: %s\n' "$(uname -m)" >&2
-    exit 1
+    fail "Nicht unterstützte Architektur für k-playbook: $(uname -m)"
     ;;
 esac
 
-target="${dist_dir}/k-playbook-${os}-${arch}"
-if [[ ! -x "${target}" ]]; then
-  printf 'Binary fehlt: %s\n' "${target}" >&2
-  printf 'Mit "git pull" aktualisieren oder mit "make dist" selbst bauen.\n' >&2
-  exit 1
+binary_name="k-playbook-${os}-${arch}"
+
+# VERSION koppelt den Clone-Stand an ein Binary. Fehlt die Datei, gibt es zu
+# diesem Stand kein Release — dann bleibt es bei dist/ und Cache.
+version=""
+if [[ -f "${root_dir}/VERSION" ]]; then
+  version="$(tr -d '[:space:]' < "${root_dir}/VERSION")"
 fi
 
-exec "${target}" "$@"
+# Der Cache liegt bewusst außerhalb der Installation: die wird nach jedem
+# Update schreibgesperrt, und ein Cache darunter wäre nicht beschreibbar.
+cache_root="${K_PLAYBOOK_CACHE:-}"
+if [[ -z "${cache_root}" ]]; then
+  if [[ -n "${XDG_CACHE_HOME:-}" ]]; then
+    cache_root="${XDG_CACHE_HOME}/k-playbook"
+  elif [[ -n "${HOME:-}" ]]; then
+    cache_root="${HOME}/.cache/k-playbook"
+  fi
+fi
+
+# Die Version im Pfad hält mehrere Stände auseinander; der plattformspezifische
+# Dateiname darunter lässt Host und Container denselben Cache teilen.
+cache_dir=""
+if [[ -n "${cache_root}" && -n "${version}" ]]; then
+  cache_dir="${cache_root}/bin/${version}"
+fi
+
+sha256_of() {
+  local path="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${path}" | awk '{ print $1 }'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "${path}" | awk '{ print $1 }'
+  else
+    return 1
+  fi
+}
+
+# Die erwartete Summe kommt aus dem Repo und damit über einen anderen Weg als
+# das Binary. Beide über dieselbe HTTPS-Quelle zu holen prüfte nichts.
+expected_sha() {
+  local name="$1"
+  [[ -f "${root_dir}/SHA256SUMS" ]] || return 1
+  awk -v name="${name}" '
+    $2 == name || $2 == "*" name { print $1; found = 1; exit }
+    END { if (!found) exit 1 }
+  ' "${root_dir}/SHA256SUMS"
+}
+
+# fetch_binary lädt genau ein Plattform-Binary in den Cache. Geschrieben wird
+# erst daneben und dann umbenannt: parallele Starts sehen nie eine halbe Datei.
+fetch_binary() {
+  local name="$1"
+  local target="${cache_dir}/${name}"
+  local url="${release_base_url}/${version}/${name}"
+
+  if [[ -z "${version}" ]]; then
+    printf 'Keine VERSION in %s — zu diesem Stand gibt es kein Release.\n' "${root_dir}" >&2
+    return 1
+  fi
+  if [[ -z "${cache_root}" ]]; then
+    printf 'Kein Cache-Ort bestimmbar: weder K_PLAYBOOK_CACHE noch HOME ist gesetzt.\n' >&2
+    return 1
+  fi
+
+  local want
+  if ! want="$(expected_sha "${name}")"; then
+    printf 'Keine Prüfsumme für %s in %s/SHA256SUMS.\n' "${name}" "${root_dir}" >&2
+    return 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    printf 'curl fehlt — ohne curl kann das Binary nicht geladen werden.\n' >&2
+    return 1
+  fi
+
+  mkdir -p "${cache_dir}"
+  local temporary
+  temporary="$(mktemp "${cache_dir}/.${name}.XXXXXX")"
+
+  if ! curl -fL --retry 2 --connect-timeout 15 -o "${temporary}" "${url}"; then
+    rm -f "${temporary}"
+    printf 'Download fehlgeschlagen: %s\n' "${url}" >&2
+    return 1
+  fi
+
+  local have
+  if ! have="$(sha256_of "${temporary}")"; then
+    rm -f "${temporary}"
+    printf 'Weder sha256sum noch shasum vorhanden — Prüfsumme nicht kontrollierbar.\n' >&2
+    return 1
+  fi
+  if [[ "${have}" != "${want}" ]]; then
+    rm -f "${temporary}"
+    printf 'Prüfsumme weicht ab für %s\n  erwartet: %s\n  erhalten: %s\n' "${name}" "${want}" "${have}" >&2
+    return 1
+  fi
+
+  chmod +x "${temporary}"
+  mv -f "${temporary}" "${target}"
+  return 0
+}
+
+missing_binary_help() {
+  printf 'Kein k-playbook-Binary für %s-%s gefunden.\n\n' "${os}" "${arch}" >&2
+  printf 'Gesucht wurde in dieser Reihenfolge:\n' >&2
+  printf '  1. $K_PLAYBOOK_BINARY\n' >&2
+  printf '  2. %s\n' "${root_dir}/dist/${binary_name}" >&2
+  if [[ -n "${cache_dir}" ]]; then
+    printf '  3. %s\n' "${cache_dir}/${binary_name}" >&2
+  elif [[ -z "${cache_root}" ]]; then
+    printf '  3. Cache — kein Ort bestimmbar, weder K_PLAYBOOK_CACHE noch HOME gesetzt\n' >&2
+  else
+    printf '  3. Cache unter %s/bin/ — ohne VERSION ist der Stand nicht benennbar\n' "${cache_root}" >&2
+  fi
+  if [[ -n "${version}" ]]; then
+    printf '  4. %s/%s/%s\n' "${release_base_url}" "${version}" "${binary_name}" >&2
+  else
+    printf '  4. Download — keine VERSION in %s\n' "${root_dir}" >&2
+  fi
+  printf '\nWege weiter:\n' >&2
+  printf '  %s --prefetch\n' "${script_dir}/k-playbook" >&2
+  printf '      lädt das Binary in den Cache\n' >&2
+  printf '  K_PLAYBOOK_CACHE=<pfad>\n' >&2
+  printf '      setzt einen anderen Cache-Ort — etwa einen vorbefüllten im\n' >&2
+  printf '      Container oder auf einem Rechner ohne Netzzugriff\n' >&2
+  printf '  make dist-host\n' >&2
+  printf '      baut das Binary selbst (braucht Go)\n' >&2
+  exit 1
+}
+
+# Die Auflösungskette. Erfolg schreibt den Pfad nach resolved_binary.
+resolved_binary=""
+resolve_binary() {
+  if [[ -n "${K_PLAYBOOK_BINARY:-}" ]]; then
+    if [[ ! -x "${K_PLAYBOOK_BINARY}" ]]; then
+      fail "K_PLAYBOOK_BINARY zeigt auf kein ausführbares Binary: ${K_PLAYBOOK_BINARY}"
+    fi
+    resolved_binary="${K_PLAYBOOK_BINARY}"
+    return 0
+  fi
+
+  local local_binary="${root_dir}/dist/${binary_name}"
+  if [[ -x "${local_binary}" ]]; then
+    resolved_binary="${local_binary}"
+    return 0
+  fi
+
+  if [[ -n "${cache_dir}" && -x "${cache_dir}/${binary_name}" ]]; then
+    resolved_binary="${cache_dir}/${binary_name}"
+    return 0
+  fi
+
+  if fetch_binary "${binary_name}"; then
+    resolved_binary="${cache_dir}/${binary_name}"
+    return 0
+  fi
+  return 1
+}
+
+resolve_binary || missing_binary_help
+
+exec "${resolved_binary}" "$@"
