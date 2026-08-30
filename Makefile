@@ -11,6 +11,14 @@ INSTALLER_PKG := ./cmd/k-playbook
 INSTALLER_WRAPPER := bin/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
+# Die Toolchain steht in installer/go.mod und wird hier nur gelesen. Sie ist
+# der Grund, warum das versionierte SHA256SUMS trägt: CI baut mit derselben
+# Version und kommt deshalb auf dieselben Summen.
+INSTALLER_GO_TOOLCHAIN = $(shell awk '$$1 == "toolchain" { print $$2 }' installer/go.mod)
+# Die Prüfsummendatei liegt im Wurzelverzeichnis, nicht in dist/: sie kommt so
+# über den Git-Remote und nicht über dieselbe HTTPS-Quelle wie das Binary.
+INSTALLER_SUMS_FILE := SHA256SUMS
+INSTALLER_VERSION_FILE := VERSION
 # Bewusst mit = statt := : `go env` darf erst laufen, wenn ein Target es
 # wirklich braucht. In einem Zielprojekt ohne Go würde die sofortige Auswertung
 # sonst schon bei `make help` eine Fehlermeldung ausgeben.
@@ -27,7 +35,7 @@ DEV_MARKER := .k-playbook-devsync
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host gui test installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host gui test release release-publish installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -174,6 +182,108 @@ gui: dist-host installer-sync ## Baut, spielt den Arbeitsstand ein und startet d
 
 test: ## Führt die Tests aus
 	cd installer && go test ./...
+
+# Ein Release läuft in zwei Schritten, und die Reihenfolge ist nicht beliebig.
+#
+#   make release VERSION=v0.1.0   baut, schreibt VERSION und SHA256SUMS,
+#                                 committet beides und pusht nur den Tag
+#   ... CI baut, prüft gegen SHA256SUMS und lädt die Assets hoch ...
+#   make release-publish VERSION=v0.1.0   bringt denselben Commit auf main
+#
+# Andersherum zeigte VERSION eine Zeit lang auf einen Tag ohne Downloads, und
+# jede Installation, die in diesem Fenster aktualisiert, startet nicht mehr.
+# Einen Versions-Fallback im Wrapper gibt es dafür nicht.
+define require_toolchain
+	@set -eu; \
+	  want="$(INSTALLER_GO_TOOLCHAIN)"; \
+	  test -n "$$want" || { \
+	    printf 'In installer/go.mod fehlt die toolchain-Zeile.\n' >&2; \
+	    exit 1; \
+	  }; \
+	  have="$$(go env GOVERSION)"; \
+	  test "$$have" = "$$want" || { \
+	    printf 'Go %s ist installiert, verlangt ist %s (installer/go.mod, toolchain).\n' \
+	      "$$have" "$$want" >&2; \
+	    printf 'Ein Release mit einer anderen Toolchain ergäbe andere Prüfsummen als CI.\n' >&2; \
+	    exit 1; \
+	  }
+endef
+
+define require_version_arg
+	@test -n "$(VERSION)" || { \
+	  printf 'Aufruf: make %s VERSION=v0.1.0\n' "$(GOAL)" >&2; \
+	  exit 1; \
+	}
+	@case "$(VERSION)" in v*) ;; *) \
+	  printf 'Die Version muss mit v beginnen: %s\n' "$(VERSION)" >&2; exit 1 ;; \
+	esac
+endef
+
+release: ## Baut das Release, committet VERSION und SHA256SUMS und pusht den Tag (VERSION=v0.1.0)
+	$(require_version_arg)
+	$(require_toolchain)
+	@git diff --quiet && git diff --cached --quiet || { \
+	  printf 'Der Arbeitsstand ist nicht sauber. Ein Release taggt genau den Stand,\n' >&2; \
+	  printf 'den CI nachbaut — offene Änderungen gehören vorher committet.\n' >&2; \
+	  exit 1; \
+	}
+	@git rev-parse --verify --quiet "refs/tags/$(VERSION)" >/dev/null && { \
+	  printf 'Den Tag %s gibt es bereits.\n' "$(VERSION)" >&2; exit 1; \
+	} || true
+	$(call build_binaries,$(INSTALLER_RELEASE_TARGETS))
+	@printf '%s\n' "$(VERSION)" > "$(INSTALLER_VERSION_FILE)"
+	@set -eu; \
+	  if command -v sha256sum >/dev/null 2>&1; then \
+	    checksum() { sha256sum "$$@"; }; \
+	  else \
+	    checksum() { shasum -a 256 "$$@"; }; \
+	  fi; \
+	  ( cd "$(INSTALLER_DIST_DIR)" && for target in $(INSTALLER_RELEASE_TARGETS); do \
+	      checksum "$(INSTALLER_BINARY)-$$target"; \
+	    done ) > "$(INSTALLER_SUMS_FILE)"
+	@git add "$(INSTALLER_VERSION_FILE)" "$(INSTALLER_SUMS_FILE)"
+	@# Übergang: solange dist/ versioniert ist, muss der getaggte Commit die
+	@# frisch gebauten Binaries tragen — der Wrapper zieht sie dem Cache vor,
+	@# ein alter Stand dort lieferte neuen Inhalt mit altem Code aus. Fällt
+	@# weg, sobald dist/ nicht mehr verfolgt wird.
+	@set -eu; \
+	  if [ -n "$$(git ls-files "$(INSTALLER_DIST_DIR)")" ]; then \
+	    git add -u "$(INSTALLER_DIST_DIR)"; \
+	  fi
+	@git commit -m "Release $(VERSION)"
+	@git tag -a "$(VERSION)" -m "Release $(VERSION)"
+	@git push origin "refs/tags/$(VERSION)"
+	@echo ""
+	@echo "Tag $(VERSION) gepusht. CI baut jetzt und lädt die Assets hoch."
+	@echo "Danach, und erst danach:"
+	@echo "  make release-publish VERSION=$(VERSION)"
+
+release-publish: ## Bringt den getaggten Commit auf main — erst wenn die Assets liegen
+	$(require_version_arg)
+	@set -eu; \
+	  tagged="$$(git rev-parse "$(VERSION)^{commit}")"; \
+	  head="$$(git rev-parse HEAD)"; \
+	  test "$$tagged" = "$$head" || { \
+	    printf 'HEAD ist nicht der getaggte Commit (%s vs. %s).\n' "$$head" "$$tagged" >&2; \
+	    exit 1; \
+	  }
+	@set -eu; \
+	  command -v gh >/dev/null 2>&1 || { \
+	    printf 'Ohne gh lässt sich hier nicht prüfen, ob die Assets liegen.\n' >&2; \
+	    printf 'Von Hand nachsehen und dann: git push origin main\n' >&2; \
+	    exit 1; \
+	  }; \
+	  for target in $(INSTALLER_RELEASE_TARGETS); do \
+	    name="$(INSTALLER_BINARY)-$$target"; \
+	    gh release view "$(VERSION)" --json assets \
+	      --jq '.assets[].name' 2>/dev/null | grep -qx "$$name" || { \
+	      printf 'Im Release %s fehlt das Asset %s.\n' "$(VERSION)" "$$name" >&2; \
+	      printf 'VERSION darf erst auf main, wenn alle vier Assets liegen.\n' >&2; \
+	      exit 1; \
+	    }; \
+	  done
+	@git push origin main
+	@echo "$(VERSION) ist auf main."
 
 installer-build: build ## Alias für build
 

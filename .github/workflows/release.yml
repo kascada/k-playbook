@@ -1,0 +1,102 @@
+name: Release
+
+# Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
+# Release. Der Clone trägt sie nicht mehr; der Wrapper lädt genau das eine, das
+# er braucht.
+#
+# Geprüft wird gegen das committete SHA256SUMS: die erwarteten Summen kommen
+# über Git, die Binaries über HTTPS. Weicht ein Hash ab, bricht der Lauf ab —
+# dann wird kein Asset veröffentlicht, und VERSION darf nicht auf main.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag, dessen Assets gebaut werden (z. B. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      # Kein stiller Griff zu einer anderen Toolchain: weicht die installierte
+      # Version von installer/go.mod ab, soll der Lauf scheitern statt
+      # abweichende Prüfsummen zu erzeugen.
+      GOTOOLCHAIN: local
+
+    steps:
+      - name: Getaggten Stand auschecken
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      # Liest die toolchain-Zeile aus installer/go.mod. Damit steht die Version
+      # an genau einer Stelle — derselben, die `make release` lokal prüft.
+      - name: Go einrichten
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: installer/go.mod
+          cache-dependency-path: installer/go.sum
+
+      - name: Toolchain prüfen
+        run: |
+          set -eu
+          want="$(awk '$1 == "toolchain" { print $2 }' installer/go.mod)"
+          have="$(go env GOVERSION)"
+          test -n "$want" || { echo "In installer/go.mod fehlt die toolchain-Zeile." >&2; exit 1; }
+          if [ "$have" != "$want" ]; then
+            echo "Go $have installiert, verlangt ist $want." >&2
+            exit 1
+          fi
+          echo "Toolchain: $have"
+
+      # Dieselben Flags wie im Makefile. -trimpath, CGO_ENABLED=0 und
+      # -buildvcs=false sind es, die den Build reproduzierbar machen.
+      - name: Binaries bauen
+        run: |
+          set -eu
+          mkdir -p dist
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            os="${target%-*}"
+            arch="${target#*-}"
+            output="../dist/k-playbook-${os}-${arch}"
+            echo "Baue $output"
+            (cd installer && CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$output" ./cmd/k-playbook)
+          done
+
+      - name: Gegen SHA256SUMS prüfen
+        run: |
+          set -eu
+          test -f SHA256SUMS || { echo "SHA256SUMS fehlt im getaggten Stand." >&2; exit 1; }
+          cd dist
+          sha256sum -c ../SHA256SUMS
+
+      - name: VERSION gegen den Tag prüfen
+        run: |
+          set -eu
+          test -f VERSION || { echo "VERSION fehlt im getaggten Stand." >&2; exit 1; }
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [ "$version" != "$TAG" ]; then
+            echo "VERSION nennt $version, gebaut wird aber $TAG." >&2
+            exit 1
+          fi
+
+      - name: Assets veröffentlichen
+        run: |
+          set -eu
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/k-playbook-* --clobber
+          else
+            gh release create "$TAG" dist/k-playbook-* \
+              --title "$TAG" \
+              --generate-notes
+          fi

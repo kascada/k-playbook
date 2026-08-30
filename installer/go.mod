@@ -2,6 +2,11 @@ module github.com/kascada/k-playbook/installer
 
 go 1.26
 
+// Festgenagelt, damit CI bitgleich baut wie der Release-Commit: das
+// versionierte SHA256SUMS trägt nur, wenn beide Seiten dieselbe Toolchain
+// verwenden. `make release` und der Workflow prüfen diese Zeile.
+toolchain go1.26.4
+
 require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
