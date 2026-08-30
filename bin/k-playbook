@@ -164,7 +164,9 @@ fetch_binary() {
     return 1
   fi
 
-  chmod +x "${temporary}"
+  # Ausdrücklich 755 und nicht chmod +x: mktemp legt mit 600 an, ein +x
+  # ergäbe daraus 711 — ein Cache, den nur der Eigentümer lesen kann.
+  chmod 755 "${temporary}"
   mv -f "${temporary}" "${target}"
   return 0
 }
