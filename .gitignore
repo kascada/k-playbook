@@ -44,6 +44,15 @@ venv/
 # Go build artifacts
 /installer/k-playbook-installer
 
+# Die Plattform-Binaries sind Release-Assets und werden nicht mehr versioniert:
+# 57 MB je Build-Satz, und jedes Update zog alle vier. Der Wrapper baut sie
+# lokal (make dist-host) oder lädt genau das eine, das er braucht, in den Cache.
+/dist/
+
+# Cache-Ort für Container-Projekte, die K_PLAYBOOK_CACHE auf den Workspace
+# zeigen lassen, damit er den Rebuild überlebt.
+k-playbook-local/.cache/
+
 # Editor/OS noise
 .vscode/
 .DS_Store

@@ -28,6 +28,11 @@ const (
 // zu diesem Stand gehören. Content-Commits ändern sie nicht.
 const VersionFileName = "VERSION"
 
+// SumsFileName trägt die Prüfsummen der Release-Assets. Sie liegt versioniert
+// im Repo, damit die erwartete Summe über den Git-Remote kommt und nicht über
+// dieselbe HTTPS-Quelle wie das Binary.
+const SumsFileName = "SHA256SUMS"
+
 // InstallDirEnv nennt die Variable, mit der der Wrapper seine eigene
 // Installation benennt. Seit das Binary aus einem Cache außerhalb der
 // Installation kommen kann, ist das die einzige verlässliche Quelle.

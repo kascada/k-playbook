@@ -242,14 +242,6 @@ release: ## Baut das Release, committet VERSION und SHA256SUMS und pusht den Tag
 	      checksum "$(INSTALLER_BINARY)-$$target"; \
 	    done ) > "$(INSTALLER_SUMS_FILE)"
 	@git add "$(INSTALLER_VERSION_FILE)" "$(INSTALLER_SUMS_FILE)"
-	@# Übergang: solange dist/ versioniert ist, muss der getaggte Commit die
-	@# frisch gebauten Binaries tragen — der Wrapper zieht sie dem Cache vor,
-	@# ein alter Stand dort lieferte neuen Inhalt mit altem Code aus. Fällt
-	@# weg, sobald dist/ nicht mehr verfolgt wird.
-	@set -eu; \
-	  if [ -n "$$(git ls-files "$(INSTALLER_DIST_DIR)")" ]; then \
-	    git add -u "$(INSTALLER_DIST_DIR)"; \
-	  fi
 	@git commit -m "Release $(VERSION)"
 	@git tag -a "$(VERSION)" -m "Release $(VERSION)"
 	@git push origin "refs/tags/$(VERSION)"

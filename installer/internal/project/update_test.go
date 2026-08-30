@@ -29,8 +29,14 @@ func newGitInstallation(t *testing.T) (projectDir string, remoteDir string) {
 	if err := os.MkdirAll(filepath.Join(dir, "dist"), 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
+	// Seit die Binaries Release-Assets sind, liegt hier keins mehr. Die Datei
+	// bleibt als beliebige verfolgte Datei stehen — die Tests darunter prüfen
+	// Schreibsperre und Sauberkeit, nicht den Inhalt.
 	if err := os.WriteFile(filepath.Join(dir, "dist", "k-playbook-linux-amd64"), []byte("alt"), 0o755); err != nil {
-		t.Fatalf("Binary anlegen: %v", err)
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, VersionFileName), []byte("v0.0.1\n"), 0o644); err != nil {
+		t.Fatalf("VERSION anlegen: %v", err)
 	}
 
 	run(t, dir, "git", "init", "-b", "main")
@@ -152,19 +158,19 @@ func TestUpdateMachtReadOnlyInstallationTemporärBeschreibbar(t *testing.T) {
 	assertNotWritable(t, filepath.Join(dir, ".git", "config"))
 }
 
-// Nur wenn sich die Binaries ändern, bringt ein Neustart eine andere Version.
-func TestUpdateMeldetGeaenderteBinaries(t *testing.T) {
+// Nur wenn VERSION wechselt, bringt ein Neustart eine andere Version.
+func TestUpdateMeldetVersionswechsel(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
 
 	other := filepath.Join(t.TempDir(), "anderer")
 	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
 	run(t, other, "git", "config", "user.email", "test@example.com")
 	run(t, other, "git", "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(other, "dist", "k-playbook-linux-amd64"), []byte("neu"), 0o755); err != nil {
-		t.Fatalf("Binary ändern: %v", err)
+	if err := os.WriteFile(filepath.Join(other, VersionFileName), []byte("v0.0.2\n"), 0o644); err != nil {
+		t.Fatalf("VERSION ändern: %v", err)
 	}
 	run(t, other, "git", "add", "-A")
-	run(t, other, "git", "commit", "-m", "neues Binary")
+	run(t, other, "git", "commit", "-m", "neue Version")
 	run(t, other, "git", "push")
 
 	result, err := Update(projectDir)
@@ -172,7 +178,7 @@ func TestUpdateMeldetGeaenderteBinaries(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 	if !result.BinaryChanged {
-		t.Error("BinaryChanged = false, obwohl das Binary ersetzt wurde")
+		t.Error("BinaryChanged = false, obwohl VERSION gewechselt hat")
 	}
 
 	status, err := CheckUpdate(projectDir)
@@ -184,7 +190,7 @@ func TestUpdateMeldetGeaenderteBinaries(t *testing.T) {
 	}
 }
 
-func TestUpdateOhneBinaeraenderung(t *testing.T) {
+func TestUpdateOhneVersionswechsel(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
 
 	other := filepath.Join(t.TempDir(), "anderer")
@@ -203,7 +209,7 @@ func TestUpdateOhneBinaeraenderung(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 	if result.BinaryChanged {
-		t.Error("BinaryChanged = true, obwohl sich nur Text geändert hat")
+		t.Error("BinaryChanged = true, obwohl VERSION gleich geblieben ist")
 	}
 }
 

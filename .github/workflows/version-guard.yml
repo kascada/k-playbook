@@ -1,0 +1,67 @@
+name: VERSION-Wächter
+
+# Seit die Binaries Release-Assets sind, sagt allein VERSION, welches Binary zu
+# einem Stand gehört. Ein Push auf main, der installer/ ändert, ohne VERSION
+# anzuheben, liefert deshalb neuen Inhalt mit altem Code aus — und niemand
+# merkt es, weil nichts abbricht. Genau dieser Fall wird hier rot.
+#
+# Content-Commits an rules, reviews, commands oder docs sind nicht betroffen:
+# sie ändern das Binary nicht und lösen keinen Download aus.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "installer/**"
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Vollständige Historie auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: VERSION muss mitgehen
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -eu
+
+          # Beim ersten Push eines Branches gibt es kein Vorher.
+          case "$BEFORE" in
+            ""|0000000000000000000000000000000000000000)
+              echo "Kein Vorgänger-Commit — nichts zu vergleichen."
+              exit 0
+              ;;
+          esac
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "Vorgänger-Commit $BEFORE ist nicht erreichbar — übersprungen."
+            exit 0
+          fi
+
+          # Eine fehlende Datei zählt als leerer Wert: dann ist jeder Bump ein
+          # Wechsel, und ein Stand ohne VERSION fällt ohnehin auf.
+          before_version="$(git show "$BEFORE:VERSION" 2>/dev/null || true)"
+          after_version="$(git show "$AFTER:VERSION" 2>/dev/null || true)"
+
+          if [ "$before_version" = "$after_version" ]; then
+            echo "installer/ hat sich geändert, VERSION aber nicht ($after_version)." >&2
+            echo "" >&2
+            echo "Der Clone trägt kein Binary mehr; allein VERSION sagt, welches" >&2
+            echo "Release dazugehört. Ohne Bump laufen alle Installationen mit dem" >&2
+            echo "alten Binary weiter, obwohl der Inhalt neu ist." >&2
+            echo "" >&2
+            echo "Auflösung: make release VERSION=<neue Version>, dann nach dem" >&2
+            echo "Asset-Upload make release-publish VERSION=<neue Version>." >&2
+            exit 1
+          fi
+
+          echo "VERSION: $before_version -> $after_version"

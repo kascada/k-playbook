@@ -9,16 +9,23 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-const testPlatform = "k-playbook-linux-amd64"
-
-// newSource baut eine Quell-Installation mit Wrapper und einem Binary auf.
-func newSource(t *testing.T, binaryContent string) string {
+// newSource baut eine Quell-Installation aus genau den Dateien, die gespiegelt
+// werden. Das Argument landet in VERSION und macht zwei Quellen unterscheidbar.
+func newSource(t *testing.T, version string) string {
 	t.Helper()
 
 	source := t.TempDir()
 	writeFile(t, filepath.Join(source, project.BinDirName, project.WrapperName), "#!/usr/bin/env bash\n")
-	writeFile(t, filepath.Join(source, distDirName, testPlatform), binaryContent)
+	writeFile(t, filepath.Join(source, project.VersionFileName), version)
+	writeFile(t, filepath.Join(source, project.SumsFileName), "summe  "+version+"\n")
 	return source
+}
+
+// mirroredVersion liest die VERSION aus der host-weiten Kopie.
+func mirroredVersion(t *testing.T, req request) string {
+	t.Helper()
+
+	return readFile(t, filepath.Join(req.target, project.VersionFileName))
 }
 
 // newRequest verdrahtet Quelle und ein frisches Ziel.
@@ -30,7 +37,6 @@ func newRequest(t *testing.T, source string, stamp string) request {
 		source:    source,
 		target:    filepath.Join(home, ".local", "share", project.WrapperName, installDirName),
 		linkDir:   filepath.Join(home, ".local", project.BinDirName),
-		platform:  testPlatform,
 		stamp:     stamp,
 		pathValue: filepath.Join(home, ".local", project.BinDirName),
 	}
@@ -64,28 +70,31 @@ func TestMirrorLegtZielAn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mirrorInto: %v", err)
 	}
-	if len(result.Copied) != 2 {
-		t.Fatalf("erwartet 2 kopierte Dateien, bekommen %v", result.Copied)
+	if len(result.Copied) != 3 {
+		t.Fatalf("erwartet 3 kopierte Dateien, bekommen %v", result.Copied)
 	}
 
-	binary := filepath.Join(req.target, distDirName, testPlatform)
-	if got := readFile(t, binary); got != "binary-v1" {
-		t.Errorf("Binary nicht gespiegelt: %q", got)
-	}
-	if !fileExists(filepath.Join(req.target, project.BinDirName, project.WrapperName)) {
+	wrapper := filepath.Join(req.target, project.BinDirName, project.WrapperName)
+	if !fileExists(wrapper) {
 		t.Error("Wrapper fehlt im Ziel")
 	}
-	if got := readStamp(binary + stampSuffix); got != "1000" {
+	if got := mirroredVersion(t, req); got != "binary-v1" {
+		t.Errorf("VERSION = %q, erwartet binary-v1", got)
+	}
+	if !fileExists(filepath.Join(req.target, project.SumsFileName)) {
+		t.Error("SHA256SUMS fehlt im Ziel")
+	}
+	if got := readStamp(filepath.Join(req.target, stampFileName)); got != "1000" {
 		t.Errorf("Stempel = %q, erwartet 1000", got)
 	}
 
-	// Der Wrapper leitet über ../dist ab; nur ein ausführbares Binary hilft.
-	info, err := os.Stat(binary)
+	// Gestartet wird über den Wrapper; nur ausführbar hilft er.
+	info, err := os.Stat(wrapper)
 	if err != nil {
-		t.Fatalf("Binary prüfen: %v", err)
+		t.Fatalf("Wrapper prüfen: %v", err)
 	}
 	if info.Mode().Perm()&0o111 == 0 {
-		t.Errorf("Binary ist nicht ausführbar: %v", info.Mode())
+		t.Errorf("Wrapper ist nicht ausführbar: %v", info.Mode())
 	}
 }
 
@@ -154,8 +163,8 @@ func TestMirrorUeberspringtAelterenStand(t *testing.T) {
 	if len(result.Copied) != 0 {
 		t.Errorf("älterer Stand hat überschrieben: %v", result.Copied)
 	}
-	if got := readFile(t, filepath.Join(req.target, distDirName, testPlatform)); got != "binary-neu" {
-		t.Errorf("Binary = %q, erwartet binary-neu", got)
+	if got := mirroredVersion(t, req); got != "binary-neu" {
+		t.Errorf("VERSION = %q, erwartet binary-neu", got)
 	}
 }
 
@@ -173,44 +182,55 @@ func TestMirrorHebtAufNeuerenStand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
-	if len(result.Copied) != 2 {
-		t.Fatalf("erwartet 2 kopierte Dateien, bekommen %v", result.Copied)
+	if len(result.Copied) != 3 {
+		t.Fatalf("erwartet 3 kopierte Dateien, bekommen %v", result.Copied)
 	}
-	if got := readFile(t, filepath.Join(req.target, distDirName, testPlatform)); got != "binary-neu" {
-		t.Errorf("Binary = %q, erwartet binary-neu", got)
+	if got := mirroredVersion(t, req); got != "binary-neu" {
+		t.Errorf("VERSION = %q, erwartet binary-neu", got)
 	}
-	if got := readStamp(filepath.Join(req.target, distDirName, testPlatform) + stampSuffix); got != "2000" {
+	if got := readStamp(filepath.Join(req.target, stampFileName)); got != "2000" {
 		t.Errorf("Stempel = %q, erwartet 2000", got)
 	}
 }
 
-// Der Fall Mac-Host plus DevContainer bei geteiltem Home: gleicher Clone,
-// gleicher Stand, aber die Plattform des Aufrufers liegt noch nicht im Ziel.
-func TestMirrorErgaenztFehlendePlattform(t *testing.T) {
-	req := newRequest(t, newSource(t, "linux"), "1000")
+// Bis die Binaries Release-Assets wurden, lag im Ziel eine Kopie unter dist/.
+// Sie muss weg: der Wrapper zieht ein vorhandenes dist/ dem Cache vor und
+// startete sonst auf Dauer den alten Stand.
+func TestMirrorRaeumtAltesDistWeg(t *testing.T) {
+	req := newRequest(t, newSource(t, "v1"), "1000")
+	altes := filepath.Join(req.target, legacyDistDirName, "k-playbook-linux-amd64")
+	writeFile(t, altes, "altes Binary")
+
+	result, err := mirrorInto(req)
+	if err != nil {
+		t.Fatalf("mirrorInto: %v", err)
+	}
+	if len(result.Copied) != 3 {
+		t.Fatalf("erwartet 3 kopierte Dateien, bekommen %v", result.Copied)
+	}
+	if fileExists(altes) {
+		t.Error("altes Binary liegt weiterhin im Ziel")
+	}
+	if dirExists(filepath.Join(req.target, legacyDistDirName)) {
+		t.Error("dist/ liegt weiterhin im Ziel")
+	}
+}
+
+// Ein zurückgebliebenes dist/ löst die Spiegelung auch dann aus, wenn der
+// Stempel gleich geblieben ist — sonst überlebte es jeden weiteren Start.
+func TestMirrorRaeumtAltesDistAuchBeiGleichemStandWeg(t *testing.T) {
+	req := newRequest(t, newSource(t, "v1"), "1000")
 	if _, err := mirrorInto(req); err != nil {
 		t.Fatalf("erster Lauf: %v", err)
 	}
+	altes := filepath.Join(req.target, legacyDistDirName, "k-playbook-linux-amd64")
+	writeFile(t, altes, "altes Binary")
 
-	andere := req
-	andere.platform = "k-playbook-darwin-arm64"
-	andere.source = t.TempDir()
-	writeFile(t, filepath.Join(andere.source, project.BinDirName, project.WrapperName), "#!/usr/bin/env bash\n")
-	writeFile(t, filepath.Join(andere.source, distDirName, andere.platform), "darwin")
-
-	result, err := mirrorInto(andere)
-	if err != nil {
+	if _, err := mirrorInto(req); err != nil {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
-	if len(result.Copied) != 2 {
-		t.Fatalf("fehlende Plattform nicht ergänzt: %v", result.Copied)
-	}
-	if got := readFile(t, filepath.Join(req.target, distDirName, andere.platform)); got != "darwin" {
-		t.Errorf("zweites Binary = %q, erwartet darwin", got)
-	}
-	// Das zuerst gespiegelte Binary bleibt daneben liegen.
-	if got := readFile(t, filepath.Join(req.target, distDirName, testPlatform)); got != "linux" {
-		t.Errorf("erstes Binary = %q, erwartet linux", got)
+	if fileExists(altes) {
+		t.Error("altes Binary liegt weiterhin im Ziel")
 	}
 }
 
@@ -222,10 +242,10 @@ func TestMirrorOhneStempelNurWennZielFehlt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("erster Lauf: %v", err)
 	}
-	if len(result.Copied) != 2 {
+	if len(result.Copied) != 3 {
 		t.Fatalf("fehlendes Ziel nicht befüllt: %v", result.Copied)
 	}
-	if fileExists(filepath.Join(req.target, distDirName, testPlatform) + stampSuffix) {
+	if fileExists(filepath.Join(req.target, stampFileName)) {
 		t.Error("ohne Stempel darf keine Stempeldatei entstehen")
 	}
 
@@ -310,13 +330,7 @@ func TestMirrorMeldetFehlendeQuelle(t *testing.T) {
 	req := newRequest(t, t.TempDir(), "1000")
 
 	if _, err := mirrorInto(req); err == nil {
-		t.Fatal("fehlendes Quell-Binary blieb unbemerkt")
-	}
-}
-
-func TestPlatformBinary(t *testing.T) {
-	if got := PlatformBinary("darwin", "arm64"); got != "k-playbook-darwin-arm64" {
-		t.Errorf("PlatformBinary = %q", got)
+		t.Fatal("fehlende Quelldateien blieben unbemerkt")
 	}
 }
 

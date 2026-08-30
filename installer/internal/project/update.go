@@ -2,9 +2,7 @@ package project
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -244,8 +242,9 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 // UpdateResult ist das Ergebnis eines Pull-Laufs.
 type UpdateResult struct {
 	Output string `json:"output"`
-	// BinaryChanged meldet, ob sich die ausgelieferten Binaries geändert
-	// haben. Nur dann bringt ein Neustart eine andere Programmversion.
+	// BinaryChanged meldet, ob der Stand ein anderes Binary verlangt — das
+	// heißt: ob VERSION gewechselt hat. Nur dann bringt ein Neustart eine
+	// andere Programmversion.
 	BinaryChanged bool   `json:"binaryChanged"`
 	Message       string `json:"message"`
 	// Cleanliness trägt den Grund, wenn das Update gar nicht erst lief.
@@ -314,7 +313,6 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	}
 
 	versionBefore := InstalledVersion(dir)
-	before := binaryHashes(dir)
 	if err := setInstallationWritable(projectDir); err != nil {
 		return UpdateResult{}, fmt.Errorf("Installation beschreibbar machen: %w", err)
 	}
@@ -338,12 +336,10 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	result = UpdateResult{Output: text}
 
 	versionAfter := InstalledVersion(dir)
+	// Seit die Binaries Release-Assets sind, hängt alles an VERSION: der Clone
+	// trägt kein Binary mehr, das sich vergleichen ließe.
 	versionChanged := versionBefore != versionAfter
-	// Übergangsregel, solange dist/ versioniert ist: auch ein ersetztes Binary
-	// meldet den Neustart. Ohne diese Hälfte fiele der Hinweis zwischen dem
-	// Go-Umbau und dem ersten Release still aus, weil es noch keine VERSION
-	// gibt. Mit dist/ fällt sie weg.
-	result.BinaryChanged = versionChanged || !sameHashes(before, binaryHashes(dir))
+	result.BinaryChanged = versionChanged
 
 	if versionChanged {
 		output, err := prefetchBinary(dir)
@@ -402,48 +398,6 @@ func prefetchBinary(playbookDir string) (string, error) {
 		return text, fmt.Errorf("--prefetch fehlgeschlagen")
 	}
 	return text, nil
-}
-
-// binaryHashes bildet die ausgelieferten Binaries ab. Ändern sie sich, läuft
-// der aktuelle Prozess weiterhin mit dem alten Code: unter Linux behält er
-// seinen Inode, auch wenn die Datei ersetzt wurde.
-func binaryHashes(playbookDir string) map[string]string {
-	hashes := map[string]string{}
-
-	entries, err := os.ReadDir(filepath.Join(playbookDir, "dist"))
-	if err != nil {
-		return hashes
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := filepath.Join(playbookDir, "dist", entry.Name())
-		file, err := os.Open(path)
-		if err != nil {
-			continue
-		}
-		digest := sha256.New()
-		_, err = io.Copy(digest, file)
-		file.Close()
-		if err != nil {
-			continue
-		}
-		hashes[entry.Name()] = fmt.Sprintf("%x", digest.Sum(nil))
-	}
-	return hashes
-}
-
-func sameHashes(before map[string]string, after map[string]string) bool {
-	if len(before) != len(after) {
-		return false
-	}
-	for name, hash := range before {
-		if after[name] != hash {
-			return false
-		}
-	}
-	return true
 }
 
 // GitOutput führt ein Git-Kommando in dir aus und liefert die getrimmte

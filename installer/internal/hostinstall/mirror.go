@@ -6,9 +6,11 @@
 // und verlinkt sie nach ~/.local/bin. Wer aus einem aktuelleren Clone startet,
 // hebt die host-weite Kopie damit von selbst an.
 //
-// Gespiegelt wird der Wrapper zusammen mit dem Binary, nicht das Binary allein:
-// Host und Container teilen sich unter Umständen dasselbe Home, brauchen aber
-// verschiedene Plattformen. Erst der Wrapper wählt zur Laufzeit aus.
+// Gespiegelt wird kein Binary mehr, sondern der Wrapper zusammen mit VERSION
+// und SHA256SUMS: daraus löst er das Binary über den Cache auf. Host und
+// Container teilen sich unter Umständen dasselbe Home, brauchen aber
+// verschiedene Plattformen — der Cache hält sie über den Dateinamen
+// auseinander, die Kopie muss davon nichts wissen.
 package hostinstall
 
 import (
@@ -17,7 +19,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -26,16 +27,17 @@ import (
 )
 
 const (
-	// Der Name des Wrappers und sein Verzeichnis stehen in internal/project:
-	// dort werden sie auch für die MCP-Registrierung gebraucht, und die
-	// Importrichtung geht von hier nach dort.
-	distDirName = "dist"
+	// legacyDistDirName ist die Altlast: bis die Binaries Release-Assets
+	// wurden, lag hier eine Kopie des Binaries. Sie muss weg, nicht bloß
+	// unbeachtet bleiben — siehe mirrorInto.
+	legacyDistDirName = "dist"
 	// installDirName trennt die Spiegelung von den Tool-venvs, die unter
 	// ~/.local/share/k-playbook/ ebenfalls zuhause sind. Ein venv bringt ein
 	// eigenes bin/ mit; ohne diese Ebene kollidierten beide.
 	installDirName = "installation"
-	// stampSuffix hält den Commit-Stand neben dem gespiegelten Binary fest.
-	stampSuffix = ".stamp"
+	// stampFileName hält den Commit-Stand der Quelle fest. Er hängt nicht mehr
+	// an einem Binary-Pfad und liegt deshalb im Wurzelverzeichnis der Kopie.
+	stampFileName = ".stamp"
 	// stampTimeout begrenzt die Git-Abfrage. Sie läuft lokal und ist schnell;
 	// ein hängendes Git darf den Start trotzdem nicht aufhalten.
 	stampTimeout = 5 * time.Second
@@ -66,8 +68,6 @@ type request struct {
 	target string
 	// linkDir nimmt den Symlink auf; hier greift der PATH.
 	linkDir string
-	// platform ist der Dateiname des Binaries in dist/.
-	platform string
 	// stamp ist der Commit-Stand der Quelle. Leer, wenn nicht ermittelbar.
 	stamp string
 	// pathValue ist der PATH, gegen den linkDir geprüft wird.
@@ -99,17 +99,17 @@ func Mirror() (Result, error) {
 		source:    source,
 		target:    target,
 		linkDir:   filepath.Join(home, ".local", project.BinDirName),
-		platform:  PlatformBinary(runtime.GOOS, runtime.GOARCH),
 		stamp:     sourceStamp(source),
 		pathValue: os.Getenv("PATH"),
 	})
 }
 
-// PlatformBinary bildet den Dateinamen in dist/. GOOS und GOARCH tragen bereits
-// die Schreibweise, die beim Bauen verwendet wird — anders als `uname`, das der
-// Wrapper erst übersetzen muss.
-func PlatformBinary(goos string, goarch string) string {
-	return fmt.Sprintf("%s-%s-%s", project.WrapperName, goos, goarch)
+// mirroredFiles nennt, was die host-weite Kopie braucht: den Wrapper und die
+// beiden Dateien, mit denen er das Binary auflöst.
+var mirroredFiles = []string{
+	filepath.Join(project.BinDirName, project.WrapperName),
+	project.VersionFileName,
+	project.SumsFileName,
 }
 
 // PathStatus meldet, ob `k-playbook` ohne Pfadangabe aufrufbar ist.
@@ -172,29 +172,34 @@ func linkExists(path string) bool {
 func mirrorInto(req request) (Result, error) {
 	result := Result{}
 
-	sourceWrapper := filepath.Join(req.source, project.BinDirName, project.WrapperName)
-	sourceBinary := filepath.Join(req.source, distDirName, req.platform)
 	targetWrapper := filepath.Join(req.target, project.BinDirName, project.WrapperName)
-	targetBinary := filepath.Join(req.target, distDirName, req.platform)
-	stampPath := targetBinary + stampSuffix
+	stampPath := filepath.Join(req.target, stampFileName)
 
-	if needsCopy(req.stamp, stampPath, targetWrapper, targetBinary) {
-		if !fileExists(sourceBinary) {
-			return result, fmt.Errorf("in der Quelle fehlt %s", sourceBinary)
+	if needsCopy(req, stampPath) {
+		for _, relative := range mirroredFiles {
+			if !fileExists(filepath.Join(req.source, relative)) {
+				return result, fmt.Errorf("in der Quelle fehlt %s", filepath.Join(req.source, relative))
+			}
 		}
-		if !fileExists(sourceWrapper) {
-			return result, fmt.Errorf("in der Quelle fehlt %s", sourceWrapper)
+		for _, relative := range mirroredFiles {
+			// Der Wrapper muss ausführbar sein; VERSION und SHA256SUMS liest
+			// nur er selbst.
+			mode := os.FileMode(0o644)
+			if relative == mirroredFiles[0] {
+				mode = 0o755
+			}
+			if err := copyFile(filepath.Join(req.source, relative), filepath.Join(req.target, relative), mode); err != nil {
+				return result, err
+			}
+			result.Copied = append(result.Copied, relative)
 		}
 
-		if err := copyExecutable(sourceWrapper, targetWrapper); err != nil {
+		// Vor Task 036 lag hier ein gespiegeltes Binary. Der Wrapper zieht ein
+		// vorhandenes dist/ dem Cache vor — bliebe es liegen, startete die
+		// host-weite Kopie auf Dauer den alten Stand.
+		if err := os.RemoveAll(filepath.Join(req.target, legacyDistDirName)); err != nil {
 			return result, err
 		}
-		result.Copied = append(result.Copied, filepath.Join(project.BinDirName, project.WrapperName))
-
-		if err := copyExecutable(sourceBinary, targetBinary); err != nil {
-			return result, err
-		}
-		result.Copied = append(result.Copied, filepath.Join(distDirName, req.platform))
 
 		// Ohne Stempel bleibt die Datei weg: ein leerer Wert würde beim
 		// nächsten Start wie "unbekannt" gelesen und nichts ändern.
@@ -219,15 +224,20 @@ func mirrorInto(req request) (Result, error) {
 
 // needsCopy entscheidet, ob gespiegelt wird.
 //
-// Der Stempel allein reicht nicht: die Kopie trägt nur die Plattformen, von
-// denen aus sie schon einmal aufgerufen wurde. Startet ein Container aus
-// demselben Clone, den zuvor der Host gespiegelt hat, sind die Stände gleich —
-// sein Binary fehlt trotzdem.
-func needsCopy(sourceStamp string, stampPath string, targetWrapper string, targetBinary string) bool {
-	if !fileExists(targetBinary) || !fileExists(targetWrapper) {
+// Der Stempel allein reicht nicht: fehlt im Ziel eine der Dateien, muss
+// kopiert werden, auch wenn die Stände gleich sind. Und ein zurückgebliebenes
+// dist/ aus der Zeit vor den Release-Assets muss verschwinden, bevor der
+// Wrapper es dem Cache vorzieht.
+func needsCopy(req request, stampPath string) bool {
+	for _, relative := range mirroredFiles {
+		if !fileExists(filepath.Join(req.target, relative)) {
+			return true
+		}
+	}
+	if dirExists(filepath.Join(req.target, legacyDistDirName)) {
 		return true
 	}
-	return newer(sourceStamp, readStamp(stampPath))
+	return newer(req.stamp, readStamp(stampPath))
 }
 
 // newer vergleicht zwei Commit-Zeitpunkte als Sekunden seit Epoch.
@@ -247,14 +257,18 @@ func newer(source string, target string) bool {
 	return sourceValue > targetValue
 }
 
-// sourceStamp liest den Zeitpunkt des letzten Commits, der dist/ angefasst hat.
-// Leer, wenn die Quelle kein Git-Repository ist — dann wird nur gespiegelt,
-// falls im Ziel etwas fehlt.
+// sourceStamp liest den Zeitpunkt des HEAD-Commits. Leer, wenn die Quelle kein
+// Git-Repository ist — dann wird nur gespiegelt, falls im Ziel etwas fehlt.
+//
+// Früher zählte der letzte Commit an dist/. Seit dort nichts mehr liegt, wäre
+// das ein eingefrorener Stempel. Der HEAD wechselt dafür bei jedem
+// Content-Commit: die Kopie wird öfter erneuert als früher — sie ist klein,
+// und der Wrapper ist genau die Datei, die aktuell sein muss.
 func sourceStamp(source string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), stampTimeout)
 	defer cancel()
 
-	stamp, err := project.GitOutput(ctx, source, "log", "-1", "--format=%ct", "--", distDirName)
+	stamp, err := project.GitOutput(ctx, source, "log", "-1", "--format=%ct")
 	if err != nil {
 		return ""
 	}
@@ -276,11 +290,11 @@ func writeStamp(path string, stamp string) error {
 	return os.WriteFile(path, []byte(stamp+"\n"), 0o644)
 }
 
-// copyExecutable schreibt erst daneben und benennt dann um.
+// copyFile schreibt erst daneben und benennt dann um.
 //
 // Das Umbenennen ist atomar und umgeht ETXTBSY: eine parallel laufende Instanz
 // hält die alte Datei offen, während der Name schon auf die neue zeigt.
-func copyExecutable(source string, target string) error {
+func copyFile(source string, target string, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
@@ -292,7 +306,7 @@ func copyExecutable(source string, target string) error {
 	defer in.Close()
 
 	temporary := target + ".tmp"
-	out, err := os.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	out, err := os.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
@@ -307,7 +321,7 @@ func copyExecutable(source string, target string) error {
 		return err
 	}
 	// Explizit, weil eine vorhandene Datei ihre alten Rechte behält.
-	if err := os.Chmod(temporary, 0o755); err != nil {
+	if err := os.Chmod(temporary, mode); err != nil {
 		os.Remove(temporary)
 		return err
 	}
@@ -389,4 +403,9 @@ func resolve(path string) string {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
