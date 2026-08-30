@@ -19,9 +19,14 @@ wenn du aus einem Fork oder Mirror unter abweichendem Namen klonst, hänge `k-pl
 als zweites Argument an.
 
 **Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
-passende Binary aus `dist/` startet; die Binaries liegen fertig im Repo. Für macOS und
-Linux gleichermaßen, was auch den Fall abdeckt, dass Host und DevContainer
-unterschiedliche Plattformen sind.
+passende Binary startet — für macOS und Linux gleichermaßen, was auch den Fall abdeckt,
+dass Host und DevContainer unterschiedliche Plattformen sind.
+
+**Der erste Start braucht Netz.** Die Binaries liegen nicht mehr im Repo, sondern als
+Assets am Release, das die `VERSION` im Wurzelverzeichnis nennt. Der Wrapper lädt genau
+das eine, das er braucht, in einen Cache außerhalb der Installation und prüft es gegen
+das mitgelieferte `SHA256SUMS`. Für Rechner ohne Zugriff gibt es `bin/k-playbook
+--prefetch` und `K_PLAYBOOK_CACHE` — siehe [docs/installation.md](docs/installation.md).
 
 Der letzte Aufruf startet die Oberfläche im Browser. Beim ersten Mal findet sie noch
 keine `K-PLAYBOOK.yaml` und schlägt vor, wo sie angelegt wird: das Verzeichnis über dem
@@ -54,7 +59,7 @@ projekt/
 │   └── commands/ ──┤
 ├── k-playbook/   ←─┤     die Installation, vollständig ersetzbar
 │   ├── commands/ skills/ rules/ reviews/ checks/
-│   ├── bin/ dist/ scripts/
+│   ├── bin/ scripts/
 │   ├── k-playbook.md     mitgelieferte Instruktionsebene
 │   └── installer/ docs/
 └── k-playbook-local/ ←─┘ projekteigen, committed
@@ -125,17 +130,32 @@ make -C k-playbook installer-update
 
 ## Selbst bauen
 
-Die mitgelieferten Binaries genügen für den normalen Betrieb. Wer am Werkzeug selbst
-arbeitet oder lieber selbst baut, braucht Go:
+Für den normalen Betrieb genügen die Release-Assets, die der Wrapper selbst lädt. Wer am
+Werkzeug arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-make dist   # baut alle Plattformen nach dist/
-make gui    # baut und startet die Oberfläche
+make dist        # baut alle Plattformen nach dist/
+make dist-host   # baut nur diese Plattform, deutlich schneller
+make gui         # baut und startet die Oberfläche
 ```
 
-`make dist` ist das einzige Build-Target und verwendet dieselben Flags wie die
-ausgelieferten Artefakte, damit beide Wege dasselbe Ergebnis liefern. `make gui` ist der
-Weg beim Entwickeln: es startet den frisch gebauten Stand.
+Ein `dist/` im Checkout hat immer Vorrang vor Cache und Download. Der
+Entwicklungs-Loop bleibt dadurch netzfrei: `make gui` baut und startet den frisch
+gebauten Stand, ohne etwas zu laden. `dist/` ist nicht versioniert.
+
+Gebaut wird mit denselben Flags, mit denen CI die Release-Assets baut — `-trimpath`,
+`CGO_ENABLED=0`, `-buildvcs=false` und die in `installer/go.mod` festgenagelte
+Toolchain —, damit beide Wege bitgleiche Binaries liefern. Genau darauf beruht das
+versionierte `SHA256SUMS`.
+
+Ein Release läuft in zwei Schritten, damit `VERSION` nie auf einen Tag ohne Downloads
+zeigt:
+
+```bash
+make release VERSION=v0.2.0          # baut, committet VERSION und SHA256SUMS, pusht den Tag
+# CI baut nach, prüft gegen SHA256SUMS und lädt die Assets hoch
+make release-publish VERSION=v0.2.0  # bringt denselben Commit auf main
+```
 
 ## Grundprinzipien
 

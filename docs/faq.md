@@ -208,8 +208,11 @@ Skript nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen g
 
 ## Brauche ich Go?
 
-Nein. `bin/k-playbook` ist ein Wrapper, der das zur Plattform passende Binary aus `dist/`
-startet; die Binaries liegen fertig im Repo, für macOS und Linux.
+Nein. `bin/k-playbook` ist ein Wrapper, der das zur Plattform passende Binary startet —
+für macOS und Linux. Es liegt nicht mehr im Repo, sondern als Asset am Release: der
+Wrapper lädt genau das eine, das er braucht, in einen Cache und prüft es gegen das
+mitgelieferte `SHA256SUMS`. Der erste Start braucht dafür Netz; ohne Zugriff helfen
+`bin/k-playbook --prefetch`, ein vorbefüllter `K_PLAYBOOK_CACHE` oder `make dist-host`.
 
 Go brauchst du nur, wenn du am Werkzeug selbst arbeitest:
 

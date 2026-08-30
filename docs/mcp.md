@@ -109,6 +109,11 @@ Hauptverzeichnis — nicht die host-weite Kopie unter `~/.local/bin`. Drei Grün
 - **Plattformen.** Der Wrapper wählt die Binary selbst über `uname`. Aus einem einzigen
   Eintrag funktionieren damit macOS auf dem Host und Linux im Container.
 
+Weil `$HOME` im Container ein anderer ist, gilt das auch für den Cache, aus dem der
+Wrapper das Binary auflöst: er überlebt einen Rebuild nur, wenn `K_PLAYBOOK_CACHE` in den
+Workspace zeigt. Die `containerEnv`-Zeile dazu steht in
+[installation.md](installation.md#das-binary-und-der-cache).
+
 Der Server selbst ist ortsunabhängig: er löst das Projekt zur Laufzeit über die
 Aufwärtssuche nach `K-PLAYBOOK.yaml` auf, nicht über seinen eigenen Ort.
 

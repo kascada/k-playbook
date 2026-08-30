@@ -181,7 +181,7 @@ Alles Übrige hat kein Gegenstück auf der anderen Seite:
 | | Verzeichnisse |
 |---|---|
 | nur projekteigen | `results/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `material/`, `TODO.md` |
-| nur mitgeliefert | `docs/`, `scripts/`, `bin/`, `dist/`, `installer/` |
+| nur mitgeliefert | `docs/`, `scripts/`, `bin/`, `installer/` |
 
 `docs/` steht in beiden Zeilen, ist aber kein Paar: `k-playbook/docs/` dokumentiert
 k-playbook selbst, `k-playbook-local/docs/` das Projekt. Zwei verschiedene Gegenstände

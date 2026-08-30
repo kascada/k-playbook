@@ -155,10 +155,11 @@ erst nach Bestätigung. Kandidaten in dieser Reihenfolge:
 
 1. **Das Git-Repository, in dem der Aufruf stattfindet.** Wer das Werkzeug startet, steht
    in aller Regel in dem Projekt, das er meint. Der stärkste Hinweis.
-2. **Aus dem Ort des Binaries.** Es liegt in `<X>/dist/`, also ist `X` die Installation.
-   Ob `X` selbst das Hauptverzeichnis ist oder eine Ebene darunter liegt, hängt daran, ob
-   die Installation geklont wurde oder das Repo selbst ist — beides kommt vor, deshalb
-   stehen beide Orte zur Auswahl.
+2. **Aus `InstallDir()`.** Vorrangig sagt der Wrapper über
+   `K_PLAYBOOK_INSTALL_DIR`, wo die Installation liegt; ersatzweise wird sie aus dem Ort
+   des Binaries abgeleitet (`<X>/dist/` → `X`). Ob `X` selbst das Hauptverzeichnis ist
+   oder eine Ebene darunter liegt, hängt daran, ob die Installation geklont wurde oder
+   das Repo selbst ist — beides kommt vor, deshalb stehen beide Orte zur Auswahl.
 3. Das Arbeitsverzeichnis.
 
 Ein früherer Ansatz leitete das Hauptverzeichnis allein aus dem Binary-Pfad ab und
@@ -628,10 +629,29 @@ Ist ausgerechnet `bin/k-playbook` die veränderte Datei, ist die Oberfläche üb
 Wrapper nicht mehr erreichbar. Dann führt der host-weite `k-playbook` aus dem `PATH` zum
 selben Ergebnis.
 
-Vor und nach dem Pull werden die Dateien unter `dist/` per SHA-256 gehasht.
-`BinaryChanged` meldet, ob sich etwas geändert hat — **nur dann** bringt ein Neustart
-eine andere Programmversion. Unter Linux behält der laufende Prozess seinen Inode und
-arbeitet mit dem alten Code weiter, auch wenn die Datei ersetzt wurde.
+Vor und nach dem Pull wird `VERSION` gelesen. `BinaryChanged` meldet, ob sie gewechselt
+hat — **nur dann** gehört zum neuen Stand ein anderes Binary, und nur dann bringt ein
+Neustart eine andere Programmversion. Unter Linux behält der laufende Prozess ohnehin
+seinen Inode und arbeitet mit dem alten Code weiter.
+
+Früher wurden dafür die Dateien unter `dist/` gehasht. Seit die Binaries Release-Assets
+sind, liegt im Clone keins mehr, das sich vergleichen ließe; `VERSION` ist an diese
+Stelle getreten und trennt zugleich sauber: Commits an Regeln, Reviews, Commands oder
+Docs ändern sie nicht.
+
+Hat `VERSION` gewechselt, ruft der Update-Pfad
+`filepath.Join(PlaybookDir(projectDir), "bin", "k-playbook")` mit `--prefetch` auf und
+legt das neue Binary gleich in den Cache — sonst wartet der Nutzer beim Neustart auf den
+Download. Festgenagelt genau dieser Wrapper und nicht `InstallDir()`: das laufende Binary
+kann eine fremde Installation aktualisieren (die WebUI ruft
+`project.Update(environment.ProjectDir)`), und nur der frisch gezogene Clone trägt nach
+dem Pull die neue `VERSION` samt passender Prüfsummen.
+
+Der Prefetch ist **best effort** — eigener Timeout statt des `pullTimeout`-Kontexts,
+Fehler nur als Hinweis in `Message` und `Output`, nie als Rückgabefehler. Sonst ließe der
+benannte Rückgabefehler mit `defer keepInstallationReadOnly(projectDir, &err)` ein bereits
+erfolgreiches `git pull` als gescheitertes Update erscheinen — getroffen wird das offline,
+hinter Proxys und genau im Fenster zwischen Tag und Asset-Upload.
 
 ### Die Verlinkung wird mitgezogen
 
@@ -676,11 +696,9 @@ Gespiegelt wird nach:
 └── share/k-playbook/
     ├── installation/
     │   ├── bin/k-playbook                 Kopie des Wrappers
-    │   └── dist/
-    │       ├── k-playbook-darwin-arm64    vom Mac-Host gespiegelt
-    │       ├── k-playbook-darwin-arm64.stamp
-    │       ├── k-playbook-linux-arm64     vom Container gespiegelt
-    │       └── k-playbook-linux-arm64.stamp
+    │   ├── VERSION                        welches Release dazugehört
+    │   ├── SHA256SUMS                     Prüfsummen der Assets
+    │   └── .stamp                         Commit-Stand der Quelle
     └── security-tools/                    Tool-venvs, davon unberührt
 ```
 
@@ -699,24 +717,33 @@ Stattdessen kopiert nun jeder Start seine eigenen Dateien dorthin, sofern er ein
 Stand mitbringt. Wer aus einem aktuelleren Clone startet, hebt die host-weite Kopie damit
 von selbst an — und ein gelöschter Clone stört nicht.
 
-### Wrapper und Binary, nicht das Binary allein
+### Der Wrapper, kein Binary
 
-Nahe liegt, nur das fertige Binary zu kopieren: die Plattform ist beim Kopieren ja bereits
-entschieden, ein Wrapper wäre dann überflüssig. Das greift zu kurz. Auf einem Mac mit
-DevContainer ist `~/.local/bin` derselbe Pfad, aber Host und Container brauchen
-verschiedene Plattformen. Ist `~/.local` per `mounts` geteilt, treffen beide auf dieselbe
-Datei.
+Gespiegelt werden genau drei Dateien: `bin/k-playbook`, `VERSION` und `SHA256SUMS`. Kein
+Binary — das löst der Wrapper über den Cache auf, und dort liegt es ohnehin schon.
 
-Deshalb wird der Wrapper mitkopiert und die Struktur `<X>/bin/` neben `<X>/dist/`
-eingehalten — die Plattformwahl bleibt damit zur Laufzeit, wo sie hingehört. Der Wrapper
-löst seine Symlink-Kette selbst auf und leitet `dist/` aus seinem **aufgelösten** Ort
-ab; er braucht für den Symlink in `~/.local/bin` keine Anpassung.
+Der Wrapper allein trägt auch den Fall Mac mit DevContainer: `~/.local/bin` ist derselbe
+Pfad, Host und Container brauchen aber verschiedene Plattformen. Früher musste dafür je
+Plattform ein eigenes Binary neben dem Wrapper liegen; heute trennt sie der Cache über
+den Dateinamen `k-playbook-<os>-<arch>`, und die Kopie muss davon nichts wissen. Die
+Plattformwahl bleibt zur Laufzeit, wo sie hingehört. Der Wrapper löst seine
+Symlink-Kette selbst auf und leitet seine Installation aus dem **aufgelösten** Ort ab; er
+braucht für den Symlink in `~/.local/bin` keine Anpassung.
+
+**Ein zurückgebliebenes `dist/` wird entfernt.** Kopien aus der Zeit vor den
+Release-Assets tragen dort noch ein Binary, und der Wrapper zieht ein vorhandenes `dist/`
+dem Cache vor — es bliebe sonst für immer der Startpunkt der host-weiten Kopie. Sein
+Vorhandensein löst die Spiegelung auch dann aus, wenn der Stempel gleich geblieben ist.
 
 ### Commit-Stand statt mtime
 
-Verglichen wird der Zeitpunkt des letzten Commits, der `dist/` angefasst hat:
-`git log -1 --format=%ct -- dist`. Der Wert landet als `<plattform>.stamp` neben dem
-gespiegelten Binary.
+Verglichen wird der Zeitpunkt des HEAD-Commits: `git log -1 --format=%ct`. Der Wert
+landet als `.stamp` im Wurzelverzeichnis der Kopie.
+
+Früher zählte der letzte Commit an `dist/`. Seit dort nichts mehr liegt, wäre das ein
+eingefrorener Stempel. Der HEAD wechselt dafür bei jedem Content-Commit: die Kopie wird
+öfter erneuert als früher — sie ist dafür klein, und der Wrapper ist genau die Datei, die
+aktuell sein muss.
 
 Die mtime der Dateien wäre das naheliegende Kriterium und ist trotzdem falsch: Git setzt
 sie beim Auschecken auf den Zeitpunkt des Clones, nicht des Commits. Ein frisch geklonter
@@ -726,16 +753,12 @@ alter Stand sähe damit neuer aus als eine korrekte Installation und würde sie
 Ist die Quelle kein Git-Repository, bleibt der Stempel leer und es wird nur gespiegelt,
 wenn im Ziel etwas fehlt. Ein unbekannter Stand darf einen bekannten nicht verdrängen.
 
-### Stempel pro Plattform
+### Fehlende Datei schlägt den Stempel
 
-Der Stempel gilt bewusst je Plattformdatei, nicht für die Installation als Ganzes.
-Spiegelt der Mac zuerst, steht dort sein Stand und nur `darwin-arm64`. Startet danach der
-Container aus demselben Clone, wäre ein gemeinsamer Stempel gleich — und `linux-arm64`
-fehlte dauerhaft. Kopiert wird deshalb auch, wenn das **eigene** Binary im Ziel fehlt,
-unabhängig vom Stand.
-
-So wachsen genau die Plattformen zusammen, von denen aus tatsächlich gestartet wurde,
-statt alle vier Artefakte mit ihren rund 42 MB zu kopieren.
+Der Stempel allein entscheidet nicht: fehlt im Ziel eine der drei Dateien, wird kopiert,
+auch wenn die Stände gleich sind. Früher trug das den Fall, dass die Kopie nur die
+Plattformen enthielt, von denen aus sie schon einmal aufgerufen wurde — mit dem Wegfall
+des Binaries ist daraus die schlichte Vollständigkeitsprüfung geworden.
 
 ### Kein Sonderfall DevContainer
 
@@ -798,29 +821,66 @@ Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 Reviews, Checks — kommen dagegen **immer** aus `PlaybookDir(projektDir)`, also aus
 `<projekt>/k-playbook/`. Das Binary liest nie neben sich.
 
-Das ist Absicht. In einem Zielprojekt liegt das Binary in `<projekt>/k-playbook/dist/`,
-also *innerhalb* der Installation — „neben dem Binary" und „die Installation" fallen dort
-zusammen. Für die host-weite Kopie wäre „neben dem Binary" sogar falsch: dort liegen nur
-Wrapper und Binary, kein `scripts/`, keine `rules/`.
+Das ist Absicht — und seit die Binaries Release-Assets sind, unumgänglich: das Binary
+liegt im Regelfall im Cache unter `$HOME`, weit außerhalb jeder Installation. „Neben dem
+Binary" gäbe es dort nichts zu lesen. Genau deshalb sagt der Wrapper über
+`K_PLAYBOOK_INSTALL_DIR`, wo die Installation liegt, statt sie aus dem eigenen Ort raten
+zu lassen.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
-| `<projekt>/k-playbook/bin|dist/` | Installation | `git pull` im Clone, also „Update prüfen" |
-| `~/.local/share/k-playbook/installation/bin|dist/` | host-weite Kopie | `Mirror()` bei jedem Start — mit Einschränkung, siehe unten |
+| `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst `$HOME/.cache/k-playbook` | Cache, geteilt über alle Projekte | Download beim Start oder `bin/k-playbook --prefetch` |
+| `<projekt>/k-playbook/bin/` | Wrapper der Installation | `git pull` im Clone, also „Update prüfen" |
+| `~/.local/share/k-playbook/installation/bin/` | Wrapper der host-weiten Kopie | `Mirror()` bei jedem Start — mit Einschränkung, siehe unten |
 | `~/.local/bin/k-playbook` | Symlink auf den Wrapper der Kopie | `Mirror()` |
-| `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` |
+| `<entwicklungsrepo>/dist/` | Build des Arbeitsstands, schlägt Cache und Download | `make dist` / `make dist-host` |
 
 **Die host-weite Kopie erneuert sich nicht beim lokalen Bauen.** `needsCopy()` vergleicht
-den Commit-Zeitpunkt des letzten Commits, der `dist/` angefasst hat — bewusst nicht die
-Dateizeit, weil Git die beim Auschecken auf den Zeitpunkt des Clones setzt. `make dist`
-ändert diesen Stempel nicht, die Kopie bleibt also stehen.
+den Commit-Zeitpunkt des HEAD — bewusst nicht die Dateizeit, weil Git die beim Auschecken
+auf den Zeitpunkt des Clones setzt. `make dist` ändert diesen Stempel nicht, die Kopie
+bleibt also stehen.
+
+### Die Auflösungskette des Wrappers
+
+`bin/k-playbook` nimmt das erste Binary, das er findet:
+
+1. **`$K_PLAYBOOK_BINARY`** — ausdrücklich gesetzt, gewinnt immer. Zeigt es auf nichts
+   Ausführbares, bricht der Wrapper ab, statt weiterzusuchen: eine gesetzte Variable ist
+   eine Ansage, kein Vorschlag.
+2. **`<installation>/dist/`** — im Repo-Checkout hat der lokale Build Vorrang vor Cache
+   und Download. Nur so bleibt `make gui` netzfrei.
+3. **Der Cache** — `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst
+   `$HOME/.cache/k-playbook`, darunter `bin/<version>/k-playbook-<os>-<arch>`.
+4. **Download** des Release-Assets zu der Version aus `<installation>/VERSION`, geprüft
+   gegen `<installation>/SHA256SUMS`.
+
+Geladen wird in eine Temp-Datei im Zielverzeichnis und dann umbenannt — parallele Starts
+sehen so nie eine halbe Datei. Stimmt die Prüfsumme nicht, wird die Datei verworfen.
+
+**Warum der Cache außerhalb der Installation liegt.** Die Installation wird nach jedem
+Update per `chmod -R a-w` gesperrt; in ein `dist/` darunter könnte der Wrapper nicht
+schreiben. Der Cache löst das und wird zugleich von allen Projekten desselben Rechners
+geteilt. Host und Container kollidieren nicht, weil der Dateiname die Plattform trägt.
+
+**Der Wrapper exportiert `K_PLAYBOOK_INSTALL_DIR`** mit seinem eigenen Elternverzeichnis.
+Das Binary kann aus dem Cache kommen und wüsste sonst nicht, zu welcher Installation es
+gehört. `InstallDir()` liest die Variable vorrangig; die Ableitung aus dem Binary-Pfad
+bleibt Rückfall für direkt gestartete Binaries und gilt nur, wenn unter dem abgeleiteten
+Verzeichnis auch wirklich `bin/k-playbook` oder `K-PLAYBOOK.yaml` liegt. Ohne diese
+Plausibilisierung lieferte ein Cache-Binary `<cache>/bin` mit `ok = true` — kein Fehler,
+sondern ein falsches Ergebnis.
+
+**Kein Versions-Fallback.** Findet der Wrapper zur `VERSION` kein Asset, bricht er mit
+einer Meldung ab, die jede geprüfte Stelle und die Wege weiter nennt — `--prefetch`,
+`K_PLAYBOOK_CACHE`, `make dist-host`. Ein stiller Rückfall auf eine ältere Version
+widerspräche der Zusage, dass ein Clone-Stand eindeutig einem Binary zugeordnet ist.
 
 Daraus folgt für den Aufruf:
 
 | Start | Binary aus | Dateien aus | kann driften |
 |---|---|---|---|
-| `<projekt>/k-playbook/bin/k-playbook` | dem Clone | dem Clone | nein |
-| `k-playbook` aus dem `PATH` | der host-weiten Kopie | der Installation des aktuellen Projekts | ja |
+| `<projekt>/k-playbook/bin/k-playbook` | Cache oder Download zur `VERSION` des Clones | dem Clone | nein |
+| `k-playbook` aus dem `PATH` | Cache oder Download zur `VERSION` der Kopie | der Installation des aktuellen Projekts | ja |
 | `make installer-run` im Entwicklungsrepo | dem Arbeitsstand | siehe „Entwicklungsstand" | ohne Sync ja |
 
 ### Entwicklungsstand
@@ -1319,7 +1379,10 @@ Hinweis auf die Port-Weiterleitung.
 - Kein Projekt-Store. Es gibt keine Liste bekannter Projekte mehr — das Werkzeug arbeitet
   auf dem Projekt, in dem es liegt.
 - Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt.
-- `dist/` wird mitversioniert, damit die Installation ohne Go auskommt.
+- Die Binaries sind Release-Assets, nicht versionierte Dateien. „Go wird nicht
+  gebraucht" gilt weiter, „ohne Netz" nicht mehr: der erste Start lädt genau ein Binary.
+- `SHA256SUMS` liegt versioniert im Repo. Die erwartete Prüfsumme kommt damit über den
+  Git-Remote und nicht über dieselbe HTTPS-Quelle wie das Binary.
 
 ## Abhängigkeiten
 

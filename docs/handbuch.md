@@ -44,7 +44,7 @@ flowchart LR
     Anchor --> Local["k-playbook-local/"]
 
     Playbook --> Base["rules/ · reviews/ · checks/<br>commands/ · skills/"]
-    Playbook --> Tool["bin/ · dist/ · scripts/"]
+    Playbook --> Tool["bin/ · scripts/"]
 
     Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
     Local --> Artifacts["results/ · docs/ · tasks/ · guidelines/ · TODO.md"]
@@ -122,7 +122,9 @@ git clone git@github.com:kascada/k-playbook.git
 k-playbook/bin/k-playbook
 ```
 
-Go wird nicht gebraucht — die Binaries liegen fertig im Repo. Der letzte Aufruf startet
+Go wird nicht gebraucht — der Wrapper lädt das Binary der eigenen Plattform beim ersten
+Start als Release-Asset in einen Cache und prüft es gegen das mitgelieferte
+`SHA256SUMS`; dafür braucht dieser erste Start Netz. Der letzte Aufruf startet
 die Oberfläche, die durch vier Schritte führt: Konfiguration anlegen, projekteigene
 Struktur anlegen, MCP-Server registrieren, Assistenten verlinken. Geschrieben wird jeweils
 erst nach Bestätigung.

@@ -15,9 +15,13 @@ ein eigenes Argument brauchst du nur, wenn du aus einem Fork oder Mirror unter
 abweichendem Namen klonst. Dann lautet es `k-playbook`.
 
 **Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
-passende Binary aus `dist/` startet; die Binaries liegen fertig im Repo. Für macOS und
-Linux gleichermaßen, was auch den Fall abdeckt, dass Host und Container unterschiedliche
-Plattformen sind.
+passende Binary startet — für macOS und Linux gleichermaßen, was auch den Fall abdeckt,
+dass Host und Container unterschiedliche Plattformen sind.
+
+**Der erste Start braucht Netz.** Die Binaries liegen nicht mehr im Clone, sondern als
+Assets am Release. Der Wrapper lädt genau das eine, das er braucht, und prüft es gegen
+das mitgelieferte `SHA256SUMS`. Ohne Netzzugriff: [Das Binary und der
+Cache](#das-binary-und-der-cache).
 
 ## Die vier Schritte
 
@@ -344,10 +348,12 @@ für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine l
 veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
 stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
 
-Haben sich dabei die Binaries unter `dist/` geändert, verlangt die Oberfläche einen
-Neustart: unter Linux behält ein laufender Prozess seinen Inode und arbeitet mit dem
-alten Code weiter, auch wenn die Datei ersetzt wurde. Sind nur Commands, Regeln oder
-Rezepte neu, genügt ein Neustart des Assistenten.
+Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary: die
+Oberfläche verlangt einen Neustart und lädt das neue Binary gleich in den Cache, damit
+der Neustart nicht darauf warten muss. Schlägt das Laden fehl — offline, hinter einem
+Proxy —, bleibt es bei einem Hinweis; das Update selbst gilt trotzdem als gelungen, und
+der nächste Start holt es nach. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
+`VERSION` nicht und ein Neustart des Assistenten genügt.
 
 **Die Verlinkung zieht die Oberfläche dabei selbst nach.** Weil Commands und Skills
 einzeln verlinkt sind, kommt ein neu mitgelieferter Command nicht von allein an — nach
@@ -429,7 +435,7 @@ Oberfläche legt eine host-weite Kopie an und verlinkt sie:
 ~/.local/
 ├── bin/k-playbook -> ../share/k-playbook/installation/bin/k-playbook
 └── share/k-playbook/
-    ├── installation/{bin,dist}   die gespiegelte Installation
+    ├── installation/bin          der gespiegelte Wrapper
     └── security-tools/           Tool-venvs, davon unberührt
 ```
 
@@ -443,13 +449,19 @@ k-playbook
 Es ist dasselbe Werkzeug für alle Projekte. Welches Projekt gemeint ist, ergibt sich aus
 dem Verzeichnis, in dem der Aufruf stattfindet — nicht aus dem Ort des Programms.
 
-Gespiegelt wird nur die eigene Plattform und nur, wenn der Clone einen neueren Stand
-mitbringt als die Kopie. Wer in einem Projekt `git pull` macht und dort startet, hebt die
-host-weite Kopie damit an. Umgekehrt überschreibt ein älterer Clone sie nicht.
+Gespiegelt werden genau drei Dateien — `bin/k-playbook`, `VERSION` und `SHA256SUMS` —
+und nur, wenn der Clone einen neueren Stand mitbringt als die Kopie. Kein Binary: das
+löst der Wrapper über den Cache auf. Wer in einem Projekt `git pull` macht und dort
+startet, hebt die host-weite Kopie damit an. Umgekehrt überschreibt ein älterer Clone
+sie nicht.
+
+Maßgeblich für „neuer" ist der HEAD-Commit des Clones. Die Kopie wird dadurch öfter
+erneuert als früher, als nur Commits an den Binaries zählten — sie ist dafür klein, und
+der Wrapper ist genau die Datei, die aktuell sein muss.
 
 Ein DevContainer bekommt seine eigene Kopie unter seinem eigenen Home; nach einem Rebuild
-stellt der nächste Start sie wieder her. Auf einem Mac mit Container liegen beide
-Plattformen nebeneinander, falls `~/.local` geteilt ist.
+stellt der nächste Start sie wieder her. Auf einem Mac mit Container teilen sich beide
+denselben Wrapper, falls `~/.local` geteilt ist — die Plattformen trennt erst der Cache.
 
 **Eine eigene DevContainer-Integration gibt es nicht mehr** — keinen Bind-Mount nach
 `/workspaces/k-playbook`, keinen Symlink im Container und kein Setup-Skript in
@@ -475,6 +487,44 @@ verschwindet die Karte wieder — dieselbe Zeile steht außerdem beim Start im T
 
 Der Aufruf über `k-playbook/bin/k-playbook` im Projekt bleibt jederzeit möglich und
 gleichwertig. Die Commands nutzen ausschließlich ihn, nie den `PATH`.
+
+## Das Binary und der Cache
+
+Der Wrapper sucht das Binary in dieser Reihenfolge und nimmt das erste, das er findet:
+
+1. `$K_PLAYBOOK_BINARY` — ausdrücklich gesetzt, gewinnt immer
+2. `<installation>/dist/` — lokal gebaut; im Repo-Checkout hat das Vorrang, damit der
+   Entwicklungs-Loop netzfrei bleibt
+3. der Cache
+4. Download des Release-Assets zu der Version aus `VERSION`, geprüft gegen `SHA256SUMS`
+
+Der Cache liegt **außerhalb** der Installation — die wird nach jedem Update per
+`chmod -R a-w` gesperrt, ein Cache darunter wäre nicht beschreibbar. Der Ort ergibt sich
+aus `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst
+`$HOME/.cache/k-playbook`; darunter liegt `bin/<version>/k-playbook-<os>-<arch>`. Alle
+Projekte desselben Rechners teilen ihn, und Host und Container kollidieren nicht, weil
+die Dateinamen die Plattform tragen.
+
+**Ohne Netzzugriff.** `bin/k-playbook --prefetch` lädt das Binary der eigenen Plattform
+vorab, `--prefetch --all` alle vier auf einmal — das deckt den Mac mit Linux-Container in
+einem Aufruf ab. Wo `objects.githubusercontent.com` nicht erreichbar ist, wird der Cache
+anderswo befüllt und über `K_PLAYBOOK_CACHE` eingebunden; alternativ baut `make dist-host`
+das Binary selbst (dafür braucht es Go).
+
+**Im DevContainer.** Ein Cache unter `$HOME` überlebt den Rebuild nicht: der Container
+hat sein eigenes Home. Deshalb zeigt man ihn in den Workspace:
+
+```json
+"containerEnv": { "K_PLAYBOOK_CACHE": "${containerWorkspaceFolder}/k-playbook-local/.cache" }
+```
+
+`k-playbook-local/.cache/` gehört in die ignorierten Pfade.
+
+**Ein Stand, ein Binary.** `VERSION` im Wurzelverzeichnis nennt das Release, dessen
+Assets zu diesem Clone-Stand gehören. Commits an Regeln, Reviews, Commands oder Docs
+ändern sie nicht und lösen deshalb keinen Download aus. Wechselt sie beim Update, lädt
+der Update-Pfad das neue Binary gleich in den Cache und meldet, dass ein Neustart eine
+andere Programmversion bringt.
 
 ## GitHub CLI
 
@@ -607,8 +657,8 @@ nicht in die Quere kommen; die Wurzel lässt sich mit `--venv-root` verlegen.
 
 ## Selbst bauen
 
-Die mitgelieferten Binaries genügen für den normalen Betrieb. Wer am Werkzeug selbst
-arbeitet oder lieber selbst baut, braucht Go:
+Für den normalen Betrieb genügt das Release-Asset, das der Wrapper selbst lädt. Wer am
+Werkzeug arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
 make -C k-playbook dist        # alle Plattformen nach dist/
@@ -616,9 +666,11 @@ make -C k-playbook dist-host   # nur die Plattform dieses Rechners
 k-playbook/bin/k-playbook      # startet den gebauten Stand
 ```
 
-Beide Build-Targets verwenden dieselben Flags wie die ausgelieferten Artefakte, damit
-jeder Weg dasselbe Ergebnis liefert. `dist-host` spart die drei fremden Plattformen und
-genügt, wenn nur dieser Rechner den Stand starten soll.
+Beide Build-Targets verwenden dieselben Flags wie CI beim Bauen der Release-Assets,
+damit jeder Weg bitgleiche Binaries liefert. `dist-host` spart die drei fremden
+Plattformen und genügt, wenn nur dieser Rechner den Stand starten soll. Ein selbst
+gebautes `dist/` hat Vorrang vor Cache und Download — und ist damit zugleich der Weg,
+ganz ohne Netzzugriff zu arbeiten.
 
 Die Installation ist schreibgeschützt; zum Bauen gibt `make -C k-playbook
 installer-writable` sie frei, `installer-readonly` sperrt sie wieder. Ein Update setzt
@@ -680,5 +732,7 @@ und rät bewusst nicht. Die Oberfläche schlägt dann einen Ort vor.
 Modell: die host-globalen Symlinks wirken in jedes Projekt hinein. Die Oberfläche einmal
 starten, sie räumt sie weg und meldet, was entfernt wurde.
 
-**Das Binary fehlt.** `bin/k-playbook` meldet, welches Artefakt es unter `dist/` erwartet
-hat. Entweder `git pull` oder `make dist`.
+**Das Binary fehlt.** `bin/k-playbook` nennt jede Stelle, an der es gesucht hat, und die
+Wege weiter: `bin/k-playbook --prefetch` lädt es in den Cache, `K_PLAYBOOK_CACHE` zeigt
+auf einen vorbefüllten Cache, `make dist-host` baut es selbst. Fehlt `VERSION`, gehört zu
+diesem Stand kein Release — dann hilft nur `git pull` oder ein eigener Build.
