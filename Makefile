@@ -222,11 +222,16 @@ endef
 release: ## Baut das Release, committet VERSION und SHA256SUMS und pusht den Tag (VERSION=v0.1.0)
 	$(require_version_arg)
 	$(require_toolchain)
-	@git diff --quiet && git diff --cached --quiet || { \
-	  printf 'Der Arbeitsstand ist nicht sauber. Ein Release taggt genau den Stand,\n' >&2; \
-	  printf 'den CI nachbaut — offene Änderungen gehören vorher committet.\n' >&2; \
-	  exit 1; \
-	}
+	@set -eu; \
+	  dirty="$$(git status --porcelain)"; \
+	  test -z "$$dirty" || { \
+	    printf 'Der Arbeitsstand ist nicht sauber. Ein Release taggt genau den Stand,\n' >&2; \
+	    printf 'den CI nachbaut — offene Änderungen gehören vorher committet.\n\n' >&2; \
+	    printf '%s\n\n' "$$dirty" >&2; \
+	    printf 'Unverfolgtes (??) zählt mit: der Build hier nähme es auf, CI baut den\n' >&2; \
+	    printf 'Tag ohne es — die Prüfsummen gingen auseinander und der Lauf würde rot.\n' >&2; \
+	    exit 1; \
+	  }
 	@git rev-parse --verify --quiet "refs/tags/$(VERSION)" >/dev/null && { \
 	  printf 'Den Tag %s gibt es bereits.\n' "$(VERSION)" >&2; exit 1; \
 	} || true
