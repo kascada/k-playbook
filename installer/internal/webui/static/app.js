@@ -75,20 +75,6 @@ const elements = {
   mcpWorkdir: document.getElementById("mcp-workdir"),
   mcpMessage: document.getElementById("mcp-message"),
   mcpApply: document.getElementById("mcp-apply"),
-  docsCard: document.getElementById("docs-card"),
-  workflowsCard: document.getElementById("workflows-card"),
-  workflowsReviews: document.getElementById("workflows-reviews"),
-  workflowsTasks: document.getElementById("workflows-tasks"),
-  workflowsTodos: document.getElementById("workflows-todos"),
-  workflowsMessage: document.getElementById("workflows-message"),
-  docsPill: document.getElementById("docs-pill"),
-  docsList: document.getElementById("docs-list"),
-  docsMessage: document.getElementById("docs-message"),
-  docOverlay: document.getElementById("doc-overlay"),
-  docTitle: document.getElementById("doc-title"),
-  docPath: document.getElementById("doc-path"),
-  docViewer: document.getElementById("doc-viewer"),
-  closeDoc: document.getElementById("close-doc"),
 };
 
 const CONFIG_LABELS = { doneLabel: "Angelegt", todoLabel: "Anlegen" };
@@ -128,19 +114,6 @@ elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
 elements.mcpApply.addEventListener("click", applyMCP);
 elements.contextCard.addEventListener("toggle", onContextToggle);
-elements.closeDoc.addEventListener("click", closeDocOverlay);
-elements.docViewer.addEventListener("click", onDocViewerClick);
-// Ein Klick neben das Fenster schließt es; einer darin darf nicht durchgreifen.
-elements.docOverlay.addEventListener("click", (event) => {
-  if (event.target === elements.docOverlay) {
-    closeDocOverlay();
-  }
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !elements.docOverlay.classList.contains("hidden")) {
-    closeDocOverlay();
-  }
-});
 // Ein Listener für alle Kopier-Knöpfe: sie stehen in Blöcken, die erst
 // später sichtbar werden, und einzeln gebundene Listener müssten nachgezogen
 // werden.
@@ -448,12 +421,10 @@ function renderConfig(data) {
     elements.localCard.classList.remove("hidden");
     elements.privateCard.classList.remove("hidden");
     elements.mcpCard.classList.remove("hidden");
-    elements.workflowsCard.classList.remove("hidden");
     elements.assistantCard.classList.remove("hidden");
     elements.remediationCard.classList.remove("hidden");
     elements.ghCard.classList.remove("hidden");
     elements.toolsCard.classList.remove("hidden");
-    elements.docsCard.classList.remove("hidden");
     // Der Kontext-Block wird nur sichtbar, nicht geladen: das passiert erst
     // beim Aufklappen.
     elements.contextCard.classList.remove("hidden");
@@ -464,8 +435,6 @@ function renderConfig(data) {
     loadRemediation();
     loadGH();
     loadTools();
-    loadWorkflows();
-    loadDocs();
     return;
   }
 
@@ -474,12 +443,10 @@ function renderConfig(data) {
   elements.localCard.classList.add("hidden");
   elements.privateCard.classList.add("hidden");
   elements.mcpCard.classList.add("hidden");
-  elements.workflowsCard.classList.add("hidden");
   elements.assistantCard.classList.add("hidden");
   elements.remediationCard.classList.add("hidden");
   elements.ghCard.classList.add("hidden");
   elements.toolsCard.classList.add("hidden");
-  elements.docsCard.classList.add("hidden");
   elements.contextCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
@@ -1323,265 +1290,6 @@ function renderLanguageChoices(data) {
     elements.toolsMessage.textContent =
       "Noch nicht gespeichert: Bis project.languages in K-PLAYBOOK.yaml steht, nutzt k-playbook die Standardauswahl. Eine Sprachänderung speichert die Auswahl.";
   }
-}
-
-// Der Workflow-Block führt nur weiter. Aufgelistet wird auf den Zielseiten;
-// hier steht je Ziel bloß, wie viel dort liegt.
-async function loadWorkflows() {
-  try {
-    const response = await fetch("/api/workflows", { cache: "no-store" });
-    renderWorkflows(await response.json());
-  } catch {
-    elements.workflowsMessage.textContent = "Stand konnte nicht geladen werden.";
-  }
-}
-
-function renderWorkflows(data) {
-  elements.workflowsMessage.textContent = data.message || "";
-  // Ohne belastbare Zahl bleibt der Knopf ein Knopf: er führt weiter, auch
-  // wenn nicht feststeht, was dort liegt.
-  const count = (value) => (data.available && !data.message ? `${value}` : "");
-  elements.workflowsReviews.textContent = count(data.reviews);
-  elements.workflowsTasks.textContent = count(data.tasks);
-  elements.workflowsTodos.textContent = count(data.todos);
-}
-
-// Der Doku-Block listet die mitgelieferten Markdown-Dateien; gelesen wird eine
-// davon erst auf Klick, in einem Fenster über der Seite.
-async function loadDocs() {
-  elements.docsPill.className = "pill muted";
-  elements.docsPill.textContent = "Laden...";
-  try {
-    const response = await fetch("/api/docs", { cache: "no-store" });
-    renderDocs(await response.json());
-  } catch {
-    elements.docsPill.className = "pill warn";
-    elements.docsPill.textContent = "Fehlgeschlagen";
-    elements.docsMessage.textContent = "Doku konnte nicht geladen werden.";
-  }
-}
-
-function renderDocs(data) {
-  elements.docsList.replaceChildren();
-  elements.docsMessage.textContent = data.message || "";
-
-  if (!data.available) {
-    elements.docsList.classList.add("empty");
-    elements.docsPill.className = "pill muted";
-    elements.docsPill.textContent = "Nicht installiert";
-    return;
-  }
-
-  // Fehlt das Verzeichnis, steht der Grund in der Meldung; eine leere Liste
-  // wäre dafür die falsche Auskunft.
-  if (data.message) {
-    elements.docsList.classList.add("empty");
-    elements.docsPill.className = "pill warn";
-    elements.docsPill.textContent = "Nicht lesbar";
-    return;
-  }
-
-  const docs = data.docs || [];
-  elements.docsList.classList.toggle("empty", docs.length === 0);
-  if (docs.length === 0) {
-    elements.docsList.textContent = "Keine Markdown-Dateien vorhanden.";
-    elements.docsPill.className = "pill muted";
-    elements.docsPill.textContent = "Leer";
-    return;
-  }
-
-  for (const doc of docs) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "doc-link";
-    button.textContent = doc.title || doc.path;
-    // Der Titel steht auf dem Knopf, der Dateiname gehört trotzdem dazu.
-    button.title = doc.path;
-    button.dataset.path = doc.path;
-    button.addEventListener("click", () => openDoc(doc.path, doc.title || doc.path));
-    elements.docsList.append(button);
-  }
-
-  elements.docsPill.className = "pill ok";
-  elements.docsPill.textContent = docs.length === 1 ? "1 Datei" : `${docs.length} Dateien`;
-}
-
-// Die offene Datei; Verweise darin werden relativ zu ihr aufgelöst.
-let currentDocPath = "";
-
-async function openDoc(path, title, anchor = "") {
-  currentDocPath = path;
-  openDocOverlay(title || path, path);
-  setActiveDocPath(path);
-  elements.docViewer.classList.add("empty");
-  elements.docViewer.textContent = "Wird geladen...";
-
-  try {
-    const response = await fetch(`/api/docs/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
-    const data = await response.json();
-    // Wurde inzwischen etwas anderes geöffnet, gehört diese Antwort nicht
-    // mehr ins Fenster.
-    if (currentDocPath !== path) {
-      return;
-    }
-    if (data.message) {
-      elements.docViewer.textContent = data.message;
-      return;
-    }
-
-    elements.docTitle.textContent = data.title || title || path;
-    elements.docPath.textContent = data.path || path;
-    elements.docViewer.classList.remove("empty");
-    // Das HTML kommt aus dem eigenen Backend. Gerendert wird dort mit
-    // abgeschaltetem Roh-HTML, es steht also nichts darin, was nicht aus der
-    // Markdown-Struktur der Datei stammt.
-    elements.docViewer.innerHTML = data.html || "";
-    scrollToAnchor(anchor);
-    renderMermaidDiagrams(elements.docViewer);
-  } catch {
-    elements.docViewer.textContent = "Datei konnte nicht geladen werden.";
-  }
-}
-
-function setActiveDocPath(path) {
-  for (const button of elements.docsList.querySelectorAll(".doc-link")) {
-    button.classList.toggle("active", button.dataset.path === path);
-  }
-}
-
-// Verweise in der Doku zeigen überwiegend auf andere Dateien der Doku. Ohne
-// eigene Behandlung würde ein Klick die Oberfläche verlassen — und mit ihr
-// den Server, der an ihr hängt.
-function onDocViewerClick(event) {
-  const link = event.target.closest("a[href]");
-  if (!link) {
-    return;
-  }
-
-  const href = link.getAttribute("href");
-  if (href.startsWith("#")) {
-    event.preventDefault();
-    scrollToAnchor(href.slice(1));
-    return;
-  }
-
-  // Ein Ziel mit Schema führt aus der Doku heraus und gehört in ein eigenes
-  // Fenster.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-    link.target = "_blank";
-    link.rel = "noopener";
-    return;
-  }
-
-  event.preventDefault();
-  const [target, anchor] = splitAnchor(href);
-
-  // Ein reiner Anker ohne Dateiname ist bereits oben abgefangen; bleibt ein
-  // Verweis auf eine Datei. Alles außer Markdown kann diese Ansicht nicht
-  // zeigen, der Pfad steht aber im Text und lässt sich im Editor öffnen.
-  if (target.toLowerCase().endsWith(".md")) {
-    openDoc(resolveDocPath(currentDocPath, target), "", anchor);
-  }
-}
-
-// Löst einen Verweis gegen das Verzeichnis der offenen Datei auf; die
-// URL-Klasse erledigt dabei "./" und "../".
-function resolveDocPath(base, href) {
-  const resolved = new URL(href, `https://docs.invalid/${base}`);
-  return decodeURIComponent(resolved.pathname).replace(/^\//, "");
-}
-
-function splitAnchor(href) {
-  const index = href.indexOf("#");
-  return index === -1 ? [href, ""] : [href.slice(0, index), href.slice(index + 1)];
-}
-
-// Springt zu einer Überschrift der offenen Datei. Ohne Anker beginnt die
-// Datei oben — sonst bliebe die Ansicht dort stehen, wo die vorige endete.
-function scrollToAnchor(anchor) {
-  const target = anchor ? elements.docViewer.querySelector(`#${CSS.escape(anchor)}`) : null;
-  if (target) {
-    target.scrollIntoView();
-    return;
-  }
-  elements.docViewer.scrollTop = 0;
-}
-
-function openDocOverlay(title, path) {
-  elements.docTitle.textContent = title;
-  elements.docPath.textContent = path;
-  elements.docOverlay.classList.remove("hidden");
-  document.body.classList.add("doc-overlay-open");
-  elements.closeDoc.focus({ preventScroll: true });
-}
-
-function closeDocOverlay() {
-  elements.docOverlay.classList.add("hidden");
-  document.body.classList.remove("doc-overlay-open");
-}
-
-// Mermaid ist zu groß, um es mitzuliefern, und wird deshalb nur bei Bedarf vom
-// CDN geholt. Ohne Netz bleibt der Quelltext des Diagramms als Codeblock
-// stehen — die Datei ist dann immer noch lesbar.
-const MERMAID_MODULE_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-let mermaidLoader = null;
-let mermaidDiagramCount = 0;
-
-async function renderMermaidDiagrams(container) {
-  const blocks = Array.from(container.querySelectorAll("pre > code.language-mermaid"));
-  if (blocks.length === 0) {
-    return;
-  }
-
-  let mermaid;
-  try {
-    mermaid = await loadMermaid();
-  } catch (error) {
-    for (const block of blocks) {
-      const note = document.createElement("p");
-      note.className = "mermaid-message";
-      note.textContent = `Mermaid konnte nicht geladen werden (${error.message}); das Diagramm bleibt als Quelltext stehen.`;
-      block.closest("pre").before(note);
-    }
-    return;
-  }
-
-  for (const block of blocks) {
-    const pre = block.closest("pre");
-    // Das Laden dauert; inzwischen kann eine andere Datei im Fenster stehen.
-    if (!pre.isConnected) {
-      continue;
-    }
-    const source = block.textContent.trim();
-
-    const diagram = document.createElement("div");
-    diagram.className = "mermaid-diagram";
-    diagram.setAttribute("aria-label", "Mermaid-Diagramm");
-    pre.replaceWith(diagram);
-
-    try {
-      const { svg } = await mermaid.render(`doc-mermaid-${++mermaidDiagramCount}`, source);
-      diagram.innerHTML = svg;
-    } catch (error) {
-      // Ein fehlerhaftes Diagramm ersetzt sich selbst durch die Meldung und
-      // seinen Quelltext, damit die Stelle im Text nicht einfach verschwindet.
-      diagram.classList.add("mermaid-error");
-      diagram.textContent = `Diagramm konnte nicht gezeichnet werden: ${error.message}`;
-      diagram.append(pre);
-    }
-  }
-}
-
-function loadMermaid() {
-  if (!mermaidLoader) {
-    mermaidLoader = import(MERMAID_MODULE_URL).then((module) => {
-      const mermaid = module.default;
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "neutral" });
-      return mermaid;
-    });
-  }
-  return mermaidLoader;
 }
 
 // Der Kontext-Block ist der einzige, der nicht beim Seitenaufbau lädt: seine

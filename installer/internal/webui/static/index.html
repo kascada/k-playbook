@@ -122,24 +122,6 @@
             <p id="private-message" class="message"></p>
           </section>
 
-          <!-- Nur der Weg zu den beiden Arbeitsseiten. Aufgelistet wird dort:
-               hier stünde eine Liste, die man ohnehin auf der nächsten Seite
-               noch einmal sieht. -->
-          <section class="card{{if not .Installed}} hidden{{end}}" id="workflows-card">
-            <div class="section-head">
-              <div>
-                <h2>Workflows</h2>
-              </div>
-            </div>
-            <p class="hint">Reviews liegen unter <code>k-playbook-local/results/</code>, Tasks unter <code>k-playbook-local/tasks/</code>, Todos in <code>k-playbook-local/TODO.md</code>.</p>
-            <div class="link-row">
-              <a class="button-link" href="/reviews">Reviews<span id="workflows-reviews" class="link-count">…</span></a>
-              <a class="button-link" href="/tasks">Tasks<span id="workflows-tasks" class="link-count">…</span></a>
-              <a class="button-link" href="/todos">Todos<span id="workflows-todos" class="link-count">…</span></a>
-            </div>
-            <p id="workflows-message" class="message"></p>
-          </section>
-
           <!-- Der vierte Einrichtungspunkt, unmittelbar vor der Verlinkung:
                beide richten denselben Assistenten ein, und beide wirken erst
                nach dessen Neustart. Der Eintrag ist relativ und damit teilbar
@@ -229,18 +211,6 @@
             </div>
           </section>
 
-          <section class="card{{if not .Installed}} hidden{{end}}" id="docs-card">
-            <div class="section-head">
-              <div>
-                <h2>Dokumentation</h2>
-              </div>
-              <span id="docs-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">Die mitgelieferte Doku aus <code>k-playbook/docs</code>. Ein Klick öffnet die Datei.</p>
-            <div id="docs-list" class="docs-list"></div>
-            <p id="docs-message" class="message"></p>
-          </section>
-
           <details class="card{{if not .Installed}} hidden{{end}}" id="context-card">
             <summary class="section-head disclosure">
               <div class="disclosure-title">
@@ -254,20 +224,6 @@
             <div id="context-catalogs"></div>
             <p id="context-message" class="message"></p>
           </details>
-        </div>
-      </div>
-
-      <div id="doc-overlay" class="doc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="doc-title">
-        <div class="doc-panel">
-          <header class="doc-panel-head">
-            <div>
-              <p class="eyebrow">Dokumentation</p>
-              <h2 id="doc-title">Markdown-Datei</h2>
-              <p id="doc-path" class="doc-path"></p>
-            </div>
-            <button id="close-doc" class="secondary">Schließen</button>
-          </header>
-          <article id="doc-viewer" class="doc-viewer"></article>
         </div>
       </div>
 

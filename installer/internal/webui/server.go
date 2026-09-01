@@ -162,7 +162,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/context", contextHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
-	mux.HandleFunc("GET /api/workflows", workflowsHandler)
 	mux.HandleFunc("GET /api/tasks", tasksHandler)
 	mux.HandleFunc("GET /api/tasks/done", doneTasksHandler)
 	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
