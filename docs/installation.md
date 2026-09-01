@@ -355,11 +355,16 @@ Proxy —, bleibt es bei einem Hinweis; das Update selbst gilt trotzdem als gelu
 der nächste Start holt es nach. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
 `VERSION` nicht und ein Neustart des Assistenten genügt.
 
-**Die Verlinkung zieht die Oberfläche dabei selbst nach.** Weil Commands und Skills
-einzeln verlinkt sind, kommt ein neu mitgelieferter Command nicht von allein an — nach
-dem Pull richtet sie die Registrierung neu aus und meldet, was sich geändert hat
-(`Verlinkung nachgezogen: 3 dazugekommen, 1 entfernt.`). Wer von Hand `git pull` macht,
-startet die Oberfläche danach einmal oder drückt im Assistenten-Block auf Einrichten.
+**Die Verlinkung zieht sich selbst nach.** Weil Commands und Skills einzeln verlinkt
+sind, kommt ein neu mitgelieferter Command nicht von allein an. Nachgezogen wird deshalb
+auf dem Lesepfad, nicht erst auf Knopfdruck: Der Assistenten-Block richtet die
+Registrierung beim Anzeigen aus und meldet, was sich geändert hat (`Verlinkung
+nachgezogen: 3 dazugekommen, 1 entfernt.`), und `k-playbook context` tut dasselbe — der
+Aufruf, der ohnehin am Anfang jeder Assistenten-Sitzung steht. Wie die Installation zu
+ihrem Stand kam, spielt dabei keine Rolle: über die Oberfläche, mit `git pull` von Hand
+oder über ein Ziel im Makefile. Was sich nicht von selbst auflösen lässt — eine echte
+Projektdatei im Weg, ein Konflikt an `CLAUDE.md` — bleibt liegen und steht weiter im
+Assistenten-Block.
 
 Damit die neuen Commands im Assistenten ankommen, muss dieser danach neu gestartet
 werden — Claude Code, OpenCode und Cursor erfassen sie beim Start.

@@ -63,7 +63,7 @@ installer/
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
 │   ├── local_private.go         messen und umschalten, ob priv/ und material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
-│   ├── links.go                 Assistenten-Verlinkung prüfen und herstellen
+│   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
 │   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
 │   ├── instructions_layout.go   CLAUDE.md/AGENTS.md als Paar einordnen und auflösen
@@ -409,6 +409,49 @@ Die Reihenfolge — einordnen, `ApplyRootInstructions()`, `ApplyLinks()` — ste
 braucht `AGENTS.md` als Ziel, und die Umbenennung muss vor dem Anlegen aus der Vorlage
 laufen. Siehe [Instruktionen](#instruktionen).
 
+### Selbstheilung auf dem Lesepfad
+
+`HealLinks()` in `project/links.go` prüft, richtet ein, was sich einrichten lässt, und
+meldet als `LinkRepair`, was danach offen bleibt. Gerufen wird es von zwei Stellen, die
+beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `ContextForDir()`
+— und damit vom Subkommando `context` wie vom MCP-Werkzeug.
+
+Der Grund ist eine Zuordnung, die lange falsch herum gedacht war. Welche Links gelten,
+folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem die Installation zu ihrem
+Stand kam. Hing das Nachziehen an einem Weg — dem Update-Handler —, blieb die
+Registrierung bei jedem anderen stehen: `make installer-update`, `make installer-sync`,
+ein `git pull` von Hand. Und zwar unbemerkt; gesehen hat es nur, wer die
+Assistenten-Karte öffnete. Der Lesepfad ist die richtige Stelle, weil er ohnehin bei
+jedem Sitzungsstart betreten wird und weil er dasselbe Projekt meint.
+
+Zwei Eigenschaften halten das billig und harmlos:
+
+- **Geschrieben wird nur, wenn Schreiben etwas ändert.** `LinksFixable()` fragt vorher,
+  ob Einrichten überhaupt etwas bewirkt. Ohne die Unterscheidung schriebe jeder
+  Lesezugriff in einem blockierten Projekt dieselben Links neu — `applyRegistryLink()`
+  setzt jeden Link unbedingt neu.
+- **`blocked` und `conflict` lösen kein Anwenden aus.** Beide sind für `ApplyLinks()`
+  unauflösbar und stehen stattdessen in `LinkRepair.Open`.
+
+Die Bilanz stammt aus dem Zustand **vor** dem Anwenden — danach ist sie per Definition
+leer, und genau sie ist das, was gelesen werden soll. Bei einem Ziel, das es vorher gar
+nicht gab, bleibt sie leer und `Applied` trägt die Aussage: dort hat sich keine
+Registrierung verändert, dort ist eine entstanden.
+
+In der Kontextausgabe steht das Ergebnis als `links` und **fehlt im Normalfall**
+(`contextLinks()` in `project/context.go`): eine Meldung, die bei jedem Aufruf dasselbe
+sagt, liest niemand mehr. `note` sagt dazu, was das für die laufende Sitzung heißt —
+nämlich nichts, weil Assistenten ihre Command-Liste beim Start lesen.
+
+`ContextForDir()` baut **erst** den Kontext und heilt **dann**. Bricht der Aufbau an
+einer unlesbaren oder zu neuen Konfiguration ab, wird auch nichts eingerichtet: ein
+Werkzeug, das die Fassung nicht versteht, soll die Registrierung nicht nach seinen Regeln
+umschreiben.
+
+Der Knopf bleibt trotzdem. `ApplyAssistantSetup()` tut mehr als die Heilung: Es ordnet
+das Paar `CLAUDE.md`/`AGENTS.md` ein und legt den Anstoß an — Inhalt, der auf einem
+Lesepfad nichts zu suchen hat.
+
 ### Instruktionsdateien einordnen
 
 `project/instructions_layout.go` ordnet das **Paar** (`CLAUDE.md`, `AGENTS.md`) ein,
@@ -675,6 +718,12 @@ und `.cursor/`.
 
 Schlägt das Nachziehen fehl, bleibt das Update gültig: der Pull ist durch, und die
 Verlinkung lässt sich über die Assistenten-Karte nachholen.
+
+Seit die Heilung auf dem Lesepfad sitzt (siehe
+[Selbstheilung auf dem Lesepfad](#selbstheilung-auf-dem-lesepfad)), ist dieser Aufruf
+nicht mehr die einzige Absicherung, sondern die frühestmögliche: Er meldet die Bilanz
+schon im Antworttext des Updates, statt sie dem nächsten Lesezugriff zu überlassen. Und
+er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 
 ## Host-weite Spiegelung
 
@@ -1128,7 +1177,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `POST` | `/api/local` | fehlende Teile anlegen |
 | `GET` | `/api/local/private` | messen, ob der Inhalt von `priv/` und `material/` privat ist |
 | `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
-| `GET` | `/api/assistant` | Verlinkung prüfen |
+| `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
 | `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |

@@ -5,8 +5,9 @@
 `/k-gui` startet die Oberfläche. Sinnvoll ist das:
 
 - nach dem Klonen von k-playbook in ein Projekt, für die vier Einrichtungsschritte.
-- nach einem `git pull`, wenn neue Commands oder Skills dazugekommen sind und die
-  Verlinkung nachgezogen werden soll.
+- wenn die Verlinkung klemmt und du sehen willst, woran: Nachgezogen wird sie von
+  selbst, aber eine echte Projektdatei im Weg oder ein Konflikt an `CLAUDE.md` lösen sich
+  nicht von allein auf. Der Assistenten-Block nennt den Ausweg.
 - wenn Teile der projekteigenen Struktur fehlen oder Symlinks kaputt sind.
 
 Wenn du nur wissen willst, ob alles stimmt, öffne die Oberfläche und schau, ohne einen
@@ -148,9 +149,9 @@ k-playbook-local/commands/k-todo.md     ersetzt den mitgelieferten
 k-playbook-local/skills/mein-skill/SKILL.md
 ```
 
-Danach die Oberfläche starten (`/k-gui`) und im Assistenten-Block auf **Einrichten**
-drücken — der neue Command wird nicht von selbst registriert. Anschließend den
-Assistenten neu starten, der erfasst Commands beim Start.
+Registriert wird der neue Command von selbst: beim nächsten `k-playbook context` — dem
+Aufruf am Anfang jeder Sitzung — oder beim nächsten Blick in den Assistenten-Block der
+Oberfläche. Anschließend den Assistenten neu starten, der erfasst Commands beim Start.
 
 Bei Commands zählt der Pfad ab `commands/`: eine lokale `commands/_shared/x.md` ersetzt
 genau diese Datei, der Rest des Namensraums bleibt mitgeliefert. Ein Skill wird dagegen
@@ -163,8 +164,8 @@ damit käme entweder nur `k-playbook/` oder nur `k-playbook-local/` an. Deshalb 
 Ziel ein echtes Verzeichnis mit je einem Link pro Command bzw. Skill, der auf die Fassung
 zeigt, die nach der Overlay-Regel gilt.
 
-Ältere Installationen haben dort noch einen einzelnen Verzeichnis-Symlink. Die
-Oberfläche erkennt ihn und baut ihn beim Einrichten um.
+Ältere Installationen haben dort noch einen einzelnen Verzeichnis-Symlink. Er wird
+erkannt und beim nächsten Nachziehen durch Einzel-Links ersetzt.
 
 Eine **echte Datei**, die du selbst dort abgelegt hast, wird nie ersetzt. Sie gewinnt, und
 die Oberfläche weist sie als projekteigen aus.

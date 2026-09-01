@@ -364,3 +364,52 @@ func TestBuildContextLehntFremdesSchemaAb(t *testing.T) {
 		t.Error("Kontext wurde trotz fremder schema_version gebaut")
 	}
 }
+
+// Der Kontextaufruf steht am Anfang jeder Sitzung. Er ist deshalb der Ort, an
+// dem die Assistenten-Registrierung nachgezogen wird — unabhängig davon, auf
+// welchem Weg die Installation zu ihrem Stand kam.
+func TestContextForDirZiehtVerlinkungNach(t *testing.T) {
+	root := newContextProject(t)
+	writeFile(t, filepath.Join(PlaybookDir(root), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(PlaybookDir(root), "skills", "beispiel", skillFileName), "# Beispiel\n")
+
+	context, err := ContextForDir(root)
+	if err != nil {
+		t.Fatalf("ContextForDir: %v", err)
+	}
+	if context.Links == nil {
+		t.Fatal("die Selbstheilung muss im Kontext stehen")
+	}
+	if context.Links.Note == "" {
+		t.Error("ohne Klartext weiß ein Assistent nicht, was das für seine Sitzung heißt")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "commands", "k-test.md")); err != nil {
+		t.Errorf("der Command ist nicht registriert: %v", err)
+	}
+
+	// Beim zweiten Aufruf gibt es nichts mehr zu melden. Eine Meldung, die
+	// jedes Mal dasselbe sagt, liest niemand mehr.
+	again, err := ContextForDir(root)
+	if err != nil {
+		t.Fatalf("ContextForDir: %v", err)
+	}
+	if again.Links != nil {
+		t.Errorf("Links = %+v, erwartet nichts zu melden", again.Links)
+	}
+}
+
+// Versteht das Werkzeug die Konfiguration nicht, schreibt es auch nicht: die
+// Registrierung nach den Regeln einer anderen Fassung umzubauen wäre schlimmer
+// als sie stehen zu lassen.
+func TestContextForDirHeiltNichtBeiUnbekannterFassung(t *testing.T) {
+	root := newContextProject(t)
+	writeFile(t, filepath.Join(PlaybookDir(root), "commands", "k-test.md"), "test\n")
+	write(t, ConfigPath(root), "schema_version: 99\n\nproject:\n  repo_root: .\n  vcs: git\n")
+
+	if _, err := ContextForDir(root); err == nil {
+		t.Fatal("eine zu neue Fassung muss abbrechen")
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+		t.Error("bei abgebrochenem Aufbau darf nichts verlinkt worden sein")
+	}
+}

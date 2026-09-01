@@ -17,8 +17,46 @@ type assistantResponse struct {
 	Message     string                        `json:"message"`
 }
 
+// assistantHandler liest den Zustand — und zieht dabei nach, was sich von
+// selbst nachziehen lässt.
+//
+// Ein reiner Lesepfad wäre hier zu wenig. Die Registrierung hängt am Katalog
+// des Projekts, und der ändert sich hinter dem Rücken der Oberfläche: ein
+// aktualisierter Stand der Installation, ein neuer projekteigener Command, ein
+// umbenannter mitgelieferter. Ohne die Heilung stünde die Abweichung nur in der
+// Karte und bliebe dort, bis jemand sie wegklickt. Genau so überlebt ein toter
+// Link auf einen umbenannten Command wochenlang, ohne dass es jemandem auffällt.
+//
+// Was das Einrichten nicht auflösen kann, bleibt liegen und steht weiter in der
+// Karte. Der Knopf bleibt deshalb: er tut mehr als die Heilung — er ordnet auch
+// das Paar CLAUDE.md/AGENTS.md ein und legt den Anstoß an.
 func assistantHandler(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, assistantState(""))
+	environment := project.Detect()
+	if !environment.Installed {
+		writeJSON(w, http.StatusOK, assistantState(""))
+		return
+	}
+
+	repair := project.HealLinks(environment.ProjectDir)
+	writeJSON(w, http.StatusOK, assistantState(describeRepair(repair)))
+}
+
+// describeRepair formuliert, was die Selbstheilung getan hat. Stimmte alles,
+// bleibt der Text leer — die Karte meldet dann ohnehin „eingerichtet".
+func describeRepair(repair project.LinkRepair) string {
+	parts := []string{}
+	switch {
+	case !repair.Changed.Empty():
+		parts = append(parts, describeLinkChanges(repair.Changed))
+	case repair.Applied:
+		// Ein Ziel, das es vorher gar nicht gab: da hat sich keine
+		// Registrierung verändert, da ist eine entstanden.
+		parts = append(parts, "Verlinkung eingerichtet.")
+	}
+	if repair.Error != "" {
+		parts = append(parts, "Nicht vollständig eingerichtet: "+repair.Error)
+	}
+	return strings.Join(parts, " ")
 }
 
 // applyAssistantHandler richtet die Verlinkung ein. Ohne gefundene Config gibt

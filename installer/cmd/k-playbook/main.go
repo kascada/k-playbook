@@ -36,6 +36,9 @@ func run(args []string) error {
 	switch args[0] {
 	case "context":
 		// Ohne cleanUpLegacy: dessen Ausgabe würde die JSON-Ausgabe stören.
+		// Die Assistenten-Verlinkung zieht ContextForDir dabei nach — das ist
+		// projektbezogen und gehört deshalb hierher, nicht in cleanUpLegacy,
+		// das die Host-Installation aufräumt.
 		return printContext()
 	case "mcp":
 		// Ohne cleanUpLegacy und mirrorHostInstall, aus demselben Grund wie bei
@@ -89,6 +92,8 @@ Unterkommandos:
   context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
             Konfiguration und die effektiven Kataloge für rules, reviews
             und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
+            Zieht dabei die Assistenten-Verlinkung auf den Katalog nach;
+            was sich geändert hat, steht unter "links".
   mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
             als Werkzeug anbietet. Gedacht für den Aufruf durch einen
             Assistenten, nicht für die Hand.

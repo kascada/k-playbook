@@ -153,6 +153,34 @@ func LinksOK(statuses []LinkStatus) bool {
 	return len(statuses) > 0
 }
 
+// Fixable meldet, ob Einrichten an diesem Zustand etwas ändern kann.
+//
+// Blockiert, im Konflikt oder ohne Quelle kann es das nicht: dort liegt eine
+// echte Datei des Projekts, es stehen zwei Auflösungen zur Wahl, oder es gibt
+// nichts zu verlinken. Auf dem Lesepfad zählt der Unterschied, denn dort wird
+// nur angewendet, wenn Anwenden auch etwas bewirkt. Ohne die Unterscheidung
+// schriebe jeder Aufruf in einem blockierten Projekt dieselben Links neu.
+func (s LinkStatus) Fixable() bool {
+	switch s.State {
+	case StateMissing, StateStale:
+		return true
+	case StateIncomplete:
+		return len(s.Missing)+len(s.Wrong)+len(s.Stale) > 0
+	default:
+		return false
+	}
+}
+
+// LinksFixable meldet, ob mindestens ein Ziel durch Einrichten besser wird.
+func LinksFixable(statuses []LinkStatus) bool {
+	for _, status := range statuses {
+		if status.Fixable() {
+			return true
+		}
+	}
+	return false
+}
+
 // LinkChanges fasst zusammen, was ein Einrichten an der Registrierung ändern
 // würde — über alle Ziele hinweg und ohne Dopplung.
 //
@@ -487,6 +515,86 @@ func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 	}
 
 	return CheckLinks(projectRoot), nil
+}
+
+// LinkIssue ist ein Ziel, an dem nach dem Einrichten noch etwas zu tun ist.
+// Knapp gehalten, weil es in der Kontextausgabe landet, die am Anfang jedes
+// Commands gelesen wird.
+type LinkIssue struct {
+	Path   string    `json:"path"`
+	State  LinkState `json:"state"`
+	Detail string    `json:"detail"`
+}
+
+// LinkRepair ist das Ergebnis einer Selbstheilung.
+type LinkRepair struct {
+	// Applied meldet, ob eingerichtet wurde. Ohne heilbare Abweichung bleibt es
+	// beim Lesen.
+	Applied bool `json:"applied,omitempty"`
+	// Changed nennt die Einträge, die dazukamen, wegfielen oder die Quelle
+	// wechselten. Bei einem Ziel, das es vorher gar nicht gab, bleibt sie leer:
+	// dort hat sich keine Registrierung verändert, dort ist eine entstanden.
+	Changed LinkChanges `json:"changed,omitempty"`
+	// Open sind die Ziele, die danach noch offen sind — blockiert, im Konflikt
+	// oder am Einrichten gescheitert.
+	Open []LinkIssue `json:"open,omitempty"`
+	// Error nennt den Grund, wenn das Einrichten abgebrochen ist. Auf dem
+	// Lesepfad ist das kein Fehler des Aufrufs: gelesen wird trotzdem.
+	Error string `json:"error,omitempty"`
+}
+
+// Quiet meldet, ob es nichts zu berichten gibt.
+func (r LinkRepair) Quiet() bool {
+	return !r.Applied && len(r.Open) == 0 && r.Error == ""
+}
+
+// HealLinks bringt die Registrierung von sich aus auf den Stand des Katalogs
+// und meldet, was danach offen bleibt.
+//
+// Der Aufruf gehört auf den Lesepfad, nicht nur hinter einen Knopf. Welche
+// Links gelten, hängt am Projekt — an seinem Katalog aus mitgelieferten und
+// projekteigenen Einträgen —, nicht an der Installation. Wie die Installation
+// zu ihrem Stand kam, ist dabei gleichgültig: ein Update über die Oberfläche,
+// ein Ziel im Makefile, ein Clone von Hand. Hinge das Nachziehen an einem
+// dieser Wege, bliebe die Registrierung bei allen anderen stehen, und zwar
+// unbemerkt — der umbenannte Command fehlt, der alte Link zeigt ins Leere, und
+// beides sieht nur, wer zufällig die Assistenten-Karte öffnet.
+//
+// Geschrieben wird nur, wenn Schreiben etwas ändert. Steht alles, bleibt es bei
+// den Vergleichen; was das Einrichten ohnehin nicht auflösen kann — eine echte
+// Projektdatei im Weg, ein Konflikt an CLAUDE.md — führt nicht zu einem
+// Anwenden, das jedes Mal dieselben Links neu schriebe.
+func HealLinks(projectRoot string) LinkRepair {
+	statuses := CheckLinks(projectRoot)
+	if !LinksFixable(statuses) {
+		return LinkRepair{Open: openIssues(statuses)}
+	}
+
+	// Die Bilanz stammt aus dem Zustand davor: danach ist sie per Definition
+	// leer, und genau sie ist das, was der Nutzer lesen will.
+	changed := PendingLinkChanges(statuses)
+
+	after, err := ApplyLinks(projectRoot)
+	repair := LinkRepair{Applied: true, Changed: changed, Open: openIssues(after)}
+	if err != nil {
+		repair.Error = err.Error()
+	}
+	return repair
+}
+
+// openIssues sind die Ziele, an denen noch etwas zu tun ist.
+func openIssues(statuses []LinkStatus) []LinkIssue {
+	issues := []LinkIssue{}
+	for _, status := range statuses {
+		if !status.NeedsAction() {
+			continue
+		}
+		issues = append(issues, LinkIssue{Path: status.Path, State: status.State, Detail: status.Detail})
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	return issues
 }
 
 // applyFileLink setzt einen einzelnen Symlink. Etwas Echtes im Weg gehört dem

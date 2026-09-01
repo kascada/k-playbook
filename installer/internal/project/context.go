@@ -43,6 +43,10 @@ type Context struct {
 	Cleanliness Cleanliness               `json:"cleanliness"`
 	Catalogs    map[string][]CatalogEntry `json:"catalogs"`
 	Guidelines  []string                  `json:"guidelines"`
+	// Links meldet die Selbstheilung der Assistenten-Registrierung: was dabei
+	// nachgezogen wurde und was offen blieb. Fehlt das Feld, stimmte alles —
+	// eine Meldung, die bei jedem Aufruf dasselbe sagt, liest niemand mehr.
+	Links *ContextLinks `json:"links,omitempty"`
 }
 
 // InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heißt bewusst
@@ -588,12 +592,71 @@ func listFiles(dir string) []string {
 	return files
 }
 
+// ContextLinks ist die Selbstheilung der Registrierung, wie sie in der
+// Kontextausgabe steht.
+type ContextLinks struct {
+	// Healed nennt die Einträge, die dazukamen, wegfielen oder die Quelle
+	// wechselten.
+	Healed LinkChanges `json:"healed,omitempty"`
+	// Open sind die Ziele, an denen danach noch etwas zu tun ist.
+	Open []LinkIssue `json:"open,omitempty"`
+	// Note sagt im Klartext, was das für diese Sitzung bedeutet.
+	Note string `json:"note,omitempty"`
+}
+
+// contextLinks übersetzt die Selbstheilung in den Teil, der in die
+// Kontextausgabe gehört.
+//
+// Der Hinweis auf die laufende Sitzung steht bewusst dabei: Claude Code,
+// OpenCode und Cursor lesen ihre Command-Liste beim Start. Ein Command, der
+// gerade erst verlinkt wurde, ist auf der Platte da und im Assistenten trotzdem
+// nicht — ohne den Satz sucht ein Assistent den Fehler bei sich.
+func contextLinks(repair LinkRepair) *ContextLinks {
+	if repair.Quiet() {
+		return nil
+	}
+
+	notes := []string{}
+	if repair.Applied {
+		notes = append(notes, "Die Assistenten-Registrierung wurde nachgezogen. Ein laufender Assistent hat noch die alte Liste; neue Commands und Skills kommen erst in einer neuen Sitzung an.")
+	}
+	if repair.Error != "" {
+		notes = append(notes, "Nicht vollständig eingerichtet: "+repair.Error+".")
+	}
+	if len(repair.Open) > 0 {
+		notes = append(notes, "Was offen steht, löst sich nicht von selbst auf; der Assistenten-Block der Oberfläche nennt den Ausweg.")
+	}
+
+	return &ContextLinks{
+		Healed: repair.Changed,
+		Open:   repair.Open,
+		Note:   strings.Join(notes, " "),
+	}
+}
+
 // ContextForDir stellt den Kontext ab einem Startverzeichnis zusammen und
 // meldet, wenn keine Installation gefunden wurde.
+//
+// Dabei zieht er die Assistenten-Registrierung nach. Das gehört hierher, weil
+// dieser Aufruf am Anfang jeder Sitzung steht — über das Unterkommando context
+// und über MCP — und weil die Registrierung projektbezogen ist: sie folgt dem
+// Katalog dieses Projekts, nicht dem Weg, auf dem die Installation zu ihrem
+// Stand kam.
 func ContextForDir(startDir string) (Context, error) {
 	projectDir, err := Discover(startDir)
 	if err != nil {
 		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
 	}
-	return BuildContext(projectDir)
+
+	// Erst bauen, dann heilen. Bricht der Aufbau an einer unlesbaren oder zu
+	// neuen Konfiguration ab, wird auch nichts eingerichtet: ein Werkzeug, das
+	// die Fassung nicht versteht, soll die Registrierung nicht nach seinen
+	// Regeln umschreiben.
+	built, err := BuildContext(projectDir)
+	if err != nil {
+		return Context{}, err
+	}
+
+	built.Links = contextLinks(HealLinks(projectDir))
+	return built, nil
 }

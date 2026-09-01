@@ -6,6 +6,12 @@ Instruktionsdateien in Lesereihenfolge, die Remediation-Policy, die Guidelines u
 effektiven Kataloge für Regeln, Reviews und Checks — mitgeliefert und projekteigen bereits
 zusammengeführt.
 
+`k_playbook_context` ist dabei das einzige Werkzeug, das nebenbei schreibt: Es zieht die
+Assistenten-Verlinkung des Projekts auf den Katalog nach, so wie das Subkommando es auch
+tut. Geschrieben wird nur, wenn Schreiben etwas ändert, und nur an den Symlinks, die
+k-playbook selbst angelegt hat. Was dabei passiert ist, steht unter `links` in der
+Antwort; fehlt das Feld, stand alles bereits.
+
 Der Server bietet den Arbeitsstand und die Review-Lauf-Werkzeuge an. `k_playbook_context`
 hat den optionalen Parameter `dir`; alle Review-Werkzeuge verlangen `projectDir`, weil ein
 stdio-Server nicht annehmen darf, dass sein Prozess-Arbeitsverzeichnis das Zielprojekt ist.
@@ -121,7 +127,7 @@ Aufwärtssuche nach `K-PLAYBOOK.yaml` auf, nicht über seinen eigenen Ort.
 
 | Werkzeug | Zweck |
 |---|---|
-| `k_playbook_context` | aufgelösten Arbeitsstand wie `k-playbook context` zurückgeben |
+| `k_playbook_context` | aufgelösten Arbeitsstand wie `k-playbook context` zurückgeben und dabei die Assistenten-Verlinkung nachziehen |
 | `k_playbook_review_status` | Auswahlbasis für neue Läufe oder Status eines bestehenden Laufs lesen |
 | `k_playbook_review_create` | Review-Lauf anlegen oder im Dry-Run die validierte `run.json` zurückgeben |
 | `k_playbook_review_scan` | Tool-Einträge eines Laufs über `review.Execute` ausführen |

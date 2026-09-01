@@ -492,3 +492,85 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 		t.Error("nach dem Einrichten darf nichts offen sein")
 	}
 }
+
+// Der Fall, um den es geht: in der Installation wurde ein Command umbenannt.
+// Der alte Link zeigt danach ins Leere, der neue fehlt — und keiner der beiden
+// Zustände fällt jemandem auf, solange nur die Karte ihn zeigt.
+func TestHealLinksZiehtUmbenanntenCommandNach(t *testing.T) {
+	root := newProject(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+
+	commands := filepath.Join(PlaybookDir(root), "commands")
+	if err := os.Rename(filepath.Join(commands, "k-test.md"), filepath.Join(commands, "k-task-test.md")); err != nil {
+		t.Fatalf("umbenennen: %v", err)
+	}
+
+	repair := HealLinks(root)
+	if !repair.Applied {
+		t.Fatal("eine heilbare Abweichung muss angewendet werden")
+	}
+	if got := repair.Changed.Added; len(got) != 1 || got[0] != "k-task-test.md" {
+		t.Errorf("Added = %v, erwartet [k-task-test.md]", got)
+	}
+	if got := repair.Changed.Removed; len(got) != 1 || got[0] != "k-test.md" {
+		t.Errorf("Removed = %v, erwartet [k-test.md]", got)
+	}
+	if len(repair.Open) != 0 {
+		t.Errorf("Open = %v, erwartet nichts Offenes", repair.Open)
+	}
+
+	if !LinksOK(CheckLinks(root)) {
+		t.Error("nach der Heilung muss die Verlinkung stehen")
+	}
+	if _, err := os.Lstat(filepath.Join(root, claudeCommands(), "k-test.md")); !os.IsNotExist(err) {
+		t.Error("der verwaiste Link muss verschwunden sein")
+	}
+	// Stat statt Lstat: der Link muss auch etwas treffen.
+	if _, err := os.Stat(filepath.Join(root, claudeCommands(), "k-task-test.md")); err != nil {
+		t.Errorf("neuer Link zeigt ins Leere: %v", err)
+	}
+}
+
+func TestHealLinksSchweigtWennAllesSteht(t *testing.T) {
+	root := newProject(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+
+	repair := HealLinks(root)
+	if repair.Applied {
+		t.Error("ohne Abweichung darf nicht geschrieben werden")
+	}
+	if !repair.Quiet() {
+		t.Errorf("ohne Abweichung gibt es nichts zu melden, war %+v", repair)
+	}
+}
+
+// Was das Einrichten nicht auflösen kann, darf es auch nicht bei jedem Aufruf
+// versuchen: sonst schriebe der Lesepfad in einem blockierten Projekt endlos
+// dieselben Links neu.
+func TestHealLinksWendetNichtsAnWennNichtsHeilbarIst(t *testing.T) {
+	root := newProject(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+
+	blocked := filepath.Join(root, ".cursor", "commands")
+	if err := os.RemoveAll(blocked); err != nil {
+		t.Fatalf("Zielverzeichnis entfernen: %v", err)
+	}
+	writeFile(t, blocked, "echte Datei des Projekts\n")
+
+	repair := HealLinks(root)
+	if repair.Applied {
+		t.Error("ein blockiertes Ziel darf kein Anwenden auslösen")
+	}
+	if len(repair.Open) != 1 || repair.Open[0].State != StateBlocked {
+		t.Errorf("Open = %+v, erwartet ein blockiertes Ziel", repair.Open)
+	}
+	if repair.Quiet() {
+		t.Error("ein offener Punkt muss gemeldet werden")
+	}
+}

@@ -211,6 +211,7 @@ zusammenrechnen müsste:
 | `cleanliness` | der lokale Zustand der Installation: geänderte und zusätzliche Dateien, lokale Commits, eingespielter Arbeitsstand |
 | `catalogs` | `rules`, `reviews`, `checks` — zusammengeführt |
 | `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
+| `links` | nur wenn es etwas zu melden gibt: was die Selbstheilung der Assistenten-Verlinkung nachgezogen hat (`healed`), was offen blieb (`open`) und was das für diese Sitzung heißt (`note`) |
 
 Jeder Katalogeintrag trägt `name` (den Dateinamen), `key` (den Aufrufnamen ohne Endung
 und Sortenpräfix), `path`, `origin` — `dist`, `local` oder `override` — und `disabled`,
@@ -224,6 +225,14 @@ nicht selbst durchsetzt und ihr Bruch still bleibt: Ändert sich eine lokal ver�
 Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie stehen. Zwei
 `git`-Aufrufe im lokalen Clone, ohne Netz — dieselbe Prüfung, die auch die Oberfläche vor
 einem Update anstellt. Damit gibt es eine Antwort auf die Frage statt zwei.
+
+`links` fehlt im Normalfall, und das ist Absicht: Der Aufruf zieht die
+Assistenten-Verlinkung auf den Katalog nach — dazu unten mehr —, und eine Meldung, die
+bei jedem Aufruf dasselbe sagt, liest niemand mehr. Steht etwas darin, lohnt der Blick:
+`healed` nennt die Commands und Skills, die gerade erst registriert wurden. Sie liegen
+auf der Platte, aber der laufende Assistent hat seine Liste beim Start gelesen und kennt
+sie noch nicht; genau das sagt `note`. `open` nennt die Ziele, die sich nicht von selbst
+auflösen lassen — eine echte Projektdatei im Weg, ein Konflikt an `CLAUDE.md`.
 
 `now` steht aus einem anderen Grund dort: Commands stempeln Datumsangaben in Dateien, die
 bleiben — Review-Logs, Ergebnisverzeichnisse, Namen von Summary-Dateien. Nicht jedem

@@ -26,7 +26,9 @@ Projekt tatsächlich gilt, zeigt die Oberfläche im Assistenten-Block.
 ## Übersicht
 
 Neue Commands werden erst sichtbar, nachdem die Verlinkung steht und der Assistent neu
-gestartet wurde.
+gestartet wurde. Die Verlinkung zieht `k-playbook context` von selbst nach — der Aufruf
+am Anfang jeder Sitzung —, der Neustart bleibt: Claude Code, OpenCode und Cursor lesen
+ihre Command-Liste beim Start.
 
 | Command | Zweck | Detail |
 |---|---|---|

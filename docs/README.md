@@ -74,6 +74,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `context` / `aufgelöster Arbeitsstand` -> [`k-playbook-format.md`](./k-playbook-format.md#der-aufgelöste-arbeitsstand), [`commands.md`](./commands.md#der-aufgelöste-arbeitsstand)
 - `k-playbook.md` / `Instruktionen` / `Anstoß` -> [`k-playbook-format.md`](./k-playbook-format.md#instruktionen), [`faq.md`](./faq.md)
 - `Altlasten` / `alte globale Verlinkung` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
+- `Command fehlt` / `toter Symlink` / `Verlinkung nachziehen` -> [`installation.md`](./installation.md#aktualisieren), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
 - `Pfade` / `warum keine paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#keine-pfade-in-der-konfiguration)
 - `PR-Review` -> [`pr-review.md`](./pr-review.md)
 - `Remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)

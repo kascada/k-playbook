@@ -128,6 +128,12 @@ make -C k-playbook installer-update
 
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar.
 
+Die Verlinkung für die Assistenten zieht sich danach selbst nach — beim nächsten
+`k-playbook context`, dem Aufruf am Anfang jeder Sitzung, oder beim nächsten Blick in den
+Assistenten-Block der Oberfläche. Sie folgt dem Katalog des Projekts, nicht dem Weg, über
+den die Installation aktualisiert wurde. Damit die neuen Commands ankommen, ist der
+Assistent einmal neu zu starten; seine Liste liest er beim Start.
+
 ## Selbst bauen
 
 Für den normalen Betrieb genügen die Release-Assets, die der Wrapper selbst lädt. Wer am
