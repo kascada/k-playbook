@@ -183,35 +183,49 @@ func routes(state *serverState) http.Handler {
 	return mux
 }
 
-var indexTemplate = template.Must(template.ParseFS(staticFiles, "static/index.html"))
+// Die Bereiche des Umschalters. Der Wert steht in den Vorlagendaten und
+// entscheidet, welcher Eintrag markiert ist.
+const (
+	areaSetup = "setup"
+)
+
+// pageTemplate parst eine Seite zusammen mit dem Fragment der linken Spalte.
+// Die Seitendatei steht zuerst: ParseFS benennt das Ergebnis nach der ersten
+// Datei, und Execute führt damit die Seite aus und nicht das Fragment.
+func pageTemplate(name string) *template.Template {
+	return template.Must(template.ParseFS(staticFiles, "static/"+name, "static/sidebar.html"))
+}
+
+var indexTemplate = pageTemplate("index.html")
 
 // reviewsTemplate ist die zweite Seite. Sie teilt den Kopf mit der Startseite,
 // deshalb dieselben Vorlagendaten.
 var reviewsTemplate = template.Must(template.ParseFS(staticFiles, "static/reviews.html"))
 
 func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, reviewsTemplate)
+	renderPage(w, reviewsTemplate, "")
 }
 
 // tasksTemplate ist die Seite der Tasks, ebenfalls mit dem gemeinsamen Kopf.
 var tasksTemplate = template.Must(template.ParseFS(staticFiles, "static/tasks.html"))
 
 func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, tasksTemplate)
+	renderPage(w, tasksTemplate, "")
 }
 
 // todosTemplate ist die Seite der Todos, ebenfalls mit dem gemeinsamen Kopf.
 var todosTemplate = template.Must(template.ParseFS(staticFiles, "static/todos.html"))
 
 func todosPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, todosTemplate)
+	renderPage(w, todosTemplate, "")
 }
 
-// mcpTemplate ist die Seite des MCP-Servers, ebenfalls mit dem gemeinsamen Kopf.
-var mcpTemplate = template.Must(template.ParseFS(staticFiles, "static/mcp.html"))
+// mcpTemplate ist die Seite des MCP-Servers. Sie ist eine Detailseite des
+// Setup-Blocks und trägt deshalb dessen Bereich im Umschalter.
+var mcpTemplate = pageTemplate("mcp.html")
 
 func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, mcpTemplate)
+	renderPage(w, mcpTemplate, areaSetup)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -219,11 +233,13 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	renderPage(w, indexTemplate)
+	renderPage(w, indexTemplate, areaSetup)
 }
 
-// renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus.
-func renderPage(w http.ResponseWriter, tmpl *template.Template) {
+// renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus. area sagt,
+// welcher Eintrag des Umschalters markiert wird; Seiten ohne linke Spalte
+// übergeben eine leere Zeichenkette.
+func renderPage(w http.ResponseWriter, tmpl *template.Template, area string) {
 	environment := project.Detect()
 	data := struct {
 		Mode        string
@@ -232,7 +248,8 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template) {
 		RepoRoot    string
 		PlaybookDir string
 		Installed   bool
-	}{Installed: environment.Installed}
+		Area        string
+	}{Installed: environment.Installed, Area: area}
 
 	if environment.Installed {
 		data.Mode = "project"

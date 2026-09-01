@@ -38,10 +38,7 @@
       </section>
 
       <div class="layout">
-        <!-- Die Einträge entstehen zur Laufzeit aus den Blöcken daneben, damit
-             ein neuer Block nicht an zwei Stellen gepflegt werden muss. -->
-        <nav id="block-nav" class="block-nav" aria-label="Bereiche"></nav>
-
+{{template "sidebar" .}}
         <div class="blocks">
           <!-- Nur sichtbar, solange `k-playbook` nicht aus jedem Verzeichnis
                aufrufbar ist. Betrifft den Host, nicht das Projekt. -->
@@ -283,6 +280,7 @@
       </div>
     </main>
     <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

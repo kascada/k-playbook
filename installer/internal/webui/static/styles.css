@@ -52,11 +52,20 @@ select {
   gap: 28px;
 }
 
-/* Das Menü bleibt stehen, während die Karten scrollen. Es ist kurz genug,
-   dass alle Einträge ohne eigenes Scrollen sichtbar bleiben. */
-.block-nav {
+/* Die linke Spalte bleibt stehen, während die Karten scrollen. Sie ist kurz
+   genug, dass Umschalter und Menü ohne eigenes Scrollen sichtbar bleiben. */
+.sidebar {
   position: sticky;
   top: 24px;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+/* Zwei Kästen derselben Machart: der obere sagt, in welchem Bereich man ist,
+   der untere, was in diesem Bereich steht. */
+.area-nav,
+.block-nav {
   display: grid;
   align-content: start;
   gap: 2px;
@@ -68,6 +77,7 @@ select {
   backdrop-filter: blur(18px);
 }
 
+.area-nav-item,
 .block-nav-item {
   display: flex;
   align-items: center;
@@ -82,13 +92,21 @@ select {
   text-align: left;
 }
 
+/* Der Umschalter besteht aus Verweisen, das Blockmenü aus Knöpfen; gleich
+   aussehen sollen beide. */
+.area-nav-item {
+  text-decoration: none;
+}
+
+.area-nav-item:hover,
 .block-nav-item:hover {
   color: var(--accent-strong);
   background: rgba(47, 93, 80, 0.1);
 }
 
-/* Zeigt den zuletzt angesprungenen Block. Der Rahmen macht das auch ohne
-   Farbwahrnehmung erkennbar. */
+/* Zeigt den aktiven Bereich und den zuletzt angesprungenen Block. Der Rahmen
+   macht das auch ohne Farbwahrnehmung erkennbar. */
+.area-nav-item.active,
 .block-nav-item.active {
   color: var(--accent-strong);
   background: rgba(47, 93, 80, 0.14);
@@ -122,11 +140,22 @@ select {
   scroll-margin-top: 20px;
 }
 
-/* Unter dieser Breite bliebe für die Karten zu wenig übrig; das Menü
-   entfällt, gescrollt wird dann von Hand. */
+/* Unter dieser Breite bliebe für die Karten zu wenig übrig; das Blockmenü
+   entfällt, gescrollt wird dann von Hand. Der Umschalter bleibt: ohne ihn
+   wären die anderen Bereiche von hier aus nicht mehr erreichbar. Er legt sich
+   waagerecht über die Karten. */
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .area-nav {
+    grid-auto-flow: column;
+    justify-content: start;
   }
 
   .block-nav {

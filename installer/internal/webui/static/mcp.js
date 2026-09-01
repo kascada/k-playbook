@@ -46,6 +46,9 @@ const STATE_NOTES = {
 // drücken.
 const STATE_WARNINGS = ["unreadable", "no-wrapper", "ambiguous-target"];
 
+// Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
+// zieht das nur mit, wenn es die Karten schon beobachtet.
+buildBlockNav();
 // Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
 // nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.
 startSession((message) => {

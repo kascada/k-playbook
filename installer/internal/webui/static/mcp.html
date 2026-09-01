@@ -30,84 +30,85 @@
               {{.PlaybookDir}}
             </span>
           </p>
-          <div class="hero-actions">
-            <a class="button-link secondary" href="/">Zurück</a>
-          </div>
         </div>
       </section>
 
-      <div class="blocks">
-        <section class="card" id="registration-card">
-          <div class="section-head">
-            <div>
-              <h2>Registrierung</h2>
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <section class="card" id="registration-card">
+            <div class="section-head">
+              <div>
+                <h2>Registrierung</h2>
+              </div>
+              <span id="registration-pill" class="pill muted">Prüfen...</span>
             </div>
-            <span id="registration-pill" class="pill muted">Prüfen...</span>
-          </div>
 
-          <p class="hint">
-            Eingetragen wird <code id="registration-command">k-playbook/bin/k-playbook mcp</code> —
-            der projekteigene Wrapper, nicht die host-weite Kopie. Der Pfad ist relativ zum
-            Hauptverzeichnis: nur so lässt er sich einchecken und gilt im DevContainer genauso.
-          </p>
-          <p id="registration-workdir" class="hint hidden">
-            Der Eintrag wird gegen das Arbeitsverzeichnis des Assistenten aufgelöst, nicht
-            gegen den Ort der Konfigurationsdatei. Er wirkt deshalb nur, wenn der Assistent im
-            Hauptverzeichnis geöffnet ist — dort, wo <code>K-PLAYBOOK.yaml</code> liegt.
-          </p>
+            <p class="hint">
+              Eingetragen wird <code id="registration-command">k-playbook/bin/k-playbook mcp</code> —
+              der projekteigene Wrapper, nicht die host-weite Kopie. Der Pfad ist relativ zum
+              Hauptverzeichnis: nur so lässt er sich einchecken und gilt im DevContainer genauso.
+            </p>
+            <p id="registration-workdir" class="hint hidden">
+              Der Eintrag wird gegen das Arbeitsverzeichnis des Assistenten aufgelöst, nicht
+              gegen den Ort der Konfigurationsdatei. Er wirkt deshalb nur, wenn der Assistent im
+              Hauptverzeichnis geöffnet ist — dort, wo <code>K-PLAYBOOK.yaml</code> liegt.
+            </p>
 
-          <div id="registration-entries" class="settings"></div>
-          <p id="registration-message" class="message"></p>
-        </section>
+            <div id="registration-entries" class="settings"></div>
+            <p id="registration-message" class="message"></p>
+          </section>
 
-        <section class="card" id="tools-card">
-          <div class="section-head">
-            <div>
-              <h2>Angebotene Werkzeuge</h2>
+          <section class="card" id="tools-card">
+            <div class="section-head">
+              <div>
+                <h2>Angebotene Werkzeuge</h2>
+              </div>
+              <span id="tools-pill" class="pill muted">Messen...</span>
             </div>
-            <span id="tools-pill" class="pill muted">Messen...</span>
-          </div>
 
-          <p class="hint">
-            Gemessen, nicht behauptet: die Oberfläche startet den registrierten Wrapper als
-            eigenen Prozess, schickt ihm <code>initialize</code> und <code>tools/list</code> und
-            zeigt, was zurückkommt. Damit beantwortet dieselbe Anzeige auch, ob der Server
-            überhaupt läuft.
-          </p>
+            <p class="hint">
+              Gemessen, nicht behauptet: die Oberfläche startet den registrierten Wrapper als
+              eigenen Prozess, schickt ihm <code>initialize</code> und <code>tools/list</code> und
+              zeigt, was zurückkommt. Damit beantwortet dieselbe Anzeige auch, ob der Server
+              überhaupt läuft.
+            </p>
 
-          <dl id="tools-facts" class="facts"></dl>
-          <div id="tools-list" class="settings"></div>
-          <p id="tools-message" class="message"></p>
-        </section>
+            <dl id="tools-facts" class="facts"></dl>
+            <div id="tools-list" class="settings"></div>
+            <p id="tools-message" class="message"></p>
+          </section>
 
-        <section class="card" id="about-card">
-          <div class="section-head">
-            <div>
-              <h2>Wozu der Server da ist</h2>
+          <section class="card" id="about-card">
+            <div class="section-head">
+              <div>
+                <h2>Wozu der Server da ist</h2>
+              </div>
             </div>
-          </div>
-          <p class="hint">
-            Er gibt einem Assistenten dieselbe Auskunft, die <code>k-playbook context</code> auf
-            der Kommandozeile liefert: die aufgelösten Pfade, die Instruktionsdateien in
-            Lesereihenfolge, die Remediation-Policy, die Guidelines und die effektiven Kataloge
-            für Regeln, Reviews und Checks — mitgeliefert und projekteigen bereits
-            zusammengeführt.
-          </p>
-          <p class="hint">
-            Mehr tut er nicht. Er führt keine Reviews aus, legt nichts an und verändert nichts
-            am Projekt; das machen Commands und Skills im Assistenten. Und er entfernt seine
-            eigene Registrierung nicht: wer den Eintrag loswerden will, löscht ihn von Hand.
-          </p>
-          <p class="hint">
-            Nach dem Einrichten steht der Server erst nach einem Neustart des Assistenten zur
-            Verfügung. Claude Code fragt dabei einmal nach der Freigabe — projektbezogene Server
-            aus <code>.mcp.json</code> gelten dort erst nach ausdrücklicher Zustimmung.
-          </p>
-        </section>
+            <p class="hint">
+              Er gibt einem Assistenten dieselbe Auskunft, die <code>k-playbook context</code> auf
+              der Kommandozeile liefert: die aufgelösten Pfade, die Instruktionsdateien in
+              Lesereihenfolge, die Remediation-Policy, die Guidelines und die effektiven Kataloge
+              für Regeln, Reviews und Checks — mitgeliefert und projekteigen bereits
+              zusammengeführt.
+            </p>
+            <p class="hint">
+              Mehr tut er nicht. Er führt keine Reviews aus, legt nichts an und verändert nichts
+              am Projekt; das machen Commands und Skills im Assistenten. Und er entfernt seine
+              eigene Registrierung nicht: wer den Eintrag loswerden will, löscht ihn von Hand.
+            </p>
+            <p class="hint">
+              Nach dem Einrichten steht der Server erst nach einem Neustart des Assistenten zur
+              Verfügung. Claude Code fragt dabei einmal nach der Freigabe — projektbezogene Server
+              aus <code>.mcp.json</code> gelten dort erst nach ausdrücklicher Zustimmung.
+            </p>
+          </section>
+        </div>
       </div>
     </main>
 
     <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
     <script src="/static/mcp.js"></script>
   </body>
 </html>

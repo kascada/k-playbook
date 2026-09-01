@@ -1,0 +1,15 @@
+{{define "sidebar"}}
+        <div class="sidebar">
+          <!-- Der Umschalter ist server-gerendert: welche Bereiche es gibt,
+               hängt an der Installation, und welcher aktiv ist, weiß nur die
+               Seite selbst. -->
+          <nav class="area-nav" aria-label="Bereiche">
+            <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="page"{{end}}>Setup</a>
+          </nav>
+
+          <!-- Die Einträge entstehen zur Laufzeit aus den Blöcken daneben,
+               damit ein neuer Block nicht an zwei Stellen gepflegt werden
+               muss. -->
+          <nav id="block-nav" class="block-nav" aria-label="Inhalt dieser Seite"></nav>
+        </div>
+{{end}}
