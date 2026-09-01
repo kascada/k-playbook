@@ -5,6 +5,9 @@
                Seite selbst. -->
           <nav class="area-nav" aria-label="Bereiche">
             <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="page"{{end}}>Setup</a>
+            {{if .Installed}}
+            <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="page"{{end}}>Workflows</a>
+            {{end}}
           </nav>
 
           <!-- Die Einträge entstehen zur Laufzeit aus den Blöcken daneben,

@@ -174,6 +174,7 @@ func routes(state *serverState) http.Handler {
 		panic(fmt.Sprintf("eingebettete Assets: %v", err))
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	mux.HandleFunc("GET /workflows", workflowsPageHandler)
 	mux.HandleFunc("GET /reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /tasks", tasksPageHandler)
 	mux.HandleFunc("GET /todos", todosPageHandler)
@@ -186,7 +187,8 @@ func routes(state *serverState) http.Handler {
 // Die Bereiche des Umschalters. Der Wert steht in den Vorlagendaten und
 // entscheidet, welcher Eintrag markiert ist.
 const (
-	areaSetup = "setup"
+	areaSetup     = "setup"
+	areaWorkflows = "workflows"
 )
 
 // pageTemplate parst eine Seite zusammen mit dem Fragment der linken Spalte.
@@ -197,6 +199,14 @@ func pageTemplate(name string) *template.Template {
 }
 
 var indexTemplate = pageTemplate("index.html")
+
+// workflowsTemplate ist die Seite der täglichen Arbeit: Reviews, Tasks und
+// Todos untereinander.
+var workflowsTemplate = pageTemplate("workflows.html")
+
+func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, workflowsTemplate, areaWorkflows)
+}
 
 // reviewsTemplate ist die zweite Seite. Sie teilt den Kopf mit der Startseite,
 // deshalb dieselben Vorlagendaten.
