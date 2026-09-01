@@ -674,19 +674,13 @@ Zeit vor `jobs` bleiben lesbar.
 
 ## Die Oberfläche
 
-Der Block **Workflows** auf der Startseite führt mit einem Knopf zur Seite `/reviews`; die
-Zahl darauf ist die der vorhandenen Läufe. Aufgelistet werden sie auf der Seite selbst.
-Dort wird auch ein neuer Lauf zusammengestellt:
+Der Bereich **Workflows** listet die bisherigen Läufe aus `k-playbook-local/results/`,
+mit ihrer Zahl an der Liste. Je Lauf stehen sein Zustand und die Zahl der Einträge dabei;
+ein Verzeichnis ohne `run.json` wird als solches ausgewiesen.
 
-- **Werkzeuge** aus der Tool-Matrix, gefiltert nach `project.languages`. Was nicht
-  installiert ist, steht da, lässt sich aber nicht auswählen — mit dem Hinweis, wie es
-  installiert wird.
-- **Reviews** aus dem aufgelösten Katalog, mitgeliefert und projekteigen zusammengeführt.
-  Abgeschaltete und nicht audit-aktivierte Einträge (`audit.enabled: false`) fehlen.
-
-„Erstellen" legt das Verzeichnis und `run.json` an. Mehr nicht: **das Anlegen startet
-nichts.** Gestartet wird im Terminal, mit `k-playbook scan` — einen Knopf dafür gibt es
-in der Oberfläche bewusst noch nicht.
+Mehr tut die Oberfläche hier nicht: **sie legt keinen Lauf an und startet keinen.**
+Angelegt wird ein Lauf über `/k-audit` oder `/k-review` im Assistenten, gescannt wird im
+Terminal mit `k-playbook scan`.
 
 ## MCP-Werkzeuge
 
@@ -695,8 +689,8 @@ Weg; MCP ist für die Chat-Orchestrierung ohne Shell-Out zur `k-playbook`-CLI ge
 
 | Werkzeug | Zweck | CLI-Äquivalent |
 |---|---|---|
-| `k_playbook_review_status` | Auswahlbasis oder bestehenden Laufstatus lesen | keines, nahe an Oberfläche `/reviews` |
-| `k_playbook_review_create` | Lauf anlegen oder Dry-Run der `run.json`-Struktur erzeugen | Oberfläche „Erstellen" |
+| `k_playbook_review_status` | Auswahlbasis oder bestehenden Laufstatus lesen | keines, nahe am Bereich `/workflows` |
+| `k_playbook_review_create` | Lauf anlegen oder Dry-Run der `run.json`-Struktur erzeugen | keines |
 | `k_playbook_review_scan` | Tool-Einträge blockierend ausführen | `k-playbook scan <lauf>` |
 | `k_playbook_review_merge` | `review-input.json` und `review-input.md` schreiben | `k-playbook merge <lauf>` |
 | `k_playbook_review_write_ai_entry` | Status eines AI-Eintrags schreiben | kein CLI-Äquivalent |

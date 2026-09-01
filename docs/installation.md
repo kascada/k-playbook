@@ -270,15 +270,15 @@ export BROWSER=/pfad/zum/helfer.sh   # bekommt die URL als Argument
 
 ## Reviews und Tasks
 
-Der Block **Workflows** führt zu den beiden Arbeitsvorräten. Auf jedem Knopf steht, wie
-viel dort liegt: die Zahl der Review-Läufe unter `k-playbook-local/results/` und die der
-offenen Tasks unter `k-playbook-local/tasks/`.
+Der Bereich **Workflows** führt die Arbeitsvorräte zusammen: Review-Läufe aus
+`k-playbook-local/results/`, Tasks aus `k-playbook-local/tasks/` und Todos aus
+`k-playbook-local/TODO.md`. Jede Liste trägt ihre eigene Zahl.
 
-Aufgelistet wird auf den Seiten selbst. `/reviews` zeigt die bisherigen Läufe und stellt
-einen neuen zusammen. `/tasks` listet die offenen Tasks nach ihrer Nummer; ein Klick
-zeigt den Task als Markdown unter der Liste. Die erledigten aus `tasks/done/` stehen
-darunter in einem zugeklappten Block — die jüngste Nummer oben — und lassen sich genauso
-lesen.
+Ein Beschreibungsblock steht voran und sagt, was die drei Sorten sind und wann man
+welche nimmt. Darunter stehen die bisherigen Läufe, dann die offenen Tasks nach ihrer
+Nummer; ein Klick zeigt den Task als Markdown unter der Liste. Die erledigten aus
+`tasks/done/` stehen in einem zugeklappten Block — die jüngste Nummer oben — und lassen
+sich genauso lesen. Den Schluss machen die Todos, offene und abgehakte getrennt.
 
 Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-task-refine` gegangen ist —
 mit Datum, sofern das Review-Log eines nennt. „ohne Task-Refine" ist kein Fehler, aber
@@ -289,10 +289,10 @@ Gelesen wird nur. Angelegt und ausgeführt werden Tasks über `/k-task-create` u
 
 ## Doku lesen
 
-Über dem Kontext-Block steht **Dokumentation**. Die Karte listet alle Markdown-Dateien
-aus `k-playbook/docs` — dieselbe Doku, die du gerade liest, in dem Stand, der im Projekt
-installiert ist. Ein Klick öffnet die Datei in einem Fenster über der Seite; Verweise
-darin führen zur nächsten Datei, `Escape` oder ein Klick daneben schließt.
+Der Bereich **Docs** zeigt alle Markdown-Dateien aus `k-playbook/docs` — dieselbe Doku,
+die du gerade liest, in dem Stand, der im Projekt installiert ist. Der Index steht links
+im Menü, die geöffnete Datei rechts; ohne Auswahl steht dort die `README.md`. Verweise im
+Text führen zur nächsten Datei, Anker springen innerhalb der offenen.
 
 Mermaid-Diagramme werden gezeichnet, sofern der Rechner ins Netz kommt: die Library wird
 bei Bedarf geladen. Ohne Netz bleibt der Diagramm-Quelltext stehen, der Text ist

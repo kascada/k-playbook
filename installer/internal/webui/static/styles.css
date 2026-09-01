@@ -528,43 +528,6 @@ details[open] > summary.disclosure .disclosure-marker {
   margin-top: 14px;
 }
 
-/* Die Doku-Liste ist eine Kachelwand: viele kurze Titel, die nebeneinander
-   passen sollen, ohne dass eine Spalte die Breite bestimmt. */
-.docs-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  align-content: start;
-  gap: 6px;
-  max-height: 420px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.52);
-}
-
-.docs-list.empty {
-  display: block;
-  padding: 16px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.doc-link {
-  width: 100%;
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: var(--ink);
-  background: transparent;
-  text-align: left;
-}
-
-.doc-link.active,
-.doc-link:hover {
-  color: var(--accent-strong);
-  background: rgba(47, 93, 80, 0.1);
-}
-
 .doc-viewer {
   flex: 1;
   min-height: 0;
@@ -853,20 +816,6 @@ button.attention-highlight {
   gap: 10px;
 }
 
-/* Die Zahl gehört zum Knopf, ist aber nicht seine Beschriftung: sie sitzt
-   abgesetzt dahinter und verschwindet, solange sie nicht feststeht. */
-.link-count {
-  margin-left: 10px;
-  border-radius: 999px;
-  padding: 2px 9px;
-  background: rgba(255, 255, 255, 0.22);
-  font-size: 0.85em;
-}
-
-.link-count:empty {
-  display: none;
-}
-
 /* Tasks stehen untereinander: die Zeile trägt Dateiname und Titel, das liest
    sich nebeneinander schlecht. */
 .task-list {
@@ -1032,10 +981,6 @@ button.attention-highlight {
   .hero-subrow {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .docs-list {
-    grid-template-columns: 1fr;
   }
 
   .doc-viewer {

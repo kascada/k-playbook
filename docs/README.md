@@ -57,6 +57,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `AGENTS.md` / `CLAUDE.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `BROWSER` / `Browser öffnet nicht` / `DevContainer` -> [`installation.md`](./installation.md#browser-beim-start), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
+- `Bereiche` / `Setup` / `Workflows` / `Umschalter` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-und-tasks)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `Commands` -> [`commands.md`](./commands.md)
 - `Docs zuerst` -> [`handbuch.md`](./handbuch.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)

@@ -80,16 +80,17 @@ installer/
 │   ├── server.go                Routen, Lebenszyklus
 │   ├── browser.go               Browser öffnen, Container erkennen
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
-│   ├── tasks.go                 Task-Endpunkte und die Zahlen des Workflow-Blocks
+│   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
 │   ├── hostpath.go              PATH-Zustand melden, read-only
 │   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, reviews.html, tasks.html, todos.html,
-│                                mcp.html, session.js, app.js, reviews.js, tasks.js,
-│                                todos.js, mcp.js, styles.css
+│   └── static/                  index.html, workflows.html, docs.html, mcp.html,
+│                                sidebar.html (Fragment der linken Spalte),
+│                                session.js, nav.js, app.js, workflows.js,
+│                                docs.js, mcp.js, styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── internal/review/
@@ -1053,6 +1054,43 @@ Browser. Auch das Umschalten zwischen Accounts steht nur als Befehl da: es gilt
 maschinenweit für jedes Terminal und jedes Projekt, und ein Approve läuft danach unter
 dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite verdecken.
 
+## Bereiche und die linke Spalte
+
+Die Oberfläche hat drei Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`
+und **Docs** unter `/docs`. `/mcp` ist keine vierte Sorte, sondern die Detailseite des
+Setup-Blocks und trägt dessen Bereich.
+
+Jede dieser Seiten hat links dieselbe Spalte, und die beantwortet zwei Fragen: In welchem
+Bereich bin ich, und was steht in diesem Bereich? Oben der **Umschalter**, eine Liste von
+`<a>` mit dem aktiven Bereich markiert; darunter das **Blockmenü** der Seite.
+
+Beides steht in einem einzigen Template-Fragment, `static/sidebar.html` mit
+`{{define "sidebar"}}`. `pageTemplate()` parst es mit jeder Seite zusammen — die
+Seitendatei zuerst, denn `ParseFS` benennt das Ergebnis nach der ersten Datei, und
+`Execute` führt damit die Seite aus und nicht das Fragment. Dreimal dasselbe Markup zu
+kopieren wäre die Variante, die beim nächsten Bereich wieder auseinanderläuft.
+
+Welcher Eintrag aktiv ist, kommt aus den Vorlagendaten: `renderPage()` bekommt den
+Bereich vom Handler. Ob es Workflows und Docs überhaupt gibt, entscheidet `.Installed` —
+vor der Einrichtung führt der Umschalter nur nach Setup, weil die beiden anderen Bereiche
+dort nichts zu zeigen hätten.
+
+Das Blockmenü ist **generiert** und steht in `static/nav.js`: `buildBlockNav()` läuft über
+`.blocks > .card`, nimmt Id und `<h2>` jeder Karte und hängt je einen Eintrag an
+`#block-nav`. Der Statuspunkt spiegelt die Pill der Karte, ein `MutationObserver` zieht
+das nach — eine neue Karte braucht deshalb nichts weiter als Id und Überschrift. Der
+Aufruf muss **vor** den Ladefunktionen einer Seite stehen: die blenden Karten ein, und
+das Menü zieht das nur mit, wenn es sie schon beobachtet.
+
+`nav.js` gehört keiner Seite und holt sich `#block-nav` selbst, statt in ein
+seitenspezifisches `elements` zu greifen. Eine Ausnahme kennt der Mechanismus: `/docs`
+füllt dieselbe Liste aus seinen Dateien statt aus Karten und nutzt davon nur
+`markBlockNavItem()`.
+
+Unter 1080px entfällt das Blockmenü — für die Karten bliebe daneben zu wenig übrig. Der
+Umschalter bleibt und legt sich waagerecht über die Karten: ohne ihn wären die anderen
+Bereiche von dort aus nicht mehr erreichbar.
+
 ## Befehle zum Kopieren
 
 Mehrere Karten zeigen einen Befehl, der ins Terminal gehört — `PATH`-Zeile, Aufräumen der
@@ -1086,9 +1124,9 @@ passieren. Die übrigen Pfade kürzt die Oberfläche gegen das Projektverzeichni
 
 ## Doku in der Oberfläche
 
-Über dem Kontext-Block steht die mitgelieferte Doku aus `k-playbook/docs`. Die Karte
+Der Bereich **Docs** zeigt die mitgelieferte Doku aus `k-playbook/docs`. Das Menü links
 listet alle Markdown-Dateien, auch die aus Unterverzeichnissen wie `libs/`; ein Klick
-öffnet die Datei in einem Fenster über der Seite.
+zeigt die Datei in der Karte daneben. Ohne Auswahl steht dort die `README.md`.
 
 `project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,
 ersatzweise den Dateinamen. Die `README.md` steht vorn, sie ist der Einstieg. Fehlt das
@@ -1107,27 +1145,38 @@ ein Weg, beliebige Dateien des Rechners zu lesen.
 Verweise innerhalb der Doku fängt die Oberfläche ab, weil ein Klick sonst die Seite
 verlassen und damit den Server hinter ihr beenden würde: `.md`-Ziele öffnet sie im
 selben Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen
-neuen Tab.
+neuen Tab. Führt ein Verweis in eine andere Datei, zieht das Menü mit.
+
+Der Text steht in einer Karte und ist kein eigener Scroll-Container. Ohne Anker scrollt
+deshalb das **Fenster** nach oben, nicht das Element — sonst bliebe die Ansicht dort
+stehen, wo die vorige Datei endete.
 
 Mermaid-Blöcke rendert der Browser nach. Die Library kommt bei Bedarf vom CDN — sie ist
 zu groß, um sie mitzuliefern. Ohne Netz bleibt der Quelltext des Diagramms als
 Codeblock stehen, die Datei ist also weiterhin lesbar.
 
-## Workflows: Reviews und Tasks
+## Workflows: Reviews, Tasks und Todos
 
-Beides sind Arbeitsvorräte, beides hat eine eigene Seite. Auf der Startseite steht
-deshalb nur der Block **Workflows** mit zwei Knöpfen, je einem pro Seite, und der Zahl
-dessen, was dort liegt. Eine Liste an dieser Stelle wäre dieselbe Liste, die die nächste
-Seite noch einmal zeigt.
+Drei Arbeitsvorräte, ein Bereich. `/workflows` stellt sie untereinander: die bisherigen
+Läufe, die offenen und erledigten Tasks samt gelesenem Inhalt, die offenen und
+abgehakten Todos. Ein Beschreibungsblock steht voran und sagt, was die drei Sorten sind
+und wann man welche nimmt — die Listen darunter beantworten das nicht von selbst.
 
-Die Zahlen kommen aus `/api/workflows` und nicht aus den Endpunkten der Seiten:
-`/api/reviews` stellt einen ganzen Lauf zusammen und prüft dafür jedes Werkzeug — viel
-zu viel Arbeit für eine Zahl auf einem Knopf.
+Jede Liste trägt ihre eigene Pill mit ihrer Zahl. Einen Aggregat-Endpunkt daneben gibt
+es nicht: er wäre die Doppelung dieser drei Zahlen.
 
-Gezählt werden die Lauf-Verzeichnisse unter `k-playbook-local/results/` und die offenen
-Tasks. Offen heißt: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte liegen
-in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine Aufgabe und
-zählt nicht mit, in der Liste wie im Zähler.
+Offen heißt bei Tasks: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte
+liegen in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine
+Aufgabe und steht nicht in der Liste der offenen.
+
+Die drei Herkünfte hatten je ein eigenes Seitenskript, mit gleichnamigen Namen auf
+Top-Level: dreimal `elements`, dreimal `load` und `render`, dazu `doneRequested` und
+`doneOpenKey` in zweien. Aneinandergehängt wäre das ein SyntaxError, und dann liefe keine
+Zeile. In `workflows.js` steht deshalb jede Herkunft in einer eigenen Kapsel und behält
+ihre Namen bei sich. Geteilt wird nur, was zur Seite gehört und nicht zu einer ihrer
+Listen: das Blockmenü, der Merkspeicher der Aufklapp-Blöcke und **ein** `startSession()`
+— drei Aufrufe wären drei Intervalle und drei Klick-Listener, von denen nur der zuletzt
+gesetzte Handler zählt.
 
 `project.ListTasks()` sortiert nach Dateinamen; die Nummer steht vorn und ordnet damit
 bereits richtig. Als Titel dient die erste Überschrift, ersatzweise der Dateiname —
@@ -1143,7 +1192,7 @@ Ausführung nachfragt — deshalb steht er in Warnfarbe. Ein fehlendes Task-Verz
 Doku **kein** Befund: die projekteigene Struktur wird erst angelegt, und "noch keine
 Tasks" ist dieselbe Auskunft wie ein leeres Verzeichnis.
 
-Die Seite `/tasks` listet die offenen Tasks untereinander — die Zeile trägt Dateinamen
+Die Liste stellt die offenen Tasks untereinander — die Zeile trägt Dateinamen
 und Titel, das liest sich nebeneinander schlecht. Ein Klick zeigt den Task als Markdown
 in einer Karte **unter** der Liste, nicht in einem Fenster darüber: die Liste bleibt
 sichtbar, der nächste Task ist einen Klick entfernt. Gerendert wird wie bei der Doku mit
@@ -1184,8 +1233,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Wrapper als Subprozess |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
-| `GET` | `/api/reviews` | Läufe auflisten, dazu die wählbaren Werkzeuge und Rezepte |
-| `POST` | `/api/reviews` | Lauf anlegen; startet nichts |
+| `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
@@ -1196,14 +1244,16 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
-| `GET` | `/api/workflows` | Läufe und offene Tasks zählen, read-only |
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
+| `GET` | `/api/todos` | offene Todos aus `TODO.md` auflisten, read-only |
+| `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
 
-Statische Assets liegen unter `/static/`, die Startseite unter `/`; daneben stehen die
-Seiten `/reviews`, `/tasks` und `/mcp`. Alle vier rendert `renderPage()` aus derselben
-Vorlage für den Kopf und liefert vorab mit, ob eine Installation gefunden wurde.
+Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows`,
+`/docs` und `/mcp`; alle vier rendert `renderPage()` aus derselben Vorlage für den Kopf
+und die linke Spalte. Mitgeliefert werden der aktive Bereich und die Auskunft, ob eine
+Installation gefunden wurde.
 
 ## Der MCP-Server
 
@@ -1372,9 +1422,10 @@ Beenden funktioniert in beide Richtungen:
 - `Ctrl+C` und der `Schließen`-Button gehen ebenfalls.
 
 Weil die Oberfläche mehrere Seiten hat, gilt das für **jede** von ihnen: `session.js`
-trägt Heartbeat und Abmeldung und wird von `index.html`, `reviews.html`, `tasks.html` und
-`mcp.html` vor der jeweiligen Seitenlogik geladen. Eine Seite ohne Lebenszeichen beendete den Server
-wenige Sekunden nach dem Wechsel zu ihr — der Weg zurück führte dann auf eine tote Seite.
+trägt Heartbeat und Abmeldung und wird von `index.html`, `workflows.html`, `docs.html`
+und `mcp.html` vor `nav.js` und der jeweiligen Seitenlogik geladen. Eine Seite ohne
+Lebenszeichen beendete den Server wenige Sekunden nach dem Wechsel zu ihr — der Weg
+zurück führte dann auf eine tote Seite. Ein Bereichswechsel ist genau so ein Wechsel.
 
 Ein Klick auf einen Verweis dieser Oberfläche meldet gar nicht erst ab: `session.js`
 merkt sich, dass das Fenster zur nächsten eigenen Seite geht. Der Zurück-Knopf löst
