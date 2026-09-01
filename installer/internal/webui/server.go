@@ -175,6 +175,7 @@ func routes(state *serverState) http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /workflows", workflowsPageHandler)
+	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /tasks", tasksPageHandler)
 	mux.HandleFunc("GET /todos", todosPageHandler)
@@ -189,6 +190,7 @@ func routes(state *serverState) http.Handler {
 const (
 	areaSetup     = "setup"
 	areaWorkflows = "workflows"
+	areaDocs      = "docs"
 )
 
 // pageTemplate parst eine Seite zusammen mit dem Fragment der linken Spalte.
@@ -206,6 +208,14 @@ var workflowsTemplate = pageTemplate("workflows.html")
 
 func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, workflowsTemplate, areaWorkflows)
+}
+
+// docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die
+// gelesene Datei rechts.
+var docsTemplate = pageTemplate("docs.html")
+
+func docsPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, docsTemplate, areaDocs)
 }
 
 // reviewsTemplate ist die zweite Seite. Sie teilt den Kopf mit der Startseite,

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Docs - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+      <section class="hero app-header">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>Docs</h1>
+        </div>
+        <div class="hero-subrow">
+          <p class="eyebrow path">
+            <span class="path-entry">
+              <span class="path-key">{{.ModeLabel}}:</span>
+              {{if .Path}}{{.Path}}{{end}}
+            </span>
+            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
+              <span class="path-key">Repository:</span>
+              {{.RepoRoot}}
+            </span>
+            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
+              <span class="path-key">Installation:</span>
+              {{.PlaybookDir}}
+            </span>
+          </p>
+        </div>
+      </section>
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <!-- Das Menü links entsteht hier nicht aus Karten, sondern aus der
+             Dateiliste: dieser Bereich hat genau einen Inhalt, und das ist die
+             gerade geöffnete Datei. -->
+        <div class="blocks">
+          <section class="card" id="doc-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" id="doc-path"></p>
+                <h2 id="doc-title">Dokumentation</h2>
+              </div>
+            </div>
+            <article id="doc-viewer" class="doc-viewer inline"></article>
+            <p id="docs-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/docs.js"></script>
+  </body>
+</html>

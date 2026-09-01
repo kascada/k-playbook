@@ -77,6 +77,14 @@ select {
   backdrop-filter: blur(18px);
 }
 
+/* Auf /docs entstehen die Einträge aus den Dateien und können mehr werden, als
+   nebeneinander ins Fenster passt. Dann scrollt das Menü selbst; die Karte
+   daneben bleibt davon unberührt. */
+.block-nav {
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+}
+
 .area-nav-item,
 .block-nav-item {
   display: flex;
