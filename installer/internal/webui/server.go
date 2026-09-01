@@ -175,9 +175,6 @@ func routes(state *serverState) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /workflows", workflowsPageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
-	mux.HandleFunc("GET /reviews", reviewsPageHandler)
-	mux.HandleFunc("GET /tasks", tasksPageHandler)
-	mux.HandleFunc("GET /todos", todosPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
@@ -217,28 +214,6 @@ func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, docsTemplate, areaDocs)
 }
 
-// reviewsTemplate ist die zweite Seite. Sie teilt den Kopf mit der Startseite,
-// deshalb dieselben Vorlagendaten.
-var reviewsTemplate = template.Must(template.ParseFS(staticFiles, "static/reviews.html"))
-
-func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, reviewsTemplate, "")
-}
-
-// tasksTemplate ist die Seite der Tasks, ebenfalls mit dem gemeinsamen Kopf.
-var tasksTemplate = template.Must(template.ParseFS(staticFiles, "static/tasks.html"))
-
-func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, tasksTemplate, "")
-}
-
-// todosTemplate ist die Seite der Todos, ebenfalls mit dem gemeinsamen Kopf.
-var todosTemplate = template.Must(template.ParseFS(staticFiles, "static/todos.html"))
-
-func todosPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, todosTemplate, "")
-}
-
 // mcpTemplate ist die Seite des MCP-Servers. Sie ist eine Detailseite des
 // Setup-Blocks und trägt deshalb dessen Bereich im Umschalter.
 var mcpTemplate = pageTemplate("mcp.html")
@@ -256,8 +231,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus. area sagt,
-// welcher Eintrag des Umschalters markiert wird; Seiten ohne linke Spalte
-// übergeben eine leere Zeichenkette.
+// welcher Eintrag des Umschalters markiert wird.
 func renderPage(w http.ResponseWriter, tmpl *template.Template, area string) {
 	environment := project.Detect()
 	data := struct {
