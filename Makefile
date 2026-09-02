@@ -29,7 +29,10 @@ INSTALLER_HOST_TARGET = $(shell go env GOOS)-$(shell go env GOARCH)
 # Stand, nicht den, an dem gerade gearbeitet wird — und die Oberfläche liest
 # Skripte, Regeln und Reviews immer von dort.
 PLAYBOOK_DIR := k-playbook
-INSTALLATION_DIR := $(if $(wildcard $(PLAYBOOK_DIR)/.git),$(PLAYBOOK_DIR),.)
+# Im Entwicklungsrepo liegt die Installation stets unter k-playbook/. Die
+# Schreibschutz-Targets dürfen deshalb nie auf . fallen und den Arbeitsstand
+# einschließlich k-playbook-local/ sperren.
+INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard installer)),$(PLAYBOOK_DIR),.)
 DEV_MARKER := .k-playbook-devsync
 # Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
