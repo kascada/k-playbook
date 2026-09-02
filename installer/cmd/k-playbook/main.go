@@ -34,6 +34,8 @@ func run(args []string) error {
 	}
 
 	switch args[0] {
+	case "config":
+		return runConfig(args[1:])
 	case "context":
 		// Ohne cleanUpLegacy: dessen Ausgabe würde die JSON-Ausgabe stören.
 		// Die Assistenten-Verlinkung zieht ContextForDir dabei nach — das ist
@@ -89,6 +91,10 @@ func printUsage() {
 Ohne Argument:  startet die lokale Oberfläche im Browser.
 
 Unterkommandos:
+  config create [--repo-root <pfad>] [hauptverzeichnis]
+             Legt K-PLAYBOOK.yaml explizit an. Ohne Hauptverzeichnis wird das
+             Arbeitsverzeichnis verwendet; eine vorhandene Datei bleibt immer
+             unverändert.
   context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
             Konfiguration und die effektiven Kataloge für rules, reviews
             und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.

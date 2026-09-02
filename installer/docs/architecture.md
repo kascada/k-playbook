@@ -27,9 +27,11 @@ if len(args) == 0 {
 }
 ```
 
-Ohne Argument die Oberfläche, davor das Aufräumen der Altlasten. Mit `context` die
-JSON-Ausgabe, mit `mcp` der Server für einen Assistenten, mit `scan` die Ausführung
-eines Review-Laufs — und alle drei **ohne** `cleanUpLegacy()` und `mirrorHostInstall()`:
+Ohne Argument die Oberfläche, davor das Aufräumen der Altlasten. `config create` legt
+den Anker ohne Aufwärtssuche im ausdrücklich gewählten oder aktuellen Verzeichnis an.
+Mit `context` die JSON-Ausgabe, mit `mcp` der Server für einen Assistenten, mit `scan`
+die Ausführung eines Review-Laufs — und alle vier **ohne** `cleanUpLegacy()` und
+`mirrorHostInstall()`:
 deren Meldungen gehen nach stdout und würden die Ausgabe stören. Bei `mcp` wiegt das
 schwerer als bei `context`: dort trägt stdout einen JSON-RPC-Strom, der über die ganze
 Sitzung offen bleibt, und eine einzige fremde Zeile macht ihn unbrauchbar. Bei `scan`
@@ -41,7 +43,7 @@ Preflight, Konfiguration — und reicht es an `internal/review` weiter; dort ste
 Ausführung selbst, ohne eigene Suche nach Pfaden oder Binaries. Wie der Lauf aussieht,
 den es ausführt, steht in [`../../docs/review-runs.md`](../../docs/review-runs.md).
 
-Mehr Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
+Weitere Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
 `smoke` und `projects …` des alten Stands sind entfallen, samt der lokalen Projektliste
 unter `.k-playbook-local/projects.json`.
 

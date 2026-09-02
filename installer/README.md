@@ -10,6 +10,8 @@ einzige Aufgabe; die jeweilige steckt im Subkommando.
 
 ```bash
 k-playbook/bin/k-playbook           # öffnet die Oberfläche im Browser
+k-playbook/bin/k-playbook config create
+                                     # legt K-PLAYBOOK.yaml im aktuellen Verzeichnis an
 k-playbook/bin/k-playbook context   # gibt den aufgelösten Arbeitsstand als JSON aus
 k-playbook/bin/k-playbook help
 ```
@@ -53,6 +55,11 @@ temporär beschreibbar.
 
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.
+
+Wenn die Oberfläche wegen eines Ankers in einem übergeordneten Verzeichnis nicht die
+Ersteinrichtung zeigt, legt `k-playbook config create` den Anker bewusst ohne Suche an.
+Optional nimmt der Befehl ein Hauptverzeichnis und mit `--repo-root` ein relativ dazu
+liegendes Repository entgegen.
 
 ## Struktur
 

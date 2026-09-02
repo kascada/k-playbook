@@ -51,6 +51,26 @@ projekt/
 Eine vorhandene `K-PLAYBOOK.yaml` wird nie überschrieben. Das Format steht in
 [`k-playbook-format.md`](./k-playbook-format.md).
 
+### Konfiguration im Terminal anlegen
+
+Wenn ein Anker eines übergeordneten Projekts die Ersteinrichtung der Oberfläche
+überdeckt, lässt sich der Anker ohne Suche direkt anlegen:
+
+```bash
+k-playbook/bin/k-playbook config create
+```
+
+Der Befehl schreibt in das aktuelle Verzeichnis und meldet danach den genauen Pfad,
+das erkannte Repository und die Versionskontrolle. Optional kann ein anderer
+Projektordner angegeben werden; liegt das Repository darin nicht im Hauptverzeichnis,
+setzt `--repo-root` dessen relativen Pfad:
+
+```bash
+k-playbook/bin/k-playbook config create --repo-root app /pfad/zum/projekt
+```
+
+Eine vorhandene `K-PLAYBOOK.yaml` bleibt auch auf diesem Weg unverändert.
+
 ### 2. Projekteigene Struktur anlegen
 
 Daneben entsteht `k-playbook-local/` mit allem, was dem Projekt gehört:
