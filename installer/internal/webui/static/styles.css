@@ -143,7 +143,7 @@ select {
   scroll-margin-top: 20px;
 }
 
-/* Unter dieser Breite bliebe für die Karten zu wenig übrig; das Blockmenü
+/* Unter dieser Breite bliebe für die Karten zu wenig übrig; das Sprungmenü
    entfällt, gescrollt wird dann von Hand. Der Umschalter bleibt: ohne ihn
    wären die anderen Bereiche von hier aus nicht mehr erreichbar. Er legt sich
    waagerecht über die Karten. */
@@ -161,8 +161,20 @@ select {
     justify-content: start;
   }
 
-  .block-nav {
+  /* Nur das Sprungmenü entfällt: seine Ziele stehen als Karten gleich daneben,
+     erreichbar bleiben sie also auch ohne das Menü. */
+  .block-nav:not(.file-index) {
     display: none;
+  }
+
+  /* Der Dateiindex bleibt stehen — auf /docs führt sonst kein Weg mehr zu den
+     anderen Dateien. Er steht dann als eigener Kasten über dem Text statt
+     mitlaufend daneben. Seine Grenze ist hier bewusst ein Anteil der
+     Fensterhöhe: ohne sticky Spalte gibt es kein Gitter, aus dem sich eine
+     Höhe rechnen ließe, und 15 Einträge würden den Text sonst aus dem
+     Fenster schieben. */
+  .block-nav.file-index {
+    max-height: 45vh;
   }
 }
 

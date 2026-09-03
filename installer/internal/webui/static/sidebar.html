@@ -14,6 +14,10 @@
           <!-- Die Einträge entstehen zur Laufzeit aus den Blöcken daneben,
                damit ein neuer Block nicht an zwei Stellen gepflegt werden
                muss. -->
-          <nav id="block-nav" class="block-nav" aria-label="Inhalt dieser Seite"></nav>
+          <!-- Auf /docs trägt dasselbe Element den Dateiindex statt eines
+               Sprungmenüs. Der Modifier kommt serverseitig aus .Area und nicht
+               beim Füllen aus docs.js: schmal bliebe der Index sonst so lange
+               ausgeblendet, bis /api/docs antwortet. -->
+          <nav id="block-nav" class="block-nav{{if eq .Area "docs"}} file-index{{end}}" aria-label="Inhalt dieser Seite"></nav>
         </div>
 {{end}}
