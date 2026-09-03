@@ -1,20 +1,24 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
 
-// runGUI ist der argumentlose Einstieg. Er sieht zuerst nach, ob für dieses
-// Projekt schon ein Server läuft, und handelt nach dem Ergebnis: ein zweiter
-// Aufruf startet nichts Neues, er öffnet nur den Browser.
+// runGUI ist der argumentlose Einstieg, der Client-Pfad. Er pflegt den Wirt,
+// sieht dann nach, ob für dieses Projekt schon ein Server läuft, und handelt
+// nach dem Ergebnis: ein zweiter Aufruf startet nichts Neues, er öffnet nur
+// den Browser. Das Terminal ist danach in jedem Fall wieder frei.
 func runGUI() error {
 	cleanUpLegacy()
 	mirrorHostInstall()
+	protectProjectInstallation()
 
 	key, err := guiproc.Key()
 	if err != nil {
@@ -28,9 +32,21 @@ func runGUI() error {
 		open:    openExisting,
 		stop:    stopExisting,
 		discard: guiproc.Remove,
-		start:   webui.Run,
+		start:   startDetached,
 		out:     os.Stdout,
 	})
+}
+
+// protectProjectInstallation setzt eine vorhandene Installation read-only.
+// Läuft bei jedem Aufruf und nicht im Server: der startet nur einmal.
+func protectProjectInstallation() {
+	environment := project.Detect()
+	if !environment.Installed || !environment.PlaybookPresent {
+		return
+	}
+	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Installation konnte nicht read-only gesetzt werden: %v\n", err)
+	}
 }
 
 // guiActions sind die Handgriffe, zwischen denen reuseOrStart wählt.
@@ -93,10 +109,61 @@ func unresponsiveError(finding guiproc.Finding) error {
 		finding.Record.PID, finding.Path)
 }
 
-// openExisting zeigt den laufenden Server so, wie ein frischer Start es täte.
+// openExisting zeigt den laufenden Server: URL ausgeben, Browser öffnen. Der
+// Containerfall steckt in Announce — ohne $BROWSER nur URL und Hinweis auf
+// die Portweiterleitung.
 func openExisting(record guiproc.Record) {
 	webui.Announce(record.URL())
 	fmt.Println("Beenden mit: k-playbook stop")
+}
+
+// startDetached startet den Server als eigenen Prozess und zeigt ihn, sobald
+// er antwortet.
+func startDetached() error {
+	record, err := spawnServer(os.Stdout)
+	if err != nil {
+		return err
+	}
+	openExisting(record)
+	return nil
+}
+
+// spawnServer koppelt den Server ab und wartet auf sein erstes Lebenszeichen:
+// Laufzeitdatei mit seiner PID und /api/health mit demselben Schlüssel.
+//
+// Endet das Kind vorher, kann ein gleichzeitiger Aufruf die Laufzeitdatei
+// zuerst geschrieben haben; dann gilt dessen Server, sofern er als eigener
+// antwortet. Alles andere ist ein Fehler mit dem Log. Antwortet das Kind
+// nicht rechtzeitig, wird es beendet — ein Server, der nicht erreichbar ist,
+// bleibt nicht stehen.
+func spawnServer(out io.Writer) (guiproc.Record, error) {
+	key, err := guiproc.Key()
+	if err != nil {
+		return guiproc.Record{}, err
+	}
+	location, err := guiproc.Locate(key)
+	if err != nil {
+		return guiproc.Record{}, err
+	}
+	child, err := guiproc.Spawn(location.Log)
+	if err != nil {
+		return guiproc.Record{}, err
+	}
+
+	record, err := child.Await(key, location.File, guiproc.StartupTimeout, guiproc.ProbeHealth)
+	if err == nil {
+		return record, nil
+	}
+	if errors.Is(err, guiproc.ErrChildExited) {
+		finding, inspectErr := guiproc.Inspect(key, guiproc.OwnVersion(), guiproc.DefaultInspector())
+		if inspectErr == nil && finding.Status == guiproc.StatusRunning {
+			fmt.Fprintf(out, "Ein gleichzeitiger Aufruf hat den Server gestartet (PID %d).\n", finding.Record.PID)
+			return finding.Record, nil
+		}
+	} else {
+		child.Terminate()
+	}
+	return guiproc.Record{}, fmt.Errorf("Server nicht gestartet: %w\nLog (%s):\n%s", err, location.Log, child.Log())
 }
 
 // stopExisting schickt dem alten Server den Shutdown und wartet auf sein

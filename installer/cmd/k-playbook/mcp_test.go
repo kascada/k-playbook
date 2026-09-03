@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
@@ -24,6 +25,16 @@ import (
 const childEnv = "K_PLAYBOOK_TEST_MCP_CHILD"
 
 func TestMain(m *testing.M) {
+	// Der abgekoppelte Server: spawnServer startet das eigene Binary — im
+	// Test dieses hier — mit der Servermarke. run() nimmt denselben Weg wie im
+	// Betrieb.
+	if guiproc.ServeMode() {
+		if err := run(nil); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if os.Getenv(childEnv) == "1" {
 		if err := run([]string{"mcp"}); err != nil {
 			fmt.Fprintln(os.Stderr, err)

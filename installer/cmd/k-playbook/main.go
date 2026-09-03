@@ -13,10 +13,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/hostinstall"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/webui"
 )
 
 func main() {
@@ -28,6 +30,15 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
+		if guiproc.ServeMode() {
+			// Der abgekoppelte Server, gestartet vom argumentlosen Aufruf.
+			// Keine Wirt-Pflege und kein Browser: beides gehört zum Aufruf,
+			// der jedes Mal läuft — hier liefe es nur beim allerersten Start.
+			// Die Marke wird gelöscht, damit kein Kindprozess des Servers sie
+			// erbt und selbst zum Server wird.
+			os.Unsetenv(guiproc.ServeEnv)
+			return webui.Serve()
+		}
 		return runGUI()
 	}
 
@@ -90,7 +101,9 @@ func printContext() error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `k-playbook
 
-Ohne Argument:  startet die lokale Oberfläche im Browser.
+Ohne Argument:  startet die lokale Oberfläche im Browser. Der Server läuft
+                dazu als Hintergrunddienst je Projekt weiter; ein zweiter
+                Aufruf findet ihn und öffnet nur den Browser.
 
 Unterkommandos:
   config create [--repo-root <pfad>] [hauptverzeichnis]

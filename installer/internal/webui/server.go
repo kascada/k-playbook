@@ -52,11 +52,15 @@ type serverState struct {
 	lastRequestAt time.Time
 }
 
-// Run startet den lokalen Server und blockiert, bis er per /api/shutdown,
-// SIGINT oder SIGTERM beendet wird oder idleTimeout lang niemand mehr fragt.
-func Run() error {
-	protectProjectInstallation()
-
+// Serve ist der Servermodus: der abgekoppelte Prozess hinter K_PLAYBOOK_SERVE=1.
+// Er behält das Arbeitsverzeichnis seines Starts — daraus leiten alle Handler
+// das Projekt ab — und blockiert, bis er per /api/shutdown, SIGINT oder
+// SIGTERM beendet wird oder idleTimeout lang niemand mehr fragt.
+//
+// Wirt-Pflege und Browser gehören dem Aufruf, nicht dem Server: hier liefen
+// sie nur beim allerersten Start. Ausgaben gehen ins Log, das der Aufruf als
+// stdout und stderr vorgibt.
+func Serve() error {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return fmt.Errorf("GUI-Port öffnen: %w", err)
@@ -81,8 +85,11 @@ func Run() error {
 	if err != nil {
 		listener.Close()
 		if errors.Is(err, fs.ErrExist) {
+			// Zwei Aufrufe zugleich: der andere Start hat die Datei zuerst
+			// geschrieben, dieser Prozess tritt zurück. Der Aufruf liest dann
+			// dessen Datei und öffnet dessen Server.
 			location, _ := guiproc.Locate(key)
-			return fmt.Errorf("für dieses Projekt liegt schon eine Laufzeitdatei: %s", location.File)
+			return fmt.Errorf("für dieses Projekt liegt schon eine Laufzeitdatei, ein anderer Start hat gewonnen: %s", location.File)
 		}
 		return fmt.Errorf("Laufzeitdatei anlegen: %w", err)
 	}
@@ -102,8 +109,8 @@ func Run() error {
 	}()
 	go state.watchIdle(ctx)
 
-	Announce("http://" + listener.Addr().String() + "/")
-	fmt.Println("Zum Beenden Ctrl+C drücken.")
+	fmt.Printf("k-playbook: http://%s/\n", listener.Addr().String())
+	fmt.Printf("Server für %s (PID %d, Version %q). Beenden mit: k-playbook stop\n", key, os.Getpid(), version)
 
 	// SIGTERM wie SIGINT: `k-playbook stop` greift damit auch bei einem
 	// Server, der nicht mehr antwortet, und die Laufzeitdatei verschwindet
@@ -113,8 +120,8 @@ func Run() error {
 	defer signal.Stop(interrupt)
 
 	select {
-	case <-interrupt:
-		fmt.Println()
+	case sig := <-interrupt:
+		fmt.Printf("Signal %s, der Server beendet sich.\n", sig)
 	case <-ctx.Done():
 	case err := <-serverErr:
 		if errors.Is(err, http.ErrServerClosed) {
@@ -128,22 +135,14 @@ func Run() error {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("GUI-Server stoppen: %w", err)
 	}
+	fmt.Println("Server beendet.")
 	return nil
-}
-
-func protectProjectInstallation() {
-	environment := project.Detect()
-	if !environment.Installed || !environment.PlaybookPresent {
-		return
-	}
-	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: Installation konnte nicht read-only gesetzt werden: %v\n", err)
-	}
 }
 
 // Announce gibt die URL aus und öffnet den Browser, sofern das hier
 // überhaupt sinnvoll ist. Dieselbe Bewegung für einen frisch gestarteten
-// wie für einen wiedergefundenen Server.
+// wie für einen wiedergefundenen Server; sie läuft im Aufruf, nicht im
+// Server — der hat kein Terminal mehr, in dem ein Browser sinnvoll wäre.
 func Announce(url string) {
 	fmt.Printf("k-playbook: %s\n", url)
 
