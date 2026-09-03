@@ -207,8 +207,8 @@ function setUpDoneCard(card, openKey, load) {
     if (unreviewed > 0) {
       elements.tasksMessage.textContent =
         unreviewed === 1
-          ? "Ein Task ist noch nicht durch /k-review-loop gegangen."
-          : `${unreviewed} Tasks sind noch nicht durch /k-review-loop gegangen.`;
+          ? "Ein Task ist noch nicht durch /k-task-refine gegangen."
+          : `${unreviewed} Tasks sind noch nicht durch /k-task-refine gegangen.`;
     }
   }
 
@@ -240,7 +240,7 @@ function setUpDoneCard(card, openKey, load) {
           ? task.reviewedAt
             ? `gereviewt ${task.reviewedAt}`
             : "gereviewt"
-          : "ohne Review-Loop";
+          : "ohne Task-Refine";
         button.append(review);
       }
 

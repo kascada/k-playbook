@@ -95,7 +95,7 @@ Bei explizitem Datei-Argument gilt dieselbe Prüfung, nur für die eine Datei.
 
 `/k-task-refine` hängt sein Log an **jede geprüfte** Datei an, auch an die, an der nichts
 zu ändern war (dort mit dem Vermerk „keine Änderungen"). Ein fehlender Block heißt
-deshalb: diese Datei war nie im Review-Loop.
+deshalb: diese Datei ist nie durch Task-Refine gegangen.
 
 Trotzdem bleibt es eine Rückfrage und kein Abbruch. Eine von Hand geschriebene oder aus
 einem anderen Projekt übernommene Task-Datei kann sachlich in Ordnung sein, ohne je
