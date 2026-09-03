@@ -1096,8 +1096,10 @@ und das Menü zieht das nur mit, wenn es sie schon beobachtet.
 
 `nav.js` gehört keiner Seite und holt sich `#block-nav` selbst, statt in ein
 seitenspezifisches `elements` zu greifen. Eine Ausnahme kennt der Mechanismus: `/docs`
-füllt dieselbe Liste aus seinen Dateien statt aus Karten und nutzt davon nur
-`markBlockNavItem()`.
+füllt dieselbe Liste aus seinen Dateien statt aus Karten und nutzt davon nur die
+Markierung: `markBlockNavItem()` setzt sie, `clearBlockNavMarking()` räumt sie ab, ohne
+eine neue zu setzen. Die zweite Funktion braucht `/docs`, weil ein Verweis in eine Datei
+außerhalb des Index führen kann — dann gehört gar kein Eintrag markiert.
 
 Unter 1080px entfällt das Blockmenü, **solange es ein Sprungmenü ist** — für die Karten
 bliebe daneben zu wenig übrig, und seine Ziele stehen ohnehin als Karten gleich darunter.
