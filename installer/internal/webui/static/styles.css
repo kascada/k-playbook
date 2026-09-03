@@ -556,11 +556,10 @@ details[open] > summary.disclosure .disclosure-marker {
   margin-top: 14px;
 }
 
+/* Der gerenderte Fließtext einer Markdown-Datei. Er steht in einer Karte, die
+   Rand und Polster schon mitbringt, und ist kein eigener Scroll-Container:
+   gescrollt wird das Fenster. */
 .doc-viewer {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 28px clamp(20px, 4vw, 56px);
   font-size: 1rem;
   line-height: 1.62;
   overflow-wrap: anywhere;
@@ -568,12 +567,6 @@ details[open] > summary.disclosure .disclosure-marker {
 
 .doc-viewer.empty {
   color: var(--muted);
-}
-
-/* Derselbe Fließtext, aber in einer Karte statt im Fenster darüber: die Karte
-   bringt ihren Rand schon mit. */
-.doc-viewer.inline {
-  padding: 0;
 }
 
 .doc-viewer h1,
@@ -1009,9 +1002,5 @@ button.attention-highlight {
   .hero-subrow {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .doc-viewer {
-    padding: 20px 18px;
   }
 }

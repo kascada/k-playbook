@@ -1072,26 +1072,48 @@ Seitendatei zuerst, denn `ParseFS` benennt das Ergebnis nach der ersten Datei, u
 `Execute` führt damit die Seite aus und nicht das Fragment. Dreimal dasselbe Markup zu
 kopieren wäre die Variante, die beim nächsten Bereich wieder auseinanderläuft.
 
-Welcher Eintrag aktiv ist, kommt aus den Vorlagendaten: `renderPage()` bekommt den
-Bereich vom Handler. Ob es Workflows und Docs überhaupt gibt, entscheidet `.Installed` —
-vor der Einrichtung führt der Umschalter nur nach Setup, weil die beiden anderen Bereiche
-dort nichts zu zeigen hätten.
+Welcher Eintrag aktiv ist, kommt aus den Vorlagendaten: `renderPage()` bekommt Bereich
+und offene Seite vom Handler. Beides ist nicht dasselbe, sobald ein Bereich mehr als eine
+Seite hat — deshalb führt `aria-current="page"` nur der Verweis auf die offene Seite,
+während ein aktiver Bereich mit anderem Ziel `aria-current="true"` bekommt: der Fall auf
+`/mcp`, wo Setup aktiv ist, die Startseite darunter aber nicht offen. Ob es Workflows und
+Docs überhaupt gibt, entscheidet `.Installed` — vor der Einrichtung führt der Umschalter
+nur nach Setup, weil die beiden anderen Bereiche dort nichts zu zeigen hätten.
+
+Die Spalte ist so hoch wie das Fenster abzüglich des sticky-Abstands, oben und unten je
+einmal. Darin teilen sich ihre Kästen den Platz selbst auf: jeder behält seine Höhe,
+allein das Blockmenü gibt nach und scrollt dann selbst. Geschätzt wird daran nichts, und
+ein weiterer Kasten in der Spalte ändert die Rechnung nicht.
 
 Das Blockmenü ist **generiert** und steht in `static/nav.js`: `buildBlockNav()` läuft über
 `.blocks > .card`, nimmt Id und `<h2>` jeder Karte und hängt je einen Eintrag an
-`#block-nav`. Der Statuspunkt spiegelt die Pill der Karte, ein `MutationObserver` zieht
-das nach — eine neue Karte braucht deshalb nichts weiter als Id und Überschrift. Der
-Aufruf muss **vor** den Ladefunktionen einer Seite stehen: die blenden Karten ein, und
-das Menü zieht das nur mit, wenn es sie schon beobachtet.
+`#block-nav`. Statuspunkt und Beschriftung spiegeln Pill und Überschrift der Karte, je ein
+`MutationObserver` zieht das nach — eine neue Karte braucht deshalb nichts weiter als Id
+und Überschrift, und ein Eintrag folgt seiner Karte auch dann noch, wenn sie ihre
+Überschrift zur Laufzeit austauscht: `#task-card` trägt den Titel des geöffneten Tasks.
+Der Aufruf muss **vor** den Ladefunktionen einer Seite stehen: die blenden Karten ein,
+und das Menü zieht das nur mit, wenn es sie schon beobachtet.
 
 `nav.js` gehört keiner Seite und holt sich `#block-nav` selbst, statt in ein
 seitenspezifisches `elements` zu greifen. Eine Ausnahme kennt der Mechanismus: `/docs`
 füllt dieselbe Liste aus seinen Dateien statt aus Karten und nutzt davon nur
 `markBlockNavItem()`.
 
-Unter 1080px entfällt das Blockmenü — für die Karten bliebe daneben zu wenig übrig. Der
-Umschalter bleibt und legt sich waagerecht über die Karten: ohne ihn wären die anderen
-Bereiche von dort aus nicht mehr erreichbar.
+Unter 1080px entfällt das Blockmenü, **solange es ein Sprungmenü ist** — für die Karten
+bliebe daneben zu wenig übrig, und seine Ziele stehen ohnehin als Karten gleich darunter.
+Trägt es dagegen den Dateiindex von `/docs`, bleibt es stehen: dort führt sonst kein Weg
+mehr zu den übrigen Dateien. Es steht dann als eigener Kasten über dem Text, nicht
+mitlaufend, und begrenzt sich auf einen Anteil der Fensterhöhe — die eine Stelle, an der
+eine Höhe geschätzt wird, weil es ohne sticky Spalte kein Gitter gibt, aus dem sich
+rechnen ließe.
+
+Welcher der beiden Fälle vorliegt, sagt der Modifier `file-index` am `#block-nav`.
+`sidebar.html` setzt ihn serverseitig aus `.Area`, zusammen mit der Beschriftung des
+Menüs — nicht `docs.js` beim Füllen: schmal bliebe der Index sonst so lange ausgeblendet,
+bis `/api/docs` antwortet.
+
+Der Umschalter bleibt in beiden Fällen und legt sich waagerecht über die Karten: ohne ihn
+wären die anderen Bereiche von dort aus nicht mehr erreichbar.
 
 ## Befehle zum Kopieren
 
@@ -1147,7 +1169,8 @@ ein Weg, beliebige Dateien des Rechners zu lesen.
 Verweise innerhalb der Doku fängt die Oberfläche ab, weil ein Klick sonst die Seite
 verlassen und damit den Server hinter ihr beenden würde: `.md`-Ziele öffnet sie im
 selben Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen
-neuen Tab. Führt ein Verweis in eine andere Datei, zieht das Menü mit.
+neuen Tab. Führt ein Verweis in eine andere Datei, zieht das Menü mit; steht die Datei
+nicht im Index, bleibt gar kein Eintrag markiert statt der vorige.
 
 Der Text steht in einer Karte und ist kein eigener Scroll-Container. Ohne Anker scrollt
 deshalb das **Fenster** nach oben, nicht das Element — sonst bliebe die Ansicht dort
