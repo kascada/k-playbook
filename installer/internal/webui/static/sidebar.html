@@ -2,12 +2,17 @@
         <div class="sidebar">
           <!-- Der Umschalter ist server-gerendert: welche Bereiche es gibt,
                hängt an der Installation, und welcher aktiv ist, weiß nur die
-               Seite selbst. -->
+               Seite selbst.
+
+               aria-current unterscheidet zwei Fälle: "page" führt nur der
+               Verweis auf die offene Seite, "true" der aktive Bereich, dessen
+               Ziel eine andere Seite ist. Auf /mcp ist Setup aktiv, / ist aber
+               nicht offen — dort wäre "page" eine falsche Auskunft. -->
           <nav class="area-nav" aria-label="Bereiche">
-            <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="page"{{end}}>Setup</a>
+            <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="{{if eq .Page "/"}}page{{else}}true{{end}}"{{end}}>Setup</a>
             {{if .Installed}}
-            <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="page"{{end}}>Workflows</a>
-            <a class="area-nav-item{{if eq .Area "docs"}} active{{end}}" href="/docs"{{if eq .Area "docs"}} aria-current="page"{{end}}>Docs</a>
+            <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="{{if eq .Page "/workflows"}}page{{else}}true{{end}}"{{end}}>Workflows</a>
+            <a class="area-nav-item{{if eq .Area "docs"}} active{{end}}" href="/docs"{{if eq .Area "docs"}} aria-current="{{if eq .Page "/docs"}}page{{else}}true{{end}}"{{end}}>Docs</a>
             {{end}}
           </nav>
 
@@ -15,9 +20,12 @@
                damit ein neuer Block nicht an zwei Stellen gepflegt werden
                muss. -->
           <!-- Auf /docs trägt dasselbe Element den Dateiindex statt eines
-               Sprungmenüs. Der Modifier kommt serverseitig aus .Area und nicht
-               beim Füllen aus docs.js: schmal bliebe der Index sonst so lange
-               ausgeblendet, bis /api/docs antwortet. -->
-          <nav id="block-nav" class="block-nav{{if eq .Area "docs"}} file-index{{end}}" aria-label="Inhalt dieser Seite"></nav>
+               Sprungmenüs. Modifier und Beschriftung kommen aus derselben
+               .Area-Weiche, serverseitig und nicht beim Füllen aus docs.js:
+               schmal bliebe der Index sonst so lange ausgeblendet, bis
+               /api/docs antwortet. -->
+          <nav id="block-nav"
+               class="block-nav{{if eq .Area "docs"}} file-index{{end}}"
+               aria-label="{{if eq .Area "docs"}}Dateien der Doku{{else}}Inhalt dieser Seite{{end}}"></nav>
         </div>
 {{end}}

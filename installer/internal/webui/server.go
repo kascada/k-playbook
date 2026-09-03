@@ -203,7 +203,7 @@ var indexTemplate = pageTemplate("index.html")
 var workflowsTemplate = pageTemplate("workflows.html")
 
 func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, workflowsTemplate, areaWorkflows)
+	renderPage(w, workflowsTemplate, areaWorkflows, "/workflows")
 }
 
 // docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die
@@ -211,7 +211,7 @@ func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
 var docsTemplate = pageTemplate("docs.html")
 
 func docsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, docsTemplate, areaDocs)
+	renderPage(w, docsTemplate, areaDocs, "/docs")
 }
 
 // mcpTemplate ist die Seite des MCP-Servers. Sie ist eine Detailseite des
@@ -219,7 +219,7 @@ func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 var mcpTemplate = pageTemplate("mcp.html")
 
 func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, mcpTemplate, areaSetup)
+	renderPage(w, mcpTemplate, areaSetup, "/mcp")
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -227,12 +227,15 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	renderPage(w, indexTemplate, areaSetup)
+	renderPage(w, indexTemplate, areaSetup, "/")
 }
 
 // renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus. area sagt,
-// welcher Eintrag des Umschalters markiert wird.
-func renderPage(w http.ResponseWriter, tmpl *template.Template, area string) {
+// welcher Eintrag des Umschalters markiert wird, page nennt die offene Seite.
+// Beides fällt auseinander, sobald ein Bereich mehr als eine Seite hat: /mcp
+// trägt den Bereich Setup, ist aber nicht dessen Startseite — und nur die
+// offene Seite darf aria-current="page" führen.
+func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, page string) {
 	environment := project.Detect()
 	data := struct {
 		Mode        string
@@ -242,7 +245,8 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string) {
 		PlaybookDir string
 		Installed   bool
 		Area        string
-	}{Installed: environment.Installed, Area: area}
+		Page        string
+	}{Installed: environment.Installed, Area: area, Page: page}
 
 	if environment.Installed {
 		data.Mode = "project"
