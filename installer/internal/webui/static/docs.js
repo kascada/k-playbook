@@ -137,6 +137,11 @@ function setActiveDocPath(path) {
       return;
     }
   }
+
+  // Kein Eintrag passt: ein Verweis kann in eine Datei außerhalb des Index
+  // führen. Bliebe die alte Markierung stehen, zeigte das Menü auf eine Datei,
+  // die gar nicht mehr offen ist.
+  clearBlockNavMarking();
 }
 
 // Verweise in der Doku zeigen überwiegend auf andere Dateien der Doku. Ohne

@@ -28,7 +28,6 @@ function buildBlockNav() {
     const dot = document.createElement("span");
     dot.className = "block-nav-dot";
     const label = document.createElement("span");
-    label.textContent = heading.textContent;
 
     const item = document.createElement("button");
     item.type = "button";
@@ -37,25 +36,34 @@ function buildBlockNav() {
     item.addEventListener("click", () => goToBlock(card, item));
     blockNav.append(item);
 
-    // Ob ein Block sichtbar ist und wie es um ihn steht, entscheiden die
-    // Render-Funktionen an der Karte. Beobachten ist billiger, als in jeder
-    // einzelnen zusätzlich das Menü nachzuziehen.
+    // Ob ein Block sichtbar ist, wie es um ihn steht und wie er heißt,
+    // entscheiden die Render-Funktionen an der Karte. Beobachten ist billiger,
+    // als in jeder einzelnen zusätzlich das Menü nachzuziehen.
     const pill = card.querySelector(".section-head .pill");
-    syncNavItem(card, item, dot, pill);
-    const sync = () => syncNavItem(card, item, dot, pill);
+    const sync = () => syncNavItem(card, item, dot, pill, label, heading);
+    sync();
     new MutationObserver(sync).observe(card, { attributes: true, attributeFilter: ["class"] });
     if (pill) {
       new MutationObserver(sync).observe(pill, { attributes: true, attributeFilter: ["class"] });
     }
+    // Die Überschrift kann sich zur Laufzeit ändern: /workflows schreibt den
+    // Titel des geöffneten Tasks in die Karte. Ohne diesen Beobachter bliebe
+    // der Eintrag auf der Beschriftung des Seitenaufbaus stehen. childList
+    // fängt den ausgetauschten Textknoten, characterData den umgeschriebenen.
+    new MutationObserver(sync).observe(heading, { childList: true, characterData: true, subtree: true });
   });
 }
 
 // Ein verborgener Block hat auch keinen Eintrag; der Punkt übernimmt die
 // Statusfarbe seiner Pill, alles außerhalb von ok/warn/error bleibt neutral.
-function syncNavItem(card, item, dot, pill) {
+// Die Beschriftung ist die Überschrift der Karte, und zwar die aktuelle: der
+// Eintrag soll nennen, was in der Karte steht, nicht was beim Aufbau darin
+// stand.
+function syncNavItem(card, item, dot, pill, label, heading) {
   item.classList.toggle("hidden", card.classList.contains("hidden"));
   const state = pill && ["ok", "warn", "error"].find((name) => pill.classList.contains(name));
   dot.className = state ? `block-nav-dot ${state}` : "block-nav-dot";
+  label.textContent = heading.textContent;
 }
 
 // Markiert wird der angeklickte Eintrag — er zeigt, wohin gesprungen wurde,
@@ -75,6 +83,15 @@ function goToBlock(card, item) {
 // weil nicht jedes Menü aus Karten entsteht: /docs füllt dieselbe Liste aus
 // seinen Dateien und braucht dieselbe Markierung.
 function markBlockNavItem(item) {
+  clearBlockNavMarking();
+  item.classList.add("active");
+  item.setAttribute("aria-current", "true");
+}
+
+// Räumt die Markierung ab, ohne eine neue zu setzen. /docs braucht das: ein
+// Verweis kann in eine Datei außerhalb des Index führen, und dann gehört gar
+// kein Eintrag markiert — die alte Markierung wäre eine falsche Auskunft.
+function clearBlockNavMarking() {
   const blockNav = blockNavElement();
   if (!blockNav) {
     return;
@@ -84,8 +101,6 @@ function markBlockNavItem(item) {
     other.classList.remove("active");
     other.removeAttribute("aria-current");
   });
-  item.classList.add("active");
-  item.setAttribute("aria-current", "true");
 }
 
 function blockNavElement() {
