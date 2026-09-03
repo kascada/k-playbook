@@ -15,10 +15,9 @@
 // zieht das nur mit, wenn es die Karten schon beobachtet.
 buildBlockNav();
 
-// Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
-// nach dem Wechsel hierher — der Weg zurück führte dann ins Leere. Der Aufruf
-// steht genau einmal: drei wären drei Intervalle und drei Klick-Listener, von
-// denen nur der zuletzt gesetzte Handler zählt.
+// Das Lebenszeichen dieses Fensters: es hält den Dienst aus dem Leerlauf und
+// merkt, wenn er weg ist. Der Aufruf steht genau einmal: drei wären drei
+// Intervalle, von denen jedes für sich zählte.
 startSession(showServerLost);
 
 // Der Server ist für alle drei Listen derselbe. Fällt er aus, ist jede von

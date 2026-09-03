@@ -26,5 +26,13 @@
           <nav id="block-nav"
                class="block-nav{{if eq .Area "docs"}} file-index{{end}}"
                aria-label="{{if eq .Area "docs"}}Dateien der Doku{{else}}Inhalt dieser Seite{{end}}"></nav>
+
+          <!-- Der Server hält keinen Zustand und liest die Platte bei jeder
+               Anfrage neu; ein frischer Stand ist deshalb genau ein Neuladen
+               der Seite. Der Knopf steht auf jeder Seite, weil der Weg dahin
+               sonst über das Terminal führte. Er behält seine Höhe wie jeder
+               Kasten der Spalte — nachgeben tut allein das Blockmenü. -->
+          <button type="button" id="reload-page" class="secondary reload-page"
+                  title="Lädt die Seite neu und holt damit den vollständigen Stand von der Platte.">Neu einlesen</button>
         </div>
 {{end}}

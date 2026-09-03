@@ -49,8 +49,8 @@ const STATE_WARNINGS = ["unreadable", "no-wrapper", "ambiguous-target"];
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
 buildBlockNav();
-// Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
-// nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.
+// Das Lebenszeichen dieses Fensters: es hält den Dienst aus dem Leerlauf und
+// merkt, wenn er weg ist.
 startSession((message) => {
   elements.registrationMessage.textContent = message;
 });

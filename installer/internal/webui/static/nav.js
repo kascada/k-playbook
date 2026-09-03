@@ -106,3 +106,11 @@ function clearBlockNavMarking() {
 function blockNavElement() {
   return document.getElementById("block-nav");
 }
+
+// „Neu einlesen" in der linken Spalte: ein Neuladen der Seite ist der
+// vollständige frische Stand, weil der Server keinen eigenen hält. Steht hier,
+// weil die Spalte keiner Seite gehört.
+const reloadPage = document.getElementById("reload-page");
+if (reloadPage) {
+  reloadPage.addEventListener("click", () => window.location.reload());
+}

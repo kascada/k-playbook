@@ -93,6 +93,12 @@ select {
   overflow: auto;
 }
 
+/* Der Knopf unter dem Menü füllt die Spaltenbreite wie die Kästen darüber.
+   Schmal, ohne Spalte, steht er wieder in seiner eigenen Breite. */
+.sidebar > .reload-page {
+  width: 100%;
+}
+
 .area-nav-item,
 .block-nav-item {
   display: flex;
@@ -175,6 +181,11 @@ select {
   .area-nav {
     grid-auto-flow: column;
     justify-content: start;
+  }
+
+  .sidebar > .reload-page {
+    width: auto;
+    align-self: flex-start;
   }
 
   /* Nur das Sprungmenü entfällt: seine Ziele stehen als Karten gleich daneben,
@@ -987,6 +998,10 @@ button.attention-highlight {
   padding: 22px;
   background: rgba(244, 241, 232, 0.85);
   backdrop-filter: blur(12px);
+}
+
+.closed-actions {
+  margin-top: 14px;
 }
 
 @media (max-width: 820px) {

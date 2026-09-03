@@ -32,7 +32,8 @@
           </p>
           <div class="hero-actions">
             <button id="update" class="secondary">Update prüfen</button>
-            <button id="shutdown" class="secondary danger">Schließen</button>
+            <button id="shutdown" class="secondary danger"
+                    title="Beendet den Hintergrunddienst dieses Projekts, für alle Fenster.">Dienst beenden</button>
           </div>
         </div>
       </section>
@@ -227,11 +228,19 @@
         </div>
       </div>
 
+      <!-- Sperrfläche, wenn der Dienst weg ist: beendet aus diesem oder einem
+           anderen Fenster, per k-playbook stop, nach einem Update oder im
+           Leerlauf. Kein Sackgassen-Text: erst „Erneut verbinden", und erst
+           wenn das scheitert, der Weg über das Terminal. -->
       <div id="closed" class="closed hidden">
         <div class="card">
-          <p class="eyebrow">k-playbook beendet</p>
-          <h2 id="closed-title">Dieses Browserfenster kann jetzt geschlossen werden.</h2>
+          <p class="eyebrow">k-playbook</p>
+          <h2 id="closed-title">Der Dienst ist beendet, für alle Fenster dieses Projekts.</h2>
           <p id="closed-message" class="message hidden"></p>
+          <div class="closed-actions">
+            <button id="closed-reconnect" class="secondary">Erneut verbinden</button>
+          </div>
+          <p id="closed-hint" class="message hidden">Der Dienst antwortet nicht. Im Terminal <code>bin/k-playbook</code> aufrufen: das startet ihn neu und öffnet die Oberfläche unter neuer Adresse.</p>
         </div>
       </div>
     </main>

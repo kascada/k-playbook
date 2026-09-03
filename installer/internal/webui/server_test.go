@@ -82,6 +82,9 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			if !strings.Contains(body, `id="block-nav"`) {
 				t.Error("das Blockmenü fehlt")
 			}
+			if !strings.Contains(body, `id="reload-page"`) {
+				t.Error("der Knopf „Neu einlesen“ fehlt")
+			}
 			if count := strings.Count(body, "area-nav-item active"); count != 1 {
 				t.Errorf("markierte Bereiche = %d, erwartet genau 1", count)
 			}

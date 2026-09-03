@@ -2,21 +2,24 @@
 
 // Die Sitzung zwischen Browser und Server, für jede Seite dieselbe.
 //
-// Der Server lebt nur, solange ein Fenster ihn braucht: bleibt das Lebenszeichen
-// aus, macht er zu. Deshalb muss **jede** Seite es senden — sonst beendet sich
-// der Server wenige Sekunden nach einem Seitenwechsel, und der Weg zurück führt
-// auf eine tote Seite.
+// Der Server ist ein Hintergrunddienst je Projekt: er hängt nicht an diesem
+// Fenster und beendet sich erst, wenn ihn eine Stunde lang niemand fragt. Das
+// Lebenszeichen hier hält ihn aus dem Leerlauf — solange jemand hinsieht,
+// läuft er — und merkt, wenn er weg ist: beendet aus einem anderen Fenster,
+// per `k-playbook stop`, nach einem Update oder im Leerlauf.
 
-const HEALTH_INTERVAL = 1800;
+// Der Server stirbt nicht mehr, wenn das Lebenszeichen ausbleibt; es muss nur
+// deutlich unter der Leerlaufgrenze liegen. Deshalb viel seltener als früher.
+const HEALTH_INTERVAL = 10000;
+
+// Ein einzelner Fehlschlag sperrt nicht: ein kurzer Aussetzer soll die Seite
+// nicht totstellen. Erst nach so vielen in Folge gilt der Server als weg.
+const HEALTH_FAILURES_BEFORE_LOCK = 3;
 
 // Hält fest, ob das Backend noch antwortet. Sobald es weg ist, wird die
 // Oberfläche gesperrt und nicht weiter gepollt.
 let serverAvailable = true;
-
-// Ein Wechsel innerhalb der Oberfläche ist kein Abschied. Ohne diese
-// Unterscheidung meldete jeder Klick auf eine andere Seite „Fenster weg", und
-// der Server stünde bis zum Aufbau der nächsten Seite unter Countdown.
-let leavingForOwnPage = false;
+let healthFailures = 0;
 
 // Was geschehen soll, wenn der Server nicht mehr antwortet. Die Startseite
 // legt dafür ein eigenes Fenster über die Seite; ohne eigene Behandlung bleibt
@@ -28,21 +31,32 @@ function startSession(handler) {
     serverLostHandler = handler;
   }
   window.setInterval(checkHealth, HEALTH_INTERVAL);
-  window.addEventListener("pagehide", notifyClientGone);
-  document.addEventListener("click", noteInternalNavigation);
 }
 
-// Erkennt ein weggefallenes Backend: schlägt der Aufruf fehl, ist der Server
-// beendet worden.
+// Erkennt ein weggefallenes Backend — aber erst, wenn es mehrmals in Folge
+// nicht geantwortet hat.
 async function checkHealth() {
   if (!serverAvailable) {
     return;
   }
 
-  try {
-    await fetch("/api/health", { cache: "no-store" });
-  } catch {
+  if (await serverResponds()) {
+    healthFailures = 0;
+    return;
+  }
+  healthFailures += 1;
+  if (healthFailures >= HEALTH_FAILURES_BEFORE_LOCK) {
     markServerGone("Verbindung zu k-playbook verloren.");
+  }
+}
+
+// Fragt den Server einmal. Wahr, wenn er antwortet.
+async function serverResponds() {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -51,31 +65,13 @@ function markServerGone(message) {
   serverLostHandler(message);
 }
 
-// Meldet dem Backend, dass dieses Fenster verschwindet. sendBeacon überlebt
-// das Entladen der Seite, fetch nicht zuverlässig.
-function notifyClientGone() {
-  if (!serverAvailable || leavingForOwnPage) {
-    return;
+// Versucht, einen gesperrten Stand wieder anzubinden: antwortet der Server,
+// wird die Seite neu geladen — derselbe Weg wie „Neu einlesen". Falsch, wenn
+// er nicht antwortet; der Aufrufer zeigt dann den Weg über das Terminal.
+async function reconnect() {
+  if (await serverResponds()) {
+    window.location.reload();
+    return true;
   }
-
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/client-gone");
-    return;
-  }
-
-  fetch("/api/client-gone", { method: "POST", keepalive: true }).catch(() => {});
-}
-
-// Ein Klick auf einen Verweis dieser Oberfläche führt zur nächsten Seite und
-// nicht aus ihr heraus. Der Zurück-Knopf löst keinen Klick aus und meldet
-// deshalb weiterhin ab — die nächste Seite ist rechtzeitig da und hebt die
-// Abmeldung mit ihrem ersten Lebenszeichen wieder auf.
-function noteInternalNavigation(event) {
-  const link = event.target.closest && event.target.closest("a[href]");
-  if (!link || link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey) {
-    return;
-  }
-  if (new URL(link.href, window.location.href).origin === window.location.origin) {
-    leavingForOwnPage = true;
-  }
+  return false;
 }

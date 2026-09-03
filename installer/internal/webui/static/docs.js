@@ -20,8 +20,8 @@ const elements = {
 // Die offene Datei; Verweise darin werden relativ zu ihr aufgelöst.
 let currentDocPath = "";
 
-// Ohne Lebenszeichen von dieser Seite beendet sich der Server wenige Sekunden
-// nach dem Wechsel hierher — der Weg zurück führte dann ins Leere.
+// Das Lebenszeichen dieses Fensters: es hält den Dienst aus dem Leerlauf und
+// merkt, wenn er weg ist.
 startSession((message) => {
   elements.docsMessage.textContent = message;
 });
@@ -144,9 +144,10 @@ function setActiveDocPath(path) {
   clearBlockNavMarking();
 }
 
-// Verweise in der Doku zeigen überwiegend auf andere Dateien der Doku. Ohne
-// eigene Behandlung würde ein Klick die Oberfläche verlassen — und mit ihr
-// den Server, der an ihr hängt.
+// Verweise in der Doku zeigen überwiegend auf andere Dateien der Doku.
+// Abgefangen werden sie, damit das Menü mitzieht und Anker innerhalb der
+// Datei springen — ein roher Klick führte auf einen Pfad, den der Server
+// nicht kennt, statt in die gerenderte Ansicht.
 function onDocViewerClick(event) {
   const link = event.target.closest("a[href]");
   if (!link) {

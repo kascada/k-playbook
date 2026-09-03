@@ -1,6 +1,6 @@
 "use strict";
 
-// Heartbeat, Abmeldung und serverAvailable stehen in session.js — sie gelten
+// Lebenszeichen, Sperre und Wiederverbinden stehen in session.js — sie gelten
 // für jede Seite gleich und werden vor dieser Datei geladen.
 
 const elements = {
@@ -9,6 +9,8 @@ const elements = {
   closed: document.getElementById("closed"),
   closedTitle: document.getElementById("closed-title"),
   closedMessage: document.getElementById("closed-message"),
+  closedReconnect: document.getElementById("closed-reconnect"),
+  closedHint: document.getElementById("closed-hint"),
   pathCard: document.getElementById("path-card"),
   pathPill: document.getElementById("path-pill"),
   pathMessage: document.getElementById("path-message"),
@@ -108,6 +110,7 @@ const REGISTRY_DEVIATIONS = [
 ];
 
 elements.shutdown.addEventListener("click", shutdown);
+elements.closedReconnect.addEventListener("click", onReconnectClick);
 elements.update.addEventListener("click", onUpdateClick);
 elements.configCreate.addEventListener("click", onConfigClick);
 elements.localCreate.addEventListener("click", createLocal);
@@ -171,9 +174,12 @@ async function onUpdateClick() {
     const data = await response.json();
     renderUpdate(data);
     if (data.restartRequired) {
+      // Der Dienst beendet sich nach dieser Antwort selbst: zum neuen Stand
+      // gehört ein anderes Binary, und ein alter Daemon soll nicht stehen
+      // bleiben.
       showClosed(
-        "Das Programm wurde aktualisiert. Dieses Fenster schließen und " +
-          "bin/k-playbook neu starten, um die neue Version zu verwenden."
+        "Das Programm wurde aktualisiert. Der Dienst hat sich beendet; ein " +
+          "neuer Aufruf von bin/k-playbook startet die neue Fassung."
       );
     }
   } catch {
@@ -1492,10 +1498,30 @@ async function shutdown() {
   showClosed();
 }
 
+// Sperrt die Seite, weil der Dienst weg ist — ob auf Knopfdruck hier, aus
+// einem anderen Fenster, per k-playbook stop oder weil er nach einem Update
+// zugemacht hat. Er war für alle Fenster derselbe, also gilt das für alle.
+// Der Weg zurück ist zuerst „Erneut verbinden"; der Hinweis auf das Terminal
+// kommt erst, wenn auch das scheitert.
 function showClosed(message = "") {
   serverAvailable = false;
-  elements.closedTitle.textContent = "Dieses Browserfenster kann jetzt geschlossen werden.";
+  elements.closedTitle.textContent = "Der Dienst ist beendet, für alle Fenster dieses Projekts.";
   elements.closedMessage.textContent = message;
   elements.closedMessage.classList.toggle("hidden", !message);
+  elements.closedHint.classList.add("hidden");
+  elements.closedReconnect.disabled = false;
+  elements.closedReconnect.textContent = "Erneut verbinden";
   elements.closed.classList.remove("hidden");
+}
+
+async function onReconnectClick() {
+  elements.closedReconnect.disabled = true;
+  elements.closedReconnect.textContent = "Verbinde...";
+  if (await reconnect()) {
+    // Die Seite lädt neu; hier gibt es nichts mehr zu tun.
+    return;
+  }
+  elements.closedHint.classList.remove("hidden");
+  elements.closedReconnect.disabled = false;
+  elements.closedReconnect.textContent = "Erneut verbinden";
 }
