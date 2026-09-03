@@ -22,20 +22,34 @@ Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`, wird aber als
 
 ```go
 if len(args) == 0 {
-    cleanUpLegacy()
-    return webui.Run()
+    if guiproc.ServeMode() {
+        return webui.Serve()
+    }
+    return runGUI()
 }
 ```
 
-Ohne Argument die Oberfläche, davor das Aufräumen der Altlasten. `config create` legt
-den Anker ohne Aufwärtssuche im ausdrücklich gewählten oder aktuellen Verzeichnis an.
-Mit `context` die JSON-Ausgabe, mit `mcp` der Server für einen Assistenten, mit `scan`
-die Ausführung eines Review-Laufs — und alle vier **ohne** `cleanUpLegacy()` und
-`mirrorHostInstall()`:
-deren Meldungen gehen nach stdout und würden die Ausgabe stören. Bei `mcp` wiegt das
-schwerer als bei `context`: dort trägt stdout einen JSON-RPC-Strom, der über die ganze
-Sitzung offen bleibt, und eine einzige fremde Zeile macht ihn unbrauchbar. Bei `scan`
-zählt ein anderer Grund: ein Scan liest nur und soll den Host nicht nebenbei anfassen.
+Ohne Argument die Oberfläche — genauer: der **Client-Pfad** `runGUI()` in
+`cmd/k-playbook/gui.go`. Er räumt Altlasten weg, spiegelt host-weit, sperrt die
+Installation und sieht dann in der Laufzeitdatei nach, ob für dieses Projekt schon ein
+Server läuft. Läuft einer, öffnet er nur den Browser; läuft keiner, startet er das eigene
+Binary mit `K_PLAYBOOK_SERVE=1` als abgekoppelten Server und endet, sobald der antwortet
+(siehe „Lebenszyklus"). Diese Umgebungsmarke ist der **verdeckte Servermodus**: kein
+Subkommando, weil ihn niemand von Hand aufruft — `webui.Serve()` ohne Wirt-Pflege und
+ohne Browser, die Ausgaben gehen ins Log.
+
+`stop` beendet den Server dieses Projekts: Laufzeitdatei lesen, Prozessidentität prüfen,
+`POST /api/shutdown`, sonst SIGTERM. Ohne Datei eine Auskunft und kein Fehler; eine
+verwaiste Datei wird dabei entfernt.
+
+`config create` legt den Anker ohne Aufwärtssuche im ausdrücklich gewählten oder
+aktuellen Verzeichnis an. Mit `context` die JSON-Ausgabe, mit `mcp` der Server für einen
+Assistenten, mit `scan` die Ausführung eines Review-Laufs — und diese wie `stop` **ohne**
+`cleanUpLegacy()` und `mirrorHostInstall()`: deren Meldungen gehen nach stdout und würden
+die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt stdout
+einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige fremde
+Zeile macht ihn unbrauchbar. Bei `scan` zählt ein anderer Grund: ein Scan liest nur und
+soll den Host nicht nebenbei anfassen. Bei `stop`: wer beendet, will nichts einrichten.
 
 `scan <lauf> [eintrag …]` führt die Werkzeug-Einträge eines Laufs aus und blockiert, bis
 sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
@@ -45,15 +59,28 @@ den es ausführt, steht in [`../../docs/review-runs.md`](../../docs/review-runs.
 
 Weitere Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
 `smoke` und `projects …` des alten Stands sind entfallen, samt der lokalen Projektliste
-unter `.k-playbook-local/projects.json`.
+unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem Hintergrunddienst
+nicht zurück: wer die URL braucht, ruft `k-playbook` ohne Argument auf — das findet den
+laufenden Server und öffnet ihn.
 
 ## Aufbau
 
 ```text
 installer/
 ├── cmd/k-playbook/
-│   ├── main.go                  räumt Altlasten weg, startet webui.Run()
-│   └── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
+│   ├── main.go                  Einstiege: Client-Pfad, verdeckter Servermodus, Subkommandos
+│   ├── gui.go                   Client-Pfad: Wirt-Pflege, Laufzeitdatei einordnen, abkoppeln
+│   ├── stop.go                  Subkommando stop
+│   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
+│   └── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
+├── internal/guiproc/
+│   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
+│   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
+│   ├── process.go               Prozessidentität: PID lebt und Startzeit passt
+│   ├── control.go               Shutdown anfordern, auf das Ende warten
+│   ├── spawn.go                 eigenes Binary als Server starten, auf Antwort warten
+│   └── *_unix.go *_linux.go *_darwin.go
+│                                Signal 0, SIGTERM, Setsid, Startzeit je Plattform
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/hostinstall/
@@ -79,7 +106,7 @@ installer/
 │   ├── todos.go                 TODO.md parsen: offene und abgehakte Einträge
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
-│   ├── server.go                Routen, Lebenszyklus
+│   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
 │   ├── browser.go               Browser öffnen, Container erkennen
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
@@ -973,6 +1000,12 @@ wird eine Kopie, keine Arbeit. **Ohne Markierung lehnt `DiscardDevSync()` ab** �
 sich nicht wissen, ob dort jemand absichtlich entwickelt hat, und es bleibt beim Befehl zum
 Kopieren.
 
+**Bekannte Grenze des Hintergrunddienstes.** Der Aufruf erkennt einen laufenden Server
+anderer Version an der `VERSION` der Installation, siehe „Lebenszyklus". Ein frisch
+gebautes Binary bei unveränderter `VERSION` — `make dist-host`, `make gui` — unterscheidet
+sich davon nicht: der laufende Server bleibt stehen und bedient weiter mit dem alten Code,
+samt eingebetteter Assets. Vor dem Start deshalb `k-playbook stop`.
+
 ## Altlasten des globalen Modells
 
 `RemoveGlobalLinks()` in `legacy/global.go` läuft bei jedem Programmstart, vor der
@@ -1085,6 +1118,16 @@ einmal. Darin teilen sich ihre Kästen den Platz selbst auf: jeder behält seine
 allein das Blockmenü gibt nach und scrollt dann selbst. Geschätzt wird daran nichts, und
 ein weiterer Kasten in der Spalte ändert die Rechnung nicht.
 
+Unter dem Blockmenü steht **Neu einlesen**: ein `window.location.reload()`, nicht mehr.
+Der Server hält keinen Zustand — jeder Handler ruft `project.Detect()` und liest die
+Dateien bei jeder Anfrage neu —, ein vollständiges Neu-Einlesen ist deshalb genau ein
+Neuladen der Seite, dieselbe Bewegung, die `app.js` nach dem Anlegen der Konfiguration
+schon macht. Der Knopf steht auf jeder Seite, weil der einzige Weg zu einem frischen
+Stand sonst über das Terminal führte; seit der Server im Hintergrund läuft, hieße das
+„Dienst beenden und neu aufrufen". Nicht erneuert wird dabei das Binary samt
+eingebetteter Assets — dafür gibt es den Update-Fall. Der Knopf behält wie jeder Kasten
+seine Höhe; die Rechnung der Spalte hängt nicht an der Elementzahl.
+
 Das Blockmenü ist **generiert** und steht in `static/nav.js`: `buildBlockNav()` läuft über
 `.blocks > .card`, nimmt Id und `<h2>` jeder Karte und hängt je einen Eintrag an
 `#block-nav`. Statuspunkt und Beschriftung spiegeln Pill und Überschrift der Karte, je ein
@@ -1168,11 +1211,13 @@ Der angefragte Pfad kommt aus dem Browser und wird in `docFilePath()` geprüft: 
 innerhalb des Doku-Verzeichnisses, Endung `.md`. Ohne diese Prüfung wäre der Endpunkt
 ein Weg, beliebige Dateien des Rechners zu lesen.
 
-Verweise innerhalb der Doku fängt die Oberfläche ab, weil ein Klick sonst die Seite
-verlassen und damit den Server hinter ihr beenden würde: `.md`-Ziele öffnet sie im
-selben Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen
-neuen Tab. Führt ein Verweis in eine andere Datei, zieht das Menü mit; steht die Datei
-nicht im Index, bleibt gar kein Eintrag markiert statt der vorige.
+Verweise innerhalb der Doku fängt die Oberfläche ab: `.md`-Ziele öffnet sie im selben
+Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen neuen Tab.
+Der Grund ist nicht mehr der Server — der läuft im Hintergrund und endet mit keiner
+Seite —, sondern die Ansicht selbst: ein roher Klick auf `handbuch.md` führte auf einen
+Pfad, den der Server nicht kennt, statt in die gerenderte Datei, und das Menü soll
+mitziehen. Führt ein Verweis in eine andere Datei, zieht es mit; steht die Datei nicht im
+Index, bleibt gar kein Eintrag markiert statt der vorige.
 
 Der Text steht in einer Karte und ist kein eigener Scroll-Container. Ohne Anker scrollt
 deshalb das **Fenster** nach oben, nicht das Element — sonst bliebe die Ansicht dort
@@ -1243,9 +1288,8 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| `GET` | `/api/health` | Heartbeat in beide Richtungen |
-| `POST` | `/api/client-gone` | Browser meldet Tab-/Fenster-Schließen |
-| `POST` | `/api/shutdown` | Server beenden |
+| `GET` | `/api/health` | Lebenszeichen des Fensters; antwortet mit Schlüssel, Version und PID des Servers |
+| `POST` | `/api/shutdown` | Dienst beenden, für alle Fenster |
 | `GET` | `/api/path` | host-weite Aufrufbarkeit prüfen, read-only; kein `POST` |
 | `GET` | `/api/config` | Anker suchen bzw. Ort vorschlagen |
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
@@ -1266,7 +1310,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt; liefert den lokalen Sauberkeitszustand mit |
-| `POST` | `/api/update` | `git pull --ff-only` ausführen; bricht bei lokal veränderter Installation vorher ab |
+| `POST` | `/api/update` | `git pull --ff-only` ausführen; bricht bei lokal veränderter Installation vorher ab; hat `VERSION` gewechselt, beendet sich der Dienst nach der Antwort |
 | `POST` | `/api/update/discard` | eingespielten Arbeitsstand verwerfen; nur bei vorhandener Markierung |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
@@ -1281,6 +1325,9 @@ Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflo
 `/docs` und `/mcp`; alle vier rendert `renderPage()` aus derselben Vorlage für den Kopf
 und die linke Spalte. Mitgeliefert werden der aktive Bereich und die Auskunft, ob eine
 Installation gefunden wurde.
+
+Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST
+/api/client-gone` gibt es nicht mehr; der Server endet nicht mehr mit dem Fenster.
 
 ## Der MCP-Server
 
@@ -1435,37 +1482,160 @@ Fehlerfall die Seite mitnimmt — also in dem Fall, für den er gebaut ist.
 
 ## Lebenszyklus
 
-Der Server bindet auf `127.0.0.1:0`, nimmt also einen freien Port, und gibt die URL im
-Terminal aus.
+Der Server ist ein **Hintergrunddienst je Projekt**. Der argumentlose Aufruf ist nur der
+Client: er endet, sobald der Browser offen ist, und das Terminal ist wieder frei. Der
+Server hängt an keinem Fenster und an keinem Terminal — er bleibt stehen, bis ihn
+`k-playbook stop` oder der Knopf `Dienst beenden` beendet, ein Update ein neues Binary
+verlangt oder ihn `idleTimeout` (60 Minuten) lang niemand mehr fragt. Er bindet auf
+`127.0.0.1:0`, nimmt also einen freien Port.
 
-Beenden funktioniert in beide Richtungen:
+**Ein Server je Projekt, das Arbeitsverzeichnis trägt die Fachlogik.** Alle Handler
+rufen pro Anfrage `project.Detect()`, und das leitet das Projekt aus `os.Getwd()` ab.
+Der abgekoppelte Prozess behält deshalb das Arbeitsverzeichnis seines Starts; das
+`chdir("/")` klassischer Daemonisierung wäre hier genau der Fehler, der alles bricht.
+Mehrere Projekte aus einem Prozess zu bedienen ist bewusst nicht vorgesehen.
 
-- Der Client ruft alle paar Sekunden `/api/health`. Bleibt er länger als 5 Sekunden aus,
-  ist das Browserfenster weg und der Server beendet sich.
-- Beim Schließen meldet der Browser `/api/client-gone` per `sendBeacon`. Danach wartet
-  der Server 3 Sekunden, damit ein Reload ihn nicht abräumt.
-- Solange sich **nie** ein Client gemeldet hat, bleibt der Server stehen: der Browser kann
-  noch unterwegs sein, oder die URL wird von Hand eingetragen.
-- `Ctrl+C` und der `Schließen`-Button gehen ebenfalls.
+### Die Laufzeitdatei
 
-Weil die Oberfläche mehrere Seiten hat, gilt das für **jede** von ihnen: `session.js`
-trägt Heartbeat und Abmeldung und wird von `index.html`, `workflows.html`, `docs.html`
-und `mcp.html` vor `nav.js` und der jeweiligen Seitenlogik geladen. Eine Seite ohne
-Lebenszeichen beendete den Server wenige Sekunden nach dem Wechsel zu ihr — der Weg
-zurück führte dann auf eine tote Seite. Ein Bereichswechsel ist genau so ein Wechsel.
+`internal/guiproc` hält je Projekt eine Datei unter `$XDG_RUNTIME_DIR/k-playbook/`
+(Rückfall `$XDG_STATE_HOME/k-playbook/`, sonst `~/.local/state/k-playbook/`, angelegt
+mit 0700), benannt nach den ersten 16 Hex-Zeichen des SHA-256 über den **Schlüssel**.
+Der Schlüssel ist das aufgelöste `ProjectDir` aus `project.Detect()` — nicht das
+Arbeitsverzeichnis, das bei einem Start aus einem Unterverzeichnis davon abweicht; ohne
+Installation gilt das Arbeitsverzeichnis. Client und Server berechnen ihn über dieselbe
+Funktion, `guiproc.Key()`. Die Datei trägt Schlüssel, Adresse, PID, Version und die
+Startzeit des Prozesses; daneben liegt `<hash>.log` mit stdout und stderr des Servers,
+bei jedem Start neu.
 
-Ein Klick auf einen Verweis dieser Oberfläche meldet gar nicht erst ab: `session.js`
-merkt sich, dass das Fenster zur nächsten eigenen Seite geht. Der Zurück-Knopf löst
-keinen Klick aus und meldet deshalb weiterhin ab — die nächste Seite ist innerhalb der
-3 Sekunden da und hebt die Abmeldung mit ihrem ersten Lebenszeichen wieder auf.
+Geschrieben wird sie nach dem Binden mit `O_CREAT|O_EXCL`, damit zwei gleichzeitige
+Aufrufe nicht beide einen Server hochziehen: der Verlierer endet mit einer Meldung im
+Log, sein Elternprozess liest die Datei des Gewinners und öffnet dessen Server. Legt
+`POST /api/config` die Konfiguration an und ändert sich dadurch das aufgelöste
+`ProjectDir`, schlüsselt der Server um — neue Datei, alte weg. Beim Beenden verschwindet
+die Datei über `defer`; SIGINT und SIGTERM werden gleich behandelt, damit sie auch nach
+einem `kill` weg ist.
+
+Warum das Laufzeitverzeichnis und nicht das Projekt: die Installation ist read-only,
+`k-playbook-local/` gehört dem Projekt. `$XDG_RUNTIME_DIR` trennt Host und DevContainer,
+weil es je Sitzung vergeben wird. Der Rückfall ins Home — auf macOS immer — nimmt ein
+geteiltes Home als bekannte Grenze in Kauf: ist dort der Projektpfad identisch gemountet,
+sieht die andere Seite eine PID aus fremdem Namensraum und ein Loopback, das nicht
+antwortet, ersetzt die Datei durch ihre eigene, und beide Seiten laufen mit eigenem
+Server. Kein Schaden, aber die Datei flattert zwischen ihnen.
+
+### Gefunden wird der Server, nicht der Port
+
+Ein Port aus einer alten Datei kann einem fremden Prozess gehören, eine PID nach
+unsauberem Ende neu vergeben sein. `guiproc.Inspect()` prüft deshalb in zwei Stufen und
+liefert eines von fünf Ergebnissen:
+
+1. **Prozessidentität**: die PID lebt (`Signal 0`, `EPERM` zählt als lebend) **und** ihre
+   Startzeit passt zu der in der Datei — Linux aus `/proc/<pid>/stat` (Feld 22, hinter
+   der letzten `)`, gegen `btime`), macOS über `ps -o lstart=`, Toleranz 3 Sekunden. Der
+   Server schreibt seine Startzeit über dieselbe Funktion. Ist die PID tot oder passt die
+   Startzeit nicht, ist die Datei **verwaist** — nur dann wird sie verworfen. Eine Prüfung
+   des Prozessnamens gibt es nicht; `/proc/<pid>/comm` ist auf 15 Zeichen begrenzt.
+2. **`/api/health`** muss mit demselben Schlüssel und derselben PID antworten. Bleibt die
+   Antwort aus oder kommt sie von einem Fremden, **lebt der Server ohne Antwort**: die
+   Datei bleibt liegen, der Client startet nichts und verweist auf `k-playbook stop`. Die
+   Datei eines lebenden eigenen Prozesses zu löschen hieße, beim nächsten Aufruf einen
+   zweiten Server für dasselbe Projekt hochzuziehen.
+3. Antwortet der eigene Server, entscheidet die Version: gleich → **läuft unter dieser
+   URL**, anders → **läuft mit anderer Version**. Ohne Datei: **nicht vorhanden**.
+
+Die Version ist die `VERSION` der Installation, die das Binary gewählt hat —
+`project.InstalledVersion(project.InstallDir())`, der Wrapper exportiert dafür
+`K_PLAYBOOK_INSTALL_DIR` —, nicht die Projektinstallation aus `Detect()`: ein bloßes
+`k-playbook` aus dem PATH läuft über die host-weite Spiegelung. Jeder Prozess hält sie
+beim Start fest und liest sie nicht je Anfrage, sonst wäre ein Wechsel auf der Platte nie
+zu erkennen. Der Schlüssel in `/api/health` wird dagegen je Anfrage berechnet: nach dem
+Umschlüsseln muss schon die nächste Antwort den neuen tragen.
+
+### Der Aufruf
+
+`runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `cleanUpLegacy()`,
+`mirrorHostInstall()`, `protectProjectInstallation()` — und zwar bei **jedem** Aufruf,
+auch bei dem, der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start.
+Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
+
+| Ergebnis | Handlung |
+|---|---|
+| läuft unter dieser URL | URL ausgeben, Browser öffnen, Ende 0 |
+| läuft mit anderer Version | `POST /api/shutdown`, warten, bis die Datei weg oder die PID tot ist (10 s, über den 5 s `shutdownTimeout`), dann starten; läuft die Zeit ab, wie „lebt ohne Antwort" |
+| verwaist | Datei löschen, starten |
+| lebt ohne Antwort | nichts starten; Meldung mit Dateipfad und Hinweis auf `k-playbook stop`, Ende ≠ 0 |
+| nicht vorhanden | starten |
+
+**Starten heißt abkoppeln.** `guiproc.Spawn()` startet das eigene Binary
+(`os.Executable()`) mit der Umgebung plus `K_PLAYBOOK_SERVE=1`,
+`SysProcAttr{Setsid: true}`, unverändertem Arbeitsverzeichnis, stdin aus `/dev/null`,
+stdout und stderr in die Logdatei. Der Elternprozess wartet bis zu 10 Sekunden, bis die
+Laufzeitdatei die PID des Kindes trägt und `/api/health` mit dem eigenen Schlüssel
+antwortet, gibt dann die URL aus, öffnet den Browser und endet. Endet das Kind vorher,
+hat vielleicht ein gleichzeitiger Aufruf gewonnen: dann gilt dessen Server. Antwortet es
+nicht rechtzeitig, bekommt es SIGTERM, und die Meldung trägt das Log. Das
+Plattformspezifische — `Setsid`, `Signal 0`, SIGTERM, Startzeit — steht in eigenen Dateien
+mit Build-Tags (`_unix.go`, `_linux.go`, `_darwin.go`); eine Windows-Fassung käme nur
+dazu.
+
+Die Umgebungsmarke `K_PLAYBOOK_SERVE=1` ist der verdeckte Servermodus: `webui.Serve()`
+ohne Wirt-Pflege und ohne Browser, Ausgaben nur ins Log. Der Server löscht die Marke aus
+seiner Umgebung, damit kein Kindprozess sie erbt und selbst zum Server wird.
+
+### Im Server
+
+Der Heartbeat ist geblieben, hat aber seine Rolle gewechselt: er ist das **Lebenszeichen
+des Fensters**, nicht mehr die Lebensader des Servers. Ein offenes Fenster ruft alle 10
+Sekunden `/api/health` und hält den Server damit aus dem Leerlauf — solange jemand
+hinsieht, läuft er. Jede Anfrage, nicht nur diese, setzt `lastRequestAt`; `watchIdle`
+prüft alle 30 Sekunden und beendet nach `idleTimeout` ohne Anfrage. Der Leerlauf zählt ab
+dem Start, damit auch ein nie besuchter Server nicht ewig steht. Entfallen sind
+`clientHeartbeatTimeout`, `clientGoneShutdownDelay`, `POST /api/client-gone` und im
+Browser `notifyClientGone` samt `leavingForOwnPage` — sie existierten nur, um den Server
+über einen Seitenwechsel zu retten, und ohne Suizid gibt es nichts mehr zu retten. Ein
+Mechanismus statt zweier.
+
+Im Browser sperrt ein ausgebliebenes Lebenszeichen erst nach drei Fehlschlägen in Folge,
+damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Startseite ist keine
+Sackgasse: sie bietet „Erneut verbinden" — antwortet der Server, lädt die Seite neu —,
+und erst wenn das scheitert, den Weg über `bin/k-playbook` im Terminal. Der Knopf
+`Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
+
+`POST /api/update` beendet den Server nach der Antwort, wenn die `VERSION` gewechselt hat
+(`BinaryChanged`): zum neuen Stand gehört ein anderes Binary, und ein alter Daemon soll
+nicht stehen bleiben. Das deckt den Weg über die Oberfläche; nach einem `git pull` von
+Hand greift der Versionsvergleich des Clients beim nächsten Aufruf. Nicht erkannt wird
+ein frisch gebautes Binary bei unveränderter `VERSION`, siehe „Entwicklungsstand". Ein
+portstabiler Neustart, bei dem der Dienst den Listener an das neue Binary vererbt, wäre
+möglich und ist bewusst nicht gebaut — er lohnt erst, wenn Updates im Alltag stören.
+
+`k-playbook stop` nutzt dieselbe Einordnung: läuft der eigene Server, `POST
+/api/shutdown` und warten; antwortet er nicht, SIGTERM an die PID — die Identitätsprüfung
+hat zuvor gesichert, dass es der eigene Prozess ist. Eine verwaiste Datei wird gelöscht,
+eine fehlende ist eine Auskunft und kein Fehler.
+
+### Herkunftsprüfung
+
+Alle `POST`-Routen stehen hinter `sameOrigin`: trägt die Anfrage einen `Origin`-Header,
+muss dessen Host-Anteil (Schema abgeschnitten, Rest bis zum nächsten `/`) dem
+`Host`-Header gleichen, sonst 403. Fehlt `Origin` — `curl`, `stop` —, gilt die Anfrage
+als eigene Herkunft. Keine Fixierung auf `127.0.0.1:<port>` und keine Loopback-Liste:
+hinter einer Portweiterleitung (VS Code weicht bei belegtem Port aus, Codespaces liefert
+eine Fremddomain) kommt der Host-Header vom Browser unverändert und wäre sonst gerade dort
+abgewiesen. Das Schema bleibt außen vor, weil Codespaces TLS terminiert. Der Zufallsport
+macht DNS-Rebinding ohnehin unpraktikabel. Der Grund für die Prüfung ist die Lebensdauer:
+der Prozess lebt jetzt Stunden statt Minuten, und eine beliebige Seite im Browser könnte
+sonst Endpunkte treffen, hinter denen `git pull` und Schreibvorgänge stehen.
 
 Der Browser wird nicht automatisch geschlossen, wenn der Server endet. Browser blockieren
 das in vielen Fällen, und `open`/`xdg-open` liefern keinen verlässlichen Tab-Handle.
 
 ### Browser öffnen
 
-`announce()` in `webui/server.go` gibt die URL aus und öffnet den Browser. Die Kandidaten
-liefert `browserOpeners()` in `webui/browser.go`, in dieser Reihenfolge:
+`Announce()` in `webui/server.go` gibt die URL aus und öffnet den Browser. Aufgerufen wird
+es vom Client-Pfad in `cmd/k-playbook/gui.go`, nicht vom Server — der hat kein Terminal
+mehr, in dem ein Browser sinnvoll wäre. Die Kandidaten liefert `browserOpeners()` in
+`webui/browser.go`, in dieser Reihenfolge:
 
 1. **`$BROWSER`**, zerlegt von `envOpeners()` nach der freedesktop-Konvention: `:`-getrennte
    Liste, `%s` als Platzhalter für die URL, sonst wird sie angehängt.
@@ -1505,6 +1675,20 @@ Hinweis auf die Port-Weiterleitung.
   Clones ungefragt verändert.
 - Kein Projekt-Store. Es gibt keine Liste bekannter Projekte mehr — das Werkzeug arbeitet
   auf dem Projekt, in dem es liegt.
+- Die Oberfläche läuft als Hintergrunddienst je Projekt, wiedergefunden über eine
+  Laufzeitdatei im Laufzeitverzeichnis des Nutzers. Ein zweiter Aufruf öffnet nur den
+  Browser; das Terminal ist nach jedem Aufruf frei.
+- Kein fester Port, kein Lesezeichen. Ein fester Port ließe sich bei einem Server je
+  Projekt nicht kollisionsfrei vergeben und wäre für fremde Seiten im Browser
+  vorhersagbar. Dass die URL bei jedem Serverstart wechselt, ist in Kauf genommen — der
+  Aufruf gibt sie aus und öffnet den Browser ohnehin.
+- Das Laufzeitverzeichnis statt Projekt oder Installation: die eine ist read-only, das
+  andere gehört dem Projekt. Ein geteiltes Home im Rückfall ist bekannte Grenze.
+  Verworfen wird eine Laufzeitdatei nur, wenn ihr Prozess nachweislich nicht mehr läuft —
+  PID tot oder Startzeit passt nicht.
+- Same-Origin-Vergleich statt Host-Liste für schreibende Endpunkte: der Host-Anteil von
+  `Origin` gegen den `Host`-Header, ohne Schema.
+- Kein `status`-Kommando; neu ist allein `stop`.
 - Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt.
 - Die Binaries sind Release-Assets, nicht versionierte Dateien. „Go wird nicht
   gebraucht" gilt weiter, „ohne Netz" nicht mehr: der erste Start lädt genau ein Binary.
@@ -1534,10 +1718,16 @@ curl -sS -X POST http://127.0.0.1:34531/api/shutdown
 ```
 
 `/api/config` ist der erste Check: er sagt, ob ein Anker gefunden wurde oder ob die
-Oberfläche im Vorschlagsmodus läuft.
+Oberfläche im Vorschlagsmodus läuft. Ohne `Origin`-Header kommt `curl` an der
+Herkunftsprüfung vorbei; ein Browser täte das nicht.
 
-Ein laufender Server nutzt weiter den Code im Speicher. Nach Backend- oder
-Asset-Änderungen neu starten.
+Läuft der Server schon, gibt `k-playbook` ohne Argument die URL erneut aus. Die
+Laufzeitdatei liegt unter `$XDG_RUNTIME_DIR/k-playbook/<hash>.json`, das Log des
+abgekoppelten Prozesses als `<hash>.log` daneben.
+
+Ein laufender Server nutzt weiter den Code im Speicher, und ein frisch gebautes Binary
+bei unveränderter `VERSION` wird nicht erkannt. Nach Backend- oder Asset-Änderungen
+deshalb `k-playbook stop`, dann neu aufrufen.
 
 ## Der alte Stand
 

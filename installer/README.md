@@ -13,15 +13,17 @@ k-playbook/bin/k-playbook           # öffnet die Oberfläche im Browser
 k-playbook/bin/k-playbook config create
                                      # legt K-PLAYBOOK.yaml im aktuellen Verzeichnis an
 k-playbook/bin/k-playbook context   # gibt den aufgelösten Arbeitsstand als JSON aus
+k-playbook/bin/k-playbook stop      # beendet den Hintergrunddienst dieses Projekts
 k-playbook/bin/k-playbook help
 ```
 
 Der Wrapper wählt anhand von `uname` das passende Binary aus `dist/` und startet es.
 
-Ohne Argument öffnet das Programm die lokale Oberfläche und blockiert, bis der Client
-sich abmeldet, verschwindet oder `Ctrl+C` gedrückt wird. Dabei räumt es zuvor die
-host-globale Verlinkung des alten Modells weg, falls noch welche liegt, und spiegelt sich
-nach `~/.local/share/k-playbook/installation` — danach genügt in jedem Projekt ein
+Ohne Argument öffnet das Programm die lokale Oberfläche. Der Server dahinter läuft als
+Hintergrunddienst je Projekt weiter, das Terminal ist sofort wieder frei; ein zweiter
+Aufruf findet ihn und öffnet nur den Browser, `stop` beendet ihn. Davor räumt der Aufruf
+die host-globale Verlinkung des alten Modells weg, falls noch welche liegt, und spiegelt
+sich nach `~/.local/share/k-playbook/installation` — danach genügt in jedem Projekt ein
 bloßes `k-playbook`.
 
 `context` ist der Einstieg für Commands und Skills: es löst Verzeichnisse,
@@ -69,6 +71,7 @@ installer/
 ├── internal/project/          Anker, Config, Struktur, Verlinkung, Kontext, Update, Tools
 ├── internal/hostinstall/      host-weite Kopie unter ~/.local aktuell halten
 ├── internal/legacy/           host-globale Altlasten des alten Modells entfernen
+├── internal/guiproc/          Laufzeitdatei des Hintergrunddienstes, Prozessidentität, Abkoppeln
 ├── internal/webui/            Server, Endpunkte, eingebettete Oberfläche
 ├── docs/architecture.md
 ├── go.mod

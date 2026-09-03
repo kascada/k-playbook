@@ -260,8 +260,12 @@ werden — beide erfassen sie beim Start.
 
 ## Browser beim Start
 
-Beim Start der Oberfläche steht die URL im Terminal, und der Browser wird geöffnet.
-Welches Programm das tut, entscheidet sich in dieser Reihenfolge:
+Beim Start der Oberfläche steht die URL im Terminal, und der Browser wird geöffnet. Der
+Server dahinter läuft als Hintergrunddienst je Projekt weiter: der Aufruf kehrt zurück,
+sobald der Browser offen ist, und ein zweiter Aufruf im selben Projekt öffnet nur ein
+weiteres Fenster auf denselben Server. Beendet wird er über `Dienst beenden` in der
+Oberfläche oder `k-playbook stop`; ohne jede Anfrage beendet er sich nach 60 Minuten von
+selbst. Welches Programm den Browser öffnet, entscheidet sich in dieser Reihenfolge:
 
 1. **`$BROWSER`**, sofern gesetzt. Die freedesktop-Konvention: eine mit `:` getrennte
    Liste von Kommandos, in denen `%s` für die URL steht. Fehlt der Platzhalter, wird die
@@ -368,12 +372,16 @@ für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine l
 veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
 stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
 
-Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary: die
-Oberfläche verlangt einen Neustart und lädt das neue Binary gleich in den Cache, damit
-der Neustart nicht darauf warten muss. Schlägt das Laden fehl — offline, hinter einem
-Proxy —, bleibt es bei einem Hinweis; das Update selbst gilt trotzdem als gelungen, und
-der nächste Start holt es nach. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
-`VERSION` nicht und ein Neustart des Assistenten genügt.
+Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary: der Dienst
+beendet sich nach der Antwort selbst, und ein neuer Aufruf von `bin/k-playbook` startet
+die neue Fassung. Das Binary liegt dann schon im Cache, weil das Update es gleich vorab
+lädt. Schlägt das Laden fehl — offline, hinter einem Proxy —, bleibt es bei einem Hinweis;
+das Update selbst gilt trotzdem als gelungen, und der nächste Start holt es nach. Nach
+einem `git pull` von Hand oder `make -C k-playbook installer-update` läuft der alte Dienst
+zunächst weiter; der nächste Aufruf von `bin/k-playbook` erkennt ihn an der Version und
+ersetzt ihn. Sind nur Commands, Regeln oder Rezepte neu, ändert sich `VERSION` nicht: der
+Dienst läuft weiter, `Neu einlesen` in der Oberfläche holt den Stand, und ein Neustart des
+Assistenten genügt.
 
 **Die Verlinkung zieht sich selbst nach.** Weil Commands und Skills einzeln verlinkt
 sind, kommt ein neu mitgelieferter Command nicht von allein an. Nachgezogen wird deshalb

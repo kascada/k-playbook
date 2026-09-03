@@ -40,7 +40,8 @@ raten; starte ihn ohne Argument im aktuellen Projekt:
 
 ## Hinweise
 
-- Die GUI läuft im Vordergrund, bis sie über den Browser-Button `Schließen`, Browser-Tab-Schließen, Heartbeat-Timeout oder `Ctrl+C` beendet wird.
+- Der Server läuft als Hintergrunddienst je Projekt; der Aufruf kehrt zurück, sobald der Browser offen ist. Ein zweiter Aufruf im selben Projekt startet nichts Neues, sondern öffnet nur den Browser.
+- Beendet wird über den Knopf `Dienst beenden` in der Oberfläche oder `<playbook.dir>/bin/k-playbook stop`; ohne jede Anfrage beendet sich der Server nach 60 Minuten von selbst. Das Schließen des Browserfensters beendet ihn nicht.
 - Die Oberfläche gibt die lokale URL aus, falls der Browser nicht automatisch startet.
 - Dieser Command verändert keine Projektdateien.
 - Der Start hält nebenbei die host-weite Kopie unter `~/.local/share/k-playbook/installation` aktuell. Nach dem ersten Mal genügt in jedem Projekt ein bloßes `k-playbook`.
