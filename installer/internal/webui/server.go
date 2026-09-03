@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -38,6 +39,13 @@ const (
 
 type serverState struct {
 	shutdown func()
+	// version ist die VERSION der Installation, die dieses Binary gewählt hat,
+	// beim Start festgehalten. Der Client vergleicht sie mit seiner eigenen
+	// und ersetzt einen Server anderer Version.
+	version string
+	// registration ist die Laufzeitdatei dieses Servers. Nil in Tests, die
+	// nur die Routen prüfen.
+	registration *guiproc.Registration
 
 	mu             sync.Mutex
 	lastClientSeen time.Time
@@ -54,10 +62,36 @@ func Run() error {
 		return fmt.Errorf("GUI-Port öffnen: %w", err)
 	}
 
+	// Die Laufzeitdatei entsteht nach dem Binden, damit sie eine Adresse
+	// trägt, unter der schon jemand antwortet. Sie geht mit dem Server: ein
+	// späterer Aufruf fände sonst eine Datei ohne Prozess.
+	key, err := guiproc.Key()
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	version := guiproc.OwnVersion()
+	registration, err := guiproc.Register(guiproc.Record{
+		Key:       key,
+		Addr:      listener.Addr().String(),
+		PID:       os.Getpid(),
+		Version:   version,
+		StartTime: guiproc.OwnStartTime().Unix(),
+	})
+	if err != nil {
+		listener.Close()
+		if errors.Is(err, fs.ErrExist) {
+			location, _ := guiproc.Locate(key)
+			return fmt.Errorf("für dieses Projekt liegt schon eine Laufzeitdatei: %s", location.File)
+		}
+		return fmt.Errorf("Laufzeitdatei anlegen: %w", err)
+	}
+	defer registration.Remove()
+
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	state := &serverState{shutdown: stop}
+	state := &serverState{shutdown: stop, version: version, registration: registration}
 	server := &http.Server{Handler: routes(state)}
 
 	serverErr := make(chan error, 1)
@@ -136,7 +170,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
 	mux.HandleFunc("GET /api/path", hostPathHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
-	mux.HandleFunc("POST /api/config", createConfigHandler)
+	mux.HandleFunc("POST /api/config", state.createConfigHandler)
 	mux.HandleFunc("POST /api/config/reset", resetConfigHandler)
 	mux.HandleFunc("GET /api/local", localHandler)
 	mux.HandleFunc("POST /api/local", createLocalHandler)
@@ -277,9 +311,38 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 // healthHandler dient dem Client als Lebenszeichen in beide Richtungen:
 // schlägt der Aufruf fehl, weiß der Client, dass der Server weg ist;
 // bleibt er aus, weiß der Server, dass der Client weg ist.
+//
+// Die Antwort nennt Schlüssel, Version und PID, damit ein CLI-Aufruf den
+// Server als seinen eigenen erkennt. Der Schlüssel wird je Anfrage neu
+// berechnet: nach einem Umschlüsseln durch POST /api/config muss schon die
+// nächste Antwort den neuen tragen. Die Version dagegen ist die vom Start.
 func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
 	state.noteClientSeen()
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	key, _ := guiproc.Key()
+	writeJSON(w, http.StatusOK, guiproc.Health{
+		Status:  "ok",
+		Key:     key,
+		Version: state.version,
+		PID:     os.Getpid(),
+	})
+}
+
+// rekey zieht die Laufzeitdatei auf den aktuellen Schlüssel nach. Nötig nach
+// POST /api/config: die Konfiguration entsteht in einem vom Nutzer gewählten
+// Verzeichnis, und das aufgelöste ProjectDir kann sich dadurch ändern. Bei
+// gleichem Schlüssel passiert nichts.
+func (state *serverState) rekey() {
+	if state.registration == nil {
+		return
+	}
+	key, err := guiproc.Key()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Schlüssel der Laufzeitdatei nicht bestimmbar: %v\n", err)
+		return
+	}
+	if err := state.registration.Rekey(key); err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Laufzeitdatei nicht umgeschlüsselt: %v\n", err)
+	}
 }
 
 func (state *serverState) clientGoneHandler(w http.ResponseWriter, r *http.Request) {

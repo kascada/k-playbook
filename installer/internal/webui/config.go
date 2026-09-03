@@ -50,7 +50,11 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 
 // createConfigHandler legt die K-PLAYBOOK.yaml an dem vom Nutzer bestätigten
 // Ort an.
-func createConfigHandler(w http.ResponseWriter, r *http.Request) {
+//
+// Danach schlüsselt der Server seine Laufzeitdatei um: mit der Konfiguration
+// kann sich das aufgelöste ProjectDir ändern, und die Datei muss unter dem
+// Schlüssel liegen, den der nächste Aufruf berechnet.
+func (state *serverState) createConfigHandler(w http.ResponseWriter, r *http.Request) {
 	var request createConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeJSON(w, http.StatusBadRequest, configResponse{Message: "Anfrage nicht lesbar: " + err.Error()})
@@ -61,6 +65,7 @@ func createConfigHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, configState("Nicht angelegt: "+err.Error()))
 		return
 	}
+	state.rekey()
 	if err := project.SetInstallationReadOnly(request.ProjectDir); err != nil {
 		writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt. Hinweis: Installation konnte nicht read-only gesetzt werden: "+err.Error()))
 		return

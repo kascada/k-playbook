@@ -1,12 +1,14 @@
 package webui
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -106,5 +108,43 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	}
 	if strings.Contains(body, `href="/workflows"`) || strings.Contains(body, `href="/docs"`) {
 		t.Error("der Umschalter führt nach Workflows oder Docs, obwohl nichts eingerichtet ist")
+	}
+}
+
+// /api/health nennt Schlüssel, Version und PID: daran erkennt ein CLI-Aufruf
+// den Server als seinen eigenen. Der Schlüssel ist das aufgelöste ProjectDir,
+// die Version die vom Start.
+func TestHealthNenntSchluesselVersionUndPID(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	chdir(t, root)
+
+	recorder := httptest.NewRecorder()
+	routes(&serverState{version: "v1.2.3"}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet %d", recorder.Code, http.StatusOK)
+	}
+
+	var health guiproc.Health
+	if err := json.Unmarshal(recorder.Body.Bytes(), &health); err != nil {
+		t.Fatalf("Antwort lesen: %v", err)
+	}
+	if health.Status != "ok" {
+		t.Errorf("status = %q", health.Status)
+	}
+	want, err := guiproc.Key()
+	if err != nil {
+		t.Fatalf("Schlüssel: %v", err)
+	}
+	if health.Key != want {
+		t.Errorf("key = %q, erwartet %q", health.Key, want)
+	}
+	if health.Version != "v1.2.3" {
+		t.Errorf("version = %q", health.Version)
+	}
+	if health.PID != os.Getpid() {
+		t.Errorf("pid = %d, erwartet %d", health.PID, os.Getpid())
 	}
 }
