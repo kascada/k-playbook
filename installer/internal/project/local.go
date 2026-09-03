@@ -191,8 +191,25 @@ func writeIfMissing(path string, content string) error {
 }
 
 func readmeTemplate(entry LocalEntry) string {
+	if entry.Path == "docs" {
+		return docsReadmeTemplate()
+	}
 	return fmt.Sprintf("# %s\n\n%s\n\nDieses Verzeichnis gehört dem Projekt und wird von einem Update nie angefasst.\n",
 		entry.Path, entry.Purpose)
+}
+
+func docsReadmeTemplate() string {
+	return `# Projektdokumentation
+
+Dieser Index ist der Einstieg für Projektwissen in AI-Sessions. Er enthält noch
+keine fachlichen Dokumente.
+
+Wenn Dokumentation entsteht, ergänzt /k-docs-index diese Datei um Übersicht,
+Stichwort-Index und direkte Fragen. Bis dahin gilt: Erst diesen Index lesen,
+dann nur bei Bedarf den Code untersuchen.
+
+Die AI-Session-Regel steht in ../../AGENTS.md.
+`
 }
 
 // fileTemplate liefert den Erstinhalt eines Datei-Eintrags.

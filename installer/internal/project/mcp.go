@@ -31,8 +31,11 @@ const MCPServerKey = "k-playbook"
 // Projekt gehört, wird nicht um Schlüssel ergänzt, die niemand angefordert hat —
 // auch nicht um diesen.
 const (
-	opencodeSchemaKey = "$schema"
-	opencodeSchemaURL = "https://opencode.ai/config.json"
+	opencodeSchemaKey       = "$schema"
+	opencodeSchemaURL       = "https://opencode.ai/config.json"
+	opencodeInstructionsKey = "instructions"
+	opencodeReferencesKey   = "references"
+	opencodeDocsKey         = "docs"
 )
 
 // MCPSchema unterscheidet die beiden Schreibweisen, in denen ein Assistent
@@ -353,14 +356,15 @@ func applyMCPTarget(projectRoot string, target MCPTarget) error {
 	if !ok {
 		return nil
 	}
-	if found, present := section[MCPServerKey]; present && reflect.DeepEqual(found, mcpEntry(target.Schema)) {
+	if found, present := section[MCPServerKey]; present && reflect.DeepEqual(found, mcpEntry(target.Schema)) &&
+		(target.Schema != MCPSchemaOpenCode || opencodeMemoryConfigured(doc.content)) {
 		return nil
 	}
 
 	var encoded []byte
 	if exists {
 		_, sectionPresent := doc.content[string(target.Schema)]
-		encoded, err = patchMCPFile(doc.raw, target, sectionPresent)
+		encoded, err = patchMCPFile(doc.raw, target, sectionPresent, doc.content)
 	} else {
 		encoded, err = newMCPFile(target)
 	}
@@ -384,6 +388,8 @@ func newMCPFile(target MCPTarget) ([]byte, error) {
 	content := map[string]any{}
 	if target.Schema == MCPSchemaOpenCode {
 		content[opencodeSchemaKey] = opencodeSchemaURL
+		content[opencodeInstructionsKey] = []any{RootInstructionsFile}
+		content[opencodeReferencesKey] = map[string]any{opencodeDocsKey: opencodeDocsReference()}
 	}
 	content[string(target.Schema)] = map[string]any{MCPServerKey: mcpEntry(target.Schema)}
 
@@ -407,7 +413,7 @@ type jsonPatchOp struct {
 // existieren; fehlt er, wird er in derselben Patch-Folge zuerst als leeres
 // Objekt angelegt. Beide Pfadbestandteile sind Konstanten ohne "/" und "~",
 // deshalb braucht der JSON-Pointer keine Maskierung.
-func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool) ([]byte, error) {
+func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool, content map[string]any) ([]byte, error) {
 	value, err := hujson.Parse(raw)
 	if err != nil {
 		return nil, err
@@ -431,6 +437,9 @@ func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool) ([]byte, er
 		Path:  "/" + string(target.Schema) + "/" + MCPServerKey,
 		Value: entry,
 	})
+	if target.Schema == MCPSchemaOpenCode {
+		ops = append(ops, opencodeMemoryPatchOps(content)...)
+	}
 
 	patch, err := json.Marshal(ops)
 	if err != nil {
@@ -446,6 +455,64 @@ func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool) ([]byte, er
 		packed = append(packed, '\n')
 	}
 	return packed, nil
+}
+
+func opencodeDocsReference() map[string]any {
+	return map[string]any{
+		"path":        "./" + LocalDirName + "/docs",
+		"description": "Autoritative Projektdokumentation. Zuerst " + LocalDirName + "/docs/README.md als Index lesen, bevor Code analysiert wird.",
+	}
+}
+
+func opencodeMemoryConfigured(content map[string]any) bool {
+	instructions, ok := content[opencodeInstructionsKey].([]any)
+	if !ok || !containsAnyString(instructions, RootInstructionsFile) {
+		return false
+	}
+	references, ok := content[opencodeReferencesKey].(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = references[opencodeDocsKey]
+	return ok
+}
+
+func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
+	ops := []jsonPatchOp{}
+	instructions, present := content[opencodeInstructionsKey]
+	switch values := instructions.(type) {
+	case nil:
+		ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeInstructionsKey, Value: json.RawMessage(`["AGENTS.md"]`)})
+	case []any:
+		if !containsAnyString(values, RootInstructionsFile) {
+			ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeInstructionsKey + "/-", Value: json.RawMessage(`"AGENTS.md"`)})
+		}
+	default:
+		_ = present
+	}
+
+	references, present := content[opencodeReferencesKey]
+	encoded, _ := json.Marshal(opencodeDocsReference())
+	switch values := references.(type) {
+	case nil:
+		ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey, Value: json.RawMessage(`{"docs":` + string(encoded) + `}`)})
+	case map[string]any:
+		if _, ok := values[opencodeDocsKey]; !ok {
+			ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey + "/" + opencodeDocsKey, Value: encoded})
+		}
+	default:
+		_ = present
+	}
+	return ops
+}
+
+func containsAnyString(values []any, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 // jsonDocument ist eine gelesene Konfigurationsdatei: der ausgewertete Inhalt

@@ -15,6 +15,11 @@ const RootInstructionsFile = "AGENTS.md"
 // würde ein zweiter Lauf den Block ein zweites Mal anhängen.
 const instructionsMarker = "<!-- k-playbook:anstoss -->"
 
+// sessionMemoryMarker hält den nachträglich ergänzten Docs-first-Block vom
+// allgemeinen k-playbook-Anstoß getrennt. So erhalten Bestandsprojekte die
+// neue Regel, ohne ihren vorhandenen Anstoß doppelt zu bekommen.
+const sessionMemoryMarker = "<!-- k-playbook:session-memory -->"
+
 // RootInstructionsState ist der Zustand der Wurzeldatei.
 type RootInstructionsState struct {
 	Path string `json:"path"`
@@ -75,9 +80,21 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 	case err != nil:
 		return CheckRootInstructions(projectDir), fmt.Errorf("%s lesen: %w", RootInstructionsFile, err)
 
-	case !strings.Contains(string(data), instructionsMarker):
-		content := strings.TrimRight(string(data), "\n") + "\n\n" + instructionsBlock()
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	default:
+		content := strings.TrimRight(string(data), "\n")
+		changed := false
+		if !strings.Contains(content, instructionsMarker) {
+			content += "\n\n" + instructionsBlock()
+			changed = true
+		}
+		if !strings.Contains(content, sessionMemoryMarker) {
+			content += "\n\n" + sessionMemoryBlock()
+			changed = true
+		}
+		if changed {
+			content += "\n"
+		}
+		if changed && os.WriteFile(path, []byte(content), 0o644) != nil {
 			return CheckRootInstructions(projectDir), fmt.Errorf("%s ergänzen: %w", RootInstructionsFile, err)
 		}
 	}
@@ -86,7 +103,7 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 }
 
 func rootInstructionsTemplate() string {
-	return "# AGENTS.md\n\n" + instructionsBlock()
+	return "# AGENTS.md\n\n" + instructionsBlock() + "\n" + sessionMemoryBlock()
 }
 
 // instructionsBlock ist der Anstoß. Er nennt bewusst keine Verzeichnisebenen:
@@ -104,5 +121,16 @@ Für dieses Projekt gilt k-playbook. Rufe zu Beginn
 auf und lies die Dateien aus ` + "`instructions`" + ` in der angegebenen Reihenfolge,
 bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
 die effektiven Kataloge für Regeln, Reviews und Checks.
+`
+}
+
+func sessionMemoryBlock() string {
+	return sessionMemoryMarker + `
+## Projektwissen zuerst
+
+Die autoritative Projektdokumentation beginnt bei
+` + "`" + LocalDirName + `/docs/README.md` + "`" + `. Lies diesen Index zuerst, bevor du den
+Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
+konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
 `
 }

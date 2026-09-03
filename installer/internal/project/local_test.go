@@ -84,6 +84,25 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	}
 }
 
+func TestCreateLocalLegtDocsIndexAn(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	path := filepath.Join(LocalDir(root), "docs", "README.md")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("Docs-Index lesen: %v", err)
+	}
+	for _, want := range []string{"Projektwissen", "../../AGENTS.md"} {
+		if !strings.Contains(string(content), want) {
+			t.Errorf("Docs-Index enthält %q nicht:\n%s", want, content)
+		}
+	}
+}
+
 func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	root := t.TempDir()
 	local := LocalDir(root)

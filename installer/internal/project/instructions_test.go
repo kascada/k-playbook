@@ -25,6 +25,9 @@ func TestApplyRootInstructionsLegtDateiAn(t *testing.T) {
 	if !strings.Contains(string(content), "bin/k-playbook context") {
 		t.Errorf("Anstoß fehlt:\n%s", content)
 	}
+	if !strings.Contains(string(content), "k-playbook-local/docs/README.md") {
+		t.Errorf("Session-Memory-Verweis fehlt:\n%s", content)
+	}
 
 }
 
@@ -49,6 +52,9 @@ func TestApplyRootInstructionsErgaenztVorhandene(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "bin/k-playbook context") {
 		t.Errorf("Anstoß fehlt:\n%s", content)
+	}
+	if !strings.Contains(string(content), "k-playbook-local/docs/README.md") {
+		t.Errorf("Session-Memory-Verweis fehlt:\n%s", content)
 	}
 }
 

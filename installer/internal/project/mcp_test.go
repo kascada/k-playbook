@@ -110,6 +110,18 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 	if entry["enabled"] != true || entry["type"] != "local" {
 		t.Errorf("type/enabled = %v/%v, erwartet local/true", entry["type"], entry["enabled"])
 	}
+	instructions, ok := opencode[opencodeInstructionsKey].([]any)
+	if !ok || !containsAnyString(instructions, RootInstructionsFile) {
+		t.Errorf("instructions = %v, erwartet %s", opencode[opencodeInstructionsKey], RootInstructionsFile)
+	}
+	references, ok := opencode[opencodeReferencesKey].(map[string]any)
+	if !ok {
+		t.Fatalf("opencode.json hat keinen references-Block: %v", opencode)
+	}
+	docs, ok := references[opencodeDocsKey].(map[string]any)
+	if !ok || docs["path"] != "./k-playbook-local/docs" {
+		t.Errorf("Docs-Referenz = %v, erwartet k-playbook-local/docs", references[opencodeDocsKey])
+	}
 
 	// Cursor bekommt dasselbe Schema in seinem eigenen Verzeichnis.
 	if _, err := os.Stat(filepath.Join(root, ".cursor", "mcp.json")); err != nil {
@@ -182,6 +194,9 @@ func TestApplyMCPLaesstFremdeEintraegeStehen(t *testing.T) {
 	instructions, ok := opencode["instructions"].([]any)
 	if !ok || len(instructions) != 1 || instructions[0] != "AGENTS.md" {
 		t.Errorf("instructions verändert: %v", opencode["instructions"])
+	}
+	if _, ok := opencode[opencodeReferencesKey].(map[string]any)[opencodeDocsKey]; !ok {
+		t.Errorf("Docs-Referenz fehlt: %v", opencode)
 	}
 }
 
