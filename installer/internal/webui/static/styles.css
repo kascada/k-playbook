@@ -47,14 +47,25 @@ select {
   gap: 28px;
 }
 
-/* Die linke Spalte bleibt stehen, während die Karten scrollen. Sie ist kurz
-   genug, dass Umschalter und Menü ohne eigenes Scrollen sichtbar bleiben. */
+/* Die linke Spalte bleibt stehen, während die Karten scrollen. Ihre Höhe ist
+   das Fenster abzüglich des sticky-Abstands: einmal oben, wo sie einrastet,
+   und einmal unten, damit sie nicht an der Kante klebt. Mehr wird nicht
+   abgezogen — was in der Spalte steht, teilt sich den Platz selbst auf, ein
+   weiteres Element ändert die Rechnung also nicht. */
 .sidebar {
+  --sidebar-top: 24px;
   position: sticky;
-  top: 24px;
-  display: grid;
-  align-content: start;
+  top: var(--sidebar-top);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  max-height: calc(100vh - 2 * var(--sidebar-top));
+}
+
+/* Jedes Element der Spalte behält seine Höhe. Nachgeben soll allein das
+   Blockmenü — das sagt die Regel weiter unten. */
+.sidebar > * {
+  flex: none;
 }
 
 /* Zwei Kästen derselben Machart: der obere sagt, in welchem Bereich man ist,
@@ -73,10 +84,12 @@ select {
 }
 
 /* Auf /docs entstehen die Einträge aus den Dateien und können mehr werden, als
-   nebeneinander ins Fenster passt. Dann scrollt das Menü selbst; die Karte
-   daneben bleibt davon unberührt. */
-.block-nav {
-  max-height: calc(100vh - 140px);
+   in die Spalte passt. Dann gibt das Menü nach und scrollt selbst; die Karte
+   daneben bleibt davon unberührt. min-height hebt dafür die Mindestgröße auf,
+   die ein Flex-Element sonst von seinem Inhalt bekommt. */
+.sidebar > .block-nav {
+  flex: 0 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -154,6 +167,9 @@ select {
 
   .sidebar {
     position: static;
+    /* Ohne sticky Spalte gibt es keinen Abstand, gegen den sich rechnen
+       ließe: die Höhe der Kästen steht hier einzeln. */
+    max-height: none;
   }
 
   .area-nav {
