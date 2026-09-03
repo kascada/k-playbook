@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -215,7 +216,50 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
-	return state.noteRequests(mux)
+	return sameOrigin(state.noteRequests(mux))
+}
+
+// sameOrigin weist schreibende Anfragen fremder Herkunft ab. Der Prozess lebt
+// jetzt Stunden statt Minuten, und eine beliebige Seite im Browser des
+// Nutzers könnte sonst Endpunkte treffen, hinter denen git pull und
+// Schreibvorgänge stehen.
+//
+// Geprüft wird ein echter Same-Origin-Vergleich: der Host-Anteil von Origin
+// gegen den Host-Header, ohne Fixierung auf 127.0.0.1:<port> und ohne
+// Loopback-Namensliste — hinter einer Portweiterleitung (VS Code, Codespaces)
+// kommt der Host-Header vom Browser unverändert und wäre sonst gerade dort
+// abgewiesen. Das Schema bleibt außen vor, weil Codespaces TLS terminiert:
+// der Browser schickt ein https-Origin, der Server sieht http. Fehlt Origin —
+// curl, das Unterkommando stop —, gilt die Anfrage als eigene Herkunft.
+func sameOrigin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && !originAllowed(r.Header.Get("Origin"), r.Host) {
+			http.Error(w, "Anfrage fremder Herkunft abgewiesen.", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// originAllowed meldet, ob origin zum Host der Anfrage passt. Ohne Origin ja.
+func originAllowed(origin string, host string) bool {
+	if origin == "" {
+		return true
+	}
+	return originHost(origin) == host
+}
+
+// originHost schneidet das Schema ab und nimmt den Rest bis zum nächsten "/".
+// Ein opakes Origin ("null") bleibt stehen und passt zu keinem Host.
+func originHost(origin string) string {
+	rest := origin
+	if i := strings.Index(rest, "://"); i >= 0 {
+		rest = rest[i+3:]
+	}
+	if i := strings.Index(rest, "/"); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
 }
 
 // noteRequests hält den Zeitpunkt jeder Anfrage fest, egal welcher: solange

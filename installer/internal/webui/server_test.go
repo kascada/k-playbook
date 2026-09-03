@@ -205,3 +205,57 @@ func TestClientGoneEntfallen(t *testing.T) {
 		t.Errorf("Status = %d, erwartet einen Fehlerstatus", recorder.Code)
 	}
 }
+
+// Schreibende Anfragen müssen von derselben Herkunft kommen: der Host-Anteil
+// von Origin gegen den Host-Header, ohne Schema und ohne feste Adressliste.
+func TestHerkunftspruefung(t *testing.T) {
+	chdir(t, t.TempDir())
+
+	tests := []struct {
+		name   string
+		method string
+		url    string
+		origin string
+		want   int
+	}{
+		{name: "gleiche Herkunft erlaubt", method: http.MethodPost, url: "http://127.0.0.1:4711/api/shutdown", origin: "http://127.0.0.1:4711", want: http.StatusOK},
+		{name: "fremde Herkunft 403", method: http.MethodPost, url: "http://127.0.0.1:4711/api/shutdown", origin: "http://boese.example", want: http.StatusForbidden},
+		{name: "gleicher Host, anderer Port 403", method: http.MethodPost, url: "http://127.0.0.1:4711/api/shutdown", origin: "http://127.0.0.1:4712", want: http.StatusForbidden},
+		{name: "opakes Origin 403", method: http.MethodPost, url: "http://127.0.0.1:4711/api/shutdown", origin: "null", want: http.StatusForbidden},
+		// Weitergeleiteter Port: der Browser sieht einen anderen Host als den,
+		// auf dem der Server lauscht, und schickt beides passend zueinander.
+		{name: "weitergeleiteter Port erlaubt", method: http.MethodPost, url: "http://localhost:9999/api/shutdown", origin: "http://localhost:9999", want: http.StatusOK},
+		// Codespaces terminiert TLS: https im Origin, http am Server.
+		{name: "Fremddomain hinter TLS erlaubt", method: http.MethodPost, url: "http://x-8080.app.github.dev/api/shutdown", origin: "https://x-8080.app.github.dev", want: http.StatusOK},
+		{name: "ohne Origin erlaubt", method: http.MethodPost, url: "http://127.0.0.1:4711/api/shutdown", want: http.StatusOK},
+		{name: "GET bleibt ungeprüft", method: http.MethodGet, url: "http://127.0.0.1:4711/api/health", origin: "http://boese.example", want: http.StatusOK},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, test.url, nil)
+			if test.origin != "" {
+				request.Header.Set("Origin", test.origin)
+			}
+			recorder := httptest.NewRecorder()
+			routes(&serverState{}).ServeHTTP(recorder, request)
+			if recorder.Code != test.want {
+				t.Errorf("Status = %d, erwartet %d (Body: %s)", recorder.Code, test.want, strings.TrimSpace(recorder.Body.String()))
+			}
+		})
+	}
+}
+
+func TestOriginHost(t *testing.T) {
+	for origin, want := range map[string]string{
+		"http://127.0.0.1:4711":      "127.0.0.1:4711",
+		"https://a.b:1/pfad?x=1":     "a.b:1",
+		"http://localhost":           "localhost",
+		"null":                       "null",
+		"x-8080.app.github.dev/ohne": "x-8080.app.github.dev",
+	} {
+		if got := originHost(origin); got != want {
+			t.Errorf("originHost(%q) = %q, erwartet %q", origin, got, want)
+		}
+	}
+}
