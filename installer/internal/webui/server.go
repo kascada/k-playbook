@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
@@ -23,15 +24,13 @@ import (
 var staticFiles embed.FS
 
 const (
-	// Der Client meldet sich regelmäßig. Bleibt er länger als
-	// clientHeartbeatTimeout aus, ist das Browserfenster weg und der Server
-	// wird nicht mehr gebraucht.
-	clientHeartbeatTimeout = 5 * time.Second
-	// Nach einer ausdrücklichen Abmeldung wird kurz gewartet, damit ein
-	// Reload den Server nicht abräumt.
-	clientGoneShutdownDelay = 3 * time.Second
-	clientMonitorInterval   = 2 * time.Second
-	shutdownTimeout         = 5 * time.Second
+	// Der Server hängt nicht am Browserfenster: er bleibt stehen, bis ihn
+	// idleTimeout lang niemand mehr gefragt hat — dann ist er vergessen und
+	// räumt sich selbst weg. Ein offenes Fenster fragt regelmäßig /api/health
+	// und hält ihn damit aus dem Leerlauf.
+	idleTimeout       = 60 * time.Minute
+	idleCheckInterval = 30 * time.Second
+	shutdownTimeout   = 5 * time.Second
 	// Verzögerung, damit die Antwort auf /api/shutdown noch rausgeht,
 	// bevor der Server zumacht.
 	shutdownResponseDelay = 150 * time.Millisecond
@@ -47,13 +46,14 @@ type serverState struct {
 	// nur die Routen prüfen.
 	registration *guiproc.Registration
 
-	mu             sync.Mutex
-	lastClientSeen time.Time
-	clientGoneAt   time.Time
+	mu sync.Mutex
+	// lastRequestAt ist der Zeitpunkt der letzten Anfrage, egal welcher. Der
+	// Leerlaufwächter misst daran.
+	lastRequestAt time.Time
 }
 
-// Run startet den lokalen Server und blockiert, bis der Client sich
-// abmeldet, verschwindet oder Ctrl+C gedrückt wird.
+// Run startet den lokalen Server und blockiert, bis er per /api/shutdown,
+// SIGINT oder SIGTERM beendet wird oder idleTimeout lang niemand mehr fragt.
 func Run() error {
 	protectProjectInstallation()
 
@@ -91,19 +91,24 @@ func Run() error {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	state := &serverState{shutdown: stop, version: version, registration: registration}
+	// Der Leerlauf zählt ab dem Start: auch ein Server, den nie jemand
+	// besucht, soll nicht ewig stehen bleiben.
+	state := &serverState{shutdown: stop, version: version, registration: registration, lastRequestAt: time.Now()}
 	server := &http.Server{Handler: routes(state)}
 
 	serverErr := make(chan error, 1)
 	go func() {
 		serverErr <- server.Serve(listener)
 	}()
-	go state.monitorClient(ctx)
+	go state.watchIdle(ctx)
 
 	announce("http://" + listener.Addr().String() + "/")
 
+	// SIGTERM wie SIGINT: `k-playbook stop` greift damit auch bei einem
+	// Server, der nicht mehr antwortet, und die Laufzeitdatei verschwindet
+	// über das defer auch nach einem kill.
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(interrupt)
 
 	select {
@@ -166,7 +171,6 @@ func announce(url string) {
 func routes(state *serverState) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", state.healthHandler)
-	mux.HandleFunc("POST /api/client-gone", state.clientGoneHandler)
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
 	mux.HandleFunc("GET /api/path", hostPathHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
@@ -189,7 +193,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)
-	mux.HandleFunc("POST /api/update", applyUpdateHandler)
+	mux.HandleFunc("POST /api/update", state.applyUpdateHandler)
 	mux.HandleFunc("POST /api/update/discard", discardDevSyncHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
@@ -212,7 +216,16 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
-	return mux
+	return state.noteRequests(mux)
+}
+
+// noteRequests hält den Zeitpunkt jeder Anfrage fest, egal welcher: solange
+// irgendjemand fragt, ist der Server nicht vergessen.
+func (state *serverState) noteRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		state.noteRequest(time.Now())
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Die Bereiche des Umschalters. Der Wert steht in den Vorlagendaten und
@@ -308,16 +321,15 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 	}
 }
 
-// healthHandler dient dem Client als Lebenszeichen in beide Richtungen:
-// schlägt der Aufruf fehl, weiß der Client, dass der Server weg ist;
-// bleibt er aus, weiß der Server, dass der Client weg ist.
+// healthHandler ist das Lebenszeichen des Fensters: solange eines fragt,
+// bleibt der Server aus dem Leerlauf. Schlägt der Aufruf fehl, weiß das
+// Fenster, dass der Server weg ist.
 //
 // Die Antwort nennt Schlüssel, Version und PID, damit ein CLI-Aufruf den
 // Server als seinen eigenen erkennt. Der Schlüssel wird je Anfrage neu
 // berechnet: nach einem Umschlüsseln durch POST /api/config muss schon die
 // nächste Antwort den neuen tragen. Die Version dagegen ist die vom Start.
 func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
-	state.noteClientSeen()
 	key, _ := guiproc.Key()
 	writeJSON(w, http.StatusOK, guiproc.Health{
 		Status:  "ok",
@@ -345,34 +357,34 @@ func (state *serverState) rekey() {
 	}
 }
 
-func (state *serverState) clientGoneHandler(w http.ResponseWriter, r *http.Request) {
-	state.noteClientGone()
-	w.WriteHeader(http.StatusNoContent)
-}
-
+// shutdownHandler beendet den Dienst für alle Fenster.
 func (state *serverState) shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting_down"})
+	state.shutdownAfterResponse()
+}
+
+// shutdownAfterResponse lässt die laufende Antwort noch hinaus und macht dann
+// zu. Ohne die Verzögerung bekäme der Aufrufer einen Verbindungsabbruch statt
+// der Bestätigung.
+func (state *serverState) shutdownAfterResponse() {
+	if state.shutdown == nil {
+		return
+	}
 	go func() {
 		time.Sleep(shutdownResponseDelay)
 		state.shutdown()
 	}()
 }
 
-func (state *serverState) noteClientSeen() {
+func (state *serverState) noteRequest(now time.Time) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	state.lastClientSeen = time.Now()
-	state.clientGoneAt = time.Time{}
+	state.lastRequestAt = now
 }
 
-func (state *serverState) noteClientGone() {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.clientGoneAt = time.Now()
-}
-
-func (state *serverState) monitorClient(ctx context.Context) {
-	ticker := time.NewTicker(clientMonitorInterval)
+// watchIdle beendet den Server, wenn idleTimeout lang keine Anfrage kam.
+func (state *serverState) watchIdle(ctx context.Context) {
+	ticker := time.NewTicker(idleCheckInterval)
 	defer ticker.Stop()
 
 	for {
@@ -380,7 +392,8 @@ func (state *serverState) monitorClient(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-ticker.C:
-			if state.shouldShutdownForMissingClient(now) {
+			if state.idleExceeded(now) {
+				fmt.Printf("Seit %s keine Anfrage, der Server beendet sich.\n", idleTimeout)
 				state.shutdown()
 				return
 			}
@@ -388,15 +401,11 @@ func (state *serverState) monitorClient(ctx context.Context) {
 	}
 }
 
-// shouldShutdownForMissingClient meldet, ob der Client weg ist. Solange sich
-// noch nie einer gemeldet hat, bleibt der Server stehen: der Browser kann
-// noch unterwegs sein oder die URL wird von Hand eingetragen.
-func (state *serverState) shouldShutdownForMissingClient(now time.Time) bool {
+// idleExceeded meldet, ob seit der letzten Anfrage idleTimeout vergangen ist.
+// Eigene Funktion mit übergebener Zeit, damit der Wächter ohne Warten prüfbar
+// ist.
+func (state *serverState) idleExceeded(now time.Time) bool {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-
-	if !state.clientGoneAt.IsZero() && now.Sub(state.clientGoneAt) >= clientGoneShutdownDelay {
-		return true
-	}
-	return !state.lastClientSeen.IsZero() && now.Sub(state.lastClientSeen) >= clientHeartbeatTimeout
+	return !state.lastRequestAt.IsZero() && now.Sub(state.lastRequestAt) >= idleTimeout
 }

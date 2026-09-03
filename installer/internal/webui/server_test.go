@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -146,5 +147,58 @@ func TestHealthNenntSchluesselVersionUndPID(t *testing.T) {
 	}
 	if health.PID != os.Getpid() {
 		t.Errorf("pid = %d, erwartet %d", health.PID, os.Getpid())
+	}
+}
+
+// Der Leerlaufwächter misst ab der letzten Anfrage, egal welcher. Geprüft mit
+// injizierter Zeit, ohne zu warten.
+func TestLeerlaufwaechterMitInjizierterZeit(t *testing.T) {
+	start := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	state := &serverState{lastRequestAt: start}
+
+	if state.idleExceeded(start.Add(idleTimeout - time.Second)) {
+		t.Error("kurz vor der Grenze gilt schon als Leerlauf")
+	}
+	if !state.idleExceeded(start.Add(idleTimeout)) {
+		t.Error("an der Grenze gilt nicht als Leerlauf")
+	}
+
+	// Eine Anfrage setzt die Uhr zurück.
+	state.noteRequest(start.Add(idleTimeout))
+	if state.idleExceeded(start.Add(idleTimeout + time.Minute)) {
+		t.Error("eine Anfrage setzt den Leerlauf nicht zurück")
+	}
+
+	// Ohne Startzeit — nur in Tests, die die Routen prüfen — läuft nichts ab.
+	if (&serverState{}).idleExceeded(start.Add(24 * time.Hour)) {
+		t.Error("ohne Bezugszeit gilt als Leerlauf")
+	}
+}
+
+// Jede Anfrage über die Routen zählt als Lebenszeichen, nicht nur /api/health.
+func TestJedeAnfrageSetztDieLeerlaufuhr(t *testing.T) {
+	chdir(t, t.TempDir())
+	state := &serverState{}
+
+	recorder := httptest.NewRecorder()
+	routes(state).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/static/styles.css", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("Status = %d", recorder.Code)
+	}
+	if state.lastRequestAt.IsZero() {
+		t.Error("die Anfrage wurde nicht festgehalten")
+	}
+}
+
+// Der Heartbeat-Suizid ist weg: POST /api/client-gone gibt es nicht mehr. Der
+// Mux antwortet mit 405, weil das Muster „GET /" den Pfad noch deckt — eine
+// alte Seite, die den Endpunkt bis zum Neuladen weiter ruft, trifft ins Leere.
+func TestClientGoneEntfallen(t *testing.T) {
+	chdir(t, t.TempDir())
+
+	recorder := httptest.NewRecorder()
+	routes(&serverState{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/client-gone", nil))
+	if recorder.Code < http.StatusBadRequest {
+		t.Errorf("Status = %d, erwartet einen Fehlerstatus", recorder.Code)
 	}
 }

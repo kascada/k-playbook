@@ -84,7 +84,12 @@ func discardDevSyncHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // applyUpdateHandler holt den neuen Stand.
-func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
+//
+// Wechselt dabei die VERSION, gehört zum neuen Stand ein anderes Binary. Der
+// Hintergrunddienst beendet sich dann nach der Antwort, wie bei /api/shutdown:
+// ein weiterlaufender alter Daemon würde vom nächsten Aufruf zwar an der
+// Version erkannt und ersetzt, hier ist der Wechsel aber schon bekannt.
+func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusConflict, updateResponse{
@@ -109,7 +114,7 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		Message:         "Aktualisiert.",
 	}
 	if result.BinaryChanged {
-		response.Message = "Aktualisiert. Das Programm wurde ersetzt und läuft bis zum Neustart mit dem bisherigen Stand."
+		response.Message = "Aktualisiert. Das Programm wurde ersetzt; der Dienst beendet sich jetzt, ein neuer Aufruf von bin/k-playbook startet die neue Fassung."
 	}
 	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 
@@ -123,6 +128,17 @@ func applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		response.Cleanliness = status.Cleanliness
 	}
 	writeJSON(w, http.StatusOK, response)
+	state.completeUpdate(result.BinaryChanged)
+}
+
+// completeUpdate beendet den Dienst nach einem Update, das ein neues Binary
+// verlangt. Bei unveränderter VERSION läuft er weiter: der neue Stand liegt
+// auf der Platte, und jeder Handler liest ihn bei der nächsten Anfrage.
+func (state *serverState) completeUpdate(binaryChanged bool) {
+	if !binaryChanged {
+		return
+	}
+	state.shutdownAfterResponse()
 }
 
 // relinkAfterUpdate zieht die Assistenten-Einrichtung auf den neuen Stand nach

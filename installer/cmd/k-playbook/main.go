@@ -3,7 +3,8 @@
 // Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
-// eines Review-Laufs aus, und `merge` fasst einen Lauf als Review-Input zusammen.
+// eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
+// und `stop` beendet den Hintergrunddienst der Oberfläche.
 package main
 
 import (
@@ -57,6 +58,10 @@ func run(args []string) error {
 		// Wie scan: ein Merge arbeitet auf einem vorhandenen Lauf und fasst dessen
 		// Artefakte zusammen, ohne die Host-Installation anzufassen.
 		return runMerge(args[1:])
+	case "stop":
+		// Ohne cleanUpLegacy und mirrorHostInstall: wer beendet, will nichts
+		// einrichten.
+		return runStop(os.Stdout)
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -111,6 +116,9 @@ Unterkommandos:
   merge     Fasst einen bestehenden Review-Lauf zusammen:
             k-playbook merge <lauf>. Das Ergebnis wird als Review-Input in das
             Laufverzeichnis geschrieben.
+  stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
+            Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
+            Laufzeitdatei wird dabei entfernt.
   help      Diese Übersicht.
 `)
 }

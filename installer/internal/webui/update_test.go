@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -109,5 +110,27 @@ func TestRelinkAfterUpdateMeldetKonflikt(t *testing.T) {
 	}
 	if content := readFile(t, filepath.Join(root, "CLAUDE.md")); content != "# eigenständig\n" {
 		t.Errorf("CLAUDE.md wurde verändert: %q", content)
+	}
+}
+
+// Nach einem Update beendet sich der Dienst nur, wenn die VERSION gewechselt
+// hat — dann gehört zum neuen Stand ein anderes Binary. Sonst läuft er weiter
+// und liest den neuen Stand bei der nächsten Anfrage.
+func TestUpdateShutdownNurBeiGewechselterVersion(t *testing.T) {
+	called := make(chan struct{}, 1)
+	state := &serverState{shutdown: func() { called <- struct{}{} }}
+
+	state.completeUpdate(false)
+	select {
+	case <-called:
+		t.Fatal("ohne Versionswechsel wurde beendet")
+	case <-time.After(3 * shutdownResponseDelay):
+	}
+
+	state.completeUpdate(true)
+	select {
+	case <-called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("bei Versionswechsel wurde nicht beendet")
 	}
 }
