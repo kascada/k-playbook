@@ -17,7 +17,6 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
-	"github.com/kascada/k-playbook/installer/internal/webui"
 )
 
 func main() {
@@ -29,9 +28,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		cleanUpLegacy()
-		mirrorHostInstall()
-		return webui.Run()
+		return runGUI()
 	}
 
 	switch args[0] {

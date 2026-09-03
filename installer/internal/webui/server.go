@@ -102,7 +102,8 @@ func Run() error {
 	}()
 	go state.watchIdle(ctx)
 
-	announce("http://" + listener.Addr().String() + "/")
+	Announce("http://" + listener.Addr().String() + "/")
+	fmt.Println("Zum Beenden Ctrl+C drücken.")
 
 	// SIGTERM wie SIGINT: `k-playbook stop` greift damit auch bei einem
 	// Server, der nicht mehr antwortet, und die Laufzeitdatei verschwindet
@@ -140,9 +141,10 @@ func protectProjectInstallation() {
 	}
 }
 
-// announce gibt die URL aus und öffnet den Browser, sofern das hier
-// überhaupt sinnvoll ist.
-func announce(url string) {
+// Announce gibt die URL aus und öffnet den Browser, sofern das hier
+// überhaupt sinnvoll ist. Dieselbe Bewegung für einen frisch gestarteten
+// wie für einen wiedergefundenen Server.
+func Announce(url string) {
 	fmt.Printf("k-playbook: %s\n", url)
 
 	marker, inContainer := containerMarker()
@@ -164,8 +166,6 @@ func announce(url string) {
 		fmt.Printf("Browser konnte nicht automatisch geöffnet werden: %v\n", err)
 		fmt.Println("Obige URL bitte manuell im Browser eintragen.")
 	}
-
-	fmt.Println("Zum Beenden Ctrl+C drücken.")
 }
 
 func routes(state *serverState) http.Handler {
