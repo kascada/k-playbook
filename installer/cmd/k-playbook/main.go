@@ -14,7 +14,6 @@ import (
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
-	"github.com/kascada/k-playbook/installer/internal/hostinstall"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -46,29 +45,24 @@ func run(args []string) error {
 	case "config":
 		return runConfig(args[1:])
 	case "context":
-		// Ohne cleanUpLegacy: dessen Ausgabe würde die JSON-Ausgabe stören.
+		// Ohne Wirt-Pflege: deren Ausgabe würde die JSON-Ausgabe stören.
 		// Die Assistenten-Verlinkung zieht ContextForDir dabei nach — das ist
-		// projektbezogen und gehört deshalb hierher, nicht in cleanUpLegacy,
-		// das die Host-Installation aufräumt.
+		// projektbezogen und gehört deshalb hierher, nicht in den Startpfad.
 		return printContext()
 	case "mcp":
-		// Ohne cleanUpLegacy und mirrorHostInstall, aus demselben Grund wie bei
-		// context — hier sogar zwingend: stdout trägt den JSON-RPC-Strom, und der
-		// bleibt über die ganze Sitzung offen. Eine einzige Zeile daneben macht
-		// die Verbindung unbrauchbar.
+		// Ohne Wirt-Pflege: stdout trägt den JSON-RPC-Strom, und eine einzige
+		// fremde Zeile daneben macht die Verbindung unbrauchbar.
 		return mcpserver.Run(context.Background())
 	case "scan":
-		// Ohne cleanUpLegacy und mirrorHostInstall: beides gehört zum Start der
-		// Oberfläche. Ein Scan liest nur und soll den Host nicht nebenbei
+		// Ohne Wirt-Pflege: ein Scan liest nur und soll den Host nicht nebenbei
 		// anfassen, während er läuft.
 		return runScan(args[1:])
 	case "merge":
 		// Wie scan: ein Merge arbeitet auf einem vorhandenen Lauf und fasst dessen
-		// Artefakte zusammen, ohne die Host-Installation anzufassen.
+		// Artefakte zusammen, ohne den Host nebenbei anzufassen.
 		return runMerge(args[1:])
 	case "stop":
-		// Ohne cleanUpLegacy und mirrorHostInstall: wer beendet, will nichts
-		// einrichten.
+		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
 	case "help", "-h", "--help":
 		printUsage()
@@ -147,36 +141,5 @@ func cleanUpLegacy() {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: alte globale Verlinkung nicht vollständig entfernt: %v\n", err)
-	}
-}
-
-// mirrorHostInstall hält die host-weite Kopie auf dem Stand dieses Aufrufs,
-// damit `k-playbook` aus jedem Verzeichnis startbar ist.
-//
-// Nur hier, nicht bei `context`: dessen JSON darf keine Beigaben bekommen, und
-// die Spiegelung braucht ein Git-Kommando, das den häufigen Kontextaufrufen
-// der Commands nichts bringt.
-//
-// Wie cleanUpLegacy meldet sie sich nur, wenn etwas passiert ist, und ein
-// Fehler hält den Start nicht auf: die Oberfläche läuft auch ohne Kopie.
-func mirrorHostInstall() {
-	result, err := hostinstall.Mirror()
-	if len(result.Copied) > 0 {
-		fmt.Printf("Host-weite Kopie aktualisiert (%d):\n", len(result.Copied))
-		for _, copied := range result.Copied {
-			fmt.Printf("  - %s\n", copied)
-		}
-	}
-	if result.Link != "" {
-		fmt.Printf("Verlinkt: %s\n", result.Link)
-	}
-	// Ohne Bedingung auf result: der PATH stimmt auch dann noch nicht, wenn
-	// diesmal nichts zu spiegeln war. Sonst sähe man den Hinweis genau einmal.
-	if status := hostinstall.CheckPath(); status.Export != "" {
-		fmt.Printf("Hinweis: %s liegt nicht im PATH. Diese Zeile ins Shell-Profil:\n", status.Dir)
-		fmt.Printf("  %s\n", status.Export)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: host-weite Kopie nicht aktualisiert: %v\n", err)
 	}
 }

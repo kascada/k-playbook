@@ -10,7 +10,8 @@ Installation und keinen festen Hostpfad; jedes Projekt trägt seine eigene.
 ```bash
 cd /pfad/zum/projekt
 git clone git@github.com:kascada/k-playbook.git
-k-playbook/bin/k-playbook
+k-playbook/bin/install
+k-playbook
 ```
 
 Das Zielverzeichnis muss `k-playbook` heißen, denn Commands und Skills sprechen es so an.
@@ -18,15 +19,13 @@ Ohne Zielargument ergibt sich der Name aus dem Repo-Namen; gib keinen anderen an
 wenn du aus einem Fork oder Mirror unter abweichendem Namen klonst, hänge `k-playbook`
 als zweites Argument an.
 
-**Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
-passende Binary startet — für macOS und Linux gleichermaßen, was auch den Fall abdeckt,
-dass Host und DevContainer unterschiedliche Plattformen sind.
+**Go wird nicht gebraucht.** `bin/install` lädt das zur Plattform passende Release-Binary
+und installiert es nach `~/.local/bin/k-playbook`. Auf dem Host und im DevContainer wird
+es jeweils in der eigenen Umgebung ausgeführt und installiert daher das passende Binary.
 
-**Der erste Start braucht Netz.** Die Binaries liegen nicht mehr im Repo, sondern als
-Assets am Release, das die `VERSION` im Wurzelverzeichnis nennt. Der Wrapper lädt genau
-das eine, das er braucht, in einen Cache außerhalb der Installation und prüft es gegen
-das mitgelieferte `SHA256SUMS`. Für Rechner ohne Zugriff gibt es `bin/k-playbook
---prefetch` und `K_PLAYBOOK_CACHE` — siehe [docs/installation.md](docs/installation.md).
+**Die Installation braucht Netz.** Die Binaries liegen nicht im Repo, sondern als Assets
+am Release, das die `VERSION` im Wurzelverzeichnis nennt. `bin/install` lädt das passende
+Asset und prüft es gegen das mitgelieferte `SHA256SUMS`.
 
 Der letzte Aufruf startet die Oberfläche im Browser. Beim ersten Mal findet sie noch
 keine `K-PLAYBOOK.yaml` und schlägt vor, wo sie angelegt wird: das Verzeichnis über dem

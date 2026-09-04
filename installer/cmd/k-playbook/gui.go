@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
@@ -17,7 +18,7 @@ import (
 // den Browser. Das Terminal ist danach in jedem Fall wieder frei.
 func runGUI() error {
 	cleanUpLegacy()
-	mirrorHostInstall()
+	cleanUpFormerHostInstall()
 	protectProjectInstallation()
 
 	key, err := guiproc.Key()
@@ -35,6 +36,21 @@ func runGUI() error {
 		start:   startDetached,
 		out:     os.Stdout,
 	})
+}
+
+// cleanUpFormerHostInstall entfernt Daten des abgelösten Wrapper-Modells.
+// Die direkt installierte Datei ~/.local/bin/k-playbook bleibt erhalten.
+func cleanUpFormerHostInstall() {
+	removals, err := legacy.RemoveFormerHostInstall()
+	if len(removals) > 0 {
+		fmt.Printf("Alte Host-Installation entfernt (%d):\n", len(removals))
+		for _, removal := range removals {
+			fmt.Printf("  - %s\n", removal)
+		}
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: alte Host-Installation nicht vollständig entfernt: %v\n", err)
+	}
 }
 
 // protectProjectInstallation setzt eine vorhandene Installation read-only.

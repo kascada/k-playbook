@@ -172,7 +172,6 @@ func routes(state *serverState) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", state.healthHandler)
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
-	mux.HandleFunc("GET /api/path", hostPathHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", state.createConfigHandler)
 	mux.HandleFunc("POST /api/config/reset", resetConfigHandler)

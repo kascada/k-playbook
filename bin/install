@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Installiert das passende Release-Binary dieses Clones in ~/.local/bin. Der
+# Installer bleibt im Clone, damit VERSION und SHA256SUMS unabhängig vom
+# heruntergeladenen Asset geprüft werden können.
+
+release_base_url="https://github.com/kascada/k-playbook/releases/download"
+
+fail() {
+  printf '%s\n' "$@" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'EOF'
+Verwendung: bin/install
+
+Lädt das Release-Binary, das VERSION in diesem Clone nennt, prüft es gegen
+SHA256SUMS und installiert es nach ~/.local/bin/k-playbook.
+EOF
+}
+
+case "${1:-}" in
+  "") ;;
+  help|-h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
+
+script_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(dirname "${script_dir}")"
+
+version_file="${root_dir}/VERSION"
+sums_file="${root_dir}/SHA256SUMS"
+[[ -f "${version_file}" ]] || fail "VERSION fehlt: ${version_file}"
+[[ -f "${sums_file}" ]] || fail "SHA256SUMS fehlt: ${sums_file}"
+
+version="$(tr -d '[:space:]' < "${version_file}")"
+[[ -n "${version}" ]] || fail "VERSION ist leer: ${version_file}"
+
+case "$(uname -s)" in
+  Linux) os="linux" ;;
+  Darwin) os="darwin" ;;
+  *) fail "Nicht unterstütztes Betriebssystem: $(uname -s)" ;;
+esac
+
+case "$(uname -m)" in
+  x86_64|amd64) arch="amd64" ;;
+  arm64|aarch64) arch="arm64" ;;
+  *) fail "Nicht unterstützte Architektur: $(uname -m)" ;;
+esac
+
+binary="k-playbook-${os}-${arch}"
+expected="$(awk -v name="${binary}" '$2 == name || $2 == "*" name { print $1; exit }' "${sums_file}")"
+[[ -n "${expected}" ]] || fail "Keine Prüfsumme für ${binary} in ${sums_file}"
+
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256_of() { sha256sum "$1" | awk '{ print $1 }'; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha256_of() { shasum -a 256 "$1" | awk '{ print $1 }'; }
+else
+  fail "Weder sha256sum noch shasum verfügbar; Download kann nicht geprüft werden."
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  download() { curl -fL --retry 2 --connect-timeout 15 --output "$1" "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+  download() { wget --output-document="$1" "$2"; }
+else
+  fail "Weder curl noch wget verfügbar; Release-Binary kann nicht geladen werden."
+fi
+
+target_dir="${HOME:?HOME ist nicht gesetzt}/.local/bin"
+target="${target_dir}/k-playbook"
+url="${release_base_url}/${version}/${binary}"
+mkdir -p "${target_dir}"
+
+temporary="$(mktemp "${target_dir}/.k-playbook.XXXXXX")"
+trap 'rm -f "${temporary}"' EXIT
+
+printf 'Lade %s ...\n' "${url}"
+download "${temporary}" "${url}"
+
+actual="$(sha256_of "${temporary}")"
+if [[ "${actual}" != "${expected}" ]]; then
+  fail "Prüfsumme weicht ab für ${binary}
+  erwartet: ${expected}
+  erhalten: ${actual}"
+fi
+
+# Ein alter Symlink muss selbst ersetzt werden, nicht sein bisheriges Ziel.
+if [[ -L "${target}" ]]; then
+  rm -f "${target}"
+fi
+chmod 0755 "${temporary}"
+mv -f "${temporary}" "${target}"
+temporary=""
+
+# Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab.
+# Security-Tool-venvs liegen ebenfalls unter ~/.local/share/k-playbook und
+# bleiben deshalb ausdrücklich außerhalb dieser Bereinigung.
+rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook"
+
+printf 'Installiert: %s (%s)\n' "${target}" "${version}"
+case ":${PATH}:" in
+  *":${target_dir}:"*) ;;
+  *)
+    printf 'Hinweis: %s liegt nicht im PATH. Ins Shell-Profil aufnehmen:\n' "${target_dir}" >&2
+    printf '  export PATH="$HOME/.local/bin:$PATH"\n' >&2
+    ;;
+esac

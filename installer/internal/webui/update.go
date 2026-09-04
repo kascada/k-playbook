@@ -114,7 +114,7 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		Message:         "Aktualisiert.",
 	}
 	if result.BinaryChanged {
-		response.Message = "Aktualisiert. Das Programm wurde ersetzt; der Dienst beendet sich jetzt, ein neuer Aufruf von bin/k-playbook startet die neue Fassung."
+		response.Message = "Aktualisiert. Der Dienst beendet sich jetzt; die neue Fassung mit bin/install installieren und danach k-playbook erneut aufrufen."
 	}
 	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 

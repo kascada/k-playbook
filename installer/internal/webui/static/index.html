@@ -41,22 +41,6 @@
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Nur sichtbar, solange `k-playbook` nicht aus jedem Verzeichnis
-               aufrufbar ist. Betrifft den Host, nicht das Projekt. -->
-          <section class="card hidden" id="path-card">
-            <div class="section-head">
-              <div>
-                <h2>Aufruf von überall</h2>
-              </div>
-              <span id="path-pill" class="pill muted">Prüfen...</span>
-            </div>
-            <p id="path-message" class="message"></p>
-            <div id="path-command" class="command-row hidden">
-              <code id="path-command-text"></code>
-              <button class="copy secondary" data-copy="path-command-text">Kopieren</button>
-            </div>
-          </section>
-
           <!-- Nur sichtbar, wenn in der Installation lokal gearbeitet wurde. Das
                Verzeichnis ist ein Clone und wird bei jedem Update ersetzt; eine
                Änderung dort fällt sonst nie auf, weil git eine nicht

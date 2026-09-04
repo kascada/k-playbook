@@ -70,6 +70,72 @@ func RemoveGlobalLinks() ([]Removal, error) {
 	return removeGlobalLinks(home)
 }
 
+// RemoveFormerHostInstall räumt die alte Wrapper-Spiegelung und ihren
+// Standard-Cache weg. Ein direkt installiertes Binary bleibt erhalten; nur ein
+// Symlink auf die alte Spiegelung fällt weg.
+func RemoveFormerHostInstall() ([]Removal, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("Home-Verzeichnis ermitteln: %w", err)
+	}
+	return removeFormerHostInstall(home)
+}
+
+func removeFormerHostInstall(home string) ([]Removal, error) {
+	installation := filepath.Join(home, ".local", "share", "k-playbook", "installation")
+	cache := filepath.Join(home, ".cache", "k-playbook")
+	launcher := filepath.Join(home, ".local", "bin", "k-playbook")
+	removals := []Removal{}
+	problems := []string{}
+
+	if target, ok := symlinkTarget(launcher); ok && isWithin(target, installation) {
+		if err := os.Remove(launcher); err != nil {
+			problems = append(problems, fmt.Sprintf("%s entfernen: %v", launcher, err))
+		} else {
+			removals = append(removals, Removal{Path: launcher, Detail: "Symlink auf alte Host-Installation"})
+		}
+	}
+	for _, path := range []string{installation, cache} {
+		if !pathExists(path) {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			problems = append(problems, fmt.Sprintf("%s entfernen: %v", path, err))
+		} else {
+			removals = append(removals, Removal{Path: path, Detail: "abgelöstes Wrapper-Modell"})
+		}
+	}
+	if len(problems) > 0 {
+		return removals, errors.New(strings.Join(problems, "; "))
+	}
+	return removals, nil
+}
+
+func symlinkTarget(path string) (string, bool) {
+	info, err := os.Lstat(path)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		return "", false
+	}
+	target, err := os.Readlink(path)
+	if err != nil {
+		return "", false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+	return filepath.Clean(target), true
+}
+
+func isWithin(path string, parent string) bool {
+	relative, err := filepath.Rel(parent, path)
+	return err == nil && relative != ".." && !filepath.IsAbs(relative)
+}
+
+func pathExists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
 func removeGlobalLinks(home string) ([]Removal, error) {
 	removals := []Removal{}
 	problems := []string{}

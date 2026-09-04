@@ -113,6 +113,59 @@ func TestLaeuftAufSauberemHomeDurch(t *testing.T) {
 	}
 }
 
+func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	installation := filepath.Join(home, ".local", "share", "k-playbook", "installation")
+	launcher := filepath.Join(home, ".local", "bin", "k-playbook")
+	cache := filepath.Join(home, ".cache", "k-playbook")
+
+	write := func(path string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("%s anlegen: %v", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, []byte("alt\n"), 0o644); err != nil {
+			t.Fatalf("%s schreiben: %v", path, err)
+		}
+	}
+	write(filepath.Join(installation, "bin", "k-playbook"))
+	write(filepath.Join(cache, "bin", "v0.1.2", "k-playbook-linux-amd64"))
+	symlink(t, filepath.Join(installation, "bin", "k-playbook"), launcher)
+
+	removals, err := removeFormerHostInstall(home)
+	if err != nil {
+		t.Fatalf("removeFormerHostInstall: %v", err)
+	}
+	if len(removals) != 3 {
+		t.Fatalf("Removals = %+v, erwartet Launcher, Installation und Cache", removals)
+	}
+	for _, path := range []string{launcher, installation, cache} {
+		if _, err := os.Lstat(path); !os.IsNotExist(err) {
+			t.Errorf("%s besteht weiter", path)
+		}
+	}
+}
+
+func TestLaesstDirektInstalliertesBinaryStehen(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	launcher := filepath.Join(home, ".local", "bin", "k-playbook")
+	if err := os.MkdirAll(filepath.Dir(launcher), 0o755); err != nil {
+		t.Fatalf("Launcher-Verzeichnis anlegen: %v", err)
+	}
+	if err := os.WriteFile(launcher, []byte("neu\n"), 0o755); err != nil {
+		t.Fatalf("Launcher schreiben: %v", err)
+	}
+
+	if _, err := removeFormerHostInstall(home); err != nil {
+		t.Fatalf("removeFormerHostInstall: %v", err)
+	}
+	if content, err := os.ReadFile(launcher); err != nil || string(content) != "neu\n" {
+		t.Errorf("direkt installiertes Binary verändert: %q, %v", content, err)
+	}
+}
+
 func TestEntferntSkillsPathAusConfig(t *testing.T) {
 	home, _ := newHome(t)
 	config := filepath.Join(home, ".config", "opencode", "opencode.jsonc")

@@ -45,7 +45,7 @@ verwaiste Datei wird dabei entfernt.
 `config create` legt den Anker ohne Aufwärtssuche im ausdrücklich gewählten oder
 aktuellen Verzeichnis an. Mit `context` die JSON-Ausgabe, mit `mcp` der Server für einen
 Assistenten, mit `scan` die Ausführung eines Review-Laufs — und diese wie `stop` **ohne**
-`cleanUpLegacy()` und `mirrorHostInstall()`: deren Meldungen gehen nach stdout und würden
+`cleanUpLegacy()` und die Migrationsbereinigung: deren Meldungen gehen nach stdout und würden
 die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt stdout
 einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige fremde
 Zeile macht ihn unbrauchbar. Bei `scan` zählt ein anderer Grund: ein Scan liest nur und
@@ -83,8 +83,6 @@ installer/
 │                                Signal 0, SIGTERM, Setsid, Startzeit je Plattform
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
-├── internal/hostinstall/
-│   └── mirror.go                host-weite Kopie spiegeln, verlinken, PATH prüfen
 ├── internal/project/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
@@ -111,7 +109,6 @@ installer/
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
-│   ├── hostpath.go              PATH-Zustand melden, read-only
 │   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
@@ -712,19 +709,9 @@ sind, liegt im Clone keins mehr, das sich vergleichen ließe; `VERSION` ist an d
 Stelle getreten und trennt zugleich sauber: Commits an Regeln, Reviews, Commands oder
 Docs ändern sie nicht.
 
-Hat `VERSION` gewechselt, ruft der Update-Pfad
-`filepath.Join(PlaybookDir(projectDir), "bin", "k-playbook")` mit `--prefetch` auf und
-legt das neue Binary gleich in den Cache — sonst wartet der Nutzer beim Neustart auf den
-Download. Festgenagelt genau dieser Wrapper und nicht `InstallDir()`: das laufende Binary
-kann eine fremde Installation aktualisieren (die WebUI ruft
-`project.Update(environment.ProjectDir)`), und nur der frisch gezogene Clone trägt nach
-dem Pull die neue `VERSION` samt passender Prüfsummen.
-
-Der Prefetch ist **best effort** — eigener Timeout statt des `pullTimeout`-Kontexts,
-Fehler nur als Hinweis in `Message` und `Output`, nie als Rückgabefehler. Sonst ließe der
-benannte Rückgabefehler mit `defer keepInstallationReadOnly(projectDir, &err)` ein bereits
-erfolgreiches `git pull` als gescheitertes Update erscheinen — getroffen wird das offline,
-hinter Proxys und genau im Fenster zwischen Tag und Asset-Upload.
+Hat `VERSION` gewechselt, beendet sich der Hintergrunddienst nach der Update-Antwort. Das
+neue Binary wird anschließend ausdrücklich mit `bin/install` installiert; der Update-Pfad
+lädt oder ersetzt keine Host-Binaries selbst.
 
 ### Die Verlinkung wird mitgezogen
 
@@ -755,11 +742,12 @@ nicht mehr die einzige Absicherung, sondern die frühestmögliche: Er meldet die
 schon im Antworttext des Updates, statt sie dem nächsten Lesezugriff zu überlassen. Und
 er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 
-## Host-weite Spiegelung
+## Direktinstallation
 
-`Mirror()` in `hostinstall/mirror.go` läuft bei jedem Start der Oberfläche, direkt nach
-dem Aufräumschritt. Sie löst das Problem, dass die Oberfläche häufig gebraucht wird,
-aber nur über `<projekt>/k-playbook/bin/k-playbook` erreichbar ist.
+`bin/install` bleibt im Projekt-Clone und installiert einmalig das passende, gegen
+`SHA256SUMS` geprüfte Release-Binary direkt nach `~/.local/bin/k-playbook`. Der normale
+Aufruf ist danach immer `k-playbook`; der GUI-Start installiert oder aktualisiert kein
+Binary selbst.
 
 Der globale Aufruf ist überhaupt möglich, weil das Programm sein Projekt aus dem
 **Arbeitsverzeichnis** ableitet (`Detect()` über `os.Getwd()`) und nicht aus seinem
@@ -785,112 +773,12 @@ Die Ebene `installation/` trennt die Spiegelung von den Tool-venvs, die unter
 `~/.local/share/k-playbook/` ebenfalls zuhause sind (`rules/tool-install-scope.md`). Ein
 venv bringt ein eigenes `bin/` mit; ohne diese Ebene kollidierten beide.
 
-### Kopie statt Symlink ins Repo
+### Übergang aufräumen
 
-Der abgelöste Weg war ein Symlink von `~/.local/bin/k-playbook` auf den Wrapper **eines
-bestimmten Clones**. Das bindet die host-weite Installation an ein einzelnes Projekt: wird
-dort nicht gepullt, veraltet sie, und verschwindet der Clone, zeigt der Link ins Leere. Im
-DevContainer kam hinzu, dass er nach jedem Rebuild von Hand neu zu setzen war.
-
-Stattdessen kopiert nun jeder Start seine eigenen Dateien dorthin, sofern er einen neueren
-Stand mitbringt. Wer aus einem aktuelleren Clone startet, hebt die host-weite Kopie damit
-von selbst an — und ein gelöschter Clone stört nicht.
-
-### Der Wrapper, kein Binary
-
-Gespiegelt werden genau drei Dateien: `bin/k-playbook`, `VERSION` und `SHA256SUMS`. Kein
-Binary — das löst der Wrapper über den Cache auf, und dort liegt es ohnehin schon.
-
-Der Wrapper allein trägt auch den Fall Mac mit DevContainer: `~/.local/bin` ist derselbe
-Pfad, Host und Container brauchen aber verschiedene Plattformen. Früher musste dafür je
-Plattform ein eigenes Binary neben dem Wrapper liegen; heute trennt sie der Cache über
-den Dateinamen `k-playbook-<os>-<arch>`, und die Kopie muss davon nichts wissen. Die
-Plattformwahl bleibt zur Laufzeit, wo sie hingehört. Der Wrapper löst seine
-Symlink-Kette selbst auf und leitet seine Installation aus dem **aufgelösten** Ort ab; er
-braucht für den Symlink in `~/.local/bin` keine Anpassung.
-
-**Ein zurückgebliebenes `dist/` wird entfernt.** Kopien aus der Zeit vor den
-Release-Assets tragen dort noch ein Binary, und der Wrapper zieht ein vorhandenes `dist/`
-dem Cache vor — es bliebe sonst für immer der Startpunkt der host-weiten Kopie. Sein
-Vorhandensein löst die Spiegelung auch dann aus, wenn der Stempel gleich geblieben ist.
-
-### Commit-Stand statt mtime
-
-Verglichen wird der Zeitpunkt des HEAD-Commits: `git log -1 --format=%ct`. Der Wert
-landet als `.stamp` im Wurzelverzeichnis der Kopie.
-
-Früher zählte der letzte Commit an `dist/`. Seit dort nichts mehr liegt, wäre das ein
-eingefrorener Stempel. Der HEAD wechselt dafür bei jedem Content-Commit: die Kopie wird
-öfter erneuert als früher — sie ist dafür klein, und der Wrapper ist genau die Datei, die
-aktuell sein muss.
-
-Die mtime der Dateien wäre das naheliegende Kriterium und ist trotzdem falsch: Git setzt
-sie beim Auschecken auf den Zeitpunkt des Clones, nicht des Commits. Ein frisch geklonter
-alter Stand sähe damit neuer aus als eine korrekte Installation und würde sie
-überschreiben — bei mehreren Projekten mit je eigenem Clone ständig.
-
-Ist die Quelle kein Git-Repository, bleibt der Stempel leer und es wird nur gespiegelt,
-wenn im Ziel etwas fehlt. Ein unbekannter Stand darf einen bekannten nicht verdrängen.
-
-### Fehlende Datei schlägt den Stempel
-
-Der Stempel allein entscheidet nicht: fehlt im Ziel eine der drei Dateien, wird kopiert,
-auch wenn die Stände gleich sind. Früher trug das den Fall, dass die Kopie nur die
-Plattformen enthielt, von denen aus sie schon einmal aufgerufen wurde — mit dem Wegfall
-des Binaries ist daraus die schlichte Vollständigkeitsprüfung geworden.
-
-### Kein Sonderfall DevContainer
-
-Im Container ist `~/.local/bin` ein **anderes** Verzeichnis: der Benutzer ist `vscode`
-oder `root`, gemountet wird standardmäßig nur der Workspace nach `/workspaces/<name>`,
-nicht das Home. Die Spiegelung läuft dort deshalb ganz normal und erzeugt eine
-container-eigene Kopie. Nach einem Rebuild ist sie weg und wird vom nächsten Start
-wiederhergestellt — genau der Vorzug gegenüber dem alten Symlink.
-
-`containerMarker()` in `webui/browser.go` bleibt davon unberührt und dient weiterhin
-allein dazu, die geratenen Browser-Kandidaten auszusortieren — siehe
-[Browser öffnen](#browser-öffnen).
-
-### Nur beim Start der Oberfläche
-
-Aufgerufen wird ausschließlich im Zweig ohne Argumente, nicht bei `context`. Dessen JSON
-auf stdout verträgt keine Beigaben — dieselbe Begründung, aus der auch der
-Aufräumschritt dort ausgelassen wird. Zugleich spart es das Git-Kommando bei den
-häufigen Kontextaufrufen der Commands, denen die Spiegelung ohnehin nichts bringt: sie
-rufen `k-playbook/bin/k-playbook context` projektlokal auf und berühren den `PATH` nie.
-
-### Schreiben ohne Kollision
-
-Jede Datei wird nach `<ziel>.tmp` geschrieben und dann umbenannt. Das Umbenennen ist
-atomar und umgeht `ETXTBSY`: eine parallel laufende Instanz hält die alte Datei offen,
-während der Name schon auf die neue zeigt.
-
-Der Symlink wird angelegt oder neu ausgerichtet, wenn er fehlt oder woandershin zeigt.
-Liegt dort eine **echte Datei**, gewinnt sie und bleibt unberührt — dieselbe Regel wie
-bei der Assistenten-Verlinkung.
-
-Wie beim Aufräumschritt meldet sich die Spiegelung nur, wenn etwas passiert ist, und ein
-Fehler hält den Start nicht auf: die Oberfläche läuft auch ohne host-weite Kopie.
-
-### Der PATH wird geprüft, nicht geschrieben
-
-`CheckPath()` ist die rein lesende Gegenstück-Funktion: Liegt der Symlink? Steht
-`~/.local/bin` im `PATH`? Sie hängt **nicht** an `Mirror()`. Das war vorher so und war
-ein Fehler: der Hinweis stand unter `!result.Empty()` und erschien damit nur beim ersten
-Start. Beim zweiten war nichts zu spiegeln, `Result` blieb leer — und der Hinweis fiel
-weg, obwohl der `PATH` weiterhin nicht stimmte.
-
-`ExportLine()` baut die Zeile fürs Profil und setzt `$HOME` ein, wenn das Verzeichnis
-darunter liegt. Dasselbe Profil wird auf Host und im Container gelesen; ein absoluter
-Pfad wäre dort falsch.
-
-**Geschrieben wird in kein Shell-Profil.** Es gibt zu `/api/path` kein `POST`. Das Profil
-gehört dem Nutzer, und ein Programm, das ungefragt darin schreibt, wäre schwerer zu
-durchschauen als eine Zeile zum Kopieren. Die Oberfläche zeigt den Zustand — als Karte,
-die nur erscheint, solange etwas fehlt —, gehandelt wird im Terminal.
-
-Geprüft wird der `PATH` **dieses** Prozesses. Wer die Zeile gerade eingetragen hat, sieht
-die Änderung erst in einer neuen Shell; die Meldung sagt das dazu.
+Der erste Start des neuen Binaries entfernt die alte Spiegelung unter
+`~/.local/share/k-playbook/installation/` sowie den früheren Standard-Cache unter
+`~/.cache/k-playbook/`. Ein direkter Eintrag `~/.local/bin/k-playbook` bleibt erhalten;
+nur ein Symlink auf die alte Spiegelung wird entfernt.
 
 ## Woher Binary und Dateien kommen
 
@@ -908,59 +796,13 @@ zu lassen.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
-| `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst `$HOME/.cache/k-playbook` | Cache, geteilt über alle Projekte | Download beim Start oder `bin/k-playbook --prefetch` |
-| `<projekt>/k-playbook/bin/` | Wrapper der Installation | `git pull` im Clone, also „Update prüfen" |
-| `~/.local/share/k-playbook/installation/bin/` | Wrapper der host-weiten Kopie | `Mirror()` bei jedem Start — mit Einschränkung, siehe unten |
-| `~/.local/bin/k-playbook` | Symlink auf den Wrapper der Kopie | `Mirror()` |
-| `<entwicklungsrepo>/dist/` | Build des Arbeitsstands, schlägt Cache und Download | `make dist` / `make dist-host` |
+| `~/.local/bin/k-playbook` | direkt installiertes Binary | `bin/install` oder `make install` |
+| `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` / `make dist-host` |
 
-**Die host-weite Kopie erneuert sich nicht beim lokalen Bauen.** `needsCopy()` vergleicht
-den Commit-Zeitpunkt des HEAD — bewusst nicht die Dateizeit, weil Git die beim Auschecken
-auf den Zeitpunkt des Clones setzt. `make dist` ändert diesen Stempel nicht, die Kopie
-bleibt also stehen.
-
-### Die Auflösungskette des Wrappers
-
-`bin/k-playbook` nimmt das erste Binary, das er findet:
-
-1. **`$K_PLAYBOOK_BINARY`** — ausdrücklich gesetzt, gewinnt immer. Zeigt es auf nichts
-   Ausführbares, bricht der Wrapper ab, statt weiterzusuchen: eine gesetzte Variable ist
-   eine Ansage, kein Vorschlag.
-2. **`<installation>/dist/`** — im Repo-Checkout hat der lokale Build Vorrang vor Cache
-   und Download. Nur so bleibt `make gui` netzfrei.
-3. **Der Cache** — `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst
-   `$HOME/.cache/k-playbook`, darunter `bin/<version>/k-playbook-<os>-<arch>`.
-4. **Download** des Release-Assets zu der Version aus `<installation>/VERSION`, geprüft
-   gegen `<installation>/SHA256SUMS`.
-
-Geladen wird in eine Temp-Datei im Zielverzeichnis und dann umbenannt — parallele Starts
-sehen so nie eine halbe Datei. Stimmt die Prüfsumme nicht, wird die Datei verworfen.
-
-**Warum der Cache außerhalb der Installation liegt.** Die Installation wird nach jedem
-Update per `chmod -R a-w` gesperrt; in ein `dist/` darunter könnte der Wrapper nicht
-schreiben. Der Cache löst das und wird zugleich von allen Projekten desselben Rechners
-geteilt. Host und Container kollidieren nicht, weil der Dateiname die Plattform trägt.
-
-**Der Wrapper exportiert `K_PLAYBOOK_INSTALL_DIR`** mit seinem eigenen Elternverzeichnis.
-Das Binary kann aus dem Cache kommen und wüsste sonst nicht, zu welcher Installation es
-gehört. `InstallDir()` liest die Variable vorrangig; die Ableitung aus dem Binary-Pfad
-bleibt Rückfall für direkt gestartete Binaries und gilt nur, wenn unter dem abgeleiteten
-Verzeichnis auch wirklich `bin/k-playbook` oder `K-PLAYBOOK.yaml` liegt. Ohne diese
-Plausibilisierung lieferte ein Cache-Binary `<cache>/bin` mit `ok = true` — kein Fehler,
-sondern ein falsches Ergebnis.
-
-**Kein Versions-Fallback.** Findet der Wrapper zur `VERSION` kein Asset, bricht er mit
-einer Meldung ab, die jede geprüfte Stelle und die Wege weiter nennt — `--prefetch`,
-`K_PLAYBOOK_CACHE`, `make dist-host`. Ein stiller Rückfall auf eine ältere Version
-widerspräche der Zusage, dass ein Clone-Stand eindeutig einem Binary zugeordnet ist.
-
-Daraus folgt für den Aufruf:
-
-| Start | Binary aus | Dateien aus | kann driften |
-|---|---|---|---|
-| `<projekt>/k-playbook/bin/k-playbook` | Cache oder Download zur `VERSION` des Clones | dem Clone | nein |
-| `k-playbook` aus dem `PATH` | Cache oder Download zur `VERSION` der Kopie | der Installation des aktuellen Projekts | ja |
-| `make installer-run` im Entwicklungsrepo | dem Arbeitsstand | siehe „Entwicklungsstand" | ohne Sync ja |
+`bin/install` ermittelt die Plattform, lädt das Release-Asset zu `VERSION`, prüft es
+gegen `SHA256SUMS` und ersetzt `~/.local/bin/k-playbook` atomar. Es gibt keinen
+Programm-Binary-Cache und keine Laufzeit-Auflösung mehr. Die Zuordnung eines laufenden
+Binary zu seiner Version wird gesondert behandelt.
 
 ### Entwicklungsstand
 
@@ -1290,7 +1132,6 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 |---|---|---|
 | `GET` | `/api/health` | Lebenszeichen des Fensters; antwortet mit Schlüssel, Version und PID des Servers |
 | `POST` | `/api/shutdown` | Dienst beenden, für alle Fenster |
-| `GET` | `/api/path` | host-weite Aufrufbarkeit prüfen, read-only; kein `POST` |
 | `GET` | `/api/config` | Anker suchen bzw. Ort vorschlagen |
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
 | `GET` | `/api/local` | projekteigene Struktur prüfen |
@@ -1351,7 +1192,7 @@ Drei Regeln gelten:
 - **stdout gehört dem Protokoll.** Dort läuft der JSON-RPC-Strom, und er bleibt über die
   ganze Sitzung offen. Diagnose geht nach stderr — die Spec hat ihr Logging-Primitiv
   abgekündigt und empfiehlt für stdio genau das. Deshalb laufen im `mcp`-Zweig weder
-  `cleanUpLegacy()` noch `mirrorHostInstall()`.
+  die Wirt-Pflege.
 - **Zustand läuft über einen expliziten Bezeichner, nie über die Verbindung.** Die Spec
   verlangt das ausdrücklich, und für einen stdio-Server ist es keine Formalie: er wird
   einmal gestartet und behält das Arbeitsverzeichnis des Clients über die ganze Sitzung.
@@ -1422,13 +1263,9 @@ JWCC-Parser eng: Kommentare und Trailing Commas sind lesbar, gemeldet und nicht 
 wird nur noch, was auch als JWCC kein JSON-Objekt ergibt (kaputte Syntax, ein Array, ein
 `null`). So geht keine Handarbeit eines Projekts verloren.
 
-**Registriert wird der projekteigene Wrapper**, `project.WrapperPath()` — relativ zum
-Hauptverzeichnis, nicht die host-weite Kopie. Die wäre bequemer und trüge sogar immer den
-neuesten Stand, scheitert aber am Container: dort ist `$HOME` ein anderes,
-`~/.local/bin/k-playbook` existiert nicht, während das Projekt gemountet ist. Dazu kommt,
-dass nur ein relativer Eintrag teilbar ist und dass der Wrapper die Plattform selbst über
-`uname` wählt. `WrapperName` und `BinDirName` stehen deshalb in `internal/project`;
-`hostinstall` benutzt sie von dort, die umgekehrte Richtung wäre ein Import-Zyklus.
+Die MCP-Registrierung wird im Zuge der Umstellung auf den direkt installierten Befehl
+gesondert angepasst. Bis dahin beschreibt dieser Abschnitt noch den bisherigen
+projektlokalen Eintrag.
 
 Der Preis ist eine **Bedingung**: ein relativer Eintrag wird gegen das Arbeitsverzeichnis
 des Assistenten aufgelöst, nicht gegen den Ort der Konfigurationsdatei. Er gilt nur, wenn
@@ -1554,7 +1391,7 @@ Umschlüsseln muss schon die nächste Antwort den neuen tragen.
 ### Der Aufruf
 
 `runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `cleanUpLegacy()`,
-`mirrorHostInstall()`, `protectProjectInstallation()` — und zwar bei **jedem** Aufruf,
+die Migrationsbereinigung, `protectProjectInstallation()` — und zwar bei **jedem** Aufruf,
 auch bei dem, der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start.
 Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 

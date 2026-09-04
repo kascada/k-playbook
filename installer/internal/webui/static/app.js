@@ -11,11 +11,6 @@ const elements = {
   closedMessage: document.getElementById("closed-message"),
   closedReconnect: document.getElementById("closed-reconnect"),
   closedHint: document.getElementById("closed-hint"),
-  pathCard: document.getElementById("path-card"),
-  pathPill: document.getElementById("path-pill"),
-  pathMessage: document.getElementById("path-message"),
-  pathCommand: document.getElementById("path-command"),
-  pathCommandText: document.getElementById("path-command-text"),
   cleanCard: document.getElementById("clean-card"),
   cleanPill: document.getElementById("clean-pill"),
   cleanFacts: document.getElementById("clean-facts"),
@@ -129,9 +124,6 @@ startSession(showClosed);
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
 // blendet ihn dann ein und lädt ihn nach.
 loadConfig();
-// Der PATH betrifft den Host, nicht das Projekt — deshalb unabhängig davon,
-// ob eine Konfiguration gefunden wurde.
-loadPath();
 // Die Update-Prüfung braucht das Netz. Sie läuft nebenher, damit die Seite
 // nicht auf einen langsamen Remote wartet.
 checkUpdate();
@@ -178,8 +170,8 @@ async function onUpdateClick() {
       // gehört ein anderes Binary, und ein alter Daemon soll nicht stehen
       // bleiben.
       showClosed(
-        "Das Programm wurde aktualisiert. Der Dienst hat sich beendet; ein " +
-          "neuer Aufruf von bin/k-playbook startet die neue Fassung."
+        "Das Programm wurde aktualisiert. Der Dienst hat sich beendet; " +
+          "bin/install ausführen und danach k-playbook neu starten."
       );
     }
   } catch {
@@ -331,35 +323,6 @@ function renderLoading(element, text) {
   spinner.setAttribute("aria-hidden", "true");
   loading.append(spinner, text);
   element.replaceChildren(loading);
-}
-
-// Die Karte erscheint nur, solange etwas fehlt. Steht der Aufruf, ist sie
-// nichts, was man wissen müsste — und würde die Schritte nur verdecken.
-async function loadPath() {
-  let data;
-  try {
-    const response = await fetch("/api/path", { cache: "no-store" });
-    data = await response.json();
-  } catch {
-    return;
-  }
-
-  if (data.ok || !data.dir) {
-    elements.pathCard.classList.add("hidden");
-    return;
-  }
-
-  elements.pathPill.className = "pill warn";
-  elements.pathPill.textContent = data.linked ? "Nicht im PATH" : "Fehlt";
-  elements.pathMessage.textContent = data.message || "";
-
-  if (data.export) {
-    elements.pathCommandText.textContent = data.export;
-    elements.pathCommand.classList.remove("hidden");
-  } else {
-    elements.pathCommand.classList.add("hidden");
-  }
-  elements.pathCard.classList.remove("hidden");
 }
 
 async function loadConfig() {

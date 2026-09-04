@@ -1,7 +1,7 @@
 # k-playbook — das Werkzeug
 
-Go-Modul hinter `bin/k-playbook`. Es richtet die k-playbook-Installation eines Projekts
-ein und führt dabei durch drei Schritte.
+Go-Modul hinter dem direkt installierten Befehl `k-playbook`. Der Bootstrap liegt als
+`bin/install` im Projekt-Clone; das Go-Programm richtet das Projekt selbst ein.
 
 Das Werkzeug heißt `k-playbook`, nicht `k-playbook-installer`. Einrichten ist nicht seine
 einzige Aufgabe; die jeweilige steckt im Subkommando.
@@ -9,22 +9,22 @@ einzige Aufgabe; die jeweilige steckt im Subkommando.
 ## Aufruf
 
 ```bash
-k-playbook/bin/k-playbook           # öffnet die Oberfläche im Browser
-k-playbook/bin/k-playbook config create
+k-playbook                          # öffnet die Oberfläche im Browser
+k-playbook config create
                                      # legt K-PLAYBOOK.yaml im aktuellen Verzeichnis an
-k-playbook/bin/k-playbook context   # gibt den aufgelösten Arbeitsstand als JSON aus
-k-playbook/bin/k-playbook stop      # beendet den Hintergrunddienst dieses Projekts
-k-playbook/bin/k-playbook help
+k-playbook context                  # gibt den aufgelösten Arbeitsstand als JSON aus
+k-playbook stop                     # beendet den Hintergrunddienst dieses Projekts
+k-playbook help
 ```
 
-Der Wrapper wählt anhand von `uname` das passende Binary aus `dist/` und startet es.
+`bin/install` lädt das passende Release-Binary, prüft es gegen `SHA256SUMS` und legt es
+nach `~/.local/bin/k-playbook`.
 
 Ohne Argument öffnet das Programm die lokale Oberfläche. Der Server dahinter läuft als
 Hintergrunddienst je Projekt weiter, das Terminal ist sofort wieder frei; ein zweiter
 Aufruf findet ihn und öffnet nur den Browser, `stop` beendet ihn. Davor räumt der Aufruf
-die host-globale Verlinkung des alten Modells weg, falls noch welche liegt, und spiegelt
-sich nach `~/.local/share/k-playbook/installation` — danach genügt in jedem Projekt ein
-bloßes `k-playbook`.
+die globale Assistenten-Verlinkung des alten Modells sowie Reste der früheren
+Wrapper-Installation weg.
 
 `context` ist der Einstieg für Commands und Skills: es löst Verzeichnisse,
 Instruktionsdateien und die drei Kataloge auf, damit kein Command die Overlay-Regeln
@@ -69,7 +69,6 @@ liegendes Repository entgegen.
 installer/
 ├── cmd/k-playbook/main.go
 ├── internal/project/          Anker, Config, Struktur, Verlinkung, Kontext, Update, Tools
-├── internal/hostinstall/      host-weite Kopie unter ~/.local aktuell halten
 ├── internal/legacy/           host-globale Altlasten des alten Modells entfernen
 ├── internal/guiproc/          Laufzeitdatei des Hintergrunddienstes, Prozessidentität, Abkoppeln
 ├── internal/webui/            Server, Endpunkte, eingebettete Oberfläche

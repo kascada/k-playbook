@@ -1,14 +1,10 @@
 .DEFAULT_GOAL := help
 
-# Die host-weite Verfügbarkeit richtet das Programm selbst ein: jeder Start der
-# Oberfläche spiegelt sich nach ~/.local/share/k-playbook/installation und
-# verlinkt nach ~/.local/bin. Das Makefile baut nur.
+# Der Bootstrap-Installer lädt ein Release-Binary; im Entwicklungsrepo baut
+# `make install` stattdessen den Arbeitsstand und installiert ihn direkt.
 INSTALLER_BINARY := k-playbook
 # Paketpfad relativ zum installer/-Verzeichnis, in dem go build läuft.
 INSTALLER_PKG := ./cmd/k-playbook
-# Der Wrapper liegt versioniert im Repo, damit direkt nach dem Clone ein
-# Einstiegspunkt vorhanden ist. Er wird nicht gebaut.
-INSTALLER_WRAPPER := bin/$(INSTALLER_BINARY)
 INSTALLER_DIST_DIR := dist
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 # Die Toolchain steht in installer/go.mod und wird hier nur gelesen. Sie ist
@@ -38,7 +34,7 @@ DEV_MARKER := .k-playbook-devsync
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host gui test release release-publish installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host install gui test release release-publish installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -46,15 +42,15 @@ help: ## Zeigt diese Hilfe an
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Direkt starten, ohne Go und ohne Installation:"
-	@echo "  bin/k-playbook"
+	@echo "Ohne Go installieren:"
+	@echo "  bin/install"
 	@echo ""
 	@echo "Selbst bauen (braucht Go) und starten:"
 	@echo "  make dist        alle Plattformen, für ein Release"
-	@echo "  make gui         nur diese Plattform, dann starten"
+	@echo "  make install     nur diese Plattform bauen und direkt installieren"
+	@echo "  make gui         installieren und starten"
 	@echo ""
-	@echo "Host-weit verfügbar: richtet der erste Start selbst ein."
-	@echo "  danach genügt überall:  k-playbook"
+	@echo "Danach genügt überall:  k-playbook"
 	@echo ""
 
 # -buildvcs=false ist kein Detail: ohne das stempelt Go den Commit-Hash ins
@@ -180,8 +176,18 @@ installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	    echo "Installation aktualisiert: $$before -> $$after"; \
 	  fi
 
-gui: dist-host installer-sync ## Baut, spielt den Arbeitsstand ein und startet die GUI
-	"$(INSTALLER_WRAPPER)"
+install: dist-host ## Baut diese Plattform und installiert sie nach ~/.local/bin
+	@set -eu; \
+	  binary="$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$(INSTALLER_HOST_TARGET)"; \
+	  target="$$HOME/.local/bin/$(INSTALLER_BINARY)"; \
+	  test -f "$$binary" || { printf 'Binary fehlt: %s\n' "$$binary" >&2; exit 1; }; \
+	  mkdir -p "$${target%/*}"; \
+	  command -p install -m 755 "$$binary" "$$target.tmp"; \
+	  mv -f "$$target.tmp" "$$target"; \
+	  printf 'Installiert: %s\n' "$$target"
+
+gui: install ## Baut, installiert und startet die GUI
+	"$$HOME/.local/bin/$(INSTALLER_BINARY)"
 
 test: ## Führt die Tests aus
 	cd installer && go test ./...

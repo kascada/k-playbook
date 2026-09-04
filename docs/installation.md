@@ -6,7 +6,8 @@ Installation und keinen festen Hostpfad; jedes Projekt trägt seine eigene.
 ```bash
 cd /pfad/zum/projekt
 git clone git@github.com:kascada/k-playbook.git
-k-playbook/bin/k-playbook
+k-playbook/bin/install
+k-playbook
 ```
 
 Das Zielverzeichnis muss `k-playbook` heißen — Commands und Skills sprechen es so an.
@@ -14,14 +15,14 @@ Ohne Zielargument ergibt sich der Name aus dem Repo-Namen und stimmt damit von s
 ein eigenes Argument brauchst du nur, wenn du aus einem Fork oder Mirror unter
 abweichendem Namen klonst. Dann lautet es `k-playbook`.
 
-**Go wird nicht gebraucht.** `bin/k-playbook` ist ein Wrapper, der das zur Plattform
-passende Binary startet — für macOS und Linux gleichermaßen, was auch den Fall abdeckt,
-dass Host und Container unterschiedliche Plattformen sind.
+**Go wird nicht gebraucht.** `bin/install` lädt das zur Plattform passende Release-Binary
+und installiert es nach `~/.local/bin/k-playbook`. Auf macOS und im DevContainer läuft
+der Installer jeweils in seiner eigenen Umgebung und installiert deshalb das passende
+macOS- beziehungsweise Linux-Binary.
 
-**Der erste Start braucht Netz.** Die Binaries liegen nicht mehr im Clone, sondern als
-Assets am Release. Der Wrapper lädt genau das eine, das er braucht, und prüft es gegen
-das mitgelieferte `SHA256SUMS`. Ohne Netzzugriff: [Das Binary und der
-Cache](#das-binary-und-der-cache).
+**Die Installation braucht Netz.** Die Binaries liegen nicht im Clone, sondern als Assets
+am Release. `bin/install` lädt genau das passende Asset und prüft es gegen das
+mitgelieferte `SHA256SUMS`.
 
 ## Die vier Schritte
 
