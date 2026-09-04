@@ -10,8 +10,14 @@ Installation und keinen festen Hostpfad; jedes Projekt trägt seine eigene.
 ```bash
 cd /pfad/zum/projekt
 git clone git@github.com:kascada/k-playbook.git
-k-playbook/bin/install
+make -C k-playbook install
 k-playbook
+```
+
+Ohne `make` geht derselbe Bootstrap direkt:
+
+```bash
+k-playbook/bin/install
 ```
 
 Das Zielverzeichnis muss `k-playbook` heißen, denn Commands und Skills sprechen es so an.

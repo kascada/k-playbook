@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
-# Der Bootstrap-Installer lädt ein Release-Binary; im Entwicklungsrepo baut
-# `make install` stattdessen den Arbeitsstand und installiert ihn direkt.
+# `make install` ist der Go-freie Bootstrap aus einem Projekt-Clone.
+# `make dev-install` baut nur im Entwicklungsrepo den Arbeitsstand selbst.
 INSTALLER_BINARY := k-playbook
 # Paketpfad relativ zum installer/-Verzeichnis, in dem go build läuft.
 INSTALLER_PKG := ./cmd/k-playbook
@@ -35,7 +35,7 @@ DEV_MARKER := .k-playbook-devsync
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host install gui test release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host install dev-install gui test release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -44,12 +44,13 @@ help: ## Zeigt diese Hilfe an
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Ohne Go installieren:"
-	@echo "  bin/install"
+	@echo "  make install"
+	@echo "  oder: bin/install"
 	@echo ""
 	@echo "Selbst bauen (braucht Go) und starten:"
 	@echo "  make dist        alle Plattformen, für ein Release"
-	@echo "  make install     nur diese Plattform bauen und direkt installieren"
-	@echo "  make gui         installieren und starten"
+	@echo "  make dev-install nur diese Plattform bauen und direkt installieren"
+	@echo "  make gui         dev-install und starten"
 	@echo ""
 	@echo "Danach genügt überall:  k-playbook"
 	@echo ""
@@ -149,7 +150,10 @@ installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	    echo "Installation aktualisiert: $$before -> $$after"; \
 	  fi
 
-install: dist-host ## Baut diese Plattform und installiert sie nach ~/.local/bin
+install: ## Installiert das passende Release-Binary ohne Go
+	"./bin/install"
+
+dev-install: dist-host ## Baut diese Plattform und installiert sie nach ~/.local/bin
 	@set -eu; \
 	  binary="$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$(INSTALLER_HOST_TARGET)"; \
 	  target="$$HOME/.local/bin/$(INSTALLER_BINARY)"; \
@@ -159,7 +163,7 @@ install: dist-host ## Baut diese Plattform und installiert sie nach ~/.local/bin
 	  mv -f "$$target.tmp" "$$target"; \
 	  printf 'Installiert: %s\n' "$$target"
 
-gui: install ## Baut, installiert und startet die GUI
+gui: dev-install ## Baut, installiert und startet die GUI
 	-"$$HOME/.local/bin/$(INSTALLER_BINARY)" stop
 	"$$HOME/.local/bin/$(INSTALLER_BINARY)"
 
