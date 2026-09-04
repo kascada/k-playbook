@@ -94,8 +94,10 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 		if changed {
 			content += "\n"
 		}
-		if changed && os.WriteFile(path, []byte(content), 0o644) != nil {
-			return CheckRootInstructions(projectDir), fmt.Errorf("%s ergänzen: %w", RootInstructionsFile, err)
+		if changed {
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				return CheckRootInstructions(projectDir), fmt.Errorf("%s ergänzen: %w", RootInstructionsFile, err)
+			}
 		}
 	}
 
