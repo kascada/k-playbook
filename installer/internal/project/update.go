@@ -220,6 +220,9 @@ type UpdateResult struct {
 	Message       string `json:"message"`
 	// Cleanliness trägt den Grund, wenn das Update gar nicht erst lief.
 	Cleanliness Cleanliness `json:"cleanliness"`
+	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag beim Update
+	// selbsttätig korrigiert wurde — relativ zum Hauptverzeichnis.
+	MCPRepaired []string `json:"mcpRepaired,omitempty"`
 }
 
 // Update holt den neuen Stand per Fast-Forward.
@@ -265,6 +268,17 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	// trägt kein Binary mehr, das sich vergleichen ließe.
 	versionChanged := versionBefore != versionAfter
 	result.BinaryChanged = versionChanged
+
+	// Die MCP-Registrierung liegt im Hauptverzeichnis, nicht im Clone — der
+	// Pull erreicht sie nicht. Ein Bestandsprojekt käme sonst mit einem Eintrag
+	// aus dem Update, der auf den abgelösten Wrapper zeigt. Korrigiert wird nur
+	// dieser eine Fall, und ein Fehlschlag entwertet das Update nicht: der Pull
+	// ist durch, und der nächste Start versucht es erneut.
+	repaired, repairErr := RepairMCP(projectDir)
+	result.MCPRepaired = repaired
+	if repairErr != nil {
+		result.Message = "MCP-Registrierung nicht vollständig korrigiert: " + repairErr.Error()
+	}
 
 	return result, nil
 }

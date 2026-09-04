@@ -104,7 +104,7 @@ Abweichungen beim Namen und bietet an, sie zu beheben.
 Was am Ende gilt, rechnet kein Command selbst aus:
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Verlinkt wird für Claude Code, OpenCode und Cursor. Skills stehen nur einmal unter
@@ -133,6 +133,19 @@ make -C k-playbook installer-update
 
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar.
 
+**Hat `VERSION` dabei gewechselt, gehört zum neuen Stand ein anderes Binary.** Der
+Hintergrunddienst beendet sich dann und nennt den Bootstrap; installiert wird er nicht
+von selbst. Der Aufruf ist derselbe wie bei der Erstinstallation und in jeder Umgebung
+einmal fällig — auf dem Host wie im DevContainer:
+
+```bash
+make -C k-playbook install
+```
+
+Ohne `make`: `k-playbook/bin/install`. Ein Zielprojekt hat kein eigenes `install`-Target;
+der Aufruf geht immer über den Clone. Sind nur Commands, Regeln oder Rezepte neu, wechselt
+`VERSION` nicht und der Dienst läuft weiter.
+
 Die Verlinkung für die Assistenten zieht sich danach selbst nach — beim nächsten
 `k-playbook context`, dem Aufruf am Anfang jeder Sitzung, oder beim nächsten Blick in den
 Assistenten-Block der Oberfläche. Sie folgt dem Katalog des Projekts, nicht dem Weg, über
@@ -141,18 +154,18 @@ Assistent einmal neu zu starten; seine Liste liest er beim Start.
 
 ## Selbst bauen
 
-Für den normalen Betrieb genügen die Release-Assets, die der Wrapper selbst lädt. Wer am
+Für den normalen Betrieb genügen die Release-Assets, die `bin/install` lädt. Wer am
 Werkzeug arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-make dist        # baut alle Plattformen nach dist/
+make dist        # baut alle Plattformen nach dist/, der Weg vor einem Release
 make dist-host   # baut nur diese Plattform, deutlich schneller
-make gui         # baut und startet die Oberfläche
+make dev-install # baut diese Plattform und ersetzt ~/.local/bin/k-playbook
+make gui         # dev-install und starten
 ```
 
-Ein `dist/` im Checkout hat immer Vorrang vor Cache und Download. Der
-Entwicklungs-Loop bleibt dadurch netzfrei: `make gui` baut und startet den frisch
-gebauten Stand, ohne etwas zu laden. `dist/` ist nicht versioniert.
+Der Entwicklungs-Loop bleibt dadurch netzfrei: `make gui` baut, installiert und startet
+den frisch gebauten Stand, ohne etwas zu laden. `dist/` ist nicht versioniert.
 
 Gebaut wird mit denselben Flags, mit denen CI die Release-Assets baut — `-trimpath`,
 `CGO_ENABLED=0`, `-buildvcs=false` und die in `installer/go.mod` festgenagelte

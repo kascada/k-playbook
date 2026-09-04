@@ -5,7 +5,7 @@
 
 Für dieses Projekt gilt k-playbook. Rufe zu Beginn
 
-    k-playbook/bin/k-playbook context
+    k-playbook context
 
 auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,
 bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und

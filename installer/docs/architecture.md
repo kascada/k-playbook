@@ -15,8 +15,10 @@ selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — 
 Alles Weitere — Reviews, Tasks, Checks — machen Commands und Skills im Assistenten, nicht
 dieses Programm.
 
-Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`, wird aber als
-`bin/k-playbook` aus dem Repo-Root heraus aufgerufen.
+Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`. Ausgeliefert wird es
+als ein Binary je Plattform; im Betrieb liegt es unter `~/.local/bin/k-playbook` und wird
+unter dem bloßen Namen `k-playbook` aufgerufen. Einen Einstiegspunkt im Projekt-Clone
+gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 
 ## Vier Einstiege
 
@@ -30,7 +32,7 @@ if len(args) == 0 {
 ```
 
 Ohne Argument die Oberfläche — genauer: der **Client-Pfad** `runGUI()` in
-`cmd/k-playbook/gui.go`. Er räumt Altlasten weg, spiegelt host-weit, sperrt die
+`cmd/k-playbook/gui.go`. Er räumt Altlasten weg, sperrt die
 Installation und sieht dann in der Laufzeitdatei nach, ob für dieses Projekt schon ein
 Server läuft. Läuft einer, öffnet er nur den Browser; läuft keiner, startet er das eigene
 Binary mit `K_PLAYBOOK_SERVE=1` als abgekoppelten Server und endet, sobald der antwortet
@@ -92,6 +94,7 @@ installer/
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
+│   ├── installed.go             den absoluten Pfad des installierten k-playbook auflösen
 │   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
 │   ├── instructions_layout.go   CLAUDE.md/AGENTS.md als Paar einordnen und auflösen
 │   ├── remediation.go           remediation:-Block lesen und setzen
@@ -441,7 +444,7 @@ beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `Context
 Der Grund ist eine Zuordnung, die lange falsch herum gedacht war. Welche Links gelten,
 folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem die Installation zu ihrem
 Stand kam. Hing das Nachziehen an einem Weg — dem Update-Handler —, blieb die
-Registrierung bei jedem anderen stehen: `make installer-update`,
+Registrierung bei jedem anderen stehen: `make -C k-playbook installer-update`,
 ein `git pull` von Hand. Und zwar unbemerkt; gesehen hat es nur, wer die
 Assistenten-Karte öffnete. Der Lesepfad ist die richtige Stelle, weil er ohnehin bei
 jedem Sitzungsstart betreten wird und weil er dasselbe Projekt meint.
@@ -586,7 +589,36 @@ bleibt richtig, wo bereits eine Instruktionsdatei steht.
 
 Der Anstoß nennt **keine Verzeichnisebene**. Dieselbe Datei liegt im Projekt, in der
 Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwei dieser
-Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf.
+Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf. Aufgerufen wird das
+einmal je Host oder DevContainer installierte `k-playbook` unter seinem Namen.
+
+### Ein veralteter Anstoß wird ersetzt
+
+Der Marker allein war zu wenig. Ein Bestandsprojekt trug den Anstoß des abgelösten
+Wrapper-Modells (`k-playbook/bin/k-playbook context`); weil der Marker dastand, tat
+`applyRootInstructions()` nichts — und der Git-Update-Weg erreicht die Datei nicht, denn
+sie liegt im Hauptverzeichnis und nicht im Clone. Nach dem Entfernen des Wrappers zeigte
+sie dauerhaft auf eine Datei, die es nicht mehr gibt.
+
+`replaceOutdatedInstructionsBlock()` ersetzt deshalb den Block, wenn er noch
+`legacyInstructionsCommand` (`/bin/k-playbook context`) enthält — dieselbe enge
+Definition von „veraltet" wie bei der MCP-Registrierung, und aus demselben Grund: die
+neue Fassung enthält das Muster nicht, der Lauf ist damit idempotent.
+
+`instructionsBlockBounds()` grenzt den Block ab: von der Markerzeile bis zum nächsten
+HTML-Kommentar oder zur nächsten Überschrift, abzüglich der Leerzeilen davor. Der Block
+trägt genau einen Marker und genau eine Überschrift; was ein Projekt dahinter geschrieben
+hat — auch der Session-Memory-Block — bleibt dadurch stehen.
+
+Zwei Einstiege, wie bei MCP:
+
+| Weg | Einstieg | Tut |
+|---|---|---|
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen |
+| selbsttätig | `RepairRootInstructions()`, jeder Start | ausschließlich einen veralteten Block ersetzen |
+
+Der Auffangweg legt nichts an, ergänzt nichts und fasst einen fremden Text nicht an. Er
+ist der Gegenpart zu `RepairMCP()` für die zweite Datei, die im Hauptverzeichnis liegt.
 
 ## Kataloge auflösen
 
@@ -680,7 +712,7 @@ Drei Zustände, zwei Schweregrade:
 | lokale Commits (`@{u}..HEAD`) | ja | blockieren `--ff-only`, nur von Hand auflösbar |
 
 `Update()` prüft **vor** dem Pull und bricht bei `Blocking()` ab, statt hinterher zu
-stolpern. Das ist der Unterschied zwischen „irgendwas ging schief" und „`bin/k-playbook`
+stolpern. Das ist der Unterschied zwischen „irgendwas ging schief" und „`bin/install`
 ist verändert".
 
 Die Oberfläche zeigt den Befund in einer eigenen Karte, weil dort Dateinamen hinmüssen.
@@ -689,10 +721,6 @@ Ist ein Remote-Update verfügbar und der Zustand blockierend, heißt der Kopfkno
 Pull. Bewusst **ohne** Knopf zum Zurücksetzen: das wäre `git checkout -- .` in einem
 fremden Verzeichnis, und die Oberfläche kann nicht wissen, ob dort jemand absichtlich
 entwickelt. Der Befehl steht zum Kopieren da.
-
-Ist ausgerechnet `bin/k-playbook` die veränderte Datei, ist die Oberfläche über den
-Wrapper nicht mehr erreichbar. Dann führt der host-weite `k-playbook` aus dem `PATH` zum
-selben Ergebnis.
 
 Vor und nach dem Pull wird `VERSION` gelesen. `BinaryChanged` meldet, ob sie gewechselt
 hat — **nur dann** gehört zum neuen Stand ein anderes Binary, und nur dann bringt ein
@@ -705,8 +733,10 @@ Stelle getreten und trennt zugleich sauber: Commits an Regeln, Reviews, Commands
 Docs ändern sie nicht.
 
 Hat `VERSION` gewechselt, beendet sich der Hintergrunddienst nach der Update-Antwort. Das
-neue Binary wird anschließend ausdrücklich mit `bin/install` installiert; der Update-Pfad
-lädt oder ersetzt keine Host-Binaries selbst.
+neue Binary wird anschließend ausdrücklich über den Bootstrap installiert — die Antwort
+nennt ihn in der kanonischen Form aus `project.BootstrapHint`, also
+`make -C k-playbook install`, ohne make `k-playbook/bin/install`. Der Update-Pfad lädt
+oder ersetzt keine Host-Binaries selbst.
 
 ### Die Verlinkung wird mitgezogen
 
@@ -749,31 +779,48 @@ Der globale Aufruf ist überhaupt möglich, weil das Programm sein Projekt aus d
 eigenen Ort. Ein einziges Binary bedient damit alle Projekte; projektspezifisch ist nur
 der Kontext, nicht das Werkzeug.
 
-Gespiegelt wird nach:
+### Der PATH ist Voraussetzung, kein Hinweis
 
-```text
-~/.local/
-├── bin/
-│   └── k-playbook -> ../share/k-playbook/installation/bin/k-playbook
-└── share/k-playbook/
-    ├── installation/
-    │   ├── bin/k-playbook                 Kopie des Wrappers
-    │   ├── VERSION                        welches Release dazugehört
-    │   ├── SHA256SUMS                     Prüfsummen der Assets
-    │   └── .stamp                         Commit-Stand der Quelle
-    └── security-tools/                    Tool-venvs, davon unberührt
-```
+Der ganze Vertrag hängt daran, dass `~/.local/bin` im `PATH` liegt: `k-playbook` wird
+ausschließlich unter seinem Namen aufgerufen — von Commands, von den Instruktionen, vom
+Nutzer. Ein installiertes, aber nicht auffindbares Binary wäre deshalb ein stiller
+Totalausfall.
 
-Die Ebene `installation/` trennt die Spiegelung von den Tool-venvs, die unter
-`~/.local/share/k-playbook/` ebenfalls zuhause sind (`rules/tool-install-scope.md`). Ein
-venv bringt ein eigenes `bin/` mit; ohne diese Ebene kollidierten beide.
+`bin/install` bricht in diesem Fall ab und nennt die Zeile fürs Shell-Profil. Die Prüfung
+liegt **vor** dem Download: sie braucht kein Release-Asset, und ein Abbruch soll nichts
+geladen und nichts ersetzt haben.
+
+### Ein Binary je Plattform, ein Ort
+
+`~/.local/bin/k-playbook` ist eine echte Datei, kein Symlink und keine Auflösung zur
+Laufzeit. Jede Arbeitsumgebung installiert die Fassung ihrer eigenen Plattform: der
+macOS-Host ein Darwin-Binary, der DevContainer ein Linux-Binary.
+
+Teilen sich beide dasselbe `$HOME`, überschreiben sie einander an dieser einen Datei.
+Getrennte HOMEs sind der saubere Zustand, aber nicht erzwingbar. `bin/install` liest
+deshalb vor dem Ersetzen die Magic-Bytes einer vorhandenen Datei — ELF gegen Mach-O,
+ohne `file`, das in schlanken Containern fehlt — und meldet beim Ersetzen, dass die
+andere Umgebung denselben Bootstrap noch einmal braucht.
+
+**Die Grenze davon steht hier ausdrücklich:** Träger der Erkennung ist allein
+`bin/install`. Wer `~/.local/bin/k-playbook` direkt aufruft, während dort ein
+plattformfremdes Binary liegt, bekommt weiterhin die Meldung der Shell
+(`cannot execute binary file`) — nach dem Wrapper-Ausstieg fängt das nichts mehr ab. Die
+make-Targets tragen die Erkennung ebenfalls nicht: `make dev-install` und `make gui`
+bauen vorher unbedingt für die eigene Plattform, dort kann nie ein fremdes Binary stehen.
 
 ### Übergang aufräumen
 
-Der erste Start des neuen Binaries entfernt die alte Spiegelung unter
-`~/.local/share/k-playbook/installation/` sowie den früheren Standard-Cache unter
-`~/.cache/k-playbook/`. Ein direkter Eintrag `~/.local/bin/k-playbook` bleibt erhalten;
-nur ein Symlink auf die alte Spiegelung wird entfernt.
+Der erste Start des neuen Binaries — und ebenso `bin/install` — entfernt die alte
+Spiegelung unter `~/.local/share/k-playbook/installation/` sowie den früheren
+Standard-Cache unter `~/.cache/k-playbook/`. Ein direkter Eintrag
+`~/.local/bin/k-playbook` bleibt erhalten; nur ein Symlink auf die alte Spiegelung wird
+entfernt.
+
+Die Tool-venvs unter `~/.local/share/k-playbook/security-tools/`
+(`rules/tool-install-scope.md`) bleiben ausdrücklich außerhalb dieser Bereinigung. Die
+Ebene `installation/` gab es genau dafür: ein venv bringt ein eigenes `bin/` mit, ohne
+diese Trennung kollidierten beide.
 
 ## Woher Binary und Dateien kommen
 
@@ -789,7 +836,7 @@ Arbeitsverzeichnis und dem Anker ab.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
-| `~/.local/bin/k-playbook` | direkt installiertes Binary | `bin/install` oder `make install` |
+| `~/.local/bin/k-playbook` | direkt installiertes Binary | `make -C k-playbook install`, ohne make `k-playbook/bin/install`; im Entwicklungsrepo `make dev-install` |
 | `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` / `make dist-host` |
 
 `bin/install` ermittelt die Plattform, lädt das Release-Asset zu `VERSION`, prüft es
@@ -801,39 +848,15 @@ Binary zu seiner Version wird gesondert behandelt.
 
 Im Entwicklungsrepo fallen Quelle und Installation auseinander: `~/dev/k-playbook/` ist
 der Arbeitsstand, `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zuletzt
-gepushten Commit. Ein frisch gebautes Binary läse also weiterhin alte Dateien.
+gepushten Commit.
 
-`make installer-sync` spielt deshalb den verfolgten Dateisatz — `git ls-files`, per
-Definition das, was ein Clone enthält — in die Installation ein und legt dort
-`.k-playbook-devsync` ab. `make installer-run` tut das mit. Zurück geht es über die
-Oberfläche, siehe unten — ein Make-Target dafür gibt es bewusst nicht: der nächste
-`installer-sync` spielt ohnehin wieder ein, ein zweiter Weg im Terminal führte nur zum
-selben Ergebnis.
-
-Die Markierung ist nötig, weil Git die eingespielten Dateien zwangsläufig als Änderungen
-sieht. Verbergen lässt sich das nicht: `.git/info/exclude` wirkt nur auf Unverfolgtes,
-`--assume-unchanged` ist unverbindlich, und `--skip-worktree` bricht den Checkout. Also
-wird der Zustand benannt statt versteckt — `CheckCleanliness()` prüft die Markierung vor
-dem `git status` und meldet `DevSync` statt einer Liste einzelner Dateien. `Blocking()`
-bleibt trotzdem wahr: ein Pull in einen eingespielten Stand wäre falsch.
-
-Ohne diese Unterscheidung stünde in der Installations-Karte dauerhaft „lokal gearbeitet" —
-also genau der Alarm, der echte Handarbeit im Clone melden soll, und der damit wertlos
-würde.
-
-**Verworfen wird aus der Oberfläche.** Der Update-Knopf heißt im Entwicklungsstand
-„Arbeitsstand verwerfen" und ruft `/api/update/discard` auf; dahinter steht
-`DiscardDevSync()` mit `git checkout -- .` und `git clean -fd`. Danach zeigt die Antwort
-den neuen Stand, aus dem wie gewohnt „Update verfügbar" werden kann — **zwei Klicks, nicht
-einer.** Der Zustand, den man ansieht, verschwindet beim Verwerfen; das gehört angesagt und
-nicht in dieselbe Aktion wie das Aktualisieren gepackt.
-
-Dass die Oberfläche hier von sich aus `git checkout -- .` und `git clean -fd` ausführt, ist
-die einzige Ausnahme von der Regel, dass sie fremde Verzeichnisse nicht zurücksetzt. Sie
-trägt: die Markierung sagt, woher der Inhalt kommt, nämlich aus dem Arbeitsstand. Verworfen
-wird eine Kopie, keine Arbeit. **Ohne Markierung lehnt `DiscardDevSync()` ab** — dann lässt
-sich nicht wissen, ob dort jemand absichtlich entwickelt hat, und es bleibt beim Befehl zum
-Kopieren.
+Das bleibt so und ist gewollt. `make dev-install` baut den Arbeitsstand und ersetzt damit
+das Binary unter `~/.local/bin`; der Inhalt — Regeln, Reviews, Checks, Commands, Skills —
+kommt weiterhin aus dem Clone unter `k-playbook/` und damit vom zuletzt gepushten Stand.
+Der Preis dafür ist bewusst bezahlt: der Clone bleibt ein read-only Vendor-Verzeichnis,
+in das nichts eingespielt wird, und `CheckCleanliness()` meldet jede Abweichung dort als
+das, was sie ist — Handarbeit in einem fremden Verzeichnis. Es gibt keinen Sync-Weg aus
+dem Arbeitsstand in die Installation und keine Ausnahme davon in der Oberfläche.
 
 **Bekannte Grenze des Hintergrunddienstes.** Der Aufruf erkennt einen laufenden Server
 anderer Version an der `VERSION` der Installation, siehe „Lebenszyklus". Ein frisch
@@ -1135,7 +1158,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
 | `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |
-| `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Wrapper als Subprozess |
+| `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Befehl als Subprozess |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
@@ -1245,8 +1268,8 @@ entstehende Datei geht weiter über `json.MarshalIndent` — dort gibt es nichts
 Sichtbar bleibt eine Nebenwirkung: nach dem Patch läuft `Value.Format()` und rückt die
 Datei einheitlich mit Tabs ein. Bei einer eingecheckten Konfiguration mit
 Leerzeichen-Einrückung ist das ein Diff über die ganze Datei. Es passiert einmal:
-`applyMCPTarget()` schreibt gar nicht, wenn der Eintrag schon gleich ist — sonst
-formatierte jeder Lauf eine fremde Datei erneut um.
+`applyMCPTarget()` schreibt gar nicht, wenn der Eintrag schon in einer akzeptierten Form
+dasteht — sonst formatierte jeder Lauf eine fremde Datei erneut um.
 
 Der Schlüssel gehört k-playbook. Ein abweichender Wert darunter ist kein Konflikt,
 sondern ein falscher Stand: `MCPStateStale` meldet ihn, `ApplyMCP()` überschreibt ihn. Als
@@ -1255,21 +1278,89 @@ JWCC-Parser eng: Kommentare und Trailing Commas sind lesbar, gemeldet und nicht 
 wird nur noch, was auch als JWCC kein JSON-Objekt ergibt (kaputte Syntax, ein Array, ein
 `null`). So geht keine Handarbeit eines Projekts verloren.
 
-Die MCP-Registrierung wird im Zuge der Umstellung auf den direkt installierten Befehl
-gesondert angepasst. Bis dahin beschreibt dieser Abschnitt noch den bisherigen
-projektlokalen Eintrag.
+#### Was eingetragen wird
 
-Der Preis ist eine **Bedingung**: ein relativer Eintrag wird gegen das Arbeitsverzeichnis
-des Assistenten aufgelöst, nicht gegen den Ort der Konfigurationsdatei. Er gilt nur, wenn
-der Assistent im Hauptverzeichnis geöffnet ist. Das wird nicht umgangen, sondern gesagt —
-im Block und in [`docs/mcp.md`](../../docs/mcp.md). Weicht `Environment.SearchedFrom` von
-`Environment.ProjectDir` ab, wurde schon die Oberfläche nicht dort gestartet; dann zeigt
-`GET /api/mcp` `workdirMismatch` und der Hinweis wird deutlich statt beiläufig.
+`MCPCommand()` liefert den **beim Schreiben aufgelösten absoluten Pfad** des installierten
+k-playbook, dazu das Subkommando `mcp`. Aufgelöst wird er in `project/installed.go`:
+zuerst `~/.local/bin/k-playbook` — das Ziel von `bin/install` und `make dev-install` —,
+sonst der laufende Prozess, wenn er selbst `k-playbook` heißt. Über die `PATH` wird
+bewusst **nicht** gesucht: ein PATH-Treffer hinge wieder an der Umgebung des Aufrufers
+und könnte auf einen ganz anderen Stand zeigen als den, den `bin/install` gelegt hat.
 
-**Fehlt der Wrapper**, meldet jedes Ziel `MCPStateNoWrapper` und `ApplyMCP()` schreibt
-nichts. Sonst meldete ein frischer Clone ohne `k-playbook/` eine Registrierung als „steht
-richtig", die auf nichts zeigt. Ein **Entfernen** gibt es nicht: die Oberfläche richtet
-ein, sie räumt nicht ab.
+Absolut und nicht als bloßer Kommandoname, weil aus Dock oder Finder gestartete Clients
+die Shell-`PATH` nicht erben; `~/.local/bin` fehlt dort typischerweise. Lässt sich kein
+Binary auflösen, meldet jedes Ziel `MCPStateNoCommand` und es wird nichts geschrieben:
+eine Registrierung, die auf nichts zeigt, ist schlechter als keine.
+
+#### Eine Menge akzeptierter Formen statt eines Sollwerts
+
+Geschrieben wird genau eine Form, geprüft wird gegen eine Menge. `reflect.DeepEqual`
+gegen `mcpEntry()` ist deshalb weg; an seiner Stelle stehen drei Prädikate in `mcp.go`:
+
+- `acceptedMCPCommandForms()` — die Menge selbst, als Liste benannter Formen. Heute zwei:
+  jeder absolute Pfad, dessen Dateiname `k-playbook` ist, **auch der eines fremden
+  `$HOME`** (`isInstalledCommandForm`), und der bloße Kommandoname `k-playbook`
+  (`isPortableCommandForm`) — die eincheckbare Form, die kein `$HOME` nennt. Eine
+  weitere Form ist ein weiterer Listeneintrag; der Vergleich selbst bleibt unverändert.
+- `isOutdatedMCPCommand()` — „veraltet" im engen Sinn: der abgelöste Wrapper. Ein
+  **relativer** Eintrag genügt mit der Endung `bin/k-playbook`, ein **absoluter** muss
+  auf `k-playbook/bin/k-playbook` enden. Ohne diese Trennung fiele
+  `~/.local/bin/k-playbook` selbst darunter — es endet ebenfalls auf `bin/k-playbook` —
+  und die Auto-Korrektur schriebe endlos.
+- `mcpEntryCommand()` — liest Kommando und Argumente aus dem vorgefundenen Eintrag,
+  ohne den Rest zu bewerten. Zusätzliche Schlüssel wie ein von Hand gesetztes `timeout`
+  bei OpenCode überleben damit; der frühere Strukturvergleich hätte sie weggeschrieben.
+
+`legacyWrapperCommand` und `legacyWrapperTail` in `mcp.go` sowie
+`legacyInstructionsCommand` in `instructions.go` sind bewusst **eigene** Konstanten und
+nicht aus einem Wrapper-Bezeichner abgeleitet. Die Datei `bin/k-playbook` gibt es im
+Quell-Repo nicht mehr; genau deshalb müssen die drei Konstanten sie überleben — sie sind
+das Einzige, was ein Bestandsprojekt noch von ihr weg migriert. Sie werden erst
+entfernt, wenn kein Projekt mehr aus dem Wrapper-Modell aktualisiert.
+
+Der fremde `$HOME` ist eine Entscheidung mit Preis, und der steht in
+[`docs/mcp.md`](../../docs/mcp.md): teilen sich Host und Container ein Repository bei
+getrennten HOMEs, bleibt MCP in der jeweils anderen Umgebung tot, ohne dass die
+Auto-Korrektur greift. Die Alternative wäre schlechter — beide Umgebungen erklärten sich
+in derselben Datei wechselseitig für veraltet.
+
+Die portable Form hat ihren eigenen Preis, und auch der steht dort: der bloße Name
+hängt an der `PATH`, und aus Dock oder Finder gestartete Clients erben sie nicht. Sie ist
+deshalb ausdrücklich **kein** Schreibziel — `MCPCommand()` liefert weiter den absoluten
+Pfad —, sondern nur eine Form, die eine eingecheckte Registrierung tragen darf, ohne von
+der Auto-Korrektur überschrieben zu werden. `isPortableCommandForm` prüft bewusst ohne
+`path.Clean` auf Gleichheit mit dem Namen: `./k-playbook` bliebe sonst als „aktuell"
+hängen, obwohl es einen Projektpfad meint.
+
+#### Zwei Schreibwege, eine Entscheidungsstelle
+
+| Weg | Einstieg | Schreibt bei |
+|---|---|---|
+| ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | allem, was nicht zur Menge gehört |
+| selbsttätig | `RepairMCP()`, Clone-Update und jeder Start | ausschließlich `MCPStateOutdated` |
+
+Beide gehen durch `mcpTargetNeedsWrite()`; das `onlyOutdated`-Flag ist der einzige
+Unterschied. Die Enge des zweiten Weges ist die Idempotenz-Zusage: er legt keine Datei
+an, ergänzt keinen fehlenden Eintrag und fasst keine akzeptierte Form an. Ohne das machte
+jeder Start die getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit
+eingecheckter Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.
+
+Gerufen wird `RepairMCP()` von `Update()` (`project/update.go`, Ergebnis in
+`UpdateResult.MCPRepaired`) und von `runGUI()` (`cmd/k-playbook/gui.go`). Beide Stellen
+sind nötig: der `git pull` erreicht die Dateien nicht, weil sie im Hauptverzeichnis
+liegen und nicht im Clone, und ein `git pull` von Hand oder `make -C k-playbook
+installer-update` geht am Update-Handler ganz vorbei — für den ist der Start der
+Auffangweg. Ein **Entfernen** gibt es weiterhin nicht: die Oberfläche richtet ein, sie
+räumt nicht ab.
+
+#### Die Bedingung, die bleibt
+
+Der eingetragene Pfad sagt, welches Binary startet — nicht, welches Projekt gemeint ist.
+Der Server löst das zur Laufzeit über die Aufwärtssuche nach `K-PLAYBOOK.yaml` ab seinem
+Arbeitsverzeichnis auf, und das ist das des Assistenten. Weicht `Environment.SearchedFrom`
+von `Environment.ProjectDir` ab, wurde schon die Oberfläche nicht im Hauptverzeichnis
+gestartet; dann zeigt `GET /api/mcp` `workdirMismatch` und der Hinweis wird deutlich
+statt beiläufig.
 
 ### Die Seite /mcp
 
@@ -1278,15 +1369,22 @@ Werkzeug-Selbsttest. Er ist ein eigener Endpunkt, weil dahinter ein Subprozess s
 Teil von `GET /api/mcp` bremste er die Startseite aus. Aufgerufen wird er nur von
 `mcp.js`, also erst beim Öffnen der Seite.
 
-Gestartet wird der **registrierte Wrapper** mit dem Hauptverzeichnis als
+Gestartet wird der **registrierte Befehl** mit dem Hauptverzeichnis als
 Arbeitsverzeichnis, nicht der laufende Prozess: nur so misst die Seite das, was der
-Assistent später bekommt, Binary-Auswahl inbegriffen. Die Mechanik ist dieselbe wie in
-`cmd/k-playbook/mcp_test.go` — `initialize`, `notifications/initialized`, `tools/list`,
-und stdin bleibt offen, bis die Antworten da sind.
+Assistent später bekommt. Die Mechanik ist dieselbe wie in `cmd/k-playbook/mcp_test.go` —
+`initialize`, `notifications/initialized`, `tools/list`, und stdin bleibt offen, bis die
+Antworten da sind.
 
-Fehlender Wrapper, keine Antwort, kein verwertbares JSON: alles davon ist ein **Ergebnis**
-der Seite, keine Störung — sie zeigt „Server antwortet nicht" samt Grund. Der Handler darf
-unter keinen Umständen hängen bleiben und die Seite mitnehmen.
+**Ohne die geerbte Shell-`PATH`.** `mcpProbeEnv()` streicht `PATH` aus der Umgebung und
+setzt die minimale System-`PATH`, die launchd einem GUI-Programm mitgibt. Das ist der
+Fall, den der Test abbilden soll: ein aus Dock oder Finder gestarteter Client erbt keine
+Login-Shell. Mit der `PATH` der Shell, in der die Oberfläche gestartet wurde, meldete der
+Test grün, während der Client scheitert — er misst dann eine Umgebung, die es beim Client
+nicht gibt. Leer wäre falsch, der Server ruft seinerseits `git` auf.
+
+Kein installiertes Binary, keine Antwort, kein verwertbares JSON: alles davon ist ein
+**Ergebnis** der Seite, keine Störung — sie zeigt „Server antwortet nicht" samt Grund.
+Der Handler darf unter keinen Umständen hängen bleiben und die Seite mitnehmen.
 
 Genau das ist die Stelle, an der es einmal nicht gereicht hat. `exec.CommandContext` mit 10
 Sekunden und ein `defer`, das den Prozess beendet, sehen nach der vollständigen Antwort aus
@@ -1308,6 +1406,18 @@ Drei Dinge zusammen lösen es, und keines davon ist entbehrlich:
 
 Wer hier vereinfacht, bekommt einen Handler zurück, der im Normalfall funktioniert und im
 Fehlerfall die Seite mitnimmt — also in dem Fall, für den er gebaut ist.
+
+**Das gelesene Schema bleibt nachsichtig.** `tools/list` liefert je Parameter ein
+JSON-Schema, und dessen `type` darf zwei Formen haben: einen Namen (`"string"`) und eine
+Liste von Namen (`["null","array"]`). Die zweite ist keine Ausnahme — das Go-SDK erzeugt
+sie für jeden optionalen Parameter, der aus einem Zeiger- oder Slice-Feld kommt, und die
+eigenen Werkzeuge dieses Servers nutzen sie. Ein blankes `string` an dieser Stelle wäre
+deshalb kein Anzeigefehler gewesen, sondern ein falscher Befund: `json.Unmarshal` bricht
+die **ganze** Antwort ab, und die Seite meldete „Server antwortet nicht" für einen Server,
+der einwandfrei geantwortet hat. `schemaType` in `webui/mcp.go` liest deshalb beide Formen
+und macht aus der Liste `null | array`; eine dritte, unbekannte Form bleibt still leer und
+kippt den Selbsttest nicht. Dieselbe Zurückhaltung gilt für jedes weitere Feld, das aus
+`tools/list` gelesen wird: es beschreibt eine fremde Antwort, nicht den eigenen Zustand.
 
 ## Lebenszyklus
 
@@ -1372,9 +1482,15 @@ liefert eines von fünf Ergebnissen:
 3. Antwortet der eigene Server, entscheidet die Version: gleich → **läuft unter dieser
    URL**, anders → **läuft mit anderer Version**. Ohne Datei: **nicht vorhanden**.
 
-Die Version wird beim Build mit `-ldflags -X` in das Binary gestempelt. `make install`
-nimmt den Wert aus `VERSION`; der Release-Workflow stempelt denselben Wert in die vier
-Assets. Jeder Prozess hält ihn beim Start fest und liest ihn nicht von der Platte, sonst
+Die Version wird beim Build mit `-ldflags -X` in das Binary gestempelt. Der Wert kommt
+aus der `VERSION` des Standes, der gebaut wird: `make dist`, `make dist-host` und
+`make dev-install` lesen sie über `INSTALLER_BUILD_VERSION`, der Release-Workflow liest
+dieselbe Datei und stempelt denselben Wert in die vier Assets. Ein lokaler
+Entwicklungsbuild und das Release-Asset derselben `VERSION` tragen damit dieselbe
+Kennung — und `/api/health` gibt genau sie zurück, denn der Server nimmt sie über
+`guiproc.OwnVersion()` aus `buildinfo.Version`. Der Bootstrap `make -C k-playbook install`
+stempelt nichts; er lädt das fertig gestempelte Asset.
+Jeder Prozess hält den Wert beim Start fest und liest ihn nicht von der Platte, sonst
 wäre ein Wechsel auf der Platte nie zu erkennen. Der Schlüssel in `/api/health` wird
 dagegen je Anfrage berechnet: nach dem Umschlüsseln muss schon die nächste Antwort den
 neuen tragen.
@@ -1426,7 +1542,7 @@ Mechanismus statt zweier.
 Im Browser sperrt ein ausgebliebenes Lebenszeichen erst nach drei Fehlschlägen in Folge,
 damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Startseite ist keine
 Sackgasse: sie bietet „Erneut verbinden" — antwortet der Server, lädt die Seite neu —,
-und erst wenn das scheitert, den Weg über `bin/k-playbook` im Terminal. Der Knopf
+und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 
 `POST /api/update` beendet den Server nach der Antwort, wenn die `VERSION` gewechselt hat

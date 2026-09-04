@@ -109,7 +109,7 @@ Eine Liste in der Konfiguration gibt es dafür nicht.
 ## Woher weiß ich, was am Ende gilt?
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Gibt den aufgelösten Arbeitsstand als JSON aus: Verzeichnisse, Instruktionsdateien in
@@ -209,11 +209,11 @@ Skript nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen g
 
 ## Brauche ich Go?
 
-Nein. `bin/k-playbook` ist ein Wrapper, der das zur Plattform passende Binary startet —
-für macOS und Linux. Es liegt nicht mehr im Repo, sondern als Asset am Release: der
-Wrapper lädt genau das eine, das er braucht, in einen Cache und prüft es gegen das
-mitgelieferte `SHA256SUMS`. Der erste Start braucht dafür Netz; ohne Zugriff helfen
-`bin/k-playbook --prefetch`, ein vorbefüllter `K_PLAYBOOK_CACHE` oder `make dist-host`.
+Nein. Der Bootstrap `k-playbook/bin/install` ist ein reines Shell-Skript. Er wählt das
+zur Plattform passende Release-Asset — macOS oder Linux —, prüft es gegen das
+mitgelieferte `SHA256SUMS` und installiert es als echte Datei nach
+`~/.local/bin/k-playbook`. Er läuft einmal je Host oder DevContainer und braucht dafür
+Netz; danach läuft jeder Aufruf über das installierte `k-playbook`.
 
 Go brauchst du nur, wenn du am Werkzeug selbst arbeitest:
 

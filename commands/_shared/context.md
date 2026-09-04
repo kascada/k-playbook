@@ -6,13 +6,17 @@ shared module; there is nothing else to apply.
 ## Load the project context
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
-The path is relative to the project's main directory, which is normally the working
-directory. If the wrapper is not there, walk upwards until a directory contains
-`k-playbook/bin/k-playbook`, and call it from there. The binary then finds
-`K-PLAYBOOK.yaml` on its own, so it does not matter where it was started from.
+`k-playbook` is installed once per host or DevContainer and is called by its name, from
+the project's main directory — normally the working directory. There is no path to
+resolve and nothing to search for: the binary finds `K-PLAYBOOK.yaml` by walking up from
+the working directory, so it does not matter where the binary itself lives.
+
+If the command is not found, k-playbook is not installed in this environment. Stop and
+report it; the bootstrap is `make -C k-playbook install` (without make:
+`k-playbook/bin/install`). Do not look for a project-local copy.
 
 It writes JSON to stdout and exits non-zero if there is no installation — in that case,
 stop and report it. Do not guess paths and do not create anything.
@@ -85,8 +89,7 @@ from the output above — never from configuration, and never by searching.
 | unversioned working files | `<local.dir>/priv/` |
 | project-local commands | `<local.dir>/commands/` |
 | project-local skills | `<local.dir>/skills/` |
-| the wrapper itself | `<playbook.dir>/bin/k-playbook` |
-| check runner | `<playbook.dir>/bin/k-check` |
+| the check runner, project-local by contract | `<playbook.dir>/bin/k-check` |
 | scripts | `<playbook.dir>/scripts/` |
 | security tool matrix | `<playbook.dir>/scripts/security-tools.tsv` |
 

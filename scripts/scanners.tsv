@@ -1,9 +1,10 @@
 # Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
 # Fields: job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 #
-# Katalog und Binary werden gemeinsam ausgerollt (make installer-sync überträgt beides in
-# einem Schritt). Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen
-# wird: ein altes Binary läse einen um eine Spalte erweiterten Katalog gar nicht mehr und
+# Katalog und Binary gehören zusammen: dieser Katalog kommt mit dem Clone, das Binary mit
+# `bin/install`. Nach einem Clone-Update mit VERSION-Wechsel gehört deshalb der Bootstrap
+# hinterher. Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen wird:
+# ein altes Binary läse einen um eine Spalte erweiterten Katalog gar nicht mehr und
 # brächte keinen Lauf mehr zustande.
 #
 # Der Eintrag eines Laufs ist das Werkzeug, der Job ist der Aufruf. Ein Werkzeug kann

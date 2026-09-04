@@ -117,7 +117,7 @@ Geschrieben wird dorthin nie.
 Kein Command rechnet selbst aus, was gilt. Das macht das Werkzeug:
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Die JSON-Ausgabe nennt die aufgelösten Verzeichnisse, die Instruktionsdateien in

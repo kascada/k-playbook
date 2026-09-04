@@ -45,13 +45,23 @@
             </div>
 
             <p class="hint">
-              Eingetragen wird <code id="registration-command">k-playbook/bin/k-playbook mcp</code> —
-              der projekteigene Wrapper, nicht die host-weite Kopie. Der Pfad ist relativ zum
-              Hauptverzeichnis: nur so lässt er sich einchecken und gilt im DevContainer genauso.
+              Eingetragen wird <code id="registration-command">k-playbook mcp</code> — der beim
+              Schreiben aufgelöste absolute Pfad des installierten Binaries, nicht sein bloßer
+              Name. Aus Dock oder Finder gestartete Clients erben die Shell-PATH nicht; ein
+              Kommandoname wäre dort tot.
+            </p>
+            <p class="hint">
+              Als aktuell gilt nicht ein einziger Wert, sondern eine Menge von Formen: jeder
+              absolute Pfad auf ein installiertes <code>k-playbook</code>, auch der eines anderen
+              <code>$HOME</code>. Sonst erklärten Host und DevContainer sich in derselben Datei
+              wechselseitig für veraltet. Dazu der bloße Name <code>k-playbook</code> — die
+              eincheckbare Form, die kein <code>$HOME</code> nennt; sie wird nie geschrieben,
+              aber auch nie überschrieben. Von selbst überschrieben wird nur der abgelöste
+              Wrapper-Pfad <code>k-playbook/bin/k-playbook</code>.
             </p>
             <p id="registration-workdir" class="hint hidden">
-              Der Eintrag wird gegen das Arbeitsverzeichnis des Assistenten aufgelöst, nicht
-              gegen den Ort der Konfigurationsdatei. Er wirkt deshalb nur, wenn der Assistent im
+              Der Server löst das Projekt über sein Arbeitsverzeichnis auf, nicht über den Ort
+              der Konfigurationsdatei. Er findet es deshalb nur, wenn der Assistent im
               Hauptverzeichnis geöffnet ist — dort, wo <code>K-PLAYBOOK.yaml</code> liegt.
             </p>
 
@@ -68,10 +78,12 @@
             </div>
 
             <p class="hint">
-              Gemessen, nicht behauptet: die Oberfläche startet den registrierten Wrapper als
+              Gemessen, nicht behauptet: die Oberfläche startet den registrierten Befehl als
               eigenen Prozess, schickt ihm <code>initialize</code> und <code>tools/list</code> und
               zeigt, was zurückkommt. Damit beantwortet dieselbe Anzeige auch, ob der Server
-              überhaupt läuft.
+              überhaupt läuft. Gestartet wird er dabei <strong>ohne die geerbte Shell-PATH</strong>
+              — sonst meldete der Test grün, während der aus Dock oder Finder gestartete Client
+              scheitert.
             </p>
 
             <dl id="tools-facts" class="facts"></dl>

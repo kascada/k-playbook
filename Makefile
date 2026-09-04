@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
-# `make install` ist der Go-freie Bootstrap aus einem Projekt-Clone.
+# Das Target `install` ist der Go-freie Bootstrap. Diese Datei liegt im Clone;
+# im Zielprojekt heißt der Aufruf deshalb `make -C k-playbook install` — ein
+# Zielprojekt hat kein eigenes install-Target.
 # `make dev-install` baut nur im Entwicklungsrepo den Arbeitsstand selbst.
 INSTALLER_BINARY := k-playbook
 # Paketpfad relativ zum installer/-Verzeichnis, in dem go build läuft.
@@ -30,7 +32,6 @@ PLAYBOOK_DIR := k-playbook
 # Schreibschutz-Targets dürfen deshalb nie auf . fallen und den Arbeitsstand
 # einschließlich k-playbook-local/ sperren.
 INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard installer)),$(PLAYBOOK_DIR),.)
-DEV_MARKER := .k-playbook-devsync
 # Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
@@ -43,9 +44,9 @@ help: ## Zeigt diese Hilfe an
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Ohne Go installieren:"
-	@echo "  make install"
-	@echo "  oder: bin/install"
+	@echo "Ohne Go installieren (aus dem Hauptverzeichnis des Projekts):"
+	@echo "  make -C k-playbook install"
+	@echo "  oder ohne make: k-playbook/bin/install"
 	@echo ""
 	@echo "Selbst bauen (braucht Go) und starten:"
 	@echo "  make dist        alle Plattformen, für ein Release"
@@ -83,11 +84,10 @@ dist-host: ## Baut nur das Binary dieser Plattform nach ./dist/
 
 build: dist ## Alias für dist
 
-# Beide Prüfungen unten schlagen bei derselben Verwechslung an — Aufruf in der
-# Installation statt im Arbeitsstand —, scheitern aber an verschiedenen Stellen:
-# der Build an der Schreibsperre, der Sync am fehlenden Arbeitsstand. Der
-# Hinweis ist deshalb geteilt: gleicher Rat im Entwicklungsrepo, eigener
-# Fallback für ein Zielprojekt, wo jede Prüfung etwas anderes bedeutet.
+# Die Verwechslung, gegen die das hier absichert: `make` läuft in der
+# Installation statt im Arbeitsstand. Der Build scheitert dann an der
+# Schreibsperre — mit einer Meldung, die den richtigen Ort nennt statt eines
+# "permission denied".
 define in_dev_installation
 test -d "../installer" -a -d "../$(PLAYBOOK_DIR)/.git"
 endef
@@ -96,21 +96,6 @@ define hint_use_workspace
 	    printf 'Hier läuft die Makefile-Kopie in der Installation. Gebaut und\n' >&2; \
 	    printf 'eingespielt wird aus dem Arbeitsstand eine Ebene höher:\n\n' >&2; \
 	    printf '  make -C %s %s\n\n' "$(abspath ..)" "$(GOAL)" >&2
-endef
-
-# Nur im Entwicklungsrepo sinnvoll: in einem Zielprojekt gibt es keinen
-# Arbeitsstand, aus dem gesynct werden könnte, und ein rsync über die
-# Installation wäre dort schlicht Datenverlust.
-define require_dev_repo
-	@test -d "$(PLAYBOOK_DIR)/.git" -a -d installer || { \
-	  if $(in_dev_installation); then \
-	    $(hint_use_workspace); \
-	  else \
-	    printf '%s gilt nur im Entwicklungsrepo: %s/ muss ein Clone sein und installer/ vorhanden.\n' \
-	      "$(GOAL)" "$(PLAYBOOK_DIR)" >&2; \
-	  fi; \
-	  exit 1; \
-	}
 endef
 
 # Vor dem Build, nicht mittendrin: sonst bricht `go build` erst beim Schreiben
@@ -148,6 +133,9 @@ installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	    echo "Installation bereits aktuell ($$after)"; \
 	  else \
 	    echo "Installation aktualisiert: $$before -> $$after"; \
+	    echo "Dieser Weg aktualisiert nur den Clone. Was im Hauptverzeichnis liegt"; \
+	    echo "— MCP-Registrierung, Anstoßblock —, zieht der nächste Aufruf nach:"; \
+	    echo "  k-playbook"; \
 	  fi
 
 install: ## Installiert das passende Release-Binary ohne Go
@@ -179,7 +167,16 @@ test: ## Führt die Tests aus
 #
 # Andersherum zeigte VERSION eine Zeit lang auf einen Tag ohne Downloads, und
 # jede Installation, die in diesem Fenster aktualisiert, startet nicht mehr.
-# Einen Versions-Fallback im Wrapper gibt es dafür nicht.
+# Einen Versions-Fallback gibt es dafür nicht: bin/install lädt genau das
+# Asset, das VERSION nennt, oder gar keins.
+#
+# Gefragt wird in installer/, nicht hier: `go env GOVERSION` beantwortet die
+# Frage modulabhängig. Im Wurzelverzeichnis gibt es keine go.mod, dort nennt es
+# die Basis-Toolchain der Maschine; in installer/ hat GOTOOLCHAIN=auto die
+# toolchain-Zeile schon aufgelöst und nennt genau die Version, mit der `go
+# build` dann tatsächlich baut — dieselbe Version, die CI installiert. Am
+# falschen Ort gefragt scheitert das Release auf einem Rechner, dessen
+# Basis-Toolchain älter ist, obwohl gebaut würde, was CI baut.
 define require_toolchain
 	@set -eu; \
 	  want="$(INSTALLER_GO_TOOLCHAIN)"; \
@@ -187,7 +184,7 @@ define require_toolchain
 	    printf 'In installer/go.mod fehlt die toolchain-Zeile.\n' >&2; \
 	    exit 1; \
 	  }; \
-	  have="$$(go env GOVERSION)"; \
+	  have="$$(cd installer && go env GOVERSION)"; \
 	  test "$$have" = "$$want" || { \
 	    printf 'Go %s ist installiert, verlangt ist %s (installer/go.mod, toolchain).\n' \
 	      "$$have" "$$want" >&2; \

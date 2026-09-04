@@ -332,3 +332,31 @@ func TestCheckUpdateOhneGit(t *testing.T) {
 		t.Errorf("erwartet wurde eine Meldung ohne Update: %+v", status)
 	}
 }
+
+// Nach dem Clone-Update darf kein Bestandsprojekt mit einer kaputten
+// MCP-Registrierung zurückbleiben. Der Pull erreicht die Datei nicht — sie
+// liegt im Hauptverzeichnis, nicht im Clone —, also korrigiert das Update sie
+// selbst.
+func TestUpdateKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
+	projectDir, _ := newGitInstallation(t)
+
+	installed := installTestBinary(t)
+	writeFile(t, filepath.Join(projectDir, ".mcp.json"),
+		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
+
+	result, err := Update(projectDir)
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if len(result.MCPRepaired) != 1 || result.MCPRepaired[0] != ".mcp.json" {
+		t.Fatalf("MCPRepaired = %v, erwartet [.mcp.json]", result.MCPRepaired)
+	}
+
+	status := mcpStatusFor(t, CheckMCP(projectDir), ".mcp.json")
+	if !status.OK() {
+		t.Fatalf("nach dem Update nicht korrigiert: %+v", status)
+	}
+	if status.Detail != "-> "+installed {
+		t.Errorf("Detail = %q, erwartet den absoluten Pfad %s", status.Detail, installed)
+	}
+}

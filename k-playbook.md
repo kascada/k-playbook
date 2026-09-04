@@ -60,7 +60,7 @@ vergleicht den Katalog mit dem Registrierten und richtet die Verlinkung ein.
 
 ## Wo was liegt
 
-Verlass dich nicht auf Annahmen über Pfade. `k-playbook/bin/k-playbook context`
+Verlass dich nicht auf Annahmen über Pfade. `k-playbook context`
 liefert die aufgelösten Verzeichnisse und die effektiven Kataloge — mitgeliefert und
 projekteigen bereits zusammengeführt, abgeschaltete Einträge markiert.
 
@@ -93,7 +93,7 @@ projekteigener Command ersetzt den gleichnamigen mitgelieferten oder schaltet ih
 Die Oberfläche startet ohne Argument:
 
 ```bash
-k-playbook/bin/k-playbook
+k-playbook
 ```
 
 Das ist der Weg, den ein Nutzer selbst geht: Konfiguration, Status der projekteigenen

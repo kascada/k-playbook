@@ -20,6 +20,8 @@ func runGUI() error {
 	cleanUpLegacy()
 	cleanUpFormerHostInstall()
 	protectProjectInstallation()
+	repairMCPRegistration()
+	repairRootInstructions()
 
 	key, err := guiproc.Key()
 	if err != nil {
@@ -65,6 +67,60 @@ func protectProjectInstallation() {
 	}
 }
 
+// repairMCPRegistration zieht eine veraltete MCP-Registrierung des Projekts
+// nach — der zweite selbsttätige Migrationsweg neben dem Clone-Update.
+//
+// Er ist der Auffangweg für alles, was nicht über die Oberfläche aktualisiert
+// wurde: ein `git pull` von Hand oder `make -C k-playbook installer-update`
+// erreicht die Registrierung nicht, weil sie im Hauptverzeichnis liegt und
+// nicht im Clone. Ein Klick auf „Einrichten" ist dafür nicht nötig.
+//
+// Geschrieben wird nur der eine, eng definierte Fall: ein Eintrag, der auf den
+// abgelösten Wrapper zeigt. Steht dort eine akzeptierte Form, bleibt die Datei
+// unangetastet — sonst machte jeder Start die getrackten MCP-Dateien eines
+// Projekts dreckig. Ein Fehler hält den Start nicht auf.
+func repairMCPRegistration() {
+	environment := project.Detect()
+	if !environment.Installed {
+		return
+	}
+
+	repaired, err := project.RepairMCP(environment.ProjectDir)
+	for _, path := range repaired {
+		fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s\n", path)
+	}
+	if len(repaired) > 0 {
+		fmt.Println("Der Assistent liest den neuen Eintrag beim nächsten Start.")
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: MCP-Registrierung nicht vollständig korrigiert: %v\n", err)
+	}
+}
+
+// repairRootInstructions zieht einen veralteten Anstoßblock in AGENTS.md nach
+// — das Gegenstück zur MCP-Korrektur für die zweite Datei, die im
+// Hauptverzeichnis liegt und die der Git-Update-Weg deshalb nicht erreicht.
+//
+// Ein Bestandsprojekt behielte sonst dauerhaft den Aufruf des abgelösten
+// Wrappers und schickte jeden Assistenten auf eine Datei, die es nicht mehr
+// gibt. Geschrieben wird nur dieser eine Fall: eine fehlende Datei wird nicht
+// angelegt und ein fremder Text nicht angefasst. Ein Fehler hält den Start
+// nicht auf.
+func repairRootInstructions() {
+	environment := project.Detect()
+	if !environment.Installed {
+		return
+	}
+
+	repaired, err := project.RepairRootInstructions(environment.ProjectDir)
+	if repaired {
+		fmt.Printf("Veralteten Anstoß in %s korrigiert.\n", project.RootInstructionsFile)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Anstoß nicht korrigiert: %v\n", err)
+	}
+}
+
 // guiActions sind die Handgriffe, zwischen denen reuseOrStart wählt.
 // Austauschbar, damit die Entscheidung ohne Server und Browser prüfbar ist.
 type guiActions struct {
@@ -82,8 +138,9 @@ type guiActions struct {
 
 // reuseOrStart setzt die Einordnung der Laufzeitdatei in Handlung um.
 //
-// Ein Server anderer Version wird ersetzt: nach einem git pull von Hand wählt
-// der Wrapper schon das neue Binary, der alte Daemon liefe sonst weiter. Ein
+// Ein Server anderer Version wird ersetzt: nach einer Neuinstallation liegt
+// unter ~/.local/bin schon das neue Binary, der alte Daemon liefe sonst
+// weiter und bediente die Oberfläche mit dem alten Code. Ein
 // eigener Prozess, der nicht antwortet, wird nicht angetastet — seine Datei zu
 // löschen hieße, einen zweiten Server für dasselbe Projekt hochzuziehen; der
 // Weg ist `k-playbook stop`, das mit SIGTERM immer greift.

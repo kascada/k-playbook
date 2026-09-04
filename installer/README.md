@@ -34,12 +34,14 @@ stören.
 Zum Entwickeln:
 
 ```bash
-make dist   # baut alle Plattformen nach dist/
-make gui    # baut und startet
+make dist        # baut alle Plattformen nach dist/, der Weg vor einem Release
+make dev-install # baut nur diese Plattform und ersetzt ~/.local/bin/k-playbook
+make gui         # dev-install und starten
 ```
 
-`make dist` ist das einzige Build-Target. Eigener Build und Auslieferung verwenden
-dieselben Flags und liefern dasselbe Ergebnis.
+Alle drei bauen mit denselben Flags; eigener Build und Auslieferung liefern dasselbe
+Ergebnis. `make dev-install` baut nur die eigene Plattform, weil im Entwicklungs-Loop
+ohnehin nur die gestartet wird.
 
 ## Was es macht
 

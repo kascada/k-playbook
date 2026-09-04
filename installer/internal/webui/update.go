@@ -83,7 +83,10 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		Message:         "Aktualisiert.",
 	}
 	if result.BinaryChanged {
-		response.Message = "Aktualisiert. Der Dienst beendet sich jetzt; die neue Fassung mit bin/install installieren und danach k-playbook erneut aufrufen."
+		response.Message = versionChangeMessage()
+	}
+	if note := describeMCPRepair(result); note != "" {
+		response.Message += " " + note
 	}
 	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 
@@ -98,6 +101,18 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 	}
 	writeJSON(w, http.StatusOK, response)
 	state.completeUpdate(result.BinaryChanged)
+}
+
+// versionChangeMessage ist die Meldung des Versionswechsels.
+//
+// Sie sagt zwei Dinge, die zusammengehören: der Dienst endet jetzt, und das
+// neue Binary kommt nicht von selbst — es wird über den Bootstrap installiert.
+// Der steht hier nicht als Literal, sondern als project.BootstrapHint, damit
+// Meldung, README und docs/installation.md dieselbe kanonische Form nennen. Ein
+// bloßes `make install` gibt es in einem Zielprojekt nicht.
+func versionChangeMessage() string {
+	return "Aktualisiert. Zum neuen Stand gehört ein anderes Binary; der Dienst beendet sich jetzt. " +
+		"Neu installieren mit: " + project.BootstrapHint + ". Danach k-playbook erneut aufrufen."
 }
 
 // completeUpdate beendet den Dienst nach einem Update, das ein neues Binary
@@ -144,6 +159,25 @@ func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, 
 		parts = append(parts, describeLinkChanges(changes))
 	}
 	return changes, strings.Join(parts, " ")
+}
+
+// describeMCPRepair meldet, was das Update an veralteten MCP-Einträgen
+// richtiggestellt hat.
+//
+// Das gehört in die Antwort und nicht ins Log: die Registrierung liegt im
+// Hauptverzeichnis und ist damit eine Änderung an einer Projektdatei — sie
+// stillschweigend vorzunehmen wäre genau die Art Nebenwirkung, die niemand
+// erwartet.
+func describeMCPRepair(result project.UpdateResult) string {
+	parts := []string{}
+	if len(result.MCPRepaired) > 0 {
+		parts = append(parts, "MCP-Registrierung auf das installierte k-playbook korrigiert: "+
+			strings.Join(result.MCPRepaired, ", ")+".")
+	}
+	if result.Message != "" {
+		parts = append(parts, result.Message)
+	}
+	return strings.Join(parts, " ")
 }
 
 // describeLinkChanges formuliert die Bilanz als Satz.

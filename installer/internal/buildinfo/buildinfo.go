@@ -1,6 +1,7 @@
-// Package buildinfo holds values stamped into the executable at build time.
+// Package buildinfo trägt die Werte, die beim Bauen in das Binary gestempelt
+// werden.
 package buildinfo
 
-// Version is set through -ldflags at build time. It stays empty only for an
-// ad-hoc go build that intentionally omits the build flags.
+// Version wird beim Bauen über -ldflags gesetzt. Leer bleibt sie nur bei einem
+// Ad-hoc-`go build`, das die Build-Flags bewusst weglässt.
 var Version string

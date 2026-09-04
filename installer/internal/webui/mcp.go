@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,12 +24,14 @@ import (
 type mcpResponse struct {
 	Environment project.Environment `json:"environment"`
 	Entries     []project.MCPStatus `json:"entries"`
-	// Command ist der Eintrag, der geschrieben wird — relativ zum
-	// Hauptverzeichnis.
+	// Command ist der Eintrag, der geschrieben wird: der beim Schreiben
+	// aufgelöste absolute Pfad des installierten k-playbook. Leer, wenn sich
+	// keines auflösen ließ — dann wird auch nichts geschrieben.
 	Command string `json:"command"`
 	// WorkdirMismatch: die Oberfläche selbst wurde nicht im Hauptverzeichnis
-	// gestartet. Der Eintrag ist relativ; dann ist der Verdacht begründet, dass
-	// auch der Assistent woanders geöffnet wird.
+	// gestartet. Der eingetragene Befehl ist zwar absolut, der MCP-Server löst
+	// das Projekt aber über sein Arbeitsverzeichnis auf; dann ist der Verdacht
+	// begründet, dass auch der Assistent woanders geöffnet wird.
 	WorkdirMismatch bool   `json:"workdirMismatch"`
 	OK              bool   `json:"ok"`
 	Message         string `json:"message"`
@@ -64,12 +67,14 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 // fehlendes k-playbook/ vorab abgefangen, statt in die Messung zu laufen.
 func mcpState(message string) mcpResponse {
 	environment := project.Detect()
-	command, args := project.MCPCommand()
 
 	response := mcpResponse{
 		Environment: environment,
-		Command:     command + " " + args[0],
 		Message:     message,
+	}
+	command, args, err := project.MCPCommand()
+	if err == nil {
+		response.Command = command + " " + args[0]
 	}
 
 	switch {
@@ -82,8 +87,15 @@ func mcpState(message string) mcpResponse {
 	case !environment.PlaybookPresent:
 		if response.Message == "" {
 			response.Message = "Installationsverzeichnis " + project.PlaybookDirName +
-				"/ fehlt. Ohne den Wrapper darin zeigte der Eintrag ins Leere."
+				"/ fehlt. Ohne die Inhalte darin hätte der Server nichts auszuliefern."
 		}
+
+	case err != nil:
+		if response.Message == "" {
+			response.Message = err.Error() + ". Ohne installiertes Binary gibt es keinen Pfad, " +
+				"der sich eintragen ließe — erst den Bootstrap ausführen."
+		}
+		response.Entries = project.CheckMCP(environment.ProjectDir)
 
 	default:
 		response.Entries = project.CheckMCP(environment.ProjectDir)
@@ -117,8 +129,34 @@ const (
 	mcpWaitDelay = time.Second
 )
 
+// mcpProbePath ist die PATH, mit der der Selbsttest läuft.
+//
+// Bewusst **nicht** die geerbte Shell-PATH: der Fall, den der Selbsttest
+// abbilden soll, ist der aus Dock oder Finder gestartete Client. Der erbt keine
+// Login-Shell, und ~/.local/bin fehlt dort typischerweise. Liefe der Test mit
+// der PATH der Shell, in der die Oberfläche gestartet wurde, meldete er grün,
+// während der Client scheitert — genau die Lücke, die der eingetragene absolute
+// Pfad schließt.
+//
+// Leer wäre falsch: der Server ruft seinerseits git auf. Was hier steht, ist
+// die Umgebung, die launchd einem GUI-Programm mitgibt.
+const mcpProbePath = "/usr/bin:/bin:/usr/sbin:/sbin"
+
+// mcpProbeEnv baut die Umgebung des Selbsttests: alles Geerbte außer PATH,
+// dazu die minimale System-PATH.
+func mcpProbeEnv(environ []string) []string {
+	filtered := make([]string, 0, len(environ)+1)
+	for _, entry := range environ {
+		if strings.HasPrefix(entry, "PATH=") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	return append(filtered, "PATH="+mcpProbePath)
+}
+
 // mcpToolsResponse ist das Ergebnis des Selbsttests: was der registrierte
-// Wrapper tatsächlich anbietet.
+// Befehl tatsächlich anbietet.
 type mcpToolsResponse struct {
 	// Command ist, was gestartet wurde — absolut, damit erkennbar ist, welche
 	// Datei geantwortet hat.
@@ -160,32 +198,38 @@ func mcpToolsHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, probeMCPServer(environment.ProjectDir))
 }
 
-// probeMCPServer startet den registrierten Wrapper als Subprozess, spricht das
+// probeMCPServer startet den registrierten Befehl als Subprozess, spricht das
 // Protokoll und gibt zurück, was ankommt.
 //
-// Gestartet wird genau das, was auch der Assistent startet — Wrapper und
-// Binary-Auswahl inbegriffen —, mit dem Hauptverzeichnis als
-// Arbeitsverzeichnis. Der laufende Prozess wäre der bequemere, aber falsche
-// Messgegenstand.
+// Gestartet wird genau das, was auch der Assistent startet — derselbe absolute
+// Pfad —, mit dem Hauptverzeichnis als Arbeitsverzeichnis und **ohne die
+// geerbte Shell-PATH**. Der laufende Prozess wäre der bequemere, aber falsche
+// Messgegenstand, und eine geerbte PATH machte den Test zur Schönwettermessung:
+// er liefe grün, während der aus Dock oder Finder gestartete Client scheitert.
 //
 // Jeder Fehlfall ist ein Ergebnis, keine Störung: die Seite sagt „antwortet
 // nicht" samt Grund und bleibt bedienbar.
 func probeMCPServer(projectRoot string) mcpToolsResponse {
-	wrapper := filepath.Join(projectRoot, project.WrapperPath())
-	_, args := project.MCPCommand()
+	response := mcpToolsResponse{Tools: []mcpTool{}}
 
-	response := mcpToolsResponse{Command: wrapper + " " + args[0], Tools: []mcpTool{}}
+	binary, args, err := project.MCPCommand()
+	if err != nil {
+		response.Message = err.Error() + " — es gibt nichts zu starten."
+		return response
+	}
+	response.Command = binary + " " + args[0]
 
-	if info, err := os.Stat(wrapper); err != nil || info.IsDir() {
-		response.Message = project.WrapperPath() + " fehlt im Projekt — es gibt nichts zu starten."
+	if info, err := os.Stat(binary); err != nil || info.IsDir() {
+		response.Message = binary + " ist nicht ausführbar — es gibt nichts zu starten."
 		return response
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), mcpProbeTimeout)
 	defer cancel()
 
-	command := exec.CommandContext(ctx, wrapper, args...)
+	command := exec.CommandContext(ctx, binary, args...)
 	command.Dir = projectRoot
+	command.Env = mcpProbeEnv(os.Environ())
 
 	stdin, err := command.StdinPipe()
 	if err != nil {
@@ -333,12 +377,43 @@ type mcpToolsResult struct {
 		Description string `json:"description"`
 		InputSchema struct {
 			Properties map[string]struct {
-				Type        string `json:"type"`
-				Description string `json:"description"`
+				Type        schemaType `json:"type"`
+				Description string     `json:"description"`
 			} `json:"properties"`
 			Required []string `json:"required"`
 		} `json:"inputSchema"`
 	} `json:"tools"`
+}
+
+// schemaType nimmt das `type`-Feld eines JSON-Schemas auf.
+//
+// JSON Schema erlaubt dort zwei Formen: einen Namen (`"string"`) und eine Liste
+// von Namen (`["null","array"]`). Die zweite ist keine Ausnahme — die eigenen
+// Werkzeuge dieses Servers nutzen sie für jeden optionalen Parameter, den das
+// Go-SDK aus einem Zeiger- oder Slice-Feld ableitet.
+//
+// Ein blankes `string` an dieser Stelle wäre deshalb kein kleiner Anzeigefehler:
+// json.Unmarshal bricht die **ganze** tools/list-Antwort ab, und der Selbsttest
+// meldete „Server antwortet nicht" für einen Server, der einwandfrei geantwortet
+// hat. Ein unlesbares type-Feld darf den Test nie kippen: unbekannte Formen
+// werden still leer, mehr nicht.
+type schemaType string
+
+func (t *schemaType) UnmarshalJSON(raw []byte) error {
+	var single string
+	if err := json.Unmarshal(raw, &single); err == nil {
+		*t = schemaType(single)
+		return nil
+	}
+
+	var many []string
+	if err := json.Unmarshal(raw, &many); err == nil {
+		*t = schemaType(strings.Join(many, " | "))
+		return nil
+	}
+
+	*t = ""
+	return nil
 }
 
 // readMCPResult liest eine Antwortzeile und packt ihr result-Feld aus.
@@ -396,7 +471,7 @@ func describeTools(listed mcpToolsResult) []mcpTool {
 			property := entry.InputSchema.Properties[name]
 			tool.Parameters = append(tool.Parameters, mcpToolParameter{
 				Name:        name,
-				Type:        property.Type,
+				Type:        string(property.Type),
 				Required:    required[name],
 				Description: property.Description,
 			})

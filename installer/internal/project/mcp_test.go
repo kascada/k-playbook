@@ -10,14 +10,31 @@ import (
 	"github.com/tailscale/hujson"
 )
 
-// newMCPProject legt ein Projekt mit dem Wrapper an, den die Registrierung
-// einträgt. Ohne ihn meldet jede Prüfung MCPStateNoWrapper.
+// newMCPProject legt ein Projekt an und installiert dazu ein k-playbook in
+// einem eigenen $HOME. Ohne installiertes Binary meldet jede Prüfung
+// MCPStateNoCommand und es wird nichts geschrieben.
 func newMCPProject(t *testing.T) string {
 	t.Helper()
 
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, WrapperPath()), "#!/usr/bin/env bash\n")
-	return root
+	installTestBinary(t)
+	return t.TempDir()
+}
+
+// installTestBinary setzt $HOME auf ein Testverzeichnis und legt dort das
+// installierte k-playbook ab. Zurück kommt sein absoluter Pfad — genau der
+// Wert, der registriert werden soll.
+func installTestBinary(t *testing.T) string {
+	t.Helper()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	path := filepath.Join(home, ".local", "bin", InstalledCommandName)
+	writeFile(t, path, "#!/bin/sh\n")
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatalf("%s ausführbar machen: %v", path, err)
+	}
+	return path
 }
 
 func mcpStatusFor(t *testing.T, statuses []MCPStatus, path string) MCPStatus {
@@ -66,7 +83,8 @@ func TestCheckMCPMeldetFehlendeDateien(t *testing.T) {
 }
 
 func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
-	root := newMCPProject(t)
+	installed := installTestBinary(t)
+	root := t.TempDir()
 
 	statuses, err := ApplyMCP(root)
 	if err != nil {
@@ -86,8 +104,8 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 	if !ok {
 		t.Fatalf("kein Eintrag %s: %v", MCPServerKey, servers)
 	}
-	if got := entry["command"]; got != "k-playbook/bin/k-playbook" {
-		t.Errorf("command = %v, erwartet den projekteigenen Wrapper", got)
+	if got := entry["command"]; got != installed {
+		t.Errorf("command = %v, erwartet den absoluten Pfad %s", got, installed)
 	}
 	if args, ok := entry["args"].([]any); !ok || len(args) != 1 || args[0] != "mcp" {
 		t.Errorf("args = %v, erwartet [mcp]", entry["args"])
@@ -104,8 +122,8 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 		t.Fatalf("kein Eintrag %s: %v", MCPServerKey, block)
 	}
 	command, ok := entry["command"].([]any)
-	if !ok || len(command) != 2 || command[0] != "k-playbook/bin/k-playbook" || command[1] != "mcp" {
-		t.Errorf("command = %v, erwartet ein Array aus Wrapper und mcp", entry["command"])
+	if !ok || len(command) != 2 || command[0] != installed || command[1] != "mcp" {
+		t.Errorf("command = %v, erwartet ein Array aus absolutem Pfad und mcp", entry["command"])
 	}
 	if entry["enabled"] != true || entry["type"] != "local" {
 		t.Errorf("type/enabled = %v/%v, erwartet local/true", entry["type"], entry["enabled"])
@@ -202,10 +220,10 @@ func TestApplyMCPLaesstFremdeEintraegeStehen(t *testing.T) {
 
 func TestApplyMCPKorrigiertFremdenWert(t *testing.T) {
 	root := newMCPProject(t)
-	// Ein absoluter Pfad auf die host-weite Kopie: derselbe Schlüssel, falscher
-	// Stand.
+	// Ein fremdes Kommando unter demselben Schlüssel: falscher Stand, aber
+	// nicht der alte Wrapper — also stale, nicht outdated.
 	writeFile(t, filepath.Join(root, ".mcp.json"),
-		`{"mcpServers":{"`+MCPServerKey+`":{"command":"/home/wer/.local/bin/k-playbook","args":["mcp"]}}}`+"\n")
+		`{"mcpServers":{"`+MCPServerKey+`":{"command":"/opt/fremd/dienst","args":["mcp"]}}}`+"\n")
 
 	status := mcpStatusFor(t, CheckMCP(root), ".mcp.json")
 	if status.State != MCPStateStale {
@@ -279,13 +297,16 @@ func TestApplyMCPSchreibtTrotzGescheitertemZiel(t *testing.T) {
 	}
 }
 
-func TestMCPOhneWrapperWirdNichtsGeschrieben(t *testing.T) {
+// Ohne installiertes k-playbook gibt es kein Kommando, das sich eintragen
+// ließe. Dann wird nichts geschrieben.
+func TestMCPOhneInstalliertesBinaryWirdNichtsGeschrieben(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	root := t.TempDir()
 
 	statuses := CheckMCP(root)
 	for _, status := range statuses {
-		if status.State != MCPStateNoWrapper {
-			t.Errorf("%s: State = %q, erwartet %q", status.Path, status.State, MCPStateNoWrapper)
+		if status.State != MCPStateNoCommand {
+			t.Errorf("%s: State = %q, erwartet %q", status.Path, status.State, MCPStateNoCommand)
 		}
 	}
 

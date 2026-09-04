@@ -8,7 +8,7 @@
 - Command `/k-enforcement`: expliziter Check danach oder zwischendurch.
 
 Beide verwenden dieselbe Regelquelle: die Context-Ausgabe von
-`k-playbook/bin/k-playbook context`.
+`k-playbook context`.
 
 ## Regelquellen
 

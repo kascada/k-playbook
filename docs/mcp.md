@@ -30,13 +30,14 @@ trägt den Server in allen drei Dateien ein:
 | Cursor | `.cursor/mcp.json` | dasselbe Schema, derselbe Schlüssel |
 | OpenCode | `opencode.json`, oder `opencode.jsonc`, wenn nur die existiert | `mcp` → `k-playbook` |
 
-Registriert wird immer dasselbe Kommando, nur in zwei Schreibweisen:
+Registriert wird immer dasselbe Kommando, nur in zwei Schreibweisen — der beim
+Schreiben aufgelöste absolute Pfad des installierten `k-playbook`:
 
 ```json
 {
   "mcpServers": {
     "k-playbook": {
-      "command": "k-playbook/bin/k-playbook",
+      "command": "/home/wer/.local/bin/k-playbook",
       "args": ["mcp"]
     }
   }
@@ -48,7 +49,7 @@ Registriert wird immer dasselbe Kommando, nur in zwei Schreibweisen:
   "mcp": {
     "k-playbook": {
       "type": "local",
-      "command": ["k-playbook/bin/k-playbook", "mcp"],
+      "command": ["/home/wer/.local/bin/k-playbook", "mcp"],
       "enabled": true
     }
   }
@@ -84,14 +85,20 @@ sonst beim nächsten Start selbst nach und schreibt die Datei dafür zurück; mi
 Eintrag bleibt sie so liegen, wie das Einrichten sie hinterlassen hat. In eine bereits
 vorhandene Datei wird er **nicht** nachgetragen — die gehört dem Projekt.
 
-Der Schlüssel `k-playbook` gehört k-playbook. Steht dort etwas anderes — ein absoluter
-Pfad, ein fremdes Kommando —, ist das kein Konflikt, sondern ein falscher Stand: die
-Oberfläche meldet „zeigt woandershin" und überschreibt ihn beim Einrichten. Nur eine
-Datei, die sich auch als JWCC nicht lesen lässt — eine fehlende Klammer, ein Fragment —,
-wird gemeldet und **nicht** angefasst. Kommentare allein sind kein solcher Fall.
+Der Schlüssel `k-playbook` gehört k-playbook. Steht dort ein fremdes Kommando, ist das
+kein Konflikt, sondern ein falscher Stand: die Oberfläche meldet „zeigt woandershin" und
+überschreibt ihn beim Einrichten. Was als richtiger Stand gilt, ist dabei nicht ein
+einzelner Wert, sondern eine Menge von Formen — siehe
+[Warum der Eintrag ein absoluter Pfad ist](#warum-der-eintrag-ein-absoluter-pfad-ist).
+Nur eine Datei, die sich auch als JWCC nicht lesen lässt — eine fehlende Klammer, ein
+Fragment —, wird gemeldet und **nicht** angefasst. Kommentare allein sind kein solcher
+Fall.
 
-In einem Zielprojekt gehören alle drei Dateien ins Repository, damit das Team denselben
-Server bekommt.
+Die geschriebene Registrierung ist ein absoluter Pfad und damit an eine Umgebung
+gebunden; einchecken lässt sie sich so nicht. Wer sie teilen will, trägt von Hand die
+[portable Form](#die-portable-form-der-bloße-kommandoname) ein — den bloßen
+Kommandonamen. Was dort steht, wird von der automatischen Korrektur nicht angefasst,
+solange es zur Menge der akzeptierten Formen gehört.
 
 ## Freigabe und Neustart
 
@@ -103,25 +110,129 @@ Claude Code verlangt zusätzlich eine **Freigabe**: projektbezogene Server aus e
 Frage kommt einmal beim nächsten Start. Seit v2.1.196 kommt Workspace-Trust dazu; ein
 frisch geklontes Projekt kann seine eigenen Server nicht selbst freigeben.
 
-## Warum der Eintrag relativ ist
+## Warum der Eintrag ein absoluter Pfad ist
 
-Eingetragen wird der projekteigene Wrapper `k-playbook/bin/k-playbook`, relativ zum
-Hauptverzeichnis — nicht die host-weite Kopie unter `~/.local/bin`. Drei Gründe:
+Eingetragen wird der **beim Schreiben aufgelöste absolute Pfad** des installierten
+Binaries, typischerweise `~/.local/bin/k-playbook`, ausgeschrieben. Nicht der bloße
+Kommandoname und nicht mehr der projekteigene Wrapper.
 
-- **DevContainer.** Dort ist `$HOME` ein anderes; `~/.local/bin/k-playbook` gibt es
-  nicht. Das Projekt dagegen ist gemountet.
-- **Teilbarkeit.** Ein absoluter Pfad wäre auf jedem Rechner ein anderer. Nur ein
-  relativer Eintrag lässt sich einchecken und gilt für das ganze Team.
-- **Plattformen.** Der Wrapper wählt die Binary selbst über `uname`. Aus einem einzigen
-  Eintrag funktionieren damit macOS auf dem Host und Linux im Container.
+Der Grund ist der Fall, in dem der Eintrag gebraucht wird. Ein Client, der aus Dock oder
+Finder gestartet wird — Cursor, VS Code, Claude Desktop —, erbt die PATH einer
+Login-Shell **nicht**; `~/.local/bin` steht dort typischerweise nicht drin. Ein bloßes
+`k-playbook` wäre in genau diesen Umgebungen tot, während derselbe Eintrag aus einem
+Terminal heraus funktioniert. Ein absoluter Pfad hängt von keiner geerbten Umgebung ab.
 
-Weil `$HOME` im Container ein anderer ist, gilt das auch für den Cache, aus dem der
-Wrapper das Binary auflöst: er überlebt einen Rebuild nur, wenn `K_PLAYBOOK_CACHE` in den
-Workspace zeigt. Die `containerEnv`-Zeile dazu steht in
-[installation.md](installation.md#das-binary-und-der-cache).
+### Eine Menge akzeptierter Formen, nicht ein Sollwert
 
-Der Server selbst ist ortsunabhängig: er löst das Projekt zur Laufzeit über die
-Aufwärtssuche nach `K-PLAYBOOK.yaml` auf, nicht über seinen eigenen Ort.
+Geschrieben wird immer genau eine Form. **Geprüft** wird gegen eine Menge:
+
+| Form | Gilt als |
+|---|---|
+| jeder absolute Pfad, dessen Dateiname `k-playbook` ist | aktuell |
+| derselbe Pfad aus einem anderen `$HOME` | aktuell |
+| der bloße Kommandoname `k-playbook` — die portable Form | aktuell |
+| `k-playbook/bin/k-playbook`, `bin/k-playbook` und jeder Pfad, der darauf endet | veraltet |
+| alles andere, auch `./k-playbook` | falscher Stand, wird gemeldet |
+
+Ein Vergleich auf Gleichheit mit einem einzigen Sollwert erklärte jede andere gültige
+Schreibweise für falsch und schriebe sie bei jedem Lauf um. Zwei Fälle machen das
+konkret: eine eingecheckte Registrierung kann keinen absoluten Home-Pfad tragen, und
+Host und DevContainer haben verschiedene HOMEs.
+
+„Veraltet" ist deshalb **eng** definiert: der alte Wrapper-Pfad und sonst nichts. Nur er
+wird von selbst überschrieben. Ein Eintrag, der weder in die Menge passt noch der alte
+Wrapper ist, wird gemeldet und erst beim ausdrücklichen Klick auf *Einrichten*
+überschrieben.
+
+### Die portable Form: der bloße Kommandoname
+
+Ein absoluter Pfad trägt ein `$HOME` und ist damit an eine Umgebung gebunden. Wer seine
+Registrierung **einchecken** will, kann ihn nicht verwenden: dieselbe Datei gilt auf dem
+Host und im DevContainer, und deren HOMEs sind verschieden. Dafür steht der bloße Name:
+
+```json
+{
+  "mcpServers": {
+    "k-playbook": {
+      "command": "k-playbook",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Er ist die einzige Schreibweise, die gar keine Umgebung nennt. Jede Umgebung löst ihn
+über ihre eigene PATH auf ihr eigenes Binary auf — genau das, was der Bootstrap
+sicherstellt: `~/.local/bin` **muss** im PATH liegen, sonst bricht `bin/install` ab. Aus
+demselben Grund spielen Host und Container an dieser Datei kein Ping-Pong: keiner von
+beiden findet darin etwas zu korrigieren.
+
+Geschrieben wird sie nie. *Einrichten* trägt weiterhin den aufgelösten absoluten Pfad
+ein; die portable Form kommt von Hand in die Datei und bleibt dann liegen. Akzeptiert
+ist genau der Name — `./k-playbook` und jeder Pfad, der auf den Namen endet, sind es
+nicht.
+
+### Drei Grenzen, ausdrücklich
+
+**Die portable Form deckt den Dock-/Finder-Fall nicht ab.** Das ist der Preis, und er
+wird hier genannt statt verschwiegen: ein Client, der aus Dock oder Finder gestartet
+wird — Cursor, VS Code, Claude Desktop —, erbt die Login-Shell-PATH nicht. Unter einem
+bloßen Namen findet er nichts, und der Server bleibt tot. Genau dieser Fall ist der
+Grund, warum *Einrichten* den absoluten Pfad schreibt.
+
+Wer eine eingecheckte Registrierung teilt, teilt damit eine Form, die aus dem Terminal
+heraus und in einem DevContainer funktioniert, aus dem Dock heraus nicht. Der Weg dorthin
+ist derselbe wie bei getrennten HOMEs: in dieser Umgebung einmal auf *Einrichten*
+klicken. Das schreibt den absoluten Pfad in die Datei — in einem Repo, das sie trackt,
+ist das ein Diff, der nicht committet gehört.
+
+Auch der Selbsttest auf `/mcp` deckt die portable Form nicht ab: er startet, was
+*Einrichten* schreiben würde — den aufgelösten absoluten Pfad —, nicht das, was in der
+Datei steht. Er beantwortet also „antwortet das installierte Binary", nicht „findet der
+Client den Eintrag".
+
+
+**Ein absoluter Pfad aus einem fremden `$HOME` gilt als aktuell.** Das ist eine
+Entscheidung, keine Nachlässigkeit: sonst erklärten Host und DevContainer sich in
+derselben Datei wechselseitig für veraltet und schrieben sie bei jedem Wechsel um. Der
+Preis: teilen sich Host und Container dasselbe Repository, haben aber getrennte HOMEs,
+bleibt MCP in der jeweils anderen Umgebung tot, ohne dass die automatische Korrektur
+greift. Anschlagen tut dann nur der Selbsttest auf `/mcp`. Wer in dieser Lage arbeitet,
+richtet in jeder Umgebung einmal ausdrücklich ein.
+
+**Der Server findet das Projekt über sein Arbeitsverzeichnis.** Der eingetragene Pfad
+sagt, welches Binary startet — nicht, welches Projekt gemeint ist. Der Server löst das
+zur Laufzeit über die Aufwärtssuche nach `K-PLAYBOOK.yaml` auf, ab seinem
+Arbeitsverzeichnis. Das ist das des Assistenten. Wer den Assistenten in einem
+Unterverzeichnis öffnet — etwa im Code-Repository, das nach
+[`installation.md`](./installation.md#1-konfiguration-anlegen) neben dem Playbook liegen
+darf —, bekommt einen Server, der sein Projekt nicht findet. Die Oberfläche sagt die
+Bedingung im Block und weist deutlich darauf hin, wenn schon sie selbst nicht im
+Hauptverzeichnis gestartet wurde.
+
+## Bestandsprojekte ziehen von selbst nach
+
+Ein Projekt, dessen Registrierung noch den abgelösten Wrapper nennt, wird ohne
+Handgriff korrigiert — an zwei Stellen:
+
+- beim **Clone-Update** über die Oberfläche. Der `git pull` allein erreicht die Dateien
+  nicht: sie liegen im Hauptverzeichnis, nicht in `k-playbook/`.
+- bei **jedem Start** von `k-playbook`. Das ist der Auffangweg für alles, was daran
+  vorbeigeht — ein `git pull` von Hand oder `make -C k-playbook installer-update`.
+
+Ein Klick auf *Einrichten* ist dafür nicht nötig; er bleibt daneben der ausdrückliche
+Schreibweg.
+
+Diese Korrektur ist **eng und idempotent**. Geschrieben wird nur bei einem vorhandenen
+Eintrag, der im engen Sinn veraltet ist. Eine fehlende Datei wird nicht angelegt, ein
+fehlender Eintrag nicht ergänzt, und keine akzeptierte Form wird angefasst — sonst
+machte jeder Start die eingecheckten MCP-Dateien eines Projekts dreckig. Ersetzt wird
+ein Konfigurationseintrag; gelöscht wird nichts.
+
+Voraussetzung bleibt der einmalige Bootstrap je Host oder DevContainer —
+`make -C k-playbook install`, ohne make `k-playbook/bin/install`: beide Korrekturwege
+laufen im installierten Binary. Ohne installiertes `k-playbook` gibt es keinen Pfad, der
+sich eintragen ließe — dann wird gar nichts geschrieben und die Oberfläche sagt es.
 
 ## Werkzeuge
 
@@ -319,7 +430,12 @@ Server verifiziert: ein Scan-Lauf von 158 Sekunden lief in einem OpenCode-Client
 `mcp.k-playbook.timeout: 90000` (90 Sekunden) vollständig durch, ohne dass der Tool-Call
 abgebrochen wurde; kein Scanner persistierte `reason: "abgebrochen"`. Der Nachweis stützt
 sich auf die persistierten Entry-Zustände (`k-playbook-local/results/<lauf>/entries/*.json`).
-`opencode.json` in diesem Repo trägt diesen Wert deshalb als expliziten Eintrag.
+
+Der Wert gehört in die Client-Konfiguration und wird nicht von k-playbook geschrieben.
+Die eingecheckte `opencode.json` dieses Repos setzt ihn **nicht**; sie trägt nur die
+Registrierung selbst. Ein von Hand ergänztes `timeout` überlebt die automatische
+Korrektur allerdings — `mcpEntryCommand()` bewertet nur Kommando und Argumente und lässt
+zusätzliche Schlüssel stehen.
 
 Für Clients mit `progressToken`-Support und geprüftem Timeout-Reset ist ein moderater
 Anfrage-Timeout (60–90 Sekunden) sinnvoll: er begrenzt einen wirklich hängenden Server
@@ -337,42 +453,33 @@ der zuletzt laufende Scanner persistiert `reason: "abgebrochen"`. Progress-Notif
 ändern daran nichts — sie zielen ausschließlich auf den Timeout-Fehlermodus, nicht auf
 Cancellation.
 
-### Die Bedingung, die daraus folgt
-
-Ein relativer Eintrag wird vom Assistenten gegen dessen **Arbeitsverzeichnis** aufgelöst,
-nicht gegen den Ort der Konfigurationsdatei. Der Eintrag gilt deshalb nur, wenn der
-Assistent im Hauptverzeichnis geöffnet ist — dort, wo `K-PLAYBOOK.yaml` liegt.
-
-Das ist eine bekannte Grenze, keine Nachlässigkeit. Wer den Assistenten in einem
-Unterverzeichnis öffnet — etwa im Code-Repository, das nach
-[`installation.md`](./installation.md#1-konfiguration-anlegen) neben dem Playbook liegen
-darf —, bekommt einen Pfad, der ins Leere zeigt. Einen absoluten Fallback gibt es
-bewusst nicht: er gäbe genau die Teilbarkeit auf, wegen der der Eintrag relativ ist.
-
-Die Oberfläche sagt die Bedingung im Block und weist deutlich darauf hin, wenn schon sie
-selbst nicht im Hauptverzeichnis gestartet wurde.
-
 ## Nachsehen, was der Server anbietet
 
 Die Seite **/mcp** — im Block über *Zustand und Werkzeuge* erreichbar — zeigt zweierlei:
 
 - den Registrierungszustand je Assistent, ausführlicher als im Block,
 - die tatsächlich angebotenen Werkzeuge. Sie stehen nicht in einer Liste im Code: die
-  Oberfläche startet den registrierten Wrapper als eigenen Prozess, schickt ihm
+  Oberfläche startet den registrierten Befehl als eigenen Prozess, schickt ihm
   `initialize` und `tools/list` und zeigt, was zurückkommt. Damit beantwortet dieselbe
   Anzeige auch die Frage, ob der Server überhaupt läuft.
 
-Gestartet wird dabei genau das, was auch der Assistent startet — Wrapper und
-Binary-Auswahl inbegriffen. Antwortet er nicht, fehlt der Wrapper oder kommt kein
-verwertbares JSON zurück, ist das ein Ergebnis der Seite und keine Störung: sie meldet
-„Server antwortet nicht" samt Grund und bleibt bedienbar.
+Gestartet wird dabei genau das, was auch der Assistent startet: derselbe absolute Pfad,
+mit dem Hauptverzeichnis als Arbeitsverzeichnis und **ohne die geerbte Shell-PATH**. Das
+letzte ist kein Detail. Liefe der Selbsttest mit der PATH der Shell, in der die
+Oberfläche gestartet wurde, meldete er grün, während der aus Dock oder Finder gestartete
+Client scheitert — er misst dann eine Umgebung, die der Client gar nicht hat. Gesetzt
+wird stattdessen die minimale System-PATH, die ein GUI-Programm bekommt.
+
+Antwortet der Server nicht, ist gar keines installiert oder kommt kein verwertbares JSON
+zurück, ist das ein Ergebnis der Seite und keine Störung: sie meldet „Server antwortet
+nicht" samt Grund und bleibt bedienbar.
 
 ## Von Hand
 
 Der Server lässt sich auch ohne Oberfläche starten:
 
 ```bash
-k-playbook/bin/k-playbook mcp
+k-playbook mcp
 ```
 
 Er spricht dann JSON-RPC über stdin und stdout und wartet auf einen Client.
@@ -384,14 +491,19 @@ Assistenten neu.
 
 ## In diesem Repo
 
-Das Quell-Repo von k-playbook ist zugleich sein eigenes Zielprojekt, aber die drei
-Dateien werden hier **nicht** eingecheckt:
+Das Quell-Repo von k-playbook ist zugleich sein eigenes Zielprojekt. Von den drei Dateien
+ist nur eine getrackt:
 
-- `.mcp.json` und `.cursor/mcp.json` stehen in `.gitignore`. `/k-playbook/` ist hier
-  selbst ignoriert; der eingetragene Wrapper existiert nach einem frischen Clone also gar
-  nicht, ein eingecheckter Eintrag zeigte ins Leere.
-- `opencode.json` ist getrackt und lässt sich nicht teilweise ignorieren. Der
-  `mcp`-Block, den das Einrichten hinzufügt, bleibt hier eine lokale Änderung und wird
-  nicht committet.
+- `.mcp.json` und `.cursor/mcp.json` stehen in `.gitignore`.
+- `opencode.json` ist getrackt und lässt sich nicht teilweise ignorieren; ihr
+  `mcp`-Block steht deshalb im Repository.
 
-In einem Zielprojekt gilt das Gegenteil: dort gehören alle drei Dateien ins Repository.
+Alle drei tragen die **portable Form** — den bloßen Kommandonamen `k-playbook`. Der
+geschriebene absolute Pfad ist an ein `$HOME` gebunden und hier nicht verwendbar; die
+beiden ignorierten Dateien führen ihn nur mit, damit auf diesem Rechner überall dasselbe
+steht. Die automatische Korrektur fasst keine davon an: die portable Form gehört zur
+Menge der akzeptierten, und geschrieben wird von selbst nur der alte Wrapper-Pfad.
+
+Damit bleibt der Arbeitsbaum bei jedem Clone-Update und jedem Start sauber. Wer hier auf
+*Einrichten* klickt, bekommt dagegen den absoluten Pfad in `opencode.json` — ein Diff in
+einer getrackten Datei, der zurückzunehmen ist.

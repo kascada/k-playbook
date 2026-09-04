@@ -30,6 +30,27 @@ macOS- beziehungsweise Linux-Binary.
 am Release. `bin/install` lädt genau das passende Asset und prüft es gegen das
 mitgelieferte `SHA256SUMS`.
 
+**`~/.local/bin` muss im PATH liegen** — das ist Voraussetzung, kein Hinweis am Rand.
+Aufgerufen wird k-playbook ausschließlich unter seinem Namen; ohne den PATH-Eintrag wäre
+es installiert, aber für niemanden auffindbar. Fehlt er, bricht der Bootstrap ab,
+bevor er etwas lädt, und nennt die Zeile fürs Shell-Profil:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Auf Linux ist der Eintrag meist schon da. Auf macOS **nicht** — `/etc/paths` kennt ihn
+nicht und `path_helper` ergänzt ihn nicht. Die Zeile gehört in `~/.zprofile` (zsh) oder
+`~/.bashrc` (bash); danach eine neue Shell öffnen und den Bootstrap erneut aufrufen.
+
+**Host und DevContainer mit geteiltem Home.** `~/.local/bin/k-playbook` ist eine echte
+Datei je Plattform. Teilen sich beide Umgebungen dasselbe `$HOME`, überschreiben sie
+einander dort. `bin/install` erkennt ein plattformfremdes Binary und meldet beim
+Ersetzen, dass die andere Umgebung denselben Bootstrap noch einmal braucht. Ruft man das
+Binary dagegen direkt auf, während es der falschen Plattform gehört, fängt das nichts ab:
+dann meldet die Shell `cannot execute binary file`. Getrennte HOMEs sind der saubere
+Zustand.
+
 ## Die vier Schritte
 
 Der letzte Aufruf startet die Oberfläche im Browser. Sie führt durch vier Schritte und
@@ -64,7 +85,7 @@ Wenn ein Anker eines übergeordneten Projekts die Ersteinrichtung der Oberfläch
 überdeckt, lässt sich der Anker ohne Suche direkt anlegen:
 
 ```bash
-k-playbook/bin/k-playbook config create
+k-playbook config create
 ```
 
 Der Befehl schreibt in das aktuelle Verzeichnis und meldet danach den genauen Pfad,
@@ -73,7 +94,7 @@ Projektordner angegeben werden; liegt das Repository darin nicht im Hauptverzeic
 setzt `--repo-root` dessen relativen Pfad:
 
 ```bash
-k-playbook/bin/k-playbook config create --repo-root app /pfad/zum/projekt
+k-playbook config create --repo-root app /pfad/zum/projekt
 ```
 
 Eine vorhandene `K-PLAYBOOK.yaml` bleibt auch auf diesem Weg unverändert.
@@ -156,9 +177,12 @@ projekt/
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
-Eingetragen wird `k-playbook/bin/k-playbook mcp` — der projekteigene Wrapper, **relativ**
-zum Hauptverzeichnis. Nur so lässt sich der Eintrag einchecken und gilt im DevContainer
-genauso. Der Preis ist eine Bedingung: der Eintrag wirkt nur, wenn der Assistent im
+Eingetragen wird `k-playbook mcp` — beim Schreiben aufgelöst zum **absoluten Pfad** des
+installierten Binaries. Aus Dock oder Finder gestartete Clients erben die Shell-PATH
+nicht; ein bloßer Kommandoname wäre dort tot. Wer den Eintrag einchecken will, trägt von
+Hand den bloßen Namen `k-playbook` ein: die automatische Korrektur fasst ihn nicht an.
+Beides steht in [`mcp.md`](./mcp.md#warum-der-eintrag-ein-absoluter-pfad-ist). Eine
+Bedingung gilt in jedem Fall: der Eintrag wirkt nur, wenn der Assistent im
 Hauptverzeichnis geöffnet ist — dort, wo `K-PLAYBOOK.yaml` liegt.
 
 Die drei Dateien gehören dem Projekt. Angefasst wird genau der Schlüssel `k-playbook`,
@@ -337,7 +361,7 @@ effektiven Kataloge für Regeln, Reviews und Checks samt Herkunft — mitgeliefe
 projekteigen oder ersetzt — und die Guidelines. Abgeschaltete Einträge stehen mit, damit
 sichtbar bleibt, dass es sie gibt.
 
-Es ist dieselbe Auskunft wie `k-playbook/bin/k-playbook context`, nur lesbar aufbereitet.
+Es ist dieselbe Auskunft wie `k-playbook context`, nur lesbar aufbereitet.
 Der Block lädt erst beim Aufklappen und verändert nichts.
 
 Ein Assistent kann dieselbe Auskunft als Werkzeug bekommen, statt sie über die
@@ -364,6 +388,24 @@ make -C k-playbook installer-update
 
 Das Make-Target entspricht `chmod -R u+w k-playbook && git -C k-playbook fetch origin && git -C k-playbook reset --hard origin/main && git -C k-playbook clean -fd && chmod -R a-w k-playbook` und sperrt die Installation auch dann wieder, wenn der Pull fehlschlägt. Der harte Reset ist bewusst: `k-playbook/` trägt per Vertrag keine lokalen Änderungen; alles darin darf nur durch Pull entstehen. Im Entwicklungsrepo funktioniert zusätzlich `make installer-update`, weil dort der Installations-Clone unter `./k-playbook/` liegt.
 
+**Der Make-Weg aktualisiert den Clone, nicht das Projekt daneben.** Er ist eine reine
+Git-Kette und läuft absichtlich ohne Go und ohne das installierte Binary — das ist sein
+Zweck: er muss auch dann noch funktionieren, wenn im Projekt gar nichts anderes läuft.
+Was im Hauptverzeichnis liegt und nicht im Clone — die MCP-Registrierung, der
+Anstoßblock in `AGENTS.md` — erreicht er deshalb nicht.
+
+Nachgezogen wird das beim **nächsten Aufruf von `k-playbook`**. Der Start ist der zweite,
+allgemeine Auffangweg: er korrigiert eine veraltete MCP-Registrierung von selbst und
+meldet, was er getan hat. Das gilt für jeden Weg, der am Update-Knopf der Oberfläche
+vorbeigeht — auch für ein `git pull` von Hand. Nach einem Update von Hand also einmal:
+
+```bash
+k-playbook
+```
+
+Das ist kein zusätzlicher Handgriff im Alltag, sondern derselbe Aufruf, mit dem eine
+Sitzung ohnehin beginnt.
+
 `k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar —
 auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen
 daneben und bleiben unberührt.
@@ -379,16 +421,32 @@ für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine l
 veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
 stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
 
-Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary: der Dienst
-beendet sich nach der Antwort selbst, und ein neuer Aufruf von `bin/k-playbook` startet
-die neue Fassung. Das Binary liegt dann schon im Cache, weil das Update es gleich vorab
-lädt. Schlägt das Laden fehl — offline, hinter einem Proxy —, bleibt es bei einem Hinweis;
-das Update selbst gilt trotzdem als gelungen, und der nächste Start holt es nach. Nach
-einem `git pull` von Hand oder `make -C k-playbook installer-update` läuft der alte Dienst
-zunächst weiter; der nächste Aufruf von `bin/k-playbook` erkennt ihn an der Version und
-ersetzt ihn. Sind nur Commands, Regeln oder Rezepte neu, ändert sich `VERSION` nicht: der
-Dienst läuft weiter, `Neu einlesen` in der Oberfläche holt den Stand, und ein Neustart des
-Assistenten genügt.
+Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary. Der Dienst
+beendet sich dann nach der Antwort selbst. Installiert wird das neue Binary ausdrücklich
+über den Bootstrap — `make -C k-playbook install`, ohne make `k-playbook/bin/install` —;
+der Update-Pfad lädt oder ersetzt von sich aus kein Host-Binary. Danach startet
+`k-playbook` die neue Fassung. Nach einem `git pull` von Hand oder
+`make -C k-playbook installer-update` läuft ein alter Dienst zunächst weiter; erkannt und
+ersetzt wird er erst, wenn der nächste Aufruf von `k-playbook` aus einem neu installierten
+Binary anderer Version kommt. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
+`VERSION` nicht: der Dienst läuft weiter, `Neu einlesen` in der Oberfläche holt den Stand,
+und ein Neustart des Assistenten genügt.
+
+**Das Übergangsfenster beim Wechsel auf die direkte Installation.** Ein Projekt, das noch
+nach dem abgelösten Wrapper-Modell eingerichtet ist, braucht die Schritte in dieser
+Reihenfolge — und dazwischen liegt ein Fenster, in dem nichts läuft:
+
+1. **Zuerst den Clone aktualisieren.** Vorher gibt es `k-playbook/bin/install` in diesem
+   Projekt gar nicht; der Bootstrap ist erst nach dem Update vorhanden.
+2. **Danach der Bootstrap**, einmal je Host und einmal je DevContainer:
+   `make -C k-playbook install`, ohne make `k-playbook/bin/install`.
+
+Zwischen beiden Schritten zeigen die Commands, der Anstoßblock in `AGENTS.md` und die
+MCP-Registrierung noch auf `k-playbook/bin/k-playbook` — die Datei, die das Update
+entfernt hat. In diesem Fenster gibt es kein funktionierendes Kommando, auch keinen
+Ersatzaufruf: die beiden selbsttätigen Korrekturwege laufen im installierten Binary und
+setzen den Bootstrap deshalb voraus. Er ist der eine verbleibende Handgriff; danach zieht
+der nächste Aufruf von `k-playbook` Registrierung und Anstoßblock von selbst nach.
 
 **Die Verlinkung zieht sich selbst nach.** Weil Commands und Skills einzeln verlinkt
 sind, kommt ein neu mitgelieferter Command nicht von allein an. Nachgezogen wird deshalb
@@ -466,20 +524,9 @@ git mv k-playbook/TODO.md   k-playbook-local/TODO.md
 Welche Pfade es sind, steht im `paths.`-Block der alten Datei. Sind sie umgezogen, wird
 der Knopf frei.
 
-## Host-weit aufrufbar
+## Ein Werkzeug für alle Projekte
 
-Der tiefe Pfad `k-playbook/bin/k-playbook` ist nur beim ersten Mal nötig. Jeder Start der
-Oberfläche legt eine host-weite Kopie an und verlinkt sie:
-
-```text
-~/.local/
-├── bin/k-playbook -> ../share/k-playbook/installation/bin/k-playbook
-└── share/k-playbook/
-    ├── installation/bin          der gespiegelte Wrapper
-    └── security-tools/           Tool-venvs, davon unberührt
-```
-
-Danach genügt überall:
+Nach dem Bootstrap genügt überall:
 
 ```bash
 cd /pfad/zum/projekt
@@ -487,84 +534,27 @@ k-playbook
 ```
 
 Es ist dasselbe Werkzeug für alle Projekte. Welches Projekt gemeint ist, ergibt sich aus
-dem Verzeichnis, in dem der Aufruf stattfindet — nicht aus dem Ort des Programms.
+dem Verzeichnis, in dem der Aufruf stattfindet — nicht aus dem Ort des Programms. Der
+Clone unter `k-playbook/` ist reine Inhaltsquelle: Commands, Skills, Regeln, Reviews,
+Checks und Doku. Ein zweiter Einstiegspunkt im Projekt selbst existiert nicht mehr;
+aufgerufen wird k-playbook ausschließlich unter seinem Namen, und die Commands tun
+dasselbe.
 
-Gespiegelt werden genau drei Dateien — `bin/k-playbook`, `VERSION` und `SHA256SUMS` —
-und nur, wenn der Clone einen neueren Stand mitbringt als die Kopie. Kein Binary: das
-löst der Wrapper über den Cache auf. Wer in einem Projekt `git pull` macht und dort
-startet, hebt die host-weite Kopie damit an. Umgekehrt überschreibt ein älterer Clone
-sie nicht.
-
-Maßgeblich für „neuer" ist der HEAD-Commit des Clones. Die Kopie wird dadurch öfter
-erneuert als früher, als nur Commits an den Binaries zählten — sie ist dafür klein, und
-der Wrapper ist genau die Datei, die aktuell sein muss.
-
-Ein DevContainer bekommt seine eigene Kopie unter seinem eigenen Home; nach einem Rebuild
-stellt der nächste Start sie wieder her. Auf einem Mac mit Container teilen sich beide
-denselben Wrapper, falls `~/.local` geteilt ist — die Plattformen trennt erst der Cache.
+`~/.local/bin/k-playbook` ist eine echte Datei, kein Symlink und keine Auflösung zur
+Laufzeit. Jede Arbeitsumgebung installiert die Fassung ihrer eigenen Plattform: der
+macOS-Host ein Darwin-Binary, der DevContainer ein Linux-Binary. Ein DevContainer
+bootstrappt deshalb einmal für sich selbst, nach einem Rebuild erneut.
 
 **Eine eigene DevContainer-Integration gibt es nicht mehr** — keinen Bind-Mount nach
 `/workspaces/k-playbook`, keinen Symlink im Container und kein Setup-Skript in
 `.devcontainer/`. Die Installation liegt im Projektverzeichnis und kommt mit ihm in den
 Container, wie jede andere Projektdatei auch.
 
-**Zum PATH:** Auf Linux ist `~/.local/bin` meist schon drin. Auf macOS **nicht** —
-`/etc/paths` kennt es nicht und `path_helper` ergänzt es nicht.
-
-Fehlt es, zeigt die Oberfläche ganz oben die Karte **Aufruf von überall** mit der Zeile
-zum Kopieren:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Die Zeile gehört ins Shell-Profil — `~/.zprofile` bei zsh (Standard seit Catalina),
-`~/.bashrc` bei bash. Danach eine neue Shell öffnen; geprüft wird der `PATH` des
-laufenden Prozesses, eine gerade eingetragene Zeile sieht er noch nicht.
-
-**Geschrieben wird dort nichts von selbst.** Das Profil gehört dir. Steht der Aufruf,
-verschwindet die Karte wieder — dieselbe Zeile steht außerdem beim Start im Terminal.
-
-Der Aufruf über `k-playbook/bin/k-playbook` im Projekt bleibt jederzeit möglich und
-gleichwertig. Die Commands nutzen ausschließlich ihn, nie den `PATH`.
-
-## Das Binary und der Cache
-
-Der Wrapper sucht das Binary in dieser Reihenfolge und nimmt das erste, das er findet:
-
-1. `$K_PLAYBOOK_BINARY` — ausdrücklich gesetzt, gewinnt immer
-2. `<installation>/dist/` — lokal gebaut; im Repo-Checkout hat das Vorrang, damit der
-   Entwicklungs-Loop netzfrei bleibt
-3. der Cache
-4. Download des Release-Assets zu der Version aus `VERSION`, geprüft gegen `SHA256SUMS`
-
-Der Cache liegt **außerhalb** der Installation — die wird nach jedem Update per
-`chmod -R a-w` gesperrt, ein Cache darunter wäre nicht beschreibbar. Der Ort ergibt sich
-aus `$K_PLAYBOOK_CACHE`, sonst `$XDG_CACHE_HOME/k-playbook`, sonst
-`$HOME/.cache/k-playbook`; darunter liegt `bin/<version>/k-playbook-<os>-<arch>`. Alle
-Projekte desselben Rechners teilen ihn, und Host und Container kollidieren nicht, weil
-die Dateinamen die Plattform tragen.
-
-**Ohne Netzzugriff.** `bin/k-playbook --prefetch` lädt das Binary der eigenen Plattform
-vorab, `--prefetch --all` alle vier auf einmal — das deckt den Mac mit Linux-Container in
-einem Aufruf ab. Wo `objects.githubusercontent.com` nicht erreichbar ist, wird der Cache
-anderswo befüllt und über `K_PLAYBOOK_CACHE` eingebunden; alternativ baut `make dist-host`
-das Binary selbst (dafür braucht es Go).
-
-**Im DevContainer.** Ein Cache unter `$HOME` überlebt den Rebuild nicht: der Container
-hat sein eigenes Home. Deshalb zeigt man ihn in den Workspace:
-
-```json
-"containerEnv": { "K_PLAYBOOK_CACHE": "${containerWorkspaceFolder}/k-playbook-local/.cache" }
-```
-
-`k-playbook-local/.cache/` gehört in die ignorierten Pfade.
-
-**Ein Stand, ein Binary.** `VERSION` im Wurzelverzeichnis nennt das Release, dessen
-Assets zu diesem Clone-Stand gehören. Commits an Regeln, Reviews, Commands oder Docs
-ändern sie nicht und lösen deshalb keinen Download aus. Wechselt sie beim Update, lädt
-der Update-Pfad das neue Binary gleich in den Cache und meldet, dass ein Neustart eine
-andere Programmversion bringt.
+**Ein Stand, ein Binary.** `VERSION` im Wurzelverzeichnis des Clones nennt das Release,
+dessen Assets zu diesem Clone-Stand gehören; `SHA256SUMS` daneben trägt deren Prüfsummen.
+Commits an Regeln, Reviews, Commands oder Docs ändern beide Dateien nicht. Wechselt
+`VERSION` beim Update, gehört zum neuen Stand ein anderes Binary — installiert wird es
+ausdrücklich über den Bootstrap, nie nebenbei.
 
 ## GitHub CLI
 
@@ -697,28 +687,25 @@ nicht in die Quere kommen; die Wurzel lässt sich mit `--venv-root` verlegen.
 
 ## Selbst bauen
 
-Für den normalen Betrieb genügt das Release-Asset, das der Wrapper selbst lädt. Wer am
+Für den normalen Betrieb genügt das Release-Asset, das `bin/install` lädt. Wer am
 Werkzeug arbeitet oder lieber selbst baut, braucht Go:
 
 ```bash
-make -C k-playbook dist        # alle Plattformen nach dist/
-make -C k-playbook dist-host   # nur die Plattform dieses Rechners
-k-playbook/bin/k-playbook      # startet den gebauten Stand
+make -C k-playbook dist         # alle Plattformen nach dist/
+make -C k-playbook dist-host    # nur die Plattform dieses Rechners
+make -C k-playbook dev-install  # baut diese Plattform und installiert sie
 ```
 
-Beide Build-Targets verwenden dieselben Flags wie CI beim Bauen der Release-Assets,
-damit jeder Weg bitgleiche Binaries liefert. `dist-host` spart die drei fremden
-Plattformen und genügt, wenn nur dieser Rechner den Stand starten soll. Ein selbst
-gebautes `dist/` hat Vorrang vor Cache und Download — und ist damit zugleich der Weg,
-ganz ohne Netzzugriff zu arbeiten.
+Alle Build-Targets verwenden dieselben Flags wie CI beim Bauen der Release-Assets, damit
+jeder Weg bitgleiche Binaries liefert. `dist-host` spart die drei fremden Plattformen und
+genügt, wenn nur dieser Rechner den Stand starten soll. Gestartet wird ein selbst gebautes
+Binary nicht von allein: `dev-install` legt es nach `~/.local/bin/k-playbook`, und erst
+danach nimmt der Aufruf `k-playbook` es auf. Das ist zugleich der Weg, ganz ohne
+Netzzugriff zu arbeiten — gebaut statt geladen.
 
 Die Installation ist schreibgeschützt; zum Bauen gibt `make -C k-playbook
 installer-writable` sie frei, `installer-readonly` sperrt sie wieder. Ein Update setzt
 sie ohnehin auf den Clone-Stand zurück.
-
-`make gui` erscheint zwar in der Hilfe, gilt aber nur im Entwicklungsrepo von
-k-playbook: es spielt vor dem Start einen Arbeitsstand in die Installation ein, den es
-in einem Zielprojekt nicht gibt.
 
 ## Verifikation
 
@@ -738,7 +725,7 @@ Checkliste für ein Projekt:
       Eine mitgebrachte echte `CLAUDE.md` wurde dabei nach `AGENTS.md` umbenannt; steht
       stattdessen ein `Konflikt`, ist er von Hand aufzulösen — bis dahin sieht Claude
       Code den Anstoß nicht.
-- [ ] `k-playbook/bin/k-playbook context` läuft durch und nennt die erwarteten Kataloge.
+- [ ] `k-playbook context` läuft durch und nennt die erwarteten Kataloge.
 
 Der letzte Punkt prüft alles Vorherige auf einmal: das Kommando bricht ab, wenn die
 Konfiguration fehlt oder eine andere `schema_version` trägt.
@@ -772,7 +759,16 @@ und rät bewusst nicht. Die Oberfläche schlägt dann einen Ort vor.
 Modell: die host-globalen Symlinks wirken in jedes Projekt hinein. Die Oberfläche einmal
 starten, sie räumt sie weg und meldet, was entfernt wurde.
 
-**Das Binary fehlt.** `bin/k-playbook` nennt jede Stelle, an der es gesucht hat, und die
-Wege weiter: `bin/k-playbook --prefetch` lädt es in den Cache, `K_PLAYBOOK_CACHE` zeigt
-auf einen vorbefüllten Cache, `make dist-host` baut es selbst. Fehlt `VERSION`, gehört zu
-diesem Stand kein Release — dann hilft nur `git pull` oder ein eigener Build.
+**`k-playbook: command not found`.** Entweder ist der Bootstrap in dieser Umgebung noch
+nicht gelaufen — dann `make -C k-playbook install` (ohne make: `k-playbook/bin/install`)
+—, oder `~/.local/bin` fehlt im PATH. Der Bootstrap prüft den PATH selbst und bricht in
+diesem Fall ab, bevor er etwas lädt.
+
+**`cannot execute binary file`.** Unter `~/.local/bin/k-playbook` liegt das Binary einer
+anderen Plattform — typisch bei Host und DevContainer mit geteiltem `$HOME`. Den
+Bootstrap in dieser Umgebung erneut ausführen; er erkennt den Fall und meldet, dass die
+andere Umgebung ihn danach ebenfalls noch einmal braucht.
+
+**Der Bootstrap findet kein Asset.** Fehlt `VERSION` im Clone, gehört zu diesem Stand
+kein Release — dann hilft `git pull` in `k-playbook/` oder ein eigener Build, siehe
+[Selbst bauen](#selbst-bauen).

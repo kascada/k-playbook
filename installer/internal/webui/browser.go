@@ -87,9 +87,9 @@ func envOpeners() []browserOpener {
 // probiert werden. Welche davon vorhanden sind, unterscheidet sich je nach
 // Desktop, Distribution und WSL-Setup, deshalb wird nichts vorausgesetzt.
 //
-// Windows kommt nicht vor: der Einstiegspunkt bin/k-playbook ist ein
-// Bash-Skript, das Programm läuft dort gar nicht erst an. Unter WSL greift
-// der Linux-Zweig.
+// Windows kommt nicht vor: gebaut und als Release-Asset veröffentlicht werden
+// nur Linux- und macOS-Binaries, das Programm läuft dort gar nicht erst an.
+// Unter WSL greift der Linux-Zweig.
 func browserOpeners() []browserOpener {
 	guessed := []browserOpener{
 		{command: "wslview"},                     // WSL: reicht an den Windows-Browser durch

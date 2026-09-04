@@ -14,7 +14,11 @@ fail() {
 
 usage() {
   cat <<'EOF'
-Verwendung: bin/install
+Verwendung: make -C k-playbook install
+   ohne make: k-playbook/bin/install
+
+Aufgerufen wird beides aus dem Hauptverzeichnis des Projekts; ein Zielprojekt
+hat kein eigenes install-Target.
 
 Lädt das Release-Binary, das VERSION in diesem Clone nennt, prüft es gegen
 SHA256SUMS und installiert es nach ~/.local/bin/k-playbook.
@@ -76,9 +80,88 @@ else
   fail "Weder curl noch wget verfügbar; Release-Binary kann nicht geladen werden."
 fi
 
+# physical_path löst Symlinks im Pfad auf, soweit das Verzeichnis existiert.
+# Auf macOS ist $HOME über /System/Volumes/Data verlinkt; ohne die Auflösung
+# hielte der PATH-Vergleich zwei Schreibweisen desselben Verzeichnisses
+# auseinander.
+physical_path() {
+  local dir="$1"
+  [[ -d "${dir}" ]] || { printf '%s' "${dir}"; return 0; }
+  (cd -P "${dir}" 2>/dev/null && pwd) || printf '%s' "${dir}"
+}
+
+# path_contains meldet, ob ein Verzeichnis im PATH steht — verglichen wird die
+# Schreibweise selbst und, wo auflösbar, der physische Pfad.
+path_contains() {
+  local wanted="$1" wanted_physical entry
+  wanted_physical="$(physical_path "${wanted}")"
+  local IFS=":"
+  for entry in ${PATH}; do
+    [[ -n "${entry}" ]] || continue
+    if [[ "${entry}" == "${wanted}" || "${entry}" == "${wanted_physical}" ]]; then
+      return 0
+    fi
+    if [[ -d "${entry}" && "$(physical_path "${entry}")" == "${wanted_physical}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# require_target_dir_in_path bricht ab, wenn das Zielverzeichnis nicht im PATH
+# liegt.
+#
+# Das ist kein Hinweis am Rand: nach dem Ausstieg aus dem projektlokalen
+# Wrapper ist `k-playbook` der einzige Aufruf. Ein installiertes, aber nicht
+# auffindbares Binary wäre ein stiller Totalausfall — Commands, Instruktionen
+# und die MCP-Registrierung liefen alle ins Leere, ohne dass der Bootstrap je
+# etwas gemeldet hätte.
+require_target_dir_in_path() {
+  if path_contains "${target_dir}"; then
+    return 0
+  fi
+  fail "${target_dir} liegt nicht im PATH." \
+    "" \
+    "k-playbook wird ausschließlich unter seinem Namen aufgerufen; ohne diesen" \
+    "Eintrag wäre es zwar installiert, aber nirgends auffindbar. Deshalb bricht" \
+    "der Bootstrap hier ab, statt einen stillen Erfolg zu melden." \
+    "" \
+    "Ins Shell-Profil aufnehmen — ~/.zprofile bei zsh, ~/.bashrc bei bash:" \
+    "" \
+    '  export PATH="$HOME/.local/bin:$PATH"' \
+    "" \
+    "Danach eine neue Shell öffnen und den Bootstrap erneut aufrufen."
+}
+
+# foreign_platform_kind meldet, welcher fremden Plattform ein bereits
+# vorhandenes Binary angehört: "macOS", "Linux" oder leer.
+#
+# Erkannt wird an den Magic-Bytes, nicht über `file` — das fehlt in schlanken
+# Containern. Gemeldet wird nur, was sich positiv als Format der jeweils
+# anderen Plattform lesen lässt; alles andere (Skript, Symlink, Fragment)
+# bleibt stumm.
+foreign_platform_kind() {
+  local path="$1" magic
+  [[ -f "${path}" && ! -L "${path}" ]] || return 0
+  magic="$(head -c 4 "${path}" 2>/dev/null | od -An -v -tx1 | tr -d ' \n')"
+  case "${os}:${magic}" in
+    # ELF auf einem Darwin-Host.
+    darwin:7f454c46) printf 'Linux' ;;
+    # Mach-O (32/64 Bit, beide Endianness) und Universal Binaries auf Linux.
+    linux:cffaedfe|linux:cefaedfe|linux:feedface|linux:feedfacf|linux:cafebabe|linux:bebafeca) printf 'macOS' ;;
+    *) : ;;
+  esac
+}
+
 target_dir="${HOME:?HOME ist nicht gesetzt}/.local/bin"
 target="${target_dir}/k-playbook"
 url="${release_base_url}/${version}/${binary}"
+
+# Beide Prüfungen laufen **vor** dem Download: sie brauchen kein Release-Asset,
+# und ein Abbruch soll nichts geladen und nichts ersetzt haben.
+require_target_dir_in_path
+foreign="$(foreign_platform_kind "${target}")"
+
 mkdir -p "${target_dir}"
 
 temporary="$(mktemp "${target_dir}/.k-playbook.XXXXXX")"
@@ -108,10 +191,25 @@ temporary=""
 rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook"
 
 printf 'Installiert: %s (%s)\n' "${target}" "${version}"
-case ":${PATH}:" in
-  *":${target_dir}:"*) ;;
-  *)
-    printf 'Hinweis: %s liegt nicht im PATH. Ins Shell-Profil aufnehmen:\n' "${target_dir}" >&2
-    printf '  export PATH="$HOME/.local/bin:$PATH"\n' >&2
-    ;;
-esac
+
+# Host und DevContainer, die sich dasselbe $HOME teilen, überschreiben einander
+# an dieser Datei. Das ist kein Fehler dieses Laufs — hier steht jetzt das
+# richtige Binary —, aber die andere Umgebung ist damit lahmgelegt und muss
+# denselben Bootstrap noch einmal ausführen. Deshalb wird das Ersetzen genannt
+# und nicht stillschweigend getan.
+#
+# Die Grenze dieser Erkennung: sie sitzt allein hier. Ruft jemand
+# ~/.local/bin/k-playbook direkt auf, während dort ein plattformfremdes Binary
+# liegt, fängt das niemand ab — der Aufruf endet mit der Meldung der Shell
+# ("cannot execute binary file"). Die make-Targets tragen die Erkennung
+# ebenfalls nicht: `make dev-install` und `make gui` bauen vorher unbedingt für
+# die eigene Plattform, dort kann nie ein fremdes Binary stehen.
+if [[ -n "${foreign}" ]]; then
+  printf '\n'
+  printf 'Ersetzt wurde ein %s-Binary — offenbar teilen sich Host und Container\n' "${foreign}"
+  printf 'dasselbe HOME (%s).\n' "${HOME}"
+  printf 'In der anderen Umgebung ist k-playbook damit bis auf Weiteres tot; dort\n'
+  printf 'den Bootstrap erneut ausführen:\n\n'
+  printf '  make -C k-playbook install\n'
+  printf '  oder ohne make: k-playbook/bin/install\n'
+fi

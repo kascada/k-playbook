@@ -1,8 +1,8 @@
 name: Release
 
 # Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
-# Release. Der Clone trägt sie nicht mehr; der Wrapper lädt genau das eine, das
-# er braucht.
+# Release. Der Clone trägt sie nicht mehr; `bin/install` lädt genau das eine,
+# das zur Plattform der jeweiligen Umgebung passt.
 #
 # Geprüft wird gegen das committete SHA256SUMS: die erwarteten Summen kommen
 # über Git, die Binaries über HTTPS. Weicht ein Hash ab, bricht der Lauf ab —
@@ -102,13 +102,49 @@ jobs:
             exit 1
           fi
 
+      # Die Notes tragen den Bootstrap vorweg, nicht nur die Doku: er ist der
+      # eine Handgriff, den auch ein Bestandsprojekt nach einem Clone-Update mit
+      # gewechselter VERSION noch braucht, und die Release-Seite ist die Stelle,
+      # die beim Versionswechsel tatsächlich gelesen wird. `--notes` wird von
+      # `--generate-notes` nicht ersetzt: die generierte Liste hängt dahinter.
+      #
+      # Nur im Erstellungszweig. Der Upload-Zweig ist der Wiederholungslauf zu
+      # einem Tag, dessen Release die Notes bereits trägt; ihn dort neu zu
+      # schreiben überschriebe eine womöglich von Hand ergänzte Fassung.
       - name: Assets veröffentlichen
         run: |
           set -eu
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/k-playbook-* --clobber
-          else
-            gh release create "$TAG" dist/k-playbook-* \
-              --title "$TAG" \
-              --generate-notes
+            exit 0
           fi
+          intro="$(cat <<'EOF'
+          ## Installieren und aktualisieren
+
+          `k-playbook` wird einmal je Host und einmal je DevContainer installiert. Nach dem
+          Clone und nach jedem Clone-Update, bei dem `VERSION` wechselt, gehört der
+          Bootstrap dazu — der Update-Pfad lädt von sich aus kein Binary:
+
+          ```bash
+          make -C k-playbook install
+          # ohne make:
+          k-playbook/bin/install
+          ```
+
+          Ein Zielprojekt hat kein eigenes `install`-Target; der Aufruf geht immer über den
+          Clone. `~/.local/bin` muss im PATH liegen, sonst bricht der Bootstrap ab, bevor er
+          etwas lädt.
+
+          **Reihenfolge in einem Bestandsprojekt:** zuerst den Clone aktualisieren
+          (Update-Knopf der Oberfläche oder `make -C k-playbook installer-update`), erst
+          danach den Bootstrap. Vorher liegt `k-playbook/bin/install` noch gar nicht im
+          Projekt. Zwischen beiden Schritten zeigen Commands, der Anstoßblock in `AGENTS.md`
+          und die MCP-Registrierung noch auf den abgelösten Wrapper, und es gibt kein
+          funktionierendes Kommando. Nach dem Bootstrap zieht der nächste Aufruf von
+          `k-playbook` beides von selbst nach.
+          EOF
+          )"
+          gh release create "$TAG" dist/k-playbook-* \
+            --title "$TAG" \
+            --notes "$intro" \
+            --generate-notes

@@ -85,7 +85,7 @@ Verzeichnis-Symlink zeigt auf genau eine Quelle und könnte die zweite nie errei
 Was am Ende gilt, rechnet nicht jeder Command selbst aus:
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Das Kommando gibt den aufgelösten Arbeitsstand als JSON aus — Verzeichnisse,
@@ -93,7 +93,7 @@ Instruktionsdateien in Lesereihenfolge, Remediation-Policy, Guidelines und die d
 Kataloge, bereits zusammengeführt, mit Herkunft je Eintrag und markierten Abschaltungen.
 
 Dieselbe Auskunft gibt es für einen Assistenten auch als Werkzeug:
-`k-playbook/bin/k-playbook mcp` startet einen MCP-Server, dessen einziges Werkzeug den
+`k-playbook mcp` startet einen MCP-Server, dessen einziges Werkzeug den
 Arbeitsstand zurückgibt. Gedacht ist das für den Aufruf durch den Assistenten, nicht für
 die Hand — auf der Kommandozeile bleibt `context` der Weg.
 
@@ -119,19 +119,21 @@ der auf `k-playbook context` verweist — vorhandener Inhalt bleibt unangetastet
 ```bash
 cd /pfad/zum/projekt
 git clone git@github.com:kascada/k-playbook.git
-k-playbook/bin/k-playbook
+make -C k-playbook install
+k-playbook
 ```
 
-Go wird nicht gebraucht — der Wrapper lädt das Binary der eigenen Plattform beim ersten
-Start als Release-Asset in einen Cache und prüft es gegen das mitgelieferte
-`SHA256SUMS`; dafür braucht dieser erste Start Netz. Der letzte Aufruf startet
-die Oberfläche, die durch vier Schritte führt: Konfiguration anlegen, projekteigene
-Struktur anlegen, MCP-Server registrieren, Assistenten verlinken. Geschrieben wird jeweils
-erst nach Bestätigung.
+Go wird nicht gebraucht — `bin/install` ist ein Shell-Skript; es lädt das Release-Asset
+der eigenen Plattform, prüft es gegen das mitgelieferte `SHA256SUMS` und installiert es
+nach `~/.local/bin/k-playbook`. Dafür braucht dieser eine Bootstrap Netz, und
+`~/.local/bin` muss im PATH liegen. Der letzte Aufruf startet die Oberfläche, die durch
+vier Schritte führt: Konfiguration anlegen, projekteigene Struktur anlegen, MCP-Server
+registrieren, Assistenten verlinken. Geschrieben wird jeweils erst nach Bestätigung.
 
 ```mermaid
 flowchart TD
-    A["git clone ..."] --> B["k-playbook/bin/k-playbook"]
+    A["git clone ..."] --> A2["make -C k-playbook install"]
+    A2 --> B["k-playbook"]
     B --> C["K-PLAYBOOK.yaml anlegen"]
     C --> D["k-playbook-local/ anlegen"]
     D --> E["MCP-Server registrieren"]

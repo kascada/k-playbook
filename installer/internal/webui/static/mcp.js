@@ -20,9 +20,10 @@ const elements = {
 // steht der Platz dafür, und wer hierher kommt, will den Grund wissen.
 const STATE_TEXTS = {
   ok: "eingetragen",
-  "no-wrapper": "Wrapper fehlt",
+  "no-command": "kein installiertes k-playbook gefunden",
   "missing-file": "Datei nicht vorhanden",
   "missing-entry": "Eintrag fehlt",
+  outdated: "zeigt auf den abgelösten Wrapper",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON",
   "ambiguous-target": "zwei Konfigurationen",
@@ -30,12 +31,14 @@ const STATE_TEXTS = {
 
 const STATE_NOTES = {
   ok: "Der Assistent liest den Eintrag beim nächsten Start.",
-  "no-wrapper":
-    "Solange der Wrapper fehlt, wird nichts geschrieben: ein Eintrag, der auf nichts zeigt, ist schlechter als keiner.",
+  "no-command":
+    "Auf diesem Rechner ließ sich kein installiertes k-playbook auflösen. Solange das so ist, wird nichts geschrieben: ein Eintrag, der auf nichts zeigt, ist schlechter als keiner. Erst den Bootstrap ausführen.",
   "missing-file": "Die Datei entsteht beim Einrichten neu.",
   "missing-entry": "Die Datei bleibt erhalten, es kommt nur der eigene Eintrag hinzu.",
+  outdated:
+    "Der Eintrag stammt aus dem abgelösten Wrapper-Modell. Das ist der eine Fall, den k-playbook von sich aus richtigstellt — beim Clone-Update und beim nächsten Start, ohne Klick auf Einrichten.",
   stale:
-    "Der Schlüssel k-playbook gehört k-playbook. Ein abweichender Wert ist kein Konflikt, sondern ein falscher Stand — er wird beim Einrichten überschrieben.",
+    "Der Schlüssel k-playbook gehört k-playbook. Ein abweichender Wert ist kein Konflikt, sondern ein falscher Stand — er wird beim Einrichten überschrieben, aber nicht von selbst.",
   unreadable:
     "Die Datei wird nicht angefasst, damit keine Handarbeit verlorengeht. Erst reparieren, dann einrichten. Kommentare und Trailing Commas sind kein Grund dafür — die werden gelesen.",
   "ambiguous-target":
@@ -44,7 +47,7 @@ const STATE_NOTES = {
 
 // Die Zustände, bei denen jemand eingreifen muss statt nur einen Knopf zu
 // drücken.
-const STATE_WARNINGS = ["unreadable", "no-wrapper", "ambiguous-target"];
+const STATE_WARNINGS = ["unreadable", "no-command", "ambiguous-target"];
 
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.

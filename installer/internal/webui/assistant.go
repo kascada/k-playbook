@@ -102,6 +102,9 @@ func describeSetup(setup project.AssistantSetup) string {
 		parts = append(parts, project.RootInstructionsFile+" aus der Vorlage angelegt.")
 	case setup.RootExtended:
 		parts = append(parts, "Der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
+	case setup.RootRefreshed:
+		parts = append(parts, "Der veraltete Anstoß in "+project.RootInstructionsFile+
+			" wurde auf den aktuellen Aufruf gebracht.")
 	}
 
 	return strings.Join(parts, " ")

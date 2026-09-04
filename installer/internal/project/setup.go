@@ -16,6 +16,10 @@ type AssistantSetup struct {
 	RootCreated bool `json:"rootCreated,omitempty"`
 	// RootExtended: der Anstoß wurde einer vorhandenen Datei angehängt.
 	RootExtended bool `json:"rootExtended,omitempty"`
+	// RootRefreshed: ein vorhandener, aber veralteter Anstoß wurde ersetzt.
+	// Das ist eine Änderung an einer Projektdatei und gehört deshalb in die
+	// Antwort, nicht nur ins Log.
+	RootRefreshed bool `json:"rootRefreshed,omitempty"`
 }
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
@@ -45,6 +49,7 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	// os.ReadFile nur in den Fehlerzweig; die Einordnung kennt den Fall bereits.
 	if result.runInstructions {
 		before := CheckRootInstructions(projectDir)
+		outdatedBefore := before.HasMarker && before.HasOutdatedAnstoss
 		root, err := applyRootInstructions(projectDir, result.MayCreate)
 		if err != nil {
 			errs = append(errs, err)
@@ -52,6 +57,7 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 		setup.Root = root
 		setup.RootCreated = !before.Present && root.Present
 		setup.RootExtended = before.Present && !before.HasMarker && root.HasMarker
+		setup.RootRefreshed = outdatedBefore && !root.HasOutdatedAnstoss
 	} else {
 		setup.Root = CheckRootInstructions(projectDir)
 	}

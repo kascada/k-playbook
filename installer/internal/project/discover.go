@@ -16,13 +16,6 @@ const ConfigFileName = "K-PLAYBOOK.yaml"
 // fest; wie das Projektverzeichnis selbst heißt, spielt keine Rolle.
 const PlaybookDirName = "k-playbook"
 
-const (
-	// WrapperName ist der Name des Wrappers in bin/ und des Symlinks darauf.
-	WrapperName = "k-playbook"
-	// BinDirName ist das Verzeichnis, in dem der Wrapper liegt.
-	BinDirName = "bin"
-)
-
 // VersionFileName koppelt einen Clone-Stand an ein Binary. Die Datei liegt im
 // Wurzelverzeichnis der Installation und nennt den Release-Tag, dessen Assets
 // zu diesem Stand gehören. Content-Commits ändern sie nicht.
@@ -74,17 +67,6 @@ func Discover(startDir string) (string, error) {
 // PlaybookDir ist die Installation innerhalb eines Projekts.
 func PlaybookDir(projectDir string) string {
 	return filepath.Join(projectDir, PlaybookDirName)
-}
-
-// WrapperPath ist der Wrapper des Projekts — bewusst **relativ** zum
-// Hauptverzeichnis.
-//
-// Genau dieser Wert wird als Kommando bei den Assistenten registriert. Ein
-// absoluter Pfad wäre auf jedem Rechner ein anderer und damit nicht teilbar,
-// und im DevContainer zeigte er ins Leere. Der Wrapper wählt die Binary selbst
-// über `uname`, deshalb genügt derselbe Eintrag für Host und Container.
-func WrapperPath() string {
-	return filepath.Join(PlaybookDirName, BinDirName, WrapperName)
 }
 
 // ConfigPath ist der Ort der K-PLAYBOOK.yaml eines Projekts.

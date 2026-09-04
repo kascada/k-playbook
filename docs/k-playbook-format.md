@@ -162,7 +162,7 @@ als abgeschaltet und wird nicht registriert.
 Wer wissen will, was am Ende gilt, fragt nicht das Dateisystem, sondern das Werkzeug:
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Die Ausgabe führt die zusammengeführten Kataloge mit Herkunft je Eintrag — `dist`,
@@ -193,7 +193,7 @@ dort Regeln oder Rezepte lesen. Ein Update ersetzt das Verzeichnis vollständig.
 ## Der aufgelöste Arbeitsstand
 
 ```bash
-k-playbook/bin/k-playbook context
+k-playbook context
 ```
 
 Gibt als JSON aus, was ein Command sonst selbst aus Konfiguration und Dateisystem

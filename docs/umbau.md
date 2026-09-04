@@ -13,12 +13,12 @@ Der Umbau auf das projektlokale Modell ist durch und in der Doku eingearbeitet:
 | Thema | Wo es steht |
 |---|---|
 | Modell, Anker, Verzeichnisaufteilung, Overlay-Regeln, Konfiguration | [`k-playbook-format.md`](./k-playbook-format.md) |
-| Clone, die drei Einrichtungsschritte, Aktualisieren, host-weiter Aufruf | [`installation.md`](./installation.md) |
+| Clone, Bootstrap, die vier Einrichtungsschritte, Aktualisieren | [`installation.md`](./installation.md) |
 | Grundmodell und Standardabläufe | [`handbuch.md`](./handbuch.md) |
 | Commands, `context` einmal je Sitzung | [`commands.md`](./commands.md) |
 | Rezepte, Ergebnisse, Remediation-Policy | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Entfallenes: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
-| Werkzeug: Anker finden, Verlinkung, Update, Spiegelung, Altlasten, Web-API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
+| Werkzeug: Anker finden, Verlinkung, Update, Direktinstallation, Altlasten, Web-API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
 | Command-Namen und Review-Handoff: `/k-audit`, `/k-review`, `/k-task-refine`, einheitliches `review-triage.md` | [`commands.md`](./commands.md), [`code-review.md`](./code-review.md), [`review-runs.md`](./review-runs.md) |
 
 ## Arbeitsteilung: Entwicklungsrepo vs. Installation

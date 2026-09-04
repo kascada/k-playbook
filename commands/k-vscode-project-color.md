@@ -10,8 +10,8 @@ allowed-tools: [Read, Write, Bash, Glob]
 ## Erster Schritt
 
 Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook/bin/k-playbook context`
-auf und lies die Dateien aus `instructions`.
+Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
+Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 

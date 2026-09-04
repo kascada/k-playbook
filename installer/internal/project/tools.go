@@ -120,10 +120,10 @@ func ReadToolLanguages(projectDir string) ([]string, error) {
 // in die Irre führt.
 //
 // Binary und Skript können auseinanderlaufen: aufgerufen wird das Skript der
-// Installation des aktuellen Projekts, das Binary kann aber aus der host-weiten
-// Kopie stammen, die ein anderes Projekt gespiegelt hat. Ist die Installation
-// älter, kennt ihr Skript ein neueres Argument nicht — und "Unknown argument"
-// sagt niemandem, dass ein Update fehlt.
+// Installation des aktuellen Projekts, das Binary liegt dagegen einmal je Host
+// unter ~/.local/bin und bedient alle Projekte. Ist die Installation älter,
+// kennt ihr Skript ein neueres Argument nicht — und "Unknown argument" sagt
+// niemandem, dass ein Update fehlt.
 func describePreflightError(message string, playbookDir string) error {
 	if strings.Contains(message, "Unknown argument:") {
 		return fmt.Errorf("die Installation unter %s ist älter als dieses Werkzeug: ihr Preflight-Skript meldet %q. Ziehe sie nach — in der Oberfläche über \"Update prüfen\", sonst mit git pull in diesem Verzeichnis",

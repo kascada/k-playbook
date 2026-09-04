@@ -133,6 +133,12 @@ func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
 	write(filepath.Join(cache, "bin", "v0.1.2", "k-playbook-linux-amd64"))
 	symlink(t, filepath.Join(installation, "bin", "k-playbook"), launcher)
 
+	// Die Tool-venvs wohnen unter demselben Dach wie die alte Spiegelung. Sie
+	// sind teuer wiederherzustellen und gehören einer anderen Zuständigkeit:
+	// die Bereinigung darf sie nicht mitnehmen.
+	venv := filepath.Join(home, ".local", "share", "k-playbook", "security-tools", "semgrep-venv")
+	write(filepath.Join(venv, "bin", "semgrep"))
+
 	removals, err := removeFormerHostInstall(home)
 	if err != nil {
 		t.Fatalf("removeFormerHostInstall: %v", err)
@@ -144,6 +150,9 @@ func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {
 			t.Errorf("%s besteht weiter", path)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(venv, "bin", "semgrep")); err != nil {
+		t.Errorf("Tool-venv wurde mitentfernt: %v", err)
 	}
 }
 

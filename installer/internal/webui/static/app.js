@@ -159,9 +159,15 @@ async function onUpdateClick() {
       // Der Dienst beendet sich nach dieser Antwort selbst: zum neuen Stand
       // gehört ein anderes Binary, und ein alter Daemon soll nicht stehen
       // bleiben.
+      //
+      // Der Bootstrap steht hier in derselben kanonischen Form wie in
+      // project.BootstrapHint und in der Dokumentation: ein Zielprojekt hat
+      // kein eigenes install-Target, der Aufruf geht über den Clone.
       showClosed(
         "Das Programm wurde aktualisiert. Der Dienst hat sich beendet; " +
-          "bin/install ausführen und danach k-playbook neu starten."
+          "neu installieren mit: make -C k-playbook install " +
+          "(ohne make: k-playbook/bin/install). " +
+          "Danach k-playbook erneut aufrufen."
       );
     }
   } catch {
@@ -758,9 +764,10 @@ function renderAssistant(data) {
 // auf der Seite /mcp; hier genügt der Halbsatz neben dem Dateinamen.
 const MCP_STATE_LABELS = {
   ok: "eingetragen",
-  "no-wrapper": "Wrapper fehlt",
+  "no-command": "kein installiertes k-playbook gefunden",
   "missing-file": "Datei nicht vorhanden",
   "missing-entry": "Eintrag fehlt",
+  outdated: "zeigt auf den abgelösten Wrapper",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON, bleibt unangetastet",
   "ambiguous-target": "zwei Konfigurationen, nur opencode.json wird gepflegt",
@@ -810,7 +817,7 @@ function renderMCP(data) {
   elements.mcpWorkdir.classList.toggle("warn", Boolean(data.workdirMismatch));
 
   // Ohne Installation gibt es nichts einzurichten, der Button bleibt grau —
-  // ohne k-playbook/ ebenso: der eingetragene Wrapper existierte dann nicht.
+  // ohne k-playbook/ ebenso: der Server hätte dann keine Inhalte auszuliefern.
   const environment = data.environment || {};
   const usable = environment.installed && environment.playbookPresent;
   const state = !usable ? "blocked" : data.ok ? "ok" : "todo";

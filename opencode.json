@@ -7,7 +7,7 @@
   "mcp": {
     "k-playbook": {
       "command": [
-        "k-playbook/bin/k-playbook",
+        "k-playbook",
         "mcp"
       ],
       "enabled": true,

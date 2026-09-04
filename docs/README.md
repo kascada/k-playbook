@@ -22,7 +22,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 | [`review-runs.md`](./review-runs.md) | Das Laufmodell: `run.json`, Einträge, Betriebsarten der Katalog-Rezepte, Merge, known-decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
-| [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag relativ ist. |
+| [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag ein absoluter Pfad ist. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |
 | [`schreibweise.md`](./schreibweise.md) | Umlaute statt ASCII-Umschreibung, und wo ASCII bleibt. Gilt für alle Texte des Repos. |
 

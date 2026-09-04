@@ -55,7 +55,7 @@ func TestRelinkAfterUpdateRichtetEin(t *testing.T) {
 	if !strings.Contains(content, "# Unser Projekt") {
 		t.Errorf("der mitgebrachte Inhalt fehlt in AGENTS.md:\n%s", content)
 	}
-	if !strings.Contains(content, "bin/k-playbook context") {
+	if !strings.Contains(content, "\n    k-playbook context\n") {
 		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
 	}
 
@@ -82,7 +82,7 @@ func TestRelinkAfterUpdateLegtWurzeldateiAn(t *testing.T) {
 	_, message := relinkAfterUpdate(root, "Aktualisiert.")
 
 	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
-	if !strings.Contains(content, "bin/k-playbook context") {
+	if !strings.Contains(content, "\n    k-playbook context\n") {
 		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
 	}
 	if !strings.Contains(message, project.RootInstructionsFile) {
@@ -132,5 +132,49 @@ func TestUpdateShutdownNurBeiGewechselterVersion(t *testing.T) {
 	case <-called:
 	case <-time.After(2 * time.Second):
 		t.Fatal("bei Versionswechsel wurde nicht beendet")
+	}
+}
+
+// Der Versionswechsel meldet den Bootstrap in der kanonischen Form. Geprüft
+// wird der ganze Satz, nicht nur ein Wortbestandteil: die Meldung ist die
+// einzige Stelle, an der ein Nutzer beim Wechsel erfährt, dass das neue Binary
+// noch geholt werden muss.
+//
+// Ausdrücklich mitgeprüft wird, was **nicht** dastehen darf: ein Zielprojekt
+// hat kein eigenes install-Target, `make install` liefe dort ins Leere.
+func TestVersionswechselMeldetKanonischenBootstrap(t *testing.T) {
+	message := versionChangeMessage()
+
+	for _, want := range []string{
+		"beendet sich jetzt",
+		"make -C " + project.PlaybookDirName + " install",
+		project.PlaybookDirName + "/bin/install",
+	} {
+		if !strings.Contains(message, want) {
+			t.Errorf("in der Meldung fehlt %q: %s", want, message)
+		}
+	}
+	if strings.Contains(strings.ReplaceAll(message, "make -C "+project.PlaybookDirName+" install", ""), "make install") {
+		t.Errorf("die Meldung nennt ein install-Target, das ein Zielprojekt nicht hat: %s", message)
+	}
+}
+
+// Die Oberfläche zeigt denselben Bootstrap wie die Antwort des Servers. Beide
+// Texte stehen an verschiedenen Stellen — Go-Meldung und app.js —, und genau
+// deshalb wird der Gleichlauf geprüft statt vorausgesetzt.
+func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
+	source, err := staticFiles.ReadFile("static/app.js")
+	if err != nil {
+		t.Fatalf("app.js lesen: %v", err)
+	}
+	script := string(source)
+
+	for _, want := range []string{
+		"make -C " + project.PlaybookDirName + " install",
+		project.PlaybookDirName + "/bin/install",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("in app.js fehlt %q", want)
+		}
 	}
 }
