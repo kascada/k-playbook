@@ -182,12 +182,7 @@ erst nach Bestätigung. Kandidaten in dieser Reihenfolge:
 
 1. **Das Git-Repository, in dem der Aufruf stattfindet.** Wer das Werkzeug startet, steht
    in aller Regel in dem Projekt, das er meint. Der stärkste Hinweis.
-2. **Aus `InstallDir()`.** Vorrangig sagt der Wrapper über
-   `K_PLAYBOOK_INSTALL_DIR`, wo die Installation liegt; ersatzweise wird sie aus dem Ort
-   des Binaries abgeleitet (`<X>/dist/` → `X`). Ob `X` selbst das Hauptverzeichnis ist
-   oder eine Ebene darunter liegt, hängt daran, ob die Installation geklont wurde oder
-   das Repo selbst ist — beides kommt vor, deshalb stehen beide Orte zur Auswahl.
-3. Das Arbeitsverzeichnis.
+2. Das Arbeitsverzeichnis.
 
 Ein früherer Ansatz leitete das Hauptverzeichnis allein aus dem Binary-Pfad ab und
 prüfte, ob das Zwischenverzeichnis `k-playbook` heißt. Das ging im Entwicklungsrepo
@@ -446,7 +441,7 @@ beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `Context
 Der Grund ist eine Zuordnung, die lange falsch herum gedacht war. Welche Links gelten,
 folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem die Installation zu ihrem
 Stand kam. Hing das Nachziehen an einem Weg — dem Update-Handler —, blieb die
-Registrierung bei jedem anderen stehen: `make installer-update`, `make installer-sync`,
+Registrierung bei jedem anderen stehen: `make installer-update`,
 ein `git pull` von Hand. Und zwar unbemerkt; gesehen hat es nur, wer die
 Assistenten-Karte öffnete. Der Lesepfad ist die richtige Stelle, weil er ohnehin bei
 jedem Sitzungsstart betreten wird und weil er dasselbe Projekt meint.
@@ -788,11 +783,9 @@ Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 Reviews, Checks — kommen dagegen **immer** aus `PlaybookDir(projektDir)`, also aus
 `<projekt>/k-playbook/`. Das Binary liest nie neben sich.
 
-Das ist Absicht — und seit die Binaries Release-Assets sind, unumgänglich: das Binary
-liegt im Regelfall im Cache unter `$HOME`, weit außerhalb jeder Installation. „Neben dem
-Binary" gäbe es dort nichts zu lesen. Genau deshalb sagt der Wrapper über
-`K_PLAYBOOK_INSTALL_DIR`, wo die Installation liegt, statt sie aus dem eigenen Ort raten
-zu lassen.
+Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist nicht an einen
+bestimmten Projekt-Clone gebunden. Es leitet den Projektinhalt ausschließlich aus dem
+Arbeitsverzeichnis und dem Anker ab.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
@@ -1152,7 +1145,6 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt; liefert den lokalen Sauberkeitszustand mit |
 | `POST` | `/api/update` | `git pull --ff-only` ausführen; bricht bei lokal veränderter Installation vorher ab; hat `VERSION` gewechselt, beendet sich der Dienst nach der Antwort |
-| `POST` | `/api/update/discard` | eingespielten Arbeitsstand verwerfen; nur bei vorhandener Markierung |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -1380,13 +1372,12 @@ liefert eines von fünf Ergebnissen:
 3. Antwortet der eigene Server, entscheidet die Version: gleich → **läuft unter dieser
    URL**, anders → **läuft mit anderer Version**. Ohne Datei: **nicht vorhanden**.
 
-Die Version ist die `VERSION` der Installation, die das Binary gewählt hat —
-`project.InstalledVersion(project.InstallDir())`, der Wrapper exportiert dafür
-`K_PLAYBOOK_INSTALL_DIR` —, nicht die Projektinstallation aus `Detect()`: ein bloßes
-`k-playbook` aus dem PATH läuft über die host-weite Spiegelung. Jeder Prozess hält sie
-beim Start fest und liest sie nicht je Anfrage, sonst wäre ein Wechsel auf der Platte nie
-zu erkennen. Der Schlüssel in `/api/health` wird dagegen je Anfrage berechnet: nach dem
-Umschlüsseln muss schon die nächste Antwort den neuen tragen.
+Die Version wird beim Build mit `-ldflags -X` in das Binary gestempelt. `make install`
+nimmt den Wert aus `VERSION`; der Release-Workflow stempelt denselben Wert in die vier
+Assets. Jeder Prozess hält ihn beim Start fest und liest ihn nicht von der Platte, sonst
+wäre ein Wechsel auf der Platte nie zu erkennen. Der Schlüssel in `/api/health` wird
+dagegen je Anfrage berechnet: nach dem Umschlüsseln muss schon die nächste Antwort den
+neuen tragen.
 
 ### Der Aufruf
 

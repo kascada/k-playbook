@@ -15,6 +15,7 @@ INSTALLER_GO_TOOLCHAIN = $(shell awk '$$1 == "toolchain" { print $$2 }' installe
 # über den Git-Remote und nicht über dieselbe HTTPS-Quelle wie das Binary.
 INSTALLER_SUMS_FILE := SHA256SUMS
 INSTALLER_VERSION_FILE := VERSION
+INSTALLER_BUILD_VERSION = $(or $(VERSION),$(shell tr -d '[:space:]' < $(INSTALLER_VERSION_FILE)))
 # Bewusst mit = statt := : `go env` darf erst laufen, wenn ein Target es
 # wirklich braucht. In einem Zielprojekt ohne Go würde die sofortige Auswertung
 # sonst schon bei `make help` eine Fehlermeldung ausgeben.
@@ -34,7 +35,7 @@ DEV_MARKER := .k-playbook-devsync
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host install gui test release release-publish installer-build installer-run installer-test installer-sync installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host install gui test release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -66,7 +67,7 @@ define build_binaries
 		arch="$${target#*-}"; \
 		output="../$(INSTALLER_DIST_DIR)/$(INSTALLER_BINARY)-$${os}-$${arch}"; \
 		echo "Baue $$output"; \
-		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$$output" "$(INSTALLER_PKG)"); \
+		(cd installer && CGO_ENABLED=0 GOOS="$$os" GOARCH="$$arch" go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/kascada/k-playbook/installer/internal/buildinfo.Version=$(INSTALLER_BUILD_VERSION)" -o "$$output" "$(INSTALLER_PKG)"); \
 	done
 endef
 
@@ -126,41 +127,13 @@ define require_writable
 	}
 endef
 
-# Übertragen wird genau der verfolgte Dateisatz — das ist per Definition, was
-# ein Clone enthaelt. Ein Filter auf .gitignore waere nur eine Naeherung: er
-# schleppt unverfolgte, aber nicht ignorierte Dateien mit, etwa
-# .claude/settings.local.json.
-installer-sync: ## Spielt den Arbeitsstand in die Installation ein (nur Entwicklungsrepo)
-	$(require_dev_repo)
-	@set -eu; \
-	  trap 'chmod -R a-w "$(PLAYBOOK_DIR)"' EXIT; \
-	  chmod -R u+w "$(PLAYBOOK_DIR)"; \
-	  git -C "$(PLAYBOOK_DIR)" checkout -- .; \
-	  git -C "$(PLAYBOOK_DIR)" clean -qfd; \
-	  git ls-files -z | rsync -a --from0 --files-from=- --delete-missing-args ./ "$(PLAYBOOK_DIR)/"; \
-	  soll="$$(mktemp)"; ist="$$(mktemp)"; \
-	  git ls-files | sort > "$$soll"; \
-	  (cd "$(PLAYBOOK_DIR)" && find . -path ./.git -prune -o \( -type f -o -type l \) -print) \
-	    | sed 's|^\./||' | grep -vx '$(DEV_MARKER)' | sort > "$$ist"; \
-	  comm -13 "$$soll" "$$ist" | while IFS= read -r path; do rm -f "$(PLAYBOOK_DIR)/$$path"; done; \
-	  rm -f "$$soll" "$$ist"; \
-	  find "$(PLAYBOOK_DIR)" -depth -type d -empty \
-	    ! -path "$(PLAYBOOK_DIR)/.git" ! -path "$(PLAYBOOK_DIR)/.git/*" -delete; \
-	  printf 'Eingespielter Arbeitsstand, kein Clone.\nEntstanden durch "make installer-sync".\nZurück: in der Oberfläche "Arbeitsstand verwerfen".\n' \
-	    > "$(PLAYBOOK_DIR)/$(DEV_MARKER)"
-	@echo "Arbeitsstand eingespielt nach $(PLAYBOOK_DIR)/"
-
 installer-writable: ## Macht die lokale Installation temporär beschreibbar
 	@chmod -R u+w "$(INSTALLATION_DIR)"
 
 installer-readonly: ## Sperrt Schreibzugriffe auf die lokale Installation
 	@chmod -R a-w "$(INSTALLATION_DIR)"
 
-# Kein pull --ff-only: dieses Ziel laeuft auch, wenn zwischenzeitlich ein
-# installer-sync in die Installation geschrieben hat. Der Vertrag von
-# INSTALLATION_DIR (nie schreiben) macht reset --hard sicher; Sync-Reste und
-# der Marker werden dabei entfernt und die Installation ist wieder ein
-# sauberer Clone.
+# Der Vertrag von INSTALLATION_DIR (nie schreiben) macht reset --hard sicher.
 installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
 	@set -eu; \
 	  trap 'chmod -R a-w "$(INSTALLATION_DIR)"' EXIT; \
@@ -187,6 +160,7 @@ install: dist-host ## Baut diese Plattform und installiert sie nach ~/.local/bin
 	  printf 'Installiert: %s\n' "$$target"
 
 gui: install ## Baut, installiert und startet die GUI
+	-"$$HOME/.local/bin/$(INSTALLER_BINARY)" stop
 	"$$HOME/.local/bin/$(INSTALLER_BINARY)"
 
 test: ## Führt die Tests aus

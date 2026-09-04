@@ -129,10 +129,8 @@ loadConfig();
 checkUpdate();
 
 // updateAvailable steuert, was ein Klick auf den Button tut: prüfen oder
-// tatsächlich aktualisieren. devSyncActive geht beidem vor: solange ein
-// Arbeitsstand eingespielt ist, gibt es nichts zu ziehen.
+// tatsächlich aktualisieren.
 let updateAvailable = false;
-let devSyncActive = false;
 
 async function checkUpdate() {
   elements.update.disabled = true;
@@ -146,14 +144,6 @@ async function checkUpdate() {
 }
 
 async function onUpdateClick() {
-  // Ein eingespielter Arbeitsstand wird zuerst verworfen, und zwar allein: der
-  // Zustand, den man gerade ansieht, verschwindet dabei. Ob danach ein Update
-  // ansteht, zeigt die Antwort — das zieht dann ein zweiter Klick.
-  if (devSyncActive) {
-    await discardDevSync();
-    return;
-  }
-
   if (!updateAvailable) {
     await checkUpdate();
     return;
@@ -185,20 +175,7 @@ function renderUpdate(data) {
     (cleanliness.modified && cleanliness.modified.length > 0) || cleanliness.ahead > 0,
   );
   updateAvailable = Boolean(data.available) && !blockingCleanliness;
-  devSyncActive = Boolean(cleanliness.devSync);
   renderCleanliness(cleanliness);
-
-  // Der eingespielte Arbeitsstand geht vor: er verdeckt, was upstream liegt,
-  // und muss erst weg. Der Knopf sagt, was er tut — was man ansieht,
-  // verschwindet dabei.
-  if (devSyncActive) {
-    elements.update.className = "secondary";
-    elements.update.textContent = "Arbeitsstand verwerfen";
-    elements.update.title =
-      "Stellt den unberührten Clone wieder her. Danach lässt sich auf ein Update prüfen.";
-    elements.update.disabled = false;
-    return;
-  }
 
   if (data.available && blockingCleanliness) {
     elements.update.className = "secondary";
@@ -221,17 +198,6 @@ function renderUpdate(data) {
   // geprüft werden, dann bleibt es bei der Aufforderung.
   resetUpdateButton(data.message ? "Update prüfen" : "Version ist aktuell");
   elements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
-}
-
-async function discardDevSync() {
-  elements.update.disabled = true;
-  elements.update.textContent = "Verwerfe...";
-  try {
-    const response = await fetch("/api/update/discard", { method: "POST" });
-    renderUpdate(await response.json());
-  } catch {
-    resetUpdateButton("Arbeitsstand verwerfen");
-  }
 }
 
 function resetUpdateButton(label) {
@@ -257,19 +223,6 @@ function renderCleanliness(state) {
 
   elements.cleanFacts.replaceChildren();
   elements.cleanMessage.textContent = state.message || "";
-
-  // Ein eingespielter Arbeitsstand ist gewollt, kein Versehen. Deshalb keine
-  // Warnfarbe und kein Befehl zum Verwerfen — der stünde hier für „mach die
-  // Arbeit rückgängig, die du gerade ansehen willst".
-  if (state.devSync) {
-    elements.cleanPill.className = "pill muted";
-    elements.cleanPill.textContent = "Entwicklungsstand";
-    // Kein Befehl zum Kopieren: dafür gibt es oben den Knopf. Der Befehl
-    // stünde nur als zweiter Weg daneben, der dasselbe tut.
-    elements.cleanCommand.classList.add("hidden");
-    elements.cleanCard.classList.remove("hidden");
-    return;
-  }
 
   const blocking = (state.modified && state.modified.length > 0) || state.ahead > 0;
   elements.cleanPill.className = "pill warn";

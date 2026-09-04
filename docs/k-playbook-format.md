@@ -208,7 +208,7 @@ zusammenrechnen müsste:
 | `playbook`, `local` | die beiden aufgelösten Verzeichnisse |
 | `remediation` | die Policy, mit Default, falls der Block fehlt |
 | `gh` | die Entscheidung zur GitHub CLI samt Host-Befund |
-| `cleanliness` | der lokale Zustand der Installation: geänderte und zusätzliche Dateien, lokale Commits, eingespielter Arbeitsstand |
+| `cleanliness` | der lokale Zustand der Installation: geänderte und zusätzliche Dateien, lokale Commits |
 | `catalogs` | `rules`, `reviews`, `checks` — zusammengeführt |
 | `guidelines` | die Dateien aus `k-playbook-local/guidelines/` |
 | `links` | nur wenn es etwas zu melden gibt: was die Selbstheilung der Assistenten-Verlinkung nachgezogen hat (`healed`), was offen blieb (`open`) und was das für diese Sitzung heißt (`note`) |

@@ -31,50 +31,7 @@ func Detect() Environment {
 	if err != nil {
 		return Environment{}
 	}
-	if environment, ok := setupEnvironment(start); ok {
-		return environment
-	}
 	return DetectFrom(start)
-}
-
-// setupEnvironment erkennt den ersten Start aus einer projektlokalen
-// Installation. Ohne diesen Vorrang würde ein Anker eines übergeordneten
-// Projekts die noch fehlende Konfiguration des Clones verdecken.
-func setupEnvironment(startDir string) (Environment, bool) {
-	installDir, ok := InstallDir()
-	if !ok || filepath.Base(installDir) != PlaybookDirName {
-		return Environment{}, false
-	}
-
-	projectDir := filepath.Dir(installDir)
-	if fileExists(ConfigPath(projectDir)) || !isWithinResolved(startDir, projectDir) {
-		return Environment{}, false
-	}
-	return Environment{
-		ProjectDir:      projectDir,
-		PlaybookDir:     installDir,
-		PlaybookPresent: true,
-		SearchedFrom:    startDir,
-	}, true
-}
-
-func isWithinResolved(dir string, parent string) bool {
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return false
-	}
-	parent, err = filepath.Abs(parent)
-	if err != nil {
-		return false
-	}
-	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = resolved
-	}
-	if resolved, err := filepath.EvalSymlinks(parent); err == nil {
-		parent = resolved
-	}
-	relative, err := filepath.Rel(parent, dir)
-	return err == nil && relative != ".." && !filepath.IsAbs(relative)
 }
 
 // DetectFrom sucht ab einem bestimmten Verzeichnis und ist dadurch prüfbar.

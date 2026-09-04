@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kascada/k-playbook/installer/internal/buildinfo"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -70,19 +71,11 @@ func canonical(dir string) string {
 	return dir
 }
 
-// OwnVersion ist die VERSION der Installation, die dieses Binary gewählt hat:
-// die aus K_PLAYBOOK_INSTALL_DIR, nicht die Projektinstallation — ein bloßes
-// `k-playbook` aus dem PATH läuft über die host-weite Spiegelung. Leer, wenn
-// InstallDir() nichts liefert.
-//
-// Einmal beim Start festhalten und nicht je Anfrage lesen: sonst wäre ein
-// Wechsel auf der Platte nie zu erkennen.
+// OwnVersion ist die beim Build in das Binary gestempelte Version. Sie wird
+// nicht von einer Projektinstallation abgeleitet: das Binary wird direkt nach
+// ~/.local/bin installiert und bedient mehrere Projekte.
 func OwnVersion() string {
-	dir, ok := project.InstallDir()
-	if !ok {
-		return ""
-	}
-	return project.InstalledVersion(dir)
+	return buildinfo.Version
 }
 
 // Location sind die Pfade eines Schlüssels: das Verzeichnis, die

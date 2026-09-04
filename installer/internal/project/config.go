@@ -172,7 +172,7 @@ type Suggestion struct {
 // Anders als Discover darf das raten: geschrieben wird erst nach Bestätigung.
 // Der stärkste Hinweis ist das Repository, in dem der Aufruf stattfindet — wer
 // das Werkzeug startet, steht in aller Regel in dem Projekt, das er meint.
-// Danach kommt der Ort des Binaries.
+// Danach kommt das Arbeitsverzeichnis selbst.
 func Suggest() Suggestion {
 	suggestion := Suggestion{}
 	workdir, _ := os.Getwd()
@@ -181,17 +181,6 @@ func Suggest() Suggestion {
 		if root, ok := gitWorktreeRoot(workdir); ok {
 			suggestion.ProjectCandidates = append(suggestion.ProjectCandidates, root)
 		}
-	}
-
-	// Das Binary liegt in <X>/dist/; X ist die Installation. Ob X selbst das
-	// Hauptverzeichnis ist oder eine Ebene darunter liegt, hängt daran, ob die
-	// Installation geklont wurde oder das Repo selbst ist — beides ist möglich,
-	// deshalb kommen beide Orte in die Auswahl.
-	if install, ok := InstallDir(); ok {
-		if filepath.Base(install) == PlaybookDirName {
-			suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, filepath.Dir(install))
-		}
-		suggestion.ProjectCandidates = addUnique(suggestion.ProjectCandidates, install)
 	}
 
 	if workdir != "" {
@@ -203,45 +192,6 @@ func Suggest() Suggestion {
 		suggestion.RepoRoot, suggestion.RepoCandidates = suggestRepoRoot(suggestion.ProjectDir)
 	}
 	return suggestion
-}
-
-// InstallDir liefert das Verzeichnis der Installation.
-//
-// Vorrang hat, was der Wrapper sagt: er kennt seinen eigenen Ort und ist die
-// einzige Stelle, die ihn noch kennt, seit das Binary auch aus dem Cache
-// kommen kann. Die Ableitung aus dem Ort des Binaries bleibt Rückfall für
-// direkt gestartete Binaries.
-func InstallDir() (string, bool) {
-	if dir := strings.TrimSpace(os.Getenv(InstallDirEnv)); dir != "" {
-		if absolute, err := filepath.Abs(dir); err == nil {
-			dir = absolute
-		}
-		if isDir(dir) {
-			return dir, true
-		}
-	}
-
-	exe, err := os.Executable()
-	if err != nil {
-		return "", false
-	}
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
-
-	// Das Binary liegt in <X>/dist/; X wäre die Installation. Für ein Binary
-	// aus dem Cache (<cache>/bin/<version>/<binary>) trifft das nicht zu, und
-	// <cache>/bin existiert trotzdem — ein bloßes isDir lieferte dann ein
-	// falsches Verzeichnis statt eines Fehlers. Deshalb muss darunter auch
-	// wirklich eine Installation liegen.
-	dir := filepath.Dir(filepath.Dir(exe))
-	if !isDir(dir) {
-		return "", false
-	}
-	if !fileExists(filepath.Join(dir, BinDirName, WrapperName)) && !fileExists(filepath.Join(dir, ConfigFileName)) {
-		return "", false
-	}
-	return dir, true
 }
 
 // gitWorktreeRoot sucht ab dir aufwärts das Repository, in dem dir liegt.

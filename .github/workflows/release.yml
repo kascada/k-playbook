@@ -82,7 +82,7 @@ jobs:
             output="../dist/k-playbook-${os}-${arch}"
             echo "Baue $output"
             (cd installer && CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-              go build -trimpath -buildvcs=false -ldflags="-s -w" -o "$output" ./cmd/k-playbook)
+              go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/kascada/k-playbook/installer/internal/buildinfo.Version=$(tr -d '[:space:]' < ../VERSION)" -o "$output" ./cmd/k-playbook)
           done
 
       - name: Gegen SHA256SUMS prüfen

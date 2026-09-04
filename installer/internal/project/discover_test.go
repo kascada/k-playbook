@@ -136,44 +136,6 @@ func TestDetectFromOhneInstallation(t *testing.T) {
 	}
 }
 
-// Ein erster GUI-Start aus einem frisch geklonten k-playbook/ darf nicht den
-// Anker eines übergeordneten Projekts übernehmen. Sonst erscheint die
-// Konfiguration als erledigt, obwohl sie im eigentlichen Projekt fehlt.
-func TestDetectBevorzugtFrischenEigenenCloneVorUebergeordnetemAnker(t *testing.T) {
-	parent := t.TempDir()
-	newInstallation(t, parent)
-
-	projectDir := filepath.Join(parent, "unterprojekt")
-	installDir := PlaybookDir(projectDir)
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		t.Fatalf("frische Installation anlegen: %v", err)
-	}
-
-	before, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Arbeitsverzeichnis lesen: %v", err)
-	}
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("ins Unterprojekt wechseln: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(before) })
-	t.Setenv(InstallDirEnv, installDir)
-
-	environment := Detect()
-	if environment.Installed {
-		t.Fatal("Installed = true, obwohl im Unterprojekt kein Anker liegt")
-	}
-	if want := resolved(t, projectDir); environment.ProjectDir != want {
-		t.Errorf("ProjectDir = %q, erwartet %q", environment.ProjectDir, want)
-	}
-	if want := resolved(t, installDir); environment.PlaybookDir != want {
-		t.Errorf("PlaybookDir = %q, erwartet %q", environment.PlaybookDir, want)
-	}
-	if !environment.PlaybookPresent {
-		t.Error("PlaybookPresent = false, obwohl der frische Clone vorhanden ist")
-	}
-}
-
 // Ein Verzeichnis wird als Anker nur anerkannt, wenn K-PLAYBOOK.yaml eine Datei
 // ist; ein gleichnamiges Verzeichnis darf nicht zählen.
 func TestDiscoverIgnoriertGleichnamigesVerzeichnis(t *testing.T) {

@@ -33,11 +33,6 @@ const VersionFileName = "VERSION"
 // dieselbe HTTPS-Quelle wie das Binary.
 const SumsFileName = "SHA256SUMS"
 
-// InstallDirEnv nennt die Variable, mit der der Wrapper seine eigene
-// Installation benennt. Seit das Binary aus einem Cache außerhalb der
-// Installation kommen kann, ist das die einzige verlässliche Quelle.
-const InstallDirEnv = "K_PLAYBOOK_INSTALL_DIR"
-
 // ErrNotFound meldet, dass oberhalb des Startverzeichnisses keine Installation liegt.
 var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 
