@@ -771,23 +771,22 @@ func opencodeDocsReference() map[string]any {
 	}
 }
 
+// opencodeMemoryConfigured meldet, ob am Memory-Block nichts mehr zu tun ist.
+//
+// Gefragt wird die Stelle, die auch patcht: was opencodeMemoryPatchOps stehen
+// lässt, gilt hier als eingerichtet. Beides auseinanderlaufen zu lassen kostete
+// genau das, was die Entscheidung verhindern soll — ein fremd getypter Wert
+// (instructions als Zeichenkette, references als Liste) galt als nicht
+// eingerichtet, die Patch-Folge hatte aber nichts zu ändern. Jedes Einrichten
+// schrieb und formatierte opencode.json dann neu, ohne dass sich inhaltlich
+// etwas bewegte.
 func opencodeMemoryConfigured(content map[string]any) bool {
-	instructions, ok := content[opencodeInstructionsKey].([]any)
-	if !ok || !containsAnyString(instructions, RootInstructionsFile) {
-		return false
-	}
-	references, ok := content[opencodeReferencesKey].(map[string]any)
-	if !ok {
-		return false
-	}
-	_, ok = references[opencodeDocsKey]
-	return ok
+	return len(opencodeMemoryPatchOps(content)) == 0
 }
 
 func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 	ops := []jsonPatchOp{}
-	instructions, present := content[opencodeInstructionsKey]
-	switch values := instructions.(type) {
+	switch values := content[opencodeInstructionsKey].(type) {
 	case nil:
 		ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeInstructionsKey, Value: json.RawMessage(`["AGENTS.md"]`)})
 	case []any:
@@ -795,12 +794,12 @@ func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 			ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeInstructionsKey + "/-", Value: json.RawMessage(`"AGENTS.md"`)})
 		}
 	default:
-		_ = present
+		// Ein anderer Typ gehört dem Projekt. Hineingeschrieben wird dort
+		// nicht — und deshalb gilt der Block als eingerichtet.
 	}
 
-	references, present := content[opencodeReferencesKey]
 	encoded, _ := json.Marshal(opencodeDocsReference())
-	switch values := references.(type) {
+	switch values := content[opencodeReferencesKey].(type) {
 	case nil:
 		ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey, Value: json.RawMessage(`{"docs":` + string(encoded) + `}`)})
 	case map[string]any:
@@ -808,7 +807,7 @@ func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 			ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey + "/" + opencodeDocsKey, Value: encoded})
 		}
 	default:
-		_ = present
+		// Wie oben: fremder Typ, nichts zu tun.
 	}
 	return ops
 }

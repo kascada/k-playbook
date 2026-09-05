@@ -43,6 +43,12 @@ Auf Linux ist der Eintrag meist schon da. Auf macOS **nicht** — `/etc/paths` k
 nicht und `path_helper` ergänzt ihn nicht. Die Zeile gehört in `~/.zprofile` (zsh) oder
 `~/.bashrc` (bash); danach eine neue Shell öffnen und den Bootstrap erneut aufrufen.
 
+Ein Sonderfall beim allerersten Lauf auf einem frischen Host oder in einem DevContainer:
+Debian und Ubuntu nehmen `~/.local/bin` in `~/.profile` nur auf, wenn das Verzeichnis
+beim Anmelden bereits existiert. Der Bootstrap legt es deshalb an, **bevor** er den PATH
+prüft, und sagt im Abbruch, dass am Profil nichts zu ändern ist — es genügt, sich neu
+anzumelden (oder `. ~/.profile`) und den Bootstrap erneut aufzurufen.
+
 **Host und DevContainer mit geteiltem Home.** `~/.local/bin/k-playbook` ist eine echte
 Datei je Plattform. Teilen sich beide Umgebungen dasselbe `$HOME`, überschreiben sie
 einander dort. `bin/install` erkennt ein plattformfremdes Binary und meldet beim

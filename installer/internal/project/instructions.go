@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +28,46 @@ const instructionsMarker = "<!-- k-playbook:anstoss -->"
 // Die Datei `bin/k-playbook` gibt es im Quell-Repo nicht mehr; diese Konstante
 // bleibt trotzdem — sie ist es, die Bestandsprojekte von ihr weg migriert.
 const legacyInstructionsCommand = "/bin/k-playbook context"
+
+// legacyInstructionsCommandLine markiert in legacyInstructionsBlockLines die
+// eine Zeile, die variieren darf: den Aufruf. Erkannt wird sie über
+// legacyInstructionsCommand und nicht wörtlich, damit auch eine Fassung trifft,
+// die eine weitere Verzeichnisebene davorgeschrieben hat. Der Wert kann in
+// einer Markdown-Datei nicht vorkommen.
+const legacyInstructionsCommandLine = "\x00aufruf\x00"
+
+// legacyInstructionsBlockLines ist der abgelöste Anstoßblock, Zeile für Zeile,
+// so wie er ausgeliefert wurde.
+//
+// Bewusst eine eigene Kopie und nicht aus instructionsBlock() abgeleitet: der
+// abgelöste Block ist Geschichte und ändert sich nicht mehr, der aktuelle darf
+// sich jederzeit ändern. Nur so bleibt er als Grenze verlässlich.
+//
+// Genau darin liegt sein Nutzen: passt er, ist das Ende des Blocks positiv
+// bestimmt — auch dann, wenn dahinter Projekt-Prosa ohne eigene Überschrift
+// steht, die sonst nichts vom Block trennt.
+var legacyInstructionsBlockLines = []string{
+	instructionsMarker,
+	"## k-playbook",
+	"",
+	"Für dieses Projekt gilt k-playbook. Rufe zu Beginn",
+	"",
+	legacyInstructionsCommandLine,
+	"",
+	"auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,",
+	"bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und",
+	"die effektiven Kataloge für Regeln, Reviews und Checks.",
+}
+
+// errAnstossEndeUnbestimmt meldet den einen Fall, in dem der abgelöste Aufruf
+// dasteht, das Ende des Blocks sich aber nicht bestimmen lässt.
+//
+// Ersetzt wird dann nichts. Eine Grenze zu raten hieße, bis zum Dateiende zu
+// verwerfen — und damit Projekttext, den niemand zurückbekommt. Ein Hinweis ist
+// die einzige ehrliche Antwort.
+var errAnstossEndeUnbestimmt = errors.New("das Ende des veralteten Anstoßblocks in " +
+	RootInstructionsFile + " ließ sich nicht bestimmen; die Datei bleibt unangetastet." +
+	" Den Block bitte von Hand auf `" + InstalledCommandName + " context` umstellen.")
 
 // sessionMemoryMarker hält den nachträglich ergänzten Docs-first-Block vom
 // allgemeinen k-playbook-Anstoß getrennt. So erhalten Bestandsprojekte die
@@ -61,8 +102,11 @@ func CheckRootInstructions(projectDir string) RootInstructionsState {
 		state.Present = true
 		state.HasMarker = strings.Contains(string(data), instructionsMarker)
 		if state.HasMarker {
-			_, replaced := replaceOutdatedInstructionsBlock(strings.TrimRight(string(data), "\n"))
-			state.HasOutdatedAnstoss = replaced
+			_, replaced, err := replaceOutdatedInstructionsBlock(strings.TrimRight(string(data), "\n"))
+			// Ein unbestimmbares Blockende ändert nichts daran, dass der
+			// abgelöste Aufruf dasteht — nur daran, dass er sich nicht von
+			// selbst ersetzen lässt.
+			state.HasOutdatedAnstoss = replaced || err != nil
 		}
 	}
 	return state
@@ -87,6 +131,11 @@ func ApplyRootInstructions(projectDir string) (RootInstructionsState, error) {
 // dessen totem Ziel, weil os.WriteFile den Link öffnet.
 func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsState, error) {
 	path := filepath.Join(projectDir, RootInstructionsFile)
+
+	// hint trägt den Fall, in dem der abgelöste Block dasteht, aber nicht
+	// abgegrenzt werden kann. Er hält das Einrichten nicht auf — alles Übrige
+	// gehört trotzdem getan —, darf aber auch nicht untergehen.
+	var hint error
 
 	data, err := os.ReadFile(path)
 	switch {
@@ -113,7 +162,11 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 			// tun". Ein Bestandsprojekt behielt damit dauerhaft den Aufruf des
 			// abgelösten Wrappers, und der Git-Update-Weg erreicht die Datei
 			// nicht: sie liegt im Hauptverzeichnis, nicht im Clone.
-			if replaced, ok := replaceOutdatedInstructionsBlock(content); ok {
+			replaced, ok, err := replaceOutdatedInstructionsBlock(content)
+			if err != nil {
+				hint = err
+			}
+			if ok {
 				content = replaced
 				changed = true
 			}
@@ -132,7 +185,7 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 		}
 	}
 
-	return CheckRootInstructions(projectDir), nil
+	return CheckRootInstructions(projectDir), hint
 }
 
 // RepairRootInstructions ersetzt einen veralteten Anstoßblock in einer
@@ -160,7 +213,10 @@ func RepairRootInstructions(projectDir string) (bool, error) {
 	}
 
 	content := strings.TrimRight(string(data), "\n")
-	replaced, ok := replaceOutdatedInstructionsBlock(content)
+	replaced, ok, err := replaceOutdatedInstructionsBlock(content)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
 		return false, nil
 	}
@@ -172,15 +228,28 @@ func RepairRootInstructions(projectDir string) (bool, error) {
 
 // replaceOutdatedInstructionsBlock ersetzt den Anstoßblock durch die aktuelle
 // Fassung, wenn er noch den abgelösten Wrapper aufruft. Das zweite Ergebnis
-// meldet, ob etwas ersetzt wurde.
-func replaceOutdatedInstructionsBlock(content string) (string, bool) {
+// meldet, ob etwas ersetzt wurde, das dritte den Fall aus
+// errAnstossEndeUnbestimmt: der abgelöste Aufruf steht da, das Ende des Blocks
+// ließ sich aber nicht bestimmen.
+func replaceOutdatedInstructionsBlock(content string) (string, bool, error) {
 	lines := strings.Split(content, "\n")
-	start, end, ok := instructionsBlockBounds(lines)
-	if !ok {
-		return content, false
+	start := instructionsBlockStart(lines)
+	if start < 0 {
+		return content, false, nil
+	}
+
+	end, bounded := instructionsBlockEnd(lines, start)
+	if !bounded {
+		// Ohne bestimmtes Ende wird nichts ersetzt. Ob überhaupt etwas zu tun
+		// wäre, entscheidet der Rest der Datei ab dem Marker: steht der
+		// abgelöste Aufruf dort, bekommt der Nutzer einen Hinweis.
+		if strings.Contains(strings.Join(lines[start:], "\n"), legacyInstructionsCommand) {
+			return content, false, errAnstossEndeUnbestimmt
+		}
+		return content, false, nil
 	}
 	if !strings.Contains(strings.Join(lines[start:end], "\n"), legacyInstructionsCommand) {
-		return content, false
+		return content, false, nil
 	}
 
 	replacement := strings.Split(strings.TrimRight(instructionsBlock(), "\n"), "\n")
@@ -188,50 +257,90 @@ func replaceOutdatedInstructionsBlock(content string) (string, bool) {
 	updated = append(updated, lines[:start]...)
 	updated = append(updated, replacement...)
 	updated = append(updated, lines[end:]...)
-	return strings.Join(updated, "\n"), true
+	return strings.Join(updated, "\n"), true, nil
 }
 
-// instructionsBlockBounds grenzt den Anstoßblock in den Zeilen ab: die
-// Markerzeile bis ausschließlich der ersten Zeile, die nicht mehr dazugehört.
-//
-// Das Ende ist bewusst eng gefasst. Der Block trägt genau einen Marker und
-// genau eine Überschrift; die nächste Überschrift oder der nächste
-// HTML-Kommentar — etwa der Session-Memory-Block — beginnt bereits etwas
-// anderes. Leerzeilen davor bleiben außerhalb, damit die Trennung zum
-// Folgeabschnitt beim Ersetzen erhalten bleibt. Alles, was ein Projekt hinter
-// den Block geschrieben hat, wird so nicht mitgenommen.
-func instructionsBlockBounds(lines []string) (int, int, bool) {
-	start := -1
+// instructionsBlockStart meldet die Markerzeile des Anstoßblocks, sonst -1.
+func instructionsBlockStart(lines []string) int {
 	for i, line := range lines {
 		if strings.Contains(line, instructionsMarker) {
-			start = i
-			break
+			return i
 		}
 	}
-	if start < 0 {
-		return 0, 0, false
+	return -1
+}
+
+// instructionsBlockEnd grenzt den Anstoßblock nach hinten ab: die erste Zeile,
+// die nicht mehr dazugehört. Das zweite Ergebnis meldet, ob sich diese Grenze
+// überhaupt bestimmen ließ.
+//
+// Zwei Wege, in dieser Reihenfolge:
+//
+// Erstens die bekannte Gestalt. Der abgelöste Block ist ein endlicher, längst
+// ausgelieferter Textbaustein; steht er ab dem Marker Zeile für Zeile da, ist
+// sein Ende exakt bekannt, gleichgültig was dahinter folgt.
+//
+// Zweitens die Abgrenzung am Folgeabschnitt. Der Block trägt genau einen Marker
+// und genau eine Überschrift; die nächste Überschrift oder der nächste
+// HTML-Kommentar — etwa der Session-Memory-Block — beginnt bereits etwas
+// anderes. Leerzeilen davor bleiben außerhalb, damit die Trennung zum
+// Folgeabschnitt beim Ersetzen erhalten bleibt.
+//
+// Findet keiner der beiden Wege eine Grenze, ist das Ergebnis **nicht** das
+// Dateiende. Genau diese Annahme verwarf früher Projekt-Prosa, die ohne eigene
+// Überschrift und ohne HTML-Kommentar hinter dem Block steht: sie lag innerhalb
+// der vermeintlichen Grenzen und verschwand beim Ersetzen — still, denn
+// gemeldet wurde nur „korrigiert". Alles, was ein Projekt hinter den Block
+// geschrieben hat, bleibt so unangetastet.
+func instructionsBlockEnd(lines []string, start int) (int, bool) {
+	if end, ok := knownInstructionsBlockEnd(lines, start); ok {
+		return end, true
 	}
 
-	end := len(lines)
 	headings := 0
 	for i := start + 1; i < len(lines); i++ {
 		trimmed := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(trimmed, "<!--") {
-			end = i
-			break
-		}
+		boundary := strings.HasPrefix(trimmed, "<!--")
 		if strings.HasPrefix(trimmed, "#") {
 			headings++
-			if headings > 1 {
-				end = i
-				break
+			boundary = boundary || headings > 1
+		}
+		if !boundary {
+			continue
+		}
+		end := i
+		for end > start+1 && strings.TrimSpace(lines[end-1]) == "" {
+			end--
+		}
+		return end, true
+	}
+	return 0, false
+}
+
+// knownInstructionsBlockEnd meldet das Ende, wenn ab start wörtlich der
+// abgelöste Block steht.
+//
+// Verglichen wird zeilenweise ohne nachlaufende Leerzeichen — die tilgt mancher
+// Editor beim Speichern. Die Aufrufzeile zählt, sobald sie den abgelösten
+// Aufruf enthält; alle übrigen Zeilen müssen wörtlich stimmen.
+func knownInstructionsBlockEnd(lines []string, start int) (int, bool) {
+	end := start + len(legacyInstructionsBlockLines)
+	if end > len(lines) {
+		return 0, false
+	}
+	for offset, want := range legacyInstructionsBlockLines {
+		got := strings.TrimRight(lines[start+offset], " \t")
+		if want == legacyInstructionsCommandLine {
+			if !strings.Contains(got, legacyInstructionsCommand) {
+				return 0, false
 			}
+			continue
+		}
+		if got != want {
+			return 0, false
 		}
 	}
-	for end > start+1 && strings.TrimSpace(lines[end-1]) == "" {
-		end--
-	}
-	return start, end, true
+	return end, true
 }
 
 func rootInstructionsTemplate() string {

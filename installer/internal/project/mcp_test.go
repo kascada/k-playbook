@@ -505,3 +505,67 @@ func TestMCPZielwahlBeiBeidenDateien(t *testing.T) {
 		t.Errorf("opencode.jsonc wurde angefasst:\n%s", unveraendert)
 	}
 }
+
+// Ein fremd getypter Wert im Memory-Block gehört dem Projekt und wird nicht
+// angefasst. Dann darf er auch kein Schreiben mehr auslösen: sonst gilt der
+// Block bei jedem Einrichten als nicht eingerichtet, und opencode.json wird
+// neu geschrieben und formatiert, ohne dass sich inhaltlich etwas ändert.
+func TestOpencodeMemoryFremderTypGiltAlsEingerichtet(t *testing.T) {
+	faelle := map[string]map[string]any{
+		"instructions als Zeichenkette": {
+			opencodeInstructionsKey: RootInstructionsFile,
+			opencodeReferencesKey:   map[string]any{opencodeDocsKey: opencodeDocsReference()},
+		},
+		"references als Liste": {
+			opencodeInstructionsKey: []any{RootInstructionsFile},
+			opencodeReferencesKey:   []any{opencodeDocsKey},
+		},
+	}
+
+	for name, content := range faelle {
+		t.Run(name, func(t *testing.T) {
+			if ops := opencodeMemoryPatchOps(content); len(ops) != 0 {
+				t.Fatalf("unerwartete Patch-Operationen: %+v", ops)
+			}
+			if !opencodeMemoryConfigured(content) {
+				t.Error("gilt als nicht eingerichtet, obwohl nichts zu patchen ist")
+			}
+		})
+	}
+}
+
+// Dasselbe am ganzen Ablauf: steht alles, was geschrieben werden würde, dann
+// bleibt die Datei liegen — samt der Formatierung, die das Projekt ihr gegeben
+// hat.
+func TestApplyMCPSchreibtOhneAenderungNichtErneut(t *testing.T) {
+	root := newMCPProject(t)
+	pfad := filepath.Join(root, "opencode.json")
+	// instructions als Zeichenkette statt als Liste: eine Form, die
+	// opencodeMemoryPatchOps bewusst stehen lässt.
+	writeFile(t, pfad, `{"instructions":"AGENTS.md"}`+"\n")
+
+	if _, err := ApplyMCP(root); err != nil {
+		t.Fatalf("erster Lauf: %v", err)
+	}
+
+	// Derselbe Inhalt, aber in einer Zeile: ein zweiter Schreibvorgang liefe
+	// über Format() und wäre an der Einrückung zu erkennen.
+	kompakt, err := json.Marshal(readJSONC(t, pfad))
+	if err != nil {
+		t.Fatalf("%s kodieren: %v", pfad, err)
+	}
+	eigen := string(kompakt)
+	writeFile(t, pfad, eigen)
+
+	if _, err := ApplyMCP(root); err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+
+	danach, err := os.ReadFile(pfad)
+	if err != nil {
+		t.Fatalf("%s lesen: %v", pfad, err)
+	}
+	if string(danach) != eigen {
+		t.Errorf("ohne inhaltliche Änderung neu geschrieben:\n%s", danach)
+	}
+}

@@ -180,6 +180,76 @@ Die hier gehören uns.
 	}
 }
 
+// Hinter dem Block steht Prosa ohne eigene Überschrift und ohne
+// HTML-Kommentar: nichts grenzt sie vom Anstoß ab. Früher reichte der Block
+// deshalb bis zum Dateiende, und die Prosa verschwand beim Ersetzen — still,
+// denn gemeldet wurde nur „korrigiert".
+func TestErsetzenLaesstProsaOhneUeberschriftStehen(t *testing.T) {
+	root := t.TempDir()
+	eigen := veralteterAnstoss + `
+Diese Zeilen gehören dem Projekt. Sie tragen weder eine Überschrift noch einen
+HTML-Kommentar, der sie vom Anstoß trennen würde.
+`
+	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
+		t.Fatalf("AGENTS.md anlegen: %v", err)
+	}
+
+	repaired, err := RepairRootInstructions(root)
+	if err != nil {
+		t.Fatalf("RepairRootInstructions: %v", err)
+	}
+	if !repaired {
+		t.Fatal("der veraltete Block wurde nicht ersetzt")
+	}
+
+	content := readInstructions(t, root)
+	for _, erwartet := range []string{
+		"Diese Zeilen gehören dem Projekt.",
+		"HTML-Kommentar, der sie vom Anstoß trennen würde.",
+		anstossAufruf,
+	} {
+		if !strings.Contains(content, erwartet) {
+			t.Errorf("%q fehlt:\n%s", erwartet, content)
+		}
+	}
+	if strings.Contains(content, legacyInstructionsCommand) {
+		t.Errorf("der abgelöste Wrapper steht noch drin:\n%s", content)
+	}
+}
+
+// Ein von Hand umformulierter Block, hinter dem Prosa ohne Überschrift steht:
+// weder die bekannte Gestalt noch ein Folgeabschnitt grenzt ihn ab. Dann wird
+// die Grenze nicht geraten — die Datei bleibt, wie sie ist, und der Aufrufer
+// bekommt einen Hinweis statt eines stillen Verlusts.
+func TestErsetzenVerweigertUnbestimmbaresBlockende(t *testing.T) {
+	root := t.TempDir()
+	eigen := strings.Replace(veralteterAnstoss,
+		"Für dieses Projekt gilt k-playbook. Rufe zu Beginn",
+		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn",
+		1) + `
+Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.
+`
+	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
+		t.Fatalf("AGENTS.md anlegen: %v", err)
+	}
+
+	repaired, err := RepairRootInstructions(root)
+	if err == nil {
+		t.Fatal("das unbestimmbare Blockende wurde nicht gemeldet")
+	}
+	if repaired {
+		t.Error("es wurde trotzdem geschrieben")
+	}
+	if readInstructions(t, root) != eigen {
+		t.Error("die Datei wurde verändert")
+	}
+
+	// Gemeldet bleibt der Block trotzdem als veraltet: er ist es ja.
+	if state := CheckRootInstructions(root); !state.HasOutdatedAnstoss {
+		t.Errorf("der veraltete Block wird nicht mehr als veraltet gemeldet: %+v", state)
+	}
+}
+
 // Der Auffangweg beim Start ist eng: er repariert einen veralteten Block und
 // rührt sonst nichts an.
 func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {

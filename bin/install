@@ -94,9 +94,15 @@ physical_path() {
 # Schreibweise selbst und, wo auflösbar, der physische Pfad.
 path_contains() {
   local wanted="$1" wanted_physical entry
+  local -a entries=()
   wanted_physical="$(physical_path "${wanted}")"
-  local IFS=":"
-  for entry in ${PATH}; do
+  # Zerlegt wird über `read -a` und nicht über ein ungequotetes ${PATH}: dort
+  # greift neben dem Wortsplitting auch die Pfadnamen-Expansion. Ein Eintrag
+  # mit *, ? oder [ würde dann durch passende Dateinamen ersetzt — und ein
+  # Verzeichnis, das tatsächlich im PATH steht, gälte als nicht gefunden.
+  IFS=":" read -r -a entries <<<"${PATH}"
+  [[ ${#entries[@]} -gt 0 ]] || return 1
+  for entry in "${entries[@]}"; do
     [[ -n "${entry}" ]] || continue
     if [[ "${entry}" == "${wanted}" || "${entry}" == "${wanted_physical}" ]]; then
       return 0
@@ -116,21 +122,53 @@ path_contains() {
 # auffindbares Binary wäre ein stiller Totalausfall — Commands, Instruktionen
 # und die MCP-Registrierung liefen alle ins Leere, ohne dass der Bootstrap je
 # etwas gemeldet hätte.
+# Geprüft wird erst, nachdem das Zielverzeichnis angelegt ist: sonst bewertet
+# die Prüfung eine Lage, die der Bootstrap selbst gerade aufgelöst hat. Welcher
+# Hinweis richtig ist, hängt genau daran — deshalb der Blick auf
+# target_dir_created.
 require_target_dir_in_path() {
   if path_contains "${target_dir}"; then
     return 0
   fi
+
+  local -a hint
+  if [[ -n "${target_dir_created}" ]]; then
+    # Der Debian-Fall: dort steht die Aufnahme von ~/.local/bin bereits in
+    # ~/.profile, aber unter `if [ -d "$HOME/.local/bin" ]`. Beim allerersten
+    # Bootstrap auf einem frischen Host oder in einem DevContainer gab es das
+    # Verzeichnis beim Anmelden noch nicht — das Profil ist also richtig und
+    # greift ab der nächsten Anmeldung von selbst.
+    hint=(
+      "Das Verzeichnis gab es bis eben nicht; angelegt ist es jetzt. Debian und"
+      "Ubuntu nehmen ~/.local/bin in ~/.profile nur auf, wenn es beim Anmelden"
+      "bereits existiert — dort ist nichts zu ändern. Melde dich neu an oder"
+      "lade dein Profil neu (bash: . ~/.profile) und rufe den Bootstrap erneut"
+      "auf:"
+      ""
+      "  make -C k-playbook install"
+      ""
+      "Bleibt das Verzeichnis auch danach draußen, kennt dein Profil den Eintrag"
+      "nicht. Dann aufnehmen — ~/.zprofile bei zsh, ~/.bashrc bei bash:"
+      ""
+      '  export PATH="$HOME/.local/bin:$PATH"'
+    )
+  else
+    hint=(
+      "Ins Shell-Profil aufnehmen — ~/.zprofile bei zsh, ~/.bashrc bei bash:"
+      ""
+      '  export PATH="$HOME/.local/bin:$PATH"'
+      ""
+      "Danach eine neue Shell öffnen und den Bootstrap erneut aufrufen."
+    )
+  fi
+
   fail "${target_dir} liegt nicht im PATH." \
     "" \
     "k-playbook wird ausschließlich unter seinem Namen aufgerufen; ohne diesen" \
     "Eintrag wäre es zwar installiert, aber nirgends auffindbar. Deshalb bricht" \
     "der Bootstrap hier ab, statt einen stillen Erfolg zu melden." \
     "" \
-    "Ins Shell-Profil aufnehmen — ~/.zprofile bei zsh, ~/.bashrc bei bash:" \
-    "" \
-    '  export PATH="$HOME/.local/bin:$PATH"' \
-    "" \
-    "Danach eine neue Shell öffnen und den Bootstrap erneut aufrufen."
+    "${hint[@]}"
 }
 
 # foreign_platform_kind meldet, welcher fremden Plattform ein bereits
@@ -157,12 +195,22 @@ target_dir="${HOME:?HOME ist nicht gesetzt}/.local/bin"
 target="${target_dir}/k-playbook"
 url="${release_base_url}/${version}/${binary}"
 
+# Das Zielverzeichnis entsteht **vor** der PATH-Prüfung. Debians und Ubuntus
+# ~/.profile nimmt ~/.local/bin nur auf, `if [ -d "$HOME/.local/bin" ]`; auf
+# einem frischen Host oder in einem DevContainer gibt es das Verzeichnis beim
+# allerersten Bootstrap noch nicht. Andersherum bewertete die Prüfung eine Lage,
+# die eine Zeile später ohnehin aufgelöst war, und verwies auf ein Profil, das
+# längst richtig ist.
+target_dir_created=""
+[[ -d "${target_dir}" ]] || target_dir_created="ja"
+mkdir -p "${target_dir}"
+
 # Beide Prüfungen laufen **vor** dem Download: sie brauchen kein Release-Asset,
-# und ein Abbruch soll nichts geladen und nichts ersetzt haben.
+# und ein Abbruch soll nichts geladen und nichts ersetzt haben. Das angelegte
+# Zielverzeichnis bleibt dabei stehen — leer und genau dort, wo das Profil bei
+# der nächsten Anmeldung nachsieht.
 require_target_dir_in_path
 foreign="$(foreign_platform_kind "${target}")"
-
-mkdir -p "${target_dir}"
 
 temporary="$(mktemp "${target_dir}/.k-playbook.XXXXXX")"
 trap 'rm -f "${temporary}"' EXIT
