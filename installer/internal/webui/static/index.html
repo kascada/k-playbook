@@ -167,6 +167,26 @@
             </div>
           </section>
 
+          <!-- Die Karte erscheint nur, wenn wirklich etwas fehlt. Ist alles da,
+               bleibt sie versteckt: eine Karte, die bei jedem Aufruf dasselbe
+               sagt, liest niemand mehr. -->
+          <section class="card hidden" id="base-tools-card">
+            <div class="section-head">
+              <div>
+                <h2>Basis-Werkzeuge</h2>
+              </div>
+              <span id="base-tools-pill" class="pill warn">Prüfen...</span>
+            </div>
+            <p class="hint">Die Werkzeuge, die k-playbook selbst aufruft. Ein fehlendes warnt, es blockiert nicht.</p>
+            <dl id="base-tools-facts" class="facts"></dl>
+            <p id="base-tools-message" class="message"></p>
+            <div id="base-tools-command" class="command-row hidden">
+              <p class="hint">Ein Aufruf für alle. Das Skript entscheidet je Werkzeug: als root mit <code>apt-get</code> installiert es systemweit, sonst user-lokal aus dem Release — der Weg braucht keinen root. Gibt es für ein Werkzeug nur den systemweiten Weg, nennt es den <code>sudo apt-get</code>-Befehl und führt ihn nicht aus.</p>
+              <code id="base-tools-command-text"></code>
+              <button class="copy secondary" data-copy="base-tools-command-text">Kopieren</button>
+            </div>
+          </section>
+
           <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
             <div class="section-head">
               <div>

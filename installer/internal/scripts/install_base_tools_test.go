@@ -284,3 +284,66 @@ func TestBaseRootFall1(t *testing.T) {
 		t.Errorf("Fall 1 fiel in Fall 3 durch:\n%s", got.all())
 	}
 }
+
+// TestBaseRangfolgeTabelle geht die Rangfolge als Tabelle durch: je Kombination
+// aus Methode der Matrix und Verfügbarkeit von apt-get eine Zeile, keine bleibt
+// ohne Fall.
+//
+// Der Root-Status ist die vierte Größe. Ohne root fällt jeder Eintrag in die
+// Fälle 2 bis 4; Fall 1 braucht die effektive UID 0 und steht in
+// TestBaseRootFall1. Alles läuft über --dry-run: kein Netz, keine Installation.
+func TestBaseRangfolgeTabelle(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("läuft als root: dann greift für jeden apt-Eintrag Fall 1. Ungetestet bleiben hier die Nicht-Root-Zeilen der Tabelle.")
+	}
+
+	cases := []struct {
+		name     string
+		matrix   string
+		aptGet   bool
+		wantCode int
+		wantText string
+		fall     string
+	}{
+		{
+			name: "github-Eintrag, apt vorhanden", matrix: githubEntryMatrix, aptGet: true,
+			wantCode: 0, wantText: "user-lokal aus dem Release von", fall: "Fall 2",
+		},
+		{
+			name: "github-Eintrag, kein apt", matrix: githubEntryMatrix, aptGet: false,
+			wantCode: 0, wantText: "user-lokal aus dem Release von", fall: "Fall 2",
+		},
+		{
+			name: "apt-only, apt vorhanden", matrix: aptOnlyEntryMatrix, aptGet: true,
+			wantCode: 3, wantText: "kein user-lokaler Weg", fall: "Fall 3",
+		},
+		{
+			name: "apt-only, kein apt", matrix: aptOnlyEntryMatrix, aptGet: false,
+			wantCode: 3, wantText: "apt-only, aber es gibt kein", fall: "Fall 4",
+		},
+		{
+			name: "Methode none, apt vorhanden", matrix: noneEntryMatrix, aptGet: true,
+			wantCode: 3, wantText: "kein Installationsweg vorgesehen", fall: "none",
+		},
+		{
+			name: "Methode none, kein apt", matrix: noneEntryMatrix, aptGet: false,
+			wantCode: 3, wantText: "kein Installationsweg vorgesehen", fall: "none",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := runBase(t, testCase.matrix, minimalPath(t, testCase.aptGet), "--install", "--yes", "--dry-run")
+			if got.code != testCase.wantCode {
+				t.Fatalf("%s endete mit %d, erwartet %d:\n%s", testCase.fall, got.code, testCase.wantCode, got.all())
+			}
+			if !strings.Contains(got.all(), testCase.wantText) {
+				t.Errorf("%s nennt %q nicht:\n%s", testCase.fall, testCase.wantText, got.all())
+			}
+			// Ein apt-Befehl darf nur fallen, wo es auch apt gibt.
+			if !testCase.aptGet && strings.Contains(got.all(), "sudo apt-get") {
+				t.Errorf("%s nennt einen apt-Befehl auf einem Host ohne apt:\n%s", testCase.fall, got.all())
+			}
+		})
+	}
+}

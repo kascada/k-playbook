@@ -41,6 +41,12 @@ const elements = {
   toolsCommandText: document.getElementById("tools-command-text"),
   toolsCommandVenv: document.getElementById("tools-command-venv"),
   toolsCommandVenvText: document.getElementById("tools-command-venv-text"),
+  baseToolsCard: document.getElementById("base-tools-card"),
+  baseToolsPill: document.getElementById("base-tools-pill"),
+  baseToolsFacts: document.getElementById("base-tools-facts"),
+  baseToolsMessage: document.getElementById("base-tools-message"),
+  baseToolsCommand: document.getElementById("base-tools-command"),
+  baseToolsCommandText: document.getElementById("base-tools-command-text"),
   privateCard: document.getElementById("private-card"),
   privatePill: document.getElementById("private-pill"),
   privateEntries: document.getElementById("private-entries"),
@@ -363,6 +369,9 @@ function renderConfig(data) {
     loadRemediation();
     loadGH();
     loadTools();
+    // Ohne classList-Zeile: die Karte zeigt sich selbst, und nur dann, wenn
+    // wirklich etwas fehlt.
+    loadBaseTools();
     return;
   }
 
@@ -375,6 +384,7 @@ function renderConfig(data) {
   elements.remediationCard.classList.add("hidden");
   elements.ghCard.classList.add("hidden");
   elements.toolsCard.classList.add("hidden");
+  elements.baseToolsCard.classList.add("hidden");
   elements.contextCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
@@ -1036,6 +1046,61 @@ function showGHCommand(hint, command) {
   elements.ghCommandHint.textContent = hint;
   elements.ghCommandText.textContent = command;
   elements.ghCommand.classList.remove("hidden");
+}
+
+// Die Basis-Werkzeuge sind der Befund aus der Kontextausgabe, nicht ein
+// zweiter Skriptlauf: /api/base-tools prüft nur den PATH je Werkzeug.
+//
+// Die Karte erscheint ausschließlich, wenn etwas fehlt. Sie rechnet nicht aus,
+// welcher Weg root braucht — das entscheidet das Skript beim Laufen, je Eintrag
+// und erst nach `command -v apt-get`. Läge die Rangfolge auch hier, stünde sie
+// zweimal im Repo. Ausgeführt wird nach wie vor nichts; der Befehl steht zum
+// Kopieren da, wie bei den Security-Tools und bei gh.
+async function loadBaseTools() {
+  try {
+    const response = await fetch("/api/base-tools", { cache: "no-store" });
+    renderBaseTools(await response.json());
+  } catch {
+    // Ein nicht erreichbarer Befund darf keine Karte aufmachen, die nichts
+    // aussagt: die übrigen Karten sagen dann ohnehin dasselbe.
+    elements.baseToolsCard.classList.add("hidden");
+  }
+}
+
+function renderBaseTools(data) {
+  elements.baseToolsFacts.replaceChildren();
+  elements.baseToolsMessage.textContent = "";
+  elements.baseToolsCommand.classList.add("hidden");
+
+  const missing = data.missing || [];
+
+  // Alles da, kein Projekt, oder die Matrix ließ sich nicht lesen: dann bleibt
+  // die Karte weg. Über einen Zustand, den niemand ändern muss, schweigt die
+  // Oberfläche — und über einen, den sie nicht kennt, rät sie nicht.
+  if (!data.available || !data.present || missing.length === 0) {
+    elements.baseToolsCard.classList.add("hidden");
+    return;
+  }
+
+  elements.baseToolsPill.className = "pill warn";
+  elements.baseToolsPill.textContent =
+    missing.length === 1 ? "1 Werkzeug fehlt" : `${missing.length} Werkzeuge fehlen`;
+
+  // Je Werkzeug seine Rolle: was ohne das Werkzeug ausfällt, statt einer
+  // pauschalen Warnung.
+  for (const tool of missing) {
+    addFact(elements.baseToolsFacts, tool.name, tool.role || "keine Rolle vermerkt");
+  }
+
+  elements.baseToolsMessage.textContent =
+    "Die Commands laufen weiter und benennen die Lücke. Anders als bei gh bricht nichts ab.";
+
+  if (data.command) {
+    elements.baseToolsCommandText.textContent = data.command;
+    elements.baseToolsCommand.classList.remove("hidden");
+  }
+
+  elements.baseToolsCard.classList.remove("hidden");
 }
 
 // Der Tool-Block hat keinen Button: installiert wird im Terminal, weil das den

@@ -786,9 +786,21 @@ mit Begründung, statt in einer Konfigurationszeile.
 nicht zum Muster passt. Unterverzeichnisse wie `checks/lib/` ebenso — dort liegt
 Hilfscode.
 
-Der Security-Tool-Preflight fehlt im Kontext bewusst: er startet je Tool ein `--version`
-und dauert spürbar. `context` soll billig genug sein, um am Anfang jedes Commands zu
-stehen.
+Der Security-Tool-Preflight fehlt im Kontext bewusst — aber nicht, weil eine
+Werkzeugprüfung generell zu teuer wäre. Entscheidend ist, **was** geprüft wird:
+
+- **Versionsprüfung, teuer.** Der Security-Preflight startet je Tool einen Unterprozess
+  und liest dessen `--version`. Das dauert spürbar, und ein hängendes Tool hält den
+  ganzen Aufruf auf; deshalb hat `CheckTools()` ein Timeout. So etwas gehört nicht an den
+  Anfang jedes Commands.
+- **Anwesenheitsprüfung, billig.** Der Befund zu den Basis-Werkzeugen schlägt je Werkzeug
+  nur im PATH nach — `exec.LookPath`, kein Unterprozess, keine Shell. Gemessen auf dem
+  Entwicklungshost: rund 0,3 Millisekunden für die sieben Werkzeuge, gegen rund
+  46 Millisekunden für den gesamten `k-playbook context`. Das ist etwa ein halbes Prozent
+  des Aufrufs. Deshalb steht `baseTools` im Kontext und `tools` nicht.
+
+`context` soll billig genug sein, um am Anfang jedes Commands zu stehen. Die Grenze
+verläuft zwischen Unterprozess und Nachschlagen, nicht zwischen Werkzeug und Nicht-Werkzeug.
 
 `CheckSchema()` läuft vor allem anderen. Bei einer anderen Fassung als `3` bricht
 `BuildContext()` ab, statt zu raten — die Werte ließen sich lesen, bedeuteten aber etwas
@@ -1048,6 +1060,242 @@ Ein aktives Projekt-venv ist für diesen read-only Aufruf erlaubt. Das JSON meld
 `toolScope: "project-venv"`, damit die Oberfläche den Status nicht als host-/user-lokale
 Tool-Installation ausgibt. Bricht das Skript aus anderen Gründen ab, landet die erste
 stderr-Zeile in der Fehlermeldung.
+
+## Basis-Werkzeuge
+
+Die Werkzeuge, die k-playbook **selbst** aufruft, haben eine eigene Matrix:
+`scripts/base-tools.tsv`. Heute sind das `bash`, `git`, `curl` oder `wget`, `tar`,
+`python3` und `rg`.
+
+**Warum getrennt von den Security-Tools.** `scripts/scanners.tsv` referenziert
+`security-tools.tsv` über die Spalte `tool`, und `resolveTools()` übersetzt jeden Eintrag
+dort in einen Lauf-Zustand. Ein `rg` in der Security-Matrix erschiene in jedem Review-Lauf
+als übersprungener Eintrag. Die Basis-Matrix taucht in keinem Review auf.
+
+Die Matrix trennt, was `security-tools.tsv` in einer Spalte führt: Paketname und
+Programmname fallen auseinander (`ripgrep` liefert `rg`, `fd-find` liefert `fdfind`).
+Deshalb gibt es je Methode eine eigene Referenzspalte — `apt_package`, `github_repo` und
+`asset_ref` — neben dem Programmnamen `name`, der der Prüfschlüssel ist. `group`
+kennzeichnet Einträge, von denen einer genügt: `curl` und `wget` bilden eine Gruppe, und
+sie gilt als vorhanden, sobald eines ihrer Mitglieder da ist. `guarded` hält je Eintrag
+fest, ob die Aufrufstellen im Repo heute schon abgesichert sind — damit ein bestehender
+Guard nicht ein zweites Mal gebaut wird.
+
+### Befund im Kontext
+
+`DetectBaseTools()` in `project/basetools.go` liest die Matrix und prüft je Eintrag mit
+`exec.LookPath`. Kein Unterprozess, kein `--version`, keine Shell; die Kostenrechnung
+steht oben bei „Der Security-Tool-Preflight fehlt im Kontext bewusst". Das Ergebnis steht
+als `baseTools` neben `gh` in der Kontextausgabe.
+
+Das Skript wird von Go aus **nie** aufgerufen — auch nicht mit `--json`. Als
+Installationsbefehl meldet der Befund genau einen Aufruf:
+`bash "<installation>/scripts/install-base-tools.sh" --install`. Welchen Weg das Skript je
+Eintrag geht, rechnet Go nicht nach; sonst läge die Rangfolge zweimal vor, in Shell und in
+Go, und liefe nach der ersten einseitigen Änderung auseinander. Gemeldet werden nur
+Matrix-Daten: Programmname, Rolle und die Methodenspalte, wie sie in der TSV steht.
+
+Fehlt die Matrix, ist das kein Abbruch: `present` wird `false`, `error` nennt den Zustand,
+`missing` bleibt leer. Der Kontext steht am Anfang jedes Commands und muss auch mit einer
+älteren Installation nutzbar bleiben.
+
+**Bekannter Fehlalarm.** Gemessen wird Anwesenheit im PATH. Eine Shell-Funktion oder ein
+Alias steht nicht im PATH: Claude Code setzt eine Shell-Funktion `rg` auf das im eigenen
+Binary mitgelieferte ripgrep, und dort meldet der Befund `rg` dauerhaft als fehlend,
+obwohl der Aufruf funktioniert. Das ist bekannt und wird hingenommen. In genau den
+Umgebungen, für die der Befund existiert — OpenCode, Cursor, ein normales Terminal —, ist
+er richtig, und dort fällt der Command sonst wortlos um. Die Alternative wäre, je Werkzeug
+eine Shell zu starten; das kostet den Unterprozess, den der Kontext gerade nicht ausgeben
+soll, und machte den Befund von der Shell des Aufrufers abhängig.
+
+**Warnen statt blockieren.** Ein fehlendes Basis-Werkzeug beendet keinen Lauf. Das ist der
+Unterschied zu `gh.ready`, das ein PR-Review hart abbricht. `commands/_shared/context.md`
+schreibt vor, dass ein Command die Lücke benennt — Werkzeug, Rolle, Installationsbefehl —
+und mit dem Rückfall weiterarbeitet, wo es einen gibt.
+
+### Installationswege
+
+`scripts/install-base-tools.sh` führt dieselben Optionen wie das Security-Skript:
+`--preflight`, `--json`, `--install`, `--yes`, `--dry-run`, `--prefix` und `--bin-dir`.
+Sein Installationsziel liegt in einem **eigenen** Namensraum: `K_BASE_TOOLS_MATRIX`,
+`K_BASE_TOOLS_PREFIX` und `K_BASE_TOOLS_BIN_DIR`. Die `K_SECURITY_TOOLS_*`-Variablen
+gehören dem anderen Skript, und ein fest verdrahtetes `~/.local/bin` ließe den gemeinsamen
+Guard ins Leere zeigen, weil es dann gar kein auflösbares Ziel gäbe. Das Default-Ziel ist
+PATH-sichtbar gewählt (erstes vorhandene aus `~/.opencode/bin` und `~/.local/bin`); ist
+keines im PATH, wird trotzdem installiert, aber mit einem ausdrücklichen PATH-Hinweis —
+sonst meldete `exec.LookPath` ein erfolgreich installiertes Werkzeug weiterhin als fehlend.
+
+Root wird über die effektive UID erkannt, nicht über die Existenz von `sudo`: im
+Image-Build ist man root, und `sudo` fehlt dort oft ganz.
+
+Die Rangfolge wird **je Eintrag** durchlaufen. Jeder Fall endet benannt; keiner läuft ins
+Leere:
+
+1. **Root und `apt-get` vorhanden** — über apt, mit `apt-get update` vorweg und
+   `DEBIAN_FRONTEND=noninteractive`. Das Ziel ist systemweit und hängt nicht an `$HOME`.
+2. **Sonst, und nur für Einträge mit `github` in der Methodenspalte** — user-lokaler
+   Release-Weg nach dem aufgelösten Ziel, auch dann, wenn `apt-get` vorhanden ist. Das ist
+   der häufigste Entwicklerfall: Ubuntu-Host, apt da, kein root; der Weg funktioniert dort
+   ohne root. Heute trifft das allein `rg`. Ist zusätzlich `apt-get` da, wird der
+   vollständige `sudo apt-get`-Befehl mit ausgegeben — als Hinweis, nicht als Endstation:
+   installiert wird trotzdem user-lokal.
+3. **Apt-only auf einem Host mit `apt-get`, aber ohne root** — der `sudo apt-get`-Befehl
+   wird ausgegeben. Er ist hier das **Ergebnis**, nicht ein Zwischenschritt: es wird nichts
+   user-lokal geschrieben und kein Erfolg gemeldet.
+4. **Apt-only auf einem Host ohne `apt-get`** — Alpine, RHEL, macOS, gleich ob root oder
+   nicht: es gibt keinen Weg. Werkzeug und Grund werden benannt. Ohne diesen Fall bliebe
+   etwa `git` als root im Alpine-Container ohne Ergebnis.
+
+Die Fälle 3 und 4 sowie die Methode `none` enden mit dem eigenen Rückgabewert **3**. Er
+trennt „für dieses Werkzeug gibt es hier keinen Weg" vom echten Fehlschlag, der wie überall
+mit 1 endet.
+
+**Apt-only ist ein zulässiger Zustand, keine Lücke.** Für `git`, `curl`, `wget`, `tar` und
+`python3` gibt es keinen sinnvollen GitHub-Release, den man nach `~/.local/bin` entpacken
+könnte. Einen Release-Weg für sie zu erfinden wäre schlimmer als keiner. Der Kopfkommentar
+der Matrix sagt das ausdrücklich, damit niemand die Lücke „füllt".
+
+**Warum apt bevorzugt ist** — nicht wegen automatischer Updates. Im Container wird gebaut,
+nicht gepflegt, und Layer-Caching hält dieselbe Version fest. Der Grund ist: es ist die
+Version, die die Distribution ohnehin testet, sie braucht keinen Netzzugriff auf die
+GitHub-API, und für ein Basis-Werkzeug ist eine vorhandene Version wichtiger als eine neue.
+
+### Für ein Dockerfile
+
+`--yes` schaltet jede Rückfrage ab, damit eine einzelne RUN-Zeile unbeaufsichtigt
+durchläuft. Als root mit `apt-get` greift für jeden Eintrag Fall 1:
+
+```dockerfile
+RUN bash /opt/projekt/k-playbook/scripts/install-base-tools.sh --install --yes
+```
+
+Ein DevContainer übernimmt dieselbe Zeile. Zwei Dinge sind dabei zu wissen:
+
+- Der Lauf endet mit **3**, wenn ein Werkzeug auf diesem Host keinen Weg hat — etwa
+  apt-only ohne apt. Das ist kein Fehlschlag, aber `docker build` bricht darauf ab. Wer das
+  nicht will, hängt `|| test $? -eq 3` an; wer es will, lässt es stehen und sieht die
+  Lücke beim Bauen.
+- Wird als nicht-root gebaut, greift für `rg` Fall 2 und das Ziel hängt an `$HOME`; die
+  übrigen Einträge fallen dann in Fall 3 und geben nur den `sudo apt-get`-Befehl aus.
+
+### Root-Doktrin beider Skripte
+
+Im Security-Skript ist root der Abbruch, im Basis-Skript der Installationsweg. Das sieht
+gegensätzlich aus, ist aber dieselbe Regel in drei Punkten:
+
+1. **k-playbook eskaliert nie selbst.** Kein Skript startet sich per `sudo` neu. Ein
+   `sudo`-Befehl wird gezeigt, nie ausgeführt. Ein Skript, das sich selbst mit erweiterten
+   Rechten neu startet und danach Binaries aus dem Netz holt, bräche die Zusage, die
+   `tools.go` und die Oberfläche überall sonst einhalten.
+2. **Root wird akzeptiert, wo das Ziel systemweit ist.** Der apt-Weg im Basis-Skript und
+   der Image-Build sind legitim. Ein Guard auf die effektive UID 0 würde ein Dockerfile
+   mithinausweisen, das als root nach `/root/.local/bin` installiert — das ist ein
+   erlaubter Weg, den man nicht zunagelt, um einen Tippfehler zu fangen.
+3. **Ein schreibender Aufruf, dessen aufgelöstes Ziel nicht der effektiven UID gehört,
+   wird abgewiesen** — egal welches Skript. Das betrifft user-lokale Ziele, die an `$HOME`
+   hängen; im Basis-Skript trifft es den user-lokalen Weg (Fall 2), nicht den apt-Weg
+   (Fall 1).
+
+Beide Skripte verweisen in ihrer Abbruchmeldung auf diese Doktrin, damit der Unterschied
+am Abbruch selbst erklärt ist.
+
+### Der Guard auf das Installationsziel
+
+`ensure_target_owner()` in `scripts/lib/install-common.sh` ist Punkt 3 der Doktrin.
+
+Der ursprüngliche Fehler: `install-security-tools.sh` prüfte ein aktives Python-venv, aber
+nie, ob das Installationsziel zum ausführenden Benutzer passt. `default_bin_dir` und
+`PREFIX` hängen an `$HOME`. Wer `sudo ./install-security-tools.sh --install missing` tippt,
+bekommt je nach sudo-Konfiguration entweder Binaries in root's Home, wo sie niemand findet,
+oder Dateien im eigenen `~/.local/bin`, die root gehören. Beides scheitert lautlos.
+
+Es gibt genau **ein** Abbruchkriterium: Das aufgelöste Installationsziel gehört nicht der
+effektiven UID. Daraus folgt:
+
+- **Abgewiesen wird der gebrochene Zielpfad, nicht die UID.** Root allein ist kein
+  Abbruchgrund.
+- **Weder `$HOME` noch `SUDO_USER` sind eigenständige Abbruchgründe.** Sie kommen nur im
+  Meldungstext als Erklärung vor. Als ODER-Liste träfe die Bedingung sonst auch
+  `sudo -u builder -H …` — eine Rechteabgabe, kein Fehler — und blockierte den systemweiten
+  Weg `--bin-dir /usr/local/bin`, den dieselbe Doktrin ausdrücklich erlaubt.
+- **Geprüft wird das aufgelöste Ziel, nicht das Default-Ziel** — also nachdem `--prefix`,
+  `--bin-dir` und die Overrides ausgewertet sind. Ein Aufruf mit
+  `--bin-dir /usr/local/bin` zielt auf einen Pfad, der gar nicht an `$HOME` hängt.
+- **Existiert das Ziel noch nicht, gilt das nächste vorhandene Elternverzeichnis.** Beim
+  ersten Lauf ist `~/.local/bin` oft nicht da, und eine Eigentümerprüfung auf einen nicht
+  existierenden Pfad wäre undefiniert. Genau das trifft den Image-Build.
+- **Lesende Läufe sind ausgenommen.** `--preflight`, `--json` und `--dry-run` schreiben
+  nichts; ein Abbruch nähme dort gerade die Diagnose, mit der man den Fall versteht.
+
+Die fünf Aufrufformen trennen damit sauber: `sudo …` auf das Default-Ziel bricht ab;
+`sudo … --bin-dir /usr/local/bin` läuft durch; `sudo -H …` läuft durch; `sudo -u <user> -H …`
+läuft durch; ein normaler Nutzer läuft durch.
+
+**Der Ort ist verschieden, das Kriterium nicht.** Im Security-Skript steht der Guard am
+Anfang des schreibenden Laufs: das Ziel ist dort für den ganzen Lauf dasselbe, einmal aus
+Optionen und Overrides aufgelöst. Im Basis-Skript steht er je Eintrag unmittelbar vor dem
+Schreiben, weil erst je Eintrag und erst nach `command -v apt-get` feststeht, ob überhaupt
+user-lokal geschrieben wird — ein Guard am Skriptanfang bräche
+`sudo ./install-base-tools.sh --install` auf Ubuntu zu Unrecht ab, wo jeder apt-Eintrag in
+Fall 1 fällt. Kein Widerspruch, sondern derselbe Guard an der jeweils frühestmöglichen
+Stelle.
+
+### Die geteilte Bibliothek
+
+`scripts/lib/install-common.sh` ist eine gesourcete Bibliothek neben den ausführbaren
+Skripten — im Muster von `checks/lib/`, das dort schon Hilfscode trägt. Ein
+`lib/`-Unterverzeichnis ist kein Katalogeintrag: `isCatalogEntry()` übergeht es, und der
+Assistent sieht es nicht.
+
+Beide Installer sourcen sie relativ zum Ort des aufrufenden Skripts (`BASH_SOURCE`), nicht
+zum Arbeitsverzeichnis — die Skripte laufen aus der Installation heraus und aus beliebigen
+Verzeichnissen. Der Vertrag an das sourcende Skript steht im Kopf der Datei: es definiert
+`die()`, `log()` und `run_or_print()` und setzt `DRY_RUN`.
+
+Darin liegen **der Resolver und der Guard**, also alles, was beide gemeinsam haben:
+`has_cmd`, `nearest_existing_dir`, `path_owner_uid`, `ensure_target_owner`, `download_file`,
+`platform_key`, `resolve_release_asset`, `latest_asset` und `install_release_binary`.
+
+Warum geteilt und nicht kopiert: Der Platzhaltersatz wird für `rg` erweitert, und die
+Zusage lautet, dass die bestehenden Muster der Security-Matrix unverändert dasselbe Asset
+auflösen. Eine zweite Kopie entwertete diese Zusage nach der ersten einseitigen Änderung —
+sie gälte dann für den einen Resolver und stillschweigend nicht mehr für den anderen. Der
+Regressionstest in `installer/internal/scripts/release_asset_test.go` prüft deshalb die
+Muster, wie sie in der ausgelieferten `security-tools.tsv` stehen, und nicht eine Abschrift
+davon.
+
+### Der Platzhaltersatz für Asset-Muster
+
+`resolve_release_asset` ersetzt im Asset-Muster Platzhalter und lässt alles Übrige als
+regulären Ausdruck stehen. Bisher kannte er `{tool}`, `{version}`, `{os}` (linux|darwin),
+`{arch}` (amd64|arm64), `{arch_x64}`, `{os_cap}` und `{arch_bits}`.
+
+Das trägt `rg` nicht. `BurntSushi/ripgrep` benennt seine Assets nach Rust-Target-Triples:
+`ripgrep-<version>-x86_64-unknown-linux-musl.tar.gz`, `…-aarch64-unknown-linux-gnu…`,
+`…-x86_64-apple-darwin…`. Keine Kombination der bisherigen Platzhalter erzeugt
+`x86_64-unknown-linux-musl` oder `apple-darwin`. Hinzugekommen sind deshalb:
+
+- **`{arch_raw}`** — `x86_64` beziehungsweise `aarch64`, der Architekturteil des Triples.
+- **`{vendor_os}`** — der Vendor-/Libc-Teil: unter Linux `unknown-linux-(?:musl|gnu)`,
+  unter macOS `apple-darwin`. Der Libc-Teil ist unter Linux nicht einheitlich — x86_64
+  kommt als musl, aarch64 als gnu —, deshalb steht dort eine Alternative statt eines festen
+  Tokens. Der Platzhalter hängt nur am Betriebssystem; die Architektur steckt schon in
+  `{arch_raw}`, und ein Muster, das beide mischte, träfe unter Linux auch das
+  `apple-darwin`-Asset.
+
+Zwei weitere Punkte gehören dazu:
+
+- **`{tool}` bindet an die Installationsreferenz, nicht an den Programmnamen.** In der
+  Security-Matrix ist beides dasselbe, deshalb fiel es nie auf. In der Basis-Matrix steht
+  dafür `asset_ref`: `ripgrep`, nicht `rg`. Mit dem Programmnamen träfe das Muster kein
+  einziges Asset.
+- **`.sha256`-Assets werden nie getroffen.** Jedes Release-Asset hat ein
+  Prüfsummen-Geschwister, und ein laxes Muster ohne Endanker griffe zuerst die Prüfsumme —
+  installiert würde dann eine Textdatei.
+
+Die Erweiterung ist **rein additiv**: kein bestehender Platzhalter ändert seine Bedeutung,
+und kein Muster der Security-Matrix wurde angefasst. Der Regressionstest belegt das für
+jeden `github`-Eintrag auf zwei Plattformen.
 
 ## GitHub CLI
 
@@ -1362,6 +1610,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Befehl als Subprozess |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
+| `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
@@ -1462,12 +1711,27 @@ Leser einer Werkzeugantwort und die einzige Stelle, die es weitersagen kann. Des
 die Handlung ausdrücklich darin.
 
 **Warum kein Beenden im Leerlauf.** Bei stdio startet der *Client* den Prozess. Ob er nach
-einem Ende neu startet, steht in keiner Spec und ist je Client anders. Endet der Server bei
-einem Client, der das nicht tut, hat der Assistent für den Rest der Sitzung gar keine
-k-playbook-Werkzeuge mehr — schlechter als ein alter Server, der arbeitet. Das bleibt
-offen, bis gemessen ist, wie sich OpenCode und Claude Code tatsächlich verhalten; ein
-Abgang im Leerlauf bräuchte dann zusätzlich einen In-flight-Zähler, denn die
-Review-Werkzeuge laufen minutenlang.
+einem Ende neu startet, steht in keiner Spec und ist je Client anders — für OpenCode ist es
+am 6. September 2026 gemessen worden, an einer laufenden Sitzung, deren Server per SIGTERM
+beendet wurde:
+
+```
+15:56:11  run=ea62bce9  permission=k-playbook_k_playbook_context   ← MCP-Weg, funktioniert
+15:57:09  run=ea62bce9  WARN "MCP connection closed" server=k-playbook
+15:57:31  run=ea62bce9  permission=bash pattern="k-playbook context"   ← Ausweichweg
+```
+
+Der Abgang wird bemerkt und protokolliert, **nachgestartet wird nichts**. Der Assistent ist
+still auf das Subkommando ausgewichen; für den Nutzer sah der Aufruf aus wie ein Erfolg.
+Genau darin liegt die Gefahr: `k_playbook_context` hat ein CLI-Gegenstück, die
+Review-Werkzeuge nach dem Muster start/status/collect haben keins. Dort verschwände die
+Fähigkeit stumm, ohne erkennbaren Zusammenhang mit dem Update.
+
+Ein Server, der sich selbst beendet, nähme einer laufenden Sitzung damit dauerhaft seine
+Werkzeuge — schlechter als ein alter Server, der arbeitet. Der Hinweis ist deshalb kein
+Kompromiss, sondern die Lösung. Sollte sich ein Client anders verhalten und das je Client
+unterschieden werden, bräuchte ein Abgang im Leerlauf zusätzlich einen In-flight-Zähler:
+die Review-Werkzeuge laufen minutenlang.
 
 **Warum kein `syscall.Exec`** auf das neue Binary, das die Pipes behielte und vom Client
 unbemerkt bliebe: das neue Prozessabbild erwartete ein `initialize`, das der Client längst

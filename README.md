@@ -222,7 +222,8 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 - Shipped rules, reviews and checks are not edited. A project deviates by overlay: a local file of the same name replaces completely, an empty one disables.
 - Paths are not part of the configuration. They follow from the location of `K-PLAYBOOK.yaml`.
 - Tasks, reviews and results stay project-owned artifacts under `k-playbook-local/`.
-- Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are the one deliberate exception to project locality.
+- Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
+- The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.
 - Nothing is written except after confirmation, step by step.
 
 ## Documentation

@@ -37,6 +37,8 @@ mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 | Check-Runner | `k-playbook/bin/k-check` |
 | Skripte | `k-playbook/scripts/` |
 | Security-Tool-Matrix | `k-playbook/scripts/security-tools.tsv` |
+| Matrix der Basis-Werkzeuge | `k-playbook/scripts/base-tools.tsv` |
+| geteilte Skript-Bibliothek | `k-playbook/scripts/lib/` |
 | projekteigene Regeln | `k-playbook-local/rules/` |
 | projekteigene Review-Rezepte | `k-playbook-local/reviews/` |
 | projekteigene Checks | `k-playbook-local/checks/` |
@@ -167,6 +169,13 @@ Eine projekteigene Datei schaltet man ab, indem man sie löscht.
 
 `README.md` in einem der Verzeichnisse ist nie ein Eintrag, ebensowenig Dotfiles oder
 irgendetwas unter `checks/lib/`.
+
+Dasselbe gilt für `scripts/lib/`: dort liegt geteilter Code neben den ausführbaren
+Skripten, kein eigener Eintrag. Heute steht darin `install-common.sh`, das
+`install-security-tools.sh` und `install-base-tools.sh` gemeinsam sourcen — beide gehen
+denselben Release-Weg und führen denselben Guard auf das Installationsziel. Eine zweite
+Kopie würde die Zusage entwerten, dass die Asset-Muster der Security-Matrix unverändert
+dasselbe Asset auflösen, sobald der eine Resolver ohne den anderen geändert wird.
 
 Bei Skills entscheidet die `SKILL.md` über das Abschalten: ist sie leer, gilt der Skill
 als abgeschaltet und wird nicht registriert.

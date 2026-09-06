@@ -15,9 +15,15 @@ import (
 // Command sonst selbst aus Konfiguration und Dateisystem zusammenrechnen
 // müsste.
 //
-// Die Security-Tools fehlen bewusst. Ihr Preflight ruft je Tool ein --version
-// auf und dauert spürbar; dieser Aufruf soll billig genug sein, um am Anfang
-// jedes Commands zu stehen.
+// Die Security-Tools fehlen bewusst — nicht, weil eine Werkzeugprüfung generell
+// zu teuer wäre, sondern weil ihr Preflight je Tool einen Unterprozess startet
+// und dessen --version liest. Dieser Aufruf soll billig genug sein, um am
+// Anfang jedes Commands zu stehen.
+//
+// Die Anwesenheitsprüfung der Basis-Werkzeuge steht deshalb sehr wohl hier: sie
+// schlägt je Werkzeug nur im PATH nach (exec.LookPath), ohne Unterprozess. Die
+// Grenze verläuft zwischen Unterprozess und Nachschlagen, nicht zwischen
+// Werkzeug und Nicht-Werkzeug; siehe BaseTools weiter unten.
 type Context struct {
 	SchemaVersion string `json:"schemaVersion"`
 	// Now ist der Zeitpunkt dieses Aufrufs. Er steht hier, weil Commands Daten

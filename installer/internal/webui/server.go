@@ -196,6 +196,9 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/mcp/tools", mcpToolsHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
+	// Die Basis-Werkzeuge haben einen eigenen Endpunkt neben den Security-Tools:
+	// dahinter steht kein Skriptaufruf, sondern der PATH-Befund aus dem Kontext.
+	mux.HandleFunc("GET /api/base-tools", baseToolsHandler)
 	mux.HandleFunc("GET /api/reviews", reviewsHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)

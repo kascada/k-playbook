@@ -651,8 +651,9 @@ Entscheidung je Projekt; das wäre etwas anderes als das hier.
 ## Security-Tools
 
 Projekte dürfen mit eigenem `.venv` arbeiten. Security-Tools werden davon getrennt host-
-oder user-lokal installiert, nie in ein Projekt-venv. Sie sind die eine bewusste Ausnahme
-von der Projektlokalität: ein Scanner gehört zur Arbeitsumgebung, nicht zum Projekt.
+oder user-lokal installiert, nie in ein Projekt-venv. Sie sind eine von zwei bewussten
+Ausnahmen von der Projektlokalität: ein Scanner gehört zur Arbeitsumgebung, nicht zum
+Projekt. Die zweite Ausnahme sind die Basis-Werkzeuge, siehe unten.
 
 Die kanonische Matrix liegt in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv).
 Sie wird vom Installationsskript und von der Oberfläche gelesen; die Liste steht nicht
@@ -745,6 +746,58 @@ unter `~/.local/share/k-playbook/security-tools/<tool>-venv`. `--method venv` be
 Python-CLI-Tools; GitHub-Release- und Go-Tools nutzen weiterhin ihren nativen
 Installationsweg. Je Python-Tool gibt es ein eigenes venv, damit sich ihre Abhängigkeiten
 nicht in die Quere kommen; die Wurzel lässt sich mit `--venv-root` verlegen.
+
+## Basis-Werkzeuge
+
+Die zweite bewusste Ausnahme von der Projektlokalität, und eine andere Sorte als die
+Security-Tools: Basis-Werkzeuge sind keine Scanner, sondern der Boden, auf dem die
+Commands stehen — `bash`, `git`, `curl` oder `wget`, `tar`, `python3` und `rg`. Von
+`curl` und `wget` genügt eines.
+
+Die Matrix liegt in [`../scripts/base-tools.tsv`](../scripts/base-tools.tsv), getrennt von
+der Security-Matrix: `scanners.tsv` referenziert jene über die Spalte `tool`, und ein `rg`
+darin erschiene in jedem Review-Lauf als übersprungener Eintrag.
+
+**Ein fehlendes Basis-Werkzeug warnt, es blockiert nicht.** `k-playbook context` meldet
+den Zustand unter `baseTools`; ein Command benennt die Lücke, nimmt einen Rückfall, wo es
+einen gibt, und läuft weiter. Das unterscheidet sie von `gh`, dessen Fehlen ein PR-Review
+hart beendet.
+
+Zustand ansehen und installieren:
+
+```bash
+k-playbook/scripts/install-base-tools.sh --preflight
+k-playbook/scripts/install-base-tools.sh --install
+```
+
+Das Skript entscheidet je Werkzeug: Als root mit `apt-get` installiert es systemweit über
+den Paketmanager. Sonst geht es den user-lokalen Weg aus einem GitHub-Release — heute
+trifft das allein `rg`, und dieser Weg braucht keinen root. Für `git`, `curl`, `wget`,
+`tar` und `python3` gibt es keinen sinnvollen user-lokalen Weg; dort gibt das Skript den
+`sudo apt-get`-Befehl aus und endet mit dem Rückgabewert `3`, der „für dieses Werkzeug
+gibt es hier keinen Weg" vom Fehlschlag trennt.
+
+**k-playbook eskaliert nie selbst zu root.** Der `sudo`-Befehl wird gezeigt, nie
+ausgeführt, und das Skript startet sich nicht per `sudo` neu.
+
+Das Ziel des user-lokalen Wegs lässt sich mit `--prefix` und `--bin-dir` verlegen, dazu
+über `K_BASE_TOOLS_PREFIX` und `K_BASE_TOOLS_BIN_DIR`. Ein schreibender Aufruf, dessen
+aufgelöstes Ziel nicht dem ausführenden Benutzer gehört, wird abgewiesen — das fängt den
+`sudo`-Tippfehler ab, der sonst Binaries mit falschem Eigentümer hinterließe.
+
+### Für ein Dockerfile oder einen DevContainer
+
+`--yes` schaltet jede Rückfrage ab, damit eine einzelne RUN-Zeile unbeaufsichtigt
+durchläuft. Als root mit `apt-get` — der Normalfall im Image-Build — installiert sie alles
+systemweit:
+
+```dockerfile
+RUN bash /opt/projekt/k-playbook/scripts/install-base-tools.sh --install --yes
+```
+
+Hat ein Werkzeug auf diesem Host keinen Weg, endet der Lauf mit `3`. Das ist kein
+Fehlschlag, aber `docker build` bricht darauf ab. Wer das nicht will, hängt
+`|| test $? -eq 3` an; wer die Lücke beim Bauen sehen will, lässt es stehen.
 
 ## Selbst bauen
 
