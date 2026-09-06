@@ -452,8 +452,13 @@ install_apt_package() {
   tool="$1"
   package="${TOOL_APT_PACKAGE[$tool]}"
   log "Installiere $tool über apt: $package"
-  DEBIAN_FRONTEND=noninteractive run_or_print apt-get update
-  DEBIAN_FRONTEND=noninteractive run_or_print apt-get install -y --no-install-recommends "$package"
+  # Jeder Schritt reicht seinen Fehlschlag ausdrücklich weiter. Der Aufrufer in
+  # main() steht in einer AND-OR-Liste (`install_entry … || status=$?`); darin
+  # ist `set -e` für den ganzen Aufrufbaum abgeschaltet. Ohne das `|| return`
+  # liefe ein gescheitertes `apt-get update` weiter ins `apt-get install`, und
+  # der Lauf meldete am Ende Erfolg, obwohl nichts installiert wurde.
+  DEBIAN_FRONTEND=noninteractive run_or_print apt-get update || return $?
+  DEBIAN_FRONTEND=noninteractive run_or_print apt-get install -y --no-install-recommends "$package" || return $?
 }
 
 # install_entry geht die Rangfolge für genau einen Eintrag durch. Jeder Fall
@@ -467,7 +472,7 @@ install_entry() {
   # Fall 1: root und apt-get vorhanden. Das Ziel ist systemweit und hängt nicht
   # an $HOME, deshalb gilt der Eigentümer-Guard hier nicht.
   if has_method "$methods" apt && is_root && has_cmd apt-get; then
-    install_apt_package "$tool"
+    install_apt_package "$tool" || return $?
     return 0
   fi
 
@@ -495,7 +500,7 @@ install_entry() {
     # ensure_bin_dir steht vor dem Trockenlauf-Zweig, damit auch dort der
     # PATH-Hinweis erscheint: ein Ziel außerhalb des PATH meldete der
     # Kontextbefund nach der Installation weiterhin als fehlend.
-    ensure_bin_dir
+    ensure_bin_dir || return $?
     # Ein Trockenlauf geht nicht ins Netz. Die Auflösung des Assets fragt die
     # GitHub-API; das ist genau das, was ein --dry-run im Image-Build und im
     # Test nicht tun soll. Gezeigt wird deshalb das Ziel, nicht die aufgelöste
@@ -512,7 +517,7 @@ install_entry() {
       "${TOOL_ASSET_REF[$tool]}" \
       "${TOOL_GITHUB_REPO[$tool]}" \
       "${TOOL_ASSET_PATTERN[$tool]}" \
-      "$BIN_DIR"
+      "$BIN_DIR" || return $?
     return 0
   fi
 

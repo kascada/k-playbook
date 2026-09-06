@@ -283,18 +283,21 @@ install_release_binary() {
   archive="$tmp_dir/$asset"
   extract_dir="$tmp_dir/extract"
   mkdir -p "$extract_dir"
-  download_file "$url" "$archive"
+  # Auch hier gilt die abgeschaltete `set -e`-Kette aus dem Basis-Skript: jeder
+  # Schritt reicht seinen Fehlschlag ausdrücklich weiter, sonst endet ein
+  # gescheiterter Download in einem Lauf, der Erfolg meldet.
+  download_file "$url" "$archive" || return $?
 
   # Nicht jedes Projekt packt seine Binary ein: osv-scanner etwa lädt sie blank
   # aus. Entschieden wird am Namen des Assets, nicht am Muster.
   case "$asset" in
     *.tar.gz|*.tgz)
-      tar -xzf "$archive" -C "$extract_dir"
+      tar -xzf "$archive" -C "$extract_dir" || { rm -rf "$tmp_dir"; return 1; }
       ;;
     *)
-      install -m 0755 "$archive" "$bin_dir/$program"
+      install -m 0755 "$archive" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
       rm -rf "$tmp_dir"
-      return
+      return 0
       ;;
   esac
 
@@ -302,7 +305,7 @@ install_release_binary() {
   shopt -s globstar nullglob
   for candidate in "$extract_dir"/**/"$program"; do
     if [[ -f "$candidate" ]]; then
-      install -m 0755 "$candidate" "$bin_dir/$program"
+      install -m 0755 "$candidate" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
       installed=1
       break
     fi

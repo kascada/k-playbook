@@ -347,3 +347,84 @@ func TestBaseRangfolgeTabelle(t *testing.T) {
 		})
 	}
 }
+
+// rootPathMitFehlschlagendemApt baut ein PATH-Verzeichnis, in dem `id -u` eine
+// 0 liefert und `apt-get` scheitert. Damit ist Fall 1 der Rangfolge prüfbar,
+// ohne den Test unter echtem root zu fahren — und ohne dem Skript einen
+// Test-Hook einzubauen. Jeder apt-Aufruf wird zusätzlich protokolliert, damit
+// der Test belegen kann, dass nach einem gescheiterten `update` kein `install`
+// mehr folgt.
+func rootPathMitFehlschlagendemApt(t *testing.T, protokoll string) string {
+	t.Helper()
+	dir := minimalPath(t, false)
+
+	stub := "#!/bin/sh\nif [ \"$1\" = \"-u\" ]; then echo 0; exit 0; fi\nexec " +
+		mussFinden(t, "id") + " \"$@\"\n"
+	// minimalPath legt `id` als Symlink auf das echte Programm an. Ein
+	// os.WriteFile darauf schriebe durch den Link hindurch nach /usr/bin und
+	// scheiterte an dessen Rechten — der Link muss also erst weg.
+	if err := os.Remove(filepath.Join(dir, "id")); err != nil {
+		t.Fatalf("id-Symlink entfernen: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "id"), []byte(stub), 0o755); err != nil {
+		t.Fatalf("id-Stub: %v", err)
+	}
+
+	apt := "#!/bin/sh\necho \"$*\" >> " + protokoll + "\n" +
+		"echo 'E: Could not get lock (Stub)' >&2\nexit 100\n"
+	if err := os.WriteFile(filepath.Join(dir, "apt-get"), []byte(apt), 0o755); err != nil {
+		t.Fatalf("apt-get-Stub: %v", err)
+	}
+	return dir
+}
+
+func mussFinden(t *testing.T, name string) string {
+	t.Helper()
+	pfad, err := exec.LookPath(name)
+	if err != nil {
+		t.Skipf("%s nicht gefunden: %v", name, err)
+	}
+	return pfad
+}
+
+// TestBaseAptFehlschlagWirdNichtVerschluckt hält den Befund aus dem Code-Review
+// zu Task 045 fest: Der Aufruf in main() steht in einer AND-OR-Liste
+// (`install_entry … || status=$?`), und darin ist `set -e` für den ganzen
+// Aufrufbaum abgeschaltet. Ohne ausdrückliches Durchreichen endete ein Lauf,
+// dessen apt-Installation scheiterte, mit Exit 0 — im Dockerfile also eine
+// grüne Build-Schicht ohne das Werkzeug. Genau das darf nicht wiederkommen.
+func TestBaseAptFehlschlagWirdNichtVerschluckt(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("Der id-Stub greift nur, solange der Test nicht ohnehin als root läuft.")
+	}
+
+	protokoll := filepath.Join(t.TempDir(), "apt-aufrufe.txt")
+	pfad := rootPathMitFehlschlagendemApt(t, protokoll)
+
+	got := runBase(t, aptOnlyEntryMatrix, pfad, "--install", "--yes")
+
+	if got.code == 0 {
+		t.Fatalf("Exit 0 trotz gescheiterter apt-Installation — der Fehlschlag wurde verschluckt.\n%s", got.all())
+	}
+	if got.code != 100 {
+		t.Errorf("Exit %d, erwartet 100 (der Rückgabewert von apt-get)", got.code)
+	}
+	// Exit 3 heißt „für dieses Werkzeug gibt es keinen Weg" und ist etwas
+	// anderes als ein Fehlschlag. Ein apt-Lauf, der scheitert, darf nicht als
+	// „kein Weg" erscheinen.
+	if got.code == 3 {
+		t.Errorf("Exit 3 verwechselt den Fehlschlag mit „kein user-lokaler Weg\"")
+	}
+
+	roh, err := os.ReadFile(protokoll)
+	if err != nil {
+		t.Fatalf("apt-Protokoll lesen: %v", err)
+	}
+	aufrufe := strings.TrimSpace(string(roh))
+	if !strings.Contains(aufrufe, "update") {
+		t.Errorf("apt-get update wurde nicht aufgerufen:\n%s", aufrufe)
+	}
+	if strings.Contains(aufrufe, "install") {
+		t.Errorf("Nach gescheitertem `apt-get update` folgte trotzdem ein `install`:\n%s", aufrufe)
+	}
+}
