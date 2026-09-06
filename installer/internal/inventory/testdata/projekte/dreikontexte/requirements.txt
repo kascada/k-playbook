@@ -1,0 +1,3 @@
+# Lokal, auf dem Entwicklungsrechner: die neueste Fassung.
+poetry==1.8.4
+redis==5.2.0

@@ -1,0 +1,6 @@
+dependencies:
+  - name: postgresql
+    repository: https://charts.example.invalid
+    version: 15.5.0
+digest: sha256:aaaa
+generated: "2026-01-01T00:00:00Z"

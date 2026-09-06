@@ -62,7 +62,8 @@ done
 - Welches Repo hat `FROM ghcr.io/…` (= Overlay)? Welches nicht (= Base)?
 - Welche `docker-compose.yaml`-Services sind wo definiert?
 - Gibt es bereits einen `k-playbook-local/docs/`-Baum mit seinen
-  Herkunfts-Unterverzeichnissen (`code/`, `libs/`, `extracted/`, `manual/`)?
+  Herkunfts-Unterverzeichnissen (`code/`, `libs/`, `extracted/`, `versions/`,
+  `manual/`)?
   Was liegt schon in `docs/code/`? Dieser Bestand bestimmt in Phase 5 die freien Nummern.
 
 ### Ergebnis

@@ -124,8 +124,12 @@ k-playbook-local/
 ├── priv/          eigene Notizen, siehe unten
 ├── material/      Rohmaterial als Quelle für Docs, siehe unten
 ├── k-playbook.md  projekteigene Instruktionsebene
-└── TODO.md
+├── TODO.md
+└── version-sources.yaml   Versionsquellen des Versionsinventars, handgepflegt
 ```
+
+Die erzeugten Docs-Herkünfte `docs/code/`, `docs/libs/`, `docs/extracted/` und
+`docs/versions/` stehen nicht darin: sie entstehen beim ersten Lauf ihres Erzeugers.
 
 Jedes Verzeichnis trägt eine `README.md` mit seinem Zweck — auch weil Git leere
 Verzeichnisse nicht speichert und sie sonst nach einem Clone des Projekts fehlen würden.
@@ -206,7 +210,7 @@ Verlinkt wird für Claude Code, OpenCode und Cursor:
 ```text
 projekt/
 ├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
-├── CLAUDE.md             Symlink auf AGENTS.md; die Richtung ist fest
+├── CLAUDE.md             Include-Datei mit der Zeile @AGENTS.md; die Richtung ist fest
 ├── .claude/
 │   ├── commands/         je ein Symlink pro Command
 │   └── skills/           je ein Symlink pro Skill; OpenCode liest hier mit
@@ -235,9 +239,12 @@ es angeglichen. Eine echte Datei, die jemand selbst dort abgelegt hat, gewinnt i
 wird nie ersetzt.
 
 Skills stehen nur einmal unter `.claude/skills`: OpenCode durchsucht dieses Verzeichnis
-mit, Cursor kennt kein Skill-Konzept. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, weil
-Claude Code ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt — so
-landet jede Änderung in beiden.
+mit, Cursor kennt kein Skill-Konzept. `CLAUDE.md` ist eine Include-Datei mit der
+Import-Zeile `@AGENTS.md`, weil Claude Code ausschließlich `CLAUDE.md` liest und OpenCode
+wie Cursor `AGENTS.md` bevorzugen — so gibt es genau eine echte Instruktionsdatei, und
+Claude Code lädt sie beim Start über den Import. Das Einrichten schreibt dazu einen
+kurzen Stub: über der Import-Zeile ein Hinweis, dass Projektregeln nach `AGENTS.md`
+gehören, dann die Zeile `@AGENTS.md` allein auf einer Zeile.
 
 `AGENTS.md` bekommt dabei einen kurzen **Anstoß**: einen Block, der auf
 `k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
@@ -246,18 +253,27 @@ Block angehängt und vorhandener Inhalt nicht angetastet. Ein Marker
 
 ### Eine vorhandene CLAUDE.md
 
-Die Richtung des Symlinks ist fest. Damit daneben keine zweite, abweichende
-Instruktionsdatei entsteht, ordnet das Einrichten das Paar `CLAUDE.md`/`AGENTS.md`
-zuerst ein und löst auf, was sich auflösen lässt:
+Die Richtung ist fest: `CLAUDE.md` bindet `AGENTS.md` ein, nie umgekehrt. Damit daneben
+keine zweite, abweichende Instruktionsdatei entsteht, ordnet das Einrichten das Paar
+`CLAUDE.md`/`AGENTS.md` zuerst ein und löst auf, was sich auflösen lässt:
 
 | Ausgangslage | Was geschieht |
 |---|---|
-| nur eine echte `CLAUDE.md` | sie wird nach `AGENTS.md` **umbenannt**, der Anstoß an den erhaltenen Inhalt angehängt, `CLAUDE.md` neu als Symlink gesetzt |
-| `AGENTS.md` ist ein Symlink auf `CLAUDE.md` | die verdrehte Richtung wird aufgelöst: Symlink weg, umbenennen, neu verlinken |
+| `CLAUDE.md` trägt die Zeile `@AGENTS.md`, `AGENTS.md` ist eine echte Datei | der **Sollzustand** — nichts zu tun. Was neben der Import-Zeile steht, gehört dem Projekt und bleibt unangetastet |
+| `CLAUDE.md` ist noch ein Symlink auf `AGENTS.md` | die ältere Bauform: der Symlink wird **verlustfrei ersetzt**, der Inhalt steht ohnehin in `AGENTS.md` — auch auf dem Lesepfad, siehe unten |
+| nur eine echte `CLAUDE.md` ohne Import-Zeile | sie wird nach `AGENTS.md` **umbenannt**, der Anstoß an den erhaltenen Inhalt angehängt, `CLAUDE.md` neu als Include-Datei angelegt |
+| nur die Include-Datei, `AGENTS.md` fehlt | sie bleibt liegen, `AGENTS.md` entsteht aus der Vorlage. Umbenannt ergäbe sie ein `AGENTS.md`, das sich selbst importiert |
+| `AGENTS.md` ist ein Symlink auf `CLAUDE.md` | die verdrehte Richtung wird aufgelöst: Symlink weg; eine echte `CLAUDE.md` wird umbenannt, eine Include-Datei bleibt liegen; dann Include neu anlegen bzw. `AGENTS.md` aus der Vorlage |
 | `AGENTS.md` ist ein toter Symlink | er wird entfernt, damit die Datei nicht an seinem Ziel landet |
-| beide sind echte Dateien | **Konflikt** — von Hand zusammenführen und `CLAUDE.md` löschen; oder, wenn ein Editor beim Speichern den Symlink ersetzt hat, `CLAUDE.md` löschen und neu einrichten |
-| `CLAUDE.md` oder `AGENTS.md` zeigt bewusst auf ein anderes Ziel | **Konflikt** — der Link des Projekts bleibt stehen |
+| beide sind echte Dateien, `CLAUDE.md` ohne wirksame Import-Zeile | **Konflikt** — ob der Inhalt für alle Assistenten gilt oder nur für Claude Code, entscheidet das Projekt: entweder den Inhalt nach `AGENTS.md` übernehmen und `CLAUDE.md` auf die Zeile `@AGENTS.md` reduzieren, oder die Zeile `@AGENTS.md` vor den vorhandenen Inhalt setzen und ihn dort stehen lassen. Automatisch geschieht keines von beiden |
+| `CLAUDE.md` zeigt bewusst auf ein anderes Ziel | **Konflikt** — der Link des Projekts bleibt stehen, sonst wären die dort gelesenen Instruktionen ab sofort unwirksam |
+| `AGENTS.md` zeigt bewusst auf ein anderes Ziel | eine Entscheidung des Projekts, kein Fehler: die Include-Datei wirkt durch den Link hindurch, dort kommt auch der Anstoß an. Trägt `CLAUDE.md` daneben eigenen Inhalt ohne Import-Zeile, ist das ein **Konflikt** |
 | `AGENTS.md` ist in git ignoriert | **Konflikt** — sonst fiele der Inhalt still aus der Versionskontrolle; Ignore-Regel entfernen und neu einrichten |
+
+**Wirksam** ist die Import-Zeile nur außerhalb von Backticks und Code-Blöcken — dort
+überliest Claude Code sie beim Import-Parsing. Eine `CLAUDE.md`, die `@AGENTS.md` nur
+in Backticks oder in einem Code-Block nennt, gilt deshalb als Datei ohne Import und
+landet im Konflikt, nicht im Sollzustand.
 
 Bei einem Konflikt wird nichts verschoben, nichts gelöscht, nichts gesichert und auch
 kein `AGENTS.md` angelegt. Das ist kein Schönheitsfehler: solange er steht, sieht Claude
@@ -267,6 +283,33 @@ Assistenten-Karte meldet den Zustand als `Konflikt` und nennt den Ausweg im Deta
 Derselbe Ablauf läuft beim **Aktualisieren**. Ein Projekt, das nur eine echte
 `CLAUDE.md` hat, wird also auch darüber eingerichtet, und ein Projekt ganz ohne
 `AGENTS.md` bekommt sie dabei erstmals.
+
+**Bestandsprojekte** migrieren sich von selbst. Der erste `k-playbook context` — oder
+der Assistenten-Block der Oberfläche — ersetzt den alten Symlink durch die Include-Datei
+und sagt das in `links.note`. Danach zeigt `git status` einmalig eine geänderte
+`CLAUDE.md` mit gewechseltem Modus (Symlink → reguläre Datei, `120000` → `100644`); die
+Änderung gehört committet. Es ist die eine Stelle, an der ein reiner Lesepfad eine
+versionierte Datei im Hauptverzeichnis ändert, und genau so wird sie benannt. Kein
+Include ins Leere: solange `AGENTS.md` fehlt, wartet ein alter Symlink auf sein Ziel und
+wird erst ersetzt, wenn es da ist. Steht dagegen die Include-Datei und `AGENTS.md` fehlt,
+nennt der Detailtext den Import ins Leere — Claude Code lädt daraus nichts, bis
+**Einrichten** `AGENTS.md` anlegt.
+
+**Der Preis der Trennung.** Ohne Symlink sind es zwei Dateien, die auseinanderlaufen
+können: was Claude Code über `/memory` oder `#` nach `CLAUDE.md` schreibt, erreicht
+OpenCode und Cursor nicht, und die Prüfung meldet Projektinhalt neben dem Include nicht
+als Konflikt. Das ist bewusst so — die Gegenrichtung hieße, jeden Inhalt neben dem
+Include zum Konflikt zu erklären. Als Gegengewicht steht im Stub über der Import-Zeile,
+dass Projektregeln nach `AGENTS.md` gehören.
+
+**Was Claude Code dafür können muss.** `@`-Importe in `CLAUDE.md` gibt es seit Claude
+Code **0.2.107** (CHANGELOG, Eintrag „CLAUDE.md files can now import other files"); eine
+ältere Fassung lädt aus dem Stub still gar nichts. Die Importtiefe ist begrenzt: laut
+Dokumentation folgt Claude Code Importen bis zu **vier Ebenen** tief („Imported files
+can recursively import other files, with a maximum depth of four hops", code.claude.com,
+Seite „How Claude remembers your project", Stand 2026-09-05). Der Stub verbraucht davon
+eine Ebene — ein `AGENTS.md`, das selbst mit `@` importiert, hat gegenüber dem früheren
+Symlink eine Ebene weniger.
 
 Was ein Assistent darüber hinaus lesen soll, steht nicht in `AGENTS.md`, sondern in
 `k-playbook.md` — je einmal pro Ebene:
@@ -727,10 +770,11 @@ Checkliste für ein Projekt:
 - [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands` und `.cursor/commands`
       sind Verzeichnisse mit Einzel-Symlinks nach `k-playbook/` bzw. `k-playbook-local/`;
       die Oberfläche meldet sie als eingerichtet.
-- [ ] `CLAUDE.md` ist ein Symlink auf `AGENTS.md`, und `AGENTS.md` trägt den Anstoß.
-      Eine mitgebrachte echte `CLAUDE.md` wurde dabei nach `AGENTS.md` umbenannt; steht
-      stattdessen ein `Konflikt`, ist er von Hand aufzulösen — bis dahin sieht Claude
-      Code den Anstoß nicht.
+- [ ] `CLAUDE.md` ist eine reguläre Datei mit der Zeile `@AGENTS.md` außerhalb von
+      Backticks und Code-Blöcken, und `AGENTS.md` trägt den Anstoß. Eine mitgebrachte
+      echte `CLAUDE.md` wurde dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer
+      älteren Fassung durch die Include-Datei ersetzt; steht stattdessen ein `Konflikt`,
+      ist er von Hand aufzulösen — bis dahin sieht Claude Code den Anstoß nicht.
 - [ ] `k-playbook context` läuft durch und nennt die erwarteten Kataloge.
 
 Der letzte Punkt prüft alles Vorherige auf einmal: das Kommando bricht ab, wenn die

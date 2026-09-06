@@ -1,0 +1,9 @@
+{
+  // DevContainer für das Beispielprojekt
+  "name": "beispiel",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/python:3.12": {},
+    "ghcr.io/devcontainers/features/node": { "version": "20.11.1" }
+  }
+}

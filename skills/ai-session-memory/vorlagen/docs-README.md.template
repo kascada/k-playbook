@@ -24,6 +24,12 @@ Dies ist der einzige Index. Er deckt alle Herkünfte ab; geschrieben wird er von
 |-------|--------|-----------|
 | [`extracted/01-<slug>.md`](./extracted/01-<slug>.md) | ... | bestaetigt |
 
+### Versionen (`versions/`) — erzeugt von `/k-doc-inventory`
+
+| Datei | Inhalt | Erhoben |
+|-------|--------|---------|
+| [`versions/inventory.md`](./versions/inventory.md) | ... | <datum> |
+
 ### Handgepflegt (`manual/`)
 
 | Datei | Inhalt |
@@ -35,7 +41,7 @@ Dies ist der einzige Index. Er deckt alle Herkünfte ab; geschrieben wird er von
 ## Libs & Stack
 
 Kuratierte Referenz zu Libraries und Tools. Fokus: Pitfalls, nicht Tutorials.
-Erzeugt von `/k-tools-scan` unter `libs/`.
+Erzeugt von `/k-docs-tools` unter `libs/`.
 
 | Lib | Version | Severity | Letzter Review |
 |-----|---------|----------|----------------|
@@ -93,8 +99,9 @@ das Herkunftsverzeichnis im Pfad.
     ├── docs/                  diese Doku
     │   ├── README.md          dieser Index
     │   ├── code/              aus dem Code abgeleitet
-    │   ├── libs/              erzeugt von /k-tools-scan
+    │   ├── libs/              erzeugt von /k-docs-tools
     │   ├── extracted/         erzeugt von /k-docs-extract
+    │   ├── versions/          erzeugt von /k-doc-inventory
     │   └── manual/            von Hand gepflegt
     └── material/              Rohmaterial, nie indiziert
 ```

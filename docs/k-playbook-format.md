@@ -43,12 +43,14 @@ mehr. Alle Orte ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`:
 | Review-Ergebnisse | `k-playbook-local/results/` |
 | Projekt-Dokumentation | `k-playbook-local/docs/` |
 | Tool-Steckbriefe | `k-playbook-local/docs/libs/` |
+| Versionsinventar | `k-playbook-local/docs/versions/` |
 | Handgepflegte Doku | `k-playbook-local/docs/manual/` |
 | Rohmaterial | `k-playbook-local/material/` |
 | Guidelines | `k-playbook-local/guidelines/` |
 | offene Tasks | `k-playbook-local/tasks/` |
 | erledigte Tasks | `k-playbook-local/tasks/done/` |
 | Projekt-TODO | `k-playbook-local/TODO.md` |
+| Versionsquellen | `k-playbook-local/version-sources.yaml` |
 | Privates | `k-playbook-local/priv/` |
 | Instruktionen, mitgeliefert | `k-playbook/k-playbook.md` |
 | Instruktionen, projekteigen | `k-playbook-local/k-playbook.md` |
@@ -75,11 +77,17 @@ schreibt kein Command Doc-Dateien; die Struktur-README aus dem Einrichten ist da
 ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Erzeuger:
 sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
-`docs/code/`, `docs/libs/` und `docs/extracted/` entstehen beim ersten Lauf eines
-Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-docs-code` und der Skill
-`ks-overlay-repo-analyse`, in `docs/libs/` `/k-docs-tools`, in `docs/extracted/`
-`/k-docs-extract`. Das Einrichten legt sie nicht an; es legt `docs/manual/` und
-`material/` an.
+`docs/code/`, `docs/libs/`, `docs/extracted/` und `docs/versions/` entstehen beim ersten
+Lauf eines Werkzeugs ihrer Herkunft — in `docs/code/` schreiben `/k-docs-code` und der
+Skill `ks-overlay-repo-analyse`, in `docs/libs/` `/k-docs-tools`, in `docs/extracted/`
+`/k-docs-extract`, in `docs/versions/` `/k-doc-inventory`. Das Einrichten legt sie nicht
+an; es legt `docs/manual/` und `material/` an.
+
+Die Quellenkonfiguration des Versionsinventars, `k-playbook-local/version-sources.yaml`,
+legt das Einrichten dagegen als gültige, leere Konfiguration an. Sie ist handgepflegt und
+wird von einem Update nie überschrieben; ihr Zustand steht in der Ausgabe von
+`k-playbook context` unter `versionSources`, damit kein Command sie selbst liest. Der
+Vertrag dazu steht in [`versionsinventar.md`](./versionsinventar.md).
 
 `k-playbook-local/material/` ist die Quellseite: Rohmaterial wie Chat-Mitschnitte und
 Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt wird wie
@@ -279,6 +287,11 @@ aus, und er ist dem Hauptverzeichnis vorbehalten.
 `k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
 Block angehängt und vorhandener Inhalt nicht angetastet. Ein Marker
 `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhängt.
+
+Claude Code liest `AGENTS.md` nicht von sich aus. Dafür legt das Einrichten daneben eine
+`CLAUDE.md` an, die nur die Import-Zeile `@AGENTS.md` trägt — eine reguläre Datei, kein
+Symlink. Wie das Paar eingeordnet wird und was mit einer mitgebrachten `CLAUDE.md`
+geschieht, steht in [`installation.md`](./installation.md#eine-vorhandene-claudemd).
 
 ## Minimalformat
 

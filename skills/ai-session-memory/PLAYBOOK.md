@@ -15,14 +15,16 @@ Docs. Bei neuen Projekten wächst der Aufwand mit den Docs mit.
 > 1. **`/k-docs-code`** — Doku aus dem Code nach `docs/code/`.
 > 2. **`/k-docs-tools`** — Library- und Tool-Steckbriefe nach `docs/libs/`.
 > 3. **`/k-docs-extract`** — Rohmaterial aus `material/` nach `docs/extracted/`.
-> 4. **`/k-docs-index`** — baut `docs/README.md` über alle Herkünfte und
+> 4. **`/k-doc-inventory`** — Versionsinventar aus deklarativen Quellen nach
+>    `docs/versions/`.
+> 5. **`/k-docs-index`** — baut `docs/README.md` über alle Herkünfte und
 >    schreibt `AGENTS.md` und `opencode.json`.
 >
 > Nach `docs/code/` schreibt außerdem der Skill `ks-overlay-repo-analyse`;
 > welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem
 > Frontmatter unter `generated.by`.
 >
-> Nur der letzte Schritt schließt die Session-Memory-Kette; die drei davor
+> Nur der letzte Schritt schließt die Session-Memory-Kette; die vier davor
 > erzeugen nur Inhalt. Dieses PLAYBOOK beschreibt weiterhin das *Modell* —
 > nützlich, wenn jemand konzeptionell verstehen will, was passiert, oder das
 > Setup manuell (ohne Command) machen möchte.
@@ -58,6 +60,7 @@ Projekt-Root/
     │   ├── code/                    aus dem Code abgeleitet
     │   ├── libs/                    erzeugt von /k-docs-tools
     │   ├── extracted/               erzeugt von /k-docs-extract
+    │   ├── versions/                erzeugt von /k-doc-inventory
     │   └── manual/                  von Hand gepflegt
     └── material/                Rohmaterial, nie indiziert
 ```
@@ -85,15 +88,16 @@ Ohne alle drei Bausteine funktioniert der Mechanismus nicht:
 cd <projekt-root>
 ls k-playbook-local/docs/
 ls k-playbook-local/docs/code/ k-playbook-local/docs/libs/ \
-   k-playbook-local/docs/extracted/ k-playbook-local/docs/manual/
+   k-playbook-local/docs/extracted/ k-playbook-local/docs/versions/ \
+   k-playbook-local/docs/manual/
 ```
 
 Identifiziere:
 
 - Welche Doc-Dateien existieren, und **in welcher Herkunft**? Die Herkunft ist
   am Verzeichnis ablesbar, und daran hängt, wer die Datei pflegt.
-- Ein fehlendes `code/`, `libs/` oder `extracted/` ist der Normalzustand: es
-  entsteht erst beim ersten Lauf seines Erzeugers.
+- Ein fehlendes `code/`, `libs/`, `extracted/` oder `versions/` ist der
+  Normalzustand: es entsteht erst beim ersten Lauf seines Erzeugers.
 - Liegen flache `docs/*.md` direkt im Docs-Verzeichnis? Das sind Dateien aus
   der Zeit vor dieser Struktur; sie haben keinen Erzeuger. `/k-docs-index`
   bietet an, sie nach `docs/code/` zu verschieben.
@@ -128,6 +132,12 @@ ihn `/k-docs-index`; von Hand sieht die Grundstruktur so aus:
 
 | Datei | Inhalt | Konfidenz |
 |-------|--------|-----------|
+| ... | ... | ... |
+
+### Versionen (`versions/`) — erzeugt von `/k-doc-inventory`
+
+| Datei | Inhalt | Erhoben |
+|-------|--------|---------|
 | ... | ... | ... |
 
 ### Handgepflegt (`manual/`)
@@ -326,9 +336,10 @@ Der Wert dieses Setups hängt daran, dass Docs und Index gepflegt werden.
 
 - `ks-overlay-repo-analyse/` – erzeugt Docs für Base+Overlay-Projekte,
   auf denen dieses Playbook aufsetzt.
-- `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract` (Commands) – erzeugen die
-  Doku je Herkunft unter `docs/code/`, `docs/libs/` und `docs/extracted/`; nach
-  `docs/code/` schreibt außerdem `ks-overlay-repo-analyse` (siehe oben).
+- `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-doc-inventory`
+  (Commands) – erzeugen die Doku je Herkunft unter `docs/code/`, `docs/libs/`,
+  `docs/extracted/` und `docs/versions/`; nach `docs/code/` schreibt außerdem
+  `ks-overlay-repo-analyse` (siehe oben).
 - `/k-docs-index` (Command) – letzter Schritt der Kette: baut `docs/README.md`
   über alle Herkünfte und schreibt `AGENTS.md` und `opencode.json`. Erst
   danach greift die hier beschriebene Session-Memory.

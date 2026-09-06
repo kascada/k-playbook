@@ -87,7 +87,7 @@ const RESET_LABELS = {
 const STATE_LABELS = {
   ok: "eingerichtet",
   missing: "nicht vorhanden",
-  stale: "zeigt woandershin",
+  stale: "alte Form, wird ersetzt",
   incomplete: "weicht vom Katalog ab",
   blocked: "blockiert",
   "no-source": "Quelle fehlt",

@@ -122,6 +122,25 @@ func assertSymlink(t *testing.T, path string, want string) {
 	}
 }
 
+// assertInclude prüft den Sollzustand an CLAUDE.md: eine reguläre Datei, kein
+// Symlink, mit wirksamer Import-Zeile.
+func assertInclude(t *testing.T, path string) {
+	t.Helper()
+
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Errorf("%s fehlt: %v", path, err)
+		return
+	}
+	if !info.Mode().IsRegular() {
+		t.Errorf("%s ist keine reguläre Datei (%s)", path, info.Mode())
+		return
+	}
+	if !hasEffectiveInclude(readFile(t, path)) {
+		t.Errorf("%s trägt keine wirksame Zeile %s:\n%s", path, ClaudeIncludeLine, readFile(t, path))
+	}
+}
+
 func assertMissing(t *testing.T, path string) {
 	t.Helper()
 
@@ -218,7 +237,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
 				assertContains(t, filepath.Join(root, RootInstructionsFile), "# eigen")
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -229,7 +248,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			},
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -241,7 +260,28 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			},
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
+			},
+		},
+		{
+			// Die Include-Datei wird nicht umbenannt — sonst importierte
+			// AGENTS.md sich selbst. Erst weicht der Symlink, dann entsteht
+			// AGENTS.md aus der Vorlage.
+			name: "6 — verdrehte Richtung mit Include-Datei", row: 6, resolved: 10,
+			outcome: InstructionsCleared, linksOK: true,
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), claudeIncludeStub())
+				symlink(t, filepath.Join(root, RootInstructionsFile), ClaudeInstructionsFile)
+			},
+			after: func(t *testing.T, root string) {
+				assertRegular(t, filepath.Join(root, RootInstructionsFile))
+				assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
+				if strings.Contains(readFile(t, filepath.Join(root, RootInstructionsFile)), ClaudeIncludeLine) {
+					t.Error("AGENTS.md importiert sich selbst")
+				}
+				if readFile(t, filepath.Join(root, ClaudeInstructionsFile)) != claudeIncludeStub() {
+					t.Error("die Include-Datei wurde angefasst")
+				}
 			},
 		},
 		{
@@ -255,7 +295,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
 				assertContains(t, filepath.Join(root, RootInstructionsFile), "# eigen")
 				assertMissing(t, filepath.Join(root, "weg.md"))
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -283,7 +323,23 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			},
 			after: func(t *testing.T, root string) {
 				assertSymlink(t, filepath.Join(root, RootInstructionsFile), fremd)
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
+				assertContains(t, filepath.Join(root, fremd), instructionsMarker)
+			},
+		},
+		{
+			// Die Include-Datei, die das Einrichten schreibt, muss selbst zu
+			// Zeile 9 gehören — sonst fiele sie beim nächsten Lauf in Zeile 8.
+			name: "9 — AGENTS.md verlinkt, CLAUDE.md Include-Datei", row: 9,
+			outcome: InstructionsUnchanged, linksOK: true,
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, fremd), "# fremd\n")
+				symlink(t, filepath.Join(root, RootInstructionsFile), fremd)
+				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), claudeIncludeStub())
+			},
+			after: func(t *testing.T, root string) {
+				assertSymlink(t, filepath.Join(root, RootInstructionsFile), fremd)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 				assertContains(t, filepath.Join(root, fremd), instructionsMarker)
 			},
 		},
@@ -295,11 +351,44 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
 				assertContains(t, filepath.Join(root, RootInstructionsFile), "# eigen")
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
-			name: "11 — beide echte Dateien", row: 11, outcome: InstructionsConflict,
+			// Der Stub ohne Ziel ist ein Rest, kein Inhalt: er bleibt liegen,
+			// AGENTS.md entsteht aus der Vorlage.
+			name: "10 — nur Include-Datei", row: 10, outcome: InstructionsUnchanged, linksOK: true,
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), claudeIncludeStub())
+			},
+			after: func(t *testing.T, root string) {
+				assertRegular(t, filepath.Join(root, RootInstructionsFile))
+				assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
+				if strings.Contains(readFile(t, filepath.Join(root, RootInstructionsFile)), ClaudeIncludeLine) {
+					t.Error("AGENTS.md importiert sich selbst")
+				}
+				if readFile(t, filepath.Join(root, ClaudeInstructionsFile)) != claudeIncludeStub() {
+					t.Error("die Include-Datei wurde angefasst")
+				}
+			},
+		},
+		{
+			// Der Sollzustand. Hausregeln neben dem Include gehören dem Projekt.
+			name: "11 — Include-Datei neben AGENTS.md", row: 11, outcome: InstructionsUnchanged, linksOK: true,
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, RootInstructionsFile), "# vorhanden\n")
+				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), ClaudeIncludeLine+"\n\n## Hausregeln\n\nNur für Claude Code.\n")
+			},
+			after: func(t *testing.T, root string) {
+				assertContains(t, filepath.Join(root, RootInstructionsFile), "# vorhanden")
+				assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
+				if content := readFile(t, filepath.Join(root, ClaudeInstructionsFile)); content != ClaudeIncludeLine+"\n\n## Hausregeln\n\nNur für Claude Code.\n" {
+					t.Errorf("CLAUDE.md wurde verändert: %q", content)
+				}
+			},
+		},
+		{
+			name: "11 — beide echte Dateien ohne Include", row: 11, outcome: InstructionsConflict,
 			setup: func(t *testing.T, root string) {
 				writeFile(t, filepath.Join(root, RootInstructionsFile), "# A\n")
 				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), "# eigenständig\n")
@@ -316,7 +405,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			setup: func(t *testing.T, root string) {},
 			after: func(t *testing.T, root string) {
 				assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -327,18 +416,20 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			after: func(t *testing.T, root string) {
 				assertContains(t, filepath.Join(root, RootInstructionsFile), "# vorhanden")
 				assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
-			name: "14 — Sollzustand", row: 14, outcome: InstructionsUnchanged, linksOK: true,
+			// Die Migration: der Symlink aus einer älteren Fassung wird
+			// verlustfrei durch die Include-Datei ersetzt.
+			name: "14 — Symlink aus älterer Fassung", row: 14, outcome: InstructionsUnchanged, linksOK: true,
 			setup: func(t *testing.T, root string) {
 				writeFile(t, filepath.Join(root, RootInstructionsFile), "# vorhanden\n")
 				symlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
 			},
 			after: func(t *testing.T, root string) {
 				assertContains(t, filepath.Join(root, RootInstructionsFile), "# vorhanden")
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -349,7 +440,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			},
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 			},
 		},
 		{
@@ -360,7 +451,7 @@ func TestApplyAssistantSetupFallmatrix(t *testing.T) {
 			},
 			after: func(t *testing.T, root string) {
 				assertRegular(t, filepath.Join(root, RootInstructionsFile))
-				assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+				assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
 				assertMissing(t, filepath.Join(root, "weg.md"))
 			},
 		},
@@ -415,7 +506,7 @@ func assertRegistryLinks(t *testing.T, root string, statuses []LinkStatus) {
 
 	registry := 0
 	for _, status := range statuses {
-		if status.IsFile {
+		if status.IsInclude {
 			continue
 		}
 		registry++
@@ -476,9 +567,11 @@ func TestEinrichtenErhaeltInhaltUndAnstoss(t *testing.T) {
 				t.Errorf("Anstoß steht %dmal, erwartet genau einmal:\n%s", got, content)
 			}
 
-			// Über den Symlink gelesen ist es dieselbe Datei.
-			if readFile(t, filepath.Join(root, ClaudeInstructionsFile)) != content {
-				t.Error("CLAUDE.md liefert nicht den Inhalt von AGENTS.md")
+			// CLAUDE.md ist danach nur noch der Include; der Inhalt steht
+			// einmal, in AGENTS.md.
+			assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
+			if strings.Contains(readFile(t, filepath.Join(root, ClaudeInstructionsFile)), "Eigene Regeln.") {
+				t.Error("der Inhalt steht doppelt, auch in CLAUDE.md")
 			}
 
 			// Ein zweiter Lauf hängt den Anstoß nicht erneut an.
@@ -574,7 +667,43 @@ func TestZeile7EntferntRestLink(t *testing.T) {
 	assertRegular(t, filepath.Join(root, RootInstructionsFile))
 	assertContains(t, filepath.Join(root, RootInstructionsFile), instructionsMarker)
 	assertMissing(t, filepath.Join(root, "docs", "weg.md"))
-	assertSymlink(t, filepath.Join(root, ClaudeInstructionsFile), RootInstructionsFile)
+	assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
+}
+
+// Zeile 9 schreibt die Include-Datei neben ein bewusst fremdverlinktes
+// AGENTS.md. Der zweite Lauf darf an genau dieser Datei keinen Konflikt melden
+// — sie ist eine reguläre Datei, und ohne den Include-Zweig in Zeile 9 fiele
+// sie in Zeile 8.
+func TestZeile9ZweiterLaufOhneKonflikt(t *testing.T) {
+	root := newProject(t)
+	fremd := filepath.Join("docs", "AGENTS.md")
+	writeFile(t, filepath.Join(root, fremd), "# fremd\n")
+	symlink(t, filepath.Join(root, RootInstructionsFile), fremd)
+
+	first, err := ApplyAssistantSetup(root)
+	if err != nil {
+		t.Fatalf("erster Lauf: %v", err)
+	}
+	if first.Instructions.Row != 9 {
+		t.Fatalf("Zeile = %d, erwartet 9", first.Instructions.Row)
+	}
+	assertInclude(t, filepath.Join(root, ClaudeInstructionsFile))
+
+	second, err := ApplyAssistantSetup(root)
+	if err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+	if second.Instructions.Row != 9 || second.Instructions.Outcome != InstructionsUnchanged {
+		t.Errorf("zweiter Lauf: Zeile = %d, Outcome = %q — %s",
+			second.Instructions.Row, second.Instructions.Outcome, second.Instructions.Detail)
+	}
+	status := statusFor(t, second.Links, ClaudeInstructionsFile)
+	if status.State != StateOK {
+		t.Errorf("State = %q (%s), erwartet %q", status.State, status.Detail, StateOK)
+	}
+	if !LinksOK(second.Links) {
+		t.Errorf("zweiter Lauf nicht eingerichtet: %+v", second.Links)
+	}
 }
 
 // Zeile 2: das Verzeichnis an AGENTS.md darf die Katalog-Links nicht mit

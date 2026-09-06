@@ -50,9 +50,10 @@ leichtgewichtig OKF-kompatibles YAML-Frontmatter (`type`, `title`,
 Dateien nach Bedeutung, Status und Herkunft einordnen können. Der Einstieg
 bleibt `k-playbook-local/docs/README.md`.
 
-Die Herkunft steht am Verzeichnis: nach `code/` schreiben `/k-code2docs` und
-der Skill `ks-overlay-repo-analyse`, `libs/` erzeugt `/k-tools-scan`,
-`extracted/` erzeugt `/k-docs-extract`, `manual/` ist handgepflegt. Welches
+Die Herkunft steht am Verzeichnis: nach `code/` schreiben `/k-docs-code` und
+der Skill `ks-overlay-repo-analyse`, `libs/` erzeugt `/k-docs-tools`,
+`extracted/` erzeugt `/k-docs-extract`, `versions/` erzeugt `/k-doc-inventory`,
+`manual/` ist handgepflegt. Welches
 Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
 `generated.by`. Den Index `README.md` schreibt `/k-docs-index`.
 
@@ -71,7 +72,7 @@ wie der Nutzer (i.d.R. <Standard-Sprache>).
 └── k-playbook-local/
     ├── docs/                          ★ die autoritative Dokumentation
     │   ├── README.md                  Index über alle Herkünfte
-    │   └── code/  libs/  extracted/  manual/
+    │   └── code/  libs/  extracted/  versions/  manual/
     └── material/                      Rohmaterial, nie indiziert
 ```
 

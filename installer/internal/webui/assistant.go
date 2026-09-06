@@ -48,10 +48,16 @@ func describeRepair(repair project.LinkRepair) string {
 	switch {
 	case !repair.Changed.Empty():
 		parts = append(parts, describeLinkChanges(repair.Changed))
-	case repair.Applied:
+	case repair.Applied && !repair.IncludeMigrated:
 		// Ein Ziel, das es vorher gar nicht gab: da hat sich keine
 		// Registrierung verändert, da ist eine entstanden.
 		parts = append(parts, "Verlinkung eingerichtet.")
+	}
+	// Die Migration ändert eine versionierte Projektdatei und wird deshalb
+	// eigens genannt, nicht unter „Verlinkung eingerichtet" verbucht.
+	if repair.IncludeMigrated {
+		parts = append(parts, project.ClaudeInstructionsFile+" ist jetzt eine Include-Datei mit "+
+			project.ClaudeIncludeLine+" statt eines Symlinks; git zeigt dafür einmalig eine geänderte Datei mit gewechseltem Modus.")
 	}
 	if repair.Error != "" {
 		parts = append(parts, "Nicht vollständig eingerichtet: "+repair.Error)

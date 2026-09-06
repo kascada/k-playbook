@@ -24,6 +24,8 @@ func linkTo(kind pathKind, destination string) pathState {
 func TestFallmatrixTrifftJedeZeile(t *testing.T) {
 	dir := t.TempDir()
 
+	// Die Zeilen 10 und 11 tragen je zwei Zweige unter derselben Nummer; rename
+	// und conflict unterscheiden sie hier.
 	cases := []struct {
 		row    int
 		name   string
@@ -31,28 +33,41 @@ func TestFallmatrixTrifftJedeZeile(t *testing.T) {
 		agents pathState
 		// resolved ist die Zeile des zweiten Durchgangs; 0 heißt „wie row".
 		resolved int
+		rename   bool
+		conflict bool
 	}{
 		{row: 1, name: "CLAUDE.md unlesbar", claude: pathState{kind: kindUnreadable, err: os.ErrPermission}, agents: pathState{kind: kindMissing}},
 		{row: 1, name: "AGENTS.md unlesbar", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindUnreadable, err: os.ErrPermission}},
 		{row: 2, name: "AGENTS.md ist ein Verzeichnis", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindDir}},
 		{row: 3, name: "CLAUDE.md ist ein Verzeichnis", claude: pathState{kind: kindDir}, agents: pathState{kind: kindMissing}},
-		{row: 4, name: "CLAUDE.md zeigt woandershin", claude: linkTo(kindLinkForeign, "docs/AGENTS.md"), agents: pathState{kind: kindMissing}},
-		{row: 5, name: "verdrehte Richtung mit Inhalt", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkToOther, "CLAUDE.md")},
+		{row: 4, name: "CLAUDE.md zeigt woandershin", claude: linkTo(kindLinkForeign, "docs/AGENTS.md"), agents: pathState{kind: kindMissing}, conflict: true},
+		{row: 5, name: "verdrehte Richtung mit Inhalt", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkToOther, "CLAUDE.md"), rename: true},
 		{row: 6, name: "verdrehte Richtung ohne Inhalt", claude: pathState{kind: kindMissing}, agents: linkTo(kindLinkToOther, "CLAUDE.md"), resolved: 12},
 		{row: 6, name: "verdrehte Richtung als Zyklus", claude: linkTo(kindLinkToOther, "AGENTS.md"), agents: linkTo(kindLinkToOther, "CLAUDE.md"), resolved: 15},
 		{row: 6, name: "verdrehte Richtung auf Rest-Link", claude: linkTo(kindLinkDangling, "weg.md"), agents: linkTo(kindLinkToOther, "CLAUDE.md"), resolved: 16},
+		// Der Stub wird nicht umbenannt — umbenannt stünde sein Import im Kreis.
+		{row: 6, name: "verdrehte Richtung mit Include-Datei", claude: pathState{kind: kindInclude}, agents: linkTo(kindLinkToOther, "CLAUDE.md"), resolved: 10},
 		{row: 7, name: "AGENTS.md ist ein Rest-Link", claude: pathState{kind: kindMissing}, agents: linkTo(kindLinkDangling, "weg.md"), resolved: 12},
-		{row: 7, name: "Rest-Link neben echter CLAUDE.md", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkDangling, "weg.md"), resolved: 10},
-		{row: 8, name: "AGENTS.md verlinkt, CLAUDE.md echt", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkForeign, "docs/AGENTS.md")},
+		{row: 7, name: "Rest-Link neben echter CLAUDE.md", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkDangling, "weg.md"), resolved: 10, rename: true},
+		{row: 7, name: "Rest-Link neben Include-Datei", claude: pathState{kind: kindInclude}, agents: linkTo(kindLinkDangling, "weg.md"), resolved: 10},
+		{row: 8, name: "AGENTS.md verlinkt, CLAUDE.md echt", claude: pathState{kind: kindRegular}, agents: linkTo(kindLinkForeign, "docs/AGENTS.md"), conflict: true},
 		{row: 9, name: "AGENTS.md verlinkt, CLAUDE.md leer", claude: pathState{kind: kindMissing}, agents: linkTo(kindLinkForeign, "docs/AGENTS.md")},
-		{row: 10, name: "nur CLAUDE.md", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindMissing}},
-		{row: 11, name: "beide echt", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindRegular}},
+		// Der Stub, den Zeile 9 selbst schreibt, gehört zu Zeile 9 — nicht zu 8.
+		{row: 9, name: "AGENTS.md verlinkt, CLAUDE.md Include-Datei", claude: pathState{kind: kindInclude}, agents: linkTo(kindLinkForeign, "docs/AGENTS.md")},
+		{row: 10, name: "nur CLAUDE.md", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindMissing}, rename: true},
+		// Der Stub ohne Ziel ist ein Rest und wird nicht umbenannt.
+		{row: 10, name: "nur Include-Datei", claude: pathState{kind: kindInclude}, agents: pathState{kind: kindMissing}},
+		// Der Sollzustand.
+		{row: 11, name: "Include-Datei neben AGENTS.md", claude: pathState{kind: kindInclude}, agents: pathState{kind: kindRegular}},
+		{row: 11, name: "beide echt ohne Include", claude: pathState{kind: kindRegular}, agents: pathState{kind: kindRegular}, conflict: true},
 		{row: 12, name: "beides fehlt", claude: pathState{kind: kindMissing}, agents: pathState{kind: kindMissing}},
 		{row: 13, name: "nur AGENTS.md", claude: pathState{kind: kindMissing}, agents: pathState{kind: kindRegular}},
-		{row: 14, name: "Sollzustand", claude: linkTo(kindLinkToOther, "AGENTS.md"), agents: pathState{kind: kindRegular}},
+		// Die Migration: der Symlink aus einer älteren Fassung.
+		{row: 14, name: "Symlink neben AGENTS.md", claude: linkTo(kindLinkToOther, "AGENTS.md"), agents: pathState{kind: kindRegular}},
 		{row: 15, name: "Link auf fehlendes AGENTS.md", claude: linkTo(kindLinkToOther, "AGENTS.md"), agents: pathState{kind: kindMissing}},
 		{row: 16, name: "CLAUDE.md ist ein Rest-Link", claude: linkTo(kindLinkDangling, "weg.md"), agents: pathState{kind: kindMissing}},
-		{row: 17, name: "Auffangzweig", claude: pathState{kind: kindOther, mode: os.ModeNamedPipe}, agents: pathState{kind: kindMissing}},
+		{row: 17, name: "Auffangzweig", claude: pathState{kind: kindOther, mode: os.ModeNamedPipe}, agents: pathState{kind: kindMissing}, conflict: true},
+		{row: 17, name: "Include-Datei neben Sonstigem", claude: pathState{kind: kindInclude}, agents: pathState{kind: kindOther, mode: os.ModeSocket}, conflict: true},
 	}
 
 	seen := map[int]bool{}
@@ -69,6 +84,12 @@ func TestFallmatrixTrifftJedeZeile(t *testing.T) {
 			}
 			if plan.row != resolved {
 				t.Errorf("entscheidende Zeile = %d, erwartet %d", plan.row, resolved)
+			}
+			if plan.rename != testCase.rename {
+				t.Errorf("rename = %v, erwartet %v", plan.rename, testCase.rename)
+			}
+			if plan.conflict != testCase.conflict {
+				t.Errorf("conflict = %v, erwartet %v — %s", plan.conflict, testCase.conflict, plan.detail)
 			}
 		})
 		seen[testCase.row] = true
@@ -87,7 +108,7 @@ func TestFallmatrixFaengtJedesPaarAuf(t *testing.T) {
 	dir := t.TempDir()
 
 	kinds := []pathKind{
-		kindMissing, kindRegular, kindDir, kindLinkToOther,
+		kindMissing, kindRegular, kindInclude, kindDir, kindLinkToOther,
 		kindLinkForeign, kindLinkDangling, kindUnreadable, kindOther,
 	}
 
@@ -127,6 +148,33 @@ func TestZeile17NenntBeideZustaende(t *testing.T) {
 		if !strings.Contains(plan.detail, phrase) {
 			t.Errorf("Detailtext nennt %q nicht: %s", phrase, plan.detail)
 		}
+	}
+}
+
+// Die Include-Datei ist eine eigene Sorte — aber nur an CLAUDE.md. Ein
+// AGENTS.md mit derselben Zeile importierte sich selbst und bleibt eine echte
+// Datei.
+func TestKlassifikationErkenntIncludeDatei(t *testing.T) {
+	root := t.TempDir()
+
+	writeFile(t, filepath.Join(root, ClaudeInstructionsFile), claudeIncludeStub())
+	if got := classifyPath(root, ClaudeInstructionsFile, RootInstructionsFile).kind; got != kindInclude {
+		t.Errorf("Stub: kind = %d, erwartet kindInclude", got)
+	}
+
+	writeFile(t, filepath.Join(root, ClaudeInstructionsFile), "# Hausregeln\n\n"+ClaudeIncludeLine+"\n")
+	if got := classifyPath(root, ClaudeInstructionsFile, RootInstructionsFile).kind; got != kindInclude {
+		t.Errorf("Include mit Inhalt: kind = %d, erwartet kindInclude", got)
+	}
+
+	writeFile(t, filepath.Join(root, ClaudeInstructionsFile), "# eigen\n\n`"+ClaudeIncludeLine+"`\n")
+	if got := classifyPath(root, ClaudeInstructionsFile, RootInstructionsFile).kind; got != kindRegular {
+		t.Errorf("Include in Backticks: kind = %d, erwartet kindRegular", got)
+	}
+
+	writeFile(t, filepath.Join(root, RootInstructionsFile), ClaudeIncludeLine+"\n")
+	if got := classifyPath(root, RootInstructionsFile, ClaudeInstructionsFile).kind; got != kindRegular {
+		t.Errorf("AGENTS.md mit Import-Zeile: kind = %d, erwartet kindRegular", got)
 	}
 }
 

@@ -28,9 +28,9 @@ From the context output:
   playbook directory.
 - `DOCS_DIR = <local.dir>/docs`.
 - `CODE_DOCS_DIR = <DOCS_DIR>/code` — the only origin that follows the code. `libs/`
-  follows the libraries, `manual/` and `extracted/` follow nothing; they are outside the
-  docs-sync duty. `DOCS_DIR/README.md` is the generated index and belongs to
-  `/k-docs-index`.
+  follows the libraries, `versions/` the declared versions, `manual/` and `extracted/`
+  follow nothing; they are all outside the docs-sync duty. `DOCS_DIR/README.md` is the
+  generated index and belongs to `/k-docs-index`.
 
 - If `$ARGUMENTS` is set, it names the directory to check. It must lie inside
   `project.repoRoot`; otherwise stop and say so.
@@ -93,8 +93,9 @@ Always perform this check when code files changed.
 Use the loaded rules, especially `docs-sync.md`, and inspect:
 
 - Changed source/config/schema/API files.
-- Docs under `CODE_DOCS_DIR`, if it exists. Do not report `libs/`, `manual/`,
-  `extracted/` or the generated `README.md` as out of sync — they do not follow the code.
+- Docs under `CODE_DOCS_DIR`, if it exists. Do not report `libs/`, `versions/`,
+  `manual/`, `extracted/` or the generated `README.md` as out of sync — they do not
+  follow the code.
 - `README.md`, `AGENTS.md`, and obvious architecture/setup/API docs.
 
 Decide one of:

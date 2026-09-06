@@ -20,7 +20,11 @@ als ein Binary je Plattform; im Betrieb liegt es unter `~/.local/bin/k-playbook`
 unter dem bloßen Namen `k-playbook` aufgerufen. Einen Einstiegspunkt im Projekt-Clone
 gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 
-## Vier Einstiege
+## Acht Einstiege
+
+Ohne Argument die Oberfläche, dazu die sieben Subkommandos `config create`, `context`,
+`mcp`, `scan`, `merge`, `inventory` und `stop`. Die Aufzählung unten geht sie in dieser
+Reihenfolge durch; `help` zählt nicht mit, es gibt nur diese Übersicht aus.
 
 ```go
 if len(args) == 0 {
@@ -46,12 +50,14 @@ verwaiste Datei wird dabei entfernt.
 
 `config create` legt den Anker ohne Aufwärtssuche im ausdrücklich gewählten oder
 aktuellen Verzeichnis an. Mit `context` die JSON-Ausgabe, mit `mcp` der Server für einen
-Assistenten, mit `scan` die Ausführung eines Review-Laufs — und diese wie `stop` **ohne**
-`cleanUpLegacy()` und die Migrationsbereinigung: deren Meldungen gehen nach stdout und würden
-die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt stdout
-einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige fremde
-Zeile macht ihn unbrauchbar. Bei `scan` zählt ein anderer Grund: ein Scan liest nur und
-soll den Host nicht nebenbei anfassen. Bei `stop`: wer beendet, will nichts einrichten.
+Assistenten, mit `scan` die Ausführung eines Review-Laufs, mit `merge` seine
+Zusammenfassung, mit `inventory` die Erhebung des Versionsinventars — und diese wie `stop`
+**ohne** `cleanUpLegacy()` und die Migrationsbereinigung: deren Meldungen gehen nach stdout
+und würden die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `context`: dort trägt
+stdout einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige
+fremde Zeile macht ihn unbrauchbar. Bei `scan`, `merge` und `inventory` zählt ein anderer
+Grund: sie arbeiten auf dem Projekt und sollen den Host nicht nebenbei anfassen. Bei
+`stop`: wer beendet, will nichts einrichten.
 
 `scan <lauf> [eintrag …]` führt die Werkzeug-Einträge eines Laufs aus und blockiert, bis
 sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
@@ -59,11 +65,35 @@ Preflight, Konfiguration — und reicht es an `internal/review` weiter; dort ste
 Ausführung selbst, ohne eigene Suche nach Pfaden oder Binaries. Wie der Lauf aussieht,
 den es ausführt, steht in [`../../docs/review-runs.md`](../../docs/review-runs.md).
 
-Weitere Subkommandos gibt es nicht. `init`, `update`, `restore`, `migrate`, `status`,
-`smoke` und `projects …` des alten Stands sind entfallen, samt der lokalen Projektliste
-unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem Hintergrunddienst
-nicht zurück: wer die URL braucht, ruft `k-playbook` ohne Argument auf — das findet den
-laufenden Server und öffnet ihn.
+`merge <lauf>` fasst einen bereits gelaufenen Review-Lauf zu den Review-Input-Artefakten
+zusammen: `review-input.json` und `review-triage.md` im Laufverzeichnis. Auch hier löst
+das Kommando nur Lauf, Projektumgebung und Severity-Katalog auf; die Zusammenführung
+selbst steht in `internal/review/merge`. Es scannt nichts nach — was nicht im Lauf steht,
+kommt nicht in den Input.
+
+`inventory` erhebt das Versionsinventar des Projekts und schreibt es nach
+`k-playbook-local/docs/versions/inventory.md`. Es liest ausschließlich deklarative
+Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateien, dazu die
+in `k-playbook-local/version-sources.yaml` konfigurierten —, fragt kein Netz und führt
+kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Installation
+`<projekt>/k-playbook/` — ein Clone des Werkzeugs, der in jedem Zielprojekt dieselben
+Manifeste trägt — und die Muster aus `exclude:` der Quellenkonfiguration; beide Ausschlüsse
+stehen mit der Zahl der übergangenen Quellen im Inventar, und ein Eintrag in `sources:`
+holt jede Quelle daraus wieder herein. Das Kommando sammelt Projektwurzel,
+Quellenkonfiguration und
+Zielpfad zusammen und reicht sie an `internal/inventory` weiter; dort liegen Parser,
+Vertrauensgrenze und Renderer. Ein Lauf ohne inhaltliche Änderung lässt die Datei
+byte-identisch stehen. Der Vertrag steht in
+[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); denselben Lauf stößt
+der Command `/k-doc-inventory` an.
+
+Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
+`update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
+Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
+Hintergrunddienst nicht zurück: wer die URL braucht, ruft `k-playbook` ohne Argument auf —
+das findet den laufenden Server und öffnet ihn. Ein neues Subkommando entsteht dort, wo
+deterministische Go-Fachlogik einen eigenen Anstoß braucht, den kein Assistent nachbaut —
+so ist `inventory` dazugekommen.
 
 ## Aufbau
 
@@ -74,7 +104,8 @@ installer/
 │   ├── gui.go                   Client-Pfad: Wirt-Pflege, Laufzeitdatei einordnen, abkoppeln
 │   ├── stop.go                  Subkommando stop
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
-│   └── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
+│   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
+│   └── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -131,6 +162,27 @@ installer/
 │   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
 │   └── execute.go               Jobs starten, je Modul auffächern, SARIF zählen,
 │                                Fortschritt fortschreiben
+├── internal/inventory/
+│   ├── model.go                 Datenmodell, Pin-Taxonomie, Labels, Ökosysteme
+│   ├── trust.go                 die Vertrauensgrenze: Check, Expand, ReadFile
+│   ├── discover.go              Standardquellen unterhalb der Projektwurzel finden
+│   ├── collect.go               Standard- und Zusatzquellen planen, lesen, sammeln
+│   ├── parse*.go                je Ökosystem ein Leser: Python, Go, Node, Container,
+│   │                            Helm, CI, weitere Manifesttypen
+│   ├── normalize.go             Namen, Versionen, Digests, Pin-Art bestimmen
+│   ├── deviations.go            Gruppen bilden, Abweichungen ausweisen
+│   ├── render.go                die Inventardatei erzeugen, deterministisch
+│   ├── write.go                 Byte-Stabilitätsregel: vergleichen, sonst nicht schreiben
+│   ├── status.go                Frontmatter der Inventardatei lesen (ReadStatus)
+│   ├── tomllite.go jsonc.go textutil.go
+│   │                            kleine Leser für TOML, JSON mit Kommentaren, Textzeilen
+│   └── testdata/projekte/       Fixture-Projekte für die Parser
+├── internal/versionsources/
+│   └── versionsources.go        version-sources.yaml lesen — die eine Implementierung,
+│                                benutzt vom Sammler und von project/context.go
+├── internal/yamllite/
+│   ├── yamllite.go              der YAML-Ausschnitt, den beide brauchen, mit Zeilennummer
+│   └── flow.go                  Flow-Schreibweise: [a, b] und { k: v }
 ├── go.mod
 └── README.md
 ```
@@ -151,6 +203,15 @@ Dateisystem. `FindModules()` nimmt das gesuchte Manifest als Parameter, damit `p
 denselben Mechanismus benutzen kann; angewandt wird er bisher nur auf Go. Aus dem
 Ergebnis macht `execute.go` die Jobs: einer je Modul, bei genau einem Modul mit
 unverändertem Namen ([`docs/review-runs.md`](../../docs/review-runs.md)).
+
+`internal/inventory` folgt derselben Trennung: Projektwurzel, Quellenkonfiguration und
+Zielpfad stehen in `inventory.Options`, gesucht wird nichts selbst. Geöffnet wird jede
+Quelle ausschließlich über `Boundary.ReadFile` in `trust.go` — die Vertrauensgrenze ist
+einmal implementiert und gilt für Subkommando, Command und die spätere Web-API gleich.
+`internal/versionsources` liegt daneben statt darin, weil `project` es importiert: läge es
+in `project`, zöge der Sammler das ganze Projektpaket herein und `project` könnte den
+Sammler nie benutzen. `internal/yamllite` ist der YAML-Ausschnitt, den beide brauchen; es
+merkt sich Zeilennummern, weil die Herkunft einer Inventarzeile sie trägt.
 
 ## Anker finden
 
@@ -236,7 +297,18 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 ```text
 rules/  reviews/  checks/  commands/  skills/  results/  docs/  docs/manual/
 guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md  TODO.md
+version-sources.yaml
 ```
+
+Die erzeugten Docs-Herkünfte — `docs/code/`, `docs/libs/`, `docs/extracted/` und
+`docs/versions/` — stehen bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres
+Erzeugers.
+
+Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder von ihnen braucht
+dort einen eigenen Zweig: der Rückfall ist `todoTemplate()`, und der schriebe sonst einen
+TODO-Rumpf in eine Datei, die etwas anderes ist. `version-sources.yaml` bekommt deshalb
+die gültige, leere Quellenkonfiguration aus `versionSourcesTemplate()` — wortgleich die
+Vorlage aus `docs/versionsinventar.md`.
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
@@ -414,25 +486,52 @@ zusammensetzbar.
 | `.claude/skills` | Katalog `skills` | Claude Code, OpenCode |
 | `.opencode/commands` | Katalog `commands` | OpenCode |
 | `.cursor/commands` | Katalog `commands` | Cursor |
-| `CLAUDE.md` | Datei-Link auf `AGENTS.md` | Claude Code |
+| `CLAUDE.md` | Include-Datei mit `@AGENTS.md` (`IsInclude`) | Claude Code |
 
 Skills stehen nur einmal: OpenCode durchsucht neben `.opencode/skills/` auch
 `.claude/skills/`, ein zweiter Ort wäre Dopplung. Cursor kennt kein Skill-Konzept.
 
-`CLAUDE.md` zeigt auf `AGENTS.md`, weil Claude Code ausschließlich `CLAUDE.md` liest und
-OpenCode `AGENTS.md` bevorzugt. Ein Symlink statt eines Imports, damit eine Änderung
-immer in beiden ankommt — wer in `CLAUDE.md` schreibt, schreibt durch den Link hindurch.
-Der Link ist `Optional`, weil seine Quelle dem Projekt gehört und nicht der Installation.
+`CLAUDE.md` ist eine erzeugte reguläre Datei, die `AGENTS.md` über die Import-Zeile
+`ClaudeIncludeLine` (`"@" + RootInstructionsFile`) einbindet, weil Claude Code
+ausschließlich `CLAUDE.md` liest und OpenCode wie Cursor `AGENTS.md` bevorzugen. Früher
+war es ein Symlink: der hielt beide Dateien zwangsläufig gleich, brach aber bei jedem
+Editor, der beim Speichern atomar ersetzt, und die Prüfung meldete danach `blocked` mit
+„echte Datei statt Symlink". Dieser Fall existiert nicht mehr. Der Preis: zwei Dateien,
+die auseinanderlaufen können — was Claude Code nach `CLAUDE.md` schreibt, erreicht die
+anderen nicht, und die Prüfung deckt das als `ok` zu. Das ist bewusst so; der Stub aus
+`claudeIncludeStub()` sagt über der Import-Zeile, dass Projektregeln nach `AGENTS.md`
+gehören.
 
-Die Richtung ist eine Konstante, keine projektabhängige Variable: ein umgedrehter Link
-müsste in Prüfung, Oberfläche und Doku dauerhaft mitgedacht werden. Deshalb wird eine
-mitgebrachte echte `CLAUDE.md` einmalig **umbenannt** statt der Link umgedreht. Siehe
-[Instruktionsdateien einordnen](#instruktionsdateien-einordnen).
+Geprüft wird am **Inhalt**, nicht an der Bauform: `hasEffectiveInclude()` sucht die
+Import-Zeile als eigenes Wort außerhalb eingezäunter Code-Blöcke und außerhalb von
+Backtick-Spans — dort überliest Claude Code sie beim Import-Parsing. Trägt die Datei den
+wirksamen Include, ist sie `ok`, gleichgültig was daneben steht. Ein Symlink auf
+`AGENTS.md` ist `stale` und damit heilbar; `applyIncludeFile()` entfernt ihn und schreibt
+den Stub — verlustfrei, der Inhalt steht in `AGENTS.md`. Eine echte Datei wird nie
+überschrieben. Kein Include ins Leere: fehlt `AGENTS.md`, schreibt `applyIncludeFile()`
+nichts, und `checkIncludeFile()` meldet `no-source` — auch über den Migrationszweig
+hinweg, sonst meldete jeder Lesezugriff erneut `Applied`.
+
+Die Include-Datei ist `Optional`, weil ihre Quelle dem Projekt gehört: der Lesepfad ruft
+`HealLinks()` direkt und legt nie ein `AGENTS.md` an. Ohne das Flag meldete jedes Projekt
+ohne `AGENTS.md` dauerhaft einen offenen, nicht heilbaren Punkt. Die Kehrseite: steht der
+Stub und fehlt `AGENTS.md`, bleibt `LinksOK` true, während der Import ins Leere zeigt —
+der Detailtext benennt genau das.
+
+Die Richtung ist eine Konstante, keine projektabhängige Variable: eine umgedrehte
+Richtung müsste in Prüfung, Oberfläche und Doku dauerhaft mitgedacht werden. Deshalb wird
+eine mitgebrachte echte `CLAUDE.md` einmalig **umbenannt** statt die Richtung umgedreht.
+Siehe [Instruktionsdateien einordnen](#instruktionsdateien-einordnen).
 
 Die Reihenfolge — einordnen, `ApplyRootInstructions()`, `ApplyLinks()` — steckt in
-`ApplyAssistantSetup()` (`project/setup.go`) und nicht mehr im Handler: der Symlink
+`ApplyAssistantSetup()` (`project/setup.go`) und nicht mehr im Handler: die Include-Datei
 braucht `AGENTS.md` als Ziel, und die Umbenennung muss vor dem Anlegen aus der Vorlage
 laufen. Siehe [Instruktionen](#instruktionen).
+
+Zwei Eigenschaften der Import-Syntax, belegt am Stand vom 2026-09-05: `@`-Importe in
+`CLAUDE.md` gibt es seit Claude Code 0.2.107 (CHANGELOG), und die Importtiefe ist auf vier
+Ebenen begrenzt (code.claude.com, „How Claude remembers your project"). Der Stub
+verbraucht davon eine.
 
 ### Selbstheilung auf dem Lesepfad
 
@@ -457,6 +556,15 @@ Zwei Eigenschaften halten das billig und harmlos:
   setzt jeden Link unbedingt neu.
 - **`blocked` und `conflict` lösen kein Anwenden aus.** Beide sind für `ApplyLinks()`
   unauflösbar und stehen stattdessen in `LinkRepair.Open`.
+
+Eine Ausnahme von „nur registrieren" ist die Migration von `CLAUDE.md`: ein Symlink auf
+`AGENTS.md` ist `stale` und damit `Fixable()`, der Lesepfad ersetzt ihn durch die
+Include-Datei — die eine Stelle, an der er eine versionierte Datei im Hauptverzeichnis
+ändert (git zeigt den Modewechsel `120000` → `100644`). `LinkRepair.IncludeMigrated`
+trägt das; `contextLinks()` und `describeRepair()` benennen es eigens, und der Hinweis auf
+die laufende Sitzung bleibt den Katalog-Links vorbehalten. Sie erscheint nur einmal:
+danach ist die Datei `ok`. Scheitert das Schreiben — etwa an einem nicht beschreibbaren
+Projektverzeichnis —, steht der Grund in `LinkRepair.Error`, und gelesen wird trotzdem.
 
 Die Bilanz stammt aus dem Zustand **vor** dem Anwenden — danach ist sie per Definition
 leer, und genau sie ist das, was gelesen werden soll. Bei einem Ziel, das es vorher gar
@@ -485,17 +593,33 @@ bevor irgendetwas geschrieben wird. Abgelesen wird mit `Lstat` und `Readlink`, n
 `CLAUDE.md` — bliebe damit unsichtbar. Verglichen wird das aufgelöste Ziel, nicht der
 Rohstring aus `Readlink`.
 
-Jede der beiden Dateien steht in genau einem von acht Zuständen (fehlt, echte Datei,
-Verzeichnis, Link auf die andere, Link auf ein fremdes vorhandenes Ziel, Rest-Link,
-unlesbar, sonstiges). Die Fallmatrix daraus wird von oben nach unten geprüft, die erste
-passende Zeile gewinnt, und die letzte fängt alles Übrige auf — kein Zustand fällt durch.
-Aufgelöst werden nur die Zeilen, bei denen nichts verloren geht: Umbenennen und das
-Entfernen eines irreführenden Symlinks an `AGENTS.md`.
+Jede der beiden Dateien steht in genau einem von neun Zuständen (fehlt, echte Datei,
+Include-Datei, Verzeichnis, Link auf die andere, Link auf ein fremdes vorhandenes Ziel,
+Rest-Link, unlesbar, sonstiges). „Include-Datei" (`kindInclude`) gibt es nur an
+`CLAUDE.md`: eine reguläre Datei mit wirksamer Import-Zeile, gleichgültig was daneben
+steht — ein `AGENTS.md` mit derselben Zeile importierte sich selbst und bleibt „echte
+Datei". Die Fallmatrix daraus wird von oben nach unten geprüft, die erste passende Zeile
+gewinnt, und die letzte fängt alles Übrige auf — kein Zustand fällt durch. Aufgelöst
+werden nur die Zeilen, bei denen nichts verloren geht: Umbenennen einer echten `CLAUDE.md`
+und das Entfernen eines irreführenden Symlinks an `AGENTS.md`. Die Include-Datei wird
+**nie** umbenannt — umbenannt ergäbe sie ein `AGENTS.md`, das sich selbst importiert.
+Neben fehlendem `AGENTS.md` ist sie ein Rest, der liegen bleibt, während `AGENTS.md` aus
+der Vorlage entsteht; neben verdrehter Richtung weicht erst der Symlink an `AGENTS.md`.
+
+Die Zeilen 10 („nur `CLAUDE.md`") und 11 („beide echte Dateien") tragen deshalb je zwei
+Zweige unter **derselben Nummer**: die Nummer benennt die Ausgangslage nach Dateisorte,
+der Zweig hängt am wirksamen Include — Zeile 10 benennt um oder lässt den Stub liegen,
+Zeile 11 ist Sollzustand oder Konflikt. Eine eigene Nummer je Zweig hätte die Matrix auf
+19 Zeilen gestreckt und jede Zeilenangabe in Tests und Doku verschoben; `Outcome` und
+`Detail` unterscheiden die Zweige ohnehin. Zeile 14 (Symlink neben echter `AGENTS.md`) ist
+nicht mehr der Sollzustand, sondern die Migration; Zeile 9 (fremd verlinktes `AGENTS.md`)
+zählt die Include-Datei ausdrücklich mit, weil sie den Stub selbst schreibt und er sonst
+beim nächsten Lauf in Zeile 8 fiele — ein Konflikt an der eigenen Datei.
 
 Alles andere wird als `StateConflict` gemeldet und **nicht angefasst** — auch nicht
 angelegt. Der Detailtext nennt die Ursache, den Ausweg und die Folge: bis zur Handarbeit
 sieht Claude Code den Anstoß nicht. Prüfung und Einrichten benutzen dieselbe
-Klassifikation; zwei Implementierungen liefen auseinander. `checkFileLink()` ordnet
+Klassifikation; zwei Implementierungen liefen auseinander. `checkIncludeFile()` ordnet
 deshalb in dieser Reihenfolge ein: Konflikt, `blocked`, `no-source`, Zielzustand.
 
 Ein einziger Vorbehalt blockiert eine sonst mögliche Umbenennung: steht in der
@@ -555,11 +679,11 @@ Zustände in `LinkState`:
 |---|---|
 | `ok` | alles steht so, wie es stehen soll |
 | `missing` | nichts vorhanden |
-| `stale` | Datei-Link auf ein falsches Ziel, oder Verzeichnis-Symlink aus einer älteren Fassung |
+| `stale` | eine ältere Bauform, die verlustfrei ersetzt wird: der Symlink `CLAUDE.md -> AGENTS.md`, der zur Include-Datei wird, oder der Verzeichnis-Symlink eines Katalog-Links, der zu Einzel-Links wird; die Oberfläche beschriftet ihn „alte Form, wird ersetzt" |
 | `incomplete` | das Verzeichnis steht, sein Inhalt weicht vom Katalog ab |
 | `blocked` | etwas Echtes steht im Weg; wird nicht angefasst |
-| `no-source` | es gibt nichts zu verlinken |
-| `conflict` | `CLAUDE.md` und `AGENTS.md` lassen sich nicht auflösen, ohne Inhalt zu verlieren oder zu verdoppeln; der Detailtext nennt die Auflösungen |
+| `no-source` | es gibt nichts zu verlinken; an `CLAUDE.md` nennt der Detailtext, ob ein Stub schon ins Leere zeigt |
+| `conflict` | `CLAUDE.md` und `AGENTS.md` lassen sich nicht auflösen, ohne Inhalt zu verlieren oder zu verdoppeln — typisch eine echte `CLAUDE.md` ohne wirksame Import-Zeile neben `AGENTS.md`; der Detailtext nennt die Auflösungen |
 
 ## Instruktionen
 

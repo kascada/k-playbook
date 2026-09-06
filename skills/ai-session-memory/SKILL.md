@@ -18,10 +18,11 @@ Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
 in jeder OpenCode-Session **automatisch als autoritative Quelle** genutzt
 wird, statt dass der AI-Assistent jedes Mal wieder von vorn Code analysiert.
 
-> **Ausführung:** Die Docs gliedern sich in vier Herkünfte, und die operative
+> **Ausführung:** Die Docs gliedern sich in fünf Herkünfte, und die operative
 > Umsetzung machen die Werkzeuge der jeweiligen Herkunft: **`/k-docs-code`**
 > schreibt nach `docs/code/`, **`/k-docs-tools`** nach `docs/libs/`,
-> **`/k-docs-extract`** nach `docs/extracted/`, `docs/manual/` ist
+> **`/k-docs-extract`** nach `docs/extracted/`, **`/k-doc-inventory`** nach
+> `docs/versions/`, `docs/manual/` ist
 > handgepflegt. Nach `docs/code/` schreibt außerdem der Skill
 > `ks-overlay-repo-analyse` — welches Werkzeug eine einzelne Datei geschrieben
 > hat, steht in ihrem Frontmatter unter `generated.by`. Den Index
@@ -54,7 +55,7 @@ Drei zusammenspielende Bausteine:
    **„Häufige Fragen → Datei"**-Tabelle – damit die AI beim Nachschlagen
    in den Docs gezielt findet, was drin ist, ohne alle Files zu lesen. Es ist
    der einzige Index, und er deckt alle Herkünfte ab: `code/`, `libs/`,
-   `extracted/` und `manual/`.
+   `extracted/`, `versions/` und `manual/`.
 
 ## Ausführung
 

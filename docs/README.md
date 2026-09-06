@@ -23,6 +23,7 @@ Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten s
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
 | [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag ein absoluter Pfad ist. |
+| [`versionsinventar.md`](./versionsinventar.md) | Der Vertrag des Versionsinventars: Datenmodell, Pin-Taxonomie, Quellen, Vertrauensgrenze, `version-sources.yaml`. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |
 | [`schreibweise.md`](./schreibweise.md) | Umlaute statt ASCII-Umschreibung, und wo ASCII bleibt. Gilt für alle Texte des Repos. |
 
@@ -54,7 +55,7 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 ## Stichwort-Index
 
 - `Anker` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
-- `AGENTS.md` / `CLAUDE.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
+- `AGENTS.md` / `CLAUDE.md` / `Include` / `@AGENTS.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
 - `BROWSER` / `Browser öffnet nicht` / `DevContainer` -> [`installation.md`](./installation.md#browser-beim-start), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
 - `Bereiche` / `Setup` / `Workflows` / `Umschalter` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-und-tasks)
@@ -92,3 +93,4 @@ Wenn nichts mehr offen ist, wird sie gelöscht.
 - `Security-Tools` / `Tool-Matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
 - `Tasks` -> [`task-flow.md`](./task-flow.md)
 - `Update` / `git pull` -> [`installation.md`](./installation.md#aktualisieren)
+- `Versionsinventar` / `inventory` / `version-sources.yaml` / `Pin-Art` / `Vertrauensgrenze` -> [`versionsinventar.md`](./versionsinventar.md)

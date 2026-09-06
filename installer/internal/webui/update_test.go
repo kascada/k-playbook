@@ -59,9 +59,15 @@ func TestRelinkAfterUpdateRichtetEin(t *testing.T) {
 		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
 	}
 
-	destination, err := os.Readlink(filepath.Join(root, "CLAUDE.md"))
-	if err != nil || destination != project.RootInstructionsFile {
-		t.Errorf("CLAUDE.md zeigt auf %q, %v", destination, err)
+	// CLAUDE.md ist danach die Include-Datei: regulär, mit der Import-Zeile,
+	// ohne den umbenannten Inhalt.
+	claude := filepath.Join(root, "CLAUDE.md")
+	if info, err := os.Lstat(claude); err != nil || !info.Mode().IsRegular() {
+		t.Errorf("CLAUDE.md ist keine reguläre Datei: %v", err)
+	}
+	if claudeContent := readFile(t, claude); !strings.Contains(claudeContent, "\n"+project.ClaudeIncludeLine+"\n") ||
+		strings.Contains(claudeContent, "# Unser Projekt") {
+		t.Errorf("CLAUDE.md ist kein reiner Include:\n%s", claudeContent)
 	}
 	if !project.LinksOK(project.CheckLinks(root)) {
 		t.Errorf("nach dem Aktualisieren nicht eingerichtet: %+v", project.CheckLinks(root))

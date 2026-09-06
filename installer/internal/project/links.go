@@ -12,19 +12,20 @@ import (
 //
 // Es gibt zwei Sorten. Ein Katalog-Link ist ein Verzeichnis, das mit
 // Einzel-Symlinks aus dem aufgelösten Katalog bestückt wird — die Sorte steht
-// in Kind. Ein Datei-Link ist ein einzelner Symlink auf eine Datei im Projekt;
-// dort steht Source statt Kind.
+// in Kind. Eine Include-Datei ist eine erzeugte reguläre Datei, die eine andere
+// Datei im Projekt per Import-Zeile einbindet; dort steht Source statt Kind.
 type Link struct {
 	// Path ist relativ zur Projektwurzel.
 	Path string `json:"path"`
 	// Assistant nennt, wer hier liest — nur für die Anzeige.
 	Assistant string `json:"assistant"`
-	// Kind nennt den Katalog hinter einem Verzeichnis. Leer bei Datei-Links.
+	// Kind nennt den Katalog hinter einem Verzeichnis. Leer bei Include-Dateien.
 	Kind AssetKind `json:"kind,omitempty"`
-	// Source ist die Quelle eines Datei-Links, relativ zur Projektwurzel.
+	// Source ist die Datei, die eine Include-Datei einbindet, relativ zur
+	// Projektwurzel.
 	Source string `json:"source,omitempty"`
-	// IsFile unterscheidet Datei- von Katalog-Links.
-	IsFile bool `json:"isFile,omitempty"`
+	// IsInclude unterscheidet die Include-Datei von Katalog-Links.
+	IsInclude bool `json:"isInclude,omitempty"`
 	// Optional markiert Links, deren Quelle dem Projekt gehört. Fehlt sie, ist
 	// nichts zu tun — im Gegensatz zu einer fehlenden Quelle in der
 	// Installation, die auf eine beschädigte Installation hindeutet.
@@ -42,32 +43,42 @@ type Link struct {
 // .claude/skills/, ein zweiter Ort wäre Dopplung. Cursor kennt kein
 // Skill-Konzept.
 //
-// CLAUDE.md zeigt auf AGENTS.md, weil Claude Code ausschließlich CLAUDE.md
-// liest und OpenCode AGENTS.md bevorzugt. Ein Symlink statt eines Imports,
-// damit eine Änderung immer in beiden ankommt — wer in CLAUDE.md schreibt,
-// schreibt durch den Link hindurch in AGENTS.md.
+// CLAUDE.md ist eine Include-Datei mit der Import-Zeile @AGENTS.md, weil Claude
+// Code ausschließlich CLAUDE.md liest und OpenCode wie Cursor AGENTS.md
+// bevorzugen. Früher war es ein Symlink: der hielt beide Dateien zwangsläufig
+// gleich, brach aber bei jedem Editor, der beim Speichern atomar ersetzt, und
+// die Prüfung meldete danach „echte Datei statt Symlink". Der Import kennt
+// diesen Fall nicht. Sein Preis: zwei Dateien, die auseinanderlaufen können —
+// was Claude Code über /memory oder # nach CLAUDE.md schreibt, erreicht die
+// anderen Assistenten nicht, und die Prüfung deckt das als StateOK zu. Das ist
+// bewusst in Kauf genommen; die Gegenrichtung hieße, jeden Projektinhalt neben
+// dem Include zum Konflikt zu erklären. Als Gegengewicht sagt der erzeugte Stub
+// über der Import-Zeile, dass Projektregeln nach AGENTS.md gehören.
 //
 // Die Richtung ist überall dieselbe. Bringt ein Projekt nur eine echte
 // CLAUDE.md mit, wird sie beim Einrichten nach AGENTS.md umbenannt statt
 // ignoriert; sonst stünden zwei Instruktionsdateien mit verschiedenem Inhalt
-// nebeneinander. Was sich nicht automatisch auflösen lässt — eine bewusst
-// gesetzte Verlinkung auf ein fremdes Ziel, zwei echte Dateien, ein
-// git-ignoriertes AGENTS.md — wird als StateConflict gemeldet und nicht
-// angefasst. Die Fallmatrix dazu steht in instructions_layout.go.
+// nebeneinander. Eine echte CLAUDE.md mit wirksamem Include gilt als
+// eingerichtet, auch mit Projektinhalt daneben. Was sich nicht automatisch
+// auflösen lässt — eine bewusst gesetzte Verlinkung auf ein fremdes Ziel, zwei
+// echte Dateien ohne Include, ein git-ignoriertes AGENTS.md — wird als
+// StateConflict gemeldet und nicht angefasst. Die Fallmatrix dazu steht in
+// instructions_layout.go.
+//
+// Die Include-Datei ist Optional, weil ihre Quelle dem Projekt gehört.
+// ApplyAssistantSetup legt AGENTS.md zwar immer an, der Lesepfad ruft HealLinks
+// aber direkt und legt nie eines an. Dort bleibt es bei StateNoSource:
+// Fixable() schließt den Zustand aus, aus NeedsAction() nimmt ihn allein
+// Optional heraus. Ohne das Flag meldete `k-playbook context` in jedem Projekt
+// ohne AGENTS.md dauerhaft einen offenen, nicht heilbaren Punkt.
 func Links() []Link {
 	return []Link{
 		{Path: filepath.Join(".claude", "commands"), Kind: KindCommands, Assistant: "Claude Code"},
 		{Path: filepath.Join(".claude", "skills"), Kind: KindSkills, Assistant: "Claude Code, OpenCode"},
 		{Path: filepath.Join(".opencode", "commands"), Kind: KindCommands, Assistant: "OpenCode"},
 		{Path: filepath.Join(".cursor", "commands"), Kind: KindCommands, Assistant: "Cursor"},
-		{Path: ClaudeInstructionsFile, Source: RootInstructionsFile, Assistant: "Claude Code", IsFile: true, Optional: true},
+		{Path: ClaudeInstructionsFile, Source: RootInstructionsFile, Assistant: "Claude Code", IsInclude: true, Optional: true},
 	}
-}
-
-// isRootInstructionsLink erkennt den einen Datei-Link, hinter dem das Paar
-// (CLAUDE.md, AGENTS.md) steht.
-func isRootInstructionsLink(link Link) bool {
-	return link.IsFile && link.Path == ClaudeInstructionsFile && link.Source == RootInstructionsFile
 }
 
 // LinkState ist der Zustand einer einzelnen Verlinkung.
@@ -78,9 +89,13 @@ const (
 	StateOK LinkState = "ok"
 	// StateMissing: nichts vorhanden.
 	StateMissing LinkState = "missing"
-	// StateStale: vorhanden, aber in einer Form, die nicht mehr gilt — ein
-	// Datei-Link auf ein falsches Ziel oder der Verzeichnis-Symlink aus einer
-	// älteren Fassung.
+	// StateStale: vorhanden, aber in einer Bauform, die nicht mehr gilt und
+	// verlustfrei ersetzt wird — der Symlink CLAUDE.md -> AGENTS.md aus einer
+	// älteren Fassung, der zur Include-Datei wird, oder der Verzeichnis-Symlink
+	// eines Katalog-Links, der zu Einzel-Links wird. Kein eigener Zustand für
+	// die Migration: er zöge Fixable(), NeedsAction(), Kontextausgabe und
+	// Oberfläche mit, für den Gewinn eines Textes. Die Fallunterscheidung
+	// steht im Detail.
 	StateStale LinkState = "stale"
 	// StateIncomplete: das Verzeichnis steht, sein Inhalt weicht vom Katalog ab.
 	StateIncomplete LinkState = "incomplete"
@@ -239,46 +254,46 @@ func sortedKeys(set map[string]bool) []string {
 }
 
 func checkLink(projectRoot string, link Link) LinkStatus {
-	if link.IsFile {
-		return checkFileLink(projectRoot, link)
+	if link.IsInclude {
+		return checkIncludeFile(projectRoot, link)
 	}
 	return checkRegistryLink(projectRoot, link)
 }
 
-// checkFileLink prüft einen einzelnen Symlink auf eine Datei im Projekt.
+// checkIncludeFile prüft die Include-Datei am Inhalt, nicht an der Bauform:
+// wirksamer Include vorhanden heißt eingerichtet, gleichgültig was daneben
+// steht.
 //
 // Die Reihenfolge ist festgelegt: Konflikt, Blockade, fehlende Quelle,
 // Zielzustand. Käme die Quellprüfung zuerst, bliebe der Konflikt gerade dort
 // unsichtbar, wo er am meisten zählt — bei einem CLAUDE.md, das auf ein fremdes
 // Ziel zeigt, während AGENTS.md fehlt. Der Detailtext nennte dann mit
-// „AGENTS.md fehlt im Projekt" die falsche Ursache.
-func checkFileLink(projectRoot string, link Link) LinkStatus {
+// „AGENTS.md fehlt im Projekt" die falsche Ursache. Und fehlt AGENTS.md,
+// gewinnt StateNoSource auch über den Migrationszweig: sonst wäre der Zustand
+// Fixable(), applyIncludeFile schriebe aber nichts, und HealLinks meldete bei
+// jedem `k-playbook context` erneut Applied.
+func checkIncludeFile(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
-	if isRootInstructionsLink(link) {
-		switch plan := classifyInstructions(projectRoot); {
-		case plan.conflict:
-			status.State = StateConflict
-			status.Detail = plan.detail
-			return status
+	switch plan := classifyInstructions(projectRoot); {
+	case plan.conflict:
+		status.State = StateConflict
+		status.Detail = plan.detail
+		return status
 
-		case plan.blocked:
-			status.State = StateBlocked
-			status.Detail = plan.detail
-			return status
-		}
-	}
-
-	source := filepath.Join(projectRoot, link.Source)
-	if !fileExists(source) {
-		status.State = StateNoSource
-		// Instruktionsdateien gehören dem Projekt; wir legen keine an.
-		status.Detail = link.Source + " fehlt im Projekt"
+	case plan.blocked:
+		status.State = StateBlocked
+		status.Detail = plan.detail
 		return status
 	}
 
 	target := filepath.Join(projectRoot, link.Path)
-	wanted := relativeSource(target, source)
+	source := filepath.Join(projectRoot, link.Source)
+	if !fileExists(source) {
+		status.State = StateNoSource
+		status.Detail = noSourceDetail(target, link)
+		return status
+	}
 
 	info, err := os.Lstat(target)
 	switch {
@@ -291,31 +306,81 @@ func checkFileLink(projectRoot string, link Link) LinkStatus {
 		status.Detail = err.Error()
 
 	case info.Mode()&os.ModeSymlink != 0:
+		// Ein Symlink ist die ältere Bauform. Zeigt er auf AGENTS.md, ist das
+		// die Migration; alles andere ist ein Rest — ein Fremdlink mit
+		// vorhandenem Ziel wäre oben als Konflikt herausgefallen.
+		status.State = StateStale
 		destination, err := os.Readlink(target)
 		switch {
 		case err != nil:
-			status.State = StateStale
-			status.Detail = "Ziel nicht lesbar"
-		case destination == wanted:
-			status.State = StateOK
-			status.Detail = "-> " + destination
+			status.Detail = "Symlink mit unlesbarem Ziel, wird durch die Include-Datei ersetzt"
+		case destination == relativeSource(target, source):
+			status.Detail = "Symlink auf " + link.Source + " aus einer älteren Fassung, wird durch eine Include-Datei mit " +
+				ClaudeIncludeLine + " ersetzt"
 		default:
-			status.State = StateStale
-			status.Detail = "zeigt auf " + destination
+			status.Detail = "toter Symlink auf " + destination + ", wird durch die Include-Datei ersetzt"
 		}
 
 	case info.IsDir():
 		status.State = StateBlocked
 		status.Detail = "Verzeichnis steht im Weg"
 
+	case info.Mode().IsRegular():
+		data, err := os.ReadFile(target)
+		switch {
+		case err != nil:
+			status.State = StateBlocked
+			status.Detail = err.Error()
+		case hasEffectiveInclude(string(data)):
+			status.State = StateOK
+			status.Detail = "Include-Datei, bindet " + link.Source + " mit " + ClaudeIncludeLine + " ein"
+			if strings.TrimSpace(string(data)) != strings.TrimSpace(claudeIncludeStub()) {
+				status.Detail += "; daneben eigener Inhalt"
+			}
+		default:
+			// Eine echte Datei ohne wirksamen Include neben AGENTS.md ist der
+			// Konflikt aus der Fallmatrix; hier nur, falls beide Prüfungen
+			// je auseinanderliefen.
+			status.State = StateConflict
+			status.Detail = bothRealDetail()
+		}
+
 	default:
-		// Typisch nach einem Editor, der "atomar" speichert: er ersetzt den
-		// Symlink durch eine echte Datei. Ab dann laufen beide auseinander.
 		status.State = StateBlocked
-		status.Detail = "echte Datei statt Symlink, Änderungen erreichen " + link.Source + " nicht"
+		status.Detail = "weder Datei noch Verzeichnis noch Symlink (" + info.Mode().String() + ")"
 	}
 
 	return status
+}
+
+// noSourceDetail benennt die Lage ohne AGENTS.md. Instruktionsdateien gehören
+// dem Projekt; der Link-Mechanismus legt keine an.
+//
+// Steht die Include-Datei schon, zeigt ihr Import ins Leere: Optional nimmt
+// den Zustand aus NeedsAction(), LinksOK bleibt true, die Assistenten-Karte
+// meldet die Verlinkung als eingerichtet — und Claude Code lädt still nichts.
+// Beim Symlink war derselbe Endzustand wenigstens als kaputter Link sichtbar;
+// hier muss der Text es sagen.
+func noSourceDetail(target string, link Link) string {
+	base := link.Source + " fehlt im Projekt"
+
+	info, err := os.Lstat(target)
+	switch {
+	case err != nil:
+		return base
+
+	case info.Mode()&os.ModeSymlink != 0:
+		return base + "; der Symlink " + link.Path + " wartet auf sein Ziel und wird beim Einrichten durch die Include-Datei ersetzt"
+
+	case info.Mode().IsRegular():
+		data, err := os.ReadFile(target)
+		if err == nil && hasEffectiveInclude(string(data)) {
+			return base + "; " + link.Path + " steht schon als Include-Datei und bindet mit " + ClaudeIncludeLine +
+				" ins Leere ein — Claude Code lädt daraus nichts, bis " + link.Source + " angelegt ist (Einrichten legt es an)"
+		}
+		return base
+	}
+	return base
 }
 
 // checkRegistryLink vergleicht den aufgelösten Katalog mit dem, was im
@@ -504,8 +569,8 @@ func ownedLinks(projectRoot string, dir string, prefix string) []string {
 func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 	for _, link := range Links() {
 		var err error
-		if link.IsFile {
-			err = applyFileLink(projectRoot, link)
+		if link.IsInclude {
+			err = applyIncludeFile(projectRoot, link)
 		} else {
 			err = applyRegistryLink(projectRoot, link)
 		}
@@ -535,12 +600,22 @@ type LinkRepair struct {
 	// wechselten. Bei einem Ziel, das es vorher gar nicht gab, bleibt sie leer:
 	// dort hat sich keine Registrierung verändert, dort ist eine entstanden.
 	Changed LinkChanges `json:"changed,omitempty"`
+	// IncludeMigrated: CLAUDE.md war ein Symlink auf AGENTS.md und ist jetzt
+	// die Include-Datei. Das ist die eine Stelle, an der der Lesepfad eine
+	// versionierte Datei im Hauptverzeichnis ändert — git zeigt den
+	// Modewechsel 120000 → 100644 —, und deshalb wird sie eigens benannt. Sie
+	// kommt nur einmal vor: danach ist die Datei StateOK und heilt nichts mehr.
+	IncludeMigrated bool `json:"includeMigrated,omitempty"`
 	// Open sind die Ziele, die danach noch offen sind — blockiert, im Konflikt
 	// oder am Einrichten gescheitert.
 	Open []LinkIssue `json:"open,omitempty"`
 	// Error nennt den Grund, wenn das Einrichten abgebrochen ist. Auf dem
 	// Lesepfad ist das kein Fehler des Aufrufs: gelesen wird trotzdem.
 	Error string `json:"error,omitempty"`
+	// registryApplied: mindestens ein Katalog-Link war heilbar. Nur für den
+	// Hinweis auf die laufende Sitzung — die Migration der Include-Datei
+	// allein ändert an der Command-Liste eines Assistenten nichts.
+	registryApplied bool
 }
 
 // Quiet meldet, ob es nichts zu berichten gibt.
@@ -564,6 +639,13 @@ func (r LinkRepair) Quiet() bool {
 // den Vergleichen; was das Einrichten ohnehin nicht auflösen kann — eine echte
 // Projektdatei im Weg, ein Konflikt an CLAUDE.md — führt nicht zu einem
 // Anwenden, das jedes Mal dieselben Links neu schriebe.
+//
+// Ein Symlink CLAUDE.md -> AGENTS.md ist StateStale und damit Fixable(): der
+// Lesepfad ersetzt ihn durch die Include-Datei, jedes `k-playbook context` in
+// einem Bestandsprojekt migriert also von selbst. Weil das eine versionierte
+// Datei im Hauptverzeichnis ändert, steht es als IncludeMigrated im Ergebnis.
+// Scheitert das Schreiben — etwa an einem nicht beschreibbaren
+// Projektverzeichnis —, landet der Grund in Error, und gelesen wird trotzdem.
 func HealLinks(projectRoot string) LinkRepair {
 	statuses := CheckLinks(projectRoot)
 	if !LinksFixable(statuses) {
@@ -573,11 +655,28 @@ func HealLinks(projectRoot string) LinkRepair {
 	// Die Bilanz stammt aus dem Zustand davor: danach ist sie per Definition
 	// leer, und genau sie ist das, was der Nutzer lesen will.
 	changed := PendingLinkChanges(statuses)
+	migrating := false
+	registry := false
+	for _, status := range statuses {
+		switch {
+		case status.IsInclude:
+			migrating = status.State == StateStale
+		case status.Fixable():
+			registry = true
+		}
+	}
 
 	after, err := ApplyLinks(projectRoot)
-	repair := LinkRepair{Applied: true, Changed: changed, Open: openIssues(after)}
+	repair := LinkRepair{Applied: true, Changed: changed, Open: openIssues(after), registryApplied: registry}
 	if err != nil {
 		repair.Error = err.Error()
+	}
+	// Migriert ist erst, was danach als Include-Datei steht. Blieb der Symlink
+	// stehen, steht der Grund in Error, und die Datei bleibt StateStale.
+	for _, status := range after {
+		if status.IsInclude && migrating && status.State == StateOK {
+			repair.IncludeMigrated = true
+		}
 	}
 	return repair
 }
@@ -597,16 +696,21 @@ func openIssues(statuses []LinkStatus) []LinkIssue {
 	return issues
 }
 
-// applyFileLink setzt einen einzelnen Symlink. Etwas Echtes im Weg gehört dem
-// Projekt und bleibt liegen; die Prüfung meldet den Zustand.
-func applyFileLink(projectRoot string, link Link) error {
-	if isRootInstructionsLink(link) {
-		// Ein gemeldeter Konflikt bleibt unangetastet — auch der Fall, in dem
-		// CLAUDE.md auf ein fremdes Ziel zeigt und sonst unten in den
-		// Symlink-Zweig fiele und still umgebogen würde.
-		if plan := classifyInstructions(projectRoot); plan.conflict || plan.blocked {
-			return nil
-		}
+// applyIncludeFile schreibt die Include-Datei. Eine echte Datei wird nie
+// überschrieben: mit wirksamem Include ist sie eingerichtet, ohne ist sie der
+// Konflikt aus der Fallmatrix. Ein alter Symlink weicht vorher — der Inhalt
+// steht in AGENTS.md, das Ersetzen ist verlustfrei.
+//
+// Kein Include ins Leere: fehlt AGENTS.md, wird nichts geschrieben. Im
+// Einrichten-Pfad kommt das nicht vor, dort legt ApplyAssistantSetup die Datei
+// vorher an. HealLinks ruft ApplyLinks dagegen direkt; dort bleibt die
+// Include-Datei bei StateNoSource, bis das Projekt ein AGENTS.md hat.
+func applyIncludeFile(projectRoot string, link Link) error {
+	// Ein gemeldeter Konflikt bleibt unangetastet — auch der Fall, in dem
+	// CLAUDE.md auf ein fremdes Ziel zeigt und sonst unten in den
+	// Symlink-Zweig fiele und still ersetzt würde.
+	if plan := classifyInstructions(projectRoot); plan.conflict || plan.blocked {
+		return nil
 	}
 
 	source := filepath.Join(projectRoot, link.Source)
@@ -615,10 +719,6 @@ func applyFileLink(projectRoot string, link Link) error {
 	}
 
 	target := filepath.Join(projectRoot, link.Path)
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return fmt.Errorf("%s anlegen: %w", filepath.Dir(link.Path), err)
-	}
-
 	info, err := os.Lstat(target)
 	switch {
 	case err != nil && os.IsNotExist(err):
@@ -627,7 +727,7 @@ func applyFileLink(projectRoot string, link Link) error {
 		return fmt.Errorf("%s prüfen: %w", link.Path, err)
 
 	case info.Mode()&os.ModeSymlink != 0:
-		// Neu setzen: ein bestehender Link kann nach einem Umzug ins Leere zeigen.
+		// Migration von der älteren Bauform, oder ein Rest-Link ins Leere.
 		if err := os.Remove(target); err != nil {
 			return fmt.Errorf("%s ersetzen: %w", link.Path, err)
 		}
@@ -636,8 +736,8 @@ func applyFileLink(projectRoot string, link Link) error {
 		return nil
 	}
 
-	if err := os.Symlink(relativeSource(target, source), target); err != nil {
-		return fmt.Errorf("%s verlinken: %w", link.Path, err)
+	if err := os.WriteFile(target, []byte(claudeIncludeStub()), 0o644); err != nil {
+		return fmt.Errorf("%s schreiben: %w", link.Path, err)
 	}
 	return nil
 }

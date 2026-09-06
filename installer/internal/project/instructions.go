@@ -87,8 +87,9 @@ type RootInstructionsState struct {
 	HasOutdatedAnstoss bool `json:"hasOutdatedAnstoss,omitempty"`
 }
 
-// OK meldet, ob nichts mehr zu tun ist. CLAUDE.md gehört nicht dazu: der
-// Symlink darauf läuft über den Link-Mechanismus.
+// OK meldet, ob nichts mehr zu tun ist. CLAUDE.md gehört nicht dazu: die
+// Include-Datei, die diese Datei per @AGENTS.md einbindet, läuft über den
+// Link-Mechanismus in links.go und hat dort ihren eigenen Zustand.
 func (s RootInstructionsState) OK() bool {
 	return s.Present && s.HasMarker
 }

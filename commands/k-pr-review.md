@@ -100,8 +100,9 @@ Aus der Context-Ausgabe:
 - `PR_TARGET_DIR` = `project.repoRoot`. Das deckt auch Wrapper-Repos ab, bei denen das eigentliche Git-Repo nicht das Hauptverzeichnis ist.
 - `DOCS_DIR` = `<local.dir>/docs`.
 - `CODE_DOCS_DIR` = `<DOCS_DIR>/code` — Phase 2 braucht es für die Docs-Sync-Pflicht. Nur
-  diese Herkunft folgt dem Code; `libs/`, `manual/` und `extracted/` sind davon
-  ausgenommen, und `DOCS_DIR/README.md` ist der erzeugte Index von `/k-docs-index`.
+  diese Herkunft folgt dem Code; `libs/`, `versions/`, `manual/` und `extracted/` sind
+  davon ausgenommen, und `DOCS_DIR/README.md` ist der erzeugte Index von
+  `/k-docs-index`.
 - `EFFECTIVE_RULES` = `catalogs.rules`, inklusive Herkunft je Regel.
 
 Wenn `remediation.target` gesetzt und nicht `.` ist, benennt es den engeren Code-Root

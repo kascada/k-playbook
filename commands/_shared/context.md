@@ -59,6 +59,19 @@ fields from two loads.
 | `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
 | `cleanliness` | The local state of the installation: `clean`, `modified`, `untracked`, `ahead`, `devSync`, `message`. |
 | `guidelines` | Project guideline files. |
+| `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures and which areas it excludes from the default scan. Read it from here — never read that file yourself. |
+
+`versionSources` carries the whole answer, so no command has to open the file:
+`present` says whether it exists, `path` where it is, `schemaVersion` which contract
+version it declares, `roots` the additional readable roots and `sources` the configured
+extra sources (`path`, `kind`, `env`, `note`, `optional` per entry) and `exclude` the
+patterns the default scan skips. The installation `<playbook.dir>` is always skipped and
+is not part of `exclude` — that rule comes from the contract, not from the file. `error`
+is filled only when the file is there but unreadable or of an unknown schema version —
+then `roots`, `sources` and `exclude` are empty and the state is a visible finding, not an
+empty result. The
+field is absent on an installation older than it. The full contract is in
+`<playbook.dir>/docs/versionsinventar.md`.
 
 `gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
 `disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. `gh.installed`, `gh.loggedIn`,
@@ -81,7 +94,9 @@ from the output above — never from configuration, and never by searching.
 | code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
 | extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
+| version inventory | `<local.dir>/docs/versions/` — entsteht beim ersten Lauf von `/k-doc-inventory` |
 | hand-written documentation | `<local.dir>/docs/manual/` |
+| version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
 | raw material, never indexed | `<local.dir>/material/` |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |

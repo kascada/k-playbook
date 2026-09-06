@@ -54,7 +54,7 @@ für die Assistenten ein.
 projekt/
 ├── K-PLAYBOOK.yaml       der Anker
 ├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
-├── CLAUDE.md             Symlink auf AGENTS.md; die Richtung ist fest
+├── CLAUDE.md             Include-Datei mit der Zeile @AGENTS.md; die Richtung ist fest
 ├── .claude/
 │   ├── commands/ ──┐     je ein Symlink pro Command
 │   └── skills/     │     je ein Symlink pro Skill; OpenCode liest hier mit
@@ -81,7 +81,8 @@ projekt/
     ├── priv/             Notizen und Zwischenstände
     ├── material/         Rohmaterial als Quelle für Docs, nie indiziert
     ├── k-playbook.md     projekteigene Instruktionsebene
-    └── TODO.md
+    ├── TODO.md
+    └── version-sources.yaml   Versionsquellen des Versionsinventars, handgepflegt
 ```
 
 `k-playbook-local/` gehört ins Repository des Projekts. Drei Verzeichnisse stehen darin
@@ -109,16 +110,19 @@ k-playbook context
 
 Verlinkt wird für Claude Code, OpenCode und Cursor. Skills stehen nur einmal unter
 `.claude/skills`, weil OpenCode dieses Verzeichnis mitdurchsucht und Cursor kein
-Skill-Konzept hat. `CLAUDE.md` ist ein Symlink auf `AGENTS.md`: Claude Code liest
-ausschließlich `CLAUDE.md`, OpenCode bevorzugt `AGENTS.md` — so landet jede Änderung in
-beiden.
+Skill-Konzept hat. `CLAUDE.md` ist eine kleine Include-Datei mit der Zeile `@AGENTS.md`:
+Claude Code liest ausschließlich `CLAUDE.md`, OpenCode und Cursor bevorzugen `AGENTS.md`
+— so gibt es genau eine Instruktionsdatei, und Claude Code lädt sie über den Import.
 
 Die Richtung ist überall dieselbe. Bringt ein Projekt nur eine echte `CLAUDE.md` mit,
-wird sie beim Einrichten nach `AGENTS.md` **umbenannt** und `CLAUDE.md` neu als Symlink
-gesetzt; der Inhalt bleibt erhalten und wird nicht verdoppelt. Was sich nicht
-automatisch auflösen lässt — zwei echte Dateien, eine bewusst gesetzte Verlinkung auf
-ein anderes Ziel, ein git-ignoriertes `AGENTS.md` — wird als **Konflikt** gemeldet und
-nicht angefasst. Solange der steht, sieht Claude Code vom Playbook nichts.
+wird sie beim Einrichten nach `AGENTS.md` **umbenannt** und `CLAUDE.md` neu als Include
+angelegt; der Inhalt bleibt erhalten und wird nicht verdoppelt. Eine `CLAUDE.md`, die
+die Zeile `@AGENTS.md` schon trägt, ist eingerichtet — auch mit eigenen Hausregeln
+daneben. Ein Symlink aus einer älteren Fassung wird beim ersten `k-playbook context`
+verlustfrei ersetzt. Was sich nicht automatisch auflösen lässt — zwei echte Dateien
+ohne Import-Zeile, eine bewusst gesetzte Verlinkung auf ein anderes Ziel, ein
+git-ignoriertes `AGENTS.md` — wird als **Konflikt** gemeldet und nicht angefasst.
+Solange der steht, sieht Claude Code vom Playbook nichts.
 
 ## Aktualisieren
 

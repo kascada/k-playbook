@@ -1,0 +1,17 @@
+[project]
+name = "beispiel"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.109",
+  "redis==5.0.1",
+  "httpx[http2]~=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.2.0",
+]
+
+[build-system]
+requires = ["hatchling==1.24.2"]
+build-backend = "hatchling.build"

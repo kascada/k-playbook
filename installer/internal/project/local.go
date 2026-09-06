@@ -10,6 +10,11 @@ import (
 // liegt neben der Installation, damit diese vollständig ersetzbar bleibt.
 const LocalDirName = "k-playbook-local"
 
+// VersionSourcesFileName ist die Quellenkonfiguration des Versionsinventars.
+// Sie liegt neben der Instruktionsdatei in k-playbook-local/ und wird von einem
+// Update nie überschrieben. Vertrag: docs/versionsinventar.md.
+const VersionSourcesFileName = "version-sources.yaml"
+
 // LocalEntry ist ein Bestandteil der lokalen Struktur. Verzeichnisse bekommen
 // eine README, weil Git leere Verzeichnisse nicht speichert — ohne sie wären
 // sie nach einem Clone des Projekts verschwunden.
@@ -71,7 +76,7 @@ func LocalStructure() []LocalEntry {
 				"committet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore allein\n" +
 				"wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in der Historie.",
 		},
-		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-code2docs, libs/ von /k-tools-scan, extracted/ von /k-docs-extract, manual/ von Hand. Die drei erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu."},
+		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand. Die vier erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu."},
 		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
 		{Path: "tasks", Purpose: "Offene Tasks, nummeriert als <nummer>-<name>.md."},
@@ -88,6 +93,19 @@ func LocalStructure() []LocalEntry {
 		},
 		{Path: InstructionsFileName, IsFile: true},
 		{Path: "TODO.md", IsFile: true},
+		{
+			Path:   VersionSourcesFileName,
+			IsFile: true,
+			Purpose: "Versionsquellen für `k-playbook inventory`: zusätzlich lesbare Wurzeln außerhalb\n" +
+				"des Projekts und zusätzliche Quellen über die Standarderkennung hinaus.\n\n" +
+				"Die Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher Bestätigung\n" +
+				"in sie, und dann ausschließlich ergänzend: bestehende Einträge, Kommentare und\n" +
+				"Reihenfolge bleiben erhalten. Ohne Einträge gelten die Standardquellen unterhalb\n" +
+				"der Projektwurzel.\n\n" +
+				"Sie wird beim Einrichten als gültige, leere Konfiguration angelegt — nicht erst beim\n" +
+				"ersten Lauf des Sammlers —, damit ihr Zustand in `k-playbook context` von Anfang an\n" +
+				"eine Antwort hat. Vollständige Beschreibung: " + PlaybookDirName + "/docs/versionsinventar.md.",
+		},
 	}
 }
 
@@ -213,9 +231,16 @@ Die AI-Session-Regel steht in ../../AGENTS.md.
 }
 
 // fileTemplate liefert den Erstinhalt eines Datei-Eintrags.
+//
+// Jeder Datei-Eintrag braucht hier einen eigenen Zweig: der Rückfall auf
+// todoTemplate() schriebe sonst einen TODO-Rumpf in eine Datei, die etwas
+// anderes ist.
 func fileTemplate(entry LocalEntry) string {
-	if entry.Path == InstructionsFileName {
+	switch entry.Path {
+	case InstructionsFileName:
 		return instructionsTemplate()
+	case VersionSourcesFileName:
+		return versionSourcesTemplate()
 	}
 	return todoTemplate()
 }
@@ -234,6 +259,61 @@ wiederkehrende Abläufe, alles was ein Assistent in jeder Sitzung wissen sollte.
 
 Was nicht: allgemeine k-playbook-Regeln — die stehen in der mitgelieferten
 Ebene und werden bei jedem Update aktualisiert.
+`
+}
+
+// versionSourcesTemplate ist die gültige, leere Quellenkonfiguration des
+// Versionsinventars. Der Inhalt ist wortgleich die Vorlage aus
+// docs/versionsinventar.md, Abschnitt „Quellenkonfiguration → Vorlage"; wer ihn
+// ändert, ändert ihn dort und zieht hier nach.
+func versionSourcesTemplate() string {
+	return "# Versionsquellen für `k-playbook inventory`\n" + `#
+# Diese Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher
+# Bestätigung in sie, und dann ausschließlich ergänzend: bestehende Einträge,
+# Kommentare und Reihenfolge bleiben erhalten.
+#
+` + "# Ohne Einträge erhebt `k-playbook inventory` die Standardquellen unterhalb der\n" + `# Projektwurzel — Manifeste, Lockfiles, Dockerfiles, Compose, DevContainer,
+# Helm und CI. Hier stehen nur zusätzliche Quellen und die Wurzeln außerhalb
+# des Projekts, die dafür gelesen werden dürfen.
+#
+# Vollständige Beschreibung: k-playbook/docs/versionsinventar.md
+
+schema_version: 1
+
+# Zusätzlich lesbare Wurzeln, je ein absoluter Pfad. Die Projektwurzel ist
+# immer erlaubt und gehört nicht hierher. Was nicht unter einer dieser Wurzeln
+# liegt, wird abgelehnt — sichtbar gemeldet, nicht stillschweigend übergangen.
+#
+#   roots:
+#     - /srv/deploy
+roots: []
+
+# Zusätzliche Quellen. Je Eintrag:
+#   path: Datei oder Glob, relativ zur Projektwurzel oder absolut
+#   kind: auto, python, go, node, rust, ruby, php, java, elixir, dockerfile,
+#         compose, devcontainer, helm, ci, tool-versions
+#   env:  lokal, dev, devcontainer, ci, deployment
+#   note: optionaler Anzeigetext
+#
+#   sources:
+#     - path: /srv/deploy/values-prod.yaml
+#       kind: helm
+#       env: deployment
+#       note: Produktionswerte aus dem Deployment-Repo
+sources: []
+
+# Bereiche, in denen die Standarderkennung nicht suchen soll — je ein Muster
+` + "# relativ zur Projektwurzel, `*` für ein Segment, `**` für beliebig viele.\n" + `# Gedacht für Testfixtures und Beispielprojekte: gepflegter Inhalt, dessen
+# Versionen nichts über dieses Projekt aussagen.
+#
+# Gesperrt ist damit nichts. Jeder Ausschluss steht mit der Zahl der
+` + "# übergangenen Quellen im Inventar, und eine Quelle daraus kommt wieder hinein,\n" +
+		"# sobald sie unter `sources:` steht.\n" + `#
+` + "# Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht hierher:\n" + `# sie ist ein Clone des Werkzeugs und sagt nichts über dieses Projekt.
+#
+#   exclude:
+#     - tests/fixtures/**
+exclude: []
 `
 }
 

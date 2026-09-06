@@ -1,0 +1,5 @@
+# Direkte Abhängigkeiten
+fastapi==0.110.0
+redis==5.0.1
+-e .
+--index-url https://example.invalid/simple

@@ -10,12 +10,88 @@ import (
 	"time"
 )
 
-// ClaudeInstructionsFile ist der Symlink auf RootInstructionsFile. Claude Code
-// liest ausschließlich diese Datei, OpenCode bevorzugt AGENTS.md. Die Richtung
-// CLAUDE.md -> AGENTS.md ist deshalb fest und keine projektabhängige Variable:
-// ein umgedrehter Link müsste in Prüfung, Oberfläche und Doku dauerhaft
-// mitgedacht werden.
+// ClaudeInstructionsFile ist die Include-Datei für Claude Code: eine reguläre
+// Datei, die RootInstructionsFile über die Import-Zeile ClaudeIncludeLine
+// einbindet. Claude Code liest ausschließlich diese Datei, OpenCode und Cursor
+// bevorzugen AGENTS.md. Die Richtung CLAUDE.md -> AGENTS.md ist fest und keine
+// projektabhängige Variable: eine umgedrehte Richtung müsste in Prüfung,
+// Oberfläche und Doku dauerhaft mitgedacht werden.
+//
+// Früher war CLAUDE.md ein Symlink auf AGENTS.md. Der hielt beide Dateien
+// zwangsläufig gleich, brach aber bei jedem Editor, der beim Speichern atomar
+// ersetzt — danach standen zwei echte Dateien nebeneinander, und die Prüfung
+// meldete „echte Datei statt Symlink". Die Include-Datei kennt diesen Fall
+// nicht. Ein noch stehender Symlink ist eine ältere Bauform und wird von
+// ApplyLinks verlustfrei ersetzt: der Inhalt steht ohnehin in AGENTS.md.
 const ClaudeInstructionsFile = "CLAUDE.md"
+
+// ClaudeIncludeLine ist die Import-Zeile, mit der CLAUDE.md AGENTS.md lädt.
+// Abgeleitet aus RootInstructionsFile, damit beide nicht auseinanderlaufen.
+const ClaudeIncludeLine = "@" + RootInstructionsFile
+
+// claudeIncludeStub ist der Inhalt, den ApplyLinks nach CLAUDE.md schreibt.
+//
+// Der Hinweis über der Import-Zeile ist das Gegengewicht zur Toleranz: was
+// Claude Code über /memory oder # nach CLAUDE.md schreibt, erreicht OpenCode
+// und Cursor nicht, und die Prüfung meldet Projektinhalt neben dem Include
+// nicht als Konflikt. Die Import-Zeile steht allein auf einer Zeile, ohne
+// Backticks und außerhalb jedes Code-Blocks — nur so wertet Claude Code sie
+// aus. Der Hinweis nennt AGENTS.md bewusst ohne @, sonst wäre er selbst ein
+// zweiter Import.
+func claudeIncludeStub() string {
+	return "Diese Datei ist nur der Include für Claude Code. Projektregeln gehören nach\n" +
+		RootInstructionsFile + " — was hier steht, erreicht OpenCode und Cursor nicht.\n" +
+		"\n" +
+		ClaudeIncludeLine + "\n"
+}
+
+// hasEffectiveInclude meldet, ob content die Import-Zeile so trägt, dass Claude
+// Code sie auswertet: außerhalb eingezäunter Code-Blöcke und außerhalb von
+// Code-Spans in Backticks. Dort überliest Claude Code sie beim Import-Parsing;
+// ein solches Vorkommen ist Text und lädt nichts. Die Zeile muss nicht allein
+// stehen — Claude Code wertet @-Importe auch mitten im Satz aus —, wohl aber
+// als eigenes Wort: ein angehängtes Satzzeichen ergäbe einen anderen Pfad.
+func hasEffectiveInclude(content string) bool {
+	inFence := false
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		for _, word := range strings.Fields(stripCodeSpans(line)) {
+			if word == ClaudeIncludeLine {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// stripCodeSpans ersetzt Code-Spans in Backticks durch ein Leerzeichen. Ein
+// unpaariger Backtick öffnet keinen Span; der Rest der Zeile bleibt Text.
+func stripCodeSpans(line string) string {
+	var text strings.Builder
+	rest := line
+	for {
+		open := strings.IndexByte(rest, '`')
+		if open < 0 {
+			text.WriteString(rest)
+			return text.String()
+		}
+		length := strings.IndexByte(rest[open+1:], '`')
+		if length < 0 {
+			text.WriteString(rest)
+			return text.String()
+		}
+		text.WriteString(rest[:open])
+		text.WriteByte(' ')
+		rest = rest[open+1+length+1:]
+	}
+}
 
 // checkIgnoreTimeout begrenzt den einen git-Aufruf des Ignoriert-Vorbehalts. Er
 // ist rein lokal; wer länger braucht, antwortet nicht mehr sinnvoll.
@@ -37,8 +113,17 @@ type pathKind int
 const (
 	// kindMissing: nichts vorhanden.
 	kindMissing pathKind = iota
-	// kindRegular: eine reguläre Datei.
+	// kindRegular: eine reguläre Datei mit eigenem Inhalt — an CLAUDE.md eine
+	// ohne wirksamen Include.
 	kindRegular
+	// kindInclude: eine reguläre CLAUDE.md, die die Import-Zeile @AGENTS.md
+	// wirksam trägt — nicht in Backticks, nicht in einem Code-Block. Das
+	// Kriterium ist allein der Include, nicht ob daneben eigener Inhalt steht:
+	// die Toleranz erlaubt Projektinhalt neben dem Include, und der Stub trägt
+	// selbst eine Hinweiszeile. Nur CLAUDE.md kann diesen Zustand haben; ein
+	// AGENTS.md mit derselben Zeile importierte sich selbst und bleibt
+	// kindRegular.
+	kindInclude
 	// kindDir: ein Verzeichnis.
 	kindDir
 	// kindLinkToOther: ein Symlink auf die jeweils andere der beiden Dateien.
@@ -90,11 +175,28 @@ func classifyPath(projectDir string, name string, other string) pathState {
 		return pathState{kind: kindDir}
 
 	case info.Mode().IsRegular():
+		if name == ClaudeInstructionsFile {
+			return classifyRegularClaude(path)
+		}
 		return pathState{kind: kindRegular}
 
 	default:
 		return pathState{kind: kindOther, mode: info.Mode()}
 	}
+}
+
+// classifyRegularClaude unterscheidet an CLAUDE.md die Include-Datei von einer
+// echten Datei mit eigenem Inhalt. Lässt sich die Datei nicht lesen, ist das
+// dieselbe Lage wie ein fehlgeschlagenes Lstat: nichts anfassen.
+func classifyRegularClaude(path string) pathState {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return pathState{kind: kindUnreadable, err: err}
+	}
+	if hasEffectiveInclude(string(data)) {
+		return pathState{kind: kindInclude}
+	}
+	return pathState{kind: kindRegular}
 }
 
 // classifyLink ordnet einen Symlink ein.
@@ -188,6 +290,13 @@ func planInstructions(projectDir string, claude pathState, agents pathState) ins
 // matchInstructions geht die Fallmatrix von oben nach unten durch; die erste
 // passende Zeile gewinnt. Damit ist sie disjunkt, und Zeile 17 fängt alles
 // Übrige auf — kein Zustand fällt durch.
+//
+// Die Zeilen 10 und 11 tragen je zwei Zweige unter derselben Nummer: die
+// Nummer benennt die Ausgangslage nach Dateisorte — welche der beiden Dateien
+// als reguläre Datei dasteht —, der Zweig hängt daran, ob CLAUDE.md die
+// wirksame Import-Zeile trägt. Eine eigene Nummer je Zweig hätte die Matrix
+// auf 19 Zeilen gestreckt und jede Zeilenangabe in Tests und Doku verschoben;
+// Outcome und Detail unterscheiden die Zweige ohnehin.
 func matchInstructions(projectDir string, claude pathState, agents pathState) instructionsPlan {
 	switch {
 	// 1 — eine der beiden unlesbar: nichts anfassen, nichts anlegen.
@@ -217,13 +326,17 @@ func matchInstructions(projectDir string, claude pathState, agents pathState) in
 	case claude.kind == kindLinkForeign:
 		return conflictPlan(4, foreignClaudeDetail(claude))
 
-	// 5 — verdrehte Richtung, der Inhalt steht in CLAUDE.md.
+	// 5 — verdrehte Richtung, der Inhalt steht in CLAUDE.md. Nur eine echte
+	// Datei wird umbenannt; die Include-Datei gehört zu Zeile 6 — umbenannt
+	// stünde ihr Import im Kreis.
 	case agents.kind == kindLinkToOther && claude.kind == kindRegular:
 		return renamePlan(projectDir, 5, verdrehtReason())
 
-	// 6 — verdrehte Richtung, am Ziel steht kein echter Inhalt.
+	// 6 — verdrehte Richtung, am Ziel steht kein eigener Inhalt: erst den
+	// Symlink an AGENTS.md entfernen, dann neu einordnen.
 	case agents.kind == kindLinkToOther &&
-		(claude.kind == kindMissing || claude.kind == kindLinkDangling || claude.kind == kindLinkToOther):
+		(claude.kind == kindMissing || claude.kind == kindLinkDangling ||
+			claude.kind == kindLinkToOther || claude.kind == kindInclude):
 		return afterRemovingAgentsLink(projectDir, 6, claude, verdrehtReason())
 
 	// 7 — AGENTS.md ist ein Rest-Link. Bliebe er stehen, legte das Einrichten
@@ -231,21 +344,41 @@ func matchInstructions(projectDir string, claude pathState, agents pathState) in
 	case agents.kind == kindLinkDangling:
 		return afterRemovingAgentsLink(projectDir, 7, claude, restLinkReason())
 
-	// 8 — AGENTS.md ist bewusst verlinkt, CLAUDE.md hat daneben eigenen Inhalt.
+	// 8 — AGENTS.md ist bewusst verlinkt, CLAUDE.md hat daneben eigenen Inhalt
+	// ohne wirksamen Include.
 	case agents.kind == kindLinkForeign && claude.kind == kindRegular:
 		return conflictPlan(8, foreignAgentsDetail(agents))
 
 	// 9 — AGENTS.md ist bewusst verlinkt, an CLAUDE.md steht kein eigener
-	// Inhalt. Das ist eine Entscheidung des Projekts, kein Fehler.
+	// Inhalt. Das ist eine Entscheidung des Projekts, kein Fehler: der Include
+	// wirkt durch den Symlink hindurch, dort kommt auch der Anstoß an. Die
+	// Include-Datei, die das Einrichten hier schreibt, gehört deshalb zu
+	// dieser Zeile — sonst fiele sie beim nächsten Lauf in Zeile 8, ein
+	// Konflikt an der Datei, die das Werkzeug gerade selbst angelegt hat.
 	case agents.kind == kindLinkForeign &&
-		(claude.kind == kindMissing || claude.kind == kindLinkToOther || claude.kind == kindLinkDangling):
+		(claude.kind == kindMissing || claude.kind == kindLinkToOther ||
+			claude.kind == kindLinkDangling || claude.kind == kindInclude):
 		return plainPlan(9)
 
-	// 10 — nur CLAUDE.md: umbenennen, damit der Inhalt erhalten bleibt.
+	// 10 — nur CLAUDE.md, echte Datei: umbenennen, damit der Inhalt erhalten
+	// bleibt.
 	case claude.kind == kindRegular && agents.kind == kindMissing:
 		return renamePlan(projectDir, 10, "")
 
-	// 11 — beide echte Dateien, zwei Ursachen mit verschiedenen Auflösungen.
+	// 10 — nur CLAUDE.md, Include-Datei: ein Rest ohne Ziel, kein Inhalt.
+	// Umbenannt ergäbe sie ein AGENTS.md, das sich mit @AGENTS.md selbst
+	// importiert, und ApplyLinks schriebe daneben einen zweiten Stub. Sie
+	// bleibt liegen; AGENTS.md entsteht aus der Vorlage.
+	case claude.kind == kindInclude && agents.kind == kindMissing:
+		return plainPlan(10)
+
+	// 11 — beide echte Dateien, CLAUDE.md mit wirksamem Include: der
+	// Sollzustand. Was neben dem Include steht, gehört dem Projekt.
+	case claude.kind == kindInclude && agents.kind == kindRegular:
+		return plainPlan(11)
+
+	// 11 — beide echte Dateien, CLAUDE.md ohne wirksamen Include: Handarbeit,
+	// weil unentschieden ist, ob der Inhalt allen Assistenten gilt.
 	case claude.kind == kindRegular && agents.kind == kindRegular:
 		return conflictPlan(11, bothRealDetail())
 
@@ -257,15 +390,18 @@ func matchInstructions(projectDir string, claude pathState, agents pathState) in
 	case claude.kind == kindMissing && agents.kind == kindRegular:
 		return plainPlan(13)
 
-	// 14 — der Sollzustand.
+	// 14 — Migration: der Symlink aus einer älteren Fassung neben echter
+	// AGENTS.md. Hier ist nichts anzufassen; ApplyLinks ersetzt ihn
+	// verlustfrei durch die Include-Datei.
 	case claude.kind == kindLinkToOther && agents.kind == kindRegular:
 		return plainPlan(14)
 
-	// 15 — CLAUDE.md zeigt auf ein noch fehlendes AGENTS.md.
+	// 15 — der alte Symlink zeigt auf ein noch fehlendes AGENTS.md und wartet
+	// auf sein Ziel.
 	case claude.kind == kindLinkToOther && agents.kind == kindMissing:
 		return plainPlan(15)
 
-	// 16 — CLAUDE.md ist ein Rest-Link und wird neu gesetzt.
+	// 16 — CLAUDE.md ist ein Rest-Link und wird durch die Include-Datei ersetzt.
 	case claude.kind == kindLinkDangling && (agents.kind == kindMissing || agents.kind == kindRegular):
 		return plainPlan(16)
 
@@ -373,7 +509,7 @@ type InstructionsResult struct {
 // auflösen lässt.
 //
 // Die Reihenfolge zählt: erst den irreführenden Symlink weg, dann umbenennen.
-// Den neuen Symlink an CLAUDE.md setzt danach ApplyLinks.
+// Die Include-Datei an CLAUDE.md schreibt danach ApplyLinks.
 func resolveInstructions(projectDir string) (InstructionsResult, error) {
 	plan := classifyInstructions(projectDir)
 	result := InstructionsResult{
@@ -436,7 +572,7 @@ func resolvedDetail(plan instructionsPlan, result InstructionsResult) string {
 	}
 	if result.Renamed {
 		parts = append(parts, ClaudeInstructionsFile+" ist nach "+RootInstructionsFile+
-			" umbenannt und selbst wieder ein Symlink darauf.")
+			" umbenannt und neu als Include-Datei mit "+ClaudeIncludeLine+" angelegt.")
 	}
 	if len(parts) == 0 {
 		return plan.detail
@@ -491,12 +627,17 @@ func foreignAgentsDetail(agents pathState) string {
 		"beide Quellen sind von Hand zusammenzuführen. " + conflictHint
 }
 
+// bothRealDetail beschreibt Zeile 11 ohne Include. Der Fall bleibt Handarbeit,
+// weil unentschieden ist, ob der Inhalt von CLAUDE.md für alle Assistenten
+// gilt oder bewusst nur Claude Code erreichen soll — das entscheidet das
+// Projekt, nicht das Werkzeug. Der Text nennt beide Auswege.
 func bothRealDetail() string {
-	return ClaudeInstructionsFile + " und " + RootInstructionsFile + " sind zwei echte Dateien. " +
-		"Entweder bringt das Projekt eine eigene " + ClaudeInstructionsFile + " mit — dann beide von Hand " +
-		"zusammenführen und " + ClaudeInstructionsFile + " danach löschen. Oder ein Editor hat den Symlink " +
-		"beim Speichern durch eine echte Datei ersetzt — dann " + ClaudeInstructionsFile + " löschen und neu " +
-		"einrichten, der Inhalt steht bereits in " + RootInstructionsFile + ". " + conflictHint
+	return ClaudeInstructionsFile + " und " + RootInstructionsFile + " sind zwei echte Dateien, und " +
+		ClaudeInstructionsFile + " trägt keine wirksame Import-Zeile " + ClaudeIncludeLine + ". " +
+		"Gilt der Inhalt für alle Assistenten, den Inhalt nach " + RootInstructionsFile + " übernehmen und " +
+		ClaudeInstructionsFile + " auf die Zeile " + ClaudeIncludeLine + " reduzieren. Soll er nur Claude Code " +
+		"erreichen, die Zeile " + ClaudeIncludeLine + " vor den vorhandenen Inhalt setzen und ihn dort stehen " +
+		"lassen. Automatisch geschieht keines von beiden. " + conflictHint
 }
 
 func ignoredDetail() string {
@@ -518,6 +659,8 @@ func describeKind(state pathState) string {
 		return "nicht vorhanden"
 	case kindRegular:
 		return "eine echte Datei"
+	case kindInclude:
+		return "eine Include-Datei mit " + ClaudeIncludeLine
 	case kindDir:
 		return "ein Verzeichnis"
 	case kindLinkToOther, kindLinkForeign:

@@ -380,35 +380,242 @@ func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
 	}
 }
 
-// CLAUDE.md zeigt auf AGENTS.md; beide gehören dem Projekt.
-func TestApplyLinksVerknuepftClaudeMitAgents(t *testing.T) {
+// CLAUDE.md bindet AGENTS.md per Import-Zeile ein; beide gehören dem Projekt.
+func TestApplyLinksSchreibtIncludeAufAgents(t *testing.T) {
 	root := newProject(t)
 	agents := filepath.Join(root, "AGENTS.md")
 	writeFile(t, agents, "# Projektregeln\n")
 
-	if _, err := ApplyLinks(root); err != nil {
+	statuses, err := ApplyLinks(root)
+	if err != nil {
 		t.Fatalf("ApplyLinks: %v", err)
 	}
 
 	claude := filepath.Join(root, "CLAUDE.md")
-	destination, err := os.Readlink(claude)
+	info, err := os.Lstat(claude)
 	if err != nil {
-		t.Fatalf("CLAUDE.md ist kein Symlink: %v", err)
+		t.Fatalf("CLAUDE.md fehlt: %v", err)
 	}
-	if destination != "AGENTS.md" {
-		t.Errorf("Ziel = %q, erwartet %q", destination, "AGENTS.md")
+	if !info.Mode().IsRegular() {
+		t.Fatalf("CLAUDE.md ist keine reguläre Datei: %s", info.Mode())
+	}
+	content := readFile(t, claude)
+	if content != claudeIncludeStub() {
+		t.Errorf("CLAUDE.md = %q, erwartet den Stub", content)
+	}
+	if !hasEffectiveInclude(content) {
+		t.Error("der Stub trägt keine wirksame Import-Zeile")
+	}
+	// Der Hinweis über der Import-Zeile: Projektregeln gehören nach AGENTS.md.
+	if !strings.Contains(content, "Projektregeln gehören nach\nAGENTS.md") {
+		t.Errorf("der Hinweis auf AGENTS.md fehlt im Stub:\n%s", content)
+	}
+	// Genau ein Import: der Hinweis darf nicht selbst einer sein.
+	if strings.Count(content, ClaudeIncludeLine) != 1 {
+		t.Errorf("die Import-Zeile steht nicht genau einmal:\n%s", content)
 	}
 
-	// Ein Schreibzugriff auf CLAUDE.md muss in AGENTS.md ankommen.
-	if err := os.WriteFile(claude, []byte("# Geändert\n"), 0o644); err != nil {
-		t.Fatalf("über den Link schreiben: %v", err)
+	status := statusFor(t, statuses, "CLAUDE.md")
+	if status.State != StateOK {
+		t.Errorf("State = %q (%s), erwartet %q", status.State, status.Detail, StateOK)
 	}
-	content, err := os.ReadFile(agents)
+	if !strings.Contains(status.Detail, ClaudeIncludeLine) || strings.Contains(status.Detail, "eigener Inhalt") {
+		t.Errorf("Detail = %q, erwartet den reinen Include", status.Detail)
+	}
+	if readFile(t, agents) != "# Projektregeln\n" {
+		t.Error("AGENTS.md wurde angefasst")
+	}
+}
+
+// Ein Bestandsprojekt trägt CLAUDE.md noch als Symlink. Der Lesepfad ersetzt
+// ihn verlustfrei — der Inhalt steht in AGENTS.md — und benennt die Migration,
+// weil sie eine versionierte Datei ändert. Ein zweiter Aufruf schweigt.
+func TestHealLinksMigriertSymlinkZurIncludeDatei(t *testing.T) {
+	root := newProject(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
+	if err := os.Symlink("AGENTS.md", filepath.Join(root, "CLAUDE.md")); err != nil {
+		t.Fatalf("Symlink anlegen: %v", err)
+	}
+
+	status := statusFor(t, CheckLinks(root), "CLAUDE.md")
+	if status.State != StateStale {
+		t.Fatalf("State = %q, erwartet %q", status.State, StateStale)
+	}
+	if !strings.Contains(status.Detail, "älteren Fassung") || !strings.Contains(status.Detail, ClaudeIncludeLine) {
+		t.Errorf("Detailtext benennt die Migration nicht: %s", status.Detail)
+	}
+	if !status.Fixable() {
+		t.Error("die Migration muss heilbar sein")
+	}
+
+	repair := HealLinks(root)
+	if !repair.Applied || !repair.IncludeMigrated {
+		t.Fatalf("Applied = %v, IncludeMigrated = %v, erwartet beides", repair.Applied, repair.IncludeMigrated)
+	}
+	if !repair.Changed.Empty() {
+		t.Errorf("Changed = %+v, die Registrierung war unverändert", repair.Changed)
+	}
+	if len(repair.Open) != 0 {
+		t.Errorf("Open = %+v, erwartet nichts Offenes", repair.Open)
+	}
+
+	claude := filepath.Join(root, "CLAUDE.md")
+	if info, err := os.Lstat(claude); err != nil || !info.Mode().IsRegular() {
+		t.Fatalf("CLAUDE.md ist nach der Migration keine reguläre Datei: %v", err)
+	}
+	if readFile(t, claude) != claudeIncludeStub() {
+		t.Errorf("CLAUDE.md = %q, erwartet den Stub", readFile(t, claude))
+	}
+	if readFile(t, filepath.Join(root, "AGENTS.md")) != "# Projektregeln\n" {
+		t.Error("AGENTS.md wurde bei der Migration angefasst")
+	}
+
+	// Danach ist nichts mehr zu melden — sonst erschiene die Migration bei
+	// jedem Aufruf erneut.
+	second := HealLinks(root)
+	if !second.Quiet() {
+		t.Errorf("zweiter Lauf meldet noch etwas: %+v", second)
+	}
+	if second.IncludeMigrated {
+		t.Error("zweiter Lauf meldet die Migration erneut")
+	}
+}
+
+// Die Toleranz: Projektinhalt neben dem Include gehört dem Projekt, bleibt
+// unangetastet und ist kein Konflikt.
+func TestCheckLinksToleriertProjektinhaltNebenInclude(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
+	eigen := "# Für Claude Code\n\nSiehe " + ClaudeIncludeLine + " für alles Weitere.\n\n## Hausregeln\n\nPlan-Modus unter src/.\n"
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), eigen)
+
+	status := statusFor(t, CheckLinks(root), "CLAUDE.md")
+	if status.State != StateOK {
+		t.Fatalf("State = %q (%s), erwartet %q", status.State, status.Detail, StateOK)
+	}
+	if !strings.Contains(status.Detail, "eigener Inhalt") {
+		t.Errorf("Detail = %q, erwartet den Hinweis auf eigenen Inhalt", status.Detail)
+	}
+
+	statuses, err := ApplyLinks(root)
 	if err != nil {
-		t.Fatalf("AGENTS.md lesen: %v", err)
+		t.Fatalf("ApplyLinks: %v", err)
 	}
-	if string(content) != "# Geändert\n" {
-		t.Errorf("AGENTS.md = %q, Änderung kam nicht an", content)
+	if !LinksOK(statuses) {
+		t.Errorf("nicht eingerichtet: %+v", statuses)
+	}
+	if readFile(t, filepath.Join(root, "CLAUDE.md")) != eigen {
+		t.Error("der Projektinhalt neben dem Include wurde verändert")
+	}
+	if HealLinks(root).Applied {
+		t.Error("an einer eingerichteten Include-Datei darf nichts angewendet werden")
+	}
+}
+
+// Ein Vorkommen in Backticks oder in einem Code-Block überliest Claude Code
+// beim Import-Parsing. Es lädt nichts und gilt deshalb nicht als eingerichtet.
+func TestIncludeInBackticksOderCodeBlockGiltNicht(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{"allein auf einer Zeile", ClaudeIncludeLine + "\n", true},
+		{"der Stub", claudeIncludeStub(), true},
+		{"mitten im Satz", "Lies " + ClaudeIncludeLine + " zuerst.\n", true},
+		{"mit Satzzeichen dahinter", "Lies " + ClaudeIncludeLine + ".\n", false},
+		{"in Backticks", "Die Zeile `" + ClaudeIncludeLine + "` gehört hierher.\n", false},
+		{"im Code-Block", "```\n" + ClaudeIncludeLine + "\n```\n", false},
+		{"im Code-Block mit Sprache", "```markdown\n" + ClaudeIncludeLine + "\n```\n", false},
+		{"im Tilde-Block", "~~~\n" + ClaudeIncludeLine + "\n~~~\n", false},
+		{"nach dem Code-Block", "```\nBeispiel\n```\n\n" + ClaudeIncludeLine + "\n", true},
+		{"Backticks und wirksam", "Nicht `" + ClaudeIncludeLine + "` in Backticks, sondern " + ClaudeIncludeLine + "\n", true},
+		{"unpaariger Backtick", "Ein ` Backtick, dann " + ClaudeIncludeLine + "\n", true},
+		{"anderes Ziel", "@docs/AGENTS.md\n", false},
+		{"leer", "", false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := hasEffectiveInclude(testCase.content); got != testCase.want {
+				t.Errorf("hasEffectiveInclude = %v, erwartet %v für %q", got, testCase.want, testCase.content)
+			}
+		})
+	}
+
+	// Am Dateisystem: ein unwirksamer Include neben AGENTS.md ist der Konflikt.
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, "AGENTS.md"), "# A\n")
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), "```\n"+ClaudeIncludeLine+"\n```\n")
+	if got := statusFor(t, CheckLinks(root), "CLAUDE.md").State; got != StateConflict {
+		t.Errorf("State = %q, erwartet %q", got, StateConflict)
+	}
+}
+
+// Kein Include ins Leere: fehlt AGENTS.md, wird auch dann kein Stub
+// geschrieben, wenn ein alter Symlink zu ersetzen wäre. Der Zustand bleibt
+// StateNoSource, und ein zweiter HealLinks-Lauf meldet kein erneutes Applied.
+func TestHealLinksSchreibtKeinenIncludeOhneAgents(t *testing.T) {
+	root := newProject(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if err := os.Symlink("AGENTS.md", filepath.Join(root, "CLAUDE.md")); err != nil {
+		t.Fatalf("Symlink anlegen: %v", err)
+	}
+
+	status := statusFor(t, CheckLinks(root), "CLAUDE.md")
+	if status.State != StateNoSource {
+		t.Fatalf("State = %q (%s), erwartet %q", status.State, status.Detail, StateNoSource)
+	}
+	if !strings.Contains(status.Detail, "wartet auf sein Ziel") {
+		t.Errorf("Detail = %q, erwartet den wartenden Symlink", status.Detail)
+	}
+	if status.Fixable() || status.NeedsAction() {
+		t.Error("ohne AGENTS.md ist nichts heilbar und nichts offen")
+	}
+
+	for run := 1; run <= 2; run++ {
+		repair := HealLinks(root)
+		if repair.Applied {
+			t.Errorf("Lauf %d: Applied trotz fehlendem AGENTS.md", run)
+		}
+		if !repair.Quiet() {
+			t.Errorf("Lauf %d: meldet %+v", run, repair)
+		}
+	}
+	if _, err := os.Readlink(filepath.Join(root, "CLAUDE.md")); err != nil {
+		t.Errorf("der Symlink wurde ohne Ziel ersetzt: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "AGENTS.md")); err == nil {
+		t.Error("AGENTS.md wurde angelegt")
+	}
+}
+
+// Die Restlage: der Stub steht, AGENTS.md fehlt. Optional nimmt den Zustand
+// aus NeedsAction(), die Karte meldet die Verlinkung deshalb als eingerichtet —
+// der Detailtext muss sagen, dass der Import ins Leere zeigt.
+func TestCheckLinksBenenntIncludeInsLeere(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), claudeIncludeStub())
+
+	status := statusFor(t, CheckLinks(root), "CLAUDE.md")
+	if status.State != StateNoSource {
+		t.Fatalf("State = %q (%s), erwartet %q", status.State, status.Detail, StateNoSource)
+	}
+	for _, phrase := range []string{"fehlt im Projekt", "ins Leere", "lädt daraus nichts"} {
+		if !strings.Contains(status.Detail, phrase) {
+			t.Errorf("Detailtext nennt %q nicht: %s", phrase, status.Detail)
+		}
+	}
+	if status.NeedsAction() {
+		t.Error("ohne AGENTS.md gibt es auf dem Lesepfad nichts zu tun")
+	}
+	if HealLinks(root).Applied && statusFor(t, CheckLinks(root), "CLAUDE.md").State != StateNoSource {
+		t.Error("HealLinks hat an der Restlage etwas geändert")
 	}
 }
 
@@ -431,13 +638,11 @@ func TestApplyLinksLegtKeineAgentsAn(t *testing.T) {
 	}
 }
 
-// Ein Editor, der "atomar" speichert, ersetzt den Symlink durch eine echte
-// Datei. Das muss auffallen, sonst laufen beide still auseinander.
-//
-// Dieselbe Lage entsteht, wenn das Projekt eine eigene CLAUDE.md mitbringt. Der
-// Detailtext muss beide Auflösungen nennen, sonst leitet er in einem der Fälle
-// falsch an.
-func TestCheckLinksMeldetErsetztenSymlink(t *testing.T) {
+// Eine echte CLAUDE.md ohne wirksamen Include neben AGENTS.md ist ein Konflikt:
+// ob ihr Inhalt für alle Assistenten gilt oder nur für Claude Code, entscheidet
+// das Projekt. Der Detailtext muss beide Auswege nennen, sonst leitet er in
+// einem der Fälle falsch an — und nichts wird angefasst.
+func TestCheckLinksMeldetEchteDateiOhneInclude(t *testing.T) {
 	root := newProject(t)
 	writeFile(t, filepath.Join(root, "AGENTS.md"), "# A\n")
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# eigenständig\n")
@@ -447,13 +652,24 @@ func TestCheckLinksMeldetErsetztenSymlink(t *testing.T) {
 		t.Errorf("State = %q, erwartet %q", status.State, StateConflict)
 	}
 	for _, phrase := range []string{
-		"zusammenführen",
-		"neu einrichten",
+		"keine wirksame Import-Zeile",
+		"nach AGENTS.md übernehmen",
+		"vor den vorhandenen Inhalt setzen",
 		"sieht Claude Code den Anstoß nicht",
 	} {
 		if !strings.Contains(status.Detail, phrase) {
 			t.Errorf("Detailtext nennt %q nicht: %s", phrase, status.Detail)
 		}
+	}
+	if strings.Contains(status.Detail, "Editor") {
+		t.Errorf("Detailtext nennt noch die abgelöste Ursache: %s", status.Detail)
+	}
+
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if readFile(t, filepath.Join(root, "CLAUDE.md")) != "# eigenständig\n" {
+		t.Error("die eigenständige CLAUDE.md wurde angefasst")
 	}
 }
 

@@ -47,10 +47,40 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	if !fileExists(filepath.Join(local, "TODO.md")) {
 		t.Error("TODO.md fehlt")
 	}
+	if !fileExists(filepath.Join(local, VersionSourcesFileName)) {
+		t.Errorf("%s fehlt", VersionSourcesFileName)
+	}
 }
 
-// docs/code/, docs/libs/ und docs/extracted/ gehören je einem Erzeuger und
-// entstehen beim ersten Lauf des jeweiligen Commands, nicht beim Einrichten.
+// fileTemplate fällt ohne eigenen Zweig auf todoTemplate() zurück. Die
+// Quellenkonfiguration bekäme dann einen TODO-Rumpf statt einer gültigen, leeren
+// Konfiguration — und ihr Leser bräche beim ersten Lauf ab.
+func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	path := filepath.Join(LocalDir(root), VersionSourcesFileName)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s lesen: %v", VersionSourcesFileName, err)
+	}
+	text := string(content)
+	if strings.Contains(text, "/k-todo") {
+		t.Fatalf("%s trägt den TODO-Rumpf:\n%s", VersionSourcesFileName, text)
+	}
+	for _, want := range []string{"schema_version: 1", "roots: []", "sources: []", "versionsinventar.md"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("%s enthält %q nicht:\n%s", VersionSourcesFileName, want, text)
+		}
+	}
+}
+
+// docs/code/, docs/libs/, docs/extracted/ und docs/versions/ gehören je einem
+// Erzeuger und entstehen beim ersten Lauf des jeweiligen Commands, nicht beim
+// Einrichten.
 func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 	root := t.TempDir()
 
@@ -58,7 +88,7 @@ func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	for _, name := range []string{"code", "libs", "extracted"} {
+	for _, name := range []string{"code", "libs", "extracted", "versions"} {
 		if pathExists(filepath.Join(LocalDir(root), "docs", name)) {
 			t.Errorf("docs/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", name)
 		}

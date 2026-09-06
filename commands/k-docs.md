@@ -1,6 +1,6 @@
 ---
-description: Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, index rebuild and memory registration. With an argument, dispatches directly to that action.
-argument-hint: [status|code|tools|extract|index]
+description: Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action.
+argument-hint: [status|code|tools|extract|inventory|index]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 ---
@@ -33,6 +33,8 @@ From the context output:
 - `CODE_DIR = <RESOLVED_DOCS_DIR>/code`
 - `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs`
 - `EXTRACTED_DIR = <RESOLVED_DOCS_DIR>/extracted`
+- `VERSIONS_DIR = <RESOLVED_DOCS_DIR>/versions`
+- `INVENTORY_FILE = <VERSIONS_DIR>/inventory.md`
 - `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual`
 - `MATERIAL_DIR = <local.dir>/material`
 - `INDEX_FILE = <RESOLVED_DOCS_DIR>/README.md`
@@ -41,8 +43,8 @@ Command-specific policy:
 
 - If `RESOLVED_DOCS_DIR` is missing: ask whether to create exactly that directory or to run
   `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR`, `LIBS_DIR` and `EXTRACTED_DIR` are producer directories. Missing is normal;
-  do not create them during the status pass.
+- `CODE_DIR`, `LIBS_DIR`, `EXTRACTED_DIR` and `VERSIONS_DIR` are producer directories.
+  Missing is normal; do not create them during the status pass.
 - `MANUAL_DIR` and `MATERIAL_DIR` are created by setup. If either is missing, report it as
   a setup gap and offer `/k-gui`; do not create it silently.
 - Without a confirmed action this command writes nothing.
@@ -51,8 +53,14 @@ Command-specific policy:
 
 Collect these facts, compactly:
 
-- Doc files per origin: `code/`, `libs/`, `extracted/`, `manual/`, plus flat
+- Doc files per origin: `code/`, `libs/`, `extracted/`, `versions/`, `manual/`, plus flat
   `docs/*.md` except `README.md`.
+- For the inventory under `VERSIONS_DIR`, the frontmatter values `generated.at` and
+  `inventory.*`. Its **state** comes from there and from nowhere else — never derive it
+  from the Markdown body. Reading the entry tables is a different matter and happens only
+  for the authority check in Schritt 3.
+- The state of the version source configuration from `versionSources` in the context
+  output. Do not read `k-playbook-local/version-sources.yaml` yourself.
 - Whether `INDEX_FILE` exists.
 - Whether `AGENTS.md` exists and mentions `k-playbook-local/docs/README.md`.
 - Whether `opencode.json` or `opencode.jsonc` exists and contains a `references.docs.path`
@@ -76,9 +84,30 @@ Report, but do not repair:
   - `docs/code/`: `k-docs-code`, legacy `k-code2docs`, `ks-overlay-repo-analyse`.
   - `docs/libs/`: `k-docs-tools`, legacy `k-tools-scan`.
   - `docs/extracted/`: `k-docs-extract`.
+  - `docs/versions/`: `k-doc-inventory` — on both call paths, the subcommand
+    `k-playbook inventory` included.
 - Flat doc files under `docs/` besides `README.md`.
 - `libs/README.md` with an overview table instead of only explanatory text.
 - Missing index or missing memory registration in `AGENTS.md` / `opencode.json`.
+
+**Versionsangaben aus `LIBS_DIR` gegen das Inventar.** Only if the inventory exists. For
+every file under `LIBS_DIR`, take its frontmatter `version` and `version-pin` and look up
+the same tool in `INVENTORY_FILE`. Read only the inventory's context tables for that —
+`Gegenstand`, `Version` and `Pin` — and match by the canonical name behind the group key
+`<ecosystem>/<name>`; a tool that is not in the inventory is no finding, and neither is a
+lib file without `version`.
+
+Report every difference as its **own, non-repairing** finding, one line each:
+
+```text
+libs/<name>.md: version <wert> (<pin>) — Inventar: <wert> (<pin>), <herkunft>
+```
+
+The inventory is the authority on versions; `docs/libs/` stays curated pitfall
+documentation whose `version` is a snapshot as of its `last-reviewed`. Do **not** rewrite
+`docs/libs/`, not even after confirmation — that belongs to `/k-docs-tools` — and do not
+count these lines as inventory deviations: a deviation arises from two sources, this
+difference from two documents. Where both disagree, the inventory holds.
 
 If there are no findings, say so in one line.
 
@@ -92,19 +121,25 @@ Build the option list from the facts, not from guesses:
 code/       <N> Dateien | fehlt
 libs/       <N> Dateien | fehlt
 extracted/  <N> Dateien | fehlt
+versions/   <N> Dateien | fehlt
 manual/     <N> Dateien | fehlt
 unsortiert  <N> Dateien
 Index       vorhanden | fehlt
 Memory      ok | fehlt AGENTS.md | fehlt opencode.json | unvollständig
 Material    <N> Dateien
 Manifeste   <N> gefunden
+Inventar    erhoben <generated.at>, <sources-read> Quellen gelesen,
+            <sources-configured> konfiguriert, <deviations> Abweichungen | fehlt
+Quellkonfig version-sources.yaml vorhanden (<N> Wurzeln, <N> Quellen,
+            <N> Ausschlüsse) | fehlt | defekt
 
 Mögliche Aktionen:
-  1. code     Code semantisch analysieren → /k-docs-code
-  2. tools    Libraries/Tools dokumentieren → /k-docs-tools
-  3. extract  Rohmaterial verdichten → /k-docs-extract
-  4. index    Index bauen und Memory registrieren → /k-docs-index
-  5. status   nur diesen Bericht anzeigen
+  1. code       Code semantisch analysieren → /k-docs-code
+  2. tools      Libraries/Tools dokumentieren → /k-docs-tools
+  3. extract    Rohmaterial verdichten → /k-docs-extract
+  4. inventory  Versionsinventar erheben → /k-doc-inventory
+  5. index      Index bauen und Memory registrieren → /k-docs-index
+  6. status     nur diesen Bericht anzeigen
 
 Was soll ich tun?
 ```
@@ -118,6 +153,8 @@ Argument dispatch:
 - `code` → apply `k-playbook/commands/_docs/code.md` with the remaining arguments.
 - `tools` → apply `k-playbook/commands/_docs/tools.md` with the remaining arguments.
 - `extract` → run the flow from `/k-docs-extract` with the remaining arguments.
+- `inventory` → apply `k-playbook/commands/_docs/inventory.md`. It takes no arguments; the
+  collection itself is the subcommand `k-playbook inventory`.
 - `index` → run the flow from `/k-docs-index`.
 
 When dispatching to a module or command, use the context already loaded in this session.
@@ -137,7 +174,8 @@ For dispatched actions, use the dispatched module's or command's own Abschluss.
 
 ## Fehlerfälle
 
-- Unknown argument → show valid arguments: `status`, `code`, `tools`, `extract`, `index`.
+- Unknown argument → show valid arguments: `status`, `code`, `tools`, `extract`,
+  `inventory`, `index`.
 - A required module under `commands/_docs/` is missing → abort that action and report an
   incomplete or outdated k-playbook installation. Do not reconstruct the module in chat.
 - `opencode.json` and `opencode.jsonc` both exist → report the ambiguity. The target rule

@@ -150,7 +150,7 @@ Der vollständige Index steht in [`commands.md`](./commands.md). Die Gruppen:
 | Gruppe | Commands | Zweck |
 |---|---|---|
 | Projekt | `/k-gui` | Oberfläche starten, Projektzustand prüfen und einrichten |
-| Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
+| Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-doc-inventory`, `/k-docs-index` | Projektwissen je Herkunft prüfen, dokumentieren und für AI-Sessions registrieren |
 | Code-Review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-remediation` | PRs bewerten, Reviews und Audits ausführen, Findings abarbeiten |
 | Task-Flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | geplante Arbeit erstellen, härten und ausführen |
 | Hilfen | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Regeln prüfen, Tests diagnostizieren, Verläufe lesen, VS Code markieren |
@@ -221,14 +221,16 @@ eigenen Herkunft:
 /k-docs-code      → k-playbook-local/docs/code/
 /k-docs-tools     → k-playbook-local/docs/libs/
 /k-docs-extract   → k-playbook-local/docs/extracted/
+/k-doc-inventory  → k-playbook-local/docs/versions/
 /k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json
 ```
 
 `/k-docs` ist der geführte Einstieg: er prüft Bestand, Konsistenz und Session-Memory und
-bietet an, welcher nächste Schritt möglich ist. Die drei Produzenten erzeugen Inhalt:
+bietet an, welcher nächste Schritt möglich ist. Die vier Produzenten erzeugen Inhalt:
 `/k-docs-code` liest den Code, `/k-docs-tools` die
-Libraries, `/k-docs-extract` das Rohmaterial aus `k-playbook-local/material/`. Wer nichts
-davon hat, lässt die Stufe aus.
+Libraries, `/k-docs-extract` das Rohmaterial aus `k-playbook-local/material/`,
+`/k-doc-inventory` die deklarierten Versionen aus Manifesten, Lockfiles, Container-,
+Helm- und CI-Dateien. Wer nichts davon hat, lässt die Stufe aus.
 
 `/k-docs-index` ist der letzte Schritt und der einzige, der `docs/README.md` schreibt —
 den einen Index über alle Herkünfte, `docs/manual/` eingeschlossen. Er registriert die

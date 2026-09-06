@@ -44,8 +44,9 @@ Command-specific policy:
   without asking if it is missing — before the first run that is the normal state, not a
   broken installation.
 - Write nothing outside `CODE_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
-  belong to `/k-docs-index`; `docs/libs/`, `docs/extracted/` and `docs/manual/` belong to
-  other producers and are not touched here — not even read for repair.
+  belong to `/k-docs-index`; `docs/libs/`, `docs/extracted/`, `docs/versions/` and
+  `docs/manual/` belong to other producers and are not touched here — not even read for
+  repair.
 
 **Preflight-Snapshot anzeigen:**
 
@@ -224,5 +225,5 @@ Kompakte Zusammenfassung:
 - **Framework-Standards ausformulieren.** „Wir nutzen Standard-Django-Views" gehört nicht dokumentiert.
 - **Isolierte Docs.** Ohne Cross-Links wird jede Datei eine Insel. Verwandte Themen **immer** verlinken.
 - **Silent overwrite.** Existierende Dateien nur mit expliziter Bestätigung anfassen.
-- **Fremdes Verzeichnis beschreiben.** `docs/README.md`, `docs/libs/`, `docs/extracted/` und `docs/manual/` haben andere Eigentümer. Wer hier hineinschreibt, zerstört beim nächsten Lauf des Eigentümers seine eigene Arbeit — oder schlimmer, fremde.
+- **Fremdes Verzeichnis beschreiben.** `docs/README.md`, `docs/libs/`, `docs/extracted/`, `docs/versions/` und `docs/manual/` haben andere Eigentümer. Wer hier hineinschreibt, zerstört beim nächsten Lauf des Eigentümers seine eigene Arbeit — oder schlimmer, fremde.
 - **Den Index nebenbei nachziehen.** Der Index wird nicht „schnell noch" ergänzt; dafür läuft `/k-docs-index` über alle Herkünfte.

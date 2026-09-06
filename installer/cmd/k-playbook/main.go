@@ -4,7 +4,8 @@
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
-// und `stop` beendet den Hintergrunddienst der Oberfläche.
+// `inventory` erhebt das Versionsinventar des Projekts, und `stop` beendet den
+// Hintergrunddienst der Oberfläche.
 package main
 
 import (
@@ -61,6 +62,14 @@ func run(args []string) error {
 		// Wie scan: ein Merge arbeitet auf einem vorhandenen Lauf und fasst dessen
 		// Artefakte zusammen, ohne den Host nebenbei anzufassen.
 		return runMerge(args[1:])
+	case "inventory":
+		// Wie scan und merge ohne Wirt-Pflege: die Erhebung liest die
+		// deklarativen Quellen des Projekts und schreibt genau eine Datei
+		// darunter — den Host fasst sie dabei nicht nebenbei an. Dazu kommt der
+		// Grund von context: die Meldungen der Bereinigung gingen nach stdout
+		// und stünden mitten im Bericht des Laufs, in dem jede Ablehnung
+		// sichtbar sein muss.
+		return runInventory(args[1:])
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -120,6 +129,13 @@ Unterkommandos:
   merge     Fasst einen bestehenden Review-Lauf zusammen:
             k-playbook merge <lauf>. Das Ergebnis wird als Review-Input in das
             Laufverzeichnis geschrieben.
+  inventory Erhebt das Versionsinventar dieses Projekts und schreibt es nach
+            k-playbook-local/docs/versions/inventory.md: k-playbook inventory,
+            ohne weitere Argumente. Gelesen werden nur deklarative Quellen —
+            Manifeste, Lockfiles, Container-, DevContainer-, Helm- und
+            CI-Dateien —, dazu die in k-playbook-local/version-sources.yaml
+            konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt die Datei
+            unangetastet. Vertrag: k-playbook/docs/versionsinventar.md.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

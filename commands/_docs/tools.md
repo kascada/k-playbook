@@ -36,8 +36,8 @@ Command-specific policy:
 - There is no precondition on `/k-docs-code` and none on the main index. The index is
   built separately by `/k-docs-index`, so this command runs standalone.
 - Write nothing outside `LIBS_DIR`. `docs/README.md`, `AGENTS.md` and `opencode.json`
-  belong to `/k-docs-index`; `docs/code/`, `docs/extracted/` and `docs/manual/` belong to
-  other producers and are not touched here.
+  belong to `/k-docs-index`; `docs/code/`, `docs/extracted/`, `docs/versions/` and
+  `docs/manual/` belong to other producers and are not touched here.
 
 ## Schritt 2 — Scope klären
 

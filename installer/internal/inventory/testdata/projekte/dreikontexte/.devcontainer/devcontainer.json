@@ -1,0 +1,4 @@
+{
+  "name": "dreikontexte",
+  "build": { "dockerfile": "Dockerfile" }
+}

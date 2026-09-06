@@ -1,5 +1,5 @@
 ---
-description: Build the single documentation index at k-playbook-local/docs/README.md from every origin — code/, libs/, extracted/, manual/ and unsorted flat files — check consistency, verify findability in at most two lookups, and register the docs in MEMORY (AGENTS.md + opencode.json). Takes no argument and always covers the whole docs directory.
+description: Build the single documentation index at k-playbook-local/docs/README.md from every origin — code/, libs/, extracted/, versions/, manual/ and unsorted flat files — check consistency, verify findability in at most two lookups, and register the docs in MEMORY (AGENTS.md + opencode.json). Takes no argument and always covers the whole docs directory.
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
@@ -35,6 +35,7 @@ From the context output:
 - `CODE_DIR = <RESOLVED_DOCS_DIR>/code` — written by `/k-docs-code`
 - `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs` — written by `/k-docs-tools`
 - `EXTRACTED_DIR = <RESOLVED_DOCS_DIR>/extracted` — written by `/k-docs-extract`
+- `VERSIONS_DIR = <RESOLVED_DOCS_DIR>/versions` — written by `/k-doc-inventory`
 - `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual` — written by hand
 - `INDEX_FILE = <RESOLVED_DOCS_DIR>/README.md`
 - `AGENTS_FILE = <project.dir>/AGENTS.md`
@@ -53,9 +54,9 @@ Command-specific policy:
 
 - If `RESOLVED_DOCS_DIR` or `MANUAL_DIR` is missing: ask whether to create exactly that
   directory or to run `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR`, `LIBS_DIR` and `EXTRACTED_DIR` are created by their producers on first run.
-  A missing one is the normal state — skip that origin silently, do not create it and do
-  not ask.
+- `CODE_DIR`, `LIBS_DIR`, `EXTRACTED_DIR` and `VERSIONS_DIR` are created by their producers
+  on first run. A missing one is the normal state — skip that origin silently, do not
+  create it and do not ask.
 - This command writes exactly three files: `INDEX_FILE`, `AGENTS_FILE`,
   `OPENCODE_CONFIG`. It never writes a doc file into any subdirectory of
   `RESOLVED_DOCS_DIR`, and it never edits an existing doc file.
@@ -71,12 +72,14 @@ Per origin, collect all `*.md` except `README.md`:
 | Code | `CODE_DIR` | `/k-docs-code`, Skill `ks-overlay-repo-analyse` |
 | Libs | `LIBS_DIR` | `/k-docs-tools` |
 | Extrahiert | `EXTRACTED_DIR` | `/k-docs-extract` |
+| Versionen | `VERSIONS_DIR` | `/k-doc-inventory` |
 | Manuell | `MANUAL_DIR` | Mensch |
 | Unsortiert | flache `<RESOLVED_DOCS_DIR>/*.md` | kein Erzeuger |
 
 Read the YAML frontmatter of every file: `title`, `description`, `tags`, `type`,
 `generated.by`. For files under `LIBS_DIR` also `lib`, `version`, `severity` and
-`last-reviewed` — exactly the fields the table in Schritt 5 is built from.
+`last-reviewed`, for files under `VERSIONS_DIR` also `generated.at` — exactly the fields
+the tables in Schritt 5 are built from.
 
 Show a compact overview per origin — count plus one line per file (`Datei — title`), not
 the content:
@@ -87,6 +90,7 @@ the content:
 code/       <N> Dateien
 libs/       <N> Dateien
 extracted/  <N> Dateien
+versions/   <N> Dateien
 manual/     <N> Dateien
 unsortiert  <N> Dateien (flach in docs/)
 ```
@@ -150,7 +154,9 @@ Check and **report**; do not repair silently and do not rewrite a doc file.
   in `EXTRACTED_DIR`. Every directory stands for an origin; only a value from a *foreign*
   origin is a finding. `CODE_DIR` (`docs/code/`) accepts `k-docs-code`, legacy
   `k-code2docs` and `ks-overlay-repo-analyse`; `LIBS_DIR` accepts `k-docs-tools` and
-  legacy `k-tools-scan`.
+  legacy `k-tools-scan`; `EXTRACTED_DIR` accepts `k-docs-extract`; `VERSIONS_DIR` accepts
+  `k-doc-inventory` — that value is the producer's name on both call paths, the
+  subcommand `k-playbook inventory` included.
 
 Print the findings as a short list. If there are none, say so in one line. Ask nothing
 here — the index is built either way; the user decides later what to fix and with which
@@ -181,6 +187,12 @@ Write `INDEX_FILE` with these blocks:
 | Datei | Inhalt | Konfidenz |
 |-------|--------|-----------|
 | [`extracted/01-<slug>.md`](extracted/01-<slug>.md) | ... | bestaetigt |
+
+### Versionen (`versions/`) — erzeugt von `/k-doc-inventory`
+
+| Datei | Inhalt | Erhoben |
+|-------|--------|---------|
+| [`versions/inventory.md`](versions/inventory.md) | ... | 2026-07-12 |
 
 ### Handgepflegt (`manual/`)
 
@@ -230,6 +242,9 @@ Alphabetisch. Format: **Begriff** → `datei.md` §Abschnitt.
   path.
 - The „Libs & Stack" table is built from the frontmatter of the files in `LIBS_DIR`
   (`lib`, `version`, `severity`, `last-reviewed`), not from a separate libs index.
+- The „Versionen" table takes „Erhoben" from `generated.at` in the frontmatter of the
+  files in `VERSIONS_DIR`. The inventory itself is never summarised here — the index
+  links it, it does not repeat it.
 
 **Regeln für den Stichwort-Index:**
 
@@ -310,7 +325,7 @@ Explizit dem User sagen:
 
 Kompakte Zusammenfassung:
 
-- Zahlen je Herkunft: `code/`, `libs/`, `extracted/`, `manual/`, unsortiert.
+- Zahlen je Herkunft: `code/`, `libs/`, `extracted/`, `versions/`, `manual/`, unsortiert.
 - Migration: wie viele flache Dateien verschoben, mit `git mv` oder `mv`, wie viele
   liegen geblieben.
 - Konsistenz-Befunde aus Schritt 4 (Anzahl je Sorte, keine Wiederholung der Liste).
