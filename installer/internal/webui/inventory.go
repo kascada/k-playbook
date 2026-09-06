@@ -77,9 +77,11 @@ type inventoryRunSummary struct {
 // im Inventar, und eine Lücke, die niemand sieht, ist schlimmer als ein Fehler.
 type inventoryRunResponse struct {
 	Available bool `json:"available"`
-	// OK ist false, wenn der Lauf abgebrochen hat — unlesbare oder fremd
-	// versionierte Quellenkonfiguration. Dann steht der Grund in Message und
-	// es wurde nichts geschrieben.
+	// OK ist false, wenn der Lauf abgebrochen hat: die Quellenkonfiguration
+	// ist nicht lesbar oder von fremder Fassung, oder das Schreiben der Datei
+	// ist fehlgeschlagen. Der Grund steht in Message; ob die Datei dabei
+	// geschrieben wurde, sagt allein Outcome.Written — das Schreiben ist
+	// atomar, ein Fehler lässt den alten Stand stehen.
 	OK         bool                  `json:"ok"`
 	Message    string                `json:"message,omitempty"`
 	Outcome    inventory.Outcome     `json:"outcome"`
@@ -189,9 +191,10 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, outcome, err := inventory.Run(options)
 	if err != nil {
-		// Der abbrechende Fall und nur er: die Quellenkonfiguration ist nicht
-		// lesbar oder von fremder Fassung. Es wurde nichts geschrieben; der
-		// Stand bleibt der von vorher.
+		// Abgebrochen: Quellenkonfiguration nicht lesbar oder von fremder
+		// Fassung, oder das Schreiben ist fehlgeschlagen. Was davon, sagt err;
+		// ob geschrieben wurde, sagt outcome.Written. Der Stand kommt in jedem
+		// Fall neu von der Datei.
 		response.Message = "Erhebung abgebrochen: " + err.Error()
 		response.Outcome = outcome
 		response.Status = inventory.ReadStatus(options.InventoryFile)

@@ -262,6 +262,37 @@ func TestInventarDefekteKonfigurationBrichtAbUndIstSichtbar(t *testing.T) {
 	}
 }
 
+// Auch ein Schreibfehler ist ein sichtbarer Abbruch, kein stiller Erfolg: die
+// Meldung nennt den Grund, und Outcome.Written sagt, dass die Datei nicht
+// angefasst wurde. Provoziert wird er über eine reguläre Datei an der Stelle
+// des Zielverzeichnisses.
+func TestInventarSchreibfehlerBrichtSichtbarAb(t *testing.T) {
+	root := newInventoryProject(t)
+	inventoryFile := inventory.FilePath(project.LocalDir(root))
+	if err := os.MkdirAll(filepath.Dir(filepath.Dir(inventoryFile)), 0o755); err != nil {
+		t.Fatalf("anlegen: %v", err)
+	}
+	if err := os.WriteFile(filepath.Dir(inventoryFile), []byte("im Weg\n"), 0o644); err != nil {
+		t.Fatalf("schreiben: %v", err)
+	}
+
+	code, response := postInventory(t)
+	if code != http.StatusOK || !response.Available || response.OK {
+		t.Fatalf("Status %d, Antwort %+v — erwartet Abbruch", code, response)
+	}
+	if !strings.HasPrefix(response.Message, "Erhebung abgebrochen: ") || !strings.Contains(response.Message, "anlegen") {
+		t.Errorf("die Meldung nennt den Schreibfehler nicht: %q", response.Message)
+	}
+	if response.Outcome.Written {
+		t.Error("Outcome.Written trotz Schreibfehler")
+	}
+	// Der Stand kommt neu von der Datei: dort liegt nichts Lesbares, und das
+	// sagt der Status als Problem — kein Erzeuger, keine Einträge.
+	if response.Status.GeneratedBy != "" || response.Status.Entries != 0 || response.Status.Problem == "" {
+		t.Errorf("Status nach dem Abbruch = %+v", response.Status)
+	}
+}
+
 // Die konfigurierten Zusatzquellen und Ausschlüsse erscheinen als Zahlen —
 // gelesen mit demselben Leser wie im Sammler. Ein Formular gibt es nicht.
 func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {

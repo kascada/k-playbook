@@ -74,8 +74,10 @@ async function runInventory() {
     const data = await response.json();
     renderRun(data);
     if (data.available) {
-      renderInventory(data);
-      await loadFile();
+      // Stand und Quellenkonfiguration kommen neu vom Server. Die Antwort des
+      // Anstoßes trägt keine `sources`; aus ihr zu zeichnen ließe die Karte
+      // „Quellenkonfiguration" leer zurück.
+      await Promise.all([loadInventory(), loadFile()]);
     }
   } catch {
     elements.runCard.classList.remove("hidden");
@@ -93,8 +95,7 @@ function setRunning(running, text = "") {
   elements.runProgressText.textContent = text;
 }
 
-// Stand und Quellenkonfiguration. Dieselbe Funktion zeichnet auch die Antwort
-// des Anstoßes: sie trägt `status` und `displayPath` in derselben Form.
+// Stand und Quellenkonfiguration, aus der Antwort von GET /api/inventory.
 function renderInventory(data) {
   elements.statusFacts.replaceChildren();
   elements.sourcesFacts.replaceChildren();
@@ -195,7 +196,12 @@ function renderRun(data) {
   if (!data.ok) {
     elements.runPill.className = "pill error";
     elements.runPill.textContent = "Abgebrochen";
-    elements.runMessage.textContent = `${data.message || "Erhebung abgebrochen."}\nEs wurde nichts geschrieben.`;
+    // Ob die Datei angefasst wurde, sagt allein das Outcome: der Lauf kann an
+    // der Quellenkonfiguration scheitern oder erst beim Schreiben.
+    const written = Boolean(data.outcome && data.outcome.written);
+    elements.runMessage.textContent = `${data.message || "Erhebung abgebrochen."}\n${
+      written ? "Die Datei wurde geschrieben." : "Es wurde nichts geschrieben; der bisherige Stand bleibt."
+    }`;
     return;
   }
 

@@ -13,6 +13,19 @@ func TestBodyTrenntDasFrontmatterAb(t *testing.T) {
 	}
 }
 
+// Zeilenenden werden in beiden Zweigen gleich behandelt: CRLF kommt als LF
+// zurück, ob ein Frontmatter davorsteht oder nicht.
+func TestBodyNormalisiertZeilenendenInBeidenZweigen(t *testing.T) {
+	for name, data := range map[string]string{
+		"mit Frontmatter":  "---\r\ntitle: x\r\n---\r\n\r\n# Rumpf\r\n",
+		"ohne Frontmatter": "# Rumpf\r\n",
+	} {
+		if got := string(Body([]byte(data))); got != "# Rumpf\n" {
+			t.Errorf("%s: Body = %q", name, got)
+		}
+	}
+}
+
 // Ohne Frontmatter ist der Rumpf die ganze Datei — auch dann, wenn ein
 // öffnendes `---` kein schließendes findet.
 func TestBodyOhneFrontmatterIstDieGanzeDatei(t *testing.T) {

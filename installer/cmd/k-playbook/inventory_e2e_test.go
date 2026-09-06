@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,8 +83,9 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 }
 
 // Ein abgelehnter Pfad erzeugt auf dem CLI-Weg dieselbe Ablehnung wie über die
-// API: beide kommen aus derselben Vertrauensgrenze, und der Bericht des
-// Subkommandos nennt angefragten Pfad und Grund im Wortlaut der Fachlogik.
+// API: beide kommen aus derselben Vertrauensgrenze. Geprüft wird die echte
+// Ausgabe von runInventory gegen Pfad und Grund als Literale — nicht gegen die
+// Funktion, die den Bericht selbst formatiert.
 func TestSubkommandoNenntAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 	root := fixtureProject(t, "dreikontexte")
 	outside := t.TempDir()
@@ -103,24 +105,39 @@ func TestSubkommandoNenntAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 		t.Fatalf("schreiben: %v", err)
 	}
 
-	result, err := inventory.Collect(options)
-	if err != nil {
-		t.Fatalf("Collect: %v", err)
+	out := captureStdout(t, func() {
+		if err := runInventory(nil); err != nil {
+			t.Fatalf("runInventory: %v", err)
+		}
+	})
+	if !strings.Contains(out, foreign+": liegt außerhalb der erlaubten Wurzeln (") {
+		t.Errorf("der Bericht nennt Pfad und Grund der Ablehnung nicht:\n%s", out)
 	}
-	if len(result.Rejections) != 1 {
-		t.Fatalf("Ablehnungen = %+v", result.Rejections)
+	if !strings.Contains(out, "Abgelehnte Quellen:           1") {
+		t.Errorf("der Bericht zählt die Ablehnung nicht:\n%s", out)
 	}
+}
 
-	var out strings.Builder
-	_, outcome, err := inventory.Run(options)
+// captureStdout fängt ab, was fn nach os.Stdout schreibt — runInventory kennt
+// keinen anderen Ausgang, und genau der soll geprüft werden.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	reader, writer, err := os.Pipe()
 	if err != nil {
-		t.Fatalf("Run: %v", err)
+		t.Fatalf("Pipe: %v", err)
 	}
-	printInventory(&out, options, result, outcome)
-	if !strings.Contains(out.String(), describeRejection(result.Rejections[0])) {
-		t.Errorf("der Bericht nennt die Ablehnung nicht im Wortlaut:\n%s", out.String())
-	}
-	if !strings.Contains(out.String(), "Abgelehnte Quellen:           1") {
-		t.Errorf("der Bericht zählt die Ablehnung nicht:\n%s", out.String())
-	}
+	before := os.Stdout
+	os.Stdout = writer
+	defer func() { os.Stdout = before }()
+
+	done := make(chan string)
+	go func() {
+		var buffer strings.Builder
+		_, _ = io.Copy(&buffer, reader)
+		done <- buffer.String()
+	}()
+	fn()
+	writer.Close()
+	return <-done
 }
