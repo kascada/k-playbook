@@ -184,3 +184,54 @@ func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
 		}
 	}
 }
+
+// Ob zum neuen Stand ein anderes Binary gehört, entscheidet nicht der Wechsel
+// der VERSION allein, sondern der Vergleich mit dem laufenden Prozess.
+func TestBinaryOutdated(t *testing.T) {
+	tests := []struct {
+		name    string
+		running string
+		result  project.UpdateResult
+		want    bool
+	}{
+		{
+			name:    "Zielprojekt: Clone zieht an, Binary bleibt zurück",
+			running: "v0.3.0",
+			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
+			want:    true,
+		},
+		{
+			// Der Entwicklungsfall: `make dev-install` hat das Binary des neuen
+			// Standes schon eingespielt, der Clone holt ihn erst jetzt nach.
+			name:    "Entwicklungsrepo: Binary trägt die neue Version bereits",
+			running: "v0.4.0",
+			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
+		},
+		{
+			// Ohne Versionswechsel darf nichts verlangt werden — auch dann
+			// nicht, wenn das Binary neuer ist als der Clone. Sonst schlüge
+			// jeder Doku-Pull im Entwicklungsrepo in die Aufforderung um, ein
+			// älteres Binary zu installieren.
+			name:    "kein Versionswechsel, Binary neuer als der Clone",
+			running: "v0.4.0",
+			result:  project.UpdateResult{Version: "v0.3.0"},
+		},
+		{
+			name:    "Installation ohne VERSION",
+			running: "v0.4.0",
+			result:  project.UpdateResult{VersionChanged: true},
+		},
+		{
+			name:   "Binary ohne gestempelte Version",
+			result: project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := binaryOutdated(test.running, test.result); got != test.want {
+				t.Errorf("binaryOutdated = %v, erwartet %v", got, test.want)
+			}
+		})
+	}
+}

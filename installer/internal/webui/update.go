@@ -77,12 +77,13 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	restartRequired := binaryOutdated(state.version, result)
 	response := updateResponse{
 		Output:          result.Output,
-		RestartRequired: result.BinaryChanged,
+		RestartRequired: restartRequired,
 		Message:         "Aktualisiert.",
 	}
-	if result.BinaryChanged {
+	if restartRequired {
 		response.Message = versionChangeMessage()
 	}
 	if note := describeMCPRepair(result); note != "" {
@@ -100,7 +101,37 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		response.Cleanliness = status.Cleanliness
 	}
 	writeJSON(w, http.StatusOK, response)
-	state.completeUpdate(result.BinaryChanged)
+	state.completeUpdate(restartRequired)
+}
+
+// binaryOutdated meldet, ob zum aktualisierten Stand ein anderes Binary gehört
+// als das laufende.
+//
+// Zwei Bedingungen, und beide werden gebraucht:
+//
+//   - Der Pull muss die VERSION bewegt haben. Ohne das ist der Stand derselbe
+//     wie vorher, und ein Binary, das schon vorher passte, passt weiter.
+//   - Das laufende Binary darf die neue Version nicht schon tragen. Genau hier
+//     lag der Fehler: im Entwicklungsrepo steht unter ~/.local/bin längst das
+//     Binary des neuen Standes, weil `make dev-install` es gebaut hat, während
+//     der Clone noch dem zuletzt gepushten Commit folgt. Holt der ihn nach,
+//     wechselt dort die VERSION — und der Dienst beendete sich, obwohl nichts
+//     zu tun war, und verwies auf den Bootstrap. Der lädt das Release-Asset:
+//     im Entwicklungsrepo der falsche Weg, und vor dem Release gibt es das
+//     Asset nicht einmal.
+//
+// Warum nicht schlicht „laufende Version ≠ Version der Installation": im
+// Entwicklungsrepo ist das Binary regelmäßig **neuer** als der Clone. Jeder
+// Pull ohne Versionswechsel schlüge dann in eine Aufforderung um, ein älteres
+// Binary zu installieren.
+//
+// Fehlt eine der beiden Angaben, wird nichts verlangt: ohne Vergleichsgrundlage
+// ist ein selbsttätiges Ende des Dienstes das schlechtere Ergebnis.
+func binaryOutdated(running string, result project.UpdateResult) bool {
+	if !result.VersionChanged || running == "" || result.Version == "" {
+		return false
+	}
+	return running != result.Version
 }
 
 // versionChangeMessage ist die Meldung des Versionswechsels.

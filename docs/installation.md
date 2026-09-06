@@ -470,8 +470,10 @@ für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine l
 veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
 stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
 
-Hat dabei `VERSION` gewechselt, gehört zu dem neuen Stand ein anderes Binary. Der Dienst
-beendet sich dann nach der Antwort selbst. Installiert wird das neue Binary ausdrücklich
+Hat dabei `VERSION` gewechselt und trägt das laufende Binary diese Version noch nicht,
+gehört zu dem neuen Stand ein anderes Binary. Der Dienst beendet sich dann nach der Antwort
+selbst. Trägt das Binary sie bereits — der Regelfall im Entwicklungsrepo, wo
+`make dev-install` es vor dem Clone einspielt —, läuft der Dienst weiter. Installiert wird das neue Binary ausdrücklich
 über den Bootstrap — `make -C k-playbook install`, ohne make `k-playbook/bin/install` —;
 der Update-Pfad lädt oder ersetzt von sich aus kein Host-Binary. Danach startet
 `k-playbook` die neue Fassung. Nach einem `git pull` von Hand oder

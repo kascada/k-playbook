@@ -213,11 +213,14 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 // UpdateResult ist das Ergebnis eines Pull-Laufs.
 type UpdateResult struct {
 	Output string `json:"output"`
-	// BinaryChanged meldet, ob der Stand ein anderes Binary verlangt — das
-	// heißt: ob VERSION gewechselt hat. Nur dann bringt ein Neustart eine
-	// andere Programmversion.
-	BinaryChanged bool   `json:"binaryChanged"`
-	Message       string `json:"message"`
+	// VersionChanged meldet, ob der Pull die VERSION der Installation bewegt
+	// hat. Das ist eine Tatsache über den Clone, noch keine Aufforderung: ob
+	// dazu auch ein anderes Binary gehört, entscheidet der Aufrufer anhand von
+	// Version — er allein weiß, aus welcher Version er selbst läuft.
+	VersionChanged bool `json:"versionChanged"`
+	// Version ist die VERSION der Installation nach dem Pull.
+	Version string `json:"version"`
+	Message string `json:"message"`
 	// Cleanliness trägt den Grund, wenn das Update gar nicht erst lief.
 	Cleanliness Cleanliness `json:"cleanliness"`
 	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag beim Update
@@ -266,8 +269,8 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	versionAfter := InstalledVersion(dir)
 	// Seit die Binaries Release-Assets sind, hängt alles an VERSION: der Clone
 	// trägt kein Binary mehr, das sich vergleichen ließe.
-	versionChanged := versionBefore != versionAfter
-	result.BinaryChanged = versionChanged
+	result.VersionChanged = versionBefore != versionAfter
+	result.Version = versionAfter
 
 	// Die MCP-Registrierung liegt im Hauptverzeichnis, nicht im Clone — der
 	// Pull erreicht sie nicht. Ein Bestandsprojekt käme sonst mit einem Eintrag

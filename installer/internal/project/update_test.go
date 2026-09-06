@@ -176,8 +176,11 @@ func TestUpdateMeldetVersionswechsel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if !result.BinaryChanged {
-		t.Error("BinaryChanged = false, obwohl VERSION gewechselt hat")
+	if !result.VersionChanged {
+		t.Error("VersionChanged = false, obwohl VERSION gewechselt hat")
+	}
+	if result.Version != "v0.0.2" {
+		t.Errorf("Version = %q, erwartet v0.0.2", result.Version)
 	}
 
 	status, err := CheckUpdate(projectDir)
@@ -207,8 +210,8 @@ func TestUpdateOhneVersionswechsel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if result.BinaryChanged {
-		t.Error("BinaryChanged = true, obwohl VERSION gleich geblieben ist")
+	if result.VersionChanged {
+		t.Error("VersionChanged = true, obwohl VERSION gleich geblieben ist")
 	}
 }
 

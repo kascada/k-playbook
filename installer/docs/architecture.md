@@ -2078,9 +2078,27 @@ Sackgasse: sie bietet „Erneut verbinden" — antwortet der Server, lädt die S
 und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 
-`POST /api/update` beendet den Server nach der Antwort, wenn die `VERSION` gewechselt hat
-(`BinaryChanged`): zum neuen Stand gehört ein anderes Binary, und ein alter Daemon soll
-nicht stehen bleiben. Das deckt den Weg über die Oberfläche; nach einem `git pull` von
+`POST /api/update` beendet den Server nach der Antwort, wenn zum neuen Stand ein anderes
+Binary gehört als das laufende — und ein alter Daemon soll nicht stehen bleiben. Die
+Bedingung dafür hat zwei Teile, `binaryOutdated()` in `webui/update.go`: der Pull muss die
+`VERSION` bewegt haben (`UpdateResult.VersionChanged`) **und** der laufende Prozess darf
+diese Version nicht schon tragen.
+
+Der zweite Teil ist der Entwicklungsfall: dort steht unter `~/.local/bin` längst das Binary
+des neuen Standes, weil `make dev-install` es gebaut hat, während der Clone noch dem zuletzt
+gepushten Commit folgt. Holt er ihn nach, wechselt dort die `VERSION` — und der Dienst
+beendete sich, obwohl nichts zu tun war, und verwies auf den Bootstrap. Der lädt das
+Release-Asset: im Entwicklungsrepo der falsche Weg, und vor dem Release liegt das Asset
+nicht einmal.
+
+Der schlichtere Vergleich „laufende Version ≠ `VERSION` der Installation" taugt dafür
+nicht: im Entwicklungsrepo ist das Binary regelmäßig **neuer** als der Clone, und jeder
+Pull ohne Versionswechsel schlüge dann in die Aufforderung um, ein älteres Binary zu
+installieren. Fehlt eine der beiden Angaben, wird nichts verlangt.
+
+Die Entscheidung liegt bewusst in `webui` und nicht in `project.Update()`: nur der Server
+kennt die Version, aus der er selbst läuft. `UpdateResult` meldet deshalb die Tatsache
+(`VersionChanged`, `Version`), nicht die Aufforderung. Das deckt den Weg über die Oberfläche; nach einem `git pull` von
 Hand greift der Standvergleich des Clients beim nächsten Aufruf — und der erkennt über
 die Build-Kennung auch ein frisch gebautes Binary bei unveränderter `VERSION`. Ein
 portstabiler Neustart, bei dem der Dienst den Listener an das neue Binary vererbt, wäre
