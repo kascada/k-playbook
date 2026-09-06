@@ -137,6 +137,13 @@ Ohne Konfiguration sucht der Sammler diese Quellen unterhalb der Projektwurzel. 
 findet, liest er vollständig; was er nicht kennt, ignoriert er stillschweigend — nur eine
 **gefundene, aber nicht lesbare** Quelle wird gemeldet.
 
+Aus einem Lockfile werden in jedem Ökosystem ausschließlich die **direkten**
+Abhängigkeiten seines zugehörigen Manifests geführt. Bei Workspaces ist die
+Referenzmenge die Vereinigung des Wurzelmanifests und aller deklarierten
+Mitgliedsmanifeste; sie gilt nur, wenn jedes Mitglied aufgelöst, nicht ausgeschlossen und
+lesbar ist. Transitive Lockfile-Einträge treten niemals an die Stelle einer fehlenden
+Referenzmenge.
+
 Nicht betreten werden dabei die Verzeichnisse, die ein Werkzeug befüllt hat: `.git`,
 `.hg`, `.svn`, `node_modules`, `vendor`, `bower_components`, `.venv`, `venv`,
 `__pycache__`, `.tox`, `.nox`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `target`,
@@ -214,22 +221,25 @@ gehört — nur nicht diesem Projekt.
 - `dependencies`, `devDependencies`, `optionalDependencies` und `peerDependencies` gehen
   in `scope`.
 - `engines.node` und `packageManager` sind `runtime`-Einträge.
-- Aus Lockfiles werden **nur direkte** Abhängigkeiten geführt. Transitive würden das
-  Inventar unlesbar machen, ohne eine Frage zu beantworten, die es stellt.
+- Lockfiles folgen der allgemeinen Direkt-Regel dieses Abschnitts.
 
 ### Weitere Manifesttypen
 
 Dieselben, die `/k-docs-tools` bereits erkennt: `Cargo.toml`/`Cargo.lock`,
 `Gemfile`/`Gemfile.lock`, `composer.json`/`composer.lock`, `pom.xml`,
 `build.gradle`/`build.gradle.kts`, `mix.exs`/`mix.lock`. Semantik wie oben: Manifest und
-Lockfile beide, direkte Abhängigkeiten, Scope aus dem Abschnitt.
+Lockfile beide; Lockfiles folgen der allgemeinen Direkt-Regel dieses Abschnitts, Scope
+ aus dem Abschnitt.
 
 ### Container
 
 `Dockerfile`, `Dockerfile.*`, `docker-compose*.y{a,}ml`, `compose*.y{a,}ml`.
 
-- `FROM <image>:<tag>` ist ein `image`-Eintrag; `@sha256:…` macht daraus `digest`.
-- `FROM <stage>` auf eine Stage derselben Datei ist `local` und wird als solche geführt,
+- `FROM [--flag=wert …] <image>:<tag> [AS <stage>]` ist ein `image`-Eintrag;
+  `@sha256:…` macht daraus `digest`. Flags gehören nicht zur Image-Referenz, und ein
+  Stage-Alias registriert die lokale Stage.
+- `FROM [--flag=wert …] <stage> [AS <stage>]` auf eine Stage derselben Datei ist `local`
+  und wird als solche geführt,
   nicht weggelassen.
 - `ARG`-Werte werden nur aufgelöst, wenn ihr Default in derselben Datei steht. Sonst
   `unknown` mit `note`.
@@ -634,9 +644,10 @@ muss:
    und Zeile, den `sourceKey` und, wo vorhanden, Digest und `note`.
 4. `## Abweichungen` — je Gruppe ein Block mit Art (`widersprüchlich` vor
    `umgebungsbedingt`), den beteiligten Zeilen und deren Herkunft.
-5. `## Ausgewertete Quellen` — jede gelesene Datei mit Quellart, Label und Zahl der
-   Einträge. Eine Quelle aus der Quellenkonfiguration trägt den Zusatz `(konfiguriert)`
-   an ihrer Quellart; sonst wäre nicht zu sehen, welche Zeile woher kommt.
+5. `## Ausgewertete Quellen` — jede gelesene Datei mit Quellart, Label, Zahl der
+   Einträge und, falls für die Quelle konfiguriert, ihrer `note`. Eine Quelle aus der
+   Quellenkonfiguration trägt den Zusatz `(konfiguriert)` an ihrer Quellart; sonst wäre
+   nicht zu sehen, welche Zeile woher kommt.
 6. `## Nicht durchsuchte Bereiche` — je Ausschlussregel Muster, Herkunft
    (`installation` oder `configured`), Zahl der übergangenen Quellen und Grund. Der
    Abschnitt steht immer, auch wenn keine Regel etwas getroffen hat.
@@ -734,6 +745,9 @@ nirgends.
 | Pfad außerhalb der erlaubten Wurzeln | Sichtbare Ablehnung mit angefragtem und aufgelöstem Pfad. Der Lauf geht weiter. |
 | Symlink zeigt aus jeder Wurzel heraus | Wie oben; gemeldet wird das aufgelöste Ziel, damit erkennbar ist, was tatsächlich gelesen worden wäre. |
 | Bekannte Quelldatei ist defekt | Sichtbarer Hinweis mit Datei und Fehler; die übrigen Quellen werden erhoben. Keine erfundenen Einträge, kein Teilergebnis ohne Kennzeichnung. |
+| Lockfile lesbar, zugehöriges Manifest fehlt oder ist nicht lesbar | Das Lockfile trägt keine Einträge bei. Ein sichtbarer Hinweis nennt Lockfile, erwartetes Manifest und den Grund; transitive Lockfile-Pakete ersetzen die direkten nicht. |
+| Lockfile lesbar, zugehöriges Manifest ist durch `exclude:` ausgenommen | Das Lockfile trägt keine Einträge bei. Der Ausschluss bleibt zusätzlich im Abschnitt „Nicht durchsuchte Bereiche“ sichtbar; der Hinweis nennt die greifende Ausschlussregel. Ein ausdrücklich unter `sources:` genanntes Lockfile hebt den Ausschluss nur für sich auf, nicht für sein Manifest. |
+| Workspace-Lockfile mit fehlendem, nicht auflösbarem, ausgeschlossenem oder nicht lesbarem Mitgliedsmanifest | Das Lockfile trägt insgesamt keine Einträge bei. Der Hinweis nennt Wurzelmanifest, Mitgliedsdeklaration beziehungsweise aufgelösten Pfad und Grund; eine teilweise Vereinigung der übrigen Mitglieder ist unzulässig. |
 | Unbekannter Dateityp unterhalb der Projektwurzel | Stillschweigend übergangen. Nur was gesucht wird, kann fehlen. |
 | Inventardatei da, Frontmatter defekt | Sichtbarer Befund. Der Lauf erhebt neu und schreibt die Datei, weil ein Vergleich nicht möglich ist. |
 

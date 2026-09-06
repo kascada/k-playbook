@@ -149,6 +149,9 @@ type SourceRead struct {
 	Entries int    `json:"entries"`
 	// Configured sagt, ob die Quelle aus der Quellenkonfiguration stammt.
 	Configured bool `json:"configured,omitempty"`
+	// Note ist der Anzeigetext aus version-sources.yaml; er gehört nur in die
+	// Quellenliste der Inventardatei.
+	Note string `json:"note,omitempty"`
 }
 
 // Rejection ist ein Pfad, den die Vertrauensgrenze abgelehnt hat. Sie nennt den

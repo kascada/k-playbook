@@ -131,6 +131,9 @@ func parsePackageLock(c *collector) {
 // parseYarnLock liest das eigene Format von Yarn: ein Kopf mit den
 // angeforderten Bereichen, darunter die aufgelöste Version.
 func parseYarnLock(c *collector) {
+	if c.file.Direct == nil {
+		return
+	}
 	lines := c.lines()
 	var heads []string
 	var headLine int
@@ -155,8 +158,13 @@ func parseYarnLock(c *collector) {
 				if at := strings.LastIndex(head, "@"); at > 0 {
 					name = head[:at]
 				}
+				name = normalizeName(EcoNode, name)
+				scope, direct := c.file.Direct[name]
+				if !direct {
+					continue
+				}
 				c.add(Entry{Ecosystem: EcoNode, Name: name, KindOfThing: ThingPackage,
-					Version: version, Pin: PinExact,
+					Version: version, Pin: PinExact, Scope: scope,
 					SourceKey: head, SourceLine: headLine})
 			}
 			heads = nil

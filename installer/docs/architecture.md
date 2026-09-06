@@ -168,7 +168,7 @@ installer/
 │   ├── model.go                 Datenmodell, Pin-Taxonomie, Labels, Ökosysteme
 │   ├── trust.go                 die Vertrauensgrenze: Check, Expand, ReadFile
 │   ├── discover.go              Standardquellen unterhalb der Projektwurzel finden
-│   ├── collect.go               Standard- und Zusatzquellen planen, lesen, sammeln
+│   ├── collect.go               Quellen zweiphasig planen: Manifeste als Referenzmenge lesen, dann Lockfiles und übrige Quellen sammeln
 │   ├── parse*.go                je Ökosystem ein Leser: Python, Go, Node, Container,
 │   │                            Helm, CI, weitere Manifesttypen
 │   ├── normalize.go             Namen, Versionen, Digests, Pin-Art bestimmen

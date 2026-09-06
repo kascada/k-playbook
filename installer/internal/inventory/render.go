@@ -171,15 +171,15 @@ func renderSources(out *strings.Builder, result Result) {
 		out.WriteString("Keine.\n\n")
 		return
 	}
-	out.WriteString("| Datei | Quellart | Label | Einträge |\n")
-	out.WriteString("|---|---|---|---|\n")
+	out.WriteString("| Datei | Quellart | Label | Einträge | Note |\n")
+	out.WriteString("|---|---|---|---|---|\n")
 	for _, source := range result.Sources {
 		kind := source.Kind
 		if source.Configured {
 			kind += " (konfiguriert)"
 		}
-		fmt.Fprintf(out, "| %s | %s | %s | %d |\n",
-			code(source.File), cell(kind), cell(source.Env), source.Entries)
+		fmt.Fprintf(out, "| %s | %s | %s | %d | %s |\n",
+			code(source.File), cell(kind), cell(source.Env), source.Entries, cell(source.Note))
 	}
 	out.WriteString("\n")
 }

@@ -80,13 +80,37 @@ func fillStatus(status *Status, data []byte) {
 
 	var missing []string
 	for _, field := range []struct{ name, value string }{
+		{"type", root.Get("type").Str()},
 		{"title", root.Get("title").Str()},
 		{"description", root.Get("description").Str()},
+		{"status", root.Get("status").Str()},
 		{"generated.by", status.GeneratedBy},
 		{"generated.at", status.GeneratedAt},
 	} {
 		if strings.TrimSpace(field.value) == "" {
 			missing = append(missing, field.name)
+		}
+	}
+	if tags := root.Get("tags"); tags == nil || len(tags.List()) == 0 {
+		missing = append(missing, "tags")
+	}
+	for _, field := range []struct {
+		name string
+		node *yamllite.Node
+	}{
+		{"inventory.sources-configured", root.Get("inventory", "sources-configured")},
+		{"inventory.sources-read", root.Get("inventory", "sources-read")},
+		{"inventory.entries", root.Get("inventory", "entries")},
+		{"inventory.deviations", root.Get("inventory", "deviations")},
+		{"inventory.rejected", root.Get("inventory", "rejected")},
+		{"inventory.sources-excluded", root.Get("inventory", "sources-excluded")},
+	} {
+		if field.node == nil || field.node.Str() == "" {
+			missing = append(missing, field.name)
+			continue
+		}
+		if _, ok := field.node.Int(); !ok {
+			missing = append(missing, field.name+" (ungültig)")
 		}
 	}
 	if len(missing) > 0 {

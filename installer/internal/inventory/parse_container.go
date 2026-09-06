@@ -51,10 +51,14 @@ func addDockerfileFrom(c *collector, fields []string, args map[string]string, st
 	if len(fields) < 2 {
 		return
 	}
-	reference := fields[1]
-	if len(fields) >= 4 && strings.EqualFold(fields[2], "AS") {
-		stages[strings.ToLower(fields[3])] = true
+	index := 1
+	for index < len(fields) && strings.HasPrefix(fields[index], "--") {
+		index++
 	}
+	if index == len(fields) {
+		return
+	}
+	reference := fields[index]
 
 	// `FROM <stage>` auf eine Stage derselben Datei ist local und wird als
 	// solche geführt, nicht weggelassen.
@@ -63,6 +67,9 @@ func addDockerfileFrom(c *collector, fields []string, args map[string]string, st
 			SourceKey: "FROM", SourceLine: lineNumber,
 			Note: "Stage derselben Datei"})
 		return
+	}
+	if index+2 < len(fields) && strings.EqualFold(fields[index+1], "AS") {
+		stages[strings.ToLower(fields[index+2])] = true
 	}
 
 	resolved, note := resolveArgs(reference, args)
@@ -119,14 +126,13 @@ func addPinnedInstalls(c *collector, line string, lineNumber int) {
 				continue
 			}
 			name, version, found := strings.Cut(token, form.separator)
+			if form.ecosystem == EcoNode {
+				if at := strings.LastIndex(token, "@"); at > 0 {
+					name, version, found = token[:at], token[at+1:], true
+				}
+			}
 			if !found || name == "" || version == "" {
 				continue
-			}
-			if strings.ContainsAny(name, "/@") && form.ecosystem == EcoNode {
-				// Ein `@scope/paket@1.2.3` trennt am letzten `@`.
-				if at := strings.LastIndex(token, "@"); at > 0 {
-					name, version = token[:at], token[at+1:]
-				}
 			}
 			c.add(Entry{Ecosystem: form.ecosystem, Name: name, KindOfThing: ThingTool,
 				Version: version, SourceKey: "RUN", SourceLine: lineNumber,

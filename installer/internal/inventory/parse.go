@@ -18,6 +18,10 @@ type fileContext struct {
 	Env       string
 	EnvOrigin string
 	Data      []byte
+	// Direct enthält die direkten Paketnamen eines zugehörigen Manifests. Es ist
+	// nur für Lockfiles gesetzt; nil bedeutet, dass keine gültige Referenzmenge
+	// ermittelt werden konnte.
+	Direct map[string]string
 }
 
 // collector sammelt die Funde einer Datei und füllt die Felder, die für alle

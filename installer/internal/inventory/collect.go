@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -81,7 +82,7 @@ func Collect(options Options) (Result, error) {
 	result.Exclusions = exclusions
 
 	for _, item := range candidates {
-		readCandidate(boundary, item, &result)
+		readCandidate(boundary, item, config.Exclude, &result)
 	}
 
 	sortEntries(result.Entries)
@@ -160,7 +161,7 @@ func planSources(boundary *Boundary, config versionsources.Config) ([]candidate,
 
 // readCandidate öffnet eine geplante Quelle — ausschließlich über die
 // Vertrauensgrenze — und wertet sie aus.
-func readCandidate(boundary *Boundary, item candidate, result *Result) {
+func readCandidate(boundary *Boundary, item candidate, excludes []string, result *Result) {
 	data, resolved, exists, err := boundary.ReadFile(item.Requested)
 	if err != nil {
 		var pathError *PathError
@@ -182,14 +183,22 @@ func readCandidate(boundary *Boundary, item candidate, result *Result) {
 		return
 	}
 
-	entries, notes := parseFile(fileContext{
+	context := fileContext{
 		Display:   display,
 		Base:      filepath.Base(resolved),
 		Kind:      item.Kind,
 		Env:       item.Env,
 		EnvOrigin: item.EnvOrigin,
 		Data:      data,
-	})
+	}
+	if manifest := lockManifest(item.Kind, filepath.Base(resolved)); manifest != "" {
+		direct, note := lockDirect(boundary, resolved, manifest, item, excludes)
+		if note != "" {
+			result.Notes = append(result.Notes, Note{Source: display, Text: note})
+		}
+		context.Direct = direct
+	}
+	entries, notes := parseFile(context)
 	result.Entries = append(result.Entries, entries...)
 	result.Notes = append(result.Notes, notes...)
 	result.Sources = append(result.Sources, SourceRead{
@@ -198,7 +207,189 @@ func readCandidate(boundary *Boundary, item candidate, result *Result) {
 		Env:        item.Env,
 		Entries:    len(entries),
 		Configured: item.Configured,
+		Note:       item.Note,
 	})
+}
+
+// lockManifest benennt die direkte Referenzquelle eines Lockfiles. Die
+// Workspace-Erweiterungen werden beim Manifestlesen ergänzt; ohne lesbares
+// Wurzelmanifest gibt es bewusst keine Lockfile-Einträge.
+var lockManifests = map[string]string{
+	"yarn.lock":     "package.json",
+	"poetry.lock":   "pyproject.toml",
+	"uv.lock":       "pyproject.toml",
+	"Pipfile.lock":  "Pipfile",
+	"Cargo.lock":    "Cargo.toml",
+	"composer.lock": "composer.json",
+	"mix.lock":      "mix.exs",
+}
+
+func lockManifest(kind, base string) string { return lockManifests[base] }
+
+func lockDirect(boundary *Boundary, lockPath, manifest string, item candidate, excludes []string) (map[string]string, string) {
+	manifestPath := filepath.Join(filepath.Dir(lockPath), manifest)
+	displayLock := displayPath(boundary.ProjectRoot(), lockPath)
+	displayManifest := displayPath(boundary.ProjectRoot(), manifestPath)
+	if relative, err := filepath.Rel(boundary.ProjectRoot(), manifestPath); err == nil {
+		relative = filepath.ToSlash(relative)
+		for _, pattern := range excludes {
+			if matchExclude(pattern, relative) {
+				return nil, fmt.Sprintf("zugehöriges Manifest %s ist durch Ausschlussregel %q ausgenommen", displayManifest, pattern)
+			}
+		}
+	}
+	data, resolved, exists, err := boundary.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s nicht lesbar: %v", displayManifest, displayLock, err)
+	}
+	if !exists {
+		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s fehlt", displayManifest, displayLock)
+	}
+	entries, notes := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), resolved), Base: manifest,
+		Kind: item.Kind, Env: item.Env, EnvOrigin: item.EnvOrigin, Data: data})
+	if len(notes) > 0 {
+		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s ist nicht lesbar: %s", displayManifest, displayLock, notes[0].Text)
+	}
+	direct := map[string]string{}
+	for _, entry := range entries {
+		if entry.KindOfThing == ThingPackage {
+			direct[entry.Name] = entry.Scope
+		}
+	}
+	for _, declaration := range workspaceManifests(manifestPath, manifest, data) {
+		members, rejections := boundary.Expand(declaration)
+		if len(rejections) > 0 {
+			return nil, fmt.Sprintf("Workspace-Mitglied %s für Lockfile %s nicht auflösbar: %s", declaration, displayLock, rejections[0].Reason)
+		}
+		if len(members) == 0 {
+			return nil, fmt.Sprintf("Workspace-Mitglied %s für Lockfile %s nicht auflösbar", declaration, displayLock)
+		}
+		for _, member := range members {
+			if relative, err := filepath.Rel(boundary.ProjectRoot(), member); err == nil {
+				relative = filepath.ToSlash(relative)
+				for _, pattern := range excludes {
+					if matchExclude(pattern, relative) {
+						return nil, fmt.Sprintf("Workspace-Manifest %s ist durch Ausschlussregel %q ausgenommen", relative, pattern)
+					}
+				}
+			}
+			memberData, memberResolved, memberExists, memberErr := boundary.ReadFile(member)
+			if memberErr != nil || !memberExists {
+				reason := "fehlt"
+				if memberErr != nil {
+					reason = memberErr.Error()
+				}
+				return nil, fmt.Sprintf("Workspace-Manifest %s für Lockfile %s %s", displayPath(boundary.ProjectRoot(), member), displayLock, reason)
+			}
+			memberEntries, memberNotes := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), memberResolved), Base: manifest,
+				Kind: item.Kind, Env: item.Env, EnvOrigin: item.EnvOrigin, Data: memberData})
+			if len(memberNotes) > 0 {
+				return nil, fmt.Sprintf("Workspace-Manifest %s für Lockfile %s ist nicht lesbar: %s", displayPath(boundary.ProjectRoot(), member), displayLock, memberNotes[0].Text)
+			}
+			for _, entry := range memberEntries {
+				if entry.KindOfThing == ThingPackage {
+					direct[entry.Name] = entry.Scope
+				}
+			}
+			if manifest == "Cargo.toml" {
+				addCargoWorkspaceDependencies(direct, data, memberData)
+			}
+		}
+	}
+	return direct, ""
+}
+
+// addCargoWorkspaceDependencies ergänzt nur die zentral deklarierte Abhängigkeit,
+// die ein Mitglied tatsächlich mit `workspace = true` verwendet.
+func addCargoWorkspaceDependencies(direct map[string]string, root, member []byte) {
+	rootDoc := parseTOML(root)
+	dependencies := rootDoc.table("workspace.dependencies")
+	if dependencies == nil {
+		return
+	}
+	memberDoc := parseTOML(member)
+	for _, section := range []string{"dependencies", "dev-dependencies", "build-dependencies"} {
+		table := memberDoc.table(section)
+		if table == nil {
+			continue
+		}
+		for _, name := range table.Keys {
+			entry := table.Entries[name]
+			fields := tomlInline(entry.Raw)
+			if fields == nil || strings.TrimSpace(fields["workspace"]) != "true" {
+				continue
+			}
+			if _, declared := dependencies.get(name); declared {
+				direct[normalizeName(EcoRust, name)] = map[string]string{"dependencies": "main", "dev-dependencies": "dev", "build-dependencies": "build"}[section]
+			}
+		}
+	}
+}
+
+// workspaceManifests löst die deklarierte Workspace-Mitgliedsmenge gegen das
+// Wurzelmanifest auf. Ein leeres Ergebnis bedeutet kein Workspace, nicht einen
+// Fehler; nicht auflösbare Mitglieder werden beim anschließenden Boundary-Lesen
+// sichtbar und machen die gesamte Lockfile-Referenzmenge ungültig.
+func workspaceManifests(manifestPath, base string, data []byte) []string {
+	dir := filepath.Dir(manifestPath)
+	var members []string
+	switch base {
+	case "package.json":
+		var doc struct {
+			Workspaces json.RawMessage `json:"workspaces"`
+		}
+		if json.Unmarshal(data, &doc) == nil {
+			var paths []string
+			if json.Unmarshal(doc.Workspaces, &paths) != nil {
+				var object struct {
+					Packages []string `json:"packages"`
+				}
+				_ = json.Unmarshal(doc.Workspaces, &object)
+				paths = object.Packages
+			}
+			for _, path := range paths {
+				members = append(members, filepath.Join(dir, path, "package.json"))
+			}
+		}
+	case "Cargo.toml", "pyproject.toml":
+		doc := parseTOML(data)
+		table := "workspace"
+		if base == "pyproject.toml" {
+			table = "tool.uv.workspace"
+		}
+		if workspace := doc.table(table); workspace != nil {
+			if entry, ok := workspace.get("members"); ok {
+				for _, member := range tomlArray(entry.Raw, entry.Line) {
+					if value, ok := tomlString(member.Raw); ok {
+						members = append(members, filepath.Join(dir, value, base))
+					}
+				}
+			}
+		}
+	case "mix.exs":
+		appsPath := "apps"
+		hasAppsPath := false
+		for _, line := range strings.Split(string(data), "\n") {
+			if index := strings.Index(line, "apps_path:"); index >= 0 {
+				value := strings.TrimSpace(line[index+len("apps_path:"):])
+				if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') {
+					if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
+						value = value[1 : end+1]
+					}
+				}
+				value = strings.Trim(value, "\"', ")
+				if value != "" {
+					appsPath = value
+					hasAppsPath = true
+				}
+			}
+		}
+		if hasAppsPath {
+			members = append(members, filepath.Join(dir, appsPath, "*", "mix.exs"))
+		}
+	}
+	sort.Strings(members)
+	return members
 }
 
 // displayPath ist der Wert für Entry.SourceFile: projektrelativ mit `/` als

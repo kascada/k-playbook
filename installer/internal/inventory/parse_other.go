@@ -13,14 +13,21 @@ import (
 func parseRust(c *collector) {
 	doc := parseTOML(c.file.Data)
 	if c.file.Base == "Cargo.lock" {
+		if c.file.Direct == nil {
+			return
+		}
 		for _, table := range doc.tables("package") {
 			name, ok := tomlString(table.Entries["name"].Raw)
 			if !ok {
 				continue
 			}
 			version, _ := tomlString(table.Entries["version"].Raw)
+			scope, direct := c.file.Direct[normalizeName(EcoRust, name)]
+			if !direct {
+				continue
+			}
 			c.add(Entry{Ecosystem: EcoRust, Name: name, KindOfThing: ThingPackage,
-				Version: version, SourceKey: "package." + name, SourceLine: table.Line})
+				Version: version, Scope: scope, SourceKey: "package." + name, SourceLine: table.Line})
 		}
 		return
 	}
@@ -161,6 +168,9 @@ func parsePHP(c *collector) {
 		return
 	}
 
+	if c.file.Direct == nil {
+		return
+	}
 	var lock struct {
 		Packages []struct {
 			Name    string `json:"name"`
@@ -177,13 +187,21 @@ func parsePHP(c *collector) {
 	}
 	finder := newLineFinder(c.file.Data)
 	for _, item := range lock.Packages {
+		scope, direct := c.file.Direct[normalizeName(EcoPHP, item.Name)]
+		if !direct {
+			continue
+		}
 		c.add(Entry{Ecosystem: EcoPHP, Name: item.Name, KindOfThing: ThingPackage,
-			Version: item.Version, Scope: "main",
+			Version: item.Version, Scope: scope,
 			SourceKey: "packages." + item.Name, SourceLine: finder.find(item.Name, 0)})
 	}
 	for _, item := range lock.PackagesDev {
+		scope, direct := c.file.Direct[normalizeName(EcoPHP, item.Name)]
+		if !direct {
+			continue
+		}
 		c.add(Entry{Ecosystem: EcoPHP, Name: item.Name, KindOfThing: ThingPackage,
-			Version: item.Version, Scope: "dev",
+			Version: item.Version, Scope: scope,
 			SourceKey: "packages-dev." + item.Name, SourceLine: finder.find(item.Name, 0)})
 	}
 }
@@ -259,6 +277,9 @@ var mixDependency = regexp.MustCompile(`\{\s*:([a-z0-9_]+)\s*,\s*"([^"]+)"`)
 var mixLockEntry = regexp.MustCompile(`"([a-z0-9_]+)":\s*\{:hex,\s*:[a-z0-9_]+,\s*"([^"]+)"`)
 
 func parseElixir(c *collector) {
+	if c.file.Base == "mix.lock" && c.file.Direct == nil {
+		return
+	}
 	pattern := mixDependency
 	section := "deps"
 	if c.file.Base == "mix.lock" {
@@ -269,6 +290,11 @@ func parseElixir(c *collector) {
 		match := pattern.FindStringSubmatch(line)
 		if match == nil {
 			continue
+		}
+		if c.file.Base == "mix.lock" {
+			if _, direct := c.file.Direct[normalizeName(EcoElixir, match[1])]; !direct {
+				continue
+			}
 		}
 		c.add(Entry{Ecosystem: EcoElixir, Name: match[1], KindOfThing: ThingPackage,
 			Version: match[2], SourceKey: section + "." + match[1], SourceLine: index + 1})

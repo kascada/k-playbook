@@ -218,6 +218,9 @@ func parsePipfile(c *collector) {
 }
 
 func parsePipfileLock(c *collector) {
+	if c.file.Direct == nil {
+		return
+	}
 	var document map[string]map[string]struct {
 		Version string `json:"version"`
 	}
@@ -232,6 +235,10 @@ func parsePipfileLock(c *collector) {
 			continue
 		}
 		for _, name := range sortedKeys(packages) {
+			canonical := normalizeName(EcoPython, name)
+			if _, direct := c.file.Direct[canonical]; !direct {
+				continue
+			}
 			c.add(Entry{Ecosystem: EcoPython, Name: name, KindOfThing: ThingPackage,
 				Version: packages[name].Version, Scope: section.scope,
 				SourceKey:  section.key + "." + name,
@@ -243,6 +250,9 @@ func parsePipfileLock(c *collector) {
 // parsePythonLock liest poetry.lock und uv.lock. Beide führen ihre Pakete als
 // TOML-Tabellenliste `[[package]]`.
 func parsePythonLock(c *collector) {
+	if c.file.Direct == nil {
+		return
+	}
 	doc := parseTOML(c.file.Data)
 	for _, table := range doc.tables("package") {
 		name, ok := tomlString(table.Entries["name"].Raw)
@@ -250,8 +260,13 @@ func parsePythonLock(c *collector) {
 			continue
 		}
 		version, _ := tomlString(table.Entries["version"].Raw)
+		canonical := normalizeName(EcoPython, name)
+		scope, direct := c.file.Direct[canonical]
+		if !direct {
+			continue
+		}
 		c.add(Entry{Ecosystem: EcoPython, Name: name, KindOfThing: ThingPackage,
-			Version: version, SourceKey: "package." + name, SourceLine: table.Line})
+			Version: version, Scope: scope, SourceKey: "package." + name, SourceLine: table.Line})
 	}
 }
 
