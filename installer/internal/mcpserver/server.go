@@ -16,6 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -64,6 +65,13 @@ func Run(ctx context.Context) error {
 		Description: toolDescription,
 	}, contextTool)
 	addReviewTools(server)
+
+	// Die Kennung des Binaries wird vor dem ersten Aufruf festgehalten. Danach
+	// meldet dieselbe Funktion, was unter dem Pfad **jetzt** liegt: os.Executable()
+	// steht für einen laufenden Prozess fest, und Go schneidet das " (deleted)"
+	// weg, das Linux an den Link hängt, sobald die Datei ersetzt wurde. Ein
+	// späterer Aufruf sieht deshalb die neue Datei.
+	server.AddReceivingMiddleware(staleBinaryNotice(guiproc.OwnBuild(), guiproc.OwnBuild))
 
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil && !isSessionEnd(err) {
 		return fmt.Errorf("MCP-Server: %w", err)

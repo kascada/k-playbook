@@ -1,0 +1,63 @@
+# Matrix der Basis-Werkzeuge, die k-playbook selbst aufruft — für
+# install-base-tools.sh, den Kontextbefund und die Oberfläche.
+#
+# Diese Matrix ist bewusst von security-tools.tsv getrennt: scanners.tsv
+# referenziert die Security-Matrix über die Spalte tool, und jeder Eintrag dort
+# wird zu einem Lauf-Zustand in jedem Review. Ein rg in der Security-Matrix
+# erschiene in jedem Review-Lauf als übersprungener Eintrag.
+#
+# Fields: name	group	role	guarded	methods	apt_package	github_repo	asset_ref	asset_pattern
+#
+# name          Programmname, wie er im PATH steht. Das ist der Prüfschlüssel:
+#               das Skript prüft ihn mit `command -v`, die Go-Seite mit
+#               exec.LookPath. Paketname und Programmname fallen auseinander
+#               (ripgrep liefert rg), deshalb steht die Installationsreferenz
+#               je Methode in eigenen Spalten.
+# group         Gruppenschlüssel für Einträge, von denen einer genügt, sonst -.
+#               Die Gruppe gilt als vorhanden, sobald eines ihrer Mitglieder da
+#               ist. Ohne das meldete der Befund auf einem Host mit curl
+#               dauerhaft wget als fehlend.
+# role          Was ohne dieses Werkzeug ausfällt. Der Hinweis im Kontext nennt
+#               das, statt pauschal zu warnen.
+# guarded       Sind die Aufrufstellen im Repo heute schon abgesichert?
+#               ja           — Aufrufe stehen hinter has_cmd/command -v mit
+#                              Abbruch oder Skip.
+#               interpreter  — das Werkzeug ist der Interpreter selbst und kann
+#                              nicht fehlen, während ein Skript läuft.
+#               selbsterklaerend — ungeguarded, der Fehlschlag benennt sich aber
+#                              selbst; siehe die zurückgestellte Ausnahme in
+#                              rules/command-authoring.md.
+#               ja-seit-045  — in dieser Runde nachgezogen.
+#               Die Spalte verhindert, dass bestehende Guards ein zweites Mal
+#               gebaut werden.
+# methods       Komma-Liste der Installationswege in Rangfolge: apt bevorzugt,
+#               github als user-lokaler Rückfall, none für das, was niemand
+#               installiert. Ein Eintrag darf ausdrücklich nur apt führen: für
+#               git, curl, wget, tar und python3 gibt es keinen sinnvollen
+#               GitHub-Release, den man nach ~/.local/bin entpacken könnte.
+#               Dieser Zustand „apt-only" ist gewollt und keine Lücke — es
+#               werden für sie keine Release-URLs erfunden. Einen github-Weg
+#               führt heute allein rg; er ist der Grund, aus dem der Rückfall
+#               überhaupt existiert (Ubuntu-Host, apt vorhanden, kein root).
+# apt_package   Paketname für apt-get install, oder -.
+# github_repo   owner/repo des Releases, oder -.
+# asset_ref     Die Installationsreferenz, an die {tool} im Asset-Muster
+#               bindet — nicht der Programmname. BurntSushi/ripgrep benennt
+#               seine Assets ripgrep-…, das Programm heißt rg.
+# asset_pattern Nur für github: regulärer Ausdruck auf den Asset-Namen.
+#               Platzhalter: {tool} (asset_ref), {version}, {os} (linux|darwin),
+#               {arch} (amd64|arm64), {arch_x64}, {os_cap}, {arch_bits} wie in
+#               der Security-Matrix, dazu {arch_raw} (x86_64|aarch64) und
+#               {vendor_os} für den Vendor-/Libc-Teil der Rust-Target-Triples
+#               (unter Linux unknown-linux-(?:musl|gnu), unter macOS
+#               apple-darwin). Assets mit der Endung .sha256 werden nie
+#               getroffen. Endet der Name nicht auf .tar.gz oder .tgz, gilt das
+#               Asset als blanke Binary und wird direkt installiert.
+name	group	role	guarded	methods	apt_package	github_repo	asset_ref	asset_pattern
+bash	-	Interpreter der Skripte, Checks und Installer	interpreter	apt	bash	-	-	-
+git	-	Repository-Zugriff für Tasks, Reviews, Enforcement und den Docs-Index	selbsterklaerend	apt	git	-	-	-
+curl	download	Download von Release-Assets und des Installer-Binaries	ja	apt	curl	-	-	-
+wget	download	Download-Rückfall, wenn curl fehlt	ja	apt	wget	-	-	-
+tar	-	Entpacken der Release-Archive	ja	apt	tar	-	-	-
+python3	-	Auflösung der GitHub-Releases und Auswertung in den Checks	ja	apt	python3	-	-	-
+rg	-	Volltextsuche über die AI-Verläufe in /k-verlauf	ja-seit-045	apt,github	ripgrep	BurntSushi/ripgrep	ripgrep	^{tool}-{version}-{arch_raw}-{vendor_os}\.tar\.gz$

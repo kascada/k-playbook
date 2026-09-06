@@ -93,12 +93,15 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 // den er meint; liegt dort nichts, fällt auch nichts aus.
 //
 // Warum diese Liste nicht dieselbe ist wie moduleSearchExcluded: die Modulsuche
-// fragt, wo ein Modul des Projekts liegt, und lässt deshalb vendor/,
-// node_modules/ und testdata/ aus — dort steht fremder oder Prüfcode. Die
-// Zählung fragt etwas anderes, nämlich was ein Werkzeug hätte sehen können, und
-// die Werkzeuge sehen dort sehr wohl hinein. Sie hier auszunehmen ergäbe eine
-// Zahl unter der Zahl der geprüften Dateien — und damit ein „nichts zu prüfen",
-// wo es etwas zu prüfen gab.
+// fragt, wo ein Modul des Projekts liegt, und lässt deshalb vendor/ und
+// testdata/ aus — dort steht fremder oder Prüfcode. Die Zählung fragt etwas
+// anderes, nämlich was ein Werkzeug hätte sehen können, und die Werkzeuge sehen
+// dort sehr wohl hinein. Sie hier auszunehmen ergäbe eine Zahl unter der Zahl
+// der geprüften Dateien — und damit ein „nichts zu prüfen", wo es etwas zu
+// prüfen gab.
+//
+// node_modules/ ist die eine Ausnahme davon und steht deshalb nicht hier,
+// sondern in candidateExcludedByName — die Begründung dort.
 //
 // Was bleibt, sind die beiden generischen Ausschlüsse, die jeder Job in
 // scanners.tsv mitführt.
@@ -109,6 +112,26 @@ var candidateExcluded = map[string]bool{
 	// Die Ergebnisse früherer Läufe. Ohne den Ausschluss zählten die
 	// Secret-Sucher die SARIF-Dateien des vorigen Laufs als Gegenstand mit.
 	"k-playbook-local/results": true,
+}
+
+// candidateExcludedByName sind die Verzeichnisse, die kein Job sieht, **über
+// ihren Namen** und damit auf jeder Ebene — anders als candidateExcluded, das
+// den Pfad ab dem Bezugspunkt verankert.
+//
+// Die Verankerung dort hat ihren Grund: results/ und k-playbook/ meinen genau
+// einen Ort, und eine Regel über den bloßen Namen fräße gleichnamige
+// Verzeichnisse mit. Bei node_modules/ ist es umgekehrt — gemeint ist jedes,
+// auf jeder Ebene, denn npm legt sie geschachtelt an.
+//
+// Warum node_modules/ überhaupt herausfällt, obwohl der Block über
+// candidateExcluded gerade begründet, dass die Zählung fremden Code mitzählt:
+// weil dort kein Werkzeug dieses Katalogs hineinsieht. njsscan führt
+// node_modules in seinen Voreinstellungen, semgrep ebenso, und die Job-Zeile
+// nimmt es zusätzlich aus. Die Obergrenze bliebe formal gültig, wäre aber
+// nutzlos — in confluence-companion stünden 20 echte Dateien gegen die von 151
+// Paketen. Eine Zahl, die man nicht mehr lesen kann, ist keine Auskunft.
+var candidateExcludedByName = map[string]bool{
+	"node_modules": true,
 }
 
 // countCandidates zählt die Dateien unter root, die für kind und languages als
@@ -165,12 +188,17 @@ func countCandidates(root string, kind CandidateKind, languages string) (int, er
 
 // skipCandidateDir meldet, ob ein Verzeichnis für die Zählung ausfällt.
 //
-// Verzeichnisse mit führendem Punkt fallen als Gruppe heraus, und die einzig
-// über den Namen: dort liegen Versionsverwaltung, Werkzeug-Caches und virtuelle
-// Umgebungen, und zwar auf jeder Ebene. Sie mitzuzählen hieße, die Auskunft in
-// Zehntausenden Dateien aus .git und .venv zu ertränken.
+// Geprüft wird in drei Stufen, und zwei davon gehen über den Namen, weil sie
+// jede Ebene meinen. Verzeichnisse mit führendem Punkt fallen als Gruppe heraus:
+// dort liegen Versionsverwaltung, Werkzeug-Caches und virtuelle Umgebungen. Sie
+// mitzuzählen hieße, die Auskunft in Zehntausenden Dateien aus .git und .venv zu
+// ertränken. Dazu kommen die namentlich genannten aus candidateExcludedByName.
+// Erst zuletzt greift candidateExcluded über den verankerten Pfad.
 func skipCandidateDir(name string, relative string) bool {
 	if strings.HasPrefix(name, ".") {
+		return true
+	}
+	if candidateExcludedByName[name] {
 		return true
 	}
 	return candidateExcluded[relative]

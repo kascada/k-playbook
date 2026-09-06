@@ -37,6 +37,18 @@ type Context struct {
 	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
 	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
 	GH GH `json:"gh"`
+	// BaseTools ist der Host-Befund zu den Werkzeugen, die k-playbook selbst
+	// aufruft — bash, git, curl/wget, tar, python3, rg. Gemessen wird reine
+	// Anwesenheit im PATH über exec.LookPath: kein Unterprozess je Werkzeug,
+	// kein --version. Nur deshalb darf der Befund hier stehen und der
+	// Security-Preflight nicht.
+	//
+	// Eine Shell-Funktion oder ein Alias wird dabei nicht gesehen. Unter Claude
+	// Code ist `rg` genau das, und der Befund meldet es dort dauerhaft als
+	// fehlend, obwohl der Aufruf funktioniert; die Begründung steht am Typ
+	// BaseTools. Ein fehlendes Basis-Werkzeug warnt und blockiert nicht —
+	// anders als gh.ready.
+	BaseTools BaseTools `json:"baseTools"`
 	// Cleanliness ist der lokale Zustand der Installation. Sie steht hier, weil
 	// die Regel „in k-playbook/ wird nie geschrieben" sich nicht selbst
 	// durchsetzt und ihr Bruch still bleibt: Ändert sich eine lokal veränderte
@@ -302,6 +314,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Local:          ContextDir{Dir: localDir},
 		Remediation:    remediation,
 		GH:             gh,
+		BaseTools:      DetectBaseTools(projectDir),
 		Cleanliness:    CheckCleanliness(projectDir),
 		Catalogs:       map[string][]CatalogEntry{},
 		Guidelines:     listFiles(filepath.Join(localDir, "guidelines")),

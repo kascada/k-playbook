@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body data-mode="{{.Mode}}">
-    <main class="shell">
+    <main class="shell wide">
       <section class="hero app-header">
         <div class="brand-row">
           <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
@@ -40,6 +40,20 @@
              Installation, das Inventar ist eine erzeugte Datei des Projekts.
              Das Menü links entsteht wie auf der Startseite aus den Karten. -->
         <div class="blocks">
+          <!-- Die Datei steht oben: sie ist der Gegenstand der Seite, alles
+               andere beschreibt nur ihren Zustand und ihre Herkunft. Das
+               Blockmenü links folgt dieser Reihenfolge von selbst. -->
+          <section class="card" id="file-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" id="file-path"></p>
+                <h2>Inventardatei</h2>
+              </div>
+            </div>
+            <article id="file-viewer" class="doc-viewer"></article>
+            <p id="file-message" class="message"></p>
+          </section>
+
           <section class="card" id="status-card">
             <div class="section-head">
               <div>
@@ -98,17 +112,6 @@
             </p>
             <dl id="sources-facts" class="facts"></dl>
             <p id="sources-message" class="message"></p>
-          </section>
-
-          <section class="card" id="file-card">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow" id="file-path"></p>
-                <h2>Inventardatei</h2>
-              </div>
-            </div>
-            <article id="file-viewer" class="doc-viewer"></article>
-            <p id="file-message" class="message"></p>
           </section>
         </div>
       </div>

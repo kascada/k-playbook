@@ -202,20 +202,61 @@ func TestRegisterSchreibtExklusiv(t *testing.T) {
 	}
 }
 
+// Die Build-Kennung unterscheidet zwei Dateien, die dieselbe Version tragen
+// könnten — der Fall, den `make dev-install` erzeugt. Eine fehlende Datei
+// ergibt keine Kennung; der Vergleich fällt dann auf die Version zurück.
+func TestBuildOfUnterscheidetDateien(t *testing.T) {
+	dir := t.TempDir()
+	erste := filepath.Join(dir, "erste")
+	zweite := filepath.Join(dir, "zweite")
+	if err := os.WriteFile(erste, []byte("alt"), 0o755); err != nil {
+		t.Fatalf("schreiben: %v", err)
+	}
+	// Gleiche Größe, andere Änderungszeit: genau der Fall, den ein zweiter
+	// Build derselben Quelle erzeugt.
+	if err := os.WriteFile(zweite, []byte("neu"), 0o755); err != nil {
+		t.Fatalf("schreiben: %v", err)
+	}
+	if err := os.Chtimes(zweite, time.Unix(1, 0), time.Unix(1, 0)); err != nil {
+		t.Fatalf("Zeiten setzen: %v", err)
+	}
+
+	if buildOf(erste) == "" {
+		t.Error("keine Kennung für eine vorhandene Datei")
+	}
+	if buildOf(erste) != buildOf(erste) {
+		t.Error("zwei Aufrufe ergeben verschiedene Kennungen")
+	}
+	if buildOf(erste) == buildOf(zweite) {
+		t.Error("zwei Dateien tragen dieselbe Kennung")
+	}
+	if buildOf(filepath.Join(dir, "fehlt")) != "" {
+		t.Error("eine fehlende Datei ergibt eine Kennung")
+	}
+}
+
+// Das eigene Testbinary liegt auf der Platte und hat deshalb eine Kennung.
+func TestOwnIdentityNenntBuild(t *testing.T) {
+	if OwnIdentity().Build == "" {
+		t.Error("keine Kennung für das laufende Binary")
+	}
+}
+
 // Die Einordnung in zwei Stufen: erst die Prozessidentität, dann die Antwort.
 func TestClassify(t *testing.T) {
-	record := Record{Key: "/p", Addr: "127.0.0.1:1", PID: 4242, Version: "v1", StartTime: 1000}
+	record := Record{Key: "/p", Addr: "127.0.0.1:1", PID: 4242, Version: "v1", Build: "b1", StartTime: 1000}
 	identity := func(pid int, start time.Time) bool { return pid == 4242 && start.Unix() == 1000 }
 	healthy := func(string) (Health, error) {
-		return Health{Status: "ok", Key: "/p", Version: "v1", PID: 4242}, nil
+		return Health{Status: "ok", Key: "/p", Version: "v1", Build: "b1", PID: 4242}, nil
 	}
+	same := Identity{Version: "v1", Build: "b1"}
 
 	tests := []struct {
 		name     string
 		record   Record
 		identity func(int, time.Time) bool
 		health   func(string) (Health, error)
-		version  string
+		own      Identity
 		want     Status
 	}{
 		{
@@ -223,7 +264,7 @@ func TestClassify(t *testing.T) {
 			record:   record,
 			identity: func(int, time.Time) bool { return false },
 			health:   healthy,
-			version:  "v1",
+			own:      same,
 			want:     StatusOrphaned,
 		},
 		{
@@ -231,7 +272,7 @@ func TestClassify(t *testing.T) {
 			record:   Record{Key: "/p", Addr: "127.0.0.1:1", PID: 4242, Version: "v1", StartTime: 5000},
 			identity: identity,
 			health:   healthy,
-			version:  "v1",
+			own:      same,
 			want:     StatusOrphaned,
 		},
 		{
@@ -239,7 +280,7 @@ func TestClassify(t *testing.T) {
 			record:   record,
 			identity: identity,
 			health:   func(string) (Health, error) { return Health{}, errors.New("connection refused") },
-			version:  "v1",
+			own:      same,
 			want:     StatusUnresponsive,
 		},
 		{
@@ -249,8 +290,8 @@ func TestClassify(t *testing.T) {
 			health: func(string) (Health, error) {
 				return Health{Status: "ok", Key: "/anderes", Version: "v1", PID: 4242}, nil
 			},
-			version: "v1",
-			want:    StatusUnresponsive,
+			own:  same,
+			want: StatusUnresponsive,
 		},
 		{
 			name:     "fremde PID hinter dem Port: lebt ohne Antwort",
@@ -259,30 +300,65 @@ func TestClassify(t *testing.T) {
 			health: func(string) (Health, error) {
 				return Health{Status: "ok", Key: "/p", Version: "v1", PID: 99}, nil
 			},
-			version: "v1",
-			want:    StatusUnresponsive,
+			own:  same,
+			want: StatusUnresponsive,
 		},
 		{
 			name:     "andere Version",
 			record:   record,
 			identity: identity,
 			health:   healthy,
-			version:  "v2",
+			own:      Identity{Version: "v2", Build: "b2"},
 			want:     StatusOtherVersion,
+		},
+		{
+			// Der Fall des Entwicklungsstands: die VERSION steht still, das
+			// Binary wurde neu gebaut. Ohne die Build-Kennung bliebe der alte
+			// Server stehen und bediente weiter mit altem Code.
+			name:     "gleiche Version, neu gebautes Binary",
+			record:   record,
+			identity: identity,
+			health:   healthy,
+			own:      Identity{Version: "v1", Build: "b2"},
+			want:     StatusOtherVersion,
+		},
+		{
+			// Ein Server aus einem Binary vor der Build-Kennung meldet keine.
+			// Er ist damit immer ein anderer Stand — und wird ersetzt, sobald
+			// das neue Binary das erste Mal aufgerufen wird.
+			name:     "Server ohne Build-Kennung",
+			record:   record,
+			identity: identity,
+			health: func(string) (Health, error) {
+				return Health{Status: "ok", Key: "/p", Version: "v1", PID: 4242}, nil
+			},
+			own:  same,
+			want: StatusOtherVersion,
+		},
+		{
+			// Ohne eigene Kennung — os.Executable() nicht auflösbar — bleibt
+			// nur die Version. Ein Fehlurteil dürfte hier nicht dazu führen,
+			// dass jeder Aufruf den laufenden Server abräumt.
+			name:     "ohne eigene Kennung entscheidet die Version",
+			record:   record,
+			identity: identity,
+			health:   healthy,
+			own:      Identity{Version: "v1"},
+			want:     StatusRunning,
 		},
 		{
 			name:     "läuft",
 			record:   record,
 			identity: identity,
 			health:   healthy,
-			version:  "v1",
+			own:      same,
 			want:     StatusRunning,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			finding := Classify(test.record, "/p", test.version, Inspector{Identity: test.identity, Health: test.health})
+			finding := Classify(test.record, "/p", test.own, Inspector{Identity: test.identity, Health: test.health})
 			if finding.Status != test.want {
 				t.Errorf("Status = %s, erwartet %s", finding.Status, test.want)
 			}
@@ -297,7 +373,7 @@ func TestClassify(t *testing.T) {
 func TestInspectOhneUndMitUnlesbarerDatei(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
 
-	finding, err := Inspect("/p", "v1", DefaultInspector())
+	finding, err := Inspect("/p", Identity{Version: "v1"}, DefaultInspector())
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
@@ -311,7 +387,7 @@ func TestInspectOhneUndMitUnlesbarerDatei(t *testing.T) {
 	if err := os.WriteFile(finding.Path, []byte("{halb"), 0o600); err != nil {
 		t.Fatalf("Datei schreiben: %v", err)
 	}
-	finding, err = Inspect("/p", "v1", DefaultInspector())
+	finding, err = Inspect("/p", Identity{Version: "v1"}, DefaultInspector())
 	if err != nil {
 		t.Fatalf("Inspect: %v", err)
 	}
@@ -348,7 +424,7 @@ func TestStatusString(t *testing.T) {
 	for status, want := range map[Status]string{
 		StatusAbsent:       "nicht vorhanden",
 		StatusRunning:      "läuft unter dieser URL",
-		StatusOtherVersion: "läuft mit anderer Version",
+		StatusOtherVersion: "läuft mit anderem Stand",
 		StatusOrphaned:     "verwaist",
 		StatusUnresponsive: "lebt ohne Antwort",
 	} {

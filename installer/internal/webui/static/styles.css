@@ -40,6 +40,19 @@ select {
   padding: 44px 0;
 }
 
+/* Umschalter für Seiten, deren rechte Spalte breite Inhalte trägt — gerenderte
+   Dokumente mit Tabellen und Codeblöcken, wie in Docs und Inventar. Sie
+   bekommen mehr Fensterbreite, während der Rest der Oberfläche bei der
+   ruhigeren Grundbreite bleibt. Gesetzt wird die Klasse am <main> der Seite.
+
+   Die Breite wächst mit dem Fenster: schmale Fenster nutzen alles bis auf den
+   Rand, ab rund 1810px steht die Grundbreite von 1780px — 30 % mehr als sonst
+   —, noch breitere Fenster bekommen 78 % davon. Der Deckel bei 2240px hält die
+   Fließtexte in den Karten lesbar. */
+.shell.wide {
+  width: min(calc(100% - 32px), max(1780px, 78vw), 2240px);
+}
+
 .layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -1022,7 +1035,11 @@ button.attention-highlight {
 }
 
 @media (max-width: 820px) {
-  .shell {
+  /* Auf schmalen Fenstern gibt es nichts umzuschalten: hier gilt für beide
+     Sorten dieselbe Breite. Der Umschalter wird mitgenannt, weil er sonst
+     spezifischer bliebe als diese Regel. */
+  .shell,
+  .shell.wide {
     width: min(100% - 22px, 1120px);
     padding: 28px 0;
   }

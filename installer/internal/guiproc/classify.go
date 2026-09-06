@@ -14,10 +14,10 @@ const (
 	// StatusAbsent: keine Laufzeitdatei, also kein Server.
 	StatusAbsent Status = iota
 	// StatusRunning: der eigene Server läuft unter dieser URL, mit gleichem
-	// Schlüssel und gleicher Version.
+	// Schlüssel und gleichem Stand.
 	StatusRunning
-	// StatusOtherVersion: der eigene Server läuft, aber aus einer anderen
-	// Version der Installation.
+	// StatusOtherVersion: der eigene Server läuft, aber aus einem anderen
+	// Stand — anderer Version oder anderem Build derselben Version.
 	StatusOtherVersion
 	// StatusOrphaned: der Prozess aus der Datei läuft nachweislich nicht mehr,
 	// PID tot oder Startzeit passt nicht. Nur dann darf die Datei weg.
@@ -35,7 +35,7 @@ func (s Status) String() string {
 	case StatusRunning:
 		return "läuft unter dieser URL"
 	case StatusOtherVersion:
-		return "läuft mit anderer Version"
+		return "läuft mit anderem Stand"
 	case StatusOrphaned:
 		return "verwaist"
 	case StatusUnresponsive:
@@ -45,11 +45,17 @@ func (s Status) String() string {
 }
 
 // Health ist die Antwort von GET /api/health. Der Server meldet Schlüssel,
-// Version und PID; der Client vergleicht mit seiner eigenen Auflösung.
+// Version, Build-Kennung und PID; der Client vergleicht mit seiner eigenen
+// Auflösung.
+//
+// Build fehlt in der Antwort eines Servers aus einem Binary vor dieser
+// Erweiterung. Der leere Wert ist deshalb kein Sonderfall, sondern die
+// richtige Auskunft: ein solcher Server ist ein anderer Stand.
 type Health struct {
 	Status  string `json:"status"`
 	Key     string `json:"key"`
 	Version string `json:"version"`
+	Build   string `json:"build"`
 	PID     int    `json:"pid"`
 }
 
@@ -78,9 +84,9 @@ func DefaultInspector() Inspector {
 	return Inspector{Identity: IdentityMatches, Health: ProbeHealth}
 }
 
-// Inspect liest die Laufzeitdatei zu key und ordnet sie ein. version ist die
-// eigene Version, gegen die der laufende Server verglichen wird.
-func Inspect(key string, version string, inspector Inspector) (Finding, error) {
+// Inspect liest die Laufzeitdatei zu key und ordnet sie ein. own ist der
+// eigene Stand, gegen den der laufende Server verglichen wird.
+func Inspect(key string, own Identity, inspector Inspector) (Finding, error) {
 	location, err := Locate(key)
 	if err != nil {
 		return Finding{}, err
@@ -94,7 +100,7 @@ func Inspect(key string, version string, inspector Inspector) (Finding, error) {
 	if !ok {
 		return Finding{Status: StatusAbsent, Path: location.File}, nil
 	}
-	finding := Classify(record, key, version, inspector)
+	finding := Classify(record, key, own, inspector)
 	finding.Path = location.File
 	return finding, nil
 }
@@ -107,7 +113,7 @@ func Inspect(key string, version string, inspector Inspector) (Finding, error) {
 // eigene, hängende Server: die Datei eines lebenden eigenen Prozesses zu
 // löschen hieße, beim nächsten Aufruf einen zweiten Server für dasselbe
 // Projekt hochzuziehen.
-func Classify(record Record, key string, version string, inspector Inspector) Finding {
+func Classify(record Record, key string, own Identity, inspector Inspector) Finding {
 	finding := Finding{Record: record}
 
 	if !inspector.Identity(record.PID, time.Unix(record.StartTime, 0)) {
@@ -122,7 +128,7 @@ func Classify(record Record, key string, version string, inspector Inspector) Fi
 	}
 	finding.Health = health
 
-	if health.Version != version {
+	if !own.Matches(health) {
 		finding.Status = StatusOtherVersion
 		return finding
 	}

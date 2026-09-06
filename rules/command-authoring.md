@@ -176,6 +176,30 @@ Satz, wofür er da ist. Gibt es keinen Nachfolger, sagt der Schritt das ebenso
 ausdrücklich. Ein Command, der offen endet, hinterlässt die Frage „und jetzt?" beim
 Nutzer.
 
+## Externe Werkzeuge
+
+Ein Command, der ein externes Werkzeug aufruft — `rg`, `git`, `curl`, `python3`, was auch
+immer —, braucht dafür einen **Guard oder einen Rückfall**. Er darf nicht davon ausgehen,
+dass das Werkzeug da ist.
+
+- Guard heißt: vorher prüfen, und beim Fehlen benennen, was ausfällt, statt in
+  `command not found` zu laufen. Der Befund dazu steht fertig in der Context-Ausgabe unter
+  `baseTools`; er wird nicht selbst erhoben.
+- Rückfall heißt: ein zweiter Weg, der dasselbe liefert. Er muss dieselbe Form liefern wie
+  der erste — ein Rückfall, der etwas anderes zurückgibt als der Aufruf, den er ersetzt,
+  bricht die folgenden Schritte.
+- Ein Command installiert nie selbst. Er nennt den Befehl aus
+  `baseTools.installCommand` und überlässt die Ausführung dem Nutzer.
+
+**Bekannte, bewusst zurückgestellte Ausnahme.** `git` wird heute in fünf mitgelieferten
+Commands ohne ausdrücklichen Guard aufgerufen: `k-task-run.md`, `k-pr-review.md`,
+`k-enforcement.md`, `k-remediation.md` und `k-docs-index.md`. Der Fehlschlag ist dort
+selbsterklärend, und ohne git gäbe es das Repository nicht, in dem k-playbook arbeitet.
+Diese Regel gilt ab sofort für **neue und geänderte** Commands; die fünf `git`-Stellen
+werden nachgezogen, wenn sie ohnehin angefasst werden. Der Rückstand steht in
+`k-playbook-local/TODO.md`, damit er wieder auftaucht, statt in dieser Regeldatei zu
+verschwinden.
+
 ## Schreibweise
 
 Es gilt `docs/schreibweise.md`: Umlaute und ß in allem, was gelesen wird — Überschriften,

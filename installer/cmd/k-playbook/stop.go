@@ -19,7 +19,7 @@ func runStop(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	finding, err := guiproc.Inspect(key, guiproc.OwnVersion(), guiproc.DefaultInspector())
+	finding, err := guiproc.Inspect(key, guiproc.OwnIdentity(), guiproc.DefaultInspector())
 	if err != nil {
 		return err
 	}

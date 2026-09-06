@@ -100,6 +100,17 @@ Benutze `rg` (ripgrep), um den Suchbegriff in den gefundenen Dateien zu suchen:
 rg -il "SEARCH" <dateien>
 ```
 
+Fehlt `rg`, nimm `grep`. Der Rückfall liefert dasselbe: die Namen der Dateien mit
+Treffern.
+
+```bash
+grep -ril "SEARCH" <dateien>
+```
+
+Sag einmal, dass der Rückfall gegriffen hat, und nenne `baseTools.installCommand` aus
+der Context-Ausgabe. Installiere nichts selbst. Steht `rg` dort als fehlend, obwohl der
+Aufruf funktioniert, war es eine Shell-Funktion — der Befund misst nur den `PATH`.
+
 Für jede Datei mit Treffern:
 
 1. **Datum** aus dem ersten JSONL-Eintrag lesen.
@@ -151,6 +162,13 @@ Suche case-insensitive:
 
 ```bash
 rg -i "SEARCH" "$OPENCODE_LOG"
+```
+
+Fehlt `rg`, nimm `grep` — **ohne** `-l`. Die folgenden Schritte werten die Trefferzeilen
+selbst aus; mit `-l` käme nur der Dateiname zurück und die Auswertung bräche ab.
+
+```bash
+grep -i "SEARCH" "$OPENCODE_LOG"
 ```
 
 Wenn `DATE_FILTER` gesetzt ist, filtere zusätzlich über den Prefix `timestamp=YYYY-MM-DD...`.

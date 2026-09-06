@@ -164,6 +164,19 @@ run, and the producing command creates its own directory without asking.
   is false. In the last case name which half is missing: install `gh`, or run
   `gh auth login --hostname github.com`. Never install and never sign in yourself —
   both change the host, and signing in needs a browser.
+- **Before calling a base tool, check `baseTools` from this output.** It lists the tools
+  k-playbook itself calls — `bash`, `git`, `curl` or `wget`, `tar`, `python3`, `rg`.
+  Say something only when `baseTools.missing` is non-empty; when nothing is missing, say
+  nothing. For each entry that a command in this run actually needs, name the tool, what
+  `role` says it costs you, and `baseTools.installCommand` as the way to get it. Do not
+  warn in general terms and do not list tools this run does not touch. A missing base
+  tool **warns, it does not stop the run** — that is the difference from `gh.ready`,
+  which ends a PR review. Where a fallback exists, take it and say that you did. Never
+  install anything yourself: the command is printed, never run. Note that presence is
+  measured in `PATH` only, so a shell function or alias is invisible — under Claude Code
+  `rg` may be reported as missing although it works; that is known and accepted.
+  When `baseTools.present` is false the matrix could not be read; say nothing about base
+  tools then, rather than guessing.
 - **Name `gh.account` before writing to GitHub.** Approving, merging or commenting is
   externally visible and acts as whoever is signed in. The active account is machine-wide
   and may have been switched in another project since.

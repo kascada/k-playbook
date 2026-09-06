@@ -477,7 +477,8 @@ der Update-Pfad lädt oder ersetzt von sich aus kein Host-Binary. Danach startet
 `k-playbook` die neue Fassung. Nach einem `git pull` von Hand oder
 `make -C k-playbook installer-update` läuft ein alter Dienst zunächst weiter; erkannt und
 ersetzt wird er erst, wenn der nächste Aufruf von `k-playbook` aus einem neu installierten
-Binary anderer Version kommt. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
+Binary kommt. Verglichen wird dabei die Binärdatei selbst und nicht nur ihre Version — ein
+neu gebautes Binary derselben `VERSION` löst den alten Dienst also ebenso ab. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
 `VERSION` nicht: der Dienst läuft weiter, `Neu einlesen` in der Oberfläche holt den Stand,
 und ein Neustart des Assistenten genügt.
 
@@ -667,15 +668,26 @@ Pflicht-Tools:
 | `syft` | alle | SBOM-Erzeugung |
 | `grype` | alle | SBOM-/Dependency-CVE-Auswertung |
 | `pip-audit` | Python | Python Dependency-CVEs |
-| `semgrep` | Python, Go | generische Security-Regeln |
-| `osv-scanner` | Python, Go | Dependency-CVEs mit SARIF |
+| `ruff` | Python | Python-Qualität und flake8-bandit-Regeln |
+| `semgrep` | Python, Go, JS/TS | generische Security-Regeln |
+| `osv-scanner` | Python, Go, JS/TS | Dependency-CVEs mit SARIF |
 | `gosec` | Go | Go-Security |
 | `govulncheck` | Go | Go-CVEs mit Reachability |
+| `njsscan` | JS/TS | Node-/JS-Security |
 
-Optional, weil sie sich mit anderen überschneiden oder eine projekteigene Konfiguration
-brauchen: `ruff` (Python-Qualität; sein `S`-Regelwerk *ist* flake8-bandit), `bandit`
-(Python-Security) und `golangci-lint` (Go-Qualität). `docker` ist ebenfalls optional und
-wird als Fallback-Kontext angezeigt, aber nicht durch k-playbook installiert.
+Optional, weil sie sich mit anderen überschneiden: `golangci-lint` (Go-Qualität, bündelt
+staticcheck und errcheck). `docker` ist ebenfalls optional und wird als Fallback-Kontext
+angezeigt, aber nicht durch k-playbook installiert.
+
+`bandit` steht bewusst in keiner der beiden Listen: `ruff` deckt es ab, sein
+`S`-Regelwerk *ist* flake8-bandit. Ein zweites Werkzeug für dieselben Regeln brächte nur
+doppelte Befunde.
+
+**JavaScript und TypeScript sind zwei getrennte Sprachen** in der Matrix, keine
+gemeinsame. `AppliesTo` kostet das nichts, aber die Kandidatenzählung leitet aus
+derselben Angabe ab, welche Endungen zählen — mit nur `javascript` bekäme ein reines
+TypeScript-Projekt eine 0 auf seinen `.ts`-Dateien. Ein Projekt, das beides hat, nennt
+beide.
 
 **Pflicht gilt je Sprache.** Ein sprachgebundenes Tool zählt nur dann als fehlende
 Pflicht, wenn seine Sprache gefragt war — und ohne Angabe gilt gar keine Sprachbindung als

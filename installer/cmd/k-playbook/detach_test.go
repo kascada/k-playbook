@@ -41,7 +41,7 @@ func TestSpawnServerUndStop(t *testing.T) {
 	}
 
 	// Ein zweiter Blick findet ihn als laufend, nicht als etwas Neues.
-	finding, err := guiproc.Inspect(key, guiproc.OwnVersion(), guiproc.DefaultInspector())
+	finding, err := guiproc.Inspect(key, guiproc.OwnIdentity(), guiproc.DefaultInspector())
 	if err != nil || finding.Status != guiproc.StatusRunning {
 		t.Errorf("Inspect = %s, %v; erwartet %s", finding.Status, err, guiproc.StatusRunning)
 	}

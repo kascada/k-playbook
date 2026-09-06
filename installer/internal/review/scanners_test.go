@@ -198,6 +198,8 @@ func TestScannerAppliesTo(t *testing.T) {
 		{"python", []string{"go"}, false},
 		{"python,go", []string{"go"}, true},
 		{"python", []string{"python", "go"}, true},
+		{"python,go,javascript,typescript", []string{"typescript"}, true},
+		{"javascript,typescript", []string{"python"}, false},
 	}
 	for _, fall := range fälle {
 		scanner := Scanner{Languages: fall.languages}

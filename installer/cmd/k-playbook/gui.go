@@ -27,11 +27,12 @@ func runGUI() error {
 	if err != nil {
 		return err
 	}
-	finding, err := guiproc.Inspect(key, guiproc.OwnVersion(), guiproc.DefaultInspector())
+	own := guiproc.OwnIdentity()
+	finding, err := guiproc.Inspect(key, own, guiproc.DefaultInspector())
 	if err != nil {
 		return err
 	}
-	return reuseOrStart(finding, guiActions{
+	return reuseOrStart(finding, own, guiActions{
 		open:    openExisting,
 		stop:    stopExisting,
 		discard: guiproc.Remove,
@@ -138,21 +139,21 @@ type guiActions struct {
 
 // reuseOrStart setzt die Einordnung der Laufzeitdatei in Handlung um.
 //
-// Ein Server anderer Version wird ersetzt: nach einer Neuinstallation liegt
-// unter ~/.local/bin schon das neue Binary, der alte Daemon liefe sonst
+// Ein Server aus einem anderen Stand wird ersetzt: nach einer Neuinstallation
+// liegt unter ~/.local/bin schon das neue Binary, der alte Daemon liefe sonst
 // weiter und bediente die Oberfläche mit dem alten Code. Ein
 // eigener Prozess, der nicht antwortet, wird nicht angetastet — seine Datei zu
 // löschen hieße, einen zweiten Server für dasselbe Projekt hochzuziehen; der
 // Weg ist `k-playbook stop`, das mit SIGTERM immer greift.
-func reuseOrStart(finding guiproc.Finding, actions guiActions) error {
+func reuseOrStart(finding guiproc.Finding, own guiproc.Identity, actions guiActions) error {
 	switch finding.Status {
 	case guiproc.StatusRunning:
 		fmt.Fprintf(actions.out, "Der Server für dieses Projekt läuft bereits (PID %d).\n", finding.Record.PID)
 		actions.open(finding.Record)
 		return nil
 	case guiproc.StatusOtherVersion:
-		fmt.Fprintf(actions.out, "Ein Server anderer Version (%s) läuft für dieses Projekt und wird beendet.\n",
-			describeVersion(finding.Health.Version))
+		fmt.Fprintf(actions.out, "%s läuft für dieses Projekt und wird beendet.\n",
+			describeOtherStand(finding.Health, own))
 		if !actions.stop(finding) {
 			return unresponsiveError(finding)
 		}
@@ -175,6 +176,16 @@ func describeVersion(version string) string {
 		return "ohne VERSION"
 	}
 	return version
+}
+
+// describeOtherStand benennt, worin sich der laufende Server unterscheidet.
+// Bei gleicher Version wäre „andere Version" irreführend — dort steht auf
+// beiden Seiten dieselbe, und unterschieden hat sich das gebaute Binary.
+func describeOtherStand(health guiproc.Health, own guiproc.Identity) string {
+	if health.Version != own.Version {
+		return fmt.Sprintf("Ein Server anderer Version (%s)", describeVersion(health.Version))
+	}
+	return fmt.Sprintf("Ein Server aus einem anderen Build derselben Version (%s)", describeVersion(health.Version))
 }
 
 func unresponsiveError(finding guiproc.Finding) error {
@@ -228,7 +239,7 @@ func spawnServer(out io.Writer) (guiproc.Record, error) {
 		return record, nil
 	}
 	if errors.Is(err, guiproc.ErrChildExited) {
-		finding, inspectErr := guiproc.Inspect(key, guiproc.OwnVersion(), guiproc.DefaultInspector())
+		finding, inspectErr := guiproc.Inspect(key, guiproc.OwnIdentity(), guiproc.DefaultInspector())
 		if inspectErr == nil && finding.Status == guiproc.StatusRunning {
 			fmt.Fprintf(out, "Ein gleichzeitiger Aufruf hat den Server gestartet (PID %d).\n", finding.Record.PID)
 			return finding.Record, nil

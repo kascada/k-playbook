@@ -262,3 +262,74 @@ func TestCountCandidatesMitDateiAlsBezugspunkt(t *testing.T) {
 		t.Errorf("Kandidaten = %d, erwartet 0 — haupt.py ist kein Manifest", got)
 	}
 }
+
+// JavaScript und TypeScript sind zwei Schlüssel und keiner: ein reines
+// TypeScript-Projekt soll seine Endungen gezählt bekommen, ohne ersatzweise
+// javascript ankreuzen zu müssen.
+func TestCountCandidatesJavaScriptUndTypeScript(t *testing.T) {
+	root := dateiBaum(t,
+		"src/index.ts", "src/tabellen.ts", "src/komponente.tsx", "typen.mts", "alt.cts",
+		"test/anfuegen.test.mjs", "skripte/rauch.mjs", "werkzeug.js", "alt.cjs", "sicht.jsx",
+		"liesmich.md", "package.json",
+	)
+
+	if got := zähle(t, root, CandidateSource, "typescript"); got != 5 {
+		t.Errorf("typescript = %d, erwartet 5", got)
+	}
+	if got := zähle(t, root, CandidateSource, "javascript"); got != 5 {
+		t.Errorf("javascript = %d, erwartet 5", got)
+	}
+	if got := zähle(t, root, CandidateSource, "javascript,typescript"); got != 10 {
+		t.Errorf("javascript,typescript = %d, erwartet 10", got)
+	}
+	// Die Sprachen dürfen sich nicht überschneiden, sonst zählte ein Projekt
+	// mit beiden Schlüsseln seine Dateien doppelt.
+	if got := zähle(t, root, CandidateSource, "go"); got != 0 {
+		t.Errorf("go = %d, erwartet 0", got)
+	}
+}
+
+// Beide Node-Schlüssel tragen dieselbe Manifestliste: welches Manifest ein
+// Projekt hat, sagt nichts darüber, ob darin JavaScript oder TypeScript steht.
+func TestCountCandidatesNodeManifeste(t *testing.T) {
+	root := dateiBaum(t,
+		"package.json", "package-lock.json", "unten/package.json",
+		"yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json",
+		"src/index.ts", "liesmich.md",
+	)
+
+	if got := zähle(t, root, CandidateManifest, "javascript"); got != 6 {
+		t.Errorf("javascript = %d, erwartet 6", got)
+	}
+	if got := zähle(t, root, CandidateManifest, "typescript"); got != 6 {
+		t.Errorf("typescript = %d, erwartet 6", got)
+	}
+	// Beide zusammen ergeben dieselbe Menge und nicht die doppelte: die Muster
+	// werden gegen jeden Dateinamen geprüft, nicht je Sprache aufaddiert.
+	if got := zähle(t, root, CandidateManifest, "javascript,typescript"); got != 6 {
+		t.Errorf("javascript,typescript = %d, erwartet 6", got)
+	}
+}
+
+// node_modules/ fällt über den Namen heraus, auf jeder Ebene — anders als die
+// verankerten Ausschlüsse aus candidateExcluded. Sonst stünden die wenigen
+// echten Dateien eines Node-Projekts gegen die tausenden seiner Abhängigkeiten.
+func TestCountCandidatesNodeModulesZähltNicht(t *testing.T) {
+	root := dateiBaum(t,
+		"src/index.ts", "werkzeug.js",
+		"node_modules/paket/index.js", "node_modules/paket/package.json",
+		"unten/node_modules/tief/index.js",
+		"package.json",
+	)
+
+	if got := zähle(t, root, CandidateSource, "javascript,typescript"); got != 2 {
+		t.Errorf("source = %d, erwartet 2", got)
+	}
+	if got := zähle(t, root, CandidateManifest, "javascript,typescript"); got != 1 {
+		t.Errorf("manifest = %d, erwartet 1", got)
+	}
+	// Auch die Secret-Sucher sehen dort nicht hinein.
+	if got := zähle(t, root, CandidateAny, "*"); got != 3 {
+		t.Errorf("any = %d, erwartet 3", got)
+	}
+}

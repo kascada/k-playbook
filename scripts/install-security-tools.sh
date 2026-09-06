@@ -3,6 +3,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PLAYBOOK_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# Der Release-Weg und der Guard auf das Installationsziel liegen in einer
+# gemeinsamen Bibliothek: install-base-tools.sh geht denselben Weg, und
+# doppelter Code driftet nach der ersten einseitigen Änderung auseinander.
+# Gesucht wird relativ zum Ort dieses Skripts, nicht zum Arbeitsverzeichnis.
+# shellcheck source=lib/install-common.sh
+source "$SCRIPT_DIR/lib/install-common.sh"
 # Die Matrix liegt neben diesem Skript, damit beide zusammen verschoben werden
 # können und kein Pfad ins übergeordnete Verzeichnis nötig ist.
 TOOL_MATRIX_FILE="${K_SECURITY_TOOLS_MATRIX:-$SCRIPT_DIR/security-tools.tsv}"
@@ -166,10 +172,6 @@ load_tool_matrix() {
   done < "$TOOL_MATRIX_FILE"
 
   [[ "${#REQUIRED_TOOLS[@]}" -gt 0 ]] || die "Security-Tool-Matrix enthält keine Pflicht-Tools: $TOOL_MATRIX_FILE"
-}
-
-has_cmd() {
-  command -v "$1" >/dev/null 2>&1
 }
 
 ensure_no_active_project_venv() {
@@ -557,154 +559,14 @@ ensure_bin_dir() {
   esac
 }
 
-download_file() {
-  local url dest
-  url="$1"
-  dest="$2"
-
-  if has_cmd curl; then
-    run_or_print curl -L --fail --show-error --output "$dest" "$url"
-  elif has_cmd wget; then
-    run_or_print wget -O "$dest" "$url"
-  else
-    die "curl oder wget ist für native Downloads erforderlich."
-  fi
-}
-
-platform_key() {
-  local os arch
-  case "$(uname -s)" in
-    Linux) os="linux" ;;
-    Darwin) os="darwin" ;;
-    *) die "Unsupported OS for native GitHub-release installs: $(uname -s)" ;;
-  esac
-
-  case "$(uname -m)" in
-    x86_64|amd64) arch="amd64" ;;
-    arm64|aarch64) arch="arm64" ;;
-    *) die "Unsupported architecture for native GitHub-release installs: $(uname -m)" ;;
-  esac
-
-  printf '%s %s' "$os" "$arch"
-}
-
-latest_asset() {
-  local tool repo pattern os arch
-  tool="$1"
-  repo="$2"
-  pattern="$3"
-  read -r os arch < <(platform_key)
-
-  python3 - "$repo" "$tool" "$os" "$arch" "$pattern" <<'PY'
-import json
-import re
-import sys
-import urllib.request
-
-repo, tool, os_name, arch, pattern = sys.argv[1:]
-
-# Die Platzhalter decken die drei Namenskonventionen ab, die unter den Tools
-# tatsächlich vorkommen. Alles andere im Muster ist regulärer Ausdruck und
-# steht so in der Matrix.
-placeholders = {
-    "{tool}": re.escape(tool),
-    "{version}": r".*",
-    "{os}": os_name,
-    "{arch}": arch,
-    "{arch_x64}": "x64" if arch == "amd64" else "arm64",
-    "{os_cap}": "Linux" if os_name == "linux" else "macOS",
-    "{arch_bits}": "64bit" if arch == "amd64" else "ARM64",
-}
-for key, value in placeholders.items():
-    pattern = pattern.replace(key, value)
-
-url = f"https://api.github.com/repos/{repo}/releases/latest"
-req = urllib.request.Request(
-    url,
-    headers={"Accept": "application/vnd.github+json", "User-Agent": "k-playbook"},
-)
-with urllib.request.urlopen(req, timeout=30) as response:
-    data = json.load(response)
-
-assets = data.get("assets", [])
-tag = data.get("tag_name", "latest")
-
-regex = re.compile(pattern)
-for asset in assets:
-    name = asset.get("name", "")
-    if regex.match(name):
-        print(tag)
-        print(asset["browser_download_url"])
-        print(name)
-        raise SystemExit(0)
-
-names = ", ".join(asset.get("name", "") for asset in assets)
-raise SystemExit(f"no matching release asset for {tool}; pattern {pattern}; available: {names}")
-PY
-}
-
+# install_github_binary ist die Matrix-Sicht auf den Release-Weg: die Referenzen
+# kommen aus der TSV, der Weg selbst aus der gemeinsamen Bibliothek. In dieser
+# Matrix ist der Programmname zugleich die Installationsreferenz, deshalb steht
+# er an beiden Stellen; die Basis-Matrix trennt beides.
 install_github_binary() {
-  local tool repo pattern tmp_dir asset_info tag url asset archive extract_dir candidate installed asset_lines
+  local tool
   tool="$1"
-  repo="$(install_ref "$tool")"
-  pattern="$(asset_pattern "$tool")"
-  [[ -n "$repo" && "$repo" != "-" ]] || die "Kein GitHub-Repo in der Matrix für $tool. Spalte install_ref prüfen."
-  [[ -n "$pattern" && "$pattern" != "-" ]] || die "Kein asset_pattern in der Matrix für $tool."
-
-  has_cmd python3 || die "python3 is required to resolve latest GitHub releases."
-  has_cmd tar || die "tar is required to extract release archives."
-
-  asset_info="$(latest_asset "$tool" "$repo" "$pattern")"
-  mapfile -t asset_lines <<< "$asset_info"
-  tag="${asset_lines[0]:-}"
-  url="${asset_lines[1]:-}"
-  asset="${asset_lines[2]:-}"
-  [[ -n "$tag" && -n "$url" && -n "$asset" ]] || die "Could not resolve release asset for $tool."
-
-  log "Installing $tool $tag from $repo into $BIN_DIR"
-  log "Asset: $asset"
-
-  if [[ "$DRY_RUN" -eq 1 ]]; then
-    printf 'DRY-RUN: download %s\n' "$url" >&2
-    printf 'DRY-RUN: install binary %s to %s/%s\n' "$tool" "$BIN_DIR" "$tool" >&2
-    return
-  fi
-
-  tmp_dir="$(mktemp -d)"
-  archive="$tmp_dir/$asset"
-  extract_dir="$tmp_dir/extract"
-  mkdir -p "$extract_dir"
-  download_file "$url" "$archive"
-
-  # Nicht jedes Projekt packt seine Binary ein: osv-scanner etwa lädt sie blank
-  # aus. Entschieden wird am Namen des Assets, nicht am Muster.
-  case "$asset" in
-    *.tar.gz|*.tgz)
-      tar -xzf "$archive" -C "$extract_dir"
-      ;;
-    *)
-      install -m 0755 "$archive" "$BIN_DIR/$tool"
-      rm -rf "$tmp_dir"
-      return
-      ;;
-  esac
-
-  installed=0
-  shopt -s globstar nullglob
-  for candidate in "$extract_dir"/**/"$tool"; do
-    if [[ -f "$candidate" ]]; then
-      install -m 0755 "$candidate" "$BIN_DIR/$tool"
-      installed=1
-      break
-    fi
-  done
-  shopt -u globstar nullglob
-
-  rm -rf "$tmp_dir"
-
-  if [[ "$installed" -ne 1 ]]; then
-    die "Release archive for $tool did not contain a $tool binary."
-  fi
+  install_release_binary "$tool" "$tool" "$(install_ref "$tool")" "$(asset_pattern "$tool")" "$BIN_DIR"
 }
 
 # install_pipx_tool installiert ein pip-Paket host-lokal: bevorzugt mit pipx, sonst
@@ -986,6 +848,13 @@ main() {
   fi
 
   ensure_host_tool_scope
+  # Ein Lauf, der nichts schreibt, wird nicht abgewiesen: --dry-run soll gerade
+  # in der Konstellation laufen, die schreibend abbräche.
+  if [[ "$DRY_RUN" -ne 1 ]]; then
+    ensure_target_owner "$BIN_DIR" \
+      "bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing}" \
+      "sudo bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing} --bin-dir /usr/local/bin"
+  fi
 
   validate_install_spec
 

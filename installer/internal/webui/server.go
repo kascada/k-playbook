@@ -43,6 +43,12 @@ type serverState struct {
 	// beim Start festgehalten. Der Client vergleicht sie mit seiner eigenen
 	// und ersetzt einen Server anderer Version.
 	version string
+	// build ist die Kennung der Binärdatei dieses Prozesses, ebenfalls beim
+	// Start festgehalten — und nur so brauchbar: nach `make dev-install` liegt
+	// unter demselben Pfad längst ein anderes Binary, und ein Server, der erst
+	// auf Nachfrage nachsähe, meldete dessen Kennung statt seiner eigenen. Sie
+	// erkennt den Wechsel, den die stillstehende VERSION nicht zeigt.
+	build string
 	// registration ist die Laufzeitdatei dieses Servers. Nil in Tests, die
 	// nur die Routen prüfen.
 	registration *guiproc.Registration
@@ -76,11 +82,13 @@ func Serve() error {
 		return err
 	}
 	version := guiproc.OwnVersion()
+	build := guiproc.OwnBuild()
 	registration, err := guiproc.Register(guiproc.Record{
 		Key:       key,
 		Addr:      listener.Addr().String(),
 		PID:       os.Getpid(),
 		Version:   version,
+		Build:     build,
 		StartTime: guiproc.OwnStartTime().Unix(),
 	})
 	if err != nil {
@@ -101,7 +109,7 @@ func Serve() error {
 
 	// Der Leerlauf zählt ab dem Start: auch ein Server, den nie jemand
 	// besucht, soll nicht ewig stehen bleiben.
-	state := &serverState{shutdown: stop, version: version, registration: registration, lastRequestAt: time.Now()}
+	state := &serverState{shutdown: stop, version: version, build: build, registration: registration, lastRequestAt: time.Now()}
 	server := &http.Server{Handler: routes(state)}
 
 	serverErr := make(chan error, 1)
@@ -393,16 +401,18 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 // bleibt der Server aus dem Leerlauf. Schlägt der Aufruf fehl, weiß das
 // Fenster, dass der Server weg ist.
 //
-// Die Antwort nennt Schlüssel, Version und PID, damit ein CLI-Aufruf den
-// Server als seinen eigenen erkennt. Der Schlüssel wird je Anfrage neu
-// berechnet: nach einem Umschlüsseln durch POST /api/config muss schon die
-// nächste Antwort den neuen tragen. Die Version dagegen ist die vom Start.
+// Die Antwort nennt Schlüssel, Version, Build-Kennung und PID, damit ein
+// CLI-Aufruf den Server als seinen eigenen und als denselben Stand erkennt.
+// Der Schlüssel wird je Anfrage neu berechnet: nach einem Umschlüsseln durch
+// POST /api/config muss schon die nächste Antwort den neuen tragen. Version
+// und Kennung dagegen sind die vom Start.
 func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
 	key, _ := guiproc.Key()
 	writeJSON(w, http.StatusOK, guiproc.Health{
 		Status:  "ok",
 		Key:     key,
 		Version: state.version,
+		Build:   state.build,
 		PID:     os.Getpid(),
 	})
 }

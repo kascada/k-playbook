@@ -3,7 +3,8 @@
 // Ein Server je Projekt: Der Schlüssel ist das aufgelöste ProjectDir aus
 // project.Detect(), ohne Installation das Arbeitsverzeichnis. Client und
 // Server berechnen ihn über dieselbe Funktion, und die Laufzeitdatei trägt
-// neben dem Schlüssel Adresse, PID, Version und Startzeit des Prozesses.
+// neben dem Schlüssel Adresse, PID, Version, Build-Kennung und Startzeit des
+// Prozesses.
 //
 // Wiedergefunden wird nicht der Port, sondern der Server: erst muss der
 // Prozess aus der Datei noch derselbe sein — PID lebt und Startzeit passt —,
@@ -76,6 +77,78 @@ func canonical(dir string) string {
 // ~/.local/bin installiert und bedient mehrere Projekte.
 func OwnVersion() string {
 	return buildinfo.Version
+}
+
+// OwnBuild kennzeichnet die Datei, aus der dieser Prozess läuft: Größe und
+// Änderungszeit hinter os.Executable(), als "<bytes>-<unixnano>".
+//
+// Warum die Version dafür nicht reicht: sie kommt aus der `VERSION` des
+// Standes und steht zwischen zwei Releases still. Jeder lokale Build derselben
+// `VERSION` — `make dist-host`, `make gui` — trägt damit dieselbe Kennung; ein
+// laufender Server bliebe stehen und bediente weiter mit altem Code, samt
+// eingebetteter Assets. Größe und Änderungszeit unterscheiden dagegen jede
+// eingespielte Datei: `make dev-install` wie der Bootstrap schreiben das Binary
+// neu, und beide Wege ändern die Änderungszeit auch bei gleicher Größe.
+//
+// Kein Inhalts-Hash: das wären 16 MB je Aufruf, und ein Fehlurteil kostet hier
+// nur einen überflüssigen Neustart des Servers, nie falschen Code.
+//
+// Leer, wenn die Datei nicht zu ermitteln ist — dann bleibt der Vergleich bei
+// der Version.
+//
+// Der Zeitpunkt des Aufrufs entscheidet, was der Wert bedeutet, und beide
+// Bedeutungen werden gebraucht:
+//
+//   - Beim Start erhoben, ist er die Kennung **dieses** Prozesses. Wer sie
+//     meldet — der GUI-Server in /api/health —, muss sie dort festhalten:
+//     os.Executable() zeigt nach einem `mv` über die Datei auf einen anderen
+//     Inhalt, und ein Server, der erst auf Nachfrage nachsähe, meldete die
+//     Kennung des neuen Binaries statt seiner eigenen.
+//   - Später erhoben, ist er die Kennung dessen, was **jetzt** unter dem Pfad
+//     liegt. Genau das nutzt der MCP-Server, um einen Wechsel zu bemerken: der
+//     Pfad steht für einen laufenden Prozess fest, und Go schneidet das
+//     " (deleted)" weg, das Linux an /proc/self/exe hängt, sobald die Datei
+//     ersetzt wurde.
+func OwnBuild() string {
+	path, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return buildOf(path)
+}
+
+// buildOf ist die Kennung einer Datei, ohne den Blick auf den eigenen Prozess.
+func buildOf(path string) string {
+	info, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d-%d", info.Size(), info.ModTime().UnixNano())
+}
+
+// Identity ist, woran ein laufender Server als derselbe Stand erkannt wird:
+// die gestempelte Version und die Kennung der Datei dahinter.
+type Identity struct {
+	Version string
+	Build   string
+}
+
+// OwnIdentity ist der Stand dieses Prozesses.
+func OwnIdentity() Identity {
+	return Identity{Version: OwnVersion(), Build: OwnBuild()}
+}
+
+// Matches meldet, ob health denselben Stand nennt.
+//
+// Es entscheidet die Build-Kennung; die Version zählt nur, wenn die eigene
+// Kennung fehlt. Ein Server, der gar keine meldet, gilt deshalb als anderer
+// Stand: er läuft aus einem Binary, das sie noch nicht kannte — und genau das
+// ist ein Wechsel.
+func (i Identity) Matches(health Health) bool {
+	if i.Build == "" {
+		return i.Version == health.Version
+	}
+	return i.Build == health.Build
 }
 
 // Location sind die Pfade eines Schlüssels: das Verzeichnis, die
@@ -151,6 +224,10 @@ type Record struct {
 	Addr    string `json:"addr"`
 	PID     int    `json:"pid"`
 	Version string `json:"version"`
+	// Build ist die Kennung der Binärdatei aus OwnBuild(). Sie steht hier für
+	// die Nachschau von Hand; verglichen wird die aus /api/health, denn nur
+	// die kommt nachweislich vom laufenden Prozess.
+	Build string `json:"build"`
 	// StartTime ist die Startzeit des Prozesses in Unix-Sekunden. Sie
 	// unterscheidet den Prozess von einem späteren mit derselben PID.
 	StartTime int64 `json:"startTime"`

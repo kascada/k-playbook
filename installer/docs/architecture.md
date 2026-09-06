@@ -968,7 +968,7 @@ Arbeitsverzeichnis und dem Anker ab.
 `bin/install` ermittelt die Plattform, lädt das Release-Asset zu `VERSION`, prüft es
 gegen `SHA256SUMS` und ersetzt `~/.local/bin/k-playbook` atomar. Es gibt keinen
 Programm-Binary-Cache und keine Laufzeit-Auflösung mehr. Die Zuordnung eines laufenden
-Binary zu seiner Version wird gesondert behandelt.
+Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 
 ### Entwicklungsstand
 
@@ -984,11 +984,16 @@ in das nichts eingespielt wird, und `CheckCleanliness()` meldet jede Abweichung 
 das, was sie ist — Handarbeit in einem fremden Verzeichnis. Es gibt keinen Sync-Weg aus
 dem Arbeitsstand in die Installation und keine Ausnahme davon in der Oberfläche.
 
-**Bekannte Grenze des Hintergrunddienstes.** Der Aufruf erkennt einen laufenden Server
-anderer Version an der `VERSION` der Installation, siehe „Lebenszyklus". Ein frisch
-gebautes Binary bei unveränderter `VERSION` — `make dist-host`, `make gui` — unterscheidet
-sich davon nicht: der laufende Server bleibt stehen und bedient weiter mit dem alten Code,
-samt eingebetteter Assets. Vor dem Start deshalb `k-playbook stop`.
+**Der Hintergrunddienst erkennt auch einen dev-Build.** Verglichen wird nicht die
+`VERSION`, sondern die Datei dahinter, siehe „Lebenszyklus": Größe und Änderungszeit von
+`os.Executable()`. Ein frisch gebautes Binary bei unveränderter `VERSION` — `make
+dist-host`, `make gui` — ist damit ein anderer Stand, und der nächste Aufruf in **jedem**
+Projekt beendet dessen alten Server und zieht einen neuen hoch. Ein `k-playbook stop` von
+Hand ist dafür nicht mehr nötig.
+
+Was das nicht leistet: die Ablösung geschieht je Projekt und erst beim nächsten Aufruf
+dort. `make gui` im Arbeitsstand beendet weiterhin nur den Server dieses Projekts — die
+Server anderer Projekte laufen bis zu ihrem nächsten `k-playbook` mit altem Code weiter.
 
 ## Altlasten des globalen Modells
 
@@ -1342,7 +1347,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| `GET` | `/api/health` | Lebenszeichen des Fensters; antwortet mit Schlüssel, Version und PID des Servers |
+| `GET` | `/api/health` | Lebenszeichen des Fensters; antwortet mit Schlüssel, Version, Build-Kennung und PID des Servers |
 | `POST` | `/api/shutdown` | Dienst beenden, für alle Fenster |
 | `GET` | `/api/config` | Anker suchen bzw. Ort vorschlagen |
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
@@ -1427,6 +1432,47 @@ fehlt — der Typ liegt im `internal`-Paket des SDK, und weder `io.EOF` noch
 `mcp.ErrConnectionClosed` greifen über `errors.Is`. `isSessionEnd()` prüft deshalb den
 Text. Ohne diese Unterscheidung endete der Prozess bei jedem normalen Sitzungsende mit
 Exit 1, was für den Client wie ein Absturz aussieht.
+
+### Der Serverprozess überlebt sein Binary
+
+Ein MCP-Server läuft, solange der Client ihn offenhält — bei OpenCode und Claude Code also
+über die ganze Assistenten-Sitzung, oft stundenlang. Wird `~/.local/bin/k-playbook` in
+dieser Zeit ersetzt, arbeitet er mit dem Code weiter, mit dem er gestartet ist. Der
+Standvergleich des GUI-Servers greift hier nicht: es gibt keine Laufzeitdatei, keinen
+Port und keinen zweiten Prozess, der nachsehen könnte.
+
+Der Schaden ist begrenzt, aber real. Die **Inhalte** sind aktuell: `contextTool` ruft bei
+jedem Aufruf `project.ContextForDir()`, Regeln, Reviews, Checks und Instruktionen kommen
+frisch von der Platte. Veraltet ist der **Code** der Werkzeuge — und `tools/list` geht
+genau einmal beim Start, ein seither hinzugekommenes Werkzeug kann die laufende Sitzung
+deshalb nie sehen.
+
+Gemeldet wird das über eine empfangende Middleware, `staleBinaryNotice()` in
+`internal/mcpserver/stale.go`. Sie hält beim Start `guiproc.OwnBuild()` fest und ruft
+dieselbe Funktion bei jedem `tools/call` erneut: der Pfad aus `os.Executable()` steht für
+einen laufenden Prozess fest, und Go schneidet das `" (deleted)"` weg, das Linux an
+`/proc/self/exe` hängt, sobald die Datei ersetzt wurde — ein späterer Aufruf sieht also
+die neue Datei. Weichen beide ab, hängt an der Antwort ein **zusätzlicher** Inhaltsblock
+mit dem Hinweis. Der erste Block bleibt Zeichen für Zeichen der des Subkommandos; nur so
+bleibt der Vergleich beider Fassaden prüfbar. Fehlt eine der beiden Kennungen, wird nichts
+gemeldet: eine Kennung, die sich nicht erheben lässt, ist kein Nachweis eines Wechsels.
+
+Der Text richtet sich an den **Assistenten**, nicht an den Nutzer — er ist der einzige
+Leser einer Werkzeugantwort und die einzige Stelle, die es weitersagen kann. Deshalb steht
+die Handlung ausdrücklich darin.
+
+**Warum kein Beenden im Leerlauf.** Bei stdio startet der *Client* den Prozess. Ob er nach
+einem Ende neu startet, steht in keiner Spec und ist je Client anders. Endet der Server bei
+einem Client, der das nicht tut, hat der Assistent für den Rest der Sitzung gar keine
+k-playbook-Werkzeuge mehr — schlechter als ein alter Server, der arbeitet. Das bleibt
+offen, bis gemessen ist, wie sich OpenCode und Claude Code tatsächlich verhalten; ein
+Abgang im Leerlauf bräuchte dann zusätzlich einen In-flight-Zähler, denn die
+Review-Werkzeuge laufen minutenlang.
+
+**Warum kein `syscall.Exec`** auf das neue Binary, das die Pipes behielte und vom Client
+unbemerkt bliebe: das neue Prozessabbild erwartete ein `initialize`, das der Client längst
+geschickt hat und nicht wiederholt. Den Sitzungszustand zu übergeben, ginge nur mit
+Eingriffen ins Go-SDK.
 
 Geprüft wird das in `cmd/k-playbook/mcp_test.go`, und zwar gegen einen echten Prozess:
 das Test-Binary ruft sich mit einem Umgebungsmarker selbst auf. In-process ließe sich die
@@ -1644,9 +1690,9 @@ mit 0700), benannt nach den ersten 16 Hex-Zeichen des SHA-256 über den **Schlü
 Der Schlüssel ist das aufgelöste `ProjectDir` aus `project.Detect()` — nicht das
 Arbeitsverzeichnis, das bei einem Start aus einem Unterverzeichnis davon abweicht; ohne
 Installation gilt das Arbeitsverzeichnis. Client und Server berechnen ihn über dieselbe
-Funktion, `guiproc.Key()`. Die Datei trägt Schlüssel, Adresse, PID, Version und die
-Startzeit des Prozesses; daneben liegt `<hash>.log` mit stdout und stderr des Servers,
-bei jedem Start neu.
+Funktion, `guiproc.Key()`. Die Datei trägt Schlüssel, Adresse, PID, Version, Build-Kennung
+und die Startzeit des Prozesses; daneben liegt `<hash>.log` mit stdout und stderr des
+Servers, bei jedem Start neu.
 
 Geschrieben wird sie nach dem Binden mit `O_CREAT|O_EXCL`, damit zwei gleichzeitige
 Aufrufe nicht beide einen Server hochziehen: der Verlierer endet mit einer Meldung im
@@ -1681,21 +1727,42 @@ liefert eines von fünf Ergebnissen:
    Datei bleibt liegen, der Client startet nichts und verweist auf `k-playbook stop`. Die
    Datei eines lebenden eigenen Prozesses zu löschen hieße, beim nächsten Aufruf einen
    zweiten Server für dasselbe Projekt hochzuziehen.
-3. Antwortet der eigene Server, entscheidet die Version: gleich → **läuft unter dieser
-   URL**, anders → **läuft mit anderer Version**. Ohne Datei: **nicht vorhanden**.
+3. Antwortet der eigene Server, entscheidet der **Stand**: gleich → **läuft unter dieser
+   URL**, anders → **läuft mit anderem Stand**. Ohne Datei: **nicht vorhanden**.
+
+Der Stand ist `guiproc.Identity` — Version **und** Build-Kennung —, und `Matches()` legt
+fest, welche von beiden entscheidet.
 
 Die Version wird beim Build mit `-ldflags -X` in das Binary gestempelt. Der Wert kommt
 aus der `VERSION` des Standes, der gebaut wird: `make dist`, `make dist-host` und
 `make dev-install` lesen sie über `INSTALLER_BUILD_VERSION`, der Release-Workflow liest
-dieselbe Datei und stempelt denselben Wert in die vier Assets. Ein lokaler
-Entwicklungsbuild und das Release-Asset derselben `VERSION` tragen damit dieselbe
-Kennung — und `/api/health` gibt genau sie zurück, denn der Server nimmt sie über
-`guiproc.OwnVersion()` aus `buildinfo.Version`. Der Bootstrap `make -C k-playbook install`
-stempelt nichts; er lädt das fertig gestempelte Asset.
-Jeder Prozess hält den Wert beim Start fest und liest ihn nicht von der Platte, sonst
-wäre ein Wechsel auf der Platte nie zu erkennen. Der Schlüssel in `/api/health` wird
-dagegen je Anfrage berechnet: nach dem Umschlüsseln muss schon die nächste Antwort den
-neuen tragen.
+dieselbe Datei und stempelt denselben Wert in die vier Assets. Der Bootstrap
+`make -C k-playbook install` stempelt nichts; er lädt das fertig gestempelte Asset.
+
+Genau daraus folgt, dass die Version allein nicht reicht: ein lokaler Entwicklungsbuild
+und das Release-Asset derselben `VERSION` tragen dieselbe Kennung, und zwei
+aufeinanderfolgende `make gui` ebenfalls. Der laufende Server bliebe stehen und bediente
+weiter mit altem Code, samt eingebetteter Assets.
+
+Deshalb kommt die **Build-Kennung** dazu: `guiproc.OwnBuild()`, Größe und Änderungszeit
+der Datei hinter `os.Executable()`, als `"<bytes>-<unixnano>"`. Jede eingespielte Datei
+unterscheidet sich darin — `make dev-install` wie `bin/install` schreiben das Binary neu.
+Kein Inhalts-Hash: das wären 16 MB je Aufruf, und ein Fehlurteil kostet hier nur einen
+überflüssigen Serverneustart, nie falschen Code.
+
+`Matches()` vergleicht die Build-Kennung; die Version zählt nur, wenn die **eigene**
+Kennung fehlt — `os.Executable()` nicht auflösbar —, damit ein Prozess ohne eigene
+Auskunft nicht bei jedem Aufruf den laufenden Server abräumt. Ein Server, der gar keine
+Kennung meldet, gilt dagegen als anderer Stand: er läuft aus einem Binary von vor dieser
+Erweiterung, und das *ist* ein Wechsel. So löst der erste Aufruf mit dem neuen Binary die
+alten Daemons von selbst ab.
+
+Beide Werte hält jeder Prozess beim **Start** fest und liest sie nicht von der Platte,
+sonst wäre ein Wechsel dort nie zu erkennen — bei der Kennung wiegt das doppelt: nach
+einem `mv` über die Datei zeigt `os.Executable()` auf einen gelöschten Inode, und ein
+Server, der erst auf Nachfrage nachsähe, meldete die Kennung des **neuen** Binaries statt
+seiner eigenen. Der Schlüssel in `/api/health` wird dagegen je Anfrage berechnet: nach
+dem Umschlüsseln muss schon die nächste Antwort den neuen tragen.
 
 ### Der Aufruf
 
@@ -1707,7 +1774,7 @@ Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 | Ergebnis | Handlung |
 |---|---|
 | läuft unter dieser URL | URL ausgeben, Browser öffnen, Ende 0 |
-| läuft mit anderer Version | `POST /api/shutdown`, warten, bis die Datei weg oder die PID tot ist (10 s, über den 5 s `shutdownTimeout`), dann starten; läuft die Zeit ab, wie „lebt ohne Antwort" |
+| läuft mit anderem Stand | `POST /api/shutdown`, warten, bis die Datei weg oder die PID tot ist (10 s, über den 5 s `shutdownTimeout`), dann starten; läuft die Zeit ab, wie „lebt ohne Antwort". Die Meldung nennt den Unterschied: andere Version, oder anderer Build derselben Version |
 | verwaist | Datei löschen, starten |
 | lebt ohne Antwort | nichts starten; Meldung mit Dateipfad und Hinweis auf `k-playbook stop`, Ende ≠ 0 |
 | nicht vorhanden | starten |
@@ -1750,8 +1817,8 @@ und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `POST /api/update` beendet den Server nach der Antwort, wenn die `VERSION` gewechselt hat
 (`BinaryChanged`): zum neuen Stand gehört ein anderes Binary, und ein alter Daemon soll
 nicht stehen bleiben. Das deckt den Weg über die Oberfläche; nach einem `git pull` von
-Hand greift der Versionsvergleich des Clients beim nächsten Aufruf. Nicht erkannt wird
-ein frisch gebautes Binary bei unveränderter `VERSION`, siehe „Entwicklungsstand". Ein
+Hand greift der Standvergleich des Clients beim nächsten Aufruf — und der erkennt über
+die Build-Kennung auch ein frisch gebautes Binary bei unveränderter `VERSION`. Ein
 portstabiler Neustart, bei dem der Dienst den Listener an das neue Binary vererbt, wäre
 möglich und ist bewusst nicht gebaut — er lohnt erst, wenn Updates im Alltag stören.
 
@@ -1871,9 +1938,11 @@ Läuft der Server schon, gibt `k-playbook` ohne Argument die URL erneut aus. Die
 Laufzeitdatei liegt unter `$XDG_RUNTIME_DIR/k-playbook/<hash>.json`, das Log des
 abgekoppelten Prozesses als `<hash>.log` daneben.
 
-Ein laufender Server nutzt weiter den Code im Speicher, und ein frisch gebautes Binary
-bei unveränderter `VERSION` wird nicht erkannt. Nach Backend- oder Asset-Änderungen
-deshalb `k-playbook stop`, dann neu aufrufen.
+Ein laufender Server nutzt weiter den Code im Speicher — der nächste `k-playbook` in
+diesem Projekt löst ihn aber ab, sobald ein anderes Binary unter `~/.local/bin` liegt.
+Erkannt wird das an der Build-Kennung, nicht an der `VERSION`; ein `k-playbook stop` nach
+Backend- oder Asset-Änderungen ist deshalb nur noch nötig, wenn dasselbe Binary neuen
+Code bedienen soll, was es nicht kann.
 
 ## Der alte Stand
 

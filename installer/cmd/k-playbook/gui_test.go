@@ -54,7 +54,7 @@ func TestReuseOrStartEntscheidetNachStatus(t *testing.T) {
 				out: &out,
 			}
 
-			err := reuseOrStart(guiproc.Finding{Status: test.status, Path: path, Record: record}, actions)
+			err := reuseOrStart(guiproc.Finding{Status: test.status, Path: path, Record: record}, guiproc.Identity{}, actions)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("Fehler = %v, erwartet Fehler: %v", err, test.wantErr)
 			}
@@ -71,11 +71,28 @@ func TestReuseOrStartEntscheidetNachStatus(t *testing.T) {
 	}
 }
 
+// Die Meldung beim Ersetzen muss den Unterschied richtig benennen. Bei
+// gleicher VERSION — dem Entwicklungsfall — wäre „andere Version" schlicht
+// falsch: dort steht auf beiden Seiten dieselbe.
+func TestDescribeOtherStandTrenntVersionUndBuild(t *testing.T) {
+	own := guiproc.Identity{Version: "v0.3.0", Build: "20-2"}
+
+	andere := describeOtherStand(guiproc.Health{Version: "v0.2.0", Build: "20-1"}, own)
+	if !strings.Contains(andere, "anderer Version") || !strings.Contains(andere, "v0.2.0") {
+		t.Errorf("andere Version: %q", andere)
+	}
+
+	gleiche := describeOtherStand(guiproc.Health{Version: "v0.3.0", Build: "20-1"}, own)
+	if !strings.Contains(gleiche, "anderen Build") || !strings.Contains(gleiche, "v0.3.0") {
+		t.Errorf("gleiche Version, anderer Build: %q", gleiche)
+	}
+}
+
 // Kann die verwaiste Datei nicht weg, wird nicht gestartet: der nächste
 // Aufruf fände sonst wieder dieselbe Datei.
 func TestReuseOrStartBrichtBeiFehlendemDiscardAb(t *testing.T) {
 	started := false
-	err := reuseOrStart(guiproc.Finding{Status: guiproc.StatusOrphaned, Path: "/x.json"}, guiActions{
+	err := reuseOrStart(guiproc.Finding{Status: guiproc.StatusOrphaned, Path: "/x.json"}, guiproc.Identity{}, guiActions{
 		discard: func(string) error { return errors.New("read-only") },
 		start: func() error {
 			started = true
