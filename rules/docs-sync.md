@@ -31,10 +31,31 @@ Unter `k-playbook-local/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, 
 - `docs/libs/` folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
 - `docs/manual/` ist handgepflegt und folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst.
 - `docs/extracted/` hält fest, was aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage.
-- `docs/versions/` folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht bei der Nachzugs-Pflicht bei Versionssprüngen und wird hier nicht ein zweites Mal ausformuliert.
+- `docs/versions/` folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht im Abschnitt „Nachzug bei Versionssprüngen" unten und wird hier nicht ein zweites Mal ausformuliert.
 - `docs/README.md` ist der erzeugte Index. Er wird nicht von Hand nachgezogen, sondern von `/k-docs-index` neu geschrieben.
 
 Ändert sich dort tatsächlich etwas, ist der Weg der jeweilige Erzeuger — nicht die Handkorrektur im selben Arbeitsgang.
+
+## Nachzug bei Versionssprüngen
+
+Ein Versionssprung ist keine Code-Änderung; die Verpflichtung oben greift für ihn nicht. Er hat trotzdem eine Pflicht, und sie steht hier — nicht in einem Skill-Text und nicht als Erinnerung.
+
+Ändert sich ein unterstütztes Manifest oder Lockfile — `pyproject.toml`, `requirements*.txt`, `go.mod`, `package.json`, `Cargo.toml`, `Gemfile`, ihre Lockfiles und die übrigen aus dem Vertrag —, eine Container-, DevContainer-, Compose-, Helm- oder CI-Datei, sodass eine Versionsangabe hinzukommt, wegfällt oder wechselt, dann veraltet `docs/versions/`, und das Inventar wird **im selben Arbeitsgang, über den Erzeuger** nachgezogen — nicht per Handkorrektur an `docs/versions/inventory.md`. Der Erzeuger ist auf jedem Weg derselbe Lauf:
+
+- `/k-doc-inventory` im Assistenten (Modul `commands/_docs/inventory.md`),
+- `k-playbook inventory` auf der Kommandozeile,
+- der Bereich „Inventar" der Oberfläche (`k-playbook` ohne Argument, Knopf „Aktualisieren").
+
+Alle drei rufen dieselbe Go-Fachlogik und schreiben dieselbe Datei. Ein Lauf ohne inhaltliche Änderung lässt sie byte-identisch stehen — nachziehen kostet nichts, wenn nichts zu ändern war, und es gibt keinen Grund, es zu unterlassen.
+
+Zwei Fälle, die auseinanderzuhalten sind:
+
+- **Die Änderung stammt aus dem laufenden Arbeitsgang.** Dann wird das Inventar im selben Arbeitsgang aktualisiert, und der Abschluss nennt das Ergebnis: geschrieben mit Erhebungszeitpunkt, oder unverändert, weil die Erhebung inhaltlich dieselbe ist.
+- **Nur eine fremde, bereits vorhandene Abweichung wird entdeckt** — das Inventar ist älter als ein Manifest, das jemand anders geändert hat, oder es weist eine Abweichung der Art `widersprüchlich` aus. Dann ist das ein sichtbarer Hinweis an den Nutzer, keine stille Aktualisierung nebenbei: der Nachzug ist eine eigene, benannte Handlung, die er auslöst oder ablehnt.
+
+Die Quellenkonfiguration `k-playbook-local/version-sources.yaml` folgt dabei der Schreibregel des Vertrags („Quellenkonfiguration" in `k-playbook/docs/versionsinventar.md`): nur nach ausdrücklicher Bestätigung, nur ergänzend, bestehende Einträge, Kommentare und Reihenfolge bleiben erhalten. Sie wird hier nicht neu und nicht strenger formuliert.
+
+`docs/libs/` bleibt davon getrennt. Ein Versionssprung veraltet auch die Steckbriefe dort, nachgezogen werden sie aber über `/k-docs-tools`, nicht durch Umschreiben aus dem Inventar. Weichen beide voneinander ab, gibt das Inventar die Auskunft, und `/k-docs` meldet den Unterschied als Hinweis; die Abgrenzung steht in `commands/_docs/tools.md` und `commands/k-docs.md`.
 
 ## Nicht automatisch dokumentieren
 

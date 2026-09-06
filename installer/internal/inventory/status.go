@@ -94,6 +94,24 @@ func fillStatus(status *Status, data []byte) {
 	}
 }
 
+// Body liefert den Markdown-Rumpf ohne den Frontmatter-Block — das, was eine
+// Anzeige rendert. Ohne Frontmatter ist der Rumpf die ganze Datei. Der Rumpf
+// wird dabei nicht gedeutet, nur abgetrennt: der Status kommt weiterhin
+// ausschließlich aus dem Frontmatter.
+func Body(data []byte) []byte {
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return data
+	}
+	for index := 1; index < len(lines); index++ {
+		if strings.TrimSpace(lines[index]) == "---" {
+			return []byte(strings.TrimLeft(strings.Join(lines[index+1:], "\n"), "\n"))
+		}
+	}
+	return data
+}
+
 // frontmatterBlock schneidet den YAML-Block zwischen den beiden `---`-Zeilen am
 // Dateianfang heraus.
 func frontmatterBlock(data []byte) (string, bool) {

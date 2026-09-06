@@ -198,6 +198,12 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/context", contextHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
+	// Das Versionsinventar hat eine eigene API neben der Doku: die zeigt die
+	// mitgelieferte Doku der Installation, das Inventar ist eine Datei des
+	// Projekts. Hinter dem POST steht ausschließlich inventory.Run.
+	mux.HandleFunc("GET /api/inventory", inventoryHandler)
+	mux.HandleFunc("POST /api/inventory", runInventoryHandler)
+	mux.HandleFunc("GET /api/inventory/file", inventoryFileHandler)
 	mux.HandleFunc("GET /api/tasks", tasksHandler)
 	mux.HandleFunc("GET /api/tasks/done", doneTasksHandler)
 	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
@@ -211,6 +217,7 @@ func routes(state *serverState) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /workflows", workflowsPageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
+	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
@@ -275,6 +282,10 @@ const (
 	areaSetup     = "setup"
 	areaWorkflows = "workflows"
 	areaDocs      = "docs"
+	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
+	// Docs, nicht darin: Docs zeigt die mitgelieferte Doku der Installation,
+	// das Inventar ist eine erzeugte Datei des Projekts.
+	areaInventory = "inventory"
 )
 
 // pageTemplate parst eine Seite zusammen mit dem Fragment der linken Spalte.
@@ -300,6 +311,17 @@ var docsTemplate = pageTemplate("docs.html")
 
 func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, docsTemplate, areaDocs, "/docs")
+}
+
+// inventoryTemplate ist die Seite des Versionsinventars: Stand, Anstoß der
+// Erhebung, Quellenkonfiguration und die erzeugte Datei. Eigener Bereich mit
+// eigenem Eintrag in der linken Spalte — die Datei muss im Bereich selbst
+// lesbar sein, und der Aktualisieren-Knopf braucht Verlaufsstatus; beides
+// trägt keine Karte auf der Startseite.
+var inventoryTemplate = pageTemplate("inventory.html")
+
+func inventoryPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, inventoryTemplate, areaInventory, "/inventory")
 }
 
 // mcpTemplate ist die Seite des MCP-Servers. Sie ist eine Detailseite des

@@ -33,13 +33,13 @@ ihre Command-Liste beim Start.
 | Command | Zweck | Detail |
 |---|---|---|
 | **Projekt** | | |
-| `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung |
+| `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung; Bereiche Workflows, Docs und Inventar — letzterer zeigt das Versionsinventar und stößt seine Erhebung an |
 | **Docs** | | |
 | `/k-docs` | Docs-Bestand prüfen und mögliche Aktionen anbieten | read-only Status; kann zu Code-, Tool-, Extract-, Inventar- oder Index-Aktion dispatchen |
 | `/k-docs-code` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/`; dorthin schreibt auch der Skill `ks-overlay-repo-analyse` |
 | `/k-docs-tools` | Library-/Tool-Doku ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | Rohmaterial aus `k-playbook-local/material/` zu Doku verdichten | schreibt je Thema eine Datei nach `k-playbook-local/docs/extracted/`, mit Quelle und Konfidenz |
-| `/k-doc-inventory` | Versionsinventar erheben | schreibt `k-playbook-local/docs/versions/inventory.md` über das Subkommando `k-playbook inventory`; Vertrag in [`versionsinventar.md`](./versionsinventar.md) |
+| `/k-doc-inventory` | Versionsinventar erheben | schreibt `k-playbook-local/docs/versions/inventory.md` über das Subkommando `k-playbook inventory`; derselbe Lauf steht im Bereich „Inventar" der Oberfläche hinter „Aktualisieren"; Vertrag in [`versionsinventar.md`](./versionsinventar.md), Nachzugs-Pflicht bei Versionssprüngen in `rules/docs-sync.md` |
 | `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` (oder `opencode.jsonc`, wenn nur die existiert) |
 | **Code-Review** | | |
 | `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |

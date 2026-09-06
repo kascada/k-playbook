@@ -65,6 +65,9 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		{path: "/", markiert: `<a class="area-nav-item active" href="/" aria-current="page">`},
 		{path: "/workflows", markiert: `<a class="area-nav-item active" href="/workflows" aria-current="page">`},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
+		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
+		// Blockmenü wie die Startseite.
+		{path: "/inventory", markiert: `<a class="area-nav-item active" href="/inventory" aria-current="page">`},
 		// /mcp ist die Detailseite des Setup-Blocks: der Bereich ist aktiv,
 		// die Startseite darunter ist aber nicht offen.
 		{path: "/mcp", markiert: `<a class="area-nav-item active" href="/" aria-current="true">`},
@@ -110,8 +113,8 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	if count := strings.Count(body, `class="area-nav-item`); count != 1 {
 		t.Errorf("Einträge im Umschalter = %d, erwartet genau 1", count)
 	}
-	if strings.Contains(body, `href="/workflows"`) || strings.Contains(body, `href="/docs"`) {
-		t.Error("der Umschalter führt nach Workflows oder Docs, obwohl nichts eingerichtet ist")
+	if strings.Contains(body, `href="/workflows"`) || strings.Contains(body, `href="/docs"`) || strings.Contains(body, `href="/inventory"`) {
+		t.Error("der Umschalter führt nach Workflows, Docs oder Inventar, obwohl nichts eingerichtet ist")
 	}
 }
 

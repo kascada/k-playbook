@@ -86,8 +86,12 @@ an; es legt `docs/manual/` und `material/` an.
 Die Quellenkonfiguration des Versionsinventars, `k-playbook-local/version-sources.yaml`,
 legt das Einrichten dagegen als gültige, leere Konfiguration an. Sie ist handgepflegt und
 wird von einem Update nie überschrieben; ihr Zustand steht in der Ausgabe von
-`k-playbook context` unter `versionSources`, damit kein Command sie selbst liest. Der
-Vertrag dazu steht in [`versionsinventar.md`](./versionsinventar.md).
+`k-playbook context` unter `versionSources`, damit kein Command sie selbst liest. Die
+Oberfläche zeigt sie im Bereich „Inventar" nur an — Pfad, Zustand und die Zahl der
+Wurzeln, Quellen und Ausschlüsse —, bearbeitet sie aber nicht; dort steht auch der
+Anstoß der Erhebung, derselbe Lauf wie `k-playbook inventory` und `/k-doc-inventory`.
+Der Vertrag dazu steht in [`versionsinventar.md`](./versionsinventar.md), die Pflicht
+zum Nachzug bei Versionssprüngen in `rules/docs-sync.md`.
 
 `k-playbook-local/material/` ist die Quellseite: Rohmaterial wie Chat-Mitschnitte und
 Notizen. Es wird nie indiziert und von keinem Command geschrieben. Sein Inhalt wird wie

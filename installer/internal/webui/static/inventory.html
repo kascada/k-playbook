@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventar - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+      <section class="hero app-header">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>Versionsinventar</h1>
+        </div>
+        <div class="hero-subrow">
+          <p class="eyebrow path">
+            <span class="path-entry">
+              <span class="path-key">{{.ModeLabel}}:</span>
+              {{if .Path}}{{.Path}}{{end}}
+            </span>
+            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
+              <span class="path-key">Repository:</span>
+              {{.RepoRoot}}
+            </span>
+            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
+              <span class="path-key">Installation:</span>
+              {{.PlaybookDir}}
+            </span>
+          </p>
+        </div>
+      </section>
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <!-- Eigener Bereich neben Docs: Docs zeigt die mitgelieferte Doku der
+             Installation, das Inventar ist eine erzeugte Datei des Projekts.
+             Das Menü links entsteht wie auf der Startseite aus den Karten. -->
+        <div class="blocks">
+          <section class="card" id="status-card">
+            <div class="section-head">
+              <div>
+                <h2>Stand</h2>
+              </div>
+              <span id="status-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">
+              Die <strong>deklarierten</strong> Versionen des Projekts — Pakete, Tools, Runtimes,
+              Container-Images, Helm-Charts —, erhoben aus Manifesten, Lockfiles, Container-,
+              DevContainer-, Helm- und CI-Dateien, nach Umgebung getrennt und mit Herkunft je
+              Zeile. Gelesen wird nur; kein Netz, keine Installation, kein Ausführen eines
+              gefundenen Werkzeugs. Der Stand hier kommt aus dem Frontmatter der Inventardatei.
+            </p>
+            <dl id="status-facts" class="facts"></dl>
+            <p id="status-message" class="message"></p>
+            <p class="hint">
+              „Aktualisieren“ erhebt neu — derselbe Lauf wie <code>k-playbook inventory</code>
+              und <code>/k-doc-inventory</code>. Ein Lauf ohne inhaltliche Änderung lässt die
+              Datei byte-identisch stehen, auch ihr Zeitstempel bleibt dann der alte.
+            </p>
+            <div id="run-progress" class="loading-inline hidden">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <span id="run-progress-text">Erhebung läuft...</span>
+            </div>
+            <button id="inventory-run" class="secondary" disabled>Aktualisieren</button>
+          </section>
+
+          <!-- Das Ergebnis des letzten Anstoßes aus dieser Seite. Erscheint erst
+               nach einem Lauf; bis dahin gibt es nichts zu berichten. -->
+          <section class="card hidden" id="run-card">
+            <div class="section-head">
+              <div>
+                <h2>Letzter Lauf</h2>
+              </div>
+              <span id="run-pill" class="pill muted"></span>
+            </div>
+            <p id="run-message" class="message"></p>
+            <dl id="run-facts" class="facts"></dl>
+            <div id="run-findings" class="settings"></div>
+          </section>
+
+          <section class="card" id="sources-card">
+            <div class="section-head">
+              <div>
+                <h2>Quellenkonfiguration</h2>
+              </div>
+              <span id="sources-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">
+              Zusätzlich lesbare Wurzeln außerhalb des Projekts, zusätzliche Quellen über die
+              Standarderkennung hinaus und Bereiche, in denen nicht gesucht wird. Die Datei ist
+              <strong>handgepflegt</strong> und wird hier nur angezeigt, nicht bearbeitet: geschrieben
+              wird in sie nur nach ausdrücklicher Bestätigung und ausschließlich ergänzend — das
+              macht <code>/k-doc-inventory</code> mit dem Diff vor Augen, nicht ein Formular.
+            </p>
+            <dl id="sources-facts" class="facts"></dl>
+            <p id="sources-message" class="message"></p>
+          </section>
+
+          <section class="card" id="file-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" id="file-path"></p>
+                <h2>Inventardatei</h2>
+              </div>
+            </div>
+            <article id="file-viewer" class="doc-viewer"></article>
+            <p id="file-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/inventory.js"></script>
+  </body>
+</html>

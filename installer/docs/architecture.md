@@ -84,8 +84,9 @@ Quellenkonfiguration und
 Zielpfad zusammen und reicht sie an `internal/inventory` weiter; dort liegen Parser,
 Vertrauensgrenze und Renderer. Ein Lauf ohne inhaltliche Änderung lässt die Datei
 byte-identisch stehen. Der Vertrag steht in
-[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); denselben Lauf stößt
-der Command `/k-doc-inventory` an.
+[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); denselben Lauf stoßen
+der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
+`POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
 
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
@@ -141,16 +142,17 @@ installer/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
 │   ├── browser.go               Browser öffnen, Container erkennen
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
+│   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
 │   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, workflows.html, docs.html, mcp.html,
-│                                sidebar.html (Fragment der linken Spalte),
+│   └── static/                  index.html, workflows.html, docs.html, inventory.html,
+│                                mcp.html, sidebar.html (Fragment der linken Spalte),
 │                                session.js, nav.js, app.js, workflows.js,
-│                                docs.js, mcp.js, styles.css
+│                                docs.js, inventory.js, mcp.js, styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── internal/review/
@@ -1073,9 +1075,18 @@ dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite v
 
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat drei Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`
-und **Docs** unter `/docs`. `/mcp` ist keine vierte Sorte, sondern die Detailseite des
-Setup-Blocks und trägt dessen Bereich.
+Die Oberfläche hat vier Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
+**Docs** unter `/docs` und **Inventar** unter `/inventory`. `/mcp` ist keine fünfte
+Sorte, sondern die Detailseite des Setup-Blocks und trägt dessen Bereich.
+
+Das Inventar ist ein eigener Bereich und keine Karte auf der Startseite — nach demselben
+Muster wie Workflows und Docs: die Startseite trägt die Einrichtungsschritte, und das
+Inventar ist keiner. Eine Karte dort hätte auch nicht gereicht: die erzeugte Inventardatei
+muss im Bereich selbst lesbar sein, und der Aktualisieren-Knopf braucht Verlaufsstatus
+und ein Ergebnis mit Ablehnungen im Wortlaut. Beides braucht eine Seite. Eine zusätzliche
+Verweis-Karte auf der Startseite gibt es deshalb ebenso wenig wie für Workflows und Docs;
+der Weg ist der Umschalter. Was der Bereich zeigt und warum er vom Docs-Bereich getrennt
+ist, steht unter „Das Versionsinventar in der Oberfläche".
 
 Jede dieser Seiten hat links dieselbe Spalte, und die beantwortet zwei Fragen: In welchem
 Bereich bin ich, und was steht in diesem Bereich? Oben der **Umschalter**, eine Liste von
@@ -1179,6 +1190,14 @@ Der Bereich **Docs** zeigt die mitgelieferte Doku aus `k-playbook/docs`. Das Men
 listet alle Markdown-Dateien, auch die aus Unterverzeichnissen wie `libs/`; ein Klick
 zeigt die Datei in der Karte daneben. Ohne Auswahl steht dort die `README.md`.
 
+Das bleibt so, ausdrücklich: „Doku in der Oberfläche" zeigt **weiterhin nur die
+mitgelieferte** Doku der Installation. `project.DocsDir()`, `project.ListDocs()`,
+`GET /api/docs`, `GET /api/docs/file` und die Seite `/docs` kennen `k-playbook-local/docs`
+nicht und werden für das Versionsinventar nicht erweitert — das Inventar ist ein eigener
+Bereich mit eigener API (siehe „Das Versionsinventar in der Oberfläche") und davon
+getrennt. Eine zweite Docs-Wurzel in Werkzeug, API und Oberfläche wäre teurer als der
+eigene Bereich gewesen und hätte eine bewusst getroffene Entscheidung rückgängig gemacht.
+
 `project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,
 ersatzweise den Dateinamen. Die `README.md` steht vorn, sie ist der Einstieg. Fehlt das
 Verzeichnis, ist das ein Befund und keine leere Liste: die Antwort trägt dann eine
@@ -1208,6 +1227,59 @@ stehen, wo die vorige Datei endete.
 Mermaid-Blöcke rendert der Browser nach. Die Library kommt bei Bedarf vom CDN — sie ist
 zu groß, um sie mitzuliefern. Ohne Netz bleibt der Quelltext des Diagramms als
 Codeblock stehen, die Datei ist also weiterhin lesbar.
+
+## Das Versionsinventar in der Oberfläche
+
+Der Bereich **Inventar** unter `/inventory` zeigt das Versionsinventar des Projekts und
+stößt seine Erhebung an. Der Vertrag steht in
+[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); die Oberfläche
+formuliert nichts davon neu.
+
+Die Seite hat vier Karten. **Stand** zeigt, ob die Inventardatei da ist, wann sie zuletzt
+inhaltlich geändert wurde, den Erzeuger und die Zahlen aus ihrem Frontmatter — Quellen
+gelesen und konfiguriert, Einträge, Abweichungen, abgelehnte und nicht durchsuchte
+Quellen —, dazu den Pfad der Datei und den Knopf **Aktualisieren**. Solange der Lauf
+steht, ist der Knopf gesperrt und ein Ring daneben sagt, dass gearbeitet wird; ein Lauf
+liest jede Quelle des Projekts. **Letzter Lauf** erscheint danach: Erfolg oder Abbruch,
+ob geschrieben wurde oder die Datei unverändert blieb, die Zahlen des Laufs — dieselben,
+die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss und
+jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt `version-sources.yaml`: Pfad,
+vorhanden oder fehlend oder defekt, und die Zahl der Wurzeln, Zusatzquellen und
+Ausschlussmuster. **Inventardatei** zeigt die erzeugte Datei gerendert, ohne ihren
+Frontmatter-Block — der steht als Stand darüber.
+
+Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter der Inventardatei
+und nirgends sonst; ein Zwischenartefakt gibt es nicht. Das ist die eine Statusquelle, die
+auch der Sammler, `/k-docs` und das Subkommando benutzen.
+
+**Nur die Fachlogik.** Die Handler in `webui/inventory.go` rufen ausschließlich
+`internal/inventory` auf: `inventory.FilePath` für den Ort der Datei, `inventory.ReadStatus`
+für den Stand, `inventory.Run` für den Anstoß, `inventory.Body` zum Abtrennen des
+Frontmatters vor dem Rendern. Es gibt keinen zweiten Parser und keine Sonderbehandlung von
+Pfaden: `GET /api/inventory/file` nimmt keinen Pfad aus der Anfrage entgegen, sondern liest
+genau die eine Datei. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
+unverändert und wird nicht zweitverwendet implementiert — ein abgelehnter Pfad steht in
+der Antwort so, wie die Fachlogik ihn meldet: angefragter Pfad, aufgelöster Pfad, Grund.
+Die Quellenkonfiguration liest derselbe `versionsources.Read` wie im Sammler und in
+`k-playbook context`. Gerendert wird mit dem Goldmark aus `docs.go`; geteilt wird nur der
+Renderer, der Docs-Bereich selbst bleibt unberührt.
+
+**Anzeigen, nicht pflegen.** Die Quellenkonfiguration wird in der Oberfläche nur
+gezeigt. Die Schreibregel des Vertrags verlangt ausdrückliche Bestätigung und rein
+ergänzendes Schreiben unter Erhalt von Einträgen, Kommentaren und Reihenfolge; eine
+Eingabemaske bräuchte dafür eine eigene Validierung gegen das Quellenmodell und einen
+zweiten Schreibpfad neben `/k-doc-inventory`, der den Diff vor Augen hat. Es gibt deshalb
+weder ein Formular noch einen Endpunkt, der in `version-sources.yaml` schreibt. Der
+einzige schreibende Endpunkt des Bereichs ist `POST /api/inventory`, und der schreibt
+allein die Inventardatei — und auch die nur, wenn die Erhebung sich inhaltlich vom Bestand
+unterscheidet: die Byte-Stabilitätsregel steht in `inventory.Write`, nicht im Handler.
+Der POST steht wie jeder andere hinter der Herkunftsprüfung.
+
+**Eigener Bereich, eigene API.** Docs zeigt die mitgelieferte Doku der Installation; das
+Inventar ist eine erzeugte Datei des Projekts unter `k-playbook-local/docs/versions/`.
+Deshalb ein eigener Eintrag im Umschalter, eine eigene Seite und drei eigene Endpunkte —
+und keine Erweiterung von `/api/docs`. Das Blockmenü entsteht wie auf der Startseite aus
+den Karten; unter 1080px entfällt es wie dort.
 
 ## Workflows: Reviews, Tasks und Todos
 
@@ -1295,6 +1367,9 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
+| `GET` | `/api/inventory` | Stand des Versionsinventars aus dem Frontmatter der Inventardatei, dazu der Zustand der Quellenkonfiguration; read-only |
+| `POST` | `/api/inventory` | Erhebung anstoßen über `inventory.Run`; schreibt allein die Inventardatei, und die nur bei inhaltlicher Änderung; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, Hinweisen und dem Stand danach |
+| `GET` | `/api/inventory/file` | die Inventardatei als HTML lesen, ohne Frontmatter; fester Pfad, kein Parameter; read-only |
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
@@ -1302,8 +1377,8 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows`,
-`/docs` und `/mcp`; alle vier rendert `renderPage()` aus derselben Vorlage für den Kopf
-und die linke Spalte. Mitgeliefert werden der aktive Bereich und die Auskunft, ob eine
+`/docs`, `/inventory` und `/mcp`; alle fünf rendert `renderPage()` aus derselben Vorlage
+für den Kopf und die linke Spalte. Mitgeliefert werden der aktive Bereich und die Auskunft, ob eine
 Installation gefunden wurde.
 
 Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST

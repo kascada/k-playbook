@@ -109,6 +109,16 @@ documentation whose `version` is a snapshot as of its `last-reviewed`. Do **not*
 count these lines as inventory deviations: a deviation arises from two sources, this
 difference from two documents. Where both disagree, the inventory holds.
 
+The two origins do not blend: `docs/libs/` is **curated and pitfall-oriented** (a
+selection, one profile per tool, written by `/k-docs-tools`), `docs/versions/` is
+**complete and source-oriented** (every declared version from every source, with its
+origin per line, written by `/k-doc-inventory` through `k-playbook inventory`). Each
+finding above therefore names both sides and the way to close it: refresh the inventory
+with `/k-doc-inventory` if it is older than the manifest, or refresh the profile with
+`/k-docs-tools` if its content — not just its number — is stale. When a version bump is
+what caused the difference, the obligation to update the inventory in the same working
+step is stated in `rules/docs-sync.md`, section „Nachzug bei Versionssprüngen".
+
 If there are no findings, say so in one line.
 
 ## Schritt 4 — Möglichkeiten anbieten

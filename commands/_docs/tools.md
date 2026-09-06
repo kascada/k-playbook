@@ -16,6 +16,19 @@ Nothing else. This command writes only inside its own directory `docs/libs/`.
 
 **Fokus:** Pitfalls, Auth-Quirks, Concurrency-Fallen, Version-Migrations-Notes, empfohlene Idiome. **Kein** Copy-Paste-Tutorial — dafür gibt es die offiziellen Docs.
 
+**Abgrenzung zum Versionsinventar.** `docs/libs/` ist **kuratiert und pitfall-orientiert**:
+eine Auswahl von Tools, je Tool ein Steckbrief, und seine `version` ist ein Stand zum
+Zeitpunkt `last-reviewed`. Das Inventar unter `docs/versions/` (Erzeuger
+`/k-doc-inventory`, Modul `_docs/inventory.md`) ist **vollständig und quellenorientiert**:
+jede deklarierte Version aus jeder Quelle, nach Umgebung getrennt, mit Herkunft je Zeile,
+ohne Auswahl. Beide teilen sich die Pin-Taxonomie aus Schritt 3 — das Inventar erweitert
+sie um `digest`, `local` und `unknown` —, damit nicht zwei Sprachen für dieselbe Sache
+entstehen. Weichen die Versionsangaben voneinander ab, gibt das **Inventar** die Auskunft;
+`docs/libs/` wird deswegen **nicht** automatisch umgeschrieben, sondern `/k-docs` meldet
+den Unterschied als Hinweis. Nachgezogen wird ein Steckbrief über diesen Command, wenn
+sein Inhalt — nicht nur seine Versionszahl — veraltet ist. Wann ein Versionssprung welchen
+Nachzug auslöst, steht in `rules/docs-sync.md` unter „Nachzug bei Versionssprüngen".
+
 ## Schritt 1 — Pfade auflösen
 
 From the context output:
@@ -225,6 +238,7 @@ sources:
 **Regeln:**
 - Das Frontmatter ist OKF-kompatibel: `type: Tool Reference` plus `title`, `description`, `tags`, `status`, `generated`. Die bestehenden Tool-Felder (`lib`, `version`, `version-pin`, `severity`, `last-reviewed`, `sources`) bleiben für `/k-docs-tools` erhalten.
 - `generated.by` ist immer `k-docs-tools`. Der Index akzeptiert außerdem den Altwert `k-tools-scan`; ein anderer Wert in `docs/libs/` ist ein Befund.
+- `version` und `version-pin` sind der Stand zum Zeitpunkt `last-reviewed`, nicht die Auskunft über die aktuell deklarierte Version — die gibt das Inventar unter `docs/versions/`. Weicht das Inventar ab, wird die Datei hier **nicht** aus dem Inventar umgeschrieben; `/k-docs` meldet den Unterschied, und ein neuer Lauf dieses Commands zieht den Steckbrief nach, wenn sein Inhalt veraltet ist.
 - `lib`, `version`, `severity` und `last-reviewed` sind Pflicht: `/k-docs-index` baut daraus die Übersichtstabelle „Libs & Stack". Fehlt eines, kommt die Datei trotzdem in den Index — die Lücke wird dort als Konsistenz-Befund gemeldet, nicht stillschweigend übergangen.
 - `sources` im Frontmatter nur für tatsächlich genutzte Quellen eintragen, jeweils als OKF-Objekt mit mindestens `resource`. Offizielle Doku und Changelog/Releases bevorzugen.
 - **Keine** Tutorials, keine „Getting Started"-Snippets.
