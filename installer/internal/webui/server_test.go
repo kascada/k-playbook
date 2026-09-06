@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/buildinfo"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -96,6 +97,44 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			}
 			if got := strings.Contains(body, "block-nav file-index"); got != test.fileIndex {
 				t.Errorf("Modifier file-index = %v, erwartet %v", got, test.fileIndex)
+			}
+		})
+	}
+}
+
+// Jede Seite trägt rechts oben die Version des Binarys, das sie ausliefert.
+// Die Installation daneben kann einen anderen Stand haben; ohne die Marke
+// verriete ein Fenster nach einem Update nicht, welcher Server antwortet.
+// Ein Build ohne Flags zeigt das sichtbar an, statt eine leere Marke zu
+// tragen.
+func TestSeitenTragenDieVersion(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	chdir(t, root)
+
+	before := buildinfo.Version
+	t.Cleanup(func() { buildinfo.Version = before })
+
+	for _, path := range []string{"/", "/workflows", "/docs", "/inventory", "/mcp"} {
+		t.Run(path, func(t *testing.T) {
+			buildinfo.Version = "v1.2.3"
+			status, body := getPage(t, path)
+			if status != http.StatusOK {
+				t.Fatalf("Status = %d, erwartet %d", status, http.StatusOK)
+			}
+			if !strings.Contains(body, `class="version-badge"`) {
+				t.Error("die Versionsmarke fehlt")
+			}
+			if !strings.Contains(body, ">v1.2.3</span>") {
+				t.Error("die Versionsmarke nennt nicht v1.2.3")
+			}
+
+			buildinfo.Version = ""
+			_, body = getPage(t, path)
+			if !strings.Contains(body, ">ohne Version</span>") {
+				t.Error("ein Build ohne Version zeigt keine Marke „ohne Version“")
 			}
 		})
 	}

@@ -85,9 +85,8 @@ Architektur, Endpunkte, Abläufe und Designentscheidungen stehen in
 [`docs/architecture.md`](./docs/architecture.md). Diese Datei ist der Einstieg für
 weitere Arbeiten am Werkzeug.
 
-`installer/_old/` enthält den vollständigen Stand vor dem Umbau als Nachschlagewerk.
-Verzeichnisse mit `_`-Präfix ignoriert die Go-Toolchain vollständig — der Code dort ist
-nicht baubar und nur zum Lesen da.
+Der Stand vor dem Umbau ist aus dem Baum entfernt und nur noch in der Git-Historie
+erreichbar, zuletzt in Commit `02f78d3` unter `installer/_old/`.
 
 ## Prüfungen nach Änderungen
 

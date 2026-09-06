@@ -1,0 +1,1 @@
+../../k-playbook/commands/k-doc-inventory.md

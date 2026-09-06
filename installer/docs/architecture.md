@@ -1378,8 +1378,11 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows`,
 `/docs`, `/inventory` und `/mcp`; alle fünf rendert `renderPage()` aus derselben Vorlage
-für den Kopf und die linke Spalte. Mitgeliefert werden der aktive Bereich und die Auskunft, ob eine
-Installation gefunden wurde.
+für den Kopf und die linke Spalte. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
+Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
+Marke, weil die Installation daneben einen anderen Stand tragen kann und ein offenes Fenster
+nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Build ohne
+`-ldflags` zeigt dort „ohne Version".
 
 Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST
 /api/client-gone` gibt es nicht mehr; der Server endet nicht mehr mit dem Fenster.
@@ -1874,19 +1877,10 @@ deshalb `k-playbook stop`, dann neu aufrufen.
 
 ## Der alte Stand
 
-`installer/_old/` enthält rund 7800 Zeilen Go vor dem Umbau, per `git mv` verschoben und
-damit in der Historie nachvollziehbar. Verzeichnisse mit `_`-Präfix ignoriert die
-Go-Toolchain vollständig: kein Build, keine Tests, keine Imports. Der Code ist dort
-**nicht baubar** — seine Imports zeigen auf Pfade, die es nicht mehr gibt. Er ist zum
-Lesen und Herüberkopieren da.
-
-| Ort | Inhalt |
-|---|---|
-| `_old/internal/install/config.go` | vollständiger Config-Vertrag: `PathKeys`, `ValidatePath`, `RenderConfig` |
-| `_old/internal/install/migrate.go` | zeilenweise Migration, die Kommentare und unbekannte Blöcke erhält |
-| `_old/internal/projects/status.go` | die elf Statusprüfungen der alten Oberfläche |
-| `_old/internal/webui/server.go` | die alte GUI mit allen Bedienabläufen |
-| `_old/payload/payload.go` | `go:embed` samt Extract-Logik des abgelösten Modells |
+Der Code vor dem Umbau lag bis September 2026 als `installer/_old/` im Baum und ist
+gelöscht. Wer ihn nachschlagen will, findet ihn in der Git-Historie, zuletzt in
+Commit `02f78d3`, zum Beispiel mit
+`git show 02f78d3:installer/_old/internal/install/migrate.go`.
 
 ## Offene Punkte
 

@@ -356,7 +356,12 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 		Installed   bool
 		Area        string
 		Page        string
-	}{Installed: environment.Installed, Area: area, Page: page}
+		// Version ist die des Binarys, das diese Seite ausliefert. Sie steht
+		// rechts oben im Kopf, weil die Installation daneben einen anderen
+		// Stand tragen kann und ein Fenster nach einem Update sonst nicht
+		// verrät, welcher Server gerade antwortet.
+		Version string
+	}{Installed: environment.Installed, Area: area, Page: page, Version: displayVersion(guiproc.OwnVersion())}
 
 	if environment.Installed {
 		data.Mode = "project"
@@ -471,4 +476,14 @@ func (state *serverState) idleExceeded(now time.Time) bool {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	return !state.lastRequestAt.IsZero() && now.Sub(state.lastRequestAt) >= idleTimeout
+}
+
+// displayVersion ist die Version für den Seitenkopf. Leer bleibt sie nur bei
+// einem Ad-hoc-`go build` ohne Build-Flags; das soll sichtbar sein und nicht
+// wie ein fehlendes Element aussehen.
+func displayVersion(version string) string {
+	if version == "" {
+		return "ohne Version"
+	}
+	return version
 }

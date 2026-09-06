@@ -14,10 +14,9 @@ on:
       - main
     paths:
       - "installer/**"
-      # Prosa und abgelegter Code bauen nicht mit: eine Änderung dort verlangt
-      # kein neues Binary und damit auch keinen VERSION-Bump.
+      # Prosa baut nicht mit: eine Änderung dort verlangt kein neues Binary und
+      # damit auch keinen VERSION-Bump.
       - "!installer/docs/**"
-      - "!installer/_old/**"
 
 permissions:
   contents: read
