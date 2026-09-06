@@ -1,0 +1,22 @@
+# Ausschlüsse für njsscan. Die Datei liegt neben scanners.tsv und wird über den
+# Platzhalter {scripts} angesprochen, wie gitleaks.toml und aus demselben Grund:
+# das Werkzeug kennt keinen Ausschluss-Schalter, nur eine eigene Konfiguration.
+#
+# libsast vergleicht ignore-paths als reinen Teilstring gegen den Pfad
+# (scanner.py: `any(pp in path.as_posix() for pp in self.ignore_paths)`) — ohne
+# Anker. Deshalb nennt die Job-Zeile in scanners.tsv als Ziel `.` und nicht
+# {target}: bei absolutem Ziel träfe `k-playbook/` in einem Projekt, das selbst
+# so heißt, den kompletten Pfad, und der Job fände überhaupt nichts mehr. Genau
+# die Falle, die dort für gitleaks beschrieben ist.
+#
+# `k-playbook/` trifft `k-playbook-local/` nicht: dort folgt auf den Namen ein
+# `-` und kein `/`. Beide Einträge stehen deshalb einzeln da.
+ignore-paths:
+  # Die Installationskopie. Ihr ausgeliefertes JavaScript unter
+  # installer/internal/webui/static/ ist kein Code des Projekts.
+  - k-playbook/
+  # Die Ergebnisse früherer Läufe.
+  - k-playbook-local/results/
+
+# node_modules, bower_components und .git stehen bewusst nicht hier: njsscan
+# führt sie in seinen eigenen Voreinstellungen (settings.py, IGNORE_PATHS).

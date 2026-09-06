@@ -119,7 +119,8 @@
 #              ihn gerade nicht, weil das Arbeitsverzeichnis schon stimmt. Er ist für
 #              Werkzeuge da, die den Pfad als Argument nehmen — bei module-file ist das
 #              der Sinn der Sache, dort trägt ihn jede Zeile.
-#   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml).
+#   {scripts}  Dieses Verzeichnis. Für Beigaben, die ein Aufruf braucht (gitleaks.toml,
+#              njsscan.yaml).
 #
 # Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
 # schreibt sie anders — ruff --exclude, trivy --skip-dirs, semgrep --exclude, grype
@@ -154,13 +155,22 @@
 # Dazu für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
 # gemessen 97,3 % der Befunde, siehe docs/umbau.md, „Gemessen".
 #
-# Die gitleaks-Jobs nennen als Ziel . statt {target}, obwohl beides dasselbe
-# Verzeichnis meint. Grund: gitleaks kann Pfade nur über reguläre Ausdrücke ausnehmen,
-# und die laufen gegen den gemeldeten Pfad. Bei absolutem Ziel ist der absolut — in
-# einem Projekt, das selbst k-playbook heißt, träfe ein Muster für die
-# Installationskopie dann die ganze Projektwurzel, und der Lauf fände nichts mehr.
-# Mit . sind die gemeldeten Pfade relativ zur Wurzel, und die Muster in gitleaks.toml
-# greifen mit ^ genau dort, wo sie sollen.
+# Die gitleaks- und njsscan-Jobs nennen als Ziel . statt {target}, obwohl beides
+# dasselbe Verzeichnis meint. Grund: beide Werkzeuge können Pfade nur über ihre eigene
+# Konfiguration ausnehmen, und deren Muster laufen gegen den gemeldeten Pfad. Bei
+# absolutem Ziel ist der absolut — in einem Projekt, das selbst k-playbook heißt, träfe
+# ein Muster für die Installationskopie dann die ganze Projektwurzel, und der Lauf fände
+# nichts mehr. Mit . sind die gemeldeten Pfade relativ zur Wurzel, und die Muster
+# greifen genau dort, wo sie sollen: gitleaks.toml mit ^ verankert, njsscan.yaml über
+# den Teilstring k-playbook/, der libsast genügt.
+#
+# osv-scanner braucht diesen Umweg nicht und behält {target}: sein
+# --experimental-exclude nimmt einen exakten Verzeichnisnamen und wird nicht auf die
+# Scan-Wurzel angewandt. Nachgemessen in einem Repo, dessen Wurzel k-playbook heißt —
+# mit und ohne Flag dieselben 331 Verzeichnisse und dieselben vier Manifeste. Der
+# Schalter ist trotz des Namens experimental die einzige Ausschlussmöglichkeit des
+# Werkzeugs; ohne ihn meldet es die Abhängigkeiten der Installationskopie mit, deren
+# testdata/ in deren eigenem Clone nicht gitignored ist.
 #
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
@@ -169,12 +179,13 @@ job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 gitleaks-git	gitleaks	*	any	native	file	10m		target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
 gitleaks-dir	gitleaks	*	any	native	file	10m		target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
 ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=tests --exclude=test {target}
+semgrep	semgrep	python,go,javascript,typescript	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=node_modules --exclude=tests --exclude=test {target}
 trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
 trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
 gosec	gosec	go	source	native	file	15m		module	-fmt=sarif -out={out} ./...
 govulncheck	govulncheck	go	manifest	native	stdout	15m		module	-format sarif ./...
-osv-scanner	osv-scanner	python,go	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --format sarif --output-file {out} {target}
+njsscan	njsscan	javascript,typescript	source	native	file	15m		target	--sarif -o {out} -c {scripts}/njsscan.yaml .
+osv-scanner	osv-scanner	python,go,javascript,typescript	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --experimental-exclude k-playbook --experimental-exclude k-playbook-local/results --format sarif --output-file {out} {target}
 grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
 golangci-lint	golangci-lint	go	source	native	file	15m		module	run --output.sarif.path {out} --output.text.path stderr ./...
 trufflehog-git	trufflehog	*	any	convert	stdout	15m		target	git file://{target} --json --no-update

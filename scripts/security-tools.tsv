@@ -21,10 +21,11 @@ trivy	*	true	true	github	aquasecurity/trivy	^{tool}_{version}_{os_cap}-{arch_bit
 syft	*	true	true	github	anchore/syft	^{tool}_{version}_{os}_{arch}\.tar\.gz$	SBOM-Erzeugung	anchore/syft:latest	version,--version
 grype	*	true	true	github	anchore/grype	^{tool}_{version}_{os}_{arch}\.tar\.gz$	SBOM-/Dependency-CVE-Auswertung	anchore/grype:latest	version,--version
 pip-audit	python	true	true	pipx	pip-audit	-	Python Dependency-CVEs	-	--version
-semgrep	python,go	true	true	pipx	semgrep	-	Generische Security-Regeln	semgrep/semgrep:latest	--version
-osv-scanner	python,go	true	true	github	google/osv-scanner	^{tool}_{os}_{arch}$	Dependency-CVEs mit SARIF	-	--version
+semgrep	python,go,javascript,typescript	true	true	pipx	semgrep	-	Generische Security-Regeln	semgrep/semgrep:latest	--version
+osv-scanner	python,go,javascript,typescript	true	true	github	google/osv-scanner	^{tool}_{os}_{arch}$	Dependency-CVEs mit SARIF	-	--version
 gosec	go	true	true	github	securego/gosec	^{tool}_{version}_{os}_{arch}\.tar\.gz$	Go-Security	-	--version
 govulncheck	go	true	true	go	golang.org/x/vuln/cmd/govulncheck@latest	-	Go-CVEs mit Reachability	-	--version
+njsscan	javascript,typescript	true	true	pipx	njsscan	-	Node-/JS-Security	-	--version
 ruff	python	true	true	pipx	ruff	-	Python-Qualität und flake8-bandit-Regeln	-	--version
 golangci-lint	go	false	true	github	golangci/golangci-lint	^{tool}-{version}-{os}-{arch}\.tar\.gz$	Go-Qualität, bündelt staticcheck und errcheck	-	--version
 docker	*	false	false	none	-	-	Optionaler Fallback für Container-Images	-	--version

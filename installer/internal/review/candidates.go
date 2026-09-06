@@ -52,6 +52,11 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 	CandidateSource: {
 		"go":     {"*.go"},
 		"python": {"*.py", "*.pyi"},
+		// .mjs und .cjs stehen dabei, weil ein Node-Projekt seine Modulart je
+		// Datei wählen kann und beide Endungen echten Projektcode tragen —
+		// confluence-companion etwa hat seine Tests als .mjs.
+		"javascript": {"*.js", "*.mjs", "*.cjs", "*.jsx"},
+		"typescript": {"*.ts", "*.mts", "*.cts", "*.tsx"},
 	},
 	CandidateManifest: {
 		"go": {"go.mod", "go.sum"},
@@ -60,6 +65,18 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 		"python": {
 			"requirements*.txt", "constraints*.txt", "pyproject.toml",
 			"setup.py", "setup.cfg", "Pipfile", "Pipfile.lock", "poetry.lock",
+		},
+		// Beide Schlüssel tragen dieselbe Liste: das Manifest eines
+		// Node-Projekts sagt nichts darüber, ob darin JavaScript oder
+		// TypeScript steht. Getrennt stehen sie trotzdem, weil die Sprachspalte
+		// eines Jobs nur einen der beiden nennen kann.
+		"javascript": {
+			"package.json", "package-lock.json", "npm-shrinkwrap.json",
+			"yarn.lock", "pnpm-lock.yaml",
+		},
+		"typescript": {
+			"package.json", "package-lock.json", "npm-shrinkwrap.json",
+			"yarn.lock", "pnpm-lock.yaml",
 		},
 	},
 }
