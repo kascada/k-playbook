@@ -227,17 +227,23 @@ export BROWSER=/path/to/helper.sh   # receives the URL as an argument
 
 ## Reviews and tasks
 
-The **Workflows** section brings together the work queues: review runs from `k-playbook-local/results/`, tasks from `k-playbook-local/tasks/`, and todos from `k-playbook-local/TODO.md`. Each list has its own count.
+The **Workflows** section brings together the work queues, one page per kind: tasks from `k-playbook-local/tasks/`, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/TODO.md`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
 
-A description block comes first and explains what the three kinds are and when to use each. Below it are the previous runs, then the open tasks in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. Todos conclude the section, with open and checked-off items separated.
+`/workflows` itself is the overview: it explains what the three kinds are, when to use each, and how much each currently holds. From there, one link per kind leads to its page.
 
-On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. "without task refine" is not an error, but it is why `/k-task-run` asks before execution.
+**Tasks** (`/workflows/tasks`) lists the open tasks in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. "without task refine" is not an error, but it is why `/k-task-run` asks before execution.
+
+**Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
+
+Each of the four pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the tasks to `task-flow.md`, the reviews to `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
 
 This section is read-only. Tasks are created and executed through `/k-task-create` and `/k-task-run` in the assistant.
 
 ## Read documentation
 
 The **Docs** section shows all Markdown files from `k-playbook/docs`, the same documentation you are reading now, at the version installed in the project. The index is on the left in the menu and the open file on the right; without a selection, it shows `README.md`. Links in the text lead to the next file, and anchors jump within the open file.
+
+Another page can request a specific file: `/docs?file=task-flow.md`, optionally followed by an anchor. That is how the help links of the Workflows pages work. If the requested file is not in the index, the answer says so rather than falling back to `README.md` — the installation can carry a different state than the binary that wrote the link.
 
 Mermaid diagrams are rendered if the machine has network access: the library is loaded when needed. Without network access, the diagram source remains visible and the text is still fully readable.
 

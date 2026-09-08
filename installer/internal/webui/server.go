@@ -227,6 +227,9 @@ func routes(state *serverState) http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /workflows", workflowsPageHandler)
+	mux.HandleFunc("GET /workflows/tasks", tasksPageHandler)
+	mux.HandleFunc("GET /workflows/reviews", reviewsPageHandler)
+	mux.HandleFunc("GET /workflows/todos", todosPageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
@@ -299,21 +302,46 @@ const (
 	areaInventory = "inventory"
 )
 
-// pageTemplate parst eine Seite zusammen mit dem Fragment der linken Spalte.
-// Die Seitendatei steht zuerst: ParseFS benennt das Ergebnis nach der ersten
-// Datei, und Execute führt damit die Seite aus und nicht das Fragment.
+// pageTemplate parst eine Seite zusammen mit den beiden gemeinsamen
+// Fragmenten: dem Kopf und der linken Spalte. Die Seitendatei steht zuerst:
+// ParseFS benennt das Ergebnis nach der ersten Datei, und Execute führt damit
+// die Seite aus und nicht ein Fragment.
 func pageTemplate(name string) *template.Template {
-	return template.Must(template.ParseFS(staticFiles, "static/"+name, "static/sidebar.html"))
+	return template.Must(template.ParseFS(staticFiles, "static/"+name, "static/sidebar.html", "static/hero.html"))
 }
 
 var indexTemplate = pageTemplate("index.html")
 
-// workflowsTemplate ist die Seite der täglichen Arbeit: Reviews, Tasks und
-// Todos untereinander.
+// workflowsTemplate ist die Übersicht des Bereichs der täglichen Arbeit: was
+// die drei Sorten sind, wie viel in jeder liegt und der Weg zu ihrer Seite.
+// Die Listen selbst stehen auf den drei Seiten darunter — untereinander auf
+// einer Seite waren sie eine Strecke, auf der man scrollte statt zu lesen.
 var workflowsTemplate = pageTemplate("workflows.html")
 
 func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, workflowsTemplate, areaWorkflows, "/workflows")
+	renderPage(w, workflowsTemplate, areaWorkflows, "/workflows", "Workflows")
+}
+
+// tasksTemplate ist die Seite der Tasks: die offenen, die erledigten und der
+// gelesene Inhalt.
+var tasksTemplate = pageTemplate("tasks.html")
+
+func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, tasksTemplate, areaWorkflows, "/workflows/tasks", "Tasks")
+}
+
+// reviewsTemplate ist die Seite der Reviews: die bisherigen Läufe.
+var reviewsTemplate = pageTemplate("reviews.html")
+
+func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, reviewsTemplate, areaWorkflows, "/workflows/reviews", "Reviews")
+}
+
+// todosTemplate ist die Seite der Todos: die offenen und die abgehakten.
+var todosTemplate = pageTemplate("todos.html")
+
+func todosPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, todosTemplate, areaWorkflows, "/workflows/todos", "Todos")
 }
 
 // docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die
@@ -321,7 +349,7 @@ func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
 var docsTemplate = pageTemplate("docs.html")
 
 func docsPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, docsTemplate, areaDocs, "/docs")
+	renderPage(w, docsTemplate, areaDocs, "/docs", "Docs")
 }
 
 // inventoryTemplate ist die Seite des Versionsinventars: Stand, Anstoß der
@@ -332,7 +360,7 @@ func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 var inventoryTemplate = pageTemplate("inventory.html")
 
 func inventoryPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, inventoryTemplate, areaInventory, "/inventory")
+	renderPage(w, inventoryTemplate, areaInventory, "/inventory", "Versionsinventar")
 }
 
 // mcpTemplate ist die Seite des MCP-Servers. Sie ist eine Detailseite des
@@ -340,7 +368,7 @@ func inventoryPageHandler(w http.ResponseWriter, r *http.Request) {
 var mcpTemplate = pageTemplate("mcp.html")
 
 func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, mcpTemplate, areaSetup, "/mcp")
+	renderPage(w, mcpTemplate, areaSetup, "/mcp", "k-playbook-MCP")
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -348,15 +376,17 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	renderPage(w, indexTemplate, areaSetup, "/")
+	renderPage(w, indexTemplate, areaSetup, "/", "k-playbook")
 }
 
 // renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus. area sagt,
 // welcher Eintrag des Umschalters markiert wird, page nennt die offene Seite.
 // Beides fällt auseinander, sobald ein Bereich mehr als eine Seite hat: /mcp
-// trägt den Bereich Setup, ist aber nicht dessen Startseite — und nur die
-// offene Seite darf aria-current="page" führen.
-func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, page string) {
+// trägt den Bereich Setup, ist aber nicht dessen Startseite, und die drei
+// Seiten unter /workflows tragen dessen Bereich — nur die offene Seite darf
+// aria-current="page" führen. title ist die Überschrift im Kopf und der Name
+// des Fensters.
+func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, page string, title string) {
 	environment := project.Detect()
 	data := struct {
 		Mode        string
@@ -367,12 +397,17 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 		Installed   bool
 		Area        string
 		Page        string
+		// Title steht im Kopf und im Fensternamen. Die Startseite trägt ihn
+		// fest im Markup: sie hat als einzige einen eigenen Kopf, weil dort
+		// die Pfade IDs für app.js brauchen und die Knöpfe für Update und
+		// Dienst daneben stehen.
+		Title string
 		// Version ist die des Binarys, das diese Seite ausliefert. Sie steht
 		// rechts oben im Kopf, weil die Installation daneben einen anderen
 		// Stand tragen kann und ein Fenster nach einem Update sonst nicht
 		// verrät, welcher Server gerade antwortet.
 		Version string
-	}{Installed: environment.Installed, Area: area, Page: page, Version: displayVersion(guiproc.OwnVersion())}
+	}{Installed: environment.Installed, Area: area, Page: page, Title: title, Version: displayVersion(guiproc.OwnVersion())}
 
 	if environment.Installed {
 		data.Mode = "project"

@@ -59,12 +59,32 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// markiert ist der Eintrag des aktiven Bereichs, samt aria-current:
 		// "page" nur auf der offenen Seite selbst.
 		markiert string
+		// unterpunkt ist der markierte Eintrag unter dem Bereich. Nur die drei
+		// Seiten von Workflows haben einen; leer heißt: keiner ist markiert.
+		unterpunkt string
 		// fileIndex sagt, ob das Blockmenü den Dateiindex trägt und deshalb
 		// auch schmal stehen bleibt.
 		fileIndex bool
 	}{
 		{path: "/", markiert: `<a class="area-nav-item active" href="/" aria-current="page">`},
 		{path: "/workflows", markiert: `<a class="area-nav-item active" href="/workflows" aria-current="page">`},
+		// Die drei Seiten des Bereichs: Workflows ist aktiv, seine Übersicht
+		// ist aber nicht offen — offen ist der Unterpunkt.
+		{
+			path:       "/workflows/tasks",
+			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
+			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/tasks" aria-current="page">`,
+		},
+		{
+			path:       "/workflows/reviews",
+			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
+			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/reviews" aria-current="page">`,
+		},
+		{
+			path:       "/workflows/todos",
+			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
+			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/todos" aria-current="page">`,
+		},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
 		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
 		// Blockmenü wie die Startseite.
@@ -83,8 +103,12 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			if !strings.Contains(body, `class="area-nav-item`) {
 				t.Error("der Umschalter fehlt")
 			}
-			if !strings.Contains(body, `id="block-nav"`) {
-				t.Error("das Blockmenü fehlt")
+			// Die Übersicht von Workflows hat kein Blockmenü: ihre Karten
+			// sind die drei Seiten, die als Unterpunkte schon im Umschalter
+			// stehen.
+			wantBlockNav := test.path != "/workflows"
+			if got := strings.Contains(body, `id="block-nav"`); got != wantBlockNav {
+				t.Errorf("Blockmenü vorhanden = %v, erwartet %v", got, wantBlockNav)
 			}
 			if !strings.Contains(body, `id="reload-page"`) {
 				t.Error("der Knopf „Neu einlesen“ fehlt")
@@ -95,8 +119,56 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			if !strings.Contains(body, test.markiert) {
 				t.Errorf("der markierte Eintrag ist nicht %s", test.markiert)
 			}
+			erwarteteUnterpunkte := 0
+			if test.unterpunkt != "" {
+				erwarteteUnterpunkte = 1
+				if !strings.Contains(body, test.unterpunkt) {
+					t.Errorf("der markierte Unterpunkt ist nicht %s", test.unterpunkt)
+				}
+			}
+			if count := strings.Count(body, "area-nav-subitem active"); count != erwarteteUnterpunkte {
+				t.Errorf("markierte Unterpunkte = %d, erwartet %d", count, erwarteteUnterpunkte)
+			}
+			// Die drei Seiten des Workflows-Bereichs stehen im Umschalter jeder
+			// Seite: von Setup aus soll der Weg zu den Tasks nicht erst über die
+			// Übersicht führen.
+			for _, sub := range []string{"/workflows/tasks", "/workflows/reviews", "/workflows/todos"} {
+				if !strings.Contains(body, `href="`+sub+`"`) {
+					t.Errorf("der Unterpunkt %s fehlt im Umschalter", sub)
+				}
+			}
 			if got := strings.Contains(body, "block-nav file-index"); got != test.fileIndex {
 				t.Errorf("Modifier file-index = %v, erwartet %v", got, test.fileIndex)
+			}
+		})
+	}
+}
+
+// Jeder Hilfe-Block der Workflows-Seiten verweist in die mitgelieferte Doku,
+// und zwar immer auf demselben Weg: /docs?file=<datei>. Der Bereich Docs macht
+// daraus die gelesene Datei — eine zweite Ansicht gibt es dafür nicht. Ohne
+// diesen Test fiele ein vertippter oder verlorener Verweis erst im Browser auf.
+func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	chdir(t, root)
+
+	for path, datei := range map[string]string{
+		"/workflows":         "commands.md",
+		"/workflows/tasks":   "task-flow.md",
+		"/workflows/reviews": "review-runs.md",
+		"/workflows/todos":   "commands.md",
+	} {
+		t.Run(path, func(t *testing.T) {
+			status, body := getPage(t, path)
+			if status != http.StatusOK {
+				t.Fatalf("Status = %d, erwartet %d", status, http.StatusOK)
+			}
+			want := `<a class="doc-link" href="/docs?file=` + datei + `"`
+			if !strings.Contains(body, want) {
+				t.Errorf("der Verweis %s fehlt", want)
 			}
 		})
 	}
@@ -117,7 +189,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/workflows", "/docs", "/inventory", "/mcp"} {
+	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/docs", "/inventory", "/mcp"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -154,6 +226,10 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	}
 	if strings.Contains(body, `href="/workflows"`) || strings.Contains(body, `href="/docs"`) || strings.Contains(body, `href="/inventory"`) {
 		t.Error("der Umschalter führt nach Workflows, Docs oder Inventar, obwohl nichts eingerichtet ist")
+	}
+	// Die Unterpunkte hängen an demselben Zweig und dürfen ihn nicht überleben.
+	if strings.Contains(body, `class="area-nav-subitem`) {
+		t.Error("der Umschalter zeigt Unterpunkte, obwohl nichts eingerichtet ist")
 	}
 }
 

@@ -658,9 +658,9 @@ no job, so perspective files retain exactly the form they had before, and files 
 
 ## The Interface
 
-The **Workflows** section lists previous runs from `k-playbook-local/results/`, including
-their count next to the list. Each run shows its state and entry count; a directory without
-`run.json` is identified as such.
+The **Reviews** page of the Workflows section (`/workflows/reviews`) lists previous runs
+from `k-playbook-local/results/`, including their count next to the list. Each run shows its
+state and entry count; a directory without `run.json` is identified as such.
 
 The interface does no more here: **it does not create or start a run.** A run is created
 through `/k-audit` or `/k-review` in the assistant, and scanned in the terminal with

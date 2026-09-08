@@ -113,6 +113,7 @@ select {
 }
 
 .area-nav-item,
+.area-nav-subitem,
 .block-nav-item {
   display: flex;
   align-items: center;
@@ -129,11 +130,24 @@ select {
 
 /* Der Umschalter besteht aus Verweisen, das Blockmenü aus Knöpfen; gleich
    aussehen sollen beide. */
-.area-nav-item {
+.area-nav-item,
+.area-nav-subitem {
   text-decoration: none;
 }
 
+/* Die Seiten eines Bereichs stehen eingerückt unter ihm und eine Spur leiser:
+   Workflows ist der Bereich, Tasks, Reviews und Todos sind seine Seiten. Der
+   Einzug ist der einzige Träger dieser Rangfolge — deshalb steht er in der
+   Breite eines Wortes und nicht in ein paar Pixeln. */
+.area-nav-subitem {
+  padding-left: 26px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .area-nav-item:hover,
+.area-nav-subitem:hover,
 .block-nav-item:hover {
   color: var(--accent-strong);
   background: rgba(47, 93, 80, 0.1);
@@ -142,6 +156,7 @@ select {
 /* Zeigt den aktiven Bereich und den zuletzt angesprungenen Block. Der Rahmen
    macht das auch ohne Farbwahrnehmung erkennbar. */
 .area-nav-item.active,
+.area-nav-subitem.active,
 .block-nav-item.active {
   color: var(--accent-strong);
   background: rgba(47, 93, 80, 0.14);
@@ -194,6 +209,13 @@ select {
   .area-nav {
     grid-auto-flow: column;
     justify-content: start;
+  }
+
+  /* Waagerecht gibt es kein Oben und Unten mehr, gegen das eingerückt werden
+     könnte; die Unterpunkte stehen dann als gleich breite Einträge in der
+     Reihe und behalten allein ihre leisere Schrift. */
+  .area-nav-subitem {
+    padding-left: 11px;
   }
 
   .sidebar > .reload-page {
@@ -869,6 +891,27 @@ button.attention-highlight {
 .button-link.secondary {
   color: var(--accent-strong);
   background: #e5ded0;
+}
+
+/* Der Verweis in die Doku, im Kopf eines Hilfe-Blocks an der Stelle, an der
+   sonst die Pill steht. Kleiner als ein Knopf der Karte: er führt weiter, er
+   tut nichts. Ziel ist immer /docs?file=<datei> — der Bereich Docs zeigt die
+   Datei mit Index, Querverweisen und Diagrammen, und diese Seiten brauchen
+   dafür keine zweite Ansicht. */
+.doc-link {
+  flex: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--accent-strong);
+  background: rgba(47, 93, 80, 0.12);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.doc-link:hover {
+  background: rgba(47, 93, 80, 0.2);
 }
 
 /* Mehrere Knöpfe nebeneinander, die auf schmalen Fenstern umbrechen dürfen. */

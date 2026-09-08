@@ -1,0 +1,32 @@
+{{define "hero"}}
+      <!-- Der Kopf jeder Seite außer der Startseite: Logo, Titel, Version und
+           die aufgelösten Pfade. Auf der Startseite steht stattdessen ein
+           eigener — dort tragen die Pfade IDs, weil app.js sie nach einer
+           Einrichtung ohne Neuladen nachzieht, und daneben stehen die Knöpfe
+           für Update und Dienst. Alle übrigen Seiten zeigen denselben festen
+           Stand und unterscheiden sich allein im Titel. -->
+      <section class="hero app-header">
+        <div class="brand-row">
+          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
+          <h1>{{.Title}}</h1>
+          <span class="version-badge" title="Version des k-playbook-Binarys, das diesen Dienst bereitstellt. Die Installation daneben kann einen anderen Stand tragen.">{{.Version}}</span>
+        </div>
+        <div class="hero-subrow">
+          <p class="eyebrow path">
+            <span class="path-entry">
+              <span class="path-key">{{.ModeLabel}}:</span>
+              {{if .Path}}{{.Path}}{{end}}
+            </span>
+            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
+              <span class="path-key">Repository:</span>
+              {{.RepoRoot}}
+            </span>
+            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
+                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
+              <span class="path-key">Installation:</span>
+              {{.PlaybookDir}}
+            </span>
+          </p>
+        </div>
+      </section>
+{{end}}

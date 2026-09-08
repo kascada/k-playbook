@@ -24,7 +24,7 @@ New commands become visible only after linking is in place and the assistant has
 | Command | Purpose | Detail |
 |---|---|---|
 | **Project** | | |
-| `/k-gui` | Start the interface | guides through configuration, project-owned structure, and assistant linking; the Workflows, Docs, and Inventory sections, the last of which shows the version inventory and initiates its collection |
+| `/k-gui` | Start the interface | guides through configuration, project-owned structure, and assistant linking; the Workflows section with its Tasks, Reviews, and Todos pages, plus the Docs and Inventory sections, the last of which shows the version inventory and initiates its collection |
 | **Docs** | | |
 | `/k-docs` | Check documentation inventory and offer possible actions | read-only status; can dispatch to code, tool, extract, inventory, or index actions |
 | `/k-docs-code` | Generate semantic project documentation from the code | writes one file per topic to `k-playbook-local/docs/code/`; the `ks-overlay-repo-analyse` skill also writes there |

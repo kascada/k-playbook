@@ -149,10 +149,13 @@ installer/
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, workflows.html, docs.html, inventory.html,
-│                                mcp.html, sidebar.html (Fragment der linken Spalte),
-│                                session.js, nav.js, app.js, workflows.js,
-│                                docs.js, inventory.js, mcp.js, styles.css
+│   └── static/                  index.html, workflows.html, tasks.html, reviews.html,
+│                                todos.html, docs.html, inventory.html, mcp.html,
+│                                sidebar.html und hero.html (Fragmente für linke
+│                                Spalte und Kopf), session.js, nav.js,
+│                                disclosure.js, app.js, workflows.js, tasks.js,
+│                                reviews.js, todos.js, docs.js, inventory.js,
+│                                mcp.js, styles.css
 ├── internal/mcpserver/
 │   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 ├── internal/review/
@@ -1310,6 +1313,14 @@ Die Oberfläche hat vier Bereiche: **Setup** unter `/`, **Workflows** unter `/wo
 **Docs** unter `/docs` und **Inventar** unter `/inventory`. `/mcp` ist keine fünfte
 Sorte, sondern die Detailseite des Setup-Blocks und trägt dessen Bereich.
 
+Ein Bereich ist nicht dasselbe wie eine Seite. Workflows hat vier: die Übersicht unter
+`/workflows` und je eine für **Tasks**, **Reviews** und **Todos** darunter. Sie sind
+gleichrangig — keine ist die Detailseite einer anderen —, deshalb stehen sie als
+Unterpunkte im Umschalter und nicht hinter einem Klick auf der Übersicht, und zwar in
+jedem Bereich: wer von Setup aus zu den Tasks will, soll nicht erst die Übersicht laden
+müssen. Der Unterschied zu `/mcp` ist genau das: `/mcp` vertieft eine Karte der
+Startseite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
+
 Das Inventar ist ein eigener Bereich und keine Karte auf der Startseite — nach demselben
 Muster wie Workflows und Docs: die Startseite trägt die Einrichtungsschritte, und das
 Inventar ist keiner. Eine Karte dort hätte auch nicht gereicht: die erzeugte Inventardatei
@@ -1326,16 +1337,28 @@ Bereich bin ich, und was steht in diesem Bereich? Oben der **Umschalter**, eine 
 Beides steht in einem einzigen Template-Fragment, `static/sidebar.html` mit
 `{{define "sidebar"}}`. `pageTemplate()` parst es mit jeder Seite zusammen — die
 Seitendatei zuerst, denn `ParseFS` benennt das Ergebnis nach der ersten Datei, und
-`Execute` führt damit die Seite aus und nicht das Fragment. Dreimal dasselbe Markup zu
-kopieren wäre die Variante, die beim nächsten Bereich wieder auseinanderläuft.
+`Execute` führt damit die Seite aus und nicht das Fragment. Achtmal dasselbe Markup zu
+kopieren wäre die Variante, die bei der nächsten Seite wieder auseinanderläuft.
+
+Aus demselben Grund steht der **Kopf** in `static/hero.html`: Logo, Titel, Versionsmarke
+und die aufgelösten Pfade waren auf allen Seiten außer der Startseite byte-gleich bis auf
+das `<h1>`. Der Titel kommt jetzt als `.Title` aus `renderPage()` und füllt Überschrift
+und Fensternamen zugleich. Die Startseite behält ihren eigenen Kopf: dort tragen die
+Pfade Ids, weil `app.js` sie nach dem Anlegen der Konfiguration ohne Neuladen nachzieht,
+und daneben stehen die Knöpfe für Update und Dienst.
 
 Welcher Eintrag aktiv ist, kommt aus den Vorlagendaten: `renderPage()` bekommt Bereich
 und offene Seite vom Handler. Beides ist nicht dasselbe, sobald ein Bereich mehr als eine
 Seite hat — deshalb führt `aria-current="page"` nur der Verweis auf die offene Seite,
 während ein aktiver Bereich mit anderem Ziel `aria-current="true"` bekommt: der Fall auf
-`/mcp`, wo Setup aktiv ist, die Startseite darunter aber nicht offen. Ob es Workflows und
+`/mcp`, wo Setup aktiv ist, die Startseite darunter aber nicht offen, und der Fall auf
+den drei Workflows-Seiten, wo der Bereich aktiv ist und der markierte Unterpunkt die
+offene Seite nennt. Die Unterpunkte tragen dafür eine eigene Klasse, `area-nav-subitem`:
+sie sehen aus wie ein Eintrag des Umschalters, sind eingerückt und leiser, und die
+Prüfung „genau ein aktiver Bereich" zählt sie nicht mit. Ob es Workflows und
 Docs überhaupt gibt, entscheidet `.Installed` — vor der Einrichtung führt der Umschalter
-nur nach Setup, weil die beiden anderen Bereiche dort nichts zu zeigen hätten.
+nur nach Setup, weil die beiden anderen Bereiche dort nichts zu zeigen hätten; die
+Unterpunkte hängen an demselben Zweig und verschwinden mit ihm.
 
 Die Spalte ist so hoch wie das Fenster abzüglich des sticky-Abstands, oben und unten je
 einmal. Darin teilen sich ihre Kästen den Platz selbst auf: jeder behält seine Höhe,
@@ -1420,6 +1443,16 @@ passieren. Die übrigen Pfade kürzt die Oberfläche gegen das Projektverzeichni
 Der Bereich **Docs** zeigt die mitgelieferte Doku aus `k-playbook/docs`. Das Menü links
 listet alle Markdown-Dateien, auch die aus Unterverzeichnissen wie `libs/`; ein Klick
 zeigt die Datei in der Karte daneben. Ohne Auswahl steht dort die `README.md`.
+
+Eine andere Seite kann eine bestimmte Datei anfordern: **`/docs?file=<datei>`**, wahlweise
+mit Anker dahinter. Mehr braucht der Verweis nicht — kein Endpunkt, kein Skript auf der
+verweisenden Seite, keine zweite Ansicht: die Datei geht dort auf, wo Doku ohnehin
+gelesen wird, mit Index, Querverweisen und Diagrammen. Das ist der Weg, auf dem die
+Hilfe-Verweise der Workflows-Seiten arbeiten (`.doc-link` im Kopf ihres Hilfe-Blocks,
+siehe „Workflows"). Steht die angeforderte Datei nicht im Index, wird sie trotzdem
+geöffnet und die Antwort des Servers sagt, dass es sie nicht gibt: die Installation kann
+einen anderen Stand tragen als das Binary, das den Verweis geschrieben hat, und
+ersatzweise die `README.md` zu zeigen wäre dann eine falsche Auskunft.
 
 Das bleibt so, ausdrücklich: „Doku in der Oberfläche" zeigt **weiterhin nur die
 mitgelieferte** Doku der Installation. `project.DocsDir()`, `project.ListDocs()`,
@@ -1512,28 +1545,52 @@ Deshalb ein eigener Eintrag im Umschalter, eine eigene Seite und drei eigene End
 und keine Erweiterung von `/api/docs`. Das Blockmenü entsteht wie auf der Startseite aus
 den Karten; unter 1080px entfällt es wie dort.
 
-## Workflows: Reviews, Tasks und Todos
+## Workflows: Tasks, Reviews und Todos
 
-Drei Arbeitsvorräte, ein Bereich. `/workflows` stellt sie untereinander: die bisherigen
-Läufe, die offenen und erledigten Tasks samt gelesenem Inhalt, die offenen und
-abgehakten Todos. Ein Beschreibungsblock steht voran und sagt, was die drei Sorten sind
-und wann man welche nimmt — die Listen darunter beantworten das nicht von selbst.
+Drei Arbeitsvorräte, ein Bereich — und je eine Seite: `/workflows/tasks` mit den offenen
+und erledigten Tasks samt gelesenem Inhalt, `/workflows/reviews` mit den bisherigen
+Läufen, `/workflows/todos` mit den offenen und abgehakten Punkten. Zuerst die Tasks: sie
+sind die Umsetzung und damit das, was am häufigsten gesucht wird.
 
-Jede Liste trägt ihre eigene Pill mit ihrer Zahl. Einen Aggregat-Endpunkt daneben gibt
-es nicht: er wäre die Doppelung dieser drei Zahlen.
+Untereinander auf einer Seite standen sie vorher, und das war eine Strecke, auf der man
+scrollte statt zu lesen: drei Beschreibungsblöcke, fünf Listen und die gelesene Task in
+einer Spalte. Der Schnitt verläuft entlang der drei Sorten, weil das die Grenze ist, an
+der sie sich auch sonst trennen — eigene Commands, eigene Verzeichnisse, eigene
+Endpunkte.
+
+`/workflows` bleibt als **Übersicht** des Bereichs: was die drei Sorten sind, wann man
+welche nimmt, wie viel gerade in jeder liegt und je ein Verweis auf ihre Seite. Die Zahl
+holt `workflows.js` aus derselben Antwort, aus der die jeweilige Seite ihre Liste baut.
+Einen Aggregat-Endpunkt daneben gibt es weiterhin nicht: er wäre die Doppelung dieser
+drei Zahlen. Ein Hinweis in der Antwort schlägt dabei die Zahl — wo nicht gelesen werden
+konnte, steht „Nicht lesbar" und keine Ziffer, die nichts belegt.
+
+Jede Liste trägt ihre eigene Pill mit ihrer Zahl, auf ihrer Seite wie auf der Übersicht.
+
+Jede der vier Seiten beginnt mit einem **Hilfe-Block**: ein paar Sätze dazu, wie die
+Sorte angelegt und ausgeführt wird. In dessen Kopf steht rechts ein `.doc-link` — dort,
+wo eine Liste ihre Pill trägt — und führt in die mitgelieferte Doku: die Übersicht und
+die Todos nach `commands.md`, die Tasks nach `task-flow.md`, die Reviews nach
+`review-runs.md`. Es ist ein reines `<a>` auf `/docs?file=<datei>`; die Datei geht im
+Bereich Docs auf, mit Index und Querverweisen. Ein eigener Betrachter auf diesen Seiten
+wäre die zweite Ansicht derselben Sache gewesen, samt Verweisauflösung und Mermaid.
+Derselbe Verweis passt in jede Karte, die eine mitgelieferte Datei erklärt.
 
 Offen heißt bei Tasks: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte
 liegen in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine
 Aufgabe und steht nicht in der Liste der offenen.
 
-Die drei Herkünfte hatten je ein eigenes Seitenskript, mit gleichnamigen Namen auf
-Top-Level: dreimal `elements`, dreimal `load` und `render`, dazu `doneRequested` und
-`doneOpenKey` in zweien. Aneinandergehängt wäre das ein SyntaxError, und dann liefe keine
-Zeile. In `workflows.js` steht deshalb jede Herkunft in einer eigenen Kapsel und behält
-ihre Namen bei sich. Geteilt wird nur, was zur Seite gehört und nicht zu einer ihrer
-Listen: das Blockmenü, der Merkspeicher der Aufklapp-Blöcke und **ein** `startSession()`
-— drei Aufrufe wären drei Intervalle und drei Klick-Listener, von denen nur der zuletzt
-gesetzte Handler zählt.
+Jede Seite hat wieder ihr eigenes Skript: `tasks.js`, `reviews.js`, `todos.js`. Solange
+die drei Herkünfte eine Seite teilten, mussten sie sich `elements`, `load` und `render`
+gegenseitig aus dem Weg halten — jede stand deshalb in einer eigenen Kapsel, sonst wäre
+das Aneinandergehängte ein SyntaxError gewesen. Getrennte Seiten laden getrennte
+Dateien, und damit ist der Grund für die Kapseln weg: jede Datei hat ihre Namen wieder
+für sich, und jede ruft `startSession()` genau einmal.
+
+Geteilt wird, was mehr als eine Seite braucht. Der Aufklapp-Block der Erledigten steht
+deshalb in `static/disclosure.js` — `setUpDoneCard()` samt Merkspeicher, geladen von der
+Task- und der Todo-Seite. Eine Seite kann ihn der anderen nicht leihen: jede lädt nur
+ihr eigenes Skript.
 
 `project.ListTasks()` sortiert nach Dateinamen; die Nummer steht vorn und ordnet damit
 bereits richtig. Als Titel dient die erste Überschrift, ersatzweise der Dateiname —
@@ -1608,9 +1665,10 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/todos` | offene Todos aus `TODO.md` auflisten, read-only |
 | `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
 
-Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows`,
-`/docs`, `/inventory` und `/mcp`; alle fünf rendert `renderPage()` aus derselben Vorlage
-für den Kopf und die linke Spalte. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
+Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/docs`,
+`/inventory` und `/mcp`; alle acht rendert `renderPage()` aus denselben Fragmenten für
+den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige selbst. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
 Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
 Marke, weil die Installation daneben einen anderen Stand tragen kann und ein offenes Fenster
 nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Build ohne

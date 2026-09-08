@@ -69,6 +69,22 @@ function renderDocs(data) {
     elements.blockNav.append(docNavItem(doc));
   }
 
+  // Eine andere Seite kann eine bestimmte Datei anfordern:
+  // /docs?file=task-flow.md, wahlweise mit Anker dahinter. Das ist der Weg,
+  // auf dem die Hilfe-Verweise der übrigen Seiten hierher zeigen — sie
+  // brauchen dafür kein eigenes Skript und keine zweite Ansicht.
+  //
+  // Steht die angeforderte Datei nicht im Index, wird sie trotzdem geöffnet:
+  // die Antwort des Servers sagt dann, dass es sie nicht gibt. Ersatzweise die
+  // README zu zeigen wäre die falsche Auskunft — die Installation daneben kann
+  // einen anderen Stand tragen, und ein Verweis geht dort ins Leere.
+  const requested = new URLSearchParams(window.location.search).get("file");
+  if (requested) {
+    const doc = docs.find((entry) => entry.path === requested);
+    openDoc(requested, doc ? doc.title : "", window.location.hash.slice(1));
+    return;
+  }
+
   // Ohne Auswahl steht die README da: sie ist der Einstieg und steht deshalb
   // auch in der Liste vorn.
   const start = docs.find((doc) => doc.path === "README.md") || docs[0];

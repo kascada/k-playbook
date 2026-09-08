@@ -12,7 +12,7 @@ The task flow is the standard path for planned work that should not be completed
 
 Tasks can arise directly from the conversation or be created by `/k-remediation`. In both cases: review task files first, then execute them.
 
-Tasks can also be read in the interface: the **Workflows** section lists open tasks together with their number; clicking shows the task below it. Completed tasks appear in a collapsed section after that. This is read-only; tasks are created and executed through the commands.
+Tasks can also be read in the interface, on the **Tasks** page of the Workflows section (`/workflows/tasks`): it lists open tasks together with their number; clicking shows the task below it. Completed tasks appear in a collapsed section after that. This is read-only; tasks are created and executed through the commands.
 
 ## /k-task-create
 
@@ -64,12 +64,3 @@ The command:
 If a task file contains `### Stage` headings, `/k-task-run` maintains a `## Progress` table in it. The subagent enters every stage immediately after it is completed, not only at the end, so progress survives a hard interruption. A later `/k-task-run` reads the table and offers to resume at the first open stage. The table is the only source of progress; nothing is inferred from the code or `git log`.
 
 If a task file contains `## Execution context`, `/k-task-run` evaluates `Target repo`, `Base branch`, `Work branch`, and `PR required`, among other values. The branch/dirty-worktree preflight and, where applicable, PR handoff are then part of the flow.
-
-## Remediation tasks
-
-Tasks created by `/k-remediation` are ordinary task-flow inputs. The following are particularly important:
-
-- Finding IDs and sources must appear in the task.
-- Branch/PR requirements from the remediation policy must appear in the execution context.
-- `/k-task-refine` runs before implementation.
-- Implementation then runs through `/k-task-run`.

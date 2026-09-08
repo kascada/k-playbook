@@ -3,209 +3,92 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Workflows - k-playbook</title>
+    <title>{{.Title}} - k-playbook</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body data-mode="{{.Mode}}">
     <main class="shell">
-      <section class="hero app-header">
-        <div class="brand-row">
-          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
-          <h1>Workflows</h1>
-          <span class="version-badge" title="Version des k-playbook-Binarys, das diesen Dienst bereitstellt. Die Installation daneben kann einen anderen Stand tragen.">{{.Version}}</span>
-        </div>
-        <div class="hero-subrow">
-          <p class="eyebrow path">
-            <span class="path-entry">
-              <span class="path-key">{{.ModeLabel}}:</span>
-              {{if .Path}}{{.Path}}{{end}}
-            </span>
-            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
-              <span class="path-key">Repository:</span>
-              {{.RepoRoot}}
-            </span>
-            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
-                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
-              <span class="path-key">Installation:</span>
-              {{.PlaybookDir}}
-            </span>
-          </p>
-        </div>
-      </section>
+{{template "hero" .}}
 
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Steht vor den Listen, weil die Listen erst dann etwas sagen,
-               wenn klar ist, wofür die drei Sorten da sind. -->
+          <!-- Die Übersicht des Bereichs: was die drei Sorten sind, wie viel
+               in jeder liegt und der Weg zu ihrer Seite. Die Listen selbst
+               stehen dort und nicht hier — dreimal Liste untereinander war
+               eine Seite, auf der man scrollte, statt zu lesen. -->
           <section class="card" id="workflows-intro-card">
             <div class="section-head">
               <div>
                 <h2>Was Workflows sind</h2>
               </div>
+              <!-- Der Verweis in die mitgelieferte Doku: er öffnet die Datei im
+                   Bereich Docs, mit Index und Querverweisen. Dasselbe Muster
+                   trägt jeder Hilfe-Block dieser Seiten. -->
+              <a class="doc-link" href="/docs?file=commands.md"
+                 title="Öffnet commands.md im Bereich Docs: alle Commands mit ihrer Zuständigkeit.">Doku: Commands</a>
             </div>
             <p class="hint">
               Die drei Sorten, in denen hier gearbeitet wird. Angelegt und ausgeführt wird
-              jede im Assistenten; diese Seite zeigt nur, was vorliegt.
-            </p>
-            <p class="hint">
-              <strong>Reviews</strong> messen den Bestand: <code>/k-audit</code> führt einen
-              vollständigen Sweep an oder setzt ihn fort, <code>/k-review</code> ein einzelnes
-              Rezept. Ihre Befunde landen als Ergebnisdatei unter
-              <code>k-playbook-local/results/</code>.
-            </p>
-            <p class="hint">
-              <strong>Tasks</strong> sind die Umsetzung. <code>/k-remediation</code> überführt
-              Review-Befunde in Tasks; von Hand entsteht eine über
-              <code>/k-task-create</code> → <code>/k-task-refine</code> →
-              <code>/k-task-run</code>. Alles, was über einen trivialen Einzelschritt
-              hinausgeht, wird eine Task und bleibt nicht als Plan im Gespräch stehen.
-            </p>
-            <p class="hint">
-              <strong>Todos</strong> sind der lose Merkzettel dazu: ein Punkt, den man nicht
-              vergessen will, aber noch nicht ausarbeiten möchte. <code>/k-todo</code> trägt
-              ihn ein, abgehakt wird von Hand.
+              jede im Assistenten; die Oberfläche zeigt nur, was vorliegt.
             </p>
           </section>
 
-          <!-- Gestartet wird ein Review nicht hier, sondern im Assistenten: die
-               Oberfläche zeigt nur, was bereits vorliegt. -->
-          <section class="card" id="reviews-intro-card">
+          <section class="card" id="tasks-card">
             <div class="section-head">
               <div>
-                <h2>Reviews starten</h2>
-              </div>
-            </div>
-            <p class="hint">
-              Ein neuer Lauf entsteht im Assistenten, nicht auf dieser Seite. Zwei Einstiege:
-            </p>
-            <p class="hint">
-              <code>/k-audit</code> führt einen vollständigen Audit-Sweep an oder setzt ihn
-              fort — optional mit <code>new</code>, <code>latest</code> oder einem Datum
-              <code>YYYY-MM-DD</code>.
-            </p>
-            <p class="hint">
-              <code>/k-review &lt;name&gt;</code> führt ein einzelnes Review-Rezept aus. Ohne
-              Argument zeigt der Befehl die Auswahl der aktivierten Rezepte.
-            </p>
-          </section>
-
-          <section class="card" id="runs-card">
-            <div class="section-head">
-              <div>
-                <h2>Bisherige Läufe</h2>
-              </div>
-              <span id="runs-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">Aus <code>k-playbook-local/results/</code>.</p>
-            <dl id="runs-list" class="facts"></dl>
-            <p id="runs-message" class="message"></p>
-          </section>
-
-          <section class="card" id="tasks-list-card">
-            <div class="section-head">
-              <div>
-                <h2>Offene Tasks</h2>
+                <h2>Tasks</h2>
               </div>
               <span id="tasks-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
-              Aus <code>k-playbook-local/tasks/</code>, nach Nummer geordnet. Erledigte liegen in
-              <code>done/</code> und stehen darunter.
+              Tasks sind die Umsetzung. <code>/k-remediation</code> überführt Review-Befunde in
+              Tasks; von Hand entsteht eine über <code>/k-task-create</code> →
+              <code>/k-task-refine</code> → <code>/k-task-run</code>. Alles, was über einen
+              trivialen Einzelschritt hinausgeht, wird eine Task und bleibt nicht als Plan im
+              Gespräch stehen.
             </p>
-            <div id="tasks-list" class="task-list empty"></div>
-            <p id="tasks-message" class="message"></p>
-          </section>
-
-          <!-- Erledigte sammeln sich an und werden nie weniger. Sie stehen
-               deshalb zugeklappt und werden erst beim Aufklappen geholt: für die
-               Liste wird jede Datei einmal gelesen. -->
-          <details class="card" id="tasks-done-card">
-            <summary class="section-head disclosure">
-              <div class="disclosure-title">
-                <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
-                <h2>Erledigte Tasks</h2>
-              </div>
-              <span id="tasks-done-pill" class="pill muted">Aufklappen</span>
-            </summary>
-            <p class="hint">
-              Aus <code>k-playbook-local/tasks/done/</code>, dorthin verschoben von <code>/k-task-run</code>.
-              Die zuletzt abgearbeitete Nummer steht oben.
-            </p>
-            <div id="tasks-done-list" class="task-list empty"></div>
-            <p id="tasks-done-message" class="message"></p>
-          </details>
-
-          <!-- Der Inhalt steht unter der Liste statt in einem Fenster darüber:
-               die Liste bleibt dadurch sichtbar, und der nächste Task ist einen
-               Klick entfernt. -->
-          <section class="card hidden" id="task-card">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow" id="task-path"></p>
-                <h2 id="task-title">Task</h2>
-              </div>
+            <div class="link-row">
+              <a class="button-link secondary" href="/workflows/tasks">Offene und erledigte Tasks</a>
             </div>
-            <article id="task-viewer" class="doc-viewer"></article>
           </section>
 
-          <section class="card" id="todos-intro-card">
+          <section class="card" id="reviews-card">
             <div class="section-head">
               <div>
-                <h2>/k-todo</h2>
+                <h2>Reviews</h2>
               </div>
+              <span id="reviews-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
-              Der Befehl verwaltet die offenen Punkte dieses Projekts in <code>k-playbook-local/TODO.md</code>.
-              <code>/k-todo &lt;Text&gt;</code> trägt einen neuen Punkt ein, <code>/k-todo</code> ohne
-              Argument zeigt die aktuelle Liste — dieselbe, die unten steht. Die Hauptnutzung, direkt im
-              Chat:
+              Reviews messen den Bestand: <code>/k-audit</code> führt einen vollständigen Sweep
+              an oder setzt ihn fort, <code>/k-review</code> ein einzelnes Rezept. Ihre Befunde
+              landen als Ergebnisdatei unter <code>k-playbook-local/results/</code>.
             </p>
-            <p class="hint"><code>/k-todo Bessere Beschreibung für die Todos generieren</code></p>
-            <p class="hint">
-              Die genaue Syntax ist dabei nicht nötig — der Befehl versteht auch natürliche
-              Formulierungen im Chat, zum Beispiel:
-            </p>
-            <ul class="example-list">
-              <li>„Zeige alle /k-todos“</li>
-              <li>„Welches /k-todo sollten wir als Nächstes bearbeiten?“</li>
-              <li>„Trag als Todo ein: …“</li>
-            </ul>
+            <div class="link-row">
+              <a class="button-link secondary" href="/workflows/reviews">Bisherige Läufe</a>
+            </div>
           </section>
 
-          <section class="card" id="todos-list-card">
+          <section class="card" id="todos-card">
             <div class="section-head">
               <div>
-                <h2>Offene Todos</h2>
+                <h2>Todos</h2>
               </div>
               <span id="todos-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
-              Aus <code>k-playbook-local/TODO.md</code>, in der Reihenfolge der Datei. Erledigte
-              (abgehakte) Einträge stehen darunter.
+              Todos sind der lose Merkzettel dazu: ein Punkt, den man nicht vergessen will, aber
+              noch nicht ausarbeiten möchte. <code>/k-todo</code> trägt ihn ein, abgehakt wird
+              von Hand.
             </p>
-            <div id="todos-list" class="todo-list empty"></div>
-            <p id="todos-message" class="message"></p>
+            <div class="link-row">
+              <a class="button-link secondary" href="/workflows/todos">Offene und erledigte Todos</a>
+            </div>
           </section>
 
-          <!-- Wie bei den erledigten Tasks: zugeklappt, erst beim Aufklappen
-               geholt. -->
-          <details class="card" id="todos-done-card">
-            <summary class="section-head disclosure">
-              <div class="disclosure-title">
-                <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
-                <h2>Erledigte Todos</h2>
-              </div>
-              <span id="todos-done-pill" class="pill muted">Aufklappen</span>
-            </summary>
-            <p class="hint">
-              Abgehakte Einträge aus <code>k-playbook-local/TODO.md</code> — <code>/k-todo</code>
-              hakt selbst nichts ab, das geschieht von Hand.
-            </p>
-            <div id="todos-done-list" class="todo-list empty"></div>
-            <p id="todos-done-message" class="message"></p>
-          </details>
+          <p id="workflows-message" class="message"></p>
         </div>
       </div>
     </main>

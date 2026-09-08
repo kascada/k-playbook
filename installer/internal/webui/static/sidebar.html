@@ -7,11 +7,19 @@
                aria-current unterscheidet zwei Fälle: "page" führt nur der
                Verweis auf die offene Seite, "true" der aktive Bereich, dessen
                Ziel eine andere Seite ist. Auf /mcp ist Setup aktiv, / ist aber
-               nicht offen — dort wäre "page" eine falsche Auskunft. -->
+               nicht offen — dort wäre "page" eine falsche Auskunft.
+
+               Workflows ist der einzige Bereich mit mehreren gleichrangigen
+               Seiten; seine drei stehen deshalb als Unterpunkte darunter, und
+               zwar in jedem Bereich. Wer von Setup aus zu den Tasks will, soll
+               nicht erst die Übersicht laden müssen. -->
           <nav class="area-nav" aria-label="Bereiche">
             <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="{{if eq .Page "/"}}page{{else}}true{{end}}"{{end}}>Setup</a>
             {{if .Installed}}
             <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="{{if eq .Page "/workflows"}}page{{else}}true{{end}}"{{end}}>Workflows</a>
+            <a class="area-nav-subitem{{if eq .Page "/workflows/tasks"}} active{{end}}" href="/workflows/tasks"{{if eq .Page "/workflows/tasks"}} aria-current="page"{{end}}>Tasks</a>
+            <a class="area-nav-subitem{{if eq .Page "/workflows/reviews"}} active{{end}}" href="/workflows/reviews"{{if eq .Page "/workflows/reviews"}} aria-current="page"{{end}}>Reviews</a>
+            <a class="area-nav-subitem{{if eq .Page "/workflows/todos"}} active{{end}}" href="/workflows/todos"{{if eq .Page "/workflows/todos"}} aria-current="page"{{end}}>Todos</a>
             <a class="area-nav-item{{if eq .Area "docs"}} active{{end}}" href="/docs"{{if eq .Area "docs"}} aria-current="{{if eq .Page "/docs"}}page{{else}}true{{end}}"{{end}}>Docs</a>
             <a class="area-nav-item{{if eq .Area "inventory"}} active{{end}}" href="/inventory"{{if eq .Area "inventory"}} aria-current="{{if eq .Page "/inventory"}}page{{else}}true{{end}}"{{end}}>Inventar</a>
             {{end}}
@@ -23,10 +31,16 @@
                Dateiindex; Modifier und Beschriftung dafür kommen aus derselben
                .Area-Weiche, serverseitig und nicht beim Füllen aus docs.js:
                schmal bliebe der Index sonst so lange ausgeblendet, bis
-               /api/docs antwortet. -->
+               /api/docs antwortet.
+
+               Die Übersicht von Workflows hat keines: ihre Karten sind genau
+               die drei Seiten, die als Unterpunkte schon darüber stehen. Das
+               Menü wäre dort dieselbe Liste ein zweites Mal. -->
+          {{if ne .Page "/workflows"}}
           <nav id="block-nav"
                class="block-nav{{if eq .Area "docs"}} file-index{{end}}"
                aria-label="{{if eq .Area "docs"}}Dateien der Doku{{else}}Inhalt dieser Seite{{end}}"></nav>
+          {{end}}
 
           <!-- Der Server hält keinen Zustand und liest die Platte bei jeder
                Anfrage neu; ein frischer Stand ist deshalb genau ein Neuladen

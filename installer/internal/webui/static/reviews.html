@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Gestartet wird ein Review nicht hier, sondern im Assistenten: die
+               Oberfläche zeigt nur, was bereits vorliegt. -->
+          <section class="card" id="reviews-intro-card">
+            <div class="section-head">
+              <div>
+                <h2>Reviews starten</h2>
+              </div>
+              <a class="doc-link" href="/docs?file=review-runs.md"
+                 title="Öffnet review-runs.md im Bereich Docs: Aufbau eines Laufs, Zustände und Ergebnisdateien.">Doku: Review-Läufe</a>
+            </div>
+            <p class="hint">
+              Ein neuer Lauf entsteht im Assistenten, nicht auf dieser Seite. Zwei Einstiege:
+            </p>
+            <p class="hint">
+              <code>/k-audit</code> führt einen vollständigen Audit-Sweep an oder setzt ihn
+              fort — optional mit <code>new</code>, <code>latest</code> oder einem Datum
+              <code>YYYY-MM-DD</code>.
+            </p>
+            <p class="hint">
+              <code>/k-review &lt;name&gt;</code> führt ein einzelnes Review-Rezept aus. Ohne
+              Argument zeigt der Befehl die Auswahl der aktivierten Rezepte.
+            </p>
+            <p class="hint">
+              Die Befunde eines Laufs werden mit <code>/k-remediation</code> zu Tasks — die
+              Umsetzung steht auf der <a href="/workflows/tasks">Task-Seite</a>.
+            </p>
+          </section>
+
+          <section class="card" id="runs-card">
+            <div class="section-head">
+              <div>
+                <h2>Bisherige Läufe</h2>
+              </div>
+              <span id="runs-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">Aus <code>k-playbook-local/results/</code>.</p>
+            <dl id="runs-list" class="facts"></dl>
+            <p id="runs-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/reviews.js"></script>
+  </body>
+</html>

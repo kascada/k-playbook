@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Angelegt und ausgeführt wird ein Task nicht hier, sondern im
+               Assistenten: die Oberfläche zeigt nur, was vorliegt. -->
+          <section class="card" id="tasks-intro-card">
+            <div class="section-head">
+              <div>
+                <h2>Tasks anlegen und ausführen</h2>
+              </div>
+              <a class="doc-link" href="/docs?file=task-flow.md"
+                 title="Öffnet task-flow.md im Bereich Docs: der Weg von /k-task-create bis /k-task-run.">Doku: Task-Flow</a>
+            </div>
+            <p class="hint">
+              Ein Task entsteht im Assistenten, nicht auf dieser Seite. Der Weg von Hand:
+              <code>/k-task-create</code> → <code>/k-task-refine</code> →
+              <code>/k-task-run</code>.
+            </p>
+            <p class="hint">
+              <code>/k-remediation</code> überführt Review-Befunde in Tasks und übernimmt damit
+              denselben Weg für alles, was ein Lauf gefunden hat.
+            </p>
+          </section>
+
+          <section class="card" id="tasks-list-card">
+            <div class="section-head">
+              <div>
+                <h2>Offene Tasks</h2>
+              </div>
+              <span id="tasks-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Aus <code>k-playbook-local/tasks/</code>, nach Nummer geordnet. Erledigte liegen in
+              <code>done/</code> und stehen darunter.
+            </p>
+            <div id="tasks-list" class="task-list empty"></div>
+            <p id="tasks-message" class="message"></p>
+          </section>
+
+          <!-- Erledigte sammeln sich an und werden nie weniger. Sie stehen
+               deshalb zugeklappt und werden erst beim Aufklappen geholt: für die
+               Liste wird jede Datei einmal gelesen. -->
+          <details class="card" id="tasks-done-card">
+            <summary class="section-head disclosure">
+              <div class="disclosure-title">
+                <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+                <h2>Erledigte Tasks</h2>
+              </div>
+              <span id="tasks-done-pill" class="pill muted">Aufklappen</span>
+            </summary>
+            <p class="hint">
+              Aus <code>k-playbook-local/tasks/done/</code>, dorthin verschoben von <code>/k-task-run</code>.
+              Die zuletzt abgearbeitete Nummer steht oben.
+            </p>
+            <div id="tasks-done-list" class="task-list empty"></div>
+            <p id="tasks-done-message" class="message"></p>
+          </details>
+
+          <!-- Der Inhalt steht unter der Liste statt in einem Fenster darüber:
+               die Liste bleibt dadurch sichtbar, und der nächste Task ist einen
+               Klick entfernt. -->
+          <section class="card hidden" id="task-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" id="task-path"></p>
+                <h2 id="task-title">Task</h2>
+              </div>
+            </div>
+            <article id="task-viewer" class="doc-viewer"></article>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/disclosure.js"></script>
+    <script src="/static/tasks.js"></script>
+  </body>
+</html>
