@@ -1591,7 +1591,8 @@ Jede der vier Seiten beginnt mit einem **Hilfe-Block**: ein paar Sätze dazu, wi
 Sorte angelegt und ausgeführt wird. In dessen Kopf steht rechts ein `.doc-link` — dort,
 wo eine Liste ihre Pill trägt — und führt in die mitgelieferte Doku: die Übersicht und
 die Todos nach `commands.md`, die Tasks nach `task-flow.md`, die Reviews nach
-`review-runs.md`. Es ist ein reines `<a>` auf `/docs?file=<datei>`; die Datei geht im
+`code-review.md` und `review-runs.md` — der Ablauf eines Reviews und der Aufbau eines
+Laufs sind zwei Fragen, und die Seite beantwortet keine davon selbst. Es ist ein reines `<a>` auf `/docs?file=<datei>`; die Datei geht im
 Bereich Docs auf, mit Index und Querverweisen. Ein eigener Betrachter auf diesen Seiten
 wäre die zweite Ansicht derselben Sache gewesen, samt Verweisauflösung und Mermaid.
 Derselbe Verweis passt in jede Karte, die eine mitgelieferte Datei erklärt.

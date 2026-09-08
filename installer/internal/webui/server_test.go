@@ -158,20 +158,22 @@ func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
 	}
 	chdir(t, root)
 
-	for path, datei := range map[string]string{
-		"/workflows":         "commands.md",
-		"/workflows/tasks":   "task-flow.md",
-		"/workflows/reviews": "review-runs.md",
-		"/workflows/todos":   "commands.md",
+	for path, dateien := range map[string][]string{
+		"/workflows":         {"commands.md"},
+		"/workflows/tasks":   {"task-flow.md"},
+		"/workflows/reviews": {"code-review.md", "review-runs.md"},
+		"/workflows/todos":   {"commands.md"},
 	} {
 		t.Run(path, func(t *testing.T) {
 			status, body := getPage(t, path)
 			if status != http.StatusOK {
 				t.Fatalf("Status = %d, erwartet %d", status, http.StatusOK)
 			}
-			want := `<a class="doc-link" href="/docs?file=` + datei + `"`
-			if !strings.Contains(body, want) {
-				t.Errorf("der Verweis %s fehlt", want)
+			for _, datei := range dateien {
+				want := `<a class="doc-link" href="/docs?file=` + datei + `"`
+				if !strings.Contains(body, want) {
+					t.Errorf("der Verweis %s fehlt", want)
+				}
 			}
 		})
 	}

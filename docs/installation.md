@@ -236,7 +236,7 @@ The **Workflows** section brings together the work queues, one page per kind: ta
 
 **Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
 
-Each of the four pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the tasks to `task-flow.md`, the reviews to `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
+Each of the four pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the tasks to `task-flow.md`, the reviews to `code-review.md` and `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
 
 This section is read-only. Tasks are created and executed through `/k-task-create` and `/k-task-run` in the assistant.
 
