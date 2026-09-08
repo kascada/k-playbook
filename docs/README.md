@@ -21,7 +21,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`reviews-and-results.md`](./reviews-and-results.md) | Artifact model: result families, findings, status values, prioritization. |
 | [`review-runs.md`](./review-runs.md) | The run model: `run.json`, entries, operating modes of catalog recipes, merge, known decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
-| [`wissensablage.md`](./wissensablage.md) | Knowledge storage: the path from knowledge input through the MCP server and the versioned Markdown files into the local vector database. Shown in the interface under Knowledge. |
+| [`knowledge-storage.md`](./knowledge-storage.md) | Knowledge storage: the path from knowledge input through the MCP server and the versioned Markdown files into the local vector database. Shown in the interface under Knowledge. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` for specific GitHub pull requests. |
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why the entry uses an absolute path. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |

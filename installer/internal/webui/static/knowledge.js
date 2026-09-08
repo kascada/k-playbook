@@ -10,7 +10,7 @@
 
 // Die Datei liegt in der mitgelieferten Doku und wird über deren Endpunkt
 // gelesen. Ein eigener Endpunkt käme erst mit der Auflistung infrage.
-const KNOWLEDGE_FILE = "wissensablage.md";
+const KNOWLEDGE_FILE = "knowledge-storage.md";
 
 const elements = {
   title: document.getElementById("knowledge-title"),

@@ -1648,7 +1648,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
 ## Knowledge in der Oberfläche
 
-Der Bereich **Knowledge** zeigt vorerst genau eine Datei: `wissensablage.md` aus der
+Der Bereich **Knowledge** zeigt vorerst genau eine Datei: `knowledge-storage.md` aus der
 mitgelieferten Doku, den Weg des Wissens von der Quelle bis zu seiner Nutzung durch die
 KI. Die Auflistung der abgelegten Einträge kommt später als weiterer Block darunter —
 deshalb steht der Text schon jetzt in einer Karte und nicht als ganze Seite, und deshalb
@@ -1668,7 +1668,7 @@ Knowledge-Seite gibt es keinen Index, ein Verweis geht deshalb nach
 `/docs?file=<datei>`. Die Kopie der Mermaid-Behandlung war die Alternative und wäre die
 zweite Stelle gewesen, an der ein Diagramm zu zeichnen ist.
 
-**Frontmatter wird abgetrennt.** `wissensablage.md` trägt `title` und `description` für
+**Frontmatter wird abgetrennt.** `knowledge-storage.md` trägt `title` und `description` für
 den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt Überschrift, und
 die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert deshalb
 `inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter ist

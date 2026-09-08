@@ -12,7 +12,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// Eine Doku-Datei kann einen Frontmatter-Block tragen — wissensablage.md tut
+// Eine Doku-Datei kann einen Frontmatter-Block tragen — knowledge-storage.md tut
 // es. Er gehört nicht in die Ansicht: Goldmark läse ihn sonst als Trennlinie
 // mit anschließender Überschrift, und die Datei begänne mit ihren eigenen
 // Kopfdaten statt mit ihrem Text.
@@ -25,7 +25,7 @@ func TestDokuOhneFrontmatterGerendert(t *testing.T) {
 	if err := os.MkdirAll(docs, 0o755); err != nil {
 		t.Fatalf("Doku-Verzeichnis anlegen: %v", err)
 	}
-	datei := "wissensablage.md"
+	datei := "knowledge-storage.md"
 	inhalt := "---\ntitle: Knowledge Storage\ndescription: Weg des Wissens.\n---\n\n# Knowledge Storage\n\nWohin das Wissen fließt.\n"
 	if err := os.WriteFile(filepath.Join(docs, datei), []byte(inhalt), 0o644); err != nil {
 		t.Fatalf("Datei schreiben: %v", err)

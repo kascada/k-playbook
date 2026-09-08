@@ -242,7 +242,7 @@ This section is read-only. Tasks are created and executed through `/k-task-creat
 
 ## Project knowledge
 
-The **Knowledge** section, above Docs in the switcher, shows where knowledge flows in this project: from the input, through the MCP server and the versioned Markdown files, into the local vector database and back to the AI. For now it is one file, `wissensablage.md` from the shipped documentation, rendered with its diagram; a listing of the stored entries will follow below it.
+The **Knowledge** section, above Docs in the switcher, shows where knowledge flows in this project: from the input, through the MCP server and the versioned Markdown files, into the local vector database and back to the AI. For now it is one file, `knowledge-storage.md` from the shipped documentation, rendered with its diagram; a listing of the stored entries will follow below it.
 
 Docs and Knowledge are deliberately separate: Docs is the reference work of the installation, Knowledge is what accumulates in the project.
 

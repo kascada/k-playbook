@@ -350,7 +350,7 @@ func todosPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // knowledgeTemplate ist die Seite der Wissensablage. Vorerst zeigt sie genau
-// eine Datei, wissensablage.md aus der mitgelieferten Doku; die Auflistung der
+// eine Datei, knowledge-storage.md aus der mitgelieferten Doku; die Auflistung der
 // abgelegten Einträge kommt später als weiterer Block darunter. Deshalb schon
 // jetzt ein eigener Bereich und keine Karte im Bereich Docs.
 var knowledgeTemplate = pageTemplate("knowledge.html")
