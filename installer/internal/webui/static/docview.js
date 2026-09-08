@@ -78,12 +78,58 @@ function splitAnchor(href) {
 // Der Text ist kein eigener Scroll-Container: er steht in einer Karte,
 // gescrollt wird die Seite.
 function scrollToAnchor(viewer, anchor) {
-  const target = anchor ? viewer.querySelector(`#${CSS.escape(anchor)}`) : null;
+  const target = anchor ? findAnchorTarget(viewer, anchor) : null;
   if (target) {
     target.scrollIntoView();
     return;
   }
   window.scrollTo({ top: 0 });
+}
+
+// Sucht das Ziel eines Ankers, in zwei Anläufen.
+//
+// Zuerst die Id, die Goldmark vergeben hat — das ist der Normalfall und der
+// einzige, den ein Verweis aus derselben Ansicht braucht.
+//
+// Der zweite Anlauf gilt Ankern, die ein Mensch geschrieben hat. Goldmark wirft
+// Nicht-ASCII aus seinen Überschriften-Ids ersatzlos weg: aus „Doku in der
+// Oberfläche" wird `doku-in-der-oberflche`. Wer den Verweis von Hand setzt,
+// schreibt aber `#doku-in-der-oberfläche`, und der träfe nie — in
+// `k-playbook-local/docs/README.md` stehen sieben solcher Anker, erzeugt von
+// /k-docs-index. Nachsichtig zu sein ist hier die bessere Seite: der
+// Markdown-Quelltext bleibt lesbar, und bestehende Verweise heilen von selbst.
+// Die Alternative wären verstümmelte Anker im Quelltext, die für einen Leser
+// wie Tippfehler aussehen.
+function findAnchorTarget(viewer, anchor) {
+  const byID = viewer.querySelector(`#${CSS.escape(anchor)}`);
+  if (byID) {
+    return byID;
+  }
+
+  const wanted = anchorKey(anchor);
+  for (const heading of viewer.querySelectorAll("h1, h2, h3, h4, h5, h6")) {
+    if (anchorKey(heading.textContent) === wanted) {
+      return heading;
+    }
+  }
+  return null;
+}
+
+// Der Vergleichsschlüssel: kleingeschrieben, und übrig bleiben allein Buchstaben
+// und Ziffern — Umlaute eingeschlossen.
+//
+// Trennzeichen fallen ganz weg, statt zu Bindestrichen zu werden, denn genau
+// darin gehen die Regeln auseinander: „K-PLAYBOOK.yaml ist ein Symlink" heißt
+// beim Index `k-playbookyaml-ist-ein-symlink` — der Punkt verschwindet, er wird
+// kein Bindestrich. Wer hier Bindestriche setzte, verlangte eine Einigkeit über
+// Satzzeichen, die es nicht gibt. Ohne sie vergleicht der Schlüssel das, worauf
+// sich alle Regeln einigen: die Zeichenfolge der Wörter.
+//
+// Angewandt wird er auf beide Seiten, auf den verlangten Anker wie auf den
+// Wortlaut der Überschrift. Ein bereits von Goldmark verstümmelter Anker fällt
+// dabei durch — er trifft ohnehin schon über die Id.
+function anchorKey(text) {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 // Mermaid ist zu groß, um es mitzuliefern, und wird deshalb nur bei Bedarf vom

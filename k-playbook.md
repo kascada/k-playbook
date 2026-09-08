@@ -118,4 +118,8 @@ abgearbeitet werden:
 - `direct-allowed` — kleine, sichere Befunde dürfen nach Code-Sichtung direkt behoben
   werden.
 
-Steht nichts in der Datei, gilt `task-first`.
+Fehlt der `remediation:`-Block, nimmt `/k-remediation` keinen Modus an, sondern fragt nach:
+entweder die Policy über `/k-gui` setzen lassen oder für die laufende Sitzung ausdrücklich
+einen Modus wählen. Die Ausgabe von `k-playbook context` zeigt in diesem Fall zwar
+`task-first` — das ist nur der Anzeigewert. Entscheidungsgrundlage ist `configured: false`
+aus derselben Ausgabe.

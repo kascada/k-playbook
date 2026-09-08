@@ -2,7 +2,7 @@
 
 How a review run is created, what it writes to disk, and how participants record their
 progress in it. For the artifacts created by an individual review, see
-[`reviews-and-results.md`](./reviews-and-results.md); for the migration from which this
+[`code-review.md`](./code-review.md); for the migration from which this
 emerged, see [`migration.md`](./migration.md).
 
 ## The Run Is the Container

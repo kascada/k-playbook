@@ -208,8 +208,8 @@ There is no additional step between assessment and handling: `review-triage.md`
 is both the result and the input for `/k-remediation`. To see multiple sources
 merged, use `/k-audit`; findings are consolidated there, and only there.
 
-The complete flow is in [`code-review.md`](./code-review.md); the artifact model
-is in [`reviews-and-results.md`](./reviews-and-results.md).
+The complete flow and the artifact model are in
+[`code-review.md`](./code-review.md).
 
 ### Docs first
 
@@ -284,5 +284,4 @@ Details are in [`../checks/README.md`](../checks/README.md) and
 | Code review flow | [`code-review.md`](./code-review.md) |
 | PR review | [`pr-review.md`](./pr-review.md) |
 | Task flow | [`task-flow.md`](./task-flow.md) |
-| Review artifacts | [`reviews-and-results.md`](./reviews-and-results.md) |
 | FAQ | [`faq.md`](./faq.md) |

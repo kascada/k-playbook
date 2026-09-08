@@ -17,8 +17,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 
 | Document | Content |
 |---|---|
-| [`code-review.md`](./code-review.md) | Workflow of `/k-review`, `/k-remediation`, and the handoffs. |
-| [`reviews-and-results.md`](./reviews-and-results.md) | Artifact model: result families, findings, status values, prioritization. |
+| [`code-review.md`](./code-review.md) | Both review paths, `/k-audit` and `/k-review`: flow, division of labour, result families, artifacts, status values, and the handoff to `/k-remediation`. |
 | [`review-runs.md`](./review-runs.md) | The run model: `run.json`, entries, operating modes of catalog recipes, merge, known decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
 | [`knowledge-storage.md`](./knowledge-storage.md) | Knowledge storage: the path from knowledge input through the MCP server and the versioned Markdown files into the local vector database. Shown in the interface under Knowledge. |
@@ -64,7 +63,7 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `commands` -> [`commands.md`](./commands.md)
 - `docs first` -> [`manual.md`](./manual.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
 - `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
-- `findings` / `status values` -> [`reviews-and-results.md`](./reviews-and-results.md#status-model)
+- `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md)
 - `installation` / `git clone` -> [`installation.md`](./installation.md)
@@ -80,8 +79,8 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `command missing` / `dead symlink` / `update links` -> [`installation.md`](./installation.md#update), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `PR review` -> [`pr-review.md`](./pr-review.md)
-- `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)
-- `results` -> [`reviews-and-results.md`](./reviews-and-results.md)
+- `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)
+- `results` -> [`code-review.md`](./code-review.md)
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#assessing-with-review-scan-triage), [`commands.md`](./commands.md#review-flow)
 - `/k-task-refine` / `task hardening` -> [`task-flow.md`](./task-flow.md)
 - `review-input` / `merge` / `consolidation` -> [`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge)

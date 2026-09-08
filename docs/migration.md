@@ -16,7 +16,7 @@ The migration to the project-local model is complete and incorporated into the d
 | Clone, bootstrap, the four setup steps, updating | [`installation.md`](./installation.md) |
 | Core model and standard workflows | [`manual.md`](./manual.md) |
 | Commands, `context` once per session | [`commands.md`](./commands.md) |
-| Recipes, results, remediation policy | [`reviews-and-results.md`](./reviews-and-results.md) |
+| Recipes, results, remediation policy | [`code-review.md`](./code-review.md), [`k-playbook-format.md`](./k-playbook-format.md#remediation) |
 | Removed: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
 | Tool: find anchors, linking, update, direct installation, legacy artifacts, web API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
 | Command names and review handoff: `/k-audit`, `/k-review`, `/k-task-refine`, consistent `review-triage.md` | [`commands.md`](./commands.md), [`code-review.md`](./code-review.md), [`review-runs.md`](./review-runs.md) |

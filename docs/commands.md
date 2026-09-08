@@ -13,7 +13,6 @@ A project-owned command with the name of a shipped command **replaces** it; an e
 | PR review | [`pr-review.md`](./pr-review.md) |
 | Code review flow | [`code-review.md`](./code-review.md) |
 | Task flow | [`task-flow.md`](./task-flow.md) |
-| Review, results, and remediation artifacts | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Installation | [`installation.md`](./installation.md) |
 | Project configuration | [`k-playbook-format.md`](./k-playbook-format.md) |
 

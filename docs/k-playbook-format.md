@@ -432,14 +432,16 @@ The modes, from strictest to most permissive:
 
 **The default is `task-first`.** Tasks as the standard are the safe default:
 nothing changes in code without action, while direct fixes remain possible after
-approval.
+approval. That default is a display value, not a decision. If the block is absent,
+`k-playbook context` reports `mode: task-first` alongside `configured: false`, and
+`configured` is the field that decides: `/k-remediation` must not guess a mode but
+explicitly ask for the current session, or have the policy set through `/k-gui`.
+`configured` belongs to the `k-playbook context` output, not to `K-PLAYBOOK.yaml`;
+it is therefore not in the field table above.
 
 `pr_required` and `direct_fixes` are additionally in the file so commands can
 read them without interpreting the mode. They are written when setting the mode
 and are not maintained independently.
-
-If the block is absent, `/k-remediation` must not guess but explicitly ask for
-the current session.
 
 ### `tools`
 
