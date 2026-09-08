@@ -1,90 +1,75 @@
 # Commands
 
-Kompakter Index der Slash-Commands. Detailabläufe stehen in eigenen Themenseiten; diese
-Seite dupliziert sie nicht.
+Compact index of slash commands. Detailed flows are on dedicated topic pages; this page does not duplicate them.
 
-Mitgelieferte Commands, Skills, Regeln, Review-Rezepte und Checks liegen unter
-`k-playbook/`. Unter `k-playbook-local/` liegt das Projekteigene — dieselben fünf Sorten
-plus Tasks und Ergebnisse. Beide Orte ergeben sich aus der Lage der `K-PLAYBOOK.yaml`; es
-gibt keine konfigurierten Pfade mehr.
+Shipped commands, skills, rules, review recipes, and checks are under `k-playbook/`. `k-playbook-local/` contains project-owned content: the same five kinds, plus tasks and results. Both locations derive from the location of `K-PLAYBOOK.yaml`; there are no configured paths anymore.
 
-Ein projekteigener Command mit dem Namen eines mitgelieferten **ersetzt** diesen; ein
-leerer schaltet ihn ab. Diese Seite listet die mitgelieferten — was in einem konkreten
-Projekt tatsächlich gilt, zeigt die Oberfläche im Assistenten-Block.
+A project-owned command with the name of a shipped command **replaces** it; an empty one disables it. This page lists the shipped commands; the assistants section in the interface shows what actually applies in a particular project.
 
-## Detailseiten
+## Detail pages
 
-| Thema | Detailseite |
+| Topic | Detail page |
 |---|---|
-| PR-Review | [`pr-review.md`](./pr-review.md) |
-| Code-Review-Flow | [`code-review.md`](./code-review.md) |
-| Task-Flow | [`task-flow.md`](./task-flow.md) |
-| Review-, Results- und Remediation-Artefakte | [`reviews-and-results.md`](./reviews-and-results.md) |
+| PR review | [`pr-review.md`](./pr-review.md) |
+| Code review flow | [`code-review.md`](./code-review.md) |
+| Task flow | [`task-flow.md`](./task-flow.md) |
+| Review, results, and remediation artifacts | [`reviews-and-results.md`](./reviews-and-results.md) |
 | Installation | [`installation.md`](./installation.md) |
-| Projektkonfiguration | [`k-playbook-format.md`](./k-playbook-format.md) |
+| Project configuration | [`k-playbook-format.md`](./k-playbook-format.md) |
 
-## Übersicht
+## Overview
 
-Neue Commands werden erst sichtbar, nachdem die Verlinkung steht und der Assistent neu
-gestartet wurde. Die Verlinkung zieht `k-playbook context` von selbst nach — der Aufruf
-am Anfang jeder Sitzung —, der Neustart bleibt: Claude Code, OpenCode und Cursor lesen
-ihre Command-Liste beim Start.
+New commands become visible only after linking is in place and the assistant has been restarted. `k-playbook context`, the call at the beginning of every session, brings linking up to date automatically; the restart remains necessary because Claude Code, OpenCode, and Cursor read their command list at startup.
 
-| Command | Zweck | Detail |
+| Command | Purpose | Detail |
 |---|---|---|
-| **Projekt** | | |
-| `/k-gui` | Oberfläche starten | führt durch Konfiguration, projekteigene Struktur und Assistenten-Verlinkung; Bereiche Workflows, Docs und Inventar — letzterer zeigt das Versionsinventar und stößt seine Erhebung an |
+| **Project** | | |
+| `/k-gui` | Start the interface | guides through configuration, project-owned structure, and assistant linking; the Workflows, Docs, and Inventory sections, the last of which shows the version inventory and initiates its collection |
 | **Docs** | | |
-| `/k-docs` | Docs-Bestand prüfen und mögliche Aktionen anbieten | read-only Status; kann zu Code-, Tool-, Extract-, Inventar- oder Index-Aktion dispatchen |
-| `/k-docs-code` | semantische Projekt-Doku aus dem Code erzeugen | schreibt je Thema eine Datei nach `k-playbook-local/docs/code/`; dorthin schreibt auch der Skill `ks-overlay-repo-analyse` |
-| `/k-docs-tools` | Library-/Tool-Doku ergänzen | erzeugt je ausgewähltem Tool eine Pitfall-Datei unter `k-playbook-local/docs/libs/` |
-| `/k-docs-extract` | Rohmaterial aus `k-playbook-local/material/` zu Doku verdichten | schreibt je Thema eine Datei nach `k-playbook-local/docs/extracted/`, mit Quelle und Konfidenz |
-| `/k-doc-inventory` | Versionsinventar erheben | schreibt `k-playbook-local/docs/versions/inventory.md` über das Subkommando `k-playbook inventory`; derselbe Lauf steht im Bereich „Inventar" der Oberfläche hinter „Aktualisieren"; Vertrag in [`versionsinventar.md`](./versionsinventar.md), Nachzugs-Pflicht bei Versionssprüngen in `rules/docs-sync.md` |
-| `/k-docs-index` | den einen Docs-Index bauen und die Docs für AI-Sessions registrieren | schreibt `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` (oder `opencode.jsonc`, wenn nur die existiert) |
-| **Code-Review** | | |
-| `/k-pr-review` | GitHub-PRs laden, bewerten und optional approven, mergen oder lokal validieren | [`pr-review.md`](./pr-review.md) |
-| `/k-review` | Review-Rezepte ausführen | [`code-review.md`](./code-review.md) |
-| `/k-audit` | vollständigen Audit-Sweep über MCP anlegen oder fortsetzen und nach dem Merge triagieren | [`review-runs.md`](./review-runs.md) |
-| `/k-remediation` | Findings bündeln und in Tasks oder Fixes überführen | [`code-review.md`](./code-review.md) |
-| **Task-Flow** | | |
-| `/k-task-create` | Task-Datei aus dem Gesprächskontext erzeugen | [`task-flow.md`](./task-flow.md) |
-| `/k-task-refine` | Task-Dateien vor der Ausführung per Critic/Editor-Dialog härten | [`task-flow.md`](./task-flow.md) |
-| `/k-task-run` | Task-Dateien sequenziell ausführen | [`task-flow.md`](./task-flow.md) |
-| `/k-todo` | `k-playbook-local/TODO.md` anzeigen oder ergänzen | |
-| **Hilfen** | | |
-| `/k-enforcement` | expliziter Check gegen die effektive Regelmenge | read-only Bericht; Fixes nur nach Freigabe |
-| `/k-test-check` | Tests ausführen und Fehlerursachen diagnostizieren | startet bewusst Tests, nicht nur Statuschecks |
-| `/k-verlauf` | alte AI-Verläufe durchsuchen | read-only |
-| `/k-vscode-project-color` | VS-Code-Fensterfarbe und -Titel pro Projekt setzen | schreibt `.vscode/settings.json` |
+| `/k-docs` | Check documentation inventory and offer possible actions | read-only status; can dispatch to code, tool, extract, inventory, or index actions |
+| `/k-docs-code` | Generate semantic project documentation from the code | writes one file per topic to `k-playbook-local/docs/code/`; the `ks-overlay-repo-analyse` skill also writes there |
+| `/k-docs-tools` | Add library/tool documentation | generates one pitfall file per selected tool under `k-playbook-local/docs/libs/` |
+| `/k-docs-extract` | Condense raw material from `k-playbook-local/material/` into documentation | writes one file per topic to `k-playbook-local/docs/extracted/`, with source and confidence |
+| `/k-doc-inventory` | Collect the version inventory | writes `k-playbook-local/docs/versions/inventory.md` through the `k-playbook inventory` subcommand; the same run is behind "Update" in the interface's "Inventory" section; contract in [`version-inventory.md`](./version-inventory.md), synchronization required for version jumps in `rules/docs-sync.md` |
+| `/k-docs-index` | Build the single docs index and register docs for AI sessions | writes `k-playbook-local/docs/README.md`, plus `AGENTS.md` and `opencode.json` (or `opencode.jsonc` if only that exists) |
+| **Session** | | |
+| `/k-danke` | Close a working session | presents the findings written to `k-playbook-local/material/befunde/` during the work, promotes confirmed ones through `/k-docs-extract`, stores operating pitfalls and checks the docs follow-up via `/k-enforcement`; what gets recorded while working is defined by `k-playbook/rules/befunde.md` and applied by the skill `ks-befunde` |
+| **Code review** | | |
+| `/k-pr-review` | Load and assess GitHub PRs and optionally approve, merge, or validate them locally | [`pr-review.md`](./pr-review.md) |
+| `/k-review` | Run review recipes | [`code-review.md`](./code-review.md) |
+| `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge | [`review-runs.md`](./review-runs.md) |
+| `/k-remediation` | Bundle findings and turn them into tasks or fixes | [`code-review.md`](./code-review.md) |
+| **Task flow** | | |
+| `/k-task-create` | Create a task file from the conversation context | [`task-flow.md`](./task-flow.md) |
+| `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue | [`task-flow.md`](./task-flow.md) |
+| `/k-task-run` | Execute task files sequentially | [`task-flow.md`](./task-flow.md) |
+| `/k-todo` | Display or add to `k-playbook-local/TODO.md` | |
+| **Helpers** | | |
+| `/k-enforcement` | Explicit check against the effective rule set | read-only report; fixes only after approval |
+| `/k-test-check` | Run tests and diagnose root causes of failures | deliberately starts tests, not only status checks |
+| `/k-verlauf` | Search old AI histories | read-only |
+| `/k-vscode-project-color` | Set VS Code window color and title per project | writes `.vscode/settings.json` |
 
-Einen Command `/k-install-security-tools` gibt es nicht mehr. Status und
-Installationsbefehl kommen aus der Oberfläche, alles Weitere kann
-`k-playbook/scripts/install-security-tools.sh` selbst — siehe
-[`installation.md`](./installation.md#security-tools).
+There is no `/k-install-security-tools` command anymore. The interface provides the status and installation command; `k-playbook/scripts/install-security-tools.sh` handles everything else itself. See [`installation.md`](./installation.md#security-tools).
 
-## Review-Flow
+## Review flow
 
-Die Code-Review-Familie ist bewusst gestuft:
+The code-review family is deliberately staged:
 
-| Anlass | Command | Ergebnis |
+| Occasion | Command | Result |
 |---|---|---|
-| vollständiger Sicherheits-Sweep über passende Werkzeuge und Audit-Rezepte | `/k-audit` | `k-playbook-local/results/YYYY-MM-DD/review-input.json`, `review-input.md`, `review-triage.md` |
-| gezieltes einzelnes Review-Rezept, interaktiv oder als Report | `/k-review <name>` | interaktive Änderungsvorschläge oder `<family>/YYYY-MM-DD/review-input.json` und `review-triage.md` |
-| Task-/Instruction-Datei vor Ausführung härten | `/k-task-refine [path]` | Review-Log direkt in der geprüften Task-/Instruction-Datei |
+| complete security sweep across suitable tools and audit recipes | `/k-audit` | `k-playbook-local/results/YYYY-MM-DD/review-input.json`, `review-input.md`, `review-triage.md` |
+| focused individual review recipe, interactive or as a report | `/k-review <name>` | interactive change proposals or `<family>/YYYY-MM-DD/review-input.json` and `review-triage.md` |
+| harden a task/instruction file before execution | `/k-task-refine [path]` | review log directly in the reviewed task/instruction file |
 
-1. `/k-pr-review` bewertet einen konkreten Pull Request und bleibt standardmäßig read-only.
-2. `/k-review <name>` führt ein Rezept aus und erzeugt je nach Rezept interaktive
-   Änderungsvorschläge oder `review-triage.md` als Report-Handoff.
-3. `/k-audit` orchestriert das Laufmodell: Lauf anlegen oder fortsetzen, Scanner starten,
-   Evidence-Rezepte vor dem Merge ausführen, Merge starten, Perspektiven danach führen und
-   `review-triage.md` schreiben.
-4. `/k-remediation <result>` plant die Abarbeitung der Findings. Er nimmt genau eine
-   Ergebnisdatei; zusammengeführt wird ausschließlich im Audit-Lauf.
+1. `/k-pr-review` assesses a specific pull request and remains read-only by default.
+2. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or `review-triage.md` as a report handoff.
+3. `/k-audit` orchestrates the run model: creates or continues a run, starts scanners, runs evidence recipes before the merge, starts the merge, leads perspectives afterward, and writes `review-triage.md`.
+4. `/k-remediation <result>` plans how to address findings. It takes exactly one result file; merging happens exclusively in the audit run.
 
-Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: erst
-`/k-task-refine`, dann `/k-task-run`.
+When `/k-remediation` creates tasks, they belong in the normal task flow: first `/k-task-refine`, then `/k-task-run`.
 
-## Task-Flow
+## Task flow
 
 ```text
 /k-task-create
@@ -92,45 +77,41 @@ Wenn `/k-remediation` Tasks erzeugt, gehören sie in den normalen Task-Flow: ers
 /k-task-run
 ```
 
-Tasks entstehen direkt aus dem Gespräch oder aus `/k-remediation`. In beiden Fällen
-werden sie vor der Ausführung gegengeprüft.
+Tasks arise directly from the conversation or from `/k-remediation`. In both cases, they are reviewed before execution.
 
-## Wo Commands ihre Ziele finden
+## Where commands find their targets
 
-Kein Command liest oder rät einen Pfad. Alles leitet sich aus dem Ort der
-`K-PLAYBOOK.yaml` ab:
+No command reads or guesses a path. Everything derives from the location of `K-PLAYBOOK.yaml`:
 
-| Command | schreibt nach |
+| Command | writes to |
 |---|---|
-| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, erledigt nach `tasks/done/` |
+| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, completed tasks to `tasks/done/` |
 | `/k-todo` | `k-playbook-local/TODO.md` |
 | `/k-review`, `/k-audit` | `k-playbook-local/results/` |
-| `/k-docs-code`, Skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
+| `/k-docs-code`, skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
 | `/k-docs-tools` | `k-playbook-local/docs/libs/` |
 | `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
-| `/k-doc-inventory` | `k-playbook-local/docs/versions/`, dazu nur nach ausdrücklicher Bestätigung und ausschließlich ergänzend `k-playbook-local/version-sources.yaml` |
-| `/k-docs-index` | `k-playbook-local/docs/README.md`, dazu `AGENTS.md` und `opencode.json` (oder `opencode.jsonc`) im Hauptverzeichnis |
+| `/k-doc-inventory` | `k-playbook-local/docs/versions/`, plus `k-playbook-local/version-sources.yaml` only after explicit confirmation and exclusively by adding to it |
+| `/k-docs-index` | `k-playbook-local/docs/README.md`, plus `AGENTS.md` and `opencode.json` (or `opencode.jsonc`) in the project root |
+| `/k-danke`, skill `ks-befunde` | `k-playbook-local/material/befunde/` — the only place any command writes below `material/`; after confirmation also `k-playbook-local/guidelines/betrieb.md` and `k-playbook-local/rules/` |
 
-Gelesen wird zusätzlich aus `k-playbook/` — Regeln, Rezepte, Checks und Skripte.
-Geschrieben wird dorthin nie.
+It additionally reads from `k-playbook/`: rules, recipes, checks, and scripts. It never writes there.
 
-## Der aufgelöste Arbeitsstand
+## The resolved working state
 
-Kein Command rechnet selbst aus, was gilt. Das macht das Werkzeug:
+No command determines what applies itself. The tool does that:
 
 ```bash
 k-playbook context
 ```
 
-Die JSON-Ausgabe nennt die aufgelösten Verzeichnisse, die Instruktionsdateien in
-Lesereihenfolge, die Remediation-Policy, die Guidelines und die drei Kataloge —
-mitgeliefert und projekteigen bereits zusammengeführt:
+The JSON output names the resolved directories, instruction files in read order, remediation policy, guidelines, and the three catalogs, with shipped and project-owned content already merged:
 
 ```json
 {
   "instructions": [
-    "/projekt/k-playbook/k-playbook.md",
-    "/projekt/k-playbook-local/k-playbook.md"
+    "/project/k-playbook/k-playbook.md",
+    "/project/k-playbook-local/k-playbook.md"
   ],
   "catalogs": {
     "rules": [
@@ -144,31 +125,19 @@ mitgeliefert und projekteigen bereits zusammengeführt:
 }
 ```
 
-`origin` ist `dist`, `local` oder `override`. `disabled` steht dort, wo die projekteigene
-Datei leer ist — das ist der Weg, einen mitgelieferten Eintrag abzuschalten.
+`origin` is `dist`, `local`, or `override`. `disabled` appears where the project-owned file is empty; that is how to disable a shipped entry.
 
-Der Aufruf steht am Anfang jedes Commands, aber nur einmal je Sitzung. Die Ausgabe
-ändert sich während der Arbeit nicht und ist für jeden Command dieselbe, also
-verwenden nachfolgende Commands die vorhandene weiter — auch die Dateien aus
-`instructions` werden nur einmal gelesen. Neu geholt wird sie, wenn die
-`K-PLAYBOOK.yaml` geschrieben wurde, sich der Bestand an Regeln, Reviews, Checks oder
-Guidelines geändert hat oder die Arbeit in ein anderes Projekt gewechselt ist.
+The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it, and the files from `instructions` are read only once. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of rules, reviews, checks, or guidelines has changed, or work has moved to another project.
 
-`/k-review`, `/k-enforcement` und `k-check` arbeiten auf dieser Menge und weisen sie vor
-der Arbeit aus. Die Regeln im Detail stehen in
-[`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen).
+`/k-review`, `/k-enforcement`, and `k-check` work on this set and display it before working. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 
 ## k-check
 
-`k-playbook/bin/k-check` ist kein Slash-Command, sondern ein CLI-Runner für die
-effektive Check-Menge:
+`k-playbook/bin/k-check` is not a slash command, but a CLI runner for the effective check set:
 
 ```bash
 k-playbook/bin/k-check --mode changed
 k-playbook/bin/k-check --mode baseline
 ```
 
-Die stabile Check-Schnittstelle ist `.sh`. Ein Check darf Python oder anderes intern
-verwenden, muss aber genau eine Statuszeile `K_CHECK_STATUS=ok|skip|fail` und optional
-`K_CHECK_REASON=<text>` schreiben. Details stehen in
-[`../checks/README.md`](../checks/README.md).
+The stable check interface is `.sh`. A check may use Python or something else internally, but must write exactly one status line, `K_CHECK_STATUS=ok|skip|fail`, and optionally `K_CHECK_REASON=<text>`. Details are in [`../checks/README.md`](../checks/README.md).

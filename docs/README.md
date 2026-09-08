@@ -1,96 +1,96 @@
-# Dokumentation
+# Documentation
 
-k-playbook ist ein Werkzeugkasten aus Slash-Commands, Skills, Review-Rezepten, Regeln und
-Checks. Er wird in ein Unterverzeichnis des Projekts geklont, das er begleiten soll.
+k-playbook is a toolkit of slash commands, skills, review recipes, rules, and
+checks. It is cloned into a subdirectory of the project it is meant to support.
 
-## Einstieg
+## Getting started
 
-| Dokument | Inhalt |
+| Document | Content |
 |---|---|
-| [`handbuch.md`](./handbuch.md) | Zweck, Grundmodell, Standardabläufe, Betriebsregeln. Die zentrale Seite. |
-| [`installation.md`](./installation.md) | Clone, die vier Einrichtungsschritte, Security-Tools, Aktualisieren, Fehlersuche. |
-| [`k-playbook-format.md`](./k-playbook-format.md) | Der Kontrakt: `K-PLAYBOOK.yaml`, Verzeichnisaufteilung, Overlay-Regeln. |
-| [`commands.md`](./commands.md) | Index der Slash-Commands und ihrer Zuständigkeiten. |
-| [`faq.md`](./faq.md) | Kurze Antworten zu Installation, Pfaden, Overlay und Security-Tools. |
+| [`manual.md`](./manual.md) | Purpose, core model, standard workflows, operating rules. The central page. |
+| [`installation.md`](./installation.md) | Clone, the four setup steps, security tools, updating, troubleshooting. |
+| [`k-playbook-format.md`](./k-playbook-format.md) | The contract: `K-PLAYBOOK.yaml`, directory layout, overlay rules. |
+| [`commands.md`](./commands.md) | Index of slash commands and their responsibilities. |
+| [`faq.md`](./faq.md) | Short answers about installation, paths, overlays, and security tools. |
 
-## Detailseiten
+## Detail pages
 
-| Dokument | Inhalt |
+| Document | Content |
 |---|---|
-| [`code-review.md`](./code-review.md) | Ablauf von `/k-review`, `/k-remediation` und den Handoffs. |
-| [`reviews-and-results.md`](./reviews-and-results.md) | Artefaktmodell: Ergebnisfamilien, Findings, Statuswerte, Priorisierung. |
-| [`review-runs.md`](./review-runs.md) | Das Laufmodell: `run.json`, Einträge, Betriebsarten der Katalog-Rezepte, Merge, known-decisions. |
+| [`code-review.md`](./code-review.md) | Workflow of `/k-review`, `/k-remediation`, and the handoffs. |
+| [`reviews-and-results.md`](./reviews-and-results.md) | Artifact model: result families, findings, status values, prioritization. |
+| [`review-runs.md`](./review-runs.md) | The run model: `run.json`, entries, operating modes of catalog recipes, merge, known decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
-| [`pr-review.md`](./pr-review.md) | `/k-pr-review` für konkrete GitHub-Pull-Requests. |
-| [`mcp.md`](./mcp.md) | Der MCP-Server: registrieren, Freigabe bei Claude Code, warum der Eintrag ein absoluter Pfad ist. |
-| [`versionsinventar.md`](./versionsinventar.md) | Der Vertrag des Versionsinventars: Datenmodell, Pin-Taxonomie, Quellen, Vertrauensgrenze, `version-sources.yaml`. |
-| [`local-github-ssh.md`](./local-github-ssh.md) | Host-spezifische GitHub-SSH-Aliases und Deploy-Keys. Kein Teil des Installationsvertrags. |
-| [`schreibweise.md`](./schreibweise.md) | Umlaute statt ASCII-Umschreibung, und wo ASCII bleibt. Gilt für alle Texte des Repos. |
+| [`pr-review.md`](./pr-review.md) | `/k-pr-review` for specific GitHub pull requests. |
+| [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why the entry uses an absolute path. |
+| [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
+| [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract. |
+| [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
 
-## Werkzeug und Kataloge
+## Tool and catalogs
 
-| Dokument | Inhalt |
+| Document | Content |
 |---|---|
-| [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Architektur des Go-Werkzeugs: Anker finden, Verlinkung, Web-API, Designentscheidungen. |
-| [`../installer/README.md`](../installer/README.md) | Kurzeinstieg und Prüfungen für Arbeiten am Werkzeug. |
-| [`../checks/README.md`](../checks/README.md) | Schnittstelle und Nutzung von `bin/k-check`. |
-| [`../rules/README.md`](../rules/README.md) | Die mitgelieferten Regeln. |
-| [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv) | Kanonische Security-Tool-Matrix für Skript, Oberfläche und Review-Rezepte. |
+| [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Architecture of the Go tool: finding anchors, linking, web API, design decisions. |
+| [`../installer/README.md`](../installer/README.md) | Quick start and checks for working on the tool. |
+| [`../checks/README.md`](../checks/README.md) | Interface and use of `bin/k-check`. |
+| [`../rules/README.md`](../rules/README.md) | The shipped rules. |
+| [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv) | Canonical security tool matrix for the script, interface, and review recipes. |
 
 ## Skills
 
-| Skill | Zweck |
+| Skill | Purpose |
 |---|---|
-| [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md) | Docs als autoritative Quelle für AI-Sessions verankern. |
-| [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md) | Mitgelieferte und projekteigene Regeln während der Arbeit anwenden. |
-| [`../skills/overlay-repo-analyse/PLAYBOOK.md`](../skills/overlay-repo-analyse/PLAYBOOK.md) | Docker-Overlay-Repos systematisch analysieren und dokumentieren. |
+| [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md) | Establish docs as the authoritative source for AI sessions. |
+| [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md) | Apply shipped and project-owned rules while working. |
+| [`../skills/overlay-repo-analyse/PLAYBOOK.md`](../skills/overlay-repo-analyse/PLAYBOOK.md) | Systematically analyze and document Docker overlay repositories. |
 
-## Umstellung
+## Migration
 
-[`umbau.md`](./umbau.md) ist die Arbeitsdatei zur Umstellung. Das projektlokale Modell ist
-umgesetzt und in den Seiten oben beschrieben; in der Arbeitsdatei steht nur noch, was
-festgelegt, aber noch nicht umgesetzt ist — derzeit der Umbau der Scan-Reviews auf SARIF.
-Wenn nichts mehr offen ist, wird sie gelöscht.
+[`migration.md`](./migration.md) is the working document for the migration. The project-local
+model has been implemented and is described on the pages above; the working document
+contains only what has been decided but not yet implemented, currently migrating scan
+reviews to SARIF. It is deleted when nothing remains open.
 
-## Stichwort-Index
+## Keyword index
 
-- `Anker` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
-- `AGENTS.md` / `CLAUDE.md` / `Include` / `@AGENTS.md` / `Verlinkung` / `Umbenennen` / `Konflikt` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
-- `Assistenten` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
-- `BROWSER` / `Browser öffnet nicht` / `DevContainer` -> [`installation.md`](./installation.md#browser-beim-start), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
-- `Bereiche` / `Setup` / `Workflows` / `Umschalter` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-und-tasks)
+- `anchor` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
+- `AGENTS.md` / `CLAUDE.md` / `include` / `@AGENTS.md` / `linking` / `renaming` / `conflict` -> [`installation.md`](./installation.md#4-link-assistants)
+- `assistants` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-link-assistants)
+- `BROWSER` / `browser does not open` / `DevContainer` -> [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
+- `sections` / `setup` / `workflows` / `switch` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-and-tasks)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
-- `Commands` -> [`commands.md`](./commands.md)
-- `Docs zuerst` -> [`handbuch.md`](./handbuch.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
-- `Enforcement` / `Regeln` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
-- `Findings` / `Statuswerte` -> [`reviews-and-results.md`](./reviews-and-results.md#statusmodell)
+- `commands` -> [`commands.md`](./commands.md)
+- `docs first` -> [`manual.md`](./manual.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
+- `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
+- `findings` / `status values` -> [`reviews-and-results.md`](./reviews-and-results.md#status-model)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
-- `GitHub SSH` / `Deploy-Key` -> [`local-github-ssh.md`](./local-github-ssh.md)
-- `Installation` / `git clone` -> [`installation.md`](./installation.md)
-- `MCP` / `.mcp.json` / `mcpServers` / `Freigabe` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
-- `k-playbook-local` / `projekteigen` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen)
-- `Oberfläche` / `k-gui` / `Web-API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
-- `priv` / `material` / `privat` / `Lokale Einstellungen` -> [`installation.md`](./installation.md#2-projekteigene-struktur-anlegen), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
-- `Doku lesen` / `Markdown-Ansicht` / `Mermaid` -> [`installation.md`](./installation.md#doku-lesen), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
-- `Overlay` / `Regel ersetzen` / `abschalten` -> [`k-playbook-format.md`](./k-playbook-format.md#mitgeliefertes-und-projekteigenes-zusammenfassen), [`faq.md`](./faq.md)
-- `context` / `aufgelöster Arbeitsstand` -> [`k-playbook-format.md`](./k-playbook-format.md#der-aufgelöste-arbeitsstand), [`commands.md`](./commands.md#der-aufgelöste-arbeitsstand)
-- `k-playbook.md` / `Instruktionen` / `Anstoß` -> [`k-playbook-format.md`](./k-playbook-format.md#instruktionen), [`faq.md`](./faq.md)
-- `Altlasten` / `alte globale Verlinkung` -> [`installation.md`](./installation.md#4-assistenten-verlinken)
-- `Command fehlt` / `toter Symlink` / `Verlinkung nachziehen` -> [`installation.md`](./installation.md#aktualisieren), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
-- `Pfade` / `warum keine paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#keine-pfade-in-der-konfiguration)
-- `PR-Review` -> [`pr-review.md`](./pr-review.md)
-- `Remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)
-- `Results` / `Ergebnisse` -> [`reviews-and-results.md`](./reviews-and-results.md)
-- `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#bewerten-mit-review-scan-triage), [`commands.md`](./commands.md#review-flow)
-- `/k-task-refine` / `Task-Härtung` -> [`task-flow.md`](./task-flow.md)
-- `review-input` / `merge` / `Zusammenfassen` -> [`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge)
-- `Belegvertrag` / `review-input.json`-Schema / `stableId`-Bildung -> [`../commands/_review-run/review-input-contract.md`](../commands/_review-run/review-input-contract.md)
-- `audit.mode` / `Perspektive` / `Evidence-Rezept` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#katalog-rezepte-im-lauf), [`../rules/review-authoring.md`](../rules/review-authoring.md)
-- `known-decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd)
-- `Schreibweise` / `Umlaute` / `Rechtschreibung` -> [`schreibweise.md`](./schreibweise.md)
-- `Reviews` -> [`code-review.md`](./code-review.md)
+- `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md)
+- `installation` / `git clone` -> [`installation.md`](./installation.md)
+- `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
+- `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
+- `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#2-create-project-owned-structure), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
+- `read docs` / `Markdown view` / `Mermaid` -> [`installation.md`](./installation.md#read-documentation), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
+- `overlay` / `replace rule` / `disable` -> [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content), [`faq.md`](./faq.md)
+- `context` / `resolved working state` -> [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`commands.md`](./commands.md#the-resolved-working-state)
+- `k-playbook.md` / `instructions` / `prompt` -> [`k-playbook-format.md`](./k-playbook-format.md#instructions), [`faq.md`](./faq.md)
+- `legacy artifacts` / `old global linking` -> [`installation.md`](./installation.md#4-link-assistants)
+- `command missing` / `dead symlink` / `update links` -> [`installation.md`](./installation.md#update), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
+- `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
+- `PR review` -> [`pr-review.md`](./pr-review.md)
+- `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`reviews-and-results.md`](./reviews-and-results.md#remediation)
+- `results` -> [`reviews-and-results.md`](./reviews-and-results.md)
+- `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#assessing-with-review-scan-triage), [`commands.md`](./commands.md#review-flow)
+- `/k-task-refine` / `task hardening` -> [`task-flow.md`](./task-flow.md)
+- `review-input` / `merge` / `consolidation` -> [`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge)
+- `evidence contract` / `review-input.json` schema / `stableId` generation -> [`../commands/_review-run/review-input-contract.md`](../commands/_review-run/review-input-contract.md)
+- `audit.mode` / `perspective` / `evidence recipe` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#catalog-recipes-in-the-run), [`../rules/review-authoring.md`](../rules/review-authoring.md)
+- `known decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd)
+- `spelling` / `umlauts` / `orthography` -> [`writing-style.md`](./writing-style.md)
+- `reviews` -> [`code-review.md`](./code-review.md)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
-- `Security-Tools` / `Tool-Matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
-- `Tasks` -> [`task-flow.md`](./task-flow.md)
-- `Update` / `git pull` -> [`installation.md`](./installation.md#aktualisieren)
-- `Versionsinventar` / `inventory` / `version-sources.yaml` / `Pin-Art` / `Vertrauensgrenze` -> [`versionsinventar.md`](./versionsinventar.md)
+- `security tools` / `tool matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
+- `tasks` -> [`task-flow.md`](./task-flow.md)
+- `update` / `git pull` -> [`installation.md`](./installation.md#update)
+- `version inventory` / `inventory` / `version-sources.yaml` / `pin type` / `trust boundary` -> [`version-inventory.md`](./version-inventory.md)

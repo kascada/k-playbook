@@ -26,7 +26,7 @@ func docsFixture(t *testing.T, files map[string]string) string {
 
 func TestListDocsNimmtTitelUndUnterverzeichnisse(t *testing.T) {
 	root := docsFixture(t, map[string]string{
-		"handbuch.md":    "# Handbuch\n\nText\n",
+		"manual.md":      "# Manual\n\nText\n",
 		"libs/django.md": "Vorspann\n\n# Django\n",
 		"ohne-titel.md":  "nur Text\n",
 		"notiz.txt":      "keine Doku\n",
@@ -44,8 +44,8 @@ func TestListDocsNimmtTitelUndUnterverzeichnisse(t *testing.T) {
 	for _, doc := range docs {
 		titles[doc.Path] = doc.Title
 	}
-	if titles["handbuch.md"] != "Handbuch" {
-		t.Errorf("Titel aus Überschrift: %q", titles["handbuch.md"])
+	if titles["manual.md"] != "Manual" {
+		t.Errorf("Titel aus Überschrift: %q", titles["manual.md"])
 	}
 	if titles["libs/django.md"] != "Django" {
 		t.Errorf("Unterverzeichnis fehlt oder falscher Titel: %+v", titles)
@@ -80,16 +80,16 @@ func TestListDocsMeldetFehlendesVerzeichnis(t *testing.T) {
 }
 
 func TestReadDocLiefertInhalt(t *testing.T) {
-	root := docsFixture(t, map[string]string{"handbuch.md": "# Handbuch\n\nText\n"})
+	root := docsFixture(t, map[string]string{"manual.md": "# Manual\n\nText\n"})
 
-	doc, content, err := ReadDoc(root, "handbuch.md")
+	doc, content, err := ReadDoc(root, "manual.md")
 	if err != nil {
 		t.Fatalf("ReadDoc: %v", err)
 	}
-	if doc.Title != "Handbuch" || doc.Path != "handbuch.md" {
+	if doc.Title != "Manual" || doc.Path != "manual.md" {
 		t.Errorf("unerwarteter Eintrag: %+v", doc)
 	}
-	if string(content) != "# Handbuch\n\nText\n" {
+	if string(content) != "# Manual\n\nText\n" {
 		t.Errorf("unerwarteter Inhalt: %q", content)
 	}
 }
@@ -97,7 +97,7 @@ func TestReadDocLiefertInhalt(t *testing.T) {
 // Der Pfad kommt aus dem Browser. Nichts davon darf aus dem Doku-Verzeichnis
 // herausführen oder etwas anderes als Markdown lesen.
 func TestReadDocWeistFremdePfadeAb(t *testing.T) {
-	root := docsFixture(t, map[string]string{"handbuch.md": "# Handbuch\n"})
+	root := docsFixture(t, map[string]string{"manual.md": "# Manual\n"})
 	if err := os.WriteFile(filepath.Join(root, "geheim.md"), []byte("# Geheim\n"), 0o644); err != nil {
 		t.Fatalf("Nachbardatei anlegen: %v", err)
 	}

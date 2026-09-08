@@ -1,221 +1,162 @@
 # FAQ
 
-## Wann rufe ich `/k-gui` auf?
+## When do I call `/k-gui`?
 
-`/k-gui` startet die Oberfläche. Sinnvoll ist das:
+`/k-gui` starts the interface. It is useful:
 
-- nach dem Klonen von k-playbook in ein Projekt, für die vier Einrichtungsschritte.
-- wenn die Verlinkung klemmt und du sehen willst, woran: Nachgezogen wird sie von
-  selbst, aber eine echte Projektdatei im Weg oder ein Konflikt an `CLAUDE.md` lösen sich
-  nicht von allein auf. Der Assistenten-Block nennt den Ausweg.
-- wenn Teile der projekteigenen Struktur fehlen oder Symlinks kaputt sind.
+- after cloning k-playbook into a project, for the four setup steps.
+- when linking is stuck and you want to see why: it is brought up to date automatically, but an actual project file in the way or a conflict in `CLAUDE.md` does not resolve itself. The assistants section explains the resolution.
+- when parts of the project-owned structure are missing or symlinks are broken.
 
-Wenn du nur wissen willst, ob alles stimmt, öffne die Oberfläche und schau, ohne einen
-der Schritte zu bestätigen — geschrieben wird erst nach Bestätigung.
+If you only want to know whether everything is correct, open the interface and look without confirming any of the steps: it writes only after confirmation.
 
-## Muss ich `/k-gui` in einem bestimmten Verzeichnis aufrufen?
+## Must I call `/k-gui` from a particular directory?
 
-Am besten im Projekt, das du meinst. Das Werkzeug sucht ab dem Arbeitsverzeichnis
-aufwärts nach `K-PLAYBOOK.yaml` und nimmt den ersten Fund als Hauptverzeichnis.
+Preferably from the project you mean. Starting at the working directory, the tool searches upwards for `K-PLAYBOOK.yaml` and uses the first match as the project root.
 
-Findet es nichts — etwa direkt nach dem Clone — dann rät es nicht, sondern schlägt
-einen Ort vor und lässt ihn bestätigen. Der stärkste Hinweis ist dabei das
-Git-Repository, in dem der Aufruf stattfindet: wer das Werkzeug startet, steht in aller
-Regel in dem Projekt, das er meint.
+If it finds nothing, for example immediately after cloning, it does not guess. Instead, it proposes a location and lets you confirm it. The strongest indication is the Git repository in which the command is called: whoever starts the tool is usually in the project they mean.
 
-## Ich habe mehrere Projekte. Muss ich k-playbook mehrfach installieren?
+## I have several projects. Must I install k-playbook several times?
 
-Ja, und das ist Absicht. Jedes Projekt bekommt seinen eigenen Clone unter
-`<projekt>/k-playbook/`.
+Yes, and that is intentional. Every project gets its own clone under `<project>/k-playbook/`.
 
-Der Vorteil: Projekte können unterschiedliche Stände tragen. Ein Projekt, das gerade
-nicht angefasst wird, bleibt auf seinem Stand, und ein Update in einem anderen Projekt
-ändert daran nichts. Es gibt keine zentrale Installation, die alle gleichzeitig
-betrifft, und keinen Hostpfad, der auf allen Rechnern stimmen muss.
+The advantage is that projects can use different versions. A project that is not currently being touched remains at its version, and an update in another project does not change that. There is no central installation that affects all of them at once and no host path that must work on every machine.
 
-## Das Verzeichnis muss `k-playbook` heißen?
+## Must the directory be named `k-playbook`?
 
-Ja. Commands und Skills sprechen es so an. Wie das Projektverzeichnis darüber heißt,
-spielt dagegen keine Rolle.
+Yes. Commands and skills refer to it by that name. The name of the project directory above it does not matter.
 
 ```bash
 git clone git@github.com:kascada/k-playbook.git
 ```
 
-Ohne Zielargument ergibt sich der Name aus dem Repo-Namen — richtig ist er damit von
-selbst. Ein eigenes Argument brauchst du nur bei einem Fork oder Mirror unter
-abweichendem Namen; dann lautet es `k-playbook`.
+Without a destination argument, the name is derived from the repository name and is therefore correct automatically. You need your own argument only for a fork or mirror cloned under a different name; then it must be `k-playbook`.
 
-## Warum liegt `K-PLAYBOOK.yaml` nicht in `k-playbook/`?
+## Why is `K-PLAYBOOK.yaml` not in `k-playbook/`?
 
-Weil `k-playbook/` bei jedem Update vollständig ersetzt wird. Alles, was dem Projekt
-gehört, muss daneben liegen — sonst wäre es nach dem nächsten `git pull` weg.
+Because `k-playbook/` is completely replaced with every update. Everything owned by the project must sit beside it, otherwise it would be gone after the next `git pull`.
 
-Deshalb liegen `K-PLAYBOOK.yaml` und `k-playbook-local/` im Hauptverzeichnis:
+Therefore, `K-PLAYBOOK.yaml` and `k-playbook-local/` are in the project root:
 
 ```text
-projekt/
-├── K-PLAYBOOK.yaml        der Anker
-├── k-playbook/            ersetzbar
-└── k-playbook-local/      projekteigen
+project/
+├── K-PLAYBOOK.yaml        the anchor
+├── k-playbook/            replaceable
+└── k-playbook-local/      project-owned
 ```
 
-## Wo stehen die Pfade für Tasks, Reviews und Ergebnisse?
+## Where are the paths for tasks, reviews, and results?
 
-Nirgends — sie ergeben sich aus dem Ort der `K-PLAYBOOK.yaml`. Tasks liegen unter
-`k-playbook-local/tasks/`, Ergebnisse unter `k-playbook-local/results/`, mitgelieferte
-Regeln unter `k-playbook/rules/`.
+Nowhere: they derive from the location of `K-PLAYBOOK.yaml`. Tasks are under `k-playbook-local/tasks/`, results under `k-playbook-local/results/`, and shipped rules under `k-playbook/rules/`.
 
-Frühere Versionen hatten dafür einen `paths:`-Block mit neun Schlüsseln. Der ist
-entfallen: die Struktur ist fest, und ein Schlüssel mit immer demselben Wert wäre nur
-eine Fehlerquelle. Die vollständige Zuordnung steht in
-[`k-playbook-format.md`](./k-playbook-format.md).
+Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
-## Wie ändere ich eine mitgelieferte Regel?
+## How do I change a shipped rule?
 
-Gar nicht — `k-playbook/` wird beim Update ersetzt. Stattdessen legst du eine Datei mit
-demselben Namen unter `k-playbook-local/` an:
+You do not: `k-playbook/` is replaced during updates. Instead, create a file with the same name under `k-playbook-local/`:
 
 ```text
-k-playbook/rules/docs-sync.md          wird dann nicht mehr gelesen
-k-playbook-local/rules/docs-sync.md    gilt allein
+k-playbook/rules/docs-sync.md          is no longer read
+k-playbook-local/rules/docs-sync.md    applies on its own
 ```
 
-Die lokale Datei ersetzt die mitgelieferte **vollständig**. Sie muss die Regel also
-ganz enthalten; einzelne Abschnitte werden nicht aus dem Original übernommen. Der Preis
-davon ist, dass spätere Verbesserungen am Original diese Kopie nicht mehr erreichen.
+The local file **completely** replaces the shipped one. It must therefore contain the whole rule; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
 
-Dasselbe gilt für `reviews/` und `checks/`.
+The same applies to `reviews/` and `checks/`.
 
-## Wie schalte ich eine mitgelieferte Regel ab?
+## How do I disable a shipped rule?
 
-Mit einer **leeren** Datei desselben Namens. Da die lokale Datei die mitgelieferte
-vollständig ersetzt, bleibt bei einer leeren nichts übrig.
+With an **empty** file of the same name. Because the local file completely replaces the shipped one, nothing remains for an empty file.
 
-„Leer" heißt: nichts außer Leerzeilen und Kommentaren. Damit kann die Datei ihren
-eigenen Grund tragen:
+"Empty" means nothing except blank lines and comments. This lets the file state its own reason:
 
 ```bash
 # k-playbook-local/checks/check_django_baseline.sh
-# Abgeschaltet: dieses Projekt nutzt kein Django.
+# Disabled: this project does not use Django.
 ```
 
-Bei `rules` und `reviews` bleibt der Eintrag im Katalog sichtbar, sein Inhalt sagt dann,
-dass er abgeschaltet ist. Ein Check fällt ganz aus dem Katalog — ein leeres Skript liefe
-mit Exit 0 durch und sähe aus wie ein bestandener Check.
+For `rules` and `reviews`, the entry remains visible in the catalog and its content states that it is disabled. A check disappears from the catalog entirely: an empty script would run with exit 0 and look like a passing check.
 
-Eine Liste in der Konfiguration gibt es dafür nicht.
+There is no list for this in the configuration.
 
-## Woher weiß ich, was am Ende gilt?
+## How do I know what ultimately applies?
 
 ```bash
 k-playbook context
 ```
 
-Gibt den aufgelösten Arbeitsstand als JSON aus: Verzeichnisse, Instruktionsdateien in
-Lesereihenfolge, Remediation-Policy, Guidelines und die drei Kataloge — mitgeliefert und
-projekteigen bereits zusammengeführt, mit Herkunft je Eintrag und markierten
-Abschaltungen.
+It outputs the resolved working state as JSON: directories, instruction files in read order, remediation policy, guidelines, and the three catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
 
-Die Oberfläche zeigt dasselbe lesbar aufbereitet, im Block `Aufgelöster Kontext`.
+The interface presents the same information in readable form in the `Resolved context` section.
 
-## Was ist `k-playbook.md`?
+## What is `k-playbook.md`?
 
-Die Instruktionsdatei — was ein Assistent vor der Arbeit lesen soll. Es gibt sie zweimal:
+The instruction file: what an assistant should read before working. It exists twice:
 
-| Datei | Gilt für | Beim Update |
+| File | Applies to | On update |
 |---|---|---|
-| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
-| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+| `k-playbook/k-playbook.md` | every project that uses k-playbook | is replaced |
+| `k-playbook-local/k-playbook.md` | this project only | remains |
 
-Gelesen wird in dieser Reihenfolge. In die projekteigene Ebene gehört, was nur hier
-gilt: Aufbau und Besonderheiten des Projekts, Konventionen, wiederkehrende Abläufe.
-Allgemeine k-playbook-Regeln nicht — die stehen in der mitgelieferten Ebene und werden
-bei jedem Update aktualisiert.
+They are read in this order. The project-owned layer is where content that applies only here belongs: project structure and special characteristics, conventions, recurring flows. General k-playbook rules do not belong there: they are in the shipped layer and are updated with every update.
 
-Sie heißt bewusst nicht `AGENTS.md`: diesen Namen lesen die Assistenten von sich aus, und
-er ist dem Hauptverzeichnis vorbehalten. Dort steht nur ein kurzer Anstoß, der auf
-`k-playbook context` verweist.
+It is deliberately not named `AGENTS.md`: assistants read that name themselves, and it is reserved for the project root. It contains only a brief prompt that refers to `k-playbook context`.
 
-## Kann ich eigene Slash-Commands hinzufügen?
+## Can I add my own slash commands?
 
-Ja. `k-playbook-local/commands/` nimmt sie auf, `k-playbook-local/skills/` die eigenen
-Skills. Es gilt dieselbe Regel wie bei Regeln und Reviews: gleicher Name ersetzt den
-mitgelieferten, ein leerer Eintrag schaltet ihn ab.
+Yes. `k-playbook-local/commands/` holds them, and `k-playbook-local/skills/` holds custom skills. The same rule applies as for rules and reviews: the same name replaces the shipped item, and an empty entry disables it.
 
 ```text
-k-playbook-local/commands/k-eigen.md    neu, nur in diesem Projekt
-k-playbook-local/commands/k-todo.md     ersetzt den mitgelieferten
-k-playbook-local/skills/mein-skill/SKILL.md
+k-playbook-local/commands/k-own.md    new, only in this project
+k-playbook-local/commands/k-todo.md   replaces the shipped item
+k-playbook-local/skills/my-skill/SKILL.md
 ```
 
-Registriert wird der neue Command von selbst: beim nächsten `k-playbook context` — dem
-Aufruf am Anfang jeder Sitzung — oder beim nächsten Blick in den Assistenten-Block der
-Oberfläche. Anschließend den Assistenten neu starten, der erfasst Commands beim Start.
+The new command is registered automatically: at the next `k-playbook context`, the call at the beginning of every session, or when the assistants section of the interface is next displayed. Then restart the assistant; it reads commands at startup.
 
-Bei Commands zählt der Pfad ab `commands/`: eine lokale `commands/_shared/x.md` ersetzt
-genau diese Datei, der Rest des Namensraums bleibt mitgeliefert. Ein Skill wird dagegen
-als Ganzes ersetzt — `SKILL.md` und Beiwerk müssen zueinander passen.
+For commands, the path from `commands/` counts: a local `commands/_shared/x.md` replaces exactly that file, while the rest of the namespace remains shipped. A skill, on the other hand, is replaced as a whole: `SKILL.md` and accompanying files must match each other.
 
-## Warum sind `.claude/commands/` und `.opencode/commands/` voller Symlinks?
+## Why are `.claude/commands/` and `.opencode/commands/` full of symlinks?
 
-Weil die Einträge aus zwei Quellen kommen. Ein Verzeichnis-Symlink zeigt auf genau eine —
-damit käme entweder nur `k-playbook/` oder nur `k-playbook-local/` an. Deshalb ist das
-Ziel ein echtes Verzeichnis mit je einem Link pro Command bzw. Skill, der auf die Fassung
-zeigt, die nach der Overlay-Regel gilt.
+Because entries come from two sources. A directory symlink points to exactly one of them, so it would provide either only `k-playbook/` or only `k-playbook-local/`. The target is therefore an actual directory with one link for each command or skill, pointing to the version that applies under the overlay rule.
 
-Ältere Installationen haben dort noch einen einzelnen Verzeichnis-Symlink. Er wird
-erkannt und beim nächsten Nachziehen durch Einzel-Links ersetzt.
+Older installations still have one directory symlink there. It is detected and replaced with individual links at the next synchronization.
 
-Eine **echte Datei**, die du selbst dort abgelegt hast, wird nie ersetzt. Sie gewinnt, und
-die Oberfläche weist sie als projekteigen aus.
+An **actual file** that you placed there yourself is never replaced. It takes precedence, and the interface identifies it as project-owned.
 
-## Darf ein Projekt mit venv laufen?
+## May a project run with a venv?
 
-Ja. Ein Projekt-venv ist für Projekt-Abhängigkeiten normal. Der read-only Status der
-k-playbook-Security-Tools darf dieses aktive venv messen und kennzeichnet das in der
-Oberfläche. Nur beim Installieren darf kein Projekt-venv aktiv sein, damit nichts ins
-Projekt-venv geschrieben wird. Wenn `VIRTUAL_ENV` gesetzt ist und installiert werden soll:
+Yes. A project venv for project dependencies is normal. The read-only status of k-playbook security tools may inspect this active venv and identifies that in the interface. Only during installation must no project venv be active so that nothing is written into it. If `VIRTUAL_ENV` is set and installation is to happen:
 
 ```bash
 deactivate
 ```
 
-Auch `.venv/bin`, `venv/bin` oder `env/bin` im `PATH` blockieren deshalb nur
-Installationen, nicht die Statusanzeige. Empfohlen ist `--method auto`. Wenn Python-CLI-Tools ausdrücklich in venvs
-isoliert werden sollen, dann mit dedizierten k-playbook-Tool-venvs:
+`.venv/bin`, `venv/bin`, or `env/bin` in `PATH` therefore block installations only, not the status display. `--method auto` is recommended. If Python CLI tools should explicitly be isolated in venvs, use dedicated k-playbook tool venvs:
 
 ```bash
 k-playbook/scripts/install-security-tools.sh --install missing --method venv
 ```
 
-Das Ziel ist `~/.local/share/k-playbook/security-tools/<tool>-venv`, nicht
-`<projekt>/.venv`.
+The destination is `~/.local/share/k-playbook/security-tools/<tool>-venv`, not `<project>/.venv`.
 
-## Wie installiere ich fehlende Security-Tools?
+## How do I install missing security tools?
 
-Die Oberfläche zeigt den Status read-only. Installiert wird über das Skript:
+The interface displays the status read-only. Install through the script:
 
 ```bash
 k-playbook/scripts/install-security-tools.sh --install missing
 ```
 
-Ohne `--yes` zeigt es den Plan und fragt. `--help` erklärt die Methoden `auto`,
-`native`, `docker`, `pipx` und `venv`. Es schreibt keine Projektdateien und startet keine
-Scans.
+Without `--yes`, it shows the plan and asks. `--help` explains the `auto`, `native`, `docker`, `pipx`, and `venv` methods. It writes no project files and starts no scans.
 
-Einen eigenen `/k-install-security-tools`-Command gibt es nicht mehr — er hätte das
-Skript nur in Prosa gedoppelt und wäre bei jeder Skriptänderung nachzuziehen gewesen.
+There is no longer a dedicated `/k-install-security-tools` command. It would only duplicate the script in prose and would have needed updating whenever the script changed.
 
-## Brauche ich Go?
+## Do I need Go?
 
-Nein. Der Bootstrap `k-playbook/bin/install` ist ein reines Shell-Skript. Er wählt das
-zur Plattform passende Release-Asset — macOS oder Linux —, prüft es gegen das
-mitgelieferte `SHA256SUMS` und installiert es als echte Datei nach
-`~/.local/bin/k-playbook`. Er läuft einmal je Host oder DevContainer und braucht dafür
-Netz; danach läuft jeder Aufruf über das installierte `k-playbook`.
+No. The `k-playbook/bin/install` bootstrap is a pure shell script. It selects the release asset for the platform, macOS or Linux, verifies it against the shipped `SHA256SUMS`, and installs it as an actual file under `~/.local/bin/k-playbook`. It runs once per host or DevContainer and requires network access; every invocation then runs through the installed `k-playbook`.
 
-Go brauchst du nur, wenn du am Werkzeug selbst arbeitest:
+You need Go only if you work on the tool itself:
 
 ```bash
 make dist

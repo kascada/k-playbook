@@ -153,7 +153,7 @@
 #                              fänden gitleaks und trufflehog im nächsten Lauf die
 #                              Funde des vorigen in dessen eigenem SARIF wieder.
 # Dazu für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
-# gemessen 97,3 % der Befunde, siehe docs/umbau.md, „Gemessen".
+# gemessen 97,3 % der Befunde, siehe docs/migration.md, „Gemessen".
 #
 # Die gitleaks- und njsscan-Jobs nennen als Ziel . statt {target}, obwohl beides
 # dasselbe Verzeichnis meint. Grund: beide Werkzeuge können Pfade nur über ihre eigene

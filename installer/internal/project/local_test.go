@@ -71,7 +71,7 @@ func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) 
 	if strings.Contains(text, "/k-todo") {
 		t.Fatalf("%s trägt den TODO-Rumpf:\n%s", VersionSourcesFileName, text)
 	}
-	for _, want := range []string{"schema_version: 1", "roots: []", "sources: []", "versionsinventar.md"} {
+	for _, want := range []string{"schema_version: 1", "roots: []", "sources: []", "version-inventory.md"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("%s enthält %q nicht:\n%s", VersionSourcesFileName, want, text)
 		}

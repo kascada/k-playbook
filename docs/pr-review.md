@@ -1,16 +1,16 @@
 # /k-pr-review
 
-Kurzer Guide für den PR-Check-Flow.
+Brief guide to the PR review flow.
 
-`/k-pr-review` dient dazu, einen Pull Request strukturiert zu bewerten, ihn vorab mit den passenden Checks zu testen und danach je nach Lage entweder zu approven, zu mergen oder beim Anlegen eines lokalen Branches für weitergehende Tests zu helfen.
+`/k-pr-review` is used to assess a pull request in a structured way, test it in advance with the appropriate checks, and then, depending on the situation, approve it, merge it, or help create a local branch for more extensive testing.
 
-## Zweck
+## Purpose
 
-`/k-pr-review` soll einen GitHub-PR für das in `K-PLAYBOOK.yaml` konfigurierte Repo laden, knapp bewerten und danach eine sinnvolle Folgeaktion anbieten: Approval, expliziter Merge oder ein lokaler Validierungs-Branch für weitergehende Tests.
+`/k-pr-review` should load a GitHub PR for the repository configured in `K-PLAYBOOK.yaml`, assess it concisely, and then offer a sensible follow-up action: approval, an explicit merge, or a local validation branch for further testing.
 
-Perspektivisch sollte der Flow außerdem eine Schnittstelle zu Jira oder Confluence bekommen, damit Bewertungen, Entscheidungen, Testergebnisse und Merge-Hinweise strukturiert außerhalb des Chats abgelegt werden können.
+In the future, the flow should also provide an interface to Jira or Confluence so that assessments, decisions, test results, and merge notes can be stored in a structured form outside the chat.
 
-## Aufrufe
+## Invocations
 
 - `/k-pr-review`
 - `/k-pr-review 454`
@@ -20,77 +20,77 @@ Perspektivisch sollte der Flow außerdem eine Schnittstelle zu Jira oder Conflue
 - `/k-pr-review 454 standard`
 - `/k-pr-review #454 deep`
 
-## Phasen
+## Phases
 
-1. Repo und PR auflösen
-2. PR-Überblick zeigen
-3. Bewertung in `quick`, `standard` oder `deep`
-4. Empfehlung ableiten
-5. Folgeaktion ausführen
+1. Resolve the repository and PR
+2. Show the PR overview
+3. Assess in `quick`, `standard`, or `deep` mode
+4. Derive a recommendation
+5. Perform the follow-up action
 
-## Schaubild
+## Diagram
 
 ```mermaid
 flowchart TD
-    A["/k-pr-review [selector] [mode]"] --> B["Repo und PR auflösen"]
-    B --> C["PR-Überblick zeigen"]
-    C --> D{"Bewertungsmodus"}
-    D -->|quick| E["GitHub-Signale + Diff-Scope + Enforcement-Einschätzung"]
+    A["/k-pr-review [selector] [mode]"] --> B["Resolve repository and PR"]
+    B --> C["Show PR overview"]
+    C --> D{"Assessment mode"}
+    D -->|quick| E["GitHub signals + diff scope + enforcement assessment"]
     D -->|standard| F["quick + k-check --mode changed"]
-    D -->|deep| G["standard + lokale Zusatzvalidierung"]
-    E --> H["Empfehlung ableiten"]
+    D -->|deep| G["standard + additional local validation"]
+    E --> H["Derive recommendation"]
     F --> H
     G --> H
-    H --> I{"Folgeaktion"}
-    I -->|direkt annehmen| J["GitHub-Approval"]
-    I -->|explizit mergen| K["GitHub-Merge"]
-    I -->|weiter testen| L["lokalen PR-Head-Branch erstellen"]
-    I -->|nichts weiter| M["keine Aktion"]
-    L --> N["erweiterte Tests ausführen"]
-    N --> O["zum ursprünglichen PR zurück"]
+    H --> I{"Follow-up action"}
+    I -->|approve directly| J["GitHub approval"]
+    I -->|merge explicitly| K["GitHub merge"]
+    I -->|test further| L["Create local PR-head branch"]
+    I -->|nothing further| M["No action"]
+    L --> N["Run extended tests"]
+    N --> O["Return to the original PR"]
     O --> H
-    J --> P["Repo-Sauberkeitsprüfung"]
+    J --> P["Check repository cleanliness"]
     K --> P
     M --> P
-    P --> Q["Abschluss melden"]
+    P --> Q["Report completion"]
 ```
 
-## Bewertungsmodi
+## Assessment Modes
 
-- `quick`: GitHub-Signale, Diff-Scope, Enforcement-Einschätzung
+- `quick`: GitHub signals, diff scope, enforcement assessment
 - `standard`: `quick` plus `k-check --mode changed`
-- `deep`: `standard` plus kleinste sinnvolle lokale Zusatzvalidierung
+- `deep`: `standard` plus the smallest sensible additional local validation
 
-## Folgeaktionen
+## Follow-Up Actions
 
-- `direkt annehmen`: Approval auf GitHub.
-- `direkt mergen`: nur auf ausdrückliche Anfrage.
-- `branch erstellen und weiter testen`: lokaler Validierungs-Branch vom PR-Head, erweiterter Testlauf, danach zurück zum ursprünglichen PR.
-- `nichts weiter`
+- `approve directly`: approve on GitHub.
+- `merge directly`: only on an explicit request.
+- `create a branch and test further`: create a local validation branch from the PR head, run extended tests, then return to the original PR.
+- `nothing further`
 
-## Wichtige Regeln
+## Important Rules
 
-- Kein automatischer Merge ohne ausdrückliche User-Anfrage
-- PR-Kommentar- und Approval-Texte immer per `--body-file`, nie als fragiler Inline-Mehrzeiler
-- Lokale Prüf-Branches sind nicht merge-relevant
-- Merge-relevant bleibt immer der ursprüngliche PR
-- Am Ende immer `git status --short --branch` prüfen
+- Do not merge automatically without an explicit user request
+- Always use `--body-file` for PR comments and approval text, never fragile inline multi-line text
+- Local validation branches are not merge-relevant
+- The original PR always remains merge-relevant
+- Always check `git status --short --branch` at the end
 
-## Bereits praktisch getestet
+## Already Tested in Practice
 
-Der Flow wurde bereits praktisch durchgespielt:
+The flow has already been exercised in practice:
 
-1. Offene PRs listen und PR auswählen
-2. `standard`-Bewertung für echte PRs (`#441`, `#442`, `#454`)
-3. Approval-Fall mit sauberem Self-Approval-Fehler
-4. Branch-Flow für `#454`
-5. Lokalen Validierungs-Branch anlegen
-6. Erweiterte Tests auf dem Prüf-Branch ausführen
-7. PR `#454` mergen
-8. Lokale Branches aufräumen und Repo-Zustand prüfen
+1. List open PRs and select a PR
+2. Perform `standard` assessments for real PRs (`#441`, `#442`, `#454`)
+3. Test the approval case with a clear self-approval error
+4. Exercise the branch flow for `#454`
+5. Create a local validation branch
+6. Run extended tests on the validation branch
+7. Merge PR `#454`
+8. Clean up local branches and check repository state
 
-## Offene Grenze
+## Open Boundary
 
-Wenn GitHub wegen Branch-Protection, fehlenden Rechten oder Self-Approval blockiert, soll der Command das klar melden und keinen stillen Workaround versuchen.
+If GitHub blocks an action because of branch protection, missing permissions, or self-approval, the command should report this clearly and must not attempt a silent workaround.
 
-Eine sinnvolle nächste Erweiterung ist die Ablage der PR-Ergebnisse in Jira oder Confluence, z. B. als verlinkte Review-Notiz, Entscheidungsprotokoll oder Testzusammenfassung.
+A sensible next extension is to store PR results in Jira or Confluence, for example as a linked review note, decision record, or test summary.

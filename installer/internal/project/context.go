@@ -54,15 +54,9 @@ type Context struct {
 	// fehlend, obwohl der Aufruf funktioniert; die Begründung steht am Typ
 	// BaseTools. Ein fehlendes Basis-Werkzeug warnt und blockiert nicht —
 	// anders als gh.ready.
-	BaseTools BaseTools `json:"baseTools"`
-	// Cleanliness ist der lokale Zustand der Installation. Sie steht hier, weil
-	// die Regel „in k-playbook/ wird nie geschrieben" sich nicht selbst
-	// durchsetzt und ihr Bruch still bleibt: Ändert sich eine lokal veränderte
-	// Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
-	// stehen. Zwei git-Aufrufe im lokalen Clone, ohne Netz.
-	Cleanliness Cleanliness               `json:"cleanliness"`
-	Catalogs    map[string][]CatalogEntry `json:"catalogs"`
-	Guidelines  []string                  `json:"guidelines"`
+	BaseTools  BaseTools                 `json:"baseTools"`
+	Catalogs   map[string][]CatalogEntry `json:"catalogs"`
+	Guidelines []string                  `json:"guidelines"`
 	// VersionSources ist der Zustand der Quellenkonfiguration des
 	// Versionsinventars. Sie steht hier, weil Commands Konfiguration
 	// ausschließlich aus dieser Ausgabe lesen: eine Datei, die nur der Sammler
@@ -79,8 +73,8 @@ type Context struct {
 }
 
 // VersionSources ist der Zustand von k-playbook-local/version-sources.yaml in
-// der Kontextausgabe. Der Vertrag dazu steht in docs/versionsinventar.md,
-// Abschnitt „Quellenkonfiguration"; die Feldnamen sind die YAML-Schlüssel der
+// der Kontextausgabe. Der Vertrag dazu steht in docs/version-inventory.md,
+// Abschnitt „Source Configuration"; die Feldnamen sind die YAML-Schlüssel der
 // Datei, in camelCase wie überall sonst in dieser Ausgabe.
 //
 // Hier steht nur das Schema. Gelesen wird die Datei von
@@ -321,7 +315,6 @@ func BuildContext(projectDir string) (Context, error) {
 		Remediation:    remediation,
 		GH:             gh,
 		BaseTools:      DetectBaseTools(projectDir),
-		Cleanliness:    CheckCleanliness(projectDir),
 		Catalogs:       map[string][]CatalogEntry{},
 		Guidelines:     listFiles(filepath.Join(localDir, "guidelines")),
 		VersionSources: readVersionSources(localDir),

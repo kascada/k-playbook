@@ -1237,7 +1237,7 @@ func TestReviewWriteAIEntryEvidenceTeilannahmeBeiScopeVerstoss(t *testing.T) {
 	sarifPath := filepath.Join(runDir, review.RawDirName, "hardspots.sarif")
 	mustWriteFile(t, sarifPath, evidenceSARIF("hardspots",
 		evidenceResult("tech-veraltet", "installer/internal/review/run.go"),
-		evidenceResult("tech-kopplung", "docs/handbuch.md"),
+		evidenceResult("tech-kopplung", "docs/manual.md"),
 		evidenceResult("tech-kopplung", "k-playbook/reviews/review-tech.md"),
 	))
 
@@ -1273,7 +1273,7 @@ func TestReviewWriteAIEntryEvidenceTeilannahmeBeiScopeVerstoss(t *testing.T) {
 	if status.Jobs[0].Started != "2026-08-19T10:00:00Z" || status.Jobs[0].Finished != "2026-08-19T10:05:00Z" {
 		t.Fatalf("Job-Zeiten = %#v", status.Jobs[0])
 	}
-	if !strings.Contains(status.Reason, "2 Fund") || !strings.Contains(status.Reason, "docs/handbuch.md") {
+	if !strings.Contains(status.Reason, "2 Fund") || !strings.Contains(status.Reason, "docs/manual.md") {
 		t.Fatalf("reason = %q", status.Reason)
 	}
 
@@ -1281,7 +1281,7 @@ func TestReviewWriteAIEntryEvidenceTeilannahmeBeiScopeVerstoss(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SARIF lesen: %v", err)
 	}
-	if strings.Contains(string(raw), "docs/handbuch.md") || strings.Contains(string(raw), "k-playbook/reviews") {
+	if strings.Contains(string(raw), "docs/manual.md") || strings.Contains(string(raw), "k-playbook/reviews") {
 		t.Fatalf("SARIF wurde nicht bereinigt: %s", raw)
 	}
 	if !strings.Contains(string(raw), "installer/internal/review/run.go") {

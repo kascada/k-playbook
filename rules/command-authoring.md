@@ -202,7 +202,7 @@ verschwinden.
 
 ## Schreibweise
 
-Es gilt `docs/schreibweise.md`: Umlaute und ß in allem, was gelesen wird — Überschriften,
+Es gilt `docs/writing-style.md`: Umlaute und ß in allem, was gelesen wird — Überschriften,
 Fließtext, Nutzertexte, Kommentare. ASCII bleibt bei Datei- und Verzeichnisnamen,
 Command-Namen, Konfigurationsschlüsseln und den ALL-CAPS-Pfadnamen.
 

@@ -1,61 +1,46 @@
-# Reviews und Results
+# Reviews and Results
 
-Diese Seite beschreibt das Artefaktmodell: welche Dateien ein Review erzeugt, wo sie
-liegen und welchen Status sie tragen. Der Ablauf der Commands steht in
-[`code-review.md`](./code-review.md).
+This page describes the artifact model: which files a review creates, where they reside, and which status they carry. The command flow is described in [`code-review.md`](./code-review.md).
 
-## Grundmodell
+## Core Model
 
-k-playbook trennt drei Schritte:
+k-playbook separates three steps:
 
-1. **Review oder Audit ausführen** — `/k-review <name>` bewertet gezielt eine Familie,
-   `/k-audit` führt einen vollständigen Sweep aus.
-2. **Ergebnisse ablegen** — je Lauf beziehungsweise je Familie und Datum unter
-   `k-playbook-local/results/`.
-3. **Abarbeiten** — `/k-remediation` arbeitet die bewerteten Bündel aus genau einer
-   Ergebnisdatei ab.
+1. **Run a review or audit**: `/k-review <name>` assesses one family specifically; `/k-audit` performs a complete sweep.
+2. **Store results**: per run or per family and date under `k-playbook-local/results/`.
+3. **Work through them**: `/k-remediation` processes the assessed bundles from exactly one result file.
 
-Zusammengeführt wird an **einer** Stelle: im Audit-Lauf. Der Merge dedupliziert über
-Werkzeuge hinweg, schreibt die Deckung aus `known-decisions.md` mit, und die Triage
-vergibt Priorität und Kategorie. Einen nachgelagerten Schritt, der dasselbe eine Ebene
-höher noch einmal täte, gibt es nicht.
+Consolidation happens at **one** point: in the audit run. The merge deduplicates across tools, records coverage from `known-decisions.md`, and the triage assigns priority and category. No downstream step repeats the same work at a higher level.
 
-`/k-remediation` aggregiert deshalb nicht selbst und nimmt genau eine Ergebnisdatei. Es
-gruppiert die Findings darin vor der Umsetzung zu Bündeln — nach Risiko, Aufwand,
-Quick-Win-Potential und gemeinsamer Verifikation — und gleicht sie vor der Task-Erzeugung
-gegen bestehende Tasks ab.
+`/k-remediation` therefore does not aggregate on its own and accepts exactly one result file. Before implementation, it groups the findings in that file into bundles by risk, effort, quick-win potential, and shared verification, and compares them with existing tasks before creating tasks.
 
-## Verzeichnisse
+## Directories
 
-Rezepte und Ergebnisse sind strikt getrennt:
+Recipes and results are strictly separate:
 
 ```text
-k-playbook/reviews/                    mitgelieferte Rezepte
-k-playbook-local/reviews/              projekteigene Rezepte, Overlay
-k-playbook-local/known-decisions.md    bewusst getroffene Entscheidungen, von Hand gepflegt
-k-playbook-local/results/              alles, was Reviews erzeugen
+k-playbook/reviews/                    shipped recipes
+k-playbook-local/reviews/              project-owned recipes, overlay
+k-playbook-local/known-decisions.md    deliberately made decisions, maintained by hand
+k-playbook-local/results/              everything reviews create
 ```
 
-`reviews/` enthält ausschließlich `review-<name>.md`. Damit bleibt es ein reines
-Overlay-Verzeichnis, in dem jede Datei nach derselben Regel behandelt wird: gleicher
-Dateiname, lokale Datei gewinnt vollständig.
+`reviews/` contains only `review-<name>.md`. This keeps it a pure overlay directory, where every file follows the same rule: same filename, the local file completely wins.
 
-`known-decisions.md` steht bewusst eine Ebene höher, neben `rules/` und `guidelines/`:
-Sie wird von Hand gepflegt und von keinem Review erzeugt — sie ist Eingabe, keine
-Ausgabe. Alles Erzeugte liegt daneben:
+`known-decisions.md` deliberately sits one level higher, next to `rules/` and `guidelines/`: it is maintained by hand and created by no review, so it is input rather than output. Everything generated is next to it:
 
 ```text
 k-playbook-local/results/
-├── log.md                        wann welches Review lief
-├── YYYY-MM-DD/                   ein Audit-Lauf
-└── <familie>/YYYY-MM-DD/
+├── log.md                        when each review ran
+├── YYYY-MM-DD/                   an audit run
+└── <family>/YYYY-MM-DD/
     ├── review-input.json
     ├── review-triage.md
     ├── run-metadata.json
     └── raw/
 ```
 
-Beispiel:
+Example:
 
 ```text
 k-playbook-local/results/k-check/2026-07-24/
@@ -66,149 +51,99 @@ k-playbook-local/results/k-check/2026-07-24/
     └── k-check-baseline.txt
 ```
 
-`k-playbook-local/checks/` bleibt für ausführbare Checks reserviert. Ergebnisse gehören
-nie dorthin.
+`k-playbook-local/checks/` remains reserved for executable checks. Results never belong there.
 
-### `results/` wird nicht versioniert
+### `results/` Is Not Versioned
 
-Der **gesamte** Inhalt von `results/` gilt als lokal — nicht nur, was Scanner roh
-ausgeben. `raw/` und `entries/`, die erzeugten Dokumente `review-input.md`,
-`review-input.json`, `run.json` und `review-triage.md`, die Review-Dokumente je Familie,
-dazu `log.md` und, wo noch vorhanden, alte `summary-YYYY-MM-DD.md`.
+The **entire** contents of `results/` are local, not only raw scanner output: `raw/` and `entries/`, generated documents `review-input.md`, `review-input.json`, `run.json`, and `review-triage.md`, review documents per family, plus `log.md` and, where they still exist, old `summary-YYYY-MM-DD.md` files.
 
-Der Grund ist derselbe für alle: Ein Review ist aus dem Code wiederholbar. Sein Ergebnis
-ist ein Stand von einem Rechner zu einem Zeitpunkt, kein Projektwissen. Bei `log.md`
-kommt hinzu, dass es persönlich ist — wer wann auf seinem Rechner gescannt hat, geht das
-Projekt nichts an. Und die Rohausgaben eines Secret-Scanners enthalten gefundene Secrets
-im Klartext; die gehören unter keinen Umständen ins Repository.
+The reason is the same for all of them: a review is repeatable from the code. Its result is a state from one machine at one point in time, not project knowledge. `log.md` is also personal: when someone scanned on their machine is not the project's concern. And raw output from a secret scanner contains discovered secrets in clear text; it must never enter the repository.
 
-Was vom Ergebnis wirklich Projektwissen ist, wandert ohnehin heraus: in
-`k-playbook-local/known-decisions.md` — die genau deshalb eine Ebene höher liegt — und in
-die Tasks, die aus einer Remediation entstehen. Der Preis ist bewusst in Kauf genommen:
-AI-Bewertungen sind nicht mehr im Repository nachlesbar.
+Whatever result is genuinely project knowledge is moved out anyway: to `k-playbook-local/known-decisions.md`, which is precisely why it sits one level higher, and to tasks created by remediation. The cost is accepted deliberately: AI assessments can no longer be read in the repository.
 
-Weil der Zuschnitt damit homogen ist, reicht der übliche verwaltete Ignore-Inhalt (`*`,
-`!.gitignore`, `!README.md`) unverändert. `results/` ist deshalb das einzige Verzeichnis,
-das k-playbook bei der Installation schon privat anlegt; umschaltbar bleibt es wie
-`priv/` und `material/` über den Block **Lokale Einstellungen** der Oberfläche. Für
-Bestandsprojekte ändert sich nichts von selbst — die verwaltete `.gitignore` entsteht nur
-beim erstmaligen Anlegen des Verzeichnisses.
+Because this scope is homogeneous, the usual managed ignore content (`*`, `!.gitignore`, `!README.md`) remains sufficient. `results/` is therefore the only directory that k-playbook creates privately during setup; like `priv/` and `material/`, it remains switchable through the **Local settings** section of the interface. Nothing changes automatically for existing projects: the managed `.gitignore` is created only when the directory is first created.
 
-## Artefakte pro Familie
+## Artifacts Per Family
 
-Jede neue Report-/Scan-Familie erzeugt diese Dateien:
+Every new report/scan family creates these files:
 
-- `review-input.json` — der Belegvertrag. Sein Schema steht an genau einer Stelle:
-  `commands/_review-run/review-input-contract.md`. Dort ist auch beschrieben, welche
-  Felder nur der Merge füllt und was gilt, wenn sie fehlen.
-- `review-triage.md` — einheitliches Endartefakt mit Kopf, Bündel-Tabelle,
-  Bündel-Details, Nicht gebündelt und Deckung aus known-decisions.
-- `raw/` — auditierbare Originalausgaben, z. B. SARIF, JSON oder Tool-Logs.
-- `run-metadata.json` oder äquivalent — auditierbare Laufmetadaten.
+- `review-input.json`: the evidence contract. Its schema is specified in exactly one place: `commands/_review-run/review-input-contract.md`. That document also describes which fields only the merge fills and what applies when they are absent.
+- `review-triage.md`: a consistent final artifact with header, bundle table, bundle details, unbundled findings, and coverage from known decisions.
+- `raw/`: auditable original output, for example SARIF, JSON, or tool logs.
+- `run-metadata.json` or equivalent: auditable run metadata.
 
-Raw-Artefakte und Run-Metadaten sind auditierbar. Sie dürfen nach dem Schreiben nicht
-gekürzt, überschrieben oder inhaltlich korrigiert werden. Korrekturen erfolgen über
-neue Raw-Dateien plus aktualisierte Bewertung.
+Raw artifacts and run metadata are auditable. They must not be shortened, overwritten, or corrected in content after writing. Corrections are made through new raw files plus an updated assessment.
 
-`review-triage.md` ist kuratiert. Es darf nachvollziehbar aktualisiert werden, z. B. um
-einen Abschnitt `## Remediation-Status`, aber die ursprünglichen Raw-Belege bleiben
-unverändert. `assessment.md` und `findings.md` sind Legacy-Artefakte älterer
-Ergebnisfamilien und werden nur gelesen, wenn kein `review-triage.md` vorhanden ist.
+`review-triage.md` is curated. It may be updated traceably, for example with a `## Remediation status` section, but the original raw evidence remains unchanged. `assessment.md` and `findings.md` are legacy artifacts of older result families and are read only when no `review-triage.md` exists.
 
-Für Läufe im neuen Laufmodell (`k-playbook-local/results/YYYY-MM-DD/`) tritt ein zweites
-Artefaktpaar daneben: `review-input.json` und `review-input.md` aus `k-playbook merge`.
-Sie fassen `raw/` und `entries/` zusammen und dienen als Eingabe für die Bewertung durch
-den Assistenten. Details in
-[`review-runs.md`](./review-runs.md#zusammenfassen-mit-k-playbook-merge).
+For runs in the new run model (`k-playbook-local/results/YYYY-MM-DD/`), a second artifact pair is added: `review-input.json` and `review-input.md` from `k-playbook merge`. They consolidate `raw/` and `entries/` and serve as input for assessment by the assistant. Details are in [`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge).
 
-Das kuratierbare Endprodukt beider Bewertungswege ist `review-triage.md`: beim Audit
-direkt unter `k-playbook-local/results/YYYY-MM-DD/`, beim gezielten Report-Review unter
-`k-playbook-local/results/<familie>/YYYY-MM-DD/`. Nur der Scope unterscheidet sich.
-Aktive Audit-Katalog-Rezepte tragen je nach `audit.mode` unterschiedlich bei. Eine
-**Perspektive** (`mode: perspective`) schreibt zusätzlich je eine Perspektiven-Datei direkt
-im Laufordner, etwa `review-secret-scanning.md`; sie liest denselben Merge-Beleg, filtert
-über ihren gespeicherten `scope.tools` und dient `scan-triage` nur als Kontext. Eine
-**Evidence-Quelle** (`mode: evidence`) schreibt gar kein Markdown, sondern läuft vor dem
-Merge und legt `raw/<entry>.sarif` ab; ihre Funde stehen danach als Gruppen mit dem Präfix
-`ai-<entry>-` in `review-input.json` und gehen damit denselben Weg wie Scanner-Funde.
-`/k-remediation` arbeitet gegen `review-triage.md`;
-Legacy-`assessment.md`/`findings.md` bleiben nur Fallback für Family-Ordner ohne
-`review-triage.md`.
+The curated final product of both assessment paths is `review-triage.md`: directly under `k-playbook-local/results/YYYY-MM-DD/` for audits, and under `k-playbook-local/results/<family>/YYYY-MM-DD/` for targeted report reviews. Only the scope differs. Active audit catalog recipes contribute differently depending on `audit.mode`. A **perspective** (`mode: perspective`) additionally writes one perspective file directly into the run directory, for example `review-secret-scanning.md`; it reads the same merge evidence, filters through its stored `scope.tools`, and serves only as context for `scan-triage`. An **evidence source** (`mode: evidence`) writes no Markdown at all; it runs before the merge and stores `raw/<entry>.sarif`, whose findings subsequently appear as groups with the `ai-<entry>-` prefix in `review-input.json` and thus follow the same path as scanner findings. `/k-remediation` works against `review-triage.md`; legacy `assessment.md`/`findings.md` remain fallback only for family directories without `review-triage.md`.
 
-## Statusmodell
+## Status Model
 
-Statuswerte in Legacy-`findings.md`:
+Status values in legacy `findings.md`:
 
-| Status | Bedeutung | Remediation-Relevanz |
+| Status | Meaning | Relevant to remediation |
 |---|---|---|
-| `open` | neu oder noch nicht geprüft | ja |
-| `confirmed` | validierter echter Befund | ja |
-| `context-needed` | weitere Kontextprüfung nötig | ja |
-| `likely-false-positive` | plausibler Fehlalarm | nur nach expliziter Auswahl |
-| `accepted` | bewusste Entscheidung oder akzeptiertes Restrisiko | nein |
-| `fixed` | behoben und verifiziert | nein |
+| `open` | new or not yet checked | yes |
+| `confirmed` | validated real finding | yes |
+| `context-needed` | further context review required | yes |
+| `likely-false-positive` | plausible false positive | only after explicit selection |
+| `accepted` | deliberate decision or accepted residual risk | no |
+| `fixed` | fixed and verified | no |
 
-Finding-IDs müssen stabil bleiben. Einmal vergebene IDs dürfen bei Re-Runs,
-Statusänderungen oder Remediation nicht umbenannt werden.
+Finding IDs must remain stable. IDs assigned once must not be renamed during re-runs, status changes, or remediation.
 
-Bewusste projektweite Entscheidungen stehen in `k-playbook-local/known-decisions.md` und
-werden von `k-playbook merge` als Deckung an Findings und Gruppen geschrieben. Das Format,
-der Ort und die Ablaufregel stehen in
-[`review-runs.md`](./review-runs.md#wirkung-von-known-decisionsmd). Eine Decision ersetzt
-keinen Statuswert und filtert nichts aus den Rohdaten; sie macht nur sichtbar, dass ein
-Befund durch eine dokumentierte Entscheidung gedeckt ist.
+Deliberate project-wide decisions are recorded in `k-playbook-local/known-decisions.md` and written by `k-playbook merge` as coverage on findings and groups. The format, location, and flow rule are described in [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd). A decision neither replaces a status value nor filters anything from raw data; it only makes visible that a finding is covered by a documented decision.
 
-Schema für k-check:
+Schema for k-check:
 
 ```text
 kcheck-<area>-NNN
 ```
 
-Beispiele: `kcheck-logging-003`, `kcheck-secrets-001`, `kcheck-user-scope-014`.
+Examples: `kcheck-logging-003`, `kcheck-secrets-001`, `kcheck-user-scope-014`.
 
-Scanner-Familien dürfen die nativen Regel-Präfixe ihres Tools behalten, damit ein
-Finding zu seiner Rohmeldung zurückverfolgbar bleibt.
+Scanner families may retain their tool's native rule prefixes so a finding remains traceable to its raw report.
 
-## Scanner-Tools vs. k-check
+## Scanner Tools vs. k-check
 
-Security-Scanner wie `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft` und `grype`
-werden **nicht** als Checks unter `checks/*.sh` modelliert.
+Security scanners such as `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, and `grype` are **not** modeled as checks under `checks/*.sh`.
 
-Grund:
+Reason:
 
-- Sie erzeugen eigene strukturierte Rohdaten wie JSON, SARIF-ähnliche Reports oder SBOMs.
-- Non-zero Exit-Codes bedeuten oft fachliche Findings, nicht technische Fehler.
-- Ergebnisse müssen dedupliziert, priorisiert und bewertet werden.
-- Raw-Artefakte müssen dauerhaft unter `k-playbook-local/results/<familie>/YYYY-MM-DD/raw/` landen.
-- Remediation braucht stabile Finding-IDs, Statuswerte und Quellenbelege.
+- They create their own structured raw data such as JSON, SARIF-like reports, or SBOMs.
+- Non-zero exit codes often mean substantive findings, not technical errors.
+- Results must be deduplicated, prioritized, and assessed.
+- Raw artifacts must permanently reside under `k-playbook-local/results/<family>/YYYY-MM-DD/raw/`.
+- Remediation needs stable finding IDs, status values, and source evidence.
 
-Darum laufen diese Tools über Report-Mode-Reviews:
+These tools therefore run through report-mode reviews:
 
-| Tool | Review | Ergebnisfamilie |
+| Tool | Review | Result family |
 |---|---|---|
 | `gitleaks` | `/k-review secret-scanning` | `secret-scanning` |
 | `trufflehog` | `/k-review secret-scanning` | `secret-scanning` |
 | `pip-audit` | `/k-review dependency-cve` | `dependency-cve` |
-| `trivy` | `/k-review dependency-cve` und `/k-review iac-container` | `dependency-cve` / `iac-container` |
+| `trivy` | `/k-review dependency-cve` and `/k-review iac-container` | `dependency-cve` / `iac-container` |
 | `syft` | `/k-review iac-container` | `iac-container` |
-| `grype` | `/k-review dependency-cve` oder `/k-review iac-container` | `dependency-cve` / `iac-container` |
+| `grype` | `/k-review dependency-cve` or `/k-review iac-container` | `dependency-cve` / `iac-container` |
 | GitHub Dependabot Alerts | `/k-review dependabot-alerts` | `dependabot-alerts` |
 
-`checks/*.sh` bleibt für schnelle, generische k-check-Heuristiken und Preflight-artige
-Checks reserviert. Kleine Tool-Verfügbarkeitschecks dürfen dort liegen, aber nicht der
-eigentliche Scannerlauf mit dauerhafter Bewertung.
+`checks/*.sh` remains reserved for fast, generic k-check heuristics and preflight-like checks. Small tool-availability checks may reside there, but not the actual scanner run with persistent assessment.
 
-## Die Familien im Einzelnen
+## The Families in Detail
 
 ### k-check
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-k-check-security.md` |
+| Recipe | `k-playbook/reviews/review-k-check-security.md` |
 | Runner | `k-playbook/bin/k-check` |
-| Ergebnisse | `k-playbook-local/results/k-check/YYYY-MM-DD/` |
+| Results | `k-playbook-local/results/k-check/YYYY-MM-DD/` |
 
-Typischer auditierbarer Lauf:
+Typical auditable run:
 
 ```bash
 k-playbook/bin/k-check \
@@ -217,189 +152,140 @@ k-playbook/bin/k-check \
   --metadata-output k-playbook-local/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-`--output` erhält stdout/stderr und schreibt zusätzlich den vollständigen Raw-Stream.
-`--metadata-output` schreibt Kommando, Exit-Code, Zeitstempel, Roots, Modus,
-Check-Konfiguration und Version bzw. Git-Commit, soweit verfügbar.
+`--output` receives stdout/stderr and additionally writes the complete raw stream. `--metadata-output` writes the command, exit code, timestamp, roots, mode, check configuration, and version or Git commit where available.
 
-Vorhandene Ziel-Dateien werden nicht überschrieben. Für erneute Läufe am selben Tag
-eindeutige Namen verwenden, z. B. `k-check-baseline-e2e.txt` und `run-metadata-e2e.json`.
+Existing target files are not overwritten. Use unique names for repeat runs on the same day, for example `k-check-baseline-e2e.txt` and `run-metadata-e2e.json`.
 
-### Secret-Scanning
+### Secret Scanning
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-secret-scanning.md` |
-| Ergebnisse | `k-playbook-local/results/secret-scanning/YYYY-MM-DD/` |
-| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-secret-scanning.md` |
-| Audit-Scope | `gitleaks`, `trufflehog` |
+| Recipe | `k-playbook/reviews/review-secret-scanning.md` |
+| Results | `k-playbook-local/results/secret-scanning/YYYY-MM-DD/` |
+| Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-secret-scanning.md` |
+| Audit scope | `gitleaks`, `trufflehog` |
 
-Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json`,
-`raw/trufflehog.json`.
+Typical artifacts: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json`, `raw/trufflehog.json`.
 
-Die Tools kommen host-lokal aus
-`k-playbook/scripts/install-security-tools.sh`. Fehlende Tools werden nicht im Projekt
-installiert.
+The tools are provided locally on the host by `k-playbook/scripts/install-security-tools.sh`. Missing tools are not installed into the project.
 
-### Dependency-CVE
+### Dependency CVE
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-dependency-cve.md` |
-| Ergebnisse | `k-playbook-local/results/dependency-cve/YYYY-MM-DD/` |
-| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-dependency-cve.md` |
-| Audit-Scope | `pip-audit`, `trivy`, `grype`, `osv-scanner`, `govulncheck` |
+| Recipe | `k-playbook/reviews/review-dependency-cve.md` |
+| Results | `k-playbook-local/results/dependency-cve/YYYY-MM-DD/` |
+| Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-dependency-cve.md` |
+| Audit scope | `pip-audit`, `trivy`, `grype`, `osv-scanner`, `govulncheck` |
 
-Typische Artefakte: `review-input.json`, `review-triage.md`, `raw/pip-audit.json`,
-`raw/trivy-fs.json`, bei Bedarf `raw/grype.json`.
+Typical artifacts: `review-input.json`, `review-triage.md`, `raw/pip-audit.json`, `raw/trivy-fs.json`, and, where needed, `raw/grype.json`.
 
-Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
-`review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
+This recipe is active in the audit run model. It assesses the groups from `review-input.json` that carry at least one evidence item from an audit-scope tool.
 
 ### GitHub Dependabot Alerts
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-dependabot-alerts.md` |
-| Ergebnisse | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
-| Audit-Laufmodell | deaktiviert; Begründung und geprüfte Alternativen im Rezept |
+| Recipe | `k-playbook/reviews/review-dependabot-alerts.md` |
+| Results | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
+| Audit run model | disabled; rationale and examined alternatives are in the recipe |
 
-Typische Artefakte: `review-input.json`, `review-triage.md`,
-`raw/dependabot-alerts-open.jsonl` als auditierbarer Import,
-`raw/dependabot-alerts-summary.tsv` für schnelle Triage.
+Typical artifacts: `review-input.json`, `review-triage.md`, `raw/dependabot-alerts-open.jsonl` as an auditable import, and `raw/dependabot-alerts-summary.tsv` for rapid triage.
 
-Diese Familie nutzt GitHub als Quelle. Sie passt besonders, wenn ein Projekt lokale
-Dependency-Scanner nicht nutzt oder zuerst die in GitHub vorhandene Alert-Menge bewerten
-will. Absichtlich deaktivierte Dependabot-PRs, z. B. `open-pull-requests-limit: 0`, sind
-kein Finding.
+This family uses GitHub as its source. It is particularly suitable when a project does not use local dependency scanners or first wants to assess the alert set present in GitHub. Intentionally disabled Dependabot PRs, for example `open-pull-requests-limit: 0`, are not a finding.
 
 ### IaC/Container
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-iac-container.md` |
-| Ergebnisse | `k-playbook-local/results/iac-container/YYYY-MM-DD/` |
-| Audit-Perspektive | `k-playbook-local/results/YYYY-MM-DD/review-iac-container.md` |
-| Audit-Scope | `trivy`, `syft`, `grype` |
+| Recipe | `k-playbook/reviews/review-iac-container.md` |
+| Results | `k-playbook-local/results/iac-container/YYYY-MM-DD/` |
+| Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-iac-container.md` |
+| Audit scope | `trivy`, `syft`, `grype` |
 
-Typische Artefakte: `review-input.json`, `review-triage.md` für Container-, Image-, IaC- und
-Filesystem-Findings,
-`raw/trivy-*.json`, bei Bedarf `raw/syft-*.json` und `raw/grype-*.json`.
+Typical artifacts: `review-input.json`, `review-triage.md` for container, image, IaC, and filesystem findings, `raw/trivy-*.json`, and, where needed, `raw/syft-*.json` and `raw/grype-*.json`.
 
-Im Audit-Laufmodell ist dieses Rezept aktiv. Es bewertet die Gruppen aus
-`review-input.json`, die mindestens eine Evidence mit einem der Audit-Scope-Tools tragen.
+This recipe is active in the audit run model. It assesses the groups from `review-input.json` that carry at least one evidence item from an audit-scope tool.
 
-### Tech-Debt
+### Tech Debt
 
 | | |
 |---|---|
-| Rezept | `k-playbook/reviews/review-tech.md` |
-| Ergebnisse | `k-playbook-local/results/tech/YYYY-MM-DD/` |
-| Audit-Eintrag | Evidence-Quelle `tech`, SARIF unter `k-playbook-local/results/YYYY-MM-DD/raw/tech.sarif` |
+| Recipe | `k-playbook/reviews/review-tech.md` |
+| Results | `k-playbook-local/results/tech/YYYY-MM-DD/` |
+| Audit entry | Evidence source `tech`, SARIF under `k-playbook-local/results/YYYY-MM-DD/raw/tech.sarif` |
 
-Typische Artefakte im Report-Modus: `review-input.json` und `review-triage.md`. Dieses
-Rezept arbeitet in zwei Betriebsarten mit denselben Prüfkriterien; unterschiedlich ist
-allein die Ergebnisform. Siehe auch **Rezepte als Evidence-Quelle** weiter unten.
+Typical artifacts in report mode: `review-input.json` and `review-triage.md`. This recipe operates in two modes with the same review criteria; only the result form differs. See also **Recipes as evidence sources** below.
 
-### Rezepte als Evidence-Quelle
+### Recipes as Evidence Sources
 
-Zwei Katalog-Rezepte liefern im Lauf eigene Belege aus dem Code, statt vorhandene zu
-filtern. Sie laufen vor dem Merge, lesen ausschließlich in ihrem eingefrorenen
-`scope.paths` und schreiben SARIF nach `raw/<entry>.sarif`:
+Two catalog recipes provide their own evidence from code in a run rather than filtering existing evidence. They run before the merge, read only their frozen `scope.paths`, and write SARIF to `raw/<entry>.sarif`:
 
-| Rezept | Eintrag | Was es liest |
+| Recipe | Entry | What it reads |
 |---|---|---|
-| `review-tech.md` | `tech` | Quell- und Infrastrukturdateien; Tech-Debt-Kandidaten mit `tech-*`-Rule-IDs. |
-| `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python-Quellen; Stellen ohne rekonstruierbare Begründung, mit `hardspot-*`-Rule-IDs. |
+| `review-tech.md` | `tech` | Source and infrastructure files; tech-debt candidates with `tech-*` rule IDs. |
+| `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python sources; locations without reconstructable rationale, with `hardspot-*` rule IDs. |
 
-Beide bleiben daneben über `/k-review` auswählbar — `review-tech` im Report-Modus mit der
-Ergebnisfamilie `tech`, `review-python-comment-hardspots` interaktiv. Die Prüfkriterien
-sind in beiden Betriebsarten dieselben; unterschiedlich ist nur die Ergebnisform.
+Both remain selectable through `/k-review`: `review-tech` in report mode with the `tech` result family, and `review-python-comment-hardspots` interactively. The review criteria are the same in both modes; only the result form differs.
 
-### Family-only-Rezepte im Audit-Laufmodell
+### Family-Only Recipes in the Audit Run Model
 
-Einige Katalog-Rezepte bleiben über `/k-review` auswählbar, sind aber für `/k-audit`
-deaktiviert, bis ihre Eingaben als Evidence in `review-input.json` vorliegen oder ein
-separater Scope-Vertrag existiert:
+Some catalog recipes remain selectable through `/k-review` but are disabled for `/k-audit` until their inputs are available as evidence in `review-input.json` or a separate scope contract exists:
 
-| Rezept | Grund |
+| Recipe | Reason |
 |---|---|
-| `review-k-check-security.md` | `k-check`-Ergebnisse sind noch nicht als Evidence im Merge modelliert. |
-| `review-dependabot-alerts.md` | Der Input kommt extern über `gh api` und ist noch kein Tool-Eintrag im Lauf-Merge. |
+| `review-k-check-security.md` | `k-check` results are not yet modeled as evidence in the merge. |
+| `review-dependabot-alerts.md` | Input arrives externally through `gh api` and is not yet a tool entry in the run merge. |
 
-Beide Rezepte tragen die ausführliche Prüfung selbst — welcher Teil des Evidence-Vertrags
-sie hindert und was eine Umstellung bräuchte, steht in ihrem Abschnitt **Stellung im
-Audit-Laufmodell**. Für den Weg dieser beiden gilt bis dahin: Ihr `review-triage.md` geht
-direkt an `/k-remediation`, **ohne** familienübergreifende Zusammenführung und **ohne**
-Dedupe gegen andere Quellen. Dasselbe gilt für jeden eigenständigen `/k-review`-Lauf eines
-Familienrezepts: Der Family-Ordner liegt außerhalb jedes Laufordners und wird mit dem
-Audit-Lauf nicht verrechnet.
+Both recipes contain their detailed examination themselves: their **Position in the audit run model** section states which part of the evidence contract blocks them and what a conversion would require. Until then, their `review-triage.md` goes directly to `/k-remediation`, **without** consolidation across families and **without** deduplication against other sources. The same applies to every independent `/k-review` run of a family recipe: the family directory is outside every run directory and is not combined with the audit run.
 
-## Review-Log
+## Review Log
 
-`/k-review` pflegt das Log neben den Ergebnissen:
+`/k-review` maintains the log beside the results:
 
 ```text
 k-playbook-local/results/log.md
 ```
 
-Es enthält pro Familie den letzten Lauf, ab wann der nächste fällig ist, Modus und
-Fokus sowie eine Protokollzeile mit Scope, Output und Handoff.
+For each family, it contains the latest run, when the next is due, mode and focus, and a log line with scope, output, and handoff.
 
-Beispiel-Handoff:
+Example handoff:
 
 ```text
 /k-remediation k-playbook-local/results/k-check/2026-07-24/review-triage.md
 ```
 
-`k-playbook-local/known-decisions.md` hält daneben fest, was bewusst so entschieden wurde.
-Der Merge-Schritt liest diese eine Datei und schreibt ihre Wirkung sichtbar in
-`review-input.json` und `review-input.md`; die Bewertung übernimmt diese Information
-anschließend aus dem JSON.
+Alongside this, `k-playbook-local/known-decisions.md` records what was deliberately decided. The merge step reads this single file and writes its effect visibly into `review-input.json` and `review-input.md`; the assessment then takes this information solely from the JSON.
 
 ## Remediation
 
-`/k-remediation` versteht diese Eingaben:
+`/k-remediation` understands these inputs:
 
-- einen Audit-Lauf, `k-playbook-local/results/<datum>/review-triage.md` — der Hauptweg,
-- eine Familie, `k-playbook-local/results/<familie>/<datum>/review-triage.md`,
-- Legacy: eine vorhandene Summary, `k-playbook-local/results/summary-YYYY-MM-DD.md`,
-- Legacy: eine Familie mit `assessment.md` und `findings.md`, wenn dort kein
-  `review-triage.md` liegt.
+- an audit run, `k-playbook-local/results/<date>/review-triage.md`: the primary path,
+- a family, `k-playbook-local/results/<family>/<date>/review-triage.md`,
+- legacy: an existing summary, `k-playbook-local/results/summary-YYYY-MM-DD.md`,
+- legacy: a family with `assessment.md` and `findings.md` when no `review-triage.md` exists there.
 
-`review-triage.md` ist überall die primäre Arbeitsdatei. `raw/` und `run-metadata.*` sind
-read-only.
+`review-triage.md` is the primary working file everywhere. `raw/` and `run-metadata.*` are read-only.
 
-**Summaries werden nicht mehr erzeugt.** Mit dem nachgelagerten Priorisierungsschritt ist
-auch ihr Erzeuger entfallen; weder `/k-audit` noch `/k-review` schreiben sie. Was in einem bereits eingerichteten
-Projekt noch liegt, bleibt für `/k-remediation` lesbar — als Eingabe aus der Vergangenheit,
-nicht als Ausgabe eines Laufs.
+**Summaries are no longer created.** Their creator was removed with the downstream prioritization step; neither `/k-audit` nor `/k-review` writes them. Whatever remains in an already configured project stays readable for `/k-remediation`: input from the past, not output from a run.
 
-Vor der Task-Erzeugung gleicht `/k-remediation` jeden Befund gegen `tasks/` und
-`tasks/done/` ab. Ein bestehender Task deckt einen Befund ab, wenn **Quelle und
-Bündel-/Gruppen-ID** übereinstimmen — Titelähnlichkeit allein reicht nicht. Ein Treffer in
-`tasks/` verhindert den zweiten Task; ein Treffer in `tasks/done/` wird gemeldet, schließt
-den Befund aber nicht: dass er erneut im Ergebnis steht, heißt, dass er wieder da ist.
+Before creating tasks, `/k-remediation` compares every finding with `tasks/` and `tasks/done/`. An existing task covers a finding when **source and bundle/group ID** match; title similarity alone is not enough. A match in `tasks/` prevents a second task; a match in `tasks/done/` is reported but does not close the finding: its reappearance in the result means it has returned.
 
-Ein erzeugter Remediation-Task muss enthalten:
+A generated remediation task must contain:
 
-- die Quelle, `k-playbook-local/results/<familie>/<datum>/review-triage.md`,
-- die Bündel- oder Gruppen-IDs aus `review-triage.md`,
-- das Arbeitsregister `review-triage.md`,
-- die Raw-Quelle, falls vorhanden,
-- die ursprüngliche Ort-/Message-Angabe,
-- alle Findings, die zusammen gelöst werden sollen, wenn es einen gemeinsamen
-  Fix-/Verifikationspfad gibt,
-- den Remediation-Modus aus `K-PLAYBOOK.yaml`,
-- konkrete Verifikationsschritte.
+- the source, `k-playbook-local/results/<family>/<date>/review-triage.md`,
+- the bundle or group IDs from `review-triage.md`,
+- the `review-triage.md` working register,
+- the raw source, if present,
+- the original location/message information,
+- all findings to be resolved together when they share a fix/verification path,
+- the remediation mode from `K-PLAYBOOK.yaml`,
+- concrete verification steps.
 
-Der Result-Pfad in einem committeten Task ist dabei eine **Herkunftsangabe, keine
-auflösbare Referenz**: `results/` wird nicht versioniert, Tasks werden es. Wer den Task
-aus dem Repository liest, hat die Ergebnisdatei nicht — und selbst auf dem Rechner, der
-sie erzeugt hat, ist sie nach dem nächsten Lauf überschrieben. Deshalb bleibt die
-Inline-Evidence Pflicht: Gruppen-IDs, Ort und Message gehören in den Task selbst, nicht
-nur als Verweis.
+The result path in a committed task is a **provenance statement, not a resolvable reference**: `results/` is not versioned, but tasks are. Anyone reading the task from the repository does not have the result file, and even on the machine that created it, it is overwritten by the next run. Inline evidence therefore remains required: group IDs, location, and message belong in the task itself, not only in a reference.
 
-Projektweite Policy:
+Project-wide policy:
 
 ```yaml
 remediation:
@@ -412,31 +298,22 @@ remediation:
   direct_fixes: false
 ```
 
-Modi, vom striktesten zum offensten:
+Modes, from strictest to most open:
 
-- `task-branch-pr` — keine direkten Fixes. Jedes bestätigte Bündel wird eine Task mit
-  Branch- und PR-Hinweis; umgesetzt wird später über `/k-task-run`.
-- `task-first` — Tasks sind der Standard. Direkte Fixes nur nach ausdrücklicher Freigabe
-  für einzelne kleine Bündel. **Das ist der Default.**
-- `direct-allowed` — kleine, sichere Befunde dürfen nach Code-Sichtung sofort behoben
-  werden, wenn die Kategorien freigegeben sind.
+- `task-branch-pr`: no direct fixes. Every confirmed bundle becomes a task with a branch and PR note; implementation happens later through `/k-task-run`.
+- `task-first`: tasks are the default. Direct fixes only after explicit approval for individual small bundles. **This is the default.**
+- `direct-allowed`: small, safe findings may be fixed immediately after code inspection when the categories are approved.
 
-`pr_required` und `direct_fixes` werden aus `mode` abgeleitet und mitgeschrieben.
+`pr_required` and `direct_fixes` are derived from `mode` and recorded.
 
-## Security-Tools
+## Security Tools
 
-Projekt-venvs sind für Projekt-Abhängigkeiten normal. Der read-only Status darf ein
-aktives Projekt-venv messen und kennzeichnet diesen Messkontext. Tool-Installation und
-Docker-Fallbacks bleiben davon getrennt host-/user-lokal; vor Installation darf kein
-Projekt-venv aktiv sein. Python-CLI-Tools kommen empfohlen über `pipx` oder, mit `--method
-venv`, in dedizierte k-playbook-Tool-venvs.
+Project virtual environments are normal for project dependencies. Read-only status may measure an active project virtual environment and labels that measurement context. Tool installation and Docker fallbacks remain separate and local to the host/user; no project virtual environment may be active before installation. Python CLI tools are recommended through `pipx` or, with `--method venv`, in dedicated k-playbook tool virtual environments.
 
 ```bash
-k-playbook/scripts/install-security-tools.sh                    # Status
-k-playbook/scripts/install-security-tools.sh --install missing  # fragt vor der Installation
-k-playbook/scripts/install-security-tools.sh --install missing --method venv  # dedizierte Tool-venvs
+k-playbook/scripts/install-security-tools.sh                    # status
+k-playbook/scripts/install-security-tools.sh --install missing  # asks before installation
+k-playbook/scripts/install-security-tools.sh --install missing --method venv  # dedicated tool virtual environments
 ```
 
-Die Pflicht-Tools stehen kanonisch in
-[`../scripts/security-tools.tsv`](../scripts/security-tools.tsv). Skript, Oberfläche und
-Review-Rezepte lesen dieselbe Matrix.
+The required tools are canonically listed in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv). The script, interface, and review recipes read the same matrix.

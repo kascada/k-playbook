@@ -428,3 +428,77 @@ func TestBaseAptFehlschlagWirdNichtVerschluckt(t *testing.T) {
 		t.Errorf("Nach gescheitertem `apt-get update` folgte trotzdem ein `install`:\n%s", aufrufe)
 	}
 }
+
+// TestBaseHelpOhneMatrix stellt sicher, dass die Hilfe auch den Ausweg nennt,
+// wenn genau die Matrix fehlt, deren Override sie erklärt.
+func TestBaseHelpOhneMatrix(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "fehlt.tsv")
+	got := runScript(t, baseScript(t), []string{"K_BASE_TOOLS_MATRIX=" + missing}, "--help")
+	if got.code != 0 {
+		t.Fatalf("--help brach ohne Matrix ab:\n%s", got.all())
+	}
+	if !strings.Contains(got.stdout, "K_BASE_TOOLS_MATRIX") {
+		t.Errorf("--help nennt den Matrix-Override nicht:\n%s", got.stdout)
+	}
+}
+
+// TestBaseRelativesBinZiel wird aus einem fremden Arbeitsverzeichnis gestartet.
+// Der absolute Zielpfad muss den Guard treffen, ohne im Arbeitsstand zu schreiben.
+func TestBaseRelativesBinZielTrifftGuard(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("braucht root, um ein fremdes Elternverzeichnis für den Guard anzulegen")
+	}
+	base := t.TempDir()
+	foreign := filepath.Join(base, "fremd")
+	if err := os.Mkdir(foreign, 0o755); err != nil {
+		t.Fatalf("fremdes Verzeichnis anlegen: %v", err)
+	}
+	if err := os.Chown(foreign, 65534, 65534); err != nil {
+		t.Skipf("Eigentümer nicht setzbar: %v", err)
+	}
+	command := exec.Command("bash", baseScript(t), "--install", "--yes", "--bin-dir", "../fremd/bin")
+	command.Dir = filepath.Join(base, "unterordner")
+	if err := os.Mkdir(command.Dir, 0o755); err != nil {
+		t.Fatalf("Arbeitsverzeichnis anlegen: %v", err)
+	}
+	command.Env = []string{
+		"K_BASE_TOOLS_MATRIX=" + writeMatrix(t, githubEntryMatrix),
+		"PATH=" + minimalPath(t, false),
+		"HOME=" + t.TempDir(),
+	}
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "gehört nicht dem ausführenden Benutzer") {
+		t.Fatalf("relatives fremdes Ziel wurde nicht vom Guard abgewiesen:\n%s", output)
+	}
+	if _, err := os.Stat(filepath.Join(command.Dir, "relbin")); !os.IsNotExist(err) {
+		t.Errorf("es wurde unter dem Arbeitsverzeichnis geschrieben: %v", err)
+	}
+}
+
+// TestReleaseInstallUmgehtPathSchatten stellt den Bootstrap namens install vor
+// coreutils in PATH. Der Release-Weg muss dennoch das echte install aufrufen.
+func TestReleaseInstallUmgehtPathSchatten(t *testing.T) {
+	binDir := t.TempDir()
+	shadowDir := t.TempDir()
+	shadow := filepath.Join(shadowDir, "install")
+	if err := os.WriteFile(shadow, []byte("#!/bin/sh\nexit 99\n"), 0o755); err != nil {
+		t.Fatalf("Schatten-install anlegen: %v", err)
+	}
+
+	common := filepath.Join(repoRoot(t), "scripts", "lib", "install-common.sh")
+	program := `die() { exit 1; }
+log() { :; }
+run_or_print() { "$@"; }
+DRY_RUN=0
+source "$1"
+latest_asset() { printf 'v1\nhttps://example.invalid/tool\ntool'; }
+download_file() { printf '#!/bin/sh\nexit 0\n' > "$2"; }
+install_release_binary tool tool example/tool '^tool$' "$2"`
+	got := runBashWithEnv(t, program, []string{"PATH=" + shadowDir + ":" + os.Getenv("PATH")}, common, binDir)
+	if got.code != 0 {
+		t.Fatalf("Release-Installation wurde durch PATH-Schatten gekapert:\n%s", got.all())
+	}
+	if _, err := os.Stat(filepath.Join(binDir, "tool")); err != nil {
+		t.Fatalf("Binary wurde nicht installiert: %v", err)
+	}
+}

@@ -19,6 +19,7 @@ import (
 func runGUI() error {
 	cleanUpLegacy()
 	cleanUpFormerHostInstall()
+	cleanUpLegacyWrapper()
 	protectProjectInstallation()
 	repairMCPRegistration()
 	repairRootInstructions()
@@ -53,6 +54,27 @@ func cleanUpFormerHostInstall() {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: alte Host-Installation nicht vollständig entfernt: %v\n", err)
+	}
+}
+
+// cleanUpLegacyWrapper entfernt die Wrapper-Datei des abgelösten Modells aus
+// der Installation. Das Quell-Repo kennt sie nicht mehr, und .gitignore deckt
+// sie nicht ab — sie bleibt sonst als zusätzliche Datei im Clone liegen.
+//
+// Ein Fehler hält den Start nicht auf: er wird sichtbar gemeldet, und der
+// nächste Start versucht es erneut.
+func cleanUpLegacyWrapper() {
+	environment := project.Detect()
+	if !environment.Installed || !environment.PlaybookPresent {
+		return
+	}
+
+	removed, err := project.RemoveLegacyWrapper(environment.ProjectDir)
+	if removed != "" {
+		fmt.Printf("Wrapper des abgelösten Modells entfernt: %s\n", removed)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: Wrapper des abgelösten Modells nicht entfernt: %v\n", err)
 	}
 }
 

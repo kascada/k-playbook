@@ -84,6 +84,10 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
   überführt Befunde in Tasks oder Fixes.
 - **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-task-run`; `/k-todo` pflegt
   `k-playbook-local/TODO.md`.
+- **Sitzung** — `/k-danke` schließt eine Arbeitssitzung ab: er legt die Befunde vor, die
+  während der Arbeit nach `k-playbook-local/material/befunde/` geschrieben wurden,
+  befördert Bestätigtes über `/k-docs-extract` in die Doku und prüft den Docs-Nachzug.
+  Was währenddessen festzuhalten ist, regelt `k-playbook/rules/befunde.md`.
 - **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`
   führt Tests aus und diagnostiziert Fehler, `/k-verlauf` durchsucht alte AI-Verläufe,
   `/k-vscode-project-color` setzt Fensterfarbe und Titel.

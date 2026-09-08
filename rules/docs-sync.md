@@ -53,7 +53,7 @@ Zwei Fälle, die auseinanderzuhalten sind:
 - **Die Änderung stammt aus dem laufenden Arbeitsgang.** Dann wird das Inventar im selben Arbeitsgang aktualisiert, und der Abschluss nennt das Ergebnis: geschrieben mit Erhebungszeitpunkt, oder unverändert, weil die Erhebung inhaltlich dieselbe ist.
 - **Nur eine fremde, bereits vorhandene Abweichung wird entdeckt** — das Inventar ist älter als ein Manifest, das jemand anders geändert hat, oder es weist eine Abweichung der Art `widersprüchlich` aus. Dann ist das ein sichtbarer Hinweis an den Nutzer, keine stille Aktualisierung nebenbei: der Nachzug ist eine eigene, benannte Handlung, die er auslöst oder ablehnt.
 
-Die Quellenkonfiguration `k-playbook-local/version-sources.yaml` folgt dabei der Schreibregel des Vertrags („Quellenkonfiguration" in `k-playbook/docs/versionsinventar.md`): nur nach ausdrücklicher Bestätigung, nur ergänzend, bestehende Einträge, Kommentare und Reihenfolge bleiben erhalten. Sie wird hier nicht neu und nicht strenger formuliert.
+Die Quellenkonfiguration `k-playbook-local/version-sources.yaml` folgt dabei der Schreibregel des Vertrags („Source Configuration" in `k-playbook/docs/version-inventory.md`): nur nach ausdrücklicher Bestätigung, nur ergänzend, bestehende Einträge, Kommentare und Reihenfolge bleiben erhalten. Sie wird hier nicht neu und nicht strenger formuliert.
 
 `docs/libs/` bleibt davon getrennt. Ein Versionssprung veraltet auch die Steckbriefe dort, nachgezogen werden sie aber über `/k-docs-tools`, nicht durch Umschreiben aus dem Inventar. Weichen beide voneinander ab, gibt das Inventar die Auskunft, und `/k-docs` meldet den Unterschied als Hinweis; die Abgrenzung steht in `commands/_docs/tools.md` und `commands/k-docs.md`.
 

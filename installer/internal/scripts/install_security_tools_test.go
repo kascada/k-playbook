@@ -14,6 +14,12 @@ import (
 const securityMatrix = "name\tlanguages\trequired\tinstallable\tinstall_method\tinstall_ref\tasset_pattern\trole\tdocker_image\tversion_args\n" +
 	"bash\t*\ttrue\ttrue\tgithub\tbeispiel/bash\t^{tool}$\tInterpreter\t-\t--version\n"
 
+const pipSecurityMatrix = "name\tlanguages\trequired\tinstallable\tinstall_method\tinstall_ref\tasset_pattern\trole\tdocker_image\tversion_args\n" +
+	"k-fehlt\t*\ttrue\ttrue\tpipx\tk-fehlt\t-\tTestwerkzeug\texample/k-fehlt:latest\t--version\n"
+
+const githubSecurityMatrix = "name\tlanguages\trequired\tinstallable\tinstall_method\tinstall_ref\tasset_pattern\trole\tdocker_image\tversion_args\n" +
+	"k-fehlt\t*\ttrue\ttrue\tgithub\tbeispiel/k-fehlt\t^{tool}$\tTestwerkzeug\t-\t--version\n"
+
 func securityScript(t *testing.T) string {
 	t.Helper()
 	return scriptPath(t, "install-security-tools.sh")
@@ -26,6 +32,14 @@ func runSecurityInstall(t *testing.T, binDir string, extra ...string) result {
 	args := append([]string{"--install", "missing", "--bin-dir", binDir}, extra...)
 	return runScript(t, securityScript(t), []string{
 		"K_SECURITY_TOOLS_MATRIX=" + matrix,
+	}, args...)
+}
+
+func runMissingSecurityInstall(t *testing.T, binDir string, extra ...string) result {
+	t.Helper()
+	args := append([]string{"--install", "missing", "--bin-dir", binDir, "--yes"}, extra...)
+	return runScript(t, securityScript(t), []string{
+		"K_SECURITY_TOOLS_MATRIX=" + writeMatrix(t, githubSecurityMatrix),
 	}, args...)
 }
 
@@ -44,7 +58,7 @@ func TestSecurityGuardWeistFremdesZielAb(t *testing.T) {
 		t.Skip("/usr/local/bin gibt es auf diesem Host nicht")
 	}
 
-	got := runSecurityInstall(t, "/usr/local/bin")
+	got := runMissingSecurityInstall(t, "/usr/local/bin")
 	if got.code == 0 {
 		t.Fatalf("Aufruf lief durch, erwartet war ein Abbruch. Ausgabe:\n%s", got.all())
 	}
@@ -112,7 +126,7 @@ func TestSecurityGuardLaesstLesendeLaeufeDurch(t *testing.T) {
 	}
 
 	// Erst der Beleg, dass genau diese Konstellation schreibend abbräche.
-	writing := runSecurityInstall(t, "/usr/local/bin")
+	writing := runMissingSecurityInstall(t, "/usr/local/bin")
 	if writing.code == 0 {
 		t.Fatalf("Vorbedingung verfehlt: der schreibende Lauf bricht nicht ab:\n%s", writing.all())
 	}
@@ -178,9 +192,44 @@ func TestSecurityGuardRootFaelle(t *testing.T) {
 		if err := os.Chown(foreign, 65534, 65534); err != nil {
 			t.Skipf("Eigentümer nicht setzbar: %v", err)
 		}
-		got := runSecurityInstall(t, foreign)
+		got := runMissingSecurityInstall(t, foreign)
 		if got.code == 0 {
 			t.Fatalf("fremdes Ziel lief durch, erwartet war ein Abbruch:\n%s", got.all())
+		}
+	})
+}
+
+// TestSecurityGuardNachMethode prüft beide Richtungen des Guards: Docker
+// schreibt kein lokales Ziel, venv dagegen schreibt unter VENV_ROOT.
+func TestSecurityGuardNachMethode(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("läuft als root; ein fremdes Ziel ist hier nicht ohne Eigentümerwechsel herstellbar")
+	}
+	if _, err := os.Stat("/usr/local/bin"); err != nil {
+		t.Skip("/usr/local/bin gibt es auf diesem Host nicht")
+	}
+
+	matrix := writeMatrix(t, pipSecurityMatrix)
+	t.Run("docker ignoriert fremdes Bin-Ziel", func(t *testing.T) {
+		path := t.TempDir()
+		if err := os.WriteFile(filepath.Join(path, "docker"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatalf("Docker-Stub anlegen: %v", err)
+		}
+		got := runScript(t, securityScript(t), []string{
+			"K_SECURITY_TOOLS_MATRIX=" + matrix,
+			"PATH=" + path + ":" + os.Getenv("PATH"),
+		},
+			"--install", "missing", "--method", "docker", "--bin-dir", "/usr/local/bin", "--yes")
+		if got.code != 0 || strings.Contains(got.stderr, "gehört nicht dem ausführenden Benutzer") {
+			t.Errorf("Docker wurde am unbenutzten Bin-Ziel abgewiesen:\n%s", got.all())
+		}
+	})
+
+	t.Run("venv weist fremde Wurzel ab", func(t *testing.T) {
+		got := runScript(t, securityScript(t), []string{"K_SECURITY_TOOLS_MATRIX=" + matrix},
+			"--install", "missing", "--method", "venv", "--venv-root", "/usr/local/bin", "--yes")
+		if got.code == 0 || !strings.Contains(got.stderr, "gehört nicht dem ausführenden Benutzer") {
+			t.Fatalf("fremde venv-Wurzel wurde nicht abgewiesen:\n%s", got.all())
 		}
 	})
 }

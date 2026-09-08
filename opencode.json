@@ -16,8 +16,8 @@
   },
   "references": {
     "docs": {
-      "description": "Autoritative k-playbook-Dokumentation. Zuerst docs/README.md lesen. Hinweis: Dieses Repo ist die k-playbook-Basisinstallation, kein normales Zielprojekt; k-playbook-Enforcement-Regeln gelten hier nicht automatisch direkt als projektlokale Regeln.",
-      "path": "./docs"
+      "description": "Autoritative Projektdokumentation für k-playbook: Entwicklungsinstallation, Assistenten-Verlinkung, Release-Ablauf und Versionsinventar. Zuerst k-playbook-local/docs/README.md lesen. Dieses Repo ist das k-playbook-Entwicklungsrepo; Enforcement-Regeln gelten hier nicht automatisch als projektlokale Regeln.",
+      "path": "./k-playbook-local/docs"
     }
   }
 }

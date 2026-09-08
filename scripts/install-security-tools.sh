@@ -131,7 +131,7 @@ load_tool_matrix() {
 
   # Die Leseliste muss alle Spalten nennen: read schiebt sonst jede weitere Spalte
   # stillschweigend in die letzte Variable.
-  while IFS=$'\t' read -r name languages required installable install_method install_ref asset_pattern role docker_image version_args; do
+  while IFS=$'\t' read -r name languages required installable install_method install_ref asset_pattern role docker_image version_args || [[ -n "${name:-}" ]]; do
     [[ -z "${name:-}" ]] && continue
     [[ "$name" == \#* ]] && continue
     [[ "$name" == "name" ]] && continue
@@ -648,12 +648,7 @@ install_tool() {
     pipx)
       case "$method" in
         auto|native|pipx|venv) install_pipx_tool "$tool" "$method" ;;
-        docker)
-          if ! install_docker_image "$tool"; then
-            log "Installiere $tool stattdessen in einem dedizierten Tool-venv."
-            install_pipx_tool "$tool" venv
-          fi
-          ;;
+        docker) install_docker_image "$tool" ;;
         *) die "Unknown install method for $tool: $method" ;;
       esac
       ;;
@@ -688,6 +683,40 @@ install_tool() {
       die "Unknown tool: $tool"
       ;;
   esac
+}
+
+# ensure_install_target_owners prüft nur Ziele, die der gewählte Weg tatsächlich
+# beschreibt. Der Docker-Weg schreibt kein lokales Ziel; venv kann zusätzlich
+# native Tools aus derselben Auswahl nach BIN_DIR installieren.
+ensure_install_target_owners() {
+  local tool needs_bin_dir needs_venv_root
+  [[ "$DRY_RUN" -eq 1 || "$METHOD" == "docker" ]] && return
+
+  needs_bin_dir=0
+  needs_venv_root=0
+  for tool in "$@"; do
+    case "$(install_method "$tool")" in
+      pipx)
+        if [[ "$METHOD" == "venv" ]]; then
+          needs_venv_root=1
+        else
+          needs_bin_dir=1
+        fi
+        ;;
+      go|github) needs_bin_dir=1 ;;
+    esac
+  done
+
+  if [[ "$needs_bin_dir" -eq 1 ]]; then
+    ensure_target_owner "$BIN_DIR" \
+      "bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing}" \
+      "sudo bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing} --bin-dir /usr/local/bin"
+  fi
+  if [[ "$needs_venv_root" -eq 1 ]]; then
+    ensure_target_owner "$VENV_ROOT" \
+      "bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing} --method venv" \
+      "sudo bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing} --method venv --venv-root /usr/local/share/k-playbook/security-tools"
+  fi
 }
 
 selected_tools() {
@@ -832,8 +861,11 @@ parse_args() {
 
 main() {
   local tools tool count answer
-  load_tool_matrix
   parse_args "$@"
+  PREFIX="$(absolute_path "$PREFIX")"
+  BIN_DIR="$(absolute_path "$BIN_DIR")"
+  VENV_ROOT="$(absolute_path "$VENV_ROOT")"
+  load_tool_matrix
 
   # --json ist rein lesend: es beschreibt den Zustand und installiert nichts.
   if [[ "$JSON_OUTPUT" -eq 1 ]]; then
@@ -848,14 +880,6 @@ main() {
   fi
 
   ensure_host_tool_scope
-  # Ein Lauf, der nichts schreibt, wird nicht abgewiesen: --dry-run soll gerade
-  # in der Konstellation laufen, die schreibend abbräche.
-  if [[ "$DRY_RUN" -ne 1 ]]; then
-    ensure_target_owner "$BIN_DIR" \
-      "bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing}" \
-      "sudo bash \"$(script_path)\" --install ${INSTALL_SPEC:-missing} --bin-dir /usr/local/bin"
-  fi
-
   validate_install_spec
 
   mapfile -t tools < <(selected_tools)
@@ -865,6 +889,8 @@ main() {
     printf '\nNichts zu installieren für Auswahl: %s\n' "$INSTALL_SPEC"
     exit 0
   fi
+
+  ensure_install_target_owners "${tools[@]}"
 
   printf '\nInstallationsplan\n'
   printf '%s\n' '-----------------'

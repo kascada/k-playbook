@@ -6,6 +6,8 @@ Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zi
 
 ## Dateien
 
+- `befunde.md` - Regel: Erkenntnisse aus Analyse und Fehlersuche festhalten.
+- `command-authoring.md` - Regeln für neue oder geänderte Command-Dateien.
 - `review-authoring.md` - Regeln für neue oder geänderte Review-Rezepte.
 - `docs-sync.md` - Regel: Code- und Doku-Änderungen synchron halten.
 - `tool-install-scope.md` - Regel: `/k-install*`, host-lokale Tools und Projekt-venvs trennen.

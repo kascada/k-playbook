@@ -1,6 +1,9 @@
 package yamllite
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseLiestAbbildungenListenUndZeilen(t *testing.T) {
 	document := []byte(`# Kommentar
@@ -98,5 +101,48 @@ func TestGetIstNilFest(t *testing.T) {
 	}
 	if value, ok := root.Get("a").Int(); !ok || value != 1 {
 		t.Errorf("Int() = %d, %v", value, ok)
+	}
+}
+
+// Ein einzelner Ursachenfehler darf den Fehlertext nicht fluten: gleichlautende
+// Hinweise fallen zusammen, mehr als maxReportedProblems verschiedene werden
+// gezählt statt aufgezählt. Die Wirkung bleibt: Parse liefert nil.
+func TestFehlertextIstBegrenzt(t *testing.T) {
+	var document strings.Builder
+	document.WriteString("a: 1\n")
+	for line := 0; line < 40; line++ {
+		document.WriteString("    verwaist: x\n")
+	}
+	root, err := Parse([]byte(document.String()))
+	if err == nil {
+		t.Fatal("erwartet wurde ein Fehler, keiner kam")
+	}
+	if root != nil {
+		t.Errorf("bei einem strukturellen Problem darf es keinen Teilbaum geben: %+v", root)
+	}
+	text := err.Error()
+	if got := strings.Count(text, "Zeile "); got != maxReportedProblems {
+		t.Errorf("%d Hinweise im Text, erwartet %d: %s", got, maxReportedProblems, text)
+	}
+	if !strings.Contains(text, "… und 30 weitere Hinweise") {
+		t.Errorf("das Abschneiden muss sichtbar sein: %s", text)
+	}
+	if len(text) > 600 {
+		t.Errorf("Fehlertext ist %d Zeichen lang", len(text))
+	}
+}
+
+func TestGleicheHinweiseFallenZusammen(t *testing.T) {
+	_, err := Parse([]byte("a: [x\n"))
+	if err == nil {
+		t.Fatal("erwartet wurde ein Fehler, keiner kam")
+	}
+	if got := strings.Count(err.Error(), "Zeile 1:"); got != 1 {
+		t.Errorf("Hinweis zu Zeile 1 kommt %d-mal vor: %s", got, err)
+	}
+	// Wenige Hinweise bleiben vollständig, ohne Zählhinweis.
+	_, err = Parse([]byte("a: 1\n  b: 2\n  c: 3\n"))
+	if err == nil || strings.Contains(err.Error(), "weitere") || strings.Count(err.Error(), "Zeile ") != 2 {
+		t.Errorf("zwei Hinweise müssen vollständig erscheinen: %v", err)
 	}
 }

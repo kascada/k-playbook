@@ -8,7 +8,18 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 )
+
+// untrackedScanTimeout begrenzt den rein lokalen `git status`-Aufruf, mit dem
+// zusätzliche Dateien in der Installation gesucht werden. Hängen kann er nur
+// bei einem blockierten Index.
+const untrackedScanTimeout = 10 * time.Second
+
+// maxReportedPaths begrenzt die gemeldete Dateiliste. Wer dort umfangreich
+// gearbeitet hat, braucht keine vollständige Aufzählung, sondern die
+// Erkenntnis, dass er es getan hat.
+const maxReportedPaths = 20
 
 // ResetConfig sichert eine Konfiguration aus einem abgelösten Modell weg und
 // legt eine frische an.
@@ -240,7 +251,7 @@ func legacyPathsFromDir(dir string) []string {
 }
 
 func untrackedInPlaybookDir(dir string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), cleanlinessTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), untrackedScanTimeout)
 	defer cancel()
 
 	output, err := GitOutput(ctx, dir, "status", "--porcelain")

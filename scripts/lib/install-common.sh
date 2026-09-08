@@ -26,6 +26,16 @@ has_cmd() {
 # Guard auf das Installationsziel
 # ---------------------------------------------------------------------------
 
+# absolute_path macht ein vom Aufrufer angegebenes Ziel vor jedem schreibenden
+# Guard eindeutig. Nicht vorhandene Teile bleiben dabei erhalten; der Guard
+# läuft anschließend bis zum nächsten vorhandenen Elternverzeichnis hoch.
+absolute_path() {
+  case "$1" in
+    /*) printf '%s' "$1" ;;
+    *) printf '%s/%s' "$(pwd -P)" "$1" ;;
+  esac
+}
+
 # nearest_existing_dir liefert das nächste vorhandene Verzeichnis oberhalb eines
 # Pfads — den Pfad selbst, wenn es ihn schon gibt.
 #
@@ -295,7 +305,7 @@ install_release_binary() {
       tar -xzf "$archive" -C "$extract_dir" || { rm -rf "$tmp_dir"; return 1; }
       ;;
     *)
-      install -m 0755 "$archive" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
+      command -p install -m 0755 "$archive" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
       rm -rf "$tmp_dir"
       return 0
       ;;
@@ -305,7 +315,7 @@ install_release_binary() {
   shopt -s globstar nullglob
   for candidate in "$extract_dir"/**/"$program"; do
     if [[ -f "$candidate" ]]; then
-      install -m 0755 "$candidate" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
+      command -p install -m 0755 "$candidate" "$bin_dir/$program" || { rm -rf "$tmp_dir"; return 1; }
       installed=1
       break
     fi

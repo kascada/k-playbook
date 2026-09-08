@@ -52,6 +52,9 @@ func TestApplyRootInstructionsLegtDateiAn(t *testing.T) {
 	if !strings.Contains(string(content), "k-playbook-local/docs/README.md") {
 		t.Errorf("Session-Memory-Verweis fehlt:\n%s", content)
 	}
+	if !strings.Contains(string(content), "k-playbook-local/material/befunde/") {
+		t.Errorf("Befunde-Verweis fehlt:\n%s", content)
+	}
 
 }
 
@@ -79,6 +82,9 @@ func TestApplyRootInstructionsErgaenztVorhandene(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "k-playbook-local/docs/README.md") {
 		t.Errorf("Session-Memory-Verweis fehlt:\n%s", content)
+	}
+	if !strings.Contains(string(content), "k-playbook-local/material/befunde/") {
+		t.Errorf("Befunde-Verweis fehlt:\n%s", content)
 	}
 }
 
@@ -108,6 +114,12 @@ func TestApplyRootInstructionsIstIdempotent(t *testing.T) {
 	if strings.Count(string(second), instructionsMarker) != 1 {
 		t.Errorf("Anstoß steht mehrfach:\n%s", second)
 	}
+	if strings.Count(string(second), sessionMemoryMarker) != 1 {
+		t.Errorf("der Session-Memory-Block steht mehrfach:\n%s", second)
+	}
+	if strings.Count(string(second), findingsMarker) != 1 {
+		t.Errorf("der Befunde-Block steht mehrfach:\n%s", second)
+	}
 }
 
 // Der Anstoß eines Bestandsprojekts nennt noch den abgelösten Wrapper. Weil der
@@ -136,6 +148,9 @@ func TestApplyRootInstructionsErsetztVeraltetenBlock(t *testing.T) {
 	}
 	if !strings.Contains(content, sessionMemoryMarker) {
 		t.Errorf("der Session-Memory-Block fehlt:\n%s", content)
+	}
+	if !strings.Contains(content, findingsMarker) {
+		t.Errorf("der Befunde-Block fehlt:\n%s", content)
 	}
 }
 
@@ -177,6 +192,9 @@ Die hier gehören uns.
 	}
 	if strings.Count(content, sessionMemoryMarker) != 1 {
 		t.Errorf("der Session-Memory-Block steht mehrfach:\n%s", content)
+	}
+	if strings.Count(content, findingsMarker) != 1 {
+		t.Errorf("der Befunde-Block steht mehrfach:\n%s", content)
 	}
 }
 
@@ -276,6 +294,9 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if strings.Contains(content, sessionMemoryMarker) {
 			t.Errorf("der Auffangweg hat etwas ergänzt:\n%s", content)
 		}
+		if strings.Contains(content, findingsMarker) {
+			t.Errorf("der Auffangweg hat den Befunde-Block ergänzt:\n%s", content)
+		}
 
 		vorher := content
 		repaired, err = RepairRootInstructions(root)
@@ -352,4 +373,48 @@ func readInstructions(t *testing.T, root string) string {
 		t.Fatalf("AGENTS.md lesen: %v", err)
 	}
 	return string(content)
+}
+
+// Der wichtigste Fall in der Praxis: ein Bestandsprojekt trägt den aktuellen
+// Anstoß und den Session-Memory-Block, aber noch keinen Befunde-Block. Genau so
+// sah jede eingerichtete AGENTS.md aus, bevor es diesen Block gab.
+//
+// Erwartet wird das Engstmögliche: der fehlende Block wird angehängt, die
+// beiden vorhandenen bleiben unangetastet, und der Text, den das Projekt selbst
+// geschrieben hat, steht danach unverändert da.
+func TestBefundeBlockWirdBestandsprojektNachgereicht(t *testing.T) {
+	root := t.TempDir()
+	bestand := "# AGENTS.md\n\n" + instructionsBlock() + "\n" + sessionMemoryBlock() +
+		"\n## Unsere eigenen Regeln\n\nDie hier gehören uns.\n"
+	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(bestand), 0o644); err != nil {
+		t.Fatalf("AGENTS.md anlegen: %v", err)
+	}
+
+	if _, err := ApplyRootInstructions(root); err != nil {
+		t.Fatalf("ApplyRootInstructions: %v", err)
+	}
+
+	content := readInstructions(t, root)
+	if !strings.Contains(content, findingsMarker) {
+		t.Errorf("der Befunde-Block wurde nicht nachgereicht:\n%s", content)
+	}
+	for _, marker := range []string{instructionsMarker, sessionMemoryMarker, findingsMarker} {
+		if strings.Count(content, marker) != 1 {
+			t.Errorf("%q steht nicht genau einmal:\n%s", marker, content)
+		}
+	}
+	for _, erwartet := range []string{"## Unsere eigenen Regeln", "Die hier gehören uns."} {
+		if !strings.Contains(content, erwartet) {
+			t.Errorf("Projektinhalt verloren, %q fehlt:\n%s", erwartet, content)
+		}
+	}
+
+	// Der zweite Lauf hat nichts mehr zu tun.
+	vorher := content
+	if _, err := ApplyRootInstructions(root); err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+	if readInstructions(t, root) != vorher {
+		t.Error("der zweite Lauf hat die Datei verändert")
+	}
 }

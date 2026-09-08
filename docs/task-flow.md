@@ -1,8 +1,8 @@
-# Task-Flow
+# Task flow
 
-Der Task-Flow ist der Standardweg für geplante Arbeit, die nicht direkt in einem kurzen Chat-Schritt erledigt werden soll.
+The task flow is the standard path for planned work that should not be completed directly in a short chat step.
 
-## Standardablauf
+## Standard flow
 
 ```text
 /k-task-create
@@ -10,66 +10,66 @@ Der Task-Flow ist der Standardweg für geplante Arbeit, die nicht direkt in eine
 /k-task-run
 ```
 
-Tasks können direkt aus dem Gespräch entstehen oder von `/k-remediation` erzeugt werden. In beiden Fällen gilt: erst Task-Dateien prüfen, dann ausführen.
+Tasks can arise directly from the conversation or be created by `/k-remediation`. In both cases: review task files first, then execute them.
 
-Nachlesen lassen sich die Tasks auch in der Oberfläche: der Bereich **Workflows** listet die offenen Tasks samt ihrer Zahl, ein Klick zeigt den Task darunter. Die erledigten stehen in einem zugeklappten Block dahinter. Gelesen wird nur — angelegt und ausgeführt wird über die Commands.
+Tasks can also be read in the interface: the **Workflows** section lists open tasks together with their number; clicking shows the task below it. Completed tasks appear in a collapsed section after that. This is read-only; tasks are created and executed through the commands.
 
 ## /k-task-create
 
-`/k-task-create [short-name]` erzeugt eine strukturierte Task-Datei unter `k-playbook-local/tasks/`.
+`/k-task-create [short-name]` creates a structured task file under `k-playbook-local/tasks/`.
 
-Der Command:
+The command:
 
-- leitet den Ort aus der Lage der `K-PLAYBOOK.yaml` ab.
-- bestimmt die nächste freie Nummer aus offenen Tasks und `done/`.
-- erzeugt einen Dateinamen wie `014-audiosocket-server.md`.
-- nimmt relevante Referenzen und besondere Tools in die Task-Datei auf.
-- zeigt den Entwurf zuerst und speichert erst nach Bestätigung.
+- derives the location from the position of `K-PLAYBOOK.yaml`.
+- determines the next available number from open tasks and `done/`.
+- creates a filename such as `014-audiosocket-server.md`.
+- includes relevant references and special tools in the task file.
+- shows the draft first and saves only after confirmation.
 
-Tasks sollen so geschrieben sein, dass `/k-task-run` sie ohne weiteren Chatkontext ausführen kann.
+Tasks should be written so that `/k-task-run` can execute them without further chat context.
 
-Umfangreiche Arbeit wird nicht auf viele kleine Dateien verteilt, sondern in einer Datei unter `## Zu bauen` als `### Etappe N — Titel` gegliedert. Geteilt wird nur, was sachlich auseinanderfällt: unterschiedlicher Kontext, einzeln sinnvoll, einzeln verifizierbar. Der Grund, allein wegen des Umfangs zu teilen, entfällt durch die Fortschrittsverfolgung in `/k-task-run`.
+Substantial work is not split into many small files, but structured in one file under `## To build` as `### Stage N - Title`. Split only what is substantively separate: different context, meaningful on its own, verifiable on its own. The reason to split solely because of size does not apply because `/k-task-run` tracks progress.
 
 ## /k-task-refine
 
-`/k-task-refine [path]` härtet Task- oder Instruktionsdateien vor der Ausführung.
+`/k-task-refine [path]` hardens task or instruction files before execution.
 
-Der Command nutzt einen strukturierten Critic/Editor-Dialog:
+The command uses a structured Critic/Editor dialogue:
 
-- Critic und Editor sind read-only.
-- Der Moderator ist der einzige Writer.
-- Tatsächlicher Dateistand gewinnt nach jeder Änderung.
-- Akzeptierte Edits und Entscheidungen werden im Review-Log festgehalten.
-- Am Ende wird gegen den angegebenen `## Intent` geprüft, falls vorhanden.
+- Critic and Editor are read-only.
+- The moderator is the only writer.
+- The actual file state takes precedence after every change.
+- Accepted edits and decisions are recorded in the review log.
+- At the end, it checks against the specified `## Intent`, if present.
 
-Jede geprüfte Datei bekommt ein `## Review-Log`, auch die, an der nichts zu ändern war — dort mit dem Vermerk „keine Änderungen". Das Log ist der einzige Beleg, dass ein Review stattgefunden hat; `/k-task-run` erkennt daran, ob ein Task gegengelesen wurde.
+Every reviewed file receives a `## Review log`, including one that needed no changes, with the note "no changes". The log is the only evidence that a review took place; `/k-task-run` uses it to identify whether a task was reviewed.
 
-Ohne Argument prüft der Command die offenen Task-Dateien unter `k-playbook-local/tasks/`.
+Without an argument, the command reviews the open task files under `k-playbook-local/tasks/`.
 
 ## /k-task-run
 
-`/k-task-run [file-or-directory]` führt Task-Dateien sequenziell aus.
+`/k-task-run [file-or-directory]` executes task files sequentially.
 
-Der Command:
+The command:
 
-- nutzt ohne Argument `k-playbook-local/tasks/`.
-- sortiert Tasks nach numerischem Prefix.
-- führt Tasks nie parallel aus.
-- fragt nach, wenn eine Task-Datei kein Review-Log trägt, also nie durch `/k-task-refine` gegangen ist.
-- klärt offene Fragen vor Delegation an Subagenten.
-- hängt eine Ausführungsnotiz an.
-- verschiebt erfolgreich abgeschlossene Tasks nach `done/`.
-- lässt abgebrochene oder teilweise ausgeführte Tasks offen.
+- uses `k-playbook-local/tasks/` without an argument.
+- sorts tasks by numeric prefix.
+- never executes tasks in parallel.
+- asks when a task file has no review log and therefore has never gone through `/k-task-refine`.
+- clarifies open questions before delegating to subagents.
+- appends an execution note.
+- moves successfully completed tasks to `done/`.
+- leaves aborted or partially executed tasks open.
 
-Enthält eine Task-Datei `### Etappe`-Überschriften, führt `/k-task-run` darin eine `## Fortschritt`-Tabelle. Der Subagent trägt jede Etappe direkt nach ihrem Abschluss ein, nicht erst am Ende — so überlebt der Stand einen harten Abbruch. Ein späterer `/k-task-run` liest die Tabelle und bietet an, bei der ersten offenen Etappe fortzusetzen. Die Tabelle ist die einzige Quelle für den Stand; aus dem Code oder aus `git log` wird nichts abgeleitet.
+If a task file contains `### Stage` headings, `/k-task-run` maintains a `## Progress` table in it. The subagent enters every stage immediately after it is completed, not only at the end, so progress survives a hard interruption. A later `/k-task-run` reads the table and offers to resume at the first open stage. The table is the only source of progress; nothing is inferred from the code or `git log`.
 
-Wenn eine Task-Datei `## Ausführungskontext` enthält, wertet `/k-task-run` daraus unter anderem `Target repo`, `Base branch`, `Work branch` und `PR required` aus. Dann gehören Branch-/Dirty-Worktree-Preflight und ggf. PR-Handoff zum Ablauf.
+If a task file contains `## Execution context`, `/k-task-run` evaluates `Target repo`, `Base branch`, `Work branch`, and `PR required`, among other values. The branch/dirty-worktree preflight and, where applicable, PR handoff are then part of the flow.
 
-## Remediation-Tasks
+## Remediation tasks
 
-Von `/k-remediation` erzeugte Tasks sind normale Task-Flow-Eingaben. Besonders wichtig sind dabei:
+Tasks created by `/k-remediation` are ordinary task-flow inputs. The following are particularly important:
 
-- Findings-IDs und Quellen müssen in der Task stehen.
-- Branch-/PR-Anforderungen aus der Remediation-Policy müssen im Ausführungskontext stehen.
-- Vor Umsetzung läuft `/k-task-refine`.
-- Umsetzung läuft danach über `/k-task-run`.
+- Finding IDs and sources must appear in the task.
+- Branch/PR requirements from the remediation policy must appear in the execution context.
+- `/k-task-refine` runs before implementation.
+- Implementation then runs through `/k-task-run`.

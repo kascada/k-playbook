@@ -137,7 +137,7 @@ load_tool_matrix() {
 
   # Die Leseliste muss alle Spalten nennen: read schiebt sonst jede weitere
   # Spalte stillschweigend in die letzte Variable.
-  while IFS=$'\t' read -r name group role guarded methods apt_package github_repo asset_ref asset_pattern; do
+  while IFS=$'\t' read -r name group role guarded methods apt_package github_repo asset_ref asset_pattern || [[ -n "${name:-}" ]]; do
     [[ -z "${name:-}" ]] && continue
     [[ "$name" == \#* ]] && continue
     [[ "$name" == "name" ]] && continue
@@ -592,8 +592,10 @@ parse_args() {
 main() {
   local tool answer status no_way
   local -a missing
-  load_tool_matrix
   parse_args "$@"
+  PREFIX="$(absolute_path "$PREFIX")"
+  BIN_DIR="$(absolute_path "$BIN_DIR")"
+  load_tool_matrix
 
   # --json ist rein lesend: es beschreibt den Zustand und installiert nichts.
   if [[ "$JSON_OUTPUT" -eq 1 ]]; then

@@ -1,37 +1,36 @@
-# Lokale GitHub-SSH-Konfiguration
+# Local GitHub SSH configuration
 
-Diese Notiz dokumentiert die lokale SSH-/GitHub-Konfiguration auf dem Kleist-Dev-Host. Sie ist host-spezifisch und kein allgemeiner k-playbook-Installationsvertrag.
+This note documents the local SSH/GitHub configuration on the Kleist development host. It is host-specific and not a general k-playbook installation contract.
 
-## Ausgangslage
+## Starting point
 
-`gh` und der normale `github.com`-SSH-Key sind für einen anderen GitHub-Account eingerichtet. Für Repos unter `kascada` deshalb nicht blind `git@github.com:...` verwenden, sondern den passenden SSH-Host-Alias aus `~/.ssh/config`.
+`gh` and the regular `github.com` SSH key are configured for a different GitHub account. Therefore, do not blindly use `git@github.com:...` for repositories under `kascada`; use the appropriate SSH host alias from `~/.ssh/config` instead.
 
 ## k-playbook
 
-Das Entwicklungs-Repo unter `~/dev/k-playbook` nutzt diesen Remote. Derselbe Alias gilt
-für jeden Clone in ein Zielprojekt, denn jedes Projekt klont dasselbe Repo:
+The development repository at `~/dev/k-playbook` uses this remote. The same alias applies to every clone into a target project because every project clones the same repository:
 
 ```text
 git@github-kamranbycloud:kascada/k-playbook.git
 ```
 
-Der Alias `github-kamranbycloud` zeigt auf:
+The `github-kamranbycloud` alias points to:
 
 ```text
 ~/.ssh/id_ed25519_kamranbycloud
 ```
 
-Dieser Key authentifiziert bei GitHub als Deploy-Key für `kascada/k-playbook`. Er ist repo-spezifisch und kann nicht für weitere Repos wiederverwendet werden.
+This key authenticates with GitHub as the deploy key for `kascada/k-playbook`. It is repository-specific and cannot be reused for other repositories.
 
 ## KamranApps
 
-Für `kascada/KamranApps` wurde ein separater Deploy-Key angelegt:
+A separate deploy key was created for `kascada/KamranApps`:
 
 ```text
 ~/.ssh/id_ed25519_kamranapps
 ```
 
-Der passende SSH-Config-Eintrag ist:
+The corresponding SSH config entry is:
 
 ```sshconfig
 Host github-kamranapps
@@ -41,10 +40,10 @@ Host github-kamranapps
   IdentitiesOnly yes
 ```
 
-Clone-URL:
+Clone URL:
 
 ```bash
 git clone git@github-kamranapps:kascada/KamranApps.git ~/dev/KamranApps
 ```
 
-Wenn der Clone oder `git ls-remote` mit `Repository not found` fehlschlägt, zuerst prüfen, ob der Public Key aus `~/.ssh/id_ed25519_kamranapps.pub` als Deploy-Key im Repo `kascada/KamranApps` hinterlegt ist.
+If the clone or `git ls-remote` fails with `Repository not found`, first check whether the public key from `~/.ssh/id_ed25519_kamranapps.pub` is registered as a deploy key in the `kascada/KamranApps` repository.

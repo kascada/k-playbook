@@ -74,6 +74,11 @@ var errAnstossEndeUnbestimmt = errors.New("das Ende des veralteten Anstoßblocks
 // neue Regel, ohne ihren vorhandenen Anstoß doppelt zu bekommen.
 const sessionMemoryMarker = "<!-- k-playbook:session-memory -->"
 
+// findingsMarker hält den Befunde-Block von den beiden anderen getrennt. Wie
+// beim Session-Memory-Block bekommen Bestandsprojekte die neue Regel dadurch
+// nachgereicht, ohne ihren vorhandenen Anstoß ein zweites Mal zu erhalten.
+const findingsMarker = "<!-- k-playbook:befunde -->"
+
 // RootInstructionsState ist der Zustand der Wurzeldatei.
 type RootInstructionsState struct {
 	Path string `json:"path"`
@@ -174,6 +179,10 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 		}
 		if !strings.Contains(content, sessionMemoryMarker) {
 			content += "\n\n" + sessionMemoryBlock()
+			changed = true
+		}
+		if !strings.Contains(content, findingsMarker) {
+			content += "\n\n" + findingsBlock()
 			changed = true
 		}
 		if changed {
@@ -345,7 +354,8 @@ func knownInstructionsBlockEnd(lines []string, start int) (int, bool) {
 }
 
 func rootInstructionsTemplate() string {
-	return "# AGENTS.md\n\n" + instructionsBlock() + "\n" + sessionMemoryBlock()
+	return "# AGENTS.md\n\n" + instructionsBlock() + "\n" + sessionMemoryBlock() +
+		"\n" + findingsBlock()
 }
 
 // instructionsBlock ist der Anstoß. Er nennt bewusst keine Verzeichnisebenen:
@@ -379,5 +389,41 @@ Die autoritative Projektdokumentation beginnt bei
 ` + "`" + LocalDirName + `/docs/README.md` + "`" + `. Lies diesen Index zuerst, bevor du den
 Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
 konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
+`
+}
+
+// findingsBlock ist die Anweisung, Erkenntnisse aus Analyse und Fehlersuche
+// festzuhalten.
+//
+// Er ist als Abschlussbedingung formuliert und nicht als Erinnerung: „die Arbeit
+// ist erst abgeschlossen, wenn …", dazu die Pflicht, die geschriebene Datei in
+// der Antwort zu nennen. Eine Bitte wird überlesen, ein Abschlusskriterium wird
+// Teil der Aufgabe.
+//
+// Die Regeldatei wird über ihren Pfad genannt und nicht über den Skill
+// `ks-befunde`. Nicht jeder Assistent kennt Skills — Codex etwa sucht sie
+// global statt im Projekt —, und ein Pfad lässt sich überall lesen. Die
+// Mindestfelder stehen deshalb hier im Block: er muss auch dann tragen, wenn
+// die Regeldatei nie geöffnet wird.
+func findingsBlock() string {
+	return findingsMarker + `
+## Befunde festhalten
+
+Wenn du Code analysierst, einer Ursache nachgehst oder eine These durch einen
+Test prüfst, ist die Arbeit erst abgeschlossen, wenn der Befund geschrieben ist.
+Er gehört nach ` + "`" + LocalDirName + `/material/befunde/` + "`" + `, eine Datei je Thema; neue
+Erkenntnisse werden angehängt. Nenne in deiner Antwort die geschriebene Datei.
+
+Knapp festhalten, sobald etwas belegt ist. Ausführlicher, sobald ein Problem
+erkannt und gelöst wurde — dann auch, welche Wege du ausgeschlossen hast. Jeder
+Eintrag nennt Befund, Beleg (` + "`pfad:zeile`" + ` oder Testausgabe) und Sicherheit
+(bestaetigt, unbestaetigt oder widerlegt). Das vollständige Format steht in
+` + "`" + PlaybookDirName + `/rules/befunde.md` + "`" + `.
+
+Nicht festgehalten werden Zwischenschritte und alles, was der Code selbst sagt.
+
+Am Ende einer Sitzung schließt **/k-danke** die Arbeit ab: er legt die Befunde
+vor, befördert Bestätigtes in die Dokumentation und prüft, ob die Doku
+nachzuziehen ist.
 `
 }

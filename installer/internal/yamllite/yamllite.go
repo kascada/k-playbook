@@ -5,7 +5,7 @@
 // Warum kein YAML-Paket: das Werkzeug kommt bisher ohne YAML-Abhängigkeit aus —
 // die K-PLAYBOOK.yaml wird zeilenweise gelesen —, und für das Versionsinventar
 // ist die Zeilennummer jedes Fundes Pflicht: sie ist Teil der Herkunft
-// (docs/versionsinventar.md, „Datenmodell einer Inventarzeile"). Die üblichen
+// (docs/version-inventory.md, „Data Model for an Inventory Row"). Die üblichen
 // Pakete geben sie nur über Umwege heraus.
 //
 // Zwei Leser benutzen dieses Paket: der Sammler des Versionsinventars und der
@@ -13,10 +13,27 @@
 // Standardbibliothek — sonst entstünde ein Importzyklus zwischen `project` und
 // dem Sammler.
 //
-// Was fehlt: Anker und Aliase, Merge-Keys, mehrere Dokumente je Datei und
-// komplexe Schlüssel. Was davon vorkommt, bleibt als Rohtext stehen, statt den
-// Lauf abzubrechen; was gar nicht deutbar ist, wird als Fehler gemeldet — ein
-// stilles Leerergebnis gibt es nicht.
+// Anker an Wertpositionen — Abbildungswert, Listeneintrag, oberste Ebene —
+// werden gelesen: `tag: &v "1.2.3"` liefert `1.2.3`, `b: &block` mit einem
+// eingerückten Block darunter liefert den Block. Ein Anker ist ein Etikett am
+// Wert; er ändert weder den Wert noch die Zeilennummer. Anker an Schlüsseln
+// (`&a key: v`) und innerhalb von Flow-Sammlungen (`[&a x]`) bleiben Rohtext.
+//
+// Erkannt, aber nicht unterstützt: Aliase `*name` und der Merge-Key `<<`.
+// Beide bleiben als Rohtext stehen und brechen den Lauf nicht ab — ein Alias
+// an einer Wertposition ist ein Skalar mit dem wörtlichen Wert `*name`, `<<`
+// ein gewöhnliches Feld mit diesem Wert. Ein Alias wird bewusst nicht
+// aufgelöst: er ist eine Wiederverwendung, keine neue Aussage, und die
+// Fundstelle eines aufgelösten Alias wäre die Zeile des Ankers — im
+// Widerspruch dazu, dass jeder Fund seine eigene Quellzeile trägt. Ebenso
+// nicht unterstützt: mehrere Dokumente je Datei und komplexe Schlüssel.
+//
+// Strukturelle Fehler — eine Einrückung, die zu keiner offenen Ebene passt,
+// eine Zeile, die weder Schlüssel noch Listeneintrag ist, eine unbalancierte
+// Flow-Klammer — brechen die ganze Datei ab: Parse liefert nil und einen
+// Fehler, keinen Teilbaum. Der Fehlertext ist begrenzt (maxReportedProblems)
+// und nennt, wie viele Hinweise er verschweigt; ein stilles Leerergebnis gibt
+// es nicht.
 package yamllite
 
 import (
@@ -118,17 +135,25 @@ func Parse(data []byte) (*Node, error) {
 	}
 	parser := &parser{lines: lines}
 	parser.skipDocumentStart()
+	parser.skipTopLevelAnchor()
 
 	first, ok := parser.peek()
 	if !ok {
 		return &Node{Kind: Mapping, Fields: map[string]*Node{}}, nil
 	}
 	root := parser.parseBlock(first.indent)
-	if len(parser.problems) > 0 {
-		return nil, fmt.Errorf("%s", strings.Join(parser.problems, "; "))
+	if err := parser.err(); err != nil {
+		return nil, err
 	}
 	return root, nil
 }
+
+// maxReportedProblems begrenzt, wie viele Hinweise der Fehlertext von Parse
+// nennt. Ein einziger Ursachenfehler — etwa ein Block, der zu keinem Schlüssel
+// gehört — erzeugt sonst je Folgezeile einen Hinweis, und der Fehlertext
+// wächst mit der Datei statt mit dem Problem. Die Grenze gilt für den Text,
+// nicht für die Wirkung: Parse liefert bei jedem strukturellen Problem nil.
+const maxReportedProblems = 10
 
 type sourceLine struct {
 	num    int
@@ -190,9 +215,13 @@ func stripComment(line string) string {
 }
 
 type parser struct {
-	lines    []sourceLine
-	index    int
+	lines []sourceLine
+	index int
+	// problems hält die ersten maxReportedProblems verschiedenen Hinweise;
+	// seen zählt alle verschiedenen, damit der Fehlertext sagen kann, wie
+	// viele er verschweigt. Ein wiederholter Hinweis zählt nicht doppelt.
 	problems []string
+	seen     map[string]bool
 }
 
 func (p *parser) peek() (sourceLine, bool) {
@@ -206,13 +235,81 @@ func (p *parser) peek() (sourceLine, bool) {
 }
 
 func (p *parser) skipDocumentStart() {
-	if line, ok := p.peek(); ok && strings.TrimSpace(line.text) == "---" {
+	line, ok := p.peek()
+	if !ok {
+		return
+	}
+	trimmed := strings.TrimSpace(line.text)
+	if trimmed == "---" {
 		p.index++
+		return
+	}
+	// `--- &name` etikettiert das ganze Dokument; das Etikett zählt nicht.
+	if strings.HasPrefix(trimmed, "--- ") {
+		if rest, anchored := stripAnchor(trimmed[4:]); anchored && rest == "" {
+			p.index++
+		}
 	}
 }
 
+// skipTopLevelAnchor übergeht ein Etikett, das allein auf der ersten Zeile
+// steht (`&name`) und den Wurzelknoten benennt.
+func (p *parser) skipTopLevelAnchor() {
+	if line, ok := p.peek(); ok {
+		if rest, anchored := stripAnchor(line.text); anchored && rest == "" {
+			p.index++
+		}
+	}
+}
+
+// stripAnchor trennt ein führendes Anker-Token `&name` ab und liefert den
+// verbleibenden Wert. Ein Anker ist ein Etikett am Wert: er ändert weder den
+// Wert noch die Schachtelung darunter, und er verschiebt keine Zeilennummer.
+// Bleibt nichts übrig, steht der Wert — Block, Liste oder gar nichts — auf
+// den folgenden Zeilen, genau wie bei einem leeren Rest ohne Anker.
+//
+// Die Funktion ist die eine Stelle, an der Anker gelesen werden; jede
+// Wertposition — Abbildungswert, Listeneintrag, oberste Ebene — ruft sie auf.
+// Anker an Schlüsseln (`&a key: v`) und innerhalb von Flow-Sammlungen
+// (`[&a x]`) werden bewusst nicht erkannt und bleiben Rohtext.
+func stripAnchor(text string) (rest string, anchored bool) {
+	text = strings.TrimSpace(text)
+	if !strings.HasPrefix(text, "&") {
+		return text, false
+	}
+	end := strings.IndexAny(text, " \t")
+	if end < 0 {
+		return "", true
+	}
+	return strings.TrimSpace(text[end:]), true
+}
+
 func (p *parser) note(format string, args ...any) {
-	p.problems = append(p.problems, fmt.Sprintf(format, args...))
+	text := fmt.Sprintf(format, args...)
+	if p.seen == nil {
+		p.seen = map[string]bool{}
+	}
+	if p.seen[text] {
+		return
+	}
+	p.seen[text] = true
+	if len(p.problems) < maxReportedProblems {
+		p.problems = append(p.problems, text)
+	}
+}
+
+// err fasst die gesammelten Hinweise zu einem Fehler zusammen; nil, wenn es
+// keine gab. Was über die Grenze hinausgeht, wird gezählt und nicht still
+// weggelassen.
+func (p *parser) err() error {
+	if len(p.seen) == 0 {
+		return nil
+	}
+	text := strings.Join(p.problems, "; ")
+	if hidden := len(p.seen) - len(p.problems); hidden > 0 {
+		text += fmt.Sprintf("; … und %d weitere Hinweise", hidden)
+	}
+	return fmt.Errorf("%s", text)
 }
 
 func (p *parser) parseBlock(indent int) *Node {
@@ -261,7 +358,7 @@ func (p *parser) parseMapping(indent int) *Node {
 }
 
 func (p *parser) parseValue(keyLine sourceLine, indent int, rest string) *Node {
-	rest = strings.TrimSpace(rest)
+	rest, _ = stripAnchor(rest)
 	switch {
 	case rest == "":
 		next, ok := p.peek()
@@ -304,7 +401,7 @@ func (p *parser) parseSequence(indent int) *Node {
 		for offset < len(trimmed) && trimmed[offset] == ' ' {
 			offset++
 		}
-		content := strings.TrimSpace(trimmed[offset:])
+		content, _ := stripAnchor(trimmed[offset:])
 		itemIndent := line.indent + offset
 		p.index++
 

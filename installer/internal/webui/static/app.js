@@ -11,12 +11,6 @@ const elements = {
   closedMessage: document.getElementById("closed-message"),
   closedReconnect: document.getElementById("closed-reconnect"),
   closedHint: document.getElementById("closed-hint"),
-  cleanCard: document.getElementById("clean-card"),
-  cleanPill: document.getElementById("clean-pill"),
-  cleanFacts: document.getElementById("clean-facts"),
-  cleanMessage: document.getElementById("clean-message"),
-  cleanCommand: document.getElementById("clean-command"),
-  cleanCommandText: document.getElementById("clean-command-text"),
   configCard: document.getElementById("config-card"),
   localCard: document.getElementById("local-card"),
   assistantCard: document.getElementById("assistant-card"),
@@ -182,20 +176,7 @@ async function onUpdateClick() {
 }
 
 function renderUpdate(data) {
-  const cleanliness = data.cleanliness || {};
-  const blockingCleanliness = Boolean(
-    (cleanliness.modified && cleanliness.modified.length > 0) || cleanliness.ahead > 0,
-  );
-  updateAvailable = Boolean(data.available) && !blockingCleanliness;
-  renderCleanliness(cleanliness);
-
-  if (data.available && blockingCleanliness) {
-    elements.update.className = "secondary";
-    elements.update.textContent = "Update blockiert";
-    elements.update.title = cleanliness.message || `${data.local} -> ${data.remote} (${data.branch})`;
-    elements.update.disabled = false;
-    return;
-  }
+  updateAvailable = Boolean(data.available);
 
   if (updateAvailable) {
     // Hervorgehoben, solange etwas anliegt.
@@ -217,51 +198,6 @@ function resetUpdateButton(label) {
   elements.update.className = "secondary";
   elements.update.textContent = label;
   elements.update.disabled = false;
-}
-
-// Die Karte erscheint nur, wenn in der Installation lokal gearbeitet wurde.
-// Sie kommt bei jeder Update-Prüfung mit, also auch ohne anstehendes Update —
-// die Verschmutzung entsteht unabhängig davon.
-//
-// Bewusst kein Knopf, der zurücksetzt: das wäre `git checkout -- .` in einem
-// fremden Verzeichnis, und die Oberfläche kann nicht wissen, ob dort jemand
-// absichtlich entwickelt. Der Befehl steht zum Kopieren da, ausgeführt wird er
-// vom Nutzer.
-function renderCleanliness(state) {
-  if (!state || state.clean) {
-    elements.cleanCard.classList.add("hidden");
-    return;
-  }
-
-  elements.cleanFacts.replaceChildren();
-  elements.cleanMessage.textContent = state.message || "";
-
-  const blocking = (state.modified && state.modified.length > 0) || state.ahead > 0;
-  elements.cleanPill.className = "pill warn";
-  elements.cleanPill.textContent = blocking ? "Verändert" : "Zusätzliche Dateien";
-
-  if (state.ahead > 0) {
-    addFact(elements.cleanFacts, "Lokale Commits", String(state.ahead));
-  }
-  for (const path of state.modified || []) {
-    addFact(elements.cleanFacts, "Verändert", path);
-  }
-  for (const path of state.untracked || []) {
-    addFact(elements.cleanFacts, "Zusätzlich", path);
-  }
-
-  // Lokale Commits sind mit Verwerfen nicht aufzulösen; dafür gibt es keinen
-  // Befehl, den man blind vorschlagen könnte.
-  if (state.ahead > 0) {
-    elements.cleanCommand.classList.add("hidden");
-  } else {
-    elements.cleanCommandText.textContent = state.modified && state.modified.length > 0
-      ? "git -C k-playbook checkout -- ."
-      : "git -C k-playbook clean -nd";
-    elements.cleanCommand.classList.remove("hidden");
-  }
-
-  elements.cleanCard.classList.remove("hidden");
 }
 
 // Legt eine Zeile in einer Faktenliste an und gibt sie zurück, damit der

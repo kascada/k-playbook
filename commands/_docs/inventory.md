@@ -11,7 +11,7 @@ selbst ist Go-Fachlogik: dieser Ablauf klärt die Quellenlage, stößt das Subko
 `k-playbook inventory` an und berichtet dessen Ergebnis. Der Index über die erzeugte Datei
 wird von `/k-docs-index` gebaut; dieses Modul schreibt ihn nicht.
 
-Der verbindliche Vertrag steht in `<playbook.dir>/docs/versionsinventar.md`: Datenmodell,
+Der verbindliche Vertrag steht in `<playbook.dir>/docs/version-inventory.md`: Datenmodell,
 Pin-Taxonomie, Quellenarten, Abweichungen, Vertrauensgrenze, Quellenkonfiguration und die
 Regel zu Zeitstempel und Byte-Stabilität. Dieses Modul formuliert nichts davon neu.
 

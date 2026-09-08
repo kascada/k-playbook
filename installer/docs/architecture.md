@@ -84,7 +84,7 @@ Quellenkonfiguration und
 Zielpfad zusammen und reicht sie an `internal/inventory` weiter; dort liegen Parser,
 Vertrauensgrenze und Renderer. Ein Lauf ohne inhaltliche Änderung lässt die Datei
 byte-identisch stehen. Der Vertrag steht in
-[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); denselben Lauf stoßen
+[`../../docs/version-inventory.md`](../../docs/version-inventory.md); denselben Lauf stoßen
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
 
@@ -133,7 +133,7 @@ installer/
 │   ├── context.go               Arbeitsstand auflösen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
-│   ├── update.go                Remote-Stand prüfen, Sauberkeit, Fast-Forward
+│   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 TODO.md parsen: offene und abgehakte Einträge
@@ -310,7 +310,7 @@ Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder von ihnen 
 dort einen eigenen Zweig: der Rückfall ist `todoTemplate()`, und der schriebe sonst einen
 TODO-Rumpf in eine Datei, die etwas anderes ist. `version-sources.yaml` bekommt deshalb
 die gültige, leere Quellenkonfiguration aus `versionSourcesTemplate()` — wortgleich die
-Vorlage aus `docs/versionsinventar.md`.
+Vorlage aus `docs/version-inventory.md`.
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
@@ -828,37 +828,7 @@ ist keine Sicherheitsgrenze gegen den Besitzer des Verzeichnisses, sondern eine 
 Barriere gegen versehentliche Schreibwerkzeuge: in `k-playbook/` wird nur noch in
 gezielten Wartungswegen geschrieben.
 
-### Die Installation muss sauber sein
-
-`CheckCleanliness()` liest bei jeder Prüfung den lokalen Zustand des Clones mit — rein
-lokal, ohne Netz, deshalb billig genug für den ungefragten Lauf nach dem Start. Die
-Git-Aufrufe laufen mit `GIT_OPTIONAL_LOCKS=0`, damit die rein lesende Prüfung auch in
-einem read-only gesetzten Clone nicht am Index-Lock scheitert.
-
-Der Grund ist ein stiller Fehlerfall. Das Modell verlangt, dass in `k-playbook/` nie
-geschrieben wird, aber die Regel erzwingt sich nicht. Ändert sich eine lokal veränderte
-Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie stehen: die
-Änderung überlebt dann jedes Update, ohne je gemeldet zu werden. Ändert sie sich doch
-mit, bricht git ab — mit einer Meldung, die im `output` verschwindet.
-
-Drei Zustände, zwei Schweregrade:
-
-| Zustand | `Blocking()` | Warum |
-|---|---|---|
-| verfolgte Datei geändert/gelöscht | ja | geht beim Update verloren oder verhindert es |
-| zusätzliche Datei | nein | steht einem Fast-Forward nicht im Weg, gehört aber nach `k-playbook-local/` |
-| lokale Commits (`@{u}..HEAD`) | ja | blockieren `--ff-only`, nur von Hand auflösbar |
-
-`Update()` prüft **vor** dem Pull und bricht bei `Blocking()` ab, statt hinterher zu
-stolpern. Das ist der Unterschied zwischen „irgendwas ging schief" und „`bin/install`
-ist verändert".
-
-Die Oberfläche zeigt den Befund in einer eigenen Karte, weil dort Dateinamen hinmüssen.
-Ist ein Remote-Update verfügbar und der Zustand blockierend, heißt der Kopfknopf
-„Update blockiert" statt „Update verfügbar"; ein Klick prüft erneut, startet aber keinen
-Pull. Bewusst **ohne** Knopf zum Zurücksetzen: das wäre `git checkout -- .` in einem
-fremden Verzeichnis, und die Oberfläche kann nicht wissen, ob dort jemand absichtlich
-entwickelt. Der Befehl steht zum Kopieren da.
+### Der Versionswechsel beim Update
 
 Vor und nach dem Pull wird `VERSION` gelesen. `BinaryChanged` meldet, ob sie gewechselt
 hat — **nur dann** gehört zum neuen Stand ein anderes Binary, und nur dann bringt ein
@@ -955,6 +925,15 @@ Standard-Cache unter `~/.cache/k-playbook/`. Ein direkter Eintrag
 `~/.local/bin/k-playbook` bleibt erhalten; nur ein Symlink auf die alte Spiegelung wird
 entfernt.
 
+Beim Start der Oberfläche entfernt `RemoveLegacyWrapper()` in
+`project/legacywrapper.go` zusätzlich die Wrapper-Datei des abgelösten Modells,
+`<projekt>/k-playbook/bin/k-playbook`. Das Quell-Repo kennt sie nicht mehr, und
+`.gitignore` deckt sie nicht ab — sie bliebe sonst als zusätzliche Datei im Clone
+liegen. Der Clone ist read-only, deshalb macht die Funktion ihn für den Löschvorgang
+kurz beschreibbar und setzt ihn per `defer` wieder zurück. Gemeldet wird nur, wenn
+wirklich etwas wegfällt; ein Fehler hält den Start nicht auf, und der nächste Start
+versucht es erneut.
+
 Die Tool-venvs unter `~/.local/share/k-playbook/security-tools/`
 (`rules/tool-install-scope.md`) bleiben ausdrücklich außerhalb dieser Bereinigung. Die
 Ebene `installation/` gab es genau dafür: ein venv bringt ein eigenes `bin/` mit, ohne
@@ -992,9 +971,8 @@ Das bleibt so und ist gewollt. `make dev-install` baut den Arbeitsstand und erse
 das Binary unter `~/.local/bin`; der Inhalt — Regeln, Reviews, Checks, Commands, Skills —
 kommt weiterhin aus dem Clone unter `k-playbook/` und damit vom zuletzt gepushten Stand.
 Der Preis dafür ist bewusst bezahlt: der Clone bleibt ein read-only Vendor-Verzeichnis,
-in das nichts eingespielt wird, und `CheckCleanliness()` meldet jede Abweichung dort als
-das, was sie ist — Handarbeit in einem fremden Verzeichnis. Es gibt keinen Sync-Weg aus
-dem Arbeitsstand in die Installation und keine Ausnahme davon in der Oberfläche.
+in das nichts eingespielt wird. Es gibt keinen Sync-Weg aus dem Arbeitsstand in die
+Installation und keine Ausnahme davon in der Oberfläche.
 
 **Der Hintergrunddienst erkennt auch einen dev-Build.** Verglichen wird nicht die
 `VERSION`, sondern die Datei dahinter, siehe „Lebenszyklus": Größe und Änderungszeit von
@@ -1468,7 +1446,7 @@ ein Weg, beliebige Dateien des Rechners zu lesen.
 Verweise innerhalb der Doku fängt die Oberfläche ab: `.md`-Ziele öffnet sie im selben
 Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen neuen Tab.
 Der Grund ist nicht mehr der Server — der läuft im Hintergrund und endet mit keiner
-Seite —, sondern die Ansicht selbst: ein roher Klick auf `handbuch.md` führte auf einen
+Seite —, sondern die Ansicht selbst: ein roher Klick auf `manual.md` führte auf einen
 Pfad, den der Server nicht kennt, statt in die gerenderte Datei, und das Menü soll
 mitziehen. Führt ein Verweis in eine andere Datei, zieht es mit; steht die Datei nicht im
 Index, bleibt gar kein Eintrag markiert statt der vorige.
@@ -1485,7 +1463,7 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 
 Der Bereich **Inventar** unter `/inventory` zeigt das Versionsinventar des Projekts und
 stößt seine Erhebung an. Der Vertrag steht in
-[`../../docs/versionsinventar.md`](../../docs/versionsinventar.md); die Oberfläche
+[`../../docs/version-inventory.md`](../../docs/version-inventory.md); die Oberfläche
 formuliert nichts davon neu.
 
 Die Seite hat vier Karten. **Stand** zeigt, ob die Inventardatei da ist, wann sie zuletzt
@@ -1616,8 +1594,8 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt; liefert den lokalen Sauberkeitszustand mit |
-| `POST` | `/api/update` | `git pull --ff-only` ausführen; bricht bei lokal veränderter Installation vorher ab; hat `VERSION` gewechselt, beendet sich der Dienst nach der Antwort |
+| `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt |
+| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er, trägt die Antwort seine Ausgabe; hat `VERSION` gewechselt, beendet sich der Dienst nach der Antwort |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -2236,10 +2214,9 @@ Commit `02f78d3`, zum Beispiel mit
 ## Offene Punkte
 
 - Was der Projektstatus in der Oberfläche zeigen soll, nachdem der Projekt-Store
-  entfallen ist. Der Slash-Command `/k-status` ist gelöscht: sein Kern — die Prüfung, ob
-  die Installation unverändert ist — war eine Nachbildung von `CheckCleanliness()` in
-  Prosa, der Rest billige Existenzprüfungen auf der `context`-Ausgabe. Der Zustand kommt
-  jetzt aus der Oberfläche.
+  entfallen ist. Der Slash-Command `/k-status` ist gelöscht: sein Kern war eine Prüfung
+  in Prosa, ob die Installation unverändert ist, der Rest billige Existenzprüfungen auf
+  der `context`-Ausgabe. Der Zustand kommt jetzt aus der Oberfläche.
 - Kaum automatisierte Tests für die HTTP-Handler; getestet ist im Wesentlichen
   `internal/project`. Ausnahme sind die schreibenden Endpunkte unter
   `/api/local/private` — dort hängt an der Whitelist eine git-Operation, deshalb steht

@@ -78,14 +78,18 @@ func runScript(t *testing.T, script string, env []string, args ...string) result
 // das, um eine einzelne Funktion der gesourcten Bibliothek zu prüfen, ohne ein
 // ganzes Skript zu starten.
 func runBash(t *testing.T, program string, args ...string) result {
+	return runBashWithEnv(t, program, nil, args...)
+}
+
+func runBashWithEnv(t *testing.T, program string, env []string, args ...string) result {
 	t.Helper()
 
 	command := exec.Command("bash", append([]string{"-c", program, "bash"}, args...)...)
-	command.Env = []string{
+	command.Env = append([]string{
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + os.Getenv("HOME"),
 		"LC_ALL=C",
-	}
+	}, env...)
 
 	var stdout, stderr strings.Builder
 	command.Stdout = &stdout

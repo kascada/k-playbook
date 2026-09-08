@@ -20,13 +20,8 @@ type updateResponse struct {
 	RestartRequired bool `json:"restartRequired"`
 	// Links nennt, was das Update an der Registrierung von Commands und Skills
 	// geändert hat.
-	Links project.LinkChanges `json:"links"`
-	// Cleanliness ist der lokale Zustand der Installation. Er wird bei jeder
-	// Prüfung mitgeliefert, auch ohne anstehendes Update: die Verschmutzung
-	// entsteht unabhängig davon, und wer nie aktualisiert, bekäme sie sonst
-	// nie zu sehen.
-	Cleanliness project.Cleanliness `json:"cleanliness"`
-	Message     string              `json:"message"`
+	Links   project.LinkChanges `json:"links"`
+	Message string              `json:"message"`
 }
 
 // updateCheckHandler prüft den Remote-Stand. Rein lesend.
@@ -43,12 +38,11 @@ func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, updateResponse{
-		Available:   status.Available,
-		Branch:      status.Branch,
-		Local:       shortCommit(status.Local),
-		Remote:      shortCommit(status.Remote),
-		Cleanliness: status.Cleanliness,
-		Message:     status.Message,
+		Available: status.Available,
+		Branch:    status.Branch,
+		Local:     shortCommit(status.Local),
+		Remote:    shortCommit(status.Remote),
+		Message:   status.Message,
 	})
 }
 
@@ -70,9 +64,8 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 	result, err := project.Update(environment.ProjectDir)
 	if err != nil {
 		writeJSON(w, http.StatusConflict, updateResponse{
-			Output:      result.Output,
-			Cleanliness: result.Cleanliness,
-			Message:     err.Error(),
+			Output:  result.Output,
+			Message: err.Error(),
 		})
 		return
 	}
@@ -98,7 +91,6 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		response.Branch = status.Branch
 		response.Local = shortCommit(status.Local)
 		response.Remote = shortCommit(status.Remote)
-		response.Cleanliness = status.Cleanliness
 	}
 	writeJSON(w, http.StatusOK, response)
 	state.completeUpdate(restartRequired)

@@ -11,8 +11,8 @@
 // Sammler das ganze Projektpaket und `project` könnte den Sammler nie
 // benutzen. Es hängt deshalb von nichts ab außer `yamllite`.
 //
-// Der Vertrag steht in docs/versionsinventar.md, Abschnitt
-// „Quellenkonfiguration".
+// Der Vertrag steht in docs/version-inventory.md, Abschnitt
+// „Source Configuration".
 package versionsources
 
 import (
@@ -106,7 +106,7 @@ func (c Config) Valid() []Source {
 // fremde schema_version. Beide Aufrufwege bekommen denselben Befund und
 // entscheiden verschieden: der Erhebungslauf bricht ab, `k-playbook context`
 // gibt den Fehler als Zustand aus und läuft weiter. So steht es im Vertrag,
-// Abschnitt „Zustand in der Kontextausgabe": context steht am Anfang jedes
+// Abschnitt „State in the Context Output": context steht am Anfang jedes
 // Commands, und eine defekte Zusatzkonfiguration darf nicht jeden Command
 // lahmlegen.
 //

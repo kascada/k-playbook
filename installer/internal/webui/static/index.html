@@ -42,25 +42,6 @@
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Nur sichtbar, wenn in der Installation lokal gearbeitet wurde. Das
-               Verzeichnis ist ein Clone und wird bei jedem Update ersetzt; eine
-               Änderung dort fällt sonst nie auf, weil git eine nicht
-               kollidierende Datei beim Pull einfach stehen lässt. -->
-          <section class="card hidden" id="clean-card">
-            <div class="section-head">
-              <div>
-                <h2>Installation</h2>
-              </div>
-              <span id="clean-pill" class="pill muted">Prüfen...</span>
-            </div>
-            <p id="clean-message" class="message"></p>
-            <dl id="clean-facts" class="facts"></dl>
-            <div id="clean-command" class="command-row hidden">
-              <code id="clean-command-text"></code>
-              <button class="copy secondary" data-copy="clean-command-text">Kopieren</button>
-            </div>
-          </section>
-
           <section class="card{{if .Installed}} hidden{{end}}" id="config-card">
             <div class="section-head">
               <div>

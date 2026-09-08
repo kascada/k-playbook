@@ -13,7 +13,7 @@ import (
 // Manifest erzeugt ein halbes Inventar, und das sähe aus wie ein vollständiges.
 const MaxFileSize = 8 << 20
 
-// Boundary ist die Vertrauensgrenze aus docs/versionsinventar.md. Sie ist die
+// Boundary ist die Vertrauensgrenze aus docs/version-inventory.md. Sie ist die
 // einzige Stelle, an der entschieden wird, ob eine Datei gelesen werden darf,
 // und die einzige, die sie öffnet.
 //

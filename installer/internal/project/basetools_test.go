@@ -2,6 +2,7 @@ package project
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -160,4 +161,42 @@ func TestBuildContextTraegtBaseTools(t *testing.T) {
 	if context.BaseTools.InstallCommand == "" {
 		t.Error("baseTools nennt keinen Installationsbefehl")
 	}
+}
+
+// TestBasisMatrixOhneFinalenZeilenumbruch haelt Shell und Go auf derselben
+// Matrix zusammen: beide müssen auch den letzten Eintrag ohne Newline sehen.
+func TestBasisMatrixOhneFinalenZeilenumbruch(t *testing.T) {
+	root := newInstallationWithBaseMatrix(t,
+		"k-erster\t-\tErster\tja\tapt\tpaket-erster\t-\t-\t-\n"+
+			"k-letzter\t-\tLetzter\tja\tapt\tpaket-letzter\t-\t-\t-")
+	matrix := BaseToolMatrix(root)
+	path := t.TempDir()
+	t.Setenv("PATH", path+":"+os.Getenv("PATH"))
+
+	state := DetectBaseTools(root)
+	if len(state.Missing) != 2 {
+		t.Fatalf("Go-Leser meldet %d statt zwei Einträge: %+v", len(state.Missing), state.Missing)
+	}
+
+	script := filepath.Join(repoRootForBaseToolsTest(t), "scripts", "install-base-tools.sh")
+	command := exec.Command("bash", script, "--json")
+	command.Env = []string{"K_BASE_TOOLS_MATRIX=" + matrix, "PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("Shell-Leser brach ab: %v", err)
+	}
+	for _, name := range []string{"k-erster", "k-letzter"} {
+		if !strings.Contains(string(output), `"name": "`+name+`"`) {
+			t.Errorf("Shell-Leser nennt %s nicht:\n%s", name, output)
+		}
+	}
+}
+
+func repoRootForBaseToolsTest(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("Arbeitsstand auflösen: %v", err)
+	}
+	return root
 }

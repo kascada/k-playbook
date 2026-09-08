@@ -1,891 +1,523 @@
 # Installation
 
-k-playbook wird in das Projekt geklont, das es begleiten soll. Es gibt keine zentrale
-Installation und keinen festen Hostpfad; jedes Projekt trägt seine eigene.
+k-playbook is cloned into the project it is meant to support. There is no central installation and no fixed host path; each project has its own.
 
 ```bash
-cd /pfad/zum/projekt
+cd /path/to/project
 git clone git@github.com:kascada/k-playbook.git
 make -C k-playbook install
 k-playbook
 ```
 
-Ohne `make` geht derselbe Bootstrap direkt:
+The same bootstrap also works directly without `make`:
 
 ```bash
 k-playbook/bin/install
 ```
 
-Das Zielverzeichnis muss `k-playbook` heißen — Commands und Skills sprechen es so an.
-Ohne Zielargument ergibt sich der Name aus dem Repo-Namen und stimmt damit von selbst;
-ein eigenes Argument brauchst du nur, wenn du aus einem Fork oder Mirror unter
-abweichendem Namen klonst. Dann lautet es `k-playbook`.
+The target directory must be named `k-playbook`: commands and skills address it by that name. Without a destination argument, the name derives from the repository name and is therefore correct automatically; you need a custom argument only when cloning a fork or mirror under another name. It must then be `k-playbook`.
 
-**Go wird nicht gebraucht.** `bin/install` lädt das zur Plattform passende Release-Binary
-und installiert es nach `~/.local/bin/k-playbook`. Auf macOS und im DevContainer läuft
-der Installer jeweils in seiner eigenen Umgebung und installiert deshalb das passende
-macOS- beziehungsweise Linux-Binary.
+**Go is not required.** `bin/install` downloads the release binary suitable for the platform and installs it to `~/.local/bin/k-playbook`. On macOS and in the DevContainer, the installer runs in its own environment and therefore installs the matching macOS or Linux binary.
 
-**Die Installation braucht Netz.** Die Binaries liegen nicht im Clone, sondern als Assets
-am Release. `bin/install` lädt genau das passende Asset und prüft es gegen das
-mitgelieferte `SHA256SUMS`.
+**Installation requires network access.** The binaries are not in the clone but are release assets. `bin/install` downloads exactly the matching asset and verifies it against the shipped `SHA256SUMS`.
 
-**`~/.local/bin` muss im PATH liegen** — das ist Voraussetzung, kein Hinweis am Rand.
-Aufgerufen wird k-playbook ausschließlich unter seinem Namen; ohne den PATH-Eintrag wäre
-es installiert, aber für niemanden auffindbar. Fehlt er, bricht der Bootstrap ab,
-bevor er etwas lädt, und nennt die Zeile fürs Shell-Profil:
+**`~/.local/bin` must be in PATH**: this is a requirement, not an aside. k-playbook is called exclusively by its name; without the PATH entry, it would be installed but not discoverable by anyone. If it is missing, the bootstrap stops before downloading anything and prints the line for the shell profile:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Auf Linux ist der Eintrag meist schon da. Auf macOS **nicht** — `/etc/paths` kennt ihn
-nicht und `path_helper` ergänzt ihn nicht. Die Zeile gehört in `~/.zprofile` (zsh) oder
-`~/.bashrc` (bash); danach eine neue Shell öffnen und den Bootstrap erneut aufrufen.
+On Linux, the entry usually already exists. On macOS, it does **not**: `/etc/paths` does not include it and `path_helper` does not add it. The line belongs in `~/.zprofile` (zsh) or `~/.bashrc` (bash); then open a new shell and call the bootstrap again.
 
-Ein Sonderfall beim allerersten Lauf auf einem frischen Host oder in einem DevContainer:
-Debian und Ubuntu nehmen `~/.local/bin` in `~/.profile` nur auf, wenn das Verzeichnis
-beim Anmelden bereits existiert. Der Bootstrap legt es deshalb an, **bevor** er den PATH
-prüft, und sagt im Abbruch, dass am Profil nichts zu ändern ist — es genügt, sich neu
-anzumelden (oder `. ~/.profile`) und den Bootstrap erneut aufzurufen.
+One special case exists on the first run on a fresh host or in a DevContainer: Debian and Ubuntu add `~/.local/bin` in `~/.profile` only when the directory already exists at login. The bootstrap therefore creates it **before** checking PATH and, when stopping, says that the profile does not need changing: log in again (or run `. ~/.profile`) and call the bootstrap again.
 
-**Host und DevContainer mit geteiltem Home.** `~/.local/bin/k-playbook` ist eine echte
-Datei je Plattform. Teilen sich beide Umgebungen dasselbe `$HOME`, überschreiben sie
-einander dort. `bin/install` erkennt ein plattformfremdes Binary und meldet beim
-Ersetzen, dass die andere Umgebung denselben Bootstrap noch einmal braucht. Ruft man das
-Binary dagegen direkt auf, während es der falschen Plattform gehört, fängt das nichts ab:
-dann meldet die Shell `cannot execute binary file`. Getrennte HOMEs sind der saubere
-Zustand.
+**Host and DevContainer with a shared home.** `~/.local/bin/k-playbook` is a real file for each platform. If both environments share the same `$HOME`, they overwrite each other there. `bin/install` detects a binary for another platform and reports during replacement that the other environment also needs to run the bootstrap again. Calling the binary directly when it belongs to the wrong platform is not handled: the shell then reports `cannot execute binary file`. Separate homes are the clean state.
 
-## Die vier Schritte
+## The four steps
 
-Der letzte Aufruf startet die Oberfläche im Browser. Sie führt durch vier Schritte und
-schreibt jeden erst nach Bestätigung.
+The final call opens the interface in the browser. It guides you through four steps and writes each one only after confirmation.
 
-### 1. Konfiguration anlegen
+### 1. Create configuration
 
-Beim ersten Mal findet die Oberfläche noch keine `K-PLAYBOOK.yaml` — nach einem frischen
-Clone kann es sie nicht geben. Statt zu raten, schlägt sie einen Ort vor und lässt ihn
-bestätigen. Kandidaten in dieser Reihenfolge:
+On its first run, the interface does not yet find `K-PLAYBOOK.yaml`: after a fresh clone, it cannot exist. Rather than guessing, it proposes a location and lets you confirm it. Candidates in this order:
 
-1. das Git-Repository, in dem der Aufruf stattfindet,
-2. der Ort abgeleitet aus der Lage des Binaries,
-3. das Arbeitsverzeichnis.
+1. the Git repository in which the command is called,
+2. the location derived from the binary's position,
+3. the working directory.
 
-Mitvorgeschlagen wird, wo das Projekt-Repository liegt — entweder das Hauptverzeichnis
-selbst oder ein Unterverzeichnis daneben, etwa wenn der Code parallel zum Playbook
-ausgecheckt ist. Das Ergebnis:
+It also proposes where the project repository is located, either the project root itself or a sibling subdirectory, for example when code is checked out alongside the playbook. The result:
 
 ```text
-projekt/
-├── K-PLAYBOOK.yaml     der Anker; sein Ort bestimmt das Hauptverzeichnis
-└── k-playbook/         die Installation
+project/
+├── K-PLAYBOOK.yaml     the anchor; its location determines the project root
+└── k-playbook/         the installation
 ```
 
-Eine vorhandene `K-PLAYBOOK.yaml` wird nie überschrieben. Das Format steht in
-[`k-playbook-format.md`](./k-playbook-format.md).
+An existing `K-PLAYBOOK.yaml` is never overwritten. Its format is described in [`k-playbook-format.md`](./k-playbook-format.md).
 
-### Konfiguration im Terminal anlegen
+### Create configuration in the terminal
 
-Wenn ein Anker eines übergeordneten Projekts die Ersteinrichtung der Oberfläche
-überdeckt, lässt sich der Anker ohne Suche direkt anlegen:
+When an anchor of a parent project masks initial setup in the interface, an anchor can be created directly without searching:
 
 ```bash
 k-playbook config create
 ```
 
-Der Befehl schreibt in das aktuelle Verzeichnis und meldet danach den genauen Pfad,
-das erkannte Repository und die Versionskontrolle. Optional kann ein anderer
-Projektordner angegeben werden; liegt das Repository darin nicht im Hauptverzeichnis,
-setzt `--repo-root` dessen relativen Pfad:
+The command writes to the current directory and then reports the exact path, detected repository, and version control. Optionally, another project directory can be given; if the repository is not at its root, `--repo-root` sets its relative path:
 
 ```bash
-k-playbook config create --repo-root app /pfad/zum/projekt
+k-playbook config create --repo-root app /path/to/project
 ```
 
-Eine vorhandene `K-PLAYBOOK.yaml` bleibt auch auf diesem Weg unverändert.
+An existing `K-PLAYBOOK.yaml` remains unchanged through this path as well.
 
-### 2. Projekteigene Struktur anlegen
+### 2. Create project-owned structure
 
-Daneben entsteht `k-playbook-local/` mit allem, was dem Projekt gehört:
+Alongside it, `k-playbook-local/` is created with everything owned by the project:
 
 ```text
 k-playbook-local/
-├── rules/         Overlay zu k-playbook/rules/
-├── reviews/       Overlay zu k-playbook/reviews/
-├── checks/        Overlay zu k-playbook/checks/
-├── commands/      Overlay zu k-playbook/commands/
-├── skills/        Overlay zu k-playbook/skills/
-├── results/       alles, was Reviews erzeugen; siehe unten
-├── docs/          Projektwissen für AI-Sessions, nach Herkunft getrennt
-│   └── manual/    handgepflegte Doku; kein Command schreibt hier hinein
+├── rules/         overlay for k-playbook/rules/
+├── reviews/       overlay for k-playbook/reviews/
+├── checks/        overlay for k-playbook/checks/
+├── commands/      overlay for k-playbook/commands/
+├── skills/        overlay for k-playbook/skills/
+├── results/       everything reviews generate; see below
+├── docs/          project knowledge for AI sessions, separated by origin
+│   └── manual/    manually maintained documentation; no command writes here
 ├── guidelines/
 ├── tasks/done/
-├── priv/          eigene Notizen, siehe unten
-├── material/      Rohmaterial als Quelle für Docs, siehe unten
-├── k-playbook.md  projekteigene Instruktionsebene
+├── priv/          private notes; see below
+├── material/      raw material as a source for docs; see below
+├── k-playbook.md  project-owned instruction layer
 ├── TODO.md
-└── version-sources.yaml   Versionsquellen des Versionsinventars, handgepflegt
+└── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
-Die erzeugten Docs-Herkünfte `docs/code/`, `docs/libs/`, `docs/extracted/` und
-`docs/versions/` stehen nicht darin: sie entstehen beim ersten Lauf ihres Erzeugers.
+The generated docs origins `docs/code/`, `docs/libs/`, `docs/extracted/`, and `docs/versions/` are not shown there: they arise on the first run of their generator.
 
-Jedes Verzeichnis trägt eine `README.md` mit seinem Zweck — auch weil Git leere
-Verzeichnisse nicht speichert und sie sonst nach einem Clone des Projekts fehlen würden.
-Vorhandene Dateien bleiben unberührt, auch READMEs mit eigenem Text.
+Every directory contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
-`k-playbook-local/` gehört ins Repository des Projekts und wird committet — bis auf den
-**Inhalt** von drei Verzeichnissen, für die diese Wahl ansteht: `results/`, `priv/` und
-`material/`. Für `priv/` und `material/` gilt weiterhin, dass k-playbook von sich aus
-keine `.gitignore` schreibt und nicht entscheidet, was ein Projekt versioniert.
+`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of three directories for which the project makes that decision: `results/`, `priv/`, and `material/`. For `priv/` and `material/`, k-playbook still does not write a `.gitignore` itself and does not decide what a project versions.
 
-`results/` ist die Ausnahme: es wird beim erstmaligen Anlegen schon privat angelegt.
-Ein Review ist aus dem Code wiederholbar, sein Ergebnis ist ein Stand von diesem Rechner
-— und die Rohausgaben eines Secret-Scanners gehören ohnehin nicht ins Repository. Auch
-das bleibt umschaltbar, und einmal umgeschaltet nimmt k-playbook es nicht zurück: die
-verwaltete `.gitignore` entsteht nur beim erstmaligen Anlegen des Verzeichnisses, nicht
-bei jedem Lauf. Bestandsprojekte, die `results/` bisher versioniert haben, merken vom
-Update also nichts.
+`results/` is the exception: it is created as private on initial creation. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update.
 
-Sichtbar und umschaltbar ist diese Wahl im Block **Lokale Einstellungen** der
-Oberfläche. Er misst je Verzeichnis mit `git check-ignore`, ob der Inhalt
-wirklich draußen ist, und nennt das Repository, auf das sich die Aussage
-bezieht — liegt in `k-playbook-local/` ein eigenes, gilt sie für dieses.
-Angezeigt wird einer von vier Zuständen:
+This choice is visible and switchable in the **Local settings** section of the interface. For each directory, it uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
 
-| Zustand | Bedeutung |
+| State | Meaning |
 |---|---|
-| privat | der Inhalt bleibt draußen |
-| wird versioniert | keine Regel, der Inhalt kommt mit ins Repository |
-| teilweise privat | eine Regel greift, es stehen aber Dateien im Repository — die Regel wirkt nur für neue |
-| privat erst nach dem nächsten Commit | die Dateien sind aus dem Index genommen, aber noch nicht committet |
+| private | the content stays out |
+| versioned | no rule; the content is included in the repository |
+| partially private | a rule applies, but files are in the repository; the rule applies only to new files |
+| private only after the next commit | files were removed from the index but have not yet been committed |
 
-Die beiden letzten sehen privat aus und sind es nicht; sie stehen deshalb als
-Warnung da und nennen die betroffenen Dateien. Das Umschalten auf privat legt
-die `.gitignore` an und nimmt bereits versionierte Dateien mit
-`git rm --cached` aus dem Index — wirksam wird das erst mit dem nächsten
-Commit, und was schon gepusht wurde, bleibt in der Historie.
+The last two look private but are not; they are therefore shown as a warning and name the affected files. Switching to private creates `.gitignore` and removes already versioned files from the index with `git rm --cached`; this takes effect only with the next commit, and anything already pushed remains in history.
 
-Stammt die Ignore-Regel von woanders — der `.gitignore` im Projekt-Root,
-`.git/info/exclude`, der globalen Konfiguration — oder trägt die Datei im
-Verzeichnis eigenen Inhalt, wird nichts geschrieben: der Block zeigt dann den
-Zustand und benennt die Quelle. Von Hand geht der Weg weiterhin über eine
-`.gitignore` im betreffenden Verzeichnis; die jeweilige `README.md` nennt den
-Inhalt.
+If the ignore rule comes from elsewhere, the `.gitignore` at the project root, `.git/info/exclude`, or global configuration, or if the file in the directory has its own content, nothing is written: the section then shows the state and identifies the source. Manually, the path continues to be a `.gitignore` in the relevant directory; the respective `README.md` names the content.
 
-### 3. MCP-Server registrieren
+### 3. Register the MCP server
 
-Der Block **k-playbook-MCP** trägt den mitgelieferten MCP-Server bei den drei Assistenten
-ein. Damit bekommt ein Assistent den aufgelösten Arbeitsstand als Werkzeug, statt ihn über
-die Kommandozeile zu holen:
+The **k-playbook MCP** section registers the shipped MCP server with the three assistants. This gives an assistant the resolved working state as a tool instead of making it retrieve it through the command line:
 
 ```text
-projekt/
+project/
 ├── .mcp.json          Claude Code:  mcpServers -> k-playbook
-├── .cursor/mcp.json   Cursor:       dasselbe Schema
+├── .cursor/mcp.json   Cursor:       same schema
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
-Eingetragen wird `k-playbook mcp` — beim Schreiben aufgelöst zum **absoluten Pfad** des
-installierten Binaries. Aus Dock oder Finder gestartete Clients erben die Shell-PATH
-nicht; ein bloßer Kommandoname wäre dort tot. Wer den Eintrag einchecken will, trägt von
-Hand den bloßen Namen `k-playbook` ein: die automatische Korrektur fasst ihn nicht an.
-Beides steht in [`mcp.md`](./mcp.md#warum-der-eintrag-ein-absoluter-pfad-ist). Eine
-Bedingung gilt in jedem Fall: der Eintrag wirkt nur, wenn der Assistent im
-Hauptverzeichnis geöffnet ist — dort, wo `K-PLAYBOOK.yaml` liegt.
+It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, where `K-PLAYBOOK.yaml` is located.
 
-Die drei Dateien gehören dem Projekt. Angefasst wird genau der Schlüssel `k-playbook`,
-fremde Einträge bleiben stehen. Fertig ist die Registrierung erst nach einem Neustart des
-Assistenten; Claude Code fragt dabei einmal nach der Freigabe.
+The three files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
 
-Alles Weitere — die beiden Schemata, der Umgang mit fremden Werten, das Entfernen von
-Hand und die Seite `/mcp` mit den tatsächlich angebotenen Werkzeugen — steht in
-[`mcp.md`](./mcp.md).
+Everything else, the two schemas, handling foreign values, manual removal, and the `/mcp` page with the tools actually offered, is described in [`mcp.md`](./mcp.md).
 
-### 4. Assistenten verlinken
+### 4. Link assistants
 
-Verlinkt wird für Claude Code, OpenCode und Cursor:
+Links are created for Claude Code, OpenCode, and Cursor:
 
 ```text
-projekt/
-├── AGENTS.md             Instruktionen, eine Quelle für alle Assistenten
-├── CLAUDE.md             Include-Datei mit der Zeile @AGENTS.md; die Richtung ist fest
+project/
+├── AGENTS.md             instructions, one source for all assistants
+├── CLAUDE.md             include file with the line @AGENTS.md; the direction is fixed
 ├── .claude/
-│   ├── commands/         je ein Symlink pro Command
-│   └── skills/           je ein Symlink pro Skill; OpenCode liest hier mit
+│   ├── commands/         one symlink per command
+│   └── skills/           one symlink per skill; OpenCode reads here too
 ├── .opencode/
 │   └── commands/
 └── .cursor/
     └── commands/
 ```
 
-Die vier Ziele sind **echte Verzeichnisse mit Einzel-Symlinks**, kein Verzeichnis-Symlink.
-Ein Verzeichnis-Symlink zeigt auf genau eine Quelle; damit käme entweder nur die
-Installation oder nur `k-playbook-local/` an. Jeder Link zeigt auf die Fassung, die nach
-der Overlay-Regel gilt:
+The four targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the installation or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
 
 ```text
 .claude/commands/
-  k-todo.md    -> ../../k-playbook/commands/k-todo.md          mitgeliefert
-  k-review.md  -> ../../k-playbook-local/commands/k-review.md  projekteigen, ersetzt
-  k-eigen.md   -> ../../k-playbook-local/commands/k-eigen.md   nur projekteigen
+  k-todo.md    -> ../../k-playbook/commands/k-todo.md          shipped
+  k-review.md  -> ../../k-playbook-local/commands/k-review.md  project-owned, replaces
+  k-own.md     -> ../../k-playbook-local/commands/k-own.md     project-owned only
 ```
 
-Die Oberfläche vergleicht diesen Soll-Stand mit dem, was tatsächlich registriert ist,
-und meldet Abweichungen mit Namen: was fehlt, was auf die falsche Quelle zeigt, was
-verwaist ist, und was dem Projekt gehört und deshalb liegen bleibt. Auf Knopfdruck wird
-es angeglichen. Eine echte Datei, die jemand selbst dort abgelegt hat, gewinnt immer und
-wird nie ersetzt.
+The interface compares this expected state with what is actually registered and reports deviations by name: what is missing, what points to the wrong source, what is orphaned, and what belongs to the project and therefore remains. It synchronizes them at the press of a button. An actual file that someone placed there themselves always takes precedence and is never replaced.
 
-Skills stehen nur einmal unter `.claude/skills`: OpenCode durchsucht dieses Verzeichnis
-mit, Cursor kennt kein Skill-Konzept. `CLAUDE.md` ist eine Include-Datei mit der
-Import-Zeile `@AGENTS.md`, weil Claude Code ausschließlich `CLAUDE.md` liest und OpenCode
-wie Cursor `AGENTS.md` bevorzugen — so gibt es genau eine echte Instruktionsdatei, und
-Claude Code lädt sie beim Start über den Import. Das Einrichten schreibt dazu einen
-kurzen Stub: über der Import-Zeile ein Hinweis, dass Projektregeln nach `AGENTS.md`
-gehören, dann die Zeile `@AGENTS.md` allein auf einer Zeile.
+Skills appear only once under `.claude/skills`: OpenCode searches this directory too, while Cursor has no skill concept. `CLAUDE.md` is an include file with the import line `@AGENTS.md`, because Claude Code reads only `CLAUDE.md` while OpenCode and Cursor prefer `AGENTS.md`. This leaves exactly one actual instruction file, and Claude Code loads it at startup through the import. Setup writes a short stub: above the import line, a note that project rules belong in `AGENTS.md`, then `@AGENTS.md` alone on a line.
 
-`AGENTS.md` bekommt dabei einen kurzen **Anstoß**: einen Block, der auf
-`k-playbook context` verweist. Fehlt die Datei, wird sie angelegt; ist sie da, wird der
-Block angehängt und vorhandener Inhalt nicht angetastet. Ein Marker
-`<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf ihn erneut anhängt.
+`AGENTS.md` also receives a brief **prompt**: a block that refers to `k-playbook context`. If the file is missing, it is created; if it exists, the block is appended and existing content is not touched. A `<!-- k-playbook:anstoss -->` marker prevents a second run from appending it again.
 
-### Eine vorhandene CLAUDE.md
+### An existing CLAUDE.md
 
-Die Richtung ist fest: `CLAUDE.md` bindet `AGENTS.md` ein, nie umgekehrt. Damit daneben
-keine zweite, abweichende Instruktionsdatei entsteht, ordnet das Einrichten das Paar
-`CLAUDE.md`/`AGENTS.md` zuerst ein und löst auf, was sich auflösen lässt:
+The direction is fixed: `CLAUDE.md` includes `AGENTS.md`, never the other way around. So that a second, divergent instruction file does not arise alongside it, setup first classifies the `CLAUDE.md`/`AGENTS.md` pair and resolves what can be resolved:
 
-| Ausgangslage | Was geschieht |
+| Initial situation | What happens |
 |---|---|
-| `CLAUDE.md` trägt die Zeile `@AGENTS.md`, `AGENTS.md` ist eine echte Datei | der **Sollzustand** — nichts zu tun. Was neben der Import-Zeile steht, gehört dem Projekt und bleibt unangetastet |
-| `CLAUDE.md` ist noch ein Symlink auf `AGENTS.md` | die ältere Bauform: der Symlink wird **verlustfrei ersetzt**, der Inhalt steht ohnehin in `AGENTS.md` — auch auf dem Lesepfad, siehe unten |
-| nur eine echte `CLAUDE.md` ohne Import-Zeile | sie wird nach `AGENTS.md` **umbenannt**, der Anstoß an den erhaltenen Inhalt angehängt, `CLAUDE.md` neu als Include-Datei angelegt |
-| nur die Include-Datei, `AGENTS.md` fehlt | sie bleibt liegen, `AGENTS.md` entsteht aus der Vorlage. Umbenannt ergäbe sie ein `AGENTS.md`, das sich selbst importiert |
-| `AGENTS.md` ist ein Symlink auf `CLAUDE.md` | die verdrehte Richtung wird aufgelöst: Symlink weg; eine echte `CLAUDE.md` wird umbenannt, eine Include-Datei bleibt liegen; dann Include neu anlegen bzw. `AGENTS.md` aus der Vorlage |
-| `AGENTS.md` ist ein toter Symlink | er wird entfernt, damit die Datei nicht an seinem Ziel landet |
-| beide sind echte Dateien, `CLAUDE.md` ohne wirksame Import-Zeile | **Konflikt** — ob der Inhalt für alle Assistenten gilt oder nur für Claude Code, entscheidet das Projekt: entweder den Inhalt nach `AGENTS.md` übernehmen und `CLAUDE.md` auf die Zeile `@AGENTS.md` reduzieren, oder die Zeile `@AGENTS.md` vor den vorhandenen Inhalt setzen und ihn dort stehen lassen. Automatisch geschieht keines von beiden |
-| `CLAUDE.md` zeigt bewusst auf ein anderes Ziel | **Konflikt** — der Link des Projekts bleibt stehen, sonst wären die dort gelesenen Instruktionen ab sofort unwirksam |
-| `AGENTS.md` zeigt bewusst auf ein anderes Ziel | eine Entscheidung des Projekts, kein Fehler: die Include-Datei wirkt durch den Link hindurch, dort kommt auch der Anstoß an. Trägt `CLAUDE.md` daneben eigenen Inhalt ohne Import-Zeile, ist das ein **Konflikt** |
-| `AGENTS.md` ist in git ignoriert | **Konflikt** — sonst fiele der Inhalt still aus der Versionskontrolle; Ignore-Regel entfernen und neu einrichten |
+| `CLAUDE.md` contains the `@AGENTS.md` line, `AGENTS.md` is an actual file | the **expected state**, nothing to do. Content beside the import line belongs to the project and remains untouched |
+| `CLAUDE.md` is still a symlink to `AGENTS.md` | the older form: the symlink is **replaced without loss**; the content is already in `AGENTS.md`, including on the read path, see below |
+| only an actual `CLAUDE.md` without an import line | it is **renamed** to `AGENTS.md`, the prompt is appended to the preserved content, and `CLAUDE.md` is created again as an include file |
+| only the include file, `AGENTS.md` missing | it remains; `AGENTS.md` is created from the template. Renaming it would create an `AGENTS.md` that imports itself |
+| `AGENTS.md` is a symlink to `CLAUDE.md` | the reversed direction is resolved: remove the symlink; rename an actual `CLAUDE.md`, leave an include file in place; then create the include file again or create `AGENTS.md` from the template |
+| `AGENTS.md` is a dead symlink | it is removed so the file is not written to its target |
+| both are actual files, `CLAUDE.md` has no effective import line | **conflict**: the project decides whether the content applies to all assistants or only Claude Code: either move the content to `AGENTS.md` and reduce `CLAUDE.md` to the `@AGENTS.md` line, or put `@AGENTS.md` before the existing content and leave it there. Neither happens automatically |
+| `CLAUDE.md` deliberately points to another target | **conflict**: the project's link remains, otherwise the instructions read there would immediately become ineffective |
+| `AGENTS.md` deliberately points to another target | a project decision, not an error: the include file works through the link, and that is where the prompt arrives. If `CLAUDE.md` also has its own content without an import line, it is a **conflict** |
+| `AGENTS.md` is ignored by Git | **conflict**: otherwise its content would silently fall out of version control; remove the ignore rule and set up again |
 
-**Wirksam** ist die Import-Zeile nur außerhalb von Backticks und Code-Blöcken — dort
-überliest Claude Code sie beim Import-Parsing. Eine `CLAUDE.md`, die `@AGENTS.md` nur
-in Backticks oder in einem Code-Block nennt, gilt deshalb als Datei ohne Import und
-landet im Konflikt, nicht im Sollzustand.
+The import line is **effective** only outside backticks and code blocks; Claude Code ignores it there during import parsing. A `CLAUDE.md` that mentions `@AGENTS.md` only in backticks or a code block is therefore treated as a file without an import and becomes a conflict rather than the expected state.
 
-Bei einem Konflikt wird nichts verschoben, nichts gelöscht, nichts gesichert und auch
-kein `AGENTS.md` angelegt. Das ist kein Schönheitsfehler: solange er steht, sieht Claude
-Code vom Einrichten nichts, weil er ausschließlich `CLAUDE.md` liest. Die
-Assistenten-Karte meldet den Zustand als `Konflikt` und nennt den Ausweg im Detailtext.
+During a conflict, nothing is moved, deleted, backed up, and no `AGENTS.md` is created. This is not cosmetic: while it persists, Claude Code sees nothing from setup because it reads only `CLAUDE.md`. The assistants card reports the state as `Conflict` and details the resolution.
 
-Derselbe Ablauf läuft beim **Aktualisieren**. Ein Projekt, das nur eine echte
-`CLAUDE.md` hat, wird also auch darüber eingerichtet, und ein Projekt ganz ohne
-`AGENTS.md` bekommt sie dabei erstmals.
+The same process runs during **updates**. A project that has only an actual `CLAUDE.md` is therefore set up that way too, and a project without any `AGENTS.md` gets it for the first time.
 
-**Bestandsprojekte** migrieren sich von selbst. Der erste `k-playbook context` — oder
-der Assistenten-Block der Oberfläche — ersetzt den alten Symlink durch die Include-Datei
-und sagt das in `links.note`. Danach zeigt `git status` einmalig eine geänderte
-`CLAUDE.md` mit gewechseltem Modus (Symlink → reguläre Datei, `120000` → `100644`); die
-Änderung gehört committet. Es ist die eine Stelle, an der ein reiner Lesepfad eine
-versionierte Datei im Hauptverzeichnis ändert, und genau so wird sie benannt. Kein
-Include ins Leere: solange `AGENTS.md` fehlt, wartet ein alter Symlink auf sein Ziel und
-wird erst ersetzt, wenn es da ist. Steht dagegen die Include-Datei und `AGENTS.md` fehlt,
-nennt der Detailtext den Import ins Leere — Claude Code lädt daraus nichts, bis
-**Einrichten** `AGENTS.md` anlegt.
+**Existing projects** migrate themselves. The first `k-playbook context`, or the assistants section of the interface, replaces the old symlink with the include file and reports this in `links.note`. Afterwards, `git status` shows a one-time modified `CLAUDE.md` with a changed mode (symlink -> regular file, `120000` -> `100644`); this change must be committed. It is the one place where a read-only path changes a versioned file in the project root, and it is named as such. No include to nowhere: as long as `AGENTS.md` is absent, an old symlink waits for its target and is replaced only when it exists. If the include file exists while `AGENTS.md` is missing, the detail text identifies the import to nowhere: Claude Code loads nothing from it until **Setup** creates `AGENTS.md`.
 
-**Der Preis der Trennung.** Ohne Symlink sind es zwei Dateien, die auseinanderlaufen
-können: was Claude Code über `/memory` oder `#` nach `CLAUDE.md` schreibt, erreicht
-OpenCode und Cursor nicht, und die Prüfung meldet Projektinhalt neben dem Include nicht
-als Konflikt. Das ist bewusst so — die Gegenrichtung hieße, jeden Inhalt neben dem
-Include zum Konflikt zu erklären. Als Gegengewicht steht im Stub über der Import-Zeile,
-dass Projektregeln nach `AGENTS.md` gehören.
+**The cost of separation.** Without a symlink, there are two files that can diverge: content Claude Code writes to `CLAUDE.md` through `/memory` or `#` does not reach OpenCode and Cursor, and the check does not report project content beside the include as a conflict. This is deliberate: reversing the direction would mean treating every piece of content beside the include as a conflict. As a counterweight, the stub above the import line says that project rules belong in `AGENTS.md`.
 
-**Was Claude Code dafür können muss.** `@`-Importe in `CLAUDE.md` gibt es seit Claude
-Code **0.2.107** (CHANGELOG, Eintrag „CLAUDE.md files can now import other files"); eine
-ältere Fassung lädt aus dem Stub still gar nichts. Die Importtiefe ist begrenzt: laut
-Dokumentation folgt Claude Code Importen bis zu **vier Ebenen** tief („Imported files
-can recursively import other files, with a maximum depth of four hops", code.claude.com,
-Seite „How Claude remembers your project", Stand 2026-09-05). Der Stub verbraucht davon
-eine Ebene — ein `AGENTS.md`, das selbst mit `@` importiert, hat gegenüber dem früheren
-Symlink eine Ebene weniger.
+**What Claude Code must support.** `@` imports in `CLAUDE.md` have existed since Claude Code **0.2.107** (CHANGELOG entry "CLAUDE.md files can now import other files"); an older version silently loads nothing from the stub. Import depth is limited: according to the documentation, Claude Code follows imports up to **four levels** deep ("Imported files can recursively import other files, with a maximum depth of four hops", code.claude.com, page "How Claude remembers your project", as of 2026-09-05). The stub consumes one level, so an `AGENTS.md` that itself imports with `@` has one level less than the former symlink.
 
-Was ein Assistent darüber hinaus lesen soll, steht nicht in `AGENTS.md`, sondern in
-`k-playbook.md` — je einmal pro Ebene:
+Anything else an assistant should read is not in `AGENTS.md`, but in `k-playbook.md`, once per layer:
 
-| Datei | Gilt für | Beim Update |
+| File | Applies to | On update |
 |---|---|---|
-| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
-| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+| `k-playbook/k-playbook.md` | every project that uses k-playbook | is replaced |
+| `k-playbook-local/k-playbook.md` | this project only | remains |
 
-Gelesen wird in dieser Reihenfolge; die projekteigene Ebene ergänzt die mitgelieferte
-oder überstimmt sie.
+They are read in this order; the project-owned layer supplements or overrides the shipped one.
 
-Die Verlinkung ist projektlokal. Es wird nichts in `~/.config/opencode/` oder
-`~/.claude/` geschrieben. Dadurch kann ein Rechner mehrere Projekte mit
-unterschiedlichen k-playbook-Ständen tragen, ohne dass sie sich gegenseitig
-überschreiben.
+Linking is project-local. Nothing is written to `~/.config/opencode/` or `~/.claude/`. This allows one machine to have several projects with different k-playbook versions without them overwriting each other.
 
-**Altlasten werden entfernt.** Auf Rechnern mit einer Installation nach dem alten Modell
-liegen noch host-globale Symlinks unter `~/.claude/commands`, `~/.claude/skills` und
-`~/.config/opencode/command`, dazu ein `skills.paths`-Eintrag in der
-OpenCode-User-Config. Die wirken in jedes Projekt hinein — ein Assistent sähe dort
-zusätzlich die Commands eines fremden Standes. `k-playbook` entfernt sie bei jedem Start,
-aber nur, was nachweislich zu einem k-playbook gehört. Fällt etwas weg, meldet es das im
-Terminal; sonst bleibt es still.
+**Legacy artifacts are removed.** On machines with an installation from the old model, host-global symlinks still exist under `~/.claude/commands`, `~/.claude/skills`, and `~/.config/opencode/command`, along with a `skills.paths` entry in the OpenCode user configuration. They apply to every project, so an assistant would additionally see commands from another version. `k-playbook` removes them on every start, but only items demonstrably belonging to k-playbook. If it removes something, it reports this in the terminal; otherwise it stays silent.
 
-Nach Änderungen an Commands oder Skills muss der jeweilige Assistent neu gestartet
-werden — beide erfassen sie beim Start.
+After changing commands or skills, restart the respective assistant: both discover them at startup.
 
-## Browser beim Start
+## Browser on startup
 
-Beim Start der Oberfläche steht die URL im Terminal, und der Browser wird geöffnet. Der
-Server dahinter läuft als Hintergrunddienst je Projekt weiter: der Aufruf kehrt zurück,
-sobald der Browser offen ist, und ein zweiter Aufruf im selben Projekt öffnet nur ein
-weiteres Fenster auf denselben Server. Beendet wird er über `Dienst beenden` in der
-Oberfläche oder `k-playbook stop`; ohne jede Anfrage beendet er sich nach 60 Minuten von
-selbst. Welches Programm den Browser öffnet, entscheidet sich in dieser Reihenfolge:
+At interface startup, the URL is printed in the terminal and the browser opens. The server behind it continues as a background service per project: the call returns as soon as the browser is open, and a second call in the same project only opens another window on the same server. It is stopped through `Stop service` in the interface or `k-playbook stop`; without any request, it stops itself after 60 minutes. The program that opens the browser is selected in this order:
 
-1. **`$BROWSER`**, sofern gesetzt. Die freedesktop-Konvention: eine mit `:` getrennte
-   Liste von Kommandos, in denen `%s` für die URL steht. Fehlt der Platzhalter, wird die
-   URL angehängt.
-2. Andernfalls die üblichen Verdächtigen der Plattform — `open` auf macOS, sonst
-   `wslview`, `xdg-open`, `gio open` und weitere, bis eines startet.
+1. **`$BROWSER`**, if set. The freedesktop convention: a `:`-separated list of commands in which `%s` stands for the URL. If the placeholder is absent, the URL is appended.
+2. Otherwise, the usual platform candidates: `open` on macOS, otherwise `wslview`, `xdg-open`, `gio open`, and others until one starts.
 
-**Im Container zählt allein `$BROWSER`.** Dort liefe jeder geratene Kandidat im Container
-statt auf dem Rechner vor dem Nutzer; schlimmer noch, `x-www-browser` und
-`sensible-browser` zeigen in schlanken Images gern auf einen Terminal-Browser, der dann
-das Terminal übernimmt. Ein ausdrücklich gesetzter `$BROWSER` weiß es dagegen besser: Er
-zeigt auf einen Helfer, der die URL an den Host durchreicht.
+**In a container, only `$BROWSER` counts.** Every guessed candidate would run in the container rather than on the user's machine; worse, `x-www-browser` and `sensible-browser` in slim images often point to a terminal browser, which then takes over the terminal. An explicitly set `$BROWSER` knows better: it points to a helper that passes the URL through to the host.
 
-Der DevContainer von VS Code richtet genau das von selbst ein — die Variable zeigt dort
-auf ein Skript, das `code --openExternal` aufruft und damit den Browser auf dem Host
-öffnet. Der weitergeleitete Port kommt ebenfalls von VS Code. Es ist derselbe Weg, über
-den auch `gh auth login` seinen Browser öffnet.
+The VS Code DevContainer sets this up automatically: the variable points to a script that calls `code --openExternal` and therefore opens the browser on the host. VS Code also forwards the port. It is the same path by which `gh auth login` opens its browser.
 
-Ist `$BROWSER` im Container nicht gesetzt, bleibt es beim bisherigen Verhalten: das
-Terminal nennt den erkannten Container-Marker und die URL zum Selbsteintragen. Wer den
-Helfer nachrüsten will, setzt die Variable selbst:
+If `$BROWSER` is not set in the container, the existing behavior remains: the terminal names the detected container marker and the URL to enter manually. To add the helper, set the variable yourself:
 
 ```bash
-export BROWSER=/pfad/zum/helfer.sh   # bekommt die URL als Argument
+export BROWSER=/path/to/helper.sh   # receives the URL as an argument
 ```
 
-## Reviews und Tasks
+## Reviews and tasks
 
-Der Bereich **Workflows** führt die Arbeitsvorräte zusammen: Review-Läufe aus
-`k-playbook-local/results/`, Tasks aus `k-playbook-local/tasks/` und Todos aus
-`k-playbook-local/TODO.md`. Jede Liste trägt ihre eigene Zahl.
+The **Workflows** section brings together the work queues: review runs from `k-playbook-local/results/`, tasks from `k-playbook-local/tasks/`, and todos from `k-playbook-local/TODO.md`. Each list has its own count.
 
-Ein Beschreibungsblock steht voran und sagt, was die drei Sorten sind und wann man
-welche nimmt. Darunter stehen die bisherigen Läufe, dann die offenen Tasks nach ihrer
-Nummer; ein Klick zeigt den Task als Markdown unter der Liste. Die erledigten aus
-`tasks/done/` stehen in einem zugeklappten Block — die jüngste Nummer oben — und lassen
-sich genauso lesen. Den Schluss machen die Todos, offene und abgehakte getrennt.
+A description block comes first and explains what the three kinds are and when to use each. Below it are the previous runs, then the open tasks in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. Todos conclude the section, with open and checked-off items separated.
 
-Rechts an jeder Task-Zeile steht, ob sie schon durch `/k-task-refine` gegangen ist —
-mit Datum, sofern das Review-Log eines nennt. „ohne Task-Refine" ist kein Fehler, aber
-der Grund, warum `/k-task-run` vor der Ausführung nachfragt.
+On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. "without task refine" is not an error, but it is why `/k-task-run` asks before execution.
 
-Gelesen wird nur. Angelegt und ausgeführt werden Tasks über `/k-task-create` und
-`/k-task-run` im Assistenten.
+This section is read-only. Tasks are created and executed through `/k-task-create` and `/k-task-run` in the assistant.
 
-## Doku lesen
+## Read documentation
 
-Der Bereich **Docs** zeigt alle Markdown-Dateien aus `k-playbook/docs` — dieselbe Doku,
-die du gerade liest, in dem Stand, der im Projekt installiert ist. Der Index steht links
-im Menü, die geöffnete Datei rechts; ohne Auswahl steht dort die `README.md`. Verweise im
-Text führen zur nächsten Datei, Anker springen innerhalb der offenen.
+The **Docs** section shows all Markdown files from `k-playbook/docs`, the same documentation you are reading now, at the version installed in the project. The index is on the left in the menu and the open file on the right; without a selection, it shows `README.md`. Links in the text lead to the next file, and anchors jump within the open file.
 
-Mermaid-Diagramme werden gezeichnet, sofern der Rechner ins Netz kommt: die Library wird
-bei Bedarf geladen. Ohne Netz bleibt der Diagramm-Quelltext stehen, der Text ist
-weiterhin vollständig lesbar.
+Mermaid diagrams are rendered if the machine has network access: the library is loaded when needed. Without network access, the diagram source remains visible and the text is still fully readable.
 
-## Nachsehen, was gilt
+## Inspect what applies
 
-Ganz unten steht der Block **Aufgelöster Kontext**. Aufgeklappt zeigt er, was ein
-Command sieht: die aufgelösten Pfade, die Instruktionsdateien in Lesereihenfolge, die
-effektiven Kataloge für Regeln, Reviews und Checks samt Herkunft — mitgeliefert,
-projekteigen oder ersetzt — und die Guidelines. Abgeschaltete Einträge stehen mit, damit
-sichtbar bleibt, dass es sie gibt.
+At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, instruction files in read order, effective catalogs for rules, reviews, and checks with their origin, shipped, project-owned, or replaced, plus guidelines. Disabled entries are included so their existence remains visible.
 
-Es ist dieselbe Auskunft wie `k-playbook context`, nur lesbar aufbereitet.
-Der Block lädt erst beim Aufklappen und verändert nichts.
+It provides the same information as `k-playbook context`, only presented readably.
 
-Ein Assistent kann dieselbe Auskunft als Werkzeug bekommen, statt sie über die
-Kommandozeile zu holen. Dafür ist der MCP-Server da; eingerichtet wird er im Block
-**k-playbook-MCP**, und die Seite `/mcp` zeigt den Registrierungszustand samt den
-Werkzeugen, die der Server tatsächlich anbietet. Alles dazu steht in
-[`mcp.md`](./mcp.md).
+The section loads only when expanded and changes nothing.
 
-## Aktualisieren
+An assistant can receive the same information as a tool instead of retrieving it from the command line. That is what the MCP server is for; it is configured in the **k-playbook MCP** section, and the `/mcp` page shows the registration state along with the tools the server actually offers. Everything about it is in [`mcp.md`](./mcp.md).
 
-Der bequeme Weg ist die Oberfläche. Sie prüft nach dem Start per `git ls-remote`, ob
-die Installation hinter dem Remote liegt, und zieht auf Knopfdruck per
-`git pull --ff-only` nach. Dafür macht sie `k-playbook/` kurz beschreibbar und setzt es
-danach wieder read-only. Bewusst `ls-remote` statt `fetch`: die Prüfung läuft
-ungefragt und darf den Zustand des Repositorys nicht anfassen. Bewusst `--ff-only`: ein
-Merge im Clone erzeugte eine lokale Historie, die niemand pflegt.
+## Update
 
-Von Hand geht es genauso:
+The convenient path is the interface. After startup, it checks with `git ls-remote` whether the installation is behind the remote and updates it at the press of a button with `git pull --ff-only`. It briefly makes `k-playbook/` writable and then sets it read-only again. Deliberately `ls-remote` rather than `fetch`: the check runs without being requested and must not touch repository state. Deliberately `--ff-only`: a merge in the clone would create local history that nobody maintains.
+
+Manually, it works the same way:
 
 ```bash
-cd /pfad/zum/projekt
+cd /path/to/project
 make -C k-playbook installer-update
 ```
 
-Das Make-Target entspricht `chmod -R u+w k-playbook && git -C k-playbook fetch origin && git -C k-playbook reset --hard origin/main && git -C k-playbook clean -fd && chmod -R a-w k-playbook` und sperrt die Installation auch dann wieder, wenn der Pull fehlschlägt. Der harte Reset ist bewusst: `k-playbook/` trägt per Vertrag keine lokalen Änderungen; alles darin darf nur durch Pull entstehen. Im Entwicklungsrepo funktioniert zusätzlich `make installer-update`, weil dort der Installations-Clone unter `./k-playbook/` liegt.
+The Make target corresponds to `chmod -R u+w k-playbook && git -C k-playbook fetch origin && git -C k-playbook reset --hard origin/main && git -C k-playbook clean -fd && chmod -R a-w k-playbook` and also locks the installation again if the pull fails. The hard reset is deliberate: by contract, `k-playbook/` has no local changes; everything in it may arise only through pulling. In the development repository, `make installer-update` additionally works because the installation clone is under `./k-playbook/`.
 
-**Der Make-Weg aktualisiert den Clone, nicht das Projekt daneben.** Er ist eine reine
-Git-Kette und läuft absichtlich ohne Go und ohne das installierte Binary — das ist sein
-Zweck: er muss auch dann noch funktionieren, wenn im Projekt gar nichts anderes läuft.
-Was im Hauptverzeichnis liegt und nicht im Clone — die MCP-Registrierung, der
-Anstoßblock in `AGENTS.md` — erreicht er deshalb nicht.
+**The Make path updates the clone, not the adjacent project.** It is a pure Git chain and deliberately runs without Go and without the installed binary. That is its purpose: it must keep working even when nothing else works in the project. It therefore does not reach things in the project root but not in the clone, the MCP registration and the prompt block in `AGENTS.md`.
 
-Nachgezogen wird das beim **nächsten Aufruf von `k-playbook`**. Der Start ist der zweite,
-allgemeine Auffangweg: er korrigiert eine veraltete MCP-Registrierung von selbst und
-meldet, was er getan hat. Das gilt für jeden Weg, der am Update-Knopf der Oberfläche
-vorbeigeht — auch für ein `git pull` von Hand. Nach einem Update von Hand also einmal:
+This is caught up on the **next call to `k-playbook`**. Startup is the second, general fallback path: it corrects stale MCP registration itself and reports what it did. This applies to every path that bypasses the interface update button, including a manual `git pull`. Therefore, after a manual update, call once:
 
 ```bash
 k-playbook
 ```
 
-Das ist kein zusätzlicher Handgriff im Alltag, sondern derselbe Aufruf, mit dem eine
-Sitzung ohnehin beginnt.
+This is not an additional everyday step, but the same call with which a session starts anyway.
 
-`k-playbook/` enthält nichts Projekteigenes und ist dadurch vollständig ersetzbar —
-auch per `rm -rf` und neuem Clone. `K-PLAYBOOK.yaml` und `k-playbook-local/` liegen
-daneben und bleiben unberührt.
+`k-playbook/` contains no project-owned content and is therefore completely replaceable, including by `rm -rf` and a new clone. `K-PLAYBOOK.yaml` and `k-playbook-local/` sit alongside it and remain untouched.
 
-Bei jedem Start der Oberfläche wird eine vorhandene Installation ebenfalls read-only
-gesetzt. Das ist nur eine lokale Schutzschicht gegen versehentliche Schreibzugriffe; das
-Update hebt sie gezielt und temporär auf.
+At every interface startup, an existing installation is also set read-only. This is only a local protection layer against accidental writes; the update deliberately and temporarily lifts it.
 
-**Wurde dort trotzdem lokal gearbeitet, sagt die Oberfläche es und aktualisiert nicht.**
-Der Block `Installation` erscheint nur in diesem Fall, nennt die betroffenen Dateien und
-gibt den Befehl zum Zurücksetzen aus; ausgeführt wird er nicht von selbst. Der Grund
-für die Prüfung ist, dass der Fehler sich sonst versteckt: ändert sich eine lokal
-veränderte Datei upstream nicht mit, läuft `git pull` sauber durch und lässt sie
-stehen — die Änderung überlebt dann jedes Update, ohne je aufzufallen.
+**If local work was nevertheless done there, the interface reports it and does not update.** The `Installation` section appears only in this case, names the affected files, and gives the reset command; it does not run it automatically. The reason for the check is that the mistake would otherwise stay hidden: if a locally modified file does not also change upstream, `git pull` completes successfully and leaves it in place, so the change survives every update without ever being noticed.
 
-Hat dabei `VERSION` gewechselt und trägt das laufende Binary diese Version noch nicht,
-gehört zu dem neuen Stand ein anderes Binary. Der Dienst beendet sich dann nach der Antwort
-selbst. Trägt das Binary sie bereits — der Regelfall im Entwicklungsrepo, wo
-`make dev-install` es vor dem Clone einspielt —, läuft der Dienst weiter. Installiert wird das neue Binary ausdrücklich
-über den Bootstrap — `make -C k-playbook install`, ohne make `k-playbook/bin/install` —;
-der Update-Pfad lädt oder ersetzt von sich aus kein Host-Binary. Danach startet
-`k-playbook` die neue Fassung. Nach einem `git pull` von Hand oder
-`make -C k-playbook installer-update` läuft ein alter Dienst zunächst weiter; erkannt und
-ersetzt wird er erst, wenn der nächste Aufruf von `k-playbook` aus einem neu installierten
-Binary kommt. Verglichen wird dabei die Binärdatei selbst und nicht nur ihre Version — ein
-neu gebautes Binary derselben `VERSION` löst den alten Dienst also ebenso ab. Sind nur Commands, Regeln oder Rezepte neu, ändert sich
-`VERSION` nicht: der Dienst läuft weiter, `Neu einlesen` in der Oberfläche holt den Stand,
-und ein Neustart des Assistenten genügt.
+If `VERSION` changed and the running binary does not yet have that version, the new version requires another binary. The service then stops itself after responding. If the binary already has it, the usual case in the development repository where `make dev-install` installs it before the clone, the service continues. Install the new binary explicitly through the bootstrap, `make -C k-playbook install`, or without make `k-playbook/bin/install`; the update path does not itself download or replace a host binary. Afterwards, `k-playbook` starts the new version. After a manual `git pull` or `make -C k-playbook installer-update`, an old service initially keeps running; it is detected and replaced only when the next call to `k-playbook` comes from a newly installed binary. The binary file itself is compared, not only its version, so a newly built binary with the same `VERSION` also replaces the old service. If only commands, rules, or recipes are new, `VERSION` does not change: the service continues, `Reload` in the interface loads the version, and restarting the assistant is enough.
 
-**Das Übergangsfenster beim Wechsel auf die direkte Installation.** Ein Projekt, das noch
-nach dem abgelösten Wrapper-Modell eingerichtet ist, braucht die Schritte in dieser
-Reihenfolge — und dazwischen liegt ein Fenster, in dem nichts läuft:
+**The transition window when changing to direct installation.** A project still configured under the retired wrapper model needs these steps in this order, with a window between them where nothing works:
 
-1. **Zuerst den Clone aktualisieren.** Vorher gibt es `k-playbook/bin/install` in diesem
-   Projekt gar nicht; der Bootstrap ist erst nach dem Update vorhanden.
-2. **Danach der Bootstrap**, einmal je Host und einmal je DevContainer:
-   `make -C k-playbook install`, ohne make `k-playbook/bin/install`.
+1. **Update the clone first.** Before that, `k-playbook/bin/install` does not exist in this project at all; the bootstrap is present only after the update.
+2. **Then run the bootstrap**, once per host and once per DevContainer: `make -C k-playbook install`, or without make `k-playbook/bin/install`.
 
-Zwischen beiden Schritten zeigen die Commands, der Anstoßblock in `AGENTS.md` und die
-MCP-Registrierung noch auf `k-playbook/bin/k-playbook` — die Datei, die das Update
-entfernt hat. In diesem Fenster gibt es kein funktionierendes Kommando, auch keinen
-Ersatzaufruf: die beiden selbsttätigen Korrekturwege laufen im installierten Binary und
-setzen den Bootstrap deshalb voraus. Er ist der eine verbleibende Handgriff; danach zieht
-der nächste Aufruf von `k-playbook` Registrierung und Anstoßblock von selbst nach.
+Between the two steps, commands, the prompt block in `AGENTS.md`, and the MCP registration still point to `k-playbook/bin/k-playbook`, the file removed by the update. In this window, no command works, nor is there a replacement invocation: the two automatic correction paths run in the installed binary and therefore require the bootstrap. It is the one remaining manual step; after it, the next call to `k-playbook` catches up registration and the prompt block itself.
 
-**Die Verlinkung zieht sich selbst nach.** Weil Commands und Skills einzeln verlinkt
-sind, kommt ein neu mitgelieferter Command nicht von allein an. Nachgezogen wird deshalb
-auf dem Lesepfad, nicht erst auf Knopfdruck: Der Assistenten-Block richtet die
-Registrierung beim Anzeigen aus und meldet, was sich geändert hat (`Verlinkung
-nachgezogen: 3 dazugekommen, 1 entfernt.`), und `k-playbook context` tut dasselbe — der
-Aufruf, der ohnehin am Anfang jeder Assistenten-Sitzung steht. Wie die Installation zu
-ihrem Stand kam, spielt dabei keine Rolle: über die Oberfläche, mit `git pull` von Hand
-oder über ein Ziel im Makefile. Was sich nicht von selbst auflösen lässt — eine echte
-Projektdatei im Weg, ein Konflikt an `CLAUDE.md` — bleibt liegen und steht weiter im
-Assistenten-Block.
+**Linking catches itself up.** Because commands and skills are linked individually, a newly shipped command does not arrive by itself. It is therefore caught up on the read path, not only at the press of a button: the assistants section synchronizes registration when displayed and reports what changed (`Linking synchronized: 3 added, 1 removed.`), and `k-playbook context` does the same, the call already made at the beginning of every assistant session. How the installation reached its version is irrelevant: through the interface, manual `git pull`, or a Makefile target. What cannot resolve itself, an actual project file in the way or a conflict in `CLAUDE.md`, remains and continues to appear in the assistants section.
 
-Damit die neuen Commands im Assistenten ankommen, muss dieser danach neu gestartet
-werden — Claude Code, OpenCode und Cursor erfassen sie beim Start.
+For the new commands to reach the assistant, restart it afterwards: Claude Code, OpenCode, and Cursor discover them at startup.
 
-### Bestehende Projekte: zwei Dinge kommen dazu
+### Existing projects: two things are added
 
-Wer ein Projekt aus einer Fassung bis 0.4 aktualisiert, findet nach dem Update zweierlei
-vor. Beides erledigt ein Klick, gelöscht oder überschrieben wird nichts:
+Anyone updating a project from a version through 0.4 finds two things after the update. One click handles both; nothing is deleted or overwritten:
 
-| Wo | Was die Oberfläche meldet | Was zu tun ist |
+| Where | What the interface reports | What to do |
 |---|---|---|
-| Projekteigene Struktur | `Fehlende Einträge: commands, skills` | **Anlegen** — die beiden Overlay-Verzeichnisse entstehen mit ihrer README |
-| Assistenten-Verlinkung | `Verzeichnis-Symlink aus einer älteren Fassung` | **Einrichten** — der Symlink wird durch Einzel-Links ersetzt |
+| Project-owned structure | `Missing entries: commands, skills` | **Create**: the two overlay directories are created with their README |
+| Assistant linking | `Directory symlink from an older version` | **Set up**: the symlink is replaced with individual links |
 
-Der zweite Punkt ist die eigentliche Umstellung: aus `.claude/commands -> ../k-playbook/commands`
-wird ein echtes Verzeichnis mit einem Link je Command. Die Quelle in `k-playbook/` bleibt
-dabei unangetastet.
+The second point is the actual conversion: `.claude/commands -> ../k-playbook/commands` becomes an actual directory with one link per command. The source in `k-playbook/` remains untouched.
 
-Die Einzel-Links gehören ins Repository des Projekts und werden committet — dann hat ein
-frischer Clone die Commands sofort registriert.
+Individual links belong in the project's repository and are committed. A fresh clone then has commands registered immediately.
 
-### Eine Konfiguration aus einem abgelösten Modell
+### A configuration from a retired model
 
-Wer ein Projekt aus einer der ersten Fassungen weiterträgt, stößt irgendwann auf:
+Anyone carrying forward a project from one of the first versions will eventually encounter:
 
 ```text
-K-PLAYBOOK.yaml hat schema_version 1 und beschreibt ein abgelöstes Modell …
+K-PLAYBOOK.yaml has schema_version 1 and describes a retired model ...
 ```
 
-Das ist kein Fehler im Projekt, sondern die Folge einer bewussten Aufteilung: die
-Installation aktualisiert sich per `git pull`, die `K-PLAYBOOK.yaml` liegt daneben und
-wird nie überschrieben — sie gehört dem Projekt. Irgendwann ist das Werkzeug drei
-Modelle weiter und die Datei noch beim ersten. Umgerechnet wird nicht
-([`k-playbook-format.md`](./k-playbook-format.md#schema_version) sagt, warum);
-zurückgesetzt schon.
+This is not an error in the project, but the consequence of a deliberate separation: the installation updates itself through `git pull`, while `K-PLAYBOOK.yaml` sits beside it and is never overwritten because it belongs to the project. At some point the tool is three models ahead while the file is still at the first. It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_version) explains why), but it can be reset.
 
-Die Oberfläche starten: der Block **Projektkonfiguration** steht dann wieder da, nennt
-die gefundene Fassung und das Modell, das sie beschreibt, und bietet **Zurücksetzen und
-neu anlegen** an. Dabei wird
+Start the interface: the **Project configuration** section then appears again, names the found version and the model it describes, and offers **Reset and create again**. It:
 
-- die alte Datei als `K-PLAYBOOK.yaml.v1-alt` daneben gelegt — nicht gelöscht, denn
-  `remediation`, `tools` und `project.repo_root` stehen nur dort,
-- eine frische `K-PLAYBOOK.yaml` mit `schema_version: 3` geschrieben, mit dem alten
-  `project.repo_root` vorbelegt,
-- eine bereits vorhandene Sicherung nie überschrieben; sie bekommt `-2`, `-3` angehängt.
+- places the old file alongside it as `K-PLAYBOOK.yaml.v1-alt`, rather than deleting it, because `remediation`, `tools`, and `project.repo_root` exist only there,
+- writes a fresh `K-PLAYBOOK.yaml` with `schema_version: 3`, prefilled with the old `project.repo_root`,
+- never overwrites an existing backup, instead appending `-2`, `-3`.
 
-Danach die restlichen Blöcke wie bei einer neuen Installation durchgehen und die eigenen
-Werte aus der Sicherung zurückholen.
+Then go through the remaining sections as for a new installation and retrieve custom values from the backup.
 
-**Vorher zieht das Projekteigene um.** Unter Modell 1 lagen Tasks, Checks, Reviews,
-Guidelines, Docs und die `TODO.md` **innerhalb** von `k-playbook/` — genau dem
-Verzeichnis, das heute der ersetzbare Clone ist. Nur die Konfiguration zu erneuern
-hinterließe eine stille Falle: alles sähe gesund aus, und das nächste Update nähme die
-Inhalte mit. Findet die Oberfläche dort Projekteigenes, schreibt sie deshalb nichts,
-nennt die Pfade und bleibt bei „Veraltet" stehen:
+**First move project-owned content.** Under model 1, tasks, checks, reviews, guidelines, docs, and `TODO.md` were **inside** `k-playbook/`, precisely the directory that is now the replaceable clone. Merely renewing the configuration would leave a silent trap: everything would look healthy, and the next update would take the content with it. If the interface finds project-owned content there, it writes nothing, names the paths, and remains at "Outdated":
 
 ```bash
-cd /pfad/zum/projekt
+cd /path/to/project
 git mv k-playbook/tasks     k-playbook-local/tasks
 git mv k-playbook/reviews   k-playbook-local/reviews
 git mv k-playbook/TODO.md   k-playbook-local/TODO.md
 ```
 
-Welche Pfade es sind, steht im `paths.`-Block der alten Datei. Sind sie umgezogen, wird
-der Knopf frei.
+The old file's `paths.` section identifies the paths. Once they have moved, the button becomes available.
 
-## Ein Werkzeug für alle Projekte
+## One tool for all projects
 
-Nach dem Bootstrap genügt überall:
+After bootstrapping, this is enough everywhere:
 
 ```bash
-cd /pfad/zum/projekt
+cd /path/to/project
 k-playbook
 ```
 
-Es ist dasselbe Werkzeug für alle Projekte. Welches Projekt gemeint ist, ergibt sich aus
-dem Verzeichnis, in dem der Aufruf stattfindet — nicht aus dem Ort des Programms. Der
-Clone unter `k-playbook/` ist reine Inhaltsquelle: Commands, Skills, Regeln, Reviews,
-Checks und Doku. Ein zweiter Einstiegspunkt im Projekt selbst existiert nicht mehr;
-aufgerufen wird k-playbook ausschließlich unter seinem Namen, und die Commands tun
-dasselbe.
+It is the same tool for every project. Which project it means derives from the directory in which it is called, not from the program's location. The clone under `k-playbook/` is a pure content source: commands, skills, rules, reviews, checks, and documentation. A second entry point in the project itself no longer exists; k-playbook is called exclusively by its name, and commands do the same.
 
-`~/.local/bin/k-playbook` ist eine echte Datei, kein Symlink und keine Auflösung zur
-Laufzeit. Jede Arbeitsumgebung installiert die Fassung ihrer eigenen Plattform: der
-macOS-Host ein Darwin-Binary, der DevContainer ein Linux-Binary. Ein DevContainer
-bootstrappt deshalb einmal für sich selbst, nach einem Rebuild erneut.
+`~/.local/bin/k-playbook` is an actual file, not a symlink or runtime resolution. Every work environment installs the version for its own platform: the macOS host a Darwin binary and the DevContainer a Linux binary. A DevContainer therefore bootstraps once for itself and again after a rebuild.
 
-**Eine eigene DevContainer-Integration gibt es nicht mehr** — keinen Bind-Mount nach
-`/workspaces/k-playbook`, keinen Symlink im Container und kein Setup-Skript in
-`.devcontainer/`. Die Installation liegt im Projektverzeichnis und kommt mit ihm in den
-Container, wie jede andere Projektdatei auch.
+**There is no longer dedicated DevContainer integration**: no bind mount to `/workspaces/k-playbook`, no symlink in the container, and no setup script in `.devcontainer/`. The installation is in the project directory and enters the container with it like every other project file.
 
-**Ein Stand, ein Binary.** `VERSION` im Wurzelverzeichnis des Clones nennt das Release,
-dessen Assets zu diesem Clone-Stand gehören; `SHA256SUMS` daneben trägt deren Prüfsummen.
-Commits an Regeln, Reviews, Commands oder Docs ändern beide Dateien nicht. Wechselt
-`VERSION` beim Update, gehört zum neuen Stand ein anderes Binary — installiert wird es
-ausdrücklich über den Bootstrap, nie nebenbei.
+**One version, one binary.** `VERSION` at the root of the clone names the release whose assets belong to this clone version; `SHA256SUMS` beside it contains their checksums. Commits to rules, reviews, commands, or docs change neither file. If `VERSION` changes during an update, the new version requires another binary, installed explicitly through the bootstrap and never incidentally.
 
 ## GitHub CLI
 
-`/k-pr-review` und das Dependabot-Review arbeiten über `gh`. Die Karte **GitHub CLI**
-hält zwei Dinge auseinander, die leicht durcheinandergeraten.
+`/k-pr-review` and the Dependabot review work through `gh`. The **GitHub CLI** card separates two things that are easily confused.
 
-Das eine ist die **Entscheidung des Projekts**: nutzt es `gh` oder nicht. Sie wird hier
-gesetzt und landet in `K-PLAYBOOK.yaml` unter `tools.gh.status`. Bis sie fällt, steht sie
-auf `unknown`, und die Karte zeigt das rot — nicht als Schönheitsfehler, sondern weil ein
-Command sonst nicht weiß, ob ein fehlendes `gh` ein Problem oder gewollt ist. Commands,
-die `gh` brauchen, brechen bei `unknown` ab.
+One is the **project's decision**: whether it uses `gh`. It is set here and stored in `K-PLAYBOOK.yaml` under `tools.gh.status`. Until it is made, its value is `unknown`, and the card shows it in red, not as a cosmetic defect, but because a command otherwise cannot tell whether a missing `gh` is a problem or intentional. Commands requiring `gh` stop at `unknown`.
 
-Das andere ist der **Befund für diesen Rechner**: liegt `gh` im PATH, und ist ein Account
-hinterlegt. Der steht nur in der Karte und in der Kontextausgabe, nie in der
-Konfiguration — auf dem nächsten Rechner ist er ein anderer.
+The other is the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine.
 
-Installiert und angemeldet wird im Terminal, wie bei den Security-Tools: beides verändert
-den Host, und `gh auth login` will einen Browser. Die Karte zeigt dafür den passenden
-Befehl.
+Install and sign in through the terminal, just as with security tools: both change the host, and `gh auth login` needs a browser. The card shows the appropriate command.
 
 ```bash
-gh auth login --hostname github.com   # anmelden
-gh auth status                        # Token beim Server prüfen
+gh auth login --hostname github.com   # sign in
+gh auth status                        # check the token with the server
 ```
 
-Der Befund ist aus `~/.config/gh/hosts.yml` gelesen und **nicht beim Server geprüft**:
-ein hinterlegter Token kann abgelaufen oder zurückgezogen sein. Wer Gewissheit braucht,
-ruft `gh auth status` auf.
+The finding is read from `~/.config/gh/hosts.yml` and is **not checked with the server**: a stored token may have expired or been revoked. To be certain, run `gh auth status`.
 
-Sind mehrere Accounts hinterlegt, nennt die Karte sie und zeigt den Umschaltbefehl:
+If several accounts are stored, the card names them and shows the switch command:
 
 ```bash
 gh auth switch --hostname github.com --user <account>
 ```
 
-Bewusst als Befehl und nicht als Knopf. Der Wechsel gilt für jedes Terminal und jedes
-Projekt auf diesem Rechner, nicht nur für dieses — und ein Approve oder Merge läuft
-danach unter dem neuen Namen. `/k-pr-review` nennt den aktiven Account deshalb vor jeder
-Schreibaktion.
+Deliberately a command, not a button. Switching applies to every terminal and project on this machine, not only this one, and an approval or merge then runs under the new name. `/k-pr-review` therefore names the active account before every write action.
 
-Nur `github.com`. Enterprise-Instanzen hätten eigene Accounts je Host und eine eigene
-Entscheidung je Projekt; das wäre etwas anderes als das hier.
+Only `github.com`. Enterprise instances would have their own accounts per host and a separate decision per project; that would be different from this.
 
-## Security-Tools
+## Security tools
 
-Projekte dürfen mit eigenem `.venv` arbeiten. Security-Tools werden davon getrennt host-
-oder user-lokal installiert, nie in ein Projekt-venv. Sie sind eine von zwei bewussten
-Ausnahmen von der Projektlokalität: ein Scanner gehört zur Arbeitsumgebung, nicht zum
-Projekt. Die zweite Ausnahme sind die Basis-Werkzeuge, siehe unten.
+Projects may work with their own `.venv`. Security tools are installed separately at host or user scope, never in a project venv. They are one of two deliberate exceptions to project locality: a scanner belongs to the work environment, not the project. Base tools are the second exception; see below.
 
-Die kanonische Matrix liegt in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv).
-Sie wird vom Installationsskript und von der Oberfläche gelesen; die Liste steht nicht
-zusätzlich im Go-Code.
+The canonical matrix is in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv). The installation script and interface read it; the list is not duplicated in Go code.
 
-Pflicht-Tools:
+Required tools:
 
-| Tool | Sprachen | Rolle |
+| Tool | Languages | Role |
 |---|---|---|
-| `gitleaks` | alle | Secret-Scanning |
-| `trufflehog` | alle | tiefes Secret-Scanning |
-| `trivy` | alle | Filesystem-, Container- und IaC-CVEs |
-| `syft` | alle | SBOM-Erzeugung |
-| `grype` | alle | SBOM-/Dependency-CVE-Auswertung |
-| `pip-audit` | Python | Python Dependency-CVEs |
-| `ruff` | Python | Python-Qualität und flake8-bandit-Regeln |
-| `semgrep` | Python, Go, JS/TS | generische Security-Regeln |
-| `osv-scanner` | Python, Go, JS/TS | Dependency-CVEs mit SARIF |
-| `gosec` | Go | Go-Security |
-| `govulncheck` | Go | Go-CVEs mit Reachability |
-| `njsscan` | JS/TS | Node-/JS-Security |
+| `gitleaks` | all | secret scanning |
+| `trufflehog` | all | deep secret scanning |
+| `trivy` | all | filesystem, container, and IaC CVEs |
+| `syft` | all | SBOM generation |
+| `grype` | all | SBOM/dependency CVE analysis |
+| `pip-audit` | Python | Python dependency CVEs |
+| `ruff` | Python | Python quality and flake8-bandit rules |
+| `semgrep` | Python, Go, JS/TS | generic security rules |
+| `osv-scanner` | Python, Go, JS/TS | dependency CVEs with SARIF |
+| `gosec` | Go | Go security |
+| `govulncheck` | Go | Go CVEs with reachability |
+| `njsscan` | JS/TS | Node/JS security |
 
-Optional, weil sie sich mit anderen überschneiden: `golangci-lint` (Go-Qualität, bündelt
-staticcheck und errcheck). `docker` ist ebenfalls optional und wird als Fallback-Kontext
-angezeigt, aber nicht durch k-playbook installiert.
+Optional because they overlap with others: `golangci-lint` (Go quality, bundles staticcheck and errcheck). `docker` is also optional and appears as fallback context, but k-playbook does not install it.
 
-`bandit` steht bewusst in keiner der beiden Listen: `ruff` deckt es ab, sein
-`S`-Regelwerk *ist* flake8-bandit. Ein zweites Werkzeug für dieselben Regeln brächte nur
-doppelte Befunde.
+`bandit` deliberately appears in neither list: `ruff` covers it; its `S` rule set *is* flake8-bandit. A second tool for the same rules would only produce duplicate findings.
 
-**JavaScript und TypeScript sind zwei getrennte Sprachen** in der Matrix, keine
-gemeinsame. `AppliesTo` kostet das nichts, aber die Kandidatenzählung leitet aus
-derselben Angabe ab, welche Endungen zählen — mit nur `javascript` bekäme ein reines
-TypeScript-Projekt eine 0 auf seinen `.ts`-Dateien. Ein Projekt, das beides hat, nennt
-beide.
+**JavaScript and TypeScript are two separate languages** in the matrix, not a shared one. `AppliesTo` has no cost for this, but candidate counting derives which extensions count from the same setting. With only `javascript`, a pure TypeScript project would get a 0 for its `.ts` files. A project with both names both.
 
-**Pflicht gilt je Sprache.** Ein sprachgebundenes Tool zählt nur dann als fehlende
-Pflicht, wenn seine Sprache gefragt war — und ohne Angabe gilt gar keine Sprachbindung als
-Pflicht, weil sich ohne diese Information nicht verlangen lässt, was vielleicht nicht
-gebraucht wird:
+**Required applies per language.** A language-bound tool counts as a missing requirement only when its language was requested. Without an indication, no language binding counts as required, because without this information it cannot require what may not be needed:
 
 ```bash
 k-playbook/scripts/install-security-tools.sh --languages python,go --preflight
 ```
 
-Die Oberfläche zeigt den Status read-only und installiert nichts. Alles Weitere macht
-das Skript selbst:
+The interface shows the status read-only and installs nothing. The script itself does everything else:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh                       # Status, das ist der Default
-k-playbook/scripts/install-security-tools.sh --install missing     # fragt vor der Installation
-k-playbook/scripts/install-security-tools.sh --help                # erklärt die Methoden
+k-playbook/scripts/install-security-tools.sh                       # status; this is the default
+k-playbook/scripts/install-security-tools.sh --install missing     # asks before installing
+k-playbook/scripts/install-security-tools.sh --help                # explains the methods
 ```
 
-`--method` wählt zwischen `auto`, `native`, `docker`, `pipx` und `venv`. Ohne `--yes`
-zeigt das Skript den Plan und fragt.
+`--method` selects between `auto`, `native`, `docker`, `pipx`, and `venv`. Without `--yes`, the script shows the plan and asks.
 
-Woher ein Tool kommt, steht in der Matrix und nicht im Skript: die Spalte
-`install_method` nennt `github` (Release-Asset), `go` (`go install`), `pipx` (pipx oder
-ein dediziertes Tool-venv) oder `none`, die Spalte `install_ref` die passende Referenz und
-`asset_pattern` bei GitHub-Releases das Namensmuster des Assets. Ein neues Tool ist damit
-eine Zeile in der TSV.
+The tool's origin is in the matrix rather than the script: the `install_method` column names `github` (release asset), `go` (`go install`), `pipx` (pipx or a dedicated tool venv), or `none`; `install_ref` gives the appropriate reference, and `asset_pattern` gives the asset-name pattern for GitHub releases. A new tool is therefore one TSV row.
 
-**`go install` bleibt den Tools vorbehalten, die Go ohnehin brauchen.** Sonst müsste ein
-reines Python-Projekt Go installieren, nur um an einen Scanner zu kommen. Betroffen ist
-allein `govulncheck`: es analysiert Go-Quellen und braucht die Toolchain zur Laufzeit, hat
-aber keine Release-Binaries. `gosec`, `golangci-lint` und `osv-scanner` kommen deshalb aus
-GitHub-Releases — `osv-scanner` als blanke Binary ohne Archiv, was das Skript am
-Asset-Namen erkennt.
+**`go install` remains limited to tools that already need Go.** Otherwise a pure Python project would have to install Go merely to acquire a scanner. Only `govulncheck` is affected: it analyzes Go sources and needs the toolchain at runtime but has no release binaries. `gosec`, `golangci-lint`, and `osv-scanner` therefore come from GitHub releases, with `osv-scanner` as a bare binary without an archive, which the script recognizes from the asset name.
 
-Ein Projekt darf selbstverständlich mit `.venv` arbeiten. Der read-only Preflight misst
-dann genau dieses aktive venv und kennzeichnet den Messkontext in der Oberfläche. **Nur vor
-der Installation der Security-Tools darf kein Projekt-venv aktiv sein**, damit nichts ins
-Projekt-venv geschrieben wird. Falls `VIRTUAL_ENV` gesetzt ist und installiert werden soll:
+A project may of course work with `.venv`. The read-only preflight then measures exactly that active venv and identifies the measurement context in the interface. **Only before installing security tools must no project venv be active**, so nothing is written into the project venv. If `VIRTUAL_ENV` is set and installation is planned:
 
 ```bash
 deactivate
 ```
 
-Empfohlen ist `--method auto`: native Binaries, Go-Tools und Python-CLI-Tools über `pipx`
-oder dedizierte Tool-venvs. Wer Python-CLI-Tools grundsätzlich in venvs kapseln will,
-nutzt explizit:
+`--method auto` is recommended: native binaries, Go tools, and Python CLI tools through `pipx` or dedicated tool venvs. To generally isolate Python CLI tools in venvs, use explicitly:
 
 ```bash
 k-playbook/scripts/install-security-tools.sh --install missing --method venv
 ```
 
-Auch das installiert nicht in `<projekt>/.venv`, sondern in dedizierte k-playbook-Tool-venvs
-unter `~/.local/share/k-playbook/security-tools/<tool>-venv`. `--method venv` betrifft nur
-Python-CLI-Tools; GitHub-Release- und Go-Tools nutzen weiterhin ihren nativen
-Installationsweg. Je Python-Tool gibt es ein eigenes venv, damit sich ihre Abhängigkeiten
-nicht in die Quere kommen; die Wurzel lässt sich mit `--venv-root` verlegen.
+This also does not install into `<project>/.venv`, but into dedicated k-playbook tool venvs under `~/.local/share/k-playbook/security-tools/<tool>-venv`. `--method venv` applies only to Python CLI tools; GitHub-release and Go tools continue to use their native installation path. Each Python tool gets its own venv so their dependencies do not interfere; `--venv-root` can relocate the root.
 
-## Basis-Werkzeuge
+## Base tools
 
-Die zweite bewusste Ausnahme von der Projektlokalität, und eine andere Sorte als die
-Security-Tools: Basis-Werkzeuge sind keine Scanner, sondern der Boden, auf dem die
-Commands stehen — `bash`, `git`, `curl` oder `wget`, `tar`, `python3` und `rg`. Von
-`curl` und `wget` genügt eines.
+The second deliberate exception to project locality, and a different type from security tools: base tools are not scanners but the ground on which commands stand: `bash`, `git`, `curl` or `wget`, `tar`, `python3`, and `rg`. Either `curl` or `wget` is sufficient.
 
-Die Matrix liegt in [`../scripts/base-tools.tsv`](../scripts/base-tools.tsv), getrennt von
-der Security-Matrix: `scanners.tsv` referenziert jene über die Spalte `tool`, und ein `rg`
-darin erschiene in jedem Review-Lauf als übersprungener Eintrag.
+The matrix is in [`../scripts/base-tools.tsv`](../scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
 
-**Ein fehlendes Basis-Werkzeug warnt, es blockiert nicht.** `k-playbook context` meldet
-den Zustand unter `baseTools`; ein Command benennt die Lücke, nimmt einen Rückfall, wo es
-einen gibt, und läuft weiter. Das unterscheidet sie von `gh`, dessen Fehlen ein PR-Review
-hart beendet.
+**A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence ends a PR review hard.
 
-Zustand ansehen und installieren:
+Inspect and install state:
 
 ```bash
 k-playbook/scripts/install-base-tools.sh --preflight
 k-playbook/scripts/install-base-tools.sh --install
 ```
 
-Das Skript entscheidet je Werkzeug: Als root mit `apt-get` installiert es systemweit über
-den Paketmanager. Sonst geht es den user-lokalen Weg aus einem GitHub-Release — heute
-trifft das allein `rg`, und dieser Weg braucht keinen root. Für `git`, `curl`, `wget`,
-`tar` und `python3` gibt es keinen sinnvollen user-lokalen Weg; dort gibt das Skript den
-`sudo apt-get`-Befehl aus und endet mit dem Rückgabewert `3`, der „für dieses Werkzeug
-gibt es hier keinen Weg" vom Fehlschlag trennt.
+The script decides per tool: as root with `apt-get`, it installs system-wide through the package manager. Otherwise, it takes the user-local path from a GitHub release. Currently this applies only to `rg`, and this path needs no root. For `git`, `curl`, `wget`, `tar`, and `python3`, there is no useful user-local path; the script prints the `sudo apt-get` command and exits with status `3`, which distinguishes "there is no path for this tool here" from failure.
 
-**k-playbook eskaliert nie selbst zu root.** Der `sudo`-Befehl wird gezeigt, nie
-ausgeführt, und das Skript startet sich nicht per `sudo` neu.
+**k-playbook never escalates to root itself.** It shows the `sudo` command but never runs it, and the script does not restart itself through `sudo`.
 
-Das Ziel des user-lokalen Wegs lässt sich mit `--prefix` und `--bin-dir` verlegen, dazu
-über `K_BASE_TOOLS_PREFIX` und `K_BASE_TOOLS_BIN_DIR`. Ein schreibender Aufruf, dessen
-aufgelöstes Ziel nicht dem ausführenden Benutzer gehört, wird abgewiesen — das fängt den
-`sudo`-Tippfehler ab, der sonst Binaries mit falschem Eigentümer hinterließe.
+The target of the user-local path can be relocated through `--prefix` and `--bin-dir`, as well as `K_BASE_TOOLS_PREFIX` and `K_BASE_TOOLS_BIN_DIR`. A writing invocation whose resolved target does not belong to the executing user is rejected. This catches the `sudo` typo that would otherwise leave binaries with incorrect ownership.
 
-### Für ein Dockerfile oder einen DevContainer
+### For a Dockerfile or DevContainer
 
-`--yes` schaltet jede Rückfrage ab, damit eine einzelne RUN-Zeile unbeaufsichtigt
-durchläuft. Als root mit `apt-get` — der Normalfall im Image-Build — installiert sie alles
-systemweit:
+`--yes` disables every prompt so a single RUN line can run unattended. As root with `apt-get`, the normal case in an image build, it installs everything system-wide:
 
 ```dockerfile
-RUN bash /opt/projekt/k-playbook/scripts/install-base-tools.sh --install --yes
+RUN bash /opt/project/k-playbook/scripts/install-base-tools.sh --install --yes
 ```
 
-Hat ein Werkzeug auf diesem Host keinen Weg, endet der Lauf mit `3`. Das ist kein
-Fehlschlag, aber `docker build` bricht darauf ab. Wer das nicht will, hängt
-`|| test $? -eq 3` an; wer die Lücke beim Bauen sehen will, lässt es stehen.
+If a tool has no path on this host, the run ends with `3`. This is not a failure, but `docker build` stops for it. If you do not want that, append `|| test $? -eq 3`; if you want to see the gap during the build, leave it in place.
 
-## Selbst bauen
+## Build it yourself
 
-Für den normalen Betrieb genügt das Release-Asset, das `bin/install` lädt. Wer am
-Werkzeug arbeitet oder lieber selbst baut, braucht Go:
+For normal operation, the release asset downloaded by `bin/install` is enough. Anyone working on the tool or preferring to build it themselves needs Go:
 
 ```bash
-make -C k-playbook dist         # alle Plattformen nach dist/
-make -C k-playbook dist-host    # nur die Plattform dieses Rechners
-make -C k-playbook dev-install  # baut diese Plattform und installiert sie
+make -C k-playbook dist         # all platforms into dist/
+make -C k-playbook dist-host    # only this machine's platform
+make -C k-playbook dev-install  # builds and installs this platform
 ```
 
-Alle Build-Targets verwenden dieselben Flags wie CI beim Bauen der Release-Assets, damit
-jeder Weg bitgleiche Binaries liefert. `dist-host` spart die drei fremden Plattformen und
-genügt, wenn nur dieser Rechner den Stand starten soll. Gestartet wird ein selbst gebautes
-Binary nicht von allein: `dev-install` legt es nach `~/.local/bin/k-playbook`, und erst
-danach nimmt der Aufruf `k-playbook` es auf. Das ist zugleich der Weg, ganz ohne
-Netzzugriff zu arbeiten — gebaut statt geladen.
+All build targets use the same flags CI uses to build release assets, so every path produces bit-identical binaries. `dist-host` saves the three foreign platforms and is enough when only this machine needs to run the version. A self-built binary is not used automatically: `dev-install` places it at `~/.local/bin/k-playbook`, and only afterwards does the `k-playbook` call use it. This is also the way to work without network access: build rather than download.
 
-Die Installation ist schreibgeschützt; zum Bauen gibt `make -C k-playbook
-installer-writable` sie frei, `installer-readonly` sperrt sie wieder. Ein Update setzt
-sie ohnehin auf den Clone-Stand zurück.
+The installation is write-protected. `make -C k-playbook installer-writable` makes it writable for building, and `installer-readonly` locks it again. An update returns it to the clone state anyway.
 
-## Verifikation
+## Verification
 
-Checkliste für ein Projekt:
+Checklist for a project:
 
-- [ ] `K-PLAYBOOK.yaml` liegt im Hauptverzeichnis, nicht in `k-playbook/`.
-- [ ] `schema_version: 3` ist gesetzt.
-- [ ] `project.repo_root` zeigt auf das Projekt-Repository, `project.vcs` ist `git` oder `none`.
-- [ ] `k-playbook/` ist ein eigener Clone und enthält nichts Projekteigenes.
-- [ ] `k-playbook-local/` existiert vollständig und ist im Projekt-Repository committet —
-      der Inhalt von `results/` ausgenommen, der bei einer Neuinstallation von vornherein
-      draußen bleibt.
-- [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands` und `.cursor/commands`
-      sind Verzeichnisse mit Einzel-Symlinks nach `k-playbook/` bzw. `k-playbook-local/`;
-      die Oberfläche meldet sie als eingerichtet.
-- [ ] `CLAUDE.md` ist eine reguläre Datei mit der Zeile `@AGENTS.md` außerhalb von
-      Backticks und Code-Blöcken, und `AGENTS.md` trägt den Anstoß. Eine mitgebrachte
-      echte `CLAUDE.md` wurde dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer
-      älteren Fassung durch die Include-Datei ersetzt; steht stattdessen ein `Konflikt`,
-      ist er von Hand aufzulösen — bis dahin sieht Claude Code den Anstoß nicht.
-- [ ] `k-playbook context` läuft durch und nennt die erwarteten Kataloge.
+- [ ] `K-PLAYBOOK.yaml` is in the project root, not in `k-playbook/`.
+- [ ] `schema_version: 3` is set.
+- [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
+- [ ] `k-playbook/` is its own clone and contains no project-owned content.
+- [ ] `k-playbook-local/` exists completely and is committed in the project repository, except for the contents of `results/`, which are excluded from the outset in a new installation.
+- [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands`, and `.cursor/commands` are directories with individual symlinks to `k-playbook/` or `k-playbook-local/`; the interface reports them as configured.
+- [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
+- [ ] `k-playbook context` completes and names the expected catalogs.
 
-Der letzte Punkt prüft alles Vorherige auf einmal: das Kommando bricht ab, wenn die
-Konfiguration fehlt oder eine andere `schema_version` trägt.
+The final item checks all preceding items at once: the command stops if configuration is missing or has a different `schema_version`.
 
-## Fehlersuche
+## Troubleshooting
 
-**Slash-Commands tauchen nicht auf.** Die Oberfläche starten: sie vergleicht den
-Katalog mit dem, was registriert ist, und nennt die fehlenden Commands beim Namen.
-Nach dem Einrichten den Assistenten neu starten.
+**Slash commands do not appear.** Start the interface: it compares the catalog with what is registered and names missing commands. Restart the assistant after setup.
 
-**Ein neuer Command aus `k-playbook-local/commands/` fehlt.** Er wird nicht automatisch
-registriert — die Oberfläche meldet ihn als fehlend und legt den Link auf Knopfdruck an.
-Dasselbe gilt, wenn eine projekteigene Datei einen mitgelieferten Command neuerdings
-ersetzt: dann zeigt der bestehende Link noch auf die alte Quelle.
+**A new command from `k-playbook-local/commands/` is missing.** It is not registered automatically: the interface reports it as missing and creates the link at the press of a button. The same applies when a project-owned file has newly replaced a shipped command; then the existing link still points to the old source.
 
-**Skills werden nicht getriggert.** Unter jedem Skill-Ordner muss `SKILL.md` liegen —
-ohne sie gilt das Verzeichnis nicht als Skill und wird nicht verlinkt. Danach den
-Assistenten neu starten.
+**Skills are not triggered.** Every skill directory must contain `SKILL.md`; without it, the directory does not count as a skill and is not linked. Then restart the assistant.
 
-**`schema_version` passt nicht.** Ist die Zahl kleiner als `3` oder fehlt sie, ist die
-Konfiguration älter als das Werkzeug — die Oberfläche setzt sie zurück, siehe
-[Eine Konfiguration aus einem abgelösten Modell](#eine-konfiguration-aus-einem-abgelösten-modell).
-Ist sie größer, liegt es umgekehrt: die Installation ist hinterher. Dann hilft `git pull`
-in `k-playbook/`, kein Zurücksetzen — das würde die neuere Datei wegwerfen.
+**`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The interface resets it; see [A configuration from a retired model](#a-configuration-from-a-retired-model). If it is higher, the reverse is true: the installation is behind. Then `git pull` in `k-playbook/` helps, not a reset, which would discard the newer file.
 
-**Das Werkzeug findet kein Projekt.** Dann fehlt die `K-PLAYBOOK.yaml` oberhalb des
-Aufrufortes. Die Suche läuft ab dem Arbeitsverzeichnis aufwärts bis `$HOME` bzw. `/`
-und rät bewusst nicht. Die Oberfläche schlägt dann einen Ort vor.
+**The tool finds no project.** Then `K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location.
 
-**Ein Assistent sieht fremde Commands.** Typisch nach einer Installation nach dem alten
-Modell: die host-globalen Symlinks wirken in jedes Projekt hinein. Die Oberfläche einmal
-starten, sie räumt sie weg und meldet, was entfernt wurde.
+**An assistant sees foreign commands.** Typical after an installation from the old model: host-global symlinks apply to every project. Start the interface once; it removes them and reports what was removed.
 
-**`k-playbook: command not found`.** Entweder ist der Bootstrap in dieser Umgebung noch
-nicht gelaufen — dann `make -C k-playbook install` (ohne make: `k-playbook/bin/install`)
-—, oder `~/.local/bin` fehlt im PATH. Der Bootstrap prüft den PATH selbst und bricht in
-diesem Fall ab, bevor er etwas lädt.
+**`k-playbook: command not found`.** Either the bootstrap has not yet run in this environment, in which case use `make -C k-playbook install` (without make: `k-playbook/bin/install`), or `~/.local/bin` is missing from PATH. The bootstrap checks PATH itself and stops in that case before downloading anything.
 
-**`cannot execute binary file`.** Unter `~/.local/bin/k-playbook` liegt das Binary einer
-anderen Plattform — typisch bei Host und DevContainer mit geteiltem `$HOME`. Den
-Bootstrap in dieser Umgebung erneut ausführen; er erkennt den Fall und meldet, dass die
-andere Umgebung ihn danach ebenfalls noch einmal braucht.
+**`cannot execute binary file`.** `~/.local/bin/k-playbook` contains the binary for another platform, typical with a host and DevContainer sharing `$HOME`. Run the bootstrap again in this environment; it detects the case and reports that the other environment also needs to run it again afterwards.
 
-**Der Bootstrap findet kein Asset.** Fehlt `VERSION` im Clone, gehört zu diesem Stand
-kein Release — dann hilft `git pull` in `k-playbook/` oder ein eigener Build, siehe
-[Selbst bauen](#selbst-bauen).
+**The bootstrap finds no asset.** If `VERSION` is missing in the clone, no release belongs to this version. Then `git pull` in `k-playbook/` or build it yourself; see [Build it yourself](#build-it-yourself).

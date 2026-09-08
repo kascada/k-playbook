@@ -135,7 +135,7 @@ Unterkommandos:
             Manifeste, Lockfiles, Container-, DevContainer-, Helm- und
             CI-Dateien —, dazu die in k-playbook-local/version-sources.yaml
             konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt die Datei
-            unangetastet. Vertrag: k-playbook/docs/versionsinventar.md.
+            unangetastet. Vertrag: k-playbook/docs/version-inventory.md.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

@@ -12,7 +12,7 @@ const LocalDirName = "k-playbook-local"
 
 // VersionSourcesFileName ist die Quellenkonfiguration des Versionsinventars.
 // Sie liegt neben der Instruktionsdatei in k-playbook-local/ und wird von einem
-// Update nie überschrieben. Vertrag: docs/versionsinventar.md.
+// Update nie überschrieben. Vertrag: docs/version-inventory.md.
 const VersionSourcesFileName = "version-sources.yaml"
 
 // LocalEntry ist ein Bestandteil der lokalen Struktur. Verzeichnisse bekommen
@@ -88,7 +88,7 @@ func LocalStructure() []LocalEntry {
 		},
 		{
 			Path:    "material",
-			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert und von keinem Command geschrieben — gelesen wird es von\n/k-docs-extract, geschrieben nach docs/extracted/.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n.gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\nwas schon gepusht wurde, bleibt in der Historie.",
+			Purpose: "Rohmaterial als Quelle für Docs: Chat-Mitschnitte, Notizen, Zulieferungen.\nEs wird nie indiziert; gelesen wird es von /k-docs-extract, geschrieben nach\ndocs/extracted/.\n\nGeschrieben wird hier nur an einer einzigen Stelle: nach befunde/. Dort halten\nder Skill ks-befunde und der Command /k-danke fest, was eine Analyse oder\nFehlersuche ergeben hat — Belegtes, Widerlegtes und ausgeschlossene Sackgassen.\nDas Verzeichnis legt sein Erzeuger beim ersten Lauf an; die Form steht in der\nRegel rules/befunde.md. Alles andere in diesem Verzeichnis bleibt unangetastet.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n.gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\nwas schon gepusht wurde, bleibt in der Historie.",
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},
@@ -104,7 +104,7 @@ func LocalStructure() []LocalEntry {
 				"der Projektwurzel.\n\n" +
 				"Sie wird beim Einrichten als gültige, leere Konfiguration angelegt — nicht erst beim\n" +
 				"ersten Lauf des Sammlers —, damit ihr Zustand in `k-playbook context` von Anfang an\n" +
-				"eine Antwort hat. Vollständige Beschreibung: " + PlaybookDirName + "/docs/versionsinventar.md.",
+				"eine Antwort hat. Vollständige Beschreibung: " + PlaybookDirName + "/docs/version-inventory.md.",
 		},
 	}
 }
@@ -264,7 +264,7 @@ Ebene und werden bei jedem Update aktualisiert.
 
 // versionSourcesTemplate ist die gültige, leere Quellenkonfiguration des
 // Versionsinventars. Der Inhalt ist wortgleich die Vorlage aus
-// docs/versionsinventar.md, Abschnitt „Quellenkonfiguration → Vorlage"; wer ihn
+// docs/version-inventory.md, Abschnitt „Source Configuration → Template"; wer ihn
 // ändert, ändert ihn dort und zieht hier nach.
 func versionSourcesTemplate() string {
 	return "# Versionsquellen für `k-playbook inventory`\n" + `#
@@ -276,7 +276,7 @@ func versionSourcesTemplate() string {
 # Helm und CI. Hier stehen nur zusätzliche Quellen und die Wurzeln außerhalb
 # des Projekts, die dafür gelesen werden dürfen.
 #
-# Vollständige Beschreibung: k-playbook/docs/versionsinventar.md
+# Vollständige Beschreibung: k-playbook/docs/version-inventory.md
 
 schema_version: 1
 

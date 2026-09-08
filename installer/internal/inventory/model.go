@@ -2,7 +2,7 @@
 // deklarativen Quellen, liest sie, normalisiert die Funde, bündelt
 // Abweichungen und rendert die lesbare Inventardatei.
 //
-// Der Vertrag steht in docs/versionsinventar.md und ist verbindlich. Was hier
+// Der Vertrag steht in docs/version-inventory.md und ist verbindlich. Was hier
 // steht, formuliert ihn nicht neu, sondern setzt ihn um; wo dieser Code und der
 // Vertrag auseinandergingen, gilt der Vertrag.
 //

@@ -1,0 +1,29 @@
+# Anonymisierte Belegdatei: alle Ankersorten in einer Datei.
+global:
+  environment: &default_environment "development"   # Skalar-Anker
+  timeout: &default_timeout 30
+  base: &base_config
+    replicas: 2
+    logLevel: info
+  overlay:
+    <<: *base_config
+    logLevel: debug
+app:
+  image: &app_image
+    repository: registry.example/team/app
+    tag: "1.4.2"
+  environment: *default_environment
+  sidecars:
+    - &sidecar_flower
+      name: flower
+      image: registry.example/team/app:1.4.2
+    - &sidecar_plain metrics
+    - name: proxy
+      image: *app_image
+  hosts: &all_hosts
+    - a.example
+    - b.example
+worker:
+  image: *app_image
+  environment: *default_environment
+  timeout: *default_timeout

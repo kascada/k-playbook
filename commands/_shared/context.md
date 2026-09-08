@@ -57,7 +57,6 @@ fields from two loads.
 | `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
-| `cleanliness` | The local state of the installation: `clean`, `modified`, `untracked`, `ahead`, `devSync`, `message`. |
 | `guidelines` | Project guideline files. |
 | `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures and which areas it excludes from the default scan. Read it from here — never read that file yourself. |
 
@@ -71,7 +70,7 @@ is filled only when the file is there but unreadable or of an unknown schema ver
 then `roots`, `sources` and `exclude` are empty and the state is a visible finding, not an
 empty result. The
 field is absent on an installation older than it. The full contract is in
-`<playbook.dir>/docs/versionsinventar.md`.
+`<playbook.dir>/docs/version-inventory.md`.
 
 `gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
 `disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. `gh.installed`, `gh.loggedIn`,
@@ -98,6 +97,7 @@ from the output above — never from configuration, and never by searching.
 | hand-written documentation | `<local.dir>/docs/manual/` |
 | version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
 | raw material, never indexed | `<local.dir>/material/` |
+| findings from analysis and debugging | `<local.dir>/material/befunde/` — entsteht beim ersten Lauf von `/k-danke` oder des Skills `ks-befunde` |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
@@ -117,7 +117,12 @@ ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Er
 sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
 `<local.dir>/material/` is the source side: raw notes, chat transcripts and hand-offs. It
-is never indexed and no command writes into it.
+is never indexed. Exactly one subdirectory is written to: `material/befunde/`, where the
+skill `ks-befunde` and the command `/k-danke` record what an analysis or a debugging run
+produced — what was proven, what was disproven and which dead ends were ruled out. Its
+form is defined by the rule `befunde.md` in `catalogs.rules`. Everything else below
+`material/` is left untouched by every command, including `/k-docs-extract`, which reads
+it and never changes it.
 
 `<local.dir>/rules/`, `reviews/`, `checks/` and `guidelines/` are the project-local side
 of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain
@@ -153,11 +158,7 @@ run, and the producing command creates its own directory without asking.
   directories yourself and do not re-derive which entry wins.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
 - Never write into `playbook.dir`. It is replaced on every update. Everything a command
-  produces goes into `local.dir`. `cleanliness` reports whether that rule has held: it is
-  the one field that looks backwards. Do not re-derive it with your own `git` calls, and
-  do not repair what it reports — name it and point to `/k-gui`. `modified` or `ahead`
-  means an update will fail or silently keep the wrong file; `devSync` means someone put
-  a working copy there on purpose.
+  produces goes into `local.dir`.
 - **Before calling `gh`, check `gh` from this output.** Stop and report instead of
   calling it when `gh.status` is `disabled` (the project decided against it), when
   `gh.status` is `unknown` (nobody decided yet — point to `/k-gui`), or when `gh.ready`

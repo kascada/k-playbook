@@ -112,6 +112,7 @@ project/
     ├── tasks/done/
     ├── priv/             notes and work in progress
     ├── material/         raw material as a source for docs, never indexed
+    │   └── befunde/      findings from analysis and debugging, written by /k-danke
     ├── k-playbook.md     project-owned instruction layer
     ├── TODO.md
     └── version-sources.yaml   version sources of the version inventory, hand-maintained
@@ -228,11 +229,9 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 
 ## Documentation
 
-The documents below are written in German.
-
 - [`docs/README.md`](./docs/README.md) - the complete documentation index.
-- [`docs/handbuch.md`](./docs/handbuch.md) - purpose, core model and standard workflows.
+- [`docs/manual.md`](./docs/manual.md) - purpose, core model and standard workflows.
 - [`docs/k-playbook-format.md`](./docs/k-playbook-format.md) - the contract: `K-PLAYBOOK.yaml`, structure, overlay.
 - [`docs/installation.md`](./docs/installation.md) - clone, setup steps, security tools.
 - [`docs/commands.md`](./docs/commands.md) - index of the slash commands.
-- [`docs/umbau.md`](./docs/umbau.md) - state of the migration, decisions and open points.
+- [`docs/migration.md`](./docs/migration.md) - state of the migration, decisions and open points.
