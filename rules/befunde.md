@@ -46,7 +46,7 @@ Nicht hierher gehören zwei andere Sorten Wissen, die in einer Analyse mit anfal
 
 - **Betriebsfallen** — was man vor dem Handeln wissen muss, damit man nicht hineintritt
   („dieses Verzeichnis ist gesperrt", „dieser Test sagt nichts aus"). Sie gehören nach
-  `k-playbook-local/guidelines/betrieb.md`.
+  `k-playbook-local/guidelines/fallen.md`.
 - **Prüfbare Regeln** — was jedes Mal zu geschehen hat. Sie gehören als projekteigene
   Regel nach `k-playbook-local/rules/`.
 

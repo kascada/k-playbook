@@ -62,7 +62,7 @@ Datei, wird dort angehängt, statt eine zweite anzulegen.
 In derselben Arbeit fällt regelmäßig Wissen an, das kein Projektbefund ist:
 
 - **Betriebsfalle** — was man vor dem Handeln wissen muss („dieses Verzeichnis ist
-  gesperrt", „dieser Test sagt nichts aus"). Ziel: `k-playbook-local/guidelines/betrieb.md`.
+  gesperrt", „dieser Test sagt nichts aus"). Ziel: `k-playbook-local/guidelines/fallen.md`.
 - **Prüfbare Regel** — was jedes Mal zu geschehen hat. Ziel: `k-playbook-local/rules/`.
 
 Beides wird **nur nach ausdrücklicher Bestätigung** geschrieben; jeder Eintrag dort wirkt

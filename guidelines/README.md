@@ -24,6 +24,20 @@ Datei schaltet die mitgelieferte ab; ihr Inhalt darf dann den Grund nennen.
 - `betrieb.md` — wo abgelegte Dateien landen: Ablageorte, Namensregeln und was
   nirgends hingehört.
 
+## Wohin `/k-danke` schreibt
+
+`/k-danke` und der Skill `befunde` hängen bestätigte Betriebsfallen an
+`k-playbook-local/guidelines/fallen.md` an — **nicht** an eine projekteigene
+`betrieb.md`. Der Grund steht im Abschnitt „Zusammenführung": eine gleichnamige
+projekteigene Datei ersetzt die mitgelieferte vollständig. Der erste Lauf, der einen
+Eintrag nach `k-playbook-local/guidelines/betrieb.md` schriebe, schaltete damit die
+mitgelieferte Ablage-Guideline still ab — samt der Regeln zu `data/`, `cache/` und der
+Todo-Verwaltung, die dort stehen.
+
+Die Trennung ist auch inhaltlich die richtige: `betrieb.md` sagt, wohin etwas gehört,
+`fallen.md` sagt, was man vorher wissen muss. Wer diesen Zielpfad ändert, muss zuerst
+die Overlay-Regel oben lesen.
+
 ## Eine Guideline ergänzen
 
 Eine neue Guideline bekommt eine eigene Datei `guidelines/<thema>.md` und eine Zeile

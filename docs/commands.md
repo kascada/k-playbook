@@ -93,7 +93,7 @@ No command reads or guesses a path. Everything derives from the location of `K-P
 | `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
 | `/k-doc-inventory` | `k-playbook-local/docs/versions/`, plus `k-playbook-local/version-sources.yaml` only after explicit confirmation and exclusively by adding to it |
 | `/k-docs-index` | `k-playbook-local/docs/README.md`, plus `AGENTS.md` and `opencode.json` (or `opencode.jsonc`) in the project root |
-| `/k-danke`, skill `ks-befunde` | `k-playbook-local/material/befunde/` — the only place any command writes below `material/`; after confirmation also `k-playbook-local/guidelines/betrieb.md` and `k-playbook-local/rules/` |
+| `/k-danke`, skill `ks-befunde` | `k-playbook-local/material/befunde/` — the only place any command writes below `material/`; after confirmation also `k-playbook-local/guidelines/fallen.md` and `k-playbook-local/rules/` |
 
 It additionally reads from `k-playbook/`: rules, recipes, checks, and scripts. It never writes there.
 

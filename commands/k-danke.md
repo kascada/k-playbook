@@ -25,7 +25,7 @@ richtet sich nach dem, was die Sitzung tatsächlich getan hat.
 Produces:
 - Ergänzungen in `k-playbook-local/material/befunde/<slug>.md` — was noch nicht
   festgehalten war.
-- Nach Bestätigung: einen Eintrag in `k-playbook-local/guidelines/betrieb.md` oder eine
+- Nach Bestätigung: einen Eintrag in `k-playbook-local/guidelines/fallen.md` oder eine
   projekteigene Regel unter `k-playbook-local/rules/`.
 
 Nach `k-playbook-local/docs/` schreibt dieser Command **nicht** selbst; dafür ruft er
@@ -38,7 +38,7 @@ Aus der Context-Ausgabe:
 - `BEFUNDE_DIR = <local.dir>/material/befunde`
 - `BEFUNDE_DISPLAY_PATH = k-playbook-local/material/befunde`
 - `GUIDELINES_DIR = <local.dir>/guidelines`
-- `BETRIEB_PATH = <GUIDELINES_DIR>/betrieb.md`
+- `FALLEN_PATH = <GUIDELINES_DIR>/fallen.md`
 - `LOCAL_RULES_DIR = <local.dir>/rules`
 - `RESOLVED_DOCS_DIR = <local.dir>/docs` — nur zum Lesen, für den Abgleich.
 
@@ -51,7 +51,7 @@ Command-specific policy:
   Einrichten anlegt. Kein Ersatzpfad, kein harter Abbruch.
 - **Verbindlich ist die Regel `befunde.md`** aus `catalogs.rules`. Sie enthält Anlässe,
   Dateiformat, Anhänge- und Konfliktregel; dieser Command wiederholt sie nicht.
-- Geschrieben wird ausschließlich in `BEFUNDE_DIR`, `BETRIEB_PATH` und `LOCAL_RULES_DIR`.
+- Geschrieben wird ausschließlich in `BEFUNDE_DIR`, `FALLEN_PATH` und `LOCAL_RULES_DIR`.
   `docs/` gehört seinen Erzeugern, `docs/README.md` gehört `/k-docs-index`.
 
 ## Schritt 2 — Bestimmen, was diese Sitzung getan hat
@@ -111,7 +111,7 @@ Was davon soll dauerhaft festgehalten werden?
   Projektwissen → Dokumentation
     - Abbruch kommt aus dem Timeout des Vorlaufs         [ja | nein]
 
-  Betriebsfalle → guidelines/betrieb.md
+  Betriebsfalle → guidelines/fallen.md
     - Der Integrationstest läuft ohne Netz durch und sagt nichts aus   [ja | nein]
 
   Prüfbare Regel → rules/
@@ -121,7 +121,7 @@ Was davon soll dauerhaft festgehalten werden?
 - **Projektwissen** wird nicht hier geschrieben, sondern in Schritt 7 über
   `/k-docs-extract` befördert.
 - **Betriebsfalle** heißt: was man wissen muss, **bevor** man handelt. Anhängen an
-  `BETRIEB_PATH`; existiert die Datei nicht, lege sie mit einer H1 und einem Einleitungssatz an.
+  `FALLEN_PATH`; existiert die Datei nicht, lege sie mit einer H1 und einem Einleitungssatz an.
 - **Prüfbare Regel** heißt: was jedes Mal zu geschehen hat. Eine Datei unter
   `LOCAL_RULES_DIR`, aufgebaut wie die mitgelieferten Regeln.
 
@@ -143,7 +143,7 @@ Bleibt danach etwas offen, nenne es beim Abschluss, statt es still zu lassen.
 Kompakte Zusammenfassung:
 
 - Geschriebene und ergänzte Dateien unter `BEFUNDE_DISPLAY_PATH`, mit Dateinamen.
-- Was nach `betrieb.md` oder `rules/` ging — oder ausdrücklich: nichts.
+- Was nach `fallen.md` oder `rules/` ging — oder ausdrücklich: nichts.
 - Ergebnis der Docs-Prüfung, mit offenen Punkten.
 - Verteilung `bestaetigt` gegen `unbestaetigt` gegen `widerlegt`.
 
@@ -178,7 +178,7 @@ Sitzung abgeschlossen ist.
   über `/k-docs-extract`, das die Herkunft und die Konfidenz mitschreibt.
 - **Vor dem Gate in Schritt 5 schreiben.** Ein halb angelegter Eintrag aus einem
   abgebrochenen Lauf sieht später aus wie bestätigtes Wissen.
-- **Alles nach `betrieb.md` kippen.** Diese Datei wird künftig vor dem Handeln gelesen;
+- **Alles nach `fallen.md` kippen.** Diese Datei wird künftig vor dem Handeln gelesen;
   was dort ohne Not steht, kostet jede weitere Sitzung Aufmerksamkeit.
 - **Die Sitzung zusammenfassen.** Dieser Command sammelt Befunde ein, er schreibt kein
   Protokoll. Was nichts erklärt, gehört nicht hinein.
