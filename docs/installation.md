@@ -83,6 +83,8 @@ k-playbook-local/
 ├── commands/      overlay for k-playbook/commands/
 ├── skills/        overlay for k-playbook/skills/
 ├── results/       everything reviews generate; see below
+├── data/          machine files owned by k-playbook, versioned; holds todos.json
+├── cache/         derived content this machine can rebuild at any time; see below
 ├── docs/          project knowledge for AI sessions, separated by origin
 │   └── manual/    manually maintained documentation; no command writes here
 ├── guidelines/
@@ -90,7 +92,6 @@ k-playbook-local/
 ├── priv/          private notes; see below
 ├── material/      raw material as a source for docs; see below
 ├── k-playbook.md  project-owned instruction layer
-├── TODO.md
 └── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
@@ -98,9 +99,9 @@ The generated docs origins `docs/code/`, `docs/libs/`, `docs/extracted/`, and `d
 
 Every directory contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
-`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of three directories for which the project makes that decision: `results/`, `priv/`, and `material/`. For `priv/` and `material/`, k-playbook still does not write a `.gitignore` itself and does not decide what a project versions.
+`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of four directories for which the project makes that decision: `results/`, `cache/`, `priv/`, and `material/`. For `priv/` and `material/`, k-playbook still does not write a `.gitignore` itself and does not decide what a project versions. `data/` is never among them: it holds machine files that belong to the project's state, above all `todos.json`.
 
-`results/` is the exception: it is created as private on initial creation. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update.
+`results/` and `cache/` are the exception: both are created as private on initial creation. Everything under `cache/` is derived from the project and can be rebuilt at any time, so it does not belong in the repository — it would go stale there unnoticed. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update.
 
 This choice is visible and switchable in the **Local settings** section of the interface. For each directory, it uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
 
@@ -227,7 +228,7 @@ export BROWSER=/path/to/helper.sh   # receives the URL as an argument
 
 ## Reviews and tasks
 
-The **Workflows** section brings together the work queues, one page per kind: tasks from `k-playbook-local/tasks/`, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/TODO.md`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
+The **Workflows** section brings together the work queues, one page per kind: tasks from `k-playbook-local/tasks/`, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/data/todos.json`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
 
 `/workflows` itself is the overview: it explains what the three kinds are, when to use each, and how much each currently holds. From there, one link per kind leads to its page.
 
@@ -238,6 +239,12 @@ The **Workflows** section brings together the work queues, one page per kind: ta
 Each of the four pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the tasks to `task-flow.md`, the reviews to `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
 
 This section is read-only. Tasks are created and executed through `/k-task-create` and `/k-task-run` in the assistant.
+
+## Project knowledge
+
+The **Knowledge** section, above Docs in the switcher, shows where knowledge flows in this project: from the input, through the MCP server and the versioned Markdown files, into the local vector database and back to the AI. For now it is one file, `wissensablage.md` from the shipped documentation, rendered with its diagram; a listing of the stored entries will follow below it.
+
+Docs and Knowledge are deliberately separate: Docs is the reference work of the installation, Knowledge is what accumulates in the project.
 
 ## Read documentation
 
@@ -338,6 +345,8 @@ git mv k-playbook/tasks     k-playbook-local/tasks
 git mv k-playbook/reviews   k-playbook-local/reviews
 git mv k-playbook/TODO.md   k-playbook-local/TODO.md
 ```
+
+The moved `TODO.md` does not stay in that form: on the first todo access -- through the interface, `/k-todo`, or `k-playbook todo` -- it is translated into `k-playbook-local/data/todos.json` and then removed. Text, order, and done state are preserved.
 
 The old file's `paths.` section identifies the paths. Once they have moved, the button becomes available.
 

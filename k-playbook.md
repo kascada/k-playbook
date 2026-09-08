@@ -82,8 +82,8 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
   vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
   überführt Befunde in Tasks oder Fixes.
-- **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-task-run`; `/k-todo` pflegt
-  `k-playbook-local/TODO.md`.
+- **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-task-run`; `/k-todo` pflegt die
+  Todos des Projekts über `k-playbook todo`.
 - **Sitzung** — `/k-danke` schließt eine Arbeitssitzung ab: er legt die Befunde vor, die
   während der Arbeit nach `k-playbook-local/material/befunde/` geschrieben wurden,
   befördert Bestätigtes über `/k-docs-extract` in die Doku und prüft den Docs-Nachzug.

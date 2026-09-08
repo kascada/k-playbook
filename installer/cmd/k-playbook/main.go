@@ -4,8 +4,8 @@
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
-// `inventory` erhebt das Versionsinventar des Projekts, und `stop` beendet den
-// Hintergrunddienst der Oberfläche.
+// `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
+// Todos, und `stop` beendet den Hintergrunddienst der Oberfläche.
 package main
 
 import (
@@ -70,6 +70,10 @@ func run(args []string) error {
 		// und stünden mitten im Bericht des Laufs, in dem jede Ablehnung
 		// sichtbar sein muss.
 		return runInventory(args[1:])
+	case "todo":
+		// Ohne Wirt-Pflege aus demselben Grund wie context: die Ausgabe ist
+		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
+		return runTodo(args[1:])
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -136,6 +140,11 @@ Unterkommandos:
             CI-Dateien —, dazu die in k-playbook-local/version-sources.yaml
             konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt die Datei
             unangetastet. Vertrag: k-playbook/docs/version-inventory.md.
+  todo      Verwaltet die Todos des Projekts in
+            k-playbook-local/data/todos.json: k-playbook todo list|add|update|
+            delete|import. Die Ausgabe ist JSON auf stdout. Ohne Unterbefehl
+            und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
+            gelesen oder geschrieben werden.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

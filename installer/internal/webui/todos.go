@@ -7,10 +7,16 @@ import (
 )
 
 // todosResponse ist eine Liste von Todos — offene oder erledigte.
+//
+// Message ist das Feld des Fehlerfalls: die Seite blendet bei jedem nichtleeren
+// Message die Liste aus und setzt die Pille auf „Nicht lesbar". Hint ist
+// daneben der Hinweis eines gelungenen Zugriffs — etwa eine zurückgebliebene
+// Datei der früheren Markdown-Ablage — und lässt Liste und Zählpille stehen.
 type todosResponse struct {
 	Available bool           `json:"available"`
 	Todos     []project.Todo `json:"todos"`
 	Message   string         `json:"message"`
+	Hint      string         `json:"hint"`
 }
 
 func todosHandler(w http.ResponseWriter, r *http.Request) {
@@ -20,13 +26,13 @@ func todosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todos, err := project.ListTodos(environment.ProjectDir)
+	todos, notice, err := project.ListTodos(environment.ProjectDir)
 	if err != nil {
 		writeJSON(w, http.StatusOK, todosResponse{Available: true, Message: err.Error()})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos})
+	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos, Hint: notice.Hint})
 }
 
 // doneTodosHandler liefert die abgehakten Todos. Eigener Endpunkt, damit die
@@ -38,11 +44,11 @@ func doneTodosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todos, err := project.ListDoneTodos(environment.ProjectDir)
+	todos, notice, err := project.ListDoneTodos(environment.ProjectDir)
 	if err != nil {
 		writeJSON(w, http.StatusOK, todosResponse{Available: true, Message: err.Error()})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos})
+	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos, Hint: notice.Hint})
 }

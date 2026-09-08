@@ -1033,6 +1033,18 @@ button.attention-highlight {
   white-space: pre-line;
 }
 
+/* Kennung und Datum stehen vor dem Text in derselben Zeile: die Kennung ist
+   das, womit /k-todo den Eintrag anspricht, das Datum nur Beiwerk. */
+.todo-meta {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.todo-date {
+  font-size: 0.82em;
+}
+
 /* Der Umschalter hängt am Textende, nicht daneben: /k-todo trägt oft einen
    einzigen, langen Fließtextsatz ein, und eine eigene Spalte dafür würde die
    Zeile unnötig aufspalten. */

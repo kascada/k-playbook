@@ -33,9 +33,19 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "tasks", "priv", "material"} {
+	for _, name := range []string{"rules", "reviews", "checks", "results", "data", "cache", "guidelines", "tasks", "priv", "material"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
+		}
+	}
+	// data/ hält Maschinendateien, die zum Projektstand gehören: es wird
+	// mitversioniert und ist deshalb weder privat noch vorbelegt.
+	for _, entry := range LocalStructure() {
+		if entry.Path != "data" {
+			continue
+		}
+		if entry.Private || entry.PrivateByDefault {
+			t.Errorf("data/ ist als privat geführt: Private=%v PrivateByDefault=%v", entry.Private, entry.PrivateByDefault)
 		}
 	}
 	if !isDir(filepath.Join(local, "tasks", "done")) {
@@ -44,17 +54,15 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	if !isDir(filepath.Join(local, "docs", "manual")) {
 		t.Error("docs/manual fehlt")
 	}
-	if !fileExists(filepath.Join(local, "TODO.md")) {
-		t.Error("TODO.md fehlt")
-	}
 	if !fileExists(filepath.Join(local, VersionSourcesFileName)) {
 		t.Errorf("%s fehlt", VersionSourcesFileName)
 	}
 }
 
-// fileTemplate fällt ohne eigenen Zweig auf todoTemplate() zurück. Die
-// Quellenkonfiguration bekäme dann einen TODO-Rumpf statt einer gültigen, leeren
-// Konfiguration — und ihr Leser bräche beim ersten Lauf ab.
+// fileTemplate fällt ohne eigenen Zweig auf den neutralen default:-Zweig
+// zurück, der aus dem Zweck des Eintrags eine Markdown-Überschrift baut. Die
+// Quellenkonfiguration bekäme dann einen Markdown-Rumpf statt einer gültigen,
+// leeren Konfiguration — und ihr Leser bräche beim ersten Lauf ab.
 func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) {
 	root := t.TempDir()
 
@@ -68,8 +76,8 @@ func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) 
 		t.Fatalf("%s lesen: %v", VersionSourcesFileName, err)
 	}
 	text := string(content)
-	if strings.Contains(text, "/k-todo") {
-		t.Fatalf("%s trägt den TODO-Rumpf:\n%s", VersionSourcesFileName, text)
+	if strings.HasPrefix(text, "# "+VersionSourcesFileName) {
+		t.Fatalf("%s trägt den neutralen Rumpf des default:-Zweigs:\n%s", VersionSourcesFileName, text)
 	}
 	for _, want := range []string{"schema_version: 1", "roots: []", "sources: []", "version-inventory.md"} {
 		if !strings.Contains(text, want) {
@@ -145,9 +153,9 @@ func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	if err := os.WriteFile(eigen, []byte("# eigene Beschreibung\n"), 0o644); err != nil {
 		t.Fatalf("README anlegen: %v", err)
 	}
-	todo := filepath.Join(local, "TODO.md")
-	if err := os.WriteFile(todo, []byte("- offener Punkt\n"), 0o644); err != nil {
-		t.Fatalf("TODO.md anlegen: %v", err)
+	instructions := filepath.Join(local, InstructionsFileName)
+	if err := os.WriteFile(instructions, []byte("# eigene Projektregeln\n"), 0o644); err != nil {
+		t.Fatalf("%s anlegen: %v", InstructionsFileName, err)
 	}
 
 	if _, err := CreateLocal(root); err != nil {
@@ -155,8 +163,8 @@ func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	}
 
 	for path, want := range map[string]string{
-		eigen: "# eigene Beschreibung\n",
-		todo:  "- offener Punkt\n",
+		eigen:        "# eigene Beschreibung\n",
+		instructions: "# eigene Projektregeln\n",
 	} {
 		content, err := os.ReadFile(path)
 		if err != nil {

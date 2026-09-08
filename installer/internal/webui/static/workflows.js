@@ -51,13 +51,19 @@ function render(pill, stock, data) {
     return;
   }
 
-  // Ein Hinweis in der Antwort heißt: gelesen wurde nicht. Die Zahl daneben
+  // Eine Meldung in der Antwort heißt: gelesen wurde nicht. Die Zahl daneben
   // wäre dann keine Auskunft, sondern eine falsche.
   if (data.message) {
     pill.className = "pill warn";
     pill.textContent = "Nicht lesbar";
     message.textContent = data.message;
     return;
+  }
+
+  // Ein hint ist das Gegenteil: gelesen wurde, es gibt nur etwas dazu zu sagen.
+  // Er darf die Zahl deshalb nicht auf "Nicht lesbar" kippen.
+  if (data.hint) {
+    message.textContent = data.hint;
   }
 
   const count = (data[stock.field] || []).length;

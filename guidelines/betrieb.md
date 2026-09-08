@@ -26,7 +26,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 |---|---|---|
 | Task, offen | `tasks/<NNN>-<slug>.md` | `/k-task-create`, `/k-remediation` |
 | Task, erledigt | `tasks/done/<NNN>-<slug>.md` | `/k-task-run` verschiebt sie dorthin |
-| Kurznotiz, unsortiert | `TODO.md` | `/k-todo` |
+| Kurznotiz, unsortiert | `data/todos.json` | `/k-todo`, `k-playbook todo`, die Oberfläche |
 | Review- und Audit-Lauf | `results/<YYYY-MM-DD>/` bzw. `results/<familie>/<YYYY-MM-DD>/` | `/k-review`, `/k-audit` |
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
@@ -42,6 +42,14 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
 | Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
 | Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
+
+**Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage
+`data/todos.json` gehört dem Werkzeug: gelesen und geschrieben wird sie über den
+Command, über das Subkommando `k-playbook todo` oder über die Oberfläche. Wer sie
+selbst öffnet, führt eine zweite Auslegung des Formats ein, die in keine Prüfung
+eingeht. Die einzige Ausnahme ist die Auflösung eines Merge-Konflikts — beide
+Einträge behalten, `nextId` auf `max(id)+1` setzen —, und die macht ein Mensch.
+Eine ältere `TODO.md` wird beim ersten Zugriff übersetzt und danach entfernt.
 
 `docs/` ist nach Herkunft geteilt, nicht nach Thema. Das Unterverzeichnis sagt, wer
 die Datei erzeugt hat und was sie veralten lässt: `code/` folgt dem Code, `libs/` den
@@ -83,6 +91,14 @@ in die falsche Herkunft legt, hängt sie an den falschen Nachzug.
 Ergebnis ist ein Stand von einer Maschine zu einem Zeitpunkt. Rohausgaben von
 Secret-Scannern enthalten gefundene Geheimnisse im Klartext und dürfen nie eingecheckt
 werden.
+
+`cache/` ist ebenfalls lokal, aus einem anderen Grund: was dort liegt, ist aus dem
+Projekt abgeleitet und jederzeit neu baubar. Ableitbares im Repository veraltet
+unbemerkt. Wer etwas Unwiederbringliches ablegen will, braucht ein anderes Verzeichnis —
+`cache/` darf ohne Rückfrage gelöscht werden.
+
+`data/` gehört dagegen ins Repository: dort liegen Maschinendateien, die zum
+Projektstand gehören, allen voran `todos.json`.
 
 Bei `priv/` und `material/` entscheidet das Projekt. Was gerade gilt, zeigt die
 Oberfläche im Block **Lokale Einstellungen** — gemessen mit `git check-ignore`, nicht

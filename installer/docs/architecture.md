@@ -106,7 +106,8 @@ installer/
 │   ├── stop.go                  Subkommando stop
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
-│   └── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
+│   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
+│   └── todo.go                  Subkommando todo: list, add, update, delete, import
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -122,7 +123,8 @@ installer/
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
-│   ├── local_private.go         messen und umschalten, ob priv/ und material/ privat sind
+│   ├── local_private.go         messen und umschalten, ob results/, cache/, priv/ und
+│   │                            material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
@@ -136,7 +138,7 @@ installer/
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
-│   ├── todos.go                 TODO.md parsen: offene und abgehakte Einträge
+│   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
@@ -150,14 +152,19 @@ installer/
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   └── static/                  index.html, workflows.html, tasks.html, reviews.html,
-│                                todos.html, docs.html, inventory.html, mcp.html,
-│                                sidebar.html und hero.html (Fragmente für linke
-│                                Spalte und Kopf), session.js, nav.js,
-│                                disclosure.js, app.js, workflows.js, tasks.js,
-│                                reviews.js, todos.js, docs.js, inventory.js,
-│                                mcp.js, styles.css
+│                                todos.html, knowledge.html, docs.html,
+│                                inventory.html, mcp.html, sidebar.html und
+│                                hero.html (Fragmente für linke Spalte und Kopf),
+│                                session.js, nav.js, disclosure.js, docview.js
+│                                (geteilter Markdown-Betrachter), app.js,
+│                                workflows.js, tasks.js, reviews.js, todos.js,
+│                                knowledge.js, docs.js, inventory.js, mcp.js,
+│                                styles.css
 ├── internal/mcpserver/
-│   └── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
+│   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
+│   ├── review.go                Werkzeuge k_playbook_review_*
+│   └── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
+│                                dünne Hüllen über internal/project
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -300,8 +307,8 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-rules/  reviews/  checks/  commands/  skills/  results/  docs/  docs/manual/
-guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md  TODO.md
+rules/  reviews/  checks/  commands/  skills/  results/  data/  cache/  docs/
+docs/manual/  guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
 version-sources.yaml
 ```
 
@@ -309,11 +316,12 @@ Die erzeugten Docs-Herkünfte — `docs/code/`, `docs/libs/`, `docs/extracted/` 
 `docs/versions/` — stehen bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres
 Erzeugers.
 
-Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder von ihnen braucht
-dort einen eigenen Zweig: der Rückfall ist `todoTemplate()`, und der schriebe sonst einen
-TODO-Rumpf in eine Datei, die etwas anderes ist. `version-sources.yaml` bekommt deshalb
-die gültige, leere Quellenkonfiguration aus `versionSourcesTemplate()` — wortgleich die
-Vorlage aus `docs/version-inventory.md`.
+Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder Eintrag mit einem
+eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus
+`entry.Purpose` einen neutralen Markdown-Rumpf — Überschrift plus Zweck —, damit ein
+neuer Eintrag ohne Zweig nicht still das Format eines fremden bekommt.
+`version-sources.yaml` bekommt deshalb die gültige, leere Quellenkonfiguration aus
+`versionSourcesTemplate()` — wortgleich die Vorlage aus `docs/version-inventory.md`.
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
@@ -328,23 +336,29 @@ und Bestandsprojekte mit getrackten Dateien unter `results/` landeten sonst im Z
 Projekt.
 
 Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
-überhaupt ansteht — `results/`, `priv/` **und** `material/`. Bei `priv/` ist der Grund
-offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/` ist er
+überhaupt ansteht — `results/`, `cache/`, `priv/` **und** `material/`. Bei `priv/` ist der
+Grund offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/` ist er
 derselbe und wird leicht übersehen: Rohmaterial sind Chat-Mitschnitte, Notizen und
-Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Alle bekommen
+Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Bei `cache/` ist
+der Inhalt aus dem Projekt abgeleitet und jederzeit neu baubar. Alle bekommen
 über dasselbe `Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt
 ausschließt und das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg.
 Das Feld geht als JSON an die Oberfläche und ist dort die Whitelist des Blocks
 [Lokale Einstellungen](#lokale-einstellungen).
 
-`results/` unterscheidet sich in einem Punkt: es trägt zusätzlich `PrivateByDefault` und
-ist damit das einzige Verzeichnis, das bei der Installation schon privat angelegt wird.
-Bei `priv/` und `material/` geht es um Geschmack, dort ist Zurückhaltung richtig. Bei
-`results/` nicht: ein Werkzeug, das gefundene Secrets im Klartext ins Repository des
-Nutzers schreibt, ist ein Fehler von k-playbook und keine Projektentscheidung — und die
-Rohausgaben sind nur der schärfste Fall. Ein Review ist aus dem Code wiederholbar, sein
-Ergebnis ist ein Stand von einem Rechner. Umschaltbar bleibt es trotzdem, in beide
-Richtungen, und einmal umgeschaltet bleibt es dabei.
+`results/` und `cache/` unterscheiden sich in einem Punkt: sie tragen zusätzlich
+`PrivateByDefault` und sind damit die Verzeichnisse, die bei der Installation schon privat
+angelegt werden. Bei `priv/` und `material/` geht es um Geschmack, dort ist Zurückhaltung
+richtig. Bei `results/` nicht: ein Werkzeug, das gefundene Secrets im Klartext ins
+Repository des Nutzers schreibt, ist ein Fehler von k-playbook und keine
+Projektentscheidung — und die Rohausgaben sind nur der schärfste Fall. Ein Review ist aus
+dem Code wiederholbar, sein Ergebnis ist ein Stand von einem Rechner. Bei `cache/` ist der
+Grund ein anderer und führt zum selben Ergebnis: ableitbarer Inhalt, der jederzeit neu
+entsteht, veraltet im Repository unbemerkt und bläht die Historie. Umschaltbar bleiben
+beide trotzdem, in beide Richtungen, und einmal umgeschaltet bleibt es dabei.
+
+`data/` trägt keins von beidem: es hält Maschinendateien, die zum Projektstand gehören —
+allen voran `todos.json` — und wird ganz normal mitversioniert.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
@@ -355,9 +369,9 @@ Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
 ## Lokale Einstellungen
 
 Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
-stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für drei Verzeichnisse:
-ob der **Inhalt** von `results/`, `priv/` und `material/` aus der Versionskontrolle
-bleibt. `project/local_private.go` misst das und schaltet es um,
+stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für vier Verzeichnisse:
+ob der **Inhalt** von `results/`, `cache/`, `priv/` und `material/` aus der
+Versionskontrolle bleibt. `project/local_private.go` misst das und schaltet es um,
 `webui/local_private.go` reicht es an die Oberfläche.
 
 „Statt dass k-playbook es stillschweigend erzwingt" trägt auch für `results/`: dort ist
@@ -1309,9 +1323,15 @@ dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite v
 
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat vier Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
-**Docs** unter `/docs` und **Inventar** unter `/inventory`. `/mcp` ist keine fünfte
-Sorte, sondern die Detailseite des Setup-Blocks und trägt dessen Bereich.
+Die Oberfläche hat fünf Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
+**Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
+`/inventory`. `/mcp` ist keine sechste Sorte, sondern die Detailseite des Setup-Blocks
+und trägt dessen Bereich.
+
+Knowledge steht **über** Docs, und das ist die Aussage der Reihenfolge: Docs ist das
+Nachschlagewerk der Installation, die Wissensablage ist das, was im Projekt an Wissen
+zusammenkommt. Zurzeit zeigt der Bereich genau eine Datei; was er wird, steht unter
+„Knowledge in der Oberfläche".
 
 Ein Bereich ist nicht dasselbe wie eine Seite. Workflows hat vier: die Übersicht unter
 `/workflows` und je eine für **Tasks**, **Reviews** und **Todos** darunter. Sie sind
@@ -1626,6 +1646,34 @@ Grund, den flachen Vergleich mit `filepath.Base()` zu verlassen; genau dieses ei
 Verzeichnis, genau eine Ebene tiefer — alles andere fällt weiterhin weg. Die Namen aus
 beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 
+## Knowledge in der Oberfläche
+
+Der Bereich **Knowledge** zeigt vorerst genau eine Datei: `wissensablage.md` aus der
+mitgelieferten Doku, den Weg des Wissens von der Quelle bis zu seiner Nutzung durch die
+KI. Die Auflistung der abgelegten Einträge kommt später als weiterer Block darunter —
+deshalb steht der Text schon jetzt in einer Karte und nicht als ganze Seite, und deshalb
+ist es ein eigener Bereich und keine Karte im Bereich Docs.
+
+Gelesen wird über `GET /api/docs/file`, den Endpunkt der mitgelieferten Doku. Ein eigener
+Endpunkt käme erst mit der Auflistung infrage: solange genau eine mitgelieferte Datei
+gezeigt wird, wäre er dieselbe Antwort unter einem zweiten Namen. Fehlt die Datei — die
+Installation daneben kann einen älteren Stand tragen —, steht der Grund als Meldung in
+der Karte.
+
+**Der Betrachter ist geteilt.** Anker, Querverweise und Mermaid stehen in
+`static/docview.js`; `docs.js` und `knowledge.js` benutzen dasselbe. Was sie
+unterscheidet, bleibt bei ihnen: welche Datei geöffnet wird, und wohin ein Verweis führt.
+Im Bereich Docs führt er in dieselbe Karte, weil der Index daneben mitzieht; auf der
+Knowledge-Seite gibt es keinen Index, ein Verweis geht deshalb nach
+`/docs?file=<datei>`. Die Kopie der Mermaid-Behandlung war die Alternative und wäre die
+zweite Stelle gewesen, an der ein Diagramm zu zeichnen ist.
+
+**Frontmatter wird abgetrennt.** `wissensablage.md` trägt `title` und `description` für
+den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt Überschrift, und
+die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert deshalb
+`inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter ist
+der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift.
+
 ## Web-API
 
 | Methode | Pfad | Zweck |
@@ -1636,7 +1684,7 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
 | `GET` | `/api/local` | projekteigene Struktur prüfen |
 | `POST` | `/api/local` | fehlende Teile anlegen |
-| `GET` | `/api/local/private` | messen, ob der Inhalt von `priv/` und `material/` privat ist |
+| `GET` | `/api/local/private` | messen, ob der Inhalt von `results/`, `cache/`, `priv/` und `material/` privat ist |
 | `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
 | `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
@@ -1662,13 +1710,14 @@ beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
-| `GET` | `/api/todos` | offene Todos aus `TODO.md` auflisten, read-only |
+| `GET` | `/api/todos` | offene Todos aus `data/todos.json` auflisten, read-only; migriert beim ersten Zugriff und meldet eine zurückgebliebene Markdown-Ablage in `hint` |
 | `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/docs`,
-`/inventory` und `/mcp`; alle acht rendert `renderPage()` aus denselben Fragmenten für
-den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige selbst. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/knowledge`,
+`/docs`, `/inventory` und `/mcp`; alle neun rendert `renderPage()` aus denselben
+Fragmenten für den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige
+selbst. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
 Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
 Marke, weil die Installation daneben einen anderen Stand tragen kann und ein offenes Fenster
 nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Build ohne

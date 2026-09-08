@@ -29,16 +29,20 @@ type LocalEntry struct {
 	// Das Feld bleibt, weil es genau die Verzeichnisse benennt, für die diese
 	// Wahl überhaupt zur Debatte steht.
 	Private bool `json:"private"`
-	// PrivateByDefault ist die eine Ausnahme davon: der Eintrag wird bei der
-	// Installation schon privat angelegt, statt die Wahl offen zu lassen. Nur
-	// results/ trägt das.
+	// PrivateByDefault ist die Ausnahme davon: der Eintrag wird bei der
+	// Installation schon privat angelegt, statt die Wahl offen zu lassen.
+	// results/ und cache/ tragen das.
 	//
 	// Begründung: Bei priv/ und material/ geht es um Geschmack, dort ist die
 	// Zurückhaltung richtig. Ein Werkzeug, das gefundene Secrets im Klartext
 	// ins Repository des Nutzers schreibt, ist dagegen ein Fehler von
 	// k-playbook und keine Projektentscheidung — und die Rohausgaben sind nur
 	// der schärfste Fall: ein Review ist aus dem Code wiederholbar, sein
-	// Ergebnis ist ein Stand von einem Rechner.
+	// Ergebnis ist ein Stand von einem Rechner. Bei cache/ ist der Grund ein
+	// anderer, führt aber zum selben Ergebnis: der Inhalt ist aus dem Projekt
+	// abgeleitet und entsteht jederzeit neu. Ableitbares gehört nicht ins
+	// Repository — es veraltet dort, ohne dass jemand es merkt, und bläht die
+	// Historie mit Ständen auf, die niemand liest.
 	//
 	// Eine Erzwingung ist es trotzdem nicht: der Zustand bleibt in der
 	// Oberfläche umschaltbar, und geschrieben wird die verwaltete .gitignore
@@ -76,6 +80,31 @@ func LocalStructure() []LocalEntry {
 				"committet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore allein\n" +
 				"wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in der Historie.",
 		},
+		{
+			Path: "data",
+			Purpose: "Maschinendateien, die k-playbook selbst besitzt und die zum Projektstand gehören.\n" +
+				"Sie werden ganz normal mitversioniert; dieses Verzeichnis bekommt keine .gitignore.\n\n" +
+				"Erste Datei ist todos.json mit den Todos des Projekts. Geschrieben wird sie über\n" +
+				"/k-todo, über das Subkommando `k-playbook todo` oder über die Oberfläche — nie von\n" +
+				"Hand. Einzige Ausnahme ist die Auflösung eines Merge-Konflikts: treffen zwei Branches\n" +
+				"aufeinander, die je ein Todo angelegt haben, kollidieren sie an nextId und am Ende des\n" +
+				"Arrays. Die Auflösung ist mechanisch — beide Einträge behalten, nextId auf max(id)+1\n" +
+				"setzen.",
+		},
+		{
+			Path:             "cache",
+			Private:          true,
+			PrivateByDefault: true,
+			Purpose: "Was diese Maschine aus dem Projekt ableitet und jederzeit neu bauen kann.\n\n" +
+				"Alles hier ist wiederherstellbar. Wer etwas Unwiederbringliches ablegen will, braucht\n" +
+				"ein anderes Verzeichnis — dieses darf ohne Rückfrage gelöscht werden, und sein Inhalt\n" +
+				"bleibt aus der Versionskontrolle.\n\n" +
+				"k-playbook legt dafür beim erstmaligen Anlegen dieses Verzeichnisses eine .gitignore mit\n" +
+				"diesem Inhalt an:\n\n" +
+				"    *\n    !.gitignore\n    !README.md\n\n" +
+				"Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen Ist-Zustand und\n" +
+				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei.",
+		},
 		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand. Die vier erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu."},
 		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
@@ -92,7 +121,6 @@ func LocalStructure() []LocalEntry {
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},
-		{Path: "TODO.md", IsFile: true},
 		{
 			Path:   VersionSourcesFileName,
 			IsFile: true,
@@ -232,17 +260,27 @@ Die AI-Session-Regel steht in ../../AGENTS.md.
 
 // fileTemplate liefert den Erstinhalt eines Datei-Eintrags.
 //
-// Jeder Datei-Eintrag braucht hier einen eigenen Zweig: der Rückfall auf
-// todoTemplate() schriebe sonst einen TODO-Rumpf in eine Datei, die etwas
-// anderes ist.
+// Jeder Datei-Eintrag mit einem eigenen Format braucht hier einen eigenen
+// Zweig. Der default:-Zweig baut aus dem Zweck des Eintrags einen neutralen
+// Rumpf — Überschrift plus Zweck —, damit ein neuer Eintrag ohne Zweig nicht
+// still das Format eines fremden bekommt.
 func fileTemplate(entry LocalEntry) string {
 	switch entry.Path {
 	case InstructionsFileName:
 		return instructionsTemplate()
 	case VersionSourcesFileName:
 		return versionSourcesTemplate()
+	default:
+		return genericFileTemplate(entry)
 	}
-	return todoTemplate()
+}
+
+// genericFileTemplate ist der Rumpf für Datei-Einträge ohne eigenes Format.
+func genericFileTemplate(entry LocalEntry) string {
+	if entry.Purpose == "" {
+		return fmt.Sprintf("# %s\n", entry.Path)
+	}
+	return fmt.Sprintf("# %s\n\n%s\n", entry.Path, entry.Purpose)
 }
 
 // instructionsTemplate ist die projekteigene Instruktionsebene. Sie wird von
@@ -315,8 +353,4 @@ sources: []
 #     - tests/fixtures/**
 exclude: []
 `
-}
-
-func todoTemplate() string {
-	return "# TODO\n\nOffene Punkte des Projekts. Einträge kommen über /k-todo hinzu.\n"
 }

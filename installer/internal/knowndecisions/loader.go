@@ -23,7 +23,7 @@ const fileName = "known-decisions.md"
 //
 // Der alte Ort wird nur übergangsweise weiter gelesen. Diese Konstante, resolvePath
 // und die beiden Warnungen darin werden zum 2027-02-28 ersatzlos entfernt; der
-// Ausbau steht als Eintrag in k-playbook-local/TODO.md.
+// Ausbau steht als Todo des Projekts (/k-todo).
 const legacyResultsDirName = "results"
 
 var validCategories = map[string]bool{

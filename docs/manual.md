@@ -47,7 +47,7 @@ flowchart LR
     Playbook --> Tool["bin/ · scripts/"]
 
     Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
-    Local --> Artifacts["results/ · docs/ · tasks/ · guidelines/ · TODO.md"]
+    Local --> Artifacts["results/ · data/ · cache/ · docs/ · tasks/ · guidelines/"]
 
     Base --> Effective["effective set"]
     Overlay --> Effective

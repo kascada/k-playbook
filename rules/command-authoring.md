@@ -196,8 +196,8 @@ Commands ohne ausdrücklichen Guard aufgerufen: `k-task-run.md`, `k-pr-review.md
 `k-enforcement.md`, `k-remediation.md` und `k-docs-index.md`. Der Fehlschlag ist dort
 selbsterklärend, und ohne git gäbe es das Repository nicht, in dem k-playbook arbeitet.
 Diese Regel gilt ab sofort für **neue und geänderte** Commands; die fünf `git`-Stellen
-werden nachgezogen, wenn sie ohnehin angefasst werden. Der Rückstand steht in
-`k-playbook-local/TODO.md`, damit er wieder auftaucht, statt in dieser Regeldatei zu
+werden nachgezogen, wenn sie ohnehin angefasst werden. Der Rückstand steht als Todo des
+Projekts (`/k-todo`), damit er wieder auftaucht, statt in dieser Regeldatei zu
 verschwinden.
 
 ## Schreibweise

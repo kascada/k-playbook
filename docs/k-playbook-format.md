@@ -53,7 +53,9 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | guidelines | `k-playbook-local/guidelines/` |
 | open tasks | `k-playbook-local/tasks/` |
 | completed tasks | `k-playbook-local/tasks/done/` |
-| project TODO | `k-playbook-local/TODO.md` |
+| machine files owned by k-playbook | `k-playbook-local/data/` |
+| derived, disposable content | `k-playbook-local/cache/` |
+| project todos | `k-playbook-local/data/todos.json` |
 | version sources | `k-playbook-local/version-sources.yaml` |
 | private content | `k-playbook-local/priv/` |
 | instructions, shipped | `k-playbook/k-playbook.md` |
@@ -105,13 +107,14 @@ transcripts and notes. It is never indexed and no command writes to it. Like
 `.gitignore` for it. Raw material commonly contains tokens, paths, and names;
 the project decides whether it should therefore stay outside the repository.
 
-Three directories are optional in this respect: `results/`, `priv/`, and
-`material/`. `results/` is the only one made private during installation by
-default: review results are the state of one machine, not project knowledge. All
-three can be switched. The interface's **Local settings** block shows the
-measured current state and switches it for **all three** directories; manually,
-this is controlled through a `.gitignore` in the directory itself, whose content
-is named by the relevant `README.md`. Details are in
+Four directories are optional in this respect: `results/`, `cache/`, `priv/`,
+and `material/`. `results/` and `cache/` are made private during installation by
+default: review results are the state of one machine, not project knowledge, and
+everything under `cache/` is derived from the project and can be rebuilt at any
+time. All four can be switched. The interface's **Local settings** block shows
+the measured current state and switches it for **all four** directories;
+manually, this is controlled through a `.gitignore` in the directory itself,
+whose content is named by the relevant `README.md`. Details are in
 [`installation.md`](./installation.md#2-create-project-owned-structure).
 
 ## Finding the anchor
@@ -207,7 +210,7 @@ Everything else has no counterpart on the other side:
 
 | | Directories |
 |---|---|
-| project-owned only | `results/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `material/`, `TODO.md` |
+| project-owned only | `results/`, `data/`, `cache/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `material/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
 
 `docs/` appears in both rows but is not a pair: `k-playbook/docs/` documents

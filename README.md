@@ -106,6 +106,8 @@ project/
     ├── commands/         overlay onto k-playbook/commands/
     ├── skills/           overlay onto k-playbook/skills/
     ├── results/          everything reviews produce; not versioned
+    ├── data/             machine files owned by k-playbook, versioned; holds todos.json
+    ├── cache/            derived content, rebuildable at any time; not versioned
     ├── docs/             project knowledge for AI sessions, separated by origin
     │   └── manual/       hand-written docs; no command writes in here
     ├── guidelines/
@@ -114,16 +116,17 @@ project/
     ├── material/         raw material as a source for docs, never indexed
     │   └── befunde/      findings from analysis and debugging, written by /k-danke
     ├── k-playbook.md     project-owned instruction layer
-    ├── TODO.md
     └── version-sources.yaml   version sources of the version inventory, hand-maintained
 ```
 
-`k-playbook-local/` belongs in the project's repository. Three directories inside it are
-a matter of choice — `results/`, `priv/` and `material/`; one of them, `results/`, is
-already created as private during setup, and all three remain switchable. Review results
-are a snapshot from one machine and may contain found secrets in clear text; for `priv/`
-and `material/` the project decides, and k-playbook writes no `.gitignore` there on its
-own. What currently applies is shown and switched by the **Local settings** block of the
+`k-playbook-local/` belongs in the project's repository. Four directories inside it are
+a matter of choice — `results/`, `cache/`, `priv/` and `material/`; two of them,
+`results/` and `cache/`, are already created as private during setup, and all four remain
+switchable. Review results are a snapshot from one machine and may contain found secrets
+in clear text; everything under `cache/` is derived from the project and can be rebuilt at
+any time. For `priv/` and `material/` the project decides, and k-playbook writes no
+`.gitignore` there on its own. `data/` is not part of that choice: it holds machine files
+that belong to the project's state. What currently applies is shown and switched by the **Local settings** block of the
 interface — measured with `git check-ignore`, not guessed.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty

@@ -230,6 +230,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /workflows/tasks", tasksPageHandler)
 	mux.HandleFunc("GET /workflows/reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /workflows/todos", todosPageHandler)
+	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
@@ -295,6 +296,10 @@ func (state *serverState) noteRequests(next http.Handler) http.Handler {
 const (
 	areaSetup     = "setup"
 	areaWorkflows = "workflows"
+	// areaKnowledge ist der Bereich der Wissensablage. Er steht über Docs:
+	// Docs ist das Nachschlagewerk der Installation, die Wissensablage das,
+	// was im Projekt an Wissen zusammenkommt.
+	areaKnowledge = "knowledge"
 	areaDocs      = "docs"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
 	// Docs, nicht darin: Docs zeigt die mitgelieferte Doku der Installation,
@@ -342,6 +347,16 @@ var todosTemplate = pageTemplate("todos.html")
 
 func todosPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, todosTemplate, areaWorkflows, "/workflows/todos", "Todos")
+}
+
+// knowledgeTemplate ist die Seite der Wissensablage. Vorerst zeigt sie genau
+// eine Datei, wissensablage.md aus der mitgelieferten Doku; die Auflistung der
+// abgelegten Einträge kommt später als weiterer Block darunter. Deshalb schon
+// jetzt ein eigener Bereich und keine Karte im Bereich Docs.
+var knowledgeTemplate = pageTemplate("knowledge.html")
+
+func knowledgePageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, knowledgeTemplate, areaKnowledge, "/knowledge", "Knowledge")
 }
 
 // docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die

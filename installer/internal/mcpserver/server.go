@@ -65,6 +65,7 @@ func Run(ctx context.Context) error {
 		Description: toolDescription,
 	}, contextTool)
 	addReviewTools(server)
+	addTodoTools(server)
 
 	// Die Kennung des Binaries wird vor dem ersten Aufruf festgehalten. Danach
 	// meldet dieselbe Funktion, was unter dem Pfad **jetzt** liegt: os.Executable()

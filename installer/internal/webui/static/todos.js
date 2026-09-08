@@ -1,9 +1,10 @@
 "use strict";
 
-// Seite "Todos": die offenen und die abgehakten Punkte aus TODO.md.
+// Seite "Todos": die offenen und die abgehakten Punkte aus
+// k-playbook-local/data/todos.json.
 //
-// Gelesen wird nur. Eingetragen wird ein Punkt über /k-todo, abgehakt wird von
-// Hand in der Datei.
+// Gelesen wird hier nur. Geschrieben wird die Ablage über /k-todo, über das
+// Subkommando `k-playbook todo` oder über die Oberfläche — nie von Hand.
 
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
@@ -17,14 +18,16 @@ const elements = {
   todosPill: document.getElementById("todos-pill"),
   todosList: document.getElementById("todos-list"),
   todosMessage: document.getElementById("todos-message"),
+  todosHint: document.getElementById("todos-hint"),
   doneCard: document.getElementById("todos-done-card"),
   donePill: document.getElementById("todos-done-pill"),
   doneList: document.getElementById("todos-done-list"),
   doneMessage: document.getElementById("todos-done-message"),
+  doneHint: document.getElementById("todos-done-hint"),
 };
 
-// Ab dieser Zeichenzahl wird ein Eintrag gekürzt angezeigt — /k-todo hängt
-// oft einen einzigen, langen Fließtextsatz an. Rund zwei Zeilen.
+// Ab dieser Zeichenzahl wird ein Eintrag gekürzt angezeigt — über /k-todo
+// kommt oft ein einziger, langer Fließtextsatz hinzu. Rund zwei Zeilen.
 const clampLength = 150;
 
 // Die Erledigten werden einmal je Seitenaufruf geholt, beim ersten Aufklappen.
@@ -47,6 +50,7 @@ async function load() {
 function render(data) {
   elements.todosList.replaceChildren();
   elements.todosMessage.textContent = data.message || "";
+  showHint(elements.todosHint, data.hint);
 
   if (!data.available) {
     elements.todosList.classList.add("empty");
@@ -77,27 +81,70 @@ function render(data) {
   elements.todosPill.textContent = todos.length === 1 ? "1 offen" : `${todos.length} offen`;
 }
 
+// showHint zeigt einen Hinweis über der Liste — etwa eine zurückgebliebene
+// Datei der früheren Markdown-Ablage. Er ist ausdrücklich kein Fehler: Liste
+// und Zählpille bleiben stehen.
+// Der Fehlerfall ist data.message, und nur der blendet die Liste aus.
+function showHint(element, hint) {
+  if (!element) {
+    return;
+  }
+  element.textContent = hint || "";
+  element.hidden = !hint;
+}
+
 // fillList baut die Zeilen einer Liste. Ein langer Eintrag steht zunächst
 // gekürzt da — die Liste soll auf einen Blick überschaubar bleiben, auch wenn
 // ein einzelner Punkt ein langer Fließtext ist.
+//
+// Vor dem Text steht die Kennung, unter der /k-todo den Eintrag anspricht,
+// dahinter klein sein Datum.
 function fillList(container, todos, done) {
   for (const todo of todos) {
     const item = document.createElement("div");
     item.className = done ? "todo-item done" : "todo-item";
-    item.append(buildText(todo.text));
+    item.append(buildText(todo.text, todo));
     container.append(item);
   }
+}
+
+// buildMeta baut die Kennung und das Datum eines Eintrags.
+//
+// Gezeigt wird das Datum, das den Eintrag beschreibt: bei einem offenen sein
+// created, bei einem abgehakten sein done. Ein done aus der Migration ist kein
+// Abhak-Tag — das sagt der Titel, statt ein Datum zu behaupten, das es nie gab.
+function buildMeta(todo) {
+  const meta = document.createElement("span");
+  meta.className = "todo-meta";
+  meta.textContent = `#${todo.id}`;
+
+  const stamp = todo.done || todo.created || "";
+  if (stamp) {
+    const date = document.createElement("span");
+    date.className = "todo-date";
+    date.textContent = stamp;
+    if (todo.done && todo.doneMigrated) {
+      date.title = "Datum der Übersetzung aus der früheren Markdown-Ablage, kein Abhak-Datum.";
+    } else if (todo.done) {
+      date.title = "Abgehakt am";
+    } else {
+      date.title = "Angelegt am";
+    }
+    meta.append(" ", date);
+  }
+  return meta;
 }
 
 // buildText baut den Absatz eines Eintrags. Der Umschalter hängt direkt am
 // Ende des (gekürzten) Textes — keine eigene Spalte, nur ein paar Wörter mehr
 // in derselben Zeile.
-function buildText(fullText) {
+function buildText(fullText, todo) {
   const paragraph = document.createElement("p");
   paragraph.className = "todo-text";
+  paragraph.append(buildMeta(todo), " ");
 
   if (fullText.length <= clampLength) {
-    paragraph.textContent = fullText;
+    paragraph.append(fullText);
     return paragraph;
   }
 
@@ -148,6 +195,7 @@ async function loadDone() {
 function renderDone(data) {
   elements.doneList.replaceChildren();
   elements.doneMessage.textContent = data.message || "";
+  showHint(elements.doneHint, data.hint);
 
   if (!data.available) {
     elements.doneList.classList.add("empty");

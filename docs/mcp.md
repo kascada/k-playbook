@@ -228,6 +228,10 @@ then nothing is written and the interface says so.
 | `k_playbook_review_scan` | execute a run's tool entries through `review.Execute` |
 | `k_playbook_review_merge` | consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
 | `k_playbook_review_write_ai_entry` | write the status and result of an AI review entry |
+| `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones |
+| `k_playbook_todo_add` | add a todo and assign the next id |
+| `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
+| `k_playbook_todo_delete` | remove a todo permanently |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -431,6 +435,47 @@ no notifications, and their timeout expires without warning. Recommendations:
 An explicit client cancellation after scanning starts still aborts the scanners hard; the
 last scanner that was running persists `reason: "cancelled"`. Progress notifications do not
 change this -- they address only the timeout failure mode, not cancellation.
+
+### Todo Contract and Migration
+
+The four todo tools are thin wrappers. The load-bearing layer is the subcommand
+`k-playbook todo`: the MCP server is registered **per project** (see "Registering"), so a
+project without that entry does not have the tools -- while the binary is there with the
+installation. A missing tool never even appears at the client and cannot be reported; a binary
+that is too old answers `k-playbook todo` with `unbekanntes Kommando`, which is detectable. The
+interface, the subcommand, and the tools all call the same functions in `internal/project`;
+none of the three touches the file itself.
+
+The store is `k-playbook-local/data/todos.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "nextId": 14,
+  "migratedOn": "2026-09-08",
+  "todos": [
+    { "id": 3, "text": "...", "created": "2026-08-25", "done": "2026-09-08", "origin": "Task 026" },
+    { "id": 4, "text": "...", "created": "", "done": "2026-09-08", "doneMigrated": true }
+  ]
+}
+```
+
+`id` is never reused; `nextId` guarantees that even after a delete. `done` is absent on open
+entries -- there is no separate status field. `doneMigrated` marks a `done` that came from a
+migration or an import, so it is not mistaken for the day someone ticked the entry off.
+`migratedOn` is the provenance note of the **document**, not of a single entry.
+
+An older `k-playbook-local/TODO.md` is translated on the first access -- through any of the three
+layers, reading or writing -- and removed afterward. The response then carries
+`migrated: <count>`. Text, order, and done state are preserved; timestamps are not invented, so
+`created` stays empty for translated entries. If both files exist, access does not fail: the JSON
+document is read and written, and the leftover file is reported in `hint`. Only the migration
+itself refuses, and its message names the way out: `k-playbook todo import
+k-playbook-local/TODO.md` appends the Markdown entries to the existing document and removes the
+file.
+
+Ticking off keeps the entry, deleting removes it -- two separate tools, so a model cannot throw
+away history by accident.
 
 ## Inspecting What the Server Offers
 

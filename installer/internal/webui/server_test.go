@@ -85,6 +85,9 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
 			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/todos" aria-current="page">`,
 		},
+		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
+		// des Projekts, nicht das Nachschlagewerk der Installation.
+		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
 		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
 		// Blockmenü wie die Startseite.
@@ -189,7 +192,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/docs", "/inventory", "/mcp"} {
+	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/knowledge", "/docs", "/inventory", "/mcp"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -224,8 +227,10 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	if count := strings.Count(body, `class="area-nav-item`); count != 1 {
 		t.Errorf("Einträge im Umschalter = %d, erwartet genau 1", count)
 	}
-	if strings.Contains(body, `href="/workflows"`) || strings.Contains(body, `href="/docs"`) || strings.Contains(body, `href="/inventory"`) {
-		t.Error("der Umschalter führt nach Workflows, Docs oder Inventar, obwohl nichts eingerichtet ist")
+	for _, ziel := range []string{"/workflows", "/knowledge", "/docs", "/inventory"} {
+		if strings.Contains(body, `href="`+ziel+`"`) {
+			t.Errorf("der Umschalter führt nach %s, obwohl nichts eingerichtet ist", ziel)
+		}
 	}
 	// Die Unterpunkte hängen an demselben Zweig und dürfen ihn nicht überleben.
 	if strings.Contains(body, `class="area-nav-subitem`) {

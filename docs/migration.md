@@ -279,8 +279,33 @@ maintained by hand and is input, not output. It deliberately remains **not** an 
 location would always exist afterward -- and transitional reading of the old location would never
 run. `/k-gui` therefore does not create it; its purpose is in
 [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd). The old location continues to
-be read until 2027-02-28 and the move is reported visibly; removal is an entry in
-`k-playbook-local/TODO.md`, triggered by the comment on `legacyResultsDirName`.
+be read until 2027-02-28 and the move is reported visibly; removal is a project todo
+(`/k-todo`), triggered by the comment on `legacyResultsDirName`.
+
+**Completed: todos move from `TODO.md` to `data/todos.json`.** From Task 053. The project todos
+used to live in `k-playbook-local/TODO.md`, a Markdown checklist that the `/k-todo` command wrote
+by hand. They now live in `k-playbook-local/data/todos.json`, a document owned by Go: it carries
+an `id` per entry that is never reused, a `created` and a `done` date, an optional `origin`, and
+`nextId` at the document level.
+
+The translation happens once, on the first access through any of the three layers -- the
+interface, `k-playbook todo`, or the MCP tools `k_playbook_todo_*`. All three go through the same
+function in `internal/project`, writing accesses included: `add` in a project that still has a
+`TODO.md` migrates first and never creates a second, empty document beside it. Text, order, and
+done state are preserved. Timestamps are not invented: `created` stays empty, because the
+Markdown file never said when an entry was written, and a done entry receives the migration date
+with `doneMigrated` marking it as exactly that, not as the day someone ticked it off. The
+`TODO.md` is removed afterward.
+
+If both files exist, access does not fail: the JSON document is read and written, and the
+leftover `TODO.md` is reported as a hint -- `hint` in the web response, a warning in the CLI and
+MCP envelopes, never `message`. Only the migration itself refuses in that case, and its message
+names the way out: `k-playbook todo import k-playbook-local/TODO.md` appends the Markdown entries
+to the existing document and removes the file.
+
+Two directories arrived with it: `k-playbook-local/data/` for machine files that belong to the
+project's state, versioned and without a `.gitignore`, and `k-playbook-local/cache/` for derived
+content that can be rebuilt at any time, private by default like `results/`.
 
 **Completed: namespace convention for command modules.** Decided together with Task 018 and
 anchored in `rules/command-authoring.md`: `commands/_<name>/` contains modules (not a command).

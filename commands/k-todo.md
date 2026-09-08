@@ -1,8 +1,8 @@
 ---
-description: "Add a todo item to the project todo file, or list all todos. Pass text directly to add; call without arguments to list."
-argument-hint: [todo text]
+description: "Listet, ergänzt, ändert, hakt ab und löscht die Todos des Projekts. Ohne Argument listen; done/delete/edit/reopen steuern einen Eintrag, alles andere ist ein neuer Eintrag."
+argument-hint: [text | done <id|stichwort> | delete <id|stichwort> | edit <id> <text> | reopen <id>]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob]
+allowed-tools: [Bash, k_playbook_todo_list, k_playbook_todo_add, k_playbook_todo_update, k_playbook_todo_delete]
 ---
 
 # k-todo
@@ -15,51 +15,82 @@ Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
+Die Todos liegen in `k-playbook-local/data/todos.json`. Diese Datei gehört Go.
+**Sie wird in diesem Command nie gelesen und nie geschrieben** — weder mit Read
+noch mit Write oder Edit. Jede Auskunft und jede Änderung läuft über den
+Zugriffsweg aus Schritt 1.
 
-Manage the project todo file.
+## Schritt 1 — Zugriffsweg wählen
 
-## Step 1 — Resolve todo file
+In dieser Reihenfolge, der erste verfügbare gewinnt:
 
-From the context output:
+1. **MCP-Werkzeuge.** Bietet der Client `k_playbook_todo_list`,
+   `k_playbook_todo_add`, `k_playbook_todo_update` und `k_playbook_todo_delete`
+   an, werden sie benutzt. `projectDir` ist `project.dir` aus dem Kontext.
+2. **Subkommando.** Bietet er sie nicht an, wird `k-playbook todo …` über Bash
+   aufgerufen. Das ist der Normalfall und keine Notlösung: der MCP-Server wird
+   pro Projekt registriert und kann fehlen, das Binary ist mit der Installation
+   da. Die Ausgabe ist JSON auf stdout.
 
-- `TODO_PATH = <local.dir>/TODO.md`.
-- `TODO_DISPLAY_PATH = k-playbook-local/TODO.md`.
+Beide Wege rufen dieselbe Fachlogik auf und geben dieselben Felder zurück:
+`id`, `text`, `created`, `done` (leer heißt offen), `doneMigrated`, `origin`.
 
-Command-specific policy:
+## Schritt 2 — Argumente deuten
 
-- If `local.dir` does not exist: abort and tell the user to run `/k-gui`.
-- If `local.dir` exists but `TODO.md` does not: that is normal, Step 2 creates it.
+| Eingabe | Aktion |
+|---|---|
+| kein Argument | listen |
+| `done <id\|stichwort>` | abhaken |
+| `delete <id\|stichwort>` | löschen |
+| `edit <id> <text>` | Text ändern |
+| `reopen <id>` | wieder öffnen |
+| alles andere | neuer Eintrag mit genau diesem Text |
 
-## Step 2 — Branch on arguments
+**Listen.** `k_playbook_todo_list` bzw. `k-playbook todo list`. Ausgegeben wird
+je Zeile Kennung, Datum und Text, etwa `#3 (2026-08-25) pip-audit einbauen`.
+Die erledigten kommen über `includeDone` bzw. `--done` dazu, wenn der Nutzer
+danach fragt.
 
-### No arguments → List
+**Anlegen.** `k_playbook_todo_add` bzw. `k-playbook todo add "<text>"`. Der Text
+geht unverändert durch — nicht umformulieren, nicht kürzen.
 
-- If `TODO_PATH` does not exist: output "Keine Todos vorhanden."
-- If it exists: read and display the full contents.
+**Abhaken, ändern, wieder öffnen.** `k_playbook_todo_update` bzw.
+`k-playbook todo update <id> --done` / `--text "<text>"` / `--reopen`.
 
-### With arguments → Add
+**Löschen.** `k_playbook_todo_delete` bzw. `k-playbook todo delete <id>`.
+Löschen ist der Fall für Fehleingaben, nicht für Erledigtes — was getan ist,
+wird abgehakt und bleibt stehen.
 
-**2a. Create file if missing**
+**Stichwort statt Kennung.** Steht kein `<id>`, sondern ein Stichwort: erst die
+Liste holen, dann die Treffer zeigen und bestätigen lassen, danach aufrufen.
+Bei mehreren Treffern zur Auswahl stellen. Ohne Bestätigung wird nichts
+geschrieben — die unscharfe Zuordnung ist Sache des Modells, aber nicht ohne
+Rückfrage.
 
-If `TODO_PATH` does not exist, create it with this header:
+## Schritt 3 — Nebenmeldungen weitergeben
 
-```
-# TODO
+- `migrated: <anzahl>` — dieser Aufruf hat eine vorhandene `TODO.md` nach
+  `data/todos.json` übersetzt und danach entfernt. Einmal nennen, dann normal
+  weiterarbeiten.
+- `hint` — eine `TODO.md` liegt noch neben der JSON-Datei. Kein Fehler: gelesen
+  und geschrieben wird die JSON-Datei. Den Hinweis samt genanntem Ausweg
+  weitergeben und **nicht** von Hand aufräumen.
 
-```
+## Fehlerfälle
 
-**2b. Append the new item**
+- `k-playbook todo` meldet `unbekanntes Kommando` → die Installation ist älter
+  als dieser Command. Melden, Update oder `/k-gui` nennen, und die Verwaltung
+  **nicht** von Hand nachbauen. Derselbe Fall wie bei `k-playbook inventory`.
+- Kein Projekt gefunden → `/k-gui` nennen, nichts anlegen.
+- Unbekannte Kennung → melden und die Liste zeigen, damit der Nutzer wählen kann.
 
-Append a new line at the end of the file:
+## Anti-Muster (nicht tun)
 
-```
-- [ ] <ARGUMENTS>
-```
-
-**2c. Confirm**
-
-Output:
-```
-TODO.md: <TODO_DISPLAY_PATH>
-Hinzugefügt: <ARGUMENTS>
-```
+- **`data/todos.json` von Hand lesen oder schreiben.** Auch nicht „nur kurz
+  nachsehen": es gäbe dann zwei Auslegungen des Formats, und die zweite ginge in
+  keine Prüfung ein. Einzige Ausnahme im ganzen Projekt ist die Auflösung eines
+  Merge-Konflikts, und die macht ein Mensch.
+- **Eine `TODO.md` schreiben oder anlegen.** Die Markdown-Ablage ist Geschichte;
+  sie wird beim ersten Zugriff übersetzt.
+- **Erledigtes löschen.** Abhaken behält den Eintrag, Löschen wirft ihn weg.
+- **Bei einem Stichwort ungefragt schreiben.** Erst Treffer zeigen, dann handeln.

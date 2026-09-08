@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Vorerst genau eine Datei: die Wissensablage aus der
+               mitgelieferten Doku. Die Auflistung der abgelegten Einträge
+               kommt später als weiterer Block darunter — deshalb steht der
+               Text schon in einer eigenen Karte und nicht als ganze Seite. -->
+          <section class="card" id="knowledge-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" id="knowledge-path">wissensablage.md</p>
+                <h2 id="knowledge-title">Knowledge</h2>
+              </div>
+              <a class="doc-link" href="/docs?file=wissensablage.md"
+                 title="Öffnet dieselbe Datei im Bereich Docs, dort mit dem Index der übrigen Doku daneben.">In Docs öffnen</a>
+            </div>
+            <article id="knowledge-viewer" class="doc-viewer empty"></article>
+            <p id="knowledge-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/docview.js"></script>
+    <script src="/static/knowledge.js"></script>
+  </body>
+</html>

@@ -87,7 +87,7 @@ from the output above — never from configuration, and never by searching.
 |---|---|
 | tasks | `<local.dir>/tasks/` |
 | completed tasks | `<local.dir>/tasks/done/` |
-| todo | `<local.dir>/TODO.md` |
+| todo | über `/k-todo` bzw. das Subkommando `k-playbook todo`; die Ablage besitzt Go |
 | project documentation | `<local.dir>/docs/` |
 | documentation index | `<local.dir>/docs/README.md` |
 | code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |

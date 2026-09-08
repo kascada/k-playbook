@@ -8,6 +8,7 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 
+	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -68,8 +69,13 @@ func docFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Der Frontmatter-Block gehört nicht in die Ansicht: er trägt Metadaten für
+	// den Doku-Index, keinen Text. Ungetrennt läse Goldmark ihn als Trennlinie
+	// samt Überschrift — die Datei begänne mit ihren eigenen Kopfdaten.
+	// Abgetrennt wird er von derselben Stelle wie beim Inventar; ohne
+	// Frontmatter ist der Rumpf die ganze Datei.
 	var rendered bytes.Buffer
-	if err := markdown.Convert(content, &rendered); err != nil {
+	if err := markdown.Convert(inventory.Body(content), &rendered); err != nil {
 		writeJSON(w, http.StatusOK, docResponse{
 			Available: true,
 			Path:      doc.Path,
