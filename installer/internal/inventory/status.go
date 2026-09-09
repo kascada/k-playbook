@@ -59,7 +59,7 @@ func ReadStatus(path string) Status {
 }
 
 func fillStatus(status *Status, data []byte) {
-	block, ok := frontmatterBlock(data)
+	block, ok := FrontmatterBlock(data)
 	if !ok {
 		status.Problem = "kein Frontmatter am Dateianfang"
 		return
@@ -137,9 +137,11 @@ func Body(data []byte) []byte {
 	return []byte(text)
 }
 
-// frontmatterBlock schneidet den YAML-Block zwischen den beiden `---`-Zeilen am
-// Dateianfang heraus.
-func frontmatterBlock(data []byte) (string, bool) {
+// FrontmatterBlock schneidet den YAML-Block zwischen den beiden `---`-Zeilen am
+// Dateianfang heraus. Ohne Frontmatter ist das zweite Ergebnis false. Das
+// Wissenstor in project/ benutzt denselben Schnitt für title und description,
+// damit Frontmatter an genau einer Stelle erkannt wird.
+func FrontmatterBlock(data []byte) (string, bool) {
 	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
 		return "", false

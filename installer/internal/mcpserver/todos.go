@@ -2,11 +2,7 @@ package mcpserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -161,28 +157,14 @@ func todoDeleteTool(ctx context.Context, req *mcp.CallToolRequest, input todoDel
 }
 
 // wrapTodoTool löst das Projekt auf und übergibt dessen Hauptverzeichnis.
-//
-// Gebraucht wird nur der Anker: die Todos liegen unter k-playbook-local/, nicht
-// im Katalog der Installation.
+// Aufgelöst wird über resolveProjectDir, gemeinsam mit den übrigen
+// Werkzeugfamilien.
 func wrapTodoTool(tool string, inputDir string, fn func(projectDir string) *mcp.CallToolResult) *mcp.CallToolResult {
-	if strings.TrimSpace(inputDir) == "" {
-		return todoErrorResult(tool, "", "project_not_found", fmt.Errorf("kein projectDir angegeben"))
+	projectDir, err := resolveProjectDir(inputDir)
+	if err != nil {
+		return todoErrorResult(tool, projectDir, "project_not_found", err)
 	}
-	dir := filepath.Clean(inputDir)
-	if !filepath.IsAbs(dir) {
-		workdir, err := os.Getwd()
-		if err != nil {
-			return todoErrorResult(tool, inputDir, "project_not_found", err)
-		}
-		dir = filepath.Join(workdir, dir)
-	}
-
-	environment := project.DetectFrom(dir)
-	if !environment.Installed {
-		return todoErrorResult(tool, dir, "project_not_found",
-			fmt.Errorf("kein k-playbook-Projekt gefunden — gesucht ab %s aufwärts nach %s", dir, project.ConfigFileName))
-	}
-	return fn(environment.ProjectDir)
+	return fn(projectDir)
 }
 
 func todoErrorResult(tool string, projectDir string, code string, err error) *mcp.CallToolResult {
@@ -195,15 +177,5 @@ func todoErrorResult(tool string, projectDir string, code string, err error) *mc
 }
 
 func todoResult(envelope todoEnvelope, toolError bool) *mcp.CallToolResult {
-	encoded, err := json.MarshalIndent(envelope, "", "  ")
-	if err != nil {
-		return &mcp.CallToolResult{
-			IsError: true,
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Antwort kodieren: %v", err)}},
-		}
-	}
-	return &mcp.CallToolResult{
-		IsError: toolError,
-		Content: []mcp.Content{&mcp.TextContent{Text: string(encoded)}},
-	}
+	return jsonToolResult(envelope, toolError)
 }

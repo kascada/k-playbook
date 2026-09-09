@@ -88,7 +88,11 @@ on the first run of a tool from their origin: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill write to `docs/code/`, `/k-docs-tools` to
 `docs/libs/`, `/k-docs-extract` to `docs/extracted/`, and `/k-doc-inventory` to
 `docs/versions/`. Setup does not create them; it creates `docs/manual/` and
-`material/`.
+`material/`. `docs/learned/` is where the knowledge gate writes: it is created on
+the first `k-playbook knowledge write` or `k_playbook_knowledge_write` call and is
+the only directory the gate writes to, while it reads all of them. `/k-docs-index`
+does not list it yet, so what lands there is reachable through the gate and not
+through `docs/README.md`.
 
 In contrast, setup creates the version inventory source configuration,
 `k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is

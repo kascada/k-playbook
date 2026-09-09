@@ -5,7 +5,8 @@
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
-// Todos, und `stop` beendet den Hintergrunddienst der Oberfläche.
+// Todos, `knowledge` liest, durchsucht und schreibt das Wissensverzeichnis,
+// und `stop` beendet den Hintergrunddienst der Oberfläche.
 package main
 
 import (
@@ -74,6 +75,10 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege aus demselben Grund wie context: die Ausgabe ist
 		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
 		return runTodo(args[1:])
+	case "knowledge":
+		// Ohne Wirt-Pflege wie todo: die Ausgabe ist maschinenlesbar, und
+		// der Zugriff soll nichts anfassen außer dem eigenen Index.
+		return runKnowledge(args[1:])
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -145,6 +150,11 @@ Unterkommandos:
             delete|import. Die Ausgabe ist JSON auf stdout. Ohne Unterbefehl
             und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
             gelesen oder geschrieben werden.
+  knowledge Liest, durchsucht und schreibt das Wissensverzeichnis
+            k-playbook-local/docs/: k-playbook knowledge search|list|read|
+            write|status, jeweils mit --json für maschinenlesbare Ausgabe.
+            Geschrieben wird nur nach docs/learned/; der Index liegt unter
+            k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

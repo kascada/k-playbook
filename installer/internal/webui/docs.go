@@ -4,25 +4,16 @@ import (
 	"bytes"
 	"net/http"
 
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	mdconfig "github.com/kascada/k-playbook/installer/internal/markdown"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// markdown rendert die Doku. GFM deckt Tabellen und Aufgabenlisten ab, die in
-// den mitgelieferten Dateien vorkommen; Überschriften bekommen eine ID, damit
-// Verweise innerhalb einer Datei funktionieren.
-//
-// Rohes HTML aus der Quelle bleibt bewusst abgeschaltet — das ist die
-// Voreinstellung von goldmark und genau richtig für Text, der einfach im
-// Browser landet.
-var markdown = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
-	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
-)
+// markdown rendert die Doku. Die Konfiguration — GFM, automatische
+// Überschriften-Ids, kein rohes HTML — steht in internal/markdown und ist
+// dieselbe, mit der das Wissenstor in project/ die Anker seiner Chunks bildet:
+// nur so treffen Sprünge aus einem Suchtreffer die gerenderte Überschrift.
+var markdown = mdconfig.New()
 
 // docsResponse ist die Liste der verfügbaren Dateien.
 type docsResponse struct {

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -66,6 +67,7 @@ func Run(ctx context.Context) error {
 	}, contextTool)
 	addReviewTools(server)
 	addTodoTools(server)
+	addKnowledgeTools(server)
 
 	// Die Kennung des Binaries wird vor dem ersten Aufruf festgehalten. Danach
 	// meldet dieselbe Funktion, was unter dem Pfad **jetzt** liegt: os.Executable()
@@ -78,6 +80,54 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("MCP-Server: %w", err)
 	}
 	return nil
+}
+
+// resolveProjectDir löst den projectDir-Parameter eines Werkzeugs auf: leer
+// ist ein Fehler, ein relativer Pfad gilt zum Arbeitsverzeichnis des
+// Serverprozesses, und ab dem Ergebnis wird aufwärts nach dem Anker gesucht.
+//
+// Im Fehlerfall trägt das erste Ergebnis das Verzeichnis, das die Meldung
+// nennen soll — vor der Auflösung gibt es kein Projektverzeichnis, aber der
+// Aufrufer soll sagen, wonach gesucht wurde.
+//
+// Gemeinsam für alle Werkzeugfamilien, die nur den Anker brauchen: Todos und
+// Wissensverzeichnis liegen unter k-playbook-local/, nicht im Katalog der
+// Installation. Zweimal aufgelöst hieße zwei Chancen, es verschieden zu tun.
+func resolveProjectDir(inputDir string) (string, error) {
+	if strings.TrimSpace(inputDir) == "" {
+		return "", fmt.Errorf("kein projectDir angegeben")
+	}
+	dir := filepath.Clean(inputDir)
+	if !filepath.IsAbs(dir) {
+		workdir, err := os.Getwd()
+		if err != nil {
+			return inputDir, err
+		}
+		dir = filepath.Join(workdir, dir)
+	}
+
+	environment := project.DetectFrom(dir)
+	if !environment.Installed {
+		return dir, fmt.Errorf("kein k-playbook-Projekt gefunden — gesucht ab %s aufwärts nach %s", dir, project.ConfigFileName)
+	}
+	return environment.ProjectDir, nil
+}
+
+// jsonToolResult kodiert einen Antwort-Umschlag als eingerückten JSON-Text.
+// Der Umschlag ist je Werkzeugfamilie ein eigener Typ; das Kodieren ist es
+// nicht.
+func jsonToolResult(envelope any, toolError bool) *mcp.CallToolResult {
+	encoded, err := json.MarshalIndent(envelope, "", "  ")
+	if err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Antwort kodieren: %v", err)}},
+		}
+	}
+	return &mcp.CallToolResult{
+		IsError: toolError,
+		Content: []mcp.Content{&mcp.TextContent{Text: string(encoded)}},
+	}
 }
 
 // sessionEndMarker ist der Text, mit dem das SDK das Ende einer Sitzung meldet.

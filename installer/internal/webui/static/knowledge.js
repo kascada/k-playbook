@@ -30,6 +30,10 @@ startSession((message) => {
 // und diese Seite zeigt bewusst nur die eine Datei.
 setUpDocLinks(elements.viewer, (target, anchor) => {
   const path = resolveDocPath(KNOWLEDGE_FILE, target);
+  if (!path) {
+    elements.message.textContent = `${target} gehört nicht zur mitgelieferten Doku und kann hier nicht geöffnet werden; im Repository liegt die Datei neben k-playbook/docs.`;
+    return;
+  }
   window.location.href = `/docs?file=${encodeURIComponent(path)}${anchor ? `#${anchor}` : ""}`;
 });
 

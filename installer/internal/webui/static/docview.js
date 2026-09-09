@@ -60,11 +60,29 @@ function setUpDocLinks(viewer, openMarkdown) {
   });
 }
 
+// Ein Verzeichnis über der Doku-Wurzel, das es nicht gibt. Es macht sichtbar,
+// wenn ein Verweis die Wurzel verlässt: bleibt es im aufgelösten Pfad stehen,
+// liegt das Ziel innerhalb der Doku; ist es weg, hat ein "../" hinausgeführt.
+const DOC_ROOT = "/wurzel/";
+
 // Löst einen Verweis gegen das Verzeichnis der offenen Datei auf; die
-// URL-Klasse erledigt dabei "./" und "../".
+// URL-Klasse erledigt dabei "./" und "../". Null heißt: das Ziel liegt
+// außerhalb der angezeigten Doku.
+//
+// Ohne diese Unterscheidung wäre ein Verweis wie
+// `../installer/docs/architecture.md` nach dem Auflösen nicht mehr von einem
+// echten Unterverzeichnis zu unterscheiden. Der Betrachter fragte danach und
+// bekäme ein „no such file or directory" — das liest sich wie ein Fehler der
+// Doku, dabei ist die Datei bloß nicht Teil dessen, was dieser Bereich zeigt.
+// Solche Verweise sind Absicht und keine Nachlässigkeit: im Repository und auf
+// GitHub führen sie richtig, nur `k-playbook/docs` reicht nicht so weit.
 function resolveDocPath(base, href) {
-  const resolved = new URL(href, `https://docs.invalid/${base}`);
-  return decodeURIComponent(resolved.pathname).replace(/^\//, "");
+  const resolved = new URL(href, `https://docs.invalid${DOC_ROOT}${base}`);
+  const path = decodeURIComponent(resolved.pathname);
+  if (!path.startsWith(DOC_ROOT)) {
+    return null;
+  }
+  return path.slice(DOC_ROOT.length);
 }
 
 function splitAnchor(href) {

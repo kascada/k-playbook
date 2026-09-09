@@ -3,9 +3,12 @@
 package project
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ConfigFileName ist der Anker. Er liegt im Hauptverzeichnis des Projekts, nicht
@@ -95,4 +98,53 @@ func fileExists(path string) bool {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// writeJSONFileAtomic schreibt payload als eingerücktes JSON nach path: erst
+// eine temporäre Datei im selben Verzeichnis, dann ein Rename. Ein
+// abgebrochener Lauf hinterlässt damit keine halbe Datei, sondern gar keine —
+// und ein Leser sieht entweder den alten oder den neuen Stand, nie einen
+// dazwischen. Das Verzeichnis entsteht, wenn es fehlt.
+//
+// label steht am Anfang jeder Fehlermeldung („Todos schreiben"), damit ein
+// Fehler die Datei benennt, um die es ging.
+func writeJSONFileAtomic(path string, payload any, label string) error {
+	content, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	content = append(content, '\n')
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("%s anlegen: %w", dir, err)
+	}
+
+	// Das Muster der temporären Datei leitet sich aus dem Ziel ab: bleibt
+	// nach einem Absturz eine liegen, ist ihr anzusehen, wozu sie gehörte.
+	temp, err := os.CreateTemp(dir, "."+strings.TrimSuffix(filepath.Base(path), ".json")+"-*.json")
+	if err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	tempPath := temp.Name()
+	fail := func(err error) error {
+		os.Remove(tempPath)
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	if _, err := temp.Write(content); err != nil {
+		temp.Close()
+		return fail(err)
+	}
+	if err := temp.Close(); err != nil {
+		return fail(err)
+	}
+	// CreateTemp legt mit 0600 an; die Datei soll lesbar sein wie jede andere
+	// im Projekt.
+	if err := os.Chmod(tempPath, 0o644); err != nil {
+		return fail(err)
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return fail(err)
+	}
+	return nil
 }

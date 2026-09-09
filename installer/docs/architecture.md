@@ -22,9 +22,9 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 
 ## Acht Einstiege
 
-Ohne Argument die Oberfläche, dazu die sieben Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory` und `stop`. Die Aufzählung unten geht sie in dieser
-Reihenfolge durch; `help` zählt nicht mit, es gibt nur diese Übersicht aus.
+Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge` und `stop`. Die Aufzählung unten
+geht sie in dieser Reihenfolge durch; `help` zählt nicht mit, es gibt nur diese Übersicht aus.
 
 ```go
 if len(args) == 0 {
@@ -88,6 +88,17 @@ byte-identisch stehen. Der Vertrag steht in
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
 
+`knowledge search|list|read|write|status` ist das Wissenstor über
+`k-playbook-local/docs/`, jeweils mit `--json`. Es ist die tragende Schicht: die
+MCP-Werkzeuge `k_playbook_knowledge_*` sind Hüllen um dieselben Funktionen in
+`project/knowledge.go`, und ein Client ohne registrierten MCP-Server fällt auf das
+Subkommando zurück — antwortet auch das mit `unbekanntes Kommando`, ist die Installation
+zu alt. `write` schreibt ausschließlich nach `docs/learned/`; der Index liegt verwerfbar
+unter `k-playbook-local/cache/knowledge/`. Der Vertrag steht in
+[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Knowledge Contract"; ohne Unterbefehl
+oder mit `--help` fasst das Kommando keine Daten an und legt den Index nicht an, damit es
+als Rauchtest nach einem Release folgenlos bleibt.
+
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
 Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
@@ -107,7 +118,8 @@ installer/
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
-│   └── todo.go                  Subkommando todo: list, add, update, delete, import
+│   ├── todo.go                  Subkommando todo: list, add, update, delete, import
+│   └── knowledge.go             Subkommando knowledge: search, list, read, write, status
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -118,6 +130,9 @@ installer/
 │                                Signal 0, SIGTERM, Setsid, Startzeit je Plattform
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
+├── internal/markdown/
+│   └── markdown.go              die eine Goldmark-Konfiguration (GFM, WithAutoHeadingID),
+│                                geteilt von webui und project — dieselben Anker
 ├── internal/project/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
@@ -139,6 +154,10 @@ installer/
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
+│   ├── knowledge.go             Wissenstor über k-playbook-local/docs/: chunken entlang
+│   │                            der Überschriften, Search/List/Read/Write/Status
+│   ├── knowledge_index.go       BM25-Index als cache/knowledge/index.json, Drift über
+│   │                            Datei-Hashes, Neubau bei indexVersion/Goldmark-Wechsel
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
@@ -163,8 +182,10 @@ installer/
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 │   ├── review.go                Werkzeuge k_playbook_review_*
-│   └── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
-│                                dünne Hüllen über internal/project
+│   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
+│   │                            dünne Hüllen über internal/project
+│   └── knowledge.go             Werkzeuge k_playbook_knowledge_search/list/read/write/
+│                                status, dünne Hüllen über project.Knowledge
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -202,6 +223,11 @@ installer/
 `internal/project` kennt kein HTTP, `internal/webui` keine Dateisystem-Details. Die
 Trennung hält die Fachlogik testbar. `internal/mcpserver` steht neben `webui`: beide
 sind Fassaden auf `project`, die eine über HTTP, die andere über JSON-RPC.
+
+`internal/markdown` liegt unter beiden, weil beide Goldmark brauchen und es genau eine
+Konfiguration geben darf: `webui` rendert damit die Doku, `project/knowledge.go` entnimmt
+demselben Parser-Lauf die Überschriften-Anker für die Suchtreffer. Zwei Konfigurationen
+wären zwei Slug-Regeln, und ein Sprung aus einem Treffer liefe stumm ins Leere.
 
 `internal/review` bekommt seine Vorgaben ebenfalls von außen — Laufverzeichnis, Ziel,
 Sprachen, Katalog und die aufgelösten Werkzeuge stehen in `review.Options`. Deshalb
@@ -334,6 +360,13 @@ jeder `/k-gui`-Start, jedes „Struktur anlegen" — dürfte sie nicht still zur
 und Bestandsprojekte mit getrackten Dateien unter `results/` landeten sonst im Zustand
 `PrivacyPartial`. Ansonsten gilt weiter: was ein Projekt versioniert, entscheidet das
 Projekt.
+
+Dieselbe Bedingung gilt an der zweiten Stelle, an der `cache/` entstehen kann:
+`ensureCacheDir()` legt es beim ersten Zugriff des Wissenstors an und schreibt dabei
+die verwaltete `.gitignore` — aber nur, wenn das Verzeichnis in genau diesem Lauf
+entsteht. Ohne diesen Weg wäre der abgeleitete Suchindex committierbar, denn
+`CreateLocal()` zöge die Datei später nie nach; ein Release mit `git add -A` nähme den
+Chunk-Abzug der ganzen Doku mit.
 
 Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
 überhaupt ansteht — `results/`, `cache/`, `priv/` **und** `material/`. Bei `priv/` ist der
@@ -1482,6 +1515,14 @@ Bereich mit eigener API (siehe „Das Versionsinventar in der Oberfläche") und 
 getrennt. Eine zweite Docs-Wurzel in Werkzeug, API und Oberfläche wäre teurer als der
 eigene Bereich gewesen und hätte eine bewusst getroffene Entscheidung rückgängig gemacht.
 
+Den eigenen Zugriffsweg für `k-playbook-local/docs`, den diese Entscheidung als Bedingung
+nannte, gibt es inzwischen: `project.Knowledge` (`project/knowledge.go`) sucht, listet,
+liest und schreibt dort, erreichbar über das Subkommando `k-playbook knowledge` und die
+MCP-Werkzeuge `k_playbook_knowledge_*` (siehe „Der MCP-Server"). Er teilt mit dieser Seite
+nur die Goldmark-Konfiguration aus `internal/markdown` und die Pfadprüfung
+`docFilePath()`, nicht die Endpunkte. Ein `/api/knowledge/*` für die Seite `/knowledge`
+ist ein Folge-Task; bis dahin liest sie weiter `/api/docs/file`.
+
 `project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,
 ersatzweise den Dateinamen. Die `README.md` steht vorn, sie ist der Einstieg. Fehlt das
 Verzeichnis, ist das ein Befund und keine leere Liste: die Antwort trägt dann eine
@@ -1503,6 +1544,24 @@ Seite —, sondern die Ansicht selbst: ein roher Klick auf `manual.md` führte a
 Pfad, den der Server nicht kennt, statt in die gerenderte Datei, und das Menü soll
 mitziehen. Führt ein Verweis in eine andere Datei, zieht es mit; steht die Datei nicht im
 Index, bleibt gar kein Eintrag markiert statt der vorige.
+
+**Ein Verweis kann aus der Doku herausführen, und das ist kein Fehler.** 31 Verweise der
+mitgelieferten Doku zeigen mit `../` auf `.md`-Dateien neben `docs/` — auf
+`installer/docs/architecture.md`, `checks/README.md`, Skill-Playbooks; allein der
+Stichwortindex der `README.md` trägt 22 davon. Im Repository und auf GitHub führen sie
+richtig, nur dieser Bereich reicht nicht so weit: `docFilePath()` lässt nichts außerhalb
+von `k-playbook/docs` zu, und das bleibt so. Deshalb erkennt `resolveDocPath()` den Fall
+selbst und gibt `null` zurück, statt den Server danach zu fragen. Sichtbar wird das an
+einer Meldung, die sagt, wo die Datei liegt — vorher stand dort die Antwort des Servers,
+„no such file or directory", und die liest sich wie ein Fehler der Doku. Erkannt wird der
+Ausbruch an einem Sentinel-Verzeichnis über der Wurzel: bleibt es beim Auflösen stehen,
+liegt das Ziel innerhalb; ist es weg, hat ein `../` hinausgeführt. Ohne diesen Kniff wäre
+`../installer/docs/architecture.md` nach dem Auflösen von einem echten Unterverzeichnis
+nicht mehr zu unterscheiden.
+
+Die Verweise selbst umzuschreiben wäre die andere Möglichkeit gewesen und ist verworfen:
+sie sind außerhalb der Oberfläche richtig, und 31 Stellen umzubiegen tauschte einen
+sichtbaren Hinweis gegen 31 schlechtere Verweise.
 
 Der Text steht in einer Karte und ist kein eigener Scroll-Container. Ohne Anker scrollt
 deshalb das **Fenster** nach oben, nicht das Element — sonst bliebe die Ansicht dort
@@ -1734,8 +1793,17 @@ Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". 
 Subkommando `context` und `GET /api/context`. Wer eine vierte Quelle aufmacht, bekommt
 zwangsläufig eine abweichende Antwort.
 
-Ein Werkzeug, `k_playbook_context`. Es gibt dasselbe JSON zurück wie das Subkommando —
-dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen lassen.
+Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie das
+Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
+lassen. Dazu kommen drei Familien nach demselben Muster „Subkommando trägt, MCP ist
+Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playbook_todo_*`
+(`todos.go`) um `project/todos.go` und `k_playbook_knowledge_search/list/read/write/status`
+(`knowledge.go`) um `project.Knowledge` — das Wissenstor über `k-playbook-local/docs/`,
+das auch `k-playbook knowledge` bedient. Keine der Hüllen trägt eigene Fachlogik; sie
+lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
+Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
+Fehlerfall. Tool-Tabelle und Verträge stehen in
+[`../../docs/mcp.md`](../../docs/mcp.md).
 
 **Maßgeblich ist die Spec-Fassung [`2026-07-28`](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture).**
 Die Clients sprechen sie allerdings noch nicht: Claude Code trägt den Pfad zwar im

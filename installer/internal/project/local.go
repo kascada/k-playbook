@@ -103,9 +103,12 @@ func LocalStructure() []LocalEntry {
 				"diesem Inhalt an:\n\n" +
 				"    *\n    !.gitignore\n    !README.md\n\n" +
 				"Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen Ist-Zustand und\n" +
-				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei.",
+				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei.\n\n" +
+				"knowledge/index.json ist der Suchindex des Wissenstors über ../docs/ (`k-playbook\n" +
+				"knowledge`, MCP-Werkzeuge k_playbook_knowledge_*). Fehlt er, baut ihn der nächste\n" +
+				"Zugriff neu; Änderungen am Tor vorbei erkennt er über Datei-Hashes selbst.",
 		},
-		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand. Die vier erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu."},
+		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand, learned/ vom Wissenstor — Dokumente, die über `k-playbook knowledge write` oder das MCP-Werkzeug k_playbook_knowledge_write hereinkommen; das Tor liest alle Ordner und schreibt nur dorthin. Die fünf erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu — heute noch über die fünf Ordner und die flachen Wurzeldateien, learned/ nimmt er noch nicht auf. Gefunden werden die Dokumente dort deshalb vorerst nur über das Wissenstor selbst."},
 		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
 		{Path: "tasks", Purpose: "Offene Tasks, nummeriert als <nummer>-<name>.md."},
@@ -219,6 +222,30 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 	}
 
 	return CheckLocal(projectDir), nil
+}
+
+// ensureCacheDir legt cache/ an und schreibt dabei dieselbe verwaltete
+// .gitignore, die CreateLocal für einen Eintrag mit PrivateByDefault schreibt.
+//
+// Das Wissenstor legt sein cache/knowledge/ beim ersten Zugriff selbst an und
+// bringt cache/ damit nebenbei mit. Ohne diesen Weg entstünde es dann ohne
+// .gitignore, und CreateLocal zöge sie nie nach: der schreibt sie nur, wenn
+// das Verzeichnis in genau seinem Lauf entsteht. Der abgeleitete Index wäre
+// damit committierbar — ein Release mit `git add -A` nähme den Chunk-Abzug
+// der ganzen Doku mit.
+//
+// Nachträglich geschrieben wird nichts: ist cache/ schon da, bleibt es, wie
+// es ist. Ein bewusstes Umschalten auf öffentlich (makePublic) darf dieser
+// Weg so wenig zurückdrehen wie CreateLocal.
+func ensureCacheDir(projectDir string) error {
+	dir := filepath.Join(LocalDir(projectDir), CacheDirName)
+	if pathExists(dir) {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("%s anlegen: %w", dir, err)
+	}
+	return writeIfMissing(filepath.Join(dir, PrivateIgnoreFile), managedIgnoreContent())
 }
 
 // writeIfMissing schreibt nur, wenn nichts da ist. Projektinhalte werden nie

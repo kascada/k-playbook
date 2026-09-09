@@ -232,6 +232,11 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
+| `k_playbook_knowledge_search` | search the knowledge directory `k-playbook-local/docs/` section by section; hits carry `path`, `heading`, `excerpt`, `source`, `rank`, `anchor` |
+| `k_playbook_knowledge_list` | list the files of the knowledge directory with `path`, `title`, `source`; the README comes first |
+| `k_playbook_knowledge_read` | read one file of the knowledge directory as Markdown |
+| `k_playbook_knowledge_write` | write a Markdown document below `k-playbook-local/docs/learned/` -- nowhere else -- with `source` as provenance note in the frontmatter |
+| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `fileCount`, `chunkCount`, `bySource`, `builtAt`, `stale`, `staleFiles` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -476,6 +481,28 @@ file.
 
 Ticking off keeps the entry, deleting removes it -- two separate tools, so a model cannot throw
 away history by accident.
+
+### Knowledge Contract
+
+The five knowledge tools follow the same pattern: thin wrappers over `project.Knowledge`, the
+one place that chunks, indexes, and searches; the load-bearing layer is the subcommand
+`k-playbook knowledge`, and a binary that is too old answers it with `unbekanntes Kommando`. The
+envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on failure. A
+search hit names `path`, `heading` (the heading verbatim, the leading field), `excerpt` (the
+start of the section, at most 400 characters), `source` (the origin folder: `code`, `libs`,
+`extracted`, `versions`, `manual`, `learned`, or `root` for flat files), `rank` (from 1; the
+order is the statement, there is no score) and `anchor` (the Goldmark heading id, a display
+aid). `read` returns Markdown, not HTML. `write` accepts a path relative to `docs/learned/`
+only, refuses anything that leads out of it, and puts `source` into the frontmatter; the index
+under `k-playbook-local/cache/knowledge/` is updated in the same call, and the reported `path`
+is the one the write itself resolved, relative to `docs/`. `status` reports `stale: true` and
+`staleFiles` when the last access found files changed behind the tools' back and re-read them.
+`search` always carries `hits` and `list` always carries `entries`, empty ones included -- the
+same as the `--json` output of the subcommand, so a caller reading `hits.length` never trips
+over an empty result. The other three tools omit both keys rather than sending `null`, which
+would feign an empty result they never computed. A `hint` appears when an access had to skip something
+without failing over it: an unwritable `cache/`, an unreadable file. The answer stands in that
+case; the index is disposable and the next access rebuilds it.
 
 ## Inspecting What the Server Offers
 

@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -392,5 +393,55 @@ func TestContextForDirHeiltNichtBeiUnbekannterFassung(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
 		t.Error("bei abgebrochenem Aufbau darf nichts verlinkt worden sein")
+	}
+}
+
+// Der ausgelieferte Rezeptkatalog wird gegen die Tool-Matrix gehalten, weil ein
+// Tippfehler in audit.scope.tools sonst niemandem auffällt: der Filter läuft,
+// findet kein Werkzeug dieses Namens und das Rezept scopt still ins Leere. Ein
+// leerer Perspektiven-Report sieht dann aus wie ein sauberes Projekt.
+func TestAusgelieferteRezepteScopenNurBekannteWerkzeuge(t *testing.T) {
+	reviewsDir := filepath.Join("..", "..", "..", "reviews")
+	entries, err := os.ReadDir(reviewsDir)
+	if err != nil {
+		t.Fatalf("reviews/: %v", err)
+	}
+
+	matrix, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "security-tools.tsv"))
+	if err != nil {
+		t.Fatalf("security-tools.tsv: %v", err)
+	}
+	known := map[string]bool{}
+	for _, line := range strings.Split(string(matrix), "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		name := strings.Split(line, "\t")[0]
+		if name != "name" {
+			known[name] = true
+		}
+	}
+
+	geprüft := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		modes := readReviewModes(filepath.Join(reviewsDir, entry.Name()))
+		if modes.Scope == nil {
+			continue
+		}
+		for _, tool := range modes.Scope.Tools {
+			geprüft++
+			if !known[tool] {
+				t.Errorf("%s scopt das Werkzeug %s, das die Tool-Matrix nicht kennt", entry.Name(), tool)
+			}
+		}
+	}
+
+	// Ohne diese Schranke wäre der Test auch dann grün, wenn das Einlesen des
+	// Frontmatters nichts mehr fände.
+	if geprüft == 0 {
+		t.Fatal("kein ausgeliefertes Rezept trägt audit.scope.tools")
 	}
 }

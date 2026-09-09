@@ -154,6 +154,7 @@ Typical review families:
 - `/k-review dependency-cve`
 - `/k-review dependabot-alerts`
 - `/k-review iac-container`
+- `/k-review sast`
 - `/k-review tech`
 - `/k-review python-comment-hardspots`
 
@@ -211,8 +212,8 @@ itself, not only in a reference.
 
 ## Scanner Tools vs. k-check
 
-Security scanners such as `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, and `grype` are
-**not** modeled as checks under `checks/*.sh`.
+Security scanners such as `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`,
+`semgrep`, `gosec`, `ruff`, and `njsscan` are **not** modeled as checks under `checks/*.sh`.
 
 Reason:
 
@@ -233,6 +234,10 @@ These tools therefore run through report-mode reviews:
 | `trivy` | `/k-review dependency-cve` and `/k-review iac-container` | `dependency-cve` / `iac-container` |
 | `syft` | `/k-review iac-container` | `iac-container` |
 | `grype` | `/k-review dependency-cve` or `/k-review iac-container` | `dependency-cve` / `iac-container` |
+| `semgrep` | `/k-review sast` | `sast` |
+| `gosec` | `/k-review sast` | `sast` |
+| `ruff` | `/k-review sast` | `sast` |
+| `njsscan` | `/k-review sast` | `sast` |
 | GitHub Dependabot Alerts | `/k-review dependabot-alerts` | `dependabot-alerts` |
 
 `checks/*.sh` remains reserved for fast, generic k-check heuristics and preflight-like checks.
@@ -325,6 +330,23 @@ filesystem findings, `raw/trivy-*.json`, and, where needed, `raw/syft-*.json` an
 
 This recipe is active in the audit run model. It assesses the groups from `review-input.json`
 that carry at least one evidence item from an audit-scope tool.
+
+### SAST
+
+| | |
+|---|---|
+| Recipe | `k-playbook/reviews/review-sast.md` |
+| Results | `k-playbook-local/results/sast/YYYY-MM-DD/` |
+| Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-sast.md` |
+| Audit scope | `semgrep`, `gosec`, `ruff`, `njsscan` |
+
+Typical artifacts: `review-input.json`, `review-triage.md`, `raw/semgrep.sarif`,
+`raw/gosec.sarif`, `raw/ruff.sarif`, and `raw/njsscan.sarif`.
+
+This recipe is active in the audit run model. It assesses the groups from `review-input.json`
+that carry at least one evidence item from an audit-scope tool. It assesses patterns in the
+project's own source code: findings about a version or a package belong to Dependency CVE,
+secrets to Secret Scanning, and IaC or container configuration to IaC/Container.
 
 ### Tech Debt
 

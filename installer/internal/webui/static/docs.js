@@ -31,7 +31,13 @@ startSession((message) => {
 // Ein Verweis im Text führt in dieselbe Karte: dieser Bereich zeigt die Doku,
 // und das Menü daneben zieht mit.
 setUpDocLinks(elements.docViewer, (target, anchor) => {
-  openDoc(resolveDocPath(currentDocPath, target), "", anchor);
+  const path = resolveDocPath(currentDocPath, target);
+  if (!path) {
+    elements.docsMessage.textContent = `${target} gehört nicht zur mitgelieferten Doku und kann hier nicht geöffnet werden; im Repository liegt die Datei neben k-playbook/docs.`;
+    return;
+  }
+  elements.docsMessage.textContent = "";
+  openDoc(path, "", anchor);
 });
 loadDocs();
 

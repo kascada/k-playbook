@@ -7,6 +7,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 
 | Document | Content |
 |---|---|
+| [`overview.md`](./overview.md) | What k-playbook is for: the three kinds of work — building, diagnosis, quality — the means that apply to all of them, and the knowledge store they share. One diagram. |
 | [`manual.md`](./manual.md) | Purpose, core model, standard workflows, operating rules. The central page. |
 | [`installation.md`](./installation.md) | Clone, the four setup steps, security tools, updating, troubleshooting. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | The contract: `K-PLAYBOOK.yaml`, directory layout, overlay rules. |
@@ -77,6 +78,7 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `k-playbook.md` / `instructions` / `prompt` -> [`k-playbook-format.md`](./k-playbook-format.md#instructions), [`faq.md`](./faq.md)
 - `legacy artifacts` / `old global linking` -> [`installation.md`](./installation.md#4-link-assistants)
 - `command missing` / `dead symlink` / `update links` -> [`installation.md`](./installation.md#update), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
+- `overview` / `what is it for` / `three kinds of work` / `big picture` -> [`overview.md`](./overview.md)
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `PR review` -> [`pr-review.md`](./pr-review.md)
 - `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)

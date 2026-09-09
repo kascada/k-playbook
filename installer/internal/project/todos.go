@@ -326,49 +326,14 @@ func readTodoDocument(path string) (*TodoDocument, error) {
 	return document, nil
 }
 
-// writeTodos schreibt das Dokument atomar: erst eine temporäre Datei daneben,
-// dann ein Rename. Ein abgebrochener Schreibvorgang hinterlässt damit nie ein
-// halbes Dokument.
+// writeTodos schreibt das Dokument atomar (siehe writeJSONFileAtomic) und
+// zieht dabei Schemafassung und nächste Kennung nach.
 func writeTodos(projectDir string, document *TodoDocument) error {
 	document.SchemaVersion = TodoSchemaVersion
 	if document.NextID < nextTodoID(document.Todos) {
 		document.NextID = nextTodoID(document.Todos)
 	}
-
-	content, err := json.MarshalIndent(document, "", "  ")
-	if err != nil {
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	content = append(content, '\n')
-
-	dir := TodoDataDir(projectDir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("%s anlegen: %w", dir, err)
-	}
-
-	temp, err := os.CreateTemp(dir, ".todos-*.json")
-	if err != nil {
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	tempPath := temp.Name()
-	if _, err := temp.Write(content); err != nil {
-		temp.Close()
-		os.Remove(tempPath)
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	if err := temp.Close(); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	if err := os.Chmod(tempPath, 0o644); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	if err := os.Rename(tempPath, TodoFile(projectDir)); err != nil {
-		os.Remove(tempPath)
-		return fmt.Errorf("Todos schreiben: %w", err)
-	}
-	return nil
+	return writeJSONFileAtomic(TodoFile(projectDir), document, "Todos schreiben")
 }
 
 // migrateTodos übersetzt eine vorhandene TODO.md nach data/todos.json und
