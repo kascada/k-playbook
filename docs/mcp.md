@@ -236,7 +236,7 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_list` | list the files of the knowledge directory with `path`, `title`, `source`; the README comes first |
 | `k_playbook_knowledge_read` | read one file of the knowledge directory as Markdown |
 | `k_playbook_knowledge_write` | write a Markdown document below `k-playbook-local/docs/learned/` -- nowhere else -- with `source` as provenance note in the frontmatter |
-| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `fileCount`, `chunkCount`, `bySource`, `builtAt`, `stale`, `staleFiles` |
+| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `bySource`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -502,7 +502,13 @@ same as the `--json` output of the subcommand, so a caller reading `hits.length`
 over an empty result. The other three tools omit both keys rather than sending `null`, which
 would feign an empty result they never computed. A `hint` appears when an access had to skip something
 without failing over it: an unwritable `cache/`, an unreadable file. The answer stands in that
-case; the index is disposable and the next access rebuilds it.
+case; the index is disposable and the next access rebuilds it. `status` also carries `model`
+and `dims`, empty while the index is lexical: they are the place where an index built with one
+embedding model and queried with another would show up instead of quietly returning nonsense.
+
+This section describes what is built. The concept it is heading towards -- how a deposit is
+classified, what the query surface looks like, and which decisions rest on which measurements
+-- is in [knowledge-gate.md](knowledge-gate.md).
 
 ## Inspecting What the Server Offers
 

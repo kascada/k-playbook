@@ -32,6 +32,16 @@ flowchart TD
     MCPRead --> Audit
 ```
 
+**LanceDB is deferred.** The measurements in `knowledge-gate.md` put the expected corpus at
+a few thousand chunks, which the in-process index handles without a database of its own.
+The diagram keeps it as the far end of the road, not as the next step: if the corpus or the
+retrieval quality ever demands it, the contract is built so it can be slotted in without
+changing a caller. Until then the chunks are indexed in the Go process.
+
+The concept underneath this diagram — how a deposit is classified, what the query surface
+looks like, and which decisions rest on which measurements — is in
+[`knowledge-gate.md`](knowledge-gate.md).
+
 ## Automatic learning
 
 A chat session produces knowledge that nobody writes down. When a session ends,

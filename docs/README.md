@@ -21,7 +21,9 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`code-review.md`](./code-review.md) | Both review paths, `/k-audit` and `/k-review`: flow, division of labour, result families, artifacts, status values, and the handoff to `/k-remediation`. |
 | [`review-runs.md`](./review-runs.md) | The run model: `run.json`, entries, operating modes of catalog recipes, merge, known decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
-| [`knowledge-storage.md`](./knowledge-storage.md) | Knowledge storage: the path from knowledge input through the MCP server and the versioned Markdown files into the local vector database. Shown in the interface under Knowledge. |
+| [`knowledge-storage.md`](./knowledge-storage.md) | Knowledge storage: the path from knowledge input through the MCP server into the versioned Markdown files and the index over them. A database of its own is deferred. Shown in the interface under Knowledge. |
+| [`knowledge-gate.md`](./knowledge-gate.md) | The concept under that diagram: how a deposit is classified by kind, origin, state and format, the query surface over the store, the staged plan for the index, and the measurements the decisions rest on. |
+| [`knowledge-layout.md`](./knowledge-layout.md) | The storage layout under `k-playbook-local`: the three zones `inbox/`, `queue/` and `knowledge/`, the ownership rule, the frontmatter contract, the table of what lands where, and the write tools every deposit goes through. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` for specific GitHub pull requests. |
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why the entry uses an absolute path. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
