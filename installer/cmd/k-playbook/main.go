@@ -5,7 +5,7 @@
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
-// Todos, `knowledge` liest, durchsucht und schreibt das Wissensverzeichnis,
+// Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage,
 // und `stop` beendet den Hintergrunddienst der Oberfläche.
 package main
 
@@ -150,10 +150,12 @@ Unterkommandos:
             delete|import. Die Ausgabe ist JSON auf stdout. Ohne Unterbefehl
             und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
             gelesen oder geschrieben werden.
-  knowledge Liest, durchsucht und schreibt das Wissensverzeichnis
-            k-playbook-local/docs/: k-playbook knowledge search|list|read|
-            write|status, jeweils mit --json für maschinenlesbare Ausgabe.
-            Geschrieben wird nur nach docs/learned/; der Index liegt unter
+  knowledge Liest, durchsucht und schreibt die Wissensablage
+            k-playbook-local/knowledge/: k-playbook knowledge search|list|
+            read|write|publish|supersede|status, dazu inbox put|list|read
+            für den Eingang und queue add|list|drop für die Warteschlange,
+            jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
+            dessen Verzeichnis; der Index liegt unter
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste

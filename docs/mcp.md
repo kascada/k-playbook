@@ -232,11 +232,19 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
-| `k_playbook_knowledge_search` | search the knowledge directory `k-playbook-local/docs/` section by section; hits carry `path`, `heading`, `excerpt`, `source`, `rank`, `anchor` |
-| `k_playbook_knowledge_list` | list the files of the knowledge directory with `path`, `title`, `source`; the README comes first |
-| `k_playbook_knowledge_read` | read one file of the knowledge directory as Markdown |
-| `k_playbook_knowledge_write` | write a Markdown document below `k-playbook-local/docs/learned/` -- nowhere else -- with `source` as provenance note in the frontmatter |
-| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `bySource`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
+| `k_playbook_knowledge_search` | search the knowledge store `k-playbook-local/knowledge/` section by section; hits carry `path`, `heading`, `excerpt`, `kind`, `origin`, `state`, `rank`, `anchor`; documents in state `raw` or `superseded` and the root `README.md` are not hits |
+| `k_playbook_knowledge_list` | list the files of the store with `path`, `title` (frontmatter `title`, else the first heading, else the file name), `kind`, `origin`, `state`; the README comes first, raw and superseded documents included |
+| `k_playbook_knowledge_read` | read one file of the store as Markdown |
+| `k_playbook_knowledge_write` | write one document: `producer` from the closed list, `path` inside the producer's directory, the frontmatter as fields (`title`, `subject`, `origin`, `state`, `format`, `sources`), `body` without a header, optional `queue` entry that is deleted once the document exists |
+| `k_playbook_knowledge_publish` | a generator (`docs-code`, `docs-tools`, `inventory`) hands over its complete `documents` and the store swaps the directory atomically; reports how many were written and removed |
+| `k_playbook_knowledge_supersede` | set `state: superseded` on a document, record `successor` and `superseded_reason`; nothing is deleted |
+| `k_playbook_knowledge_inbox_put` | drop a raw piece into `k-playbook-local/inbox/<source>/<name>` from `content` or `file`, with an optional `note` stored beside it |
+| `k_playbook_knowledge_inbox_list` | list the raw pieces of the inbox with `path`, `source`, `name`, `format`, `size`, `modified`, `note` |
+| `k_playbook_knowledge_inbox_read` | read one raw piece as text; text formats only |
+| `k_playbook_knowledge_queue_add` | add a queue entry from `origin`, `target`, `reason`; the tool assigns the `id` |
+| `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
+| `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
+| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -484,29 +492,87 @@ away history by accident.
 
 ### Knowledge Contract
 
-The five knowledge tools follow the same pattern: thin wrappers over `project.Knowledge`, the
-one place that chunks, indexes, and searches; the load-bearing layer is the subcommand
+The knowledge tools follow the same pattern: thin wrappers over `project.Knowledge`, the one
+place that chunks, indexes, searches and writes; the load-bearing layer is the subcommand
 `k-playbook knowledge`, and a binary that is too old answers it with `unbekanntes Kommando`. The
-envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on failure. A
-search hit names `path`, `heading` (the heading verbatim, the leading field), `excerpt` (the
-start of the section, at most 400 characters), `source` (the origin folder: `code`, `libs`,
-`extracted`, `versions`, `manual`, `learned`, or `root` for flat files), `rank` (from 1; the
-order is the statement, there is no score) and `anchor` (the Goldmark heading id, a display
-aid). `read` returns Markdown, not HTML. `write` accepts a path relative to `docs/learned/`
-only, refuses anything that leads out of it, and puts `source` into the frontmatter; the index
-under `k-playbook-local/cache/knowledge/` is updated in the same call, and the reported `path`
-is the one the write itself resolved, relative to `docs/`. `status` reports `stale: true` and
-`staleFiles` when the last access found files changed behind the tools' back and re-read them.
-`search` always carries `hits` and `list` always carries `entries`, empty ones included -- the
-same as the `--json` output of the subcommand, so a caller reading `hits.length` never trips
-over an empty result. The other three tools omit both keys rather than sending `null`, which
-would feign an empty result they never computed. A `hint` appears when an access had to skip something
-without failing over it: an unwritable `cache/`, an unreadable file. The answer stands in that
-case; the index is disposable and the next access rebuilds it. `status` also carries `model`
-and `dims`, empty while the index is lexical: they are the place where an index built with one
-embedding model and queried with another would show up instead of quietly returning nonsense.
+envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on failure.
+The store is the zone `k-playbook-local/knowledge/`; `inbox/` and `queue/` lie beside it and
+are never indexed. [knowledge-layout.md](knowledge-layout.md) defines the zones, the owner per
+directory and the frontmatter; this section only fixes what the tools return.
 
-This section describes what is built. The concept it is heading towards -- how a deposit is
+**Reading.** A search hit names `path`, `heading` (the heading verbatim, the leading field),
+`excerpt` (the start of the section, at most 400 characters), `kind` (the directory under
+`knowledge/`, which is the owner: `code`, `libs`, `versions`, `extracted`, `external`,
+`findings`, `pitfalls`, `manual`, or `root` for a flat file), `origin` and `state` from the
+document's frontmatter, `rank` (from 1; the order is the statement, there is no score) and
+`anchor` (the Goldmark heading id, a display aid). `kind` is read from the path and never from
+the document; `origin` is the actual provenance and lives only in the frontmatter -- the two
+were one field called `source` in v0.7.0 and were split before anything consumed them.
+Documents in state `raw` or `superseded` are not hits, and neither is the root `README.md`,
+which is generated navigation whose keyword index would otherwise outrank the documents it
+points at; `list` carries all of them with their `state`, and `read` returns any of them.
+There is no filter on `state`; that belongs to the reading side. The `title` that `list`
+reports is the frontmatter `title` when the document has one, otherwise its first heading,
+otherwise the file name -- what a caller had to give `write` comes back on reading, and a
+file without a header still gets a readable name. `search` always carries
+`hits` and `list` always carries `entries`, empty ones included -- the same as the `--json`
+output of the subcommand. The other tools omit both keys rather than sending `null`.
+
+**Writing.** Every write names its `producer` from the closed list in the layout, and the
+`path` -- relative to `knowledge/`, reported back exactly as `read`, `list` and `search`
+name it -- must lie in that producer's directory. Three refusals, three messages: an unknown
+producer, a path that leads out of the zone, and a target inside the zone but outside the
+producer's directory. The frontmatter is composed by the tool from `title`, `subject`,
+`origin`, `state` (`raw`, `condensed`, `reviewed`; `superseded` is refused), optional
+`format` (`markdown` by default, or `text`, `html`, `image`, `pdf`) and `sources`; `updated`
+is set by the tool. The `body` is Markdown without a header, and a body that carries one is
+refused rather than passed through. `write` optionally names a `queue` entry, which is
+deleted after the document exists and the index knows it -- not before, and not if the write
+failed. The generators `docs-code`, `docs-tools` and `inventory` cannot `write`: they
+`publish` their complete set of `documents` (paths relative to their directory), and the
+tool builds the new directory beside the old one and swaps it, so a run that dies halfway
+leaves the previous state untouched; the result says how many were `written` and `removed`.
+An empty set -- `documents: []` or the field left out -- is refused as `invalid_input` before
+anything is created: `publish` never empties a directory, on either path.
+On the command line, `publish --from <dir>` reads every Markdown file below `<dir>` with the
+same fields in its frontmatter, checks them and recomposes the header -- nothing is copied.
+`supersede` sets `state: superseded`, `successor` and `superseded_reason`, refreshes
+`updated` and leaves the body; the successor must already exist in the store.
+
+**Inbox and queue.** `inbox_put` stores a raw piece under `inbox/<source>/<name>` as it is
+-- any format, no frontmatter, no index -- and refuses an occupied name; a `note` is stored
+beside it as `<name>.note` and shown by `inbox_list` at the piece's entry. `inbox_read` reads
+text formats only (`md`, `txt`, `html`, `htm`, `json`, `yaml`, `yml`, `csv`, `xml`, `log`).
+`queue_add` takes `origin`, `target` (a directory relative to `knowledge/`, checked for path
+safety only) and `reason` and assigns the `id` itself; `queue_list` returns the backlog with
+those fields plus `added` and any `notes`; `queue_drop` deletes an entry and records nothing.
+
+**Error codes.** The `code` says whether the arguments or the environment are wrong, so a
+caller can decide between correcting and giving up. `invalid_input` is reserved for input
+errors, which the core (`project.InputError`) distinguishes and the wrappers only relay: an
+unknown producer, a path out of the zone or outside the producer's directory, a missing or
+malformed field, a body with a header, a refused `state`, an empty `documents` set, a
+non-text format at `inbox_read`, an occupied inbox name -- and "not there": a missing path
+at `read` or `supersede`, a missing successor at `supersede`, an unknown queue `id` at
+`queue_drop` or `write`, a missing inbox path at `inbox_read`. The caller named something
+that does not exist and can correct it; no separate code. Everything else is the
+environment: the writing tools (`write`, `publish`, `supersede`, `inbox_put`, `queue_add`,
+`queue_drop`) answer `write_failed`, the reading tools (`read`, `search`, `list`,
+`inbox_read`, `inbox_list`, `queue_list`, `status`) answer `read_failed` -- for instance an
+unwritable `knowledge/`, or a path that exists but cannot be read. `project_not_found` stays
+the code for a `projectDir` that leads to no k-playbook project.
+
+`status` reports `stale: true` and `staleFiles` when the last access found files changed
+behind the tools' back and re-read them. A `hint` appears when an access had to skip
+something without failing over it: an unwritable `cache/`, an unreadable file. Unreadable is
+not drift: a file whose hash cannot be taken is reported in the `hint`, its index entry is
+dropped once, and it stays invisible to the comparison -- no `stale`, no rewrite of the index
+-- until it is readable again; its return then counts as drift like any new file. `status` also
+carries `model` and `dims`, empty while the index is lexical: they are the place where an
+index built with one embedding model and queried with another would show up instead of
+quietly returning nonsense.
+
+This section describes what is built. The concept it belongs to -- how a deposit is
 classified, what the query surface looks like, and which decisions rest on which measurements
 -- is in [knowledge-gate.md](knowledge-gate.md).
 

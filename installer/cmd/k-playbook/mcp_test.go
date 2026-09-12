@@ -256,8 +256,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 15 {
-		t.Fatalf("tools/list meldet nicht genau fünfzehn Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 23 {
+		t.Fatalf("tools/list meldet nicht genau dreiundzwanzig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -280,6 +280,14 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_knowledge_list",
 		"k_playbook_knowledge_read",
 		"k_playbook_knowledge_write",
+		"k_playbook_knowledge_publish",
+		"k_playbook_knowledge_supersede",
+		"k_playbook_knowledge_inbox_put",
+		"k_playbook_knowledge_inbox_list",
+		"k_playbook_knowledge_inbox_read",
+		"k_playbook_knowledge_queue_add",
+		"k_playbook_knowledge_queue_list",
+		"k_playbook_knowledge_queue_drop",
 		"k_playbook_knowledge_status",
 	} {
 		if !found[name] {
@@ -312,8 +320,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 15 {
-		t.Fatalf("tools/list meldet nicht fünfzehn Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 23 {
+		t.Fatalf("tools/list meldet nicht dreiundzwanzig Werkzeuge: %v", responses[1])
 	}
 
 	for id, call := range []struct {

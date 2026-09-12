@@ -98,18 +98,18 @@ func ReadDoc(projectDir string, rel string) (Doc, []byte, error) {
 // Rechners zu lesen.
 func docFilePath(root string, rel string) (string, error) {
 	if strings.TrimSpace(rel) == "" {
-		return "", fmt.Errorf("kein Pfad angegeben")
+		return "", InputErrorf("kein Pfad angegeben")
 	}
 	if filepath.IsAbs(rel) {
-		return "", fmt.Errorf("nur Pfade innerhalb von %s", DocsDirName)
+		return "", InputErrorf("nur Pfade innerhalb von %s", DocsDirName)
 	}
 
 	path := filepath.Join(root, filepath.FromSlash(rel))
 	if path != root && !strings.HasPrefix(path, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("nur Pfade innerhalb von %s", DocsDirName)
+		return "", InputErrorf("nur Pfade innerhalb von %s", DocsDirName)
 	}
 	if !strings.EqualFold(filepath.Ext(path), ".md") {
-		return "", fmt.Errorf("nur Markdown-Dateien")
+		return "", InputErrorf("nur Markdown-Dateien")
 	}
 	return path, nil
 }

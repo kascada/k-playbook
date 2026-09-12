@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -22,23 +22,31 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
 
-// KnowledgeDirName ist das Wissensverzeichnis unterhalb von k-playbook-local:
-// das Projektwissen für AI-Sessions, nach Herkunft getrennt (siehe den
-// Eintrag docs in LocalStructure). Es ist dasselbe Verzeichnis, das
-// /k-docs-index indiziert — ein zweites wird nicht angelegt.
-const KnowledgeDirName = "docs"
+// KnowledgeDirName ist die Wissensablage unterhalb von k-playbook-local: die
+// dritte Zone aus docs/knowledge-layout.md, das, was gilt. Nur was hier liegt,
+// wird indiziert, durchsucht und gelesen (siehe den Eintrag knowledge in
+// LocalStructure). Bis zur Migration ist sie in jedem Projekt leer — das
+// heutige docs/ bleibt daneben bestehen und trägt weiter; ein Rückfall dorthin
+// wird bewusst nicht gebaut.
+const KnowledgeDirName = "knowledge"
 
-// KnowledgeLearnedDirName ist der einzige Ordner, in den das Wissenstor
-// schreibt. Die Herkunftsordner code/, libs/, extracted/, versions/ und
-// manual/ gehören ihren Generatoren, die ganze Dateien neu schreiben; was
-// dorthin geschrieben würde, wäre nach dem nächsten Lauf still weg.
-const KnowledgeLearnedDirName = "learned"
+// InboxDirName ist der Eingang unterhalb von k-playbook-local: Rohmaterial in
+// jedem Format, nach Quelle unterteilt (inbox/<quelle>/…), nie indiziert. Ein
+// Archiv, keine Warteschlange — was hier liegt, bleibt, bis eine Person es
+// entfernt (siehe den Eintrag inbox in LocalStructure).
+const InboxDirName = "inbox"
 
-// KnowledgeRootSource ist die Herkunft einer Datei, die flach in der Wurzel
-// des Wissensverzeichnisses liegt — heute README.md, der Index selbst.
-// /k-docs-index kennt sie als „unsorted flat files"; ohne eigenen Wert liefe
-// ausgerechnet die wichtigste Datei mit einem Leerwert durch List().
-const KnowledgeRootSource = "root"
+// QueueDirName ist die Warteschlange unterhalb von k-playbook-local: je ein
+// Markdown-Eintrag für ein Rohstück, das Wissen werden soll. Ein Eintrag
+// verschwindet, wenn sein Dokument steht — deshalb heißt ein leeres queue/:
+// nichts offen (siehe den Eintrag queue in LocalStructure).
+const QueueDirName = "queue"
+
+// KnowledgeRootKind ist die Art einer Datei, die flach in der Wurzel der
+// Wissensablage liegt — die README.md, der Index selbst, den /k-docs-index
+// schreibt. Ohne eigenen Wert liefe ausgerechnet die wichtigste Datei mit
+// einem Leerwert durch List().
+const KnowledgeRootKind = "root"
 
 // Chunk ist ein Abschnitt einer Wissensdatei: alles unter einer Überschrift
 // bis zur nächsten. Die Suche findet Chunks, nicht Dateien.
@@ -58,9 +66,11 @@ type Chunk struct {
 	// ist abgeschnitten. Die Überschrift steht in Heading und wird beim
 	// Suchen mitgewichtet.
 	Text string `json:"text"`
-	// Source ist der Herkunftsordner: das erste Pfadsegment, oder
-	// KnowledgeRootSource für Dateien in der Wurzel.
-	Source string `json:"source"`
+	// Kind ist die Art: das erste Pfadsegment — der Eigentümer, den der Pfad
+	// trägt —, oder KnowledgeRootKind für Dateien in der Wurzel. Sie kommt
+	// aus dem Pfad und nie aus dem Dokument: ein Feld, das den Pfad
+	// wiederholt, ist ein Feld, das ihm widersprechen kann.
+	Kind string `json:"kind"`
 }
 
 // Ein Hash je Chunk gibt es nicht. Erkannt wird Drift je Datei
@@ -69,21 +79,27 @@ type Chunk struct {
 // hätte damit keinen Leser und stünde nur als zweite, ungenutzte Wahrheit in
 // jeder Zeile des Index.
 
-// knowledgeFrontmatter sind die Metadaten aus dem Kopf einer Wissensdatei.
-// Der Doku-Index verlangt beide Felder; sie gehören in keinen Chunk-Text.
+// knowledgeFrontmatter sind die Metadaten aus dem Kopf einer Wissensdatei —
+// der Vertrag aus docs/knowledge-layout.md, soweit der Index ihn liest. Sie
+// gehören in keinen Chunk-Text. State hat Zähne: raw und superseded fehlen in
+// Search standardmäßig; List und Read führen sie weiter.
 type knowledgeFrontmatter struct {
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
+	Title   string `json:"title,omitempty"`
+	Subject string `json:"subject,omitempty"`
+	Origin  string `json:"origin,omitempty"`
+	State   string `json:"state,omitempty"`
+	Format  string `json:"format,omitempty"`
+	Updated string `json:"updated,omitempty"`
 }
 
 // knowledgeFileEntry ist, was der Index über eine Datei weiß.
 type knowledgeFileEntry struct {
 	// Hash ist SHA-256 über den Dateiinhalt, hexadezimal. Er fängt Dateien,
 	// die am Tor vorbei geändert wurden.
-	Hash   string `json:"hash"`
-	Source string `json:"source"`
-	// Title folgt der Regel von ListDocs: erste Überschrift, ersatzweise der
-	// Dateiname.
+	Hash string `json:"hash"`
+	Kind string `json:"kind"`
+	// Title folgt knowledgeTitle: Frontmatter-Titel, sonst erste Überschrift,
+	// ersatzweise der Dateiname.
 	Title       string               `json:"title"`
 	Frontmatter knowledgeFrontmatter `json:"frontmatter"`
 }
@@ -97,19 +113,24 @@ func KnowledgeDir(projectDir string) string {
 	return filepath.Join(LocalDir(projectDir), KnowledgeDirName)
 }
 
-// KnowledgeLearnedDir ist der Schreibordner des Wissenstors.
-func KnowledgeLearnedDir(projectDir string) string {
-	return filepath.Join(KnowledgeDir(projectDir), KnowledgeLearnedDirName)
-}
-
-// knowledgeSource leitet die Herkunft aus dem Pfad ab: das erste Segment,
-// oder root für eine Datei ohne Verzeichnis.
-func knowledgeSource(rel string) string {
+// knowledgeKind leitet die Art aus dem Pfad ab: das erste Segment, oder root
+// für eine Datei ohne Verzeichnis.
+func knowledgeKind(rel string) string {
 	rel = filepath.ToSlash(rel)
 	if index := strings.IndexByte(rel, '/'); index >= 0 {
 		return rel[:index]
 	}
-	return KnowledgeRootSource
+	return KnowledgeRootKind
+}
+
+// knowledgeSearchable meldet, ob eine Datei Chunks in den Suchindex gibt.
+// Die README in der Wurzel gibt keine: sie ist erzeugte Navigation ohne
+// eigenen Inhalt, und ihr Stichwortindex — kurz, begriffsdicht, genau die
+// Form, die BM25 doppelt belohnt — verdrängte die Dokumente, auf die er
+// zeigt (belegt in material/befunde/wissenstor-mcp.md). List führt sie
+// weiter; Navigation ist dort besser aufgehoben als im Ranking.
+func knowledgeSearchable(rel string) bool {
+	return filepath.ToSlash(rel) != knowledgeReadmeName
 }
 
 // scanKnowledgeTree sammelt alle Markdown-Dateien unterhalb der Wurzel,
@@ -172,19 +193,36 @@ func chunkKnowledgeFile(root, rel string) (knowledgeFileEntry, []Chunk, error) {
 		return knowledgeFileEntry{}, nil, fmt.Errorf("%s lesen: %w", rel, err)
 	}
 
+	frontmatter := parseKnowledgeFrontmatter(data)
 	entry := knowledgeFileEntry{
 		Hash:        sha256Hex(data),
-		Source:      knowledgeSource(rel),
-		Title:       docTitle(full),
-		Frontmatter: parseKnowledgeFrontmatter(data),
+		Kind:        knowledgeKind(rel),
+		Title:       knowledgeTitle(full, frontmatter),
+		Frontmatter: frontmatter,
 	}
-	chunks := chunkMarkdown(filepath.ToSlash(rel), entry.Source, inventory.Body(data))
+	if !knowledgeSearchable(rel) {
+		return entry, []Chunk{}, nil
+	}
+	chunks := chunkMarkdown(filepath.ToSlash(rel), entry.Kind, inventory.Body(data))
 	return entry, chunks, nil
 }
 
-// parseKnowledgeFrontmatter liest title und description aus dem Kopf. Ein
-// Kopf, den yamllite nicht versteht, ist kein Fehler des Wissenstors: die
-// Metadaten bleiben dann leer, die Datei wird trotzdem indiziert.
+// knowledgeTitle ist der Titel, unter dem List und Index eine Datei führen:
+// der Frontmatter-Titel, wenn gesetzt — was ein Aufrufer bei write als
+// Pflichtfeld angeben musste, kommt beim Lesen auch zurück —, sonst wie bei
+// ListDocs die erste Überschrift, ersatzweise der Dateiname. So bleiben die
+// Wurzel-README und fremde Dateien ohne Kopf lesbar benannt.
+func knowledgeTitle(full string, frontmatter knowledgeFrontmatter) string {
+	if frontmatter.Title != "" {
+		return frontmatter.Title
+	}
+	return docTitle(full)
+}
+
+// parseKnowledgeFrontmatter liest die Vertragsfelder aus dem Kopf. Ein Kopf,
+// den yamllite nicht versteht, ist kein Fehler des Wissenstors: die Metadaten
+// bleiben dann leer, die Datei wird trotzdem indiziert — und ohne state gilt
+// sie als suchbar; eine Datei am Tor vorbei soll nicht unsichtbar werden.
 func parseKnowledgeFrontmatter(data []byte) knowledgeFrontmatter {
 	block, ok := inventory.FrontmatterBlock(data)
 	if !ok {
@@ -195,8 +233,12 @@ func parseKnowledgeFrontmatter(data []byte) knowledgeFrontmatter {
 		return knowledgeFrontmatter{}
 	}
 	return knowledgeFrontmatter{
-		Title:       strings.TrimSpace(root.Get("title").Str()),
-		Description: strings.TrimSpace(root.Get("description").Str()),
+		Title:   strings.TrimSpace(root.Get("title").Str()),
+		Subject: strings.TrimSpace(root.Get("subject").Str()),
+		Origin:  strings.TrimSpace(root.Get("origin").Str()),
+		State:   strings.TrimSpace(root.Get("state").Str()),
+		Format:  strings.TrimSpace(root.Get("format").Str()),
+		Updated: strings.TrimSpace(root.Get("updated").Str()),
 	}
 }
 
@@ -297,7 +339,7 @@ func nextLineStart(source []byte, pos int) int {
 // ersten Überschrift wird ein Chunk mit leerem Heading und Anker — aber nur,
 // wenn dort tatsächlich etwas steht; die meisten Dateien beginnen mit ihrer
 // Überschrift, und ein leerer Vorspann wäre ein Treffer ohne Inhalt.
-func chunkMarkdown(rel, source string, body []byte) []Chunk {
+func chunkMarkdown(rel, kind string, body []byte) []Chunk {
 	chunks := []Chunk{}
 	add := func(heading, anchor string, from, to int) {
 		if from > to {
@@ -312,7 +354,7 @@ func chunkMarkdown(rel, source string, body []byte) []Chunk {
 			Heading: heading,
 			Anchor:  anchor,
 			Text:    content,
-			Source:  source,
+			Kind:    kind,
 		})
 	}
 
@@ -373,11 +415,12 @@ const knowledgeDefaultLimit = 10
 const knowledgeExcerptRunes = 400
 
 // KnowledgeFilter grenzt Search und List ein. Heute ein Feld; weitere kommen
-// dazu, ohne dass ein Aufrufer bricht.
+// dazu, ohne dass ein Aufrufer bricht. Ein Filter auf state ist bewusst
+// keiner: das ist Leseseite.
 type KnowledgeFilter struct {
-	// Source ist ein Herkunftswert (code, libs, extracted, versions, manual,
-	// learned, root) oder leer für alle.
-	Source string `json:"source,omitempty"`
+	// Kind ist die Art aus dem Pfad (code, libs, versions, extracted,
+	// external, findings, pitfalls, manual, root) oder leer für alle.
+	Kind string `json:"kind,omitempty"`
 }
 
 // Hit ist ein Suchtreffer — der Vertrag, der später nicht mehr wackeln darf.
@@ -392,22 +435,29 @@ type Hit struct {
 	// Excerpt ist der Anfang des Chunks — nicht ein Fenster um den Treffer,
 	// das Term-Positionen voraussetzte, die ein Vektorindex nicht hat.
 	Excerpt string `json:"excerpt"`
-	Source  string `json:"source"`
-	Rank    int    `json:"rank"`
-	Anchor  string `json:"anchor"`
+	// Kind ist die Art aus dem Pfad; Origin und State kommen aus dem
+	// Frontmatter und fehlen, wo das Dokument keines trägt.
+	Kind   string `json:"kind"`
+	Origin string `json:"origin,omitempty"`
+	State  string `json:"state,omitempty"`
+	Rank   int    `json:"rank"`
+	Anchor string `json:"anchor"`
 }
 
 // KnowledgeEntry ist eine Datei in List.
 type KnowledgeEntry struct {
 	Path string `json:"path"`
-	// Title folgt der Regel von ListDocs: erste Überschrift, ersatzweise der
-	// Dateiname — eine Liste aus Dateinamen liest sich schlecht.
+	// Title ist der Frontmatter-Titel, sonst die erste Überschrift,
+	// ersatzweise der Dateiname (knowledgeTitle) — eine Liste aus Dateinamen
+	// liest sich schlecht.
 	Title  string `json:"title"`
-	Source string `json:"source"`
+	Kind   string `json:"kind"`
+	Origin string `json:"origin,omitempty"`
+	State  string `json:"state,omitempty"`
 }
 
-// KnowledgeSourceCount ist die Größe einer Herkunft in Status.
-type KnowledgeSourceCount struct {
+// KnowledgeKindCount ist die Größe einer Art in Status.
+type KnowledgeKindCount struct {
 	Files  int `json:"files"`
 	Chunks int `json:"chunks"`
 }
@@ -415,15 +465,15 @@ type KnowledgeSourceCount struct {
 // KnowledgeStatus trägt heute schon die Felder von morgen: Model und Dims
 // bleiben leer, bis ein Vektorindex sie füllt — dann sind sie die Stelle, an
 // der ein mit dem einen Modell gebauter und mit einem anderen befragter Index
-// auffällt. FileCount und BySource sind die Messgrundlage für die
+// auffällt. FileCount und ByKind sind die Messgrundlage für die
 // RAG-Entscheidung, ausdrücklich als Untergrenze.
 type KnowledgeStatus struct {
-	IndexKind  string                          `json:"indexKind"`
-	Model      string                          `json:"model"`
-	Dims       int                             `json:"dims"`
-	FileCount  int                             `json:"fileCount"`
-	ChunkCount int                             `json:"chunkCount"`
-	BySource   map[string]KnowledgeSourceCount `json:"bySource"`
+	IndexKind  string                        `json:"indexKind"`
+	Model      string                        `json:"model"`
+	Dims       int                           `json:"dims"`
+	FileCount  int                           `json:"fileCount"`
+	ChunkCount int                           `json:"chunkCount"`
+	ByKind     map[string]KnowledgeKindCount `json:"byKind"`
 	// BuiltAt ist der Stand des Index als RFC3339-Zeitstempel.
 	BuiltAt      time.Time `json:"builtAt"`
 	IndexVersion int       `json:"indexVersion"`
@@ -434,10 +484,13 @@ type KnowledgeStatus struct {
 	StaleFiles int  `json:"staleFiles"`
 }
 
-// Search durchsucht die Chunks. limit 0 heißt knowledgeDefaultLimit.
+// Search durchsucht die Chunks. limit 0 heißt knowledgeDefaultLimit. Chunks
+// aus Dokumenten mit state raw oder superseded bleiben draußen: Rohes würde
+// die verdichtete Fassung seiner selbst überdecken, Abgelöstes hat aufgehört
+// zu gelten. Beides bleibt über Read und List erreichbar.
 func (k *Knowledge) Search(query string, filter KnowledgeFilter, limit int) ([]Hit, error) {
 	if strings.TrimSpace(query) == "" {
-		return nil, fmt.Errorf("leere Suchanfrage")
+		return nil, InputErrorf("leere Suchanfrage")
 	}
 	if limit <= 0 {
 		limit = knowledgeDefaultLimit
@@ -451,14 +504,20 @@ func (k *Knowledge) Search(query string, filter KnowledgeFilter, limit int) ([]H
 	hits := []Hit{}
 	for _, scored := range buildBM25(index.Chunks).search(query) {
 		chunk := index.Chunks[scored.chunk]
-		if filter.Source != "" && chunk.Source != filter.Source {
+		if filter.Kind != "" && chunk.Kind != filter.Kind {
+			continue
+		}
+		file := index.Files[chunk.Path]
+		if knowledgeHiddenState(file.Frontmatter.State) {
 			continue
 		}
 		hits = append(hits, Hit{
 			Path:    chunk.Path,
 			Heading: chunk.Heading,
 			Excerpt: knowledgeExcerpt(chunk.Text),
-			Source:  chunk.Source,
+			Kind:    chunk.Kind,
+			Origin:  file.Frontmatter.Origin,
+			State:   file.Frontmatter.State,
 			Rank:    len(hits) + 1,
 			Anchor:  chunk.Anchor,
 		})
@@ -479,10 +538,13 @@ func (k *Knowledge) List(filter KnowledgeFilter) ([]KnowledgeEntry, error) {
 
 	entries := []KnowledgeEntry{}
 	for rel, file := range index.Files {
-		if filter.Source != "" && file.Source != filter.Source {
+		if filter.Kind != "" && file.Kind != filter.Kind {
 			continue
 		}
-		entries = append(entries, KnowledgeEntry{Path: rel, Title: file.Title, Source: file.Source})
+		entries = append(entries, KnowledgeEntry{
+			Path: rel, Title: file.Title, Kind: file.Kind,
+			Origin: file.Frontmatter.Origin, State: file.Frontmatter.State,
+		})
 	}
 	sort.Slice(entries, func(i int, j int) bool {
 		if readme := entries[i].Path == "README.md"; readme != (entries[j].Path == "README.md") {
@@ -503,67 +565,15 @@ func (k *Knowledge) Read(path string) (string, error) {
 	}
 	content, err := os.ReadFile(full)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			// Nicht vorhanden ist ein Eingabefehler: der Aufrufer hat einen
+			// Pfad genannt, den es nicht gibt, und kann ihn korrigieren.
+			// Vorhanden, aber unlesbar, ist die Umgebung.
+			return "", InputErrorf("%s gibt es nicht in der Wissensablage — list nennt, was dort liegt", path)
+		}
 		return "", fmt.Errorf("%s lesen: %w", path, err)
 	}
 	return string(content), nil
-}
-
-// Write legt eine Datei unterhalb von docs/learned/ an oder ersetzt sie.
-// path ist relativ zu diesem Ordner; jeder Pfad, der herausführt, wird
-// abgewiesen. source geht als Herkunftsvermerk ins Frontmatter, und die
-// Chunks der Datei werden im selben Zug aktualisiert. Löschen und Umbenennen
-// gibt es nicht.
-//
-// Das erste Ergebnis ist der geschriebene Ort relativ zum Wissensverzeichnis,
-// also mit learned/ davor — so, wie Read, List und Search ihn nennen. Er
-// entsteht hier ohnehin; ihn wegzuwerfen und in jedem Aufrufer nachzubauen
-// hieße, dieselbe Rechnung dreimal zu führen und sie zweimal falsch haben zu
-// können.
-//
-// Erst der Index, dann die Datei: der Zugriff gleicht zuerst den Baum ab, so
-// dass die eigene Schreibung danach nicht als Drift zählt — das Tor selbst
-// hat nicht am Tor vorbei geschrieben.
-func (k *Knowledge) Write(path, content, source string) (string, error) {
-	source = strings.TrimSpace(source)
-	if source == "" || strings.ContainsAny(source, "\r\n") {
-		return "", fmt.Errorf("kein Herkunftsvermerk: Write braucht ein einzeiliges source")
-	}
-
-	learned := KnowledgeLearnedDir(k.projectDir)
-	full, err := docFilePath(learned, path)
-	if err != nil {
-		return "", fmt.Errorf("Pfad %q abgelehnt — geschrieben wird nur unterhalb von %s/%s/%s: %w",
-			path, LocalDirName, KnowledgeDirName, KnowledgeLearnedDirName, err)
-	}
-
-	index, err := k.open()
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		return "", fmt.Errorf("%s anlegen: %w", filepath.Dir(full), err)
-	}
-	if err := os.WriteFile(full, []byte(knowledgeWithSource(content, source)), 0o644); err != nil {
-		return "", fmt.Errorf("%s schreiben: %w", path, err)
-	}
-
-	root := KnowledgeDir(k.projectDir)
-	rel, err := filepath.Rel(root, full)
-	if err != nil {
-		return "", fmt.Errorf("%s einordnen: %w", path, err)
-	}
-	rel = filepath.ToSlash(rel)
-	entry, chunks, err := chunkKnowledgeFile(root, rel)
-	if err != nil {
-		return "", err
-	}
-	index.replaceFile(rel, entry, chunks)
-	index.BuiltAt = knowledgeNow()
-	if err := writeKnowledgeIndex(k.projectDir, index); err != nil {
-		return "", err
-	}
-	return rel, nil
 }
 
 // Status liefert Art und Größe des Index samt der Drift-Meldung des letzten
@@ -574,28 +584,33 @@ func (k *Knowledge) Status() (KnowledgeStatus, error) {
 		return KnowledgeStatus{}, err
 	}
 
-	bySource := map[string]KnowledgeSourceCount{}
+	byKind := map[string]KnowledgeKindCount{}
 	for _, file := range index.Files {
-		count := bySource[file.Source]
+		count := byKind[file.Kind]
 		count.Files++
-		bySource[file.Source] = count
+		byKind[file.Kind] = count
 	}
 	for _, chunk := range index.Chunks {
-		count := bySource[chunk.Source]
+		count := byKind[chunk.Kind]
 		count.Chunks++
-		bySource[chunk.Source] = count
+		byKind[chunk.Kind] = count
 	}
 
 	return KnowledgeStatus{
 		IndexKind:    KnowledgeIndexKind,
 		FileCount:    len(index.Files),
 		ChunkCount:   len(index.Chunks),
-		BySource:     bySource,
+		ByKind:       byKind,
 		BuiltAt:      index.BuiltAt,
 		IndexVersion: index.IndexVersion,
 		Stale:        index.Stale,
 		StaleFiles:   index.StaleFiles,
 	}, nil
+}
+
+// knowledgeHiddenState meldet, ob ein state ein Dokument aus der Suche hält.
+func knowledgeHiddenState(state string) bool {
+	return state == KnowledgeStateRaw || state == KnowledgeStateSuperseded
 }
 
 // knowledgeExcerpt bildet den Auszug: der Anfang des Chunk-Texts, Leerraum
@@ -617,63 +632,4 @@ func knowledgeExcerpt(content string) string {
 		cut = knowledgeExcerptRunes
 	}
 	return strings.TrimRightFunc(string(runes[:cut]), unicode.IsSpace) + "…"
-}
-
-// knowledgeWithSource setzt den Herkunftsvermerk ins Frontmatter: ein
-// vorhandenes source-Feld wird ersetzt, ein fehlendes ergänzt, ein fehlender
-// Block vorangestellt. Ein title wird nicht erfunden. Zeilenenden werden LF,
-// die Datei endet mit einem Zeilenumbruch.
-//
-// Ein führender ---Block gilt nur als Frontmatter, wenn er als YAML-Abbildung
-// durchgeht. „---" als erste Zeile ist gültiges Markdown — ein Thematic
-// Break —, und wer den Text dahinter für Frontmatter hielte, schöbe den
-// Vermerk vor das nächste „---" mitten im Dokument. inventory.Body() schnitte
-// danach alles davor weg: Titel und erste Absätze fehlten in Chunks, Suche und
-// Anzeige, während docTitle den Titel weiterhin meldete — list und search
-// widersprächen sich.
-func knowledgeWithSource(content, source string) string {
-	text := strings.ReplaceAll(content, "\r\n", "\n")
-	if !strings.HasSuffix(text, "\n") {
-		text += "\n"
-	}
-	line := "source: " + source
-
-	lines := strings.Split(text, "\n")
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
-		for end := 1; end < len(lines); end++ {
-			if strings.TrimSpace(lines[end]) != "---" {
-				continue
-			}
-			if !isKnowledgeFrontmatter(strings.Join(lines[1:end], "\n")) {
-				break
-			}
-			for position := 1; position < end; position++ {
-				key, _, found := strings.Cut(lines[position], ":")
-				// Leerraum um den Schlüssel gehört nicht dazu: „ source:"
-				// und „source :" sind dasselbe Feld, und ein zweites
-				// daneben zu schreiben ergäbe einen doppelten Schlüssel.
-				if found && strings.TrimSpace(key) == "source" {
-					lines[position] = line
-					return strings.Join(lines, "\n")
-				}
-			}
-			lines = slices.Insert(lines, end, line)
-			return strings.Join(lines, "\n")
-		}
-	}
-	return "---\n" + line + "\n---\n\n" + text
-}
-
-// isKnowledgeFrontmatter prüft, ob der führende Block eine YAML-Abbildung ist.
-// Geprüft wird mit yamllite — demselben Leser, aus dem parseKnowledgeFrontmatter
-// title und description holt. Ein leerer Block zählt mit: dort kann nichts
-// verrutschen. Eine Liste oder Fließtext zählt nicht.
-//
-// Die Prüfung ist absichtlich die schwächere Seite: ein Markdown-Absatz mit
-// Doppelpunkt geht als Abbildung durch und würde weiterhin für Frontmatter
-// gehalten. Der teure Fall ist der umgekehrte — Inhalt, der nach dem
-// Schreiben aus dem Rumpf verschwindet —, und den fängt sie.
-func isKnowledgeFrontmatter(block string) bool {
-	root, err := yamllite.Parse([]byte(block))
-	return err == nil && root != nil && root.Kind == yamllite.Mapping
 }

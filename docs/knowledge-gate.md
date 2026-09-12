@@ -29,10 +29,13 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | Part | State |
 |---|---|
 | Chunking, BM25 index, drift detection | built |
-| `search`, `list`, `read`, `write`, `status` over CLI and MCP | built |
-| Classification of deposits (kind, origin, state, format) | concept, this page |
-| Briefing call | concept, this page |
-| Ranking correction | known defect, see Open points |
+| `search`, `list`, `read`, `status` over CLI and MCP | built |
+| The three zones `inbox/`, `queue/`, `knowledge/` and the write tools `write`, `publish`, `supersede`, `inbox_*`, `queue_*` | built, task 056; see [`knowledge-layout.md`](knowledge-layout.md) |
+| Classification of deposits (kind from the path, origin, state, format in the frontmatter) | built, task 056 |
+| `raw` and `superseded` out of search by default | built, task 056 |
+| Migration of `docs/` into `knowledge/` | not built; `knowledge/` is empty until then |
+| Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
+| Ranking correction | built, task 056: the root `README.md` is out of the search index |
 | Vectors, local model | deliberately not built, tier two |
 | LanceDB or another dedicated database | deferred; revisited only if the corpus or the retrieval quality demands it |
 | External source connectors | deliberately not built, tier three |
@@ -54,33 +57,21 @@ outlasted.
 
 ## Depositing: what a write has to declare
 
-Today a write carries a path, the content, and a free-text origin note. That is not enough
-once several kinds of producer write through the same server. Four things have to be
-declared, and they answer four different questions.
+A write names its producer, its path, the frontmatter as fields and the body. Four things
+are declared, and they answer four different questions.
 
 ### Kind — what this is
 
-A closed vocabulary. It says what sort of knowledge this is, and it decides which directory
-the document lands in.
-
-| Kind | Meaning | Written by |
-|---|---|---|
-| `code` | derived from the source of this project | `/k-docs-code` |
-| `libs` | reference for a tool, library or stack in use | `/k-docs-tools` |
-| `extracted` | distilled from raw material | `/k-docs-extract` |
-| `versions` | the version inventory | `/k-doc-inventory` |
-| `manual` | written by a person | a person |
-| `learned` | a finding from a finished session | the gate |
-| `external` | an extract of an outside source | a connector |
-
-The first five exist. `learned` is the gate's own destination today. `external` is the new
-one and the reason the vocabulary has to be closed: as soon as a connector writes, the
+The kind is the directory under `knowledge/`, read from the path and never from the
+document. Which directory belongs to which producer is the table "Who may write where" in
+[`knowledge-layout.md`](knowledge-layout.md); it is the only place that table lives, so this
+page does not repeat it. The vocabulary is closed because as soon as a connector writes, the
 folder cannot be inferred from who is calling.
 
 **Ownership follows the kind.** A generator rewrites its directory completely on the next
-run. Anything a different producer put there disappears without a trace. That is why the
-gate writes only to `learned/` today, and why the rule has to generalise rather than be
-repeated per case: a directory has exactly one owner, and only the owner may write there.
+run. Anything a different producer put there disappears without a trace. That is why a
+directory has exactly one owner, only the owner may write there, and the tool refuses a
+target outside the producer's directory.
 
 ### Origin — where it came from
 
@@ -152,7 +143,7 @@ tool cannot enforce this. `AGENTS.md` has to say it, which is also where the ass
 told that the store knows things the repository does not.
 
 **The feedback loop closes here.** When the store answers poorly and the deeper search
-finds something, the finding is written back as `learned`. The next session gets it locally
+finds something, the finding is written back into `findings/` by the session. The next session gets it locally
 and fast. Note what judges "answered poorly": the assistant that read the hits, not a
 threshold on a score. That is deliberate. A score threshold would break the moment the
 index behind it changes, which is exactly the change this design is built to allow.
@@ -244,44 +235,38 @@ carries no score, which is what lets the index be replaced. And the anchors come
 Goldmark pass over the whole file, which is what lets a hit point at a heading the renderer
 actually produced.
 
+## Settled since
+
+Two open points of the first version were closed by task 056 and are recorded here so a
+later reader knows what was decided and why.
+
+**The ranking put pointers above their targets.** The keyword index in this repository's
+`README.md` took rank 1 for `ApplyLinks`, `SHA256SUMS` and `Symlink-Konflikt`; in the third
+case the actual target did not appear in the top five at all. The cause is structural: BM25
+rewards short, term-dense documents twice over, and an index of keywords is exactly that by
+construction. Of the three ways out — exclude the keyword section, keep the README out of
+the search index, weight the root down — the second was taken: the root `README.md` of the
+store is generated navigation without content of its own, it gives no chunks to the index
+at all (so it does not skew the term statistics either), and `list` covers navigation.
+
+**`source` meant two different things in the same tool family.** `search` and `list`
+returned `source` as the origin directory — the *kind* — while `write` took `source` as a
+free-text provenance note — the *origin*. The field was split before anything consumed it:
+`kind` is read from the path, `origin` lives in the frontmatter, and the tools report both.
+
 ## Open points
 
-**The ranking puts pointers above their targets.** The keyword index in this repository's
-`README.md` takes rank 1 for `ApplyLinks`, `SHA256SUMS` and `Symlink-Konflikt`; in the third
-case the actual target does not appear in the top five at all. The cause is structural:
-BM25 rewards short, term-dense documents twice over, and an index of keywords is exactly
-that by construction. It competes against the documents it exists to open up, on precisely
-the terms somebody searches for. Three ways out: exclude the keyword section from chunking,
-keep the README out of the search index entirely since `list` covers navigation anyway, or
-weight the root origin down. This is a ranking decision and belongs to whoever has the
-finished index in front of them.
-
-**`source` means two different things in the same tool family, and it should be renamed
-before anything consumes it.** `search` and `list` return `source` as the origin directory,
-which in the vocabulary above is the *kind*. `write` takes `source` as a free-text provenance
-note and puts it in the frontmatter, which above is the *origin*. The value that goes in is
-not the value that comes back. Demonstrated: a write with `--source confluence` produces a
-document whose frontmatter says `confluence`, while a search for it reports `source: learned`.
-
-The collision is invisible today only because the gate writes to exactly one directory, so the
-kind is a constant. It stops being invisible the moment a connector writes as `external` or a
-generator writes through the gate.
-
-Splitting the field into `kind` and `origin` costs almost nothing right now: the tools are
-released but nothing reads them yet, and the interface that will read them has not built its
-listing block. Later it costs a release plus every caller. *This is a contract change and
-therefore a decision for the project owner.*
-
-**The documentation index does not know `learned/`.** Anything written through the gate is
-findable by search but does not appear in `k-playbook-local/docs/README.md`, which
-`AGENTS.md` declares the authoritative entry point. Either the index takes the directory in,
-or the directory stays out on purpose and `AGENTS.md` says that the index is no longer
-complete. Tracked as a todo.
+**The documentation index still lives in `docs/`.** `/k-docs-index` writes
+`k-playbook-local/docs/README.md`, which `AGENTS.md` declares the authoritative entry point,
+and knows nothing of `knowledge/`. In the store its place is `knowledge/README.md`, written
+by the same command through `write` with `producer: docs-index`; that switch is part of the
+migration, together with the instruction in the generated `AGENTS.md`.
 
 **Outside sources change upstream.** Drift detection notices a local edit. It cannot notice
 that the Confluence page an extract came from has changed. Whether the gate refreshes such
 sources periodically, or whether an extract stays a dated snapshot, is undecided.
 
-**Deleting and renaming do not exist.** A second import run finds pages that are gone. The
-`superseded` state above is the proposed answer, but it has not been built, and a store that
-only ever grows will eventually hold things that vanished upstream long ago.
+**Deleting and renaming do not exist, and `supersede` is only half the answer.** A second
+import run finds pages that are gone; it can supersede them, but nothing yet does. A store
+that only ever grows will eventually hold things that vanished upstream long ago, and which
+run marks them is undecided.

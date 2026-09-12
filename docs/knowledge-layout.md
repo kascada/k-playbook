@@ -10,6 +10,13 @@ describes where it lies. It defines the storage zones from scratch, deliberately
 the directories in use today rather than on top of them: the new names are free, so the
 migration is a move and never a rename during operation.
 
+**Status: built.** The three zones, the write tools and the index over `knowledge/` exist
+since task 056 (the zones are created by setup, the tools are `k-playbook knowledge …` and
+`k_playbook_knowledge_*`, see [`mcp.md`](mcp.md), "Knowledge Contract"). What is not yet
+built is the migration: `docs/` still holds everything and is still shipped, `knowledge/`
+is empty in every project until the migration moves the documents, and the reading side
+(`briefing`, filters on `state`) is a separate step.
+
 ## Why zones, and why by lifetime
 
 Everything a project knows currently lands in one pot called `docs/`, and that pot mixes
@@ -124,10 +131,13 @@ answer them nowhere a search can reach.
 | `state` | `raw`, `condensed`, `reviewed` or `superseded` |
 | `format` | what the original was: `markdown`, `text`, `html`, `image`, `pdf` |
 | `sources` | the inbox paths a document was distilled from, where there are any |
+| `successor` | set by `supersede`: the path of the document that replaces this one, relative to `knowledge/` |
+| `superseded_reason` | set by `supersede`: why it was replaced |
 | `updated` | the day it last changed |
 
 `state` has teeth or it is decoration: `raw` and `superseded` stay out of search results by
-default and remain readable on request.
+default and remain readable on request. `write` accepts `raw`, `condensed` and `reviewed`;
+`superseded` only ever comes from `supersede`. `format` is `markdown` unless given.
 
 **There is no `kind` field.** The kind is the directory, and a field that repeats the path is
 a field that can contradict it. It is read from the path and never from the document.
@@ -178,8 +188,9 @@ Three consequences, and they hold from the first line of code:
 This cannot be enforced against a producer that has a filesystem, and pretending otherwise
 would be the wrong design. What can be done is what the index already does: it carries a hash
 per file and notices when the tree disagrees with it. A write past the gate is therefore
-detectable, and it has to be **reported by name** rather than silently repaired — a corrected
-drift that nobody hears about is a rule nobody follows.
+detectable; it is repaired silently, and `status` says that it happened (`stale`,
+`staleFiles`) without naming the file. A drift report that names the file and stays until
+somebody acknowledges it was considered and deliberately not built — see "Decisions".
 
 ## The write tools
 
@@ -212,14 +223,21 @@ later, and that the mapping exists in exactly one place rather than in eight cal
 | Tool | Arguments | Result |
 |---|---|---|
 | `inbox_put` | `source`, `name`, `content` or `file`, `note` | the inbox path |
-| `inbox_list` | `source` | what lies there, with format and date |
+| `inbox_list` | `source` | what lies there, with format, size, date and note |
 | `inbox_read` | `path` | the raw piece, for text formats |
 | `queue_add` | `origin` (an inbox path or an outside address), `target`, `reason` | the entry id |
 | `queue_list` | — | the backlog |
 | `queue_drop` | `id`, `reason` | — |
 | `write` | `producer`, `path`, `title`, `subject`, `origin`, `state`, `format`, `sources`, `body`, `queue` | the written path |
 | `publish` | `producer`, `documents` | how many written, how many removed |
-| `supersede` | `path`, `successor`, `reason` | — |
+| `supersede` | `path`, `successor`, `reason` | the superseded path |
+
+Over MCP the names are `k_playbook_knowledge_<tool>`; on the command line `inbox` and `queue`
+are groups (`k-playbook knowledge inbox put`, `… queue add`) and the rest are subcommands
+directly below `knowledge`. `publish` takes `--from <dir>` on the command line: every
+Markdown file below the directory carries the fields of `write` in its frontmatter, the
+tool checks them and recomposes the header; over MCP it takes the `documents` array. The
+exact arguments and results are in [`mcp.md`](mcp.md), "Knowledge Contract".
 
 `write` takes the frontmatter as **fields and the body as Markdown without a header**. The
 server composes the frontmatter and sets `updated` itself. A caller that could hand over a
@@ -241,6 +259,9 @@ zone that insists on a tool is a drop zone nobody fills.
 
 Reading stays as it is built today: `search`, `list`, `read`, `status`, plus the `briefing`
 call that [`knowledge-gate.md`](knowledge-gate.md) describes and that does not exist yet.
+`search` and `list` report the `kind` — the directory, read from the path — and `origin` and
+`state` from the frontmatter; `raw` and `superseded` documents and the root `README.md` are
+not search hits, `list` carries them all.
 
 ## Migration
 
@@ -292,9 +313,10 @@ of a document, not its location — the finding stays where it was written and b
 
 ## Open points
 
-**The queue entry's format is not fixed.** It needs a source reference, a target directory and
-a reason; whether it carries more depends on what the processing run needs and is decided when
-that run is built.
+**The queue entry's format is internal.** `queue/<id>.md` carries `origin`, `target`,
+`reason` and `added` in its frontmatter and notes in the body; it may change as long as the
+arguments of `queue_add` stay the same. A processing run that needs more decides that when it
+is built.
 
 **`subject` has no vocabulary yet.** Open as a free field it is a second `origin` — useful for
 reading, useless for filtering. Whether the values come from a closed list, and who maintains

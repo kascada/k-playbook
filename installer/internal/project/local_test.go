@@ -141,6 +141,62 @@ func TestCreateLocalLegtDocsIndexAn(t *testing.T) {
 	}
 }
 
+// Die drei Zonen der Wissensablage entstehen beim Einrichten, jede mit einer
+// README, die ihren Zweck in eigenen Worten trägt. inbox/ ist Rohmaterial mit
+// Tokens und Namen und darum privat umschaltbar wie material/ — aber nicht
+// vorbelegt: ob es ins Repository geht, entscheidet das Projekt. queue/ und
+// knowledge/ werden ganz normal versioniert. Die Erzeugerordner unterhalb von
+// knowledge/ legt nicht das Einrichten an, sondern der jeweilige Erzeuger.
+func TestCreateLocalLegtDieDreiZonenAn(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+	local := LocalDir(root)
+
+	for name, want := range map[string]string{
+		InboxDirName:     "Archiv, keine Warteschlange",
+		QueueDirName:     "nichts offen",
+		KnowledgeDirName: "Eigentümer",
+	} {
+		if !isDir(filepath.Join(local, name)) {
+			t.Errorf("%s fehlt", name)
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(local, name, "README.md"))
+		if err != nil {
+			t.Errorf("%s/README.md fehlt: %v", name, err)
+			continue
+		}
+		if !strings.Contains(string(content), want) {
+			t.Errorf("%s/README.md trägt %q nicht:\n%s", name, want, content)
+		}
+		if pathExists(filepath.Join(local, name, PrivateIgnoreFile)) {
+			t.Errorf("%s wurde privat vorbelegt", name)
+		}
+	}
+	for _, sub := range []string{"code", "libs", "versions", "extracted", "external", "findings", "pitfalls", "manual"} {
+		if pathExists(filepath.Join(local, KnowledgeDirName, sub)) {
+			t.Errorf("knowledge/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", sub)
+		}
+	}
+
+	private := map[string]bool{}
+	for _, entry := range LocalStructure() {
+		private[entry.Path] = entry.Private
+		if entry.PrivateByDefault && (entry.Path == InboxDirName || entry.Path == QueueDirName || entry.Path == KnowledgeDirName) {
+			t.Errorf("%s ist privat vorbelegt", entry.Path)
+		}
+	}
+	if !private[InboxDirName] {
+		t.Error("inbox/ trägt das Private-Kennzeichen nicht")
+	}
+	if private[QueueDirName] || private[KnowledgeDirName] {
+		t.Error("queue/ oder knowledge/ tragen das Private-Kennzeichen, sind aber Projektwissen")
+	}
+}
+
 func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	root := t.TempDir()
 	local := LocalDir(root)

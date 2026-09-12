@@ -88,13 +88,16 @@ byte-identisch stehen. Der Vertrag steht in
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
 
-`knowledge search|list|read|write|status` ist das Wissenstor über
-`k-playbook-local/docs/`, jeweils mit `--json`. Es ist die tragende Schicht: die
-MCP-Werkzeuge `k_playbook_knowledge_*` sind Hüllen um dieselben Funktionen in
-`project/knowledge.go`, und ein Client ohne registrierten MCP-Server fällt auf das
-Subkommando zurück — antwortet auch das mit `unbekanntes Kommando`, ist die Installation
-zu alt. `write` schreibt ausschließlich nach `docs/learned/`; der Index liegt verwerfbar
-unter `k-playbook-local/cache/knowledge/`. Der Vertrag steht in
+`knowledge search|list|read|write|publish|supersede|status` samt den Gruppen `inbox
+put|list|read` und `queue add|list|drop` ist das Wissenstor über die Wissensablage
+`k-playbook-local/knowledge/` mit dem Eingang `inbox/` und der Warteschlange `queue/`
+daneben, jeweils mit `--json`. Es ist die tragende Schicht: die MCP-Werkzeuge
+`k_playbook_knowledge_*` sind Hüllen um dieselben Funktionen in `project/knowledge*.go`,
+und ein Client ohne registrierten MCP-Server fällt auf das Subkommando zurück — antwortet
+auch das mit `unbekanntes Kommando`, ist die Installation zu alt. Jede Schreibung nennt
+ihren Erzeuger und geht nur in dessen Verzeichnis (`project/knowledge_producer.go`); ein
+Generator veröffentlicht sein Verzeichnis als Ganzes. Der Index liegt verwerfbar unter
+`k-playbook-local/cache/knowledge/`. Der Vertrag steht in
 [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Knowledge Contract"; ohne Unterbefehl
 oder mit `--help` fasst das Kommando keine Daten an und legt den Index nicht an, damit es
 als Rauchtest nach einem Release folgenlos bleibt.
@@ -154,10 +157,15 @@ installer/
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
-│   ├── knowledge.go             Wissenstor über k-playbook-local/docs/: chunken entlang
-│   │                            der Überschriften, Search/List/Read/Write/Status
+│   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
+│   │                            entlang der Überschriften, Search/List/Read/Status
 │   ├── knowledge_index.go       BM25-Index als cache/knowledge/index.json, Drift über
 │   │                            Datei-Hashes, Neubau bei indexVersion/Goldmark-Wechsel
+│   ├── knowledge_producer.go    Erzeugertabelle: wer wohin schreiben darf, Pfadprüfung
+│   ├── knowledge_write.go       Write: Frontmatter aus Feldern, Queue-Eintrag fällt danach
+│   ├── knowledge_publish.go     Publish (Verzeichnistausch der Generatoren), Supersede
+│   ├── knowledge_inbox.go       Eingang: InboxPut/List/Read, Notiz als Sidecar
+│   ├── knowledge_queue.go       Warteschlange: QueueAdd/List/Drop
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
@@ -184,8 +192,9 @@ installer/
 │   ├── review.go                Werkzeuge k_playbook_review_*
 │   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
 │   │                            dünne Hüllen über internal/project
-│   └── knowledge.go             Werkzeuge k_playbook_knowledge_search/list/read/write/
-│                                status, dünne Hüllen über project.Knowledge
+│   └── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
+│                                write, publish, supersede, inbox_*, queue_*, status),
+│                                dünne Hüllen über project.Knowledge
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -1515,9 +1524,10 @@ Bereich mit eigener API (siehe „Das Versionsinventar in der Oberfläche") und 
 getrennt. Eine zweite Docs-Wurzel in Werkzeug, API und Oberfläche wäre teurer als der
 eigene Bereich gewesen und hätte eine bewusst getroffene Entscheidung rückgängig gemacht.
 
-Den eigenen Zugriffsweg für `k-playbook-local/docs`, den diese Entscheidung als Bedingung
-nannte, gibt es inzwischen: `project.Knowledge` (`project/knowledge.go`) sucht, listet,
-liest und schreibt dort, erreichbar über das Subkommando `k-playbook knowledge` und die
+Den eigenen Zugriffsweg, den diese Entscheidung als Bedingung nannte, gibt es inzwischen —
+über die Wissensablage `k-playbook-local/knowledge/`, nicht über `docs/`: `project.Knowledge`
+(`project/knowledge*.go`) sucht, listet, liest und schreibt dort, erreichbar über das
+Subkommando `k-playbook knowledge` und die
 MCP-Werkzeuge `k_playbook_knowledge_*` (siehe „Der MCP-Server"). Er teilt mit dieser Seite
 nur die Goldmark-Konfiguration aus `internal/markdown` und die Pfadprüfung
 `docFilePath()`, nicht die Endpunkte. Ein `/api/knowledge/*` für die Seite `/knowledge`
@@ -1797,9 +1807,9 @@ Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie d
 Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
 lassen. Dazu kommen drei Familien nach demselben Muster „Subkommando trägt, MCP ist
 Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playbook_todo_*`
-(`todos.go`) um `project/todos.go` und `k_playbook_knowledge_search/list/read/write/status`
-(`knowledge.go`) um `project.Knowledge` — das Wissenstor über `k-playbook-local/docs/`,
-das auch `k-playbook knowledge` bedient. Keine der Hüllen trägt eigene Fachlogik; sie
+(`todos.go`) um `project/todos.go` und `k_playbook_knowledge_*` (`knowledge.go`) um
+`project.Knowledge` — das Wissenstor über `k-playbook-local/knowledge/` samt Eingang und
+Warteschlange, das auch `k-playbook knowledge` bedient. Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall. Tool-Tabelle und Verträge stehen in

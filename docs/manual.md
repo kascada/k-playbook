@@ -232,16 +232,16 @@ content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries,
 `/k-docs-extract` reads raw material from `k-playbook-local/material/`, and
 `/k-doc-inventory` reads declared versions from manifests, lockfiles, container,
 Helm, and CI files. Skip a stage if it has no input.
-`k-playbook-local/docs/learned/` belongs to no command: it is where the knowledge
-gate writes -- `k-playbook knowledge write` or the MCP tool
-`k_playbook_knowledge_write` -- which reads every origin but writes only there
-(see [mcp.md](mcp.md), "Knowledge Contract").
+The knowledge gate -- `k-playbook knowledge` and the MCP tools
+`k_playbook_knowledge_*` -- no longer reads or writes here: it works on the
+knowledge store `k-playbook-local/knowledge/`, with `inbox/` and `queue/`
+beside it, which are empty until the migration moves the documents (see
+[knowledge-layout.md](knowledge-layout.md) and [mcp.md](mcp.md), "Knowledge
+Contract").
 
 `/k-docs-index` is the final step and the only one that writes `docs/README.md`:
-the index across the five generated origins and the flat root files,
-`docs/manual/` included. It does not yet cover `docs/learned/`, so a document
-written through the gate is found through the gate and not through the index;
-teaching `/k-docs-index` about that directory is a follow-up. It also registers
+the index across the generated origins and the flat root files,
+`docs/manual/` included. It also registers
 the docs in `AGENTS.md` and `opencode.json`, or `opencode.jsonc` if only that
 file exists; it never creates a second file. Then restart the assistant so the
 new session memory takes effect.

@@ -10,13 +10,11 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/kascada/k-playbook/installer/internal/inventory"
 )
 
-// knowledgeFixture legt ein Projekt mit einem Wissensverzeichnis an, das alle
-// fünf Herkunftsordner, learned/ und eine flache Wurzeldatei trägt, und gibt
-// das Hauptverzeichnis zurück.
+// knowledgeFixture legt ein Projekt mit einer Wissensablage an, die die drei
+// Generatorordner, extracted/, manual/, findings/ und die README in der Wurzel
+// trägt, und gibt das Hauptverzeichnis zurück.
 func knowledgeFixture(t *testing.T) string {
 	t.Helper()
 
@@ -30,9 +28,9 @@ func knowledgeFixture(t *testing.T) string {
 		"code/links.md":         "# Verlinkung\n\nWie Symlinks entstehen.\n\n## Ablauf\n\nErster Ablauf.\n\n## Ablauf\n\nZweiter Ablauf.\n\n## Ablauf\n\nDritter Ablauf.\n",
 		"libs/goldmark.md":      "# Goldmark\n\nFallen beim Rendern.\n\n## Überschriften\n\nUmlaute fallen aus der Id.\n",
 		"extracted/sitzung.md":  "# Sitzung\n\nAus einem Mitschnitt extrahiert.\n\n## Codeblock\n\n```md\n# Keine Überschrift\n## Auch keine\n```\n\nDanach Text.\n",
-		"versions/inventory.md": "---\ntitle: Versionsinventar\n---\n\n# Versionsinventar\n\n## Laufzeiten\n\nGo 1.26.\n",
+		"versions/inventory.md": "---\ntitle: Versionsinventar\nsubject: Versionen\norigin: /k-doc-inventory\nstate: condensed\nformat: markdown\nupdated: 2026-09-10\n---\n\n# Versionsinventar\n\nStand heute.\n\n## Laufzeiten\n\nGo 1.26.\n",
 		"manual/release.md":     "# Release\n\nWie ein Release entsteht.\n\n## Der Weg\n\nTag setzen, CI abwarten.\n",
-		"learned/notiz.md":      "---\nsource: sitzung 42\n---\n\n# Gelernt\n\nDer Befehl war make sichern.\n",
+		"findings/notiz.md":     "---\ntitle: Gelernt\nsubject: Release\norigin: Sitzung 42\nstate: reviewed\nformat: markdown\nupdated: 2026-09-10\n---\n\n# Gelernt\n\nDer Befehl war make sichern.\n",
 	}
 	for rel, content := range files {
 		writeKnowledgeFile(t, root, rel, content)
@@ -60,9 +58,10 @@ func chunkFixtureFile(t *testing.T, root, rel string) (knowledgeFileEntry, []Chu
 	return entry, chunks
 }
 
-// Die Herkunft ist das erste Pfadsegment; eine Datei flach in der Wurzel
-// bekommt ausdrücklich root — der Leerwert wäre ein Zufall, kein Vertrag.
-func TestKnowledgeSourceJeHerkunftsordner(t *testing.T) {
+// Die Art ist das erste Pfadsegment; eine Datei flach in der Wurzel bekommt
+// ausdrücklich root — der Leerwert wäre ein Zufall, kein Vertrag. Die README
+// gibt keine Chunks in den Suchindex, alle anderen schon.
+func TestKnowledgeKindJeEigentuemerordner(t *testing.T) {
 	root := knowledgeFixture(t)
 
 	want := map[string]string{
@@ -72,7 +71,7 @@ func TestKnowledgeSourceJeHerkunftsordner(t *testing.T) {
 		"extracted/sitzung.md":  "extracted",
 		"versions/inventory.md": "versions",
 		"manual/release.md":     "manual",
-		"learned/notiz.md":      "learned",
+		"findings/notiz.md":     "findings",
 	}
 	paths, err := scanKnowledgeTree(KnowledgeDir(root))
 	if err != nil {
@@ -83,14 +82,20 @@ func TestKnowledgeSourceJeHerkunftsordner(t *testing.T) {
 	}
 	for _, rel := range paths {
 		entry, chunks := chunkFixtureFile(t, root, rel)
-		if entry.Source != want[rel] {
-			t.Errorf("%s: Source = %q, erwartet %q", rel, entry.Source, want[rel])
+		if entry.Kind != want[rel] {
+			t.Errorf("%s: Kind = %q, erwartet %q", rel, entry.Kind, want[rel])
+		}
+		if rel == "README.md" {
+			if len(chunks) != 0 {
+				t.Errorf("README.md gibt Chunks in den Suchindex: %+v", chunks)
+			}
+			continue
 		}
 		if len(chunks) == 0 {
 			t.Errorf("%s: keine Chunks", rel)
 		}
 		for _, chunk := range chunks {
-			if chunk.Source != want[rel] || chunk.Path != rel {
+			if chunk.Kind != want[rel] || chunk.Path != rel {
 				t.Errorf("%s: Chunk %+v", rel, chunk)
 			}
 		}
@@ -141,16 +146,17 @@ func TestKnowledgeAnkerEindeutigUeberDasDokument(t *testing.T) {
 	}
 }
 
-// Frontmatter ist Metadatum, kein Text: title und description landen am
+// Frontmatter ist Metadatum, kein Text: die Vertragsfelder landen am
 // Eintrag, in keinem Chunk steht „title:".
 func TestKnowledgeFrontmatterBleibtAusDemText(t *testing.T) {
 	root := knowledgeFixture(t)
-	entry, chunks := chunkFixtureFile(t, root, "README.md")
+	entry, chunks := chunkFixtureFile(t, root, "versions/inventory.md")
 
-	if entry.Frontmatter.Title != "Index" || entry.Frontmatter.Description != "Der Einstieg" {
-		t.Errorf("Frontmatter = %+v", entry.Frontmatter)
+	want := knowledgeFrontmatter{Title: "Versionsinventar", Subject: "Versionen", Origin: "/k-doc-inventory", State: "condensed", Format: "markdown", Updated: "2026-09-10"}
+	if entry.Frontmatter != want {
+		t.Errorf("Frontmatter = %+v, erwartet %+v", entry.Frontmatter, want)
 	}
-	if entry.Title != "k-playbook – Dokumentation" {
+	if entry.Title != "Versionsinventar" {
 		t.Errorf("Title = %q", entry.Title)
 	}
 	for _, chunk := range chunks {
@@ -158,8 +164,13 @@ func TestKnowledgeFrontmatterBleibtAusDemText(t *testing.T) {
 			t.Errorf("Frontmatter im Chunk: %q", chunk.Text)
 		}
 	}
-	if len(chunks) != 2 || chunks[0].Heading != "k-playbook – Dokumentation" || chunks[0].Text != "Diese Dokumentation beschreibt das Setup." {
+	if len(chunks) != 2 || chunks[0].Heading != "Versionsinventar" || chunks[0].Text != "Stand heute." {
 		t.Errorf("Chunks = %+v", chunks)
+	}
+	// Ohne Kopf bleiben die Felder leer — und die Datei wird trotzdem indiziert.
+	entry, _ = chunkFixtureFile(t, root, "manual/release.md")
+	if entry.Frontmatter != (knowledgeFrontmatter{}) {
+		t.Errorf("ohne Kopf: %+v", entry.Frontmatter)
 	}
 }
 
@@ -342,11 +353,15 @@ func TestKnowledgeIndexEntferntGeloeschteDateien(t *testing.T) {
 	}
 }
 
-// Kaputtes JSON und eine fremde Fassung führen kommentarlos zum Neubau.
+// Kaputtes JSON und eine fremde Fassung führen kommentarlos zum Neubau. Die
+// Fassung 2 ist der Index, den v0.7.0 über docs/ gebaut hat: er wird ersetzt,
+// nicht fortgeführt — sonst zählte der erste Zugriff über knowledge/ jede
+// seiner Dateien als Drift.
 func TestKnowledgeIndexNeubauBeiKaputterOderFremderDatei(t *testing.T) {
 	for name, content := range map[string]string{
 		"kaputt":          "{ das ist kein JSON",
 		"indexVersion":    `{"indexVersion": 999, "goldmarkVersion": "` + knowledgeGoldmarkVersion + `", "stale": true, "staleFiles": 5, "files": {}, "chunks": []}`,
+		"docs-Fassung":    `{"indexVersion": 2, "goldmarkVersion": "` + knowledgeGoldmarkVersion + `", "stale": false, "staleFiles": 0, "files": {"manual/alt.md": {"hash": "x", "source": "manual", "title": "Alt"}}, "chunks": [{"path": "manual/alt.md", "heading": "Alt", "anchor": "alt", "text": "Aus docs/.", "source": "manual"}]}`,
 		"goldmarkVersion": fmt.Sprintf(`{"indexVersion": %d, "goldmarkVersion": "v0.0.1", "stale": true, "staleFiles": 5, "files": {}, "chunks": []}`, KnowledgeIndexVersion),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -464,13 +479,21 @@ func jsonKeys(t *testing.T, value any) []string {
 // Der Vertrag eines Treffers: genau diese Felder, kein score.
 func TestKnowledgeHitJSONFelder(t *testing.T) {
 	keys := jsonKeys(t, Hit{Rank: 1})
-	want := []string{"anchor", "excerpt", "heading", "path", "rank", "source"}
+	want := []string{"anchor", "excerpt", "heading", "kind", "path", "rank"}
 	if strings.Join(keys, ",") != strings.Join(want, ",") {
 		t.Errorf("Felder = %v, erwartet %v", keys, want)
 	}
+	keys = jsonKeys(t, Hit{Rank: 1, Origin: "Sitzung 42", State: "reviewed"})
+	if strings.Join(keys, ",") != "anchor,excerpt,heading,kind,origin,path,rank,state" {
+		t.Errorf("Felder mit Frontmatter = %v", keys)
+	}
 	keys = jsonKeys(t, KnowledgeEntry{})
-	if strings.Join(keys, ",") != "path,source,title" {
+	if strings.Join(keys, ",") != "kind,path,title" {
 		t.Errorf("List-Felder = %v", keys)
+	}
+	keys = jsonKeys(t, KnowledgeEntry{Origin: "o", State: "s"})
+	if strings.Join(keys, ",") != "kind,origin,path,state,title" {
+		t.Errorf("List-Felder mit Frontmatter = %v", keys)
 	}
 }
 
@@ -526,7 +549,7 @@ func TestKnowledgeSearchVertrag(t *testing.T) {
 		t.Fatalf("Treffer = %+v", hits)
 	}
 	hit := hits[0]
-	if hit.Rank != 1 || hit.Path != "code/links.md" || hit.Heading != "Verlinkung" || hit.Anchor != "verlinkung" || hit.Source != "code" {
+	if hit.Rank != 1 || hit.Path != "code/links.md" || hit.Heading != "Verlinkung" || hit.Anchor != "verlinkung" || hit.Kind != "code" || hit.Origin != "" || hit.State != "" {
 		t.Errorf("Treffer = %+v", hit)
 	}
 	if hit.Excerpt != "Wie Symlinks entstehen." {
@@ -551,10 +574,10 @@ func TestKnowledgeSearchVertrag(t *testing.T) {
 		t.Errorf("limit 2: %d Treffer, %v", len(hits), err)
 	}
 
-	if hits, err := knowledge.Search("Ablauf Release", KnowledgeFilter{Source: "manual"}, 0); err != nil || len(hits) != 1 || hits[0].Source != "manual" || hits[0].Rank != 1 {
+	if hits, err := knowledge.Search("Ablauf Release", KnowledgeFilter{Kind: "manual"}, 0); err != nil || len(hits) != 1 || hits[0].Kind != "manual" || hits[0].Rank != 1 {
 		t.Errorf("Filter manual: %+v, %v", hits, err)
 	}
-	if hits, err := knowledge.Search("Ablauf", KnowledgeFilter{Source: "gibt-es-nicht"}, 0); err != nil || len(hits) != 0 {
+	if hits, err := knowledge.Search("Ablauf", KnowledgeFilter{Kind: "gibt-es-nicht"}, 0); err != nil || len(hits) != 0 {
 		t.Errorf("Filter unbekannt: %+v, %v", hits, err)
 	}
 	if _, err := knowledge.Search("   ", KnowledgeFilter{}, 0); err == nil {
@@ -577,8 +600,8 @@ func TestKnowledgeSearchVertrag(t *testing.T) {
 	}
 }
 
-// List: path, title nach der ListDocs-Regel, source; README vorn, dann
-// alphabetisch; Filter nach Herkunft.
+// List: path, title nach der ListDocs-Regel, kind, dazu origin und state aus
+// dem Frontmatter; README vorn, dann alphabetisch; Filter nach Art.
 func TestKnowledgeListVertrag(t *testing.T) {
 	root := knowledgeFixture(t)
 	writeKnowledgeFile(t, root, "manual/ohne-titel.md", "Nur Text.\n")
@@ -592,26 +615,67 @@ func TestKnowledgeListVertrag(t *testing.T) {
 	for _, entry := range entries {
 		paths = append(paths, entry.Path)
 	}
-	want := "README.md,code/links.md,extracted/sitzung.md,learned/notiz.md,libs/goldmark.md,manual/ohne-titel.md,manual/release.md,versions/inventory.md"
+	want := "README.md,code/links.md,extracted/sitzung.md,findings/notiz.md,libs/goldmark.md,manual/ohne-titel.md,manual/release.md,versions/inventory.md"
 	if strings.Join(paths, ",") != want {
 		t.Errorf("Reihenfolge = %v", paths)
 	}
 	titles := map[string]string{}
-	sources := map[string]string{}
+	kinds := map[string]string{}
+	byPath := map[string]KnowledgeEntry{}
 	for _, entry := range entries {
 		titles[entry.Path] = entry.Title
-		sources[entry.Path] = entry.Source
+		kinds[entry.Path] = entry.Kind
+		byPath[entry.Path] = entry
 	}
-	if titles["README.md"] != "k-playbook – Dokumentation" || titles["manual/ohne-titel.md"] != "ohne-titel" || titles["learned/notiz.md"] != "Gelernt" {
+	// Die README trägt title: Index im Kopf — der gewinnt vor der Überschrift.
+	if titles["README.md"] != "Index" || titles["manual/ohne-titel.md"] != "ohne-titel" || titles["findings/notiz.md"] != "Gelernt" || titles["manual/release.md"] != "Release" {
 		t.Errorf("Titel = %v", titles)
 	}
-	if sources["README.md"] != "root" || sources["learned/notiz.md"] != "learned" {
-		t.Errorf("Herkunft = %v", sources)
+	if kinds["README.md"] != "root" || kinds["findings/notiz.md"] != "findings" {
+		t.Errorf("Art = %v", kinds)
+	}
+	if entry := byPath["findings/notiz.md"]; entry.Origin != "Sitzung 42" || entry.State != "reviewed" {
+		t.Errorf("Frontmatter in List: %+v", entry)
+	}
+	if entry := byPath["manual/release.md"]; entry.Origin != "" || entry.State != "" {
+		t.Errorf("ohne Kopf: %+v", entry)
 	}
 
-	entries, err = knowledge.List(KnowledgeFilter{Source: "manual"})
+	entries, err = knowledge.List(KnowledgeFilter{Kind: "manual"})
 	if err != nil || len(entries) != 2 || entries[0].Path != "manual/ohne-titel.md" {
 		t.Errorf("Filter manual: %+v, %v", entries, err)
+	}
+}
+
+// Der Titel in List und im Index folgt einer Regel: der Frontmatter-Titel,
+// wenn gesetzt — das Pflichtfeld, das ein Aufrufer bei write angeben musste,
+// kommt beim Lesen auch zurück —, sonst die erste Überschrift, ersatzweise der
+// Dateiname. Ein Dokument, dessen Rumpf mit „## " beginnt, hieß vorher nach
+// seiner Datei, obwohl es einen Titel trägt.
+func TestKnowledgeListTitelAusDemFrontmatter(t *testing.T) {
+	root := knowledgeFixture(t)
+	writeKnowledgeFile(t, root, "findings/wissenstor.md", "---\ntitle: Wie das Wissenstor Drift erkennt\nsubject: Index\norigin: Sitzung 43\nstate: reviewed\nformat: markdown\nupdated: 2026-09-12\n---\n\n## Der Abgleich\n\nHash je Datei.\n")
+	writeKnowledgeFile(t, root, "findings/leerer-titel.md", "---\ntitle: \"\"\nstate: reviewed\n---\n\n# Aus der Überschrift\n\nText.\n")
+	writeKnowledgeFile(t, root, "manual/nur-rumpf.md", "Kein Kopf, keine Überschrift.\n")
+
+	entries, err := NewKnowledge(root).List(KnowledgeFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	titles := map[string]string{}
+	for _, entry := range entries {
+		titles[entry.Path] = entry.Title
+	}
+	for rel, want := range map[string]string{
+		"findings/wissenstor.md":   "Wie das Wissenstor Drift erkennt",
+		"findings/leerer-titel.md": "Aus der Überschrift",
+		"manual/release.md":        "Release",
+		"manual/nur-rumpf.md":      "nur-rumpf",
+		"README.md":                "Index",
+	} {
+		if titles[rel] != want {
+			t.Errorf("%s: Titel = %q, erwartet %q", rel, titles[rel], want)
+		}
 	}
 }
 
@@ -639,87 +703,8 @@ func TestKnowledgeReadVertragUndPfadabwehr(t *testing.T) {
 	}
 }
 
-func readLearned(t *testing.T, root, rel string) string {
-	t.Helper()
-	content, err := os.ReadFile(filepath.Join(KnowledgeLearnedDir(root), filepath.FromSlash(rel)))
-	if err != nil {
-		t.Fatalf("%s lesen: %v", rel, err)
-	}
-	return string(content)
-}
-
-// Write schreibt nur unterhalb von learned/, legt Ordner an, setzt source ins
-// Frontmatter und aktualisiert die Chunks, ohne dass das als Drift zählt.
-func TestKnowledgeWriteVertrag(t *testing.T) {
-	root := knowledgeFixture(t)
-	knowledge := NewKnowledge(root)
-
-	for _, path := range []string{"../manual/x.md", "../../x.md", filepath.Join(root, "x.md"), "notiz.txt", "", "tief/../../x.md"} {
-		if rel, err := knowledge.Write(path, "# X\n", "sitzung"); err == nil || rel != "" {
-			t.Errorf("Write(%q) nicht abgewiesen: %q, %v", path, rel, err)
-		}
-	}
-	if _, err := knowledge.Write("x.md", "# X\n", "  "); err == nil {
-		t.Error("leeres source nicht abgewiesen")
-	}
-	if _, err := knowledge.Write("x.md", "# X\n", "zwei\nzeilen"); err == nil {
-		t.Error("mehrzeiliges source nicht abgewiesen")
-	}
-	if _, err := os.Stat(filepath.Join(KnowledgeDir(root), "manual", "x.md")); err == nil {
-		t.Error("Ausbruch nach manual/ hat geschrieben")
-	}
-
-	// Ohne Frontmatter: Block voranstellen.
-	if rel, err := knowledge.Write("sitzung/befund.md", "# Befund\n\nDer Wächter prüft VERSION.", "sitzung 42"); err != nil || rel != "learned/sitzung/befund.md" {
-		t.Fatalf("Write: %q, %v", rel, err)
-	}
-	if got := readLearned(t, root, "sitzung/befund.md"); got != "---\nsource: sitzung 42\n---\n\n# Befund\n\nDer Wächter prüft VERSION.\n" {
-		t.Errorf("ohne Frontmatter: %q", got)
-	}
-
-	// Mit Frontmatter ohne source: Feld ergänzen, title nicht anfassen.
-	if _, err := knowledge.Write("mit.md", "---\ntitle: Mit\ndescription: Beschreibung\n---\n\n# Mit\n\nText.\n", "extern"); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if got := readLearned(t, root, "mit.md"); got != "---\ntitle: Mit\ndescription: Beschreibung\nsource: extern\n---\n\n# Mit\n\nText.\n" {
-		t.Errorf("Feld ergänzen: %q", got)
-	}
-
-	// Mit source: ersetzen.
-	if _, err := knowledge.Write("ersetzt.md", "---\nsource: alt\ntitle: E\n---\n# E\n", "neu"); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if got := readLearned(t, root, "ersetzt.md"); got != "---\nsource: neu\ntitle: E\n---\n# E\n" {
-		t.Errorf("Feld ersetzen: %q", got)
-	}
-
-	// Die Chunks sind da, und die eigene Schreibung ist keine Drift.
-	hits, err := knowledge.Search("Wächter", KnowledgeFilter{Source: "learned"}, 0)
-	if err != nil || len(hits) != 1 || hits[0].Path != "learned/sitzung/befund.md" || hits[0].Heading != "Befund" {
-		t.Errorf("Treffer nach Write: %+v, %v", hits, err)
-	}
-	status, err := knowledge.Status()
-	if err != nil {
-		t.Fatalf("Status: %v", err)
-	}
-	if status.Stale || status.StaleFiles != 0 {
-		t.Errorf("Write als Drift gemeldet: %+v", status)
-	}
-	if status.BySource["learned"].Files != 4 {
-		t.Errorf("learned = %+v", status.BySource["learned"])
-	}
-
-	// Überschreiben ersetzt die Chunks, statt sie zu verdoppeln.
-	if _, err := knowledge.Write("sitzung/befund.md", "# Befund\n\nJetzt ohne den Begriff.\n", "sitzung 43"); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if hits, err := knowledge.Search("Wächter", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
-		t.Errorf("alter Chunk geblieben: %+v, %v", hits, err)
-	}
-}
-
-// Status: die Felder von morgen heute schon, bySource je Herkunft, builtAt als
-// RFC3339.
+// Status: die Felder von morgen heute schon, byKind je Art, builtAt als
+// RFC3339. Die README zählt als Datei, gibt aber keine Chunks.
 func TestKnowledgeStatusVertrag(t *testing.T) {
 	root := knowledgeFixture(t)
 	status, err := NewKnowledge(root).Status()
@@ -728,21 +713,21 @@ func TestKnowledgeStatusVertrag(t *testing.T) {
 	}
 
 	keys := jsonKeys(t, status)
-	want := "builtAt,bySource,chunkCount,dims,fileCount,indexKind,indexVersion,model,stale,staleFiles"
+	want := "builtAt,byKind,chunkCount,dims,fileCount,indexKind,indexVersion,model,stale,staleFiles"
 	if strings.Join(keys, ",") != want {
 		t.Errorf("Felder = %v", keys)
 	}
 	if status.IndexKind != "bm25" || status.Model != "" || status.Dims != 0 || status.IndexVersion != KnowledgeIndexVersion {
 		t.Errorf("Status = %+v", status)
 	}
-	if status.FileCount != 7 || status.ChunkCount != 15 {
+	if status.FileCount != 7 || status.ChunkCount != 13 {
 		t.Errorf("fileCount=%d chunkCount=%d", status.FileCount, status.ChunkCount)
 	}
-	if status.BySource["root"] != (KnowledgeSourceCount{Files: 1, Chunks: 2}) || status.BySource["code"] != (KnowledgeSourceCount{Files: 1, Chunks: 4}) {
-		t.Errorf("bySource = %+v", status.BySource)
+	if status.ByKind["root"] != (KnowledgeKindCount{Files: 1, Chunks: 0}) || status.ByKind["code"] != (KnowledgeKindCount{Files: 1, Chunks: 4}) {
+		t.Errorf("byKind = %+v", status.ByKind)
 	}
-	if len(status.BySource) != 7 {
-		t.Errorf("bySource kennt %d Herkünfte: %+v", len(status.BySource), status.BySource)
+	if len(status.ByKind) != 7 {
+		t.Errorf("byKind kennt %d Arten: %+v", len(status.ByKind), status.ByKind)
 	}
 
 	content, err := json.Marshal(status)
@@ -764,8 +749,60 @@ func TestKnowledgeStatusVertrag(t *testing.T) {
 	if !parsed.Equal(status.BuiltAt) || time.Since(parsed) > time.Minute {
 		t.Errorf("builtAt = %s", builtAt)
 	}
-	if string(raw["bySource"]) == "null" {
-		t.Error("bySource ist null statt Objekt")
+	if string(raw["byKind"]) == "null" {
+		t.Error("byKind ist null statt Objekt")
+	}
+}
+
+// Ein leeres knowledge/ ist bis zur Migration der Normalfall, ein fehlendes
+// der Zustand jeder bestehenden Installation, bis die Struktur erneut
+// angewendet wird. Suche, Liste und Status antworten auf beides leer, nicht
+// mit einem Fehler — und ein Rückfall auf docs/ findet nicht statt: was dort
+// liegt, bleibt für das Tor unsichtbar.
+func TestKnowledgeLeereOderFehlendeZoneAntwortetLeer(t *testing.T) {
+	for name, prepare := range map[string]func(t *testing.T, root string){
+		"leer": func(t *testing.T, root string) {
+			if err := os.MkdirAll(KnowledgeDir(root), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"fehlt": func(t *testing.T, root string) {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.MkdirAll(LocalDir(root), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			// docs/ liegt voll daneben und darf nicht als Rückfall dienen.
+			docs := filepath.Join(LocalDir(root), "docs", "manual")
+			if err := os.MkdirAll(docs, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(docs, "alt.md"), []byte("# Alt\n\nKennwort aus docs.\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			prepare(t, root)
+
+			knowledge := NewKnowledge(root)
+			hits, err := knowledge.Search("Kennwort", KnowledgeFilter{}, 0)
+			if err != nil || len(hits) != 0 {
+				t.Errorf("Search: %+v, %v", hits, err)
+			}
+			entries, err := knowledge.List(KnowledgeFilter{})
+			if err != nil || len(entries) != 0 {
+				t.Errorf("List: %+v, %v", entries, err)
+			}
+			status, err := knowledge.Status()
+			if err != nil {
+				t.Fatalf("Status: %v", err)
+			}
+			if status.FileCount != 0 || status.ChunkCount != 0 || status.Stale {
+				t.Errorf("Status = %+v", status)
+			}
+			if len(knowledge.Notes()) != 0 {
+				t.Errorf("Notizen bei leerer Zone: %v", knowledge.Notes())
+			}
+		})
 	}
 }
 
@@ -779,7 +816,7 @@ func TestKnowledgeStatusOhneVerzeichnis(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if status.FileCount != 0 || status.ChunkCount != 0 || len(status.BySource) != 0 || status.Stale {
+	if status.FileCount != 0 || status.ChunkCount != 0 || len(status.ByKind) != 0 || status.Stale {
 		t.Errorf("Status = %+v", status)
 	}
 }
@@ -967,7 +1004,9 @@ func TestKnowledgeIndexUeberlebtGesperrtenCache(t *testing.T) {
 
 // Eine unlesbare Datei fällt aus dem Index, statt alle fünf Werkzeuge
 // lahmzulegen — dieselbe Duldung, die scanKnowledgeTree unlesbaren Teilbäumen
-// gewährt. Auf dem Drift-Weg zählt sie als Drift.
+// gewährt. Auf dem Drift-Weg zählt sie nicht als Drift: ihr Eintrag wird
+// entfernt und gemeldet, stale bleibt dem vorbehalten, was am Index vorbei
+// geändert wurde (siehe TestKnowledgeIndexUnlesbareDateiIstKeinDrift).
 func TestKnowledgeIndexUeberspringtUnlesbareDatei(t *testing.T) {
 	t.Run("Neubau", func(t *testing.T) {
 		root := knowledgeFixture(t)
@@ -1010,11 +1049,11 @@ func TestKnowledgeIndexUeberspringtUnlesbareDatei(t *testing.T) {
 		if status.FileCount != 6 {
 			t.Errorf("fileCount = %d, erwartet 6", status.FileCount)
 		}
-		if !status.Stale || status.StaleFiles != 1 {
-			t.Errorf("stale=%v staleFiles=%d, erwartet true/1", status.Stale, status.StaleFiles)
+		if status.Stale || status.StaleFiles != 0 {
+			t.Errorf("stale=%v staleFiles=%d, erwartet false/0 — unlesbar ist nicht „am Tor vorbei“", status.Stale, status.StaleFiles)
 		}
-		if _, there := status.BySource["libs"]; there {
-			t.Errorf("libs noch gezählt: %+v", status.BySource)
+		if _, there := status.ByKind["libs"]; there {
+			t.Errorf("libs noch gezählt: %+v", status.ByKind)
 		}
 		if notes := strings.Join(knowledge.Notes(), "; "); !strings.Contains(notes, "libs/goldmark.md") {
 			t.Errorf("Notizen = %q, erwartet die übersprungene Datei", notes)
@@ -1022,111 +1061,147 @@ func TestKnowledgeIndexUeberspringtUnlesbareDatei(t *testing.T) {
 	})
 }
 
-// Ein führender Thematic Break ist kein Frontmatter. Der Vermerk kommt davor,
-// statt vor das nächste „---" mitten im Dokument — sonst schnitte
-// inventory.Body() Titel und ersten Absatz weg, und list und search
-// widersprächen sich: die Liste nennte den Titel, die Suche fände den Text
-// darunter nicht mehr.
-func TestKnowledgeWriteFuehrenderThematicBreak(t *testing.T) {
+// Unlesbar ist nicht „am Tor vorbei": eine Datei, deren Hash nicht gebildet
+// werden kann, wird gemeldet, nicht als Drift gezählt. War sie im Index, fällt
+// ihr Eintrag beim ersten Hash-Fehler einmal heraus und der Index wird einmal
+// geschrieben; danach ist sie für den Abgleich unsichtbar — kein Drift, kein
+// weiteres Neuschreiben —, bis sie wieder lesbar ist. Vorher hielt sie stale
+// für immer auf true und der Index wurde bei jedem Zugriff neu geschrieben.
+// Ihre Rückkehr zählt wie jede neu erscheinende Datei als Drift.
+func TestKnowledgeIndexUnlesbareDateiIstKeinDrift(t *testing.T) {
+	root := knowledgeFixture(t)
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatalf("Index bauen: %v", err)
+	}
+	locked := filepath.Join(KnowledgeDir(root), "libs", "goldmark.md")
+	denyRead(t, locked)
+
+	var stored []byte
+	for round := 1; round <= 3; round++ {
+		knowledge := NewKnowledge(root)
+		status, err := knowledge.Status()
+		if err != nil {
+			t.Fatalf("Status %d: %v", round, err)
+		}
+		if status.Stale || status.StaleFiles != 0 {
+			t.Errorf("Status %d: stale=%v staleFiles=%d, erwartet false/0", round, status.Stale, status.StaleFiles)
+		}
+		if status.FileCount != 6 {
+			t.Errorf("Status %d: fileCount = %d, erwartet 6", round, status.FileCount)
+		}
+		if notes := strings.Join(knowledge.Notes(), "; "); !strings.Contains(notes, "libs/goldmark.md") {
+			t.Errorf("Status %d: Notizen = %q, erwartet die unlesbare Datei", round, notes)
+		}
+		hits, err := NewKnowledge(root).Search("Rendern", KnowledgeFilter{}, 0)
+		if err != nil {
+			t.Fatalf("Search %d: %v", round, err)
+		}
+		for _, hit := range hits {
+			if hit.Path == "libs/goldmark.md" {
+				t.Errorf("Status %d: alter Chunk der unlesbaren Datei ist noch ein Treffer: %+v", round, hit)
+			}
+		}
+
+		content, err := os.ReadFile(KnowledgeIndexFile(root))
+		if err != nil {
+			t.Fatalf("Index lesen: %v", err)
+		}
+		if round > 1 && string(content) != string(stored) {
+			t.Errorf("Status %d hat den Index neu geschrieben, obwohl sich nichts geändert hat", round)
+		}
+		stored = content
+	}
+
+	if err := os.Chmod(locked, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewKnowledge(root).Status()
+	if err != nil {
+		t.Fatalf("Status nach Wiederherstellung: %v", err)
+	}
+	if status.FileCount != 7 || !status.Stale || status.StaleFiles != 1 {
+		t.Errorf("nach Wiederherstellung: %+v, erwartet 7 Dateien und die Rückkehr als Drift", status)
+	}
+	if hits, err := NewKnowledge(root).Search("Rendern", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "libs/goldmark.md" {
+		t.Errorf("nach Wiederherstellung nicht im Index: %+v, %v", hits, err)
+	}
+}
+
+// state hat Zähne: ein rohes und ein abgelöstes Dokument fehlen in den
+// Treffern, List führt beide mit ihrem state, Read liefert sie. Kein
+// Filterargument hebt das auf — das ist Leseseite.
+func TestKnowledgeSearchLaesstRawUndSupersededAus(t *testing.T) {
 	root := knowledgeFixture(t)
 	knowledge := NewKnowledge(root)
 
-	content := "---\n\n# Titel\n\nAbsatz mit Kennwort.\n\n---\n\nRest nach dem zweiten Strich.\n"
-	rel, err := knowledge.Write("bruch.md", content, "sitzung 44")
-	if err != nil {
-		t.Fatalf("Write: %v", err)
+	raw := sessionDoc("findings/roh.md")
+	raw.State = KnowledgeStateRaw
+	raw.Body = "# Roh\n\nDas Rohwort steht nur hier.\n"
+	if _, err := knowledge.Write("session", raw, ""); err != nil {
+		t.Fatal(err)
+	}
+	if hits, err := knowledge.Search("Rohwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("rohes Dokument in den Treffern: %+v, %v", hits, err)
+	}
+	if hits, err := knowledge.Search("Rohwort", KnowledgeFilter{Kind: "findings"}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("rohes Dokument trotz Filter in den Treffern: %+v, %v", hits, err)
 	}
 
-	got := readLearned(t, root, "bruch.md")
-	if want := "---\nsource: sitzung 44\n---\n\n" + content; got != want {
-		t.Errorf("geschrieben:\n%q\nerwartet:\n%q", got, want)
+	// Vorher gefunden, nach supersede nicht mehr — read und list kennen es weiter.
+	if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "findings/notiz.md" || hits[0].Origin != "Sitzung 42" || hits[0].State != "reviewed" {
+		t.Fatalf("vor supersede: %+v, %v", hits, err)
 	}
-	body := string(inventory.Body([]byte(got)))
-	if !strings.Contains(body, "# Titel") || !strings.Contains(body, "Absatz mit Kennwort.") {
-		t.Errorf("Rumpf hat Titel oder Absatz verloren: %q", body)
+	if _, err := knowledge.Supersede("findings/notiz.md", "findings/roh.md", "Ersetzt"); err != nil {
+		t.Fatal(err)
 	}
-
-	// list und search sehen danach dasselbe Dokument.
-	entries, err := knowledge.List(KnowledgeFilter{Source: KnowledgeLearnedDirName})
+	if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("abgelöstes Dokument in den Treffern: %+v, %v", hits, err)
+	}
+	content, err := knowledge.Read("findings/notiz.md")
+	if err != nil || !strings.Contains(content, "make sichern") || !strings.Contains(content, "state: superseded") {
+		t.Errorf("Read nach supersede: %v", err)
+	}
+	entries, err := knowledge.List(KnowledgeFilter{Kind: "findings"})
 	if err != nil {
-		t.Fatalf("List: %v", err)
+		t.Fatal(err)
 	}
-	title := ""
+	states := map[string]string{}
 	for _, entry := range entries {
-		if entry.Path == rel {
-			title = entry.Title
-		}
+		states[entry.Path] = entry.State
 	}
-	if title != "Titel" {
-		t.Errorf("List meldet Titel %q für %s", title, rel)
+	if states["findings/notiz.md"] != "superseded" || states["findings/roh.md"] != "raw" {
+		t.Errorf("List nach supersede: %v", states)
 	}
-	hits, err := knowledge.Search("Kennwort", KnowledgeFilter{}, 0)
-	if err != nil {
-		t.Fatalf("Search: %v", err)
-	}
-	if len(hits) != 1 || hits[0].Path != rel || hits[0].Heading != title {
-		t.Errorf("Search: %+v — erwartet einen Treffer in %s unter %q", hits, rel, title)
+
+	// Der Status zählt beide weiter — sie stehen im Index, nur nicht in den Treffern.
+	status, err := knowledge.Status()
+	if err != nil || status.ByKind["findings"].Files != 2 || status.ByKind["findings"].Chunks == 0 {
+		t.Errorf("Status: %+v, %v", status, err)
 	}
 }
 
-// Leerraum gehört nicht zum Schlüssel: „source :" und „ source:" sind dasselbe
-// Feld, und ein zweites daneben ergäbe einen doppelten Schlüssel im Kopf.
-func TestKnowledgeWriteSchluesselMitLeerraum(t *testing.T) {
+// Die README fällt aus dem Suchindex: ihr Text ist kein Treffer, List führt
+// sie vorn wie bisher, Read liefert sie.
+func TestKnowledgeReadmeFaelltAusDemSuchindex(t *testing.T) {
 	root := knowledgeFixture(t)
 	knowledge := NewKnowledge(root)
 
-	for name, content := range map[string]string{
-		"Leerzeichen vor dem Doppelpunkt": "---\nsource : alt\ntitle: E\n---\n\n# E\n",
-		"eingerückter Schlüssel":          "---\n source: alt\ntitle: E\n---\n\n# E\n",
-	} {
-		t.Run(name, func(t *testing.T) {
-			if _, err := knowledge.Write("schluessel.md", content, "neu"); err != nil {
-				t.Fatalf("Write: %v", err)
-			}
-			got := readLearned(t, root, "schluessel.md")
-			if strings.Count(got, "source") != 1 {
-				t.Errorf("doppelter Schlüssel: %q", got)
-			}
-			if got != "---\nsource: neu\ntitle: E\n---\n\n# E\n" {
-				t.Errorf("geschrieben: %q", got)
-			}
-		})
+	if hits, err := knowledge.Search("Setup", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("README in den Treffern: %+v, %v", hits, err)
 	}
-}
-
-// Write meldet den Ort, den es selbst berechnet hat, und genau dieser Ort ist
-// der, unter dem Read, List und Search die Datei kennen. Nachgebaut wird er
-// nirgends: zwei Rechnungen für denselben Pfad wären zwei Chancen, ihn
-// verschieden zu buchstabieren.
-func TestKnowledgeWriteMeldetDenEigenenPfad(t *testing.T) {
-	root := knowledgeFixture(t)
-	knowledge := NewKnowledge(root)
-
-	for _, tc := range []struct{ path, want string }{
-		{"notiz.md", "learned/notiz.md"},
-		{"./notiz.md", "learned/notiz.md"},
-		{"tief/unten/../notiz.md", "learned/tief/notiz.md"},
-	} {
-		rel, err := knowledge.Write(tc.path, "# Notiz\n\nInhalt.\n", "sitzung")
-		if err != nil {
-			t.Fatalf("Write(%q): %v", tc.path, err)
-		}
-		if rel != tc.want {
-			t.Errorf("Write(%q) = %q, erwartet %q", tc.path, rel, tc.want)
-		}
-		if _, err := knowledge.Read(rel); err != nil {
-			t.Errorf("Read(%q): %v", rel, err)
-		}
-		entries, err := knowledge.List(KnowledgeFilter{Source: KnowledgeLearnedDirName})
-		if err != nil {
-			t.Fatalf("List: %v", err)
-		}
-		found := false
-		for _, entry := range entries {
-			found = found || entry.Path == rel
-		}
-		if !found {
-			t.Errorf("List kennt %q nicht: %+v", rel, entries)
-		}
+	if hits, err := knowledge.Search("Tabelle", KnowledgeFilter{Kind: "root"}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("README trotz Filter root in den Treffern: %+v, %v", hits, err)
+	}
+	entries, err := knowledge.List(KnowledgeFilter{})
+	if err != nil || len(entries) == 0 || entries[0].Path != "README.md" || entries[0].Kind != "root" {
+		t.Errorf("List ohne README vorn: %+v, %v", entries, err)
+	}
+	if content, err := knowledge.Read("README.md"); err != nil || !strings.Contains(content, "Setup") {
+		t.Errorf("Read README: %v", err)
+	}
+	// Eine README in einem Unterverzeichnis ist ein gewöhnliches Dokument.
+	writeKnowledgeFile(t, root, "manual/README.md", "# Handbuch\n\nDas Handbuchwort.\n")
+	if hits, err := knowledge.Search("Handbuchwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "manual/README.md" {
+		t.Errorf("manual/README.md nicht gefunden: %+v, %v", hits, err)
 	}
 }

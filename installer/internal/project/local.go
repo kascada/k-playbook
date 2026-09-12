@@ -104,12 +104,81 @@ func LocalStructure() []LocalEntry {
 				"    *\n    !.gitignore\n    !README.md\n\n" +
 				"Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen Ist-Zustand und\n" +
 				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei.\n\n" +
-				"knowledge/index.json ist der Suchindex des Wissenstors über ../docs/ (`k-playbook\n" +
+				"knowledge/index.json ist der Suchindex des Wissenstors über ../knowledge/ (`k-playbook\n" +
 				"knowledge`, MCP-Werkzeuge k_playbook_knowledge_*). Fehlt er, baut ihn der nächste\n" +
 				"Zugriff neu; Änderungen am Tor vorbei erkennt er über Datei-Hashes selbst.",
 		},
-		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand, learned/ vom Wissenstor — Dokumente, die über `k-playbook knowledge write` oder das MCP-Werkzeug k_playbook_knowledge_write hereinkommen; das Tor liest alle Ordner und schreibt nur dorthin. Die fünf erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu — heute noch über die fünf Ordner und die flachen Wurzeldateien, learned/ nimmt er noch nicht auf. Gefunden werden die Dokumente dort deshalb vorerst nur über das Wissenstor selbst."},
+		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, extracted/ von /k-docs-extract, versions/ von /k-doc-inventory, manual/ von Hand. Die vier erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu über die Ordner und die flachen Wurzeldateien. Das Wissenstor (`k-playbook knowledge`, MCP-Werkzeuge k_playbook_knowledge_*) liest und schreibt nicht mehr hier, sondern in der Wissensablage ../knowledge/; dieses Verzeichnis bleibt bestehen und trägt weiter, bis die Migration seine Dokumente dorthin überführt."},
 		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
+		{
+			Path:    InboxDirName,
+			Private: true,
+			Purpose: "Der Eingang: was ankommt, bevor jemand es gelesen hat. Chat-Mitschnitte, Notizen,\n" +
+				"PDFs, Screenshots, HTML-Abzüge, Exporte — alles, was eine Person oder ein Connector\n" +
+				"ablegt, in dem Format, in dem es kommt. Unterteilt allein nach Quelle: inbox/<quelle>/…,\n" +
+				"die Quelle ist frei (confluence, chat, mail, scan).\n\n" +
+				"Es gibt keine Namensregel, kein Frontmatter und keine Pflicht über das Ablegen hinaus.\n" +
+				"Das ist die Bedingung dafür, dass überhaupt etwas abgelegt wird: ein Eingang, der\n" +
+				"Vorbereitung verlangt, wird einmal benutzt. Abgelegt wird über `k-playbook knowledge\n" +
+				"inbox put`, das MCP-Werkzeug k_playbook_knowledge_inbox_put oder schlicht mit dem\n" +
+				"Dateimanager.\n\n" +
+				"Der Eingang ist ein Archiv, keine Warteschlange. Etwas kann monatelang hier liegen,\n" +
+				"ohne dass jemand hineinsieht, und nichts ist offen, nur weil es hier liegt. Er wird\n" +
+				"nie indiziert und taucht in keiner Suche auf. Eine Verarbeitung verbraucht ihn nicht:\n" +
+				"ein Rohstück bleibt, nachdem daraus Wissen gemacht wurde — nur so lässt sich ein\n" +
+				"schlechter Extrakt aus derselben Quelle noch einmal ziehen. Gelöscht wird hier\n" +
+				"ausschließlich von Hand, nie als Nebenwirkung eines Laufs. Was kein Markdown ist,\n" +
+				"bleibt für immer hier; das Wissensdokument unter ../knowledge/ zeigt darauf.\n\n" +
+				"Der Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\n" +
+				"Tokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n" +
+				"„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n" +
+				".gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\n" +
+				"Von Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\n" +
+				"Inhalt:\n\n    *\n    !.gitignore\n    !README.md\n\n" +
+				"Was bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\n" +
+				"was schon gepusht wurde, bleibt in der Historie.",
+		},
+		{
+			Path: QueueDirName,
+			Purpose: "Die Warteschlange: was noch aussteht. Ein Eintrag ist ein Stück Arbeit — dieses\n" +
+				"Rohstück soll Wissen werden. Er ist eine kleine Markdown-Datei, die auf ihre Quelle\n" +
+				"im Eingang verweist statt sie zu kopieren, und das Zielverzeichnis unter ../knowledge/\n" +
+				"und den Grund nennt. Angelegt wird er über `k-playbook knowledge queue add` oder das\n" +
+				"MCP-Werkzeug k_playbook_knowledge_queue_add, das die Kennung selbst vergibt.\n\n" +
+				"Nach der Übernahme in die Ablage wird der Eintrag gelöscht — nicht verschoben, nicht\n" +
+				"archiviert, nicht abgehakt. Das erledigt `k-playbook knowledge write` selbst, wenn\n" +
+				"ihm der Eintrag genannt wird: gelöscht wird, nachdem das Dokument steht, und nur dann.\n" +
+				"Eine leere Warteschlange heißt deshalb: nichts offen. Das ist der ganze Zweck des\n" +
+				"Verzeichnisses. Ein Rückstand, der sich nur durch Zählen oder Filtern feststellen\n" +
+				"lässt, ist einer, den niemand liest.\n\n" +
+				"Ein Lauf, der scheitert, lässt seinen Eintrag liegen. Das Verzeichnis hält Arbeit,\n" +
+				"nicht Geschichte; was aus einer Quelle geworden ist, steht im origin des fertigen\n" +
+				"Dokuments. Wer einen Eintrag ohne Übernahme loswerden will, nimmt `k-playbook\n" +
+				"knowledge queue drop`. Indiziert wird hier nichts.",
+		},
+		{
+			Path: KnowledgeDirName,
+			Purpose: "Die Wissensablage: was gilt. Nur was hier liegt, wird indiziert, durchsucht, gelesen\n" +
+				"und in einer Antwort zitiert. Immer Markdown mit YAML-Frontmatter; was in einem anderen\n" +
+				"Format ankommt, wird am Eingang umgewandelt oder bleibt unter ../inbox/ liegen, mit\n" +
+				"einem Markdown-Stub hier, der es beschreibt. Ein Dokument je Thema, fortgeschrieben —\n" +
+				"nicht eines je Ereignis.\n\n" +
+				"Der Pfad trägt den Eigentümer, das Frontmatter das Thema: code/ gehört /k-docs-code,\n" +
+				"libs/ gehört /k-docs-tools, versions/ gehört /k-doc-inventory, extracted/ gehört\n" +
+				"/k-docs-extract, external/<system>/ je einem Connector, findings/ der Sitzung,\n" +
+				"pitfalls/ und manual/ einer Person, README.md dem Index-Command /k-docs-index. Genau ein\n" +
+				"Eigentümer je Verzeichnis, und nur der schreibt dort: die drei Generatoren code/, libs/\n" +
+				"und versions/ schreiben ihr Verzeichnis bei jedem Lauf als Ganzes neu, und was ein\n" +
+				"anderer dort abgelegt hätte, wäre danach spurlos weg.\n\n" +
+				"Geschrieben wird ausschließlich über das Werkzeug — `k-playbook knowledge write`,\n" +
+				"`publish` und `supersede` oder die MCP-Werkzeuge k_playbook_knowledge_*. Jede\n" +
+				"Schreibung nennt ihren Erzeuger, und ein Ziel außerhalb seines Verzeichnisses wird\n" +
+				"abgewiesen. Das Frontmatter baut das Werkzeug aus den übergebenen Feldern; niemand\n" +
+				"reicht einen fertigen Dateikopf durch. Gelöscht wird nichts: Überholtes bekommt\n" +
+				"`state: superseded`, fällt aus der Suche und bleibt lesbar.\n\n" +
+				"Der Suchindex darüber liegt unter ../cache/knowledge/ und ist jederzeit verwerfbar;\n" +
+				"Änderungen am Werkzeug vorbei erkennt er selbst über Datei-Hashes.",
+		},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
 		{Path: "tasks", Purpose: "Offene Tasks, nummeriert als <nummer>-<name>.md."},
 		{Path: filepath.Join("tasks", "done"), Purpose: "Erledigte Tasks, nach der Ausführung hierher verschoben."},

@@ -32,7 +32,19 @@ const KnowledgeIndexFileName = "index.json"
 // 2: der Hash je Chunk ist entfallen. Er hatte keinen Leser; ein Bestand ohne
 // ihn antwortete zwar gleich, trüge das Feld aber ungenutzt bis in alle
 // Ewigkeit weiter.
-const KnowledgeIndexVersion = 2
+//
+// 3: der Index liest knowledge/ statt docs/. Ein Bestand der Fassung 2
+// beschreibt das alte Verzeichnis; würde er fortgeführt, zählte der erste
+// Zugriff jede seiner Dateien als Drift und meldete „am Tor vorbei geändert"
+// für einen Umzug, den niemand vorgenommen hat. Er wird verworfen und über
+// der neuen Zone neu gebaut — leer, solange die Migration aussteht.
+//
+// 4: die Titelquelle hat sich geändert. Der Titel je Datei kommt jetzt aus
+// dem Frontmatter, wenn es eines mit title gibt, und erst sonst aus der
+// ersten Überschrift (knowledgeTitle). Ein Bestand der Fassung 3 trägt für
+// jedes Dokument mit Kopf den alten Titel, und die Datei-Hashes fingen das
+// nie — die Dateien sind unverändert, nur die Regel ist neu.
+const KnowledgeIndexVersion = 4
 
 // KnowledgeIndexKind benennt das Verfahren hinter dem Index. Es steht nur in
 // status; kein Treffer trägt es.
@@ -182,6 +194,15 @@ func (index *knowledgeIndex) removeFile(rel string) {
 // zurück. Ein Neubau von Grund auf zählt nicht als Drift: dort gab es keinen
 // Stand, an dem jemand vorbeigeschrieben haben könnte.
 //
+// Unlesbar ist nicht „am Tor vorbei": eine Datei, deren Hash nicht gebildet
+// werden kann, zählt nicht als Drift. War sie im Index, fällt ihr Eintrag beim
+// ersten Hash-Fehler einmal heraus und der Index wird einmal geschrieben;
+// danach ist sie für den Abgleich unsichtbar — kein Drift, kein weiteres
+// Neuschreiben —, bis sie wieder lesbar ist. Ihre Rückkehr zählt dann wie
+// jede neu erscheinende Datei als Drift. Sonst hielte eine dauerhaft
+// unlesbare Datei stale für immer auf true und schriebe den Index bei jedem
+// Zugriff neu, und die Drift-Meldung verlöre ihre Aussage.
+//
 // Scheitert etwas, das nur den Cache betrifft — eine einzelne unlesbare Datei,
 // ein nicht beschreibbares cache/ —, antwortet der Zugriff trotzdem: der
 // vollständige Index steht im Speicher. Was dabei übergangen wurde, geht als
@@ -210,18 +231,22 @@ func (k *Knowledge) open() (*knowledgeIndex, error) {
 	}
 
 	changed := 0
+	dropped := 0
 	seen := map[string]bool{}
 	for _, rel := range paths {
 		entry, chunks, err := reindexKnowledgeFile(index, root, rel)
 		if err != nil {
 			// Eine unlesbare oder zwischen Walk und Zugriff verschwundene
 			// Datei darf die anderen nicht mitreißen: scanKnowledgeTree
-			// überspringt unlesbare Teilbäume, hier gilt dasselbe. Sie fällt
-			// aus dem Index und zählt als Drift — der Baum sieht anders aus
-			// als der Stand, den der Index beschreibt.
+			// überspringt unlesbare Teilbäume, hier gilt dasselbe. Sie wird
+			// gemeldet; ein noch vorhandener Eintrag fällt einmal heraus,
+			// ohne als Drift zu zählen — beim nächsten Zugriff ist sie dem
+			// Index unbekannt und kostet nichts mehr.
 			k.skip(rel, err)
-			index.removeFile(rel)
-			changed++
+			if _, indexed := index.Files[rel]; indexed {
+				index.removeFile(rel)
+				dropped++
+			}
 			continue
 		}
 		seen[rel] = true
@@ -246,6 +271,10 @@ func (k *Knowledge) open() (*knowledgeIndex, error) {
 	case index.Stale || index.StaleFiles != 0:
 		index.Stale = false
 		index.StaleFiles = 0
+	case dropped > 0:
+		// Nur ein Eintrag ist gefallen: der Index hat sich geändert und wird
+		// geschrieben, aber niemand hat am Tor vorbei geschrieben.
+		index.BuiltAt = knowledgeNow()
 	default:
 		return index, nil
 	}

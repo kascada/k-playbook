@@ -88,11 +88,13 @@ on the first run of a tool from their origin: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill write to `docs/code/`, `/k-docs-tools` to
 `docs/libs/`, `/k-docs-extract` to `docs/extracted/`, and `/k-doc-inventory` to
 `docs/versions/`. Setup does not create them; it creates `docs/manual/` and
-`material/`. `docs/learned/` is where the knowledge gate writes: it is created on
-the first `k-playbook knowledge write` or `k_playbook_knowledge_write` call and is
-the only directory the gate writes to, while it reads all of them. `/k-docs-index`
-does not list it yet, so what lands there is reachable through the gate and not
-through `docs/README.md`.
+`material/`. Setup also creates the three zones of the knowledge store beside
+`docs/` -- `inbox/`, `queue/` and `knowledge/`, each with a README that says
+what it holds -- and the knowledge gate (`k-playbook knowledge`,
+`k_playbook_knowledge_*`) reads and writes only there; the owner directories
+below `knowledge/` are created by their producers on the first write. Until the
+migration moves the documents, `knowledge/` is empty and `docs/` carries on
+(see [knowledge-layout.md](knowledge-layout.md)).
 
 In contrast, setup creates the version inventory source configuration,
 `k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is

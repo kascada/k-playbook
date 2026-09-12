@@ -55,15 +55,16 @@ func writeManagedIgnore(t *testing.T, root string) {
 	writeFile(t, filepath.Join(LocalDir(root), "priv", PrivateIgnoreFile), managedIgnoreContent())
 }
 
-// Die vier privaten Verzeichnisse stehen zur Wahl — und nur sie. results/ und
-// cache/ sind bei der Installation vorbelegt, umschaltbar bleiben sie trotzdem.
-func TestPrivateEntriesNenntResultsCachePrivUndMaterial(t *testing.T) {
+// Die fünf privaten Verzeichnisse stehen zur Wahl — und nur sie. results/ und
+// cache/ sind bei der Installation vorbelegt, umschaltbar bleiben sie trotzdem;
+// inbox/ ist Rohmaterial wie material/ und darum genauso umschaltbar.
+func TestPrivateEntriesNenntResultsCacheInboxPrivUndMaterial(t *testing.T) {
 	paths := []string{}
 	for _, entry := range PrivateEntries() {
 		paths = append(paths, entry.Path)
 	}
 
-	erwartet := []string{"results", "cache", "priv", "material"}
+	erwartet := []string{"results", "cache", "inbox", "priv", "material"}
 	if !slices.Equal(paths, erwartet) {
 		t.Errorf("PrivateEntries = %v, erwartet %v", paths, erwartet)
 	}

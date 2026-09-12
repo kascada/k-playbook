@@ -13,9 +13,9 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// newKnowledgeProject legt ein k-playbook-Projekt mit einem kleinen
-// Wissensverzeichnis an: eine flache README (source root) und ein Dokument
-// unter manual/. learned/ entsteht erst durch das Schreiben.
+// newKnowledgeProject legt ein k-playbook-Projekt mit einer kleinen
+// Wissensablage an: eine flache README (source root) und ein Dokument unter
+// manual/. findings/ entsteht erst durch das Schreiben.
 func newKnowledgeProject(t *testing.T) string {
 	t.Helper()
 
@@ -78,21 +78,21 @@ func TestKnowledgeSearchLiefertVertragsfelder(t *testing.T) {
 		t.Fatalf("Treffer: %+v", knowledgeHitsOf(envelope))
 	}
 	hit := knowledgeHitsOf(envelope)[0]
-	if hit.Path != "manual/ablauf.md" || hit.Heading != "Freigabe" || hit.Source != "manual" || hit.Rank != 1 || hit.Anchor != "freigabe" {
+	if hit.Path != "manual/ablauf.md" || hit.Heading != "Freigabe" || hit.Kind != "manual" || hit.Rank != 1 || hit.Anchor != "freigabe" {
 		t.Errorf("Treffer: %+v", hit)
 	}
 	if !strings.HasPrefix(hit.Excerpt, "Die Freigabe") {
 		t.Errorf("Excerpt = %q, erwartet den Anfang des Chunks", hit.Excerpt)
 	}
 
-	// Der Herkunftsfilter grenzt ein: unter root gibt es keinen Wächter.
+	// Der Filter auf die Art grenzt ein: unter root gibt es keinen Wächter.
 	result, _, err = knowledgeSearchTool(context.Background(), nil, knowledgeSearchInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Query: "Wächter", Source: project.KnowledgeRootSource,
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Query: "Wächter", Kind: project.KnowledgeRootKind,
 	})
 	if err != nil {
-		t.Fatalf("search source: %v", err)
+		t.Fatalf("search kind: %v", err)
 	}
-	if envelope = decodeKnowledgeEnvelope(t, result); !envelope.OK || len(knowledgeHitsOf(envelope)) != 0 || envelope.Source != "root" {
+	if envelope = decodeKnowledgeEnvelope(t, result); !envelope.OK || len(knowledgeHitsOf(envelope)) != 0 || envelope.Kind != "root" {
 		t.Errorf("gefilterte Suche: %#v", envelope)
 	}
 }
@@ -128,20 +128,20 @@ func TestKnowledgeListNenntReadmeZuerst(t *testing.T) {
 	if !envelope.OK || len(knowledgeEntriesOf(envelope)) != 2 {
 		t.Fatalf("Einträge: %#v", envelope)
 	}
-	if knowledgeEntriesOf(envelope)[0].Path != "README.md" || knowledgeEntriesOf(envelope)[0].Source != project.KnowledgeRootSource || knowledgeEntriesOf(envelope)[0].Title != "Projektwissen" {
+	if knowledgeEntriesOf(envelope)[0].Path != "README.md" || knowledgeEntriesOf(envelope)[0].Kind != project.KnowledgeRootKind || knowledgeEntriesOf(envelope)[0].Title != "Index" {
 		t.Errorf("erster Eintrag: %+v", knowledgeEntriesOf(envelope)[0])
 	}
-	if knowledgeEntriesOf(envelope)[1].Path != "manual/ablauf.md" || knowledgeEntriesOf(envelope)[1].Source != "manual" || knowledgeEntriesOf(envelope)[1].Title != "Ablauf" {
+	if knowledgeEntriesOf(envelope)[1].Path != "manual/ablauf.md" || knowledgeEntriesOf(envelope)[1].Kind != "manual" || knowledgeEntriesOf(envelope)[1].Title != "Ablauf" {
 		t.Errorf("zweiter Eintrag: %+v", knowledgeEntriesOf(envelope)[1])
 	}
 
 	result, _, err = knowledgeListTool(context.Background(), nil, knowledgeListInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Source: "manual",
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Kind: "manual",
 	})
 	if err != nil {
-		t.Fatalf("list source: %v", err)
+		t.Fatalf("list kind: %v", err)
 	}
-	if envelope = decodeKnowledgeEnvelope(t, result); len(knowledgeEntriesOf(envelope)) != 1 || knowledgeEntriesOf(envelope)[0].Source != "manual" {
+	if envelope = decodeKnowledgeEnvelope(t, result); len(knowledgeEntriesOf(envelope)) != 1 || knowledgeEntriesOf(envelope)[0].Kind != "manual" {
 		t.Errorf("gefilterte Liste: %#v", knowledgeEntriesOf(envelope))
 	}
 }
@@ -185,27 +185,32 @@ func TestKnowledgeReadWehrtPfadeAb(t *testing.T) {
 	}
 }
 
-func TestKnowledgeWriteSchreibtNurNachLearned(t *testing.T) {
+// Die Hülle reicht Erzeuger, Felder und Queue an project.Knowledge.Write
+// durch und meldet den Pfad, den Write berechnet hat. Danach kennen read,
+// search, list und status das Dokument unter genau diesem Pfad.
+func TestKnowledgeWriteSchreibtMitErzeugerUndFeldern(t *testing.T) {
 	root := newKnowledgeProject(t)
 
 	result, _, err := knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
 		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root},
-		Path:               "sitzung.md",
-		Content:            "# Gelernt\n\n## Erkenntnis\n\nDer Wächter verlangt ein Release.\n",
-		Source:             "Task 055",
+		Producer:           "session",
+		knowledgeDocumentInput: knowledgeDocumentInput{
+			Path: "findings/sitzung.md", Title: "Gelernt", Subject: "Release", Origin: "Task 056", State: "reviewed",
+			Body: "# Gelernt\n\n## Erkenntnis\n\nDer Wächter verlangt ein Release.\n",
+		},
 	})
 	if err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	written := decodeKnowledgeEnvelope(t, result)
-	if !written.OK || !written.Written || written.Path != "learned/sitzung.md" || written.Source != "Task 055" {
+	if !written.OK || !written.Written || written.Path != "findings/sitzung.md" || written.Producer != "session" {
 		t.Fatalf("Umschlag: %#v", written)
 	}
-	if _, err := os.Stat(filepath.Join(project.KnowledgeLearnedDir(root), "sitzung.md")); err != nil {
-		t.Fatalf("Datei fehlt unter learned/: %v", err)
+	if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), "findings", "sitzung.md")); err != nil {
+		t.Fatalf("Datei fehlt unter findings/: %v", err)
 	}
 
-	// Lesen unter dem gemeldeten Pfad, mit Herkunftsvermerk im Frontmatter.
+	// Lesen unter dem gemeldeten Pfad, mit dem erzeugten Frontmatter.
 	result, _, err = knowledgeReadTool(context.Background(), nil, knowledgeReadInput{
 		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: written.Path,
 	})
@@ -213,23 +218,23 @@ func TestKnowledgeWriteSchreibtNurNachLearned(t *testing.T) {
 		t.Fatalf("read: %v", err)
 	}
 	read := decodeKnowledgeEnvelope(t, result)
-	if !read.OK || read.Content == nil || !strings.Contains(*read.Content, "source: Task 055") {
+	if !read.OK || read.Content == nil || !strings.HasPrefix(*read.Content, "---\ntitle: Gelernt\nsubject: Release\norigin: Task 056\nstate: reviewed\nformat: markdown\nupdated: ") {
 		t.Fatalf("gelesener Inhalt: %#v", read)
 	}
 
-	// Suchen findet das neue Dokument unter der Herkunft learned.
+	// Suchen findet das neue Dokument unter findings.
 	result, _, err = knowledgeSearchTool(context.Background(), nil, knowledgeSearchInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Query: "Release", Source: project.KnowledgeLearnedDirName,
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Query: "Release", Kind: "findings",
 	})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	searched := decodeKnowledgeEnvelope(t, result)
-	if len(knowledgeHitsOf(searched)) != 1 || knowledgeHitsOf(searched)[0].Path != "learned/sitzung.md" || knowledgeHitsOf(searched)[0].Heading != "Erkenntnis" {
+	if len(knowledgeHitsOf(searched)) != 1 || knowledgeHitsOf(searched)[0].Path != "findings/sitzung.md" || knowledgeHitsOf(searched)[0].Heading != "Erkenntnis" {
 		t.Fatalf("Treffer nach dem Schreiben: %+v", knowledgeHitsOf(searched))
 	}
 
-	// Auflisten kennt drei Dateien, Status zählt learned mit.
+	// Auflisten kennt drei Dateien, Status zählt findings mit.
 	result, _, err = knowledgeListTool(context.Background(), nil, knowledgeListInput{
 		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root},
 	})
@@ -252,26 +257,36 @@ func TestKnowledgeWriteSchreibtNurNachLearned(t *testing.T) {
 	if status.Status.IndexKind != project.KnowledgeIndexKind || status.Status.FileCount != 3 || status.Status.ChunkCount == 0 {
 		t.Errorf("Status: %+v", *status.Status)
 	}
-	if learned := status.Status.BySource[project.KnowledgeLearnedDirName]; learned.Files != 1 || learned.Chunks == 0 {
-		t.Errorf("bySource.learned = %+v", learned)
+	if findings := status.Status.ByKind["findings"]; findings.Files != 1 || findings.Chunks == 0 {
+		t.Errorf("byKind.findings = %+v", findings)
 	}
 	if status.Status.Stale {
 		t.Errorf("das Tor selbst hat nicht am Tor vorbei geschrieben: %+v", *status.Status)
 	}
 }
 
-func TestKnowledgeWriteWehrtPfadeUndLeerenInhaltAb(t *testing.T) {
+// Jede Eingabe-Ablehnung aus project/ kommt als invalid_input zurück —
+// Erzeuger, Ziel, Felder, Rumpf und ein unbekannter Queue-Eintrag —, und
+// nichts davon hinterlässt eine Datei.
+func TestKnowledgeWriteWehrtErzeugerZielUndFelderAb(t *testing.T) {
 	root := newKnowledgeProject(t)
 
+	good := knowledgeDocumentInput{Path: "findings/neu.md", Title: "Neu", Subject: "Test", Origin: "Test", State: "raw", Body: "# Neu\n"}
 	cases := []struct {
 		name  string
 		input knowledgeWriteInput
 	}{
-		{"herausführender Pfad", knowledgeWriteInput{Path: "../manual/neu.md", Content: "# Neu\n", Source: "Test"}},
-		{"absoluter Pfad", knowledgeWriteInput{Path: filepath.Join(root, "neu.md"), Content: "# Neu\n", Source: "Test"}},
-		{"keine Markdown-Datei", knowledgeWriteInput{Path: "neu.txt", Content: "# Neu\n", Source: "Test"}},
-		{"leerer Inhalt", knowledgeWriteInput{Path: "neu.md", Content: "  \n", Source: "Test"}},
-		{"fehlende Herkunft", knowledgeWriteInput{Path: "neu.md", Content: "# Neu\n", Source: " "}},
+		{"herausführender Pfad", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withPath(good, "../manual/neu.md")}},
+		{"absoluter Pfad", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withPath(good, filepath.Join(root, "neu.md"))}},
+		{"keine Markdown-Datei", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withPath(good, "findings/neu.txt")}},
+		{"fremdes Verzeichnis", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withPath(good, "manual/neu.md")}},
+		{"unbekannter Erzeuger", knowledgeWriteInput{Producer: "gate", knowledgeDocumentInput: good}},
+		{"Generator", knowledgeWriteInput{Producer: "docs-code", knowledgeDocumentInput: withPath(good, "code/neu.md")}},
+		{"leerer body", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withBody(good, "  \n")}},
+		{"Kopf im body", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withBody(good, "---\ntitle: X\n---\n# Neu\n")}},
+		{"state superseded", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withState(good, "superseded")}},
+		{"fehlender title", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: withTitle(good, " ")}},
+		{"unbekannter Queue-Eintrag", knowledgeWriteInput{Producer: "session", knowledgeDocumentInput: good, Queue: "gibt-es-nicht"}},
 	}
 	for _, tc := range cases {
 		tc.input.ProjectDir = root
@@ -284,8 +299,275 @@ func TestKnowledgeWriteWehrtPfadeUndLeerenInhaltAb(t *testing.T) {
 			t.Errorf("%s wurde angenommen: %#v", tc.name, envelope)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), "manual", "neu.md")); !os.IsNotExist(err) {
-		t.Errorf("Datei außerhalb von learned/ entstanden: %v", err)
+	for _, rel := range []string{"manual/neu.md", "findings/neu.md", "code/neu.md"} {
+		if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			t.Errorf("%s ist trotz Ablehnung entstanden: %v", rel, err)
+		}
+	}
+}
+
+func withPath(doc knowledgeDocumentInput, path string) knowledgeDocumentInput {
+	doc.Path = path
+	return doc
+}
+
+func withBody(doc knowledgeDocumentInput, body string) knowledgeDocumentInput {
+	doc.Body = body
+	return doc
+}
+
+func withState(doc knowledgeDocumentInput, state string) knowledgeDocumentInput {
+	doc.State = state
+	return doc
+}
+
+func withTitle(doc knowledgeDocumentInput, title string) knowledgeDocumentInput {
+	doc.Title = title
+	return doc
+}
+
+// publish tauscht das Generatorverzeichnis über die Hülle; supersede löst ein
+// Dokument ab. Beide melden Eingabefehler aus project/ als invalid_input.
+func TestKnowledgePublishUndSupersedeUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	doc := func(path string) knowledgeDocumentInput {
+		return knowledgeDocumentInput{Path: path, Title: "Code", Subject: "Quelle", Origin: "/k-docs-code", State: "condensed", Body: "# " + path + "\n"}
+	}
+
+	result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "docs-code",
+		Documents: []knowledgeDocumentInput{doc("links.md"), doc("tief/unten.md")},
+	})
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	published := decodeKnowledgeEnvelope(t, result)
+	if !published.OK || published.Publish == nil || published.Publish.Written != 2 || published.Publish.Removed != 0 || published.Publish.Dir != "code/" || published.Producer != "docs-code" {
+		t.Fatalf("Umschlag: %#v", published)
+	}
+	for _, rel := range []string{"code/links.md", "code/tief/unten.md"} {
+		if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), filepath.FromSlash(rel))); err != nil {
+			t.Errorf("%s fehlt: %v", rel, err)
+		}
+	}
+
+	// Ein zweiter Satz ohne tief/unten.md entfernt es.
+	result, _, err = knowledgePublishTool(context.Background(), nil, knowledgePublishInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "docs-code",
+		Documents: []knowledgeDocumentInput{doc("links.md")},
+	})
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if published = decodeKnowledgeEnvelope(t, result); published.Publish == nil || published.Publish.Removed != 1 {
+		t.Errorf("zweiter Satz: %#v", published)
+	}
+
+	// Kein Generator, ungültiger Satz: invalid_input.
+	for name, input := range map[string]knowledgePublishInput{
+		"kein Generator": {Producer: "session", Documents: []knowledgeDocumentInput{doc("x.md")}},
+		"ungültig":       {Producer: "docs-code", Documents: []knowledgeDocumentInput{withState(doc("x.md"), "superseded")}},
+	} {
+		input.ProjectDir = root
+		result, _, err := knowledgePublishTool(context.Background(), nil, input)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+			t.Errorf("%s angenommen: %#v", name, envelope)
+		}
+	}
+
+	// supersede: manual/ablauf.md wird durch code/links.md abgelöst.
+	result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "code/links.md", Reason: "Ersetzt",
+	})
+	if err != nil {
+		t.Fatalf("supersede: %v", err)
+	}
+	superseded := decodeKnowledgeEnvelope(t, result)
+	if !superseded.OK || !superseded.Superseded || superseded.Path != "manual/ablauf.md" || superseded.Successor != "code/links.md" {
+		t.Fatalf("Umschlag: %#v", superseded)
+	}
+	result, _, err = knowledgeReadTool(context.Background(), nil, knowledgeReadInput{knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read := decodeKnowledgeEnvelope(t, result); read.Content == nil || !strings.Contains(*read.Content, "state: superseded\nsuccessor: code/links.md\nsuperseded_reason: Ersetzt\n") {
+		t.Errorf("abgelöst gelesen: %#v", read)
+	}
+	result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "code/fehlt.md", Reason: "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Errorf("fehlender Nachfolger angenommen: %#v", envelope)
+	}
+}
+
+// Ein leerer Satz über die Hülle — documents: [] oder das Feld weggelassen
+// (nil) — ist ein Eingabefehler und leert das Generatorverzeichnis nicht. Die
+// Kommandozeile war über den Lader geschützt; hier zählt der Wächter im Kern.
+func TestKnowledgePublishLeererSatzUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	doc := knowledgeDocumentInput{Path: "links.md", Title: "Code", Subject: "Quelle", Origin: "/k-docs-code", State: "condensed", Body: "# Links\n"}
+	result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "docs-code", Documents: []knowledgeDocumentInput{doc},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published := decodeKnowledgeEnvelope(t, result); !published.OK {
+		t.Fatalf("erster Lauf: %#v", published)
+	}
+	target := filepath.Join(project.KnowledgeDir(root), "code", "links.md")
+
+	for name, documents := range map[string][]knowledgeDocumentInput{"leer": {}, "weggelassen": nil} {
+		result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{
+			knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "docs-code", Documents: documents,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		envelope := decodeKnowledgeEnvelope(t, result)
+		if envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" || !result.IsError {
+			t.Errorf("%s angenommen: %#v", name, envelope)
+		}
+		if _, err := os.Stat(target); err != nil {
+			t.Errorf("%s: code/links.md nach leerem Satz weg: %v", name, err)
+		}
+	}
+}
+
+// Eingang und Warteschlange über die Hüllen: put mit content und mit file,
+// list mit Notiz, read nur für Text; queue add → list → write mit queue →
+// leer; drop.
+func TestKnowledgeInboxUndQueueUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	base := knowledgeBaseInput{ProjectDir: root}
+
+	result, _, err := knowledgeInboxPutTool(context.Background(), nil, knowledgeInboxPutInput{
+		knowledgeBaseInput: base, Source: "chat", Name: "standup.md", Content: "# Standup\n\nKennwort.\n", Note: "Vom 12.9.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := decodeKnowledgeEnvelope(t, result)
+	if !put.OK || !put.Written || put.Path != "chat/standup.md" || put.Source != "chat" {
+		t.Fatalf("inbox_put: %#v", put)
+	}
+	binary := filepath.Join(root, "seite.pdf")
+	if err := os.WriteFile(binary, []byte{0x25, 0x50, 0x44, 0x46}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, _, err = knowledgeInboxPutTool(context.Background(), nil, knowledgeInboxPutInput{knowledgeBaseInput: base, Source: "scan", Name: "seite.pdf", File: binary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if put = decodeKnowledgeEnvelope(t, result); !put.OK || put.Path != "scan/seite.pdf" {
+		t.Fatalf("inbox_put file: %#v", put)
+	}
+	for name, input := range map[string]knowledgeInboxPutInput{
+		"ohne Inhalt":      {Source: "chat", Name: "leer.md"},
+		"content und file": {Source: "chat", Name: "beides.md", Content: "x", File: binary},
+		"belegter Name":    {Source: "chat", Name: "standup.md", Content: "x"},
+		"Ausbruch":         {Source: "chat", Name: "../x.md", Content: "x"},
+	} {
+		input.ProjectDir = root
+		result, _, err := knowledgeInboxPutTool(context.Background(), nil, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+			t.Errorf("%s angenommen: %#v", name, envelope)
+		}
+	}
+
+	result, _, err = knowledgeInboxListTool(context.Background(), nil, knowledgeInboxListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := decodeKnowledgeEnvelope(t, result)
+	if !listed.OK || listed.Inbox == nil || len(*listed.Inbox) != 2 || (*listed.Inbox)[0].Note != "Vom 12.9." || (*listed.Inbox)[1].Format != "pdf" {
+		t.Fatalf("inbox_list: %#v", listed)
+	}
+	if got := string(rawKnowledgeJSON(t, result)["inbox"]); !strings.HasPrefix(got, "[") {
+		t.Errorf("inbox = %s", got)
+	}
+
+	result, _, err = knowledgeInboxReadTool(context.Background(), nil, knowledgeInboxReadInput{knowledgeBaseInput: base, Path: "chat/standup.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read := decodeKnowledgeEnvelope(t, result); !read.OK || read.Content == nil || *read.Content != "# Standup\n\nKennwort.\n" {
+		t.Errorf("inbox_read: %#v", read)
+	}
+	result, _, err = knowledgeInboxReadTool(context.Background(), nil, knowledgeInboxReadInput{knowledgeBaseInput: base, Path: "scan/seite.pdf"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read := decodeKnowledgeEnvelope(t, result); read.OK || read.Error == nil || !strings.Contains(read.Error.Message, "kein Textformat") {
+		t.Errorf("PDF gelesen: %#v", read)
+	}
+
+	result, _, err = knowledgeQueueAddTool(context.Background(), nil, knowledgeQueueAddInput{knowledgeBaseInput: base, Origin: "chat/standup.md", Target: "findings", Reason: "Befund"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := decodeKnowledgeEnvelope(t, result)
+	if !added.OK || !added.Added || !strings.HasSuffix(added.ID, "-chat-standup-md") {
+		t.Fatalf("queue_add: %#v", added)
+	}
+	result, _, err = knowledgeQueueListTool(context.Background(), nil, knowledgeQueueListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue := decodeKnowledgeEnvelope(t, result)
+	if !queue.OK || queue.Queue == nil || len(*queue.Queue) != 1 || (*queue.Queue)[0].ID != added.ID || (*queue.Queue)[0].Target != "findings/" {
+		t.Fatalf("queue_list: %#v", queue)
+	}
+
+	result, _, err = knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
+		knowledgeBaseInput: base, Producer: "session", Queue: added.ID,
+		knowledgeDocumentInput: knowledgeDocumentInput{Path: "findings/standup.md", Title: "Standup", Subject: "Team", Origin: "chat/standup.md", State: "condensed", Sources: []string{"chat/standup.md"}, Body: "# Standup\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written := decodeKnowledgeEnvelope(t, result); !written.OK {
+		t.Fatalf("write mit queue: %#v", written)
+	}
+	result, _, err = knowledgeQueueListTool(context.Background(), nil, knowledgeQueueListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if queue = decodeKnowledgeEnvelope(t, result); queue.Queue == nil || len(*queue.Queue) != 0 {
+		t.Errorf("Eintrag nach write noch da: %#v", queue)
+	}
+	if got := string(rawKnowledgeJSON(t, result)["queue"]); got != "[]" {
+		t.Errorf("queue = %s, erwartet []", got)
+	}
+
+	result, _, err = knowledgeQueueAddTool(context.Background(), nil, knowledgeQueueAddInput{knowledgeBaseInput: base, Origin: "mail/x.eml", Target: "extracted/", Reason: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := decodeKnowledgeEnvelope(t, result).ID
+	result, _, err = knowledgeQueueDropTool(context.Background(), nil, knowledgeQueueDropInput{knowledgeBaseInput: base, ID: id, Reason: "doch nicht"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dropped := decodeKnowledgeEnvelope(t, result); !dropped.OK || !dropped.Dropped || dropped.ID != id {
+		t.Errorf("queue_drop: %#v", dropped)
+	}
+	result, _, err = knowledgeQueueDropTool(context.Background(), nil, knowledgeQueueDropInput{knowledgeBaseInput: base, ID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dropped := decodeKnowledgeEnvelope(t, result); dropped.OK || dropped.Error == nil || dropped.Error.Code != "invalid_input" {
+		t.Errorf("zweiter drop angenommen: %#v", dropped)
 	}
 }
 
@@ -338,7 +620,7 @@ func TestKnowledgeLeereErgebnisseBleibenImJSON(t *testing.T) {
 	}
 
 	result, _, err = knowledgeListTool(context.Background(), nil, knowledgeListInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Source: "gibtesnicht",
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Kind: "gibtesnicht",
 	})
 	if err != nil {
 		t.Fatalf("list: %v", err)
@@ -367,6 +649,123 @@ func TestKnowledgeLeereErgebnisseBleibenImJSON(t *testing.T) {
 
 // knowledgeHitsOf und knowledgeEntriesOf lesen die Zeigerfelder des Umschlags
 // nil-sicher: nur das Werkzeug, das sie beantwortet, setzt sie.
+// denyWrite nimmt einem Verzeichnis das Schreibrecht und gibt es am Ende des
+// Tests zurück, damit t.TempDir() aufräumen kann. Greifen die Rechte nicht —
+// als root, auf manchen Dateisystemen —, bewiese der Test nichts und wird
+// übersprungen. Dasselbe Muster wie in project.
+func denyWrite(t *testing.T, dir string) {
+	t.Helper()
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("%s: %v", dir, err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatalf("%s sperren: %v", dir, err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, info.Mode().Perm()) })
+
+	probe := filepath.Join(dir, ".schreibprobe")
+	if err := os.WriteFile(probe, []byte("x"), 0o644); err == nil {
+		_ = os.Remove(probe)
+		t.Skip("das entzogene Schreibrecht greift hier nicht")
+	}
+}
+
+// denyRead nimmt einer Datei das Leserecht, mit derselben Vorsichtsmaßnahme.
+func denyRead(t *testing.T, path string) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatalf("%s sperren: %v", path, err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, info.Mode().Perm()) })
+
+	if _, err := os.ReadFile(path); err == nil {
+		t.Skip("das entzogene Leserecht greift hier nicht")
+	}
+}
+
+// Der Fehlercode sagt, ob die Argumente oder die Umgebung falsch sind:
+// invalid_input nur für Eingabefehler aus project/ (auch „nicht vorhanden"),
+// write_failed für alles andere bei schreibenden, read_failed bei lesenden
+// Hüllen. Vorher meldete jede schreibende Hülle jeden Fehler als
+// invalid_input — ein Aufrufer, der daran entscheidet, korrigierte bei einem
+// nicht beschreibbaren knowledge/ endlos.
+func TestKnowledgeFehlercodesUnterscheidenEingabeUndUmgebung(t *testing.T) {
+	code := func(t *testing.T, result *mcp.CallToolResult, err error) string {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		envelope := decodeKnowledgeEnvelope(t, result)
+		if envelope.OK || envelope.Error == nil || !result.IsError {
+			t.Fatalf("kein Fehler: %#v", envelope)
+		}
+		return envelope.Error.Code
+	}
+	good := knowledgeDocumentInput{Path: "findings/neu.md", Title: "Neu", Subject: "Test", Origin: "Test", State: "raw", Body: "# Neu\n"}
+
+	t.Run("nicht beschreibbares knowledge/ ist write_failed", func(t *testing.T) {
+		root := newKnowledgeProject(t)
+		denyWrite(t, project.KnowledgeDir(root))
+		base := knowledgeBaseInput{ProjectDir: root}
+
+		result, _, err := knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{knowledgeBaseInput: base, Producer: "session", knowledgeDocumentInput: good})
+		if got := code(t, result, err); got != "write_failed" {
+			t.Errorf("write: code = %q, erwartet write_failed", got)
+		}
+		result, _, err = knowledgePublishTool(context.Background(), nil, knowledgePublishInput{
+			knowledgeBaseInput: base, Producer: "docs-code", Documents: []knowledgeDocumentInput{withPath(good, "neu.md")},
+		})
+		if got := code(t, result, err); got != "write_failed" {
+			t.Errorf("publish: code = %q, erwartet write_failed", got)
+		}
+	})
+
+	t.Run("falscher Erzeuger ist invalid_input", func(t *testing.T) {
+		root := newKnowledgeProject(t)
+		result, _, err := knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
+			knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "gate", knowledgeDocumentInput: good,
+		})
+		if got := code(t, result, err); got != "invalid_input" {
+			t.Errorf("code = %q, erwartet invalid_input", got)
+		}
+	})
+
+	t.Run("fehlender Pfad bei read ist invalid_input", func(t *testing.T) {
+		root := newKnowledgeProject(t)
+		result, _, err := knowledgeReadTool(context.Background(), nil, knowledgeReadInput{knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/fehlt.md"})
+		if got := code(t, result, err); got != "invalid_input" {
+			t.Errorf("code = %q, erwartet invalid_input", got)
+		}
+	})
+
+	t.Run("vorhandener, unlesbarer Pfad bei read ist read_failed", func(t *testing.T) {
+		root := newKnowledgeProject(t)
+		denyRead(t, filepath.Join(project.KnowledgeDir(root), "manual", "ablauf.md"))
+		result, _, err := knowledgeReadTool(context.Background(), nil, knowledgeReadInput{knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md"})
+		if got := code(t, result, err); got != "read_failed" {
+			t.Errorf("code = %q, erwartet read_failed", got)
+		}
+	})
+
+	t.Run("unbekannter Queue-Eintrag und fehlender Nachfolger sind invalid_input", func(t *testing.T) {
+		root := newKnowledgeProject(t)
+		base := knowledgeBaseInput{ProjectDir: root}
+		result, _, err := knowledgeQueueDropTool(context.Background(), nil, knowledgeQueueDropInput{knowledgeBaseInput: base, ID: "gibt-es-nicht"})
+		if got := code(t, result, err); got != "invalid_input" {
+			t.Errorf("queue_drop: code = %q, erwartet invalid_input", got)
+		}
+		result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{knowledgeBaseInput: base, Path: "manual/ablauf.md", Successor: "manual/fehlt.md", Reason: "x"})
+		if got := code(t, result, err); got != "invalid_input" {
+			t.Errorf("supersede: code = %q, erwartet invalid_input", got)
+		}
+	})
+}
+
 func knowledgeHitsOf(envelope knowledgeEnvelope) []project.Hit {
 	if envelope.Hits == nil {
 		return nil

@@ -298,7 +298,10 @@ const (
 	areaWorkflows = "workflows"
 	// areaKnowledge ist der Bereich der Wissensablage. Er steht über Docs:
 	// Docs ist das Nachschlagewerk der Installation, die Wissensablage das,
-	// was im Projekt an Wissen zusammenkommt.
+	// was im Projekt an Wissen zusammenkommt — unter k-playbook-local/ in
+	// den drei Zonen inbox/, queue/ und knowledge/, beschrieben in
+	// docs/knowledge-layout.md. Die Seite zeigt vorerst das Zielbild; die
+	// Zonen selbst listet sie erst, wenn ein /api/knowledge/* sie liefert.
 	areaKnowledge = "knowledge"
 	areaDocs      = "docs"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben

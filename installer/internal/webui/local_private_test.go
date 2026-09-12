@@ -80,8 +80,8 @@ func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
 	}
-	if !response.Available || len(response.Entries) != 4 {
-		t.Fatalf("Available = %v, Einträge = %d, erwartet 4", response.Available, len(response.Entries))
+	if !response.Available || len(response.Entries) != 5 {
+		t.Fatalf("Available = %v, Einträge = %d, erwartet 5", response.Available, len(response.Entries))
 	}
 	if entry := privateEntry(t, response, "priv"); entry.State != project.PrivacyPublic {
 		t.Errorf("priv = %+v, erwartet %q", entry, project.PrivacyPublic)
@@ -89,6 +89,7 @@ func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	privateEntry(t, response, "results")
 	privateEntry(t, response, "cache")
 	privateEntry(t, response, "material")
+	privateEntry(t, response, "inbox")
 }
 
 // Der schreibende Weg: einschalten, danach ändert ein zweiter Aufruf nichts.
