@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -22,7 +23,12 @@ import (
 type mcpServersResponse struct {
 	Environment project.Environment `json:"environment"`
 	project.MCPServerInventory
-	// OK: alle Dateien lesbar und kein Pflichtserver fehlt.
+	// RequiredError ist gesetzt, wenn tools.mcp.required nicht lesbar ist —
+	// etwa wegen eines unzulässigen Namens. Dann ist die Pflichtliste leer,
+	// ok false, und die Seite zeigt den Fehler an der Pflichtkarte; die Server
+	// stehen trotzdem da.
+	RequiredError string `json:"requiredError,omitempty"`
+	// OK: alle Dateien lesbar, Pflichtliste lesbar und kein Pflichtserver fehlt.
 	OK      bool   `json:"ok"`
 	Message string `json:"message"`
 }
@@ -55,6 +61,9 @@ func mcpServersState() mcpServersResponse {
 	inventory, err := project.MCPServerInventoryFor(environment.ProjectDir)
 	response.MCPServerInventory = inventory
 	if err != nil {
+		// `k-playbook context` bricht an derselben Datei ab. Die Oberfläche
+		// bleibt bedienbar, sagt aber ebenso deutlich, dass etwas nicht stimmt.
+		response.RequiredError = err.Error()
 		response.Message = "Pflichtliste nicht lesbar: " + err.Error()
 		return response
 	}
@@ -73,8 +82,12 @@ func mcpServersState() mcpServersResponse {
 // die Detailseite sie beim Laden zeigt. Sie startet nichts: gemessen wird
 // erst auf Knopfdruck über den POST.
 type mcpServerDetailResponse struct {
-	Environment project.Environment    `json:"environment"`
-	Entry       project.MCPServerEntry `json:"entry"`
+	Environment project.Environment  `json:"environment"`
+	Entry       mcpServerDetailEntry `json:"entry"`
+	// RequiredError ist gesetzt, wenn tools.mcp.required nicht lesbar ist —
+	// dasselbe Feld wie in der Übersicht. entry.required ist dann null: ob
+	// der Server Pflicht ist, lässt sich nicht sagen.
+	RequiredError string `json:"requiredError,omitempty"`
 	// ResolvedCommand ist der Pfad, den ein bloßer Kommandoname über die PATH
 	// dieses Prozesses ergibt. Leer, wenn er sich nicht auflösen lässt — dann
 	// sagt Note, warum.
@@ -85,8 +98,21 @@ type mcpServerDetailResponse struct {
 	Note      string `json:"note,omitempty"`
 }
 
+// mcpServerDetailEntry ist der Eintrag, wie die Detailseite ihn bekommt.
+//
+// Required überdeckt das gleichnamige Feld des Eintrags: encoding/json nimmt
+// das weniger tief eingebettete. Als Zeiger kann es null sein — bei nicht
+// lesbarer Pflichtliste stünde dort sonst false, und die Seite behauptete
+// „Pflicht: nein".
+type mcpServerDetailEntry struct {
+	project.MCPServerEntry
+	Required *bool `json:"required"`
+}
+
 // mcpServerProbeResponse ist das Ergebnis einer Messung auf der Detailseite.
-// Started sagt, ob überhaupt ein Prozess lief: bei remote und unknown nicht.
+// Started sagt, ob überhaupt ein Prozess lief: bei remote und unknown nicht,
+// und auch dann nicht, wenn das Kommando fehlt oder sich nicht starten ließ.
+// Den Wert liefert probeMCPCommand selbst; der Handler setzt nichts dazu.
 type mcpServerProbeResponse struct {
 	mcpToolsResponse
 	Started bool `json:"started"`
@@ -95,14 +121,34 @@ type mcpServerProbeResponse struct {
 // findMCPServer sucht den Eintrag zu Assistent und Name in der gelesenen
 // Liste. Nur was dort steht, lässt sich anzeigen oder messen — ein Pfad, der
 // keinen Eintrag trifft, ist 404 und kein Start von irgendetwas.
-func findMCPServer(projectRoot string, assistantID string, name string) (project.MCPServerEntry, bool) {
-	inventory, _ := project.MCPServerInventoryFor(projectRoot)
-	for _, entry := range inventory.Servers {
-		if entry.AssistantID == assistantID && entry.Name == name {
-			return entry, true
+//
+// Gelesen werden nur die MCP-Dateien, nicht die Pflichtliste: Seite, GET und
+// POST rufen den Lookup je einmal auf, und nur das GET braucht Required — es
+// liest die Liste selbst. Required ist im Ergebnis deshalb immer false.
+//
+// file unterscheidet gleichnamige Einträge, wenn opencode.json und
+// opencode.jsonc nebeneinander liegen. Es ist ein reiner Vergleichswert gegen
+// MCPServerEntry.File aus der gelesenen Liste und wird nie als Pfad geöffnet;
+// gesetzt, aber ohne Treffer, ist es 404 wie ein unbekannter Name. Leer gilt
+// der erste Treffer.
+func findMCPServer(projectRoot string, assistantID string, name string, file string) (project.MCPServerEntry, bool) {
+	servers, _ := project.ListMCPServers(projectRoot)
+	for _, entry := range servers {
+		if entry.AssistantID != assistantID || entry.Name != name {
+			continue
 		}
+		if file != "" && entry.File != file {
+			continue
+		}
+		return entry, true
 	}
 	return project.MCPServerEntry{}, false
+}
+
+// mcpServerFileParam ist der optionale Query-Parameter, der unter
+// gleichnamigen Einträgen den aus einer bestimmten Datei wählt.
+func mcpServerFileParam(r *http.Request) string {
+	return r.URL.Query().Get("file")
 }
 
 // resolveMCPCommand löst das Kommando eines lokalen Eintrags auf: ein bloßer
@@ -125,13 +171,23 @@ func mcpServerDetailHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	entry, ok := findMCPServer(environment.ProjectDir, r.PathValue("assistant"), r.PathValue("name"))
+	entry, ok := findMCPServer(environment.ProjectDir, r.PathValue("assistant"), r.PathValue("name"), mcpServerFileParam(r))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
 
-	response := mcpServerDetailResponse{Environment: environment, Entry: entry}
+	response := mcpServerDetailResponse{Environment: environment, Entry: mcpServerDetailEntry{MCPServerEntry: entry}}
+	// Die Pflichtliste wird hier einmal gelesen, nicht im Lookup: Seite und
+	// Messung brauchen sie nicht.
+	if required, _, err := project.ReadRequiredMCPServers(environment.ProjectDir); err != nil {
+		response.RequiredError = err.Error()
+	} else {
+		isRequired := slices.Contains(required, entry.Name)
+		response.Entry.Required = &isRequired
+		response.Entry.MCPServerEntry.Required = isRequired
+	}
+
 	switch entry.Transport {
 	case project.MCPTransportLocal:
 		response.Probeable = true
@@ -176,7 +232,9 @@ func mcpServerProbeHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	entry, ok := findMCPServer(environment.ProjectDir, r.PathValue("assistant"), r.PathValue("name"))
+	// Beide Einträge desselben Namens teilen den Mutex unten: er hängt am
+	// Namen, nicht an der Datei.
+	entry, ok := findMCPServer(environment.ProjectDir, r.PathValue("assistant"), r.PathValue("name"), mcpServerFileParam(r))
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -209,7 +267,6 @@ func mcpServerProbeHandler(w http.ResponseWriter, r *http.Request) {
 	defer lock.Unlock()
 
 	env := append(os.Environ(), entry.Environ()...)
-	response.mcpToolsResponse = probeMCPCommand(environment.ProjectDir, binary, entry.Args, env)
-	response.Started = true
+	response.mcpToolsResponse, response.Started = probeMCPCommand(environment.ProjectDir, binary, entry.Args, env, mcpInstallTimeoutHint)
 	writeJSON(w, http.StatusOK, response)
 }

@@ -40,6 +40,12 @@ const [assistantId, serverName] = window.location.pathname
   .slice(2, 4)
   .map((segment) => decodeURIComponent(segment));
 const apiPath = `/api/mcp-servers/${encodeURIComponent(assistantId)}/${encodeURIComponent(serverName)}`;
+// ?file= wählt unter gleichnamigen Einträgen den aus einer bestimmten Datei —
+// bei OpenCode, wenn opencode.json und opencode.jsonc nebeneinander liegen.
+// GET und POST bekommen ihn gleichermaßen, damit die Messung den Eintrag
+// trifft, dessen Konfiguration die Seite zeigt.
+const fileParam = new URLSearchParams(window.location.search).get("file");
+const apiQuery = fileParam ? `?file=${encodeURIComponent(fileParam)}` : "";
 
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
@@ -54,7 +60,7 @@ loadConfig();
 
 async function loadConfig() {
   try {
-    const response = await fetch(apiPath, { cache: "no-store" });
+    const response = await fetch(`${apiPath}${apiQuery}`, { cache: "no-store" });
     if (!response.ok) {
       elements.configPill.className = "pill warn";
       elements.configPill.textContent = "Nicht gefunden";
@@ -85,7 +91,13 @@ function renderConfig(data) {
     addFact(elements.configFacts, "URL", entry.url || "");
   }
   addFact(elements.configFacts, "Aktiv", entry.enabled ? "ja" : "nein (deaktiviert)");
-  addFact(elements.configFacts, "Pflicht", entry.required ? "ja (tools.mcp.required)" : "nein");
+  // Ist die Pflichtliste nicht lesbar, ist required null: dann weiß die Seite
+  // es nicht und sagt das, statt „nein" zu behaupten.
+  if (data.requiredError) {
+    addFact(elements.configFacts, "Pflicht", `unbekannt — ${data.requiredError}`).className = "missing";
+  } else {
+    addFact(elements.configFacts, "Pflicht", entry.required ? "ja (tools.mcp.required)" : "nein");
+  }
   const envKeys = entry.envKeys || [];
   addFact(elements.configFacts, "Umgebung", envKeys.length > 0 ? envKeys.join(", ") : "keine Einträge");
 
@@ -119,7 +131,7 @@ async function probe() {
   elements.serverMessage.textContent = "";
 
   try {
-    const response = await fetch(`${apiPath}/probe`, { method: "POST", cache: "no-store" });
+    const response = await fetch(`${apiPath}/probe${apiQuery}`, { method: "POST", cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Status ${response.status}`);
     }
@@ -137,10 +149,19 @@ async function probe() {
 function renderProbe(data) {
   elements.serverFacts.replaceChildren();
   elements.serverCapabilities.replaceChildren();
+  // Bei einer Antwort ist die Meldung ein Hinweis — etwa, dass prompts/list
+  // scheiterte. Er steht unter den Serverdaten; die Werkzeuge erscheinen
+  // trotzdem, denn initialize und tools/list sind angekommen.
   elements.serverMessage.textContent = data.message || "";
 
+  // started kommt aus der Messung selbst: false, wenn kein Prozess lief —
+  // Datei fehlt, Start scheiterte, remote oder unbekannte Form.
   if (data.command) {
-    addFact(elements.serverFacts, "Gestartet", data.started ? data.command : `${data.command} (nicht gestartet)`);
+    addFact(
+      elements.serverFacts,
+      data.started ? "Gestartet" : "Befehl",
+      data.started ? data.command : `${data.command} (nicht gestartet)`,
+    );
   }
 
   // Ein Fehlfall ist das Ergebnis dieser Messung, keine Störung: er

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,13 +122,15 @@ func resolvePath(path string) string {
 	return cleaned
 }
 
-const (
-	// mcpProbeTimeout begrenzt den Selbsttest. Der Server antwortet lokal und
-	// sofort; hängt er trotzdem, darf er die Seite nicht mitnehmen.
-	mcpProbeTimeout = 10 * time.Second
-	// mcpWaitDelay begrenzt, wie lange danach noch auf die Rohre gewartet wird.
-	mcpWaitDelay = time.Second
-)
+// mcpProbeTimeout begrenzt den Selbsttest. Der Server antwortet lokal und
+// sofort; hängt er trotzdem, darf er die Seite nicht mitnehmen.
+//
+// Eine Variable, keine Konstante: nur so kann ein Test den Weg über die
+// abgelaufene Frist gehen, ohne jedes Mal zehn Sekunden zu warten.
+var mcpProbeTimeout = 10 * time.Second
+
+// mcpWaitDelay begrenzt, wie lange danach noch auf die Rohre gewartet wird.
+const mcpWaitDelay = time.Second
 
 // mcpProbePath ist die PATH, mit der der Selbsttest läuft.
 //
@@ -174,7 +177,10 @@ type mcpToolsResponse struct {
 	// Fähigkeit gemeldet hat; erst dann wird danach gefragt.
 	Prompts   []mcpPrompt   `json:"prompts,omitempty"`
 	Resources []mcpResource `json:"resources,omitempty"`
-	Message   string        `json:"message"`
+	// Message ist ohne Antwort der Grund. Mit Antwort ist sie leer oder ein
+	// Hinweis auf eine gescheiterte Folgeanfrage (prompts/list,
+	// resources/list); die übrigen Felder gelten dann trotzdem.
+	Message string `json:"message"`
 }
 
 // mcpPrompt ist eine angebotene Vorlage samt ihren Argumenten.
@@ -246,7 +252,11 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 			Message:      err.Error() + " — es gibt nichts zu starten.",
 		}
 	}
-	return probeMCPCommand(projectRoot, binary, args, mcpProbeEnv(os.Environ()))
+	// Der Selbsttest hat keinen Knopf „Erneut messen", und sein Befehl ist nie
+	// npx oder uvx: er bekommt den Hinweis dazu nicht. Ob der Prozess lief,
+	// wertet /mcp nicht aus.
+	response, _ := probeMCPCommand(projectRoot, binary, args, mcpProbeEnv(os.Environ()), "")
+	return response
 }
 
 // probeMCPCommand ist der Kern jeder Messung: startet binary mit args im
@@ -257,13 +267,18 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 // Detailseite eines fremden Servers die geerbte Umgebung samt env aus dem
 // Eintrag. binary ist ein Pfad, kein bloßer Name: aufgelöst wird vorher, damit
 // die Antwort nennt, welche Datei geantwortet hat.
-func probeMCPCommand(projectRoot string, binary string, args []string, env []string) mcpToolsResponse {
+//
+// timeoutHint wird an die Meldung nach abgelaufener Frist angehängt; leer
+// bleibt es beim bloßen Satz. Das zweite Ergebnis sagt, ob command.Start()
+// gelungen ist — ob also überhaupt ein Prozess lief. Jeder Rückweg davor
+// liefert false.
+func probeMCPCommand(projectRoot string, binary string, args []string, env []string, timeoutHint string) (mcpToolsResponse, bool) {
 	response := mcpToolsResponse{Capabilities: []string{}, Tools: []mcpTool{}}
 	response.Command = strings.Join(append([]string{binary}, args...), " ")
 
 	if info, err := os.Stat(binary); err != nil || info.IsDir() {
 		response.Message = binary + " ist nicht ausführbar — es gibt nichts zu starten."
-		return response
+		return response, false
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), mcpProbeTimeout)
@@ -276,12 +291,12 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 	stdin, err := command.StdinPipe()
 	if err != nil {
 		response.Message = "Server nicht ansprechbar: " + err.Error()
-		return response
+		return response, false
 	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		response.Message = "Server nicht ansprechbar: " + err.Error()
-		return response
+		return response, false
 	}
 	var stderr lockedBuffer
 	command.Stderr = &stderr
@@ -293,7 +308,7 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 
 	if err := command.Start(); err != nil {
 		response.Message = "Server ließ sich nicht starten: " + err.Error()
-		return response
+		return response, false
 	}
 	// Der Prozess darf den Handler unter keinen Umständen überleben: cancel()
 	// beendet ihn, das Schließen der Rohre löst den Leser aus seiner Blockade,
@@ -315,13 +330,13 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 
 	select {
 	case <-ctx.Done():
-		response.Message = mcpTimeoutMessage()
-		return response
+		response.Message = mcpTimeoutMessage(timeoutHint)
+		return response, true
 
 	case result := <-answered:
 		if result.err != nil {
-			response.Message = mcpFailureMessage(ctx, result.err, stderr.String())
-			return response
+			response.Message = mcpFailureMessage(ctx, result.err, stderr.String(), timeoutHint)
+			return response, true
 		}
 
 		response.Available = true
@@ -332,16 +347,22 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 		response.Tools = describeTools(result.listed)
 		response.Prompts = describePrompts(result.prompts)
 		response.Resources = describeResources(result.resources)
-		return response
+		response.Message = strings.Join(result.notes, "\n")
+		return response, true
 	}
 }
 
 // mcpProbeResult ist das Ergebnis des Dialogs mit dem Server.
+//
+// err ist fatal und gilt nur für initialize und tools/list: ohne sie gibt es
+// nichts anzuzeigen. Scheitern die Folgeanfragen, bleibt, was bis dahin
+// angekommen ist; notes sagt, welche Frage keine Antwort bekam.
 type mcpProbeResult struct {
 	initialized mcpInitializeResult
 	listed      mcpToolsResult
 	prompts     mcpPromptsResult
 	resources   mcpResourcesResult
+	notes       []string
 	err         error
 }
 
@@ -382,18 +403,28 @@ func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
 		return result
 	}
 
+	// Ab hier ist ein Fehler kein Ausfall mehr: der Server hat geantwortet und
+	// seine Werkzeuge genannt. Eine Folgeanfrage, die scheitert, wird Hinweis;
+	// ihre Karte bleibt leer, die Werkzeuge bleiben stehen.
 	if _, ok := result.initialized.Capabilities["prompts"]; ok {
 		if err := askMCP(stdin, reader, mcpPromptsID, "prompts/list", &result.prompts); err != nil {
-			result.err = err
-			return result
+			result.prompts = mcpPromptsResult{}
+			result.notes = append(result.notes, mcpFollowUpNote("prompts", "prompts/list", err))
 		}
 	}
 	if _, ok := result.initialized.Capabilities["resources"]; ok {
 		if err := askMCP(stdin, reader, mcpResourcesID, "resources/list", &result.resources); err != nil {
-			result.err = err
+			result.resources = mcpResourcesResult{}
+			result.notes = append(result.notes, mcpFollowUpNote("resources", "resources/list", err))
 		}
 	}
 	return result
+}
+
+// mcpFollowUpNote ist der Hinweis zu einer gescheiterten Folgeanfrage.
+func mcpFollowUpNote(capability string, method string, err error) string {
+	return fmt.Sprintf("Der Server meldet %s, aber %s scheiterte: %s. Werkzeuge und Serverdaten oben sind vollständig.",
+		capability, method, err.Error())
 }
 
 // askMCP schickt eine Folgeanfrage und liest ihre Antwort.
@@ -405,12 +436,24 @@ func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
 func askMCP(stdin io.Writer, reader *mcpReader, id int, method string, target any) error {
 	_, writeErr := io.WriteString(stdin, mcpRequest(id, method))
 	if err := reader.result(id, target); err != nil {
-		if writeErr != nil {
+		// Eine Fehlerantwort des Servers ist die eigentliche Auskunft und
+		// geht vor: er hat sie geschickt, bevor er sich beendete, und der
+		// Schreibfehler danach sagt nur, dass er weg ist.
+		var answered mcpResponseError
+		if writeErr != nil && !errors.As(err, &answered) {
 			return fmt.Errorf("Anfragen nicht schreibbar: %w", writeErr)
 		}
 		return err
 	}
 	return nil
+}
+
+// mcpResponseError ist eine Fehlerantwort des Servers — im Unterschied zu
+// einem Lese- oder Schreibfehler auf den Rohren.
+type mcpResponseError string
+
+func (e mcpResponseError) Error() string {
+	return "Fehlerantwort: " + string(e)
 }
 
 // lockedBuffer sammelt die Ausgabe auf stderr.
@@ -453,7 +496,8 @@ func mcpRequest(id int, method string) string {
 
 // mcpRPCResponse ist der Rahmen einer Antwort. Verglichen wird nur er; was das
 // SDK in result schreibt, gehört ihm. ID fehlt bei Benachrichtigungen — die
-// überspringt der Leser.
+// überspringt der Leser — und ist null bei einer Fehlerantwort, die der Server
+// keiner Anfrage zuordnen konnte; die meldet er.
 type mcpRPCResponse struct {
 	ID     *json.RawMessage `json:"id"`
 	Result json.RawMessage  `json:"result"`
@@ -561,7 +605,7 @@ func (r *mcpReader) result(id int, target any) error {
 		if ok {
 			delete(r.pending, wanted)
 			if response.Error != nil {
-				return fmt.Errorf("Fehlerantwort: %s", response.Error.Message)
+				return mcpResponseError(response.Error.Message)
 			}
 			return json.Unmarshal(response.Result, target)
 		}
@@ -578,28 +622,44 @@ func (r *mcpReader) result(id int, target any) error {
 			return fmt.Errorf("Antwort ist kein JSON: %w", err)
 		}
 		if parsed.ID == nil {
+			// Ohne ID, aber mit error ist es keine Benachrichtigung, sondern
+			// eine Fehlerantwort, deren Anfrage der Server nicht zuordnen
+			// konnte — JSON-RPC schreibt dann id: null. Sie gilt der gerade
+			// ausstehenden Anfrage; wartete der Leser weiter, liefe die
+			// Messung in die Frist, statt den Grund zu nennen.
+			if parsed.Error != nil {
+				return mcpResponseError(parsed.Error.Message)
+			}
 			continue
 		}
 		r.pending[strings.Trim(string(*parsed.ID), `"`)] = parsed
 	}
 }
 
-// mcpTimeoutMessage ist die Meldung nach abgelaufener Frist. Sie nennt den
-// häufigsten Grund bei fremden Servern: npx und uvx laden beim ersten Start
-// Pakete nach, und das dauert länger als die Frist. Ein zweiter Versuch
-// findet sie im Cache.
-func mcpTimeoutMessage() string {
-	return fmt.Sprintf("Server antwortet nicht: nach %s abgebrochen. "+
-		"Wird der Server über npx oder uvx gestartet, kann das eine Erstinstallation gewesen sein — "+
-		"dann „Erneut messen“.", mcpProbeTimeout)
+// mcpTimeoutMessage ist die Meldung nach abgelaufener Frist. hint wird mit
+// einem Leerzeichen angehängt, wenn es einen gibt; ohne ist es der Satz, den
+// /mcp immer gezeigt hat.
+func mcpTimeoutMessage(hint string) string {
+	message := fmt.Sprintf("Server antwortet nicht: nach %s abgebrochen.", mcpProbeTimeout)
+	if hint != "" {
+		message += " " + hint
+	}
+	return message
 }
+
+// mcpInstallTimeoutHint nennt den häufigsten Grund bei fremden Servern: npx
+// und uvx laden beim ersten Start Pakete nach, und das dauert länger als die
+// Frist. Ein zweiter Versuch findet sie im Cache. Nur die Detailseite gibt
+// ihn mit — sie hat den Knopf, den er nennt.
+const mcpInstallTimeoutHint = "Wird der Server über npx oder uvx gestartet, kann das eine Erstinstallation gewesen sein — " +
+	"dann „Erneut messen“."
 
 // mcpFailureMessage sagt, woran es lag. Die Ausgabe auf stderr kommt mit, wenn
 // es eine gibt: dort steht bei einem gescheiterten Wrapper der eigentliche
-// Grund.
-func mcpFailureMessage(ctx context.Context, err error, stderr string) string {
+// Grund. timeoutHint gilt nur, wenn die Frist der Grund war.
+func mcpFailureMessage(ctx context.Context, err error, stderr string, timeoutHint string) string {
 	if ctx.Err() != nil {
-		return mcpTimeoutMessage()
+		return mcpTimeoutMessage(timeoutHint)
 	}
 
 	message := "Server antwortet nicht: " + err.Error()

@@ -427,7 +427,7 @@ func mcpServerPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	assistant, name := r.PathValue("assistant"), r.PathValue("name")
-	if _, ok := findMCPServer(environment.ProjectDir, assistant, name); !ok {
+	if _, ok := findMCPServer(environment.ProjectDir, assistant, name, mcpServerFileParam(r)); !ok {
 		http.NotFound(w, r)
 		return
 	}

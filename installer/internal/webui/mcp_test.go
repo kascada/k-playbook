@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -175,6 +176,89 @@ func TestProbeMCPServerOhneInstalliertesBinary(t *testing.T) {
 	}
 	if response.Message == "" {
 		t.Error("kein Grund genannt")
+	}
+}
+
+// shortProbeTimeout verkürzt die Frist für einen Test, damit der Weg über die
+// abgelaufene Frist nicht zehn Sekunden kostet.
+func shortProbeTimeout(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	before := mcpProbeTimeout
+	mcpProbeTimeout = timeout
+	t.Cleanup(func() { mcpProbeTimeout = before })
+}
+
+// mcpHangingServer schreibt einen Server, der nie antwortet und stdin offen
+// hält — nur Shell-Bordmittel, damit er ohne PATH läuft.
+func mcpHangingServer(t *testing.T, path string) {
+	t.Helper()
+	writeExecutable(t, path, "#!/bin/sh\nwhile read -r line; do :; done\n")
+}
+
+// /mcp zeigt nach abgelaufener Frist den Satz, den es vor der Detailseite
+// gezeigt hat — ohne npx/uvx-Hinweis und ohne „Erneut messen": dort gibt es
+// keinen solchen Knopf, und der eigene Server wird nie über npx gestartet.
+func TestProbeMCPServerTimeoutOhneInstallationshinweis(t *testing.T) {
+	if got, want := mcpTimeoutMessage(""), "Server antwortet nicht: nach 10s abgebrochen."; got != want {
+		t.Errorf("mcpTimeoutMessage(\"\") = %q, erwartet %q", got, want)
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	mcpHangingServer(t, filepath.Join(home, ".local", "bin", project.InstalledCommandName))
+	shortProbeTimeout(t, 300*time.Millisecond)
+
+	response := probeMCPServer(t.TempDir())
+	if want := "Server antwortet nicht: nach 300ms abgebrochen."; response.Message != want {
+		t.Errorf("Meldung = %q, erwartet genau %q", response.Message, want)
+	}
+	if response.Available {
+		t.Error("ein hängender Server gilt als verfügbar")
+	}
+}
+
+// Fehlt das Binary, lief kein Prozess: probeMCPCommand sagt das selbst.
+func TestProbeMCPCommandOhneBinaryStartetNichts(t *testing.T) {
+	root := t.TempDir()
+	response, started := probeMCPCommand(root, filepath.Join(root, "bin", "gibt-es-nicht"), nil, os.Environ(), mcpInstallTimeoutHint)
+	if started {
+		t.Error("started = true, obwohl es kein Binary gibt")
+	}
+	if response.Available || !strings.Contains(response.Message, "nicht ausführbar") {
+		t.Errorf("Antwort = %+v", response)
+	}
+}
+
+// Eine Fehlerantwort mit id: null ist keine Benachrichtigung. Sie gilt der
+// ausstehenden Anfrage — hier initialize — und wird sofort gemeldet, statt
+// die Messung in die Frist laufen zu lassen. Eine echte Benachrichtigung
+// davor wird weiter übersprungen.
+func TestProbeMCPCommandMeldetFehlerantwortOhneID(t *testing.T) {
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "null-id")
+	writeExecutable(t, binary, `#!/bin/sh
+printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/message","params":{"level":"info","data":"hallo"}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"initialize abgelehnt"}}'
+while read -r line; do :; done
+`)
+	shortProbeTimeout(t, 5*time.Second)
+
+	begin := time.Now()
+	response, started := probeMCPCommand(dir, binary, nil, os.Environ(), mcpInstallTimeoutHint)
+	if !started {
+		t.Error("started = false, obwohl der Prozess lief")
+	}
+	if response.Available {
+		t.Fatal("eine abgelehnte initialize-Anfrage gilt als verfügbar")
+	}
+	if !strings.Contains(response.Message, "Fehlerantwort: initialize abgelehnt") {
+		t.Errorf("Meldung = %q, erwartet die Fehlerantwort", response.Message)
+	}
+	if strings.Contains(response.Message, "abgebrochen") {
+		t.Errorf("Meldung = %q: die Messung lief in die Frist", response.Message)
+	}
+	if elapsed := time.Since(begin); elapsed > 3*time.Second {
+		t.Errorf("Messung dauerte %s, die Fehlerantwort wurde nicht sofort gemeldet", elapsed)
 	}
 }
 

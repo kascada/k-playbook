@@ -490,7 +490,11 @@ Which MCP servers the project requires -- by the key under which they appear in
 `.mcp.json`, `opencode.json`, and `.cursor/mcp.json`. Both YAML list forms are
 read: block form with dashes and flow form `[k-playbook, atlassian]`. Names
 must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; any other name stops `context`, as
-an invalid language name does.
+an invalid language name does. The interface does not stop: the **/mcp-servers**
+page shows the required list as unreadable with the error, its matrix pill
+warns, and a server's detail page reports "Pflicht: unbekannt" instead of "no".
+Only `required` directly under `tools.mcp` counts; a `required` key deeper
+inside `mcp` is not the list.
 
 The block is optional. Without it, nothing is required and `context` reports
 `mcp.configured: false`; the **/mcp-servers** page of the interface then shows

@@ -125,69 +125,19 @@ func ReadLanguages(projectDir string) ([]string, bool, error) {
 	return DefaultLanguages, false, nil
 }
 
-// parseLanguages liest die Liste zeilenweise, wie der Rest der Konfiguration.
-// Beide YAML-Schreibweisen werden verstanden: die Flussform in einer Zeile und
-// die Blockform mit Spiegelstrichen. Geschrieben wird immer die Blockform.
+// parseLanguages liest project.languages über parseYAMLList — Fluss- und
+// Blockform — und bereinigt und prüft die Einträge. Geschrieben wird immer die
+// Blockform.
 func parseLanguages(content string) ([]string, bool, error) {
-	inProject := false
-	listIndent := -1
-	found := false
-	languages := []string{}
-
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := lineIndent(line)
-
-		if indent == 0 {
-			// Ein neuer Block auf oberster Ebene beendet die Liste.
-			if listIndent >= 0 {
-				break
-			}
-			inProject = trimmed == "project:"
-			continue
-		}
-		if !inProject {
-			continue
-		}
-
-		if listIndent >= 0 {
-			if strings.HasPrefix(trimmed, "- ") || trimmed == "-" {
-				if value := cleanLanguage(strings.TrimPrefix(trimmed, "-")); value != "" {
-					languages = append(languages, value)
-				}
-				continue
-			}
-			// Etwas anderes auf gleicher oder geringerer Tiefe: die Liste ist zu Ende.
-			if indent <= listIndent {
-				break
-			}
-			continue
-		}
-
-		key, value, hasColon := strings.Cut(trimmed, ":")
-		if !hasColon || strings.TrimSpace(key) != "languages" {
-			continue
-		}
-		found = true
-		value = strings.TrimSpace(value)
-		if value == "" {
-			listIndent = indent
-			continue
-		}
-		// Flussform: languages: [python, go]
-		for _, item := range strings.Split(strings.Trim(value, "[]"), ",") {
-			if cleaned := cleanLanguage(item); cleaned != "" {
-				languages = append(languages, cleaned)
-			}
-		}
-		break
-	}
-
+	items, found := parseYAMLList(content, "project", "languages")
 	if !found {
 		return DefaultLanguages, false, nil
+	}
+	languages := []string{}
+	for _, item := range items {
+		if cleaned := cleanLanguage(item); cleaned != "" {
+			languages = append(languages, cleaned)
+		}
 	}
 	for _, language := range languages {
 		if !ValidLanguage(language) {

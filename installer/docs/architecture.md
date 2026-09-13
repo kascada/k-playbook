@@ -1837,9 +1837,9 @@ der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift
 | `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
 | `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |
 | `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Befehl als Subprozess |
-| `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json`, `opencode.json[c]` und `.cursor/mcp.json`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien |
-| `GET` | `/api/mcp-servers/{assistant}/{name}` | Konfiguration eines Servers; 404, wenn er in den Projektdateien nicht steht; startet nichts |
-| `POST` | `/api/mcp-servers/{assistant}/{name}/probe` | Messung: startet das konfigurierte Kommando als Subprozess; remote und unknown antworten ohne Start; je Servername serialisiert |
+| `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json`, `opencode.json[c]` und `.cursor/mcp.json`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien; bei unlesbarer Pflichtliste `ok=false` und `requiredError` |
+| `GET` | `/api/mcp-servers/{assistant}/{name}[?file=…]` | Konfiguration eines Servers; `file` wählt unter gleichnamigen Einträgen (nur Vergleich mit `entry.file`); 404, wenn nichts passt; `requiredError` und `entry.required: null` bei unlesbarer Pflichtliste; startet nichts |
+| `POST` | `/api/mcp-servers/{assistant}/{name}/probe[?file=…]` | Messung: startet das konfigurierte Kommando als Subprozess; `started` nur, wenn ein Prozess lief; remote und unknown antworten ohne Start; gescheiterte Folgeanfragen als Hinweis in `message`; je Servername serialisiert; 404 wie beim GET |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
@@ -2266,11 +2266,20 @@ die Schlüsselnamen (`envKeys`), und `Environ()` reicht die Werte ausschließlic
 Prozessstart der Messung. Ein Test kodiert die Liste und sucht nach dem Wert.
 
 **Pflichtliste.** `tools.mcp.required` in `K-PLAYBOOK.yaml` nennt die Server, die das
-Projekt bei jedem Assistenten voraussetzt. `project/mcp_required.go` liest den Block
-zeilenweise wie `parseGHStatus` und `parseLanguages` — Block- und Flussform, ohne
-YAML-Parser —, prüft jeden Namen gegen `^[A-Za-z0-9][A-Za-z0-9._-]*$` (er ist Schlüssel
-in den MCP-Dateien und Pfadsegment der Detailseite) und bricht bei einem unzulässigen
-Namen ab wie bei einem unzulässigen Sprachnamen. `k-playbook context` trägt das als Feld
+Projekt bei jedem Assistenten voraussetzt. Gelesen wird sie wie `project.languages` über
+den einen Listenleser `parseYAMLList(content, path...)` in `project/yaml_list.go` —
+Block- und Flussform, ohne YAML-Parser, und mit genau geprüftem Schlüsselpfad: ein
+`required` tiefer unter `mcp` (etwa `mcp: servers: x: required: true`) ist keine
+Pflichtliste. `parseRequiredMCPServers` und `parseLanguages` sind Hüllen darum, mit
+eigener Bereinigung und Prüfung. Jeder Name muss auf `^[A-Za-z0-9][A-Za-z0-9._-]*$`
+passen (er ist Schlüssel in den MCP-Dateien und Pfadsegment der Detailseite). Ein
+unzulässiger Name lässt `k-playbook context` abbrechen wie ein unzulässiger Sprachname.
+Die Oberfläche bricht nicht ab, zeigt ihn aber als Fehler: `MCPServerInventoryFor`
+liefert `configured=true` samt Fehler, `GET /api/mcp-servers` setzt `ok=false`,
+`message` und `requiredError`; die Pflichtkarte zeigt „Nicht lesbar", die Pille der
+Matrix warnt. Das Detail-GET trägt denselben Fehler in `requiredError`, `entry.required`
+ist dann `null`, und die Seite sagt „Pflicht: unbekannt" statt „nein". Erkannt wird der
+Fall am eigenen Feld, nicht an `requiredConfigured` — das ist dabei ja `true`. `k-playbook context` trägt das als Feld
 `mcp` mit `{required, configured}`: Objektform, damit weitere MCP-Angaben Platz finden,
 ohne das Feld umzubenennen. Einen Schreiber gibt es nicht; die Seite zeigt ohne Block
 einen YAML-Schnipsel zum Abschreiben. `renderConfig` bleibt unverändert, der Block ist
@@ -2288,7 +2297,33 @@ Messung, und die Seite verweist dorthin.
 **Remote wird nicht angesprochen.** HTTP- und SSE-Server laufen hinter einer URL, und
 OAuth-Server wie Atlassian sind ohne die Token des Assistenten nicht messbar. Die
 Detailseite zeigt Konfiguration und Hinweis; der POST antwortet mit `started: false` und
-einer Meldung, ohne etwas zu tun. Ein Streamable-HTTP-Client ohne Anmeldung wäre ein
+einer Meldung, ohne etwas zu tun.
+
+**`started` heißt: ein Prozess lief.** Den Wert liefert `probeMCPCommand` als zweites
+Ergebnis selbst — `true` genau dann, wenn `command.Start()` gelungen ist. Jeder Rückweg
+davor (Datei fehlt laut `os.Stat`, Rohr nicht anlegbar, Start scheitert) ergibt `false`,
+und die Seite zeigt „Nicht gemessen" statt „Antwortet nicht". Der Handler setzt nichts
+dazu. `/mcp` verwirft den Wert; seine Antwort bleibt, wie sie war.
+
+**Gleichnamige Einträge in beiden OpenCode-Dateien.** Seite, `GET` und `POST` nehmen den
+optionalen Query-Parameter `file=<Datei relativ zur Projektwurzel>`. `findMCPServer`
+vergleicht ihn nur mit `MCPServerEntry.File` aus der gelesenen Liste und öffnet ihn nie;
+gesetzt, aber ohne Treffer, ist die Antwort 404 wie bei einem unbekannten Namen. Ohne
+Parameter gilt der erste Treffer. Die Matrix hängt `file` nur an, wenn ein Assistent
+mehrere Einträge desselben Namens hat; die Detailseite reicht ihn an `GET` und `POST`
+durch, damit die Messung den Eintrag trifft, den sie zeigt. Der Mutex bleibt je
+Servername, beide Einträge teilen ihn. Der Lookup liest nur `ListMCPServers`; die
+Pflichtliste liest allein das Detail-GET, einmal.
+
+**Folgeanfragen sind nicht fatal.** Nur `initialize` und `tools/list` entscheiden, ob
+der Server antwortet. Scheitert danach `prompts/list` oder `resources/list`, bleiben
+Serverinfo, Capabilities und Werkzeuge stehen; `message` trägt einen Hinweis, welche
+Frage scheiterte. Eine Fehlerantwort, die der Server vor seinem Ende geschickt hat, geht
+dabei dem Schreibfehler auf das geschlossene stdin vor (`mcpResponseError`). Eine
+Antwort ohne ID, aber mit `error` — JSON-RPC schreibt `id: null`, wenn der Server die
+Anfrage nicht zuordnen kann — ist keine Benachrichtigung: `mcpReader` meldet sie sofort
+als Fehler der gerade ausstehenden Anfrage, fatal bei `initialize` und `tools/list`,
+Hinweis bei den Folgeanfragen. Benachrichtigungen ohne `error` werden weiter übersprungen. Ein Streamable-HTTP-Client ohne Anmeldung wäre ein
 möglicher Folgeschritt; er steht im Befund `k-playbook-local/material/befunde/
 mcp-server-erkennung.md`.
 
@@ -2304,8 +2339,14 @@ nach. `GET /api/mcp-servers/{assistant}/{name}` liefert deshalb nur die Konfigur
 für aktivierte, deaktivierte und den eigenen Server gleichermaßen. Zwei Klicks kurz
 nacheinander starten denselben Server nicht zweimal: `mcpProbeLock(name)` serialisiert je
 Servername, der zweite Aufruf wartet. Der Timeout bleibt bei `mcpProbeTimeout` (10 s);
-läuft er ab, nennt die Meldung eine Erstinstallation durch `npx`/`uvx` als mögliche
-Ursache und schlägt „Erneut messen" vor — der zweite Start findet die Pakete im Cache.
+läuft er auf der Detailseite ab, nennt die Meldung eine Erstinstallation durch
+`npx`/`uvx` als mögliche Ursache und schlägt „Erneut messen" vor — der zweite Start
+findet die Pakete im Cache. Der Hinweis ist ein Parameter von `probeMCPCommand` und
+`mcpFailureMessage`: der Probe-Handler übergibt `mcpInstallTimeoutHint`, `/mcp` übergibt
+nichts und zeigt weiter genau „Server antwortet nicht: nach 10s abgebrochen." — dort gibt
+es keinen solchen Knopf, und der eigene Server startet nie über `npx`.
+`mcpProbeTimeout` ist eine Variable, damit Tests den Weg über die Frist gehen können,
+ohne zehn Sekunden zu warten.
 
 ## Lebenszyklus
 

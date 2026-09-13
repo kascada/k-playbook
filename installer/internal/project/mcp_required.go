@@ -36,88 +36,18 @@ func ReadRequiredMCPServers(projectDir string) ([]string, bool, error) {
 	return parseRequiredMCPServers(string(data))
 }
 
-// parseRequiredMCPServers liest die Liste zeilenweise, wie parseGHStatus den
-// gh-Block und parseLanguages die Sprachliste: Block tools → mcp → required,
-// in Fluss- und Blockform. Kein YAML-Parser, damit die Datei beim späteren
-// Zurückschreiben eines anderen Blocks unangetastet bleibt.
+// parseRequiredMCPServers liest tools.mcp.required über parseYAMLList — Fluss-
+// und Blockform, genau dieser Pfad — und bereinigt und prüft die Namen.
 func parseRequiredMCPServers(content string) ([]string, bool, error) {
-	inTools := false
-	mcpIndent := -1
-	listIndent := -1
-	found := false
-	names := []string{}
-
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := lineIndent(line)
-
-		if indent == 0 {
-			if found {
-				break
-			}
-			key, _, _ := strings.Cut(trimmed, ":")
-			inTools = strings.TrimSpace(key) == "tools"
-			mcpIndent = -1
-			continue
-		}
-		if !inTools {
-			continue
-		}
-
-		// Innerhalb der Blockliste zählen nur die Spiegelstriche; alles
-		// andere auf gleicher oder geringerer Tiefe beendet sie.
-		if listIndent >= 0 {
-			if strings.HasPrefix(trimmed, "- ") || trimmed == "-" {
-				if value := cleanMCPServerName(strings.TrimPrefix(trimmed, "-")); value != "" {
-					names = append(names, value)
-				}
-				continue
-			}
-			if indent <= listIndent {
-				break
-			}
-			continue
-		}
-
-		// Zurück auf die Ebene der Tool-Namen: der mcp-Block ist zu Ende.
-		if mcpIndent >= 0 && indent <= mcpIndent {
-			mcpIndent = -1
-		}
-		key, value, hasColon := strings.Cut(trimmed, ":")
-		if !hasColon {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		if mcpIndent < 0 {
-			if key == "mcp" && value == "" {
-				mcpIndent = indent
-			}
-			continue
-		}
-		if key != "required" {
-			continue
-		}
-		found = true
-		if value == "" {
-			listIndent = indent
-			continue
-		}
-		// Flussform: required: [k-playbook, atlassian]
-		for _, item := range strings.Split(strings.Trim(value, "[]"), ",") {
-			if cleaned := cleanMCPServerName(item); cleaned != "" {
-				names = append(names, cleaned)
-			}
-		}
-		break
-	}
-
+	items, found := parseYAMLList(content, "tools", "mcp", "required")
 	if !found {
 		return []string{}, false, nil
+	}
+	names := []string{}
+	for _, item := range items {
+		if cleaned := cleanMCPServerName(item); cleaned != "" {
+			names = append(names, cleaned)
+		}
 	}
 	for _, name := range names {
 		if !ValidMCPServerName(name) {

@@ -105,8 +105,16 @@ function renderMatrix(data) {
 
   if (names.length === 0) {
     elements.serversMessage.textContent = "In keiner der Projektdateien ist ein MCP-Server eingetragen.";
-  } else if (data.message) {
+  } else if (data.message && !data.requiredError) {
     elements.serversMessage.textContent = data.message;
+  }
+
+  // Ist die Pflichtliste nicht lesbar, fehlen der Matrix die Pflichtmarken.
+  // Die Pille sagt das; den Fehlertext trägt die Pflichtkarte.
+  if (data.requiredError) {
+    elements.serversPill.className = "pill warn";
+    elements.serversPill.textContent = "Pflichtliste nicht lesbar";
+    return;
   }
 
   const missing = data.missing || [];
@@ -143,7 +151,9 @@ function matrixCell(name, assistant, servers, isRequired) {
       cell.append(document.createElement("br"));
     }
     const link = document.createElement("a");
-    link.href = detailPath(assistant.id, name);
+    // Die Datei kommt nur bei mehreren gleichnamigen Einträgen mit: ohne sie
+    // träfe jeder Link den ersten, und der zweite wäre unerreichbar.
+    link.href = detailPath(assistant.id, name, entries.length > 1 ? entry.file : "");
     link.textContent = describeEntry(entry);
     cell.append(link);
     if (!entry.enabled) {
@@ -177,8 +187,9 @@ function describeEntry(entry) {
   }
 }
 
-function detailPath(assistantId, name) {
-  return `/mcp-servers/${encodeURIComponent(assistantId)}/${encodeURIComponent(name)}`;
+function detailPath(assistantId, name, file) {
+  const path = `/mcp-servers/${encodeURIComponent(assistantId)}/${encodeURIComponent(name)}`;
+  return file ? `${path}?file=${encodeURIComponent(file)}` : path;
 }
 
 // Die Pflichtliste: was verlangt ist, wo es fehlt — oder der Schnipsel, mit
@@ -189,11 +200,13 @@ function renderRequired(data) {
   elements.requiredMessage.textContent = "";
   elements.requiredSnippet.classList.add("hidden");
 
-  if (data.message && !data.requiredConfigured) {
+  if (data.requiredError) {
     // Ein Lesefehler an der Pflichtliste ist ihr Befund, nicht der der Matrix.
+    // Erkannt am eigenen Feld: der Block steht ja da, requiredConfigured ist
+    // dabei true.
     elements.requiredPill.className = "pill warn";
     elements.requiredPill.textContent = "Nicht lesbar";
-    elements.requiredMessage.textContent = data.message;
+    elements.requiredMessage.textContent = data.message || data.requiredError;
     return;
   }
 

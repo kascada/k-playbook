@@ -75,6 +75,24 @@ func TestParseRequiredMCPServers(t *testing.T) {
 			configured: false,
 		},
 		{
+			name:       "ein required tiefer unter mcp zählt nicht",
+			content:    "tools:\n  mcp:\n    servers:\n      x:\n        required: true\n",
+			want:       []string{},
+			configured: false,
+		},
+		{
+			name:       "ein required unter mcp auf oberster Ebene zählt nicht",
+			content:    "mcp:\n  required: [x]\ntools:\n  gh:\n    status: enabled\n",
+			want:       []string{},
+			configured: false,
+		},
+		{
+			name:       "ein ungültiger Name in Flussform ist ein Fehler",
+			content:    "tools:\n  mcp:\n    required: [k-playbook, \"bad name\"]\n",
+			configured: true,
+			wantErr:    true,
+		},
+		{
 			name:       "ein ungültiger Name ist ein Fehler",
 			content:    "tools:\n  mcp:\n    required:\n      - k-playbook\n      - ../boese\n",
 			configured: true,
@@ -88,6 +106,11 @@ func TestParseRequiredMCPServers(t *testing.T) {
 			if testCase.wantErr {
 				if err == nil {
 					t.Fatalf("kein Fehler für %q", testCase.content)
+				}
+				// Der Block stand da: die Oberfläche zeigt den Fehler an der
+				// Pflichtliste, statt „nicht festgelegt" zu behaupten.
+				if !configured {
+					t.Error("configured = false beim Fehler, erwartet true")
 				}
 				return
 			}
@@ -129,6 +152,9 @@ func TestMCPServerInventoryForLiestPflichtliste(t *testing.T) {
 	inventory, err = MCPServerInventoryFor(root)
 	if err == nil {
 		t.Fatal("ein ungültiger Pflichtname wurde nicht gemeldet")
+	}
+	if !inventory.RequiredConfigured {
+		t.Error("RequiredConfigured = false beim Fehler, erwartet true")
 	}
 	if len(inventory.Servers) != 1 {
 		t.Errorf("die Serverliste ging mit dem Fehler verloren: %+v", inventory.Servers)

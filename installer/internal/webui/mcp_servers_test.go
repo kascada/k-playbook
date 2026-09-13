@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -94,6 +95,83 @@ func TestMCPServersAPIOhnePflichtliste(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("%s fehlt in %s", want, body)
 		}
+	}
+}
+
+// badRequiredConfig ist eine Pflichtliste mit unzulässigem Namen. `k-playbook
+// context` bricht daran ab; die Oberfläche zeigt den Fehler und bleibt
+// bedienbar.
+const badRequiredConfig = "schema_version: 3\n\nproject:\n  repo_root: .\n\ntools:\n  mcp:\n    required: [k-playbook, \"bad name\"]\n"
+
+// Eine nicht lesbare Pflichtliste ist ein Fehler, kein Erfolg: ok ist false,
+// requiredError trägt den Grund, die Server stehen trotzdem da, und die Seite
+// lädt.
+func TestMCPServersAPIPflichtlisteNichtLesbar(t *testing.T) {
+	newMCPProject(t, badRequiredConfig, map[string]string{
+		".mcp.json": `{"mcpServers": {"k-playbook": {"command": "k-playbook", "args": ["mcp"]}}}`,
+	})
+
+	var response mcpServersResponse
+	if status := getJSON(t, "/api/mcp-servers", &response); status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if response.OK {
+		t.Error("ok = true bei unzulässigem Pflichtnamen")
+	}
+	if !strings.Contains(response.RequiredError, `"bad name"`) {
+		t.Errorf("requiredError = %q, erwartet den unzulässigen Namen", response.RequiredError)
+	}
+	if !response.RequiredConfigured {
+		t.Error("requiredConfigured = false, obwohl der Block dasteht")
+	}
+	if response.Message == "" {
+		t.Error("keine Meldung")
+	}
+	if len(response.Servers) != 1 {
+		t.Errorf("Servers = %+v, die Serverliste ging verloren", response.Servers)
+	}
+
+	if status, _ := getPage(t, "/mcp-servers"); status != http.StatusOK {
+		t.Errorf("Seite: Status = %d, erwartet 200", status)
+	}
+}
+
+// Die Detailseite trägt denselben Fehler im selben Feld, und entry.required
+// ist null statt false: ob der Server Pflicht ist, weiß sie nicht.
+func TestMCPServerDetailPflichtlisteNichtLesbar(t *testing.T) {
+	newMCPProject(t, badRequiredConfig, map[string]string{
+		".mcp.json": `{"mcpServers": {"k-playbook": {"command": "k-playbook", "args": ["mcp"]}}}`,
+	})
+
+	recorder := httptest.NewRecorder()
+	routes(&serverState{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/mcp-servers/claude-code/k-playbook", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", recorder.Code)
+	}
+	var raw struct {
+		RequiredError string                     `json:"requiredError"`
+		Entry         map[string]json.RawMessage `json:"entry"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("Antwort nicht lesbar: %v", err)
+	}
+	if !strings.Contains(raw.RequiredError, `"bad name"`) {
+		t.Errorf("requiredError = %q, erwartet den unzulässigen Namen", raw.RequiredError)
+	}
+	if got := string(raw.Entry["required"]); got != "null" {
+		t.Errorf("entry.required = %s, erwartet null", got)
+	}
+
+	// Mit lesbarer Liste ist required wieder ein Wahrheitswert.
+	if err := os.WriteFile(project.ConfigPath("."), []byte("schema_version: 3\n\ntools:\n  mcp:\n    required: [k-playbook]\n"), 0o644); err != nil {
+		t.Fatalf("Konfiguration schreiben: %v", err)
+	}
+	var detail mcpServerDetailResponse
+	if status := getJSON(t, "/api/mcp-servers/claude-code/k-playbook", &detail); status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if detail.RequiredError != "" || detail.Entry.Required == nil || !*detail.Entry.Required {
+		t.Errorf("Detail = %+v, erwartet required true ohne Fehler", detail)
 	}
 }
 
@@ -305,6 +383,154 @@ func TestMCPServerProbeOhneKommando(t *testing.T) {
 	}
 	if response.Started || response.Available || !strings.Contains(response.Message, "ließ sich nicht starten") {
 		t.Errorf("Messung = %+v", response)
+	}
+}
+
+// Ein relativer Pfad, hinter dem keine Datei liegt, lässt sich auflösen, aber
+// nicht starten. Dann lief kein Prozess: started ist false, die Seite zeigt
+// „Nicht gemessen" statt „Antwortet nicht".
+func TestMCPServerProbeBinaryFehlt(t *testing.T) {
+	newMCPProject(t, "", map[string]string{
+		filepath.Join(".cursor", "mcp.json"): `{"mcpServers": {"kaputt": {"command": "./bin/gibt-es-nicht"}}}`,
+	})
+
+	status, response := postProbe(t, "/api/mcp-servers/cursor/kaputt/probe")
+	if status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if response.Started {
+		t.Errorf("started = true, obwohl kein Prozess lief: %+v", response)
+	}
+	if response.Available || !strings.Contains(response.Message, "nicht ausführbar") {
+		t.Errorf("Messung = %+v", response)
+	}
+}
+
+// Meldet ein Server prompts, beantwortet prompts/list aber mit einem Fehler,
+// bleiben initialize und tools/list stehen: die Werkzeuge erscheinen, die
+// Ressourcen auch, und der Fehler kommt als Hinweis mit.
+func TestMCPServerProbeFolgeanfrageScheitertNichtFatal(t *testing.T) {
+	bin := t.TempDir()
+	writeExecutable(t, filepath.Join(bin, "halb-mcp"), `#!/bin/sh
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{},"prompts":{},"resources":{}},"serverInfo":{"name":"halb","version":"1"}}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"gruss"}]}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":3,"error":{"code":-32601,"message":"prompts/list gibt es nicht"}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":4,"result":{"resources":[{"uri":"file:///x"}]}}'
+`)
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	newMCPProject(t, "", map[string]string{
+		".mcp.json": `{"mcpServers": {"halb": {"command": "halb-mcp"}}}`,
+	})
+
+	status, response := postProbe(t, "/api/mcp-servers/claude-code/halb/probe")
+	if status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if !response.Started || !response.Available {
+		t.Fatalf("Messung = %+v, erwartet gestartet und verfügbar", response)
+	}
+	if response.ServerName != "halb" || strings.Join(response.Capabilities, ",") != "prompts,resources,tools" {
+		t.Errorf("Serverdaten gingen verloren: %+v", response)
+	}
+	if len(response.Tools) != 1 || response.Tools[0].Name != "gruss" {
+		t.Errorf("Tools = %+v, erwartet gruss", response.Tools)
+	}
+	if response.Prompts != nil {
+		t.Errorf("Prompts = %+v, erwartet keine", response.Prompts)
+	}
+	if len(response.Resources) != 1 {
+		t.Errorf("Resources = %+v, erwartet eine", response.Resources)
+	}
+	if !strings.Contains(response.Message, "prompts/list") || !strings.Contains(response.Message, "prompts/list gibt es nicht") {
+		t.Errorf("Hinweis = %q, erwartet den Fehler von prompts/list", response.Message)
+	}
+}
+
+// Die Detailseite bekommt nach abgelaufener Frist den npx/uvx-Hinweis — genau
+// einmal: probeMCPCommand hängt ihn an, der Handler nichts mehr dazu.
+func TestMCPServerProbeTimeoutMitHinweisGenauEinmal(t *testing.T) {
+	bin := t.TempDir()
+	mcpHangingServer(t, filepath.Join(bin, "stumm-mcp"))
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	shortProbeTimeout(t, 300*time.Millisecond)
+	newMCPProject(t, "", map[string]string{
+		".mcp.json": `{"mcpServers": {"stumm": {"command": "stumm-mcp"}}}`,
+	})
+
+	status, response := postProbe(t, "/api/mcp-servers/claude-code/stumm/probe")
+	if status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if !response.Started || response.Available {
+		t.Errorf("Messung = %+v, erwartet gestartet, nicht verfügbar", response)
+	}
+	want := "Server antwortet nicht: nach 300ms abgebrochen. " + mcpInstallTimeoutHint
+	if response.Message != want {
+		t.Errorf("Meldung = %q, erwartet %q", response.Message, want)
+	}
+	for _, part := range []string{"npx", "Erneut messen"} {
+		if count := strings.Count(response.Message, part); count != 1 {
+			t.Errorf("%q steht %d-mal in der Meldung, erwartet genau einmal", part, count)
+		}
+	}
+}
+
+// Steht ein Name in opencode.json und opencode.jsonc, wählt ?file= den
+// Eintrag: auf der Seite, im GET und im POST. Ohne Parameter gilt der erste,
+// ein Dateiname ohne Treffer ist 404 — er wird nur verglichen, nie geöffnet.
+func TestMCPServerDoppelterOpenCodeEintragPerFile(t *testing.T) {
+	root := newMCPProject(t, "", map[string]string{
+		"opencode.json":  `{"mcp": {"doppelt": {"type": "local", "command": ["./bin/lokal-mcp"]}}}`,
+		"opencode.jsonc": `{"mcp": {"doppelt": {"type": "remote", "url": "https://example.invalid/mcp"}}}`,
+	})
+	beleg := filepath.Join(root, "beleg.txt")
+	writeExecutable(t, filepath.Join(root, "bin", "lokal-mcp"), "#!/bin/sh\ntouch "+beleg+"\n")
+
+	var remote mcpServerDetailResponse
+	if status := getJSON(t, "/api/mcp-servers/opencode/doppelt?file=opencode.jsonc", &remote); status != http.StatusOK {
+		t.Fatalf("GET mit file: Status = %d, erwartet 200", status)
+	}
+	if remote.Entry.File != "opencode.jsonc" || remote.Entry.Transport != project.MCPTransportRemote {
+		t.Errorf("GET mit file = %+v, erwartet den Remote-Eintrag aus opencode.jsonc", remote.Entry)
+	}
+
+	var first mcpServerDetailResponse
+	if status := getJSON(t, "/api/mcp-servers/opencode/doppelt", &first); status != http.StatusOK {
+		t.Fatalf("GET ohne file: Status = %d, erwartet 200", status)
+	}
+	if first.Entry.File != "opencode.json" || first.Entry.Transport != project.MCPTransportLocal {
+		t.Errorf("GET ohne file = %+v, erwartet den ersten Eintrag aus opencode.json", first.Entry)
+	}
+
+	status, response := postProbe(t, "/api/mcp-servers/opencode/doppelt/probe?file=opencode.jsonc")
+	if status != http.StatusOK {
+		t.Fatalf("POST mit file: Status = %d, erwartet 200", status)
+	}
+	if response.Started || response.Command != "https://example.invalid/mcp" || !strings.HasPrefix(response.Message, "Nicht gemessen") {
+		t.Errorf("POST mit file = %+v, erwartet den Remote-Eintrag ohne Start", response)
+	}
+	if _, err := os.Stat(beleg); err == nil {
+		t.Error("POST auf den Remote-Eintrag hat das lokale Kommando gestartet")
+	}
+
+	if status, _ := getPage(t, "/mcp-servers/opencode/doppelt?file=opencode.jsonc"); status != http.StatusOK {
+		t.Errorf("Seite mit file: Status = %d, erwartet 200", status)
+	}
+
+	const unknown = "?file=gibt-es-nicht.json"
+	if status, _ := getPage(t, "/mcp-servers/opencode/doppelt"+unknown); status != http.StatusNotFound {
+		t.Errorf("Seite mit unbekannter Datei: Status = %d, erwartet 404", status)
+	}
+	recorder := httptest.NewRecorder()
+	routes(&serverState{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/mcp-servers/opencode/doppelt"+unknown, nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("GET mit unbekannter Datei: Status = %d, erwartet 404", recorder.Code)
+	}
+	if status, _ := postProbe(t, "/api/mcp-servers/opencode/doppelt/probe"+unknown); status != http.StatusNotFound {
+		t.Errorf("POST mit unbekannter Datei: Status = %d, erwartet 404", status)
+	}
+	if _, err := os.Stat(beleg); err == nil {
+		t.Error("ein POST hat das lokale Kommando gestartet")
 	}
 }
 
