@@ -1,48 +1,68 @@
 ---
 title: Knowledge Storage
-description: Diagram of the path from knowledge input through the k-playbook MCP server and the versioned Markdown files into the local LanceDB, up to agentic RAG with hybrid search.
+description: Diagram of the path knowledge takes — into the inbox, through the queue, into the knowledge zone through the write tools, and back out through the in-process index and the k-playbook MCP server. Vectors and a database of their own are deferred.
 ---
 
 # Knowledge Storage
 
-Where knowledge flows, from the source to its use by the AI. Parts of this are
-still being built; the diagram shows what it is heading towards.
+Where knowledge flows, from the source to its use by the AI. This page is the picture. The
+entry page for the knowledge store — why it exists, what is built, how we proceed — is
+[`knowledge-gate.md`](knowledge-gate.md); the zones and the write tools are defined in
+[`knowledge-layout.md`](knowledge-layout.md).
+
+Solid lines are built. Dashed lines are planned or deliberately deferred.
 
 ```mermaid
 flowchart TD
-    Input["Inputs<br>docs · learned knowledge · tool research<br>arbitrary knowledge sources · external sources via MCP"]
-    Material["k-playbook-local/material/<br>raw material, prepared and taken along"]
-    Learn["Automatic learning<br>from finished chat sessions"]
-    MCPWrite["k-playbook MCP server<br>stores"]
-    Store["Knowledge directory in k-playbook-local<br>versioned, Markdown files"]
-    Lance["LanceDB<br>local, not versioned<br>vector database over the chunks"]
-    MCPRead["k-playbook MCP server<br>reads"]
+    Sources["Outside sources and raw material<br>files, exported pages, notes"]
+    Generators["Generators<br>/k-docs-code · /k-docs-tools · /k-doc-inventory"]
+    Session["A session<br>what an analysis or a hunt established"]
+    Person["A person<br>hand-written pages and pitfalls"]
+    Learn["Automatic learning<br>from finished sessions"]
+
+    Inbox["inbox/<br>what arrives · kept · never indexed"]
+    Queue["queue/<br>what is outstanding"]
+    Knowledge["knowledge/<br>what holds · Markdown with frontmatter · versioned"]
+
+    Index["Index in the Go process<br>BM25 over the chunks · cache/knowledge/ · disposable"]
+    Vectors["Vectors from a local model<br>tier two · deferred"]
+    Gate["k-playbook MCP server and CLI<br>search · list · read · status"]
+
     Ask["AI questions<br>answers from the project knowledge"]
     Tasks["/k-task-…<br>plan and run tasks"]
-    Audit["/k-audit · /k-review<br>security scans and reviews"]
+    Audit["/k-audit · /k-review<br>scans and reviews"]
 
-    Input -->|"written through"| MCPWrite
-    Learn --> MCPWrite
-    MCPWrite --> Store
-    Material --> Store
-    Store -->|"chunking"| Lance
-    Lance -->|"agentic RAG with hybrid search<br>(vector search + full-text search)"| MCPRead
-    MCPRead --> Ask
-    MCPRead --> Tasks
-    MCPRead --> Audit
+    Sources -->|"inbox_put"| Inbox
+    Inbox -->|"queue_add"| Queue
+    Queue -->|"processing, e.g. /k-docs-extract · write"| Knowledge
+    Generators -->|"publish · whole directory"| Knowledge
+    Session -->|"write · findings/"| Knowledge
+    Person -->|"write · manual/ and pitfalls/"| Knowledge
+    Learn -.->|"write · not built"| Knowledge
+
+    Knowledge -->|"chunking · hash per file"| Index
+    Index -.-> Vectors
+    Index --> Gate
+    Vectors -.-> Gate
+    Gate --> Ask
+    Gate --> Tasks
+    Gate --> Audit
 ```
 
-**LanceDB is deferred.** The measurements in `knowledge-gate.md` put the expected corpus at
-a few thousand chunks, which the in-process index handles without a database of its own.
-The diagram keeps it as the far end of the road, not as the next step: if the corpus or the
-retrieval quality ever demands it, the contract is built so it can be slotted in without
-changing a caller. Until then the chunks are indexed in the Go process.
+**Today `knowledge/` is empty in every project.** The documents still live in `docs/` until
+the migration moves them; the order of the steps is in
+[`knowledge-gate.md`](knowledge-gate.md), "How we proceed".
 
-The concept underneath this diagram — how a deposit is classified, what the query surface
-looks like, and which decisions rest on which measurements — is in
-[`knowledge-gate.md`](knowledge-gate.md).
+**No database of its own.** The measurements in `knowledge-gate.md` put the expected corpus
+at a few thousand chunks, which the index in the Go process handles without effort. LanceDB,
+which an earlier version of this diagram drew at the end of the road, is deferred and
+revisited only if the corpus or the retrieval quality demands it. The response contract is
+built so that vectors or a database can be slotted in without changing a caller.
 
 ## Automatic learning
+
+**Status: concept, not built.** When it is, it writes into `knowledge/findings/` through the
+same tool as every other deposit.
 
 A chat session produces knowledge that nobody writes down. When a session ends,
 it is examined for what is worth keeping, and the result enters the store

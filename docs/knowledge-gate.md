@@ -5,10 +5,20 @@ description: The concept for depositing knowledge through the MCP server and que
 
 # Knowledge Gate
 
-[`knowledge-storage.md`](knowledge-storage.md) draws where knowledge flows. This page is
-the concept underneath it: how something is deposited, how it is asked for, and why the
-parts are shaped the way they are. It records decisions together with the measurements
-they rest on, so a later change knows what it is overturning.
+**This is the entry page for the knowledge store.** It says why the store exists, what is
+built, how we proceed from here, how something is deposited and asked for, and which
+decisions rest on which measurements. Everything else about the store is linked from here,
+so a conversation about it needs to point at this one page.
+
+| Page | What it holds |
+|---|---|
+| this page | purpose, status, next steps, the concept of depositing and querying, decisions, open points |
+| [`knowledge-layout.md`](knowledge-layout.md) | where things lie: the zones `inbox/`, `queue/` and `knowledge/`, who may write where, the frontmatter, the write tools, the migration |
+| [`knowledge-storage.md`](knowledge-storage.md) | the picture: how knowledge flows through the zones and back out; shown in the interface under Knowledge |
+| [`mcp.md`](mcp.md#knowledge-contract), "Knowledge Contract" | the exact arguments, results and error codes of the tools |
+
+The page records decisions together with the measurements they rest on, so a later change
+knows what it is overturning.
 
 ## Why the gate exists
 
@@ -35,10 +45,51 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | `raw` and `superseded` out of search by default | built, task 056 |
 | Migration of `docs/` into `knowledge/` | not built; `knowledge/` is empty until then |
 | Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
+| Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
+| Test of the write side against the built tools | next step, see "How we proceed" |
 | Ranking correction | built, task 056: the root `README.md` is out of the search index |
 | Vectors, local model | deliberately not built, tier two |
 | LanceDB or another dedicated database | deferred; revisited only if the corpus or the retrieval quality demands it |
 | External source connectors | deliberately not built, tier three |
+
+## How we proceed
+
+The write side is built, and `knowledge/` is still empty in every project. The order from
+here:
+
+1. **Test the write side against the real tools.** Before any document moves, every write
+   tool is exercised in a project and the result is checked on disk, in the index and in the
+   interface. The criteria are listed below.
+2. **Migrate once.** What a generator produces is not moved: the generators run again and
+   `publish` into `knowledge/`. Everything written by hand — pages, extracts, findings,
+   pitfalls — is moved in a single pass by an assistant, document by document through
+   `write`, with subject, origin and state decided per document. That pass is the second and
+   larger test of the contract. Details are in [`knowledge-layout.md`](knowledge-layout.md#migration).
+3. **Switch the entry point.** `/k-docs-index` writes `knowledge/README.md` through `write`
+   with `producer: docs-index`, and the generated `AGENTS.md` tells a session to ask the store
+   first. Until then `docs/README.md` stays the authoritative entry point (see "Open points").
+4. **Build the reading side.** `briefing` and the filters on `kind`, `state` and `subject`, as
+   described under "Querying".
+5. **Tier two only on demand.** Vectors from a local model, or a database of its own, only if
+   the corpus or the retrieval quality after the migration asks for it.
+
+### What the write test checks
+
+- **Ownership.** Each producer from the table in `knowledge-layout.md` writes into its own
+  directory; a target outside it is refused with an error and leaves no file behind.
+- **Frontmatter.** The written file carries the fields that were passed, composed by the
+  tool, with `updated` set; `list` and `read` return them, the title included.
+- **State.** A `raw` and a `superseded` document are readable through `read` and `list` but
+  are not search hits; `supersede` sets `successor` and `superseded_reason`.
+- **Queue.** A `write` naming a queue entry removes the entry once the document exists; a
+  write that fails leaves the entry in place.
+- **Publish.** A generator's `publish` replaces its directory as a whole; a `publish` without
+  any document is refused, and a failed run leaves the previous state.
+- **Inbox.** What `inbox_put` stores is listed by `inbox_list` and never appears in search.
+- **Index.** After a write, `status` counts the new chunks, `search` finds the document, and a
+  hit's anchor opens the right heading in the interface.
+- **Past the gate.** A file changed by an editor or a `git pull` is picked up as drift on the
+  next access.
 
 ## The store
 
@@ -261,6 +312,12 @@ free-text provenance note — the *origin*. The field was split before anything 
 and knows nothing of `knowledge/`. In the store its place is `knowledge/README.md`, written
 by the same command through `write` with `producer: docs-index`; that switch is part of the
 migration, together with the instruction in the generated `AGENTS.md`.
+
+**An empty store answers silently.** Until the migration `knowledge/` is empty, and `search`
+returns an empty hit list without any hint — indistinguishable from "nothing on this topic",
+although `docs/` holds the material. `status` shows it (no chunks), `search` does not. A hint
+when the index is empty would keep an assistant from drawing the wrong conclusion in the
+meantime.
 
 **Outside sources change upstream.** Drift detection notices a local edit. It cannot notice
 that the Confluence page an extract came from has changed. Whether the gate refreshes such

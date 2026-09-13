@@ -25,7 +25,7 @@ flowchart LR
     Diagnose <--> Knowledge
     Quality <--> Knowledge
 
-    Knowledge["Knowledge<br>hybrid search over<br>the project's knowledge<br>and other sources"]
+    Knowledge["Knowledge<br>a searchable store of<br>the project's knowledge<br>and other sources"]
 ```
 
 ## The three kinds of work
@@ -86,15 +86,17 @@ instruction files in read order, and the three catalogs with `dist`, `local` and
 All three draw on the same store, and all three feed it. It holds what the
 project knows — generated code documentation, tool and library pitfalls, the
 version inventory, extracted material, findings from earlier sessions — as
-versioned Markdown in `k-playbook-local`, reachable through hybrid search over a
-local vector index, and open to further sources through MCP.
+versioned Markdown in `k-playbook-local`, reachable through a search index in the
+Go process — full text today, vectors from a local model as a later tier — and open
+to further sources through MCP.
 
 This is what makes the three cheap to run. A review does not re-read the
 repository, a diagnosis does not re-derive what a previous session already
 established, and planning starts from what the project knows rather than from a
-fresh analysis. The path from an input to its use is drawn out in
-[`knowledge-storage.md`](./knowledge-storage.md); the commands that write into
-it are the `/k-docs-*` family and `/k-danke`.
+fresh analysis. What the store is for, what is built and how we proceed is in
+[`knowledge-gate.md`](./knowledge-gate.md), which links the rest; the path from
+an input to its use is drawn out in [`knowledge-storage.md`](./knowledge-storage.md).
+The commands that write into it are the `/k-docs-*` family and `/k-danke`.
 
 ## The same picture, filled in
 
@@ -125,7 +127,7 @@ flowchart LR
 
     MCP["k-playbook MCP server<br>reads and writes"]
 
-    MCP --- Store["Knowledge store<br>versioned Markdown<br>in k-playbook-local"]
-    MCP --- Hybrid["Hybrid search<br>vector plus full text,<br>agentic RAG"]
+    MCP --- Store["Knowledge store<br>inbox · queue · knowledge<br>versioned Markdown in k-playbook-local"]
+    MCP --- Search["Search index<br>full text in the Go process<br>vectors later, from a local model"]
     MCP --- Sources["Other sources<br>project docs · material<br>external, through MCP"]
 ```
