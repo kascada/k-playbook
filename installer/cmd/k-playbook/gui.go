@@ -21,6 +21,7 @@ func runGUI() error {
 	cleanUpFormerHostInstall()
 	cleanUpLegacyWrapper()
 	protectProjectInstallation()
+	ensureLocalStructure()
 	repairMCPRegistration()
 	repairRootInstructions()
 
@@ -90,45 +91,95 @@ func protectProjectInstallation() {
 	}
 }
 
-// repairMCPRegistration zieht eine veraltete MCP-Registrierung des Projekts
-// nach — der zweite selbsttätige Migrationsweg neben dem Clone-Update.
+// ensureLocalStructure legt die projekteigene Struktur an, wenn sie ganz
+// fehlt — der erste der selbsttätigen Einrichtungswege beim Start.
+//
+// Ein frisch geklontes Projekt soll nach dem ersten Aufruf einsatzbereit sein,
+// ohne dass jemand die Karte „Struktur" sieht und klickt. Angelegt wird nur,
+// wenn k-playbook-local/ ganz fehlt: ein vorhandenes Verzeichnis, auch ein
+// unvollständiges, bleibt dem Knopf „Anlegen" — dort kann ein Teil bewusst
+// entfernt worden sein, und der käme sonst bei jedem Start zurück. Ein Fehler
+// hält den Start nicht auf.
+func ensureLocalStructure() {
+	environment := project.Detect()
+	if !environment.Installed {
+		return
+	}
+
+	statuses, created, err := project.EnsureLocal(environment.ProjectDir)
+	if created {
+		fmt.Printf("Projekteigene Struktur angelegt: %s/\n", project.LocalDirName)
+		for _, status := range statuses {
+			if status.Present {
+				fmt.Printf("  - %s\n", status.Path)
+			}
+		}
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Hinweis: projekteigene Struktur nicht vollständig angelegt: %v\n", err)
+	}
+}
+
+// repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — der
+// zweite selbsttätige Weg neben dem Clone-Update, und der weitere von beiden.
 //
 // Er ist der Auffangweg für alles, was nicht über die Oberfläche aktualisiert
 // wurde: ein `git pull` von Hand oder `make -C k-playbook installer-update`
 // erreicht die Registrierung nicht, weil sie im Hauptverzeichnis liegt und
 // nicht im Clone. Ein Klick auf „Einrichten" ist dafür nicht nötig.
 //
-// Geschrieben wird nur der eine, eng definierte Fall: ein Eintrag, der auf den
-// abgelösten Wrapper zeigt. Steht dort eine akzeptierte Form, bleibt die Datei
-// unangetastet — sonst machte jeder Start die getrackten MCP-Dateien eines
-// Projekts dreckig. Ein Fehler hält den Start nicht auf.
+// Zwei Fälle, zwei Meldungen. Ein Eintrag, der auf den abgelösten Wrapper
+// zeigt, wird korrigiert — unabhängig davon, ob die Datei versioniert ist,
+// denn den Eintrag hat k-playbook selbst geschrieben. Eine fehlende Datei oder
+// ein fehlender Eintrag wird eingetragen, aber nur, wenn die Datei nicht von
+// git erfasst ist; die Meldung sagt dazu, dass die Datei einen rechnerbezogenen
+// Pfad trägt und unversioniert bleiben sollte. Welcher Fall vorlag, sagt der
+// Zustand vor dem Lauf. Ein Fehler hält den Start nicht auf.
 func repairMCPRegistration() {
 	environment := project.Detect()
 	if !environment.Installed {
 		return
 	}
 
-	repaired, err := project.RepairMCP(environment.ProjectDir)
+	outdated := map[string]bool{}
+	for _, status := range project.CheckMCP(environment.ProjectDir) {
+		if status.State == project.MCPStateOutdated {
+			outdated[status.Path] = true
+		}
+	}
+
+	repaired, err := project.RepairMCP(environment.ProjectDir, project.MCPWriteOutdatedAndUnversioned)
+	added := 0
 	for _, path := range repaired {
-		fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s\n", path)
+		if outdated[path] {
+			fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s\n", path)
+			continue
+		}
+		added++
+		fmt.Printf("MCP-Registrierung eingetragen: %s\n", path)
+	}
+	if added > 0 {
+		fmt.Println("Die eingetragene Datei trägt den rechnerbezogenen Pfad des installierten k-playbook und sollte unversioniert bleiben.")
 	}
 	if len(repaired) > 0 {
-		fmt.Println("Der Assistent liest den neuen Eintrag beim nächsten Start.")
+		fmt.Println("Der Assistent liest den neuen Eintrag erst nach einem Neustart.")
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: MCP-Registrierung nicht vollständig korrigiert: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Hinweis: MCP-Registrierung nicht vollständig nachgezogen: %v\n", err)
 	}
 }
 
-// repairRootInstructions zieht einen veralteten Anstoßblock in AGENTS.md nach
-// — das Gegenstück zur MCP-Korrektur für die zweite Datei, die im
-// Hauptverzeichnis liegt und die der Git-Update-Weg deshalb nicht erreicht.
+// repairRootInstructions zieht AGENTS.md nach — das Gegenstück zur
+// MCP-Korrektur für die zweite Datei, die im Hauptverzeichnis liegt und die
+// der Git-Update-Weg deshalb nicht erreicht.
 //
-// Ein Bestandsprojekt behielte sonst dauerhaft den Aufruf des abgelösten
-// Wrappers und schickte jeden Assistenten auf eine Datei, die es nicht mehr
-// gibt. Geschrieben wird nur dieser eine Fall: eine fehlende Datei wird nicht
-// angelegt und ein fremder Text nicht angefasst. Ein Fehler hält den Start
-// nicht auf.
+// Zwei Fälle, zwei Meldungen. Ein veralteter Anstoßblock wird ersetzt: ein
+// Bestandsprojekt behielte sonst dauerhaft den Aufruf des abgelösten Wrappers
+// und schickte jeden Assistenten auf eine Datei, die es nicht mehr gibt. Eine
+// ganz fehlende Datei entsteht aus der Vorlage — und das wird eigens gesagt,
+// denn es ist eine neue, versionierbare Datei im Hauptverzeichnis, kein
+// stiller Nebeneffekt. Ein fremder Text wird nie angefasst. Ein Fehler hält
+// den Start nicht auf.
 func repairRootInstructions() {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -136,11 +187,14 @@ func repairRootInstructions() {
 	}
 
 	repaired, err := project.RepairRootInstructions(environment.ProjectDir)
-	if repaired {
+	if repaired.Refreshed {
 		fmt.Printf("Veralteten Anstoß in %s korrigiert.\n", project.RootInstructionsFile)
 	}
+	if repaired.Created {
+		fmt.Printf("%s aus der Vorlage angelegt — eine neue Datei im Hauptverzeichnis, die zum Projekt gehört und eingecheckt werden kann.\n", project.RootInstructionsFile)
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: Anstoß nicht korrigiert: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Hinweis: %s nicht nachgezogen: %v\n", project.RootInstructionsFile, err)
 	}
 }
 

@@ -373,3 +373,98 @@ func TestCreateLocalBringtEntfernteGitignoreNichtZurueck(t *testing.T) {
 		}
 	}
 }
+
+// Der selbsttätige Weg beim Start: fehlt k-playbook-local/ ganz, entsteht die
+// vollständige Struktur; ein zweiter Lauf hat nichts mehr zu tun.
+func TestEnsureLocalLegtFehlendeStrukturAn(t *testing.T) {
+	root := t.TempDir()
+
+	statuses, created, err := EnsureLocal(root)
+	if err != nil {
+		t.Fatalf("EnsureLocal: %v", err)
+	}
+	if !created {
+		t.Fatal("das fehlende Verzeichnis wurde nicht angelegt")
+	}
+	if !LocalOK(statuses) {
+		t.Fatalf("nach EnsureLocal unvollständig: %+v", statuses)
+	}
+	if !LocalOK(CheckLocal(root)) {
+		t.Fatal("die Struktur ist nach dem Anlegen nicht vollständig")
+	}
+
+	statuses, created, err = EnsureLocal(root)
+	if err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+	if created {
+		t.Error("der zweite Lauf hat erneut angelegt")
+	}
+	if statuses != nil {
+		t.Errorf("der zweite Lauf meldet Zustände, obwohl nichts angelegt wurde: %+v", statuses)
+	}
+}
+
+// Ein vorhandenes, aber unvollständiges Verzeichnis bleibt dem Knopf: eine
+// fehlende README kann bewusst entfernt worden sein und käme sonst bei jedem
+// Start zurück.
+func TestEnsureLocalLaesstUnvollstaendigesVerzeichnisStehen(t *testing.T) {
+	root := t.TempDir()
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+	readme := filepath.Join(LocalDir(root), "rules", "README.md")
+	if err := os.Remove(readme); err != nil {
+		t.Fatalf("README entfernen: %v", err)
+	}
+
+	_, created, err := EnsureLocal(root)
+	if err != nil {
+		t.Fatalf("EnsureLocal: %v", err)
+	}
+	if created {
+		t.Error("ein vorhandenes Verzeichnis wurde als angelegt gemeldet")
+	}
+	if pathExists(readme) {
+		t.Error("die entfernte README ist beim Start zurückgekommen")
+	}
+}
+
+// Ein über makePublic() bewusst öffentlich geschaltetes Verzeichnis bleibt
+// öffentlich: der Startlauf fasst ein vorhandenes k-playbook-local/ nicht an
+// und bringt die verwaltete .gitignore nicht zurück.
+func TestEnsureLocalLaesstOeffentlichGeschaltetesVerzeichnisOeffentlich(t *testing.T) {
+	root := t.TempDir()
+	gitInit(t, root)
+	writeVCSConfig(t, root, "git")
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+
+	entry, ok := PrivateEntry("results")
+	if !ok {
+		t.Fatal("results steht nicht als privates Verzeichnis in der lokalen Struktur")
+	}
+	change, err := SetPrivate(root, entry, false)
+	if err != nil {
+		t.Fatalf("SetPrivate: %v", err)
+	}
+	if change.Status.State != PrivacyPublic {
+		t.Fatalf("State nach dem Umschalten = %q, erwartet %q (%s)", change.Status.State, PrivacyPublic, change.Status.Reason)
+	}
+
+	_, created, err := EnsureLocal(root)
+	if err != nil {
+		t.Fatalf("EnsureLocal: %v", err)
+	}
+	if created {
+		t.Error("ein vorhandenes Verzeichnis wurde als angelegt gemeldet")
+	}
+	if pathExists(filepath.Join(LocalDir(root), "results", PrivateIgnoreFile)) {
+		t.Error("die bewusst entfernte .gitignore ist beim Start zurückgekommen")
+	}
+	if status := PrivacyStatusFor(root, entry); status.State != PrivacyPublic {
+		t.Errorf("State nach dem Start = %q, erwartet %q (%s)", status.State, PrivacyPublic, status.Reason)
+	}
+}

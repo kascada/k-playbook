@@ -155,19 +155,47 @@ func mcpProbeEnv(environ []string) []string {
 	return append(filtered, "PATH="+mcpProbePath)
 }
 
-// mcpToolsResponse ist das Ergebnis des Selbsttests: was der registrierte
-// Befehl tatsächlich anbietet.
+// mcpToolsResponse ist das Ergebnis einer Messung: was ein gestarteter
+// Server tatsächlich anbietet.
 type mcpToolsResponse struct {
 	// Command ist, was gestartet wurde — absolut, damit erkennbar ist, welche
 	// Datei geantwortet hat.
 	Command string `json:"command"`
 	// Available: der Server hat geantwortet.
-	Available       bool      `json:"available"`
-	ServerName      string    `json:"serverName,omitempty"`
-	ServerVersion   string    `json:"serverVersion,omitempty"`
-	ProtocolVersion string    `json:"protocolVersion,omitempty"`
-	Tools           []mcpTool `json:"tools"`
-	Message         string    `json:"message"`
+	Available       bool   `json:"available"`
+	ServerName      string `json:"serverName,omitempty"`
+	ServerVersion   string `json:"serverVersion,omitempty"`
+	ProtocolVersion string `json:"protocolVersion,omitempty"`
+	// Capabilities sind die Namen, die der Server in initialize meldet —
+	// tools, prompts, resources, logging und was er sonst kann. Sortiert.
+	Capabilities []string  `json:"capabilities"`
+	Tools        []mcpTool `json:"tools"`
+	// Prompts und Resources sind nur gefüllt, wenn der Server die jeweilige
+	// Fähigkeit gemeldet hat; erst dann wird danach gefragt.
+	Prompts   []mcpPrompt   `json:"prompts,omitempty"`
+	Resources []mcpResource `json:"resources,omitempty"`
+	Message   string        `json:"message"`
+}
+
+// mcpPrompt ist eine angebotene Vorlage samt ihren Argumenten.
+type mcpPrompt struct {
+	Name        string              `json:"name"`
+	Description string              `json:"description,omitempty"`
+	Arguments   []mcpPromptArgument `json:"arguments,omitempty"`
+}
+
+type mcpPromptArgument struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required"`
+}
+
+// mcpResource ist eine angebotene Ressource.
+type mcpResource struct {
+	URI         string `json:"uri"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	MimeType    string `json:"mimeType,omitempty"`
 }
 
 // mcpTool ist ein angebotenes Werkzeug samt seinen Parametern.
@@ -210,14 +238,28 @@ func mcpToolsHandler(w http.ResponseWriter, r *http.Request) {
 // Jeder Fehlfall ist ein Ergebnis, keine Störung: die Seite sagt „antwortet
 // nicht" samt Grund und bleibt bedienbar.
 func probeMCPServer(projectRoot string) mcpToolsResponse {
-	response := mcpToolsResponse{Tools: []mcpTool{}}
-
 	binary, args, err := project.MCPCommand()
 	if err != nil {
-		response.Message = err.Error() + " — es gibt nichts zu starten."
-		return response
+		return mcpToolsResponse{
+			Capabilities: []string{},
+			Tools:        []mcpTool{},
+			Message:      err.Error() + " — es gibt nichts zu starten.",
+		}
 	}
-	response.Command = binary + " " + args[0]
+	return probeMCPCommand(projectRoot, binary, args, mcpProbeEnv(os.Environ()))
+}
+
+// probeMCPCommand ist der Kern jeder Messung: startet binary mit args im
+// Hauptverzeichnis und der übergebenen Umgebung, spricht das Protokoll und
+// gibt zurück, was ankommt.
+//
+// Der Selbsttest des eigenen Servers gibt die gesäuberte PATH mit, die
+// Detailseite eines fremden Servers die geerbte Umgebung samt env aus dem
+// Eintrag. binary ist ein Pfad, kein bloßer Name: aufgelöst wird vorher, damit
+// die Antwort nennt, welche Datei geantwortet hat.
+func probeMCPCommand(projectRoot string, binary string, args []string, env []string) mcpToolsResponse {
+	response := mcpToolsResponse{Capabilities: []string{}, Tools: []mcpTool{}}
+	response.Command = strings.Join(append([]string{binary}, args...), " ")
 
 	if info, err := os.Stat(binary); err != nil || info.IsDir() {
 		response.Message = binary + " ist nicht ausführbar — es gibt nichts zu starten."
@@ -229,7 +271,7 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Dir = projectRoot
-	command.Env = mcpProbeEnv(os.Environ())
+	command.Env = env
 
 	stdin, err := command.StdinPipe()
 	if err != nil {
@@ -273,7 +315,7 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 
 	select {
 	case <-ctx.Done():
-		response.Message = fmt.Sprintf("Server antwortet nicht: nach %s abgebrochen.", mcpProbeTimeout)
+		response.Message = mcpTimeoutMessage()
 		return response
 
 	case result := <-answered:
@@ -286,7 +328,10 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 		response.ServerName = result.initialized.ServerInfo.Name
 		response.ServerVersion = result.initialized.ServerInfo.Version
 		response.ProtocolVersion = result.initialized.ProtocolVersion
+		response.Capabilities = capabilityNames(result.initialized.Capabilities)
 		response.Tools = describeTools(result.listed)
+		response.Prompts = describePrompts(result.prompts)
+		response.Resources = describeResources(result.resources)
 		return response
 	}
 }
@@ -295,30 +340,77 @@ func probeMCPServer(projectRoot string) mcpToolsResponse {
 type mcpProbeResult struct {
 	initialized mcpInitializeResult
 	listed      mcpToolsResult
+	prompts     mcpPromptsResult
+	resources   mcpResourcesResult
 	err         error
 }
 
-// speakMCP schickt den Handshake und sammelt die beiden Antworten ein.
+// Die IDs der Anfragen. Antworten werden über sie zugeordnet, nicht über die
+// Reihenfolge: ein Server darf sie in anderer Folge schicken und dazwischen
+// Benachrichtigungen ausgeben.
+const (
+	mcpInitializeID = 1
+	mcpToolsListID  = 2
+	mcpPromptsID    = 3
+	mcpResourcesID  = 4
+)
+
+// speakMCP schickt den Handshake und sammelt die Antworten ein.
 //
-// stdin bleibt offen, bis sie da sind — genau wie bei einem echten Client. Ein
-// sofortiges EOF beendet die Verbindung, während die Anfragen noch in Arbeit
-// sind.
+// Was der Server in initialize als Fähigkeiten meldet, entscheidet, was noch
+// gefragt wird: prompts/list und resources/list nur, wenn er prompts bzw.
+// resources kann. Einen Server nach etwas zu fragen, das er nicht kann,
+// brächte eine Fehlerantwort, und die sähe aus wie ein Ausfall.
+//
+// stdin bleibt offen, bis alles da ist — genau wie bei einem echten Client.
+// Ein sofortiges EOF beendet die Verbindung, während die Anfragen noch in
+// Arbeit sind.
 func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
 	if _, err := io.WriteString(stdin, mcpHandshake()); err != nil {
 		return mcpProbeResult{err: fmt.Errorf("Anfragen nicht schreibbar: %w", err)}
 	}
 
-	reader := bufio.NewReader(stdout)
+	reader := newMCPReader(stdout)
 	result := mcpProbeResult{}
 
-	if err := readMCPResult(reader, &result.initialized); err != nil {
+	if err := reader.result(mcpInitializeID, &result.initialized); err != nil {
 		result.err = err
 		return result
 	}
-	if err := readMCPResult(reader, &result.listed); err != nil {
+	if err := reader.result(mcpToolsListID, &result.listed); err != nil {
 		result.err = err
+		return result
+	}
+
+	if _, ok := result.initialized.Capabilities["prompts"]; ok {
+		if err := askMCP(stdin, reader, mcpPromptsID, "prompts/list", &result.prompts); err != nil {
+			result.err = err
+			return result
+		}
+	}
+	if _, ok := result.initialized.Capabilities["resources"]; ok {
+		if err := askMCP(stdin, reader, mcpResourcesID, "resources/list", &result.resources); err != nil {
+			result.err = err
+		}
 	}
 	return result
+}
+
+// askMCP schickt eine Folgeanfrage und liest ihre Antwort.
+//
+// Ein Schreibfehler ist hier noch kein Ergebnis: ein Server, der sich nach
+// dem Handshake beendet hat, kann die Antwort schon geschickt haben, und die
+// steht dann im Puffer. Erst wenn auch das Lesen scheitert, gilt der
+// Schreibfehler.
+func askMCP(stdin io.Writer, reader *mcpReader, id int, method string, target any) error {
+	_, writeErr := io.WriteString(stdin, mcpRequest(id, method))
+	if err := reader.result(id, target); err != nil {
+		if writeErr != nil {
+			return fmt.Errorf("Anfragen nicht schreibbar: %w", writeErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // lockedBuffer sammelt die Ausgabe auf stderr.
@@ -351,13 +443,20 @@ func (b *lockedBuffer) String() string {
 func mcpHandshake() string {
 	return `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"k-playbook-gui","version":"0"}}}` + "\n" +
 		`{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n" +
-		`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}` + "\n"
+		mcpRequest(mcpToolsListID, "tools/list")
+}
+
+// mcpRequest ist eine Anfrage ohne Parameter, als eine Zeile.
+func mcpRequest(id int, method string) string {
+	return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"%s","params":{}}`, id, method) + "\n"
 }
 
 // mcpRPCResponse ist der Rahmen einer Antwort. Verglichen wird nur er; was das
-// SDK in result schreibt, gehört ihm.
+// SDK in result schreibt, gehört ihm. ID fehlt bei Benachrichtigungen — die
+// überspringt der Leser.
 type mcpRPCResponse struct {
-	Result json.RawMessage `json:"result"`
+	ID     *json.RawMessage `json:"id"`
+	Result json.RawMessage  `json:"result"`
 	Error  *struct {
 		Message string `json:"message"`
 	} `json:"error"`
@@ -369,6 +468,30 @@ type mcpInitializeResult struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
 	} `json:"serverInfo"`
+	// Capabilities ist, was der Server kann — die Schlüssel zählen, ihr
+	// Inhalt (etwa listChanged) nicht.
+	Capabilities map[string]json.RawMessage `json:"capabilities"`
+}
+
+type mcpPromptsResult struct {
+	Prompts []struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Arguments   []struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			Required    bool   `json:"required"`
+		} `json:"arguments"`
+	} `json:"prompts"`
+}
+
+type mcpResourcesResult struct {
+	Resources []struct {
+		URI         string `json:"uri"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		MimeType    string `json:"mimeType"`
+	} `json:"resources"`
 }
 
 type mcpToolsResult struct {
@@ -416,21 +539,59 @@ func (t *schemaType) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-// readMCPResult liest eine Antwortzeile und packt ihr result-Feld aus.
-func readMCPResult(reader *bufio.Reader, target any) error {
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return err
-	}
+// mcpReader liest Antwortzeilen und ordnet sie über die ID zu.
+//
+// Benachrichtigungen ohne ID — Logausgaben, die manche Server auf stdout
+// schicken — werden übersprungen; eine Antwort auf eine andere als die
+// erwartete Anfrage wird aufgehoben, bis sie an der Reihe ist.
+type mcpReader struct {
+	reader  *bufio.Reader
+	pending map[string]mcpRPCResponse
+}
 
-	var response mcpRPCResponse
-	if err := json.Unmarshal([]byte(line), &response); err != nil {
-		return fmt.Errorf("Antwort ist kein JSON: %w", err)
+func newMCPReader(stdout io.Reader) *mcpReader {
+	return &mcpReader{reader: bufio.NewReader(stdout), pending: map[string]mcpRPCResponse{}}
+}
+
+// result wartet auf die Antwort mit der ID und packt ihr result-Feld aus.
+func (r *mcpReader) result(id int, target any) error {
+	wanted := fmt.Sprint(id)
+	for {
+		response, ok := r.pending[wanted]
+		if ok {
+			delete(r.pending, wanted)
+			if response.Error != nil {
+				return fmt.Errorf("Fehlerantwort: %s", response.Error.Message)
+			}
+			return json.Unmarshal(response.Result, target)
+		}
+
+		line, err := r.reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var parsed mcpRPCResponse
+		if err := json.Unmarshal([]byte(line), &parsed); err != nil {
+			return fmt.Errorf("Antwort ist kein JSON: %w", err)
+		}
+		if parsed.ID == nil {
+			continue
+		}
+		r.pending[strings.Trim(string(*parsed.ID), `"`)] = parsed
 	}
-	if response.Error != nil {
-		return fmt.Errorf("Fehlerantwort: %s", response.Error.Message)
-	}
-	return json.Unmarshal(response.Result, target)
+}
+
+// mcpTimeoutMessage ist die Meldung nach abgelaufener Frist. Sie nennt den
+// häufigsten Grund bei fremden Servern: npx und uvx laden beim ersten Start
+// Pakete nach, und das dauert länger als die Frist. Ein zweiter Versuch
+// findet sie im Cache.
+func mcpTimeoutMessage() string {
+	return fmt.Sprintf("Server antwortet nicht: nach %s abgebrochen. "+
+		"Wird der Server über npx oder uvx gestartet, kann das eine Erstinstallation gewesen sein — "+
+		"dann „Erneut messen“.", mcpProbeTimeout)
 }
 
 // mcpFailureMessage sagt, woran es lag. Die Ausgabe auf stderr kommt mit, wenn
@@ -438,7 +599,7 @@ func readMCPResult(reader *bufio.Reader, target any) error {
 // Grund.
 func mcpFailureMessage(ctx context.Context, err error, stderr string) string {
 	if ctx.Err() != nil {
-		return fmt.Sprintf("Server antwortet nicht: nach %s abgebrochen.", mcpProbeTimeout)
+		return mcpTimeoutMessage()
 	}
 
 	message := "Server antwortet nicht: " + err.Error()
@@ -446,6 +607,54 @@ func mcpFailureMessage(ctx context.Context, err error, stderr string) string {
 		message += "\n" + stderr
 	}
 	return message
+}
+
+// capabilityNames sind die gemeldeten Fähigkeiten als sortierte Liste.
+func capabilityNames(capabilities map[string]json.RawMessage) []string {
+	names := make([]string, 0, len(capabilities))
+	for name := range capabilities {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// describePrompts bringt die Vorlagen in eine Form, die sich anzeigen lässt.
+func describePrompts(listed mcpPromptsResult) []mcpPrompt {
+	if listed.Prompts == nil {
+		return nil
+	}
+	prompts := make([]mcpPrompt, 0, len(listed.Prompts))
+	for _, entry := range listed.Prompts {
+		prompt := mcpPrompt{Name: entry.Name, Description: entry.Description}
+		for _, argument := range entry.Arguments {
+			prompt.Arguments = append(prompt.Arguments, mcpPromptArgument{
+				Name:        argument.Name,
+				Description: argument.Description,
+				Required:    argument.Required,
+			})
+		}
+		prompts = append(prompts, prompt)
+	}
+	return prompts
+}
+
+// describeResources bringt die Ressourcen in eine Form, die sich anzeigen
+// lässt.
+func describeResources(listed mcpResourcesResult) []mcpResource {
+	if listed.Resources == nil {
+		return nil
+	}
+	resources := make([]mcpResource, 0, len(listed.Resources))
+	for _, entry := range listed.Resources {
+		resources = append(resources, mcpResource{
+			URI:         entry.URI,
+			Name:        entry.Name,
+			Description: entry.Description,
+			MimeType:    entry.MimeType,
+		})
+	}
+	return resources
 }
 
 // describeTools bringt die Werkzeuge in eine Form, die sich anzeigen lässt.

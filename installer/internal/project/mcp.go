@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,6 +63,10 @@ type MCPTarget struct {
 	// Schema ist zugleich der Schlüssel, unter dem die Server in der Datei
 	// stehen.
 	Schema MCPSchema `json:"schema"`
+	// traceDir ist das Verzeichnis des Assistenten im Hauptverzeichnis, an dem
+	// der Startlauf seine Spur sucht, bevor er eine fehlende Datei anlegt
+	// (assistantTrace). Nur intern: für die Anzeige spielt es keine Rolle.
+	traceDir string
 }
 
 // opencodeConfigJSON und opencodeConfigJSONC sind die beiden Endungen, unter
@@ -83,9 +88,9 @@ const (
 // projectRoot: es gibt keine feste Liste, sondern eine Regel.
 func MCPTargets(projectRoot string) []MCPTarget {
 	return []MCPTarget{
-		{Path: ".mcp.json", Assistant: "Claude Code", Schema: MCPSchemaServers},
-		{Path: filepath.Join(".cursor", "mcp.json"), Assistant: "Cursor", Schema: MCPSchemaServers},
-		{Path: opencodeTarget(projectRoot), Assistant: "OpenCode", Schema: MCPSchemaOpenCode},
+		{Path: ".mcp.json", Assistant: "Claude Code", Schema: MCPSchemaServers, traceDir: ".claude"},
+		{Path: filepath.Join(".cursor", "mcp.json"), Assistant: "Cursor", Schema: MCPSchemaServers, traceDir: ".cursor"},
+		{Path: opencodeTarget(projectRoot), Assistant: "OpenCode", Schema: MCPSchemaOpenCode, traceDir: ".opencode"},
 	}
 }
 
@@ -129,13 +134,18 @@ const (
 	// k-playbook auflösen. Dann wird nichts geschrieben — sonst stünde eine
 	// Registrierung da, die auf nichts zeigt.
 	MCPStateNoCommand MCPState = "no-command"
-	// MCPStateMissingFile: die Datei gibt es noch nicht.
+	// MCPStateMissingFile: die Datei gibt es noch nicht. Der Start legt sie
+	// von sich aus an, wenn sie nicht von git erfasst ist und der Assistent
+	// eine eigene Spur im Projekt hat (MCPWriteOutdatedAndUnversioned).
 	MCPStateMissingFile MCPState = "missing-file"
-	// MCPStateMissingEntry: die Datei steht, unser Eintrag fehlt darin.
+	// MCPStateMissingEntry: die Datei steht, unser Eintrag fehlt darin. Der
+	// Start ergänzt ihn von sich aus, wenn die Datei nicht von git erfasst ist.
 	MCPStateMissingEntry MCPState = "missing-entry"
 	// MCPStateOutdated: der Eintrag trägt das Kommando des abgelösten
 	// Wrapper-Modells. Das ist der eine Fall, den die Auto-Korrektur beim
-	// Clone-Update und beim Start von sich aus richtigstellt.
+	// Clone-Update und beim Start unabhängig von der Versionierung
+	// richtigstellt — eine Reparatur an Inhalt, den k-playbook selbst
+	// geschrieben hat.
 	MCPStateOutdated MCPState = "outdated"
 	// MCPStateStale: der Eintrag steht, gehört aber zu keiner akzeptierten Form
 	// und ist auch nicht der alte Wrapper. Er wird gemeldet und erst beim
@@ -353,32 +363,56 @@ func MCPOK(statuses []MCPStatus) bool {
 // unregistriert zu lassen. Gesammelt wird, was schiefging; welches Ziel steht
 // und welches nicht, sagt ohnehin der zurückgegebene Zustand.
 func ApplyMCP(projectRoot string) ([]MCPStatus, error) {
-	_, err := writeMCPEntries(projectRoot, false)
+	_, err := writeMCPEntries(projectRoot, MCPWriteAll)
 	return CheckMCP(projectRoot), err
 }
 
-// RepairMCP korrigiert veraltete Einträge und sonst nichts. Das ist der
-// **selbsttätige** Weg: er läuft beim Clone-Update und bei jedem Start, ohne
-// dass jemand einen Knopf drückt.
+// MCPWriteScope benennt, wie weit ein Schreibweg greifen darf. Drei Werte,
+// weil es drei Einstiege gibt, die verschieden weit gehen dürfen — und weil
+// die Entscheidung trotzdem an einer Stelle bleiben soll: mcpTargetNeedsWrite.
+type MCPWriteScope int
+
+const (
+	// MCPWriteAll: alles, was nicht zur Menge der akzeptierten Formen gehört
+	// — der Klick auf „Einrichten" (ApplyMCP).
+	MCPWriteAll MCPWriteScope = iota
+	// MCPWriteOutdatedOnly: ausschließlich MCPStateOutdated — das
+	// Clone-Update. Es soll den Eintrag auf den abgelösten Wrapper
+	// nachziehen und sonst nichts.
+	MCPWriteOutdatedOnly
+	// MCPWriteOutdatedAndUnversioned: MCPStateOutdated, dazu eine fehlende
+	// Datei und ein fehlender Eintrag, wenn die Zieldatei nicht von git
+	// erfasst ist — der Start. Die fehlende Datei zusätzlich nur, wenn der
+	// Assistent eine eigene Spur im Projekt hat.
+	MCPWriteOutdatedAndUnversioned
+)
+
+// RepairMCP ist der **selbsttätige** Weg: er läuft beim Clone-Update und bei
+// jedem Start, ohne dass jemand einen Knopf drückt. Wie weit er gehen darf,
+// sagt der Modus — das Update übergibt MCPWriteOutdatedOnly, der Start
+// MCPWriteOutdatedAndUnversioned.
 //
-// Zurück kommen die Pfade der korrigierten Dateien, relativ zum
+// Zurück kommen die Pfade der geschriebenen Dateien, relativ zum
 // Hauptverzeichnis — leer, wenn nichts zu tun war.
 //
-// Die Enge ist hier die eigentliche Zusage. Geschrieben wird ausschließlich
-// bei MCPStateOutdated, nie bei einer akzeptierten Form und nie bei einer
-// fehlenden Datei oder einem fehlenden Eintrag: sonst machte jeder Start die
-// getrackten MCP-Dateien eines Projekts dreckig, und ein Repo, das seine
-// Registrierung in portabler Form eincheckt, käme nie mehr an einem sauberen
-// Arbeitsbaum vorbei. Angelegt wird dabei nichts und gelöscht erst recht
-// nicht — ersetzt wird ein Konfigurationseintrag.
-func RepairMCP(projectRoot string) ([]string, error) {
-	return writeMCPEntries(projectRoot, true)
+// Die Enge ist hier die eigentliche Zusage, und sie hat zwei Stufen. Ein
+// vorhandener Eintrag wird ausschließlich bei MCPStateOutdated ersetzt — eine
+// Reparatur an Inhalt, den k-playbook selbst geschrieben hat, unabhängig von
+// der Versionierung. Eine akzeptierte Form und ein fremder Stand
+// (MCPStateStale) bleiben liegen: der Eintrag kann aus einem fremden $HOME
+// stammen und dort gültig sein. Angelegt oder ergänzt wird nur, wenn die
+// Zieldatei **nicht von git erfasst** ist, und das wird gemessen, nicht
+// geraten (mcpTargetTracked). Sonst machte jeder Start die getrackten
+// MCP-Dateien eines Projekts dreckig, und ein Repo, das seine Registrierung in
+// portabler Form eincheckt, käme nie mehr an einem sauberen Arbeitsbaum
+// vorbei. Gelöscht wird nie.
+func RepairMCP(projectRoot string, scope MCPWriteScope) ([]string, error) {
+	return writeMCPEntries(projectRoot, scope)
 }
 
-// writeMCPEntries ist der gemeinsame Schreibweg beider Einstiege. onlyOutdated
-// unterscheidet sie: die Auto-Korrektur greift nur in den engen Fall ein, das
-// Einrichten in alles, was nicht zur Menge gehört.
-func writeMCPEntries(projectRoot string, onlyOutdated bool) ([]string, error) {
+// writeMCPEntries ist der gemeinsame Schreibweg aller Einstiege; der Modus
+// unterscheidet sie.
+func writeMCPEntries(projectRoot string, scope MCPWriteScope) ([]string, error) {
 	command, args, err := MCPCommand()
 	if err != nil {
 		// Kein installiertes k-playbook: es gibt kein Kommando, das sich
@@ -389,7 +423,7 @@ func writeMCPEntries(projectRoot string, onlyOutdated bool) ([]string, error) {
 	var written []string
 	var failures []error
 	for _, target := range MCPTargets(projectRoot) {
-		changed, err := applyMCPTarget(projectRoot, target, command, args, onlyOutdated)
+		changed, err := applyMCPTarget(projectRoot, target, command, args, scope)
 		if err != nil {
 			failures = append(failures, err)
 			continue
@@ -631,7 +665,7 @@ func describeMCPEntry(value any) string {
 // geschrieben. Sonst würde jeder Lauf eine fremde Datei erneut umformatieren.
 //
 // Zurück kommt, ob tatsächlich geschrieben wurde.
-func applyMCPTarget(projectRoot string, target MCPTarget, command string, args []string, onlyOutdated bool) (bool, error) {
+func applyMCPTarget(projectRoot string, target MCPTarget, command string, args []string, scope MCPWriteScope) (bool, error) {
 	file := filepath.Join(projectRoot, target.Path)
 
 	doc, exists, err := readJSONObject(file)
@@ -645,7 +679,7 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 		return false, nil
 	}
 	found, present := section[MCPServerKey]
-	if !mcpTargetNeedsWrite(target.Schema, doc.content, found, present, onlyOutdated) {
+	if !mcpTargetNeedsWrite(projectRoot, target, doc.content, exists, found, present, scope) {
 		return false, nil
 	}
 
@@ -669,23 +703,116 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 	return true, nil
 }
 
-// mcpTargetNeedsWrite ist die eine Stelle, an der beide Schreibwege ihre
+// mcpTargetNeedsWrite ist die eine Stelle, an der alle Schreibwege ihre
 // Entscheidung treffen.
 //
-// Auto-Korrektur (onlyOutdated): ausschließlich ein vorhandener, im engen Sinn
-// veralteter Eintrag. Eine fehlende Datei, ein fehlender Eintrag und jede
-// akzeptierte Form bleiben unangetastet — das ist die Idempotenz-Zusage.
+// Clone-Update (MCPWriteOutdatedOnly): ausschließlich ein vorhandener, im
+// engen Sinn veralteter Eintrag. Eine fehlende Datei, ein fehlender Eintrag
+// und jede akzeptierte Form bleiben unangetastet.
 //
-// Einrichten: alles, was nicht zur Menge der akzeptierten Formen gehört, dazu
-// bei OpenCode der Memory-Block, der zum Einrichten dazugehört.
-func mcpTargetNeedsWrite(schema MCPSchema, content map[string]any, found any, present bool, onlyOutdated bool) bool {
-	if onlyOutdated {
+// Start (MCPWriteOutdatedAndUnversioned): dasselbe, dazu der fehlende Eintrag
+// und die fehlende Datei — aber nur, wenn die Zieldatei nicht von git erfasst
+// ist, und die fehlende Datei nur, wenn der Assistent eine eigene Spur im
+// Projekt hat. Ein vorhandener Eintrag, der weder veraltet noch akzeptiert
+// ist (MCPStateStale), bleibt auch hier liegen. Gemessen wird erst, wenn es
+// darauf ankommt: die beiden git-Aufrufe laufen nicht für Dateien, die ohnehin
+// nicht geschrieben würden.
+//
+// Einrichten (MCPWriteAll): alles, was nicht zur Menge der akzeptierten Formen
+// gehört, dazu bei OpenCode der Memory-Block, der zum Einrichten dazugehört.
+func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[string]any, exists bool, found any, present bool, scope MCPWriteScope) bool {
+	switch scope {
+	case MCPWriteOutdatedOnly:
 		return present && mcpEntryOutdated(found)
+
+	case MCPWriteOutdatedAndUnversioned:
+		if present {
+			return mcpEntryOutdated(found)
+		}
+		if !exists && !assistantTrace(projectRoot, target) {
+			return false
+		}
+		return !mcpTargetTracked(projectRoot, target.Path)
 	}
-	if !present || !mcpEntryUpToDate(schema, found) {
+
+	if !present || !mcpEntryUpToDate(target.Schema, found) {
 		return true
 	}
-	return schema == MCPSchemaOpenCode && !opencodeMemoryConfigured(content)
+	return target.Schema == MCPSchemaOpenCode && !opencodeMemoryConfigured(content)
+}
+
+// mcpTargetTracked meldet, ob git die Zieldatei erfasst. Gemessen wird im
+// Hauptverzeichnis, denn dort liegen die Dateien — nicht in project.repo_root,
+// das daneben liegen kann.
+//
+// Die Kette hat drei Stufen, und jede unbeantwortete Frage fällt in dieselbe
+// Richtung wie bei agentsIgnored: als erfasst, also nicht schreiben.
+//
+//   - K-PLAYBOOK.yaml nicht lesbar: unbeantwortet, gilt als erfasst. „Keine
+//     Config = kein git = schreiben" wäre die unsichere Richtung.
+//   - project.vcs nicht git: nichts ist erfasst.
+//   - rev-parse --show-toplevel sagt nein: an dieser Stelle gibt es kein
+//     Repository, nichts ist erfasst. Nur ein git, das gelaufen ist und
+//     geantwortet hat, zählt dafür; kam es gar nicht zu Wort — nicht
+//     installiert, Timeout —, ist die Frage unbeantwortet.
+//   - ls-files --error-unmatch: Exit 0 heißt erfasst, Exit 1 nicht erfasst,
+//     alles andere unbeantwortet. ls-files deckt auch die gelöschte, aber noch
+//     im Index stehende Datei ab; ein reiner Existenztest täte das nicht.
+func mcpTargetTracked(projectRoot string, path string) bool {
+	config, err := ReadConfig(projectRoot)
+	if err != nil {
+		return true
+	}
+	if config.VCS != "git" {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), privateGitTimeout)
+	defer cancel()
+
+	if _, code, _ := runGit(ctx, projectRoot, "rev-parse", "--show-toplevel"); code != 0 {
+		return code < 0
+	}
+	_, code, _ := runGit(ctx, projectRoot, "ls-files", "--error-unmatch", "--", path)
+	switch code {
+	case 0:
+		return true
+	case 1:
+		return false
+	default:
+		return true
+	}
+}
+
+// assistantTrace meldet, ob der Assistent eines Ziels eine Spur im Projekt
+// hat, die nicht von k-playbook stammt: das Assistenten-Verzeichnis trägt
+// mindestens einen Eintrag, der keiner der von Links() verwalteten Pfade ist
+// — etwa .claude/settings.json, .cursor/rules/ oder eine eigene Datei unter
+// .opencode/.
+//
+// Die Verzeichnisse selbst taugen nicht als Spur: ApplyLinks legt sie in jedem
+// Projekt an, schon auf dem Lesepfad. Ohne diese Bedingung entstünden bei
+// jedem Start drei Dateien, die niemand braucht. Ein fehlendes oder
+// unlesbares Verzeichnis ist keine Spur.
+func assistantTrace(projectRoot string, target MCPTarget) bool {
+	if target.traceDir == "" {
+		return false
+	}
+	entries, err := os.ReadDir(filepath.Join(projectRoot, target.traceDir))
+	if err != nil {
+		return false
+	}
+
+	managed := map[string]bool{}
+	for _, link := range Links() {
+		managed[link.Path] = true
+	}
+	for _, entry := range entries {
+		if !managed[filepath.Join(target.traceDir, entry.Name())] {
+			return true
+		}
+	}
+	return false
 }
 
 // newMCPFile baut eine Datei, die es noch nicht gab: nur der eigene Eintrag,

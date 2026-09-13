@@ -244,6 +244,7 @@ configuration and the filesystem:
 | `playbook`, `local` | the two resolved directories |
 | `remediation` | the policy, including a default when the block is missing |
 | `gh` | the GitHub CLI decision and host finding |
+| `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `rules`, `reviews`, `checks`, merged |
 | `guidelines` | files from `k-playbook-local/guidelines/` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
@@ -366,6 +367,9 @@ remediation:
 tools:
   gh:
     status: enabled
+  mcp:
+    required:
+      - k-playbook
 ```
 
 ## Fields
@@ -476,12 +480,30 @@ The block says nothing about whether `gh` exists on this machine. That is a host
 finding and exists only in context output. Nor is there a host here: the
 decision applies to `github.com`.
 
+#### `tools.mcp`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `required` | list of strings | MCP server names the project expects in every assistant |
+
+Which MCP servers the project requires -- by the key under which they appear in
+`.mcp.json`, `opencode.json`, and `.cursor/mcp.json`. Both YAML list forms are
+read: block form with dashes and flow form `[k-playbook, atlassian]`. Names
+must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; any other name stops `context`, as
+an invalid language name does.
+
+The block is optional. Without it, nothing is required and `context` reports
+`mcp.configured: false`; the **/mcp-servers** page of the interface then shows
+a snippet to copy. With it, the page marks every required name that is missing
+in one of the three assistant files. Nothing writes this block: it is edited by
+hand.
+
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
 - Write only after confirmation, step by step.
 - The tool owns `schema_version` and `project.*`.
-- The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file.
+- The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` is only read.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.
 - Host-local installation states do not belong in this file.

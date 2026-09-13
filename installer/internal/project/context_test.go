@@ -310,6 +310,35 @@ func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 	}
 }
 
+// Die Pflichtliste der MCP-Server steht im Kontext als Objekt: ohne Block leer
+// und unkonfiguriert, mit Block die Namen. Ein ungültiger Name bricht ab wie
+// ein ungültiger Sprachname.
+func TestBuildContextLiestPflichtMCPServer(t *testing.T) {
+	root := newContextProject(t)
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if context.MCP.Configured || context.MCP.Required == nil || len(context.MCP.Required) != 0 {
+		t.Errorf("MCP ohne Block = %+v, erwartet leere, unkonfigurierte Liste", context.MCP)
+	}
+
+	write(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n\ntools:\n  mcp:\n    required:\n      - k-playbook\n      - atlassian\n")
+	context, err = BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if !context.MCP.Configured || strings.Join(context.MCP.Required, ",") != "k-playbook,atlassian" {
+		t.Errorf("MCP = %+v", context.MCP)
+	}
+
+	write(t, ConfigPath(root), "schema_version: 3\n\ntools:\n  mcp:\n    required: [\"k playbook\"]\n")
+	if _, err := BuildContext(root); err == nil {
+		t.Error("ein ungültiger Pflichtname bricht den Kontext nicht ab")
+	}
+}
+
 func TestContextForDirOhneInstallation(t *testing.T) {
 	if _, err := ContextForDir(t.TempDir()); err == nil {
 		t.Error("fehlende Installation wurde nicht gemeldet")

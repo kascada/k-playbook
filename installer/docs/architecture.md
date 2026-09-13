@@ -146,6 +146,8 @@ installer/
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
+│   ├── mcp_servers.go           alle MCP-Server aus denselben Dateien lesen, Pflichtlücken
+│   ├── mcp_required.go          tools.mcp.required lesen, Inventar zusammenführen
 │   ├── installed.go             den absoluten Pfad des installierten k-playbook auflösen
 │   ├── setup.go                 ein Ablauf für alle Einstiege: einordnen, Anstoß, verlinken
 │   ├── instructions_layout.go   CLAUDE.md/AGENTS.md als Paar einordnen und auflösen
@@ -174,19 +176,23 @@ installer/
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
-│   ├── mcp.go                   Registrierung messen und herstellen, Werkzeug-Selbsttest
+│   ├── mcp.go                   Registrierung messen und herstellen, Probe-Kern
+│   │                            (probeMCPCommand) und Werkzeug-Selbsttest
+│   ├── mcp_servers.go           Übersicht aller MCP-Server, Detail je Server, Messung
+│   │                            per POST
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   └── static/                  index.html, workflows.html, tasks.html, reviews.html,
 │                                todos.html, knowledge.html, docs.html,
-│                                inventory.html, mcp.html, sidebar.html und
+│                                inventory.html, mcp.html, mcp-servers.html,
+│                                mcp-server.html, sidebar.html und
 │                                hero.html (Fragmente für linke Spalte und Kopf),
 │                                session.js, nav.js, disclosure.js, docview.js
 │                                (geteilter Markdown-Betrachter), app.js,
 │                                workflows.js, tasks.js, reviews.js, todos.js,
 │                                knowledge.js, docs.js, inventory.js, mcp.js,
-│                                styles.css
+│                                mcp-servers.js, mcp-server.js, styles.css
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 │   ├── review.go                Werkzeuge k_playbook_review_*
@@ -365,10 +371,21 @@ würden. Mehr schreibt `CreateLocal()` nicht — mit **einer** Ausnahme: Einträ
 Verzeichnis in genau diesem Lauf entsteht. Deshalb wird vor `os.MkdirAll` geprüft, ob es
 schon da ist; `MkdirAll` selbst meldet das nicht. Die Bedingung löst zwei Fälle auf
 einmal: `makePublic()` entfernt die Datei bewusst, ein späterer `CreateLocal()`-Lauf —
-jeder `/k-gui`-Start, jedes „Struktur anlegen" — dürfte sie nicht still zurückbringen;
-und Bestandsprojekte mit getrackten Dateien unter `results/` landeten sonst im Zustand
-`PrivacyPartial`. Ansonsten gilt weiter: was ein Projekt versioniert, entscheidet das
-Projekt.
+jedes „Struktur anlegen" — dürfte sie nicht still zurückbringen; und Bestandsprojekte
+mit getrackten Dateien unter `results/` landeten sonst im Zustand `PrivacyPartial`.
+Ansonsten gilt weiter: was ein Projekt versioniert, entscheidet das Projekt.
+
+**Zwei Einstiege.** `CreateLocal()` ist der ausdrückliche Weg: der Knopf „Anlegen"
+(`POST /api/local`), der auch ein unvollständiges Verzeichnis ergänzt. Der selbsttätige
+Weg ist `EnsureLocal()`, gerufen von `ensureLocalStructure()` in `runGUI()` bei jedem
+Start — und der legt nur an, wenn `k-playbook-local/` **ganz fehlt**. Ein vorhandenes
+Verzeichnis, auch ein unvollständiges, rührt er nicht an: `CreateLocal()` ist additiv,
+und additiv heißt auch, dass eine bewusst gelöschte Strukturdatei bei jedem Start
+zurückkäme. Die Enge macht einen Vorher-nachher-Vergleich über `CheckLocal()`
+überflüssig — entweder entsteht alles, oder nichts wird angefasst — und sie lässt eine
+Umschaltung auf öffentlich ohnehin stehen, denn die setzt ein vorhandenes Verzeichnis
+voraus. Ein frisch geklontes Projekt ist damit nach dem ersten `k-playbook`-Aufruf
+eingerichtet, ohne dass jemand die Karte sieht.
 
 Dieselbe Bedingung gilt an der zweiten Stelle, an der `cache/` entstehen kann:
 `ensureCacheDir()` legt es beim ersten Zugriff des Wissenstors an und schreibt dabei
@@ -799,11 +816,24 @@ Zwei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen |
-| selbsttätig | `RepairRootInstructions()`, jeder Start | ausschließlich einen veralteten Block ersetzen |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Session-Memory- und Befunde-Block nachtragen, `opencode.json` registrieren |
+| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
-Der Auffangweg legt nichts an, ergänzt nichts und fasst einen fremden Text nicht an. Er
-ist der Gegenpart zu `RepairMCP()` für die zweite Datei, die im Hauptverzeichnis liegt.
+Der Auffangweg kennt genau zwei Fälle, und `RootInstructionsRepair` sagt, welcher
+eingetreten ist (`Refreshed` oder `Created`), damit `runGUI()` beide eigens meldet. Das
+Ersetzen des veralteten Blocks ist eine Reparatur an Inhalt, den k-playbook selbst
+geschrieben hat, und läuft deshalb unabhängig davon, ob die Datei versioniert ist. Das
+Anlegen (`createRootInstructions()`) greift nur, wenn `AGENTS.md` ganz fehlt und die
+Fallmatrix aus `instructions_layout.go` nichts anderes vorsieht: kein Konflikt, keine
+Blockade, keine Umbenennung einer echten `CLAUDE.md`, kein zu entfernender Symlink. Dann
+gibt es nichts zu überschreiben und keine Entscheidung zu übergehen — es entsteht nur die
+Datei aus `rootInstructionsTemplate()`, sonst nichts: `ApplyRootInstructions()` läuft
+nicht, `opencode.json` bleibt unangetastet. Geschrieben wird mit `O_EXCL`, weil ein
+Rest-Link an `AGENTS.md` per `ReadFile` als „nicht vorhanden" erscheint, `WriteFile` ihm
+aber an sein totes Ziel folgte. Ein fehlender Anstoß in einer vorhandenen Datei, die
+Umbenennung und jeder Konflikt bleiben dem Knopf; der Konflikt wird auf der
+Assistenten-Karte gemeldet. Der Auffangweg ist der Gegenpart zu `RepairMCP()` für die
+zweite Datei, die im Hauptverzeichnis liegt.
 
 ## Kataloge auflösen
 
@@ -1088,6 +1118,37 @@ wenn seine Sprache im Aufruf stand. Ohne `--languages` gilt nur Sprachunabhängi
 Pflicht — was nicht gefragt wurde, kann auch nicht fehlen. Go reicht die Antwort
 unverändert durch und rechnet nichts nach.
 
+### Projektsprachen: erkannt statt geraten
+
+Welche Sprachen der Preflight bekommt, sagt `ReadLanguages()` in `project/languages.go`
+— an einer Stelle, damit Oberfläche, `k-playbook context` und der Preflight dieselbe
+Antwort geben. Steht `project.languages` in der Konfiguration, gilt es und sticht alles
+andere. Fehlt der Schlüssel, liefert `DetectLanguages()` die Sprachen aus den Manifesten
+des Projekts, und erst wenn die Erkennung leer ausfällt, greift `DefaultLanguages`
+(`python`). `configured` bleibt in beiden Fällen `false`: erkannt ist nicht entschieden,
+geschrieben wird erst auf ausdrückliche Wahl über `POST /api/languages`; die Karte sagt
+dazu, dass die Auswahl aus den Manifesten erkannt und noch nicht gespeichert ist.
+
+| Manifest | Sprache |
+|---|---|
+| `go.mod` | `go` |
+| `pyproject.toml`, `setup.py`, `setup.cfg`, `Pipfile`, `requirements.txt` | `python` |
+| `package.json` | `javascript` |
+| `tsconfig.json` | `typescript` |
+
+**Keine Rekursion.** Geprüft wird nur die oberste Ebene von `project.repo_root` und,
+falls verschieden, die oberste Ebene des Hauptverzeichnisses. Ein rekursiver Lauf träfe
+`node_modules/`, `vendor/` und Monorepo-Rauschen und liefe bei jedem `k-playbook context`
+mit; eine Ausschlussliste braucht es so nicht, denn die beiden k-playbook-Verzeichnisse
+sind Verzeichnisse, keine Manifeste.
+
+**Begrenzt auf die Tool-Matrix.** Das Ergebnis wird auf die Sprachen beschnitten, die
+`ReadToolLanguages()` aus `scripts/security-tools.tsv` liest — dieselbe Funktion, aus der
+die Oberfläche ihre wählbaren Sprachen bezieht (`buildToolsResponse()` in
+`webui/tools.go`), damit es eine Definition der Menge gibt; `project` kann `webui` nicht
+importieren. Eine Sprache, für die kein Tool zuständig ist, wäre in der Auswahl eine
+tote Option. Ohne lesbare Matrix — keine Installation — steht die Erkennung für sich.
+
 Der Aufruf ist ausschließlich lesend: `--json` prüft nur, ob die Binaries vorhanden
 sind. Installiert wird bewusst im Terminal, weil das die Arbeitsumgebung verändert und
 nicht die Projekt-Abhängigkeiten. Ein Timeout von 30 Sekunden begrenzt den Aufruf, weil
@@ -1368,7 +1429,9 @@ dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite v
 Die Oberfläche hat fünf Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
 **Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
 `/inventory`. `/mcp` ist keine sechste Sorte, sondern die Detailseite des Setup-Blocks
-und trägt dessen Bereich.
+und trägt dessen Bereich. Dasselbe gilt für `/mcp-servers` und die Detailseiten
+`/mcp-servers/{assistant}/{name}` darunter — mit einem Unterschied: die Übersicht steht
+als Unterpunkt unter Setup, `/mcp` nicht.
 
 Knowledge steht **über** Docs, und das ist die Aussage der Reihenfolge: Docs ist das
 Nachschlagewerk der Installation, die Wissensablage ist das, was im Projekt an Wissen
@@ -1382,6 +1445,15 @@ Unterpunkte im Umschalter und nicht hinter einem Klick auf der Übersicht, und z
 jedem Bereich: wer von Setup aus zu den Tasks will, soll nicht erst die Übersicht laden
 müssen. Der Unterschied zu `/mcp` ist genau das: `/mcp` vertieft eine Karte der
 Startseite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
+
+Setup hat seit der MCP-Server-Übersicht ebenfalls einen Unterpunkt, **MCP-Server** unter
+`/mcp-servers`. Die Seite vertieft keine Karte, sondern ist eine eigene Sicht auf das
+Projekt: alle Server der drei Assistenten in einer Matrix. Ihre Detailseiten
+`/mcp-servers/{assistant}/{name}` laufen unter demselben Unterpunkt — er ist bei jedem
+Pfad unter `/mcp-servers` aktiv, `aria-current="page"` führt nur die Übersicht selbst.
+`/mcp` bekommt keinen Unterpunkt: dorthin führen die Karte der Startseite und die
+Detailseite des eigenen Servers. Warum die Seite so gebaut ist, steht unter „MCP-Server in
+der Oberfläche".
 
 Das Inventar ist ein eigener Bereich und keine Karte auf der Startseite — nach demselben
 Muster wie Workflows und Docs: die Startseite trägt die Einrichtungsschritte, und das
@@ -1398,9 +1470,11 @@ Bereich bin ich, und was steht in diesem Bereich? Oben der **Umschalter**, eine 
 
 Beides steht in einem einzigen Template-Fragment, `static/sidebar.html` mit
 `{{define "sidebar"}}`. `pageTemplate()` parst es mit jeder Seite zusammen — die
-Seitendatei zuerst, denn `ParseFS` benennt das Ergebnis nach der ersten Datei, und
-`Execute` führt damit die Seite aus und nicht das Fragment. Achtmal dasselbe Markup zu
-kopieren wäre die Variante, die bei der nächsten Seite wieder auseinanderläuft.
+Vorlage trägt den Namen der Seitendatei, damit `Execute` die Seite ausführt und nicht das
+Fragment — und gibt ihr die Funktion `hasPrefix` mit: der Unterpunkt „MCP-Server" ist
+bei jedem Pfad unter `/mcp-servers` aktiv, und das lässt sich mit `eq` allein nicht
+sagen. Zehnmal dasselbe Markup zu kopieren wäre die Variante, die bei der nächsten Seite
+wieder auseinanderläuft.
 
 Aus demselben Grund steht der **Kopf** in `static/hero.html`: Logo, Titel, Versionsmarke
 und die aufgelösten Pfade waren auf allen Seiten außer der Startseite byte-gleich bis auf
@@ -1420,7 +1494,9 @@ sie sehen aus wie ein Eintrag des Umschalters, sind eingerückt und leiser, und 
 Prüfung „genau ein aktiver Bereich" zählt sie nicht mit. Ob es Workflows und
 Docs überhaupt gibt, entscheidet `.Installed` — vor der Einrichtung führt der Umschalter
 nur nach Setup, weil die beiden anderen Bereiche dort nichts zu zeigen hätten; die
-Unterpunkte hängen an demselben Zweig und verschwinden mit ihm.
+Unterpunkte hängen an demselben Zweig und verschwinden mit ihm. Das gilt auch für den
+Unterpunkt von Setup: ohne Installation gibt es keine MCP-Dateien, keine Karte und
+keinen Unterpunkt.
 
 Die Spalte ist so hoch wie das Fenster abzüglich des sticky-Abstands, oben und unten je
 einmal. Darin teilen sich ihre Kästen den Platz selbst auf: jeder behält seine Höhe,
@@ -1761,6 +1837,9 @@ der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift
 | `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
 | `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |
 | `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Befehl als Subprozess |
+| `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json`, `opencode.json[c]` und `.cursor/mcp.json`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien |
+| `GET` | `/api/mcp-servers/{assistant}/{name}` | Konfiguration eines Servers; 404, wenn er in den Projektdateien nicht steht; startet nichts |
+| `POST` | `/api/mcp-servers/{assistant}/{name}/probe` | Messung: startet das konfigurierte Kommando als Subprozess; remote und unknown antworten ohne Start; je Servername serialisiert |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
@@ -1785,7 +1864,8 @@ der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
 `/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/knowledge`,
-`/docs`, `/inventory` und `/mcp`; alle neun rendert `renderPage()` aus denselben
+`/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
+`/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` aus denselben
 Fragmenten für den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige
 selbst. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
 Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
@@ -2010,24 +2090,60 @@ hängen, obwohl es einen Projektpfad meint.
 
 #### Zwei Schreibwege, eine Entscheidungsstelle
 
-| Weg | Einstieg | Schreibt bei |
-|---|---|---|
-| ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | allem, was nicht zur Menge gehört |
-| selbsttätig | `RepairMCP()`, Clone-Update und jeder Start | ausschließlich `MCPStateOutdated` |
+| Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei |
+|---|---|---|---|
+| ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört |
+| selbsttätig | `RepairMCP()`, Clone-Update | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` |
+| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn die Zieldatei **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten |
 
-Beide gehen durch `mcpTargetNeedsWrite()`; das `onlyOutdated`-Flag ist der einzige
-Unterschied. Die Enge des zweiten Weges ist die Idempotenz-Zusage: er legt keine Datei
-an, ergänzt keinen fehlenden Eintrag und fasst keine akzeptierte Form an. Ohne das machte
-jeder Start die getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit
-eingecheckter Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.
+Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
+ist ein Parameter von `RepairMCP()`, weil die beiden selbsttätigen Aufrufer verschieden
+weit gehen dürfen. Das Clone-Update (`Update()` in `project/update.go`, Ergebnis in
+`UpdateResult.MCPRepaired`) soll den Eintrag auf den abgelösten Wrapper nachziehen und
+sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) darf
+mehr, und die Grenze ist gemessen, nicht geraten:
 
-Gerufen wird `RepairMCP()` von `Update()` (`project/update.go`, Ergebnis in
-`UpdateResult.MCPRepaired`) und von `runGUI()` (`cmd/k-playbook/gui.go`). Beide Stellen
-sind nötig: der `git pull` erreicht die Dateien nicht, weil sie im Hauptverzeichnis
-liegen und nicht im Clone, und ein `git pull` von Hand oder `make -C k-playbook
-installer-update` geht am Update-Handler ganz vorbei — für den ist der Start der
-Auffangweg. Ein **Entfernen** gibt es weiterhin nicht: die Oberfläche richtet ein, sie
-räumt nicht ab.
+- **`MCPStateOutdated`** wird in beiden Modi ersetzt, unabhängig von der Versionierung —
+  eine Reparatur an Inhalt, den k-playbook selbst geschrieben hat.
+- **`MCPStateStale`**, `MCPStateUnreadable`, `MCPStateAmbiguousTarget` und
+  `MCPStateNoCommand` bleiben in beiden Modi liegen: ein Eintrag kann aus einem fremden
+  `$HOME` stammen und dort gültig sein, und sonst gibt es nichts Eindeutiges zu
+  schreiben.
+- **Nicht von git erfasst** misst `mcpTargetTracked()` im Hauptverzeichnis, denn dort
+  liegen die Dateien, mit Vorbedingung und Timeout wie `agentsIgnored()` und
+  `local_private.go`. Drei Stufen, und jede unbeantwortete Frage fällt auf „erfasst",
+  also nicht schreiben: `K-PLAYBOOK.yaml` nicht lesbar → erfasst; `project.vcs` nicht
+  `git` → nicht erfasst; `git rev-parse --show-toplevel` sagt nein → kein Repository an
+  dieser Stelle, nicht erfasst (kommt git gar nicht zu Wort — nicht installiert,
+  Timeout —, ist die Frage unbeantwortet); erst dann `git ls-files --error-unmatch`, Exit
+  0 erfasst, Exit 1 nicht erfasst, alles andere unbeantwortet. `ls-files` sieht auch die
+  gelöschte, noch im Index stehende Datei; ein Existenztest täte das nicht.
+- **Spur des Assistenten** (`assistantTrace()`): eine fehlende Datei entsteht nur, wenn
+  das Assistenten-Verzeichnis — `.claude/`, `.cursor/`, `.opencode/` — mindestens einen
+  Eintrag trägt, der keiner der von `Links()` verwalteten Pfade ist, etwa
+  `.claude/settings.json` oder `.cursor/rules/`. Die Verzeichnisse selbst sind keine
+  Spur: `ApplyLinks()` legt sie in jedem Projekt an, schon auf dem Lesepfad. Ohne die
+  Bedingung entstünden bei jedem Start drei Dateien, die niemand braucht. Ein fehlender
+  Eintrag in vorhandener Datei braucht keine Spur.
+
+Geschrieben wird in jedem Modus dieselbe Form wie über den Knopf — der absolute Pfad aus
+`MCPCommand()` —, damit es eine Schreibform gibt. Dass die Datei nicht erfasst ist,
+heißt: das Projekt hat sie nicht eingecheckt. Die Startmeldung sagt beim Eintragen
+deshalb dazu, dass die Datei einen rechnerbezogenen Pfad trägt und unversioniert bleiben
+sollte, und unterscheidet „eingetragen" von „korrigiert" anhand des Zustands vor dem
+Lauf. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht wird nur der eigene
+Schlüssel.
+
+Die Enge ist die Idempotenz-Zusage: der zweite Lauf schreibt nichts mehr, und keine von
+git erfasste Datei wird durch das Ergänzen verändert. Ohne das machte jeder Start die
+getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit eingecheckter
+Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.
+
+Beide selbsttätigen Stellen sind nötig: der `git pull` erreicht die Dateien nicht, weil
+sie im Hauptverzeichnis liegen und nicht im Clone, und ein `git pull` von Hand oder
+`make -C k-playbook installer-update` geht am Update-Handler ganz vorbei — für den ist
+der Start der Auffangweg. Ein **Entfernen** gibt es weiterhin nicht: die Oberfläche
+richtet ein, sie räumt nicht ab.
 
 #### Die Bedingung, die bleibt
 
@@ -2094,6 +2210,102 @@ der einwandfrei geantwortet hat. `schemaType` in `webui/mcp.go` liest deshalb be
 und macht aus der Liste `null | array`; eine dritte, unbekannte Form bleibt still leer und
 kippt den Selbsttest nicht. Dieselbe Zurückhaltung gilt für jedes weitere Feld, das aus
 `tools/list` gelesen wird: es beschreibt eine fremde Antwort, nicht den eigenen Zustand.
+
+Seit der MCP-Server-Übersicht ist `probeMCPServer()` nur noch eine Hülle: sie löst den
+registrierten Befehl auf und ruft `probeMCPCommand(projectRoot, binary, args, env)`, den
+gemeinsamen Kern. Der Selbsttest gibt ihm die gesäuberte PATH mit, die Detailseite eines
+fremden Servers die geerbte Umgebung. Der Dialog ordnet Antworten über ihre ID zu und
+überspringt Benachrichtigungen ohne ID — fremde Server dürfen auf stdout loggen, der
+eigene tut es nicht. Was der Server in `initialize` als `capabilities` meldet, entscheidet
+über zwei weitere Anfragen: `prompts/list` (ID 3) und `resources/list` (ID 4) gehen nur
+an einen Server, der `prompts` bzw. `resources` kann. Einen Server nach etwas zu fragen,
+das er nicht kann, brächte eine Fehlerantwort, und die sähe aus wie ein Ausfall.
+
+## MCP-Server in der Oberfläche
+
+`/mcp` zeigt den eigenen Server. `/mcp-servers` zeigt **alle**: eine Matrix der
+Servernamen gegen Claude Code, OpenCode und Cursor, die Pflichtliste aus
+`tools.mcp.required` mit ihren Lücken und die gelesenen Dateien. Jede Zelle führt zur
+Detailseite `/mcp-servers/{assistant}/{name}` mit der Konfiguration des Eintrags und, auf
+Knopfdruck, dem, was der Server anbietet: Name, Version, Protokoll, Capabilities,
+Werkzeuge mit Parametern, bei Bedarf Vorlagen und Ressourcen.
+
+**Quelle sind die Konfigdateien, nicht die CLIs.** `claude mcp list` und `opencode mcp
+list` existieren, liefern aber nur Text ohne Vertrag — keine JSON-Option, Box-Zeichen und
+Farbcodes bei OpenCode —, brauchen je zwei bis drei Sekunden, weil sie jeden Server
+anpingen, und sagen nicht, ob ein Eintrag aus der globalen oder der Projektkonfiguration
+stammt. `project/mcp_servers.go` liest deshalb dieselben drei Dateien, die `MCPTargets`
+schon für die Registrierung kennt, mit demselben `readJSONObject` (JWCC, Kommentare und
+Trailing Commas erlaubt) und derselben `mcpSection`; neu ist nur, dass über alle Schlüssel
+gelaufen wird statt auf `k-playbook` zu filtern. Was ein Assistent global kennt —
+`~/.claude.json`, `~/.config/opencode/`, die Connectoren von claude.ai — steht nicht auf
+der Seite, und die Seite sagt das. Ebenso ausgeklammert sind `enabledMcpjsonServers` und
+`disabledMcpjsonServers` in `.claude/settings*.json`: sie entscheiden, ob Claude Code
+einen Server aus `.mcp.json` überhaupt lädt. Die Matrix zeigt, was in den Dateien steht;
+die `files-card` benennt beide Grenzen.
+
+**Beide OpenCode-Dateien.** Liegen `opencode.json` und `opencode.jsonc` nebeneinander,
+führt OpenCode sie zusammen, und welcher Eintrag am Ende wirkt, ist von außen nicht zu
+sehen. Die Registrierung schreibt nur in eine und meldet die Doppelung
+(`MCPStateAmbiguousTarget`); die Übersicht liest **beide** und markiert sie als doppelt —
+`mcpListTargets()` hängt die zweite Datei an `MCPTargets()` an. Ein Server, der nur in der
+zweiten steht, wäre sonst unsichtbar.
+
+**Drei Transportformen, eine davon ist „weiß nicht".** Claude Code und Cursor notieren
+`command`+`args` (lokal) oder `type: http|sse`+`url` (remote); OpenCode `type: local` mit
+`command`-Array oder `type: remote` mit `url`, dazu `enabled` (fehlt → true). Alles, was
+in keine der beiden Formen passt, ist `unknown`: die Konfiguration wird gezeigt, wie sie
+dasteht, und nie gestartet. Ein Leser, der bei einer fremden Form abbräche, machte einen
+Tippfehler in einem Eintrag zum Ausfall der ganzen Seite; einer, der riete, startete
+womöglich das Falsche. Eine unlesbare Datei hält die anderen ebenfalls nicht auf: ihr
+Zustand steht an der Datei, ihre Server fehlen.
+
+**`env` bleibt im Haus.** In `env` (Claude Code, Cursor) und `environment` (OpenCode)
+stehen Tokens. `MCPServerEntry` hält sie in einem unexportierten Feld; ins JSON gehen nur
+die Schlüsselnamen (`envKeys`), und `Environ()` reicht die Werte ausschließlich an den
+Prozessstart der Messung. Ein Test kodiert die Liste und sucht nach dem Wert.
+
+**Pflichtliste.** `tools.mcp.required` in `K-PLAYBOOK.yaml` nennt die Server, die das
+Projekt bei jedem Assistenten voraussetzt. `project/mcp_required.go` liest den Block
+zeilenweise wie `parseGHStatus` und `parseLanguages` — Block- und Flussform, ohne
+YAML-Parser —, prüft jeden Namen gegen `^[A-Za-z0-9][A-Za-z0-9._-]*$` (er ist Schlüssel
+in den MCP-Dateien und Pfadsegment der Detailseite) und bricht bei einem unzulässigen
+Namen ab wie bei einem unzulässigen Sprachnamen. `k-playbook context` trägt das als Feld
+`mcp` mit `{required, configured}`: Objektform, damit weitere MCP-Angaben Platz finden,
+ohne das Feld umzubenennen. Einen Schreiber gibt es nicht; die Seite zeigt ohne Block
+einen YAML-Schnipsel zum Abschreiben. `renderConfig` bleibt unverändert, der Block ist
+optional, `schema_version` bleibt bei 3.
+
+**Geerbte PATH für fremde Server, gesäuberte für den eigenen.** Der Selbsttest auf `/mcp`
+läuft absichtlich mit `/usr/bin:/bin:/usr/sbin:/sbin`, um den aus Dock oder Finder
+gestarteten Client abzubilden. Fremde Server liegen dort nicht: `npx` und `uvx` kommen
+aus `~/.local/bin` oder einem Versionsmanager. Die Detailseite startet deshalb mit der
+geerbten Umgebung plus `env` aus dem Eintrag, löst einen bloßen Namen per `exec.LookPath`
+auf und nennt den aufgelösten Pfad; einen relativen Pfad legt sie an das Hauptverzeichnis.
+Das gilt auch für den eigenen Server auf seiner Detailseite — `/mcp` bleibt die strengere
+Messung, und die Seite verweist dorthin.
+
+**Remote wird nicht angesprochen.** HTTP- und SSE-Server laufen hinter einer URL, und
+OAuth-Server wie Atlassian sind ohne die Token des Assistenten nicht messbar. Die
+Detailseite zeigt Konfiguration und Hinweis; der POST antwortet mit `started: false` und
+einer Meldung, ohne etwas zu tun. Ein Streamable-HTTP-Client ohne Anmeldung wäre ein
+möglicher Folgeschritt; er steht im Befund `k-playbook-local/material/befunde/
+mcp-server-erkennung.md`.
+
+**Messen nur per POST, nur auf Knopfdruck.** Die Detailseite startet in den Projektdateien
+konfigurierte Kommandos — mit der geerbten Umgebung und Klartext-`env`. Wer diese
+Dateien schreibt, bestimmt, was läuft; das ist dieselbe Vertrauensgrenze wie beim
+Assistenten, der dieselben Kommandos startet. Was daraus **nicht** folgen darf: dass ein
+`GET` etwas startet. Dann löste jeder Seitenaufruf, jeder Vorabruf des Browsers und ein
+`<img src>` auf einer fremden Seite eine Messung aus, und `npx`/`uvx` lüden dabei Pakete
+nach. `GET /api/mcp-servers/{assistant}/{name}` liefert deshalb nur die Konfiguration,
+`POST …/probe` misst — hinter der Herkunftsprüfung wie jeder POST, und ohne
+`?probe=1`-Abkürzung. Beim Laden zeigt die Seite Konfiguration und den Knopf „Messen",
+für aktivierte, deaktivierte und den eigenen Server gleichermaßen. Zwei Klicks kurz
+nacheinander starten denselben Server nicht zweimal: `mcpProbeLock(name)` serialisiert je
+Servername, der zweite Aufruf wartet. Der Timeout bleibt bei `mcpProbeTimeout` (10 s);
+läuft er ab, nennt die Meldung eine Erstinstallation durch `npx`/`uvx` als mögliche
+Ursache und schlägt „Erneut messen" vor — der zweite Start findet die Pakete im Cache.
 
 ## Lebenszyklus
 
@@ -2195,8 +2407,31 @@ dem Umschlüsseln muss schon die nächste Antwort den neuen tragen.
 ### Der Aufruf
 
 `runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `cleanUpLegacy()`,
-die Migrationsbereinigung, `protectProjectInstallation()` — und zwar bei **jedem** Aufruf,
-auch bei dem, der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start.
+die Migrationsbereinigung, `protectProjectInstallation()` — und richtet dann das
+Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
+der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start. Die
+selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
+
+| Weg | Schreibt | Nur wenn |
+|---|---|---|
+| `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs und den vorbelegten `.gitignore` | das Verzeichnis ganz fehlt |
+| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `.cursor/mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
+| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
+
+Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
+Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, entscheidet das
+Projekt. Ausgenommen sind allein Reparaturen an Inhalt, den k-playbook selbst geschrieben
+hat: die Korrektur des veralteten Wrapper-Eintrags (`MCPStateOutdated`), der Nachzug des
+veralteten Anstoßblocks in `AGENTS.md` und die Migration des `CLAUDE.md`-Symlinks zur
+Include-Datei auf dem Lesepfad. Jeder Weg ist idempotent — ein zweiter Lauf schreibt
+nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas
+geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `ContextForDir()`
+heilt ausschließlich Symlinks unter `.claude/`, `.opencode/` und `.cursor/`; Dateien im
+Projekt anzulegen darf nicht bei jedem Command-Aufruf einer KI-Sitzung passieren, der
+ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttätig läuft
+und warum — gh-Entscheidung, Remediation-Modus, Update, Privat-Schalter, Tool-Installation,
+`MCPStateStale` —, steht in den jeweiligen Abschnitten.
+
 Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 
 | Ergebnis | Handlung |

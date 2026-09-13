@@ -43,6 +43,10 @@ type Context struct {
 	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
 	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
 	GH GH `json:"gh"`
+	// MCP ist die Pflichtliste der MCP-Server aus tools.mcp.required samt der
+	// Auskunft, ob der Block dastand. Gelesen wird nur die Konfiguration —
+	// welche Server tatsächlich eingetragen sind, zeigt die Oberfläche.
+	MCP MCPRequirements `json:"mcp"`
 	// BaseTools ist der Host-Befund zu den Werkzeugen, die k-playbook selbst
 	// aufruft — bash, git, curl/wget, tar, python3, rg. Gemessen wird reine
 	// Anwesenheit im PATH über exec.LookPath: kein Unterprozess je Werkzeug,
@@ -184,8 +188,9 @@ type ContextProject struct {
 	VCS      string `json:"vcs"`
 	Config   string `json:"config"`
 	// Languages sind die Sprachen, für die dieses Projekt Werkzeuge braucht.
-	// Steht nichts in der Konfiguration, gilt DefaultLanguages — der Wert ist
-	// also immer belegt und muss nicht ausgelegt werden.
+	// Steht nichts in der Konfiguration, gilt die Erkennung aus den
+	// Manifesten, sonst DefaultLanguages — der Wert ist also immer belegt und
+	// muss nicht ausgelegt werden.
 	Languages []string `json:"languages"`
 }
 
@@ -295,6 +300,12 @@ func BuildContext(projectDir string) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
+	// Und noch einmal: ein unzulässiger Pflichtname bricht ab, statt als
+	// „nichts verlangt" durchzugehen.
+	requiredMCP, mcpConfigured, err := ReadRequiredMCPServers(projectDir)
+	if err != nil {
+		return Context{}, err
+	}
 
 	playbookDir := PlaybookDir(projectDir)
 	localDir := LocalDir(projectDir)
@@ -314,6 +325,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Local:          ContextDir{Dir: localDir},
 		Remediation:    remediation,
 		GH:             gh,
+		MCP:            MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
 		BaseTools:      DetectBaseTools(projectDir),
 		Catalogs:       map[string][]CatalogEntry{},
 		Guidelines:     listFiles(filepath.Join(localDir, "guidelines")),

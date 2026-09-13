@@ -95,6 +95,13 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// /mcp ist die Detailseite des Setup-Blocks: der Bereich ist aktiv,
 		// die Startseite darunter ist aber nicht offen.
 		{path: "/mcp", markiert: `<a class="area-nav-item active" href="/" aria-current="true">`},
+		// /mcp-servers ist der Unterpunkt von Setup: der Bereich ist aktiv, der
+		// Unterpunkt ist die offene Seite.
+		{
+			path:       "/mcp-servers",
+			markiert:   `<a class="area-nav-item active" href="/" aria-current="true">`,
+			unterpunkt: `<a class="area-nav-subitem active" href="/mcp-servers" aria-current="page">`,
+		},
 	}
 
 	for _, test := range tests {
@@ -132,10 +139,10 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			if count := strings.Count(body, "area-nav-subitem active"); count != erwarteteUnterpunkte {
 				t.Errorf("markierte Unterpunkte = %d, erwartet %d", count, erwarteteUnterpunkte)
 			}
-			// Die drei Seiten des Workflows-Bereichs stehen im Umschalter jeder
-			// Seite: von Setup aus soll der Weg zu den Tasks nicht erst über die
-			// Übersicht führen.
-			for _, sub := range []string{"/workflows/tasks", "/workflows/reviews", "/workflows/todos"} {
+			// Die drei Seiten des Workflows-Bereichs und der Unterpunkt von Setup
+			// stehen im Umschalter jeder Seite: von Setup aus soll der Weg zu den
+			// Tasks nicht erst über die Übersicht führen, und umgekehrt.
+			for _, sub := range []string{"/mcp-servers", "/workflows/tasks", "/workflows/reviews", "/workflows/todos"} {
 				if !strings.Contains(body, `href="`+sub+`"`) {
 					t.Errorf("der Unterpunkt %s fehlt im Umschalter", sub)
 				}
@@ -194,7 +201,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/knowledge", "/docs", "/inventory", "/mcp"} {
+	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)

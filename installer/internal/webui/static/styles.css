@@ -921,6 +921,88 @@ button.attention-highlight {
   gap: 10px;
 }
 
+/* Die Matrix der MCP-Server: Namen gegen Assistenten. Sie scrollt in ihrer
+   Hülle waagerecht, weil drei Kommandozeilen nebeneinander auf einem
+   schmalen Fenster nicht umbrechen sollen — die Karte bleibt so breit wie die
+   anderen. */
+.matrix-wrap {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.matrix th,
+.matrix td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.matrix thead th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.matrix tbody th {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.matrix td a {
+  color: var(--accent-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+/* Ein fehlender Pflichtserver muss beim Überfliegen auffallen; ein fehlender
+   freiwilliger und ein deaktivierter treten zurück. */
+.matrix td.warn {
+  color: var(--warn);
+  font-weight: 800;
+}
+
+.matrix td.muted,
+.matrix .muted {
+  color: var(--muted);
+}
+
+/* Mehrere Pills nebeneinander, etwa die gemeldeten Fähigkeiten eines
+   MCP-Servers. */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pill-row:empty {
+  display: none;
+}
+
+/* Ein Konfigurationsschnipsel zum Abschreiben, etwa der Block
+   tools.mcp.required für ein Projekt, das noch keinen hat. */
+.snippet {
+  margin: 12px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 /* Tasks stehen untereinander: die Zeile trägt Dateiname und Titel, das liest
    sich nebeneinander schlecht. */
 .task-list {

@@ -208,10 +208,30 @@ work in two places:
 
 Clicking *Set up* is not required for this; it remains the explicit write path alongside it.
 
-This correction is **narrow and idempotent**. It writes only for an existing entry that is
-obsolete in the narrow sense. A missing file is not created, a missing entry is not added,
-and no accepted form is touched -- otherwise every start would dirty a project's committed
-MCP files. One configuration entry is replaced; nothing is deleted.
+This correction is **narrow and idempotent**. Replacing the obsolete entry is a repair of
+content k-playbook wrote itself, so it runs regardless of whether the file is committed.
+No accepted form is touched, and an entry that is neither obsolete nor accepted (`stale`)
+is left alone -- it may come from a foreign `$HOME` and be valid there. Nothing is deleted.
+
+The two automatic paths differ in how far they go. The clone update replaces the obsolete
+entry and nothing else. The start goes further: it also **adds a missing entry and creates
+a missing file -- but only when the target file is not tracked by git.** That is the
+condition that keeps a clone's working tree clean, and it is measured, not guessed,
+in the project root: `K-PLAYBOOK.yaml` unreadable counts as tracked (the question is
+unanswered, so nothing is written); `project.vcs` other than `git` means nothing is
+tracked; `git rev-parse --show-toplevel` answering "no repository" means nothing is tracked
+here; then `git ls-files --error-unmatch` decides -- exit 0 tracked, exit 1 not tracked,
+anything else (including a timeout or a git that could not run) counts as tracked. A
+missing file is additionally created only if the assistant has left a **trace of its own**
+in the project: an entry in `.claude/`, `.cursor/` or `.opencode/` that is not one of the
+symlink targets k-playbook manages itself -- for example `.claude/settings.json` or
+`.cursor/rules/`. The directories alone are no trace; k-playbook creates them in every
+project. Without that condition every start would create three files nobody needs.
+
+What is written is the same form *Set up* writes: the absolute path. The start message says
+so -- the file carries a machine-specific path and should stay unversioned. Whether the
+project commits it anyway is the project's decision; from then on the file is tracked and
+the automatic path no longer touches it.
 
 The prerequisite remains the one-time bootstrap per host or Dev Container --
 `make -C k-playbook install`, or without make `k-playbook/bin/install`: both correction paths
@@ -595,6 +615,28 @@ program is set.
 If the server does not respond, none is installed, or no usable JSON is returned, this is a
 page result and not a failure: it reports "server does not respond" with the reason and
 remains usable.
+
+### All Servers of the Project
+
+The **/mcp-servers** page -- the *MCP-Server* entry under *Setup* in the left column, or
+*All MCP servers* in the block -- shows every MCP server the three assistants know in
+this project: a matrix of server names against Claude Code, OpenCode, and Cursor, the
+required servers from `tools.mcp.required` in `K-PLAYBOOK.yaml` with their gaps, and the
+files that were read. The source is those files alone: `.mcp.json`, `opencode.json` (and
+`opencode.jsonc`, if both exist), and `.cursor/mcp.json`. Global configurations and the
+`enabledMcpjsonServers` lists in `.claude/settings*.json` are deliberately not read; the
+page says so.
+
+Each cell leads to a detail page `/mcp-servers/<assistant>/<name>` with the entry's
+configuration -- transport, command or URL, resolved path, `enabled`, whether it is
+required, and the key names from `env` without their values. Loading the page starts
+nothing. *Measure* sends a `POST` and starts the configured command with the project root
+as working directory and the **inherited** environment plus `env` from the entry -- unlike
+the self-test on `/mcp`, which strips the shell PATH. Foreign servers via `npx` or `uvx`
+do not live in the minimal system PATH; the page names the resolved path. The result
+lists server name, version, protocol, capabilities, tools with parameters, and prompts and
+resources where the server reports them. Remote servers (HTTP/SSE) are not contacted:
+their login belongs to the assistant.
 
 ## Manually
 

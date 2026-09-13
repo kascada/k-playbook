@@ -247,7 +247,9 @@ func LocalOK(statuses []LocalEntryStatus) bool {
 }
 
 // CreateLocal legt fehlende Teile der Struktur an. Vorhandenes bleibt
-// unberührt, auch READMEs mit eigenem Text.
+// unberührt, auch READMEs mit eigenem Text. Das ist der **ausdrückliche**
+// Weg: der Knopf „Anlegen" (POST /api/local). Beim Start läuft er nicht —
+// dort greift EnsureLocal, und das nur, wenn das Verzeichnis ganz fehlt.
 //
 // Für Einträge mit PrivateByDefault schreibt CreateLocal zusätzlich die
 // verwaltete .gitignore — aber nur, wenn das Verzeichnis in genau diesem Lauf
@@ -255,9 +257,8 @@ func LocalOK(statuses []LocalEntryStatus) bool {
 // selbst meldet das nicht. Zwei Gründe:
 //
 //   - makePublic() entfernt die verwaltete Datei bewusst. Ein späterer
-//     CreateLocal()-Lauf — jeder /k-gui-Start, jedes „Struktur anlegen" —
-//     brächte sie sonst still zurück und überginge die Entscheidung des
-//     Projekts.
+//     CreateLocal()-Lauf — jedes „Struktur anlegen" — brächte sie sonst
+//     still zurück und überginge die Entscheidung des Projekts.
 //   - Bestandsprojekte mit getrackten Dateien unter results/ landeten sonst im
 //     Zustand PrivacyPartial: Regel greift, Dateien stehen im Index. Wer nur
 //     aktualisiert, soll davon nichts merken.
@@ -291,6 +292,25 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 	}
 
 	return CheckLocal(projectDir), nil
+}
+
+// EnsureLocal legt die Struktur an, wenn k-playbook-local/ ganz fehlt — der
+// **selbsttätige** Weg beim Start. Das zweite Ergebnis meldet, ob angelegt
+// wurde; die Zustände sind die aus CreateLocal.
+//
+// Nur das ganz fehlende Verzeichnis, nicht der fehlende Teil: CreateLocal ist
+// rein additiv, und additiv heißt auch, dass eine bewusst gelöschte
+// Strukturdatei bei jedem Start zurückkäme. Existiert das Verzeichnis — auch
+// unvollständig —, bleibt es deshalb beim Knopf. Damit braucht es hier keinen
+// Vorher-nachher-Vergleich über CheckLocal: entweder entsteht alles, oder
+// nichts wird angefasst. Eine bewusste Umschaltung auf öffentlich bleibt so
+// ebenfalls stehen — sie setzt ein vorhandenes Verzeichnis voraus.
+func EnsureLocal(projectDir string) ([]LocalEntryStatus, bool, error) {
+	if pathExists(LocalDir(projectDir)) {
+		return nil, false, nil
+	}
+	statuses, err := CreateLocal(projectDir)
+	return statuses, true, err
 }
 
 // ensureCacheDir legt cache/ an und schreibt dabei dieselbe verwaltete

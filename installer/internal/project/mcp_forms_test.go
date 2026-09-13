@@ -202,7 +202,7 @@ func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
 	portabel := `{"mcpServers":{"` + MCPServerKey + `":{"command":"/Users/fremd/.local/bin/k-playbook","args":["mcp"]}}}` + "\n"
 	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), portabel)
 
-	repaired, err := RepairMCP(root)
+	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestRepairMCPIstIdempotent(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".mcp.json"),
 		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
 
-	if _, err := RepairMCP(root); err != nil {
+	if _, err := RepairMCP(root, MCPWriteOutdatedOnly); err != nil {
 		t.Fatalf("erster Lauf: %v", err)
 	}
 	first, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
@@ -245,7 +245,7 @@ func TestRepairMCPIstIdempotent(t *testing.T) {
 		t.Fatalf(".mcp.json lesen: %v", err)
 	}
 
-	repaired, err := RepairMCP(root)
+	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestRepairMCPIstIdempotent(t *testing.T) {
 func TestRepairMCPLegtNichtsAn(t *testing.T) {
 	root := newMCPProject(t)
 
-	repaired, err := RepairMCP(root)
+	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestRepairMCPOhneInstalliertesBinary(t *testing.T) {
 	veraltet := `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
 	writeFile(t, filepath.Join(root, ".mcp.json"), veraltet)
 
-	repaired, err := RepairMCP(root)
+	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -333,7 +333,7 @@ func TestPortableFormBleibtVonSelbstUnangetastet(t *testing.T) {
 		}
 	}
 
-	repaired, err := RepairMCP(root)
+	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}

@@ -9,13 +9,20 @@
                Ziel eine andere Seite ist. Auf /mcp ist Setup aktiv, / ist aber
                nicht offen — dort wäre "page" eine falsche Auskunft.
 
-               Workflows ist der einzige Bereich mit mehreren gleichrangigen
-               Seiten; seine drei stehen deshalb als Unterpunkte darunter, und
-               zwar in jedem Bereich. Wer von Setup aus zu den Tasks will, soll
-               nicht erst die Übersicht laden müssen. -->
+               Zwei Bereiche haben mehrere gleichrangige Seiten. Workflows hat
+               drei, die als Unterpunkte darunter stehen; Setup hat die
+               Übersicht der MCP-Server, und ihre Detailseiten laufen unter
+               demselben Unterpunkt: aktiv bei jedem Pfad unter /mcp-servers,
+               aria-current="page" nur auf der Übersicht selbst. /mcp hat
+               keinen Unterpunkt — die Karte und die Detailseite des eigenen
+               Servers führen dorthin. Die Unterpunkte stehen in jedem Bereich:
+               wer von Setup aus zu den Tasks will, soll nicht erst die
+               Übersicht laden müssen. Ohne Installation gibt es keine
+               MCP-Dateien und keinen Unterpunkt, wie bei Workflows. -->
           <nav class="area-nav" aria-label="Bereiche">
             <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="{{if eq .Page "/"}}page{{else}}true{{end}}"{{end}}>Setup</a>
             {{if .Installed}}
+            <a class="area-nav-subitem{{if hasPrefix .Page "/mcp-servers"}} active{{end}}" href="/mcp-servers"{{if eq .Page "/mcp-servers"}} aria-current="page"{{end}}>MCP-Server</a>
             <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="{{if eq .Page "/workflows"}}page{{else}}true{{end}}"{{end}}>Workflows</a>
             <a class="area-nav-subitem{{if eq .Page "/workflows/tasks"}} active{{end}}" href="/workflows/tasks"{{if eq .Page "/workflows/tasks"}} aria-current="page"{{end}}>Tasks</a>
             <a class="area-nav-subitem{{if eq .Page "/workflows/reviews"}} active{{end}}" href="/workflows/reviews"{{if eq .Page "/workflows/reviews"}} aria-current="page"{{end}}>Reviews</a>

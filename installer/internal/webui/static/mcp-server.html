@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <section class="card" id="config-card">
+            <div class="section-head">
+              <div>
+                <h2>Konfiguration</h2>
+              </div>
+              <span id="config-pill" class="pill muted">Lesen...</span>
+            </div>
+
+            <p class="hint">
+              So steht der Server in der Projektdatei des Assistenten. Werte aus
+              <code>env</code> und <code>environment</code> zeigt die Seite nicht — nur die
+              Schlüsselnamen; dort stehen Tokens.
+            </p>
+
+            <dl id="config-facts" class="facts"></dl>
+            <p id="config-note" class="hint hidden"></p>
+            <p id="config-message" class="message"></p>
+            <div class="link-row">
+              <a class="button-link secondary" href="/mcp-servers">Alle MCP-Server</a>
+              <a id="own-link" class="button-link secondary hidden" href="/mcp">Selbsttest des eigenen Servers</a>
+            </div>
+          </section>
+
+          <section class="card" id="server-card">
+            <div class="section-head">
+              <div>
+                <h2>Server</h2>
+              </div>
+              <span id="server-pill" class="pill muted">Nicht gemessen</span>
+            </div>
+
+            <p class="hint">
+              Gemessen, nicht behauptet: auf Knopfdruck startet die Oberfläche das konfigurierte
+              Kommando als eigenen Prozess — im Hauptverzeichnis, mit der geerbten Umgebung und
+              <code>env</code> aus dem Eintrag, ein bloßer Name über die PATH aufgelöst —, schickt
+              ihm <code>initialize</code> und <code>tools/list</code> und zeigt, was zurückkommt.
+              Beim Laden dieser Seite wird nichts gestartet. Der Selbsttest unter
+              <a href="/mcp">/mcp</a> misst den eigenen Server strenger, ohne die Shell-PATH.
+            </p>
+
+            <dl id="server-facts" class="facts"></dl>
+            <div id="server-capabilities" class="pill-row"></div>
+            <p id="server-message" class="message"></p>
+            <button id="probe" class="secondary" disabled>Messen</button>
+          </section>
+
+          <section class="card hidden" id="tools-card">
+            <div class="section-head">
+              <div>
+                <h2>Werkzeuge</h2>
+              </div>
+              <span id="tools-pill" class="pill muted"></span>
+            </div>
+            <div id="tools-list" class="settings"></div>
+            <p id="tools-message" class="message"></p>
+          </section>
+
+          <section class="card hidden" id="prompts-card">
+            <div class="section-head">
+              <div>
+                <h2>Vorlagen</h2>
+              </div>
+              <span id="prompts-pill" class="pill muted"></span>
+            </div>
+            <div id="prompts-list" class="settings"></div>
+          </section>
+
+          <section class="card hidden" id="resources-card">
+            <div class="section-head">
+              <div>
+                <h2>Ressourcen</h2>
+              </div>
+              <span id="resources-pill" class="pill muted"></span>
+            </div>
+            <div id="resources-list" class="settings"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/mcp-server.js"></script>
+  </body>
+</html>

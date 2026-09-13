@@ -138,9 +138,10 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	// Die MCP-Registrierung liegt im Hauptverzeichnis, nicht im Clone — der
 	// Pull erreicht sie nicht. Ein Bestandsprojekt käme sonst mit einem Eintrag
 	// aus dem Update, der auf den abgelösten Wrapper zeigt. Korrigiert wird nur
-	// dieser eine Fall, und ein Fehlschlag entwertet das Update nicht: der Pull
-	// ist durch, und der nächste Start versucht es erneut.
-	repaired, repairErr := RepairMCP(projectDir)
+	// dieser eine Fall — das Update ergänzt keinen fehlenden Eintrag, das ist
+	// Sache des Starts —, und ein Fehlschlag entwertet das Update nicht: der
+	// Pull ist durch, und der nächste Start versucht es erneut.
+	repaired, repairErr := RepairMCP(projectDir, MCPWriteOutdatedOnly)
 	result.MCPRepaired = repaired
 	if repairErr != nil {
 		result.Message = "MCP-Registrierung nicht vollständig korrigiert: " + repairErr.Error()

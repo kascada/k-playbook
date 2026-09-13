@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <section class="card" id="servers-card">
+            <div class="section-head">
+              <div>
+                <h2>Konfigurierte Server</h2>
+              </div>
+              <span id="servers-pill" class="pill muted">Lesen...</span>
+            </div>
+
+            <p class="hint">
+              Was die drei Assistenten in diesem Projekt an MCP-Servern kennen — gelesen aus
+              <code>.mcp.json</code>, <code>opencode.json</code> und <code>.cursor/mcp.json</code>,
+              sonst nichts. Ein Name führt zur Detailseite des Servers beim jeweiligen
+              Assistenten; dort lässt sich messen, was er anbietet. Beim Laden dieser Seite wird
+              kein Server gestartet.
+            </p>
+
+            <div class="matrix-wrap">
+              <table class="matrix" id="servers-matrix">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Pflicht</th>
+                    <th scope="col">Claude Code</th>
+                    <th scope="col">OpenCode</th>
+                    <th scope="col">Cursor</th>
+                  </tr>
+                </thead>
+                <tbody id="servers-rows"></tbody>
+              </table>
+            </div>
+            <p id="servers-message" class="message"></p>
+          </section>
+
+          <section class="card" id="required-card">
+            <div class="section-head">
+              <div>
+                <h2>Pflichtserver</h2>
+              </div>
+              <span id="required-pill" class="pill muted">Lesen...</span>
+            </div>
+
+            <p class="hint">
+              Welche Server das Projekt bei jedem Assistenten voraussetzt, steht in
+              <code>K-PLAYBOOK.yaml</code> unter <code>tools.mcp.required</code>. Die Liste
+              erscheint auch in <code>k-playbook context</code> als Feld <code>mcp</code>; die
+              Matrix oben markiert die Lücken.
+            </p>
+
+            <dl id="required-facts" class="facts"></dl>
+            <div id="required-gaps" class="settings"></div>
+            <pre id="required-snippet" class="snippet hidden"></pre>
+            <p id="required-message" class="message"></p>
+          </section>
+
+          <section class="card" id="files-card">
+            <div class="section-head">
+              <div>
+                <h2>Gelesene Dateien</h2>
+              </div>
+              <span id="files-pill" class="pill muted">Lesen...</span>
+            </div>
+
+            <p class="hint">
+              Nur die Projektdateien werden gelesen. Was ein Assistent zusätzlich global kennt —
+              <code>~/.claude.json</code>, <code>~/.config/opencode/</code>, die Connectoren von
+              claude.ai — steht hier nicht. Ebenso wenig, ob Claude Code einen Server aus
+              <code>.mcp.json</code> tatsächlich lädt: das steuern
+              <code>enabledMcpjsonServers</code> und <code>disabledMcpjsonServers</code> in
+              <code>.claude/settings.json</code> und <code>.claude/settings.local.json</code>, die
+              diese Seite nicht auswertet. Die Matrix zeigt, was in den Dateien steht.
+            </p>
+
+            <div id="files-list" class="settings"></div>
+            <p id="files-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/mcp-servers.js"></script>
+  </body>
+</html>

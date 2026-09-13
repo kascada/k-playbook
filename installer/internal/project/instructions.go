@@ -198,42 +198,96 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 	return CheckRootInstructions(projectDir), hint
 }
 
-// RepairRootInstructions ersetzt einen veralteten Anstoßblock in einer
-// **vorhandenen** Wurzeldatei — und sonst nichts.
+// RootInstructionsRepair nennt, was der Auffangweg beim Start an AGENTS.md
+// getan hat. Beides zugleich ist unmöglich: ersetzt wird in einer vorhandenen
+// Datei, angelegt wird eine fehlende.
+type RootInstructionsRepair struct {
+	// Refreshed: ein veralteter Anstoßblock wurde ersetzt.
+	Refreshed bool
+	// Created: die Datei fehlte ganz und wurde aus der Vorlage angelegt.
+	Created bool
+}
+
+// RepairRootInstructions ist der Auffangweg beim Start, das Gegenstück zu
+// RepairMCP: ein `git pull` von Hand oder `make -C k-playbook
+// installer-update` erreicht AGENTS.md nicht, weil sie im Hauptverzeichnis
+// liegt und nicht im Clone.
 //
-// Das ist der Auffangweg beim Start, das Gegenstück zu RepairMCP: ein
-// `git pull` von Hand oder `make -C k-playbook installer-update` erreicht
-// AGENTS.md nicht, weil sie im Hauptverzeichnis liegt und nicht im Clone.
+// Genau zwei Fälle, beide idempotent:
 //
-// Eng und idempotent wie die MCP-Korrektur: eine fehlende Datei wird nicht
-// angelegt, ein fehlender Anstoß nicht ergänzt, der Session-Memory-Block nicht
-// nachgetragen. Geschrieben wird nur, wenn der vorhandene Block noch den
-// abgelösten Wrapper aufruft. Der ausdrückliche Weg für alles Weitere bleibt
-// das Einrichten über ApplyRootInstructions.
+//   - Die Datei steht und ihr Anstoßblock ruft noch den abgelösten Wrapper
+//     auf: der Block wird ersetzt — eine Reparatur an Inhalt, den k-playbook
+//     selbst geschrieben hat, unabhängig davon, ob die Datei versioniert ist.
+//   - Die Datei fehlt ganz und die Einordnung des Paars CLAUDE.md/AGENTS.md
+//     kennt weder Konflikt noch etwas zu verschieben: sie entsteht aus der
+//     Vorlage (createRootInstructions). Es gibt dann nichts zu überschreiben
+//     und keine Entscheidung zu übergehen.
 //
-// Zurück kommt, ob geschrieben wurde.
-func RepairRootInstructions(projectDir string) (bool, error) {
+// Alles Übrige bleibt dem Einrichten über ApplyRootInstructions: ein fehlender
+// Anstoß in einer vorhandenen Datei wird nicht ergänzt, der Session-Memory-
+// und der Befunde-Block nicht nachgetragen, eine echte CLAUDE.md nicht
+// umbenannt, kein opencode.json angefasst.
+func RepairRootInstructions(projectDir string) (RootInstructionsRepair, error) {
 	path := filepath.Join(projectDir, RootInstructionsFile)
 
 	data, err := os.ReadFile(path)
-	if err != nil {
-		// Keine lesbare Datei heißt: nichts zu reparieren. Das Anlegen ist
-		// Sache des Einrichtens, nicht dieses Weges.
-		return false, nil
+	switch {
+	case err != nil && os.IsNotExist(err):
+		return createRootInstructions(projectDir)
+
+	case err != nil:
+		// Nicht lesbar heißt: nichts zu reparieren und nichts anzulegen.
+		return RootInstructionsRepair{}, nil
 	}
 
 	content := strings.TrimRight(string(data), "\n")
 	replaced, ok, err := replaceOutdatedInstructionsBlock(content)
 	if err != nil {
-		return false, err
+		return RootInstructionsRepair{}, err
 	}
 	if !ok {
-		return false, nil
+		return RootInstructionsRepair{}, nil
 	}
 	if err := os.WriteFile(path, []byte(replaced+"\n"), 0o644); err != nil {
-		return false, fmt.Errorf("%s auffrischen: %w", RootInstructionsFile, err)
+		return RootInstructionsRepair{}, fmt.Errorf("%s auffrischen: %w", RootInstructionsFile, err)
 	}
-	return true, nil
+	return RootInstructionsRepair{Refreshed: true}, nil
+}
+
+// createRootInstructions legt eine ganz fehlende AGENTS.md aus der Vorlage an
+// — nur die Datei, nichts weiter: kein Eintrag in opencode.json, keine
+// Umbenennung, kein entfernter Link. Das bleibt dem Einrichten.
+//
+// Die Einordnung kommt aus instructions_layout.go und wird nicht nachgebaut.
+// Angelegt wird nur, wenn die Fallmatrix nichts anderes vorsieht: ein Konflikt
+// (etwa CLAUDE.md als Link auf ein fremdes Ziel) und eine Blockade bleiben
+// liegen und werden nur gemeldet; steht eine echte CLAUDE.md, gehört die
+// Umbenennung dem Knopf — eine Vorlage daneben ergäbe zwei echte Dateien und
+// damit den Konflikt aus Zeile 11; ein Symlink an AGENTS.md ist erst zu
+// entfernen und heißt ebenfalls Knopf.
+//
+// O_EXCL statt WriteFile: ein Rest-Link an AGENTS.md ist per ReadFile
+// „nicht vorhanden", WriteFile folgte ihm aber an sein totes Ziel. So entsteht
+// die Datei nur dort, wo wirklich nichts liegt.
+func createRootInstructions(projectDir string) (RootInstructionsRepair, error) {
+	plan := classifyInstructions(projectDir)
+	if plan.conflict || plan.blocked || plan.rename || plan.removeAgentsLink || !plan.mayCreate {
+		return RootInstructionsRepair{}, nil
+	}
+
+	path := filepath.Join(projectDir, RootInstructionsFile)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if os.IsExist(err) {
+			return RootInstructionsRepair{}, nil
+		}
+		return RootInstructionsRepair{}, fmt.Errorf("%s anlegen: %w", RootInstructionsFile, err)
+	}
+	_, writeErr := file.WriteString(rootInstructionsTemplate())
+	if err := errors.Join(writeErr, file.Close()); err != nil {
+		return RootInstructionsRepair{}, fmt.Errorf("%s anlegen: %w", RootInstructionsFile, err)
+	}
+	return RootInstructionsRepair{Created: true}, nil
 }
 
 // replaceOutdatedInstructionsBlock ersetzt den Anstoßblock durch die aktuelle

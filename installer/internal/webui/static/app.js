@@ -1214,11 +1214,12 @@ function renderLanguageChoices(data) {
     elements.toolsLanguages.append(label);
   }
 
-  // Die Vorauswahl gilt auch ohne Eintrag in der Datei; das sollte sichtbar
-  // sein, damit niemand eine ausdrückliche Entscheidung vermutet.
+  // Ohne Eintrag in der Datei ist die Auswahl aus den Manifesten des Projekts
+  // erkannt, nicht entschieden; das sollte sichtbar sein, damit niemand eine
+  // ausdrückliche Entscheidung vermutet.
   if (!data.configured && !data.message) {
     elements.toolsMessage.textContent =
-      "Noch nicht gespeichert: Bis project.languages in K-PLAYBOOK.yaml steht, nutzt k-playbook die Standardauswahl. Eine Sprachänderung speichert die Auswahl.";
+      "Noch nicht gespeichert: Die Auswahl ist aus den Manifesten des Projekts erkannt (go.mod, pyproject.toml, package.json …) und steht noch nicht als project.languages in K-PLAYBOOK.yaml. Eine Sprachänderung speichert die Auswahl.";
   }
 }
 

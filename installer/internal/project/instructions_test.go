@@ -216,7 +216,7 @@ HTML-Kommentar, der sie vom Anstoß trennen würde.
 	if err != nil {
 		t.Fatalf("RepairRootInstructions: %v", err)
 	}
-	if !repaired {
+	if !repaired.Refreshed {
 		t.Fatal("der veraltete Block wurde nicht ersetzt")
 	}
 
@@ -255,7 +255,7 @@ Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.
 	if err == nil {
 		t.Fatal("das unbestimmbare Blockende wurde nicht gemeldet")
 	}
-	if repaired {
+	if repaired.Refreshed {
 		t.Error("es wurde trotzdem geschrieben")
 	}
 	if readInstructions(t, root) != eigen {
@@ -281,7 +281,7 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RepairRootInstructions: %v", err)
 		}
-		if !repaired {
+		if !repaired.Refreshed {
 			t.Fatal("der veraltete Block wurde nicht gemeldet")
 		}
 
@@ -303,7 +303,7 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("zweiter Lauf: %v", err)
 		}
-		if repaired {
+		if repaired.Refreshed {
 			t.Error("der zweite Lauf hat erneut geschrieben")
 		}
 		if readInstructions(t, root) != vorher {
@@ -322,7 +322,7 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RepairRootInstructions: %v", err)
 		}
-		if repaired {
+		if repaired.Refreshed {
 			t.Error("ein aktueller Block wurde geschrieben")
 		}
 		if readInstructions(t, root) != vorher {
@@ -341,7 +341,7 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RepairRootInstructions: %v", err)
 		}
-		if repaired {
+		if repaired.Refreshed {
 			t.Error("ohne Anstoß wurde geschrieben")
 		}
 		if readInstructions(t, root) != eigen {
@@ -349,20 +349,128 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		}
 	})
 
-	t.Run("fehlende Datei wird nicht angelegt", func(t *testing.T) {
+	t.Run("fremder Text wird nicht angelegt gemeldet", func(t *testing.T) {
 		root := t.TempDir()
+		eigen := "# Unser Projekt\n\nHier steht kein Anstoß.\n"
+		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
+			t.Fatalf("AGENTS.md anlegen: %v", err)
+		}
 
 		repaired, err := RepairRootInstructions(root)
 		if err != nil {
 			t.Fatalf("RepairRootInstructions: %v", err)
 		}
-		if repaired {
-			t.Error("eine fehlende Datei wurde gemeldet")
+		if repaired.Created {
+			t.Error("eine vorhandene Datei wurde als angelegt gemeldet")
 		}
-		if _, err := os.Stat(filepath.Join(root, RootInstructionsFile)); !os.IsNotExist(err) {
-			t.Error("der Auffangweg hat AGENTS.md angelegt")
+		if readInstructions(t, root) != eigen {
+			t.Error("eine fremde Datei wurde verändert")
 		}
 	})
+}
+
+// Der zweite Fall des Auffangwegs: fehlt AGENTS.md ganz, entsteht sie aus der
+// Vorlage — nur die Datei. opencode.json bleibt unangetastet, und der zweite
+// Lauf hat nichts mehr zu tun.
+func TestRepairRootInstructionsLegtFehlendeDateiAusVorlageAn(t *testing.T) {
+	root := t.TempDir()
+	opencode := filepath.Join(root, "opencode.json")
+	vorher := `{"$schema":"https://opencode.ai/config.json"}` + "\n"
+	if err := os.WriteFile(opencode, []byte(vorher), 0o644); err != nil {
+		t.Fatalf("opencode.json anlegen: %v", err)
+	}
+
+	repaired, err := RepairRootInstructions(root)
+	if err != nil {
+		t.Fatalf("RepairRootInstructions: %v", err)
+	}
+	if !repaired.Created {
+		t.Fatal("die fehlende Datei wurde nicht angelegt")
+	}
+	if repaired.Refreshed {
+		t.Error("eine neue Datei wurde als ersetzt gemeldet")
+	}
+	if readInstructions(t, root) != rootInstructionsTemplate() {
+		t.Errorf("die Datei entspricht nicht der Vorlage:\n%s", readInstructions(t, root))
+	}
+	if state := CheckRootInstructions(root); !state.OK() {
+		t.Errorf("die angelegte Datei gilt nicht als eingerichtet: %+v", state)
+	}
+
+	nachher, err := os.ReadFile(opencode)
+	if err != nil {
+		t.Fatalf("opencode.json lesen: %v", err)
+	}
+	if string(nachher) != vorher {
+		t.Errorf("der Auffangweg hat opencode.json verändert:\n%s", nachher)
+	}
+
+	erst := readInstructions(t, root)
+	repaired, err = RepairRootInstructions(root)
+	if err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+	if repaired.Created || repaired.Refreshed {
+		t.Errorf("der zweite Lauf hat erneut geschrieben: %+v", repaired)
+	}
+	if readInstructions(t, root) != erst {
+		t.Error("der zweite Lauf hat die Datei verändert")
+	}
+}
+
+// Was die Fallmatrix nicht als glatten Fall kennt, legt der Auffangweg nicht
+// an: ein Konflikt, eine echte CLAUDE.md, deren Umbenennung dem Knopf gehört,
+// und ein Rest-Link an AGENTS.md, dem WriteFile an sein totes Ziel folgte.
+func TestRepairRootInstructionsLegtBeiKonfliktNichtsAn(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(t *testing.T, root string)
+	}{
+		{
+			name: "CLAUDE.md zeigt auf ein fremdes Ziel (Zeile 4)",
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, "fremd.md"), "# fremd\n")
+				if err := os.Symlink("fremd.md", filepath.Join(root, ClaudeInstructionsFile)); err != nil {
+					t.Fatalf("Symlink anlegen: %v", err)
+				}
+			},
+		},
+		{
+			name: "echte CLAUDE.md wartet auf die Umbenennung (Zeile 10)",
+			setup: func(t *testing.T, root string) {
+				writeFile(t, filepath.Join(root, ClaudeInstructionsFile), "# Unser Projekt\n")
+			},
+		},
+		{
+			name: "AGENTS.md ist ein Rest-Link (Zeile 7)",
+			setup: func(t *testing.T, root string) {
+				if err := os.Symlink("weg.md", filepath.Join(root, RootInstructionsFile)); err != nil {
+					t.Fatalf("Symlink anlegen: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			test.setup(t, root)
+
+			repaired, err := RepairRootInstructions(root)
+			if err != nil {
+				t.Fatalf("RepairRootInstructions: %v", err)
+			}
+			if repaired.Created || repaired.Refreshed {
+				t.Errorf("der Auffangweg hat geschrieben: %+v", repaired)
+			}
+			if info, err := os.Lstat(filepath.Join(root, RootInstructionsFile)); err == nil && info.Mode().IsRegular() {
+				t.Error("der Auffangweg hat AGENTS.md angelegt")
+			}
+			if pathExists(filepath.Join(root, "weg.md")) {
+				t.Error("der Auffangweg ist dem Rest-Link an sein totes Ziel gefolgt")
+			}
+		})
+	}
 }
 
 func readInstructions(t *testing.T, root string) string {

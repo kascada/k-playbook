@@ -3,7 +3,6 @@ package webui
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -39,7 +38,8 @@ type toolsResponse struct {
 	Languages          []string `json:"languages"`
 	AvailableLanguages []string `json:"availableLanguages"`
 	// Configured meldet, ob project.languages in der Konfiguration steht. Ist es
-	// das nicht, zeigt die Oberfläche die Vorauswahl als noch nicht getroffen.
+	// das nicht, sind Languages die aus den Manifesten erkannten Sprachen, und
+	// die Oberfläche zeigt die Auswahl als noch nicht gespeichert.
 	Configured bool `json:"configured"`
 }
 
@@ -110,6 +110,12 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		return response
 	}
 
+	// Die wählbaren Sprachen kommen aus der Tool-Matrix selbst, über dieselbe
+	// Funktion, die auch die Erkennung in project.DetectLanguages begrenzt —
+	// eine Definition der Menge, nicht zwei. Ohne lesbare Matrix bleibt die
+	// Liste leer, und die Oberfläche zeigt keine Auswahl.
+	available, _ := project.ReadToolLanguages(projectDir)
+
 	return toolsResponse{
 		Available:           true,
 		Tools:               preflight.Tools,
@@ -124,7 +130,7 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		MissingOptional:     preflight.MissingOptional,
 		OK:                  preflight.MissingRequired == 0,
 		Languages:           languages,
-		AvailableLanguages:  languagesFromMatrix(preflight.Tools),
+		AvailableLanguages:  available,
 		Configured:          configured,
 	}
 }
@@ -143,27 +149,4 @@ func fallbackToolInstallCommand(projectDir string, languages []string, extra str
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
-}
-
-// languagesFromMatrix sammelt die wählbaren Sprachen aus der Tool-Matrix: alles,
-// was ein Tool als Zuständigkeit nennt, außer dem sprachunabhängigen *. Damit
-// bringt ein künftiges Tool seine Sprache von allein mit.
-func languagesFromMatrix(tools []project.Tool) []string {
-	seen := map[string]bool{}
-	for _, tool := range tools {
-		for _, language := range strings.Split(tool.Languages, ",") {
-			language = strings.TrimSpace(language)
-			if language == "" || language == "*" {
-				continue
-			}
-			seen[language] = true
-		}
-	}
-
-	languages := make([]string, 0, len(seen))
-	for language := range seen {
-		languages = append(languages, language)
-	}
-	sort.Strings(languages)
-	return languages
 }

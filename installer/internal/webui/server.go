@@ -194,6 +194,12 @@ func routes(state *serverState) http.Handler {
 	// Eigener Endpunkt, weil dahinter ein Subprozess steht: nur die Seite /mcp
 	// fragt ihn, die Startseite bliebe sonst daran hängen.
 	mux.HandleFunc("GET /api/mcp/tools", mcpToolsHandler)
+	// Die Übersicht aller MCP-Server liest nur Dateien. Die Messung eines
+	// Servers steht hinter einem POST: sie startet ein Kommando aus den
+	// Projektdateien und darf weder ein GET noch ein Seitenaufruf auslösen.
+	mux.HandleFunc("GET /api/mcp-servers", mcpServersHandler)
+	mux.HandleFunc("GET /api/mcp-servers/{assistant}/{name}", mcpServerDetailHandler)
+	mux.HandleFunc("POST /api/mcp-servers/{assistant}/{name}/probe", mcpServerProbeHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
 	// Die Basis-Werkzeuge haben einen eigenen Endpunkt neben den Security-Tools:
@@ -234,6 +240,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
+	mux.HandleFunc("GET /mcp-servers", mcpServersPageHandler)
+	mux.HandleFunc("GET /mcp-servers/{assistant}/{name}", mcpServerPageHandler)
 	mux.HandleFunc("GET /", indexHandler)
 
 	return sameOrigin(state.noteRequests(mux))
@@ -311,11 +319,15 @@ const (
 )
 
 // pageTemplate parst eine Seite zusammen mit den beiden gemeinsamen
-// Fragmenten: dem Kopf und der linken Spalte. Die Seitendatei steht zuerst:
-// ParseFS benennt das Ergebnis nach der ersten Datei, und Execute führt damit
-// die Seite aus und nicht ein Fragment.
+// Fragmenten: dem Kopf und der linken Spalte. Die Vorlage trägt den Namen der
+// Seitendatei, damit Execute die Seite ausführt und nicht ein Fragment.
+//
+// hasPrefix braucht die linke Spalte für den Unterpunkt „MCP-Server": der ist
+// auf der Übersicht und auf jeder Detailseite darunter aktiv, aria-current
+// führt aber nur die Übersicht selbst.
 func pageTemplate(name string) *template.Template {
-	return template.Must(template.ParseFS(staticFiles, "static/"+name, "static/sidebar.html", "static/hero.html"))
+	funcs := template.FuncMap{"hasPrefix": strings.HasPrefix}
+	return template.Must(template.New(name).Funcs(funcs).ParseFS(staticFiles, "static/"+name, "static/sidebar.html", "static/hero.html"))
 }
 
 var indexTemplate = pageTemplate("index.html")
@@ -387,6 +399,39 @@ var mcpTemplate = pageTemplate("mcp.html")
 
 func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, mcpTemplate, areaSetup, "/mcp", "k-playbook-MCP")
+}
+
+// mcpServersTemplate ist die Übersicht aller MCP-Server der drei Assistenten.
+// Sie ist neben /mcp die zweite Seite des Setup-Bereichs und hat als einzige
+// einen Unterpunkt in der linken Spalte: /mcp bleibt über die Karte und die
+// Detailseite des eigenen Servers erreichbar.
+var mcpServersTemplate = pageTemplate("mcp-servers.html")
+
+// mcpServersPage ist der Pfad der Übersicht; die Detailseiten liegen darunter.
+const mcpServersPage = "/mcp-servers"
+
+func mcpServersPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, mcpServersTemplate, areaSetup, mcpServersPage, "MCP-Server")
+}
+
+// mcpServerTemplate ist die Detailseite eines einzelnen Servers bei einem
+// Assistenten. Sie gibt es nur für Einträge, die in den Projektdateien
+// stehen; alles andere ist 404. Beim Laden zeigt sie die Konfiguration, die
+// Messung läuft erst auf Knopfdruck über den POST.
+var mcpServerTemplate = pageTemplate("mcp-server.html")
+
+func mcpServerPageHandler(w http.ResponseWriter, r *http.Request) {
+	environment := project.Detect()
+	if !environment.Installed {
+		http.NotFound(w, r)
+		return
+	}
+	assistant, name := r.PathValue("assistant"), r.PathValue("name")
+	if _, ok := findMCPServer(environment.ProjectDir, assistant, name); !ok {
+		http.NotFound(w, r)
+		return
+	}
+	renderPage(w, mcpServerTemplate, areaSetup, mcpServersPage+"/"+assistant+"/"+name, name)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {

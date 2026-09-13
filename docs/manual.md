@@ -96,7 +96,10 @@ disabled entries.
 The same information is also available to an assistant as a tool:
 `k-playbook mcp` starts an MCP server whose only tool returns the working state.
 It is meant to be invoked by the assistant, not by hand; on the command line,
-`context` remains the way to use it.
+`context` remains the way to use it. Which MCP servers the project has
+registered with each assistant -- this one and any other -- shows the interface
+under *Setup → MCP-Server*, with a detail page per server that measures what
+it offers on request; see [`mcp.md`](./mcp.md).
 
 One answer also means once per session. The output does not change while work
 is underway, so the next command does not retrieve it again but continues with
