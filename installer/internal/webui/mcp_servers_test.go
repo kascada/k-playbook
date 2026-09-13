@@ -446,6 +446,41 @@ printf '%s\n' '{"jsonrpc":"2.0","id":4,"result":{"resources":[{"uri":"file:///x"
 	}
 }
 
+// Schweigt ein Server auf prompts/list, läuft die Frist ab. initialize und
+// tools/list sind dann aber schon da: die Werkzeuge bleiben stehen, und die
+// Frist wird Hinweis statt Ausfall — ohne den npx/uvx-Hinweis, denn der
+// Server lief und antwortete.
+func TestMCPServerProbeFolgeanfrageHaengtNichtFatal(t *testing.T) {
+	bin := t.TempDir()
+	writeExecutable(t, filepath.Join(bin, "zaeh-mcp"), `#!/bin/sh
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{},"prompts":{}},"serverInfo":{"name":"zaeh","version":"1"}}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"gruss"}]}}'
+while read -r line; do :; done
+`)
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	shortProbeTimeout(t, 300*time.Millisecond)
+	newMCPProject(t, "", map[string]string{
+		".mcp.json": `{"mcpServers": {"zaeh": {"command": "zaeh-mcp"}}}`,
+	})
+
+	status, response := postProbe(t, "/api/mcp-servers/claude-code/zaeh/probe")
+	if status != http.StatusOK {
+		t.Fatalf("Status = %d, erwartet 200", status)
+	}
+	if !response.Started || !response.Available {
+		t.Fatalf("Messung = %+v, erwartet gestartet und verfügbar", response)
+	}
+	if response.ServerName != "zaeh" || len(response.Tools) != 1 || response.Tools[0].Name != "gruss" {
+		t.Errorf("Serverdaten oder Werkzeuge gingen verloren: %+v", response)
+	}
+	if !strings.Contains(response.Message, "prompts/list") || !strings.Contains(response.Message, "300ms") {
+		t.Errorf("Hinweis = %q, erwartet prompts/list und die Frist", response.Message)
+	}
+	if strings.Contains(response.Message, "npx") {
+		t.Errorf("Hinweis = %q, der Installationshinweis gehört nicht dazu", response.Message)
+	}
+}
+
 // Die Detailseite bekommt nach abgelaufener Frist den npx/uvx-Hinweis — genau
 // einmal: probeMCPCommand hängt ihn an, der Handler nichts mehr dazu.
 func TestMCPServerProbeTimeoutMitHinweisGenauEinmal(t *testing.T) {

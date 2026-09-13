@@ -2318,7 +2318,11 @@ Pflichtliste liest allein das Detail-GET, einmal.
 **Folgeanfragen sind nicht fatal.** Nur `initialize` und `tools/list` entscheiden, ob
 der Server antwortet. Scheitert danach `prompts/list` oder `resources/list`, bleiben
 Serverinfo, Capabilities und Werkzeuge stehen; `message` trägt einen Hinweis, welche
-Frage scheiterte. Eine Fehlerantwort, die der Server vor seinem Ende geschickt hat, geht
+Frage scheiterte. Das gilt auch, wenn eine Folgeanfrage bis zum Ende der Frist ohne
+Antwort bleibt: `speakMCP` legt vor jeder Folgeanfrage den Stand in `mcpProgress` ab, und
+der Zweig nach abgelaufener Frist zeigt ihn samt Hinweis statt der Timeout-Meldung. Die
+Matrix-Pille der Übersicht nennt jedes Problem — nicht lesbare Pflichtliste, fehlender
+Pflichtserver, nicht lesbare Datei —, keines verdeckt das andere. Eine Fehlerantwort, die der Server vor seinem Ende geschickt hat, geht
 dabei dem Schreibfehler auf das geschlossene stdin vor (`mcpResponseError`). Eine
 Antwort ohne ID, aber mit `error` — JSON-RPC schreibt `id: null`, wenn der Server die
 Anfrage nicht zuordnen kann — ist keine Benachrichtigung: `mcpReader` meldet sie sofort

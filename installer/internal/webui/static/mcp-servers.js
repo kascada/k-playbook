@@ -109,19 +109,24 @@ function renderMatrix(data) {
     elements.serversMessage.textContent = data.message;
   }
 
-  // Ist die Pflichtliste nicht lesbar, fehlen der Matrix die Pflichtmarken.
-  // Die Pille sagt das; den Fehlertext trägt die Pflichtkarte.
-  if (data.requiredError) {
-    elements.serversPill.className = "pill warn";
-    elements.serversPill.textContent = "Pflichtliste nicht lesbar";
-    return;
-  }
-
+  // Die Pille nennt jedes Problem, nicht nur das erste: eine nicht lesbare
+  // Pflichtliste darf eine kaputte MCP-Datei nicht verdecken. Den Fehlertext
+  // der Pflichtliste trägt die Pflichtkarte, den der Dateien die Dateikarte.
   const missing = data.missing || [];
   const broken = (data.files || []).filter((file) => file.error).length;
-  if (missing.length > 0 || broken > 0) {
+  const problems = [];
+  if (data.requiredError) {
+    problems.push("Pflichtliste nicht lesbar");
+  }
+  if (missing.length > 0) {
+    problems.push("Pflichtserver fehlt");
+  }
+  if (broken > 0) {
+    problems.push("Datei nicht lesbar");
+  }
+  if (problems.length > 0) {
     elements.serversPill.className = "pill warn";
-    elements.serversPill.textContent = missing.length > 0 ? "Pflichtserver fehlt" : "Datei nicht lesbar";
+    elements.serversPill.textContent = problems.join(" · ");
     return;
   }
   elements.serversPill.className = "pill ok";

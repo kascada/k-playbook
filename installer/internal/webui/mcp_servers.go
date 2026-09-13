@@ -185,7 +185,6 @@ func mcpServerDetailHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		isRequired := slices.Contains(required, entry.Name)
 		response.Entry.Required = &isRequired
-		response.Entry.MCPServerEntry.Required = isRequired
 	}
 
 	switch entry.Transport {

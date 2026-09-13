@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -324,12 +325,21 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 	// niemand antwortet: ein Lesen auf einem Rohr, das offen bleibt, ließe sich
 	// sonst durch nichts unterbrechen und nähme die Seite mit.
 	answered := make(chan mcpProbeResult, 1)
+	progress := &mcpProgress{}
 	go func() {
-		answered <- speakMCP(stdin, stdout)
+		answered <- speakMCP(stdin, stdout, progress)
 	}()
 
 	select {
 	case <-ctx.Done():
+		// Hing erst eine Folgeanfrage, sind initialize und tools/list schon
+		// da: sie bleiben stehen, und die Frist wird zum Hinweis — wie eine
+		// Fehlerantwort auf dieselbe Frage.
+		if partial, waiting, ok := progress.load(); ok {
+			fillMCPResponse(&response, partial)
+			response.Message = strings.Join(append(partial.notes, mcpFollowUpTimeoutNote(waiting)), "\n")
+			return response, true
+		}
 		response.Message = mcpTimeoutMessage(timeoutHint)
 		return response, true
 
@@ -339,17 +349,23 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 			return response, true
 		}
 
-		response.Available = true
-		response.ServerName = result.initialized.ServerInfo.Name
-		response.ServerVersion = result.initialized.ServerInfo.Version
-		response.ProtocolVersion = result.initialized.ProtocolVersion
-		response.Capabilities = capabilityNames(result.initialized.Capabilities)
-		response.Tools = describeTools(result.listed)
-		response.Prompts = describePrompts(result.prompts)
-		response.Resources = describeResources(result.resources)
+		fillMCPResponse(&response, result)
 		response.Message = strings.Join(result.notes, "\n")
 		return response, true
 	}
+}
+
+// fillMCPResponse überträgt, was der Server geantwortet hat. Message bleibt
+// Sache des Aufrufers.
+func fillMCPResponse(response *mcpToolsResponse, result mcpProbeResult) {
+	response.Available = true
+	response.ServerName = result.initialized.ServerInfo.Name
+	response.ServerVersion = result.initialized.ServerInfo.Version
+	response.ProtocolVersion = result.initialized.ProtocolVersion
+	response.Capabilities = capabilityNames(result.initialized.Capabilities)
+	response.Tools = describeTools(result.listed)
+	response.Prompts = describePrompts(result.prompts)
+	response.Resources = describeResources(result.resources)
 }
 
 // mcpProbeResult ist das Ergebnis des Dialogs mit dem Server.
@@ -386,7 +402,10 @@ const (
 // stdin bleibt offen, bis alles da ist — genau wie bei einem echten Client.
 // Ein sofortiges EOF beendet die Verbindung, während die Anfragen noch in
 // Arbeit sind.
-func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
+//
+// progress bekommt vor jeder Folgeanfrage den Stand bis dahin: läuft die Frist
+// ab, während sie aussteht, gehen die Werkzeuge nicht verloren.
+func speakMCP(stdin io.Writer, stdout io.Reader, progress *mcpProgress) mcpProbeResult {
 	if _, err := io.WriteString(stdin, mcpHandshake()); err != nil {
 		return mcpProbeResult{err: fmt.Errorf("Anfragen nicht schreibbar: %w", err)}
 	}
@@ -407,12 +426,14 @@ func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
 	// seine Werkzeuge genannt. Eine Folgeanfrage, die scheitert, wird Hinweis;
 	// ihre Karte bleibt leer, die Werkzeuge bleiben stehen.
 	if _, ok := result.initialized.Capabilities["prompts"]; ok {
+		progress.waitFor(result, "prompts/list")
 		if err := askMCP(stdin, reader, mcpPromptsID, "prompts/list", &result.prompts); err != nil {
 			result.prompts = mcpPromptsResult{}
 			result.notes = append(result.notes, mcpFollowUpNote("prompts", "prompts/list", err))
 		}
 	}
 	if _, ok := result.initialized.Capabilities["resources"]; ok {
+		progress.waitFor(result, "resources/list")
 		if err := askMCP(stdin, reader, mcpResourcesID, "resources/list", &result.resources); err != nil {
 			result.resources = mcpResourcesResult{}
 			result.notes = append(result.notes, mcpFollowUpNote("resources", "resources/list", err))
@@ -425,6 +446,42 @@ func speakMCP(stdin io.Writer, stdout io.Reader) mcpProbeResult {
 func mcpFollowUpNote(capability string, method string, err error) string {
 	return fmt.Sprintf("Der Server meldet %s, aber %s scheiterte: %s. Werkzeuge und Serverdaten oben sind vollständig.",
 		capability, method, err.Error())
+}
+
+// mcpFollowUpTimeoutNote ist der Hinweis, wenn eine Folgeanfrage bis zum Ende
+// der Frist ohne Antwort blieb.
+func mcpFollowUpTimeoutNote(method string) string {
+	return fmt.Sprintf("Der Server antwortete auf %s nicht innerhalb von %s. Werkzeuge und Serverdaten oben sind vollständig.",
+		method, mcpProbeTimeout)
+}
+
+// mcpProgress ist der Stand des Dialogs, während eine Folgeanfrage aussteht.
+// Geschrieben wird er von der Goroutine, die mit dem Server spricht, gelesen
+// nach abgelaufener Frist im Handler — daher der Mutex. Gespeichert wird eine
+// Kopie: der Dialog arbeitet danach an seinem eigenen Ergebnis weiter.
+type mcpProgress struct {
+	mu       sync.Mutex
+	snapshot mcpProbeResult
+	waiting  string
+	ok       bool
+}
+
+// waitFor hält fest, was bis jetzt da ist und auf welche Anfrage gewartet wird.
+func (p *mcpProgress) waitFor(result mcpProbeResult, method string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	result.notes = slices.Clone(result.notes)
+	p.snapshot, p.waiting, p.ok = result, method, true
+}
+
+// load liefert den festgehaltenen Stand; ok ist false, solange initialize und
+// tools/list noch ausstehen.
+func (p *mcpProgress) load() (mcpProbeResult, string, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	snapshot := p.snapshot
+	snapshot.notes = slices.Clone(snapshot.notes)
+	return snapshot, p.waiting, p.ok
 }
 
 // askMCP schickt eine Folgeanfrage und liest ihre Antwort.
