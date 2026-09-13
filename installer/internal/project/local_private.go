@@ -590,6 +590,25 @@ func runGit(ctx context.Context, dir string, args ...string) (string, int, strin
 
 // runGitStdin ist runGit mit einer Eingabe auf stdin.
 func runGitStdin(ctx context.Context, dir string, input string, args ...string) (string, int, string) {
+	return runGitCommand(ctx, dir, input, nil, args...)
+}
+
+// gitUntranslatedEnv hält git bei der englischen Originalmeldung. LC_ALL=C
+// schlägt LANG und LC_MESSAGES, das leere LANGUAGE hebt die GNU-Liste auf,
+// die sonst sogar LC_ALL überstimmt.
+var gitUntranslatedEnv = []string{"LC_ALL=C", "LANGUAGE="}
+
+// runGitUntranslated ist runGit mit gitUntranslatedEnv — für den einen Fall,
+// in dem der Aufrufer den Grund am Wortlaut auswertet, statt ihn anzuzeigen.
+// Alle anderen Aufrufer behalten die Sprache des Nutzers, weil ihr Grund in
+// der Oberfläche erscheint.
+func runGitUntranslated(ctx context.Context, dir string, args ...string) (string, int, string) {
+	return runGitCommand(ctx, dir, "", gitUntranslatedEnv, args...)
+}
+
+// runGitCommand ist der gemeinsame Aufruf. env ergänzt die geerbte Umgebung;
+// bei doppelten Schlüsseln gilt der letzte Wert (os/exec).
+func runGitCommand(ctx context.Context, dir string, input string, env []string, args ...string) (string, int, string) {
 	var stdout, stderr bytes.Buffer
 
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -598,6 +617,9 @@ func runGitStdin(ctx context.Context, dir string, input string, args ...string) 
 	cmd.Stderr = &stderr
 	if input != "" {
 		cmd.Stdin = strings.NewReader(input)
+	}
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
 	}
 	err := cmd.Run()
 

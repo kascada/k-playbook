@@ -835,6 +835,16 @@ Umbenennung und jeder Konflikt bleiben dem Knopf; der Konflikt wird auf der
 Assistenten-Karte gemeldet. Der Auffangweg ist der Gegenpart zu `RepairMCP()` für die
 zweite Datei, die im Hauptverzeichnis liegt.
 
+**Randfall: erfasst und lokal gelöscht.** Anders als der MCP-Weg fragt das Anlegen nicht
+bei git nach. Eine `AGENTS.md`, die im Index steht, aber lokal gelöscht wurde, entsteht
+deshalb beim nächsten Start neu. Das ist eine bewusste, vom Nutzer entschiedene Ausnahme
+von der Regel „kein selbsttätiger Lauf verändert eine von git erfasste Datei" (§„Der
+Aufruf"), kein Fall, der zu ihr passt. Die Folge: Die neu angelegte Datei weicht in der
+Regel vom Index ab, und `git status` zeigt sie als geändert. Wer die Datei nicht im
+Repository will, entfernt sie aus dem Index (`git rm --cached AGENTS.md`). Der Start legt
+sie danach weiterhin an, aber als nicht erfasste Datei, die von keinem Index mehr
+abweicht.
+
 ## Kataloge auflösen
 
 `BuildContext()` und `resolveCatalog()` in `project/context.go` sind der Kern. Hier liegt
@@ -2094,7 +2104,7 @@ hängen, obwohl es einen Projektpfad meint.
 |---|---|---|---|
 | ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört |
 | selbsttätig | `RepairMCP()`, Clone-Update | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` |
-| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn die Zieldatei **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten |
+| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten |
 
 Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
 ist ein Parameter von `RepairMCP()`, weil die beiden selbsttätigen Aufrufer verschieden
@@ -2113,11 +2123,42 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   liegen die Dateien, mit Vorbedingung und Timeout wie `agentsIgnored()` und
   `local_private.go`. Drei Stufen, und jede unbeantwortete Frage fällt auf „erfasst",
   also nicht schreiben: `K-PLAYBOOK.yaml` nicht lesbar → erfasst; `project.vcs` nicht
-  `git` → nicht erfasst; `git rev-parse --show-toplevel` sagt nein → kein Repository an
-  dieser Stelle, nicht erfasst (kommt git gar nicht zu Wort — nicht installiert,
-  Timeout —, ist die Frage unbeantwortet); erst dann `git ls-files --error-unmatch`, Exit
-  0 erfasst, Exit 1 nicht erfasst, alles andere unbeantwortet. `ls-files` sieht auch die
-  gelöschte, noch im Index stehende Datei; ein Existenztest täte das nicht.
+  `git` → nicht erfasst; dann `git rev-parse --show-toplevel`; erst nach dessen Erfolg
+  `git ls-files --error-unmatch`, Exit 0 erfasst, Exit 1 nicht erfasst, alles andere
+  unbeantwortet. `ls-files` sieht auch die gelöschte, noch im Index stehende Datei; ein
+  Existenztest täte das nicht.
+- **Scheitert `rev-parse`**, trägt der Exit-Code allein nichts: „dubious ownership" und
+  „not a git repository" enden beide mit 128. Kommt git gar nicht zu Wort (Exit < 0,
+  nicht installiert oder Timeout), ist die Frage unbeantwortet. Sonst gilt die Datei nur
+  dann als nicht erfasst, wenn zweierlei zutrifft. (a) Die erste stderr-Zeile meldet
+  ausdrücklich `not a git repository (or any of the parent directories)` oder, an einer
+  Dateisystemgrenze, `not a git repository (or any parent up to mount point …)`
+  (`gitReportsNoRepository()`). (b) Weder im Hauptverzeichnis noch darüber liegt ein
+  `.git`-Eintrag, geprüft je per `os.Lstat` über die Elternkette des übergebenen und die
+  des aufgelösten Pfads, denn git sucht physisch (`gitEntryInAncestors()`). Jeder andere
+  Fehler gilt als erfasst. Der Text allein reicht nicht: Eine `.git`-Datei, die ins
+  Leere zeigt, meldet `not a git repository: <pfad>`, und ein `.git`-Verzeichnis ohne
+  `HEAD` meldet wörtlich dieselbe Zeile wie ein Verzeichnis ohne Repository, obwohl in
+  beiden Fällen Dateien erfasst sein können. Damit der Wortlaut vergleichbar bleibt,
+  läuft genau dieser Aufruf mit `LC_ALL=C` und `LANGUAGE=` (`runGitUntranslated()`). Die
+  übrigen git-Aufrufe behalten die Sprache des Nutzers, weil ihr Grund in der
+  Oberfläche erscheint.
+- **Symlink auf dem Weg** (`mcpTargetViaSymlink()`): Führt der Weg vom Hauptverzeichnis
+  zur Zieldatei über einen Link, ergänzt der Start nichts und legt nichts an. Das gilt
+  für die Zieldatei selbst, auch als toten Link, und für ein verlinktes
+  Assistenten-Verzeichnis. Geprüft werden per `os.Lstat` nur die Bestandteile unterhalb
+  des Hauptverzeichnisses, ein Projekt unter einem verlinkten Pfad wie `~/dev` → `/mnt/…`
+  läuft normal. Ohne diese Prüfung schriebe der Start ins Linkziel, gemessen würde aber
+  der Pfad des Links: Ein ignorierter Link `.cursor/mcp.json` auf die erfasste
+  `.mcp.json` ergab `ls-files` Exit 1 und danach ` M .mcp.json`. **Überspringen statt
+  auflösen:** Ein Link auf eine MCP-Datei ist eine bewusste Einrichtung des Projekts, und
+  die übergeht der Start nicht. Beim Auflösen kämen neue offene Fragen hinzu: ein Ziel
+  außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
+  Startzweig von `mcpTargetNeedsWrite()`, nicht in `applyMCPTarget()`. Der Knopf schreibt
+  deshalb weiter durch den Link, das Clone-Update bleibt unverändert, und
+  `MCPStateOutdated` wird auch hinter einem Link korrigiert. Offen bleiben harte Links:
+  `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
+  `os.WriteFile` schreibt in denselben Inode.
 - **Spur des Assistenten** (`assistantTrace()`): eine fehlende Datei entsteht nur, wenn
   das Assistenten-Verzeichnis — `.claude/`, `.cursor/`, `.opencode/` — mindestens einen
   Eintrag trägt, der keiner der von `Links()` verwalteten Pfade ist, etwa
@@ -2460,7 +2501,7 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
 | `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs und den vorbelegten `.gitignore` | das Verzeichnis ganz fehlt |
-| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `.cursor/mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
+| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `.cursor/mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
 | `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
@@ -2468,7 +2509,9 @@ Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, ents
 Projekt. Ausgenommen sind allein Reparaturen an Inhalt, den k-playbook selbst geschrieben
 hat: die Korrektur des veralteten Wrapper-Eintrags (`MCPStateOutdated`), der Nachzug des
 veralteten Anstoßblocks in `AGENTS.md` und die Migration des `CLAUDE.md`-Symlinks zur
-Include-Datei auf dem Lesepfad. Jeder Weg ist idempotent — ein zweiter Lauf schreibt
+Include-Datei auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
+außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„Instruktionen").
+Jeder Weg ist idempotent — ein zweiter Lauf schreibt
 nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas
 geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `ContextForDir()`
 heilt ausschließlich Symlinks unter `.claude/`, `.opencode/` und `.cursor/`; Dateien im

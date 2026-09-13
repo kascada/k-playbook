@@ -219,9 +219,22 @@ a missing file -- but only when the target file is not tracked by git.** That is
 condition that keeps a clone's working tree clean, and it is measured, not guessed,
 in the project root: `K-PLAYBOOK.yaml` unreadable counts as tracked (the question is
 unanswered, so nothing is written); `project.vcs` other than `git` means nothing is
-tracked; `git rev-parse --show-toplevel` answering "no repository" means nothing is tracked
-here; then `git ls-files --error-unmatch` decides -- exit 0 tracked, exit 1 not tracked,
-anything else (including a timeout or a git that could not run) counts as tracked. A
+tracked; if `git rev-parse --show-toplevel` fails, nothing is tracked only when git
+explicitly reports "not a git repository (or any of the parent directories)" or "(or any
+parent up to mount point …)" **and** no `.git` entry exists in the project root or above
+it, along the given path and along the resolved one; any other failure -- "dubious
+ownership" in a repository owned by someone else, an orphaned `.git` file, a `.git`
+directory without `HEAD`, a timeout or a git that could not run -- counts as tracked. The
+call runs with `LC_ALL=C` so the wording stays comparable. After a successful `rev-parse`,
+`git ls-files --error-unmatch` decides -- exit 0 tracked, exit 1 not tracked, anything
+else counts as tracked. The start also adds nothing and creates nothing when the path to
+the target file **goes through a symlink** -- the file itself (even a dangling link) or
+the assistant directory. Writing would land in the link target while the measurement saw
+the link, and a link is a deliberate setup of the project, so it is skipped rather than
+resolved. Only the components below the project root count; a project that lives under a
+symlinked path is not affected. In both cases -- symlink and a repository git refuses to
+trust -- only *Set up* writes; an obsolete entry is still corrected. Hard links are not
+detected and remain a known gap. A
 missing file is additionally created only if the assistant has left a **trace of its own**
 in the project: an entry in `.claude/`, `.cursor/` or `.opencode/` that is not one of the
 symlink targets k-playbook manages itself -- for example `.claude/settings.json` or

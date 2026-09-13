@@ -713,10 +713,14 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 // Start (MCPWriteOutdatedAndUnversioned): dasselbe, dazu der fehlende Eintrag
 // und die fehlende Datei — aber nur, wenn die Zieldatei nicht von git erfasst
 // ist, und die fehlende Datei nur, wenn der Assistent eine eigene Spur im
-// Projekt hat. Ein vorhandener Eintrag, der weder veraltet noch akzeptiert
-// ist (MCPStateStale), bleibt auch hier liegen. Gemessen wird erst, wenn es
-// darauf ankommt: die beiden git-Aufrufe laufen nicht für Dateien, die ohnehin
-// nicht geschrieben würden.
+// Projekt hat. Führt der Weg vom Hauptverzeichnis zur Zieldatei über einen
+// Symlink (mcpTargetViaSymlink), wird weder ergänzt noch angelegt: geschrieben
+// würde ins Linkziel, gemessen aber der Pfad des Links. Übersprungen wird,
+// nicht aufgelöst — ein Link ist eine bewusste Einrichtung des Projekts. Der
+// veraltete Eintrag wird auch hinter einem Link korrigiert. Ein vorhandener
+// Eintrag, der weder veraltet noch akzeptiert ist (MCPStateStale), bleibt auch
+// hier liegen. Gemessen wird erst, wenn es darauf ankommt: die beiden
+// git-Aufrufe laufen nicht für Dateien, die ohnehin nicht geschrieben würden.
 //
 // Einrichten (MCPWriteAll): alles, was nicht zur Menge der akzeptierten Formen
 // gehört, dazu bei OpenCode der Memory-Block, der zum Einrichten dazugehört.
@@ -728,6 +732,9 @@ func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[strin
 	case MCPWriteOutdatedAndUnversioned:
 		if present {
 			return mcpEntryOutdated(found)
+		}
+		if mcpTargetViaSymlink(projectRoot, target.Path) {
+			return false
 		}
 		if !exists && !assistantTrace(projectRoot, target) {
 			return false
@@ -741,6 +748,36 @@ func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[strin
 	return target.Schema == MCPSchemaOpenCode && !opencodeMemoryConfigured(content)
 }
 
+// mcpTargetViaSymlink meldet, ob der Weg vom Hauptverzeichnis zur Zieldatei
+// über einen Symlink führt. Geprüft werden nur die Bestandteile von path
+// unterhalb von projectRoot, je per os.Lstat — etwa .cursor und
+// .cursor/mcp.json. Das Hauptverzeichnis selbst und alles darüber zählt
+// nicht: ein Projekt unter einem verlinkten Pfad wie ~/dev → /mnt/… wird
+// nicht deshalb übersprungen.
+//
+// Ein fehlender Bestandteil ist kein Link; was danach käme, fehlt ebenso. Jeder
+// andere Fehler zählt als Link, genauso ein path, der nicht lokal ist — beides
+// ist unbeantwortet und fällt auf „nicht schreiben". Ein toter Link ist ein
+// Link: os.WriteFile legte sonst die Datei an seinem Ziel an.
+func mcpTargetViaSymlink(projectRoot string, path string) bool {
+	if !filepath.IsLocal(path) {
+		return true
+	}
+
+	current := projectRoot
+	for _, part := range strings.Split(filepath.Clean(path), string(filepath.Separator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return !errors.Is(err, os.ErrNotExist)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // mcpTargetTracked meldet, ob git die Zieldatei erfasst. Gemessen wird im
 // Hauptverzeichnis, denn dort liegen die Dateien — nicht in project.repo_root,
 // das daneben liegen kann.
@@ -751,10 +788,17 @@ func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[strin
 //   - K-PLAYBOOK.yaml nicht lesbar: unbeantwortet, gilt als erfasst. „Keine
 //     Config = kein git = schreiben" wäre die unsichere Richtung.
 //   - project.vcs nicht git: nichts ist erfasst.
-//   - rev-parse --show-toplevel sagt nein: an dieser Stelle gibt es kein
-//     Repository, nichts ist erfasst. Nur ein git, das gelaufen ist und
-//     geantwortet hat, zählt dafür; kam es gar nicht zu Wort — nicht
-//     installiert, Timeout —, ist die Frage unbeantwortet.
+//   - rev-parse --show-toplevel scheitert: kam git gar nicht zu Wort — nicht
+//     installiert, Timeout —, ist die Frage unbeantwortet. Hat git
+//     geantwortet, heißt der Exit-Code allein nichts: „dubious ownership" und
+//     „not a git repository" enden beide mit 128. Nicht erfasst ist nur, was
+//     git ausdrücklich als „kein Repository" meldet (gitReportsNoRepository)
+//     und wo auch kein .git-Eintrag im Hauptverzeichnis oder darüber liegt
+//     (gitEntryInAncestors). Denn eine verwaiste .git-Datei und ein
+//     .git-Verzeichnis ohne HEAD melden ebenfalls „not a git repository",
+//     obwohl dort Dateien erfasst sein können. Der Aufruf läuft ohne
+//     Übersetzung, damit der Wortlaut vergleichbar bleibt. Jeder andere Fehler
+//     gilt als erfasst.
 //   - ls-files --error-unmatch: Exit 0 heißt erfasst, Exit 1 nicht erfasst,
 //     alles andere unbeantwortet. ls-files deckt auch die gelöschte, aber noch
 //     im Index stehende Datei ab; ein reiner Existenztest täte das nicht.
@@ -770,8 +814,11 @@ func mcpTargetTracked(projectRoot string, path string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), privateGitTimeout)
 	defer cancel()
 
-	if _, code, _ := runGit(ctx, projectRoot, "rev-parse", "--show-toplevel"); code != 0 {
-		return code < 0
+	if _, code, reason := runGitUntranslated(ctx, projectRoot, "rev-parse", "--show-toplevel"); code != 0 {
+		if code < 0 {
+			return true
+		}
+		return !gitReportsNoRepository(reason) || gitEntryInAncestors(projectRoot)
 	}
 	_, code, _ := runGit(ctx, projectRoot, "ls-files", "--error-unmatch", "--", path)
 	switch code {
@@ -782,6 +829,54 @@ func mcpTargetTracked(projectRoot string, path string) bool {
 	default:
 		return true
 	}
+}
+
+// Die beiden Formen, in denen git ausdrücklich meldet, dass es kein
+// Repository gefunden hat — Wortlaut aus setup.c, im Binary von git 2.53.0
+// nachgelesen. Die zweite erscheint, wenn die Suche an einer
+// Dateisystemgrenze endet; ein Projekt auf einem eigenen Mount fiele ohne sie
+// grundlos auf „erfasst".
+const (
+	gitNoRepositoryParents    = "not a git repository (or any of the parent directories)"
+	gitNoRepositoryMountPoint = "not a git repository (or any parent up to mount point "
+)
+
+// gitReportsNoRepository meldet, ob die erste stderr-Zeile eines gescheiterten
+// rev-parse ausdrücklich „kein Repository" sagt. Die kurze Form
+// `not a git repository: <pfad>` zählt nicht: sie meldet eine .git-Datei, die
+// ins Leere zeigt, also ein kaputtes Repository, kein fehlendes.
+func gitReportsNoRepository(line string) bool {
+	return strings.Contains(line, gitNoRepositoryParents) ||
+		strings.Contains(line, gitNoRepositoryMountPoint)
+}
+
+// gitEntryInAncestors meldet, ob im Hauptverzeichnis oder einem seiner
+// Elternverzeichnisse ein .git-Eintrag liegt — Datei, Verzeichnis oder Link,
+// je per os.Lstat. Geprüft werden zwei Elternketten: die des übergebenen
+// Pfads und die des aufgelösten, denn git sucht über den physischen Pfad.
+// Scheitert das Auflösen oder ein Lstat mit etwas anderem als „existiert
+// nicht", zählt das als Eintrag: die Frage ist unbeantwortet.
+func gitEntryInAncestors(projectRoot string) bool {
+	logical, err := filepath.Abs(projectRoot)
+	if err != nil {
+		return true
+	}
+	physical, err := filepath.EvalSymlinks(logical)
+	if err != nil {
+		return true
+	}
+
+	for _, start := range []string{logical, physical} {
+		for dir := start; ; dir = filepath.Dir(dir) {
+			if _, err := os.Lstat(filepath.Join(dir, ".git")); !errors.Is(err, os.ErrNotExist) {
+				return true
+			}
+			if filepath.Dir(dir) == dir {
+				break
+			}
+		}
+	}
+	return false
 }
 
 // assistantTrace meldet, ob der Assistent eines Ziels eine Spur im Projekt
