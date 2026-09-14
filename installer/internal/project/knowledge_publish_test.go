@@ -324,7 +324,7 @@ func TestKnowledgeSupersede(t *testing.T) {
 	if _, err := knowledge.Write("session", sessionDoc("findings/neu.md"), ""); err != nil {
 		t.Fatal(err)
 	}
-	rel, err := knowledge.Supersede("./findings/notiz.md", "findings/neu.md", "Befund war unvollständig")
+	rel, _, err := knowledge.Supersede("./findings/notiz.md", "findings/neu.md", "Befund war unvollständig")
 	if err != nil || rel != "findings/notiz.md" {
 		t.Fatalf("Supersede: %q, %v", rel, err)
 	}
@@ -344,17 +344,17 @@ func TestKnowledgeSupersede(t *testing.T) {
 		t.Errorf("Supersede als Drift gemeldet: %+v, %v", status, err)
 	}
 
-	// Ein zweites Mal: die Felder werden ersetzt, nicht verdoppelt.
-	if _, err := knowledge.Supersede("findings/notiz.md", "findings/neu.md", "Anderer Grund"); err != nil {
-		t.Fatal(err)
+	// Ein zweites Mal ist ein Eingabefehler (Task 063, Entscheidung 3): wer den
+	// Nachfolger ändern will, löst den Nachfolger ab. Verweis und Grund bleiben.
+	if _, _, err := knowledge.Supersede("findings/notiz.md", "findings/neu.md", "Anderer Grund"); err == nil || !IsInputError(err) {
+		t.Errorf("zweites Ablösen: %v", err)
 	}
-	got := readKnowledgeFile(t, root, rel)
-	if strings.Count(got, "successor:") != 1 || strings.Count(got, "state:") != 1 || !strings.Contains(got, "superseded_reason: Anderer Grund\n") {
-		t.Errorf("Felder verdoppelt:\n%s", got)
+	if got := readKnowledgeFile(t, root, rel); got != want {
+		t.Errorf("zweites Ablösen hat die Datei verändert:\n%s", got)
 	}
 
 	// Eine Datei ohne Kopf — an der Prüfung vorbei entstanden — bekommt einen.
-	rel, err = knowledge.Supersede("manual/release.md", "findings/neu.md", "Ersetzt")
+	rel, _, err = knowledge.Supersede("manual/release.md", "findings/neu.md", "Ersetzt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,11 +370,346 @@ func TestKnowledgeSupersede(t *testing.T) {
 		"Ausbruch":             {"../k-playbook.md", "findings/neu.md", "x"},
 		"Nachfolger Ausbruch":  {"findings/neu.md", "../x.md", "x"},
 	} {
-		if _, err := knowledge.Supersede(args[0], args[1], args[2]); err == nil {
+		if _, _, err := knowledge.Supersede(args[0], args[1], args[2]); err == nil {
 			t.Errorf("%s angenommen", name)
 		}
 	}
 	if got := readKnowledgeFile(t, root, "findings/neu.md"); strings.Contains(got, "superseded") {
 		t.Error("findings/neu.md wurde trotz Ablehnung abgelöst")
+	}
+}
+
+// Entscheidung 1 aus Task 063: Die Pfade bei publish sind relativ zum
+// Generatorverzeichnis. Ein Pfad, der es schon trägt (code/…), wird als
+// Eingabefehler abgewiesen und nicht still nach code/code/ geschrieben — der
+// Tausch hätte sonst den ganzen Bestand entfernt.
+func TestKnowledgePublishPfadMitErzeugerverzeichnisWirdAbgewiesen(t *testing.T) {
+	for producer, rel := range map[string]string{"docs-code": "code/overview.md", "docs-tools": "libs/x.md", "inventory": "versions/tief/x.md"} {
+		t.Run(producer, func(t *testing.T) {
+			root := knowledgeFixture(t)
+			knowledge := NewKnowledge(root)
+			if _, err := knowledge.Status(); err != nil {
+				t.Fatal(err)
+			}
+			dir := strings.SplitN(rel, "/", 2)[0]
+			before := map[string]string{
+				"code":     readKnowledgeFile(t, root, "code/links.md"),
+				"libs":     readKnowledgeFile(t, root, "libs/goldmark.md"),
+				"versions": readKnowledgeFile(t, root, "versions/inventory.md"),
+			}
+
+			_, err := knowledge.Publish(producer, []KnowledgeDocument{codeDoc("neu.md", "# Neu\n"), codeDoc(rel, "# Doppelt\n")})
+			if err == nil {
+				t.Fatal("Pfad mit vorangestelltem Erzeugerverzeichnis angenommen")
+			}
+			if !IsInputError(err) {
+				t.Errorf("kein Eingabefehler: %v", err)
+			}
+			if !strings.Contains(err.Error(), "relativ zu "+dir+"/") {
+				t.Errorf("Meldung nennt die Konvention nicht: %q", err)
+			}
+			if pathExists(filepath.Join(KnowledgeDir(root), dir, dir)) || pathExists(filepath.Join(KnowledgeDir(root), dir, "neu.md")) {
+				t.Error("trotz Abweisung geschrieben")
+			}
+			for kind, content := range before {
+				file := map[string]string{"code": "code/links.md", "libs": "libs/goldmark.md", "versions": "versions/inventory.md"}[kind]
+				if got := readKnowledgeFile(t, root, file); got != content {
+					t.Errorf("%s verändert", file)
+				}
+			}
+			if hidden := hiddenSiblings(t, root); len(hidden) != 0 {
+				t.Errorf("Zwischenverzeichnisse geblieben: %v", hidden)
+			}
+			if status, err := knowledge.Status(); err != nil || status.Stale {
+				t.Errorf("Status nach Abweisung: %+v, %v", status, err)
+			}
+		})
+	}
+}
+
+// Scheitert das Schreiben des Index, steht der vorherige Stand auf der Platte
+// und im Index: der Index wird vor dem Tausch geschrieben, ein Fehlschlag dort
+// ist ein Abbruch ohne Tausch. Der Fehlschlag greift beim Schreiben, nicht beim
+// Öffnen — der Index ist gebaut und ohne Drift, open() schreibt nichts.
+func TestKnowledgePublishFehlschlagBeimIndexschreibenLaesstAltenStand(t *testing.T) {
+	root := knowledgeFixture(t)
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatal(err)
+	}
+	before := readKnowledgeFile(t, root, "code/links.md")
+	denyWrite(t, KnowledgeCacheDir(root))
+
+	knowledge := NewKnowledge(root)
+	_, err := knowledge.Publish("docs-code", []KnowledgeDocument{codeDoc("neu.md", "# Neu\n\nKennwortchunk.\n")})
+	if err == nil {
+		t.Fatal("Publish gelang trotz gesperrtem Index")
+	}
+	if !strings.Contains(err.Error(), "Wissensindex schreiben") {
+		t.Errorf("Fehlschlag nicht beim Schreiben des Index: %v", err)
+	}
+	if IsInputError(err) {
+		t.Errorf("Umgebungsfehler als Eingabefehler: %v", err)
+	}
+	if !pathExists(filepath.Join(KnowledgeDir(root), "code", "links.md")) {
+		t.Fatal("code/links.md ist weg — der Tausch lief vor dem Index")
+	}
+	if got := readKnowledgeFile(t, root, "code/links.md"); got != before {
+		t.Error("code/links.md verändert")
+	}
+	if pathExists(filepath.Join(KnowledgeDir(root), "code", "neu.md")) {
+		t.Error("code/neu.md steht trotz Fehlschlag")
+	}
+	if hidden := hiddenSiblings(t, root); len(hidden) != 0 {
+		t.Errorf("Zwischenverzeichnisse geblieben: %v", hidden)
+	}
+	stored := readIndexFile(t, root)
+	if _, ok := stored.Files["code/links.md"]; !ok {
+		t.Error("Index kennt code/links.md nicht mehr")
+	}
+	if _, ok := stored.Files["code/neu.md"]; ok {
+		t.Error("Index beschreibt den neuen Stand")
+	}
+	status, err := NewKnowledge(root).Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Stale || status.ByKind["code"].Files != 1 {
+		t.Errorf("Status nach Fehlschlag: %+v", status)
+	}
+	if hits, err := NewKnowledge(root).Search("Symlinks", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "code/links.md" {
+		t.Errorf("alter Stand nicht im Index: %+v, %v", hits, err)
+	}
+}
+
+// Die beiden übrigen Fehlschläge lassen sich ohne Fehler-Hook im Produktivpfad
+// nicht erzeugen; ihre Fälle stehen in
+// material/befunde/wissensablage-schreibseite.md.
+func TestKnowledgePublishFehlschlagBeimChunkenUndBeimTausch(t *testing.T) {
+	t.Run("Chunken", func(t *testing.T) {
+		t.Skip("Chunken liest die eben mit 0o644 geschriebenen Dateien des Zwischenverzeichnisses; ein Lesefehler dazwischen ist über Rechte nicht erzeugbar, ohne das Schreiben selbst zu verhindern. Liegt vor dem Tausch und ist ein Abbruch ohne Tausch.")
+	})
+	t.Run("Tausch", func(t *testing.T) {
+		t.Skip("rename innerhalb von knowledge/ braucht nur das Schreibrecht auf knowledge/, das schon das Zwischenverzeichnis braucht; ein Verzeichnis im selben Elternverzeichnis umzubenennen verlangt unter Linux kein Schreibrecht auf das Verzeichnis selbst. Ohne root (chattr, Mount) nicht erzeugbar.")
+	})
+}
+
+// Stirbt der Prozess zwischen Indexschreiben und Tausch, stehen der neue Index
+// und der alte Stand auf der Platte. Nachgestellt über einen erfolgreichen Lauf,
+// dessen Verzeichnis danach auf den alten Stand zurückgesetzt wird. Der nächste
+// Zugriff liefert den alten Stand; stale: true ist dabei die erwartete Meldung.
+func TestKnowledgePublishAbbruchZwischenIndexUndTausch(t *testing.T) {
+	root := knowledgeFixture(t)
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatal(err)
+	}
+	before := readKnowledgeFile(t, root, "code/links.md")
+	if _, err := NewKnowledge(root).Publish("docs-code", []KnowledgeDocument{codeDoc("neu.md", "# Neu\n\nKennwortchunk.\n")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(KnowledgeDir(root), "code")); err != nil {
+		t.Fatal(err)
+	}
+	writeKnowledgeFile(t, root, "code/links.md", before)
+
+	status, err := NewKnowledge(root).Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Stale || status.ByKind["code"].Files != 1 {
+		t.Errorf("Status nach Abbruch: %+v", status)
+	}
+	if hits, err := NewKnowledge(root).Search("Symlinks", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "code/links.md" {
+		t.Errorf("alter Stand nicht zurück im Index: %+v, %v", hits, err)
+	}
+	if hits, err := NewKnowledge(root).Search("Kennwortchunk", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("neuer Stand noch im Index: %+v, %v", hits, err)
+	}
+	if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
+		t.Errorf("zweiter Zugriff: %+v, %v", status, err)
+	}
+}
+
+// swapCrash stellt einen Absturz zwischen den beiden Umbenennungen nach: der
+// neue Satz ist veröffentlicht und im Index, dann wird der Zustand der Platte
+// auf „Ziel beiseitegestellt, Zwischenverzeichnis nicht eingesetzt"
+// zurückgedreht — code/ fehlt, der alte Stand liegt als .code-alt-*, der neue
+// als .code-neu-*.
+func swapCrash(t *testing.T, root string) (old string) {
+	t.Helper()
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatal(err)
+	}
+	old = readKnowledgeFile(t, root, "code/links.md")
+	if _, err := NewKnowledge(root).Publish("docs-code", []KnowledgeDocument{codeDoc("neu.md", "# Neu\n\nKennwortchunk.\n")}); err != nil {
+		t.Fatal(err)
+	}
+	dir := KnowledgeDir(root)
+	if err := os.Rename(filepath.Join(dir, "code"), filepath.Join(dir, ".code-neu-111111")); err != nil {
+		t.Fatal(err)
+	}
+	writeKnowledgeFile(t, root, ".code-alt-222222/links.md", old)
+	return old
+}
+
+// Ein verwaistes .<dir>-alt-* ohne Zielverzeichnis stellt der nächste Zugriff
+// zurück, bevor die Drift-Erkennung läuft: Platte und Index zeigen den alten
+// Stand. Das versteckte -neu-* bleibt liegen, und status nennt es.
+func TestKnowledgeVerwaistesAltVerzeichnisWirdZurueckgestellt(t *testing.T) {
+	t.Run("zurückgestellt", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		old := swapCrash(t, root)
+
+		knowledge := NewKnowledge(root)
+		status, err := knowledge.Status()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !pathExists(filepath.Join(KnowledgeDir(root), "code", "links.md")) {
+			t.Fatal("code/ nicht zurückgestellt")
+		}
+		if got := readKnowledgeFile(t, root, "code/links.md"); got != old {
+			t.Error("code/links.md trägt nicht den alten Stand")
+		}
+		if status.ByKind["code"].Files != 1 || !status.Stale {
+			t.Errorf("Status: %+v", status)
+		}
+		if hits, err := NewKnowledge(root).Search("Symlinks", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "code/links.md" {
+			t.Errorf("alter Stand nicht im Index: %+v, %v", hits, err)
+		}
+		if hits, err := NewKnowledge(root).Search("Kennwortchunk", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+			t.Errorf("neuer Stand im Index: %+v, %v", hits, err)
+		}
+		if hidden := hiddenSiblings(t, root); len(hidden) != 1 || hidden[0] != ".code-neu-111111" {
+			t.Errorf("versteckte Verzeichnisse: %v", hidden)
+		}
+		notes := strings.Join(knowledge.Notes(), "; ")
+		if !strings.Contains(notes, ".code-alt-222222") || !strings.Contains(notes, ".code-neu-111111") {
+			t.Errorf("Notizen nennen Rückstellung und Rest nicht: %q", notes)
+		}
+	})
+
+	t.Run("vorhandenes leeres Ziel wird nicht ersetzt", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		swapCrash(t, root)
+		if err := os.Mkdir(filepath.Join(KnowledgeDir(root), "code"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatalf("Zugriff scheitert: %v", err)
+		}
+		if pathExists(filepath.Join(KnowledgeDir(root), "code", "links.md")) {
+			t.Error("vorhandenes leeres Ziel ersetzt")
+		}
+		if !pathExists(filepath.Join(KnowledgeDir(root), ".code-alt-222222", "links.md")) {
+			t.Error(".code-alt-222222 verschwunden")
+		}
+		if notes := strings.Join(knowledge.Notes(), "; "); !strings.Contains(notes, ".code-alt-222222") {
+			t.Errorf("Notiz nennt das verbliebene Verzeichnis nicht: %q", notes)
+		}
+	})
+
+	t.Run("mehrere Kandidaten", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		old := swapCrash(t, root)
+		writeKnowledgeFile(t, root, ".code-alt-333333/links.md", old)
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatalf("Zugriff scheitert: %v", err)
+		}
+		if pathExists(filepath.Join(KnowledgeDir(root), "code")) {
+			t.Error("bei zwei Kandidaten zurückgestellt")
+		}
+		notes := strings.Join(knowledge.Notes(), "; ")
+		if !strings.Contains(notes, ".code-alt-222222") || !strings.Contains(notes, ".code-alt-333333") {
+			t.Errorf("Notiz nennt die Kandidaten nicht: %q", notes)
+		}
+	})
+
+	t.Run("Rückstellung scheitert", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		swapCrash(t, root)
+		denyWrite(t, KnowledgeDir(root))
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatalf("Zugriff scheitert: %v", err)
+		}
+		if pathExists(filepath.Join(KnowledgeDir(root), "code")) {
+			t.Error("trotz gesperrtem knowledge/ zurückgestellt")
+		}
+		if notes := strings.Join(knowledge.Notes(), "; "); !strings.Contains(notes, ".code-alt-222222") {
+			t.Errorf("Notiz nennt das Verzeichnis nicht: %q", notes)
+		}
+	})
+}
+
+// Entscheidungen 2 bis 4 aus Task 063: supersede weist Ziele und Nachfolger in
+// den Generatorverzeichnissen und die Wurzel-README ab, ebenso ein schon
+// abgelöstes Ziel und einen Nachfolger, der kein Suchtreffer sein kann (raw,
+// superseded). Keine Abweisung verändert eine Datei oder den Index.
+func TestKnowledgeSupersedeWeistZielZustandUndNachfolgerAb(t *testing.T) {
+	root := knowledgeFixture(t)
+	knowledge := NewKnowledge(root)
+	if _, err := knowledge.Write("session", sessionDoc("findings/neu.md"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledge.Write("session", with(sessionDoc("findings/roh.md"), func(d *KnowledgeDocument) { d.State = KnowledgeStateRaw }), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledge.Write("session", sessionDoc("findings/weg.md"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := knowledge.Supersede("findings/weg.md", "findings/neu.md", "Ersetzt"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledge.Status(); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]struct{ path, successor, message string }{
+		"Ziel unter code/":           {"code/links.md", "findings/neu.md", "code/"},
+		"Ziel unter libs/":           {"libs/goldmark.md", "findings/neu.md", "libs/"},
+		"Ziel unter versions/":       {"versions/inventory.md", "findings/neu.md", "versions/"},
+		"Ziel README":                {"README.md", "findings/neu.md", "README.md"},
+		"Nachfolger unter code/":     {"findings/notiz.md", "code/links.md", "code/"},
+		"Nachfolger unter libs/":     {"findings/notiz.md", "libs/goldmark.md", "libs/"},
+		"Nachfolger unter versions/": {"findings/notiz.md", "versions/inventory.md", "versions/"},
+		"Nachfolger README":          {"findings/notiz.md", "README.md", "README.md"},
+		"schon abgelöst":             {"findings/weg.md", "findings/notiz.md", "schon abgelöst"},
+		"Nachfolger raw":             {"findings/notiz.md", "findings/roh.md", "condensed oder reviewed"},
+		"Nachfolger superseded":      {"findings/notiz.md", "findings/weg.md", "condensed oder reviewed"},
+	}
+	files := []string{"README.md", "code/links.md", "libs/goldmark.md", "versions/inventory.md", "findings/notiz.md", "findings/neu.md", "findings/roh.md", "findings/weg.md"}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			before := map[string]string{}
+			for _, rel := range files {
+				before[rel] = readKnowledgeFile(t, root, rel)
+			}
+			indexBefore, err := os.ReadFile(KnowledgeIndexFile(root))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, _, err = knowledge.Supersede(tc.path, tc.successor, "Grund")
+			if err == nil {
+				t.Fatal("angenommen")
+			}
+			if !IsInputError(err) {
+				t.Errorf("kein Eingabefehler: %v", err)
+			}
+			if !strings.Contains(err.Error(), tc.message) {
+				t.Errorf("Meldung %q trägt %q nicht", err, tc.message)
+			}
+			for _, rel := range files {
+				if got := readKnowledgeFile(t, root, rel); got != before[rel] {
+					t.Errorf("%s verändert", rel)
+					writeKnowledgeFile(t, root, rel, before[rel])
+				}
+			}
+			if indexAfter, err := os.ReadFile(KnowledgeIndexFile(root)); err != nil || string(indexAfter) != string(indexBefore) {
+				t.Errorf("Index verändert: %v", err)
+			}
+		})
 	}
 }

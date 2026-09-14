@@ -41,9 +41,17 @@ type KnowledgePublishResult struct {
 // der Index nie: scanKnowledgeTree überspringt Einträge mit führendem Punkt,
 // also ist auch ein liegengebliebenes nach einem Absturz kein Treffer.
 //
+// Die Pfade sind relativ zum Generatorverzeichnis; ein Pfad, der es schon
+// trägt (code/…), wird abgewiesen.
+//
 // Erst der Index, dann der Tausch: der Zugriff gleicht zuerst den Baum ab,
-// dann werden alle Einträge des Verzeichnisses ersetzt — die eigene Schreibung
-// zählt nicht als Drift.
+// dann entsteht aus dem Zwischenverzeichnis der Index des neuen Stands und
+// wird geschrieben, erst danach wird getauscht — die eigene Schreibung zählt
+// nicht als Drift. Die Platte ist die Wahrheit: Stirbt der Lauf zwischen Index
+// und Tausch, führt die Drift-Erkennung zum alten Stand zurück (stale: true,
+// obwohl niemand am Tor vorbei geschrieben hat — hingenommen). Stirbt er
+// zwischen den beiden Umbenennungen, stellt der nächste Zugriff das
+// beiseitegestellte Verzeichnis zurück (restoreRetired).
 func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (KnowledgePublishResult, error) {
 	parsed, err := ParseProducer(producer)
 	if err != nil {
@@ -72,6 +80,15 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 		rel, err := KnowledgeRelPath(doc.Path)
 		if err != nil {
 			return result, err
+		}
+		// Die Pfade sind relativ zum Generatorverzeichnis. Ein Pfad, der es
+		// schon trägt, ist ein falsch gebauter Generator: still abgeschnitten
+		// würde der Fehler verdeckt, still vorangestellt landete er unter
+		// code/code/, und der Tausch entfernte den ganzen Bestand. Die Folge
+		// der Regel: Direkt unter einem Generatorverzeichnis steht kein
+		// Unterverzeichnis gleichen Namens.
+		if strings.HasPrefix(rel, dir) {
+			return result, InputErrorf("Pfad %q beginnt mit dem Erzeugerverzeichnis %s: bei publish sind die Pfade relativ zu %s, also %q", doc.Path, dir, dir, strings.TrimPrefix(rel, dir))
 		}
 		full := dir + rel
 		if _, err := KnowledgeRelPath(full); err != nil || !parsed.owns(full) {
@@ -103,7 +120,7 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 	// dieselben Rechte wie die Unterverzeichnisse darin: 0o755 unter der
 	// umask. os.MkdirTemp legte es mit 0o700 an, und der Tausch benannte
 	// genau dieses Verzeichnis um — für jeden anderen Benutzer unlesbar.
-	staging, err := reserveSibling(root, "."+strings.TrimSuffix(dir, "/")+"-neu-*")
+	staging, err := reserveSibling(root, "."+strings.TrimSuffix(dir, "/")+knowledgeStagingInfix+"*")
 	if err != nil {
 		return result, err
 	}
@@ -130,9 +147,44 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 	if err != nil {
 		return abort(err)
 	}
+	removed := 0
 	for _, rel := range previous {
 		if !seen[dir+rel] {
-			result.Removed++
+			removed++
+		}
+	}
+
+	// Der Index, der den neuen Stand beschreibt, entsteht aus dem
+	// Zwischenverzeichnis und wird vor dem Tausch geschrieben. Die Platte ist
+	// die Wahrheit: scheitert danach etwas oder stirbt der Prozess, stehen
+	// alter Stand und neuer Index, und die Drift-Erkennung führt zum alten
+	// Stand zurück — nie umgekehrt. Ein Fehlschlag beim Chunken oder beim
+	// Schreiben des Index ist ein Abbruch ohne Tausch.
+	previousIndex := index.clone()
+	for rel := range index.Files {
+		if strings.HasPrefix(rel, dir) {
+			index.removeFile(rel)
+		}
+	}
+	for _, doc := range prepared {
+		full := filepath.Join(staging, filepath.FromSlash(strings.TrimPrefix(doc.Path, dir)))
+		entry, chunks, err := chunkKnowledgeFileAt(full, doc.Path)
+		if err != nil {
+			return abort(err)
+		}
+		index.replaceFile(doc.Path, entry, chunks)
+	}
+	index.BuiltAt = knowledgeNow()
+	if err := writeKnowledgeIndex(k.projectDir, index); err != nil {
+		return abort(err)
+	}
+
+	// rollback schreibt den Index des vorherigen Stands zurück. Scheitert auch
+	// das, bleibt der neue Index über dem alten Stand stehen, und der nächste
+	// Zugriff stellt ihn aus der Platte wieder her — die Notiz sagt es.
+	rollback := func() {
+		if err := writeKnowledgeIndex(k.projectDir, previousIndex); err != nil {
+			k.note("Index des vorherigen Stands nicht zurückgeschrieben: %v — der nächste Zugriff gleicht ihn an den Stand auf der Platte an", err)
 		}
 	}
 
@@ -140,18 +192,28 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 	// Stand zurück — sonst stünde die Ablage genau hier leer.
 	retired := ""
 	if pathExists(target) {
-		retired, err = reserveSibling(root, "."+strings.TrimSuffix(dir, "/")+"-alt-*")
+		retired, err = reserveSibling(root, "."+strings.TrimSuffix(dir, "/")+knowledgeRetiredInfix+"*")
 		if err != nil {
+			rollback()
 			return abort(err)
 		}
 		if err := os.Rename(target, retired); err != nil {
+			rollback()
 			return abort(fmt.Errorf("%s beiseitestellen: %w", dir, err))
 		}
 	}
 	if err := os.Rename(staging, target); err != nil {
 		if retired != "" {
-			_ = os.Rename(retired, target)
+			if back := os.Rename(retired, target); back != nil {
+				// Beide Umbenennungen gescheitert: nichts wird entfernt, auch
+				// das Zwischenverzeichnis nicht. Der nächste Zugriff stellt
+				// das beiseitegestellte Verzeichnis zurück (restoreRetired).
+				rollback()
+				return result, fmt.Errorf("%s einsetzen: %w; zurückstellen: %v — der vorherige Stand liegt in %s, der neue in %s; der nächste Zugriff stellt den vorherigen zurück",
+					dir, err, back, filepath.Base(retired), filepath.Base(staging))
+			}
 		}
+		rollback()
 		return abort(fmt.Errorf("%s einsetzen: %w", dir, err))
 	}
 	if retired != "" {
@@ -161,24 +223,8 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 			k.note("vorheriger Stand von %s nicht entfernt: %v", dir, err)
 		}
 	}
-
-	for rel := range index.Files {
-		if strings.HasPrefix(rel, dir) {
-			index.removeFile(rel)
-		}
-	}
-	for _, doc := range prepared {
-		entry, chunks, err := chunkKnowledgeFile(root, doc.Path)
-		if err != nil {
-			return result, err
-		}
-		index.replaceFile(doc.Path, entry, chunks)
-		result.Written++
-	}
-	index.BuiltAt = knowledgeNow()
-	if err := writeKnowledgeIndex(k.projectDir, index); err != nil {
-		return result, err
-	}
+	result.Written = len(prepared)
+	result.Removed = removed
 	return result, nil
 }
 
@@ -294,35 +340,77 @@ const (
 // liegen: erst schreiben, dann ablösen; ein Nachfolger, den es nicht gibt,
 // wäre ein Verweis ins Leere, und genau der soll am Aufruf auffallen.
 //
-// Das Ergebnis ist der bereinigte Pfad des abgelösten Dokuments.
-func (k *Knowledge) Supersede(docPath string, successor string, reason string) (string, error) {
+// Abgewiesen wird (Task 063, Entscheidungen 2 bis 4):
+//
+//   - ein Ziel oder Nachfolger unter code/, libs/ oder versions/: ein Generator
+//     nimmt ein Dokument heraus, indem er es nicht mehr veröffentlicht, und
+//     sein nächster Lauf ersetzte eine Ablösung dort ebenso wie einen
+//     Nachfolger, auf den successor dann ins Leere zeigte;
+//   - die Wurzel-README als Ziel oder Nachfolger: sie ist Navigation, kein
+//     Wissen, und nie ein Suchtreffer;
+//   - ein schon abgelöstes Ziel: wer den Nachfolger ändern will, löst den
+//     Nachfolger ab — so entsteht eine Kette statt eines überschriebenen
+//     Verweises, und eine Ablösung ist endgültig;
+//   - ein Nachfolger, der kein Suchtreffer sein kann: state muss condensed
+//     oder reviewed sein, sonst verschwände das Thema ganz aus der Suche.
+//
+// Ein Erzeugerargument gibt es nicht: nach diesen Regeln bleiben nur
+// Verzeichnisse, in denen einzeln geschrieben wird.
+//
+// Das Ergebnis sind die bereinigten Pfade des abgelösten Dokuments und des
+// Nachfolgers.
+func (k *Knowledge) Supersede(docPath string, successor string, reason string) (string, string, error) {
 	rel, err := KnowledgeRelPath(docPath)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	next, err := KnowledgeRelPath(successor)
 	if err != nil {
-		return "", InputErrorf("Nachfolger: %w", err)
+		return "", "", InputErrorf("Nachfolger: %w", err)
 	}
 	if next == rel {
-		return "", InputErrorf("ein Dokument kann nicht sein eigener Nachfolger sein: %s", rel)
+		return "", "", InputErrorf("ein Dokument kann nicht sein eigener Nachfolger sein: %s", rel)
 	}
 	if err := requireLine("reason", reason); err != nil {
-		return "", err
+		return "", "", err
+	}
+	if rel == knowledgeReadmeName {
+		return "", "", InputErrorf("%s ist die Wurzel-README: Navigation, kein Wissen — sie wird nicht abgelöst", rel)
+	}
+	if next == knowledgeReadmeName {
+		return "", "", InputErrorf("Nachfolger %s ist die Wurzel-README: sie ist nie ein Suchtreffer, das Thema verschwände aus der Suche", next)
+	}
+	if generator, dir, ok := knowledgeGeneratorOf(rel); ok {
+		return "", "", InputErrorf("Dokument %s liegt unter %s, dem Verzeichnis des Generators %s: ein Generator nimmt ein Dokument heraus, indem er es nicht mehr veröffentlicht; eine Ablösung hielte nur bis zu seinem nächsten Lauf", rel, dir, generator)
+	}
+	if generator, dir, ok := knowledgeGeneratorOf(next); ok {
+		return "", "", InputErrorf("Nachfolger %s liegt unter %s, dem Verzeichnis des Generators %s: sein nächster Lauf könnte ihn entfernen, und successor zeigte ins Leere", next, dir, generator)
 	}
 	root := KnowledgeDir(k.projectDir)
 	full := filepath.Join(root, filepath.FromSlash(rel))
+	nextFull := filepath.Join(root, filepath.FromSlash(next))
 	if !fileExists(full) {
-		return "", InputErrorf("Dokument %s gibt es nicht", rel)
+		return "", "", InputErrorf("Dokument %s gibt es nicht", rel)
 	}
-	if !fileExists(filepath.Join(root, filepath.FromSlash(next))) {
-		return "", InputErrorf("Nachfolger %s gibt es nicht — erst schreiben, dann ablösen", next)
+	if !fileExists(nextFull) {
+		return "", "", InputErrorf("Nachfolger %s gibt es nicht — erst schreiben, dann ablösen", next)
 	}
 
 	data, err := os.ReadFile(full)
 	if err != nil {
-		return "", fmt.Errorf("%s lesen: %w", rel, err)
+		return "", "", fmt.Errorf("%s lesen: %w", rel, err)
 	}
+	if state, previous := knowledgeSupersession(data); state == KnowledgeStateSuperseded {
+		return "", "", InputErrorf("Dokument %s ist schon abgelöst (Nachfolger %s): eine Ablösung ist endgültig — wer den Nachfolger ändern will, löst den Nachfolger ab", rel, previous)
+	}
+	nextData, err := os.ReadFile(nextFull)
+	if err != nil {
+		return "", "", fmt.Errorf("%s lesen: %w", next, err)
+	}
+	if state, _ := knowledgeSupersession(nextData); state != KnowledgeStateCondensed && state != KnowledgeStateReviewed {
+		return "", "", InputErrorf("Nachfolger %s hat state %q: ein Nachfolger muss ein Suchtreffer sein können, also condensed oder reviewed — sonst verschwände das Thema ganz aus der Suche", next, state)
+	}
+
 	updated := supersedeFrontmatter(string(data), [][2]string{
 		{knowledgeFieldState, KnowledgeStateSuperseded},
 		{knowledgeFieldSuccessor, next},
@@ -332,21 +420,47 @@ func (k *Knowledge) Supersede(docPath string, successor string, reason string) (
 
 	index, err := k.open()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := os.WriteFile(full, []byte(updated), 0o644); err != nil {
-		return "", fmt.Errorf("%s schreiben: %w", rel, err)
+		return "", "", fmt.Errorf("%s schreiben: %w", rel, err)
 	}
 	entry, chunks, err := chunkKnowledgeFile(root, rel)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	index.replaceFile(rel, entry, chunks)
 	index.BuiltAt = knowledgeNow()
 	if err := writeKnowledgeIndex(k.projectDir, index); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return rel, nil
+	return rel, next, nil
+}
+
+// knowledgeGeneratorOf meldet, ob ein bereinigter Pfad in einem
+// Generatorverzeichnis liegt, und nennt Generator und Verzeichnis.
+func knowledgeGeneratorOf(rel string) (Producer, string, bool) {
+	for _, producer := range []Producer{ProducerDocsCode, ProducerDocsTools, ProducerInventory} {
+		if producer.owns(rel) {
+			return producer, producer.Dirs()[0], true
+		}
+	}
+	return "", "", false
+}
+
+// knowledgeSupersession liest state und successor aus dem Kopf einer Datei —
+// von der Platte, nicht aus dem Index: die Platte ist die Wahrheit. Ein
+// fehlender oder unlesbarer Kopf liefert zwei leere Werte.
+func knowledgeSupersession(data []byte) (state string, successor string) {
+	block, ok := inventory.FrontmatterBlock(data)
+	if !ok {
+		return "", ""
+	}
+	head, err := yamllite.Parse([]byte(block))
+	if err != nil || head == nil || head.Kind != yamllite.Mapping {
+		return "", ""
+	}
+	return strings.TrimSpace(head.Get(knowledgeFieldState).Str()), strings.TrimSpace(head.Get(knowledgeFieldSuccessor).Str())
 }
 
 // supersedeFrontmatter setzt Felder im Kopf einer Datei: vorhandene Schlüssel

@@ -1151,7 +1151,15 @@ func TestKnowledgeSearchLaesstRawUndSupersededAus(t *testing.T) {
 	if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "findings/notiz.md" || hits[0].Origin != "Sitzung 42" || hits[0].State != "reviewed" {
 		t.Fatalf("vor supersede: %+v, %v", hits, err)
 	}
-	if _, err := knowledge.Supersede("findings/notiz.md", "findings/roh.md", "Ersetzt"); err != nil {
+	// Der Nachfolger muss selbst ein Suchtreffer sein können (Task 063,
+	// Entscheidung 4) — ein roher wird abgewiesen.
+	if _, _, err := knowledge.Supersede("findings/notiz.md", "findings/roh.md", "Ersetzt"); !IsInputError(err) {
+		t.Errorf("roher Nachfolger: %v", err)
+	}
+	if _, err := knowledge.Write("session", sessionDoc("findings/nachfolger.md"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := knowledge.Supersede("findings/notiz.md", "findings/nachfolger.md", "Ersetzt"); err != nil {
 		t.Fatal(err)
 	}
 	if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
@@ -1175,7 +1183,7 @@ func TestKnowledgeSearchLaesstRawUndSupersededAus(t *testing.T) {
 
 	// Der Status zählt beide weiter — sie stehen im Index, nur nicht in den Treffern.
 	status, err := knowledge.Status()
-	if err != nil || status.ByKind["findings"].Files != 2 || status.ByKind["findings"].Chunks == 0 {
+	if err != nil || status.ByKind["findings"].Files != 3 || status.ByKind["findings"].Chunks == 0 {
 		t.Errorf("Status: %+v, %v", status, err)
 	}
 }
@@ -1204,4 +1212,151 @@ func TestKnowledgeReadmeFaelltAusDemSuchindex(t *testing.T) {
 	if hits, err := knowledge.Search("Handbuchwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "manual/README.md" {
 		t.Errorf("manual/README.md nicht gefunden: %+v, %v", hits, err)
 	}
+}
+
+// Read liefert nur, was der Index sehen kann (Task 063, Etappe 4): kein
+// verstecktes Segment und kein Weg durch ein symbolisch verlinktes
+// Verzeichnis, das scanKnowledgeTree überspringt. Eine verlinkte Datei sieht
+// der Index dagegen, und read liefert sie weiter.
+func TestKnowledgeReadLiefertNurWasDerIndexSieht(t *testing.T) {
+	t.Run("verstecktes Segment", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		writeKnowledgeFile(t, root, "findings/.versteckt/y.md", "# Versteckt\n")
+		_, err := NewKnowledge(root).Read("findings/.versteckt/y.md")
+		if err == nil || !IsInputError(err) {
+			t.Fatalf("verstecktes Segment gelesen oder kein Eingabefehler: %v", err)
+		}
+		if strings.Contains(err.Error(), "docs") {
+			t.Errorf("Meldung nennt docs statt knowledge/: %v", err)
+		}
+		if _, err := NewKnowledge(root).Read("../x.md"); err == nil || !strings.Contains(err.Error(), "knowledge/") {
+			t.Errorf("Ausbruch: Meldung ohne knowledge/: %v", err)
+		}
+	})
+
+	t.Run("verlinktes Verzeichnis", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		outside := filepath.Join(LocalDir(root), "extern")
+		if err := os.MkdirAll(outside, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(outside, "y.md"), []byte("# Extern\n\nGeheimwort.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(KnowledgeDir(root), "findings", "link")); err != nil {
+			t.Skipf("symbolische Verknüpfung nicht anlegbar: %v", err)
+		}
+		knowledge := NewKnowledge(root)
+		if hits, err := knowledge.Search("Geheimwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+			t.Fatalf("der Index sieht das verlinkte Verzeichnis doch — die These trägt nicht: %+v, %v", hits, err)
+		}
+		content, err := knowledge.Read("findings/link/y.md")
+		if err == nil {
+			t.Fatalf("read über ein verlinktes Verzeichnis geliefert: %q", content)
+		}
+		if !IsInputError(err) || !strings.Contains(err.Error(), "knowledge/") {
+			t.Errorf("Meldung/Klasse: %v", err)
+		}
+	})
+
+	t.Run("verlinkte Datei sieht der Index", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		outside := filepath.Join(LocalDir(root), "extern.md")
+		if err := os.WriteFile(outside, []byte("# Extern\n\nDateiwort.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(KnowledgeDir(root), "findings", "datei.md")); err != nil {
+			t.Skipf("symbolische Verknüpfung nicht anlegbar: %v", err)
+		}
+		knowledge := NewKnowledge(root)
+		if hits, err := knowledge.Search("Dateiwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 {
+			t.Fatalf("verlinkte Datei nicht im Index: %+v, %v", hits, err)
+		}
+		if content, err := knowledge.Read("findings/datei.md"); err != nil || !strings.Contains(content, "Dateiwort") {
+			t.Errorf("verlinkte Datei nicht gelesen: %q, %v", content, err)
+		}
+	})
+}
+
+// Entscheidung 6 aus Task 063: kein Rückfall beim Lesen auf den alten Ort
+// docs/learned/, sondern eine Notiz in status, solange dort Markdown liegt.
+// list und search bleiben unberührt — sie liefern die Datei nicht und tragen
+// die Notiz nicht.
+func TestKnowledgeStatusNenntAltenOrtDocsLearned(t *testing.T) {
+	hasLearnedNote := func(knowledge *Knowledge) bool {
+		return strings.Contains(strings.Join(knowledge.Notes(), "; "), "docs/learned")
+	}
+
+	t.Run("ohne", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatal(err)
+		}
+		if hasLearnedNote(knowledge) {
+			t.Errorf("Notiz ohne docs/learned/: %v", knowledge.Notes())
+		}
+	})
+
+	t.Run("nur andere Dateien", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		learned := filepath.Join(LocalDir(root), "docs", "learned")
+		if err := os.MkdirAll(learned, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(learned, "notiz.txt"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatal(err)
+		}
+		if hasLearnedNote(knowledge) {
+			t.Errorf("Notiz ohne Markdown in docs/learned/: %v", knowledge.Notes())
+		}
+	})
+
+	t.Run("mit Markdown", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		learned := filepath.Join(LocalDir(root), "docs", "learned")
+		if err := os.MkdirAll(learned, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(learned, "alt.md"), []byte("# Alt\n\nLernwort.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		knowledge := NewKnowledge(root)
+		status, err := knowledge.Status()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !hasLearnedNote(knowledge) {
+			t.Errorf("keine Notiz zum alten Ort: %v", knowledge.Notes())
+		}
+		if status.FileCount != 7 {
+			t.Errorf("docs/learned/ im Index: %+v", status)
+		}
+
+		lister := NewKnowledge(root)
+		entries, err := lister.List(KnowledgeFilter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if strings.Contains(entry.Path, "learned") {
+				t.Errorf("List liefert den alten Ort: %+v", entry)
+			}
+		}
+		if hasLearnedNote(lister) {
+			t.Errorf("List trägt die Notiz: %v", lister.Notes())
+		}
+		searcher := NewKnowledge(root)
+		if hits, err := searcher.Search("Lernwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+			t.Errorf("Search liefert den alten Ort: %+v, %v", hits, err)
+		}
+		if hasLearnedNote(searcher) {
+			t.Errorf("Search trägt die Notiz: %v", searcher.Notes())
+		}
+	})
 }

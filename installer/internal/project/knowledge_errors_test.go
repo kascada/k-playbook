@@ -62,14 +62,17 @@ func TestKnowledgeEingabefehlerSindErkennbar(t *testing.T) {
 		"fehlender Pfad bei read":    func() error { _, err := knowledge.Read("manual/fehlt.md"); return err },
 		"Pfad aus der Zone bei read": func() error { _, err := knowledge.Read("../geheim.md"); return err },
 		"fehlendes Dokument bei supersede": func() error {
-			_, err := knowledge.Supersede("manual/fehlt.md", "manual/release.md", "x")
+			_, _, err := knowledge.Supersede("manual/fehlt.md", "manual/release.md", "x")
 			return err
 		},
 		"fehlender Nachfolger bei supersede": func() error {
-			_, err := knowledge.Supersede("manual/release.md", "manual/fehlt.md", "x")
+			_, _, err := knowledge.Supersede("manual/release.md", "manual/fehlt.md", "x")
 			return err
 		},
-		"eigener Nachfolger":                 func() error { _, err := knowledge.Supersede("manual/release.md", "manual/release.md", "x"); return err },
+		"eigener Nachfolger": func() error {
+			_, _, err := knowledge.Supersede("manual/release.md", "manual/release.md", "x")
+			return err
+		},
 		"leere Suchanfrage":                  func() error { _, err := knowledge.Search(" ", KnowledgeFilter{}, 0); return err },
 		"unbekannter Queue-Eintrag bei drop": func() error { return knowledge.QueueDrop("gibt-es-nicht", "") },
 		"ungültige Queue-Kennung":            func() error { return knowledge.QueueDrop("../x", "") },

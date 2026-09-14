@@ -46,7 +46,8 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | Migration of `docs/` into `knowledge/` | not built; `knowledge/` is empty until then |
 | Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
 | Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
-| Test of the write side against the built tools | next step, see "How we proceed" |
+| Test of the write side against the built tools | run on 2026-09-13; the findings it reproduced are fixed by task 063, the repeated run in the project is still open; see "How we proceed" |
+| Document view for `knowledge/` in the interface | not built; until it exists the anchor check of the write test cannot be satisfied, see "Open points" |
 | Ranking correction | built, task 056: the root `README.md` is out of the search index |
 | Vectors, local model | deliberately not built, tier two |
 | LanceDB or another dedicated database | deferred; revisited only if the corpus or the retrieval quality demands it |
@@ -87,7 +88,10 @@ here:
   any document is refused, and a failed run leaves the previous state.
 - **Inbox.** What `inbox_put` stores is listed by `inbox_list` and never appears in search.
 - **Index.** After a write, `status` counts the new chunks, `search` finds the document, and a
-  hit's anchor opens the right heading in the interface.
+  hit's anchor opens the right heading in the interface. The second half cannot currently be
+  satisfied: the interface renders only `docs/` and has no document view for `knowledge/` (see
+  "Open points"). What the write side measures is that the hit carries the anchor of the right
+  heading.
 - **Past the gate.** A file changed by an editor or a `git pull` is picked up as drift on the
   next access.
 
@@ -327,3 +331,13 @@ sources periodically, or whether an extract stays a dated snapshot, is undecided
 import run finds pages that are gone; it can supersede them, but nothing yet does. A store
 that only ever grows will eventually hold things that vanished upstream long ago, and which
 run marks them is undecided.
+
+**There is no document view for `knowledge/`.** The interface renders only
+`k-playbook-local/docs/` (`GET /api/docs/file`); the page `/knowledge` shows the picture from
+[`knowledge-storage.md`](knowledge-storage.md). A hit's anchor therefore has no place to open
+in, and the anchor check of the write test stays unsatisfiable until such a view exists.
+
+**A successor can still drop out of search later.** `supersede` requires a successor in state
+`condensed` or `reviewed`, but a later `write` onto the successor may set `state: raw`. The
+topic then leaves search again, without any refusal. Whether `write` should guard the state of
+a document that is another document's successor is undecided.

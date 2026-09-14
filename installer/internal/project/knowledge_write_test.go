@@ -359,3 +359,81 @@ func TestKnowledgeWriteLoeschtQueueEintragNurBeiErfolg(t *testing.T) {
 		t.Error("Dokument fehlt")
 	}
 }
+
+// Entscheidung 7 aus Task 063: write überschreibt kein Dokument mit state
+// superseded. Sonst setzte ein späterer Lauf desselben Erzeugers die Ablösung
+// still zurück und verlöre successor. Datei, Index und Queue-Eintrag bleiben.
+func TestKnowledgeWriteWeistAbgeloestesDokumentAb(t *testing.T) {
+	root := knowledgeFixture(t)
+	knowledge := NewKnowledge(root)
+	if _, err := knowledge.Write("session", sessionDoc("findings/neu.md"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := knowledge.Supersede("findings/notiz.md", "findings/neu.md", "Ersetzt"); err != nil {
+		t.Fatal(err)
+	}
+	before := readKnowledgeFile(t, root, "findings/notiz.md")
+	if _, err := knowledge.Status(); err != nil {
+		t.Fatal(err)
+	}
+	indexBefore, err := os.ReadFile(KnowledgeIndexFile(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := knowledge.QueueAdd("chat/x.md", "findings/", "Nachtrag")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	again := with(sessionDoc("findings/notiz.md"), func(d *KnowledgeDocument) { d.Body = "# Gelernt\n\nJetzt doch sichern.\n" })
+	_, err = knowledge.Write("session", again, id)
+	if err == nil {
+		t.Fatal("write auf ein abgelöstes Dokument angenommen")
+	}
+	if !IsInputError(err) || !strings.Contains(err.Error(), "abgelöst") || !strings.Contains(err.Error(), "findings/neu.md") {
+		t.Errorf("Meldung/Klasse: %v", err)
+	}
+	if got := readKnowledgeFile(t, root, "findings/notiz.md"); got != before {
+		t.Errorf("abgelöstes Dokument überschrieben:\n%s", got)
+	}
+	if indexAfter, err := os.ReadFile(KnowledgeIndexFile(root)); err != nil || string(indexAfter) != string(indexBefore) {
+		t.Errorf("Index verändert: %v", err)
+	}
+	if entries, err := knowledge.QueueList(); err != nil || len(entries) != 1 {
+		t.Errorf("Queue-Eintrag nicht mehr da: %+v, %v", entries, err)
+	}
+	if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+		t.Errorf("abgelöstes Dokument wieder in der Suche: %+v, %v", hits, err)
+	}
+}
+
+// bodyCarriesFrontmatter schneidet wie composeKnowledgeFile auch führende
+// Zeilenumbrüche ab (Task 063, Etappe 4): ein Rumpf mit Leerzeile und Kopf
+// wird über write und publish abgewiesen, statt als zweiter Kopfblock in der
+// Datei zu landen.
+func TestKnowledgeRumpfMitLeerzeileUndKopfWirdAbgewiesen(t *testing.T) {
+	for name, body := range map[string]string{
+		"Leerzeile":               "\n---\ntitle: Fremd\n---\n\n# X\n",
+		"Leerraum und Leerzeilen": " \n\t\n---\ntitle: Fremd\n---\n# X\n",
+		"CRLF":                    "\r\n---\r\ntitle: Fremd\r\n---\r\n# X\r\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := knowledgeFixture(t)
+			knowledge := NewKnowledge(root)
+			_, err := knowledge.Write("session", with(sessionDoc("findings/x.md"), func(d *KnowledgeDocument) { d.Body = body }), "")
+			if err == nil || !IsInputError(err) || !strings.Contains(err.Error(), "Dateikopf") {
+				t.Errorf("write: %v", err)
+			}
+			if pathExists(filepath.Join(KnowledgeDir(root), "findings", "x.md")) {
+				t.Error("write hat trotz Kopf geschrieben")
+			}
+			_, err = knowledge.Publish("docs-code", []KnowledgeDocument{codeDoc("x.md", body)})
+			if err == nil || !IsInputError(err) || !strings.Contains(err.Error(), "Dateikopf") {
+				t.Errorf("publish: %v", err)
+			}
+			if pathExists(filepath.Join(KnowledgeDir(root), "code", "x.md")) || !pathExists(filepath.Join(KnowledgeDir(root), "code", "links.md")) {
+				t.Error("publish hat trotz Kopf getauscht")
+			}
+		})
+	}
+}

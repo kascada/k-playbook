@@ -187,7 +187,13 @@ func knowledgeFileHash(root, rel string) (string, error) {
 // dokumentweite Eindeutigkeit der Ids — drei „## Ablauf" bekämen dreimal
 // „ablauf", und der Sprung aus einem Treffer landete auf der ersten.
 func chunkKnowledgeFile(root, rel string) (knowledgeFileEntry, []Chunk, error) {
-	full := filepath.Join(root, filepath.FromSlash(rel))
+	return chunkKnowledgeFileAt(filepath.Join(root, filepath.FromSlash(rel)), rel)
+}
+
+// chunkKnowledgeFileAt chunkt die Datei unter full so, als läge sie unter rel
+// in der Ablage — für Publish, das den Index aus dem Zwischenverzeichnis baut,
+// bevor getauscht wird.
+func chunkKnowledgeFileAt(full, rel string) (knowledgeFileEntry, []Chunk, error) {
 	data, err := os.ReadFile(full)
 	if err != nil {
 		return knowledgeFileEntry{}, nil, fmt.Errorf("%s lesen: %w", rel, err)
@@ -556,13 +562,32 @@ func (k *Knowledge) List(filter KnowledgeFilter) ([]KnowledgeEntry, error) {
 }
 
 // Read liefert eine Datei als Markdown, nicht als HTML: gerendert wird an
-// einer Stelle, in der Oberfläche. Der Pfad wird geprüft wie bei der
-// mitgelieferten Doku — relativ, kein Ausbruch, Markdown-Datei.
+// einer Stelle, in der Oberfläche. Read liefert nur, was der Index sehen kann:
+// der Pfad wird geprüft wie beim Schreiben (KnowledgeRelPath — relativ, kein
+// Ausbruch, keine versteckten Segmente, Markdown-Datei), und ein Weg durch ein
+// symbolisch verlinktes Verzeichnis wird abgewiesen, weil scanKnowledgeTree
+// dort nicht absteigt. Eine verlinkte Datei sieht der Index; sie wird gelesen.
 func (k *Knowledge) Read(path string) (string, error) {
-	full, err := docFilePath(KnowledgeDir(k.projectDir), path)
+	rel, err := KnowledgeRelPath(path)
 	if err != nil {
 		return "", err
 	}
+	root := KnowledgeDir(k.projectDir)
+	current := root
+	segments := strings.Split(rel, "/")
+	for _, segment := range segments[:len(segments)-1] {
+		current = filepath.Join(current, segment)
+		info, err := os.Lstat(current)
+		if err != nil {
+			// Fehlt ein Verzeichnis, sagt das Lesen unten „gibt es nicht".
+			break
+		}
+		if info.Mode()&fs.ModeSymlink != 0 {
+			return "", InputErrorf("Pfad %q führt durch ein verlinktes Verzeichnis (%s): %s/%s/ indiziert keine verlinkten Verzeichnisse, und read liefert nur, was der Index sieht",
+				path, strings.TrimPrefix(filepath.ToSlash(strings.TrimPrefix(current, root)), "/"), LocalDirName, KnowledgeDirName)
+		}
+	}
+	full := filepath.Join(root, filepath.FromSlash(rel))
 	content, err := os.ReadFile(full)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -595,6 +620,18 @@ func (k *Knowledge) Status() (KnowledgeStatus, error) {
 		count.Chunks++
 		byKind[chunk.Kind] = count
 	}
+	// Versteckte Reste eines abgebrochenen publish werden nicht automatisch
+	// gelöscht — ob ein -alt-* noch gebraucht wird, weiß nur ein Mensch.
+	// status nennt sie, der Index sieht sie ohnehin nicht.
+	if _, residues := knowledgeSwapResidues(KnowledgeDir(k.projectDir)); len(residues) > 0 {
+		k.note("versteckte Reste eines publish in %s/%s/: %s — sie werden nicht automatisch gelöscht", LocalDirName, KnowledgeDirName, strings.Join(residues, ", "))
+	}
+	// Kein Rückfall beim Lesen auf den alten Ort (Task 063, Entscheidung 6),
+	// aber ein Hinweis, solange dort Markdown liegt: sonst wären die Dokumente
+	// aus v0.7.0 unsichtbar, ohne dass es jemand erfährt.
+	if count := knowledgeLegacyLearnedMarkdown(k.projectDir); count > 0 {
+		k.note("%d Markdown-Datei(en) unter %s/%s/ — dem alten Ort, an den knowledge write bis v0.7.0 schrieb; die Wissensablage liest dort nicht, die Migration nimmt sie mit", count, LocalDirName, knowledgeLegacyLearnedDir)
+	}
 
 	return KnowledgeStatus{
 		IndexKind:    KnowledgeIndexKind,
@@ -606,6 +643,38 @@ func (k *Knowledge) Status() (KnowledgeStatus, error) {
 		Stale:        index.Stale,
 		StaleFiles:   index.StaleFiles,
 	}, nil
+}
+
+// knowledgeLegacyLearnedDir ist der alte Ort unterhalb von k-playbook-local,
+// an den knowledge write bis v0.7.0 schrieb (git show
+// v0.7.0:installer/internal/project/knowledge.go).
+const knowledgeLegacyLearnedDir = "docs/learned"
+
+// knowledgeLegacyLearnedMarkdown zählt die Markdown-Dateien am alten Ort,
+// versteckte Einträge ausgenommen. Ein fehlendes oder unlesbares Verzeichnis
+// zählt null.
+func knowledgeLegacyLearnedMarkdown(projectDir string) int {
+	root := filepath.Join(LocalDir(projectDir), filepath.FromSlash(knowledgeLegacyLearnedDir))
+	if !isDir(root) {
+		return 0
+	}
+	count := 0
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if path != root && strings.HasPrefix(entry.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasPrefix(entry.Name(), ".") && strings.EqualFold(filepath.Ext(path), ".md") {
+			count++
+		}
+		return nil
+	})
+	return count
 }
 
 // knowledgeHiddenState meldet, ob ein state ein Dokument aus der Suche hält.

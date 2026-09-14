@@ -1,7 +1,9 @@
 package project
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -150,8 +152,14 @@ func oneOf(values []string, value string) bool {
 // führender ---Block, der als YAML-Abbildung durchgeht. Ein führendes „---"
 // allein ist kein Kopf, sondern ein Thematic Break — gültiges Markdown, und
 // der Text dahinter bleibt Rumpf (belegt in material/befunde/wissenstor-mcp.md).
+//
+// Geschnitten wird wie in composeKnowledgeFile, das CRLF zu LF macht und
+// führende Zeilenumbrüche abschneidet — sonst ginge ein Rumpf mit Leerzeile
+// und Kopf an der Prüfung vorbei und stünde als zweiter Kopfblock unter dem
+// erzeugten. Leerraum am Zeilenanfang wird zusätzlich abgeschnitten.
 func bodyCarriesFrontmatter(body string) bool {
-	block, ok := inventory.FrontmatterBlock([]byte(strings.TrimLeft(body, " \t")))
+	normalized := strings.TrimLeft(strings.ReplaceAll(body, "\r\n", "\n"), " \t\r\n")
+	block, ok := inventory.FrontmatterBlock([]byte(normalized))
 	return ok && isKnowledgeFrontmatter(block)
 }
 
@@ -260,6 +268,20 @@ func (k *Knowledge) Write(producer string, doc KnowledgeDocument, queue string) 
 		return "", err
 	}
 	doc.Path = rel
+
+	// Ein abgelöstes Dokument wird nicht überschrieben (Task 063,
+	// Entscheidung 7): sonst setzte ein späterer Lauf desselben Erzeugers den
+	// Zustand still zurück und verlöre successor. Geprüft wird an der Platte,
+	// bevor irgendetwas geschrieben wird.
+	existing, err := os.ReadFile(filepath.Join(KnowledgeDir(k.projectDir), filepath.FromSlash(rel)))
+	switch {
+	case err == nil:
+		if state, successor := knowledgeSupersession(existing); state == KnowledgeStateSuperseded {
+			return "", InputErrorf("%s ist abgelöst (Nachfolger %s) und wird nicht überschrieben — wer das Thema ändern will, schreibt den Nachfolger oder löst ihn ab", rel, successor)
+		}
+	case !errors.Is(err, fs.ErrNotExist):
+		return "", fmt.Errorf("%s lesen: %w", rel, err)
+	}
 
 	queueFile := ""
 	if strings.TrimSpace(queue) != "" {

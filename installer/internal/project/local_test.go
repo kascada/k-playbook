@@ -468,3 +468,57 @@ func TestEnsureLocalLaesstOeffentlichGeschaltetesVerzeichnisOeffentlich(t *testi
 		t.Errorf("State nach dem Start = %q, erwartet %q (%s)", status.State, PrivacyPublic, status.Reason)
 	}
 }
+
+// CreateLocal legt die README in knowledge/ durch das Tor an (Erzeuger
+// docs-index): mit Frontmatter, und der Index kennt sie. Ein gebauter, leerer
+// Index meldet danach keine Drift. Eine vorhandene README bleibt, wie sie ist
+// (Task 063, Etappe 3).
+func TestCreateLocalOhneDriftInKnowledge(t *testing.T) {
+	t.Run("neu", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := NewKnowledge(root).Status(); err != nil {
+			t.Fatalf("Status vor CreateLocal: %v", err)
+		}
+		if _, err := CreateLocal(root); err != nil {
+			t.Fatalf("CreateLocal: %v", err)
+		}
+		status, err := NewKnowledge(root).Status()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status.Stale || status.StaleFiles != 0 || status.FileCount != 1 {
+			t.Errorf("Status nach CreateLocal: %+v", status)
+		}
+		content, err := os.ReadFile(filepath.Join(LocalDir(root), KnowledgeDirName, "README.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		head := parseKnowledgeFrontmatter(content)
+		if head.Title == "" || head.State == "" {
+			t.Errorf("README ohne title oder state:\n%s", content)
+		}
+		if !strings.Contains(string(content), "Eigentümer") {
+			t.Errorf("README ohne Zweck:\n%s", content)
+		}
+		if gitignore := filepath.Join(LocalDir(root), CacheDirName, PrivateIgnoreFile); !fileExists(gitignore) {
+			t.Error("cache/.gitignore fehlt")
+		}
+	})
+
+	t.Run("vorhandene README bleibt", func(t *testing.T) {
+		root := t.TempDir()
+		readme := filepath.Join(LocalDir(root), KnowledgeDirName, "README.md")
+		if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(readme, []byte("# eigener Index\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := CreateLocal(root); err != nil {
+			t.Fatalf("CreateLocal: %v", err)
+		}
+		if content, err := os.ReadFile(readme); err != nil || string(content) != "# eigener Index\n" {
+			t.Errorf("vorhandene README verändert: %q, %v", content, err)
+		}
+	})
+}

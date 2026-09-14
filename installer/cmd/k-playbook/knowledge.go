@@ -482,13 +482,12 @@ func runKnowledgeSupersede(args []string) error {
 	if err != nil {
 		return err
 	}
-	rel, err := knowledge.Supersede(parsed.positional[0], parsed.get("--successor"), parsed.get("--reason"))
+	rel, successor, err := knowledge.Supersede(parsed.positional[0], parsed.get("--successor"), parsed.get("--reason"))
 	if err != nil {
 		return err
 	}
 	reportKnowledgeNotes(knowledge)
 
-	successor := filepath.ToSlash(strings.TrimSpace(parsed.get("--successor")))
 	if parsed.json {
 		return printKnowledgeJSON(knowledgeSupersedeOutput{Path: rel, Successor: successor, Superseded: true})
 	}
@@ -856,7 +855,7 @@ Eingang (k-playbook-local/inbox/, nie indiziert):
   inbox list [<quelle>] [--json]
             Listet die Rohstücke mit Format, Größe, Datum und Notiz.
   inbox read <pfad> [--json]
-            Gibt ein Rohstück aus — nur Textformate (md, txt, html, htm,
+            Gibt ein Rohstück aus — nur Textformate (md, markdown, txt, html, htm,
             json, yaml, yml, csv, xml, log).
 
 Warteschlange (k-playbook-local/queue/, leer heißt: nichts offen):

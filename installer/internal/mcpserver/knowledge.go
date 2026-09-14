@@ -115,7 +115,7 @@ type knowledgeInboxListInput struct {
 
 type knowledgeInboxReadInput struct {
 	knowledgeBaseInput
-	Path string `json:"path" jsonschema:"Pflicht. Pfad relativ zu k-playbook-local/inbox/, so wie inbox_list ihn nennt (<quelle>/<name>). Nur Textformate: md, txt, html, htm, json, yaml, yml, csv, xml, log."`
+	Path string `json:"path" jsonschema:"Pflicht. Pfad relativ zu k-playbook-local/inbox/, so wie inbox_list ihn nennt (<quelle>/<name>). Nur Textformate: md, markdown, txt, html, htm, json, yaml, yml, csv, xml, log."`
 }
 
 type knowledgeQueueAddInput struct {
@@ -353,13 +353,15 @@ func knowledgePublishTool(ctx context.Context, req *mcp.CallToolRequest, input k
 func knowledgeSupersedeTool(ctx context.Context, req *mcp.CallToolRequest, input knowledgeSupersedeInput) (*mcp.CallToolResult, any, error) {
 	return wrapKnowledgeTool(knowledgeToolSupersede, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
 		knowledge := project.NewKnowledge(projectDir)
-		rel, err := knowledge.Supersede(input.Path, input.Successor, input.Reason)
+		// Beide Pfade kommen bereinigt aus dem Kern — ./findings/y.md wird als
+		// findings/y.md gemeldet, so, wie read und list es nennen.
+		rel, next, err := knowledge.Supersede(input.Path, input.Successor, input.Reason)
 		if err != nil {
 			return knowledgeFailure(knowledgeToolSupersede, projectDir, "write_failed", err)
 		}
 		return knowledgeResult(knowledgeEnvelope{
 			OK: true, Tool: knowledgeToolSupersede, ProjectDir: projectDir,
-			Path: rel, Successor: filepath.ToSlash(strings.TrimSpace(input.Successor)), Superseded: true,
+			Path: rel, Successor: next, Superseded: true,
 			Hint: knowledgeHint(knowledge),
 		}, false)
 	}), nil, nil

@@ -235,3 +235,55 @@ func TestKnowledgeQueueAddWeistAb(t *testing.T) {
 		t.Errorf("freies Ziel abgewiesen: %v", err)
 	}
 }
+
+// Liegt am Quellpfad eine Datei — die README aus CreateLocal als Quelle, eine
+// abgelegte Datei als Zwischenverzeichnis im Namen —, ist das ein Eingabefehler
+// mit sprechender Meldung, bevor irgendetwas angelegt wird (Task 063, Etappe 5).
+func TestKnowledgeInboxPutQuellpfadIstDatei(t *testing.T) {
+	root := t.TempDir()
+	knowledge := NewKnowledge(root)
+	readme := filepath.Join(InboxDir(root), "README.md")
+	if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(readme, []byte("# inbox\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledge.InboxPut("chat", "a.md", []byte("x"), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, tc := range map[string][2]string{
+		"Quelle ist Datei":       {"README.md", "x.md"},
+		"Name führt durch Datei": {"chat", "a.md/b.md"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := knowledge.InboxPut(tc[0], tc[1], []byte("y"), "Notiz")
+			if err == nil {
+				t.Fatal("angenommen")
+			}
+			if !IsInputError(err) || !strings.Contains(err.Error(), "Datei") {
+				t.Errorf("Meldung/Klasse: %v", err)
+			}
+		})
+	}
+	if content, err := os.ReadFile(readme); err != nil || string(content) != "# inbox\n" {
+		t.Errorf("README verändert: %q, %v", content, err)
+	}
+	if content, err := os.ReadFile(filepath.Join(InboxDir(root), "chat", "a.md")); err != nil || string(content) != "x" {
+		t.Errorf("chat/a.md verändert: %q, %v", content, err)
+	}
+}
+
+// .markdown ist Text: inbox_list nennt es markdown, inbox_read liefert es.
+func TestKnowledgeInboxReadLiestMarkdownEndung(t *testing.T) {
+	root := t.TempDir()
+	knowledge := NewKnowledge(root)
+	if _, err := knowledge.InboxPut("chat", "notiz.markdown", []byte("# Notiz\n"), ""); err != nil {
+		t.Fatal(err)
+	}
+	content, err := knowledge.InboxRead("chat/notiz.markdown")
+	if err != nil || content != "# Notiz\n" {
+		t.Errorf("InboxRead: %q, %v", content, err)
+	}
+}

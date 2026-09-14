@@ -598,7 +598,11 @@ were one field called `source` in v0.7.0 and were split before anything consumed
 Documents in state `raw` or `superseded` are not hits, and neither is the root `README.md`,
 which is generated navigation whose keyword index would otherwise outrank the documents it
 points at; `list` carries all of them with their `state`, and `read` returns any of them.
-There is no filter on `state`; that belongs to the reading side. The `title` that `list`
+`read` only returns what the index can see: its path is checked like a write path -- relative,
+inside the zone, no hidden segment, a Markdown file -- and a path through a symbolically
+linked directory, which the index does not descend into, is refused as `invalid_input`; a
+linked file is indexed and readable. There is no filter on `state`; that belongs to the reading
+side. The `title` that `list`
 reports is the frontmatter `title` when the document has one, otherwise its first heading,
 otherwise the file name -- what a caller had to give `write` comes back on reading, and a
 file without a header still gets a readable name. `search` always carries
@@ -613,23 +617,44 @@ producer's directory. The frontmatter is composed by the tool from `title`, `sub
 `origin`, `state` (`raw`, `condensed`, `reviewed`; `superseded` is refused), optional
 `format` (`markdown` by default, or `text`, `html`, `image`, `pdf`) and `sources`; `updated`
 is set by the tool. The `body` is Markdown without a header, and a body that carries one is
-refused rather than passed through. `write` optionally names a `queue` entry, which is
+refused rather than passed through -- also when blank lines, leading whitespace or CRLF line
+endings come before it. `write` optionally names a `queue` entry, which is
 deleted after the document exists and the index knows it -- not before, and not if the write
-failed. The generators `docs-code`, `docs-tools` and `inventory` cannot `write`: they
-`publish` their complete set of `documents` (paths relative to their directory), and the
-tool builds the new directory beside the old one and swaps it, so a run that dies halfway
+failed. `write` does not overwrite a document whose file carries `state: superseded`: the call
+is refused before anything is written, and the file, the index and a named queue entry stay as
+they are. A later run of the same producer would otherwise reset the state silently and lose
+`successor`; whoever wants to change the topic writes the successor or supersedes it.
+The generators `docs-code`, `docs-tools` and `inventory` cannot `write`: they
+`publish` their complete set of `documents`, and the tool builds the new directory beside the
+old one, writes the index that describes it and only then swaps it, so a run that dies halfway
 leaves the previous state untouched; the result says how many were `written` and `removed`.
+The paths of `documents` are relative to the generator's directory: a path that already starts
+with it (`code/overview.md` for `docs-code`) is refused as `invalid_input`, on the command line
+as well, instead of landing in `code/code/` -- a generator directory therefore holds no
+subdirectory of its own name. If a swap is interrupted between its two renames, the next access
+puts the set-aside directory `.<dir>-alt-*` back under its name before drift detection runs,
+provided the target is missing and exactly one candidate lies there; it never replaces an
+existing target. [knowledge-layout.md](knowledge-layout.md#the-write-tools) spells out every
+failure case.
 An empty set -- `documents: []` or the field left out -- is refused as `invalid_input` before
 anything is created: `publish` never empties a directory, on either path.
 On the command line, `publish --from <dir>` reads every Markdown file below `<dir>` with the
 same fields in its frontmatter, checks them and recomposes the header -- nothing is copied.
 `supersede` sets `state: superseded`, `successor` and `superseded_reason`, refreshes
-`updated` and leaves the body; the successor must already exist in the store.
+`updated` and leaves the body; the successor must already exist in the store and must be able
+to be a search hit, that is `condensed` or `reviewed`. Refused as `invalid_input`: a document
+or a successor under `code/`, `libs/` or `versions/`, the root `README.md` on either side, a
+document that is already superseded, and a successor in any other state. The result names both
+paths cleaned: `./findings/y.md` comes back as `findings/y.md`. A supersession is final; the
+rules and the way to correct a wrong successor are in
+[knowledge-layout.md](knowledge-layout.md#superseding).
 
 **Inbox and queue.** `inbox_put` stores a raw piece under `inbox/<source>/<name>` as it is
--- any format, no frontmatter, no index -- and refuses an occupied name; a `note` is stored
+-- any format, no frontmatter, no index -- and refuses an occupied name as well as a path on
+which a file lies where a directory is needed (`README.md` as `source`, an existing piece as an
+intermediate directory in `name`); a `note` is stored
 beside it as `<name>.note` and shown by `inbox_list` at the piece's entry. `inbox_read` reads
-text formats only (`md`, `txt`, `html`, `htm`, `json`, `yaml`, `yml`, `csv`, `xml`, `log`).
+text formats only (`md`, `markdown`, `txt`, `html`, `htm`, `json`, `yaml`, `yml`, `csv`, `xml`, `log`).
 `queue_add` takes `origin`, `target` (a directory relative to `knowledge/`, checked for path
 safety only) and `reason` and assigns the `id` itself; `queue_list` returns the backlog with
 those fields plus `added` and any `notes`; `queue_drop` deletes an entry and records nothing.
@@ -639,7 +664,11 @@ caller can decide between correcting and giving up. `invalid_input` is reserved 
 errors, which the core (`project.InputError`) distinguishes and the wrappers only relay: an
 unknown producer, a path out of the zone or outside the producer's directory, a missing or
 malformed field, a body with a header, a refused `state`, an empty `documents` set, a
-non-text format at `inbox_read`, an occupied inbox name -- and "not there": a missing path
+non-text format at `inbox_read`, an occupied inbox name or a file on its path, a `publish`
+path that starts with the generator's directory, a `supersede` target or successor in a
+generator directory or the root `README.md`, an already superseded target, a successor that is
+not `condensed` or `reviewed`, a `write` onto a superseded document, a `read` path with a hidden
+segment or through a linked directory -- and "not there": a missing path
 at `read` or `supersede`, a missing successor at `supersede`, an unknown queue `id` at
 `queue_drop` or `write`, a missing inbox path at `inbox_read`. The caller named something
 that does not exist and can correct it; no separate code. Everything else is the
@@ -650,8 +679,14 @@ unwritable `knowledge/`, or a path that exists but cannot be read. `project_not_
 the code for a `projectDir` that leads to no k-playbook project.
 
 `status` reports `stale: true` and `staleFiles` when the last access found files changed
-behind the tools' back and re-read them. A `hint` appears when an access had to skip
-something without failing over it: an unwritable `cache/`, an unreadable file. Unreadable is
+behind the tools' back and re-read them. The same report can mean an interrupted or a
+concurrently running `publish`: its index is written before its swap, so for that moment, or
+after a crash in it, the index describes a set the disk does not hold, and the access returns
+to what is on disk -- although nobody wrote past the gate. A `hint` appears when an access had
+to skip something without failing over it: an unwritable `cache/`, an unreadable file, a
+set-aside directory put back after an interrupted swap. `status` also names hidden leftovers of
+a swap (`.<dir>-neu-*`, `.<dir>-alt-*`), which are never deleted automatically, and Markdown
+files at the old location `k-playbook-local/docs/learned/`, which the store no longer reads. Unreadable is
 not drift: a file whose hash cannot be taken is reported in the `hint`, its index entry is
 dropped once, and it stays invisible to the comparison -- no `stale`, no rewrite of the index
 -- until it is readable again; its return then counts as drift like any new file. `status` also

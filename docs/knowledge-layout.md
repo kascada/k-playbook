@@ -189,7 +189,10 @@ This cannot be enforced against a producer that has a filesystem, and pretending
 would be the wrong design. What can be done is what the index already does: it carries a hash
 per file and notices when the tree disagrees with it. A write past the gate is therefore
 detectable; it is repaired silently, and `status` says that it happened (`stale`,
-`staleFiles`) without naming the file. A drift report that names the file and stays until
+`staleFiles`) without naming the file. `stale` can also mean an interrupted or a concurrently
+running `publish` rather than a write past the gate: `publish` writes its index before its swap
+(see "The write tools"), so in that moment, or after a crash in it, the index describes a set
+the disk does not hold, and the next access returns to what is on disk. A drift report that names the file and stays until
 somebody acknowledges it was considered and deliberately not built — see "Decisions".
 
 ## The write tools
@@ -230,7 +233,7 @@ later, and that the mapping exists in exactly one place rather than in eight cal
 | `queue_drop` | `id`, `reason` | — |
 | `write` | `producer`, `path`, `title`, `subject`, `origin`, `state`, `format`, `sources`, `body`, `queue` | the written path |
 | `publish` | `producer`, `documents` | how many written, how many removed |
-| `supersede` | `path`, `successor`, `reason` | the superseded path |
+| `supersede` | `path`, `successor`, `reason` | the superseded path and the successor, both cleaned |
 
 Over MCP the names are `k_playbook_knowledge_<tool>`; on the command line `inbox` and `queue`
 are groups (`k-playbook knowledge inbox put`, `… queue add`) and the rest are subcommands
@@ -248,10 +251,49 @@ turns up.
 before and not in a second call. That is the whole reason the queue can be trusted as a
 backlog: there is no window in which the work is both done and outstanding.
 
+`write` does **not overwrite a superseded document**. A target whose file carries
+`state: superseded` is refused before anything is written. Otherwise a later run of the same
+producer would set the state back silently and lose `successor`, and the supersession would be
+gone without anyone noticing. Whoever wants to change the topic writes the successor, or
+supersedes it.
+
 `publish` is how a generator writes, and the only way it does. It hands over its **complete**
 set of documents; the tool writes them and removes what is not in the set. A run that dies
 halfway changes nothing at all, whereas a `clear` followed by writes would leave the store
 empty for as long as the run takes.
+
+The paths of a set are **relative to the generator's directory**: `overview.md`, not
+`code/overview.md`. A path that already starts with the directory is refused, not cut: it
+points at a wrongly built generator, and cutting it silently would hide that. The consequence
+is that directly below a generator directory there is no subdirectory of the same name
+(`code/code/`).
+
+That a run which dies halfway changes nothing rests on the order of the exchange and on one
+rule: **the files on disk are the truth, and drift detection may only ever lead back to the
+previous state.** The new set is written into a hidden directory beside the old one
+(`.<dir>-neu-*`); the index that describes it is computed from there and written; only then
+are the directories swapped — the old one set aside as `.<dir>-alt-*`, the new one put in its
+place, the old one removed.
+
+- A failure before the swap — an invalid document, a full disk, an unwritable index — removes
+  the hidden directory and leaves the old directory and the old index.
+- A failed swap puts the old directory back and writes the old index again. If writing the
+  index fails too, drift detection restores it from the disk on the next access.
+- A run that dies between writing the index and the swap leaves the old directory under the
+  new index. The next access returns to the old state and reports `stale: true`, although
+  nobody wrote past the gate; that is accepted and not suppressed.
+- A run that dies between the two renames, or whose swap and restore both fail, leaves the
+  target missing and the old state hidden as `.<dir>-alt-*`; the error names both directories,
+  and nothing is removed. The next access puts the orphaned `.<dir>-alt-*` back under its name
+  before drift detection runs.
+
+There is no lock, so that restore never replaces an existing target — not even an empty one,
+which a concurrent `publish` may just have put in place. If the restore fails or more than one
+candidate lies there, nothing is restored, a note names the directories, and the access itself
+does not fail. If the restore meets a concurrent `publish` between its renames, that `publish`
+reports an error, the previous state stands, and its hidden `-neu-*` stays behind. Hidden
+leftovers are never deleted automatically; `status` names them. If only removing the old
+directory after a successful swap fails, the run counts as successful and says so in a note.
 
 `inbox_put` exists because a connector and a session need a way to deposit raw material. People
 keep putting files there with a file manager — the inbox has no contract to violate, and a drop
@@ -262,6 +304,29 @@ call that [`knowledge-gate.md`](knowledge-gate.md) describes and that does not e
 `search` and `list` report the `kind` — the directory, read from the path — and `origin` and
 `state` from the frontmatter; `raw` and `superseded` documents and the root `README.md` are
 not search hits, `list` carries them all.
+
+### Superseding
+
+`supersede` marks a document as replaced: `state: superseded`, `successor` and
+`superseded_reason` go into the frontmatter, the body stays. It is refused in three cases:
+
+- **A document in a generator directory.** Under `code/`, `libs/` and `versions/` a generator
+  takes a document out by no longer publishing it; a supersession there would only last until
+  its next run. The root `README.md` is refused too — it is navigation, not knowledge.
+- **A document that is already superseded.** Whoever wants to change the successor supersedes
+  the successor. That forms a chain instead of an overwritten reference.
+- **A successor that cannot be a search hit.** The successor must be `condensed` or `reviewed`;
+  with `raw` or `superseded` the topic would vanish from search altogether. For the same reason
+  the root `README.md` is never a successor, and neither is a document under `code/`, `libs/`
+  or `versions/`: a generator run could remove it, and `successor` would point at nothing.
+
+`supersede` takes no producer. After these rules only directories remain in which single
+documents are written; there the ownership rule protects against a generator run overwriting
+them, and that reason does not apply to a supersession.
+
+**A supersession is final.** `write` refuses a superseded document, and nobody edits under
+`knowledge/` by hand, so the state cannot be taken back. A wrongly chosen successor is
+corrected by superseding it with the right document; the chain stays as history.
 
 ## Migration
 
@@ -279,6 +344,12 @@ It splits into two halves that need entirely different effort:
   per document and not a rule a script can apply. That pass is worth doing exactly once, and
   only when the write interface exists — every document it touches goes in through the tool,
   which is at the same time the first real test of the contract.
+
+**The old location `docs/learned/` belongs to the second half.** Up to v0.7.0,
+`knowledge write` wrote to `k-playbook-local/docs/learned/`. The store does not read there
+and has deliberately no fallback, so those documents are invisible to `list`, `search`,
+`read` and `status`. Instead, `status` carries a note as long as Markdown files lie there,
+and the migration moves them with the rest of the hand-written material.
 
 ## Decisions and what they exclude
 

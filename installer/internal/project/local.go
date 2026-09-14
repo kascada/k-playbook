@@ -280,7 +280,11 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 			return CheckLocal(projectDir), fmt.Errorf("%s anlegen: %w", entry.Path, err)
 		}
 		readme := filepath.Join(path, "README.md")
-		if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
+		if entry.Path == KnowledgeDirName {
+			if err := createKnowledgeReadme(projectDir, readme, entry); err != nil {
+				return CheckLocal(projectDir), err
+			}
+		} else if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
 			return CheckLocal(projectDir), err
 		}
 		if fresh && entry.PrivateByDefault {
@@ -348,6 +352,31 @@ func writeIfMissing(path string, content string) error {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("%s schreiben: %w", path, err)
+	}
+	return nil
+}
+
+// createKnowledgeReadme legt die README der Wissensablage an, wenn sie fehlt —
+// durch das Tor, als Erzeuger docs-index, dem sie gehört. So trägt sie
+// Frontmatter wie jedes Dokument der Ablage, und der Index kennt sie: ein
+// schon gebauter Index meldet danach keine Drift. state ist condensed, denn
+// der Text ist maschinell erzeugte Navigation, von niemandem geprüft; die
+// README ist ohnehin nie ein Suchtreffer. Eine vorhandene README bleibt, wie
+// sie ist — auch eine ohne Kopf, bis /k-docs-index sie neu schreibt.
+func createKnowledgeReadme(projectDir string, readme string, entry LocalEntry) error {
+	if pathExists(readme) {
+		return nil
+	}
+	_, err := NewKnowledge(projectDir).Write(string(ProducerDocsIndex), KnowledgeDocument{
+		Path:    knowledgeReadmeName,
+		Title:   "Wissensablage",
+		Subject: "Index der Wissensablage",
+		Origin:  "k-playbook, Einrichtung der Struktur",
+		State:   KnowledgeStateCondensed,
+		Body:    readmeTemplate(entry),
+	}, "")
+	if err != nil {
+		return fmt.Errorf("%s anlegen: %w", filepath.Join(entry.Path, knowledgeReadmeName), err)
 	}
 	return nil
 }

@@ -169,6 +169,18 @@ func (index *knowledgeIndex) replaceFile(rel string, entry knowledgeFileEntry, c
 	sort.SliceStable(index.Chunks, func(i int, j int) bool { return index.Chunks[i].Path < index.Chunks[j].Path })
 }
 
+// clone kopiert den Index so, dass Änderungen am Original ihn nicht berühren:
+// removeFile schneidet die Chunks an Ort und Stelle zurecht.
+func (index *knowledgeIndex) clone() *knowledgeIndex {
+	copied := *index
+	copied.Files = make(map[string]knowledgeFileEntry, len(index.Files))
+	for rel, entry := range index.Files {
+		copied.Files[rel] = entry
+	}
+	copied.Chunks = append([]Chunk{}, index.Chunks...)
+	return &copied
+}
+
 // removeFile nimmt eine Datei samt Chunks aus dem Index.
 func (index *knowledgeIndex) removeFile(rel string) {
 	delete(index.Files, rel)
@@ -209,6 +221,7 @@ func (index *knowledgeIndex) removeFile(rel string) {
 // Notiz an den Aufrufer (siehe note).
 func (k *Knowledge) open() (*knowledgeIndex, error) {
 	root := KnowledgeDir(k.projectDir)
+	k.restoreRetired(root)
 	paths, err := scanKnowledgeTree(root)
 	if err != nil {
 		return nil, err
@@ -280,6 +293,78 @@ func (k *Knowledge) open() (*knowledgeIndex, error) {
 	}
 	k.cache(index)
 	return index, nil
+}
+
+// Die Infixe der versteckten Verzeichnisse, die Publish neben dem
+// Generatorverzeichnis anlegt: .<dir>-neu-* ist das Zwischenverzeichnis,
+// .<dir>-alt-* der beiseitegestellte vorherige Stand.
+const (
+	knowledgeStagingInfix = "-neu-"
+	knowledgeRetiredInfix = "-alt-"
+)
+
+// knowledgeSwapResidues sammelt je Generatorverzeichnis die versteckten
+// Verzeichnisse eines Tauschs in der Wurzel der Ablage, alphabetisch. Eine
+// fehlende oder unlesbare Wurzel hat keine.
+func knowledgeSwapResidues(root string) (retired map[string][]string, all []string) {
+	retired = map[string][]string{}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return retired, nil
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		for _, producer := range []Producer{ProducerDocsCode, ProducerDocsTools, ProducerInventory} {
+			name := strings.TrimSuffix(producer.Dirs()[0], "/")
+			switch {
+			case strings.HasPrefix(entry.Name(), "."+name+knowledgeRetiredInfix):
+				retired[name] = append(retired[name], entry.Name())
+				all = append(all, entry.Name())
+			case strings.HasPrefix(entry.Name(), "."+name+knowledgeStagingInfix):
+				all = append(all, entry.Name())
+			}
+		}
+	}
+	return retired, all
+}
+
+// restoreRetired stellt ein verwaistes .<dir>-alt-* an seinen Namen zurück,
+// wenn das Generatorverzeichnis fehlt — der Zustand nach einem publish, das
+// zwischen seinen beiden Umbenennungen gestorben ist oder dessen Einsetzen und
+// Zurückstellen beide scheiterten. Es läuft beim Öffnen des Index, vor der
+// Drift-Erkennung, damit sie den alten Stand sieht und nicht dessen Fehlen.
+//
+// Es gibt keine Sperre. Deshalb ersetzt die Rückstellung nie ein vorhandenes
+// Ziel, auch kein leeres: ein gleichzeitiges publish kann es gerade eingesetzt
+// haben. Geprüft wird unmittelbar vor dem rename; ein eingesetztes
+// Zwischenverzeichnis ist nie leer (publish weist den leeren Satz ab), und
+// rename weist ein nicht leeres Ziel ab. Scheitert die Rückstellung oder liegt
+// mehr als ein Kandidat vor, wird nichts zurückgestellt; eine Notiz nennt die
+// Verzeichnisse, und der Zugriff selbst scheitert nicht.
+func (k *Knowledge) restoreRetired(root string) {
+	retired, _ := knowledgeSwapResidues(root)
+	for _, producer := range []Producer{ProducerDocsCode, ProducerDocsTools, ProducerInventory} {
+		name := strings.TrimSuffix(producer.Dirs()[0], "/")
+		candidates := retired[name]
+		if len(candidates) == 0 {
+			continue
+		}
+		target := filepath.Join(root, name)
+		if _, err := os.Lstat(target); err == nil {
+			continue
+		}
+		if len(candidates) > 1 {
+			k.note("%s/ fehlt, daneben liegen mehrere vorherige Stände (%s) — nichts zurückgestellt", name, strings.Join(candidates, ", "))
+			continue
+		}
+		if err := os.Rename(filepath.Join(root, candidates[0]), target); err != nil {
+			k.note("%s/ fehlt, %s nicht zurückgestellt: %v", name, candidates[0], err)
+			continue
+		}
+		k.note("%s/ aus %s zurückgestellt — ein publish war zwischen seinen Umbenennungen abgebrochen", name, candidates[0])
+	}
 }
 
 // reindexKnowledgeFile prüft eine Datei gegen den Index. Stimmt ihr Hash mit

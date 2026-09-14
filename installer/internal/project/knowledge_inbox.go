@@ -26,7 +26,7 @@ const inboxNoteSuffix = ".note"
 // inboxTextExtensions sind die Endungen, die InboxRead als Text liefert.
 // Alles andere — Bilder, PDFs, Archive — bleibt im Eingang liegen und wird
 // mit klarer Meldung abgewiesen: ein Textkanal für Binärdaten wäre Rauschen.
-var inboxTextExtensions = []string{"md", "txt", "html", "htm", "json", "yaml", "yml", "csv", "xml", "log"}
+var inboxTextExtensions = []string{"md", "markdown", "txt", "html", "htm", "json", "yaml", "yml", "csv", "xml", "log"}
 
 // inboxFormats ordnet Endungen dem Format zu, das die Liste nennt; die
 // Werte decken sich, wo es passt, mit dem format-Feld der Wissensablage.
@@ -100,9 +100,25 @@ func (k *Knowledge) InboxPut(source string, name string, content []byte, note st
 	if len(content) == 0 {
 		return "", InputErrorf("leerer Inhalt: ein Rohstück ohne Inhalt gehört nicht in den Eingang")
 	}
-	full := filepath.Join(InboxDir(k.projectDir), filepath.FromSlash(rel))
+	inbox := InboxDir(k.projectDir)
+	full := filepath.Join(inbox, filepath.FromSlash(rel))
 	if pathExists(full) {
 		return "", InputErrorf("%s liegt schon im Eingang — der Eingang überschreibt nicht, ein anderer Name oder Löschen von Hand", rel)
+	}
+	// Liegt am Quellpfad eine Datei — inbox/README.md als Quelle, ein
+	// abgelegtes Rohstück als Zwischenverzeichnis im Namen —, kann darunter
+	// nichts entstehen. Das ist die Eingabe, nicht die Umgebung: gemeldet,
+	// bevor MkdirAll mit einem rohen „not a directory" scheitert.
+	segments := strings.Split(rel, "/")
+	for position := range segments[:len(segments)-1] {
+		prefix := strings.Join(segments[:position+1], "/")
+		info, err := os.Stat(filepath.Join(inbox, filepath.FromSlash(prefix)))
+		if err != nil {
+			break
+		}
+		if !info.IsDir() {
+			return "", InputErrorf("%s ist im Eingang eine Datei, kein Verzeichnis — %s kann nicht darunter liegen; eine andere Quelle oder ein anderer Name", prefix, rel)
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return "", fmt.Errorf("%s anlegen: %w", filepath.Dir(full), err)

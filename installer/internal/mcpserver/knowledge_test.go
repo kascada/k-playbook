@@ -378,26 +378,37 @@ func TestKnowledgePublishUndSupersedeUeberDieHuelle(t *testing.T) {
 		}
 	}
 
-	// supersede: manual/ablauf.md wird durch code/links.md abgelöst.
+	// supersede: manual/ablauf.md wird durch findings/nachfolger.md abgelöst.
+	// Ein Nachfolger unter code/ wäre abgewiesen (Task 063, Entscheidung 4).
+	result, _, err = knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Producer: "session",
+		knowledgeDocumentInput: knowledgeDocumentInput{Path: "findings/nachfolger.md", Title: "N", Subject: "S", Origin: "O", State: "condensed", Body: "# N\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written := decodeKnowledgeEnvelope(t, result); !written.OK {
+		t.Fatalf("Nachfolger schreiben: %#v", written)
+	}
 	result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "code/links.md", Reason: "Ersetzt",
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "findings/nachfolger.md", Reason: "Ersetzt",
 	})
 	if err != nil {
 		t.Fatalf("supersede: %v", err)
 	}
 	superseded := decodeKnowledgeEnvelope(t, result)
-	if !superseded.OK || !superseded.Superseded || superseded.Path != "manual/ablauf.md" || superseded.Successor != "code/links.md" {
+	if !superseded.OK || !superseded.Superseded || superseded.Path != "manual/ablauf.md" || superseded.Successor != "findings/nachfolger.md" {
 		t.Fatalf("Umschlag: %#v", superseded)
 	}
 	result, _, err = knowledgeReadTool(context.Background(), nil, knowledgeReadInput{knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if read := decodeKnowledgeEnvelope(t, result); read.Content == nil || !strings.Contains(*read.Content, "state: superseded\nsuccessor: code/links.md\nsuperseded_reason: Ersetzt\n") {
+	if read := decodeKnowledgeEnvelope(t, result); read.Content == nil || !strings.Contains(*read.Content, "state: superseded\nsuccessor: findings/nachfolger.md\nsuperseded_reason: Ersetzt\n") {
 		t.Errorf("abgelöst gelesen: %#v", read)
 	}
 	result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{
-		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "code/fehlt.md", Reason: "x",
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: root}, Path: "manual/ablauf.md", Successor: "findings/fehlt.md", Reason: "x",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -778,4 +789,147 @@ func knowledgeEntriesOf(envelope knowledgeEnvelope) []project.KnowledgeEntry {
 		return nil
 	}
 	return *envelope.Entries
+}
+
+// Ein Dokumentpfad mit vorangestelltem Generatorverzeichnis ist über die Hülle
+// invalid_input, und der Bestand bleibt (Task 063, Entscheidung 1).
+func TestKnowledgePublishPfadMitErzeugerverzeichnisUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	doc := func(path string) knowledgeDocumentInput {
+		return knowledgeDocumentInput{Path: path, Title: "Code", Subject: "Quelle", Origin: "/k-docs-code", State: "condensed", Body: "# " + path + "\n"}
+	}
+	base := knowledgeBaseInput{ProjectDir: root}
+	result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{knowledgeBaseInput: base, Producer: "docs-code", Documents: []knowledgeDocumentInput{doc("links.md")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published := decodeKnowledgeEnvelope(t, result); !published.OK {
+		t.Fatalf("erster Lauf: %#v", published)
+	}
+
+	result, _, err = knowledgePublishTool(context.Background(), nil, knowledgePublishInput{knowledgeBaseInput: base, Producer: "docs-code", Documents: []knowledgeDocumentInput{doc("code/zztest-dup.md")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := decodeKnowledgeEnvelope(t, result)
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" || !strings.Contains(envelope.Error.Message, "relativ zu code/") {
+		t.Errorf("angenommen oder falscher Code: %#v", envelope)
+	}
+	if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), "code", "links.md")); err != nil {
+		t.Errorf("Bestand weg: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project.KnowledgeDir(root), "code", "code")); err == nil {
+		t.Error("code/code/ entstanden")
+	}
+}
+
+// supersede über die Hülle: die Antwort nennt den bereinigten Nachfolger, die
+// neuen Abweisungen (Task 063, Entscheidungen 2 bis 4 und 7) sind
+// invalid_input.
+func TestKnowledgeSupersedeUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	base := knowledgeBaseInput{ProjectDir: root}
+	write := func(producer, path, state string) {
+		t.Helper()
+		result, _, err := knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
+			knowledgeBaseInput: base, Producer: producer,
+			knowledgeDocumentInput: knowledgeDocumentInput{Path: path, Title: "T", Subject: "S", Origin: "O", State: state, Body: "# " + path + "\n"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK {
+			t.Fatalf("write %s: %#v", path, envelope)
+		}
+	}
+	write("session", "findings/y.md", "condensed")
+	write("session", "findings/z.md", "condensed")
+	write("session", "findings/roh.md", "raw")
+	result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{knowledgeBaseInput: base, Producer: "docs-code",
+		Documents: []knowledgeDocumentInput{{Path: "links.md", Title: "C", Subject: "S", Origin: "O", State: "condensed", Body: "# C\n"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK {
+		t.Fatalf("publish: %#v", envelope)
+	}
+
+	result, _, err = knowledgeSupersedeTool(context.Background(), nil, knowledgeSupersedeInput{knowledgeBaseInput: base, Path: "manual/ablauf.md", Successor: "./findings/y.md", Reason: "Ersetzt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK || envelope.Path != "manual/ablauf.md" || envelope.Successor != "findings/y.md" {
+		t.Errorf("Umschlag: %#v", envelope)
+	}
+
+	for name, input := range map[string]knowledgeSupersedeInput{
+		"Nachfolger unter code/": {Path: "findings/z.md", Successor: "code/links.md", Reason: "x"},
+		"Nachfolger README":      {Path: "findings/z.md", Successor: "README.md", Reason: "x"},
+		"Nachfolger raw":         {Path: "findings/z.md", Successor: "findings/roh.md", Reason: "x"},
+		"Ziel unter code/":       {Path: "code/links.md", Successor: "findings/z.md", Reason: "x"},
+		"Ziel README":            {Path: "README.md", Successor: "findings/z.md", Reason: "x"},
+		"schon abgelöst":         {Path: "manual/ablauf.md", Successor: "findings/z.md", Reason: "x"},
+		"Nachfolger abgelöst":    {Path: "findings/z.md", Successor: "manual/ablauf.md", Reason: "x"},
+	} {
+		input.knowledgeBaseInput = base
+		result, _, err := knowledgeSupersedeTool(context.Background(), nil, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+			t.Errorf("%s: %#v", name, envelope)
+		}
+	}
+
+	result, _, err = knowledgeWriteTool(context.Background(), nil, knowledgeWriteInput{
+		knowledgeBaseInput: base, Producer: "person",
+		knowledgeDocumentInput: knowledgeDocumentInput{Path: "manual/ablauf.md", Title: "T", Subject: "S", Origin: "O", State: "condensed", Body: "# Neu\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Errorf("write auf abgelöstes Dokument: %#v", envelope)
+	}
+	content, err := os.ReadFile(filepath.Join(project.KnowledgeDir(root), "manual", "ablauf.md"))
+	if err != nil || !strings.Contains(string(content), "state: superseded\nsuccessor: findings/y.md\n") {
+		t.Errorf("Ablösung nicht erhalten: %v\n%s", err, content)
+	}
+}
+
+// inbox_put mit einer Datei am Quellpfad ist invalid_input, nicht write_failed;
+// .markdown ist über inbox_read lesbar (Task 063, Etappe 5).
+func TestKnowledgeInboxQuellpfadUndMarkdownUeberDieHuelle(t *testing.T) {
+	root := newKnowledgeProject(t)
+	base := knowledgeBaseInput{ProjectDir: root}
+	readme := filepath.Join(project.InboxDir(root), "README.md")
+	if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(readme, []byte("# inbox\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _, err := knowledgeInboxPutTool(context.Background(), nil, knowledgeInboxPutInput{knowledgeBaseInput: base, Source: "README.md", Name: "zztest.md", Content: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Errorf("Quelle README.md: %#v", envelope)
+	}
+
+	result, _, err = knowledgeInboxPutTool(context.Background(), nil, knowledgeInboxPutInput{knowledgeBaseInput: base, Source: "chat", Name: "zztest.markdown", Content: "# Z\n"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK {
+		t.Fatalf("inbox_put: %#v", envelope)
+	}
+	result, _, err = knowledgeInboxReadTool(context.Background(), nil, knowledgeInboxReadInput{knowledgeBaseInput: base, Path: "chat/zztest.markdown"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK || envelope.Content == nil || *envelope.Content != "# Z\n" {
+		t.Errorf("inbox_read .markdown: %#v", envelope)
+	}
 }

@@ -310,22 +310,35 @@ func TestKnowledgePublishUndSupersede(t *testing.T) {
 		}
 	}
 
-	output, err = runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "code/links.md", "--reason", "Ersetzt", "--json")
+	// Ein Nachfolger unter code/ ist abgewiesen (Task 063, Entscheidung 4);
+	// abgelöst wird auf ein Befunddokument. Die Antwort nennt den bereinigten
+	// Nachfolger.
+	if _, err := runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "code/links.md", "--reason", "Ersetzt"); err == nil {
+		t.Error("Nachfolger unter code/ wurde angenommen")
+	}
+	nachfolger := filepath.Join(project.KnowledgeDir(root), "findings", "nachfolger.md")
+	if err := os.MkdirAll(filepath.Dir(nachfolger), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nachfolger, []byte("---\ntitle: N\nsubject: S\norigin: O\nstate: condensed\n---\n# N\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output, err = runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "./findings/nachfolger.md", "--reason", "Ersetzt", "--json")
 	if err != nil {
 		t.Fatalf("knowledge supersede: %v", err)
 	}
 	superseded := decodeTodoOutput[knowledgeSupersedeOutput](t, output)
-	if superseded.Path != "manual/release.md" || superseded.Successor != "code/links.md" || !superseded.Superseded {
+	if superseded.Path != "manual/release.md" || superseded.Successor != "findings/nachfolger.md" || !superseded.Superseded {
 		t.Errorf("supersede = %+v", superseded)
 	}
 	content, err = os.ReadFile(filepath.Join(project.KnowledgeDir(root), "manual", "release.md"))
-	if err != nil || !strings.Contains(string(content), "state: superseded\nsuccessor: code/links.md\nsuperseded_reason: Ersetzt\n") {
+	if err != nil || !strings.Contains(string(content), "state: superseded\nsuccessor: findings/nachfolger.md\nsuperseded_reason: Ersetzt\n") {
 		t.Errorf("manual/release.md: %v\n%s", err, content)
 	}
-	if _, err := runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "code/fehlt.md", "--reason", "x"); err == nil {
+	if _, err := runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "findings/fehlt.md", "--reason", "x"); err == nil {
 		t.Error("fehlender Nachfolger wurde angenommen")
 	}
-	if _, err := runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "code/links.md"); err == nil {
+	if _, err := runKnowledgeCaptured(t, "supersede", "manual/release.md", "--successor", "findings/nachfolger.md"); err == nil {
 		t.Error("supersede ohne --reason wurde angenommen")
 	}
 }
@@ -490,5 +503,37 @@ func TestKnowledgeHinweisStehtAufStderr(t *testing.T) {
 	}
 	if strings.Contains(stdout, "Hinweis:") {
 		t.Errorf("der Hinweis steht in der JSON-Antwort:\n%s", stdout)
+	}
+}
+
+// publish --from mit einer Datei unter <dir>/code/: der Pfad trägt das
+// Generatorverzeichnis und wird abgewiesen, statt nach knowledge/code/code/ zu
+// gehen (Task 063, Entscheidung 1).
+func TestKnowledgePublishPfadMitErzeugerverzeichnisUeberFrom(t *testing.T) {
+	root := knowledgeProject(t)
+	write := func(dir, rel string) {
+		full := filepath.Join(root, dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("---\ntitle: X\nsubject: Y\norigin: /k-docs-code\nstate: condensed\n---\n# X\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("gut", "links.md")
+	write("falsch", "code/overview.md")
+
+	if _, err := runKnowledgeCaptured(t, "publish", "--producer", "docs-code", "--from", filepath.Join(root, "gut")); err != nil {
+		t.Fatalf("erster Lauf: %v", err)
+	}
+	_, err := runKnowledgeCaptured(t, "publish", "--producer", "docs-code", "--from", filepath.Join(root, "falsch"))
+	if err == nil || !strings.Contains(err.Error(), "relativ zu code/") {
+		t.Errorf("abgewiesen mit Konvention erwartet: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(project.KnowledgeDir(root), "code", "code")); statErr == nil {
+		t.Error("knowledge/code/code/ entstanden")
+	}
+	if _, statErr := os.Stat(filepath.Join(project.KnowledgeDir(root), "code", "links.md")); statErr != nil {
+		t.Errorf("Bestand weg: %v", statErr)
 	}
 }
