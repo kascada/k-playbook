@@ -191,11 +191,24 @@ func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, 
 // Hauptverzeichnis und ist damit eine Änderung an einer Projektdatei — sie
 // stillschweigend vorzunehmen wäre genau die Art Nebenwirkung, die niemand
 // erwartet.
+//
+// Das Update ersetzt veraltete Einträge nach derselben Regel wie der Start und
+// schreibt in einer erfassten Datei — oder bei unbeantworteter Tracking-Frage —
+// den bloßen Kommandonamen. Dann gilt derselbe Hinweis wie beim Start: ein aus
+// Dock oder Finder gestarteter Client findet den Namen nicht. Er hängt wie dort
+// an der geschriebenen Form (UpdateResult.MCPRepairedPortable). Ohne ihn läse
+// „auf das installierte k-playbook korrigiert" sich wie ein absoluter Pfad.
 func describeMCPRepair(result project.UpdateResult) string {
 	parts := []string{}
 	if len(result.MCPRepaired) > 0 {
 		parts = append(parts, "MCP-Registrierung auf das installierte k-playbook korrigiert: "+
 			strings.Join(result.MCPRepaired, ", ")+".")
+	}
+	if len(result.MCPRepairedPortable) > 0 {
+		parts = append(parts, "In "+strings.Join(result.MCPRepairedPortable, ", ")+
+			" steht jetzt der bloße Name "+project.InstalledCommandName+
+			", weil die Datei von git erfasst ist oder sich das nicht klären ließ. "+
+			"Ein aus Dock oder Finder gestarteter Client findet ihn nicht und braucht den absoluten Pfad, von Hand eingetragen.")
 	}
 	if result.Message != "" {
 		parts = append(parts, result.Message)

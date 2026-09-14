@@ -44,7 +44,7 @@ New commands become visible only after linking is in place and the assistant has
 | `/k-task-run` | Execute task files sequentially | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | List, add, edit, complete, and delete the project todos through `k-playbook todo` | |
 | **Helpers** | | |
-| `/k-enforcement` | Explicit check against the effective rule set | read-only report; fixes only after approval |
+| `/k-enforcement` | Explicit check against the effective rule set | read-only report; also lists the effective check set from `catalogs.checks` without running it (`k-playbook/bin/k-check` runs it); fixes only after approval |
 | `/k-test-check` | Run tests and diagnose root causes of failures | deliberately starts tests, not only status checks |
 | `/k-verlauf` | Search old AI histories | read-only |
 | `/k-vscode-project-color` | Set VS Code window color and title per project | writes `.vscode/settings.json` |
@@ -140,3 +140,5 @@ k-playbook/bin/k-check --mode baseline
 ```
 
 The stable check interface is `.sh`. A check may use Python or something else internally, but must write exactly one status line, `K_CHECK_STATUS=ok|skip|fail`, and optionally `K_CHECK_REASON=<text>`. Details are in [`../checks/README.md`](../checks/README.md).
+
+Among the shipped checks, `check_command_tool_guards.sh` enforces the "Externe Werkzeuge" rule from `rules/command-authoring.md` on the commands themselves: a tool from `scripts/base-tools.tsv` called at the start of a command in a shell code block needs a local `if command -v <tool>` guard or a `<tool> … || …` fallback. Deliberately deferred call sites are listed one by one, with file, line, tool, and reason, in `command-tool-guard-exceptions.tsv` next to the effective check; a stale entry fails the check. `/k-enforcement` lists the effective check set but does not run it.

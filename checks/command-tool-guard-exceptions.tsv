@@ -1,0 +1,31 @@
+# Bewusst zurückgestellte Werkzeugaufrufe in Commands, eine Zeile je Fundstelle.
+#
+# Gelesen wird diese Datei nur von check_command_tool_guards.sh im selben
+# Verzeichnis. Ersetzt ein projekteigener Check den mitgelieferten, gilt allein
+# die Datei neben ihm; diese hier wird dann nicht zusätzlich gelesen.
+#
+# Das ist keine Werkzeugliste. Werkzeuge kommen aus scripts/base-tools.tsv; hier
+# darf nur stehen, was dort in der Spalte name steht.
+#
+# Fields: datei	zeile	werkzeug	begründung
+#
+# datei       Pfad ab commands/, z. B. k-pr-review.md oder _audit/x.md — derselbe
+#             Schlüssel, über den mitgelieferte und projekteigene Commands
+#             verrechnet werden.
+# zeile       1-basierte Zeilennummer des Aufrufs in dieser Datei.
+# werkzeug    Programmname aus base-tools.tsv.
+# begründung  Warum dieser Aufruf ohne Guard bleibt.
+#
+# Ein Eintrag nimmt genau den Aufruf aus, auf den datei, zeile und werkzeug
+# passen, keinen weiteren desselben Werkzeugs. Verschiebt eine Änderung den
+# Aufruf, meldet der Check den Eintrag als veraltet: Zeile nachziehen und die
+# Begründung dabei erneut prüfen.
+datei	zeile	werkzeug	begründung
+k-pr-review.md	541	git	Arbeitsbaum vor dem Branch-Wechsel prüfen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend (rules/command-authoring.md, Externe Werkzeuge).
+k-pr-review.md	650	git	Arbeitsbaum vor dem Löschen des Validierungs-Branches prüfen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
+k-pr-review.md	663	git	Rückkehr auf den Base-Branch beim Aufräumen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
+k-pr-review.md	664	git	Fast-Forward des Base-Branches beim Aufräumen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
+k-pr-review.md	665	git	Löschen des lokalen Validierungs-Branches; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
+k-pr-review.md	679	git	Abschließende Sauberkeitsprüfung des Repositorys; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
+k-task-run.md	268	git	Diff-Statistik gegen den Baseline-Commit; DIFF_ENABLED setzt ein git-Repository voraus, der Fehlschlag ist selbsterklärend.
+k-task-run.md	269	git	Diff gegen den Baseline-Commit; DIFF_ENABLED setzt ein git-Repository voraus, der Fehlschlag ist selbsterklärend.

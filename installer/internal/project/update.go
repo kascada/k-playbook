@@ -97,6 +97,10 @@ type UpdateResult struct {
 	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag beim Update
 	// selbsttätig korrigiert wurde — relativ zum Hauptverzeichnis.
 	MCPRepaired []string `json:"mcpRepaired,omitempty"`
+	// MCPRepairedPortable nennt die Dateien aus MCPRepaired, in denen danach
+	// der bloße Kommandoname steht — die Datei ist erfasst, oder die
+	// Tracking-Frage blieb unbeantwortet. Die Meldung hängt an dieser Form.
+	MCPRepairedPortable []string `json:"mcpRepairedPortable,omitempty"`
 }
 
 // Update holt den neuen Stand per Fast-Forward.
@@ -142,7 +146,12 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	// Sache des Starts —, und ein Fehlschlag entwertet das Update nicht: der
 	// Pull ist durch, und der nächste Start versucht es erneut.
 	repaired, repairErr := RepairMCP(projectDir, MCPWriteOutdatedOnly)
-	result.MCPRepaired = repaired
+	result.MCPRepaired = MCPWritePaths(repaired)
+	for _, write := range repaired {
+		if write.Portable() {
+			result.MCPRepairedPortable = append(result.MCPRepairedPortable, write.Path)
+		}
+	}
 	if repairErr != nil {
 		result.Message = "MCP-Registrierung nicht vollständig korrigiert: " + repairErr.Error()
 	}

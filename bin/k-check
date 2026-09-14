@@ -496,6 +496,7 @@ def run_check(
     env.update(
         {
             "K_CHECK_CONFIG_ROOT": str(config_root),
+            "K_CHECK_PLAYBOOK_DIR": str(DIST_DIR),
             "K_CHECK_TARGET_ROOT": str(target_root),
             "K_CHECK_PROJECT_ROOT": str(target_root),
             "K_CHECK_MODE": mode,

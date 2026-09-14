@@ -127,7 +127,7 @@ project/
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
-It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, where `K-PLAYBOOK.yaml` is located.
+It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it, and when it replaces an obsolete wrapper entry in a tracked file, it writes the bare name itself. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, where `K-PLAYBOOK.yaml` is located.
 
 The three files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
 

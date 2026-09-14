@@ -234,10 +234,13 @@ func TestCheckUpdateOhneGit(t *testing.T) {
 // MCP-Registrierung zurückbleiben. Der Pull erreicht die Datei nicht — sie
 // liegt im Hauptverzeichnis, nicht im Clone —, also korrigiert das Update sie
 // selbst.
+//
+// Das Hauptverzeichnis hat keine K-PLAYBOOK.yaml: die Tracking-Frage ist
+// unbeantwortet, geschrieben wird seit Task 062 der bloße Name.
 func TestUpdateKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 
-	installed := installTestBinary(t)
+	installTestBinary(t)
 	writeFile(t, filepath.Join(projectDir, ".mcp.json"),
 		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
 
@@ -253,7 +256,10 @@ func TestUpdateKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
 	if !status.OK() {
 		t.Fatalf("nach dem Update nicht korrigiert: %+v", status)
 	}
-	if status.Detail != "-> "+installed {
-		t.Errorf("Detail = %q, erwartet den absoluten Pfad %s", status.Detail, installed)
+	if status.Detail != "-> "+InstalledCommandName {
+		t.Errorf("Detail = %q, erwartet den bloßen Namen %s", status.Detail, InstalledCommandName)
+	}
+	if len(result.MCPRepairedPortable) != 1 || result.MCPRepairedPortable[0] != ".mcp.json" {
+		t.Errorf("MCPRepairedPortable = %v, erwartet [.mcp.json]", result.MCPRepairedPortable)
 	}
 }

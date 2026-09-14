@@ -94,22 +94,23 @@ Wenn der Claude-Scope nicht existiert: diesen Provider mit Hinweis überspringen
 
 Nur wenn Claude-Dateien gefunden wurden.
 
-Benutze `rg` (ripgrep), um den Suchbegriff in den gefundenen Dateien zu suchen:
+Benutze `rg` (ripgrep), um den Suchbegriff in den gefundenen Dateien zu suchen. Fehlt
+`rg`, greift im selben Block `grep`. Der Rückfall liefert dasselbe: die Namen der Dateien
+mit Treffern.
 
 ```bash
-rg -il "SEARCH" <dateien>
+if command -v rg >/dev/null 2>&1; then
+  rg -il "SEARCH" <dateien>
+else
+  printf 'rg fehlt, Rückfall auf grep\n' >&2
+  grep -ril "SEARCH" <dateien>
+fi
 ```
 
-Fehlt `rg`, nimm `grep`. Der Rückfall liefert dasselbe: die Namen der Dateien mit
-Treffern.
-
-```bash
-grep -ril "SEARCH" <dateien>
-```
-
-Sag einmal, dass der Rückfall gegriffen hat, und nenne `baseTools.installCommand` aus
-der Context-Ausgabe. Installiere nichts selbst. Steht `rg` dort als fehlend, obwohl der
-Aufruf funktioniert, war es eine Shell-Funktion — der Befund misst nur den `PATH`.
+Hat der Rückfall gegriffen, sag das einmal und nenne `baseTools.installCommand` aus der
+Context-Ausgabe. Installiere nichts selbst. Steht `rg` dort als fehlend, obwohl der
+`rg`-Zweig lief, war es eine Shell-Funktion — `command -v` erkennt auch sie, der Befund
+misst nur den `PATH`.
 
 Für jede Datei mit Treffern:
 
@@ -158,18 +159,21 @@ OpenCode durchsucht Logzeilen, nicht komplette Chattexte. Sinnvolle Suchbegriffe
 - Tool-/MCP-Namen
 - Model- oder Provider-Namen
 
-Suche case-insensitive:
+Suche case-insensitive. Fehlt `rg`, greift im selben Block `grep` — **ohne** `-l`. Die
+folgenden Schritte werten die Trefferzeilen selbst aus; mit `-l` käme nur der Dateiname
+zurück und die Auswertung bräche ab.
 
 ```bash
-rg -i "SEARCH" "$OPENCODE_LOG"
+if command -v rg >/dev/null 2>&1; then
+  rg -i "SEARCH" "$OPENCODE_LOG"
+else
+  printf 'rg fehlt, Rückfall auf grep\n' >&2
+  grep -i "SEARCH" "$OPENCODE_LOG"
+fi
 ```
 
-Fehlt `rg`, nimm `grep` — **ohne** `-l`. Die folgenden Schritte werten die Trefferzeilen
-selbst aus; mit `-l` käme nur der Dateiname zurück und die Auswertung bräche ab.
-
-```bash
-grep -i "SEARCH" "$OPENCODE_LOG"
-```
+Für den Rückfall gilt dasselbe wie in Schritt 5: einmal sagen, dass er gegriffen hat,
+`baseTools.installCommand` nennen und nichts selbst installieren.
 
 Wenn `DATE_FILTER` gesetzt ist, filtere zusätzlich über den Prefix `timestamp=YYYY-MM-DD...`.
 

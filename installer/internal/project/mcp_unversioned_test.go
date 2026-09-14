@@ -100,7 +100,7 @@ func TestStartErgaenztNichtErfassteDatei(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 
@@ -144,7 +144,7 @@ func TestStartSchreibtOhneVersionskontrolle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 	if !hasOwnEntry(t, file) {
@@ -166,7 +166,7 @@ func TestStartSchreibtAusserhalbDesRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 	if !hasOwnEntry(t, file) {
@@ -467,7 +467,7 @@ func TestStartErgaenztUnterVerlinktemHauptverzeichnis(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 	servers := readJSON(t, filepath.Join(root, ".mcp.json"))["mcpServers"].(map[string]any)
@@ -528,7 +528,7 @@ func TestStartKorrigiertVeraltetenEintragHinterSymlink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != filepath.Join(".cursor", "mcp.json") {
+	if len(repaired) != 1 || repaired[0].Path != filepath.Join(".cursor", "mcp.json") {
 		t.Fatalf("geschrieben = %v, erwartet nur .cursor/mcp.json", repaired)
 	}
 	servers := readJSON(t, shared)["mcpServers"].(map[string]any)
@@ -702,7 +702,7 @@ func TestStartSchreibtAusserhalbDesReposMitDeutscherSprache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 	if !hasOwnEntry(t, file) {

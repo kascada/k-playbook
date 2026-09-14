@@ -191,12 +191,30 @@ dass das Werkzeug da ist.
 - Ein Command installiert nie selbst. Er nennt den Befehl aus
   `baseTools.installCommand` und überlässt die Ausführung dem Nutzer.
 
-**Bekannte, bewusst zurückgestellte Ausnahme.** `git` wird heute in fünf mitgelieferten
-Commands ohne ausdrücklichen Guard aufgerufen: `k-task-run.md`, `k-pr-review.md`,
-`k-enforcement.md`, `k-remediation.md` und `k-docs-index.md`. Der Fehlschlag ist dort
+**Durchgesetzt durch einen Check.** `checks/check_command_tool_guards.sh` gleicht die
+Shell-Codeblöcke des effektiven Command-Katalogs gegen die Spalte `name` aus
+`scripts/base-tools.tsv` ab. Er meldet jeden Aufruf eines dieser Werkzeuge am
+Befehlsanfang, der weder im then-Zweig eines `if command -v <werkzeug>` im selben
+Codeblock steht noch direkt dahinter einen Rückfall `<werkzeug> … || …` hat — ein `||`
+weiter hinten, etwa in `<werkzeug> … && … || …`, zählt nicht.
+Ein Guard in einem anderen Codeblock oder ein Verweis auf `baseTools` genügt nicht.
+Erfassungsumfang und Grenzen stehen in `checks/README.md`.
+
+**Bekannte, bewusst zurückgestellte Ausnahme.** Task 045 hat fünf Commands genannt, die
+`git` ohne ausdrücklichen Guard aufrufen: `k-task-run.md`, `k-pr-review.md`,
+`k-enforcement.md`, `k-remediation.md` und `k-docs-index.md`. Als Aufruf in einem
+Shell-Codeblock steht `git` heute nur in `k-pr-review.md` und `k-task-run.md`; die
+übrigen drei nennen es im Fließtext und haben keine Fundstelle. Der Fehlschlag ist dort
 selbsterklärend, und ohne git gäbe es das Repository nicht, in dem k-playbook arbeitet.
-Diese Regel gilt ab sofort für **neue und geänderte** Commands; die fünf `git`-Stellen
-werden nachgezogen, wenn sie ohnehin angefasst werden. Der Rückstand steht als Todo des
+
+Jede dieser Fundstellen steht einzeln mit `datei`, `zeile`, `werkzeug` und `begründung` in
+`command-tool-guard-exceptions.tsv` neben dem wirksamen Check, mitgeliefert also unter
+`checks/`. Ein Eintrag nimmt genau diesen Aufruf aus, keinen weiteren desselben Werkzeugs
+in derselben Datei. Verschiebt eine Änderung den Aufruf, meldet der Check den Eintrag als
+veraltet, bis er auf die neue Zeile nachgezogen und seine Begründung erneut geprüft ist.
+
+Diese Regel gilt für **neue und geänderte** Commands; die `git`-Stellen werden
+nachgezogen, wenn sie ohnehin angefasst werden. Der Rückstand steht als Todo des
 Projekts (`/k-todo`), damit er wieder auftaucht, statt in dieser Regeldatei zu
 verschwinden.
 

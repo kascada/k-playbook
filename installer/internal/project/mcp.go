@@ -177,13 +177,18 @@ func (s MCPStatus) OK() bool { return s.State == MCPStateOK }
 // MCP-Server über stdin und stdout spricht.
 const MCPSubcommand = "mcp"
 
-// MCPCommand ist das Kommando, das registriert wird: der beim Schreiben
-// aufgelöste absolute Pfad des installierten k-playbook, gefolgt vom
-// Subkommando.
+// MCPCommand ist das Kommando, das in der Regel registriert wird: der beim
+// Schreiben aufgelöste absolute Pfad des installierten k-playbook, gefolgt vom
+// Subkommando. Einrichten, Ergänzen und Anlegen schreiben immer diese Form.
 //
 // Absolut und nicht als bloßer Name: aus Dock oder Finder gestartete Clients
 // erben die Shell-PATH nicht, dort fehlt ~/.local/bin typischerweise. Ein
 // Kommandoname wäre in genau diesen Umgebungen tot.
+//
+// Die eine Ausnahme ist die selbsttätige Korrektur eines veralteten Eintrags
+// in einer von git erfassten Datei, oder wenn sich das nicht klären lässt
+// (mcpRepairCommand): dort steht danach der bloße Name, weil ein
+// rechnerbezogener Pfad nicht in einen Commit gehört.
 //
 // Der Schrägstrich ist hier kein Dateisystempfad, sondern Teil eines Wertes in
 // einer Konfigurationsdatei — deshalb ToSlash und nicht der Trenner der
@@ -250,8 +255,10 @@ type mcpCommandForm struct {
 // acceptedMCPCommandForms ist die Menge der Eintragsformen, die als aktuell
 // gelten.
 //
-// Geschrieben wird immer nur **eine** davon — der aufgelöste absolute Pfad aus
-// MCPCommand(). Geprüft wird gegen die ganze Menge, und das ist keine
+// Geschrieben werden beide, aber je Zieldatei nur eine und nach fester Regel:
+// der aufgelöste absolute Pfad aus MCPCommand() überall, der bloße Name nur
+// beim selbsttätigen Ersetzen eines veralteten Eintrags in einer erfassten
+// Datei (mcpRepairCommand). Geprüft wird gegen die ganze Menge, und das ist keine
 // Bequemlichkeit: ein Vergleich auf Gleichheit mit einem einzigen Sollwert
 // erklärte jede andere gültige Schreibweise für falsch und schriebe sie bei
 // jedem Lauf um. Zwei Fälle machen das konkret:
@@ -287,11 +294,20 @@ func acceptedMCPCommandForms() []mcpCommandForm {
 // PATH auf ihr je eigenes Binary auf — genau der DevContainer-Vertrag aus
 // docs/mcp.md, ohne dass eine der beiden Umgebungen die Datei umschreibt.
 //
-// Geschrieben wird sie nie: MCPCommand() liefert weiter den aufgelösten
-// absoluten Pfad. Ihre Grenze steht in docs/mcp.md — ein aus Dock oder Finder
-// gestarteter Client erbt die Shell-PATH nicht und findet unter diesem Namen
-// nichts. Wer so arbeitet, richtet in seiner Umgebung einmal ausdrücklich ein
-// und bekommt dabei den absoluten Pfad.
+// Geschrieben wird sie an genau einer Stelle: wenn die selbsttätige Korrektur
+// einen veralteten Eintrag in einer erfassten Datei ersetzt oder die
+// Tracking-Frage unbeantwortet bleibt (mcpRepairCommand). Der alte relative
+// Wrapper-Eintrag war umgebungsneutral; der Name ist seine treue Übersetzung,
+// ein absoluter Pfad wäre es nicht. Überall sonst liefert MCPCommand() den
+// aufgelösten absoluten Pfad.
+//
+// Ihr Preis steht in docs/mcp.md: ein aus Dock oder Finder gestarteter Client
+// erbt die Shell-PATH nicht und findet unter diesem Namen nichts. Einrichten
+// hilft dagegen im Regelfall nicht, denn der Name ist akzeptiert und wird nicht
+// überschrieben — nur bei OpenCode ohne Memory-Block schreibt Einrichten den
+// Eintrag neu und damit den absoluten Pfad. Der Ausweg ist, den absoluten Pfad
+// von Hand einzutragen: auch er ist akzeptiert und bleibt stehen, in einer
+// erfassten Datei als lokaler Diff.
 //
 // Bewusst ohne path.Clean: akzeptiert ist genau der Name, nicht `./k-playbook`
 // und nicht irgendein Pfad, der darauf endet. Alles andere bleibt „falscher
@@ -392,44 +408,76 @@ const (
 // sagt der Modus — das Update übergibt MCPWriteOutdatedOnly, der Start
 // MCPWriteOutdatedAndUnversioned.
 //
-// Zurück kommen die Pfade der geschriebenen Dateien, relativ zum
-// Hauptverzeichnis — leer, wenn nichts zu tun war.
+// Zurück kommen die geschriebenen Dateien, relativ zum Hauptverzeichnis, je mit
+// dem Kommando, das jetzt darin steht — leer, wenn nichts zu tun war. Die Form
+// kommt mit, weil der Aufrufer sonst nur den Zustand vor dem Lauf kennt und
+// nicht sagen könnte, ob der bloße Name geschrieben wurde.
 //
 // Die Enge ist hier die eigentliche Zusage, und sie hat zwei Stufen. Ein
 // vorhandener Eintrag wird ausschließlich bei MCPStateOutdated ersetzt — eine
 // Reparatur an Inhalt, den k-playbook selbst geschrieben hat, unabhängig von
-// der Versionierung. Eine akzeptierte Form und ein fremder Stand
-// (MCPStateStale) bleiben liegen: der Eintrag kann aus einem fremden $HOME
-// stammen und dort gültig sein. Angelegt oder ergänzt wird nur, wenn die
-// Zieldatei **nicht von git erfasst** ist, und das wird gemessen, nicht
-// geraten (mcpTargetTracked). Sonst machte jeder Start die getrackten
-// MCP-Dateien eines Projekts dreckig, und ein Repo, das seine Registrierung in
-// portabler Form eincheckt, käme nie mehr an einem sauberen Arbeitsbaum
-// vorbei. Gelöscht wird nie.
-func RepairMCP(projectRoot string, scope MCPWriteScope) ([]string, error) {
+// der Versionierung. Welche Form dabei geschrieben wird, entscheidet die
+// Versionierung aber sehr wohl (mcpRepairCommand): in einer erfassten Datei der
+// bloße Name, in einer nicht erfassten der absolute Pfad. Gemessen wird das
+// nur, wenn wirklich ein veralteter Eintrag ersetzt wird. Eine akzeptierte
+// Form und ein fremder Stand (MCPStateStale) bleiben liegen: der Eintrag kann
+// aus einem fremden $HOME stammen und dort gültig sein. Angelegt oder ergänzt
+// wird nur, wenn die Zieldatei **nicht von git erfasst** ist, und das wird
+// gemessen, nicht geraten (mcpTargetTracked). Sonst machte jeder Start die
+// getrackten MCP-Dateien eines Projekts dreckig, und ein Repo, das seine
+// Registrierung in portabler Form eincheckt, käme nie mehr an einem sauberen
+// Arbeitsbaum vorbei. Gelöscht wird nie.
+func RepairMCP(projectRoot string, scope MCPWriteScope) ([]MCPWrite, error) {
 	return writeMCPEntries(projectRoot, scope)
+}
+
+// MCPWrite nennt eine geschriebene Zieldatei und das Kommando, das nach dem
+// Schreiben darin steht.
+type MCPWrite struct {
+	// Path ist relativ zum Hauptverzeichnis.
+	Path string
+	// Command ist das eingetragene Kommando ohne Subkommando: der absolute
+	// Pfad aus MCPCommand() oder der bloße InstalledCommandName.
+	Command string
+}
+
+// Portable meldet, ob der bloße Kommandoname geschrieben wurde. Daran hängen
+// die Meldungen, nicht am Tracking-Ergebnis: auch eine unbeantwortete
+// Tracking-Frage führt zu dieser Form.
+func (w MCPWrite) Portable() bool {
+	return isPortableCommandForm(w.Command)
+}
+
+// MCPWritePaths zieht die Pfade aus einer Liste geschriebener Zieldateien.
+func MCPWritePaths(writes []MCPWrite) []string {
+	paths := make([]string, 0, len(writes))
+	for _, write := range writes {
+		paths = append(paths, write.Path)
+	}
+	return paths
 }
 
 // writeMCPEntries ist der gemeinsame Schreibweg aller Einstiege; der Modus
 // unterscheidet sie.
-func writeMCPEntries(projectRoot string, scope MCPWriteScope) ([]string, error) {
+func writeMCPEntries(projectRoot string, scope MCPWriteScope) ([]MCPWrite, error) {
 	command, args, err := MCPCommand()
 	if err != nil {
 		// Kein installiertes k-playbook: es gibt kein Kommando, das sich
-		// eintragen ließe. CheckMCP meldet den Zustand.
+		// eintragen ließe. CheckMCP meldet den Zustand. Das gilt auch für die
+		// portable Form — sie zeigte ebenso auf nichts.
 		return nil, nil
 	}
 
-	var written []string
+	var written []MCPWrite
 	var failures []error
 	for _, target := range MCPTargets(projectRoot) {
-		changed, err := applyMCPTarget(projectRoot, target, command, args, scope)
+		wrote, err := applyMCPTarget(projectRoot, target, command, args, scope)
 		if err != nil {
 			failures = append(failures, err)
 			continue
 		}
-		if changed {
-			written = append(written, target.Path)
+		if wrote != "" {
+			written = append(written, MCPWrite{Path: target.Path, Command: wrote})
 		}
 	}
 	return written, errors.Join(failures...)
@@ -664,23 +712,35 @@ func describeMCPEntry(value any) string {
 // Steht der Eintrag bereits in einer akzeptierten Form, wird gar nicht
 // geschrieben. Sonst würde jeder Lauf eine fremde Datei erneut umformatieren.
 //
-// Zurück kommt, ob tatsächlich geschrieben wurde.
-func applyMCPTarget(projectRoot string, target MCPTarget, command string, args []string, scope MCPWriteScope) (bool, error) {
+// Das Kommando wird erst festgelegt, wenn feststeht, dass geschrieben wird.
+// Ersetzt ein selbsttätiger Weg einen veralteten Eintrag, wählt
+// mcpRepairCommand die Form je Zieldatei: in einer erfassten Datei — oder wenn
+// sich das nicht klären lässt — den bloßen Namen, sonst den übergebenen
+// absoluten Pfad. Einrichten und das Ergänzen fehlender Einträge und Dateien
+// schreiben unverändert den absoluten Pfad. Der Preis des Namens: ein aus Dock
+// oder Finder gestarteter Client findet ihn nicht; wer so arbeitet, trägt den
+// absoluten Pfad von Hand ein, und der bleibt als akzeptierte Form stehen.
+//
+// Zurück kommt das geschriebene Kommando — leer, wenn nicht geschrieben wurde.
+func applyMCPTarget(projectRoot string, target MCPTarget, command string, args []string, scope MCPWriteScope) (string, error) {
 	file := filepath.Join(projectRoot, target.Path)
 
 	doc, exists, err := readJSONObject(file)
 	if err != nil {
 		// Nicht lesbar heißt: nicht anfassen. Die Prüfung meldet es.
-		return false, nil
+		return "", nil
 	}
 
 	section, ok := mcpSection(doc.content, target.Schema)
 	if !ok {
-		return false, nil
+		return "", nil
 	}
 	found, present := section[MCPServerKey]
 	if !mcpTargetNeedsWrite(projectRoot, target, doc.content, exists, found, present, scope) {
-		return false, nil
+		return "", nil
+	}
+	if scope != MCPWriteAll && present && mcpEntryOutdated(found) {
+		command = mcpRepairCommand(projectRoot, target.Path, command)
 	}
 
 	var encoded []byte
@@ -691,16 +751,100 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 		encoded, err = newMCPFile(target, command, args)
 	}
 	if err != nil {
-		return false, fmt.Errorf("%s kodieren: %w", target.Path, err)
+		return "", fmt.Errorf("%s kodieren: %w", target.Path, err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-		return false, fmt.Errorf("%s anlegen: %w", filepath.Dir(target.Path), err)
+		return "", fmt.Errorf("%s anlegen: %w", filepath.Dir(target.Path), err)
 	}
 	if err := os.WriteFile(file, encoded, 0o644); err != nil {
-		return false, fmt.Errorf("%s schreiben: %w", target.Path, err)
+		return "", fmt.Errorf("%s schreiben: %w", target.Path, err)
 	}
-	return true, nil
+	return command, nil
+}
+
+// mcpRepairCommand wählt das Kommando, mit dem ein selbsttätiger Weg einen
+// veralteten Eintrag ersetzt: InstalledCommandName, wenn die tatsächlich
+// beschriebene Datei von git erfasst ist oder die Frage unbeantwortet bleibt
+// (mcpRepairTargetTracked), sonst installed — den absoluten Pfad aus
+// MCPCommand().
+//
+// Warum: eine eingecheckte Registrierung wird von Umgebungen mit getrennten
+// HOMEs geteilt, etwa Host und DevContainer. Ein absoluter Pfad aus dem einen
+// HOME führt im anderen zu ENOENT und gilt dort trotzdem als akzeptiert, die
+// Korrektur griffe also nie wieder. Der bloße Name löst jede Umgebung über ihre
+// eigene PATH auf; ein Folgestart schreibt nichts, weil er akzeptiert ist.
+//
+// Der Preis: ein aus Dock oder Finder gestarteter Client erbt die Shell-PATH
+// nicht und findet den Namen nicht. Einrichten hilft im Regelfall nicht, weil
+// es eine akzeptierte Form nicht überschreibt. Der Ausweg ist, den absoluten
+// Pfad von Hand einzutragen; auch er ist akzeptiert und bleibt stehen.
+//
+// Unbeantwortet heißt hier „erfasst", wie beim Ergänzen: dort folgt daraus
+// „nicht schreiben", hier die Form, die in einem Commit keinen Schaden anrichtet.
+func mcpRepairCommand(projectRoot string, path string, installed string) string {
+	if mcpRepairTargetTracked(projectRoot, path) {
+		return InstalledCommandName
+	}
+	return installed
+}
+
+// mcpRepairTargetTracked beantwortet die Tracking-Frage für die Datei, die
+// tatsächlich beschrieben wird.
+//
+// Ohne Symlink auf dem Weg ist das die Zieldatei selbst, und es gilt
+// mcpTargetTracked unverändert. Führt der Weg über einen Link, misst ls-files
+// am Linkpfad aber nur den Link (Exit 1, „nicht erfasst"), während das Linkziel
+// erfasst sein kann; ohne diese Regel landete der absolute Pfad in der
+// erfassten Datei. Deshalb läuft zuerst dieselbe Kette wie in
+// mcpTargetTracked — Config, project.vcs, rev-parse. Erst wenn sie ergibt, dass
+// das Hauptverzeichnis in einem Repository liegt, wird das Linkziel gemessen.
+// Bei project.vcs ≠ git oder ohne Repository bleibt die Datei auch hinter einem
+// Link „nicht erfasst".
+//
+// Gemessen wird physisch gegen physisch, denn auch das Hauptverzeichnis kann
+// über einen Symlink-Pfad erreicht werden:
+//
+//   - Die Zieldatei wird mit filepath.EvalSymlinks aufgelöst.
+//   - rev-parse --show-toplevel im Verzeichnis des Linkziels muss dieselbe
+//     Wurzel liefern wie im Hauptverzeichnis, beide ebenfalls aufgelöst.
+//     Liegt das Ziel in einem anderen Repository — auch einem verschachtelten
+//     — oder in keinem, ist die Frage unbeantwortet.
+//   - ls-files --error-unmatch läuft in dieser Wurzel mit dem Pfad relativ
+//     dazu; die Exit-Codes zählen wie in mcpTargetTracked.
+//
+// Scheitert ein Auflösen oder ein git-Aufruf, ist die Frage unbeantwortet und
+// gilt als erfasst.
+func mcpRepairTargetTracked(projectRoot string, path string) bool {
+	if !mcpTargetViaSymlink(projectRoot, path) {
+		return mcpTargetTracked(projectRoot, path)
+	}
+
+	return mcpGitTracked(projectRoot, func(ctx context.Context, toplevel string) bool {
+		physicalFile, err := filepath.EvalSymlinks(filepath.Join(projectRoot, path))
+		if err != nil {
+			return true
+		}
+		physicalTop, err := filepath.EvalSymlinks(strings.TrimSpace(toplevel))
+		if err != nil {
+			return true
+		}
+
+		fileTop, code, _ := runGitUntranslated(ctx, filepath.Dir(physicalFile), "rev-parse", "--show-toplevel")
+		if code != 0 {
+			return true
+		}
+		physicalFileTop, err := filepath.EvalSymlinks(strings.TrimSpace(fileTop))
+		if err != nil || physicalFileTop != physicalTop {
+			return true
+		}
+
+		relative, err := filepath.Rel(physicalTop, physicalFile)
+		if err != nil || !filepath.IsLocal(relative) {
+			return true
+		}
+		return gitLsFilesTracked(ctx, physicalTop, relative)
+	})
 }
 
 // mcpTargetNeedsWrite ist die eine Stelle, an der alle Schreibwege ihre
@@ -717,13 +861,19 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 // Symlink (mcpTargetViaSymlink), wird weder ergänzt noch angelegt: geschrieben
 // würde ins Linkziel, gemessen aber der Pfad des Links. Übersprungen wird,
 // nicht aufgelöst — ein Link ist eine bewusste Einrichtung des Projekts. Der
-// veraltete Eintrag wird auch hinter einem Link korrigiert. Ein vorhandener
+// veraltete Eintrag wird auch hinter einem Link korrigiert; für seine Form wird
+// dort das Linkziel gemessen (mcpRepairTargetTracked). Ein vorhandener
 // Eintrag, der weder veraltet noch akzeptiert ist (MCPStateStale), bleibt auch
 // hier liegen. Gemessen wird erst, wenn es darauf ankommt: die beiden
 // git-Aufrufe laufen nicht für Dateien, die ohnehin nicht geschrieben würden.
 //
 // Einrichten (MCPWriteAll): alles, was nicht zur Menge der akzeptierten Formen
 // gehört, dazu bei OpenCode der Memory-Block, der zum Einrichten dazugehört.
+// Über der portablen Form schreibt Einrichten deshalb nichts — außer bei
+// OpenCode ohne Memory-Block, dann mit dem absoluten Pfad.
+//
+// Hier fällt nur, ob geschrieben wird. Welches Kommando beim Ersetzen eines
+// veralteten Eintrags geschrieben wird, entscheidet danach mcpRepairCommand.
 func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[string]any, exists bool, found any, present bool, scope MCPWriteScope) bool {
 	switch scope {
 	case MCPWriteOutdatedOnly:
@@ -802,7 +952,22 @@ func mcpTargetViaSymlink(projectRoot string, path string) bool {
 //   - ls-files --error-unmatch: Exit 0 heißt erfasst, Exit 1 nicht erfasst,
 //     alles andere unbeantwortet. ls-files deckt auch die gelöschte, aber noch
 //     im Index stehende Datei ab; ein reiner Existenztest täte das nicht.
+//
+// Die Antwort hat zwei Folgen. Beim Ergänzen fehlender Einträge und Dateien
+// heißt „erfasst": nicht schreiben. Beim Ersetzen eines veralteten Eintrags
+// heißt es: den bloßen Namen schreiben (mcpRepairCommand). Gemessen wird dabei
+// der Pfad, nicht das Ziel eines Links — hinter einem Link misst
+// mcpRepairTargetTracked das Linkziel.
 func mcpTargetTracked(projectRoot string, path string) bool {
+	return mcpGitTracked(projectRoot, func(ctx context.Context, _ string) bool {
+		return gitLsFilesTracked(ctx, projectRoot, path)
+	})
+}
+
+// mcpGitTracked durchläuft die Kette aus mcpTargetTracked bis vor ls-files und
+// ruft measure erst, wenn feststeht, dass das Hauptverzeichnis in einem
+// Repository liegt. measure bekommt dessen Wurzel, wie rev-parse sie meldet.
+func mcpGitTracked(projectRoot string, measure func(ctx context.Context, toplevel string) bool) bool {
 	config, err := ReadConfig(projectRoot)
 	if err != nil {
 		return true
@@ -814,13 +979,21 @@ func mcpTargetTracked(projectRoot string, path string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), privateGitTimeout)
 	defer cancel()
 
-	if _, code, reason := runGitUntranslated(ctx, projectRoot, "rev-parse", "--show-toplevel"); code != 0 {
+	toplevel, code, reason := runGitUntranslated(ctx, projectRoot, "rev-parse", "--show-toplevel")
+	if code != 0 {
 		if code < 0 {
 			return true
 		}
 		return !gitReportsNoRepository(reason) || gitEntryInAncestors(projectRoot)
 	}
-	_, code, _ := runGit(ctx, projectRoot, "ls-files", "--error-unmatch", "--", path)
+	return measure(ctx, toplevel)
+}
+
+// gitLsFilesTracked fragt ls-files --error-unmatch in dir nach path: Exit 0
+// heißt erfasst, Exit 1 nicht erfasst, alles andere unbeantwortet und damit
+// erfasst.
+func gitLsFilesTracked(ctx context.Context, dir string, path string) bool {
+	_, code, _ := runGit(ctx, dir, "ls-files", "--error-unmatch", "--", path)
 	switch code {
 	case 0:
 		return true

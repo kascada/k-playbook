@@ -191,8 +191,11 @@ func TestCheckMCPMeldetDenAltenWrapperAlsVeraltet(t *testing.T) {
 
 // Die Auto-Korrektur greift genau einmal und genau dort: der Wrapper-Eintrag
 // wird ersetzt, die akzeptierte Form daneben bleibt Byte für Byte stehen.
+//
+// Das Projekt hat keine K-PLAYBOOK.yaml: die Tracking-Frage ist unbeantwortet,
+// und seit Task 062 steht nach der Korrektur deshalb der bloße Name darin.
 func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
-	installed := installTestBinary(t)
+	installTestBinary(t)
 	root := t.TempDir()
 
 	veraltet := filepath.Join(root, ".mcp.json")
@@ -206,13 +209,16 @@ func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0] != ".mcp.json" {
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
 		t.Fatalf("korrigiert = %v, erwartet nur .mcp.json", repaired)
+	}
+	if repaired[0].Command != InstalledCommandName {
+		t.Errorf("geschriebenes Kommando = %q, erwartet %q", repaired[0].Command, InstalledCommandName)
 	}
 
 	entry := readJSON(t, veraltet)["mcpServers"].(map[string]any)[MCPServerKey].(map[string]any)
-	if entry["command"] != installed {
-		t.Errorf("command = %v, erwartet %q", entry["command"], installed)
+	if entry["command"] != InstalledCommandName {
+		t.Errorf("command = %v, erwartet %q", entry["command"], InstalledCommandName)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(root, ".cursor", "mcp.json"))

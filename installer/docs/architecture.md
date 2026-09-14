@@ -2056,11 +2056,18 @@ und könnte auf einen ganz anderen Stand zeigen als den, den `bin/install` geleg
 Absolut und nicht als bloßer Kommandoname, weil aus Dock oder Finder gestartete Clients
 die Shell-`PATH` nicht erben; `~/.local/bin` fehlt dort typischerweise. Lässt sich kein
 Binary auflösen, meldet jedes Ziel `MCPStateNoCommand` und es wird nichts geschrieben:
-eine Registrierung, die auf nichts zeigt, ist schlechter als keine.
+eine Registrierung, die auf nichts zeigt, ist schlechter als keine. Das gilt auch für die
+portable Form.
+
+Eine Ausnahme hat die Form: Ersetzt ein selbsttätiger Weg einen veralteten Eintrag, wählt
+`mcpRepairCommand()` je Zieldatei — erfasst oder unbeantwortet der bloße Name
+`k-playbook`, nicht erfasst `MCPCommand()`. Einzelheiten unter „Zwei Schreibwege, eine
+Entscheidungsstelle".
 
 #### Eine Menge akzeptierter Formen statt eines Sollwerts
 
-Geschrieben wird genau eine Form, geprüft wird gegen eine Menge. `reflect.DeepEqual`
+Geschrieben wird je Zieldatei genau eine Form nach fester Regel, geprüft wird gegen eine
+Menge. `reflect.DeepEqual`
 gegen `mcpEntry()` ist deshalb weg; an seiner Stelle stehen drei Prädikate in `mcp.go`:
 
 - `acceptedMCPCommandForms()` — die Menge selbst, als Liste benannter Formen. Heute zwei:
@@ -2091,26 +2098,35 @@ Auto-Korrektur greift. Die Alternative wäre schlechter — beide Umgebungen erk
 in derselben Datei wechselseitig für veraltet.
 
 Die portable Form hat ihren eigenen Preis, und auch der steht dort: der bloße Name
-hängt an der `PATH`, und aus Dock oder Finder gestartete Clients erben sie nicht. Sie ist
-deshalb ausdrücklich **kein** Schreibziel — `MCPCommand()` liefert weiter den absoluten
-Pfad —, sondern nur eine Form, die eine eingecheckte Registrierung tragen darf, ohne von
-der Auto-Korrektur überschrieben zu werden. `isPortableCommandForm` prüft bewusst ohne
+hängt an der `PATH`, und aus Dock oder Finder gestartete Clients erben sie nicht.
+Einrichten, Ergänzen und Anlegen schreiben sie deshalb nie — `MCPCommand()` liefert
+weiter den absoluten Pfad. Schreibziel ist sie an genau einer Stelle: beim selbsttätigen
+Ersetzen eines veralteten Eintrags in einer erfassten Datei (`mcpRepairCommand()`, siehe
+unten). Der alte relative Wrapper-Eintrag nannte keine Umgebung; der Name ist seine treue
+Übersetzung, ein absoluter Pfad in einem Commit wäre es nicht. Sonst ist sie eine Form, die
+eine eingecheckte Registrierung tragen darf, ohne von der Auto-Korrektur überschrieben zu
+werden. Der Ausweg für Dock und Finder ist der Handeintrag des absoluten Pfads; er ist
+akzeptiert und bleibt stehen. *Einrichten* hilft nicht, denn es überschreibt keine
+akzeptierte Form — außer bei OpenCode ohne Memory-Block: dann schreibt
+`mcpTargetNeedsWrite()` wegen `opencodeMemoryConfigured()`, und `patchMCPFile()` setzt den
+Eintrag mit dem absoluten Pfad neu. `isPortableCommandForm` prüft bewusst ohne
 `path.Clean` auf Gleichheit mit dem Namen: `./k-playbook` bliebe sonst als „aktuell"
 hängen, obwohl es einen Projektpfad meint.
 
 #### Zwei Schreibwege, eine Entscheidungsstelle
 
-| Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei |
-|---|---|---|---|
-| ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört |
-| selbsttätig | `RepairMCP()`, Clone-Update | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` |
-| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten |
+| Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei | Geschriebene Form |
+|---|---|---|---|---|
+| ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört | absoluter Pfad |
+| selbsttätig | `RepairMCP()`, Clone-Update | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
+| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie beim Clone-Update; Ergänzen und Anlegen absoluter Pfad |
 
 Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
 ist ein Parameter von `RepairMCP()`, weil die beiden selbsttätigen Aufrufer verschieden
 weit gehen dürfen. Das Clone-Update (`Update()` in `project/update.go`, Ergebnis in
-`UpdateResult.MCPRepaired`) soll den Eintrag auf den abgelösten Wrapper nachziehen und
-sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) darf
+`UpdateResult.MCPRepaired`, die Dateien mit bloßem Namen zusätzlich in
+`UpdateResult.MCPRepairedPortable`) soll den Eintrag auf den abgelösten Wrapper nachziehen
+und sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) darf
 mehr, und die Grenze ist gemessen, nicht geraten:
 
 - **`MCPStateOutdated`** wird in beiden Modi ersetzt, unabhängig von der Versionierung —
@@ -2156,7 +2172,8 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
   Startzweig von `mcpTargetNeedsWrite()`, nicht in `applyMCPTarget()`. Der Knopf schreibt
   deshalb weiter durch den Link, das Clone-Update bleibt unverändert, und
-  `MCPStateOutdated` wird auch hinter einem Link korrigiert. Offen bleiben harte Links:
+  `MCPStateOutdated` wird auch hinter einem Link korrigiert; für dessen Form wird dort
+  das Linkziel gemessen (nächster Punkt). Offen bleiben harte Links:
   `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
   `os.WriteFile` schreibt in denselben Inode.
 - **Spur des Assistenten** (`assistantTrace()`): eine fehlende Datei entsteht nur, wenn
@@ -2166,16 +2183,43 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   Spur: `ApplyLinks()` legt sie in jedem Projekt an, schon auf dem Lesepfad. Ohne die
   Bedingung entstünden bei jedem Start drei Dateien, die niemand braucht. Ein fehlender
   Eintrag in vorhandener Datei braucht keine Spur.
+- **Form beim Ersetzen** (`mcpRepairCommand()`): Erst wenn feststeht, dass geschrieben
+  wird und der vorgefundene Eintrag veraltet ist, legt `applyMCPTarget()` das Kommando
+  fest — in beiden selbsttätigen Modi, nie bei `MCPWriteAll`. Erfasst oder unbeantwortet
+  heißt `InstalledCommandName`, nicht erfasst `MCPCommand()`. Die git-Aufrufe laufen nur
+  in diesem Fall. Ohne Link auf dem Weg misst `mcpTargetTracked()` wie oben. Mit Link misst
+  `mcpRepairTargetTracked()` die Datei, die tatsächlich beschrieben wird: Die Kette aus
+  Config, `project.vcs` und `rev-parse` läuft unverändert (`mcpGitTracked()`), bei
+  `project.vcs` ≠ git oder ohne Repository bleibt es also bei „nicht erfasst". Danach wird
+  die Zieldatei per `filepath.EvalSymlinks` aufgelöst, `rev-parse --show-toplevel` im
+  Verzeichnis des Linkziels muss — ebenfalls aufgelöst — dieselbe Wurzel melden wie im
+  Hauptverzeichnis, und `ls-files --error-unmatch` läuft in dieser Wurzel mit dem Pfad
+  relativ dazu. Physisch gegen physisch, weil auch das Hauptverzeichnis über einen
+  verlinkten Pfad erreicht werden kann. Ein Ziel außerhalb dieses Repositorys, auch in
+  einem verschachtelten, und jedes gescheiterte Auflösen gelten als unbeantwortet. Ohne
+  diese Regel misst `ls-files` den Linkpfad (Exit 1) und schriebe den absoluten Pfad in
+  die erfasste Datei.
 
-Geschrieben wird in jedem Modus dieselbe Form wie über den Knopf — der absolute Pfad aus
-`MCPCommand()` —, damit es eine Schreibform gibt. Dass die Datei nicht erfasst ist,
-heißt: das Projekt hat sie nicht eingecheckt. Die Startmeldung sagt beim Eintragen
-deshalb dazu, dass die Datei einen rechnerbezogenen Pfad trägt und unversioniert bleiben
-sollte, und unterscheidet „eingetragen" von „korrigiert" anhand des Zustands vor dem
-Lauf. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht wird nur der eigene
-Schlüssel.
+Ergänzen und Anlegen schreiben dieselbe Form wie der Knopf — den absoluten Pfad aus
+`MCPCommand()`. Dass die Datei nicht erfasst ist, heißt: das Projekt hat sie nicht
+eingecheckt. Die Startmeldung sagt beim Eintragen deshalb dazu, dass die Datei einen
+rechnerbezogenen Pfad trägt und unversioniert bleiben sollte, und unterscheidet
+„eingetragen" von „korrigiert" anhand des Zustands vor dem Lauf. Welche Form geschrieben
+wurde, liefert `RepairMCP()` selbst zurück (`[]MCPWrite` mit `Path` und `Command`). Steht
+der bloße Name darin, sagen die Startmeldung und `describeMCPRepair()` nach dem
+Clone-Update das und nennen den Preis: ein aus Dock oder Finder gestarteter Client braucht
+den absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen Form,
+nicht am Tracking-Ergebnis. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht
+wird nur der eigene Schlüssel.
 
-Die Enge ist die Idempotenz-Zusage: der zweite Lauf schreibt nichts mehr, und keine von
+Bereits migrierte und committete Projekte bleiben, wie sie sind: ein absoluter Pfad aus
+fremdem `$HOME` gilt als akzeptiert und wird nicht mehr ersetzt. Ebenso bleibt eine per
+Bind-Mount geteilte, aber nicht erfasste Datei beim absoluten Pfad der Umgebung, in der
+die Korrektur lief — „erfasst" heißt committet, nicht geteilt. Beides steht als Grenze in
+`docs/mcp.md`.
+
+Die Enge ist die Idempotenz-Zusage: der zweite Lauf schreibt nichts mehr — auch nicht in
+einer zweiten Umgebung, denn beide geschriebenen Formen sind akzeptiert —, und keine von
 git erfasste Datei wird durch das Ergänzen verändert. Ohne das machte jeder Start die
 getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit eingecheckter
 Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.

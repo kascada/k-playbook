@@ -29,8 +29,8 @@ the server in all three files:
 | Cursor | `.cursor/mcp.json` | same schema, same key |
 | OpenCode | `opencode.json`, or `opencode.jsonc` if only that one exists | `mcp` -> `k-playbook` |
 
-The same command is always registered, in only two spellings -- the absolute path of the
-installed `k-playbook`, resolved when writing:
+*Set up* always registers the same command, in two spellings -- one per schema -- as the
+absolute path of the installed `k-playbook`, resolved when writing:
 
 ```json
 {
@@ -89,10 +89,12 @@ see [Why the Entry Is an Absolute Path](#why-the-entry-is-an-absolute-path). Onl
 cannot be read even as JWCC -- a missing bracket, a fragment -- is reported and **not**
 touched. Comments alone are not such a case.
 
-The written registration is an absolute path and is therefore tied to an environment; it
-cannot be committed as-is. To share it, enter the [portable form](#the-portable-form-the-bare-command-name)
+The registration *Set up* writes is an absolute path and is therefore tied to an environment;
+it cannot be committed as-is. To share it, enter the [portable form](#the-portable-form-the-bare-command-name)
 manually -- the bare command name. What is there is not touched by automatic correction as
-long as it belongs to the set of accepted forms.
+long as it belongs to the set of accepted forms. k-playbook writes the bare name itself in
+one case only: when automatic correction replaces an obsolete entry in a file tracked by git
+-- see [Existing Projects Synchronize Automatically](#existing-projects-synchronize-automatically).
 
 ## Approval and Restart
 
@@ -106,9 +108,11 @@ cannot approve its own servers.
 
 ## Why the Entry Is an Absolute Path
 
-The registered value is the **absolute path of the installed binary resolved when writing**,
-typically `~/.local/bin/k-playbook`, expanded. It is neither the bare command name nor the
-project-owned wrapper used previously.
+The value *Set up* registers is the **absolute path of the installed binary resolved when
+writing**, typically `~/.local/bin/k-playbook`, expanded. It is neither the bare command name
+nor the project-owned wrapper used previously. The one exception is automatic correction of
+an obsolete entry in a tracked file: it writes the bare name
+([below](#the-portable-form-the-bare-command-name)).
 
 The reason is the case in which the entry is needed. A client started from the Dock or Finder
 -- Cursor, VS Code, Claude Desktop -- does **not** inherit the PATH of a login shell;
@@ -118,7 +122,9 @@ no inherited environment.
 
 ### A Set of Accepted Forms, Not a Target Value
 
-Exactly one form is always written. **Validation** checks against a set:
+Each write puts exactly one form into a file, chosen by a fixed rule: the absolute path,
+except when automatic correction replaces an obsolete entry in a tracked file -- then the bare
+name. **Validation** checks against a set:
 
 | Form | Counts as |
 |---|---|
@@ -159,9 +165,14 @@ its own PATH to its own binary -- exactly what bootstrap ensures: `~/.local/bin`
 in PATH, or `bin/install` aborts. For the same reason, host and container do not play
 ping-pong with this file: neither finds anything in it to correct.
 
-It is never written. *Set up* continues to write the resolved absolute path; the portable
-form is entered manually in the file and then remains there. Exactly the name is accepted --
-`./k-playbook` and every path ending in the name are not.
+*Set up* never writes it, and neither does adding a missing entry or creating a missing file
+-- all of them write the resolved absolute path. k-playbook writes it in exactly one case:
+when automatic correction replaces an obsolete wrapper entry in a file git tracks, or where
+that question cannot be answered ([details](#existing-projects-synchronize-automatically)).
+The old relative wrapper entry named no environment, so the bare name is its faithful
+translation. Otherwise the portable form is entered manually in the file and then remains
+there. Exactly the name is accepted -- `./k-playbook` and every path ending in the name are
+not.
 
 ### Three Explicit Boundaries
 
@@ -169,11 +180,17 @@ form is entered manually in the file and then remains there. Exactly the name is
 here rather than concealed: a client started from the Dock or Finder -- Cursor, VS Code,
 Claude Desktop -- does not inherit the login-shell PATH. It finds nothing under a bare name,
 and the server remains unavailable. This exact case is why *Set up* writes the absolute path.
+It applies to a bare name entered manually and to one written by automatic correction in a
+tracked file alike.
 
 Anyone sharing a committed registration shares a form that works from the terminal and in a
-Dev Container, but not from the Dock. The path to a solution is the same as for separate
-HOMEs: click *Set up* once in that environment. It writes the absolute path into the file --
-in a repository that tracks it, that is a diff that must not be committed.
+Dev Container, but not from the Dock. *Set up* does not help here: the bare name belongs to
+the accepted forms, so *Set up* leaves it in place. The only exception is an OpenCode
+configuration without the memory block (`instructions` with `AGENTS.md`, `references.docs`):
+there *Set up* rewrites the entry and writes the absolute path with it. The way out is to
+**enter the absolute path manually** in that environment. It is an accepted form as well, so
+neither automatic correction nor *Set up* replaces it -- in a repository that tracks the
+file, that is a local diff that must not be committed.
 
 The `/mcp` self-test also does not cover the portable form: it starts what *Set up* would
 write -- the resolved absolute path -- rather than what is in the file. It therefore answers
@@ -184,8 +201,15 @@ write -- the resolved absolute path -- rather than what is in the file. It there
 oversight: otherwise, host and Dev Container would mutually declare the shared file obsolete
 and rewrite it on every switch. The cost: if host and container share the same repository but
 have separate HOMEs, MCP remains unavailable in the other environment without automatic
-correction intervening. Then only the `/mcp` self-test reports a problem. Anyone working in
-this situation sets up explicitly once in each environment.
+correction intervening. Then only the `/mcp` self-test reports a problem. *Set up* does not
+replace a foreign absolute path either; anyone working in this situation enters the portable
+form manually.
+
+The same applies to a file that host and Dev Container **share without git tracking it** --
+through a bind mount, for example. Automatic correction then writes the absolute path of the
+environment it runs in, and the other environment stays without MCP, because the foreign
+path counts as current. The bare name is written automatically only into tracked files:
+"tracked" means committed, not shared. This boundary is named, not solved.
 
 **The server finds the project through its working directory.** The registered path says
 which binary starts -- not which project is intended. At runtime, the server resolves this by
@@ -209,7 +233,8 @@ work in two places:
 Clicking *Set up* is not required for this; it remains the explicit write path alongside it.
 
 This correction is **narrow and idempotent**. Replacing the obsolete entry is a repair of
-content k-playbook wrote itself, so it runs regardless of whether the file is committed.
+content k-playbook wrote itself, so it runs regardless of whether the file is committed;
+only the form written depends on it (see below).
 No accepted form is touched, and an entry that is neither obsolete nor accepted (`stale`)
 is left alone -- it may come from a foreign `$HOME` and be valid there. Nothing is deleted.
 
@@ -241,10 +266,39 @@ symlink targets k-playbook manages itself -- for example `.claude/settings.json`
 `.cursor/rules/`. The directories alone are no trace; k-playbook creates them in every
 project. Without that condition every start would create three files nobody needs.
 
-What is written is the same form *Set up* writes: the absolute path. The start message says
-so -- the file carries a machine-specific path and should stay unversioned. Whether the
-project commits it anyway is the project's decision; from then on the file is tracked and
-the automatic path no longer touches it.
+Which form is written depends on the case. **Adding** a missing entry and **creating** a
+missing file write what *Set up* writes: the absolute path. The start message says so -- the
+file carries a machine-specific path and should stay unversioned. Whether the project
+commits it anyway is the project's decision; from then on the file is tracked and the
+automatic path adds nothing to it any more.
+
+**Replacing** an obsolete entry follows the same tracking measurement, per target file and in
+both automatic paths: a file git **tracks** -- or one for which the question stays
+unanswered, such as with an unreadable `K-PLAYBOOK.yaml` -- gets the bare name `k-playbook`;
+a file that is **not tracked** gets the absolute path. The old relative wrapper entry named no
+environment, and a committed replacement must not name one either. The absolute legacy path
+`…/k-playbook/bin/k-playbook` follows the same rule. A later start writes nothing, neither on
+the host nor in a second environment, because both forms are accepted. The measurement runs
+only when an obsolete entry is actually replaced.
+
+Behind a **symlink**, the question is answered for the file that is actually written: the
+link target. That rule applies only after the chain above has established that the project
+uses git and its root lies in a repository -- with `project.vcs` other than `git`, a file
+behind a link stays untracked and gets the absolute path. The link target is resolved and
+compared physically with the physical repository root, since the project root itself may be
+reached through a symlinked path. A target in the same repository is measured with
+`git ls-files`; a target that is not tracked there gets the absolute path. A target outside
+that repository -- in no repository or in a nested one -- or one that cannot be resolved
+leaves the question unanswered and gets the bare name.
+
+When the bare name was written, the start message and the clone-update response say so and
+name its cost: a client launched from the Dock or Finder needs the absolute path, entered
+manually.
+
+**Projects already migrated and committed stay as they are.** Earlier versions wrote the
+absolute path into tracked files as well. A path from a foreign `$HOME` counts as current and
+is not replaced again. Affected projects enter the bare name `k-playbook` manually in
+`.mcp.json`, `.cursor/mcp.json` and `opencode.json`; automatic correction leaves it there.
 
 The prerequisite remains the one-time bootstrap per host or Dev Container --
 `make -C k-playbook install`, or without make `k-playbook/bin/install`: both correction paths
@@ -618,8 +672,9 @@ The **/mcp** page -- reachable in the block through *State and tools* -- shows t
   registered command as a separate process, sends it `initialize` and `tools/list`, and
   displays what it returns. Thus, the same view also answers whether the server runs at all.
 
-It starts exactly what the assistant starts: the same absolute path, with the project root as
-the working directory and **without the inherited shell PATH**. The last point is not a
+It starts the resolved absolute path -- what the assistant starts when the file holds that
+form; for the bare name see [Three Explicit Boundaries](#three-explicit-boundaries) -- with
+the project root as the working directory and **without the inherited shell PATH**. The last point is not a
 detail. If the self-test ran with the PATH of the shell that started the interface, it would
 report success while a client started from the Dock or Finder fails -- it would measure an
 environment the client does not have. Instead, the minimal system PATH received by a GUI
@@ -674,12 +729,13 @@ is tracked:
 - `opencode.json` is tracked and cannot be partially ignored; its `mcp` block is therefore in
   the repository.
 
-All three use the **portable form** -- the bare command name `k-playbook`. The written
-absolute path is tied to a `$HOME` and cannot be used here; the two ignored files contain it
-only so this machine has the same setting everywhere. Automatic correction touches neither:
-the portable form belongs to the set of accepted forms, and only the old wrapper path is
-written automatically.
+All three use the **portable form** -- the bare command name `k-playbook`. The absolute path
+*Set up* writes is tied to a `$HOME` and cannot be used here; the two ignored files contain
+the bare name only so this machine has the same setting everywhere. Automatic correction
+touches neither: the portable form belongs to the set of accepted forms, and only the old
+wrapper path is replaced automatically.
 
 This keeps the working tree clean with every clone update and every start. Clicking *Set up*
-here, by contrast, puts the absolute path in `opencode.json` -- a diff in a tracked file that
-must be reverted.
+here writes nothing either, as long as `opencode.json` carries the memory block: the bare
+name is accepted. Only if that block were missing would *Set up* rebuild the entry with the
+absolute path -- a diff in a tracked file that must be reverted.

@@ -40,7 +40,7 @@ If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a 
 docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
 finding by itself — name it and move on.
 
-## Step 2 — Load rule files
+## Step 2 — Load rule files and checks
 
 Take `catalogs.rules` from the context output. It already merges the shipped catalog
 with the project-local one and records `origin` per entry — do not list directories
@@ -50,6 +50,12 @@ Read the files in the order given and skip entries marked `disabled`. If the set
 empty, report this and stop; an empty set is a deliberate project decision, not a
 reason to fall back to the shipped catalog.
 
+Take `catalogs.checks` from the same output. It is the effective check set, merged the
+same way, with `origin` per entry; entries switched off by an empty local script carry
+`disabled`. Do not list `checks/` directories yourself. These checks run through
+`<playbook.dir>/bin/k-check`, not through this command: `/k-enforcement` names them
+with their origin and does not execute them.
+
 Print a compact startup summary:
 
 ```text
@@ -58,6 +64,8 @@ Enforcement-Check
 Ziel:         <geprüftes Verzeichnis>
 Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
 Abgeschaltet: <D> (leere lokale Datei) | —
+Checks:       <K> aktiv  (<E> dist, <F> local, <G> override), <H> abgeschaltet
+              Lauf über <playbook.dir>/bin/k-check
 Docs:         k-playbook-local/docs/code | fehlt
 ```
 
@@ -121,7 +129,16 @@ Relevant:        <rule filenames>
 Ergebnis:
 - <rule> [dist|local|override]: ok | offen | unklar | verletzt
 
+Checks:          <K> aktiv (<E> dist, <F> local, <G> override, <H> abgeschaltet) — nicht ausgeführt
+- <check> [dist|local|override]
+- <check> [override, abgeschaltet]
+Lauf:            <playbook.dir>/bin/k-check --mode changed
+
 Docs-Sync:       angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Thema>) | unklar
 ```
+
+The check list comes from `catalogs.checks` as loaded in Step 2. Do not report a check
+result you did not see: the checks are run through `<playbook.dir>/bin/k-check`, and
+`/k-enforcement` only names that call.
 
 If anything is `offen`, `unklar`, or `verletzt`, finish with the concrete next action and ask before editing.

@@ -235,3 +235,25 @@ func TestBinaryOutdated(t *testing.T) {
 		})
 	}
 }
+
+// Nach einem Clone-Update hängt der Dock/Finder-Hinweis an der geschriebenen
+// Form: nur wo der bloße Name steht, wird er genannt.
+func TestDescribeMCPRepairNenntDiePortableForm(t *testing.T) {
+	absolute := describeMCPRepair(project.UpdateResult{MCPRepaired: []string{".mcp.json"}})
+	if !strings.Contains(absolute, ".mcp.json") {
+		t.Errorf("Meldung nennt die Datei nicht: %q", absolute)
+	}
+	if strings.Contains(absolute, "bloße Name") || strings.Contains(absolute, "Dock oder Finder") {
+		t.Errorf("Meldung ohne portable Form nennt den Hinweis: %q", absolute)
+	}
+
+	portable := describeMCPRepair(project.UpdateResult{
+		MCPRepaired:         []string{".mcp.json", "opencode.json"},
+		MCPRepairedPortable: []string{".mcp.json"},
+	})
+	for _, want := range []string{"bloße Name " + project.InstalledCommandName, "In .mcp.json steht", "Dock oder Finder", "von Hand"} {
+		if !strings.Contains(portable, want) {
+			t.Errorf("Meldung enthält %q nicht: %q", want, portable)
+		}
+	}
+}

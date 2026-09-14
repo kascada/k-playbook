@@ -128,13 +128,21 @@ func ensureLocalStructure() {
 // erreicht die Registrierung nicht, weil sie im Hauptverzeichnis liegt und
 // nicht im Clone. Ein Klick auf „Einrichten" ist dafür nicht nötig.
 //
-// Zwei Fälle, zwei Meldungen. Ein Eintrag, der auf den abgelösten Wrapper
-// zeigt, wird korrigiert — unabhängig davon, ob die Datei versioniert ist,
-// denn den Eintrag hat k-playbook selbst geschrieben. Eine fehlende Datei oder
-// ein fehlender Eintrag wird eingetragen, aber nur, wenn die Datei nicht von
-// git erfasst ist; die Meldung sagt dazu, dass die Datei einen rechnerbezogenen
-// Pfad trägt und unversioniert bleiben sollte. Welcher Fall vorlag, sagt der
-// Zustand vor dem Lauf. Ein Fehler hält den Start nicht auf.
+// Zwei Fälle, zwei Meldungen, dazu ein Hinweis je geschriebener Form. Ein
+// Eintrag, der auf den abgelösten Wrapper zeigt, wird korrigiert — unabhängig
+// davon, ob die Datei versioniert ist, denn den Eintrag hat k-playbook selbst
+// geschrieben. Eine fehlende Datei oder ein fehlender Eintrag wird
+// eingetragen, aber nur, wenn die Datei nicht von git erfasst ist. Welcher Fall
+// vorlag, sagt der Zustand vor dem Lauf.
+//
+// Welche Form geschrieben wurde, sagt RepairMCP selbst. Steht danach der
+// absolute Pfad in einer ergänzten Datei, sagt die Meldung, dass sie einen
+// rechnerbezogenen Pfad trägt und unversioniert bleiben sollte. Steht der
+// bloße Name darin — eine Korrektur in einer erfassten Datei oder bei
+// unbeantworteter Tracking-Frage —, sagt sie das und nennt den Preis: ein aus
+// Dock oder Finder gestarteter Client findet den Namen nicht und braucht den
+// absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen
+// Form, nicht am Tracking-Ergebnis. Ein Fehler hält den Start nicht auf.
 func repairMCPRegistration() {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -150,16 +158,26 @@ func repairMCPRegistration() {
 
 	repaired, err := project.RepairMCP(environment.ProjectDir, project.MCPWriteOutdatedAndUnversioned)
 	added := 0
-	for _, path := range repaired {
-		if outdated[path] {
-			fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s\n", path)
+	portable := 0
+	for _, write := range repaired {
+		if write.Portable() {
+			portable++
+		}
+		if outdated[write.Path] {
+			fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s -> %s\n", write.Path, write.Command)
 			continue
 		}
-		added++
-		fmt.Printf("MCP-Registrierung eingetragen: %s\n", path)
+		if !write.Portable() {
+			added++
+		}
+		fmt.Printf("MCP-Registrierung eingetragen: %s\n", write.Path)
 	}
 	if added > 0 {
 		fmt.Println("Die eingetragene Datei trägt den rechnerbezogenen Pfad des installierten k-playbook und sollte unversioniert bleiben.")
+	}
+	if portable > 0 {
+		fmt.Printf("Eingetragen ist der bloße Name %s: die Datei ist von git erfasst oder ihre Versionierung ließ sich nicht klären, und ein rechnerbezogener Pfad gehört nicht in einen Commit.\n", project.InstalledCommandName)
+		fmt.Println("Ein aus Dock oder Finder gestarteter Client findet den Namen nicht; dort den absoluten Pfad von Hand eintragen — er bleibt stehen.")
 	}
 	if len(repaired) > 0 {
 		fmt.Println("Der Assistent liest den neuen Eintrag erst nach einem Neustart.")
