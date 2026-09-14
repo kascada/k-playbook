@@ -70,7 +70,7 @@ say the same thing are two rows; they are merged only in the presentation.
 | `sourceLine` | no | The line number, if the assertion can be assigned to exactly one line. Empty otherwise; then `sourceKey` provides findability. |
 | `group` | yes | The group key for forming deviations: `<ecosystem>/<name>`. |
 | `deviation` | no | Reference to the deviation to which this row belongs; empty if the item has only one assertion or if all assertions are equal. |
-| `note` | no | A visible note for exactly this row, for example "Value from variable, cannot be resolved". |
+| `note` | no | A visible note for exactly this row, for example `Wert aus Variable, nicht auflösbar: ${IMAGE_TAG}` ("value from variable, cannot be resolved"). |
 
 Together, `sourceFile`, `sourceKey`, and, where present, `sourceLine` must be sufficient
 to find the assertion again **without searching**. This is the criterion for every new
@@ -175,12 +175,13 @@ Both apply **only** to default detection. Anyone who wants a source from them in
 inventory writes it in `sources:`; an explicit entry overrides every exclusion and then
 carries its own environment label.
 
-**No exclusion is silent.** Every rule appears in the "Areas not searched" section of the
-inventory file, with pattern, origin (`installation` or `configured`), reason, and the
-number of sources skipped as a result. The total additionally appears in frontmatter under
-`inventory.sources-excluded` and in the overview. A rule without matches is included too:
-"nothing was found here" and "this location was not searched" are two different
-assertions, and the difference belongs in the file.
+**No exclusion is silent.** Every rule appears in the "Nicht durchsuchte Bereiche" (areas
+not searched) section of the inventory file, with pattern, origin (`installation` or
+`configured`), reason, and the number of sources skipped as a result. The total
+additionally appears in frontmatter under `inventory.sources-excluded` and in the
+"Übersicht" (overview) section as `Nicht durchsuchte Quellen`. A rule without matches is
+included too: "nothing was found here" and "this location was not searched" are two
+different assertions, and the difference belongs in the file.
 
 The difference from the `skippedDirs` list above is the reason, not the effect: it lists
 what a tool populated and thus belongs to no one; this lists what belongs to someone, just
@@ -340,7 +341,7 @@ Within a group:
 3. A deviation is **never** resolved, consolidated, or reduced to a "correct" value. It is
    reported with all involved rows and their origins.
 
-Both types appear in the "Deviations" section of the inventory file, with
+Both types appear in the "Abweichungen" (deviations) section of the inventory file, with
 `widersprüchlich` first. The number of deviations is the number of groups with a deviation,
 not the number of involved rows.
 
@@ -422,9 +423,9 @@ wrong for a security check: `/etc/passwd` and `etc/passwd` must not be the same 
 
 ### Rejection Is Visible
 
-Every rejection produces a message in the result: in the "Rejected sources and notices"
-section of the inventory file, in the subcommand output, and in the API response. It
-states the requested path, resolved path, and reason.
+Every rejection produces a message in the result: in the "Abgelehnte Quellen und
+Hinweise" (rejected sources and notices) section of the inventory file, in the subcommand
+output, and in the API response. It states the requested path, resolved path, and reason.
 
 **There is no silent skipping.** A configured source that could not be read is a gap in
 the inventory; a gap no one sees is worse than an error.
@@ -478,58 +479,60 @@ and individually, and an entry in `sources` includes each of them again.
 
 The following content is both the **example file and the template** created by
 `LocalStructure()` in Stage 2: a valid, empty configuration with an explanatory comment.
-Stage 2 copies it verbatim into the `fileTemplate()` branch of
-`installer/internal/project/local.go` rather than drafting it again.
+The template is German, as is the inventory file it configures; the block below is its
+exact wording. Stage 2 copies it verbatim into `versionSourcesTemplate()` in
+`installer/internal/project/local.go`, which the `fileTemplate()` branch returns for
+`version-sources.yaml`, rather than drafting it again.
 
 ```yaml
-# Version sources for `k-playbook inventory`
+# Versionsquellen für `k-playbook inventory`
 #
-# This file is maintained manually. k-playbook writes to it only with explicit
-# confirmation, and then only additively: existing entries, comments, and
-# ordering remain unchanged.
+# Diese Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher
+# Bestätigung in sie, und dann ausschließlich ergänzend: bestehende Einträge,
+# Kommentare und Reihenfolge bleiben erhalten.
 #
-# Without entries, `k-playbook inventory` collects the default sources below
-# the project root: manifests, lockfiles, Dockerfiles, Compose, DevContainer,
-# Helm, and CI. Only additional sources and roots outside the project that may
-# be read for this purpose belong here.
+# Ohne Einträge erhebt `k-playbook inventory` die Standardquellen unterhalb der
+# Projektwurzel — Manifeste, Lockfiles, Dockerfiles, Compose, DevContainer,
+# Helm und CI. Hier stehen nur zusätzliche Quellen und die Wurzeln außerhalb
+# des Projekts, die dafür gelesen werden dürfen.
 #
-# Full description: k-playbook/docs/version-inventory.md
+# Vollständige Beschreibung: k-playbook/docs/version-inventory.md
 
 schema_version: 1
 
-# Additional readable roots, one absolute path each. The project root is
-# always allowed and does not belong here. Anything not below one of these
-# roots is rejected: reported visibly, not skipped silently.
+# Zusätzlich lesbare Wurzeln, je ein absoluter Pfad. Die Projektwurzel ist
+# immer erlaubt und gehört nicht hierher. Was nicht unter einer dieser Wurzeln
+# liegt, wird abgelehnt — sichtbar gemeldet, nicht stillschweigend übergangen.
 #
 #   roots:
 #     - /srv/deploy
 roots: []
 
-# Additional sources. For each entry:
-#   path: file or glob, relative to the project root or absolute
+# Zusätzliche Quellen. Je Eintrag:
+#   path: Datei oder Glob, relativ zur Projektwurzel oder absolut
 #   kind: auto, python, go, node, rust, ruby, php, java, elixir, dockerfile,
 #         compose, devcontainer, helm, ci, tool-versions
 #   env:  lokal, dev, devcontainer, ci, deployment
-#   note: optional display text
+#   note: optionaler Anzeigetext
 #
 #   sources:
 #     - path: /srv/deploy/values-prod.yaml
 #       kind: helm
 #       env: deployment
-#       note: Production values from the deployment repository
+#       note: Produktionswerte aus dem Deployment-Repo
 sources: []
 
-# Areas where default detection should not search, one pattern relative to the
-# project root each; `*` for one segment, `**` for any number. Intended for
-# test fixtures and example projects: maintained content whose versions say
-# nothing about this project.
+# Bereiche, in denen die Standarderkennung nicht suchen soll — je ein Muster
+# relativ zur Projektwurzel, `*` für ein Segment, `**` für beliebig viele.
+# Gedacht für Testfixtures und Beispielprojekte: gepflegter Inhalt, dessen
+# Versionen nichts über dieses Projekt aussagen.
 #
-# This does not block anything. Every exclusion appears in the inventory with
-# the number of skipped sources, and a source from it is included again as soon
-# as it appears under `sources:`.
+# Gesperrt ist damit nichts. Jeder Ausschluss steht mit der Zahl der
+# übergangenen Quellen im Inventar, und eine Quelle daraus kommt wieder hinein,
+# sobald sie unter `sources:` steht.
 #
-# The `k-playbook/` installation is always excluded and does not belong here:
-# it is a clone of the tool and says nothing about this project.
+# Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht hierher:
+# sie ist ein Clone des Werkzeugs und sagt nichts über dieses Projekt.
 #
 #   exclude:
 #     - tests/fixtures/**
@@ -608,8 +611,8 @@ finding. `generated.by` alone is insufficient.
 ```yaml
 ---
 type: Version Inventory
-title: Version Inventory
-description: Complete overview of this project's declared versions, separated by environment and with origin for each row.
+title: Versionsinventar
+description: Vollständige Übersicht der deklarierten Versionen dieses Projekts, nach Umgebung getrennt und mit Herkunft je Zeile.
 tags: [versions, inventory, dependencies]
 status: stable
 generated: { by: k-doc-inventory, at: <RFC 3339> }
@@ -625,30 +628,59 @@ inventory:
 
 `generated.at` is the collection time; there is only this one timestamp.
 
+The keys and the values of `type`, `tags`, and `status` are fixed identifiers and stay
+English. `title` and `description` are German, in the exact wording the renderer writes.
+
 ### Structure
 
 The body has a deterministic structure; every section is always present, even if empty,
-so that a diff does not have to distinguish between "section absent" and "section empty":
+so that a diff does not have to distinguish between "section absent" and "section empty".
+The body is German, like `title` and `description`. Headings and fixed text are quoted
+here in the renderer's exact wording, with English explanations alongside:
 
-1. `# Version Inventory` and a paragraph with generator, collection time, and the note
-   that the file is generated.
-2. `## Overview`: number of entries, sources, deviations, and rejections.
-3. `## <Context>` for each environment label in the fixed order `lokal`, `dev`,
+1. `# Versionsinventar` and a paragraph that begins ``Erzeugt von `k-doc-inventory` am``:
+   generator, collection time (`generated.at`), the note that the file is regenerated on
+   every run and manual changes are lost, and that it lists the **declared** versions, not
+   what is active at runtime.
+2. `## Übersicht` (overview): a list of seven counters, in this order: `Einträge`
+   (entries), `Ausgewertete Quellen` (sources read), `Konfigurierte Zusatzquellen`
+   (entries in the source configuration, rejected ones included), `Abweichungen`
+   (deviations), `Abgelehnte Quellen` (rejections), `Nicht durchsuchte Quellen` (sources
+   skipped by an exclusion rule), and `Hinweise` (notices). The first six carry the same
+   numbers as the `inventory.*` keys in frontmatter; `Hinweise` appears only here.
+3. `## <label>` for each environment label in the fixed order `lokal`, `dev`,
    `devcontainer`, `ci`, `deployment`; labels without entries are omitted. It contains a
-   table with item (`<ecosystem>/<name>`, the group key), kind (`kindOfThing`), version,
-   pin type, scope, and origin. The origin cell contains file and line, `sourceKey`, and,
-   where present, digest and `note`.
-4. `## Deviations`: one block per group with type (`widersprüchlich` before
-   `umgebungsbedingt`), the involved rows, and their origins.
-5. `## Evaluated Sources`: every read file with source type, label, number of entries,
-   and, if configured for the source, its `note`. A source from the source configuration
-   carries `(configured)` after its source type; otherwise it would not be visible where a
-   row comes from.
-6. `## Areas Not Searched`: for each exclusion rule, pattern, origin (`installation` or
-   `configured`), number of skipped sources, and reason. The section is always present,
-   even if no rule matched anything.
-7. `## Rejected Sources and Notices`: every rejection with requested path, resolved path,
-   and reason, plus notices from unreadable or unknown sources.
+   table with the columns `Gegenstand` (item: `<ecosystem>/<name>`, the group key), `Art`
+   (`kindOfThing`), `Version`, `Pin` (pin type), `Scope`, and `Herkunft` (origin). The
+   origin cell contains file and line, `sourceKey`, and, where present, digest and `note`,
+   separated by `·`. If no label has any entries, a single `## Einträge` (entries) section
+   stands in place of all of them.
+4. `## Abweichungen` (deviations): a short paragraph explaining the two types, then one
+   block per group, headed `` ### <type> — `<group>` ``, with type `widersprüchlich` before
+   `umgebungsbedingt`. Each block is a table of the involved rows with the columns
+   `Version`, `Pin`, `Kontext` (context), and `Herkunft` (origin).
+5. `## Ausgewertete Quellen` (evaluated sources): a table with one row per read file and
+   the columns `Datei` (file), `Quellart` (source type), `Label`, `Einträge` (number of
+   entries), and `Note`, which carries the `note` if one is configured for the source. A
+   source from the source configuration carries `(konfiguriert)` (configured) after its
+   source type; otherwise it would not be visible where a row comes from.
+6. `## Nicht durchsuchte Bereiche` (areas not searched): a fixed paragraph stating that
+   these areas are within the project, are not searched by default detection, and are not
+   blocked; then a table with one row per exclusion rule and the columns `Muster`
+   (pattern), `Herkunft` (origin: `installation` or `configured`), `Übergangene Quellen`
+   (number of skipped sources), and `Grund` (reason). A rule that matched nothing still
+   has its row.
+7. `## Abgelehnte Quellen und Hinweise` (rejected sources and notices): a table with one
+   row per rejection and the columns `Angefragt` (requested path), `Aufgelöst` (resolved
+   path), and `Grund` (reason), followed by the notices as a list, each prefixed with its
+   source file where there is one.
+
+**Empty sections.** A section with nothing to list contains the single line `Keine.`
+(none): `## Einträge` when there are no entries at all, `## Abweichungen` without
+deviations, `## Ausgewertete Quellen` without read sources, and
+`## Abgelehnte Quellen und Hinweise` when there are neither rejections nor notices. In
+`## Nicht durchsuchte Bereiche`, `Keine.` follows the fixed paragraph when there is no
+rule; since the installation rule always exists, this does not occur in practice.
 
 **Sorting.** Contexts use the fixed order above. Within a context: `ecosystem`, then
 `name`, then `sourceFile`, then `sourceLine`, and finally `sourceKey` and `version`, all
@@ -729,15 +761,15 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 | `version-sources.yaml` is unreadable YAML | **Abort** before any collection, with file, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
 | `schema_version` is absent or not `1` | **Abort**, as for `K-PLAYBOOK.yaml`. |
 | A root in `roots:` is not absolute | **Abort**. A relative root would depend on the caller's working directory and mean something different in the web-server process than on the CLI path; partially interpreting a trust boundary stated this way would be worse than rejecting it. |
-| Unknown `env` label in an entry | The **entry** is rejected and listed under "Rejected sources and notices", with the found value and the five valid values. The run continues. |
+| Unknown `env` label in an entry | The **entry** is rejected and listed under "Abgelehnte Quellen und Hinweise" (rejected sources and notices), with the found value and the five valid values. The run continues. |
 | Unknown `kind` in an entry | As for the label: entry rejected, visibly, run continues. |
-| Absolute or empty pattern in `exclude:` | The **pattern** is rejected and listed under "Rejected sources and notices", with line and reason. It then does not apply; the run continues. |
+| Absolute or empty pattern in `exclude:` | The **pattern** is rejected and listed under "Abgelehnte Quellen und Hinweise" (rejected sources and notices), with line and reason. It then does not apply; the run continues. |
 | Configured source is missing from disk | Visible notice, unless the entry has `optional: true`. |
 | Path outside allowed roots | Visible rejection with requested and resolved path. The run continues. |
 | Symlink points outside every root | As above; the resolved target is reported, so it is clear what would actually have been read. |
 | Known source file is invalid | Visible notice with file and error; the remaining sources are collected. No invented entries, no partial result without marking. |
 | Lockfile readable, associated manifest absent or unreadable | The lockfile contributes no entries. A visible notice states lockfile, expected manifest, and reason; transitive lockfile packages do not substitute for direct ones. |
-| Lockfile readable, associated manifest excluded by `exclude:` | The lockfile contributes no entries. The exclusion also remains visible in the "Areas Not Searched" section; the notice names the matching exclusion rule. A lockfile explicitly named under `sources:` overrides the exclusion only for itself, not for its manifest. |
+| Lockfile readable, associated manifest excluded by `exclude:` | The lockfile contributes no entries. The exclusion also remains visible in the "Nicht durchsuchte Bereiche" (areas not searched) section; the notice names the matching exclusion rule. A lockfile explicitly named under `sources:` overrides the exclusion only for itself, not for its manifest. |
 | Workspace lockfile with a missing, unresolvable, excluded, or unreadable member manifest | The lockfile contributes no entries at all. The notice states root manifest, member declaration or resolved path, and reason; a partial union of remaining members is not allowed. |
 | Unknown file type below the project root | Silently skipped. Only what is searched can be absent. |
 | Inventory file exists, frontmatter invalid | Visible finding. The run collects again and writes the file because comparison is not possible. |

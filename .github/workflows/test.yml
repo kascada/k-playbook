@@ -1,0 +1,65 @@
+name: Tests
+
+# Prüft den Installer bei jedem Push und Pull Request: go vet, gofmt und
+# go test. Lokal läuft dasselbe nur in `release-preflight`; ein Stand, der über
+# `sichern` nach GitHub kommt, war bisher nirgends geprüft.
+#
+# Der Lauf ändert nichts und veröffentlicht nichts — rot heißt nur rot.
+
+on:
+  push:
+    paths:
+      - "installer/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "installer/**"
+      - ".github/workflows/test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Dieselbe Toolchain wie beim Release, ohne stillen Griff zu einer anderen.
+      GOTOOLCHAIN: local
+    defaults:
+      run:
+        working-directory: installer
+
+    steps:
+      - name: Auschecken
+        uses: actions/checkout@v4
+
+      # Wie in release.yml: die toolchain-Zeile, nicht die go-Direktive.
+      - name: Toolchain-Version lesen
+        id: toolchain
+        run: |
+          set -eu
+          version="$(awk '$1 == "toolchain" { sub(/^go/, "", $2); print $2 }' go.mod)"
+          test -n "$version" || { echo "In installer/go.mod fehlt die toolchain-Zeile." >&2; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Go einrichten
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.toolchain.outputs.version }}
+          cache-dependency-path: installer/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: gofmt
+        run: |
+          set -eu
+          unformatiert="$(gofmt -l .)"
+          if [ -n "$unformatiert" ]; then
+            printf 'gofmt: diese Dateien sind nicht formatiert:\n%s\n' "$unformatiert" >&2
+            exit 1
+          fi
+
+      - name: go test
+        run: go test ./...
