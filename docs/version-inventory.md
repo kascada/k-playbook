@@ -231,6 +231,16 @@ The same ones that `/k-docs-tools` already recognizes: `Cargo.toml`/`Cargo.lock`
 and lockfile; lockfiles follow the general direct-dependency rule in this section; scope
 comes from the section.
 
+- `mix.exs` has no sections. There, the scope comes from `only:` of the individual
+  dependency, evaluated over the complete dependency entry even if it spans several lines.
+  The environment names are mapped like the Python group names (`dev`, `develop`,
+  `development` → `dev`; `test`, `tests`, `testing` → `test`; `build` → `build`; `main`,
+  `default` → `main`; anything else → `optional`), with one exception: `:prod` is `main`.
+  A dependency without `only:` is `main`. If `only:` names several environments, the order
+  of precedence decides, not the order in the source: `main` before `dev` before `test`
+  before `build` before `optional`. If `only:` names no readable atom, `scope` stays empty.
+- `mix.lock` takes the scope from its direct dependency in `mix.exs`.
+
 ### Containers
 
 `Dockerfile`, `Dockerfile.*`, `docker-compose*.y{a,}ml`, `compose*.y{a,}ml`.

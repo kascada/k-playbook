@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell wide">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <!-- Eine Sitzung beim OpenCode-Dienst. Die Seite hält nichts
+             dauerhaft: sie lädt den Verlauf und spielt danach die Ereignisse
+             des Dienstes ein. Welche Sitzung, steht im Pfad. -->
+        <div class="blocks">
+          <section class="card" id="chat-conversation-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow"><a class="chat-back" href="/chat">&larr; Alle Sitzungen</a></p>
+                <h2 id="chat-title">Sitzung</h2>
+              </div>
+              <span id="chat-run-pill" class="pill muted">Laden...</span>
+            </div>
+            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <div id="chat-permissions" class="chat-permissions" hidden></div>
+            <form id="chat-form" class="chat-form">
+              <textarea id="chat-input" class="chat-input" rows="3" disabled
+                        placeholder="Nachricht an OpenCode – Enter sendet, Umschalt+Enter beginnt eine neue Zeile."></textarea>
+              <div class="chat-actions">
+                <button type="submit" id="chat-send" class="primary" disabled>Senden</button>
+                <button type="button" id="chat-abort" class="secondary" hidden>Abbrechen</button>
+              </div>
+            </form>
+            <p id="chat-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/chat-common.js"></script>
+    <script src="/static/chat-session.js"></script>
+  </body>
+</html>

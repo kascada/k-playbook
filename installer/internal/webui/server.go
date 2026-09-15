@@ -57,6 +57,13 @@ type serverState struct {
 	// lastRequestAt ist der Zeitpunkt der letzten Anfrage, egal welcher. Der
 	// Leerlaufwächter misst daran.
 	lastRequestAt time.Time
+
+	// streams wird beim Beenden geschlossen und beendet damit die offenen
+	// Ereignisströme des Chats. Ein Strom endet nie von selbst; ohne den Kanal
+	// wartete Shutdown auf ihn bis zur Frist. Nil in Tests, die nur die Routen
+	// prüfen.
+	streams     chan struct{}
+	streamsOnce sync.Once
 }
 
 // Serve ist der Servermodus: der abgekoppelte Prozess hinter K_PLAYBOOK_SERVE=1.
@@ -109,8 +116,9 @@ func Serve() error {
 
 	// Der Leerlauf zählt ab dem Start: auch ein Server, den nie jemand
 	// besucht, soll nicht ewig stehen bleiben.
-	state := &serverState{shutdown: stop, version: version, build: build, registration: registration, lastRequestAt: time.Now()}
+	state := &serverState{shutdown: stop, version: version, build: build, registration: registration, lastRequestAt: time.Now(), streams: make(chan struct{})}
 	server := &http.Server{Handler: routes(state)}
+	server.RegisterOnShutdown(state.closeStreams)
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -226,6 +234,21 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
 	mux.HandleFunc("GET /api/todos", todosHandler)
 	mux.HandleFunc("GET /api/todos/done", doneTodosHandler)
+	// Der Chat leitet an den OpenCode-Dienst weiter; welche Endpunkte dort
+	// dahinter stehen, weiß allein chat.go. Die POSTs schützt sameOrigin wie
+	// alle übrigen.
+	mux.HandleFunc("GET /api/chat/status", chatStatusHandler)
+	mux.HandleFunc("GET /api/chat/sessions", chatSessionsHandler)
+	mux.HandleFunc("POST /api/chat/sessions", chatCreateSessionHandler)
+	mux.HandleFunc("GET /api/chat/sessions/{id}", chatSessionHandler)
+	mux.HandleFunc("GET /api/chat/sessions/{id}/messages", chatMessagesHandler)
+	mux.HandleFunc("POST /api/chat/sessions/{id}/prompt", chatPromptHandler)
+	mux.HandleFunc("POST /api/chat/sessions/{id}/abort", chatAbortHandler)
+	mux.HandleFunc("GET /api/chat/permissions", chatPermissionsHandler)
+	mux.HandleFunc("POST /api/chat/permissions/{id}/reply", chatPermissionReplyHandler)
+	mux.HandleFunc("GET /api/chat/events", state.chatEventsHandler)
+	// Rendert Antworttexte mit Goldmark; fragt OpenCode nicht.
+	mux.HandleFunc("POST /api/chat/markdown", chatMarkdownHandler)
 
 	staticFS, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -236,6 +259,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /workflows/tasks", tasksPageHandler)
 	mux.HandleFunc("GET /workflows/reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /workflows/todos", todosPageHandler)
+	mux.HandleFunc("GET /chat", chatPageHandler)
+	mux.HandleFunc("GET /chat/{id}", chatSessionPageHandler)
 	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
@@ -304,6 +329,10 @@ func (state *serverState) noteRequests(next http.Handler) http.Handler {
 const (
 	areaSetup     = "setup"
 	areaWorkflows = "workflows"
+	// areaChat ist der Bereich des Chats mit dem OpenCode-Dienst. Er steht
+	// unter Workflows: auch dort geht es um die tägliche Arbeit, aber im
+	// Gespräch statt über Dateien.
+	areaChat = "chat"
 	// areaKnowledge ist der Bereich der Wissensablage. Er steht über Docs:
 	// Docs ist das Nachschlagewerk der Installation, die Wissensablage das,
 	// was im Projekt an Wissen zusammenkommt — unter k-playbook-local/ in
@@ -362,6 +391,29 @@ var todosTemplate = pageTemplate("todos.html")
 
 func todosPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, todosTemplate, areaWorkflows, "/workflows/todos", "Todos")
+}
+
+// chatTemplate ist die Übersicht des Chats: die Sitzungen und der Zustand des
+// OpenCode-Dienstes, an den er weiterleitet.
+var chatTemplate = pageTemplate("chat.html")
+
+func chatPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, chatTemplate, areaChat, "/chat", "Chat")
+}
+
+// chatSessionTemplate ist die Seite einer einzelnen Sitzung: die Unterhaltung
+// steht auf eigener Seite statt unter der Liste. Eine Kennung, die nicht wie
+// eine von OpenCode aussieht, ist 404 — die Seite setzt sie in ihre Anfragen
+// ein.
+var chatSessionTemplate = pageTemplate("chat-session.html")
+
+func chatSessionPageHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !openCodeID.MatchString(id) || !project.Detect().Installed {
+		http.NotFound(w, r)
+		return
+	}
+	renderPage(w, chatSessionTemplate, areaChat, "/chat/"+id, "Chat")
 }
 
 // knowledgeTemplate ist die Seite der Wissensablage. Vorerst zeigt sie genau

@@ -286,19 +286,150 @@ func parseElixir(c *collector) {
 		pattern = mixLockEntry
 		section = "lock"
 	}
-	for index, line := range c.lines() {
-		match := pattern.FindStringSubmatch(line)
+	lines := c.lines()
+	for index, line := range lines {
+		match := pattern.FindStringSubmatchIndex(line)
 		if match == nil {
 			continue
 		}
+		name, version := line[match[2]:match[3]], line[match[4]:match[5]]
+		var scope string
 		if c.file.Base == "mix.lock" {
-			if _, direct := c.file.Direct[normalizeName(EcoElixir, match[1])]; !direct {
+			var direct bool
+			scope, direct = c.file.Direct[normalizeName(EcoElixir, name)]
+			if !direct {
 				continue
 			}
+		} else {
+			scope = mixDependencyScope(lines, index, match[0])
 		}
-		c.add(Entry{Ecosystem: EcoElixir, Name: match[1], KindOfThing: ThingPackage,
-			Version: match[2], SourceKey: section + "." + match[1], SourceLine: index + 1})
+		c.add(Entry{Ecosystem: EcoElixir, Name: name, KindOfThing: ThingPackage,
+			Version: version, Scope: scope, SourceKey: section + "." + name, SourceLine: index + 1})
 	}
+}
+
+// mixScopeRank ist die Rangfolge, nach der eine `only:`-Angabe mit mehreren
+// Umgebungen auf genau einen Scope fällt. Sie ist eine Elixir-Festlegung: die
+// übrigen Parser lösen Mehrfachzuordnungen über die Lesereihenfolge auf.
+var mixScopeRank = map[string]int{"main": 0, "dev": 1, "test": 2, "build": 3, "optional": 4}
+
+var mixOnly = regexp.MustCompile(`\bonly:\s*`)
+var mixAtom = regexp.MustCompile(`^:([A-Za-z0-9_]+)`)
+
+// mixDependencyScope bewertet den vollständigen Dep-Eintrag, der in Zeile
+// `index` an Position `start` mit `{` beginnt. Reicht er über mehrere Zeilen,
+// wird er bis zur schließenden Klammer zusammengefasst — ein `only:` in einer
+// Folgezeile darf nicht zu der Aussage `main` führen.
+//
+// Ohne `only:` ist der Scope `main`. Bleibt der Eintrag bis zum Dateiende offen
+// oder nennt `only:` keine lesbaren Atome (`only: @envs`, `only: Mix.env()`),
+// bleibt der Scope leer: geraten wird nichts.
+func mixDependencyScope(lines []string, index, start int) string {
+	tuple, closed := mixTuple(lines, index, start)
+	if !closed {
+		return ""
+	}
+	position := mixOnly.FindStringIndex(tuple)
+	if position == nil {
+		return "main"
+	}
+	envs, readable := mixOnlyAtoms(tuple[position[1]:])
+	if !readable {
+		return ""
+	}
+	best := ""
+	for _, env := range envs {
+		// Einzige Ausnahme von scopeFor: `:prod` ist in Mix die
+		// Produktionsumgebung, scopeFor legte den Namen auf `optional`.
+		scope := "main"
+		if env != "prod" {
+			scope = scopeFor(env)
+		}
+		if best == "" || mixScopeRank[scope] < mixScopeRank[best] {
+			best = scope
+		}
+	}
+	return best
+}
+
+// mixTuple liefert den Text des Dep-Tupels ab der öffnenden Klammer bis zu der
+// Klammer, die es schließt. Inhalte von Zeichenketten und Kommentaren werden
+// nicht übernommen: ein `only:` darin ist keine Angabe, und eine Klammer darin
+// schließt nichts.
+func mixTuple(lines []string, index, start int) (string, bool) {
+	var text strings.Builder
+	depth := 0
+	inString := false
+	for row := index; row < len(lines); row++ {
+		line := lines[row]
+		if row == index {
+			line = line[start:]
+		}
+	scan:
+		for position := 0; position < len(line); position++ {
+			character := line[position]
+			if inString {
+				if character == '\\' {
+					position++
+				} else if character == '"' {
+					inString = false
+					text.WriteByte(character)
+				}
+				continue
+			}
+			switch character {
+			case '"':
+				inString = true
+			case '#':
+				break scan
+			case '{', '[', '(':
+				depth++
+			case '}', ']', ')':
+				depth--
+			}
+			text.WriteByte(character)
+			if depth == 0 {
+				return text.String(), true
+			}
+		}
+		text.WriteByte('\n')
+	}
+	return "", false
+}
+
+// mixOnlyAtoms liest den Wert hinter `only:`: ein einzelnes Atom oder eine
+// Liste aus Atomen, jeweils als ganzer Wert bis zum nächsten Komma oder zur
+// schließenden Klammer des Tupels. Alles andere ist nicht lesbar.
+func mixOnlyAtoms(value string) ([]string, bool) {
+	var envs []string
+	var rest string
+	if strings.HasPrefix(value, "[") {
+		end := strings.Index(value, "]")
+		if end < 0 {
+			return nil, false
+		}
+		for _, element := range strings.Split(value[1:end], ",") {
+			element = strings.TrimSpace(element)
+			match := mixAtom.FindStringSubmatch(element)
+			if match == nil || len(match[0]) != len(element) {
+				return nil, false
+			}
+			envs = append(envs, match[1])
+		}
+		rest = value[end+1:]
+	} else {
+		match := mixAtom.FindStringSubmatch(value)
+		if match == nil {
+			return nil, false
+		}
+		envs = []string{match[1]}
+		rest = value[len(match[0]):]
+	}
+	rest = strings.TrimSpace(rest)
+	if !strings.HasPrefix(rest, ",") && !strings.HasPrefix(rest, "}") {
+		return nil, false
+	}
+	return envs, true
 }
 
 // parseToolVersions liest .tool-versions von asdf und mise: je Zeile ein

@@ -176,6 +176,11 @@ installer/
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
+│   ├── chat.go                  Chat: Weiterleitung an den OpenCode-Dienst samt
+│   │                            Ereignisstrom, Anmeldung aus OPENCODE_SERVER_*
+│   ├── chat_guard.go            im Container nur ein eigener Dienst; Hinweis zum
+│   │                            Installieren und Starten
+│   ├── chat_markdown.go         Antworttexte mit Goldmark als HTML rendern
 │   ├── mcp.go                   Registrierung messen und herstellen, Probe-Kern
 │   │                            (probeMCPCommand) und Werkzeug-Selbsttest
 │   ├── mcp_servers.go           Übersicht aller MCP-Server, Detail je Server, Messung
@@ -184,15 +189,17 @@ installer/
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   └── static/                  index.html, workflows.html, tasks.html, reviews.html,
-│                                todos.html, knowledge.html, docs.html,
+│                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
 │                                inventory.html, mcp.html, mcp-servers.html,
 │                                mcp-server.html, sidebar.html und
 │                                hero.html (Fragmente für linke Spalte und Kopf),
 │                                session.js, nav.js, disclosure.js, docview.js
 │                                (geteilter Markdown-Betrachter), app.js,
-│                                workflows.js, tasks.js, reviews.js, todos.js,
+│                                workflows.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
 │                                knowledge.js, docs.js, inventory.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
+│                                (Gestaltungswerte in :root, siehe „Gestaltung
+│                                der Oberfläche")
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 │   ├── review.go                Werkzeuge k_playbook_review_*
@@ -1570,6 +1577,57 @@ einzeln gebundene Listener müssten nachgezogen werden.
 jeder Browser hält sich daran, deshalb liegt `document.execCommand("copy")` als
 Rückfallebene darunter. Beide Wege melden ihr Ergebnis am Knopf zurück.
 
+## Gestaltung der Oberfläche
+
+`static/styles.css` ist das einzige Stylesheet der Oberfläche. Seine Gestaltungswerte
+stehen als Variablen in `:root`; der Rest verweist nur per `var(--…)` darauf. Wer die
+Oberfläche dichter, weniger rund oder in anderer Schrift haben will, ändert Werte in
+`:root` und keine verstreuten Zeilen.
+
+**Gliederung.** `:root` steht in dieser Reihenfolge: Farben, Flächen, Schrift, Abstände,
+Form, Schatten, Breiten.
+
+**Zwei Ebenen.** Die Skala trägt die Grundwerte: Grundfarben wie `--bg` und `--accent`,
+Schriftgrößen `--text-2xs` bis `--text-lg` samt `--text-title` und `--text-display`,
+Gewichte `--weight-*`, Abstände `--space-1` bis `--space-11` (2 px bis 24 px) und die
+`em`-Stufen `--space-em-*` für Fließtext und Inline-Code. Darüber liegen Rollen, die auf
+die Skala verweisen: Transparenzstufen wie `--glass` oder `--accent-wash`, in `:root`
+per `color-mix()` gebildet, Abstände wie `--space-card` und `--space-control`,
+Laufweiten wie `--tracking-eyebrow`. Eine neue Farbstufe bekommt einen Rollennamen; was
+sich sichtbar nicht von einer vorhandenen Stufe unterscheidet, nutzt diese. Auch ein
+einmal genutzter Wert läuft über eine Variable, denn der Wächter prüft jeden.
+
+**Erlaubte Ausnahmen.** Außerhalb von `:root` dürfen stehen:
+
+- `0`, `auto` und Prozentwerte — sie hängen an keinem Gestaltungsmaß;
+- Breakpoints in `@media`-Bedingungen — `var()` gilt dort nicht, ein Kommentar über jeder
+  Bedingung sagt das;
+- CSS-weite Schlüsselwörter wie `inherit`, dazu `none` bei `box-shadow`;
+- Größen von Kreisen und Icons, deren Seitenverhältnis an genau einem Wert hängt, etwa
+  der Punkt im Blockmenü oder der Ladering. Kommt eine solche Größe mehrfach vor, wird
+  sie eine Variable.
+
+`em`-Werte sind keine Ausnahme: Abstände und Schriftgrößen in `em` laufen über eigene
+`em`-Stufen. Eine Variable mit `em` wird erst am Element aufgelöst, das sie nutzt.
+
+**Bewusste Lücke.** Breiten und Rahmenstärken prüft der Wächter nicht. Seitenbreiten,
+linke Spalte und Rand stehen zwar als `--width-*` und `--gutter*` in `:root`, doch
+Breiten gehören zum Layout und hängen oft an einem einzelnen Element. Rahmenstärken
+(`1px`, `2px`, `4px` in `border…` und `outline`) bleiben Zahlen: Ihre Farbe läuft schon
+über Variablen, und der Wächter müsste Kurzschreibweisen wie `border: 2px solid …`
+zerlegen.
+
+**Der Wächter.** `internal/webui/styles_test.go` liest das eingebettete Stylesheet,
+blendet Kommentare und `:root` aus und meldet jeden festen Wert mit Zeile, Eigenschaft
+und Wert: Farben (`#…`, `rgb`, `rgba`, `hsl`, `color-mix(`, benannte wie `white`) in
+jeder Eigenschaft; `font`, `font-size`, `font-family`, `font-weight`, `line-height`,
+`letter-spacing`, `border-radius` und `box-shadow`, die nicht nur aus `var(--…)`
+bestehen; `padding`, `margin` und `gap` mit px-, rem- oder em-Werten; feste Längen in
+Variablen, die außerhalb von `:root` gesetzt werden. `color-mix(` zählt dort auch dann,
+wenn es nur Variablen mischt — die Mischung ist die Rolle und gehört nach `:root`. Ein
+zweiter Test prüft den Wächter an einem kleinen Beispiel, damit er nicht unbemerkt leer
+durchläuft. Ausnahmen für einzelne Blöcke gibt es nicht.
+
 ## Aufgelöster Kontext in der Oberfläche
 
 Der unterste Block der Startseite zeigt, was `BuildContext()` liefert — dasselbe, was
@@ -1835,6 +1893,101 @@ die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert deshalb
 `inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter ist
 der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift.
 
+## Chat in der Oberfläche
+
+Der Chat ist ein Client des OpenCode-Dienstes, kein eigener Chat mit einem Modell.
+Sitzungen, Agenten, Subagenten, Tools, MCP, Skills und Commands laufen dort; die Oberfläche
+lädt den Verlauf einer Sitzung, spielt die Ereignisse des Dienstes ein und reicht Eingaben
+weiter. Dauerhaft hält sie nichts. Dieselben Sitzungen sieht `opencode attach` im Terminal.
+
+**Zwei Seiten.** `/chat` listet die obersten Sitzungen des Projekts — eine kleine Zeile je
+Sitzung, zuletzt benutzte zuerst, „Neue Sitzung" vorn in der Kopfzeile — und darunter den
+Zustand des Dienstes. Eine Sitzung öffnet sich auf ihrer eigenen Seite `/chat/{id}`: die
+Kennung steht im Pfad, die Seite lässt sich wieder öffnen und in einem eigenen Tab halten.
+Eine Kennung, die nicht wie eine von OpenCode aussieht, ist 404. Was beide Seiten brauchen
+— Anfragen, Ereignisstrom, Formatierer —, steht in `chat-common.js`.
+
+**Weiterleitung statt Direktzugriff.** Der Browser spricht nur `/api/chat/*`. `chat.go`
+übersetzt in die OpenCode-API und setzt dabei zwei Dinge, die der Browser nicht bestimmen
+soll: das Projektverzeichnis (`?directory=` aus `project.Detect()`) und die Anmeldung.
+Adresse und Anmeldung kommen aus denselben Variablen, die `opencode attach` liest:
+`OPENCODE_SERVER_URL` (ohne sie `http://127.0.0.1:4096`), `OPENCODE_SERVER_USERNAME`
+(sonst `opencode`) und `OPENCODE_SERVER_PASSWORD`. Ist ein Passwort gesetzt, geht es als
+Basic Auth mit und erreicht den Browser nie; ein 401 des Dienstes kommt als 502 mit
+Erklärung an, damit der Browser nicht selbst nach Zugangsdaten fragt. Der Server erbt die
+Umgebung des Aufrufs, der ihn startet. Kennungen aus dem Pfad müssen wie OpenCode-Kennungen
+aussehen (`ses_…`, `per_…`), bevor sie in die Weiterleitung eingesetzt werden.
+
+**Kein Dienst: was zu tun ist.** Ist kein Dienst erreichbar oder im Container keiner
+benutzbar, trägt `GET /api/chat/status` einen `hint`. Liegt `opencode` im `PATH` oder unter
+`~/.opencode/bin`, nennt er den Befehl zum Starten, `opencode serve --port <Port der
+Adresse>`; sonst zusätzlich den offiziellen Installationsweg
+`curl -fsSL https://opencode.ai/install | bash`. Ausgeführt wird nichts — installiert wird
+bewusst im Terminal, wie bei den Security-Tools.
+
+**Im Container nur ein eigener Dienst.** Erkennt `containerMarker()` einen Container, benutzt
+der Chat nur einen OpenCode-Dienst im Container selbst: ein Dienst des Hosts arbeitet mit
+dessen Dateisystem, Zugangsdaten und Freigaben, und der Container wäre als Grenze wertlos.
+Eine Loopback-Adresse beweist das nicht, mit `--network host` ist `127.0.0.1` der Host.
+`chat_guard.go` verlangt deshalb eine Loopback-Adresse **und** einen Prozess dieses
+Containers als Besitzer des lauschenden Sockets. Die Inode kommt aus `/proc/net/tcp` und
+`tcp6`, die den ganzen Netzwerk-Namensraum zeigen, der Besitzer aus den fd-Verweisen unter
+`/proc/<pid>/fd`, die nur Prozesse des eigenen PID-Namensraums zeigen. Fehlt der Besitzer
+oder ist `/proc` nicht lesbar, antworten alle Weiterleitungen und der Ereignisstrom mit 403,
+und der Status meldet `blocked` samt Hinweis. Außerhalb eines Containers gilt keine
+Einschränkung.
+
+**Die alte API, bewusst.** Genutzt wird die unpräfixierte Generation (`/session`, `/event`,
+`/permission`). Die neue unter `/api/` ist in OpenCode 1.18 ein eigener Sitzungsmotor: ihre
+Ereignisse und Daten gelten laut OpenCode als experimentell und verwerfbar, ihr fehlen unter
+anderem konfigurierte Instructions und ein Command-Endpunkt, und sie sieht die Sitzungen der
+alten nicht. Die OpenCode-Web-App sendet selbst noch über die alte. Umzusteigen ist, wenn
+der Schema-Changelog von OpenCode (`specs/v2/schema-changelog.md`) die `session.next.*`-Schemas
+als ausgeliefert führt und die OpenCode-Web-App Prompts über `/api/session/:id/prompt`
+sendet. Betroffen ist dann nur `chat.go`.
+
+**Einspielen der Ereignisse.** `GET /api/chat/events` reicht `GET /event?directory=…` als
+`text/event-stream` durch, jeden gelesenen Block mit sofortigem Flush — gepuffert stockte
+die Live-Ausgabe. `chat.js` spielt ein wie die Web-App von OpenCode:
+
+| Ereignis | Wirkung |
+|---|---|
+| `message.updated` | Nachricht einfügen oder ihren Kopf ersetzen |
+| `message.part.updated` | Teil einfügen oder ganz ersetzen, auch den aus Deltas angesammelten Text |
+| `message.part.delta` | Text an das genannte Feld eines bekannten Teils hängen; ohne Teil verwerfen |
+| `message.removed`, `message.part.removed` | entfernen |
+| `session.status`, `session.idle` | „Arbeitet", „Wiederholt" oder „Bereit" |
+| `session.created`, `session.updated`, `session.deleted` | Sitzungsliste |
+| `permission.asked`, `permission.replied` | Freigaben mit „Einmal", „Immer", „Ablehnen" |
+| `server.connected` | nach einem Wiederverbinden Sitzungen, Freigaben und Verlauf neu laden |
+
+`step-start`, `step-finish`, `patch` und `snapshot` werden nicht angezeigt. Gemessen an einem
+Lauf am 2026-09-15: ein Textteil kommt zuerst leer, dann als Deltas, zuletzt vollständig;
+`session.status busy` kommt mehrfach. Nachrichten- und Teil-IDs von OpenCode sind aufsteigend
+sortierbar, die Reihenfolge der Anzeige ergibt sich daraus.
+
+**Markdown und Reasoning.** Antworten von OpenCode sind Markdown. Solange ein Textteil
+entsteht, zeigt die Seite ihn als schlichten Text — mitten im Satz ist Markdown oft
+unvollständig. Ist er fertig, erkennbar an `time.end` am Teil oder `time.completed` an der
+Nachricht, holt sie das HTML über `POST /api/chat/markdown`, für mehrere Texte in einem
+Aufruf, und zeigt es mit den Stilen von `.doc-viewer`. Gerendert wird mit demselben Goldmark
+wie die Doku; ohne `WithUnsafe` lässt es rohes HTML weg und entschärft Verweise wie
+`javascript:`, deshalb braucht die Seite keinen eigenen Parser. Eigene Nachrichten bleiben
+schlichter Text. Das Reasoning — die Denkschritte des Modells, Teile vom Typ `reasoning` —
+steht klein und gedämpft ohne Rahmen vor der Antwort.
+
+**Ströme und Beenden.** Ein Ereignisstrom endet nie von selbst. `Serve()` registriert deshalb
+`closeStreams` über `RegisterOnShutdown`; der Handler bricht seine Anfrage an OpenCode ab,
+sobald `state.streams` geschlossen ist. Ohne das wartete `Shutdown` bei offener Chat-Seite
+bis `shutdownTimeout` und endete mit einem Fehler. Den Leerlauf beeinflusst ein offener Strom
+nicht: gezählt wird der Beginn einer Anfrage, und wach hält den Server wie auf jeder Seite
+das Lebenszeichen.
+
+**Noch nicht gebaut:** Rückfragen (`question.asked`), Commands über
+`POST /session/{id}/command` — die Antwort kommt erst nach dem ganzen Lauf und braucht eine
+längere Frist als `openCodeRequestTimeout` —, Auswahl von Agent und Modell, Kind-Sitzungen
+der Subagenten und die sofortige Anzeige der eigenen Nachricht, die bisher erst mit dem
+Ereignis von OpenCode erscheint.
 ## Web-API
 
 | Methode | Pfad | Zweck |
@@ -1876,9 +2029,20 @@ der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
 | `GET` | `/api/todos` | offene Todos aus `data/todos.json` auflisten, read-only; migriert beim ersten Zugriff und meldet eine zurückgebliebene Markdown-Ablage in `hint` |
 | `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
+| `GET` | `/api/chat/status` | ob der OpenCode-Dienst erreichbar, bereit und hier benutzbar ist, mit Adresse, Version, Projektverzeichnis, ob ein Passwort mitgeht und ob ein Container erkannt wurde; `blocked` und `hint`, wenn keiner benutzbar ist; read-only |
+| `GET` | `/api/chat/sessions` | oberste Sitzungen des Projekts beim Dienst, über `GET /session?roots=true&limit=50` |
+| `POST` | `/api/chat/sessions` | Sitzung anlegen, optional mit `title` |
+| `GET` | `/api/chat/sessions/{id}` | eine Sitzung, für den Titel ihrer Seite |
+| `GET` | `/api/chat/sessions/{id}/messages` | Verlauf einer Sitzung, `{info, parts}` je Nachricht |
+| `POST` | `/api/chat/sessions/{id}/prompt` | `{text}` als Textteil über `prompt_async` senden; antwortet `{"ok": true}`, den Lauf meldet der Ereignisstrom |
+| `POST` | `/api/chat/sessions/{id}/abort` | laufenden Lauf abbrechen |
+| `GET` | `/api/chat/permissions` | offene Freigaben |
+| `POST` | `/api/chat/permissions/{id}/reply` | Freigabe beantworten mit `once`, `always` oder `reject` |
+| `GET` | `/api/chat/events` | Ereignisstrom des Dienstes für das Projekt als `text/event-stream`; endet mit dem Server |
+| `POST` | `/api/chat/markdown` | `{texts}` mit Goldmark als HTML rendern, ohne rohes HTML und ohne gefährliche Verweise; höchstens 200 Texte; fragt OpenCode nicht |
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/knowledge`,
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/knowledge`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` aus denselben
 Fragmenten für den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige

@@ -61,3 +61,8 @@ codeql-cli/
 codeql-*.zip
 databases/
 results/
+
+# Ablage der Playwright-Werkzeuge. Sie speichern Snapshots und Screenshots nur
+# unter dem Arbeitsverzeichnis, nicht im Scratchpad; ein Release mit git add -A
+# nähme das Verzeichnis sonst mit.
+.playwright-mcp/

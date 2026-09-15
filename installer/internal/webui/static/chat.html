@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell wide">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <!-- Der Chat spricht kein Modell selbst an: er leitet an den
+             OpenCode-Dienst weiter, bei dem Sitzungen, Agenten und Tools
+             liegen. Diese Seite zeigt die Sitzungen und den Dienst; eine
+             Sitzung öffnet sich auf ihrer eigenen Seite /chat/<id>. -->
+        <div class="blocks">
+          <section class="card" id="chat-sessions-card">
+            <div class="section-head">
+              <!-- „Neue Sitzung" steht links vorn, damit der häufigste Schritt
+                   nicht am rechten Rand gesucht werden muss. -->
+              <div class="chat-toolbar">
+                <button type="button" id="chat-new-session" class="primary" disabled>Neue Sitzung</button>
+                <h2>Sitzungen</h2>
+              </div>
+              <span id="chat-sessions-pill" class="pill muted">Laden...</span>
+            </div>
+            <div id="chat-session-list" class="chat-session-list empty">Laden...</div>
+            <p id="chat-sessions-message" class="message"></p>
+            <p class="hint">
+              Zuletzt benutzte zuerst; ein Klick öffnet die Sitzung auf eigener Seite. Dieselben
+              Sitzungen sieht auch <code>opencode attach</code> im Terminal.
+            </p>
+          </section>
+
+          <section class="card" id="chat-status-card">
+            <div class="section-head">
+              <div>
+                <h2>OpenCode-Dienst</h2>
+              </div>
+              <span id="chat-connection-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">
+              Die Oberfläche leitet an den Dienst unter <code>OPENCODE_SERVER_URL</code> weiter, ohne
+              diese Variable an <code>http://127.0.0.1:4096</code>. Verlangt der Dienst eine Anmeldung,
+              schickt sie <code>OPENCODE_SERVER_PASSWORD</code> mit — dieselben Variablen, die
+              <code>opencode attach</code> liest. Das Passwort bleibt im Server der Oberfläche und
+              erreicht den Browser nicht. Im Container wird nur ein Dienst benutzt, der im Container
+              selbst läuft.
+            </p>
+            <dl id="chat-status-facts" class="facts"></dl>
+            <p id="chat-status-message" class="message"></p>
+            <div id="chat-status-hint" class="chat-hint" hidden></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/chat-common.js"></script>
+    <script src="/static/chat.js"></script>
+  </body>
+</html>

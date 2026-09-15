@@ -85,6 +85,12 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
 			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/todos" aria-current="page">`,
 		},
+		// /chat ist ein eigener Bereich unter Workflows, mit kartenbasiertem
+		// Blockmenü.
+		{path: "/chat", markiert: `<a class="area-nav-item active" href="/chat" aria-current="page">`},
+		// Die Seite einer Sitzung trägt den Bereich Chat, ist aber nicht
+		// dessen Übersicht.
+		{path: "/chat/ses_abc123", markiert: `<a class="area-nav-item active" href="/chat" aria-current="true">`},
 		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
 		// des Projekts, nicht das Nachschlagewerk der Installation.
 		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},
@@ -201,7 +207,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
+	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -236,7 +242,7 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	if count := strings.Count(body, `class="area-nav-item`); count != 1 {
 		t.Errorf("Einträge im Umschalter = %d, erwartet genau 1", count)
 	}
-	for _, ziel := range []string{"/workflows", "/knowledge", "/docs", "/inventory"} {
+	for _, ziel := range []string{"/workflows", "/chat", "/knowledge", "/docs", "/inventory"} {
 		if strings.Contains(body, `href="`+ziel+`"`) {
 			t.Errorf("der Umschalter führt nach %s, obwohl nichts eingerichtet ist", ziel)
 		}

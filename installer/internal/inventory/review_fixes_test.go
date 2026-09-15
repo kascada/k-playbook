@@ -136,6 +136,80 @@ func TestLockfilesFuehrenNurDirekteManifestAbhaengigkeiten(t *testing.T) {
 	}
 }
 
+// mix.exs leitet den Scope aus `only:` der einzelnen Abhängigkeit ab, mix.lock
+// übernimmt ihn von der direkten Manifest-Abhängigkeit. `only: [:test, :dev]`
+// belegt die Rangfolge: nach Schreibreihenfolge ergäbe es `test`.
+func TestElixirScopeAusOnlyUndLockfileUebernahme(t *testing.T) {
+	result := collectFiles(t, map[string]string{
+		"elixir/mix.exs": `defmodule Demo.MixProject do
+  defp deps do
+    [
+      {:phoenix, "~> 1.7"},
+      {:credo, "~> 1.7", only: :dev},
+      {:mox, "~> 1.0", only: [:test, :dev]},
+      {:telemetry, "~> 1.2", only: :prod},
+      {:ex_staging, "~> 0.1", only: :staging},
+      {:dialyxir, "~> 1.4",
+       only: :test,
+       runtime: false},
+      {:variable, "~> 2.0", only: @envs}
+    ]
+  end
+end
+`,
+		"elixir/mix.lock": `%{
+  "phoenix": {:hex, :phoenix, "1.7.14"},
+  "credo": {:hex, :credo, "1.7.7"},
+  "mox": {:hex, :mox, "1.1.0"},
+  "telemetry": {:hex, :telemetry, "1.2.1"},
+  "ex_staging": {:hex, :ex_staging, "0.1.0"},
+  "dialyxir": {:hex, :dialyxir, "1.4.3"},
+  "variable": {:hex, :variable, "2.0.0"},
+  "plug": {:hex, :plug, "1.16.1"},
+}
+`,
+	})
+	type expectation struct {
+		scope, version string
+		line           int
+	}
+	manifest := map[string]expectation{
+		"phoenix":    {"main", "~> 1.7", 4},
+		"credo":      {"dev", "~> 1.7", 5},
+		"mox":        {"dev", "~> 1.0", 6},
+		"telemetry":  {"main", "~> 1.2", 7},
+		"ex_staging": {"optional", "~> 0.1", 8},
+		"dialyxir":   {"test", "~> 1.4", 9},
+		// `only:` ohne lesbares Atom: geraten wird nichts, der Scope bleibt leer.
+		"variable": {"", "~> 2.0", 12},
+	}
+	lock := map[string]string{"phoenix": "1.7.14", "credo": "1.7.7", "mox": "1.1.0", "telemetry": "1.2.1",
+		"ex_staging": "0.1.0", "dialyxir": "1.4.3", "variable": "2.0.0"}
+
+	manifestEntries := entriesFrom(result, "elixir/mix.exs")
+	if len(manifestEntries) != len(manifest) {
+		t.Errorf("mix.exs-Einträge = %+v", manifestEntries)
+	}
+	for _, entry := range manifestEntries {
+		wanted, known := manifest[entry.Name]
+		if !known {
+			t.Errorf("unerwarteter mix.exs-Eintrag %+v", entry)
+			continue
+		}
+		if entry.Scope != wanted.scope || entry.Version != wanted.version || entry.SourceLine != wanted.line {
+			t.Errorf("mix.exs %s = Scope %q, Version %q, Zeile %d; erwartet %+v", entry.Name, entry.Scope, entry.Version, entry.SourceLine, wanted)
+		}
+	}
+
+	lockEntries := entriesFrom(result, "elixir/mix.lock")
+	requireNames(t, lockEntries, "phoenix", "credo", "mox", "telemetry", "ex_staging", "dialyxir", "variable")
+	for _, entry := range lockEntries {
+		if entry.Scope != manifest[entry.Name].scope || entry.Version != lock[entry.Name] {
+			t.Errorf("mix.lock %s = Scope %q, Version %q; erwartet Scope %q, Version %q", entry.Name, entry.Scope, entry.Version, manifest[entry.Name].scope, lock[entry.Name])
+		}
+	}
+}
+
 func affectedLockfiles() []string {
 	var locks []string
 	for base := range lockManifests {
@@ -242,6 +316,33 @@ func TestDockerfileFlagsStagesUndScopedNPM(t *testing.T) {
 	for index, name := range []string{"@scope/install", "@scope/i", "@scope/yarn"} {
 		if entries[index+2].Name != name {
 			t.Errorf("Scoped NPM-Pin = %+v", entries[index+2])
+		}
+	}
+}
+
+// Eine Stage, die selbst aus einer lokalen Stage entsteht, bleibt über ihren
+// Alias als lokal bekannt. Benannt wird jeweils die Referenz; ein nur
+// eingeführter, nie referenzierter Alias erzeugt keinen Eintrag.
+func TestDockerfileLokaleStageAliasKette(t *testing.T) {
+	entries, notes := parseFile(fileContext{Display: "Dockerfile", Base: "Dockerfile", Kind: KindDockerfile, Env: EnvDeployment, EnvOrigin: ContextDefault, Data: []byte("FROM golang:1.22 AS build\nFROM build AS final\nFROM final AS production\nFROM production AS release\n")})
+	if len(notes) != 0 {
+		t.Fatalf("Hinweise = %+v", notes)
+	}
+	if len(entries) != 4 {
+		t.Fatalf("Einträge = %+v", entries)
+	}
+	if entries[0].Name != "golang" || entries[0].Version != "1.22" || entries[0].Pin == PinLocal {
+		t.Errorf("externes Image = %+v", entries[0])
+	}
+	for index, name := range []string{"build", "final", "production"} {
+		entry := entries[index+1]
+		if entry.Name != name || entry.Pin != PinLocal || entry.SourceLine != index+2 {
+			t.Errorf("lokale Stage %q in Zeile %d = %+v", name, index+2, entry)
+		}
+	}
+	for _, entry := range entries {
+		if entry.Name == "release" {
+			t.Errorf("nie referenzierter Alias darf keinen Eintrag erzeugen: %+v", entry)
 		}
 	}
 }

@@ -59,17 +59,24 @@ func addDockerfileFrom(c *collector, fields []string, args map[string]string, st
 		return
 	}
 	reference := fields[index]
+	// Ob die Referenz eine lokale Stage ist, wird vor der Alias-Registrierung
+	// festgestellt: `FROM x AS x` bliebe sonst kein externes Image.
+	local := stages[strings.ToLower(reference)]
+
+	// Der Alias wird für externe Images und lokale Stages gleichermaßen
+	// registriert. Stünde er hinter dem Rücksprung für lokale Stages, gälte in
+	// `FROM build AS final` / `FROM final …` die Stage `final` als externes Image.
+	if index+2 < len(fields) && strings.EqualFold(fields[index+1], "AS") {
+		stages[strings.ToLower(fields[index+2])] = true
+	}
 
 	// `FROM <stage>` auf eine Stage derselben Datei ist local und wird als
-	// solche geführt, nicht weggelassen.
-	if stages[strings.ToLower(reference)] {
+	// solche geführt, nicht weggelassen. Benannt wird die Referenz, nicht der Alias.
+	if local {
 		c.add(Entry{Ecosystem: EcoContainer, Name: reference, KindOfThing: ThingImage, Pin: PinLocal,
 			SourceKey: "FROM", SourceLine: lineNumber,
 			Note: "Stage derselben Datei"})
 		return
-	}
-	if index+2 < len(fields) && strings.EqualFold(fields[index+1], "AS") {
-		stages[strings.ToLower(fields[index+2])] = true
 	}
 
 	resolved, note := resolveArgs(reference, args)
