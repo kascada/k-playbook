@@ -601,7 +601,9 @@ points at; `list` carries all of them with their `state`, and `read` returns any
 `read` only returns what the index can see: its path is checked like a write path -- relative,
 inside the zone, no hidden segment, a Markdown file -- and a path through a symbolically
 linked directory, which the index does not descend into, is refused as `invalid_input`; a
-linked file is indexed and readable. There is no filter on `state`; that belongs to the reading
+linked file is indexed and readable. Like every access, `read` first puts an orphaned
+`.<dir>-alt-*` of an interrupted `publish` back, and its result reports that in `hint` (the
+subcommand on stderr). There is no filter on `state`; that belongs to the reading
 side. The `title` that `list`
 reports is the frontmatter `title` when the document has one, otherwise its first heading,
 otherwise the file name -- what a caller had to give `write` comes back on reading, and a
@@ -624,15 +626,17 @@ failed. `write` does not overwrite a document whose file carries `state: superse
 is refused before anything is written, and the file, the index and a named queue entry stay as
 they are. A later run of the same producer would otherwise reset the state silently and lose
 `successor`; whoever wants to change the topic writes the successor or supersedes it.
+A `write` path through a symbolically linked directory is refused as `invalid_input` before
+anything is read, created or written: the file would lie where the index does not look.
+`publish` is not affected; its swap replaces a linked directory with a real one.
 The generators `docs-code`, `docs-tools` and `inventory` cannot `write`: they
 `publish` their complete set of `documents`, and the tool builds the new directory beside the
 old one, writes the index that describes it and only then swaps it, so a run that dies halfway
 leaves the previous state untouched; the result says how many were `written` and `removed`.
-The paths of `documents` are relative to the generator's directory: a path that already starts
-with it (`code/overview.md` for `docs-code`) is refused as `invalid_input`, on the command line
+The paths of `documents` are relative to the generator's directory: a path that already starts with it, in any case (`code/overview.md` or `Code/overview.md` for
+`docs-code`), is refused as `invalid_input`, on the command line
 as well, instead of landing in `code/code/` -- a generator directory therefore holds no
-subdirectory of its own name. If a swap is interrupted between its two renames, the next access
-puts the set-aside directory `.<dir>-alt-*` back under its name before drift detection runs,
+subdirectory of its own name. If a swap is interrupted between its two renames, the next access -- `read` included -- puts the set-aside directory `.<dir>-alt-*` back under its name before drift detection runs,
 provided the target is missing and exactly one candidate lies there; it never replaces an
 existing target. [knowledge-layout.md](knowledge-layout.md#the-write-tools) spells out every
 failure case.
@@ -641,10 +645,12 @@ anything is created: `publish` never empties a directory, on either path.
 On the command line, `publish --from <dir>` reads every Markdown file below `<dir>` with the
 same fields in its frontmatter, checks them and recomposes the header -- nothing is copied.
 `supersede` sets `state: superseded`, `successor` and `superseded_reason`, refreshes
-`updated` and leaves the body; the successor must already exist in the store and must be able
-to be a search hit, that is `condensed` or `reviewed`. Refused as `invalid_input`: a document
-or a successor under `code/`, `libs/` or `versions/`, the root `README.md` on either side, a
-document that is already superseded, and a successor in any other state. The result names both
+`updated` and leaves the body; the successor must already exist in the store and must be able to be a search hit: it is
+refused exactly when search hides it by its state (`raw`, `superseded`), so a successor without a
+header or without `state` is allowed. Refused as `invalid_input`: a document or a successor
+under `code/`, `libs/` or `versions/` and the root `README.md` on either side -- all recognised
+without regard to case (`Code/x.md`, `readme.md`) --, a document that is already superseded, a
+successor that search hides, and a document or successor through a linked directory. The result names both
 paths cleaned: `./findings/y.md` comes back as `findings/y.md`. A supersession is final; the
 rules and the way to correct a wrong successor are in
 [knowledge-layout.md](knowledge-layout.md#superseding).
@@ -664,11 +670,11 @@ caller can decide between correcting and giving up. `invalid_input` is reserved 
 errors, which the core (`project.InputError`) distinguishes and the wrappers only relay: an
 unknown producer, a path out of the zone or outside the producer's directory, a missing or
 malformed field, a body with a header, a refused `state`, an empty `documents` set, a
-non-text format at `inbox_read`, an occupied inbox name or a file on its path, a `publish`
-path that starts with the generator's directory, a `supersede` target or successor in a
-generator directory or the root `README.md`, an already superseded target, a successor that is
-not `condensed` or `reviewed`, a `write` onto a superseded document, a `read` path with a hidden
-segment or through a linked directory -- and "not there": a missing path
+non-text format at `inbox_read`, an occupied inbox name or a file on its path, a `publish` path that starts with the generator's directory (in any case), a `supersede` target or
+successor in a generator directory or the root `README.md` (in any case), an already superseded
+target, a successor that search hides by its state, a `write` onto a superseded document, a
+`read` path with a hidden segment, a `read`, `write` or `supersede` path through a linked
+directory -- and "not there": a missing path
 at `read` or `supersede`, a missing successor at `supersede`, an unknown queue `id` at
 `queue_drop` or `write`, a missing inbox path at `inbox_read`. The caller named something
 that does not exist and can correct it; no separate code. Everything else is the
@@ -682,8 +688,7 @@ the code for a `projectDir` that leads to no k-playbook project.
 behind the tools' back and re-read them. The same report can mean an interrupted or a
 concurrently running `publish`: its index is written before its swap, so for that moment, or
 after a crash in it, the index describes a set the disk does not hold, and the access returns
-to what is on disk -- although nobody wrote past the gate. A `hint` appears when an access had
-to skip something without failing over it: an unwritable `cache/`, an unreadable file, a
+to what is on disk -- although nobody wrote past the gate. A `hint` appears -- at `read` as well -- when an access had to skip something without failing over it: an unwritable `cache/`, an unreadable file, a
 set-aside directory put back after an interrupted swap. `status` also names hidden leftovers of
 a swap (`.<dir>-neu-*`, `.<dir>-alt-*`), which are never deleted automatically, and Markdown
 files at the old location `k-playbook-local/docs/learned/`, which the store no longer reads. Unreadable is

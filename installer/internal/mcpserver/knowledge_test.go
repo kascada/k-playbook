@@ -932,4 +932,51 @@ func TestKnowledgeInboxQuellpfadUndMarkdownUeberDieHuelle(t *testing.T) {
 	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK || envelope.Content == nil || *envelope.Content != "# Z\n" {
 		t.Errorf("inbox_read .markdown: %#v", envelope)
 	}
+
+	// inbox_list nennt .markdown mit dem Format markdown (Task 064, Etappe 6).
+	result, _, err = knowledgeInboxListTool(context.Background(), nil, knowledgeInboxListInput{knowledgeBaseInput: base, Source: "chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := decodeKnowledgeEnvelope(t, result)
+	if !envelope.OK || envelope.Inbox == nil || len(*envelope.Inbox) != 1 {
+		t.Fatalf("inbox_list: %#v", envelope)
+	}
+	if entry := (*envelope.Inbox)[0]; entry.Path != "chat/zztest.markdown" || entry.Format != "markdown" {
+		t.Errorf("inbox_list .markdown: %+v", entry)
+	}
+}
+
+// read stellt ein verwaistes .<dir>-alt-* zurück und meldet das im hint (Task
+// 064, Entscheidung 4) — ohne das Feld käme die Meldung über MCP nie an.
+func TestKnowledgeReadMeldetRueckstellungImHint(t *testing.T) {
+	root := newKnowledgeProject(t)
+	base := knowledgeBaseInput{ProjectDir: root}
+	result, _, err := knowledgePublishTool(context.Background(), nil, knowledgePublishInput{knowledgeBaseInput: base, Producer: "docs-code",
+		Documents: []knowledgeDocumentInput{{Path: "links.md", Title: "C", Subject: "S", Origin: "O", State: "condensed", Body: "# C\n\nAltstand.\n"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK {
+		t.Fatalf("publish: %#v", envelope)
+	}
+	dir := project.KnowledgeDir(root)
+	if err := os.Rename(filepath.Join(dir, "code"), filepath.Join(dir, ".code-alt-222222")); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _, err = knowledgeReadTool(context.Background(), nil, knowledgeReadInput{knowledgeBaseInput: base, Path: "code/links.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope := decodeKnowledgeEnvelope(t, result)
+	if !envelope.OK || envelope.Content == nil || !strings.Contains(*envelope.Content, "Altstand.") {
+		t.Fatalf("read nach abgebrochenem publish: %#v", envelope)
+	}
+	if !strings.Contains(envelope.Hint, "zurückgestellt") || !strings.Contains(envelope.Hint, ".code-alt-222222") {
+		t.Errorf("hint ohne Rückstellung: %q", envelope.Hint)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "code", "links.md")); err != nil {
+		t.Errorf("code/ steht nicht wieder: %v", err)
+	}
 }

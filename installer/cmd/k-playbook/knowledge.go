@@ -342,6 +342,7 @@ func runKnowledgeRead(args []string) error {
 	if err != nil {
 		return err
 	}
+	reportKnowledgeNotes(knowledge)
 
 	if parsed.json {
 		return printKnowledgeJSON(knowledgeReadOutput{Path: filepath.ToSlash(parsed.positional[0]), Content: content})

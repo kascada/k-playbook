@@ -46,7 +46,7 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | Migration of `docs/` into `knowledge/` | not built; `knowledge/` is empty until then |
 | Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
 | Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
-| Test of the write side against the built tools | run on 2026-09-13; the findings it reproduced are fixed by task 063, the repeated run in the project is still open; see "How we proceed" |
+| Test of the write side against the built tools | run on 2026-09-13; the findings it reproduced are fixed by task 063 and re-measured in the project on 2026-09-14. The edges found in the review of task 063 — linked directories at `write` and `supersede`, the successor rule, case in generator directories and the root `README.md`, the restore at `read`, `CreateLocal` with an unwritable index — are fixed by task 064 and re-measured in the project on 2026-09-15 over MCP and the command line |
 | Document view for `knowledge/` in the interface | not built; until it exists the anchor check of the write test cannot be satisfied, see "Open points" |
 | Ranking correction | built, task 056: the root `README.md` is out of the search index |
 | Vectors, local model | deliberately not built, tier two |
@@ -337,7 +337,7 @@ run marks them is undecided.
 [`knowledge-storage.md`](knowledge-storage.md). A hit's anchor therefore has no place to open
 in, and the anchor check of the write test stays unsatisfiable until such a view exists.
 
-**A successor can still drop out of search later.** `supersede` requires a successor in state
-`condensed` or `reviewed`, but a later `write` onto the successor may set `state: raw`. The
+**A successor can still drop out of search later.** `supersede` refuses a successor that search hides by its state, but a later `write` onto the
+successor may set `state: raw`. The
 topic then leaves search again, without any refusal. Whether `write` should guard the state of
 a document that is another document's successor is undecided.

@@ -376,6 +376,15 @@ func createKnowledgeReadme(projectDir string, readme string, entry LocalEntry) e
 		Body:    readmeTemplate(entry),
 	}, "")
 	if err != nil {
+		// Write schreibt erst die Datei, dann den Index. Steht die README
+		// danach auf der Platte, ist nur der Index gescheitert: der nächste
+		// Zugriff nimmt sie über die Drift-Erkennung auf, und CreateLocal legt
+		// die übrigen Einträge noch an (Task 064, Entscheidung 5). Einen
+		// Hinweiskanal hat CreateLocal nicht. Fehlt die Datei, bleibt es beim
+		// Fehler.
+		if fileExists(readme) {
+			return nil
+		}
 		return fmt.Errorf("%s anlegen: %w", filepath.Join(entry.Path, knowledgeReadmeName), err)
 	}
 	return nil

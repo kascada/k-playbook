@@ -561,31 +561,52 @@ func (k *Knowledge) List(filter KnowledgeFilter) ([]KnowledgeEntry, error) {
 	return entries, nil
 }
 
-// Read liefert eine Datei als Markdown, nicht als HTML: gerendert wird an
-// einer Stelle, in der Oberfläche. Read liefert nur, was der Index sehen kann:
-// der Pfad wird geprüft wie beim Schreiben (KnowledgeRelPath — relativ, kein
-// Ausbruch, keine versteckten Segmente, Markdown-Datei), und ein Weg durch ein
-// symbolisch verlinktes Verzeichnis wird abgewiesen, weil scanKnowledgeTree
-// dort nicht absteigt. Eine verlinkte Datei sieht der Index; sie wird gelesen.
-func (k *Knowledge) Read(path string) (string, error) {
-	rel, err := KnowledgeRelPath(path)
-	if err != nil {
-		return "", err
-	}
-	root := KnowledgeDir(k.projectDir)
+// rejectLinkedKnowledgeDir weist einen bereinigten Pfad ab, der durch ein
+// symbolisch verlinktes Verzeichnis unter knowledge/ führt: scanKnowledgeTree
+// steigt dort nicht ab, und was darin liegt, sieht der Index nie. read, write
+// und supersede prüfen damit gleich (Task 064, Entscheidung 3). Geprüft werden
+// nur die Verzeichnissegmente; eine verlinkte Datei sieht der Index und bleibt
+// zulässig. original ist die Eingabe des Aufrufers, für die Meldung.
+func rejectLinkedKnowledgeDir(root string, original string, rel string) error {
 	current := root
 	segments := strings.Split(rel, "/")
 	for _, segment := range segments[:len(segments)-1] {
 		current = filepath.Join(current, segment)
 		info, err := os.Lstat(current)
 		if err != nil {
-			// Fehlt ein Verzeichnis, sagt das Lesen unten „gibt es nicht".
-			break
+			// Fehlt ein Verzeichnis, liegt darunter auch kein Link; was
+			// daraus folgt, sagt der Aufrufer („gibt es nicht", anlegen).
+			return nil
 		}
 		if info.Mode()&fs.ModeSymlink != 0 {
-			return "", InputErrorf("Pfad %q führt durch ein verlinktes Verzeichnis (%s): %s/%s/ indiziert keine verlinkten Verzeichnisse, und read liefert nur, was der Index sieht",
-				path, strings.TrimPrefix(filepath.ToSlash(strings.TrimPrefix(current, root)), "/"), LocalDirName, KnowledgeDirName)
+			return InputErrorf("Pfad %q führt durch ein verlinktes Verzeichnis (%s): %s/%s/ indiziert keine verlinkten Verzeichnisse, was dort liegt, sieht der Index nie",
+				original, strings.TrimPrefix(filepath.ToSlash(strings.TrimPrefix(current, root)), "/"), LocalDirName, KnowledgeDirName)
 		}
+	}
+	return nil
+}
+
+// Read liefert eine Datei als Markdown, nicht als HTML: gerendert wird an
+// einer Stelle, in der Oberfläche. Read liefert nur, was der Index sehen kann:
+// der Pfad wird geprüft wie beim Schreiben (KnowledgeRelPath — relativ, kein
+// Ausbruch, keine versteckten Segmente, Markdown-Datei), und ein Weg durch ein
+// symbolisch verlinktes Verzeichnis wird abgewiesen (rejectLinkedKnowledgeDir).
+// Eine verlinkte Datei sieht der Index; sie wird gelesen.
+//
+// Read öffnet den Index nicht, ist aber ein Zugriff: ein verwaistes
+// .<dir>-alt-* eines abgebrochenen publish wird auch hier zurückgestellt
+// (restoreRetired, Task 064, Entscheidung 4), sonst meldete read „gibt es
+// nicht", bis list, search oder status es zurückstellen. Die Notiz geht über
+// Notes an den Aufrufer.
+func (k *Knowledge) Read(path string) (string, error) {
+	rel, err := KnowledgeRelPath(path)
+	if err != nil {
+		return "", err
+	}
+	root := KnowledgeDir(k.projectDir)
+	k.restoreRetired(root)
+	if err := rejectLinkedKnowledgeDir(root, path, rel); err != nil {
+		return "", err
 	}
 	full := filepath.Join(root, filepath.FromSlash(rel))
 	content, err := os.ReadFile(full)

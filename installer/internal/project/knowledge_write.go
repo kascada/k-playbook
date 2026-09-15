@@ -269,6 +269,14 @@ func (k *Knowledge) Write(producer string, doc KnowledgeDocument, queue string) 
 	}
 	doc.Path = rel
 
+	// Ein Weg durch ein verlinktes Verzeichnis ist ein Eingabefehler, geprüft
+	// vor jedem Lesen, vor MkdirAll und vor jedem Schreiben: sonst meldete
+	// write Erfolg für eine Datei, die der Index nie sieht (Task 064,
+	// Entscheidung 3).
+	if err := rejectLinkedKnowledgeDir(KnowledgeDir(k.projectDir), doc.Path, rel); err != nil {
+		return "", err
+	}
+
 	// Ein abgelöstes Dokument wird nicht überschrieben (Task 063,
 	// Entscheidung 7): sonst setzte ein späterer Lauf desselben Erzeugers den
 	// Zustand still zurück und verlöre successor. Geprüft wird an der Platte,

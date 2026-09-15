@@ -537,3 +537,31 @@ func TestKnowledgePublishPfadMitErzeugerverzeichnisUeberFrom(t *testing.T) {
 		t.Errorf("Bestand weg: %v", statErr)
 	}
 }
+
+// knowledge read gibt die Notizen des Zugriffs auf stderr aus wie die übrigen
+// Unterbefehle (Task 064, Entscheidung 4): stellt read ein verwaistes
+// .<dir>-alt-* zurück, steht die Antwort auf stdout und die Notiz auf stderr.
+func TestKnowledgeReadNenntRueckstellungAufStderr(t *testing.T) {
+	root := knowledgeProject(t)
+	alt := filepath.Join(project.KnowledgeDir(root), ".code-alt-222222", "zztest.md")
+	if err := os.MkdirAll(filepath.Dir(alt), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(alt, []byte("# Zztest\n\nAltstand.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runKnowledgeStreams(t, "read", "code/zztest.md")
+	if err != nil {
+		t.Fatalf("read nach abgebrochenem publish: %v", err)
+	}
+	if !strings.Contains(stdout, "Altstand.") || strings.Contains(stdout, "Hinweis:") {
+		t.Errorf("stdout:\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "Hinweis:") || !strings.Contains(stderr, "zurückgestellt") {
+		t.Errorf("Notiz zur Rückstellung fehlt auf stderr:\n%s", stderr)
+	}
+	if _, statErr := os.Stat(filepath.Join(project.KnowledgeDir(root), "code", "zztest.md")); statErr != nil {
+		t.Errorf("code/ steht nicht wieder: %v", statErr)
+	}
+}

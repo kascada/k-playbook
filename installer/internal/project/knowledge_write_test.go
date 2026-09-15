@@ -437,3 +437,46 @@ func TestKnowledgeRumpfMitLeerzeileUndKopfWirdAbgewiesen(t *testing.T) {
 		})
 	}
 }
+
+// write über ein symbolisch verlinktes Verzeichnis unter knowledge/ ist ein
+// Eingabefehler (Task 064, Entscheidung 3): scanKnowledgeTree steigt dort
+// nicht ab, eine Datei darin sähe der Index nie. Geprüft wird vor MkdirAll —
+// im Linkziel entsteht weder die Datei noch ein Zwischenverzeichnis, und der
+// Index bleibt unverändert.
+func TestKnowledgeWriteUeberVerlinktesVerzeichnis(t *testing.T) {
+	root := knowledgeFixture(t)
+	outside := filepath.Join(t.TempDir(), "extern")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(KnowledgeDir(root), "findings", "link")); err != nil {
+		t.Skipf("symbolische Verknüpfung nicht anlegbar: %v", err)
+	}
+	knowledge := NewKnowledge(root)
+	if _, err := knowledge.Status(); err != nil {
+		t.Fatal(err)
+	}
+	indexBefore, err := os.ReadFile(KnowledgeIndexFile(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, rel := range []string{"findings/link/x.md", "findings/link/neu/x.md"} {
+		_, err := knowledge.Write("session", sessionDoc(rel), "")
+		if err == nil {
+			t.Errorf("%s: write über ein verlinktes Verzeichnis angenommen", rel)
+		} else if !IsInputError(err) || !strings.Contains(err.Error(), "verlinktes Verzeichnis") {
+			t.Errorf("%s: Meldung/Klasse: %v", rel, err)
+		}
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("im Linkziel entstanden: %v", entries)
+	}
+	if indexAfter, err := os.ReadFile(KnowledgeIndexFile(root)); err != nil || string(indexAfter) != string(indexBefore) {
+		t.Errorf("Index verändert: %v", err)
+	}
+}

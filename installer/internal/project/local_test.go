@@ -522,3 +522,59 @@ func TestCreateLocalOhneDriftInKnowledge(t *testing.T) {
 		}
 	})
 }
+
+// Scheitert beim Anlegen der README in knowledge/ nur der Index, steht die
+// Datei aber auf der Platte, läuft CreateLocal weiter und legt die übrigen
+// Einträge an (Task 064, Entscheidung 5). Der nächste Zugriff nimmt die README
+// über die Drift-Erkennung auf.
+func TestCreateLocalLaeuftBeiGeschriebenerReadmeWeiter(t *testing.T) {
+	root := t.TempDir()
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatalf("Status vor CreateLocal: %v", err)
+	}
+	cache := KnowledgeCacheDir(root)
+	denyWrite(t, cache)
+
+	if _, err := CreateLocal(root); err != nil {
+		t.Fatalf("CreateLocal bricht trotz geschriebener README ab: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(KnowledgeDir(root), "README.md"))
+	if err != nil {
+		t.Fatalf("README fehlt: %v", err)
+	}
+	if head := parseKnowledgeFrontmatter(content); head.Title == "" || head.State == "" {
+		t.Errorf("README ohne title oder state:\n%s", content)
+	}
+	after := false
+	checked := 0
+	for _, status := range CheckLocal(root) {
+		if status.Path == KnowledgeDirName {
+			after = true
+			continue
+		}
+		if !after {
+			continue
+		}
+		checked++
+		if !status.Present {
+			t.Errorf("Eintrag nach knowledge/ nicht angelegt: %s", status.Path)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("Vorbedingung: in LocalStructure steht nichts hinter knowledge/")
+	}
+
+	if err := os.Chmod(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewKnowledge(root).Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.FileCount != 1 || status.ByKind[KnowledgeRootKind].Files != 1 {
+		t.Errorf("README nicht indiziert: %+v", status)
+	}
+	if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
+		t.Errorf("zweiter Zugriff: %+v, %v", status, err)
+	}
+}

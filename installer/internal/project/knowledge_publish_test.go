@@ -497,6 +497,15 @@ func TestKnowledgePublishFehlschlagBeimChunkenUndBeimTausch(t *testing.T) {
 // und der alte Stand auf der Platte. Nachgestellt über einen erfolgreichen Lauf,
 // dessen Verzeichnis danach auf den alten Stand zurückgesetzt wird. Der nächste
 // Zugriff liefert den alten Stand; stale: true ist dabei die erwartete Meldung.
+//
+// Belegt ist damit nur die Heilung dieses Zustands, nicht die Reihenfolge
+// „Index vor Tausch": ohne Fehler-Hook im Produktivpfad lässt sich kein Lauf
+// zwischen den beiden Schritten anhalten, und ein Fehlschlag beim Tausch ist
+// ohne root nicht erzeugbar (siehe …FehlschlagBeimChunkenUndBeimTausch). Die
+// Reihenfolge belegt TestKnowledgePublishFehlschlagBeimIndexschreibenLaesstAltenStand:
+// scheitert das Indexschreiben und steht der alte Stand, war noch nicht
+// getauscht (Task 064, Etappe 6; nachgestellt in
+// material/befunde/wissensablage-schreibseite.md).
 func TestKnowledgePublishAbbruchZwischenIndexUndTausch(t *testing.T) {
 	root := knowledgeFixture(t)
 	if _, err := NewKnowledge(root).Status(); err != nil {
@@ -613,8 +622,11 @@ func TestKnowledgeVerwaistesAltVerzeichnisWirdZurueckgestellt(t *testing.T) {
 		root := knowledgeFixture(t)
 		old := swapCrash(t, root)
 		writeKnowledgeFile(t, root, ".code-alt-333333/links.md", old)
+		// Die Notiz wird an List geprüft, nicht an Status: Status nennt die
+		// Reste ohnehin und hielte den Test auch ohne Notiz aus
+		// restoreRetired grün (Task 064, Etappe 6).
 		knowledge := NewKnowledge(root)
-		if _, err := knowledge.Status(); err != nil {
+		if _, err := knowledge.List(KnowledgeFilter{}); err != nil {
 			t.Fatalf("Zugriff scheitert: %v", err)
 		}
 		if pathExists(filepath.Join(KnowledgeDir(root), "code")) {
@@ -630,8 +642,9 @@ func TestKnowledgeVerwaistesAltVerzeichnisWirdZurueckgestellt(t *testing.T) {
 		root := knowledgeFixture(t)
 		swapCrash(t, root)
 		denyWrite(t, KnowledgeDir(root))
+		// Notiz am auslösenden Zugriff ohne Rest-Notiz, siehe oben.
 		knowledge := NewKnowledge(root)
-		if _, err := knowledge.Status(); err != nil {
+		if _, err := knowledge.List(KnowledgeFilter{}); err != nil {
 			t.Fatalf("Zugriff scheitert: %v", err)
 		}
 		if pathExists(filepath.Join(KnowledgeDir(root), "code")) {
@@ -676,8 +689,8 @@ func TestKnowledgeSupersedeWeistZielZustandUndNachfolgerAb(t *testing.T) {
 		"Nachfolger unter versions/": {"findings/notiz.md", "versions/inventory.md", "versions/"},
 		"Nachfolger README":          {"findings/notiz.md", "README.md", "README.md"},
 		"schon abgelöst":             {"findings/weg.md", "findings/notiz.md", "schon abgelöst"},
-		"Nachfolger raw":             {"findings/notiz.md", "findings/roh.md", "condensed oder reviewed"},
-		"Nachfolger superseded":      {"findings/notiz.md", "findings/weg.md", "condensed oder reviewed"},
+		"Nachfolger raw":             {"findings/notiz.md", "findings/roh.md", "die Suche blendet ihn aus"},
+		"Nachfolger superseded":      {"findings/notiz.md", "findings/weg.md", "die Suche blendet ihn aus"},
 	}
 	files := []string{"README.md", "code/links.md", "libs/goldmark.md", "versions/inventory.md", "findings/notiz.md", "findings/neu.md", "findings/roh.md", "findings/weg.md"}
 	for name, tc := range cases {
@@ -711,5 +724,267 @@ func TestKnowledgeSupersedeWeistZielZustandUndNachfolgerAb(t *testing.T) {
 				t.Errorf("Index verändert: %v", err)
 			}
 		})
+	}
+}
+
+// supersede über ein symbolisch verlinktes Verzeichnis ist ein Eingabefehler,
+// für das Ziel wie für den Nachfolger (Task 064, Entscheidung 3): der Index
+// sieht beides nicht. Keine Datei und nicht der Index ändern sich.
+func TestKnowledgeSupersedeUeberVerlinktesVerzeichnis(t *testing.T) {
+	root := knowledgeFixture(t)
+	outside := filepath.Join(t.TempDir(), "extern")
+	linked := "---\ntitle: Extern\nsubject: Extern\norigin: Test\nstate: condensed\n---\n\n# Extern\n\nLinkwort.\n"
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outside, "y.md"), []byte(linked), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(KnowledgeDir(root), "findings", "link")); err != nil {
+		t.Skipf("symbolische Verknüpfung nicht anlegbar: %v", err)
+	}
+	knowledge := NewKnowledge(root)
+	if _, err := knowledge.Status(); err != nil {
+		t.Fatal(err)
+	}
+	notiz := readKnowledgeFile(t, root, "findings/notiz.md")
+	indexBefore, err := os.ReadFile(KnowledgeIndexFile(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, args := range map[string][2]string{
+		"Ziel":       {"findings/link/y.md", "findings/notiz.md"},
+		"Nachfolger": {"findings/notiz.md", "findings/link/y.md"},
+	} {
+		_, _, err := knowledge.Supersede(args[0], args[1], "Grund")
+		if err == nil {
+			t.Errorf("%s über ein verlinktes Verzeichnis angenommen", name)
+		} else if !IsInputError(err) || !strings.Contains(err.Error(), "verlinktes Verzeichnis") {
+			t.Errorf("%s: Meldung/Klasse: %v", name, err)
+		}
+	}
+	if got, err := os.ReadFile(filepath.Join(outside, "y.md")); err != nil || string(got) != linked {
+		t.Errorf("Datei im Linkziel verändert: %v\n%s", err, got)
+	}
+	if got := readKnowledgeFile(t, root, "findings/notiz.md"); got != notiz {
+		t.Errorf("findings/notiz.md verändert:\n%s", got)
+	}
+	if indexAfter, err := os.ReadFile(KnowledgeIndexFile(root)); err != nil || string(indexAfter) != string(indexBefore) {
+		t.Errorf("Index verändert: %v", err)
+	}
+}
+
+// publish ist von verlinkten Verzeichnissen nicht so betroffen wie write (Task
+// 064, Entscheidung 3, geprüft, nicht behoben): der Tausch benennt den Link
+// selbst beiseite und setzt ein echtes Verzeichnis ein; RemoveAll entfernt nur
+// den Link. Die veröffentlichten Dokumente liegen dort, wo der Index sie sieht,
+// und das Linkziel bleibt unberührt — für ein verlinktes Generatorverzeichnis
+// wie für ein verlinktes Unterverzeichnis darin.
+func TestKnowledgePublishUeberVerlinktesVerzeichnis(t *testing.T) {
+	for name, link := range map[string]string{"Generatorverzeichnis": "code", "Unterverzeichnis": "code/sub"} {
+		t.Run(name, func(t *testing.T) {
+			root := knowledgeFixture(t)
+			outside := filepath.Join(t.TempDir(), "extern")
+			if err := os.MkdirAll(outside, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(outside, "alt.md"), []byte("# Alt\n\nAltwort.\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			full := filepath.Join(KnowledgeDir(root), filepath.FromSlash(link))
+			if link == "code" {
+				if err := os.RemoveAll(full); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink(outside, full); err != nil {
+				t.Skipf("symbolische Verknüpfung nicht anlegbar: %v", err)
+			}
+
+			knowledge := NewKnowledge(root)
+			if _, err := knowledge.Publish("docs-code", []KnowledgeDocument{codeDoc("sub/neu.md", "# Neu\n\nNeuwort.\n")}); err != nil {
+				t.Fatal(err)
+			}
+			for dir := filepath.Join(KnowledgeDir(root), "code"); dir != filepath.Dir(KnowledgeDir(root)); dir = filepath.Dir(dir) {
+				if info, err := os.Lstat(dir); err != nil || info.Mode()&os.ModeSymlink != 0 {
+					t.Errorf("%s ist nach publish kein echtes Verzeichnis: %v", dir, err)
+				}
+			}
+			if info, err := os.Lstat(filepath.Join(KnowledgeDir(root), "code", "sub")); err != nil || info.Mode()&os.ModeSymlink != 0 {
+				t.Errorf("code/sub ist nach publish kein echtes Verzeichnis: %v", err)
+			}
+			if hits, err := NewKnowledge(root).Search("Neuwort", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "code/sub/neu.md" {
+				t.Errorf("veröffentlichtes Dokument nicht im Index: %+v, %v", hits, err)
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "alt.md" {
+				t.Errorf("Linkziel verändert: %v, %v", entries, err)
+			}
+			if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
+				t.Errorf("Status: %+v, %v", status, err)
+			}
+		})
+	}
+}
+
+// Die Nachfolger-Regel folgt dem Prädikat, nach dem die Suche ausblendet
+// (Task 064, Entscheidung 1): abgewiesen wird genau, was knowledgeHiddenState
+// ausblendet. Ein Nachfolger ohne Kopf — in manual/ entstehen Dokumente von
+// Hand —, mit Kopf ohne state oder mit unlesbarem Kopf ist ein Suchtreffer und
+// damit zulässig; die Ablösung hält, und das alte Dokument fällt aus der Suche.
+func TestKnowledgeSupersedeNachfolgerNachSuchpraedikat(t *testing.T) {
+	cases := map[string]struct{ path, content string }{
+		"ohne Kopf unter manual/": {"manual/release.md", ""},
+		"Kopf ohne state":         {"findings/ohne-state.md", "---\ntitle: Ohne state\nsubject: Release\n---\n\n# Ohne state\n\nNachfolgerwort.\n"},
+		"unlesbarer Kopf":         {"findings/unlesbar.md", "---\ntitle: Unlesbar\n\tstate: raw\n---\n\n# Unlesbar\n\nNachfolgerwort.\n"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := knowledgeFixture(t)
+			if tc.content != "" {
+				writeKnowledgeFile(t, root, tc.path, tc.content)
+			}
+			knowledge := NewKnowledge(root)
+			if _, err := knowledge.Status(); err != nil {
+				t.Fatal(err)
+			}
+			if entries, err := knowledge.List(KnowledgeFilter{}); err != nil {
+				t.Fatal(err)
+			} else {
+				for _, entry := range entries {
+					if entry.Path == tc.path && knowledgeHiddenState(entry.State) {
+						t.Fatalf("Vorbedingung: der Index blendet %s aus (state %q)", tc.path, entry.State)
+					}
+				}
+			}
+			if hits, err := knowledge.Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 {
+				t.Fatalf("Vorbedingung: findings/notiz.md nicht in der Suche: %+v, %v", hits, err)
+			}
+
+			if _, next, err := knowledge.Supersede("findings/notiz.md", tc.path, "Ersetzt"); err != nil || next != tc.path {
+				t.Fatalf("Nachfolger %s abgewiesen: %q, %v", tc.path, next, err)
+			}
+			if got := readKnowledgeFile(t, root, "findings/notiz.md"); !strings.Contains(got, "state: superseded\n") || !strings.Contains(got, "successor: "+tc.path+"\n") {
+				t.Errorf("Ablösung nicht geschrieben:\n%s", got)
+			}
+			if hits, err := NewKnowledge(root).Search("sichern", KnowledgeFilter{}, 0); err != nil || len(hits) != 0 {
+				t.Errorf("abgelöstes Dokument noch in der Suche: %+v, %v", hits, err)
+			}
+			if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
+				t.Errorf("Status: %+v, %v", status, err)
+			}
+		})
+	}
+}
+
+// Die Prüfungen ohne Erzeuger erkennen Generatorverzeichnis und Wurzel-README
+// ohne Beachtung der Schreibweise, auf jeder Plattform (Task 064, Entscheidung
+// 2): auf einem Dateisystem, das Groß- und Kleinschreibung nicht unterscheidet
+// (APFS), sind Code/x.md und code/x.md dieselbe Datei. Die Abweisung greift vor
+// jedem Dateizugriff und ist deshalb auch auf ext4 prüfbar — dort hieße das
+// Verfehlen „gibt es nicht".
+func TestKnowledgeSchreibweiseBeiGeneratorverzeichnisUndReadme(t *testing.T) {
+	t.Run("supersede", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatal(err)
+		}
+		cases := map[string]struct{ path, successor, message string }{
+			"Ziel Code/x.md":        {"Code/x.md", "findings/notiz.md", "Verzeichnis des Generators docs-code"},
+			"Nachfolger LIBS/y.md":  {"findings/notiz.md", "LIBS/y.md", "Verzeichnis des Generators docs-tools"},
+			"Nachfolger readme.md":  {"findings/notiz.md", "readme.md", "Wurzel-README"},
+			"Ziel ReadMe.md":        {"ReadMe.md", "findings/notiz.md", "Wurzel-README"},
+			"Ziel Versions/tief.md": {"Versions/tief.md", "findings/notiz.md", "Verzeichnis des Generators inventory"},
+		}
+		for name, tc := range cases {
+			_, _, err := knowledge.Supersede(tc.path, tc.successor, "Grund")
+			if err == nil {
+				t.Errorf("%s angenommen", name)
+				continue
+			}
+			if !IsInputError(err) || !strings.Contains(err.Error(), tc.message) {
+				t.Errorf("%s: Meldung %q trägt %q nicht", name, err, tc.message)
+			}
+		}
+		if got := readKnowledgeFile(t, root, "findings/notiz.md"); strings.Contains(got, "superseded") {
+			t.Error("findings/notiz.md trotz Abweisung abgelöst")
+		}
+	})
+
+	t.Run("publish Code/x.md", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		knowledge := NewKnowledge(root)
+		if _, err := knowledge.Status(); err != nil {
+			t.Fatal(err)
+		}
+		before := readKnowledgeFile(t, root, "code/links.md")
+		indexBefore, err := os.ReadFile(KnowledgeIndexFile(root))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = knowledge.Publish("docs-code", []KnowledgeDocument{codeDoc("Code/x.md", "# X\n")})
+		if err == nil {
+			t.Fatal("Code/x.md bei docs-code angenommen")
+		}
+		if !IsInputError(err) || !strings.Contains(err.Error(), "relativ zu code/") || !strings.Contains(err.Error(), `"x.md"`) {
+			t.Errorf("Meldung/Klasse: %v", err)
+		}
+		if got := readKnowledgeFile(t, root, "code/links.md"); got != before {
+			t.Error("code/links.md verändert")
+		}
+		if pathExists(filepath.Join(KnowledgeDir(root), "code", "Code")) {
+			t.Error("code/Code/ entstanden")
+		}
+		if indexAfter, err := os.ReadFile(KnowledgeIndexFile(root)); err != nil || string(indexAfter) != string(indexBefore) {
+			t.Errorf("Index verändert: %v", err)
+		}
+		if hidden := hiddenSiblings(t, root); len(hidden) != 0 {
+			t.Errorf("Zwischenverzeichnisse geblieben: %v", hidden)
+		}
+	})
+
+	// Regression: write bindet jeden Erzeuger über owns an sein eigenes
+	// Präfix; owns bleibt unverändert und vergleicht exakt.
+	t.Run("write person Manual/ und Pitfalls/", func(t *testing.T) {
+		root := knowledgeFixture(t)
+		knowledge := NewKnowledge(root)
+		for _, rel := range []string{"Manual/x.md", "Pitfalls/x.md"} {
+			_, err := knowledge.Write("person", sessionDoc(rel), "")
+			if err == nil || !IsInputError(err) || !strings.Contains(err.Error(), "außerhalb des Erzeugerverzeichnisses") {
+				t.Errorf("%s: %v", rel, err)
+			}
+			if pathExists(filepath.Join(KnowledgeDir(root), filepath.FromSlash(rel))) {
+				t.Errorf("%s geschrieben", rel)
+			}
+		}
+	})
+}
+
+// Die Rückstellung eines verwaisten .<dir>-alt-* geschieht bei jedem Zugriff,
+// auch bei read (Task 064, Entscheidung 4): read liefert den alten Inhalt statt
+// „gibt es nicht", code/ steht danach wieder, und die Notiz meldet die
+// Rückstellung am selben Zugriff.
+func TestKnowledgeReadStelltVerwaistesAltVerzeichnisZurueck(t *testing.T) {
+	root := knowledgeFixture(t)
+	old := swapCrash(t, root)
+
+	knowledge := NewKnowledge(root)
+	content, err := knowledge.Read("code/links.md")
+	if err != nil {
+		t.Fatalf("read nach abgebrochenem publish: %v", err)
+	}
+	if content != old {
+		t.Errorf("read liefert nicht den alten Stand:\n%s", content)
+	}
+	if !pathExists(filepath.Join(KnowledgeDir(root), "code", "links.md")) {
+		t.Error("code/ steht nach read nicht wieder")
+	}
+	if pathExists(filepath.Join(KnowledgeDir(root), ".code-alt-222222")) {
+		t.Error(".code-alt-222222 liegt noch")
+	}
+	if notes := strings.Join(knowledge.Notes(), "; "); !strings.Contains(notes, "zurückgestellt") || !strings.Contains(notes, ".code-alt-222222") {
+		t.Errorf("Notiz zur Rückstellung fehlt: %q", notes)
 	}
 }

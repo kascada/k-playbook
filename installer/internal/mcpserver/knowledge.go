@@ -302,13 +302,18 @@ func knowledgeListTool(ctx context.Context, req *mcp.CallToolRequest, input know
 
 func knowledgeReadTool(ctx context.Context, req *mcp.CallToolRequest, input knowledgeReadInput) (*mcp.CallToolResult, any, error) {
 	return wrapKnowledgeTool(knowledgeToolRead, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
-		content, err := project.NewKnowledge(projectDir).Read(input.Path)
+		knowledge := project.NewKnowledge(projectDir)
+		content, err := knowledge.Read(input.Path)
 		if err != nil {
 			return knowledgeFailure(knowledgeToolRead, projectDir, "read_failed", err)
 		}
+		// read ist ein Zugriff und kann ein verwaistes Verzeichnis eines
+		// abgebrochenen publish zurückstellen; ohne hint käme die Meldung
+		// darüber hier nie an (Task 064, Entscheidung 4).
 		return knowledgeResult(knowledgeEnvelope{
 			OK: true, Tool: knowledgeToolRead, ProjectDir: projectDir,
 			Path: filepath.ToSlash(input.Path), Content: &content,
+			Hint: knowledgeHint(knowledge),
 		}, false)
 	}), nil, nil
 }

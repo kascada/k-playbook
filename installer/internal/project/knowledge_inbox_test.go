@@ -286,4 +286,16 @@ func TestKnowledgeInboxReadLiestMarkdownEndung(t *testing.T) {
 	if err != nil || content != "# Notiz\n" {
 		t.Errorf("InboxRead: %q, %v", content, err)
 	}
+
+	// Auch die Liste führt .markdown mit dem Format aus inboxFormats (Task 064,
+	// Etappe 6). Weil inboxFormat ohne Zuordnung die Endung selbst nennt — hier
+	// ebenfalls „markdown" —, prüft erst der Abgleich mit der Zuordnung, dass
+	// sie besteht und dieselbe ist wie für .md.
+	if format := inboxFormats["markdown"]; format == "" || format != inboxFormats["md"] {
+		t.Fatalf("inboxFormats ordnet markdown nicht wie md zu: %q", format)
+	}
+	entries, err := knowledge.InboxList("chat")
+	if err != nil || len(entries) != 1 || entries[0].Path != "chat/notiz.markdown" || entries[0].Format != inboxFormats["markdown"] {
+		t.Errorf("InboxList: %+v, %v", entries, err)
+	}
 }

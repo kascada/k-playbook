@@ -1616,8 +1616,12 @@ Den eigenen Zugriffsweg, den diese Entscheidung als Bedingung nannte, gibt es in
 Subkommando `k-playbook knowledge` und die
 MCP-Werkzeuge `k_playbook_knowledge_*` (siehe „Der MCP-Server"). Er teilt mit dieser Seite
 nur die Goldmark-Konfiguration aus `internal/markdown`, nicht die Endpunkte und nicht die
-Pfadprüfung: `read` prüft seit Task 063 wie das Schreiben über `KnowledgeRelPath` und weist
-Wege durch verlinkte Verzeichnisse ab, die der Index nicht sieht. Ein `/api/knowledge/*` für die Seite `/knowledge`
+Pfadprüfung: `read` prüft seit Task 063 wie das Schreiben über `KnowledgeRelPath`. Wege durch
+verlinkte Verzeichnisse, die der Index nicht sieht, weisen seit Task 064 `read`, `write` und
+`supersede` über dieselbe Hilfe ab (`rejectLinkedKnowledgeDir`); `publish` ersetzt ein
+verlinktes Verzeichnis beim Tausch durch ein echtes. `read` öffnet den Index nicht, stellt aber
+wie jeder Zugriff ein verwaistes `.<dir>-alt-*` eines abgebrochenen `publish` zurück
+(`restoreRetired`) und meldet das über `Notes`. Ein `/api/knowledge/*` für die Seite `/knowledge`
 ist ein Folge-Task; bis dahin liest sie weiter `/api/docs/file`.
 
 `project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,

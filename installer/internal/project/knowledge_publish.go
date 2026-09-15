@@ -87,8 +87,10 @@ func (k *Knowledge) Publish(producer string, documents []KnowledgeDocument) (Kno
 		// code/code/, und der Tausch entfernte den ganzen Bestand. Die Folge
 		// der Regel: Direkt unter einem Generatorverzeichnis steht kein
 		// Unterverzeichnis gleichen Namens.
-		if strings.HasPrefix(rel, dir) {
-			return result, InputErrorf("Pfad %q beginnt mit dem Erzeugerverzeichnis %s: bei publish sind die Pfade relativ zu %s, also %q", doc.Path, dir, dir, strings.TrimPrefix(rel, dir))
+		// Ohne Beachtung der Schreibweise (Task 064, Entscheidung 2): auf
+		// APFS ist code/Code/x.md dasselbe wie der verbotene Fall code/code/.
+		if hasKnowledgeDirPrefixFold(rel, dir) {
+			return result, InputErrorf("Pfad %q beginnt mit dem Erzeugerverzeichnis %s: bei publish sind die Pfade relativ zu %s, also %q", doc.Path, dir, dir, rel[len(dir):])
 		}
 		full := dir + rel
 		if _, err := KnowledgeRelPath(full); err != nil || !parsed.owns(full) {
@@ -351,8 +353,17 @@ const (
 //   - ein schon abgelöstes Ziel: wer den Nachfolger ändern will, löst den
 //     Nachfolger ab — so entsteht eine Kette statt eines überschriebenen
 //     Verweises, und eine Ablösung ist endgültig;
-//   - ein Nachfolger, der kein Suchtreffer sein kann: state muss condensed
-//     oder reviewed sein, sonst verschwände das Thema ganz aus der Suche.
+//   - ein Nachfolger, den die Suche nach seinem Zustand ausblendet
+//     (knowledgeHiddenState, heute raw und superseded), sonst verschwände das
+//     Thema ganz aus der Suche. Zulässig ist damit auch ein Nachfolger ohne
+//     Kopf oder ohne state: die Suche führt ihn als Treffer, und in manual/
+//     entstehen Dokumente von Hand (Task 064, Entscheidung 1);
+//   - ein Ziel oder Nachfolger durch ein verlinktes Verzeichnis
+//     (rejectLinkedKnowledgeDir).
+//
+// Generatorverzeichnisse und die Wurzel-README werden ohne Beachtung der
+// Schreibweise erkannt (Task 064, Entscheidung 2) — strenger, als die Suche
+// ausblendet, nie weniger streng.
 //
 // Ein Erzeugerargument gibt es nicht: nach diesen Regeln bleiben nur
 // Verzeichnisse, in denen einzeln geschrieben wird.
@@ -374,10 +385,10 @@ func (k *Knowledge) Supersede(docPath string, successor string, reason string) (
 	if err := requireLine("reason", reason); err != nil {
 		return "", "", err
 	}
-	if rel == knowledgeReadmeName {
+	if strings.EqualFold(rel, knowledgeReadmeName) {
 		return "", "", InputErrorf("%s ist die Wurzel-README: Navigation, kein Wissen — sie wird nicht abgelöst", rel)
 	}
-	if next == knowledgeReadmeName {
+	if strings.EqualFold(next, knowledgeReadmeName) {
 		return "", "", InputErrorf("Nachfolger %s ist die Wurzel-README: sie ist nie ein Suchtreffer, das Thema verschwände aus der Suche", next)
 	}
 	if generator, dir, ok := knowledgeGeneratorOf(rel); ok {
@@ -387,6 +398,14 @@ func (k *Knowledge) Supersede(docPath string, successor string, reason string) (
 		return "", "", InputErrorf("Nachfolger %s liegt unter %s, dem Verzeichnis des Generators %s: sein nächster Lauf könnte ihn entfernen, und successor zeigte ins Leere", next, dir, generator)
 	}
 	root := KnowledgeDir(k.projectDir)
+	// Ziel und Nachfolger durch ein verlinktes Verzeichnis sieht der Index
+	// nicht (Task 064, Entscheidung 3).
+	if err := rejectLinkedKnowledgeDir(root, docPath, rel); err != nil {
+		return "", "", err
+	}
+	if err := rejectLinkedKnowledgeDir(root, successor, next); err != nil {
+		return "", "", InputErrorf("Nachfolger: %w", err)
+	}
 	full := filepath.Join(root, filepath.FromSlash(rel))
 	nextFull := filepath.Join(root, filepath.FromSlash(next))
 	if !fileExists(full) {
@@ -407,8 +426,11 @@ func (k *Knowledge) Supersede(docPath string, successor string, reason string) (
 	if err != nil {
 		return "", "", fmt.Errorf("%s lesen: %w", next, err)
 	}
-	if state, _ := knowledgeSupersession(nextData); state != KnowledgeStateCondensed && state != KnowledgeStateReviewed {
-		return "", "", InputErrorf("Nachfolger %s hat state %q: ein Nachfolger muss ein Suchtreffer sein können, also condensed oder reviewed — sonst verschwände das Thema ganz aus der Suche", next, state)
+	// Zulässig ist, was die Suche nicht nach dem Zustand ausblendet — dasselbe
+	// Prädikat und derselbe Leseweg wie beim Indizieren, damit Regel und Suche
+	// nicht auseinanderlaufen (Task 064, Entscheidung 1).
+	if state := parseKnowledgeFrontmatter(nextData).State; knowledgeHiddenState(state) {
+		return "", "", InputErrorf("Nachfolger %s hat state %q: die Suche blendet ihn aus, ein Nachfolger muss ein Suchtreffer sein können — sonst verschwände das Thema ganz aus der Suche", next, state)
 	}
 
 	updated := supersedeFrontmatter(string(data), [][2]string{
@@ -438,14 +460,25 @@ func (k *Knowledge) Supersede(docPath string, successor string, reason string) (
 }
 
 // knowledgeGeneratorOf meldet, ob ein bereinigter Pfad in einem
-// Generatorverzeichnis liegt, und nennt Generator und Verzeichnis.
+// Generatorverzeichnis liegt, und nennt Generator und Verzeichnis. Verglichen
+// wird ohne Beachtung der Schreibweise (Task 064, Entscheidung 2): Code/x.md
+// liegt auf APFS in code/. owns bleibt davon unberührt und vergleicht exakt —
+// es bewacht auch write und publish, und jeder Erzeuger ist dort an sein
+// eigenes Präfix gebunden.
 func knowledgeGeneratorOf(rel string) (Producer, string, bool) {
 	for _, producer := range []Producer{ProducerDocsCode, ProducerDocsTools, ProducerInventory} {
-		if producer.owns(rel) {
-			return producer, producer.Dirs()[0], true
+		dir := producer.Dirs()[0]
+		if hasKnowledgeDirPrefixFold(rel, dir) && len(rel) > len(dir) {
+			return producer, dir, true
 		}
 	}
 	return "", "", false
+}
+
+// hasKnowledgeDirPrefixFold meldet, ob rel mit dem Verzeichnis dir (mit
+// Schrägstrich am Ende) beginnt, ohne Beachtung der Schreibweise.
+func hasKnowledgeDirPrefixFold(rel string, dir string) bool {
+	return len(rel) >= len(dir) && strings.EqualFold(rel[:len(dir)], dir)
 }
 
 // knowledgeSupersession liest state und successor aus dem Kopf einer Datei —

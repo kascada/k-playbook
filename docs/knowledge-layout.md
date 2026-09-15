@@ -257,6 +257,13 @@ producer would set the state back silently and lose `successor`, and the superse
 gone without anyone noticing. Whoever wants to change the topic writes the successor, or
 supersedes it.
 
+`write` refuses a **path through a symbolically linked directory** under `knowledge/` before it
+reads, creates a directory or writes anything: the index does not descend into a linked
+directory, so the file would lie where no search reaches it. `read` and `supersede` refuse such a
+path the same way; a linked *file* is indexed and stays allowed. `publish` is not affected: its
+swap renames the link itself aside and puts a real directory in its place, so the published
+documents land where the index sees them, and the link's target is left untouched.
+
 `publish` is how a generator writes, and the only way it does. It hands over its **complete**
 set of documents; the tool writes them and removes what is not in the set. A run that dies
 halfway changes nothing at all, whereas a `clear` followed by writes would leave the store
@@ -266,7 +273,9 @@ The paths of a set are **relative to the generator's directory**: `overview.md`,
 `code/overview.md`. A path that already starts with the directory is refused, not cut: it
 points at a wrongly built generator, and cutting it silently would hide that. The consequence
 is that directly below a generator directory there is no subdirectory of the same name
-(`code/code/`).
+(`code/code/`). The comparison ignores case on every platform — `Code/overview.md` is refused
+as well —, because on a file system that does not distinguish case (APFS on macOS)
+`code/Code/` is that same forbidden directory.
 
 That a run which dies halfway changes nothing rests on the order of the exchange and on one
 rule: **the files on disk are the truth, and drift detection may only ever lead back to the
@@ -284,8 +293,9 @@ place, the old one removed.
   nobody wrote past the gate; that is accepted and not suppressed.
 - A run that dies between the two renames, or whose swap and restore both fail, leaves the
   target missing and the old state hidden as `.<dir>-alt-*`; the error names both directories,
-  and nothing is removed. The next access puts the orphaned `.<dir>-alt-*` back under its name
-  before drift detection runs.
+  and nothing is removed. The next access — `read` included, although it does not open the
+  index — puts the orphaned `.<dir>-alt-*` back under its name before drift detection runs, and
+  says so in a note: `hint` over MCP, stderr on the command line.
 
 There is no lock, so that restore never replaces an existing target — not even an empty one,
 which a concurrent `publish` may just have put in place. If the restore fails or more than one
@@ -308,24 +318,37 @@ not search hits, `list` carries them all.
 ### Superseding
 
 `supersede` marks a document as replaced: `state: superseded`, `successor` and
-`superseded_reason` go into the frontmatter, the body stays. It is refused in three cases:
+`superseded_reason` go into the frontmatter, the body stays. It is refused in these cases:
 
 - **A document in a generator directory.** Under `code/`, `libs/` and `versions/` a generator
   takes a document out by no longer publishing it; a supersession there would only last until
   its next run. The root `README.md` is refused too — it is navigation, not knowledge.
 - **A document that is already superseded.** Whoever wants to change the successor supersedes
   the successor. That forms a chain instead of an overwritten reference.
-- **A successor that cannot be a search hit.** The successor must be `condensed` or `reviewed`;
-  with `raw` or `superseded` the topic would vanish from search altogether. For the same reason
-  the root `README.md` is never a successor, and neither is a document under `code/`, `libs/`
-  or `versions/`: a generator run could remove it, and `successor` would point at nothing.
+- **A successor that search hides.** Otherwise the topic would vanish from search altogether.
+  The successor is refused exactly when search hides it by its state — the same predicate
+  search applies (`raw` and `superseded` today) on the same reading of the header as the index.
+  A successor without a header, without `state`, or with a header the index cannot parse is a
+  search hit and therefore allowed: `knowledge/manual/` belongs to a person, and documents
+  written there by hand routinely carry no header. Stricter than search, and on purpose, the
+  root `README.md` is never a successor, and neither is a document under `code/`, `libs/` or
+  `versions/`: a generator run could remove it, and `successor` would point at nothing. The
+  rule may refuse more than search hides, never less. One limit stays: a successor without a
+  body yields no section and is never a hit.
+- **A path through a linked directory**, for the document as for the successor; the index
+  sees neither.
+
+Generator directories and the root `README.md` are recognised without regard to case
+(`Code/x.md`, `LIBS/y.md`, `readme.md`), on every platform: on a file system that does not
+distinguish case they are the same files.
 
 `supersede` takes no producer. After these rules only directories remain in which single
 documents are written; there the ownership rule protects against a generator run overwriting
 them, and that reason does not apply to a supersession.
 
-**A supersession is final.** `write` refuses a superseded document, and nobody edits under
-`knowledge/` by hand, so the state cannot be taken back. A wrongly chosen successor is
+**A supersession is final at the gate.** `write` refuses a superseded document, and no tool
+sets the state back. A change by hand remains possible — `knowledge/manual/` belongs to a
+person — but it is not a path through the gate; drift detection only re-reads such a file. A wrongly chosen successor is
 corrected by superseding it with the right document; the chain stays as history.
 
 ## Migration
