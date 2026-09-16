@@ -413,6 +413,8 @@ func (p *parser) parseSequence(indent int) *Node {
 			} else {
 				node.Items = append(node.Items, &Node{Kind: Scalar, Line: line.num})
 			}
+		case content[0] == '|' || content[0] == '>':
+			node.Items = append(node.Items, p.parseBlockScalar(line, indent, content[0] == '>'))
 		case content[0] == '[' || content[0] == '{':
 			item, err := parseFlow(content, line.num)
 			if err != nil {
@@ -449,11 +451,24 @@ func (p *parser) parseItemMapping(line sourceLine, itemIndent int, key string, r
 	return node
 }
 
+// parseBlockScalar liest den Rumpf eines Blockskalars als Text. indent ist die
+// Spalte des Elternknotens — Schlüssel oder Listenstrich —; der Rumpf endet an
+// der ersten Zeile, die nicht tiefer steht.
+//
+// Die Zeilen kommen aus scanLines, das Kommentare schon entfernt hat. Im Rumpf
+// gibt es keine Kommentare: eine Zeile wie `# Ohne Passwort` ist dort Inhalt
+// und wird aus dem Rohtext zurückgeholt, statt als Leerzeile zu gelten. Steht
+// sie weniger tief als der Rumpf, bleibt sie ein Kommentar.
 func (p *parser) parseBlockScalar(keyLine sourceLine, indent int, folded bool) *Node {
 	var parts []string
 	blockIndent := -1
 	for p.index < len(p.lines) {
 		line := p.lines[p.index]
+		if line.blank {
+			if content := rawContentLine(line); !content.blank && content.indent > indent && content.indent >= blockIndent {
+				line = content
+			}
+		}
 		if line.blank {
 			parts = append(parts, "")
 			p.index++
@@ -482,6 +497,23 @@ func (p *parser) parseBlockScalar(keyLine sourceLine, indent int, folded bool) *
 		separator = " "
 	}
 	return &Node{Kind: Scalar, Line: keyLine.num, Value: strings.Join(parts, separator)}
+}
+
+// rawContentLine bewertet eine als leer gescannte Zeile neu nach ihrem
+// Rohtext. Leer bleibt sie nur, wenn sie wirklich nichts enthält.
+func rawContentLine(line sourceLine) sourceLine {
+	text := strings.TrimRight(line.raw, " \t")
+	indent := 0
+	for indent < len(text) && text[indent] == ' ' {
+		indent++
+	}
+	if indent == len(text) {
+		return line
+	}
+	line.blank = false
+	line.indent = indent
+	line.text = text
+	return line
 }
 
 func isSequenceItem(text string) bool {

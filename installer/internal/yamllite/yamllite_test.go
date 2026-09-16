@@ -146,3 +146,59 @@ func TestGleicheHinweiseFallenZusammen(t *testing.T) {
 		t.Errorf("zwei Hinweise müssen vollständig erscheinen: %v", err)
 	}
 }
+
+// Blockskalare als Listeneintrag — `- |` und `- >` — sind in Compose-Dateien
+// üblich (`command:`, `healthcheck.test:`). Ihr Rumpf ist Text: tiefer
+// eingerückte Zeilen darin sind keine Struktur und dürfen nicht gegen die
+// offenen Ebenen geprüft werden. Dasselbe gilt für `key: |`.
+func TestParseLiestBlockskalareAlsListeneintrag(t *testing.T) {
+	root, err := Parse([]byte(`services:
+  redis:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --requirepass "$$REDIS_PASSWORD"
+        fi
+        # Ohne Passwort
+        exec redis-server
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          redis-cli
+            ping
+      script: |
+          echo a
+            echo b
+        # Kommentar, weniger tief als der Rumpf
+  db:
+    image: postgres:15-alpine
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	command := root.Get("services", "redis", "command").List()
+	if len(command) != 3 {
+		t.Fatalf("command = %d Einträge, erwartet 3", len(command))
+	}
+	want := "if [ -n \"$$REDIS_PASSWORD\" ]; then\n  exec redis-server --requirepass \"$$REDIS_PASSWORD\"\nfi\n# Ohne Passwort\nexec redis-server"
+	if got := command[2].Str(); got != want {
+		t.Errorf("Blockskalar = %q, erwartet %q", got, want)
+	}
+	if command[2].At() != 7 {
+		t.Errorf("Zeile des Blockskalars = %d, erwartet 7", command[2].At())
+	}
+	test := root.Get("services", "redis", "healthcheck", "test").List()
+	if len(test) != 2 || test[1].Kind != Scalar || !strings.HasPrefix(test[1].Str(), "redis-cli") {
+		t.Errorf("healthcheck.test = %+v", test)
+	}
+	if got := root.Get("services", "redis", "healthcheck", "script").Str(); got != "echo a\n  echo b" {
+		t.Errorf("script = %q", got)
+	}
+	if got := root.Get("services", "db", "image").Str(); got != "postgres:15-alpine" {
+		t.Errorf("db.image = %q", got)
+	}
+}
