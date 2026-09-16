@@ -11,13 +11,19 @@ import (
 
 // repoRoot ist die Wurzel des Arbeitsstands. Die Tests laufen im
 // Paketverzeichnis, also drei Ebenen tiefer.
+//
+// Der Anker ist eine versionierte Datei. `K-PLAYBOOK.yaml` taugte dafür nicht:
+// Sie entsteht erst lokal beim ersten Start und ist im Quell-Repo ignoriert, im
+// Clone eines Runners fehlt sie also. Weil jeder Test dieses Pakets über diesen
+// Helper geht, riss der eine fehlende Anker die ganze CI mit; gelesen wird die
+// Datei ohnehin nie, alles Geprüfte liegt unter `scripts/`.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatalf("Wurzel auflösen: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "K-PLAYBOOK.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "VERSION")); err != nil {
 		t.Fatalf("Wurzel %s sieht nicht nach dem Arbeitsstand aus: %v", root, err)
 	}
 	return root

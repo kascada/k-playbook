@@ -1,0 +1,7 @@
+# Diese Fixture ist eine Testdatei, keine Python-Laufzeit: Das Projekt hier
+# enthält jede Quellart des Versionsinventars genau einmal, und
+# TestCollectLiestAlleQuellartenDerFixture prüft, dass alle erkannt werden.
+# Die Regel `.python-version` in der Wurzel meint echte Laufzeiten auf dem
+# Entwicklungsrechner und träfe diese Datei versehentlich mit; ohne sie fehlte
+# die Quellart im Clone, und die Prüfung wäre in der CI still unvollständig.
+!.python-version

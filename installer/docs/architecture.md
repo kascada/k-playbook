@@ -2040,7 +2040,7 @@ sendet. Betroffen ist dann nur `chat.go`.
 
 **Einspielen der Ereignisse.** `GET /api/chat/events` reicht `GET /event?directory=…` als
 `text/event-stream` durch, jeden gelesenen Block mit sofortigem Flush — gepuffert stockte
-die Live-Ausgabe. `chat.js` spielt ein wie die Web-App von OpenCode:
+die Live-Ausgabe. `chat-session.js` spielt ein wie die Web-App von OpenCode:
 
 | Ereignis | Wirkung |
 |---|---|
@@ -2049,9 +2049,12 @@ die Live-Ausgabe. `chat.js` spielt ein wie die Web-App von OpenCode:
 | `message.part.delta` | Text an das genannte Feld eines bekannten Teils hängen; ohne Teil verwerfen |
 | `message.removed`, `message.part.removed` | entfernen |
 | `session.status`, `session.idle` | „Arbeitet", „Wiederholt" oder „Bereit" |
-| `session.created`, `session.updated`, `session.deleted` | Sitzungsliste |
+| `session.created`, `session.updated`, `session.deleted` | Sitzungsliste; auf der Sitzungsseite merkt `session.created` mit `info.parentID` zugleich eine neue Kind-Sitzung |
+| `session.error` | Meldung; die Marke „Fehler" nur, wenn es kein `MessageAbortedError` ist |
 | `permission.asked`, `permission.replied` | Freigaben mit „Einmal", „Immer", „Ablehnen" |
-| `server.connected` | nach einem Wiederverbinden Sitzungen, Freigaben und Verlauf neu laden |
+| `question.asked` | Rückfrage ins Dock, wenn sie zu dieser Seite gehört; die Kennung steht in `id` |
+| `question.replied`, `question.rejected` | Kasten entfernen; die Kennung steht hier in `requestID` |
+| `server.connected` | nach einem Wiederverbinden Sitzungen, Freigaben, Rückfragen, Kind-Sitzungen, Verlauf und den Ausgang eines ausstehenden Commands neu laden |
 
 `step-start`, `step-finish`, `patch` und `snapshot` werden nicht angezeigt. Gemessen an einem
 Lauf am 2026-09-15: ein Textteil kommt zuerst leer, dann als Deltas, zuletzt vollständig;
@@ -2068,6 +2071,170 @@ wie die Doku; ohne `WithUnsafe` lässt es rohes HTML weg und entschärft Verweis
 schlichter Text. Das Reasoning — die Denkschritte des Modells, Teile vom Typ `reasoning` —
 steht klein und gedämpft ohne Rahmen vor der Antwort.
 
+**Rückfragen gehören ins Dock, nicht in den Verlauf.** Eine Rückfrage (`question.asked`) hält
+den Lauf an, bis sie beantwortet oder abgelehnt ist. Sie steht deshalb nicht im Verlauf,
+sondern in einem eigenen Dock `#chat-questions` neben dem der Freigaben über dem Formular.
+Der Grund ist die Bauweise des Verlaufs: `renderLog()` baut ihn mit `replaceChildren()`
+komplett neu, `refreshMessage(id)` ersetzt eine ganze Nachricht und rettet allein
+`details[open]`. Weil Textteile buchstabenweise als Deltas eintreffen, verlöre ein Formular
+dort laufend die halb getroffene Auswahl und den getippten Eigentext.
+
+**`renderQuestions` gleicht ab, statt neu zu bauen.** Die Platzierung im Dock allein genügt
+nicht: `renderPermissions()` baut sein Dock jedes Mal mit `replaceChildren()` neu, was bei
+reinen Knöpfen nicht auffällt. Ein Rückfragen-Kasten verlöre Auswahl und Eigentext dann bei
+jedem weiteren `question.asked`, bei `question.replied`/`question.rejected` und nach jedem
+Wiederverbinden. `renderQuestions` gleicht deshalb gegen den Schlüssel `request.id` ab: neue
+Kästen anhängen, verschwundene entfernen, stehende unberührt lassen.
+
+Der Abgleich läuft in beide Richtungen, und das ist keine Symmetrie um ihrer selbst willen,
+sondern die Selbstheilung, die das frühere Ersetzen hatte. Wird eine Anfrage während einer
+Trennung anderswo beantwortet, fehlt sie in der frisch geholten Liste, das Ereignis dazu hat
+die Seite aber nie gesehen; ohne die Gegenrichtung bliebe ihr Kasten für immer stehen und
+hielte über die Vorrangliste den Laufzustand dauerhaft auf „Wartet auf Antwort". `loadQuestions()`
+entfernt deshalb jeden stehenden Kasten, dessen Kennung in der frisch geholten Liste nicht
+vorkommt; die enthaltenen bleiben unberührt, Auswahl und Eigentext also gerettet. „Anhängen
+oder entfernen je Ereignis" gilt nur für den Ereignisweg.
+
+Ein Kasten trägt alle Fragen seiner Anfrage untereinander, je Frage Radios oder Kästchen nach
+`multiple` und immer ein Feld für eine eigene Antwort — das Schemafeld `custom` wertet auch die
+Web-App von OpenCode nirgends aus. Geantwortet wird für die ganze Anfrage auf einmal:
+`answers` trägt je Frage einen Eintrag in der Reihenfolge der Fragen, darin die `label`-Werte
+der gewählten Optionen, für eine unbeantwortete Frage eine leere Liste, damit die Positionen
+stimmen. Eine eigene Antwort ersetzt bei Einfachauswahl die Wahl und steht bei Mehrfachauswahl
+daneben.
+
+**Die Herkunftsprüfung fällt offen aus.** `GET /question` und `question.asked` gelten über alle
+Sitzungen. Ein `/k-…`-Command mit `subtask: true` läuft in einer Kind-Sitzung; filterte die
+Seite wie `renderPermissions()` hart auf `request.sessionID === sessionID`, bliebe dessen
+Rückfrage unsichtbar und der Lauf hinge — genau das, was der Chat verhindern soll. Gezeigt
+werden deshalb die Rückfragen der eigenen Sitzung und ihrer Nachkommen. Bekannt werden Kinder
+aus `GET /api/chat/sessions/{id}/children`, aus `session.created` mit
+`info.parentID === sessionID` und aus `state.metadata.sessionId` der `task`-Tool-Teile.
+
+Diese Liste entscheidet aber nicht allein, denn geschlossen angewandt verwürfe sie jede
+`question.asked`, die vor `session.created` oder vor dem `task`-Teil eintrifft, und jede aus
+einer Enkel-Sitzung: `children` liefert nur die erste Ebene, und `parentID === sessionID` trifft
+nur direkte Kinder. Bei unbekannter Sitzung holt die Seite sie deshalb einmalig über den
+vorhandenen `GET /api/chat/sessions/{id}` und verfolgt `Session.parentID` nach oben, bis sie bei
+der eigenen Sitzung ankommt oder die Kette endet; erst dann wird verworfen. Höchstens eine
+Anfrage je fremder Sitzung, und das Ergebnis wird gemerkt — ein Fehlschlag dagegen nicht, sonst
+versteckte ein einziger Aussetzer des Dienstes eine echte Rückfrage dauerhaft. Geprüft wird beim
+Eintragen in die Ablage, nicht beim Zeichnen: `renderQuestions` wird aus dem Ereignisstrom heraus
+gerufen und muss synchron bleiben, die Prüfung kann aber eine Anfrage an den Server brauchen. Ein
+Kasten aus einer Kind-Sitzung nennt seine Herkunft und verlinkt `/chat/<sessionID>`.
+
+**Der Laufzustand hat eine Vorrangliste.** Er entsteht aus mehreren Quellen zugleich;
+`setRunState` entscheidet deshalb nicht mehr allein aus dem Ereignis, und
+`renderQuestions`/`renderPermissions` stoßen ihn mit an. Die Reihenfolge von oben nach unten:
+abschließende Marke (nicht erreichbar, nicht gefunden, gelöscht) → Getrennt/Verbinde neu →
+Fehler → Wartet auf Antwort → Wiederholt/Arbeitet → Bereit. Die Verbindungsmarken gehören in
+dieselbe Liste, weil sie sonst vom nächsten Ereignis überschrieben würden. „Wartet auf Antwort"
+setzt eine offene Rückfrage der eigenen oder einer Kind-Sitzung oder eine offene Freigabe der
+eigenen Sitzung. „Fehler" bleibt nicht die ganze Sitzung stehen: das nächste Senden und das
+nächste `busy` räumen ihn, und ein `MessageAbortedError` setzt ihn gar nicht erst — ein Abbruch
+ist das gewollte Ende des Laufs, kein Fehler. Der Abbrechen-Knopf folgt dem Lauf, nicht der
+angezeigten Marke: bei „Wartet auf Antwort" läuft der Lauf weiter und bleibt abbrechbar.
+
+**Commands: die gefilterte Liste entscheidet zweimal.** `GET /command` liefert die Commands des
+Projekts; Einträge mit führendem `_` sind interne Bausteine und werden weggelassen. Dieselbe
+gefilterte Liste trägt die Vorschläge der Seite **und** die Namensprüfung beim Senden: ein von
+Hand getipptes `/_docs:code` ist damit auch beim Tippen kein Command, geht als gewöhnlicher Text
+hinaus, und wer den Endpunkt direkt aufruft, bekommt 400. Die Weiche folgt der Web-App von
+OpenCode: erstes Wort `/name` und `name` in der gefilterten Liste bekannt → Command, der Rest
+wird zu `arguments`; getrennt wird an beliebigem Leerraum, damit Argumente in einer zweiten Zeile
+denselben Command meinen wie die Vorschlagsliste, die den Namen ebenso beendet.
+
+**Der Command-Aufruf läuft abgekoppelt.** `POST /session/{sessionID}/command` antwortet erst nach
+dem ganzen Lauf — das können Minuten sein, und `openCodeRequestTimeout` (30 s) passt dafür nicht.
+`forwardOpenCode` ist hier unbrauchbar: es baut seinen Kontext aus
+`context.WithTimeout(r.Context(), …)` und schreibt direkt in `w`. Der Handler ist deshalb eine
+Methode auf `*serverState`; `chatTarget`, Verzeichnis, Rumpf und Namensprüfung laufen vor dem
+Start der Goroutine, die danach weder `w` noch `r` anfasst, und die Seite bekommt sofort
+`202 {"ok": true, "messageID": …}`. Der Kontext des abgekoppelten Aufrufs kommt aus
+`context.Background()` und ausdrücklich nicht aus `r.Context()`: die Anfrage ist mit der 202
+beendet, ein daran hängender Aufruf stürbe vor der Bearbeitung. Abgebrochen wird er allein über
+`state.streams` — und das beendet ausdrücklich nur die wartende HTTP-Anfrage an OpenCode. Der
+Lauf dort läuft weiter und endet allein über `POST …/abort`; Abbrechen bleibt Sache der Seite.
+
+**`command-state` ist der Rückweg für späte Fehler.** Scheitert der abgekoppelte Aufruf nach der
+202 — 404, 400, Modell- oder Providerfehler, Verbindungsabbruch —, entsteht kein Ereignis; nur zu
+protokollieren ließe die Seite dauerhaft auf „Arbeitet" stehen. Der Server merkt sich deshalb je
+Sitzung den letzten Ausgang unter einem eigenen Mutex, nur den letzten Eintrag und mit gekürztem
+Fehlerrumpf, und `GET /api/chat/sessions/{id}/command-state` liefert
+`{state: "running"|"done"|"failed"|"unknown", message?}`.
+
+`unknown` ist die Antwort für eine Sitzung **ohne Eintrag** — GUI neu gestartet, Command aus dem
+Terminal. Die Seite behandelt es als „nichts tun" und lässt den Laufzustand unberührt; `done`
+wäre dort irreführend. Ein Fehler geht genau einmal hinaus: danach trägt sein Eintrag eine
+Lesemarke und meldet sich als `done`. Gelöscht wird er nicht, denn dann antwortete
+`command-state` `unknown`, und die Vorgabe „bei `unknown` nichts tun" gilt dem Fall „kein
+Eintrag", nicht „Fehler schon abgeholt". Dass bei zwei offenen Tabs derselben Sitzung der erste
+Leser den Fehler wegräumt und der zweite ihn nicht mehr sieht, wird bewusst hingenommen.
+
+Die Ablage wächst nicht unbegrenzt; beim Verlassen von `running` wird sie begrenzt. Verdrängt
+werden dabei nur `done`-Einträge und bereits gelesene Fehler — ein ungelesener `failed` **nie**.
+Sonst höben sich die beiden Regeln gegenseitig auf: fiele er vor dem Abholen heraus, antwortete
+`command-state` `unknown`, die Seite täte laut Vorgabe nichts und bliebe auf „Arbeitet" stehen,
+also genau in dem Zustand, gegen den der Rückweg gebaut ist.
+
+Abgeholt wird wiederholt, etwa alle 5 s, bis der Zustand nicht mehr `running` ist, zusätzlich bei
+`session.idle` und nach jedem Wiederverbinden. Eine Stille-Frist („10 s ohne Ereignis") trüge
+nicht: bei einem `subtask`-Command entstehen in der Elternsitzung womöglich gar keine Ereignisse,
+und umgekehrt setzte jedes beliebige Sitzungsereignis die Frist zurück. Bei `failed` bekommt der
+Laufzustand die Marke „Fehler" und die Meldung den Fehlerbereich.
+
+`command-state` ist zugleich die einzige Ausnahme unter den Chat-Endpunkten: Er durchläuft
+`chatTarget` — Projektbezug und `containerGuard` gelten auch für ihn —, leitet aber nichts weiter
+und trägt deshalb **kein** `directory`, weil er nur lokalen Zustand liest.
+
+**Subtask-Commands.** Ein Command mit `subtask: true` (im Projekt z. B. `review`) läuft in einer
+Kind-Sitzung. Die Vorschlagsliste kennzeichnet ihn, und nach dem Senden sagt ein Hinweis, dass
+der Fortschritt dort entsteht: Rückfragen der Kind-Sitzung zeigt das Dock, ihre Freigaben (Bash,
+Datei schreiben) nicht — die sind allein auf deren eigener Seite zu beantworten. Der Hinweis
+verlinkt sie, sobald die Kennung bekannt ist.
+
+**Vorschlagsliste beim Tippen von `/`.** Steht am Anfang des Eingabefelds ein `/` und folgt kein
+Leerraum, zeigt die Seite die passenden Commands darunter (`#chat-suggestions`): höchstens acht,
+Namenstreffer am Anfang zuerst, Beschreibung gekürzt, Skills und `subtask` als `.pill`.
+Pfeiltasten laufen um, Enter und Tab übernehmen `/name ` samt Leerzeichen, Escape und der
+Fokusverlust schließen. Geschlossen fasst die Liste keine Taste an: Enter sendet, Tab springt
+weiter, die Pfeiltasten bewegen die Schreibmarke. Gespeist wird sie aus derselben Liste wie die
+Weiche beim Senden, einmal je Seite geladen.
+
+**Agentenauswahl.** `GET /api/chat/agents` liefert, was `GET /agent` kennt, außer
+`mode: "subagent"` und `hidden: true` — eine Prüfung auf `mode === "primary"` würfe die Agenten
+mit `mode: "all"` fälschlich weg und böte versteckte an. Die Vorgabe kommt aus `Session.agent`;
+der gewählte Agent geht bei Text und Command gleichermaßen mit. Kommt keine Liste, bleibt die
+Auswahl verborgen und OpenCode entscheidet wie bisher selbst.
+
+**Die eigene Nachricht steht sofort da.** Bis die echte Nachricht über den Ereignisstrom
+zurückkommt, zeigt die Seite eine vorläufige Blase. Zugeordnet wird sie über ein `messageID`, das
+die Weiterleitung erzeugt, an `prompt_async` bzw. `command` mitschickt und in ihrer Antwort
+zurückgibt: die Blase verschwindet genau dann, wenn die Nachricht mit dieser Kennung eintrifft,
+und es entsteht weder eine Doppelanzeige noch eine Geisterblase. Weil `renderLog()` per reinem
+Zeichenvergleich der Kennungen sortiert, wird die Blase hinter die sortierte Liste gehängt und
+nicht einsortiert.
+
+Das Format der Kennung ist nicht frei wählbar, und entscheidend ist die Ordnung **gegen die
+Kennungen von OpenCode**, nicht nur die der eigenen untereinander: weicht die Kodierung in
+Alphabet, Länge oder Auffüllung ab, sortieren alle eigenen Nutzernachrichten als Block vor oder
+hinter allen fremden — dauerhaft und auch nach dem Neuladen. Nachgebaut ist deshalb die gemessene
+Kodierung von `Identifier.ascending`: `msg_` + 12 Hexziffern + 14 Zeichen aus `[A-Za-z0-9]`,
+zusammen feste 30 Zeichen. Die Hexziffern sind `(Zeitstempel_ms << 12 | Zähler)`, auf 48 Bit
+abgeschnitten und links mit Nullen gefüllt; der Zähler beginnt mit jeder neuen Millisekunde
+wieder bei 1. Feste Länge und Auffüllung sind das, was den Zeichenvergleich überhaupt trägt —
+ohne sie sortierte jede kürzere Kennung vor jeder längeren, unabhängig von der Zeit. Ein Test
+prüft die Ordnung gegen eine tatsächlich beobachtete Kennung von OpenCode, nicht nur gegen zwei
+eigene. Der Rückfallweg ohne Kennung bleibt: verwirft der Dienst ein mitgeschicktes `messageID`,
+verschwindet die Blase beim ersten unbekannten `message.updated` mit `role: "user"`.
+
+**Kind-Sitzungen erreichen.** Ein Subagent-Aufruf ist ein Tool-Teil `task`;
+`state.metadata.sessionId` nennt die Kind-Sitzung. In dessen Kopfzeile steht „Subagent öffnen",
+ohne dass der Teil aufgeklappt werden muss, und eine Kind-Sitzung trägt neben dem Rückweg einen
+Link auf ihre Elternsitzung (`Session.parentID`). Den Weg nach unten gibt es damit über den
+`task`-Teil, den nach oben über den Link — die Liste `/chat` zeigt weiterhin nur oberste
+Sitzungen.
+
 **Ströme und Beenden.** Ein Ereignisstrom endet nie von selbst. `Serve()` registriert deshalb
 `closeStreams` über `RegisterOnShutdown`; der Handler bricht seine Anfrage an OpenCode ab,
 sobald `state.streams` geschlossen ist. Ohne das wartete `Shutdown` bei offener Chat-Seite
@@ -2075,11 +2242,27 @@ bis `shutdownTimeout` und endete mit einem Fehler. Den Leerlauf beeinflusst ein 
 nicht: gezählt wird der Beginn einer Anfrage, und wach hält den Server wie auf jeder Seite
 das Lebenszeichen.
 
-**Noch nicht gebaut:** Rückfragen (`question.asked`), Commands über
-`POST /session/{id}/command` — die Antwort kommt erst nach dem ganzen Lauf und braucht eine
-längere Frist als `openCodeRequestTimeout` —, Auswahl von Agent und Modell, Kind-Sitzungen
-der Subagenten und die sofortige Anzeige der eigenen Nachricht, die bisher erst mit dem
-Ereignis von OpenCode erscheint.
+**Noch nicht gebaut:** die Auswahl des Modells — der Agent wird gewählt, das Modell nicht — und
+die Aktionen des Terminal-Clients (kompaktieren, rückgängig, teilen, abzweigen, Shell `!`); sie
+sind keine Commands, sondern eigene Endpunkte.
+
+**Freigaben aus Kind-Sitzungen.** Rückfragen einer Kind-Sitzung zeigt die Seite, deren Freigaben
+nicht: `renderPermissions()` filtert weiter hart auf `request.sessionID === sessionID`. Das ist
+bewusst offen geblieben, damit der Umbau der Rückfragen nicht zwei Umstellungen zugleich trägt,
+und es fällt jetzt eher auf als vorher — ein `/k-…`-Command mit `subtask: true` lässt sich nun aus
+dem Browser starten. Der Hinweis nach einem solchen Command nennt die Lücke deshalb ausdrücklich
+und verlinkt die Kindseite, auf der deren Freigaben zu beantworten sind. Ein eigener Endpunkt
+entsteht dafür nicht; nachzuziehen wäre `renderPermissions()` auf dieselbe offene
+Herkunftsprüfung, die die Rückfragen schon benutzen.
+
+**Noch ungemessen** — was hier steht, braucht einen Durchgang im Browser gegen den echten
+Dienst, nicht nur ein Schema: ob die alte API ein mitgeschicktes `messageID` tatsächlich übernimmt, statt es zu
+ignorieren oder zu überschreiben (das Schema belegt nur, dass das Feld vorgesehen ist; solange es
+offen ist, bleibt der Rückfallweg ohne Kennung stehen), und ob die Elternsitzung für einen
+Subtask-Command wirklich einen `task`-Tool-Teil bekommt, an dem der Link „Subagent öffnen" hängt.
+Offen ist damit auch, ob die Elternkette über `Session.parentID` bei einer Enkel-Sitzung
+durchläuft.
+
 ## Web-API
 
 | Methode | Pfad | Zweck |
@@ -2130,10 +2313,18 @@ Ereignis von OpenCode erscheint.
 | `POST` | `/api/chat/sessions` | Sitzung anlegen, optional mit `title` |
 | `GET` | `/api/chat/sessions/{id}` | eine Sitzung, für den Titel ihrer Seite |
 | `GET` | `/api/chat/sessions/{id}/messages` | Verlauf einer Sitzung, `{info, parts}` je Nachricht |
-| `POST` | `/api/chat/sessions/{id}/prompt` | `{text}` als Textteil über `prompt_async` senden; antwortet `{"ok": true}`, den Lauf meldet der Ereignisstrom |
+| `GET` | `/api/chat/sessions/{id}/children` | direkte Kind-Sitzungen einer Sitzung, über `GET /session/{id}/children`; die Seite erkennt daran eine Rückfrage aus einem Subtask als zu ihr gehörig |
+| `POST` | `/api/chat/sessions/{id}/prompt` | `{text, agent?}` als Textteil über `prompt_async` senden; die Weiterleitung erzeugt das `messageID` und gibt es zurück (`{"ok": true, "messageID": …}`), den Lauf meldet der Ereignisstrom |
 | `POST` | `/api/chat/sessions/{id}/abort` | laufenden Lauf abbrechen |
+| `POST` | `/api/chat/sessions/{id}/command` | `{command, arguments, agent?}`; der Name wird gegen die gefilterte Liste geprüft (unbekannt → 400, ohne den Command-Endpunkt zu erreichen), dann läuft der Aufruf abgekoppelt aus `context.Background()` weiter und die Antwort kommt sofort als `202 {"ok": true, "messageID": …}` |
+| `GET` | `/api/chat/sessions/{id}/command-state` | Ausgang des abgekoppelten Aufrufs dieser Sitzung: `{state: "running"\|"done"\|"failed"\|"unknown", message?}`; ein Fehler geht genau einmal hinaus und meldet sich danach als `done`, eine Sitzung ohne Eintrag als `unknown`. Einzige Ausnahme unter den Chat-Routen: durchläuft `chatTarget`, leitet aber nichts weiter und trägt kein `directory` |
+| `GET` | `/api/chat/commands` | Commands des Projekts über `GET /command`, ohne die internen Bausteine mit führendem `_`; je Eintrag `name`, `description`, `source`, `hints`, `subtask`. Dieselbe Liste trägt Vorschläge und Namensprüfung |
+| `GET` | `/api/chat/agents` | Agenten über `GET /agent`, ohne `mode: "subagent"` und ohne `hidden: true` |
 | `GET` | `/api/chat/permissions` | offene Freigaben |
 | `POST` | `/api/chat/permissions/{id}/reply` | Freigabe beantworten mit `once`, `always` oder `reject` |
+| `GET` | `/api/chat/questions` | offene Rückfragen über `GET /question`; sie gelten über alle Sitzungen des Projekts, welche davon sie zeigt, entscheidet die Seite |
+| `POST` | `/api/chat/questions/{id}/reply` | Rückfrage beantworten mit `{answers}` — je Frage ein Eintrag in deren Reihenfolge, darin die `label`-Werte; geprüft als Liste von Listen von Zeichenketten, `null` wird zur leeren Liste. Trägt keine `sessionID`; die Antwort von OpenCode ist ein nacktes `true` und geht unverändert durch |
+| `POST` | `/api/chat/questions/{id}/reject` | Rückfrage ablehnen, ohne Rumpf; Antwort ebenfalls ein nacktes `true` |
 | `GET` | `/api/chat/events` | Ereignisstrom des Dienstes für das Projekt als `text/event-stream`; endet mit dem Server |
 | `POST` | `/api/chat/markdown` | `{texts}` mit Goldmark als HTML rendern, ohne rohes HTML und ohne gefährliche Verweise; höchstens 200 Texte; fragt OpenCode nicht |
 

@@ -1387,6 +1387,17 @@ button.attention-highlight {
   border-color: var(--accent);
 }
 
+/* Die vorläufige Blase steht schon da, bevor OpenCode die Nachricht bestätigt
+   hat. Sie wird gestrichelt und gedämpft gezeigt und verschwindet, sobald die
+   echte Nachricht unter derselben Kennung eintrifft. */
+.chat-message.pending {
+  border-style: dashed;
+}
+
+.chat-message.pending .chat-text {
+  color: var(--muted);
+}
+
 .chat-message-head {
   margin: 0;
 }
@@ -1437,6 +1448,13 @@ button.attention-highlight {
   white-space: nowrap;
 }
 
+/* Der Sprung in die Kind-Sitzung eines task-Aufrufs steht in der Kopfzeile des
+   Tool-Teils, nicht in seinem aufgeklappten Inneren: dort fände ihn niemand. */
+.chat-tool-open {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+}
+
 .chat-error {
   margin: 0;
   color: var(--error);
@@ -1453,6 +1471,61 @@ button.attention-highlight {
   border-radius: var(--radius-md);
   padding: var(--space-inset);
   background: var(--card);
+}
+
+/* Rückfragen: derselbe Kasten wie eine Freigabe, nur mit Inhalt. Er steht in
+   einem eigenen Dock und wird beim Abgleich nicht neu gebaut — getroffene
+   Auswahl und getippter Eigentext bleiben deshalb stehen. */
+.chat-question {
+  display: grid;
+  gap: var(--space-stack);
+}
+
+.chat-question-origin {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.chat-question-item {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.chat-question-text {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+}
+
+.chat-question-options {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Eine Option: Auswahlfeld links, Beschriftung daneben, die Erläuterung klein
+   darunter in derselben Spalte. */
+.chat-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2) var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.chat-option-description {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.chat-question-custom {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-inset);
+  color: var(--ink);
+  background: var(--field-bg);
+  font-size: var(--text-sm);
 }
 
 .chat-form {
@@ -1474,7 +1547,84 @@ button.attention-highlight {
 .chat-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-stack);
+}
+
+/* Auswahl des Agenten neben den Knöpfen. Das Wort davor ist eine Beschriftung
+   des Feldes, kein Zustand — es bleibt schlichter Text. */
+.chat-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.chat-agent-select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-5);
+  color: var(--ink);
+  background: var(--field-bg);
+  font-size: var(--text-sm);
+}
+
+/* Vorschlagsliste der Commands: sie liegt unter dem Eingabefeld und zeigt je
+   Zeile Name, gekürzte Beschreibung und die Kennzeichnungen. Ein Eintrag ist
+   ein Knopf und darf deshalb Fläche tragen; die Kennzeichnungen daneben sind
+   reine Beschriftungen und nutzen .pill — eigene Flächen bekommen sie nicht. */
+.chat-suggestions {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: var(--card);
+}
+
+.chat-suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-5);
+  color: var(--ink);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+}
+
+/* Die Zeile unter den Pfeiltasten sieht aus wie die unter dem Zeiger. */
+.chat-suggestion:hover,
+.chat-suggestion.active {
+  color: var(--accent-strong);
+  background: var(--accent-wash);
+}
+
+.chat-suggestion-name {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
+.chat-suggestion-description {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-suggestion-marks {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-6);
 }
 
 /* GitHub: die Seite /github — Repo und Zugang, Pull Requests, CI-Läufe. Alle

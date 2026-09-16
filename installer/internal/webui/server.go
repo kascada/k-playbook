@@ -64,6 +64,12 @@ type serverState struct {
 	// prüfen.
 	streams     chan struct{}
 	streamsOnce sync.Once
+
+	commandMu sync.Mutex
+	// commandRuns hält je Sitzung den letzten Ausgang des abgekoppelten
+	// Command-Aufrufs. Ohne ihn entstünde für einen Fehler nach der 202 kein
+	// Ereignis und die Seite bliebe dauerhaft auf „Arbeitet" stehen.
+	commandRuns map[string]*chatCommandOutcome
 }
 
 // Serve ist der Servermodus: der abgekoppelte Prozess hinter K_PLAYBOOK_SERVE=1.
@@ -252,10 +258,27 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("POST /api/chat/sessions", chatCreateSessionHandler)
 	mux.HandleFunc("GET /api/chat/sessions/{id}", chatSessionHandler)
 	mux.HandleFunc("GET /api/chat/sessions/{id}/messages", chatMessagesHandler)
+	// Die Kind-Sitzungen braucht die Seite, um eine Rückfrage aus einem
+	// Subtask als zu ihr gehörig zu erkennen.
+	mux.HandleFunc("GET /api/chat/sessions/{id}/children", chatSessionChildrenHandler)
 	mux.HandleFunc("POST /api/chat/sessions/{id}/prompt", chatPromptHandler)
 	mux.HandleFunc("POST /api/chat/sessions/{id}/abort", chatAbortHandler)
+	// Commands: die Liste ohne die internen Bausteine, das Senden abgekoppelt —
+	// OpenCode antwortet darauf erst nach dem ganzen Lauf — und der Ausgang des
+	// abgekoppelten Aufrufs, den sonst kein Ereignis meldete.
+	mux.HandleFunc("GET /api/chat/commands", chatCommandsHandler)
+	// Die Agenten, unter denen die Seite wählen lässt: alles außer Subagenten
+	// und versteckten.
+	mux.HandleFunc("GET /api/chat/agents", chatAgentsHandler)
+	mux.HandleFunc("POST /api/chat/sessions/{id}/command", state.chatCommandHandler)
+	mux.HandleFunc("GET /api/chat/sessions/{id}/command-state", state.chatCommandStateHandler)
 	mux.HandleFunc("GET /api/chat/permissions", chatPermissionsHandler)
 	mux.HandleFunc("POST /api/chat/permissions/{id}/reply", chatPermissionReplyHandler)
+	// Rückfragen des Agenten: die Liste gilt über alle Sitzungen, Antwort und
+	// Ablehnung brauchen nur die Kennung der Anfrage.
+	mux.HandleFunc("GET /api/chat/questions", chatQuestionsHandler)
+	mux.HandleFunc("POST /api/chat/questions/{id}/reply", chatQuestionReplyHandler)
+	mux.HandleFunc("POST /api/chat/questions/{id}/reject", chatQuestionRejectHandler)
 	mux.HandleFunc("GET /api/chat/events", state.chatEventsHandler)
 	// Rendert Antworttexte mit Goldmark; fragt OpenCode nicht.
 	mux.HandleFunc("POST /api/chat/markdown", chatMarkdownHandler)

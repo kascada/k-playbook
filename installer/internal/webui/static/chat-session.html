@@ -20,19 +20,35 @@
           <section class="card" id="chat-conversation-card">
             <div class="section-head">
               <div>
-                <p class="eyebrow"><a class="chat-back" href="/chat">&larr; Alle Sitzungen</a></p>
+                <!-- Auf einer Kind-Sitzung kommt hinter den Rückweg ein Link
+                     auf die Elternsitzung; die Kennung steht in parentID. -->
+                <p class="eyebrow"><a class="chat-back" href="/chat">&larr; Alle Sitzungen</a><span id="chat-parent"></span></p>
                 <h2 id="chat-title">Sitzung</h2>
               </div>
               <span id="chat-run-pill" class="pill muted">Laden...</span>
             </div>
             <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <!-- Zwei Docks über dem Formular, keine Formulare im Verlauf: der
+                 wird bei jedem Delta neu gebaut und verlöre laufend die halb
+                 getroffene Auswahl und den getippten Text. -->
             <div id="chat-permissions" class="chat-permissions" hidden></div>
+            <div id="chat-questions" class="chat-permissions" hidden></div>
             <form id="chat-form" class="chat-form">
               <textarea id="chat-input" class="chat-input" rows="3" disabled
                         placeholder="Nachricht an OpenCode – Enter sendet, Umschalt+Enter beginnt eine neue Zeile."></textarea>
+              <!-- Vorschlagsliste der Commands: sie steht unter dem Eingabefeld
+                   und erscheint, sobald dort ein / am Anfang getippt wird. -->
+              <div id="chat-suggestions" class="chat-suggestions" role="listbox" aria-label="Commands" hidden></div>
               <div class="chat-actions">
                 <button type="submit" id="chat-send" class="primary" disabled>Senden</button>
                 <button type="button" id="chat-abort" class="secondary" hidden>Abbrechen</button>
+                <!-- Auswahl des Agenten: Vorgabe aus der Sitzung, mitgesendet
+                     bei Text und Command. Bis die Liste da ist, bleibt sie
+                     verborgen — ohne Auswahl entscheidet OpenCode selbst. -->
+                <label class="chat-agent" id="chat-agent-row" hidden>
+                  <span>Agent</span>
+                  <select id="chat-agent" class="chat-agent-select"></select>
+                </label>
               </div>
             </form>
             <p id="chat-message" class="message"></p>
