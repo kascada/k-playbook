@@ -1,7 +1,10 @@
 package inventory
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 // envIndex ordnet ein Umgebungslabel in die feste Abschnittsreihenfolge ein.
@@ -58,7 +61,9 @@ func entryLess(a Entry, b Entry) bool {
 //
 // Eine Abweichung wird nie aufgelöst, zusammengefasst oder auf einen
 // „richtigen" Wert reduziert. Sie wird ausgewiesen, mit allen beteiligten
-// Zeilen und deren Herkunft.
+// Zeilen und deren Herkunft. Dass ein stimmiges Paar aus package.json und
+// package-lock.json als eine Aussage zählt, gilt nur für die Einteilung; die
+// Abweichung trägt trotzdem jede Zeile.
 func buildDeviations(entries []Entry) []Deviation {
 	groups := map[string][]int{}
 	var order []string
@@ -73,14 +78,12 @@ func buildDeviations(entries []Entry) []Deviation {
 	var deviations []Deviation
 	for _, group := range order {
 		indexes := groups[group]
-		if len(indexes) < 2 {
-			continue
-		}
-		if sameStatement(entries, indexes) {
+		units := statements(entries, indexes)
+		if len(units) < 2 || sameStatement(units) {
 			continue
 		}
 		art := DeviationEnvironmental
-		if conflicting(entries, indexes) {
+		if conflicting(units) {
 			art = DeviationConflicting
 		}
 		deviation := Deviation{Group: group, Art: art}
@@ -103,34 +106,119 @@ func buildDeviations(entries []Entry) []Deviation {
 	return deviations
 }
 
-// sameStatement: haben alle Zeilen dieselbe version und denselben pin, gibt es
-// keine Abweichung.
-func sameStatement(entries []Entry, indexes []int) bool {
-	first := statement(entries[indexes[0]])
-	for _, index := range indexes[1:] {
-		if statement(entries[index]) != first {
+// statement ist eine Aussage für die Einteilung: eine einzelne Zeile oder ein
+// stimmiges Paar. key vergleicht zwei Aussagen; ein Paar ist nie dieselbe
+// Aussage wie eine einzelne Zeile.
+type statement struct {
+	context string
+	key     string
+}
+
+// statements bildet die Aussagen einer Gruppe.
+//
+// Ein Paar entsteht nur zwischen einer Zeile aus package-lock.json und allen
+// Zeilen desselben Pakets aus dem package.json im selben Verzeichnis und
+// demselben Kontext. Stimmig ist es, wenn die Lock-Version jeden Bereich
+// erfüllt; dann ist es eine Aussage aus der Menge der Deklarationen und der
+// Lock-Version. Verletzt die Lock-Version einen Bereich, bekommt die Lock-Zeile
+// den Hinweis und das Paar zerfällt in seine Zeilen — wie auch dann, wenn ein
+// Bereich oder die Lock-Version nicht prüfbar ist.
+func statements(entries []Entry, indexes []int) []statement {
+	paired := map[int]bool{}
+	var units []statement
+	for _, lockIndex := range indexes {
+		lock := entries[lockIndex]
+		if lock.Manifest == "" || lock.Ecosystem != EcoNode {
+			continue
+		}
+		var declarations []int
+		for _, index := range indexes {
+			entry := entries[index]
+			if index != lockIndex && entry.Manifest == "" && entry.SourceFile == lock.Manifest && entry.Context == lock.Context {
+				declarations = append(declarations, index)
+			}
+		}
+		if len(declarations) == 0 {
+			continue
+		}
+		checkable := true
+		var violations []string
+		for _, index := range declarations {
+			declaration := entries[index]
+			satisfied, ok := npmSatisfies(declaration.Version, lock.Version)
+			switch {
+			case !ok:
+				checkable = false
+			case !satisfied:
+				violations = append(violations, rangeViolation(lock, declaration))
+			}
+		}
+		if len(violations) > 0 {
+			note := strings.Join(violations, "; ")
+			if entries[lockIndex].Note != "" {
+				note = entries[lockIndex].Note + "; " + note
+			}
+			entries[lockIndex].Note = note
+			continue
+		}
+		if !checkable {
+			continue
+		}
+		declared := make([]string, 0, len(declarations))
+		for _, index := range declarations {
+			declared = append(declared, rowKey(entries[index]))
+			paired[index] = true
+		}
+		sort.Strings(declared)
+		paired[lockIndex] = true
+		units = append(units, statement{context: lock.Context,
+			key: "paar\x00" + strings.Join(declared, "\x01") + "\x02" + rowKey(lock)})
+	}
+	for _, index := range indexes {
+		if !paired[index] {
+			units = append(units, statement{context: entries[index].Context, key: "zeile\x00" + rowKey(entries[index])})
+		}
+	}
+	return units
+}
+
+// rangeViolation ist der Hinweis an der Lock-Zeile, wortgleich wie im Vertrag.
+func rangeViolation(lock Entry, declaration Entry) string {
+	location := declaration.SourceFile
+	if declaration.SourceLine > 0 {
+		location += ":" + strconv.Itoa(declaration.SourceLine)
+	}
+	return fmt.Sprintf("Lock-Version %s erfüllt den Range %s nicht (%s, %s)",
+		lock.Version, declaration.Version, location, declaration.SourceKey)
+}
+
+// rowKey ist die Aussage einer einzelnen Zeile: version und pin.
+func rowKey(entry Entry) string {
+	return entry.Version + "\x00" + entry.Pin
+}
+
+// sameStatement: sagen alle Aussagen dasselbe, gibt es keine Abweichung.
+func sameStatement(units []statement) bool {
+	for _, unit := range units[1:] {
+		if unit.key != units[0].key {
 			return false
 		}
 	}
 	return true
 }
 
-func statement(entry Entry) string {
-	return entry.Version + "\x00" + entry.Pin
-}
-
-// conflicting: tragen zwei abweichende Zeilen denselben Kontext, ist die
-// Abweichung widersprüchlich — Manifest gegen Lockfile, zwei Compose-Dateien
-// derselben Umgebung, Chart.yaml gegen Chart.lock. Tragen sie verschiedene, ist
-// sie umgebungsbedingt und meist Absicht.
-func conflicting(entries []Entry, indexes []int) bool {
+// conflicting: sagen zwei Aussagen desselben Kontexts Verschiedenes, ist die
+// Abweichung widersprüchlich — zwei Compose-Dateien derselben Umgebung,
+// Chart.yaml gegen Chart.lock, zwei Manifeste mit verschiedener Deklaration,
+// ein Manifest gegen ein Lockfile außerhalb der Paarregel. Tragen sie
+// verschiedene Kontexte, ist sie umgebungsbedingt und meist Absicht.
+func conflicting(units []statement) bool {
 	perContext := map[string]string{}
-	for _, index := range indexes {
-		entry := entries[index]
-		if previous, seen := perContext[entry.Context]; seen && previous != statement(entry) {
+	for _, unit := range units {
+		if previous, seen := perContext[unit.context]; seen && previous != unit.key {
 			return true
 		}
-		perContext[entry.Context] = statement(entry)
+		perContext[unit.context] = unit.key
 	}
 	return false
 }

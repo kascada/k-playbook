@@ -118,13 +118,20 @@ type Entry struct {
 	Group             string `json:"group"`
 	Deviation         string `json:"deviation,omitempty"`
 	Note              string `json:"note,omitempty"`
+	// Manifest ist bei einer Zeile aus package-lock.json das package.json im
+	// selben Verzeichnis, als SourceFile-Wert. Es verknüpft die Zeile für die
+	// Paarregel mit ihren Deklarationen und ist nur dafür da: kein Feld der
+	// Inventarzeile, nicht im JSON. Zeilen aus yarn.lock und pnpm-lock.yaml
+	// tragen es nicht — dort ist die Zuordnung nicht eindeutig oder die Zeile
+	// hat keine aufgelöste Version.
+	Manifest string `json:"-"`
 }
 
 // Die beiden Arten einer Abweichung.
 const (
 	// DeviationConflicting: dieselbe Umgebung sagt Verschiedenes. Das wirft eine
-	// Frage auf — Manifest gegen Lockfile, zwei Compose-Dateien derselben
-	// Umgebung, Chart.yaml gegen Chart.lock.
+	// Frage auf — Manifest gegen Lockfile außerhalb der Paarregel, zwei
+	// Compose-Dateien derselben Umgebung, Chart.yaml gegen Chart.lock.
 	DeviationConflicting = "widersprüchlich"
 	// DeviationEnvironmental: verschiedene Umgebungen sagen Verschiedenes. Das
 	// ist der Normalfall und meist Absicht.
@@ -152,6 +159,24 @@ type SourceRead struct {
 	// Note ist der Anzeigetext aus version-sources.yaml; er gehört nur in die
 	// Quellenliste der Inventardatei.
 	Note string `json:"note,omitempty"`
+	// Unevaluable ist der Zustand „nicht auswertbar": die Quelle wurde gelesen,
+	// konnte als Ganzes aber nicht ausgewertet werden — eigener Parse-Fehler,
+	// fehlendes Wurzelpaket oder ein benötigtes Manifest, das fehlt, nicht
+	// lesbar oder ausgeschlossen ist. Der Grund steht als Hinweis zur Quelle.
+	Unevaluable bool `json:"unevaluable,omitempty"`
+}
+
+// UnevaluableSources liefert die Quellen im Zustand „nicht auswertbar", in der
+// Reihenfolge der Quellentabelle. Datei, Subkommando und Oberfläche zählen über
+// diese eine Funktion, damit die Zahl überall dieselbe ist.
+func (r Result) UnevaluableSources() []SourceRead {
+	var sources []SourceRead
+	for _, source := range r.Sources {
+		if source.Unevaluable {
+			sources = append(sources, source)
+		}
+	}
+	return sources
 }
 
 // Rejection ist ein Pfad, den die Vertrauensgrenze abgelehnt hat. Sie nennt den

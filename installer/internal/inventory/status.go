@@ -34,6 +34,9 @@ type Status struct {
 	// übergangen hat — die Installation und, wenn konfiguriert, die Muster aus
 	// `exclude:`.
 	SourcesExcluded int `json:"sourcesExcluded"`
+	// SourcesUnevaluable ist die Zahl der Quellen im Zustand „nicht
+	// auswertbar": gelesen, aber als Ganzes nicht ausgewertet.
+	SourcesUnevaluable int `json:"sourcesUnevaluable"`
 	// Problem ist ein sichtbarer Befund zum Bestand: die Datei ist da, ihr
 	// Frontmatter aber unvollständig oder defekt. Ein stilles Nullergebnis gibt
 	// es nicht.
@@ -77,6 +80,7 @@ func fillStatus(status *Status, data []byte) {
 	status.Deviations, _ = root.Get("inventory", "deviations").Int()
 	status.Rejected, _ = root.Get("inventory", "rejected").Int()
 	status.SourcesExcluded, _ = root.Get("inventory", "sources-excluded").Int()
+	status.SourcesUnevaluable, _ = root.Get("inventory", "sources-unevaluable").Int()
 
 	var missing []string
 	for _, field := range []struct{ name, value string }{
@@ -104,6 +108,7 @@ func fillStatus(status *Status, data []byte) {
 		{"inventory.deviations", root.Get("inventory", "deviations")},
 		{"inventory.rejected", root.Get("inventory", "rejected")},
 		{"inventory.sources-excluded", root.Get("inventory", "sources-excluded")},
+		{"inventory.sources-unevaluable", root.Get("inventory", "sources-unevaluable")},
 	} {
 		if field.node == nil || field.node.Str() == "" {
 			missing = append(missing, field.name)

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,44 @@ exclude:
 	if len(state.Exclude) != 1 || state.Exclude[0] != "tests/fixtures/**" {
 		t.Errorf("exclude = %v — der Zustand muss vollständig aus context kommen", state.Exclude)
 	}
+	if len(state.HelmValues) != 0 {
+		t.Errorf("helmValues = %+v, erwartet leer", state.HelmValues)
+	}
+}
+
+// helm_values steht in der Kontextausgabe wie in der Datei — unter Fassung 1
+// auch dann, wenn der Sammler den Abschnitt ablehnt.
+func TestBuildContextGibtHelmValuesAus(t *testing.T) {
+	for _, version := range []string{"1", "2"} {
+		t.Run("Fassung "+version, func(t *testing.T) {
+			root := newContextProject(t)
+			write(t, versionSourcesPath(root), "schema_version: "+version+`
+helm_values:
+  - path: omni-gw/helm/values.yaml
+    key: helm-chart-generic.redis.standalone.tag
+    item: container/redis
+`)
+			context, err := BuildContext(root)
+			if err != nil {
+				t.Fatalf("BuildContext: %v", err)
+			}
+			state := context.VersionSources
+			if state.Error != "" || len(state.HelmValues) != 1 {
+				t.Fatalf("Zustand = %+v", state)
+			}
+			value := state.HelmValues[0]
+			if value.Path != "omni-gw/helm/values.yaml" || value.Key != "helm-chart-generic.redis.standalone.tag" || value.Item != "container/redis" {
+				t.Errorf("Eintrag = %+v", value)
+			}
+			data, err := json.Marshal(state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(data), `"helmValues":[{"path":"omni-gw/helm/values.yaml","key":"helm-chart-generic.redis.standalone.tag","item":"container/redis"}]`) {
+				t.Errorf("JSON = %s", data)
+			}
+		})
+	}
 }
 
 // Eine defekte Zusatzkonfiguration darf nicht jeden Command lahmlegen: der
@@ -108,7 +147,10 @@ func TestVersionSourcesVorlageIstEineGueltigeLeereKonfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("die Vorlage muss lesbar sein: %v", err)
 	}
-	if config.SchemaVersion != versionsources.SchemaVersion {
+	// Die Vorlage bleibt bei Fassung 1: 2 braucht nur, wer helm_values
+	// einträgt, und eine neu angelegte Datei soll ältere Installationen
+	// desselben Projekts nicht aussperren.
+	if config.SchemaVersion != versionsources.MinSchemaVersion {
 		t.Errorf("schema_version = %d", config.SchemaVersion)
 	}
 	if len(config.Roots) != 0 || len(config.Sources) != 0 || len(config.Exclude) != 0 {

@@ -300,15 +300,16 @@ func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
 	writeVersionSources(t, root, "schema_version: 1\nroots:\n  - /srv/deploy\nsources:\n"+
 		"  - path: /srv/deploy/values.yaml\n    kind: helm\n    env: deployment\n"+
 		"  - path: docs/extra.txt\n    kind: python\n    env: lokal\n    optional: true\n"+
-		"exclude:\n  - tests/fixtures/**\n")
+		"exclude:\n  - tests/fixtures/**\n"+
+		"helm_values:\n  - path: helm/values.yaml\n    key: redis.standalone.tag\n    item: container/redis\n")
 
 	var state inventoryResponse
 	getJSON(t, "/api/inventory", &state)
 	if !state.Sources.Present || state.Sources.Error != "" {
 		t.Fatalf("Quellenkonfiguration = %+v", state.Sources)
 	}
-	if state.Sources.Roots != 1 || state.Sources.Sources != 2 || state.Sources.Exclude != 1 {
-		t.Errorf("Zahlen = %+v, erwartet 1 Wurzel, 2 Quellen, 1 Ausschluss", state.Sources)
+	if state.Sources.Roots != 1 || state.Sources.Sources != 2 || state.Sources.Exclude != 1 || state.Sources.HelmValues != 1 {
+		t.Errorf("Zahlen = %+v, erwartet 1 Wurzel, 2 Quellen, 1 Ausschluss, 1 Helm-Wert", state.Sources)
 	}
 }
 
@@ -368,5 +369,40 @@ func TestInventarseiteTraegtDenBereich(t *testing.T) {
 	}
 	if strings.Contains(body, "<input") || strings.Contains(body, "<textarea") {
 		t.Error("die Seite trägt ein Eingabefeld — die Quellenkonfiguration wird nur angezeigt")
+	}
+}
+
+// Eine nicht auswertbare Quelle steht in der Antwort mit Datei und Quellart,
+// und Lauf, Frontmatter und Fachlogik nennen dieselbe Zahl.
+func TestInventarAnstossFuehrtNichtAuswertbareQuellen(t *testing.T) {
+	root := newInventoryProject(t)
+	if err := os.WriteFile(filepath.Join(root, "docker-compose.yml"), []byte("services: [\n"), 0o644); err != nil {
+		t.Fatalf("schreiben: %v", err)
+	}
+
+	code, response := postInventory(t)
+	if code != http.StatusOK || !response.OK {
+		t.Fatalf("Status %d, Antwort %+v", code, response)
+	}
+	if len(response.Unevaluable) != 1 || response.Unevaluable[0].File != "docker-compose.yml" || !response.Unevaluable[0].Unevaluable {
+		t.Fatalf("nicht auswertbare Quellen = %+v", response.Unevaluable)
+	}
+
+	result, err := inventory.Collect(inventoryOptions(root))
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	want := len(result.UnevaluableSources())
+	if want != 1 || response.Summary.Unevaluable != want || response.Status.SourcesUnevaluable != want {
+		t.Errorf("Fachlogik %d, Summary %d, Status %d — erwartet überall 1",
+			want, response.Summary.Unevaluable, response.Status.SourcesUnevaluable)
+	}
+
+	content, err := os.ReadFile(response.Outcome.Path)
+	if err != nil {
+		t.Fatalf("Inventar lesen: %v", err)
+	}
+	if !strings.Contains(string(content), "| `docker-compose.yml` | compose | dev | 0 | nicht auswertbar |") {
+		t.Errorf("die Quellentabelle zeigt den Zustand nicht:\n%s", content)
 	}
 }

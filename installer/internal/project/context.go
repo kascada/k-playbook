@@ -104,6 +104,10 @@ type VersionSources struct {
 	// Exclude sind die Muster, die von der Standarderkennung übergangen werden.
 	// Sie wirken nur dort: was unter Sources ausdrücklich steht, bleibt gelesen.
 	Exclude []string `json:"exclude,omitempty"`
+	// HelmValues sind die konfigurierten Helm-Werte. Wie bei Sources stehen
+	// auch abgelehnte Einträge darin — auch alle unter schema_version 1, wo der
+	// Abschnitt nicht angewandt wird.
+	HelmValues []VersionHelmValue `json:"helmValues,omitempty"`
 	// Error ist gesetzt, wenn die Datei da, aber nicht lesbar oder von
 	// unbekannter Fassung ist. Dann sind Roots und Sources leer und der Zustand
 	// ist ein sichtbarer Befund statt eines stillen Leerergebnisses. Der
@@ -123,6 +127,14 @@ type VersionSource struct {
 	Note string `json:"note,omitempty"`
 	// Optional: true heißt, dass eine fehlende Datei kein Hinweis ist.
 	Optional bool `json:"optional,omitempty"`
+}
+
+// VersionHelmValue ist ein Eintrag aus helm_values:. Die Felder heißen wie die
+// YAML-Schlüssel.
+type VersionHelmValue struct {
+	Path string `json:"path"`
+	Key  string `json:"key"`
+	Item string `json:"item"`
 }
 
 // readVersionSources löst den Zustand der Quellenkonfiguration auf.
@@ -159,6 +171,13 @@ func readVersionSources(localDir string) *VersionSources {
 			Env:      source.Env,
 			Note:     source.Note,
 			Optional: source.Optional,
+		})
+	}
+	for _, value := range config.HelmValues {
+		state.HelmValues = append(state.HelmValues, VersionHelmValue{
+			Path: value.Path,
+			Key:  value.Key,
+			Item: value.Item,
 		})
 	}
 	return state

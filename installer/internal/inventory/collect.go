@@ -81,9 +81,13 @@ func Collect(options Options) (Result, error) {
 	result.Rejections = append(result.Rejections, rejections...)
 	result.Exclusions = exclusions
 
+	valuesByFile, valueTargets, valueNotes := planHelmValues(boundary, config.ValidHelmValues())
+	result.Notes = append(result.Notes, valueNotes...)
+
 	for _, item := range candidates {
-		readCandidate(boundary, item, config.Exclude, &result)
+		readCandidate(boundary, item, config.Exclude, valuesByFile, &result)
 	}
+	finishHelmValues(boundary, valueTargets, config.Exclude, &result)
 
 	sortEntries(result.Entries)
 	result.Deviations = buildDeviations(result.Entries)
@@ -161,20 +165,24 @@ func planSources(boundary *Boundary, config versionsources.Config) ([]candidate,
 
 // readCandidate öffnet eine geplante Quelle — ausschließlich über die
 // Vertrauensgrenze — und wertet sie aus.
-func readCandidate(boundary *Boundary, item candidate, excludes []string, result *Result) {
+func readCandidate(boundary *Boundary, item candidate, excludes []string, values map[string][]*valueTarget, result *Result) {
 	data, resolved, exists, err := boundary.ReadFile(item.Requested)
 	if err != nil {
 		var pathError *PathError
 		if errorsAs(err, &pathError) {
 			result.Rejections = append(result.Rejections, pathError.Rejection())
+			markUnread(values[pathError.Resolved], "die Datei wurde abgelehnt: "+pathError.Reason)
 			return
 		}
 		result.Rejections = append(result.Rejections, Rejection{
 			Requested: item.Requested, Resolved: resolved, Reason: err.Error()})
+		markUnread(values[resolved], "die Datei wurde abgelehnt: "+err.Error())
 		return
 	}
 	display := displayPath(boundary.ProjectRoot(), resolved)
+	targets := values[resolved]
 	if !exists {
+		markUnread(targets, "die Datei liegt nicht auf der Platte")
 		if item.Optional {
 			return
 		}
@@ -191,23 +199,40 @@ func readCandidate(boundary *Boundary, item candidate, excludes []string, result
 		EnvOrigin: item.EnvOrigin,
 		Data:      data,
 	}
+	// Ein Lockfile, dessen benötigtes Manifest fehlt, nicht lesbar oder
+	// ausgeschlossen ist, ist als Ganzes nicht auswertbar. Der Zustand steht am
+	// Lockfile, denn das ist die Quelle, die deshalb nichts liefert — nicht am
+	// Manifest, das womöglich gar nicht gelesen wurde.
+	unevaluable := false
 	if manifest := lockManifest(item.Kind, filepath.Base(resolved)); manifest != "" {
 		direct, note := lockDirect(boundary, resolved, manifest, item, excludes)
 		if note != "" {
 			result.Notes = append(result.Notes, Note{Source: display, Text: note})
+			unevaluable = true
 		}
 		context.Direct = direct
 	}
-	entries, notes := parseFile(context)
+	context.Values = targets
+	entries, notes, failed := parseFile(context)
+	switch {
+	case failed:
+		markUnread(targets, "die Datei ist nicht auswertbar")
+	case item.Kind != KindHelm:
+		markUnread(targets, "die Datei wird als "+item.Kind+" gelesen, nicht als Helm-values")
+	default:
+		// Chart.yaml und Chart.lock sind Helm, aber keine values-Datei.
+		markUnread(targets, "die Datei wird als "+filepath.Base(resolved)+" gelesen, nicht als Helm-values")
+	}
 	result.Entries = append(result.Entries, entries...)
 	result.Notes = append(result.Notes, notes...)
 	result.Sources = append(result.Sources, SourceRead{
-		File:       display,
-		Kind:       item.Kind,
-		Env:        item.Env,
-		Entries:    len(entries),
-		Configured: item.Configured,
-		Note:       item.Note,
+		File:        display,
+		Kind:        item.Kind,
+		Env:         item.Env,
+		Entries:     len(entries),
+		Configured:  item.Configured,
+		Note:        item.Note,
+		Unevaluable: unevaluable || failed,
 	})
 }
 
@@ -245,10 +270,10 @@ func lockDirect(boundary *Boundary, lockPath, manifest string, item candidate, e
 	if !exists {
 		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s fehlt", displayManifest, displayLock)
 	}
-	entries, notes := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), resolved), Base: manifest,
+	entries, notes, failed := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), resolved), Base: manifest,
 		Kind: item.Kind, Env: item.Env, EnvOrigin: item.EnvOrigin, Data: data})
-	if len(notes) > 0 {
-		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s ist nicht lesbar: %s", displayManifest, displayLock, notes[0].Text)
+	if failed {
+		return nil, fmt.Sprintf("zugehöriges Manifest %s für Lockfile %s ist nicht lesbar: %s", displayManifest, displayLock, notes[len(notes)-1].Text)
 	}
 	direct := map[string]string{}
 	for _, entry := range entries {
@@ -281,10 +306,10 @@ func lockDirect(boundary *Boundary, lockPath, manifest string, item candidate, e
 				}
 				return nil, fmt.Sprintf("Workspace-Manifest %s für Lockfile %s %s", displayPath(boundary.ProjectRoot(), member), displayLock, reason)
 			}
-			memberEntries, memberNotes := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), memberResolved), Base: manifest,
+			memberEntries, memberNotes, memberFailed := parseFile(fileContext{Display: displayPath(boundary.ProjectRoot(), memberResolved), Base: manifest,
 				Kind: item.Kind, Env: item.Env, EnvOrigin: item.EnvOrigin, Data: memberData})
-			if len(memberNotes) > 0 {
-				return nil, fmt.Sprintf("Workspace-Manifest %s für Lockfile %s ist nicht lesbar: %s", displayPath(boundary.ProjectRoot(), member), displayLock, memberNotes[0].Text)
+			if memberFailed {
+				return nil, fmt.Sprintf("Workspace-Manifest %s für Lockfile %s ist nicht lesbar: %s", displayPath(boundary.ProjectRoot(), member), displayLock, memberNotes[len(memberNotes)-1].Text)
 			}
 			for _, entry := range memberEntries {
 				if entry.KindOfThing == ThingPackage {

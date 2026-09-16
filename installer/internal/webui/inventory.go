@@ -41,6 +41,9 @@ type inventorySourcesState struct {
 	Roots       int    `json:"roots"`
 	Sources     int    `json:"sources"`
 	Exclude     int    `json:"exclude"`
+	// HelmValues ist die Zahl der Einträge unter helm_values, abgelehnte
+	// eingeschlossen — wie Sources.
+	HelmValues int `json:"helmValues"`
 	// Error ist gesetzt, wenn die Datei da, aber nicht lesbar oder von
 	// unbekannter Fassung ist. Der Erhebungslauf bricht dann ab; die Anzeige
 	// nennt den Grund.
@@ -68,7 +71,10 @@ type inventoryRunSummary struct {
 	Conflicting       int `json:"conflicting"`
 	Rejected          int `json:"rejected"`
 	Excluded          int `json:"excluded"`
-	Notes             int `json:"notes"`
+	// Unevaluable ist die Zahl der Quellen im Zustand „nicht auswertbar" —
+	// dieselbe Zahl wie in der Übersicht und im Frontmatter der Datei.
+	Unevaluable int `json:"unevaluable"`
+	Notes       int `json:"notes"`
 }
 
 // inventoryRunResponse ist die Antwort auf einen Anstoß. Ablehnungen,
@@ -88,7 +94,10 @@ type inventoryRunResponse struct {
 	Summary    inventoryRunSummary   `json:"summary"`
 	Rejections []inventory.Rejection `json:"rejections"`
 	Exclusions []inventory.Exclusion `json:"exclusions"`
-	Notes      []inventory.Note      `json:"notes"`
+	// Unevaluable sind die Quellen im Zustand „nicht auswertbar", mit Datei
+	// und Quellart; der Grund steht unter Notes.
+	Unevaluable []inventory.SourceRead `json:"unevaluable"`
+	Notes       []inventory.Note       `json:"notes"`
 	// Status ist der Stand nach dem Lauf, aus dem Frontmatter gelesen — so,
 	// wie GET /api/inventory ihn liefert.
 	Status      inventory.Status `json:"status"`
@@ -143,6 +152,7 @@ func inventorySources(projectDir string, path string) inventorySourcesState {
 	state.Roots = len(config.Roots)
 	state.Sources = len(config.Sources)
 	state.Exclude = len(config.Exclude)
+	state.HelmValues = len(config.HelmValues)
 	return state
 }
 
@@ -186,6 +196,7 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 		DisplayPath: inventoryDisplayPath(environment.ProjectDir, options.InventoryFile),
 		Rejections:  []inventory.Rejection{},
 		Exclusions:  []inventory.Exclusion{},
+		Unevaluable: []inventory.SourceRead{},
 		Notes:       []inventory.Note{},
 	}
 
@@ -211,6 +222,9 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	if result.Exclusions != nil {
 		response.Exclusions = result.Exclusions
 	}
+	if unevaluable := result.UnevaluableSources(); unevaluable != nil {
+		response.Unevaluable = unevaluable
+	}
 	if result.Notes != nil {
 		response.Notes = result.Notes
 	}
@@ -228,6 +242,7 @@ func summarizeInventoryRun(result inventory.Result) inventoryRunSummary {
 		Entries:           len(result.Entries),
 		Deviations:        len(result.Deviations),
 		Rejected:          len(result.Rejections),
+		Unevaluable:       len(result.UnevaluableSources()),
 		Notes:             len(result.Notes),
 	}
 	for _, deviation := range result.Deviations {

@@ -59,8 +59,9 @@ Zwei Auskünfte, beide ohne eigene Dateilektüre:
 1. **Die Quellenkonfiguration** aus dem Feld `versionSources` der Context-Ausgabe. Lies
    `VERSION_SOURCES_PATH` **nicht** selbst — dieselbe Regel wie für `K-PLAYBOOK.yaml`. Drei
    Zustände, und mehr nicht:
-   - `present: true`, `error` leer → gültig. `roots`, `sources` und `exclude` tragen den
-     Inhalt; leere Listen heißen „nichts konfiguriert".
+   - `present: true`, `error` leer → gültig. `roots`, `sources`, `exclude` und
+     `helmValues` tragen den Inhalt; leere Listen heißen „nichts konfiguriert".
+     `schemaVersion` ist `1` oder `2`; `helmValues` wirkt nur unter `2`.
    - `present: false` → fehlt. Es gelten die Standardquellen unterhalb der Projektwurzel.
    - `error` gefüllt → defekt. Der Erhebungslauf bricht damit ab (Fehlerfälle unten).
    Fehlt das Feld `versionSources` ganz, ist die Installation älter als es: das sagen und
@@ -75,7 +76,7 @@ Zeige die Lage kompakt:
 /k-doc-inventory — Quellenlage
 ─────────────────────────────────────
 Inventar      erhoben <generated.at>, <N> Quellen, <N> Abweichungen | fehlt
-Quellkonfig   vorhanden (<N> Wurzeln, <N> Quellen, <N> Ausschlüsse) | fehlt | defekt: <error>
+Quellkonfig   vorhanden (<N> Wurzeln, <N> Quellen, <N> Ausschlüsse, <N> Helm-Werte) | fehlt | defekt: <error>
 ```
 
 ## Schritt 3 — Weitere Quellen erfragen
@@ -98,6 +99,9 @@ Lockfiles, Dockerfiles, Compose, DevContainer, Helm und CI.
 4. Gibt es umgekehrt Bereiche, die *nicht* mitgescannt werden sollen? Testfixtures
    und Beispielprojekte etwa, deren Versionen absichtlich alt oder widersprüchlich
    sind und über das Projekt nichts aussagen.
+5. Stehen in Helm-values Versionen, die keine Image-Referenz sind — etwa ein Tag, den
+   ein Subchart entgegennimmt? Dann brauchen sie Datei, Schlüsselpfad und Gegenstand
+   (`container/<name>`).
 
 Ohne Angabe läuft die Erhebung mit den Standardquellen; das ist eine gültige
 Antwort und kein Mangel.
@@ -105,6 +109,11 @@ Antwort und kein Mangel.
 
 Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht in Frage 4 — das
 regelt der Vertrag, nicht die Konfiguration.
+
+Nennt der Nutzer auf Frage 5 Werte, ordne jedem `path`, `key` und `item` zu, wie sie der
+Vertrag unter „Configured Helm values" beschreibt; der Kontext der Zeile kommt aus der
+Quelle, als die die Datei gelesen wird, nicht aus dem Eintrag. Rate keinen Imagenamen:
+fehlt er, frag danach.
 
 Antwortet der Nutzer mit Quellen, ordne jeder eine Quellart (`kind`) und ein Umgebungslabel
 (`env`) aus den geschlossenen Mengen des Vertrags zu und zeige die Zuordnung, bevor
@@ -115,15 +124,19 @@ zusätzlich eine Wurzel unter `roots:` — ein absoluter Pfad in `sources:` gibt
 ## Schritt 4 — Quellenkonfiguration ergänzen
 
 Nur wenn Schritt 3 Quellen ergeben hat **und** der Nutzer Frage 3 bejaht hat, oder wenn er
-auf Frage 4 Bereiche genannt hat. Für `exclude:` gilt dieselbe Schreibregel wie für
-`sources:` — die Liste unten macht dabei keinen Unterschied zwischen beiden.
+auf Frage 4 Bereiche oder auf Frage 5 Helm-Werte genannt hat. Für `exclude:` und
+`helm_values:` gilt dieselbe Schreibregel wie für `sources:` — die Liste unten macht dabei
+keinen Unterschied zwischen ihnen.
 
 Die Datei ist handgepflegt. Für sie gilt die Schreibregel des Vertrags, und sie gilt für
 jeden Aufrufweg gleich:
 
 - **Nur nach ausdrücklicher Bestätigung.** Ohne sie wird nicht geschrieben. Ein „ja" auf
   Frage 3 aus Schritt 3 ist diese Bestätigung nur zusammen mit der Diff-Bestätigung unten.
-- **Nur ergänzend.** Neue Einträge kommen ans Ende der jeweiligen Liste.
+- **Nur ergänzend.** Neue Einträge kommen ans Ende der jeweiligen Liste. Die einzige
+  Änderung an Bestehendem: Ist der neue Eintrag der erste unter `helm_values:` und steht
+  `schema_version: 1` in der Datei, wird sie im selben Diff auf `2` gehoben — unter `1`
+  lehnt das Werkzeug den Abschnitt ab.
 - **Bestehende Einträge, Kommentare und Reihenfolge bleiben unangetastet.** Nichts wird
   umsortiert, neu formatiert, zusammengefasst oder von Kommentaren befreit. Die
   auskommentierten Beispiele der Vorlage bleiben stehen.
@@ -149,8 +162,9 @@ die Byte-Stabilitätsregel stehen an genau einer Stelle im Werkzeug, und eine zw
 nachgebaute Erhebung wäre eine zweite Auslegung desselben Vertrags.
 
 Die Ausgabe des Laufs trägt: ausgewertete Quellen, konfigurierte Zusatzquellen, Einträge,
-Abweichungen (davon widersprüchliche), abgelehnte Quellen, nicht durchsuchte Quellen und
-Hinweise, dazu jede Ablehnung, jeden greifenden Ausschluss und jeden Hinweis im Wortlaut.
+Abweichungen (davon widersprüchliche), abgelehnte Quellen, nicht durchsuchte Quellen, nicht
+auswertbare Quellen und Hinweise, dazu jede Ablehnung, jeden greifenden Ausschluss, jede
+nicht auswertbare Quelle und jeden Hinweis im Wortlaut.
 Übernimm sie unverändert in den Abschluss; **keine Ablehnung** wird dabei weggelassen.
 
 Die Datei selbst wird danach nicht nachbearbeitet. Fällt am Ergebnis etwas auf, ist das ein
@@ -165,7 +179,9 @@ Kompakte Zusammenfassung:
   (mit der Zahl neuer Einträge) oder unangetastet blieb.
 - Zahlen des Laufs: ausgewertete Quellen, konfigurierte Zusatzquellen, Einträge,
   Abweichungen (davon widersprüchliche), abgelehnte Quellen, nicht durchsuchte Quellen,
-  Hinweise.
+  nicht auswertbare Quellen, Hinweise.
+- Jede nicht auswertbare Quelle mit ihrem Hinweis. Sie wurde gelesen, hat aber als Ganzes
+  nichts ergeben; ohne diese Nennung sähe sie aus wie eine geprüfte Quelle ohne Fundstellen.
 - `INVENTORY_DISPLAY_PATH`: neu geschrieben (mit Erhebungszeitpunkt) oder unverändert, weil
   die Erhebung inhaltlich dieselbe ist. Beides ist ein erfolgreicher Lauf.
 - Jede abgelehnte Quelle mit angefragtem Pfad, aufgelöstem Pfad und Grund. Eine Ablehnung

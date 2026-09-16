@@ -221,7 +221,12 @@ not to this project.
 - `dependencies`, `devDependencies`, `optionalDependencies`, and `peerDependencies` go
   into `scope`.
 - `engines.node` and `packageManager` are `runtime` entries.
-- Lockfiles follow the general direct-dependency rule in this section.
+- Lockfiles follow the general direct-dependency rule in this section. `package-lock.json`
+  takes its direct dependencies from `packages[""]` of the same lockfile, `pnpm-lock.yaml`
+  from `importers`, and only `yarn.lock` from its associated `package.json`.
+- A `package.json` and the `package-lock.json` in the same directory form pairs for
+  classifying deviations; see "Pairs from `package.json` and `package-lock.json`" under
+  "Deviations". The rows themselves stay separate.
 
 ### Other manifest types
 
@@ -280,8 +285,17 @@ comes from the section.
 - `Chart.lock` provides the resolved state of the same dependencies: separate rows; a
   contradiction with `Chart.yaml` is a deviation.
 - In `values*.yaml`, the key pairs `image.repository` + `image.tag` and a single `image`
-  string count as an image reference. `image.digest` makes it `digest`. Other keys are not
-  guessed.
+  string count as an image reference. `image.digest` makes it `digest`. The same two forms
+  count under every key that ends in `Image` in camelCase, i.e. `Image` preceded by a
+  lowercase letter or a digit: `gatewayImage.repository` + `gatewayImage.tag`, or a
+  `browserImage` string. `imagePullSecrets`, `IMAGE`, or `myimage` are not such keys. Other
+  keys are not guessed: a `tag:` outside an image reference yields no row.
+- A mapping is **not** an image reference merely because it has a `repository` key: in
+  values files, `repository` also names chart and Git sources, and a registry without an
+  image name (`redis.repository: registry.example.io` next to `redis.standalone.tag`)
+  cannot be completed without guessing the name from a subchart template. Such values are
+  collected only when configured; see "Configured Helm values" under "Source
+  Configuration".
 - Anchors in `values*.yaml` are skipped as labels: `tag: &v "1.2.3"` yields `1.2.3`, and a
   block below `image: &img` is read like any other block. The anchor changes neither the
   value nor the source line. Aliases stay literal: `image: *img` is the string `*img`, and
@@ -321,6 +335,9 @@ local to an ecosystem: Python `redis` and an image `redis` are two items.
 `pin: exact`: leading `v`, `==`, and whitespace are removed; the rest remains. For
 `range`, `floating`, `digest`, `local`, and `unknown`, `versionNormalized` remains empty:
 a normalized range would be an interpretation, and the inventory does not interpret.
+The single place where a range is evaluated is the pair rule for `package-lock.json` under
+"Deviations"; it only decides how rows are classified and never rewrites `version`,
+`versionNormalized`, or `pin`.
 
 **Digests.** In the form `sha256:<64 hex>` or as a full 40-character commit SHA. Short
 SHAs are not extended and count as `unknown`.
@@ -337,19 +354,99 @@ assign the assertion to exactly one line.
 
 Grouping uses `group` (`<ecosystem>/<name>`), not the display name.
 
-Within a group:
+Within a group, classification compares **statements**. A statement is usually one row,
+with its `version` and `pin`. The one exception is a consistent pair from `package.json`
+and `package-lock.json` (see below): it is a single statement made of the set of its
+declarations (`version` and `pin` of each manifest row) **and** the resolved lock version.
 
-1. If all rows have the same `version` **and** the same `pin`, there is no deviation. The
-   rows are included in the context table, with their origins listed alongside each other.
+1. If all statements are the same, there is no deviation. For a single row, "the same"
+   means the same `version` **and** the same `pin`; two consistent pairs are the same only
+   if both their sets of declarations and their lock versions are equal, and a pair is
+   never the same as a single row. The rows are included in the context table, with their
+   origins listed alongside each other.
 2. If they differ, a deviation of one of the two types arises:
-   - `umgebungsbedingt` means the deviating rows have **different** `context` values. This
-     is the normal case and usually intentional: a newer version in `lokal` than in
-     `deployment`.
-   - `widersprüchlich` means the deviating rows have the **same** `context`. This is the
-     case that raises a question: manifest versus lockfile, two Compose files for the same
-     environment, or `Chart.yaml` versus `Chart.lock`.
-3. A deviation is **never** resolved, consolidated, or reduced to a "correct" value. It is
-   reported with all involved rows and their origins.
+   - `umgebungsbedingt` means the deviating statements have **different** `context`
+     values. This is the normal case and usually intentional: a newer version in `lokal`
+     than in `deployment`.
+   - `widersprüchlich` means the deviating statements have the **same** `context`. This is
+     the case that raises a question: two Compose files for the same environment,
+     `Chart.yaml` versus `Chart.lock`, two manifests of the same context that declare the
+     same package differently, or a manifest versus a lockfile outside the pair rule, for
+     example `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, or a `package-lock.json` whose
+     version violates a range.
+3. A deviation is **never** resolved, consolidated, or reduced to a "correct" value.
+   Treating a consistent pair as one statement applies **only** to classification; a
+   deviation is still reported with **all** involved rows and their origins, manifest and
+   lockfile rows alike.
+
+### Pairs from `package.json` and `package-lock.json`
+
+A pair exists only in the `node` ecosystem, between a `package-lock.json` and the
+`package.json` **in the same directory**, and only within the same `context`. It consists
+of the lock row of a package and **all** rows of that package from this `package.json`,
+for example `peerDependencies` `>=3` and `devDependencies` `^3.17.1`. Pairing only by
+package name and context is not enough: two directories with their own manifest and
+lockfile in the same context would then mix, and a lock version would be checked against
+another directory's range.
+
+The pair is **consistent** if the lock version satisfies **every** range of its
+declarations under npm range semantics. A consistent pair counts as one statement, as
+described above. Otherwise its rows stay separate statements, exactly as without the rule:
+
+- **Violated range.** If the lock version does not satisfy a declaration, the rows stay
+  separate, which is always a deviation, and the lock row carries this `note`, once per
+  violated declaration and joined by `; `:
+  `Lock-Version <lock version> erfüllt den Range <range> nicht (<manifest file>:<line>, <sourceKey>)`
+  ("lock version does not satisfy the range").
+- **Range or lock version not checkable.** The rows stay separate statements without a
+  `note`, as they were before the rule.
+- **Row without a partner.** A lock row whose `package.json` is absent or does not declare
+  the package, and a manifest row without a lock row, are each a statement of their own.
+
+The link between a lock row and its `package.json` is internal to classification. It is not
+a field of the inventory row and does not appear in the JSON output: the row already names
+its `sourceFile`, from which the partner follows, and no consumer needs a second path.
+
+**Checkable forms**, evaluated with the semantics of npm's `semver` package without
+options:
+
+- exact versions `1.2.3`, with or without `=` or `v`; build metadata `+…` is ignored;
+- partial versions and wildcards `1`, `1.2`, `1.x`, `1.2.x`, `1.2.*`, `*`, `x`, `X`, and the
+  empty string;
+- `^` and `~` (also `~>`), including the special cases `^0.x`, `^0.0.x`, and `~1`;
+- comparisons `>`, `>=`, `<`, `<=`, also with partial versions (`<2` means `<2.0.0-0`);
+- hyphen ranges `1.2.3 - 2.3.4`;
+- conditions joined by whitespace (all must hold) and alternatives joined by `||` (one
+  must hold);
+- prereleases by npm's rules: a prerelease lock version satisfies an alternative only if
+  one of its conditions itself names a prerelease of the same `major.minor.patch`, and
+  `^1.2.3` does not admit `2.0.0-beta` because its upper bound is `<2.0.0-0`.
+
+**Not checkable**: `npm:` aliases, `workspace:`, `link:`, `file:`, Git URLs and
+`owner/repo` shorthands, tarball URLs, dist tags such as `latest`, and every other
+declaration that is not a valid range; likewise a lock version that is not a complete
+version, for example a linked package.
+
+**Boundaries.** The rule deliberately covers nothing else:
+
+- `yarn.lock` stays unchanged: its assignment to manifests is one-to-many. The direct
+  names come from one shared name→scope map over the root and all workspace members, and
+  every lock head whose package name is direct becomes a row, including heads with
+  transitive ranges. A row therefore has no single partner.
+- `pnpm-lock.yaml` stays unchanged: its reader records the manifest's `specifier` as
+  `version`, not the resolved version, so there is nothing to check. Such a row carries the
+  same range as its manifest and does not produce a false deviation.
+- npm workspaces stay unchanged: member entries `packages["<member>"]` are not read, and a
+  member manifest without its own lockfile has no partner.
+- Python, Rust, Elixir, and every other ecosystem stay unchanged; a manifest versus its
+  lockfile remains a deviation there whenever the rows differ.
+
+**Example.** A `package.json` without a lockfile declaring `^3.17.1` and, in the same
+context, a consistent pair `^3.17.1`/`3.17.1` remain a `widersprüchlich` deviation with
+three rows: the resolution of the first is unknown, and nothing is guessed. Likewise two
+consistent pairs `^3.14.8`/`3.17.1` and `^3.17.1`/`3.17.1` are a deviation because their
+declarations differ, and two consistent pairs `^3.14.8`/`3.14.8` and `^3.14.8`/`3.17.1`
+because their lock versions differ; each shows four rows.
 
 Both types appear in the "Abweichungen" (deviations) section of the inventory file, with
 `widersprüchlich` first. The number of deviations is the number of groups with a deviation,
@@ -452,7 +549,9 @@ a second format would provide no benefit.
 **Write rule.** The file is maintained manually. The command, subcommand, and every
 future interface may write to it only with the user's explicit confirmation, and then
 only additively: existing entries, comments, and ordering remain untouched. Without
-confirmation, nothing is written.
+confirmation, nothing is written. The single in-place change allowed is raising
+`schema_version: 1` to `2` when the confirmed addition is the first `helm_values` entry;
+it is part of the diff shown for confirmation.
 
 **State through `context`.** Commands read configuration exclusively from
 `k-playbook context`. The state of this file, whether present or absent, the allowed
@@ -465,10 +564,11 @@ reader as the **only** implementation used by both the collector and
 
 | Key | Required | Meaning |
 |---|---|---|
-| `schema_version` | yes | Currently `1`. Another value aborts the run instead of interpreting fields that could mean something else. |
+| `schema_version` | yes | `1` or `2`. `2` is required only by `helm_values`; see "Schema version" below. Another value aborts the run instead of interpreting fields that could mean something else. |
 | `roots` | no | List of absolute paths that may be read in addition to the project root. Empty or absent means only the project root. |
 | `sources` | no | List of additional sources. Empty or absent means only the default sources below the project root. |
 | `exclude` | no | List of patterns where default detection does not search. Each pattern is a path relative to the project root; `*` means any number of characters within a segment, `**` any number of segments. A pattern without a wildcard matches the path itself and everything below it. An absolute pattern is visibly rejected: it would depend on the machine and match nothing on another one. |
+| `helm_values` | no | List of configured Helm values; see "Configured Helm values" below. Requires `schema_version: 2`. |
 
 For each entry in `sources`:
 
@@ -484,6 +584,78 @@ For each entry in `sources`:
 that disables default detection: an inventory that does not include the project sources
 would not be one. `exclude` does not disable it either: it removes named areas, visibly
 and individually, and an entry in `sources` includes each of them again.
+
+### Configured Helm values
+
+Some version declarations in `values*.yaml` are not image references and cannot be
+recognized without guessing, for example a subchart that takes only a tag
+(`redis.standalone.tag: v7.4.11`) and builds the image name in its own template.
+`helm_values` names such a value explicitly. For each entry:
+
+| Key | Required | Meaning |
+|---|---|---|
+| `path` | yes | File or glob of the values file, relative to the project root or absolute, like `path` in `sources`. |
+| `key` | yes | Dot path to the value, for example `helm-chart-generic.redis.standalone.tag`. A segment may carry a list index in square brackets starting at `0`: `services[1].tag`. A key that itself contains a `.` cannot be addressed. |
+| `item` | yes | The item the value belongs to, as a group key `container/<name>`, for example `container/redis`. The name is normalized like an image name. Only the `container` ecosystem is allowed. |
+
+**Checks.** An entry without `path`, `key`, or `item`, with a `key` that has an empty
+segment or an invalid index, or with an `item` that is not `container/<name>`, is visibly
+rejected under "Abgelehnte Quellen und Hinweise" with the file's line and the reason, like
+an entry in `sources` with an unknown `kind`. The run continues.
+
+**Row.** The value of the key becomes `version` verbatim, and the pin rules for container
+tags apply: an empty value or a moving tag such as `latest` is `floating`, an unresolvable
+variable is `unknown`, and every other value is `exact`. `kindOfThing` is `image`,
+`sourceKey` is the configured `key`, `sourceLine` the line of the value, and `note` is
+`konfiguriert in version-sources.yaml` ("configured in version-sources.yaml"). The row
+carries the `context` of the source as which the file is read, including an `env` from
+`sources`. A configured entry does not make a file a source: the file must be read as Helm
+values anyway, by default detection or through `sources`.
+
+**No silent gap.** Every configured entry that yields no row produces a visible notice for
+the file, in the form
+`konfigurierter Helm-Wert <key> → <item> (version-sources.yaml, Zeile <n>) nicht angewandt: <reason>`
+("configured Helm value … not applied"). The reasons:
+
+| Case | Reason text |
+|---|---|
+| The path is outside the allowed roots | the rejection reason of the trust boundary |
+| A glob matches no file | `das Muster trifft keine Datei` |
+| The file does not exist | `die Datei liegt nicht auf der Platte` |
+| The file is excluded from default detection and not in `sources` | ``die Datei ist durch die Ausschlussregel `<pattern>` von der Standarderkennung ausgenommen; als Quelle unter sources: eintragen`` |
+| The file is not a source at all, for example because of its name | `die Datei ist keine Quelle des Inventars; als Quelle unter sources: mit kind: helm eintragen` |
+| The file is read with another source type, or as `Chart.yaml`/`Chart.lock` | `die Datei wird als <kind or file name> gelesen, nicht als Helm-values` |
+| The file was rejected when read | `die Datei wurde abgelehnt: <reason>` |
+| The file could not be evaluated | `die Datei ist nicht auswertbar` |
+| The key is missing | `der Schlüssel fehlt in der Datei` |
+| The key has a mapping or list instead of a scalar | `der Schlüssel hat keinen Skalar` |
+
+With a glob, every matched file is checked on its own: a file in which the key is missing
+produces its own notice, while the other files yield their rows.
+
+### Schema version
+
+`helm_values` is the first key added after `schema_version: 1`. An older binary checks only
+the version and does not recognize unknown top-level keys; under `schema_version: 1` it
+would skip `helm_values` silently and write an inventory without the configured rows. A
+configuration that is applied halfway and silently dropped halfway is worse than an error.
+
+**Decided:** `helm_values` requires `schema_version: 2`.
+
+- This binary reads both `1` and `2`. A file without `helm_values` works unchanged with
+  `1`; nothing needs to be migrated, and the template keeps `schema_version: 1`, so a newly
+  created configuration remains readable for older installations of the same project.
+- Under `schema_version: 1`, `helm_values` is not applied. The section is visibly
+  rejected once with its line and the reason
+  ``helm_values verlangt schema_version: 2; unter schema_version: 1 wird der Abschnitt nicht angewandt``,
+  and the run continues.
+- An older binary that understands only `1` aborts on a file with `2`, and its context
+  output reports `error`. The failure is visible, which is the point: the file relies on
+  a section that binary cannot apply.
+
+The rejected alternative was to keep `helm_values` under `schema_version: 1` and to
+document that older binaries skip it. It avoids the abort but leaves exactly the silent
+gap this contract rules out everywhere else.
 
 ### Template
 
@@ -547,6 +719,20 @@ sources: []
 #   exclude:
 #     - tests/fixtures/**
 exclude: []
+
+# Versionen in Helm-values, die keine Image-Referenz sind — etwa ein Subchart,
+# das nur einen Tag entgegennimmt. Je Eintrag:
+#   path: values-Datei oder Glob; sie muss ohnehin als Helm-values gelesen werden
+#   key:  Punktpfad zum Wert, Listenindex in eckigen Klammern
+#   item: Gegenstand als container/<name>
+#
+# Der Abschnitt verlangt `schema_version: 2`; unter 1 wird er abgelehnt. Jeder
+# Eintrag, der keine Zeile ergibt, steht als Hinweis mit Grund im Inventar.
+#
+#   helm_values:
+#     - path: helm/values.yaml
+#       key: redis.standalone.tag
+#       item: container/redis
 ```
 
 ### State in the Context Output
@@ -571,6 +757,13 @@ context output thereby answers the question completely, and no command needs to 
     }
   ],
   "exclude": ["tests/fixtures/**"],
+  "helmValues": [
+    {
+      "path": "helm/values.yaml",
+      "key": "redis.standalone.tag",
+      "item": "container/redis"
+    }
+  ],
   "error": ""
 }
 ```
@@ -583,20 +776,23 @@ context output thereby answers the question completely, and no command needs to 
 | `roots` | no | The allowed roots, verbatim as in the file. The project root is **not** included because it is always allowed. |
 | `sources` | no | The configured additional sources, in file order. Each entry has `path`, `kind`, `env`, `note`, `optional`, the same names as the YAML keys. An entry with an unknown `kind` or `env` is **included**: the context output shows the file as it stands, and omitting it would represent it differently. It is rejected only during the collection run, visibly there. |
 | `exclude` | no | The patterns where default detection does not search, verbatim as in the file. The fixed installation rule is **not** included because it does not come from the file. An absolute pattern that is therefore rejected is likewise not included: unlike `sources`, a pattern is not an entry one can inspect, but a rule that either applies or does not. |
+| `helmValues` | no | The configured Helm values, in file order, each with `path`, `key`, and `item`. As with `sources`, an entry the collection run rejects is **included**, including every entry under `schema_version: 1`, where the section is not applied. |
 | `error` | no | Set when the file exists but is unreadable or has an unknown version. |
 
 The field names are the file's YAML keys, in camelCase as everywhere else in the context
-output; only `schema_version` becomes `schemaVersion`. There is no renaming and no second
-terminology.
+output; only `schema_version` becomes `schemaVersion` and `helm_values` becomes
+`helmValues`. There is no renaming and no second terminology.
 
 Three states, and no more:
 
-- **present and valid**: `present: true`, `error` empty. `roots`, `sources`, and
-  `exclude` contain the content; empty lists mean "nothing configured", not "not read".
-- **absent**: `present: false`, `error` empty, and `roots`, `sources`, and `exclude`
-  empty. This is not an error: the default sources below the project root apply.
-- **invalid**: `present: true`, `error` populated, and `roots`, `sources`, and `exclude`
-  empty.
+- **present and valid**: `present: true`, `error` empty. `roots`, `sources`, `exclude`,
+  and `helmValues` contain the content; empty lists mean "nothing configured", not "not
+  read".
+- **absent**: `present: false`, `error` empty, and `roots`, `sources`, `exclude`, and
+  `helmValues` empty. This is not an error: the default sources below the project root
+  apply.
+- **invalid**: `present: true`, `error` populated, and `roots`, `sources`, `exclude`, and
+  `helmValues` empty.
 
 The context invocation does **not** abort for an invalid file. It runs at the start of
 every command; an invalid additional configuration must not disable every command. The
@@ -633,6 +829,7 @@ inventory:
   deviations: <N>
   rejected: <N>
   sources-excluded: <N>
+  sources-unevaluable: <N>
 ---
 ```
 
@@ -652,12 +849,14 @@ here in the renderer's exact wording, with English explanations alongside:
    generator, collection time (`generated.at`), the note that the file is regenerated on
    every run and manual changes are lost, and that it lists the **declared** versions, not
    what is active at runtime.
-2. `## Übersicht` (overview): a list of seven counters, in this order: `Einträge`
+2. `## Übersicht` (overview): a list of eight counters, in this order: `Einträge`
    (entries), `Ausgewertete Quellen` (sources read), `Konfigurierte Zusatzquellen`
-   (entries in the source configuration, rejected ones included), `Abweichungen`
-   (deviations), `Abgelehnte Quellen` (rejections), `Nicht durchsuchte Quellen` (sources
-   skipped by an exclusion rule), and `Hinweise` (notices). The first six carry the same
-   numbers as the `inventory.*` keys in frontmatter; `Hinweise` appears only here.
+   (entries in `sources` of the source configuration, rejected ones included),
+   `Abweichungen` (deviations), `Abgelehnte Quellen` (rejections), `Nicht durchsuchte
+   Quellen` (sources skipped by an exclusion rule), `Nicht auswertbare Quellen` (sources
+   read but not evaluable as a whole, see below), and `Hinweise` (notices). The first seven
+   carry the same numbers as the `inventory.*` keys in frontmatter; `Hinweise` appears only
+   here.
 3. `## <label>` for each environment label in the fixed order `lokal`, `dev`,
    `devcontainer`, `ci`, `deployment`; labels without entries are omitted. It contains a
    table with the columns `Gegenstand` (item: `<ecosystem>/<name>`, the group key), `Art`
@@ -671,9 +870,10 @@ here in the renderer's exact wording, with English explanations alongside:
    `Version`, `Pin`, `Kontext` (context), and `Herkunft` (origin).
 5. `## Ausgewertete Quellen` (evaluated sources): a table with one row per read file and
    the columns `Datei` (file), `Quellart` (source type), `Label`, `Einträge` (number of
-   entries), and `Note`, which carries the `note` if one is configured for the source. A
-   source from the source configuration carries `(konfiguriert)` (configured) after its
-   source type; otherwise it would not be visible where a row comes from.
+   entries), `Zustand` (state: `ausgewertet` or `nicht auswertbar`), and `Note`, which
+   carries the `note` if one is configured for the source. A source from the source
+   configuration carries `(konfiguriert)` (configured) after its source type; otherwise it
+   would not be visible where a row comes from.
 6. `## Nicht durchsuchte Bereiche` (areas not searched): a fixed paragraph stating that
    these areas are within the project, are not searched by default detection, and are not
    blocked; then a table with one row per exclusion rule and the columns `Muster`
@@ -699,6 +899,45 @@ where two assertions come from the same line, for example two pinned tools in on
 line; without them the parser's order would decide. Deviations are sorted by type, then
 `group`. Sources are sorted by `sourceFile`. Two runs over the same state therefore
 produce the same file, regardless of the order in which the file system returns entries.
+
+### Sources that could not be evaluated
+
+A source that was found and read but could not be evaluated **as a whole** has the state
+`nicht auswertbar` ("not evaluable"). Without it, such a source would look like a checked
+source without findings: `Einträge 0` and nothing else in its row. The name is chosen over
+"nicht lesbar" (unreadable) because two of its triggers concern a readable file whose
+evaluation depends on something else, and over "fehlerhaft" (faulty) because an excluded
+manifest is not a fault of the lockfile.
+
+It has exactly three triggers:
+
+1. **The source's own parse error**: invalid JSON, JSONC, YAML, or TOML of a known source
+   type, or a source type the collector does not know.
+2. **A missing root package**: a `package-lock.json` without `packages[""]`, whose direct
+   dependencies therefore cannot be recognized.
+3. **A required manifest that is absent, unreadable, or excluded**, including a workspace
+   member manifest, for a lockfile that takes its direct dependencies from its manifest
+   (`yarn.lock`, `poetry.lock`, `uv.lock`, `Pipfile.lock`, `Cargo.lock`, `composer.lock`,
+   `mix.lock`). The state is set on the **lockfile**, which is the source that therefore
+   yields no entries, not on the manifest.
+
+Each trigger also produces a notice for the source that states the reason; the state does
+not replace it. A notice about content, for example an unresolvable variable, an
+unreadable `install_requires`, or a configured Helm value that was not applied, does
+**not** set the state: the source was evaluated, and the notice concerns one statement.
+
+The state appears identically in every output:
+
+- in the file: the `Zustand` column of `## Ausgewertete Quellen`, the counter
+  `Nicht auswertbare Quellen` in `## Übersicht`, and `inventory.sources-unevaluable` in
+  frontmatter;
+- in JSON: `unevaluable: true` on the source in `sources` of the collection result, and
+  `sourcesUnevaluable` in the status read from frontmatter;
+- in the interface and in the subcommand output: the same counter, and each such source
+  with its file.
+
+A source that is not evaluable still counts under `Ausgewertete Quellen`: it was found and
+read. The new counter says how many of those yielded nothing for that reason.
 
 ## Byte Stability and Timestamps
 
@@ -732,7 +971,9 @@ created.**
 The interface from Task 043 needs four machine-readable values: state, time of the last
 collection, number of sources, and number of deviations. All four are in the frontmatter
 (`generated.at`, `inventory.sources-*`, `inventory.deviations`), and the state follows
-from whether the file exists.
+from whether the file exists. The number of sources that could not be evaluated is read
+the same way, from `inventory.sources-unevaluable`; a file without that key is an
+incomplete frontmatter like any other and is written again on the next run.
 
 Only the YAML block between the two `---` lines at the beginning of the file is read. The
 Markdown body is **never** parsed: no table is read backward and no heading evaluated.
@@ -769,7 +1010,10 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 |---|---|
 | `version-sources.yaml` is absent | No error. The default sources below the project root apply; the context output reports the file as absent. |
 | `version-sources.yaml` is unreadable YAML | **Abort** before any collection, with file, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
-| `schema_version` is absent or not `1` | **Abort**, as for `K-PLAYBOOK.yaml`. |
+| `schema_version` is absent or neither `1` nor `2` | **Abort**, as for `K-PLAYBOOK.yaml`. |
+| `helm_values` under `schema_version: 1` | The **section** is rejected once, with line and reason, and not applied; see "Schema version". The run continues. |
+| Invalid entry in `helm_values` | The **entry** is rejected with line and reason; the run continues. |
+| Configured Helm value yields no row | Visible notice for the file with key, item, configuration line, and reason; see "Configured Helm values". |
 | A root in `roots:` is not absolute | **Abort**. A relative root would depend on the caller's working directory and mean something different in the web-server process than on the CLI path; partially interpreting a trust boundary stated this way would be worse than rejecting it. |
 | Unknown `env` label in an entry | The **entry** is rejected and listed under "Abgelehnte Quellen und Hinweise" (rejected sources and notices), with the found value and the five valid values. The run continues. |
 | Unknown `kind` in an entry | As for the label: entry rejected, visibly, run continues. |
@@ -777,10 +1021,11 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 | Configured source is missing from disk | Visible notice, unless the entry has `optional: true`. |
 | Path outside allowed roots | Visible rejection with requested and resolved path. The run continues. |
 | Symlink points outside every root | As above; the resolved target is reported, so it is clear what would actually have been read. |
-| Known source file is invalid | Visible notice with file and error; the remaining sources are collected. No invented entries, no partial result without marking. |
-| Lockfile readable, associated manifest absent or unreadable | The lockfile contributes no entries. A visible notice states lockfile, expected manifest, and reason; transitive lockfile packages do not substitute for direct ones. |
-| Lockfile readable, associated manifest excluded by `exclude:` | The lockfile contributes no entries. The exclusion also remains visible in the "Nicht durchsuchte Bereiche" (areas not searched) section; the notice names the matching exclusion rule. A lockfile explicitly named under `sources:` overrides the exclusion only for itself, not for its manifest. |
-| Workspace lockfile with a missing, unresolvable, excluded, or unreadable member manifest | The lockfile contributes no entries at all. The notice states root manifest, member declaration or resolved path, and reason; a partial union of remaining members is not allowed. |
+| Known source file is invalid | Visible notice with file and error; the source has the state `nicht auswertbar`. The remaining sources are collected. No invented entries, no partial result without marking. |
+| `package-lock.json` without `packages[""]` | Visible notice; the lockfile contributes no entries and has the state `nicht auswertbar`. |
+| Lockfile readable, associated manifest absent or unreadable | The lockfile contributes no entries and has the state `nicht auswertbar`. A visible notice states lockfile, expected manifest, and reason; transitive lockfile packages do not substitute for direct ones. |
+| Lockfile readable, associated manifest excluded by `exclude:` | The lockfile contributes no entries and has the state `nicht auswertbar`. The exclusion also remains visible in the "Nicht durchsuchte Bereiche" (areas not searched) section; the notice names the matching exclusion rule. A lockfile explicitly named under `sources:` overrides the exclusion only for itself, not for its manifest. |
+| Workspace lockfile with a missing, unresolvable, excluded, or unreadable member manifest | The lockfile contributes no entries at all and has the state `nicht auswertbar`. The notice states root manifest, member declaration or resolved path, and reason; a partial union of remaining members is not allowed. |
 | Unknown file type below the project root | Silently skipped. Only what is searched can be absent. |
 | Inventory file exists, frontmatter invalid | Visible finding. The run collects again and writes the file because comparison is not possible. |
 

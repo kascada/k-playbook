@@ -148,6 +148,7 @@ function renderStatus(status, displayPath) {
   addFact(elements.statusFacts, "Abweichungen", String(status.deviations ?? 0));
   addFact(elements.statusFacts, "Abgelehnte Quellen", String(status.rejected ?? 0));
   addFact(elements.statusFacts, "Nicht durchsuchte Quellen", String(status.sourcesExcluded ?? 0));
+  addFact(elements.statusFacts, "Nicht auswertbare Quellen", String(status.sourcesUnevaluable ?? 0));
 }
 
 // Die Quellenkonfiguration: Ort, Zustand, Zahlen. Kein Formular.
@@ -174,6 +175,7 @@ function renderSources(sources) {
   addFact(elements.sourcesFacts, "Zusätzliche Wurzeln", String(sources.roots ?? 0));
   addFact(elements.sourcesFacts, "Zusätzliche Quellen", String(sources.sources ?? 0));
   addFact(elements.sourcesFacts, "Ausschlussmuster", String(sources.exclude ?? 0));
+  addFact(elements.sourcesFacts, "Konfigurierte Helm-Werte", String(sources.helmValues ?? 0));
 }
 
 // Das Ergebnis eines Anstoßes: Erfolg oder Abbruch, die Zahlen des Laufs, und
@@ -208,9 +210,13 @@ function renderRun(data) {
   const outcome = data.outcome || {};
   const summary = data.summary || {};
   const rejected = summary.rejected || 0;
+  const unevaluable = summary.unevaluable || 0;
 
-  elements.runPill.className = rejected > 0 ? "pill warn" : "pill ok";
-  elements.runPill.textContent = rejected > 0 ? "Mit Ablehnungen" : "Erfolgreich";
+  // Eine nicht auswertbare Quelle ist wie eine Ablehnung eine Lücke im
+  // Inventar: sie wurde gelesen, hat aber nichts ergeben.
+  elements.runPill.className = rejected > 0 || unevaluable > 0 ? "pill warn" : "pill ok";
+  elements.runPill.textContent =
+    rejected > 0 ? "Mit Ablehnungen" : unevaluable > 0 ? "Mit nicht auswertbaren Quellen" : "Erfolgreich";
   elements.runMessage.textContent = outcome.written
     ? `Geschrieben: ${data.displayPath || outcome.path} (erhoben ${outcome.at || ""}).`
     : `Unverändert: ${data.displayPath || outcome.path} — die Erhebung ist inhaltlich dieselbe (erhoben ${outcome.at || ""}).`;
@@ -224,6 +230,7 @@ function renderRun(data) {
   addFact(elements.runFacts, "Abweichungen", describeDeviations(summary));
   addFact(elements.runFacts, "Abgelehnte Quellen", String(rejected));
   addFact(elements.runFacts, "Nicht durchsuchte Quellen", String(summary.excluded || 0));
+  addFact(elements.runFacts, "Nicht auswertbare Quellen", String(unevaluable));
   addFact(elements.runFacts, "Hinweise", String(summary.notes || 0));
 
   for (const rejection of data.rejections || []) {
@@ -239,6 +246,11 @@ function renderRun(data) {
         `${exclusion.pattern} (${exclusion.origin}): ${exclusion.skipped} Quellen übergangen — ${exclusion.reason}`,
         false,
       ),
+    );
+  }
+  for (const source of data.unevaluable || []) {
+    elements.runFindings.append(
+      findingBox("Nicht auswertbar", `${source.file} (${source.kind}) — der Grund steht unter den Hinweisen`, true),
     );
   }
   for (const note of data.notes || []) {

@@ -100,8 +100,10 @@ In contrast, setup creates the version inventory source configuration,
 `k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is
 maintained manually and never overwritten by an update. Its status appears in
 the `versionSources` section of `k-playbook context`, so no command reads it
-itself. The interface only displays it in the "Inventory" section, showing the
-path, status, and count of roots, sources, and exclusions; it does not edit it.
+itself. The template declares `schema_version: 1`; a configuration that uses
+`helm_values` declares `2`, and the tool reads both. The interface only displays
+it in the "Inventory" section, showing the path, status, and count of roots,
+sources, exclusions, and configured Helm values; it does not edit it.
 That section also offers the inventory prompt, the same run as `k-playbook
 inventory` and `/k-doc-inventory`. The contract is in
 [`version-inventory.md`](./version-inventory.md), and the requirement to update

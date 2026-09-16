@@ -79,7 +79,11 @@ kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Installation
 `<projekt>/k-playbook/` — ein Clone des Werkzeugs, der in jedem Zielprojekt dieselben
 Manifeste trägt — und die Muster aus `exclude:` der Quellenkonfiguration; beide Ausschlüsse
 stehen mit der Zahl der übergangenen Quellen im Inventar, und ein Eintrag in `sources:`
-holt jede Quelle daraus wieder herein. Das Kommando sammelt Projektwurzel,
+holt jede Quelle daraus wieder herein. Eine Quelle, die gelesen, aber als Ganzes nicht
+ausgewertet werden konnte — eigener Parse-Fehler, fehlendes Wurzelpaket einer
+`package-lock.json`, fehlendes oder ausgeschlossenes Manifest eines Lockfiles —, steht als
+`nicht auswertbar` in der Quellentabelle und wird in der Übersicht, im Frontmatter und in
+der Ausgabe des Kommandos gezählt. Das Kommando sammelt Projektwurzel,
 Quellenkonfiguration und
 Zielpfad zusammen und reicht sie an `internal/inventory` weiter; dort liegen Parser,
 Vertrauensgrenze und Renderer. Ein Lauf ohne inhaltliche Änderung lässt die Datei
@@ -229,7 +233,13 @@ installer/
 │   ├── parse*.go                je Ökosystem ein Leser: Python, Go, Node, Container,
 │   │                            Helm, CI, weitere Manifesttypen
 │   ├── normalize.go             Namen, Versionen, Digests, Pin-Art bestimmen
-│   ├── deviations.go            Gruppen bilden, Abweichungen ausweisen
+│   ├── deviations.go            Gruppen bilden, Aussagen vergleichen — ein stimmiges
+│   │                            Paar aus package.json und package-lock.json ist eine
+│   │                            Aussage —, Abweichungen ausweisen
+│   ├── npmrange.go              npm-Range-Prüfung aus der Standardbibliothek, nur für
+│   │                            die Paarregel; nicht prüfbare Formen melden sich als solche
+│   ├── helmvalues.go            konfigurierte Helm-Werte (helm_values) den gelesenen
+│   │                            values-Dateien zuordnen, Hinweise für wirkungslose Einträge
 │   ├── render.go                die Inventardatei erzeugen, deterministisch
 │   ├── write.go                 Byte-Stabilitätsregel: vergleichen, sonst nicht schreiben
 │   ├── status.go                Frontmatter der Inventardatei lesen (ReadStatus)
@@ -373,7 +383,10 @@ eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus
 `entry.Purpose` einen neutralen Markdown-Rumpf — Überschrift plus Zweck —, damit ein
 neuer Eintrag ohne Zweig nicht still das Format eines fremden bekommt.
 `version-sources.yaml` bekommt deshalb die gültige, leere Quellenkonfiguration aus
-`versionSourcesTemplate()` — wortgleich die Vorlage aus `docs/version-inventory.md`.
+`versionSourcesTemplate()` — wortgleich die Vorlage aus `docs/version-inventory.md`. Sie
+deklariert `schema_version: 1`, obwohl `versionsources` auch `2` liest: `2` braucht nur, wer
+`helm_values` einträgt, und eine neu angelegte Datei soll auch ältere Installationen
+desselben Projekts nicht aussperren.
 
 Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
@@ -1932,14 +1945,15 @@ formuliert nichts davon neu.
 Die Seite hat vier Karten. **Stand** zeigt, ob die Inventardatei da ist, wann sie zuletzt
 inhaltlich geändert wurde, den Erzeuger und die Zahlen aus ihrem Frontmatter — Quellen
 gelesen und konfiguriert, Einträge, Abweichungen, abgelehnte und nicht durchsuchte
-Quellen —, dazu den Pfad der Datei und den Knopf **Aktualisieren**. Solange der Lauf
+Quellen, nicht auswertbare Quellen —, dazu den Pfad der Datei und den Knopf
+**Aktualisieren**. Solange der Lauf
 steht, ist der Knopf gesperrt und ein Ring daneben sagt, dass gearbeitet wird; ein Lauf
 liest jede Quelle des Projekts. **Letzter Lauf** erscheint danach: Erfolg oder Abbruch,
 ob geschrieben wurde oder die Datei unverändert blieb, die Zahlen des Laufs — dieselben,
-die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss und
-jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt `version-sources.yaml`: Pfad,
-vorhanden oder fehlend oder defekt, und die Zahl der Wurzeln, Zusatzquellen und
-Ausschlussmuster. **Inventardatei** zeigt die erzeugte Datei gerendert, ohne ihren
+die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss, jede
+nicht auswertbare Quelle und jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt
+`version-sources.yaml`: Pfad, vorhanden oder fehlend oder defekt, und die Zahl der Wurzeln,
+Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte. **Inventardatei** zeigt die erzeugte Datei gerendert, ohne ihren
 Frontmatter-Block — der steht als Stand darüber.
 
 Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter der Inventardatei
@@ -2485,7 +2499,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
 | `GET` | `/api/inventory` | Stand des Versionsinventars aus dem Frontmatter der Inventardatei, dazu der Zustand der Quellenkonfiguration; read-only |
-| `POST` | `/api/inventory` | Erhebung anstoßen über `inventory.Run`; schreibt allein die Inventardatei, und die nur bei inhaltlicher Änderung; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, Hinweisen und dem Stand danach |
+| `POST` | `/api/inventory` | Erhebung anstoßen über `inventory.Run`; schreibt allein die Inventardatei, und die nur bei inhaltlicher Änderung; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, nicht auswertbaren Quellen, Hinweisen und dem Stand danach |
 | `GET` | `/api/inventory/file` | die Inventardatei als HTML lesen, ohne Frontmatter; fester Pfad, kein Parameter; read-only |
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |

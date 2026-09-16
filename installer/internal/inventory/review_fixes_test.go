@@ -300,7 +300,7 @@ func TestWorkspaceFehlerUndFehlendeOderAusgeschlosseneManifesteLeerenLockfile(t 
 }
 
 func TestDockerfileFlagsStagesUndScopedNPM(t *testing.T) {
-	entries, notes := parseFile(fileContext{Display: "Dockerfile", Base: "Dockerfile", Kind: KindDockerfile, Env: EnvDeployment, EnvOrigin: ContextDefault, Data: []byte("FROM --platform=$BUILDPLATFORM golang:1.22 AS build\nFROM build AS final\nRUN npm install @scope/install@1.2.3\nRUN npm i @scope/i@2.3.4\nRUN yarn add @scope/yarn@3.4.5\n")})
+	entries, notes, _ := parseFile(fileContext{Display: "Dockerfile", Base: "Dockerfile", Kind: KindDockerfile, Env: EnvDeployment, EnvOrigin: ContextDefault, Data: []byte("FROM --platform=$BUILDPLATFORM golang:1.22 AS build\nFROM build AS final\nRUN npm install @scope/install@1.2.3\nRUN npm i @scope/i@2.3.4\nRUN yarn add @scope/yarn@3.4.5\n")})
 	if len(notes) != 0 {
 		t.Fatalf("Hinweise = %+v", notes)
 	}
@@ -324,7 +324,7 @@ func TestDockerfileFlagsStagesUndScopedNPM(t *testing.T) {
 // Alias als lokal bekannt. Benannt wird jeweils die Referenz; ein nur
 // eingeführter, nie referenzierter Alias erzeugt keinen Eintrag.
 func TestDockerfileLokaleStageAliasKette(t *testing.T) {
-	entries, notes := parseFile(fileContext{Display: "Dockerfile", Base: "Dockerfile", Kind: KindDockerfile, Env: EnvDeployment, EnvOrigin: ContextDefault, Data: []byte("FROM golang:1.22 AS build\nFROM build AS final\nFROM final AS production\nFROM production AS release\n")})
+	entries, notes, _ := parseFile(fileContext{Display: "Dockerfile", Base: "Dockerfile", Kind: KindDockerfile, Env: EnvDeployment, EnvOrigin: ContextDefault, Data: []byte("FROM golang:1.22 AS build\nFROM build AS final\nFROM final AS production\nFROM production AS release\n")})
 	if len(notes) != 0 {
 		t.Fatalf("Hinweise = %+v", notes)
 	}

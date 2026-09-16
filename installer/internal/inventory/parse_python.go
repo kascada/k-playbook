@@ -225,7 +225,7 @@ func parsePipfileLock(c *collector) {
 		Version string `json:"version"`
 	}
 	if err := json.Unmarshal(c.file.Data, &document); err != nil {
-		c.note("nicht lesbares JSON: %v", err)
+		c.fail("nicht lesbares JSON: %v", err)
 		return
 	}
 	finder := newLineFinder(c.file.Data)

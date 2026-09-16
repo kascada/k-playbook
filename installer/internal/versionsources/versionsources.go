@@ -20,15 +20,29 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
 
-// SchemaVersion ist die einzige Fassung, die dieses Werkzeug versteht. Eine
-// andere bricht ab, statt Felder zu deuten, die etwas anderes bedeuten könnten
-// — dieselbe Regel wie bei der K-PLAYBOOK.yaml.
-const SchemaVersion = 1
+// SchemaVersion ist die neueste Fassung, die dieses Werkzeug versteht. Gelesen
+// werden alle Fassungen von MinSchemaVersion bis hierher; eine andere bricht ab,
+// statt Felder zu deuten, die etwas anderes bedeuten könnten — dieselbe Regel
+// wie bei der K-PLAYBOOK.yaml.
+//
+// Fassung 2 bringt `helm_values`. Ein älteres Binary prüft nur die Fassung und
+// kennt keine unbekannten Schlüssel; unter Fassung 1 überginge es den
+// Abschnitt still. Deshalb verlangt `helm_values` die 2: ein älteres Binary
+// bricht an einer solchen Datei sichtbar ab, und eine Datei ohne den Abschnitt
+// bleibt mit 1 für alle lesbar.
+const SchemaVersion = 2
+
+// MinSchemaVersion ist die älteste Fassung, die weiter gelesen wird.
+const MinSchemaVersion = 1
+
+// HelmValuesSchemaVersion ist die Fassung, ab der `helm_values` angewandt wird.
+const HelmValuesSchemaVersion = 2
 
 // Envs ist die geschlossene Menge der Umgebungslabels.
 var Envs = []string{"lokal", "dev", "devcontainer", "ci", "deployment"}
@@ -55,6 +69,79 @@ type Source struct {
 	// trotzdem in der Liste: die Kontextausgabe zeigt die Datei so, wie sie
 	// dasteht. Der Sammler überspringt ihn und führt die Ablehnung sichtbar.
 	Valid bool
+}
+
+// HelmValue ist ein Eintrag aus `helm_values:` — ein Wert in einer
+// values-Datei, der keine Image-Referenz ist und deshalb ausdrücklich benannt
+// wird. Die Felder heißen wie die YAML-Schlüssel.
+type HelmValue struct {
+	// Path ist die values-Datei oder ein Glob, wie `path` in `sources`.
+	Path string
+	// Key ist der Punktpfad zum Wert, Listenindex in eckigen Klammern.
+	Key string
+	// Item ist der Gegenstand als `container/<name>`.
+	Item string
+	// Line ist die Zeile des Eintrags in der Konfigurationsdatei.
+	Line int
+	// Valid ist false, wenn der Eintrag abgelehnt wurde — auch dann, wenn der
+	// ganze Abschnitt unter schema_version 1 steht. Wie bei `sources` bleibt
+	// der Eintrag in der Liste, damit die Kontextausgabe die Datei zeigt, wie
+	// sie dasteht.
+	Valid bool
+}
+
+// ItemName ist der Name aus `container/<name>`, ohne Ökosystem.
+func (h HelmValue) ItemName() string {
+	return strings.TrimPrefix(h.Item, HelmValueEcosystem+"/")
+}
+
+// HelmValueEcosystem ist das einzige Ökosystem, das ein konfigurierter
+// Helm-Wert tragen darf: es gelten die Pin-Regeln der Container-Tags.
+const HelmValueEcosystem = "container"
+
+// KeyStep ist ein Schritt eines Schlüsselpfads: ein Abbildungsschlüssel und
+// danach null oder mehr Listenindizes.
+type KeyStep struct {
+	Key     string
+	Indexes []int
+}
+
+// ParseKeyPath zerlegt `a.b[0].c`. Ein leeres Segment, ein Segment ohne Namen
+// oder ein ungültiger Index machen den Pfad ungültig; ein Schlüssel, der selbst
+// einen Punkt enthält, ist nicht adressierbar.
+func ParseKeyPath(key string) ([]KeyStep, bool) {
+	if strings.TrimSpace(key) == "" {
+		return nil, false
+	}
+	var steps []KeyStep
+	for _, segment := range strings.Split(key, ".") {
+		name := segment
+		var indexes []int
+		if open := strings.Index(segment, "["); open >= 0 {
+			name = segment[:open]
+			rest := segment[open:]
+			for rest != "" {
+				if rest[0] != '[' {
+					return nil, false
+				}
+				closing := strings.Index(rest, "]")
+				if closing < 2 {
+					return nil, false
+				}
+				index, err := strconv.Atoi(rest[1:closing])
+				if err != nil || index < 0 || strings.TrimSpace(rest[1:closing]) != rest[1:closing] {
+					return nil, false
+				}
+				indexes = append(indexes, index)
+				rest = rest[closing+1:]
+			}
+		}
+		if name == "" || strings.ContainsAny(name, "[]") || strings.TrimSpace(name) != name {
+			return nil, false
+		}
+		steps = append(steps, KeyStep{Key: name, Indexes: indexes})
+	}
+	return steps, true
 }
 
 // Rejection ist ein abgelehnter Eintrag. Ablehnungen sind sichtbar: eine
@@ -85,8 +172,23 @@ type Config struct {
 	// wortgleich wie in der Datei. Sie wirken nur auf die Standardquellen: was
 	// unter `sources:` ausdrücklich hingeschrieben ist, bleibt gelesen.
 	Exclude []string
-	// Rejections nennt die Einträge mit unbekanntem `kind` oder `env`.
+	// HelmValues sind die konfigurierten Helm-Werte in Dateireihenfolge.
+	HelmValues []HelmValue
+	// Rejections nennt die abgelehnten Einträge und Muster: `sources` mit
+	// unbekanntem `kind` oder `env`, ungültige `exclude`-Muster, ungültige
+	// `helm_values`-Einträge und den Abschnitt `helm_values` unter Fassung 1.
 	Rejections []Rejection
+}
+
+// ValidHelmValues liefert die Helm-Werte, die der Sammler anwenden darf.
+func (c Config) ValidHelmValues() []HelmValue {
+	valid := make([]HelmValue, 0, len(c.HelmValues))
+	for _, value := range c.HelmValues {
+		if value.Valid {
+			valid = append(valid, value)
+		}
+	}
+	return valid
 }
 
 // Valid liefert die Einträge, mit denen der Sammler arbeiten darf.
@@ -137,8 +239,8 @@ func Read(path string) (Config, error) {
 	if !ok {
 		return config, fmt.Errorf("%s hat keine lesbare schema_version; erwartet wird %d", path, SchemaVersion)
 	}
-	if version != SchemaVersion {
-		return config, fmt.Errorf("%s hat schema_version %d, dieses Werkzeug versteht %d", path, version, SchemaVersion)
+	if version < MinSchemaVersion || version > SchemaVersion {
+		return config, fmt.Errorf("%s hat schema_version %d, dieses Werkzeug versteht %d bis %d", path, version, MinSchemaVersion, SchemaVersion)
 	}
 	config.SchemaVersion = version
 
@@ -178,7 +280,60 @@ func Read(path string) (Config, error) {
 		}
 		config.Sources = append(config.Sources, source)
 	}
+
+	section := root.Get("helm_values")
+	for index, item := range section.List() {
+		value, rejection := readHelmValue(item, index)
+		if rejection != nil {
+			config.Rejections = append(config.Rejections, *rejection)
+		}
+		if version < HelmValuesSchemaVersion {
+			value.Valid = false
+		}
+		config.HelmValues = append(config.HelmValues, value)
+	}
+	if version < HelmValuesSchemaVersion && len(config.HelmValues) > 0 {
+		// Einmal für den Abschnitt, nicht je Eintrag: der Grund ist die Fassung
+		// der Datei, nicht der einzelne Wert.
+		config.Rejections = append(config.Rejections, Rejection{Path: "helm_values", Line: section.At(),
+			Reason: fmt.Sprintf("helm_values verlangt schema_version: %d; unter schema_version: %d wird der Abschnitt nicht angewandt",
+				HelmValuesSchemaVersion, version)})
+	}
 	return config, nil
+}
+
+func readHelmValue(item *yamllite.Node, index int) (HelmValue, *Rejection) {
+	value := HelmValue{
+		Path:  strings.TrimSpace(item.Get("path").Str()),
+		Key:   strings.TrimSpace(item.Get("key").Str()),
+		Item:  strings.TrimSpace(item.Get("item").Str()),
+		Line:  item.At(),
+		Valid: true,
+	}
+	label := value.Path
+	if label == "" {
+		label = fmt.Sprintf("helm_values[%d]", index)
+	}
+	reject := func(reason string) (HelmValue, *Rejection) {
+		value.Valid = false
+		return value, &Rejection{Path: label, Line: value.Line, Reason: reason}
+	}
+	switch {
+	case value.Path == "":
+		return reject("kein `path` angegeben")
+	case value.Key == "":
+		return reject("kein `key` angegeben")
+	case value.Item == "":
+		return reject("kein `item` angegeben; erwartet wird `container/<name>`")
+	}
+	if _, ok := ParseKeyPath(value.Key); !ok {
+		return reject(fmt.Sprintf("ungültiger Schlüsselpfad %q; erwartet wird ein Punktpfad wie `redis.standalone.tag`, Listenindex in eckigen Klammern", value.Key))
+	}
+	ecosystem, name, found := strings.Cut(value.Item, "/")
+	if !found || ecosystem != HelmValueEcosystem || strings.TrimSpace(name) == "" {
+		return reject(fmt.Sprintf("ungültiger Gegenstand %q; erwartet wird `container/<name>`", value.Item))
+	}
+	return value, nil
 }
 
 func readSource(item *yamllite.Node, index int) (Source, *Rejection) {

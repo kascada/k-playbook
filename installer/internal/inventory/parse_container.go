@@ -152,7 +152,7 @@ func addPinnedInstalls(c *collector, line string, lineNumber int) {
 func parseCompose(c *collector) {
 	root, err := yamllite.Parse(c.file.Data)
 	if err != nil {
-		c.note("nicht lesbares YAML: %v", err)
+		c.fail("nicht lesbares YAML: %v", err)
 		return
 	}
 	services := root.Get("services")
@@ -192,7 +192,7 @@ func parseCompose(c *collector) {
 func parseDevcontainer(c *collector) {
 	data, err := standardizeJSONC(c.file.Data)
 	if err != nil {
-		c.note("nicht lesbares JSONC: %v", err)
+		c.fail("nicht lesbares JSONC: %v", err)
 		return
 	}
 	var config struct {
@@ -203,7 +203,7 @@ func parseDevcontainer(c *collector) {
 		Features        map[string]any `json:"features"`
 	}
 	if err := unmarshalJSON(data, &config); err != nil {
-		c.note("nicht lesbares JSONC: %v", err)
+		c.fail("nicht lesbares JSONC: %v", err)
 		return
 	}
 	finder := newLineFinder(c.file.Data)

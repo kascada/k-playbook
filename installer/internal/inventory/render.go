@@ -40,6 +40,7 @@ func Render(result Result, at string) string {
 	fmt.Fprintf(&out, "  deviations: %d\n", len(result.Deviations))
 	fmt.Fprintf(&out, "  rejected: %d\n", len(result.Rejections))
 	fmt.Fprintf(&out, "  sources-excluded: %d\n", excludedCount(result))
+	fmt.Fprintf(&out, "  sources-unevaluable: %d\n", len(result.UnevaluableSources()))
 	out.WriteString("---\n\n")
 
 	fmt.Fprintf(&out, "# %s\n\n", frontmatterTitle)
@@ -65,6 +66,7 @@ func renderOverview(out *strings.Builder, result Result) {
 	fmt.Fprintf(out, "- Abweichungen: %d\n", len(result.Deviations))
 	fmt.Fprintf(out, "- Abgelehnte Quellen: %d\n", len(result.Rejections))
 	fmt.Fprintf(out, "- Nicht durchsuchte Quellen: %d\n", excludedCount(result))
+	fmt.Fprintf(out, "- Nicht auswertbare Quellen: %d\n", len(result.UnevaluableSources()))
 	fmt.Fprintf(out, "- Hinweise: %d\n\n", len(result.Notes))
 }
 
@@ -171,15 +173,16 @@ func renderSources(out *strings.Builder, result Result) {
 		out.WriteString("Keine.\n\n")
 		return
 	}
-	out.WriteString("| Datei | Quellart | Label | Einträge | Note |\n")
-	out.WriteString("|---|---|---|---|---|\n")
+	out.WriteString("| Datei | Quellart | Label | Einträge | Zustand | Note |\n")
+	out.WriteString("|---|---|---|---|---|---|\n")
 	for _, source := range result.Sources {
 		kind := source.Kind
 		if source.Configured {
 			kind += " (konfiguriert)"
 		}
-		fmt.Fprintf(out, "| %s | %s | %s | %d | %s |\n",
-			code(source.File), cell(kind), cell(source.Env), source.Entries, cell(source.Note))
+		fmt.Fprintf(out, "| %s | %s | %s | %d | %s | %s |\n",
+			code(source.File), cell(kind), cell(source.Env), source.Entries,
+			sourceState(source), cell(source.Note))
 	}
 	out.WriteString("\n")
 }
@@ -209,4 +212,19 @@ func renderRejections(out *strings.Builder, result Result) {
 	if len(result.Notes) > 0 {
 		out.WriteString("\n")
 	}
+}
+
+// Die beiden Zustände einer gelesenen Quelle, wortgleich wie im Vertrag.
+const (
+	SourceStateEvaluated   = "ausgewertet"
+	SourceStateUnevaluable = "nicht auswertbar"
+)
+
+// sourceState ist die Zustandszelle der Quellentabelle. Ohne sie sähe eine
+// Quelle, die nicht auswertbar war, aus wie eine geprüfte ohne Fundstellen.
+func sourceState(source SourceRead) string {
+	if source.Unevaluable {
+		return SourceStateUnevaluable
+	}
+	return SourceStateEvaluated
 }

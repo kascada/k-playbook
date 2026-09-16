@@ -58,17 +58,18 @@ fields from two loads.
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
 | `guidelines` | Project guideline files. |
-| `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures and which areas it excludes from the default scan. Read it from here — never read that file yourself. |
+| `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that file yourself. |
 
 `versionSources` carries the whole answer, so no command has to open the file:
 `present` says whether it exists, `path` where it is, `schemaVersion` which contract
 version it declares, `roots` the additional readable roots and `sources` the configured
-extra sources (`path`, `kind`, `env`, `note`, `optional` per entry) and `exclude` the
-patterns the default scan skips. The installation `<playbook.dir>` is always skipped and
+extra sources (`path`, `kind`, `env`, `note`, `optional` per entry), `exclude` the
+patterns the default scan skips and `helmValues` the configured Helm values (`path`, `key`,
+`item` per entry; applied only under `schemaVersion` 2). The installation `<playbook.dir>` is always skipped and
 is not part of `exclude` — that rule comes from the contract, not from the file. `error`
 is filled only when the file is there but unreadable or of an unknown schema version —
-then `roots`, `sources` and `exclude` are empty and the state is a visible finding, not an
-empty result. The
+then `roots`, `sources`, `exclude` and `helmValues` are empty and the state is a visible
+finding, not an empty result. The
 field is absent on an installation older than it. The full contract is in
 `<playbook.dir>/docs/version-inventory.md`.
 

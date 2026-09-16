@@ -63,6 +63,7 @@ func printInventory(out io.Writer, options inventory.Options, result inventory.R
 	fmt.Fprintf(out, "  Abweichungen:                 %s\n", describeDeviations(result.Deviations))
 	fmt.Fprintf(out, "  Abgelehnte Quellen:           %d\n", len(result.Rejections))
 	fmt.Fprintf(out, "  Nicht durchsuchte Quellen:    %d\n", excludedSources(result))
+	fmt.Fprintf(out, "  Nicht auswertbare Quellen:    %d\n", len(result.UnevaluableSources()))
 	fmt.Fprintf(out, "  Hinweise:                     %d\n", len(result.Notes))
 
 	if len(result.Rejections) > 0 {
@@ -82,6 +83,14 @@ func printInventory(out io.Writer, options inventory.Options, result inventory.R
 			}
 			fmt.Fprintf(out, "  %s (%s): %d Quellen übergangen — %s\n",
 				exclusion.Pattern, exclusion.Origin, exclusion.Skipped, exclusion.Reason)
+		}
+	}
+	if unevaluable := result.UnevaluableSources(); len(unevaluable) > 0 {
+		// Gelesen, aber als Ganzes nicht ausgewertet. Der Grund steht unter
+		// den Hinweisen; hier steht, welche Quelle deshalb nichts geliefert hat.
+		fmt.Fprintf(out, "\nNicht auswertbare Quellen:\n")
+		for _, source := range unevaluable {
+			fmt.Fprintf(out, "  %s (%s)\n", source.File, source.Kind)
 		}
 	}
 	if len(result.Notes) > 0 {

@@ -3,6 +3,7 @@ package versionsources
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -186,5 +187,124 @@ exclude:
 	}
 	if !strings.Contains(config.Rejections[1].Reason, "leeres Ausschlussmuster") {
 		t.Errorf("Grund = %q", config.Rejections[1].Reason)
+	}
+}
+
+// `helm_values:` wird unter Fassung 2 gelesen; jeder Eintrag trägt Datei,
+// Schlüsselpfad und Gegenstand. Ungültige Einträge werden sichtbar abgelehnt,
+// bleiben aber in der Liste.
+func TestReadLiestHelmValuesUnterFassung2(t *testing.T) {
+	config, err := Read(writeConfig(t, `schema_version: 2
+helm_values:
+  - path: omni-gw/helm/values.yaml
+    key: helm-chart-generic.redis.standalone.tag
+    item: container/redis
+  - path: helm/values-*.yaml
+    key: services[0].tag
+    item: container/app
+  - key: a.tag
+    item: container/x
+  - path: values.yaml
+    item: container/x
+  - path: values.yaml
+    key: a..tag
+    item: container/x
+  - path: values.yaml
+    key: a.tag
+    item: node/alpinejs
+  - path: values.yaml
+    key: a.tag
+`))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if config.SchemaVersion != 2 || len(config.HelmValues) != 7 {
+		t.Fatalf("Zustand = %+v", config)
+	}
+	first := config.HelmValues[0]
+	if first.Path != "omni-gw/helm/values.yaml" || first.Key != "helm-chart-generic.redis.standalone.tag" ||
+		first.Item != "container/redis" || first.ItemName() != "redis" || first.Line != 3 || !first.Valid {
+		t.Errorf("erster Eintrag = %+v", first)
+	}
+	valid := config.ValidHelmValues()
+	if len(valid) != 2 || valid[1].Key != "services[0].tag" {
+		t.Errorf("gültige Einträge = %+v", valid)
+	}
+	wanted := []string{"kein `path`", "kein `key`", "ungültiger Schlüsselpfad", "ungültiger Gegenstand", "kein `item`"}
+	if len(config.Rejections) != len(wanted) {
+		t.Fatalf("Ablehnungen = %+v", config.Rejections)
+	}
+	for index, fragment := range wanted {
+		if !strings.Contains(config.Rejections[index].Reason, fragment) {
+			t.Errorf("Ablehnung %d = %q, erwartet %q", index, config.Rejections[index].Reason, fragment)
+		}
+	}
+}
+
+// Unter Fassung 1 wird `helm_values` nicht angewandt, sondern einmal sichtbar
+// abgelehnt: ein älteres Binary überginge den Abschnitt still, und genau das
+// soll eine Datei, die sich auf ihn verlässt, nicht erlauben.
+func TestHelmValuesUnterFassung1WerdenAbgelehnt(t *testing.T) {
+	config, err := Read(writeConfig(t, `schema_version: 1
+helm_values:
+  - path: values.yaml
+    key: redis.standalone.tag
+    item: container/redis
+`))
+	if err != nil {
+		t.Fatalf("Fassung 1 bleibt lesbar: %v", err)
+	}
+	if len(config.HelmValues) != 1 || config.HelmValues[0].Valid {
+		t.Errorf("der Eintrag bleibt sichtbar, gilt aber nicht: %+v", config.HelmValues)
+	}
+	if len(config.ValidHelmValues()) != 0 {
+		t.Errorf("unter Fassung 1 wird nichts angewandt: %+v", config.ValidHelmValues())
+	}
+	if len(config.Rejections) != 1 || config.Rejections[0].Path != "helm_values" || config.Rejections[0].Line != 3 ||
+		!strings.Contains(config.Rejections[0].Reason, "schema_version: 2") {
+		t.Errorf("Ablehnungen = %+v", config.Rejections)
+	}
+
+	empty, err := Read(writeConfig(t, "schema_version: 1\nhelm_values: []\n"))
+	if err != nil || len(empty.Rejections) != 0 {
+		t.Errorf("eine leere Liste unter Fassung 1 ist kein Befund: %+v, %v", empty.Rejections, err)
+	}
+}
+
+func TestParseKeyPath(t *testing.T) {
+	for key, want := range map[string]string{
+		"a":                    "a",
+		"a.b.c":                "a|b|c",
+		"helm-chart-generic.x": "helm-chart-generic|x",
+		"services[0].tag":      "services[0]|tag",
+		"matrix[1][2].tag":     "matrix[1][2]|tag",
+		"":                     "",
+		"a..b":                 "",
+		".a":                   "",
+		"a.":                   "",
+		"[0].a":                "",
+		"a[x]":                 "",
+		"a[-1]":                "",
+		"a[]":                  "",
+		"a[0]b":                "",
+		"a[0":                  "",
+		"a]":                   "",
+	} {
+		steps, ok := ParseKeyPath(key)
+		got := ""
+		if ok {
+			var parts []string
+			for _, step := range steps {
+				part := step.Key
+				for _, index := range step.Indexes {
+					part += "[" + strconv.Itoa(index) + "]"
+				}
+				parts = append(parts, part)
+			}
+			got = strings.Join(parts, "|")
+		}
+		if got != want {
+			t.Errorf("ParseKeyPath(%q) = %q (%v), erwartet %q", key, got, ok, want)
+		}
 	}
 }

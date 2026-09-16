@@ -506,5 +506,18 @@ sources: []
 #   exclude:
 #     - tests/fixtures/**
 exclude: []
+
+# Versionen in Helm-values, die keine Image-Referenz sind — etwa ein Subchart,
+# das nur einen Tag entgegennimmt. Je Eintrag:
+#   path: values-Datei oder Glob; sie muss ohnehin als Helm-values gelesen werden
+#   key:  Punktpfad zum Wert, Listenindex in eckigen Klammern
+#   item: Gegenstand als container/<name>
+#
+` + "# Der Abschnitt verlangt `schema_version: 2`; unter 1 wird er abgelehnt. Jeder\n" + `# Eintrag, der keine Zeile ergibt, steht als Hinweis mit Grund im Inventar.
+#
+#   helm_values:
+#     - path: helm/values.yaml
+#       key: redis.standalone.tag
+#       item: container/redis
 `
 }

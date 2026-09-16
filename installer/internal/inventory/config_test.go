@@ -39,7 +39,7 @@ func TestFehlendeQuellenkonfigurationIstKeinFehler(t *testing.T) {
 func TestDefekteQuellenkonfigurationBrichtDenLaufAb(t *testing.T) {
 	for name, content := range map[string]string{
 		"nicht lesbares YAML": "schema_version: 1\nroots: [/srv\n",
-		"fremde Fassung":      "schema_version: 2\n",
+		"fremde Fassung":      "schema_version: 3\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			options := newRunProject(t)

@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"encoding/json"
+	"path"
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
@@ -49,7 +50,7 @@ var nodeScopes = []struct {
 func parsePackageJSON(c *collector) {
 	var manifest packageManifest
 	if err := json.Unmarshal(c.file.Data, &manifest); err != nil {
-		c.note("nicht lesbares JSON: %v", err)
+		c.fail("nicht lesbares JSON: %v", err)
 		return
 	}
 	finder := newLineFinder(c.file.Data)
@@ -91,15 +92,20 @@ func parsePackageLock(c *collector) {
 		} `json:"packages"`
 	}
 	if err := json.Unmarshal(c.file.Data, &lock); err != nil {
-		c.note("nicht lesbares JSON: %v", err)
+		c.fail("nicht lesbares JSON: %v", err)
 		return
 	}
 	root, ok := lock.Packages[""]
 	if !ok {
-		c.note("kein Wurzelpaket in packages[\"\"] — die direkten Abhängigkeiten sind nicht zu erkennen")
+		c.fail("kein Wurzelpaket in packages[\"\"] — die direkten Abhängigkeiten sind nicht zu erkennen")
 		return
 	}
 	finder := newLineFinder(c.file.Data)
+	// Partner einer Zeile ist das package.json im selben Verzeichnis — nicht
+	// irgendein Manifest desselben Kontexts, sonst mischten sich die Paare
+	// zweier Verzeichnisse. Ob es existiert und das Paket deklariert, entscheidet
+	// erst die Abweichungsbildung.
+	manifest := path.Join(path.Dir(c.file.Display), "package.json")
 	direct := map[string]string{}
 	for name := range root.Dependencies {
 		direct[name] = "main"
@@ -124,7 +130,8 @@ func parsePackageLock(c *collector) {
 		}
 		c.add(Entry{Ecosystem: EcoNode, Name: name, KindOfThing: ThingPackage,
 			Version: entry.Version, Pin: pin, Scope: direct[name],
-			SourceKey: "packages." + key, SourceLine: finder.find(key, 0), Note: note})
+			SourceKey: "packages." + key, SourceLine: finder.find(key, 0), Note: note,
+			Manifest: manifest})
 	}
 }
 
@@ -175,7 +182,7 @@ func parseYarnLock(c *collector) {
 func parsePnpmLock(c *collector) {
 	root, err := yamllite.Parse(c.file.Data)
 	if err != nil {
-		c.note("nicht lesbares YAML: %v", err)
+		c.fail("nicht lesbares YAML: %v", err)
 		return
 	}
 	importers := root.Get("importers")

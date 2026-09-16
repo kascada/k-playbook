@@ -24,7 +24,7 @@ var setupActions = map[string]struct {
 func parseCI(c *collector) {
 	root, err := yamllite.Parse(c.file.Data)
 	if err != nil {
-		c.note("nicht lesbares YAML: %v", err)
+		c.fail("nicht lesbares YAML: %v", err)
 		return
 	}
 	if jobs := root.Get("jobs"); jobs != nil {

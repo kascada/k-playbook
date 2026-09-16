@@ -139,7 +139,7 @@ func parsePHP(c *collector) {
 			RequireDev map[string]string `json:"require-dev"`
 		}
 		if err := json.Unmarshal(c.file.Data, &manifest); err != nil {
-			c.note("nicht lesbares JSON: %v", err)
+			c.fail("nicht lesbares JSON: %v", err)
 			return
 		}
 		finder := newLineFinder(c.file.Data)
@@ -182,7 +182,7 @@ func parsePHP(c *collector) {
 		} `json:"packages-dev"`
 	}
 	if err := json.Unmarshal(c.file.Data, &lock); err != nil {
-		c.note("nicht lesbares JSON: %v", err)
+		c.fail("nicht lesbares JSON: %v", err)
 		return
 	}
 	finder := newLineFinder(c.file.Data)

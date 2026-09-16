@@ -2,6 +2,7 @@ package inventory
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
@@ -9,7 +10,7 @@ import (
 func parseHelm(c *collector) {
 	root, err := yamllite.Parse(c.file.Data)
 	if err != nil {
-		c.note("nicht lesbares YAML: %v", err)
+		c.fail("nicht lesbares YAML: %v", err)
 		return
 	}
 	switch {
@@ -74,10 +75,12 @@ func sectionIndex(section string, index int) string {
 
 // parseValuesFile sucht Image-Referenzen. Es gelten genau zwei Formen: das
 // Schlüsselpaar `image.repository` + `image.tag` und ein einzelner
-// `image`-String. Andere Schlüssel werden nicht geraten — ein Inventar, das
+// `image`-String — unter `image` und unter jedem camelCase-Schlüssel, der auf
+// `Image` endet. Andere Schlüssel werden nicht geraten — ein Inventar, das
 // Werte errät, ist keines.
 func parseValuesFile(c *collector, root *yamllite.Node) {
 	walkValues(c, root, "")
+	applyHelmValues(c, root)
 }
 
 func walkValues(c *collector, node *yamllite.Node, prefix string) {
@@ -92,7 +95,7 @@ func walkValues(c *collector, node *yamllite.Node, prefix string) {
 			if prefix != "" {
 				path = prefix + "." + key
 			}
-			if key == "image" {
+			if isImageKey(key) {
 				if addValuesImage(c, child, path) {
 					continue
 				}
@@ -138,4 +141,23 @@ func addValuesImage(c *collector, node *yamllite.Node, path string) bool {
 	c.add(Entry{Ecosystem: EcoContainer, Name: name, KindOfThing: ThingImage, Version: version,
 		Pin: pin, Digest: digestValue, SourceKey: path + ".repository", SourceLine: line})
 	return true
+}
+
+// isImageKey erkennt die Schlüssel, unter denen eine Image-Referenz steht:
+// `image` selbst und jeder camelCase-Schlüssel mit der Endung `Image`, etwa
+// `gatewayImage`. Vor der Endung muss ein Kleinbuchstabe oder eine Ziffer
+// stehen; `IMAGE`, `myimage` oder `imagePullSecrets` sind keine.
+//
+// Eine Abbildung mit `repository` allein genügt bewusst nicht: in values-Dateien
+// benennt `repository` auch Chart- und Git-Quellen oder nur eine Registry.
+func isImageKey(key string) bool {
+	if key == "image" {
+		return true
+	}
+	const suffix = "Image"
+	if len(key) <= len(suffix) || !strings.HasSuffix(key, suffix) {
+		return false
+	}
+	before := key[len(key)-len(suffix)-1]
+	return (before >= 'a' && before <= 'z') || (before >= '0' && before <= '9')
 }

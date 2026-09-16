@@ -22,6 +22,10 @@ type fileContext struct {
 	// nur für Lockfiles gesetzt; nil bedeutet, dass keine gültige Referenzmenge
 	// ermittelt werden konnte.
 	Direct map[string]string
+	// Values sind die konfigurierten Helm-Werte, die auf diese Datei zeigen. Der
+	// Leser für Helm-values prüft sie und setzt Handled; jeder andere Leser
+	// lässt sie unberührt, und der Sammler meldet sie danach mit Grund.
+	Values []*valueTarget
 }
 
 // collector sammelt die Funde einer Datei und füllt die Felder, die für alle
@@ -32,6 +36,10 @@ type collector struct {
 	file    fileContext
 	entries []Entry
 	notes   []Note
+	// unevaluable ist gesetzt, wenn die Quelle als Ganzes nicht ausgewertet
+	// werden konnte. Gesetzt wird es ausschließlich über fail, also an der
+	// Stelle, die den Grund kennt — nie durch einen Vergleich von Hinweistexten.
+	unevaluable bool
 }
 
 func (c *collector) add(entry Entry) {
@@ -59,8 +67,19 @@ func (c *collector) add(entry Entry) {
 	c.entries = append(c.entries, entry)
 }
 
+// note hält einen inhaltlichen Hinweis fest: die Quelle wurde ausgewertet, der
+// Hinweis betrifft eine Aussage darin.
 func (c *collector) note(format string, args ...any) {
 	c.notes = append(c.notes, Note{Source: c.file.Display, Text: fmt.Sprintf(format, args...)})
+}
+
+// fail hält fest, dass die Quelle als Ganzes nicht auswertbar ist, und nennt
+// den Grund als Hinweis. Der Zustand ersetzt den Hinweis nicht, er kommt dazu:
+// ohne ihn sähe die Quelle in der Quellentabelle aus wie eine geprüfte ohne
+// Fundstellen.
+func (c *collector) fail(format string, args ...any) {
+	c.note(format, args...)
+	c.unevaluable = true
 }
 
 // text liefert den Inhalt als Zeilen, 1-basiert adressierbar über den Index+1.
@@ -70,10 +89,10 @@ func (c *collector) lines() []string {
 
 // parseFile liest eine freigegebene Quelle.
 //
-// Eine bekannte, aber defekte Datei erzeugt einen sichtbaren Hinweis und keine
-// erfundenen Einträge; eine unbekannte erzeugt gar nichts — nur was gesucht
-// wird, kann fehlen.
-func parseFile(file fileContext) ([]Entry, []Note) {
+// Eine bekannte, aber defekte Datei erzeugt einen sichtbaren Hinweis, den
+// Zustand „nicht auswertbar" und keine erfundenen Einträge; eine unbekannte
+// erzeugt gar nichts — nur was gesucht wird, kann fehlen.
+func parseFile(file fileContext) ([]Entry, []Note, bool) {
 	collect := &collector{file: file}
 	switch file.Kind {
 	case KindPython:
@@ -105,9 +124,9 @@ func parseFile(file fileContext) ([]Entry, []Note) {
 	case KindToolVersions:
 		parseToolVersions(collect)
 	default:
-		collect.note("unbekannte Quellart %q — die Datei wurde nicht ausgewertet", file.Kind)
+		collect.fail("unbekannte Quellart %q — die Datei wurde nicht ausgewertet", file.Kind)
 	}
-	return collect.entries, collect.notes
+	return collect.entries, collect.notes, collect.unevaluable
 }
 
 // resolveKind macht aus `auto` die Art am Dateinamen. Ein ausdrücklich
