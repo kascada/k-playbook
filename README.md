@@ -4,9 +4,11 @@
 
 ## Why k-playbook
 
-- **It learns the project and keeps what it learned.** `/k-docs-code`, `/k-docs-tools`,
-  `/k-docs-extract` and `/k-doc-inventory` write project knowledge into
-  `k-playbook-local/docs/`; `/k-docs-index` anchors it in `AGENTS.md` and
+- **It learns the project and keeps what it learned.** `/k-docs-code`, `/k-docs-tools`
+  and `/k-doc-inventory` write project knowledge into `k-playbook-local/docs/`, and
+  `/k-docs-extract` distils raw material into the knowledge store
+  `k-playbook-local/knowledge/extracted/`, where its search finds it; `/k-docs-index` anchors
+  the docs in `AGENTS.md` and
   `opencode.json`, so the next session starts from it instead of reading the code
   again. Review decisions persist as well: whatever is recorded in
   `known-decisions.md` as a false positive or an accepted risk never shows up as a

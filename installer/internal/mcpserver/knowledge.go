@@ -75,7 +75,7 @@ type knowledgeDocumentInput struct {
 	Origin  string   `json:"origin" jsonschema:"Pflicht. Die tatsächliche Herkunft: System, Kennung dort, Adresse, Zeitpunkt des Abrufs — etwa \"Sitzung 2026-09-12, Task 056\" oder \"Confluence DEV/12345, abgerufen 2026-09-12\"."`
 	State   string   `json:"state" jsonschema:"Pflicht. raw, condensed oder reviewed. superseded wird abgewiesen; es entsteht nur über k_playbook_knowledge_supersede."`
 	Format  string   `json:"format,omitempty" jsonschema:"Was das Original war: markdown (Standard), text, html, image oder pdf."`
-	Sources []string `json:"sources,omitempty" jsonschema:"Die Eingangspfade unter k-playbook-local/inbox/, aus denen das Dokument destilliert wurde — wo es welche gibt."`
+	Sources []string `json:"sources,omitempty" jsonschema:"Die Rohstücke, aus denen das Dokument destilliert wurde — wo es welche gibt: Pfade relativ zu k-playbook-local/ mit Zone, etwa inbox/<quelle>/<name> oder, solange er übergangsweise gelesen wird, material/<pfad>. inbox_list und origin eines Queue-Eintrags nennen Eingangspfade ohne inbox/; voranstellen."`
 	Body    string   `json:"body" jsonschema:"Pflicht. Der Rumpf als Markdown ohne Frontmatter; ein übergebener Kopf (---…---) wird abgewiesen."`
 }
 

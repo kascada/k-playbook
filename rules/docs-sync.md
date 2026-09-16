@@ -30,7 +30,7 @@ Unter `k-playbook-local/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, 
 
 - `docs/libs/` folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
 - `docs/manual/` ist handgepflegt und folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst.
-- `docs/extracted/` hält fest, was aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage.
+- `docs/extracted/` hält fest, was vor der Umstellung auf die Wissensablage aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage. Dasselbe gilt für die Auszüge, die `/k-docs-extract` heute nach `k-playbook-local/knowledge/extracted/` schreibt.
 - `docs/versions/` folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht im Abschnitt „Nachzug bei Versionssprüngen" unten und wird hier nicht ein zweites Mal ausformuliert.
 - `docs/README.md` ist der erzeugte Index. Er wird nicht von Hand nachgezogen, sondern von `/k-docs-index` neu geschrieben.
 

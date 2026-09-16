@@ -494,6 +494,11 @@ type KnowledgeStatus struct {
 // aus Dokumenten mit state raw oder superseded bleiben draußen: Rohes würde
 // die verdichtete Fassung seiner selbst überdecken, Abgelöstes hat aufgehört
 // zu gelten. Beides bleibt über Read und List erreichbar.
+//
+// Hat die Ablage keinen Abschnitt, der überhaupt ein Treffer sein könnte, setzt
+// Search eine Notiz (knowledgeEmptyStoreNote) — unabhängig von filter und
+// Anfrage. Sonst wäre eine leere Ablage nicht von „zu diesem Thema nichts" zu
+// unterscheiden. Eine gefüllte Ablage ohne Treffer bleibt ohne Notiz.
 func (k *Knowledge) Search(query string, filter KnowledgeFilter, limit int) ([]Hit, error) {
 	if strings.TrimSpace(query) == "" {
 		return nil, InputErrorf("leere Suchanfrage")
@@ -505,6 +510,9 @@ func (k *Knowledge) Search(query string, filter KnowledgeFilter, limit int) ([]H
 	index, err := k.open()
 	if err != nil {
 		return nil, err
+	}
+	if !knowledgeHasSearchableChunk(index) {
+		k.note("%s", knowledgeEmptyStoreNote)
 	}
 
 	hits := []Hit{}
@@ -696,6 +704,27 @@ func knowledgeLegacyLearnedMarkdown(projectDir string) int {
 		return nil
 	})
 	return count
+}
+
+// knowledgeEmptyStoreNote ist der Hinweis von Search auf eine Ablage ohne
+// durchsuchbaren Abschnitt. Der Verweis auf docs/ ist eine Übergangslesung
+// (docs/knowledge-layout.md, „Transitional reads“) und fällt in Schritt 6 der
+// Umstellung der Schreiber.
+const knowledgeEmptyStoreNote = "die Wissensablage " + LocalDirName + "/" + KnowledgeDirName +
+	"/ hat noch nichts Durchsuchbares — das Projektwissen liegt bis zur Migration unter " +
+	LocalDirName + "/docs/"
+
+// knowledgeHasSearchableChunk meldet, ob der Index einen Abschnitt hat, der ein
+// Suchtreffer sein könnte: einen Chunk aus einem Dokument, dessen state es
+// nicht aus der Suche hält. Die Wurzel-README gibt keine Chunks
+// (knowledgeSearchable) und zählt damit von selbst nicht.
+func knowledgeHasSearchableChunk(index *knowledgeIndex) bool {
+	for _, chunk := range index.Chunks {
+		if !knowledgeHiddenState(index.Files[chunk.Path].Frontmatter.State) {
+			return true
+		}
+	}
+	return false
 }
 
 // knowledgeHiddenState meldet, ob ein state ein Dokument aus der Suche hält.

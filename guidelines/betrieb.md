@@ -32,11 +32,11 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
 | Doku aus dem Code | `docs/code/<NN>-<slug>.md` | `/k-docs-code` |
 | Steckbrief zu Library oder Tool | `docs/libs/<name>.md` | `/k-docs-tools` |
-| Doku aus Rohmaterial | `docs/extracted/<NN>-<slug>.md` | `/k-docs-extract` |
+| Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |
 | Versionsinventar | `docs/versions/inventory.md` | `/k-doc-inventory`, `k-playbook inventory` |
 | Handgeschriebene Doku | `docs/manual/<slug>.md` | von Hand |
 | Doku-Index | `docs/README.md` | `/k-docs-index`, sonst niemand |
-| Rohmaterial: Verläufe, Mitschriften, Übergaben | `material/` | von Hand |
+| Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
@@ -75,9 +75,9 @@ in die falsche Herkunft legt, hängt sie an den falschen Nachzug.
   hinausgeht, wird eine Task — nicht `plan.md`, nicht `konzept.md` neben dem Code.
 - **Ergebnisse in `checks/`.** Dort liegen ausführbare Checks. Ein Ergebnis daneben
   sieht beim nächsten Lauf wie ein Skript aus.
-- **Rohmaterial in `docs/`.** Was noch nicht ausgewertet ist, liegt in `material/`
-  und wird nicht indiziert. Ausgewertet landet es in `docs/extracted/`, mit Quelle
-  und Konfidenz.
+- **Rohmaterial in `docs/`.** Was noch nicht ausgewertet ist, liegt in `inbox/`
+  und wird nicht indiziert. Ausgewertet landet es über `/k-docs-extract` in
+  `knowledge/extracted/`, mit Quelle und Konfidenz.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
   `docs/README.md`. Eine weitere Sammlung daneben wird nicht gefunden und veraltet
   unbemerkt.

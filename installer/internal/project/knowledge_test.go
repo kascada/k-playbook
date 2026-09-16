@@ -788,6 +788,12 @@ func TestKnowledgeLeereOderFehlendeZoneAntwortetLeer(t *testing.T) {
 			if err != nil || len(hits) != 0 {
 				t.Errorf("Search: %+v, %v", hits, err)
 			}
+			// Die leere Ablage sagt Search als Notiz (Task 073); List und
+			// Status bleiben ohne.
+			if notes := knowledge.Notes(); len(notes) != 1 || notes[0] != knowledgeEmptyStoreNote {
+				t.Errorf("Notizen von Search bei leerer Zone: %v", notes)
+			}
+			knowledge = NewKnowledge(root)
 			entries, err := knowledge.List(KnowledgeFilter{})
 			if err != nil || len(entries) != 0 {
 				t.Errorf("List: %+v, %v", entries, err)
@@ -1125,6 +1131,75 @@ func TestKnowledgeIndexUnlesbareDateiIstKeinDrift(t *testing.T) {
 	if hits, err := NewKnowledge(root).Search("Rendern", KnowledgeFilter{}, 0); err != nil || len(hits) != 1 || hits[0].Path != "libs/goldmark.md" {
 		t.Errorf("nach Wiederherstellung nicht im Index: %+v, %v", hits, err)
 	}
+}
+
+// Search meldet eine Ablage ohne durchsuchbaren Abschnitt mit einer Notiz
+// (Task 073): nur die Wurzel-README, nur ein rohes oder abgelöstes Dokument.
+// Eine gefüllte Ablage bleibt ohne Notiz, auch wenn die Anfrage nichts trifft
+// oder der Filter auf die Art alles ausschließt — die Notiz sagt etwas über die
+// Ablage, nicht über die Anfrage.
+func TestKnowledgeSearchMeldetAblageOhneDurchsuchbaresMitNotiz(t *testing.T) {
+	search := func(t *testing.T, root string, query string, filter KnowledgeFilter) ([]Hit, []string) {
+		t.Helper()
+		knowledge := NewKnowledge(root)
+		hits, err := knowledge.Search(query, filter, 0)
+		if err != nil {
+			t.Fatalf("Search %q: %v", query, err)
+		}
+		return hits, knowledge.Notes()
+	}
+	emptyStore := func(notes []string) bool {
+		return len(notes) == 1 && notes[0] == knowledgeEmptyStoreNote
+	}
+	storeWithReadme := func(t *testing.T) string {
+		t.Helper()
+		root := t.TempDir()
+		writeKnowledgeFile(t, root, "README.md", "# Index\n\nDer Einstieg mit dem Wort Wächter.\n")
+		return root
+	}
+
+	t.Run("nur README", func(t *testing.T) {
+		root := storeWithReadme(t)
+		hits, notes := search(t, root, "Wächter", KnowledgeFilter{})
+		if len(hits) != 0 || !emptyStore(notes) {
+			t.Errorf("Treffer %+v, Notizen %v", hits, notes)
+		}
+		if !strings.Contains(knowledgeEmptyStoreNote, "k-playbook-local/docs/") {
+			t.Errorf("Hinweis nennt docs/ nicht: %q", knowledgeEmptyStoreNote)
+		}
+	})
+
+	for _, state := range []string{KnowledgeStateRaw, KnowledgeStateSuperseded} {
+		t.Run("nur "+state, func(t *testing.T) {
+			root := storeWithReadme(t)
+			writeKnowledgeFile(t, root, "findings/roh.md", "---\ntitle: Roh\nsubject: Test\norigin: Test\nstate: "+state+"\n---\n\n# Roh\n\nDas Rohwort steht hier.\n")
+			if status, err := NewKnowledge(root).Status(); err != nil || status.ChunkCount == 0 {
+				t.Fatalf("das Dokument gibt keine Chunks, der Fall prüft nichts: %+v, %v", status, err)
+			}
+			hits, notes := search(t, root, "Rohwort", KnowledgeFilter{})
+			if len(hits) != 0 || !emptyStore(notes) {
+				t.Errorf("Treffer %+v, Notizen %v", hits, notes)
+			}
+		})
+	}
+
+	t.Run("condensed ohne Treffer", func(t *testing.T) {
+		root := storeWithReadme(t)
+		doc := sessionDoc("findings/befund.md")
+		doc.State = KnowledgeStateCondensed
+		if _, err := NewKnowledge(root).Write("session", doc, ""); err != nil {
+			t.Fatal(err)
+		}
+		if hits, notes := search(t, root, "Schnabeltier", KnowledgeFilter{}); len(hits) != 0 || len(notes) != 0 {
+			t.Errorf("Anfrage ohne Treffer: Treffer %+v, Notizen %v", hits, notes)
+		}
+		if hits, notes := search(t, root, "Wächter", KnowledgeFilter{Kind: "code"}); len(hits) != 0 || len(notes) != 0 {
+			t.Errorf("Filter schließt alles aus: Treffer %+v, Notizen %v", hits, notes)
+		}
+		if hits, notes := search(t, root, "Wächter", KnowledgeFilter{}); len(hits) != 1 || len(notes) != 0 {
+			t.Errorf("Anfrage mit Treffer: Treffer %+v, Notizen %v", hits, notes)
+		}
+	})
 }
 
 // state hat Zähne: ein rohes und ein abgelöstes Dokument fehlen in den

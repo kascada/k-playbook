@@ -149,6 +149,7 @@ Eine Analyse gilt nur dann als abgeschlossen, wenn eines davon zutrifft:
 - **Die Sackgassen weglassen**, weil sie ja zu nichts geführt haben. Sie sind der Teil,
   den man sonst ein zweites Mal bezahlt.
 - **In `docs/` schreiben.** Diese Regel schreibt ausschließlich nach `material/befunde/`.
-  Der Weg in die Doku führt über `/k-docs-extract`, und der hat sein eigenes Gate.
+  Der Weg in die Wissensablage (`knowledge/extracted/`) führt über `/k-docs-extract`, und
+  der hat sein eigenes Gate.
 - **Das übrige `material/` anfassen.** Verschieben, umbenennen oder aufräumen nimmt die
   Quelle weg, gegen die man später prüfen würde.

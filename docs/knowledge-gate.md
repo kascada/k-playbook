@@ -43,7 +43,7 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | The three zones `inbox/`, `queue/`, `knowledge/` and the write tools `write`, `publish`, `supersede`, `inbox_*`, `queue_*` | built, task 056; see [`knowledge-layout.md`](knowledge-layout.md) |
 | Classification of deposits (kind from the path, origin, state, format in the frontmatter) | built, task 056 |
 | `raw` and `superseded` out of search by default | built, task 056 |
-| Migration of `docs/` into `knowledge/` | not built; `knowledge/` is empty until then |
+| Migration of `docs/` and `material/` into `knowledge/` | under way as the switch of the writers, six steps, no separate pass; step 1 `/k-docs-extract` (task 073). The locations still read meanwhile are in [`knowledge-layout.md`](knowledge-layout.md#transitional-reads) |
 | Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
 | Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
 | Test of the write side against the built tools | run on 2026-09-13; the findings it reproduced are fixed by task 063 and re-measured in the project on 2026-09-14. The edges found in the review of task 063 — linked directories at `write` and `supersede`, the successor rule, case in generator directories and the root `README.md`, the restore at `read`, `CreateLocal` with an unwritable index — are fixed by task 064 and re-measured in the project on 2026-09-15 over MCP and the command line |
@@ -55,20 +55,26 @@ requirement; the instruction is what makes it happen. Everything below follows f
 
 ## How we proceed
 
-The write side is built, and `knowledge/` is still empty in every project. The order from
-here:
+The write side is built, and `knowledge/` fills as the writers are switched to it. The order
+from here:
 
 1. **Test the write side against the real tools.** Before any document moves, every write
    tool is exercised in a project and the result is checked on disk, in the index and in the
    interface. The criteria are listed below.
-2. **Migrate once.** What a generator produces is not moved: the generators run again and
-   `publish` into `knowledge/`. Everything written by hand — pages, extracts, findings,
-   pitfalls — is moved in a single pass by an assistant, document by document through
-   `write`, with subject, origin and state decided per document. That pass is the second and
-   larger test of the contract. Details are in [`knowledge-layout.md`](knowledge-layout.md#migration).
-3. **Switch the entry point.** `/k-docs-index` writes `knowledge/README.md` through `write`
-   with `producer: docs-index`, and the generated `AGENTS.md` tells a session to ask the store
-   first. Until then `docs/README.md` stays the authoritative entry point (see "Open points").
+2. **Migrate by switching the writers.** There is no separate migration pass: the writers
+   go through the gate one after another, in six steps, and each step takes along what its
+   writer leaves behind. What a generator produces is not moved: the generator runs again and
+   `publish`es into `knowledge/`. Step 5 clears `material/`: findings go through `write` into
+   `knowledge/findings/`, the remaining raw material into `inbox/`. What was written by hand
+   under `docs/` — the older extracts in `docs/extracted/`, `docs/learned/` — is moved in one
+   pass within step 6, document by document through `write`, with subject, origin and state
+   decided per document. Every location still read meanwhile has a row in the table of
+   transitional reads, and the step that makes it superfluous deletes the row. The steps and
+   the table are in [`knowledge-layout.md`](knowledge-layout.md#migration).
+3. **Switch the entry point.** This is step 6 of the switch: `/k-docs-index` writes
+   `knowledge/README.md` through `write` with `producer: docs-index`, and the generated
+   `AGENTS.md` tells a session to ask the store first. Until then `docs/README.md` stays the
+   authoritative entry point (see "Open points").
 4. **Build the reading side.** `briefing` and the filters on `kind`, `state` and `subject`, as
    described under "Querying".
 5. **Tier two only on demand.** Vectors from a local model, or a database of its own, only if
@@ -292,8 +298,8 @@ actually produced.
 
 ## Settled since
 
-Two open points of the first version were closed by task 056 and are recorded here so a
-later reader knows what was decided and why.
+Two open points of the first version were closed by task 056, a third by task 073. They are
+recorded here so a later reader knows what was decided and why.
 
 **The ranking put pointers above their targets.** The keyword index in this repository's
 `README.md` took rank 1 for `ApplyLinks`, `SHA256SUMS` and `Symlink-Konflikt`; in the third
@@ -309,19 +315,24 @@ returned `source` as the origin directory — the *kind* — while `write` took 
 free-text provenance note — the *origin*. The field was split before anything consumed it:
 `kind` is read from the path, `origin` lives in the frontmatter, and the tools report both.
 
+**An empty store answered silently.** While the writers are being switched, `knowledge/` may
+hold nothing searchable, and `search` returned an empty hit list without any hint —
+indistinguishable from "nothing on this topic", although `docs/` holds the material. `status`
+showed it (no chunks), `search` did not. Since task 073 `search` carries a hint whenever the
+index has no section that could be a hit — no chunk outside the root `README.md`, none from a
+`raw` or `superseded` document —, regardless of query and filter, over the existing note path
+(`hint` over MCP, stderr on the command line) and without a new field. A search without hits
+on a filled store stays without it. The hint points at `k-playbook-local/docs/`; that pointer
+is itself a transitional read and goes in step 6 (see
+[`knowledge-layout.md`](knowledge-layout.md#transitional-reads)).
+
 ## Open points
 
 **The documentation index still lives in `docs/`.** `/k-docs-index` writes
 `k-playbook-local/docs/README.md`, which `AGENTS.md` declares the authoritative entry point,
 and knows nothing of `knowledge/`. In the store its place is `knowledge/README.md`, written
-by the same command through `write` with `producer: docs-index`; that switch is part of the
-migration, together with the instruction in the generated `AGENTS.md`.
-
-**An empty store answers silently.** Until the migration `knowledge/` is empty, and `search`
-returns an empty hit list without any hint — indistinguishable from "nothing on this topic",
-although `docs/` holds the material. `status` shows it (no chunks), `search` does not. A hint
-when the index is empty would keep an assistant from drawing the wrong conclusion in the
-meantime.
+by the same command through `write` with `producer: docs-index`; that switch is step 6 of the
+switch of the writers, together with the instruction in the generated `AGENTS.md`.
 
 **Outside sources change upstream.** Drift detection notices a local edit. It cannot notice
 that the Confluence page an extract came from has changed. Whether the gate refreshes such

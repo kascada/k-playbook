@@ -376,7 +376,7 @@ func readKnowledgeBody(file string) (string, error) {
 }
 
 func runKnowledgeWrite(args []string) error {
-	const usage = "knowledge write <pfad> --producer <erzeuger> --title <titel> --subject <thema> --origin <herkunft> --state <raw|condensed|reviewed> [--format <format>] [--source <eingangspfad>]… [--queue <kennung>] [--file <datei>] [--json]"
+	const usage = "knowledge write <pfad> --producer <erzeuger> --title <titel> --subject <thema> --origin <herkunft> --state <raw|condensed|reviewed> [--format <format>] [--source <quellpfad>]… [--queue <kennung>] [--file <datei>] [--json]"
 	parsed, err := parseKnowledgeArgs(args, usage,
 		[]string{"--producer", "--title", "--subject", "--origin", "--state", "--format", "--queue", "--file"},
 		[]string{"--source"})
@@ -826,7 +826,7 @@ Unterbefehle:
             Gibt eine Datei als Markdown aus; pfad relativ zu knowledge/.
   write <pfad> --producer <erzeuger> --title <titel> --subject <thema>
         --origin <herkunft> --state <raw|condensed|reviewed>
-        [--format <markdown|text|html|image|pdf>] [--source <eingangspfad>]…
+        [--format <markdown|text|html|image|pdf>] [--source <quellpfad>]…
         [--queue <kennung>] [--file <datei>] [--json]
             Schreibt ein Dokument; pfad relativ zu knowledge/ und im
             Verzeichnis des Erzeugers. Der Rumpf kommt aus --file oder von

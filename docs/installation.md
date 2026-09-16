@@ -95,7 +95,7 @@ k-playbook-local/
 └── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
-The generated docs origins `docs/code/`, `docs/libs/`, `docs/extracted/`, and `docs/versions/` are not shown there: they arise on the first run of their generator.
+The generated docs origins `docs/code/`, `docs/libs/`, and `docs/versions/` are not shown there: they arise on the first run of their generator. `/k-docs-extract` writes to `knowledge/extracted/` in the knowledge store instead, created by its first write; raw material for it goes into `inbox/`, and `material/` is still read as the previous location until step 5 of the switch (see [knowledge-layout.md](./knowledge-layout.md#transitional-reads)).
 
 Every directory contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 

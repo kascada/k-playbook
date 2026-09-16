@@ -93,11 +93,11 @@ from the output above — never from configuration, and never by searching.
 | documentation index | `<local.dir>/docs/README.md` |
 | code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
-| extracted documentation | `<local.dir>/docs/extracted/` — entsteht beim ersten Lauf von `/k-docs-extract` |
+| extracted knowledge | `<local.dir>/knowledge/extracted/` — nur über `k-playbook knowledge write` bzw. `k_playbook_knowledge_write`; entsteht beim ersten Lauf von `/k-docs-extract` |
 | version inventory | `<local.dir>/docs/versions/` — entsteht beim ersten Lauf von `/k-doc-inventory` |
 | hand-written documentation | `<local.dir>/docs/manual/` |
 | version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
-| raw material, never indexed | `<local.dir>/material/` |
+| raw material, never indexed | `<local.dir>/inbox/` — Quelle von `/k-docs-extract`; der bisherige Ort `<local.dir>/material/` wird bis Schritt 5 der Umstellung mitgelesen (`k-playbook/docs/knowledge-layout.md`, „Transitional reads“) |
 | findings from analysis and debugging | `<local.dir>/material/befunde/` — entsteht beim ersten Lauf von `/k-danke` oder des Skills `ks-befunde` |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
@@ -122,8 +122,10 @@ is never indexed. Exactly one subdirectory is written to: `material/befunde/`, w
 skill `ks-befunde` and the command `/k-danke` record what an analysis or a debugging run
 produced — what was proven, what was disproven and which dead ends were ruled out. Its
 form is defined by the rule `befunde.md` in `catalogs.rules`. Everything else below
-`material/` is left untouched by every command, including `/k-docs-extract`, which reads
-it and never changes it.
+`material/` is left untouched by every command, including `/k-docs-extract`, which still
+reads it as a previous location until step 5 of the switch to the knowledge store and never
+changes it. Its source is `<local.dir>/inbox/`, and it writes to `<local.dir>/knowledge/extracted/`
+only through the knowledge tools.
 
 `<local.dir>/rules/`, `reviews/`, `checks/` and `guidelines/` are the project-local side
 of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain

@@ -224,7 +224,7 @@ directories of its own origin:
 /k-docs           → check inventory and offer possible docs actions
 /k-docs-code      → k-playbook-local/docs/code/
 /k-docs-tools     → k-playbook-local/docs/libs/
-/k-docs-extract   → k-playbook-local/docs/extracted/
+/k-docs-extract   → k-playbook-local/knowledge/extracted/ (through the knowledge tools)
 /k-doc-inventory  → k-playbook-local/docs/versions/
 /k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json
 ```
@@ -232,13 +232,18 @@ directories of its own origin:
 `/k-docs` is the guided entry point: it checks inventory, consistency, and
 session memory and offers the possible next step. The four producers create
 content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries,
-`/k-docs-extract` reads raw material from `k-playbook-local/material/`, and
+`/k-docs-extract` reads raw material from `k-playbook-local/inbox/` -- and, until step 5
+of the switch to the knowledge store, from the previous location
+`k-playbook-local/material/` ([transitional reads](knowledge-layout.md#transitional-reads))
+--, and
 `/k-doc-inventory` reads declared versions from manifests, lockfiles, container,
 Helm, and CI files. Skip a stage if it has no input.
 The knowledge gate -- `k-playbook knowledge` and the MCP tools
 `k_playbook_knowledge_*` -- no longer reads or writes here: it works on the
 knowledge store `k-playbook-local/knowledge/`, with `inbox/` and `queue/`
-beside it, which are empty until the migration moves the documents (see
+beside it. The store fills as the writers are switched to it, one after another;
+`/k-docs-extract` is the first and writes its extracts to `knowledge/extracted/`,
+where the knowledge search finds them and `docs/README.md` does not yet (see
 [knowledge-layout.md](knowledge-layout.md) and [mcp.md](mcp.md), "Knowledge
 Contract").
 

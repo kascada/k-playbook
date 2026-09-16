@@ -374,9 +374,10 @@ docs/manual/  guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
 version-sources.yaml
 ```
 
-Die erzeugten Docs-Herkünfte — `docs/code/`, `docs/libs/`, `docs/extracted/` und
-`docs/versions/` — stehen bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres
-Erzeugers.
+Die erzeugten Docs-Herkünfte — `docs/code/`, `docs/libs/` und `docs/versions/` — stehen
+bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres Erzeugers. `/k-docs-extract`
+schreibt nicht mehr nach `docs/extracted/`, sondern über die Wissenswerkzeuge nach
+`knowledge/extracted/`; das Verzeichnis entsteht beim ersten `write`.
 
 Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder Eintrag mit einem
 eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus

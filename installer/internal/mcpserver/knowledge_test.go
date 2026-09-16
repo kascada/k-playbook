@@ -97,6 +97,46 @@ func TestKnowledgeSearchLiefertVertragsfelder(t *testing.T) {
 	}
 }
 
+// search auf eine Ablage ohne durchsuchbaren Abschnitt trägt den Hinweis im
+// hint (Task 073); eine gefüllte Ablage ohne Treffer bleibt ohne.
+func TestKnowledgeSearchMeldetLeereAblageImHint(t *testing.T) {
+	empty := t.TempDir()
+	if err := project.CreateConfig(empty, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	readme := filepath.Join(project.KnowledgeDir(empty), "README.md")
+	if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(readme, []byte("# Index\n\nNoch nichts.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _, err := knowledgeSearchTool(context.Background(), nil, knowledgeSearchInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: empty}, Query: "Wächter",
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	envelope := decodeKnowledgeEnvelope(t, result)
+	if !envelope.OK || len(knowledgeHitsOf(envelope)) != 0 {
+		t.Fatalf("leere Ablage: %#v", envelope)
+	}
+	if !strings.Contains(envelope.Hint, "nichts Durchsuchbares") || !strings.Contains(envelope.Hint, "k-playbook-local/docs/") {
+		t.Errorf("hint ohne Leerhinweis: %q", envelope.Hint)
+	}
+
+	result, _, err = knowledgeSearchTool(context.Background(), nil, knowledgeSearchInput{
+		knowledgeBaseInput: knowledgeBaseInput{ProjectDir: newKnowledgeProject(t)}, Query: "Schnabeltier",
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if envelope = decodeKnowledgeEnvelope(t, result); !envelope.OK || len(knowledgeHitsOf(envelope)) != 0 || envelope.Hint != "" {
+		t.Errorf("gefüllte Ablage ohne Treffer: %#v", envelope)
+	}
+}
+
 func TestKnowledgeSearchLehntLeereAnfrageAb(t *testing.T) {
 	root := newKnowledgeProject(t)
 

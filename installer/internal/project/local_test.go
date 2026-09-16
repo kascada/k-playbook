@@ -86,9 +86,9 @@ func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) 
 	}
 }
 
-// docs/code/, docs/libs/, docs/extracted/ und docs/versions/ gehören je einem
-// Erzeuger und entstehen beim ersten Lauf des jeweiligen Commands, nicht beim
-// Einrichten.
+// docs/code/, docs/libs/ und docs/versions/ gehören je einem Erzeuger und
+// entstehen beim ersten Lauf des jeweiligen Commands, nicht beim Einrichten.
+// docs/extracted/ ist seit Task 073 kein Ziel mehr und entsteht ebenso wenig.
 func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 	root := t.TempDir()
 
@@ -100,6 +100,31 @@ func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 		if pathExists(filepath.Join(LocalDir(root), "docs", name)) {
 			t.Errorf("docs/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", name)
 		}
+	}
+}
+
+// Die Zwecktexte von docs/ und material/ nennen docs/extracted/ nicht mehr als
+// Ziel (Task 073): /k-docs-extract schreibt über die Wissenswerkzeuge nach
+// knowledge/extracted/, und neues Rohmaterial gehört nach inbox/.
+func TestLocalStructureZweckNenntKnowledgeExtractedAlsZiel(t *testing.T) {
+	purposes := map[string]string{}
+	for _, entry := range LocalStructure() {
+		purposes[filepath.ToSlash(entry.Path)] = entry.Purpose
+	}
+	for _, name := range []string{"docs", "material"} {
+		purpose, ok := purposes[name]
+		if !ok {
+			t.Fatalf("%s fehlt in LocalStructure", name)
+		}
+		if strings.Contains(purpose, "docs/extracted/") || strings.Contains(purpose, "extracted/ von /k-docs-extract") {
+			t.Errorf("%s nennt docs/extracted/ als Ziel:\n%s", name, purpose)
+		}
+		if !strings.Contains(purpose, "../knowledge/extracted/") {
+			t.Errorf("%s nennt knowledge/extracted/ nicht:\n%s", name, purpose)
+		}
+	}
+	if !strings.Contains(purposes["material"], "../inbox/") {
+		t.Errorf("material nennt inbox/ nicht als Ort für neues Rohmaterial:\n%s", purposes["material"])
 	}
 }
 

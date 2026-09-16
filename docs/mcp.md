@@ -634,6 +634,14 @@ otherwise the file name -- what a caller had to give `write` comes back on readi
 file without a header still gets a readable name. `search` always carries
 `hits` and `list` always carries `entries`, empty ones included -- the same as the `--json`
 output of the subcommand. The other tools omit both keys rather than sending `null`.
+When the store has no section that could be a hit at all -- no chunk outside the root
+`README.md`, and none from a document in state `raw` or `superseded` --, `search` says so in
+`hint` (the subcommand on stderr, its stdout stays `Keine Treffer …` or the plain JSON), whatever
+the query and the `kind` filter: the store has nothing searchable yet, and project knowledge
+lies under `k-playbook-local/docs/` until the migration. Without it an empty store would read
+like "nothing on this topic". A store with sections that the query does not hit carries no
+such hint. The pointer at `docs/` is a transitional read and goes in step 6 of the switch of
+the writers ([knowledge-layout.md](knowledge-layout.md#transitional-reads)).
 
 **Writing.** Every write names its `producer` from the closed list in the layout, and the
 `path` -- relative to `knowledge/`, reported back exactly as `read`, `list` and `search`
@@ -715,7 +723,7 @@ behind the tools' back and re-read them. The same report can mean an interrupted
 concurrently running `publish`: its index is written before its swap, so for that moment, or
 after a crash in it, the index describes a set the disk does not hold, and the access returns
 to what is on disk -- although nobody wrote past the gate. A `hint` appears -- at `read` as well -- when an access had to skip something without failing over it: an unwritable `cache/`, an unreadable file, a
-set-aside directory put back after an interrupted swap. `status` also names hidden leftovers of
+set-aside directory put back after an interrupted swap -- and at `search` when the store has nothing searchable yet (see "Reading"). `status` also names hidden leftovers of
 a swap (`.<dir>-neu-*`, `.<dir>-alt-*`), which are never deleted automatically, and Markdown
 files at the old location `k-playbook-local/docs/learned/`, which the store no longer reads. Unreadable is
 not drift: a file whose hash cannot be taken is reported in the `hint`, its index entry is

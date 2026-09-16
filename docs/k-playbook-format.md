@@ -83,18 +83,22 @@ belongs exclusively to `/k-docs-index`. No command writes doc files in
 `docs/*.md` files from before this structure have no producer: no command writes
 them, they are only listed.
 
-`docs/code/`, `docs/libs/`, `docs/extracted/`, and `docs/versions/` are created
+`docs/code/`, `docs/libs/`, and `docs/versions/` are created
 on the first run of a tool from their origin: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill write to `docs/code/`, `/k-docs-tools` to
-`docs/libs/`, `/k-docs-extract` to `docs/extracted/`, and `/k-doc-inventory` to
-`docs/versions/`. Setup does not create them; it creates `docs/manual/` and
-`material/`. Setup also creates the three zones of the knowledge store beside
+`docs/libs/`, and `/k-doc-inventory` to `docs/versions/`. Setup does not create
+them; it creates `docs/manual/` and `material/`. `/k-docs-extract` no longer
+writes to `docs/extracted/`: it reads raw material from `inbox/` and writes to
+`knowledge/extracted/` through the knowledge tools; what lies in
+`docs/extracted/` from before stays and is still indexed by `/k-docs-index` until
+step 6 of the switch. Setup also creates the three zones of the knowledge store beside
 `docs/` -- `inbox/`, `queue/` and `knowledge/`, each with a README that says
 what it holds -- and the knowledge gate (`k-playbook knowledge`,
 `k_playbook_knowledge_*`) reads and writes only there; the owner directories
-below `knowledge/` are created by their producers on the first write. Until the
-migration moves the documents, `knowledge/` is empty and `docs/` carries on
-(see [knowledge-layout.md](knowledge-layout.md)).
+below `knowledge/` are created by their producers on the first write. The
+migration is the switch of the writers to the store, one step each; until a
+writer is switched, `docs/` carries on for it (see
+[knowledge-layout.md](knowledge-layout.md#migration)).
 
 In contrast, setup creates the version inventory source configuration,
 `k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is

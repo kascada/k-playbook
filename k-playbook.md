@@ -77,8 +77,9 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 
 - **Projekt** — `/k-gui` startet die Oberfläche.
 - **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
-  `/k-docs-tools`, `/k-docs-extract` und `/k-doc-inventory` erzeugen Doku,
-  `/k-docs-index` baut den Index.
+  `/k-docs-tools` und `/k-doc-inventory` erzeugen Doku, `/k-docs-index` baut den Index.
+  `/k-docs-extract` verdichtet Rohmaterial aus `k-playbook-local/inbox/` und schreibt es
+  über die Wissenswerkzeuge nach `k-playbook-local/knowledge/extracted/`.
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
   vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
   überführt Befunde in Tasks oder Fixes.
@@ -86,7 +87,8 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
   Todos des Projekts über `k-playbook todo`.
 - **Sitzung** — `/k-danke` schließt eine Arbeitssitzung ab: er legt die Befunde vor, die
   während der Arbeit nach `k-playbook-local/material/befunde/` geschrieben wurden,
-  befördert Bestätigtes über `/k-docs-extract` in die Doku und prüft den Docs-Nachzug.
+  befördert Bestätigtes über `/k-docs-extract` in die Wissensablage und prüft den
+  Docs-Nachzug.
   Was währenddessen festzuhalten ist, regelt `k-playbook/rules/befunde.md`.
 - **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`
   führt Tests aus und diagnostiziert Fehler, `/k-verlauf` durchsucht alte AI-Verläufe,

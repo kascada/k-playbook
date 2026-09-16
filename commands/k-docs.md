@@ -2,7 +2,7 @@
 description: Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action.
 argument-hint: [status|code|tools|extract|inventory|index]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_knowledge_list, mcp__k-playbook__k_playbook_knowledge_inbox_list]
 ---
 
 # k-docs
@@ -32,21 +32,29 @@ From the context output:
 - `DOCS_DISPLAY_PATH = k-playbook-local/docs`
 - `CODE_DIR = <RESOLVED_DOCS_DIR>/code`
 - `LIBS_DIR = <RESOLVED_DOCS_DIR>/libs`
-- `EXTRACTED_DIR = <RESOLVED_DOCS_DIR>/extracted`
+- `EXTRACTED_DIR = <RESOLVED_DOCS_DIR>/extracted` — bisheriger Ort: Auszüge von
+  `/k-docs-extract` aus der Zeit vor der Wissensablage. Neue Auszüge liegen unter
+  `k-playbook-local/knowledge/extracted/` und werden nur über das Werkzeug gezählt
+  (`k-playbook knowledge list --kind extracted --json` bzw. `k_playbook_knowledge_list`).
 - `VERSIONS_DIR = <RESOLVED_DOCS_DIR>/versions`
 - `INVENTORY_FILE = <VERSIONS_DIR>/inventory.md`
 - `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual`
-- `MATERIAL_DIR = <local.dir>/material`
+- `INBOX_DIR = <local.dir>/inbox` — die Quelle von `/k-docs-extract`, gelistet über
+  `k-playbook knowledge inbox list --json` bzw. `k_playbook_knowledge_inbox_list`.
+- `MATERIAL_DIR = <local.dir>/material` — bisheriger Ort für Rohmaterial, bis Schritt 5 der
+  Umstellung mitgezählt. `EXTRACTED_DIR` und `MATERIAL_DIR` sind Übergangslesungen
+  (Tabelle „Transitional reads“ in `k-playbook/docs/knowledge-layout.md`).
 - `INDEX_FILE = <RESOLVED_DOCS_DIR>/README.md`
 
 Command-specific policy:
 
 - If `RESOLVED_DOCS_DIR` is missing: ask whether to create exactly that directory or to run
   `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR`, `LIBS_DIR`, `EXTRACTED_DIR` and `VERSIONS_DIR` are producer directories.
-  Missing is normal; do not create them during the status pass.
-- `MANUAL_DIR` and `MATERIAL_DIR` are created by setup. If either is missing, report it as
-  a setup gap and offer `/k-gui`; do not create it silently.
+- `CODE_DIR`, `LIBS_DIR` and `VERSIONS_DIR` are producer directories. Missing is normal; do
+  not create them during the status pass. `EXTRACTED_DIR` is no producer directory any more;
+  missing is normal too.
+- `MANUAL_DIR`, `INBOX_DIR` and `MATERIAL_DIR` are created by setup. If one is missing,
+  report it as a setup gap and offer `/k-gui`; do not create it silently.
 - Without a confirmed action this command writes nothing.
 
 ## Schritt 2 — Bestand prüfen
@@ -65,7 +73,9 @@ Collect these facts, compactly:
 - Whether `AGENTS.md` exists and mentions `k-playbook-local/docs/README.md`.
 - Whether `opencode.json` or `opencode.jsonc` exists and contains a `references.docs.path`
   pointing to `./k-playbook-local/docs`.
-- Material files under `MATERIAL_DIR`, if the directory exists.
+- Raw pieces in `INBOX_DIR` (through the tool) and material files under `MATERIAL_DIR`, if
+  the directory exists.
+- Documents under `knowledge/extracted/`, through the tool.
 - Manifest hints for tool docs: `pyproject.toml`, `requirements*.txt`, `package.json`,
   `go.mod`, `Cargo.toml`, `Gemfile`, `composer.json`, `pom.xml`, `build.gradle*`,
   `mix.exs` under `project.repoRoot`, respecting the usual exclusions from the producer
@@ -83,7 +93,9 @@ Report, but do not repair:
 - `generated.by` that does not match the origin:
   - `docs/code/`: `k-docs-code`, legacy `k-code2docs`, `ks-overlay-repo-analyse`.
   - `docs/libs/`: `k-docs-tools`, legacy `k-tools-scan`.
-  - `docs/extracted/`: `k-docs-extract`.
+  - `docs/extracted/`: `k-docs-extract` — only the older extracts there. Documents under
+    `knowledge/extracted/` carry no `generated.by`; their header is composed by the tool and
+    not checked here.
   - `docs/versions/`: `k-doc-inventory` — on both call paths, the subcommand
     `k-playbook inventory` included.
 - Flat doc files under `docs/` besides `README.md`.
@@ -130,13 +142,14 @@ Build the option list from the facts, not from guesses:
 ─────────────────────────────────────
 code/       <N> Dateien | fehlt
 libs/       <N> Dateien | fehlt
-extracted/  <N> Dateien | fehlt
+extracted/  <N> in knowledge/extracted/, <N> älter in docs/extracted/ | fehlt
 versions/   <N> Dateien | fehlt
 manual/     <N> Dateien | fehlt
 unsortiert  <N> Dateien
 Index       vorhanden | fehlt
 Memory      ok | fehlt AGENTS.md | fehlt opencode.json | unvollständig
-Material    <N> Dateien
+Eingang     <N> Rohstücke in inbox/
+Material    <N> Dateien (bisheriger Ort)
 Manifeste   <N> gefunden
 Inventar    erhoben <generated.at>, <sources-read> Quellen gelesen,
             <sources-configured> konfiguriert, <deviations> Abweichungen | fehlt
@@ -146,7 +159,7 @@ Quellkonfig version-sources.yaml vorhanden (<N> Wurzeln, <N> Quellen,
 Mögliche Aktionen:
   1. code       Code semantisch analysieren → /k-docs-code
   2. tools      Libraries/Tools dokumentieren → /k-docs-tools
-  3. extract    Rohmaterial verdichten → /k-docs-extract
+  3. extract    Rohmaterial aus inbox/ in die Wissensablage verdichten → /k-docs-extract
   4. inventory  Versionsinventar erheben → /k-doc-inventory
   5. index      Index bauen und Memory registrieren → /k-docs-index
   6. status     nur diesen Bericht anzeigen

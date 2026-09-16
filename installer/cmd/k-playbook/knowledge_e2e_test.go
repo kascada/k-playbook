@@ -506,6 +506,45 @@ func TestKnowledgeHinweisStehtAufStderr(t *testing.T) {
 	}
 }
 
+// search auf eine Ablage ohne durchsuchbaren Abschnitt (Task 073): der Hinweis
+// steht auf stderr, stdout bleibt „Keine Treffer …“ bzw. die reine JSON-Antwort.
+// Eine gefüllte Ablage ohne Treffer schreibt nichts auf stderr.
+func TestKnowledgeSearchLeereAblageHinweisAufStderr(t *testing.T) {
+	root := knowledgeProject(t)
+	if err := os.RemoveAll(filepath.Join(project.KnowledgeDir(root), "manual")); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runKnowledgeStreams(t, "search", "Einstieg")
+	if err != nil {
+		t.Fatalf("search auf leerer Ablage: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "Keine Treffer für „Einstieg“." {
+		t.Errorf("stdout:\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "Hinweis:") || !strings.Contains(stderr, "nichts Durchsuchbares") || !strings.Contains(stderr, "k-playbook-local/docs/") {
+		t.Errorf("Leerhinweis fehlt auf stderr:\n%s", stderr)
+	}
+
+	stdout, stderr, err = runKnowledgeStreams(t, "search", "Einstieg", "--json")
+	if err != nil {
+		t.Fatalf("search --json auf leerer Ablage: %v", err)
+	}
+	if strings.Contains(stdout, "Hinweis") || decodeTodoOutput[knowledgeSearchOutput](t, stdout).Hits == nil {
+		t.Errorf("stdout --json:\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "nichts Durchsuchbares") {
+		t.Errorf("Leerhinweis fehlt bei --json auf stderr:\n%s", stderr)
+	}
+
+	// knowledgeProject wechselt in ein zweites Projekt, dessen manual/ steht.
+	knowledgeProject(t)
+	stdout, stderr, err = runKnowledgeStreams(t, "search", "Schnabeltier")
+	if err != nil || !strings.Contains(stdout, "Keine Treffer") || stderr != "" {
+		t.Errorf("gefüllte Ablage ohne Treffer: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+	}
+}
+
 // publish --from mit einer Datei unter <dir>/code/: der Pfad trägt das
 // Generatorverzeichnis und wird abgewiesen, statt nach knowledge/code/code/ zu
 // gehen (Task 063, Entscheidung 1).

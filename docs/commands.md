@@ -28,7 +28,7 @@ New commands become visible only after linking is in place and the assistant has
 | `/k-docs` | Check documentation inventory and offer possible actions | read-only status; can dispatch to code, tool, extract, inventory, or index actions |
 | `/k-docs-code` | Generate semantic project documentation from the code | writes one file per topic to `k-playbook-local/docs/code/`; the `ks-overlay-repo-analyse` skill also writes there |
 | `/k-docs-tools` | Add library/tool documentation | generates one pitfall file per selected tool under `k-playbook-local/docs/libs/` |
-| `/k-docs-extract` | Condense raw material from `k-playbook-local/material/` into documentation | writes one file per topic to `k-playbook-local/docs/extracted/`, with source and confidence |
+| `/k-docs-extract` | Condense raw material from `k-playbook-local/inbox/` into knowledge | writes one document per topic to `k-playbook-local/knowledge/extracted/` through `k-playbook knowledge write` or the MCP tools, with sources and confidence, and settles a matching queue entry; reads the previous location `k-playbook-local/material/` as well until step 5 of the switch to the knowledge store, see [knowledge-layout.md](./knowledge-layout.md#transitional-reads) |
 | `/k-doc-inventory` | Collect the version inventory | writes `k-playbook-local/docs/versions/inventory.md` through the `k-playbook inventory` subcommand; the same run is behind "Update" in the interface's "Inventory" section; contract in [`version-inventory.md`](./version-inventory.md), synchronization required for version jumps in `rules/docs-sync.md` |
 | `/k-docs-index` | Build the single docs index and register docs for AI sessions | writes `k-playbook-local/docs/README.md`, plus `AGENTS.md` and `opencode.json` (or `opencode.jsonc` if only that exists) |
 | **Session** | | |
@@ -89,7 +89,7 @@ No command reads or guesses a path. Everything derives from the location of `K-P
 | `/k-review`, `/k-audit` | `k-playbook-local/results/` |
 | `/k-docs-code`, skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |
 | `/k-docs-tools` | `k-playbook-local/docs/libs/` |
-| `/k-docs-extract` | `k-playbook-local/docs/extracted/` |
+| `/k-docs-extract` | `k-playbook-local/knowledge/extracted/`, written only through `k-playbook knowledge write` or the MCP tools |
 | `/k-doc-inventory` | `k-playbook-local/docs/versions/`, plus `k-playbook-local/version-sources.yaml` only after explicit confirmation and exclusively by adding to it |
 | `/k-docs-index` | `k-playbook-local/docs/README.md`, plus `AGENTS.md` and `opencode.json` (or `opencode.jsonc`) in the project root |
 | `/k-danke`, skill `ks-befunde` | `k-playbook-local/material/befunde/` — the only place any command writes below `material/`; after confirmation also `k-playbook-local/guidelines/fallen.md` and `k-playbook-local/rules/` |

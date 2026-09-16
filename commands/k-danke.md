@@ -148,10 +148,10 @@ Kompakte Zusammenfassung:
 - Verteilung `bestaetigt` gegen `unbestaetigt` gegen `widerlegt`.
 
 Wurde in Schritt 5 Projektwissen zur Beförderung bestätigt, nenne als Folge-Command
-**`/k-docs-extract befunde`** — er verdichtet das Rohmaterial nach
-`k-playbook-local/docs/extracted/` und hat dafür sein eigenes Bestätigungs-Gate. Danach
-nimmt **`/k-docs-index`** die neuen Dateien in den Index auf; ohne diesen Lauf sind sie
-für Folge-Sessions nicht auffindbar.
+**`/k-docs-extract befunde`** — er verdichtet das Rohmaterial über die Wissenswerkzeuge nach
+`k-playbook-local/knowledge/extracted/` und hat dafür sein eigenes Bestätigungs-Gate. Die
+neuen Dokumente findet die Wissenssuche sofort; einen Lauf von `/k-docs-index` brauchen sie
+dafür nicht.
 
 Wurde nichts befördert, sage ausdrücklich, dass kein Folge-Command ansteht und die
 Sitzung abgeschlossen ist.
@@ -174,8 +174,9 @@ Sitzung abgeschlossen ist.
 
 - **Die Prüfung aus `/k-enforcement` nachbauen.** Sie kennt den zusammengeführten
   Regelkatalog; eine zweite Fassung läuft davon weg.
-- **Nach `docs/` schreiben.** Auch wenn ein Befund dort thematisch hinpasst: der Weg führt
-  über `/k-docs-extract`, das die Herkunft und die Konfidenz mitschreibt.
+- **Nach `docs/` oder `knowledge/` schreiben.** Auch wenn ein Befund dort thematisch
+  hinpasst: der Weg führt über `/k-docs-extract`, das die Herkunft und die Konfidenz
+  mitschreibt.
 - **Vor dem Gate in Schritt 5 schreiben.** Ein halb angelegter Eintrag aus einem
   abgebrochenen Lauf sieht später aus wie bestätigtes Wissen.
 - **Alles nach `fallen.md` kippen.** Diese Datei wird künftig vor dem Handeln gelesen;

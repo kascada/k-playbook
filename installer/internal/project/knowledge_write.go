@@ -58,8 +58,10 @@ type KnowledgeDocument struct {
 	State string `json:"state"`
 	// Format ist markdown (Standard), text, html, image oder pdf.
 	Format string `json:"format,omitempty"`
-	// Sources sind die Eingangspfade, aus denen das Dokument destilliert
-	// wurde — wo es welche gibt.
+	// Sources sind die Rohstücke, aus denen das Dokument destilliert wurde —
+	// wo es welche gibt: Pfade relativ zu k-playbook-local/ mit Zone
+	// (inbox/<quelle>/<name>, übergangsweise material/<pfad>). Freier Text,
+	// nicht gegen den Eingang geprüft.
 	Sources []string `json:"sources,omitempty"`
 	// Body ist der Rumpf als Markdown ohne Frontmatter.
 	Body string `json:"body"`

@@ -1,6 +1,6 @@
 ---
 title: Knowledge Layout
-description: The three storage zones under k-playbook-local — inbox for what arrives, queue for what is outstanding, knowledge for what holds — with the ownership rule, the frontmatter contract, the table of what lands where, the write tools every deposit goes through, and when the migration happens.
+description: The three storage zones under k-playbook-local — inbox for what arrives, queue for what is outstanding, knowledge for what holds — with the ownership rule, the frontmatter contract, the table of what lands where, the write tools every deposit goes through, and how the migration happens: as the switch of the writers, step by step, with the table of the reads that last until then.
 ---
 
 # Knowledge Layout
@@ -12,10 +12,11 @@ migration is a move and never a rename during operation.
 
 **Status: built.** The three zones, the write tools and the index over `knowledge/` exist
 since task 056 (the zones are created by setup, the tools are `k-playbook knowledge …` and
-`k_playbook_knowledge_*`, see [`mcp.md`](mcp.md), "Knowledge Contract"). What is not yet
-built is the migration: `docs/` still holds everything and is still shipped, `knowledge/`
-is empty in every project until the migration moves the documents, and the reading side
-(`briefing`, filters on `state`) is a separate step.
+`k_playbook_knowledge_*`, see [`mcp.md`](mcp.md), "Knowledge Contract"). The migration is
+under way, and it is not a move of its own: it is the switch of the writers to the gate, one
+step per writer (see "Migration"). Until the last step `docs/` holds what the writers not yet
+switched produce and stays the entry point, and `knowledge/` fills with every step. The reading
+side (`briefing`, filters on `state`) is a separate step.
 
 ## Why zones, and why by lifetime
 
@@ -130,7 +131,7 @@ answer them nowhere a search can reach.
 | `origin` | actual provenance: the system, the identifier there, the address, when it was fetched |
 | `state` | `raw`, `condensed`, `reviewed` or `superseded` |
 | `format` | what the original was: `markdown`, `text`, `html`, `image`, `pdf` |
-| `sources` | the inbox paths a document was distilled from, where there are any |
+| `sources` | the raw pieces a document was distilled from, where there are any: paths relative to `k-playbook-local/` with their zone, `inbox/<source>/<name>` or, while it is still read (see "Transitional reads"), `material/<path>`. The tools name inbox paths without the zone — `inbox_list` and a queue entry's `origin` say `chat/2026-09-12.md` —, so a caller prepends `inbox/` before it writes `sources` or compares with them |
 | `successor` | set by `supersede`: the path of the document that replaces this one, relative to `knowledge/` |
 | `superseded_reason` | set by `supersede`: why it was replaced |
 | `updated` | the day it last changed |
@@ -357,22 +358,64 @@ corrected by superseding it with the right document; the chain stays as history.
 move before the interface stands. Moving early would mean building the tools against a moving
 target and migrating twice.
 
-It splits into two halves that need entirely different effort:
+**The migration is the switch of the writers.** There is no separate migration pass beside
+it. The writers go through the gate one after another, one step each, and no release runs
+between the steps:
+
+1. `/k-docs-extract`
+2. `/k-doc-inventory` and `k-playbook inventory`
+3. `/k-docs-code` and the skill `overlay-repo-analyse`
+4. `/k-docs-tools`
+5. findings — `rules/befunde.md`, the skill `befunde`, `/k-danke`
+6. `/k-docs-index`, `_shared/context.md`, `/k-docs`, `rules/docs-sync.md`, the skill
+   `ai-session-memory` and the entry point in `AGENTS.md`
+
+A step also takes along what its writer leaves behind, and that splits into two halves that
+need entirely different effort:
 
 - **What a generator produces is not migrated at all.** `code/`, `libs/` and `versions/` are
-  rewritten from their sources on the next run. Moving them by hand would produce exactly the
-  files the next run overwrites.
-- **Everything else is moved once, by an assistant, in a single pass.** Hand-written pages,
-  extracts, findings, pitfalls: they need a subject, an origin and a state, which is a judgement
-  per document and not a rule a script can apply. That pass is worth doing exactly once, and
-  only when the write interface exists — every document it touches goes in through the tool,
-  which is at the same time the first real test of the contract.
+  rewritten from their sources on the next run, through `publish` (steps 2 to 4). Moving them
+  by hand would produce exactly the files the next run overwrites.
+- **Everything written by hand is moved by an assistant, document by document through
+  `write`.** Hand-written pages, extracts, findings, pitfalls: they need a subject, an origin
+  and a state, which is a judgement per document and not a rule a script can apply. Step 5
+  clears `material/`: findings go through `write` into `knowledge/findings/` (see "Findings
+  and pitfalls count as knowledge"), the remaining raw material goes into `inbox/`. What was
+  written by hand under `docs/` — the extracts left in `docs/extracted/`, the documents in
+  `docs/learned/` — is moved in one pass within step 6.
 
 **The old location `docs/learned/` belongs to the second half.** Up to v0.7.0,
 `knowledge write` wrote to `k-playbook-local/docs/learned/`. The store does not read there
 and has deliberately no fallback, so those documents are invisible to `list`, `search`,
 `read` and `status`. Instead, `status` carries a note as long as Markdown files lie there,
-and the migration moves them with the rest of the hand-written material.
+and step 6 moves them with the rest of what was written by hand under `docs/`.
+
+### Transitional reads
+
+Whoever reads a previous location enters it in this table; whoever makes the read superfluous
+removes it, clears the location and deletes the row. When the switch is complete the table is
+empty and this section goes: from then on nothing is read that does not lie in `inbox/` or
+`knowledge/`.
+
+A previous location is one a switched writer has left. A location that is still the current
+target of a writer not yet switched is not one, and it has no row: `material/befunde/` for
+`/k-danke`, `rules/befunde.md` and the skill `befunde` until step 5, `docs/code/`, `docs/libs/`
+and `docs/versions/` for `/k-docs-index` until steps 2 to 4. Every row names exactly one step.
+
+| Reader | Previous location | Why it is still read | Removed in step | State |
+|---|---|---|---|---|
+| `/k-docs-extract` | `material/` | `/k-danke` calls `/k-docs-extract befunde` until step 5, and raw material still lies there; the selection shows it as "bisheriger Ort", nothing is copied into `inbox/` | 5 — findings through `write` into `knowledge/findings/`, the remaining raw material into `inbox/` | since task 073 |
+| `/k-docs`, status report | `material/` | counts raw material to offer `/k-docs-extract` beside the pieces in `inbox/` | 5 | since task 073 |
+| `/k-docs-index`, follow-up hint | `material/` | recommends `/k-docs-extract` while raw material lies there | 5 | since task 073 |
+| `search`, hint on an empty store | `docs/` | the hint says that project knowledge lies under `k-playbook-local/docs/` until the migration | 6 | since task 073 |
+| `status`, note on the old location | `docs/learned/` | documents written there up to v0.7.0 would be invisible without it | 6 — moves the documents | since task 063 |
+| `AGENTS.md` (block from setup and from the skill `ai-session-memory`), `opencode.json` | `docs/README.md` as the entry point | the index knows `docs/` only; a new extract in `knowledge/extracted/` is found through `search`, not through the keyword index | 6 | since task 073 |
+| `/k-docs-index` | `docs/extracted/` | indexes the extracts written there before task 073; it is no target any more | 6 — moves them | since task 073 |
+| `/k-docs`, status report | `docs/extracted/` | counts the older extracts and checks their `generated.by` | 6 | since task 073 |
+| skill `ai-session-memory` | `docs/extracted/` | lists the origin directories, `extracted/` included, when it registers the docs | 6 | since task 073 |
+
+The state names the task with which the read became transitional; the reader itself may be
+older.
 
 ## Decisions and what they exclude
 
