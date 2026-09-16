@@ -1,16 +1,11 @@
 "use strict";
 
-// Lebenszeichen, Sperre und Wiederverbinden stehen in session.js — sie gelten
-// für jede Seite gleich und werden vor dieser Datei geladen.
+// Lebenszeichen und Wiederverbinden stehen in session.js, die Sperrfläche
+// und die Knöpfe für Update und Dienst in service.js — beide werden vor dieser
+// Datei geladen. Diese Datei greift auf die Knöpfe nicht zu: auf /setup stehen
+// sie nur, solange keine Projektkonfiguration besteht.
 
 const elements = {
-  shutdown: document.getElementById("shutdown"),
-  update: document.getElementById("update"),
-  closed: document.getElementById("closed"),
-  closedTitle: document.getElementById("closed-title"),
-  closedMessage: document.getElementById("closed-message"),
-  closedReconnect: document.getElementById("closed-reconnect"),
-  closedHint: document.getElementById("closed-hint"),
   configCard: document.getElementById("config-card"),
   localCard: document.getElementById("local-card"),
   assistantCard: document.getElementById("assistant-card"),
@@ -104,9 +99,6 @@ const REGISTRY_DEVIATIONS = [
   ["blocked", "projekteigen, bleibt liegen"],
 ];
 
-elements.shutdown.addEventListener("click", shutdown);
-elements.closedReconnect.addEventListener("click", onReconnectClick);
-elements.update.addEventListener("click", onUpdateClick);
 elements.configCreate.addEventListener("click", onConfigClick);
 elements.localCreate.addEventListener("click", createLocal);
 elements.assistantApply.addEventListener("click", applyAssistant);
@@ -119,86 +111,12 @@ document.addEventListener("click", onCopyClick);
 // Steht in nav.js und muss vor den Ladefunktionen laufen: die blenden Blöcke
 // ein, und das Menü zieht das nur mit, wenn es die Karten schon beobachtet.
 buildBlockNav();
-// Die Startseite hat für den beendeten Server ein eigenes Fenster.
+// Die Setup-Seite legt für den beendeten Server die Sperrfläche aus
+// service.js über die Seite.
 startSession(showClosed);
 // Der Assistenten-Block folgt erst, wenn die Konfiguration steht; loadConfig
 // blendet ihn dann ein und lädt ihn nach.
 loadConfig();
-// Die Update-Prüfung braucht das Netz. Sie läuft nebenher, damit die Seite
-// nicht auf einen langsamen Remote wartet.
-checkUpdate();
-
-// updateAvailable steuert, was ein Klick auf den Button tut: prüfen oder
-// tatsächlich aktualisieren.
-let updateAvailable = false;
-
-async function checkUpdate() {
-  elements.update.disabled = true;
-  elements.update.textContent = "Prüfe...";
-  try {
-    const response = await fetch("/api/update", { cache: "no-store" });
-    renderUpdate(await response.json());
-  } catch {
-    resetUpdateButton("Update prüfen");
-  }
-}
-
-async function onUpdateClick() {
-  if (!updateAvailable) {
-    await checkUpdate();
-    return;
-  }
-
-  elements.update.disabled = true;
-  elements.update.textContent = "Aktualisiere...";
-  try {
-    const response = await fetch("/api/update", { method: "POST" });
-    const data = await response.json();
-    renderUpdate(data);
-    if (data.restartRequired) {
-      // Der Dienst beendet sich nach dieser Antwort selbst: zum neuen Stand
-      // gehört ein anderes Binary, und ein alter Daemon soll nicht stehen
-      // bleiben.
-      //
-      // Der Bootstrap steht hier in derselben kanonischen Form wie in
-      // project.BootstrapHint und in der Dokumentation: ein Zielprojekt hat
-      // kein eigenes install-Target, der Aufruf geht über den Clone.
-      showClosed(
-        "Das Programm wurde aktualisiert. Der Dienst hat sich beendet; " +
-          "neu installieren mit: make -C k-playbook install " +
-          "(ohne make: k-playbook/bin/install). " +
-          "Danach k-playbook erneut aufrufen."
-      );
-    }
-  } catch {
-    resetUpdateButton("Update prüfen");
-  }
-}
-
-function renderUpdate(data) {
-  updateAvailable = Boolean(data.available);
-
-  if (updateAvailable) {
-    // Hervorgehoben, solange etwas anliegt.
-    elements.update.className = "primary attention-highlight";
-    elements.update.textContent = "Update verfügbar";
-    elements.update.title = `${data.local} -> ${data.remote} (${data.branch})`;
-    elements.update.disabled = false;
-    return;
-  }
-
-  // Ohne Meldung ist der Stand geprüft und gleich; mit Meldung konnte nicht
-  // geprüft werden, dann bleibt es bei der Aufforderung.
-  resetUpdateButton(data.message ? "Update prüfen" : "Version ist aktuell");
-  elements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
-}
-
-function resetUpdateButton(label) {
-  updateAvailable = false;
-  elements.update.className = "secondary";
-  elements.update.textContent = label;
-  elements.update.disabled = false;
-}
 
 // Legt eine Zeile in einer Faktenliste an und gibt sie zurück, damit der
 // Aufrufer sie noch kennzeichnen kann.
@@ -1411,42 +1329,4 @@ async function copyText(text) {
   }
   field.remove();
   return done;
-}
-
-async function shutdown() {
-  elements.shutdown.disabled = true;
-  try {
-    await fetch("/api/shutdown", { method: "POST" });
-  } catch {
-    // Das Backend darf die Antwort schuldig bleiben, wenn es sofort zumacht.
-  }
-  showClosed();
-}
-
-// Sperrt die Seite, weil der Dienst weg ist — ob auf Knopfdruck hier, aus
-// einem anderen Fenster, per k-playbook stop oder weil er nach einem Update
-// zugemacht hat. Er war für alle Fenster derselbe, also gilt das für alle.
-// Der Weg zurück ist zuerst „Erneut verbinden"; der Hinweis auf das Terminal
-// kommt erst, wenn auch das scheitert.
-function showClosed(message = "") {
-  serverAvailable = false;
-  elements.closedTitle.textContent = "Der Dienst ist beendet, für alle Fenster dieses Projekts.";
-  elements.closedMessage.textContent = message;
-  elements.closedMessage.classList.toggle("hidden", !message);
-  elements.closedHint.classList.add("hidden");
-  elements.closedReconnect.disabled = false;
-  elements.closedReconnect.textContent = "Erneut verbinden";
-  elements.closed.classList.remove("hidden");
-}
-
-async function onReconnectClick() {
-  elements.closedReconnect.disabled = true;
-  elements.closedReconnect.textContent = "Verbinde...";
-  if (await reconnect()) {
-    // Die Seite lädt neu; hier gibt es nichts mehr zu tun.
-    return;
-  }
-  elements.closedHint.classList.remove("hidden");
-  elements.closedReconnect.disabled = false;
-  elements.closedReconnect.textContent = "Erneut verbinden";
 }

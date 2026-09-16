@@ -35,58 +35,7 @@
             </p>
           </section>
 
-          <section class="card" id="tasks-card">
-            <div class="section-head">
-              <div>
-                <h2>Tasks</h2>
-              </div>
-              <span id="tasks-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">
-              Tasks sind die Umsetzung. <code>/k-remediation</code> überführt Review-Befunde in
-              Tasks; von Hand entsteht eine über <code>/k-task-create</code> →
-              <code>/k-task-refine</code> → <code>/k-task-run</code>. Alles, was über einen
-              trivialen Einzelschritt hinausgeht, wird eine Task und bleibt nicht als Plan im
-              Gespräch stehen.
-            </p>
-            <div class="link-row">
-              <a class="button-link secondary" href="/workflows/tasks">Offene und erledigte Tasks</a>
-            </div>
-          </section>
-
-          <section class="card" id="reviews-card">
-            <div class="section-head">
-              <div>
-                <h2>Reviews</h2>
-              </div>
-              <span id="reviews-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">
-              Reviews messen den Bestand: <code>/k-audit</code> führt einen vollständigen Sweep
-              an oder setzt ihn fort, <code>/k-review</code> ein einzelnes Rezept. Ihre Befunde
-              landen als Ergebnisdatei unter <code>k-playbook-local/results/</code>.
-            </p>
-            <div class="link-row">
-              <a class="button-link secondary" href="/workflows/reviews">Bisherige Läufe</a>
-            </div>
-          </section>
-
-          <section class="card" id="todos-card">
-            <div class="section-head">
-              <div>
-                <h2>Todos</h2>
-              </div>
-              <span id="todos-pill" class="pill muted">Laden...</span>
-            </div>
-            <p class="hint">
-              Todos sind der lose Merkzettel dazu: ein Punkt, den man nicht vergessen will, aber
-              noch nicht ausarbeiten möchte. <code>/k-todo</code> trägt ihn ein und hakt ihn
-              auch wieder ab; die Ablage selbst wird nie von Hand angefasst.
-            </p>
-            <div class="link-row">
-              <a class="button-link secondary" href="/workflows/todos">Offene und erledigte Todos</a>
-            </div>
-          </section>
+{{template "workflow-cards" .}}
 
           <p id="workflows-message" class="message"></p>
         </div>
@@ -96,5 +45,6 @@
     <script src="/static/session.js"></script>
     <script src="/static/nav.js"></script>
     <script src="/static/workflows.js"></script>
+    <script src="/static/workflows-page.js"></script>
   </body>
 </html>

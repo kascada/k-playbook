@@ -1,10 +1,17 @@
 {{define "hero"}}
-      <!-- Der Kopf jeder Seite außer der Startseite: Logo, Titel, Version und
-           die aufgelösten Pfade. Auf der Startseite steht stattdessen ein
-           eigener — dort tragen die Pfade IDs, weil app.js sie nach einer
-           Einrichtung ohne Neuladen nachzieht, und daneben stehen die Knöpfe
-           für Update und Dienst. Alle übrigen Seiten zeigen denselben festen
-           Stand und unterscheiden sich allein im Titel. -->
+      <!-- Der Kopf jeder Seite: Logo, Titel, Version und die aufgelösten
+           Pfade. Keine Seite hat einen eigenen; sie unterscheiden sich allein
+           im Titel und im Aktionsblock.
+
+           Der Aktionsblock mit den Knöpfen für Update und Dienst schaltet sich
+           über die Felder, die renderPage ohnehin übergibt — eine Seitendatei
+           kann dem Fragment nichts mitgeben. Er steht auf der Statusseite und
+           auf /setup, solange keine Projektkonfiguration besteht: dann leitet
+           / nach /setup, und ohne diesen Zweig gäbe es „Dienst beenden"
+           nirgends. (not .Installed) allein reichte nicht — ohne
+           Konfiguration liefern auch die übrigen Seiten aus, laden service.js
+           aber nicht, und dort stünden tote Knöpfe. Der Update-Knopf startet
+           verborgen; service.js zeigt ihn erst, wenn ein Update anliegt. -->
       <section class="hero app-header">
         <div class="brand-row">
           <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
@@ -27,6 +34,13 @@
               {{.PlaybookDir}}
             </span>
           </p>
+          {{if or (eq .Area "status") (and (eq .Page "/setup") (not .Installed))}}
+          <div class="hero-actions">
+            <button id="update" class="secondary hidden">Update prüfen</button>
+            <button id="shutdown" class="secondary danger"
+                    title="Beendet den Hintergrunddienst dieses Projekts, für alle Fenster.">Dienst beenden</button>
+          </div>
+          {{end}}
         </div>
       </section>
 {{end}}

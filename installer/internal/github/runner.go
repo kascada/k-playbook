@@ -22,13 +22,21 @@ import (
 
 // DefaultTimeout ist die Frist je Abfrage. Jede Karte der Seite hat einen
 // eigenen Endpunkt, damit eine langsame Antwort die anderen nicht aufhält;
-// die Frist begrenzt, wie lange eine einzelne warten lässt.
+// die Frist begrenzt, wie lange eine einzelne warten lässt. Sie gilt je
+// Aufruf; die Frist einer ganzen Anfrage setzt der Aufrufer über den Kontext
+// (in der Oberfläche `githubBudgets`, mit demselben Wert).
 const DefaultTimeout = 20 * time.Second
 
 // LogTimeout gilt für das Log eines Laufs. Es ist die teuerste Abfrage —
 // gh lädt das Archiv der fehlgeschlagenen Jobs — und wird nur beim Aufklappen
 // eines roten Laufs geholt, nie beim Laden der Seite.
 const LogTimeout = 60 * time.Second
+
+// waitDelay begrenzt, wie lange ExecRunner nach dem Abbruch noch auf die Pipes
+// wartet. Ohne ihn endet ein Aufruf erst, wenn auch jeder Kindprozess von gh
+// seine Pipes schließt: der Abbruch tötet nur gh selbst. Am Testserver lief so
+// ein Endpunkt mit 20 s Budget 90 s — bis der Kindprozess von selbst endete.
+const waitDelay = time.Second
 
 // Runner führt ein Kommando aus und gibt dessen Standardausgabe zurück.
 //
@@ -66,6 +74,7 @@ type ExecRunner struct{}
 func (ExecRunner) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
+	command.WaitDelay = waitDelay
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -134,7 +143,37 @@ func (c *Client) run(ctx context.Context, timeout time.Duration, name string, ar
 	if runner == nil {
 		runner = ExecRunner{}
 	}
+	// Ist das Budget der Anfrage schon verbraucht, startet kein Prozess mehr:
+	// er würde sofort abgebrochen und kostete nur den Start.
+	if err := ctx.Err(); err != nil {
+		return nil, &CommandError{Name: name, Args: args, ExitCode: -1, Err: err}
+	}
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return runner.Run(callCtx, c.Dir, name, args...)
+	out, err := runner.Run(callCtx, c.Dir, name, args...)
+	if err != nil {
+		// Ein Prozess, den der Kontext beendet hat, meldet sich als
+		// „signal: killed": os/exec zieht den Exit-Status dem Kontextfehler
+		// vor. Die Ursache steht deshalb nur noch am Kontext — hier wird sie an
+		// den Fehler gehängt, damit Classify sie mit errors.Is findet, egal was
+		// gh vorher auf stderr geschrieben hat. Das gilt für die Frist dieses
+		// Aufrufs wie für das Budget der Anfrage darüber, und ebenso für den
+		// Abbruch durch den Browser.
+		if cause := callCtx.Err(); cause != nil {
+			return out, &contextError{err: err, cause: cause}
+		}
+	}
+	return out, err
 }
+
+// contextError ist ein Fehler, dessen Aufruf an seinem Kontext gescheitert ist.
+// Der Text bleibt der des Kommandos; errors.Is findet den Kontextfehler, und
+// errors.As findet weiterhin den CommandError mit seiner Stderr.
+type contextError struct {
+	err   error
+	cause error
+}
+
+func (e *contextError) Error() string { return e.err.Error() }
+
+func (e *contextError) Unwrap() []error { return []error{e.cause, e.err} }

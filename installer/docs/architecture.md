@@ -188,14 +188,18 @@ installer/
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
-│   └── static/                  index.html, workflows.html, tasks.html, reviews.html,
+│   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
 │                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
 │                                inventory.html, mcp.html, mcp-servers.html,
-│                                mcp-server.html, sidebar.html und
-│                                hero.html (Fragmente für linke Spalte und Kopf),
-│                                session.js, nav.js, disclosure.js, docview.js
-│                                (geteilter Markdown-Betrachter), app.js,
-│                                workflows.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
+│                                mcp-server.html; sidebar.html, hero.html,
+│                                closed.html und workflow-cards.html (Fragmente
+│                                für linke Spalte, Kopf, Sperrfläche und
+│                                Workflow-Karten), session.js, nav.js,
+│                                service.js (Update, Dienst, Sperrfläche),
+│                                disclosure.js, docview.js (geteilter
+│                                Markdown-Betrachter), status.js, app.js,
+│                                workflows.js (Zählung der Workflow-Karten),
+│                                workflows-page.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
 │                                knowledge.js, docs.js, inventory.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
 │                                (Gestaltungswerte in :root, siehe „Gestaltung
@@ -1462,12 +1466,29 @@ Abschreiben und keinen Knopf, der etwas auslöst.
 Subprozess startet: die Projektentscheidung und der netzfreie Host-Befund. Steht die
 Entscheidung auf `disabled` oder `unknown`, ruft der Server `gh` gar nicht auf — das ist
 die Zusage des Zustands und nicht bloß eine andere Beschriftung. Die Seite sagt dann, wo
-die Entscheidung fällt: im Block „GitHub CLI" auf der Startseite.
+die Entscheidung fällt: im Block „GitHub CLI" auf der Setup-Seite.
 
 **Vier Endpunkte, einer je Karte.** Aus demselben Grund wie bei `/api/mcp/tools`: hinter
 jedem steht ein Subprozess, und eine langsame Abfrage soll die anderen Karten nicht
-aufhalten. Jeder hat eine Frist (20 s, für das Log 60 s). Ausgelöst werden sie allein von
-`/github`; weder die Startseite noch das Menü fragen sie.
+aufhalten. Ausgelöst werden sie allein von `/github`; weder die Statusseite noch das Menü
+fragen sie.
+
+**Eine Frist je Anfrage, nicht je Subprozess.** Jeder Endpunkt hat ein Budget — 20 s, für
+das Log 60 s —, und nach ihm ist die Anfrage beendet, egal wie viele Aufrufe sie dafür
+braucht. Die Kopfzeile ruft sieben nacheinander; mit einer Frist je Aufruf liefe sie bis
+zu 140 s. Das Budget steht als `githubBudgets` in `webui/github.go`, weil es eine Zusage an
+die HTTP-Anfrage ist und nur der Handler deren Kontext hat; die Werte sind
+`github.DefaultTimeout` und `github.LogTimeout`. Alle Aufrufe einer Anfrage leiten ihren
+Kontext davon ab, und ist das Budget verbraucht, startet `Client.run` keinen Prozess mehr.
+Dazu kommt höchstens eine Sekunde Nachlauf: `ExecRunner` setzt `WaitDelay`, sonst hielte
+ein Kindprozess von `gh`, der die Pipes offen hält, die Anfrage bis zu seinem Ende offen.
+
+**Zeitfehler am Kontext, nicht am Text.** Ein vom Kontext beendeter Prozess meldet sich
+als „signal: killed" — `os/exec` zieht den Exit-Status dem Kontextfehler vor. `Client.run`
+hängt deshalb nach dem Aufruf die Ursache des Kontexts an den Fehler, und `Classify`
+erkennt Frist und Abbruch mit `errors.Is`, gleich was `gh` vorher auf stderr geschrieben
+hat. Bricht der Browser die Anfrage ab (`context.Canceled`), ist das kein Zeitfehler: der
+Zustand heißt `canceled`, und der Handler antwortet gar nicht mehr.
 
 **Kein Cache.** Wie überall in der Oberfläche liest jede Anfrage neu; der frische Stand
 ist ein Neuladen der Seite. Ob ein Cache nötig wird, ist eine eigene Entscheidung und
@@ -1493,11 +1514,37 @@ hieße `ssh -T` zu rufen. Der Hinweis nennt deshalb nur den Alias.
 
 **Feste Zustände statt roher Fehlertexte.** Jede Antwort trägt ein Zustandsfeld und den
 Satz, der es erklärt: `ok`, `no-project`, `disabled`, `undecided`, `not-installed`,
-`not-logged-in`, `bad-credentials`, `no-remote`, `no-access`, `rate-limited`, `network`,
-`timeout`, `error`. `bad-credentials` steht eigens neben `not-logged-in`, weil
-`DetectGH()` „angemeldet" allein aus der gh-Konfiguration liest und den Token nicht prüft:
-ein abgelaufener Token sieht dort aus wie eine Anmeldung, und erst die API antwortet mit
-401. Was `gh` auf stderr schreibt, wird zur Einordnung gelesen, aber nicht durchgereicht.
+`not-logged-in`, `bad-credentials`, `no-remote`, `no-access`, `log-gone`, `rate-limited`,
+`network`, `timeout`, `canceled`, `error`. `bad-credentials` steht eigens neben
+`not-logged-in`, weil `DetectGH()` „angemeldet" allein aus der gh-Konfiguration liest und
+den Token nicht prüft: ein abgelaufener Token sieht dort aus wie eine Anmeldung, und erst
+die API antwortet mit 401. Was `gh` auf stderr schreibt, wird zur Einordnung gelesen, aber
+nicht durchgereicht; nur `error` nennt die erste Zeile.
+
+**GraphQL-Fehler am Typ.** `gh api graphql` endet bei jedem Feld `errors` mit Exit 1 —
+auch bei einem Teilfehler, bei dem nur ein Feld verweigert ist. Den Typ (`NOT_FOUND`,
+`RATE_LIMITED`, `FORBIDDEN`) schreibt `gh` nur mit dem Rumpf auf stdout, auf stderr steht
+allein die Meldung. Die PR-Karte liest deshalb den Rumpf: `RATE_LIMITED` wird
+`rate-limited`, `NOT_FOUND` wird `no-access`, alles andere ordnet `Classify` am Text ein.
+Die Daten eines Teilfehlers zeigt sie nicht: ein verweigertes Feld sähe in der Karte aus
+wie ein leeres.
+
+**Ein verworfenes Log ist kein fehlendes Recht.** `gh run view --log-failed` holt zuerst
+den Lauf, dann das Log-Archiv. Hat GitHub das Archiv nach der Aufbewahrungsfrist verworfen,
+meldet `gh` `failed to get run log: HTTP 410`; das wird `log-gone`. Eine falsche Kennung und
+ein Repo ohne Zugriff scheitern schon am Lauf und melden beide `failed to get run: HTTP
+404` — sie bleiben `no-access`, und der Satz nennt beide Möglichkeiten, weil `gh` sie nicht
+trennt.
+
+**Kein Fehler als leeres Feld.** Nach dem ersten Aufruf liest die Kopfzeile Konto, Remote,
+Tag samt Commits seitdem und die Läufe einzeln. Scheitert einer davon, bleibt der Zustand
+`ok`, und `notes` sagt je Feld, warum es leer ist: `none` (gelesen, es gibt nichts — kein
+Tag, kein Remote, keine Läufe), `unreadable` (die Abfrage ist gescheitert) oder `timeout`
+(das Budget war verbraucht). Die Seite zeigt `none` als schlichten Satz, die beiden
+anderen mit Marke. „Kein Tag" und „kein Remote" erkennt sie an den Meldungen von git
+(„No names found", „No such remote"), nicht am Exit-Code: der ist bei „kein Repo" derselbe.
+Scheitert erst die Zählung der Commits, bleibt der Tag stehen, und „nichts seitdem" wird
+nicht behauptet.
 
 **Die Ursache eines roten Laufs wird gruppiert.** Aus dem Log werden die `--- FAIL`-Zeilen
 und je Test die erste eigene Meldungszeile gezogen; gruppiert wird nach dieser Meldung.
@@ -1519,14 +1566,33 @@ Seite (`.pr-branches`, `.pr-meta`, `.run-ref`, `.run-meta`, `.failure-count`) st
 
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat sechs Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
-**GitHub** unter `/github`, **Knowledge** unter `/knowledge`, **Docs** unter `/docs` und
-**Inventar** unter `/inventory`. `/mcp` ist keine sechste Sorte, sondern die Detailseite des Setup-Blocks
+Die Oberfläche hat acht Bereiche: **Status** unter `/`, **Setup** unter `/setup`,
+**Workflows** unter `/workflows`, **Chat** unter `/chat`, **GitHub** unter `/github`,
+**Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
+`/inventory`. `/mcp` ist keine weitere Sorte, sondern die Detailseite des Setup-Blocks
 und trägt dessen Bereich. Dasselbe gilt für `/mcp-servers` und die Detailseiten
 `/mcp-servers/{assistant}/{name}` darunter — mit einem Unterschied: die Übersicht steht
 als Unterpunkt unter Setup, `/mcp` nicht.
 
-GitHub ist ein eigener Bereich und keine Karte der Startseite. Der Grund steht unter
+**Status** ist die Startseite: wer die Oberfläche öffnet, soll sehen, wie es um das Projekt
+steht, und nicht eine Einrichtung, die in aller Regel längst erledigt ist. Die Seite ist
+ein Gerüst, das später gefüllt wird — ein Statusfeld, das vorerst genau einen Satz trägt
+und nichts misst, darunter die drei Workflow-Karten und zuunterst das Bild der
+Wissensablage. Sie hat keinen eigenen Endpunkt. Ohne Projektkonfiguration leitet `/` nach
+`/setup` um: jede Quelle der Statusseite antwortete leer, und der Umschalter führt dann
+ohnehin nur dorthin. `GET /` ist zugleich das Auffangmuster des Mux; `statusPageHandler`
+prüft deshalb zuerst den Pfad und antwortet auf jeden anderen mit 404, erst danach leitet
+er um — sonst führte ohne Konfiguration jeder Tippfehler nach `/setup`. Aus demselben Grund
+fehlt der Eintrag „Status" im Umschalter ohne Konfiguration: er führte auf eine sofortige
+Umleitung.
+
+Nichts auf der Statusseite ist eine Abschrift. Die drei Workflow-Karten sind das Fragment
+`static/workflow-cards.html` (`{{define "workflow-cards"}}`), das auch `/workflows`
+einbindet; ihre Zahlen holt `loadWorkflowCounts()` aus `workflows.js`, siehe „Workflows:
+Tasks, Reviews und Todos". Das Bild holt `loadDocInto()` aus `docview.js`, siehe
+„Knowledge in der Oberfläche".
+
+GitHub ist ein eigener Bereich und keine Karte der Statusseite. Der Grund steht unter
 „Die GitHub-Ansicht": seine Karten fragen als einzige der Oberfläche über das Netz, und
 das darf weder ein Aufruf von `/` noch das Menü auslösen.
 
@@ -1541,23 +1607,23 @@ gleichrangig — keine ist die Detailseite einer anderen —, deshalb stehen sie
 Unterpunkte im Umschalter und nicht hinter einem Klick auf der Übersicht, und zwar in
 jedem Bereich: wer von Setup aus zu den Tasks will, soll nicht erst die Übersicht laden
 müssen. Der Unterschied zu `/mcp` ist genau das: `/mcp` vertieft eine Karte der
-Startseite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
+Setup-Seite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
 
 Setup hat seit der MCP-Server-Übersicht ebenfalls einen Unterpunkt, **MCP-Server** unter
 `/mcp-servers`. Die Seite vertieft keine Karte, sondern ist eine eigene Sicht auf das
 Projekt: alle Server der drei Assistenten in einer Matrix. Ihre Detailseiten
 `/mcp-servers/{assistant}/{name}` laufen unter demselben Unterpunkt — er ist bei jedem
 Pfad unter `/mcp-servers` aktiv, `aria-current="page"` führt nur die Übersicht selbst.
-`/mcp` bekommt keinen Unterpunkt: dorthin führen die Karte der Startseite und die
+`/mcp` bekommt keinen Unterpunkt: dorthin führen die Karte der Setup-Seite und die
 Detailseite des eigenen Servers. Warum die Seite so gebaut ist, steht unter „MCP-Server in
 der Oberfläche".
 
-Das Inventar ist ein eigener Bereich und keine Karte auf der Startseite — nach demselben
-Muster wie Workflows und Docs: die Startseite trägt die Einrichtungsschritte, und das
+Das Inventar ist ein eigener Bereich und keine Karte auf der Setup-Seite — nach demselben
+Muster wie Workflows und Docs: die Setup-Seite trägt die Einrichtungsschritte, und das
 Inventar ist keiner. Eine Karte dort hätte auch nicht gereicht: die erzeugte Inventardatei
 muss im Bereich selbst lesbar sein, und der Aktualisieren-Knopf braucht Verlaufsstatus
 und ein Ergebnis mit Ablehnungen im Wortlaut. Beides braucht eine Seite. Eine zusätzliche
-Verweis-Karte auf der Startseite gibt es deshalb ebenso wenig wie für Workflows und Docs;
+Verweis-Karte auf der Setup-Seite gibt es deshalb ebenso wenig wie für Workflows und Docs;
 der Weg ist der Umschalter. Was der Bereich zeigt und warum er vom Docs-Bereich getrennt
 ist, steht unter „Das Versionsinventar in der Oberfläche".
 
@@ -1574,17 +1640,41 @@ sagen. Zehnmal dasselbe Markup zu kopieren wäre die Variante, die bei der näch
 wieder auseinanderläuft.
 
 Aus demselben Grund steht der **Kopf** in `static/hero.html`: Logo, Titel, Versionsmarke
-und die aufgelösten Pfade waren auf allen Seiten außer der Startseite byte-gleich bis auf
-das `<h1>`. Der Titel kommt jetzt als `.Title` aus `renderPage()` und füllt Überschrift
-und Fensternamen zugleich. Die Startseite behält ihren eigenen Kopf: dort tragen die
-Pfade Ids, weil `app.js` sie nach dem Anlegen der Konfiguration ohne Neuladen nachzieht,
-und daneben stehen die Knöpfe für Update und Dienst.
+und die aufgelösten Pfade sind auf allen Seiten gleich bis auf das `<h1>`. Der Titel kommt
+als `.Title` aus `renderPage()` und füllt Überschrift und Fensternamen zugleich. Keine
+Seite hat einen eigenen Kopf.
+
+Die Knöpfe für Update und Dienst stehen als **Aktionsblock** im selben Fragment. Eine
+Seitendatei kann `{{template "hero" .}}` nichts mitgeben, der Block schaltet sich deshalb
+über Felder, die `renderPage()` ohnehin übergibt:
+`{{if or (eq .Area "status") (and (eq .Page "/setup") (not .Installed))}}`. Er steht auf
+der Statusseite und auf `/setup`, solange keine Projektkonfiguration besteht — dann
+leitet `/` nach `/setup`, und ohne diesen Zweig gäbe es „Dienst beenden" nirgends.
+`(not .Installed)` allein genügt nicht: ohne Konfiguration liefern auch die übrigen Seiten
+aus, laden die Knopf-Datei aber nicht, und dort stünden tote Knöpfe.
+
+Bedient werden Knöpfe und Sperrfläche aus `static/service.js`, das die Statusseite und
+`/setup` laden. Die Sperrfläche ist das Fragment `static/closed.html`
+(`{{define "closed"}}`); `showClosed()` ist der Weg beider Seiten beim Serververlust —
+`/setup` ruft `startSession(showClosed)` auch dort, wo die Knöpfe fehlen. Die Datei bindet
+die Knöpfe deshalb nur, wenn es sie gibt: ein `addEventListener` auf `null` bräche sie
+beim Laden ab, und mit ihr fehlte `showClosed`. Der Update-Knopf ist verborgen, solange
+`GET /api/update` kein Update meldet, auch wenn die Prüfung gescheitert ist; konnte nicht
+geprüft werden, steht der Grund in `#status-message` der Statuskarte, einem leeren und
+verborgenen Meldungselement neben dem Statusfeld. `/setup` hat keine Statuskarte.
+
+`pageTemplate()` parst jede Seite mit allen vier Fragmenten — Kopf, linke Spalte,
+Sperrfläche, Workflow-Karten —, auch wenn sie nicht jedes einbindet. Die Skripte sind
+klassische Skripte, keine Module: alle einer Seite teilen einen Namensraum. Ein doppelt
+deklariertes `const` auf oberster Ebene bricht die Seite beim Laden, eine gleichnamige
+`function` überschreibt still. Ein neuer Name auf oberster Ebene wird deshalb gegen alle
+Skripte geprüft, die dieselbe Seite lädt.
 
 Welcher Eintrag aktiv ist, kommt aus den Vorlagendaten: `renderPage()` bekommt Bereich
 und offene Seite vom Handler. Beides ist nicht dasselbe, sobald ein Bereich mehr als eine
 Seite hat — deshalb führt `aria-current="page"` nur der Verweis auf die offene Seite,
 während ein aktiver Bereich mit anderem Ziel `aria-current="true"` bekommt: der Fall auf
-`/mcp`, wo Setup aktiv ist, die Startseite darunter aber nicht offen, und der Fall auf
+`/mcp`, wo Setup aktiv ist, `/setup` darunter aber nicht offen, und der Fall auf
 den drei Workflows-Seiten, wo der Bereich aktiv ist und der markierte Unterpunkt die
 offene Seite nennt. Die Unterpunkte tragen dafür eine eigene Klasse, `area-nav-subitem`:
 sie sehen aus wie ein Eintrag des Umschalters, sind eingerückt und leiser, und die
@@ -1593,7 +1683,8 @@ Docs überhaupt gibt, entscheidet `.Installed` — vor der Einrichtung führt de
 nur nach Setup, weil die beiden anderen Bereiche dort nichts zu zeigen hätten; die
 Unterpunkte hängen an demselben Zweig und verschwinden mit ihm. Das gilt auch für den
 Unterpunkt von Setup: ohne Installation gibt es keine MCP-Dateien, keine Karte und
-keinen Unterpunkt.
+keinen Unterpunkt. „Status" steht in einem eigenen `.Installed`-Zweig über Setup; Setup
+selbst steht außerhalb beider Zweige.
 
 Die Spalte ist so hoch wie das Fenster abzüglich des sticky-Abstands, oben und unten je
 einmal. Darin teilen sich ihre Kästen den Platz selbst auf: jeder behält seine Höhe,
@@ -1665,7 +1756,7 @@ Oberfläche dichter, weniger rund oder in anderer Schrift haben will, ändert We
 `:root` und keine verstreuten Zeilen.
 
 **Gliederung.** `:root` steht in dieser Reihenfolge: Farben, Flächen, Schrift, Abstände,
-Form, Schatten, Breiten.
+Form, Schatten, Breiten und Höhen.
 
 **Zwei Ebenen.** Die Skala trägt die Grundwerte: Grundfarben wie `--bg` und `--accent`,
 Schriftgrößen `--text-2xs` bis `--text-lg` samt `--text-title` und `--text-display`,
@@ -1690,9 +1781,10 @@ einmal genutzter Wert läuft über eine Variable, denn der Wächter prüft jeden
 `em`-Werte sind keine Ausnahme: Abstände und Schriftgrößen in `em` laufen über eigene
 `em`-Stufen. Eine Variable mit `em` wird erst am Element aufgelöst, das sie nutzt.
 
-**Bewusste Lücke.** Breiten und Rahmenstärken prüft der Wächter nicht. Seitenbreiten,
-linke Spalte und Rand stehen zwar als `--width-*` und `--gutter*` in `:root`, doch
-Breiten gehören zum Layout und hängen oft an einem einzelnen Element. Rahmenstärken
+**Bewusste Lücke.** Breiten, Höhen und Rahmenstärken prüft der Wächter nicht. Seitenbreiten,
+linke Spalte, Rand und die Mindesthöhen fensterfüllender Seiten stehen zwar als `--width-*`,
+`--gutter*` und `--height-*` in `:root`, doch sie gehören zum Layout und hängen oft an einem
+einzelnen Element. Rahmenstärken
 (`1px`, `2px`, `4px` in `border…` und `outline`) bleiben Zahlen: Ihre Farbe läuft schon
 über Variablen, und der Wächter müsste Kurzschreibweisen wie `border: 2px solid …`
 zerlegen.
@@ -1720,9 +1812,17 @@ Selektor eine dieser Klassen als ganzen Namen trifft, Pseudo-Elemente eingeschlo
 `box-shadow` und `min-height`. Nur `.pill::before` darf eine Hintergrundfarbe tragen.
 `TestLabelGuardFindsButtonShapes` prüft diesen Wächter an einem Beispiel.
 
+**Das `hidden`-Attribut.** Der Browser verbirgt ein Element mit `hidden` nur über seine
+eingebaute Regel, und die verliert gegen jede eigene `display`-Angabe: `.chat-suggestions` mit
+`display: grid` stand trotz `hidden` als leerer Kasten unter dem Eingabefeld. Eine allgemeine
+Regel bei den Grundregeln, `[hidden] { display: none !important; }`, gibt dem Attribut den
+Vorrang zurück, für jedes Element. Wer ein Element zeigen will, nimmt das Attribut weg, statt es
+per `display` zu überstimmen. `TestStylesheetHonorsHiddenAttribute` prüft, dass die Regel mit
+`!important` im Stylesheet steht; die Klasse `.hidden` der älteren Seiten bleibt daneben bestehen.
+
 ## Aufgelöster Kontext in der Oberfläche
 
-Der unterste Block der Startseite zeigt, was `BuildContext()` liefert — dasselbe, was
+Der unterste Block der Setup-Seite zeigt, was `BuildContext()` liefert — dasselbe, was
 das Unterkommando `context` ausgibt: Pfade, Instruktionsdateien, die effektiven Kataloge
 und die Guidelines.
 
@@ -1872,7 +1972,7 @@ Der POST steht wie jeder andere hinter der Herkunftsprüfung.
 **Eigener Bereich, eigene API.** Docs zeigt die mitgelieferte Doku der Installation; das
 Inventar ist eine erzeugte Datei des Projekts unter `k-playbook-local/docs/versions/`.
 Deshalb ein eigener Eintrag im Umschalter, eine eigene Seite und drei eigene Endpunkte —
-und keine Erweiterung von `/api/docs`. Das Blockmenü entsteht wie auf der Startseite aus
+und keine Erweiterung von `/api/docs`. Das Blockmenü entsteht wie auf der Setup-Seite aus
 den Karten; unter 1080px entfällt es wie dort.
 
 ## Workflows: Tasks, Reviews und Todos
@@ -1891,6 +1991,16 @@ Endpunkte.
 `/workflows` bleibt als **Übersicht** des Bereichs: was die drei Sorten sind, wann man
 welche nimmt, wie viel gerade in jeder liegt und je ein Verweis auf ihre Seite. Die Zahl
 holt `workflows.js` aus derselben Antwort, aus der die jeweilige Seite ihre Liste baut.
+
+Die drei Karten mit ihren Zahlen stehen auch auf der Statusseite. Sie sind deshalb das
+Fragment `static/workflow-cards.html`, das beide Seiten einbinden; die Einführung „Was
+Workflows sind" bleibt auf `/workflows`. `workflows.js` tut beim Laden nichts: die Zählung
+ist die Funktion `loadWorkflowCounts(message)`, die jede Seite selbst aufruft —
+`/workflows` aus `workflows-page.js`, die Statusseite aus `status.js`. Bauten beide Seiten
+Blockmenü und Sitzung zusätzlich im Rumpf der Datei, entstünde das Menü doppelt und es
+liefen zwei Lebenszeichen. Das Meldungsziel wird übergeben, weil es nicht zu den Karten
+gehört: `/workflows` schreibt nach `#workflows-message`, die Statusseite nach
+`#status-workflows-message`.
 Einen Aggregat-Endpunkt daneben gibt es weiterhin nicht: er wäre die Doppelung dieser
 drei Zahlen. Ein Hinweis in der Antwort schlägt dabei die Zahl — wo nicht gelesen werden
 konnte, steht „Nicht lesbar" und keine Ziffer, die nichts belegt.
@@ -1978,6 +2088,19 @@ Im Bereich Docs führt er in dieselbe Karte, weil der Index daneben mitzieht; au
 Knowledge-Seite gibt es keinen Index, ein Verweis geht deshalb nach
 `/docs?file=<datei>`. Die Kopie der Mermaid-Behandlung war die Alternative und wäre die
 zweite Stelle gewesen, an der ein Diagramm zu zeichnen ist.
+
+**Das Bild steht auch auf der Statusseite.** Holen und Zeichnen stehen in
+`loadDocInto(viewer, path, {firstDiagramOnly})` in `docview.js`; `knowledge.js` zeigt damit
+die ganze Datei, die Statusseite allein ihren ersten Mermaid-Block — kein zweiter Renderer,
+keine Kopie des Diagramms. Die Funktion setzt den herausgelösten Block **erst ein und lässt
+ihn dann zeichnen**: `renderMermaidDiagrams()` überspringt jeden Block, der nicht im Dokument
+hängt, ohne Bild und ohne Meldung. In `knowledge.js` konnte sie nicht stehen — das baut beim
+Laden Blockmenü und Sitzung und führt `const elements` und `function render`. Das Diagramm
+ist englisch beschriftet wie die ganze mitgelieferte Doku; die Karte sagt darüber auf
+Deutsch, was es zeigt. Weil es groß ist, steht die Karte zuunterst, das Bild in einem
+`<details>`, das offen startet, und daneben führt „In Docs öffnen" nach
+`/docs?file=knowledge-storage.md`. Ohne Netz bleibt Mermaid aus; dann steht die Meldung
+von `docview.js` über dem Quelltext, und die übrige Seite steht.
 
 **Frontmatter wird abgetrennt.** `knowledge-storage.md` trägt `title` und `description` für
 den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt Überschrift, und
@@ -2071,6 +2194,27 @@ wie die Doku; ohne `WithUnsafe` lässt es rohes HTML weg und entschärft Verweis
 schlichter Text. Das Reasoning — die Denkschritte des Modells, Teile vom Typ `reasoning` —
 steht klein und gedämpft ohne Rahmen vor der Antwort.
 
+**Die Sitzungsseite füllt das Fenster.** `chat-session.html` trägt `.shell.fill`, der Verlauf
+`.fill-grow`. Die Höhe wird verteilt, nicht gerechnet: die Seite ist so hoch wie das Fenster,
+Kopf, Kartenkopf, Docks und Formular behalten ihre Höhe, der Verlauf bekommt den Rest. Ein
+fester Anteil wie früher `max-height: 70vh` zählte den Kopf nicht mit — bei 900 px
+Fensterhöhe stand die Seite 225 px über den unteren Rand, und der Kopf ändert seine Höhe mit
+den umbrechenden Pfaden. Unter `--height-fill-min` wird nicht weiter gestaucht, die Seite
+scrollt dann wie jede andere; der Verlauf behält mindestens `--height-chat-log-min`, auch wenn
+ein großes Dock daneben steht. Unter 1080 px steht die linke Spalte als eigene Gitterzeile
+über der Karte.
+
+**Nachrichten ohne Kopfzeile.** Die eigene Nachricht hat keinen Kopf: sie steht rechts auf
+`--own-message-bg`, der Absender „Du" steht nur noch als `aria-label`. Der Kopf einer Antwort
+(„OpenCode · build") sitzt klein auf der oberen Rahmenlinie wie eine Legende und nimmt keine
+eigene Zeile ein.
+
+**Der Cursor steht im Eingabefeld.** `focusInput()` setzt ihn nach dem Laden, dem Senden,
+dem Abbrechen, einer Freigabe und einer Antwort auf eine Rückfrage. Die Wahl des Agenten ruft
+es nicht auf, weil schon jeder Pfeiltastenschritt durch die Liste ein `change` auslöst.
+Ereignisse des Dienstes rufen es ebenfalls nicht auf — sonst verlöre ein halb getippter
+Eigentext in einer Rückfrage den Fokus.
+
 **Rückfragen gehören ins Dock, nicht in den Verlauf.** Eine Rückfrage (`question.asked`) hält
 den Lauf an, bis sie beantwortet oder abgelehnt ist. Sie steht deshalb nicht im Verlauf,
 sondern in einem eigenen Dock `#chat-questions` neben dem der Freigaben über dem Formular.
@@ -2144,6 +2288,14 @@ OpenCode: erstes Wort `/name` und `name` in der gefilterten Liste bekannt → Co
 wird zu `arguments`; getrennt wird an beliebigem Leerraum, damit Argumente in einer zweiten Zeile
 denselben Command meinen wie die Vorschlagsliste, die den Namen ebenso beendet.
 
+Die Liste lädt nach dem Freigeben des Eingabefelds; ein in diesem Fenster gesendetes `/k-todo …`
+ginge sonst als gewöhnlicher Text an den Agenten. `loadCommands()` hält deshalb sein Versprechen
+fest, sodass jeder Aufruf dieselbe Ladung teilt, und die Weiche wartet bei einem Text mit `/` und
+Namen darauf, solange die Liste nicht geladen ist. Ist die Ladung gescheitert, wird sie einmal neu
+versucht; scheitert auch das, sendet die Seite **nichts** und meldet es im Fehlerbereich. Text ohne
+führendes `/` wartet nicht. Der Senden-Knopf ist schon vor dem Warten gesperrt, ein zweites Enter
+löst kein zweites Senden aus.
+
 **Der Command-Aufruf läuft abgekoppelt.** `POST /session/{sessionID}/command` antwortet erst nach
 dem ganzen Lauf — das können Minuten sein, und `openCodeRequestTimeout` (30 s) passt dafür nicht.
 `forwardOpenCode` ist hier unbrauchbar: es baut seinen Kontext aus
@@ -2159,29 +2311,46 @@ Lauf dort läuft weiter und endet allein über `POST …/abort`; Abbrechen bleib
 **`command-state` ist der Rückweg für späte Fehler.** Scheitert der abgekoppelte Aufruf nach der
 202 — 404, 400, Modell- oder Providerfehler, Verbindungsabbruch —, entsteht kein Ereignis; nur zu
 protokollieren ließe die Seite dauerhaft auf „Arbeitet" stehen. Der Server merkt sich deshalb je
-Sitzung den letzten Ausgang unter einem eigenen Mutex, nur den letzten Eintrag und mit gekürztem
-Fehlerrumpf, und `GET /api/chat/sessions/{id}/command-state` liefert
+Sitzung unter einem eigenen Mutex, was läuft und was gescheitert ist, und
+`GET /api/chat/sessions/{id}/command-state` liefert
 `{state: "running"|"done"|"failed"|"unknown", message?}`.
+
+Eine Sitzung kann mehrere Commands zugleich laufen haben. Ein einziger Eintrag, den jedes Ende
+überschreibt, verlöre dabei Auskunft: endet `/cmd1` erfolgreich, nachdem `/cmd2` schon gescheitert
+ist, würde aus `failed` `done`, und ein noch laufender `/cmd2` meldete sich als `done`. Der Stand
+einer Sitzung hat deshalb drei Teile:
+
+- die **laufenden Aufrufe**, geschlüsselt über das `messageID`, das der Handler je Aufruf erzeugt;
+  ein Aufruf, der endet, entfernt nur seinen eigenen Schlüssel;
+- den **ungelesenen Fehler** mit gekürzter Meldung, gesetzt von einem scheiternden Aufruf; tritt ein
+  zweiter Fehler auf, bevor der erste gelesen ist, bleibt der erste stehen;
+- die Tatsache, dass es den Eintrag überhaupt gibt — sie trennt `done` von `unknown`.
+
+Daraus ergibt sich die Antwort, in dieser Reihenfolge: ungelesener Fehler → `failed` mit Meldung,
+und der Fehler ist damit geräumt; sonst mindestens ein laufender Aufruf → `running`; sonst Eintrag
+vorhanden → `done`; sonst `unknown`. Ein Fehler geht also genau einmal hinaus, und die nächste
+Antwort sagt, ob daneben noch etwas läuft.
 
 `unknown` ist die Antwort für eine Sitzung **ohne Eintrag** — GUI neu gestartet, Command aus dem
 Terminal. Die Seite behandelt es als „nichts tun" und lässt den Laufzustand unberührt; `done`
-wäre dort irreführend. Ein Fehler geht genau einmal hinaus: danach trägt sein Eintrag eine
-Lesemarke und meldet sich als `done`. Gelöscht wird er nicht, denn dann antwortete
-`command-state` `unknown`, und die Vorgabe „bei `unknown` nichts tun" gilt dem Fall „kein
-Eintrag", nicht „Fehler schon abgeholt". Dass bei zwei offenen Tabs derselben Sitzung der erste
-Leser den Fehler wegräumt und der zweite ihn nicht mehr sieht, wird bewusst hingenommen.
+wäre dort irreführend. Dass bei zwei offenen Tabs derselben Sitzung der erste Leser den Fehler
+wegräumt und der zweite ihn nicht mehr sieht, wird bewusst hingenommen.
 
-Die Ablage wächst nicht unbegrenzt; beim Verlassen von `running` wird sie begrenzt. Verdrängt
-werden dabei nur `done`-Einträge und bereits gelesene Fehler — ein ungelesener `failed` **nie**.
-Sonst höben sich die beiden Regeln gegenseitig auf: fiele er vor dem Abholen heraus, antwortete
-`command-state` `unknown`, die Seite täte laut Vorgabe nichts und bliebe auf „Arbeitet" stehen,
-also genau in dem Zustand, gegen den der Rückweg gebaut ist.
+Die Ablage wächst nicht unbegrenzt; nach jedem Ende eines Aufrufs und nach dem Lesen eines Fehlers
+wird sie begrenzt. Verdrängt werden dabei nur Sitzungen **ohne laufenden Aufruf und ohne
+ungelesenen Fehler**, die älteste zuerst. Sonst höben sich die Regeln gegenseitig auf: fiele ein
+ungelesener Fehler oder ein laufender Aufruf heraus, antwortete `command-state` `unknown`, die
+Seite täte laut Vorgabe nichts und bliebe auf „Arbeitet" stehen, also genau in dem Zustand, gegen
+den der Rückweg gebaut ist.
 
-Abgeholt wird wiederholt, etwa alle 5 s, bis der Zustand nicht mehr `running` ist, zusätzlich bei
-`session.idle` und nach jedem Wiederverbinden. Eine Stille-Frist („10 s ohne Ereignis") trüge
-nicht: bei einem `subtask`-Command entstehen in der Elternsitzung womöglich gar keine Ereignisse,
-und umgekehrt setzte jedes beliebige Sitzungsereignis die Frist zurück. Bei `failed` bekommt der
-Laufzustand die Marke „Fehler" und die Meldung den Fehlerbereich.
+Abgeholt wird wiederholt, etwa alle 5 s, zusätzlich bei `session.idle` und nach jedem
+Wiederverbinden. Eine Stille-Frist („10 s ohne Ereignis") trüge nicht: bei einem
+`subtask`-Command entstehen in der Elternsitzung womöglich gar keine Ereignisse, und umgekehrt
+setzte jedes beliebige Sitzungsereignis die Frist zurück. Bei `failed` bekommt der Laufzustand die
+Marke „Fehler", die Meldung den Fehlerbereich, und die vorläufige Blase verschwindet — der Wächter
+endet dort aber **nicht**: das Lesen hat den Fehler geräumt, und ein zweiter Command kann noch
+laufen. Er fragt weiter, solange die Antwort `running` ist, und endet erst bei `done` oder
+`unknown`.
 
 `command-state` ist zugleich die einzige Ausnahme unter den Chat-Endpunkten: Er durchläuft
 `chatTarget` — Projektbezug und `containerGuard` gelten auch für ihn —, leitet aber nichts weiter
@@ -2228,6 +2397,15 @@ prüft die Ordnung gegen eine tatsächlich beobachtete Kennung von OpenCode, nic
 eigene. Der Rückfallweg ohne Kennung bleibt: verwirft der Dienst ein mitgeschicktes `messageID`,
 verschwindet die Blase beim ersten unbekannten `message.updated` mit `role: "user"`.
 
+Scheitert eine schon angenommene Nachricht oder ein Command später, kommt die echte Nachricht
+nicht mehr, und die Blase stünde als „wird gesendet" dauerhaft da. Der `failed`-Zweig des
+Command-Wächters und `session.error` entfernen sie deshalb — `session.error` mit derselben Ausnahme
+für `MessageAbortedError`, die schon für die Marke „Fehler" gilt. Ist die echte Nachricht schon
+eingetroffen, ist die Blase längst weg und das Entfernen folgenlos. Die Zuordnung ist dabei grob:
+weder `command-state` noch `session.error` nennen die Kennung der gescheiterten Nachricht. Steht in
+dem Moment die Blase einer späteren Nachricht, verschwindet auch sie; deren echte Nachricht
+erscheint trotzdem, sobald sie eintrifft.
+
 **Kind-Sitzungen erreichen.** Ein Subagent-Aufruf ist ein Tool-Teil `task`;
 `state.metadata.sessionId` nennt die Kind-Sitzung. In dessen Kopfzeile steht „Subagent öffnen",
 ohne dass der Teil aufgeklappt werden muss, und eine Kind-Sitzung trägt neben dem Rückweg einen
@@ -2249,19 +2427,25 @@ sind keine Commands, sondern eigene Endpunkte.
 **Freigaben aus Kind-Sitzungen.** Rückfragen einer Kind-Sitzung zeigt die Seite, deren Freigaben
 nicht: `renderPermissions()` filtert weiter hart auf `request.sessionID === sessionID`. Das ist
 bewusst offen geblieben, damit der Umbau der Rückfragen nicht zwei Umstellungen zugleich trägt,
-und es fällt jetzt eher auf als vorher — ein `/k-…`-Command mit `subtask: true` lässt sich nun aus
-dem Browser starten. Der Hinweis nach einem solchen Command nennt die Lücke deshalb ausdrücklich
+und es fällt jetzt eher auf als vorher — ein Command mit `subtask: true` lässt sich nun aus dem
+Browser starten (im heutigen Katalog nur `review`, kein `/k-…`-Command). Der Hinweis nach einem solchen Command nennt die Lücke deshalb ausdrücklich
 und verlinkt die Kindseite, auf der deren Freigaben zu beantworten sind. Ein eigener Endpunkt
 entsteht dafür nicht; nachzuziehen wäre `renderPermissions()` auf dieselbe offene
 Herkunftsprüfung, die die Rückfragen schon benutzen.
 
-**Noch ungemessen** — was hier steht, braucht einen Durchgang im Browser gegen den echten
-Dienst, nicht nur ein Schema: ob die alte API ein mitgeschicktes `messageID` tatsächlich übernimmt, statt es zu
-ignorieren oder zu überschreiben (das Schema belegt nur, dass das Feld vorgesehen ist; solange es
-offen ist, bleibt der Rückfallweg ohne Kennung stehen), und ob die Elternsitzung für einen
-Subtask-Command wirklich einen `task`-Tool-Teil bekommt, an dem der Link „Subagent öffnen" hängt.
-Offen ist damit auch, ob die Elternkette über `Session.parentID` bei einer Enkel-Sitzung
-durchläuft.
+**Im Browser gemessen** (OpenCode 1.18.30): Die alte API übernimmt ein mitgeschicktes
+`messageID` — die gespeicherte Nutzernachricht trägt die Kennung der Weiterleitung, und die von
+OpenCode vergebene Antwort sortiert dahinter; der Rückfallweg ohne Kennung bleibt als Sicherung
+stehen. Ein Subtask-Command bekommt in der Elternsitzung einen `task`-Tool-Teil, an dem „Subagent
+öffnen" hängt, und eine Rückfrage der Kind-Sitzung lässt sich im Dock der Elternseite beantworten.
+Die Elternkette über `Session.parentID` bis zu einer Enkel-Sitzung ist nur gegen einen
+Stellvertreter geprüft, nicht gegen den echten Dienst.
+
+**Rückfragen aus Kind-Sitzungen brauchen eine Berechtigung.** In der ausgelieferten
+Konfiguration erlauben nur die primären Agenten `build` und `plan` das `question`-Tool; die
+Subagenten `general` und `explore` haben `question: deny`. Mit der Standardkonfiguration stellt
+eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn ein Subagent
+`question` erlaubt bekommt.
 
 ## Web-API
 
@@ -2289,10 +2473,10 @@ durchläuft.
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
-| `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem; nur lesend |
-| `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; nur lesend |
-| `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; nur lesend |
-| `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; nur lesend |
+| `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`; Frist 20 s für die ganze Anfrage; nur lesend |
+| `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; Frist 20 s samt Auflösen; nur lesend |
+| `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; Frist 20 s; nur lesend |
+| `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; ein verworfenes Log ist `log-gone`; nur lesend |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt |
@@ -2317,7 +2501,7 @@ durchläuft.
 | `POST` | `/api/chat/sessions/{id}/prompt` | `{text, agent?}` als Textteil über `prompt_async` senden; die Weiterleitung erzeugt das `messageID` und gibt es zurück (`{"ok": true, "messageID": …}`), den Lauf meldet der Ereignisstrom |
 | `POST` | `/api/chat/sessions/{id}/abort` | laufenden Lauf abbrechen |
 | `POST` | `/api/chat/sessions/{id}/command` | `{command, arguments, agent?}`; der Name wird gegen die gefilterte Liste geprüft (unbekannt → 400, ohne den Command-Endpunkt zu erreichen), dann läuft der Aufruf abgekoppelt aus `context.Background()` weiter und die Antwort kommt sofort als `202 {"ok": true, "messageID": …}` |
-| `GET` | `/api/chat/sessions/{id}/command-state` | Ausgang des abgekoppelten Aufrufs dieser Sitzung: `{state: "running"\|"done"\|"failed"\|"unknown", message?}`; ein Fehler geht genau einmal hinaus und meldet sich danach als `done`, eine Sitzung ohne Eintrag als `unknown`. Einzige Ausnahme unter den Chat-Routen: durchläuft `chatTarget`, leitet aber nichts weiter und trägt kein `directory` |
+| `GET` | `/api/chat/sessions/{id}/command-state` | Ausgang des abgekoppelten Aufrufs dieser Sitzung: `{state: "running"\|"done"\|"failed"\|"unknown", message?}`; laufende Aufrufe je `messageID`, ein ungelesener Fehler geht genau einmal hinaus, danach `running`, solange ein anderer Aufruf läuft, sonst `done`; eine Sitzung ohne Eintrag liefert `unknown`. Einzige Ausnahme unter den Chat-Routen: durchläuft `chatTarget`, leitet aber nichts weiter und trägt kein `directory` |
 | `GET` | `/api/chat/commands` | Commands des Projekts über `GET /command`, ohne die internen Bausteine mit führendem `_`; je Eintrag `name`, `description`, `source`, `hints`, `subtask`. Dieselbe Liste trägt Vorschläge und Namensprüfung |
 | `GET` | `/api/chat/agents` | Agenten über `GET /agent`, ohne `mode: "subagent"` und ohne `hidden: true` |
 | `GET` | `/api/chat/permissions` | offene Freigaben |
@@ -2328,12 +2512,13 @@ durchläuft.
 | `GET` | `/api/chat/events` | Ereignisstrom des Dienstes für das Projekt als `text/event-stream`; endet mit dem Server |
 | `POST` | `/api/chat/markdown` | `{texts}` mit Goldmark als HTML rendern, ohne rohes HTML und ohne gefährliche Verweise; höchstens 200 Texte; fragt OpenCode nicht |
 
-Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
+Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Status; ohne
+Projektkonfiguration eine Umleitung nach `/setup`), `/setup`, `/workflows` mit
 `/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/knowledge`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
-`/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` aus denselben
-Fragmenten für den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige
-selbst. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
+`/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` mit denselben
+Fragmenten für Kopf, linke Spalte, Sperrfläche und Workflow-Karten — keine Seite trägt
+einen eigenen Kopf. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
 Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
 Marke, weil die Installation daneben einen anderen Stand tragen kann und ein offenes Fenster
 nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Build ohne
@@ -2699,7 +2884,7 @@ statt beiläufig.
 
 `webui/mcp.go` bedient neben `GET`/`POST /api/mcp` noch `GET /api/mcp/tools` — den
 Werkzeug-Selbsttest. Er ist ein eigener Endpunkt, weil dahinter ein Subprozess steht: als
-Teil von `GET /api/mcp` bremste er die Startseite aus. Aufgerufen wird er nur von
+Teil von `GET /api/mcp` bremste er die Setup-Seite aus. Aufgerufen wird er nur von
 `mcp.js`, also erst beim Öffnen der Seite.
 
 Gestartet wird der **registrierte Befehl** mit dem Hauptverzeichnis als
@@ -3060,8 +3245,8 @@ Browser `notifyClientGone` samt `leavingForOwnPage` — sie existierten nur, um 
 Mechanismus statt zweier.
 
 Im Browser sperrt ein ausgebliebenes Lebenszeichen erst nach drei Fehlschlägen in Folge,
-damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Startseite ist keine
-Sackgasse: sie bietet „Erneut verbinden" — antwortet der Server, lädt die Seite neu —,
+damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Statusseite und von
+`/setup` ist keine Sackgasse: sie bietet „Erneut verbinden" — antwortet der Server, lädt die Seite neu —,
 und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 

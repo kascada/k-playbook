@@ -29,10 +29,10 @@ func (f *fakeRunner) Run(_ context.Context, _ string, name string, args ...strin
 	f.calls = append(f.calls, call)
 	for _, answer := range f.answers {
 		if strings.HasPrefix(call, answer.prefix) {
-			if answer.err != nil {
-				return nil, answer.err
-			}
-			return []byte(answer.out), nil
+			// Wie ExecRunner: stdout kommt auch bei einem Fehler zurück. gh
+			// schreibt dorthin etwa den Rumpf einer gescheiterten
+			// GraphQL-Abfrage.
+			return []byte(answer.out), answer.err
 		}
 	}
 	return nil, fmt.Errorf("unerwarteter Aufruf: %s", call)
@@ -46,4 +46,16 @@ func (f *fakeRunner) client() *Client {
 // die Zeile auf stderr, an der die Einordnung hängt.
 func ghError(stderr string) error {
 	return &CommandError{Name: "gh", Args: []string{"repo", "view"}, ExitCode: 1, Stderr: stderr, Err: fmt.Errorf("exit status 1")}
+}
+
+// stallingRunner antwortet nie. Er schreibt stderr und kehrt erst zurück, wenn
+// der Kontext endet — mit dem Fehler, den ExecRunner dann liefert: der
+// Exit-Status „signal: killed", nicht der Kontextfehler.
+type stallingRunner struct {
+	stderr string
+}
+
+func (s *stallingRunner) Run(ctx context.Context, _ string, name string, args ...string) ([]byte, error) {
+	<-ctx.Done()
+	return nil, &CommandError{Name: name, Args: args, ExitCode: -1, Stderr: s.stderr, Err: fmt.Errorf("signal: killed")}
 }

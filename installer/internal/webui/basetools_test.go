@@ -105,7 +105,7 @@ func TestBaseToolsResponseOhneMatrix(t *testing.T) {
 }
 
 // TestBaseToolsKarteWirdAusgeliefert prüft die Oberfläche selbst, nicht nur die
-// Antwort: die Route ist registriert, und die Startseite trägt die Karte samt
+// Antwort: die Route ist registriert, und die Setup-Seite trägt die Karte samt
 // Kopierzeile.
 //
 // Die Karte startet versteckt und macht sich erst sichtbar, wenn der Befund
@@ -126,9 +126,9 @@ func TestBaseToolsKarteWirdAusgeliefert(t *testing.T) {
 		}
 	})
 
-	t.Run("Startseite trägt die Karte", func(t *testing.T) {
+	t.Run("Setup-Seite trägt die Karte", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/setup", nil))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("Status = %d, erwartet 200", recorder.Code)
 		}
@@ -140,7 +140,7 @@ func TestBaseToolsKarteWirdAusgeliefert(t *testing.T) {
 			`data-copy="base-tools-command-text"`,
 		} {
 			if !strings.Contains(page, want) {
-				t.Errorf("Startseite enthält %q nicht", want)
+				t.Errorf("Setup-Seite enthält %q nicht", want)
 			}
 		}
 	})

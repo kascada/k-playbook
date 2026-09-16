@@ -118,7 +118,10 @@ elements.suggestions.addEventListener("pointerdown", (event) => {
 });
 elements.abort.addEventListener("click", abortRun);
 
-init();
+// init() wird erst am Ende der Datei aufgerufen: es läuft bis zum ersten await
+// synchron und fasst dabei über renderLog() schon pending an. Stünde der Aufruf
+// hier, wären die const-Zustände weiter unten noch nicht angelegt, und init()
+// scheiterte mit „Cannot access 'pending' before initialization".
 
 async function init() {
   renderLog();
@@ -146,6 +149,7 @@ async function init() {
 
   setRunState("idle");
   setFormEnabled(true);
+  focusInput();
   openChatEvents(applyEvent, setConnectionState);
   await Promise.all([loadMessages(), loadPermissions(), loadRelated(), loadCommands(), loadAgents()]);
 }
@@ -246,6 +250,9 @@ function applyEvent(event) {
         if (props.error.name !== "MessageAbortedError") {
           run.failed = true;
           renderRunState();
+          // Die Nachricht kommt nicht mehr; ohne das stünde „wird gesendet"
+          // dauerhaft da. Ist sie schon eingetroffen, ist die Blase längst weg.
+          clearPendingMessage();
         }
       }
       return;
@@ -460,13 +467,11 @@ function showPendingMessage(text) {
   clearPendingMessage();
   const element = document.createElement("article");
   element.className = "chat-message user pending";
-  const head = document.createElement("p");
-  head.className = "eyebrow chat-message-head";
-  head.textContent = "Du · wird gesendet";
+  element.setAttribute("aria-label", "Du · wird gesendet");
   const body = document.createElement("div");
   body.className = "chat-text";
   body.textContent = text;
-  element.append(head, body);
+  element.append(body);
   pending.node = element;
   pending.id = "";
   // Über renderLog(), nicht von Hand angehängt: sonst stünde die erste
@@ -520,10 +525,17 @@ function renderMessage(entry) {
   element.className = `chat-message ${info.role === "user" ? "user" : "assistant"}`;
   element.dataset.message = info.id;
 
-  const head = document.createElement("p");
-  head.className = "eyebrow chat-message-head";
-  head.textContent = info.role === "user" ? "Du" : `OpenCode · ${info.agent || "Agent"}`;
-  element.append(head);
+  // Die eigene Nachricht trägt keinen Kopf: sie steht rechts und grau, das
+  // reicht als Absender. Vorgelesen wird er trotzdem. Die Antwort nennt Dienst
+  // und Agenten in einer Zeile, die auf ihrem Rahmen sitzt.
+  if (info.role === "user") {
+    element.setAttribute("aria-label", "Du");
+  } else {
+    const head = document.createElement("p");
+    head.className = "chat-message-head";
+    head.textContent = `OpenCode · ${info.agent || "Agent"}`;
+    element.append(head);
+  }
 
   const parts = [...entry.parts.values()]
     .filter((part) => !HIDDEN_PARTS.has(part.type))
@@ -771,16 +783,38 @@ function setFormEnabled(enabled) {
   elements.send.disabled = !usable;
 }
 
+// Nach jeder eigenen Handlung auf der Seite steht der Cursor wieder im
+// Eingabefeld: nach dem Laden, dem Senden, dem Abbrechen, einer Freigabe, einer
+// Antwort auf eine Rückfrage. Die Wahl des Agenten bleibt außen vor: mit den
+// Pfeiltasten löst schon jeder Schritt durch die Liste ein change aus.
+// Ereignisse des Dienstes rufen das ebenfalls nicht auf — sie dürfen niemandem
+// den Eigentext einer Rückfrage unter den Fingern wegziehen.
+function focusInput() {
+  if (elements.input.disabled) {
+    return;
+  }
+  elements.input.focus();
+}
+
 async function sendPrompt() {
   const text = elements.input.value;
   if (text.trim() === "" || elements.send.disabled) {
     return;
   }
+  // Sofort gesperrt, noch vor dem ersten await: sonst löste ein zweites Enter
+  // während des Wartens auf die Command-Liste ein zweites Senden aus.
   elements.send.disabled = true;
   elements.message.textContent = "";
   // Ein Fehler von vorhin endet mit dem nächsten Senden.
   run.failed = false;
   renderRunState();
+  // Ob /name ein Command ist, weiß erst die Liste. Ist sie noch nicht da, ginge
+  // /k-todo … sonst als gewöhnlicher Text an den Agenten.
+  if (looksLikeCommand(text) && !commandList.loaded && !(await commandsReady())) {
+    elements.message.textContent = `Die Command-Liste konnte nicht geladen werden; die Nachricht wurde nicht gesendet. ${commandList.error}`.trim();
+    setFormEnabled(true);
+    return;
+  }
   const command = commandFromText(text);
   const agent = selectedAgent();
   // Die eigene Nachricht steht sofort da; ihre Kennung kommt mit der Antwort.
@@ -813,6 +847,7 @@ async function sendPrompt() {
     elements.message.textContent = error.message;
   } finally {
     setFormEnabled(true);
+    focusInput();
   }
 }
 
@@ -824,6 +859,7 @@ async function abortRun() {
     elements.message.textContent = error.message;
   } finally {
     elements.abort.disabled = false;
+    focusInput();
   }
 }
 
@@ -926,6 +962,7 @@ async function replyPermission(id, reply, actions) {
     await chatApi(`/api/chat/permissions/${encodeURIComponent(id)}/reply`, { body: { reply } });
     chat.permissions.delete(id);
     renderPermissions();
+    focusInput();
   } catch (error) {
     elements.message.textContent = error.message;
     buttons.forEach((button) => {
@@ -1208,6 +1245,7 @@ async function sendQuestion(id, actions, action, body) {
     await chatApi(`/api/chat/questions/${encodeURIComponent(id)}/${action}`, { method: "POST", body });
     chat.questions.delete(id);
     renderQuestions();
+    focusInput();
   } catch (error) {
     elements.message.textContent = error.message;
     buttons.forEach((button) => {
@@ -1236,25 +1274,65 @@ const commandWatch = {
   busy: false,
 };
 
+// Die Ladung der Command-Liste. Das Versprechen wird festgehalten, damit jeder
+// Aufruf von loadCommands() dieselbe Ladung teilt — init() und ein Senden, das
+// auf die Liste wartet, lösen keine zweite aus.
+const commandList = {
+  // Versprechen der laufenden oder letzten Ladung; es erfüllt sich mit true,
+  // wenn die Liste da ist, sonst mit false.
+  promise: null,
+  loaded: false,
+  // Die Meldung der zuletzt gescheiterten Ladung.
+  error: "",
+};
+
 // Der Hinweis nach einem Command mit subtask: true. Der Link auf die
 // Kind-Sitzung kommt nach, sobald ihre Kennung bekannt ist.
 const subtaskHint = { slot: null };
 
-async function loadCommands() {
+function loadCommands() {
+  if (!commandList.promise) {
+    commandList.promise = fetchCommands();
+  }
+  return commandList.promise;
+}
+
+// Wartet auf die Liste. Ist die Ladung gescheitert, wird sie einmal neu
+// versucht; das Ergebnis sagt, ob die Liste danach da ist.
+async function commandsReady() {
+  if (await loadCommands()) {
+    return true;
+  }
+  commandList.promise = fetchCommands();
+  return commandList.promise;
+}
+
+async function fetchCommands() {
   try {
     const commands = await chatApi("/api/chat/commands");
     chat.commands = new Map(
       (Array.isArray(commands) ? commands : []).filter((command) => command && command.name).map((command) => [command.name, command]),
     );
-  } catch {
-    // Ohne die Liste ist jeder Text ein Text. Das ist kein Grund, die Eingabe
-    // zu sperren oder eine Meldung über den Verlauf zu legen.
+    commandList.loaded = true;
+    commandList.error = "";
+  } catch (error) {
+    // Kein Grund, die Eingabe zu sperren oder eine Meldung über den Verlauf zu
+    // legen: gewöhnlicher Text geht auch ohne die Liste. Erst ein Senden mit
+    // führendem / fragt nach ihr und meldet dann das Scheitern.
+    commandList.error = error.message || "";
   }
   // Wer schon getippt hat, während die Liste noch unterwegs war, bekommt die
   // Vorschläge jetzt nachgereicht.
   if (document.activeElement === elements.input) {
     updateSuggestions();
   }
+  return commandList.loaded;
+}
+
+// Beginnt der Text mit / und einem Namen? Nur dann hängt die Weiche an der
+// Liste; alles andere geht ohne Warten hinaus.
+function looksLikeCommand(text) {
+  return /^\/\S/.test(text);
 }
 
 // Erstes Wort /name und name bekannt → Command, der Rest wird zu arguments.
@@ -1342,16 +1420,23 @@ async function pollCommandState() {
   }
   commandWatch.busy = false;
   const state = data && data.state;
+  if (state === "failed") {
+    run.failed = true;
+    renderRunState();
+    elements.message.textContent = data.message || "Der Command ist gescheitert.";
+    // Die Nachricht des gescheiterten Commands kommt nicht mehr. Ist sie schon
+    // eingetroffen, ist die Blase längst weg und das hier folgenlos.
+    clearPendingMessage();
+    // Der Wächter endet hier nicht: das Lesen hat den Fehler geräumt, und ein
+    // zweiter Command kann noch laufen. Die nächste Antwort sagt es.
+    scheduleCommandState();
+    return;
+  }
   if (state === "running") {
     scheduleCommandState();
     return;
   }
   commandWatch.active = false;
-  if (state === "failed") {
-    run.failed = true;
-    renderRunState();
-    elements.message.textContent = data.message || "Der Command ist gescheitert.";
-  }
   // „done": von hier an führen die Ereignisse den Laufzustand. „unknown": kein
   // Eintrag — GUI neu gestartet oder Command aus dem Terminal; die Seite tut
   // nichts und lässt den Laufzustand unberührt.
@@ -1544,3 +1629,7 @@ function handleSuggestionKey(event) {
   event.preventDefault();
   return true;
 }
+
+// Erst hier: alle Zustände oberhalb sind angelegt (siehe Kommentar bei den
+// Ereignis-Handlern oben).
+init();

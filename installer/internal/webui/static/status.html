@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Die Statusseite ist ein Gerüst, das später gefüllt wird: das
+               Statusfeld, darunter die Workflow-Karten und das Bild der
+               Wissensablage. Das Statusfeld misst noch nichts und trägt
+               deshalb weder Werte noch eine Zustandsmarke. Die Meldung darunter
+               bleibt leer und verborgen, solange nichts zu melden ist; hinein
+               schreibt allein service.js, wenn die Update-Prüfung nicht prüfen
+               konnte. -->
+          <section class="card" id="status-card">
+            <div class="section-head">
+              <div>
+                <h2>Status</h2>
+              </div>
+            </div>
+            <p class="hint">Statusfeld (hier werden in Kürze die wichtigsten Werte angezeigt)</p>
+            <p id="status-message" class="message hidden"></p>
+          </section>
+
+{{template "workflow-cards" .}}
+
+          <p id="status-workflows-message" class="message"></p>
+
+          <!-- Das Bild der Wissensablage: der erste Mermaid-Block aus
+               knowledge-storage.md, geholt und gezeichnet über docview.js wie
+               auf /knowledge — keine Kopie des Diagramms. Es ist groß und steht
+               deshalb zuunterst, in einem Aufklappblock, der offen startet.
+               Beschriftet ist es englisch wie die mitgelieferte Doku; der Satz
+               darüber sagt auf Deutsch, was es zeigt. Ohne Netz bleibt Mermaid
+               aus, und docview.js setzt seine Meldung über den Quelltext. -->
+          <section class="card" id="knowledge-picture-card">
+            <div class="section-head">
+              <div>
+                <h2>Wissensablage</h2>
+              </div>
+              <a class="doc-link" href="/docs?file=knowledge-storage.md"
+                 title="Öffnet knowledge-storage.md im Bereich Docs, mit dem Index der übrigen Doku daneben.">In Docs öffnen</a>
+            </div>
+            <p class="hint">
+              Wie Wissen fließt: von der Quelle über <code>inbox/</code> und <code>queue/</code> in die
+              Wissensablage und von dort zur Nutzung durch die KI. Durchgezogene Linien sind gebaut,
+              gestrichelte geplant oder bewusst zurückgestellt. Das Bild ist englisch beschriftet, wie die
+              mitgelieferte Doku.
+            </p>
+            <details id="knowledge-picture-fold" open>
+              <summary class="disclosure">
+                <span class="disclosure-title">
+                  <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+                  <span>Bild</span>
+                </span>
+              </summary>
+              <div id="knowledge-picture" class="doc-viewer empty">Wird geladen...</div>
+            </details>
+            <p id="knowledge-picture-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+
+{{template "closed" .}}
+    </main>
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/service.js"></script>
+    <script src="/static/docview.js"></script>
+    <script src="/static/workflows.js"></script>
+    <script src="/static/status.js"></script>
+  </body>
+</html>

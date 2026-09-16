@@ -6,7 +6,8 @@
 //
 // Angezeigt wird mit demselben Betrachter wie im Bereich Docs (docview.js) —
 // die Datei besteht im Wesentlichen aus einem Mermaid-Diagramm, und das soll
-// hier wie dort gezeichnet werden.
+// hier wie dort gezeichnet werden. Geholt wird sie über loadDocInto, denselben
+// Weg, auf dem die Statusseite ihr Bild holt.
 
 // Die Datei liegt in der mitgelieferten Doku und wird über deren Endpunkt
 // gelesen. Ein eigener Endpunkt käme erst mit der Auflistung infrage.
@@ -43,32 +44,26 @@ async function load() {
   elements.viewer.textContent = "Wird geladen...";
 
   try {
-    const response = await fetch(`/api/docs/file?path=${encodeURIComponent(KNOWLEDGE_FILE)}`, { cache: "no-store" });
-    render(await response.json());
+    render(await loadDocInto(elements.viewer, KNOWLEDGE_FILE));
   } catch {
     elements.viewer.textContent = "";
     elements.message.textContent = "Die Wissensablage konnte nicht geladen werden.";
   }
 }
 
+// Die Datei steht schon in der Karte, wenn es etwas zu zeigen gab; hier
+// kommen nur Meldung, Titel und Pfad dazu.
 function render(data) {
   elements.message.textContent = data.message || "";
 
   if (!data.available) {
-    elements.viewer.textContent = "";
     elements.message.textContent = "Keine Projektkonfiguration gefunden.";
     return;
   }
-
-  // Die Installation daneben kann einen älteren Stand tragen, in dem es die
-  // Datei noch nicht gibt. Dann steht der Grund in der Meldung — eine leere
-  // Karte wäre dafür die falsche Auskunft.
   if (data.message) {
-    elements.viewer.textContent = "";
     return;
   }
 
   elements.title.textContent = data.title || "Knowledge";
   elements.path.textContent = data.path || KNOWLEDGE_FILE;
-  showDoc(elements.viewer, data.html);
 }

@@ -53,8 +53,13 @@ const STATE_TONE = {
   "no-remote": "warn",
   "no-access": "error",
   "rate-limited": "warn",
+  // Kein Fehler: GitHub hat das Log nach der Aufbewahrungsfrist verworfen.
+  "log-gone": "muted",
   network: "error",
   timeout: "warn",
+  // Kommt auf der Seite nicht an: eine abgebrochene Anfrage beantwortet der
+  // Server nicht. Der Eintrag hält die Liste der Zustände vollständig.
+  canceled: "muted",
   error: "error",
 };
 
@@ -68,8 +73,10 @@ const STATE_LABEL = {
   "no-remote": "Kein Remote",
   "no-access": "Kein Zugriff",
   "rate-limited": "Rate-Limit",
+  "log-gone": "Log verworfen",
   network: "Kein Netz",
   timeout: "Zeitüberschreitung",
+  canceled: "Abgebrochen",
   error: "Fehler",
 };
 
@@ -147,14 +154,15 @@ async function loadOverview() {
   link.textContent = data.repo || "unbekannt";
   link.rel = "noreferrer";
   fact(elements.overviewFacts, "Repo", link);
+  const notes = data.notes || {};
   fact(elements.overviewFacts, "Default-Branch", data.defaultBranch || "unbekannt");
-  fact(elements.overviewFacts, "gh-Konto", data.account || "unbekannt");
+  fact(elements.overviewFacts, "gh-Konto", data.account || noteValue(notes.account));
   // Leserecht ist nicht Schreibrecht: „angemeldet" sagt nichts darüber, ob
   // über gh gemergt oder approved werden kann.
   fact(elements.overviewFacts, "Recht am Repo", pill(permissionTone(data.permission), permissionLabel(data.permission)));
-  fact(elements.overviewFacts, "CI auf dem Default-Branch", pill(ciTone(data.ci), ciLabel(data)));
-  fact(elements.overviewFacts, "Letzter Tag", tagText(data));
-  fact(elements.overviewFacts, "Git-Remote", data.remoteUrl || "unbekannt");
+  fact(elements.overviewFacts, "CI auf dem Default-Branch", ciValue(data, notes.workflows));
+  fact(elements.overviewFacts, "Letzter Tag", tagValue(data, notes.tag));
+  fact(elements.overviewFacts, "Git-Remote", data.remoteUrl || noteValue(notes.remote));
 
   for (const workflow of data.workflows || []) {
     fact(elements.overviewFacts, workflow.name, pill(runTone(workflow), runResult(workflow)));
@@ -165,6 +173,55 @@ async function loadOverview() {
   // weiteren Netzaufruf fest.
   elements.aliasHint.classList.toggle("hidden", !data.aliasHint);
   elements.aliasHint.textContent = data.aliasHint || "";
+}
+
+// Ein leeres Feld hat drei mögliche Gründe, und die Seite nennt sie
+// unterschiedlich: „nichts da" ist ein gültiger Leerzustand und steht als
+// schlichter Satz; „nicht lesbar" und „Frist abgelaufen" tragen eine Marke,
+// damit ein Fehler nie wie ein leeres Feld aussieht.
+const FIELD_MARK = {
+  unreadable: ["error", "nicht lesbar"],
+  timeout: ["warn", "Frist abgelaufen"],
+};
+
+function noteValue(note, fallback = "unbekannt") {
+  if (!note || !note.state || note.state === "ok") {
+    return fallback;
+  }
+  const mark = FIELD_MARK[note.state];
+  if (!mark) {
+    return note.message || fallback;
+  }
+  const value = document.createElement("span");
+  const text = document.createElement("span");
+  text.className = "hint";
+  text.textContent = note.message || "";
+  value.append(pill(mark[0], mark[1]), " ", text);
+  return value;
+}
+
+function ciValue(data, note) {
+  if ((data.workflows || []).length) {
+    return pill(ciTone(data.ci), ciLabel(data));
+  }
+  if (note && FIELD_MARK[note.state]) {
+    return noteValue(note);
+  }
+  return pill("muted", (note && note.message) || "keine Läufe");
+}
+
+function tagValue(data, note) {
+  if (!data.lastTag) {
+    return noteValue(note, "kein Tag gefunden");
+  }
+  // Tag gefunden, aber Zählung oder Datum gescheitert: der Tag steht da,
+  // „nichts seitdem" wird nicht behauptet.
+  if (note && FIELD_MARK[note.state]) {
+    const value = document.createElement("span");
+    value.append(`${data.lastTag} — `, noteValue(note));
+    return value;
+  }
+  return tagText(data);
 }
 
 function permissionLabel(permission) {
@@ -197,9 +254,6 @@ function ciTone(ci) {
 
 function ciLabel(data) {
   const count = (data.workflows || []).length;
-  if (!count) {
-    return "keine Läufe";
-  }
   switch (data.ci) {
     case "ok":
       return `grün (${count} Workflows)`;
@@ -213,9 +267,6 @@ function ciLabel(data) {
 }
 
 function tagText(data) {
-  if (!data.lastTag) {
-    return data.tagNote || "kein Tag gefunden";
-  }
   const since = data.commitsSinceTag || 0;
   const commits = since === 1 ? "1 Commit" : `${since} Commits`;
   return since ? `${data.lastTag} — ${commits} seitdem` : `${data.lastTag} — nichts seitdem`;
@@ -559,8 +610,16 @@ async function loadFailure(run, body) {
     return;
   }
 
+  // Die Marke sagt, welcher Fall es ist: ein verworfenes Log ist etwas anderes
+  // als fehlender Zugriff oder eine abgelaufene Frist.
   if (data.state !== "ok") {
-    body.textContent = data.message || "Das Log ist nicht abrufbar.";
+    const text = document.createElement("p");
+    text.className = "hint gh-note";
+    text.textContent = data.message || "Das Log ist nicht abrufbar.";
+    // Ein Lauf-404 heißt falsche Kennung oder fehlender Zugriff — gh trennt
+    // beides nicht. Die Marke „Kein Zugriff" behauptete eines davon.
+    const label = data.state === "no-access" ? "Nicht abrufbar" : STATE_LABEL[data.state] || "Unbekannt";
+    body.replaceChildren(pill(STATE_TONE[data.state] || "warn", label), text);
     return;
   }
 

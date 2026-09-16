@@ -66,10 +66,10 @@ type serverState struct {
 	streamsOnce sync.Once
 
 	commandMu sync.Mutex
-	// commandRuns hält je Sitzung den letzten Ausgang des abgekoppelten
-	// Command-Aufrufs. Ohne ihn entstünde für einen Fehler nach der 202 kein
-	// Ereignis und die Seite bliebe dauerhaft auf „Arbeitet" stehen.
-	commandRuns map[string]*chatCommandOutcome
+	// commandRuns hält je Sitzung die laufenden abgekoppelten Command-Aufrufe
+	// und den ungelesenen Fehler. Ohne ihn entstünde für einen Fehler nach der
+	// 202 kein Ereignis und die Seite bliebe dauerhaft auf „Arbeitet" stehen.
+	commandRuns map[string]*chatCommandRuns
 }
 
 // Serve ist der Servermodus: der abgekoppelte Prozess hinter K_PLAYBOOK_SERVE=1.
@@ -206,7 +206,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/mcp", mcpHandler)
 	mux.HandleFunc("POST /api/mcp", applyMCPHandler)
 	// Eigener Endpunkt, weil dahinter ein Subprozess steht: nur die Seite /mcp
-	// fragt ihn, die Startseite bliebe sonst daran hängen.
+	// fragt ihn, die Setup-Seite bliebe sonst daran hängen.
 	mux.HandleFunc("GET /api/mcp/tools", mcpToolsHandler)
 	// Die Übersicht aller MCP-Server liest nur Dateien. Die Messung eines
 	// Servers steht hinter einem POST: sie startet ein Kommando aus den
@@ -301,7 +301,10 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /mcp-servers", mcpServersPageHandler)
 	mux.HandleFunc("GET /mcp-servers/{assistant}/{name}", mcpServerPageHandler)
-	mux.HandleFunc("GET /", indexHandler)
+	mux.HandleFunc("GET /setup", setupPageHandler)
+	// GET / ist das Auffangmuster: jeder unbekannte Pfad landet dort, und
+	// statusPageHandler antwortet darauf mit 404.
+	mux.HandleFunc("GET /", statusPageHandler)
 
 	return sameOrigin(state.noteRequests(mux))
 }
@@ -361,6 +364,9 @@ func (state *serverState) noteRequests(next http.Handler) http.Handler {
 // Die Bereiche des Umschalters. Der Wert steht in den Vorlagendaten und
 // entscheidet, welcher Eintrag markiert ist.
 const (
+	// areaStatus ist der Bereich der Statusseite unter /: wie es um das
+	// Projekt steht. Die Einrichtung hat ihren eigenen Bereich unter /setup.
+	areaStatus    = "status"
 	areaSetup     = "setup"
 	areaWorkflows = "workflows"
 	// areaChat ist der Bereich des Chats mit dem OpenCode-Dienst. Er steht
@@ -375,8 +381,8 @@ const (
 	// Zonen selbst listet sie erst, wenn ein /api/knowledge/* sie liefert.
 	areaKnowledge = "knowledge"
 	// areaGitHub ist der Bereich der GitHub-Ansicht. Eigener Bereich und keine
-	// Karte auf der Startseite: die Seite fragt bei jedem Aufruf über gh nach
-	// draußen, und das darf weder die Startseite noch das Menü auslösen.
+	// Karte auf der Statusseite: die Seite fragt bei jedem Aufruf über gh nach
+	// draußen, und das darf weder die Statusseite noch das Menü auslösen.
 	areaGitHub = "github"
 	areaDocs   = "docs"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
@@ -385,19 +391,50 @@ const (
 	areaInventory = "inventory"
 )
 
-// pageTemplate parst eine Seite zusammen mit den beiden gemeinsamen
-// Fragmenten: dem Kopf und der linken Spalte. Die Vorlage trägt den Namen der
-// Seitendatei, damit Execute die Seite ausführt und nicht ein Fragment.
+// pageTemplate parst eine Seite zusammen mit den gemeinsamen Fragmenten: dem
+// Kopf, der linken Spalte, der Sperrfläche, die die Statusseite und /setup
+// einbinden, und den drei Workflow-Karten, die die Statusseite und /workflows
+// einbinden. Die Vorlage trägt den Namen der Seitendatei, damit Execute die
+// Seite ausführt und nicht ein Fragment.
 //
 // hasPrefix braucht die linke Spalte für den Unterpunkt „MCP-Server": der ist
 // auf der Übersicht und auf jeder Detailseite darunter aktiv, aria-current
 // führt aber nur die Übersicht selbst.
 func pageTemplate(name string) *template.Template {
 	funcs := template.FuncMap{"hasPrefix": strings.HasPrefix}
-	return template.Must(template.New(name).Funcs(funcs).ParseFS(staticFiles, "static/"+name, "static/sidebar.html", "static/hero.html"))
+	return template.Must(template.New(name).Funcs(funcs).ParseFS(staticFiles, "static/"+name, "static/sidebar.html", "static/hero.html", "static/closed.html", "static/workflow-cards.html"))
 }
 
-var indexTemplate = pageTemplate("index.html")
+// statusTemplate ist die Statusseite unter /: der Kopf mit den Knöpfen für
+// Update und Dienst, das Statusfeld, die Workflow-Karten und das Bild der
+// Wissensablage. Sie ist ein Gerüst, das später gefüllt wird, und nutzt
+// ausschließlich vorhandene Endpunkte.
+var statusTemplate = pageTemplate("status.html")
+
+// statusPageHandler prüft zuerst den Pfad und leitet erst danach um: GET / ist
+// das Auffangmuster, und ohne Konfiguration führte sonst jeder Tippfehler nach
+// /setup statt auf 404. Ohne Projektkonfiguration gehört der Aufruf in die
+// Einrichtung — der Umschalter führt dann ohnehin nur dorthin, und jede Quelle
+// der Statusseite antwortete leer.
+func statusPageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	if !project.Detect().Installed {
+		http.Redirect(w, r, "/setup", http.StatusFound)
+		return
+	}
+	renderPage(w, statusTemplate, areaStatus, "/", "Status")
+}
+
+// setupTemplate ist die Einrichtung: Projektkonfiguration, projekteigene
+// Struktur, Verlinkung, Werkzeuge und die Entscheidungen des Projekts.
+var setupTemplate = pageTemplate("setup.html")
+
+func setupPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, setupTemplate, areaSetup, "/setup", "Setup")
+}
 
 // workflowsTemplate ist die Übersicht des Bereichs der täglichen Arbeit: was
 // die drei Sorten sind, wie viel in jeder liegt und der Weg zu ihrer Seite.
@@ -466,7 +503,7 @@ func knowledgePageHandler(w http.ResponseWriter, r *http.Request) {
 
 // githubTemplate ist die Seite des GitHub-Stands: Repo und Zugang, Pull
 // Requests, CI-Läufe. Eigener Bereich, weil ihre Karten als einzige der
-// Oberfläche über das Netz fragen — als Karte auf der Startseite hinge jeder
+// Oberfläche über das Netz fragen — als Karte auf der Statusseite hinge jeder
 // Aufruf von / an GitHub. Geschrieben wird nichts: Approve und Merge bleiben
 // bei /k-pr-review.
 var githubTemplate = pageTemplate("github.html")
@@ -487,7 +524,7 @@ func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 // Erhebung, Quellenkonfiguration und die erzeugte Datei. Eigener Bereich mit
 // eigenem Eintrag in der linken Spalte — die Datei muss im Bereich selbst
 // lesbar sein, und der Aktualisieren-Knopf braucht Verlaufsstatus; beides
-// trägt keine Karte auf der Startseite.
+// trägt keine Karte auf der Setup-Seite.
 var inventoryTemplate = pageTemplate("inventory.html")
 
 func inventoryPageHandler(w http.ResponseWriter, r *http.Request) {
@@ -535,18 +572,10 @@ func mcpServerPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, mcpServerTemplate, areaSetup, mcpServersPage+"/"+assistant+"/"+name, name)
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	renderPage(w, indexTemplate, areaSetup, "/", "k-playbook")
-}
-
 // renderPage füllt den gemeinsamen Kopf und gibt die Vorlage aus. area sagt,
 // welcher Eintrag des Umschalters markiert wird, page nennt die offene Seite.
 // Beides fällt auseinander, sobald ein Bereich mehr als eine Seite hat: /mcp
-// trägt den Bereich Setup, ist aber nicht dessen Startseite, und die drei
+// trägt den Bereich Setup, ist aber nicht die Seite /setup, und die drei
 // Seiten unter /workflows tragen dessen Bereich — nur die offene Seite darf
 // aria-current="page" führen. title ist die Überschrift im Kopf und der Name
 // des Fensters.
@@ -561,10 +590,10 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 		Installed   bool
 		Area        string
 		Page        string
-		// Title steht im Kopf und im Fensternamen. Die Startseite trägt ihn
-		// fest im Markup: sie hat als einzige einen eigenen Kopf, weil dort
-		// die Pfade IDs für app.js brauchen und die Knöpfe für Update und
-		// Dienst daneben stehen.
+		// Title steht im Kopf und im Fensternamen. Alle Seiten teilen
+		// denselben Kopf aus hero.html; welche davon die Knöpfe für Update
+		// und Dienst tragen, entscheidet der Kopf selbst über Area, Page und
+		// Installed.
 		Title string
 		// Version ist die des Binarys, das diese Seite ausliefert. Sie steht
 		// rechts oben im Kopf, weil die Installation daneben einen anderen

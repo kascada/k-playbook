@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body data-mode="{{.Mode}}">
-    <main class="shell wide">
+    <main class="shell wide fill">
 {{template "hero" .}}
 
       <div class="layout">
@@ -27,7 +27,7 @@
               </div>
               <span id="chat-run-pill" class="pill muted">Laden...</span>
             </div>
-            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <div id="chat-log" class="chat-log fill-grow" aria-live="polite"></div>
             <!-- Zwei Docks über dem Formular, keine Formulare im Verlauf: der
                  wird bei jedem Delta neu gebaut und verlöre laufend die halb
                  getroffene Auswahl und den getippten Text. -->

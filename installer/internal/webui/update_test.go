@@ -166,12 +166,13 @@ func TestVersionswechselMeldetKanonischenBootstrap(t *testing.T) {
 }
 
 // Die Oberfläche zeigt denselben Bootstrap wie die Antwort des Servers. Beide
-// Texte stehen an verschiedenen Stellen — Go-Meldung und app.js —, und genau
+// Texte stehen an verschiedenen Stellen — Go-Meldung und service.js, wo der
+// Update-Knopf der Statusseite und von /setup bedient wird —, und genau
 // deshalb wird der Gleichlauf geprüft statt vorausgesetzt.
 func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
-	source, err := staticFiles.ReadFile("static/app.js")
+	source, err := staticFiles.ReadFile("static/service.js")
 	if err != nil {
-		t.Fatalf("app.js lesen: %v", err)
+		t.Fatalf("service.js lesen: %v", err)
 	}
 	script := string(source)
 
@@ -180,7 +181,7 @@ func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
 		project.PlaybookDirName + "/bin/install",
 	} {
 		if !strings.Contains(script, want) {
-			t.Errorf("in app.js fehlt %q", want)
+			t.Errorf("in service.js fehlt %q", want)
 		}
 	}
 }

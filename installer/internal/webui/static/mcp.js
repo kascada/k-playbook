@@ -1,7 +1,7 @@
 // Seite "k-playbook-MCP": der Registrierungszustand je Assistent und die
 // Werkzeuge, die der Server tatsächlich anbietet.
 //
-// Gelesen wird nur. Eingerichtet wird im Block auf der Startseite — dort steht
+// Gelesen wird nur. Eingerichtet wird im Block auf der Setup-Seite — dort steht
 // der Knopf, hier stehen die Belege.
 
 const elements = {
@@ -16,7 +16,7 @@ const elements = {
   toolsMessage: document.getElementById("tools-message"),
 };
 
-// Was der Zustand bedeutet — ausführlicher als im Block der Startseite: hier
+// Was der Zustand bedeutet — ausführlicher als im Block der Setup-Seite: hier
 // steht der Platz dafür, und wer hierher kommt, will den Grund wissen.
 const STATE_TEXTS = {
   ok: "eingetragen",
@@ -70,7 +70,7 @@ async function loadRegistration() {
 }
 
 // Der Selbsttest läuft erst beim Aufruf dieser Seite, nicht beim Laden der
-// Startseite: dahinter steht ein Subprozess.
+// Setup-Seite: dahinter steht ein Subprozess.
 async function loadTools() {
   try {
     const response = await fetch("/api/mcp/tools", { cache: "no-store" });
@@ -223,7 +223,7 @@ function toolBox(tool) {
 }
 
 // Legt eine Zeile in einer Faktenliste an. Dieselbe Form wie auf der
-// Startseite; die Seiten teilen sich kein Skript außer session.js.
+// Setup-Seite; die Seiten teilen sich kein Skript außer session.js.
 function addFact(list, term, detail) {
   const row = document.createElement("div");
   const dt = document.createElement("dt");

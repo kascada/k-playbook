@@ -842,8 +842,8 @@ func (state *serverState) chatCommandHandler(w http.ResponseWriter, r *http.Requ
 	if agent := strings.TrimSpace(input.Agent); agent != "" {
 		payload["agent"] = agent
 	}
-	state.noteCommandRunning(id)
-	go state.runCommand(id, target, directory, payload)
+	state.noteCommandRunning(id, messageID)
+	go state.runCommand(id, messageID, target, directory, payload)
 	// Die Kennung geht mit der 202 zurück: die Seite hängt ihre vorläufige
 	// Blase daran und verwirft sie, sobald die echte Nachricht eintrifft.
 	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "messageID": messageID})
@@ -857,7 +857,10 @@ func (state *serverState) chatCommandHandler(w http.ResponseWriter, r *http.Requ
 // Bearbeitung. Abgebrochen wird er allein über state.streams, und das beendet
 // ausdrücklich nur die wartende HTTP-Anfrage — der Lauf in OpenCode läuft
 // weiter und endet nur über POST …/abort.
-func (state *serverState) runCommand(sessionID string, target openCodeTarget, directory string, payload map[string]any) {
+//
+// messageID ist der Schlüssel dieses Aufrufs in der Ablage: sein Ende räumt nur
+// ihn, nicht einen zweiten Command derselben Sitzung.
+func (state *serverState) runCommand(sessionID string, messageID string, target openCodeTarget, directory string, payload map[string]any) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -872,7 +875,7 @@ func (state *serverState) runCommand(sessionID string, target openCodeTarget, di
 	if _, err := fetchOpenCode(ctx, target, http.MethodPost, "/session/"+sessionID+"/command", directory, payload); err != nil {
 		message = err.Error()
 	}
-	state.noteCommandFinished(sessionID, message)
+	state.noteCommandFinished(sessionID, messageID, message)
 }
 
 // --- Agenten ------------------------------------------------------------------
@@ -924,18 +927,27 @@ func chatAgentsHandler(w http.ResponseWriter, r *http.Request) {
 // Scheitert der Aufruf nach der 202 — 404, 400, Modell- oder Providerfehler,
 // Verbindungsabbruch —, entsteht kein Ereignis. Nur zu protokollieren ließe
 // die Seite dauerhaft auf „Arbeitet" stehen. Der Server merkt sich deshalb je
-// Sitzung den letzten Ausgang, und die Seite holt ihn ab.
+// Sitzung, was läuft und was gescheitert ist, und die Seite holt es ab.
+//
+// Eine Sitzung kann mehrere Commands zugleich laufen haben. Ein einziger
+// Eintrag, den jedes Ende überschreibt, verlöre dabei Auskunft: endet /cmd1
+// erfolgreich, nachdem /cmd2 schon gescheitert ist, würde aus failed done, und
+// ein noch laufender /cmd2 meldete sich als done. Laufende Aufrufe und Fehler
+// stehen deshalb getrennt.
 
-// chatCommandOutcome ist der letzte Ausgang einer Sitzung.
-type chatCommandOutcome struct {
-	// state ist running, done oder failed. unknown entsteht erst beim Lesen —
-	// als Antwort für eine Sitzung ohne Eintrag.
-	state   string
+// chatCommandRuns ist der Stand einer Sitzung. Dass es ihn gibt, ist zugleich
+// die Marke, dass diese Sitzung überhaupt einen Command von hier gesendet hat —
+// sie trennt done von unknown.
+type chatCommandRuns struct {
+	// running hält die laufenden Aufrufe, geschlüsselt über das messageID, das
+	// der Handler je Aufruf erzeugt. Ein Ende entfernt nur seinen Schlüssel.
+	running map[string]struct{}
+	// failed und message sind der ungelesene Fehler. Tritt ein zweiter auf,
+	// bevor der erste gelesen ist, bleibt der erste stehen.
+	failed  bool
 	message string
-	// read merkt, dass ein Fehler abgeholt wurde. Erst dann darf er verdrängt
-	// werden.
-	read bool
-	at   time.Time
+	// at ist die letzte Änderung; nach ihr wird verdrängt.
+	at time.Time
 }
 
 type chatCommandStateResponse struct {
@@ -943,52 +955,65 @@ type chatCommandStateResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
-// noteCommandRunning hält fest, dass für diese Sitzung ein abgekoppelter
-// Aufruf läuft.
-func (state *serverState) noteCommandRunning(sessionID string) {
-	state.commandMu.Lock()
-	defer state.commandMu.Unlock()
+// commandRunsFor liefert den Stand einer Sitzung und legt ihn bei Bedarf an.
+//
+// Wird nur mit gehaltenem commandMu gerufen.
+func (state *serverState) commandRunsFor(sessionID string) *chatCommandRuns {
 	if state.commandRuns == nil {
-		state.commandRuns = map[string]*chatCommandOutcome{}
+		state.commandRuns = map[string]*chatCommandRuns{}
 	}
-	state.commandRuns[sessionID] = &chatCommandOutcome{state: "running", at: time.Now()}
+	runs := state.commandRuns[sessionID]
+	if runs == nil {
+		runs = &chatCommandRuns{running: map[string]struct{}{}}
+		state.commandRuns[sessionID] = runs
+	}
+	return runs
 }
 
-// noteCommandFinished hält den Ausgang fest: eine Meldung bedeutet
-// gescheitert, keine bedeutet fertig. Beim Verlassen von running wird die
-// Ablage begrenzt.
-func (state *serverState) noteCommandFinished(sessionID string, message string) {
+// noteCommandRunning hält fest, dass für diese Sitzung der abgekoppelte Aufruf
+// mit diesem messageID läuft.
+func (state *serverState) noteCommandRunning(sessionID string, messageID string) {
 	state.commandMu.Lock()
 	defer state.commandMu.Unlock()
-	if state.commandRuns == nil {
-		state.commandRuns = map[string]*chatCommandOutcome{}
+	runs := state.commandRunsFor(sessionID)
+	runs.running[messageID] = struct{}{}
+	runs.at = time.Now()
+}
+
+// noteCommandFinished hält das Ende eines Aufrufs fest: er verlässt die Menge
+// der laufenden, und eine Meldung bedeutet gescheitert. Ein schon stehender,
+// ungelesener Fehler bleibt dabei stehen. Danach wird die Ablage begrenzt.
+func (state *serverState) noteCommandFinished(sessionID string, messageID string, message string) {
+	state.commandMu.Lock()
+	defer state.commandMu.Unlock()
+	runs := state.commandRunsFor(sessionID)
+	delete(runs.running, messageID)
+	if message != "" && !runs.failed {
+		runs.failed = true
+		runs.message = shortenChatMessage(message)
 	}
-	outcome := &chatCommandOutcome{state: "done", at: time.Now()}
-	if message != "" {
-		outcome.state = "failed"
-		outcome.message = shortenChatMessage(message)
-	}
-	state.commandRuns[sessionID] = outcome
+	runs.at = time.Now()
 	state.trimCommandRuns()
 }
 
-// trimCommandRuns hält die Ablage klein. Verdrängt werden nur done-Einträge
-// und bereits gelesene Fehler: fiele ein ungelesener failed vor dem Abholen
-// heraus, antwortete command-state unknown, die Seite täte nichts und bliebe
-// auf „Arbeitet" stehen — genau der Zustand, gegen den der Rückweg gebaut ist.
-// Ein laufender Aufruf wird aus demselben Grund nicht verdrängt.
+// trimCommandRuns hält die Ablage klein. Verdrängt werden nur Sitzungen ohne
+// laufenden Aufruf und ohne ungelesenen Fehler: fiele ein ungelesener Fehler
+// vor dem Abholen heraus, antwortete command-state unknown, die Seite täte
+// nichts und bliebe auf „Arbeitet" stehen — genau der Zustand, gegen den der
+// Rückweg gebaut ist. Ein laufender Aufruf wird aus demselben Grund nicht
+// verdrängt.
 //
 // Wird nur mit gehaltenem commandMu gerufen.
 func (state *serverState) trimCommandRuns() {
 	for len(state.commandRuns) > chatCommandStateLimit {
 		oldestID := ""
-		var oldest *chatCommandOutcome
-		for id, outcome := range state.commandRuns {
-			if outcome.state == "running" || (outcome.state == "failed" && !outcome.read) {
+		var oldest *chatCommandRuns
+		for id, runs := range state.commandRuns {
+			if len(runs.running) > 0 || runs.failed {
 				continue
 			}
-			if oldest == nil || outcome.at.Before(oldest.at) {
-				oldestID, oldest = id, outcome
+			if oldest == nil || runs.at.Before(oldest.at) {
+				oldestID, oldest = id, runs
 			}
 		}
 		if oldest == nil {
@@ -998,27 +1023,29 @@ func (state *serverState) trimCommandRuns() {
 	}
 }
 
-// commandState liest den Ausgang einer Sitzung. Ein Fehler geht genau einmal
-// hinaus; danach ist er geräumt. Dass bei zwei offenen Tabs derselben Sitzung
-// der erste Leser ihn wegräumt, wird bewusst hingenommen.
+// commandState liest den Stand einer Sitzung. Ein ungelesener Fehler geht
+// genau einmal hinaus und ist danach geräumt; läuft dann noch ein Aufruf,
+// meldet die nächste Antwort running. Dass bei zwei offenen Tabs derselben
+// Sitzung der erste Leser den Fehler wegräumt, wird bewusst hingenommen.
 func (state *serverState) commandState(sessionID string) chatCommandStateResponse {
 	state.commandMu.Lock()
 	defer state.commandMu.Unlock()
-	outcome := state.commandRuns[sessionID]
-	if outcome == nil {
+	runs := state.commandRuns[sessionID]
+	switch {
+	case runs == nil:
 		// Keine Auskunft: GUI neu gestartet, Command aus dem Terminal. done
 		// wäre hier irreführend, die Seite lässt den Laufzustand unberührt.
 		return chatCommandStateResponse{State: "unknown"}
-	}
-	if outcome.state == "failed" {
-		if outcome.read {
-			return chatCommandStateResponse{State: "done"}
-		}
-		outcome.read = true
+	case runs.failed:
+		message := runs.message
+		runs.failed, runs.message = false, ""
 		state.trimCommandRuns()
-		return chatCommandStateResponse{State: "failed", Message: outcome.message}
+		return chatCommandStateResponse{State: "failed", Message: message}
+	case len(runs.running) > 0:
+		return chatCommandStateResponse{State: "running"}
+	default:
+		return chatCommandStateResponse{State: "done"}
 	}
-	return chatCommandStateResponse{State: outcome.state}
 }
 
 // chatCommandStateHandler liefert den Ausgang an die Seite. Er durchläuft

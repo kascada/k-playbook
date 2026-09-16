@@ -2,8 +2,10 @@ package github
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 const repoViewJSON = `{"defaultBranchRef":{"name":"main"},"isPrivate":false,` +
@@ -116,8 +118,8 @@ func TestOverviewOhneTagErklaertDieLuecke(t *testing.T) {
 	if overview.State != StateOK {
 		t.Fatalf("Zustand %q, erwartet ok: ein fehlender Tag macht die Repo-Angabe nicht falsch", overview.State)
 	}
-	if overview.TagNote == "" {
-		t.Error("kein Hinweis zum fehlenden Tag; jeder Zustand ohne Daten ist erklärt statt leer")
+	if overview.Notes.Tag.State != FieldNone || overview.Notes.Tag.Message == "" {
+		t.Errorf("Hinweis zum Tag %+v, erwartet none mit Satz; jeder Zustand ohne Daten ist erklärt statt leer", overview.Notes.Tag)
 	}
 }
 
@@ -157,12 +159,66 @@ func TestOverviewOrdnetJedenFehlerEin(t *testing.T) {
 	}
 }
 
-func TestOverviewLaeuftInDieFristStattZuHaengen(t *testing.T) {
+// Ein Zeitfehler wird am Kontext erkannt, nicht am Text. Der Runner schreibt
+// vor dem Abbruch eine Zeile auf stderr — genau der Fall, in dem die frühere
+// Textprüfung aus dem Zeitfehler einen allgemeinen Fehler mit roher gh-Zeile
+// machte.
+func TestOverviewErkenntDieFristTrotzStderr(t *testing.T) {
+	runner := &stallingRunner{stderr: "! Warnung: die Anfrage dauert länger als üblich\n"}
+	client := &Client{Runner: runner, Dir: "/nicht/vorhanden", Timeout: 50 * time.Millisecond}
+
+	overview := client.FetchOverview(context.Background())
+	if overview.State != StateTimeout {
+		t.Fatalf("Zustand %q, erwartet timeout (%s)", overview.State, overview.Message)
+	}
+	if strings.Contains(overview.Message, "Warnung") {
+		t.Errorf("stderr roh durchgereicht: %q", overview.Message)
+	}
+}
+
+// Dasselbe, wenn nicht die Frist des Aufrufs abläuft, sondern das Budget der
+// Anfrage darüber: der Aufruf hätte noch 20 s, die Anfrage nur 50 ms.
+func TestOverviewErkenntDasAbgelaufeneBudget(t *testing.T) {
+	runner := &stallingRunner{stderr: "gh: irgendetwas\n"}
+	client := &Client{Runner: runner, Dir: "/nicht/vorhanden", Timeout: DefaultTimeout}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	started := time.Now()
+	overview := client.FetchOverview(ctx)
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Errorf("Antwort nach %s: das Budget griff nicht", elapsed)
+	}
+	if overview.State != StateTimeout {
+		t.Fatalf("Zustand %q, erwartet timeout (%s)", overview.State, overview.Message)
+	}
+}
+
+// Bricht der Aufrufer ab — der Browser verlässt die Seite —, ist das kein
+// Zeitfehler und kein Fehler von gh.
+func TestOverviewMeldetAbbruchWederAlsFristNochAlsFehler(t *testing.T) {
+	runner := &stallingRunner{stderr: "gh: irgendetwas\n"}
+	client := &Client{Runner: runner, Dir: "/nicht/vorhanden", Timeout: DefaultTimeout}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(20*time.Millisecond, cancel)
+
+	overview := client.FetchOverview(ctx)
+	if overview.State != StateCanceled {
+		t.Fatalf("Zustand %q, erwartet canceled (%s)", overview.State, overview.Message)
+	}
+	if strings.Contains(overview.Message, "irgendetwas") {
+		t.Errorf("stderr roh durchgereicht: %q", overview.Message)
+	}
+}
+
+// Umgekehrt ist ein getöteter Prozess ohne abgelaufenen Kontext kein
+// Zeitfehler: den Prozess hat jemand anderes beendet, etwa der OOM-Killer.
+func TestOverviewNenntGetoetetenProzessOhneFristNichtZeitfehler(t *testing.T) {
 	runner := &fakeRunner{answers: []fakeAnswer{
-		{prefix: "gh repo view", err: ghError("signal: killed")},
+		{prefix: "gh repo view", err: &CommandError{Name: "gh", ExitCode: -1, Err: errors.New("signal: killed")}},
 	}}
-	if state := runner.client().FetchOverview(context.Background()).State; state != StateTimeout {
-		t.Errorf("Zustand %q, erwartet timeout", state)
+	if state := runner.client().FetchOverview(context.Background()).State; state == StateTimeout {
+		t.Errorf("Zustand %q: ohne abgelaufenen Kontext ist das keine Frist", state)
 	}
 }
 

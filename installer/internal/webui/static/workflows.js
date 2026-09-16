@@ -1,22 +1,17 @@
 "use strict";
 
-// Seite "Workflows": die Übersicht des Bereichs. Sie sagt, was die drei Sorten
-// sind, wie viel in jeder liegt und wo sie stehen; die Listen selbst haben
-// eigene Seiten.
+// Die Zahlen der drei Workflow-Karten: wie viel in jeder Sorte liegt. Die
+// Karten selbst stehen im Fragment workflow-cards.html, das /workflows und die
+// Statusseite einbinden; beide rufen loadWorkflowCounts() auf.
 //
 // Geholt wird hier nur die Zahl. Sie stammt aus derselben Antwort, aus der die
 // jeweilige Seite ihre Liste baut — einen Aggregat-Endpunkt gibt es nicht, er
 // wäre die Doppelung dieser drei Zahlen.
-
-// Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
-// zieht das nur mit, wenn es die Karten schon beobachtet.
-buildBlockNav();
-
-const message = document.getElementById("workflows-message");
-
-startSession((lost) => {
-  message.textContent = lost;
-});
+//
+// Die Datei tut beim Laden nichts: Blockmenü und Lebenszeichen gehören der
+// Seite. Zweimal gerufen, entstünde das Menü doppelt und es liefen zwei
+// Lebenszeichen. Klassisches Skript, kein Modul — jeder Name auf oberster
+// Ebene teilt sich den Namensraum mit den übrigen Skripten der Seite.
 
 // Die drei Vorräte in der Reihenfolge der Karten. Jeder nennt seinen
 // Endpunkt, das Feld mit den Einträgen und die Beschriftung seiner Zahl:
@@ -27,15 +22,19 @@ const stocks = [
   { pill: "todos-pill", url: "/api/todos", field: "todos", label: (count) => (count === 1 ? "1 offen" : `${count} offen`) },
 ];
 
-for (const stock of stocks) {
-  loadCount(stock);
+// Füllt die drei Zahlen. message ist das Element, in das Fehler und Hinweise
+// gehen; es steht auf der Seite und nicht im Fragment der Karten.
+function loadWorkflowCounts(message) {
+  for (const stock of stocks) {
+    loadCount(stock, message);
+  }
 }
 
-async function loadCount(stock) {
+async function loadCount(stock, message) {
   const pill = document.getElementById(stock.pill);
   try {
     const response = await fetch(stock.url, { cache: "no-store" });
-    render(pill, stock, await response.json());
+    renderCount(pill, stock, await response.json(), message);
   } catch {
     pill.className = "pill warn";
     pill.textContent = "Fehler";
@@ -43,7 +42,7 @@ async function loadCount(stock) {
   }
 }
 
-function render(pill, stock, data) {
+function renderCount(pill, stock, data, message) {
   if (!data.available) {
     pill.className = "pill muted";
     pill.textContent = "Unbekannt";

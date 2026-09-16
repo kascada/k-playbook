@@ -203,7 +203,7 @@ func TestMCPServersSeite(t *testing.T) {
 		`id="required-card"`,
 		`id="files-card"`,
 		`<a class="area-nav-subitem active" href="/mcp-servers" aria-current="page">`,
-		`<a class="area-nav-item active" href="/" aria-current="true">`,
+		`<a class="area-nav-item active" href="/setup" aria-current="true">`,
 		`/static/mcp-servers.js`,
 	} {
 		if !strings.Contains(body, want) {
@@ -212,13 +212,13 @@ func TestMCPServersSeite(t *testing.T) {
 	}
 }
 
-// Die Startseite verlinkt die Übersicht aus der MCP-Karte.
+// Die Setup-Seite verlinkt die Übersicht aus der MCP-Karte.
 func TestStartseiteVerlinktMCPServer(t *testing.T) {
 	newMCPProject(t, "", nil)
 
-	_, body := getPage(t, "/")
+	_, body := getPage(t, "/setup")
 	if !strings.Contains(body, `href="/mcp-servers"`) {
-		t.Error("die Startseite verlinkt /mcp-servers nicht")
+		t.Error("die Setup-Seite verlinkt /mcp-servers nicht")
 	}
 }
 
@@ -270,7 +270,7 @@ func TestMCPServerDetailseite(t *testing.T) {
 	for _, want := range []string{
 		`id="config-card"`, `id="server-card"`, `id="tools-card"`, `id="prompts-card"`, `id="resources-card"`,
 		`<a class="area-nav-subitem active" href="/mcp-servers">`,
-		`<a class="area-nav-item active" href="/" aria-current="true">`,
+		`<a class="area-nav-item active" href="/setup" aria-current="true">`,
 		`<h1>beispiel</h1>`,
 		`/static/mcp-server.js`,
 	} {

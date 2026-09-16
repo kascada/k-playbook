@@ -31,6 +31,7 @@
   --inset-bg: color-mix(in srgb, var(--white) 50%, transparent);
   --selected-bg: color-mix(in srgb, var(--white) 85%, transparent);
   --diagram-bg: color-mix(in srgb, var(--white) 64%, transparent);
+  --own-message-bg: color-mix(in srgb, var(--ink) 6%, var(--card));
   --accent-wash: color-mix(in srgb, var(--accent) 10%, transparent);
   --accent-selected: color-mix(in srgb, var(--accent) 14%, transparent);
   --accent-glow: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -109,8 +110,9 @@
   --shadow-raised: 0 10px 24px color-mix(in srgb, var(--accent-strong) 20%, transparent);
   --shadow-focus: 0 0 0 3px var(--accent-glow), 0 14px 28px color-mix(in srgb, var(--accent-strong) 22%, transparent);
   --shadow-selected: inset 0 0 0 1px var(--accent);
-  /* Breiten: Seitenbreiten, linke Spalte und Seitenrand. Sie gehören zum
-     Layout und werden vom Wächter-Test bewusst nicht geprüft. */
+  /* Breiten und Höhen: Seitenbreiten, linke Spalte, Seitenrand und die
+     Mindesthöhen fensterfüllender Seiten. Sie gehören zum Layout und werden
+     vom Wächter-Test bewusst nicht geprüft. */
   --width-shell: 1368px;
   --width-shell-wide: 1780px;
   --width-shell-max: 2240px;
@@ -118,6 +120,8 @@
   --width-sidebar: 220px;
   --gutter: 32px;
   --gutter-narrow: 22px;
+  --height-fill-min: 36rem;
+  --height-chat-log-min: 10rem;
 }
 
 * {
@@ -141,12 +145,60 @@ textarea {
   font: inherit;
 }
 
+/* Das hidden-Attribut verbirgt ein Element nur über die eingebaute Regel des
+   Browsers, und die verliert gegen jede eigene display-Angabe: ein Dock mit
+   display: grid stünde trotz hidden da. Diese Regel gibt dem Attribut den
+   Vorrang zurück, für jedes Element. */
+[hidden] {
+  display: none !important;
+}
+
 /* Breiter als die Kartenspalte, weil links das Menü mitläuft: 220 + 28 Gap
    lassen den Karten wieder rund 1120px. */
 .shell {
   width: min(var(--width-shell), calc(100% - var(--gutter)));
   margin: 0 auto;
   padding: var(--space-page) 0;
+}
+
+/* Umschalter für Seiten mit genau einer Karte, die das Fenster füllt — die
+   Sitzung im Chat. Die Höhe wird nicht gerechnet, sondern verteilt: die Seite
+   ist so hoch wie das Fenster, Kopf, Kartenkopf und Formular behalten ihre
+   Höhe, und was übrig bleibt, bekommt das Element mit .fill-grow. Ein fester
+   Anteil der Fensterhöhe zählte den Kopf nicht mit, und der bricht je nach
+   Pfadlänge in eine oder zwei Zeilen um. Unter --height-fill-min wird nicht
+   weiter gestaucht; die Seite scrollt dann wie jede andere. */
+.shell.fill {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: var(--height-fill-min);
+}
+
+.shell.fill > .layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.shell.fill .blocks {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.shell.fill .blocks > .card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.shell.fill .fill-grow {
+  flex: 1;
+  max-height: none;
 }
 
 /* Umschalter für Seiten, deren rechte Spalte breite Inhalte trägt — gerenderte
@@ -307,6 +359,12 @@ textarea {
 @media (max-width: 1080px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Die Spalte steht jetzt als eigene Zeile über der Karte; sie behält ihre
+     Höhe, die Karte bekommt den Rest. */
+  .shell.fill > .layout {
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
@@ -1359,11 +1417,14 @@ button.attention-highlight {
   text-decoration: underline;
 }
 
+/* Die Höhe des Verlaufs verteilt .shell.fill: er bekommt, was Kopf, Formular
+   und Docks übrig lassen. Die Obergrenze gilt nur ohne diesen Umschalter, die
+   Mindesthöhe immer — ein großes Dock drückt den Verlauf nicht auf null. */
 .chat-log {
   display: grid;
   align-content: start;
   gap: var(--space-stack);
-  min-height: 40vh;
+  min-height: var(--height-chat-log-min);
   max-height: 70vh;
   overflow-y: auto;
   border: 1px solid var(--line);
@@ -1373,6 +1434,7 @@ button.attention-highlight {
 }
 
 .chat-message {
+  position: relative;
   display: grid;
   gap: var(--space-4);
   border: 1px solid var(--line);
@@ -1381,10 +1443,17 @@ button.attention-highlight {
   background: var(--card);
 }
 
+/* Über der ersten Zeile einer Antwort steht der Kopf halb im Kasten; sie
+   rückt dafür etwas tiefer. */
+.chat-message.assistant {
+  padding-top: var(--space-7);
+}
+
+/* Die eigene Nachricht hat keinen Kopf; Absender ist die Fläche. */
 .chat-message.user {
   justify-self: end;
   max-width: 80%;
-  border-color: var(--accent);
+  background: var(--own-message-bg);
 }
 
 /* Die vorläufige Blase steht schon da, bevor OpenCode die Nachricht bestätigt
@@ -1398,8 +1467,20 @@ button.attention-highlight {
   color: var(--muted);
 }
 
+/* Der Kopf einer Antwort sitzt auf der oberen Rahmenlinie wie eine Legende und
+   nimmt im Kasten keine eigene Zeile ein. Seine Fläche ist die des Kastens; sie
+   unterbricht die Linie, soweit der Text reicht. */
 .chat-message-head {
+  position: absolute;
+  top: 0;
+  left: var(--space-6);
   margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--muted);
+  background: var(--card);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  transform: translateY(-50%);
 }
 
 .chat-text {
@@ -1532,6 +1613,12 @@ button.attention-highlight {
   display: grid;
   gap: var(--space-stack);
   margin-top: var(--space-stack);
+}
+
+/* Die Meldungszeile unter dem Formular ist meist leer; leer trägt sie keinen
+   Abstand, sonst stünde unter den Knöpfen ein Streifen ohne Inhalt. */
+.chat-form ~ .message:empty {
+  margin-top: 0;
 }
 
 .chat-input {

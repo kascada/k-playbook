@@ -3,41 +3,13 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>k-playbook</title>
+    <title>{{.Title}} - k-playbook</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body data-mode="{{.Mode}}">
     <main class="shell">
-      <section class="hero app-header">
-        <div class="brand-row">
-          <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
-          <h1>k-playbook</h1>
-          <span class="version-badge" title="Version des k-playbook-Binarys, das diesen Dienst bereitstellt. Die Installation daneben kann einen anderen Stand tragen.">{{.Version}}</span>
-        </div>
-        <div class="hero-subrow">
-          <p class="eyebrow path">
-            <span class="path-entry">
-              <span class="path-key">{{.ModeLabel}}:</span>
-              <span id="header-project">{{if .Path}}{{.Path}}{{end}}</span>
-            </span>
-            <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
-              <span class="path-key">Repository:</span>
-              <span id="header-repo-root">{{.RepoRoot}}</span>
-            </span>
-            <span id="header-playbook" class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
-                  title="Hieraus kommen Skripte, Regeln, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
-              <span class="path-key">Installation:</span>
-              <span id="header-playbook-path">{{.PlaybookDir}}</span>
-            </span>
-          </p>
-          <div class="hero-actions">
-            <button id="update" class="secondary">Update prüfen</button>
-            <button id="shutdown" class="secondary danger"
-                    title="Beendet den Hintergrunddienst dieses Projekts, für alle Fenster.">Dienst beenden</button>
-          </div>
-        </div>
-      </section>
+{{template "hero" .}}
 
       <div class="layout">
 {{template "sidebar" .}}
@@ -215,24 +187,11 @@
         </div>
       </div>
 
-      <!-- Sperrfläche, wenn der Dienst weg ist: beendet aus diesem oder einem
-           anderen Fenster, per k-playbook stop, nach einem Update oder im
-           Leerlauf. Kein Sackgassen-Text: erst „Erneut verbinden", und erst
-           wenn das scheitert, der Weg über das Terminal. -->
-      <div id="closed" class="closed hidden">
-        <div class="card">
-          <p class="eyebrow">k-playbook</p>
-          <h2 id="closed-title">Der Dienst ist beendet, für alle Fenster dieses Projekts.</h2>
-          <p id="closed-message" class="message hidden"></p>
-          <div class="closed-actions">
-            <button id="closed-reconnect" class="secondary">Erneut verbinden</button>
-          </div>
-          <p id="closed-hint" class="message hidden">Der Dienst antwortet nicht. Im Terminal <code>k-playbook</code> aufrufen: das startet ihn neu und öffnet die Oberfläche unter neuer Adresse.</p>
-        </div>
-      </div>
+{{template "closed" .}}
     </main>
     <script src="/static/session.js"></script>
     <script src="/static/nav.js"></script>
+    <script src="/static/service.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

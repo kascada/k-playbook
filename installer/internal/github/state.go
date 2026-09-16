@@ -22,7 +22,7 @@ const (
 	StateDisabled State = "disabled"
 	// StateUndecided: tools.gh.status steht auf unknown. Ausdrücklicher
 	// Zustand, kein stillschweigendes Nein — die Entscheidung fällt auf der
-	// Startseite.
+	// Setup-Seite.
 	StateUndecided State = "undecided"
 	// StateNotInstalled: gh liegt nicht im PATH.
 	StateNotInstalled State = "not-installed"
@@ -39,12 +39,23 @@ const (
 	// StateNoAccess: 403 oder 404 auf das Repo — kein Zugriff, oder es gibt es
 	// unter diesem Namen nicht.
 	StateNoAccess State = "no-access"
+	// StateLogGone: der Lauf ist abrufbar, sein Log-Archiv nicht mehr. GitHub
+	// verwirft Logs nach der Aufbewahrungsfrist; gh meldet dann HTTP 410 auf
+	// das Archiv. Eigener Zustand: ohne ihn erschien das als roher Fehler, und
+	// „log not found" wurde über „not found" zu StateNoAccess — zu einem
+	// fehlenden Recht, das es nicht ist.
+	StateLogGone State = "log-gone"
 	// StateRateLimited: das Kontingent der API ist aufgebraucht.
 	StateRateLimited State = "rate-limited"
 	// StateNetwork: kein Netz, DNS- oder TLS-Fehler.
 	StateNetwork State = "network"
-	// StateTimeout: die Frist ist abgelaufen.
+	// StateTimeout: die Frist ist abgelaufen — die eines Aufrufs oder das
+	// Budget der ganzen Anfrage. Erkannt am Kontext, nicht am Fehlertext.
 	StateTimeout State = "timeout"
+	// StateCanceled: der Aufrufer hat die Anfrage abgebrochen, meist der
+	// Browser, der die Seite verlassen hat. Kein Zeitfehler und kein Fehler von
+	// gh; die Oberfläche beantwortet eine solche Anfrage gar nicht mehr.
+	StateCanceled State = "canceled"
 	// StateError: alles Übrige. Der Text sagt, was gh gemeldet hat, gekürzt
 	// auf die erste Zeile.
 	StateError State = "error"
@@ -61,16 +72,18 @@ type Result struct {
 // ist erklärt statt leer — das ist die Zusage der Ansicht.
 var stateMessages = map[State]string{
 	StateNoProject:      "Keine K-PLAYBOOK.yaml gefunden. Ohne Projekt gibt es kein Repo, dessen Stand hier stehen könnte.",
-	StateDisabled:       "Dieses Projekt nutzt gh nicht (tools.gh.status: disabled). Die Entscheidung steht auf der Startseite im Block „GitHub CLI\".",
-	StateUndecided:      "Für dieses Projekt ist noch nicht entschieden, ob gh genutzt wird (tools.gh.status: unknown). Die Entscheidung steht auf der Startseite im Block „GitHub CLI\".",
+	StateDisabled:       "Dieses Projekt nutzt gh nicht (tools.gh.status: disabled). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
+	StateUndecided:      "Für dieses Projekt ist noch nicht entschieden, ob gh genutzt wird (tools.gh.status: unknown). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
 	StateNotInstalled:   "gh liegt nicht im PATH. Ohne das Binary kann diese Seite nichts abfragen.",
 	StateNotLoggedIn:    "gh ist installiert, aber kein Konto hinterlegt. Anmelden im Terminal mit „gh auth login\".",
 	StateBadCredentials: "gh ist angemeldet, die API weist den Token aber ab (401). Er ist abgelaufen oder zurückgezogen; im Terminal mit „gh auth login\" neu anmelden.",
 	StateNoRemote:       "Kein GitHub-Remote gefunden. Diese Seite zeigt den Stand des Repos, zu dem das Arbeitsverzeichnis gehört.",
 	StateNoAccess:       "Kein Zugriff auf das Repo (403 oder 404). Entweder fehlt dem angemeldeten Konto das Recht, oder es gibt das Repo unter diesem Namen nicht.",
+	StateLogGone:        "Das Log dieses Laufs liegt bei GitHub nicht mehr vor. Der Lauf selbst ist abrufbar, sein Log-Archiv aber verworfen — nach Ablauf der Aufbewahrungsfrist (standardmäßig 90 Tage) oder weil die Logs gelöscht wurden. Das Ergebnis des Laufs steht weiter auf github.com.",
 	StateRateLimited:    "Das API-Kontingent von GitHub ist aufgebraucht. Später erneut laden.",
 	StateNetwork:        "GitHub war nicht erreichbar. Netzverbindung prüfen.",
 	StateTimeout:        "Die Abfrage hat zu lange gedauert und wurde abgebrochen.",
+	StateCanceled:       "Die Anfrage wurde abgebrochen, bevor gh geantwortet hat.",
 	StateError:          "Die Abfrage ist fehlgeschlagen.",
 }
 
@@ -95,6 +108,12 @@ func Classify(err error) Result {
 	if err == nil {
 		return Result{State: StateOK}
 	}
+	// Zuerst der Kontext: was gh vorher auf stderr geschrieben hat, ändert
+	// nichts daran, dass die Frist abgelaufen oder die Anfrage abgebrochen ist.
+	// Client.run hängt die Ursache an den Fehler.
+	if errors.Is(err, context.Canceled) {
+		return Fail(StateCanceled)
+	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return Fail(StateTimeout)
 	}
@@ -105,13 +124,14 @@ func Classify(err error) Result {
 	switch {
 	case strings.Contains(lower, "executable file not found"), strings.Contains(lower, "exec: \"gh\""):
 		return Fail(StateNotInstalled)
-	case strings.Contains(lower, "signal: killed"), strings.Contains(lower, "context deadline exceeded"):
-		return Fail(StateTimeout)
 	case strings.Contains(lower, "bad credentials"), strings.Contains(lower, "http 401"):
 		return Fail(StateBadCredentials)
 	case strings.Contains(lower, "gh auth login"), strings.Contains(lower, "not logged into"), strings.Contains(lower, "no git remotes found"), strings.Contains(lower, "authentication token not found"):
 		return authOrRemote(lower)
-	case strings.Contains(lower, "api rate limit exceeded"), strings.Contains(lower, "secondary rate limit"), strings.Contains(lower, "was submitted too quickly"):
+	// Zwei Wortlaute sind belegt: „API rate limit exceeded" und „API rate limit
+	// already exceeded".
+	case strings.Contains(lower, "api rate limit exceeded"), strings.Contains(lower, "api rate limit already exceeded"),
+		strings.Contains(lower, "secondary rate limit"), strings.Contains(lower, "was submitted too quickly"):
 		return Fail(StateRateLimited)
 	case strings.Contains(lower, "http 403"), strings.Contains(lower, "must have admin rights"), strings.Contains(lower, "resource not accessible"):
 		return Fail(StateNoAccess)
@@ -160,6 +180,9 @@ func firstLine(text string) string {
 		// gh setzt seine Fehlerzeilen mit einem Kreuz voran; das gehört nicht
 		// in die Oberfläche.
 		line = strings.TrimSpace(strings.TrimPrefix(line, "X"))
+		// `gh api` stellt seinen Meldungen „gh: " voran; in einem Satz, der mit
+		// „gh meldet:" beginnt, stünde es doppelt.
+		line = strings.TrimSpace(strings.TrimPrefix(line, "gh: "))
 		if line != "" {
 			return line
 		}

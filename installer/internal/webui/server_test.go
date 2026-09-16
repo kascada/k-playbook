@@ -67,6 +67,7 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		fileIndex bool
 	}{
 		{path: "/", markiert: `<a class="area-nav-item active" href="/" aria-current="page">`},
+		{path: "/setup", markiert: `<a class="area-nav-item active" href="/setup" aria-current="page">`},
 		{path: "/workflows", markiert: `<a class="area-nav-item active" href="/workflows" aria-current="page">`},
 		// Die drei Seiten des Bereichs: Workflows ist aktiv, seine Übersicht
 		// ist aber nicht offen — offen ist der Unterpunkt.
@@ -92,7 +93,7 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// dessen Übersicht.
 		{path: "/chat/ses_abc123", markiert: `<a class="area-nav-item active" href="/chat" aria-current="true">`},
 		// /github ist ein eigener Bereich: seine Karten fragen als einzige
-		// der Oberfläche über das Netz, und das darf weder die Startseite
+		// der Oberfläche über das Netz, und das darf weder die Statusseite
 		// noch das Menü auslösen.
 		{path: "/github", markiert: `<a class="area-nav-item active" href="/github" aria-current="page">`},
 		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
@@ -100,16 +101,16 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
 		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
-		// Blockmenü wie die Startseite.
+		// Blockmenü wie die Setup-Seite.
 		{path: "/inventory", markiert: `<a class="area-nav-item active" href="/inventory" aria-current="page">`},
 		// /mcp ist die Detailseite des Setup-Blocks: der Bereich ist aktiv,
-		// die Startseite darunter ist aber nicht offen.
-		{path: "/mcp", markiert: `<a class="area-nav-item active" href="/" aria-current="true">`},
+		// die Setup-Seite darunter ist aber nicht offen.
+		{path: "/mcp", markiert: `<a class="area-nav-item active" href="/setup" aria-current="true">`},
 		// /mcp-servers ist der Unterpunkt von Setup: der Bereich ist aktiv, der
 		// Unterpunkt ist die offene Seite.
 		{
 			path:       "/mcp-servers",
-			markiert:   `<a class="area-nav-item active" href="/" aria-current="true">`,
+			markiert:   `<a class="area-nav-item active" href="/setup" aria-current="true">`,
 			unterpunkt: `<a class="area-nav-subitem active" href="/mcp-servers" aria-current="page">`,
 		},
 	}
@@ -211,7 +212,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
+	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -235,11 +236,12 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 }
 
 // Ohne Konfiguration führt der Umschalter nur nach Setup: Workflows und Docs
-// hätten dort nichts zu zeigen.
+// hätten dort nichts zu zeigen. Er steht dort, wo man ohne Konfiguration
+// landet — auf /setup, denn / leitet dorthin um.
 func TestUmschalterOhneInstallation(t *testing.T) {
 	chdir(t, t.TempDir())
 
-	status, body := getPage(t, "/")
+	status, body := getPage(t, "/setup")
 	if status != http.StatusOK {
 		t.Fatalf("Status = %d, erwartet %d", status, http.StatusOK)
 	}
@@ -251,10 +253,158 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 			t.Errorf("der Umschalter führt nach %s, obwohl nichts eingerichtet ist", ziel)
 		}
 	}
+	// Status führte auf eine sofortige Umleitung und fehlt deshalb.
+	if strings.Contains(body, `href="/"`) {
+		t.Error("der Umschalter führt nach /, obwohl nichts eingerichtet ist")
+	}
 	// Die Unterpunkte hängen an demselben Zweig und dürfen ihn nicht überleben.
 	if strings.Contains(body, `class="area-nav-subitem`) {
 		t.Error("der Umschalter zeigt Unterpunkte, obwohl nichts eingerichtet ist")
 	}
+}
+
+// Ohne Projektkonfiguration leitet / in die Einrichtung um; mit ihr zeigt /
+// die Statusseite. Ein unbekannter Pfad bleibt in beiden Fällen 404: GET / ist
+// das Auffangmuster, und die Umleitung darf keinen Tippfehler nach /setup
+// schicken.
+func TestStartseiteLeitetOhneKonfigurationUm(t *testing.T) {
+	get := func(path string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		routes(&serverState{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		return recorder
+	}
+
+	t.Run("ohne Konfiguration", func(t *testing.T) {
+		chdir(t, t.TempDir())
+
+		recorder := get("/")
+		if recorder.Code != http.StatusFound {
+			t.Fatalf("Status = %d, erwartet %d", recorder.Code, http.StatusFound)
+		}
+		if location := recorder.Header().Get("Location"); location != "/setup" {
+			t.Errorf("Location = %q, erwartet /setup", location)
+		}
+		if code := get("/gibtesnicht").Code; code != http.StatusNotFound {
+			t.Errorf("unbekannter Pfad: Status = %d, erwartet %d", code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("mit Konfiguration", func(t *testing.T) {
+		root := t.TempDir()
+		if err := project.CreateConfig(root, "."); err != nil {
+			t.Fatalf("Konfiguration anlegen: %v", err)
+		}
+		chdir(t, root)
+
+		recorder := get("/")
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("Status = %d, erwartet %d", recorder.Code, http.StatusOK)
+		}
+		body := recorder.Body.String()
+		for _, want := range []string{
+			`id="status-card"`,
+			"Statusfeld (hier werden in Kürze die wichtigsten Werte angezeigt)",
+			`<p id="status-message" class="message hidden"></p>`,
+			`id="closed"`,
+			`/static/service.js`,
+			// Das Bild der Wissensablage: zuunterst, aufgeklappt, mit Verweis
+			// in die Doku.
+			`id="knowledge-picture-card"`,
+			`<details id="knowledge-picture-fold" open>`,
+			`href="/docs?file=knowledge-storage.md"`,
+			`/static/docview.js`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("die Statusseite enthält %q nicht", want)
+			}
+		}
+		if code := get("/gibtesnicht").Code; code != http.StatusNotFound {
+			t.Errorf("unbekannter Pfad: Status = %d, erwartet %d", code, http.StatusNotFound)
+		}
+	})
+}
+
+// Die drei Workflow-Karten stehen als ein Fragment auf /workflows und auf der
+// Statusseite, jede Karte genau einmal. Die Zahlen holt auf beiden Seiten
+// workflows.js; die Einführung „Was Workflows sind" bleibt auf /workflows.
+func TestWorkflowKartenAufBeidenSeiten(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	chdir(t, root)
+
+	for path, einfuehrung := range map[string]bool{"/": false, "/workflows": true} {
+		t.Run(path, func(t *testing.T) {
+			status, body := getPage(t, path)
+			if status != http.StatusOK {
+				t.Fatalf("Status = %d, erwartet %d", status, http.StatusOK)
+			}
+			for _, id := range []string{`id="tasks-card"`, `id="reviews-card"`, `id="todos-card"`} {
+				if count := strings.Count(body, id); count != 1 {
+					t.Errorf("%s kommt %d-mal vor, erwartet genau 1", id, count)
+				}
+			}
+			if count := strings.Count(body, `/static/workflows.js"`); count != 1 {
+				t.Errorf("workflows.js wird %d-mal geladen, erwartet genau 1", count)
+			}
+			if got := strings.Contains(body, `id="workflows-intro-card"`); got != einfuehrung {
+				t.Errorf("Einführungskarte vorhanden = %v, erwartet %v", got, einfuehrung)
+			}
+		})
+	}
+}
+
+// Die Knöpfe für Update und Dienst stehen im gemeinsamen Kopf, aber nur dort,
+// wo service.js sie bedient: auf der Statusseite und auf /setup, solange keine
+// Projektkonfiguration besteht. Auf jeder anderen Seite wären sie tot. Die
+// Sperrfläche tragen Statusseite und /setup immer — sie ist der Weg beider
+// Seiten beim Serververlust.
+func TestKnoepfeImKopf(t *testing.T) {
+	type fall struct {
+		path    string
+		knoepfe bool
+		sperre  bool
+	}
+	pruefe := func(t *testing.T, faelle []fall) {
+		for _, test := range faelle {
+			status, body := getPage(t, test.path)
+			if status != http.StatusOK {
+				t.Fatalf("%s: Status = %d, erwartet %d", test.path, status, http.StatusOK)
+			}
+			for _, id := range []string{`id="shutdown"`, `id="update"`} {
+				if got := strings.Contains(body, id); got != test.knoepfe {
+					t.Errorf("%s: %s vorhanden = %v, erwartet %v", test.path, id, got, test.knoepfe)
+				}
+			}
+			if got := strings.Contains(body, `id="closed"`); got != test.sperre {
+				t.Errorf("%s: Sperrfläche vorhanden = %v, erwartet %v", test.path, got, test.sperre)
+			}
+		}
+	}
+
+	t.Run("ohne Konfiguration", func(t *testing.T) {
+		chdir(t, t.TempDir())
+		pruefe(t, []fall{
+			{path: "/setup", knoepfe: true, sperre: true},
+			{path: "/workflows"},
+			{path: "/docs"},
+		})
+	})
+
+	t.Run("mit Konfiguration", func(t *testing.T) {
+		root := t.TempDir()
+		if err := project.CreateConfig(root, "."); err != nil {
+			t.Fatalf("Konfiguration anlegen: %v", err)
+		}
+		chdir(t, root)
+		pruefe(t, []fall{
+			{path: "/", knoepfe: true, sperre: true},
+			{path: "/setup", sperre: true},
+			{path: "/workflows"},
+			{path: "/mcp"},
+		})
+	})
 }
 
 // /api/health nennt Schlüssel, Version und PID: daran erkennt ein CLI-Aufruf

@@ -643,9 +643,10 @@ func TestChatCommandStateOhneEintrag(t *testing.T) {
 	}
 }
 
-// Die Ablage wird begrenzt, aber ein ungelesener Fehler wird dabei nie
-// verdrängt: sonst antwortete command-state unknown und die Seite bliebe auf
-// „Arbeitet" stehen — genau der Zustand, gegen den der Rückweg gebaut ist.
+// Die Ablage wird begrenzt, aber weder ein ungelesener Fehler noch ein
+// laufender Aufruf wird dabei verdrängt: sonst antwortete command-state
+// unknown und die Seite bliebe auf „Arbeitet" stehen — genau der Zustand, gegen
+// den der Rückweg gebaut ist.
 func TestChatCommandStateHaeltUngeleseneFehler(t *testing.T) {
 	chatProject(t)
 	fakeOpenCode(t, func(w http.ResponseWriter, r *http.Request) {
@@ -653,22 +654,107 @@ func TestChatCommandStateHaeltUngeleseneFehler(t *testing.T) {
 	})
 
 	state := &serverState{}
-	state.noteCommandFinished("ses_fehler", "Modell nicht erreichbar")
+	state.noteCommandRunning("ses_fehler", "msg_fehler")
+	state.noteCommandFinished("ses_fehler", "msg_fehler", "Modell nicht erreichbar")
+	// Der laufende steht vor allen fertigen in der Ablage und wäre ohne den
+	// Schutz der älteste, also der erste Kandidat für die Verdrängung.
+	state.noteCommandRunning("ses_laeuft", "msg_laeuft")
 	for i := 0; i < chatCommandStateLimit*2; i++ {
-		state.noteCommandFinished(fmt.Sprintf("ses_fertig%d", i), "")
+		id := fmt.Sprintf("ses_fertig%d", i)
+		state.noteCommandRunning(id, "msg_fertig")
+		state.noteCommandFinished(id, "msg_fertig", "")
 	}
 	if len(state.commandRuns) > chatCommandStateLimit {
 		t.Errorf("Ablage = %d Einträge, erwartet höchstens %d", len(state.commandRuns), chatCommandStateLimit)
 	}
 
-	recorder := serveChatState(t, state, http.MethodGet, "/api/chat/sessions/ses_fehler/command-state", "")
+	if response := readCommandState(t, state, "ses_fehler"); response.State != "failed" || !strings.Contains(response.Message, "Modell nicht erreichbar") {
+		t.Errorf("Antwort = %+v, erwartet den ungelesenen Fehler", response)
+	}
+	if response := readCommandState(t, state, "ses_laeuft"); response.State != "running" {
+		t.Errorf("Antwort = %+v, erwartet den laufenden Aufruf", response)
+	}
+}
+
+// readCommandState holt command-state einer Sitzung über die Route.
+func readCommandState(t *testing.T, state *serverState, sessionID string) chatCommandStateResponse {
+	t.Helper()
+	recorder := serveChatState(t, state, http.MethodGet, "/api/chat/sessions/"+sessionID+"/command-state", "")
 	var response chatCommandStateResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Antwort nicht lesbar: %v", err)
 	}
-	if response.State != "failed" || !strings.Contains(response.Message, "Modell nicht erreichbar") {
-		t.Errorf("Antwort = %+v, erwartet den ungelesenen Fehler", response)
-	}
+	return response
+}
+
+// Zwei Commands derselben Sitzung laufen nebeneinander. Das Ende des einen
+// darf weder den Fehler des anderen überschreiben noch den anderen, der noch
+// läuft, als fertig melden. Geprüft wird die Ablage direkt, ohne auf
+// abgekoppelte Aufrufe zu warten.
+func TestChatCommandStateMehrereAufrufe(t *testing.T) {
+	t.Run("späteres Ende überschreibt keinen Fehler", func(t *testing.T) {
+		state := &serverState{}
+		state.noteCommandRunning("ses_abc123", "msg_cmd1")
+		state.noteCommandRunning("ses_abc123", "msg_cmd2")
+		state.noteCommandFinished("ses_abc123", "msg_cmd2", "cmd2 gescheitert")
+		state.noteCommandFinished("ses_abc123", "msg_cmd1", "")
+
+		response := state.commandState("ses_abc123")
+		if response.State != "failed" || response.Message != "cmd2 gescheitert" {
+			t.Errorf("Antwort = %+v, erwartet failed mit der Meldung von /cmd2", response)
+		}
+		if response := state.commandState("ses_abc123"); response.State != "done" {
+			t.Errorf("nach dem Lesen = %+v, erwartet done", response)
+		}
+	})
+
+	t.Run("Ende des einen lässt den anderen laufen", func(t *testing.T) {
+		state := &serverState{}
+		state.noteCommandRunning("ses_abc123", "msg_cmd1")
+		state.noteCommandRunning("ses_abc123", "msg_cmd2")
+		state.noteCommandFinished("ses_abc123", "msg_cmd1", "")
+
+		if response := state.commandState("ses_abc123"); response.State != "running" {
+			t.Errorf("Antwort = %+v, erwartet running — /cmd2 läuft noch", response)
+		}
+		state.noteCommandFinished("ses_abc123", "msg_cmd2", "")
+		if response := state.commandState("ses_abc123"); response.State != "done" {
+			t.Errorf("Antwort = %+v, erwartet done", response)
+		}
+	})
+
+	t.Run("gelesener Fehler bei laufendem Aufruf", func(t *testing.T) {
+		state := &serverState{}
+		state.noteCommandRunning("ses_abc123", "msg_cmd1")
+		state.noteCommandRunning("ses_abc123", "msg_cmd2")
+		state.noteCommandFinished("ses_abc123", "msg_cmd2", "cmd2 gescheitert")
+
+		if response := state.commandState("ses_abc123"); response.State != "failed" {
+			t.Fatalf("Antwort = %+v, erwartet failed", response)
+		}
+		if response := state.commandState("ses_abc123"); response.State != "running" || response.Message != "" {
+			t.Errorf("nach dem Lesen = %+v, erwartet running ohne Meldung", response)
+		}
+		state.noteCommandFinished("ses_abc123", "msg_cmd1", "")
+		if response := state.commandState("ses_abc123"); response.State != "done" {
+			t.Errorf("nach dem Ende = %+v, erwartet done", response)
+		}
+	})
+
+	t.Run("zweiter Fehler lässt den ersten stehen", func(t *testing.T) {
+		state := &serverState{}
+		state.noteCommandRunning("ses_abc123", "msg_cmd1")
+		state.noteCommandRunning("ses_abc123", "msg_cmd2")
+		state.noteCommandFinished("ses_abc123", "msg_cmd1", "erster Fehler")
+		state.noteCommandFinished("ses_abc123", "msg_cmd2", "zweiter Fehler")
+
+		if response := state.commandState("ses_abc123"); response.State != "failed" || response.Message != "erster Fehler" {
+			t.Errorf("Antwort = %+v, erwartet den ersten Fehler", response)
+		}
+		if response := state.commandState("ses_abc123"); response.State != "done" {
+			t.Errorf("nach dem Lesen = %+v, erwartet done", response)
+		}
+	})
 }
 
 // Der abgekoppelte Aufruf endet mit dem Server. Gemeint ist allein die

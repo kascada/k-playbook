@@ -221,7 +221,7 @@ type mcpToolParameter struct {
 
 // mcpToolsHandler misst, was der Server anbietet. Er ist ein eigener Endpunkt
 // und nicht Teil von GET /api/mcp: er startet einen Subprozess und würde die
-// Startseite ausbremsen.
+// Setup-Seite ausbremsen.
 func mcpToolsHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {

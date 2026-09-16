@@ -1,8 +1,11 @@
 package webui
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/github"
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -15,9 +18,52 @@ import (
 // Je Karte ein eigener Endpunkt. Der Grund ist derselbe wie bei
 // /api/mcp/tools: dahinter steht ein Subprozess mit Netzzugriff, und eine
 // langsame Abfrage soll die übrigen Karten nicht aufhalten. Ausgelöst werden
-// sie allein von der Seite /github — weder die Startseite noch das Menü
+// sie allein von der Seite /github — weder die Statusseite noch das Menü
 // fragen sie. Einen Cache gibt es nicht; wie überall in der Oberfläche liest
 // jede Anfrage neu.
+
+// githubBudgets ist die zugesagte Frist je Endpunkt: nach ihr ist die Anfrage
+// beendet, egal wie viele Subprozesse sie dafür startet. Die Frist je
+// Subprozess allein reichte nicht — die Kopfzeile ruft sieben nacheinander auf,
+// und jeder hätte seine eigenen 20 s bekommen.
+//
+// Das Budget steht hier und nicht im Paket github: es ist eine Zusage an die
+// HTTP-Anfrage, und nur der Handler hat deren Kontext. Die Fetch-Funktionen
+// nehmen jeden Kontext und bleiben von der Oberfläche unabhängig; jeder andere
+// Aufrufer setzt seine eigene Frist. Die Werte selbst sind die dokumentierten
+// Fristen des Pakets, damit Doku, Paket und Endpunkt dieselbe Zahl nennen.
+//
+// Eine Variable, keine Konstante — wie mcpProbeTimeout: nur so kann ein Test
+// den Weg über die abgelaufene Frist gehen, ohne 20 s zu warten.
+var githubBudgets = struct {
+	Overview time.Duration
+	Pulls    time.Duration
+	Runs     time.Duration
+	Failure  time.Duration
+}{
+	Overview: github.DefaultTimeout,
+	Pulls:    github.DefaultTimeout,
+	Runs:     github.DefaultTimeout,
+	Failure:  github.LogTimeout,
+}
+
+// newGitHubClient baut den Client, nachdem die Vorprüfung durch ist. Die
+// einzige Naht für Handler-Tests: sie setzen einen Runner ein, der blockiert
+// oder langsam antwortet, und prüfen die Frist am Endpunkt.
+var newGitHubClient = github.NewClient
+
+// writeGitHubJSON schreibt die Antwort eines Endpunkts — außer, der Browser
+// hat die Anfrage abgebrochen. Dann hört niemand mehr zu, und die Antwort
+// trüge ohnehin keinen Stand, sondern nur den Abbruch. Still heißt hier: keine
+// Antwort und kein Eintrag im Log; ein geschlossener Tab ist kein Fehler.
+// Geprüft wird der Kontext der Anfrage selbst, nicht der abgeleitete: dessen
+// abgelaufenes Budget ist ein Zeitfehler und wird beantwortet.
+func writeGitHubJSON(w http.ResponseWriter, r *http.Request, payload any) {
+	if errors.Is(r.Context().Err(), context.Canceled) {
+		return
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
 
 // githubClient prüft die Voraussetzungen und liefert den Client dazu.
 //
@@ -61,7 +107,7 @@ func githubClient() (*github.Client, github.Result, bool) {
 	if config, err := project.ReadConfig(environment.ProjectDir); err == nil {
 		dir = project.RepoRootDir(environment.ProjectDir, config)
 	}
-	return github.NewClient(dir), github.Result{State: github.StateOK}, true
+	return newGitHubClient(dir), github.Result{State: github.StateOK}, true
 }
 
 // githubOverviewHandler ist die Kopfzeile: Repo, Konto, Recht, CI-Stand des
@@ -72,7 +118,9 @@ func githubOverviewHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, github.Overview{Result: result})
 		return
 	}
-	writeJSON(w, http.StatusOK, client.FetchOverview(r.Context()))
+	ctx, cancel := context.WithTimeout(r.Context(), githubBudgets.Overview)
+	defer cancel()
+	writeGitHubJSON(w, r, client.FetchOverview(ctx))
 }
 
 // githubPullsHandler ist die PR-Karte: offene oben, die letzten
@@ -90,16 +138,21 @@ func githubPullsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auflösen und Abfrage teilen sich ein Budget: die Frist gilt für den
+	// Endpunkt, nicht je Aufruf.
+	ctx, cancel := context.WithTimeout(r.Context(), githubBudgets.Pulls)
+	defer cancel()
+
 	repo := r.URL.Query().Get("repo")
 	if !github.ValidRepo(repo) {
-		resolved, resolveResult := client.Repo(r.Context())
+		resolved, resolveResult := client.Repo(ctx)
 		if resolveResult.State != github.StateOK {
-			writeJSON(w, http.StatusOK, github.Pulls{Result: resolveResult, Open: []github.PullRequest{}, Closed: []github.PullRequest{}, ClosedLimit: github.ClosedPullRequestLimit})
+			writeGitHubJSON(w, r, github.Pulls{Result: resolveResult, Open: []github.PullRequest{}, Closed: []github.PullRequest{}, ClosedLimit: github.ClosedPullRequestLimit})
 			return
 		}
 		repo = resolved
 	}
-	writeJSON(w, http.StatusOK, client.FetchPulls(r.Context(), repo))
+	writeGitHubJSON(w, r, client.FetchPulls(ctx, repo))
 }
 
 // githubRunsHandler ist die Lauf-Karte: die letzten Läufe mit Branch oder Tag,
@@ -111,7 +164,9 @@ func githubRunsHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, github.Runs{Result: result, Runs: []github.Run{}, Limit: github.RunLimit})
 		return
 	}
-	writeJSON(w, http.StatusOK, client.FetchRuns(r.Context()))
+	ctx, cancel := context.WithTimeout(r.Context(), githubBudgets.Runs)
+	defer cancel()
+	writeGitHubJSON(w, r, client.FetchRuns(ctx))
 }
 
 // githubRunFailureHandler ist die Ursache eines roten Laufs.
@@ -133,5 +188,7 @@ func githubRunFailureHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeJSON(w, http.StatusOK, client.FetchFailure(r.Context(), runID))
+	ctx, cancel := context.WithTimeout(r.Context(), githubBudgets.Failure)
+	defer cancel()
+	writeGitHubJSON(w, r, client.FetchFailure(ctx, runID))
 }

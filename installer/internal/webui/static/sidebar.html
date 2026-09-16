@@ -6,8 +6,13 @@
 
                aria-current unterscheidet zwei Fälle: "page" führt nur der
                Verweis auf die offene Seite, "true" der aktive Bereich, dessen
-               Ziel eine andere Seite ist. Auf /mcp ist Setup aktiv, / ist aber
-               nicht offen — dort wäre "page" eine falsche Auskunft.
+               Ziel eine andere Seite ist. Auf /mcp ist Setup aktiv, /setup ist
+               aber nicht offen — dort wäre "page" eine falsche Auskunft.
+
+               Status steht als erster Eintrag und nur mit Projektkonfiguration:
+               ohne sie leitet / nach /setup, und der Eintrag führte auf eine
+               sofortige Umleitung. Deshalb ein eigener Zweig über Setup, das
+               selbst außerhalb beider Zweige bleibt.
 
                Zwei Bereiche haben mehrere gleichrangige Seiten. Workflows hat
                drei, die als Unterpunkte darunter stehen; Setup hat die
@@ -20,7 +25,10 @@
                Übersicht laden müssen. Ohne Installation gibt es keine
                MCP-Dateien und keinen Unterpunkt, wie bei Workflows. -->
           <nav class="area-nav" aria-label="Bereiche">
-            <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/"{{if eq .Area "setup"}} aria-current="{{if eq .Page "/"}}page{{else}}true{{end}}"{{end}}>Setup</a>
+            {{if .Installed}}
+            <a class="area-nav-item{{if eq .Area "status"}} active{{end}}" href="/"{{if eq .Area "status"}} aria-current="{{if eq .Page "/"}}page{{else}}true{{end}}"{{end}}>Status</a>
+            {{end}}
+            <a class="area-nav-item{{if eq .Area "setup"}} active{{end}}" href="/setup"{{if eq .Area "setup"}} aria-current="{{if eq .Page "/setup"}}page{{else}}true{{end}}"{{end}}>Setup</a>
             {{if .Installed}}
             <a class="area-nav-subitem{{if hasPrefix .Page "/mcp-servers"}} active{{end}}" href="/mcp-servers"{{if eq .Page "/mcp-servers"}} aria-current="page"{{end}}>MCP-Server</a>
             <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="{{if eq .Page "/workflows"}}page{{else}}true{{end}}"{{end}}>Workflows</a>

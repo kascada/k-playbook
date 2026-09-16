@@ -158,7 +158,7 @@ function renderSources(sources) {
     elements.sourcesPill.className = "pill muted";
     elements.sourcesPill.textContent = "Fehlt";
     elements.sourcesMessage.textContent =
-      "Kein Fehler: es gelten die Standardquellen unterhalb der Projektwurzel. Das Einrichten auf der Startseite legt die leere Vorlage an.";
+      "Kein Fehler: es gelten die Standardquellen unterhalb der Projektwurzel. Das Einrichten auf der Setup-Seite legt die leere Vorlage an.";
     return;
   }
 
@@ -299,7 +299,7 @@ function renderFile(data) {
 }
 
 // Legt eine Zeile in einer Faktenliste an. Dieselbe Form wie auf der
-// Startseite; die Seiten teilen sich kein Skript außer session.js und nav.js.
+// Setup-Seite; die Seiten teilen sich kein Skript außer session.js und nav.js.
 function addFact(list, term, detail) {
   const row = document.createElement("div");
   const dt = document.createElement("dt");

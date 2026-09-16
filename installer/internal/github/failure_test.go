@@ -145,3 +145,57 @@ func TestFailureHoltGenauDasLogDiesesLaufs(t *testing.T) {
 		t.Errorf("Aufruf %q", runner.calls[0])
 	}
 }
+
+// Die Meldungen sind an gh 2.46.0 gemessen (Befund
+// github-stand-in-der-oberflaeche.md): ein verworfenes Log an Lauf 23831424363
+// von cli/cli, die Gegenfälle an diesem Repo und an einem, das es nicht gibt.
+func TestFailureTrenntVerworfenesLogVonKennungUndZugriff(t *testing.T) {
+	cases := []struct {
+		name   string
+		stderr string
+		want   State
+	}{
+		{
+			name:   "Log verworfen (410, gemessen)",
+			stderr: "failed to get run log: HTTP 410: Server Error (https://api.github.com/repos/cli/cli/actions/runs/23831424363/logs)\n",
+			want:   StateLogGone,
+		},
+		{
+			name:   "Log nicht gefunden (404 auf das Archiv, Quelltext)",
+			stderr: "failed to get run log: log not found\n",
+			want:   StateLogGone,
+		},
+		{
+			name:   "falsche Kennung (gemessen)",
+			stderr: "failed to get run: HTTP 404: Not Found (https://api.github.com/repos/kascada/k-playbook/actions/runs/1?exclude_pull_requests=true)\n",
+			want:   StateNoAccess,
+		},
+		{
+			name:   "kein Zugriff (gemessen)",
+			stderr: "failed to get run: HTTP 404: Not Found (https://api.github.com/repos/kascada-nonexistent-zz9/nope/actions/runs/35002675449?exclude_pull_requests=true)\n",
+			want:   StateNoAccess,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			runner := &fakeRunner{answers: []fakeAnswer{{prefix: "gh run view", err: ghError(testCase.stderr)}}}
+			failure := runner.client().FetchFailure(context.Background(), 35002675449)
+
+			if failure.State != testCase.want {
+				t.Fatalf("Zustand %q, erwartet %q (%s)", failure.State, testCase.want, failure.Message)
+			}
+			if failure.Message == "" {
+				t.Error("Zustand ohne Erklärung")
+			}
+			if strings.Contains(failure.Message, "https://") {
+				t.Errorf("Fehlertext von gh roh durchgereicht: %q", failure.Message)
+			}
+			// Weder das verworfene Log noch eine falsche Kennung ist ein
+			// fehlendes Recht. Wo gh beides nicht trennt, sagt der Satz das.
+			if testCase.want == StateNoAccess && !strings.Contains(failure.Message, "Kennung") {
+				t.Errorf("Satz behauptet fehlenden Zugriff, ohne die falsche Kennung zu nennen: %q", failure.Message)
+			}
+		})
+	}
+}

@@ -78,11 +78,41 @@ var (
 func (c *Client) FetchFailure(ctx context.Context, runID int64) Failure {
 	raw, err := c.ghWithTimeout(ctx, LogTimeout, "run", "view", strconv.FormatInt(runID, 10), "--log-failed")
 	if err != nil {
-		return Failure{Result: Classify(err), RunID: runID, Groups: []FailureGroup{}, Lines: []string{}}
+		return Failure{Result: classifyFailure(err), RunID: runID, Groups: []FailureGroup{}, Lines: []string{}}
 	}
 	failure := ParseFailureLog(string(raw))
 	failure.RunID = runID
 	return failure
+}
+
+// classifyFailure ordnet einen gescheiterten `gh run view --log-failed` ein.
+//
+// gh holt zuerst den Lauf und erst danach das Log-Archiv, und die Meldung
+// trägt, woran es gescheitert ist (gemessen an gh 2.46.0):
+//
+//   - `failed to get run log: HTTP 410: …` — der Lauf ist da, das Archiv hat
+//     GitHub verworfen. `failed to get run log: log not found` ist der Zweig
+//     für 404 auf das Archiv (Quelltext, nicht gemessen).
+//   - `failed to get run: HTTP 404: …` — schon der Lauf fehlt. So meldet gh
+//     eine falsche Kennung ebenso wie ein Repo ohne Zugriff; beides lässt sich
+//     an der Meldung nicht trennen.
+//
+// Ohne diese Unterscheidung machte das „not found" in beiden Fällen
+// „Kein Zugriff auf das Repo" daraus.
+func classifyFailure(err error) Result {
+	if contextEnded(err) {
+		return Classify(err)
+	}
+	lower := strings.ToLower(errorText(err))
+	if strings.Contains(lower, "failed to get run log:") &&
+		(strings.Contains(lower, "http 410") || strings.Contains(lower, "log not found")) {
+		return Fail(StateLogGone)
+	}
+	result := Classify(err)
+	if result.State == StateNoAccess && strings.Contains(lower, "failed to get run:") && strings.Contains(lower, "http 404") {
+		result.Message = "Der Lauf ist nicht abrufbar (404). Entweder gibt es unter dieser Kennung keinen Lauf, oder dem angemeldeten Konto fehlt der Zugriff auf das Repo — gh meldet beides gleich."
+	}
+	return result
 }
 
 // ParseFailureLog wertet das Log aus. Eigene Funktion, damit die Gruppierung an

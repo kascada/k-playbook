@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,7 +96,8 @@ fragment pullRequestFields on PullRequest {
 }`
 
 type pullsPayload struct {
-	Data struct {
+	Errors []graphQLError `json:"errors"`
+	Data   struct {
 		Repository struct {
 			DefaultBranchRef struct {
 				Name string `json:"name"`
@@ -165,10 +167,50 @@ func (c *Client) FetchPulls(ctx context.Context, repo string) Pulls {
 		"-F", "closed="+strconv.Itoa(ClosedPullRequestLimit),
 	)
 	if err != nil {
-		result := Classify(err)
+		// Auch ein Teilfehler — ein einzelnes Feld FORBIDDEN, der Rest mit
+		// Daten — endet bei gh mit Exit 1. Die Daten werden bewusst nicht
+		// gezeigt: ein verweigertes Feld sähe in der Karte aus wie ein leeres
+		// („keine Checks", „kein Review"), und das wäre eine Behauptung, die
+		// die Seite nicht belegen kann.
+		result := classifyGraphQL(raw, err)
 		return Pulls{Result: result, Open: []PullRequest{}, Closed: []PullRequest{}, ClosedLimit: ClosedPullRequestLimit}
 	}
 	return ParsePulls(raw)
+}
+
+// graphQLError ist ein Eintrag im Feld `errors` einer GraphQL-Antwort.
+type graphQLError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+// classifyGraphQL ordnet einen gescheiterten `gh api graphql` ein.
+//
+// Der Typ des Fehlers steht nur im Rumpf auf stdout: auf stderr schreibt gh
+// allein die Meldung (`gh: <message>`), den Typ liest es gar nicht. Deshalb
+// zuerst der Rumpf — der Typ hängt nicht am Wortlaut, und vom Rate-Limit sind
+// mindestens zwei Wortlaute bekannt. Was der Typ nicht eindeutig sagt, geht an
+// Classify: FORBIDDEN deckt vom fehlenden Recht am Repo bis zur SAML-Freigabe
+// Verschiedenes ab, und dort sagt die Meldung selbst mehr als ein fester Satz.
+func classifyGraphQL(raw []byte, err error) Result {
+	// Frist und Abbruch stehen am Kontext und gehen jedem Rumpf vor.
+	if contextEnded(err) {
+		return Classify(err)
+	}
+	var body struct {
+		Errors []graphQLError `json:"errors"`
+	}
+	if json.Unmarshal(raw, &body) == nil {
+		for _, entry := range body.Errors {
+			switch entry.Type {
+			case "RATE_LIMITED":
+				return Fail(StateRateLimited)
+			case "NOT_FOUND":
+				return Fail(StateNoAccess)
+			}
+		}
+	}
+	return Classify(err)
 }
 
 // ParsePulls wertet die GraphQL-Antwort aus. Eigene Funktion, damit die Tests
@@ -185,6 +227,22 @@ func ParsePulls(raw []byte) Pulls {
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return Pulls{
 			Result:      Result{State: StateError, Message: Explain(StateError) + " Die Antwort von gh war kein lesbares JSON."},
+			Open:        []PullRequest{},
+			Closed:      []PullRequest{},
+			ClosedLimit: ClosedPullRequestLimit,
+		}
+	}
+
+	// Absicherung: gh endet bei einem Feld `errors` mit Exit 1 und kommt gar
+	// nicht hierher. Kommt eine solche Antwort doch an, wird sie nicht zu
+	// „keine Pull Requests".
+	if len(payload.Errors) > 0 {
+		messages := make([]string, 0, len(payload.Errors))
+		for _, entry := range payload.Errors {
+			messages = append(messages, entry.Message)
+		}
+		return Pulls{
+			Result:      classifyGraphQL(raw, errors.New(strings.Join(messages, "\n"))),
 			Open:        []PullRequest{},
 			Closed:      []PullRequest{},
 			ClosedLimit: ClosedPullRequestLimit,

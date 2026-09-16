@@ -21,9 +21,9 @@ const HEALTH_FAILURES_BEFORE_LOCK = 3;
 let serverAvailable = true;
 let healthFailures = 0;
 
-// Was geschehen soll, wenn der Server nicht mehr antwortet. Die Startseite
-// legt dafür ein eigenes Fenster über die Seite; ohne eigene Behandlung bleibt
-// es beim Sperren.
+// Was geschehen soll, wenn der Server nicht mehr antwortet. Die Statusseite
+// und /setup legen dafür die Sperrfläche aus service.js über die Seite; ohne
+// eigene Behandlung bleibt es beim Sperren.
 let serverLostHandler = () => {};
 
 function startSession(handler) {

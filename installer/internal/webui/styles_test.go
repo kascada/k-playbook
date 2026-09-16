@@ -29,6 +29,8 @@ type styleDeclaration struct {
 	line  int
 	prop  string
 	value string
+	// important merkt das abgetrennte !important; value steht ohne es da.
+	important bool
 }
 
 var (
@@ -152,8 +154,9 @@ func parseStyleDeclaration(chunk string, line int) (styleDeclaration, bool) {
 	}
 	prop := strings.ToLower(strings.TrimSpace(text[:colon]))
 	value := strings.Join(strings.Fields(text[colon+1:]), " ")
+	important := strings.HasSuffix(value, "!important")
 	value = strings.TrimSpace(strings.TrimSuffix(value, "!important"))
-	return styleDeclaration{line: line, prop: prop, value: value}, true
+	return styleDeclaration{line: line, prop: prop, value: value, important: important}, true
 }
 
 func checkStyleDeclaration(d styleDeclaration) []styleViolation {
@@ -454,5 +457,67 @@ func TestLabelGuardFindsButtonShapes(t *testing.T) {
 	got := findLabelShapes(css, styleLabelClasses)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("Beschriftungs-Wächter meldet\n  %s\nerwartet\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+	}
+}
+
+// Das hidden-Attribut verbirgt ein Element nur über die eingebaute Regel des
+// Browsers, und jede eigene display-Angabe schlägt sie: .chat-suggestions mit
+// display: grid stand trotz hidden als leerer Kasten unter dem Eingabefeld.
+// Eine allgemeine Regel gibt dem Attribut den Vorrang zurück; fiele sie weg,
+// stünden solche Elemente wieder unbemerkt da.
+func TestStylesheetHonorsHiddenAttribute(t *testing.T) {
+	raw, err := staticFiles.ReadFile("static/styles.css")
+	if err != nil {
+		t.Fatalf("styles.css nicht eingebettet: %v", err)
+	}
+	if !hasHiddenRule(string(raw)) {
+		t.Errorf("styles.css hat keine Regel [hidden] { display: none !important; }. Ohne sie hebt jede eigene display-Angabe das hidden-Attribut auf (%s)", styleRules)
+	}
+}
+
+// hasHiddenRule sagt, ob eine Regel mit dem Selektor [hidden] display: none
+// mit !important setzt. Ohne !important verlöre sie gegen jede spezifischere
+// Klasse mit eigener display-Angabe.
+func hasHiddenRule(css string) bool {
+	for _, rule := range styleRulesOf(css) {
+		hit := false
+		for _, sel := range strings.Split(rule.selector, ",") {
+			if strings.TrimSpace(sel) == "[hidden]" {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		for _, d := range rule.decls {
+			if d.prop == "display" && d.value == "none" && d.important {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Die Prüfung selbst: sie verlangt !important und den ganzen Selektor.
+func TestHiddenRuleCheck(t *testing.T) {
+	tests := []struct {
+		name string
+		css  string
+		want bool
+	}{
+		{"vorhanden", "[hidden] {\n  display: none !important;\n}\n", true},
+		{"in einer Selektorliste", ".x, [hidden] { display: none !important; }", true},
+		{"ohne !important", "[hidden] { display: none; }", false},
+		{"anderer Wert", "[hidden] { display: block !important; }", false},
+		{"fremder Selektor", ".hidden { display: none !important; }", false},
+		{"fehlt", ".chat-suggestions { display: grid; }", false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := hasHiddenRule(test.css); got != test.want {
+				t.Errorf("hasHiddenRule = %v, erwartet %v", got, test.want)
+			}
+		})
 	}
 }
