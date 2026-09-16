@@ -99,6 +99,9 @@
   --radius-sm: 6px;
   --radius-xs: 4px;
   --radius-round: 999px;
+  /* Der Statuspunkt: im Blockmenü und vor jeder Zustandsmarke gleich groß,
+     damit linke Spalte und Karten dieselbe Sprache sprechen. */
+  --dot-size: 9px;
   /* Schatten: --shadow hebt Flächen ab, --shadow-raised einzelne Elemente wie
      das Logo, --shadow-focus einen Knopf, dessen Aktion fällig ist, und
      --shadow-selected zeichnet den Rahmen einer aktiven Auswahl. */
@@ -273,8 +276,8 @@ textarea {
    etwas fehlt. */
 .block-nav-dot {
   flex-shrink: 0;
-  width: 9px;
-  height: 9px;
+  width: var(--dot-size);
+  height: var(--dot-size);
   border-radius: var(--radius-round);
   background: var(--muted);
 }
@@ -391,16 +394,13 @@ textarea {
   font-size: var(--text-title);
 }
 
-/* Die Version des Binarys steht rechts oben, als Marke und nicht als Text:
-   sie soll auf einen Blick zu finden sein, ohne mit dem Titel zu
-   konkurrieren. */
+/* Die Version des Binarys steht rechts oben als schlichter Text in Mono: auf
+   einen Blick zu finden, ohne mit dem Titel zu konkurrieren. Sie ist nicht
+   anklickbar und trägt deshalb weder Fläche noch Rahmen, siehe
+   installer/docs/architecture.md, Abschnitt „Gestaltung der Oberfläche". */
 .version-badge {
   margin-left: auto;
   align-self: flex-start;
-  padding: var(--space-2) var(--space-5);
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -824,29 +824,38 @@ details[open] > summary.disclosure .disclosure-marker {
   font-size: var(--text-sm);
 }
 
+/* Die Zustandsmarke ist eine Beschriftung, kein Knopf: Punkt und Text in der
+   Zustandsfarbe, ohne Fläche, Rahmen oder Knopfhöhe. Die Zustandsklassen
+   setzen nur die Farbe; der Punkt folgt ihr über currentColor. */
 .pill {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-sm);
-  color: var(--on-accent);
-  background: var(--muted);
+  gap: var(--space-3);
+  color: var(--muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
   white-space: nowrap;
 }
 
+.pill::before {
+  content: "";
+  flex-shrink: 0;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-round);
+  background: currentColor;
+}
+
 .pill.ok {
-  background: var(--accent);
+  color: var(--accent);
 }
 
 .pill.warn {
-  background: var(--warn);
+  color: var(--warn);
 }
 
 .pill.error {
-  background: var(--error);
+  color: var(--error);
 }
 
 .message {
@@ -1466,6 +1475,173 @@ button.attention-highlight {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-stack);
+}
+
+/* GitHub: die Seite /github — Repo und Zugang, Pull Requests, CI-Läufe. Alle
+   Gestaltungswerte kommen aus den Variablen in :root. Die Zustandsmarken sind
+   .pill und tragen damit weder Fläche noch Rahmen; die Beschriftungen daneben
+   (.pr-branches, .pr-meta, .run-ref, .run-meta, .failure-count) stehen in
+   styleLabelClasses und werden vom selben Wächter geprüft. */
+.gh-note {
+  margin: var(--space-6) 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Ein zugeklappter Teil innerhalb einer Karte: die geschlossenen PRs, der Rest
+   einer langen Liste, die Testnamen einer Ursache. Anders als eine
+   Aufklapp-Karte trägt er keine eigene Fläche. */
+.gh-fold {
+  margin-top: var(--space-6);
+}
+
+.gh-fold-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+
+.gh-fold[open] > summary.disclosure {
+  margin-bottom: var(--space-5);
+}
+
+.pr-list,
+.run-list {
+  display: grid;
+  gap: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-inset);
+  background: var(--inset-bg);
+}
+
+.pr-list.empty,
+.run-list.empty {
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+.pr-item,
+.run-item {
+  display: grid;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-5);
+}
+
+.pr-item:last-child,
+.run-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pr-head,
+.run-head,
+.failure-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-5);
+}
+
+.pr-number {
+  flex-shrink: 0;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.pr-title,
+.run-workflow {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+/* Quell-Branch → Ziel-Branch, und daneben Branch oder Tag eines Laufs: reine
+   Beschriftungen. Sie stehen in Mono, damit ein Branchname als Bezeichner
+   lesbar ist, und tragen keine Knopfform. */
+.pr-branches,
+.run-ref {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.pr-meta,
+.run-meta {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+/* Der Einstieg zum Abschreiben. Ein Codeblock, kein Knopf: diese Seite löst
+   nichts aus, Approve und Merge laufen über /k-pr-review im Assistenten. */
+.pr-command {
+  display: inline-block;
+  justify-self: start;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-5);
+  color: var(--accent-strong);
+  background: var(--field-bg);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-x: auto;
+}
+
+/* Kopf und Kennzahlen eines Laufs. Beim roten Lauf ist dieser Block das
+   summary: die Kennzahlen bleiben dadurch auch zugeklappt lesbar. */
+.run-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.run-item[open] > summary.disclosure {
+  margin-bottom: var(--space-2);
+}
+
+.run-failure {
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+/* Eine Ursache: wie viele Tests, und woran sie gescheitert sind. Die Namen
+   selbst stehen zugeklappt darunter — die Karte zeigt zuerst den Grund. */
+.failure-group {
+  margin-top: var(--space-6);
+  border-left: 2px solid var(--error);
+  padding-left: var(--space-6);
+}
+
+.failure-count {
+  flex-shrink: 0;
+  color: var(--error);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  white-space: nowrap;
+}
+
+.failure-message {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.failure-tests {
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Die Breite steht als Zahl: in einer @media-Bedingung gilt var() nicht. */

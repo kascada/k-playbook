@@ -216,6 +216,16 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/reviews", reviewsHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
 	mux.HandleFunc("POST /api/gh", setGHHandler)
+	// Je Karte der Seite /github ein eigener Endpunkt: dahinter steht ein
+	// gh-Subprozess mit Netzzugriff, und eine langsame Abfrage soll die
+	// übrigen Karten nicht aufhalten. Nur lesend, ohne Cache.
+	mux.HandleFunc("GET /api/github/overview", githubOverviewHandler)
+	mux.HandleFunc("GET /api/github/pulls", githubPullsHandler)
+	mux.HandleFunc("GET /api/github/runs", githubRunsHandler)
+	// Das Log eines Laufs ist die teuerste Abfrage und steht deshalb hinter
+	// einem eigenen Endpunkt: geholt wird es erst beim Aufklappen eines roten
+	// Laufs, nie für alle Läufe beim Laden der Seite.
+	mux.HandleFunc("GET /api/github/runs/{id}/failure", githubRunFailureHandler)
 	mux.HandleFunc("GET /api/update", updateCheckHandler)
 	mux.HandleFunc("POST /api/update", state.applyUpdateHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
@@ -261,6 +271,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /workflows/todos", todosPageHandler)
 	mux.HandleFunc("GET /chat", chatPageHandler)
 	mux.HandleFunc("GET /chat/{id}", chatSessionPageHandler)
+	mux.HandleFunc("GET /github", githubPageHandler)
 	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
@@ -340,7 +351,11 @@ const (
 	// docs/knowledge-layout.md. Die Seite zeigt vorerst das Zielbild; die
 	// Zonen selbst listet sie erst, wenn ein /api/knowledge/* sie liefert.
 	areaKnowledge = "knowledge"
-	areaDocs      = "docs"
+	// areaGitHub ist der Bereich der GitHub-Ansicht. Eigener Bereich und keine
+	// Karte auf der Startseite: die Seite fragt bei jedem Aufruf über gh nach
+	// draußen, und das darf weder die Startseite noch das Menü auslösen.
+	areaGitHub = "github"
+	areaDocs   = "docs"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
 	// Docs, nicht darin: Docs zeigt die mitgelieferte Doku der Installation,
 	// das Inventar ist eine erzeugte Datei des Projekts.
@@ -424,6 +439,17 @@ var knowledgeTemplate = pageTemplate("knowledge.html")
 
 func knowledgePageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, knowledgeTemplate, areaKnowledge, "/knowledge", "Knowledge")
+}
+
+// githubTemplate ist die Seite des GitHub-Stands: Repo und Zugang, Pull
+// Requests, CI-Läufe. Eigener Bereich, weil ihre Karten als einzige der
+// Oberfläche über das Netz fragen — als Karte auf der Startseite hinge jeder
+// Aufruf von / an GitHub. Geschrieben wird nichts: Approve und Merge bleiben
+// bei /k-pr-review.
+var githubTemplate = pageTemplate("github.html")
+
+func githubPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, githubTemplate, areaGitHub, "/github", "GitHub")
 }
 
 // docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die

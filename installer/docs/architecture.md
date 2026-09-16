@@ -1441,14 +1441,94 @@ Browser. Auch das Umschalten zwischen Accounts steht nur als Befehl da: es gilt
 maschinenweit für jedes Terminal und jedes Projekt, und ein Approve läuft danach unter
 dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite verdecken.
 
+## Die GitHub-Ansicht
+
+Die Seite `/github` zeigt, ob das Projekt Zugriff auf sein Repo hat, ob die CI grün ist
+und warum nicht, und was zuletzt an Pull Requests lief. Sie beantwortet Fragen — „kann
+ich loslegen? warum ist es rot? wohin geht dieser PR?" —, statt die Listen von
+github.com nachzubauen.
+
+**Eigenes Paket `internal/github`.** In `internal/project/gh.go` steht der *netzfreie*
+Host-Befund: liegt `gh` im PATH, welche Konten sind hinterlegt. Der soll billig genug
+bleiben, um in jeder Kontextausgabe zu stehen. `internal/github` macht das Gegenteil: es
+startet `gh` als Subprozess gegen die API, mit Frist, Fehlereinordnung und Auswertung
+der Antwort. Zwei Zuständigkeiten, zwei Pakete.
+
+**Nur lesend.** Kein Aufruf dieses Pakets verändert etwas an GitHub. Approve, Merge und
+Kommentare bleiben bei `/k-pr-review`; ein PR zeigt deshalb `/k-pr-review <nr>` zum
+Abschreiben und keinen Knopf, der etwas auslöst.
+
+**Nur bei `tools.gh.status: enabled`.** Die Vorprüfung entscheidet aus Dateien, bevor ein
+Subprozess startet: die Projektentscheidung und der netzfreie Host-Befund. Steht die
+Entscheidung auf `disabled` oder `unknown`, ruft der Server `gh` gar nicht auf — das ist
+die Zusage des Zustands und nicht bloß eine andere Beschriftung. Die Seite sagt dann, wo
+die Entscheidung fällt: im Block „GitHub CLI" auf der Startseite.
+
+**Vier Endpunkte, einer je Karte.** Aus demselben Grund wie bei `/api/mcp/tools`: hinter
+jedem steht ein Subprozess, und eine langsame Abfrage soll die anderen Karten nicht
+aufhalten. Jeder hat eine Frist (20 s, für das Log 60 s). Ausgelöst werden sie allein von
+`/github`; weder die Startseite noch das Menü fragen sie.
+
+**Kein Cache.** Wie überall in der Oberfläche liest jede Anfrage neu; der frische Stand
+ist ein Neuladen der Seite. Ob ein Cache nötig wird, ist eine eigene Entscheidung und
+keine stille Folge dieser Ansicht.
+
+**Das Log erst auf Anforderung.** `GET /api/github/runs` liefert die Läufe ohne Logs.
+Die Ursache holt `GET /api/github/runs/{id}/failure`, und die Seite ruft ihn erst beim
+Aufklappen eines roten Laufs — gh lädt dafür das Archiv der fehlgeschlagenen Jobs, und
+das ist die teuerste Abfrage der Seite.
+
+**Repo-Erkennung über `gh`, nicht über die Remote-URL.** Ein Remote kann ein SSH-Alias
+sein, den allein die SSH-Konfiguration auflöst; ein eigener Parser läge dort falsch. Die
+Kopfzeile nennt das erkannte Repo deshalb ausdrücklich.
+
+**Leserecht ist nicht Schreibrecht.** `gh auth status` meldet „angemeldet", das Konto kann
+am Repo trotzdem nur `READ` haben. Die Kopfzeile zeigt `viewerPermission`, nicht bloß die
+Anmeldung.
+
+**Der SSH-Hinweis nennt keinen Kontonamen.** Zeigt das Remote auf einen anderen Host als
+`github.com`, läuft `git push` über einen Eintrag der SSH-Konfiguration mit eigenem
+Schlüssel. Welches Konto dahintersteht, steht nirgends im Arbeitsstand; es zu erfahren
+hieße `ssh -T` zu rufen. Der Hinweis nennt deshalb nur den Alias.
+
+**Feste Zustände statt roher Fehlertexte.** Jede Antwort trägt ein Zustandsfeld und den
+Satz, der es erklärt: `ok`, `no-project`, `disabled`, `undecided`, `not-installed`,
+`not-logged-in`, `bad-credentials`, `no-remote`, `no-access`, `rate-limited`, `network`,
+`timeout`, `error`. `bad-credentials` steht eigens neben `not-logged-in`, weil
+`DetectGH()` „angemeldet" allein aus der gh-Konfiguration liest und den Token nicht prüft:
+ein abgelaufener Token sieht dort aus wie eine Anmeldung, und erst die API antwortet mit
+401. Was `gh` auf stderr schreibt, wird zur Einordnung gelesen, aber nicht durchgereicht.
+
+**Die Ursache eines roten Laufs wird gruppiert.** Aus dem Log werden die `--- FAIL`-Zeilen
+und je Test die erste eigene Meldungszeile gezogen; gruppiert wird nach dieser Meldung.
+Vor dem Vergleich fällt das Präfix `datei:zeile:` weg — es unterscheidet sich je Test —
+und die Pfade des Runners werden vereinheitlicht. **Gezählt wird nur ein Test mit eigener
+Meldungszeile**; ein übergeordneter Test mit Subtests hat keine, seine Subtests tragen
+sie, und er zählt nicht mit. Die Antwort nennt beide Zahlen, damit der Unterschied als
+Zählregel lesbar ist und nicht wie eine verlorene Zeile aussieht. Folgt ein Log keinem
+erkannten Testformat, stehen statt einer Gruppierung die letzten Fehlerzeilen des Jobs
+da. Geprüft wird das an einer gesicherten Log-Fixture unter
+`internal/github/testdata/`: GitHub bewahrt Logs nur begrenzt auf, und ein reparierter
+Lauf fällt aus der Liste.
+
+**Gestaltung.** Die Zustandsmarken der Seite — Recht am Repo, CI-Stand, Fork, Ziel außerhalb
+des Default-Branchs, Checks, Review — sind `.pill` und damit Beschriftungen ohne Knopfform,
+wie im Abschnitt „Gestaltung der Oberfläche" beschrieben. Die übrigen Beschriftungen der
+Seite (`.pr-branches`, `.pr-meta`, `.run-ref`, `.run-meta`, `.failure-count`) stehen in
+`styleLabelClasses` und werden vom selben Wächter geprüft.
+
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat fünf Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
-**Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
-`/inventory`. `/mcp` ist keine sechste Sorte, sondern die Detailseite des Setup-Blocks
+Die Oberfläche hat sechs Bereiche: **Setup** unter `/`, **Workflows** unter `/workflows`,
+**GitHub** unter `/github`, **Knowledge** unter `/knowledge`, **Docs** unter `/docs` und
+**Inventar** unter `/inventory`. `/mcp` ist keine sechste Sorte, sondern die Detailseite des Setup-Blocks
 und trägt dessen Bereich. Dasselbe gilt für `/mcp-servers` und die Detailseiten
 `/mcp-servers/{assistant}/{name}` darunter — mit einem Unterschied: die Übersicht steht
 als Unterpunkt unter Setup, `/mcp` nicht.
+
+GitHub ist ein eigener Bereich und keine Karte der Startseite. Der Grund steht unter
+„Die GitHub-Ansicht": seine Karten fragen als einzige der Oberfläche über das Netz, und
+das darf weder ein Aufruf von `/` noch das Menü auslösen.
 
 Knowledge steht **über** Docs, und das ist die Aussage der Reihenfolge: Docs ist das
 Nachschlagewerk der Installation, die Wissensablage ist das, was im Projekt an Wissen
@@ -1604,8 +1684,8 @@ einmal genutzter Wert läuft über eine Variable, denn der Wächter prüft jeden
   Bedingung sagt das;
 - CSS-weite Schlüsselwörter wie `inherit`, dazu `none` bei `box-shadow`;
 - Größen von Kreisen und Icons, deren Seitenverhältnis an genau einem Wert hängt, etwa
-  der Punkt im Blockmenü oder der Ladering. Kommt eine solche Größe mehrfach vor, wird
-  sie eine Variable.
+  der Ladering. Kommt eine solche Größe mehrfach vor, wird sie eine Variable, so wie
+  `--dot-size` für den Punkt im Blockmenü und vor jeder Zustandsmarke.
 
 `em`-Werte sind keine Ausnahme: Abstände und Schriftgrößen in `em` laufen über eigene
 `em`-Stufen. Eine Variable mit `em` wird erst am Element aufgelöst, das sie nutzt.
@@ -1627,6 +1707,18 @@ Variablen, die außerhalb von `:root` gesetzt werden. `color-mix(` zählt dort a
 wenn es nur Variablen mischt — die Mischung ist die Rolle und gehört nach `:root`. Ein
 zweiter Test prüft den Wächter an einem kleinen Beispiel, damit er nicht unbemerkt leer
 durchläuft. Ausnahmen für einzelne Blöcke gibt es nicht.
+
+**Beschriftungen ohne Knopfform.** Fläche, Rahmen, Schatten und Knopfhöhe trägt nur,
+was sich anklicken lässt. Die Zustandsmarken `.pill` zeigen ihren Zustand über
+Schriftfarbe und einen Punkt in `.pill::before`, der über `currentColor` der Farbe
+folgt. Die Versionsangabe `.version-badge` ist schlichter Text. Die Regel und die
+Einordnung von Bildern und Inhaltsflächen stehen in der Guideline
+`k-playbook-local/guidelines/oberflaeche-gestaltung.md`, Abschnitt „Nur ein Knopf sieht
+aus wie ein Knopf“. `TestStylesheetKeepsLabelsFlat` verbietet in jeder Regel, deren
+Selektor eine dieser Klassen als ganzen Namen trifft, Pseudo-Elemente eingeschlossen,
+`background…`, `border…` außer `none` oder `0` (`border-radius` bleibt erlaubt),
+`box-shadow` und `min-height`. Nur `.pill::before` darf eine Hintergrundfarbe tragen.
+`TestLabelGuardFindsButtonShapes` prüft diesen Wächter an einem Beispiel.
 
 ## Aufgelöster Kontext in der Oberfläche
 
@@ -2014,6 +2106,10 @@ Ereignis von OpenCode erscheint.
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
+| `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem; nur lesend |
+| `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; nur lesend |
+| `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; nur lesend |
+| `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; nur lesend |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt |
@@ -2042,7 +2138,7 @@ Ereignis von OpenCode erscheint.
 | `POST` | `/api/chat/markdown` | `{texts}` mit Goldmark als HTML rendern, ohne rohes HTML und ohne gefährliche Verweise; höchstens 200 Texte; fragt OpenCode nicht |
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Setup), `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/knowledge`,
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/knowledge`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` aus denselben
 Fragmenten für den Kopf und die linke Spalte — den Kopf trägt die Startseite als einzige

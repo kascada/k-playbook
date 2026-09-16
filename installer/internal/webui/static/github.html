@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Diese Seite liest, sie schreibt nichts nach GitHub. Approve,
+               Merge und Kommentare bleiben bei /k-pr-review; ein PR zeigt
+               deshalb seinen Befehl zum Kopieren und keinen Knopf, der etwas
+               auslöst.
+
+               Je Karte ein eigener Endpunkt: dahinter steht ein gh-Subprozess
+               mit Netzzugriff, und eine langsame Abfrage soll die übrigen
+               Karten nicht aufhalten. Ausgelöst werden sie allein hier —
+               weder die Startseite noch das Menü fragen sie. -->
+          <section class="card" id="gh-overview-card">
+            <div class="section-head">
+              <div>
+                <h2>Repo und Zugang</h2>
+              </div>
+              <span id="gh-overview-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Das Repo löst <code>gh</code> selbst auf, nicht diese Seite: das Remote kann ein
+              SSH-Alias sein, den allein die SSH-Konfiguration kennt.
+            </p>
+            <dl id="gh-overview-facts" class="facts"></dl>
+            <p id="gh-alias-hint" class="hint warn gh-note hidden"></p>
+            <p id="gh-overview-message" class="message"></p>
+          </section>
+
+          <section class="card" id="gh-pulls-card">
+            <div class="section-head">
+              <div>
+                <h2>Pull Requests</h2>
+              </div>
+              <span id="gh-pulls-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Offene zuerst, darunter die zuletzt geschlossenen und gemergten. Jeder PR nennt
+              <code>Quell-Branch → Ziel-Branch</code>. Gelesen wird nur; Approve und Merge laufen
+              über <code>/k-pr-review &lt;nr&gt;</code> im Assistenten.
+            </p>
+            <div id="gh-pulls-open" class="pr-list empty">Noch nicht geladen.</div>
+
+            <!-- Geschlossene werden nie weniger und stehen deshalb zugeklappt.
+                 Geholt sind sie bereits: sie kommen in derselben Abfrage. -->
+            <details id="gh-pulls-closed-wrap" class="gh-fold hidden">
+              <summary class="disclosure gh-fold-head">
+                <span class="disclosure-marker" aria-hidden="true">&#9656;</span>
+                <span id="gh-pulls-closed-label">Zuletzt geschlossen</span>
+              </summary>
+              <div id="gh-pulls-closed" class="pr-list empty"></div>
+            </details>
+            <p id="gh-pulls-message" class="message"></p>
+          </section>
+
+          <section class="card" id="gh-runs-card">
+            <div class="section-head">
+              <div>
+                <h2>CI-Läufe</h2>
+              </div>
+              <span id="gh-runs-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Die letzten Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis. Ein roter Lauf
+              zeigt seine Ursache erst beim Aufklappen: das Log zu holen ist die teuerste Abfrage
+              dieser Seite.
+            </p>
+            <div id="gh-runs-list" class="run-list empty">Noch nicht geladen.</div>
+            <p id="gh-runs-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/github.js"></script>
+  </body>
+</html>

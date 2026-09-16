@@ -283,3 +283,176 @@ func TestStylesheetGuardFindsFixedValues(t *testing.T) {
 		t.Errorf("Wächter meldet\n  %v\nerwartet\n  %v", got, want)
 	}
 }
+
+// Nur ein Knopf sieht aus wie ein Knopf: Beschriftungen tragen weder Fläche
+// noch Rahmen, Schatten oder Knopfhöhe. Der Zustand steckt in der Schriftfarbe
+// und im Punkt davor.
+const labelRules = `k-playbook-local/guidelines/oberflaeche-gestaltung.md, Abschnitt „Nur ein Knopf sieht aus wie ein Knopf"; ausgeliefert in installer/docs/architecture.md, Abschnitt „Gestaltung der Oberfläche"`
+
+// styleLabelClasses sind die Klassen reiner Beschriftungen. Getroffen wird nur
+// der ganze Klassenname: .pill-row ist ein Behälter und zählt nicht als .pill.
+//
+// Eine neue Beschriftung gehört in diese Liste, sonst prüft der Wächter sie
+// nicht. Die fünf hinter den beiden ersten kommen von der Seite /github:
+// Quell- und Ziel-Branch eines PR, seine Kennzahlenzeile, Branch oder Tag
+// eines Laufs, dessen Kennzahlenzeile und die Zahl der Tests einer Ursache.
+// Die Zustandsmarken der Seite — Recht, CI-Stand, Fork, Ziel ≠ Default —
+// nutzen .pill und sind darüber schon abgedeckt.
+var styleLabelClasses = []string{
+	"pill", "version-badge",
+	"pr-branches", "pr-meta", "run-ref", "run-meta", "failure-count",
+}
+
+// styleLabelDot ist der einzige Selektor, der eine Fläche tragen darf — der
+// Punkt vor der Zustandsmarke. Rahmen, Schatten und Höhe bleiben ihm verboten.
+const styleLabelDot = ".pill::before"
+
+type styleRule struct {
+	selector string
+	decls    []styleDeclaration
+}
+
+// styleRulesOf zerlegt das Stylesheet in Regeln mit Selektor und
+// Deklarationen. @-Regeln wie @media sind nur Hülle; die Regeln darin zählen
+// wie alle anderen. Zeichenketten beachtet der Parser nicht: ein ; oder { in
+// einem content-Wert brächte ihn aus dem Tritt.
+func styleRulesOf(css string) []styleRule {
+	css = stripStyleComments(css)
+	var rules []styleRule
+	var open []int // Index der Regel je offener Klammer, -1 für @-Regeln
+	line, start, startLine := 1, 0, 1
+	for i := 0; i < len(css); i++ {
+		switch css[i] {
+		case '\n':
+			line++
+		case '{':
+			prelude := strings.Join(strings.Fields(css[start:i]), " ")
+			if strings.HasPrefix(prelude, "@") {
+				open = append(open, -1)
+			} else {
+				rules = append(rules, styleRule{selector: prelude})
+				open = append(open, len(rules)-1)
+			}
+			start, startLine = i+1, line
+		case '}', ';':
+			if n := len(open); n > 0 && open[n-1] >= 0 {
+				if d, ok := parseStyleDeclaration(css[start:i], startLine); ok {
+					rules[open[n-1]].decls = append(rules[open[n-1]].decls, d)
+				}
+			}
+			if css[i] == '}' && len(open) > 0 {
+				open = open[:len(open)-1]
+			}
+			start, startLine = i+1, line
+		}
+	}
+	return rules
+}
+
+func styleLabelPatterns(classes []string) []*regexp.Regexp {
+	var out []*regexp.Regexp
+	for _, c := range classes {
+		out = append(out, regexp.MustCompile(`\.`+regexp.QuoteMeta(c)+`([^\w-]|$)`))
+	}
+	return out
+}
+
+// labelShapeProperty sagt, ob eine Eigenschaft eine Beschriftung zur Fläche,
+// zum Rahmen, zum Schatten oder auf Knopfhöhe brächte. border-radius ist
+// allein keine Form und bleibt erlaubt; ein Rahmen mit none oder 0 zeichnet
+// nichts.
+func labelShapeProperty(prop, value string, dot bool) bool {
+	switch {
+	case prop == "background" || prop == "background-color":
+		return !dot
+	case strings.HasPrefix(prop, "background-"):
+		return true
+	case prop == "border" || strings.HasPrefix(prop, "border-"):
+		if strings.HasSuffix(prop, "-radius") {
+			return false
+		}
+		return value != "none" && value != "0"
+	case prop == "box-shadow", prop == "min-height":
+		return true
+	}
+	return false
+}
+
+// findLabelShapes meldet jede Deklaration, die einer Beschriftung Fläche,
+// Rahmen, Schatten oder Knopfhöhe gibt — in jeder Regel, deren Selektor eine
+// Beschriftungsklasse trifft, Pseudo-Elemente eingeschlossen.
+func findLabelShapes(css string, classes []string) []string {
+	patterns := styleLabelPatterns(classes)
+	var found []string
+	for _, rule := range styleRulesOf(css) {
+		for _, sel := range strings.Split(rule.selector, ",") {
+			sel = strings.TrimSpace(sel)
+			hit := false
+			for _, p := range patterns {
+				if p.MatchString(sel) {
+					hit = true
+					break
+				}
+			}
+			if !hit {
+				continue
+			}
+			for _, d := range rule.decls {
+				if labelShapeProperty(d.prop, d.value, sel == styleLabelDot) {
+					found = append(found, fmt.Sprintf("styles.css:%d: %s { %s: %s }", d.line, sel, d.prop, d.value))
+				}
+			}
+		}
+	}
+	return found
+}
+
+func TestStylesheetKeepsLabelsFlat(t *testing.T) {
+	raw, err := staticFiles.ReadFile("static/styles.css")
+	if err != nil {
+		t.Fatalf("styles.css nicht eingebettet: %v", err)
+	}
+	for _, v := range findLabelShapes(string(raw), styleLabelClasses) {
+		t.Errorf("%s: Beschriftung mit Fläche, Rahmen, Schatten oder Knopfhöhe. Nur was sich anklicken lässt, sieht aus wie ein Knopf; den Zustand über Schriftfarbe und Punkt zeigen (%s)", v, labelRules)
+	}
+}
+
+// Der Beschriftungs-Wächter selbst: er trifft ganze Klassennamen auch in
+// Selektorlisten, @media und Pseudo-Elementen und lässt nur den Punkt in
+// .pill::before eine Fläche tragen.
+func TestLabelGuardFindsButtonShapes(t *testing.T) {
+	css := `.pill {
+  color: var(--muted);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+}
+.pill::before {
+  background: currentColor;
+  border: 1px solid var(--line);
+}
+.pill::after { background-color: var(--warn); }
+.pill-row, .pillow { background: var(--card); min-height: 32px; }
+.card, .section-head .pill.ok:hover {
+  box-shadow: var(--shadow);
+}
+@media (max-width: 820px) {
+  .version-badge {
+    border-bottom: 1px solid var(--line);
+    border: none;
+    min-height: 32px;
+  }
+}
+`
+	want := []string{
+		"styles.css:3: .pill { background: var(--accent) }",
+		"styles.css:8: .pill::before { border: 1px solid var(--line) }",
+		"styles.css:10: .pill::after { background-color: var(--warn) }",
+		"styles.css:13: .section-head .pill.ok:hover { box-shadow: var(--shadow) }",
+		"styles.css:17: .version-badge { border-bottom: 1px solid var(--line) }",
+		"styles.css:19: .version-badge { min-height: 32px }",
+	}
+	got := findLabelShapes(css, styleLabelClasses)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("Beschriftungs-Wächter meldet\n  %s\nerwartet\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+	}
+}

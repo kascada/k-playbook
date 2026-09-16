@@ -91,6 +91,10 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// Die Seite einer Sitzung trägt den Bereich Chat, ist aber nicht
 		// dessen Übersicht.
 		{path: "/chat/ses_abc123", markiert: `<a class="area-nav-item active" href="/chat" aria-current="true">`},
+		// /github ist ein eigener Bereich: seine Karten fragen als einzige
+		// der Oberfläche über das Netz, und das darf weder die Startseite
+		// noch das Menü auslösen.
+		{path: "/github", markiert: `<a class="area-nav-item active" href="/github" aria-current="page">`},
 		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
 		// des Projekts, nicht das Nachschlagewerk der Installation.
 		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},
