@@ -388,6 +388,208 @@ func TestReviewStatusMeldetAuditModulUndFiltertAuditRezepte(t *testing.T) {
 	}
 }
 
+// TestProjectDirIstImSchemaOptional prüft, was ein Client über tools/list
+// sieht: projectDir ist bei keinem Werkzeug Pflichtfeld im Schema, sonst weist
+// die Schemaprüfung des SDK einen Aufruf ohne projectDir ab, bevor die Hülle
+// antworten kann. Pflicht im Vertrag bleibt es — das sagt die Beschreibung.
+func TestProjectDirIstImSchemaOptional(t *testing.T) {
+	root := newProject(t)
+
+	stdout := speak(t, root, 2,
+		initialize(1),
+		initialized,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
+	)
+	responses := decodeResponses(t, stdout, 1, 2)
+
+	tools, ok := result(t, responses[1])["tools"].([]any)
+	if !ok {
+		t.Fatalf("tools/list ohne Werkzeugliste: %v", responses[1])
+	}
+	withProjectDir := 0
+	for _, item := range tools {
+		tool, _ := item.(map[string]any)
+		name, _ := tool["name"].(string)
+		schema, _ := tool["inputSchema"].(map[string]any)
+		properties, _ := schema["properties"].(map[string]any)
+		required, _ := schema["required"].([]any)
+		for _, field := range required {
+			if field == "projectDir" {
+				t.Errorf("%s führt projectDir als Pflichtfeld im Schema", name)
+			}
+		}
+		property, has := properties["projectDir"].(map[string]any)
+		if !has {
+			if name != "k_playbook_context" {
+				t.Errorf("%s führt projectDir nicht in properties", name)
+			}
+			continue
+		}
+		withProjectDir++
+		if description, _ := property["description"].(string); !strings.HasPrefix(description, "Pflicht.") {
+			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
+		}
+	}
+	if withProjectDir != 22 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 22", withProjectDir)
+	}
+}
+
+// toolEnvelope ist der Teil des Antwortumschlags, der in allen drei
+// Werkzeugfamilien gleich aussieht.
+type toolEnvelope struct {
+	OK    bool   `json:"ok"`
+	Tool  string `json:"tool"`
+	Error *struct {
+		Code    string         `json:"code"`
+		Message string         `json:"message"`
+		Details map[string]any `json:"details"`
+	} `json:"error"`
+}
+
+// withProjectDir ergänzt Argumente um projectDir. Der Wert nil lässt den
+// Schlüssel ganz weg — das ist der Fall, um den es geht.
+func withProjectDir(arguments map[string]any, projectDir any) map[string]any {
+	merged := map[string]any{}
+	for key, value := range arguments {
+		merged[key] = value
+	}
+	if projectDir != nil {
+		merged["projectDir"] = projectDir
+	}
+	return merged
+}
+
+// projectDirCalls sind je Familie ein lesendes und ein schreibendes Werkzeug,
+// mit Argumenten, die bis auf projectDir dem Schema genügen.
+var projectDirCalls = []struct {
+	name string
+	args map[string]any
+}{
+	{name: "k_playbook_knowledge_status", args: map[string]any{}},
+	{name: "k_playbook_knowledge_write", args: map[string]any{
+		"producer": "session", "path": "findings/ohne-projectdir.md", "title": "Ohne projectDir",
+		"subject": "MCP", "origin": "Test", "state": "reviewed", "body": "# Ohne projectDir\n\nInhalt.\n",
+	}},
+	{name: "k_playbook_todo_list", args: map[string]any{}},
+	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
+	{name: "k_playbook_review_status", args: map[string]any{}},
+	{name: "k_playbook_review_create", args: map[string]any{"day": "2026-09-16", "dryRun": true}},
+}
+
+// TestFehlendesProjectDirIstEingabefehler prüft über das Protokoll, dass ein
+// fehlendes, leeres oder nur aus Leerraum bestehendes projectDir in allen
+// Familien den Umschlag mit invalid_input bekommt — und nicht den nackten Text
+// der Schemaprüfung des SDK.
+//
+// Der Server läuft dabei in einem gültigen Projekt. Nur so beweist die
+// Nachprüfung, dass nichts geschrieben wurde: ein Rückfall auf das
+// Arbeitsverzeichnis hätte hier ein Ziel gehabt.
+func TestFehlendesProjectDirIstEingabefehler(t *testing.T) {
+	root := newMCPReviewProject(t)
+
+	lines := []string{initialize(1), initialized}
+	type expectation struct {
+		id    int
+		label string
+	}
+	var expected []expectation
+	id := 2
+	for _, call := range projectDirCalls {
+		for _, variant := range []struct {
+			label string
+			value any
+		}{
+			{label: "ohne projectDir", value: nil},
+			{label: "leeres projectDir", value: ""},
+			{label: "projectDir aus Leerraum", value: "  "},
+		} {
+			lines = append(lines, callTool(id, call.name, withProjectDir(call.args, variant.value)))
+			expected = append(expected, expectation{id: id, label: call.name + " " + variant.label})
+			id++
+		}
+	}
+
+	ids := []int{1}
+	for _, item := range expected {
+		ids = append(ids, item.id)
+	}
+	responses := decodeResponses(t, speak(t, root, len(ids), lines...), ids...)
+
+	for i, item := range expected {
+		response := responses[i+1]
+		if isError := result(t, response)["isError"]; isError != true {
+			t.Errorf("%s: Ergebnis nicht als Fehler markiert: %v", item.label, response)
+			continue
+		}
+		var envelope toolEnvelope
+		if err := json.Unmarshal([]byte(toolText(t, response)), &envelope); err != nil {
+			t.Errorf("%s: kein Umschlag: %v — %s", item.label, err, toolText(t, response))
+			continue
+		}
+		if envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+			t.Errorf("%s: erwartet invalid_input, bekommen %+v", item.label, envelope)
+			continue
+		}
+		if !strings.Contains(envelope.Error.Message, "nichts ausgeführt") {
+			t.Errorf("%s: Meldung sagt nicht, dass nichts ausgeführt wurde: %q", item.label, envelope.Error.Message)
+		}
+	}
+
+	knowledgeFile := filepath.Join(project.KnowledgeDir(root), "findings", "ohne-projectdir.md")
+	if _, err := os.Stat(knowledgeFile); !os.IsNotExist(err) {
+		t.Errorf("knowledge_write ohne projectDir hat geschrieben: %s (%v)", knowledgeFile, err)
+	}
+	if _, err := os.Stat(project.TodoFile(root)); !os.IsNotExist(err) {
+		t.Errorf("todo_add ohne projectDir hat geschrieben: %s (%v)", project.TodoFile(root), err)
+	}
+
+	// Gegenprobe: mit projectDir schreiben dieselben Aufrufe im selben Projekt.
+	// Sonst bewiese das Fehlen der Dateien oben nichts.
+	stdout := speak(t, root, 3,
+		initialize(1),
+		initialized,
+		callTool(2, "k_playbook_knowledge_write", withProjectDir(projectDirCalls[1].args, root)),
+		callTool(3, "k_playbook_todo_add", withProjectDir(projectDirCalls[3].args, root)),
+	)
+	for _, response := range decodeResponses(t, stdout, 1, 2, 3)[1:] {
+		if isError := result(t, response)["isError"]; isError == true {
+			t.Fatalf("Gegenprobe mit projectDir schlug fehl: %s", toolText(t, response))
+		}
+	}
+	for _, path := range []string{knowledgeFile, project.TodoFile(root)} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("Gegenprobe: %s fehlt: %v", path, err)
+		}
+	}
+}
+
+// TestProjectDirOhneProjektBleibtProjectNotFound grenzt ab: ein angegebener
+// Pfad, der zu keinem Projekt führt, ist kein Eingabefehler.
+func TestProjectDirOhneProjektBleibtProjectNotFound(t *testing.T) {
+	root := newMCPReviewProject(t)
+	missing := filepath.Join(t.TempDir(), "gibt-es-nicht")
+
+	lines := []string{initialize(1), initialized}
+	ids := []int{1}
+	for i, call := range projectDirCalls {
+		lines = append(lines, callTool(i+2, call.name, withProjectDir(call.args, missing)))
+		ids = append(ids, i+2)
+	}
+	responses := decodeResponses(t, speak(t, root, len(ids), lines...), ids...)
+
+	for i, call := range projectDirCalls {
+		var envelope toolEnvelope
+		if err := json.Unmarshal([]byte(toolText(t, responses[i+1])), &envelope); err != nil {
+			t.Errorf("%s: kein Umschlag: %v", call.name, err)
+			continue
+		}
+		if envelope.OK || envelope.Error == nil || envelope.Error.Code != "project_not_found" {
+			t.Errorf("%s: erwartet project_not_found, bekommen %+v", call.name, envelope)
+		}
+	}
+}
+
 // TestOhneDirGiltDasArbeitsverzeichnis prüft den zweiten Auflösungsweg: kein
 // Parameter, dafür der Serverprozess im Projekt.
 func TestOhneDirGiltDasArbeitsverzeichnis(t *testing.T) {

@@ -22,8 +22,12 @@ const (
 	todoToolDelete = "k_playbook_todo_delete"
 )
 
+// todoBaseInput trägt projectDir. Im Vertrag ist das Feld Pflicht, im Schema
+// optional (omitempty): sonst weist die Schemaprüfung des SDK einen Aufruf ohne
+// projectDir ab, bevor die Hülle läuft, und der Aufrufer bekommt nur deren
+// nackten Text statt des Umschlags. Geprüft wird in checkProjectDir.
 type todoBaseInput struct {
-	ProjectDir string `json:"projectDir" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 }
 
 type todoListInput struct {
@@ -162,7 +166,7 @@ func todoDeleteTool(ctx context.Context, req *mcp.CallToolRequest, input todoDel
 func wrapTodoTool(tool string, inputDir string, fn func(projectDir string) *mcp.CallToolResult) *mcp.CallToolResult {
 	projectDir, err := resolveProjectDir(inputDir)
 	if err != nil {
-		return todoErrorResult(tool, projectDir, "project_not_found", err)
+		return todoErrorResult(tool, projectDir, projectDirErrorCode(err), err)
 	}
 	return fn(projectDir)
 }

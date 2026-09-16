@@ -20,8 +20,12 @@ import (
 
 const timeLayout = time.RFC3339
 
+// reviewBaseInput trägt projectDir. Im Vertrag ist das Feld Pflicht, im Schema
+// optional (omitempty): sonst weist die Schemaprüfung des SDK einen Aufruf ohne
+// projectDir ab, bevor die Hülle läuft, und der Aufrufer bekommt nur deren
+// nackten Text statt des Umschlags. Geprüft wird in checkProjectDir.
 type reviewBaseInput struct {
-	ProjectDir string `json:"projectDir" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 }
 
 type reviewStatusInput struct {
@@ -2051,10 +2055,10 @@ func isNotExist(err error) bool {
 }
 
 func resolveReviewEnvironment(inputDir string) (reviewEnvironment, reviewToolError) {
-	if strings.TrimSpace(inputDir) == "" {
+	if err := checkProjectDir(inputDir); err != nil {
 		return reviewEnvironment{}, reviewToolError{
-			Code:    "project_not_found",
-			Message: "Kein projectDir angegeben.",
+			Code:    "invalid_input",
+			Message: err.Error(),
 			Details: map[string]any{},
 		}
 	}

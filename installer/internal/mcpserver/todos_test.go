@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -197,7 +198,10 @@ func TestTodoToolOhneProjektDir(t *testing.T) {
 		t.Fatalf("list: %v", err)
 	}
 	envelope := decodeTodoEnvelope(t, result)
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "project_not_found" {
-		t.Fatalf("erwartet project_not_found, bekommen %#v", envelope)
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Fatalf("erwartet invalid_input, bekommen %#v", envelope)
+	}
+	if !strings.Contains(envelope.Error.Message, "nichts ausgeführt") {
+		t.Errorf("Meldung sagt nicht, dass nichts ausgeführt wurde: %q", envelope.Error.Message)
 	}
 }

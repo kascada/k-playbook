@@ -2546,6 +2546,16 @@ Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message
 Fehlerfall. Tool-Tabelle und Verträge stehen in
 [`../../docs/mcp.md`](../../docs/mcp.md).
 
+`projectDir` ist in allen drei Familien Pflicht, im abgeleiteten Schema aber optional
+(`omitempty` an `knowledgeBaseInput`, `todoBaseInput`, `reviewBaseInput`). Sonst wiese die
+Schemaprüfung des SDK einen Aufruf ohne das Feld ab, bevor die Hülle läuft, und der Aufrufer
+bekäme nur ihren nackten Text statt des Umschlags. Geprüft wird stattdessen an einer Stelle:
+`checkProjectDir` in `server.go`, benutzt von `resolveProjectDir` (Wissen, Todos) und
+`resolveReviewEnvironment` (Review). Fehlend, leer oder nur Leerraum ergibt `invalid_input` mit
+der Meldung aus `projectDirMissingMessage` („nichts ausgeführt“, mit `projectDir` wiederholen);
+einen Rückfall auf das Arbeitsverzeichnis des Servers gibt es nicht. `project_not_found` bleibt
+einem angegebenen Pfad ohne Projekt vorbehalten.
+
 **Maßgeblich ist die Spec-Fassung [`2026-07-28`](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture).**
 Die Clients sprechen sie allerdings noch nicht: Claude Code trägt den Pfad zwar im
 Programm, aber hinter abgeschalteten Schaltern, und benutzt voreingestellt den älteren

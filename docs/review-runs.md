@@ -682,7 +682,9 @@ manual path; MCP is intended for chat orchestration without shelling out to the
 
 All tools require `projectDir`, search upward from there for `K-PLAYBOOK.yaml`, and return
 structured JSON envelopes. Errors are domain tool results with `ok: false`, not MCP
-protocol errors. In `available` mode, `k_playbook_review_status` returns the `scan-triage`
+protocol errors. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and
+nothing is executed; a `projectDir` that leads to no project is `project_not_found` (see
+[mcp.md](mcp.md)). In `available` mode, `k_playbook_review_status` returns the `scan-triage`
 command-module entry alongside tools and catalog recipes when it is active in the effective
 command namespace. `k_playbook_review_create`, `k_playbook_review_status` for an existing
 run, and `k_playbook_review_write_ai_entry` accept this entry even though it is not in

@@ -11,9 +11,24 @@ when writing changes something, and only to symlinks created by k-playbook itsel
 response lists what happened under `links`; if the field is absent, everything was already
 up to date.
 
-The server offers the working state and the review-run tools. `k_playbook_context` has the
-optional `dir` parameter; all review tools require `projectDir`, because a stdio server must
-not assume that its process working directory is the target project.
+The server offers the working state and the review, todo and knowledge tools.
+`k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
+because a stdio server must not assume that its process working directory is the target
+project. There is no fallback to that directory.
+
+`projectDir` is required by contract but optional in the input schema, and its description
+starts with `Pflicht.`. The reason is the answer a caller gets: a field marked required in the
+schema is rejected by the SDK's schema validation before the tool runs, with a bare text
+(`validating "arguments": validating root: required: missing properties: ["projectDir"]`) --
+no envelope, no code, nothing that says the call did nothing. That is how a `knowledge_write`
+got lost once. The tools therefore check the parameter themselves: missing, empty, or only
+whitespace yields the family's envelope with `ok: false`, code `invalid_input`, and the same
+message in all three families -- `projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf
+mit projectDir, dem Projektverzeichnis mit K-PLAYBOOK.yaml (absoluter Pfad).` A `projectDir`
+that is given but leads to no project stays `project_not_found`. The price: clients that check
+required fields before calling (Claude Code) no longer do so for `projectDir`. Other schema
+violations -- another required field missing, a wrong type, also together with a missing
+`projectDir` -- are still rejected by the SDK with its bare text.
 
 The internal view -- protocol versions, the stdout rule, session termination -- is in
 [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server).
@@ -375,11 +390,16 @@ Domain error:
 
 Domain errors remain tool results with `ok: false`; the MCP server remains available for the
 next call. MCP protocol errors are reserved for malformed JSON-RPC/MCP messages. Error codes
-are stable and in `snake_case`, including `project_not_found`, `run_not_found`, `run_exists`,
+are stable and in `snake_case`, including `invalid_input`, `project_not_found`, `run_not_found`, `run_exists`,
 `invalid_mode`, `invalid_selection`, `selection_unknown`, `selection_unavailable`,
 `entry_not_found`, `entry_kind_invalid`, `entry_state_invalid`, `result_required`,
 `result_path_invalid`, `read_failed`, `write_failed`, `preflight_failed`, `execution_failed`,
 and `merge_failed`.
+
+`invalid_input` is the code for a missing, empty, or whitespace-only `projectDir`, with empty
+`details`; nothing was executed, and the call is to be repeated with `projectDir`.
+`project_not_found` is reserved for a `projectDir` that leads to no k-playbook project, a
+missing installation, or an unreadable working directory when resolving a relative path.
 
 The evidence-mode codes are also provided, all from `k_playbook_review_write_ai_entry`:
 `entry_job_invalid` (a job on a perspective or on a report that is not `done`),
@@ -577,6 +597,10 @@ file.
 Ticking off keeps the entry, deleting removes it -- two separate tools, so a model cannot throw
 away history by accident.
 
+The envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on
+failure. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and nothing is
+written; a `projectDir` that leads to no project is `project_not_found`.
+
 ### Knowledge Contract
 
 The knowledge tools follow the same pattern: thin wrappers over `project.Knowledge`, the one
@@ -681,8 +705,10 @@ that does not exist and can correct it; no separate code. Everything else is the
 environment: the writing tools (`write`, `publish`, `supersede`, `inbox_put`, `queue_add`,
 `queue_drop`) answer `write_failed`, the reading tools (`read`, `search`, `list`,
 `inbox_read`, `inbox_list`, `queue_list`, `status`) answer `read_failed` -- for instance an
-unwritable `knowledge/`, or a path that exists but cannot be read. `project_not_found` stays
-the code for a `projectDir` that leads to no k-playbook project.
+unwritable `knowledge/`, or a path that exists but cannot be read. A missing, empty, or
+whitespace-only `projectDir` is `invalid_input` as well, before anything is resolved or
+written (see the top of this page). `project_not_found` stays the code for a `projectDir` that
+is given but leads to no k-playbook project.
 
 `status` reports `stale: true` and `staleFiles` when the last access found files changed
 behind the tools' back and re-read them. The same report can mean an interrupted or a

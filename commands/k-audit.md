@@ -442,8 +442,11 @@ Abarbeitung — einen Zwischenschritt gibt es nicht. Nenne wörtlich:
 ## Fehlerfälle
 
 - Kein k-playbook-Projekt: abbrechen und die fehlende Installation nennen.
-- `k_playbook_review_status` meldet `project_not_found`: kein Ersatzpfad, stattdessen
-  `/k-gui` nennen.
+- `k_playbook_review_status` meldet `project_not_found`: `RESOLVED_PROJECT_DIR` führt zu
+  keinem Projekt. Kein Ersatzpfad, stattdessen `/k-gui` nennen.
+- Ein Review-Werkzeug meldet `invalid_input` mit „projectDir fehlt — nichts ausgeführt“:
+  der Aufruf trug kein `projectDir`. Es wurde nichts geschrieben; denselben Aufruf mit
+  `projectDir: RESOLVED_PROJECT_DIR` wiederholen.
 - Lauf fehlt: bei `new` oder Datum nach Auswahlklärung anlegen; bei `latest` die
   verfügbaren Läufe zeigen.
 - `run.json` unlesbar: nicht reparieren; Fehler und Pfad nennen.

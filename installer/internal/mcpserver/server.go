@@ -10,6 +10,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,9 +83,47 @@ func Run(ctx context.Context) error {
 	return nil
 }
 
-// resolveProjectDir löst den projectDir-Parameter eines Werkzeugs auf: leer
-// ist ein Fehler, ein relativer Pfad gilt zum Arbeitsverzeichnis des
-// Serverprozesses, und ab dem Ergebnis wird aufwärts nach dem Anker gesucht.
+// projectDirMissingMessage ist die Meldung für ein fehlendes, leeres oder nur
+// aus Leerraum bestehendes projectDir — für alle Werkzeugfamilien dieselbe.
+//
+// Sie richtet sich an das Modell, das den Aufruf abgesetzt hat: es muss daraus
+// lesen können, dass nichts geschehen ist und was es tun soll. Ohne das gilt
+// ein gescheiterter Schreibaufruf leicht als erledigt.
+const projectDirMissingMessage = "projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf mit " +
+	"projectDir, dem Projektverzeichnis mit " + project.ConfigFileName + " (absoluter Pfad)."
+
+// errProjectDirMissing ist der Fehler zu projectDirMissingMessage. Die Hüllen
+// erkennen ihn über errors.Is und melden ihn als invalid_input.
+var errProjectDirMissing = errors.New(projectDirMissingMessage)
+
+// checkProjectDir ist die gemeinsame Prüfung aller Werkzeuge mit projectDir,
+// bevor irgendetwas aufgelöst wird. Im Schema ist das Feld optional, damit ein
+// Aufruf ohne es die Hülle erreicht; Pflicht ist es trotzdem.
+//
+// Einen Rückfall auf das Arbeitsverzeichnis des Servers gibt es bewusst nicht:
+// ein stdio-Server behält das Verzeichnis, in dem der Client ihn gestartet hat,
+// und das ist nicht zwingend das Projekt, an dem gerade gearbeitet wird.
+func checkProjectDir(inputDir string) error {
+	if strings.TrimSpace(inputDir) == "" {
+		return errProjectDirMissing
+	}
+	return nil
+}
+
+// projectDirErrorCode ordnet einen Fehler aus resolveProjectDir seinem Code
+// zu: ein fehlendes projectDir ist ein Eingabefehler, alles andere heißt, dass
+// der angegebene Pfad zu keinem Projekt führt.
+func projectDirErrorCode(err error) string {
+	if errors.Is(err, errProjectDirMissing) {
+		return "invalid_input"
+	}
+	return "project_not_found"
+}
+
+// resolveProjectDir löst den projectDir-Parameter eines Werkzeugs auf: fehlt
+// er, ist das errProjectDirMissing, ein relativer Pfad gilt zum
+// Arbeitsverzeichnis des Serverprozesses, und ab dem Ergebnis wird aufwärts
+// nach dem Anker gesucht.
 //
 // Im Fehlerfall trägt das erste Ergebnis das Verzeichnis, das die Meldung
 // nennen soll — vor der Auflösung gibt es kein Projektverzeichnis, aber der
@@ -94,8 +133,8 @@ func Run(ctx context.Context) error {
 // Wissensverzeichnis liegen unter k-playbook-local/, nicht im Katalog der
 // Installation. Zweimal aufgelöst hieße zwei Chancen, es verschieden zu tun.
 func resolveProjectDir(inputDir string) (string, error) {
-	if strings.TrimSpace(inputDir) == "" {
-		return "", fmt.Errorf("kein projectDir angegeben")
+	if err := checkProjectDir(inputDir); err != nil {
+		return "", err
 	}
 	dir := filepath.Clean(inputDir)
 	if !filepath.IsAbs(dir) {
