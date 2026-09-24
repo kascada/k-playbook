@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -64,6 +65,20 @@ type serverState struct {
 	// prüfen.
 	streams     chan struct{}
 	streamsOnce sync.Once
+
+	// updateMu ist die Sperre für Aktualisierung und Neustart: POST /api/update
+	// und POST /api/update/program nehmen sie mit TryLock, ein zweiter Aufruf
+	// währenddessen bekommt 409. Zwei gleichzeitige Abläufe gäben dieselbe
+	// Laufzeitdatei zweimal frei und starteten zwei Nachfolger.
+	updateMu sync.Mutex
+	// restarting hält den Leerlaufwächter an, solange Installation und
+	// Neustart laufen. Der Bootstrap darf Minuten dauern; ein Dienst, der sich
+	// mittendrin wegen Leerlaufs beendete, ließe die Übergabe halb liegen.
+	restarting atomic.Bool
+	// openStreams zählt die offenen Ereignisströme des Chats — je einer für
+	// jede offene Chat-Ansicht. Vor einem Neustart fragt der Knopf nach, wenn
+	// welche offen sind.
+	openStreams atomic.Int32
 
 	commandMu sync.Mutex
 	// commandRuns hält je Sitzung die laufenden abgekoppelten Command-Aufrufe
@@ -232,8 +247,18 @@ func routes(state *serverState) http.Handler {
 	// einem eigenen Endpunkt: geholt wird es erst beim Aufklappen eines roten
 	// Laufs, nie für alle Läufe beim Laden der Seite.
 	mux.HandleFunc("GET /api/github/runs/{id}/failure", githubRunFailureHandler)
-	mux.HandleFunc("GET /api/update", updateCheckHandler)
+	// Die Branches des Code-Repos: lesend die Liste samt Umgebungen und
+	// Worktrees; Fetch, Vorprüfung und Umschalten je eigener Endpunkt. Ein Fetch
+	// läuft nie ungefragt, umgeschaltet wird nur nach erneuter Prüfung.
+	mux.HandleFunc("GET /api/branches", branchesHandler)
+	mux.HandleFunc("POST /api/branches/fetch", branchesFetchHandler)
+	mux.HandleFunc("GET /api/branches/switch-check", branchesSwitchCheckHandler)
+	mux.HandleFunc("POST /api/branches/switch", branchesSwitchHandler)
+	mux.HandleFunc("GET /api/update", state.updateCheckHandler)
 	mux.HandleFunc("POST /api/update", state.applyUpdateHandler)
+	// Nur das Programm: installiert über den Bootstrap des Clones und startet
+	// den Dienst daraus neu. Läuft nie ungefragt, nur auf den Knopf hin.
+	mux.HandleFunc("POST /api/update/program", state.applyProgramHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
 	mux.HandleFunc("GET /api/context", contextHandler)
@@ -295,6 +320,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /chat", chatPageHandler)
 	mux.HandleFunc("GET /chat/{id}", chatSessionPageHandler)
 	mux.HandleFunc("GET /github", githubPageHandler)
+	mux.HandleFunc("GET /branches", branchesPageHandler)
 	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
@@ -384,7 +410,11 @@ const (
 	// Karte auf der Statusseite: die Seite fragt bei jedem Aufruf über gh nach
 	// draußen, und das darf weder die Statusseite noch das Menü auslösen.
 	areaGitHub = "github"
-	areaDocs   = "docs"
+	// areaBranches ist der Bereich der Branches des Code-Repos. Eigener
+	// Bereich neben GitHub: die Seite braucht gh nicht, und sie ist die einzige,
+	// die im Code-Repo etwas verändern kann — nach Vorprüfung und Bestätigung.
+	areaBranches = "branches"
+	areaDocs     = "docs"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
 	// Docs, nicht darin: Docs zeigt die mitgelieferte Doku der Installation,
 	// das Inventar ist eine erzeugte Datei des Projekts.
@@ -510,6 +540,15 @@ var githubTemplate = pageTemplate("github.html")
 
 func githubPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, githubTemplate, areaGitHub, "/github", "GitHub")
+}
+
+// branchesTemplate ist die Seite der Branches: Umgebungen, die geordnete Liste
+// samt Vorprüfung und Umschalten, Worktrees. Sie ist ohne gh erreichbar; mit gh
+// kommen Default-Branch, PRs und Deployments hinzu.
+var branchesTemplate = pageTemplate("branches.html")
+
+func branchesPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, branchesTemplate, areaBranches, "/branches", "Branches")
 }
 
 // docsTemplate ist die Seite zum Nachschlagen: der Index links im Menü, die
@@ -713,7 +752,14 @@ func (state *serverState) watchIdle(ctx context.Context) {
 // idleExceeded meldet, ob seit der letzten Anfrage idleTimeout vergangen ist.
 // Eigene Funktion mit übergebener Zeit, damit der Wächter ohne Warten prüfbar
 // ist.
+//
+// Während Installation und Neustart gilt der Dienst nie als leer: der
+// Bootstrap kann länger dauern als eine Prüfrunde, und der Ablauf muss zu Ende
+// kommen, damit am Ende genau ein Dienst registriert ist.
 func (state *serverState) idleExceeded(now time.Time) bool {
+	if state.restarting.Load() {
+		return false
+	}
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	return !state.lastRequestAt.IsZero() && now.Sub(state.lastRequestAt) >= idleTimeout

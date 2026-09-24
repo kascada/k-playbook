@@ -1,11 +1,11 @@
 package webui
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -119,40 +119,19 @@ func TestRelinkAfterUpdateMeldetKonflikt(t *testing.T) {
 	}
 }
 
-// Nach einem Update beendet sich der Dienst nur, wenn die VERSION gewechselt
-// hat — dann gehört zum neuen Stand ein anderes Binary. Sonst läuft er weiter
-// und liest den neuen Stand bei der nächsten Anfrage.
-func TestUpdateShutdownNurBeiGewechselterVersion(t *testing.T) {
-	called := make(chan struct{}, 1)
-	state := &serverState{shutdown: func() { called <- struct{}{} }}
-
-	state.completeUpdate(false)
-	select {
-	case <-called:
-		t.Fatal("ohne Versionswechsel wurde beendet")
-	case <-time.After(3 * shutdownResponseDelay):
-	}
-
-	state.completeUpdate(true)
-	select {
-	case <-called:
-	case <-time.After(2 * time.Second):
-		t.Fatal("bei Versionswechsel wurde nicht beendet")
-	}
-}
-
-// Der Versionswechsel meldet den Bootstrap in der kanonischen Form. Geprüft
-// wird der ganze Satz, nicht nur ein Wortbestandteil: die Meldung ist die
-// einzige Stelle, an der ein Nutzer beim Wechsel erfährt, dass das neue Binary
-// noch geholt werden muss.
+// Scheitert die Programmaktualisierung, nennt die Meldung den Bootstrap in der
+// kanonischen Form. Geprüft wird der ganze Satz, nicht nur ein
+// Wortbestandteil: die Meldung ist die Stelle, an der ein Nutzer erfährt, wie
+// er das Programm von Hand nachholt.
 //
 // Ausdrücklich mitgeprüft wird, was **nicht** dastehen darf: ein Zielprojekt
 // hat kein eigenes install-Target, `make install` liefe dort ins Leere.
-func TestVersionswechselMeldetKanonischenBootstrap(t *testing.T) {
-	message := versionChangeMessage()
+func TestInstallationsfehlerNenntKanonischenBootstrap(t *testing.T) {
+	message := installFailureMessage(errors.New("kein Netz"))
 
 	for _, want := range []string{
-		"beendet sich jetzt",
+		"kein Netz",
+		"läuft mit dem bisherigen Programm weiter",
 		"make -C " + project.PlaybookDirName + " install",
 		project.PlaybookDirName + "/bin/install",
 	} {
@@ -186,9 +165,10 @@ func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
 	}
 }
 
-// Ob zum neuen Stand ein anderes Binary gehört, entscheidet nicht der Wechsel
-// der VERSION allein, sondern der Vergleich mit dem laufenden Prozess.
-func TestBinaryOutdated(t *testing.T) {
+// Ob nach dem Pull installiert und neu gestartet wird, entscheidet nicht der
+// Wechsel der VERSION allein, sondern der semantische Vergleich mit dem
+// laufenden Programm: nur „älter" löst aus.
+func TestRestartAfterPull(t *testing.T) {
 	tests := []struct {
 		name    string
 		running string
@@ -196,26 +176,36 @@ func TestBinaryOutdated(t *testing.T) {
 		want    bool
 	}{
 		{
-			name:    "Zielprojekt: Clone zieht an, Binary bleibt zurück",
+			name:    "Zielprojekt: Clone zieht an, Programm bleibt zurück",
 			running: "v0.3.0",
 			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
 			want:    true,
 		},
 		{
-			// Der Entwicklungsfall: `make dev-install` hat das Binary des neuen
-			// Standes schon eingespielt, der Clone holt ihn erst jetzt nach.
-			name:    "Entwicklungsrepo: Binary trägt die neue Version bereits",
+			// Lexikalisch stünde v0.10.0 vor v0.9.4.
+			name:    "Minor-Sprung über 9 hinaus",
+			running: "v0.9.4",
+			result:  project.UpdateResult{VersionChanged: true, Version: "v0.10.0"},
+			want:    true,
+		},
+		{
+			// Der Entwicklungsfall: `make dev-install` hat das Programm des
+			// neuen Standes schon eingespielt, der Clone holt ihn erst jetzt nach.
+			name:    "Entwicklungsrepo: Programm trägt die neue Version bereits",
 			running: "v0.4.0",
 			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
 		},
 		{
-			// Ohne Versionswechsel darf nichts verlangt werden — auch dann
-			// nicht, wenn das Binary neuer ist als der Clone. Sonst schlüge
-			// jeder Doku-Pull im Entwicklungsrepo in die Aufforderung um, ein
-			// älteres Binary zu installieren.
-			name:    "kein Versionswechsel, Binary neuer als der Clone",
-			running: "v0.4.0",
-			result:  project.UpdateResult{Version: "v0.3.0"},
+			// Neuer als der Clone: nie herabstufen.
+			name:    "Programm neuer als der neue Stand",
+			running: "v0.5.0",
+			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
+		},
+		{
+			// Ohne Versionswechsel verhält sich ein Update wie immer.
+			name:    "kein Versionswechsel, Programm älter",
+			running: "v0.3.0",
+			result:  project.UpdateResult{Version: "v0.4.0"},
 		},
 		{
 			name:    "Installation ohne VERSION",
@@ -223,15 +213,15 @@ func TestBinaryOutdated(t *testing.T) {
 			result:  project.UpdateResult{VersionChanged: true},
 		},
 		{
-			name:   "Binary ohne gestempelte Version",
+			name:   "Programm ohne gestempelte Version",
 			result: project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := binaryOutdated(test.running, test.result); got != test.want {
-				t.Errorf("binaryOutdated = %v, erwartet %v", got, test.want)
+			if got := restartAfterPull(test.running, test.result); got != test.want {
+				t.Errorf("restartAfterPull = %v, erwartet %v", got, test.want)
 			}
 		})
 	}

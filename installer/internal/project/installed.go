@@ -63,8 +63,7 @@ var ErrNoInstalledCommand = errors.New("kein installiertes " + InstalledCommandN
 // von der Umgebung des Aufrufers abhängig, und in einem Entwicklungsrepo kann
 // dort noch ein abgelöster Wrapper vor ~/.local/bin stehen.
 func InstalledCommandPath() (string, error) {
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		candidate := filepath.Join(home, installedBinDirName, installedBinSubDir, InstalledCommandName)
+	if candidate, err := InstallTargetPath(); err == nil {
 		if isExecutableFile(candidate) {
 			return candidate, nil
 		}
@@ -80,6 +79,25 @@ func InstalledCommandPath() (string, error) {
 	}
 
 	return "", ErrNoInstalledCommand
+}
+
+// InstallTargetPath ist das Installationsziel: ~/.local/bin/k-playbook, der
+// Ort, an den bin/install und `make dev-install` schreiben. Ob dort schon eine
+// Datei liegt, sagt der Wert nicht.
+//
+// Er ist der eine feste Ort, von dem aus die Oberfläche nach einer
+// Programmaktualisierung neu startet: das laufende Programm kann woanders
+// liegen, der nächste Aufruf von `k-playbook` findet aber — bei stimmendem
+// PATH — genau diese Datei.
+func InstallTargetPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if home == "" {
+		return "", errors.New("kein Home-Verzeichnis bekannt")
+	}
+	return filepath.Join(home, installedBinDirName, installedBinSubDir, InstalledCommandName), nil
 }
 
 // isExecutableFile meldet, ob an path eine ausführbare Datei liegt. Symlinks

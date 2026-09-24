@@ -44,3 +44,4 @@ k-playbook
 - Beendet wird über den Knopf `Dienst beenden` in der Oberfläche oder `k-playbook stop`; ohne jede Anfrage beendet sich der Server nach 60 Minuten von selbst. Das Schließen des Browserfensters beendet ihn nicht.
 - Die Oberfläche gibt die lokale URL aus, falls der Browser nicht automatisch startet.
 - Dieser Command löscht keine Projektdateien. Der Start zieht nebenbei eine veraltete MCP-Registrierung und einen veralteten Anstoßblock in `AGENTS.md` nach und meldet, was er getan hat.
+- Ist das laufende Programm älter als die `VERSION` der Installation, sagt das eine Zeile im Terminal, und die Oberfläche bietet „Programm aktualisieren" an. Erst der Klick installiert über `k-playbook/bin/install` und startet den Dienst daraus neu — die Seite landet dabei von selbst beim neuen Dienst, unter neuer Adresse. Der Start selbst lädt nie etwas.

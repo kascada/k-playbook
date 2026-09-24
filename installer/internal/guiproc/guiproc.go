@@ -267,6 +267,10 @@ type Registration struct {
 	mu     sync.Mutex
 	record Record
 	path   string
+	// released: die Datei ist für einen Nachfolger freigegeben. Dann gehört
+	// sie diesem Prozess nicht mehr — Remove und Rekey lassen sie in Ruhe,
+	// auch wenn inzwischen der Nachfolger unter demselben Pfad steht.
+	released bool
 }
 
 // Register schreibt die Laufzeitdatei für record.Key. Sie entsteht mit
@@ -327,7 +331,7 @@ func (r *Registration) Rekey(key string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if key == r.record.Key {
+	if key == r.record.Key || r.released {
 		return nil
 	}
 	location, err := Locate(key)
@@ -345,9 +349,59 @@ func (r *Registration) Rekey(key string) error {
 }
 
 // Remove löscht die Laufzeitdatei. Sie gehört beim Beenden weg, sonst fände
-// der nächste Aufruf eine Datei ohne Prozess.
+// der nächste Aufruf eine Datei ohne Prozess. Nach Release tut es nichts:
+// unter dem Pfad steht dann womöglich schon der Nachfolger, und dessen Datei
+// zu löschen hieße, ihn unauffindbar zu machen.
 func (r *Registration) Remove() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.released {
+		return nil
+	}
 	return Remove(r.path)
+}
+
+// Release gibt die Laufzeitdatei für einen Nachfolger frei: sie wird gelöscht,
+// und dieser Prozess gilt nicht mehr als registriert.
+//
+// Das ist die eine Richtung der Übergabe beim Neustart. Die Datei entsteht mit
+// O_CREAT|O_EXCL, ein neuer Server weicht einer vorhandenen aus — „erst
+// starten, dann übergeben" geht deshalb nicht. Stattdessen gibt der alte
+// Server frei, startet den neuen und wartet auf ihn. So sind nie zwei Server
+// registriert; die kurze Lücke dazwischen ist in Kauf genommen.
+func (r *Registration) Release() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.released {
+		return nil
+	}
+	if err := Remove(r.path); err != nil {
+		return err
+	}
+	r.released = true
+	return nil
+}
+
+// Reclaim schreibt die freigegebene Laufzeitdatei wieder, mit demselben
+// Inhalt wie zuvor — die Rückrichtung, wenn der Nachfolger nicht gestartet
+// ist. Hat inzwischen ein anderer Start die Datei geschrieben, endet Reclaim
+// wie Register mit fs.ErrExist, und dieser Prozess bleibt freigegeben.
+func (r *Registration) Reclaim() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.released {
+		return nil
+	}
+	if err := writeExclusive(r.path, r.record); err != nil {
+		return err
+	}
+	r.released = false
+	return nil
+}
+
+// Released meldet, ob die Datei freigegeben ist.
+func (r *Registration) Released() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.released
 }

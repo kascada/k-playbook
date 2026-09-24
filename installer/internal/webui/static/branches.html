@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Die Branches des Code-Repos, nicht des Hauptverzeichnisses: bei
+               repo_root: omni-gw ist es omni-gw. Ungefragt läuft kein git fetch;
+               „Aktualisieren“ ist der einzige Weg dahin. Umgeschaltet wird nur
+               nach Vorprüfung und Bestätigung, und der Server prüft unmittelbar
+               davor erneut. Eine Antwort liefert alle drei Karten. -->
+          <section class="card" id="br-env-card">
+            <div class="section-head">
+              <div>
+                <h2>Umgebungen</h2>
+              </div>
+              <span id="br-env-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Welcher Branch welche Umgebung bedient, gilt nur, wenn es in
+              <code>K-PLAYBOOK.yaml</code> unter <code>git.environments</code> festgelegt ist.
+              Alles andere ist ein Vorschlag — aus dem Branch-Namen oder, wenn das Projekt
+              <code>gh</code> nutzt, aus dem letzten Deployment — und steht als solcher da.
+            </p>
+            <div id="br-env-list" class="branch-list empty">Noch nicht geladen.</div>
+            <p id="br-env-message" class="message"></p>
+          </section>
+
+          <section class="card" id="br-list-card">
+            <div class="section-head">
+              <div>
+                <h2>Branches</h2>
+              </div>
+              <span id="br-list-pill" class="pill muted">Laden...</span>
+            </div>
+            <dl id="br-facts" class="facts"></dl>
+            <p id="br-switch-policy" class="hint branch-note"></p>
+            <div class="branch-actions">
+              <button type="button" id="br-fetch" class="secondary" disabled
+                      title="Führt git fetch --all --prune im Code-Repo aus. Lokale Branches und der Arbeitsbaum bleiben unberührt.">Aktualisieren (git fetch)</button>
+              <span id="br-fetch-progress" class="loading-inline hidden">
+                <span class="loading-spinner" aria-hidden="true"></span>
+                <span>Fetch läuft...</span>
+              </span>
+            </div>
+            <p id="br-fetch-message" class="message"></p>
+            <div id="br-groups" class="branch-groups">Noch nicht geladen.</div>
+            <p id="br-list-message" class="message"></p>
+          </section>
+
+          <section class="card" id="br-worktree-card">
+            <div class="section-head">
+              <div>
+                <h2>Worktrees</h2>
+              </div>
+              <span id="br-worktree-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Ein Branch kann nur in einem Worktree zugleich ausgecheckt sein. Ein Eintrag, dessen
+              Verzeichnis fehlt, ist <code>prunable</code> und hält seinen Branch trotzdem fest,
+              bis <code>git worktree prune</code> ihn entfernt.
+            </p>
+            <div id="br-worktrees" class="branch-list empty">Noch nicht geladen.</div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- Die Bestätigung nennt, was genau passiert: von wo nach wo, den
+         git-Befehl und die Hinweise der Prüfung. Erst „Umschalten auf …“ schickt
+         den POST, und der Server prüft dann noch einmal. -->
+    <dialog id="br-confirm" class="branch-dialog" aria-labelledby="br-confirm-title">
+      <h2 id="br-confirm-title">Umschalten bestätigen</h2>
+      <dl class="facts">
+        <div><dt>Von</dt><dd id="br-confirm-source"></dd></div>
+        <div><dt>Nach</dt><dd id="br-confirm-target"></dd></div>
+      </dl>
+      <div class="command-row">
+        <code id="br-confirm-command"></code>
+      </div>
+      <div id="br-confirm-hints"></div>
+      <p class="hint">
+        Ohne <code>--force</code>, ohne Stash und ohne Pull. Hat sich seit der Prüfung etwas
+        geändert, schaltet der Server nicht um und zeigt die neue Prüfung.
+      </p>
+      <div class="branch-actions">
+        <button type="button" id="br-confirm-cancel" class="secondary">Abbrechen</button>
+        <button type="button" id="br-confirm-run" class="primary">Umschalten</button>
+      </div>
+    </dialog>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/branches.js"></script>
+  </body>
+</html>

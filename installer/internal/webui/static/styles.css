@@ -122,6 +122,7 @@
   --gutter-narrow: 22px;
   --height-fill-min: 36rem;
   --height-chat-log-min: 10rem;
+  --width-dialog: 42rem;
 }
 
 * {
@@ -374,9 +375,12 @@ textarea {
     max-height: none;
   }
 
+  /* Waagerecht passen nicht alle Einträge in eine schmale Zeile; die Reihe
+     scrollt dann in ihrem Kasten, statt die Seite zu verbreitern. */
   .area-nav {
     grid-auto-flow: column;
     justify-content: start;
+    overflow-x: auto;
   }
 
   /* Waagerecht gibt es kein Oben und Unten mehr, gegen das eingerückt werden
@@ -1355,8 +1359,11 @@ button.attention-highlight {
   gap: var(--space-6);
 }
 
+/* Die Spalte ist begrenzt, sonst wächst sie auf die volle Länge des längsten
+   Titels und die Kürzung mit Auslassungszeichen greift nie. */
 .chat-session-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1420,8 +1427,13 @@ button.attention-highlight {
 /* Die Höhe des Verlaufs verteilt .shell.fill: er bekommt, was Kopf, Formular
    und Docks übrig lassen. Die Obergrenze gilt nur ohne diesen Umschalter, die
    Mindesthöhe immer — ein großes Dock drückt den Verlauf nicht auf null. */
+/* Die Spalte ist ausdrücklich auf die Breite des Verlaufs begrenzt. Ohne das
+   wächst die automatische Spalte bis zur längsten Zeile einer Tool-Ausgabe
+   (pre.snippet), und jede Nachricht wird so breit — die eigene, rechts
+   ausgerichtet, rückt dann aus dem sichtbaren Bereich. */
 .chat-log {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-stack);
   min-height: var(--height-chat-log-min);
@@ -1433,9 +1445,12 @@ button.attention-highlight {
   background: var(--inset-bg);
 }
 
+/* Aus demselben Grund begrenzt: lange Zeilen scrollen in ihrem eigenen Block,
+   nicht in der Nachricht. */
 .chat-message {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -1879,6 +1894,142 @@ button.attention-highlight {
   font-size: var(--text-xs);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Branches: die Seite /branches — Umgebungen, Branches des Code-Repos,
+   Worktrees und die Vorprüfung vor dem Umschalten. Zustände tragen .pill; die
+   Beschriftungen daneben (.branch-name, .branch-meta, .branch-group-title,
+   .check-title) stehen in styleLabelClasses. Knöpfe gibt es nur dort, wo
+   etwas passiert: Aktualisieren, Umschalten prüfen, Umschalten auf … */
+.branch-list {
+  display: grid;
+  gap: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-inset);
+  background: var(--inset-bg);
+}
+
+.branch-list.empty {
+  color: var(--muted);
+  font-size: var(--text-md);
+}
+
+.branch-groups {
+  display: grid;
+  gap: var(--space-stack);
+  margin-top: var(--space-stack);
+}
+
+.branch-group-title {
+  margin: 0 0 var(--space-4);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.branch-item,
+.check-item {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-5);
+}
+
+.branch-item:last-child,
+.check-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.branch-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-5);
+  min-width: 0;
+}
+
+.branch-name {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.branch-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.branch-detail {
+  font-family: var(--font-mono);
+}
+
+.branch-note {
+  margin: var(--space-4) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.branch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.branch-check {
+  margin-top: var(--space-4);
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-6);
+}
+
+.check-list {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.check-title {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.branch-hints {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-10);
+  color: var(--muted);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+
+/* Der Bestätigungsdialog ist eine Inhaltsfläche mit eigenen Bedienelementen,
+   keine Beschriftung. */
+.branch-dialog {
+  width: min(100% - var(--gutter-narrow), var(--width-dialog));
+  max-height: 90vh;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-card);
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+
+.branch-dialog::backdrop {
+  background: var(--veil);
+}
+
+.branch-dialog h2 {
+  margin-bottom: var(--space-stack);
 }
 
 /* Die Breite steht als Zahl: in einer @media-Bedingung gilt var() nicht. */

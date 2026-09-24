@@ -44,18 +44,36 @@ type Child struct {
 	LogPath string
 }
 
-// Spawn startet das eigene Binary als abgekoppelten Server: eigene Sitzung
-// (Setsid), unverändertes Arbeitsverzeichnis, stdin aus /dev/null, stdout und
-// stderr in die Logdatei, die bei jedem Start neu beginnt.
+// HostCareEnv ist die zweite Marke neben ServeEnv: der Server pflegt vor dem
+// Start den Wirt wie ein argumentloser Aufruf — MCP-Registrierung,
+// Schreibschutz, Aufräumen von Altlasten —, öffnet aber keinen Browser.
+//
+// Gesetzt wird sie beim Neustart nach einer Programmaktualisierung. Dort gibt
+// es keinen argumentlosen Aufruf, der die Pflege sonst übernähme, und das neue
+// Programm soll sie mit seinem eigenen Code ausführen, nicht mit dem des alten
+// Dienstes. Ein Programm, das die Marke nicht kennt, übergeht sie.
+const HostCareEnv = "K_PLAYBOOK_HOST_CARE"
+
+// HostCareMode meldet, ob dieser Server vor dem Start den Wirt pflegen soll.
+func HostCareMode() bool {
+	return os.Getenv(HostCareEnv) == "1"
+}
+
+// Spawn startet exe als abgekoppelten Server: eigene Sitzung (Setsid),
+// unverändertes Arbeitsverzeichnis, stdin aus /dev/null, stdout und stderr in
+// die Logdatei, die bei jedem Start neu beginnt. extraEnv kommt zur Umgebung
+// dieses Prozesses und der Servermarke hinzu.
 //
 // Das Arbeitsverzeichnis bleibt bewusst: alle Handler leiten das Projekt
 // daraus ab. Das chdir("/") klassischer Daemonisierung wäre hier genau der
 // Fehler, der alles bricht.
-func Spawn(logPath string) (*Child, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("eigenes Binary: %w", err)
-	}
+//
+// exe ist ein Parameter und nicht fest os.Executable(): der argumentlose
+// Aufruf startet sich selbst, der Neustart nach einer Programmaktualisierung
+// dagegen das Installationsziel. Das laufende Programm kann woanders liegen
+// als ~/.local/bin/k-playbook, und gestartet werden soll die Datei, die auch
+// der nächste Aufruf von `k-playbook` findet.
+func Spawn(exe string, logPath string, extraEnv ...string) (*Child, error) {
 	// O_TRUNC: jeder Start beginnt das Log neu. O_APPEND dazu, weil bei zwei
 	// gleichzeitigen Starts beide Kinder dieselbe Datei halten — so
 	// überschreibt der Verlierer nicht die Zeilen des Gewinners.
@@ -72,7 +90,7 @@ func Spawn(logPath string) (*Child, error) {
 	defer devNull.Close()
 
 	cmd := exec.Command(exe)
-	cmd.Env = append(os.Environ(), ServeEnv+"=1")
+	cmd.Env = append(append(os.Environ(), ServeEnv+"=1"), extraEnv...)
 	cmd.Stdin = devNull
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile

@@ -46,7 +46,13 @@ async function checkHealth() {
   }
   healthFailures += 1;
   if (healthFailures >= HEALTH_FAILURES_BEFORE_LOCK) {
-    markServerGone("Verbindung zu k-playbook verloren.");
+    // Der Hinweis auf das Terminal steht gleich dabei: nach einer
+    // Programmaktualisierung aus einem anderen Fenster läuft der Dienst unter
+    // neuer Adresse, und „Erneut verbinden" fände ihn hier nie wieder.
+    markServerGone(
+      "Verbindung zu k-playbook verloren. Im Terminal k-playbook aufrufen, um die Oberfläche neu " +
+        "zu öffnen — nach einem Neustart läuft der Dienst unter neuer Adresse."
+    );
   }
 }
 

@@ -250,6 +250,7 @@ configuration and the filesystem:
 | `playbook`, `local` | the two resolved directories |
 | `remediation` | the policy, including a default when the block is missing |
 | `gh` | the GitHub CLI decision and host finding |
+| `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `rules`, `reviews`, `checks`, merged |
 | `guidelines` | files from `k-playbook-local/guidelines/` |
@@ -376,6 +377,15 @@ tools:
   mcp:
     required:
       - k-playbook
+
+git:
+  switch: offer
+  allow:
+    - development
+    - remediation/*
+  environments:
+    dev: development
+    prod: master
 ```
 
 ## Fields
@@ -508,12 +518,42 @@ a snippet to copy. With it, the page marks every required name that is missing
 in one of the three assistant files. Nothing writes this block: it is edited by
 hand.
 
+### `git`
+
+Optional block for the **Branches** page of the interface: whether it offers switching the
+branch of the code repository (`project.repo_root`), where to, and which long-lived branch
+serves which environment.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `switch` | enum | `unknown`, `offer`, or `off` |
+| `allow` | list of strings | branch patterns a switch may target; `*` matches any characters including `/`; empty means every branch |
+| `environments` | mapping | environment name → branch name, in file order |
+
+**The default is `unknown`.** As with `tools.gh.status`, it is an explicit state, not a silent
+no: without the block the page lists branches and environments but offers no switch and says
+where the decision belongs. `off` is the decision not to switch from the interface.
+
+`environments` is the only authoritative source for which branch serves an environment.
+Without an entry, the page shows a suggestion — from the branch name, or, when the project uses
+`gh`, from the latest deployment — and labels it as such. A branch may serve several
+environments; several branches per environment are not expressible. The format is flat and
+keyed on purpose, so that a later per-user layer can override single keys.
+
+An unknown value or key, an empty `allow` entry, an environment without a branch, an invalid
+branch name, or the same environment in two spellings (`Prod:` and `prod:`) stops `context`;
+environment names are compared case-insensitively. The interface does not stop: it shows the list and reports the
+switch permission as not checkable. Both list forms are read for `allow`.
+
+Adding the block does not change `schema_version`: it is optional, and older installations
+ignore unknown blocks. Nothing writes this block; it is edited by hand.
+
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
 - Write only after confirmation, step by step.
 - The tool owns `schema_version` and `project.*`.
-- The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` is only read.
+- The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` and `git` are only read.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.
 - Host-local installation states do not belong in this file.

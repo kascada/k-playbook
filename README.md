@@ -174,18 +174,28 @@ make -C k-playbook installer-update
 
 `k-playbook/` contains nothing project-owned and is fully replaceable because of that.
 
-**If `VERSION` changed along the way, the new state comes with a different binary.** The
-background service then exits and names the bootstrap; it does not install itself. The
-call is the same as for the initial installation and is due once in every environment —
-on the host as well as in the devcontainer:
+**If `VERSION` changed along the way, the new state comes with a different binary.** If the
+running program is older than that version, the interface installs it on the spot: one
+click runs the clone's bootstrap, which verifies the asset against `SHA256SUMS` and
+replaces `~/.local/bin/k-playbook`, and the service then restarts itself from the new
+program — the open page follows to the new address. Nothing is downloaded on startup or
+during a check, only on that click. If the running program is equally old or newer, as in a
+development repository after `make dev-install`, nothing is installed.
+
+By hand it stays the same call as for the initial installation, due once in every
+environment — on the host as well as in the devcontainer:
 
 ```bash
 make -C k-playbook install
 ```
 
 Without `make`: `k-playbook/bin/install`. A target project has no `install` target of its
-own; the call always goes through the clone. If only commands, rules or recipes are new,
-`VERSION` does not change and the service keeps running.
+own; the call always goes through the clone. It is the way to go if the installation fails
+or if `k-playbook` in the `PATH` resolves to a different file than
+`~/.local/bin/k-playbook`; in that case the interface shows a note with both paths instead
+of the button, because a program installed there would not be the one the next call starts.
+If only commands, rules or recipes are new, `VERSION` does not change and the service keeps
+running.
 
 The linking for the assistants catches up by itself afterwards — on the next
 `k-playbook context`, the call at the start of every session, or on the next look at the

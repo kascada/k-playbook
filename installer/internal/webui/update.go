@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -15,26 +16,91 @@ type updateResponse struct {
 	Local     string `json:"local"`
 	Remote    string `json:"remote"`
 	Output    string `json:"output"`
-	// RestartRequired: die Binaries wurden ersetzt, der laufende Prozess
-	// arbeitet aber weiter mit dem alten Code.
-	RestartRequired bool `json:"restartRequired"`
 	// Links nennt, was das Update an der Registrierung von Commands und Skills
 	// geändert hat.
 	Links   project.LinkChanges `json:"links"`
 	Message string              `json:"message"`
+	// Program vergleicht das laufende Programm mit der VERSION des Clones.
+	// Die Angabe hängt nicht am Remote: sie steht auch dann da, wenn
+	// ls-remote scheitert.
+	Program *programStatus `json:"program,omitempty"`
+
+	// Die Felder darunter trägt nur die Antwort auf einen POST, der
+	// installiert und neu gestartet hat oder es versucht hat.
+
+	// Restarted: der Dienst läuft jetzt unter URL, dieser beendet sich nach
+	// der Antwort. Die Seite wechselt selbst dorthin.
+	Restarted bool   `json:"restarted,omitempty"`
+	URL       string `json:"url,omitempty"`
+	// Version ist die des neuen Dienstes.
+	Version string `json:"version,omitempty"`
+	// InstallFailed: Installation oder Neustart sind gescheitert, dieser
+	// Dienst läuft weiter. Message nennt Fehler und Befehl zum Nachholen.
+	InstallFailed bool `json:"installFailed,omitempty"`
+	// InstallOutput ist die Ausgabe von bin/install, sofern es lief, und bei
+	// einem gescheiterten Start das Log des neuen Dienstes.
+	InstallOutput string `json:"installOutput,omitempty"`
+	// Busy: es laufen Befehle oder Chats, und der Aufruf trug keine
+	// Bestätigung. Message ist die Rückfrage.
+	Busy bool `json:"busy,omitempty"`
 }
 
-// updateCheckHandler prüft den Remote-Stand. Rein lesend.
-func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
+// programStatus ist der Vergleich des laufenden Programms mit dem Clone.
+type programStatus struct {
+	// Running ist die Version dieses Dienstes, Clone die VERSION der
+	// Installation.
+	Running string `json:"running"`
+	Clone   string `json:"clone"`
+	// Order ist das Ergebnis des Vergleichs: älter, gleich, neuer, unbekannt.
+	Order string `json:"order"`
+	// Outdated: das laufende Programm ist älter als der Clone. Nur das löst
+	// eine Meldung aus.
+	Outdated bool `json:"outdated"`
+	// Installable: `k-playbook` im PATH zeigt auf das Installationsziel. Nur
+	// dann gibt es den Knopf; sonst steht Hint da, mit beiden Pfaden.
+	Installable bool   `json:"installable"`
+	Target      string `json:"target,omitempty"`
+	Found       string `json:"found,omitempty"`
+	Hint        string `json:"hint,omitempty"`
+}
+
+// checkProgram vergleicht die Version dieses Dienstes mit der VERSION des
+// Clones — die gemeinsame Prüfung für GET /api/update, den Versionswechsel im
+// POST und POST /api/update/program.
+//
+// Nur „älter" meldet. Gleich oder neuer ist im Entwicklungsrepo nach
+// `make dev-install` der Normalfall, und eine nicht lesbare Version ist kein
+// Nachweis. Den PATH prüft sie nur, wenn es etwas anzubieten gäbe.
+func checkProgram(running string, playbookDir string) *programStatus {
+	clone := project.InstalledVersion(playbookDir)
+	order := program.Compare(running, clone)
+	status := &programStatus{Running: running, Clone: clone, Order: order.String(), Outdated: order == program.Older}
+	if !status.Outdated {
+		return status
+	}
+	path := program.CheckPath()
+	status.Target, status.Found, status.Installable = path.Target, path.Found, path.OK
+	status.Hint = path.Hint()
+	return status
+}
+
+// updateCheckHandler prüft den Remote-Stand und das laufende Programm. Rein
+// lesend: heruntergeladen wird hier nie etwas.
+//
+// Beides steht nebeneinander in der Antwort. Trifft beides zu, hat das ältere
+// Programm Vorrang in der Oberfläche, denn ein Pull allein hilft dann nicht —
+// der Clone ist schon weiter als das Programm, das ihn bedient.
+func (state *serverState) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, updateResponse{})
 		return
 	}
+	programState := checkProgram(state.version, environment.PlaybookDir)
 
 	status, err := project.CheckUpdate(environment.ProjectDir)
 	if err != nil {
-		writeJSON(w, http.StatusOK, updateResponse{Message: "Prüfung fehlgeschlagen: " + err.Error()})
+		writeJSON(w, http.StatusOK, updateResponse{Message: "Prüfung fehlgeschlagen: " + err.Error(), Program: programState})
 		return
 	}
 	writeJSON(w, http.StatusOK, updateResponse{
@@ -43,15 +109,26 @@ func updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Local:     shortCommit(status.Local),
 		Remote:    shortCommit(status.Remote),
 		Message:   status.Message,
+		Program:   programState,
 	})
 }
 
+// updateBusyMessage ist die Antwort auf einen zweiten Aufruf, während einer
+// läuft.
+const updateBusyMessage = "Aktualisierung läuft bereits."
+
 // applyUpdateHandler holt den neuen Stand.
 //
-// Wechselt dabei die VERSION, gehört zum neuen Stand ein anderes Binary. Der
-// Hintergrunddienst beendet sich dann nach der Antwort, wie bei /api/shutdown:
-// ein weiterlaufender alter Daemon würde vom nächsten Aufruf zwar an der
-// Version erkannt und ersetzt, hier ist der Wechsel aber schon bekannt.
+// Bewegt der Pull die VERSION und ist das laufende Programm älter als die
+// neue, installiert der Dienst das passende Programm über den Bootstrap des
+// Clones und startet daraus neu — derselbe Ablauf wie
+// POST /api/update/program. Ist das laufende Programm gleich alt oder neuer,
+// läuft er weiter wie bei einem Update ohne Versionswechsel.
+//
+// Zeigt der PATH auf ein anderes Programm, bleibt es beim Pull: der Dienst
+// läuft weiter, und die Antwort trägt den Hinweis statt eines Neustarts. Laufen
+// Befehle oder Chats, wird ebenfalls nicht neu gestartet; die Prüfung meldet
+// danach „Programm älter", und der Knopf fragt vor dem Neustart nach.
 func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -60,6 +137,11 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		})
 		return
 	}
+	if !state.updateMu.TryLock() {
+		writeJSON(w, http.StatusConflict, updateResponse{Message: updateBusyMessage})
+		return
+	}
+	defer state.updateMu.Unlock()
 
 	result, err := project.Update(environment.ProjectDir)
 	if err != nil {
@@ -70,14 +152,9 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	restartRequired := binaryOutdated(state.version, result)
 	response := updateResponse{
-		Output:          result.Output,
-		RestartRequired: restartRequired,
-		Message:         "Aktualisiert.",
-	}
-	if restartRequired {
-		response.Message = versionChangeMessage()
+		Output:  result.Output,
+		Message: "Aktualisiert.",
 	}
 	if note := describeMCPRepair(result); note != "" {
 		response.Message += " " + note
@@ -92,60 +169,46 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 		response.Local = shortCommit(status.Local)
 		response.Remote = shortCommit(status.Remote)
 	}
-	writeJSON(w, http.StatusOK, response)
-	state.completeUpdate(restartRequired)
-}
+	response.Program = checkProgram(state.version, environment.PlaybookDir)
 
-// binaryOutdated meldet, ob zum aktualisierten Stand ein anderes Binary gehört
-// als das laufende.
-//
-// Zwei Bedingungen, und beide werden gebraucht:
-//
-//   - Der Pull muss die VERSION bewegt haben. Ohne das ist der Stand derselbe
-//     wie vorher, und ein Binary, das schon vorher passte, passt weiter.
-//   - Das laufende Binary darf die neue Version nicht schon tragen. Genau hier
-//     lag der Fehler: im Entwicklungsrepo steht unter ~/.local/bin längst das
-//     Binary des neuen Standes, weil `make dev-install` es gebaut hat, während
-//     der Clone noch dem zuletzt gepushten Commit folgt. Holt der ihn nach,
-//     wechselt dort die VERSION — und der Dienst beendete sich, obwohl nichts
-//     zu tun war, und verwies auf den Bootstrap. Der lädt das Release-Asset:
-//     im Entwicklungsrepo der falsche Weg, und vor dem Release gibt es das
-//     Asset nicht einmal.
-//
-// Warum nicht schlicht „laufende Version ≠ Version der Installation": im
-// Entwicklungsrepo ist das Binary regelmäßig **neuer** als der Clone. Jeder
-// Pull ohne Versionswechsel schlüge dann in eine Aufforderung um, ein älteres
-// Binary zu installieren.
-//
-// Fehlt eine der beiden Angaben, wird nichts verlangt: ohne Vergleichsgrundlage
-// ist ein selbsttätiges Ende des Dienstes das schlechtere Ergebnis.
-func binaryOutdated(running string, result project.UpdateResult) bool {
-	if !result.VersionChanged || running == "" || result.Version == "" {
-		return false
-	}
-	return running != result.Version
-}
-
-// versionChangeMessage ist die Meldung des Versionswechsels.
-//
-// Sie sagt zwei Dinge, die zusammengehören: der Dienst endet jetzt, und das
-// neue Binary kommt nicht von selbst — es wird über den Bootstrap installiert.
-// Der steht hier nicht als Literal, sondern als project.BootstrapHint, damit
-// Meldung, README und docs/installation.md dieselbe kanonische Form nennen. Ein
-// bloßes `make install` gibt es in einem Zielprojekt nicht.
-func versionChangeMessage() string {
-	return "Aktualisiert. Zum neuen Stand gehört ein anderes Binary; der Dienst beendet sich jetzt. " +
-		"Neu installieren mit: " + project.BootstrapHint + ". Danach k-playbook erneut aufrufen."
-}
-
-// completeUpdate beendet den Dienst nach einem Update, das ein neues Binary
-// verlangt. Bei unveränderter VERSION läuft er weiter: der neue Stand liegt
-// auf der Platte, und jeder Handler liest ihn bei der nächsten Anfrage.
-func (state *serverState) completeUpdate(binaryChanged bool) {
-	if !binaryChanged {
+	if !restartAfterPull(state.version, result) {
+		writeJSON(w, http.StatusOK, response)
 		return
 	}
-	state.shutdownAfterResponse()
+	if !response.Program.Installable {
+		response.Message += " Zum neuen Stand gehört ein neueres Programm. " + response.Program.Hint
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+	if activity := state.activeWork(); activity != "" && !confirmed(r) {
+		response.Message += " Zum neuen Stand gehört ein neueres Programm. " + activity +
+			" Deshalb startet der Dienst jetzt nicht neu; „Programm aktualisieren“ holt das nach."
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	outcome := state.installAndRestart(environment.ProjectDir)
+	outcome.applyTo(&response)
+	writeJSON(w, http.StatusOK, response)
+	if outcome.Restarted {
+		state.shutdownAfterResponse()
+	}
+}
+
+// restartAfterPull meldet, ob nach dem Pull installiert und neu gestartet
+// wird: die VERSION hat gewechselt, und das laufende Programm ist älter als
+// die neue.
+//
+// Beide Bedingungen werden gebraucht. Ohne Versionswechsel verhält sich ein
+// Update wie immer — Pull, Verlinkung, der Dienst läuft weiter. Und nur
+// „älter" löst aus, nie „ungleich": im Entwicklungsrepo ist das Programm
+// regelmäßig neuer als der Clone, weil `make dev-install` es gebaut hat,
+// während der Clone noch dem zuletzt gepushten Commit folgt. Holt er ihn
+// nach, wechselt dort die VERSION; ein Vergleich auf Ungleichheit stufte das
+// Programm dann herab. Fehlt eine Angabe oder ist sie nicht lesbar, wird
+// nichts verlangt.
+func restartAfterPull(running string, result project.UpdateResult) bool {
+	return result.VersionChanged && program.Compare(running, result.Version) == program.Older
 }
 
 // relinkAfterUpdate zieht die Assistenten-Einrichtung auf den neuen Stand nach

@@ -8,6 +8,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
+	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
@@ -17,13 +18,8 @@ import (
 // nach dem Ergebnis: ein zweiter Aufruf startet nichts Neues, er öffnet nur
 // den Browser. Das Terminal ist danach in jedem Fall wieder frei.
 func runGUI() error {
-	cleanUpLegacy()
-	cleanUpFormerHostInstall()
-	cleanUpLegacyWrapper()
-	protectProjectInstallation()
-	ensureLocalStructure()
-	repairMCPRegistration()
-	repairRootInstructions()
+	careForHost()
+	noteOutdatedProgram(os.Stdout, guiproc.OwnVersion())
 
 	key, err := guiproc.Key()
 	if err != nil {
@@ -41,6 +37,49 @@ func runGUI() error {
 		start:   startDetached,
 		out:     os.Stdout,
 	})
+}
+
+// careForHost ist die Startpflege: Wirt und Projekt nachziehen, soweit das
+// ohne Schaden geht. Sie läuft bei jedem argumentlosen Aufruf und im Server,
+// den eine Programmaktualisierung neu startet (guiproc.HostCareEnv) — dort
+// gibt es keinen Aufruf, der sie sonst übernähme. Einen Browser öffnet sie nie.
+func careForHost() {
+	cleanUpLegacy()
+	cleanUpFormerHostInstall()
+	cleanUpLegacyWrapper()
+	protectProjectInstallation()
+	ensureLocalStructure()
+	repairMCPRegistration()
+	repairRootInstructions()
+}
+
+// noteOutdatedProgram meldet in einer Zeile, dass dieses Programm älter ist
+// als die VERSION des Clones.
+//
+// Nur ein Hinweis: beim Start wird nichts heruntergeladen. Die Oberfläche
+// bietet dieselbe Aktualisierung als Knopf an, und erst der Klick installiert.
+// Ohne die Zeile bliebe der Zustand „Clone neu, Programm alt" im Terminal
+// unsichtbar — genau der Zustand, in dem ein Nutzer nach einem Update-Klick
+// und einem erneuten `k-playbook` wieder das alte Programm vor sich hatte.
+func noteOutdatedProgram(out io.Writer, running string) {
+	environment := project.Detect()
+	if !environment.Installed {
+		return
+	}
+	if line := outdatedProgramNotice(running, project.InstalledVersion(environment.PlaybookDir)); line != "" {
+		fmt.Fprintln(out, line)
+	}
+}
+
+// outdatedProgramNotice ist die Zeile selbst, leer, wenn nichts zu melden ist.
+// Nur „älter" meldet: gleich, neuer und unbekannt sind kein Anlass.
+func outdatedProgramNotice(running string, clone string) string {
+	if program.Compare(running, clone) != program.Older {
+		return ""
+	}
+	return fmt.Sprintf("Hinweis: Dieses Programm (%s) ist älter als die Installation (%s). "+
+		"Die Oberfläche bietet „Programm aktualisieren“ an; im Terminal: %s.",
+		running, clone, project.BootstrapCommand)
 }
 
 // cleanUpFormerHostInstall entfernt Daten des abgelösten Wrapper-Modells.
@@ -323,7 +362,11 @@ func spawnServer(out io.Writer) (guiproc.Record, error) {
 	if err != nil {
 		return guiproc.Record{}, err
 	}
-	child, err := guiproc.Spawn(location.Log)
+	exe, err := os.Executable()
+	if err != nil {
+		return guiproc.Record{}, fmt.Errorf("eigenes Binary: %w", err)
+	}
+	child, err := guiproc.Spawn(exe, location.Log)
 	if err != nil {
 		return guiproc.Record{}, err
 	}

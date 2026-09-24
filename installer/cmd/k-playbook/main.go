@@ -6,13 +6,16 @@
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage,
-// und `stop` beendet den Hintergrunddienst der Oberfläche.
+// `version` nennt die Version des Programms, und `stop` beendet den
+// Hintergrunddienst der Oberfläche.
 package main
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
@@ -38,6 +41,13 @@ func run(args []string) error {
 			// Die Marke wird gelöscht, damit kein Kindprozess des Servers sie
 			// erbt und selbst zum Server wird.
 			os.Unsetenv(guiproc.ServeEnv)
+			if guiproc.HostCareMode() {
+				// Neustart nach einer Programmaktualisierung: die Pflege, die
+				// sonst der argumentlose Aufruf übernimmt, läuft hier mit dem
+				// Code dieses Programms. Ausgaben gehen ins Log.
+				os.Unsetenv(guiproc.HostCareEnv)
+				careForHost()
+			}
 			return webui.Serve()
 		}
 		return runGUI()
@@ -79,6 +89,11 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie todo: die Ausgabe ist maschinenlesbar, und
 		// der Zugriff soll nichts anfassen außer dem eigenen Index.
 		return runKnowledge(args[1:])
+	case "version":
+		// Ohne Wirt-Pflege: die Ausgabe ist die Version und sonst nichts —
+		// die Oberfläche liest sie an der Datei am Installationsziel, bevor
+		// sie entscheidet, ob nachinstalliert wird.
+		return runVersion(os.Stdout)
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -89,6 +104,19 @@ func run(args []string) error {
 		printUsage()
 		return fmt.Errorf("unbekanntes Kommando: %s", args[0])
 	}
+}
+
+// runVersion gibt die gestempelte Version aus, eine Zeile, sonst nichts. Ein
+// Programm ohne Version — ein Ad-hoc-`go build` ohne Build-Flags — endet mit
+// Fehler und leerer Standardausgabe: eine erfundene Angabe wäre schlechter als
+// keine, denn der Leser vergleicht sie.
+func runVersion(out io.Writer) error {
+	version := guiproc.OwnVersion()
+	if version == "" {
+		return errors.New("dieses Programm trägt keine Version; es wurde ohne Build-Flags gebaut")
+	}
+	_, err := fmt.Fprintln(out, version)
+	return err
 }
 
 // printContext gibt den Arbeitsstand aus: Pfade, Konfiguration und die
@@ -157,6 +185,8 @@ Unterkommandos:
             jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
             dessen Verzeichnis; der Index liegt unter
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
+  version   Gibt die Version dieses Programms aus, eine Zeile, sonst nichts.
+            Ohne gestempelte Version endet es mit Fehler.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

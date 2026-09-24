@@ -96,6 +96,8 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// der Oberfläche über das Netz, und das darf weder die Statusseite
 		// noch das Menü auslösen.
 		{path: "/github", markiert: `<a class="area-nav-item active" href="/github" aria-current="page">`},
+		// /branches ist ein eigener Bereich neben GitHub und ohne gh erreichbar.
+		{path: "/branches", markiert: `<a class="area-nav-item active" href="/branches" aria-current="page">`},
 		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
 		// des Projekts, nicht das Nachschlagewerk der Installation.
 		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},

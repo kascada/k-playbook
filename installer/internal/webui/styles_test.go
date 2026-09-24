@@ -300,10 +300,13 @@ const labelRules = `k-playbook-local/guidelines/oberflaeche-gestaltung.md, Absch
 // Quell- und Ziel-Branch eines PR, seine Kennzahlenzeile, Branch oder Tag
 // eines Laufs, dessen Kennzahlenzeile und die Zahl der Tests einer Ursache.
 // Die Zustandsmarken der Seite — Recht, CI-Stand, Fork, Ziel ≠ Default —
-// nutzen .pill und sind darüber schon abgedeckt.
+// nutzen .pill und sind darüber schon abgedeckt. Die vier dahinter kommen von
+// der Seite /branches: Name eines Branches oder Worktrees, seine Kennzahlen,
+// die Überschrift einer Gruppe und der Titel eines Prüfpunkts.
 var styleLabelClasses = []string{
 	"pill", "version-badge",
 	"pr-branches", "pr-meta", "run-ref", "run-meta", "failure-count",
+	"branch-name", "branch-meta", "branch-group-title", "check-title",
 }
 
 // styleLabelDot ist der einzige Selektor, der eine Fläche tragen darf — der

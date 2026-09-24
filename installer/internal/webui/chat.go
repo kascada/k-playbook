@@ -625,6 +625,10 @@ func (state *serverState) chatEventsHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
+	// Ab hier ist eine Chat-Ansicht live verbunden. Der Zähler sagt dem
+	// Neustart nach einer Programmaktualisierung, dass er sie trennen würde.
+	state.openStreams.Add(1)
+	defer state.openStreams.Add(-1)
 	if err := controller.Flush(); err != nil {
 		return
 	}
@@ -953,6 +957,19 @@ type chatCommandRuns struct {
 type chatCommandStateResponse struct {
 	State   string `json:"state"`
 	Message string `json:"message,omitempty"`
+}
+
+// runningCommands zählt die laufenden abgekoppelten Command-Aufrufe über alle
+// Sitzungen. Ein Neustart des Dienstes beendet ihre Goroutinen; ihren Ausgang
+// meldete danach niemand mehr.
+func (state *serverState) runningCommands() int {
+	state.commandMu.Lock()
+	defer state.commandMu.Unlock()
+	count := 0
+	for _, runs := range state.commandRuns {
+		count += len(runs.running)
+	}
+	return count
 }
 
 // commandRunsFor liefert den Stand einer Sitzung und legt ihn bei Bedarf an.

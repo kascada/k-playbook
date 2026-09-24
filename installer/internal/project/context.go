@@ -47,6 +47,10 @@ type Context struct {
 	// Auskunft, ob der Block dastand. Gelesen wird nur die Konfiguration —
 	// welche Server tatsächlich eingetragen sind, zeigt die Oberfläche.
 	MCP MCPRequirements `json:"mcp"`
+	// Git ist der Abschnitt git: — ob die Oberfläche das Umschalten des
+	// Branches anbietet, wohin, und welche Umgebungen festgelegt sind. Ohne
+	// Abschnitt steht switch auf unknown und configured auf false.
+	Git GitSettings `json:"git"`
 	// BaseTools ist der Host-Befund zu den Werkzeugen, die k-playbook selbst
 	// aufruft — bash, git, curl/wget, tar, python3, rg. Gemessen wird reine
 	// Anwesenheit im PATH über exec.LookPath: kein Unterprozess je Werkzeug,
@@ -326,6 +330,13 @@ func BuildContext(projectDir string) (Context, error) {
 		return Context{}, err
 	}
 
+	// Ebenso bei git.switch: ein unbekannter Wert soll nicht wie „nicht
+	// entschieden" aussehen, und eine Umgebung ohne Branch nicht wie keine.
+	gitSettings, err := ReadGitSettings(projectDir)
+	if err != nil {
+		return Context{}, err
+	}
+
 	playbookDir := PlaybookDir(projectDir)
 	localDir := LocalDir(projectDir)
 
@@ -345,6 +356,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Remediation:    remediation,
 		GH:             gh,
 		MCP:            MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
+		Git:            gitSettings,
 		BaseTools:      DetectBaseTools(projectDir),
 		Catalogs:       map[string][]CatalogEntry{},
 		Guidelines:     listFiles(filepath.Join(localDir, "guidelines")),

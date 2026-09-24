@@ -122,6 +122,7 @@ installer/
 │   ├── main.go                  Einstiege: Client-Pfad, verdeckter Servermodus, Subkommandos
 │   ├── gui.go                   Client-Pfad: Wirt-Pflege, Laufzeitdatei einordnen, abkoppeln
 │   ├── stop.go                  Subkommando stop
+│   ├── version.go               Subkommando version: die gestempelte Version, eine Zeile
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
@@ -132,9 +133,18 @@ installer/
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
 │   ├── process.go               Prozessidentität: PID lebt und Startzeit passt
 │   ├── control.go               Shutdown anfordern, auf das Ende warten
-│   ├── spawn.go                 eigenes Binary als Server starten, auf Antwort warten
+│   ├── spawn.go                 ein Binary als Server starten, auf Antwort warten; die
+│   │                            Datei ist ein Parameter, der Neustart nimmt das
+│   │                            Installationsziel
 │   └── *_unix.go *_linux.go *_darwin.go
 │                                Signal 0, SIGTERM, Setsid, Startzeit je Plattform
+├── internal/program/
+│   ├── version.go               Versionen semantisch vergleichen: älter, gleich, neuer,
+│   │                            unbekannt
+│   ├── path.go                  zeigt `k-playbook` im PATH auf ~/.local/bin/k-playbook?
+│   └── install.go               Version einer Datei über `k-playbook version` lesen,
+│                                bin/install des Clones anstoßen, Ergebnis gegen
+│                                SHA256SUMS prüfen
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/markdown/
@@ -159,6 +169,8 @@ installer/
 │   ├── context.go               Arbeitsstand auflösen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
+│   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
+│   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
@@ -192,9 +204,13 @@ installer/
 │   ├── config.go local.go local_private.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
+│   ├── restart.go               Programm aktualisieren und den Dienst daraus neu starten:
+│   │                            Sperre, Übergabe der Laufzeitdatei, Rückfall
+│   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
+│   │                            die GitHub-Daten nur bei tools.gh.status: enabled
 │   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
 │                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
-│                                inventory.html, mcp.html, mcp-servers.html,
+│                                inventory.html, branches.html, mcp.html, mcp-servers.html,
 │                                mcp-server.html; sidebar.html, hero.html,
 │                                closed.html und workflow-cards.html (Fragmente
 │                                für linke Spalte, Kopf, Sperrfläche und
@@ -204,10 +220,20 @@ installer/
 │                                Markdown-Betrachter), status.js, app.js,
 │                                workflows.js (Zählung der Workflow-Karten),
 │                                workflows-page.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
-│                                knowledge.js, docs.js, inventory.js, mcp.js,
+│                                knowledge.js, docs.js, inventory.js, branches.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
 │                                (Gestaltungswerte in :root, siehe „Gestaltung
 │                                der Oberfläche")
+├── internal/branches/
+│   ├── git.go                   Repo und Runner, lesende Aufrufe mit --no-optional-locks,
+│   │                            austauschbare Versionserkennung
+│   ├── list.go                  for-each-ref, Upstream, Default-Branch, Worktrees,
+│   │                            Alter von FETCH_HEAD, Ordnung in Gruppen
+│   ├── environments.go          Umgebungen: Festlegung, Vorschlag aus Namen und
+│   │                            Deployment, Abweichungen als Befund
+│   ├── check.go                 Vorprüfung: Prüfpunkte, Prüfstempel
+│   ├── sessions.go              Prozessquelle /proc, Einordnung laufender Sitzungen
+│   └── actions.go               Fetch und Switch, CombinedRunner für stdout und stderr
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 │   ├── review.go                Werkzeuge k_playbook_review_*
@@ -964,11 +990,16 @@ sind, liegt im Clone keins mehr, das sich vergleichen ließe; `VERSION` ist an d
 Stelle getreten und trennt zugleich sauber: Commits an Regeln, Reviews, Commands oder
 Docs ändern sie nicht.
 
-Hat `VERSION` gewechselt, beendet sich der Hintergrunddienst nach der Update-Antwort. Das
-neue Binary wird anschließend ausdrücklich über den Bootstrap installiert — die Antwort
-nennt ihn in der kanonischen Form aus `project.BootstrapHint`, also
-`make -C k-playbook install`, ohne make `k-playbook/bin/install`. Der Update-Pfad lädt
-oder ersetzt keine Host-Binaries selbst.
+Hat `VERSION` gewechselt und ist das laufende Programm **älter** als die neue, installiert
+der Dienst das passende Programm und startet sich daraus neu (siehe
+[Programm aktualisieren und neu starten](#programm-aktualisieren-und-neu-starten)). Ist das
+laufende Programm gleich alt oder neuer — der Entwicklungsfall nach `make dev-install` —,
+geschieht nichts weiter: der Dienst läuft, wie bei einem Update ohne Versionswechsel.
+
+Die frühere Aussage „der Update-Pfad lädt oder ersetzt keine Host-Binaries selbst" gilt
+**nicht mehr** (Task 076). Neu gilt: geladen wird nur auf ausdrücklichen Klick und nur über
+`k-playbook/bin/install` des Clones, das gegen `SHA256SUMS` prüft. Eigenen Download-Code
+gibt es im Go-Programm nicht, und weder der Start noch die Prüfung lädt je etwas.
 
 ### Die Verlinkung wird mitgezogen
 
@@ -1001,10 +1032,11 @@ er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 
 ## Direktinstallation
 
-`bin/install` bleibt im Projekt-Clone und installiert einmalig das passende, gegen
-`SHA256SUMS` geprüfte Release-Binary direkt nach `~/.local/bin/k-playbook`. Der normale
-Aufruf ist danach immer `k-playbook`; der GUI-Start installiert oder aktualisiert kein
-Binary selbst.
+`bin/install` bleibt im Projekt-Clone und installiert das passende, gegen `SHA256SUMS`
+geprüfte Release-Binary direkt nach `~/.local/bin/k-playbook`. Der normale Aufruf ist danach
+immer `k-playbook`; der GUI-**Start** installiert oder aktualisiert kein Binary selbst. Auf
+Knopfdruck ruft die Oberfläche dagegen genau dieses Skript auf — sie lädt nichts selbst,
+und sie tut es nie ungefragt.
 
 Der globale Aufruf ist überhaupt möglich, weil das Programm sein Projekt aus dem
 **Arbeitsverzeichnis** ableitet (`Detect()` über `os.Getwd()`) und nicht aus seinem
@@ -1578,11 +1610,218 @@ wie im Abschnitt „Gestaltung der Oberfläche" beschrieben. Die übrigen Beschr
 Seite (`.pr-branches`, `.pr-meta`, `.run-ref`, `.run-meta`, `.failure-count`) stehen in
 `styleLabelClasses` und werden vom selben Wächter geprüft.
 
+## Branches und Umgebungen
+
+Die Seite `/branches` zeigt die Branches des Code-Repos geordnet und mit ihren Umgebungen,
+prüft vor einem Wechsel, ob er gefahrlos ist, und schaltet erst auf ausdrückliche
+Bestätigung um. Umschalten aus der Oberfläche soll **sicherer** sein als im Terminal: vorher
+steht fest, ob dabei etwas verloren gehen oder eine laufende Sitzung gestört werden kann.
+
+**Code-Repo, nicht Hauptverzeichnis.** Alle git-Aufrufe laufen in
+`project.RepoRootDir(projectDir, config)`. Bei einem Projekt mit `repo_root: app` liegt die
+Konfiguration außerhalb des Repos, das umgeschaltet wird; bei `repo_root: .` kann sich
+`K-PLAYBOOK.yaml` zwischen Branches unterscheiden, und dafür gibt es einen eigenen
+Prüfpunkt. Das Projekt ermitteln die Handler wie alle übrigen über `project.Detect()`.
+
+**Eigenes Paket `internal/branches`.** Es kennt kein HTTP und sucht nichts selbst: Projekt,
+Code-Repo, der Abschnitt `git:` und die GitHub-Daten kommen über `branches.Options`
+herein. Alle git-Aufrufe gehen über einen `github.Runner` — dieselbe Naht wie in der
+GitHub-Ansicht. Lesende Aufrufe laufen mit `git --no-optional-locks`, damit `git status` in
+einem fremden Arbeitsrepo nicht nebenbei den Index schreibt. Fetch und Switch laufen über
+`branches.CombinedRunner`: git schreibt „Switched to branch …“ und den Fortschritt auf
+stderr, und `github.ExecRunner` behält stderr nur im Fehlerfall.
+
+### Der Abschnitt `git:` in der Konfiguration
+
+```yaml
+git:
+  # Umschalten aus der Oberfläche: unknown, offer oder off.
+  switch: offer
+  # Wohin umgeschaltet werden darf; Muster mit *. Leer heißt: jeder Branch.
+  allow:
+    - development
+    - remediation/*
+  # Langlebige Branches und ihre Umgebung.
+  environments:
+    dev: development
+    prod: master
+```
+
+`project/git_settings.go` schneidet den Block zeilenweise aus der Datei und gibt nur ihn an
+`yamllite`: ein Fehler in einem fremden Block macht ihn nicht unlesbar, und geschrieben wird
+nichts. Ohne Abschnitt gilt `switch: unknown` — ein ausdrücklicher Zustand wie bei
+`tools.gh.status`: die Seite zeigt die Liste, bietet keinen Wechsel an und nennt die offene
+Entscheidung. Ein unbekannter Wert, ein unbekannter Schlüssel, ein leerer Eintrag in
+`allow`, eine Umgebung ohne Branch, ein unzulässiger Branch-Name oder dieselbe Umgebung in
+zwei Schreibweisen (`Prod:` und `prod:`) lassen `BuildContext()` abbrechen — Umgebungen werden
+ohne Rücksicht auf Groß- und Kleinschreibung zusammengelegt, zwei Schreibweisen wären eine
+Umgebung mit zwei Branches; `k-playbook context` gibt den Abschnitt als `git` aus. Die Oberfläche bricht
+nicht ab: sie zeigt die Liste, der Prüfpunkt „Umschalten freigegeben“ ist dann
+`nicht-pruefbar`.
+
+In `allow` steht `*` für beliebig viele Zeichen, auch für `/`. Ein Branch darf mehrere
+Umgebungen bedienen; mehrere Branches je Umgebung kennt das Format nicht. Es ist bewusst flach
+und schlüsselweise: die Angaben gelten heute für das Team, und eine spätere Ebene je Nutzer
+soll einzelne Schlüssel überschreiben können.
+
+**Keine Schema-Änderung.** Der Abschnitt ist optional, und ältere Installationen lesen
+unbekannte Blöcke nicht mit — sie kennen kein Umschalten, das sie ohne ihn anbieten könnten.
+`schema_version` bleibt `3`, wie schon bei `tools.mcp`.
+
+### Die Liste
+
+`GET /api/branches` liest lokale und Remote-Branches in **einem** `git for-each-ref`: Upstream
+samt Abstand und `[gone]`, letzter Commit, Worktree-Pfad. Kann git `%(ahead-behind:<ref>)`
+(ab 2.41), kommt der Abstand zum Default-Branch im selben Aufruf mit, und „gemergt“ heißt
+„keine Commits vor dem Default-Branch“. Bei älterem git bleibt der Abstand `unknown` mit
+Grund, und „gemergt“ kommt aus einem zweiten Aufruf mit `--merged`. Die Fassung fragt
+`git version` über den Runner ab; ein Test setzt dort 2.40 ein.
+
+Der Default-Branch kommt mit `gh` von GitHub, sonst aus `refs/remotes/<remote>/HEAD`. Der
+maßgebliche Remote ist der des aktuellen Branches, sonst `origin`, sonst der erste. Fehlt
+der Default-Branch, stehen Abstand und „gemergt“ als `unknown` mit Grund da, nie als leeres
+Feld. Gerechnet wird gegen den Remote-Tracking-Branch, wenn es ihn gibt.
+
+Geordnet wird in Gruppen: der aktuelle Branch; langlebige Branches — Default-Branch,
+festgelegte und vorgeschlagene Umgebungs-Branches —; dann Arbeitsbranches nach dem Präfix
+bis zum ersten `/`, alphabetisch, ohne Präfix zuletzt, darin der jüngste Commit zuerst. Ein
+Remote-Branch ohne lokales Gegenstück steht als `remoteOnly` in derselben Ordnung. Die
+Worktrees kommen aus `git worktree list --porcelain`, samt `prunable` und `locked`.
+
+**Kein ungefragtes `git fetch`.** Die Liste arbeitet mit den vorhandenen Remote-Tracking-Refs
+und nennt das Alter von `FETCH_HEAD`. `POST /api/branches/fetch` führt
+`git fetch --all --prune` aus — `--prune`, weil erst dadurch ein gelöschter Upstream als
+`[gone]` erscheint. Lokale Branches und der Arbeitsbaum bleiben unberührt.
+
+**„Mit gh“** heißt `tools.gh.status: enabled` und `gh` bereit, geprüft von derselben
+Vorprüfung wie auf `/github`. Bei `unknown` oder `disabled` startet kein gh-Prozess, auch
+wenn gh installiert ist. Mit gh laufen `gh repo view` (Repo und Default-Branch), danach
+nebeneinander die PR-Abfrage der GitHub-Ansicht (offener PR je Branch) und Environments samt
+letztem Deployment je Environment. Die gh-Abfragen teilen sich ein eigenes Budget von 10 s
+(`branchesGitHubBudget`); die git-Liste hat danach ihr eigenes von 20 s (`branchesBudget`).
+Nebeneinander laufen beide nicht, weil die Liste die GitHub-Daten als Eingabe braucht — sie
+ordnet nach dem Default-Branch von GitHub. Läuft gh in die Zeitgrenze, steht die lokale Liste
+trotzdem da: `github.state` ist `timeout`, der Default-Branch kommt aus
+`refs/remotes/<remote>/HEAD` mit Grund, und die Karte Umgebungen sagt, dass die GitHub-Daten
+fehlen — auch für eine einzelne Teilabfrage.
+
+### Umgebungen
+
+Welcher Branch welche Umgebung bedient, steht selten verlässlich an einer Stelle: oft nur in
+CI-Ausdrücken, und GitHub-Environments tragen meist keine Branch-Regel. Maßgeblich ist
+deshalb die Festlegung in `git.environments`. Ohne sie gibt es nur einen **Vorschlag**, und
+der ist in Karte und Liste als solcher gekennzeichnet und nennt seine Quelle:
+
+- **aus dem Deployment** (nur mit gh): Nennt der Ref des letzten Deployments einen
+  vorhandenen Branch, ist es dieser. Sonst zählt der SHA, nicht das Namensmuster des Refs.
+  Enthält der Branch, den der Name der Umgebung nahelegt, den Stand, gewinnt er; sonst unter
+  den langlebigen Kandidaten der mit dem geringsten Abstand. Arbeitsbranches zählen nicht:
+  frisch abgezweigt enthielten sie den Stand ebenso. Und ein älteres Deployment steckt meist
+  in mehreren langlebigen Branches — der mit dem geringsten Abstand ist dann nur der, in den
+  zuletzt gemergt wurde.
+- **aus dem Namen**: `dev`/`develop`/`development`, `stage`/`staging`,
+  `prod`/`production`/`main`/`master`; unter `main` und `master` gewinnt der Default-Branch.
+
+Je Umgebung löst die Antwort den SHA des letzten Deployments lokal auf und nennt, wie viele
+Commits der Branch weiter ist. Weichen Festlegung und Deployment ab, oder Name und
+Deployment, steht das als **Befund** da, nicht als Fehler — ob ein Stand von `stage` in
+`prod` gewollt ist, kann die Seite nicht entscheiden.
+
+### Die Vorprüfung
+
+`GET /api/branches/switch-check?target=<branch>[&remote=<remote>]` liest nur und liefert
+jeden Prüfpunkt mit Ergebnis `ok`, `hinweis`, `blockiert` oder `nicht-pruefbar` und einem
+Satz Begründung — auch die bestandenen. Angeboten wird nur, wenn kein blockierender Punkt
+etwas anderes als `ok` meldet: scheitert ein blockierender Punkt an git oder an der Frist,
+ist er `nicht-pruefbar` und verhindert das Angebot wie `blockiert`. Hinweis-Punkte dürfen
+`nicht-pruefbar` sein, ohne es zu verhindern.
+
+| Prüfpunkt | Art | Blockiert, wenn |
+|---|---|---|
+| `freigabe` | blockierend | `git.switch` ≠ `offer` oder das Ziel passt zu keinem Muster in `git.allow` |
+| `ziel` | blockierend | das Ziel fehlt, nur remote unter mehreren Remotes liegt oder schon ausgecheckt ist |
+| `arbeitsbaum` | blockierend | geänderte, gestagte oder nicht ignorierte unversionierte Dateien |
+| `ignorierte-dateien` | blockierend | ein vorhandener ignorierter Pfad liegt dort, wo das Ziel eine Datei versioniert: eine ignorierte Datei, ein ignoriertes Verzeichnis mit Inhalt oder eine ignorierte Datei, wo das Ziel ein Verzeichnis braucht |
+| `git-operation` | blockierend | merge, rebase, cherry-pick, revert oder bisect in Arbeit |
+| `worktree` | blockierend | das Ziel ist in einem anderen Worktree ausgecheckt, auch `prunable` |
+| `detached-head` | blockierend | HEAD ist losgelöst und von keinem Branch und keinem Tag erreichbar |
+| `sitzungen` | blockierend | eine KI-Sitzung oder ein MCP-Server arbeitet im Projektverzeichnis, im Code-Repo oder in der Wurzel des Arbeitsbaums; ohne `/proc` `nicht-pruefbar` |
+| `unsichtbare-sitzungen` | Hinweis | immer: was die Prozessquelle nicht sehen kann |
+| `editorfenster` | Hinweis | VS-Code-Server-Prozesse ohne KI-Erweiterung im Projekt |
+| `andere-prozesse` | Hinweis | weitere Prozesse im Projekt, etwa eine Shell oder ein Dev-Server |
+| `ungepushte-commits` | Hinweis | Commits des aktuellen Stands auf keinem Remote-Tracking-Branch |
+| `ziel-hinter-upstream` | Hinweis | das Ziel liegt hinter seinem Upstream oder dieser ist `gone` |
+| `nur-remote` | Hinweis | das Ziel entsteht als Tracking-Branch |
+| `konfiguration-im-ziel` | Hinweis | `K-PLAYBOOK.yaml` oder `k-playbook-local/` liegen im Repo und unterscheiden sich im Ziel |
+| `stash` | Hinweis | Stash-Einträge liegen vor |
+
+**Ignorierte Dateien.** `git switch` ersetzt eine ignorierte, unversionierte Datei still,
+wenn das Ziel sie versioniert — etwa eine `.env` —, und `git status` meldet davor nichts.
+Ebenso still löscht es ein ignoriertes Verzeichnis samt Inhalt, wenn das Ziel an seiner
+Stelle eine Datei versioniert, und eine ignorierte Datei, wo das Ziel ein Verzeichnis braucht
+(gemessen mit git 2.53). Verglichen wird `git ls-files --others --ignored --exclude-standard
+--directory` mit `git ls-tree -r --name-only` des Ziels. Ein Konflikt ist eine Zieldatei, die
+eine ignorierte Datei trifft; eine, an deren Stelle ein ignoriertes Verzeichnis mit Inhalt
+liegt — ein leeres räumt git ohne Verlust weg —; eine, deren Verzeichnis eine ignorierte Datei
+im Weg steht; und in einem ganz ignorierten Verzeichnis eine, die dort tatsächlich liegt oder
+für die eine vorhandene Datei Verzeichnis sein müsste.
+
+Die zweite Sicherung ist der Befehl selbst: er läuft mit `--no-overwrite-ignore`. Damit bricht
+git in allen genannten Fällen ab, nennt den Pfad und lässt Datei und Verzeichnis stehen; ohne
+Konflikt schaltet es wie sonst um. `git switch --help` beschreibt die Option nicht, nur
+`git switch -h` und die Hilfe zu `git checkout`.
+
+**Laufende git-Operationen** erkennt die Prüfung an den Pfaden aus
+`git rev-parse --git-path`, damit sie auch in einem weiteren Worktree stimmen.
+
+**Sitzungen** kommen aus einer austauschbaren Prozessquelle, unter Linux und WSL `/proc`:
+Arbeitsverzeichnis gleich dem Projektverzeichnis oder dem Code-Repo oder darunter. Erkannt
+werden Claude Code (auch als Erweiterung im VS-Code-Server), opencode, Cursor, Codex und
+MCP-Server; ein Prozess, den eine solche Sitzung gestartet hat, zählt zu ihr — ein
+MCP-Server ohne sprechenden Namen ist nur über seinen Elternprozess zuzuordnen. Geprüft wird
+auch die Wurzel des Arbeitsbaums (`git rev-parse --show-toplevel`): liegt das Code-Repo in
+einem Monorepo, schaltet der Wechsel das ganze Repo um, und eine Sitzung in dessen Wurzel oder
+einem Nachbarordner ist ebenso betroffen. Ausgenommen sind der eigene Serverprozess und seine
+Nachkommen, die selbst keine Sitzung sind und von keiner stammen — die git-Aufrufe der
+Prüfung. Eine KI-Sitzung oder ein MCP-Server unter dem Server blockiert wie jede andere. Jeder
+gefundene Prozess steht mit Art, PID und Arbeitsverzeichnis da. `ok` heißt nur: die
+Prozessquelle hat dort nichts gefunden. Nicht sichtbar sind der zentrale opencode-Dienst
+(Sitzungen per `--dir`), der Chat der Oberfläche — er startet keinen Prozess, sondern spricht
+per HTTP mit diesem Dienst — und Sitzungen in einem Container; das
+nennt ein eigener Hinweis, der nicht blockiert, weil der zentrale Dienst dauerhaft laufen
+kann. Ohne `/proc` wird nicht umgeschaltet.
+
+**Der Prüfstempel** ist `<HEAD-SHA>:<Ziel-SHA>:<Status-Hash>`; der Hash läuft über die
+Ausgabe von `git status --porcelain -z --untracked-files=all` und die ignorierten Pfade.
+
+### Umschalten
+
+`POST /api/branches/switch` nimmt `{target, remote, stamp}`. Der Server wiederholt die
+Vorprüfung; stimmt der Stempel nicht oder blockiert etwas, wird nichts ausgeführt, und die
+Antwort (409) trägt die neue Prüfung. Sonst läuft genau der Befehl, den Prüfung und Dialog
+nennen: `git switch --no-overwrite-ignore <branch>` oder, wenn nur remote,
+`git switch --no-overwrite-ignore --track <remote>/<branch>`.
+Kein `--force`, kein `--discard-changes`, kein Stash, kein Pull. Die Antwort nennt vorher und
+nachher Branch und SHA und die Ausgabe von git; verweigert git, steht dort seine Ausgabe und
+der Satz, dass nichts weiter versucht wurde. Fetch und Switch laufen serialisiert, und ein
+geschlossener Tab bricht einen laufenden `git switch` nicht ab. Wie alle POSTs steht der
+Endpunkt hinter `sameOrigin`.
+
+### Die Seite
+
+Drei Karten, gefüllt aus einer Antwort: Umgebungen, Branches, Worktrees. Die Seite ist ohne
+gh erreichbar. Ist Umschalten nicht freigegeben, gibt es keinen Knopf, sondern den Satz, wo
+`git.switch` steht. Sonst trägt jeder zulässige Branch „Umschalten prüfen“; das zeigt die
+Prüfpunkte, und nur ohne Blockierendes erscheint „Umschalten auf <branch>“ mit einem
+Bestätigungsdialog, der Quelle, Ziel, den genauen git-Befehl und die Hinweise nennt. Die
+Beschriftungen der Seite (`.branch-name`, `.branch-meta`, `.branch-group-title`,
+`.check-title`) stehen in `styleLabelClasses`, die Zustände sind `.pill`.
+
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat acht Bereiche: **Status** unter `/`, **Setup** unter `/setup`,
+Die Oberfläche hat neun Bereiche: **Status** unter `/`, **Setup** unter `/setup`,
 **Workflows** unter `/workflows`, **Chat** unter `/chat`, **GitHub** unter `/github`,
-**Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
+**Branches** unter `/branches`, **Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
 `/inventory`. `/mcp` ist keine weitere Sorte, sondern die Detailseite des Setup-Blocks
 und trägt dessen Bereich. Dasselbe gilt für `/mcp-servers` und die Detailseiten
 `/mcp-servers/{assistant}/{name}` darunter — mit einem Unterschied: die Übersicht steht
@@ -2491,11 +2730,16 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`; Frist 20 s für die ganze Anfrage; nur lesend |
 | `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; Frist 20 s samt Auflösen; nur lesend |
 | `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; Frist 20 s; nur lesend |
+| `GET` | `/api/branches` | Branches des Code-Repos geordnet, mit Upstream, Abstand zum Default-Branch, „gemergt“, Umgebungen, Worktrees und Alter des letzten Fetch; mit gh zusätzlich Default-Branch von GitHub, offener PR je Branch und letztes Deployment je Environment; kein Fetch; Fristen: gh 10 s, danach git-Liste 20 s; läuft gh ab, kommt die Liste ohne GitHub-Daten mit `github.state: timeout` |
+| `POST` | `/api/branches/fetch` | `git fetch --all --prune` im Code-Repo, nur auf Knopfdruck; antwortet mit Ausgabe und neuem Fetch-Alter |
+| `GET` | `/api/branches/switch-check` | Vorprüfung für `target` (optional `remote`): jeder Prüfpunkt mit Ergebnis und Begründung, `offered`, genauer git-Befehl und Prüfstempel; nur lesend; 400 bei unzulässigem Namen |
+| `POST` | `/api/branches/switch` | `{target, remote, stamp}`: prüft erneut und führt nur bei passendem Stempel und ohne Blockierendes `git switch` aus; sonst 409 mit der neuen Prüfung; kein force, kein Stash, kein Pull |
 | `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; ein verworfenes Log ist `log-gone`; nur lesend |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt |
-| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er, trägt die Antwort seine Ausgabe; hat `VERSION` gewechselt, beendet sich der Dienst nach der Antwort |
+| `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt, und zusätzlich, ob das laufende Programm älter ist als die `VERSION` des Clones (`program`, samt PATH-Befund); rein lesend, lädt nie etwas |
+| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er, trägt die Antwort seine Ausgabe; hat `VERSION` gewechselt und ist das laufende Programm älter, folgen Installation und Neustart wie bei `/api/update/program` |
+| `POST` | `/api/update/program` | das zum Clone passende Programm über `k-playbook/bin/install` installieren und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -2529,7 +2773,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Status; ohne
 Projektkonfiguration eine Umleitung nach `/setup`), `/setup`, `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/knowledge`,
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/branches`, `/knowledge`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` mit denselben
 Fragmenten für Kopf, linke Spalte, Sperrfläche und Workflow-Karten — keine Seite trägt
@@ -3108,8 +3352,9 @@ ohne zehn Sekunden zu warten.
 Der Server ist ein **Hintergrunddienst je Projekt**. Der argumentlose Aufruf ist nur der
 Client: er endet, sobald der Browser offen ist, und das Terminal ist wieder frei. Der
 Server hängt an keinem Fenster und an keinem Terminal — er bleibt stehen, bis ihn
-`k-playbook stop` oder der Knopf `Dienst beenden` beendet, ein Update ein neues Binary
-verlangt oder ihn `idleTimeout` (60 Minuten) lang niemand mehr fragt. Er bindet auf
+`k-playbook stop` oder der Knopf `Dienst beenden` beendet, eine Programmaktualisierung ihn
+durch einen Dienst aus dem neuen Programm ersetzt oder ihn `idleTimeout` (60 Minuten) lang
+niemand mehr fragt. Er bindet auf
 `127.0.0.1:0`, nimmt also einen freien Port.
 
 **Ein Server je Projekt, das Arbeitsverzeichnis trägt die Fachlogik.** Alle Handler
@@ -3132,7 +3377,12 @@ Servers, bei jedem Start neu.
 
 Geschrieben wird sie nach dem Binden mit `O_CREAT|O_EXCL`, damit zwei gleichzeitige
 Aufrufe nicht beide einen Server hochziehen: der Verlierer endet mit einer Meldung im
-Log, sein Elternprozess liest die Datei des Gewinners und öffnet dessen Server. Legt
+Log, sein Elternprozess liest die Datei des Gewinners und öffnet dessen Server. Genau
+dieses `O_EXCL` bestimmt auch die Reihenfolge, in der ein Neustart nach einer
+Programmaktualisierung die Datei übergibt: `Release()` gibt sie frei, `Reclaim()` schreibt
+sie unverändert zurück, wenn der Nachfolger nicht kommt, und nach einer Freigabe rührt
+`Remove()` sie nicht mehr an — dort steht dann schon der Nachfolger. Siehe
+[Programm aktualisieren und neu starten](#programm-aktualisieren-und-neu-starten). Legt
 `POST /api/config` die Konfiguration an und ändert sich dadurch das aufgelöste
 `ProjectDir`, schlüsselt der Server um — neue Datei, alte weg. Beim Beenden verschwindet
 die Datei über `defer`; SIGINT und SIGTERM werden gleich behandelt, damit sie auch nach
@@ -3202,9 +3452,9 @@ dem Umschlüsseln muss schon die nächste Antwort den neuen tragen.
 
 ### Der Aufruf
 
-`runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `cleanUpLegacy()`,
-die Migrationsbereinigung, `protectProjectInstallation()` — und richtet dann das
-Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
+`runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `careForHost()` mit
+`cleanUpLegacy()`, der Migrationsbereinigung und `protectProjectInstallation()` — und
+richtet dann das Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
 der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start. Die
 selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 
@@ -3230,6 +3480,11 @@ ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttät
 und warum — gh-Entscheidung, Remediation-Modus, Update, Privat-Schalter, Tool-Installation,
 `MCPStateStale` —, steht in den jeweiligen Abschnitten.
 
+Davor steht noch eine Zeile, wenn das aufrufende Programm **älter** ist als die `VERSION`
+des Clones (`noteOutdatedProgram()`): ein Hinweis, dass die Oberfläche die Aktualisierung
+als Knopf anbietet, und der Bootstrap für die Hand. Geladen wird beim Start nichts. Ohne
+diese Zeile bliebe der Zustand „Clone neu, Programm alt" im Terminal unsichtbar.
+
 Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 
 | Ergebnis | Handlung |
@@ -3240,8 +3495,9 @@ Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 | lebt ohne Antwort | nichts starten; Meldung mit Dateipfad und Hinweis auf `k-playbook stop`, Ende ≠ 0 |
 | nicht vorhanden | starten |
 
-**Starten heißt abkoppeln.** `guiproc.Spawn()` startet das eigene Binary
-(`os.Executable()`) mit der Umgebung plus `K_PLAYBOOK_SERVE=1`,
+**Starten heißt abkoppeln.** `guiproc.Spawn()` startet die übergebene Programmdatei — der
+argumentlose Aufruf gibt `os.Executable()` mit, der Neustart nach einer
+Programmaktualisierung das Installationsziel — mit der Umgebung plus `K_PLAYBOOK_SERVE=1`,
 `SysProcAttr{Setsid: true}`, unverändertem Arbeitsverzeichnis, stdin aus `/dev/null`,
 stdout und stderr in die Logdatei. Der Elternprozess wartet bis zu 10 Sekunden, bis die
 Laufzeitdatei die PID des Kindes trägt und `/api/health` mit dem eigenen Schlüssel
@@ -3275,36 +3531,131 @@ damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Statusseite 
 und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 
-`POST /api/update` beendet den Server nach der Antwort, wenn zum neuen Stand ein anderes
-Binary gehört als das laufende — und ein alter Daemon soll nicht stehen bleiben. Die
-Bedingung dafür hat zwei Teile, `binaryOutdated()` in `webui/update.go`: der Pull muss die
-`VERSION` bewegt haben (`UpdateResult.VersionChanged`) **und** der laufende Prozess darf
-diese Version nicht schon tragen.
+`POST /api/update` holt den neuen Stand und installiert danach, wenn nötig, auch das
+Programm: hat der Pull die `VERSION` bewegt **und** ist das laufende Programm älter als die
+neue (`restartAfterPull()` in `webui/update.go`), läuft derselbe Ablauf wie hinter dem Knopf
+„Programm aktualisieren". Sonst läuft der Dienst weiter und liest den neuen Stand bei der
+nächsten Anfrage.
 
-Der zweite Teil ist der Entwicklungsfall: dort steht unter `~/.local/bin` längst das Binary
-des neuen Standes, weil `make dev-install` es gebaut hat, während der Clone noch dem zuletzt
-gepushten Commit folgt. Holt er ihn nach, wechselt dort die `VERSION` — und der Dienst
-beendete sich, obwohl nichts zu tun war, und verwies auf den Bootstrap. Der lädt das
-Release-Asset: im Entwicklungsrepo der falsche Weg, und vor dem Release liegt das Asset
-nicht einmal.
-
-Der schlichtere Vergleich „laufende Version ≠ `VERSION` der Installation" taugt dafür
-nicht: im Entwicklungsrepo ist das Binary regelmäßig **neuer** als der Clone, und jeder
-Pull ohne Versionswechsel schlüge dann in die Aufforderung um, ein älteres Binary zu
-installieren. Fehlt eine der beiden Angaben, wird nichts verlangt.
+Beide Bedingungen werden gebraucht. Ohne Versionswechsel ist der Stand derselbe wie vorher,
+und ein Programm, das vorher passte, passt weiter. Und nur „älter" löst aus, nie
+„ungleich": im Entwicklungsrepo steht unter `~/.local/bin` längst das Programm des neuen
+Standes, weil `make dev-install` es gebaut hat, während der Clone noch dem zuletzt
+gepushten Commit folgt. Holt er ihn nach, wechselt dort die `VERSION` — bei einem Vergleich
+auf Ungleichheit stufte der Dienst sich selbst auf ein älteres Release herab, das vor dem
+Release nicht einmal als Asset existiert. Fehlt eine der beiden Angaben oder ist sie nicht
+lesbar, wird nichts verlangt: eine Version, die sich nicht lesen lässt, ist kein Nachweis.
 
 Die Entscheidung liegt bewusst in `webui` und nicht in `project.Update()`: nur der Server
 kennt die Version, aus der er selbst läuft. `UpdateResult` meldet deshalb die Tatsache
-(`VersionChanged`, `Version`), nicht die Aufforderung. Das deckt den Weg über die Oberfläche; nach einem `git pull` von
-Hand greift der Standvergleich des Clients beim nächsten Aufruf — und der erkennt über
-die Build-Kennung auch ein frisch gebautes Binary bei unveränderter `VERSION`. Ein
-portstabiler Neustart, bei dem der Dienst den Listener an das neue Binary vererbt, wäre
-möglich und ist bewusst nicht gebaut — er lohnt erst, wenn Updates im Alltag stören.
+(`VersionChanged`, `Version`), nicht die Aufforderung. Das deckt den Weg über die
+Oberfläche; nach einem `git pull` von Hand greift der Standvergleich des Clients beim
+nächsten Aufruf — und der erkennt über die Build-Kennung auch ein frisch gebautes Binary
+bei unveränderter `VERSION`.
 
 `k-playbook stop` nutzt dieselbe Einordnung: läuft der eigene Server, `POST
 /api/shutdown` und warten; antwortet er nicht, SIGTERM an die PID — die Identitätsprüfung
 hat zuvor gesichert, dass es der eigene Prozess ist. Eine verwaiste Datei wird gelöscht,
 eine fehlende ist eine Auskunft und kein Fehler.
+
+### Programm aktualisieren und neu starten
+
+Ist das laufende Programm älter als die `VERSION` des Clones, meldet `GET /api/update` das
+zusätzlich zum Remote-Vergleich (`checkProgram()`), und die Oberfläche zeigt statt „Update
+verfügbar" den Knopf „Programm aktualisieren (v0.9.3 → v0.9.4)". Der Vergleich ist lokal
+und hängt nicht am Remote: ohne Netz meldet die Prüfung ihn trotzdem. Trifft beides zu, hat
+das ältere Programm Vorrang — ein Pull allein hilft dann nicht, der Clone ist dem Programm
+schon voraus.
+
+Verglichen wird **semantisch** (`internal/program`, `Compare()`): `v0.10.0` ist neuer als
+`v0.9.4`, obwohl es lexikalisch davor steht. Nur „älter" löst aus; „unbekannt" ist kein
+Nachweis.
+
+**Der PATH ist die Bedingung.** Angeboten wird nur, wenn `k-playbook` im `PATH` dieselbe
+Datei trifft wie `~/.local/bin/k-playbook` (`program.CheckPath()`, Vergleich über
+`os.SameFile`). Sonst gibt es keinen Knopf, sondern einen Hinweis mit beiden Pfaden: ein
+neues Programm am Installationsziel startete der nächste `k-playbook`-Aufruf nicht, dessen
+`reuseOrStart()` beendete den neuen Dienst als „anderen Stand", und der Fehler wäre zurück.
+Der Dienst entfernt keine fremde Datei und installiert nicht an einen anderen Ort; dass der
+Nutzer dann doch im Terminal handeln muss, ist eine bewusst hingenommene Abweichung.
+
+**Nie herabstufen.** Vor dem Bootstrap liest `program.Install()` die Version der Datei am
+Installationsziel über das Subkommando `k-playbook version`. Ist sie gleich oder neuer als
+`VERSION`, wird nichts geladen und nur aus ihr neu gestartet — sonst überschriebe der
+Dienst, was ein anderes Projekt oder `make dev-install` dort abgelegt hat. Nur bei älter
+oder unbekannt läuft der Bootstrap; „unbekannt" ist auch ein Programm, das das Subkommando
+noch nicht kennt.
+
+**Geprüft wird die Datei, nicht der Exit-Code.** Nach einem Bootstrap-Lauf vergleicht
+`program.Verify()` die sha256 der Datei am Ziel mit dem Eintrag des Plattform-Assets in
+`SHA256SUMS` des Clones — dieselbe Quelle, gegen die `bin/install` den Download prüft, und
+ohne die Datei auszuführen. Ein Skript kann mit 0 enden und trotzdem nichts ersetzt haben;
+gemessen am 2026-09-22 mit einem Stub-Bootstrap, der mit `cp` über die laufende
+Programmdatei schrieb: `cp` scheiterte mit „Text file busy", das nächste `echo` gelang, der
+Exit-Code war 0. `bin/install` selbst hat das Problem nicht, es lädt nach `mktemp` und
+ersetzt atomar per `mv -f`.
+
+**Die Übergabe der Laufzeitdatei.** Invariante: **nie zwei registrierte Dienste für ein
+Projekt**; ein kurzer Moment mit zwei Prozessen ist zulässig. Weil die Datei mit
+`O_CREAT|O_EXCL` entsteht, weicht ein neuer Dienst einer vorhandenen aus — „erst starten,
+dann übergeben" ist damit unmöglich. Der Ablauf in `webui/restart.go`:
+
+1. Der alte Dienst gibt seine Registrierung frei (`Release()`).
+2. Er startet den neuen abgekoppelt **aus dem Installationsziel**, im selben
+   Arbeitsverzeichnis, mit `K_PLAYBOOK_SERVE=1` und `K_PLAYBOOK_HOST_CARE=1`.
+3. Er wartet, bis die Laufzeitdatei die PID des neuen trägt und `/api/health` mit demselben
+   Schlüssel, derselben PID und der **erwarteten Version** antwortet — nach einem Bootstrap
+   die `VERSION` des Clones, im Pfad ohne Download die an der Datei gelesene.
+4. Gelingt das, antwortet er der Seite mit der neuen Adresse und beendet sich. Sein
+   `defer registration.Remove()` fasst die Datei nach der Freigabe nicht mehr an.
+5. Gelingt es nicht, beendet er den Nachfolger, meldet sich mit `Reclaim()` wieder an,
+   läuft weiter und nennt den Fehler.
+
+Startet in der Lücke ein `k-playbook` von Hand, darf es gewinnen: der Nachfolger weicht
+aus, `Reclaim()` scheitert an der vorhandenen Datei, und der alte Dienst **tritt zurück** —
+er nennt der Seite die Adresse des Gewinners und beendet sich. Am Ende ist genau ein Dienst
+registriert, weder zwei noch keiner.
+
+**Startpflege ohne Browser.** Der neue Dienst erledigt sie selbst, mit seinem eigenen Code:
+`K_PLAYBOOK_HOST_CARE=1` lässt `main.go` im Servermodus `careForHost()` laufen — dieselbe
+Folge wie beim argumentlosen Aufruf (MCP-Reparatur, Schreibschutz, Altlasten, `AGENTS.md`),
+nur ohne Browser und mit der Ausgabe im Log. Deshalb liegt die Wartegrenze auf den neuen
+Dienst über `guiproc.StartupTimeout`.
+
+**Sperre und Zeitbudget.** Beide POSTs nehmen `updateMu` mit `TryLock`; ein zweiter Aufruf
+bekommt 409 „Aktualisierung läuft bereits". Zwei gleichzeitige Abläufe gäben dieselbe Datei
+zweimal frei. Solange installiert und gestartet wird, gilt der Dienst nie als leer
+(`restarting`), denn der Bootstrap darf Minuten dauern. Das Budget ist
+`program.BootstrapTimeout` (3 Minuten) plus `restartStartupTimeout`.
+
+**Laufende Arbeit.** Läuft ein Command oder hängt eine Chat-Ansicht am Ereignisstrom,
+antwortet `POST /api/update/program` ohne `?confirm=1` mit 428 und der Rückfrage; die Seite
+stellt sie und schickt den Aufruf bestätigt erneut. Im Pfad über `POST /api/update` wird in
+diesem Fall gar nicht neu gestartet — der Pull ist durch, und die Prüfung meldet danach
+„Programm älter".
+
+**Wie die Seite den neuen Dienst findet.** Der Port ist zufällig, ein `reconnect()` auf die
+alte Adresse fände nur den Dienst, der sich gerade beendet. Die Antwort trägt deshalb die
+neue Adresse; die Seite übernimmt daraus **nur den Port** und behält den Rechnernamen, unter
+dem sie geöffnet ist — direkt ist das `127.0.0.1`, hinter einer Weiterleitung, die den Port
+gleich weiterreicht, `localhost`. Gewechselt wird erst, wenn der neue Dienst von dort
+antwortet; gefragt wird mit `mode: "no-cors"`, dessen Antwort unlesbar bleibt, aber ihr
+Ausbleiben zeigt. Kommt keine, nennt die Sperrfläche die neue Adresse und den Weg über das
+Terminal — im DevContainer muss der neue Port weitergeleitet sein. Browser-Speicher der
+alten Adresse geht nicht mit über; das ist hingenommen.
+
+**Im Fehlerfall läuft der Dienst weiter.** Die Seite zeigt dann eine Meldung mit Fehler,
+Ausgabe und `make -C k-playbook install`, **nicht** die Sperrfläche — die wäre falsch, der
+Dienst antwortet ja. Danach meldet die Prüfung wieder „Programm älter". Scheitert die
+Installation nach einem Pull, ist „Clone neu, Programm alt" ein zulässiger Zustand, denn
+die Prüfung erkennt und meldet ihn; „nichts bleibt halb ersetzt" bezieht sich auf die
+Programmdatei — `bin/install` ersetzt atomar — und auf die Registrierung. Andere offene
+Fenster des alten Dienstes zeigen nach einem erfolgreichen Neustart die Sperrfläche mit dem
+Hinweis, die Oberfläche über `k-playbook` neu zu öffnen.
+
+Ein portstabiler Neustart, bei dem der Dienst den Listener an das neue Programm vererbt,
+wäre möglich und ist bewusst nicht gebaut: er spart einen Adresswechsel und kostet eine
+zweite, heikle Übergabe.
 
 ### Herkunftsprüfung
 
