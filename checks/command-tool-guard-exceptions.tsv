@@ -27,5 +27,3 @@ k-pr-review.md	663	git	Rückkehr auf den Base-Branch beim Aufräumen; ohne git g
 k-pr-review.md	664	git	Fast-Forward des Base-Branches beim Aufräumen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
 k-pr-review.md	665	git	Löschen des lokalen Validierungs-Branches; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
 k-pr-review.md	679	git	Abschließende Sauberkeitsprüfung des Repositorys; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
-k-task-run.md	268	git	Diff-Statistik gegen den Baseline-Commit; DIFF_ENABLED setzt ein git-Repository voraus, der Fehlschlag ist selbsterklärend.
-k-task-run.md	269	git	Diff gegen den Baseline-Commit; DIFF_ENABLED setzt ein git-Repository voraus, der Fehlschlag ist selbsterklärend.

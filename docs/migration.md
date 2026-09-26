@@ -429,8 +429,9 @@ Discuss individually before work begins:
   `--metadata-output` already writes JSON; the structure therefore exists, it just does not reach
   the assistant. Raw output remains in `raw/` -- it is auditable and not replaced.
 - **The changed state as an MCP tool.** What counts and what does not in an assessment is today
-  prose in `commands/k-task-run.md` ("omit generated files, lockfiles, and binary files"; for
-  more than ~100 lines, summarize) and is therefore decided anew on every run. The mechanical
+  prose in `commands/_task-run/diff-review.md`, the review module of `/k-task-run` ("generated
+  files, lockfiles, and binary files are omitted"; for more than ~100 lines, summarize) and is
+  therefore decided anew on every run. The mechanical
   part is: reference point through `git merge-base`, files and lines through `git diff --numstat`,
   Git itself reports binary, `linguist-generated` and `-diff` are in `.gitattributes`, and a
   maintained name list recognizes lockfiles. This belongs in the program -- by the same principle

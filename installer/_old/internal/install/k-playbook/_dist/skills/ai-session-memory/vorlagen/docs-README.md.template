@@ -1,0 +1,64 @@
+# <Projektname> – Dokumentation
+
+<Ein-Absatz-Beschreibung des Projekts.>
+
+> **Für AI-Sessions:** Diese Docs sind **autoritativ**. Nutze sie zuerst,
+> bevor du Code liest. Siehe [`AGENTS.md`](../AGENTS.md) im Workspace-Root.
+
+## Übersicht der Dokumente
+
+| Datei | Inhalt |
+|-------|--------|
+| [`00-overview.md`](./00-overview.md) | Gesamtsystem, Architektur, Datenfluss |
+| [`01-stack.md`](./01-stack.md) | Kompletter Tech-Stack |
+| ... | ... |
+
+## Repository-/Modul-Beziehungen
+
+```
+<optional: ASCII-Diagramm der Komponenten-Beziehungen>
+```
+
+---
+
+## Stichwort-Index
+
+Alphabetisch sortiert. **Format:** Stichwort → Datei-Nr. + Abschnitt.
+
+### A
+
+- **<Begriff>** → `<datei>` §<abschnitt>
+- **<Begriff>** → `<datei>` §<abschnitt>
+
+### B
+
+- **<Begriff>** → `<datei>` §<abschnitt>
+
+<!-- ... alle relevanten Buchstaben, mindestens A–Z im Rohbau anlegen -->
+
+---
+
+## Häufige Fragen → Direkter Sprung
+
+| Wenn du das wissen willst … | Schau hier … |
+|---|---|
+| <Typische Frage 1> | `<datei>` §<abschnitt> |
+| <Typische Frage 2> | `<datei>` §<abschnitt> |
+| ... | ... |
+
+---
+
+## Kurzfassung des Systems
+
+<Ein paar Absätze zur Zusammenfassung, damit auch ohne Doc-Öffnen ein
+Überblick da ist.>
+
+## Workspace-Struktur
+
+```
+<projekt-root>/
+├── AGENTS.md
+├── opencode.json
+├── docs/                       diese Doku
+└── <weitere verzeichnisse>
+```

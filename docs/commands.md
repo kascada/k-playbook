@@ -41,7 +41,7 @@ New commands become visible only after linking is in place and the assistant has
 | **Task flow** | | |
 | `/k-task-create` | Create a task file from the conversation context | [`task-flow.md`](./task-flow.md) |
 | `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue | [`task-flow.md`](./task-flow.md) |
-| `/k-task-run` | Execute task files sequentially | [`task-flow.md`](./task-flow.md) |
+| `/k-task-run` | Execute task files sequentially; execution and code review run in subagents, a critical finding stops the run | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | List, add, edit, complete, and delete the project todos through `k-playbook todo` | |
 | **Helpers** | | |
 | `/k-enforcement` | Explicit check against the effective rule set | read-only report; also lists the effective check set from `catalogs.checks` without running it (`k-playbook/bin/k-check` runs it); fixes only after approval |
@@ -84,7 +84,7 @@ No command reads or guesses a path. Everything derives from the location of `K-P
 
 | Command | writes to |
 |---|---|
-| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, completed tasks to `tasks/done/` |
+| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, completed tasks to `tasks/done/`; `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/` |
 | `/k-todo` | `k-playbook-local/data/todos.json`, written only through `k-playbook todo` or the MCP tools |
 | `/k-review`, `/k-audit` | `k-playbook-local/results/` |
 | `/k-docs-code`, skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |

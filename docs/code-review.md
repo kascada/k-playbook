@@ -156,6 +156,7 @@ Typical review families:
 - `/k-review iac-container`
 - `/k-review sast`
 - `/k-review tech`
+- `/k-review code`
 - `/k-review python-comment-hardspots`
 
 ## /k-remediation
@@ -360,9 +361,34 @@ Typical artifacts in report mode: `review-input.json` and `review-triage.md`. Th
 in two modes with the same review criteria; only the result form differs. See also **Recipes as
 evidence sources** below.
 
+### Code Review
+
+| | |
+|---|---|
+| Recipe | `k-playbook/reviews/review-code.md` |
+| Results | `k-playbook-local/results/code/YYYY-MM-DD/` |
+| Audit entry | Evidence source `code`, SARIF under `k-playbook-local/results/YYYY-MM-DD/raw/code.sarif` |
+| Diff of a task | Section `## Ergebnisform für den Diff eines Tasks` in the recipe, for `/k-task-run` |
+
+Typical artifacts in report mode: `review-input.json` and `review-triage.md`. The recipe reviews
+source code in Go, Python, shell, JavaScript, and TypeScript in four directions — correctness,
+security, performance, and maintainability — with `code-*` rule IDs. It is tool-neutral and needs
+no assistant-specific skill. Its criteria are the same in all three result forms; only the result
+form differs, and in an audit run the recipe does not report again what another source of the same
+run already covers: scanner entries in state `done` for their language and direction, and the
+evidence entry `tech` when it is selected. It takes the entry states from the status output of
+`/k-audit`. Run on its own, through `/k-review` or for the diff of a task, nothing is excluded.
+
+For the diff of a task, subject, yardstick, and classification are defined in the recipe only; this
+page does not repeat them. The result form itself is described in
+[`rules/review-authoring.md`](../rules/review-authoring.md). The use by `/k-task-run` has no switch
+of its own: `review.enabled` only affects `/k-review` and `audit.enabled` only `/k-audit`; only an
+empty project-owned `review-code.md` disables it. A project-owned overlay must carry the section
+under the same heading.
+
 ### Recipes as Evidence Sources
 
-Two catalog recipes provide their own evidence from code in a run rather than filtering existing
+Three catalog recipes provide their own evidence from code in a run rather than filtering existing
 evidence. They run before the merge, read only their frozen `scope.paths`, and write SARIF to
 `raw/<entry>.sarif`:
 
@@ -370,10 +396,11 @@ evidence. They run before the merge, read only their frozen `scope.paths`, and w
 |---|---|---|
 | `review-tech.md` | `tech` | Source and infrastructure files; tech-debt candidates with `tech-*` rule IDs. |
 | `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python sources; locations without reconstructable rationale, with `hardspot-*` rule IDs. |
+| `review-code.md` | `code` | Source code in Go, Python, shell, JavaScript, and TypeScript; correctness, security, performance, and maintainability findings with `code-*` rule IDs. |
 
-Both remain selectable through `/k-review`: `review-tech` in report mode with the `tech` result
-family, and `review-python-comment-hardspots` interactively. The review criteria are the same in
-both modes; only the result form differs.
+All three remain selectable through `/k-review`: `review-tech` and `review-code` in report mode with
+the `tech` and `code` result families, and `review-python-comment-hardspots` interactively. The
+review criteria are the same in both modes; only the result form differs.
 
 ### Family-Only Recipes in the Audit Run Model
 

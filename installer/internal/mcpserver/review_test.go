@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1722,4 +1723,149 @@ func triageStatus(t *testing.T, root string, run string) map[string]any {
 		t.Fatalf("kein triage-Block im Status: %#v", envelope.Data)
 	}
 	return triage
+}
+
+// TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag schickt jedes
+// mitgelieferte Rezept aus reviews/ an der Repo-Wurzel durch den Katalog
+// (project) und den Audit-Parser (readAIRecipeMetadata, ValidateAuditContract)
+// und prüft, dass beide es auswählbar führen.
+//
+// BuildContext liest <projectDir>/k-playbook/reviews/. An der Repo-Wurzel wäre
+// das der Clone der installierten Version, nicht der Arbeitsstand. Der Test
+// kopiert die Rezepte deshalb in ein temporäres Projekt und ruft Katalog und
+// Auswahl nur dort auf.
+func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
+	sources, err := filepath.Glob(filepath.Join("..", "..", "..", "reviews", "review-*.md"))
+	if err != nil {
+		t.Fatalf("reviews/ lesen: %v", err)
+	}
+	if len(sources) == 0 {
+		t.Fatal("kein Rezept unter reviews/ an der Repo-Wurzel")
+	}
+
+	root := newReviewProject(t)
+	reviewsDir := filepath.Join(root, "k-playbook", "reviews")
+	// Nur die Rezepte des Arbeitsstands sollen im Katalog stehen, nicht die
+	// Vorlage aus newReviewProject.
+	if err := os.RemoveAll(reviewsDir); err != nil {
+		t.Fatalf("Vorlagen entfernen: %v", err)
+	}
+	names := make([]string, 0, len(sources))
+	for _, source := range sources {
+		data, err := os.ReadFile(source)
+		if err != nil {
+			t.Fatalf("%s lesen: %v", source, err)
+		}
+		name := filepath.Base(source)
+		mustWriteFile(t, filepath.Join(reviewsDir, name), string(data))
+		names = append(names, name)
+	}
+
+	built, err := project.BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	catalog := built.Catalogs["reviews"]
+
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("status fehlgeschlagen: %#v", envelope.Error)
+	}
+	selection := envelope.Data.(map[string]any)["selection"].(map[string]any)
+	candidates := selection["candidates"].([]any)
+	evidenceCandidates := selection["evidenceCandidates"].([]any)
+
+	evidenceChecked := 0
+	for _, name := range names {
+		entry := reviewCatalogEntry(t, catalog, name)
+		if entry.Disabled || entry.Origin != "dist" {
+			t.Errorf("%s: Katalogeintrag disabled=%v origin=%q, erwartet aktiv und dist", name, entry.Disabled, entry.Origin)
+			continue
+		}
+		if entry.Audit == nil || entry.Review == nil {
+			t.Errorf("%s: Katalogeintrag ohne audit- oder review-Modus: %+v", name, entry)
+			continue
+		}
+
+		metadata, err := readAIRecipeMetadata(entry.Key, entry.Path)
+		if err != nil {
+			t.Errorf("%s: readAIRecipeMetadata: %v", name, err)
+			continue
+		}
+		// Katalog und Audit-Parser lesen dasselbe Frontmatter mit zwei
+		// Parsern. Weichen sie ab, zeigt die Oberfläche etwas anderes an,
+		// als der Lauf ausführt.
+		if metadata.Enabled != entry.Audit.Enabled {
+			t.Errorf("%s: audit.enabled Katalog=%v Parser=%v", name, entry.Audit.Enabled, metadata.Enabled)
+		}
+		if metadata.ReviewEnabled != entry.Review.Enabled {
+			t.Errorf("%s: review.enabled Katalog=%v Parser=%v", name, entry.Review.Enabled, metadata.ReviewEnabled)
+		}
+		if !metadata.Enabled {
+			if hasCandidate(candidates, entry.Key) {
+				t.Errorf("%s: audit.enabled ist false, steht aber in der Audit-Auswahl", name)
+			}
+			continue
+		}
+
+		if err := review.ValidateAuditContract(metadata.auditContract()); err != nil {
+			t.Errorf("%s: Audit-Vertrag ungültig: %v", name, err)
+		}
+		candidate := candidateByName(t, candidates, entry.Key)
+		if candidate["selectable"] != true || candidate["unavailableReason"] != "" {
+			t.Errorf("%s: nicht auswählbar: selectable=%v unavailableReason=%q", name, candidate["selectable"], candidate["unavailableReason"])
+		}
+
+		if metadata.Mode != review.ModeEvidence {
+			continue
+		}
+		evidenceChecked++
+		if len(metadata.RuleIDs) == 0 {
+			t.Errorf("%s: mode: evidence ohne ruleIds", name)
+		}
+		if metadata.Scope == nil || len(metadata.Scope.Paths) == 0 {
+			t.Errorf("%s: mode: evidence ohne scope.paths", name)
+		}
+		if review.Mode(entry.Audit.Mode) != review.ModeEvidence {
+			t.Errorf("%s: Katalog führt mode %q, Parser %q", name, entry.Audit.Mode, metadata.Mode)
+		}
+		if !slices.Equal(entry.Audit.RuleIDs, metadata.RuleIDs) {
+			t.Errorf("%s: ruleIds Katalog=%v Parser=%v", name, entry.Audit.RuleIDs, metadata.RuleIDs)
+		}
+		if entry.Audit.Scope == nil || metadata.Scope == nil || !slices.Equal(entry.Audit.Scope.Paths, metadata.Scope.Paths) {
+			t.Errorf("%s: scope.paths Katalog=%+v Parser=%+v", name, entry.Audit.Scope, metadata.Scope)
+		}
+		if !containsValue(evidenceCandidates, entry.Key) {
+			t.Errorf("%s: fehlt in evidenceCandidates %v", name, evidenceCandidates)
+		}
+	}
+
+	// Ohne diese Schranke wäre der Test auch dann grün, wenn kein Rezept mehr
+	// als Evidence-Quelle gelesen würde.
+	if evidenceChecked == 0 {
+		t.Fatal("kein mitgeliefertes Evidence-Rezept geprüft")
+	}
+
+	// review-code ist das Rezept, das /k-review, /k-audit und /k-task-run
+	// gemeinsam nutzen: Schlüssel code, für beide Commands auswählbar.
+	code := reviewCatalogEntry(t, catalog, "review-code.md")
+	if code.Key != "code" {
+		t.Fatalf("review-code.md hat den Schlüssel %q, erwartet code", code.Key)
+	}
+	if code.Review == nil || !code.Review.Enabled {
+		t.Errorf("review-code.md ist für /k-review nicht auswählbar: %+v", code.Review)
+	}
+	if code.Audit == nil || !code.Audit.Enabled || review.Mode(code.Audit.Mode) != review.ModeEvidence {
+		t.Errorf("review-code.md ist keine aktive Evidence-Quelle für /k-audit: %+v", code.Audit)
+	}
+	if candidate := candidateByName(t, candidates, "code"); candidate["selectable"] != true || candidate["defaultSelected"] != true {
+		t.Errorf("code in der Audit-Auswahl: selectable=%v defaultSelected=%v", candidate["selectable"], candidate["defaultSelected"])
+	}
+	if !containsValue(evidenceCandidates, "code") {
+		t.Errorf("code fehlt in evidenceCandidates %v", evidenceCandidates)
+	}
 }

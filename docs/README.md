@@ -93,6 +93,7 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `known decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd)
 - `spelling` / `umlauts` / `orthography` -> [`writing-style.md`](./writing-style.md)
 - `reviews` -> [`code-review.md`](./code-review.md)
+- `review-code` / `code review recipe` / `diff of a task` -> [`code-review.md`](./code-review.md#code-review), [`../rules/review-authoring.md`](../rules/review-authoring.md)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
 - `security tools` / `tool matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
 - `tasks` -> [`task-flow.md`](./task-flow.md)

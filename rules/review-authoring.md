@@ -106,6 +106,7 @@ Ein Review-Rezept soll enthalten:
 - Bewertungskriterien oder Anti-Muster.
 - Bei interaktiven Reviews: welche Vorschläge gemacht werden dürfen.
 - Bei Report-Reviews: wohin der Handoff geht.
+- Bei `review-code.md`: den Abschnitt für den Diff eines Tasks (Abschnitt „Ergebnisform ‚Diff eines Tasks'" unten).
 
 Bei `mode: evidence` kommt dazu:
 
@@ -114,6 +115,18 @@ Bei `mode: evidence` kommt dazu:
 - Einen Mengendeckel je Lauf samt Auswahlregel, welche Funde bei Überschreitung stehen bleiben. Er bleibt Anweisung im Text und wird beim Melden nicht erzwungen — eine Kappung dort verwürfe Funde, die danach niemand mehr sieht.
 
 Ein Evidence-Rezept liefert Funde plus `level` und sonst nichts: keine Priorität `P1`–`P3`, keine Kategoriebuchstaben `S`/`T`/`K`/`F`/`A`/`X`, keine Bündelung. Priorisierung gehört ausschließlich in `commands/_audit/review-scan-triage.md`.
+
+## Ergebnisform „Diff eines Tasks"
+
+Neben Kommentarvorschlag, Ergebnisdokument und SARIF gibt es eine vierte Ergebnisform: das Review des Diffs, den ein Task hinterlassen hat. Abnehmer ist `/k-task-run`. Sie ist keine Betriebsart mit eigenem Frontmatter-Feld, sondern ein Abschnitt im Rezept.
+
+- **Genau ein Katalogeintrag.** `/k-task-run` nutzt nur den Eintrag mit dem Schlüssel `code`, also die Datei `review-code.md`. Kein anderes Rezept trägt diesen Abschnitt.
+- **Feste Überschrift.** Der Abschnitt steht unter einer festen Überschrift, an der das Modul des Commands ihn eindeutig erkennt. Welche das ist, legt das Rezept fest; die Regel verlangt, dass es sie gibt.
+- **Inhalt.** Der Abschnitt enthält nur Gegenstand, Maßstab, die Einstufung der Funde für den Abnehmer und die aufgabengebundenen Kriterien samt ihrem Beleg. Aufgabengebunden heißen Kriterien, deren Maßstab der Task selbst oder die übergebenen Validierungsergebnisse sind. Welche das konkret sind und wie eingestuft wird, steht nur im Rezept; die Regel zählt sie nicht auf und definiert die Einstufung nicht.
+- **Einzige Ausnahme vom Verbot eigener Kriterien.** Die aufgabengebundenen Kriterien sind die einzigen Kriterien, die nur in einer Ergebnisform gelten — nur hier ist der Task der Maßstab. Die gemeinsamen Kriterien werden auch in diesem Abschnitt nicht neu geschrieben; er wendet sie an.
+- **Nicht im Rezept.** Ablauf, Form des Abschnitts in der Task-Datei und Rückgabeformat gehören ins Modul des Commands.
+- **Overlay.** Ein projekteigenes `review-code.md` ersetzt das mitgelieferte vollständig und muss den Abschnitt deshalb selbst tragen, unter derselben Überschrift. Fehlt er, hält `/k-task-run` jeden Task fail-closed an.
+- **Abschalten.** Einen eigenen Schalter gibt es nicht: `review.enabled` wirkt nur auf `/k-review`, `audit.enabled` nur auf `/k-audit`. Die Nutzung durch `/k-task-run` schaltet allein ein leeres projekteigenes `review-code.md` ab (`disabled: true` im Katalogeintrag).
 
 ## Grenzen
 
@@ -131,7 +144,9 @@ Zwei weitere Beschreibungen gehören ebenfalls nicht ins Rezept: das Schema von
 mit Bündelung, Priorität und Kategorie in `commands/_audit/review-scan-triage.md`. Ein
 Rezept verweist darauf und schreibt keine zweite Fassung — auch nicht als Auszug.
 
-Bedient dieselbe Datei zwei Betriebsarten, darf sie **nur nach der Ergebnisform** zweigeteilt werden: ein gemeinsamer Teil mit Prüfkriterien, Rule-IDs, `level` und Ausschlüssen, darunter je Betriebsart das Stück, das nur dort gilt — der Kommentarvorschlag im interaktiven Modus, das Ergebnisdokument im Report-Modus, das SARIF im Evidence-Lauf. Der generische Ablauf wird auch dann nicht wiederholt, und die Kriterien werden nicht je Betriebsart neu geschrieben: zwei Fassungen derselben Kriterien laufen auseinander, und dann findet dasselbe Rezept je nach Aufruf etwas anderes.
+Bedient dieselbe Datei mehrere Ergebnisformen, darf sie **nur nach der Ergebnisform** geteilt werden: ein gemeinsamer Teil mit Prüfkriterien, Rule-IDs, `level` und Ausschlüssen, darunter je Ergebnisform das Stück, das nur dort gilt — der Kommentarvorschlag im interaktiven Modus, das Ergebnisdokument im Report-Modus, das SARIF im Evidence-Lauf, der Abschnitt für den Diff eines Tasks. Der generische Ablauf wird auch dann nicht wiederholt, und die Kriterien werden nicht je Betriebsart neu geschrieben: zwei Fassungen derselben Kriterien laufen auseinander, und dann findet dasselbe Rezept je nach Aufruf etwas anderes. Die einzige Ausnahme sind die aufgabengebundenen Kriterien im Abschnitt für den Diff eines Tasks (Abschnitt „Ergebnisform ‚Diff eines Tasks'" oben).
+
+Für den Abschnitt „Diff eines Tasks" gehört der Ablauf nicht in `/k-review`, sondern ins Modul von `/k-task-run`; das Rezept wiederholt ihn nicht.
 
 ## Qualitätskriterium
 

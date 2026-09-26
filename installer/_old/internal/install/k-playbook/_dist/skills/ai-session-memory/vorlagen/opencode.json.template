@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "references": {
+    "docs": {
+      "path": "./docs",
+      "description": "Autoritative Projektdokumentation von <Projektname>. IMMER zuerst konsultieren (docs/README.md als Index), bevor Code gelesen oder analysiert wird. Enthält: <konkrete Themen listen, z.B. System-Overview, Tech-Stack, Detailanalysen der Repos, bekannte Bugs, Test-Anleitung>."
+    }
+  }
+}

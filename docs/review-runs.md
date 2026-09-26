@@ -262,7 +262,8 @@ An evidence source runs **before** the merge. It reads code in the frozen path s
 supplies part of `review-input.json` rather than reading it. Its required artifact is SARIF
 under `raw/<entry>.sarif`; no Markdown result is created. The two converted examples are
 [`review-tech.md`](../reviews/review-tech.md) and
-[`review-python-comment-hardspots.md`](../reviews/review-python-comment-hardspots.md).
+[`review-python-comment-hardspots.md`](../reviews/review-python-comment-hardspots.md);
+[`review-code.md`](../reviews/review-code.md) was written as an evidence source from the start.
 
 Frontmatter contract:
 
@@ -322,6 +323,12 @@ Scope semantics for `mode: evidence`:
   of the same problem in one file are therefore one group; their count is in `findingIds`.
   The recipe does not consolidate them itself.
 - A group containing scanner and AI evidence retains the scanner ID.
+- An evidence source runs after the tool entries. It may make what it reports depend on
+  the other entries of the run and their states, which the status output lists under
+  `entries`; the criteria stay the same. `review-code.md` does this to avoid double
+  findings: it does not report again what a scanner entry in state `done` covers for its
+  language and direction, or what the selected `tech` entry covers. `failed` and `skipped`
+  entries have covered nothing.
 
 ### Order in a Run
 
@@ -367,9 +374,9 @@ Manual verification after changes to the catalog-recipe run model:
 1. Start `/k-audit 2026-08-21` in a new assistant session and read the status.
 2. Verify that `secret-scanning` creates `review-secret-scanning.md` after the merge
    without an alignment note and names the `gitleaks`, `trufflehog` scope.
-3. Verify that `tech` and `python-comment-hardspots` run as evidence entries before the
-   merge, write their SARIF to `raw/<entry>.sarif`, and afterward appear as groups with
-   the `ai-<entry>-` prefix in `review-input.json`.
+3. Verify that `tech`, `code`, and `python-comment-hardspots` run as evidence entries
+   before the merge, write their SARIF to `raw/<entry>.sarif`, and afterward appear as
+   groups with the `ai-<entry>-` prefix in `review-input.json`.
 4. In a CVE-heavy target, create a small run with dependency tools and verify that
    `dependency-cve` runs as a perspective over `review-input.json`.
 5. In status output and create dry-run, verify that active recipe entries show their stored
