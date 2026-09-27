@@ -21,7 +21,13 @@ aus dem effektiven Katalog der Context-Ausgabe.
 
 This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in the `review-authoring` entry of `catalogs.rules`.
 
-## Step 1 — Resolve paths
+Produces:
+- Im Report-Modus `review-input.json` und `review-triage.md` unter
+  `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`.
+- Im interaktiven Modus Änderungen am Code, je Stelle erst nach Freigabe.
+- Einen Eintrag in `<RESULTS_DISPLAY_PATH>/log.md` je Lauf.
+
+## Schritt 1 — Pfade auflösen
 
 Recipes come from `catalogs.reviews`; `/k-review` darf nur Einträge mit
 `review.enabled: true` auswählen oder explizit ausführen. Fehlt der Block, gilt
@@ -35,10 +41,12 @@ hand-maintained input and lives one level up. From the context output:
 - `LOG_FILE` = `<RESULTS_DIR>/log.md`
 - `KNOWN_DECISIONS` = `<local.dir>/known-decisions.md`
 
-If `RESULTS_DIR` does not exist: ask whether to create it now or run `/k-gui`; do not
-use any fallback path.
+Command-specific policy:
 
-## Step 2 — Determine the review to run
+- If `RESULTS_DIR` does not exist: ask whether to create it now or run `/k-gui`; do not
+  use any fallback path.
+
+## Schritt 2 — Review bestimmen
 
 Take `catalogs.reviews` from the context output. It already merges shipped and
 project-local recipes and marks entries switched off by an empty local file. Each entry
@@ -59,7 +67,7 @@ If `$ARGUMENTS` is non-empty: treat it as the review name.
 If `$ARGUMENTS` is empty: build a selection list from the effective catalog and include
 only recipes with `review.enabled: true`. Do not show audit-only recipes as selectable.
 
-- For each entry, read its YAML frontmatter (`title`, `interval-weeks`) and, if available, the last log entry (see Step 6) to show `Letzter Lauf`.
+- For each entry, read its YAML frontmatter (`title`, `interval-weeks`) and, if available, the last log entry (see Schritt 6) to show `Letzter Lauf`.
 - Present as:
 
 ```
@@ -77,7 +85,7 @@ Welches Review ausführen?
 
 Wait for the user to pick one.
 
-## Step 3 — Load review + known-decisions
+## Schritt 3 — Review und known-decisions laden
 
 Load the resolved review file. Parse the YAML frontmatter into:
 
@@ -86,8 +94,8 @@ Load the resolved review file. Parse the YAML frontmatter into:
 - `interval-weeks` (integer; if missing, default to 12 and note this in the summary)
 - `scope-hint` (free text; may be missing)
 - `language` (optional; e.g. `python`)
-- `handoff` (optional; e.g. `/k-remediation` — see Step 5)
-- `result-family` (Pflicht, sobald `handoff` gesetzt ist; e.g. `dependency-cve` — report-mode reviews write to `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`. Fehlt sie bei einem Report-Rezept: sauber abbrechen, siehe Step 5b)
+- `handoff` (optional; e.g. `/k-remediation` — see Schritt 5)
+- `result-family` (Pflicht, sobald `handoff` gesetzt ist; e.g. `dependency-cve` — report-mode reviews write to `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`. Fehlt sie bei einem Report-Rezept: sauber abbrechen, siehe 5b)
 - `review.enabled` (optional; default `true` for this command)
 - `audit.enabled` (optional; default `false`, ignored by this command)
 
@@ -101,7 +109,7 @@ If it doesn't exist:
 - Warn once: „Keine `known-decisions.md` unter `<Pfad>`. Es kann sein, dass bewusste Entscheidungen als Findings auftauchen — bitte im Zweifel korrigieren."
 - Continue.
 
-## Step 4 — Clarify scope
+## Schritt 4 — Scope klären
 
 Show the review's `scope-hint` (if present) and ask the user to confirm or narrow the scope:
 
@@ -110,7 +118,7 @@ Show the review's `scope-hint` (if present) and ask the user to confirm or narro
 
 Do not proceed until the scope is clear.
 
-## Step 5 — Run the review
+## Schritt 5 — Review ausführen
 
 There are two execution modes, selected by the review's frontmatter:
 
@@ -151,7 +159,7 @@ Sammeldatei. Wer ein neues Report-Rezept schreibt, vergibt eine Familie.
    `RUN_DIR` = `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis. Wie beide Dateien entstehen, sagt der Abschnitt unten.
 3. Am Ende: dem User exakten Handoff-Befehl nennen:
    `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
-4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Step 6).
+4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Schritt 6).
 
 #### Zwei Module
 
@@ -180,7 +188,7 @@ entfällt.
 genannte Datei"; `run.json` gibt es nur im Audit-Lauf. Der Abschnitt ist damit
 audit-gebunden und greift im Report-Modus nicht. Das gilt für alle Family-Rezepte gleich.
 
-## Step 6 — Log-Eintrag
+## Schritt 6 — Log-Eintrag
 
 Wenn `LOG_FILE` gesetzt ist:
 
@@ -210,16 +218,21 @@ Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ers
 
 Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) werden vor der Protokoll-Tabelle hinzugefügt, sobald das jeweilige Review das erste Mal läuft.
 
-## Step 7 — Abschluss
+## Schritt 7 — Abschluss
 
 - Kompakte Zusammenfassung: N geprüft / M übernommen / K geskippt / L nicht-adressiert.
-- Wenn nicht-adressierte Findings übrig sind: dem User vorschlagen, diese über `/k-task-create` in die Task-Pipeline zu übergeben. Nur auf Bestätigung ausführen.
 - Log-Datei-Pfad nennen.
-- Bei Report-Modus: Handoff-Befehl noch einmal wörtlich ausgeben.
+- Folge-Command je Modus:
+  - Report-Modus: den Handoff-Befehl aus 5b noch einmal wörtlich ausgeben —
+    `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`.
+  - Interaktiver Modus: wenn nicht-adressierte Findings übrig sind, dem User vorschlagen,
+    diese über `/k-task-create` in die Task-Pipeline zu übergeben. Nur auf Bestätigung
+    ausführen. Sind keine übrig oder lehnt der User ab, ausdrücklich sagen, dass kein
+    Folge-Command ansteht.
 
 ## Fehlerfälle
 
-- **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Step 2 wiederholen).
+- **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Schritt 2 wiederholen).
 - **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
 - **Kein k-playbook-Projekt**: der Context-Aufruf schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` fehlt im Dateisystem**: User fragen, ob genau dieses Verzeichnis angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

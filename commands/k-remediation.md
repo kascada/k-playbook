@@ -43,6 +43,14 @@ Der `remediation`-Block der Context-Ausgabe legt fest, wie gearbeitet wird:
 
 Wenn `configured` false ist, stoppe und bitte darum, die Remediation-Policy per `/k-gui` zu setzen, oder frage für die aktuelle Session explizit.
 
+Produces:
+- Task-Dateien unter `TASKS_DIR`, eine je bestätigtem Bündel oder Befund der Kategorie T.
+- `## Remediation-Status` bzw. Statusfelder und Remediation-Log in der Arbeitsdatei
+  (`review-triage.md`, Legacy-`findings.md`, `assessment.md` oder Summary).
+- Eine Zeile im Protokoll von `LOG_FILE` je Lauf.
+- Nur nach Freigabe: direkte Fixes im Code (Kategorie S) und Einträge in
+  `known-decisions.md` (Kategorie A).
+
 ---
 
 ## Schritt 1 — Pfade auflösen
@@ -392,9 +400,9 @@ Task-Datei nach den Regeln von `/k-task-create` anlegen. Siehe `commands/k-task-
 
 1. Abgleich prüfen: Deckt ein bestehender Task aus `TASKS_DIR/` dieses Bündel bereits ab (Schritt 5, Treffer-Kriterium Quelle plus Bündel-/Gruppen-ID)? Dann keinen zweiten Task anlegen, sondern den Treffer melden und beim nächsten Bündel weitermachen. Ein Treffer aus `TASKS_DIR/done/` hält den Task nicht auf; er wird im neuen Task als Vorgeschichte genannt.
 2. Ziel-Verzeichnis: `TASKS_DIR` (aus Schritt 1). Wenn nicht gesetzt: abbrechen und `/k-gui` nennen.
-3. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/done/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Step 2).
-4. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Step 3).
-5. Inhalt: Struktur aus `k-task-create.md`, Step 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
+3. Nummer: nächste freie über `<TASKS_DIR>/*.md` und `<TASKS_DIR>/done/*.md` bestimmen, zero-padded auf 3 Stellen (siehe `k-task-create.md`, Schritt 2).
+4. Dateiname: `<NNN>-<kurzname>.md` — Kurzname aus Befundtitel abgeleitet (lowercase, hyphens; siehe `k-task-create.md`, Schritt 3).
+5. Inhalt: Struktur aus `k-task-create.md`, Schritt 6 (Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen). Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein Quick-and-Dirty).
 
     **Pflichtanker in jedem Task: Quelle plus Bündel-/Gruppen-ID.** Beide Angaben sind
     nicht bloß Herkunftsnachweis, sondern das Kriterium, an dem der Abgleich aus
@@ -589,6 +597,10 @@ Bearbeitet:   <N>
 ```
 
 Wenn noch offene K- oder F-Punkte vorhanden: diese auflisten mit kurzer Begründung warum sie offen blieben.
+
+Folge-Command: sind Tasks entstanden, **`/k-task-run`** — er setzt die erzeugten Task-Dateien
+um, wie Schritt 4 es nennt (nach `/k-task-refine`, wenn sie noch nicht gegengelesen sind).
+Sind keine Tasks entstanden, steht ausdrücklich kein Folge-Command an.
 
 ---
 

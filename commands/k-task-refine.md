@@ -18,14 +18,15 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Härtet Task-/Instruction-Dateien vor Ausführung über einen strukturierten Zwei-Agenten-Dialog zwischen **Critic** und **Editor**. Critic und Editor sind read-only Advisors. Der Moderator routet zwischen ihnen, entscheidet Deadlocks, wendet akzeptierte Edits an und hängt ein Discussion Log an. Ein finaler Alignment-Check prüft das Ergebnis gegen den angegebenen Intent.
 
-## Invocation
-
 `/k-task-refine` — offene Task-Dateien aus `k-playbook-local/tasks/` härten.
 `/k-task-refine <path>` — eine explizite Datei oder ein Verzeichnis mit `.md`-Task-/Instruction-Dateien härten.
 
----
+Produces:
+- Ein `## Review-Log (<now.date>)` am Ende jeder geprüften Task-Datei — auch ohne
+  Änderung, dann mit dem Vermerk „keine Änderungen".
+- Änderungen an den geprüften Dateien, angewendet allein vom Moderator.
 
-## Process invariants
+Process invariants:
 
 - **Subagents are read-only.** Critic and Editor must not modify files, run formatters, or call write/edit tools. They only return findings, reasoning, and proposed file contents.
 - **The Moderator is the only writer.** Apply changes only after checking that they address routed issues and do not introduce unrelated edits.
@@ -33,11 +34,7 @@ Härtet Task-/Instruction-Dateien vor Ausführung über einen strukturierten Zwe
 - **Keep an audit trail.** Record all Critic issues, Moderator routing decisions, Editor decisions, skipped items, deadlocks, and final alignment in the Review-Log. Every reviewed file gets a log, including files that needed no change — the log is the only evidence that a review happened at all.
 - **Use the fast path when possible.** If one Critic round yields only clear, non-controversial fixes and the Editor proposal is clean, apply once, reread, run the final alignment check, and stop.
 
----
-
-## Execution
-
-### Step 1 — Resolve target path
+## Schritt 1 — Zielpfad auflösen
 
 The context load from the first step is the preflight, even for explicit file or
 directory arguments: it establishes which project is being worked in.
@@ -55,12 +52,15 @@ Command-specific policy:
   - If it does not exist: abort with a clear error.
   - If the target lies outside `RESOLVED_TASKS_DIR`, continue, but announce that this is an explicit one-off target rather than the standard task queue.
 - If `$ARGUMENTS` is empty:
-  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`.
+  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Das
+    ist eine begründete Abweichung von `rules/command-authoring.md`, Abschnitt „Fehlendes
+    Verzeichnis": Ohne Task-Verzeichnis gibt es nichts zu prüfen, deshalb keine Rückfrage
+    nach dem Anlegen.
   - Otherwise use it as the review target.
 
 Remember the chosen absolute target as `REVIEW_TARGET` and the display path as `REVIEW_TARGET_DISPLAY`.
 
-### Step 2 — Collect files
+## Schritt 2 — Dateien sammeln
 
 If `REVIEW_TARGET` is a directory:
 - Collect all `.md` files directly in that directory (not subdirectories).
@@ -90,9 +90,9 @@ ohne Rückfragen implementieren können.
 
 If file references are present: read those files and use their content as Intent.
 If both inline text and file references are present: combine both.
-If no `## Intent` section exists: skip the alignment check (Step 10).
+If no `## Intent` section exists: skip the alignment check (Schritt 10).
 
-### Step 3 — Print startup summary
+## Schritt 3 — Startübersicht ausgeben
 
 Output to the user before doing anything else:
 
@@ -108,7 +108,7 @@ Runden:  max. 5
 
 ---
 
-### Step 4 — Critic round
+## Schritt 4 — Critic-Runde
 
 Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
 as Critic with this prompt:
@@ -136,7 +136,16 @@ Output format (table, no intro text):
 | ID | Kategorie | Datei | Stelle | Problem | Empfehlung |
 ```
 
-### Step 5 — Moderator: route to Editor
+**Review focus.** Check from above:
+- Is the overall approach coherent?
+- Are there contradictions between steps or files?
+- Is a critical constraint missing that the executing agent cannot infer?
+- Is the scope/framing reasonable?
+- (From round 2+) Did the Editor's changes introduce new problems?
+
+Do NOT flag: implementation choices, missing code details, style, minor wording.
+
+## Schritt 5 — Moderator: an den Editor routen
 
 For each issue from the Critic, decide:
 - **pass** — clear mistake or blocking missing constraint; send to Editor.
@@ -148,7 +157,7 @@ Skip WARNUNGs and FEHLENDs unless they block execution. Store the routing table 
 
 | ID | Kategorie | Route | Begründung | Weitergabe an Editor? |
 
-### Step 6 — Editor round
+## Schritt 6 — Editor-Runde
 
 Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
 as Editor with this prompt:
@@ -171,7 +180,7 @@ Output:
 | ID | Aktion | Begründung |
 ```
 
-### Step 7 — Moderator: validate and apply proposed edits
+## Schritt 7 — Moderator: Vorschläge prüfen und anwenden
 
 The Moderator reviews the Editor output before changing files:
 
@@ -184,13 +193,13 @@ The Moderator reviews the Editor output before changing files:
 
 Do not trust proposed file contents as applied state until the reread confirms it.
 
-### Step 8 — Moderator: route unresolved items back to Critic
+## Schritt 8 — Moderator: Offenes zurück an den Critic
 
 Collect all issues the Editor did NOT fix, all Moderator-rejected edits, and any concerns noticed while rereading the actual file state. For each, pass the Editor's reasoning and the Moderator decision to the Critic.
 
-If nothing is unresolved and no risky new change exists → use the fast path and skip to Step 10 (Intent check, if Intent exists).
+If nothing is unresolved and no risky new change exists → use the fast path and skip to Schritt 10 (Intent check, if Intent exists).
 
-### Step 9 — Critic responds (repeat up to 5 rounds total)
+## Schritt 9 — Critic antwortet (bis zu 5 Runden insgesamt)
 
 Spawn a new Critic subagent with this prompt:
 
@@ -217,14 +226,14 @@ Output:
 
 **Moderator decides:**
 - If Critic accepts Editor's reasoning → issue closed
-- If Critic insists or adds new issues → pass to Editor (Step 5), new round
+- If Critic insists or adds new issues → pass to Editor (Schritt 5), new round
 - If both sides have argued the same point twice without movement → Moderator decides and notes it as a Moderator-Entscheidung
-- If all issues resolved or max 5 rounds reached → proceed to Step 10
+- If all issues resolved or max 5 rounds reached → proceed to Schritt 10
 - If continuous improvement is happening → allow up to 5 rounds; stop early as soon as agreement is reached
 
 ---
 
-### Step 10 — Intent alignment check (only if Intent was provided)
+## Schritt 10 — Intent-Alignment-Check (nur mit Intent)
 
 Spawn a final general-purpose Critic subagent (OpenCode: `general`, Claude Code:
 `general-purpose`) with this prompt:
@@ -251,13 +260,13 @@ If alignment is NO → Moderator decides: one more targeted Editor round or ask 
 
 ---
 
-### Step 11 — Discussion log
+## Schritt 11 — Review-Log anhängen
 
 Append the following block to **each reviewed task file** — not only to the ones that
 were changed.
 
 Eine Datei, an der nichts zu korrigieren war, ist trotzdem geprüft worden, und diese
-Prüfung muss sichtbar bleiben. `/k-task-run` Step 1.2 erkennt an genau diesem Block, ob ein
+Prüfung muss sichtbar bleiben. `/k-task-run` Schritt 2 erkennt an genau diesem Block, ob ein
 Task jemals gegengelesen wurde; fehlt er auf einer ungeänderten Datei, meldet `/k-task-run`
 sie später als ungeprüft und fragt unnötig nach.
 
@@ -288,7 +297,7 @@ und unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`.
 <List deadlocks, skipped WARNUNG/FEHLEND items, rejected Editor edits, and user-input decisions, each with brief reasoning>
 
 ### Intent-Alignment
-<Result of Step 10, or "— (kein Intent angegeben)">
+<Result of Schritt 10, or "— (kein Intent angegeben)">
 
 ### Geänderte Dateien
 - <filename>: <what changed> (FEHLER-01, FEHLER-03)
@@ -298,15 +307,5 @@ und unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`.
 - <ID>: <reason>
 ```
 
----
-
-## Review focus
-
-Check from above:
-- Is the overall approach coherent?
-- Are there contradictions between steps or files?
-- Is a critical constraint missing that the executing agent cannot infer?
-- Is the scope/framing reasonable?
-- (From round 2+) Did the Editor's changes introduce new problems?
-
-Do NOT flag: implementation choices, missing code details, style, minor wording.
+Folge-Command: **`/k-task-run`** — führt die gehärteten Task-Dateien aus und legt in
+jeder das Ergebnis der Ausführung ab.

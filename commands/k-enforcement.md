@@ -20,7 +20,7 @@ Check k-playbook enforcement rules for the current project.
 
 This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
 
-## Step 1 — Resolve target and paths
+## Schritt 1 — Ziel und Pfade auflösen
 
 From the context output:
 
@@ -36,11 +36,13 @@ From the context output:
   `project.repoRoot`; otherwise stop and say so.
 - If `$ARGUMENTS` is empty, check the current working directory.
 
-If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
-docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
-finding by itself — name it and move on.
+Command-specific policy:
 
-## Step 2 — Load rule files and checks
+- If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
+  docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
+  finding by itself — name it and move on.
+
+## Schritt 2 — Regeln und Checks laden
 
 Take `catalogs.rules` from the context output. It already merges the shipped catalog
 with the project-local one and records `origin` per entry — do not list directories
@@ -69,7 +71,7 @@ Checks:       <K> aktiv  (<E> dist, <F> local, <G> override), <H> abgeschaltet
 Docs:         k-playbook-local/docs/code | fehlt
 ```
 
-## Step 3 — Determine current change scope
+## Schritt 3 — Änderungsumfang bestimmen
 
 If `project.repoRoot` is a git repo or inside a git worktree:
 
@@ -84,7 +86,7 @@ If there is no git repo or no diff:
 
 Do not modify files in this command unless the user explicitly asks to fix a found issue.
 
-## Step 4 — Check rules
+## Schritt 4 — Regeln prüfen
 
 For each loaded rule:
 
@@ -94,7 +96,7 @@ For each loaded rule:
 
 Rules apply to new or changed work, not retroactively to the entire legacy codebase, unless a rule explicitly says otherwise.
 
-## Step 5 — Docs-sync check
+## Schritt 5 — Docs-Sync prüfen
 
 Always perform this check when code files changed.
 
@@ -115,7 +117,7 @@ Decide one of:
 
 Do not silently pass a code change without one of these outcomes.
 
-## Step 6 — Report
+## Schritt 6 — Bericht
 
 Output:
 
@@ -137,8 +139,11 @@ Lauf:            <playbook.dir>/bin/k-check --mode changed
 Docs-Sync:       angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Thema>) | unklar
 ```
 
-The check list comes from `catalogs.checks` as loaded in Step 2. Do not report a check
+The check list comes from `catalogs.checks` as loaded in Schritt 2. Do not report a check
 result you did not see: the checks are run through `<playbook.dir>/bin/k-check`, and
 `/k-enforcement` only names that call.
 
 If anything is `offen`, `unklar`, or `verletzt`, finish with the concrete next action and ask before editing.
+
+Folge-Command: keiner. Der Bericht und die genannte nächste Aktion sind das Ergebnis;
+korrigiert wird nur nach Freigabe in derselben Sitzung.

@@ -10,7 +10,7 @@ Eingebunden wird es von den beiden Lauf-Commands:
 - `/k-audit` — mittelbar über `commands/_audit/review-scan-triage.md`, das es in
   Schritt 8 wortlaut-treu anwendet. Geschrieben wird die Datei dort nicht vom Command,
   sondern in Schritt 6 vom Go-Merge.
-- `/k-review` — unmittelbar in Step 5b, dem Report-Modus. Dort schreibt der Agent die
+- `/k-review` — unmittelbar in 5b, dem Report-Modus. Dort schreibt der Agent die
   Datei von Hand, in den Family-Ordner aus `result-family`.
 
 Es liegt deshalb im Familien-Namensraum `commands/_review-run/` und nicht im
@@ -139,7 +139,7 @@ ihr Vorhandensein und arbeitet ohne sie weiter, statt sie zu erfinden.
 | `groups[].dedupeRules`, `possibleDuplicates` | Welche Regel zusammengefasst hat und welche Gruppen unsichere Dubletten sind. | Keine maschinelle Dedupe-Herleitung. Die Bündelung ist Sache der Triage. |
 | `groups[].derivedSeverity`, `severitySource` | Wie beim Finding, für den Repräsentanten. | Wie beim Finding: `level` gilt unmittelbar. |
 | `groups[].dependency` | Dependency-Angaben des Repräsentanten. `ids` und `keyIds` sind die Vereinigung über die Findings der Gruppe, die dieselbe Dependency beschreiben; `package`, `version`, `manifest` und die Freitextfelder bleiben die des Repräsentanten und lassen sich nicht vereinigen. | Steht bei den Findings, sofern die Quelle sie kennt. |
-| `knownDecisions` | Geladene Quellen, Decisions mit `applied` / `notAppliedReason` / `expired` und Warnungen. | Es gab kein zentrales Matching. Im Report-Weg lädt `/k-review` `known-decisions.md` in Step 3 selbst und meldet gedeckte Funde gar nicht erst als Fund. |
+| `knownDecisions` | Geladene Quellen, Decisions mit `applied` / `notAppliedReason` / `expired` und Warnungen. | Es gab kein zentrales Matching. Im Report-Weg lädt `/k-review` `known-decisions.md` in Schritt 3 selbst und meldet gedeckte Funde gar nicht erst als Fund. |
 | `findings[].coveredByKnownDecision`, `groups[].coveredByKnownDecision`, `groups[].partialCoverage`, `groups[].knownDecisionCoverage` | Ergebnis des Matchings je Fund und je Gruppe, mit `matchedBy`. | Keine Deckungsmarker im Beleg. Der Abschnitt `## Deckung aus known-decisions` bleibt stehen und sagt in einem Satz, dass der Beleg kein Matching trägt und warum. |
 
 ## Stabile Gruppen-IDs

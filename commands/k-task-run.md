@@ -1,6 +1,6 @@
 ---
-description: "Execute one or more task files. If no path is given, uses the project's task directory. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. Execution, diff and code review run in sub-agents that write into the task file themselves. On success, the file moves to done/ unless a critical review finding stops the run first. On partial execution or error, appends a status note and leaves the file in place."
-argument-hint: "[file-or-directory]"
+description: Execute one or more task files. If no path is given, uses the project's task directory. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. Execution, diff and code review run in sub-agents that write into the task file themselves. On success, the file moves to done/ unless a critical review finding stops the run first. On partial execution or error, appends a status note and leaves the file in place.
+argument-hint: [file-or-directory]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent]
 ---
@@ -24,9 +24,16 @@ schreiben und dem Hauptkontext nur ein festes, knappes Format zurückgeben. Der 
 sieht pro Task keinen Diff, keine Dateiinhalte außer der Task-Datei selbst, keine Logs und
 kein vollständiges Review. Alle Rückfragen an den Nutzer bleiben im Hauptkontext.
 
-## Hauptkontext und Task-Datei
+Produces:
+- In jeder ausgeführten Task-Datei den Abschnitt `## Ausführung` mit Kennzeile, Status und
+  Zusammenfassung, die Diff- und Review-Abschnitte des Review-Sub-Agenten und, bei
+  Etappen, die Tabelle `## Fortschritt`.
+- Erfolgreich abgeschlossene Task-Dateien unter `<TASKS_DISPLAY_PATH>/done/`.
+- Je Task eine Ref `refs/k-task-run/<TASK_STEM>` in der Ausführungswurzel, bis der Task
+  nach `done/` wandert.
+- Bei `PR required: true` einen Pull Request über `gh`.
 
-Für den Umgang des Hauptkontexts mit Task-Dateien gilt im ganzen Command:
+**Hauptkontext und Task-Datei.** Für den Umgang des Hauptkontexts mit Task-Dateien gilt im ganzen Command:
 
 - **Lesen nur per Shell mit `sed -n`** — die ganze Datei mit `sed -n '1,$p' "<datei>"`,
   einen Abschnitt mit `sed -n '<von>,<bis>p' "<datei>"` —, nie mit dem Lese-Werkzeug des
@@ -40,8 +47,11 @@ Für den Umgang des Hauptkontexts mit Task-Dateien gilt im ganzen Command:
   Code oder `edit` in OpenCode: Diese verlangen ein Lesen mit dem Lese-Werkzeug und nach
   einer fremden Änderung ein erneutes, das Diff und Review in den Hauptkontext holte. Neues
   wird ans Dateiende angehängt, per Heredoc mit einer Endmarke in Anführungszeichen und
-  einer Leerzeile vorweg, damit der Eintrag am Zeilenanfang beginnt.
-- **Nach dem Kopf** (2f, Schritt 2) liest der Hauptkontext die Task-Datei nicht mehr, auf
+  einer Leerzeile vorweg, damit der Eintrag am Zeilenanfang beginnt. Freier Text —
+  Zusammenfassung, Grund, Begründung — steht nie in doppelten Anführungszeichen, etwa als
+  Argument von `printf` oder `echo`: Die Shell führte Backticks und `$(…)` darin als Befehl
+  aus, und Begründungen von Sub-Agenten tragen oft Bezeichner in Backticks.
+- **Nach dem Kopf** (4f, Schritt 2) liest der Hauptkontext die Task-Datei nicht mehr, auf
   keinem Weg, und ändert keine bestehende Zeile mehr; er sucht nur noch per Grep und hängt
   per Shell an.
 
@@ -51,8 +61,8 @@ eigene Zeile am Zeilenanfang. `<datei>` ist der Dateiname der Task-Datei, etwa
 
 | Zeile | Schreibt | Bedeutung |
 |---|---|---|
-| `<!-- k-task-run: snapshot <datei> <kennung> -->` | Hauptkontext, 2b.1 | Snapshot des Tasks |
-| `<!-- k-task-run: ausgeführt <datei> -->` | Hauptkontext, mit dem Kopf in 2f | ausgeführt; solange die Datei nicht in `done/` liegt, nicht abgeschlossen |
+| `<!-- k-task-run: snapshot <datei> <kennung> -->` | Hauptkontext, 4b.1 | Snapshot des Tasks |
+| `<!-- k-task-run: ausgeführt <datei> -->` | Hauptkontext, mit dem Kopf in 4f | ausgeführt; solange die Datei nicht in `done/` liegt, nicht abgeschlossen |
 | `### Diff: Geänderte Dateien` | Review-Sub-Agent | Diff-Abschnitte eines Laufs |
 | `### Review: Befunde` | Review-Sub-Agent | Review-Abschnitt eines Laufs |
 
@@ -63,7 +73,7 @@ als ausgeführt. Die beiden Überschriftenzeilen sind der Vertrag mit dem Modul
 `commands/_task-run/diff-review.md`; es beschreibt auch das Rückgabeformat des
 Review-Sub-Agenten.
 
-## Step 1 - Resolve target path and collect tasks
+## Schritt 1 — Zielpfad auflösen und Tasks sammeln
 
 The context load from the first step is the preflight, even for explicit file or
 directory arguments: task execution resolves `## Ausführungskontext` paths relative to
@@ -81,7 +91,10 @@ Command-specific policy:
   - If it is a directory: use that directory.
   - If it does not exist: abort with a clear error.
 - If `$ARGUMENTS` is empty:
-  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-task-run`; there are no tasks to execute.
+  - If `RESOLVED_TASKS_DIR` is missing on disk: abort and tell the user to run `/k-gui`. Do not create it from `/k-task-run`; there are no tasks to execute. Das ist eine
+    begründete Abweichung von `rules/command-authoring.md`, Abschnitt „Fehlendes
+    Verzeichnis": Ohne Task-Verzeichnis gibt es nichts auszuführen, deshalb keine
+    Rückfrage nach dem Anlegen.
   - Otherwise use it as the execution target.
 
 Remember the chosen absolute target as `RUN_TARGET` and the display path as `RUN_TARGET_DISPLAY`.
@@ -118,9 +131,9 @@ die ganze Datei — eine Datei kann schon Diff und Review tragen. Die Überschri
 dahinter, dann per Shell nur von der gesuchten bis vor die nächste Zeile `^## ` lesen
 (`sed -n '<von>,<bis>p' <datei>`). Maßgeblich ist der erste Treffer; trägt die Datei die
 Kennzeile „ausgeführt", zählen nur Treffer vor ihr, damit ein Ausschnitt in
-„Code-Änderungen" nicht als Abschnitt gilt. Den Intent behält der Hauptkontext für Step 3.
+„Code-Änderungen" nicht als Abschnitt gilt. Den Intent behält der Hauptkontext für Schritt 5.
 
-## Step 1.2 - Task-Refine-Status prüfen
+## Schritt 2 — Task-Refine-Status prüfen
 
 Ein Task, der nie durch `/k-task-refine` gegangen ist, wurde nie gegengelesen. Prüfe für
 jede gesammelte Task-Datei per Grep (`^## Review-Log`), ob sie eine `## Review-Log`-Sektion
@@ -140,7 +153,7 @@ Diese Tasks wurden nicht mit /k-task-refine gegengelesen.
 Trotzdem ausführen? (ja / nein / zuerst reviewen)
 ```
 
-- `ja` — weiter mit Step 1.5.
+- `ja` — weiter mit Schritt 3.
 - `nein` — abbrechen, nichts ausführen.
 - `zuerst reviewen` — abbrechen und wörtlich `/k-task-refine <RUN_TARGET_DISPLAY>`
   nennen, danach `/k-task-run` erneut starten. Den Task-Refine-Command nicht selbst aufrufen.
@@ -156,7 +169,7 @@ einem anderen Projekt übernommene Task-Datei kann sachlich in Ordnung sein, ohn
 durch Task-Refine gegangen zu sein — das zu entscheiden ist Sache des Users, nicht des
 Commands.
 
-## Step 1.5 - Diff und Review vorbereiten
+## Schritt 3 — Diff und Review vorbereiten
 
 Ob ein Task einen Diff und ein Review bekommt, folgt aus der Context-Ausgabe — nichts zu
 konfigurieren und nichts zu suchen:
@@ -177,24 +190,24 @@ Mit `DIFF_ENABLED=true`:
   `rules/command-authoring.md`. Der Hauptkontext liest das Modul nicht, er gibt nur den Pfad
   weiter. Fehlt es oder ist es leer, vor dem ersten Task abbrechen und `/k-gui` oder ein
   Update nennen.
-- Grundlage des Diffs ist ein Snapshot je Task (2b.1), kein Commit je Lauf. Er schließt nicht
+- Grundlage des Diffs ist ein Snapshot je Task (4b.1), kein Commit je Lauf. Er schließt nicht
   committete und ungetrackte Änderungen ein, auch die der Vorgänger im selben Lauf. Ein
   schmutziger Arbeitsbaum verfälscht den Diff deshalb nicht mehr, und einen Hinweis darauf
   gibt es hier nicht; ob schmutzige Dateien für einen Task erwartet sind, klärt der
-  Branch-Preflight in 2a.1. Nicht erfasst sind Dateien, die `.gitignore` ausschließt:
+  Branch-Preflight in 4a.1. Nicht erfasst sind Dateien, die `.gitignore` ausschließt:
   Änderungen daran erscheinen weder im Diff noch im Review.
 
-## Step 2 - Execute each task
+## Schritt 4 — Tasks nacheinander ausführen
 
 For each task file, **in strict sequential order** (never parallel - two agents must not modify code simultaneously):
 
-### 2a - Read and understand
+### 4a — Lesen und verstehen
 
 Zuerst per Grep die Kennzeile „ausgeführt" dieser Datei suchen
 (`^<!-- k-task-run: ausgeführt <datei> -->$`).
 
 **Trifft sie**, ist der Task ausgeführt, aber nicht abgeschlossen: nach der Stopp-Abfrage
-in 2f angehalten, oder eine Sitzung endete zwischen Kopf und Verschieben nach `done/`. Die
+in 4f angehalten, oder eine Sitzung endete zwischen Kopf und Verschieben nach `done/`. Die
 Datei wird weder gelesen noch erneut ausgeführt. Frage:
 
 ```
@@ -212,9 +225,9 @@ Wie weiter?
   printf '\n%s\n' "**Status nach Review:** abgeschlossen vom Nutzer (<now.date>)" >> "<TASK_FILE>"
   ```
 
-  Dann weiter wie 2f, Schritt 6 (nach `done/` verschieben, Snapshot freigeben); die
+  Dann weiter wie 4f, Schritt 6 (nach `done/` verschieben, Snapshot freigeben); die
   Ausführungswurzel dafür ist `Target repo` aus `## Ausführungskontext` (per Grep, nur
-  Treffer vor der Kennzeile), sonst die Projektwurzel. 2f.1 läuft nicht; steht dort
+  Treffer vor der Kennzeile), sonst die Projektwurzel. 4f.1 läuft nicht; steht dort
   `PR required: true`, nennt der Command den PR als offenen Schritt. Weiter mit dem nächsten
   Task.
 - (b): Der Lauf endet, keine weiteren Tasks.
@@ -223,9 +236,9 @@ Kein automatisches Beheben, kein erneutes Review, keine erneute Ausführung.
 
 **Trifft sie nicht**, die Task-Datei ganz per Shell lesen (`sed -n '1,$p' "<TASK_FILE>"`). Das
 `## Review-Log` kann übersprungene Punkte und Deadlocks aus dem Refine tragen, die für die
-Rückfragen in 2b gebraucht werden.
+Rückfragen in 4b gebraucht werden.
 
-### 2a.1 - Execution context and branch preflight
+### 4a.1 — Ausführungskontext und Branch-Preflight
 
 If the task contains a `## Ausführungskontext` section, parse these fields when present:
 
@@ -254,7 +267,7 @@ Before delegating to a sub-agent, perform the branch preflight in the execution 
 
 If the task does not contain `## Ausführungskontext`, continue with the existing behavior.
 
-### 2a.2 - Etappen-Fortschritt prüfen
+### 4a.2 — Etappen-Fortschritt prüfen
 
 Ein Task darf seine Arbeit in `## Zu bauen` als `### Etappe N — Titel` gliedern. Nur
 dann greift die Fortschrittsverfolgung; ein Task ohne Etappen läuft wie bisher als
@@ -262,7 +275,7 @@ Ganzes.
 
 Enthält die Task-Datei Etappen:
 
-1. Den Stand gibt eine vorhandene `## Fortschritt`-Sektion aus dem Lesen in 2a. Sie ist die
+1. Den Stand gibt eine vorhandene `## Fortschritt`-Sektion aus dem Lesen in 4a. Sie ist die
    einzige Quelle für den Stand — nicht der Code, nicht `git log`.
 2. Fehlt sie, per Shell anhängen: eine Zeile je Etappe, alle auf `offen`.
 
@@ -311,15 +324,15 @@ Der Stand wird **nicht** aus einem Abbruch heraus geraten. Steht eine Etappe auf
 gilt sie als nicht ausgeführt, auch wenn Teile davon im Code sichtbar sind — der
 Sub-Agent prüft zu Beginn der Etappe selbst, was schon da ist.
 
-### 2b - Clarify before delegating
+### 4b — Vor der Delegation klären
 
-**Before** spawning the sub-agent: identify anything in the task file that is unclear, ambiguous, or requires a decision that cannot be inferred from the task description. The questions rest on the task file alone; the main context reads no code for them. What can only be clarified at the code is left to the execution sub-agent — if it hits a real decision there, it reports it as a blocker (2d).
+**Before** spawning the sub-agent: identify anything in the task file that is unclear, ambiguous, or requires a decision that cannot be inferred from the task description. The questions rest on the task file alone; the main context reads no code for them. What can only be clarified at the code is left to the execution sub-agent — if it hits a real decision there, it reports it as a blocker (4d).
 
 If any such questions exist: **stop and ask the user**. Wait for answers before continuing. Do not skip this step, do not guess, and do not make quick-and-dirty decisions to avoid asking - ambiguities must be resolved in the main context where the user can answer them.
 
 Only proceed once all open questions are resolved.
 
-### 2b.1 - Snapshot des Tasks
+### 4b.1 — Snapshot des Tasks
 
 Nur mit `DIFF_ENABLED=true`. Der Snapshot hält den Arbeitsbaum der Ausführungswurzel vor dem
 Task fest, samt nicht committeter und ungetrackter Änderungen. Das Review vergleicht später
@@ -328,12 +341,12 @@ gelangt nur seine Kennung.
 
 Der Snapshot gehört zum Task, nicht zu einer Delegation. Er entsteht beim ersten Start des
 Tasks — unmittelbar vor seiner ersten Delegation, nach dem Branch-Preflight, in der
-Ausführungswurzel — und gilt für jeden weiteren Start: nach 2d und in jedem späteren Lauf,
+Ausführungswurzel — und gilt für jeden weiteren Start: nach 4d und in jedem späteren Lauf,
 ob der offene Etappen fortsetzt oder von vorn beginnt. Ein neuer Snapshot enthielte schon
 die Änderungen des früheren Versuchs; ein kritischer Fehler daraus ginge ungeprüft nach
 `done/`.
 
-`TASK_STEM` ist der Dateiname ohne `.md`, `EXEC_ROOT` die Ausführungswurzel aus 2a.1.
+`TASK_STEM` ist der Dateiname ohne `.md`, `EXEC_ROOT` die Ausführungswurzel aus 4a.1.
 
 1. Per Grep die Snapshot-Zeile dieser Datei suchen
    (`^<!-- k-task-run: snapshot <datei> [0-9a-f]+ -->$`); maßgeblich ist der letzte Treffer.
@@ -377,16 +390,16 @@ die Änderungen des früheren Versuchs; ein kritischer Fehler daraus ginge ungep
    ```
 
    `REVIEW_SCOPE` ist `ab Task-Beginn`, wenn der Task noch nie lief. Lief er schon — die
-   Datei trägt einen Vermerk aus 2e, eine Etappe stand auf `erledigt`, oder eine
+   Datei trägt einen Vermerk aus 4e, eine Etappe stand auf `erledigt`, oder eine
    Snapshot-Zeile ließ sich nicht mehr auflösen —, ist er `nur seit Fortsetzung`: Das
    Review deckt dann nur die Änderungen seit diesem Snapshot ab, sagt das in Abschnitt und
-   Rückgabe, und 2f fragt vor dem Verschieben nach `done/` (Schritt 5).
+   Rückgabe, und 4f fragt vor dem Verschieben nach `done/` (4f, Schritt 5).
 
 Schlägt ein Aufruf fehl, hält der Command vor der Delegation an und fragt den Nutzer, wie in
-2a.1. Führt der Nutzer den Task ohne Snapshot aus, läuft er ohne Diff und Review, wie ohne
-`DIFF_ENABLED`, und Step 4 nennt das.
+4a.1. Führt der Nutzer den Task ohne Snapshot aus, läuft er ohne Diff und Review, wie ohne
+`DIFF_ENABLED`, und Schritt 6 nennt das.
 
-### 2c - Delegate to sub-agent
+### 4c — An den Sub-Agenten delegieren
 
 Starte einen General-Purpose-Sub-Agenten (OpenCode: `general`, Claude Code:
 `general-purpose`) für die Ausführung. Er bekommt den Pfad, nicht den Inhalt:
@@ -397,16 +410,17 @@ Starte einen General-Purpose-Sub-Agenten (OpenCode: `general`, Claude Code:
   PR-Pflicht, die Entscheidung zum schmutzigen Arbeitsbaum und das Ergebnis des
   Branch-Preflights als verbindlichen Rahmen,
 - die Anweisung, vor Beginn alle `CLAUDE.md` im Projektbaum zu lesen,
-- alle Klärungen aus 2b als zusätzlichen Kontext,
+- alle Klärungen aus 4b als zusätzlichen Kontext,
 - bei `### Etappe`-Abschnitten: welche Etappen noch `offen` sind, und die Anweisung, die
   Zeile in `## Fortschritt` **unmittelbar nach Abschluss jeder Etappe** selbst zu setzen —
   vor der nächsten, nicht am Ende des Laufs,
-- die Anweisung, an der Task-Datei sonst nichts zu ändern: `## Ausführung` und die
-  Kennzeilen schreibt der Hauptkontext,
+- die Anweisung, in der Task-Datei keinen Abschnitt `## Ausführung` und keine Kennzeile
+  anzulegen oder zu ändern — die schreibt der Hauptkontext —; was der Task selbst in seiner
+  Datei verlangt, etwa einen eigenen Abschnitt, schreibt der Sub-Agent wie verlangt,
 - das Rückgabeformat unten.
 
 Kein Diff und keine Kennung eines Snapshots: Diff und Review sind Sache des
-Review-Sub-Agenten in 2f.
+Review-Sub-Agenten in 4f.
 
 Die Fortschrittszeile schreibt der Sub-Agent selbst, nicht der Hauptkontext. Nur so
 überlebt der Stand einen harten Abbruch: bricht die Sitzung mitten in Etappe 4 ab, stehen
@@ -427,23 +441,23 @@ Abgebrochen bei: – | <Schritt oder Etappe, an der die Arbeit stoppte>
 Blocker: keine | <Beschreibung + benötigte Entscheidung>
 ```
 
-- `erfolgreich` führt nach 2f, `blockiert` nach 2d, `teilweise` nach 2e. Eine Rückgabe ohne
+- `erfolgreich` führt nach 4f, `blockiert` nach 4d, `teilweise` nach 4e. Eine Rückgabe ohne
   gültige Zeile `Status:` gilt als `blockiert`.
-- Die Zeilen „Validierung" gehen in 2f an das Review und speisen den PR-Text in 2f.1.
+- Die Zeilen „Validierung" gehen in 4f an das Review und speisen den PR-Text in 4f.1.
 
 Wait for the sub-agent to finish before proceeding to the next task.
 
-### 2d - Handle unexpected blockers
+### 4d — Unerwartete Blocker behandeln
 
-If the sub-agent's result reports `Status: blockiert`: **stop and ask the user**, showing the „Blocker" line. Do not proceed to the next task until resolved. Then decide whether to re-run this task or to abort it (2e).
+If the sub-agent's result reports `Status: blockiert`: **stop and ask the user**, showing the „Blocker" line. Do not proceed to the next task until resolved. Then decide whether to re-run this task or to abort it (4e).
 
-Erneut ausführen heißt: 2c noch einmal, mit der Antwort des Nutzers als weiterer Klärung.
-Der Snapshot aus 2b.1 bleibt derselbe.
+Erneut ausführen heißt: 4c noch einmal, mit der Antwort des Nutzers als weiterer Klärung.
+Der Snapshot aus 4b.1 bleibt derselbe.
 
-### 2e - On error or abort
+### 4e — Bei Fehler oder Abbruch
 
-Gilt bei `Status: teilweise`, bei einem nach 2d abgebrochenen Task und wenn 2f eine offene
-Etappe findet — immer vor dem Kopf aus 2f. Per Shell anhängen:
+Gilt bei `Status: teilweise`, bei einem nach 4d abgebrochenen Task und wenn 4f eine offene
+Etappe findet — immer vor dem Kopf aus 4f. Per Shell anhängen:
 
 ```bash
 cat >> "<TASK_FILE>" <<'K_TASK_RUN_EOF'
@@ -465,23 +479,23 @@ oder, steht dort „keine", aus der Zusammenfassung.
   sub-agent left it. It is the resume point for the next `/k-task-run` — never reset it, never
   delete it, and never mark a stage as done that the sub-agent did not mark itself. Add
   `**Etappen erledigt:** <n> von <m>` as last line of the note above; `<n>` comes from Grep
-  (`^\|[^|]*\| *erledigt *\|`, nur Treffer innerhalb `## Fortschritt` wie in 2f, Schritt 1),
+  (`^\|[^|]*\| *erledigt *\|`, nur Treffer innerhalb `## Fortschritt` wie in 4f, Schritt 1),
   nicht aus einem Lesen der Datei.
 - Stop processing further tasks
 
-Nach dem Kopf aus 2f kommt 2e nicht mehr vor: Ein Task verlässt den Lauf dann nur nach
-`done/` oder mit der Zeile „angehalten" (2f, Schritt 5).
+Nach dem Kopf aus 4f kommt 4e nicht mehr vor: Ein Task verlässt den Lauf dann nur nach
+`done/` oder mit der Zeile „angehalten" (4f, Schritt 5).
 
-### 2f - On success
+### 4f — Bei Erfolg
 
 Bei `Status: erfolgreich`, in genau dieser Reihenfolge. So wird kein unvollständiger Task
 reviewt, und innerhalb eines Laufs steht nie ein Erfolgskopf neben einem Abbruchvermerk aus
-2e.
+4e.
 
 **1. Etappen prüfen.** Hat der Task `### Etappe`-Abschnitte: per Grep die Zeilen mit Status
 `offen` suchen (`^\|[^|]*\| *offen *\|`). Es zählen nur Treffer nach der ersten
 Zeile `^## Fortschritt` und vor der nächsten Zeile `^## ` oder `^---`. Steht eine Etappe
-offen, ist der Lauf **nicht** erfolgreich: ohne Kopf und ohne Review weiter nach 2e, mit der
+offen, ist der Lauf **nicht** erfolgreich: ohne Kopf und ohne Review weiter nach 4e, mit der
 ersten offenen Etappe unter „Abgebrochen bei" und dem Grund, dass der Sub-Agent Erfolg meldet,
 während die Etappe offen steht. Ein solcher Widerspruch wird gezeigt, nicht geglättet.
 
@@ -500,7 +514,7 @@ K_TASK_RUN_EOF
 ```
 
 Ab hier liest der Hauptkontext die Task-Datei nicht mehr. Mit `DIFF_ENABLED=false` oder
-ohne Snapshot (2b.1) folgt direkt Schritt 6 — kein Diff, kein Review.
+ohne Snapshot (4b.1) folgt direkt 4f, Schritt 6 — kein Diff, kein Review.
 
 **3. Rezept bestimmen**, ohne es zu lesen: aus `catalogs.reviews` der Context-Ausgabe der
 Eintrag mit dem Schlüssel `code` (Datei `review-code.md`). So greift ein Overlay unter
@@ -509,11 +523,11 @@ Eintrag mit dem Schlüssel `code` (Datei `review-code.md`). So greift ein Overla
 - Vorhanden, ohne `disabled: true`: `REVIEW_RECIPE = <path>` — der Sub-Agent führt Teil 1
   und Teil 2 des Moduls aus.
 - `disabled: true` (leere projekteigene Datei): abgeschaltet. Der Sub-Agent führt nur Teil 1
-  aus; die Diff-Abschnitte bleiben, das Review entfällt, und Step 4 weist
+  aus; die Diff-Abschnitte bleiben, das Review entfällt, und Schritt 6 weist
   „Review: abgeschaltet" aus. Eine Stopp-Abfrage aus dem Review gibt es dann nicht;
-  meldet Teil 1 `Diff: fehlgeschlagen`, nennt Step 4 das dahinter.
+  meldet Teil 1 `Diff: fehlgeschlagen`, nennt Schritt 6 das dahinter.
 - Fehlt der Eintrag: Der Sub-Agent führt ebenfalls nur Teil 1 aus. Das gilt als ungültiges
-  Review (Schritt 5).
+  Review (4f, Schritt 5).
 
 `review.enabled` und `audit.enabled` steuern nur `/k-review` und `/k-audit` und wirken hier
 nicht.
@@ -537,7 +551,7 @@ Rückgabe beschreibt das Modul. Danach dieselben Zeilen erneut zählen:
 - Die Diff-Abschnitte hat der Lauf geschrieben, wenn `### Diff: Geänderte Dateien` genau
   einmal mehr dasteht.
 
-**5. Stopp-Abfrage** — nach dem Review, vor dem Verschieben nach `done/`, vor 2f.1 und vor
+**5. Stopp-Abfrage** — nach dem Review, vor dem Verschieben nach `done/`, vor 4f.1 und vor
 dem nächsten Task. Sie kommt, sobald einer dieser Gründe vorliegt:
 
 | Grund | Die Abfrage nennt | (a) |
@@ -567,35 +581,38 @@ Bei den anderen Gründen steht statt der Befundzeilen `<task>.md: kein gültiges
 bleibt ungeprüft`.
 
 - **(a) beheben lassen.** Ein General-Purpose-Sub-Agent bekommt den Pfad der Task-Datei,
-  den Rahmen aus 2c (Ausführungswurzel, Branch, Preflight) und die kritischen Befunde. Er
+  den Rahmen aus 4c (Ausführungswurzel, Branch, Preflight) und die kritischen Befunde. Er
   behebt nur diese, ändert an der Task-Datei nichts, fragt den Nutzer nicht, meldet eine
-  offene Entscheidung unter „Blocker" und gibt das Format aus 2c zurück.
-  - `erfolgreich`: zurück zu Schritt 4 — das Review läuft erneut gegen denselben Snapshot
+  offene Entscheidung unter „Blocker" und gibt das Format aus 4c zurück.
+  - `erfolgreich`: zurück zu 4f, Schritt 4 — das Review läuft erneut gegen denselben Snapshot
     mit demselben Umfang und hängt seine Abschnitte an; die früheren bleiben. Bleibt etwas
     kritisch, wird wieder gefragt.
-  - `blockiert`: fragen wie in 2d. „Erneut" heißt hier nur, den Behebungs-Sub-Agenten mit
-    der Antwort des Nutzers noch einmal zu starten — nie zurück nach 2a. Wird er nicht
+  - `blockiert`: fragen wie in 4d. „Erneut" heißt hier nur, den Behebungs-Sub-Agenten mit
+    der Antwort des Nutzers noch einmal zu starten — nie zurück nach 4a. Wird er nicht
     erneut gestartet, weiter wie (c) mit dem Grund „Behebung blockiert, kritische
     Review-Befunde offen".
   - `teilweise`: weiter wie (c) mit dem Grund „Behebung unvollständig, kritische
     Review-Befunde offen".
 
-  Die Vorlage aus 2e kommt dabei nicht vor.
-- **(a) Review erneut laufen lassen** (kein gültiges Review): zurück zu Schritt 4 mit
+  Die Vorlage aus 4e kommt dabei nicht vor.
+- **(a) Review erneut laufen lassen** (kein gültiges Review): zurück zu 4f, Schritt 4 mit
   denselben Eingaben.
-- **(b) trotzdem weiter.** Weiter mit Schritt 6. Liegt kein gültiges Review vor und hat der
-  letzte Review-Lauf keine Diff-Abschnitte geschrieben (Zählung aus Schritt 4), startet der
+- **(b) trotzdem weiter.** Weiter mit 4f, Schritt 6. Liegt kein gültiges Review vor und hat der
+  letzte Review-Lauf keine Diff-Abschnitte geschrieben (Zählung aus 4f, Schritt 4), startet der
   Hauptkontext davor einen Sub-Agenten nur mit Teil 1 des Moduls.
 - **(c) anhalten.** Per Shell anhängen; die bestehende Statuszeile bleibt stehen:
 
   ```bash
-  printf '\n%s\n' "**Status nach Review:** angehalten — <Grund>" >> "<TASK_FILE>"
+  cat >> "<TASK_FILE>" <<'K_TASK_RUN_EOF'
+
+  **Status nach Review:** angehalten — <Grund>
+  K_TASK_RUN_EOF
   ```
 
   Grund ist „kritische Review-Befunde offen", „kein gültiges Review", „Review nur seit
   Fortsetzung" oder der Grund aus (a). Die Datei bleibt liegen, eine
   `## Fortschritt`-Tabelle unverändert; kein PR, keine weiteren Tasks. Die Kennzeile aus
-  Schritt 2 steht schon in der Datei; den nächsten Lauf regelt 2a.
+  4f, Schritt 2 steht schon in der Datei; den nächsten Lauf regelt 4a.
 
 **6. Abschluss.**
 
@@ -609,13 +626,13 @@ bleibt ungeprüft`.
    fi
    ```
 
-### 2f.1 - PR handoff for `PR required: true`
+### 4f.1 — PR-Handoff bei `PR required: true`
 
-Erst nach der Stopp-Abfrage aus 2f. If the task's `## Ausführungskontext` has `PR required: true`, handle PR creation after the task has completed and a local commit exists.
+Erst nach der Stopp-Abfrage aus 4f. If the task's `## Ausführungskontext` has `PR required: true`, handle PR creation after the task has completed and a local commit exists.
 
 Preflight:
 
-1. Work in the resolved execution root from Step 2a.1.
+1. Work in the resolved execution root from 4a.1.
 2. Verify the branch is `Work branch` if one was specified.
 3. Verify the worktree is clean with `git status --short`; if not clean, stop and report that a commit is required before PR creation.
 4. Verify the branch has an upstream. If it has none, ask before pushing. Do not push silently.
@@ -644,17 +661,17 @@ Do not use `--body "...\n..."`; Bash will pass literal backslash-n in normal dou
 
 If `gh` is unavailable or not authenticated, print the exact `gh pr create --body-file ...` command and the body-file contents for manual use.
 
-### 2g - Continue
+### 4g — Weiter
 
-Proceed to the next task in the list. If a task failed (Step 2e) or was stopped (2f, Schritt 5, or 2a, Option (b)), stop - do not execute remaining tasks.
+Proceed to the next task in the list. If a task failed (4e) or was stopped (4f, Schritt 5, or 4a, Option (b)), stop - do not execute remaining tasks.
 
-## Step 3 - Intent alignment check
+## Schritt 5 — Intent-Alignment-Check
 
 If all tasks went to `done/` AND the last task file has an `## Intent` section: check whether the executed work actually achieves the stated Intent.
 
-Step 3 liest keine Task-Dateien. Den Intent hat der Hauptkontext aus Step 1; was ausgeführt
+Schritt 5 liest keine Task-Dateien. Den Intent hat der Hauptkontext aus Schritt 1; was ausgeführt
 wurde, sind die Zusammenfassungen aus den Rückgaben der Sub-Agenten in diesem Lauf. Für
-einen Task, der nach 2a (a) ohne Rückgabe in diesem Lauf abgeschlossen wurde, holt der
+einen Task, der nach 4a (a) ohne Rückgabe in diesem Lauf abgeschlossen wurde, holt der
 Hauptkontext die erste Zeile `^\*\*Zusammenfassung:\*\*` nach seiner Kennzeile per Grep.
 
 Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
@@ -682,7 +699,10 @@ Output (no intro text):
 Append the result per Shell to the last task file, now under `done/`:
 
 ```bash
-printf '\n%s\n' "**Intent-Alignment:** <Ja / Teilweise / Nein> - <Begründung>" >> "<TASK_FILE_IN_DONE>"
+cat >> "<TASK_FILE_IN_DONE>" <<'K_TASK_RUN_EOF'
+
+**Intent-Alignment:** <Ja / Teilweise / Nein> - <Begründung>
+K_TASK_RUN_EOF
 ```
 
 If alignment is **not Yes**: print a clear warning to the user before the final summary:
@@ -693,7 +713,7 @@ WARNUNG: Intent nicht vollständig erreicht: <Begründung>
 
 If no Intent is present: skip this step silently.
 
-## Step 4 - Final summary
+## Schritt 6 — Abschließende Zusammenfassung
 
 After all tasks are processed, print a brief summary:
 
@@ -701,7 +721,7 @@ After all tasks are processed, print a brief summary:
 Ausgeführt:    <n> Tasks
 Erfolgreich:   <list of filenames>
   <filename>   Review: <n> kritisch, <n> wichtig, <n> Hinweis
-Abgeschlossen: <filenames closed by the user in 2a, option (a)>
+Abgeschlossen: <filenames closed by the user in 4a, option (a)>
 Angehalten:    <filename> - <Grund>
 Abgebrochen:   <filename if any> - <reason>
 Übersprungen:  <filenames if any>
@@ -717,3 +737,6 @@ Die Zeile „Review" steht je erfolgreichem Task und gibt das letzte gültige Re
 
 Bei „Abgeschlossen" steht ein offener PR-Schritt dabei, wenn der Task `PR required: true`
 trägt.
+
+Folge-Command: **`/k-danke`** — schließt die Sitzung ab: legt die Befunde vor, die während
+der Ausführung festgehalten wurden, und prüft den Docs-Nachzug.

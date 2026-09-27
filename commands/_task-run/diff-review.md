@@ -3,7 +3,7 @@
 Dieses Modul ist kein Review-Katalog-Rezept. Es beschreibt den Ablauf des
 Review-Sub-Agenten von `/k-task-run`: den Diff eines Tasks gegen den Snapshot des Tasks
 bilden, in die Task-Datei schreiben und nach dem übergebenen Rezept prüfen. Eingebunden wird
-es nur von `/k-task-run`, in Step 2f; es liegt deshalb im Modulverzeichnis
+es nur von `/k-task-run`, in 4f; es liegt deshalb im Modulverzeichnis
 `commands/_task-run/` dieses Commands. Der Hauptkontext von `/k-task-run` liest das Modul
 nicht, er gibt dem Sub-Agenten nur seinen Pfad.
 

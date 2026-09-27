@@ -1,8 +1,8 @@
 ---
-description: "Listet, ergänzt, ändert, hakt ab und löscht die Todos des Projekts. Ohne Argument listen; done/delete/edit/reopen steuern einen Eintrag, alles andere ist ein neuer Eintrag."
+description: Listet, ergänzt, ändert, hakt ab und löscht die Todos des Projekts. Ohne Argument listen; done/delete/edit/reopen steuern einen Eintrag, alles andere ist ein neuer Eintrag.
 argument-hint: [text | done <id|stichwort> | delete <id|stichwort> | edit <id> <text> | reopen <id>]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, k_playbook_todo_list, k_playbook_todo_add, k_playbook_todo_update, k_playbook_todo_delete]
+allowed-tools: [Bash, mcp__k-playbook__k_playbook_todo_list, mcp__k-playbook__k_playbook_todo_add, mcp__k-playbook__k_playbook_todo_update, mcp__k-playbook__k_playbook_todo_delete]
 ---
 
 # k-todo
@@ -75,6 +75,9 @@ Rückfrage.
 - `hint` — eine `TODO.md` liegt noch neben der JSON-Datei. Kein Fehler: gelesen
   und geschrieben wird die JSON-Datei. Den Hinweis samt genanntem Ausweg
   weitergeben und **nicht** von Hand aufräumen.
+
+Folge-Command: keiner. Mit der Ausgabe des Aufrufs ist die Todo-Verwaltung
+abgeschlossen.
 
 ## Fehlerfälle
 

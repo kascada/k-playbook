@@ -113,7 +113,7 @@ Ergebnis, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen
 Die Ergebnisfamilie ist `tech`; der Lauf schreibt in den Family-Ordner
 `k-playbook-local/results/tech/<datum>/` und dort genau zwei Dateien — `review-input.json`
 nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
-`/k-review`, Step 5b; rezeptspezifisch ist:
+`/k-review`, 5b; rezeptspezifisch ist:
 
 - Jeder Fund geht mit Ort, Rule-ID, `level` und dem Satz, der ihn trägt, in
   `review-input.json`. Die Rule-IDs sind dieselben wie im Audit-Lauf.

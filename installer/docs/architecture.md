@@ -2293,7 +2293,7 @@ dieselbe Regel wie bei der Doku.
 
 Jede Zeile sagt außerdem, ob der Task schon gegengelesen wurde. Erkannt wird das an der
 `## Review-Log`-Sektion, die `/k-task-refine` an **jede** geprüfte Datei anhängt, auch an
-die unveränderte — dieselbe Spur, an der `/k-task-run` Step 1.2 das prüft. Nennt die
+die unveränderte — dieselbe Spur, an der `/k-task-run` Schritt 2 das prüft. Nennt die
 Überschrift ein Datum, steht es dabei; mehrere Runden hängen mehrere Logs an, gezeigt
 wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als
 Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-task-run` vor der

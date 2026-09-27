@@ -1,5 +1,5 @@
 ---
-description: "Create a new task file from the current conversation. Writes to the project's task directory, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving."
+description: Create a new task file from the current conversation. Writes to the project's task directory, determines the next number, names the file <number>-<short-name>.md, includes relevant reference documents, and asks for confirmation before saving.
 argument-hint: [short-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Bash, Glob]
@@ -18,7 +18,11 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Create a new task file based on what was discussed in the current conversation.
 
-## Step 1 — Resolve task directory
+Produces:
+- `<TASKS_DISPLAY_PATH>/<number>-<short-name>.md` — the task file, written only after
+  confirmation.
+
+## Schritt 1 — Task-Verzeichnis auflösen
 
 From the context output:
 
@@ -29,13 +33,13 @@ Command-specific policy:
 
 - If `RESOLVED_TASKS_DIR` does not exist: ask whether to create exactly that directory now or run `/k-gui`; do not use any fallback path.
 
-## Step 2 — Determine next number
+## Schritt 2 — Nächste Nummer bestimmen
 
 Scan `.md` files in **both** `RESOLVED_TASKS_DIR/` and `RESOLVED_TASKS_DIR/done/` (completed tasks land there via `/k-task-run`). Find the highest leading number across both directories (e.g. `013-foo.md` → 13). The new task gets the next number, zero-padded to 3 digits (e.g. `014`).
 
 If neither directory has numbered files, start at `001`.
 
-## Step 3 — Determine filename
+## Schritt 3 — Dateinamen bestimmen
 
 If `$ARGUMENTS` is provided: use it as the short name (lowercase, words separated by hyphens).  
 If not: derive a short name (2-4 words, lowercase, hyphens) from the conversation topic.
@@ -43,7 +47,7 @@ If not: derive a short name (2-4 words, lowercase, hyphens) from the conversatio
 Filename: `<number>-<short-name>.md`  
 Example: `014-audiosocket-server.md`
 
-## Step 4 — Identify reference documents and tools
+## Schritt 4 — Referenzen und Tools bestimmen
 
 Look at the current conversation for:
 - File paths or documentation files relevant to the task → add to `## Referenzen`
@@ -51,7 +55,7 @@ Look at the current conversation for:
 
 Standard tools (Read, Write, Edit, Bash, Glob, Grep) do not need to be listed — they are always pre-approved in `/k-task-run`. Only list extras like MCP tools or special permissions.
 
-## Step 5 — Determine Intent
+## Schritt 5 — Intent bestimmen
 
 Derive the Intent from the conversation: what frame or outcome do the task(s) as a whole need to deliver?
 
@@ -81,7 +85,7 @@ Geteilt wird nur, wenn die Teile **sachlich** auseinanderfallen:
 Trifft das nicht klar zu: eine Datei. Viele kleine Tasks zersplittern den Intent — nur
 die letzte Datei trägt ihn, und die ersten laufen ohne Erfolgskriterium.
 
-## Step 6 — Draft the task
+## Schritt 6 — Task entwerfen
 
 Write a task draft from the conversation context. Structure:
 
@@ -141,13 +145,16 @@ nächsten Sinn ergibt, gehört mit dieser zusammengelegt. `/k-task-run` legt dar
 wieder an. Ohne `### Etappe`-Überschriften läuft der Task als Ganzes, ohne
 Fortschrittsverfolgung.
 
-## Step 7 — Confirm
+## Schritt 7 — Bestätigen
 
 Show the draft to the user and ask: "Passt das so, oder soll ich etwas anpassen?"
 
 Wait for confirmation or corrections before saving.
 
-## Step 8 — Save
+## Schritt 8 — Speichern
 
 Write the confirmed task to `<RESOLVED_TASKS_DIR>/<filename>` using the Write tool.  
 Confirm: "Task gespeichert: <TASKS_DISPLAY_PATH>/<filename>"
+
+Folge-Command: **`/k-task-refine`** — härtet die gespeicherte Task-Datei vor der
+Ausführung im Critic/Editor-Dialog.

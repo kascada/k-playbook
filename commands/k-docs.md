@@ -1,5 +1,5 @@
 ---
-description: Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action.
+description: "Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action."
 argument-hint: [status|code|tools|extract|inventory|index]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_knowledge_list, mcp__k-playbook__k_playbook_knowledge_inbox_list]
@@ -193,7 +193,12 @@ For read-only status:
   directories.
 - Say explicitly: no files were changed.
 
-For dispatched actions, use the dispatched module's or command's own Abschluss.
+Folge-Command im Statuslauf: einer der in Schritt 4 angebotenen — `/k-docs-code`,
+`/k-docs-tools`, `/k-docs-extract`, `/k-doc-inventory` oder `/k-docs-index` —, sobald der
+User ihn wählt; ohne Auswahl steht ausdrücklich keiner an.
+
+For dispatched actions, use the dispatched module's or command's own Abschluss — including
+its Folge-Command.
 
 ## Fehlerfälle
 

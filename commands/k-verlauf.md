@@ -1,6 +1,7 @@
 ---
 description: "Durchsucht alte AI-Verläufe. Claude: volle Chat-JSONL-Suche. OpenCode: Log-/Session-Suche in opencode.log. Unterstützt Provider claude|opencode|all, Suchbegriff und optionalen Zeitraum."
 argument-hint: "[claude|opencode|all] <Suchbegriff> [heute | gestern | YYYY-MM-DD | YYYY-MM-DD..YYYY-MM-DD] [-all]"
+# model: github-copilot/gpt-5.5
 allowed-tools: [Bash, Read, Glob]
 ---
 
@@ -222,3 +223,6 @@ Wenn OpenCode durchsucht wurde, immer den Hinweis ergänzen:
 ```text
 Hinweis: OpenCode-Modus durchsucht Log-/Session-Metadaten, nicht zwingend vollständige Chattexte.
 ```
+
+Folge-Command: keiner. Die Suche ist mit der Zusammenfassung abgeschlossen; enger suchen
+heißt, den Command mit anderem Begriff oder Zeitraum erneut aufzurufen.

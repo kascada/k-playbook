@@ -1,6 +1,6 @@
 ---
-description: List open GitHub pull requests for the configured repo target or load a specific PR directly, then present a compact overview, a PR assessment, and an optional follow-up action: approve, merge, or create a local validation branch.
-argument-hint: [pr-number|#pr-number|github-pr-url] [quick|standard|deep]
+description: "List open GitHub pull requests for the configured repo target or load a specific PR directly, then present a compact overview, a PR assessment, and an optional follow-up action: approve, merge, or create a local validation branch."
+argument-hint: "[pr-number|#pr-number|github-pr-url] [quick|standard|deep]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, TodoWrite]
 ---
@@ -36,7 +36,7 @@ Zulässige schreibende Folgeaktionen nur nach expliziter User-Entscheidung:
 - PR auf GitHub mergen
 - lokalen Validierungs-Branch für weitergehende Tests anlegen
 
-## Invocation
+Aufrufformen:
 
 - `/k-pr-review`
 - `/k-pr-review 443`
@@ -47,7 +47,7 @@ Zulässige schreibende Folgeaktionen nur nach expliziter User-Entscheidung:
 - `/k-pr-review #443 standard`
 - `/k-pr-review https://github.com/<owner>/<repo>/pull/443 deep`
 
-## Schritt 0 - Argumente normalisieren
+## Schritt 1 — Argumente normalisieren und Repo-Ziel auflösen
 
 Der Command akzeptiert bis zu zwei optionale Argumente:
 
@@ -93,8 +93,6 @@ Wenn zwei Argumente übergeben werden:
 - das zweite muss ein gültiger Bewertungsmodus sein
 - sonst mit kurzer Fehlermeldung stoppen
 
-## Schritt 1 - Repo-Ziel auflösen
-
 Aus der Context-Ausgabe:
 
 - `PR_TARGET_DIR` = `project.repoRoot`. Das deckt auch Wrapper-Repos ab, bei denen das eigentliche Git-Repo nicht das Hauptverzeichnis ist.
@@ -104,6 +102,8 @@ Aus der Context-Ausgabe:
   davon ausgenommen, und `DOCS_DIR/README.md` ist der erzeugte Index von
   `/k-docs-index`.
 - `EFFECTIVE_RULES` = `catalogs.rules`, inklusive Herkunft je Regel.
+
+Command-specific policy:
 
 Wenn `remediation.target` gesetzt und nicht `.` ist, benennt es den engeren Code-Root
 innerhalb des Repos; nutze ihn für die Code-Sichtung, aber nicht als `PR_TARGET_DIR`.
@@ -146,9 +146,9 @@ Merke:
 - `CODE_DOCS_DIR`
 - `EFFECTIVE_RULES`
 
-## Schritt 2 - PR bestimmen
+## Schritt 2 — PR bestimmen
 
-### Fall A - kein Argument übergeben
+### Fall A — kein Argument übergeben
 
 Lade die offenen PRs:
 
@@ -184,11 +184,11 @@ Antworte mit `443`, `#443` oder einer GitHub-PR-URL.
 
 - danach auf die Auswahl des Users warten
 
-### Fall B - Argument übergeben
+### Fall B — Argument übergeben
 
-Wenn `PR_SELECTOR` aus Schritt 0 bereits gesetzt ist, diesen Wert verwenden.
+Wenn `PR_SELECTOR` aus Schritt 1 bereits gesetzt ist, diesen Wert verwenden.
 
-Wenn `PR_SELECTOR` nach Schritt 0 noch leer ist, aber der User gerade einen PR aus der Liste auswählt:
+Wenn `PR_SELECTOR` nach Schritt 1 noch leer ist, aber der User gerade einen PR aus der Liste auswählt:
 
 - dieselben drei PR-Formen akzeptieren
 - `#443` zu `443` normalisieren
@@ -197,7 +197,7 @@ Wenn `PR_SELECTOR` nach Schritt 0 noch leer ist, aber der User gerade einen PR a
 
 Merke den normalisierten Wert als `PR_SELECTOR`.
 
-## Schritt 3 - PR laden
+## Schritt 3 — PR laden
 
 Wenn `PR_SELECTOR` numerisch ist, lade den PR gegen das bereits aufgelöste Repo:
 
@@ -234,7 +234,7 @@ Regeln:
 - Nicht den kompletten Diff ausgeben.
 - Noch keine Merge-Freigabe ableiten.
 
-## Schritt 4 - Kompakten PR-Überblick ausgeben
+## Schritt 4 — Kompakten PR-Überblick ausgeben
 
 Stelle den geladenen PR kompakt vor. Ziel: der User soll schnell verstehen, **welcher** PR das ist und **welche Größe/Signale** er hat.
 
@@ -272,9 +272,9 @@ Keine weiteren Interpretationen in dieser Phase, außer einer knappen Einordnung
 
 Diese Einordnung muss rein deskriptiv bleiben und darf noch keine Merge-Empfehlung enthalten.
 
-## Schritt 5 - Bewertungsmodus bestimmen
+## Schritt 5 — Bewertungsmodus bestimmen
 
-Wenn `ASSESSMENT_MODE` aus Schritt 0 bereits gesetzt ist: direkt verwenden.
+Wenn `ASSESSMENT_MODE` aus Schritt 1 bereits gesetzt ist: direkt verwenden.
 
 Wenn `ASSESSMENT_MODE` noch leer ist, frage den User nach genau einem Modus:
 
@@ -288,11 +288,11 @@ Welchen Bewertungsmodus soll ich für diesen PR verwenden?
 
 Akzeptiere nur `quick`, `standard` oder `deep`.
 
-## Schritt 6 - Read-only PR-Bewertung
+## Schritt 6 — Read-only PR-Bewertung
 
 Ziel: den PR anhand vorhandener k-playbook-Regeln und Checks knapp bewerten, ohne Review-Artefakte zu schreiben.
 
-### 6.1 Bewertungsquellen
+### 6.1 — Bewertungsquellen
 
 Lade für die Bewertung:
 
@@ -307,7 +307,7 @@ Wichtig:
 - keine Dateien unter `<local.dir>/results/` oder `<local.dir>/tasks/` schreiben.
 - nur read-only Kommandos und Analyse.
 
-### 6.2 PR-Scope klassifizieren
+### 6.2 — PR-Scope klassifizieren
 
 Ordne die geänderten Dateien knapp ein, z. B.:
 
@@ -323,7 +323,7 @@ Ordne die geänderten Dateien knapp ein, z. B.:
 
 Nutze diese Klassifikation für die spätere Relevanzbewertung der Regeln und Checks.
 
-### 6.3 Quick-Modus
+### 6.3 — Quick-Modus
 
 `quick` führt nur leichte read-only Bewertung aus:
 
@@ -341,7 +341,7 @@ Für Enforcement gilt:
 
 Es werden in `quick` keine zusätzlichen lokalen Validierungsbefehle gestartet.
 
-### 6.4 Standard-Modus
+### 6.4 — Standard-Modus
 
 `standard` enthält alles aus `quick` und lässt zusätzlich den globalen Check-Runner auf dem PR-Scope laufen.
 
@@ -365,7 +365,7 @@ Regeln:
 - `exit 2` oder fehlende Runner-Voraussetzungen als `k-check technisch nicht sauber ausführbar` berichten.
 - Die temporäre Datei am Ende entfernen.
 
-### 6.5 Deep-Modus
+### 6.5 — Deep-Modus
 
 `deep` enthält alles aus `standard` und führt zusätzlich die kleinste sinnvolle lokale Validierung passend zum Scope aus.
 
@@ -378,7 +378,7 @@ Nutze nur read-only Validierung und bleibe eng am PR-Scope. Beispiele:
 
 Wenn eine sinnvolle Deep-Validierung nicht sicher bestimmbar ist, nicht raten: kurz melden, dass `deep` keine zusätzliche sichere lokale Validierung ableiten konnte.
 
-### 6.6 Bewertungslogik
+### 6.6 — Bewertungslogik
 
 Bewerte den PR knapp und deskriptiv anhand dieser Signale:
 
@@ -417,7 +417,7 @@ Faustregeln für `branch erstellen und weiter testen`:
 - Branch-Checks fehlen und der Scope berührt sensible Bereiche wie Auth, Runtime, Models/Migrations, Ownership oder Logging/Privacy
 - es gibt eine sinnvolle weitergehende lokale Validierung, die über den aktuellen Modus hinausgeht
 
-## Schritt 7 - Bewertung ausgeben
+## Schritt 7 — Bewertung ausgeben
 
 Stelle die Bewertung kompakt dar:
 
@@ -444,7 +444,7 @@ Noch nicht enthalten in diesem Schritt:
 - keine Protokollierung in `k-playbook-local/results/` oder anderswo
 - kein automatischer Handoff nach `/k-review` oder `/k-remediation`
 
-## Schritt 8 - Folgeaktion wählen
+## Schritt 8 — Folgeaktion wählen
 
 Nach der Bewertung frage den User nach genau einer Folgeaktion:
 
@@ -459,7 +459,7 @@ Wie soll ich mit diesem PR weiter verfahren?
 Wenn die Empfehlung `direkt annehmen` ist, nenne diese Option zuerst.
 Wenn die Empfehlung `branch erstellen und weiter testen` ist, nenne diese Option zuerst.
 
-## Schritt 9 - Folgeaktion ausführen
+## Schritt 9 — Folgeaktion ausführen
 
 Approve, Merge und Kommentar sind nach außen sichtbar und laufen unter dem Account, der
 auf diesem Rechner gerade aktiv ist — der gilt maschinenweit und kann seit dem letzten
@@ -473,7 +473,7 @@ Ausgeführt wird als GitHub-Account <GH_ACCOUNT>.
 Ist `GH_ACCOUNT` leer, läuft die Anmeldung über `GH_TOKEN`/`GITHUB_TOKEN`; sag das
 genauso, statt einen Namen zu erfinden.
 
-### 9.1 Direkt annehmen
+### 9.1 — Direkt annehmen
 
 Wenn der User `direkt annehmen` wählt:
 
@@ -531,7 +531,7 @@ k-playbook PR-Einschätzung (`<mode>`):
 Hinweis: CLI-Approval war nicht möglich (`<kurzer Grund>`). Wenn Berechtigungen und Branch-Regeln es zulassen, kann der Merge bewusst online auf GitHub erfolgen.
 ```
 
-### 9.2 Branch erstellen und weiter testen
+### 9.2 — Branch erstellen und weiter testen
 
 Wenn der User `branch erstellen und weiter testen` wählt:
 
@@ -601,17 +601,17 @@ Der erweiterte Testlauf ist durch. Wie soll ich mit dem ursprünglichen PR weite
 Wenn der User `PR approven` oder `PR mergen` wählt, weiter mit Schritt 9.3.
 Wenn der User `nichts weiter` wählt, weiter mit Schritt 9.4 für Aufräumen und Abschluss.
 
-### 9.3 PR mergen oder approven
+### 9.3 — PR mergen oder approven
 
 Dieser Schritt arbeitet immer auf dem ursprünglichen PR, nie auf dem lokalen Validierungs-Branch.
 
-#### 9.3.a Approven
+#### 9.3.a — Approven
 
 - Wenn noch kein Approval versucht wurde, führe denselben Approval-Flow wie in 9.1 aus.
 - Wenn Approval wegen Self-Approval nicht möglich ist, klar sagen, dass GitHub den eigenen PR nicht approven lässt.
 - Wenn der User danach trotzdem `PR mergen` verlangt und der Repo-/Branch-Schutz es erlaubt, darf der Command den Merge auf ausdrückliche Anweisung trotzdem ausführen.
 
-#### 9.3.b Mergen
+#### 9.3.b — Mergen
 
 Merge nur wenn der User es ausdrücklich verlangt.
 
@@ -640,7 +640,7 @@ Regeln:
 - nur den Standard-Merge ausführen, sofern der User keinen anderen Merge-Typ explizit verlangt
 - wenn GitHub/Branch-Protection den Merge blockiert, den Grund klar berichten
 
-### 9.4 Lokalen Validierungs-Branch aufräumen
+### 9.4 — Lokalen Validierungs-Branch aufräumen
 
 Wenn in 9.2 ein lokaler Validierungs-Branch angelegt wurde:
 
@@ -667,11 +667,11 @@ git branch -D <LOCAL_VALIDATION_BRANCH>
 
 Wenn der ursprüngliche Start-Branch der PR-Head-Branch war und der PR gemerged wurde, ist der Base-Branch der bevorzugte Rückkehrpunkt.
 
-### 9.5 Nichts weiter
+### 9.5 — Nichts weiter
 
 Wenn der User `nichts weiter` wählt: nur kompakt bestätigen und keine Schreibaktion ausführen.
 
-## Schritt 10 - Abschluss und Sauberkeitsprüfung
+## Schritt 10 — Abschluss und Sauberkeitsprüfung
 
 Führe am Ende immer eine kurze Repo-Sauberkeitsprüfung aus:
 
@@ -699,6 +699,10 @@ Oder:
 ```text
 PR gemerged. Lokaler Validierungs-Branch `pr-review/441-python-jose` wurde anschließend entfernt und der Repo-Zustand ist sauber.
 ```
+
+Folge-Command: keiner. Ein automatischer Handoff nach `/k-review` oder `/k-remediation` ist
+ausgeschlossen (Schritt 7); was nach der Bewertung geschieht, hat der User in Schritt 8
+entschieden.
 
 ## Fehlerfälle
 
