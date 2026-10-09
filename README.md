@@ -80,7 +80,11 @@ project/
 ```
 
 The same interface then creates the project-owned structure and sets up the linking for
-the assistants.
+the assistants. If the environment has VS Code, it also installs the extension
+*k-playbook Workspace Tools* into the VS Code server there, in the background and without
+a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. Whoever never
+starts the interface installs it with `k-playbook vscode install`. See
+[`docs/vscode.md`](./docs/vscode.md).
 
 ## Directory structure
 
@@ -249,4 +253,5 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 - [`docs/k-playbook-format.md`](./docs/k-playbook-format.md) - the contract: `K-PLAYBOOK.yaml`, structure, overlay.
 - [`docs/installation.md`](./docs/installation.md) - clone, setup steps, security tools.
 - [`docs/commands.md`](./docs/commands.md) - index of the slash commands.
+- [`docs/vscode.md`](./docs/vscode.md) - the VS Code extension: commands, settings, installation, build.
 - [`docs/migration.md`](./docs/migration.md) - state of the migration, decisions and open points.

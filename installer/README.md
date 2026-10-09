@@ -51,6 +51,8 @@ ohnehin nur die gestartet wird.
 | Projekteigene Struktur anlegen | `k-playbook-local/` mit READMEs je Verzeichnis |
 | Assistenten verlinken | `.claude/`, `.opencode/`, `.cursor/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 
+| VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |
+
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die
 mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren per
 `git pull --ff-only`. Die Installation wird dabei als read-only Vendor-Clone behandelt:
@@ -74,6 +76,9 @@ installer/
 ├── internal/legacy/           host-globale Altlasten des alten Modells entfernen
 ├── internal/guiproc/          Laufzeitdatei des Hintergrunddienstes, Prozessidentität, Abkoppeln
 ├── internal/webui/            Server, Endpunkte, eingebettete Oberfläche
+├── internal/vscodeext/        die eingebettete VS-Code-Erweiterung: Erkennen, CLI wählen,
+│                              installieren, Nachzug beim Dienststart
+├── vscode/                    Quelle der Erweiterung (JavaScript, ohne Abhängigkeiten)
 ├── docs/architecture.md
 ├── go.mod
 └── README.md
@@ -99,3 +104,14 @@ go build -o /tmp/k-playbook ./cmd/k-playbook
 ```
 
 Nicht `go build ./cmd/k-playbook` ohne `-o` verwenden — das legt ein Binary im Repo ab.
+
+Nach einer Änderung unter `installer/vscode/` zusätzlich, aus dem Wurzelverzeichnis:
+
+```bash
+make vscode-test     # node --test über installer/vscode/test/
+make vscode-vsix     # VSIX neu bauen; die Datei gehört in denselben Commit
+```
+
+Node braucht nur diese beiden Ziele. `make dist`, `make test` und die Release-CI kommen
+ohne aus, weil die VSIX eingecheckt ist; `TestVSIXPasstZurQuelle` macht `make test` rot,
+wenn sie nicht zur Quelle passt. Einzelheiten in [`../docs/vscode.md`](../docs/vscode.md).

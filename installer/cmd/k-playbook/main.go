@@ -6,6 +6,7 @@
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage,
+// `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, und `stop` beendet den
 // Hintergrunddienst der Oberfläche.
 package main
@@ -22,6 +23,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/vscodeext"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
 
@@ -89,11 +91,15 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie todo: die Ausgabe ist maschinenlesbar, und
 		// der Zugriff soll nichts anfassen außer dem eigenen Index.
 		return runKnowledge(args[1:])
+	case "vscode":
+		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
+		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
+		return runVSCode(args[1:])
 	case "version":
 		// Ohne Wirt-Pflege: die Ausgabe ist die Version und sonst nichts —
 		// die Oberfläche liest sie an der Datei am Installationsziel, bevor
 		// sie entscheidet, ob nachinstalliert wird.
-		return runVersion(os.Stdout)
+		return runVersion(os.Stdout, args[1:])
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -110,12 +116,42 @@ func run(args []string) error {
 // Programm ohne Version — ein Ad-hoc-`go build` ohne Build-Flags — endet mit
 // Fehler und leerer Standardausgabe: eine erfundene Angabe wäre schlechter als
 // keine, denn der Leser vergleicht sie.
-func runVersion(out io.Writer) error {
+//
+// `version --all` nennt zusätzlich die Version der mitgereisten
+// VS-Code-Erweiterung. Nur hinter dem Schalter: `program.ReadVersion` führt
+// `<datei> version` aus und verwirft die Antwort, sobald sie mehr als eine
+// Zeile trägt — mit einer zweiten Zeile am Standardweg erkennt kein Aufruf
+// mehr einen Programmwechsel.
+func runVersion(out io.Writer, args []string) error {
+	all := false
+	switch {
+	case len(args) == 0:
+	case len(args) == 1 && args[0] == "--all":
+		all = true
+	default:
+		return fmt.Errorf("version erwartet höchstens --all: %s", args[0])
+	}
+
 	version := guiproc.OwnVersion()
 	if version == "" {
 		return errors.New("dieses Programm trägt keine Version; es wurde ohne Build-Flags gebaut")
 	}
-	_, err := fmt.Fprintln(out, version)
+	if _, err := fmt.Fprintln(out, version); err != nil {
+		return err
+	}
+	if !all {
+		return nil
+	}
+
+	extension, ok, err := vscodeext.EmbeddedVersion()
+	switch {
+	case err != nil:
+		_, err = fmt.Fprintf(out, "Erweiterung: unlesbar — %v\n", err)
+	case !ok:
+		_, err = fmt.Fprintf(out, "Erweiterung: keine — %s\n", vscodeext.NoVSIX)
+	default:
+		_, err = fmt.Fprintf(out, "Erweiterung: %s\n", extension)
+	}
 	return err
 }
 
@@ -185,8 +221,14 @@ Unterkommandos:
             jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
             dessen Verzeichnis; der Index liegt unter
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
+  vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
+            diesem Programm steckt: k-playbook vscode install|status|
+            vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig
+            installiert und nachgezogen; dieses Kommando ist der
+            ausdrückliche Weg für den, der die Oberfläche nie startet.
   version   Gibt die Version dieses Programms aus, eine Zeile, sonst nichts.
-            Ohne gestempelte Version endet es mit Fehler.
+            Ohne gestempelte Version endet es mit Fehler. Mit --all steht
+            darunter die Version der mitgereisten VS-Code-Erweiterung.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

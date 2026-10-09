@@ -141,6 +141,25 @@
             </div>
           </section>
 
+          <!-- Die Karte erscheint nur, wo es ein VS Code gibt. Auf einem Rechner
+               ohne VS Code sagt sie nichts, was jemanden angeht. -->
+          <section class="card hidden" id="vscode-card">
+            <div class="section-head">
+              <div>
+                <h2>VS-Code-Erweiterung</h2>
+              </div>
+              <span id="vscode-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">„k-playbook Workspace Tools“ reist im Programm mit und bringt den Befehl „k-playbook: OpenCode im neuen Tab“. Installiert und nachgezogen wird sie beim Start dieser Oberfläche, im Hintergrund. Ein Reload des Fensters ist nicht nötig.</p>
+            <dl id="vscode-facts" class="facts"></dl>
+            <p id="vscode-message" class="message"></p>
+            <div id="vscode-command" class="command-row hidden">
+              <p class="hint" id="vscode-command-hint"></p>
+              <code id="vscode-command-text"></code>
+              <button class="copy secondary" data-copy="vscode-command-text">Kopieren</button>
+            </div>
+          </section>
+
           <section class="card{{if not .Installed}} hidden{{end}}" id="remediation-card">
             <div class="section-head">
               <div>

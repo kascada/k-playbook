@@ -36,6 +36,13 @@ const elements = {
   baseToolsMessage: document.getElementById("base-tools-message"),
   baseToolsCommand: document.getElementById("base-tools-command"),
   baseToolsCommandText: document.getElementById("base-tools-command-text"),
+  vscodeCard: document.getElementById("vscode-card"),
+  vscodePill: document.getElementById("vscode-pill"),
+  vscodeFacts: document.getElementById("vscode-facts"),
+  vscodeMessage: document.getElementById("vscode-message"),
+  vscodeCommand: document.getElementById("vscode-command"),
+  vscodeCommandHint: document.getElementById("vscode-command-hint"),
+  vscodeCommandText: document.getElementById("vscode-command-text"),
   privateCard: document.getElementById("private-card"),
   privatePill: document.getElementById("private-pill"),
   privateEntries: document.getElementById("private-entries"),
@@ -226,6 +233,9 @@ function renderConfig(data) {
     // Ohne classList-Zeile: die Karte zeigt sich selbst, und nur dann, wenn
     // wirklich etwas fehlt.
     loadBaseTools();
+    // Wie die Basis-Werkzeuge ohne classList-Zeile: die Karte zeigt sich
+    // selbst, und nur dort, wo es ein VS Code gibt.
+    loadVSCode();
     return;
   }
 
@@ -239,6 +249,7 @@ function renderConfig(data) {
   elements.ghCard.classList.add("hidden");
   elements.toolsCard.classList.add("hidden");
   elements.baseToolsCard.classList.add("hidden");
+  elements.vscodeCard.classList.add("hidden");
   elements.contextCard.classList.add("hidden");
 
   const suggestion = data.suggestion || {};
@@ -955,6 +966,137 @@ function renderBaseTools(data) {
   }
 
   elements.baseToolsCard.classList.remove("hidden");
+}
+
+// Die VS-Code-Erweiterung: rein lesend. Installiert wird beim Start des
+// Dienstes im Hintergrund, nicht auf einen Seitenaufruf hin — ein Knopf hier
+// hätte zwei Auslöser für denselben Eingriff, und der zweite stünde in keiner
+// Doku.
+async function loadVSCode() {
+  try {
+    const response = await fetch("/api/vscode", { cache: "no-store" });
+    renderVSCode(await response.json());
+  } catch {
+    elements.vscodeCard.classList.add("hidden");
+  }
+}
+
+function renderVSCode(data) {
+  elements.vscodeFacts.replaceChildren();
+  elements.vscodeMessage.textContent = "";
+  elements.vscodeCommand.classList.add("hidden");
+
+  const installed = data.installed || [];
+  const refresh = data.lastRefresh || null;
+
+  // Kein VS Code und nichts installiert: die Karte bleibt weg. Über eine
+  // Umgebung ohne VS Code schweigt k-playbook, hier wie im Log.
+  if (!data.cli && installed.length === 0) {
+    elements.vscodeCard.classList.add("hidden");
+    return;
+  }
+
+  addFact(
+    elements.vscodeFacts,
+    "Eingebettet",
+    data.embedded || `keine — ${data.embeddedError || "unbekannt"}`,
+  );
+
+  if (installed.length === 0) {
+    addFact(elements.vscodeFacts, "Installiert", "in keinem Verzeichnis");
+  } else {
+    for (const entry of installed) {
+      addFact(elements.vscodeFacts, entry.version, entry.dir);
+    }
+  }
+
+  addFact(
+    elements.vscodeFacts,
+    "CLI",
+    data.cli ? `${data.cli.kind} — ${data.cli.path}` : "keine gefunden",
+  );
+
+  // Wohin ein Nachzug schreibt, hängt an der Art der CLI. Die Zeile steht
+  // hier, weil die Frage „nachzuziehen?" sich genau auf dieses Verzeichnis
+  // bezieht und eine zweite Installation daneben sonst unerklärlich wäre.
+  if (data.target) {
+    addFact(elements.vscodeFacts, "Nachzug nach", data.target);
+  }
+
+  const divergent = data.divergent || [];
+  for (const entry of divergent) {
+    addFact(elements.vscodeFacts, "Abweichend", `${entry.version} — ${entry.dir}`);
+  }
+
+  // Der letzte Nachzug steht als Zeitpunkt und Ausgang da. Ohne Eintrag hat
+  // in diesem Dienst keiner stattgefunden: entweder lief er noch nicht durch
+  // oder es gab in dieser Umgebung nichts zu tun.
+  addFact(
+    elements.vscodeFacts,
+    "Letzter Nachzug",
+    refresh ? `${formatVSCodeTime(refresh.at)} — ${refresh.action}` : "keiner in diesem Dienst",
+  );
+
+  if (refresh && refresh.action === "gescheitert") {
+    elements.vscodePill.className = "pill error";
+    elements.vscodePill.textContent = "Gescheitert";
+    elements.vscodeMessage.textContent = [refresh.error, refresh.output]
+      .filter(Boolean)
+      .join(" — ");
+    showVSCodeCommand(
+      "Von Hand nachziehen, mit der Fehlermeldung des Aufrufs vor Augen:",
+      "k-playbook vscode install",
+    );
+  } else if (data.needsInstall) {
+    elements.vscodePill.className = "pill warn";
+    elements.vscodePill.textContent = "Nachzuziehen";
+    elements.vscodeMessage.textContent = data.cli
+      ? "Der nächste Start dieser Oberfläche zieht nach."
+      : "Keine CLI gefunden.";
+    showVSCodeCommand(
+      data.cli
+        ? "Oder jetzt, ohne auf den nächsten Start zu warten:"
+        : `${data.hint || ""} Oder im Terminal der VS-Code-Umgebung:`,
+      "k-playbook vscode install",
+    );
+  } else if (divergent.length > 0) {
+    // Das Verzeichnis der gewählten CLI trägt die passende Fassung, ein
+    // anderes eine abweichende. Kein „Aktuell": der Nachzug erreicht dieses
+    // Verzeichnis nicht, und es bleibt liegen, bis es die CLI bedient, die
+    // dort schreibt.
+    elements.vscodePill.className = "pill warn";
+    elements.vscodePill.textContent = "Zweite Fassung";
+    elements.vscodeMessage.textContent =
+      "Eine zweite Installation trägt eine andere Fassung. Der Nachzug schreibt nur nach " +
+      `${data.target} und erreicht sie nicht.`;
+    showVSCodeCommand(
+      "In der Umgebung, die das andere Verzeichnis bedient, oder von Hand über die VSIX:",
+      "k-playbook vscode install",
+    );
+  } else {
+    elements.vscodePill.className = "pill ok";
+    elements.vscodePill.textContent = "Aktuell";
+    elements.vscodeMessage.textContent =
+      "Der Befehl steht in der Befehlspalette unter „k-playbook“, auf ctrl+alt+shift+o und als Knopf in der Titelzeile des Editors.";
+  }
+
+  elements.vscodeCard.classList.remove("hidden");
+}
+
+function showVSCodeCommand(hint, command) {
+  elements.vscodeCommandHint.textContent = hint;
+  elements.vscodeCommandText.textContent = command;
+  elements.vscodeCommand.classList.remove("hidden");
+}
+
+// Der Zeitpunkt kommt als RFC-3339-Text; ein unlesbarer bleibt, wie er ist,
+// statt zu „Invalid Date“ zu werden.
+function formatVSCodeTime(text) {
+  const when = new Date(text);
+  if (Number.isNaN(when.getTime())) {
+    return text || "unbekannt";
+  }
+  return when.toLocaleString();
 }
 
 // Der Tool-Block hat keinen Button: installiert wird im Terminal, weil das den

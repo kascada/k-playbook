@@ -23,6 +23,18 @@ INSTALLER_BUILD_VERSION = $(or $(VERSION),$(shell tr -d '[:space:]' < $(INSTALLE
 # sonst schon bei `make help` eine Fehlermeldung ausgeben.
 INSTALLER_HOST_TARGET = $(shell go env GOOS)-$(shell go env GOARCH)
 
+# Die VS-Code-Erweiterung: Quelle unter installer/vscode/, die VSIX eingecheckt
+# daneben im Go-Paket, das sie einbettet. Sie wird bewusst nicht bei jedem Build
+# erzeugt — vsce schreibt Bauzeit und mtimes in das Zip, und SHA256SUMS muss
+# bitgleich nachbaubar bleiben. Node ist deshalb ein Entwickler-Schritt und
+# weder für `make dist` noch für ein Release nötig.
+VSCODE_EXT_DIR := installer/vscode
+VSCODE_VSIX := installer/internal/vscodeext/vsix/k-playbook-workspace-tools.vsix
+# Gepinnt, weil die Ausgabe von vsce in das eingecheckte Artefakt geht: eine
+# andere Fassung packt anders, und der Go-Test gegen die Quelle würde darüber
+# stolpern. 4.0.0 verlangt ein repository-Feld in package.json.
+VSCE_VERSION := 4.0.0
+
 # Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
 # darunter und ist ein eigener Clone. Sie trägt deshalb den zuletzt gepushten
 # Stand, nicht den, an dem gerade gearbeitet wird — und die Oberfläche liest
@@ -36,7 +48,7 @@ INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard insta
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host install dev-install gui test release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -157,6 +169,38 @@ gui: dev-install ## Baut, installiert und startet die GUI
 
 test: ## Führt die Tests aus
 	cd installer && go test ./...
+	@if command -v node >/dev/null 2>&1; then \
+	  $(MAKE) --no-print-directory vscode-test; \
+	else \
+	  printf 'Node fehlt: die Tests der VS-Code-Erweiterung bleiben aus.\n' >&2; \
+	fi
+
+# Angegeben werden die Dateien, nicht das Verzeichnis: `node --test <dir>` lädt
+# unter Node 24 den Pfad als Modul und bricht mit MODULE_NOT_FOUND ab. Die
+# Hilfsdatei test/stub.js bleibt so außerdem von selbst draußen.
+vscode-test: ## Führt die Tests der VS-Code-Erweiterung aus (braucht Node)
+	@command -v node >/dev/null 2>&1 || { \
+	  printf 'Für die Tests der VS-Code-Erweiterung wird Node gebraucht.\n' >&2; \
+	  exit 1; \
+	}
+	node --test $(VSCODE_EXT_DIR)/test/*.test.js
+
+# Gebaut wird in installer/vscode/, nicht in einem Temp-Verzeichnis: unterhalb
+# von /tmp sammelt `vsce ls` keine Datei und meldet stattdessen einen fehlenden
+# Entrypoint — ein Fehlertext, der auf die Erweiterung zeigt und das
+# Arbeitsverzeichnis meint.
+vscode-vsix: ## Baut die VSIX der VS-Code-Erweiterung neu (braucht Node)
+	@command -v npx >/dev/null 2>&1 || { \
+	  printf 'Für die VSIX wird Node gebraucht (npx fehlt).\n' >&2; \
+	  printf 'Nur dieses Target braucht es: die VSIX ist eingecheckt, und\n' >&2; \
+	  printf 'Programm-Build, Tests und Release kommen ohne Node aus.\n' >&2; \
+	  exit 1; \
+	}
+	@mkdir -p "$(dir $(VSCODE_VSIX))"
+	cd $(VSCODE_EXT_DIR) && npx --yes @vscode/vsce@$(VSCE_VERSION) package --skip-license \
+	  --out "$(abspath $(VSCODE_VSIX))"
+	@printf 'Gebaut: %s\n' "$(VSCODE_VSIX)"
+	@printf 'Die Datei ist eingecheckt — die Änderung gehört in denselben Commit.\n'
 
 # Ein Release läuft in zwei Schritten, und die Reihenfolge ist nicht beliebig.
 #

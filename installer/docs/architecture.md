@@ -23,8 +23,9 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge` und `stop`. Die Aufzählung unten
-geht sie in dieser Reihenfolge durch; `help` zählt nicht mit, es gibt nur diese Übersicht aus.
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `vscode`, `version` und `stop`. Die
+Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit, es gibt nur
+diese Übersicht aus.
 
 ```go
 if len(args) == 0 {
@@ -43,6 +44,10 @@ Binary mit `K_PLAYBOOK_SERVE=1` als abgekoppelten Server und endet, sobald der a
 (siehe „Lebenszyklus"). Diese Umgebungsmarke ist der **verdeckte Servermodus**: kein
 Subkommando, weil ihn niemand von Hand aufruft — `webui.Serve()` ohne Wirt-Pflege und
 ohne Browser, die Ausgaben gehen ins Log.
+
+`vscode` ist der ausdrückliche Weg zur mitgereisten VS-Code-Erweiterung:
+`install`, `status` und `vsix -o <datei>`, alle drei ohne Wirt-Pflege. Selbsttätig
+geschieht dasselbe beim Start des Dienstes (§„Die VS-Code-Erweiterung").
 
 `stop` beendet den Server dieses Projekts: Laufzeitdatei lesen, Prozessidentität prüfen,
 `POST /api/shutdown`, sonst SIGTERM. Ohne Datei eine Auskunft und kein Fehler; eine
@@ -127,7 +132,8 @@ installer/
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
 │   ├── todo.go                  Subkommando todo: list, add, update, delete, import
-│   └── knowledge.go             Subkommando knowledge: search, list, read, write, status
+│   ├── knowledge.go             Subkommando knowledge: search, list, read, write, status
+│   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -145,6 +151,15 @@ installer/
 │   └── install.go               Version einer Datei über `k-playbook version` lesen,
 │                                bin/install des Clones anstoßen, Ergebnis gegen
 │                                SHA256SUMS prüfen
+├── internal/vscodeext/
+│   ├── vscodeext.go             die eingebettete VSIX (go:embed), ihre Version
+│   ├── detect.go                Installationen aus extensions.json, Nachzug nötig?
+│   ├── cli.go                   CLI wählen: remote-cli, code-server, code (nie /mnt/)
+│   ├── install.go               Temp-Datei, --install-extension … --force, Frist
+│   ├── status.go                die eine Auskunft für Unterkommando und Web-API
+│   ├── refresh.go               selbsttätiger Nachzug beim Dienststart, Vermerk
+│   ├── lock_unix.go             flock im Laufzeitverzeichnis gegen gleichzeitige Dienste
+│   └── vsix/                    die eingecheckte VSIX, gebaut mit `make vscode-vsix`
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/markdown/
@@ -1462,6 +1477,179 @@ Die Erweiterung ist **rein additiv**: kein bestehender Platzhalter ändert seine
 und kein Muster der Security-Matrix wurde angefasst. Der Regressionstest belegt das für
 jeden `github`-Eintrag auf zwei Plattformen.
 
+## Die VS-Code-Erweiterung
+
+k-playbook bringt eine eigene VS-Code-Erweiterung mit, „k-playbook Workspace Tools"
+(`kascada.k-playbook-workspace-tools`). Sie ist ein Sammelpaket von Workspace-Aktionen;
+die erste öffnet OpenCode in einem Terminal-Tab im Editor-Bereich. Die Quelle liegt in
+`installer/vscode/` (JavaScript, CommonJS, ohne Abhängigkeiten und ohne Bundler), das Go
+dazu in `internal/vscodeext`.
+
+**Die VSIX ist eingecheckt und per `go:embed` im Binary.** Nicht bei jedem Build mit vsce
+erzeugt: vsce schreibt die Bauzeit und die mtimes der Quelldateien in das Zip, und
+`SHA256SUMS` muss bitgleich nachbaubar bleiben — CI baut den Tag nach und prüft dagegen.
+Nicht im Clone: Clones verschiedener Projekte auf einer Maschine tragen verschiedene
+Stände und würden abwechselnd ältere und neuere Fassungen installieren. Nicht in Go
+zusammengebaut: das wäre ein Nachbau von vsce. Die Erweiterung hat deshalb eine eigene
+Version in `installer/vscode/package.json`, nicht die `VERSION` des Programms — die VSIX
+wird vor dem Tag eingecheckt und kennt die künftige Nummer nicht.
+
+`TestVSIXPasstZurQuelle` vergleicht die eingecheckte Datei in beide Richtungen gegen
+`installer/vscode/`: jeden Eintrag gegen seine Quelldatei und jede mitzuliefernde
+Quelldatei gegen die VSIX, `package.json` inhaltlich, alles andere byteweise. Bleibt
+`make vscode-vsix` nach einer Änderung aus, wird `make test` rot. Node braucht nur dieses
+Ziel und `make vscode-test`; `make dist`, `make test` und die Release-CI kommen ohne aus.
+
+### Selbsttätige Installation: eine bewusste Ausnahme
+
+`careForVSCodeExtension()` startet beim Aufbau des Servers eine Goroutine mit
+`vscodeext.EnsureInstalled()`. Fehlt die Erweiterung oder weicht ihre Version von der
+eingebetteten ab, wird sie installiert.
+
+Das ist die **Ausnahme** zu „Tool-Installation läuft nicht selbsttätig" (§„Der Aufruf").
+Der Grund ist eine Entscheidung des Nutzers: eine ausdrückliche Erstinstallation geht
+zwischen den vielen übrigen Einrichtungsschritten unter, und das Soll ist, dass niemand
+die Erweiterung je selbst installiert hat. Die Ausnahme ist eng gezogen:
+
+- **Ein Auslöser, und zwar der Start des Dienstes.** Nicht der Client-Pfad: der läuft bei
+  jedem Aufruf, eine Installation dauert Sekunden, und die selbsttätigen Wege dürfen den
+  Start nicht aufhalten. Der Dienst startet beim ersten Aufruf und nach einem
+  Programmwechsel — genau dann ist etwas nachzuziehen. Weitere Auslöser sind Todo #24.
+- **Im Hintergrund.** Der Start wartet nicht, und ein Fehlschlag beendet nichts.
+- **Nur aus einem gestempelten Programm.** Ohne `guiproc.OwnVersion()` ist der Prozess ein
+  Ad-hoc-Build — ein `go build` ohne Build-Flags oder das Test-Binary von
+  `cmd/k-playbook`, das sich für `TestSpawnServerUndStop` selbst im Servermodus startet.
+  `make dev-install`, `make dist` und der Release-Build stempeln alle über `-ldflags`, der
+  Entwicklungs-Loop und jedes ausgelieferte Programm sind also nicht betroffen.
+- **Nie aus einem Testlauf: `K_PLAYBOOK_NO_VSCODE_INSTALL`.** Steht die Variable nicht
+  leer, ruft `vscodeext.Install()` keine CLI, und `EnsureInstalled()` sucht nicht einmal
+  nach einer; der Vermerk nennt dann `gesperrt`. Gesetzt wird sie in `guard.go` im `init()`
+  jedes Test-Binarys — `testing.Testing()` steht zur Linkzeit fest und ist deshalb schon
+  dort verlässlich —, und von da erbt sie jeder Kindprozess über `os.Environ()`, beliebig
+  tief. Das ist der Grund für diese Bauart: Ein Testlauf baut und startet **echte,
+  gestempelte** Programme als Dienste (`internal/webui/restart_test.go`,
+  `update_program_test.go`), die passieren den Stempel-Wächter, und eine Isolierung von
+  HOME und PATH im einzelnen Test gilt nur dort, wo jemand daran gedacht hat — `isolateHome`
+  lässt `/usr/local/bin:/usr/bin:/bin` stehen, weil die Tests dort `git` und `sh` finden
+  müssen, und rief damit ein `code` der Distribution wirklich mit
+  `--install-extension … --force`. Gegenprobe:
+  `TestDienstRuehrtImTestlaufKeineCLIAn` startet so einen Dienst mit einer Fake-CLI im PATH
+  und wird rot, sobald sie gerufen wird; der zweite Teil desselben Tests hebt die Marke für
+  das Kind auf und belegt, dass die Probe ein Leck sieht. Für einen Benutzer ist die
+  Variable zugleich der Weg, den selbsttätigen Nachzug abzuschalten.
+- **Still, wo nichts zu tun ist.** Ohne VS Code in der Umgebung geschieht nichts und
+  wird nichts gemeldet. Liegt die passende Fassung, steht keine Zeile im Log.
+- **Laut, wo es scheitert.** Ein Fehlschlag nennt im Log seinen Grund samt Ausgabe der
+  CLI und erscheint über `vscodeext.LastRefresh()` in `GET /api/vscode` und auf der
+  Einrichtungsseite. Still scheitern wäre das Schlimmste von beidem.
+- **Nicht gegen den Nutzer.** Eine von Hand entfernte Erweiterung kommt beim nächsten
+  Dienststart zurück — der Nachzug vergleicht Versionen und kennt keine Entscheidung
+  „entfernt". Eine bewusste Deinstallation zu respektieren ist Todo #23.
+
+Ein Reload des Fensters ist nicht nötig: gemessen am 2026-10-08 erscheinen die Befehle
+einer frisch installierten Erweiterung ohne „Developer: Reload Window" in der
+Befehlspalette, und die Erweiterung ist bereits aktiv. Die Statusanzeige trägt deshalb
+keinen Reload-Hinweis.
+
+**Die Sperre.** Mehrere Projekt-Dienste können gleichzeitig starten und würden sonst
+gleichzeitig `--install-extension … --force` auf dasselbe Erweiterungsverzeichnis rufen.
+`lock()` nimmt deshalb ein `flock` auf eine Datei im Laufzeitverzeichnis des Dienstes —
+dieselbe Grenze, die schon Host und Dev Container trennt — und zwar blockierend; wer
+gewartet hat, prüft danach neu und findet in der Regel nichts mehr zu tun. `flock` gibt
+die Sperre mit dem Prozess frei, auch nach einem `kill`; eine Sperrdatei mit PID müsste
+Verwaistes selbst erkennen. Löst Task 071 die vielen Projekt-Dienste durch einen
+zentralen ab, darf die Sperre vereinfacht werden.
+
+### Erkennen und CLI wählen
+
+**Maßgeblich ist `extensions.json`, nie der Verzeichnisname.** `Find(home)` liest die
+Datei in `~/.vscode-server/extensions` und `~/.vscode/extensions`. Nach einem
+`--uninstall-extension` verschwindet der Eintrag sofort, das Verzeichnis
+`<id>-<version>/` bleibt aber zunächst liegen (gemessen am 2026-10-08) — eine Erkennung
+über Verzeichnisnamen würde eine entfernte Erweiterung als vorhanden melden und den
+Nachzug stillschweigend ausfallen lassen. Eine fehlende oder kaputte `extensions.json`
+heißt „nicht installiert"; ein Rückfall auf Verzeichnisnamen wäre hier gerade der Fehler.
+
+**Die Frage „nachzuziehen?" meint das Verzeichnis, das der Nachzug beschreibt.**
+`CLI.ExtensionsDir(home)` leitet es aus der Art ab: Remote-CLI und `code-server` bedienen
+den Server und schreiben nach `~/.vscode-server/extensions`, ein `code` aus dem PATH nach
+`~/.vscode/extensions`. Danach fragt `NeedsInstallIn()`. Fragte sie wie früher
+„irgendwo" (`NeedsInstall()`), bliebe sie wahr, sobald die Erweiterung in **beiden**
+Verzeichnissen in verschiedenen Fassungen liegt — `Install` beschreibt nur eines davon, der
+Dienst installierte also bei jedem Start erneut, schriebe jedes Mal „installiert" ins Log,
+und Karte wie `vscode status` sagten dauerhaft „Nachzuziehen". Weggerechnet wird dieser
+Zustand nicht: `Divergent()` nennt, was neben dem Ziel in anderer Fassung liegt, und Karte
+(`Abweichend`, Pille „Zweite Fassung") wie `vscode status` zeigen es. Nachzuziehen ist es
+nur aus der Umgebung, die das andere Verzeichnis bedient, oder von Hand über die VSIX.
+`NeedsInstall()` bleibt für den Fall ohne CLI: dann installiert der Benutzer von Hand und
+kann jedes Verzeichnis treffen.
+
+`ChooseCLI()` wählt in dieser Reihenfolge:
+
+| Rang | CLI | Nur wenn | Wer nimmt ihn |
+|---|---|---|---|
+| 1 | `~/.vscode-server/bin/<commit>/bin/remote-cli/code` | `VSCODE_IPC_HOOK_CLI` zeigt auf einen **vorhandenen** Socket | ein Terminal von VS Code, also der Weg von Hand |
+| 2 | `~/.vscode-server/bin/<commit>/bin/code-server`, der jüngste | ein Server-Verzeichnis liegt | der Dienst |
+| 3 | `code` aus dem PATH | nicht unterhalb von `/mnt/` | ein Desktop-VS-Code ohne Server |
+| — | keine | sonst | Hinweis auf `k-playbook vscode vsix -o` und „Extensions: Install from VSIX…" |
+
+Rang 2 ist der Punkt, an dem die selbsttätige Installation hängt, und er ist gemessen:
+`code-server --install-extension … --force`, abgekoppelt in eigener Sitzung, stdin aus
+`/dev/null` und mit einer Umgebung **ohne** `VSCODE_IPC_HOOK_CLI` und ohne die übrigen
+`VSCODE_*`-Variablen — also so gestartet wie der Dienst —, installiert bei offenem Fenster
+in `~/.vscode-server/extensions` und schreibt den Eintrag in `extensions.json`: Exit 0 in
+rund einer Sekunde. `code-server` ist das Server-Binary selbst und braucht weder Fenster
+noch IPC-Socket; der Socket ist nur der Weg der Remote-CLI, einem laufenden Fenster einen
+Befehl zuzustellen. Die naheliegende Messung aus einem VS-Code-Terminal beantwortet die
+Frage nicht — dort lebt genau der Hook, den der Dienst nicht hat.
+
+**„Nie unterhalb von `/mnt/`" ist eine Vorsichtsregel, keine Tatsachenbehauptung.**
+Gemessen leitet der Windows-Shim `/mnt/c/.../bin/code` aus WSL über `wslCode.sh` an genau
+die Remote-CLI des WSL-Servers weiter, installiert also auf der richtigen Seite. Er tut
+das aber nur, solange `ms-vscode-remote.remote-wsl` windows-seitig installiert ist —
+fehlt sie, fällt das Skript auf die echte Windows-CLI durch —, und er lädt unterwegs über
+`wslDownload.sh` einen Server nach, wenn keiner liegt. Diesen Nebeneffekt darf ein
+selbsttätiger Dienstschritt nicht blind auslösen; dazu läuft der Aufruf über
+Windows-Interop und ist deutlich langsamer als `code-server`. Die Reihenfolge
+„`code-server` vor Desktop-`code`" bleibt davon unberührt.
+
+Installiert wird immer über eine temporäre Kopie der eingebetteten VSIX und
+`--install-extension <datei> --force`, auch über eine höhere Fassung: maßgeblich ist, was
+das Programm mitbringt, nicht was zufällig schon liegt. Unter `sudo` wird verweigert — die
+Erweiterung gehört dem Benutzer, der den Editor bedient; als `root` ohne `sudo`, der
+Normalfall im Container, ist es erlaubt. stdin bleibt leer: der Dienst hat kein Terminal,
+an dem jemand auf eine Rückfrage antworten könnte.
+
+### Die Erweiterung selbst
+
+`extension.js` registriert, was in seiner Liste `actions` steht, und sonst nichts; jede
+Aktion exportiert `{ id, run }`. Der Befehl `kPlaybook.openCode` öffnet ein Terminal mit
+`location: TerminalLocation.Editor` und dem gewählten Workspace-Ordner als `cwd`.
+
+Zwei Entscheidungen darin sind gemessen:
+
+- **`shellPath` bekommt den absoluten Pfad, aufgelöst im Extension-Host.** Der
+  Extension-Host trägt den PATH einer Login-Shell (unter WSL einschließlich
+  `~/.local/bin` und `~/.opencode/bin`), der `ptyHost`, der die Terminals startet, nicht.
+  Ein bloßer Programmname hinge damit an der Umgebung, die VS Code dem einzelnen Terminal
+  mitgibt. Nebeneffekt: ein fehlendes Programm fällt dort auf, wo eine Meldung angezeigt
+  werden kann.
+- **Ein selbst erkennbarer Fehler kommt zusätzlich als `showErrorMessage`.** Ob die
+  Meldung eines mit Exit 1 endenden Programms im Terminal-Tab des Editor-Bereichs lesbar
+  stehen bleibt, ist ungemessen. Die Meldung deckt beide Ausgänge ab und kostet nichts,
+  wenn der Text ohnehin stehen bleibt. Was das gestartete Programm danach selbst schreibt,
+  bleibt in seinem Terminal; die Erweiterung liest die Ausgabe nicht mit.
+
+Beide Einstellungen (`kPlaybook.openCode.executable`, `kPlaybook.openCode.args`) haben
+`scope: "machine"`: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen.
+
+Getestet wird mit `node:test` gegen ein nachgebildetes `vscode`-Modul, nie gegen ein
+echtes VS Code — die Remote-CLI ignoriert `--extensions-dir` und schriebe in die laufende
+Umgebung. Dasselbe gilt auf der Go-Seite: `vscodeext.LookPath` ist eine Variable, damit
+Tests einen eigenen PATH vorgeben können.
+
+Der Nutzerweg und das Hinzufügen weiterer Aktionen stehen in `docs/vscode.md`.
+
 ## GitHub CLI
 
 `project/gh.go` hält zwei Dinge auseinander, die in einer Karte zusammen erscheinen.
@@ -2721,6 +2909,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json`, `opencode.json[c]` und `.cursor/mcp.json`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien; bei unlesbarer Pflichtliste `ok=false` und `requiredError` |
 | `GET` | `/api/mcp-servers/{assistant}/{name}[?file=…]` | Konfiguration eines Servers; `file` wählt unter gleichnamigen Einträgen (nur Vergleich mit `entry.file`); 404, wenn nichts passt; `requiredError` und `entry.required: null` bei unlesbarer Pflichtliste; startet nichts |
 | `POST` | `/api/mcp-servers/{assistant}/{name}/probe[?file=…]` | Messung: startet das konfigurierte Kommando als Subprozess; `started` nur, wenn ein Prozess lief; remote und unknown antworten ohne Start; gescheiterte Folgeanfragen als Hinweis in `message`; je Servername serialisiert; 404 wie beim GET |
+| `GET` | `/api/vscode` | Zustand der VS-Code-Erweiterung: eingebettete Fassung, Installationen aus `extensions.json`, die CLI, die ein Versuch jetzt nähme, und der letzte selbsttätige Nachzug dieses Dienstes; rein lesend, installiert nichts |
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
@@ -3478,7 +3667,11 @@ heilt ausschließlich Symlinks unter `.claude/`, `.opencode/` und `.cursor/`; Da
 Projekt anzulegen darf nicht bei jedem Command-Aufruf einer KI-Sitzung passieren, der
 ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttätig läuft
 und warum — gh-Entscheidung, Remediation-Modus, Update, Privat-Schalter, Tool-Installation,
-`MCPStateStale` —, steht in den jeweiligen Abschnitten.
+`MCPStateStale` —, steht in den jeweiligen Abschnitten. Von „Tool-Installation läuft nicht
+selbsttätig" gibt es genau eine, vom Nutzer entschiedene Ausnahme: die VS-Code-Erweiterung,
+die der **Dienst** beim Start im Hintergrund einspielt und nachzieht
+(§„Die VS-Code-Erweiterung"). Sie steht bewusst dort und nicht hier: eine Installation
+dauert Sekunden, und dieser Pfad läuft bei jedem Aufruf.
 
 Davor steht noch eine Zeile, wenn das aufrufende Programm **älter** ist als die `VERSION`
 des Clones (`noteOutdatedProgram()`): ein Hinweis, dass die Oberfläche die Aktualisierung
@@ -3585,6 +3778,13 @@ Installationsziel über das Subkommando `k-playbook version`. Ist sie gleich ode
 Dienst, was ein anderes Projekt oder `make dev-install` dort abgelegt hat. Nur bei älter
 oder unbekannt läuft der Bootstrap; „unbekannt" ist auch ein Programm, das das Subkommando
 noch nicht kennt.
+
+**`version` bleibt einzeilig.** `ReadVersion()` verwirft jede Antwort, die `\n` oder `\r`
+trägt, und gibt dann „unbekannt" zurück — eine zweite Zeile auf stdout nähme dem Programm
+also die Erkennung eines Programmwechsels und den Neustart nach einer Aktualisierung. Was
+noch zu dem Programm gehört, steht deshalb hinter einem Schalter: `version --all` nennt
+zusätzlich die Fassung der mitgereisten VS-Code-Erweiterung. Entschieden hat das der
+Nutzer am 2026-10-09; `version_test.go` hält die Einzeiligkeit fest.
 
 **Geprüft wird die Datei, nicht der Exit-Code.** Nach einem Bootstrap-Lauf vergleicht
 `program.Verify()` die sha256 der Datei am Ziel mit dem Eintrag des Plattform-Assets in
@@ -3704,6 +3904,9 @@ Hinweis auf die Port-Weiterleitung.
 ## Designentscheidungen
 
 - Go ist die einzige Runtime. Keine Node-Toolchain, kein Build-Schritt für das Frontend.
+  Node ist allein ein Entwickler-Schritt für `make vscode-vsix` und `make vscode-test`;
+  die VSIX der VS-Code-Erweiterung ist eingecheckt, und Programm-Build, Tests und
+  Release-CI kommen ohne Node aus.
 - Die Oberfläche ist eine lokale Web-UI, keine native App und kein Electron/Wails-Setup.
 - Assets sind per `embed` im Binary. Ein Binary, keine Begleitdateien.
 - Keine Shell-Pipelines. Fachlogik ruft Go-Funktionen; Fremdprozesse sind nur das

@@ -146,6 +146,7 @@ func Serve() error {
 		serverErr <- server.Serve(listener)
 	}()
 	go state.watchIdle(ctx)
+	careForVSCodeExtension(ctx)
 
 	fmt.Printf("k-playbook: http://%s/\n", listener.Addr().String())
 	fmt.Printf("Server für %s (PID %d, Version %q). Beenden mit: k-playbook stop\n", key, os.Getpid(), version)
@@ -229,6 +230,9 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/mcp-servers", mcpServersHandler)
 	mux.HandleFunc("GET /api/mcp-servers/{assistant}/{name}", mcpServerDetailHandler)
 	mux.HandleFunc("POST /api/mcp-servers/{assistant}/{name}/probe", mcpServerProbeHandler)
+	// Die VS-Code-Erweiterung: nur lesend. Installiert wird beim Start des
+	// Dienstes im Hintergrund, nicht auf einen Seitenaufruf hin.
+	mux.HandleFunc("GET /api/vscode", vscodeHandler)
 	mux.HandleFunc("GET /api/tools", toolsHandler)
 	mux.HandleFunc("POST /api/languages", setLanguagesHandler)
 	// Die Basis-Werkzeuge haben einen eigenen Endpunkt neben den Security-Tools:

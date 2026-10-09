@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,11 +13,24 @@ import (
 )
 
 // stopEnvironment macht ein leeres Verzeichnis zum Projekt (Schlüssel =
-// Arbeitsverzeichnis) und ein eigenes Laufzeitverzeichnis.
+// Arbeitsverzeichnis), gibt dem Test ein eigenes Laufzeitverzeichnis und
+// schneidet ihn von HOME und PATH des Rechners ab.
 func stopEnvironment(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	// HOME und PATH mit: TestSpawnServerUndStop startet das Test-Binary im
+	// Servermodus, und ein Server pflegt die VS-Code-Erweiterung. Mit dem
+	// echten HOME und dem echten PATH fände er die echte CLI und würde
+	// wirklich installieren — Muster isolierter Umgebungen wie in
+	// internal/program/program_test.go.
+	home := t.TempDir()
+	bin := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatalf("%s anlegen: %v", bin, err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", strings.Join([]string{bin, "/usr/local/bin", "/usr/bin", "/bin"}, string(os.PathListSeparator)))
 	before, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Arbeitsverzeichnis: %v", err)

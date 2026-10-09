@@ -26,6 +26,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`knowledge-storage.md`](./knowledge-storage.md) | The picture of the knowledge store: how knowledge flows through the three zones and back out through the index and the MCP server. Vectors and a database of their own are deferred. Shown in the interface under Knowledge. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` for specific GitHub pull requests. |
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why *Set up* writes an absolute path and when the bare command name is written instead. |
+| [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes, its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract. |
 | [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
@@ -99,3 +100,4 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `tasks` -> [`task-flow.md`](./task-flow.md)
 - `update` / `git pull` -> [`installation.md`](./installation.md#update)
 - `version inventory` / `inventory` / `version-sources.yaml` / `pin type` / `trust boundary` -> [`version-inventory.md`](./version-inventory.md)
+- `VS Code` / `extension` / `VSIX` / `OpenCode in a tab` / `k-playbook vscode` / `extensions.json` -> [`vscode.md`](./vscode.md)

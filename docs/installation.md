@@ -490,6 +490,29 @@ RUN bash /opt/project/k-playbook/scripts/install-base-tools.sh --install --yes
 
 If a tool has no path on this host, the run ends with `3`. This is not a failure, but `docker build` stops for it. If you do not want that, append `|| test $? -eq 3`; if you want to see the gap during the build, leave it in place.
 
+## VS Code extension
+
+If the environment has VS Code, starting the interface also installs the extension
+**k-playbook Workspace Tools** into the VS Code server of that environment — in the
+background, without holding up the start, and without a window reload. It brings the
+command *k-playbook: OpenCode im neuen Tab*, which opens OpenCode in a terminal tab in
+the editor area. The extension travels inside the program binary, so a program update
+brings the matching version with it.
+
+This is a deliberate exception to "k-playbook does not install tools by itself": an
+explicit first installation gets lost among the other setup steps. The only trigger is
+the start of the service, nothing happens in an environment without VS Code, and whoever
+never starts the interface installs it explicitly:
+
+```bash
+k-playbook vscode install   # install or catch up
+k-playbook vscode status    # embedded version, installations, chosen CLI
+```
+
+The setup page shows the same state as a card, and a failed catch-up appears there with
+its reason. Full detail — settings, which CLI is called, why the VSIX is checked in, how
+to add another action — is in [`vscode.md`](./vscode.md).
+
 ## Build it yourself
 
 For normal operation, the release asset downloaded by `bin/install` is enough. Anyone working on the tool or preferring to build it themselves needs Go:
@@ -517,6 +540,8 @@ Checklist for a project:
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.
 - [ ] `k-playbook context` completes and names the expected catalogs.
+- [ ] With VS Code in the environment: `k-playbook vscode status` names the embedded
+      version and finds it installed in `~/.vscode-server/extensions`.
 
 The final item checks all preceding items at once: the command stops if configuration is missing or has a different `schema_version`.
 

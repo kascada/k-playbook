@@ -1,0 +1,63 @@
+{
+  "name": "k-playbook-workspace-tools",
+  "displayName": "k-playbook Workspace Tools",
+  "description": "Workspace-Aktionen von k-playbook — OpenCode in einem Terminal-Tab im Editor-Bereich",
+  "version": "0.1.0",
+  "publisher": "kascada",
+  "repository": "https://github.com/kascada/k-playbook",
+  "engines": { "vscode": "^1.101.0" },
+  "extensionKind": ["workspace"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kPlaybook.openCode",
+        "title": "OpenCode im neuen Tab",
+        "category": "k-playbook",
+        "icon": "$(terminal)"
+      }
+    ],
+    "configuration": {
+      "title": "k-playbook Workspace Tools",
+      "properties": {
+        "kPlaybook.openCode.executable": {
+          "type": "string",
+          "default": "opencode-attach",
+          "scope": "machine",
+          "markdownDescription": "Das Programm, das „OpenCode im neuen Tab“ startet. Ein Name ohne `/` wird im PATH gesucht, ein Wert mit `/` als Pfad genommen. Nur für diesen Rechner einstellbar: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen."
+        },
+        "kPlaybook.openCode.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "scope": "machine",
+          "markdownDescription": "Zusätzliche Argumente für das Programm. Der Ordner wird nicht als Argument übergeben, sondern als Arbeitsverzeichnis des Terminals. Nur für diesen Rechner einstellbar."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "kPlaybook.openCode",
+          "group": "navigation",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kPlaybook.openCode",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "kPlaybook.openCode",
+        "key": "ctrl+alt+shift+o",
+        "mac": "cmd+alt+shift+o",
+        "when": "workspaceFolderCount > 0"
+      }
+    ]
+  }
+}

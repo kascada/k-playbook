@@ -4,16 +4,21 @@ name: Tests
 # go test. Lokal läuft dasselbe nur in `release-preflight`; ein Stand, der über
 # `sichern` nach GitHub kommt, war bisher nirgends geprüft.
 #
+# Dazu die Tests der VS-Code-Erweiterung in einem eigenen Job: nur sie brauchen
+# Node. Die Release-CI bleibt node-frei — die VSIX ist eingecheckt.
+#
 # Der Lauf ändert nichts und veröffentlicht nichts — rot heißt nur rot.
 
 on:
   push:
     paths:
       - "installer/**"
+      - "Makefile"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
       - "installer/**"
+      - "Makefile"
       - ".github/workflows/test.yml"
   workflow_dispatch:
 
@@ -63,3 +68,25 @@ jobs:
 
       - name: go test
         run: go test ./...
+
+  # Eigener Job, damit ein roter Lauf sagt, welche Seite rot ist, und damit
+  # Node nur dort eingerichtet wird, wo es gebraucht wird. Die VSIX wird hier
+  # nicht gebaut: sie ist eingecheckt, und `go test ./...` im Job oben prüft
+  # mit TestVSIXPasstZurQuelle, dass sie zur Quelle passt.
+  vscode:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Auschecken
+        uses: actions/checkout@v4
+
+      # Per Commit gepinnt, weil dieser Job als einziger fremden Code
+      # ausführt, der nicht aus diesem Repo kommt. Der Kommentar nennt die
+      # Fassung, der Hash ist maßgeblich.
+      - name: Node einrichten
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: node --test
+        run: make vscode-test
