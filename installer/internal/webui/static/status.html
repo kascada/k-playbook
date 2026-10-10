@@ -14,20 +14,64 @@
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Die Statusseite ist ein Gerüst, das später gefüllt wird: das
-               Statusfeld, darunter die Workflow-Karten und das Bild der
-               Wissensablage. Das Statusfeld misst noch nichts und trägt
-               deshalb weder Werte noch eine Zustandsmarke. Die Meldung darunter
-               bleibt leer und verborgen, solange nichts zu melden ist; hinein
-               schreibt allein service.js, wenn die Update-Prüfung nicht prüfen
-               konnte. -->
+          <!-- Der Einrichtungsschritt der Kephalaion-Anbindung steht vor allem
+               anderen und ist verborgen, solange die Anbindung trägt. Scheitert
+               die Prüfung oder fehlt der Eintrag, blendet status.js ihn ein:
+               Der Einstieg führt so zuerst dorthin, der Rest der Oberfläche
+               bleibt darunter erreichbar. Die Auswahl entsteht aus
+               /api/kephalaion/candidates; eingetragen wird erst nach einem
+               bestandenen Test derselben Auswahl. -->
+          <section class="card hidden" id="kephalaion-setup-card">
+            <div class="section-head">
+              <div>
+                <h2>Kephalaion-Collection einrichten</h2>
+              </div>
+              <span id="kephalaion-setup-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <p class="hint">
+              Dieses Projekt arbeitet mit einer eigenen Collection in Kephalaion. Gewählt werden Hub und
+              Account dieses Rechners und die Collection; eingetragen wird erst nach einem bestandenen Test,
+              in <code id="kephalaion-local-file">k-playbook-local/K-PLAYBOOK.local.yaml</code>. Das Token
+              bleibt in Kephalaions eigener Datei.
+            </p>
+            <p id="kephalaion-setup-reason" class="message"></p>
+            <div id="kephalaion-setup-form" hidden>
+              <h3 class="kephalaion-step">1. Hub und Account</h3>
+              <div id="kephalaion-pairs" class="choices"></div>
+              <h3 class="kephalaion-step">2. Collection</h3>
+              <div id="kephalaion-collections" class="choices"></div>
+              <div class="kephalaion-actions">
+                <button type="button" class="secondary" id="kephalaion-test">Testen</button>
+                <button type="button" class="primary" id="kephalaion-save" disabled>Eintragen</button>
+                <button type="button" class="secondary" id="kephalaion-cancel" hidden>Abbrechen</button>
+              </div>
+            </div>
+            <div id="kephalaion-admin" hidden>
+              <h3 class="kephalaion-step">Zuerst in Kephalaion einrichten</h3>
+              <p class="hint">Das erledigt ein Admin in Kephalaion, in dieser Reihenfolge:</p>
+              <ol id="kephalaion-admin-steps" class="kephalaion-steps"></ol>
+            </div>
+            <p id="kephalaion-setup-message" class="message"></p>
+          </section>
+
+          <!-- Das Statusfeld zeigt bisher die Anbindung an die
+               Kephalaion-Collection: Adresse, Account und das Ergebnis der
+               Prüfung aus /api/kephalaion. Weitere Werte folgen. Die Meldung
+               darunter bleibt leer und verborgen, solange nichts zu melden ist;
+               hinein schreibt allein service.js, wenn die Update-Prüfung nicht
+               prüfen konnte. -->
           <section class="card" id="status-card">
             <div class="section-head">
               <div>
                 <h2>Status</h2>
               </div>
+              <span id="status-kephalaion-pill" class="pill muted">Prüfen...</span>
             </div>
-            <p class="hint">Statusfeld (hier werden in Kürze die wichtigsten Werte angezeigt)</p>
+            <dl id="status-facts" class="facts"></dl>
+            <p id="status-kephalaion-message" class="message"></p>
+            <div class="kephalaion-actions">
+              <button type="button" class="secondary" id="kephalaion-change" hidden>Collection ändern</button>
+            </div>
             <p id="status-message" class="message hidden"></p>
           </section>
 

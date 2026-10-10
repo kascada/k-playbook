@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
@@ -74,6 +75,12 @@ type Context struct {
 	// Das Feld ist ein Zeiger mit omitempty, damit eine Installation, die es
 	// noch nicht füllt, dieselbe Ausgabe erzeugt wie bisher.
 	VersionSources *VersionSources `json:"versionSources,omitempty"`
+	// Kephalaion ist die Anbindung des Projekts an seine Collection: Hub,
+	// Collection und Account aus k-playbook-local/K-PLAYBOOK.local.yaml und
+	// das Ergebnis der Prüfung über MCP am Node dieses Rechners. Ein Fehler
+	// ist ein Zustand, kein Abbruch. Gefüllt wird das Feld von ContextForDir,
+	// nicht von BuildContext — siehe KephalaionStatus.
+	Kephalaion *kephalaion.Status `json:"kephalaion,omitempty"`
 	// Links meldet die Selbstheilung der Assistenten-Registrierung: was dabei
 	// nachgezogen wurde und was offen blieb. Fehlt das Feld, stimmte alles —
 	// eine Meldung, die bei jedem Aufruf dasselbe sagt, liest niemand mehr.
@@ -822,5 +829,7 @@ func ContextForDir(startDir string) (Context, error) {
 	}
 
 	built.Links = contextLinks(HealLinks(projectDir))
+	status := KephalaionStatus(projectDir)
+	built.Kephalaion = &status
 	return built, nil
 }

@@ -5,6 +5,10 @@ description: The three storage zones under k-playbook-local — inbox for what a
 
 # Knowledge Layout
 
+> **Possibly outdated.** The current direction — moving k-playbook onto Kephalaion — is
+> recorded in [`knowledge-aktuell.md`](knowledge-aktuell.md). Where the two disagree, that
+> file wins.
+
 [`knowledge-gate.md`](knowledge-gate.md) describes how a deposit is asked for. This page
 describes where it lies. It defines the storage zones from scratch, deliberately beside
 the directories in use today rather than on top of them: the new names are free, so the

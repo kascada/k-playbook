@@ -263,6 +263,13 @@ func routes(state *serverState) http.Handler {
 	// Nur das Programm: installiert über den Bootstrap des Clones und startet
 	// den Dienst daraus neu. Läuft nie ungefragt, nur auf den Knopf hin.
 	mux.HandleFunc("POST /api/update/program", state.applyProgramHandler)
+	// Die Anbindung an die Kephalaion-Collection. Die GETs nehmen keinen
+	// Wert aus der Anfrage; Test und Eintragen nur per POST. Der
+	// Sicherheitsvertrag steht in kephalaion.go.
+	mux.HandleFunc("GET /api/kephalaion", kephalaionHandler)
+	mux.HandleFunc("GET /api/kephalaion/candidates", kephalaionCandidatesHandler)
+	mux.HandleFunc("POST /api/kephalaion/test", kephalaionTestHandler)
+	mux.HandleFunc("POST /api/kephalaion/save", kephalaionSaveHandler)
 	mux.HandleFunc("GET /api/remediation", remediationHandler)
 	mux.HandleFunc("POST /api/remediation", setRemediationHandler)
 	mux.HandleFunc("GET /api/context", contextHandler)
@@ -440,9 +447,9 @@ func pageTemplate(name string) *template.Template {
 }
 
 // statusTemplate ist die Statusseite unter /: der Kopf mit den Knöpfen für
-// Update und Dienst, das Statusfeld, die Workflow-Karten und das Bild der
-// Wissensablage. Sie ist ein Gerüst, das später gefüllt wird, und nutzt
-// ausschließlich vorhandene Endpunkte.
+// Update und Dienst, der Einrichtungsschritt der Kephalaion-Anbindung (nur
+// sichtbar, wenn sie nicht trägt), das Statusfeld mit der Anbindung, die
+// Workflow-Karten und das Bild der Wissensablage.
 var statusTemplate = pageTemplate("status.html")
 
 // statusPageHandler prüft zuerst den Pfad und leitet erst danach um: GET / ist

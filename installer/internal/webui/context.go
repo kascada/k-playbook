@@ -45,6 +45,12 @@ func contextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Wie das Unterkommando trägt auch diese Antwort die Anbindung an die
+	// Kephalaion-Collection — aus dem Zwischenspeicher der Statusseite, damit
+	// das Aufklappen den Node nicht ein zweites Mal fragt.
+	status, _ := cachedKephalaionStatus(environment.ProjectDir)
+	built.Kephalaion = &status
+
 	writeJSON(w, http.StatusOK, contextResponse{
 		Available: true,
 		Context:   &built,

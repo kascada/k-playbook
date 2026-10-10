@@ -5,6 +5,10 @@ description: The concept for depositing knowledge through the MCP server and que
 
 # Knowledge Gate
 
+> **Possibly outdated.** The current direction — moving k-playbook onto Kephalaion — is
+> recorded in [`knowledge-aktuell.md`](knowledge-aktuell.md). Where the two disagree, that
+> file wins.
+
 **This is the entry page for the knowledge store.** It says why the store exists, what is
 built, how we proceed from here, how something is deposited and asked for, and which
 decisions rest on which measurements. Everything else about the store is linked from here,

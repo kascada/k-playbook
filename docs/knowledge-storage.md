@@ -5,6 +5,10 @@ description: Diagram of the path knowledge takes — into the inbox, through the
 
 # Knowledge Storage
 
+> **Possibly outdated.** The current direction — moving k-playbook onto Kephalaion — is
+> recorded in [`knowledge-aktuell.md`](knowledge-aktuell.md). Where the two disagree, that
+> file wins.
+
 Where knowledge flows, from the source to its use by the AI. This page is the picture. The
 entry page for the knowledge store — why it exists, what is built, how we proceed — is
 [`knowledge-gate.md`](knowledge-gate.md); the zones and the write tools are defined in

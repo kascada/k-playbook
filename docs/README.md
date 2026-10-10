@@ -56,6 +56,11 @@ model has been implemented and is described on the pages above; the working docu
 contains only what has been decided but not yet implemented, currently migrating scan
 reviews to SARIF. It is deleted when nothing remains open.
 
+[`knowledge-aktuell.md`](./knowledge-aktuell.md) is the current working document for moving
+k-playbook onto Kephalaion: a binary-only installation whose shipped content lives in each
+project's collection under `vendor/k-playbook/`, with the decisions so far, the open
+questions and the ordered work list.
+
 ## Keyword index
 
 - `anchor` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
@@ -68,6 +73,7 @@ reviews to SARIF. It is deleted when nothing remains open.
 - `docs first` -> [`manual.md`](./manual.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
 - `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
+- `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md)
 - `installation` / `git clone` -> [`installation.md`](./installation.md)

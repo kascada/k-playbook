@@ -369,6 +369,62 @@ It is the same tool for every project. Which project it means derives from the d
 
 **One version, one binary.** `VERSION` at the root of the clone names the release whose assets belong to this clone version; `SHA256SUMS` beside it contains their checksums. Commits to rules, reviews, commands, or docs change neither file. If `VERSION` changes during an update and the running binary is older than it, the new version requires another binary. It is installed through the bootstrap and only on an explicit click; the program never downloads anything on startup, during a check, or beside an installation of its own. There is no download code in the Go program: the interface calls the clone's `bin/install` and afterwards verifies the installed file's sha256 against `SHA256SUMS` before it restarts from it.
 
+## Kephalaion collection
+
+Each project works with its own collection in Kephalaion, usually named after the project.
+Setting it up happens in this order: an admin finds a Kephalaion hub, creates the collection
+there, creates one account per machine and grants it the collection, and enters the user who
+operates the machine; the account's token is placed on the machine's node under
+`~/.config/kephalaion/tokens/<hub>/<account>.token`. Then k-playbook names the collection.
+
+The binding is machine-local and lives in `k-playbook-local/K-PLAYBOOK.local.yaml`, which is not
+versioned:
+
+```yaml
+kephalaion:
+  hub: vm                 # alias of the hub entry at this machine's node (kephalaion status)
+  collection: k-playbook  # address for clients: vm:k-playbook
+  account: kamran-wsl     # this machine's account; one account belongs to one machine
+```
+
+A token never appears there; it stays in Kephalaion's own token file.
+
+**The check.** k-playbook asks the node of this machine over MCP: `initialize` and
+`tools/call whoami` on `/mcp`, with the header pair `X-Keph-Account-<hub>` and
+`X-Keph-Token-<hub>` and the token read from the token file. It passes when the node answers,
+reports `login: ok` for the hub and lists the collection among the readable ones. That shows
+more than the command `kephalaion node whoami`: that the node answers on `/mcp` and that the
+token is valid at the hub. It does not show whether the headers in an assistant's own MCP
+configuration carry the same, still valid token. The address comes from `node.listen` in
+Kephalaion's `config.yaml` (`$XDG_CONFIG_HOME` is honoured; without `listen` Kephalaion's
+default `127.0.0.1:7433` applies). Only `127.0.0.1`, `[::1]` and `localhost` are accepted; a
+wildcard (`0.0.0.0`, `[::]`) is reached on `127.0.0.1`, any other address is reported and never
+contacted. The whole check takes at most 3 seconds. A missing scope `vendor/k-playbook` does not
+fail it; it is shown as a hint.
+
+`k-playbook context` carries the result in the block `kephalaion` (see
+[`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state)); the check never
+makes `context` fail.
+
+**The setup step.** The status page of the interface shows the collection, the account and the
+result of the check. When nothing is entered or the check fails, the setup step is shown first:
+
+1. Choose hub and account — the pairs come from the file names under
+   `~/.config/kephalaion/tokens/` (files ending in `.pending` are skipped and mentioned as
+   waiting for their exchange at the node).
+2. Choose the collection — the node lists the readable ones for the chosen pair; the one named
+   like the project directory is preselected.
+3. **Testen** — runs the check for this choice and writes nothing.
+4. **Eintragen** — checks again and writes only when the check passes.
+
+Writing replaces only the `kephalaion:` block of `K-PLAYBOOK.local.yaml` (the file is created
+when missing). Before that, k-playbook makes sure Git ignores the file, measured with
+`git check-ignore`; only if it does not, `/K-PLAYBOOK.local.yaml` is added to
+`k-playbook-local/.gitignore`. If the file is already tracked, nothing is written and the page
+points to `git rm --cached`. Without pairs the page lists the admin steps above; when the node
+does not answer, it says to start Kephalaion. The rest of the interface stays reachable
+without a collection. "Collection ändern" on the status page opens the setup step again.
+
 ## GitHub CLI
 
 `/k-pr-review` and the Dependabot review work through `gh`. The **GitHub CLI** card separates two things that are easily confused.

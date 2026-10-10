@@ -305,7 +305,10 @@ func TestStartseiteLeitetOhneKonfigurationUm(t *testing.T) {
 		body := recorder.Body.String()
 		for _, want := range []string{
 			`id="status-card"`,
-			"Statusfeld (hier werden in Kürze die wichtigsten Werte angezeigt)",
+			// Die Anbindung an die Kephalaion-Collection: Anzeige im
+			// Statusfeld und der Einrichtungsschritt davor, anfangs verborgen.
+			`id="status-facts"`,
+			`<section class="card hidden" id="kephalaion-setup-card">`,
 			`<p id="status-message" class="message hidden"></p>`,
 			`id="closed"`,
 			`/static/service.js`,
