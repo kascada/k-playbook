@@ -254,7 +254,7 @@ configuration and the filesystem:
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `rules`, `reviews`, `checks`, merged |
 | `guidelines` | files from `k-playbook-local/guidelines/` |
-| `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `vendorScope` (`present` or `missing`), `user`, `node`, `nodeVersion` and `sync` |
+| `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
@@ -281,8 +281,7 @@ file `tokens/<hub>/<account>.token`); it runs only when the block is present, ta
 3 seconds and never stops `context` — every failure is a `state` with its own `message`:
 `not-configured`, `invalid-entry`, `kephalaion-missing`, `node-address`, `token-missing`,
 `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`,
-`replica-unreadable`, `collection-unreadable` or `ok`. A missing scope `vendor/k-playbook` does
-not fail the check; `vendorScope: missing` is only a hint. `sync` carries `lastSuccess`,
+`replica-unreadable`, `collection-unreadable` or `ok`. `sync` carries `lastSuccess`,
 `revision`, `lastError` and `neverSynced` as the node reports them. The field is filled by the
 subcommand and the MCP tool; internal callers that only need the catalogs do not ask the node.
 Details: `installer/docs/architecture.md`, section "Kephalaion-Anbindung".

@@ -136,7 +136,7 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 	env := testEnv(t, node.server.URL+"/mcp")
 
 	status := CheckBinding(context.Background(), goodBinding, env)
-	if status.Address != "vm:k-playbook" || status.User != "kamran" || status.VendorScope != "missing" {
+	if status.Address != "vm:k-playbook" || status.User != "kamran" {
 		t.Fatalf("%+v", status)
 	}
 	if strings.Join(status.Rights, ",") != "read,write" || len(status.Scopes) != 0 {
@@ -146,9 +146,9 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 		t.Fatalf("Abgleich: %+v", status.Sync)
 	}
 
-	withVendor := CheckBinding(context.Background(), Binding{Hub: "vm", Collection: "test", Account: "kamran-wsl"}, env)
-	if withVendor.VendorScope != "present" || strings.Join(withVendor.Scopes, ",") != "vendor/k-playbook,dir docs/" {
-		t.Fatalf("%+v", withVendor)
+	withScopes := CheckBinding(context.Background(), Binding{Hub: "vm", Collection: "test", Account: "kamran-wsl"}, env)
+	if strings.Join(withScopes.Scopes, ",") != "vendor/k-playbook,dir docs/" {
+		t.Fatalf("%+v", withScopes)
 	}
 
 	// Gesendet wird das Header-Paar nur an tools/call, nicht an initialize.
@@ -325,7 +325,7 @@ func TestProbePairs(t *testing.T) {
 	if pairs[0].Hub != "privat" || pairs[0].State != StateHubUnknown {
 		t.Fatalf("privat: %+v", pairs[0])
 	}
-	if pairs[1].State != StateOK || len(pairs[1].Collections) != 2 || pairs[1].Collections[1].VendorScope != "present" {
+	if pairs[1].State != StateOK || len(pairs[1].Collections) != 2 || pairs[1].Collections[1].Address != "vm:test" {
 		t.Fatalf("vm: %+v", pairs[1])
 	}
 }

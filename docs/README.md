@@ -57,8 +57,8 @@ contains only what has been decided but not yet implemented, currently migrating
 reviews to SARIF. It is deleted when nothing remains open.
 
 [`knowledge-aktuell.md`](./knowledge-aktuell.md) is the current working document for moving
-k-playbook onto Kephalaion: a binary-only installation whose shipped content lives in each
-project's collection under `vendor/k-playbook/`, with the decisions so far, the open
+k-playbook onto Kephalaion: a binary-only installation whose shipped content lives in the
+public collection `k-playbook` on every hub, under `defaults/`, with the decisions so far, the open
 questions and the ordered work list.
 
 ## Keyword index

@@ -1709,9 +1709,10 @@ Jeder Fehler wird ein Zustand, je einer mit eigenem Satz in `message`:
 | `collection-unreadable` | angemeldet, aber die Collection ist nicht unter den lesbaren |
 | `ok` | angemeldet, Collection lesbar |
 
-Bei `ok` stehen `rights`, `scopes` (`vendor/<name>`, `dir <pfad>/`), `vendorScope`
-(`present`/`missing`), `user`, `node`, `nodeVersion` und `sync` dabei. Ein fehlender Scope
-`vendor/k-playbook` lässt die Prüfung nicht scheitern.
+Bei `ok` stehen `rights`, `scopes` (`vendor/<name>`, `dir <pfad>/`), `user`, `node`,
+`nodeVersion` und `sync` dabei. Einen Hinweis auf den Scope `vendor/k-playbook` gibt es nicht
+mehr: der mitgelieferte Inhalt liegt in der öffentlichen Collection `<hub>:k-playbook`, nicht
+unter `vendor/` in der Projekt-Collection.
 
 Die Prüfung belegt, dass der Node auf `/mcp` antwortet, dass das Token aus der Token-Datei am
 Hub gilt und dass die Collection lesbar ist. Sie belegt nicht, dass die Header in der
@@ -1761,8 +1762,8 @@ wird nichts geschrieben; die Meldung nennt `git rm --cached`.
 jeder Seitenaufruf den Node fragt; nach dem Eintragen wird er verworfen. `/api/context` nimmt
 den Block aus demselben Zwischenspeicher.
 
-Die Statusseite zeigt im Statusfeld Collection, Account (mit User), Rechte, den Hinweis zum
-Scope `vendor/k-playbook` und den Stand des Abgleichs, dazu eine Zustandsmarke. Ist die
+Die Statusseite zeigt im Statusfeld Collection, Account (mit User), Rechte und den Stand des
+Abgleichs, dazu eine Zustandsmarke. Ist die
 Anbindung nicht `ok`, blendet `status.js` den Einrichtungsschritt als erste Karte ein; die
 übrige Oberfläche bleibt erreichbar. Der Schritt lädt `/api/kephalaion/candidates`: je Paar
 aus dem Token-Verzeichnis den Zustand und die lesbaren Collections. Vorgewählt sind das

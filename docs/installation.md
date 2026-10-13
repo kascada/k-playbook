@@ -399,8 +399,7 @@ configuration carry the same, still valid token. The address comes from `node.li
 Kephalaion's `config.yaml` (`$XDG_CONFIG_HOME` is honoured; without `listen` Kephalaion's
 default `127.0.0.1:7433` applies). Only `127.0.0.1`, `[::1]` and `localhost` are accepted; a
 wildcard (`0.0.0.0`, `[::]`) is reached on `127.0.0.1`, any other address is reported and never
-contacted. The whole check takes at most 3 seconds. A missing scope `vendor/k-playbook` does not
-fail it; it is shown as a hint.
+contacted. The whole check takes at most 3 seconds.
 
 `k-playbook context` carries the result in the block `kephalaion` (see
 [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state)); the check never

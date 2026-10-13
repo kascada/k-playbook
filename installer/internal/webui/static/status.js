@@ -178,8 +178,6 @@ function renderKephalaionStatus(data) {
   addStatusFact(els.statusFacts, "Account", account);
   if (status.ok) {
     addStatusFact(els.statusFacts, "Rechte", (status.rights || []).join(", ") || "–");
-    addStatusFact(els.statusFacts, "Scope vendor/k-playbook",
-      status.vendorScope === "present" ? "vorhanden" : "fehlt (nur ein Hinweis; nötig, sobald k-playbook dort schreibt)");
     if (status.sync) {
       const parts = [];
       if (status.sync.lastSuccess) {
@@ -363,7 +361,6 @@ function renderKephalaionCollections() {
   for (const collection of collections) {
     const selected = collection.collection === kephalaionSetup.collection;
     const parts = [`Rechte: ${(collection.rights || []).join(", ")}`];
-    parts.push(collection.vendorScope === "present" ? "Scope vendor/k-playbook vorhanden" : "ohne Scope vendor/k-playbook");
     if (collection.collection === kephalaionSetup.projectName) {
       parts.push("wie das Projekt benannt");
     }

@@ -8,6 +8,7 @@ INSTALLER_BINARY := k-playbook
 # Paketpfad relativ zum installer/-Verzeichnis, in dem go build läuft.
 INSTALLER_PKG := ./cmd/k-playbook
 INSTALLER_DIST_DIR := dist
+DEFAULTS_ASSET := $(INSTALLER_BINARY)-defaults.tar.gz
 INSTALLER_RELEASE_TARGETS := linux-amd64 linux-arm64 darwin-amd64 darwin-arm64
 # Die Toolchain steht in installer/go.mod und wird hier nur gelesen. Sie ist
 # der Grund, warum das versionierte SHA256SUMS trägt: CI baut mit derselben
@@ -48,7 +49,7 @@ INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard insta
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host defaults-archive install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -95,6 +96,11 @@ dist-host: ## Baut nur das Binary dieser Plattform nach ./dist/
 	$(call build_binaries,$(INSTALLER_HOST_TARGET))
 
 build: dist ## Alias für dist
+
+# Dasselbe Archiv, das die Release-Action an jedes Release hängt; Kephalaion
+# holt es nach <hub>:k-playbook/defaults/. Lokal zum Prüfen vor einem Release.
+defaults-archive: ## Packt defaults/ wie das Release nach ./dist/k-playbook-defaults.tar.gz
+	@.github/scripts/pack-defaults.sh "$(INSTALLER_DIST_DIR)/$(DEFAULTS_ASSET)"
 
 # Die Verwechslung, gegen die das hier absichert: `make` läuft in der
 # Installation statt im Arbeitsstand. Der Build scheitert dann an der
@@ -298,12 +304,11 @@ release-publish: ## Bringt den getaggten Commit auf main — erst wenn die Asset
 	    printf 'Von Hand nachsehen und dann: git push origin main\n' >&2; \
 	    exit 1; \
 	  }; \
-	  for target in $(INSTALLER_RELEASE_TARGETS); do \
-	    name="$(INSTALLER_BINARY)-$$target"; \
+	  for name in $(foreach target,$(INSTALLER_RELEASE_TARGETS),$(INSTALLER_BINARY)-$(target)) $(DEFAULTS_ASSET); do \
 	    gh release view "$(VERSION)" --json assets \
 	      --jq '.assets[].name' 2>/dev/null | grep -qx "$$name" || { \
 	      printf 'Im Release %s fehlt das Asset %s.\n' "$(VERSION)" "$$name" >&2; \
-	      printf 'VERSION darf erst auf main, wenn alle vier Assets liegen.\n' >&2; \
+	      printf 'VERSION darf erst auf main, wenn alle Assets liegen.\n' >&2; \
 	      exit 1; \
 	    }; \
 	  done

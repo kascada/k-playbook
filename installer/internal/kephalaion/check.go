@@ -76,9 +76,6 @@ type Status struct {
 	Rights []string `json:"rights,omitempty"`
 	// Scopes sind die Scopes darunter: vendor/<name> und dir <pfad>/.
 	Scopes []string `json:"scopes,omitempty"`
-	// VendorScope ist present oder missing — ob der Scope vendor/k-playbook
-	// da ist; nur bei ok. Er fehlt ohne die Prüfung scheitern zu lassen.
-	VendorScope string `json:"vendorScope,omitempty"`
 	// User ist der User hinter dem Account; nur bei ok.
 	User string `json:"user,omitempty"`
 	// Node ist der Name dieses Nodes am Hub.
@@ -233,10 +230,6 @@ func evaluate(status *Status, binding Binding, reply *whoamiOutput) {
 		status.State, status.OK = StateOK, true
 		status.Rights = append([]string{}, c.Rights...)
 		status.Scopes = scopes(c.Rights)
-		status.VendorScope = "missing"
-		if slices.Contains(c.Rights, VendorScope) {
-			status.VendorScope = "present"
-		}
 		status.Message = fmt.Sprintf("Angemeldet als %s (User %s); %s ist lesbar.", entry.Account, entry.User, status.Address)
 		return
 	}
@@ -273,10 +266,9 @@ func readableList(hub string, collections []whoamiCollection) string {
 // Collection ist eine lesbare Collection eines Paars, wie der
 // Einrichtungsschritt sie anbietet.
 type Collection struct {
-	Collection  string   `json:"collection"`
-	Address     string   `json:"address"`
-	Rights      []string `json:"rights"`
-	VendorScope string   `json:"vendorScope"`
+	Collection string   `json:"collection"`
+	Address    string   `json:"address"`
+	Rights     []string `json:"rights"`
 }
 
 // Pair ist ein Kandidat mit dem, was der Node für ihn meldet.
@@ -325,13 +317,9 @@ func ProbePairs(ctx context.Context, env Env) []Pair {
 				if !slices.Contains(col.Rights, "read") {
 					continue
 				}
-				vendor := "missing"
-				if slices.Contains(col.Rights, VendorScope) {
-					vendor = "present"
-				}
 				pair.Collections = append(pair.Collections, Collection{
 					Collection: col.Collection, Address: c.Hub + ":" + col.Collection,
-					Rights: append([]string{}, col.Rights...), VendorScope: vendor,
+					Rights: append([]string{}, col.Rights...),
 				})
 			}
 		}

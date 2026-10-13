@@ -41,10 +41,6 @@ const LocalFileName = "K-PLAYBOOK.local.yaml"
 // schreibt; alles andere in der Datei bleibt unberührt.
 const BlockName = "kephalaion"
 
-// VendorScope ist der Scope, unter dem k-playbook seinen mitgelieferten
-// Inhalt in die Collection schreibt. Fehlt er, ist das nur ein Hinweis.
-const VendorScope = "vendor/k-playbook"
-
 // Binding ist der Inhalt des Blocks kephalaion: aus LocalFileName.
 type Binding struct {
 	Hub        string `json:"hub"`

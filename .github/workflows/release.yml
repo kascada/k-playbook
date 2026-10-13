@@ -2,7 +2,8 @@ name: Release
 
 # Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
 # Release. Der Clone trägt sie nicht mehr; `bin/install` lädt genau das eine,
-# das zur Plattform der jeweiligen Umgebung passt.
+# das zur Plattform der jeweiligen Umgebung passt. Dazu kommt
+# k-playbook-defaults.tar.gz mit dem Inhalt von defaults/ für Kephalaion.
 #
 # Geprüft wird gegen das committete SHA256SUMS: die erwarteten Summen kommen
 # über Git, die Binaries über HTTPS. Weicht ein Hash ab, bricht der Lauf ab —
@@ -101,6 +102,14 @@ jobs:
             echo "VERSION nennt $version, gebaut wird aber $TAG." >&2
             exit 1
           fi
+
+      # Die Vorgaben, die Kephalaion aus dem neuesten Release nach
+      # <hub>:k-playbook/defaults/ holt. Nach der VERSION-Prüfung, damit das
+      # Archiv den geprüften Tag trägt; nicht in SHA256SUMS, das nur die
+      # Binaries für bin/install nennt. Der Upload unten nimmt es über
+      # dist/k-playbook-* mit.
+      - name: Vorgaben packen
+        run: .github/scripts/pack-defaults.sh dist/k-playbook-defaults.tar.gz
 
       # Die Notes tragen den Bootstrap vorweg, nicht nur die Doku: er ist der
       # eine Handgriff, den auch ein Bestandsprojekt nach einem Clone-Update mit

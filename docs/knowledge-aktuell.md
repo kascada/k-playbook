@@ -115,8 +115,9 @@ and checks it against `SHA256SUMS`, as `bin/install` does today.
 public and stays public, and the binary is fetched from there already.
 
 **`defaults/` holds the shipped Markdown, frozen** (2026-10-10). `defaults/` holds real
-copies of the tracked files of `docs`, `guidelines`, `reviews`, `rules`, `k-playbook.md` and
-`VERSION` — 41 files, no links. Commands, skills, scripts, `bin` and `checks` stay out: they
+copies of the tracked files of `guidelines`, `reviews`, `rules` and `k-playbook.md` — 19
+files, no links; `docs/` was taken out before v0.12.0 (the docs are taken over later, anew),
+and `VERSION` is added from the root when packing, because the release only bumps that one. Commands, skills, scripts, `bin` and `checks` stay out: they
 have to lie on disk for the assistants and to run, so they stay in the local `k-playbook/` as
 today. The old places stay for the installation; two copies cannot drift because the shipped
 content is not changed until the switch is complete. Who delivers the Markdown — k-playbook
@@ -168,12 +169,14 @@ until the last step.
    empty), at the node and in `K-PLAYBOOK.local.yaml`.
 3. **`defaults/` in the source repo** — `vendor/` with links committed (`4072607`); renamed
    to `defaults/` and filled with the shipped Markdown on 2026-10-10 in the working tree
-   (41 files; commands, skills and scripts stay local), to be committed. v0.11.0 contains neither.
+   (commands, skills and scripts stay local); released with v0.12.0.
 4. **Decide what the hub fetches** — decided 2026-10-10: a release asset, see "The hub
    fetches a release asset".
-5. **Release packs the content** — a step in `.github/workflows/release.yml` that packs
-   `defaults/` into `dist/k-playbook-defaults.tar.gz`; the existing upload of `dist/k-playbook-*`
-   takes it along. The first release with it is the first the hub can fetch.
+5. **Release packs the content** — built 2026-10-12: `.github/scripts/pack-defaults.sh`,
+   called by the release action and by `make defaults-archive`, packs `defaults/` plus `VERSION`
+   reproducibly into `dist/k-playbook-defaults.tar.gz` and checks the hub's limits first;
+   `make release-publish` requires the asset. The first release with it (after v0.12.0) is
+   the first the hub can fetch; the collection `k-playbook` already exists on hub `vm`.
 6. **Kephalaion: a collection with an external source** — readable by all accounts of the
    hub, written only by the hub, the latest release in `defaults/`, fetched at creation, by
    hand or on request.
