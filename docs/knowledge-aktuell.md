@@ -10,7 +10,7 @@ Working document for the duration of the switch, in the manner of
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
-As of: 2026-10-10.
+As of: 2026-10-13.
 
 ## Goal
 
@@ -164,9 +164,9 @@ until the last step.
 
 1. **Collection binding** — built 2026-10-09 (task 085, in the working tree); see "Collection
    binding" above. Task 082 is adapted to use the same check.
-2. **Rename the development collection** — `k-playbook` → `k-playbook-dev` at the hub (there
-   is no rename: add, grant accounts and nodes, then revoke and remove the old one — it is
-   empty), at the node and in `K-PLAYBOOK.local.yaml`.
+2. **Rename the development collection** — done by 2026-10-13: `vm:k-playbook-dev` exists
+   with `read`/`write` for `kamran-wsl`, `K-PLAYBOOK.local.yaml` points at it, and
+   `vm:k-playbook` is now the public collection.
 3. **`defaults/` in the source repo** — `vendor/` with links committed (`4072607`); renamed
    to `defaults/` and filled with the shipped Markdown on 2026-10-10 in the working tree
    (commands, skills and scripts stay local); released with v0.12.0.
@@ -175,12 +175,14 @@ until the last step.
 5. **Release packs the content** — built 2026-10-12: `.github/scripts/pack-defaults.sh`,
    called by the release action and by `make defaults-archive`, packs `defaults/` plus `VERSION`
    reproducibly into `dist/k-playbook-defaults.tar.gz` and checks the hub's limits first;
-   `make release-publish` requires the asset. The first release with it (after v0.12.0) is
-   the first the hub can fetch; the collection `k-playbook` already exists on hub `vm`.
+   `make release-publish` requires the asset. Released with v0.13.0 (2026-10-13), the first
+   release carrying `k-playbook-defaults.tar.gz`.
 6. **Kephalaion: a collection with an external source** — readable by all accounts of the
    hub, written only by the hub, the latest release in `defaults/`, fetched at creation, by
    hand or on request.
-   Kephalaion task 031, to be refined there.
+   Built as Kephalaion task 031 (Kephalaion v0.3.0, running on the VM). First run on hub `vm`
+   2026-10-13: `fetch_release vm:k-playbook` fetched v0.13.0, 20 documents under `defaults/`,
+   author `system`.
 7. **AGENTS.md reads the public collection** — the instructions point at
    `<hub>:k-playbook/defaults/` over MCP instead of the local `k-playbook/`.
 8. **Project files into the project collection** — decide how the files of
