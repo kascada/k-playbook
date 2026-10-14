@@ -256,8 +256,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 23 {
-		t.Fatalf("tools/list meldet nicht genau dreiundzwanzig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 24 {
+		t.Fatalf("tools/list meldet nicht genau vierundzwanzig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -289,6 +289,7 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_knowledge_queue_list",
 		"k_playbook_knowledge_queue_drop",
 		"k_playbook_knowledge_status",
+		"k_playbook_doc_read",
 	} {
 		if !found[name] {
 			t.Errorf("tools/list meldet %s nicht: %v", name, found)
@@ -320,8 +321,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 23 {
-		t.Fatalf("tools/list meldet nicht dreiundzwanzig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 24 {
+		t.Fatalf("tools/list meldet nicht vierundzwanzig Werkzeuge: %v", responses[1])
 	}
 
 	for id, call := range []struct {
@@ -430,8 +431,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 22 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 22", withProjectDir)
+	if withProjectDir != 23 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 23", withProjectDir)
 	}
 }
 
@@ -460,8 +461,9 @@ func withProjectDir(arguments map[string]any, projectDir any) map[string]any {
 	return merged
 }
 
-// projectDirCalls sind je Familie ein lesendes und ein schreibendes Werkzeug,
-// mit Argumenten, die bis auf projectDir dem Schema genügen.
+// projectDirCalls sind je Familie ein lesendes und ein schreibendes Werkzeug —
+// die Doc-Familie hat nur ein lesendes —, mit Argumenten, die bis auf
+// projectDir dem Schema genügen.
 var projectDirCalls = []struct {
 	name string
 	args map[string]any
@@ -475,6 +477,7 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
 	{name: "k_playbook_review_status", args: map[string]any{}},
 	{name: "k_playbook_review_create", args: map[string]any{"day": "2026-09-16", "dryRun": true}},
+	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 }
 
 // TestFehlendesProjectDirIstEingabefehler prüft über das Protokoll, dass ein

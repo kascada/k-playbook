@@ -725,6 +725,13 @@ func isEmptyFile(path string) bool {
 	if err != nil {
 		return false
 	}
+	return isEmptyContent(data)
+}
+
+// isEmptyContent ist die Prüfung hinter isEmptyFile, für einen Inhalt, der
+// schon gelesen ist — etwa aus einer DocSource, die keine Datei auf der
+// Platte sein muss.
+func isEmptyContent(data []byte) bool {
 	for _, line := range strings.Split(string(data), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {

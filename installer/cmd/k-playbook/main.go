@@ -5,7 +5,8 @@
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
-// Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage,
+// Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
+// löst einen Verweis im Präfixschema auf,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, und `stop` beendet den
 // Hintergrunddienst der Oberfläche.
@@ -91,6 +92,10 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie todo: die Ausgabe ist maschinenlesbar, und
 		// der Zugriff soll nichts anfassen außer dem eigenen Index.
 		return runKnowledge(args[1:])
+	case "read":
+		// Ohne Wirt-Pflege wie knowledge: stdout trägt den Inhalt hinter dem
+		// Verweis und sonst nichts.
+		return runRead(args[1:])
 	case "vscode":
 		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
 		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
@@ -221,6 +226,12 @@ Unterkommandos:
             jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
             dessen Verzeichnis; der Index liegt unter
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
+  read      Löst einen Verweis im Präfixschema auf und gibt aus, was
+            dahinter steht: k-playbook read <verweis> [--json]. Heute nur
+            k-playbook:-Verweise unter instructions/, lokal vor mitgeliefert;
+            ein Verweis mit / am Ende baut das Verzeichnis zu einem Text
+            zusammen. Hinweise stehen auf stderr. Dasselbe wie das
+            MCP-Werkzeug k_playbook_doc_read.
   vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
             diesem Programm steckt: k-playbook vscode install|status|
             vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig

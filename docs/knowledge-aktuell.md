@@ -10,7 +10,7 @@ Working document for the duration of the switch, in the manner of
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
-As of: 2026-10-13.
+As of: 2026-10-14.
 
 ## Goal
 
@@ -120,11 +120,46 @@ files, no links; `docs/` was taken out before v0.12.0 (the docs are taken over l
 and `VERSION` is added from the root when packing, because the release only bumps that one. Commands, skills, scripts, `bin` and `checks` stay out: they
 have to lie on disk for the assistants and to run, so they stay in the local `k-playbook/` as
 today. The old places stay for the installation; two copies cannot drift because the shipped
-content is not changed until the switch is complete. Who delivers the Markdown — k-playbook
+content is not changed until the switch is complete. `defaults/instructions/` came in on
+2026-10-14 and is the exception: it is maintained continuously and kept equal to
+`instructions/` by a test (see "A new kind `instructions/`" below). Who delivers the Markdown — k-playbook
 from the release or Kephalaion — and how local entries override it is decided together with
 the briefing. Against links at the old places, should files move later: `filepath.WalkDir`
 does not descend into a symlinked root (`installer/internal/project/docs.go:40`), and a file
 search that does not follow links (ripgrep, behind the Glob tool) would find nothing there.
+
+**A reference scheme for the Markdown files** (2026-10-14, task 087). A reference in what
+k-playbook ships or produces is one path with a prefix: `project:/…` (a file in the project,
+read from disk), `k-playbook:/…` (resolved by k-playbook, local before shipped; ending in `/`
+an assembled directory) and `keph:/…` (the project's collection, read over Kephalaion with
+`collection` = `kephalaion.address`). `project:` and not `local:`, because "local" names the
+layer `k-playbook-local/`; `keph:` names neither hub nor collection, because both are
+machine-local. The public collection `<hub>:k-playbook` is no reference target: its
+`defaults/` is the shipped layer behind `k-playbook:`. Defined in
+[`verweisschema.md`](./verweisschema.md); the version for sessions is
+`instructions/always/010-verweise.md`.
+
+**A new kind `instructions/`** (2026-10-14, task 087). `instructions/always/` holds numbered
+parts that are assembled into one text (numerically across both layers, shipped below 1000,
+local from 1000; the number is part of the name that is overridden; files without a number are
+left out and reported), `instructions/on-demand/` unnumbered files with frontmatter `title` and
+`description`. Built, but deliberately not put to use: `k-playbook.md`, `AGENTS.md`, its block
+template and the context output are unchanged, `catalogs` does not list the kind, and the text
+of the first parts stands twice for now, in the Go code that writes `AGENTS.md` and in
+`instructions/always/`. Whether `always/` replaces or supplements `k-playbook.md` is decided by
+the briefing (task 086). **"Frozen" does not apply here:** `instructions/` lies at the top of the
+repo for the installation and as a real copy in `defaults/instructions/` for the hub, and it is
+maintained continuously; a Go test in the normal test run
+(`installer/internal/project/instructions_tree_test.go`) keeps both trees equal, and
+`.github/scripts/pack-defaults.sh` refuses to pack when they differ.
+
+**`k_playbook_doc_read` and `k-playbook read`** (2026-10-14, task 087). The MCP tool and the
+subcommand resolve `k-playbook:/instructions/…` through an exchangeable source — the disk today
+(`installer/internal/project/docref.go`). A single file comes unchanged with frontmatter; an
+empty local file disables it without an error; a directory is assembled without frontmatter;
+an unknown reference is `not_found` with no fallback to the disk; `project:`, `keph:` and other
+`k-playbook:` kinds are `unsupported` for now. The `ref` in the prefix scheme is the lasting
+contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract).
 
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
 by document, with `create`/`write` into the collection, rather than replacing whole
@@ -193,6 +228,13 @@ until the last step.
    them by key; the source behind it (disk today, Kephalaion later) is invisible to the AI.
    Context output and `AGENTS.md` point at it. The Markdown files are rebuilt and integrated
    step by step afterwards; the docs are taken over later, anew.
+   Groundwork built 2026-10-14 (task 087, in the working tree): the reference scheme, the kind
+   `instructions/` and `k_playbook_doc_read`/`k-playbook read` for `k-playbook:/instructions/…`,
+   not yet put to use. Still open for 086: listing keys as `k-playbook:/…`, the other kinds
+   (`rules`, `reviews`, `guidelines`), resolving the name clash `instructions` (context field,
+   `k-playbook.md`, directory `instructions/`), and putting it into `AGENTS.md`. The check
+   against the real installation follows the next release; the installed `k-playbook/` here is
+   older and has no `instructions/`.
 10. **Generators** — `/k-docs-*` write single documents into the project collection,
     including the removal of stale ones.
 11. **Delete the local files** — the old directories in the repo and the clone in the

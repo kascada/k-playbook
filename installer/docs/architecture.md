@@ -111,6 +111,14 @@ Generator veröffentlicht sein Verzeichnis als Ganzes. Der Index liegt verwerfba
 oder mit `--help` fasst das Kommando keine Daten an und legt den Index nicht an, damit es
 als Rauchtest nach einem Release folgenlos bleibt.
 
+`read <verweis> [--json]` löst einen Verweis im Präfixschema auf
+([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
+steht — heute nur `k-playbook:`-Verweise unter `instructions/`, lokal vor mitgeliefert, ein
+Verweis mit `/` am Ende zu einem Text zusammengebaut. Ohne `--json` steht auf stdout nur der
+Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-Werkzeug
+`k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
+(`project/docref.go`).
+
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
 Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
@@ -189,6 +197,8 @@ installer/
 │   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
+│   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
+│   │                            über fs.FS), ResolveDocRef für k-playbook:/instructions/…
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
 │   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
@@ -257,6 +267,8 @@ installer/
 │   ├── review.go                Werkzeuge k_playbook_review_*
 │   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
 │   │                            dünne Hüllen über internal/project
+│   ├── docs.go                  Werkzeug k_playbook_doc_read, Hülle über
+│   │                            project.ResolveDocRef
 │   └── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │                                write, publish, supersede, inbox_*, queue_*, status),
 │                                dünne Hüllen über project.Knowledge
@@ -848,6 +860,21 @@ Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
 |---|---|---|
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
+| `k-playbook/instructions/` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook-local/instructions/` | nur dieses Projekt | bleibt |
+
+Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
+ist neu und noch nicht eingebaut (Task 087): weder `instructionFiles()` noch die
+Kontextausgabe noch `AGENTS.md` nennen sie, und sie hängt nicht in `catalogKinds()`.
+Gelesen wird sie nur über Verweise, `k-playbook read` bzw. `k_playbook_doc_read`, aufgelöst in
+`project/docref.go` nach der Regel der Kataloge: gleicher Name gewinnt lokal, leer lokal
+schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Verweis auf
+`always/` baut die Teile mit Ziffer vorn zu einem Text zusammen, numerisch sortiert über beide
+Ebenen. Die mitgelieferte Ebene ist die oberste Ebene der Installation, nicht `defaults/`;
+`defaults/instructions/` ist die Kopie für den Hub, ihr Gleichstand mit `instructions/` ist
+per Test gesichert (`project/instructions_tree_test.go`). Wie `always/` zu `k-playbook.md`
+steht, entscheidet Task 086. Regeln und Zugriffswege:
+[`../../docs/verweisschema.md`](../../docs/verweisschema.md).
 
 `instructionFiles()` sammelt sie in dieser Reihenfolge und nimmt nur auf, was existiert —
 ein Pfad ins Leere wäre schlechter als keiner.
@@ -3124,7 +3151,8 @@ lassen. Dazu kommen drei Familien nach demselben Muster „Subkommando trägt, M
 Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playbook_todo_*`
 (`todos.go`) um `project/todos.go` und `k_playbook_knowledge_*` (`knowledge.go`) um
 `project.Knowledge` — das Wissenstor über `k-playbook-local/knowledge/` samt Eingang und
-Warteschlange, das auch `k-playbook knowledge` bedient. Keine der Hüllen trägt eigene Fachlogik; sie
+Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
+(`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`. Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall. Tool-Tabelle und Verträge stehen in

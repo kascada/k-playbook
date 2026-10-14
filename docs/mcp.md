@@ -11,7 +11,8 @@ when writing changes something, and only to symlinks created by k-playbook itsel
 response lists what happened under `links`; if the field is absent, everything was already
 up to date.
 
-The server offers the working state and the review, todo and knowledge tools.
+The server offers the working state, the review, todo and knowledge tools, and
+`k_playbook_doc_read` for references.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
 because a stdio server must not assume that its process working directory is the target
 project. There is no fallback to that directory.
@@ -23,7 +24,7 @@ schema is rejected by the SDK's schema validation before the tool runs, with a b
 no envelope, no code, nothing that says the call did nothing. That is how a `knowledge_write`
 got lost once. The tools therefore check the parameter themselves: missing, empty, or only
 whitespace yields the family's envelope with `ok: false`, code `invalid_input`, and the same
-message in all three families -- `projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf
+message in all families -- `projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf
 mit projectDir, dem Projektverzeichnis mit K-PLAYBOOK.yaml (absoluter Pfad).` A `projectDir`
 that is given but leads to no project stays `project_not_found`. The price: clients that check
 required fields before calling (Claude Code) no longer do so for `projectDir`. Other schema
@@ -347,6 +348,7 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
+| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text; today only `k-playbook:/instructions/…` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -736,6 +738,41 @@ quietly returning nonsense.
 This section describes what is built. The concept it belongs to -- how a deposit is
 classified, what the query surface looks like, and which decisions rest on which measurements
 -- is in [knowledge-gate.md](knowledge-gate.md).
+
+### Doc Read Contract
+
+`k_playbook_doc_read` is a thin wrapper over `project.ResolveDocRef` (`project/docref.go`); the
+subcommand `k-playbook read <ref> [--json]` calls the same function and serves for testing and
+as a fallback. Its input is `projectDir` (required by contract, like every tool) and `ref`, a
+reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly as it stands in
+the text. `ref` in that scheme is the lasting contract of the tool: which source lies behind
+it -- the disk today, perhaps Kephalaion later -- is invisible to the caller.
+
+A successful answer is `{ok: true, tool, projectDir, ref, directory, content, disabled, hint,
+parts, problems}`:
+
+- `ref` -- the reference in canonical form; `directory` -- whether it ended in `/`.
+- `content` -- a single file unchanged, frontmatter included; for a directory the parts
+  without frontmatter, separated by a blank line. Always present, `""` when empty.
+- `disabled` -- `true` for a single file that an empty local file disables. That is not an
+  error: `content` is `""` and `hint` says why. For a directory it stays `false`, even when
+  every part is disabled.
+- `parts` -- the parts involved, in the order of the content, each with `name`, `origin`
+  (`dist`, `local`, `override`) and `disabled`; a single file has exactly one. Always present,
+  `[]` for a directory without parts.
+- `problems` -- what was skipped, for now files without a leading number in an assembled
+  directory. Always present, `[]` when nothing was skipped. The subcommand writes `hint` and
+  `problems` to stderr and keeps stdout for the content; exit 0.
+
+Error codes, in the envelope's `error.code` like the knowledge tools:
+
+| Code | When |
+|---|---|
+| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; or names a directory without the trailing `/` |
+| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/` |
+| `not_found` | neither layer has the file or directory; there is no fallback to reading anywhere else |
+| `project_not_found` | `projectDir` leads to no project |
+| `read_failed` | the source could not be read |
 
 ## Inspecting What the Server Offers
 

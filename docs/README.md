@@ -29,6 +29,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes, its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract. |
+| [`verweisschema.md`](./verweisschema.md) | The reference scheme: one path with a prefix — `project:`, `k-playbook:`, `keph:` —, the access route per prefix, and how k-playbook resolves `k-playbook:` references and assembles directories such as `k-playbook:/instructions/always/`. |
 | [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
 
 ## Tool and catalogs
@@ -90,6 +91,7 @@ questions and the ordered work list.
 - `overview` / `what is it for` / `three kinds of work` / `big picture` -> [`overview.md`](./overview.md)
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `PR review` -> [`pr-review.md`](./pr-review.md)
+- `reference` / `Verweis` / `project:` / `k-playbook:` / `keph:` / `instructions/` / `k-playbook read` / `k_playbook_doc_read` -> [`verweisschema.md`](./verweisschema.md)
 - `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)
 - `results` -> [`code-review.md`](./code-review.md)
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#assessing-with-review-scan-triage), [`commands.md`](./commands.md#review-flow)
