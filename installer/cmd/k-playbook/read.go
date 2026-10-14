@@ -97,7 +97,9 @@ Arbeitsverzeichnis aufwärts.
             Ein Verzeichnis (mit / am Ende): alle Teile mit Ziffer vorn aus
             beiden Ebenen, numerisch sortiert, ohne Frontmatter zu einem Text
             zusammengefügt. Dateien ohne Ziffer werden übergangen und auf
-            stderr gemeldet.
+            stderr gemeldet. Zusammengebaut wird nur dieses Verzeichnis; jedes
+            andere mit / am Ende — on-demand/, instructions/ selbst, eine
+            Datei mit / — ist ein Fehler: der Dateiname fehlt (invalid_input).
 
 Ohne --json steht auf stdout nur der Inhalt. Mit --json kommt die Antwort als
 JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled)

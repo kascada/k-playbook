@@ -127,9 +127,12 @@ func TestDocReadFehlercodes(t *testing.T) {
 		"k-playbook:/instructions/on-demand/fehlt.md": project.DocCodeNotFound,
 		// Datei wie ein Verzeichnis behandelt, mitgeliefert und lokal.
 		"k-playbook:/instructions/always/010-a.md/x.md": project.DocCodeNotFound,
-		"k-playbook:/instructions/always/010-a.md/":     project.DocCodeNotFound,
-		"k-playbook:/instructions/always/1000-eins.md/": project.DocCodeNotFound,
 		"k-playbook:/instructions/always/100-b.md/x.md": project.DocCodeNotFound,
+		// Mit „/" am Ende fehlt der Dateiname: nicht in der Liste der
+		// zusammengebauten Verzeichnisse.
+		"k-playbook:/instructions/always/010-a.md/":     project.DocCodeInvalidInput,
+		"k-playbook:/instructions/always/1000-eins.md/": project.DocCodeInvalidInput,
+		"k-playbook:/instructions/on-demand/":           project.DocCodeInvalidInput,
 		"project:/scripts/123.sh":                       project.DocCodeUnsupported,
 		"keph:/manual/abc.md":                           project.DocCodeUnsupported,
 		"k-playbook:/rules/befunde.md":                  project.DocCodeUnsupported,
@@ -147,7 +150,12 @@ func TestDocReadFehlercodes(t *testing.T) {
 		}
 	}
 
-	envelope, _ := callDocRead(t, "", "k-playbook:/instructions/always/")
+	envelope, _ := callDocRead(t, root, "k-playbook:/instructions/on-demand/")
+	if envelope.Error == nil || !strings.Contains(envelope.Error.Message, "Dateiname fehlt") {
+		t.Errorf("on-demand/: Meldung ohne „Dateiname fehlt“: %#v", envelope.Error)
+	}
+
+	envelope, _ = callDocRead(t, "", "k-playbook:/instructions/always/")
 	if envelope.Error == nil || envelope.Error.Code != "invalid_input" {
 		t.Errorf("ohne projectDir: %#v", envelope)
 	}

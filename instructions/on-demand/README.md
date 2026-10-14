@@ -7,5 +7,8 @@ wenn ein Verweis auf sie zeigt, etwa `k-playbook:/instructions/on-demand/<thema>
 - Zuerst gilt die lokale Fassung (`k-playbook-local/instructions/on-demand/`), sonst die
   mitgelieferte. Ein leerer lokaler Eintrag schaltet den mitgelieferten ab.
 - Mit `instructions/always/` haben sie nichts zu tun: eigener Namensraum, keine Reihenfolge.
+- Das Verzeichnis wird nicht zusammengebaut. Jede Datei liest du einzeln mit ihrem Namen;
+  `k-playbook:/instructions/on-demand/` mit `/` am Ende ist ein Fehler, weil der Dateiname
+  fehlt.
 - Jede Datei trägt im Frontmatter `title` und `description`, damit sie in einer Übersicht
   ohne ihren Inhalt beschrieben werden kann.

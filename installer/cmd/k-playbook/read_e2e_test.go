@@ -127,13 +127,19 @@ func TestReadUnbekannterVerweisIstFehler(t *testing.T) {
 		t.Fatalf("unbekannter Verweis: %v", err)
 	}
 	// Datei wie ein Verzeichnis behandelt: unbekannt, kein Systemfehler.
+	_, _, err = runReadCaptured(t, "k-playbook:/instructions/always/010-a.md/x.md")
+	if err == nil || !strings.Contains(err.Error(), "not_found") || strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("…/010-a.md/x.md: %v", err)
+	}
+	// Mit „/" am Ende fehlt der Dateiname — wie bei einem Verzeichnis, das
+	// nicht zusammengebaut wird.
 	for _, ref := range []string{
-		"k-playbook:/instructions/always/010-a.md/x.md",
 		"k-playbook:/instructions/always/010-a.md/",
 		"k-playbook:/instructions/always/100-b.md/",
+		"k-playbook:/instructions/on-demand/",
 	} {
 		_, _, err = runReadCaptured(t, ref)
-		if err == nil || !strings.Contains(err.Error(), "not_found") || strings.Contains(err.Error(), "not a directory") {
+		if err == nil || !strings.Contains(err.Error(), "(invalid_input)") || !strings.Contains(err.Error(), "Dateiname fehlt") {
 			t.Fatalf("%s: %v", ref, err)
 		}
 	}

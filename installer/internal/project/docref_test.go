@@ -323,15 +323,18 @@ func TestDocRefUnbekannterVerweisIstFehler(t *testing.T) {
 	if !strings.Contains(err.Error(), "unbekannt") {
 		t.Errorf("Meldung: %v", err)
 	}
-	expectDocError(t, layers, "k-playbook:/instructions/gibt-es-nicht/", DocCodeNotFound)
+	// Ein unbekanntes Verzeichnis steht nicht in der Liste: der Dateiname
+	// fehlt, entschieden ohne zu lesen.
+	expectDocError(t, layers, "k-playbook:/instructions/gibt-es-nicht/", DocCodeInvalidInput)
 	// Verzeichnis ohne „/" am Ende.
 	expectDocError(t, layers, "k-playbook:/instructions/always", DocCodeInvalidInput)
 }
 
-// Ein Verweis, der eine Datei wie ein Verzeichnis behandelt, ist unbekannt —
-// als Einzeldatei (…/a.md/x.md) wie als Verzeichnis (…/a.md/), in jeder
-// Ebene. Das System meldet dafür ENOTDIR, nicht „gibt es nicht“.
-func TestDocRefDateiAlsVerzeichnisIstUnbekannt(t *testing.T) {
+// Ein Verweis, der eine Datei wie ein Verzeichnis behandelt, ist als
+// Einzeldatei (…/a.md/x.md) unbekannt, in jeder Ebene — das System meldet dafür
+// ENOTDIR, nicht „gibt es nicht“. Als Verzeichnis (…/a.md/) steht er nicht in
+// der Liste der zusammengebauten Verzeichnisse: der Dateiname fehlt.
+func TestDocRefDateiAlsVerzeichnis(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
 		"instructions/always/010-a.md":    "## A\n",
 		"instructions/always/100-b.md":    "## B mitgeliefert\n",
@@ -352,14 +355,75 @@ func TestDocRefDateiAlsVerzeichnisIstUnbekannt(t *testing.T) {
 		if strings.Contains(err.Error(), "not a directory") {
 			t.Errorf("%s/x.md: Systemfehler statt Meldung: %v", ref, err)
 		}
-		err = expectDocError(t, layers, ref+"/", DocCodeNotFound)
-		if strings.Contains(err.Error(), "not a directory") {
-			t.Errorf("%s/: Systemfehler statt Meldung: %v", ref, err)
+		err = expectDocError(t, layers, ref+"/", DocCodeInvalidInput)
+		if !strings.Contains(err.Error(), "Dateiname fehlt") || !strings.Contains(err.Error(), "ohne „/“ am Ende: "+ref) {
+			t.Errorf("%s/: Meldung: %v", ref, err)
 		}
 		// Auch tiefer unter der Datei.
 		expectDocError(t, layers, ref+"/tiefer/x.md", DocCodeNotFound)
-		expectDocError(t, layers, ref+"/tiefer/", DocCodeNotFound)
+		err = expectDocError(t, layers, ref+"/tiefer/", DocCodeInvalidInput)
+		if !strings.Contains(err.Error(), "Dateiname fehlt") || !strings.Contains(err.Error(), "gemeint ist etwa "+ref) {
+			t.Errorf("%s/tiefer/: Meldung: %v", ref, err)
+		}
 	}
+}
+
+// Nur Verzeichnisse aus docAssembledDirs werden zusammengebaut. Jeder andere
+// Verzeichnis-Verweis ist unvollständig — auch wenn es das Verzeichnis lokal
+// und mitgeliefert mit Dateien gibt. Einzeldateien bleiben überall lesbar.
+func TestDocRefNurListeWirdZusammengebaut(t *testing.T) {
+	layers, _, _ := docTree(t, map[string]string{
+		"instructions/always/010-a.md":    "## A\n",
+		"instructions/on-demand/thema.md": "## Thema\n",
+		"instructions/on-demand/010-x.md": "## X\n",
+		"instructions/oben.md":            "## Oben\n",
+	}, map[string]string{
+		"instructions/on-demand/eigen.md":   "## Eigen\n\nText.\n",
+		"instructions/on-demand/1000-y.md":  "## Y\n\nText.\n",
+		"instructions/always/1000-eigen.md": "## Eigen immer\n\nText.\n",
+	})
+
+	for ref, example := range map[string]string{
+		"k-playbook:/instructions/on-demand/": "k-playbook:/instructions/on-demand/<name>.md",
+		"k-playbook:/instructions/":           "k-playbook:/instructions/on-demand/<name>.md",
+		"k-playbook:/instructions/always/x/":  "k-playbook:/instructions/always/x/<name>.md",
+	} {
+		err := expectDocError(t, layers, ref, DocCodeInvalidInput)
+		if !strings.Contains(err.Error(), "Dateiname fehlt") || !strings.Contains(err.Error(), example) {
+			t.Errorf("%s: Meldung ohne „Dateiname fehlt“ oder Beispiel %s: %v", ref, example, err)
+		}
+		if !strings.Contains(err.Error(), "k-playbook:/instructions/always/") {
+			t.Errorf("%s: Meldung nennt das zusammengebaute Verzeichnis nicht: %v", ref, err)
+		}
+	}
+
+	dir := mustResolveDoc(t, layers, "k-playbook:/instructions/always/")
+	if dir.Content != "## A\n\n## Eigen immer\n\nText.\n" {
+		t.Errorf("always/ baut nicht mehr zusammen: %q", dir.Content)
+	}
+
+	for ref, content := range map[string]string{
+		"k-playbook:/instructions/on-demand/thema.md":   "## Thema\n",
+		"k-playbook:/instructions/on-demand/eigen.md":   "## Eigen\n\nText.\n",
+		"k-playbook:/instructions/always/010-a.md":      "## A\n",
+		"k-playbook:/instructions/always/1000-eigen.md": "## Eigen immer\n\nText.\n",
+		"k-playbook:/instructions/oben.md":              "## Oben\n",
+	} {
+		file := mustResolveDoc(t, layers, ref)
+		if file.Content != content || file.Directory {
+			t.Errorf("%s: %+v", ref, file)
+		}
+	}
+
+	// Außerhalb von instructions/ bleibt es unsupported, auch mit „/“ am Ende.
+	expectDocError(t, layers, "k-playbook:/rules/", DocCodeUnsupported)
+}
+
+// Die Prüfung der Liste liest nichts: auch eine Quelle, die bei jedem Zugriff
+// scheitert, ergibt invalid_input statt eines Umgebungsfehlers.
+func TestDocRefListePrueftOhneZuLesen(t *testing.T) {
+	layers := DocLayers{Dist: failingDocSource{}, Local: failingDocSource{}}
+	expectDocError(t, layers, "k-playbook:/instructions/on-demand/", DocCodeInvalidInput)
 }
 
 func TestDocRefNichtUnterstuetzt(t *testing.T) {

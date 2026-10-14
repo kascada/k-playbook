@@ -38,18 +38,32 @@ const (
 // docInstructionsRoot ist der einzige Bereich, den die Auflösung heute kennt.
 const docInstructionsRoot = "instructions"
 
+// docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
+// zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
+// Ende. Jedes andere Verzeichnis wird nur einzeln mit Dateinamen gelesen; ein
+// Verweis darauf mit „/" am Ende ist unvollständig (invalid_input). Die Liste
+// ist ein Wert im Code, keine Konfiguration: ein neuer Eintrag ist eine
+// Vertragsänderung (docs/verweisschema.md).
+var docAssembledDirs = []string{
+	docInstructionsRoot + "/always",
+}
+
 // Die Fehlercodes der Auflösung. Die Hüllen — MCP und Subkommando — melden sie
 // unverändert; alles ohne Code ist die Umgebung (read_failed).
 const (
 	// DocCodeInvalidInput: der Verweis ist kein gültiger Verweis im Schema —
-	// kein Präfix, kein „/" danach, ein leeres, verstecktes oder ..-Segment.
+	// kein Präfix, kein „/" danach, ein leeres, verstecktes oder ..-Segment —
+	// oder er ist unvollständig: ein Verzeichnis-Verweis (mit „/" am Ende) auf
+	// ein Verzeichnis, das nicht in docAssembledDirs steht. Dort fehlt der
+	// Dateiname; entschieden wird das, ohne zu lesen.
 	DocCodeInvalidInput = "invalid_input"
 	// DocCodeUnsupported: der Verweis ist gültig, wird vom Werkzeug aber noch
 	// nicht aufgelöst — project:, keph: und k-playbook: außerhalb von
 	// instructions/.
 	DocCodeUnsupported = "unsupported"
-	// DocCodeNotFound: es gibt ihn weder lokal noch mitgeliefert. Kein
-	// Rückfall auf die Platte.
+	// DocCodeNotFound: der Verweis ist vollständig — eine Datei oder ein
+	// zusammengebautes Verzeichnis —, aber es gibt ihn weder lokal noch
+	// mitgeliefert. Kein Rückfall auf die Platte.
 	DocCodeNotFound = "not_found"
 )
 
@@ -313,9 +327,62 @@ func ResolveDocRef(layers DocLayers, raw string) (DocResult, error) {
 			"%s: k-playbook löst heute nur Verweise unter k-playbook:/%s/ auf", ref.Raw, docInstructionsRoot)
 	}
 	if ref.Dir {
+		if !isAssembledDocDir(ref.Path) {
+			return DocResult{}, missingDocFileName(ref)
+		}
 		return resolveDocDir(layers, ref)
 	}
 	return resolveDocFile(layers, ref)
+}
+
+// isAssembledDocDir meldet, ob ein Verzeichnis in docAssembledDirs steht.
+func isAssembledDocDir(dir string) bool {
+	for _, assembled := range docAssembledDirs {
+		if dir == assembled {
+			return true
+		}
+	}
+	return false
+}
+
+// missingDocFileName ist der Fehler für einen Verzeichnis-Verweis außerhalb
+// von docAssembledDirs: es fehlt der Dateiname. Das Beispiel passt zum Fall —
+// eine Datei mit „/" am Ende, ein Pfad unter einer Datei, die Wurzel
+// instructions/ oder ein gewöhnliches Verzeichnis.
+func missingDocFileName(ref DocRef) error {
+	segments := strings.Split(ref.Path, "/")
+	assembled := assembledDocDirsText()
+	for i, segment := range segments {
+		if !strings.HasSuffix(segment, ".md") {
+			continue
+		}
+		file := DocRef{Scheme: ref.Scheme, Path: strings.Join(segments[:i+1], "/")}.String()
+		if i == len(segments)-1 {
+			return docRefErrorf(DocCodeInvalidInput,
+				"%s: Dateiname fehlt — %s ist ein Dateiname, kein Verzeichnis; ohne „/“ am Ende: %s",
+				ref.Raw, segment, file)
+		}
+		return docRefErrorf(DocCodeInvalidInput,
+			"%s: Dateiname fehlt — unter der Datei %s liegt kein Verzeichnis; gemeint ist etwa %s",
+			ref.Raw, segment, file)
+	}
+	if ref.Path == docInstructionsRoot {
+		return docRefErrorf(DocCodeInvalidInput,
+			"%s: Dateiname fehlt — %s/ wird nicht zusammengebaut; gemeint ist etwa %s:/%s/on-demand/<name>.md, zusammengebaut wird nur %s",
+			ref.Raw, ref.Path, ref.Scheme, docInstructionsRoot, assembled)
+	}
+	return docRefErrorf(DocCodeInvalidInput,
+		"%s: Dateiname fehlt — %s/ wird nicht zusammengebaut; gemeint ist etwa %s:/%s/<name>.md, zusammengebaut wird nur %s",
+		ref.Raw, ref.Path, ref.Scheme, ref.Path, assembled)
+}
+
+// assembledDocDirsText nennt die zusammengebauten Verzeichnisse als Verweise.
+func assembledDocDirsText() string {
+	refs := make([]string, 0, len(docAssembledDirs))
+	for _, dir := range docAssembledDirs {
+		refs = append(refs, DocSchemeKPlaybook+":/"+dir+"/")
+	}
+	return strings.Join(refs, ", ")
 }
 
 // resolveDocFile liefert eine Einzeldatei: lokal vor mitgeliefert, Inhalt
@@ -382,7 +449,8 @@ type docDirPart struct {
 	content []byte
 }
 
-// resolveDocDir baut ein Verzeichnis aus beiden Ebenen zusammen: nur Dateien
+// resolveDocDir baut ein Verzeichnis aus docAssembledDirs aus beiden Ebenen
+// zusammen (geprüft hat das ResolveDocRef): nur Dateien
 // mit Ziffer vorn, ohne Unterverzeichnisse und README.md, gleichnamig lokal
 // ersetzt mitgeliefert, leer lokal schaltet ab, numerisch sortiert, ohne
 // Frontmatter zusammengefügt.

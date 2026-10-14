@@ -348,7 +348,7 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
-| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text; today only `k-playbook:/instructions/…` |
+| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves only `k-playbook:/instructions/…` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -768,9 +768,9 @@ Error codes, in the envelope's `error.code` like the knowledge tools:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; or names a directory without the trailing `/` |
+| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` under `instructions/` but names no assembled directory (today only `instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, an unknown directory, a file with a trailing `/` |
 | `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/` |
-| `not_found` | neither layer has the file or directory; there is no fallback to reading anywhere else |
+| `not_found` | neither layer has the file or the assembled directory; there is no fallback to reading anywhere else |
 | `project_not_found` | `projectDir` leads to no project |
 | `read_failed` | the source could not be read |
 

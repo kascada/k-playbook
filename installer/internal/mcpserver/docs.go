@@ -19,7 +19,7 @@ const docToolRead = "k_playbook_doc_read"
 // optional im Schema, geprüft in checkProjectDir.
 type docReadInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
-	Ref        string `json:"ref" jsonschema:"Pflicht. Der Verweis im Präfixschema, so wie er im Text steht, etwa k-playbook:/instructions/on-demand/thema.md für eine Datei oder k-playbook:/instructions/always/ (mit / am Ende) für ein zusammengebautes Verzeichnis. Aufgelöst werden heute nur k-playbook:-Verweise unter instructions/; project: und keph: werden als unsupported gemeldet."`
+	Ref        string `json:"ref" jsonschema:"Pflicht. Der Verweis im Präfixschema, so wie er im Text steht, etwa k-playbook:/instructions/on-demand/thema.md für eine Datei oder k-playbook:/instructions/always/ (mit / am Ende) für das zusammengebaute Verzeichnis — das einzige; jeder andere Verweis mit / am Ende, etwa k-playbook:/instructions/on-demand/, ist invalid_input, weil der Dateiname fehlt. Aufgelöst werden heute nur k-playbook:-Verweise unter instructions/; project: und keph: werden als unsupported gemeldet."`
 }
 
 // docEnvelope ist die Antwortform von k_playbook_doc_read. Die Felder der
@@ -44,8 +44,9 @@ func addDocTools(server *mcp.Server) {
 		Name: docToolRead,
 		Description: "Liest, was hinter einem k-playbook:-Verweis steht — lokal und mitgeliefert schon gegeneinander " +
 			"aufgelöst: eine lokale Datei ersetzt die gleichnamige mitgelieferte, eine leere schaltet sie ab. " +
-			"Eine Datei kommt unverändert mit Frontmatter; ein Verweis mit / am Ende baut das Verzeichnis zu einem " +
-			"Text zusammen (Teile mit Ziffer vorn, numerisch sortiert, ohne Frontmatter). Die Antwort trägt content, " +
+			"Eine Datei kommt unverändert mit Frontmatter; k-playbook:/instructions/always/ (mit / am Ende) baut das " +
+			"Verzeichnis zu einem Text zusammen (Teile mit Ziffer vorn, numerisch sortiert, ohne Frontmatter) — andere " +
+			"Verzeichnisse liest du einzeln mit Dateinamen, mit / am Ende sind sie invalid_input. Die Antwort trägt content, " +
 			"disabled (abgeschaltete Datei: leer, kein Fehler, mit hint), parts (name, origin, disabled) und problems " +
 			"(übergangene Dateien). Ein unbekannter Verweis ist ein Fehler (not_found) — dann nicht selbst auf der " +
 			"Platte suchen. Hülle über `k-playbook read`.",

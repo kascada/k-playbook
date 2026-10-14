@@ -13,7 +13,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
 | `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/xyz.md` |
-| `k-playbook:` with a trailing `/` | a directory, assembled into one text | `k-playbook:/instructions/always/` |
+| `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/manual/abc.md` |
 
 More examples:
@@ -26,9 +26,12 @@ More examples:
 
 - **After the prefix there is always a `/`.** The path runs from the root of the space the
   prefix names: the project root, the k-playbook space, the project's collection.
-- **A reference ending in `/` means a directory.** Only `k-playbook:` knows directories; the
-  reader gets all files in it as one text, in the fixed order (see
-  [Assembling a directory](#assembling-a-directory)).
+- **A reference ending in `/` means a directory.** Only `k-playbook:` knows directories, and
+  only those on a fixed list are assembled -- today only `k-playbook:/instructions/always/`.
+  The reader gets all files in it as one text, in the fixed order (see
+  [Assembling a directory](#assembling-a-directory)). Every other directory, such as
+  `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a
+  reference to it ending in `/` lacks the file name and is an error (`invalid_input`).
 - **`k-playbook:` is read only through k-playbook**, never directly from `k-playbook/` or
   `k-playbook-local/`. k-playbook decides whether a local version replaces or disables the
   shipped one; whoever looks on disk can pick the wrong version.
@@ -93,7 +96,14 @@ supported" (code `unsupported`). That limits the tool, not the reference: a `pro
 `keph:` reference is valid and is read on its route above. A `k-playbook:` path outside
 `instructions/` is refused as `unsupported` as well -- `k-playbook:/rules/befunde.md` is a valid
 reference whose kind is simply not resolved yet. Paths with `..`, `.`, hidden or empty
-segments are not references at all (`invalid_input`). An unknown reference is `not_found`.
+segments are not references at all (`invalid_input`). A `k-playbook:/instructions/…`
+reference ending in `/` whose directory is not on the list of assembled directories is
+incomplete -- the file name is missing -- and also `invalid_input`, decided without reading:
+`k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, an unknown directory and a
+file with a trailing `/` (`…/010-verweise.md/`). The message says "Dateiname fehlt" and gives
+an example that fits the case. Outside `instructions/` the check for `unsupported` comes
+first, so `k-playbook:/rules/` stays `unsupported`. An unknown reference -- a file, or an
+assembled directory that neither layer has -- is `not_found`.
 Other kinds (`rules`, `reviews`, `guidelines`) follow with the briefing (task 086). The tool's
 full answer and error codes are in [mcp.md](mcp.md#doc-read-contract).
 
@@ -123,7 +133,12 @@ layer. Today the source is the disk; later it can be Kephalaion without the call
 
 ### Assembling a directory
 
-Only for `k-playbook:` references that end in `/`:
+Only for `k-playbook:` references that end in `/` and name a directory on the list of
+assembled directories -- today only `instructions/always/`. The list is a value in code
+(`docAssembledDirs` in `installer/internal/project/docref.go`), not configuration; a new entry
+is a contract change and comes with its own task. Any other reference ending in `/` is
+refused as `invalid_input` (see [Access Route per Prefix](#access-route-per-prefix)). For the
+directories on the list:
 
 - All files of the directory from both layers, without subdirectories and without
   `README.md`.

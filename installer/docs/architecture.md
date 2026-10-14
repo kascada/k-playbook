@@ -114,7 +114,9 @@ als Rauchtest nach einem Release folgenlos bleibt.
 `read <verweis> [--json]` löst einen Verweis im Präfixschema auf
 ([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
 steht — heute nur `k-playbook:`-Verweise unter `instructions/`, lokal vor mitgeliefert, ein
-Verweis mit `/` am Ende zu einem Text zusammengebaut. Ohne `--json` steht auf stdout nur der
+Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
+`instructions/always/`) zu einem Text zusammengebaut; jeder andere mit `/` am Ende ist
+`invalid_input` („Dateiname fehlt“). Ohne `--json` steht auf stdout nur der
 Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-Werkzeug
 `k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
 (`project/docref.go`).
@@ -870,7 +872,8 @@ Gelesen wird sie nur über Verweise, `k-playbook read` bzw. `k_playbook_doc_read
 `project/docref.go` nach der Regel der Kataloge: gleicher Name gewinnt lokal, leer lokal
 schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Verweis auf
 `always/` baut die Teile mit Ziffer vorn zu einem Text zusammen, numerisch sortiert über beide
-Ebenen. Die mitgelieferte Ebene ist die oberste Ebene der Installation, nicht `defaults/`;
+Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `always/` —
+`on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferte Ebene ist die oberste Ebene der Installation, nicht `defaults/`;
 `defaults/instructions/` ist die Kopie für den Hub, ihr Gleichstand mit `instructions/` ist
 per Test gesichert (`project/instructions_tree_test.go`). Wie `always/` zu `k-playbook.md`
 steht, entscheidet Task 086. Regeln und Zugriffswege:
