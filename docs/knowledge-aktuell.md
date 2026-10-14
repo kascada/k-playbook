@@ -161,6 +161,40 @@ an unknown reference is `not_found` with no fallback to the disk; `project:`, `k
 `k-playbook:` kinds are `unsupported` for now. The `ref` in the prefix scheme is the lasting
 contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract).
 
+**A user area in the project's collection** (2026-10-14, not built). Per person there is
+`user/<name>/<kind>/`, for now with `tasks/` and `workbench/`. The tasks are public to everyone
+in the project, but a session lists only its own by default; that is a view k-playbook
+provides, not a right. One directory per person needs one Kephalaion scope (`dir user/<name>/`)
+should writing ever be limited to one's own area, instead of one scope per kind. `<name>` is the
+Kephalaion **user** (`kephalaion.user`), not the account: the account belongs to one machine,
+so the same person on two machines would otherwise get two directories. In shipped text the
+segment `~` stands for the own user (`keph:/user/~/tasks/`); see
+[`verweisschema.md`](./verweisschema.md#placeholder--for-the-own-user).
+
+**Findings go to `queue/findings/`** (2026-10-14, not built). What sessions find no longer
+lands in `material/befunde/` but as a queue entry of its own in the collection; a scheduled run
+takes the entries over into the knowledge store once the cron function exists. Two things
+differ from today's queue (`docs/knowledge-layout.md`): `queue_list` reads only the top level
+and skips subdirectories (`installer/internal/project/knowledge_queue.go:165`), and a queue entry
+today only points at a raw piece in the inbox. A finding in the queue carries its content
+itself, so after the takeover it is gone and `sources` has nothing left to point at, unless the
+run moves it to the inbox first.
+
+**Creating a named document** (2026-10-14, not built). One procedure for tasks, findings and
+whatever needs it later: the caller passes the intended short name, k-playbook normalises it
+(lower case, hyphens), takes the highest number in the counting range plus one and creates
+`<number>-<name>.md` through Kephalaion's `create`. That call goes through the hub and answers
+`name_taken` for a live document of the same name, and then the next number is tried. **Only the
+whole file name has to be unique, not the number;** two documents with the same number and
+different names are accepted. The answer is the `keph:` reference with the real user name, and
+the session reads and writes the document directly over Kephalaion.
+
+| Kind | Stored in | Counting range |
+|---|---|---|
+| tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide |
+| findings | `queue/findings/` | the directory itself |
+| workbench | `user/<name>/workbench/` | open |
+
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
 by document, with `create`/`write` into the collection, rather than replacing whole
 directories through a staging directory and `push`. Who removes stale documents is decided
@@ -179,11 +213,25 @@ when that step is built.
   extracted/                                              /k-docs-extract
   findings/                                               befunde, /k-danke
   pitfalls/
+  queue/
+    findings/          outstanding findings, numbered     (2026-10-14)
+  user/
+    <name>/            one directory per person           (2026-10-14)
+      tasks/           numbered project-wide, done/
+      workbench/       current state of work
 ```
 
 The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
 
 ## Open
+
+**The workbench** (2026-10-14). Meant for the current state of work: where one stands, what
+is open, what comes next. Unlike a task it is no assignment, and unlike a finding it carries
+no proof. Today such things end up in findings or in assistant memory; this file is itself an
+example. Proposed: one file per topic, numbered, overwritten rather than appended, with
+frontmatter `title` and `status` so that the briefing can show the titles of one's own active
+topics. Undecided: how a finished topic ends — moved to `done/`, resolved (confirmed parts as
+findings, open parts as tasks, file deleted), or both.
 
 **How commands and skills are read once the local files are gone.** Claude Code, OpenCode and
 Cursor find commands and skills only as files on disk, and checks and scripts must run.
