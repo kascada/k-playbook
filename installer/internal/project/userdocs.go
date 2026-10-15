@@ -90,9 +90,16 @@ func DocKindNames(kinds []DocKind) []string {
 // Die Fehlercodes der doc-Werkzeuge über die der Verweise hinaus
 // (DocCodeInvalidInput, DocCodeNotFound).
 const (
-	// DocCodeKephalaionUnavailable: Die Anbindung ist nicht ok, oder der Node
-	// ist nicht erreichbar. Es gibt keinen Rückfall auf die Platte.
+	// DocCodeKephalaionUnavailable: Beim Hub ist nichts angekommen — die
+	// Anbindung ist nicht ok, der Node nicht erreichbar oder zu alt
+	// (kephalaion.MinWriteNodeVersion), oder der Node meldet unreachable,
+	// unsupported oder internal. Es gibt keinen Rückfall auf die Platte.
 	DocCodeKephalaionUnavailable = "kephalaion_unavailable"
+	// DocCodeOutcomeUnknown: Anlegen oder Verschieben kann beim Hub
+	// angekommen sein, auch die Wiederholung mit demselben request_id hat den
+	// Ausgang nicht geklärt. Nicht wiederholen, sondern mit doc list
+	// nachsehen.
+	DocCodeOutcomeUnknown = "outcome_unknown"
 	// DocCodeForeignUser: Der Verweis liegt im Userbereich eines anderen.
 	DocCodeForeignUser = "foreign_user"
 	// DocCodeDoneUnsupported: Die Sorte hat kein done/.
@@ -234,7 +241,10 @@ func (k DocKind) match(name string) (docMatch, bool) {
 }
 
 // DocStore sind die Aufrufe an Kephalaion, die die doc-Werkzeuge brauchen.
-// *kephalaion.Client erfüllt sie; Tests setzen eine Fälschung ein.
+// *kephalaion.Client erfüllt sie; Tests setzen eine Fälschung ein. Create
+// und Rename tragen je Aufruf einen eigenen request_id und wiederholen nach
+// offenem Ausgang selbst, genau einmal mit demselben Schlüssel; was dann noch
+// offen ist, kommt als kephalaion.CodeOutcomeUnknown.
 type DocStore interface {
 	List(ctx context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error)
 	Create(ctx context.Context, name, content string) (kephalaion.Document, error)
@@ -298,20 +308,28 @@ func (u *UserDocs) kind(name string) (DocKind, error) {
 }
 
 // kephError übersetzt einen Fehler von Kephalaion in einen Code der
-// doc-Werkzeuge.
+// doc-Werkzeuge. kephalaion_unavailable heißt: Beim Hub ist nichts
+// angekommen. Ein offener Ausgang wird outcome_unknown, nie
+// kephalaion_unavailable.
 func kephError(err error) error {
-	switch kephalaion.ErrorCode(err) {
+	code := kephalaion.ErrorCode(err)
+	switch code {
 	case kephalaion.CodeNodeUnreachable:
 		return &DocRefError{Code: DocCodeKephalaionUnavailable, err: err}
+	case kephalaion.CodeUnreachable, kephalaion.CodeUnsupported, kephalaion.CodeInternal:
+		return &DocRefError{Code: DocCodeKephalaionUnavailable,
+			err: fmt.Errorf("%w (Code von Kephalaion: %s; nichts gespeichert)", err, code)}
+	case kephalaion.CodeOutcomeUnknown:
+		return &DocRefError{Code: DocCodeOutcomeUnknown, err: fmt.Errorf(
+			"%w Nachsehen mit k_playbook_doc_list bzw. k-playbook doc list, ob der Vorgang geschehen ist; nicht noch einmal anlegen oder verschieben", err)}
 	case kephalaion.CodeNameTaken:
 		return &DocRefError{Code: DocCodeNameTaken, err: err}
 	case kephalaion.CodeNotFound:
 		return &DocRefError{Code: DocCodeNotFound, err: err}
+	case "":
+		return &DocRefError{Code: DocCodeKephalaionError, err: err}
 	}
-	if code := kephalaion.ErrorCode(err); code != "" {
-		return &DocRefError{Code: DocCodeKephalaionError, err: fmt.Errorf("%w (Code von Kephalaion: %s)", err, code)}
-	}
-	return &DocRefError{Code: DocCodeKephalaionError, err: err}
+	return &DocRefError{Code: DocCodeKephalaionError, err: fmt.Errorf("%w (Code von Kephalaion: %s)", err, code)}
 }
 
 // NormalizeDocName macht aus dem Kurznamen des Aufrufers den Namensteil
@@ -427,7 +445,10 @@ type DocCreated struct {
 
 // Create legt ein leeres Dokument der Sorte mit der nächsten Nummer an. Ist
 // der Name belegt (name_taken), versucht es die nächste Nummer, bis zu
-// docCreateAttempts Mal.
+// docCreateAttempts Mal; jede Nummer ist ein eigener Aufruf von
+// DocStore.Create und bekommt damit einen eigenen request_id. Jeder andere
+// Fehler beendet die Schleife — ein offener Ausgang (outcome_unknown) zieht
+// nie die nächste Nummer, denn das erste Dokument kann schon angelegt sein.
 func (u *UserDocs) Create(ctx context.Context, kindName, shortName string) (DocCreated, error) {
 	kind, err := u.kind(kindName)
 	if err != nil {

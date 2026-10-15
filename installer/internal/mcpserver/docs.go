@@ -174,8 +174,11 @@ func addUserDocTools(server *mcp.Server) {
 			"des Projekts an: Nummer = höchste im Zählbereich plus eins, mindestens die Startnummer der Sorte, " +
 			"dreistellig; bei name_taken die nächste. Antwort: ref (keph:-Verweis mit echtem Usernamen, bei Sorten " +
 			"ohne Userbereich ohne User), kind, number, name, user. Den Inhalt schreibst du danach direkt über " +
-			"Kephalaion (write mit collection = kephalaion.address). Ohne bereite Anbindung: kephalaion_unavailable, " +
-			"kein Rückfall auf die Platte. Hülle über `k-playbook doc create`.",
+			"Kephalaion (write mit collection = kephalaion.address). kephalaion_unavailable heißt: beim Hub ist nichts " +
+			"angekommen (Anbindung nicht bereit, Node nicht erreichbar oder älter als v0.3.1 — dann `kephalaion " +
+			"upgrade`), kein Rückfall auf die Platte. Jeder Aufruf trägt einen eigenen request_id und wird nach offenem " +
+			"Ausgang einmal mit demselben Schlüssel wiederholt; bleibt er offen: outcome_unknown — dann nicht noch " +
+			"einmal aufrufen, sondern mit k_playbook_doc_list nachsehen. Hülle über `k-playbook doc create`.",
 	}, docCreateTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolList,
@@ -193,8 +196,9 @@ func addUserDocTools(server *mcp.Server) {
 		Description: "Verschiebt ein eigenes Dokument aus seiner Ablage nach done/ (Kephalaion rename über den Hub, " +
 			"die id bleibt). ref ist ein keph:-Verweis, ~ steht für den eigenen User. Abgelehnt: fremder User " +
 			"(foreign_user), Sorte ohne done/ (done_unsupported), Dokument schon in done/ oder in keiner Ablage " +
-			"(wrong_dir); belegtes Ziel: name_taken, nichts überschrieben. Antwort: ref (neu, mit echtem Namen), " +
-			"from, kind. Hülle über `k-playbook doc done`.",
+			"(wrong_dir); belegtes Ziel: name_taken, nichts überschrieben. kephalaion_unavailable und outcome_unknown " +
+			"wie bei k_playbook_doc_create: bei outcome_unknown nicht wiederholen, sondern mit k_playbook_doc_list " +
+			"(done: true) nachsehen. Antwort: ref (neu, mit echtem Namen), from, kind. Hülle über `k-playbook doc done`.",
 	}, docDoneTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolReopen,

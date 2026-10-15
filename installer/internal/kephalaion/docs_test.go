@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -20,12 +21,50 @@ type toolCall struct {
 	Header http.Header
 }
 
-// newToolNode ist ein gefälschter Node wie newFakeNode, der aber den Rumpf
-// von tools/call liest: reply bekommt Werkzeug und Argumente und liefert
-// isError und structuredContent.
-func newToolNode(t *testing.T, reply func(call toolCall) (isError bool, structured string, text string)) (*httptest.Server, *[]toolCall) {
+// toolNode ist ein gefälschter Node wie newFakeNode, der aber den Rumpf von
+// tools/call liest. whoami beantwortet er selbst mit version; jeden anderen
+// Aufruf hält er in calls fest und gibt ihn an raw oder reply.
+type toolNode struct {
+	mu sync.Mutex
+	// calls sind die Aufrufe außer whoami, inits die Zahl der initialize.
+	calls []toolCall
+	inits int
+	// version nennt whoami als Version des Nodes; Vorgabe MinWriteNodeVersion.
+	version string
+	// failInit lässt das n-te initialize (ab 1) mit HTTP 500 scheitern.
+	failInit func(n int) bool
+	// raw beantwortet den n-ten Aufruf (ab 1) selbst, wenn es wahr liefert.
+	raw func(n int, call toolCall, w http.ResponseWriter, r *http.Request) bool
+	// reply liefert isError, structuredContent und Text eines Aufrufs.
+	reply func(call toolCall) (isError bool, structured string, text string)
+}
+
+// recorded liefert eine Kopie der festgehaltenen Aufrufe.
+func (n *toolNode) recorded() []toolCall {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return append([]toolCall{}, n.calls...)
+}
+
+func (n *toolNode) initCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.inits
+}
+
+// writeToolResult schreibt die Antwort auf einen tools/call.
+func writeToolResult(w http.ResponseWriter, id int, isError bool, structured, text string) {
+	textJSON, _ := json.Marshal(text)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"isError":%v,"content":[{"type":"text","text":%s}]`, id, isError, textJSON)
+	if structured != "" {
+		fmt.Fprintf(w, `,"structuredContent":%s`, structured)
+	}
+	io.WriteString(w, "}}")
+}
+
+func startToolNode(t *testing.T, node *toolNode) *httptest.Server {
 	t.Helper()
-	var calls []toolCall
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, _ := io.ReadAll(r.Body)
 		var msg struct {
@@ -39,27 +78,52 @@ func newToolNode(t *testing.T, reply func(call toolCall) (isError bool, structur
 		_ = json.Unmarshal(data, &msg)
 		switch msg.Method {
 		case "initialize":
+			node.mu.Lock()
+			node.inits++
+			n := node.inits
+			node.mu.Unlock()
+			if node.failInit != nil && node.failInit(n) {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"kephalaion","version":"v0.3.0"}}}`, *msg.ID)
+			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"kephalaion","version":"v0.3.1"}}}`, *msg.ID)
 		case "notifications/initialized":
 			w.WriteHeader(http.StatusAccepted)
 		case "tools/call":
 			call := toolCall{Name: msg.Params.Name, Args: msg.Params.Arguments, Header: r.Header.Clone()}
-			calls = append(calls, call)
-			isError, structured, text := reply(call)
-			textJSON, _ := json.Marshal(text)
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"isError":%v,"content":[{"type":"text","text":%s}]`, *msg.ID, isError, textJSON)
-			if structured != "" {
-				fmt.Fprintf(w, `,"structuredContent":%s`, structured)
+			if call.Name == "whoami" {
+				version := node.version
+				if version == "" {
+					version = MinWriteNodeVersion
+				}
+				versionJSON, _ := json.Marshal(version)
+				writeToolResult(w, *msg.ID, false, `{"version":`+string(versionJSON)+`,"hubs":[],"unknown_hubs":[]}`, "kephalaion "+version)
+				return
 			}
-			io.WriteString(w, "}}")
+			node.mu.Lock()
+			node.calls = append(node.calls, call)
+			n := len(node.calls)
+			node.mu.Unlock()
+			if node.raw != nil && node.raw(n, call, w, r) {
+				return
+			}
+			isError, structured, text := node.reply(call)
+			writeToolResult(w, *msg.ID, isError, structured, text)
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	}))
 	t.Cleanup(server.Close)
-	return server, &calls
+	return server
+}
+
+// newToolNode startet einen toolNode, der jeden Aufruf mit reply beantwortet.
+// Die Aufrufe liest der Test erst, wenn alle beantwortet sind.
+func newToolNode(t *testing.T, reply func(call toolCall) (isError bool, structured string, text string)) (*httptest.Server, *[]toolCall) {
+	t.Helper()
+	node := &toolNode{reply: reply}
+	return startToolNode(t, node), &node.calls
 }
 
 func newTestClient(t *testing.T, endpoint string) *Client {

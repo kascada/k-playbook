@@ -420,6 +420,68 @@ func TestDocKephalaionNichtErreichbar(t *testing.T) {
 	}
 }
 
+func TestKephErrorJeCode(t *testing.T) {
+	cases := map[string]string{
+		kephalaion.CodeNodeUnreachable: DocCodeKephalaionUnavailable,
+		kephalaion.CodeUnreachable:     DocCodeKephalaionUnavailable,
+		kephalaion.CodeUnsupported:     DocCodeKephalaionUnavailable,
+		kephalaion.CodeInternal:        DocCodeKephalaionUnavailable,
+		kephalaion.CodeOutcomeUnknown:  DocCodeOutcomeUnknown,
+		kephalaion.CodeNameTaken:       DocCodeNameTaken,
+		kephalaion.CodeNotFound:        DocCodeNotFound,
+		"forbidden":                    DocCodeKephalaionError,
+		"":                             DocCodeKephalaionError,
+	}
+	for code, want := range cases {
+		err := kephError(&kephalaion.ToolError{Tool: "create", Code: code, Message: "Meldung"})
+		if got := DocRefErrorCode(err); got != want {
+			t.Errorf("%q: erwartet %s, bekommen %s (%v)", code, want, got, err)
+		}
+		if !strings.Contains(err.Error(), "Meldung") {
+			t.Errorf("%q: Meldung verloren: %v", code, err)
+		}
+	}
+	err := kephError(&kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeOutcomeUnknown, Message: "Ausgang offen"})
+	if !strings.Contains(err.Error(), "k_playbook_doc_list") {
+		t.Fatalf("outcome_unknown ohne Hinweis zum Nachsehen: %v", err)
+	}
+	err = kephError(&kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeUnsupported, Message: "Hub zu alt"})
+	if !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("Node-Code fehlt in der Meldung: %v", err)
+	}
+}
+
+func TestDocCreateOffenerAusgangZiehtKeineNeueNummer(t *testing.T) {
+	store := newFakeDocStore("kamran")
+	store.createFail = &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeOutcomeUnknown, Message: "Ausgang offen"}
+	docs := newTestUserDocs(t, store, DocKinds)
+	_, err := docs.Create(context.Background(), "tasks", "a")
+	wantCode(t, err, DocCodeOutcomeUnknown)
+	if len(store.creates) != 1 {
+		t.Fatalf("nach offenem Ausgang weitere Nummern versucht: %v", store.creates)
+	}
+
+	// Node-Codes, bei denen nichts gespeichert ist: kephalaion_unavailable,
+	// ebenfalls ohne nächste Nummer.
+	store = newFakeDocStore("kamran")
+	store.createFail = &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeUnreachable, Message: "Hub nicht erreicht"}
+	_, err = newTestUserDocs(t, store, DocKinds).Create(context.Background(), "tasks", "a")
+	wantCode(t, err, DocCodeKephalaionUnavailable)
+	if len(store.creates) != 1 {
+		t.Fatalf("nach unreachable weitere Nummern versucht: %v", store.creates)
+	}
+}
+
+func TestDocDoneOffenerAusgang(t *testing.T) {
+	store := newFakeDocStore("kamran", "user/kamran/tasks/100-a.md")
+	store.fail = &kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeOutcomeUnknown, Message: "Ausgang offen"}
+	_, err := newTestUserDocs(t, store, DocKinds).Done(context.Background(), "keph:/user/~/tasks/100-a.md")
+	wantCode(t, err, DocCodeOutcomeUnknown)
+	if len(store.renames) != 1 {
+		t.Fatalf("rename mehrfach: %v", store.renames)
+	}
+}
+
 func TestOpenUserDocsOhneAnbindung(t *testing.T) {
 	original := kephalaionCheck
 	kephalaionCheck = func(string) kephalaion.Status {

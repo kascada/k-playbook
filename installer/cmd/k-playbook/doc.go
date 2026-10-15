@@ -188,8 +188,14 @@ Sorten: %s.
   reopen  Holt es aus done/ zurück.
 
 Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
-eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok). Den
-Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe wie die
-MCP-Werkzeuge k_playbook_doc_create, _list, _done und _reopen.
+eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok) und für
+create, done und reopen ein Node ab v0.3.1. Den Inhalt liest und schreibt man
+direkt über Kephalaion. Dasselbe wie die MCP-Werkzeuge k_playbook_doc_create,
+_list, _done und _reopen.
+
+Fehlercodes stehen in Klammern am Ende der Meldung. kephalaion_unavailable:
+beim Hub ist nichts angekommen. outcome_unknown: create, done oder reopen kann
+beim Hub angekommen sein, auch nach der Wiederholung mit demselben Schlüssel —
+nicht noch einmal aufrufen, sondern mit doc list nachsehen.
 `, kinds)
 }

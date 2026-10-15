@@ -829,6 +829,23 @@ user area is rejected. Directories come into being in Kephalaion with their firs
   overwritten.
 - Without a ready binding (`kephalaion.ok` is not true) all four answer
   `kephalaion_unavailable`. There is no fallback to the disk.
+- `create`, `done` and `reopen` need a Kephalaion node of at least **v0.3.1**. Before the
+  first attempt k-playbook asks the node for its version (`whoami`); an older node yields
+  `kephalaion_unavailable` with "Node <version> zu alt für Schreibvorgänge, mindestens
+  v0.3.1 — `kephalaion upgrade`", and nothing is sent. A version that cannot be compared
+  with v0.3.1 (`dev`, a suffix) is let through.
+- **Request key and retry.** Every Kephalaion `create` and `rename` carries its own
+  `request_id`. If the outcome stays open after sending -- transport error, timeout, a
+  broken or unreadable answer, 5xx, or the node's code `outcome_unknown` -- k-playbook sends
+  the same call with the same key and the same fields exactly once more, in a new session
+  with its own time limit. The hub executes a key at most once: if the first attempt had
+  already written, the retry answers `replayed`, which counts as success. A rejection in the
+  retry counts as a rejection; for `create`, `name_taken` then leads to the next number, which
+  gets a **new** key. Any other failure of the retry, or a caller that gave up after sending,
+  ends in `outcome_unknown`. `create` never moves on to the next number while an outcome is
+  open. `list` carries no key and is never retried.
+- After `outcome_unknown` do not call the tool again: look with `k_playbook_doc_list` (for
+  `done`/`reopen` with `done: true`) whether the document was created or moved.
 
 **Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
 
@@ -844,7 +861,8 @@ Error codes in `error.code`:
 |---|---|
 | `invalid_input` | `projectDir` missing; unknown `kind`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
 | `project_not_found` | `projectDir` leads to no project |
-| `kephalaion_unavailable` | the binding is not ready, or the node cannot be reached |
+| `kephalaion_unavailable` | nothing reached the hub: the binding is not ready, the node cannot be reached or is older than v0.3.1, the session could not be opened, or the node reports `unreachable`, `unsupported` or `internal` (nothing stored, nothing sent); never after a `create` or `rename` may have reached the hub |
+| `outcome_unknown` | `create` or `rename` may have reached the hub and the retry with the same key did not settle it; do not call again, look with `k_playbook_doc_list` |
 | `name_taken` | `rename` onto an occupied target; or ten numbers in a row taken on `create` |
 | `not_found` | the document to move does not exist |
 | `foreign_user` | the reference lies in another user's area |

@@ -29,7 +29,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes, its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract. |
-| [`kephalaion-client.md`](./kephalaion-client.md) | The Kephalaion tools k-playbook calls itself (`whoami`, `list`, `create`, `rename`), what it expects of them — `create`/`rename` through the hub, `name_taken`, `list` from the replica and the replica lag measured —, and where the tools themselves are documented. |
+| [`kephalaion-client.md`](./kephalaion-client.md) | The Kephalaion tools k-playbook calls itself (`whoami`, `list`, `create`, `rename`), what it expects of them — `create`/`rename` through the hub, `name_taken`, `list` from the replica and the replica lag measured, `request_id` with one retry, `replayed`, `outcome_unknown` versus `node_unreachable`, minimum node v0.3.1 —, and where the tools themselves are documented. |
 | [`verweisschema.md`](./verweisschema.md) | The reference scheme: one path with a prefix — `project:`, `k-playbook:`, `keph:` —, the access route per prefix, and how k-playbook resolves `k-playbook:` references and assembles directories such as `k-playbook:/instructions/always/`. |
 | [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
 
@@ -76,7 +76,7 @@ questions and the ordered work list.
 - `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
 - `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
-- `Kephalaion client` / `name_taken` / `rename` / `replica lag` -> [`kephalaion-client.md`](./kephalaion-client.md)
+- `Kephalaion client` / `name_taken` / `rename` / `replica lag` / `request_id` / `replayed` / `outcome_unknown` / `kephalaion_unavailable` -> [`kephalaion-client.md`](./kephalaion-client.md)
 - `user area` / `user/<name>/` / `workbench` / `queue/findings/` / `k_playbook_doc_create` / `k_playbook_doc_list` / `k_playbook_doc_done` / `k_playbook_doc_reopen` / `k-playbook doc` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`knowledge-aktuell.md`](./knowledge-aktuell.md)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md)

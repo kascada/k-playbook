@@ -2,9 +2,12 @@ package kephalaion
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -17,11 +20,30 @@ import (
 // list liest die Replica des Nodes; create und rename gehen über den Hub. Ein
 // Fehler eines Werkzeugs kommt als *ToolError mit dem Code von Kephalaion
 // (name_taken, not_found, …) zurück.
+//
+// create und rename tragen je Aufruf einen eigenen request_id (Kephalaion ab
+// v0.3.1, „Wiederholung mit Schlüssel“ in Kephalaions docs/vertrag.md). Bleibt
+// der Ausgang nach dem Abschicken offen, schickt der Client denselben Aufruf
+// mit demselben Schlüssel genau einmal in einer neuen Sitzung noch einmal; der
+// Hub wiederholt einen schon ausgeführten Vorgang nicht, sondern antwortet
+// replayed. Bleibt auch die Wiederholung offen, ist der Fehler
+// CodeOutcomeUnknown. CodeNodeUnreachable heißt dagegen immer: Beim Hub ist
+// nichts angekommen.
 
-// ToolTimeout ist die Zeitgrenze für einen Aufruf von List, Create oder
-// Rename samt Anmeldung. create und rename warten auf den Hub; ein Listing
-// blättert womöglich mehrere Seiten.
+// ToolTimeout ist die Zeitgrenze für einen Aufruf von List oder für einen
+// Versuch von Create oder Rename, jeweils samt Anmeldung. create und rename
+// warten auf den Hub; ein Listing blättert womöglich mehrere Seiten. Eine
+// Wiederholung bekommt ihre eigene Zeitgrenze.
 const ToolTimeout = 15 * time.Second
+
+// toolTimeout ist die Zeitgrenze, mit der gerechnet wird — ToolTimeout, in
+// Tests kürzer.
+var toolTimeout = ToolTimeout
+
+// MinWriteNodeVersion ist die älteste Version des Nodes, die request_id an
+// create und rename annimmt. Ein älterer lehnt den Aufruf laut ab und
+// schreibt nichts.
+const MinWriteNodeVersion = "v0.3.1"
 
 // maxToolResponseBytes begrenzt jede Antwort eines Werkzeugs. Eine Seite von
 // list mit Frontmatter kann groß werden; mehr wird nicht gelesen.
@@ -44,11 +66,31 @@ const (
 	CodeNotFound = "not_found"
 )
 
+// Die Codes der Werkzeuge des Nodes, die schreiben, über die des Vertrags
+// hinaus (write error codes in Kephalaions docs/begriffe.md).
+const (
+	// CodeUnreachable: Der Node hat den Hub nicht erreicht; nichts gespeichert.
+	CodeUnreachable = "unreachable"
+	// CodeUnsupported: Der Hub kennt den Vorgang nicht, oder der Node kann den
+	// Transport nicht; nichts gespeichert.
+	CodeUnsupported = "unsupported"
+	// CodeInternal: ein Fehler des Nodes selbst; nichts abgeschickt.
+	CodeInternal = "internal"
+	// CodeOutcomeUnknown: Der Ausgang ist offen — der Vorgang kann beim Hub
+	// gespeichert sein. Der Node meldet ihn, wenn er abgeschickt, aber keine
+	// brauchbare Antwort bekommen hat; dieses Paket meldet ihn, wenn auch die
+	// Wiederholung mit demselben request_id nichts geklärt hat. Nicht noch
+	// einmal schicken, sondern nachsehen (list).
+	CodeOutcomeUnknown = "outcome_unknown"
+)
+
 // CodeNodeUnreachable ist kein Code von Kephalaion, sondern der dieses
-// Pakets: Der Node war nicht erreichbar, die Antwort nicht lesbar, oder auf
-// diesem Rechner fehlt, was ein Aufruf braucht (Adresse, Token). Nichts ist
-// beim Hub angekommen — außer bei einer Zeitüberschreitung, deren Ausgang
-// offen ist.
+// Pakets: Beim Hub ist nichts angekommen. Der Node war nicht erreichbar, die
+// Sitzung ließ sich nicht öffnen, auf diesem Rechner fehlt, was ein Aufruf
+// braucht (Adresse, Token), oder der Node ist zu alt für create und rename
+// (MinWriteNodeVersion). Nach dem Abschicken von create oder rename entsteht
+// dieser Code nie; dann ist der Ausgang offen (CodeOutcomeUnknown). Bei list
+// steht er auch für eine unlesbare Antwort — list ändert nichts.
 const CodeNodeUnreachable = "node_unreachable"
 
 // ToolError ist der Fehler eines Werkzeugs von Kephalaion oder des Wegs
@@ -108,16 +150,23 @@ type ListRequest struct {
 // Document ist die Antwort von create und rename: das Dokument, wie der Hub
 // es nach dem Vorgang meldet, bei rename unter dem neuen Namen. Note ist ein
 // Hinweis des Nodes zu einem Erfolg (Replica nicht geschrieben).
+//
+// Replayed heißt: Der Vorgang war schon ausgeführt (der erste Versuch hatte
+// den Hub erreicht), diesmal ist nichts geschrieben. Dann stehen nur Name,
+// Revision und IDs da — keine Art, keine Stempel; ID ist gesetzt, wenn IDs
+// genau ein Dokument nennt.
 type Document struct {
-	Kind     string `json:"kind,omitempty"`
-	Address  string `json:"address"`
-	Name     string `json:"name"`
-	ID       string `json:"id,omitempty"`
-	Revision int64  `json:"revision,omitempty"`
-	Created  *Stamp `json:"created,omitempty"`
-	Updated  *Stamp `json:"updated,omitempty"`
-	Size     *int64 `json:"size,omitempty"`
-	Note     string `json:"note,omitempty"`
+	Kind     string   `json:"kind,omitempty"`
+	Address  string   `json:"address"`
+	Name     string   `json:"name"`
+	ID       string   `json:"id,omitempty"`
+	Revision int64    `json:"revision,omitempty"`
+	Created  *Stamp   `json:"created,omitempty"`
+	Updated  *Stamp   `json:"updated,omitempty"`
+	Size     *int64   `json:"size,omitempty"`
+	Note     string   `json:"note,omitempty"`
+	Replayed bool     `json:"replayed,omitempty"`
+	IDs      []string `json:"ids,omitempty"`
 }
 
 // Client ruft Werkzeuge des Nodes für eine Collection auf. Er hält das Token
@@ -158,7 +207,7 @@ func (c *Client) Address() string { return c.address }
 
 // open meldet sich am Node an.
 func (c *Client) open(ctx context.Context, tool string) (*toolSession, error) {
-	session, err := openSession(ctx, newRPC(c.endpoint, maxToolResponseBytes, ToolTimeout), c.candidate, c.token)
+	session, err := openSession(ctx, newRPC(c.endpoint, maxToolResponseBytes, toolTimeout), c.candidate, c.token)
 	if err != nil {
 		return nil, c.transportError(tool, err)
 	}
@@ -170,33 +219,16 @@ func (c *Client) transportError(tool string, err error) error {
 		Message: redact(fmt.Sprintf("Node unter %s: %v", c.endpoint, err), c.token)}
 }
 
-// call ruft ein Werkzeug auf und liest den strukturierten Inhalt nach out.
-// Ein Ergebnis mit isError wird ein *ToolError: mit error.code, wenn die
-// Struktur ihn trägt (create, rename), sonst ohne Code mit dem Text.
+// call ruft ein Werkzeug auf und liest den strukturierten Inhalt nach out —
+// für list, das nichts ändert. Ein Ergebnis mit isError wird ein *ToolError:
+// mit error.code, wenn die Struktur ihn trägt, sonst ohne Code mit dem Text.
 func (c *Client) call(ctx context.Context, session *toolSession, tool string, args map[string]any, out any) error {
 	result, err := session.call(ctx, tool, args)
 	if err != nil {
 		return c.transportError(tool, err)
 	}
 	if result.IsError {
-		toolErr := &ToolError{Tool: tool, Message: result.Text}
-		var failure struct {
-			Error *struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		}
-		if len(result.Structured) > 0 && json.Unmarshal(result.Structured, &failure) == nil && failure.Error != nil {
-			toolErr.Code = failure.Error.Code
-			if failure.Error.Message != "" {
-				toolErr.Message = failure.Error.Message
-			}
-		}
-		if toolErr.Message == "" {
-			toolErr.Message = "Fehler ohne Meldung"
-		}
-		toolErr.Message = redact(toolErr.Message, c.token)
-		return toolErr
+		return c.toolFailure(tool, result)
 	}
 	if len(result.Structured) == 0 {
 		return &ToolError{Tool: tool, Code: CodeNodeUnreachable, Message: "Antwort ohne strukturierten Inhalt"}
@@ -207,11 +239,35 @@ func (c *Client) call(ctx context.Context, session *toolSession, tool string, ar
 	return nil
 }
 
+// toolFailure macht aus einem Ergebnis mit isError einen *ToolError: mit
+// error.code, wenn die Struktur ihn trägt (create, rename), sonst ohne Code
+// mit dem Text.
+func (c *Client) toolFailure(tool string, result toolResult) *ToolError {
+	toolErr := &ToolError{Tool: tool, Message: result.Text}
+	var failure struct {
+		Error *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if len(result.Structured) > 0 && json.Unmarshal(result.Structured, &failure) == nil && failure.Error != nil {
+		toolErr.Code = failure.Error.Code
+		if failure.Error.Message != "" {
+			toolErr.Message = failure.Error.Message
+		}
+	}
+	if toolErr.Message == "" {
+		toolErr.Message = "Fehler ohne Meldung"
+	}
+	toolErr.Message = redact(toolErr.Message, c.token)
+	return toolErr
+}
+
 // List listet die Dokumente unter req.Path aus der Replica des Nodes und
 // blättert dabei alle Seiten durch. Verzeichnisse als Einträge (ohne
 // recursive) werden übergangen.
 func (c *Client) List(ctx context.Context, req ListRequest) ([]Entry, error) {
-	ctx, cancel := context.WithTimeout(ctx, ToolTimeout)
+	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
 	defer cancel()
 	session, err := c.open(ctx, "list")
 	if err != nil {
@@ -256,28 +312,178 @@ func (c *Client) List(ctx context.Context, req ListRequest) ([]Entry, error) {
 }
 
 // Create legt ein Dokument an, über den Hub. Lebt unter dem Namen schon ein
-// Dokument, ist der Fehler ein *ToolError mit CodeNameTaken.
+// Dokument, ist der Fehler ein *ToolError mit CodeNameTaken. Jeder Aufruf
+// trägt einen neuen request_id: Ein zweiter Aufruf ist ein neuer Vorgang,
+// auch mit demselben Namen. Ablauf und Codes wie im Paketkommentar.
 func (c *Client) Create(ctx context.Context, name, content string) (Document, error) {
-	return c.write(ctx, "create", map[string]any{"collection": c.address, "name": name, "content": content})
+	return c.write(ctx, "create", name, map[string]any{"collection": c.address, "name": name, "content": content})
 }
 
 // Rename benennt ein Dokument um, über den Hub; die id bleibt. Ist das Ziel
 // belegt, ist der Fehler ein *ToolError mit CodeNameTaken, und nichts wird
-// überschrieben.
+// überschrieben. request_id und Wiederholung wie bei Create.
 func (c *Client) Rename(ctx context.Context, name, newName string) (Document, error) {
-	return c.write(ctx, "rename", map[string]any{"collection": c.address, "name": name, "new_name": newName})
+	return c.write(ctx, "rename", newName, map[string]any{"collection": c.address, "name": name, "new_name": newName})
 }
 
-func (c *Client) write(ctx context.Context, tool string, args map[string]any) (Document, error) {
-	ctx, cancel := context.WithTimeout(ctx, ToolTimeout)
+// attemptOutcome ist der Ausgang eines Versuchs von create oder rename.
+type attemptOutcome int
+
+const (
+	// attemptDone: Erfolg, auch replayed.
+	attemptDone attemptOutcome = iota
+	// attemptRejected: abgelehnt mit einem Code des Vertrags oder ohne Code;
+	// der Hub hat nichts geschrieben.
+	attemptRejected
+	// attemptNotSent: Beim Hub ist nichts angekommen — die Sitzung ließ sich
+	// nicht öffnen, die Versionsprüfung scheiterte, oder der Node meldet
+	// unreachable, unsupported oder internal.
+	attemptNotSent
+	// attemptOpen: abgeschickt, Ausgang offen.
+	attemptOpen
+)
+
+// write führt create oder rename aus: ein Versuch, nach offenem Ausgang genau
+// eine Wiederholung mit demselben request_id und denselben Feldern in neuer
+// Sitzung, jeder Versuch mit eigener Zeitgrenze. target ist der Name, den das
+// Dokument danach trägt.
+func (c *Client) write(ctx context.Context, tool, target string, args map[string]any) (Document, error) {
+	args["request_id"] = rand.Text()
+	doc, outcome, err := c.attempt(ctx, tool, target, args, true)
+	if outcome != attemptOpen {
+		return doc, err
+	}
+	first := err
+	if ctx.Err() != nil {
+		// Der Aufrufer hat aufgegeben, nachdem der Aufruf abgeschickt war:
+		// keine Wiederholung.
+		return Document{}, c.outcomeUnknown(tool, target, first, "keine Wiederholung, der Aufruf wurde abgebrochen")
+	}
+	doc, outcome, err = c.attempt(ctx, tool, target, args, false)
+	switch outcome {
+	case attemptDone, attemptRejected:
+		return doc, err
+	}
+	return Document{}, c.outcomeUnknown(tool, target, first, "Wiederholung mit demselben request_id: "+errorMessage(err))
+}
+
+// attempt ist ein Versuch von create oder rename in eigener Sitzung mit
+// eigener Zeitgrenze. checkVersion prüft vorher die Version des Nodes; das
+// braucht nur der erste Versuch.
+func (c *Client) attempt(ctx context.Context, tool, target string, args map[string]any, checkVersion bool) (Document, attemptOutcome, error) {
+	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
 	defer cancel()
 	session, err := c.open(ctx, tool)
 	if err != nil {
-		return Document{}, err
+		return Document{}, attemptNotSent, err
+	}
+	if checkVersion {
+		if err := c.checkNodeVersion(ctx, session, tool); err != nil {
+			return Document{}, attemptNotSent, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return Document{}, attemptNotSent, &ToolError{Tool: tool, Code: CodeNodeUnreachable,
+			Message: "abgebrochen, bevor der Aufruf abgeschickt war"}
+	}
+
+	// Ab hier ist der Aufruf abgeschickt: Jeder Fehler, der keine Auskunft
+	// des Nodes ist, lässt den Ausgang offen.
+	open := func(message string) (Document, attemptOutcome, error) {
+		return Document{}, attemptOpen, &ToolError{Tool: tool, Code: CodeOutcomeUnknown, Message: redact(message, c.token)}
+	}
+	result, err := session.call(ctx, tool, args)
+	if err != nil {
+		return open(fmt.Sprintf("Node unter %s: %v", c.endpoint, err))
+	}
+	if result.IsError {
+		toolErr := c.toolFailure(tool, result)
+		switch toolErr.Code {
+		case CodeOutcomeUnknown:
+			return Document{}, attemptOpen, toolErr
+		case CodeUnreachable, CodeUnsupported, CodeInternal:
+			return Document{}, attemptNotSent, toolErr
+		}
+		return Document{}, attemptRejected, toolErr
+	}
+	if len(result.Structured) == 0 {
+		return open("Antwort ohne strukturierten Inhalt")
 	}
 	var doc Document
-	if err := c.call(ctx, session, tool, args, &doc); err != nil {
-		return Document{}, err
+	if err := json.Unmarshal(result.Structured, &doc); err != nil {
+		return open("Antwort nicht lesbar")
 	}
-	return doc, nil
+	if doc.Name == "" {
+		doc.Name = target
+	}
+	if doc.Replayed && doc.ID == "" && len(doc.IDs) == 1 {
+		doc.ID = doc.IDs[0]
+	}
+	return doc, attemptDone, nil
+}
+
+// checkNodeVersion fragt den Node in der offenen Sitzung nach whoami und
+// lehnt einen Node vor MinWriteNodeVersion ab. Eine Version, die sich nicht
+// vergleichen lässt (dev, mit Suffix, verdeckt ohne Version), geht durch: Ein
+// alter Node lehnt request_id dann selbst ab und schreibt nichts.
+func (c *Client) checkNodeVersion(ctx context.Context, session *toolSession, tool string) error {
+	result, err := session.call(ctx, "whoami", map[string]any{})
+	if err != nil {
+		return c.transportError(tool, fmt.Errorf("whoami: %w", err))
+	}
+	fail := func(message string) error {
+		return &ToolError{Tool: tool, Code: CodeNodeUnreachable, Message: redact(message, c.token)}
+	}
+	if result.IsError {
+		return fail("whoami meldet einen Fehler: " + result.Text)
+	}
+	var out whoamiOutput
+	if len(result.Structured) == 0 || json.Unmarshal(result.Structured, &out) != nil {
+		return fail("Antwort auf whoami nicht lesbar")
+	}
+	if versionBefore(out.Version, MinWriteNodeVersion) {
+		return fail(fmt.Sprintf("Node %s zu alt für Schreibvorgänge, mindestens %s — `kephalaion upgrade`",
+			out.Version, MinWriteNodeVersion))
+	}
+	return nil
+}
+
+// outcomeUnknown ist der Fehler eines offenen Ausgangs.
+func (c *Client) outcomeUnknown(tool, target string, first error, detail string) error {
+	return &ToolError{Tool: tool, Code: CodeOutcomeUnknown, Message: redact(fmt.Sprintf(
+		"Ausgang offen: %s von %s kann beim Hub angekommen sein (erster Versuch: %s; %s). "+
+			"Nicht noch einmal schicken, sondern nachsehen.", tool, target, errorMessage(first), detail), c.token)}
+}
+
+// errorMessage ist die Meldung eines Fehlers, bei einem *ToolError ohne
+// Werkzeug davor.
+func errorMessage(err error) string {
+	var toolErr *ToolError
+	if errors.As(err, &toolErr) {
+		return toolErr.Message
+	}
+	return err.Error()
+}
+
+// semverPattern ist eine Version vMAJOR.MINOR.PATCH ohne Zusatz.
+var semverPattern = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// versionBefore sagt, ob version älter ist als min. Lässt sich eine der
+// beiden nicht lesen, ist die Antwort nein.
+func versionBefore(version, min string) bool {
+	a, b := semverPattern.FindStringSubmatch(version), semverPattern.FindStringSubmatch(min)
+	if a == nil || b == nil {
+		return false
+	}
+	for i := 1; i <= 3; i++ {
+		x, errX := strconv.Atoi(a[i])
+		y, errY := strconv.Atoi(b[i])
+		if errX != nil || errY != nil {
+			return false
+		}
+		if x != y {
+			return x < y
+		}
+	}
+	return false
 }

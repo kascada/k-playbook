@@ -178,6 +178,8 @@ func deref(value *string) string {
 // memDocStore ist ein Kephalaion im Speicher für die Hüllen-Tests.
 type memDocStore struct {
 	docs map[string]string
+	// writeFail lässt create und rename mit diesem Fehler scheitern.
+	writeFail error
 }
 
 func (s *memDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error) {
@@ -193,6 +195,9 @@ func (s *memDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kep
 }
 
 func (s *memDocStore) Create(_ context.Context, name, _ string) (kephalaion.Document, error) {
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
 	if _, ok := s.docs[name]; ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
@@ -201,6 +206,9 @@ func (s *memDocStore) Create(_ context.Context, name, _ string) (kephalaion.Docu
 }
 
 func (s *memDocStore) Rename(_ context.Context, name, newName string) (kephalaion.Document, error) {
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
 	by, ok := s.docs[name]
 	if !ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeNotFound, Message: "fehlt"}
@@ -334,6 +342,38 @@ func TestDocHuellenFehlercodes(t *testing.T) {
 		decodeEnvelope(t, result, &envelope)
 		if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != c.code || envelope.Ref != "" {
 			t.Errorf("%s: erwartet %s, bekommen %+v", c.name, c.code, envelope)
+		}
+	}
+}
+
+func TestDocHuellenOffenerAusgangUndNodeCodes(t *testing.T) {
+	root := newDocProject(t)
+	store := useMemDocs(t, "user/kamran/tasks/100-a.md")
+	ctx := context.Background()
+	cases := map[string]string{
+		kephalaion.CodeOutcomeUnknown:  project.DocCodeOutcomeUnknown,
+		kephalaion.CodeUnreachable:     project.DocCodeKephalaionUnavailable,
+		kephalaion.CodeUnsupported:     project.DocCodeKephalaionUnavailable,
+		kephalaion.CodeInternal:        project.DocCodeKephalaionUnavailable,
+		kephalaion.CodeNodeUnreachable: project.DocCodeKephalaionUnavailable,
+	}
+	for code, want := range cases {
+		store.writeFail = &kephalaion.ToolError{Tool: "create", Code: code, Message: "Meldung"}
+		r1, _, _ := docCreateTool(ctx, nil, docCreateInput{ProjectDir: root, Kind: "tasks", Name: "b"})
+		r2, _, _ := docDoneTool(ctx, nil, docMoveInput{ProjectDir: root, Ref: "keph:/user/~/tasks/100-a.md"})
+		for i, result := range []*mcp.CallToolResult{r1, r2} {
+			var envelope struct {
+				OK    bool                    `json:"ok"`
+				Error *knowledgeErrorEnvelope `json:"error"`
+			}
+			decodeEnvelope(t, result, &envelope)
+			if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != want {
+				t.Errorf("%s, Aufruf %d: erwartet %s, bekommen %+v", code, i, want, envelope.Error)
+				continue
+			}
+			if want == project.DocCodeOutcomeUnknown && !strings.Contains(envelope.Error.Message, "k_playbook_doc_list") {
+				t.Errorf("%s: Hinweis zum Nachsehen fehlt: %s", code, envelope.Error.Message)
+			}
 		}
 	}
 }

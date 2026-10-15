@@ -133,6 +133,16 @@ und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`,
 [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Document Tools in the Collection“;
 was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
 
+`create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
+`request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per
+`whoami`). Bleibt der Ausgang nach dem Abschicken offen, schickt der Client denselben Aufruf
+mit demselben Schlüssel genau einmal in neuer Sitzung mit eigener Zeitgrenze; `replayed` gilt
+als Erfolg. Was danach offen bleibt, ist `outcome_unknown` — auch in den doc-Werkzeugen, die
+dann nicht weiterzählen. `node_unreachable` bzw. `kephalaion_unavailable` heißt nur noch:
+beim Hub ist nichts angekommen (nichts abgeschickt, oder der Node meldet `unreachable`,
+`unsupported`, `internal`). Abgrenzung im Einzelnen: `docs/kephalaion-client.md`, Abschnitt
+„Request key, retry and the codes“.
+
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
 Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
@@ -329,6 +339,7 @@ installer/
 │   ├── client.go                minimaler Streamable-HTTP-Client: Sitzung, tools/call,
 │   │                            whoami
 │   ├── docs.go                  Client für die Collection: list, create, rename;
+│   │                            request_id, eine Wiederholung, outcome_unknown;
 │   │                            ToolError mit dem Code von Kephalaion
 │   ├── check.go                 Prüfung und Zustände, lesbare Collections je Kandidat
 │   └── write.go                 nur den Block kephalaion: schreiben, Ignorieren sichern

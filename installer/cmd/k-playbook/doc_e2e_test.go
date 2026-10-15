@@ -16,6 +16,8 @@ import (
 // cliDocStore ist ein Kephalaion im Speicher für die Tests des Subkommandos.
 type cliDocStore struct {
 	docs map[string]string
+	// writeFail lässt create und rename mit diesem Fehler scheitern.
+	writeFail error
 }
 
 func (s *cliDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error) {
@@ -32,6 +34,9 @@ func (s *cliDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kep
 }
 
 func (s *cliDocStore) Create(_ context.Context, name, _ string) (kephalaion.Document, error) {
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
 	if _, ok := s.docs[name]; ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
@@ -40,6 +45,9 @@ func (s *cliDocStore) Create(_ context.Context, name, _ string) (kephalaion.Docu
 }
 
 func (s *cliDocStore) Rename(_ context.Context, name, newName string) (kephalaion.Document, error) {
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
 	by, ok := s.docs[name]
 	if !ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeNotFound, Message: "fehlt"}
@@ -52,7 +60,7 @@ func (s *cliDocStore) Rename(_ context.Context, name, newName string) (kephalaio
 	return kephalaion.Document{Name: newName}, nil
 }
 
-func useCLIDocs(t *testing.T, names ...string) {
+func useCLIDocs(t *testing.T, names ...string) *cliDocStore {
 	t.Helper()
 	store := &cliDocStore{docs: map[string]string{}}
 	for _, name := range names {
@@ -63,6 +71,7 @@ func useCLIDocs(t *testing.T, names ...string) {
 		return project.NewUserDocs(project.DocKinds, store, "kamran")
 	}
 	t.Cleanup(func() { openDocs = original })
+	return store
 }
 
 // runDocCaptured führt das Subkommando aus und fängt stdout und stderr ab.
@@ -164,5 +173,22 @@ func TestDocSubkommandoOhneKephalaion(t *testing.T) {
 	_, _, err := runDocCaptured(t, "list", "tasks")
 	if err == nil || !strings.Contains(err.Error(), "(kephalaion_unavailable)") {
 		t.Fatalf("erwartet kephalaion_unavailable: %v", err)
+	}
+}
+
+func TestDocSubkommandoOffenerAusgang(t *testing.T) {
+	todoProject(t)
+	store := useCLIDocs(t, "user/kamran/tasks/100-a.md")
+	store.writeFail = &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeOutcomeUnknown, Message: "Ausgang offen"}
+	for _, args := range [][]string{{"create", "tasks", "b"}, {"done", "keph:/user/~/tasks/100-a.md"}} {
+		_, _, err := runDocCaptured(t, args...)
+		if err == nil || !strings.HasSuffix(err.Error(), "(outcome_unknown)") || !strings.Contains(err.Error(), "doc list") {
+			t.Errorf("%v: %v", args, err)
+		}
+	}
+	store.writeFail = &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeUnreachable, Message: "Hub nicht erreicht"}
+	_, _, err := runDocCaptured(t, "create", "tasks", "b")
+	if err == nil || !strings.HasSuffix(err.Error(), "(kephalaion_unavailable)") {
+		t.Fatalf("unreachable: %v", err)
 	}
 }
