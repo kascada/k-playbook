@@ -121,6 +121,18 @@ Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-W
 `k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
 (`project/docref.go`).
 
+`doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
+des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
+ist (`tasks`, `workbench`, `findings`: Ablage, Userbereich, Zählbereich, `done/`,
+Startnummer), steht allein in der Tabelle `project.DocKinds` (`project/userdocs.go`); eine neue
+Sorte ist ein neuer Eintrag, die erlaubten Werte von `kind` in CLI und MCP-Schema kommen
+daraus. Die Fachlogik `project.UserDocs` spricht Kephalaion über die Schnittstelle `DocStore`
+an, die `kephalaion.Client` (`internal/kephalaion/docs.go`: `list` aus der Replica, `create`
+und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`, `_list`,
+`_done` und `_reopen` sind die Hüllen darum. Vertrag:
+[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Document Tools in the Collection“;
+was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
 Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
@@ -143,6 +155,8 @@ installer/
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
 │   ├── todo.go                  Subkommando todo: list, add, update, delete, import
 │   ├── knowledge.go             Subkommando knowledge: search, list, read, write, status
+│   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
+│   │                            Kephalaion-Collection
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
@@ -201,6 +215,8 @@ installer/
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
 │   │                            über fs.FS), ResolveDocRef für k-playbook:/instructions/…
+│   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
+│   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
 │   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
@@ -269,8 +285,9 @@ installer/
 │   ├── review.go                Werkzeuge k_playbook_review_*
 │   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
 │   │                            dünne Hüllen über internal/project
-│   ├── docs.go                  Werkzeug k_playbook_doc_read, Hülle über
-│   │                            project.ResolveDocRef
+│   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
+│   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
+│   │                            done/reopen (Hüllen über project.UserDocs)
 │   └── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │                                write, publish, supersede, inbox_*, queue_*, status),
 │                                dünne Hüllen über project.Knowledge
@@ -309,7 +326,10 @@ installer/
 │   │                            Namensregel von Kephalaion
 │   ├── env.go                   config von Kephalaion: node.listen → Loopback-Endpunkt,
 │   │                            Token-Kandidaten aus tokens/<hub>/<account>.token
-│   ├── client.go                minimaler Streamable-HTTP-Client: initialize, whoami
+│   ├── client.go                minimaler Streamable-HTTP-Client: Sitzung, tools/call,
+│   │                            whoami
+│   ├── docs.go                  Client für die Collection: list, create, rename;
+│   │                            ToolError mit dem Code von Kephalaion
 │   ├── check.go                 Prüfung und Zustände, lesbare Collections je Kandidat
 │   └── write.go                 nur den Block kephalaion: schreiben, Ignorieren sichern
 ├── internal/versionsources/
@@ -3155,7 +3175,9 @@ Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playboo
 (`todos.go`) um `project/todos.go` und `k_playbook_knowledge_*` (`knowledge.go`) um
 `project.Knowledge` — das Wissenstor über `k-playbook-local/knowledge/` samt Eingang und
 Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
-(`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`. Keine der Hüllen trägt eigene Fachlogik; sie
+(`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
+`k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
+`k-playbook doc`. Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall. Tool-Tabelle und Verträge stehen in

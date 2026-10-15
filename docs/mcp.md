@@ -11,8 +11,9 @@ when writing changes something, and only to symlinks created by k-playbook itsel
 response lists what happened under `links`; if the field is absent, everything was already
 up to date.
 
-The server offers the working state, the review, todo and knowledge tools, and
-`k_playbook_doc_read` for references.
+The server offers the working state, the review, todo and knowledge tools,
+`k_playbook_doc_read` for references, and the four `doc` tools for numbered documents in the
+project's Kephalaion collection.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
 because a stdio server must not assume that its process working directory is the target
 project. There is no fallback to that directory.
@@ -349,6 +350,10 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
 | `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves only `k-playbook:/instructions/…` |
+| `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
+| `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
+| `k_playbook_doc_done` | move an own document into `done/` of its location |
+| `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -773,6 +778,83 @@ Error codes, in the envelope's `error.code` like the knowledge tools:
 | `not_found` | neither layer has the file or the assembled directory; there is no fallback to reading anywhere else |
 | `project_not_found` | `projectDir` leads to no project |
 | `read_failed` | the source could not be read |
+
+### Document Tools in the Collection
+
+`k_playbook_doc_create`, `_list`, `_done` and `_reopen` create numbered documents in the
+project's Kephalaion collection, list them per user, and move them into `done/` and back.
+They are thin wrappers over `project.UserDocs` (`project/userdocs.go`); the subcommand
+`k-playbook doc create|list|done|reopen [--json]` calls the same code. Reading and writing a
+document's content is not part of them: a session does that directly with Kephalaion's `read`
+and `write`, with `collection` = `kephalaion.address`. `k_playbook_doc_read` stays
+`unsupported` for `keph:`. Which Kephalaion tools are called underneath and what is expected
+of them: [kephalaion-client.md](kephalaion-client.md).
+
+**Kinds.** What a kind is comes from one table, `project.DocKinds`; a new kind is a new
+entry, and the allowed values of `kind` in the input schema (`enum`) and in the CLI are built
+from it.
+
+| Kind | Location in the collection | User area | Numbering range | `done/` | Start |
+|---|---|---|---|---|---|
+| `tasks` | `user/<name>/tasks/` | yes | all `user/*/tasks/` including `done/`, project-wide | yes | 100 |
+| `workbench` | `user/<name>/workbench/` | yes | all `user/*/workbench/` including `done/`, project-wide | yes | 001 |
+| `findings` | `queue/findings/` | no | the directory | no | 001 |
+
+`<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
+Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
+user area is rejected. Directories come into being in Kephalaion with their first document.
+`tasks` starts at 100 so its numbers do not collide with the task files on disk.
+
+**Inputs.** All four take `projectDir` (required by contract, like every tool).
+
+| Tool | Further inputs |
+|---|---|
+| `k_playbook_doc_create` | `kind`; `name`, the short name -- k-playbook lowercases it, transliterates umlauts and `ß`, turns everything else into hyphens, drops a trailing `.md` and keeps at most 50 characters |
+| `k_playbook_doc_list` | `kind`; `user` -- empty for the own user, `~` likewise, `*` for all, or a user name; `done` -- also list `done/` |
+| `k_playbook_doc_done`, `k_playbook_doc_reopen` | `ref`, a `keph:` reference to one document, for example `keph:/user/~/tasks/100-name.md`; a segment `~` is replaced by `kephalaion.user` |
+
+**Behaviour.**
+
+- `create`: the number is the highest in the numbering range plus one, at least the start
+  number, written with at least three digits (`<number>-<name>.md`). Highest number and list
+  come from the node's replica; the document is created empty through the hub with
+  Kephalaion `create`. On `name_taken` the next number is tried, up to ten times. Only the
+  whole file name has to be unique: equal numbers with different names are allowed.
+- `list`: for a kind with a user area, `user` filters by the user segment of the path; for a
+  kind without one, `user` does not apply, all entries are listed and `hint` says so. Entries
+  are sorted by reference.
+- `done` moves `<location>/<file>` to `<location>/done/<file>`, `reopen` the other way, both
+  with Kephalaion `rename` through the hub; the document keeps its `id`. Only own documents
+  and only kinds with `done/` can be moved. An occupied target yields `name_taken`; nothing is
+  overwritten.
+- Without a ready binding (`kephalaion.ok` is not true) all four answer
+  `kephalaion_unavailable`. There is no fallback to the disk.
+
+**Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
+
+| Tool | Fields on success |
+|---|---|
+| `k_playbook_doc_create` | `ref` (the `keph:` reference with the real user name, e.g. `keph:/user/kamran/tasks/100-name.md`; without user area `keph:/queue/findings/001-name.md`), `kind`, `number`, `name` (file name), `user` (absent without user area) |
+| `k_playbook_doc_list` | `kind`, `user` (the filter applied, a name or `*`; empty without user area), `done`, `items`, `hint` (only when a filter did not apply). Each item: `ref`, `title` (frontmatter `title`, else the file name), `user` (from the path; without user area the creator from Kephalaion's `created.by`, else empty), `created`, `updated`, `done` |
+| `k_playbook_doc_done`, `k_playbook_doc_reopen` | `ref` (the new reference with the real name), `from` (the old one, `~` resolved), `kind` |
+
+Error codes in `error.code`:
+
+| Code | When |
+|---|---|
+| `invalid_input` | `projectDir` missing; unknown `kind`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
+| `project_not_found` | `projectDir` leads to no project |
+| `kephalaion_unavailable` | the binding is not ready, or the node cannot be reached |
+| `name_taken` | `rename` onto an occupied target; or ten numbers in a row taken on `create` |
+| `not_found` | the document to move does not exist |
+| `foreign_user` | the reference lies in another user's area |
+| `done_unsupported` | the kind has no `done/` |
+| `wrong_dir` | `done` on a document already in `done/`, `reopen` on one outside `done/`, or a reference in no location of any kind |
+| `kephalaion_error` | any other error from Kephalaion; the message names its code |
+
+The CLI prints one line per result without `--json` (for `list`: reference, title, user,
+updated, and `done`, separated by tabs) and ends with exit 1 on an error, the code in
+parentheses at the end of the message.
 
 ## Inspecting What the Server Offers
 

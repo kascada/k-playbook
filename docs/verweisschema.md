@@ -68,10 +68,11 @@ keph:/user/~/workbench/
   real name (`keph:/user/kamran/tasks/088-name.md`). The placeholder is for text written once
   for every user.
 
-The user area itself — `user/<name>/<kind>/` with `tasks/` (numbered project-wide) and
-`workbench/` — was decided on 2026-10-14; its layout and tools are not built yet.
-
-<!-- NACHZIEHEN: Layout und Werkzeuge des Userbereichs (user/<name>/tasks, workbench) beschreiben, sobald sie festgelegt sind; dann hierher verlinken. -->
+The user area itself — `user/<name>/<kind>/` with `tasks/` and `workbench/`, each numbered
+project-wide and with a `done/` — and the tools that create, list and move its documents are
+described in [mcp.md](mcp.md#document-tools-in-the-collection). `k_playbook_doc_done` and
+`k_playbook_doc_reopen` accept `~` in their `ref`; every reference they hand back carries the
+real name.
 
 ## Why These Names
 

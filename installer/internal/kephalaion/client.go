@@ -102,44 +102,79 @@ type rpcResponse struct {
 	} `json:"error"`
 }
 
-// callWhoami fragt den Node unter endpoint nach whoami, mit dem Header-Paar des
-// Kandidaten. initialize geht ohne Anmeldung; das Paar steht nur an
-// tools/call. Jeder Fehlertext läuft durch redact, bevor er das Paket
-// verlässt.
-func callWhoami(ctx context.Context, endpoint string, candidate Candidate, token string) (*whoamiOutput, error) {
-	client := newHTTPClient()
-	redactErr := func(format string, args ...any) error {
-		return &probeError{text: redact(fmt.Sprintf(format, args...), token)}
-	}
+// rpcConn ist der Weg zum Node: Client, Endpunkt, die Grenze für eine
+// Antwort und die Zeitgrenze, die eine Meldung nennt.
+type rpcConn struct {
+	client   *http.Client
+	endpoint string
+	limit    int64
+	timeout  time.Duration
+}
 
+func newRPC(endpoint string, limit int64, timeout time.Duration) *rpcConn {
+	return &rpcConn{client: newHTTPClient(), endpoint: endpoint, limit: limit, timeout: timeout}
+}
+
+// toolSession ist eine Sitzung am Node nach initialize: Protokollfassung,
+// Sitzungskennung und das Header-Paar, das an jedem tools/call steht.
+type toolSession struct {
+	rpc     *rpcConn
+	version string
+	session string
+	headers map[string]string
+	nextID  int
+}
+
+// openSession meldet sich mit initialize an und bestätigt es. initialize
+// geht ohne Anmeldung; das Header-Paar des Kandidaten steht nur an
+// tools/call. Fehler sind noch nicht um das Token bereinigt — das macht der
+// Aufrufer mit redact.
+func openSession(ctx context.Context, rpc *rpcConn, candidate Candidate, token string) (*toolSession, error) {
 	initParams := map[string]any{
 		"protocolVersion": protocolVersion,
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]any{"name": "k-playbook", "version": "1"},
 	}
-	initResult, session, err := post(ctx, client, endpoint, nil, "", "", 1, "initialize", initParams)
+	initResult, session, err := rpc.post(ctx, nil, "", "", 1, "initialize", initParams)
 	if err != nil {
-		return nil, redactErr("%v", err)
+		return nil, err
 	}
 	var init struct {
 		ProtocolVersion string `json:"protocolVersion"`
 	}
 	if err := json.Unmarshal(initResult, &init); err != nil || init.ProtocolVersion == "" {
-		return nil, redactErr("Antwort auf initialize nicht lesbar")
+		return nil, errors.New("Antwort auf initialize nicht lesbar")
 	}
 
 	// Die Bestätigung von initialize: Ein zustandsloser Node braucht sie
 	// nicht, ein Server mit Sitzung erwartet sie. Ihr Ausgang zählt nicht.
-	_ = notify(ctx, client, endpoint, init.ProtocolVersion, session, "notifications/initialized")
+	_ = rpc.notify(ctx, init.ProtocolVersion, session, "notifications/initialized")
 
-	headers := map[string]string{
-		"X-Keph-Account-" + candidate.Hub: candidate.Account,
-		"X-Keph-Token-" + candidate.Hub:   token,
-	}
-	callParams := map[string]any{"name": "whoami", "arguments": map[string]any{}}
-	callResult, _, err := post(ctx, client, endpoint, headers, init.ProtocolVersion, session, 2, "tools/call", callParams)
+	return &toolSession{
+		rpc: rpc, version: init.ProtocolVersion, session: session, nextID: 2,
+		headers: map[string]string{
+			"X-Keph-Account-" + candidate.Hub: candidate.Account,
+			"X-Keph-Token-" + candidate.Hub:   token,
+		},
+	}, nil
+}
+
+// toolResult ist das Ergebnis eines tools/call: ob es ein Fehler ist, der
+// strukturierte Inhalt und der Text aller Textblöcke.
+type toolResult struct {
+	IsError    bool
+	Structured json.RawMessage
+	Text       string
+}
+
+// call ruft ein Werkzeug des Nodes auf.
+func (s *toolSession) call(ctx context.Context, name string, args map[string]any) (toolResult, error) {
+	id := s.nextID
+	s.nextID++
+	params := map[string]any{"name": name, "arguments": args}
+	raw, _, err := s.rpc.post(ctx, s.headers, s.version, s.session, id, "tools/call", params)
 	if err != nil {
-		return nil, redactErr("%v", err)
+		return toolResult{}, err
 	}
 	var result struct {
 		IsError           bool            `json:"isError"`
@@ -148,21 +183,41 @@ func callWhoami(ctx context.Context, endpoint string, candidate Candidate, token
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	if err := json.Unmarshal(callResult, &result); err != nil {
-		return nil, redactErr("Antwort auf whoami nicht lesbar")
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return toolResult{}, fmt.Errorf("Antwort auf %s nicht lesbar", name)
 	}
-	if result.IsError {
-		var parts []string
-		for _, c := range result.Content {
+	var parts []string
+	for _, c := range result.Content {
+		if c.Text != "" {
 			parts = append(parts, c.Text)
 		}
-		return nil, redactErr("whoami meldet einen Fehler: %s", strings.Join(parts, " "))
 	}
-	if len(result.StructuredContent) == 0 {
+	return toolResult{IsError: result.IsError, Structured: result.StructuredContent, Text: strings.Join(parts, " ")}, nil
+}
+
+// callWhoami fragt den Node unter endpoint nach whoami, mit dem Header-Paar des
+// Kandidaten. Jeder Fehlertext läuft durch redact, bevor er das Paket
+// verlässt.
+func callWhoami(ctx context.Context, endpoint string, candidate Candidate, token string) (*whoamiOutput, error) {
+	redactErr := func(format string, args ...any) error {
+		return &probeError{text: redact(fmt.Sprintf(format, args...), token)}
+	}
+	session, err := openSession(ctx, newRPC(endpoint, maxResponseBytes, DefaultTimeout), candidate, token)
+	if err != nil {
+		return nil, redactErr("%v", err)
+	}
+	result, err := session.call(ctx, "whoami", map[string]any{})
+	if err != nil {
+		return nil, redactErr("%v", err)
+	}
+	if result.IsError {
+		return nil, redactErr("whoami meldet einen Fehler: %s", result.Text)
+	}
+	if len(result.Structured) == 0 {
 		return nil, redactErr("Antwort auf whoami ohne strukturierten Inhalt")
 	}
 	var out whoamiOutput
-	if err := json.Unmarshal(result.StructuredContent, &out); err != nil {
+	if err := json.Unmarshal(result.Structured, &out); err != nil {
 		return nil, redactErr("Antwort auf whoami nicht lesbar")
 	}
 	return &out, nil
@@ -170,13 +225,13 @@ func callWhoami(ctx context.Context, endpoint string, candidate Candidate, token
 
 // post schickt eine JSON-RPC-Anfrage und liefert ihr Ergebnis. Fehler nennen
 // nie den Rumpf einer Antwort, nur Status und Art.
-func post(ctx context.Context, client *http.Client, endpoint string, headers map[string]string,
+func (rpc *rpcConn) post(ctx context.Context, headers map[string]string,
 	version, session string, id int, method string, params any) (json.RawMessage, string, error) {
 	body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
 	if err != nil {
 		return nil, "", err
 	}
-	resp, err := send(ctx, client, endpoint, headers, version, session, body)
+	resp, err := rpc.send(ctx, headers, version, session, body)
 	if err != nil {
 		return nil, "", err
 	}
@@ -184,7 +239,7 @@ func post(ctx context.Context, client *http.Client, endpoint string, headers map
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("%s: HTTP %d", method, resp.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, rpc.limit))
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: Antwort abgebrochen", method)
 	}
@@ -202,25 +257,25 @@ func post(ctx context.Context, client *http.Client, endpoint string, headers map
 }
 
 // notify schickt eine Benachrichtigung ohne Antworterwartung.
-func notify(ctx context.Context, client *http.Client, endpoint, version, session, method string) error {
+func (rpc *rpcConn) notify(ctx context.Context, version, session, method string) error {
 	body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method})
 	if err != nil {
 		return err
 	}
-	resp, err := send(ctx, client, endpoint, nil, version, session, body)
+	resp, err := rpc.send(ctx, nil, version, session, body)
 	if err != nil {
 		return err
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBytes))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, rpc.limit))
 	return resp.Body.Close()
 }
 
 // send setzt die Anfrage ab. Ein Fehler der Verbindung wird hier in einen
 // eigenen Satz übersetzt; der Text von net/http nennt Methode und URL, aber
 // keine Header.
-func send(ctx context.Context, client *http.Client, endpoint string, headers map[string]string,
+func (rpc *rpcConn) send(ctx context.Context, headers map[string]string,
 	version, session string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpc.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.New("Anfrage an den Node nicht baubar")
 	}
@@ -235,10 +290,10 @@ func send(ctx context.Context, client *http.Client, endpoint string, headers map
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := client.Do(req)
+	resp, err := rpc.client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("keine Antwort innerhalb von %s", DefaultTimeout)
+			return nil, fmt.Errorf("keine Antwort innerhalb von %s", rpc.timeout)
 		}
 		var opErr *net.OpError
 		if errors.As(err, &opErr) && opErr.Err != nil {

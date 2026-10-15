@@ -161,7 +161,8 @@ an unknown reference is `not_found` with no fallback to the disk; `project:`, `k
 `k-playbook:` kinds are `unsupported` for now. The `ref` in the prefix scheme is the lasting
 contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract).
 
-**A user area in the project's collection** (2026-10-14, not built). Per person there is
+**A user area in the project's collection** (2026-10-14, built 2026-10-15 — task 088, in the
+working tree, not yet put to use). Per person there is
 `user/<name>/<kind>/`, for now with `tasks/` and `workbench/`. The tasks are public to everyone
 in the project, but a session lists only its own by default; that is a view k-playbook
 provides, not a right. One directory per person needs one Kephalaion scope (`dir user/<name>/`)
@@ -169,31 +170,39 @@ should writing ever be limited to one's own area, instead of one scope per kind.
 Kephalaion **user** (`kephalaion.user`), not the account: the account belongs to one machine,
 so the same person on two machines would otherwise get two directories. In shipped text the
 segment `~` stands for the own user (`keph:/user/~/tasks/`); see
-[`verweisschema.md`](./verweisschema.md#placeholder--for-the-own-user).
+[`verweisschema.md`](./verweisschema.md#placeholder--for-the-own-user). The tools that create,
+list and move documents there: [`mcp.md`](./mcp.md#document-tools-in-the-collection).
 
-**Findings go to `queue/findings/`** (2026-10-14, not built). What sessions find no longer
+**Findings go to `queue/findings/`** (2026-10-14; creating and listing built 2026-10-15 in
+task 088, the scheduled run and the switch of the findings rule not built). What sessions find no longer
 lands in `material/befunde/` but as a queue entry of its own in the collection; a scheduled run
 takes the entries over into the knowledge store once the cron function exists. Two things
 differ from today's queue (`docs/knowledge-layout.md`): `queue_list` reads only the top level
 and skips subdirectories (`installer/internal/project/knowledge_queue.go:165`), and a queue entry
 today only points at a raw piece in the inbox. A finding in the queue carries its content
 itself, so after the takeover it is gone and `sources` has nothing left to point at, unless the
-run moves it to the inbox first.
+run moves it to the inbox first. Everything under `queue/` has no user area: `k_playbook_doc_list`
+ignores `user` there and takes the user from Kephalaion's `created.by`.
 
-**Creating a named document** (2026-10-14, not built). One procedure for tasks, findings and
+**Creating a named document** (2026-10-14, built 2026-10-15 — task 088, in the working tree). One procedure for tasks, findings and
 whatever needs it later: the caller passes the intended short name, k-playbook normalises it
 (lower case, hyphens), takes the highest number in the counting range plus one and creates
 `<number>-<name>.md` through Kephalaion's `create`. That call goes through the hub and answers
 `name_taken` for a live document of the same name, and then the next number is tried. **Only the
 whole file name has to be unique, not the number;** two documents with the same number and
 different names are accepted. The answer is the `keph:` reference with the real user name, and
-the session reads and writes the document directly over Kephalaion.
+the session reads and writes the document directly over Kephalaion. A kind is one entry in a
+table; below the highest number the kind's start number applies. Tasks start at 100 so they do
+not collide with the task files on disk — counting those files along was dropped (2026-10-14).
+Moving into `done/` and back is `rename` through the hub. Contract:
+[`mcp.md`](./mcp.md#document-tools-in-the-collection); what k-playbook expects of Kephalaion:
+[`kephalaion-client.md`](./kephalaion-client.md).
 
-| Kind | Stored in | Counting range |
-|---|---|---|
-| tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide |
-| findings | `queue/findings/` | the directory itself |
-| workbench | `user/<name>/workbench/` | open |
+| Kind | Stored in | Counting range | Start |
+|---|---|---|---|
+| tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide | 100 |
+| findings | `queue/findings/` | the directory itself | 001 |
+| workbench | `user/<name>/workbench/` | all `user/*/workbench/` including `done/` — project-wide | 001 |
 
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
 by document, with `create`/`write` into the collection, rather than replacing whole
@@ -218,7 +227,7 @@ when that step is built.
   user/
     <name>/            one directory per person           (2026-10-14)
       tasks/           numbered project-wide, done/
-      workbench/       current state of work
+      workbench/       current state of work, numbered project-wide, done/
 ```
 
 The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
@@ -228,10 +237,11 @@ The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
 **The workbench** (2026-10-14). Meant for the current state of work: where one stands, what
 is open, what comes next. Unlike a task it is no assignment, and unlike a finding it carries
 no proof. Today such things end up in findings or in assistant memory; this file is itself an
-example. Proposed: one file per topic, numbered, overwritten rather than appended, with
-frontmatter `title` and `status` so that the briefing can show the titles of one's own active
-topics. Undecided: how a finished topic ends — moved to `done/`, resolved (confirmed parts as
-findings, open parts as tasks, file deleted), or both.
+example. Decided and built (2026-10-14/15, task 088): one file per topic, numbered
+project-wide, and a finished topic moves to `done/`. Proposed: overwritten rather than
+appended, with frontmatter `title` and `status` so that the briefing can show the titles of
+one's own active topics. Undecided: whether a finished topic is also resolved (confirmed parts
+as findings, open parts as tasks), and the format of its content.
 
 **How commands and skills are read once the local files are gone.** Claude Code, OpenCode and
 Cursor find commands and skills only as files on disk, and checks and scripts must run.
@@ -283,9 +293,16 @@ until the last step.
    `k-playbook.md`, directory `instructions/`), and putting it into `AGENTS.md`. The check
    against the real installation follows the next release; the installed `k-playbook/` here is
    older and has no `instructions/`.
-10. **Generators** — `/k-docs-*` write single documents into the project collection,
+10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):
+    `k_playbook_doc_create`, `_list`, `_done`, `_reopen` and `k-playbook doc`, measured at hub
+    `vm`; see "Creating a named document". Not yet put to use: `/k-task-create`, `/k-task-run`,
+    `/k-danke` and the findings rule still write to the disk, and `k-playbook.md`, `AGENTS.md`
+    and the context output do not mention the tools. Calling the MCP tools from an open session
+    is a follow-up test after the next release. Still open: the rules for what goes where, the
+    scheduled run for `queue/findings/`, and `queue_list` for subdirectories.
+11. **Generators** — `/k-docs-*` write single documents into the project collection,
     including the removal of stale ones.
-11. **Delete the local files** — the old directories in the repo and the clone in the
+12. **Delete the local files** — the old directories in the repo and the clone in the
     projects; setup, update and interface without `<project>/k-playbook/`.
 
 ## Findings

@@ -96,6 +96,10 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie knowledge: stdout trägt den Inhalt hinter dem
 		// Verweis und sonst nichts.
 		return runRead(args[1:])
+	case "doc":
+		// Ohne Wirt-Pflege wie read: die Ausgabe ist der Verweis oder JSON
+		// und sonst nichts.
+		return runDoc(args[1:])
 	case "vscode":
 		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
 		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
@@ -232,6 +236,12 @@ Unterkommandos:
             ein Verweis mit / am Ende baut das Verzeichnis zu einem Text
             zusammen. Hinweise stehen auf stderr. Dasselbe wie das
             MCP-Werkzeug k_playbook_doc_read.
+  doc       Nummerierte Dokumente in der Kephalaion-Collection des
+            Projekts: k-playbook doc create|list|done|reopen [--json].
+            Legt an, listet und verschiebt nach done/ und zurück; den
+            Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe
+            wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done und
+            _reopen.
   vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
             diesem Programm steckt: k-playbook vscode install|status|
             vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig
