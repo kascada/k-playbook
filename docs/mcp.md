@@ -12,8 +12,9 @@ response lists what happened under `links`; if the field is absent, everything w
 up to date.
 
 The server offers the working state, the review, todo and knowledge tools,
-`k_playbook_doc_read` for references, and the four `doc` tools for numbered documents in the
-project's Kephalaion collection.
+`k_playbook_doc_read` for references, the four `doc` tools for numbered documents in the
+project's Kephalaion collection, and `k_playbook_gui_status` for the state and the address
+of the project's interface.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
 because a stdio server must not assume that its process working directory is the target
 project. There is no fallback to that directory.
@@ -354,6 +355,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
+| `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -873,6 +875,48 @@ Error codes in `error.code`:
 The CLI prints one line per result without `--json` (for `list`: reference, title, user,
 updated, and `done`, separated by tabs) and ends with exit 1 on an error, the code in
 parentheses at the end of the message.
+
+### GUI Status Contract
+
+`k_playbook_gui_status` answers what `k-playbook gui status` prints: the state and the
+address of the project's interface. Both ways call the same function
+(`guiproc.StatusForDir`); the subcommand renders its value set, the tool serializes it.
+
+The tool **changes nothing**. It does not start a service, does not stop one, does not
+remove an orphaned runtime file, and it does not even create the runtime directory -- a
+missing directory is an answer, not a failure, because without it no service can be
+running. Removing an orphaned file stays with `k-playbook stop`.
+
+The value set, in the envelope `{ok, tool, projectDir, …, error}`:
+
+| Field | Meaning |
+|---|---|
+| `state` | one of `none`, `running`, `otherVersion`, `orphaned`, `unresponsive` |
+| `url` | the address of the interface, from the runtime file |
+| `pid` | the process id of the live service |
+| `version` | the version the service reports on `/api/health` |
+| `build` | the build identity it reports there |
+
+The five states: `none` -- no runtime file, and the same for a missing runtime directory.
+`running` -- the service of this very program runs under `url`. `otherVersion` -- a service
+runs, but from another version or another build of the same version. `orphaned` -- the
+runtime file names a process that provably no longer exists. `unresponsive` -- the process
+is alive and is the one from the file, but `/api/health` does not answer or answers with a
+foreign key.
+
+**Fields that were not measured are absent; they do not stand there as a null value.**
+`url` and `pid` describe a process that was found alive, so they are absent for `none` and
+`orphaned`. `version` and `build` come from `/api/health`, that is from the running process
+itself, so they are absent whenever nobody answered. Without a service the whole answer is
+therefore `{"state": "none"}`, and that is information, not an error -- on the command line
+with exit code 0.
+
+Error codes in `error.code`: `invalid_input` for a missing `projectDir`,
+`project_not_found` for a `projectDir` that leads to no project, and `failed` if no runtime
+directory can be resolved at all (neither `XDG_RUNTIME_DIR` nor `XDG_STATE_HOME` nor a home
+directory). Note the precondition: a directory *without* an installation still has a key in
+`guiproc`, so a service running on it can be asked about on the command line, while
+`resolveProjectDir` rejects such a directory -- over MCP it cannot.
 
 ## Inspecting What the Server Offers
 

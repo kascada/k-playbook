@@ -84,6 +84,7 @@ questions and the ordered work list.
 - `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
 - `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
 - `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `gui status` / `k_playbook_gui_status` / `is the interface running` / `runtime file state` -> [`mcp.md`](./mcp.md#gui-status-contract), [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#zustand-erfragen-gui-status)
 - `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#2-create-project-owned-structure), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
 - `read docs` / `Markdown view` / `Mermaid` -> [`installation.md`](./installation.md#read-documentation), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
 - `overlay` / `replace rule` / `disable` -> [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content), [`faq.md`](./faq.md)

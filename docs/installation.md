@@ -211,7 +211,11 @@ After changing commands or skills, restart the respective assistant: both discov
 
 ## Browser on startup
 
-At interface startup, the URL is printed in the terminal and the browser opens. The server behind it continues as a background service per project: the call returns as soon as the browser is open, and a second call in the same project only opens another window on the same server. It is stopped through `Stop service` in the interface or `k-playbook stop`; without any request, it stops itself after 60 minutes. The program that opens the browser is selected in this order:
+At interface startup, the URL is printed in the terminal and the browser opens. The server behind it continues as a background service per project: the call returns as soon as the browser is open, and a second call in the same project only opens another window on the same server. It is stopped through `Stop service` in the interface or `k-playbook stop`; without any request, it stops itself after 60 minutes.
+
+**Asking without acting.** `k-playbook gui status` reports the state and the address of this project's service as JSON and changes nothing at all: it starts nothing, stops nothing, opens no browser, and does not clean up an orphaned runtime file. Without a service the whole answer is `{"state": "none"}`, with exit code 0. An assistant gets the same answer through the MCP tool `k_playbook_gui_status` (see [`mcp.md`](mcp.md), "GUI Status Contract").
+
+The program that opens the browser is selected in this order:
 
 1. **`$BROWSER`**, if set. The freedesktop convention: a `:`-separated list of commands in which `%s` stands for the URL. If the placeholder is absent, the URL is appended.
 2. Otherwise, the usual platform candidates: `open` on macOS, otherwise `wslview`, `xdg-open`, `gio open`, and others until one starts.

@@ -145,9 +145,12 @@ beim Hub ist nichts angekommen (nichts abgeschickt, oder der Node meldet `unreac
 
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
-Projektliste unter `.k-playbook-local/projects.json`. `status` kommt auch mit dem
-Hintergrunddienst nicht zurück: wer die URL braucht, ruft `k-playbook` ohne Argument auf —
-das findet den laufenden Server und öffnet ihn. Ein neues Subkommando entsteht dort, wo
+Projektliste unter `.k-playbook-local/projects.json`. Das alte `status` über den ganzen
+Stand kommt nicht zurück; die Frage nach dem **Dienst** dagegen hat seit 2026-10-16 eine
+eigene Antwort: `k-playbook gui status` nennt Zustand und Adresse, ohne etwas zu verändern
+(§„Zustand erfragen: `gui status`"). Wer die Oberfläche offen haben will, ruft weiter
+`k-playbook` ohne Argument auf — das findet den laufenden Server und öffnet ihn. Ein neues
+Subkommando entsteht dort, wo
 deterministische Go-Fachlogik einen eigenen Anstoß braucht, den kein Assistent nachbaut —
 so ist `inventory` dazugekommen.
 
@@ -158,6 +161,8 @@ installer/
 ├── cmd/k-playbook/
 │   ├── main.go                  Einstiege: Client-Pfad, verdeckter Servermodus, Subkommandos
 │   ├── gui.go                   Client-Pfad: Wirt-Pflege, Laufzeitdatei einordnen, abkoppeln
+│   ├── guistatus.go             Subkommando gui status: den Wertesatz aus
+│   │                            guiproc.StatusForDir als JSON rendern, nebenwirkungsfrei
 │   ├── stop.go                  Subkommando stop
 │   ├── version.go               Subkommando version: die gestempelte Version, eine Zeile
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
@@ -171,6 +176,8 @@ installer/
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
+│   ├── status.go                die eine Auskunft für Unterkommando und MCP-Werkzeug:
+│   │                            Verzeichnis → StatusReport, ohne jede Nebenwirkung
 │   ├── process.go               Prozessidentität: PID lebt und Startzeit passt
 │   ├── control.go               Shutdown anfordern, auf das Ende warten
 │   ├── spawn.go                 ein Binary als Server starten, auf Antwort warten; die
@@ -298,9 +305,11 @@ installer/
 │   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
 │   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
 │   │                            done/reopen (Hüllen über project.UserDocs)
-│   └── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
-│                                write, publish, supersede, inbox_*, queue_*, status),
-│                                dünne Hüllen über project.Knowledge
+│   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
+│   │                            write, publish, supersede, inbox_*, queue_*, status),
+│   │                            dünne Hüllen über project.Knowledge
+│   └── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
+│                                guiproc.StatusForDir)
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -1629,8 +1638,8 @@ gleichzeitig `--install-extension … --force` auf dasselbe Erweiterungsverzeich
 dieselbe Grenze, die schon Host und Dev Container trennt — und zwar blockierend; wer
 gewartet hat, prüft danach neu und findet in der Regel nichts mehr zu tun. `flock` gibt
 die Sperre mit dem Prozess frei, auch nach einem `kill`; eine Sperrdatei mit PID müsste
-Verwaistes selbst erkennen. Löst Task 071 die vielen Projekt-Dienste durch einen
-zentralen ab, darf die Sperre vereinfacht werden.
+Verwaistes selbst erkennen. Die vielen Projekt-Dienste bleiben: ein zentraler Dienst, der
+sie ablöst, ist verworfen (2026-10-16). Die Sperre bleibt deshalb, wie sie ist.
 
 ### Erkennen und CLI wählen
 
@@ -3188,7 +3197,8 @@ Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playboo
 Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
-`k-playbook doc`. Keine der Hüllen trägt eigene Fachlogik; sie
+`k-playbook doc`, und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
+`k-playbook gui status` (§„Zustand erfragen: `gui status`"). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall. Tool-Tabelle und Verträge stehen in
@@ -3950,6 +3960,53 @@ bei unveränderter `VERSION`.
 /api/shutdown` und warten; antwortet er nicht, SIGTERM an die PID — die Identitätsprüfung
 hat zuvor gesichert, dass es der eigene Prozess ist. Eine verwaiste Datei wird gelöscht,
 eine fehlende ist eine Auskunft und kein Fehler.
+
+### Zustand erfragen: `gui status`
+
+`k-playbook gui status` nennt Zustand und Adresse des Dienstes als JSON, und das MCP-Werkzeug
+`k_playbook_gui_status` dieselbe Antwort im Umschlag `{ok, tool, projectDir, …}`. Vorher
+verriet jeder Weg die Adresse nur als Nebenwirkung: der argumentlose Aufruf öffnet einen
+Browser und startet notfalls einen Dienst, `stop` beendet ihn, über MCP gab es gar keinen
+Weg. Vertrag und Feldtabelle: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt
+„GUI Status Contract".
+
+**Eine Mitte, zwei Wege.** `guiproc.StatusForDir(dir)` (`status.go`) liefert zu einem
+Verzeichnis den `StatusReport` — ein benannter Verbund mit `State`, `URL`, `PID`, `Version`
+und `Build`, damit ein später zusätzlicher Wert keinen Aufrufer bricht. Das Unterkommando
+setzt sein Arbeitsverzeichnis ein und rendert, das Werkzeug sein `projectDir` und
+serialisiert; zusammengesetzt wird die Antwort genau einmal. Zwei Fassungen desselben
+Wertesatzes driften, und ein Test, der beide gegeneinander hält, verglich sonst zwei
+Nachbauten.
+
+**`State` statt `Status.String()`.** `Status.String()` gibt deutsche Prosa („läuft unter
+dieser URL") und bleibt, wo ein Mensch liest. Der maschinenlesbare Wert ist `guiproc.State`:
+`none`, `running`, `otherVersion`, `orphaned`, `unresponsive` — die fünf Ergebnisse der
+Einordnung. Damit sind `otherVersion` und `unresponsive` erstmals erkennbar, ohne den Dienst
+zu beenden.
+
+**Nebenwirkungsfrei, auch auf dem Weg dorthin.** `StatusForDir` ruft `Inspect` **nicht**,
+obwohl Inspect dieselbe Folge ist: dessen `Locate` → `RuntimeDir()` legt das
+Laufzeitverzeichnis an (`os.MkdirAll`, `os.Mkdir 0700`) und endet mit Fehler, wenn das
+misslingt. Für den Start und für `stop` ist das richtig, für eine Auskunft nicht: ein
+`status`, das scheitert, weil es ein Verzeichnis nicht anlegen kann, ist schlechter als
+eines, das „kein Dienst" antwortet — und fehlt das Verzeichnis, läuft per Definition
+keiner. Darum läuft die Folge hier über `resolveLocation` (`runtimeDirFrom`, ohne Anlegen),
+`Read` und `Classify`; die Pfadform teilt `resolveLocation` mit `Locate` über `locationIn`.
+Einen verwaisten Stand **meldet** `gui status` nur — gelöscht wird er von `stop`. Das ist
+die Grenze zur Handlungsschicht `reuseOrStart`.
+
+**`KeyFrom(dir)` neben `Key()`.** Der Schlüssel muss sich zu einem fremden Verzeichnis
+bilden lassen: ein MCP-Server behält das Verzeichnis, in dem der Client ihn gestartet hat,
+und hätte sonst still für ein anderes Projekt geantwortet. Dieselbe Form wie
+`project.Detect()` neben `DetectFrom(dir)`; `Key()` bleibt und ruft `KeyFrom(os.Getwd())`.
+Vorbedingung, nicht Fehler: ohne Installation bildet `keyFor` den Schlüssel aus dem
+Verzeichnis selbst, `resolveProjectDir` lehnt ein solches Verzeichnis aber ab — über MCP
+ist ein Dienst darauf nicht erfragbar, über die CLI schon.
+
+Der Zweig im Dispatch läuft **ohne Wirt-Pflege**, wie jeder andere maschinenlesbare: die
+Meldungen der Bereinigung stünden mitten in der Antwort, und wer fragt, will nichts
+eingerichtet bekommen. `k-playbook gui` ohne Unterkommando druckt die Hilfe und endet mit
+Fehler — ein Startweg ist das nicht, Starten bleibt der argumentlose Aufruf.
 
 ### Programm aktualisieren und neu starten
 

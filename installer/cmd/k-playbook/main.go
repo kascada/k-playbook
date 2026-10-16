@@ -8,7 +8,8 @@
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
 // löst einen Verweis im Präfixschema auf,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
-// `version` nennt die Version des Programms, und `stop` beendet den
+// `version` nennt die Version des Programms, `gui status` nennt Zustand und
+// Adresse der Oberfläche, ohne sie anzufassen, und `stop` beendet den
 // Hintergrunddienst der Oberfläche.
 package main
 
@@ -109,6 +110,12 @@ func run(args []string) error {
 		// die Oberfläche liest sie an der Datei am Installationsziel, bevor
 		// sie entscheidet, ob nachinstalliert wird.
 		return runVersion(os.Stdout, args[1:])
+	case "gui":
+		// Ohne Wirt-Pflege aus demselben Grund wie context und todo: die
+		// Ausgabe ist maschinenlesbar und darf keine Meldungen der
+		// Bereinigung tragen. Dazu kommt der Grund von stop, nur umgekehrt:
+		// wer nach dem Zustand fragt, will nichts eingerichtet bekommen.
+		return runGUICommand(args[1:])
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
@@ -250,6 +257,13 @@ Unterkommandos:
   version   Gibt die Version dieses Programms aus, eine Zeile, sonst nichts.
             Ohne gestempelte Version endet es mit Fehler. Mit --all steht
             darunter die Version der mitgereisten VS-Code-Erweiterung.
+  gui       Auskunft über die Oberfläche dieses Projekts, ohne sie anzufassen:
+            k-playbook gui status. Die Antwort ist JSON mit "state" (none,
+            running, otherVersion, orphaned, unresponsive) und dazu, soweit
+            gemessen, "url", "pid", "version" und "build"; nicht gemessene
+            Felder fehlen. Gestartet wird dabei nichts — das tut der
+            argumentlose Aufruf. Dasselbe wie das MCP-Werkzeug
+            k_playbook_gui_status.
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.

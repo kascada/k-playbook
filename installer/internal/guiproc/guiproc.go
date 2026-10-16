@@ -45,7 +45,19 @@ func Key() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Arbeitsverzeichnis: %w", err)
 	}
-	return keyFor(project.Detect(), workdir), nil
+	return KeyFrom(workdir), nil
+}
+
+// KeyFrom bildet den Schlüssel zu einem bestimmten Verzeichnis und ist damit
+// für einen Aufrufer brauchbar, dessen Bezug nicht das eigene
+// Arbeitsverzeichnis ist: ein MCP-Server behält das Verzeichnis, in dem der
+// Client ihn gestartet hat, und das ist nicht zwingend das Projekt, nach dem
+// gefragt wird.
+//
+// Dieselbe Form wie project.Detect() neben project.DetectFrom(dir): beide
+// Fassungen stehen nebeneinander, die argumentlose bleibt.
+func KeyFrom(dir string) string {
+	return keyFor(project.DetectFrom(dir), dir)
 }
 
 // keyFor ist die Regel hinter Key, ohne Blick auf die Platte.
@@ -165,12 +177,30 @@ func Locate(key string) (Location, error) {
 	if err != nil {
 		return Location{}, err
 	}
+	return locationIn(dir, key), nil
+}
+
+// resolveLocation löst die Pfade für key auf, ohne etwas anzulegen — der Weg
+// für eine Auskunft, die nichts verändern darf (siehe StatusForDir). Fehlt das
+// Verzeichnis, fehlt auch die Laufzeitdatei darin, und das ist eine Antwort und
+// kein Fehler: ohne Verzeichnis läuft per Definition kein Dienst.
+func resolveLocation(key string) (Location, error) {
+	dir, err := runtimeDirFrom(os.Getenv, os.UserHomeDir)
+	if err != nil {
+		return Location{}, err
+	}
+	return locationIn(dir, key), nil
+}
+
+// locationIn ist die Form der Pfade, von beiden Auflösungen geteilt: zweimal
+// gebildet hieße zwei Chancen, sie verschieden zu bilden.
+func locationIn(dir string, key string) Location {
 	name := fileName(key)
 	return Location{
 		Dir:  dir,
 		File: filepath.Join(dir, name+".json"),
 		Log:  filepath.Join(dir, name+".log"),
-	}, nil
+	}
 }
 
 // RuntimeDir ist das Verzeichnis der Laufzeitdateien: $XDG_RUNTIME_DIR, sonst
