@@ -12,7 +12,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | Prefix | Meaning | Example |
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
-| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/xyz.md` |
+| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/xyz.md`, `k-playbook:/rules/befunde.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/manual/abc.md` |
 
@@ -91,22 +91,24 @@ real name.
 | `k-playbook:` | MCP `k_playbook_doc_read` with the reference as `ref`; as a fallback and for testing `k-playbook read <ref>` |
 | `keph:` | Kephalaion `read` with `collection` = `kephalaion.address` from `k-playbook context` and `name` = the path without the leading `/`, a segment `~` replaced by `kephalaion.user` |
 
-`k_playbook_doc_read` and `k-playbook read` resolve only `k-playbook:` references, and today
-only those under `k-playbook:/instructions/`. For `project:` and `keph:` they answer "not yet
-supported" (code `unsupported`). That limits the tool, not the reference: a `project:` or
-`keph:` reference is valid and is read on its route above. A `k-playbook:` path outside
-`instructions/` is refused as `unsupported` as well -- `k-playbook:/rules/befunde.md` is a valid
-reference whose kind is simply not resolved yet. Paths with `..`, `.`, hidden or empty
-segments are not references at all (`invalid_input`). A `k-playbook:/instructions/…`
-reference ending in `/` whose directory is not on the list of assembled directories is
-incomplete -- the file name is missing -- and also `invalid_input`, decided without reading:
-`k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, an unknown directory and a
-file with a trailing `/` (`…/010-verweise.md/`). The message says "Dateiname fehlt" and gives
-an example that fits the case. Outside `instructions/` the check for `unsupported` comes
-first, so `k-playbook:/rules/` stays `unsupported`. An unknown reference -- a file, or an
-assembled directory that neither layer has -- is `not_found`.
-Other kinds (`rules`, `reviews`, `guidelines`) follow with the briefing (task 086). The tool's
-full answer and error codes are in [mcp.md](mcp.md#doc-read-contract).
+`k_playbook_doc_read` and `k-playbook read` resolve only `k-playbook:` references, and of
+those the kinds `instructions/`, `rules/`, `reviews/` and `guidelines/` (`docRefKinds` in
+`installer/internal/project/docref.go`; `rules`, `reviews` and `guidelines` since task 086).
+For `project:` and `keph:` they answer "not yet supported" (code `unsupported`). That limits
+the tool, not the reference: a `project:` or `keph:` reference is valid and is read on its
+route above. A `k-playbook:` path outside those kinds is refused as `unsupported` as well --
+`k-playbook:/checks/check_x.sh` is a valid reference whose kind is not resolved: checks are
+scripts that run, commands and skills live with the assistant; nobody reads them through a
+reference. Paths with `..`, `.`, hidden or empty segments are not references at all
+(`invalid_input`). A `k-playbook:` reference ending in `/` whose directory is not on the list
+of assembled directories is incomplete -- the file name is missing -- and also
+`invalid_input`, decided without reading: `k-playbook:/instructions/on-demand/`,
+`k-playbook:/instructions/`, `k-playbook:/rules/`, an unknown directory and a file with a
+trailing `/` (`…/010-verweise.md/`). The message says "Dateiname fehlt" and gives an example
+that fits the case. Outside the kinds the check for `unsupported` comes first, so
+`k-playbook:/checks/` stays `unsupported`. An unknown reference -- a file, or an assembled
+directory that neither layer has -- is `not_found`. The tool's full answer and error codes
+are in [mcp.md](mcp.md#doc-read-contract).
 
 ## Resolving `k-playbook:`
 
@@ -124,6 +126,17 @@ keeps both trees equal; `.github/scripts/pack-defaults.sh` refuses to pack when 
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
 layer. Today the source is the disk; later it can be Kephalaion without the caller noticing.
+
+There is **one** overlay, not two: `overlayDocDir` in `docref.go` lays the two layers of a
+directory over each other -- same name wins locally, an empty local file disables -- and the
+catalogs of `k-playbook context` (`resolveCatalog`), the references here and the briefing all
+go through it. A test compares both ways for `rules` and `reviews`: name, origin and
+`disabled` of every catalog entry are what `k-playbook:/<kind>/<name>` answers, and the
+content behind the reference is the file the catalog names. The one named exception is the
+field `guidelines` of the context output, which still lists only
+`k-playbook-local/guidelines/` until the context output is switched; for references and the
+briefing, `guidelines` is a regular overlay kind with shipped `k-playbook/guidelines/` and
+local `k-playbook-local/guidelines/`.
 
 ### A single file
 

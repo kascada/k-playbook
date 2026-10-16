@@ -10,7 +10,7 @@ Working document for the duration of the switch, in the manner of
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
-As of: 2026-10-14.
+As of: 2026-10-16.
 
 ## Goal
 
@@ -204,6 +204,28 @@ Moving into `done/` and back is `rename` through the hub. Contract:
 | findings | `queue/findings/` | the directory itself | 001 |
 | workbench | `user/<name>/workbench/` | all `user/*/workbench/` including `done/` — project-wide | 001 |
 
+**The briefing** (2026-10-16, task 086 — built, not yet put to use). `k-playbook briefing
+[--json]` and `k_playbook_briefing` are the one call at the start of a session: **data, not
+prose** — which instructions, rules, reviews and guidelines apply, and what is pending in the
+project's collection. References in the prefix scheme (`k-playbook:/rules/befunde.md`,
+`keph:/user/kamran/tasks/100-….md`, `project:/k-playbook-local/docs/README.md`), never paths;
+each document with title, description (frontmatter, else the first heading) and origin (`dist`,
+`local`, `override`, `disabled`); the own open tasks and active workbench topics (not in
+`done/`, what `k_playbook_doc_list` returns without `done`) with title, and the number of open
+findings in `queue/findings/`; when Kephalaion is not usable, that state instead of the lists.
+Contents are read afterwards with `k_playbook_doc_read`, which since this task resolves
+`rules/`, `reviews/` and `guidelines/` as well, through the one overlay that also builds
+`catalogs` (`overlayDocDir`). Deliberately left out: the local knowledge store
+`k-playbook-local/knowledge/`, contents, commands, skills, checks, scripts, k-playbook's own
+docs, and every environment fact — paths, tools, `gh`, the Kephalaion binding stay in
+`k-playbook context` alone, nothing stands in both outputs. `guidelines` is an overlay kind for
+`k_playbook_doc_read` and the briefing; the field `guidelines` of the context output stays
+local-only as the one named exception until the context output is switched. The briefing of
+[`knowledge-gate.md`](./knowledge-gate.md#querying-the-surface) merges into this one: the
+document list exists now; the counts per kind, state and origin and the freshness come with the
+knowledge store later. Contract: [`mcp.md`](./mcp.md#briefing-contract); what moves where:
+"Target for `k-playbook.md` and `AGENTS.md`" below.
+
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
 by document, with `create`/`write` into the collection, rather than replacing whole
 directories through a staging directory and `push`. Who removes stale documents is decided
@@ -231,6 +253,52 @@ when that step is built.
 ```
 
 The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
+
+## Target for `k-playbook.md` and `AGENTS.md` (task 086)
+
+The goal: a session gets its entry completely through k-playbook — `k_playbook_briefing` for
+what applies and what is pending, `k_playbook_doc_read` for the contents, `k-playbook context`
+for the environment —, and `k-playbook.md` and the block in `AGENTS.md` are only a minimal
+prompt. This table (2026-10-16) assigns every section of `k-playbook.md` and every sentence of
+the three `AGENTS.md` blocks (markers `k-playbook:anstoss`, `k-playbook:session-memory`,
+`k-playbook:befunde`, templates in `installer/internal/project/instructions.go`) to its future
+place. Nothing is moved by this task; each row is its own step later ("build first, then put
+to use"), and only the last step switches `k-playbook.md`, the `AGENTS.md` block and the context
+output over.
+
+Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 1000),
+`on-demand/<name>` a file in `instructions/on-demand/`, read only when a reference points at it;
+"briefing" and "context" are fields of those outputs; "prompt" is the minimal `anstoss` block.
+
+| Source | Section / sentence | Future place | State |
+|---|---|---|---|
+| `k-playbook.md` | intro: "gilt in jedem Projekt … `k-playbook-local/k-playbook.md` wird nach dieser Datei gelesen" | drops: the reading order is the order of `documents.always` in the briefing; local parts follow shipped ones by number | open |
+| `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md`: the two layers and the two rules in a few lines; the paths come from `context` (`playbook.dir`, `local.dir`), the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md` | open |
+| `k-playbook.md` | "Überlagern und Abschalten": replace by name, empty disables, the unit per kind, commands and skills must be registered | `on-demand/ueberlagern.md`, for the session that creates, overrides or disables an entry; what a session needs every time — read `k-playbook:` only through k-playbook, origin per entry — is already in `always/010-verweise.md` and in the briefing (`origin`) | open |
+| `k-playbook.md` | "Wo was liegt": no assumptions about paths, `k-playbook context` resolves directories and catalogs | prompt: the one call stays the `anstoss` block; the catalogs with origin are in the briefing | open |
+| `k-playbook.md` | "Wie gearbeitet wird", first paragraph: anything beyond a trivial step becomes a task (`/k-task-create`, `/k-task-refine`, `/k-task-run`) | `always/300-arbeiten-in-tasks.md` | open |
+| `k-playbook.md` | "Wie gearbeitet wird", overview of the shipped commands and the interface (`k-playbook`, `/k-gui`) | `on-demand/commands.md`; the briefing deliberately lists no commands or skills, the assistant has them registered, and `k-playbook/docs/commands.md` keeps the detail | open |
+| `k-playbook.md` | "Wie gearbeitet wird", last paragraph: what applies in a project is the catalog from `context`, a local command replaces or disables the shipped one | drops into `on-demand/ueberlagern.md` (same rule) | open |
+| `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are `remediation` in `context` | open |
+| `k-playbook-local/k-playbook.md` | the project's own rules (this repo: role, memory rule, spelling, scratch pad, docs first) | local parts `k-playbook-local/instructions/always/1000-….md`, one per topic, by the project; no shipped step | open |
+| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded: `context` for the environment, `k_playbook_briefing` for what applies, then read `k-playbook:/instructions/always/` | stays |
+| `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always` in the briefing is the reading order; see the name clash below | open |
+| `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: directories stay in `context`, the catalogs with origin are in the briefing | open |
+| `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
+| `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; `k-playbook:/rules/befunde.md` resolves since task 086 | done (`NACHZIEHEN:` for the place `queue/findings/`) |
+| — | how references are written and reached | `always/010-verweise.md` | done |
+
+**What remains as the minimal prompt.** The `anstoss` block in `AGENTS.md`, reworded at the
+switch. `k-playbook.md` does not stay: when its last section has moved, the shipped file goes,
+`k-playbook-local/k-playbook.md` becomes local parts, and the context field `instructions` is
+empty — which is the moment to resolve the name clash. This is the table's proposal; it is
+confirmed or reversed when the switch step is planned, not before.
+
+**Name clash `instructions` — open, deliberately.** The context field `instructions` lists the
+`k-playbook.md` files in reading order; the directory `instructions/` is the kind behind
+`k-playbook:/instructions/always/`, which the briefing lists under `documents.always`. Both are
+right today and mean different things. The clash is resolved together with the switch of the
+context output (the field changes or goes), not in task 086.
 
 ## Open
 
@@ -281,18 +349,21 @@ until the last step.
 8. **Project files into the project collection** — decide how the files of
    `k-playbook-local/` that correspond to the shipped ones (rules, commands, skills, checks,
    reviews, `k-playbook.md`) get there; adapt AGENTS.md.
-9. **Briefing** — next step, task 086 (2026-10-10): the k-playbook MCP server lists the
-   documents that apply, shipped and local already resolved against each other, and reads
-   them by key; the source behind it (disk today, Kephalaion later) is invisible to the AI.
-   Context output and `AGENTS.md` point at it. The Markdown files are rebuilt and integrated
-   step by step afterwards; the docs are taken over later, anew.
-   Groundwork built 2026-10-14 (task 087, in the working tree): the reference scheme, the kind
-   `instructions/` and `k_playbook_doc_read`/`k-playbook read` for `k-playbook:/instructions/…`,
-   not yet put to use. Still open for 086: listing keys as `k-playbook:/…`, the other kinds
-   (`rules`, `reviews`, `guidelines`), resolving the name clash `instructions` (context field,
-   `k-playbook.md`, directory `instructions/`), and putting it into `AGENTS.md`. The check
-   against the real installation follows the next release; the installed `k-playbook/` here is
-   older and has no `instructions/`.
+9. **Briefing** — task 086 (2026-10-10; built 2026-10-16, in the working tree): the k-playbook
+   MCP server lists the documents that apply, shipped and local already resolved against each
+   other, and reads them by reference; the source behind it (disk today, Kephalaion later) is
+   invisible to the AI. Groundwork from task 087 (2026-10-14): the reference scheme, the kind
+   `instructions/` and `k_playbook_doc_read`/`k-playbook read` for `k-playbook:/instructions/…`.
+   **Built in 086:** `k_playbook_doc_read` resolves `rules/`, `reviews/` and `guidelines/`
+   through the one overlay that also builds `catalogs` (`overlayDocDir`, with a test comparing
+   both ways); `k-playbook briefing [--json]` and `k_playbook_briefing` (see "The briefing"
+   above); the table "Target for `k-playbook.md` and `AGENTS.md`" assigning every section and
+   every block sentence to its future place. **Still open, deliberately:** the name clash
+   `instructions` (context field with the `k-playbook.md` paths versus the directory
+   `instructions/` the briefing lists), putting the briefing into `AGENTS.md`, and switching
+   the context output — all three belong to the switch step at the end, after the sections of
+   the table have moved one by one. The check against the real installation follows the next
+   release.
 10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):
     `k_playbook_doc_create`, `_list`, `_done`, `_reopen` and `k-playbook doc`, measured at hub
     `vm`; see "Creating a named document". Not yet put to use: `/k-task-create`, `/k-task-run`,

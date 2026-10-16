@@ -415,8 +415,10 @@ func TestDocRefNurListeWirdZusammengebaut(t *testing.T) {
 		}
 	}
 
-	// Außerhalb von instructions/ bleibt es unsupported, auch mit „/“ am Ende.
-	expectDocError(t, layers, "k-playbook:/rules/", DocCodeUnsupported)
+	// Außerhalb der Sorten bleibt es unsupported, auch mit „/“ am Ende; eine
+	// Sorte ohne Dateinamen ist unvollständig.
+	expectDocError(t, layers, "k-playbook:/checks/", DocCodeUnsupported)
+	expectDocError(t, layers, "k-playbook:/rules/", DocCodeInvalidInput)
 }
 
 // Die Prüfung der Liste liest nichts: auch eine Quelle, die bei jedem Zugriff
@@ -429,15 +431,23 @@ func TestDocRefListePrueftOhneZuLesen(t *testing.T) {
 func TestDocRefNichtUnterstuetzt(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
 		"instructions/always/010-a.md": "## A\n",
-		"rules/befunde.md":             "## Befunde\n",
+		"checks/check_x.sh":            "#!/bin/sh\n",
 	}, nil)
 
 	expectDocError(t, layers, "project:/scripts/123.sh", DocCodeUnsupported)
 	expectDocError(t, layers, "keph:/manual/abc.md", DocCodeUnsupported)
-	// Außerhalb von instructions/ abgelehnt, auch wenn es die Datei gibt.
-	expectDocError(t, layers, "k-playbook:/rules/befunde.md", DocCodeUnsupported)
+	// Außerhalb der Sorten aus docRefKinds abgelehnt, auch wenn es die Datei
+	// gibt: checks sind Skripte, kein Lesestoff.
+	expectDocError(t, layers, "k-playbook:/checks/check_x.sh", DocCodeUnsupported)
 	expectDocError(t, layers, "k-playbook:/", DocCodeUnsupported)
 	expectDocError(t, layers, "k-playbook:/instructionsx/a.md", DocCodeUnsupported)
+	expectDocError(t, layers, "k-playbook:/rulesx/befunde.md", DocCodeUnsupported)
+	// rules/ ist eine Sorte: der Verweis darauf ist gültig, aber ohne
+	// Dateinamen unvollständig — kein unsupported mehr.
+	err := expectDocError(t, layers, "k-playbook:/rules/", DocCodeInvalidInput)
+	if !strings.Contains(err.Error(), "Dateiname fehlt") || !strings.Contains(err.Error(), "k-playbook:/rules/<name>.md") {
+		t.Errorf("rules/ mit / am Ende: %v", err)
+	}
 	// .. ist schon in der Form ungültig.
 	expectDocError(t, layers, "k-playbook:/instructions/../rules/befunde.md", DocCodeInvalidInput)
 }
@@ -475,5 +485,135 @@ func TestDocRefMitgelieferterStand(t *testing.T) {
 	muster := mustResolveDoc(t, layers, "k-playbook:/instructions/on-demand/muster.md")
 	if !strings.HasPrefix(muster.Content, "---\ntitle: ") || !strings.Contains(muster.Content, "\ndescription: ") {
 		t.Errorf("Muster ohne Frontmatter title/description: %q", muster.Content)
+	}
+}
+
+// rules, reviews und guidelines sind Sorten wie instructions: Einzeldateien,
+// lokal vor mitgeliefert, leer lokal schaltet ab. Nur instructions/always/
+// wird zusammengebaut.
+func TestDocRefSortenRulesReviewsGuidelines(t *testing.T) {
+	layers, _, _ := docTree(t, map[string]string{
+		"rules/befunde.md":          "# Regel: Befunde\n\nText.\n",
+		"rules/docs-sync.md":        "# Regel: Docs\n\nmitgeliefert\n",
+		"reviews/review-code.md":    "---\nname: review-code\n---\n# Code\n",
+		"reviews/review-tech.md":    "# Tech\n\nText.\n",
+		"guidelines/betrieb.md":     "# Betrieb\n\nText.\n",
+		"instructions/always/01.md": "## A\n",
+	}, map[string]string{
+		"rules/docs-sync.md":            "# Regel: Docs\n\nlokal\n",
+		"rules/eigene.md":               "# Eigene Regel\n\nText.\n",
+		"reviews/review-tech.md":        "# Abgeschaltet: kein Tech-Review.\n",
+		"guidelines/oberflaeche.md":     "# Oberfläche\n\nText.\n",
+		"guidelines/betrieb.md":         "",
+		"guidelines/README.md":          "# Liesmich\n",
+		"instructions/on-demand/x.md":   "## X\n",
+		"instructions/always/README.md": "# Liesmich\n",
+	})
+
+	for ref, want := range map[string]DocPart{
+		"k-playbook:/rules/befunde.md":          {Name: "befunde.md", Origin: DocOriginDist},
+		"k-playbook:/rules/docs-sync.md":        {Name: "docs-sync.md", Origin: DocOriginOverride},
+		"k-playbook:/rules/eigene.md":           {Name: "eigene.md", Origin: DocOriginLocal},
+		"k-playbook:/reviews/review-code.md":    {Name: "review-code.md", Origin: DocOriginDist},
+		"k-playbook:/reviews/review-tech.md":    {Name: "review-tech.md", Origin: DocOriginOverride, Disabled: true},
+		"k-playbook:/guidelines/betrieb.md":     {Name: "betrieb.md", Origin: DocOriginOverride, Disabled: true},
+		"k-playbook:/guidelines/oberflaeche.md": {Name: "oberflaeche.md", Origin: DocOriginLocal},
+	} {
+		result := mustResolveDoc(t, layers, ref)
+		if result.Directory || len(result.Parts) != 1 || !reflect.DeepEqual(result.Parts[0], want) {
+			t.Errorf("%s: %+v, erwartet Teil %+v", ref, result, want)
+		}
+		if result.Disabled != want.Disabled || (want.Disabled && result.Content != "") || (!want.Disabled && result.Content == "") {
+			t.Errorf("%s: disabled %v, content %q", ref, result.Disabled, result.Content)
+		}
+	}
+	if got := mustResolveDoc(t, layers, "k-playbook:/rules/docs-sync.md").Content; got != "# Regel: Docs\n\nlokal\n" {
+		t.Errorf("Überlagerung liefert nicht die lokale Fassung: %q", got)
+	}
+	if got := mustResolveDoc(t, layers, "k-playbook:/reviews/review-code.md").Content; !strings.HasPrefix(got, "---\nname: review-code\n") {
+		t.Errorf("Einzeldatei ohne Frontmatter: %q", got)
+	}
+
+	expectDocError(t, layers, "k-playbook:/rules/fehlt.md", DocCodeNotFound)
+	expectDocError(t, layers, "k-playbook:/guidelines/fehlt.md", DocCodeNotFound)
+	// Mit „/" am Ende fehlt der Dateiname: keine der drei Sorten wird
+	// zusammengebaut.
+	for _, ref := range []string{"k-playbook:/rules/", "k-playbook:/reviews/", "k-playbook:/guidelines/"} {
+		err := expectDocError(t, layers, ref, DocCodeInvalidInput)
+		if !strings.Contains(err.Error(), "Dateiname fehlt") {
+			t.Errorf("%s: %v", ref, err)
+		}
+	}
+}
+
+// Dieselbe Sorte darf nicht über zwei Wege verschieden herauskommen: Name,
+// Herkunft und Abschalten eines Eintrags sind über k_playbook_doc_read
+// (ResolveDocRef) dieselben wie unter catalogs der Kontextausgabe, und der
+// Inhalt hinter dem Verweis ist die Datei, die der Katalog nennt.
+func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
+	root := newContextProject(t)
+	files := map[string]string{
+		"k-playbook/rules/befunde.md":              "# Befunde\n\nText.\n",
+		"k-playbook/rules/docs-sync.md":            "# Docs\n\nmitgeliefert\n",
+		"k-playbook/rules/README.md":               "# Liesmich\n",
+		"k-playbook/reviews/review-code.md":        "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
+		"k-playbook/reviews/review-tech.md":        "# Tech\n",
+		"k-playbook/reviews/review-sast.md":        "# SAST\n",
+		"k-playbook/reviews/notiz.md":              "# kein Rezept\n",
+		"k-playbook-local/rules/docs-sync.md":      "# Docs\n\nlokal\n",
+		"k-playbook-local/rules/eigene.md":         "# Eigene\n\nText.\n",
+		"k-playbook-local/rules/aus.md":            "",
+		"k-playbook-local/reviews/review-tech.md":  "# Abgeschaltet.\n",
+		"k-playbook-local/reviews/review-eigen.md": "# Eigen\n\nText.\n",
+		"k-playbook-local/reviews/.versteckt.md":   "# versteckt\n",
+	}
+	for rel, content := range files {
+		write(t, filepath.Join(root, filepath.FromSlash(rel)), content)
+	}
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	layers := ProjectDocLayers(root)
+	for _, kind := range []string{"rules", "reviews"} {
+		entries := context.Catalogs[kind]
+		if len(entries) == 0 {
+			t.Fatalf("Katalog %s ist leer", kind)
+		}
+		for _, entry := range entries {
+			ref := "k-playbook:/" + kind + "/" + entry.Name
+			result := mustResolveDoc(t, layers, ref)
+			part := result.Parts[0]
+			if part.Name != entry.Name || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
+				t.Errorf("%s: Verweis %+v, Katalog %+v", ref, part, entry)
+			}
+			if entry.Disabled {
+				continue
+			}
+			data, err := os.ReadFile(entry.Path)
+			if err != nil {
+				t.Fatalf("%s lesen: %v", entry.Path, err)
+			}
+			if result.Content != string(data) {
+				t.Errorf("%s: Inhalt %q, Katalogdatei %s hat %q", ref, result.Content, entry.Path, data)
+			}
+		}
+	}
+	// Was der Katalog nicht führt, führt auch der Verweis nicht als Eintrag
+	// der Sorte — README.md und Dotfiles kommen über keinen der beiden Wege.
+	if _, ok := entryByName(context.Catalogs["rules"], "README.md"); ok {
+		t.Error("README.md im Katalog")
+	}
+	if _, ok := entryByName(context.Catalogs["reviews"], ".versteckt.md"); ok {
+		t.Error("Dotfile im Katalog")
+	}
+	if _, ok := entryByName(context.Catalogs["reviews"], "notiz.md"); ok {
+		t.Error("Datei ohne Sortenpräfix im Katalog")
+	}
+	// Die Modi der Rezepte kommen aus demselben Inhalt.
+	code, ok := entryByName(context.Catalogs["reviews"], "review-code.md")
+	if !ok || code.Audit == nil || !code.Audit.Enabled {
+		t.Errorf("review-code: %+v", code)
 	}
 }

@@ -96,6 +96,7 @@ questions and the ordered work list.
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `PR review` -> [`pr-review.md`](./pr-review.md)
 - `reference` / `Verweis` / `project:` / `k-playbook:` / `keph:` / `instructions/` / `k-playbook read` / `k_playbook_doc_read` -> [`verweisschema.md`](./verweisschema.md)
+- `briefing` / `k-playbook briefing` / `k_playbook_briefing` / `what applies` / `session start` -> [`mcp.md`](./mcp.md#briefing-contract), [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`knowledge-aktuell.md`](./knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
 - `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)
 - `results` -> [`code-review.md`](./code-review.md)
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#assessing-with-review-scan-triage), [`commands.md`](./commands.md#review-flow)

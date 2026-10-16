@@ -113,13 +113,28 @@ als Rauchtest nach einem Release folgenlos bleibt.
 
 `read <verweis> [--json]` löst einen Verweis im Präfixschema auf
 ([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
-steht — heute nur `k-playbook:`-Verweise unter `instructions/`, lokal vor mitgeliefert, ein
+steht — heute `k-playbook:`-Verweise der Sorten `instructions/`, `rules/`, `reviews/` und
+`guidelines/` (`docRefKinds`), lokal vor mitgeliefert, ein
 Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
 `instructions/always/`) zu einem Text zusammengebaut; jeder andere mit `/` am Ende ist
 `invalid_input` („Dateiname fehlt“). Ohne `--json` steht auf stdout nur der
 Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-Werkzeug
 `k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
 (`project/docref.go`).
+
+`briefing [--json]` gibt das Briefing aus (Task 086): als Daten, welche Anweisungen, Regeln,
+Reviews und Leitlinien für das Projekt gelten — `k-playbook:/instructions/always/` mit seinen
+Teilen, `on-demand/`, `rules/`, `reviews/`, `guidelines/`, je Eintrag Verweis, Titel,
+Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `local`, `override`,
+`disabled`) — und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
+Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offenen Befunde in
+`queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
+keine Pfade, keine Inhalte; Umgebungsangaben bleiben allein in `context`. Die Listen kommen aus
+den vorhandenen Funktionen (`overlayDocDir`/`assembleDocDir` in `project/docref.go`,
+`UserDocs.List` hinter `k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing`
+(`project/briefing.go`); das MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Ohne
+`--json` ein Klartext zum Lesen beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md),
+Abschnitt „Briefing Contract“.
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
@@ -231,9 +246,13 @@ installer/
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
-│   │                            über fs.FS), ResolveDocRef für k-playbook:/instructions/…
+│   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
+│   │                            für resolveCatalog), ResolveDocRef für k-playbook:/
+│   │                            instructions/…, rules/…, reviews/…, guidelines/…
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
+│   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
+│   │                            aus der Collection, als Verweise (Task 086)
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
 │   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
@@ -305,6 +324,8 @@ installer/
 │   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
 │   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
 │   │                            done/reopen (Hüllen über project.UserDocs)
+│   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
+│   │                            project.BuildBriefing)
 │   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │   │                            write, publish, supersede, inbox_*, queue_*, status),
 │   │                            dünne Hüllen über project.Knowledge
@@ -995,7 +1016,14 @@ abweicht.
 ## Kataloge auflösen
 
 `BuildContext()` und `resolveCatalog()` in `project/context.go` sind der Kern. Hier liegt
-die Overlay-Regel als Code statt als Prosa, die jeder Command selbst befolgen müsste.
+die Overlay-Regel als Code statt als Prosa, die jeder Command selbst befolgen müsste. Die
+Regel selbst steht einmal: `overlayDocDir()` in `project/docref.go` legt die beiden Ebenen
+eines Verzeichnisses übereinander, und `resolveCatalog()`, `ResolveDocRef()` und das Briefing
+rufen sie — dieselbe Sorte kommt über jeden Weg gleich heraus (Test
+`TestDocRefUndKatalogeStimmenUeberein`). Die Sorte `guidelines` hängt bewusst nicht in
+`catalogKinds()` (`guidelinesKind`): für Verweise und Briefing ist sie überlagert, das Feld
+`guidelines` der Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
+benannte Ausnahme (Task 086).
 
 Drei Sorten, definiert in `catalogKinds()`:
 
@@ -3197,7 +3225,8 @@ Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playboo
 Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
-`k-playbook doc`, und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
+`k-playbook doc`, `k_playbook_briefing` (`briefing.go`) um `project.BuildBriefing`, wie
+`k-playbook briefing`, und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
 `k-playbook gui status` (§„Zustand erfragen: `gui status`"). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im

@@ -16,17 +16,21 @@ import (
 // Verweise im Präfixschema (docs/verweisschema.md) und ihre Auflösung.
 //
 // Ein Verweis ist ein einziger Pfad mit Präfix: project:/…, k-playbook:/… oder
-// keph:/…. Aufgelöst wird hier nur k-playbook:, und davon zunächst nur, was
-// unter instructions/ liegt. Hinter k-playbook: stehen zwei Ebenen — die
-// mitgelieferte und die lokale —, die über eine austauschbare Quelle gelesen
-// werden: heute die Platte, später womöglich Kephalaion. Wer aufruft, sieht
-// davon nichts; er bekommt den Inhalt mit lokal und mitgeliefert schon
-// gegeneinander aufgelöst.
+// keph:/…. Aufgelöst wird hier nur k-playbook:, und davon die Sorten in
+// docRefKinds. Hinter k-playbook: stehen zwei Ebenen — die mitgelieferte und
+// die lokale —, die über eine austauschbare Quelle gelesen werden: heute die
+// Platte, später womöglich Kephalaion. Wer aufruft, sieht davon nichts; er
+// bekommt den Inhalt mit lokal und mitgeliefert schon gegeneinander aufgelöst.
 //
-// Die Überlagerungsregel ist die der Kataloge (resolveCatalog): gleicher Name
-// gewinnt lokal, ein leerer lokaler Eintrag schaltet ab. instructions ist
-// aber bewusst keine Sorte in catalogKinds() und erscheint nicht unter
-// catalogs der Kontextausgabe.
+// Die Überlagerungsregel ist eine für alle: overlayDocDir legt die beiden
+// Ebenen eines Verzeichnisses übereinander — gleicher Name gewinnt lokal, ein
+// leerer lokaler Eintrag schaltet ab —, und sowohl die Kataloge der
+// Kontextausgabe (resolveCatalog) als auch die Verweise hier und das Briefing
+// gehen darüber. Dieselbe Sorte kommt so über jeden Weg gleich heraus.
+// instructions und guidelines sind trotzdem keine Sorten in catalogKinds():
+// instructions erscheint nicht unter catalogs, und das Feld guidelines der
+// Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
+// benannte Ausnahme (Task 086).
 
 // Die Präfixe des Schemas.
 const (
@@ -35,8 +39,16 @@ const (
 	DocSchemeKeph      = "keph"
 )
 
-// docInstructionsRoot ist der einzige Bereich, den die Auflösung heute kennt.
+// docInstructionsRoot ist die Sorte instructions/, die einzige mit einem
+// zusammengebauten Verzeichnis.
 const docInstructionsRoot = "instructions"
+
+// docRefKinds sind die Sorten unter k-playbook:, die ResolveDocRef auflöst —
+// die obersten Verzeichnisse beider Ebenen, deren Dateien Lesestoff für eine
+// Sitzung sind. checks, commands und skills fehlen bewusst: Skripte laufen,
+// Commands und Skills liegen beim Assistenten; beides liest niemand über
+// einen Verweis.
+var docRefKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines"}
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -58,8 +70,8 @@ const (
 	// Dateiname; entschieden wird das, ohne zu lesen.
 	DocCodeInvalidInput = "invalid_input"
 	// DocCodeUnsupported: der Verweis ist gültig, wird vom Werkzeug aber noch
-	// nicht aufgelöst — project:, keph: und k-playbook: außerhalb von
-	// instructions/.
+	// nicht aufgelöst — project:, keph: und k-playbook: außerhalb der Sorten
+	// in docRefKinds.
 	DocCodeUnsupported = "unsupported"
 	// DocCodeNotFound: der Verweis ist vollständig — eine Datei oder ein
 	// zusammengebautes Verzeichnis —, aber es gibt ihn weder lokal noch
@@ -322,9 +334,9 @@ func ResolveDocRef(layers DocLayers, raw string) (DocResult, error) {
 		return DocResult{}, docRefErrorf(DocCodeUnsupported,
 			"%s: keph:-Verweise löst k-playbook noch nicht auf — gelesen wird über Kephalaion read mit collection = kephalaion.address aus k-playbook context", ref.Raw)
 	}
-	if ref.Path != docInstructionsRoot && !strings.HasPrefix(ref.Path, docInstructionsRoot+"/") {
+	if !isDocRefKind(ref.Path) {
 		return DocResult{}, docRefErrorf(DocCodeUnsupported,
-			"%s: k-playbook löst heute nur Verweise unter k-playbook:/%s/ auf", ref.Raw, docInstructionsRoot)
+			"%s: k-playbook löst heute nur Verweise unter %s auf", ref.Raw, docRefKindsText())
 	}
 	if ref.Dir {
 		if !isAssembledDocDir(ref.Path) {
@@ -333,6 +345,25 @@ func ResolveDocRef(layers DocLayers, raw string) (DocResult, error) {
 		return resolveDocDir(layers, ref)
 	}
 	return resolveDocFile(layers, ref)
+}
+
+// isDocRefKind meldet, ob ein Pfad in einer Sorte aus docRefKinds liegt.
+func isDocRefKind(refPath string) bool {
+	for _, kind := range docRefKinds {
+		if refPath == kind || strings.HasPrefix(refPath, kind+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// docRefKindsText nennt die Sorten als Verweise, für Fehlermeldungen.
+func docRefKindsText() string {
+	refs := make([]string, 0, len(docRefKinds))
+	for _, kind := range docRefKinds {
+		refs = append(refs, DocSchemeKPlaybook+":/"+kind+"/")
+	}
+	return strings.Join(refs, ", ")
 }
 
 // isAssembledDocDir meldet, ob ein Verzeichnis in docAssembledDirs steht.
@@ -405,9 +436,9 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 
 	switch {
 	case localFound:
-		part := DocPart{Name: name, Origin: "local"}
+		part := DocPart{Name: name, Origin: DocOriginLocal}
 		if distFound {
-			part.Origin = "override"
+			part.Origin = DocOriginOverride
 		}
 		if isEmptyContent(local) {
 			part.Disabled = true
@@ -419,7 +450,7 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 		result.Parts = append(result.Parts, part)
 	case distFound:
 		result.Content = string(dist)
-		result.Parts = append(result.Parts, DocPart{Name: name, Origin: "dist"})
+		result.Parts = append(result.Parts, DocPart{Name: name, Origin: DocOriginDist})
 	default:
 		return DocResult{}, docRefErrorf(DocCodeNotFound,
 			"%s ist unbekannt: weder lokal noch mitgeliefert vorhanden", result.Ref)
@@ -442,6 +473,105 @@ func readDocLayer(source DocSource, ref DocRef) ([]byte, error) {
 	return data, err
 }
 
+// Die Herkunft eines Eintrags, wie sie in Katalogen, Verweisen und Briefing
+// steht: nur mitgeliefert, nur lokal, oder lokal an Stelle eines
+// gleichnamigen mitgelieferten.
+const (
+	DocOriginDist     = "dist"
+	DocOriginLocal    = "local"
+	DocOriginOverride = "override"
+)
+
+// docDirEntry ist ein Eintrag eines Verzeichnisses, über beide Ebenen
+// aufgelöst: Name, Herkunft, ob lokal abgeschaltet, und der Inhalt der
+// wirksamen Ebene — nil, wenn abgeschaltet.
+type docDirEntry struct {
+	Name     string
+	Origin   string
+	Disabled bool
+	Content  []byte
+}
+
+// overlayDocDir legt die beiden Ebenen eines Verzeichnisses übereinander. Das
+// ist die eine Überlagerungsregel für die Kataloge der Kontextausgabe
+// (resolveCatalog), die zusammengebauten Verzeichnisse (resolveDocDir) und
+// das Briefing: Vergleichseinheit ist der Dateiname, ein gleichnamiger lokaler
+// Eintrag ersetzt den mitgelieferten vollständig (override), ein leerer
+// lokaler schaltet ihn ab, Unterverzeichnisse, README.md und Dotfiles zählen
+// nie. keep filtert die Namen weiter — etwa auf das Muster einer Sorte —; nil
+// nimmt alle. Das zweite Ergebnis meldet, ob es das Verzeichnis in mindestens
+// einer Ebene gibt. Die Einträge sind nach Namen sortiert.
+func overlayDocDir(layers DocLayers, dir string, keep func(name string) bool) ([]docDirEntry, bool, error) {
+	local, localFound, err := listDocLayer(layers.Local, dir)
+	if err != nil {
+		return nil, false, err
+	}
+	dist, distFound, err := listDocLayer(layers.Dist, dir)
+	if err != nil {
+		return nil, false, err
+	}
+	if !localFound && !distFound {
+		return nil, false, nil
+	}
+
+	inLocal := toSet(local)
+	inDist := toSet(dist)
+	names := make([]string, 0, len(inLocal)+len(inDist))
+	for name := range inLocal {
+		names = append(names, name)
+	}
+	for name := range inDist {
+		if !inLocal[name] {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	entries := make([]docDirEntry, 0, len(names))
+	for _, name := range names {
+		if keep != nil && !keep(name) {
+			continue
+		}
+		file := path.Join(dir, name)
+		entry := docDirEntry{Name: name}
+		if inLocal[name] {
+			data, err := layers.Local.Read(file)
+			if err != nil {
+				return nil, true, fmt.Errorf("%s:/%s lokal lesen: %w", DocSchemeKPlaybook, file, err)
+			}
+			entry.Origin = DocOriginLocal
+			if inDist[name] {
+				entry.Origin = DocOriginOverride
+			}
+			if isEmptyContent(data) {
+				entry.Disabled = true
+			} else {
+				entry.Content = data
+			}
+		} else {
+			data, err := layers.Dist.Read(file)
+			if err != nil {
+				return nil, true, fmt.Errorf("%s:/%s mitgeliefert lesen: %w", DocSchemeKPlaybook, file, err)
+			}
+			entry.Origin = DocOriginDist
+			entry.Content = data
+		}
+		entries = append(entries, entry)
+	}
+	return entries, true, nil
+}
+
+// docOriginText nennt die Ebenen einer Herkunft im Klartext, für Meldungen.
+func docOriginText(origin string) string {
+	switch origin {
+	case DocOriginOverride:
+		return "lokal und mitgeliefert"
+	case DocOriginLocal:
+		return "lokal"
+	}
+	return "mitgeliefert"
+}
+
 // docDirPart ist ein Teil beim Zusammenbauen, vor dem Sortieren.
 type docDirPart struct {
 	DocPart
@@ -449,79 +579,34 @@ type docDirPart struct {
 	content []byte
 }
 
-// resolveDocDir baut ein Verzeichnis aus docAssembledDirs aus beiden Ebenen
-// zusammen (geprüft hat das ResolveDocRef): nur Dateien
-// mit Ziffer vorn, ohne Unterverzeichnisse und README.md, gleichnamig lokal
-// ersetzt mitgeliefert, leer lokal schaltet ab, numerisch sortiert, ohne
-// Frontmatter zusammengefügt.
-func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
-	result := DocResult{Ref: ref.String(), Directory: true, Parts: []DocPart{}, Problems: []string{}}
-
-	local, localFound, err := listDocLayer(layers.Local, ref.Path)
-	if err != nil {
-		return DocResult{}, err
-	}
-	dist, distFound, err := listDocLayer(layers.Dist, ref.Path)
-	if err != nil {
-		return DocResult{}, err
-	}
-	if !localFound && !distFound {
-		return DocResult{}, docRefErrorf(DocCodeNotFound,
-			"%s ist unbekannt: das Verzeichnis gibt es weder lokal noch mitgeliefert", result.Ref)
+// assembleDocDir ordnet ein Verzeichnis aus docAssembledDirs zum Zusammenbau:
+// überlagert wie jedes Verzeichnis (overlayDocDir), dann nur Dateien mit
+// Ziffer vorn, numerisch sortiert über beide Ebenen, bei gleicher Ziffer nach
+// Namen. Dateien ohne Ziffer kommen als Problem zurück. Das dritte Ergebnis
+// meldet, ob es das Verzeichnis in einer Ebene gibt. Wer den Text braucht,
+// ruft resolveDocDir; das Briefing braucht die Teile mit Inhalt und Herkunft.
+func assembleDocDir(layers DocLayers, dir string) ([]docDirPart, []string, bool, error) {
+	ref := DocSchemeKPlaybook + ":/" + dir + "/"
+	entries, found, err := overlayDocDir(layers, dir, nil)
+	if err != nil || !found {
+		return nil, nil, found, err
 	}
 
-	names := map[string]bool{}
-	for _, name := range append(append([]string{}, local...), dist...) {
-		names[name] = true
-	}
-	sortedNames := make([]string, 0, len(names))
-	for name := range names {
-		sortedNames = append(sortedNames, name)
-	}
-	sort.Strings(sortedNames)
-
-	inLocal := toSet(local)
-	inDist := toSet(dist)
-	parts := make([]docDirPart, 0, len(sortedNames))
-	for _, name := range sortedNames {
-		number := leadingDigits(name)
+	problems := []string{}
+	parts := make([]docDirPart, 0, len(entries))
+	for _, entry := range entries {
+		number := leadingDigits(entry.Name)
 		if number == "" {
-			layer := "mitgeliefert"
-			switch {
-			case inLocal[name] && inDist[name]:
-				layer = "lokal und mitgeliefert"
-			case inLocal[name]:
-				layer = "lokal"
-			}
-			result.Problems = append(result.Problems, fmt.Sprintf(
-				"%s%s (%s): der Name beginnt nicht mit einer Ziffer — nicht aufgenommen", result.Ref, name, layer))
+			problems = append(problems, fmt.Sprintf(
+				"%s%s (%s): der Name beginnt nicht mit einer Ziffer — nicht aufgenommen",
+				ref, entry.Name, docOriginText(entry.Origin)))
 			continue
 		}
-		file := path.Join(ref.Path, name)
-		part := docDirPart{DocPart: DocPart{Name: name}, number: number}
-		if inLocal[name] {
-			data, err := layers.Local.Read(file)
-			if err != nil {
-				return DocResult{}, fmt.Errorf("%s%s lokal lesen: %w", result.Ref, name, err)
-			}
-			part.Origin = "local"
-			if inDist[name] {
-				part.Origin = "override"
-			}
-			if isEmptyContent(data) {
-				part.Disabled = true
-			} else {
-				part.content = data
-			}
-		} else {
-			data, err := layers.Dist.Read(file)
-			if err != nil {
-				return DocResult{}, fmt.Errorf("%s%s mitgeliefert lesen: %w", result.Ref, name, err)
-			}
-			part.Origin = "dist"
-			part.content = data
-		}
-		parts = append(parts, part)
+		parts = append(parts, docDirPart{
+			DocPart: DocPart{Name: entry.Name, Origin: entry.Origin, Disabled: entry.Disabled},
+			number:  number,
+			content: entry.Content,
+		})
 	}
 
 	sort.SliceStable(parts, func(i, j int) bool {
@@ -530,6 +615,24 @@ func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
 		}
 		return parts[i].Name < parts[j].Name
 	})
+	return parts, problems, true, nil
+}
+
+// resolveDocDir baut ein Verzeichnis aus docAssembledDirs aus beiden Ebenen
+// zusammen (geprüft hat das ResolveDocRef): die Teile aus assembleDocDir, ohne
+// Frontmatter, durch eine Leerzeile getrennt.
+func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
+	result := DocResult{Ref: ref.String(), Directory: true, Parts: []DocPart{}, Problems: []string{}}
+
+	parts, problems, found, err := assembleDocDir(layers, ref.Path)
+	if err != nil {
+		return DocResult{}, err
+	}
+	if !found {
+		return DocResult{}, docRefErrorf(DocCodeNotFound,
+			"%s ist unbekannt: das Verzeichnis gibt es weder lokal noch mitgeliefert", result.Ref)
+	}
+	result.Problems = append(result.Problems, problems...)
 
 	pieces := []string{}
 	for _, part := range parts {

@@ -350,11 +350,12 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
-| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves only `k-playbook:/instructions/…` |
+| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves `k-playbook:/instructions/…`, `/rules/…`, `/reviews/…` and `/guidelines/…` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
+| `k_playbook_briefing` | the briefing at session start: which instructions, rules, reviews and guidelines apply (references with title, description and origin) and what is pending in the project's collection (own open tasks and workbench topics, the number of open findings); like `k-playbook briefing --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
@@ -755,6 +756,15 @@ reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly a
 the text. `ref` in that scheme is the lasting contract of the tool: which source lies behind
 it -- the disk today, perhaps Kephalaion later -- is invisible to the caller.
 
+Resolved are `k-playbook:` references of the kinds `instructions/`, `rules/`, `reviews/` and
+`guidelines/`, each a single file local before shipped; only `instructions/always/` is
+assembled. The overlay is the one of `catalogs` in `k_playbook_context` (`overlayDocDir`):
+for `rules` and `reviews`, name, `origin` and `disabled` of an entry are the same over both
+ways, which a test checks. `guidelines` is an overlay kind here -- shipped
+`k-playbook/guidelines/` and local `k-playbook-local/guidelines/` -- while the field
+`guidelines` of the context output still lists only the local files
+(see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
+
 A successful answer is `{ok: true, tool, projectDir, ref, directory, content, disabled, hint,
 parts, problems}`:
 
@@ -775,8 +785,8 @@ Error codes, in the envelope's `error.code` like the knowledge tools:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` under `instructions/` but names no assembled directory (today only `instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, an unknown directory, a file with a trailing `/` |
-| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/` |
+| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` within a resolved kind but names no assembled directory (today only `instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, an unknown directory, a file with a trailing `/` |
+| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/`, `rules/`, `reviews/` and `guidelines/` (for example `checks/`) |
 | `not_found` | neither layer has the file or the assembled directory; there is no fallback to reading anywhere else |
 | `project_not_found` | `projectDir` leads to no project |
 | `read_failed` | the source could not be read |
@@ -875,6 +885,50 @@ Error codes in `error.code`:
 The CLI prints one line per result without `--json` (for `list`: reference, title, user,
 updated, and `done`, separated by tabs) and ends with exit 1 on an error, the code in
 parentheses at the end of the message.
+
+### Briefing Contract
+
+`k_playbook_briefing` is a thin wrapper over `project.BuildBriefing` (`project/briefing.go`);
+the subcommand `k-playbook briefing [--json]` calls the same function, without `--json` as a
+plain text for reading while testing. Its only input is `projectDir` (required by contract, like
+every tool). The briefing is the one call at the start of a session: **data, not prose** — it
+lists what applies and what is pending as references in the prefix scheme
+([verweisschema.md](verweisschema.md)), never paths and never contents. A listed document is
+read with `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix. It
+stands beside `k_playbook_context`, not in place of it: environment facts — paths, tools, `gh`,
+the Kephalaion binding — are only there, and a test keeps the two outputs free of shared fields
+(`schemaVersion` excepted, which describes each output itself).
+
+A successful answer is `{ok: true, tool, projectDir, schemaVersion, documents, work,
+projectDocs}`:
+
+| Field | Content |
+|---|---|
+| `schemaVersion` | the version of the briefing output, `"1"` |
+| `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `parts` in the order of the text, `problems` (files without a leading number, skipped) |
+| `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
+| each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
+| `work.available` | whether the project's collection could be read; `false` with `work.message` when `kephalaion.ok` is not true, the node cannot be reached or a listing fails -- a state, not an error |
+| `work.user` | the own Kephalaion user whose work is listed |
+| `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
+| `work.openFindings` | the number of documents in `queue/findings/` |
+| `projectDocs` | the entry of the project documentation, `project:/k-playbook-local/docs/README.md` |
+
+All lists are always present, `[]` when empty. The documents come through the same overlay as
+`catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
+shipped, an empty local file disables. `guidelines` is an overlay kind here -- shipped
+`k-playbook/guidelines/` and local `k-playbook-local/guidelines/` --, while the field
+`guidelines` of the context output still lists only the local files until the context output is
+switched.
+
+Deliberately not in the briefing: contents, commands, skills, checks, scripts, k-playbook's own
+docs and the local knowledge store `k-playbook-local/knowledge/` -- that one joins later, with
+counts per kind, state and origin and the freshness that
+[knowledge-gate.md](knowledge-gate.md#querying-the-surface) described for its briefing.
+
+Error codes in `error.code`: `invalid_input` for a missing `projectDir`, `project_not_found`
+for a `projectDir` that leads to no project, and `read_failed` when a layer could not be read
+-- a half briefing would look like a whole one, so the tool stops instead.
 
 ### GUI Status Contract
 

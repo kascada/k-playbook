@@ -36,6 +36,8 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | shipped rules | `k-playbook/rules/` |
 | shipped review recipes | `k-playbook/reviews/` |
 | shipped checks | `k-playbook/checks/` |
+| shipped guidelines | `k-playbook/guidelines/` |
+| shipped instructions, assembled and on demand | `k-playbook/instructions/always/`, `k-playbook/instructions/on-demand/` |
 | check runner | `k-playbook/bin/k-check` |
 | scripts | `k-playbook/scripts/` |
 | security tool matrix | `k-playbook/scripts/security-tools.tsv` |
@@ -50,7 +52,8 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | version inventory | `k-playbook-local/docs/versions/` |
 | manually maintained docs | `k-playbook-local/docs/manual/` |
 | raw material | `k-playbook-local/material/` |
-| guidelines | `k-playbook-local/guidelines/` |
+| project-owned guidelines | `k-playbook-local/guidelines/` |
+| project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
 | open tasks | `k-playbook-local/tasks/` |
 | completed tasks | `k-playbook-local/tasks/done/` |
 | machine files owned by k-playbook | `k-playbook-local/data/` |
@@ -222,12 +225,20 @@ Everything else has no counterpart on the other side:
 
 | | Directories |
 |---|---|
-| project-owned only | `results/`, `data/`, `cache/`, `docs/`, `guidelines/`, `tasks/`, `priv/`, `material/` |
+| project-owned only | `results/`, `data/`, `cache/`, `docs/`, `tasks/`, `priv/`, `material/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
 
 `docs/` appears in both rows but is not a pair: `k-playbook/docs/` documents
 k-playbook itself, while `k-playbook-local/docs/` documents the project. They
 are two different objects with the same name and nothing to merge.
+
+`guidelines/` is a pair since task 086 (2026-10-16): shipped `k-playbook/guidelines/`
+and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `rules/`
+-- a file of the same name replaces, an empty one disables. `k_playbook_doc_read`
+(`k-playbook:/guidelines/<name>.md`) and the briefing resolve it that way. The field
+`guidelines` of the context output is the one named exception: it still lists only
+the project-owned files until the context output is switched (see the next section);
+`catalogs` does not list the kind.
 
 Nothing below `k-playbook/` may be written, including by commands that read
 rules or recipes there. An update replaces the directory completely.
@@ -253,7 +264,7 @@ configuration and the filesystem:
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `rules`, `reviews`, `checks`, merged |
-| `guidelines` | files from `k-playbook-local/guidelines/` |
+| `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped `k-playbook/guidelines/`, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
@@ -263,6 +274,22 @@ and `disabled`, where applicable.
 
 This means no command has to apply overlay rules itself. There is one answer,
 and everyone receives the same one.
+
+**Beside the context output stands the briefing** (task 086, 2026-10-16):
+`k-playbook briefing [--json]` and the MCP tool `k_playbook_briefing`. The context
+output is the environment -- paths, configuration, tools, the merged catalogs with
+their paths. The briefing is what a session has to know at the start: which
+instructions, rules, reviews and guidelines apply, as references in the prefix
+scheme with title, description and origin (`k-playbook:/instructions/always/` with
+its parts, `on-demand/`, `rules/`, `reviews/`, `guidelines/`), and what is pending in
+the project's collection -- own open tasks and workbench topics, the number of open
+findings. References, never paths; no contents; no environment facts -- nothing
+stands in both outputs. Both go through the same overlay (`overlayDocDir` in
+`project/docref.go`), so an entry has the same origin wherever it appears. Today the
+briefing is an addition: `k-playbook.md`, the `AGENTS.md` block and `catalogs` are
+unchanged; the switch comes step by step
+([knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)).
+Contract: [mcp.md](mcp.md#briefing-contract).
 
 `links` is normally absent, intentionally: the invocation brings assistant
 linking in line with the catalog, as described below, and a message that says

@@ -303,6 +303,26 @@ func catalogKinds() []catalogKind {
 	}
 }
 
+// catalogKindNamed liefert eine Sorte aus catalogKinds() nach Namen. Ein
+// unbekannter Name ist ein Programmierfehler, kein Laufzeitfall.
+func catalogKindNamed(name string) catalogKind {
+	for _, kind := range catalogKinds() {
+		if kind.name == name {
+			return kind
+		}
+	}
+	panic("unbekannte Katalogsorte " + name)
+}
+
+// guidelinesKind ist die Sorte guidelines/: für ResolveDocRef und das
+// Briefing eine Überlagerungssorte wie rules — mitgeliefert in
+// k-playbook/guidelines/, lokal in k-playbook-local/guidelines/, gleicher Name
+// ersetzt, leer schaltet ab. Bewusst nicht in catalogKinds(): das Feld
+// Guidelines der Kontextausgabe liest bis zur Umstellung der Kontextausgabe
+// weiter nur lokal. Das ist die eine benannte Stelle, an der eine Sorte noch
+// zweifach aufgelöst wird (Task 086, docs/k-playbook-format.md).
+var guidelinesKind = catalogKind{name: "guidelines", dirName: "guidelines", suffix: ".md"}
+
 // BuildContext stellt den Arbeitsstand zusammen.
 func BuildContext(projectDir string) (Context, error) {
 	config, err := ReadConfig(projectDir)
@@ -371,49 +391,46 @@ func BuildContext(projectDir string) (Context, error) {
 	}
 
 	for _, kind := range catalogKinds() {
-		context.Catalogs[kind.name] = resolveCatalog(
+		entries, err := resolveCatalog(
 			filepath.Join(playbookDir, kind.dirName),
 			filepath.Join(localDir, kind.dirName),
 			kind,
 		)
+		if err != nil {
+			return Context{}, err
+		}
+		context.Catalogs[kind.name] = entries
 	}
 	return context, nil
 }
 
-// resolveCatalog führt mitgelieferte und projekteigene Einträge zusammen.
+// resolveCatalog führt mitgelieferte und projekteigene Einträge zusammen —
+// über overlayDocDir (docref.go), dieselbe Überlagerung, die auch die
+// Verweise und das Briefing anwenden; eine zweite Fassung der Regel gäbe
+// irgendwann eine zweite Antwort.
 //
 // Vergleichseinheit ist der Dateiname: beide Seiten benutzen dieselbe
 // Namenskonvention. Ein projekteigener Eintrag ersetzt den gleichnamigen
 // mitgelieferten vollständig; ist er leer, gilt der Eintrag als abgeschaltet.
-func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []CatalogEntry {
-	shipped := catalogFiles(shippedDir, kind)
-	local := catalogFiles(localDir, kind)
-
-	names := map[string]bool{}
-	for name := range shipped {
-		names[name] = true
-	}
-	for name := range local {
-		names[name] = true
+// Ein fehlendes Verzeichnis ist ein leerer Katalog; eine unlesbare Datei ist
+// ein Fehler, kein stiller Eintrag ohne Befund.
+func resolveCatalog(shippedDir string, localDir string, kind catalogKind) ([]CatalogEntry, error) {
+	layers := DocLayers{Dist: NewDiskDocSource(shippedDir), Local: NewDiskDocSource(localDir)}
+	resolved, _, err := overlayDocDir(layers, "", func(name string) bool { return isCatalogEntry(name, kind) })
+	if err != nil {
+		return nil, fmt.Errorf("Katalog %s: %w", kind.name, err)
 	}
 
-	entries := make([]CatalogEntry, 0, len(names))
-	for name := range names {
-		entry := CatalogEntry{Name: name, Key: catalogKey(name, kind)}
-
-		if path, ok := local[name]; ok {
-			entry.Path = path
-			entry.Origin = "local"
-			if _, overlaid := shipped[name]; overlaid {
-				entry.Origin = "override"
-			}
-			entry.Disabled = isEmptyFile(path)
-		} else {
-			entry.Path = shipped[name]
-			entry.Origin = "dist"
+	entries := make([]CatalogEntry, 0, len(resolved))
+	for _, item := range resolved {
+		entry := CatalogEntry{Name: item.Name, Key: catalogKey(item.Name, kind), Origin: item.Origin, Disabled: item.Disabled}
+		dir := shippedDir
+		if item.Origin != DocOriginDist {
+			dir = localDir
 		}
+		entry.Path = filepath.Join(dir, item.Name)
 		if kind.name == "reviews" && !entry.Disabled {
-			modes := readReviewModes(entry.Path)
+			modes := parseReviewModes(item.Content)
 			entry.Audit = &CatalogMode{
 				Enabled:        modes.AuditEnabled,
 				Mode:           modes.Mode,
@@ -429,9 +446,7 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) []Cata
 		}
 		entries = append(entries, entry)
 	}
-
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
-	return entries
+	return entries, nil
 }
 
 type reviewModes struct {
@@ -444,12 +459,20 @@ type reviewModes struct {
 	Scope          *CatalogScope
 }
 
+// readReviewModes liest die Modi eines Rezepts von der Platte.
 func readReviewModes(path string) reviewModes {
-	modes := reviewModes{AuditEnabled: false, ReviewEnabled: true}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return modes
+		return reviewModes{AuditEnabled: false, ReviewEnabled: true}
 	}
+	return parseReviewModes(data)
+}
+
+// parseReviewModes liest die Modi aus dem Frontmatter eines schon gelesenen
+// Rezepts — etwa aus einer DocSource, die keine Datei auf der Platte sein
+// muss.
+func parseReviewModes(data []byte) reviewModes {
+	modes := reviewModes{AuditEnabled: false, ReviewEnabled: true}
 	content := string(data)
 	if !(strings.HasPrefix(content, "---\n") || strings.HasPrefix(content, "---\r\n")) {
 		return modes
@@ -682,27 +705,10 @@ func markdownFrontmatterEnd(content string) int {
 	return -1
 }
 
-// catalogFiles liest ein Katalogverzeichnis, ohne Nicht-Einträge.
-func catalogFiles(dir string, kind catalogKind) map[string]string {
-	files := map[string]string{}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return files
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		// Unterverzeichnisse wie lib/ enthalten Hilfscode, keine Einträge.
-		if entry.IsDir() || !isCatalogEntry(name, kind) {
-			continue
-		}
-		files[name] = filepath.Join(dir, name)
-	}
-	return files
-}
-
 // isCatalogEntry filtert, was nie ein Eintrag ist: die README des Verzeichnisses,
-// Dotfiles und alles, was nicht zum Muster der Sorte passt.
+// Dotfiles und alles, was nicht zum Muster der Sorte passt. Unterverzeichnisse
+// wie lib/ enthalten Hilfscode, keine Einträge — die lässt schon
+// overlayDocDir aus.
 func isCatalogEntry(name string, kind catalogKind) bool {
 	if strings.HasPrefix(name, ".") || name == "README.md" {
 		return false

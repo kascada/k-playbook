@@ -6,7 +6,8 @@
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
-// löst einen Verweis im Präfixschema auf,
+// löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
+// Projekt gilt und was ansteht,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
 // Adresse der Oberfläche, ohne sie anzufassen, und `stop` beendet den
@@ -101,6 +102,10 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie read: die Ausgabe ist der Verweis oder JSON
 		// und sonst nichts.
 		return runDoc(args[1:])
+	case "briefing":
+		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
+		// Klartext oder JSON, und sonst nichts.
+		return runBriefing(args[1:])
 	case "vscode":
 		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
 		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
@@ -239,10 +244,21 @@ Unterkommandos:
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
             dahinter steht: k-playbook read <verweis> [--json]. Heute nur
-            k-playbook:-Verweise unter instructions/, lokal vor mitgeliefert;
-            ein Verweis mit / am Ende baut das Verzeichnis zu einem Text
-            zusammen. Hinweise stehen auf stderr. Dasselbe wie das
+            k-playbook:-Verweise unter instructions/, rules/, reviews/ und
+            guidelines/, lokal vor mitgeliefert; ein Verweis auf
+            instructions/always/ mit / am Ende baut das Verzeichnis zu einem
+            Text zusammen. Hinweise stehen auf stderr. Dasselbe wie das
             MCP-Werkzeug k_playbook_doc_read.
+  briefing  Listet als Daten, was für dieses Projekt gilt und was ansteht:
+            k-playbook briefing [--json]. Die immer geltenden Anweisungen
+            k-playbook:/instructions/always/ mit ihren Teilen, Anweisungen
+            auf Abruf, Regeln, Reviews und Leitlinien — lokal und
+            mitgeliefert aufgelöst, je Eintrag Verweis, Titel, Beschreibung,
+            Herkunft —, dazu aus der Projekt-Collection die eigenen offenen
+            Tasks und Arbeitsstände und die Zahl offener Befunde, und der
+            Einstieg der Projektdoku. Verweise, keine Pfade; Umgebungsangaben
+            stehen in context. Dasselbe wie das MCP-Werkzeug
+            k_playbook_briefing.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

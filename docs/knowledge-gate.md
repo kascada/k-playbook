@@ -48,7 +48,8 @@ requirement; the instruction is what makes it happen. Everything below follows f
 | Classification of deposits (kind from the path, origin, state, format in the frontmatter) | built, task 056 |
 | `raw` and `superseded` out of search by default | built, task 056 |
 | Migration of `docs/` and `material/` into `knowledge/` | under way as the switch of the writers, six steps, no separate pass; step 1 `/k-docs-extract` (task 073). The locations still read meanwhile are in [`knowledge-layout.md`](knowledge-layout.md#transitional-reads) |
-| Briefing call, filters on `kind`/`state`/`subject` | concept, this page |
+| Briefing call | built 2026-10-16 in another form than below (task 086): `k_playbook_briefing` / `k-playbook briefing` lists the documents that apply (instructions, rules, reviews, guidelines) and the own pending work in the project's collection, as references; the store's counts per kind/state/origin and freshness join later. See [`knowledge-aktuell.md`](knowledge-aktuell.md), "The briefing", and [`mcp.md`](mcp.md#briefing-contract) |
+| Filters on `kind`/`state`/`subject` | concept, this page |
 | Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
 | Test of the write side against the built tools | run on 2026-09-13; the findings it reproduced are fixed by task 063 and re-measured in the project on 2026-09-14. The edges found in the review of task 063 — linked directories at `write` and `supersede`, the successor rule, case in generator directories and the root `README.md`, the restore at `read`, `CreateLocal` with an unwritable index — are fixed by task 064 and re-measured in the project on 2026-09-15 over MCP and the command line |
 | Document view for `knowledge/` in the interface | not built; until it exists the anchor check of the write test cannot be satisfied, see "Open points" |
@@ -195,7 +196,7 @@ what keeps the index replaceable.
 
 | Tool | Answers | Notes |
 |---|---|---|
-| `briefing` | what is in the store at all | one call at session start; counts per kind, state and origin, the document titles, how fresh. Data, not prose. Not the content itself. |
+| `briefing` | what is in the store at all | one call at session start; counts per kind, state and origin, the document titles, how fresh. Data, not prose. Not the content itself. **Built in another form** as `k_playbook_briefing` (task 086): today the documents that apply and the own pending work; the store's counts and freshness come later. |
 | `search` | which sections match a question | the contract above; filters on kind, state, origin |
 | `list` | which documents exist | path, title, kind |
 | `read` | one document in full | Markdown, never HTML |

@@ -86,10 +86,14 @@ Aufruf:
   k-playbook read <verweis> [--json]
 
 Löst einen k-playbook:-Verweis auf (docs/verweisschema.md) — lokal und
-mitgeliefert schon gegeneinander aufgelöst. Gesucht wird das Projekt ab dem
+mitgeliefert schon gegeneinander aufgelöst, dieselbe Überlagerung wie
+catalogs in k-playbook context. Gesucht wird das Projekt ab dem
 Arbeitsverzeichnis aufwärts.
 
   k-playbook:/instructions/on-demand/<name>.md
+  k-playbook:/rules/<name>.md
+  k-playbook:/reviews/review-<name>.md
+  k-playbook:/guidelines/<name>.md
             Eine Datei: die lokale, sonst die mitgelieferte, unverändert mit
             Frontmatter. Eine leere lokale Datei schaltet ab: kein Inhalt,
             ein Hinweis auf stderr, Exit 0.
@@ -98,13 +102,14 @@ Arbeitsverzeichnis aufwärts.
             beiden Ebenen, numerisch sortiert, ohne Frontmatter zu einem Text
             zusammengefügt. Dateien ohne Ziffer werden übergangen und auf
             stderr gemeldet. Zusammengebaut wird nur dieses Verzeichnis; jedes
-            andere mit / am Ende — on-demand/, instructions/ selbst, eine
-            Datei mit / — ist ein Fehler: der Dateiname fehlt (invalid_input).
+            andere mit / am Ende — on-demand/, instructions/ selbst, rules/,
+            eine Datei mit / — ist ein Fehler: der Dateiname fehlt
+            (invalid_input).
 
 Ohne --json steht auf stdout nur der Inhalt. Mit --json kommt die Antwort als
 JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled)
 und problems. Ein unbekannter Verweis ist ein Fehler (not_found); project:-
-und keph:-Verweise sowie k-playbook: außerhalb von instructions/ werden noch
-nicht aufgelöst (unsupported).
+und keph:-Verweise sowie k-playbook: außerhalb von instructions/, rules/,
+reviews/ und guidelines/ werden noch nicht aufgelöst (unsupported).
 `)
 }
