@@ -116,13 +116,14 @@ Two layers, compared by name:
 
 | Layer | Directory | Origin |
 |---|---|---|
-| shipped | the installation `k-playbook/` — a clone of this repo, read at its top level, not `defaults/` | `dist` |
+| shipped | the installation `k-playbook/` — a clone of this repo; `instructions/` is read from `defaults/instructions/`, the other kinds at the top level | `dist` |
 | local | `k-playbook-local/` | `local`, or `override` when it replaces a shipped file of the same name |
 
-The shipped content therefore lies at the top of the repo (`instructions/`) and, as a real
-copy, in `defaults/instructions/` for the hub. Unlike the rest of `defaults/`, it is not
-frozen: `instructions/` is maintained continuously, and a Go test in the normal test run
-keeps both trees equal; `.github/scripts/pack-defaults.sh` refuses to pack when they differ.
+The shipped instructions exist once, in `defaults/instructions/`: the installation reads
+them there (`NewShippedDocSource` in `docref.go`), and the release packs the same files for
+the hub. Until 2026-10-17 a copy lay at the top of the repo as well, kept equal by a test;
+that copy is gone. `rules/`, `reviews/` and `guidelines/` still lie at the top of the repo
+until their own switch, because the catalogs of `k-playbook context` read them there.
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
 layer. Today the source is the disk; later it can be Kephalaion without the caller noticing.

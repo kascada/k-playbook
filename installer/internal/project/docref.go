@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -206,14 +207,51 @@ type DocLayers struct {
 }
 
 // ProjectDocLayers sind die Ebenen eines Projekts auf der Platte: die
-// Installation k-playbook/ (deren oberste Ebene, nicht defaults/) und
-// k-playbook-local/.
+// Installation k-playbook/ (siehe NewShippedDocSource) und k-playbook-local/.
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
-		Dist:  NewDiskDocSource(PlaybookDir(projectDir)),
+		Dist:  NewShippedDocSource(PlaybookDir(projectDir)),
 		Local: NewDiskDocSource(LocalDir(projectDir)),
 	}
 }
+
+// defaultsDirName ist das Verzeichnis der Installation, das den Lieferumfang
+// für den Hub trägt; sein Inhalt wird zum Release gepackt und landet unter
+// <hub>:k-playbook/defaults/.
+const defaultsDirName = "defaults"
+
+// NewShippedDocSource ist die mitgelieferte Ebene einer Installation. Die
+// Sorte instructions/ liegt nur in defaults/instructions/ — einmal, für Hub
+// und Installation gleichermaßen; eine zweite Fassung oben im Repo, die mit
+// der Kopie gleichzuhalten wäre, gibt es seit 2026-10-17 nicht mehr. Die
+// übrigen Sorten (rules/, reviews/, guidelines/) lesen bis zu ihrer
+// Umstellung weiter die oberste Ebene der Installation, weil auch die
+// Kataloge der Kontextausgabe dort lesen.
+func NewShippedDocSource(playbookDir string) DocSource {
+	return shippedDocSource{
+		top:      NewDiskDocSource(playbookDir),
+		defaults: NewDiskDocSource(filepath.Join(playbookDir, defaultsDirName)),
+	}
+}
+
+type shippedDocSource struct {
+	top      DocSource
+	defaults DocSource
+}
+
+// pick wählt die Quelle nach dem ersten Segment des Pfads: instructions/
+// aus defaults/, alles andere von oben. Der Pfad bleibt derselbe, weil
+// defaults/ denselben Aufbau hat.
+func (s shippedDocSource) pick(p string) DocSource {
+	first, _, _ := strings.Cut(p, "/")
+	if first == docInstructionsRoot {
+		return s.defaults
+	}
+	return s.top
+}
+
+func (s shippedDocSource) List(dir string) ([]DocSourceEntry, error) { return s.pick(dir).List(dir) }
+func (s shippedDocSource) Read(file string) ([]byte, error)          { return s.pick(file).Read(file) }
 
 // NewDiskDocSource ist eine DocSource über ein Verzeichnis auf der Platte.
 // Gelesen wird über fs.FS: Pfade, die aus der Wurzel herausführen, weist das

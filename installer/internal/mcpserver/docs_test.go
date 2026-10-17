@@ -27,17 +27,17 @@ func newDocProject(t *testing.T) string {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	files := map[string]string{
-		"k-playbook/instructions/always/010-a.md":           "---\ntitle: A\n---\n\n## A\n",
-		"k-playbook/instructions/always/100-b.md":           "## B mitgeliefert\n",
-		"k-playbook/instructions/always/200-c.md":           "## C\n",
-		"k-playbook/instructions/always/README.md":          "# Liesmich\n\nText.\n",
-		"k-playbook/instructions/on-demand/thema.md":        "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
-		"k-playbook/instructions/on-demand/aus.md":          "## Aus\n",
-		"k-playbook-local/instructions/always/100-b.md":     "## B lokal\n\nText.\n",
-		"k-playbook-local/instructions/always/200-c.md":     "# Abgeschaltet\n",
-		"k-playbook-local/instructions/always/notiz.md":     "## Notiz\n\nText.\n",
-		"k-playbook-local/instructions/always/1000-eins.md": "## Eigen\n\nText.\n",
-		"k-playbook-local/instructions/on-demand/aus.md":    "",
+		"k-playbook/defaults/instructions/always/010-a.md":    "---\ntitle: A\n---\n\n## A\n",
+		"k-playbook/defaults/instructions/always/100-b.md":    "## B mitgeliefert\n",
+		"k-playbook/defaults/instructions/always/200-c.md":    "## C\n",
+		"k-playbook/defaults/instructions/always/README.md":   "# Liesmich\n\nText.\n",
+		"k-playbook/defaults/instructions/on-demand/thema.md": "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
+		"k-playbook/defaults/instructions/on-demand/aus.md":   "## Aus\n",
+		"k-playbook-local/instructions/always/100-b.md":       "## B lokal\n\nText.\n",
+		"k-playbook-local/instructions/always/200-c.md":       "# Abgeschaltet\n",
+		"k-playbook-local/instructions/always/notiz.md":       "## Notiz\n\nText.\n",
+		"k-playbook-local/instructions/always/1000-eins.md":   "## Eigen\n\nText.\n",
+		"k-playbook-local/instructions/on-demand/aus.md":      "",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))

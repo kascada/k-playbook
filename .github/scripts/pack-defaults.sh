@@ -30,16 +30,11 @@ test -d "$src" || fail "$src/ fehlt; aufrufen aus dem Wurzelverzeichnis des Repo
 test -f VERSION || fail "VERSION fehlt im Wurzelverzeichnis."
 test ! -e "$src/VERSION" || fail "$src/VERSION darf es nicht geben; VERSION kommt beim Packen aus dem Wurzelverzeichnis."
 
-# instructions/ wird laufend gepflegt und liegt doppelt: oben im Repo für die
-# Installation, als echte Kopie in defaults/instructions/ für den Hub. Weichen
-# die beiden voneinander ab, bekäme der Hub einen anderen Stand als die
-# Installation. Denselben Gleichstand prüft ein Go-Test im normalen Testlauf
-# (installer/internal/project/instructions_tree_test.go).
-test -d instructions || fail "instructions/ fehlt im Wurzelverzeichnis."
+# instructions/ liegt nur hier, in defaults/instructions/ — Installation und
+# Hub lesen dieselbe Fassung (installer/internal/project/docref.go,
+# NewShippedDocSource). Eine Kopie oben im Repo gibt es seit 2026-10-17 nicht
+# mehr; nichts ist gleichzuhalten.
 test -d "$src/instructions" || fail "$src/instructions/ fehlt."
-drift="$(diff -r instructions "$src/instructions" 2>&1)" ||
-	fail "instructions/ und $src/instructions/ weichen voneinander ab:
-$drift"
 
 other="$(find "$src" ! -type f ! -type d)"
 test -z "$other" || fail "nur Dateien und Verzeichnisse erlaubt, gefunden:

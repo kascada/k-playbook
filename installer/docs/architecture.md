@@ -923,7 +923,7 @@ Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
 |---|---|---|
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
-| `k-playbook/instructions/` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/instructions/` | nur dieses Projekt | bleibt |
 
 Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
@@ -934,9 +934,11 @@ Gelesen wird sie nur über Verweise, `k-playbook read` bzw. `k_playbook_doc_read
 schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Verweis auf
 `always/` baut die Teile mit Ziffer vorn zu einem Text zusammen, numerisch sortiert über beide
 Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `always/` —
-`on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferte Ebene ist die oberste Ebene der Installation, nicht `defaults/`;
-`defaults/instructions/` ist die Kopie für den Hub, ihr Gleichstand mit `instructions/` ist
-per Test gesichert (`project/instructions_tree_test.go`). Wie `always/` zu `k-playbook.md`
+`on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferten Anweisungen liegen einmal, in
+`defaults/instructions/`: `NewShippedDocSource` (`project/docref.go`) liest die Sorte
+`instructions` dort und die übrigen Sorten weiter von der obersten Ebene der Installation,
+weil die Kataloge der Kontextausgabe dort lesen. Die Kopie oben im Repo samt
+Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
 steht, entscheidet Task 086. Regeln und Zugriffswege:
 [`../../docs/verweisschema.md`](../../docs/verweisschema.md).
 

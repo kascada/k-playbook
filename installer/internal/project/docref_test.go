@@ -472,7 +472,7 @@ func TestDocRefMitgelieferterStand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Repo-Wurzel: %v", err)
 	}
-	layers := DocLayers{Dist: NewDiskDocSource(root), Local: NewDiskDocSource(t.TempDir())}
+	layers := DocLayers{Dist: NewShippedDocSource(root), Local: NewDiskDocSource(t.TempDir())}
 
 	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/")
 	if len(always.Parts) == 0 || always.Parts[0].Name != "010-verweise.md" {
@@ -615,5 +615,38 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	code, ok := entryByName(context.Catalogs["reviews"], "review-code.md")
 	if !ok || code.Audit == nil || !code.Audit.Enabled {
 		t.Errorf("review-code: %+v", code)
+	}
+}
+
+// Die mitgelieferte Ebene liest instructions/ aus defaults/, die übrigen
+// Sorten von oben — es gibt nur eine Fassung der Anweisungen, keine Kopie.
+func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
+	playbook := t.TempDir()
+	for rel, content := range map[string]string{
+		"defaults/instructions/always/010-a.md": "## A\n",
+		"defaults/instructions/on-demand/x.md":  "## X\n",
+		"instructions/always/999-oben.md":       "## Oben\n",
+		"rules/befunde.md":                      "# Regel\n",
+		"defaults/rules/befunde.md":             "# Regel aus defaults\n",
+	} {
+		full := filepath.Join(playbook, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	layers := DocLayers{Dist: NewShippedDocSource(playbook), Local: NewDiskDocSource(t.TempDir())}
+
+	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/")
+	if len(always.Parts) != 1 || always.Parts[0].Name != "010-a.md" {
+		t.Errorf("always aus defaults/ erwartet, bekommen: %+v", always.Parts)
+	}
+	if x := mustResolveDoc(t, layers, "k-playbook:/instructions/on-demand/x.md"); x.Content != "## X\n" {
+		t.Errorf("on-demand aus defaults/: %q", x.Content)
+	}
+	if rule := mustResolveDoc(t, layers, "k-playbook:/rules/befunde.md"); rule.Content != "# Regel\n" {
+		t.Errorf("rules weiter von oben erwartet: %q", rule.Content)
 	}
 }

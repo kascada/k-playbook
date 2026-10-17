@@ -10,7 +10,7 @@ Working document for the duration of the switch, in the manner of
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
-As of: 2026-10-16.
+As of: 2026-10-17.
 
 ## Goal
 
@@ -121,8 +121,10 @@ and `VERSION` is added from the root when packing, because the release only bump
 have to lie on disk for the assistants and to run, so they stay in the local `k-playbook/` as
 today. The old places stay for the installation; two copies cannot drift because the shipped
 content is not changed until the switch is complete. `defaults/instructions/` came in on
-2026-10-14 and is the exception: it is maintained continuously and kept equal to
-`instructions/` by a test (see "A new kind `instructions/`" below). Who delivers the Markdown — k-playbook
+2026-10-14 and is the exception: it is maintained continuously and, since 2026-10-17, the
+only place of the shipped instructions (see "A new kind `instructions/`" below). From here
+on nothing new goes into the old places at the top of the repo; they are taken out kind by
+kind. Who delivers the Markdown — k-playbook
 from the release or Kephalaion — and how local entries override it is decided together with
 the briefing. Against links at the old places, should files move later: `filepath.WalkDir`
 does not descend into a symlinked root (`installer/internal/project/docs.go:40`), and a file
@@ -147,11 +149,13 @@ left out and reported), `instructions/on-demand/` unnumbered files with frontmat
 template and the context output are unchanged, `catalogs` does not list the kind, and the text
 of the first parts stands twice for now, in the Go code that writes `AGENTS.md` and in
 `instructions/always/`. Whether `always/` replaces or supplements `k-playbook.md` is decided by
-the briefing (task 086). **"Frozen" does not apply here:** `instructions/` lies at the top of the
-repo for the installation and as a real copy in `defaults/instructions/` for the hub, and it is
-maintained continuously; a Go test in the normal test run
-(`installer/internal/project/instructions_tree_test.go`) keeps both trees equal, and
-`.github/scripts/pack-defaults.sh` refuses to pack when they differ.
+the briefing (task 086). **"Frozen" does not apply here:** `instructions/` is maintained
+continuously. Until 2026-10-17 it lay twice — at the top of the repo for the installation and
+as a copy in `defaults/instructions/` for the hub, kept equal by a test. **Since 2026-10-17 it
+lies only in `defaults/instructions/`:** the installation reads it there (`NewShippedDocSource`
+in `docref.go`), the release packs the same files, the top-level copy, the test and the drift
+check in `pack-defaults.sh` are gone. `rules/`, `reviews/` and `guidelines/` are still read at
+the top of the repo until their own switch.
 
 **`k_playbook_doc_read` and `k-playbook read`** (2026-10-14, task 087). The MCP tool and the
 subcommand resolve `k-playbook:/instructions/…` through an exchangeable source — the disk today
@@ -257,9 +261,15 @@ The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
 ## Target for `k-playbook.md` and `AGENTS.md` (task 086)
 
 The goal: a session gets its entry completely through k-playbook — `k_playbook_briefing` for
-what applies and what is pending, `k_playbook_doc_read` for the contents, `k-playbook context`
-for the environment —, and `k-playbook.md` and the block in `AGENTS.md` are only a minimal
-prompt. This table (2026-10-16) assigns every section of `k-playbook.md` and every sentence of
+what applies, what is pending and the environment, `k_playbook_doc_read` for the contents —,
+and `k-playbook.md` and the block in `AGENTS.md` are only a minimal prompt.
+
+**The briefing replaces everything** (2026-10-16): `k-playbook.md`, the `AGENTS.md` blocks
+down to the minimal prompt, and `k-playbook context` as well. The context output is taken
+apart field by field — each field moves into the briefing or drops — and at the end the
+command `k-playbook context` and the tool `k_playbook_context` go. Until then both work.
+Todo #26. Where the table below still says "context" as a future place, that is an
+intermediate state, not the target. This table (2026-10-16) assigns every section of `k-playbook.md` and every sentence of
 the three `AGENTS.md` blocks (markers `k-playbook:anstoss`, `k-playbook:session-memory`,
 `k-playbook:befunde`, templates in `installer/internal/project/instructions.go`) to its future
 place. Nothing is moved by this task; each row is its own step later ("build first, then put
@@ -360,8 +370,9 @@ until the last step.
    above); the table "Target for `k-playbook.md` and `AGENTS.md`" assigning every section and
    every block sentence to its future place. **Still open, deliberately:** the name clash
    `instructions` (context field with the `k-playbook.md` paths versus the directory
-   `instructions/` the briefing lists), putting the briefing into `AGENTS.md`, and switching
-   the context output — all three belong to the switch step at the end, after the sections of
+   `instructions/` the briefing lists), putting the briefing into `AGENTS.md`, and taking the
+   context output apart into the briefing until `k-playbook context` can go (todo #26) — all
+   three belong to the switch step at the end, after the sections of
    the table have moved one by one. The check against the real installation follows the next
    release.
 10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):

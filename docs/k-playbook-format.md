@@ -37,7 +37,7 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | shipped review recipes | `k-playbook/reviews/` |
 | shipped checks | `k-playbook/checks/` |
 | shipped guidelines | `k-playbook/guidelines/` |
-| shipped instructions, assembled and on demand | `k-playbook/instructions/always/`, `k-playbook/instructions/on-demand/` |
+| shipped instructions, assembled and on demand | `k-playbook/defaults/instructions/always/`, `k-playbook/defaults/instructions/on-demand/` |
 | check runner | `k-playbook/bin/k-check` |
 | scripts | `k-playbook/scripts/` |
 | security tool matrix | `k-playbook/scripts/security-tools.tsv` |
