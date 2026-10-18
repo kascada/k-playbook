@@ -136,14 +136,17 @@ func TestDocReadFehlercodes(t *testing.T) {
 		"k-playbook:/instructions/always/010-a.md/":     project.DocCodeInvalidInput,
 		"k-playbook:/instructions/always/1000-eins.md/": project.DocCodeInvalidInput,
 		"k-playbook:/instructions/on-demand/":           project.DocCodeInvalidInput,
-		"project:/scripts/123.sh":                       project.DocCodeUnsupported,
-		"keph:/manual/abc.md":                           project.DocCodeUnsupported,
-		"k-playbook:/checks/check_x.sh":                 project.DocCodeUnsupported,
-		"k-playbook:/rules/":                            project.DocCodeInvalidInput,
-		"k-playbook:/rules/fehlt.md":                    project.DocCodeNotFound,
-		"k-playbook:/instructions/../rules/x.md":        project.DocCodeInvalidInput,
-		"instructions/always/":                          project.DocCodeInvalidInput,
-		"":                                              project.DocCodeInvalidInput,
+		"project:/scripts/123.sh":                       project.DocCodeNotFound,
+		"project:/k-playbook/":                          project.DocCodeInvalidInput,
+		// Ohne Anbindung des Projekts; der Node wird nicht gefragt.
+		"keph:/manual/abc.md":                    project.DocCodeKephalaionUnavailable,
+		"keph:/manual/":                          project.DocCodeInvalidInput,
+		"k-playbook:/checks/check_x.sh":          project.DocCodeUnsupported,
+		"k-playbook:/rules/":                     project.DocCodeInvalidInput,
+		"k-playbook:/rules/fehlt.md":             project.DocCodeNotFound,
+		"k-playbook:/instructions/../rules/x.md": project.DocCodeInvalidInput,
+		"instructions/always/":                   project.DocCodeInvalidInput,
+		"":                                       project.DocCodeInvalidInput,
 	} {
 		envelope, result := callDocRead(t, root, ref)
 		if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != code {
@@ -417,4 +420,96 @@ func TestDocKindSchemaAusDerTabelle(t *testing.T) {
 	if _, ok := docKindSchema[docMoveInput]().Properties["kind"]; ok {
 		t.Fatal("done/reopen haben kein kind")
 	}
+}
+
+// Includes über die Hülle: eingesetzt, mit includes: false roh, Fehler mit
+// Code und Kette, includes in der Antwort.
+func TestDocReadIncludes(t *testing.T) {
+	root := newDocProject(t)
+	for rel, content := range map[string]string{
+		"k-playbook/defaults/includes/context.md":          "## Kontext\n\nBaustein.\n",
+		"k-playbook/defaults/commands/k-danke.md":          "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
+		"k-playbook/defaults/commands/zyklus.md":           "include: zyklus.md\n",
+		"k-playbook/defaults/instructions/always/300-d.md": "## D\n\ninclude: k-playbook:/includes/context.md\n",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	call := func(ref string, includes *bool) docEnvelope {
+		t.Helper()
+		result, _, err := docReadTool(context.Background(), nil, docReadInput{ProjectDir: root, Ref: ref, Includes: includes})
+		if err != nil {
+			t.Fatalf("doc_read: %v", err)
+		}
+		var envelope docEnvelope
+		decodeEnvelope(t, result, &envelope)
+		return envelope
+	}
+	no := false
+	yes := true
+
+	envelope := call("k-playbook:/commands/k-danke.md", nil)
+	if !envelope.OK || deref(envelope.Content) != "# k-danke\n\n## Kontext\n\nBaustein.\n" {
+		t.Fatalf("eingesetzt: %#v", envelope)
+	}
+	if envelope.Includes == nil || !reflect.DeepEqual(*envelope.Includes, []project.DocInclude{{Ref: "k-playbook:/includes/context.md", Origin: "dist", Depth: 1}}) {
+		t.Errorf("includes: %+v", envelope.Includes)
+	}
+	if e := call("k-playbook:/commands/k-danke.md", &yes); deref(e.Content) != deref(envelope.Content) {
+		t.Errorf("includes: true weicht vom Standard ab: %q", deref(e.Content))
+	}
+	rawEnvelope := call("k-playbook:/commands/k-danke.md", &no)
+	if deref(rawEnvelope.Content) != "# k-danke\n\ninclude: k-playbook:/includes/context.md\n" || rawEnvelope.Includes == nil || len(*rawEnvelope.Includes) != 0 {
+		t.Errorf("includes: false: %#v", rawEnvelope)
+	}
+	// Ohne Include ist includes [] — immer da.
+	if e := call("k-playbook:/instructions/on-demand/thema.md", nil); e.Includes == nil || len(*e.Includes) != 0 {
+		t.Errorf("includes ohne Include: %#v", e.Includes)
+	}
+	// Das Verzeichnis setzt je Teil ein.
+	if e := call("k-playbook:/instructions/always/", nil); !strings.Contains(deref(e.Content), "## D\n\n## Kontext\n\nBaustein.\n") || len(*e.Includes) != 1 {
+		t.Errorf("Verzeichnis: %#v", e)
+	}
+	errEnvelope := call("k-playbook:/commands/zyklus.md", nil)
+	if errEnvelope.OK || errEnvelope.Error == nil || errEnvelope.Error.Code != project.DocCodeIncludeCycle ||
+		!strings.Contains(errEnvelope.Error.Message, "Include-Kette: k-playbook:/commands/zyklus.md → k-playbook:/commands/zyklus.md") {
+		t.Errorf("Zyklus: %#v", errEnvelope.Error)
+	}
+	if errEnvelope.Includes != nil || errEnvelope.Content != nil {
+		t.Errorf("Fehlerantwort trägt Inhalt: %#v", errEnvelope)
+	}
+	if e := call("k-playbook:/commands/zyklus.md", &no); !e.OK {
+		t.Errorf("Zyklus roh: %#v", e.Error)
+	}
+	// Die Sorten includes/ und testdata/ erscheinen nicht in der Beschreibung.
+	for _, text := range []string{docReadSchemaText(t), docReadDescription} {
+		if strings.Contains(text, "includes/") || strings.Contains(text, "testdata/") {
+			t.Errorf("Lesersorten in der Werkzeugbeschreibung: %q", text)
+		}
+		if strings.Contains(text, "unsupported gemeldet") {
+			t.Errorf("Beschreibung nennt project:/keph: noch als unsupported: %q", text)
+		}
+	}
+}
+
+func docReadSchemaText(t *testing.T) string {
+	t.Helper()
+	schema, err := jsonschema.For[docReadInput](nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var text strings.Builder
+	for _, prop := range schema.Properties {
+		text.WriteString(prop.Description)
+		text.WriteString("\n")
+	}
+	if _, ok := schema.Properties["includes"]; !ok {
+		t.Error("Schema ohne includes")
+	}
+	return text.String()
 }

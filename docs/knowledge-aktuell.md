@@ -10,7 +10,7 @@ Working document for the duration of the switch, in the manner of
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
-As of: 2026-10-17.
+As of: 2026-10-18.
 
 ## Goal
 
@@ -159,13 +159,46 @@ in `docref.go`), the release packs the same files, the top-level copy, the test 
 check in `pack-defaults.sh` are gone. `rules/`, `reviews/` and `guidelines/` are still read at
 the top of the repo until their own switch.
 
-**`k_playbook_doc_read` and `k-playbook read`** (2026-10-14, task 087). The MCP tool and the
-subcommand resolve `k-playbook:/instructions/…` through an exchangeable source — the disk today
-(`installer/internal/project/docref.go`). A single file comes unchanged with frontmatter; an
-empty local file disables it without an error; a directory is assembled without frontmatter;
-an unknown reference is `not_found` with no fallback to the disk; `project:`, `keph:` and other
-`k-playbook:` kinds are `unsupported` for now. The `ref` in the prefix scheme is the lasting
-contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract).
+**`k_playbook_doc_read` and `k-playbook read`** (2026-10-14, task 087; all three prefixes
+since 2026-10-18, task 093). The MCP tool and the subcommand are thin hulls over one function,
+`ResolveDocRef` (`installer/internal/project/docref.go`), which resolves `k-playbook:`
+through an exchangeable source — the disk today —, `project:` from disk below the project
+root, and `keph:` through the Kephalaion client (`Client.Read`, the node's `read` from the
+replica, access opened like for the `doc` tools, `~` replaced by `kephalaion.user`). A
+single file comes with frontmatter; an empty local file disables a `k-playbook:` file without
+an error; a directory is assembled without frontmatter; an unknown reference is `not_found`
+with no fallback; `kephalaion_unavailable` when the binding is not ready. `unsupported` is
+left for `k-playbook:` outside its kinds. The `ref` in the prefix scheme is the lasting
+contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract) and
+[`verweisschema.md`](./verweisschema.md#access-route-per-prefix). **Put to use later:**
+`instructions/always/010-verweise.md` still says "`keph:` you read directly with Kephalaion
+`read`" — that stays true and is extended by `k_playbook_doc_read` in the follow-up task that
+moves the commands; that task also decides which of the two routes is the default for
+`keph:`. Until then [`verweisschema.md`](./verweisschema.md) documents both.
+
+**Includes** (2026-10-18, task 093). An include is a reference at a particular place in a
+document; `ResolveDocRef` replaces the line by the body of the target, so that commands,
+rules and instructions no longer copy shared pieces. Decided and built: (1) **Includes apply
+generally**, in every document the resolution reads, with a parameter to switch them off
+(`k-playbook read --raw`, `k_playbook_doc_read` with `includes: false`,
+`DocReadOptions{Raw}`); there is no list of directories where they are "on". (2) **Syntax
+`include:`** at the start of a line, exactly one argument — a reference with prefix or a
+relative path in the same prefix —, not inside fenced code blocks, no HTML comment so that
+an unresolved include stays readable in the raw text. (3) **Recursive and bounded:** depth
+10, a cycle is detected on the open chain at once; the codes are `include_cycle` and
+`include_too_deep`, every include error carries the chain `a.md → b.md → c.md` once.
+(4) **Two error levels:** a failed include in a single document fails the whole read; in an
+assembled directory (`instructions/always/`, and so in the briefing) the failing part lands
+with its chain under `problems`, the others stay — a faulty local always-instruction does not
+stop the session start. (5) **Kinds `includes` and `testdata`:** `defaults/includes/` holds
+the blocks (`k-playbook:/includes/<name>.md`, local override wins, no block yet),
+`defaults/testdata/includes/` the fixed cases that the Go tests read from disk and that
+every hub carries after the release; neither appears in a catalog, the briefing or the help.
+(6) `DocResult.includes` lists the inserted targets with `ref`, `origin`, `depth`,
+`disabled`. Nothing shipped carries an include line yet ("build first, then put to use").
+**Note for the follow-up task:** `keph:` includes are allowed by the mechanism, but they
+make a document depend on the network and on `kephalaion.ok` — in always-instructions and
+briefing texts only with care. Details: [`verweisschema.md`](./verweisschema.md#includes).
 
 **Commands as a hull with a reference** (2026-10-18, task 092 — built, measured in the
 assistants after the next release). A command consists of two parts: a **hull** with the
@@ -182,9 +215,8 @@ pull after), later the binary takes over the pulling as a subcommand and the com
 calls it and relays the message — the subcommand is not named in the text until it exists.
 Includes — text blocks k-playbook inserts into a document before handing it out — are
 resolved by k-playbook in `ResolveDocRef`, recursively with a limit, not by Kephalaion;
-`defaults/includes/` exists with a README, syntax and mechanism are a task of their own, and
-`includes` becomes a kind only with that task. Fixed test cases for the mechanism are planned
-for `defaults/testdata/`, which lands read-only on every hub. Three things are deliberate:
+built in task 093 (see "Includes" below), with `includes` as a kind and the fixed test cases
+in `defaults/testdata/`, which lands read-only on every hub. Three things are deliberate:
 (1) **The hull lies by hand at the old place** `commands/`, against "nothing new goes into
 the old places" — the registry links only `k-playbook/commands/`; the hull goes when the
 binary generates hulls from `defaults/commands/` (own task). (2) **The hull has no
@@ -557,8 +589,13 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     `commands` is a kind of `k_playbook_doc_read`, read from `defaults/commands/`;
     `/k-upgrade` is hull plus text; `defaults/includes/` exists with a README. Open: the
     check in Claude Code, OpenCode and Cursor after the next release (step 4 of the task).
-14. **Includes** — syntax, resolution in `ResolveDocRef`, recursion limit, fixed test cases
-    in `defaults/testdata/` on disk and on the hub; `includes` becomes a kind with it.
+14. **All prefixes and includes** — built 2026-10-18 (task 093, in the working tree):
+    `ResolveDocRef` resolves `project:` and `keph:` (the client gained `Read`), include
+    lines are inserted in every document with `--raw`/`includes: false` to switch off,
+    `includes` and `testdata` are kinds, the fixed cases lie in `defaults/testdata/includes/`.
+    Open for the follow-up tasks: extend `010-verweise.md` by `k_playbook_doc_read` for `keph:`
+    and decide the default route; the first include (`_shared/context.md`) with the move of
+    the commands; `keph:` includes in always-instructions only with care (network).
 15. **Hulls generated by the binary** — from `defaults/commands/` instead of files under
     `commands/` and symlinks; `/k-upgrade`'s hand-made hull goes with it, and the hull form
     becomes a rule in `rules/command-authoring.md`.

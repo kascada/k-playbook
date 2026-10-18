@@ -111,16 +111,23 @@ Generator veröffentlicht sein Verzeichnis als Ganzes. Der Index liegt verwerfba
 oder mit `--help` fasst das Kommando keine Daten an und legt den Index nicht an, damit es
 als Rauchtest nach einem Release folgenlos bleibt.
 
-`read <verweis> [--json]` löst einen Verweis im Präfixschema auf
+`read <verweis> [--raw] [--json]` löst einen Verweis im Präfixschema auf
 ([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
-steht — heute `k-playbook:`-Verweise der Sorten `instructions/`, `rules/`, `reviews/`,
-`guidelines/` und `commands/` (`docRefKinds`), lokal vor mitgeliefert, ein
-Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
+steht — `project:` eine Datei des Projekts ab seiner Wurzel (`os.DirFS`, eine Ebene), `keph:`
+ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zugang wie
+`OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
+`rules/`, `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
+Include-Ziele `includes/` und `testdata/`, zusammen `docRefKinds`), lokal vor mitgeliefert,
+ein Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
 `instructions/always/`) zu einem Text zusammengebaut; jeder andere mit `/` am Ende ist
-`invalid_input` („Dateiname fehlt“). Ohne `--json` steht auf stdout nur der
-Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-Werkzeug
-`k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
-(`project/docref.go`).
+`invalid_input` („Dateiname fehlt“). Include-Zeilen (`include: <verweis>`) setzt der
+`docIncluder` in `project/docref.go` rekursiv ein (Tiefe 10, Zyklusprüfung, Kette in jeder
+Meldung; bei einer Datei scheitert der Lesevorgang, in einem zusammengebauten Verzeichnis
+fällt nur der Teil aus und steht unter `problems`); `--raw` lässt sie stehen. Ohne `--json`
+steht auf stdout nur der Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach
+stderr. Das MCP-Werkzeug `k_playbook_doc_read` ist die Hülle darum (Parameter `includes`);
+beide rufen `project.ResolveDocRefWith` (`project/docref.go`), das Briefing und ältere
+Aufrufer `project.ResolveDocRef` mit den Standardoptionen.
 
 `briefing [--json]` gibt das Briefing aus (Task 086): vorweg den Text der immer geltenden
 Anweisungen `k-playbook:/instructions/always/` (`documents.always.content`, zusammengebaut von
@@ -256,9 +263,12 @@ installer/
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
 │   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
-│   │                            für resolveCatalog), ResolveDocRef für k-playbook:/
-│   │                            instructions/…, rules/…, reviews/…, guidelines/…,
-│   │                            commands/… (der Text, die Hülle liegt beim Assistenten)
+│   │                            für resolveCatalog), ResolveDocRef für alle drei Präfixe —
+│   │                            project:/ ab der Projektwurzel, keph:/ über den Node,
+│   │                            k-playbook:/ instructions/…, rules/…, reviews/…,
+│   │                            guidelines/…, commands/… (der Text, die Hülle liegt beim
+│   │                            Assistenten), includes/…, testdata/… — und der
+│   │                            docIncluder, der Include-Zeilen einsetzt (Task 093)
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
@@ -949,7 +959,8 @@ Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `alw
 `on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferten Anweisungen liegen einmal, in
 `defaults/instructions/`: `NewShippedDocSource` (`project/docref.go`) liest die Sorte
 `instructions` dort — ebenso `commands`, deren Text in `defaults/commands/` liegt, während
-`commands/` oben nur die Hülle für den Assistenten trägt (Task 092) — und die übrigen Sorten
+`commands/` oben nur die Hülle für den Assistenten trägt (Task 092), und die Include-Sorten
+`includes` und `testdata` (Task 093) — und die übrigen Sorten
 weiter von der obersten Ebene der Installation,
 weil die Kataloge der Kontextausgabe dort lesen. Die Kopie oben im Repo samt
 Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`

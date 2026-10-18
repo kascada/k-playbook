@@ -354,7 +354,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 		ProjectDocs:   DocSchemeProject + ":/" + LocalDirName + "/docs/README.md",
 	}
 
-	always, err := briefingAssembled(layers, briefingAlwaysDir)
+	always, err := briefingAssembled(ctx, layers, briefingAlwaysDir)
 	if err != nil {
 		return Briefing{}, err
 	}
@@ -383,12 +383,14 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 }
 
 // briefingAssembled liefert ein zusammengebautes Verzeichnis: seine Teile
-// mit Herkunft und den Text daraus.
+// mit Herkunft und den Text daraus, Includes eingesetzt wie bei
+// `k-playbook read`; ein Teil, dessen Include scheitert, steht mit Kette
+// unter problems und fehlt — das Briefing kommt trotzdem zustande.
 // Gibt es das Verzeichnis in keiner Ebene, bleibt die Liste leer: der Verweis
 // steht trotzdem da, damit die Sitzung weiß, worüber sie es lesen würde.
-func briefingAssembled(layers DocLayers, dir string) (BriefingAssembled, error) {
+func briefingAssembled(ctx context.Context, layers DocLayers, dir string) (BriefingAssembled, error) {
 	assembled := BriefingAssembled{Ref: DocSchemeKPlaybook + ":/" + dir + "/", Parts: []BriefingEntry{}, Problems: []string{}}
-	parts, problems, _, err := assembleDocDir(layers, dir)
+	parts, _, problems, _, err := assembleDocDir(ctx, layers, dir, DocReadOptions{})
 	if err != nil {
 		return BriefingAssembled{}, err
 	}

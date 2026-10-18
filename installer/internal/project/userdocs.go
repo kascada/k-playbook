@@ -276,14 +276,49 @@ func (u *UserDocs) User() string { return u.user }
 // Sorten-Tabelle DocKinds. Ist kephalaion.ok nicht wahr, ist das ein Fehler
 // mit DocCodeKephalaionUnavailable.
 func OpenUserDocs(projectDir string) (*UserDocs, error) {
+	client, user, err := openKephClient(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	return NewUserDocs(DocKinds, client, user)
+}
+
+// KephDocStore sind die Aufrufe an Kephalaion, die keph:-Verweise brauchen.
+// *kephalaion.Client erfüllt sie; Tests setzen eine Fälschung ein.
+type KephDocStore interface {
+	Read(ctx context.Context, name string) (kephalaion.ReadResult, error)
+}
+
+// KephDocs ist der Zugang zur Collection des Projekts für keph:-Verweise:
+// der Store und der eigene User, für den ~ im Pfad steht.
+type KephDocs struct {
+	Store KephDocStore
+	User  string
+}
+
+// OpenKephDocs prüft die Anbindung des Projekts und baut den Zugang für
+// keph:-Verweise — derselbe Weg wie OpenUserDocs, Fehler mit
+// DocCodeKephalaionUnavailable.
+func OpenKephDocs(projectDir string) (KephDocs, error) {
+	client, user, err := openKephClient(projectDir)
+	if err != nil {
+		return KephDocs{}, err
+	}
+	return KephDocs{Store: client, User: user}, nil
+}
+
+// openKephClient ist der Zugang je Projekt: Status prüfen (kephalaion.ok),
+// Anbindung lesen, Umgebung laden, Client bauen. Zurück kommen der Client
+// und der User hinter dem Account.
+func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 	status := KephalaionStatus(projectDir)
 	if !status.OK {
-		return nil, docRefErrorf(DocCodeKephalaionUnavailable,
+		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable,
 			"Kephalaion ist für dieses Projekt nicht bereit (%s): %s", status.State, status.Message)
 	}
 	binding, _, err := kephalaion.ReadBinding(LocalDir(projectDir))
 	if err != nil {
-		return nil, docRefErrorf(DocCodeKephalaionUnavailable, "Anbindung nicht lesbar: %v", err)
+		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "Anbindung nicht lesbar: %v", err)
 	}
 	env := kephalaion.Env{}
 	if dir, err := kephalaion.DefaultConfigDir(); err == nil {
@@ -291,9 +326,9 @@ func OpenUserDocs(projectDir string) (*UserDocs, error) {
 	}
 	client, err := kephalaion.NewClient(binding, env)
 	if err != nil {
-		return nil, docRefErrorf(DocCodeKephalaionUnavailable, "%v", err)
+		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "%v", err)
 	}
-	return NewUserDocs(DocKinds, client, status.User)
+	return client, status.User, nil
 }
 
 // kind sucht eine Sorte nach Namen.

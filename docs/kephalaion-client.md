@@ -16,7 +16,7 @@ and `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
 All calls address the project's collection, `kephalaion.address` (`<hub>:<collection>`)
 from `k-playbook context`. Code: `installer/internal/kephalaion/` (`client.go` for the
-session and `whoami`, `docs.go` for `list`, `create`, `rename`).
+session and `whoami`, `docs.go` for `list`, `read`, `create`, `rename`).
 
 ## The tools k-playbook calls
 
@@ -24,12 +24,15 @@ session and `whoami`, `docs.go` for `list`, `create`, `rename`).
 |---|---|---|---|
 | `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` call before it starts; again in the session of every `create`/`rename` before the first attempt (node version) | none |
 | `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list` | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
+| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
 | `create` | through the hub | `k_playbook_doc_create` | `collection`, `name`, `content: ""`, `request_id` |
 | `rename` | through the hub | `k_playbook_doc_done`, `k_playbook_doc_reopen` | `collection`, `name`, `new_name`, `request_id` |
 
-Reading and writing a document's content is not on this list: a session does that
-directly with Kephalaion's `read` and `write`. The `doc` tools only create, list and
-move. Their contract: [`mcp.md`](./mcp.md#document-tools-in-the-collection).
+Reading a document's content goes both ways since task 093: a session can call
+Kephalaion's `read` directly, and `k_playbook_doc_read` / `k-playbook read keph:/…` call it
+through this client (`Client.Read`). Writing is still done directly by the session with
+Kephalaion's `write`; the `doc` tools only create, list and move. Their contract:
+[`mcp.md`](./mcp.md#document-tools-in-the-collection).
 
 ## What k-playbook expects
 
@@ -51,9 +54,22 @@ move. Their contract: [`mcp.md`](./mcp.md#document-tools-in-the-collection).
   documents. `created.by` is the user who created the document — the source of the user
   field for kinds without a user area (`queue/findings/`). A directory that does not
   exist yields an empty list, not an error.
-- **`list` reports errors only as text**, without a structured code; `create` and
-  `rename` carry `error.code`. k-playbook keeps Kephalaion's code where there is one and
-  maps the rest to its own codes (see the next section).
+- **`read` answers from the replica**, without the network, like `list`: the state of the
+  last sync, so what another machine has just written can be missing; own writes are
+  there at once. Its answer (`ReadOutput` in Kephalaion's `internal/node/mcpnode/read.go`)
+  carries `kind` -- `document`, `directory` or `none` --, `address`, `name`, `id`,
+  `revision`, `created`, `updated`, `size`, `writable` and, for a document, `content`
+  unchanged with frontmatter (`""` for an empty document; the field is absent for a
+  directory and for `none`). **`none` is not an error**: the name has neither a living
+  document nor a directory; k-playbook turns it into `not_found`. A directory becomes
+  `invalid_input`, since `keph:` references name single documents. `k-playbook`
+  sends only `collection` and `name`; `content: false`, `frontmatter` and `id` are not
+  used. A name that does not satisfy Kephalaion's name rule is rejected by the node as
+  text.
+- **`list` and `read` report errors only as text**, without a structured code (collection
+  not readable, replica never synced, invalid name); `create` and `rename` carry
+  `error.code`. k-playbook keeps Kephalaion's code where there is one and maps the rest
+  to its own codes (see the next section).
 - **`request_id`** (Kephalaion v0.3.1, Task 032) is accepted by `create` and `rename`:
   1–128 characters `[A-Za-z0-9._-]`, valid per account for 24 hours. The hub remembers
   only a success, in the same transaction. The same key with the same fields again answers
@@ -65,9 +81,9 @@ move. Their contract: [`mcp.md`](./mcp.md#document-tools-in-the-collection).
 - **A node before v0.3.1 rejects `request_id` loudly** (`isError` without a code) and
   writes nothing. k-playbook checks the version first and does not send to such a node.
 
-Limits on the k-playbook side: 15 s per `list` call and per `create`/`rename` attempt, each
-including its session, at most 16 MiB per answer, pages of 1000 entries and at most 100
-pages for one listing.
+Limits on the k-playbook side: 15 s per `list` or `read` call and per `create`/`rename`
+attempt, each including its session, at most 16 MiB per answer, pages of 1000 entries and at
+most 100 pages for one listing.
 
 ## Request key, retry and the codes
 
@@ -122,12 +138,25 @@ first one wrote, and the message for a node before v0.3.1 at a real node (covere
 test). Commands and output are in
 `k-playbook-local/material/befunde/ablage-userbereich-queue.md`.
 
+At the same hub and collection, with a freshly built binary (task 093, 2026-10-18):
+
+- A document created with Kephalaion's `create` came back through
+  `k-playbook read keph:/user/~/workbench/…` (with `~`) and through the real name, byte for
+  byte the content that Kephalaion's `read` returned; the `ref` in the answer carried the
+  real name. The whole call, status check (`whoami`) and `read` included, took 0.05 s.
+- A missing name answered `not_found` (the node reports `kind: none`, no error); the
+  directory name without `/` `invalid_input`. The document was deleted afterwards.
+  Output in `k-playbook-local/material/befunde/command-huelle-verweis.md`.
+
 ## Where the tools are documented
 
 In the Kephalaion repository (`github.com/kephalaion/kephalaion`):
 
 - `docs/konzept.md`, sections "Werkzeuge" → "Allgemein — lesen" and "Allgemein —
-  schreiben" — the MCP tools with their arguments and answers.
+  schreiben" — the MCP tools with their arguments and answers; `read` in "Gebaut in Task
+  009" (reads the replica, errors as text) and "Frontmatter in `list` und `read`". The
+  authoritative shape of its answer is `ReadOutput` in `internal/node/mcpnode/read.go`;
+  `docs/vertrag.md` covers only node and hub and does not describe `read`.
 - `docs/vertrag.md`, sections "Schreibvorgänge" (`create`, `rename`, "Antwort",
   "Wiederholung mit Schlüssel"), "Ausgang und Wiederholung" and "Fehler" — the contract
   between node and hub, including `name_taken`, tombstones, `request_id`/`replayed` and how

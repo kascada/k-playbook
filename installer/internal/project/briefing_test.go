@@ -480,8 +480,71 @@ func TestDocTitleAndDescription(t *testing.T) {
 // Ein Umgebungsfehler beim Lesen einer Ebene bricht ab — ein halbes Briefing
 // sähe aus wie ein ganzes.
 func TestBriefingUmgebungsfehler(t *testing.T) {
-	assembled, err := briefingAssembled(DocLayers{Dist: failingDocSource{}, Local: failingDocSource{}}, briefingAlwaysDir)
+	assembled, err := briefingAssembled(context.Background(), DocLayers{Dist: failingDocSource{}, Local: failingDocSource{}}, briefingAlwaysDir)
 	if err == nil || !errors.Is(err, err) || len(assembled.Parts) != 0 {
 		t.Fatalf("erwartet Fehler, bekommen %+v", assembled)
 	}
+}
+
+// Das Briefing setzt in den immer geltenden Anweisungen dieselben Includes
+// ein wie `k-playbook read` für den Verweis — auch wenn ein Teil scheitert:
+// der landet mit Kette unter problems, die übrigen bleiben, das Briefing
+// kommt zustande.
+func TestBriefingSetztIncludesEinWieRead(t *testing.T) {
+	root := newContextProject(t)
+	for rel, content := range map[string]string{
+		"k-playbook/defaults/instructions/always/010-a.md":       "## A\n\ninclude: k-playbook:/instructions/on-demand/baustein.md\n",
+		"k-playbook/defaults/instructions/always/020-b.md":       "## B\n",
+		"k-playbook/defaults/instructions/on-demand/baustein.md": "---\ntitle: Baustein\n---\n\nBaustein.\n",
+		"k-playbook-local/instructions/always/1000-kaputt.md":    "## Kaputt\n\ninclude: fehlt.md\n",
+		"k-playbook-local/instructions/always/1100-eigen.md":     "## Eigen\n\ninclude: 020-b.md\n",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		mkdirAll(t, filepath.Dir(path))
+		write(t, path, content)
+	}
+	stubBriefingDocs(t, unavailableDocs)
+
+	briefing, err := BuildBriefing(context.Background(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	always := briefing.Documents.Always
+	want := "## A\n\nBaustein.\n\n## B\n\n## Eigen\n\n## B\n"
+	if always.Content != want {
+		t.Errorf("always.content:\n%q\nerwartet\n%q", always.Content, want)
+	}
+	if !reflect.DeepEqual(briefingRefs(always.Parts), []string{
+		"k-playbook:/instructions/always/010-a.md",
+		"k-playbook:/instructions/always/020-b.md",
+		"k-playbook:/instructions/always/1100-eigen.md",
+	}) {
+		t.Errorf("always.parts: %+v", always.Parts)
+	}
+	if len(always.Problems) != 1 || !strings.Contains(always.Problems[0], "1000-kaputt.md") ||
+		!strings.Contains(always.Problems[0], "Include-Kette") {
+		t.Errorf("always.problems: %v", always.Problems)
+	}
+
+	read, err := ResolveDocRef(ProjectDocLayers(root), always.Ref)
+	if err != nil {
+		t.Fatalf("ResolveDocRef: %v", err)
+	}
+	if read.Content != always.Content {
+		t.Errorf("Briefing und read liefern verschiedene Texte:\n%q\n%q", always.Content, read.Content)
+	}
+	if !reflect.DeepEqual(read.Problems, always.Problems) {
+		t.Errorf("Briefing und read melden verschiedene Probleme:\n%v\n%v", always.Problems, read.Problems)
+	}
+	if !reflect.DeepEqual(partNames(read.Parts), []string{"010-a.md", "020-b.md", "1100-eigen.md"}) {
+		t.Errorf("read.parts: %+v", read.Parts)
+	}
+}
+
+func briefingRefs(entries []BriefingEntry) []string {
+	refs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		refs = append(refs, entry.Ref)
+	}
+	return refs
 }

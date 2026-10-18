@@ -22,12 +22,13 @@ const docToolRead = "k_playbook_doc_read"
 // optional im Schema, geprüft in checkProjectDir.
 type docReadInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
-	Ref        string `json:"ref" jsonschema:"Pflicht. Der Verweis im Präfixschema, so wie er im Text steht, etwa k-playbook:/instructions/on-demand/thema.md für eine Datei oder k-playbook:/instructions/always/ (mit / am Ende) für das zusammengebaute Verzeichnis — das einzige; jeder andere Verweis mit / am Ende, etwa k-playbook:/instructions/on-demand/ oder k-playbook:/rules/, ist invalid_input, weil der Dateiname fehlt. Aufgelöst werden heute k-playbook:-Verweise unter instructions/, rules/, reviews/, guidelines/ und commands/ (etwa k-playbook:/rules/befunde.md, k-playbook:/commands/k-upgrade.md); project:, keph: und andere k-playbook:-Pfade werden als unsupported gemeldet."`
+	Ref        string `json:"ref" jsonschema:"Pflicht. Der Verweis im Präfixschema, so wie er im Text steht: project:/<pfad> für eine Datei des Projekts ab seiner Wurzel, keph:/<pfad> für ein Dokument der Projekt-Collection (~ als ganzer Pfadteil steht für den eigenen User), k-playbook:/instructions/on-demand/thema.md für eine mitgelieferte oder lokale Datei oder k-playbook:/instructions/always/ (mit / am Ende) für das zusammengebaute Verzeichnis — das einzige; jeder andere Verweis mit / am Ende, etwa k-playbook:/instructions/on-demand/, k-playbook:/rules/ oder project:/docs/, ist invalid_input, weil der Dateiname fehlt. Unter k-playbook: werden instructions/, rules/, reviews/, guidelines/ und commands/ aufgelöst (etwa k-playbook:/rules/befunde.md, k-playbook:/commands/k-upgrade.md); andere k-playbook:-Pfade sind unsupported."`
+	Includes   *bool  `json:"includes,omitempty" jsonschema:"Include-Zeilen (include: <verweis>) durch den Rumpf des Ziels ersetzen, rekursiv. Standard true. Mit false kommt der Rohtext, Include-Zeilen bleiben lesbar stehen — das Gegenstück zu k-playbook read --raw."`
 }
 
 // docEnvelope ist die Antwortform von k_playbook_doc_read. Die Felder der
 // Antwort sind Zeiger, damit eine Fehlerantwort sie gar nicht erst trägt,
-// eine Erfolgsantwort aber immer — auch content "" und parts [].
+// eine Erfolgsantwort aber immer — auch content "", parts [] und includes [].
 type docEnvelope struct {
 	OK         bool                    `json:"ok"`
 	Tool       string                  `json:"tool"`
@@ -39,22 +40,31 @@ type docEnvelope struct {
 	Hint       string                  `json:"hint,omitempty"`
 	Parts      *[]project.DocPart      `json:"parts,omitempty"`
 	Problems   *[]string               `json:"problems,omitempty"`
+	Includes   *[]project.DocInclude   `json:"includes,omitempty"`
 	Error      *knowledgeErrorEnvelope `json:"error,omitempty"`
 }
 
+// docReadDescription ist die Werkzeugbeschreibung von k_playbook_doc_read;
+// ein Test prüft, dass sie keine Sorten nennt, die keine Lesersorten sind.
+const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema steht — project:/… eine Datei des Projekts ab seiner " +
+	"Wurzel, keph:/… ein Dokument der Projekt-Collection über den Kephalaion-Node (~ steht für den eigenen User; " +
+	"Anbindung nicht bereit: kephalaion_unavailable, kein Rückfall), k-playbook:/… lokal und mitgeliefert schon " +
+	"gegeneinander aufgelöst, dieselbe Überlagerung wie catalogs in k_playbook_context: eine lokale Datei ersetzt " +
+	"die gleichnamige mitgelieferte, eine leere schaltet sie ab. Sorten unter k-playbook:: instructions/, rules/, " +
+	"reviews/, guidelines/, commands/ (der Text eines Commands, dessen Hülle beim Assistenten liegt). " +
+	"Eine Datei kommt mit Frontmatter; k-playbook:/instructions/always/ (mit / am Ende) baut das Verzeichnis zu " +
+	"einem Text zusammen (Teile mit Ziffer vorn, numerisch sortiert, ohne Frontmatter) — andere Verzeichnisse " +
+	"liest du einzeln mit Dateinamen, mit / am Ende sind sie invalid_input. Include-Zeilen (include: <verweis>, " +
+	"absolut oder relativ im selben Präfix) sind schon durch den Rumpf des Ziels ersetzt, rekursiv bis Tiefe 10; " +
+	"includes: false liefert den Rohtext. Die Antwort trägt content, disabled (abgeschaltete Datei: leer, kein " +
+	"Fehler, mit hint), parts (name, origin, disabled), problems (übergangene Dateien und Teile, deren Include " +
+	"scheiterte — mit Kette) und includes (ref, origin, depth, disabled — die eingesetzten Ziele). Ein unbekannter " +
+	"Verweis ist ein Fehler (not_found) — dann nicht selbst auf der Platte suchen; ein Include-Zyklus ist " +
+	"include_cycle, eine Kette über Tiefe 10 include_too_deep, jeweils mit der Kette in der Meldung. Hülle über " +
+	"`k-playbook read`."
+
 func addDocTools(server *mcp.Server) {
-	mcp.AddTool(server, &mcp.Tool{
-		Name: docToolRead,
-		Description: "Liest, was hinter einem k-playbook:-Verweis steht — lokal und mitgeliefert schon gegeneinander " +
-			"aufgelöst, dieselbe Überlagerung wie catalogs in k_playbook_context: eine lokale Datei ersetzt die " +
-			"gleichnamige mitgelieferte, eine leere schaltet sie ab. Sorten: instructions/, rules/, reviews/, guidelines/, commands/ (der Text eines Commands, dessen Hülle beim Assistenten liegt). " +
-			"Eine Datei kommt unverändert mit Frontmatter; k-playbook:/instructions/always/ (mit / am Ende) baut das " +
-			"Verzeichnis zu einem Text zusammen (Teile mit Ziffer vorn, numerisch sortiert, ohne Frontmatter) — andere " +
-			"Verzeichnisse liest du einzeln mit Dateinamen, mit / am Ende sind sie invalid_input. Die Antwort trägt content, " +
-			"disabled (abgeschaltete Datei: leer, kein Fehler, mit hint), parts (name, origin, disabled) und problems " +
-			"(übergangene Dateien). Ein unbekannter Verweis ist ein Fehler (not_found) — dann nicht selbst auf der " +
-			"Platte suchen. Hülle über `k-playbook read`.",
-	}, docReadTool)
+	mcp.AddTool(server, &mcp.Tool{Name: docToolRead, Description: docReadDescription}, docReadTool)
 	addUserDocTools(server)
 }
 
@@ -63,7 +73,8 @@ func docReadTool(ctx context.Context, req *mcp.CallToolRequest, input docReadInp
 	if err != nil {
 		return docErrorResult(projectDir, input.Ref, projectDirErrorCode(err), err), nil, nil
 	}
-	result, err := project.ResolveDocRef(project.ProjectDocLayers(projectDir), input.Ref)
+	opts := project.DocReadOptions{Raw: input.Includes != nil && !*input.Includes}
+	result, err := project.ResolveDocRefWith(ctx, project.ProjectDocLayers(projectDir), input.Ref, opts)
 	if err != nil {
 		code := project.DocRefErrorCode(err)
 		if code == "" {
@@ -75,6 +86,7 @@ func docReadTool(ctx context.Context, req *mcp.CallToolRequest, input docReadInp
 		OK: true, Tool: docToolRead, ProjectDir: projectDir,
 		Ref: result.Ref, Directory: &result.Directory, Content: &result.Content,
 		Disabled: &result.Disabled, Hint: result.Hint, Parts: &result.Parts, Problems: &result.Problems,
+		Includes: &result.Includes,
 	}, false), nil, nil
 }
 

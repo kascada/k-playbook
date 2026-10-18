@@ -243,12 +243,15 @@ Unterkommandos:
             dessen Verzeichnis; der Index liegt unter
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
-            dahinter steht: k-playbook read <verweis> [--json]. Heute nur
-            k-playbook:-Verweise unter instructions/, rules/, reviews/,
-            guidelines/ und commands/, lokal vor mitgeliefert; ein Verweis auf
-            instructions/always/ mit / am Ende baut das Verzeichnis zu einem
-            Text zusammen. Hinweise stehen auf stderr. Dasselbe wie das
-            MCP-Werkzeug k_playbook_doc_read.
+            dahinter steht: k-playbook read <verweis> [--raw] [--json].
+            project: eine Datei des Projekts, keph: ein Dokument der
+            Collection über den Node, k-playbook: die Sorten instructions/,
+            rules/, reviews/, guidelines/ und commands/, lokal vor
+            mitgeliefert; ein Verweis auf instructions/always/ mit / am Ende
+            baut das Verzeichnis zu einem Text zusammen. Include-Zeilen
+            (include: <verweis>) werden eingesetzt, --raw lässt sie stehen.
+            Hinweise stehen auf stderr. Dasselbe wie das MCP-Werkzeug
+            k_playbook_doc_read.
   briefing  Gibt aus, was für dieses Projekt gilt und was ansteht:
             k-playbook briefing [--json]. Vorweg der Text der immer
             geltenden Anweisungen k-playbook:/instructions/always/, dann

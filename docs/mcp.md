@@ -352,7 +352,7 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
-| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves `k-playbook:/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant) |
+| `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
@@ -752,60 +752,85 @@ classified, what the query surface looks like, and which decisions rest on which
 ### Doc Read Contract
 
 `k_playbook_doc_read` is a thin wrapper over `project.ResolveDocRef` (`project/docref.go`); the
-subcommand `k-playbook read <ref> [--json]` calls the same function and serves for testing and
-as a fallback. Its input is `projectDir` (required by contract, like every tool) and `ref`, a
-reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly as it stands in
-the text. `ref` in that scheme is the lasting contract of the tool: which source lies behind
-it -- the disk today, perhaps Kephalaion later -- is invisible to the caller.
+subcommand `k-playbook read <ref> [--raw] [--json]` calls the same function and serves for
+testing and as a fallback. Its input is `projectDir` (required by contract, like every tool),
+`ref`, a reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly as it
+stands in the text, and the optional `includes` (boolean, default `true`; `false` delivers the
+raw text with its include lines, the counterpart of `--raw`). `ref` in that scheme is the
+lasting contract of the tool: which source lies behind it is invisible to the caller.
 
-Resolved are `k-playbook:` references of the kinds `instructions/`, `rules/`, `reviews/`,
-`guidelines/` and `commands/`, each a single file local before shipped; only
-`instructions/always/` is assembled. Shipped `instructions/` and `commands/` are read from
-`defaults/`; for `commands/` that is the text of a command, while the file under
-`k-playbook/commands/` is only the hull the assistant registers (task 092,
-[verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of `catalogs` in `k_playbook_context` (`overlayDocDir`):
-for `rules` and `reviews`, name, `origin` and `disabled` of an entry are the same over both
-ways, which a test checks. `guidelines` is an overlay kind here -- shipped
-`k-playbook/guidelines/` and local `k-playbook-local/guidelines/` -- while the field
-`guidelines` of the context output still lists only the local files
-(see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
+All three prefixes are resolved (task 093; [verweisschema.md](verweisschema.md#access-route-per-prefix)):
+`project:` a file of the project from disk below the project root, one layer; `keph:` a
+document of the project's collection through the node's replica (Kephalaion `read` via the
+client, access as for the `doc` tools, `~` replaced by `kephalaion.user`); `k-playbook:` the
+kinds `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/`, each a single
+file local before shipped, and as include targets `includes/` and `testdata/`. Only
+`instructions/always/` is assembled. Shipped `instructions/`, `commands/`, `includes/` and
+`testdata/` are read from `defaults/`; for `commands/` that is the text of a command, while
+the file under `k-playbook/commands/` is only the hull the assistant registers (task 092,
+[verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
+`catalogs` in `k_playbook_context` (`overlayDocDir`): for `rules` and `reviews`, name,
+`origin` and `disabled` of an entry are the same over both ways, which a test checks.
+`guidelines` is an overlay kind here -- shipped `k-playbook/guidelines/` and local
+`k-playbook-local/guidelines/` -- while the field `guidelines` of the context output still
+lists only the local files (see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
+
+Include lines (`include: <ref>`, absolute or relative within the same prefix) are replaced by
+the body of their target, recursively up to depth 10, in every document the tool reads;
+[verweisschema.md](verweisschema.md#includes) has the rules.
 
 A successful answer is `{ok: true, tool, projectDir, ref, directory, content, disabled, hint,
-parts, problems}`:
+parts, problems, includes}`:
 
-- `ref` -- the reference in canonical form; `directory` -- whether it ended in `/`.
-- `content` -- a single file unchanged, frontmatter included; for a directory the parts
-  without frontmatter, separated by a blank line. Always present, `""` when empty.
-- `disabled` -- `true` for a single file that an empty local file disables. That is not an
-  error: `content` is `""` and `hint` says why. For a directory it stays `false`, even when
-  every part is disabled.
+- `ref` -- the reference in canonical form (for `keph:` with the real user name);
+  `directory` -- whether it ended in `/`.
+- `content` -- a single file with its frontmatter, include lines replaced; for a directory
+  the parts without frontmatter, separated by a blank line. Always present, `""` when empty.
+- `disabled` -- `true` for a single `k-playbook:` file that an empty local file disables. That
+  is not an error: `content` is `""` and `hint` says why. For a directory it stays `false`,
+  even when every part is disabled; `project:` and `keph:` never disable, an empty file is
+  empty content.
 - `parts` -- the parts involved, in the order of the content, each with `name`, `origin`
-  (`dist`, `local`, `override`) and `disabled`; a single file has exactly one. Always present,
-  `[]` for a directory without parts.
-- `problems` -- what was skipped, for now files without a leading number in an assembled
-  directory. Always present, `[]` when nothing was skipped. The subcommand writes `hint` and
-  `problems` to stderr and keeps stdout for the content; exit 0.
+  (`dist`, `local`, `override`, `project`, `keph`) and `disabled`; a single file has exactly
+  one. Always present, `[]` for a directory without parts.
+- `problems` -- what was skipped: files without a leading number in an assembled directory,
+  and parts of one whose include failed (with the chain). Always present, `[]` when nothing
+  was skipped. The subcommand writes `hint` and `problems` to stderr and keeps stdout for the
+  content; exit 0.
+- `includes` -- the inserted targets in reading order, each with `ref` (resolved), `origin`,
+  `depth` (1 for an include of the main document) and `disabled`. Always present, `[]`
+  without includes and with `includes: false`.
 
 Error codes, in the envelope's `error.code` like the knowledge tools:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` within a resolved kind but names no assembled directory (today only `instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, an unknown directory, a file with a trailing `/` |
-| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/` (for example `checks/` or `skills/`) |
-| `not_found` | neither layer has the file or the assembled directory; there is no fallback to reading anywhere else |
+| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` without naming an assembled directory (today only `k-playbook:/instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, `project:/docs/`, `keph:/user/~/tasks/`, an unknown directory, a file with a trailing `/`; an include line with more than one argument |
+| `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `rules/`, `reviews/`, `guidelines/`, `commands/`, `includes/` and `testdata/` (for example `checks/` or `skills/`); the message names only the reader kinds |
+| `not_found` | neither layer has the file or the assembled directory, the project has no such file, or the node reports `none` for the name in the collection; there is no fallback to reading anywhere else |
+| `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; no fallback |
+| `kephalaion_error` | the node rejected `read` with a message (collection not readable, replica never synced, invalid name); the message is the node's |
+| `include_cycle` | an include target is already open in the chain -- `a.md` includes `b.md`, `b.md` includes `a.md`; the message carries the chain |
+| `include_too_deep` | an include would lie deeper than 10; the message carries the chain |
 | `project_not_found` | `projectDir` leads to no project |
 | `read_failed` | the source could not be read |
+
+A failed include in a single document keeps the code of its cause (`not_found`,
+`unsupported`, `kephalaion_unavailable`, `invalid_input`, or one of the two include codes) and
+appends the chain `a.md → b.md → c.md` to the message once; for a part of an assembled
+directory the same text lands under `problems` instead, and the answer is a success without
+that part.
 
 ### Document Tools in the Collection
 
 `k_playbook_doc_create`, `_list`, `_done` and `_reopen` create numbered documents in the
 project's Kephalaion collection, list them per user, and move them into `done/` and back.
 They are thin wrappers over `project.UserDocs` (`project/userdocs.go`); the subcommand
-`k-playbook doc create|list|done|reopen [--json]` calls the same code. Reading and writing a
-document's content is not part of them: a session does that directly with Kephalaion's `read`
-and `write`, with `collection` = `kephalaion.address`. `k_playbook_doc_read` stays
-`unsupported` for `keph:`. Which Kephalaion tools are called underneath and what is expected
-of them: [kephalaion-client.md](kephalaion-client.md).
+`k-playbook doc create|list|done|reopen [--json]` calls the same code. Writing a document's
+content is not part of them: a session does that directly with Kephalaion's `write`, with
+`collection` = `kephalaion.address`. Reading goes through `k_playbook_doc_read` with the
+`keph:` reference (task 093) or directly with Kephalaion's `read`. Which Kephalaion tools are
+called underneath and what is expected of them: [kephalaion-client.md](kephalaion-client.md).
 
 **Kinds.** What a kind is comes from one table, `project.DocKinds`; a new kind is a new
 entry, and the allowed values of `kind` in the input schema (`enum`) and in the CLI are built
@@ -925,7 +950,7 @@ projectDocs, context}`:
 | Field | Content |
 |---|---|
 | `schemaVersion` | the version of the briefing output, `"3"` (`"1"` had no `context`, `"2"` no `documents.always.content`) |
-| `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number, skipped) |
+| `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
 | `work.available` | whether the project's collection could be read; `false` with `work.message` when `kephalaion.ok` is not true, the node cannot be reached or a listing fails -- a state, not an error |

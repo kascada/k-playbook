@@ -1,27 +1,35 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
 // Verweise im Präfixschema (docs/verweisschema.md) und ihre Auflösung.
 //
 // Ein Verweis ist ein einziger Pfad mit Präfix: project:/…, k-playbook:/… oder
-// keph:/…. Aufgelöst wird hier nur k-playbook:, und davon die Sorten in
-// docRefKinds. Hinter k-playbook: stehen zwei Ebenen — die mitgelieferte und
-// die lokale —, die über eine austauschbare Quelle gelesen werden: heute die
-// Platte, später womöglich Kephalaion. Wer aufruft, sieht davon nichts; er
-// bekommt den Inhalt mit lokal und mitgeliefert schon gegeneinander aufgelöst.
+// keph:/…. ResolveDocRef löst alle drei auf — die eine Funktion hinter
+// `k-playbook read` und k_playbook_doc_read. project: liest eine Datei des
+// Projekts ab seiner Wurzel, keph: ein Dokument der Projekt-Collection über
+// den Node; beide haben eine Ebene, ohne Überlagerung und Zusammenbau.
+// k-playbook: löst die Sorten in docRefKinds auf; dahinter stehen zwei Ebenen
+// — die mitgelieferte und die lokale —, die über eine austauschbare Quelle
+// gelesen werden: heute die Platte, später womöglich Kephalaion. Wer aufruft,
+// sieht davon nichts; er bekommt den Inhalt mit lokal und mitgeliefert schon
+// gegeneinander aufgelöst.
 //
 // Die Überlagerungsregel ist eine für alle: overlayDocDir legt die beiden
 // Ebenen eines Verzeichnisses übereinander — gleicher Name gewinnt lokal, ein
@@ -50,12 +58,28 @@ const docInstructionsRoot = "instructions"
 // für /k-upgrade (Task 092).
 const docCommandsRoot = "commands"
 
-// docRefKinds sind die Sorten unter k-playbook:, die ResolveDocRef auflöst —
-// die obersten Verzeichnisse beider Ebenen, deren Dateien Lesestoff für eine
-// Sitzung sind. checks und skills fehlen bewusst: Skripte laufen, Skills
-// liegen beim Assistenten; beides liest niemand über einen Verweis. Commands
-// liegen beim Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
-var docRefKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines", docCommandsRoot}
+// docIncludesRoot ist die Sorte includes/: Bausteine für Include-Zeilen, aus
+// einem Command oder einer Anweisung nur über den absoluten Verweis
+// k-playbook:/includes/<name>.md erreichbar, weil kein relativer Pfad aus
+// der eigenen Sorte führt. Eine lokale Fassung eines Bausteins gewinnt.
+const docIncludesRoot = "includes"
+
+// docTestdataRoot ist die Sorte testdata/: feste Testfälle, die auf jeder
+// Installation gleich ausgehen — die Go-Tests lesen sie von der Platte, nach
+// dem Release liegen sie auf jedem Hub (defaults/testdata/README.md).
+const docTestdataRoot = "testdata"
+
+// docReaderKinds sind die Sorten unter k-playbook:, deren Dateien Lesestoff
+// für eine Sitzung sind — die, die Hilfetext und Werkzeugbeschreibung nennen.
+// checks und skills fehlen bewusst: Skripte laufen, Skills liegen beim
+// Assistenten; beides liest niemand über einen Verweis. Commands liegen beim
+// Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
+var docReaderKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines", docCommandsRoot}
+
+// docRefKinds sind alle Sorten, die ResolveDocRef auflöst: die Lesersorten
+// und dazu includes/ und testdata/, die in keinem Katalog, keinem Briefing
+// und keiner Hilfe erscheinen.
+var docRefKinds = append(append([]string{}, docReaderKinds...), docIncludesRoot, docTestdataRoot)
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -76,15 +100,33 @@ const (
 	// ein Verzeichnis, das nicht in docAssembledDirs steht. Dort fehlt der
 	// Dateiname; entschieden wird das, ohne zu lesen.
 	DocCodeInvalidInput = "invalid_input"
-	// DocCodeUnsupported: der Verweis ist gültig, wird vom Werkzeug aber noch
-	// nicht aufgelöst — project:, keph: und k-playbook: außerhalb der Sorten
-	// in docRefKinds.
+	// DocCodeUnsupported: der Verweis ist gültig, wird vom Werkzeug aber nicht
+	// aufgelöst — k-playbook: außerhalb der Sorten in docRefKinds.
 	DocCodeUnsupported = "unsupported"
 	// DocCodeNotFound: der Verweis ist vollständig — eine Datei oder ein
-	// zusammengebautes Verzeichnis —, aber es gibt ihn weder lokal noch
-	// mitgeliefert. Kein Rückfall auf die Platte.
+	// zusammengebautes Verzeichnis —, aber es gibt ihn nicht: weder lokal
+	// noch mitgeliefert, nicht im Projekt, nicht in der Collection. Kein
+	// Rückfall auf eine andere Quelle.
 	DocCodeNotFound = "not_found"
+	// DocCodeIncludeCycle: ein Include-Ziel ist in der Kette der gerade
+	// offenen Dokumente schon enthalten — a bindet b ein, b wieder a.
+	// Erkannt, sobald die Zeile gelesen ist, nicht erst an der Tiefengrenze.
+	DocCodeIncludeCycle = "include_cycle"
+	// DocCodeIncludeTooDeep: ein Include läge tiefer als docIncludeMaxDepth.
+	DocCodeIncludeTooDeep = "include_too_deep"
 )
+
+// docIncludeMaxDepth ist die größte Tiefe eines Includes; das Hauptdokument
+// hat Tiefe 0, was es einbindet Tiefe 1. Ein Include auf Tiefe 11 ist
+// include_too_deep.
+const docIncludeMaxDepth = 10
+
+// docIncludePrefix ist der Anfang einer Include-Zeile: ohne führenden
+// Leerraum, danach genau ein Argument — ein Verweis mit Präfix oder ein
+// relativer Pfad ohne — und sonst nichts. Kein HTML-Kommentar: Ein nicht
+// eingesetztes Include muss im Rohtext lesbar bleiben. „@“ und „!“ am
+// Zeilenanfang wären tabu, Claude Code deutet sie um.
+const docIncludePrefix = "include:"
 
 // DocRefError ist ein Fehler mit Code aus der Auflösung eines Verweises.
 type DocRefError struct {
@@ -205,19 +247,46 @@ type DocSource interface {
 	Read(file string) ([]byte, error)
 }
 
-// DocLayers sind die beiden Ebenen: Dist ist das Mitgelieferte, Local das
-// Projekteigene.
+// DocLayers sind die Quellen hinter den drei Präfixen. Hinter k-playbook:
+// stehen zwei Ebenen, Dist das Mitgelieferte und Local das Projekteigene;
+// hinter project: steht das Projekt selbst, eine Ebene ohne Überlagerung,
+// und hinter keph: die Collection des Projekts, geöffnet erst, wenn ein
+// keph:-Verweis sie braucht — der Zugang fragt den Node.
 type DocLayers struct {
 	Dist  DocSource
 	Local DocSource
+	// Project ist die Wurzel des Projekts (das Verzeichnis von
+	// K-PLAYBOOK.yaml); nil, wenn es keine gibt — dann ist jeder
+	// project:-Verweis not_found.
+	Project DocSource
+	// Keph öffnet den Zugang zur Collection; nil, wenn es keinen gibt — dann
+	// ist jeder keph:-Verweis kephalaion_unavailable.
+	Keph func() (KephDocs, error)
 }
 
-// ProjectDocLayers sind die Ebenen eines Projekts auf der Platte: die
-// Installation k-playbook/ (siehe NewShippedDocSource) und k-playbook-local/.
+// ProjectDocLayers sind die Quellen eines Projekts auf der Platte: die
+// Installation k-playbook/ (siehe NewShippedDocSource), k-playbook-local/,
+// das Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
+// (OpenKephDocs).
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
-		Dist:  NewShippedDocSource(PlaybookDir(projectDir)),
-		Local: NewDiskDocSource(LocalDir(projectDir)),
+		Dist:    NewShippedDocSource(PlaybookDir(projectDir)),
+		Local:   NewDiskDocSource(LocalDir(projectDir)),
+		Project: NewDiskDocSource(projectDir),
+		Keph:    memoKephDocs(func() (KephDocs, error) { return OpenKephDocs(projectDir) }),
+	}
+}
+
+// memoKephDocs öffnet den Zugang höchstens einmal je DocLayers — auch das
+// Ergebnis „nicht bereit“ bleibt stehen. Der Zugang fragt den Node; mehrere
+// keph:-Verweise in einer Auflösung (Includes) sollen das nicht wiederholen.
+func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
+	var once sync.Once
+	var docs KephDocs
+	var err error
+	return func() (KephDocs, error) {
+		once.Do(func() { docs, err = open() })
+		return docs, err
 	}
 }
 
@@ -232,9 +301,10 @@ const defaultsDirName = "defaults"
 // der Kopie gleichzuhalten wäre, gibt es seit 2026-10-17 nicht mehr. Ebenso
 // liest die Sorte commands/ aus defaults/commands/: dort liegt der Text eines
 // Commands, oben in commands/ nur seine Hülle für den Assistenten — zwei
-// verschiedene Dateien, keine Kopie. Die übrigen Sorten (rules/, reviews/,
-// guidelines/) lesen bis zu ihrer Umstellung weiter die oberste Ebene der
-// Installation, weil auch die Kataloge der Kontextausgabe dort lesen.
+// verschiedene Dateien, keine Kopie. includes/ und testdata/ gibt es nur in
+// defaults/. Die übrigen Sorten (rules/, reviews/, guidelines/) lesen bis zu
+// ihrer Umstellung weiter die oberste Ebene der Installation, weil auch die
+// Kataloge der Kontextausgabe dort lesen.
 func NewShippedDocSource(playbookDir string) DocSource {
 	return shippedDocSource{
 		top:      NewDiskDocSource(playbookDir),
@@ -247,12 +317,13 @@ type shippedDocSource struct {
 	defaults DocSource
 }
 
-// pick wählt die Quelle nach dem ersten Segment des Pfads: instructions/
-// und commands/ aus defaults/, alles andere von oben. Der Pfad bleibt
-// derselbe, weil defaults/ denselben Aufbau hat.
+// pick wählt die Quelle nach dem ersten Segment des Pfads: instructions/,
+// commands/, includes/ und testdata/ aus defaults/, alles andere von oben.
+// Der Pfad bleibt derselbe, weil defaults/ denselben Aufbau hat.
 func (s shippedDocSource) pick(p string) DocSource {
 	first, _, _ := strings.Cut(p, "/")
-	if first == docInstructionsRoot || first == docCommandsRoot {
+	switch first {
+	case docInstructionsRoot, docCommandsRoot, docIncludesRoot, docTestdataRoot:
 		return s.defaults
 	}
 	return s.top
@@ -361,36 +432,84 @@ type DocResult struct {
 	// Parts nennt die beteiligten Teile in der Reihenfolge des Inhalts,
 	// abgeschaltete eingeschlossen.
 	Parts []DocPart `json:"parts"`
-	// Problems nennt, was übergangen wurde — etwa eine Datei ohne Ziffer vorn
-	// in einem zusammengebauten Verzeichnis.
+	// Problems nennt, was übergangen wurde — eine Datei ohne Ziffer vorn in
+	// einem zusammengebauten Verzeichnis, oder ein Teil davon, dessen Include
+	// scheiterte (mit Kette).
 	Problems []string `json:"problems"`
+	// Includes nennt die eingesetzten Ziele in Lesereihenfolge, mit Tiefe;
+	// leer mit DocReadOptions.Raw. Woraus ein Text zusammengesetzt wurde.
+	Includes []DocInclude `json:"includes"`
 }
 
-// ResolveDocRef löst einen Verweis über die beiden Ebenen auf.
+// DocInclude ist ein eingesetztes Include-Ziel.
+type DocInclude struct {
+	// Ref ist das Ziel in kanonischer Form, aufgelöst — relativ gegen das
+	// einbindende Dokument, ~ durch den User ersetzt.
+	Ref string `json:"ref"`
+	// Origin ist die Herkunft des Ziels: dist, local, override, project oder
+	// keph. Leer bei einem zusammengebauten Verzeichnis als Ziel; seine
+	// Teile stehen nicht einzeln hier.
+	Origin string `json:"origin,omitempty"`
+	// Depth ist die Tiefe: 1 für ein Include des Hauptdokuments.
+	Depth int `json:"depth"`
+	// Disabled meldet ein lokal abgeschaltetes Ziel: nichts eingesetzt, kein
+	// Fehler.
+	Disabled bool `json:"disabled,omitempty"`
+}
+
+// DocReadOptions steuern die Auflösung. Der Nullwert ist der Standard.
+type DocReadOptions struct {
+	// Raw liefert den Rohtext: Include-Zeilen bleiben stehen, nichts wird
+	// eingesetzt. Standard ist einsetzen.
+	Raw bool
+}
+
+// ResolveDocRef löst einen Verweis mit den Standardoptionen auf: Includes
+// werden eingesetzt. ctx ist der Hintergrund — für Aufrufer, die keinen
+// haben (Briefing, Subkommando).
 func ResolveDocRef(layers DocLayers, raw string) (DocResult, error) {
+	return ResolveDocRefWith(context.Background(), layers, raw, DocReadOptions{})
+}
+
+// ResolveDocRefWith löst einen Verweis auf — jedes der drei Präfixe — und
+// setzt Includes ein, wenn opts es nicht abschaltet. ctx begrenzt nur den
+// Weg zur Collection (keph:); die Platte kennt keinen Abbruch.
+//
+// Zwei Fehlerebenen bei Includes: Bei einer Datei ist ein gescheitertes
+// Include der Fehler des ganzen Lesevorgangs, ohne Teilergebnis. In einem
+// zusammengebauten Verzeichnis landet der Fehler eines Teils mit Kette unter
+// problems, der Teil wird ausgelassen, die übrigen bleiben — eine fehlerhafte
+// Include-Zeile in einer lokalen Always-Anweisung legt den Sitzungsstart
+// nicht lahm, und nichts scheitert still.
+func ResolveDocRefWith(ctx context.Context, layers DocLayers, raw string, opts DocReadOptions) (DocResult, error) {
 	ref, err := ParseDocRef(raw)
 	if err != nil {
 		return DocResult{}, err
 	}
+	x := &docIncluder{ctx: ctx, layers: layers, opts: opts}
+	var result DocResult
 	switch ref.Scheme {
 	case DocSchemeProject:
-		return DocResult{}, docRefErrorf(DocCodeUnsupported,
-			"%s: project:-Verweise löst k-playbook noch nicht auf — die Datei liegt im Projekt und wird direkt von der Platte gelesen", ref.Raw)
+		result, err = resolveProjectDoc(layers, ref)
 	case DocSchemeKeph:
-		return DocResult{}, docRefErrorf(DocCodeUnsupported,
-			"%s: keph:-Verweise löst k-playbook noch nicht auf — gelesen wird über Kephalaion read mit collection = kephalaion.address aus k-playbook context", ref.Raw)
-	}
-	if !isDocRefKind(ref.Path) {
-		return DocResult{}, docRefErrorf(DocCodeUnsupported,
-			"%s: k-playbook löst heute nur Verweise unter %s auf", ref.Raw, docRefKindsText())
-	}
-	if ref.Dir {
-		if !isAssembledDocDir(ref.Path) {
-			return DocResult{}, missingDocFileName(ref)
+		result, err = resolveKephDoc(ctx, layers, ref)
+	default:
+		if !isDocRefKind(ref.Path) {
+			return DocResult{}, docRefErrorf(DocCodeUnsupported,
+				"%s: k-playbook löst nur Verweise unter %s auf", ref.Raw, docRefKindsText())
 		}
-		return resolveDocDir(layers, ref)
+		if ref.Dir {
+			if !isAssembledDocDir(ref.Path) {
+				return DocResult{}, missingDocFileName(ref)
+			}
+			return x.resolveDir(ref)
+		}
+		result, err = resolveDocFile(layers, ref)
 	}
-	return resolveDocFile(layers, ref)
+	if err != nil {
+		return DocResult{}, err
+	}
+	return x.finishFile(result, ref)
 }
 
 // isDocRefKind meldet, ob ein Pfad in einer Sorte aus docRefKinds liegt.
@@ -403,10 +522,12 @@ func isDocRefKind(refPath string) bool {
 	return false
 }
 
-// docRefKindsText nennt die Sorten als Verweise, für Fehlermeldungen.
+// docRefKindsText nennt die Lesersorten als Verweise, für Fehlermeldungen —
+// die Meldung ist Hilfe und nennt nur, was eine Sitzung liest; includes/ und
+// testdata/ löst isDocRefKind trotzdem auf.
 func docRefKindsText() string {
-	refs := make([]string, 0, len(docRefKinds))
-	for _, kind := range docRefKinds {
+	refs := make([]string, 0, len(docReaderKinds))
+	for _, kind := range docReaderKinds {
 		refs = append(refs, DocSchemeKPlaybook+":/"+kind+"/")
 	}
 	return strings.Join(refs, ", ")
@@ -504,6 +625,92 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 	return result, nil
 }
 
+// resolveProjectDoc liest eine Datei des Projekts ab seiner Wurzel: eine
+// Ebene, keine Überlagerung, kein Zusammenbau. Eine leere Datei ist leerer
+// Inhalt, nicht abgeschaltet — es gibt nichts, was sie abschalten könnte. Ein
+// Verweis mit „/" am Ende ist unvollständig: project: kennt keine
+// zusammengebauten Verzeichnisse.
+func resolveProjectDoc(layers DocLayers, ref DocRef) (DocResult, error) {
+	if ref.Dir {
+		return DocResult{}, docRefErrorf(DocCodeInvalidInput,
+			"%s: Dateiname fehlt — project: liest einzelne Dateien, kein Verzeichnis wird zusammengebaut; gemeint ist etwa %s<name>.md",
+			ref.Raw, ref.String())
+	}
+	data, err := readDocLayer(layers.Project, ref)
+	if errors.Is(err, fs.ErrNotExist) {
+		return DocResult{}, docRefErrorf(DocCodeNotFound,
+			"%s ist unbekannt: die Datei gibt es im Projekt nicht", ref.String())
+	}
+	if err != nil {
+		return DocResult{}, err
+	}
+	return DocResult{
+		Ref:      ref.String(),
+		Content:  string(data),
+		Parts:    []DocPart{{Name: path.Base(ref.Path), Origin: DocOriginProject}},
+		Problems: []string{},
+	}, nil
+}
+
+// resolveKephDoc liest ein Dokument der Projekt-Collection über den Node:
+// eine Ebene, keine Überlagerung, kein Zusammenbau. Der Zugang kommt aus
+// layers.Keph (Status, Anbindung, Client — wie OpenUserDocs); ist er nicht
+// zu haben, ist das kephalaion_unavailable. Ein ganzer Pfadteil ~ steht für
+// kephalaion.user; der Verweis in der Antwort trägt den echten Namen. Was
+// read als none meldet, ist not_found; ein Verzeichnis ist ein Eingabefehler.
+// Fehler des Clients gehen durch kephError.
+func resolveKephDoc(ctx context.Context, layers DocLayers, ref DocRef) (DocResult, error) {
+	if ref.Dir {
+		return DocResult{}, docRefErrorf(DocCodeInvalidInput,
+			"%s: Dateiname fehlt — keph: liest einzelne Dokumente, kein Verzeichnis wird zusammengebaut; gemeint ist etwa %s<name>.md",
+			ref.Raw, ref.String())
+	}
+	if layers.Keph == nil {
+		return DocResult{}, docRefErrorf(DocCodeKephalaionUnavailable,
+			"%s: in dieser Auflösung gibt es keinen Zugang zur Collection", ref.Raw)
+	}
+	docs, err := layers.Keph()
+	if err != nil {
+		return DocResult{}, err
+	}
+	segments := strings.Split(ref.Path, "/")
+	for i, segment := range segments {
+		if segment != docUserSegment {
+			continue
+		}
+		if !docNamePattern.MatchString(docs.User) {
+			return DocResult{}, docRefErrorf(DocCodeKephalaionUnavailable,
+				"%s: ~ steht für den eigenen User, aber Kephalaion nennt keinen gültigen (%q)", ref.Raw, docs.User)
+		}
+		segments[i] = docs.User
+	}
+	name := strings.Join(segments, "/")
+	canonical := DocRef{Scheme: DocSchemeKeph, Path: name}.String()
+
+	read, err := docs.Store.Read(ctx, name)
+	if err != nil {
+		return DocResult{}, kephError(err)
+	}
+	switch read.Kind {
+	case kephalaion.ReadKindNone:
+		return DocResult{}, docRefErrorf(DocCodeNotFound,
+			"%s ist unbekannt: in der Collection %s gibt es das Dokument nicht", canonical, read.Address)
+	case kephalaion.ReadKindDirectory:
+		return DocResult{}, docRefErrorf(DocCodeInvalidInput,
+			"%s ist ein Verzeichnis — keph: liest einzelne Dokumente; gemeint ist etwa %s/<name>.md", canonical, canonical)
+	}
+	content := ""
+	if read.Content != nil {
+		content = *read.Content
+	}
+	return DocResult{
+		Ref:      canonical,
+		Content:  content,
+		Parts:    []DocPart{{Name: path.Base(name), Origin: DocOriginKeph}},
+		Problems: []string{},
+	}, nil
+}
+
 // readDocLayer liest die Datei eines Verweises aus einer Ebene. Ein
 // Verzeichnis unter dem Dateipfad ist ein Eingabefehler: der Verweis hätte
 // auf „/" enden müssen.
@@ -521,11 +728,14 @@ func readDocLayer(source DocSource, ref DocRef) ([]byte, error) {
 
 // Die Herkunft eines Eintrags, wie sie in Katalogen, Verweisen und Briefing
 // steht: nur mitgeliefert, nur lokal, oder lokal an Stelle eines
-// gleichnamigen mitgelieferten.
+// gleichnamigen mitgelieferten; dazu für die anderen Präfixe das Projekt und
+// die Collection, die beide nur eine Ebene haben.
 const (
 	DocOriginDist     = "dist"
 	DocOriginLocal    = "local"
 	DocOriginOverride = "override"
+	DocOriginProject  = "project"
+	DocOriginKeph     = "keph"
 )
 
 // docDirEntry ist ein Eintrag eines Verzeichnisses, über beide Ebenen
@@ -618,32 +828,117 @@ func docOriginText(origin string) string {
 	return "mitgeliefert"
 }
 
-// docDirPart ist ein Teil beim Zusammenbauen, vor dem Sortieren.
+// docDirPart ist ein Teil beim Zusammenbauen, vor dem Sortieren. content ist
+// die Datei, wie sie in der Ebene liegt (mit Frontmatter — das Briefing liest
+// daraus Titel und Beschreibung), body ihr Rumpf ohne Frontmatter, Includes
+// schon eingesetzt; leer bei einem abgeschalteten Teil.
 type docDirPart struct {
 	DocPart
 	number  string
 	content []byte
+	body    string
 }
 
 // assembleDocDir ordnet ein Verzeichnis aus docAssembledDirs zum Zusammenbau:
 // überlagert wie jedes Verzeichnis (overlayDocDir), dann nur Dateien mit
 // Ziffer vorn, numerisch sortiert über beide Ebenen, bei gleicher Ziffer nach
-// Namen. Dateien ohne Ziffer kommen als Problem zurück. Das dritte Ergebnis
-// meldet, ob es das Verzeichnis in einer Ebene gibt. Wer den Text braucht,
-// ruft resolveDocDir; das Briefing braucht die Teile mit Inhalt und Herkunft.
-func assembleDocDir(layers DocLayers, dir string) ([]docDirPart, []string, bool, error) {
+// Namen, in jedem Teil die Includes eingesetzt. Dateien ohne Ziffer und Teile,
+// deren Include scheiterte, kommen als Problem zurück und fehlen in den
+// Teilen. Das vierte Ergebnis meldet, ob es das Verzeichnis in einer Ebene
+// gibt. Wer den Text braucht, ruft ResolveDocRef; das Briefing braucht die
+// Teile mit Inhalt und Herkunft und baut denselben Text (joinDocDirParts).
+func assembleDocDir(ctx context.Context, layers DocLayers, dir string, opts DocReadOptions) ([]docDirPart, []DocInclude, []string, bool, error) {
+	x := &docIncluder{ctx: ctx, layers: layers, opts: opts}
+	parts, found, err := x.assembleDir(dir, nil, 0)
+	return parts, x.includes, x.problems, found, err
+}
+
+// joinDocDirParts fügt die Teile eines zusammengebauten Verzeichnisses zu dem
+// einen Text: die Rümpfe ohne Frontmatter, abgeschaltete und leere Teile
+// übergangen, durch eine Leerzeile getrennt. Leer ohne aufgenommene Teile.
+// Die eine Stelle für diesen Text — `k-playbook read` und das Briefing
+// liefern denselben.
+func joinDocDirParts(parts []docDirPart) string {
+	pieces := []string{}
+	for _, part := range parts {
+		if part.Disabled || strings.TrimSpace(part.body) == "" {
+			continue
+		}
+		pieces = append(pieces, part.body)
+	}
+	if len(pieces) == 0 {
+		return ""
+	}
+	return strings.Join(pieces, "\n\n") + "\n"
+}
+
+// docIncluder setzt Include-Zeilen ein. Eine Instanz je Lesevorgang: sie
+// sammelt die eingesetzten Ziele (includes) und die Probleme zusammengebauter
+// Verzeichnisse (problems) über alle Tiefen hinweg.
+type docIncluder struct {
+	ctx      context.Context
+	layers   DocLayers
+	opts     DocReadOptions
+	includes []DocInclude
+	problems []string
+}
+
+// finishFile schließt das Lesen einer Einzeldatei ab: Includes einsetzen,
+// außer mit Raw oder bei einer abgeschalteten Datei. Ein gescheitertes Include
+// ist der Fehler des ganzen Lesevorgangs.
+func (x *docIncluder) finishFile(result DocResult, ref DocRef) (DocResult, error) {
+	result.Includes = []DocInclude{}
+	if x.opts.Raw || result.Disabled || result.Content == "" {
+		return result, nil
+	}
+	content, err := x.expand(result.Content, ref, []string{result.Ref}, 0, true)
+	if err != nil {
+		return DocResult{}, err
+	}
+	result.Content = content
+	result.Includes = append(result.Includes, x.includes...)
+	result.Problems = append(result.Problems, x.problems...)
+	return result, nil
+}
+
+// resolveDir baut ein Verzeichnis aus docAssembledDirs aus beiden Ebenen
+// zusammen (geprüft hat das ResolveDocRefWith): die Teile aus assembleDir,
+// ohne Frontmatter, durch eine Leerzeile getrennt.
+func (x *docIncluder) resolveDir(ref DocRef) (DocResult, error) {
+	result := DocResult{Ref: ref.String(), Directory: true, Parts: []DocPart{}, Problems: []string{}, Includes: []DocInclude{}}
+	parts, found, err := x.assembleDir(ref.Path, nil, 0)
+	if err != nil {
+		return DocResult{}, err
+	}
+	if !found {
+		return DocResult{}, docRefErrorf(DocCodeNotFound,
+			"%s ist unbekannt: das Verzeichnis gibt es weder lokal noch mitgeliefert", result.Ref)
+	}
+	for _, part := range parts {
+		result.Parts = append(result.Parts, part.DocPart)
+	}
+	result.Content = joinDocDirParts(parts)
+	result.Problems = append(result.Problems, x.problems...)
+	result.Includes = append(result.Includes, x.includes...)
+	return result, nil
+}
+
+// assembleDir ist der Zusammenbau hinter assembleDocDir: chain sind die
+// gerade offenen Verweise (leer beim Hauptverzeichnis), depth die Tiefe des
+// Verzeichnisses. Jeder Teil setzt seine Includes für sich ein; scheitert
+// eines, wird der Teil mit Kette unter problems gemeldet und ausgelassen.
+func (x *docIncluder) assembleDir(dir string, chain []string, depth int) ([]docDirPart, bool, error) {
 	ref := DocSchemeKPlaybook + ":/" + dir + "/"
-	entries, found, err := overlayDocDir(layers, dir, nil)
+	entries, found, err := overlayDocDir(x.layers, dir, nil)
 	if err != nil || !found {
-		return nil, nil, found, err
+		return nil, found, err
 	}
 
-	problems := []string{}
 	parts := make([]docDirPart, 0, len(entries))
 	for _, entry := range entries {
 		number := leadingDigits(entry.Name)
 		if number == "" {
-			problems = append(problems, fmt.Sprintf(
+			x.problems = append(x.problems, fmt.Sprintf(
 				"%s%s (%s): der Name beginnt nicht mit einer Ziffer — nicht aufgenommen",
 				ref, entry.Name, docOriginText(entry.Origin)))
 			continue
@@ -654,59 +949,245 @@ func assembleDocDir(layers DocLayers, dir string) ([]docDirPart, []string, bool,
 			content: entry.Content,
 		})
 	}
-
 	sort.SliceStable(parts, func(i, j int) bool {
 		if cmp := compareNumbers(parts[i].number, parts[j].number); cmp != 0 {
 			return cmp < 0
 		}
 		return parts[i].Name < parts[j].Name
 	})
-	return parts, problems, true, nil
-}
 
-// resolveDocDir baut ein Verzeichnis aus docAssembledDirs aus beiden Ebenen
-// zusammen (geprüft hat das ResolveDocRef): die Teile aus assembleDocDir, ohne
-// Frontmatter, durch eine Leerzeile getrennt.
-func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
-	result := DocResult{Ref: ref.String(), Directory: true, Parts: []DocPart{}, Problems: []string{}}
-
-	parts, problems, found, err := assembleDocDir(layers, ref.Path)
-	if err != nil {
-		return DocResult{}, err
-	}
-	if !found {
-		return DocResult{}, docRefErrorf(DocCodeNotFound,
-			"%s ist unbekannt: das Verzeichnis gibt es weder lokal noch mitgeliefert", result.Ref)
-	}
-	result.Problems = append(result.Problems, problems...)
-
-	for _, part := range parts {
-		result.Parts = append(result.Parts, part.DocPart)
-	}
-	result.Content = joinDocDirParts(parts)
-	return result, nil
-}
-
-// joinDocDirParts fügt die Teile eines zusammengebauten Verzeichnisses zu dem
-// einen Text: ohne Frontmatter, abgeschaltete und leere Teile übergangen,
-// durch eine Leerzeile getrennt. Leer ohne aufgenommene Teile. Die eine Stelle
-// für diesen Text — `k-playbook read` und das Briefing liefern denselben.
-func joinDocDirParts(parts []docDirPart) string {
-	pieces := []string{}
+	kept := make([]docDirPart, 0, len(parts))
+	dirChain := append(append([]string{}, chain...), ref)
 	for _, part := range parts {
 		if part.Disabled {
+			kept = append(kept, part)
 			continue
 		}
-		body := strings.Trim(string(inventory.Body(part.content)), "\n")
-		if strings.TrimSpace(body) == "" {
+		part.body = docBody(part.content)
+		if !x.opts.Raw {
+			partRef := DocRef{Scheme: DocSchemeKPlaybook, Path: dir + "/" + part.Name}
+			body, err := x.expand(part.body, partRef, append(append([]string{}, dirChain...), partRef.String()), depth, false)
+			if err != nil {
+				x.problems = append(x.problems, fmt.Sprintf("%s%s (%s): Include nicht aufgelöst — nicht aufgenommen: %v",
+					ref, part.Name, docOriginText(part.Origin), err))
+				continue
+			}
+			part.body = body
+		}
+		kept = append(kept, part)
+	}
+	return kept, true, nil
+}
+
+// docBody ist der Rumpf eines Dokuments ohne Frontmatter und ohne Leerzeilen
+// am Rand — das, was an Stelle einer Include-Zeile eingesetzt wird und woraus
+// ein zusammengebautes Verzeichnis besteht.
+func docBody(content []byte) string {
+	return strings.Trim(string(inventory.Body(content)), "\n")
+}
+
+// expand setzt die Include-Zeilen eines Texts ein. ref ist das Dokument, zu
+// dem der Text gehört — relative Ziele zählen ab seinem Verzeichnis im selben
+// Präfix —, chain die gerade offenen Verweise einschließlich ref, depth die
+// Tiefe des Dokuments. withFrontmatter überspringt einen Frontmatter-Block am
+// Anfang (der Text einer Einzeldatei kommt mit ihm; ein Rumpf nicht, und ein
+// Rumpf darf mit einer Trennlinie beginnen). Innerhalb eines Code-Blocks wird
+// nichts eingesetzt. Ein Fehler trägt die Kette.
+func (x *docIncluder) expand(text string, ref DocRef, chain []string, depth int, withFrontmatter bool) (string, error) {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	start := 0
+	if withFrontmatter {
+		start = frontmatterLines(lines)
+		out = append(out, lines[:start]...)
+	}
+	var fenceChar byte
+	fenceLen := 0
+	for _, line := range lines[start:] {
+		if char, n, rest := fenceMarker(line); n > 0 {
+			switch {
+			case fenceLen == 0:
+				fenceChar, fenceLen = char, n
+			case char == fenceChar && n >= fenceLen && strings.TrimSpace(rest) == "":
+				fenceLen = 0
+			}
+			out = append(out, line)
 			continue
 		}
-		pieces = append(pieces, body)
+		if fenceLen > 0 || !strings.HasPrefix(line, docIncludePrefix) {
+			out = append(out, line)
+			continue
+		}
+		inserted, err := x.includeLine(strings.TrimSpace(line[len(docIncludePrefix):]), ref, chain, depth)
+		if err != nil {
+			return "", err
+		}
+		if inserted == "" {
+			// Nichts einzusetzen (abgeschaltet oder leer): die Zeile fällt
+			// weg, keine Leerzeile bleibt zurück.
+			continue
+		}
+		out = append(out, strings.Split(inserted, "\n")...)
 	}
-	if len(pieces) == 0 {
-		return ""
+	return strings.Join(out, "\n"), nil
+}
+
+// includeLine löst das Argument einer Include-Zeile auf und liefert den
+// Text, der an ihre Stelle tritt. Jeder Fehler trägt die Kette bis zum Ziel.
+func (x *docIncluder) includeLine(arg string, from DocRef, chain []string, depth int) (string, error) {
+	fail := func(target string, err error) error {
+		return chainIncludeError(err, append(append([]string{}, chain...), target))
 	}
-	return strings.Join(pieces, "\n\n") + "\n"
+	if arg == "" || strings.ContainsAny(arg, " \t") {
+		return "", fail(arg, docRefErrorf(DocCodeInvalidInput,
+			"%s: eine Include-Zeile trägt genau ein Argument, einen Verweis mit Präfix oder einen relativen Pfad: include: %q",
+			from.String(), arg))
+	}
+	target, err := ParseDocRef(includeTarget(arg, from))
+	if err != nil {
+		return "", fail(arg, err)
+	}
+	canonical := target.String()
+	if slices.Contains(chain, canonical) {
+		return "", fail(canonical, docRefErrorf(DocCodeIncludeCycle,
+			"%s bindet %s ein, das schon offen ist — ein Include-Zyklus", from.String(), canonical))
+	}
+	if depth+1 > docIncludeMaxDepth {
+		return "", fail(canonical, docRefErrorf(DocCodeIncludeTooDeep,
+			"%s bindet %s auf Tiefe %d ein; erlaubt ist bis Tiefe %d", from.String(), canonical, depth+1, docIncludeMaxDepth))
+	}
+	inserted, err := x.include(target, append(append([]string{}, chain...), canonical), depth+1)
+	if err != nil {
+		return "", fail(canonical, err)
+	}
+	return inserted, nil
+}
+
+// include liest ein Include-Ziel und setzt dessen eigene Includes ein. chain
+// endet mit dem Ziel, depth ist seine Tiefe. Zurück kommt der Rumpf ohne
+// Frontmatter; leer bei einem abgeschalteten Ziel.
+func (x *docIncluder) include(target DocRef, chain []string, depth int) (string, error) {
+	var result DocResult
+	var err error
+	switch target.Scheme {
+	case DocSchemeProject:
+		result, err = resolveProjectDoc(x.layers, target)
+	case DocSchemeKeph:
+		result, err = resolveKephDoc(x.ctx, x.layers, target)
+	default:
+		if !isDocRefKind(target.Path) {
+			return "", docRefErrorf(DocCodeUnsupported,
+				"%s: k-playbook löst nur Verweise unter %s auf", target.String(), docRefKindsText())
+		}
+		if target.Dir {
+			if !isAssembledDocDir(target.Path) {
+				return "", missingDocFileName(target)
+			}
+			x.includes = append(x.includes, DocInclude{Ref: target.String(), Depth: depth})
+			parts, found, err := x.assembleDir(target.Path, chain[:len(chain)-1], depth)
+			if err != nil {
+				return "", err
+			}
+			if !found {
+				return "", docRefErrorf(DocCodeNotFound,
+					"%s ist unbekannt: das Verzeichnis gibt es weder lokal noch mitgeliefert", target.String())
+			}
+			return strings.Trim(joinDocDirParts(parts), "\n"), nil
+		}
+		result, err = resolveDocFile(x.layers, target)
+	}
+	if err != nil {
+		return "", err
+	}
+	if result.Ref != target.String() {
+		// keph: mit ~ — der echte Name kann schon offen sein.
+		if slices.Contains(chain, result.Ref) {
+			return "", docRefErrorf(DocCodeIncludeCycle, "%s ist schon offen — ein Include-Zyklus", result.Ref)
+		}
+		chain = append(append([]string{}, chain...), result.Ref)
+	}
+	x.includes = append(x.includes, DocInclude{Ref: result.Ref, Origin: result.Parts[0].Origin, Depth: depth, Disabled: result.Disabled})
+	if result.Disabled {
+		return "", nil
+	}
+	body := docBody([]byte(result.Content))
+	if body == "" {
+		return "", nil
+	}
+	return x.expand(body, target, chain, depth, false)
+}
+
+// includeTarget macht aus dem Argument einer Include-Zeile einen Verweis:
+// mit Präfix bleibt es, wie es ist; ohne zählt es ab dem Verzeichnis des
+// einbindenden Dokuments im selben Präfix. Nicht bereinigt — „..“ weist
+// ParseDocRef ab, so führt kein relativer Pfad aus der Sorte heraus.
+func includeTarget(arg string, from DocRef) string {
+	if i := strings.IndexAny(arg, ":/"); i >= 0 && arg[i] == ':' {
+		return arg
+	}
+	dir := path.Dir(from.Path)
+	if dir == "." {
+		return from.Scheme + ":/" + arg
+	}
+	return from.Scheme + ":/" + dir + "/" + arg
+}
+
+// includeChainError ist ein Fehler aus einem Include mit der Kette der
+// Dokumente, über die es erreicht wurde. Der Code bleibt der des Fehlers
+// (errors.As findet ihn durch Unwrap); die Kette wird nur einmal angehängt,
+// am Ort des Scheiterns.
+type includeChainError struct {
+	err   error
+	chain []string
+}
+
+func (e *includeChainError) Error() string {
+	return e.err.Error() + " — Include-Kette: " + strings.Join(e.chain, " → ")
+}
+
+// Unwrap gibt den Fehler ohne Kette frei.
+func (e *includeChainError) Unwrap() error { return e.err }
+
+func chainIncludeError(err error, chain []string) error {
+	var chained *includeChainError
+	if errors.As(err, &chained) {
+		return err
+	}
+	return &includeChainError{err: err, chain: chain}
+}
+
+// frontmatterLines zählt die Zeilen eines Frontmatter-Blocks am Anfang,
+// einschließlich der schließenden Trennzeile; 0 ohne Block. Derselbe Schnitt
+// wie inventory.FrontmatterBlock.
+func frontmatterLines(lines []string) int {
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return 0
+	}
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// fenceMarker erkennt den Zaun eines Code-Blocks: nach höchstens drei
+// Leerzeichen mindestens drei „`“ oder „~“. Zurück kommen das Zeichen, seine
+// Anzahl (0 ohne Zaun) und der Rest der Zeile.
+func fenceMarker(line string) (byte, int, string) {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) > 3 || trimmed == "" || (trimmed[0] != '`' && trimmed[0] != '~') {
+		return 0, 0, ""
+	}
+	char := trimmed[0]
+	n := 0
+	for n < len(trimmed) && trimmed[n] == char {
+		n++
+	}
+	if n < 3 {
+		return 0, 0, ""
+	}
+	return char, n, trimmed[n:]
 }
 
 // listDocLayer nennt die Dateien eines Verzeichnisses einer Ebene, die beim

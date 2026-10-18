@@ -147,8 +147,10 @@ func TestReadUnbekannterVerweisIstFehler(t *testing.T) {
 			t.Fatalf("%s: %v", ref, err)
 		}
 	}
+	// Ohne Anbindung ist die Collection nicht erreichbar; der Node wird nicht
+	// gefragt.
 	_, _, err = runReadCaptured(t, "keph:/manual/abc.md")
-	if err == nil || !strings.Contains(err.Error(), "unsupported") {
+	if err == nil || !strings.Contains(err.Error(), "(kephalaion_unavailable)") {
 		t.Fatalf("keph: %v", err)
 	}
 }
@@ -187,11 +189,122 @@ func TestReadLiestCommandTextAusDefaults(t *testing.T) {
 	}
 }
 
+// project: liest eine Datei des Projekts ab der Wurzel (dem Verzeichnis von
+// K-PLAYBOOK.yaml), ohne Überlagerung.
+func TestReadLiestProjektdatei(t *testing.T) {
+	root := readProject(t)
+	for rel, content := range map[string]string{
+		"scripts/123.sh":                  "#!/bin/sh\necho hallo\n",
+		"k-playbook-local/docs/README.md": "# Doku\n",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, stderr, err := runReadCaptured(t, "project:/scripts/123.sh")
+	if err != nil || stdout != "#!/bin/sh\necho hallo\n" || stderr != "" {
+		t.Fatalf("read project: %v — stdout %q, stderr %q", err, stdout, stderr)
+	}
+	stdout, _, err = runReadCaptured(t, "project:/k-playbook-local/docs/README.md", "--json")
+	if err != nil {
+		t.Fatalf("read --json: %v", err)
+	}
+	var result project.DocResult
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	if result.Content != "# Doku\n" || len(result.Parts) != 1 || result.Parts[0].Origin != "project" || result.Disabled {
+		t.Errorf("Antwort: %+v", result)
+	}
+
+	_, _, err = runReadCaptured(t, "project:/scripts/fehlt.sh")
+	if err == nil || !strings.Contains(err.Error(), "(not_found)") {
+		t.Fatalf("fehlende Projektdatei: %v", err)
+	}
+	_, _, err = runReadCaptured(t, "project:/scripts/")
+	if err == nil || !strings.Contains(err.Error(), "(invalid_input)") || !strings.Contains(err.Error(), "Dateiname fehlt") {
+		t.Fatalf("project: mit / am Ende: %v", err)
+	}
+}
+
 func TestReadHilfeIstFolgenlos(t *testing.T) {
 	for _, args := range [][]string{{}, {"--help"}} {
 		stdout, _, err := runReadCaptured(t, args...)
 		if err != nil || !strings.Contains(stdout, "k-playbook read <verweis>") {
 			t.Errorf("read %v: %v — %q", args, err, stdout)
 		}
+	}
+}
+
+// Includes: eingesetzt, mit --raw roh, Zyklus als Fehler mit Code, --json mit
+// includes.
+func TestReadSetztIncludesEin(t *testing.T) {
+	root := readProject(t)
+	for rel, content := range map[string]string{
+		"k-playbook/defaults/includes/context.md":             "---\ntitle: Kontext\n---\n\n## Kontext\n\nBaustein.\n",
+		"k-playbook/defaults/commands/k-danke.md":             "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
+		"k-playbook/defaults/commands/verschachtelt.md":       "# V\n\ninclude: k-danke.md\n",
+		"k-playbook/defaults/commands/zyklus-a.md":            "include: zyklus-b.md\n",
+		"k-playbook/defaults/commands/zyklus-b.md":            "include: zyklus-a.md\n",
+		"k-playbook-local/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, stderr, err := runReadCaptured(t, "k-playbook:/commands/verschachtelt.md")
+	if err != nil || stdout != "# V\n\n# k-danke\n\n## Kontext\n\nBaustein.\n" || stderr != "" {
+		t.Fatalf("verschachtelt: %v — stdout %q, stderr %q", err, stdout, stderr)
+	}
+	stdout, _, err = runReadCaptured(t, "k-playbook:/commands/verschachtelt.md", "--raw")
+	if err != nil || stdout != "# V\n\ninclude: k-danke.md\n" {
+		t.Fatalf("--raw: %v — %q", err, stdout)
+	}
+	_, _, err = runReadCaptured(t, "k-playbook:/commands/zyklus-a.md")
+	if err == nil || !strings.Contains(err.Error(), "(include_cycle)") || !strings.Contains(err.Error(), "Include-Kette") {
+		t.Fatalf("Zyklus: %v", err)
+	}
+	if _, _, err = runReadCaptured(t, "k-playbook:/commands/zyklus-a.md", "--raw"); err != nil {
+		t.Fatalf("Zyklus roh: %v", err)
+	}
+
+	stdout, _, err = runReadCaptured(t, "k-playbook:/commands/verschachtelt.md", "--json")
+	if err != nil {
+		t.Fatalf("read --json: %v", err)
+	}
+	var result project.DocResult
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	if len(result.Includes) != 2 || result.Includes[0].Ref != "k-playbook:/commands/k-danke.md" || result.Includes[0].Depth != 1 ||
+		result.Includes[1].Ref != "k-playbook:/includes/context.md" || result.Includes[1].Depth != 2 || result.Includes[1].Origin != "dist" {
+		t.Errorf("includes: %+v", result.Includes)
+	}
+	// Im zusammengebauten Verzeichnis fällt nur der kaputte Teil aus; der
+	// Hinweis steht auf stderr, Exit 0.
+	stdout, stderr, err = runReadCaptured(t, "k-playbook:/instructions/always/")
+	if err != nil || stdout != "## A\n\n## B lokal\n\nText.\n" {
+		t.Fatalf("Verzeichnis mit kaputtem Teil: %v — %q", err, stdout)
+	}
+	if !strings.Contains(stderr, "1000-kaputt.md") || !strings.Contains(stderr, "Include-Kette") {
+		t.Errorf("Hinweis fehlt auf stderr: %q", stderr)
+	}
+	// Die Sorten includes/ und testdata/ stehen nicht in der Hilfe.
+	stdout, _, _ = runReadCaptured(t, "--help")
+	if strings.Contains(stdout, "includes/") || strings.Contains(stdout, "testdata/") {
+		t.Errorf("Hilfe nennt Sorten für Leser, die keine sind: %q", stdout)
+	}
+	if !strings.Contains(stdout, "--raw") || !strings.Contains(stdout, "project:/") || !strings.Contains(stdout, "keph:/") {
+		t.Errorf("Hilfe ohne --raw oder Präfixe: %q", stdout)
 	}
 }

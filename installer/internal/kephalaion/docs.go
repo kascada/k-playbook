@@ -11,15 +11,15 @@ import (
 	"time"
 )
 
-// Dokumente in der Collection des Projekts: list, create und rename über den
-// Node dieses Rechners, mit dem Token aus der Anbindung. Der Vertrag ist der
-// des Pakets: Hub und Account aus der Anbindung, das Token aus dem Pfad des
-// Kandidaten, gesendet nur an die Loopback-Adresse des Nodes, kein Token in
-// einem Ergebnis oder Fehler.
+// Dokumente in der Collection des Projekts: list, read, create und rename
+// über den Node dieses Rechners, mit dem Token aus der Anbindung. Der Vertrag
+// ist der des Pakets: Hub und Account aus der Anbindung, das Token aus dem
+// Pfad des Kandidaten, gesendet nur an die Loopback-Adresse des Nodes, kein
+// Token in einem Ergebnis oder Fehler.
 //
-// list liest die Replica des Nodes; create und rename gehen über den Hub. Ein
-// Fehler eines Werkzeugs kommt als *ToolError mit dem Code von Kephalaion
-// (name_taken, not_found, …) zurück.
+// list und read lesen die Replica des Nodes; create und rename gehen über den
+// Hub. Ein Fehler eines Werkzeugs kommt als *ToolError mit dem Code von
+// Kephalaion (name_taken, not_found, …) zurück.
 //
 // create und rename tragen je Aufruf einen eigenen request_id (Kephalaion ab
 // v0.3.1, „Wiederholung mit Schlüssel“ in Kephalaions docs/vertrag.md). Bleibt
@@ -30,10 +30,10 @@ import (
 // CodeOutcomeUnknown. CodeNodeUnreachable heißt dagegen immer: Beim Hub ist
 // nichts angekommen.
 
-// ToolTimeout ist die Zeitgrenze für einen Aufruf von List oder für einen
-// Versuch von Create oder Rename, jeweils samt Anmeldung. create und rename
-// warten auf den Hub; ein Listing blättert womöglich mehrere Seiten. Eine
-// Wiederholung bekommt ihre eigene Zeitgrenze.
+// ToolTimeout ist die Zeitgrenze für einen Aufruf von List oder Read oder für
+// einen Versuch von Create oder Rename, jeweils samt Anmeldung. create und
+// rename warten auf den Hub; ein Listing blättert womöglich mehrere Seiten.
+// Eine Wiederholung bekommt ihre eigene Zeitgrenze.
 const ToolTimeout = 15 * time.Second
 
 // toolTimeout ist die Zeitgrenze, mit der gerechnet wird — ToolTimeout, in
@@ -90,7 +90,7 @@ const (
 // braucht (Adresse, Token), oder der Node ist zu alt für create und rename
 // (MinWriteNodeVersion). Nach dem Abschicken von create oder rename entsteht
 // dieser Code nie; dann ist der Ausgang offen (CodeOutcomeUnknown). Bei list
-// steht er auch für eine unlesbare Antwort — list ändert nichts.
+// und read steht er auch für eine unlesbare Antwort — beide ändern nichts.
 const CodeNodeUnreachable = "node_unreachable"
 
 // ToolError ist der Fehler eines Werkzeugs von Kephalaion oder des Wegs
@@ -167,6 +167,36 @@ type Document struct {
 	Note     string   `json:"note,omitempty"`
 	Replayed bool     `json:"replayed,omitempty"`
 	IDs      []string `json:"ids,omitempty"`
+}
+
+// Die Arten, die read für einen Namen meldet (ReadOutput.Kind in Kephalaions
+// internal/node/mcpnode/read.go).
+const (
+	ReadKindDocument  = "document"
+	ReadKindDirectory = "directory"
+	// ReadKindNone: Unter dem Namen lebt weder ein Dokument noch ein
+	// Verzeichnis. Kein Fehler des Werkzeugs.
+	ReadKindNone = "none"
+)
+
+// ReadResult ist die Antwort von read (ReadOutput in Kephalaions
+// internal/node/mcpnode/read.go), soweit k-playbook sie braucht. Kind ist
+// document, directory oder none; none ist kein Fehler. Content trägt den
+// Inhalt eines Dokuments unverändert, mit Frontmatter — ein Zeiger, weil das
+// Feld bei einem Verzeichnis und bei none fehlt und ein leeres Dokument ""
+// hat. Writable sagt nach der Regel des Hubs, ob der Account das Dokument
+// schreiben dürfte.
+type ReadResult struct {
+	Kind     string  `json:"kind"`
+	Address  string  `json:"address"`
+	Name     string  `json:"name"`
+	ID       string  `json:"id,omitempty"`
+	Revision int64   `json:"revision,omitempty"`
+	Created  *Stamp  `json:"created,omitempty"`
+	Updated  *Stamp  `json:"updated,omitempty"`
+	Size     *int64  `json:"size,omitempty"`
+	Writable *bool   `json:"writable,omitempty"`
+	Content  *string `json:"content,omitempty"`
 }
 
 // Client ruft Werkzeuge des Nodes für eine Collection auf. Er hält das Token
@@ -309,6 +339,38 @@ func (c *Client) List(ctx context.Context, req ListRequest) ([]Entry, error) {
 	}
 	return nil, &ToolError{Tool: "list", Code: CodeNodeUnreachable,
 		Message: fmt.Sprintf("mehr als %d Seiten; abgebrochen", maxListPages)}
+}
+
+// Read liest ein Dokument unter name aus der Replica des Nodes — wie list
+// ohne Netz, mit dem Stand des letzten Abgleichs; was ein anderer Rechner
+// gerade geschrieben hat, kann fehlen, Eigenes steht sofort da. name ist der
+// volle Name in der Collection, ohne führenden Schrägstrich. Gibt es unter dem
+// Namen nichts, ist das Ergebnis ReadKindNone und kein Fehler; ein
+// Verzeichnis ist ReadKindDirectory ohne Inhalt. Fehler meldet read nur als
+// Text (Collection nicht lesbar, Replica noch nie abgeglichen, ungültiger
+// Name): *ToolError ohne Code; ein Node, der nicht antwortet, ist
+// CodeNodeUnreachable.
+func (c *Client) Read(ctx context.Context, name string) (ReadResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+	session, err := c.open(ctx, "read")
+	if err != nil {
+		return ReadResult{}, err
+	}
+	var out ReadResult
+	if err := c.call(ctx, session, "read", map[string]any{"collection": c.address, "name": name}, &out); err != nil {
+		return ReadResult{}, err
+	}
+	switch out.Kind {
+	case ReadKindDocument, ReadKindDirectory, ReadKindNone:
+	default:
+		return ReadResult{}, &ToolError{Tool: "read", Code: CodeNodeUnreachable,
+			Message: fmt.Sprintf("Antwort mit unbekannter Art %q", out.Kind)}
+	}
+	if out.Kind == ReadKindDocument && out.Content == nil {
+		return ReadResult{}, &ToolError{Tool: "read", Code: CodeNodeUnreachable, Message: "Antwort ohne content"}
+	}
+	return out, nil
 }
 
 // Create legt ein Dokument an, über den Hub. Lebt unter dem Namen schon ein

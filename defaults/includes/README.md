@@ -1,14 +1,27 @@
 # includes
 
-Textbausteine, die k-playbook künftig vor der Ausgabe in Dokumente einsetzt — etwa
-ein Absatz, der in mehreren Commands wortgleich steht, einmal hier und von dort
+Textbausteine, die k-playbook vor der Ausgabe in Dokumente einsetzt — etwa ein
+Absatz, der in mehreren Commands wortgleich steht, einmal hier und von dort
 eingesetzt.
 
-- Syntax und Mechanismus — wie ein Dokument einen Baustein nennt, wie k-playbook ihn
-  bei der Auflösung eines Verweises einsetzt und wo die Rekursion endet — kommen mit
-  einem eigenen Task.
-- Bis dahin wird hier nichts gelesen und nichts aufgelöst: `includes/` ist keine Sorte
-  der Verweisauflösung, und `k-playbook:/includes/<name>.md` ist `unsupported`.
-- Das Verzeichnis liegt in `defaults/`, damit es mit dem Release gepackt wird und
-  auf jedem Hub unter `<hub>:k-playbook/defaults/includes/` ankommt, sobald es Inhalt
-  trägt. Feste Testfälle für den Mechanismus sind für `defaults/testdata/` geplant.
+- `includes/` ist eine Sorte der Verweisauflösung (Task 093): `k-playbook:/includes/<name>.md`
+  wird aufgelöst wie `instructions/` und `commands/`, mitgeliefert aus `defaults/includes/`,
+  eine gleichnamige Datei in `k-playbook-local/includes/` ersetzt den Baustein, eine leere
+  schaltet ihn ab. Die Sorte erscheint in keinem Katalog, keinem Briefing und keiner Hilfe:
+  Bausteine liest keine Sitzung für sich, sie werden eingesetzt.
+- Eingesetzt wird über eine Include-Zeile im einbindenden Dokument — ohne führenden
+  Leerraum, genau ein Argument, sonst nichts auf der Zeile:
+
+  ```markdown
+  include: k-playbook:/includes/<name>.md
+  ```
+
+  Ein Baustein hier ist aus einem Command oder einer Anweisung nur über diesen absoluten
+  Verweis erreichbar; ein relativer Pfad zählt ab dem Verzeichnis des einbindenden
+  Dokuments und führt nicht aus dessen Sorte heraus. Syntax, Rekursion (Tiefe 10),
+  Zyklusprüfung, Fehlercodes und der Parameter zum Abschalten (`k-playbook read --raw`,
+  `k_playbook_doc_read` mit `includes: false`): `docs/verweisschema.md`, Abschnitt „Includes“.
+- Das Verzeichnis liegt in `defaults/`, damit es mit dem Release gepackt wird und auf jedem
+  Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es noch
+  nicht: Der erste kommt mit dem Umzug der Commands (`_shared/context.md`). Feste Testfälle
+  für den Mechanismus liegen in `defaults/testdata/includes/`.

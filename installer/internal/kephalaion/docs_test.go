@@ -202,6 +202,62 @@ func TestClientCreateUndRename(t *testing.T) {
 	}
 }
 
+// read liest aus der Replica: Dokument mit Inhalt, Verzeichnis und none sind
+// Ergebnisse, kein Fehler; Fehler kommen nur als Text.
+func TestClientRead(t *testing.T) {
+	server, calls := newToolNode(t, func(call toolCall) (bool, string, string) {
+		switch call.Args["name"] {
+		case "manual/abc.md":
+			return false, `{"kind":"document","address":"vm:k-playbook","name":"manual/abc.md","id":"d1","revision":4,
+				"created":{"at":"2026-10-18T10:00:00.000Z","by":"kamran"},"size":6,"writable":true,"content":"# ABC\n"}`, ""
+		case "manual/leer.md":
+			return false, `{"kind":"document","address":"vm:k-playbook","name":"manual/leer.md","content":""}`, ""
+		case "manual":
+			return false, `{"kind":"directory","address":"vm:k-playbook","name":"manual","writable":true}`, ""
+		case "manual/fehlt.md":
+			return false, `{"kind":"none","address":"vm:k-playbook","name":"manual/fehlt.md"}`, ""
+		case "manual/kaputt.md":
+			return false, `{"kind":"document","address":"vm:k-playbook","name":"manual/kaputt.md"}`, ""
+		}
+		return true, "", "vm:k-playbook nicht lesbar: unbekannt, nicht auf diesem Node oder ohne gültige Anmeldung mit read"
+	})
+	client := newTestClient(t, server.URL+"/mcp")
+	ctx := context.Background()
+
+	doc, err := client.Read(ctx, "manual/abc.md")
+	if err != nil || doc.Kind != ReadKindDocument || doc.Content == nil || *doc.Content != "# ABC\n" || doc.Revision != 4 || doc.ID != "d1" {
+		t.Fatalf("Read: %+v, %v", doc, err)
+	}
+	if doc.Created == nil || doc.Created.By != "kamran" || doc.Size == nil || *doc.Size != 6 || doc.Writable == nil || !*doc.Writable {
+		t.Fatalf("Angaben: %+v", doc)
+	}
+	first := (*calls)[0]
+	if first.Name != "read" || first.Args["collection"] != "vm:k-playbook" || first.Args["name"] != "manual/abc.md" || len(first.Args) != 2 {
+		t.Fatalf("Argumente: %+v", first.Args)
+	}
+	if first.Header.Get("X-Keph-Account-vm") != "kamran-wsl" || first.Header.Get("X-Keph-Token-vm") != testToken {
+		t.Fatalf("Header-Paar fehlt: %v", first.Header)
+	}
+	if leer, err := client.Read(ctx, "manual/leer.md"); err != nil || leer.Content == nil || *leer.Content != "" {
+		t.Fatalf("leeres Dokument: %+v, %v", leer, err)
+	}
+	if dir, err := client.Read(ctx, "manual"); err != nil || dir.Kind != ReadKindDirectory || dir.Content != nil {
+		t.Fatalf("Verzeichnis: %+v, %v", dir, err)
+	}
+	if none, err := client.Read(ctx, "manual/fehlt.md"); err != nil || none.Kind != ReadKindNone {
+		t.Fatalf("none: %+v, %v", none, err)
+	}
+	// Ein Dokument ohne content ist keine brauchbare Antwort.
+	if _, err := client.Read(ctx, "manual/kaputt.md"); ErrorCode(err) != CodeNodeUnreachable {
+		t.Fatalf("Dokument ohne content: %v", err)
+	}
+	_, err = client.Read(ctx, "geheim/x.md")
+	var toolErr *ToolError
+	if err == nil || ErrorCode(err) != "" || !strings.Contains(err.Error(), "nicht lesbar") || !errors.As(err, &toolErr) || toolErr.Tool != "read" {
+		t.Fatalf("Fehler als Text: %v", err)
+	}
+}
+
 func TestClientFehlercodesSindUnterscheidbar(t *testing.T) {
 	server, _ := newToolNode(t, func(call toolCall) (bool, string, string) {
 		switch call.Name {
