@@ -22,6 +22,10 @@ eingesetzt.
   Zyklusprüfung, Fehlercodes und der Parameter zum Abschalten (`k-playbook read --raw`,
   `k_playbook_doc_read` mit `includes: false`): `docs/verweisschema.md`, Abschnitt „Includes“.
 - Das Verzeichnis liegt in `defaults/`, damit es mit dem Release gepackt wird und auf jedem
-  Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es noch
-  nicht: Der erste kommt mit dem Umzug der Commands (`_shared/context.md`). Feste Testfälle
+  Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es weiterhin
+  nicht: Module, die nur Commands einbinden, liegen als relative Includes in
+  `defaults/commands/_shared/` (seit Task 094: `context.md`, `gh.md`, `base-tools.md`) — dem
+  Namensraum, den `rules/command-authoring.md` für Command-Module festlegt; ein relatives
+  Include bleibt in der Sorte `commands` und nimmt an deren Überlagerung teil. Hierher kommt
+  erst ein Baustein, den mehr als eine Sorte nutzt, etwa später ein Skill-Text. Feste Testfälle
   für den Mechanismus liegen in `defaults/testdata/includes/`.

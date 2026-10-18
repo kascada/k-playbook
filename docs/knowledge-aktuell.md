@@ -236,6 +236,51 @@ and `make -C k-playbook-local nachziehen`; results go to
 before: the shell embedding `` !`k-playbook read …` `` in Claude Code and OpenCode as an
 optimisation of the hull.
 
+**What every session needs comes with the briefing; what a command needs becomes an include**
+(2026-10-18, task 094 — built, in the working tree). The module `commands/_shared/context.md`,
+which 24 commands and skills apply as their first step, is split by recipient instead of
+being rebuilt as one piece. (1) **Rules for every session** go into an always part,
+`defaults/instructions/always/030-briefing.md`, between the references and the project
+knowledge: load once, the handful of fields (`context.now.date`, the three roots,
+`documents.*`, `work`), read nothing yourself, derive every place from `local.dir`. **No
+table in `always/`:** it arrives with every briefing in every session, so it carries what a
+session has to do, in a few lines, with a reference for what one looks up. (2) **What one
+looks up** stands behind it: the full field table and the complete list of reload conditions
+in `defaults/instructions/on-demand/briefing-felder.md`, on the briefing's names
+(`documents.rules`, `context.gh`, …); the test `TestDefaultsBriefingFelderBlattIstVollstaendig`
+keeps the sheet complete against the briefing — every top-level key and every key of
+`context`, obtained the way the briefing obtains them (`briefingContextFields`), never by
+reflection over `Context`. The storage rules ("derived from `local.dir`, never searched"; "a
+missing directory is asked for or created by `/k-gui`, never silently, except the rows
+'entsteht beim ersten Lauf von …'") went to `guidelines/betrieb.md`. (3) **The command
+include is small:** `defaults/commands/_shared/context.md` only says to take the briefing of
+the session or to fetch it (`k_playbook_briefing`, else `k-playbook briefing --json`; stop
+when k-playbook is not installed) — the rules come with the briefing's own always text.
+`gh.md` and `base-tools.md` beside it are bound only by the commands that call `gh` or base
+tools. The three lie in `defaults/commands/_shared/`, not in `defaults/includes/`:
+`commands/_shared/` is the namespace `rules/command-authoring.md` already fixes for command
+modules, a relative include from a command stays in the kind `commands` and takes part in the
+commands' overlay (a local `k-playbook-local/commands/_shared/context.md` replaces the block);
+`includes/` stays for blocks that more than one kind uses. (4) **`/k-upgrade` is the first
+reader:** its text begins with `include: _shared/context.md` and takes `context.playbook.dir`
+from the briefing instead of calling `k-playbook context`; `k-playbook read
+k-playbook:/commands/k-upgrade.md` shows the inserted body, `--raw` the include line
+(`TestDefaultsKUpgradeBindetContextEin`, `TestReadKUpgradeAusDefaultsMitInclude`). The old
+module and its 24 readers are untouched; they move with the commands, one by one.
+(5) **`betrieb.md` has two copies on purpose:** `guidelines/betrieb.md` at the top of the
+repo is the version that is read (`pick` in `docref.go` takes the kind `guidelines` from the
+top of the installation), `defaults/guidelines/betrieb.md` is a byte-identical copy
+maintained by hand for the hub — no script (`pack-defaults.sh`, workflows, Makefile) copies
+it; `diff` between the two being empty is the check. The check against the installation —
+`k-playbook read k-playbook:/instructions/always/`, `k-playbook briefing`,
+`k_playbook_doc_read`, and one run of `/k-upgrade` in Claude Code — follows the next release
+and `make -C k-playbook-local nachziehen`; the Go tests against the working tree `defaults/`
+(`installer/internal/project/shipped_defaults_test.go`) are the acceptance until then.
+**Put to use later:** `rules/command-authoring.md:31` still says `commands/_shared/` holds
+"genau eine Datei: `context.md`" — reworded when the rule gains the hull form (work list 15);
+`verweisschema.md` ("Nothing shipped carries an include line yet") and the "Includes"
+paragraph above are superseded by `/k-upgrade`'s include line since this task.
+
 **A user area in the project's collection** (2026-10-14, built 2026-10-15 — task 088, in the
 working tree, not yet put to use). Per person there is
 `user/<name>/<kind>/`, for now with `tasks/` and `workbench/`. The tasks are public to everyone
@@ -362,7 +407,7 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | Source | Section / sentence | Future place | State |
 |---|---|---|---|
 | `k-playbook.md` | intro: "gilt in jedem Projekt … `k-playbook-local/k-playbook.md` wird nach dieser Datei gelesen" | drops: the reading order is the order of `documents.always` in the briefing; local parts follow shipped ones by number | open |
-| `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md`: the two layers and the two rules in a few lines; the paths are the fields `playbook` and `local` — their place is in the table "Context field → future place" below —, the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md` | open |
+| `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md` was the proposal for the two layers and the two rules. Since task 094 (2026-10-18) the part "never write into `k-playbook/`, the roots come from the briefing (`context.project.dir`, `context.local.dir`, `context.playbook.dir`), everything project-owned under `local.dir`" stands in `always/030-briefing.md`; the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md`. What is left for a `020-zwei-ebenen.md` is only the overlay rule (a file of the same name replaces, an empty one disables) — whether that still needs an always part of its own or is covered by `origin` in the briefing and `on-demand/ueberlagern.md` is noted here, not decided and not built | partly done (094); rest open |
 | `k-playbook.md` | "Überlagern und Abschalten": replace by name, empty disables, the unit per kind, commands and skills must be registered | `on-demand/ueberlagern.md`, for the session that creates, overrides or disables an entry; what a session needs every time — read `k-playbook:` only through k-playbook, origin per entry — is already in `always/010-verweise.md` and in the briefing (`origin`) | open |
 | `k-playbook.md` | "Wo was liegt": no assumptions about paths, `k-playbook context` resolves directories and catalogs | prompt: the one call stays the `anstoss` block; the catalogs with origin are in the briefing | open |
 | `k-playbook.md` | "Wie gearbeitet wird", first paragraph: anything beyond a trivial step becomes a task (`/k-task-create`, `/k-task-refine`, `/k-task-run`) | `always/300-arbeiten-in-tasks.md` | open |
@@ -407,16 +452,16 @@ the commands and skills that name the field today (`grep -rn <field> commands sk
 | Context field | Future place in the briefing | Readers today | State |
 |---|---|---|---|
 | `schemaVersion` (the configuration's version) | drops: the briefing has its own `schemaVersion`; the configuration's version is the tool's concern (`CheckSchema` stops before anything is built), no command reads it | — | in the rest |
-| `now` (`date`, `timestamp`) | `now`, same shape — a session has to take the date from here, not guess it | `_shared/context.md`, `/k-audit`, `/k-docs-extract`, `/k-remediation`, `/k-review`, `/k-task-refine`, `/k-task-run` | in the rest |
+| `now` (`date`, `timestamp`) | `now`, same shape — a session has to take the date from here, not guess it | `_shared/context.md`, since 094 as `context.now.date` also `always/030-briefing.md` and `on-demand/briefing-felder.md`; `/k-audit`, `/k-docs-extract`, `/k-remediation`, `/k-review`, `/k-task-refine`, `/k-task-run` | in the rest |
 | `instructions` (the `k-playbook.md` files in reading order) | drops: `documents.always` is the reading order, `k-playbook-local/k-playbook.md` becomes local parts (see "Name clash"); the standard header "lies die Dateien aus `instructions`" of every command then reads `k-playbook:/instructions/always/` instead | `_shared/context.md` and the header of 20 commands and 4 skills (`/k-audit`, `/k-danke`, `/k-doc-inventory`, `/k-docs*`, `/k-enforcement`, `/k-gui`, `/k-pr-review`, `/k-remediation`, `/k-review`, `/k-task-*`, `/k-test-check`, `/k-todo`, `/k-verlauf`, `/k-vscode-project-color`; `ks-ai-session-memory`, `ks-befunde`, `ks-enforcement`, `ks-overlay-repo-analyse`) | in the rest |
-| `project` (`dir`, `repoRoot`, `vcs`, `config`, `languages`) | `project`, same shape — the one place a command takes the project root, the repository and the languages from | `_shared/context.md`, `_docs/code.md`, `/k-audit`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-task-refine`, `/k-task-run`, `/k-todo`; `ks-enforcement` (`PLAYBOOK.md`) | in the rest |
-| `playbook` (`dir`) | `playbook`, same shape — every shipped path a command needs (`bin/k-check`, `scripts/`) derives from it ("Where the rest lives" in `_shared/context.md`) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-task-run`; `ks-ai-session-memory`, `ks-enforcement`, `ks-overlay-repo-analyse` | in the rest |
-| `local` (`dir`) | `local`, same shape — every project-owned path derives from it | `_shared/context.md`, `_docs/code.md`, `_docs/inventory.md`, `_docs/tools.md`, `/k-audit`, `/k-danke`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-review`, `/k-task-create`, `/k-task-refine`, `/k-task-run`; `ks-enforcement` | in the rest |
+| `project` (`dir`, `repoRoot`, `vcs`, `config`, `languages`) | `project`, same shape — the one place a command takes the project root, the repository and the languages from | `_shared/context.md`, since 094 as `context.project.dir` also `always/030-briefing.md` and `on-demand/briefing-felder.md`; `_docs/code.md`, `/k-audit`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-task-refine`, `/k-task-run`, `/k-todo`; `ks-enforcement` (`PLAYBOOK.md`) | in the rest |
+| `playbook` (`dir`) | `playbook`, same shape — every shipped path a command needs (`bin/k-check`, `scripts/`) derives from it ("Where the rest lives" in `_shared/context.md`) | `_shared/context.md`, since 094 as `context.playbook.dir` also `always/030-briefing.md`, `on-demand/briefing-felder.md` and `defaults/commands/k-upgrade.md` (the first reader on the briefing); `_docs/inventory.md`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-task-run`; `ks-ai-session-memory`, `ks-enforcement`, `ks-overlay-repo-analyse` | in the rest |
+| `local` (`dir`) | `local`, same shape — every project-owned path derives from it | `_shared/context.md`, since 094 as `context.local.dir` also `always/030-briefing.md`, `on-demand/briefing-felder.md` and `guidelines/betrieb.md`; `_docs/code.md`, `_docs/inventory.md`, `_docs/tools.md`, `/k-audit`, `/k-danke`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-review`, `/k-task-create`, `/k-task-refine`, `/k-task-run`; `ks-enforcement` | in the rest |
 | `remediation` (`mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`) | `remediation`, same shape; the meaning of the modes moves to `on-demand/remediation.md` (row "Umgang mit Befunden" above) | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-pr-review` (`remediation.target`), `/k-remediation`, `/k-review` | in the rest |
-| `gh` (`status`, `configured`, `installed`, `path`, `loggedIn`, `account`, `accounts`, `tokenFromEnv`, `ready`, `host`) | `gh`, same shape — the decision and the host finding a PR review has to check before calling `gh` | `_shared/context.md`, `/k-pr-review` | in the rest |
+| `gh` (`status`, `configured`, `installed`, `path`, `loggedIn`, `account`, `accounts`, `tokenFromEnv`, `ready`, `host`) | `gh`, same shape — the decision and the host finding a PR review has to check before calling `gh` | `_shared/context.md`, `/k-pr-review`; since 094 as `context.gh.*` the include `defaults/commands/_shared/gh.md` (not yet bound by any command) and `on-demand/briefing-felder.md` | in the rest |
 | `mcp` (`required`, `configured`) | drops: no command reads it; the required servers are the interface's concern, and the interface reads `BuildContext` directly (`webui/context.go`), not the output | — | in the rest |
 | `git` (`switch`, `allow`, `environments`, `configured`) | drops: no command reads it (commands check `project.vcs` and `baseTools.missing`, not `git`); the branch switch is the interface's, which reads `BuildContext` directly | — | in the rest |
-| `baseTools` (`matrix`, `present`, `error`, `missing`, `ok`, `installCommand`) | `baseTools`, same shape — the warning before a command calls a base tool | `_shared/context.md`, `/k-task-run`, `/k-verlauf` | in the rest |
+| `baseTools` (`matrix`, `present`, `error`, `missing`, `ok`, `installCommand`) | `baseTools`, same shape — the warning before a command calls a base tool | `_shared/context.md`, `/k-task-run`, `/k-verlauf`; since 094 as `context.baseTools.*` the include `defaults/commands/_shared/base-tools.md` (not yet bound by any command) and `on-demand/briefing-felder.md` | in the rest |
 | `catalogs.checks` (`name`, `key`, `path`, `origin`, `disabled`) | `checks`: own list beside `documents`, entries with `key`, `origin` and `disabled` — checks are run through `bin/k-check`, not read, so they are no `documents` entry and keep no `ref`; whether `path` stays is decided when the field moves | `_shared/context.md`, `/k-enforcement` | in the rest |
 | `catalogs.rules` | `documents.rules` — `ref`, `title`, `description`, `origin` instead of `path`; readers switch from the path to `k_playbook_doc_read` | `_shared/context.md`, `/k-danke`, `/k-enforcement`, `/k-pr-review`, `/k-review`; `ks-befunde`, `ks-enforcement` (`SKILL.md`, `PLAYBOOK.md`) | in the briefing |
 | `catalogs.reviews` (with `audit`/`review` modes per recipe) | `documents.reviews` — but the briefing entry carries no `audit`/`review` block (`parseReviewModes`); `/k-audit` and `/k-review` choose recipes by these modes, so before `catalogs` goes the review entries in the briefing get the modes, or the readers take them from the recipe's frontmatter — rework to decide at the switch | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-pr-review`, `/k-review`, `/k-task-run` | in the briefing |
@@ -468,6 +513,15 @@ is rebuilt by task 091 — "build first, then put to use".
   `instructions` to `k-playbook:/instructions/always/` and from `catalogs` paths to
   `documents` references; the commands' standard header drops the call. Per field, the
   readers are in the table above; they switch when the field moves, not before.
+  **Rebuilt in task 094 (2026-10-18), beside the old module:** the rebuild lies in
+  `defaults/commands/_shared/` — `context.md` (take or fetch the briefing, a few lines),
+  `gh.md`, `base-tools.md` — and in `instructions/always/030-briefing.md` plus
+  `instructions/on-demand/briefing-felder.md`; "Where the rest lives" went to
+  `guidelines/betrieb.md`. `/k-upgrade` is the first command on it (`include:
+  _shared/context.md`). The old `commands/_shared/context.md` stays unchanged until the last
+  of its 24 readers has moved (work list 16); each command switches to the include when it
+  moves. `rules/command-authoring.md:31` ("genau eine Datei: `context.md`") is reworded with
+  the hull form, not before (work list 15).
 - **`k-playbook.md`, "Wo was liegt"** (shipped, and read through the context field
   `instructions`): "`k-playbook context` liefert die aufgelösten Verzeichnisse und die
   effektiven Kataloge". **To rebuild:** row "Wo was liegt" in the table above — the section
@@ -594,8 +648,9 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     lines are inserted in every document with `--raw`/`includes: false` to switch off,
     `includes` and `testdata` are kinds, the fixed cases lie in `defaults/testdata/includes/`.
     Open for the follow-up tasks: extend `010-verweise.md` by `k_playbook_doc_read` for `keph:`
-    and decide the default route; the first include (`_shared/context.md`) with the move of
-    the commands; `keph:` includes in always-instructions only with care (network).
+    and decide the default route; `keph:` includes in always-instructions only with care
+    (network). The first include came with task 094 (2026-10-18): `defaults/commands/k-upgrade.md`
+    binds `_shared/context.md`; see "What every session needs comes with the briefing" above.
 15. **Hulls generated by the binary** — from `defaults/commands/` instead of files under
     `commands/` and symlinks; `/k-upgrade`'s hand-made hull goes with it, and the hull form
     becomes a rule in `rules/command-authoring.md`.

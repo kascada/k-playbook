@@ -7,10 +7,13 @@ Collection gezogen ist.
 Heute tut er nur eines: Er nennt die installierte Version und sagt, dass noch nichts
 nachzuziehen ist.
 
-## Schritt 1 — Version nennen
+## Schritt 1 — Briefing
 
-Rufe `k-playbook context` auf, oder nimm die Ausgabe, wenn sie in dieser Sitzung schon
-vorliegt. Entnimm daraus `playbook.dir` und lies dort die Datei `VERSION`. Gib die
+include: _shared/context.md
+
+## Schritt 2 — Version nennen
+
+Entnimm dem Briefing `context.playbook.dir` und lies dort die Datei `VERSION`. Gib die
 Zeile daraus aus, etwa so:
 
 ```text

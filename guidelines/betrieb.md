@@ -13,10 +13,20 @@ weg — ohne Fehlermeldung, ohne Spur. Alles, was das Projekt hervorbringt, lieg
 daneben in `k-playbook-local/`.
 
 **Pfade werden nicht geraten.** Der Ort wird aus der Ausgabe von `k-playbook context`
-abgeleitet: `local.dir` für alles Projekteigene, `playbook.dir` für die Installation.
-Ein fest verdrahteter Pfad geht in dem Moment kaputt, in dem ein Projekt anders heißt
-oder tiefer liegt. Für Text, den ein Mensch liest, bleibt die kurze Schreibweise
-`k-playbook-local/...` richtig; zum Schreiben wird der aufgelöste Pfad benutzt.
+abgeleitet — im Briefing dieselben Felder unter `context` —: `local.dir` für alles
+Projekteigene, `playbook.dir` für die Installation. Jeder Ort unten leitet sich aus
+`local.dir` ab, nie aus einer Konfiguration und nie durch Suchen. Ein fest verdrahteter
+Pfad geht in dem Moment kaputt, in dem ein Projekt anders heißt oder tiefer liegt. Für
+Text, den ein Mensch liest, bleibt die kurze Schreibweise `k-playbook-local/...` richtig;
+zum Schreiben wird der aufgelöste Pfad benutzt.
+
+**Ein fehlendes Verzeichnis wird nie still angelegt.** Fehlt ein Ort aus der Tabelle
+unten, wird gefragt, ob genau dieses Verzeichnis angelegt oder `/k-gui` gestartet werden
+soll, das die projektlokale Struktur wiederherstellt. Nicht hart abbrechen, nicht still
+anlegen, nie einen anderen Pfad nehmen. Das gilt für die Verzeichnisse, die das
+Einrichten anlegt. Ausgenommen sind die Zeilen mit „entsteht beim ersten Lauf von …“:
+Dort ist ein fehlendes Verzeichnis der normale Zustand vor dem ersten Lauf, und der
+erzeugende Command legt es ohne Rückfrage selbst an.
 
 ## Was wohin
 
@@ -30,10 +40,11 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Review- und Audit-Lauf | `results/<YYYY-MM-DD>/` bzw. `results/<familie>/<YYYY-MM-DD>/` | `/k-review`, `/k-audit` |
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
-| Doku aus dem Code | `docs/code/<NN>-<slug>.md` | `/k-docs-code` |
-| Steckbrief zu Library oder Tool | `docs/libs/<name>.md` | `/k-docs-tools` |
-| Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |
-| Versionsinventar | `docs/versions/inventory.md` | `/k-doc-inventory`, `k-playbook inventory` |
+| Befund aus Analyse oder Fehlersuche | `material/befunde/<thema>.md` — entsteht beim ersten Lauf von `/k-danke` oder des Skills `ks-befunde` | `/k-danke`, Skill `ks-befunde`; Form nach der Regel `befunde.md` |
+| Doku aus dem Code | `docs/code/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` | `/k-docs-code` |
+| Steckbrief zu Library oder Tool | `docs/libs/<name>.md` — entsteht beim ersten Lauf von `/k-docs-tools` | `/k-docs-tools` |
+| Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-extract` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |
+| Versionsinventar | `docs/versions/inventory.md` — entsteht beim ersten Lauf von `/k-doc-inventory` | `/k-doc-inventory`, `k-playbook inventory` |
 | Handgeschriebene Doku | `docs/manual/<slug>.md` | von Hand |
 | Doku-Index | `docs/README.md` | `/k-docs-index`, sonst niemand |
 | Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
@@ -42,6 +53,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
 | Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
 | Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
+| Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `<playbook.dir>/scripts/`, `<playbook.dir>/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
 
 **Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage
 `data/todos.json` gehört dem Werkzeug: gelesen und geschrieben wird sie über den

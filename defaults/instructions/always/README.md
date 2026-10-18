@@ -47,5 +47,9 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
 
 - `010-verweise.md`: Wie Verweise geschrieben werden und wie man sie erreicht. Steht als
   Erstes, weil alle weiteren Teile Verweise benutzen.
+- `030-briefing.md`: Die Regeln jeder Sitzung zum Briefing — einmal laden, die Handvoll
+  Felder, nichts selbst lesen, Ablegen nur aus `local.dir`. Steht gleich nach den Verweisen,
+  weil das Briefing das Erste ist, was eine Sitzung liest; Nachschlagbares dazu liegt in
+  `on-demand/briefing-felder.md`.
 - `100-projektwissen-zuerst.md`: Zuerst die Projektdoku lesen, dann den Code.
 - `200-befunde-festhalten.md`: Erkenntnisse aus Analyse und Fehlersuche festhalten.

@@ -308,3 +308,61 @@ func TestReadSetztIncludesEin(t *testing.T) {
 		t.Errorf("Hilfe ohne --raw oder Präfixe: %q", stdout)
 	}
 }
+
+// Der Arbeitsstand defaults/ des Repos als mitgelieferte Ebene eines
+// Testprojekts: `k-playbook read` zeigt /k-upgrade mit eingesetztem Rumpf von
+// _shared/context.md, mit --raw die Include-Zeile (Task 094). Die Installation
+// daneben trägt den vorigen Stand und taugt nicht als Abnahme.
+func TestReadKUpgradeAusDefaultsMitInclude(t *testing.T) {
+	// Den Repo-Pfad vor dem Wechsel ins Testprojekt auflösen.
+	repoDefaults, err := filepath.Abs(filepath.Join("..", "..", "..", "defaults"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repoDefaults, "commands", "_shared", "context.md")); err != nil {
+		t.Fatalf("defaults/commands/_shared/context.md im Repo nicht gefunden: %v", err)
+	}
+	root := todoProject(t)
+	playbook := filepath.Join(root, "k-playbook")
+	if err := os.MkdirAll(playbook, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(repoDefaults, filepath.Join(playbook, "defaults")); err != nil {
+		t.Skipf("Symlink nicht möglich: %v", err)
+	}
+
+	stdout, stderr, err := runReadCaptured(t, "k-playbook:/commands/k-upgrade.md")
+	if err != nil || stderr != "" {
+		t.Fatalf("read: %v — stderr %q", err, stderr)
+	}
+	for _, want := range []string{"# k-upgrade\n", "Liegt das Briefing in dieser Sitzung vor, nimm es.", "`context.playbook.dir`"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("eingesetzter Text ohne %q:\n%s", want, stdout)
+		}
+	}
+	for _, absent := range []string{"include:", "title: Briefing laden", "k-playbook context"} {
+		if strings.Contains(stdout, absent) {
+			t.Errorf("eingesetzter Text enthält %q:\n%s", absent, stdout)
+		}
+	}
+
+	raw, _, err := runReadCaptured(t, "k-playbook:/commands/k-upgrade.md", "--raw")
+	if err != nil {
+		t.Fatalf("read --raw: %v", err)
+	}
+	if !strings.Contains(raw, "\ninclude: _shared/context.md\n") || strings.Contains(raw, "Liegt das Briefing") {
+		t.Errorf("--raw zeigt nicht die Include-Zeile:\n%s", raw)
+	}
+
+	stdout, _, err = runReadCaptured(t, "k-playbook:/commands/k-upgrade.md", "--json")
+	if err != nil {
+		t.Fatalf("read --json: %v", err)
+	}
+	var result project.DocResult
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	if len(result.Includes) != 1 || result.Includes[0].Ref != "k-playbook:/commands/_shared/context.md" || result.Includes[0].Depth != 1 || result.Includes[0].Origin != "dist" {
+		t.Errorf("includes: %+v", result.Includes)
+	}
+}
