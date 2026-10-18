@@ -92,14 +92,16 @@ real name.
 | `keph:` | Kephalaion `read` with `collection` = `kephalaion.address` from `k-playbook context` and `name` = the path without the leading `/`, a segment `~` replaced by `kephalaion.user` |
 
 `k_playbook_doc_read` and `k-playbook read` resolve only `k-playbook:` references, and of
-those the kinds `instructions/`, `rules/`, `reviews/` and `guidelines/` (`docRefKinds` in
-`installer/internal/project/docref.go`; `rules`, `reviews` and `guidelines` since task 086).
+those the kinds `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/`
+(`docRefKinds` in `installer/internal/project/docref.go`; `rules`, `reviews` and `guidelines`
+since task 086, `commands` since task 092).
 For `project:` and `keph:` they answer "not yet supported" (code `unsupported`). That limits
 the tool, not the reference: a `project:` or `keph:` reference is valid and is read on its
 route above. A `k-playbook:` path outside those kinds is refused as `unsupported` as well --
 `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not resolved: checks are
-scripts that run, commands and skills live with the assistant; nobody reads them through a
-reference. Paths with `..`, `.`, hidden or empty segments are not references at all
+scripts that run, skills live with the assistant; nobody reads them through a reference.
+Commands lie with the assistant only as a hull (frontmatter plus the reference
+`k-playbook:/commands/<name>.md`); their text is resolved like a rule, as a single file. Paths with `..`, `.`, hidden or empty segments are not references at all
 (`invalid_input`). A `k-playbook:` reference ending in `/` whose directory is not on the list
 of assembled directories is incomplete -- the file name is missing -- and also
 `invalid_input`, decided without reading: `k-playbook:/instructions/on-demand/`,
@@ -116,7 +118,7 @@ Two layers, compared by name:
 
 | Layer | Directory | Origin |
 |---|---|---|
-| shipped | the installation `k-playbook/` — a clone of this repo; `instructions/` is read from `defaults/instructions/`, the other kinds at the top level | `dist` |
+| shipped | the installation `k-playbook/` — a clone of this repo; `instructions/` and `commands/` are read from `defaults/`, the other kinds at the top level | `dist` |
 | local | `k-playbook-local/` | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped instructions exist once, in `defaults/instructions/`: the installation reads
@@ -124,6 +126,14 @@ them there (`NewShippedDocSource` in `docref.go`), and the release packs the sam
 the hub. Until 2026-10-17 a copy lay at the top of the repo as well, kept equal by a test;
 that copy is gone. `rules/`, `reviews/` and `guidelines/` still lie at the top of the repo
 until their own switch, because the catalogs of `k-playbook context` read them there.
+
+`commands/` is read from `defaults/commands/` as well, but the file at the top of the repo
+is not a copy: `commands/<name>.md` is the hull the assistant registers, frontmatter plus the
+reference, and `defaults/commands/<name>.md` is the text behind the reference. A hull without
+a text in `defaults/` is `not_found`; there is no fallback to the hull. A local
+`k-playbook-local/commands/<name>.md` replaces both at once — the hull in the registry and the
+text here — so it carries the text itself and must not point at the same reference, which
+would resolve to that file. First command on this route: `/k-upgrade` (task 092).
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
 layer. Today the source is the disk; later it can be Kephalaion without the caller noticing.

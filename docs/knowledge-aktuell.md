@@ -117,9 +117,11 @@ public and stays public, and the binary is fetched from there already.
 **`defaults/` holds the shipped Markdown, frozen** (2026-10-10). `defaults/` holds real
 copies of the tracked files of `guidelines`, `reviews`, `rules` and `k-playbook.md` — 19
 files, no links; `docs/` was taken out before v0.12.0 (the docs are taken over later, anew),
-and `VERSION` is added from the root when packing, because the release only bumps that one. Commands, skills, scripts, `bin` and `checks` stay out: they
+and `VERSION` is added from the root when packing, because the release only bumps that one. Skills, scripts, `bin` and `checks` stay out: they
 have to lie on disk for the assistants and to run, so they stay in the local `k-playbook/` as
-today. The old places stay for the installation; two copies cannot drift because the shipped
+today. Commands are on their way in since 2026-10-18: their text goes into
+`defaults/commands/`, only a hull stays with the assistant (see "Commands as a hull with a
+reference" below); the first is `/k-upgrade`, the rest still lies at the top as today. The old places stay for the installation; two copies cannot drift because the shipped
 content is not changed until the switch is complete. `defaults/instructions/` came in on
 2026-10-14 and is the exception: it is maintained continuously and, since 2026-10-17, the
 only place of the shipped instructions (see "A new kind `instructions/`" below). From here
@@ -164,6 +166,43 @@ empty local file disables it without an error; a directory is assembled without 
 an unknown reference is `not_found` with no fallback to the disk; `project:`, `keph:` and other
 `k-playbook:` kinds are `unsupported` for now. The `ref` in the prefix scheme is the lasting
 contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract).
+
+**Commands as a hull with a reference** (2026-10-18, task 092 — built, measured in the
+assistants after the next release). A command consists of two parts: a **hull** with the
+assistant — `commands/<name>.md`, frontmatter (`description`, `argument-hint`,
+`allowed-tools`) plus one paragraph that names the reference `k-playbook:/commands/<name>.md`
+and says to read it by the reference rule (MCP `k_playbook_doc_read`, as a fallback
+`k-playbook read`) — and the **text** in `defaults/commands/<name>.md`, which `ResolveDocRef`
+delivers: `commands` is a kind in `docRefKinds`, and the shipped layer reads it from
+`defaults/` like `instructions` (`NewShippedDocSource`). The prefix is `k-playbook:`, not
+`keph:`: shipped content is never read directly from the public collection, and the
+override by project-owned content happens in the resolution. The first such command is
+`/k-upgrade`: today only an info (installed version from `<playbook.dir>/VERSION`, nothing to
+pull after), later the binary takes over the pulling as a subcommand and the command only
+calls it and relays the message — the subcommand is not named in the text until it exists.
+Includes — text blocks k-playbook inserts into a document before handing it out — are
+resolved by k-playbook in `ResolveDocRef`, recursively with a limit, not by Kephalaion;
+`defaults/includes/` exists with a README, syntax and mechanism are a task of their own, and
+`includes` becomes a kind only with that task. Fixed test cases for the mechanism are planned
+for `defaults/testdata/`, which lands read-only on every hub. Three things are deliberate:
+(1) **The hull lies by hand at the old place** `commands/`, against "nothing new goes into
+the old places" — the registry links only `k-playbook/commands/`; the hull goes when the
+binary generates hulls from `defaults/commands/` (own task). (2) **The hull has no
+`## Erster Schritt`** and does not apply `_shared/context.md`, although
+`rules/command-authoring.md` demands the section word for word; the rule stays unchanged,
+the reviews in `/k-task-run` do not count it as a finding, and the hull form becomes a rule
+only when the binary generates hulls. (3) **Two layers apply at once:** a project-owned
+`k-playbook-local/commands/<name>.md` replaces the hull (registry) and the text (resolution)
+with the same file. A local version therefore carries the text itself and must not point at
+`k-playbook:/commands/<name>.md` — that would resolve to itself, because the local layer
+wins. Commands appear neither in the briefing (`documents`) nor in `catalogs`; the second way
+for a command is the registry, and a test checks that name, origin and disabled agree over
+both ways. The check in the assistants — does Claude Code, OpenCode or Cursor read the
+reference, with which tool, does it follow the text — is step 4 of task 092 after release
+and `make -C k-playbook-local nachziehen`; results go to
+`k-playbook-local/material/befunde/command-huelle-verweis.md`. Measured after that, not
+before: the shell embedding `` !`k-playbook read …` `` in Claude Code and OpenCode as an
+optimisation of the hull.
 
 **A user area in the project's collection** (2026-10-14, built 2026-10-15 — task 088, in the
 working tree, not yet put to use). Per person there is
@@ -351,7 +390,7 @@ the commands and skills that name the field today (`grep -rn <field> commands sk
 | `catalogs.reviews` (with `audit`/`review` modes per recipe) | `documents.reviews` — but the briefing entry carries no `audit`/`review` block (`parseReviewModes`); `/k-audit` and `/k-review` choose recipes by these modes, so before `catalogs` goes the review entries in the briefing get the modes, or the readers take them from the recipe's frontmatter — rework to decide at the switch | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-pr-review`, `/k-review`, `/k-task-run` | in the briefing |
 | `guidelines` (files of `k-playbook-local/guidelines/` only) | `documents.guidelines` — a different meaning: the context field names only the local files, `documents.guidelines` the overlay of shipped (`k-playbook/guidelines/`, today `betrieb.md`) and local ([mcp.md](mcp.md#briefing-contract), `guidelinesKind` in `context.go`); readers see more after the switch — that is rework and belongs to this row | `_shared/context.md` (the field); `/k-danke` and `ks-befunde` write `<local.dir>/guidelines/fallen.md`, the directory, not the field | in the briefing |
 | `versionSources` (`path`, `present`, `schemaVersion`, `roots`, `sources`, `exclude`, `helmValues`, `error`) | `versionSources`, same shape — the contract says no command reads the file itself ([version-inventory.md](version-inventory.md)) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs` | in the rest |
-| `kephalaion` (`configured`, `hub`, `collection`, `account`, `address`, `state`, `ok`, `message`, `rights`, `scopes`, `user`, `node`, `nodeVersion`, `sync`) | `work`: `work.user` is there, `work.available`/`work.message` stand for `ok`/`message`; `address` gets `work.collection` so that `keph:` references can be read; the rest of the status (hub, account, state, rights, node, sync) drops — the interface shows it | no command; `instructions/always/010-verweise.md` names `kephalaion.address`, `kephalaion.ok` and `kephalaion.user` "aus `k-playbook context`" (reworded at the switch) | in the rest |
+| `kephalaion` (`configured`, `hub`, `collection`, `account`, `address`, `state`, `ok`, `message`, `rights`, `scopes`, `user`, `node`, `nodeVersion`, `sync`) | `work`: `work.user` is there, `work.available`/`work.message` stand for `ok`/`message`; `address` gets `work.collection` so that `keph:` references can be read; the rest of the status (hub, account, state, rights, node, sync) drops — the interface shows it | no command; `instructions/always/010-verweise.md` names `kephalaion.address`, `kephalaion.ok` and `kephalaion.user` (in the briefing under `context`, reworded to `work` at the switch) | in the rest |
 | `links` (`healed`, `open`, `note`; only when there is something to report) | `links`, same shape and only when there is something to report. The healing itself (`HealLinks`) runs in `ContextForDir` today; the briefing heals because its rest comes through that function. Before `context` goes, the healing has to sit in `BuildBriefing` itself — otherwise the briefing would stop healing the moment the rest is removed | no command reads it; the `note` addresses the session | in the rest |
 
 **Where `k-playbook context` is anchored** (task 091, 2026-10-17). The call is anchored and
@@ -402,10 +441,11 @@ is rebuilt by task 091 — "build first, then put to use".
   effektiven Kataloge". **To rebuild:** row "Wo was liegt" in the table above — the section
   drops into the prompt; the directories are the fields `project`, `playbook`, `local`.
 - **`instructions/always/010-verweise.md`** (shipped as `defaults/instructions/always/`):
-  the `keph:` row and two rules name `kephalaion.address`, `kephalaion.ok` and
-  `kephalaion.user` "aus `k-playbook context`". **To rebuild:** reworded to the briefing's
-  `work` (`work.collection`, `work.available`, `work.user`; row `kephalaion` above) — a text
-  change in the shipped part, which `AGENTS.md` does not duplicate.
+  names `kephalaion.address`, `kephalaion.ok` and `kephalaion.user` and says (since
+  2026-10-18) that they stand in the briefing under `context` and in the output of
+  `k-playbook context`. **To rebuild:** reworded to the briefing's `work` (`work.collection`,
+  `work.available`, `work.user`; row `kephalaion` above) when the field moves — a text change
+  in the shipped part, which `AGENTS.md` does not duplicate.
 - **MCP `k_playbook_context`** (`mcpserver/server.go`, `contextTool`; `toolDescription`
   says "dieselbe Antwort wie das Subkommando"), the subcommand `context` (`printContext` in
   `cmd/k-playbook/main.go`) and the usage text: the two facades on `ContextForDir`. The
@@ -510,6 +550,21 @@ until the last step.
     including the removal of stale ones.
 12. **Delete the local files** — the old directories in the repo and the clone in the
     projects; setup, update and interface without `<project>/k-playbook/`.
+
+Added 2026-10-18 (task 092); these come before step 12, in this order:
+
+13. **First command as a hull** — built 2026-10-18 (task 092, in the working tree):
+    `commands` is a kind of `k_playbook_doc_read`, read from `defaults/commands/`;
+    `/k-upgrade` is hull plus text; `defaults/includes/` exists with a README. Open: the
+    check in Claude Code, OpenCode and Cursor after the next release (step 4 of the task).
+14. **Includes** — syntax, resolution in `ResolveDocRef`, recursion limit, fixed test cases
+    in `defaults/testdata/` on disk and on the hub; `includes` becomes a kind with it.
+15. **Hulls generated by the binary** — from `defaults/commands/` instead of files under
+    `commands/` and symlinks; `/k-upgrade`'s hand-made hull goes with it, and the hull form
+    becomes a rule in `rules/command-authoring.md`.
+16. **Move the commands, then the skills** — text by text into `defaults/commands/` and
+    `defaults/skills/`; `$ARGUMENTS` and frontmatter stay in the hull. `/k-upgrade` then gets
+    its subcommand in the binary and only relays its message.
 
 ## Findings
 

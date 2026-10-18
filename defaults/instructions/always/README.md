@@ -1,7 +1,8 @@
 # instructions/always
 
 Die Teile hier gelten in jeder Sitzung. k-playbook baut sie zu einem Text zusammen und
-liefert ihn unter `k-playbook:/instructions/always/` aus.
+liefert ihn unter `k-playbook:/instructions/always/` aus; das Briefing trägt denselben Text
+vorweg (`documents.always.content`), eine Sitzung muss ihn also nicht eigens lesen.
 
 ## Zusammenbauen
 

@@ -44,12 +44,18 @@ const (
 // zusammengebauten Verzeichnis.
 const docInstructionsRoot = "instructions"
 
+// docCommandsRoot ist die Sorte commands/: der Text eines Commands. Beim
+// Assistenten liegt nur noch eine Hülle (Frontmatter plus Verweis
+// k-playbook:/commands/<name>.md), den Text löst ResolveDocRef auf — zuerst
+// für /k-upgrade (Task 092).
+const docCommandsRoot = "commands"
+
 // docRefKinds sind die Sorten unter k-playbook:, die ResolveDocRef auflöst —
 // die obersten Verzeichnisse beider Ebenen, deren Dateien Lesestoff für eine
-// Sitzung sind. checks, commands und skills fehlen bewusst: Skripte laufen,
-// Commands und Skills liegen beim Assistenten; beides liest niemand über
-// einen Verweis.
-var docRefKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines"}
+// Sitzung sind. checks und skills fehlen bewusst: Skripte laufen, Skills
+// liegen beim Assistenten; beides liest niemand über einen Verweis. Commands
+// liegen beim Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
+var docRefKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines", docCommandsRoot}
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -223,10 +229,12 @@ const defaultsDirName = "defaults"
 // NewShippedDocSource ist die mitgelieferte Ebene einer Installation. Die
 // Sorte instructions/ liegt nur in defaults/instructions/ — einmal, für Hub
 // und Installation gleichermaßen; eine zweite Fassung oben im Repo, die mit
-// der Kopie gleichzuhalten wäre, gibt es seit 2026-10-17 nicht mehr. Die
-// übrigen Sorten (rules/, reviews/, guidelines/) lesen bis zu ihrer
-// Umstellung weiter die oberste Ebene der Installation, weil auch die
-// Kataloge der Kontextausgabe dort lesen.
+// der Kopie gleichzuhalten wäre, gibt es seit 2026-10-17 nicht mehr. Ebenso
+// liest die Sorte commands/ aus defaults/commands/: dort liegt der Text eines
+// Commands, oben in commands/ nur seine Hülle für den Assistenten — zwei
+// verschiedene Dateien, keine Kopie. Die übrigen Sorten (rules/, reviews/,
+// guidelines/) lesen bis zu ihrer Umstellung weiter die oberste Ebene der
+// Installation, weil auch die Kataloge der Kontextausgabe dort lesen.
 func NewShippedDocSource(playbookDir string) DocSource {
 	return shippedDocSource{
 		top:      NewDiskDocSource(playbookDir),
@@ -240,11 +248,11 @@ type shippedDocSource struct {
 }
 
 // pick wählt die Quelle nach dem ersten Segment des Pfads: instructions/
-// aus defaults/, alles andere von oben. Der Pfad bleibt derselbe, weil
-// defaults/ denselben Aufbau hat.
+// und commands/ aus defaults/, alles andere von oben. Der Pfad bleibt
+// derselbe, weil defaults/ denselben Aufbau hat.
 func (s shippedDocSource) pick(p string) DocSource {
 	first, _, _ := strings.Cut(p, "/")
-	if first == docInstructionsRoot {
+	if first == docInstructionsRoot || first == docCommandsRoot {
 		return s.defaults
 	}
 	return s.top

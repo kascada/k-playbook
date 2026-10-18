@@ -5,7 +5,7 @@ ist die Arbeit erst abgeschlossen, wenn der Befund geschrieben ist. Er gehört n
 `project:/k-playbook-local/material/befunde/`, eine Datei je Thema; neue Erkenntnisse werden
 angehängt. Nenne in deiner Antwort die geschriebene Datei.
 
-<!-- NACHZIEHEN: Ablageort der Befunde prüfen; im Entwurf der Projekt-Collection heißt der Ort findings/ (docs/knowledge-aktuell.md:145). -->
+<!-- NACHZIEHEN: Ablageort der Befunde prüfen; in der Projekt-Collection heißt der Ort queue/findings/ (docs/knowledge-aktuell.md, „Findings go to queue/findings/“). -->
 
 Halte knapp fest, sobald etwas belegt ist. Ausführlicher wird es, sobald ein Problem erkannt
 und gelöst ist; dann gehört auch dazu, welche Wege du ausgeschlossen hast. Jeder Eintrag nennt

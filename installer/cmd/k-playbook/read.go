@@ -94,6 +94,7 @@ Arbeitsverzeichnis aufwärts.
   k-playbook:/rules/<name>.md
   k-playbook:/reviews/review-<name>.md
   k-playbook:/guidelines/<name>.md
+  k-playbook:/commands/<name>.md
             Eine Datei: die lokale, sonst die mitgelieferte, unverändert mit
             Frontmatter. Eine leere lokale Datei schaltet ab: kein Inhalt,
             ein Hinweis auf stderr, Exit 0.
@@ -110,6 +111,6 @@ Ohne --json steht auf stdout nur der Inhalt. Mit --json kommt die Antwort als
 JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled)
 und problems. Ein unbekannter Verweis ist ein Fehler (not_found); project:-
 und keph:-Verweise sowie k-playbook: außerhalb von instructions/, rules/,
-reviews/ und guidelines/ werden noch nicht aufgelöst (unsupported).
+reviews/, guidelines/ und commands/ werden noch nicht aufgelöst (unsupported).
 `)
 }

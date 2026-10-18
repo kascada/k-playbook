@@ -437,8 +437,10 @@ func TestDocRefNichtUnterstuetzt(t *testing.T) {
 	expectDocError(t, layers, "project:/scripts/123.sh", DocCodeUnsupported)
 	expectDocError(t, layers, "keph:/manual/abc.md", DocCodeUnsupported)
 	// Außerhalb der Sorten aus docRefKinds abgelehnt, auch wenn es die Datei
-	// gibt: checks sind Skripte, kein Lesestoff.
+	// gibt: checks sind Skripte, kein Lesestoff; Skills liegen beim
+	// Assistenten.
 	expectDocError(t, layers, "k-playbook:/checks/check_x.sh", DocCodeUnsupported)
+	expectDocError(t, layers, "k-playbook:/skills/ks-befunde/SKILL.md", DocCodeUnsupported)
 	expectDocError(t, layers, "k-playbook:/", DocCodeUnsupported)
 	expectDocError(t, layers, "k-playbook:/instructionsx/a.md", DocCodeUnsupported)
 	expectDocError(t, layers, "k-playbook:/rulesx/befunde.md", DocCodeUnsupported)
@@ -546,10 +548,67 @@ func TestDocRefSortenRulesReviewsGuidelines(t *testing.T) {
 	}
 }
 
+// commands ist eine Sorte wie rules: der Text eines Commands als Einzeldatei,
+// lokal vor mitgeliefert, leer lokal schaltet ab; Namensräume bleiben Pfade.
+// Mit „/" am Ende fehlt der Dateiname, und checks/ bleibt unsupported (Task
+// 092).
+func TestDocRefSorteCommands(t *testing.T) {
+	layers, _, _ := docTree(t, map[string]string{
+		"commands/k-upgrade.md":       "---\ndescription: Info\n---\n\n# k-upgrade\n\nmitgeliefert\n",
+		"commands/k-gui.md":           "# k-gui\n\nmitgeliefert\n",
+		"commands/k-danke.md":         "# k-danke\n",
+		"commands/_shared/context.md": "# Kontext\n",
+		"commands/README.md":          "# Liesmich\n",
+		"checks/check_x.sh":           "#!/bin/sh\n",
+	}, map[string]string{
+		"commands/k-gui.md":   "# k-gui\n\nlokal\n",
+		"commands/k-danke.md": "",
+		"commands/eigener.md": "# eigener\n\nText.\n",
+	})
+
+	for ref, want := range map[string]DocPart{
+		"k-playbook:/commands/k-upgrade.md":       {Name: "k-upgrade.md", Origin: DocOriginDist},
+		"k-playbook:/commands/k-gui.md":           {Name: "k-gui.md", Origin: DocOriginOverride},
+		"k-playbook:/commands/k-danke.md":         {Name: "k-danke.md", Origin: DocOriginOverride, Disabled: true},
+		"k-playbook:/commands/eigener.md":         {Name: "eigener.md", Origin: DocOriginLocal},
+		"k-playbook:/commands/_shared/context.md": {Name: "context.md", Origin: DocOriginDist},
+	} {
+		result := mustResolveDoc(t, layers, ref)
+		if result.Directory || len(result.Parts) != 1 || !reflect.DeepEqual(result.Parts[0], want) {
+			t.Errorf("%s: %+v, erwartet Teil %+v", ref, result, want)
+		}
+		if result.Disabled != want.Disabled || (want.Disabled && result.Content != "") || (!want.Disabled && result.Content == "") {
+			t.Errorf("%s: disabled %v, content %q", ref, result.Disabled, result.Content)
+		}
+	}
+	// Die Einzeldatei kommt unverändert, mit Frontmatter.
+	if got := mustResolveDoc(t, layers, "k-playbook:/commands/k-upgrade.md").Content; !strings.HasPrefix(got, "---\ndescription: Info\n") {
+		t.Errorf("Command ohne Frontmatter: %q", got)
+	}
+	if got := mustResolveDoc(t, layers, "k-playbook:/commands/k-gui.md").Content; got != "# k-gui\n\nlokal\n" {
+		t.Errorf("Überlagerung liefert nicht die lokale Fassung: %q", got)
+	}
+
+	expectDocError(t, layers, "k-playbook:/commands/fehlt.md", DocCodeNotFound)
+	err := expectDocError(t, layers, "k-playbook:/commands/", DocCodeInvalidInput)
+	if !strings.Contains(err.Error(), "Dateiname fehlt") || !strings.Contains(err.Error(), "k-playbook:/commands/<name>.md") {
+		t.Errorf("commands/ mit / am Ende: %v", err)
+	}
+	expectDocError(t, layers, "k-playbook:/commands/_shared/", DocCodeInvalidInput)
+	expectDocError(t, layers, "k-playbook:/checks/check_x.sh", DocCodeUnsupported)
+}
+
 // Dieselbe Sorte darf nicht über zwei Wege verschieden herauskommen: Name,
 // Herkunft und Abschalten eines Eintrags sind über k_playbook_doc_read
 // (ResolveDocRef) dieselben wie unter catalogs der Kontextausgabe, und der
 // Inhalt hinter dem Verweis ist die Datei, die der Katalog nennt.
+//
+// commands hat keinen Katalog in der Kontextausgabe; sein zweiter Weg ist
+// die Registry (ResolveRegistry), die die Hülle beim Assistenten verlinkt.
+// Name, Herkunft und Abschalten sind auch dort dieselben. Der Inhalt ist es
+// nur bei einer lokalen Datei: mitgeliefert liest die Registry die Hülle
+// oben in commands/, der Verweis den Text in defaults/commands/ — zwei
+// Dateien, mit Absicht (Task 092).
 func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	root := newContextProject(t)
 	files := map[string]string{
@@ -616,10 +675,62 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	if !ok || code.Audit == nil || !code.Audit.Enabled {
 		t.Errorf("review-code: %+v", code)
 	}
+
+	// commands: Registry und Verweis.
+	for rel, content := range map[string]string{
+		"k-playbook/commands/k-upgrade.md":          "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
+		"k-playbook/defaults/commands/k-upgrade.md": "# k-upgrade\n\nText\n",
+		"k-playbook/commands/k-gui.md":              "# k-gui\n\nHülle\n",
+		"k-playbook/defaults/commands/k-gui.md":     "# k-gui\n\nText\n",
+		"k-playbook/commands/k-danke.md":            "# k-danke\n",
+		"k-playbook/defaults/commands/k-danke.md":   "# k-danke\n\nText\n",
+		"k-playbook-local/commands/k-gui.md":        "# k-gui\n\nlokal\n",
+		"k-playbook-local/commands/k-danke.md":      "",
+		"k-playbook-local/commands/eigener.md":      "# eigener\n\nText.\n",
+	} {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		write(t, full, content)
+	}
+	if _, ok := context.Catalogs["commands"]; ok {
+		t.Error("commands im Katalog der Kontextausgabe")
+	}
+	registry := ResolveRegistry(root, KindCommands)
+	if len(registry) != 4 {
+		t.Fatalf("Registry: %+v", registry)
+	}
+	for _, entry := range registry {
+		ref := "k-playbook:/commands/" + entry.Name
+		result := mustResolveDoc(t, layers, ref)
+		part := result.Parts[0]
+		if part.Name != entry.Name || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
+			t.Errorf("%s: Verweis %+v, Registry %+v", ref, part, entry)
+		}
+		if entry.Disabled {
+			continue
+		}
+		data, err := os.ReadFile(entry.Path)
+		if err != nil {
+			t.Fatalf("%s lesen: %v", entry.Path, err)
+		}
+		switch entry.Origin {
+		case "dist":
+			if result.Content == string(data) || !strings.HasSuffix(result.Content, "Text\n") {
+				t.Errorf("%s: Verweis liefert %q, erwartet den Text aus defaults/, nicht die Hülle %s", ref, result.Content, entry.Path)
+			}
+		default:
+			if result.Content != string(data) {
+				t.Errorf("%s: Inhalt %q, Registry-Datei %s hat %q", ref, result.Content, entry.Path, data)
+			}
+		}
+	}
 }
 
-// Die mitgelieferte Ebene liest instructions/ aus defaults/, die übrigen
-// Sorten von oben — es gibt nur eine Fassung der Anweisungen, keine Kopie.
+// Die mitgelieferte Ebene liest instructions/ und commands/ aus defaults/,
+// die übrigen Sorten von oben — es gibt nur eine Fassung der Anweisungen,
+// keine Kopie; bei commands/ liegt oben die Hülle, in defaults/ der Text.
 func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
 	playbook := t.TempDir()
 	for rel, content := range map[string]string{
@@ -628,6 +739,9 @@ func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
 		"instructions/always/999-oben.md":       "## Oben\n",
 		"rules/befunde.md":                      "# Regel\n",
 		"defaults/rules/befunde.md":             "# Regel aus defaults\n",
+		"commands/k-upgrade.md":                 "# k-upgrade\n\nHülle\n",
+		"defaults/commands/k-upgrade.md":        "# k-upgrade\n\nText\n",
+		"commands/k-gui.md":                     "# k-gui\n\nnur oben\n",
 	} {
 		full := filepath.Join(playbook, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -649,4 +763,10 @@ func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
 	if rule := mustResolveDoc(t, layers, "k-playbook:/rules/befunde.md"); rule.Content != "# Regel\n" {
 		t.Errorf("rules weiter von oben erwartet: %q", rule.Content)
 	}
+	if cmd := mustResolveDoc(t, layers, "k-playbook:/commands/k-upgrade.md"); cmd.Content != "# k-upgrade\n\nText\n" {
+		t.Errorf("commands aus defaults/ erwartet, nicht die Hülle: %q", cmd.Content)
+	}
+	// Ein Command, der nur oben als Hülle liegt, hat keinen Text: not_found,
+	// kein Rückfall auf die Hülle.
+	expectDocError(t, layers, "k-playbook:/commands/k-gui.md", DocCodeNotFound)
 }

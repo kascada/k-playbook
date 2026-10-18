@@ -1,15 +1,17 @@
 ## Verweise
 
-Diese Anweisungen kommen aus `k-playbook:/instructions/always/`. Hier und in allem, was
-k-playbook liefert, ist ein Verweis ein einziger Pfad mit Präfix. Das Präfix sagt, wo der
-Inhalt liegt und wie du ihn liest.
+Hier und in allem, was k-playbook liefert, ist ein Verweis ein einziger Pfad mit Präfix. Das
+Präfix sagt, wo der Inhalt liegt und wie du ihn liest.
 
 | Präfix | Wo der Inhalt liegt | So liest du ihn |
 |---|---|---|
 | `project:/<pfad>` | Datei im Projekt, Pfad ab Projektwurzel | direkt von der Platte |
 | `k-playbook:/<pfad>` | von k-playbook geliefert | MCP `k_playbook_doc_read` mit dem Verweis als `ref`; ersatzweise `k-playbook read <verweis>` |
 | `k-playbook:/instructions/always/` | das einzige Verzeichnis, das k-playbook zu einem Text zusammenbaut | wie `k-playbook:/<pfad>` |
-| `keph:/<pfad>` | Collection des Projekts in Kephalaion | Kephalaion `read` mit `collection` = `kephalaion.address` aus `k-playbook context` und `name` = Pfad ohne führenden `/` |
+| `keph:/<pfad>` | Collection des Projekts in Kephalaion | Kephalaion `read` mit `collection` = `kephalaion.address` und `name` = Pfad ohne führenden `/` |
+
+Die Felder `kephalaion.address`, `kephalaion.ok` und `kephalaion.user` stehen im Briefing
+unter `context` und in der Ausgabe von `k-playbook context`.
 
 Beispiele:
 
@@ -30,13 +32,12 @@ Regeln:
 - **Ein Verweis, den k-playbook nicht kennt, ist ein Fehler.** Melde ihn und such die Datei
   nicht auf eigene Faust.
 - **Ein `keph:`-Verweis nennt weder Hub noch Collection.** Beides steht rechnerlokal in der
-  Konfiguration und kann je Rechner anders sein. Steht `kephalaion.ok` in
-  `k-playbook context` nicht auf `true`, sind `keph:`-Verweise nicht erreichbar. Sag das,
-  statt auszuweichen.
+  Konfiguration und kann je Rechner anders sein. Steht `kephalaion.ok` nicht auf `true`, sind
+  `keph:`-Verweise nicht erreichbar. Sag das, statt auszuweichen.
 - **Die öffentliche Collection `<hub>:k-playbook` sprichst du nicht direkt an.** Ihr Inhalt
   ist das Mitgelieferte und kommt über `k-playbook:`.
 - **`~` als Pfadteil steht für dich**, genauer für deinen Kephalaion-User. In
-  `keph:/user/~/tasks/` ersetzt du `~` durch `kephalaion.user` aus `k-playbook context`, nicht
-  durch `kephalaion.account`: Das Konto gilt nur für diesen Rechner, der User ist die Person.
+  `keph:/user/~/tasks/` ersetzt du `~` durch `kephalaion.user`, nicht durch
+  `kephalaion.account`: Das Konto gilt nur für diesen Rechner, der User ist die Person.
   Nur ein ganzer Pfadteil `~` ist der Platzhalter. Verweise, die k-playbook selbst ausgibt,
   enthalten schon den echten Namen.

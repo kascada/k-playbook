@@ -352,7 +352,7 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
-| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves `k-playbook:/instructions/…`, `/rules/…`, `/reviews/…` and `/guidelines/…` |
+| `k_playbook_doc_read` | read what lies behind a `k-playbook:` reference (`ref`), local and shipped already resolved against each other; a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; resolves `k-playbook:/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant) |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
@@ -758,9 +758,12 @@ reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly a
 the text. `ref` in that scheme is the lasting contract of the tool: which source lies behind
 it -- the disk today, perhaps Kephalaion later -- is invisible to the caller.
 
-Resolved are `k-playbook:` references of the kinds `instructions/`, `rules/`, `reviews/` and
-`guidelines/`, each a single file local before shipped; only `instructions/always/` is
-assembled. The overlay is the one of `catalogs` in `k_playbook_context` (`overlayDocDir`):
+Resolved are `k-playbook:` references of the kinds `instructions/`, `rules/`, `reviews/`,
+`guidelines/` and `commands/`, each a single file local before shipped; only
+`instructions/always/` is assembled. Shipped `instructions/` and `commands/` are read from
+`defaults/`; for `commands/` that is the text of a command, while the file under
+`k-playbook/commands/` is only the hull the assistant registers (task 092,
+[verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of `catalogs` in `k_playbook_context` (`overlayDocDir`):
 for `rules` and `reviews`, name, `origin` and `disabled` of an entry are the same over both
 ways, which a test checks. `guidelines` is an overlay kind here -- shipped
 `k-playbook/guidelines/` and local `k-playbook-local/guidelines/` -- while the field
@@ -788,7 +791,7 @@ Error codes, in the envelope's `error.code` like the knowledge tools:
 | Code | When |
 |---|---|
 | `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` within a resolved kind but names no assembled directory (today only `instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, an unknown directory, a file with a trailing `/` |
-| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/`, `rules/`, `reviews/` and `guidelines/` (for example `checks/`) |
+| `unsupported` | a valid reference the tool does not resolve yet: `project:`, `keph:`, and `k-playbook:` outside `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/` (for example `checks/` or `skills/`) |
 | `not_found` | neither layer has the file or the assembled directory; there is no fallback to reading anywhere else |
 | `project_not_found` | `projectDir` leads to no project |
 | `read_failed` | the source could not be read |

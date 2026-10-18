@@ -24,6 +24,7 @@ New commands become visible only after linking is in place and the assistant has
 |---|---|---|
 | **Project** | | |
 | `/k-gui` | Start the interface | guides through configuration, project-owned structure, and assistant linking; the Workflows section with its Tasks, Reviews, and Todos pages, plus the Docs and Inventory sections, the last of which shows the version inventory and initiates its collection |
+| `/k-upgrade` | Name the installed version; later fetch a new version and pull the project structure after it | today only an info from `<playbook.dir>/VERSION`, nothing is changed; the first command whose text lies in `defaults/commands/` — the file under `commands/` is a hull with frontmatter and the reference `k-playbook:/commands/k-upgrade.md`, read through `k_playbook_doc_read` or `k-playbook read` (task 092, [verweisschema.md](./verweisschema.md#resolving-k-playbook)) |
 | **Docs** | | |
 | `/k-docs` | Check documentation inventory and offer possible actions | read-only status; can dispatch to code, tool, extract, inventory, or index actions |
 | `/k-docs-code` | Generate semantic project documentation from the code | writes one file per topic to `k-playbook-local/docs/code/`; the `ks-overlay-repo-analyse` skill also writes there |

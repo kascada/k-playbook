@@ -113,8 +113,8 @@ als Rauchtest nach einem Release folgenlos bleibt.
 
 `read <verweis> [--json]` löst einen Verweis im Präfixschema auf
 ([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
-steht — heute `k-playbook:`-Verweise der Sorten `instructions/`, `rules/`, `reviews/` und
-`guidelines/` (`docRefKinds`), lokal vor mitgeliefert, ein
+steht — heute `k-playbook:`-Verweise der Sorten `instructions/`, `rules/`, `reviews/`,
+`guidelines/` und `commands/` (`docRefKinds`), lokal vor mitgeliefert, ein
 Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
 `instructions/always/`) zu einem Text zusammengebaut; jeder andere mit `/` am Ende ist
 `invalid_input` („Dateiname fehlt“). Ohne `--json` steht auf stdout nur der
@@ -257,7 +257,8 @@ installer/
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
 │   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
 │   │                            für resolveCatalog), ResolveDocRef für k-playbook:/
-│   │                            instructions/…, rules/…, reviews/…, guidelines/…
+│   │                            instructions/…, rules/…, reviews/…, guidelines/…,
+│   │                            commands/… (der Text, die Hülle liegt beim Assistenten)
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
@@ -947,7 +948,9 @@ schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Ver
 Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `always/` —
 `on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferten Anweisungen liegen einmal, in
 `defaults/instructions/`: `NewShippedDocSource` (`project/docref.go`) liest die Sorte
-`instructions` dort und die übrigen Sorten weiter von der obersten Ebene der Installation,
+`instructions` dort — ebenso `commands`, deren Text in `defaults/commands/` liegt, während
+`commands/` oben nur die Hülle für den Assistenten trägt (Task 092) — und die übrigen Sorten
+weiter von der obersten Ebene der Installation,
 weil die Kataloge der Kontextausgabe dort lesen. Die Kopie oben im Repo samt
 Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
 steht, entscheidet Task 086. Regeln und Zugriffswege:

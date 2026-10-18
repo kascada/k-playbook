@@ -26,6 +26,10 @@ func readProject(t *testing.T) string {
 		"k-playbook-local/instructions/always/notiz.md":       "## Notiz\n\nText.\n",
 		"k-playbook-local/instructions/on-demand/aus.md":      "",
 		"k-playbook/defaults/instructions/on-demand/aus.md":   "## Aus\n",
+		"k-playbook/commands/k-upgrade.md":                    "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
+		"k-playbook/defaults/commands/k-upgrade.md":           "# k-upgrade\n\nText aus defaults.\n",
+		"k-playbook/defaults/commands/k-gui.md":               "# k-gui\n\nText aus defaults.\n",
+		"k-playbook-local/commands/k-gui.md":                  "# k-gui\n\nlokal\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -146,6 +150,40 @@ func TestReadUnbekannterVerweisIstFehler(t *testing.T) {
 	_, _, err = runReadCaptured(t, "keph:/manual/abc.md")
 	if err == nil || !strings.Contains(err.Error(), "unsupported") {
 		t.Fatalf("keph: %v", err)
+	}
+}
+
+// Der Text eines Commands kommt aus defaults/commands/, nicht aus der Hülle
+// oben in commands/; lokal ersetzt (Task 092).
+func TestReadLiestCommandTextAusDefaults(t *testing.T) {
+	readProject(t)
+
+	stdout, stderr, err := runReadCaptured(t, "k-playbook:/commands/k-upgrade.md")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if stdout != "# k-upgrade\n\nText aus defaults.\n" || stderr != "" {
+		t.Errorf("stdout %q, stderr %q", stdout, stderr)
+	}
+	stdout, _, err = runReadCaptured(t, "k-playbook:/commands/k-gui.md", "--json")
+	if err != nil {
+		t.Fatalf("read --json: %v", err)
+	}
+	var result project.DocResult
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	if result.Content != "# k-gui\n\nlokal\n" || len(result.Parts) != 1 || result.Parts[0].Origin != "override" {
+		t.Errorf("Antwort: %+v", result)
+	}
+
+	_, _, err = runReadCaptured(t, "k-playbook:/commands/")
+	if err == nil || !strings.Contains(err.Error(), "(invalid_input)") || !strings.Contains(err.Error(), "Dateiname fehlt") {
+		t.Fatalf("commands/ mit / am Ende: %v", err)
+	}
+	_, _, err = runReadCaptured(t, "k-playbook:/checks/check_x.sh")
+	if err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("checks: %v", err)
 	}
 }
 

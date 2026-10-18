@@ -244,8 +244,8 @@ Unterkommandos:
             k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
             dahinter steht: k-playbook read <verweis> [--json]. Heute nur
-            k-playbook:-Verweise unter instructions/, rules/, reviews/ und
-            guidelines/, lokal vor mitgeliefert; ein Verweis auf
+            k-playbook:-Verweise unter instructions/, rules/, reviews/,
+            guidelines/ und commands/, lokal vor mitgeliefert; ein Verweis auf
             instructions/always/ mit / am Ende baut das Verzeichnis zu einem
             Text zusammen. Hinweise stehen auf stderr. Dasselbe wie das
             MCP-Werkzeug k_playbook_doc_read.
