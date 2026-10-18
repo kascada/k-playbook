@@ -9,7 +9,7 @@ nachzuziehen ist.
 
 ## Schritt 1 — Briefing
 
-include: _shared/context.md
+include: _shared/erster-schritt.md
 
 ## Schritt 2 — Version nennen
 

@@ -151,7 +151,7 @@ one argument and nothing else:
 
 ```markdown
 include: k-playbook:/includes/context.md
-include: _shared/context.md
+include: _shared/erster-schritt.md
 ```
 
 The argument is a reference with prefix, or a relative path without one. Relative means:

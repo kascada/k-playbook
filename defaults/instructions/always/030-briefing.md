@@ -25,6 +25,11 @@ Nicht selbst lesen: `K-PLAYBOOK.yaml` und die Katalogverzeichnisse unter `k-play
 Ablegen: Jeder Ort leitet sich aus `local.dir` ab. Was wohin gehört, steht in
 `k-playbook:/guidelines/betrieb.md`. Ein fehlendes Verzeichnis wird erfragt, nicht still angelegt.
 
+Sub-Agenten: Ein Sub-Agent holt das Briefing nicht von selbst, auch wenn er diese Anweisungen
+sieht. Wer einen startet, schreibt an den Anfang seines Auftrags: Führe zuerst `k-playbook briefing`
+aus und lies die Ausgabe. Das entfällt nur, wenn der Auftrag reines Nachschlagen ist und nichts
+schreibt, bewertet oder ablegt.
+
 Der Abschnitt `context` ist der Rest von `k-playbook context` unter denselben Namen. Alles Übrige
 zu den Feldern: `k-playbook:/instructions/on-demand/briefing-felder.md`.
 
