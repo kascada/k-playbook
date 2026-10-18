@@ -100,6 +100,20 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	if len(always.Problems) != 1 || !strings.Contains(always.Problems[0], "notiz.md") {
 		t.Errorf("always.problems %v", always.Problems)
 	}
+	// Der Text der immer geltenden Anweisungen steht im Briefing selbst: ohne
+	// Frontmatter, der abgeschaltete Teil übergangen, derselbe Text wie bei
+	// `k-playbook read` für den Verweis.
+	wantContent := "## Verweise\n\nText.\n\n## Projektwissen lokal\n\nText.\n\n## Eigene Anweisung\n\nText.\n"
+	if always.Content != wantContent {
+		t.Errorf("always.content:\n%q\nerwartet\n%q", always.Content, wantContent)
+	}
+	read, err := ResolveDocRef(ProjectDocLayers(root), always.Ref)
+	if err != nil {
+		t.Fatalf("ResolveDocRef: %v", err)
+	}
+	if read.Content != always.Content {
+		t.Errorf("Briefing und read liefern verschiedene Texte:\n%q\n%q", always.Content, read.Content)
+	}
 
 	wantOnDemand := []BriefingEntry{
 		{Ref: "k-playbook:/instructions/on-demand/eigen.md", Title: "Eigen auf Abruf", Origin: DocOriginLocal},
@@ -163,7 +177,7 @@ func TestBriefingOhneVerzeichnisse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.Documents.Always.Ref != "k-playbook:/instructions/always/" || len(briefing.Documents.Always.Parts) != 0 || briefing.Documents.Always.Problems == nil {
+	if briefing.Documents.Always.Ref != "k-playbook:/instructions/always/" || briefing.Documents.Always.Content != "" || len(briefing.Documents.Always.Parts) != 0 || briefing.Documents.Always.Problems == nil {
 		t.Errorf("always: %+v", briefing.Documents.Always)
 	}
 	for name, list := range map[string][]BriefingEntry{

@@ -50,6 +50,9 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 	if always.Ref != "k-playbook:/instructions/always/" || len(always.Parts) != 4 {
 		t.Fatalf("always: %+v", always)
 	}
+	if !strings.HasPrefix(always.Content, "## A\n\n## B lokal\n\nText.\n") || strings.Contains(always.Content, "## C") {
+		t.Errorf("always.content: %q", always.Content)
+	}
 	if always.Parts[1].Ref != "k-playbook:/instructions/always/100-b.md" || always.Parts[1].Origin != project.DocOriginOverride || always.Parts[1].Title != "B lokal" {
 		t.Errorf("ersetzter Teil: %+v", always.Parts[1])
 	}

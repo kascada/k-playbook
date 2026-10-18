@@ -283,7 +283,10 @@ instructions, rules, reviews and guidelines apply, as references in the prefix
 scheme with title, description and origin (`k-playbook:/instructions/always/` with
 its parts, `on-demand/`, `rules/`, `reviews/`, `guidelines/`), and what is pending in
 the project's collection -- own open tasks and workbench topics, the number of open
-findings. References, never paths; no contents. Both go through the same overlay
+findings. References, never paths; no contents, with one exception: the text of the
+always-instructions itself (`documents.always.content`, the plain text starts with
+it), assembled as `k-playbook read k-playbook:/instructions/always/` assembles it,
+because every session reads it first. Both go through the same overlay
 (`overlayDocDir` in `project/docref.go`), so an entry has the same origin wherever
 it appears.
 

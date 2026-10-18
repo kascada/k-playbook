@@ -18,7 +18,10 @@ import (
 // Projekt gelten und was in der Projekt-Collection für die eigene Arbeit
 // ansteht. Verweise im Präfixschema, keine Pfade; gelesen wird über
 // k_playbook_doc_read bzw. auf dem Weg des Präfixes. Inhalte stehen nicht
-// darin. Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
+// darin — mit einer Ausnahme: den Text der immer geltenden Anweisungen
+// (k-playbook:/instructions/always/) trägt das Briefing selbst
+// (Documents.Always.Content), denn jede Sitzung muss ihn sofort lesen; ein
+// zweiter Aufruf dafür wäre nur Umweg. Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
 // stehen nur im Übergangsabschnitt Context (Task 091): dem Rest der
 // Kontextausgabe von `k-playbook context`, den das Briefing noch nicht selbst
 // abdeckt. Ein Aufruf des Briefings genügt damit für den Einstieg; die
@@ -32,8 +35,9 @@ import (
 // `k-playbook context`.
 
 // BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe. Fassung 2 hat den
-// Abschnitt context.
-const BriefingSchemaVersion = "2"
+// Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
+// documents.always.content.
+const BriefingSchemaVersion = "3"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -76,10 +80,16 @@ type BriefingDocuments struct {
 }
 
 // BriefingAssembled ist ein zusammengebautes Verzeichnis: der Verweis, der es
-// als einen Text liefert, und seine Teile in der Reihenfolge des Texts.
+// als einen Text liefert, der Text selbst und seine Teile in der Reihenfolge
+// des Texts.
 type BriefingAssembled struct {
-	Ref   string          `json:"ref"`
-	Parts []BriefingEntry `json:"parts"`
+	Ref string `json:"ref"`
+	// Content ist der zusammengebaute Text — derselbe, den `k-playbook read`
+	// und k_playbook_doc_read für Ref liefern (joinDocDirParts): die Teile
+	// ohne Frontmatter, durch eine Leerzeile getrennt, abgeschaltete
+	// übergangen. Leer ohne aufgenommene Teile.
+	Content string          `json:"content"`
+	Parts   []BriefingEntry `json:"parts"`
 	// Problems nennt, was übergangen wurde — eine Datei ohne Ziffer vorn.
 	Problems []string `json:"problems"`
 }
@@ -372,7 +382,8 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	return briefing, nil
 }
 
-// briefingAssembled listet die Teile eines zusammengebauten Verzeichnisses.
+// briefingAssembled liefert ein zusammengebautes Verzeichnis: seine Teile
+// mit Herkunft und den Text daraus.
 // Gibt es das Verzeichnis in keiner Ebene, bleibt die Liste leer: der Verweis
 // steht trotzdem da, damit die Sitzung weiß, worüber sie es lesen würde.
 func briefingAssembled(layers DocLayers, dir string) (BriefingAssembled, error) {
@@ -386,6 +397,7 @@ func briefingAssembled(layers DocLayers, dir string) (BriefingAssembled, error) 
 			Name: part.Name, Origin: part.Origin, Disabled: part.Disabled, Content: part.content,
 		}))
 	}
+	assembled.Content = joinDocDirParts(parts)
 	assembled.Problems = append(assembled.Problems, problems...)
 	return assembled, nil
 }

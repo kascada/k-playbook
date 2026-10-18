@@ -672,9 +672,20 @@ func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
 	}
 	result.Problems = append(result.Problems, problems...)
 
-	pieces := []string{}
 	for _, part := range parts {
 		result.Parts = append(result.Parts, part.DocPart)
+	}
+	result.Content = joinDocDirParts(parts)
+	return result, nil
+}
+
+// joinDocDirParts fügt die Teile eines zusammengebauten Verzeichnisses zu dem
+// einen Text: ohne Frontmatter, abgeschaltete und leere Teile übergangen,
+// durch eine Leerzeile getrennt. Leer ohne aufgenommene Teile. Die eine Stelle
+// für diesen Text — `k-playbook read` und das Briefing liefern denselben.
+func joinDocDirParts(parts []docDirPart) string {
+	pieces := []string{}
+	for _, part := range parts {
 		if part.Disabled {
 			continue
 		}
@@ -684,10 +695,10 @@ func resolveDocDir(layers DocLayers, ref DocRef) (DocResult, error) {
 		}
 		pieces = append(pieces, body)
 	}
-	if len(pieces) > 0 {
-		result.Content = strings.Join(pieces, "\n\n") + "\n"
+	if len(pieces) == 0 {
+		return ""
 	}
-	return result, nil
+	return strings.Join(pieces, "\n\n") + "\n"
 }
 
 // listDocLayer nennt die Dateien eines Verzeichnisses einer Ebene, die beim

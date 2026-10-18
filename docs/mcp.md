@@ -357,7 +357,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
-| `k_playbook_briefing` | the briefing at session start: which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
+| `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
@@ -895,8 +895,14 @@ the subcommand `k-playbook briefing [--json]` calls the same function, without `
 plain text for reading while testing. Its only input is `projectDir` (required by contract, like
 every tool). The briefing is the one call at the start of a session: **data, not prose** — it
 lists what applies and what is pending as references in the prefix scheme
-([verweisschema.md](verweisschema.md)), never paths and never contents. A listed document is
-read with `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix.
+([verweisschema.md](verweisschema.md)), never paths, and with one exception never contents:
+`documents.always.content` carries the text of the always-instructions
+(`k-playbook:/instructions/always/`), assembled exactly as `k_playbook_doc_read` returns it for
+that reference (`joinDocDirParts` in `project/docref.go`, one function for both), because every
+session has to read that text first — a second call for it would be a detour. The plain text of
+`k-playbook briefing` therefore starts with this text, without the list of its parts; the parts
+with their origin are in the JSON only. Every other listed document is read with
+`k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix.
 Environment facts — paths, tools, `gh`, the Kephalaion binding — stand in the briefing only in
 the transitional section `context` (task 091): the rest of `k_playbook_context` that the
 briefing's own sections do not cover, built from the same function (`ContextForDir`), never
@@ -915,8 +921,8 @@ projectDocs, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"2"` (`"1"` had no `context`) |
-| `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `parts` in the order of the text, `problems` (files without a leading number, skipped) |
+| `schemaVersion` | the version of the briefing output, `"3"` (`"1"` had no `context`, `"2"` no `documents.always.content`) |
+| `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number, skipped) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
 | `work.available` | whether the project's collection could be read; `false` with `work.message` when `kephalaion.ok` is not true, the node cannot be reached or a listing fails -- a state, not an error |
@@ -935,7 +941,8 @@ shipped, an empty local file disables. `guidelines` is an overlay kind here -- s
 `guidelines` of the context output still lists only the local files until the context output is
 switched.
 
-Deliberately not in the briefing's own sections: contents, commands, skills, checks, scripts,
+Deliberately not in the briefing's own sections: contents (except `documents.always.content`,
+see above), commands, skills, checks, scripts,
 k-playbook's own docs and the local knowledge store `k-playbook-local/knowledge/` -- that one joins later, with
 counts per kind, state and origin and the freshness that
 [knowledge-gate.md](knowledge-gate.md#querying-the-surface) described for its briefing.

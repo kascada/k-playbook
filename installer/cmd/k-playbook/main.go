@@ -249,10 +249,10 @@ Unterkommandos:
             instructions/always/ mit / am Ende baut das Verzeichnis zu einem
             Text zusammen. Hinweise stehen auf stderr. Dasselbe wie das
             MCP-Werkzeug k_playbook_doc_read.
-  briefing  Listet als Daten, was für dieses Projekt gilt und was ansteht:
-            k-playbook briefing [--json]. Die immer geltenden Anweisungen
-            k-playbook:/instructions/always/ mit ihren Teilen, Anweisungen
-            auf Abruf, Regeln, Reviews und Leitlinien — lokal und
+  briefing  Gibt aus, was für dieses Projekt gilt und was ansteht:
+            k-playbook briefing [--json]. Vorweg der Text der immer
+            geltenden Anweisungen k-playbook:/instructions/always/, dann
+            Anweisungen auf Abruf, Regeln, Reviews und Leitlinien — lokal und
             mitgeliefert aufgelöst, je Eintrag Verweis, Titel, Beschreibung,
             Herkunft —, dazu aus der Projekt-Collection die eigenen offenen
             Tasks und Arbeitsstände und die Zahl offener Befunde, und der

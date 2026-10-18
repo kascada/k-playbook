@@ -122,14 +122,17 @@ Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach stderr. Das MCP-W
 `k_playbook_doc_read` ist die Hülle darum; beide rufen `project.ResolveDocRef`
 (`project/docref.go`).
 
-`briefing [--json]` gibt das Briefing aus (Task 086): als Daten, welche Anweisungen, Regeln,
-Reviews und Leitlinien für das Projekt gelten — `k-playbook:/instructions/always/` mit seinen
-Teilen, `on-demand/`, `rules/`, `reviews/`, `guidelines/`, je Eintrag Verweis, Titel,
+`briefing [--json]` gibt das Briefing aus (Task 086): vorweg den Text der immer geltenden
+Anweisungen `k-playbook:/instructions/always/` (`documents.always.content`, zusammengebaut von
+derselben Funktion wie bei `read`, `joinDocDirParts`; im Klartext steht er am Anfang, ohne die
+Liste seiner Teile), dann als Daten, welche Anweisungen, Regeln, Reviews und Leitlinien für
+das Projekt gelten — `always/` mit seinen Teilen, `on-demand/`, `rules/`, `reviews/`,
+`guidelines/`, je Eintrag Verweis, Titel,
 Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `local`, `override`,
 `disabled`) — und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
 Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offenen Befunde in
 `queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
-keine Pfade, keine Inhalte. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
+keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
 091): der Rest der Kontextausgabe, den das Briefing nicht selbst abdeckt, aus `ContextForDir`
 — derselben Funktion wie `k-playbook context` — ohne `catalogs.rules`, `catalogs.reviews` und
 `guidelines` (Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code); lässt sich

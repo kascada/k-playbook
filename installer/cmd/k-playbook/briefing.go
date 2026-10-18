@@ -16,10 +16,11 @@ import (
 // runBriefing gibt das Briefing aus — dieselbe Fachlogik, die das MCP-Werkzeug
 // k_playbook_briefing als Hülle anbietet: welche Anweisungen, Regeln, Reviews
 // und Leitlinien für dieses Projekt gelten und was in der Projekt-Collection
-// für die eigene Arbeit ansteht, als Verweise im Präfixschema; dahinter der
-// Rest von `k-playbook context`, den das Briefing noch nicht selbst abdeckt.
-// Ohne --json steht der Klartext zum Lesen beim Testen; mit --json die Antwort
-// als JSON, dieselbe Serialisierung wie über MCP.
+// für die eigene Arbeit ansteht, als Verweise im Präfixschema; vorweg der Text
+// der immer geltenden Anweisungen, dahinter der Rest von `k-playbook context`,
+// den das Briefing noch nicht selbst abdeckt. Ohne --json steht der Klartext
+// zum Lesen; mit --json die Antwort als JSON, dieselbe Serialisierung wie über
+// MCP.
 func runBriefing(args []string) error {
 	asJSON := false
 	for _, arg := range args {
@@ -51,10 +52,22 @@ func runBriefing(args []string) error {
 	return writeBriefingText(os.Stdout, briefing)
 }
 
-// writeBriefingText rendert das Briefing zum Lesen: je Abschnitt die Verweise
-// mit Herkunft in Klammern und Titel, dahinter die Beschreibung.
+// writeBriefingText rendert das Briefing zum Lesen: zuerst der Text der immer
+// geltenden Anweisungen, so wie `k-playbook read` ihn liefert — ohne die Liste
+// seiner Teile, die Herkunft steht nur in der JSON-Antwort —, dann je Abschnitt
+// die Verweise mit Herkunft in Klammern und Titel, dahinter die Beschreibung.
 func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 	var b strings.Builder
+	always := briefing.Documents.Always
+	if strings.TrimSpace(always.Content) == "" {
+		fmt.Fprintf(&b, "(keine immer geltenden Anweisungen unter %s)\n", always.Ref)
+	} else {
+		b.WriteString(strings.TrimRight(always.Content, "\n") + "\n")
+	}
+	for _, problem := range always.Problems {
+		fmt.Fprintf(&b, "Hinweis: %s\n", problem)
+	}
+	b.WriteString("\n")
 	entries := func(list []project.BriefingEntry) {
 		if len(list) == 0 {
 			b.WriteString("  (keine)\n")
@@ -69,11 +82,6 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 		}
 	}
 
-	fmt.Fprintf(&b, "Immer (%s):\n", briefing.Documents.Always.Ref)
-	entries(briefing.Documents.Always.Parts)
-	for _, problem := range briefing.Documents.Always.Problems {
-		fmt.Fprintf(&b, "  Hinweis: %s\n", problem)
-	}
 	b.WriteString("Auf Abruf:\n")
 	entries(briefing.Documents.OnDemand)
 	b.WriteString("Regeln:\n")
@@ -229,13 +237,16 @@ func printBriefingUsage(out io.Writer) {
 Aufruf:
   k-playbook briefing [--json]
 
-Listet als Daten, was eine Sitzung zu Beginn wissen muss — Verweise im
-Präfixschema (docs/verweisschema.md), keine Pfade, keine Inhalte:
+Gibt aus, was eine Sitzung zu Beginn wissen muss:
 
-  - die immer geltenden Anweisungen k-playbook:/instructions/always/ mit
-    ihren Teilen, die Anweisungen auf Abruf, Regeln, Reviews und Leitlinien —
-    lokal und mitgeliefert schon gegeneinander aufgelöst, je Eintrag Verweis,
-    Titel, Beschreibung und Herkunft (dist, local, override, disabled);
+  - vorweg den Text der immer geltenden Anweisungen
+    k-playbook:/instructions/always/, zusammengebaut wie bei k-playbook read
+    (lokal und mitgeliefert aufgelöst, in der festgelegten Reihenfolge) — der
+    einzige Inhalt im Briefing, alles Weitere sind Verweise im Präfixschema
+    (docs/verweisschema.md), keine Pfade;
+  - die Anweisungen auf Abruf, Regeln, Reviews und Leitlinien — lokal und
+    mitgeliefert schon gegeneinander aufgelöst, je Eintrag Verweis, Titel,
+    Beschreibung und Herkunft (dist, local, override, disabled);
   - aus der Projekt-Collection die eigenen offenen Tasks und aktiven
     Arbeitsstände mit Titel und die Zahl der offenen Befunde — offen heißt
     nicht in done/; ist Kephalaion nicht nutzbar, steht das dort;
@@ -253,8 +264,9 @@ k-playbook context zieht der Aufruf dabei die Assistenten-Verlinkung nach; was
 sich geändert hat, steht im Rest unter links.
 
 Ohne --json steht der Klartext zum Lesen. Mit --json kommt die Antwort als
-JSON mit schemaVersion, documents (always, onDemand, rules, reviews,
-guidelines), work (available, message, user, tasks, workbench, openFindings),
+JSON mit schemaVersion, documents (always mit content und parts, onDemand,
+rules, reviews, guidelines), work (available, message, user, tasks, workbench,
+openFindings),
 projectDocs und context (available, message, dazu die übrigen Felder der
 Kontextausgabe unter ihren Namen) — dieselbe Antwort wie das MCP-Werkzeug
 k_playbook_briefing.

@@ -64,12 +64,17 @@ func TestBriefingKlartext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("briefing: %v", err)
 	}
+	// Vorweg der Text der immer geltenden Anweisungen, wie `k-playbook read`
+	// ihn liefert; die Liste seiner Teile mit Herkunft steht nur im JSON.
+	if !strings.HasPrefix(stdout, "## A\n\n## B lokal\n\nText.\nHinweis: k-playbook:/instructions/always/notiz.md (lokal)") {
+		t.Errorf("Ausgabe beginnt nicht mit den immer geltenden Anweisungen:\n%s", stdout)
+	}
+	for _, absent := range []string{"Immer (", "[dist]  A\n", "[override]  B lokal\n", "[disabled]  200-c.md\n"} {
+		if strings.Contains(stdout, absent) {
+			t.Errorf("Ausgabe enthält %q:\n%s", absent, stdout)
+		}
+	}
 	for _, want := range []string{
-		"Immer (k-playbook:/instructions/always/):",
-		"  k-playbook:/instructions/always/010-a.md  [dist]  A\n",
-		"  k-playbook:/instructions/always/100-b.md  [override]  B lokal\n",
-		"  k-playbook:/instructions/always/200-c.md  [disabled]  200-c.md\n",
-		"  Hinweis: k-playbook:/instructions/always/notiz.md (lokal)",
 		"Auf Abruf:\n  k-playbook:/instructions/on-demand/aus.md  [disabled]  aus.md\n  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
 		"Regeln:\n  k-playbook:/rules/befunde.md  [disabled]  befunde.md\n",
 		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n  k-playbook:/reviews/review-eigen.md  [local]  Eigenes Review\n",
@@ -143,6 +148,9 @@ func TestBriefingJSON(t *testing.T) {
 	}
 	if len(briefing.Documents.Always.Parts) != 3 || len(briefing.Documents.Rules) != 1 || len(briefing.Documents.Reviews) != 2 || len(briefing.Documents.Guidelines) != 2 {
 		t.Errorf("Listen: %+v", briefing.Documents)
+	}
+	if !strings.HasPrefix(briefing.Documents.Always.Content, "## A\n\n## B lokal\n") {
+		t.Errorf("always.content: %q", briefing.Documents.Always.Content)
 	}
 	if briefing.Work.Available || briefing.Work.Message == "" {
 		t.Errorf("work: %+v", briefing.Work)

@@ -217,7 +217,10 @@ each document with title, description (frontmatter, else the first heading) and 
 `local`, `override`, `disabled`); the own open tasks and active workbench topics (not in
 `done/`, what `k_playbook_doc_list` returns without `done`) with title, and the number of open
 findings in `queue/findings/`; when Kephalaion is not usable, that state instead of the lists.
-Contents are read afterwards with `k_playbook_doc_read`, which since this task resolves
+Since 2026-10-18 the briefing also carries the text of the always-instructions itself
+(`documents.always.content`, the plain text starts with it; schema `"3"`) — the one content in
+the briefing, assembled by the same function as `k-playbook read` (`joinDocDirParts`), because
+every session reads it first. All other contents are read afterwards with `k_playbook_doc_read`, which since task 086 resolves
 `rules/`, `reviews/` and `guidelines/` as well, through the one overlay that also builds
 `catalogs` (`overlayDocDir`). Deliberately left out: the local knowledge store
 `k-playbook-local/knowledge/`, contents, commands, skills, checks, scripts, k-playbook's own
@@ -296,8 +299,8 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | `k-playbook.md` | "Wie gearbeitet wird", last paragraph: what applies in a project is the catalog from `context`, a local command replaces or disables the shipped one | drops into `on-demand/ueberlagern.md` (same rule) | open |
 | `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are the field `remediation` — its place is in the table "Context field → future place" below | open |
 | `k-playbook-local/k-playbook.md` | the project's own rules (this repo: role, memory rule, spelling, scratch pad, docs first) | local parts `k-playbook-local/instructions/always/1000-….md`, one per topic, by the project; no shipped step | open |
-| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, and — until the rest is taken apart — the environment from its section `context`; then read `k-playbook:/instructions/always/`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | stays |
-| `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always` in the briefing is the reading order; see the name clash below | open |
+| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, the text of the always-instructions (`documents.always.content`, since 2026-10-18) and — until the rest is taken apart — the environment from its section `context`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | stays |
+| `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always.content` in the briefing is the text itself, already in reading order (since 2026-10-18); see the name clash below | open |
 | `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | open |
 | `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
 | `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; `k-playbook:/rules/befunde.md` resolves since task 086 | done (`NACHZIEHEN:` for the place `queue/findings/`) |
@@ -490,6 +493,12 @@ until the last step.
    anchored" names what the switch has to rebuild — including the current `anstoss` block as
    the second superseded version beside `legacyInstructionsBlockLines`. Next steps: take the
    fields out of the rest one by one along the table; the switch itself is the last step.
+   **2026-10-18:** the briefing carries the text of the always-instructions itself
+   (`documents.always.content`, from `joinDocDirParts`, the one function behind `k-playbook read`
+   for the directory; plain text starts with it, without the list of parts; schema `"3"`). The
+   contract's "no contents" now has this one named exception
+   ([mcp.md](mcp.md#briefing-contract)); a session that calls the briefing needs no second call
+   for the always-instructions.
 10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):
     `k_playbook_doc_create`, `_list`, `_done`, `_reopen` and `k-playbook doc`, measured at hub
     `vm`; see "Creating a named document". Not yet put to use: `/k-task-create`, `/k-task-run`,

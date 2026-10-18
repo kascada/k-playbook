@@ -10,8 +10,9 @@ import (
 
 // k_playbook_briefing ist die Hülle über project.BuildBriefing, derselben
 // Funktion, die `k-playbook briefing` ausgibt. Das Briefing ist der eine
-// Aufruf zu Beginn einer Sitzung: welche Dokumente gelten und was ansteht, als
-// Verweise — gelesen wird dann über k_playbook_doc_read. Umgebungsangaben
+// Aufruf zu Beginn einer Sitzung: der Text der immer geltenden Anweisungen,
+// dann welche Dokumente gelten und was ansteht, als Verweise — gelesen wird
+// dann über k_playbook_doc_read. Umgebungsangaben
 // stehen nur im Übergangsabschnitt context, dem Rest von k_playbook_context;
 // nichts steht doppelt. Weil der Rest über ContextForDir kommt, heilt auch
 // dieses Werkzeug nebenbei die Assistenten-Links (Ergebnis in context.links)
@@ -37,9 +38,11 @@ type briefingEnvelope struct {
 func addBriefingTool(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: briefingTool,
-		Description: "Das Briefing zu Beginn einer Sitzung: listet als Daten, was für dieses Projekt gilt und was " +
-			"ansteht — Verweise im Präfixschema, keine Pfade, keine Inhalte. documents: always (das zusammengebaute " +
-			"k-playbook:/instructions/always/ mit seinen Teilen), onDemand, rules, reviews, guidelines — lokal und " +
+		Description: "Das Briefing zu Beginn einer Sitzung: was für dieses Projekt gilt und was ansteht. " +
+			"documents.always.content ist der Text der immer geltenden Anweisungen k-playbook:/instructions/always/, " +
+			"zusammengebaut wie bei k_playbook_doc_read — lies ihn zuerst, er ist der einzige Inhalt im Briefing; " +
+			"alles Weitere sind Verweise im Präfixschema, keine Pfade. documents: always (ref, content, parts), " +
+			"onDemand, rules, reviews, guidelines — lokal und " +
 			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
