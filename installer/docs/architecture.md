@@ -129,12 +129,18 @@ Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `loca
 `disabled`) — und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
 Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offenen Befunde in
 `queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
-keine Pfade, keine Inhalte; Umgebungsangaben bleiben allein in `context`. Die Listen kommen aus
-den vorhandenen Funktionen (`overlayDocDir`/`assembleDocDir` in `project/docref.go`,
-`UserDocs.List` hinter `k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing`
-(`project/briefing.go`); das MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Ohne
-`--json` ein Klartext zum Lesen beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md),
-Abschnitt „Briefing Contract“.
+keine Pfade, keine Inhalte. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
+091): der Rest der Kontextausgabe, den das Briefing nicht selbst abdeckt, aus `ContextForDir`
+— derselben Funktion wie `k-playbook context` — ohne `catalogs.rules`, `catalogs.reviews` und
+`guidelines` (Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code); lässt sich
+die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der Rest über
+`ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
+(`context.links`). Im Klartext steht der Rest hinter der Trennzeile „Noch aus k-playbook
+context — wird abgebaut“. Die Listen kommen aus den vorhandenen Funktionen
+(`overlayDocDir`/`assembleDocDir` in `project/docref.go`, `UserDocs.List` hinter
+`k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing` (`project/briefing.go`); das
+MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Ohne `--json` ein Klartext zum Lesen
+beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Briefing Contract“.
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
@@ -252,7 +258,9 @@ installer/
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
-│   │                            aus der Collection, als Verweise (Task 086)
+│   │                            aus der Collection, als Verweise (Task 086); dazu der
+│   │                            Übergangsabschnitt context — der Rest der Kontext-
+│   │                            ausgabe aus ContextForDir (Task 091)
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
 │   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken

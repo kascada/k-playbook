@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -71,6 +72,21 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 	}
 	if envelope.ProjectDocs != "project:/k-playbook-local/docs/README.md" {
 		t.Errorf("projectDocs %q", envelope.ProjectDocs)
+	}
+	// Der Rest von k_playbook_context steht im Abschnitt context, ohne die
+	// Felder, die documents schon liefert.
+	section := envelope.Context
+	if !section.Available || section.Message != "" {
+		t.Fatalf("context: %+v", section)
+	}
+	if raw, ok := section.Field("project"); !ok || !strings.Contains(string(raw), root) {
+		t.Errorf("context.project: %s", raw)
+	}
+	if _, ok := section.Field("guidelines"); ok {
+		t.Errorf("context trägt guidelines")
+	}
+	if raw, ok := section.Field("catalogs"); !ok || strings.Contains(string(raw), `"rules"`) || !strings.Contains(string(raw), `"checks"`) {
+		t.Errorf("context.catalogs: %s", raw)
 	}
 }
 

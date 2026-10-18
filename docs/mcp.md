@@ -5,10 +5,12 @@ k-playbook includes an MCP server. It gives an assistant the same information th
 files in reading order, the remediation policy, the guidelines, and the effective catalogs
 for rules, reviews, and checks -- shipped and project-owned content already merged.
 
-`k_playbook_context` is the only tool that also writes as a side effect: it synchronizes the
-project's assistant linking with the catalog, just as the subcommand does. It writes only
-when writing changes something, and only to symlinks created by k-playbook itself. The
-response lists what happened under `links`; if the field is absent, everything was already
+`k_playbook_context` and `k_playbook_briefing` are the only tools that also write as a side
+effect: they synchronize the project's assistant linking with the catalog, just as the
+subcommands do -- the briefing because its section `context` comes through the same function
+(`ContextForDir`). They write only when writing changes something, and only to symlinks created
+by k-playbook itself. The response lists what happened under `links` (`k_playbook_context`)
+resp. `context.links` (`k_playbook_briefing`); if the field is absent, everything was already
 up to date.
 
 The server offers the working state, the review, todo and knowledge tools,
@@ -355,7 +357,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
-| `k_playbook_briefing` | the briefing at session start: which instructions, rules, reviews and guidelines apply (references with title, description and origin) and what is pending in the project's collection (own open tasks and workbench topics, the number of open findings); like `k-playbook briefing --json` |
+| `k_playbook_briefing` | the briefing at session start: which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
@@ -894,17 +896,26 @@ plain text for reading while testing. Its only input is `projectDir` (required b
 every tool). The briefing is the one call at the start of a session: **data, not prose** — it
 lists what applies and what is pending as references in the prefix scheme
 ([verweisschema.md](verweisschema.md)), never paths and never contents. A listed document is
-read with `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix. It
-stands beside `k_playbook_context`, not in place of it: environment facts — paths, tools, `gh`,
-the Kephalaion binding — are only there, and a test keeps the two outputs free of shared fields
-(`schemaVersion` excepted, which describes each output itself).
+read with `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix.
+Environment facts — paths, tools, `gh`, the Kephalaion binding — stand in the briefing only in
+the transitional section `context` (task 091): the rest of `k_playbook_context` that the
+briefing's own sections do not cover, built from the same function (`ContextForDir`), never
+rebuilt. So one call is enough for the start of a session, and the rest shows what is left of
+`k_playbook_context`; each later step takes one field out of it and gives it a place of its own
+(the authority is the table "Context field → future place" in
+[knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)),
+and when the rest is empty, `k_playbook_context` and `k-playbook context` go. Until then both
+work unchanged. A test (`TestBriefingTraegtKeinFeldDerKontextausgabe`) keeps the top-level
+fields of the two outputs disjoint (`schemaVersion` excepted, which describes each output
+itself) and the rest complete: every field of `BuildContext` that is not covered is in
+`context`, the covered ones are not.
 
 A successful answer is `{ok: true, tool, projectDir, schemaVersion, documents, work,
-projectDocs}`:
+projectDocs, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"1"` |
+| `schemaVersion` | the version of the briefing output, `"2"` (`"1"` had no `context`) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `parts` in the order of the text, `problems` (files without a leading number, skipped) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
@@ -913,6 +924,9 @@ projectDocs}`:
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
 | `projectDocs` | the entry of the project documentation, `project:/k-playbook-local/docs/README.md` |
+| `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
+| `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
 `catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
@@ -921,8 +935,8 @@ shipped, an empty local file disables. `guidelines` is an overlay kind here -- s
 `guidelines` of the context output still lists only the local files until the context output is
 switched.
 
-Deliberately not in the briefing: contents, commands, skills, checks, scripts, k-playbook's own
-docs and the local knowledge store `k-playbook-local/knowledge/` -- that one joins later, with
+Deliberately not in the briefing's own sections: contents, commands, skills, checks, scripts,
+k-playbook's own docs and the local knowledge store `k-playbook-local/knowledge/` -- that one joins later, with
 counts per kind, state and origin and the freshness that
 [knowledge-gate.md](knowledge-gate.md#querying-the-surface) described for its briefing.
 

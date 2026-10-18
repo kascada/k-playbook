@@ -256,9 +256,11 @@ Unterkommandos:
             mitgeliefert aufgelöst, je Eintrag Verweis, Titel, Beschreibung,
             Herkunft —, dazu aus der Projekt-Collection die eigenen offenen
             Tasks und Arbeitsstände und die Zahl offener Befunde, und der
-            Einstieg der Projektdoku. Verweise, keine Pfade; Umgebungsangaben
-            stehen in context. Dasselbe wie das MCP-Werkzeug
-            k_playbook_briefing.
+            Einstieg der Projektdoku. Verweise, keine Pfade. Dahinter, klar
+            abgetrennt, der Rest von k-playbook context — die Umgebungs-
+            angaben, die das Briefing noch nicht selbst abdeckt; zieht dabei
+            wie context die Assistenten-Verlinkung nach. Dasselbe wie das
+            MCP-Werkzeug k_playbook_briefing.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

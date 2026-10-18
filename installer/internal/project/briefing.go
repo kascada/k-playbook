@@ -1,8 +1,12 @@
 package project
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
@@ -14,18 +18,22 @@ import (
 // Projekt gelten und was in der Projekt-Collection für die eigene Arbeit
 // ansteht. Verweise im Präfixschema, keine Pfade; gelesen wird über
 // k_playbook_doc_read bzw. auf dem Weg des Präfixes. Inhalte stehen nicht
-// darin, Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
-// ebenso wenig: die bleiben allein in `k-playbook context`. Es kommt neben
-// den bisherigen Einstieg (k-playbook.md, AGENTS.md, context); umgestellt wird
-// danach Schritt für Schritt.
+// darin. Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
+// stehen nur im Übergangsabschnitt Context (Task 091): dem Rest der
+// Kontextausgabe von `k-playbook context`, den das Briefing noch nicht selbst
+// abdeckt. Ein Aufruf des Briefings genügt damit für den Einstieg; die
+// Kontextausgabe bleibt daneben unverändert, bis der Rest leer ist und sie
+// entfallen kann. Umgestellt wird Schritt für Schritt.
 //
 // Die Listen kommen aus den vorhandenen Funktionen: die Dokumente über
 // dieselbe Überlagerung wie die Verweise und die Kataloge (overlayDocDir,
 // assembleDocDir), die eigene Arbeit über UserDocs.List — die Funktion hinter
-// k_playbook_doc_list.
+// k_playbook_doc_list —, der Rest über ContextForDir, dieselbe Funktion wie
+// `k-playbook context`.
 
-// BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe.
-const BriefingSchemaVersion = "1"
+// BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe. Fassung 2 hat den
+// Abschnitt context.
+const BriefingSchemaVersion = "2"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -49,6 +57,9 @@ type Briefing struct {
 	Work BriefingWork `json:"work"`
 	// ProjectDocs ist der Einstieg der Projektdokumentation, als Verweis.
 	ProjectDocs string `json:"projectDocs"`
+	// Context ist der Übergangsabschnitt: was von `k-playbook context` noch
+	// nicht in den eigenen Abschnitten des Briefings steht.
+	Context BriefingContext `json:"context"`
 }
 
 // BriefingDocuments sind die Dokumentlisten je Sorte, in Lesereihenfolge.
@@ -110,13 +121,222 @@ type BriefingDoc struct {
 	Updated string `json:"updated,omitempty"`
 }
 
+// BriefingContext ist der Übergangsabschnitt context des Briefings: die
+// Kontextausgabe von `k-playbook context` ohne die Felder, die das Briefing
+// schon selbst liefert (briefingCoveredContextFields). Er ist erkennbar ein
+// Übergang, kein Teil des Briefings: Jeder spätere Schritt nimmt ein Feld
+// heraus und gibt ihm einen eigenen Platz — oder lässt es entfallen. Ist der
+// Abschnitt leer, können `k-playbook context` und k_playbook_context weg.
+//
+// Lässt sich die Kontextausgabe nicht bauen — keine Installation, unbekannte
+// Fassung, unlesbare Konfiguration —, ist das ein Zustand wie bei
+// BriefingWork: Available false mit Message, das übrige Briefing bleibt.
+//
+// Im JSON stehen die übrigen Felder unmittelbar unter context, unter ihren
+// Namen aus der Kontextausgabe (context.project, context.links …), neben
+// available und message. Darum serialisiert der Typ sich selbst.
+type BriefingContext struct {
+	// Available sagt, ob die Kontextausgabe gebaut werden konnte.
+	Available bool
+	// Message nennt, warum nicht; leer, wenn Available.
+	Message string
+	// Fields sind die übrigen Felder der Kontextausgabe, in deren Reihenfolge.
+	Fields []BriefingContextField
+}
+
+// BriefingContextField ist ein Feld der Kontextausgabe im Abschnitt context:
+// sein Name und sein Wert, so wie `k-playbook context` ihn ausgibt.
+type BriefingContextField struct {
+	Name  string
+	Value json.RawMessage
+}
+
+// Field liefert den Wert eines Felds des Abschnitts, false ohne.
+func (c BriefingContext) Field(name string) (json.RawMessage, bool) {
+	for _, field := range c.Fields {
+		if field.Name == name {
+			return field.Value, true
+		}
+	}
+	return nil, false
+}
+
+// MarshalJSON schreibt available, message und die übrigen Felder als ein
+// Objekt.
+func (c BriefingContext) MarshalJSON() ([]byte, error) {
+	fields := []BriefingContextField{{Name: "available", Value: json.RawMessage(strconv.FormatBool(c.Available))}}
+	if c.Message != "" {
+		message, err := json.Marshal(c.Message)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, BriefingContextField{Name: "message", Value: message})
+	}
+	fields = append(fields, c.Fields...)
+	return marshalOrderedObject(fields)
+}
+
+// UnmarshalJSON liest die Form von MarshalJSON zurück.
+func (c *BriefingContext) UnmarshalJSON(data []byte) error {
+	fields, err := unmarshalOrderedObject(data)
+	if err != nil {
+		return err
+	}
+	*c = BriefingContext{}
+	for _, field := range fields {
+		switch field.Name {
+		case "available":
+			if err := json.Unmarshal(field.Value, &c.Available); err != nil {
+				return err
+			}
+		case "message":
+			if err := json.Unmarshal(field.Value, &c.Message); err != nil {
+				return err
+			}
+		default:
+			c.Fields = append(c.Fields, field)
+		}
+	}
+	return nil
+}
+
+// briefingCoveredContextFields nennt die Felder der Kontextausgabe, die das
+// Briefing schon in eigenen Abschnitten liefert und die darum im Abschnitt
+// context fehlen — als Pfade mit Punkt, je Eintrag der eigene Platz. Das ist
+// die eine Stelle für diese Liste; der Test vergleicht gegen BuildContext,
+// dass jedes andere Feld der Kontextausgabe im Abschnitt steht.
+var briefingCoveredContextFields = []string{
+	"catalogs.rules",   // documents.rules
+	"catalogs.reviews", // documents.reviews
+	"guidelines",       // documents.guidelines — dort überlagert, hier nur lokal
+}
+
+// briefingContextForDir ist die Quelle des Abschnitts: ContextForDir, dieselbe
+// Funktion wie `k-playbook context` — kein Nachbau. Sie heilt dabei die
+// Assistenten-Links; das Ergebnis steht wie dort unter links, hier als
+// context.links. Austauschbar für Tests.
+var briefingContextForDir = ContextForDir
+
+// briefingContext baut den Abschnitt. Jeder Fehler ist ein Zustand.
+func briefingContext(projectDir string) BriefingContext {
+	built, err := briefingContextForDir(projectDir)
+	if err != nil {
+		return BriefingContext{Message: err.Error()}
+	}
+	fields, err := briefingContextFields(built)
+	if err != nil {
+		return BriefingContext{Message: err.Error()}
+	}
+	return BriefingContext{Available: true, Fields: fields}
+}
+
+// briefingContextFields serialisiert die Kontextausgabe und nimmt die
+// abgedeckten Felder heraus. Der Umweg über JSON hält den Abschnitt an die
+// Ausgabe von `k-playbook context` gebunden: ein Feld, das dort dazukommt,
+// steht von selbst auch hier.
+func briefingContextFields(built Context) ([]BriefingContextField, error) {
+	data, err := json.Marshal(built)
+	if err != nil {
+		return nil, err
+	}
+	fields, err := unmarshalOrderedObject(data)
+	if err != nil {
+		return nil, err
+	}
+	for _, covered := range briefingCoveredContextFields {
+		if fields, err = dropOrderedField(fields, strings.Split(covered, ".")); err != nil {
+			return nil, fmt.Errorf("Kontextfeld %s auslassen: %w", covered, err)
+		}
+	}
+	return fields, nil
+}
+
+// dropOrderedField nimmt das Feld unter path aus einem Objekt heraus, auch in
+// der Tiefe. Fehlt es, bleibt das Objekt, wie es ist.
+func dropOrderedField(fields []BriefingContextField, path []string) ([]BriefingContextField, error) {
+	kept := make([]BriefingContextField, 0, len(fields))
+	for _, field := range fields {
+		if field.Name != path[0] {
+			kept = append(kept, field)
+			continue
+		}
+		if len(path) == 1 {
+			continue
+		}
+		inner, err := unmarshalOrderedObject(field.Value)
+		if err != nil {
+			return nil, err
+		}
+		if inner, err = dropOrderedField(inner, path[1:]); err != nil {
+			return nil, err
+		}
+		value, err := marshalOrderedObject(inner)
+		if err != nil {
+			return nil, err
+		}
+		kept = append(kept, BriefingContextField{Name: field.Name, Value: value})
+	}
+	return kept, nil
+}
+
+// unmarshalOrderedObject liest ein JSON-Objekt in seine Felder, in der
+// Reihenfolge der Eingabe — die geht in einer map verloren.
+func unmarshalOrderedObject(data []byte) ([]BriefingContextField, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	token, err := decoder.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := token.(json.Delim); !ok || delim != '{' {
+		return nil, fmt.Errorf("JSON-Objekt erwartet, %v bekommen", token)
+	}
+	fields := []BriefingContextField{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return nil, err
+		}
+		name, ok := token.(string)
+		if !ok {
+			return nil, fmt.Errorf("Feldname erwartet, %v bekommen", token)
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, err
+		}
+		fields = append(fields, BriefingContextField{Name: name, Value: value})
+	}
+	return fields, nil
+}
+
+// marshalOrderedObject schreibt Felder als JSON-Objekt in ihrer Reihenfolge.
+func marshalOrderedObject(fields []BriefingContextField) ([]byte, error) {
+	var b bytes.Buffer
+	b.WriteByte('{')
+	for i, field := range fields {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		name, err := json.Marshal(field.Name)
+		if err != nil {
+			return nil, err
+		}
+		b.Write(name)
+		b.WriteByte(':')
+		b.Write(field.Value)
+	}
+	b.WriteByte('}')
+	return b.Bytes(), nil
+}
+
 // openBriefingDocs ist der Zugang zur Collection; austauschbar, damit Tests
 // den Node nicht fragen.
 var openBriefingDocs = OpenUserDocs
 
 // BuildBriefing stellt das Briefing eines Projekts zusammen. Ein Fehler ist
 // nur die Umgebung — eine Ebene, die sich nicht lesen lässt; eine nicht
-// nutzbare Collection ist ein Zustand in Work, kein Fehler.
+// nutzbare Collection ist ein Zustand in Work, eine nicht baubare
+// Kontextausgabe einer in Context, beides kein Fehler.
 func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	layers := ProjectDocLayers(projectDir)
 	briefing := Briefing{
@@ -148,6 +368,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	}
 
 	briefing.Work = briefingWork(ctx, projectDir)
+	briefing.Context = briefingContext(projectDir)
 	return briefing, nil
 }
 

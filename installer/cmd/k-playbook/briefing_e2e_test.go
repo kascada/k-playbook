@@ -76,14 +76,54 @@ func TestBriefingKlartext(t *testing.T) {
 		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\n  k-playbook:/guidelines/stil.md  [local]  Stil\n",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
 		"Projektdoku: project:/k-playbook-local/docs/README.md\n",
+		"\n" + briefingContextSeparator + "\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("Ausgabe enthält nicht %q:\n%s", want, stdout)
 		}
 	}
-	// Keine Pfade der Platte: das Briefing nennt Verweise.
-	if strings.Contains(stdout, root) {
-		t.Errorf("Ausgabe nennt den Projektpfad:\n%s", stdout)
+	briefingPart, contextPart, found := strings.Cut(stdout, briefingContextSeparator)
+	if !found {
+		t.Fatalf("keine Trennzeile:\n%s", stdout)
+	}
+	// Keine Pfade der Platte im Briefing: es nennt Verweise. Pfade stehen nur
+	// im Rest von `k-playbook context` hinter der Trennzeile.
+	if strings.Contains(briefingPart, root) {
+		t.Errorf("Briefing nennt den Projektpfad:\n%s", briefingPart)
+	}
+	for _, want := range []string{
+		"\n  project:\n    config: " + filepath.Join(root, "K-PLAYBOOK.yaml") + "\n    dir: " + root + "\n",
+		"\n  now:\n    date: ",
+		"\n  catalogs:\n    checks: (keine)\n",
+		"\n  kephalaion:\n",
+		"\n  remediation:\n    branchPrefix: ",
+	} {
+		if !strings.Contains(contextPart, want) {
+			t.Errorf("Rest enthält nicht %q:\n%s", want, contextPart)
+		}
+	}
+	// Die abgedeckten Felder fehlen im Rest.
+	for _, absent := range []string{"\n  guidelines", "    rules:", "    reviews:"} {
+		if strings.Contains(contextPart, absent) {
+			t.Errorf("Rest enthält %q:\n%s", absent, contextPart)
+		}
+	}
+}
+
+// Ein Rest, der sich nicht bauen lässt, ist ein Zustand hinter der Trennzeile;
+// das Briefing steht davor, und das Subkommando endet mit 0.
+func TestBriefingKlartextOhneKontext(t *testing.T) {
+	root := briefingProject(t)
+	if err := os.WriteFile(filepath.Join(root, "K-PLAYBOOK.yaml"), []byte("schema_version: 99\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, err := runBriefingCaptured(t)
+	if err != nil {
+		t.Fatalf("briefing: %v", err)
+	}
+	if !strings.Contains(stdout, "Regeln:\n") || !strings.Contains(stdout, briefingContextSeparator+"\n  nicht verfügbar — K-PLAYBOOK.yaml hat schema_version 99") {
+		t.Errorf("Ausgabe:\n%s", stdout)
 	}
 }
 
@@ -106,6 +146,12 @@ func TestBriefingJSON(t *testing.T) {
 	}
 	if briefing.Work.Available || briefing.Work.Message == "" {
 		t.Errorf("work: %+v", briefing.Work)
+	}
+	if _, ok := briefing.Context.Field("project"); !briefing.Context.Available || !ok {
+		t.Errorf("context: %+v", briefing.Context)
+	}
+	if _, ok := briefing.Context.Field("guidelines"); ok {
+		t.Errorf("context trägt guidelines: %+v", briefing.Context)
 	}
 	// Die JSON-Ausgabe trägt die Listen auch leer als Listen, nie als null.
 	var raw map[string]json.RawMessage

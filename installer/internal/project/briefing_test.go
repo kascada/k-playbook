@@ -271,26 +271,34 @@ func TestBriefingEigeneArbeit(t *testing.T) {
 	}
 }
 
-// Nichts doppelt: das Briefing trägt kein Feld der Kontextausgabe —
-// Umgebungsangaben bleiben allein in `k-playbook context`. Verglichen werden
-// die obersten Feldnamen beider Ausgaben; schemaVersion ist die einzige
+// Nichts doppelt, nichts vergessen (Task 086, umgewidmet in Task 091): Die
+// obersten Felder von Briefing und Kontextausgabe bleiben disjunkt —
+// Umgebungsangaben stehen im Briefing nur im Übergangsabschnitt context, nicht
+// zusätzlich in den eigenen Abschnitten. schemaVersion ist oben die einzige
 // erlaubte Überschneidung, denn sie beschreibt die jeweilige Ausgabe selbst.
+// Im Abschnitt context fehlen genau die Felder, die das Briefing selbst
+// liefert; jedes übrige Feld der Kontextausgabe steht da — verglichen gegen
+// BuildContext, nicht gegen eine von Hand gepflegte Liste. `k-playbook
+// context` selbst bleibt unverändert; das sichern die Tests der Kontextausgabe.
 func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 
 	context, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
-	context.Kephalaion = &kephalaion.Status{}
-	context.Links = &ContextLinks{}
 	briefing, err := BuildBriefing(t.Context(), root)
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
 
-	contextKeys := topLevelKeys(t, context)
+	// Oben disjunkt — auch gegen die Felder, die erst ContextForDir füllt.
+	full := context
+	full.Kephalaion = &kephalaion.Status{}
+	full.Links = &ContextLinks{}
+	contextKeys := topLevelKeys(t, full)
 	for key := range topLevelKeys(t, briefing) {
 		if key == "schemaVersion" {
 			continue
@@ -299,6 +307,58 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 			t.Errorf("Feld %q steht im Briefing und in der Kontextausgabe", key)
 		}
 	}
+
+	// Der Rest: vollständig gegen BuildContext, ohne die abgedeckten Felder.
+	rest := briefing.Context
+	if !rest.Available || rest.Message != "" {
+		t.Fatalf("context: available %v, message %q", rest.Available, rest.Message)
+	}
+	covered := map[string]bool{}
+	for _, path := range briefingCoveredContextFields {
+		covered[path] = true
+	}
+	for key := range topLevelKeys(t, context) {
+		_, present := rest.Field(key)
+		if covered[key] == present {
+			t.Errorf("Kontextfeld %q: im Rest %v, abgedeckt %v", key, present, covered[key])
+		}
+	}
+	for name, entries := range context.Catalogs {
+		raw, _ := rest.Field("catalogs")
+		var catalogs map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &catalogs); err != nil {
+			t.Fatalf("context.catalogs: %v", err)
+		}
+		_, present := catalogs[name]
+		if covered["catalogs."+name] == present {
+			t.Errorf("catalogs.%s: im Rest %v, abgedeckt %v", name, present, covered["catalogs."+name])
+		}
+		if present {
+			want, _ := json.Marshal(entries)
+			if string(catalogs[name]) != string(want) {
+				t.Errorf("catalogs.%s abweichend:\n%s\n%s", name, catalogs[name], want)
+			}
+		}
+	}
+	// Was ContextForDir über BuildContext hinaus füllt, ist auch da.
+	if raw, ok := rest.Field("kephalaion"); !ok || !strings.Contains(string(raw), "Keine Collection eingetragen") {
+		t.Errorf("context.kephalaion: %s", raw)
+	}
+	// Ein übriges Feld steht unverändert da, wie `k-playbook context` es ausgibt.
+	want, _ := json.Marshal(context.Project)
+	if got, _ := rest.Field("project"); string(got) != string(want) {
+		t.Errorf("context.project:\n%s\nerwartet\n%s", got, want)
+	}
+
+	// Die drei heute abgedeckten Felder: ausgelassen hier, geliefert dort.
+	if _, ok := rest.Field("guidelines"); ok || len(briefing.Documents.Guidelines) == 0 {
+		t.Errorf("guidelines: im Rest %v, documents.guidelines %d", ok, len(briefing.Documents.Guidelines))
+	}
+	raw, _ := rest.Field("catalogs")
+	if strings.Contains(string(raw), "review-code.md") || strings.Contains(string(raw), "befunde.md") || len(briefing.Documents.Rules) == 0 || len(briefing.Documents.Reviews) == 0 {
+		t.Errorf("catalogs.rules/reviews im Rest: %s", raw)
+	}
+
 	// Die Dokumentlisten nennen Verweise, keine Pfade der Platte.
 	data, err := json.Marshal(briefing.Documents)
 	if err != nil {
@@ -307,6 +367,64 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 	if strings.Contains(string(data), root) {
 		t.Errorf("Briefing nennt den Projektpfad: %s", data)
 	}
+
+	// JSON: available und die Felder stehen unmittelbar unter context, in der
+	// Reihenfolge der Kontextausgabe, und lesen sich zurück.
+	encoded, err := json.Marshal(briefing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raws map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &raws); err != nil {
+		t.Fatal(err)
+	}
+	section := string(raws["context"])
+	if !strings.HasPrefix(section, `{"available":true,"schemaVersion":`) || !strings.Contains(section, `"project":{"dir":`) {
+		t.Errorf("context im JSON: %s", section)
+	}
+	var decoded Briefing
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(decoded.Context, briefing.Context) {
+		t.Errorf("Rückweg:\n%+v\nerwartet\n%+v", decoded.Context, briefing.Context)
+	}
+}
+
+// Lässt sich die Kontextausgabe nicht bauen, ist das ein Zustand im Abschnitt
+// context — wie bei work —, kein Fehler: das übrige Briefing bleibt.
+func TestBriefingKontextNichtBaubar(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	write(t, ConfigPath(root), "schema_version: 99\n")
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	section := briefing.Context
+	if section.Available || !strings.Contains(section.Message, "schema_version 99") || len(section.Fields) != 0 {
+		t.Errorf("context: %+v", section)
+	}
+	if len(briefing.Documents.Rules) == 0 || len(briefing.Documents.Always.Parts) == 0 {
+		t.Errorf("Dokumente fehlen: %+v", briefing.Documents)
+	}
+	encoded, err := json.Marshal(section)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(encoded), `{"available":false,"message":"`) || strings.Count(string(encoded), ":") != 2 {
+		t.Errorf("context im JSON: %s", encoded)
+	}
+}
+
+// stubKephalaionCheck ersetzt die Prüfung der Anbindung, damit der Test den
+// Node nicht fragt.
+func stubKephalaionCheck(t *testing.T, status kephalaion.Status) {
+	t.Helper()
+	original := kephalaionCheck
+	kephalaionCheck = func(string) kephalaion.Status { return status }
+	t.Cleanup(func() { kephalaionCheck = original })
 }
 
 func topLevelKeys(t *testing.T, value any) map[string]bool {

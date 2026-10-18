@@ -221,8 +221,11 @@ Contents are read afterwards with `k_playbook_doc_read`, which since this task r
 `rules/`, `reviews/` and `guidelines/` as well, through the one overlay that also builds
 `catalogs` (`overlayDocDir`). Deliberately left out: the local knowledge store
 `k-playbook-local/knowledge/`, contents, commands, skills, checks, scripts, k-playbook's own
-docs, and every environment fact — paths, tools, `gh`, the Kephalaion binding stay in
-`k-playbook context` alone, nothing stands in both outputs. `guidelines` is an overlay kind for
+docs. Environment facts — paths, tools, `gh`, the Kephalaion binding — stood in
+`k-playbook context` alone; since task 091 (2026-10-17) they are in the briefing too, but only
+in its transitional section `context`, the rest of the context output that the briefing does
+not cover itself (see "Target for `k-playbook.md` and `AGENTS.md`" below); nothing stands in
+both the briefing's own sections and the context output. `guidelines` is an overlay kind for
 `k_playbook_doc_read` and the briefing; the field `guidelines` of the context output stays
 local-only as the one named exception until the context output is switched. The briefing of
 [`knowledge-gate.md`](./knowledge-gate.md#querying-the-surface) merges into this one: the
@@ -268,8 +271,10 @@ and `k-playbook.md` and the block in `AGENTS.md` are only a minimal prompt.
 down to the minimal prompt, and `k-playbook context` as well. The context output is taken
 apart field by field — each field moves into the briefing or drops — and at the end the
 command `k-playbook context` and the tool `k_playbook_context` go. Until then both work.
-Todo #26. Where the table below still says "context" as a future place, that is an
-intermediate state, not the target. This table (2026-10-16) assigns every section of `k-playbook.md` and every sentence of
+Todo #26. Since task 091 (2026-10-17) the briefing carries the rest of the context output in
+its section `context` — one call is enough, and the rest shows what is left to take apart;
+the table "Context field → future place" below is the authority for where each field goes.
+This table (2026-10-16) assigns every section of `k-playbook.md` and every sentence of
 the three `AGENTS.md` blocks (markers `k-playbook:anstoss`, `k-playbook:session-memory`,
 `k-playbook:befunde`, templates in `installer/internal/project/instructions.go`) to its future
 place. Nothing is moved by this task; each row is its own step later ("build first, then put
@@ -283,17 +288,17 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | Source | Section / sentence | Future place | State |
 |---|---|---|---|
 | `k-playbook.md` | intro: "gilt in jedem Projekt … `k-playbook-local/k-playbook.md` wird nach dieser Datei gelesen" | drops: the reading order is the order of `documents.always` in the briefing; local parts follow shipped ones by number | open |
-| `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md`: the two layers and the two rules in a few lines; the paths come from `context` (`playbook.dir`, `local.dir`), the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md` | open |
+| `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md`: the two layers and the two rules in a few lines; the paths are the fields `playbook` and `local` — their place is in the table "Context field → future place" below —, the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md` | open |
 | `k-playbook.md` | "Überlagern und Abschalten": replace by name, empty disables, the unit per kind, commands and skills must be registered | `on-demand/ueberlagern.md`, for the session that creates, overrides or disables an entry; what a session needs every time — read `k-playbook:` only through k-playbook, origin per entry — is already in `always/010-verweise.md` and in the briefing (`origin`) | open |
 | `k-playbook.md` | "Wo was liegt": no assumptions about paths, `k-playbook context` resolves directories and catalogs | prompt: the one call stays the `anstoss` block; the catalogs with origin are in the briefing | open |
 | `k-playbook.md` | "Wie gearbeitet wird", first paragraph: anything beyond a trivial step becomes a task (`/k-task-create`, `/k-task-refine`, `/k-task-run`) | `always/300-arbeiten-in-tasks.md` | open |
 | `k-playbook.md` | "Wie gearbeitet wird", overview of the shipped commands and the interface (`k-playbook`, `/k-gui`) | `on-demand/commands.md`; the briefing deliberately lists no commands or skills, the assistant has them registered, and `k-playbook/docs/commands.md` keeps the detail | open |
 | `k-playbook.md` | "Wie gearbeitet wird", last paragraph: what applies in a project is the catalog from `context`, a local command replaces or disables the shipped one | drops into `on-demand/ueberlagern.md` (same rule) | open |
-| `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are `remediation` in `context` | open |
+| `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are the field `remediation` — its place is in the table "Context field → future place" below | open |
 | `k-playbook-local/k-playbook.md` | the project's own rules (this repo: role, memory rule, spelling, scratch pad, docs first) | local parts `k-playbook-local/instructions/always/1000-….md`, one per topic, by the project; no shipped step | open |
-| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded: `context` for the environment, `k_playbook_briefing` for what applies, then read `k-playbook:/instructions/always/` | stays |
+| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, and — until the rest is taken apart — the environment from its section `context`; then read `k-playbook:/instructions/always/`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | stays |
 | `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always` in the briefing is the reading order; see the name clash below | open |
-| `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: directories stay in `context`, the catalogs with origin are in the briefing | open |
+| `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | open |
 | `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
 | `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; `k-playbook:/rules/befunde.md` resolves since task 086 | done (`NACHZIEHEN:` for the place `queue/findings/`) |
 | — | how references are written and reached | `always/010-verweise.md` | done |
@@ -309,6 +314,104 @@ confirmed or reversed when the switch step is planned, not before.
 `k-playbook:/instructions/always/`, which the briefing lists under `documents.always`. Both are
 right today and mean different things. The clash is resolved together with the switch of the
 context output (the field changes or goes), not in task 086.
+
+**Context field → future place** (task 091, 2026-10-17). This table is the authority for the
+place of every field of the context output; where the table above still names one of these
+fields, it points here. Since task 091 the briefing carries everything the context output
+has and the briefing's own sections do not: section `context` (JSON) resp. the part behind
+the separator "Noch aus k-playbook context — wird abgebaut" (plain text), built from the same
+function as `k-playbook context` (`ContextForDir`), minus the fields listed at exactly one
+place in the code (`briefingCoveredContextFields` in `project/briefing.go`). State `in the
+briefing` means: the field has its own place in the briefing and is left out of the rest;
+`in the rest` means: it is only in `context` for now. Every later step takes one field out of
+the rest and gives it its own place — or lets it drop — and reworks the readers named in the
+row; when the rest is empty, `k-playbook context` and `k_playbook_context` go. The future
+places are this table's proposal, the names are confirmed when the field moves. Readers are
+the commands and skills that name the field today (`grep -rn <field> commands skills`;
+`_shared/context.md` is the entry of every command and names almost every field).
+
+| Context field | Future place in the briefing | Readers today | State |
+|---|---|---|---|
+| `schemaVersion` (the configuration's version) | drops: the briefing has its own `schemaVersion`; the configuration's version is the tool's concern (`CheckSchema` stops before anything is built), no command reads it | — | in the rest |
+| `now` (`date`, `timestamp`) | `now`, same shape — a session has to take the date from here, not guess it | `_shared/context.md`, `/k-audit`, `/k-docs-extract`, `/k-remediation`, `/k-review`, `/k-task-refine`, `/k-task-run` | in the rest |
+| `instructions` (the `k-playbook.md` files in reading order) | drops: `documents.always` is the reading order, `k-playbook-local/k-playbook.md` becomes local parts (see "Name clash"); the standard header "lies die Dateien aus `instructions`" of every command then reads `k-playbook:/instructions/always/` instead | `_shared/context.md` and the header of 20 commands and 4 skills (`/k-audit`, `/k-danke`, `/k-doc-inventory`, `/k-docs*`, `/k-enforcement`, `/k-gui`, `/k-pr-review`, `/k-remediation`, `/k-review`, `/k-task-*`, `/k-test-check`, `/k-todo`, `/k-verlauf`, `/k-vscode-project-color`; `ks-ai-session-memory`, `ks-befunde`, `ks-enforcement`, `ks-overlay-repo-analyse`) | in the rest |
+| `project` (`dir`, `repoRoot`, `vcs`, `config`, `languages`) | `project`, same shape — the one place a command takes the project root, the repository and the languages from | `_shared/context.md`, `_docs/code.md`, `/k-audit`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-task-refine`, `/k-task-run`, `/k-todo`; `ks-enforcement` (`PLAYBOOK.md`) | in the rest |
+| `playbook` (`dir`) | `playbook`, same shape — every shipped path a command needs (`bin/k-check`, `scripts/`) derives from it ("Where the rest lives" in `_shared/context.md`) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-task-run`; `ks-ai-session-memory`, `ks-enforcement`, `ks-overlay-repo-analyse` | in the rest |
+| `local` (`dir`) | `local`, same shape — every project-owned path derives from it | `_shared/context.md`, `_docs/code.md`, `_docs/inventory.md`, `_docs/tools.md`, `/k-audit`, `/k-danke`, `/k-docs`, `/k-docs-extract`, `/k-docs-index`, `/k-enforcement`, `/k-pr-review`, `/k-remediation`, `/k-review`, `/k-task-create`, `/k-task-refine`, `/k-task-run`; `ks-enforcement` | in the rest |
+| `remediation` (`mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`) | `remediation`, same shape; the meaning of the modes moves to `on-demand/remediation.md` (row "Umgang mit Befunden" above) | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-pr-review` (`remediation.target`), `/k-remediation`, `/k-review` | in the rest |
+| `gh` (`status`, `configured`, `installed`, `path`, `loggedIn`, `account`, `accounts`, `tokenFromEnv`, `ready`, `host`) | `gh`, same shape — the decision and the host finding a PR review has to check before calling `gh` | `_shared/context.md`, `/k-pr-review` | in the rest |
+| `mcp` (`required`, `configured`) | drops: no command reads it; the required servers are the interface's concern, and the interface reads `BuildContext` directly (`webui/context.go`), not the output | — | in the rest |
+| `git` (`switch`, `allow`, `environments`, `configured`) | drops: no command reads it (commands check `project.vcs` and `baseTools.missing`, not `git`); the branch switch is the interface's, which reads `BuildContext` directly | — | in the rest |
+| `baseTools` (`matrix`, `present`, `error`, `missing`, `ok`, `installCommand`) | `baseTools`, same shape — the warning before a command calls a base tool | `_shared/context.md`, `/k-task-run`, `/k-verlauf` | in the rest |
+| `catalogs.checks` (`name`, `key`, `path`, `origin`, `disabled`) | `checks`: own list beside `documents`, entries with `key`, `origin` and `disabled` — checks are run through `bin/k-check`, not read, so they are no `documents` entry and keep no `ref`; whether `path` stays is decided when the field moves | `_shared/context.md`, `/k-enforcement` | in the rest |
+| `catalogs.rules` | `documents.rules` — `ref`, `title`, `description`, `origin` instead of `path`; readers switch from the path to `k_playbook_doc_read` | `_shared/context.md`, `/k-danke`, `/k-enforcement`, `/k-pr-review`, `/k-review`; `ks-befunde`, `ks-enforcement` (`SKILL.md`, `PLAYBOOK.md`) | in the briefing |
+| `catalogs.reviews` (with `audit`/`review` modes per recipe) | `documents.reviews` — but the briefing entry carries no `audit`/`review` block (`parseReviewModes`); `/k-audit` and `/k-review` choose recipes by these modes, so before `catalogs` goes the review entries in the briefing get the modes, or the readers take them from the recipe's frontmatter — rework to decide at the switch | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-pr-review`, `/k-review`, `/k-task-run` | in the briefing |
+| `guidelines` (files of `k-playbook-local/guidelines/` only) | `documents.guidelines` — a different meaning: the context field names only the local files, `documents.guidelines` the overlay of shipped (`k-playbook/guidelines/`, today `betrieb.md`) and local ([mcp.md](mcp.md#briefing-contract), `guidelinesKind` in `context.go`); readers see more after the switch — that is rework and belongs to this row | `_shared/context.md` (the field); `/k-danke` and `ks-befunde` write `<local.dir>/guidelines/fallen.md`, the directory, not the field | in the briefing |
+| `versionSources` (`path`, `present`, `schemaVersion`, `roots`, `sources`, `exclude`, `helmValues`, `error`) | `versionSources`, same shape — the contract says no command reads the file itself ([version-inventory.md](version-inventory.md)) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs` | in the rest |
+| `kephalaion` (`configured`, `hub`, `collection`, `account`, `address`, `state`, `ok`, `message`, `rights`, `scopes`, `user`, `node`, `nodeVersion`, `sync`) | `work`: `work.user` is there, `work.available`/`work.message` stand for `ok`/`message`; `address` gets `work.collection` so that `keph:` references can be read; the rest of the status (hub, account, state, rights, node, sync) drops — the interface shows it | no command; `instructions/always/010-verweise.md` names `kephalaion.address`, `kephalaion.ok` and `kephalaion.user` "aus `k-playbook context`" (reworded at the switch) | in the rest |
+| `links` (`healed`, `open`, `note`; only when there is something to report) | `links`, same shape and only when there is something to report. The healing itself (`HealLinks`) runs in `ContextForDir` today; the briefing heals because its rest comes through that function. Before `context` goes, the healing has to sit in `BuildBriefing` itself — otherwise the briefing would stop healing the moment the rest is removed | no command reads it; the `note` addresses the session | in the rest |
+
+**Where `k-playbook context` is anchored** (task 091, 2026-10-17). The call is anchored and
+checked at these places; per place, what the switch to the briefing has to rebuild. None of it
+is rebuilt by task 091 — "build first, then put to use".
+
+- **The `anstoss` block in `AGENTS.md`** (`instructionsBlock()` in
+  `installer/internal/project/instructions.go`, "Rufe zu Beginn `k-playbook context` auf").
+  Checked is not the text but the marker `<!-- k-playbook:anstoss -->` (`instructionsMarker`,
+  `CheckRootInstructions` → `HasMarker`). "Outdated" is defined narrowly: only a block that
+  still calls the superseded wrapper `/bin/k-playbook context` (`legacyInstructionsCommand`)
+  and whose end can be determined — literally against `legacyInstructionsBlockLines`, or at the
+  next heading or HTML comment (`instructionsBlockEnd`) — is replaced by itself
+  (`replaceOutdatedInstructionsBlock`), at the GUI start (`RepairRootInstructions`,
+  `cmd/k-playbook/gui.go`) and at setup (`ApplyAssistantSetup`, `setup.go`, reported as
+  `RootRefreshed`); every other version belongs to the project and stays. The assistant card
+  of the interface (`webui/assistant.go`, `describeSetup`, "Der veraltete Anstoß … wurde auf den
+  aktuellen Aufruf gebracht") reports a replaced block after setup, and
+  `HasOutdatedAnstoss` marks one whose end could not be determined
+  (`errAnstossEndeUnbestimmt` — the hint names `k-playbook context` as the target by hand).
+  **To rebuild:** the current block becomes the second superseded version — a second list of
+  lines beside `legacyInstructionsBlockLines`, line by line as shipped, with its call line
+  (`k-playbook context`, `InstalledCommandName`) as the one line that may vary —, so that
+  `knownInstructionsBlockEnd` finds its end positively and existing projects get the new
+  block without losing project text; `legacyInstructionsCommand` becomes a list of superseded
+  calls, and `errAnstossEndeUnbestimmt` names the new call. The session-memory block
+  (`sessionMemoryBlock()`, marker `k-playbook:session-memory`) and the findings block
+  (`findingsBlock()`, marker `k-playbook:befunde`) are superseded the same way: their content
+  is `instructions/always/100-…` and `200-…` (rows above, state done), so the template
+  (`rootInstructionsTemplate()`) shrinks to the one block, and the two blocks are recognized
+  by their markers and removed from existing projects — `ApplyRootInstructions` stops adding
+  them (`applyRootInstructions`, the check on `sessionMemoryMarker`). Tests:
+  `instructions_test.go`, `setup_test.go`; the shipped `AGENTS.md` of this repo and of the
+  installation carry the current block.
+- **`commands/_shared/context.md`**, the entry of every command: "Load the project context"
+  calls `k-playbook context`, "Load it once per session" names the fields that age or change,
+  "What it answers" lists the fields, "Where the rest lives" derives every path from
+  `local.dir` and `playbook.dir`, "Rules" read `instructions`, `now.date`, `catalogs`, `gh`,
+  `baseTools`. About 20 commands and four skills apply the module and name `k-playbook
+  context` themselves (`grep -rln "k-playbook context" commands skills`). **To rebuild:** the
+  module calls the briefing (`k_playbook_briefing`, else `k-playbook briefing --json`), the
+  field table follows the table "Context field → future place", and the rules switch from
+  `instructions` to `k-playbook:/instructions/always/` and from `catalogs` paths to
+  `documents` references; the commands' standard header drops the call. Per field, the
+  readers are in the table above; they switch when the field moves, not before.
+- **`k-playbook.md`, "Wo was liegt"** (shipped, and read through the context field
+  `instructions`): "`k-playbook context` liefert die aufgelösten Verzeichnisse und die
+  effektiven Kataloge". **To rebuild:** row "Wo was liegt" in the table above — the section
+  drops into the prompt; the directories are the fields `project`, `playbook`, `local`.
+- **`instructions/always/010-verweise.md`** (shipped as `defaults/instructions/always/`):
+  the `keph:` row and two rules name `kephalaion.address`, `kephalaion.ok` and
+  `kephalaion.user` "aus `k-playbook context`". **To rebuild:** reworded to the briefing's
+  `work` (`work.collection`, `work.available`, `work.user`; row `kephalaion` above) — a text
+  change in the shipped part, which `AGENTS.md` does not duplicate.
+- **MCP `k_playbook_context`** (`mcpserver/server.go`, `contextTool`; `toolDescription`
+  says "dieselbe Antwort wie das Subkommando"), the subcommand `context` (`printContext` in
+  `cmd/k-playbook/main.go`) and the usage text: the two facades on `ContextForDir`. The
+  review tools (`mcpserver/review.go`) and the interface (`webui/context.go`) use
+  `BuildContext` directly and are not affected. **To rebuild:** both go when the rest is
+  empty; the healing of the assistant links moves into `BuildBriefing` first (row `links`
+  above); `docs/mcp.md` (intro, tool table, "Briefing Contract"), `docs/k-playbook-format.md`
+  ("The resolved working state") and `k-playbook-local/docs/manual/assistenten-verlinkung.md`
+  ("Wo die Rechnung ausgelöst wird") follow.
 
 ## Open
 
@@ -375,6 +478,18 @@ until the last step.
    three belong to the switch step at the end, after the sections of
    the table have moved one by one. The check against the real installation follows the next
    release.
+   **Task 091 (2026-10-17, in the working tree):** the briefing carries the rest of the
+   context output in its section `context` (plain text behind the separator "Noch aus
+   k-playbook context — wird abgebaut"), from `ContextForDir`, minus `catalogs.rules`,
+   `catalogs.reviews` and `guidelines` (`briefingCoveredContextFields`, one place in the
+   code); a failed context is a state (`context.available`), not an error; the briefing heals
+   the assistant links as a side effect (`context.links`); briefing schema `"2"`. One call is
+   enough for the start of a session; `k-playbook context`, `k_playbook_context`,
+   `k-playbook.md`, the `AGENTS.md` block and the commands are unchanged. The table "Context
+   field → future place" assigns every context field, and "Where `k-playbook context` is
+   anchored" names what the switch has to rebuild — including the current `anstoss` block as
+   the second superseded version beside `legacyInstructionsBlockLines`. Next steps: take the
+   fields out of the rest one by one along the table; the switch itself is the last step.
 10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):
     `k_playbook_doc_create`, `_list`, `_done`, `_reopen` and `k-playbook doc`, measured at hub
     `vm`; see "Creating a named document". Not yet put to use: `/k-task-create`, `/k-task-run`,

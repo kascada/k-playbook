@@ -12,7 +12,10 @@ import (
 // Funktion, die `k-playbook briefing` ausgibt. Das Briefing ist der eine
 // Aufruf zu Beginn einer Sitzung: welche Dokumente gelten und was ansteht, als
 // Verweise — gelesen wird dann über k_playbook_doc_read. Umgebungsangaben
-// bleiben in k_playbook_context; nichts steht doppelt.
+// stehen nur im Übergangsabschnitt context, dem Rest von k_playbook_context;
+// nichts steht doppelt. Weil der Rest über ContextForDir kommt, heilt auch
+// dieses Werkzeug nebenbei die Assistenten-Links (Ergebnis in context.links)
+// — neben k_playbook_context das zweite, das als Nebenwirkung schreibt.
 const briefingTool = "k_playbook_briefing"
 
 // briefingInput trägt projectDir wie die übrigen Familien: Pflicht im
@@ -41,9 +44,13 @@ func addBriefingTool(server *mcp.Server) {
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
 			"ist Kephalaion nicht nutzbar, steht available false mit message. projectDocs: der Einstieg der " +
-			"Projektdoku. Einen Eintrag liest du mit k_playbook_doc_read (ref). Umgebungsangaben — Pfade, Werkzeuge, " +
-			"gh, Kephalaion-Anbindung — stehen nicht hier, sondern in k_playbook_context. Dieselbe Antwort wie " +
-			"`k-playbook briefing --json`.",
+			"Projektdoku. Einen Eintrag liest du mit k_playbook_doc_read (ref). context: der Übergangsabschnitt " +
+			"mit dem Rest von k_playbook_context — die Umgebungsangaben (Pfade, Werkzeuge, gh, git, mcp, " +
+			"remediation, Kephalaion-Anbindung …) unter ihren Namen aus der Kontextausgabe, ohne catalogs.rules, " +
+			"catalogs.reviews und guidelines, die documents schon liefert; lässt sich die Kontextausgabe nicht " +
+			"bauen, steht available false mit message. Ein Aufruf genügt damit für den Einstieg; k_playbook_context " +
+			"ist nicht zusätzlich nötig. Nebenwirkung wie dort: zieht die Assistenten-Verlinkung nach und meldet " +
+			"unter context.links, was sich geändert hat. Dieselbe Antwort wie `k-playbook briefing --json`.",
 	}, briefingToolHandler)
 }
 

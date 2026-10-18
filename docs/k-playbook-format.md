@@ -283,13 +283,28 @@ instructions, rules, reviews and guidelines apply, as references in the prefix
 scheme with title, description and origin (`k-playbook:/instructions/always/` with
 its parts, `on-demand/`, `rules/`, `reviews/`, `guidelines/`), and what is pending in
 the project's collection -- own open tasks and workbench topics, the number of open
-findings. References, never paths; no contents; no environment facts -- nothing
-stands in both outputs. Both go through the same overlay (`overlayDocDir` in
-`project/docref.go`), so an entry has the same origin wherever it appears. Today the
-briefing is an addition: `k-playbook.md`, the `AGENTS.md` block and `catalogs` are
-unchanged; the switch comes step by step
-([knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)).
-Contract: [mcp.md](mcp.md#briefing-contract).
+findings. References, never paths; no contents. Both go through the same overlay
+(`overlayDocDir` in `project/docref.go`), so an entry has the same origin wherever
+it appears.
+
+Since task 091 (2026-10-17) the briefing also carries **the rest of the context
+output**: everything in the table above that its own sections do not cover, in the
+section `context` (`--json`, MCP) resp. behind the separator line "Noch aus
+k-playbook context — wird abgebaut" (plain text). The rest comes from the same
+function as `k-playbook context` (`ContextForDir`), minus `catalogs.rules`,
+`catalogs.reviews` and `guidelines`, which are `documents.rules`, `.reviews` and
+`.guidelines` -- the list stands at one place in the code
+(`briefingCoveredContextFields`). Nothing stands twice: environment facts are in
+the briefing only there. So one call is enough for the start of a session, and
+because the rest comes through `ContextForDir`, the briefing heals the assistant
+links too (`context.links`). If the context output cannot be built, that is a state
+(`context.available: false` with `context.message`), not an error. The rest is a
+transition: each later step takes one field out and gives it its own place in the
+briefing -- the authority is the table "Context field → future place" in
+[knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
+--, and when it is empty, `k-playbook context` and `k_playbook_context` go. Today
+`k-playbook.md`, the `AGENTS.md` block, `k-playbook context` and `catalogs` are
+unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
 
 `links` is normally absent, intentionally: the invocation brings assistant
 linking in line with the catalog, as described below, and a message that says
