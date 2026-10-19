@@ -33,8 +33,10 @@ import (
 // Hat Schritt (1) das Binary ersetzt, führt dieser — noch alte — Prozess
 // Schritt (2) nicht selbst aus: er hätte alte Vorlagen und alte Erkennung.
 // Er startet dafür das neu installierte Programm mit `upgrade --project-only`
-// (reexecProjectStep). Die Oberfläche braucht das nicht, weil sie neu startet;
-// upgrade hat keinen Neustart.
+// (reexecProjectStep) und gibt ihm mit `--repair-mcp` mit, ob der Pull entfiel:
+// das neue Programm weiß sonst nicht, ob die MCP-Einträge schon repariert
+// sind. Die Oberfläche braucht das nicht, weil sie neu startet; upgrade hat
+// keinen Neustart.
 //
 // `--check` schreibt nichts: es meldet den Programm-Stand (CheckUpdate plus
 // Vergleich mit der laufenden Version) und baut die Projektprüfung aus den
@@ -58,6 +60,9 @@ type upgradeOptions struct {
 	// projectOnly: nur Schritt (2) — der Aufruf, mit dem ein alter Prozess das
 	// neu installierte Programm für das Projekt arbeiten lässt.
 	projectOnly bool
+	// repairMCP: Schritt (2) soll die MCP-Einträge reparieren, weil der Pull
+	// im alten Prozess entfiel; nur zusammen mit projectOnly.
+	repairMCP bool
 }
 
 // upgradeReport ist die Antwort, als JSON oder — Zeile für Zeile aus Messages
@@ -132,6 +137,8 @@ func runUpgrade(args []string) error {
 			options.asJSON = true
 		case "--project-only":
 			options.projectOnly = true
+		case "--repair-mcp":
+			options.repairMCP = true
 		case "-h", "--help", "help":
 			printUpgradeUsage(os.Stdout)
 			return nil
@@ -141,6 +148,9 @@ func runUpgrade(args []string) error {
 	}
 	if options.check && options.projectOnly {
 		return errors.New("--check und --project-only schließen sich aus")
+	}
+	if options.repairMCP && !options.projectOnly {
+		return errors.New("--repair-mcp gilt nur zusammen mit --project-only")
 	}
 
 	environment := project.Detect()
@@ -174,7 +184,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	}
 
 	if options.projectOnly {
-		result := upgradeProject(environment.ProjectDir, false)
+		result := upgradeProject(environment.ProjectDir, options.repairMCP)
 		report.Project = &result
 		report.Messages = append(report.Messages, result.messages()...)
 		emit(result.messages())
@@ -201,8 +211,10 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 
 	if programReport.Installed && target != "" {
 		// Das neue Programm zieht das Projekt nach — mit seinen Vorlagen und
-		// seiner Erkennung, nicht mit denen dieses Prozesses.
-		result, lines, err := upgradeReexec(target, environment.ProjectDir, options.asJSON, out)
+		// seiner Erkennung, nicht mit denen dieses Prozesses. Ob der Pull
+		// entfiel, weiß nur dieser Prozess; die MCP-Reparatur reist als
+		// Schalter mit, mit derselben Regel wie ohne Binärwechsel.
+		result, lines, err := upgradeReexec(target, environment.ProjectDir, !programReport.Pulled, options.asJSON, out)
 		report.Project = result
 		if err != nil {
 			lines = append(lines, "Projekt: das neue Programm konnte das Projekt nicht nachziehen — "+err.Error()+
@@ -442,11 +454,14 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	case !root.HasMarker:
 		report.Pending = append(report.Pending, "der Anstoß würde an "+project.RootInstructionsFile+" angehängt.")
 	}
-	if root.HasOutdatedAnstoss {
+	// Gemeldet wird nur, was ein Lauf wirklich täte: ein Block, dessen Ende
+	// sich nicht bestimmen ließ, steht zwar in HasOutdatedAnstoss bzw.
+	// ObsoleteBlocks, bleibt aber stehen — er kommt allein über den Hinweis.
+	if root.AnstossRefreshable {
 		report.Pending = append(report.Pending, "der veraltete Anstoß in "+project.RootInstructionsFile+" würde auf "+project.InstalledCommandName+" briefing gebracht.")
 	}
-	if len(root.ObsoleteBlocks) > 0 {
-		report.Pending = append(report.Pending, strings.Join(root.ObsoleteBlocks, " und ")+" würden aus "+project.RootInstructionsFile+" entfernt; der Inhalt kommt mit dem Briefing.")
+	if len(root.RemovableBlocks) > 0 {
+		report.Pending = append(report.Pending, strings.Join(root.RemovableBlocks, " und ")+" würden aus "+project.RootInstructionsFile+" entfernt; der Inhalt kommt mit dem Briefing.")
 	}
 	if root.Hint != "" {
 		report.Pending = append(report.Pending, "von Hand: "+root.Hint)
@@ -478,11 +493,15 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 }
 
 // reexecProjectStep lässt das neu installierte Programm Schritt (2) ausführen.
-// Im Klartextmodus schreibt es direkt nach out; im JSON-Modus kommt seine
-// Antwort zurück, so wie sie kam — ein neueres Programm darf mehr Felder
-// kennen als dieses.
-func reexecProjectStep(target string, projectDir string, asJSON bool, out io.Writer) (any, []string, error) {
+// repairMCP gibt ihm mit, dass der Pull entfiel und die MCP-Einträge noch zu
+// reparieren sind. Im Klartextmodus schreibt es direkt nach out; im JSON-Modus
+// kommt seine Antwort zurück, so wie sie kam — ein neueres Programm darf mehr
+// Felder kennen als dieses.
+func reexecProjectStep(target string, projectDir string, repairMCP bool, asJSON bool, out io.Writer) (any, []string, error) {
 	args := []string{"upgrade", "--project-only"}
+	if repairMCP {
+		args = append(args, "--repair-mcp")
+	}
 	if asJSON {
 		args = append(args, "--json")
 	}

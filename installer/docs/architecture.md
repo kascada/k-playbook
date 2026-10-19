@@ -57,7 +57,8 @@ alte Erkennung —, sondern er startet das neu installierte Programm mit
 Zeilen direkt durch, mit `--json` wird seine Antwort als `project` eingebettet, so wie sie
 kam. Die MCP-Einträge korrigiert der Pull (`UpdateResult.MCPRepaired`); nur wenn der Pull
 entfiel — kein Clone, kein Git, kein Netz —, läuft `RepairMCP()` mit der Schreibregel des
-Starts. Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
+Starts. Ob der Pull entfiel, weiß nur der alte Prozess; er gibt es dem Subprozess als
+`--repair-mcp` mit, damit das neue Programm dieselbe Regel anwendet. Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
 Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das Binary
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
 behält das alte Programm. `--check` schreibt nichts: `CheckUpdate()` und
@@ -1051,14 +1052,26 @@ ein Projekt davor, dazwischen oder dahinter geschrieben hat, bleibt dadurch steh
 sich keine Grenze bestimmen, wird nichts ersetzt und nichts entfernt: der Aufrufer bekommt
 einen Hinweis (`errAnstossEndeUnbestimmt`, `obsoleteRootBlock.errEndeUnbestimmt()`), der
 den neuen Aufruf nennt, und `RootInstructionsState.Hint` trägt ihn in die Karte. Beide
-Wege laufen über `refreshRootInstructions()`, erst der Anstoß, dann die Zusatzblöcke: eine
-Datei, die nur die Zusatzblöcke trägt, bekommt so beim Einrichten den Anstoß und verliert
-die Blöcke in einem Lauf.
+Wege laufen über `refreshRootInstructions()`: erst wird ein veralteter Anstoß ersetzt, dann
+werden die Zusatzblöcke entfernt, und erst danach wird ein fehlender Anstoß angehängt. Jede
+Grenze wird so auf dem Inhalt bestimmt, den die Datei trägt — nie auf einem Marker, den
+derselbe Lauf anhängt; sonst wäre der Anstoßmarker die Grenze eines abgewandelten
+Zusatzblocks, und Prosa ohne Überschrift dahinter ginge mit ihm verloren. Eine Datei, die
+nur die Zusatzblöcke trägt, bekommt so beim Einrichten den Anstoß und verliert die Blöcke
+in einem Lauf; ein abgewandelter Block bleibt samt Prosa stehen, mit Hinweis, und der
+Anstoß kommt trotzdem dazu — genau das, was `CheckRootInstructions()` vorher meldet. Damit
+das in jedem späteren Lauf so bleibt, ist der Anstoßmarker für die Zusatzblöcke auch auf
+der Platte keine Grenze (`markedBlockEnd()`, Parameter `wall`): In keiner ausgelieferten
+Vorlage stand der Anstoß hinter einem Zusatzblock; steht er dort, hat k-playbook ihn
+angehängt, und die Suche nach der Blockgrenze endet an ihm als unbestimmt.
 
 `RootInstructionsState` meldet den Bestand ohne zu schreiben: `HasOutdatedAnstoss`,
 `ObsoleteBlocks` (die Namen der noch vorhandenen Zusatzblöcke, ein eigenes Feld, damit die
 Karte beides getrennt zeigt) und `Hint`; `NeedsRefresh()` fasst zusammen, ob ein Lauf
-etwas nachzöge. `AssistantSetup` sagt nach dem Lauf, was geschah: `RootRefreshed` deckt
+etwas nachzöge — oder es versuchte und am Hinweis scheiterte. Was ein Lauf wirklich täte,
+sagen `AnstossRefreshable` und `RemovableBlocks`: der Bestand abzüglich der Blöcke, deren
+Ende sich nicht bestimmen ließ. `upgrade --check` meldet nur aus diesen beiden „würde
+ersetzt/entfernt" und für den Rest allein den Hinweis. `AssistantSetup` sagt nach dem Lauf, was geschah: `RootRefreshed` deckt
 beide Fälle, `RootAnstossRefreshed` und `RootBlocksRemoved` sagen, welcher.
 
 Drei Einstiege, wie bei MCP:

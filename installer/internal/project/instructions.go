@@ -127,8 +127,11 @@ const findingsMarker = "<!-- k-playbook:befunde -->"
 //
 // Erkannt wird er am Marker; seine Grenze wird wie beim Anstoßblock bestimmt:
 // die bekannte Gestalt Zeile für Zeile, sonst die nächste Überschrift oder der
-// nächste HTML-Kommentar, nie das Dateiende. Ein lokal abgewandelter Block ohne
-// Grenze bleibt stehen, mit Hinweis.
+// nächste HTML-Kommentar, nie das Dateiende — und nie der Anstoß: In keiner
+// ausgelieferten Vorlage stand er hinter einem Zusatzblock; steht er dort, hat
+// k-playbook ihn an eine Datei angehängt, deren Block schon keine Grenze hatte
+// (refreshRootInstructions). Ein lokal abgewandelter Block ohne Grenze bleibt
+// stehen, mit Hinweis.
 type obsoleteRootBlock struct {
 	// name benennt den Block in Meldungen.
 	name   string
@@ -168,14 +171,24 @@ type RootInstructionsState struct {
 	// HasMarker: der Anstoß steht bereits darin.
 	HasMarker bool `json:"hasMarker"`
 	// HasOutdatedAnstoss: der Anstoß steht darin, trägt aber noch einen
-	// abgelösten Aufruf (`k-playbook context`, davor der Wrapper). Er wird
-	// beim nächsten Einrichten, Start oder `k-playbook upgrade` ersetzt.
+	// abgelösten Aufruf (`k-playbook context`, davor der Wrapper) — auch
+	// dann, wenn sich sein Ende nicht bestimmen lässt und ein Lauf ihn
+	// deshalb stehen lässt (Hint). Ob ein Lauf ihn ersetzt, sagt
+	// AnstossRefreshable.
 	HasOutdatedAnstoss bool `json:"hasOutdatedAnstoss,omitempty"`
+	// AnstossRefreshable: das nächste Einrichten, der nächste Start oder
+	// `k-playbook upgrade` ersetzt den veralteten Anstoß — sein Ende ist
+	// bestimmt. Nie ohne HasOutdatedAnstoss.
+	AnstossRefreshable bool `json:"anstossRefreshable,omitempty"`
 	// ObsoleteBlocks nennt die abgelösten Zusatzblöcke, die noch darin
-	// stehen (Session-Memory-Block, Befunde-Block). Ihr Inhalt kommt mit dem
-	// Briefing; sie werden beim nächsten Einrichten, Start oder
-	// `k-playbook upgrade` entfernt.
+	// stehen (Session-Memory-Block, Befunde-Block), erkannt am Marker — auch
+	// die, deren Ende sich nicht bestimmen lässt und die ein Lauf deshalb
+	// stehen lässt (Hint). Ihr Inhalt kommt mit dem Briefing.
 	ObsoleteBlocks []string `json:"obsoleteBlocks,omitempty"`
+	// RemovableBlocks sind die Zusatzblöcke aus ObsoleteBlocks, die das
+	// nächste Einrichten, der nächste Start oder `k-playbook upgrade`
+	// entfernt — ihr Ende ist bestimmt. Der Rest steht im Hint.
+	RemovableBlocks []string `json:"removableBlocks,omitempty"`
 	// Hint nennt, was sich nicht von selbst nachziehen lässt: einen Block,
 	// dessen Ende sich nicht bestimmen ließ. Leer, wenn alles von selbst geht.
 	Hint string `json:"hint,omitempty"`
@@ -212,8 +225,10 @@ func CheckRootInstructions(projectDir string) RootInstructionsState {
 		_, replaced, err := replaceOutdatedInstructionsBlock(content)
 		// Ein unbestimmbares Blockende ändert nichts daran, dass der
 		// abgelöste Aufruf dasteht — nur daran, dass er sich nicht von
-		// selbst ersetzen lässt.
+		// selbst ersetzen lässt. Beides wird getrennt gemeldet, damit
+		// `upgrade --check` sagt, was ein Lauf täte, und nicht mehr.
 		state.HasOutdatedAnstoss = replaced || err != nil
+		state.AnstossRefreshable = replaced
 		if err != nil {
 			hints = append(hints, err)
 		}
@@ -223,7 +238,13 @@ func CheckRootInstructions(projectDir string) RootInstructionsState {
 			state.ObsoleteBlocks = append(state.ObsoleteBlocks, block.name)
 		}
 	}
-	if _, _, err := removeObsoleteRootBlocks(content); err != nil {
+	// Dieselbe Trennung bei den Zusatzblöcken: ObsoleteBlocks aus dem Marker,
+	// RemovableBlocks aus dem, was sich wirklich abgrenzen ließ.
+	_, removable, err := removeObsoleteRootBlocks(content)
+	if len(removable) > 0 {
+		state.RemovableBlocks = removable
+	}
+	if err != nil {
 		hints = append(hints, err)
 	}
 	if len(hints) > 0 {
@@ -282,25 +303,29 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 }
 
 // refreshRootInstructions zieht den Inhalt einer vorhandenen AGENTS.md nach:
-// ein fehlender Anstoß wird angehängt (nur mit appendAnstoss), ein veralteter
-// ersetzt, die abgelösten Zusatzblöcke werden entfernt. Das zweite Ergebnis
-// meldet, ob sich etwas geändert hat, das dritte sammelt die Hinweise auf
-// Blöcke, deren Ende sich nicht bestimmen ließ.
+// ein veralteter Anstoß wird ersetzt, die abgelösten Zusatzblöcke werden
+// entfernt, ein fehlender Anstoß wird angehängt (nur mit appendAnstoss). Das
+// zweite Ergebnis meldet, ob sich etwas geändert hat, das dritte sammelt die
+// Hinweise auf Blöcke, deren Ende sich nicht bestimmen ließ.
 //
-// Die Reihenfolge zählt: erst der Anstoß, dann die Zusatzblöcke. Eine Datei,
-// die nur die Zusatzblöcke trägt, bekommt so den Anstoß und verliert die
-// Blöcke in einem Lauf.
+// Die Reihenfolge zählt: Jede Blockgrenze wird auf dem Inhalt bestimmt, den
+// die Datei trägt — der Anstoß wird deshalb zuletzt angehängt, nachdem die
+// Zusatzblöcke abgegrenzt und entfernt sind. Hinge er zuerst, wäre sein Marker
+// (ein HTML-Kommentar) auf dem erweiterten Inhalt die Grenze eines lokal
+// abgewandelten Zusatzblocks, und Projektprosa ohne Überschrift dahinter ginge
+// mit dem Block verloren. So entspricht der Lauf dem, was
+// CheckRootInstructions auf dem Original ermittelt: Eine Datei, die nur die
+// Zusatzblöcke in bekannter Gestalt trägt, bekommt den Anstoß und verliert die
+// Blöcke in einem Lauf; ein abgewandelter Block bleibt samt Prosa stehen, mit
+// Hinweis, und der Anstoß kommt trotzdem dazu. Auch in jedem späteren Lauf
+// bleibt es dabei: Der dann auf der Platte stehende Anstoß ist für die
+// Zusatzblöcke keine Grenze (markedBlockEnd, wall).
 func refreshRootInstructions(content string, appendAnstoss bool) (string, bool, error) {
 	changed := false
 	hints := []error{}
+	hasMarker := strings.Contains(content, instructionsMarker)
 
-	switch {
-	case !strings.Contains(content, instructionsMarker):
-		if appendAnstoss {
-			content += "\n\n" + strings.TrimRight(instructionsBlock(), "\n")
-			changed = true
-		}
-	default:
+	if hasMarker {
 		// Der Marker steht — bisher war das gleichbedeutend mit „nichts zu
 		// tun". Ein Bestandsprojekt behielt damit dauerhaft den abgelösten
 		// Aufruf, und der Git-Update-Weg erreicht die Datei nicht: sie liegt
@@ -321,6 +346,18 @@ func refreshRootInstructions(content string, appendAnstoss bool) (string, bool, 
 	}
 	if len(removed) > 0 {
 		content = cleaned
+		changed = true
+	}
+
+	if !hasMarker && appendAnstoss {
+		block := strings.TrimRight(instructionsBlock(), "\n")
+		if strings.TrimSpace(content) == "" {
+			// Nichts davor — etwa, weil die Datei nur die Zusatzblöcke trug:
+			// dann beginnt sie mit dem Anstoß, nicht mit einem leeren Absatz.
+			content = block
+		} else {
+			content += "\n\n" + block
+		}
 		changed = true
 	}
 	return content, changed, errors.Join(hints...)
@@ -430,7 +467,7 @@ func removeObsoleteRootBlocks(content string) (string, []string, error) {
 		}
 		end, bounded := markedBlockEnd(lines, start, func(lines []string, start int) (int, bool) {
 			return knownBlockEnd(lines, start, block.lines, "")
-		})
+		}, instructionsMarker)
 		if !bounded {
 			hints = append(hints, block.errEndeUnbestimmt())
 			continue
@@ -544,7 +581,7 @@ func instructionsBlockStart(lines []string) int {
 // instructionsBlockEnd grenzt den Anstoßblock nach hinten ab; die Regel steht
 // bei markedBlockEnd, die bekannte Gestalt sind die abgelösten Fassungen.
 func instructionsBlockEnd(lines []string, start int) (int, bool) {
-	return markedBlockEnd(lines, start, knownInstructionsBlockEnd)
+	return markedBlockEnd(lines, start, knownInstructionsBlockEnd, "")
 }
 
 // markedBlockEnd grenzt einen von k-playbook geschriebenen Block — Anstoß,
@@ -562,7 +599,11 @@ func instructionsBlockEnd(lines []string, start int) (int, bool) {
 // einen Marker und genau eine Überschrift; die nächste Überschrift oder der
 // nächste HTML-Kommentar — etwa der Marker des nächsten Blocks — beginnt
 // bereits etwas anderes. Leerzeilen davor bleiben außerhalb, damit die
-// Trennung zum Folgeabschnitt beim Ersetzen erhalten bleibt.
+// Trennung zum Folgeabschnitt beim Ersetzen erhalten bleibt. Eine Zeile, die
+// wall trägt (nicht leer), ist davon ausgenommen: Sie ist keine Grenze, sondern
+// beendet die Suche als unbestimmt. Für die Zusatzblöcke ist das der
+// Anstoßmarker — ein Anstoß hinter einem Zusatzblock wurde nachträglich
+// angehängt und sagt nichts darüber, wo der Block endet.
 //
 // Findet keiner der beiden Wege eine Grenze, ist das Ergebnis **nicht** das
 // Dateiende. Genau diese Annahme verwarf früher Projekt-Prosa, die ohne eigene
@@ -570,7 +611,7 @@ func instructionsBlockEnd(lines []string, start int) (int, bool) {
 // der vermeintlichen Grenzen und verschwand beim Ersetzen — still, denn
 // gemeldet wurde nur „korrigiert". Alles, was ein Projekt hinter den Block
 // geschrieben hat, bleibt so unangetastet.
-func markedBlockEnd(lines []string, start int, known func([]string, int) (int, bool)) (int, bool) {
+func markedBlockEnd(lines []string, start int, known func([]string, int) (int, bool), wall string) (int, bool) {
 	if end, ok := known(lines, start); ok {
 		return end, true
 	}
@@ -578,6 +619,9 @@ func markedBlockEnd(lines []string, start int, known func([]string, int) (int, b
 	headings := 0
 	for i := start + 1; i < len(lines); i++ {
 		trimmed := strings.TrimSpace(lines[i])
+		if wall != "" && strings.Contains(trimmed, wall) {
+			return 0, false
+		}
 		boundary := strings.HasPrefix(trimmed, "<!--")
 		if strings.HasPrefix(trimmed, "#") {
 			headings++
