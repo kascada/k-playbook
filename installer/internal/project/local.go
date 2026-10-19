@@ -203,8 +203,9 @@ func LocalStructure() []LocalEntry {
 				"Reihenfolge bleiben erhalten. Ohne Einträge gelten die Standardquellen unterhalb\n" +
 				"der Projektwurzel.\n\n" +
 				"Sie wird beim Einrichten als gültige, leere Konfiguration angelegt — nicht erst beim\n" +
-				"ersten Lauf des Sammlers —, damit ihr Zustand in `k-playbook context` von Anfang an\n" +
-				"eine Antwort hat. Vollständige Beschreibung: " + PlaybookDirName + "/docs/version-inventory.md.",
+				"ersten Lauf des Sammlers —, damit ihr Zustand im Briefing (`k-playbook briefing`,\n" +
+				"Feld `versionSources`) von Anfang an eine Antwort hat. Vollständige Beschreibung:\n" +
+				PlaybookDirName + "/docs/version-inventory.md.",
 		},
 	}
 }

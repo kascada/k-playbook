@@ -45,43 +45,17 @@ type updateResponse struct {
 	Busy bool `json:"busy,omitempty"`
 }
 
-// programStatus ist der Vergleich des laufenden Programms mit dem Clone.
-type programStatus struct {
-	// Running ist die Version dieses Dienstes, Clone die VERSION der
-	// Installation.
-	Running string `json:"running"`
-	Clone   string `json:"clone"`
-	// Order ist das Ergebnis des Vergleichs: älter, gleich, neuer, unbekannt.
-	Order string `json:"order"`
-	// Outdated: das laufende Programm ist älter als der Clone. Nur das löst
-	// eine Meldung aus.
-	Outdated bool `json:"outdated"`
-	// Installable: `k-playbook` im PATH zeigt auf das Installationsziel. Nur
-	// dann gibt es den Knopf; sonst steht Hint da, mit beiden Pfaden.
-	Installable bool   `json:"installable"`
-	Target      string `json:"target,omitempty"`
-	Found       string `json:"found,omitempty"`
-	Hint        string `json:"hint,omitempty"`
-}
+// programStatus ist der Vergleich des laufenden Programms mit dem Clone. Die
+// Prüfung liegt in program.CheckStatus, weil `k-playbook upgrade` dieselbe
+// braucht; hier bleibt der Name, den die Seite kennt.
+type programStatus = program.Status
 
 // checkProgram vergleicht die Version dieses Dienstes mit der VERSION des
 // Clones — die gemeinsame Prüfung für GET /api/update, den Versionswechsel im
-// POST und POST /api/update/program.
-//
-// Nur „älter" meldet. Gleich oder neuer ist im Entwicklungsrepo nach
-// `make dev-install` der Normalfall, und eine nicht lesbare Version ist kein
-// Nachweis. Den PATH prüft sie nur, wenn es etwas anzubieten gäbe.
+// POST und POST /api/update/program. Nur „älter" meldet; Begründung bei
+// program.CheckStatus.
 func checkProgram(running string, playbookDir string) *programStatus {
-	clone := project.InstalledVersion(playbookDir)
-	order := program.Compare(running, clone)
-	status := &programStatus{Running: running, Clone: clone, Order: order.String(), Outdated: order == program.Older}
-	if !status.Outdated {
-		return status
-	}
-	path := program.CheckPath()
-	status.Target, status.Found, status.Installable = path.Target, path.Found, path.OK
-	status.Hint = path.Hint()
-	return status
+	return program.CheckStatus(running, playbookDir)
 }
 
 // updateCheckHandler prüft den Remote-Stand und das laufende Programm. Rein
@@ -220,12 +194,13 @@ func restartAfterPull(running string, result project.UpdateResult) bool {
 // registriert, wäre halb erledigt — und zwar unsichtbar.
 //
 // Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß ApplyLinks.
-// Zwei Änderungen an diesem Einstieg sind gewollt und stehen deshalb im
+// Drei Änderungen an diesem Einstieg sind gewollt und stehen deshalb im
 // Antworttext: das Aktualisieren bringt jetzt den Anstoß mit — der Marker macht
-// das idempotent und überschreibt vorhandenen Inhalt nie —, und in einem
-// Projekt ohne AGENTS.md legt es die Datei erstmals aus der Vorlage an. Sonst
-// bliebe ein Projekt mit nur echter CLAUDE.md über „Aktualisieren" für immer
-// unverändert.
+// das idempotent und überschreibt vorhandenen Inhalt nie —, es zieht einen
+// veralteten Anstoß nach und entfernt die abgelösten Zusatzblöcke
+// (describeSetup), und in einem Projekt ohne AGENTS.md legt es die Datei
+// erstmals aus der Vorlage an. Sonst bliebe ein Projekt mit nur echter
+// CLAUDE.md über „Aktualisieren" für immer unverändert.
 //
 // Ein Fehler dabei lässt das Update selbst gültig: der Pull ist durch, und
 // die Verlinkung kann über die Assistenten-Karte nachgeholt werden.

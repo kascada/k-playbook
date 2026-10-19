@@ -16,50 +16,92 @@ const RootInstructionsFile = "AGENTS.md"
 // würde ein zweiter Lauf den Block ein zweites Mal anhängen.
 const instructionsMarker = "<!-- k-playbook:anstoss -->"
 
-// legacyInstructionsCommand ist der Aufruf, den der abgelöste Anstoßblock
-// nannte: der projekteigene Wrapper unterhalb der Installation.
+// legacyInstructionsBlock ist eine abgelöste Fassung des Anstoßblocks: der
+// Aufruf, an dem sie erkannt wird, und ihre Zeilen, so wie sie ausgeliefert
+// wurde.
 //
-// Er ist die enge Definition von „veraltet" für den Block — dieselbe Enge wie
-// bei der MCP-Registrierung. Nur ein Block, der diesen Aufruf noch trägt, wird
-// von selbst ersetzt; jede andere Fassung gehört dem Projekt und bleibt stehen.
-// Der Teilpfad und nicht der ganze Wrapper-Pfad, damit auch eine Fassung
-// trifft, die eine andere Verzeichnisebene davorgeschrieben hat.
+// Der Aufruf ist die enge Definition von „veraltet" für den Block — dieselbe
+// Enge wie bei der MCP-Registrierung. Nur ein Block, der einen abgelösten
+// Aufruf noch trägt, wird von selbst ersetzt; jede andere Fassung gehört dem
+// Projekt und bleibt stehen.
 //
-// Die Datei `bin/k-playbook` gibt es im Quell-Repo nicht mehr; diese Konstante
-// bleibt trotzdem — sie ist es, die Bestandsprojekte von ihr weg migriert.
-const legacyInstructionsCommand = "/bin/k-playbook context"
-
-// legacyInstructionsCommandLine markiert in legacyInstructionsBlockLines die
-// eine Zeile, die variieren darf: den Aufruf. Erkannt wird sie über
-// legacyInstructionsCommand und nicht wörtlich, damit auch eine Fassung trifft,
-// die eine weitere Verzeichnisebene davorgeschrieben hat. Der Wert kann in
-// einer Markdown-Datei nicht vorkommen.
-const legacyInstructionsCommandLine = "\x00aufruf\x00"
-
-// legacyInstructionsBlockLines ist der abgelöste Anstoßblock, Zeile für Zeile,
-// so wie er ausgeliefert wurde.
-//
-// Bewusst eine eigene Kopie und nicht aus instructionsBlock() abgeleitet: der
-// abgelöste Block ist Geschichte und ändert sich nicht mehr, der aktuelle darf
-// sich jederzeit ändern. Nur so bleibt er als Grenze verlässlich.
-//
-// Genau darin liegt sein Nutzen: passt er, ist das Ende des Blocks positiv
-// bestimmt — auch dann, wenn dahinter Projekt-Prosa ohne eigene Überschrift
-// steht, die sonst nichts vom Block trennt.
-var legacyInstructionsBlockLines = []string{
-	instructionsMarker,
-	"## k-playbook",
-	"",
-	"Für dieses Projekt gilt k-playbook. Rufe zu Beginn",
-	"",
-	legacyInstructionsCommandLine,
-	"",
-	"auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,",
-	"bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und",
-	"die effektiven Kataloge für Regeln, Reviews und Checks.",
+// Die Zeilen sind bewusst eine eigene Kopie und nicht aus instructionsBlock()
+// abgeleitet: eine abgelöste Fassung ist Geschichte und ändert sich nicht
+// mehr, die aktuelle darf sich jederzeit ändern. Nur so bleibt sie als Grenze
+// verlässlich. Genau darin liegt ihr Nutzen: passt sie, ist das Ende des
+// Blocks positiv bestimmt — auch dann, wenn dahinter Projekt-Prosa ohne eigene
+// Überschrift steht, die sonst nichts vom Block trennt.
+type legacyInstructionsBlock struct {
+	command string
+	lines   []string
 }
 
-// errAnstossEndeUnbestimmt meldet den einen Fall, in dem der abgelöste Aufruf
+// legacyInstructionsCommandLine markiert in den Zeilen einer abgelösten
+// Fassung die eine Zeile, die variieren darf: den Aufruf. Erkannt wird sie
+// über den Aufruf der Fassung und nicht wörtlich, damit auch eine Fassung
+// trifft, die eine weitere Verzeichnisebene davorgeschrieben hat. Der Wert
+// kann in einer Markdown-Datei nicht vorkommen.
+const legacyInstructionsCommandLine = "\x00aufruf\x00"
+
+// legacyInstructionsBlocks sind die abgelösten Fassungen des Anstoßblocks, die
+// älteste zuerst.
+//
+// Die erste nannte den projekteigenen Wrapper unterhalb der Installation
+// (`k-playbook/bin/k-playbook context`); erkannt wird der Teilpfad und nicht
+// der ganze Wrapper-Pfad, damit auch eine Fassung trifft, die eine andere
+// Verzeichnisebene davorgeschrieben hat. Die Datei `bin/k-playbook` gibt es im
+// Quell-Repo nicht mehr; die Fassung bleibt trotzdem — sie ist es, die
+// Bestandsprojekte von ihr weg migriert.
+//
+// Die zweite nannte das installierte Programm mit `k-playbook context` und
+// verlangte, die Dateien aus `instructions` zu lesen. Beides kommt seit dem
+// Briefing mit einem Aufruf; die aktuelle Fassung (instructionsBlock) nennt
+// deshalb `k-playbook briefing`.
+var legacyInstructionsBlocks = []legacyInstructionsBlock{
+	{
+		command: "/bin/" + InstalledCommandName + " context",
+		lines: []string{
+			instructionsMarker,
+			"## k-playbook",
+			"",
+			"Für dieses Projekt gilt k-playbook. Rufe zu Beginn",
+			"",
+			legacyInstructionsCommandLine,
+			"",
+			"auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,",
+			"bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und",
+			"die effektiven Kataloge für Regeln, Reviews und Checks.",
+		},
+	},
+	{
+		command: InstalledCommandName + " context",
+		lines: []string{
+			instructionsMarker,
+			"## k-playbook",
+			"",
+			"Für dieses Projekt gilt k-playbook. Rufe zu Beginn",
+			"",
+			legacyInstructionsCommandLine,
+			"",
+			"auf und lies die Dateien aus `instructions` in der angegebenen Reihenfolge,",
+			"bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und",
+			"die effektiven Kataloge für Regeln, Reviews und Checks.",
+		},
+	},
+}
+
+// hasLegacyInstructionsCommand meldet, ob text den Aufruf einer abgelösten
+// Fassung trägt.
+func hasLegacyInstructionsCommand(text string) bool {
+	for _, block := range legacyInstructionsBlocks {
+		if strings.Contains(text, block.command) {
+			return true
+		}
+	}
+	return false
+}
+
+// errAnstossEndeUnbestimmt meldet den einen Fall, in dem ein abgelöster Aufruf
 // dasteht, das Ende des Blocks sich aber nicht bestimmen lässt.
 //
 // Ersetzt wird dann nichts. Eine Grenze zu raten hieße, bis zum Dateiende zu
@@ -67,17 +109,56 @@ var legacyInstructionsBlockLines = []string{
 // die einzige ehrliche Antwort.
 var errAnstossEndeUnbestimmt = errors.New("das Ende des veralteten Anstoßblocks in " +
 	RootInstructionsFile + " ließ sich nicht bestimmen; die Datei bleibt unangetastet." +
-	" Den Block bitte von Hand auf `" + InstalledCommandName + " context` umstellen.")
+	" Den Block bitte von Hand auf `" + InstalledCommandName + " briefing` umstellen.")
 
-// sessionMemoryMarker hält den nachträglich ergänzten Docs-first-Block vom
-// allgemeinen k-playbook-Anstoß getrennt. So erhalten Bestandsprojekte die
-// neue Regel, ohne ihren vorhandenen Anstoß doppelt zu bekommen.
+// sessionMemoryMarker trug den Docs-first-Block, den die Vorlage bis zum
+// Briefing hinter dem Anstoß mitbrachte. Sein Inhalt kommt seither als
+// `instructions/always/100-…` mit dem Briefing; der Marker bleibt, weil an ihm
+// der Block in Bestandsprojekten erkannt und entfernt wird.
 const sessionMemoryMarker = "<!-- k-playbook:session-memory -->"
 
-// findingsMarker hält den Befunde-Block von den beiden anderen getrennt. Wie
-// beim Session-Memory-Block bekommen Bestandsprojekte die neue Regel dadurch
-// nachgereicht, ohne ihren vorhandenen Anstoß ein zweites Mal zu erhalten.
+// findingsMarker trug den Befunde-Block, den dritten Block der alten Vorlage.
+// Wie der Session-Memory-Block ist er abgelöst — sein Inhalt ist
+// `instructions/always/200-…` — und wird an seinem Marker erkannt und entfernt.
 const findingsMarker = "<!-- k-playbook:befunde -->"
+
+// obsoleteRootBlock ist einer der zwei Zusatzblöcke, die die Vorlage bis zum
+// Briefing an den Anstoß hängte und die seither mit dem Briefing kommen.
+//
+// Erkannt wird er am Marker; seine Grenze wird wie beim Anstoßblock bestimmt:
+// die bekannte Gestalt Zeile für Zeile, sonst die nächste Überschrift oder der
+// nächste HTML-Kommentar, nie das Dateiende. Ein lokal abgewandelter Block ohne
+// Grenze bleibt stehen, mit Hinweis.
+type obsoleteRootBlock struct {
+	// name benennt den Block in Meldungen.
+	name   string
+	marker string
+	// lines ist die Gestalt, in der er ausgeliefert wurde.
+	lines []string
+}
+
+// obsoleteRootBlocks sind die zwei Zusatzblöcke in der Reihenfolge der alten
+// Vorlage. Der Befunde-Block war ihr letzter: steht dahinter Projekt-Prosa ohne
+// Überschrift, bestimmt die bekannte Gestalt seine Grenze trotzdem.
+var obsoleteRootBlocks = []obsoleteRootBlock{
+	{name: "Session-Memory-Block", marker: sessionMemoryMarker, lines: blockLines(sessionMemoryBlock())},
+	{name: "Befunde-Block", marker: findingsMarker, lines: blockLines(findingsBlock())},
+}
+
+// blockLines zerlegt einen Block in seine Zeilen ohne den Zeilenumbruch am
+// Ende.
+func blockLines(block string) []string {
+	return strings.Split(strings.TrimRight(block, "\n"), "\n")
+}
+
+// errEndeUnbestimmt meldet, dass der Block dasteht, sein Ende sich aber nicht
+// bestimmen lässt. Entfernt wird dann nichts — aus demselben Grund wie beim
+// Anstoßblock (errAnstossEndeUnbestimmt).
+func (b obsoleteRootBlock) errEndeUnbestimmt() error {
+	return errors.New("das Ende des abgelösten " + b.name + "s in " + RootInstructionsFile +
+		" ließ sich nicht bestimmen; der Block bleibt stehen. Sein Inhalt kommt mit dem Briefing;" +
+		" den Block bitte von Hand entfernen.")
+}
 
 // RootInstructionsState ist der Zustand der Wurzeldatei.
 type RootInstructionsState struct {
@@ -86,10 +167,18 @@ type RootInstructionsState struct {
 	Present bool `json:"present"`
 	// HasMarker: der Anstoß steht bereits darin.
 	HasMarker bool `json:"hasMarker"`
-	// HasOutdatedAnstoss: der Anstoß steht darin, ruft aber noch den
-	// abgelösten Wrapper auf. Er wird beim nächsten Einrichten oder Start
-	// ersetzt.
+	// HasOutdatedAnstoss: der Anstoß steht darin, trägt aber noch einen
+	// abgelösten Aufruf (`k-playbook context`, davor der Wrapper). Er wird
+	// beim nächsten Einrichten, Start oder `k-playbook upgrade` ersetzt.
 	HasOutdatedAnstoss bool `json:"hasOutdatedAnstoss,omitempty"`
+	// ObsoleteBlocks nennt die abgelösten Zusatzblöcke, die noch darin
+	// stehen (Session-Memory-Block, Befunde-Block). Ihr Inhalt kommt mit dem
+	// Briefing; sie werden beim nächsten Einrichten, Start oder
+	// `k-playbook upgrade` entfernt.
+	ObsoleteBlocks []string `json:"obsoleteBlocks,omitempty"`
+	// Hint nennt, was sich nicht von selbst nachziehen lässt: einen Block,
+	// dessen Ende sich nicht bestimmen ließ. Leer, wenn alles von selbst geht.
+	Hint string `json:"hint,omitempty"`
 }
 
 // OK meldet, ob nichts mehr zu tun ist. CLAUDE.md gehört nicht dazu: die
@@ -99,29 +188,55 @@ func (s RootInstructionsState) OK() bool {
 	return s.Present && s.HasMarker
 }
 
+// NeedsRefresh meldet, ob ein Lauf von Einrichten, Start oder Upgrade an der
+// Datei etwas nachzöge — oder es versuchte und am Hinweis scheiterte.
+func (s RootInstructionsState) NeedsRefresh() bool {
+	return s.HasOutdatedAnstoss || len(s.ObsoleteBlocks) > 0
+}
+
 // CheckRootInstructions prüft, ohne etwas zu verändern.
 func CheckRootInstructions(projectDir string) RootInstructionsState {
 	path := filepath.Join(projectDir, RootInstructionsFile)
 	state := RootInstructionsState{Path: path}
 
-	if data, err := os.ReadFile(path); err == nil {
-		state.Present = true
-		state.HasMarker = strings.Contains(string(data), instructionsMarker)
-		if state.HasMarker {
-			_, replaced, err := replaceOutdatedInstructionsBlock(strings.TrimRight(string(data), "\n"))
-			// Ein unbestimmbares Blockende ändert nichts daran, dass der
-			// abgelöste Aufruf dasteht — nur daran, dass er sich nicht von
-			// selbst ersetzen lässt.
-			state.HasOutdatedAnstoss = replaced || err != nil
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return state
+	}
+	state.Present = true
+	content := strings.TrimRight(string(data), "\n")
+	state.HasMarker = strings.Contains(content, instructionsMarker)
+
+	hints := []error{}
+	if state.HasMarker {
+		_, replaced, err := replaceOutdatedInstructionsBlock(content)
+		// Ein unbestimmbares Blockende ändert nichts daran, dass der
+		// abgelöste Aufruf dasteht — nur daran, dass er sich nicht von
+		// selbst ersetzen lässt.
+		state.HasOutdatedAnstoss = replaced || err != nil
+		if err != nil {
+			hints = append(hints, err)
 		}
+	}
+	for _, block := range obsoleteRootBlocks {
+		if strings.Contains(content, block.marker) {
+			state.ObsoleteBlocks = append(state.ObsoleteBlocks, block.name)
+		}
+	}
+	if _, _, err := removeObsoleteRootBlocks(content); err != nil {
+		hints = append(hints, err)
+	}
+	if len(hints) > 0 {
+		state.Hint = errors.Join(hints...).Error()
 	}
 	return state
 }
 
-// ApplyRootInstructions legt die Wurzeldatei an oder ergänzt sie.
+// ApplyRootInstructions legt die Wurzeldatei an oder zieht sie nach.
 //
 // Eine vorhandene Datei wird nie überschrieben — sie gehört dem Projekt. Der
-// Anstoß wird angehängt und per Marker gegen Dopplung geschützt.
+// Anstoß wird angehängt und per Marker gegen Dopplung geschützt; ein
+// veralteter Anstoß wird ersetzt, die abgelösten Zusatzblöcke werden entfernt.
 func ApplyRootInstructions(projectDir string) (RootInstructionsState, error) {
 	return applyRootInstructions(projectDir, true)
 }
@@ -135,13 +250,12 @@ func ApplyRootInstructions(projectDir string) (RootInstructionsState, error) {
 // dort ankommt. Das Anlegen dagegen erzeugte neben dem echten Inhalt eine
 // zweite, fast leere Instruktionsquelle — und folgte bei einem Rest-Link sogar
 // dessen totem Ziel, weil os.WriteFile den Link öffnet.
+//
+// Der zurückgegebene Fehler ist ein Hinweis, kein Abbruch: ein Block steht da,
+// lässt sich aber nicht abgrenzen. Er hält das Einrichten nicht auf — alles
+// Übrige gehört trotzdem getan —, darf aber auch nicht untergehen.
 func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsState, error) {
 	path := filepath.Join(projectDir, RootInstructionsFile)
-
-	// hint trägt den Fall, in dem der abgelöste Block dasteht, aber nicht
-	// abgegrenzt werden kann. Er hält das Einrichten nicht auf — alles Übrige
-	// gehört trotzdem getan —, darf aber auch nicht untergehen.
-	var hint error
 
 	data, err := os.ReadFile(path)
 	switch {
@@ -152,60 +266,85 @@ func applyRootInstructions(projectDir string, mayCreate bool) (RootInstructionsS
 		if err := os.WriteFile(path, []byte(rootInstructionsTemplate()), 0o644); err != nil {
 			return CheckRootInstructions(projectDir), fmt.Errorf("%s anlegen: %w", RootInstructionsFile, err)
 		}
+		return CheckRootInstructions(projectDir), nil
 
 	case err != nil:
 		return CheckRootInstructions(projectDir), fmt.Errorf("%s lesen: %w", RootInstructionsFile, err)
-
-	default:
-		content := strings.TrimRight(string(data), "\n")
-		changed := false
-		switch {
-		case !strings.Contains(content, instructionsMarker):
-			content += "\n\n" + instructionsBlock()
-			changed = true
-		default:
-			// Der Marker steht — bisher war das gleichbedeutend mit „nichts zu
-			// tun". Ein Bestandsprojekt behielt damit dauerhaft den Aufruf des
-			// abgelösten Wrappers, und der Git-Update-Weg erreicht die Datei
-			// nicht: sie liegt im Hauptverzeichnis, nicht im Clone.
-			replaced, ok, err := replaceOutdatedInstructionsBlock(content)
-			if err != nil {
-				hint = err
-			}
-			if ok {
-				content = replaced
-				changed = true
-			}
-		}
-		if !strings.Contains(content, sessionMemoryMarker) {
-			content += "\n\n" + sessionMemoryBlock()
-			changed = true
-		}
-		if !strings.Contains(content, findingsMarker) {
-			content += "\n\n" + findingsBlock()
-			changed = true
-		}
-		if changed {
-			content += "\n"
-		}
-		if changed {
-			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-				return CheckRootInstructions(projectDir), fmt.Errorf("%s ergänzen: %w", RootInstructionsFile, err)
-			}
-		}
 	}
 
+	content, changed, hint := refreshRootInstructions(strings.TrimRight(string(data), "\n"), true)
+	if changed {
+		if err := os.WriteFile(path, []byte(content+"\n"), 0o644); err != nil {
+			return CheckRootInstructions(projectDir), fmt.Errorf("%s nachziehen: %w", RootInstructionsFile, err)
+		}
+	}
 	return CheckRootInstructions(projectDir), hint
 }
 
+// refreshRootInstructions zieht den Inhalt einer vorhandenen AGENTS.md nach:
+// ein fehlender Anstoß wird angehängt (nur mit appendAnstoss), ein veralteter
+// ersetzt, die abgelösten Zusatzblöcke werden entfernt. Das zweite Ergebnis
+// meldet, ob sich etwas geändert hat, das dritte sammelt die Hinweise auf
+// Blöcke, deren Ende sich nicht bestimmen ließ.
+//
+// Die Reihenfolge zählt: erst der Anstoß, dann die Zusatzblöcke. Eine Datei,
+// die nur die Zusatzblöcke trägt, bekommt so den Anstoß und verliert die
+// Blöcke in einem Lauf.
+func refreshRootInstructions(content string, appendAnstoss bool) (string, bool, error) {
+	changed := false
+	hints := []error{}
+
+	switch {
+	case !strings.Contains(content, instructionsMarker):
+		if appendAnstoss {
+			content += "\n\n" + strings.TrimRight(instructionsBlock(), "\n")
+			changed = true
+		}
+	default:
+		// Der Marker steht — bisher war das gleichbedeutend mit „nichts zu
+		// tun". Ein Bestandsprojekt behielt damit dauerhaft den abgelösten
+		// Aufruf, und der Git-Update-Weg erreicht die Datei nicht: sie liegt
+		// im Hauptverzeichnis, nicht im Clone.
+		replaced, ok, err := replaceOutdatedInstructionsBlock(content)
+		if err != nil {
+			hints = append(hints, err)
+		}
+		if ok {
+			content = replaced
+			changed = true
+		}
+	}
+
+	cleaned, removed, err := removeObsoleteRootBlocks(content)
+	if err != nil {
+		hints = append(hints, err)
+	}
+	if len(removed) > 0 {
+		content = cleaned
+		changed = true
+	}
+	return content, changed, errors.Join(hints...)
+}
+
 // RootInstructionsRepair nennt, was der Auffangweg beim Start an AGENTS.md
-// getan hat. Beides zugleich ist unmöglich: ersetzt wird in einer vorhandenen
-// Datei, angelegt wird eine fehlende.
+// getan hat. Angelegt wird nur eine fehlende Datei, ersetzt und entfernt nur in
+// einer vorhandenen; Created schließt die anderen beiden deshalb aus.
 type RootInstructionsRepair struct {
 	// Refreshed: ein veralteter Anstoßblock wurde ersetzt.
 	Refreshed bool
+	// RemovedBlocks nennt die abgelösten Zusatzblöcke, die entfernt wurden.
+	RemovedBlocks []string
 	// Created: die Datei fehlte ganz und wurde aus der Vorlage angelegt.
 	Created bool
+	// BlocksWithoutAnstoss: die Datei trägt abgelöste Zusatzblöcke, aber
+	// keinen Anstoßmarker. Der Start fasst eine Datei ohne Anstoß nicht an
+	// und meldet das nur; Einrichten und `k-playbook upgrade` ziehen nach.
+	BlocksWithoutAnstoss bool
+}
+
+// Changed meldet, ob der Auffangweg geschrieben hat.
+func (r RootInstructionsRepair) Changed() bool {
+	return r.Refreshed || len(r.RemovedBlocks) > 0 || r.Created
 }
 
 // RepairRootInstructions ist der Auffangweg beim Start, das Gegenstück zu
@@ -215,18 +354,22 @@ type RootInstructionsRepair struct {
 //
 // Genau zwei Fälle, beide idempotent:
 //
-//   - Die Datei steht und ihr Anstoßblock ruft noch den abgelösten Wrapper
-//     auf: der Block wird ersetzt — eine Reparatur an Inhalt, den k-playbook
-//     selbst geschrieben hat, unabhängig davon, ob die Datei versioniert ist.
+//   - Die Datei steht und trägt den Anstoßmarker: ein Anstoßblock mit
+//     abgelöstem Aufruf wird ersetzt, die abgelösten Zusatzblöcke
+//     (Session-Memory, Befunde) werden entfernt — Reparaturen an Inhalt, den
+//     k-playbook selbst geschrieben hat, unabhängig davon, ob die Datei
+//     versioniert ist. Das ist die Regel der Startwege
+//     (k-playbook-local/docs/manual/assistenten-verlinkung.md).
 //   - Die Datei fehlt ganz und die Einordnung des Paars CLAUDE.md/AGENTS.md
 //     kennt weder Konflikt noch etwas zu verschieben: sie entsteht aus der
 //     Vorlage (createRootInstructions). Es gibt dann nichts zu überschreiben
 //     und keine Entscheidung zu übergehen.
 //
-// Alles Übrige bleibt dem Einrichten über ApplyRootInstructions: ein fehlender
-// Anstoß in einer vorhandenen Datei wird nicht ergänzt, der Session-Memory-
-// und der Befunde-Block nicht nachgetragen, eine echte CLAUDE.md nicht
-// umbenannt, kein opencode.json angefasst.
+// Alles Übrige bleibt dem Einrichten über ApplyRootInstructions und
+// `k-playbook upgrade`: eine vorhandene Datei ohne Anstoßmarker wird nicht
+// angefasst — trägt sie die Zusatzblöcke, wird das nur gemeldet
+// (BlocksWithoutAnstoss) —, eine echte CLAUDE.md nicht umbenannt, kein
+// opencode.json angefasst.
 func RepairRootInstructions(projectDir string) (RootInstructionsRepair, error) {
 	path := filepath.Join(projectDir, RootInstructionsFile)
 
@@ -241,17 +384,86 @@ func RepairRootInstructions(projectDir string) (RootInstructionsRepair, error) {
 	}
 
 	content := strings.TrimRight(string(data), "\n")
-	replaced, ok, err := replaceOutdatedInstructionsBlock(content)
-	if err != nil {
-		return RootInstructionsRepair{}, err
+	if !strings.Contains(content, instructionsMarker) {
+		return RootInstructionsRepair{BlocksWithoutAnstoss: hasObsoleteRootBlocks(content)}, nil
 	}
-	if !ok {
-		return RootInstructionsRepair{}, nil
+
+	before := content
+	content, changed, hint := refreshRootInstructions(content, false)
+	if !changed {
+		return RootInstructionsRepair{}, hint
 	}
-	if err := os.WriteFile(path, []byte(replaced+"\n"), 0o644); err != nil {
-		return RootInstructionsRepair{}, fmt.Errorf("%s auffrischen: %w", RootInstructionsFile, err)
+	if err := os.WriteFile(path, []byte(content+"\n"), 0o644); err != nil {
+		return RootInstructionsRepair{}, errors.Join(hint, fmt.Errorf("%s auffrischen: %w", RootInstructionsFile, err))
 	}
-	return RootInstructionsRepair{Refreshed: true}, nil
+
+	repair := RootInstructionsRepair{}
+	_, repair.Refreshed, _ = replaceOutdatedInstructionsBlock(before)
+	_, repair.RemovedBlocks, _ = removeObsoleteRootBlocks(before)
+	return repair, hint
+}
+
+// hasObsoleteRootBlocks meldet, ob content einen der abgelösten Zusatzblöcke
+// trägt.
+func hasObsoleteRootBlocks(content string) bool {
+	for _, block := range obsoleteRootBlocks {
+		if strings.Contains(content, block.marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// removeObsoleteRootBlocks entfernt die abgelösten Zusatzblöcke samt Marker
+// und den Leerzeilen davor, so dass kein doppelter Absatz bleibt. Das zweite
+// Ergebnis nennt die entfernten Blöcke, das dritte sammelt die Hinweise auf
+// Blöcke, deren Ende sich nicht bestimmen ließ — die bleiben stehen.
+func removeObsoleteRootBlocks(content string) (string, []string, error) {
+	lines := strings.Split(content, "\n")
+	removed := []string{}
+	hints := []error{}
+
+	for _, block := range obsoleteRootBlocks {
+		start := markerLine(lines, block.marker)
+		if start < 0 {
+			continue
+		}
+		end, bounded := markedBlockEnd(lines, start, func(lines []string, start int) (int, bool) {
+			return knownBlockEnd(lines, start, block.lines, "")
+		})
+		if !bounded {
+			hints = append(hints, block.errEndeUnbestimmt())
+			continue
+		}
+
+		cut := start
+		for cut > 0 && strings.TrimSpace(lines[cut-1]) == "" {
+			cut--
+		}
+		if cut == 0 {
+			// Am Dateianfang gibt es nichts davor; dann gehen die Leerzeilen
+			// dahinter mit, sonst begänne die Datei mit einem leeren Absatz.
+			for end < len(lines) && strings.TrimSpace(lines[end]) == "" {
+				end++
+			}
+		}
+		kept := make([]string, 0, len(lines)-(end-cut))
+		kept = append(kept, lines[:cut]...)
+		kept = append(kept, lines[end:]...)
+		lines = kept
+		removed = append(removed, block.name)
+	}
+	return strings.Join(lines, "\n"), removed, errors.Join(hints...)
+}
+
+// markerLine meldet die Zeile, die marker trägt, sonst -1.
+func markerLine(lines []string, marker string) int {
+	for i, line := range lines {
+		if strings.Contains(line, marker) {
+			return i
+		}
+	}
+	return -1
 }
 
 // createRootInstructions legt eine ganz fehlende AGENTS.md aus der Vorlage an
@@ -291,10 +503,10 @@ func createRootInstructions(projectDir string) (RootInstructionsRepair, error) {
 }
 
 // replaceOutdatedInstructionsBlock ersetzt den Anstoßblock durch die aktuelle
-// Fassung, wenn er noch den abgelösten Wrapper aufruft. Das zweite Ergebnis
+// Fassung, wenn er noch einen abgelösten Aufruf trägt. Das zweite Ergebnis
 // meldet, ob etwas ersetzt wurde, das dritte den Fall aus
-// errAnstossEndeUnbestimmt: der abgelöste Aufruf steht da, das Ende des Blocks
-// ließ sich aber nicht bestimmen.
+// errAnstossEndeUnbestimmt: ein abgelöster Aufruf steht da, das Ende des
+// Blocks ließ sich aber nicht bestimmen.
 func replaceOutdatedInstructionsBlock(content string) (string, bool, error) {
 	lines := strings.Split(content, "\n")
 	start := instructionsBlockStart(lines)
@@ -305,14 +517,14 @@ func replaceOutdatedInstructionsBlock(content string) (string, bool, error) {
 	end, bounded := instructionsBlockEnd(lines, start)
 	if !bounded {
 		// Ohne bestimmtes Ende wird nichts ersetzt. Ob überhaupt etwas zu tun
-		// wäre, entscheidet der Rest der Datei ab dem Marker: steht der
-		// abgelöste Aufruf dort, bekommt der Nutzer einen Hinweis.
-		if strings.Contains(strings.Join(lines[start:], "\n"), legacyInstructionsCommand) {
+		// wäre, entscheidet der Rest der Datei ab dem Marker: steht ein
+		// abgelöster Aufruf dort, bekommt der Nutzer einen Hinweis.
+		if hasLegacyInstructionsCommand(strings.Join(lines[start:], "\n")) {
 			return content, false, errAnstossEndeUnbestimmt
 		}
 		return content, false, nil
 	}
-	if !strings.Contains(strings.Join(lines[start:end], "\n"), legacyInstructionsCommand) {
+	if !hasLegacyInstructionsCommand(strings.Join(lines[start:end], "\n")) {
 		return content, false, nil
 	}
 
@@ -326,29 +538,31 @@ func replaceOutdatedInstructionsBlock(content string) (string, bool, error) {
 
 // instructionsBlockStart meldet die Markerzeile des Anstoßblocks, sonst -1.
 func instructionsBlockStart(lines []string) int {
-	for i, line := range lines {
-		if strings.Contains(line, instructionsMarker) {
-			return i
-		}
-	}
-	return -1
+	return markerLine(lines, instructionsMarker)
 }
 
-// instructionsBlockEnd grenzt den Anstoßblock nach hinten ab: die erste Zeile,
-// die nicht mehr dazugehört. Das zweite Ergebnis meldet, ob sich diese Grenze
-// überhaupt bestimmen ließ.
+// instructionsBlockEnd grenzt den Anstoßblock nach hinten ab; die Regel steht
+// bei markedBlockEnd, die bekannte Gestalt sind die abgelösten Fassungen.
+func instructionsBlockEnd(lines []string, start int) (int, bool) {
+	return markedBlockEnd(lines, start, knownInstructionsBlockEnd)
+}
+
+// markedBlockEnd grenzt einen von k-playbook geschriebenen Block — Anstoß,
+// Session-Memory, Befunde — nach hinten ab: die erste Zeile, die nicht mehr
+// dazugehört. Das zweite Ergebnis meldet, ob sich diese Grenze überhaupt
+// bestimmen ließ.
 //
 // Zwei Wege, in dieser Reihenfolge:
 //
-// Erstens die bekannte Gestalt. Der abgelöste Block ist ein endlicher, längst
-// ausgelieferter Textbaustein; steht er ab dem Marker Zeile für Zeile da, ist
-// sein Ende exakt bekannt, gleichgültig was dahinter folgt.
+// Erstens die bekannte Gestalt (known). Ein abgelöster Block ist ein
+// endlicher, längst ausgelieferter Textbaustein; steht er ab dem Marker Zeile
+// für Zeile da, ist sein Ende exakt bekannt, gleichgültig was dahinter folgt.
 //
-// Zweitens die Abgrenzung am Folgeabschnitt. Der Block trägt genau einen Marker
-// und genau eine Überschrift; die nächste Überschrift oder der nächste
-// HTML-Kommentar — etwa der Session-Memory-Block — beginnt bereits etwas
-// anderes. Leerzeilen davor bleiben außerhalb, damit die Trennung zum
-// Folgeabschnitt beim Ersetzen erhalten bleibt.
+// Zweitens die Abgrenzung am Folgeabschnitt. Jeder dieser Blöcke trägt genau
+// einen Marker und genau eine Überschrift; die nächste Überschrift oder der
+// nächste HTML-Kommentar — etwa der Marker des nächsten Blocks — beginnt
+// bereits etwas anderes. Leerzeilen davor bleiben außerhalb, damit die
+// Trennung zum Folgeabschnitt beim Ersetzen erhalten bleibt.
 //
 // Findet keiner der beiden Wege eine Grenze, ist das Ergebnis **nicht** das
 // Dateiende. Genau diese Annahme verwarf früher Projekt-Prosa, die ohne eigene
@@ -356,8 +570,8 @@ func instructionsBlockStart(lines []string) int {
 // der vermeintlichen Grenzen und verschwand beim Ersetzen — still, denn
 // gemeldet wurde nur „korrigiert". Alles, was ein Projekt hinter den Block
 // geschrieben hat, bleibt so unangetastet.
-func instructionsBlockEnd(lines []string, start int) (int, bool) {
-	if end, ok := knownInstructionsBlockEnd(lines, start); ok {
+func markedBlockEnd(lines []string, start int, known func([]string, int) (int, bool)) (int, bool) {
+	if end, ok := known(lines, start); ok {
 		return end, true
 	}
 
@@ -381,60 +595,89 @@ func instructionsBlockEnd(lines []string, start int) (int, bool) {
 	return 0, false
 }
 
-// knownInstructionsBlockEnd meldet das Ende, wenn ab start wörtlich der
-// abgelöste Block steht.
+// knownInstructionsBlockEnd meldet das Ende, wenn ab start wörtlich eine
+// abgelöste Fassung des Anstoßblocks steht.
+func knownInstructionsBlockEnd(lines []string, start int) (int, bool) {
+	for _, block := range legacyInstructionsBlocks {
+		if end, ok := knownBlockEnd(lines, start, block.lines, block.command); ok {
+			return end, true
+		}
+	}
+	return 0, false
+}
+
+// knownBlockEnd meldet das Ende, wenn ab start wörtlich die Zeilen want
+// stehen.
 //
 // Verglichen wird zeilenweise ohne nachlaufende Leerzeichen — die tilgt mancher
-// Editor beim Speichern. Die Aufrufzeile zählt, sobald sie den abgelösten
-// Aufruf enthält; alle übrigen Zeilen müssen wörtlich stimmen.
-func knownInstructionsBlockEnd(lines []string, start int) (int, bool) {
-	end := start + len(legacyInstructionsBlockLines)
+// Editor beim Speichern. Eine Zeile legacyInstructionsCommandLine zählt, sobald
+// sie command enthält; alle übrigen Zeilen müssen wörtlich stimmen.
+func knownBlockEnd(lines []string, start int, want []string, command string) (int, bool) {
+	end := start + len(want)
 	if end > len(lines) {
 		return 0, false
 	}
-	for offset, want := range legacyInstructionsBlockLines {
+	for offset, wantLine := range want {
 		got := strings.TrimRight(lines[start+offset], " \t")
-		if want == legacyInstructionsCommandLine {
-			if !strings.Contains(got, legacyInstructionsCommand) {
+		if wantLine == legacyInstructionsCommandLine {
+			if !strings.Contains(got, command) {
 				return 0, false
 			}
 			continue
 		}
-		if got != want {
+		if got != wantLine {
 			return 0, false
 		}
 	}
 	return end, true
 }
 
+// rootInstructionsTemplate ist die Vorlage einer neuen AGENTS.md: die
+// Überschrift und der Anstoßblock, sonst nichts — genau die AGENTS.md des
+// Quell-Repos. Alles Weitere, was eine Sitzung wissen muss, kommt mit dem
+// Briefing.
 func rootInstructionsTemplate() string {
-	return "# AGENTS.md\n\n" + instructionsBlock() + "\n" + sessionMemoryBlock() +
-		"\n" + findingsBlock()
+	return "# AGENTS.md\n\n" + instructionsBlock()
 }
 
-// instructionsBlock ist der Anstoß. Er nennt bewusst keine Verzeichnisebenen:
-// dieselbe Datei liegt im Projekt, in der Installation und im Entwicklungsrepo,
-// und ein Verweis auf eine Ebene wäre an zwei dieser Orte falsch. Wo die
-// Instruktionen liegen, beantwortet der Aufruf.
+// instructionsBlock ist der Anstoß: der eine Aufruf, mit dem eine Sitzung
+// alles bekommt, was für das Projekt gilt — das Briefing. Zuerst der
+// Shell-Befehl, eingerückt als Codeblock, dann das gleichwertige MCP-Werkzeug:
+// in dieser Reihenfolge wird der Block befolgt (gemessen 2026-10-18, Befund
+// `command-huelle-verweis.md`), umgekehrt nicht.
+//
+// Er nennt bewusst keine Verzeichnisebenen: dieselbe Datei liegt im Projekt,
+// in der Installation und im Entwicklungsrepo, und ein Verweis auf eine Ebene
+// wäre an zwei dieser Orte falsch. Was es zu lesen gibt, sagt das Briefing.
 //
 // Aufgerufen wird das einmal je Host oder DevContainer installierte
 // k-playbook unter seinem Namen. Ein projektrelativer Pfad wäre doppelt falsch:
 // er zeigte auf den abgelösten Wrapper, und er hinge daran, aus welchem
 // Verzeichnis der Assistent gestartet wurde.
+//
+// Die Zielgestalt ist die AGENTS.md des Quell-Repos; ein Test hält beide
+// gleich.
 func instructionsBlock() string {
 	return instructionsMarker + `
 ## k-playbook
 
-Für dieses Projekt gilt k-playbook. Rufe zu Beginn
+Für dieses Projekt gilt k-playbook. Führe zu Beginn, bevor du arbeitest, diesen
+Befehl aus und lies seine Ausgabe:
 
-    ` + InstalledCommandName + ` context
+    ` + InstalledCommandName + ` briefing
 
-auf und lies die Dateien aus ` + "`instructions`" + ` in der angegebenen Reihenfolge,
-bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
-die effektiven Kataloge für Regeln, Reviews und Checks.
+Gleichwertig ist das MCP-Werkzeug ` + "`k_playbook_briefing`" + ` mit ` + "`projectDir`" + ` gleich
+diesem Verzeichnis. Die Ausgabe beginnt mit den Anweisungen, die in jeder Sitzung
+gelten; darauf folgen die Regeln, Reviews und Leitlinien dieses Projekts als
+Verweise, deine offene Arbeit und die Umgebung. Mehr ist zu Beginn nicht zu lesen.
+Was du sonst brauchst, erreichst du über die Verweise darin.
 `
 }
 
+// sessionMemoryBlock ist die abgelöste Gestalt des Docs-first-Blocks, so wie
+// die Vorlage ihn bis zum Briefing auslieferte. Geschrieben wird er nicht
+// mehr; er dient nur noch der Erkennung (obsoleteRootBlocks) und ändert sich
+// deshalb nicht mehr. Sein Inhalt ist `instructions/always/100-…`.
 func sessionMemoryBlock() string {
 	return sessionMemoryMarker + `
 ## Projektwissen zuerst
@@ -446,19 +689,11 @@ konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
 `
 }
 
-// findingsBlock ist die Anweisung, Erkenntnisse aus Analyse und Fehlersuche
-// festzuhalten.
-//
-// Er ist als Abschlussbedingung formuliert und nicht als Erinnerung: „die Arbeit
-// ist erst abgeschlossen, wenn …", dazu die Pflicht, die geschriebene Datei in
-// der Antwort zu nennen. Eine Bitte wird überlesen, ein Abschlusskriterium wird
-// Teil der Aufgabe.
-//
-// Die Regeldatei wird über ihren Pfad genannt und nicht über den Skill
-// `ks-befunde`. Nicht jeder Assistent kennt Skills — Codex etwa sucht sie
-// global statt im Projekt —, und ein Pfad lässt sich überall lesen. Die
-// Mindestfelder stehen deshalb hier im Block: er muss auch dann tragen, wenn
-// die Regeldatei nie geöffnet wird.
+// findingsBlock ist die abgelöste Gestalt des Befunde-Blocks, so wie die
+// Vorlage ihn bis zum Briefing auslieferte. Wie sessionMemoryBlock wird er
+// nicht mehr geschrieben, nur noch erkannt, und ändert sich nicht mehr. Sein
+// Inhalt — Abschlussbedingung, Ablageort, Mindestfelder, /k-danke — ist
+// `instructions/always/200-…`.
 func findingsBlock() string {
 	return findingsMarker + `
 ## Befunde festhalten

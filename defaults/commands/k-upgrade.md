@@ -1,28 +1,28 @@
 # k-upgrade
 
-Später holt dieser Command eine neue Version von k-playbook und zieht danach die
-Struktur des Projekts nach — etwa lokale Verzeichnisse entfernen, deren Inhalt in die
-Collection gezogen ist.
-
-Heute tut er nur eines: Er nennt die installierte Version und sagt, dass noch nichts
-nachzuziehen ist.
+Zieht Programm und Projekt auf den aktuellen Stand von k-playbook: das Binary, wenn das
+laufende älter ist als die Installation, danach `AGENTS.md` (Anstoß, abgelöste Blöcke),
+`CLAUDE.md`, die Verlinkung der Commands und Skills und die MCP-Einträge. Das tut der
+Unterbefehl `k-playbook upgrade`; dieser Command ruft ihn und gibt seine Meldung wieder,
+mehr nicht. Er nimmt kein Argument.
 
 ## Schritt 1 — Briefing
 
 include: _shared/erster-schritt.md
 
-## Schritt 2 — Version nennen
+## Schritt 2 — Nachziehen
 
-Entnimm dem Briefing `context.playbook.dir` und lies dort die Datei `VERSION`. Gib die
-Zeile daraus aus, etwa so:
+Führe in der Shell aus:
 
-```text
-k-playbook v0.16.3 ist installiert. Es ist nichts nachzuziehen.
-```
+    k-playbook upgrade
 
-Mehr ist nicht zu tun: kein Download, keine Änderung an Dateien.
+Gib die Ausgabe unverändert wieder — jede Zeile, auch Hinweise und Fehlermeldungen wie
+„Download/Install nicht möglich“. Fasse nichts zusammen, lass nichts weg und führe nichts
+anderes aus: keine weiteren Befehle, keine Änderungen an Dateien. Was ein Lauf nicht von
+selbst nachziehen konnte, steht in der Ausgabe als Hinweis; nenne ihn, behebe ihn nicht.
 
-## Hinweis
+## Schritt 3 — Schluss
 
-Nach einem Wechsel des Binaries muss die Sitzung neu gestartet werden: Der laufende
-MCP-Server behält das alte Binary, bis der Assistent ihn neu startet.
+Steht in der Ausgabe, dass das Programm gewechselt hat und die Sitzung neu zu starten ist,
+schließe mit genau diesem Hinweis: Der laufende MCP-Server behält das alte Binary, bis der
+Assistent ihn neu startet. Sonst endet der Command mit der Ausgabe.

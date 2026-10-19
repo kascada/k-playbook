@@ -12,7 +12,9 @@ einzige Aufgabe; die jeweilige steckt im Subkommando.
 k-playbook                          # öffnet die Oberfläche im Browser
 k-playbook config create
                                      # legt K-PLAYBOOK.yaml im aktuellen Verzeichnis an
-k-playbook context                  # gibt den aufgelösten Arbeitsstand als JSON aus
+k-playbook briefing                 # was für dieses Projekt gilt und was ansteht — der Einstieg jeder Sitzung
+k-playbook upgrade [--check]        # Programm aktualisieren und das Projekt nachziehen
+k-playbook context                  # gibt den aufgelösten Arbeitsstand als JSON aus (wird abgebaut)
 k-playbook stop                     # beendet den Hintergrunddienst dieses Projekts
 k-playbook help
 ```
@@ -26,10 +28,15 @@ Aufruf findet ihn und öffnet nur den Browser, `stop` beendet ihn. Davor räumt 
 die globale Assistenten-Verlinkung des alten Modells sowie Reste der früheren
 Wrapper-Installation weg.
 
-`context` ist der Einstieg für Commands und Skills: es löst Verzeichnisse,
-Instruktionsdateien und die drei Kataloge auf, damit kein Command die Overlay-Regeln
-selbst anwenden muss. Es räumt bewusst nichts auf — dessen Ausgabe würde das JSON
-stören.
+`briefing` ist der Einstieg jeder Sitzung — der Aufruf, den `AGENTS.md` nennt: der Text
+der immer geltenden Anweisungen, die Regeln, Reviews und Leitlinien als Verweise, die
+eigene offene Arbeit und, bis zum Abbau, der Rest der Kontextausgabe. `context` löst
+Verzeichnisse, Instruktionsdateien und die drei Kataloge als JSON auf, damit kein Command
+die Overlay-Regeln selbst anwenden muss; die Commands rufen es noch, bis sie einzeln auf
+das Briefing umziehen. Beide räumen bewusst nichts auf — deren Ausgabe würde die
+Antwort stören. `upgrade` zieht Programm und Projekt nach: Pull im Clone, Binary nur,
+wenn das laufende älter ist, dann `AGENTS.md`, `CLAUDE.md`, Verlinkung und
+MCP-Einträge; `--check` meldet nur, was ein Lauf täte.
 
 Zum Entwickeln:
 

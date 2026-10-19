@@ -372,10 +372,31 @@ exist: a nonexistent path is worse than no path.
 The file is deliberately not called `AGENTS.md`: assistants read that name
 automatically, and it is reserved for the project root.
 
-`AGENTS.md` receives only a **prompt**: a short block pointing to
-`k-playbook context`. If the file does not exist, it is created; if it exists,
-the block is appended without touching existing content. A marker,
-`<!-- k-playbook:anstoss -->`, prevents a second run from appending it again.
+`AGENTS.md` receives only a **prompt**: a short block naming the one call of a
+session, `k-playbook briefing`, with the MCP tool `k_playbook_briefing` as its
+equivalent — exactly the `AGENTS.md` of the source repository. If the file does
+not exist, it is created from that template; if it exists, the block is appended
+without touching existing content. A marker, `<!-- k-playbook:anstoss -->`,
+prevents a second run from appending it again. A block that still carries a
+superseded call (`k-playbook context`, before that the wrapper
+`k-playbook/bin/k-playbook context`) is replaced by the current one, and the two
+blocks the template used to add behind it — `k-playbook:session-memory` and
+`k-playbook:befunde` — are removed: their content comes with the briefing as
+`instructions/always/100-…` and `200-…`. Replaced and removed is only what can be
+bounded positively (the shipped shape line by line, else the next heading or
+HTML comment, never the end of the file); project text before, between and
+behind the blocks stays, and a block without a boundary stays with a hint. This
+runs at setup, at the start of the interface and with `k-playbook upgrade`.
+
+`k-playbook upgrade` is the one catch-up in the terminal, the subcommand behind
+`/k-upgrade`: first the program — `git pull --ff-only` in the clone, then the
+binary through `k-playbook/bin/install`, only when the running program is older
+than the clone's `VERSION` —, then the project: `AGENTS.md`, `CLAUDE.md` as the
+include file, the linking of commands and skills, the MCP entries. After a
+binary change the newly installed program performs the project step, and the
+message ends with the hint to restart the session; `--check` writes nothing
+and reports what a run would do. It never touches project prose in `AGENTS.md`
+or anything under `k-playbook-local/`.
 
 Claude Code does not read `AGENTS.md` automatically. Setup therefore creates a
 neighboring `CLAUDE.md` containing only the import line `@AGENTS.md`: a regular

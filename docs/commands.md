@@ -18,13 +18,13 @@ A project-owned command with the name of a shipped command **replaces** it; an e
 
 ## Overview
 
-New commands become visible only after linking is in place and the assistant has been restarted. `k-playbook context`, the call at the beginning of every session, brings linking up to date automatically; the restart remains necessary because Claude Code, OpenCode, and Cursor read their command list at startup.
+New commands become visible only after linking is in place and the assistant has been restarted. `k-playbook briefing`, the call at the beginning of every session, brings linking up to date automatically; the restart remains necessary because Claude Code, OpenCode, and Cursor read their command list at startup.
 
 | Command | Purpose | Detail |
 |---|---|---|
 | **Project** | | |
 | `/k-gui` | Start the interface | guides through configuration, project-owned structure, and assistant linking; the Workflows section with its Tasks, Reviews, and Todos pages, plus the Docs and Inventory sections, the last of which shows the version inventory and initiates its collection |
-| `/k-upgrade` | Name the installed version; later fetch a new version and pull the project structure after it | today only an info from `<playbook.dir>/VERSION`, nothing is changed; the first command whose text lies in `defaults/commands/` — the file under `commands/` is a hull with frontmatter and the reference `k-playbook:/commands/k-upgrade.md`, read through `k_playbook_doc_read` or `k-playbook read` (task 092, [verweisschema.md](./verweisschema.md#resolving-k-playbook)) |
+| `/k-upgrade` | Update the program and pull the project after it | runs `k-playbook upgrade` and relays its message, nothing else: `git pull` in the clone, the binary through `k-playbook/bin/install` only when the running program is older than the clone, then `AGENTS.md` (prompt replaced, superseded blocks removed), `CLAUDE.md`, the linking and the MCP entries; after a binary change the new program performs the project step, and the message ends with the hint to restart the session (`k-playbook upgrade --check` reports what a run would do). The first command whose text lies in `defaults/commands/` — the file under `commands/` is a hull with frontmatter and the reference `k-playbook:/commands/k-upgrade.md`, read through `k_playbook_doc_read` or `k-playbook read` (task 092, [verweisschema.md](./verweisschema.md#resolving-k-playbook)) |
 | **Docs** | | |
 | `/k-docs` | Check documentation inventory and offer possible actions | read-only status; can dispatch to code, tool, extract, inventory, or index actions |
 | `/k-docs-code` | Generate semantic project documentation from the code | writes one file per topic to `k-playbook-local/docs/code/`; the `ks-overlay-repo-analyse` skill also writes there |

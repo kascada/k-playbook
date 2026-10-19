@@ -415,9 +415,9 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | `k-playbook.md` | "Wie gearbeitet wird", last paragraph: what applies in a project is the catalog from `context`, a local command replaces or disables the shipped one | drops into `on-demand/ueberlagern.md` (same rule) | open |
 | `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are the field `remediation` — its place is in the table "Context field → future place" below | open |
 | `k-playbook-local/k-playbook.md` | the project's own rules (this repo: role, memory rule, spelling, scratch pad, docs first) | local parts `k-playbook-local/instructions/always/1000-….md`, one per topic, by the project; no shipped step | open |
-| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, the text of the always-instructions (`documents.always.content`, since 2026-10-18) and — until the rest is taken apart — the environment from its section `context`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | stays |
-| `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always.content` in the briefing is the text itself, already in reading order (since 2026-10-18); see the name clash below | open |
-| `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | open |
+| `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, the text of the always-instructions (`documents.always.content`, since 2026-10-18) and — until the rest is taken apart — the environment from its section `context`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
+| `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always.content` in the briefing is the text itself, already in reading order (since 2026-10-18); see the name clash below | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
+| `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
 | `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
 | `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; `k-playbook:/rules/befunde.md` resolves since task 086 | done (`NACHZIEHEN:` for the place `queue/findings/`) |
 | — | how references are written and reached | `always/010-verweise.md` | done |
@@ -542,16 +542,59 @@ is rebuilt by task 091 — "build first, then put to use".
   ("The resolved working state") and `k-playbook-local/docs/manual/assistenten-verlinkung.md`
   ("Wo die Rechnung ausgelöst wird") follow.
 
+**Inventory of `k-playbook context` and `k_playbook_context`** (task 096, 2026-10-19; raised with
+`grep -rn 'k-playbook context\|k_playbook_context'`, tests excluded). Three states: **switched
+in 096** — the place names the briefing now; **stays until its reader moves** — the commands,
+skills and shipped texts that still call `k-playbook context` and switch one by one ("build
+first, then put to use"); **stays on purpose** — the call itself, its facades, and texts that
+describe the rest of the context output while it exists. Nothing the binary **writes** into a
+project names `k-playbook context` any more (checked: `rootInstructionsTemplate()`,
+`instructionsBlock()`, the READMEs of `EnsureLocal`, `.mcp.json`/`opencode.json` entries,
+`claudeIncludeStub()`).
+
+| Place | What it does | State |
+|---|---|---|
+| `installer/internal/project/instructions.go` | template of the `AGENTS.md` block, hint `errAnstossEndeUnbestimmt`; `legacyInstructionsBlocks` names `k-playbook context` only as a superseded call to recognise | switched in 096 |
+| `installer/internal/project/local.go:206` | README text of `version-sources.yaml` that `EnsureLocal` writes into the project | switched in 096 (names the briefing) |
+| `installer/internal/project/local.go:441`, `languages.go:52/112`, `links.go:72/274/644`, `webui/inventory.go:36/139`, `webui/mcp_servers.go:64`, `versionsources/versionsources.go:5/209` | code comments about behaviour of the context output | stays on purpose |
+| `installer/internal/webui/assistant.go` | card text after setup ("auf den aktuellen Aufruf gebracht") | switched in 096 (names `k-playbook briefing`) |
+| `installer/internal/webui/static/app.js` | assistant card: state of `AGENTS.md` | switched in 096 (shows outdated prompt, obsolete blocks, hint) |
+| `installer/internal/webui/static/setup.html:201`, `mcp.html:79`, `mcp-servers.html:61` | describe the context card, the MCP server (`k_playbook_context`) and the field `mcp` of the context output | stays on purpose |
+| `installer/internal/project/briefing.go`, `installer/cmd/k-playbook/briefing.go` (`briefingContextSeparator`, usage), `installer/cmd/k-playbook/main.go` (usage), `installer/cmd/k-playbook/doc.go:191` (usage) | the rest section of the briefing and the help texts naming it | stays on purpose |
+| `installer/internal/project/context.go`, `installer/internal/mcpserver/server.go` (`k_playbook_context`), `mcpserver/briefing.go`, `mcpserver/docs.go` | the call itself and its facades | stays on purpose (go when the rest is empty, todo #26) |
+| `installer/docs/architecture.md` "Instruktionen" (prompt, superseded versions, obsolete blocks, the three entries) | architecture of the `AGENTS.md` handling | switched in 096 |
+| `installer/docs/architecture.md` other hits (`:144`, `:342`, `:1100`, `:1342`, `:1359`, `:1846`, `:2101`, `:2657`, `:3246`, `:3338-3345`, `:3726`, `:3732`) | describe the context output, the MCP tool and measurements | stays on purpose |
+| `README.md` ("What applies", "An existing CLAUDE.md", "Updating") | entry of a project: briefing instead of context | switched in 096 |
+| `installer/README.md` | call list and the paragraph on `context` | switched in 096 (briefing and upgrade added, context marked as being taken apart) |
+| `docs/k-playbook-format.md` (the `AGENTS.md` block) | the prompt | switched in 096 |
+| `docs/k-playbook-format.md` (`:210`, `:249` "The resolved working state", `:296-309`, `:521-524`) | the context output and the rest section | stays until the switch of the context output |
+| `docs/installation.md:166/191/311`, `docs/faq.md:103/115`, `docs/manual.md:119`, `docs/commands.md:21` | the prompt and "the call at the start of every session" | switched in 096 |
+| `docs/installation.md:265/408/527/601`, `docs/faq.md:85`, `docs/manual.md:88`, `docs/commands.md:105`, `docs/overview.md`, `docs/version-inventory.md`, `docs/verweisschema.md`, `docs/kephalaion-client.md`, `docs/mcp.md` | describe fields of the context output | stays until the switch of the context output |
+| `commands/*.md` (21 files), `skills/*/SKILL.md` and `PLAYBOOK.md` (5), `commands/_shared/context.md` | the old entry module and the commands' standard header | stays until its reader moves (work list 16) |
+| `rules/command-authoring.md:101` (= `defaults/rules/`), `guidelines/betrieb.md:15` (= `defaults/guidelines/`) | "sonst rufe `k-playbook context` auf", "Pfade aus `k-playbook context` ableiten" | stays until its reader moves (work list 15; `betrieb.md` when `playbook`/`local` leave the rest) |
+| `k-playbook.md` (= `defaults/k-playbook.md`) `:63`, `:125` | "Wo was liegt", "Umgang mit Befunden" | stays until its reader moves (rows of the target table above) |
+| `defaults/instructions/always/010-verweise.md:14` | names the `kephalaion.*` fields in the rest | stays until its reader moves (row `kephalaion` above) |
+| `defaults/instructions/always/030-briefing.md:33`, `defaults/instructions/on-demand/briefing-felder.md:22` | name the section `context` as the rest | stays on purpose |
+| `checks/README.md:70/101` | checks do not call the context | stays on purpose |
+| `.claude/settings.local.json` | permission pattern | stays on purpose (local settings) |
+| `docs/knowledge-aktuell.md` | this file | stays on purpose |
+
 ## Open
 
-**The workbench** (2026-10-14). Meant for the current state of work: where one stands, what
-is open, what comes next. Unlike a task it is no assignment, and unlike a finding it carries
-no proof. Today such things end up in findings or in assistant memory; this file is itself an
-example. Decided and built (2026-10-14/15, task 088): one file per topic, numbered
-project-wide, and a finished topic moves to `done/`. Proposed: overwritten rather than
-appended, with frontmatter `title` and `status` so that the briefing can show the titles of
-one's own active topics. Undecided: whether a finished topic is also resolved (confirmed parts
-as findings, open parts as tasks), and the format of its content.
+**The workbench** (2026-10-14, defined 2026-10-19). Meant for the current state of work: where
+one stands, what is open, what comes next. Unlike a task it is no assignment, and unlike a
+finding it carries no proof. Built 2026-10-14/15 (task 088): one file per topic, numbered
+project-wide, a finished topic moves to `done/`. Defined 2026-10-19 in the always part
+`defaults/instructions/always/210-workbench.md` (not yet released, not yet measured in either
+client): a topic is created as soon as a plan with open points outlives the session, updated
+whenever a point changes, closed with `doc_done` when the work is finished; the file is
+overwritten as a whole with `base_revision`, never appended; frontmatter `title` is required
+and nothing else; the first paragraph states where the work stands. The findings rule and the
+always part 200 now exclude the state of work and point to the workbench; `betrieb.md` has the
+row. First measured 2026-10-19 from Claude Code: create, write, read via `~`, briefing title,
+done and reopen all work; `keph:/user/kamran/workbench/001-workbench-einfuehren.md` holds the
+protocol. Open: `/k-danke` does not ask about active topics yet; whether a finished topic is
+also resolved (confirmed parts as findings, open parts as tasks); the OpenCode measurement.
 
 **How commands and skills are read once the local files are gone.** Claude Code, OpenCode and
 Cursor find commands and skills only as files on disk, and checks and scripts must run.
@@ -661,8 +704,20 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     `commands/` and symlinks; `/k-upgrade`'s hand-made hull goes with it, and the hull form
     becomes a rule in `rules/command-authoring.md`.
 16. **Move the commands, then the skills** — text by text into `defaults/commands/` and
-    `defaults/skills/`; `$ARGUMENTS` and frontmatter stay in the hull. `/k-upgrade` then gets
-    its subcommand in the binary and only relays its message.
+    `defaults/skills/`; `$ARGUMENTS` and frontmatter stay in the hull. `/k-upgrade` has its
+    subcommand since task 096 (2026-10-19) and only relays its message.
+17. **`AGENTS.md` template on the briefing, `k-playbook upgrade`** — built 2026-10-19
+    (task 096, in the working tree): `rootInstructionsTemplate()` is heading plus the
+    briefing prompt, byte-identical to this repo's `AGENTS.md` (test); the `k-playbook
+    context` block is the second superseded version (`legacyInstructionsBlocks`), the
+    session-memory and findings blocks are recognised by their markers and removed
+    (`obsoleteRootBlocks`, positive boundary or hint) at setup, at the GUI start and with
+    `k-playbook upgrade`; `k-playbook upgrade [--check] [--json]` pulls, installs only when
+    the running program is older, re-executes the new program for the project step, and
+    `/k-upgrade` relays its message. The inventory of `k-playbook context` is the table
+    above. Open: `/k-upgrade` in Claude Code and OpenCode with a real binary change after the
+    next release (`bin/install` needs network and writes to `~/.local/bin`; measured, not
+    assumed).
 
 ## Findings
 

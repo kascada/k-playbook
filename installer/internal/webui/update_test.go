@@ -55,7 +55,7 @@ func TestRelinkAfterUpdateRichtetEin(t *testing.T) {
 	if !strings.Contains(content, "# Unser Projekt") {
 		t.Errorf("der mitgebrachte Inhalt fehlt in AGENTS.md:\n%s", content)
 	}
-	if !strings.Contains(content, "\n    k-playbook context\n") {
+	if !strings.Contains(content, "\n    k-playbook briefing\n") {
 		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
 	}
 
@@ -88,7 +88,7 @@ func TestRelinkAfterUpdateLegtWurzeldateiAn(t *testing.T) {
 	_, message := relinkAfterUpdate(root, "Aktualisiert.")
 
 	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
-	if !strings.Contains(content, "\n    k-playbook context\n") {
+	if !strings.Contains(content, "\n    k-playbook briefing\n") {
 		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
 	}
 	if !strings.Contains(message, project.RootInstructionsFile) {
@@ -99,6 +99,52 @@ func TestRelinkAfterUpdateLegtWurzeldateiAn(t *testing.T) {
 	relinkAfterUpdate(root, "Aktualisiert.")
 	if readFile(t, filepath.Join(root, project.RootInstructionsFile)) != content {
 		t.Error("der zweite Lauf hat AGENTS.md verändert")
+	}
+}
+
+// Ein Bestandsprojekt mit der alten Vorlage kommt über „Aktualisieren" auf die
+// neue, und der Antworttext sagt, was sich an der Projektdatei geändert hat.
+func TestRelinkAfterUpdateZiehtAlteVorlageNach(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, project.RootInstructionsFile), `# AGENTS.md
+
+<!-- k-playbook:anstoss -->
+## k-playbook
+
+Für dieses Projekt gilt k-playbook. Rufe zu Beginn
+
+    k-playbook context
+
+auf und lies die Dateien aus `+"`instructions`"+` in der angegebenen Reihenfolge,
+bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
+die effektiven Kataloge für Regeln, Reviews und Checks.
+
+<!-- k-playbook:session-memory -->
+## Projektwissen zuerst
+
+Die autoritative Projektdokumentation beginnt bei
+`+"`k-playbook-local/docs/README.md`"+`. Lies diesen Index zuerst, bevor du den
+Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
+konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
+
+## Unsere Regeln
+
+Bleiben.
+`)
+
+	_, message := relinkAfterUpdate(root, "Aktualisiert.")
+
+	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
+	if !strings.Contains(content, "\n    k-playbook briefing\n") || strings.Contains(content, "k-playbook context") {
+		t.Errorf("der Anstoß wurde nicht ersetzt:\n%s", content)
+	}
+	if strings.Contains(content, "k-playbook:session-memory") || !strings.Contains(content, "## Unsere Regeln\n\nBleiben.\n") {
+		t.Errorf("der Block wurde nicht entfernt oder Projekttext ging verloren:\n%s", content)
+	}
+	for _, erwartet := range []string{"k-playbook briefing", "Session-Memory-Block aus AGENTS.md entfernt"} {
+		if !strings.Contains(message, erwartet) {
+			t.Errorf("%q fehlt im Antworttext: %s", erwartet, message)
+		}
 	}
 }
 

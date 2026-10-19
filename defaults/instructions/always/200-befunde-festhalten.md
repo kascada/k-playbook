@@ -3,7 +3,9 @@
 Wenn du Code analysierst, einer Ursache nachgehst oder eine These durch einen Test prüfst,
 ist die Arbeit erst abgeschlossen, wenn der Befund geschrieben ist. Er gehört nach
 `project:/k-playbook-local/material/befunde/`, eine Datei je Thema; neue Erkenntnisse werden
-angehängt. Nenne in deiner Antwort die geschriebene Datei.
+angehängt. Nenne in deiner Antwort die geschriebene Datei. Der Stand eines laufenden
+Vorhabens, also Plan, offene Punkte und Fortschritt, ist kein Befund; er gehört in die
+Workbench (Abschnitt „Die Workbench“).
 
 <!-- NACHZIEHEN: Ablageort der Befunde prüfen; in der Projekt-Collection heißt der Ort queue/findings/ (docs/knowledge-aktuell.md, „Findings go to queue/findings/“). -->
 

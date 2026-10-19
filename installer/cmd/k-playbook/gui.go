@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
@@ -230,13 +231,15 @@ func repairMCPRegistration() {
 // MCP-Korrektur für die zweite Datei, die im Hauptverzeichnis liegt und die
 // der Git-Update-Weg deshalb nicht erreicht.
 //
-// Zwei Fälle, zwei Meldungen. Ein veralteter Anstoßblock wird ersetzt: ein
-// Bestandsprojekt behielte sonst dauerhaft den Aufruf des abgelösten Wrappers
-// und schickte jeden Assistenten auf eine Datei, die es nicht mehr gibt. Eine
-// ganz fehlende Datei entsteht aus der Vorlage — und das wird eigens gesagt,
-// denn es ist eine neue, versionierbare Datei im Hauptverzeichnis, kein
-// stiller Nebeneffekt. Ein fremder Text wird nie angefasst. Ein Fehler hält
-// den Start nicht auf.
+// Drei Meldungen für Inhalt, den k-playbook selbst geschrieben hat. Ein
+// veralteter Anstoßblock wird ersetzt: ein Bestandsprojekt behielte sonst
+// dauerhaft den abgelösten Aufruf. Die abgelösten Zusatzblöcke (Session-Memory,
+// Befunde) werden entfernt: ihr Inhalt kommt mit dem Briefing, und doppelt
+// gelesen wäre er nur Rauschen. Eine ganz fehlende Datei entsteht aus der
+// Vorlage — und das wird eigens gesagt, denn es ist eine neue, versionierbare
+// Datei im Hauptverzeichnis, kein stiller Nebeneffekt. Ein fremder Text wird
+// nie angefasst; trägt er die Zusatzblöcke ohne Anstoß, nennt der Start den
+// Weg, der sie nachzieht. Ein Fehler hält den Start nicht auf.
 func repairRootInstructions() {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -245,10 +248,18 @@ func repairRootInstructions() {
 
 	repaired, err := project.RepairRootInstructions(environment.ProjectDir)
 	if repaired.Refreshed {
-		fmt.Printf("Veralteten Anstoß in %s korrigiert.\n", project.RootInstructionsFile)
+		fmt.Printf("Veralteten Anstoß in %s auf %s briefing gebracht.\n", project.RootInstructionsFile, project.InstalledCommandName)
+	}
+	if len(repaired.RemovedBlocks) > 0 {
+		fmt.Printf("%s aus %s entfernt; der Inhalt kommt mit dem Briefing.\n",
+			strings.Join(repaired.RemovedBlocks, " und "), project.RootInstructionsFile)
 	}
 	if repaired.Created {
 		fmt.Printf("%s aus der Vorlage angelegt — eine neue Datei im Hauptverzeichnis, die zum Projekt gehört und eingecheckt werden kann.\n", project.RootInstructionsFile)
+	}
+	if repaired.BlocksWithoutAnstoss {
+		fmt.Printf("Hinweis: %s trägt abgelöste Zusatzblöcke, aber keinen Anstoß; „Einrichten“ in der Oberfläche oder %s upgrade zieht beides nach.\n",
+			project.RootInstructionsFile, project.InstalledCommandName)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: %s nicht nachgezogen: %v\n", project.RootInstructionsFile, err)

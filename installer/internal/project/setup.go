@@ -16,10 +16,17 @@ type AssistantSetup struct {
 	RootCreated bool `json:"rootCreated,omitempty"`
 	// RootExtended: der Anstoß wurde einer vorhandenen Datei angehängt.
 	RootExtended bool `json:"rootExtended,omitempty"`
-	// RootRefreshed: ein vorhandener, aber veralteter Anstoß wurde ersetzt.
-	// Das ist eine Änderung an einer Projektdatei und gehört deshalb in die
-	// Antwort, nicht nur ins Log.
+	// RootRefreshed: AGENTS.md wurde nachgezogen — ein veralteter Anstoß
+	// ersetzt, abgelöste Zusatzblöcke entfernt, oder beides. Das ist eine
+	// Änderung an einer Projektdatei und gehört deshalb in die Antwort, nicht
+	// nur ins Log. Was genau geschah, sagen die zwei Felder darunter.
 	RootRefreshed bool `json:"rootRefreshed,omitempty"`
+	// RootAnstossRefreshed: der Anstoßblock trug einen abgelösten Aufruf und
+	// wurde durch die aktuelle Fassung ersetzt.
+	RootAnstossRefreshed bool `json:"rootAnstossRefreshed,omitempty"`
+	// RootBlocksRemoved nennt die abgelösten Zusatzblöcke, die aus AGENTS.md
+	// entfernt wurden; ihr Inhalt kommt mit dem Briefing.
+	RootBlocksRemoved []string `json:"rootBlocksRemoved,omitempty"`
 }
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
@@ -57,7 +64,9 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 		setup.Root = root
 		setup.RootCreated = !before.Present && root.Present
 		setup.RootExtended = before.Present && !before.HasMarker && root.HasMarker
-		setup.RootRefreshed = outdatedBefore && !root.HasOutdatedAnstoss
+		setup.RootAnstossRefreshed = outdatedBefore && !root.HasOutdatedAnstoss
+		setup.RootBlocksRemoved = removedBlocks(before, root)
+		setup.RootRefreshed = setup.RootAnstossRefreshed || len(setup.RootBlocksRemoved) > 0
 	} else {
 		setup.Root = CheckRootInstructions(projectDir)
 	}
@@ -69,4 +78,20 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	setup.Links = statuses
 
 	return setup, errors.Join(errs...)
+}
+
+// removedBlocks nennt die abgelösten Zusatzblöcke, die vor dem Lauf dastanden
+// und danach nicht mehr.
+func removedBlocks(before RootInstructionsState, after RootInstructionsState) []string {
+	remaining := map[string]bool{}
+	for _, name := range after.ObsoleteBlocks {
+		remaining[name] = true
+	}
+	removed := []string{}
+	for _, name := range before.ObsoleteBlocks {
+		if !remaining[name] {
+			removed = append(removed, name)
+		}
+	}
+	return removed
 }

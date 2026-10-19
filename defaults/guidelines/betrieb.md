@@ -41,6 +41,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
 | Befund aus Analyse oder Fehlersuche | `material/befunde/<thema>.md` — entsteht beim ersten Lauf von `/k-danke` oder des Skills `ks-befunde` | `/k-danke`, Skill `ks-befunde`; Form nach der Regel `befunde.md` |
+| Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
 | Doku aus dem Code | `docs/code/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` | `/k-docs-code` |
 | Steckbrief zu Library oder Tool | `docs/libs/<name>.md` — entsteht beim ersten Lauf von `/k-docs-tools` | `/k-docs-tools` |
 | Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-extract` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |

@@ -597,6 +597,23 @@ async function applyAssistant() {
   }
 }
 
+// Der Zustand der Wurzeldatei in einem Halbsatz. Ein Anstoß mit abgelöstem
+// Aufruf und die abgelösten Zusatzblöcke sind kein Fehler — „Einrichten“ zieht
+// sie nach —, gehören aber sichtbar daneben; was sich nicht von selbst
+// nachziehen lässt, sagt der Hinweis.
+function describeRootInstructions(root) {
+  if (!root.present) return "nicht vorhanden";
+  if (!root.hasMarker) return "vorhanden, Anstoß fehlt";
+  const pending = [];
+  if (root.hasOutdatedAnstoss) pending.push("Anstoß veraltet");
+  for (const block of root.obsoleteBlocks || []) pending.push(`${block} abgelöst`);
+  let detail = pending.length
+    ? `enthält den Anstoß; nachzuziehen: ${pending.join(", ")}`
+    : "enthält den Anstoß";
+  if (root.hint) detail += ` — ${root.hint}`;
+  return detail;
+}
+
 function renderAssistant(data) {
   elements.assistantFacts.replaceChildren();
 
@@ -604,12 +621,7 @@ function renderAssistant(data) {
   // daran.
   const root = data.root || {};
   if (root.path) {
-    const detail = !root.present
-      ? "nicht vorhanden"
-      : root.hasMarker
-        ? "enthält den Anstoß"
-        : "vorhanden, Anstoß fehlt";
-    addFact(elements.assistantFacts, "AGENTS.md — Einstieg", detail);
+    addFact(elements.assistantFacts, "AGENTS.md — Einstieg", describeRootInstructions(root));
   }
 
   for (const entry of data.entries || []) {

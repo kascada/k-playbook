@@ -116,7 +116,7 @@ different project.
 
 They are read in this order; the project-owned level supplements or overrides
 the shipped one. `AGENTS.md` in the project root receives only a short prompt
-that refers to `k-playbook context`; existing content remains untouched.
+that names `k-playbook briefing`; existing content remains untouched.
 
 ## Installation
 

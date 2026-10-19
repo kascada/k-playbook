@@ -1,5 +1,5 @@
 ---
-description: Zieht künftig Installation und Projektstruktur nach; heute nur eine kurze Info zur installierten Version.
+description: Zieht Installation und Projekt nach — aktualisiert das Programm, wenn es älter ist als die Installation, und bringt AGENTS.md, CLAUDE.md, Verlinkung und MCP-Einträge auf den Stand; gibt die Meldung von k-playbook upgrade wieder.
 # model: github-copilot/gpt-5.5
 allowed-tools: [Bash, Read, mcp__k-playbook__k_playbook_doc_read]
 ---

@@ -7,7 +7,8 @@
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
 // löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
-// Projekt gilt und was ansteht,
+// Projekt gilt und was ansteht, `upgrade` aktualisiert das Programm und zieht
+// das Projekt nach,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
 // Adresse der Oberfläche, ohne sie anzufassen, und `stop` beendet den
@@ -106,6 +107,11 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
 		// Klartext oder JSON, und sonst nichts.
 		return runBriefing(args[1:])
+	case "upgrade":
+		// Ohne Wirt-Pflege: der Nachzug meldet selbst je Schritt, was er tut,
+		// und seine Ausgabe wird von /k-upgrade wörtlich wiedergegeben — eine
+		// Bereinigungsmeldung dazwischen gehörte nicht dazu.
+		return runUpgrade(args[1:])
 	case "vscode":
 		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
 		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
@@ -270,6 +276,14 @@ Unterkommandos:
             Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe
             wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done und
             _reopen.
+  upgrade   Aktualisiert das Programm und zieht das Projekt nach:
+            k-playbook upgrade [--check] [--json]. Erst git pull im Clone
+            und das Binary über k-playbook/bin/install, nur wenn das laufende
+            Programm älter ist als der Clone; dann AGENTS.md (Anstoß,
+            abgelöste Blöcke), CLAUDE.md, Verlinkung und MCP-Einträge. Je
+            Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
+            Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
+            und meldet, was ein Lauf täte. Das Gegenstück zu /k-upgrade.
   vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
             diesem Programm steckt: k-playbook vscode install|status|
             vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig

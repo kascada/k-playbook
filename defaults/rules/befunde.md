@@ -42,15 +42,20 @@ Das Verzeichnis ist das Erzeuger-Verzeichnis dieser Regel und wird beim ersten L
 Rückfrage angelegt. Es ist die einzige Stelle unterhalb von `material/`, in die
 geschrieben wird; der Rest des Verzeichnisses bleibt Rohmaterial, das niemand anfasst.
 
-Nicht hierher gehören zwei andere Sorten Wissen, die in einer Analyse mit anfallen:
+Nicht hierher gehören drei andere Sorten Wissen, die in einer Analyse mit anfallen:
 
 - **Betriebsfallen** — was man vor dem Handeln wissen muss, damit man nicht hineintritt
   („dieses Verzeichnis ist gesperrt", „dieser Test sagt nichts aus"). Sie gehören nach
   `k-playbook-local/guidelines/fallen.md`.
 - **Prüfbare Regeln** — was jedes Mal zu geschehen hat. Sie gehören als projekteigene
   Regel nach `k-playbook-local/rules/`.
+- **Arbeitsstände** — wo ein laufendes Vorhaben steht, was offen ist, was als Nächstes
+  kommt. Sie sind nicht belegt und sollen verschwinden, wenn das Vorhaben fertig ist. Sie
+  gehören in die Workbench (`keph:/user/~/workbench/`, Anweisung „Die Workbench“ unter
+  `k-playbook:/instructions/always/`), nicht in eine Befund-Datei.
 
-Beide werden nur nach ausdrücklicher Bestätigung geschrieben: sie wirken dauerhaft.
+Betriebsfallen und Regeln werden nur nach ausdrücklicher Bestätigung geschrieben: sie
+wirken dauerhaft.
 
 ## Dateiformat
 

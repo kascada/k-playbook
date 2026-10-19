@@ -53,3 +53,5 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
   `on-demand/briefing-felder.md`.
 - `100-projektwissen-zuerst.md`: Zuerst die Projektdoku lesen, dann den Code.
 - `200-befunde-festhalten.md`: Erkenntnisse aus Analyse und Fehlersuche festhalten.
+- `210-workbench.md`: Den Stand eines laufenden Vorhabens in der Workbench führen. Steht
+  hinter den Befunden, weil beide sagen, was eine Sitzung während der Arbeit festhält.

@@ -23,9 +23,9 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `vscode`, `version` und `stop`. Die
-Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit, es gibt nur
-diese Übersicht aus.
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `upgrade`, `vscode`, `version` und
+`stop`. Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
+es gibt nur diese Übersicht aus.
 
 ```go
 if len(args) == 0 {
@@ -44,6 +44,27 @@ Binary mit `K_PLAYBOOK_SERVE=1` als abgekoppelten Server und endet, sobald der a
 (siehe „Lebenszyklus"). Diese Umgebungsmarke ist der **verdeckte Servermodus**: kein
 Subkommando, weil ihn niemand von Hand aufruft — `webui.Serve()` ohne Wirt-Pflege und
 ohne Browser, die Ausgaben gehen ins Log.
+
+`upgrade` ist der eine Nachzug im Terminal, das Gegenstück zu /k-upgrade
+(`cmd/k-playbook/upgrade.go`): erst das Programm — `project.Update()` im Clone, danach
+`program.Install()`, aber nur, wenn das laufende Programm älter ist als die `VERSION` des
+Clones (`program.CheckStatus()`, dieselbe Regel wie `restartAfterPull()`; im
+Entwicklungsrepo ist das Programm regelmäßig neuer, und herabgestuft wird nie) —, dann
+das Projekt über `ApplyAssistantSetup()`. Hat der Bootstrap das Binary ersetzt, führt
+nicht der noch laufende alte Prozess den Projektschritt aus — er hätte alte Vorlagen und
+alte Erkennung —, sondern er startet das neu installierte Programm mit
+`upgrade --project-only` als Subprozess (`reexecProjectStep()`); im Klartext gehen dessen
+Zeilen direkt durch, mit `--json` wird seine Antwort als `project` eingebettet, so wie sie
+kam. Die MCP-Einträge korrigiert der Pull (`UpdateResult.MCPRepaired`); nur wenn der Pull
+entfiel — kein Clone, kein Git, kein Netz —, läuft `RepairMCP()` mit der Schreibregel des
+Starts. Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
+Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das Binary
+gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
+behält das alte Programm. `--check` schreibt nichts: `CheckUpdate()` und
+`CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
+`PendingLinkChanges()` und `CheckMCP()` für das, was ein Lauf am Projekt täte — kein
+Trockenlauf-Schalter in `ApplyAssistantSetup()`. Ohne Wirt-Pflege, weil /k-upgrade die
+Ausgabe wörtlich wiedergibt.
 
 `vscode` ist der ausdrückliche Weg zur mitgereisten VS-Code-Erweiterung:
 `install`, `status` und `vsix -o <datei>`, alle drei ohne Wirt-Pflege. Selbsttätig
@@ -974,7 +995,12 @@ Die Datei heißt bewusst **nicht** `AGENTS.md`. Diesen Namen lesen die Assistent
 sich aus, und er ist dem Hauptverzeichnis vorbehalten.
 
 `ApplyRootInstructions()` legt `AGENTS.md` an, falls sie fehlt, und hängt sonst einen
-kurzen Anstoß an, der auf `k-playbook context` verweist. Vorhandener Inhalt wird nie
+kurzen Anstoß an: den einen Aufruf einer Sitzung, `k-playbook briefing`, eingerückt als
+Shell-Befehl, dahinter das gleichwertige MCP-Werkzeug `k_playbook_briefing` — in dieser
+Reihenfolge wird der Block befolgt, umgekehrt nicht (gemessen 2026-10-18, Befund
+`command-huelle-verweis.md`). Die Vorlage `rootInstructionsTemplate()` ist Überschrift
+plus dieser Block und sonst nichts: genau die `AGENTS.md` des Quell-Repos, und ein Test
+(`TestVorlageIstDieAgentsDatei`) hält beide gleich. Vorhandener Inhalt wird nie
 überschrieben. Der Marker `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf
 den Block erneut anhängt; `CheckRootInstructions()` prüft darauf.
 
@@ -989,35 +1015,66 @@ Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwe
 Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf. Aufgerufen wird das
 einmal je Host oder DevContainer installierte `k-playbook` unter seinem Namen.
 
-### Ein veralteter Anstoß wird ersetzt
+### Ein veralteter Anstoß wird ersetzt, abgelöste Zusatzblöcke werden entfernt
 
 Der Marker allein war zu wenig. Ein Bestandsprojekt trug den Anstoß des abgelösten
 Wrapper-Modells (`k-playbook/bin/k-playbook context`); weil der Marker dastand, tat
 `applyRootInstructions()` nichts — und der Git-Update-Weg erreicht die Datei nicht, denn
 sie liegt im Hauptverzeichnis und nicht im Clone. Nach dem Entfernen des Wrappers zeigte
-sie dauerhaft auf eine Datei, die es nicht mehr gibt.
+sie dauerhaft auf eine Datei, die es nicht mehr gibt. Dasselbe gilt seit dem Briefing für
+die Fassung mit `k-playbook context`, die das Binary bis dahin auslieferte.
 
-`replaceOutdatedInstructionsBlock()` ersetzt deshalb den Block, wenn er noch
-`legacyInstructionsCommand` (`/bin/k-playbook context`) enthält — dieselbe enge
-Definition von „veraltet" wie bei der MCP-Registrierung, und aus demselben Grund: die
-neue Fassung enthält das Muster nicht, der Lauf ist damit idempotent.
+`replaceOutdatedInstructionsBlock()` ersetzt deshalb den Block, wenn er den Aufruf einer
+abgelösten Fassung trägt. Die Fassungen stehen in `legacyInstructionsBlocks`, die älteste
+zuerst, je Fassung der Aufruf (`/bin/k-playbook context` als Teilpfad, dann
+`k-playbook context`) und ihre Zeilen, so wie sie ausgeliefert wurden — eine eigene Kopie,
+nicht aus `instructionsBlock()` abgeleitet, denn eine abgelöste Fassung ändert sich nicht
+mehr. Das ist dieselbe enge Definition von „veraltet" wie bei der MCP-Registrierung, und
+aus demselben Grund: die neue Fassung enthält keines der Muster, der Lauf ist damit
+idempotent. Jede andere Fassung gehört dem Projekt und bleibt stehen.
 
-`instructionsBlockBounds()` grenzt den Block ab: von der Markerzeile bis zum nächsten
-HTML-Kommentar oder zur nächsten Überschrift, abzüglich der Leerzeilen davor. Der Block
-trägt genau einen Marker und genau eine Überschrift; was ein Projekt dahinter geschrieben
-hat — auch der Session-Memory-Block — bleibt dadurch stehen.
+Die zwei Zusatzblöcke, die die Vorlage bis zum Briefing hinter den Anstoß hängte —
+`<!-- k-playbook:session-memory -->` („Projektwissen zuerst") und
+`<!-- k-playbook:befunde -->` („Befunde festhalten") —, werden nicht mehr geschrieben und
+in Bestandsdateien entfernt (`removeObsoleteRootBlocks()`, `obsoleteRootBlocks`): ihr Inhalt
+kommt als `instructions/always/100-…` und `200-…` mit dem Briefing, und doppelt gelesen wäre
+er nur Rauschen. Entfernt wird der Block samt Marker und den Leerzeilen davor, so dass kein
+doppelter Absatz bleibt. `sessionMemoryBlock()` und `findingsBlock()` bleiben im Code als
+die ausgelieferte Gestalt, nur noch zur Erkennung.
 
-Zwei Einstiege, wie bei MCP:
+`markedBlockEnd()` grenzt jeden dieser Blöcke ab, zwei Wege in dieser Reihenfolge: die
+bekannte Gestalt Zeile für Zeile (`knownBlockEnd()`; beim Anstoß die abgelösten Fassungen,
+bei den Zusatzblöcken ihre ausgelieferte Gestalt, die Aufrufzeile darf variieren), sonst
+die nächste Überschrift oder der nächste HTML-Kommentar, abzüglich der Leerzeilen davor —
+nie das Dateiende. Jeder Block trägt genau einen Marker und genau eine Überschrift; was
+ein Projekt davor, dazwischen oder dahinter geschrieben hat, bleibt dadurch stehen. Lässt
+sich keine Grenze bestimmen, wird nichts ersetzt und nichts entfernt: der Aufrufer bekommt
+einen Hinweis (`errAnstossEndeUnbestimmt`, `obsoleteRootBlock.errEndeUnbestimmt()`), der
+den neuen Aufruf nennt, und `RootInstructionsState.Hint` trägt ihn in die Karte. Beide
+Wege laufen über `refreshRootInstructions()`, erst der Anstoß, dann die Zusatzblöcke: eine
+Datei, die nur die Zusatzblöcke trägt, bekommt so beim Einrichten den Anstoß und verliert
+die Blöcke in einem Lauf.
+
+`RootInstructionsState` meldet den Bestand ohne zu schreiben: `HasOutdatedAnstoss`,
+`ObsoleteBlocks` (die Namen der noch vorhandenen Zusatzblöcke, ein eigenes Feld, damit die
+Karte beides getrennt zeigt) und `Hint`; `NeedsRefresh()` fasst zusammen, ob ein Lauf
+etwas nachzöge. `AssistantSetup` sagt nach dem Lauf, was geschah: `RootRefreshed` deckt
+beide Fälle, `RootAnstossRefreshed` und `RootBlocksRemoved` sagen, welcher.
+
+Drei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Session-Memory- und Befunde-Block nachtragen, `opencode.json` registrieren |
-| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
+| ausdrücklich, im Terminal | `k-playbook upgrade` (`cmd/k-playbook/upgrade.go`), über `ApplyAssistantSetup()` | dasselbe, nach dem Programm-Update; `--check` meldet aus `CheckRootInstructions()`, was ein Lauf täte |
+| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen, Zusatzblöcke entfernen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
 Der Auffangweg kennt genau zwei Fälle, und `RootInstructionsRepair` sagt, welcher
-eingetreten ist (`Refreshed` oder `Created`), damit `runGUI()` beide eigens meldet. Das
-Ersetzen des veralteten Blocks ist eine Reparatur an Inhalt, den k-playbook selbst
-geschrieben hat, und läuft deshalb unabhängig davon, ob die Datei versioniert ist. Das
+eingetreten ist (`Refreshed` und `RemovedBlocks`, oder `Created`), damit `runGUI()` alle
+eigens meldet; eine Datei ohne Anstoßmarker fasst er nicht an und meldet nur, wenn sie die
+Zusatzblöcke trägt (`BlocksWithoutAnstoss`). Das Ersetzen des veralteten Blocks und das
+Entfernen der Zusatzblöcke sind Reparaturen an Inhalt, den k-playbook selbst
+geschrieben hat, und laufen deshalb unabhängig davon, ob die Datei versioniert ist. Das
 Anlegen (`createRootInstructions()`) greift nur, wenn `AGENTS.md` ganz fehlt und die
 Fallmatrix aus `instructions_layout.go` nichts anderes vorsieht: kein Konflikt, keine
 Blockade, keine Umbenennung einer echten `CLAUDE.md`, kein zu entfernender Symlink. Dann
@@ -1160,11 +1217,13 @@ Skills **einzeln** verlinkt werden, kommt ein neu mitgelieferter Command nicht m
 selbst an. Ein Verzeichnis-Symlink hatte das automatisch getan; ein Update, das den
 Katalog ändert, ihn aber nicht registriert, wäre halb erledigt — und zwar unsichtbar.
 
-Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß `ApplyLinks()`. Zwei
+Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß `ApplyLinks()`. Drei
 Änderungen an diesem Einstieg sind gewollt und stehen deshalb im Antworttext: das
-Aktualisieren bringt jetzt den Anstoß mit — der Marker macht das idempotent —, und in
-einem Projekt ohne `AGENTS.md` legt es die Datei erstmals aus der Vorlage an. Sonst
+Aktualisieren bringt jetzt den Anstoß mit — der Marker macht das idempotent —, es zieht
+einen veralteten Anstoß nach und entfernt die abgelösten Zusatzblöcke (`describeSetup()`),
+und in einem Projekt ohne `AGENTS.md` legt es die Datei erstmals aus der Vorlage an. Sonst
 bliebe ein Projekt mit nur echter `CLAUDE.md` über „Aktualisieren" für immer unverändert.
+Im Terminal tut `k-playbook upgrade` dasselbe (§„Acht Einstiege").
 Umbenennung und Konflikt gehören ebenfalls in den Antworttext.
 
 `PendingLinkChanges()` liest vorher die Bilanz und meldet sie: dazugekommen, entfernt,
@@ -3917,14 +3976,15 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 |---|---|---|
 | `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs und den vorbelegten `.gitignore` | das Verzeichnis ganz fehlt |
 | `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `.cursor/mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
-| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
+| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; die abgelösten Zusatzblöcke Session-Memory und Befunde; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
 Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, entscheidet das
 Projekt. Ausgenommen sind allein Reparaturen an Inhalt, den k-playbook selbst geschrieben
 hat: die Korrektur des veralteten Wrapper-Eintrags (`MCPStateOutdated`), der Nachzug des
-veralteten Anstoßblocks in `AGENTS.md` und die Migration des `CLAUDE.md`-Symlinks zur
-Include-Datei auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
+veralteten Anstoßblocks in `AGENTS.md`, das Entfernen der zwei abgelösten Zusatzblöcke
+dort (Session-Memory, Befunde — ihr Inhalt kommt mit dem Briefing; seit Task 096) und die
+Migration des `CLAUDE.md`-Symlinks zur Include-Datei auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
 außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„Instruktionen").
 Jeder Weg ist idempotent — ein zweiter Lauf schreibt
 nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas

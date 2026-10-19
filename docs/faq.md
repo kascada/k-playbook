@@ -100,7 +100,7 @@ The instruction file: what an assistant should read before working. It exists tw
 
 They are read in this order. The project-owned layer is where content that applies only here belongs: project structure and special characteristics, conventions, recurring flows. General k-playbook rules do not belong there: they are in the shipped layer and are updated with every update.
 
-It is deliberately not named `AGENTS.md`: assistants read that name themselves, and it is reserved for the project root. It contains only a brief prompt that refers to `k-playbook context`.
+It is deliberately not named `AGENTS.md`: assistants read that name themselves, and it is reserved for the project root. It contains only a brief prompt that names `k-playbook briefing`, the one call at the start of a session.
 
 ## Can I add my own slash commands?
 
@@ -112,7 +112,7 @@ k-playbook-local/commands/k-todo.md   replaces the shipped item
 k-playbook-local/skills/my-skill/SKILL.md
 ```
 
-The new command is registered automatically: at the next `k-playbook context`, the call at the beginning of every session, or when the assistants section of the interface is next displayed. Then restart the assistant; it reads commands at startup.
+The new command is registered automatically: at the next `k-playbook briefing`, the call at the beginning of every session, or when the assistants section of the interface is next displayed. Then restart the assistant; it reads commands at startup.
 
 For commands, the path from `commands/` counts: a local `commands/_shared/x.md` replaces exactly that file, while the rest of the namespace remains shipped. A skill, on the other hand, is replaced as a whole: `SKILL.md` and accompanying files must match each other.
 

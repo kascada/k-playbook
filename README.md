@@ -144,11 +144,15 @@ individual symlinks**, not directory symlinks: only that way do both sources arr
 interface compares the resolved catalog with what is registered, names the deviations and
 offers to fix them.
 
-What applies in the end is not computed by any command itself:
+What applies in the end is not computed by any command itself. A session gets it with
+the briefing, the one call at its start:
 
 ```bash
-k-playbook context
+k-playbook briefing
 ```
+
+`k-playbook context` still prints the resolved working state as JSON; the briefing carries
+what is left of it in its section `context` until that output has been taken apart.
 
 Linking is set up for Claude Code, OpenCode and Cursor. Skills exist only once, under
 `.claude/skills`, because OpenCode searches that directory as well and Cursor has no
@@ -160,7 +164,7 @@ The direction is the same everywhere. If a project brings only a real `CLAUDE.md
 **renames** it to `AGENTS.md` and creates `CLAUDE.md` anew as an include; the content is
 preserved and not duplicated. A `CLAUDE.md` that already carries the line `@AGENTS.md` is
 set up — including one with its own house rules alongside. A symlink from an older
-version is replaced without loss on the first `k-playbook context`. What cannot be
+version is replaced without loss on the first `k-playbook briefing`. What cannot be
 resolved automatically — two real files without an import line, a deliberately set link
 to a different target, a git-ignored `AGENTS.md` — is reported as a **conflict** and left
 untouched. As long as it stands, Claude Code sees nothing of the playbook.
@@ -201,8 +205,13 @@ of the button, because a program installed there would not be the one the next c
 If only commands, rules or recipes are new, `VERSION` does not change and the service keeps
 running.
 
+In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
+the running program is older, then `AGENTS.md`, `CLAUDE.md`, linking and MCP entries —
+and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
+only reports what a run would do.
+
 The linking for the assistants catches up by itself afterwards — on the next
-`k-playbook context`, the call at the start of every session, or on the next look at the
+`k-playbook briefing`, the call at the start of every session, or on the next look at the
 assistant block of the interface. It follows the project's catalog, not the path by which
 the installation was updated. For the new commands to arrive, the assistant has to be
 restarted once; it reads its list at startup.

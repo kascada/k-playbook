@@ -729,3 +729,38 @@ func TestZeile2SetztKatalogLinksTrotzdem(t *testing.T) {
 		t.Errorf("Detailtext nennt die falsche Ursache: %s", status.Detail)
 	}
 }
+
+// Das Einrichten zieht die vollständige alte Vorlage — Wrapper-Anstoß plus
+// Session-Memory- und Befunde-Block — in einem Lauf auf die neue und meldet
+// beides getrennt: den ersetzten Anstoß und die entfernten Blöcke. Der zweite
+// Lauf meldet nichts mehr.
+func TestEinrichtenZiehtAlteVorlageNach(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, RootInstructionsFile),
+		veralteterAnstoss+"\n"+sessionMemoryBlock()+"\n"+findingsBlock()+"\n## Unsere Regeln\n\nBleiben.\n")
+
+	setup, err := ApplyAssistantSetup(root)
+	if err != nil {
+		t.Fatalf("ApplyAssistantSetup: %v", err)
+	}
+	if !setup.RootRefreshed || !setup.RootAnstossRefreshed {
+		t.Errorf("der ersetzte Anstoß wird nicht gemeldet: %+v", setup)
+	}
+	if len(setup.RootBlocksRemoved) != 2 {
+		t.Errorf("die entfernten Blöcke werden nicht gemeldet: %+v", setup.RootBlocksRemoved)
+	}
+	if setup.Root.NeedsRefresh() || setup.Root.Hint != "" {
+		t.Errorf("nach dem Lauf ist noch etwas nachzuziehen: %+v", setup.Root)
+	}
+	if content := readFile(t, filepath.Join(root, RootInstructionsFile)); content != rootInstructionsTemplate()+"\n## Unsere Regeln\n\nBleiben.\n" {
+		t.Errorf("AGENTS.md nach dem Lauf:\n%q", content)
+	}
+
+	again, err := ApplyAssistantSetup(root)
+	if err != nil {
+		t.Fatalf("zweiter Lauf: %v", err)
+	}
+	if again.RootRefreshed || again.RootAnstossRefreshed || len(again.RootBlocksRemoved) > 0 {
+		t.Errorf("der zweite Lauf meldet eine Änderung: %+v", again)
+	}
+}

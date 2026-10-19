@@ -150,12 +150,12 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 
 // Die drei Command-Module in defaults/commands/_shared/ sind über die Sorte
 // commands erreichbar, tragen Frontmatter title und description und kommen als
-// Einzeldatei unverändert; context.md bleibt wenige Zeilen. includes/ trägt
-// weiterhin keinen Baustein — wie seine README sagt.
+// Einzeldatei unverändert; erster-schritt.md bleibt wenige Zeilen. includes/
+// trägt weiterhin keinen Baustein — wie seine README sagt.
 func TestDefaultsCommandsSharedIncludes(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 
-	for _, name := range []string{"context.md", "gh.md", "base-tools.md"} {
+	for _, name := range []string{"erster-schritt.md", "gh.md", "base-tools.md"} {
 		ref := "k-playbook:/commands/_shared/" + name
 		got := mustResolveDoc(t, layers, ref)
 		if got.Directory || got.Disabled || len(got.Parts) != 1 || got.Parts[0].Origin != DocOriginDist || len(got.Problems) != 0 || len(got.Includes) != 0 {
@@ -170,18 +170,18 @@ func TestDefaultsCommandsSharedIncludes(t *testing.T) {
 		}
 	}
 
-	shared := mustResolveDoc(t, layers, "k-playbook:/commands/_shared/context.md")
+	shared := mustResolveDoc(t, layers, "k-playbook:/commands/_shared/erster-schritt.md")
 	body := strings.TrimSpace(string(inventoryBody(t, shared.Content)))
 	if lines := strings.Count(body, "\n") + 1; lines > 8 {
-		t.Errorf("context.md hat %d Zeilen Rumpf, soll wenige bleiben:\n%s", lines, body)
+		t.Errorf("erster-schritt.md hat %d Zeilen Rumpf, soll wenige bleiben:\n%s", lines, body)
 	}
 	for _, want := range []string{"`k_playbook_briefing`", "`k-playbook briefing --json`", "`documents.always.content`"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("context.md nennt nicht %s", want)
+			t.Errorf("erster-schritt.md nennt nicht %s", want)
 		}
 	}
 	if strings.Contains(body, "k-playbook context") {
-		t.Errorf("context.md ruft noch `k-playbook context`:\n%s", body)
+		t.Errorf("erster-schritt.md ruft noch `k-playbook context`:\n%s", body)
 	}
 
 	entries, err := layers.Dist.List(docIncludesRoot)
@@ -202,32 +202,38 @@ func inventoryBody(t *testing.T, content string) []byte {
 }
 
 // /k-upgrade ist der erste Command auf dem Briefing: sein Text beginnt mit
-// `include: _shared/context.md`, aufgelöst steht an der Stelle der Rumpf des
-// Moduls ohne Frontmatter, roh die Include-Zeile; die Felder kommen aus dem
-// Briefing, nicht mehr aus `k-playbook context`.
+// `include: _shared/erster-schritt.md`, aufgelöst steht an der Stelle der
+// Rumpf des Moduls ohne Frontmatter, roh die Include-Zeile; die Felder kommen
+// aus dem Briefing, nicht mehr aus `k-playbook context`. Seit Task 096 ruft
+// der Text `k-playbook upgrade` und gibt dessen Meldung wieder.
 func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	const ref = "k-playbook:/commands/k-upgrade.md"
-	const includeLine = "include: _shared/context.md\n"
+	const includeLine = "include: _shared/erster-schritt.md\n"
 
 	file := readRepoDefault(t, "commands/k-upgrade.md")
 	if !strings.Contains(file, "\n"+includeLine) {
 		t.Fatalf("k-upgrade.md ohne Include-Zeile:\n%s", file)
 	}
-	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/context.md"))))
+	if !strings.Contains(file, "\n    k-playbook upgrade\n") || strings.Contains(file, "k-playbook context") {
+		t.Errorf("k-upgrade.md ruft nicht `k-playbook upgrade`:\n%s", file)
+	}
+	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
 
 	got := mustResolveDoc(t, layers, ref)
 	want := strings.Replace(file, includeLine, module+"\n", 1)
 	if got.Content != want {
 		t.Errorf("eingesetzter Text:\n%q\nerwartet\n%q", got.Content, want)
 	}
-	if strings.Contains(got.Content, "include:") || strings.Contains(got.Content, "title: Briefing laden") {
+	// Die Include-Zeile selbst ist weg; das Modul nennt sie nur als Prosa in
+	// Backticks.
+	if strings.Contains(got.Content, "\n"+includeLine) || strings.Contains(got.Content, "title: Erster Schritt") {
 		t.Errorf("Include-Zeile oder Frontmatter des Moduls im eingesetzten Text:\n%s", got.Content)
 	}
-	if !strings.Contains(got.Content, "`context.playbook.dir`") || strings.Contains(got.Content, "k-playbook context") {
+	if !strings.Contains(got.Content, "`documents.always.content`") || strings.Contains(got.Content, "k-playbook context") {
 		t.Errorf("k-upgrade liest nicht aus dem Briefing:\n%s", got.Content)
 	}
-	if len(got.Includes) != 1 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/context.md", Origin: DocOriginDist, Depth: 1}) {
+	if len(got.Includes) != 1 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) {
 		t.Errorf("includes: %+v", got.Includes)
 	}
 	if len(got.Problems) != 0 || got.Disabled || got.Directory {
