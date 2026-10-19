@@ -715,9 +715,13 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     `k-playbook upgrade`; `k-playbook upgrade [--check] [--json]` pulls, installs only when
     the running program is older, re-executes the new program for the project step, and
     `/k-upgrade` relays its message. The inventory of `k-playbook context` is the table
-    above. Open: `/k-upgrade` in Claude Code and OpenCode with a real binary change after the
-    next release (`bin/install` needs network and writes to `~/.local/bin`; measured, not
-    assumed).
+    above. Released as v0.16.9 (without the three fixes from the review) and v0.16.10 (with
+    them). Measured 2026-10-19 after v0.16.10 with a real binary change (v0.16.9 installed,
+    clone at v0.16.10): `/k-upgrade` in Claude Code (headless `-p`) and in OpenCode
+    (`opencode run`) both run `k-playbook upgrade`, `bin/install` replaces the binary from
+    inside both clients, the message and the restart hint come through unchanged
+    (`k-playbook-local/material/befunde/command-huelle-verweis.md`, 2026-10-19). Not
+    measured: the "download/install not possible" path.
 
 ## Findings
 
