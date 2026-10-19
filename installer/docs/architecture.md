@@ -217,6 +217,8 @@ installer/
 │   ├── guistatus.go             Subkommando gui status: den Wertesatz aus
 │   │                            guiproc.StatusForDir als JSON rendern, nebenwirkungsfrei
 │   ├── stop.go                  Subkommando stop
+│   ├── notify.go                Subkommando notify: Meldung auf diesem Rechner über
+│   │                            notify.Send, --title, --body, --sound, --json
 │   ├── version.go               Subkommando version: die gestempelte Version, eine Zeile
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
@@ -226,6 +228,11 @@ installer/
 │   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
 │   │                            Kephalaion-Collection
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
+├── internal/hostenv/
+│   └── hostenv.go               Wo läuft das Programm: Container-Marker, WSL
+├── internal/notify/
+│   └── notify.go                Meldung an den Nutzer: Kanäle windows-toast (WSL),
+│                                macos, linux-desktop; ehrlich ohne Kanal
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -311,7 +318,7 @@ installer/
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
-│   ├── browser.go               Browser öffnen, Container erkennen
+│   ├── browser.go               Browser öffnen (Container-Erkennung aus hostenv)
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
@@ -373,8 +380,9 @@ installer/
 │   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │   │                            write, publish, supersede, inbox_*, queue_*, status),
 │   │                            dünne Hüllen über project.Knowledge
-│   └── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
-│                                guiproc.StatusForDir)
+│   ├── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
+│   │                            guiproc.StatusForDir)
+│   └── notify.go                Werkzeug k_playbook_notify (Hülle über notify.Send)
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -3326,7 +3334,8 @@ Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_d
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
 `k-playbook doc`, `k_playbook_briefing` (`briefing.go`) um `project.BuildBriefing`, wie
 `k-playbook briefing`, und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
-`k-playbook gui status` (§„Zustand erfragen: `gui status`"). Keine der Hüllen trägt eigene Fachlogik; sie
+`k-playbook gui status` (§„Zustand erfragen: `gui status`"), und `k_playbook_notify` (`notify.go`) um
+`notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall. Tool-Tabelle und Verträge stehen in
@@ -4258,6 +4267,47 @@ sonst Endpunkte treffen, hinter denen `git pull` und Schreibvorgänge stehen.
 
 Der Browser wird nicht automatisch geschlossen, wenn der Server endet. Browser blockieren
 das in vielen Fällen, und `open`/`xdg-open` liefern keinen verlässlichen Tab-Handle.
+
+### Fertig-Meldung: `notify`
+
+`k-playbook notify --title <text> [--body <text>] [--sound] [--json]` zeigt dem Nutzer eine
+Meldung auf dem Rechner, auf dem das Programm läuft; `k_playbook_notify` ist die MCP-Hülle
+darüber. Beide rufen `notify.Send` in `internal/notify/`. Gedacht ist es für das Ende einer
+langen Arbeit: ein Popup, mit `--sound` dazu ein Ton.
+
+Es gibt kein gemeinsames Signal der Assistenten und keinen Weg, über MCP einen Client zum
+Piepsen zu bringen. Darum meldet das Binary selbst, und zwar dort, wo es läuft: ein
+stdio-Server läuft, wo der Client ihn gestartet hat. Auf dem Entwicklerrechner ist das der
+Desktop vor dem Nutzer, im Devcontainer der Container — ohne Display, ohne Windows-Seite.
+`notify.Send` probiert darum die bekannten Kanäle in fester Reihenfolge und sagt ehrlich,
+wenn keiner geht:
+
+1. **`windows-toast`** unter WSL (`hostenv.IsWSL`: `WSL_DISTRO_NAME`, `WSL_INTEROP` oder
+   ein Microsoft-Kernel in `/proc/version`) mit `powershell.exe` im PATH. Der Toast geht
+   über die WinRT-Klassen, das XML über `XmlDocument.LoadXml` — `GetXml()` liefert in
+   PowerShell 5.1 eine Zeichenkette, gemessen am 2026-10-19. Als AppId dient die
+   PowerShell-Verknüpfung des Startmenüs, die es auf jedem Windows gibt. Das Skript geht als
+   `-EncodedCommand` (UTF-16LE, Base64), damit die Argumentumschreibung der WSL-Brücke
+   nichts daran ändert. Der Toast selbst ist stumm (`<audio silent="true"/>`); den Ton
+   spielt `Media.SoundPlayer` mit `C:\Windows\Media\notify.wav`, unabhängig von den
+   Benachrichtigungseinstellungen von Windows.
+2. **`macos`** mit `osascript`: `display notification`, Ton als `sound name "Glass"`.
+3. **`linux-desktop`** mit `DISPLAY` oder `WAYLAND_DISPLAY` und `notify-send`. Der Ton ist
+   ein zweites Programm (`paplay`, sonst `canberra-gtk-play`); fehlt es, geht die Meldung
+   trotzdem, und `reason` sagt, warum kein Ton kam.
+
+Ohne Kanal ist der Fehler eine `*notify.NoChannelError` mit dem Grund: der
+Container-Marker aus `hostenv.ContainerMarker`, das fehlende Display, das fehlende
+Programm. Die CLI endet damit mit Exit 1, das Werkzeug antwortet `ok: false` mit
+`error.code: no_channel` — eine Auskunft über den Rechner, kein Grund zum Wiederholen.
+Ein leerer Titel ist `invalid_input`, ein scheiterndes Programm `failed` mit dessen stderr.
+Jedes Programm hat zehn Sekunden.
+
+Die Container-Erkennung lag vorher in `webui/browser.go`; sie liegt jetzt in
+`internal/hostenv/`, weil Browser-Start, Chat-Wächter und Meldung dieselbe Antwort
+brauchen. Was bewusst noch fehlt: ein rechnerlokaler Schalter gegen den Ton (sein Platz
+wäre `k-playbook-local/K-PLAYBOOK.local.yaml`), Hooks in den Assistenten, die am Ende
+eines Turns `k-playbook notify` rufen, und ein Weg vom Devcontainer zum Desktop davor.
 
 ### Browser öffnen
 

@@ -2,7 +2,7 @@
 description: Execute one or more task files. If no path is given, uses the project's task directory. Pass a single .md file or a directory to override. Multiple tasks are executed in order by their numeric prefix. Execution, diff and code review run in sub-agents that write into the task file themselves. On success, the file moves to done/ unless a critical review finding stops the run first. On partial execution or error, appends a status note and leaves the file in place.
 argument-hint: [file-or-directory]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent, mcp__k-playbook__k_playbook_notify]
 ---
 
 # k-task-run
@@ -23,6 +23,13 @@ und Code-Review laufen je Task in Sub-Agenten, die ihre Ergebnisse selbst in die
 schreiben und dem Hauptkontext nur ein festes, knappes Format zurückgeben. Der Hauptkontext
 sieht pro Task keinen Diff, keine Dateiinhalte außer der Task-Datei selbst, keine Logs und
 kein vollständiges Review. Alle Rückfragen an den Nutzer bleiben im Hauptkontext.
+
+**Fertig-Meldung.** Vor jeder Rückfrage an den Nutzer und am Ende des Commands meldet
+sich der Hauptkontext auf dem Rechner des Nutzers, wie in
+`k-playbook/commands/_task/fertig-meldung.md` beschrieben (Titel `<projekt>: <task> – <was>`,
+Body was passiert ist, `sound: true`). Die Stellen in diesem Command: die Rückfrage in
+Schritt 2, die Optionen in 4a, der Blocker in 4d, die Stopp-Abfrage in 4f und die
+Zusammenfassung in Schritt 6.
 
 Produces:
 - In jeder ausgeführten Task-Datei den Abschnitt `## Ausführung` mit Kennzeile, Status und
@@ -141,8 +148,8 @@ enthält; gelesen wird dafür keine Datei.
 
 Wenn **alle** Dateien ein Review-Log tragen: weiter, ohne Rückfrage.
 
-Wenn mindestens eine keines hat: die betroffenen Dateien in **einer** Nachricht nennen
-und fragen:
+Wenn mindestens eine keines hat: erst die Fertig-Meldung (`Rückfrage: ohne Task-Refine`),
+dann die betroffenen Dateien in **einer** Nachricht nennen und fragen:
 
 ```
 Ohne Task-Refine:
@@ -449,7 +456,7 @@ Wait for the sub-agent to finish before proceeding to the next task.
 
 ### 4d — Unerwartete Blocker behandeln
 
-If the sub-agent's result reports `Status: blockiert`: **stop and ask the user**, showing the „Blocker" line. Do not proceed to the next task until resolved. Then decide whether to re-run this task or to abort it (4e).
+If the sub-agent's result reports `Status: blockiert`: **stop and ask the user**, showing the „Blocker" line — vorher die Fertig-Meldung (`Rückfrage: Blocker`, der Body nennt ihn). Do not proceed to the next task until resolved. Then decide whether to re-run this task or to abort it (4e).
 
 Erneut ausführen heißt: 4c noch einmal, mit der Antwort des Nutzers als weiterer Klärung.
 Der Snapshot aus 4b.1 bleibt derselbe.
@@ -562,6 +569,7 @@ dem nächsten Task. Sie kommt, sobald einer dieser Gründe vorliegt:
 | `REVIEW_SCOPE` ist `nur seit Fortsetzung` | „Review nur seit Fortsetzung" | entfällt |
 
 Mehrere Gründe stehen in einer Abfrage; (a) steht zur Wahl, solange einer mit (a) dabei ist.
+Vor der Abfrage die Fertig-Meldung (`Rückfrage: <Grund>`, der Body nennt die Zahlen).
 Fehlt das Rezept im Katalog, gilt dafür nur die dritte Zeile, nicht die zweite — ein erneutes
 Review fände das Rezept ebenso wenig.
 Für kritische Befunde:
@@ -715,7 +723,9 @@ If no Intent is present: skip this step silently.
 
 ## Schritt 6 — Abschließende Zusammenfassung
 
-After all tasks are processed, print a brief summary:
+After all tasks are processed, send the Fertig-Meldung first (`fertig` oder `abgebrochen`;
+der Body trägt die Zeilen „Erfolgreich", „Angehalten" und „Abgebrochen" in Kurzform), then
+print a brief summary:
 
 ```
 Ausgeführt:    <n> Tasks

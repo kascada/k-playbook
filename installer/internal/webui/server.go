@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/hostenv"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -185,7 +186,7 @@ func Serve() error {
 func Announce(url string) {
 	fmt.Printf("k-playbook: %s\n", url)
 
-	marker, inContainer := containerMarker()
+	marker, inContainer := hostenv.ContainerMarker()
 	openers := browserOpeners()
 	if inContainer {
 		// Im Container zählt allein ein ausdrücklich gesetzter $BROWSER: dort

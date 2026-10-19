@@ -15,8 +15,9 @@ up to date.
 
 The server offers the working state, the review, todo and knowledge tools,
 `k_playbook_doc_read` for references, the four `doc` tools for numbered documents in the
-project's Kephalaion collection, and `k_playbook_gui_status` for the state and the address
-of the project's interface.
+project's Kephalaion collection, `k_playbook_gui_status` for the state and the address
+of the project's interface, and `k_playbook_notify` for a desktop notification on the
+machine the server runs on.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
 because a stdio server must not assume that its process working directory is the target
 project. There is no fallback to that directory.
@@ -359,6 +360,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
+| `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -1020,6 +1022,48 @@ directory can be resolved at all (neither `XDG_RUNTIME_DIR` nor `XDG_STATE_HOME`
 directory). Note the precondition: a directory *without* an installation still has a key in
 `guiproc`, so a service running on it can be asked about on the command line, while
 `resolveProjectDir` rejects such a directory -- over MCP it cannot.
+
+### Notify Contract
+
+`k_playbook_notify` shows the user a notification on the machine the MCP server runs on: a
+popup with `title` and `body`, and with `sound: true` a sound as well. It is meant for the
+end of a long piece of work, when nobody is watching the screen any more -- not for
+progress. Both ways call the same function (`notify.Send`); the subcommand
+`k-playbook notify` renders its value set, the tool serializes it.
+
+There is no common signal between assistants and no way for an MCP server to make a
+client ring. The binary therefore notifies itself, on the machine it runs on. A stdio server
+runs where the client started it: on a developer machine that is the desktop in front of
+the user, in a devcontainer it is the container, which has no display and no Windows side.
+The tool tries the known channels in a fixed order and reports honestly when none applies.
+
+| Channel | Condition | How |
+|---|---|---|
+| `windows-toast` | WSL (`WSL_DISTRO_NAME`, `WSL_INTEROP` or a Microsoft kernel in `/proc/version`) and `powershell.exe` on `PATH` | a toast through the WinRT notification classes, sent as `-EncodedCommand`; the toast itself is silent, the sound is `C:\Windows\Media\notify.wav` through `Media.SoundPlayer`, so it does not depend on the Windows notification settings |
+| `macos` | `darwin` and `osascript` | `display notification … with title …`, with `sound name "Glass"` on request |
+| `linux-desktop` | `DISPLAY` or `WAYLAND_DISPLAY` set and `notify-send` on `PATH` | `notify-send`; the sound through `paplay` or `canberra-gtk-play` if present, otherwise the notification still goes out and `reason` says why there was no sound |
+
+Input: `projectDir` (required by contract, like all other tools), `title` (required),
+`body` (optional, truncated to about 200 characters), `sound` (optional, default `false`).
+
+The value set, in the envelope `{ok, tool, projectDir, …, error}`:
+
+| Field | Meaning |
+|---|---|
+| `channel` | the channel that showed the notification |
+| `soundPlayed` | whether a sound was played |
+| `reason` | only when a sound was requested and did not play: why not |
+
+Error codes in `error.code`: `invalid_input` for a missing `projectDir` or an empty
+`title`, `project_not_found` for a `projectDir` that leads to no project, `no_channel` when
+the machine has no way to the user -- `error.message` names the reason, such as
+`Container erkannt (DEVCONTAINER)` or a missing display -- and `failed` when the program
+that should have shown the notification failed; its stderr is in `error.message`.
+`no_channel` is information about the machine, not a reason to retry.
+
+What is deliberately not there yet: a per-machine switch to turn the sound off, hooks in
+the assistants that call `k-playbook notify` when a turn ends, and a way from a devcontainer
+to the desktop in front of it.
 
 ## Inspecting What the Server Offers
 

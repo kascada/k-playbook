@@ -2,7 +2,7 @@
 description: Härtet Task- und Instruction-Dateien vor Ausführung mit einem read-only Critic/Editor-Dialog; ohne Argument wird das Task-Verzeichnis verwendet.
 argument-hint: [path]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Task, Agent]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Task, Agent, mcp__k-playbook__k_playbook_notify]
 ---
 
 # k-task-refine
@@ -91,6 +91,12 @@ ohne Rückfragen implementieren können.
 If file references are present: read those files and use their content as Intent.
 If both inline text and file references are present: combine both.
 If no `## Intent` section exists: skip the alignment check (Schritt 10).
+
+## Fertig-Meldung
+
+Vor jeder Rückfrage an den Nutzer und am Ende meldet sich der Moderator auf dem Rechner
+des Nutzers, wie in `k-playbook/commands/_task/fertig-meldung.md` beschrieben. Die Stellen
+in diesem Command: die Rückfrage in Schritt 7 und das Ende nach Schritt 11.
 
 ## Schritt 3 — Startübersicht ausgeben
 
@@ -188,7 +194,7 @@ The Moderator reviews the Editor output before changing files:
 - Reject unrelated rewrites, style-only churn, broad restructuring, or edits outside `REVIEW_TARGET` unless explicitly justified and approved.
 - If the proposal is clean, apply the minimal change using the available file-editing tool.
 - If the proposal is partially useful, apply only the minimal accepted subset and record the rejection reason.
-- If the proposal cannot be applied cleanly, resolve the conflict minimally yourself or ask the user if the intended edit is ambiguous.
+- If the proposal cannot be applied cleanly, resolve the conflict minimally yourself or ask the user if the intended edit is ambiguous — vorher die Fertig-Meldung (`Rückfrage: unklare Änderung`).
 - Immediately reread every modified file and set `CURRENT_FILE_STATE` to the actual on-disk contents.
 
 Do not trust proposed file contents as applied state until the reread confirms it.
@@ -306,6 +312,8 @@ und unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`.
 ### Offen (nicht gefixt)
 - <ID>: <reason>
 ```
+
+Danach die Fertig-Meldung (`fertig`; der Body nennt Runden, gefixte und offene Issues).
 
 Folge-Command: **`/k-task-run`** — führt die gehärteten Task-Dateien aus und legt in
 jeder das Ergebnis der Ausführung ab.

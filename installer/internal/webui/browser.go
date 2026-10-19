@@ -15,25 +15,6 @@ import (
 // gilt, wenn er sich mit Fehler beendet.
 const openerGrace = 300 * time.Millisecond
 
-// containerMarker meldet, ob der Prozess in einem Container läuft, und woran
-// das erkannt wurde. Dort taugen die geratenen Kandidaten nicht: sie liefen im
-// Container und nicht auf dem Rechner vor dem Nutzer. Nur ein ausdrücklich
-// gesetzter $BROWSER weiß es besser — siehe announce().
-func containerMarker() (string, bool) {
-	for _, name := range []string{"REMOTE_CONTAINERS", "DEVCONTAINER", "CODESPACES"} {
-		if strings.TrimSpace(os.Getenv(name)) != "" {
-			return name, true
-		}
-	}
-	if workdir, err := os.Getwd(); err == nil && strings.HasPrefix(workdir, "/workspaces/") {
-		return "/workspaces/", true
-	}
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return "/.dockerenv", true
-	}
-	return "", false
-}
-
 // browserOpener ist ein Kommando, das eine URL im Browser öffnen kann.
 // Die URL wird beim Aufruf an args angehängt; steht in args ein "%s", tritt
 // sie stattdessen dort an dessen Stelle.

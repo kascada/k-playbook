@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/kascada/k-playbook/installer/internal/hostenv"
 )
 
 // Im Container darf der Chat nur einen OpenCode-Dienst im Container selbst
@@ -25,7 +27,7 @@ import (
 // chatInContainer meldet, ob der Server in einem Container läuft. Eine
 // Variable, damit Tests beide Fälle prüfen können.
 var chatInContainer = func() bool {
-	_, ok := containerMarker()
+	_, ok := hostenv.ContainerMarker()
 	return ok
 }
 

@@ -103,6 +103,12 @@ With `project.vcs: git` and `git` available, every task gets a diff and a code r
   the catalog entry with key `code`, so a project-owned overlay under
   `k-playbook-local/reviews/` takes effect. No assistant-specific skill is involved; the
   review behaves the same in Claude Code and OpenCode.
+- **Notification.** Before every question to the user and at the end of the run, the main
+  context sends a desktop notification through `k_playbook_notify` (title
+  `<project>: <task> – fertig|Rückfrage: …|abgebrochen`, body what happened, with sound), as
+  the module [`commands/_task/fertig-meldung.md`](../commands/_task/fertig-meldung.md)
+  describes; `/k-task-refine` follows the same module. A `no_channel` answer, for example in
+  a devcontainer, changes nothing: the question and the summary stay in the chat.
 - **Switching it off.** Only an empty project-owned `k-playbook-local/reviews/review-code.md`
   switches the review off for `/k-task-run`. The diff sections are still written, and the
   final summary shows "Review: abgeschaltet". `review.enabled` and `audit.enabled` only

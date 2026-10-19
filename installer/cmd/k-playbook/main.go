@@ -11,8 +11,9 @@
 // das Projekt nach,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
-// Adresse der Oberfläche, ohne sie anzufassen, und `stop` beendet den
-// Hintergrunddienst der Oberfläche.
+// Adresse der Oberfläche, ohne sie anzufassen, `stop` beendet den
+// Hintergrunddienst der Oberfläche, und `notify` zeigt dem Nutzer eine
+// Meldung auf diesem Rechner.
 package main
 
 import (
@@ -130,6 +131,11 @@ func run(args []string) error {
 	case "stop":
 		// Ohne Wirt-Pflege: wer beendet, will nichts einrichten.
 		return runStop(os.Stdout)
+	case "notify":
+		// Ohne Wirt-Pflege: eine Meldung soll genau das tun, wonach sie
+		// gefragt wurde, und nichts daneben — und sie läuft später aus
+		// Hooks, deren Ausgabe niemand liest.
+		return runNotify(os.Stdout, args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -302,6 +308,13 @@ Unterkommandos:
   stop      Beendet den Hintergrunddienst der Oberfläche für dieses Projekt.
             Ohne laufenden Server eine Auskunft, kein Fehler; eine verwaiste
             Laufzeitdatei wird dabei entfernt.
+  notify    Zeigt dem Nutzer eine Meldung auf diesem Rechner: k-playbook
+            notify --title <text> [--body <text>] [--sound] [--json]. Ein
+            Popup, mit --sound dazu ein Ton; unter WSL über die Windows-
+            Seite, auf macOS über osascript, auf einem Linux-Desktop über
+            notify-send. Ohne Weg zum Nutzer — etwa im Devcontainer — endet
+            es mit Fehler und nennt den Grund. Dasselbe wie das MCP-Werkzeug
+            k_playbook_notify.
   help      Diese Übersicht.
 `)
 }

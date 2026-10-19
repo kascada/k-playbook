@@ -85,6 +85,7 @@ questions and the ordered work list.
 - `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
 - `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
 - `gui status` / `k_playbook_gui_status` / `is the interface running` / `runtime file state` -> [`mcp.md`](./mcp.md#gui-status-contract), [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#zustand-erfragen-gui-status)
+- `notify` / `k_playbook_notify` / `k-playbook notify` / `desktop notification` / `toast` / `sound` / `done signal` -> [`mcp.md`](./mcp.md#notify-contract), [`task-flow.md`](./task-flow.md), [`../commands/_task/fertig-meldung.md`](../commands/_task/fertig-meldung.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#fertig-meldung-notify)
 - `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#2-create-project-owned-structure), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
 - `read docs` / `Markdown view` / `Mermaid` -> [`installation.md`](./installation.md#read-documentation), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
 - `overlay` / `replace rule` / `disable` -> [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content), [`faq.md`](./faq.md)
