@@ -348,7 +348,6 @@ func TestApplyLinksBedientAlleAssistenten(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join(".claude", "commands"),
 		filepath.Join(".opencode", "commands"),
-		filepath.Join(".cursor", "commands"),
 	} {
 		if _, err := os.Stat(filepath.Join(root, path, "k-test.md")); err != nil {
 			t.Errorf("%s: Command nicht erreichbar: %v", path, err)
@@ -674,7 +673,7 @@ func TestCheckLinksMeldetEchteDateiOhneInclude(t *testing.T) {
 }
 
 // Was ein Update an der Registrierung ändern würde, muss den Eintrag zählen,
-// nicht seine Kopien in .claude/, .opencode/ und .cursor/.
+// nicht seine Kopien in .claude/ und .opencode/.
 func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	root := newProject(t)
 
@@ -773,7 +772,7 @@ func TestHealLinksWendetNichtsAnWennNichtsHeilbarIst(t *testing.T) {
 		t.Fatalf("ApplyLinks: %v", err)
 	}
 
-	blocked := filepath.Join(root, ".cursor", "commands")
+	blocked := filepath.Join(root, ".opencode", "commands")
 	if err := os.RemoveAll(blocked); err != nil {
 		t.Fatalf("Zielverzeichnis entfernen: %v", err)
 	}

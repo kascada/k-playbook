@@ -256,8 +256,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 31 {
-		t.Fatalf("tools/list meldet nicht genau einunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 32 {
+		t.Fatalf("tools/list meldet nicht genau zweiunddreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -295,6 +295,7 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_doc_done",
 		"k_playbook_doc_reopen",
 		"k_playbook_briefing",
+		"k_playbook_health",
 		"k_playbook_gui_status",
 		"k_playbook_notify",
 	} {
@@ -328,8 +329,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 31 {
-		t.Fatalf("tools/list meldet nicht einunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 32 {
+		t.Fatalf("tools/list meldet nicht zweiunddreißig Werkzeuge: %v", responses[1])
 	}
 
 	for id, call := range []struct {
@@ -438,8 +439,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 30 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 30", withProjectDir)
+	if withProjectDir != 31 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 31", withProjectDir)
 	}
 }
 
@@ -550,27 +551,27 @@ func TestFehlendesProjectDirIstEingabefehler(t *testing.T) {
 	if _, err := os.Stat(knowledgeFile); !os.IsNotExist(err) {
 		t.Errorf("knowledge_write ohne projectDir hat geschrieben: %s (%v)", knowledgeFile, err)
 	}
-	if _, err := os.Stat(project.TodoFile(root)); !os.IsNotExist(err) {
-		t.Errorf("todo_add ohne projectDir hat geschrieben: %s (%v)", project.TodoFile(root), err)
-	}
-
-	// Gegenprobe: mit projectDir schreiben dieselben Aufrufe im selben Projekt.
-	// Sonst bewiese das Fehlen der Dateien oben nichts.
+	// Gegenprobe: mit projectDir schreibt derselbe Aufruf im selben Projekt.
+	// Sonst bewiese das Fehlen der Datei oben nichts. todo_add kommt mit
+	// projectDir bis zur Collection — das Projekt hat keine Anbindung, also
+	// kephalaion_unavailable statt invalid_input.
 	stdout := speak(t, root, 3,
 		initialize(1),
 		initialized,
 		callTool(2, "k_playbook_knowledge_write", withProjectDir(projectDirCalls[1].args, root)),
 		callTool(3, "k_playbook_todo_add", withProjectDir(projectDirCalls[3].args, root)),
 	)
-	for _, response := range decodeResponses(t, stdout, 1, 2, 3)[1:] {
-		if isError := result(t, response)["isError"]; isError == true {
-			t.Fatalf("Gegenprobe mit projectDir schlug fehl: %s", toolText(t, response))
-		}
+	responses = decodeResponses(t, stdout, 1, 2, 3)
+	if isError := result(t, responses[1])["isError"]; isError == true {
+		t.Fatalf("Gegenprobe mit projectDir schlug fehl: %s", toolText(t, responses[1]))
 	}
-	for _, path := range []string{knowledgeFile, project.TodoFile(root)} {
-		if _, err := os.Stat(path); err != nil {
-			t.Errorf("Gegenprobe: %s fehlt: %v", path, err)
-		}
+	if _, err := os.Stat(knowledgeFile); err != nil {
+		t.Errorf("Gegenprobe: %s fehlt: %v", knowledgeFile, err)
+	}
+	var todoEnvelope toolEnvelope
+	if err := json.Unmarshal([]byte(toolText(t, responses[2])), &todoEnvelope); err != nil ||
+		todoEnvelope.Error == nil || todoEnvelope.Error.Code != project.DocCodeKephalaionUnavailable {
+		t.Errorf("Gegenprobe todo_add: erwartet %s, bekommen %s", project.DocCodeKephalaionUnavailable, toolText(t, responses[2]))
 	}
 }
 

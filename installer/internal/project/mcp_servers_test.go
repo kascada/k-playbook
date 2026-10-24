@@ -29,9 +29,9 @@ func fileFor(t *testing.T, files []MCPFileInfo, path string) MCPFileInfo {
 	return MCPFileInfo{}
 }
 
-// Alle drei Schemata werden gelesen — Claude Code und Cursor mit command+args,
-// OpenCode mit command-Array —, Kommentare und Trailing Commas eingeschlossen.
-func TestListMCPServersLiestDreiSchemata(t *testing.T) {
+// Beide Schemata werden gelesen — Claude Code mit command+args, OpenCode mit
+// command-Array —, Kommentare und Trailing Commas eingeschlossen.
+func TestListMCPServersLiestBeideSchemata(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".mcp.json"), `{
   // Kommentar ist erlaubt
@@ -40,12 +40,11 @@ func TestListMCPServersLiestDreiSchemata(t *testing.T) {
     "zeta": {"command": "npx", "args": ["-y", "zeta-mcp"]}
   },
 }`)
-	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), `{"mcpServers": {"k-playbook": {"command": "/home/wer/.local/bin/k-playbook", "args": ["mcp"]}}}`)
 	writeFile(t, filepath.Join(root, "opencode.json"), `{"mcp": {"k-playbook": {"type": "local", "command": ["k-playbook", "mcp"], "enabled": true}}}`)
 
 	servers, files := ListMCPServers(root)
-	if len(servers) != 4 {
-		t.Fatalf("%d Server, erwartet 4: %+v", len(servers), servers)
+	if len(servers) != 3 {
+		t.Fatalf("%d Server, erwartet 3: %+v", len(servers), servers)
 	}
 
 	claude := serverFor(t, servers, "claude-code", "k-playbook")
@@ -59,10 +58,6 @@ func TestListMCPServersLiestDreiSchemata(t *testing.T) {
 	if zeta.Own || zeta.Command != "npx" || strings.Join(zeta.Args, " ") != "-y zeta-mcp" {
 		t.Errorf("zeta = %+v", zeta)
 	}
-	cursor := serverFor(t, servers, "cursor", "k-playbook")
-	if cursor.Assistant != "Cursor" || cursor.File != filepath.Join(".cursor", "mcp.json") || cursor.Command != "/home/wer/.local/bin/k-playbook" {
-		t.Errorf("Cursor-Eintrag = %+v", cursor)
-	}
 	opencode := serverFor(t, servers, "opencode", "k-playbook")
 	if opencode.Transport != MCPTransportLocal || opencode.Command != "k-playbook" || strings.Join(opencode.Args, " ") != "mcp" || !opencode.Enabled {
 		t.Errorf("OpenCode-Eintrag = %+v", opencode)
@@ -71,15 +66,15 @@ func TestListMCPServersLiestDreiSchemata(t *testing.T) {
 		t.Errorf("OpenCode-Eintrag = %+v", opencode)
 	}
 
-	if len(files) != 3 {
-		t.Fatalf("%d Dateien, erwartet 3: %+v", len(files), files)
+	if len(files) != 2 {
+		t.Fatalf("%d Dateien, erwartet 2: %+v", len(files), files)
 	}
 	if info := fileFor(t, files, ".mcp.json"); !info.Exists || info.Count != 2 || info.Error != "" || info.AssistantID != "claude-code" {
 		t.Errorf(".mcp.json = %+v", info)
 	}
 }
 
-// Remote-Formen: Claude Code und Cursor mit type http|sse und url, OpenCode
+// Remote-Formen: Claude Code mit type http|sse und url, OpenCode
 // mit type remote und url.
 func TestListMCPServersErkenntRemote(t *testing.T) {
 	root := t.TempDir()
@@ -161,8 +156,8 @@ func TestListMCPServersLiestBeideOpenCodeDateien(t *testing.T) {
 	writeFile(t, filepath.Join(root, "opencode.jsonc"), `{"mcp": {"zwei": {"type": "local", "command": ["b"]}}}`)
 
 	servers, files := ListMCPServers(root)
-	if len(files) != 4 {
-		t.Fatalf("%d Dateien, erwartet 4: %+v", len(files), files)
+	if len(files) != 3 {
+		t.Fatalf("%d Dateien, erwartet 3: %+v", len(files), files)
 	}
 	for _, path := range []string{"opencode.json", "opencode.jsonc"} {
 		info := fileFor(t, files, path)
@@ -187,8 +182,8 @@ func TestListMCPServersOhneDateien(t *testing.T) {
 	if len(servers) != 0 {
 		t.Errorf("Server ohne Dateien: %+v", servers)
 	}
-	if len(files) != 3 {
-		t.Fatalf("%d Dateien, erwartet 3", len(files))
+	if len(files) != 2 {
+		t.Fatalf("%d Dateien, erwartet 2", len(files))
 	}
 	for _, info := range files {
 		if info.Exists || info.Error != "" || info.Count != 0 {
@@ -198,25 +193,26 @@ func TestListMCPServersOhneDateien(t *testing.T) {
 }
 
 // Kaputtes JSON in einer Datei hält die anderen nicht auf; der Fehler steht
-// an der Datei. Ein Abschnitt, der kein Objekt ist, ebenso.
+// an der Datei. Ein Abschnitt, der kein Objekt ist, ebenso. Die dritte Datei
+// ist die zweite OpenCode-Endung, die neben der ersten mitgelesen wird.
 func TestListMCPServersKaputteDateiBleibtIsoliert(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".mcp.json"), `{"mcpServers": {`)
-	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), `{"mcpServers": ["liste"]}`)
-	writeFile(t, filepath.Join(root, "opencode.json"), `{"mcp": {"ok": {"type": "local", "command": ["a"]}}}`)
+	writeFile(t, filepath.Join(root, "opencode.json"), `{"mcp": ["liste"]}`)
+	writeFile(t, filepath.Join(root, "opencode.jsonc"), `{"mcp": {"ok": {"type": "local", "command": ["a"]}}}`)
 
 	servers, files := ListMCPServers(root)
 	if len(servers) != 1 || servers[0].Name != "ok" {
-		t.Errorf("Server = %+v, erwartet nur ok aus opencode.json", servers)
+		t.Errorf("Server = %+v, erwartet nur ok aus opencode.jsonc", servers)
 	}
 	if info := fileFor(t, files, ".mcp.json"); !info.Exists || info.Error == "" {
 		t.Errorf(".mcp.json = %+v, erwartet einen Fehler", info)
 	}
-	if info := fileFor(t, files, filepath.Join(".cursor", "mcp.json")); info.Error == "" {
-		t.Errorf("Cursor-Datei = %+v, erwartet einen Fehler", info)
+	if info := fileFor(t, files, "opencode.json"); info.Error == "" {
+		t.Errorf("opencode.json = %+v, erwartet einen Fehler", info)
 	}
-	if info := fileFor(t, files, "opencode.json"); info.Error != "" || info.Count != 1 {
-		t.Errorf("opencode.json = %+v", info)
+	if info := fileFor(t, files, "opencode.jsonc"); info.Error != "" || info.Count != 1 {
+		t.Errorf("opencode.jsonc = %+v", info)
 	}
 }
 
@@ -256,14 +252,14 @@ func TestListMCPServersVerbirgtEnvWerte(t *testing.T) {
 func TestListMCPServersSortiert(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".mcp.json"), `{"mcpServers": {"zeta": {"command": "z"}, "alpha": {"command": "a"}, "mitte": {"command": "m"}}}`)
-	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), `{"mcpServers": {"beta": {"command": "b"}}}`)
+	writeFile(t, filepath.Join(root, "opencode.json"), `{"mcp": {"beta": {"type": "local", "command": ["b"]}}}`)
 
 	servers, _ := ListMCPServers(root)
 	got := make([]string, 0, len(servers))
 	for _, server := range servers {
 		got = append(got, server.AssistantID+"/"+server.Name)
 	}
-	want := "claude-code/alpha claude-code/mitte claude-code/zeta cursor/beta"
+	want := "claude-code/alpha claude-code/mitte claude-code/zeta opencode/beta"
 	if strings.Join(got, " ") != want {
 		t.Errorf("Reihenfolge = %q, erwartet %q", strings.Join(got, " "), want)
 	}
@@ -294,7 +290,7 @@ func TestMCPServerInventoryRechnetLuecken(t *testing.T) {
 	for _, gap := range inventory.Missing {
 		got = append(got, gap.AssistantID+"/"+gap.Name)
 	}
-	want := "cursor/k-playbook claude-code/atlassian opencode/atlassian cursor/atlassian"
+	want := "claude-code/atlassian opencode/atlassian"
 	if strings.Join(got, " ") != want {
 		t.Errorf("Lücken = %q, erwartet %q", strings.Join(got, " "), want)
 	}

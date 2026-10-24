@@ -56,8 +56,7 @@ ohnehin nur die gestartet wird.
 |---|---|
 | Konfiguration anlegen | `K-PLAYBOOK.yaml` im Hauptverzeichnis |
 | Projekteigene Struktur anlegen | `k-playbook-local/` mit READMEs je Verzeichnis |
-| Assistenten verlinken | `.claude/`, `.opencode/`, `.cursor/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
-
+| Assistenten verlinken | `.claude/`, `.opencode/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 | VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |
 
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die

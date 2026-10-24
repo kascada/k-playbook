@@ -118,24 +118,23 @@ If the ignore rule comes from elsewhere, the `.gitignore` at the project root, `
 
 ### 3. Register the MCP server
 
-The **k-playbook MCP** section registers the shipped MCP server with the three assistants. This gives an assistant the resolved working state as a tool instead of making it retrieve it through the command line:
+The **k-playbook MCP** section registers the shipped MCP server with both assistants. This gives an assistant the resolved working state as a tool instead of making it retrieve it through the command line:
 
 ```text
 project/
 ├── .mcp.json          Claude Code:  mcpServers -> k-playbook
-├── .cursor/mcp.json   Cursor:       same schema
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
 It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it, and when it replaces an obsolete wrapper entry in a tracked file, it writes the bare name itself. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, where `K-PLAYBOOK.yaml` is located.
 
-The three files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
+Both files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
 
 Everything else, the two schemas, handling foreign values, manual removal, and the `/mcp` page with the tools actually offered, is described in [`mcp.md`](./mcp.md).
 
 ### 4. Link assistants
 
-Links are created for Claude Code, OpenCode, and Cursor:
+Links are created for Claude Code and OpenCode:
 
 ```text
 project/
@@ -144,13 +143,11 @@ project/
 ├── .claude/
 │   ├── commands/         one symlink per command
 │   └── skills/           one symlink per skill; OpenCode reads here too
-├── .opencode/
-│   └── commands/
-└── .cursor/
+└── .opencode/
     └── commands/
 ```
 
-The four targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the installation or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
+The three targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the installation or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
 
 ```text
 .claude/commands/
@@ -161,7 +158,7 @@ The four targets are **actual directories with individual symlinks**, not direct
 
 The interface compares this expected state with what is actually registered and reports deviations by name: what is missing, what points to the wrong source, what is orphaned, and what belongs to the project and therefore remains. It synchronizes them at the press of a button. An actual file that someone placed there themselves always takes precedence and is never replaced.
 
-Skills appear only once under `.claude/skills`: OpenCode searches this directory too, while Cursor has no skill concept. `CLAUDE.md` is an include file with the import line `@AGENTS.md`, because Claude Code reads only `CLAUDE.md` while OpenCode and Cursor prefer `AGENTS.md`. This leaves exactly one actual instruction file, and Claude Code loads it at startup through the import. Setup writes a short stub: above the import line, a note that project rules belong in `AGENTS.md`, then `@AGENTS.md` alone on a line.
+Skills appear only once under `.claude/skills`: OpenCode searches this directory too. `CLAUDE.md` is an include file with the import line `@AGENTS.md`, because Claude Code reads only `CLAUDE.md` while OpenCode prefers `AGENTS.md`. This leaves exactly one actual instruction file, and Claude Code loads it at startup through the import. Setup writes a short stub: above the import line, a note that project rules belong in `AGENTS.md`, then `@AGENTS.md` alone on a line.
 
 `AGENTS.md` also receives a brief **prompt**: a block that names `k-playbook briefing` (and the MCP tool `k_playbook_briefing`) as the one call at the start of a session. If the file is missing, it is created; if it exists, the block is appended and existing content is not touched. A `<!-- k-playbook:anstoss -->` marker prevents a second run from appending it again; a block that still names the superseded `k-playbook context` is replaced, and the two extra blocks of the old template are removed, because their content comes with the briefing.
 
@@ -190,7 +187,7 @@ The same process runs during **updates**. A project that has only an actual `CLA
 
 **Existing projects** migrate themselves. The first `k-playbook briefing`, or the assistants section of the interface, replaces the old symlink with the include file and reports this in `links.note`. Afterwards, `git status` shows a one-time modified `CLAUDE.md` with a changed mode (symlink -> regular file, `120000` -> `100644`); this change must be committed. It is the one place where a read-only path changes a versioned file in the project root, and it is named as such. No include to nowhere: as long as `AGENTS.md` is absent, an old symlink waits for its target and is replaced only when it exists. If the include file exists while `AGENTS.md` is missing, the detail text identifies the import to nowhere: Claude Code loads nothing from it until **Setup** creates `AGENTS.md`.
 
-**The cost of separation.** Without a symlink, there are two files that can diverge: content Claude Code writes to `CLAUDE.md` through `/memory` or `#` does not reach OpenCode and Cursor, and the check does not report project content beside the include as a conflict. This is deliberate: reversing the direction would mean treating every piece of content beside the include as a conflict. As a counterweight, the stub above the import line says that project rules belong in `AGENTS.md`.
+**The cost of separation.** Without a symlink, there are two files that can diverge: content Claude Code writes to `CLAUDE.md` through `/memory` or `#` does not reach OpenCode, and the check does not report project content beside the include as a conflict. This is deliberate: reversing the direction would mean treating every piece of content beside the include as a conflict. As a counterweight, the stub above the import line says that project rules belong in `AGENTS.md`.
 
 **What Claude Code must support.** `@` imports in `CLAUDE.md` have existed since Claude Code **0.2.107** (CHANGELOG entry "CLAUDE.md files can now import other files"); an older version silently loads nothing from the stub. Import depth is limited: according to the documentation, Claude Code follows imports up to **four levels** deep ("Imported files can recursively import other files, with a maximum depth of four hops", code.claude.com, page "How Claude remembers your project", as of 2026-09-05). The stub consumes one level, so an `AGENTS.md` that itself imports with `@` has one level less than the former symlink.
 
@@ -310,7 +307,7 @@ Between the two steps, commands, the prompt block in `AGENTS.md`, and the MCP re
 
 **Linking catches itself up.** Because commands and skills are linked individually, a newly shipped command does not arrive by itself. It is therefore caught up on the read path, not only at the press of a button: the assistants section synchronizes registration when displayed and reports what changed (`Linking synchronized: 3 added, 1 removed.`), and `k-playbook briefing` does the same, the call already made at the beginning of every assistant session. How the installation reached its version is irrelevant: through the interface, manual `git pull`, or a Makefile target. What cannot resolve itself, an actual project file in the way or a conflict in `CLAUDE.md`, remains and continues to appear in the assistants section.
 
-For the new commands to reach the assistant, restart it afterwards: Claude Code, OpenCode, and Cursor discover them at startup.
+For the new commands to reach the assistant, restart it afterwards: Claude Code and OpenCode discover them at startup.
 
 ### Existing projects: two things are added
 
@@ -595,7 +592,7 @@ Checklist for a project:
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
 - [ ] `k-playbook-local/` exists completely and is committed in the project repository, except for the contents of `results/`, which are excluded from the outset in a new installation.
-- [ ] `.claude/commands`, `.claude/skills`, `.opencode/commands`, and `.cursor/commands` are directories with individual symlinks to `k-playbook/` or `k-playbook-local/`; the interface reports them as configured.
+- [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks to `k-playbook/` or `k-playbook-local/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.
 - [ ] `k-playbook context` completes and names the expected catalogs.

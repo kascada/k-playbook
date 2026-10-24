@@ -52,7 +52,7 @@ flowchart LR
     Base --> Effective["effective set"]
     Overlay --> Effective
 
-    Effective --> Assistant["Claude Code · OpenCode · Cursor"]
+    Effective --> Assistant["Claude Code · OpenCode"]
 ```
 
 ### Paths are derived, not stored in config
@@ -76,7 +76,7 @@ and comments. This lets the file record its own reason, without requiring a
 list in the configuration.
 
 For commands and skills, this determines how assistants are linked:
-`.claude/commands` and the three other destinations are real directories with
+`.claude/commands` and the two other destinations are real directories with
 **one symlink per entry**. A directory symlink points to exactly one source and
 could never reach the second.
 

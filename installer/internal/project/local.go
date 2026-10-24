@@ -83,13 +83,8 @@ func LocalStructure() []LocalEntry {
 		{
 			Path: "data",
 			Purpose: "Maschinendateien, die k-playbook selbst besitzt und die zum Projektstand gehören.\n" +
-				"Sie werden ganz normal mitversioniert; dieses Verzeichnis bekommt keine .gitignore.\n\n" +
-				"Erste Datei ist todos.json mit den Todos des Projekts. Geschrieben wird sie über\n" +
-				"/k-todo, über das Subkommando `k-playbook todo` oder über die Oberfläche — nie von\n" +
-				"Hand. Einzige Ausnahme ist die Auflösung eines Merge-Konflikts: treffen zwei Branches\n" +
-				"aufeinander, die je ein Todo angelegt haben, kollidieren sie an nextId und am Ende des\n" +
-				"Arrays. Die Auflösung ist mechanisch — beide Einträge behalten, nextId auf max(id)+1\n" +
-				"setzen.",
+				"Sie werden ganz normal mitversioniert; dieses Verzeichnis bekommt keine .gitignore.\n" +
+				"Geschrieben werden sie nur über k-playbook, nie von Hand.",
 		},
 		{
 			Path:             "cache",

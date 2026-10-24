@@ -144,8 +144,8 @@ func TestMCPServerInventoryForLiestPflichtliste(t *testing.T) {
 	if !inventory.RequiredConfigured || len(inventory.Required) != 1 {
 		t.Errorf("Pflichtliste = %+v", inventory)
 	}
-	if len(inventory.Missing) != 2 {
-		t.Errorf("Lücken = %+v, erwartet OpenCode und Cursor", inventory.Missing)
+	if len(inventory.Missing) != 1 {
+		t.Errorf("Lücken = %+v, erwartet nur OpenCode", inventory.Missing)
 	}
 
 	write(t, ConfigPath(root), "schema_version: 3\n\ntools:\n  mcp:\n    required: [k playbook]\n")

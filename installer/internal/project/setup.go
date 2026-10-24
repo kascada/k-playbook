@@ -39,7 +39,7 @@ type AssistantSetup struct {
 // genau eine Instruktionsdatei gehört nicht hinein. So bekommt jeder Einstieg
 // denselben Ablauf, auch das Aktualisieren.
 //
-// Ein Fehler beendet den Ablauf nicht: die vier Katalog-Links haben mit der
+// Ein Fehler beendet den Ablauf nicht: die drei Katalog-Links haben mit der
 // Wurzeldatei nichts zu tun und sollen auch dann stehen, wenn dort etwas
 // schiefgeht. Gesammelt wird alles, was aufgetreten ist.
 func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {

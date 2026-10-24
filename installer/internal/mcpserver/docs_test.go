@@ -416,6 +416,11 @@ func TestDocKindSchemaAusDerTabelle(t *testing.T) {
 		if !reflect.DeepEqual(got, project.DocKindNames(project.DocKinds)) {
 			t.Fatalf("enum %v", got)
 		}
+		for _, name := range got {
+			if name == project.TodoKindName {
+				t.Fatalf("todos steht im enum der doc-Werkzeuge: %v", got)
+			}
+		}
 	}
 	if _, ok := docKindSchema[docMoveInput]().Properties["kind"]; ok {
 		t.Fatal("done/reopen haben kein kind")

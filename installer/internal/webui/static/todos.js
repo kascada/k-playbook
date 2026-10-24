@@ -1,10 +1,13 @@
 "use strict";
 
-// Seite "Todos": die offenen und die abgehakten Punkte aus
-// k-playbook-local/data/todos.json.
+// Seite "Todos": die offenen und die abgehakten Punkte aus der
+// Kephalaion-Collection des Projekts (todos/ und todos/done/), dazu Anlegen,
+// Abhaken, Wiederöffnen und eine Suche.
 //
-// Gelesen wird hier nur. Geschrieben wird die Ablage über /k-todo, über das
-// Subkommando `k-playbook todo` oder über die Oberfläche — nie von Hand.
+// Geschrieben wird über POST /api/todos und /api/todos/{id}/done|reopen —
+// dieselbe Fachlogik wie /k-todo und `k-playbook todo`. Ohne erreichbares
+// Kephalaion gibt es keine Todos; die Seite sagt das, statt eine leere Liste
+// zu zeigen.
 
 // Muss vor den Ladefunktionen laufen: die blenden Blöcke ein, und das Menü
 // zieht das nur mit, wenn es die Karten schon beobachtet.
@@ -24,7 +27,20 @@ const elements = {
   doneList: document.getElementById("todos-done-list"),
   doneMessage: document.getElementById("todos-done-message"),
   doneHint: document.getElementById("todos-done-hint"),
+  addForm: document.getElementById("todo-add-form"),
+  addText: document.getElementById("todo-add-text"),
+  addButton: document.getElementById("todo-add-button"),
+  addMessage: document.getElementById("todo-add-message"),
+  searchForm: document.getElementById("todo-search-form"),
+  searchText: document.getElementById("todo-search-text"),
+  searchPill: document.getElementById("todos-search-pill"),
+  searchList: document.getElementById("todos-search-list"),
+  searchMessage: document.getElementById("todos-search-message"),
 };
+
+// Codes der Fachlogik, die einen Zustand benennen statt eines Lesefehlers.
+const codeUnavailable = "kephalaion_unavailable";
+const codeNotMigrated = "todos_not_migrated";
 
 // Ab dieser Zeichenzahl wird ein Eintrag gekürzt angezeigt — über /k-todo
 // kommt oft ein einziger, langer Fließtextsatz hinzu. Rund zwei Zeilen.
@@ -35,8 +51,17 @@ let doneRequested = false;
 
 const doneOpenKey = "k-playbook.todos.done-open";
 
+// Die zuletzt gesuchte Zeichenkette; nach einer Änderung wird die Suche
+// wiederholt, damit Treffer und Knöpfe stimmen.
+let lastSearch = "";
+
 load();
 setUpDoneCard(elements.doneCard, doneOpenKey, loadDone);
+elements.addForm.addEventListener("submit", addTodo);
+elements.searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  search(elements.searchText.value.trim());
+});
 
 async function load() {
   try {
@@ -51,12 +76,23 @@ function render(data) {
   elements.todosList.replaceChildren();
   elements.todosMessage.textContent = data.message || "";
   showHint(elements.todosHint, data.hint);
+  const usable = Boolean(data.available) && data.code !== codeUnavailable;
+  elements.addText.disabled = !usable;
+  elements.addButton.disabled = !usable;
 
   if (!data.available) {
     elements.todosList.classList.add("empty");
     elements.todosList.textContent = "Keine Projektkonfiguration gefunden.";
     elements.todosPill.className = "pill muted";
     elements.todosPill.textContent = "Unbekannt";
+    return;
+  }
+
+  if (data.code === codeUnavailable) {
+    elements.todosList.classList.add("empty");
+    elements.todosList.textContent = "Ohne erreichbares Kephalaion gibt es keine Todos.";
+    elements.todosPill.className = "pill warn";
+    elements.todosPill.textContent = "Kephalaion nicht erreichbar";
     return;
   }
 
@@ -76,14 +112,14 @@ function render(data) {
     return;
   }
 
-  fillList(elements.todosList, todos);
+  fillList(elements.todosList, todos, elements.todosMessage);
   elements.todosPill.className = "pill ok";
   elements.todosPill.textContent = todos.length === 1 ? "1 offen" : `${todos.length} offen`;
 }
 
-// showHint zeigt einen Hinweis über der Liste — etwa eine zurückgebliebene
-// Datei der früheren Markdown-Ablage. Er ist ausdrücklich kein Fehler: Liste
-// und Zählpille bleiben stehen.
+// showHint zeigt einen Hinweis über der Liste — etwa ein noch nicht
+// übernommenes data/todos.json oder eine zurückgebliebene TODO.md. Er ist
+// ausdrücklich kein Fehler: Liste und Zählpille bleiben stehen.
 // Der Fehlerfall ist data.message, und nur der blendet die Liste aus.
 function showHint(element, hint) {
   if (!element) {
@@ -98,14 +134,144 @@ function showHint(element, hint) {
 // ein einzelner Punkt ein langer Fließtext ist.
 //
 // Vor dem Text steht die Kennung, unter der /k-todo den Eintrag anspricht,
-// dahinter klein sein Datum.
-function fillList(container, todos, done) {
+// dahinter klein sein Datum; rechts der Knopf zum Abhaken bzw. Wiederöffnen.
+// Ob ein Eintrag erledigt ist, sagt sein Feld done — in der Suche stehen
+// beide Sorten in einer Liste.
+function fillList(container, todos, messageElement) {
   for (const todo of todos) {
+    const done = Boolean(todo.done);
     const item = document.createElement("div");
-    item.className = done ? "todo-item done" : "todo-item";
-    item.append(buildText(todo.text, todo));
+    item.className = done ? "todo-item with-action done" : "todo-item with-action";
+    item.append(buildText(todo.text, todo), buildAction(todo, done, messageElement));
     container.append(item);
   }
+}
+
+// buildAction baut den Knopf eines Eintrags.
+function buildAction(todo, done, messageElement) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary todo-action";
+  button.textContent = done ? "Wieder öffnen" : "Abhaken";
+  button.title = done ? `Todo #${todo.id} wieder öffnen` : `Todo #${todo.id} abhaken`;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    const data = await postTodo(`/api/todos/${todo.id}/${done ? "reopen" : "done"}`, null);
+    if (!data.ok) {
+      button.disabled = false;
+      messageElement.textContent = describeFailure(data);
+      return;
+    }
+    messageElement.textContent = "";
+    refreshAll();
+  });
+  return button;
+}
+
+// postTodo schickt einen schreibenden Aufruf und liefert die Antwort; ein
+// Netzfehler wird eine Antwort ohne ok.
+async function postTodo(url, body) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body === null ? "{}" : JSON.stringify(body),
+    });
+    return await response.json();
+  } catch {
+    return { ok: false, message: "Der Aufruf hat die Oberfläche nicht erreicht." };
+  }
+}
+
+// describeFailure macht aus einer abgelehnten Änderung einen Satz.
+function describeFailure(data) {
+  if (data.code === codeNotMigrated) {
+    return "Noch nicht übernommen: Erst k-playbook todo migrate übernimmt data/todos.json in die Collection; bis dahin wird nichts angelegt oder geändert.";
+  }
+  if (data.code === codeUnavailable) {
+    return "Kephalaion ist nicht erreichbar; nichts wurde geändert. " + (data.message || "");
+  }
+  return data.message || "Die Änderung ist fehlgeschlagen.";
+}
+
+// refreshAll lädt nach einer Änderung neu, was die Seite zeigt.
+function refreshAll() {
+  load();
+  if (doneRequested) {
+    doneRequested = false;
+    loadDone();
+  }
+  if (lastSearch) {
+    search(lastSearch);
+  }
+}
+
+async function addTodo(event) {
+  event.preventDefault();
+  const text = elements.addText.value.trim();
+  if (!text) {
+    elements.addMessage.textContent = "Ein Todo braucht einen Text.";
+    return;
+  }
+  elements.addButton.disabled = true;
+  const data = await postTodo("/api/todos", { text });
+  elements.addButton.disabled = false;
+  if (!data.ok) {
+    elements.addMessage.textContent = describeFailure(data);
+    return;
+  }
+  elements.addText.value = "";
+  elements.addMessage.textContent = `Angelegt als #${data.todo.id}.`;
+  refreshAll();
+}
+
+async function search(query) {
+  lastSearch = query;
+  elements.searchList.replaceChildren();
+  elements.searchMessage.textContent = "";
+  if (!query) {
+    elements.searchList.hidden = true;
+    elements.searchPill.className = "pill muted";
+    elements.searchPill.textContent = "bereit";
+    return;
+  }
+  elements.searchPill.className = "pill muted";
+  elements.searchPill.textContent = "Suchen...";
+  let data;
+  try {
+    const response = await fetch(`/api/todos/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+    data = await response.json();
+  } catch {
+    elements.searchPill.className = "pill warn";
+    elements.searchPill.textContent = "Fehler";
+    elements.searchMessage.textContent = "Die Suche hat die Oberfläche nicht erreicht.";
+    return;
+  }
+  if (query !== lastSearch) {
+    return;
+  }
+  elements.searchList.hidden = false;
+  if (data.code === codeUnavailable || data.message) {
+    elements.searchList.classList.add("empty");
+    elements.searchList.textContent = data.code === codeUnavailable
+      ? "Ohne erreichbares Kephalaion gibt es keine Todos."
+      : "Die Todos konnten nicht gelesen werden.";
+    elements.searchPill.className = "pill warn";
+    elements.searchPill.textContent = data.code === codeUnavailable ? "Kephalaion nicht erreichbar" : "Nicht lesbar";
+    elements.searchMessage.textContent = data.message || "";
+    return;
+  }
+  const todos = data.todos || [];
+  elements.searchList.classList.toggle("empty", todos.length === 0);
+  if (todos.length === 0) {
+    elements.searchList.textContent = "Kein Todo enthält diesen Text.";
+    elements.searchPill.className = "pill muted";
+    elements.searchPill.textContent = "keine Treffer";
+    return;
+  }
+  fillList(elements.searchList, todos, elements.searchMessage);
+  elements.searchPill.className = "pill ok";
+  elements.searchPill.textContent = todos.length === 1 ? "1 Treffer" : `${todos.length} Treffer`;
 }
 
 // buildMeta baut die Kennung und das Datum eines Eintrags.
@@ -124,7 +290,7 @@ function buildMeta(todo) {
     date.className = "todo-date";
     date.textContent = stamp;
     if (todo.done && todo.doneMigrated) {
-      date.title = "Datum der Übersetzung aus der früheren Markdown-Ablage, kein Abhak-Datum.";
+      date.title = "Datum aus einer früheren Übernahme, kein Abhak-Datum.";
     } else if (todo.done) {
       date.title = "Abgehakt am";
     } else {
@@ -205,6 +371,14 @@ function renderDone(data) {
     return;
   }
 
+  if (data.code === codeUnavailable) {
+    elements.doneList.classList.add("empty");
+    elements.doneList.textContent = "Ohne erreichbares Kephalaion gibt es keine Todos.";
+    elements.donePill.className = "pill warn";
+    elements.donePill.textContent = "Kephalaion nicht erreichbar";
+    return;
+  }
+
   if (data.message) {
     elements.doneList.classList.add("empty");
     elements.donePill.className = "pill warn";
@@ -221,7 +395,7 @@ function renderDone(data) {
     return;
   }
 
-  fillList(elements.doneList, todos, true);
+  fillList(elements.doneList, todos, elements.doneMessage);
   elements.donePill.className = "pill muted";
   elements.donePill.textContent = todos.length === 1 ? "1 erledigt" : `${todos.length} erledigt`;
 }

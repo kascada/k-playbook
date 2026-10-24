@@ -1,1 +1,0 @@
-../../k-playbook/commands/k-test-check.md

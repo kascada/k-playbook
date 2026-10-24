@@ -16,23 +16,28 @@ and `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
 All calls address the project's collection, `kephalaion.address` (`<hub>:<collection>`)
 from `k-playbook context`. Code: `installer/internal/kephalaion/` (`client.go` for the
-session and `whoami`, `docs.go` for `list`, `read`, `create`, `rename`).
+session and `whoami`, `docs.go` for `list`, `read`, `create`, `write`, `rename`, `delete`).
 
 ## The tools k-playbook calls
 
 | Tool | Where | Called by | Arguments used |
 |---|---|---|---|
-| `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` call before it starts; again in the session of every `create`/`rename` before the first attempt (node version) | none |
-| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list` | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
-| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
-| `create` | through the hub | `k_playbook_doc_create` | `collection`, `name`, `content: ""`, `request_id` |
-| `rename` | through the hub | `k_playbook_doc_done`, `k_playbook_doc_reopen` | `collection`, `name`, `new_name`, `request_id` |
+| `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
+| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, every todo access (task 097) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
+| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; every todo access, one call per todo (task 097) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
+| `create` | through the hub | `k_playbook_doc_create`; `todo add` and `todo migrate` (task 097) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |
+| `write` | through the hub | `todo update` (text, `done:` field) (task 097) | `collection`, `name`, `content`, `base_revision` (the revision from the `read` just before), `request_id` |
+| `rename` | through the hub | `k_playbook_doc_done`, `k_playbook_doc_reopen`; `todo update` with done/reopen (task 097) | `collection`, `name`, `new_name`, `request_id` |
+| `delete` | through the hub | `todo delete` (task 097) | `collection`, `name`, `base_revision`, `request_id`; never `recursive` |
 
 Reading a document's content goes both ways since task 093: a session can call
 Kephalaion's `read` directly, and `k_playbook_doc_read` / `k-playbook read keph:/…` call it
 through this client (`Client.Read`). Writing is still done directly by the session with
 Kephalaion's `write`; the `doc` tools only create, list and move. Their contract:
-[`mcp.md`](./mcp.md#document-tools-in-the-collection).
+[`mcp.md`](./mcp.md#document-tools-in-the-collection). The todo functions (task 097) are the
+first in k-playbook that write content and delete themselves (`Client.Write`,
+`Client.Delete`), since a todo is the document's body plus a few frontmatter fields:
+[`mcp.md`](./mcp.md#todo-contract-and-migration).
 
 ## What k-playbook expects
 
@@ -44,7 +49,17 @@ Kephalaion's `write`; the `doc` tools only create, list and move. Their contract
   document already has the name, and of `rename` when the target is taken. Nothing is
   written or overwritten. `create` uses it to try the next number (up to ten times);
   `done`/`reopen` pass it on unchanged.
-- **`not_found`** from `rename`: there is no living document under the old name.
+- **`not_found`** from `rename`, `write` and `delete`: there is no living document under the
+  (old) name.
+- **`stale_revision`** from `write` and `delete` (and `rename`, which k-playbook calls without
+  it): the document no longer has the revision given as `base_revision`; nothing is written,
+  the message names the current revision. The todo functions read the document from the
+  replica, then write or delete on that revision, so a change another machine made in
+  between is not silently overwritten.
+- **`write` with unchanged content** writes nothing at the hub: no new revision, the answer
+  carries the existing row.
+- **`delete` sets a tombstone** (`deleted: true` in the answer, new revision). Without
+  `recursive` a directory is `invalid`; k-playbook deletes single documents only.
 - **A tombstone does not block a name.** A deleted document is not listed and does not
   count for the next number; `create` and `rename` may reuse its name.
 - **`rename` keeps the `id`** together with content and `created`; only name, revision and
@@ -70,7 +85,8 @@ Kephalaion's `write`; the `doc` tools only create, list and move. Their contract
   not readable, replica never synced, invalid name); `create` and `rename` carry
   `error.code`. k-playbook keeps Kephalaion's code where there is one and maps the rest
   to its own codes (see the next section).
-- **`request_id`** (Kephalaion v0.3.1, Task 032) is accepted by `create` and `rename`:
+- **`request_id`** (Kephalaion v0.3.1, Task 032) is accepted by `create`, `write`, `rename` and
+  `delete`:
   1–128 characters `[A-Za-z0-9._-]`, valid per account for 24 hours. The hub remembers
   only a success, in the same transaction. The same key with the same fields again answers
   `replayed: true` with the original revision and `ids`, without rows; the same key with
@@ -81,21 +97,22 @@ Kephalaion's `write`; the `doc` tools only create, list and move. Their contract
 - **A node before v0.3.1 rejects `request_id` loudly** (`isError` without a code) and
   writes nothing. k-playbook checks the version first and does not send to such a node.
 
-Limits on the k-playbook side: 15 s per `list` or `read` call and per `create`/`rename`
-attempt, each including its session, at most 16 MiB per answer, pages of 1000 entries and at
+Limits on the k-playbook side: 15 s per `list` or `read` call and per
+`create`/`write`/`rename`/`delete` attempt, each including its session, at most 16 MiB per answer, pages of 1000 entries and at
 most 100 pages for one listing.
 
 ## Request key, retry and the codes
 
-`kephalaion.Client` generates a fresh `request_id` for every `Create` and `Rename` call
+`kephalaion.Client` generates a fresh `request_id` for every `Create`, `Write`, `Rename` and
+`Delete` call
 (`crypto/rand`); each number tried by `k_playbook_doc_create` is a call of its own and thus
 gets its own key. What happens next depends on where an attempt stops:
 
-| Where the attempt stops | Meaning | Client code | `doc` tools |
+| Where the attempt stops | Meaning | Client code | `doc` and `todo` tools |
 |---|---|---|---|
 | address or token missing, `initialize` fails, the version check fails, node older than v0.3.1, caller gave up before sending | nothing reached the hub | `node_unreachable` | `kephalaion_unavailable` |
 | node reports `unreachable`, `unsupported` (nothing stored) or `internal` (nothing sent) | nothing reached the hub | the node's code | `kephalaion_unavailable` |
-| node reports a contract code (`name_taken`, `not_found`, `forbidden`, …) or an error without code | rejected, nothing written | that code (or none) | `name_taken`, `not_found`, else `kephalaion_error` |
+| node reports a contract code (`name_taken`, `not_found`, `stale_revision`, `forbidden`, …) or an error without code | rejected, nothing written | that code (or none) | `name_taken`, `not_found`, `stale_revision`, else `kephalaion_error` |
 | after sending: transport error, timeout, broken or unreadable answer, answer without structured content, HTTP 5xx, node code `outcome_unknown` | open | — retry — | — |
 
 The retry is exactly one: the same `request_id` and the same fields, in a new session
@@ -147,6 +164,22 @@ At the same hub and collection, with a freshly built binary (task 093, 2026-10-1
 - A missing name answered `not_found` (the node reports `kind: none`, no error); the
   directory name without `/` `invalid_input`. The document was deleted afterwards.
   Output in `k-playbook-local/material/befunde/command-huelle-verweis.md`.
+
+At the same hub and collection, node `wsl-kleist` v0.3.1, with a freshly built binary
+(task 097, 2026-10-20):
+
+- `write` with `base_revision` and `delete` with `base_revision`, both with a `request_id`,
+  were accepted by the node: `k-playbook todo update --text`, `--done` (`write` of `done:`,
+  then `rename` into `todos/done/`), `--reopen` (`rename` back, then `write` without `done:`)
+  and `todo delete` all succeeded; a deleted todo was gone from the next listing, and an
+  `update` of its id answered `not_found`.
+- `k-playbook todo migrate` created 28 documents (`create` with content) in about 2.5 s; the
+  following `todo list --all` (one `list` plus 28 `read` calls, each in its own session) took
+  0.28 s. The frontmatter came back unchanged, `created: ""` as an empty string in `list`
+  with `frontmatter`.
+
+Not measured: `stale_revision` at a real hub (covered by unit tests), a second node seeing the
+todos. Commands and output: `k-playbook-local/material/befunde/todos-in-der-collection.md`.
 
 ## Where the tools are documented
 

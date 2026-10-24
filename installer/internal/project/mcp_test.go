@@ -72,8 +72,8 @@ func TestCheckMCPMeldetFehlendeDateien(t *testing.T) {
 	if MCPOK(statuses) {
 		t.Fatal("frisches Projekt darf nicht als registriert gelten")
 	}
-	if len(statuses) != 3 {
-		t.Fatalf("%d Ziele geprüft, erwartet 3", len(statuses))
+	if len(statuses) != 2 {
+		t.Fatalf("%d Ziele geprüft, erwartet 2", len(statuses))
 	}
 	for _, status := range statuses {
 		if status.State != MCPStateMissingFile {
@@ -94,7 +94,7 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 		t.Fatalf("nach ApplyMCP nicht registriert: %+v", statuses)
 	}
 
-	// Claude Code und Cursor: command und args getrennt.
+	// Claude Code: command und args getrennt.
 	claude := readJSON(t, filepath.Join(root, ".mcp.json"))
 	servers, ok := claude["mcpServers"].(map[string]any)
 	if !ok {
@@ -139,11 +139,6 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 	docs, ok := references[opencodeDocsKey].(map[string]any)
 	if !ok || docs["path"] != "./k-playbook-local/docs" {
 		t.Errorf("Docs-Referenz = %v, erwartet k-playbook-local/docs", references[opencodeDocsKey])
-	}
-
-	// Cursor bekommt dasselbe Schema in seinem eigenen Verzeichnis.
-	if _, err := os.Stat(filepath.Join(root, ".cursor", "mcp.json")); err != nil {
-		t.Errorf(".cursor/mcp.json fehlt: %v", err)
 	}
 }
 
@@ -265,19 +260,20 @@ func TestApplyMCPLaesstKaputtesJSONLiegen(t *testing.T) {
 }
 
 // Ein Ziel, das sich nicht schreiben lässt, darf die anderen nicht aufhalten:
-// die drei Dateien gehören verschiedenen Assistenten und hängen nicht
+// die beiden Dateien gehören verschiedenen Assistenten und hängen nicht
 // voneinander ab.
 func TestApplyMCPSchreibtTrotzGescheitertemZiel(t *testing.T) {
 	root := newMCPProject(t)
 
-	// .cursor/ existiert, ist aber nicht beschreibbar. Damit scheitert genau das
-	// mittlere Ziel, und zwar erst beim Schreiben — nicht schon beim Lesen.
-	cursor := filepath.Join(root, ".cursor")
-	if err := os.MkdirAll(cursor, 0o555); err != nil {
-		t.Fatalf(".cursor anlegen: %v", err)
+	// .mcp.json existiert, ist aber nicht beschreibbar. Damit scheitert genau
+	// das erste Ziel, und zwar erst beim Schreiben — nicht schon beim Lesen.
+	claude := filepath.Join(root, ".mcp.json")
+	writeFile(t, claude, "{}\n")
+	if err := os.Chmod(claude, 0o444); err != nil {
+		t.Fatalf(".mcp.json schützen: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(cursor, 0o755) })
-	if err := os.WriteFile(filepath.Join(cursor, "probe"), []byte("x"), 0o644); err == nil {
+	t.Cleanup(func() { os.Chmod(claude, 0o644) })
+	if err := os.WriteFile(claude, []byte("{}\n"), 0o644); err == nil {
 		t.Skip("Schreibrechte lassen sich hier nicht entziehen (root?)")
 	}
 
@@ -286,14 +282,12 @@ func TestApplyMCPSchreibtTrotzGescheitertemZiel(t *testing.T) {
 		t.Error("gescheitertes Ziel wurde nicht gemeldet")
 	}
 
-	// Das mittlere Ziel fehlt, die beiden anderen stehen trotzdem.
-	if status := mcpStatusFor(t, statuses, filepath.Join(".cursor", "mcp.json")); status.OK() {
-		t.Errorf(".cursor/mcp.json gilt als registriert: %+v", status)
+	// Das erste Ziel fehlt, das andere steht trotzdem.
+	if status := mcpStatusFor(t, statuses, ".mcp.json"); status.OK() {
+		t.Errorf(".mcp.json gilt als registriert: %+v", status)
 	}
-	for _, path := range []string{".mcp.json", "opencode.json"} {
-		if status := mcpStatusFor(t, statuses, path); !status.OK() {
-			t.Errorf("%s nicht registriert, obwohl unabhängig: %+v", path, status)
-		}
+	if status := mcpStatusFor(t, statuses, "opencode.json"); !status.OK() {
+		t.Errorf("opencode.json nicht registriert, obwohl unabhängig: %+v", status)
 	}
 }
 

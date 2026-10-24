@@ -66,25 +66,49 @@ type DocKind struct {
 	// Start ist die Startnummer: Ist der Zählbereich leer oder liegt sein
 	// Höchstwert darunter, bekommt das Dokument sie.
 	Start int `json:"start"`
+	// OwnTools sagt, dass die Sorte eigene Werkzeuge hat und über die
+	// doc-Werkzeuge (k_playbook_doc_*, k-playbook doc) nicht erreichbar ist:
+	// Sie steht nicht in deren kind-Liste, und create, list, done und reopen
+	// lehnen sie ab. Nummernvergabe und done/-Behandlung der Tabelle gelten
+	// trotzdem — die eigenen Werkzeuge benutzen sie.
+	OwnTools bool `json:"ownTools,omitempty"`
 }
 
 // DocKinds ist die Sorten-Tabelle (Task 088, Klärungen 2026-10-14). tasks
 // beginnt bei 100, damit sich die Nummern mit den bisherigen Task-Dateien auf
-// der Platte nicht überschneiden.
+// der Platte nicht überschneiden. todos (Task 097, Entscheidung 2026-10-19)
+// ist projektweit, zählt über todos/ samt done/ und hat eigene Werkzeuge
+// (todos.go): doc_create legte ein leeres Dokument an, doc_done verschöbe
+// ohne das Feld done:.
 var DocKinds = []DocKind{
 	{Kind: "tasks", Dir: "user/~/tasks", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 100},
 	{Kind: "workbench", Dir: "user/~/workbench", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "findings", Dir: "queue/findings", UserArea: false, Counting: DocCountDir, Done: false, Start: 1},
+	{Kind: TodoKindName, Dir: "todos", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true},
 }
 
-// DocKindNames sind die Namen der Sorten in der Reihenfolge der Tabelle — die
-// erlaubten Werte von kind.
+// DocKindNames sind die Namen der Sorten in der Reihenfolge der Tabelle, die
+// die doc-Werkzeuge erreichen — die erlaubten Werte von kind. Sorten mit
+// eigenen Werkzeugen (OwnTools) fehlen.
 func DocKindNames(kinds []DocKind) []string {
 	names := make([]string, 0, len(kinds))
 	for _, kind := range kinds {
+		if kind.OwnTools {
+			continue
+		}
 		names = append(names, kind.Kind)
 	}
 	return names
+}
+
+// ownToolsError ist die Ablehnung einer Sorte mit eigenen Werkzeugen durch
+// die doc-Werkzeuge.
+func ownToolsError(kind DocKind) error {
+	if kind.Kind == TodoKindName {
+		return docRefErrorf(DocCodeInvalidInput, "die Sorte %s hat eigene Werkzeuge und ist über die doc-Werkzeuge nicht erreichbar — "+
+			"Todos gehen über k_playbook_todo_* bzw. k-playbook todo", kind.Kind)
+	}
+	return docRefErrorf(DocCodeInvalidInput, "die Sorte %s hat eigene Werkzeuge und ist über die doc-Werkzeuge nicht erreichbar", kind.Kind)
 }
 
 // Die Fehlercodes der doc-Werkzeuge über die der Verweise hinaus
@@ -110,6 +134,10 @@ const (
 	// DocCodeNameTaken: name_taken von Kephalaion — das Ziel ist belegt, oder
 	// beim Anlegen waren alle Versuche belegt.
 	DocCodeNameTaken = "name_taken"
+	// DocCodeStaleRevision: stale_revision von Kephalaion — das Dokument hat
+	// sich seit dem Lesen geändert, etwa von einem anderen Rechner; nichts
+	// wurde geschrieben. Neu lesen, dann noch einmal.
+	DocCodeStaleRevision = "stale_revision"
 	// DocCodeKephalaionError: ein anderer Fehler von Kephalaion; die Meldung
 	// nennt dessen Code.
 	DocCodeKephalaionError = "kephalaion_error"
@@ -331,15 +359,28 @@ func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 	return client, status.User, nil
 }
 
-// kind sucht eine Sorte nach Namen.
+// kind sucht eine Sorte nach Namen, für die doc-Werkzeuge: Eine Sorte mit
+// eigenen Werkzeugen ist abgelehnt.
 func (u *UserDocs) kind(name string) (DocKind, error) {
-	for _, kind := range u.kinds {
-		if kind.Kind == name {
-			return kind, nil
-		}
+	kind, ok := u.anyKind(name)
+	if ok && kind.OwnTools {
+		return DocKind{}, ownToolsError(kind)
+	}
+	if ok {
+		return kind, nil
 	}
 	return DocKind{}, docRefErrorf(DocCodeInvalidInput, "unbekannte Sorte %q — erlaubt sind %s",
 		name, strings.Join(DocKindNames(u.kinds), ", "))
+}
+
+// anyKind sucht eine Sorte nach Namen, auch eine mit eigenen Werkzeugen.
+func (u *UserDocs) anyKind(name string) (DocKind, bool) {
+	for _, kind := range u.kinds {
+		if kind.Kind == name {
+			return kind, true
+		}
+	}
+	return DocKind{}, false
 }
 
 // kephError übersetzt einen Fehler von Kephalaion in einen Code der
@@ -361,6 +402,8 @@ func kephError(err error) error {
 		return &DocRefError{Code: DocCodeNameTaken, err: err}
 	case kephalaion.CodeNotFound:
 		return &DocRefError{Code: DocCodeNotFound, err: err}
+	case kephalaion.CodeStaleRevision:
+		return &DocRefError{Code: DocCodeStaleRevision, err: err}
 	case "":
 		return &DocRefError{Code: DocCodeKephalaionError, err: err}
 	}
@@ -493,32 +536,42 @@ func (u *UserDocs) Create(ctx context.Context, kindName, shortName string) (DocC
 	if err != nil {
 		return DocCreated{}, err
 	}
+	created, _, err := u.createNumbered(ctx, kind, kind.dirFor(u.user), name, "", kephError)
+	return created, err
+}
+
+// createNumbered legt ein Dokument mit content unter dir an, mit der nächsten
+// Nummer aus dem Zählbereich der Sorte — der Weg von Create, auch für Sorten
+// mit eigenen Werkzeugen. dir ist die Ablage oder deren done/. Zurück kommen
+// die Angaben wie bei Create und die Antwort des Hubs. mapErr übersetzt einen
+// Fehler von create außer name_taken in den Code des Aufrufers.
+func (u *UserDocs) createNumbered(ctx context.Context, kind DocKind, dir, name, content string,
+	mapErr func(error) error) (DocCreated, kephalaion.Document, error) {
 	number, err := u.nextNumber(ctx, kind)
 	if err != nil {
-		return DocCreated{}, err
+		return DocCreated{}, kephalaion.Document{}, err
 	}
-	dir := kind.dirFor(u.user)
 	var lastErr error
 	for attempt := 0; attempt < docCreateAttempts; attempt++ {
 		file := docFileName(number, name)
 		if !docNamePattern.MatchString(file) {
-			return DocCreated{}, docRefErrorf(DocCodeInvalidInput, "Dateiname %q passt nicht in die Namensregel von Kephalaion", file)
+			return DocCreated{}, kephalaion.Document{}, docRefErrorf(DocCodeInvalidInput, "Dateiname %q passt nicht in die Namensregel von Kephalaion", file)
 		}
-		_, err := u.store.Create(ctx, dir+"/"+file, "")
+		doc, err := u.store.Create(ctx, dir+"/"+file, content)
 		if err == nil {
 			created := DocCreated{Ref: DocSchemeKeph + ":/" + dir + "/" + file, Kind: kind.Kind, Number: number, Name: file}
 			if kind.UserArea {
 				created.User = u.user
 			}
-			return created, nil
+			return created, doc, nil
 		}
 		if kephalaion.ErrorCode(err) != kephalaion.CodeNameTaken {
-			return DocCreated{}, kephError(err)
+			return DocCreated{}, kephalaion.Document{}, mapErr(err)
 		}
 		lastErr = err
 		number++
 	}
-	return DocCreated{}, &DocRefError{Code: DocCodeNameTaken, err: fmt.Errorf(
+	return DocCreated{}, kephalaion.Document{}, &DocRefError{Code: DocCodeNameTaken, err: fmt.Errorf(
 		"%d Nummern nacheinander belegt, zuletzt %s: %w", docCreateAttempts, docFileName(number-1, name), lastErr)}
 }
 
@@ -655,6 +708,9 @@ func (u *UserDocs) move(ctx context.Context, raw string, toDone bool) (DocMoved,
 			kind, m, found = candidate, cm, true
 			break
 		}
+	}
+	if found && kind.OwnTools {
+		return DocMoved{}, ownToolsError(kind)
 	}
 	if !found {
 		return DocMoved{}, docRefErrorf(DocCodeWrongDir, "%s liegt in keiner Ablage einer Sorte (%s) und nicht in deren done/",

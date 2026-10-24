@@ -210,6 +210,9 @@ func Announce(url string) {
 func routes(state *serverState) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", state.healthHandler)
+	// Die Umgebungsprüfung (health.Check) steht unter einem eigenen Pfad:
+	// /api/health ist das Lebenszeichen und bleibt billig.
+	mux.HandleFunc("GET /api/environment", environmentHandler)
 	mux.HandleFunc("POST /api/shutdown", state.shutdownHandler)
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", state.createConfigHandler)
@@ -287,6 +290,10 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
 	mux.HandleFunc("GET /api/todos", todosHandler)
 	mux.HandleFunc("GET /api/todos/done", doneTodosHandler)
+	mux.HandleFunc("GET /api/todos/search", searchTodosHandler)
+	mux.HandleFunc("POST /api/todos", addTodoHandler)
+	mux.HandleFunc("POST /api/todos/{id}/done", todoDoneHandler)
+	mux.HandleFunc("POST /api/todos/{id}/reopen", todoReopenHandler)
 	// Der Chat leitet an den OpenCode-Dienst weiter; welche Endpunkte dort
 	// dahinter stehen, weiß allein chat.go. Die POSTs schützt sameOrigin wie
 	// alle übrigen.
@@ -590,7 +597,7 @@ func mcpPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, mcpTemplate, areaSetup, "/mcp", "k-playbook-MCP")
 }
 
-// mcpServersTemplate ist die Übersicht aller MCP-Server der drei Assistenten.
+// mcpServersTemplate ist die Übersicht aller MCP-Server der beiden Assistenten.
 // Sie ist neben /mcp die zweite Seite des Setup-Bereichs und hat als einzige
 // einen Unterpunkt in der linken Spalte: /mcp bleibt über die Karte und die
 // Detailseite des eigenen Servers erreichbar.

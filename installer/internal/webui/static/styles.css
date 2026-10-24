@@ -1287,6 +1287,48 @@ button.attention-highlight {
   text-decoration-color: var(--line);
 }
 
+/* Ein Eintrag mit Knopf: Text links, Abhaken bzw. Wiederöffnen rechts. Der
+   Knopf bleibt klein, damit die Liste eine Liste von Texten bleibt. */
+.todo-item.with-action {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.todo-item.with-action .todo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-action {
+  flex: none;
+  font-size: var(--text-xs);
+}
+
+/* Eingabezeile zum Anlegen und zum Suchen: Feld und Knopf nebeneinander. */
+.todo-form {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.todo-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-6);
+  color: var(--ink);
+  background: var(--field-bg);
+  font-size: var(--text-md);
+}
+
+.todo-form input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .todo-text {
   margin: 0;
   overflow-wrap: anywhere;
@@ -2082,4 +2124,51 @@ button.attention-highlight {
 
 .kephalaion-steps li + li {
   margin-top: var(--space-3);
+}
+
+/* Die Umgebungsprüfung auf der Statusseite: eine Liste der Einträge aus
+   /api/environment, je Eintrag Stufe (.pill), Bereich (.environment-area,
+   eine Beschriftung in styleLabelClasses), Satz und Abhilfe. Die Liste ist
+   ohne Problem leer und nimmt dann keinen Platz; die eine Zeile steht im
+   Meldungsfeld darunter. */
+.environment-list {
+  display: grid;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.environment-list:empty {
+  display: none;
+}
+
+.environment-item + .environment-item {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-6);
+}
+
+.environment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.environment-area {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+
+.environment-text {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-md);
+}
+
+.environment-hint {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
 }

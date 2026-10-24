@@ -21,14 +21,14 @@ const (
 	MCPTransportUnknown MCPTransport = "unknown"
 )
 
-// MCPAssistant ist einer der drei Assistenten, wie ihn die Übersicht führt:
+// MCPAssistant ist einer der beiden Assistenten, wie ihn die Übersicht führt:
 // ID für Pfade und Vergleiche, Name für die Anzeige.
 type MCPAssistant struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// MCPAssistants sind die drei Assistenten in der Reihenfolge der Matrix.
+// MCPAssistants sind die beiden Assistenten in der Reihenfolge der Matrix.
 //
 // Die Namen sind dieselben, die MCPTargets in seinen Zielen trägt; die IDs
 // sind die Pfadsegmente der Detailseite.
@@ -36,7 +36,6 @@ func MCPAssistants() []MCPAssistant {
 	return []MCPAssistant{
 		{ID: "claude-code", Name: "Claude Code"},
 		{ID: "opencode", Name: "OpenCode"},
-		{ID: "cursor", Name: "Cursor"},
 	}
 }
 
@@ -132,7 +131,7 @@ type MCPServerInventory struct {
 }
 
 // mcpListTargets sind die Dateien, die für die Übersicht gelesen werden: die
-// drei Registrierungsziele und, wenn beide OpenCode-Endungen nebeneinander
+// beiden Registrierungsziele und, wenn beide OpenCode-Endungen nebeneinander
 // liegen, auch die zweite. Geschrieben wird nur in die erste — gelesen werden
 // beide, weil OpenCode beide zusammenführt.
 func mcpListTargets(projectRoot string) []MCPTarget {
@@ -143,7 +142,7 @@ func mcpListTargets(projectRoot string) []MCPTarget {
 	return targets
 }
 
-// ListMCPServers liest alle Server aus den Projektdateien der drei
+// ListMCPServers liest alle Server aus den Projektdateien der beiden
 // Assistenten. Eine unlesbare Datei hält die anderen nicht auf: ihr Zustand
 // steht in der Dateiliste, ihre Server fehlen.
 func ListMCPServers(projectRoot string) ([]MCPServerEntry, []MCPFileInfo) {
@@ -194,7 +193,7 @@ func ListMCPServers(projectRoot string) ([]MCPServerEntry, []MCPFileInfo) {
 // erkennbar ist, wird so beschrieben; alles andere ist unknown und wird nur
 // gezeigt.
 //
-// Claude Code und Cursor: `command` + `args` ist lokal, `type: http|sse` mit
+// Claude Code: `command` + `args` ist lokal, `type: http|sse` mit
 // `url` ist remote. OpenCode: `type: local` mit `command`-Array, `type: remote`
 // mit `url`; fehlt `type`, entscheidet die Form. `enabled` fehlt → true.
 func describeMCPServer(target MCPTarget, assistantID string, name string, value any) MCPServerEntry {

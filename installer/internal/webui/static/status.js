@@ -1,8 +1,9 @@
 "use strict";
 
 // Seite "Status": die Startseite der Oberfläche. Sie zeigt, wie es um das
-// Projekt steht: zuerst die Anbindung an die Kephalaion-Collection, darunter
-// die Workflow-Karten und das Bild der Wissensablage.
+// Projekt steht: zuerst die Anbindung an die Kephalaion-Collection, dann die
+// Umgebungsprüfung, darunter die Workflow-Karten und das Bild der
+// Wissensablage.
 //
 // Nichts davon steht hier ein zweites Mal: Knöpfe und Sperrfläche bedient
 // service.js, die Zahlen der Workflow-Karten holt workflows.js, und das Bild
@@ -29,6 +30,27 @@ const KEPHALAION_STATE_LABELS = {
   "login-missing": "Anmeldung fehlt",
   "replica-unreadable": "Replica nicht lesbar",
   "collection-unreadable": "Collection nicht lesbar",
+};
+
+// Beschriftungen der Umgebungsprüfung: Stufe und Bereich kommen vom Server
+// als Schlüssel (health.Level, health.Area); hier stehen die Wörter dazu. Ein
+// unbekannter Bereich — eine neue Quelle — erscheint mit seinem Schlüssel.
+const ENVIRONMENT_LEVEL_LABELS = {
+  "error": "Fehler",
+  "warning": "Warnung",
+};
+
+const ENVIRONMENT_AREA_LABELS = {
+  "kephalaion": "Kephalaion",
+  "gh": "GitHub CLI",
+  "baseTools": "Basis-Werkzeuge",
+  "versionSources": "Versionsinventar",
+};
+
+const environmentElements = {
+  pill: document.getElementById("environment-pill"),
+  problems: document.getElementById("environment-problems"),
+  message: document.getElementById("environment-message"),
 };
 
 const kephalaionElements = {
@@ -75,8 +97,96 @@ kephalaionElements.change.addEventListener("click", () => openKephalaionSetup(tr
 kephalaionElements.cancel.addEventListener("click", closeKephalaionSetup);
 
 loadKephalaion();
+loadEnvironment();
 loadWorkflowCounts(document.getElementById("status-workflows-message"));
 loadKnowledgePicture();
+
+// Die Umgebungsprüfung: der Report aus /api/environment. Ohne Problem eine
+// Zeile, sonst die Liste; die Marke der Karte sagt, wie viele Fehler oder
+// Warnungen es sind, und färbt darüber den Punkt im Blockmenü.
+async function loadEnvironment() {
+  const els = environmentElements;
+  renderKephalaionLoading(els.message, "Umgebung wird geprüft...");
+  let data;
+  try {
+    const response = await fetch("/api/environment", { cache: "no-store" });
+    data = await response.json();
+  } catch {
+    els.pill.className = "pill error";
+    els.pill.textContent = "Nicht geprüft";
+    els.message.textContent = "Die Umgebungsprüfung konnte nicht geladen werden.";
+    return;
+  }
+  renderEnvironment(data);
+}
+
+function renderEnvironment(data) {
+  const els = environmentElements;
+  els.problems.replaceChildren();
+  els.message.textContent = "";
+  if (!data.available || !data.health) {
+    els.pill.className = "pill muted";
+    els.pill.textContent = "Kein Projekt";
+    els.message.textContent = data.message || "";
+    return;
+  }
+  const problems = data.health.problems || [];
+  if (problems.length === 0) {
+    els.pill.className = "pill ok";
+    els.pill.textContent = "Keine Probleme";
+    els.message.textContent = "Die Umgebung dieses Projekts ist in Ordnung: keine Fehler, keine Warnungen.";
+    return;
+  }
+  const errors = problems.filter((problem) => problem.level === "error").length;
+  const warnings = problems.length - errors;
+  els.pill.className = errors > 0 ? "pill error" : "pill warn";
+  els.pill.textContent = environmentCountLabel(errors, warnings);
+  for (const problem of problems) {
+    els.problems.append(renderEnvironmentProblem(problem));
+  }
+}
+
+// „2 Fehler, 1 Warnung“ — nur die Zahlen, die größer als null sind.
+function environmentCountLabel(errors, warnings) {
+  const parts = [];
+  if (errors > 0) {
+    parts.push(errors === 1 ? "1 Fehler" : `${errors} Fehler`);
+  }
+  if (warnings > 0) {
+    parts.push(warnings === 1 ? "1 Warnung" : `${warnings} Warnungen`);
+  }
+  return parts.join(", ");
+}
+
+// Ein Eintrag: Stufe als Zustandsmarke und Bereich in der Kopfzeile, darunter
+// der Satz und die Abhilfe. Alles Text aus der Antwort steht in textContent.
+function renderEnvironmentProblem(problem) {
+  const item = document.createElement("li");
+  item.className = "environment-item";
+
+  const head = document.createElement("div");
+  head.className = "environment-head";
+  const level = document.createElement("span");
+  level.className = problem.level === "error" ? "pill error" : "pill warn";
+  level.textContent = ENVIRONMENT_LEVEL_LABELS[problem.level] || problem.level || "Unbekannt";
+  const area = document.createElement("span");
+  area.className = "environment-area";
+  area.textContent = ENVIRONMENT_AREA_LABELS[problem.area] || problem.area || "";
+  head.append(level, area);
+
+  const message = document.createElement("p");
+  message.className = "environment-text";
+  message.textContent = problem.message || "";
+
+  item.append(head, message);
+  if (problem.hint) {
+    const hint = document.createElement("p");
+    hint.className = "environment-hint";
+    hint.textContent = `Abhilfe: ${problem.hint}`;
+    item.append(hint);
+  }
+  return item;
+}
 
 async function loadKnowledgePicture() {
   const viewer = document.getElementById("knowledge-picture");

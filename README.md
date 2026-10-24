@@ -33,7 +33,7 @@
   reason on the entry.
 - **Its own MCP server.** `k-playbook mcp` gives the assistant the resolved paths,
   instructions and catalogs, plus the tools for review runs. It is registered for
-  Claude Code, Cursor and OpenCode.
+  Claude Code and OpenCode.
 
 ## Installation
 
@@ -98,8 +98,6 @@ project/
 │   └── skills/     │     one symlink per skill; OpenCode reads along here
 ├── .opencode/      │
 │   └── commands/ ──┤
-├── .cursor/        │
-│   └── commands/ ──┤
 ├── k-playbook/   ←─┤     the installation, fully replaceable
 │   ├── commands/ skills/ rules/ reviews/ checks/
 │   ├── bin/ scripts/
@@ -139,7 +137,7 @@ An entry of the same name in `k-playbook-local/` fully replaces the shipped one;
 one disables it. This holds for all five kinds — `rules/`, `reviews/`, `checks/`,
 `commands/` and `skills/`.
 
-That is why `.claude/commands/` and the other three targets are **real directories with
+That is why `.claude/commands/` and the other two targets are **real directories with
 individual symlinks**, not directory symlinks: only that way do both sources arrive. The
 interface compares the resolved catalog with what is registered, names the deviations and
 offers to fix them.
@@ -154,11 +152,11 @@ k-playbook briefing
 `k-playbook context` still prints the resolved working state as JSON; the briefing carries
 what is left of it in its section `context` until that output has been taken apart.
 
-Linking is set up for Claude Code, OpenCode and Cursor. Skills exist only once, under
-`.claude/skills`, because OpenCode searches that directory as well and Cursor has no
-skill concept. `CLAUDE.md` is a small include file holding the line `@AGENTS.md`: Claude
-Code reads `CLAUDE.md` exclusively, while OpenCode and Cursor prefer `AGENTS.md` — so
-there is exactly one instruction file, and Claude Code loads it through the import.
+Linking is set up for Claude Code and OpenCode. Skills exist only once, under
+`.claude/skills`, because OpenCode searches that directory as well. `CLAUDE.md` is a small
+include file holding the line `@AGENTS.md`: Claude Code reads `CLAUDE.md` exclusively,
+while OpenCode prefers `AGENTS.md` — so there is exactly one instruction file, and Claude
+Code loads it through the import.
 
 The direction is the same everywhere. If a project brings only a real `CLAUDE.md`, setup
 **renames** it to `AGENTS.md` and creates `CLAUDE.md` anew as an include; the content is

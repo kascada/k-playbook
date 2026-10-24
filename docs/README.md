@@ -28,7 +28,8 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why *Set up* writes an absolute path and when the bare command name is written instead. |
 | [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes, its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
-| [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract. |
+| [`github-access.md`](./github-access.md) | The personal GitHub access file `~/.config/k-playbook/github.yaml`: services, access types (`gh`, `token`, `ssh`, `public`), `disabled`, what the reader reports, the template written when the file is missing, and `k-playbook github check` / `show`. Contract agreed, implementation in steps. |
+| [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract; to be absorbed into `github-access.md`. |
 | [`kephalaion-client.md`](./kephalaion-client.md) | The Kephalaion tools k-playbook calls itself (`whoami`, `list`, `create`, `rename`), what it expects of them — `create`/`rename` through the hub, `name_taken`, `list` from the replica and the replica lag measured, `request_id` with one retry, `replayed`, `outcome_unknown` versus `node_unreachable`, minimum node v0.3.1 —, and where the tools themselves are documented. |
 | [`verweisschema.md`](./verweisschema.md) | The reference scheme: one path with a prefix — `project:`, `k-playbook:`, `keph:` —, the access route per prefix, and how k-playbook resolves `k-playbook:` references and assembles directories such as `k-playbook:/instructions/always/`. |
 | [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
@@ -67,7 +68,7 @@ questions and the ordered work list.
 
 - `anchor` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
 - `AGENTS.md` / `CLAUDE.md` / `include` / `@AGENTS.md` / `linking` / `renaming` / `conflict` -> [`installation.md`](./installation.md#4-link-assistants)
-- `assistants` / `Claude Code` / `OpenCode` / `Cursor` -> [`installation.md`](./installation.md#4-link-assistants)
+- `assistants` / `Claude Code` / `OpenCode` -> [`installation.md`](./installation.md#4-link-assistants)
 - `BROWSER` / `browser does not open` / `DevContainer` -> [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
 - `sections` / `setup` / `workflows` / `switch` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-and-tasks)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
@@ -84,6 +85,7 @@ questions and the ordered work list.
 - `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
 - `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
 - `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
+- `health` / `k_playbook_health` / `k-playbook health` / `GET /api/environment` / `environment check` / `Umgebung: keine Probleme` / `briefing health` -> [`mcp.md`](./mcp.md#health-contract), [`mcp.md`](./mcp.md#briefing-contract)
 - `gui status` / `k_playbook_gui_status` / `is the interface running` / `runtime file state` -> [`mcp.md`](./mcp.md#gui-status-contract), [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#zustand-erfragen-gui-status)
 - `notify` / `k_playbook_notify` / `k-playbook notify` / `desktop notification` / `toast` / `sound` / `done signal` -> [`mcp.md`](./mcp.md#notify-contract), [`task-flow.md`](./task-flow.md), [`../commands/_task/fertig-meldung.md`](../commands/_task/fertig-meldung.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#fertig-meldung-notify)
 - `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#2-create-project-owned-structure), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)

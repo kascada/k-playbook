@@ -354,3 +354,110 @@ func TestClientListZuVieleSeiten(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteUndDeleteSendenBaseRevisionUndSchluessel(t *testing.T) {
+	node := &toolNode{reply: func(call toolCall) (bool, string, string) {
+		if call.Name == "delete" {
+			return false, `{"kind":"document","address":"vm:k-playbook","name":"a/001-x.md","id":"d1","revision":6,"deleted":true}`, ""
+		}
+		return false, `{"kind":"document","address":"vm:k-playbook","name":"a/001-x.md","id":"d1","revision":5}`, ""
+	}}
+	client := newTestClient(t, startToolNode(t, node).URL+"/mcp")
+	ctx := context.Background()
+	doc, err := client.Write(ctx, "a/001-x.md", "neu\n", 4)
+	if err != nil || doc.Revision != 5 || doc.Name != "a/001-x.md" {
+		t.Fatalf("Write: %+v %v", doc, err)
+	}
+	if _, err := client.Write(ctx, "a/001-x.md", "", 0); err != nil {
+		t.Fatalf("Write ohne Revision: %v", err)
+	}
+	doc, err = client.Delete(ctx, "a/001-x.md", 5)
+	if err != nil || !doc.Deleted || doc.Revision != 6 {
+		t.Fatalf("Delete: %+v %v", doc, err)
+	}
+	if _, err := client.Delete(ctx, "a/001-x.md", 0); err != nil {
+		t.Fatalf("Delete ohne Revision: %v", err)
+	}
+	calls := node.recorded()
+	if len(calls) != 4 {
+		t.Fatalf("erwartet vier Aufrufe, bekommen %d", len(calls))
+	}
+	want := []struct {
+		tool    string
+		base    any
+		content any
+	}{{"write", float64(4), "neu\n"}, {"write", nil, ""}, {"delete", float64(5), nil}, {"delete", nil, nil}}
+	seen := map[string]bool{}
+	for i, call := range calls {
+		if call.Name != want[i].tool || call.Args["base_revision"] != want[i].base || call.Args["content"] != want[i].content ||
+			call.Args["name"] != "a/001-x.md" || call.Args["collection"] != "vm:k-playbook" {
+			t.Errorf("Aufruf %d: %+v", i+1, call)
+		}
+		if _, ok := call.Args["recursive"]; ok {
+			t.Errorf("Aufruf %d trägt recursive: %+v", i+1, call.Args)
+		}
+		key, _ := call.Args["request_id"].(string)
+		if !requestIDPattern.MatchString(key) || seen[key] {
+			t.Errorf("Aufruf %d: request_id %q ungültig oder doppelt", i+1, key)
+		}
+		seen[key] = true
+	}
+}
+
+func TestWriteUndDeleteWiederholenNachOffenemAusgang(t *testing.T) {
+	for _, tool := range []string{"write", "delete"} {
+		t.Run(tool, func(t *testing.T) {
+			node := &toolNode{raw: firstOpen(openAnswers["HTTP 500"]),
+				reply: func(toolCall) (bool, string, string) {
+					return false, `{"address":"vm:k-playbook","name":"a/001-x.md","revision":7,"replayed":true,"ids":["d1"]}`, ""
+				}}
+			client := newTestClient(t, startToolNode(t, node).URL+"/mcp")
+			var doc Document
+			var err error
+			if tool == "write" {
+				doc, err = client.Write(context.Background(), "a/001-x.md", "x", 3)
+			} else {
+				doc, err = client.Delete(context.Background(), "a/001-x.md", 3)
+			}
+			if err != nil || !doc.Replayed || doc.ID != "d1" {
+				t.Fatalf("%s: %+v %v", tool, doc, err)
+			}
+			sameRequest(t, node.recorded())
+		})
+	}
+}
+
+func TestWriteUndDeleteAblehnungen(t *testing.T) {
+	for _, code := range []string{CodeStaleRevision, CodeNotFound, "forbidden"} {
+		for _, tool := range []string{"write", "delete"} {
+			node := &toolNode{reply: func(toolCall) (bool, string, string) { return nodeError(code, "abgelehnt") }}
+			client := newTestClient(t, startToolNode(t, node).URL+"/mcp")
+			var err error
+			if tool == "write" {
+				_, err = client.Write(context.Background(), "a/001-x.md", "x", 3)
+			} else {
+				_, err = client.Delete(context.Background(), "a/001-x.md", 3)
+			}
+			if ErrorCode(err) != code {
+				t.Errorf("%s %s: bekommen %v (%q)", tool, code, err, ErrorCode(err))
+			}
+			if n := len(node.recorded()); n != 1 {
+				t.Errorf("%s %s: %d Aufrufe, erwartet einer", tool, code, n)
+			}
+		}
+	}
+}
+
+func TestWriteUndDeleteAlterNode(t *testing.T) {
+	node := &toolNode{version: "v0.3.0", reply: func(toolCall) (bool, string, string) { return false, createdJSON, "" }}
+	client := newTestClient(t, startToolNode(t, node).URL+"/mcp")
+	if _, err := client.Write(context.Background(), "a/001-x.md", "x", 0); ErrorCode(err) != CodeNodeUnreachable {
+		t.Fatalf("Write an alten Node: %v", err)
+	}
+	if _, err := client.Delete(context.Background(), "a/001-x.md", 0); ErrorCode(err) != CodeNodeUnreachable {
+		t.Fatalf("Delete an alten Node: %v", err)
+	}
+	if len(node.recorded()) != 0 {
+		t.Fatalf("alter Node hat geschrieben bekommen: %+v", node.recorded())
+	}
+}

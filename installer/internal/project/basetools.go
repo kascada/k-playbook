@@ -44,7 +44,7 @@ type BaseTool struct {
 // auf das im eigenen Binary mitgelieferte ripgrep; dort meldet der Befund `rg`
 // dauerhaft als fehlend, obwohl der Aufruf funktioniert. Das ist bekannt und
 // wird hingenommen: In genau den Umgebungen, für die dieser Befund existiert —
-// OpenCode, Cursor, ein normales Terminal —, ist er richtig, und dort fällt der
+// OpenCode, ein normales Terminal —, ist er richtig, und dort fällt der
 // Command sonst wortlos um. Die Alternative wäre, je Werkzeug eine Shell zu
 // starten; das kostet den Unterprozess, den der Kontext gerade nicht ausgeben
 // soll, und machte den Befund von der Shell des Aufrufers abhängig. Ein falsch

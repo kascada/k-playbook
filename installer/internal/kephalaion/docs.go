@@ -11,17 +11,17 @@ import (
 	"time"
 )
 
-// Dokumente in der Collection des Projekts: list, read, create und rename
-// über den Node dieses Rechners, mit dem Token aus der Anbindung. Der Vertrag
+// Dokumente in der Collection des Projekts: list, read, create, write,
+// rename und delete über den Node dieses Rechners, mit dem Token aus der Anbindung. Der Vertrag
 // ist der des Pakets: Hub und Account aus der Anbindung, das Token aus dem
 // Pfad des Kandidaten, gesendet nur an die Loopback-Adresse des Nodes, kein
 // Token in einem Ergebnis oder Fehler.
 //
-// list und read lesen die Replica des Nodes; create und rename gehen über den
-// Hub. Ein Fehler eines Werkzeugs kommt als *ToolError mit dem Code von
-// Kephalaion (name_taken, not_found, …) zurück.
+// list und read lesen die Replica des Nodes; create, write, rename und delete
+// gehen über den Hub. Ein Fehler eines Werkzeugs kommt als *ToolError mit dem
+// Code von Kephalaion (name_taken, not_found, stale_revision, …) zurück.
 //
-// create und rename tragen je Aufruf einen eigenen request_id (Kephalaion ab
+// create, write, rename und delete tragen je Aufruf einen eigenen request_id (Kephalaion ab
 // v0.3.1, „Wiederholung mit Schlüssel“ in Kephalaions docs/vertrag.md). Bleibt
 // der Ausgang nach dem Abschicken offen, schickt der Client denselben Aufruf
 // mit demselben Schlüssel genau einmal in einer neuen Sitzung noch einmal; der
@@ -31,8 +31,8 @@ import (
 // nichts angekommen.
 
 // ToolTimeout ist die Zeitgrenze für einen Aufruf von List oder Read oder für
-// einen Versuch von Create oder Rename, jeweils samt Anmeldung. create und
-// rename warten auf den Hub; ein Listing blättert womöglich mehrere Seiten.
+// einen Versuch von Create, Write, Rename oder Delete, jeweils samt Anmeldung.
+// Die schreibenden warten auf den Hub; ein Listing blättert womöglich mehrere Seiten.
 // Eine Wiederholung bekommt ihre eigene Zeitgrenze.
 const ToolTimeout = 15 * time.Second
 
@@ -41,7 +41,7 @@ const ToolTimeout = 15 * time.Second
 var toolTimeout = ToolTimeout
 
 // MinWriteNodeVersion ist die älteste Version des Nodes, die request_id an
-// create und rename annimmt. Ein älterer lehnt den Aufruf laut ab und
+// create, write, rename und delete annimmt. Ein älterer lehnt den Aufruf laut ab und
 // schreibt nichts.
 const MinWriteNodeVersion = "v0.3.1"
 
@@ -64,6 +64,10 @@ const (
 	CodeNameTaken = "name_taken"
 	// CodeNotFound: Das Dokument gibt es nicht.
 	CodeNotFound = "not_found"
+	// CodeStaleRevision: Das Dokument hat nicht die Revision, auf der write
+	// oder delete beruhen (base_revision); nichts wurde geschrieben. Die
+	// Meldung nennt die aktuelle Revision.
+	CodeStaleRevision = "stale_revision"
 )
 
 // Die Codes der Werkzeuge des Nodes, die schreiben, über die des Vertrags
@@ -87,10 +91,11 @@ const (
 // CodeNodeUnreachable ist kein Code von Kephalaion, sondern der dieses
 // Pakets: Beim Hub ist nichts angekommen. Der Node war nicht erreichbar, die
 // Sitzung ließ sich nicht öffnen, auf diesem Rechner fehlt, was ein Aufruf
-// braucht (Adresse, Token), oder der Node ist zu alt für create und rename
-// (MinWriteNodeVersion). Nach dem Abschicken von create oder rename entsteht
-// dieser Code nie; dann ist der Ausgang offen (CodeOutcomeUnknown). Bei list
-// und read steht er auch für eine unlesbare Antwort — beide ändern nichts.
+// braucht (Adresse, Token), oder der Node ist zu alt für die schreibenden
+// Werkzeuge (MinWriteNodeVersion). Nach dem Abschicken eines schreibenden
+// Werkzeugs entsteht dieser Code nie; dann ist der Ausgang offen
+// (CodeOutcomeUnknown). Bei list und read steht er auch für eine unlesbare
+// Antwort — beide ändern nichts.
 const CodeNodeUnreachable = "node_unreachable"
 
 // ToolError ist der Fehler eines Werkzeugs von Kephalaion oder des Wegs
@@ -147,9 +152,10 @@ type ListRequest struct {
 	Frontmatter bool
 }
 
-// Document ist die Antwort von create und rename: das Dokument, wie der Hub
-// es nach dem Vorgang meldet, bei rename unter dem neuen Namen. Note ist ein
-// Hinweis des Nodes zu einem Erfolg (Replica nicht geschrieben).
+// Document ist die Antwort von create, write, rename und delete: das
+// Dokument, wie der Hub es nach dem Vorgang meldet, bei rename unter dem
+// neuen Namen. Deleted steht nach delete. Note ist ein Hinweis des Nodes zu
+// einem Erfolg (Replica nicht geschrieben).
 //
 // Replayed heißt: Der Vorgang war schon ausgeführt (der erste Versuch hatte
 // den Hub erreicht), diesmal ist nichts geschrieben. Dann stehen nur Name,
@@ -164,6 +170,7 @@ type Document struct {
 	Created  *Stamp   `json:"created,omitempty"`
 	Updated  *Stamp   `json:"updated,omitempty"`
 	Size     *int64   `json:"size,omitempty"`
+	Deleted  bool     `json:"deleted,omitempty"`
 	Note     string   `json:"note,omitempty"`
 	Replayed bool     `json:"replayed,omitempty"`
 	IDs      []string `json:"ids,omitempty"`
@@ -388,7 +395,35 @@ func (c *Client) Rename(ctx context.Context, name, newName string) (Document, er
 	return c.write(ctx, "rename", newName, map[string]any{"collection": c.address, "name": name, "new_name": newName})
 }
 
-// attemptOutcome ist der Ausgang eines Versuchs von create oder rename.
+// Write ersetzt den Inhalt eines Dokuments, über den Hub. baseRevision ist
+// die Revision, auf der der neue Inhalt beruht (aus Read); hat das Dokument
+// am Hub eine andere, ist der Fehler ein *ToolError mit CodeStaleRevision und
+// nichts wird geschrieben. 0 heißt: ohne diese Prüfung. Gibt es das Dokument
+// nicht, ist der Code CodeNotFound. Ist der Inhalt unverändert, schreibt der
+// Hub nichts und meldet die bestehende Revision. request_id und Wiederholung
+// wie bei Create.
+func (c *Client) Write(ctx context.Context, name, content string, baseRevision int64) (Document, error) {
+	args := map[string]any{"collection": c.address, "name": name, "content": content}
+	if baseRevision > 0 {
+		args["base_revision"] = baseRevision
+	}
+	return c.write(ctx, "write", name, args)
+}
+
+// Delete setzt eine Löschmarke auf ein Dokument, über den Hub. Verzeichnisse
+// löscht Delete nicht (kein recursive). baseRevision wie bei Write. Die
+// Löschmarke sperrt den Namen nicht: Create darf ihn wieder vergeben.
+// request_id und Wiederholung wie bei Create.
+func (c *Client) Delete(ctx context.Context, name string, baseRevision int64) (Document, error) {
+	args := map[string]any{"collection": c.address, "name": name}
+	if baseRevision > 0 {
+		args["base_revision"] = baseRevision
+	}
+	return c.write(ctx, "delete", name, args)
+}
+
+// attemptOutcome ist der Ausgang eines Versuchs von create, write, rename
+// oder delete.
 type attemptOutcome int
 
 const (
@@ -405,7 +440,7 @@ const (
 	attemptOpen
 )
 
-// write führt create oder rename aus: ein Versuch, nach offenem Ausgang genau
+// write führt create, write, rename oder delete aus: ein Versuch, nach offenem Ausgang genau
 // eine Wiederholung mit demselben request_id und denselben Feldern in neuer
 // Sitzung, jeder Versuch mit eigener Zeitgrenze. target ist der Name, den das
 // Dokument danach trägt.
@@ -429,7 +464,7 @@ func (c *Client) write(ctx context.Context, tool, target string, args map[string
 	return Document{}, c.outcomeUnknown(tool, target, first, "Wiederholung mit demselben request_id: "+errorMessage(err))
 }
 
-// attempt ist ein Versuch von create oder rename in eigener Sitzung mit
+// attempt ist ein Versuch eines schreibenden Werkzeugs in eigener Sitzung mit
 // eigener Zeitgrenze. checkVersion prüft vorher die Version des Nodes; das
 // braucht nur der erste Versuch.
 func (c *Client) attempt(ctx context.Context, tool, target string, args map[string]any, checkVersion bool) (Document, attemptOutcome, error) {

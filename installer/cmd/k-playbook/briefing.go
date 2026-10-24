@@ -17,7 +17,8 @@ import (
 // k_playbook_briefing als Hülle anbietet: welche Anweisungen, Regeln, Reviews
 // und Leitlinien für dieses Projekt gelten und was in der Projekt-Collection
 // für die eigene Arbeit ansteht, als Verweise im Präfixschema; vorweg der Text
-// der immer geltenden Anweisungen, dahinter der Rest von `k-playbook context`,
+// der immer geltenden Anweisungen und die Umgebungsprüfung, dahinter der Rest
+// von `k-playbook context`,
 // den das Briefing noch nicht selbst abdeckt. Ohne --json steht der Klartext
 // zum Lesen; mit --json die Antwort als JSON, dieselbe Serialisierung wie über
 // MCP.
@@ -54,8 +55,10 @@ func runBriefing(args []string) error {
 
 // writeBriefingText rendert das Briefing zum Lesen: zuerst der Text der immer
 // geltenden Anweisungen, so wie `k-playbook read` ihn liefert — ohne die Liste
-// seiner Teile, die Herkunft steht nur in der JSON-Antwort —, dann je Abschnitt
-// die Verweise mit Herkunft in Klammern und Titel, dahinter die Beschreibung.
+// seiner Teile, die Herkunft steht nur in der JSON-Antwort —, dann der Block
+// der Umgebungsprüfung (healthText, derselbe wie bei `k-playbook health`),
+// dann je Abschnitt die Verweise mit Herkunft in Klammern und Titel, dahinter
+// die Beschreibung.
 func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 	var b strings.Builder
 	always := briefing.Documents.Always
@@ -67,6 +70,10 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 	for _, problem := range always.Problems {
 		fmt.Fprintf(&b, "Hinweis: %s\n", problem)
 	}
+	// Die Umgebungsprüfung unmittelbar nach dem Text der immer geltenden
+	// Anweisungen und vor den Verweisen: so liest die Sitzung sie, bevor sie
+	// etwas tut. Ohne Problem eine Zeile.
+	b.WriteString("\n" + healthText(briefing.Health))
 	b.WriteString("\n")
 	entries := func(list []project.BriefingEntry) {
 		if len(list) == 0 {
@@ -244,6 +251,11 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     (lokal und mitgeliefert aufgelöst, in der festgelegten Reihenfolge) — der
     einzige Inhalt im Briefing, alles Weitere sind Verweise im Präfixschema
     (docs/verweisschema.md), keine Pfade;
+  - gleich danach die Umgebungsprüfung: Fehler und Warnungen über die
+    Umgebung des Projekts (Kephalaion-Anbindung, gh, Basis-Werkzeuge,
+    Quellenkonfiguration), je Eintrag Stufe, Bereich, Satz und Abhilfe —
+    dieselbe Liste wie k-playbook health; ohne Problem die eine Zeile
+    „Umgebung: keine Probleme“;
   - die Anweisungen auf Abruf, Regeln, Reviews und Leitlinien — lokal und
     mitgeliefert schon gegeneinander aufgelöst, je Eintrag Verweis, Titel,
     Beschreibung und Herkunft (dist, local, override, disabled);
@@ -266,8 +278,8 @@ sich geändert hat, steht im Rest unter links.
 Ohne --json steht der Klartext zum Lesen. Mit --json kommt die Antwort als
 JSON mit schemaVersion, documents (always mit content und parts, onDemand,
 rules, reviews, guidelines), work (available, message, user, tasks, workbench,
-openFindings),
-projectDocs und context (available, message, dazu die übrigen Felder der
+openFindings), projectDocs, health (ok, problems — je Eintrag level, area,
+message, hint) und context (available, message, dazu die übrigen Felder der
 Kontextausgabe unter ihren Namen) — dieselbe Antwort wie das MCP-Werkzeug
 k_playbook_briefing.
 `)

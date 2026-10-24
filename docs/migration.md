@@ -246,7 +246,7 @@ clone, it means three things:
   anymore; `/k-remediation` continues to read them as legacy input. Anyone who no longer needs
   them deletes them manually -- `results/` is not versioned anyway.
 - With the update, the command disappears from the catalog, and the symlinks under
-  `.claude/commands/`, `.opencode/commands/`, and `.cursor/commands/` are then orphaned.
+  `.claude/commands/` and `.opencode/commands/` are then orphaned.
   Setup in the interface removes them itself. The order cannot be reversed: first update the
   clone, then set up. In reverse, setup still resolves the catalog from the old state and creates
   the links again.

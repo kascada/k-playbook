@@ -514,8 +514,8 @@ func assertRegistryLinks(t *testing.T, root string, statuses []LinkStatus) {
 			t.Errorf("%s: State = %q (%s), erwartet %q", status.Path, status.State, status.Detail, StateOK)
 		}
 	}
-	if registry != 4 {
-		t.Errorf("%d Katalog-Links geprüft, erwartet 4", registry)
+	if registry != 3 {
+		t.Errorf("%d Katalog-Links geprüft, erwartet 3", registry)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".claude", "commands", "k-test.md")); err != nil {
 		t.Errorf("Command nicht registriert: %v", err)

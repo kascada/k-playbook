@@ -14,11 +14,12 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 
 | Feld | Bedeutung |
 |---|---|
-| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"3"`. |
+| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"4"`. |
 | `documents.always` | Das zusammengebaute Verzeichnis `k-playbook:/instructions/always/`: `ref`, `content` (der Text selbst, Includes eingesetzt — eine Sitzung muss ihn nicht eigens lesen), `parts` in der Reihenfolge des Texts, `problems` (übergangene Teile). |
 | `documents.onDemand`, `documents.rules`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Mitgeliefert und projektlokal sind schon gegeneinander aufgelöst. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
 | `work` | Die eigene offene Arbeit aus der Projekt-Collection: `available` und `message` (ob die Collection lesbar war und sonst warum nicht), `user` (der eigene Kephalaion-User), `tasks` und `workbench` (je `ref`, `title`, `updated`; offen heißt: nicht in `done/`), `openFindings` (Zahl der offenen Befunde in `queue/findings/`). |
 | `projectDocs` | Der Einstieg der Projektdokumentation, als Verweis. |
+| `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
 | `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.rules`, `catalogs.reviews` und `guidelines` fehlen darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
 
 ### Der Abschnitt `context`
@@ -58,6 +59,22 @@ nur gefüllt, wenn die Datei da, aber unlesbar oder von unbekannter Fassung ist 
 `roots`, `sources`, `exclude` und `helmValues` leer, und der Zustand ist ein sichtbarer Befund,
 kein leeres Ergebnis. Auf einer Installation, die älter ist als das Feld, fehlt es. Der
 vollständige Vertrag steht in `<playbook.dir>/docs/version-inventory.md`.
+
+### `health`
+
+`health` bewertet, was `context` an Umgebungsangaben trägt, und ersetzt nichts davon: Die
+Felder `context.kephalaion`, `context.gh`, `context.baseTools` und `context.versionSources`
+stehen weiter unverändert da. Die Einträge heute: Die Anbindung an Kephalaion ist eingetragen,
+aber nicht `ok` — `error`, denn `keph:`-Verweise und `work` sind dann nicht erreichbar; sie
+ist nicht eingetragen — `warning`. Das Projekt setzt gh voraus (`context.gh.status` ist
+`enabled`), aber `context.gh.ready` ist falsch — `warning`. Je fehlendem Basis-Werkzeug
+(`context.baseTools.missing`) — `warning`. Die Quellenkonfiguration des Versionsinventars
+ist da, aber nicht lesbar oder von unbekannter Fassung (`context.versionSources.error`) —
+`error`; der Eintrag nennt den Pfad, die Einzelheiten stehen in `context.versionSources.error`.
+Was eine Sitzung mit den Einträgen tut, steht in den immer geltenden Anweisungen: in der
+ersten Antwort nennen, Fehler vor der Arbeit, nichts still beheben, die Abhilfe aus `hint`
+anbieten. Nach einer Abhilfe liefert `k_playbook_health` den Stand neu, ohne das Briefing neu
+zu laden. Weitere Quellen hängen sich hier ein; die Liste der Bereiche wächst dann.
 
 ### `gh`
 

@@ -1,4 +1,4 @@
-// Seite "MCP-Server": alle Server, die die drei Assistenten in den
+// Seite "MCP-Server": alle Server, die die beiden Assistenten in den
 // Projektdateien kennen, die Pflichtliste aus K-PLAYBOOK.yaml und die
 // gelesenen Dateien.
 //
@@ -24,7 +24,6 @@ const elements = {
 const ASSISTANTS = [
   { id: "claude-code", name: "Claude Code" },
   { id: "opencode", name: "OpenCode" },
-  { id: "cursor", name: "Cursor" },
 ];
 
 // Der Schnipsel für ein Projekt, das noch keine Pflichtliste hat.

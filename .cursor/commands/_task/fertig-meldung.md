@@ -1,1 +1,0 @@
-../../../k-playbook/commands/_task/fertig-meldung.md

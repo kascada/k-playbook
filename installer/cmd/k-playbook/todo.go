@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,36 +15,27 @@ import (
 // todoListOutput ist die Antwort von `todo list`.
 //
 // Die Ausgabe ist JSON auf stdout wie bei `context`: /k-todo soll sie lesen
-// können, ohne Fließtext zu deuten. migrated und hint stehen daneben, weil ein
-// Zugriff nebenbei migrieren kann und weil eine zurückgebliebene TODO.md ein
+// können, ohne Fließtext zu deuten. hint steht daneben, weil ein nicht
+// übernommenes data/todos.json oder eine zurückgebliebene TODO.md ein
 // Hinweis ist und kein Fehler.
 type todoListOutput struct {
-	Todos    []project.Todo `json:"todos"`
-	Migrated int            `json:"migrated,omitempty"`
-	Hint     string         `json:"hint,omitempty"`
+	Todos []project.Todo `json:"todos"`
+	Hint  string         `json:"hint,omitempty"`
 }
 
 // todoEntryOutput ist die Antwort von `todo add`, `todo update` und
 // `todo delete`: der betroffene Eintrag.
 type todoEntryOutput struct {
-	Todo     project.Todo `json:"todo"`
-	Migrated int          `json:"migrated,omitempty"`
-	Hint     string       `json:"hint,omitempty"`
-}
-
-// todoImportOutput ist die Antwort von `todo import`.
-type todoImportOutput struct {
-	Imported int    `json:"imported"`
-	Migrated int    `json:"migrated,omitempty"`
-	Hint     string `json:"hint,omitempty"`
+	Todo project.Todo `json:"todo"`
+	Hint string       `json:"hint,omitempty"`
 }
 
 // runTodo führt die Todo-Verwaltung aus.
 //
 // Ohne Unterbefehl und mit --help gibt es nur die Kurzhilfe: dieser Aufruf
-// fasst ausdrücklich keine Daten an — weder data/todos.json noch eine
-// TODO.md —, damit er als Rauchtest nach einem Release folgenlos bleibt und
-// die Migration nicht anläuft.
+// fasst ausdrücklich keine Daten an — weder die Collection noch
+// data/todos.json —, damit er als Rauchtest nach einem Release folgenlos
+// bleibt.
 func runTodo(args []string) error {
 	if len(args) == 0 {
 		printTodoUsage(os.Stdout)
@@ -62,8 +54,8 @@ func runTodo(args []string) error {
 		return runTodoUpdate(args[1:])
 	case "delete":
 		return runTodoDelete(args[1:])
-	case "import":
-		return runTodoImport(args[1:])
+	case "migrate":
+		return runTodoMigrate(args[1:])
 	default:
 		printTodoUsage(os.Stderr)
 		return fmt.Errorf("unbekannter Unterbefehl: todo %s", args[0])
@@ -73,14 +65,21 @@ func runTodo(args []string) error {
 func runTodoList(args []string) error {
 	done := false
 	all := false
-	for _, arg := range args {
-		switch arg {
+	search := ""
+	for index := 0; index < len(args); index++ {
+		switch args[index] {
 		case "--done":
 			done = true
 		case "--all":
 			all = true
+		case "--search":
+			if index+1 >= len(args) {
+				return fmt.Errorf("--search erwartet einen Wert")
+			}
+			index++
+			search = args[index]
 		default:
-			return fmt.Errorf("unbekanntes Argument: %s — erwartet wird todo list [--done] [--all]", arg)
+			return fmt.Errorf("unbekanntes Argument: %s — erwartet wird todo list [--done] [--all] [--search <text>]", args[index])
 		}
 	}
 
@@ -89,21 +88,40 @@ func runTodoList(args []string) error {
 		return err
 	}
 
+	ctx := context.Background()
 	var todos []project.Todo
 	var notice project.TodoNotice
 	switch {
+	case strings.TrimSpace(search) != "":
+		var found []project.Todo
+		found, notice, err = project.SearchTodos(ctx, projectDir, search)
+		todos = []project.Todo{}
+		for _, todo := range found {
+			if all || (todo.Done != "") == done {
+				todos = append(todos, todo)
+			}
+		}
 	case all:
-		todos, notice, err = project.ListAllTodos(projectDir)
+		todos, notice, err = project.ListAllTodos(ctx, projectDir)
 	case done:
-		todos, notice, err = project.ListDoneTodos(projectDir)
+		todos, notice, err = project.ListDoneTodos(ctx, projectDir)
 	default:
-		todos, notice, err = project.ListTodos(projectDir)
+		todos, notice, err = project.ListTodos(ctx, projectDir)
 	}
 	if err != nil {
-		return err
+		return todoError(err, notice)
 	}
 
-	return printTodoJSON(todoListOutput{Todos: todos, Migrated: notice.Migrated, Hint: notice.Hint})
+	return printTodoJSON(todoListOutput{Todos: todos, Hint: notice.Hint})
+}
+
+// todoError meldet einen Fehler der Fachlogik mit seinem Code; ein Hinweis
+// daneben geht nach stderr, stdout bleibt leer.
+func todoError(err error, notice project.TodoNotice) error {
+	if notice.Hint != "" {
+		fmt.Fprintf(os.Stderr, "Hinweis: %s\n", notice.Hint)
+	}
+	return docError(err)
 }
 
 func runTodoAdd(args []string) error {
@@ -132,11 +150,11 @@ func runTodoAdd(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.AddTodo(projectDir, text, origin)
+	todo, notice, err := project.AddTodo(context.Background(), projectDir, text, origin)
 	if err != nil {
-		return err
+		return todoError(err, notice)
 	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Migrated: notice.Migrated, Hint: notice.Hint})
+	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
 }
 
 func runTodoUpdate(args []string) error {
@@ -185,11 +203,11 @@ func runTodoUpdate(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.UpdateTodo(projectDir, id, text, done)
+	todo, notice, err := project.UpdateTodo(context.Background(), projectDir, id, text, done)
 	if err != nil {
-		return err
+		return todoError(err, notice)
 	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Migrated: notice.Migrated, Hint: notice.Hint})
+	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
 }
 
 func runTodoDelete(args []string) error {
@@ -207,33 +225,37 @@ func runTodoDelete(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.DeleteTodo(projectDir, id)
+	todo, notice, err := project.DeleteTodo(context.Background(), projectDir, id)
 	if err != nil {
-		return err
+		return todoError(err, notice)
 	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Migrated: notice.Migrated, Hint: notice.Hint})
+	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
 }
 
-func runTodoImport(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("erwartet wird todo import <pfad>")
+// runTodoMigrate übernimmt data/todos.json in die Collection. Die Ausgabe
+// nennt angelegte und übersprungene Einträge — auch bei einem Abbruch, dann
+// mit dem Fehler auf stderr.
+func runTodoMigrate(args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("erwartet wird todo migrate ohne Argumente")
 	}
-
 	projectDir, err := todoProjectDir()
 	if err != nil {
 		return err
 	}
-
-	count, notice, err := project.ImportTodos(projectDir, args[0])
-	if err != nil {
-		return err
+	result, err := project.MigrateTodos(context.Background(), projectDir)
+	if printErr := printTodoJSON(result); printErr != nil && err == nil {
+		err = printErr
 	}
-	return printTodoJSON(todoImportOutput{Imported: count, Migrated: notice.Migrated, Hint: notice.Hint})
+	if err != nil {
+		return docError(err)
+	}
+	return nil
 }
 
 // todoProjectDir löst das Projekt auf. Wie bei inventory wird nur der Anker
-// gebraucht: die Todos liegen unter k-playbook-local/, nicht im Katalog der
-// Installation.
+// gebraucht: die Anbindung an die Collection steht unter k-playbook-local/,
+// nicht im Katalog der Installation.
 func todoProjectDir() (string, error) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -260,21 +282,29 @@ func printTodoJSON(payload any) error {
 func printTodoUsage(out io.Writer) {
 	fmt.Fprint(out, `k-playbook todo — Todos des Projekts
 
-Die Ablage ist k-playbook-local/data/todos.json; geschrieben wird sie nur über
-diesen Weg, über die MCP-Werkzeuge oder über die Oberfläche. Jede Ausgabe ist
-JSON auf stdout, Fehler stehen auf stderr.
+Die Todos liegen als je ein Dokument in der Kephalaion-Collection des
+Projekts: offen unter todos/, abgehakt unter todos/done/. Geschrieben werden
+sie über diesen Weg, über die MCP-Werkzeuge k_playbook_todo_* oder über die
+Oberfläche. Ohne erreichbares Kephalaion gibt es keine Todos
+(kephalaion_unavailable). Jede Ausgabe ist JSON auf stdout, Fehler stehen mit
+ihrem Code auf stderr.
 
 Unterbefehle:
-  list [--done] [--all]
-            Listet die offenen Einträge. --done nur die erledigten, --all beide.
+  list [--done] [--all] [--search <text>]
+            Listet die offenen Einträge. --done nur die erledigten, --all beide;
+            --search nur die, deren Text <text> enthält (Groß- und
+            Kleinschreibung egal).
   add <text> [--origin <herkunft>]
-            Legt einen Eintrag an und vergibt die nächste Kennung.
+            Legt einen Eintrag an und vergibt die nächste Kennung. Nach dem
+            Löschen des Eintrags mit der höchsten Kennung wird diese wieder
+            vergeben.
   update <id> [--text <text>] [--done] [--reopen]
             Ändert den Text, hakt ab (--done) oder öffnet wieder (--reopen).
   delete <id>
-            Entfernt einen Eintrag. Die Kennung wird nie wieder vergeben.
-  import <pfad>
-            Hängt die Einträge einer Markdown-Checkliste an und entfernt sie.
+            Entfernt einen Eintrag.
+  migrate   Übernimmt k-playbook-local/data/todos.json in die Collection und
+            benennt die Datei danach um. Solange sie besteht, sind add, update
+            und delete gesperrt (todos_not_migrated).
 
 Ohne Unterbefehl und mit --help steht hier nur diese Übersicht: der Aufruf
 liest und schreibt dabei nichts.

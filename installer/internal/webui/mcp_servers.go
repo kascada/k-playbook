@@ -16,7 +16,7 @@ import (
 // /mcp-servers sie braucht: die gelesenen Dateien, die Server, die
 // Pflichtliste und die Lücken darin.
 //
-// Quelle sind ausschließlich die Projektdateien der drei Assistenten. Die
+// Quelle sind ausschließlich die Projektdateien der beiden Assistenten. Die
 // globalen Konfigurationen (~/.claude.json, ~/.config/opencode/) und die
 // Freigabelisten in .claude/settings*.json werden bewusst nicht gelesen; die
 // Seite sagt das.

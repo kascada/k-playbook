@@ -11,6 +11,9 @@ import (
 // Server, kein eigener Eintrag — der Zustand MCPStateMissingEntry.
 const fremderEintrag = `{"mcpServers":{"fremd":{"command":"anderes","args":["dienen"]}}}` + "\n"
 
+// fremderOpenCodeEintrag ist dasselbe im Schema von OpenCode.
+const fremderOpenCodeEintrag = `{"mcp":{"fremd":{"type":"local","command":["anderes","dienen"]}}}` + "\n"
+
 // unversionedRepo baut ein Projekt mit installiertem k-playbook, echtem
 // Repository und project.vcs git — der Ausgangspunkt für die Messung „nicht
 // von git erfasst".
@@ -112,11 +115,9 @@ func TestStartErgaenztNichtErfassteDatei(t *testing.T) {
 	if fremd, ok := servers["fremd"].(map[string]any); !ok || fremd["command"] != "anderes" {
 		t.Errorf("fremder Eintrag verändert oder verloren: %v", servers["fremd"])
 	}
-	// Die beiden anderen Dateien fehlten und haben keine Spur: sie entstehen nicht.
-	for _, name := range []string{filepath.Join(".cursor", "mcp.json"), "opencode.json"} {
-		if pathExists(filepath.Join(root, name)) {
-			t.Errorf("%s wurde ohne Spur des Assistenten angelegt", name)
-		}
+	// Die andere Datei fehlte und hat keine Spur: sie entsteht nicht.
+	if pathExists(filepath.Join(root, "opencode.json")) {
+		t.Error("opencode.json wurde ohne Spur des Assistenten angelegt")
 	}
 
 	first := readRaw(t, file)
@@ -270,15 +271,14 @@ func TestStartLegtFehlendeDateiNurBeiSpurAn(t *testing.T) {
 
 	// Jeder Assistent bekommt eine eigene Spur: alles entsteht.
 	writeFile(t, filepath.Join(root, ".claude", "settings.json"), "{}\n")
-	writeFile(t, filepath.Join(root, ".cursor", "rules", "eigene.mdc"), "# eigene\n")
 	writeFile(t, filepath.Join(root, ".opencode", "eigene.md"), "# eigene\n")
 
 	repaired, err = RepairMCP(root, MCPWriteOutdatedAndUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP mit Spur: %v", err)
 	}
-	if len(repaired) != 3 {
-		t.Errorf("geschrieben = %v, erwartet alle drei Ziele", repaired)
+	if len(repaired) != 2 {
+		t.Errorf("geschrieben = %v, erwartet beide Ziele", repaired)
 	}
 	for _, status := range CheckMCP(root) {
 		if !status.OK() {
@@ -336,25 +336,25 @@ func TestUpdateErgaenztKeinenFehlendenEintrag(t *testing.T) {
 const veralteterEintrag = `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
 
 // sharedLinkTarget ist das Ziel des Links, den symlinkRepo anlegt.
-var sharedLinkTarget = filepath.Join("..", ".mcp.json")
+var sharedLinkTarget = filepath.Join("geteilt", "mcp.json")
 
-// symlinkRepo baut die Einrichtung aus dem Review nach v0.8.0: .mcp.json ist
-// erfasst und trägt einen fremden Server, .cursor/ ist ignoriert, und
-// .cursor/mcp.json ist ein Symlink auf die erfasste Datei. ls-files misst den
-// Link (Exit 1), geschrieben würde ins Linkziel.
+// symlinkRepo baut die Einrichtung aus dem Review nach v0.8.0 nach: eine
+// erfasste Datei geteilt/mcp.json trägt einen fremden Server, .mcp.json ist
+// ignoriert und ein Symlink auf die erfasste Datei. ls-files misst den Link
+// (Exit 1), geschrieben würde ins Linkziel.
 func symlinkRepo(t *testing.T) (root string, shared string, link string) {
 	t.Helper()
 
 	root, _ = unversionedRepo(t)
-	writeFile(t, filepath.Join(root, ".gitignore"), ".cursor/\n")
-	shared = filepath.Join(root, ".mcp.json")
+	writeFile(t, filepath.Join(root, ".gitignore"), "/.mcp.json\n")
+	shared = filepath.Join(root, sharedLinkTarget)
 	writeFile(t, shared, fremderEintrag)
 	gitRun(t, root, "add", "--all")
 	gitRun(t, root, "commit", "-qm", "Registrierung")
 
-	link = filepath.Join(root, ".cursor", "mcp.json")
+	link = filepath.Join(root, ".mcp.json")
 	makeSymlink(t, sharedLinkTarget, link)
-	if _, code, reason := runGit(t.Context(), root, "ls-files", "--error-unmatch", "--", filepath.Join(".cursor", "mcp.json")); code != 1 {
+	if _, code, reason := runGit(t.Context(), root, "ls-files", "--error-unmatch", "--", ".mcp.json"); code != 1 {
 		t.Fatalf("ls-files misst den Link nicht als unerfasst: Exit %d (%s)", code, reason)
 	}
 	return root, shared, link
@@ -413,12 +413,12 @@ func TestStartLegtNichtsAmZielEinesTotenLinksAn(t *testing.T) {
 	installTestBinary(t)
 	root := t.TempDir()
 	writeVCSConfig(t, root, "none")
-	writeFile(t, filepath.Join(root, ".cursor", "rules", "eigene.mdc"), "# eigene\n")
+	writeFile(t, filepath.Join(root, ".claude", "settings.json"), "{}\n")
 	if err := os.MkdirAll(filepath.Join(root, "ziel"), 0o755); err != nil {
 		t.Fatalf("ziel anlegen: %v", err)
 	}
-	link := filepath.Join(root, ".cursor", "mcp.json")
-	makeSymlink(t, filepath.Join("..", "ziel", "mcp.json"), link)
+	link := filepath.Join(root, ".mcp.json")
+	makeSymlink(t, filepath.Join("ziel", "mcp.json"), link)
 
 	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
 	if err != nil {
@@ -430,28 +430,22 @@ func TestStartLegtNichtsAmZielEinesTotenLinksAn(t *testing.T) {
 	if pathExists(filepath.Join(root, "ziel", "mcp.json")) {
 		t.Error("am Ziel des toten Links ist eine Datei entstanden")
 	}
-	assertSymlink(t, link, filepath.Join("..", "ziel", "mcp.json"))
+	assertSymlink(t, link, filepath.Join("ziel", "mcp.json"))
 }
 
-// Ist das Assistenten-Verzeichnis selbst ein Link, führt der Weg ebenfalls über
-// einen Symlink: es entsteht keine Datei im verlinkten Verzeichnis.
-func TestStartSchreibtNichtInVerlinktesAssistentenVerzeichnis(t *testing.T) {
-	installTestBinary(t)
+// Ist ein Verzeichnis auf dem Weg zur Zieldatei selbst ein Link, führt der Weg
+// ebenfalls über einen Symlink. Kein ausgeliefertes Ziel liegt heute in einem
+// Unterverzeichnis; die Regel gilt trotzdem für jeden Bestandteil des Pfads.
+func TestZielHinterVerlinktemVerzeichnisGiltAlsSymlink(t *testing.T) {
 	root := t.TempDir()
-	writeVCSConfig(t, root, "none")
-	sharedDir := filepath.Join(root, "geteilt-cursor")
-	writeFile(t, filepath.Join(sharedDir, "rules", "eigene.mdc"), "# eigene\n")
-	makeSymlink(t, "geteilt-cursor", filepath.Join(root, ".cursor"))
+	writeFile(t, filepath.Join(root, "geteilt", "mcp.json"), fremderEintrag)
+	makeSymlink(t, "geteilt", filepath.Join(root, "verlinkt"))
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
-	if err != nil {
-		t.Fatalf("RepairMCP: %v", err)
+	if !mcpTargetViaSymlink(root, filepath.Join("verlinkt", "mcp.json")) {
+		t.Error("ein verlinktes Verzeichnis auf dem Weg gilt nicht als Symlink")
 	}
-	if len(repaired) != 0 {
-		t.Errorf("geschrieben = %v, erwartet nichts", repaired)
-	}
-	if pathExists(filepath.Join(sharedDir, "mcp.json")) {
-		t.Error("im verlinkten Assistenten-Verzeichnis ist mcp.json entstanden")
+	if mcpTargetViaSymlink(root, filepath.Join("geteilt", "mcp.json")) {
+		t.Error("ein regulärer Weg gilt als Symlink")
 	}
 }
 
@@ -521,21 +515,21 @@ func TestStartKorrigiertVeraltetenEintragHinterSymlink(t *testing.T) {
 	writeVCSConfig(t, root, "none")
 	shared := filepath.Join(root, "geteilt.json")
 	writeFile(t, shared, veralteterEintrag)
-	link := filepath.Join(root, ".cursor", "mcp.json")
-	makeSymlink(t, filepath.Join("..", "geteilt.json"), link)
+	link := filepath.Join(root, ".mcp.json")
+	makeSymlink(t, "geteilt.json", link)
 
 	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
-	if len(repaired) != 1 || repaired[0].Path != filepath.Join(".cursor", "mcp.json") {
-		t.Fatalf("geschrieben = %v, erwartet nur .cursor/mcp.json", repaired)
+	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
+		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
 	}
 	servers := readJSON(t, shared)["mcpServers"].(map[string]any)
 	if entry, ok := servers[MCPServerKey].(map[string]any); !ok || entry["command"] != installed {
 		t.Errorf("Eintrag im Linkziel = %v, erwartet %s", servers[MCPServerKey], installed)
 	}
-	assertSymlink(t, link, filepath.Join("..", "geteilt.json"))
+	assertSymlink(t, link, "geteilt.json")
 }
 
 // skipIfRepositoryAround steigt aus, wenn das Testverzeichnis in einem

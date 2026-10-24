@@ -182,3 +182,52 @@ func TestBriefingOptionen(t *testing.T) {
 		t.Errorf("Hilfe: %v\n%s", err, stdout)
 	}
 }
+
+// Der Block der Umgebungsprüfung steht im Klartext unmittelbar nach dem Text
+// der immer geltenden Anweisungen und vor „Auf Abruf“ — so liest die Sitzung
+// ihn, bevor sie etwas tut. Im Testprojekt ist die Anbindung nicht
+// eingetragen: eine Warnung; mit unlesbarer Quellenkonfiguration dazu ein
+// Fehler, und das Subkommando endet trotzdem mit 0 — das Briefing meldet, es
+// urteilt nicht.
+func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+	root := briefingProject(t)
+
+	stdout, err := runBriefingCaptured(t)
+	if err != nil {
+		t.Fatalf("briefing: %v", err)
+	}
+	block := "nicht aufgenommen\n\nUmgebung:\n  [warning] kephalaion: Keine Collection eingetragen"
+	if !strings.Contains(stdout, block) {
+		t.Errorf("Block fehlt oder steht falsch:\n%s", stdout)
+	}
+	umgebung, abruf := strings.Index(stdout, "\nUmgebung:\n"), strings.Index(stdout, "\nAuf Abruf:\n")
+	if umgebung < 0 || abruf < 0 || umgebung > abruf {
+		t.Errorf("Umgebung (%d) steht nicht vor Auf Abruf (%d):\n%s", umgebung, abruf, stdout)
+	}
+
+	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
+	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, err = runBriefingCaptured(t)
+	if err != nil {
+		t.Fatalf("briefing mit Fehler: %v", err)
+	}
+	if !strings.Contains(stdout, "\n  [error] versionSources: Die Quellenkonfiguration des Versionsinventars "+path+" ist nicht lesbar") {
+		t.Errorf("Fehler fehlt:\n%s", stdout)
+	}
+
+	stdout, err = runBriefingCaptured(t, "--json")
+	if err != nil {
+		t.Fatalf("briefing --json: %v", err)
+	}
+	var briefing project.Briefing
+	if err := json.Unmarshal([]byte(stdout), &briefing); err != nil {
+		t.Fatalf("kein JSON: %v", err)
+	}
+	if briefing.SchemaVersion != "4" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
+		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
+	}
+}

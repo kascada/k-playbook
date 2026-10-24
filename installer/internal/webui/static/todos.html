@@ -23,8 +23,9 @@
                  title="Öffnet commands.md im Bereich Docs: dort steht /k-todo mit den übrigen Commands.">Doku: Commands</a>
             </div>
             <p class="hint">
-              Der Befehl verwaltet die offenen Punkte dieses Projekts in
-              <code>k-playbook-local/data/todos.json</code>.
+              Der Befehl verwaltet die offenen Punkte dieses Projekts. Sie liegen als je ein Dokument
+              in der Kephalaion-Collection des Projekts, offen unter <code>todos/</code>, abgehakt unter
+              <code>todos/done/</code>, und sind damit von jedem Rechner mit Zugang zum Hub dieselben.
               <code>/k-todo &lt;Text&gt;</code> trägt einen neuen Punkt ein, <code>/k-todo</code> ohne
               Argument zeigt die aktuelle Liste — dieselbe, die unten steht. Die Hauptnutzung, direkt im
               Chat:
@@ -49,12 +50,35 @@
               <span id="todos-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
-              Aus <code>k-playbook-local/data/todos.json</code>, in der Reihenfolge der Datei.
-              Erledigte (abgehakte) Einträge stehen darunter.
+              Aus der Kephalaion-Collection, nach Kennung. Erledigte (abgehakte) Einträge stehen darunter.
             </p>
             <p id="todos-hint" class="hint" hidden></p>
+            <form id="todo-add-form" class="todo-form" autocomplete="off">
+              <input id="todo-add-text" type="text" placeholder="Neues Todo" aria-label="Text des neuen Todos" spellcheck="true" disabled>
+              <button id="todo-add-button" type="submit" class="secondary" disabled>Anlegen</button>
+            </form>
+            <p id="todo-add-message" class="message"></p>
             <div id="todos-list" class="todo-list empty"></div>
             <p id="todos-message" class="message"></p>
+          </section>
+
+          <section class="card" id="todos-search-card">
+            <div class="section-head">
+              <div>
+                <h2>Suchen</h2>
+              </div>
+              <span id="todos-search-pill" class="pill muted">bereit</span>
+            </div>
+            <p class="hint">
+              Sucht über offene und erledigte Todos nach einem Teil des Textes, ohne Rücksicht auf Groß-
+              und Kleinschreibung.
+            </p>
+            <form id="todo-search-form" class="todo-form" autocomplete="off" role="search">
+              <input id="todo-search-text" type="search" placeholder="Suchtext" aria-label="Suchtext" spellcheck="false">
+              <button type="submit" class="secondary">Suchen</button>
+            </form>
+            <div id="todos-search-list" class="todo-list empty" hidden></div>
+            <p id="todos-search-message" class="message"></p>
           </section>
 
           <!-- Wie bei den erledigten Tasks: zugeklappt, erst beim Aufklappen
@@ -68,8 +92,9 @@
               <span id="todos-done-pill" class="pill muted">Aufklappen</span>
             </summary>
             <p class="hint">
-              Abgehakte Einträge aus <code>k-playbook-local/data/todos.json</code> —
-              <code>/k-todo done &lt;id&gt;</code> hakt einen Punkt ab, er bleibt dabei stehen.
+              Abgehakte Einträge aus <code>todos/done/</code> —
+              <code>/k-todo done &lt;id&gt;</code> oder der Knopf an einem offenen Eintrag hakt einen Punkt
+              ab, er bleibt dabei stehen.
             </p>
             <p id="todos-done-hint" class="hint" hidden></p>
             <div id="todos-done-list" class="todo-list empty"></div>

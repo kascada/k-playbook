@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
@@ -547,4 +548,61 @@ func briefingRefs(entries []BriefingEntry) []string {
 		refs = append(refs, entry.Ref)
 	}
 	return refs
+}
+
+// Das Briefing trägt die Umgebungsprüfung als Abschnitt health (Task 098):
+// derselbe Report wie health.Check — ohne Problem leer mit ok, sonst die
+// Einträge sortiert; ein Fehler macht ok falsch. health ist kein Feld der
+// Kontextausgabe und bewertet nur, was dort steht.
+func TestBriefingTraegtHealth(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if briefing.SchemaVersion != "4" {
+		t.Errorf("schemaVersion %q, erwartet 4", briefing.SchemaVersion)
+	}
+	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
+		t.Errorf("health ohne Probleme: %+v", briefing.Health)
+	}
+	encoded, err := json.Marshal(briefing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"health":{"ok":true,"problems":[]}`) {
+		t.Errorf("health im JSON: %s", encoded)
+	}
+
+	// Eine Warnung und ein Fehler: beide da, ok falsch, Reihenfolge nach Bereich.
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
+	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), ": ungültig\n")
+	briefing, err = BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	report := briefing.Health
+	if report.OK || len(report.Problems) != 2 {
+		t.Fatalf("health: %+v", report)
+	}
+	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelWarning ||
+		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelError {
+		t.Errorf("Einträge: %+v", report.Problems)
+	}
+	if strings.Contains(report.Problems[1].Message, "ungültig") {
+		t.Errorf("Eintrag zitiert die Datei: %+v", report.Problems[1])
+	}
+	// Dieselbe Antwort wie health.Check selbst.
+	if direct := health.Check(t.Context(), root); !reflect.DeepEqual(direct, report) {
+		t.Errorf("health.Check:\n%+v\nBriefing:\n%+v", direct, report)
+	}
+	// Die Felder, die health bewertet, stehen weiter unverändert im Rest.
+	if raw, ok := briefing.Context.Field("versionSources"); !ok || !strings.Contains(string(raw), `"error":`) {
+		t.Errorf("context.versionSources: %s", raw)
+	}
 }

@@ -782,8 +782,8 @@ type ContextLinks struct {
 // contextLinks übersetzt die Selbstheilung in den Teil, der in die
 // Kontextausgabe gehört.
 //
-// Der Hinweis auf die laufende Sitzung steht bewusst dabei: Claude Code,
-// OpenCode und Cursor lesen ihre Command-Liste beim Start. Ein Command, der
+// Der Hinweis auf die laufende Sitzung steht bewusst dabei: Claude Code und
+// OpenCode lesen ihre Command-Liste beim Start. Ein Command, der
 // gerade erst verlinkt wurde, ist auf der Platte da und im Assistenten trotzdem
 // nicht — ohne den Satz sucht ein Assistent den Fehler bei sich.
 func contextLinks(repair LinkRepair) *ContextLinks {

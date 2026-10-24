@@ -20,6 +20,7 @@ type kephCall struct {
 	tool      string
 	name      string
 	requestID string
+	content   string
 }
 
 // kephNode ist ein gefälschter Node für den echten kephalaion.Client:
@@ -45,6 +46,17 @@ func writeKephResult(w http.ResponseWriter, id int, isError bool, structured str
 // newKephUserDocs baut UserDocs über einen echten kephalaion.Client gegen
 // den gefälschten Node.
 func newKephUserDocs(t *testing.T, node *kephNode) *UserDocs {
+	t.Helper()
+	docs, err := NewUserDocs(DocKinds, newKephClient(t, node), "kamran")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return docs
+}
+
+// newKephClient baut einen echten kephalaion.Client gegen den gefälschten
+// Node.
+func newKephClient(t *testing.T, node *kephNode) *kephalaion.Client {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, _ := io.ReadAll(r.Body)
@@ -76,6 +88,7 @@ func newKephUserDocs(t *testing.T, node *kephNode) *UserDocs {
 					call.name = newName
 				}
 				call.requestID, _ = msg.Params.Arguments["request_id"].(string)
+				call.content, _ = msg.Params.Arguments["content"].(string)
 				node.mu.Lock()
 				node.calls = append(node.calls, call)
 				n := len(node.calls)
@@ -107,11 +120,7 @@ func newKephUserDocs(t *testing.T, node *kephNode) *UserDocs {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	docs, err := NewUserDocs(DocKinds, client, "kamran")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return docs
+	return client
 }
 
 func kephOK(w http.ResponseWriter, id int, name string) {

@@ -15,7 +15,9 @@ up to date.
 
 The server offers the working state, the review, todo and knowledge tools,
 `k_playbook_doc_read` for references, the four `doc` tools for numbered documents in the
-project's Kephalaion collection, `k_playbook_gui_status` for the state and the address
+project's Kephalaion collection, `k_playbook_briefing` for the start of a session,
+`k_playbook_health` for the errors and warnings about the project's environment,
+`k_playbook_gui_status` for the state and the address
 of the project's interface, and `k_playbook_notify` for a desktop notification on the
 machine the server runs on.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
@@ -42,12 +44,11 @@ The internal view -- protocol versions, the stdout rule, session termination -- 
 ## Registering
 
 The interface provides the **k-playbook MCP** block for this. Clicking *Set up* registers
-the server in all three files:
+the server in both files:
 
 | Assistant | File | Entry |
 |---|---|---|
 | Claude Code | `.mcp.json` in the project root | `mcpServers` -> `k-playbook` |
-| Cursor | `.cursor/mcp.json` | same schema, same key |
 | OpenCode | `opencode.json`, or `opencode.jsonc` if only that one exists | `mcp` -> `k-playbook` |
 
 *Set up* always registers the same command, in two spellings -- one per schema -- as the
@@ -78,7 +79,7 @@ absolute path of the installed `k-playbook`, resolved when writing:
 
 For OpenCode, `command` is an **array** of command and arguments, not two fields.
 
-The three files belong to the project and can contain third-party entries; the OpenCode
+Both files belong to the project and can contain third-party entries; the OpenCode
 configuration also contains entirely different settings. Therefore, exactly the
 `k-playbook` key is touched, while everything else remains unchanged -- **including
 comments and trailing commas**. Files are read in JWCC format (JSON with commas and
@@ -275,17 +276,17 @@ call runs with `LC_ALL=C` so the wording stays comparable. After a successful `r
 `git ls-files --error-unmatch` decides -- exit 0 tracked, exit 1 not tracked, anything
 else counts as tracked. The start also adds nothing and creates nothing when the path to
 the target file **goes through a symlink** -- the file itself (even a dangling link) or
-the assistant directory. Writing would land in the link target while the measurement saw
+a directory on the way. Writing would land in the link target while the measurement saw
 the link, and a link is a deliberate setup of the project, so it is skipped rather than
 resolved. Only the components below the project root count; a project that lives under a
 symlinked path is not affected. In both cases -- symlink and a repository git refuses to
 trust -- only *Set up* writes; an obsolete entry is still corrected. Hard links are not
 detected and remain a known gap. A
 missing file is additionally created only if the assistant has left a **trace of its own**
-in the project: an entry in `.claude/`, `.cursor/` or `.opencode/` that is not one of the
-symlink targets k-playbook manages itself -- for example `.claude/settings.json` or
-`.cursor/rules/`. The directories alone are no trace; k-playbook creates them in every
-project. Without that condition every start would create three files nobody needs.
+in the project: an entry in `.claude/` or `.opencode/` that is not one of the symlink
+targets k-playbook manages itself -- for example `.claude/settings.json` or a file of its
+own under `.opencode/`. The directories alone are no trace; k-playbook creates them in
+every project. Without that condition every start would create two files nobody needs.
 
 Which form is written depends on the case. **Adding** a missing entry and **creating** a
 missing file write what *Set up* writes: the absolute path. The start message says so -- the
@@ -319,7 +320,7 @@ manually.
 **Projects already migrated and committed stay as they are.** Earlier versions wrote the
 absolute path into tracked files as well. A path from a foreign `$HOME` counts as current and
 is not replaced again. Affected projects enter the bare name `k-playbook` manually in
-`.mcp.json`, `.cursor/mcp.json` and `opencode.json`; automatic correction leaves it there.
+`.mcp.json` and `opencode.json`; automatic correction leaves it there.
 
 The prerequisite remains the one-time bootstrap per host or Dev Container --
 `make -C k-playbook install`, or without make `k-playbook/bin/install`: both correction paths
@@ -336,7 +337,7 @@ then nothing is written and the interface says so.
 | `k_playbook_review_scan` | execute a run's tool entries through `review.Execute` |
 | `k_playbook_review_merge` | consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
 | `k_playbook_review_write_ai_entry` | write the status and result of an AI review entry |
-| `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones |
+| `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones, `search` filters by text |
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
@@ -358,7 +359,8 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
-| `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
+| `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
+| `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message`, `hint`; repairs nothing, never names a token or a value; like `k-playbook health --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
@@ -578,35 +580,86 @@ project without that entry does not have the tools -- while the binary is there 
 installation. A missing tool never even appears at the client and cannot be reported; a binary
 that is too old answers `k-playbook todo` with `unbekanntes Kommando`, which is detectable. The
 interface, the subcommand, and the tools all call the same functions in `internal/project`;
-none of the three touches the file itself.
+none of the three talks to Kephalaion itself.
 
-The store is `k-playbook-local/data/todos.json`:
+The store is the project's Kephalaion collection (task 097, decision of 2026-10-19): one
+document per todo, `todos/<nnn>-<short-name>.md` while open, `todos/done/<nnn>-<short-name>.md`
+once ticked off -- project-wide, not under `user/<name>/`, because a todo belongs to the
+project, not to a person. The kind `todos` is an entry of the kind table (`DocKinds`), with the
+mark `OwnTools`: it is not in the `kind` list of the `doc` tools, and `doc_create`, `doc_list`,
+`doc_done` and `doc_reopen` reject it, since `doc_create` would create an empty document and
+`doc_done` would move without the `done:` field. Numbering and `done/` handling of the table
+are shared. How the client talks to Kephalaion: [`kephalaion-client.md`](./kephalaion-client.md).
 
-```json
-{
-  "schemaVersion": 1,
-  "nextId": 14,
-  "migratedOn": "2026-09-08",
-  "todos": [
-    { "id": 3, "text": "...", "created": "2026-08-25", "done": "2026-09-08", "origin": "Task 026" },
-    { "id": 4, "text": "...", "created": "", "done": "2026-09-08", "doneMigrated": true }
-  ]
-}
+```markdown
+---
+origin: Task 026
+created: 2026-08-25
+done: 2026-09-08
+doneMigrated: true
+---
+
+The text of the todo.
 ```
 
-`id` is never reused; `nextId` guarantees that even after a delete. `done` is absent on open
-entries -- there is no separate status field. `doneMigrated` marks a `done` that came from a
-migration or an import, so it is not mistaken for the day someone ticked the entry off.
-`migratedOn` is the provenance note of the **document**, not of a single entry.
+- **`id` is the number** in the file name. Numbers are counted from `todos/` and `todos/done/`
+  together, starting at 1. A tombstone does not block a name and does not count, so **after
+  deleting the todo with the highest number the next new one gets the same number again**;
+  lower numbers are never handed out twice. On `name_taken` the next number is tried, as with
+  `doc_create`. The short name is made from the first words of the text, normalized like
+  `doc_create` (lower case, hyphens).
+- **The body is `text`.** The frontmatter carries only `origin` (optional), `done` (a date, only
+  under `done/`), `doneMigrated` (optional, `true`) and `created` (only for migrated entries);
+  other fields are kept as they are. A todo without any of them has no frontmatter.
+- **`created`:** if `created:` is in the frontmatter it applies, even when empty -- migrated
+  entries without a date stay empty, timestamps are not invented. Otherwise Kephalaion's
+  `created` stamp applies. Always a date `YYYY-MM-DD`.
+- **Open or done is decided by the directory alone.** Ticking off writes `done:` with today's
+  date **first** and then renames into `done/`, because `rename` records no date and `updated`
+  moves with every text change; reopening renames back and then removes the field. Both remove
+  `doneMigrated`. A leftover `done:` under `todos/` is ignored on reading; a missing one under
+  `done/` falls back to the `updated` stamp. The next write of the entry cleans either up. If
+  the second step fails, the tool reports its code (`outcome_unknown`, `name_taken`, ...) and
+  says which step already happened.
+- **Writing goes through the hub with the revision just read** (`base_revision`): a change made
+  by another machine in between is `stale_revision`, nothing is overwritten -- list again and
+  repeat. Every write carries its own `request_id`; `outcome_unknown` means the operation may
+  have arrived: do not repeat, look with `k_playbook_todo_list` (`includeDone`).
+- **Search:** Kephalaion has no search. `k_playbook_todo_list` with `search` and
+  `k-playbook todo list --search` list, read every todo and filter by the text in Go,
+  case-insensitively, within the list `includeDone` selects; the GUI searches open and done.
+- **Without a usable Kephalaion there are no todos**, in the GUI neither:
+  `kephalaion_unavailable`, as with the `doc` tools, no fallback to the disk.
+- `doneMigrated` marks a `done` that came from a migration, so it is not mistaken for the day
+  someone ticked the entry off.
 
-An older `k-playbook-local/TODO.md` is translated on the first access -- through any of the three
-layers, reading or writing -- and removed afterward. The response then carries
-`migrated: <count>`. Text, order, and done state are preserved; timestamps are not invented, so
-`created` stays empty for translated entries. If both files exist, access does not fail: the JSON
-document is read and written, and the leftover file is reported in `hint`. Only the migration
-itself refuses, and its message names the way out: `k-playbook todo import
-k-playbook-local/TODO.md` appends the Markdown entries to the existing document and removes the
-file.
+**The former store `k-playbook-local/data/todos.json`** is no longer read by any path except
+`k-playbook todo migrate`; the others only check whether it exists. While it does, every
+response carries a `hint` naming `k-playbook todo migrate`, listing shows the collection
+only, and add, update and delete are rejected with **`todos_not_migrated`**, so that no new todo
+takes a number a former entry is meant to keep. `k-playbook todo migrate`:
+
+- **First run** (no `data/todos.json.migriert` yet): creates one document per entry under the
+  fixed name `<id, three digits>-<short-name>.md`, not through the numbering, so the former ids
+  survive; done entries go straight to `todos/done/`. The frontmatter is the format above, with
+  `created` always written (empty when the entry had none), `done`, `origin`, `doneMigrated`.
+  An entry is skipped only if a document with its number already exists in `todos/` or
+  `todos/done/` **and** has the same text; a different text aborts and names the entry. A
+  document whose number does not come from `todos.json` aborts as well. Only once every entry
+  has arrived is the file renamed to `data/todos.json.migriert`.
+- **Latecomer** (`todos.json.migriert` exists, and a `data/todos.json` has appeared again, for
+  example written by an older installed binary): its entries are appended through the normal
+  numbering, done ones straight to `todos/done/`, with the same frontmatter; an entry whose text
+  already exists as a document is skipped, so a repeated run after an abort creates nothing
+  twice. Afterwards the file is renamed under a name of its own
+  (`todos.json.nachzuegler-<date>[-<n>]`).
+- `todos.json.migriert` is never overwritten; renamed files are never read again. The output
+  names the created and skipped entries. `migrate` can be repeated.
+
+A leftover `k-playbook-local/TODO.md` (the Markdown checklist before `todos.json`) is only
+reported in `hint`: it is not taken over, its entries are to be transferred by hand. The
+former translation on first access, `k-playbook todo import` and the response field `migrated`
+are gone.
 
 Ticking off keeps the entry, deleting removes it -- two separate tools, so a model cannot throw
 away history by accident.
@@ -843,6 +896,11 @@ from it.
 | `tasks` | `user/<name>/tasks/` | yes | all `user/*/tasks/` including `done/`, project-wide | yes | 100 |
 | `workbench` | `user/<name>/workbench/` | yes | all `user/*/workbench/` including `done/`, project-wide | yes | 001 |
 | `findings` | `queue/findings/` | no | the directory | no | 001 |
+| `todos` | `todos/` | no | the directory including `done/` | yes | 001 |
+
+`todos` has tools of its own (`OwnTools`, task 097) and is not reachable through the `doc`
+tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…` reference is
+`invalid_input` there. Contract: "Todo Contract and Migration".
 
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
@@ -903,7 +961,7 @@ Error codes in `error.code`:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; unknown `kind`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
+| `invalid_input` | `projectDir` missing; unknown `kind` or the kind `todos`; a reference into `todos/`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
 | `project_not_found` | `projectDir` leads to no project |
 | `kephalaion_unavailable` | nothing reached the hub: the binding is not ready, the node cannot be reached or is older than v0.3.1, the session could not be opened, or the node reports `unreachable`, `unsupported` or `internal` (nothing stored, nothing sent); never after a `create` or `rename` may have reached the hub |
 | `outcome_unknown` | `create` or `rename` may have reached the hub and the retry with the same key did not settle it; do not call again, look with `k_playbook_doc_list` |
@@ -946,12 +1004,23 @@ fields of the two outputs disjoint (`schemaVersion` excepted, which describes ea
 itself) and the rest complete: every field of `BuildContext` that is not covered is in
 `context`, the covered ones are not.
 
+The section `health` (version 4, task 098) is the environment check: the report of
+`health.Check` (`internal/health`), the same that `k_playbook_health` and `k-playbook health`
+return -- see "Health Contract" below. It **evaluates** fields of the section `context`
+(`kephalaion`, `gh`, `baseTools`, `versionSources`) and replaces none of them; the context
+output stays unchanged. In the plain text of `k-playbook briefing` the block stands right after
+the text of the always-instructions and before "Auf Abruf", so that a session reads it before
+it does anything: one line `Umgebung: keine Probleme` without a problem, otherwise `Umgebung:`
+and one line per entry `  [level] area: message — hint`. The subcommand `briefing` exits 0
+even with errors in `health` -- the briefing reports, it does not judge; the exit code belongs
+to `k-playbook health`.
+
 A successful answer is `{ok: true, tool, projectDir, schemaVersion, documents, work,
-projectDocs, context}`:
+projectDocs, health, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"3"` (`"1"` had no `context`, `"2"` no `documents.always.content`) |
+| `schemaVersion` | the version of the briefing output, `"4"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
@@ -960,6 +1029,7 @@ projectDocs, context}`:
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
 | `projectDocs` | the entry of the project documentation, `project:/k-playbook-local/docs/README.md` |
+| `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message` (one sentence, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
 | `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
@@ -980,6 +1050,52 @@ counts per kind, state and origin and the freshness that
 Error codes in `error.code`: `invalid_input` for a missing `projectDir`, `project_not_found`
 for a `projectDir` that leads to no project, and `read_failed` when a layer could not be read
 -- a half briefing would look like a whole one, so the tool stops instead.
+
+### Health Contract
+
+`k_playbook_health` is a thin wrapper over `health.Check` (`internal/health/health.go`), the
+same function behind the subcommand `k-playbook health [--json]` and behind the section
+`health` of the briefing. Its only input is `projectDir`. The check is a collecting point: every
+source registers itself (`health.Register`) and the check asks all of them, so a further source
+-- next the personal GitHub file `~/.config/k-playbook/github.yaml` (workbench 002) -- joins
+without a change to briefing, CLI, MCP or GUI. The sources themselves live where their data is
+read, in `project/health.go`, registered when the package loads: `health` cannot import
+`project`, because `project.Briefing` carries the report. The check runs **without network**
+beyond what `kephalaion.Check` already asks the local node, it **repairs nothing**, and it
+**does not stop at the first problem**. No entry ever carries a token or a value from a file;
+the entry for an unreadable `version-sources.yaml` names the path, not the parser's message,
+which may quote a line of the file (that message stays in `context.versionSources.error`).
+
+The answer is `{ok: true, tool, projectDir, health: {ok, problems}}`. The report is nested under
+`health`, not embedded, because its `ok` (no errors) is a different thing from the envelope's
+`ok` (the tool ran); on the command line `--json` prints the bare report. Each entry has
+`level` (`error` or `warning`), `area`, `message` and `hint`; the list is sorted by area, then
+level (`error` before `warning`), then message, so two calls yield the same list. `problems`
+is always present, `[]` without a problem. The sources in this version:
+
+| Area | Condition | Level | Hint |
+|---|---|---|---|
+| `kephalaion` | the block `kephalaion:` is in `K-PLAYBOOK.local.yaml`, but the state of `kephalaion.Check` is not `ok` (invalid entry, no Kephalaion on this machine, node unreachable, token missing, login invalid, hub unknown or never synced, collection unreadable …) | `error` | per state: fix the entry, check the node (`kephalaion status`), check the account, sync the hub, or choose a readable collection in the GUI |
+| `kephalaion` | not configured | `warning` | set up the binding in the GUI; without it `keph:` references, workbench and `work` are out of reach |
+| `gh` | `tools.gh.status` is `enabled`, but `gh.ready` is false | `warning` | install gh, or `gh auth login` |
+| `gh` | `tools.gh.status` has an unknown value (the context output fails on it) | `error` | set it to `unknown`, `enabled` or `disabled` |
+| `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
+| `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
+
+Exit codes of the subcommand: 0 without an error (warnings do not count), 1 with at least one
+error, 2 on a call error (unknown option, no project). Error codes of the tool in `error.code`:
+`invalid_input` for a missing `projectDir`, `project_not_found` for a `projectDir` that leads to
+no project; the check itself never fails.
+
+What a session does with the entries is in the always-instructions
+(`defaults/instructions/always/030-briefing.md`): name them in the first answer, errors before
+the work, repair nothing silently, offer the remedy from `hint`. The GUI shows the same report
+on its start page, card "Umgebung", fetched from `GET /api/environment`, which answers
+`{available, health: {ok, problems}}` -- the report nested under `health` like this tool's
+answer, `available: false` and no report without a project configuration. `GET /api/health`
+is **not** this report: it stays the window's heartbeat of the "GUI Status Contract" below and
+must remain cheap, while the environment check asks the Kephalaion node. See the architecture
+document, "Umgebungsprüfung: `health`".
 
 ### GUI Status Contract
 
@@ -1089,11 +1205,11 @@ remains usable.
 ### All Servers of the Project
 
 The **/mcp-servers** page -- the *MCP-Server* entry under *Setup* in the left column, or
-*All MCP servers* in the block -- shows every MCP server the three assistants know in
-this project: a matrix of server names against Claude Code, OpenCode, and Cursor, the
+*All MCP servers* in the block -- shows every MCP server both assistants know in
+this project: a matrix of server names against Claude Code and OpenCode, the
 required servers from `tools.mcp.required` in `K-PLAYBOOK.yaml` with their gaps, and the
 files that were read. The source is those files alone: `.mcp.json`, `opencode.json` (and
-`opencode.jsonc`, if both exist), and `.cursor/mcp.json`. Global configurations and the
+`opencode.jsonc`, if both exist). Global configurations and the
 `enabledMcpjsonServers` lists in `.claude/settings*.json` are deliberately not read; the
 page says so.
 
@@ -1119,20 +1235,20 @@ k-playbook mcp
 It then speaks JSON-RPC over stdin and stdout and waits for a client.
 
 **Removal is manual only.** The interface sets up; it does not clean up. Anyone wanting to
-remove the server deletes the `k-playbook` entry from `.mcp.json`, `.cursor/mcp.json`, and
-`opencode.json` or `opencode.jsonc` -- then restarts the assistant.
+remove the server deletes the `k-playbook` entry from `.mcp.json` and `opencode.json` or
+`opencode.jsonc` -- then restarts the assistant.
 
 ## In This Repository
 
-The k-playbook source repository is also its own target project. Of the three files, only one
+The k-playbook source repository is also its own target project. Of the two files, only one
 is tracked:
 
-- `.mcp.json` and `.cursor/mcp.json` are in `.gitignore`.
+- `.mcp.json` is in `.gitignore`.
 - `opencode.json` is tracked and cannot be partially ignored; its `mcp` block is therefore in
   the repository.
 
-All three use the **portable form** -- the bare command name `k-playbook`. The absolute path
-*Set up* writes is tied to a `$HOME` and cannot be used here; the two ignored files contain
+Both use the **portable form** -- the bare command name `k-playbook`. The absolute path
+*Set up* writes is tied to a `$HOME` and cannot be used here; the ignored `.mcp.json` contains
 the bare name only so this machine has the same setting everywhere. Automatic correction
 touches neither: the portable form belongs to the set of accepted forms, and only the old
 wrapper path is replaced automatically.

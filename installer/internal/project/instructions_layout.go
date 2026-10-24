@@ -12,8 +12,8 @@ import (
 
 // ClaudeInstructionsFile ist die Include-Datei für Claude Code: eine reguläre
 // Datei, die RootInstructionsFile über die Import-Zeile ClaudeIncludeLine
-// einbindet. Claude Code liest ausschließlich diese Datei, OpenCode und Cursor
-// bevorzugen AGENTS.md. Die Richtung CLAUDE.md -> AGENTS.md ist fest und keine
+// einbindet. Claude Code liest ausschließlich diese Datei, OpenCode bevorzugt
+// AGENTS.md. Die Richtung CLAUDE.md -> AGENTS.md ist fest und keine
 // projektabhängige Variable: eine umgedrehte Richtung müsste in Prüfung,
 // Oberfläche und Doku dauerhaft mitgedacht werden.
 //
@@ -33,14 +33,14 @@ const ClaudeIncludeLine = "@" + RootInstructionsFile
 //
 // Der Hinweis über der Import-Zeile ist das Gegengewicht zur Toleranz: was
 // Claude Code über /memory oder # nach CLAUDE.md schreibt, erreicht OpenCode
-// und Cursor nicht, und die Prüfung meldet Projektinhalt neben dem Include
+// nicht, und die Prüfung meldet Projektinhalt neben dem Include
 // nicht als Konflikt. Die Import-Zeile steht allein auf einer Zeile, ohne
 // Backticks und außerhalb jedes Code-Blocks — nur so wertet Claude Code sie
 // aus. Der Hinweis nennt AGENTS.md bewusst ohne @, sonst wäre er selbst ein
 // zweiter Import.
 func claudeIncludeStub() string {
 	return "Diese Datei ist nur der Include für Claude Code. Projektregeln gehören nach\n" +
-		RootInstructionsFile + " — was hier steht, erreicht OpenCode und Cursor nicht.\n" +
+		RootInstructionsFile + " — was hier steht, erreicht OpenCode nicht.\n" +
 		"\n" +
 		ClaudeIncludeLine + "\n"
 }

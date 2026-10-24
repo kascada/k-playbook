@@ -36,7 +36,7 @@ func outdatedContent(schema MCPSchema, command string) string {
 	return `{"mcpServers":{"` + MCPServerKey + `":{"command":"` + command + `","args":["mcp"]}}}` + "\n"
 }
 
-// targetPaths nennt die Pfade aller drei Ziele in der Reihenfolge von MCPTargets.
+// targetPaths nennt die Pfade beider Ziele in der Reihenfolge von MCPTargets.
 func targetPaths(root string) []string {
 	paths := []string{}
 	for _, target := range MCPTargets(root) {
@@ -139,7 +139,7 @@ func assertLsFilesExit(t *testing.T, root string, path string, want int) {
 }
 
 // Der Kern: eine erfasste Datei mit veraltetem Eintrag bekommt den bloßen
-// Namen, in beiden Modi, für beide Wrapper-Formen und alle drei Schemata. Ein
+// Namen, in beiden Modi, für beide Wrapper-Formen und beide Schemata. Ein
 // Folgelauf schreibt nichts, auch nicht aus einem anderen HOME.
 func TestKorrekturSchreibtInErfassteDateiDenNamen(t *testing.T) {
 	for _, scope := range repairScopes {
@@ -225,14 +225,12 @@ func TestKorrekturHinterSymlinkAufErfassteDateiSchreibtDenNamen(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				root, _ := unversionedRepo(t)
 				writeFile(t, filepath.Join(root, "real", "claude.json"), outdatedContent(MCPSchemaServers, legacyWrapperCommand))
-				writeFile(t, filepath.Join(root, "real", "cursor", "mcp.json"), outdatedContent(MCPSchemaServers, legacyWrapperCommand))
 				writeFile(t, filepath.Join(root, "real", "opencode.json"), outdatedContent(MCPSchemaOpenCode, legacyWrapperCommand))
 				gitRun(t, root, "add", "--all")
 				gitRun(t, root, "commit", "-qm", "Registrierung")
 
 				links := map[string]string{
 					".mcp.json":     filepath.Join("real", "claude.json"),
-					".cursor":       filepath.Join("real", "cursor"),
 					"opencode.json": filepath.Join("real", "opencode.json"),
 				}
 				for link, target := range links {
@@ -269,16 +267,16 @@ func TestKorrekturHinterSymlinkAufNichtErfassteDateiSchreibtDenAbsolutenPfad(t *
 		t.Run(scope.name, func(t *testing.T) {
 			root, installed := unversionedRepo(t)
 			writeFile(t, filepath.Join(root, "geteilt.json"), veralteterEintrag)
-			link := filepath.Join(root, ".cursor", "mcp.json")
-			makeSymlink(t, filepath.Join("..", "geteilt.json"), link)
+			link := filepath.Join(root, ".mcp.json")
+			makeSymlink(t, "geteilt.json", link)
 			assertLsFilesExit(t, root, "geteilt.json", 1)
 
 			repaired, err := RepairMCP(root, scope.scope)
 			if err != nil {
 				t.Fatalf("RepairMCP: %v", err)
 			}
-			assertRepairWrote(t, root, repaired, []string{filepath.Join(".cursor", "mcp.json")}, installed)
-			assertSymlink(t, link, filepath.Join("..", "geteilt.json"))
+			assertRepairWrote(t, root, repaired, []string{".mcp.json"}, installed)
+			assertSymlink(t, link, "geteilt.json")
 		})
 	}
 }
@@ -304,13 +302,13 @@ func TestKorrekturHinterSymlinkAusDemRepositorySchreibtDenNamen(t *testing.T) {
 					shared = filepath.Join(nested, "mcp.json")
 				}
 				writeFile(t, shared, veralteterEintrag)
-				makeSymlink(t, shared, filepath.Join(root, ".cursor", "mcp.json"))
+				makeSymlink(t, shared, filepath.Join(root, ".mcp.json"))
 
 				repaired, err := RepairMCP(root, scope.scope)
 				if err != nil {
 					t.Fatalf("RepairMCP: %v", err)
 				}
-				assertRepairWrote(t, root, repaired, []string{filepath.Join(".cursor", "mcp.json")}, InstalledCommandName)
+				assertRepairWrote(t, root, repaired, []string{".mcp.json"}, InstalledCommandName)
 			})
 		}
 	}
@@ -326,13 +324,13 @@ func TestKorrekturOhneVersionskontrolleHinterSymlinkSchreibtDenAbsolutenPfad(t *
 			root := t.TempDir()
 			writeVCSConfig(t, root, "none")
 			writeFile(t, filepath.Join(root, "geteilt.json"), veralteterEintrag)
-			makeSymlink(t, filepath.Join("..", "geteilt.json"), filepath.Join(root, ".cursor", "mcp.json"))
+			makeSymlink(t, "geteilt.json", filepath.Join(root, ".mcp.json"))
 
 			repaired, err := RepairMCP(root, scope.scope)
 			if err != nil {
 				t.Fatalf("RepairMCP: %v", err)
 			}
-			assertRepairWrote(t, root, repaired, []string{filepath.Join(".cursor", "mcp.json")}, installed)
+			assertRepairWrote(t, root, repaired, []string{".mcp.json"}, installed)
 		})
 	}
 }
@@ -364,15 +362,15 @@ func TestErgaenzenBleibtBeimAbsolutenPfad(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".mcp.json"), veralteterEintrag)
 	gitRun(t, root, "add", ".mcp.json")
 	gitRun(t, root, "commit", "-qm", "Registrierung")
-	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), fremderEintrag)
+	writeFile(t, filepath.Join(root, "opencode.json"), fremderOpenCodeEintrag)
 
 	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
 	if len(repaired) != 2 {
-		t.Fatalf("geschrieben = %v, erwartet .mcp.json und .cursor/mcp.json", repaired)
+		t.Fatalf("geschrieben = %v, erwartet .mcp.json und opencode.json", repaired)
 	}
 	assertRepairWrote(t, root, repaired[:1], []string{".mcp.json"}, InstalledCommandName)
-	assertRepairWrote(t, root, repaired[1:], []string{filepath.Join(".cursor", "mcp.json")}, installed)
+	assertRepairWrote(t, root, repaired[1:], []string{"opencode.json"}, installed)
 }

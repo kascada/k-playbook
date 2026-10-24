@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
@@ -21,7 +22,8 @@ import (
 // darin — mit einer Ausnahme: den Text der immer geltenden Anweisungen
 // (k-playbook:/instructions/always/) trägt das Briefing selbst
 // (Documents.Always.Content), denn jede Sitzung muss ihn sofort lesen; ein
-// zweiter Aufruf dafür wäre nur Umweg. Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
+// zweiter Aufruf dafür wäre nur Umweg. Was an der Umgebung nicht stimmt,
+// steht bewertet unter Health (Task 098). Umgebungsangaben — Pfade, Werkzeuge, gh, Kephalaion-Anbindung —
 // stehen nur im Übergangsabschnitt Context (Task 091): dem Rest der
 // Kontextausgabe von `k-playbook context`, den das Briefing noch nicht selbst
 // abdeckt. Ein Aufruf des Briefings genügt damit für den Einstieg; die
@@ -36,8 +38,8 @@ import (
 
 // BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe. Fassung 2 hat den
 // Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
-// documents.always.content.
-const BriefingSchemaVersion = "3"
+// documents.always.content, Fassung 4 den Abschnitt health.
+const BriefingSchemaVersion = "4"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -61,6 +63,13 @@ type Briefing struct {
 	Work BriefingWork `json:"work"`
 	// ProjectDocs ist der Einstieg der Projektdokumentation, als Verweis.
 	ProjectDocs string `json:"projectDocs"`
+	// Health ist die Umgebungsprüfung (Task 098): Fehler und Warnungen über
+	// die Umgebung des Projekts, alle auf einmal, je Eintrag Stufe, Bereich,
+	// Satz und Abhilfe — dieselbe Antwort wie `k-playbook health --json` und
+	// k_playbook_health. Die Sitzung nennt die Einträge in ihrer ersten
+	// Antwort; health bewertet Felder des Abschnitts Context, ersetzt sie
+	// aber nicht.
+	Health health.Report `json:"health"`
 	// Context ist der Übergangsabschnitt: was von `k-playbook context` noch
 	// nicht in den eigenen Abschnitten des Briefings steht.
 	Context BriefingContext `json:"context"`
@@ -378,6 +387,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	}
 
 	briefing.Work = briefingWork(ctx, projectDir)
+	briefing.Health = health.Check(ctx, projectDir)
 	briefing.Context = briefingContext(projectDir)
 	return briefing, nil
 }

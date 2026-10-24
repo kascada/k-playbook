@@ -40,14 +40,13 @@ func newMCPProject(t *testing.T, config string, files map[string]string) string 
 	return root
 }
 
-// Die Übersicht antwortet mit der Matrix aus den drei Projektdateien und
+// Die Übersicht antwortet mit der Matrix aus den beiden Projektdateien und
 // meldet Lücken in der Pflichtliste: ok ist erst wahr, wenn jeder
 // Pflichtname bei jedem Assistenten steht.
 func TestMCPServersAPIMeldetPflichtluecke(t *testing.T) {
 	newMCPProject(t, "schema_version: 3\n\nproject:\n  repo_root: .\n\ntools:\n  mcp:\n    required:\n      - k-playbook\n      - atlassian\n", map[string]string{
-		".mcp.json":                          `{"mcpServers": {"k-playbook": {"command": "k-playbook", "args": ["mcp"]}}}`,
-		"opencode.json":                      `{"mcp": {"k-playbook": {"type": "local", "command": ["k-playbook", "mcp"], "enabled": true}}}`,
-		filepath.Join(".cursor", "mcp.json"): `{"mcpServers": {"k-playbook": {"command": "k-playbook", "args": ["mcp"]}}}`,
+		".mcp.json":     `{"mcpServers": {"k-playbook": {"command": "k-playbook", "args": ["mcp"]}}}`,
+		"opencode.json": `{"mcp": {"k-playbook": {"type": "local", "command": ["k-playbook", "mcp"], "enabled": true}}}`,
 	})
 
 	var response mcpServersResponse
@@ -63,16 +62,16 @@ func TestMCPServersAPIMeldetPflichtluecke(t *testing.T) {
 	if !response.RequiredConfigured || strings.Join(response.Required, ",") != "k-playbook,atlassian" {
 		t.Errorf("Pflichtliste = %v (configured %t)", response.Required, response.RequiredConfigured)
 	}
-	if len(response.Missing) != 3 {
-		t.Errorf("Missing = %+v, erwartet atlassian bei allen drei Assistenten", response.Missing)
+	if len(response.Missing) != 2 {
+		t.Errorf("Missing = %+v, erwartet atlassian bei beiden Assistenten", response.Missing)
 	}
 	for _, gap := range response.Missing {
 		if gap.Name != "atlassian" {
 			t.Errorf("Lücke %+v ist nicht atlassian", gap)
 		}
 	}
-	if len(response.Servers) != 3 || len(response.Files) != 3 {
-		t.Errorf("Servers = %d, Files = %d, erwartet je 3", len(response.Servers), len(response.Files))
+	if len(response.Servers) != 2 || len(response.Files) != 2 {
+		t.Errorf("Servers = %d, Files = %d, erwartet je 2", len(response.Servers), len(response.Files))
 	}
 	for _, server := range response.Servers {
 		if !server.Required || !server.Own {
@@ -374,10 +373,10 @@ func TestMCPServerProbeNurPerPost(t *testing.T) {
 func TestMCPServerProbeOhneKommando(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	newMCPProject(t, "", map[string]string{
-		filepath.Join(".cursor", "mcp.json"): `{"mcpServers": {"kaputt": {"command": "gibt-es-nicht-4711"}}}`,
+		".mcp.json": `{"mcpServers": {"kaputt": {"command": "gibt-es-nicht-4711"}}}`,
 	})
 
-	status, response := postProbe(t, "/api/mcp-servers/cursor/kaputt/probe")
+	status, response := postProbe(t, "/api/mcp-servers/claude-code/kaputt/probe")
 	if status != http.StatusOK {
 		t.Fatalf("Status = %d, erwartet 200", status)
 	}
@@ -391,10 +390,10 @@ func TestMCPServerProbeOhneKommando(t *testing.T) {
 // „Nicht gemessen" statt „Antwortet nicht".
 func TestMCPServerProbeBinaryFehlt(t *testing.T) {
 	newMCPProject(t, "", map[string]string{
-		filepath.Join(".cursor", "mcp.json"): `{"mcpServers": {"kaputt": {"command": "./bin/gibt-es-nicht"}}}`,
+		".mcp.json": `{"mcpServers": {"kaputt": {"command": "./bin/gibt-es-nicht"}}}`,
 	})
 
-	status, response := postProbe(t, "/api/mcp-servers/cursor/kaputt/probe")
+	status, response := postProbe(t, "/api/mcp-servers/claude-code/kaputt/probe")
 	if status != http.StatusOK {
 		t.Fatalf("Status = %d, erwartet 200", status)
 	}

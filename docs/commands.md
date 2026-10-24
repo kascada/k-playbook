@@ -18,7 +18,7 @@ A project-owned command with the name of a shipped command **replaces** it; an e
 
 ## Overview
 
-New commands become visible only after linking is in place and the assistant has been restarted. `k-playbook briefing`, the call at the beginning of every session, brings linking up to date automatically; the restart remains necessary because Claude Code, OpenCode, and Cursor read their command list at startup.
+New commands become visible only after linking is in place and the assistant has been restarted. `k-playbook briefing`, the call at the beginning of every session, brings linking up to date automatically; the restart remains necessary because Claude Code and OpenCode read their command list at startup.
 
 | Command | Purpose | Detail |
 |---|---|---|

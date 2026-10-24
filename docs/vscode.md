@@ -116,9 +116,10 @@ counts as the way to see it.
 
 `k-playbook vscode status` and the card **VS-Code-Erweiterung** on the setup page of the
 interface show the same thing: the embedded version, what `extensions.json` lists, the CLI
-a run would choose, the directory that CLI writes to, and the last automatic catch-up of
-the running service. The same data is available as JSON at `GET /api/vscode`. A failed
-catch-up is shown there with its reason instead of staying silent.
+a run would choose, and the directory that CLI writes to. The card and `GET /api/vscode`
+additionally show the last automatic catch-up of the running service; the command cannot,
+because it runs as its own process and has no access to the service's record. A failed
+catch-up is shown on the card and in the JSON with its reason instead of staying silent.
 
 **"Needs a catch-up" refers to the directory the catch-up writes to**, not to "somewhere".
 Which directory that is follows from the kind of CLI: the remote CLI and `code-server`

@@ -45,7 +45,7 @@ const (
 type MCPSchema string
 
 const (
-	// MCPSchemaServers ist das Schema von Claude Code und Cursor: unter
+	// MCPSchemaServers ist das Schema von Claude Code: unter
 	// "mcpServers" ein Objekt mit "command" und "args".
 	MCPSchemaServers MCPSchema = "mcpServers"
 	// MCPSchemaOpenCode ist das Schema von OpenCode: unter "mcp" ein Objekt mit
@@ -77,7 +77,7 @@ const (
 	opencodeConfigJSONC = "opencode.jsonc"
 )
 
-// MCPTargets sind die drei Registrierungen, die ein Zielprojekt braucht.
+// MCPTargets sind die beiden Registrierungen, die ein Zielprojekt braucht.
 //
 // Anders als bei der Verlinkung gehören diese Dateien vollständig dem Projekt:
 // sie können fremde MCP-Server tragen, und die OpenCode-Konfiguration trägt
@@ -89,7 +89,6 @@ const (
 func MCPTargets(projectRoot string) []MCPTarget {
 	return []MCPTarget{
 		{Path: ".mcp.json", Assistant: "Claude Code", Schema: MCPSchemaServers, traceDir: ".claude"},
-		{Path: filepath.Join(".cursor", "mcp.json"), Assistant: "Cursor", Schema: MCPSchemaServers, traceDir: ".cursor"},
 		{Path: opencodeTarget(projectRoot), Assistant: "OpenCode", Schema: MCPSchemaOpenCode, traceDir: ".opencode"},
 	}
 }
@@ -287,7 +286,7 @@ func acceptedMCPCommandForms() []mcpCommandForm {
 // isPortableCommandForm meldet, ob das Kommando der bloße Name des
 // installierten k-playbook ist.
 //
-// Das ist die **eincheckbare** Form. Sie steht in den drei MCP-Dateien dieses
+// Das ist die **eincheckbare** Form. Sie steht in den beiden MCP-Dateien dieses
 // Quell-Repos und in jedem Projekt, das seine Registrierung teilen will: ein
 // absoluter Pfad trägt ein `$HOME` und ist damit an eine Umgebung gebunden,
 // der Name ist es nicht. Host und DevContainer lösen ihn über ihre je eigene
@@ -365,7 +364,7 @@ func MCPOK(statuses []MCPStatus) bool {
 	return len(statuses) > 0
 }
 
-// ApplyMCP setzt den Eintrag in allen drei Dateien und meldet den Zustand
+// ApplyMCP setzt den Eintrag in beiden Dateien und meldet den Zustand
 // danach. Das ist der **ausdrückliche** Schreibweg — der Klick auf
 // „Einrichten".
 //
@@ -374,8 +373,8 @@ func MCPOK(statuses []MCPStatus) bool {
 // Registrierung, die auf nichts zeigt, ist schlechter als keine. Eine Datei,
 // die kein JSON-Objekt ist, bleibt ebenfalls unberührt; die Prüfung meldet sie.
 //
-// Die drei Ziele sind voneinander unabhängig, deshalb hält ein gescheitertes die
-// anderen nicht auf: ein nicht schreibbares .cursor/ ist kein Grund, OpenCode
+// Die beiden Ziele sind voneinander unabhängig, deshalb hält ein gescheitertes
+// das andere nicht auf: eine nicht schreibbare .mcp.json ist kein Grund, OpenCode
 // unregistriert zu lassen. Gesammelt wird, was schiefging; welches Ziel steht
 // und welches nicht, sagt ohnehin der zurückgegebene Zustand.
 func ApplyMCP(projectRoot string) ([]MCPStatus, error) {
@@ -900,9 +899,9 @@ func mcpTargetNeedsWrite(projectRoot string, target MCPTarget, content map[strin
 
 // mcpTargetViaSymlink meldet, ob der Weg vom Hauptverzeichnis zur Zieldatei
 // über einen Symlink führt. Geprüft werden nur die Bestandteile von path
-// unterhalb von projectRoot, je per os.Lstat — etwa .cursor und
-// .cursor/mcp.json. Das Hauptverzeichnis selbst und alles darüber zählt
-// nicht: ein Projekt unter einem verlinkten Pfad wie ~/dev → /mnt/… wird
+// unterhalb von projectRoot, je per os.Lstat — die Datei selbst und, läge sie
+// in einem Unterverzeichnis, auch dieses. Das Hauptverzeichnis selbst und alles
+// darüber zählt nicht: ein Projekt unter einem verlinkten Pfad wie ~/dev → /mnt/… wird
 // nicht deshalb übersprungen.
 //
 // Ein fehlender Bestandteil ist kein Link; was danach käme, fehlt ebenso. Jeder
@@ -1055,12 +1054,11 @@ func gitEntryInAncestors(projectRoot string) bool {
 // assistantTrace meldet, ob der Assistent eines Ziels eine Spur im Projekt
 // hat, die nicht von k-playbook stammt: das Assistenten-Verzeichnis trägt
 // mindestens einen Eintrag, der keiner der von Links() verwalteten Pfade ist
-// — etwa .claude/settings.json, .cursor/rules/ oder eine eigene Datei unter
-// .opencode/.
+// — etwa .claude/settings.json oder eine eigene Datei unter .opencode/.
 //
 // Die Verzeichnisse selbst taugen nicht als Spur: ApplyLinks legt sie in jedem
 // Projekt an, schon auf dem Lesepfad. Ohne diese Bedingung entstünden bei
-// jedem Start drei Dateien, die niemand braucht. Ein fehlendes oder
+// jedem Start zwei Dateien, die niemand braucht. Ein fehlendes oder
 // unlesbares Verzeichnis ist keine Spur.
 func assistantTrace(projectRoot string, target MCPTarget) bool {
 	if target.traceDir == "" {

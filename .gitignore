@@ -17,10 +17,12 @@ priv/
 # kommt: /k-playbook/ ist hier selbst ignoriert, der eingetragene Wrapper
 # entsteht also erst lokal. Ein eingecheckter Eintrag zeigte nach einem frischen
 # Clone ins Leere. Wer die Registrierung braucht, legt sie in der Oberfläche an;
-# docs/mcp.md nennt den Weg. In einem echten Zielprojekt gehören beide Dateien
+# docs/mcp.md nennt den Weg. In einem echten Zielprojekt gehört die Datei
 # dagegen ins Repository.
 /.mcp.json
-/.cursor/mcp.json
+
+# Vorübergehend: bleibt, bis das Binary ohne das Cursor-Ziel installiert ist (bis dahin legt das installierte Programm .cursor/commands bei jedem Aufruf neu an).
+/.cursor/
 
 # Secrets and local environment
 .env

@@ -202,8 +202,8 @@ func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
 	writeFile(t, veraltet,
 		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
 
-	portabel := `{"mcpServers":{"` + MCPServerKey + `":{"command":"/Users/fremd/.local/bin/k-playbook","args":["mcp"]}}}` + "\n"
-	writeFile(t, filepath.Join(root, ".cursor", "mcp.json"), portabel)
+	portabel := `{"mcp":{"` + MCPServerKey + `":{"type":"local","command":["/Users/fremd/.local/bin/k-playbook","mcp"],"enabled":true}}}` + "\n"
+	writeFile(t, filepath.Join(root, "opencode.json"), portabel)
 
 	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
 	if err != nil {
@@ -221,18 +221,14 @@ func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
 		t.Errorf("command = %v, erwartet %q", entry["command"], InstalledCommandName)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, ".cursor", "mcp.json"))
+	// Die akzeptierte Form bleibt auch ohne instructions-Eintrag stehen: die
+	// Auto-Korrektur repariert, sie richtet nicht ein.
+	raw, err := os.ReadFile(filepath.Join(root, "opencode.json"))
 	if err != nil {
-		t.Fatalf(".cursor/mcp.json lesen: %v", err)
+		t.Fatalf("opencode.json lesen: %v", err)
 	}
 	if string(raw) != portabel {
 		t.Errorf("akzeptierte Form wurde von der Auto-Korrektur angefasst:\n%s", raw)
-	}
-
-	// opencode.json fehlte und wurde nicht angelegt: die Auto-Korrektur
-	// repariert, sie richtet nicht ein.
-	if _, err := os.Stat(filepath.Join(root, "opencode.json")); !os.IsNotExist(err) {
-		t.Errorf("opencode.json wurde von der Auto-Korrektur angelegt: %v", err)
 	}
 }
 
@@ -312,7 +308,7 @@ func TestRepairMCPOhneInstalliertesBinary(t *testing.T) {
 	}
 }
 
-// Die portable Form in allen drei Dateien: der Zustand dieses Quell-Repos ab
+// Die portable Form in beiden Dateien: der Zustand dieses Quell-Repos ab
 // Etappe 3. Beide selbsttätigen Wege — Clone-Update und Start — müssen daran
 // vorbeigehen, sonst schriebe die eigene Automatik bei jedem Lauf einen
 // absoluten Home-Pfad in getrackte Dateien und der Release-Preflight scheiterte
@@ -322,8 +318,7 @@ func TestPortableFormBleibtVonSelbstUnangetastet(t *testing.T) {
 	root := newMCPProject(t)
 
 	portabel := map[string]string{
-		".mcp.json":        `{"mcpServers":{"` + MCPServerKey + `":{"command":"` + InstalledCommandName + `","args":["mcp"]}}}` + "\n",
-		".cursor/mcp.json": `{"mcpServers":{"` + MCPServerKey + `":{"command":"` + InstalledCommandName + `","args":["mcp"]}}}` + "\n",
+		".mcp.json": `{"mcpServers":{"` + MCPServerKey + `":{"command":"` + InstalledCommandName + `","args":["mcp"]}}}` + "\n",
 		"opencode.json": `{"$schema":"https://opencode.ai/config.json",` +
 			`"instructions":["` + RootInstructionsFile + `"],` +
 			`"references":{"docs":{"path":"./docs"}},` +

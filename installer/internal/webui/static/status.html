@@ -75,6 +75,23 @@
             <p id="status-message" class="message hidden"></p>
           </section>
 
+          <!-- Die Umgebungsprüfung: der Report von /api/environment, dieselbe
+               Liste wie `k-playbook health` und der Abschnitt health des
+               Briefings. Ohne Problem bleibt es bei der einen Zeile im
+               Meldungsfeld und die Liste ist leer; sonst steht je Eintrag
+               Stufe, Bereich, Satz und Abhilfe. Werte oder Token nennt kein
+               Eintrag, repariert wird hier nichts. -->
+          <section class="card" id="environment-card">
+            <div class="section-head">
+              <div>
+                <h2>Umgebung</h2>
+              </div>
+              <span id="environment-pill" class="pill muted">Prüfen...</span>
+            </div>
+            <ul id="environment-problems" class="environment-list"></ul>
+            <p id="environment-message" class="message"></p>
+          </section>
+
 {{template "workflow-cards" .}}
 
           <p id="status-workflows-message" class="message"></p>

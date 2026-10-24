@@ -531,3 +531,39 @@ func TestDocZusaetzlicheSorteNurUeberTabelle(t *testing.T) {
 		t.Fatalf("ideas erledigen: %+v %v", moved, err)
 	}
 }
+
+func TestDocKindTodosNurUeberEigeneWerkzeuge(t *testing.T) {
+	var todos DocKind
+	for _, kind := range DocKinds {
+		if kind.Kind == TodoKindName {
+			todos = kind
+		}
+	}
+	want := DocKind{Kind: "todos", Dir: "todos", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true}
+	if todos != want {
+		t.Fatalf("Sorte todos: %+v", todos)
+	}
+	for _, name := range DocKindNames(DocKinds) {
+		if name == TodoKindName {
+			t.Fatal("todos steht in der kind-Liste der doc-Werkzeuge")
+		}
+	}
+
+	store := newFakeDocStore("kamran", "todos/001-a.md", "todos/done/002-b.md")
+	docs := newTestUserDocs(t, store, DocKinds)
+	ctx := context.Background()
+	_, err := docs.Create(ctx, "todos", "x")
+	wantCode(t, err, DocCodeInvalidInput)
+	if !strings.Contains(err.Error(), "k-playbook todo") {
+		t.Errorf("Meldung nennt den Weg nicht: %v", err)
+	}
+	_, err = docs.List(ctx, DocListOptions{Kind: "todos"})
+	wantCode(t, err, DocCodeInvalidInput)
+	_, err = docs.Done(ctx, "keph:/todos/001-a.md")
+	wantCode(t, err, DocCodeInvalidInput)
+	_, err = docs.Reopen(ctx, "keph:/todos/done/002-b.md")
+	wantCode(t, err, DocCodeInvalidInput)
+	if len(store.creates) != 0 || len(store.renames) != 0 || len(store.lists) != 0 {
+		t.Fatalf("doc-Werkzeuge haben Todos angefasst: %v %v %v", store.creates, store.renames, store.lists)
+	}
+}

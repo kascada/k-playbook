@@ -323,6 +323,29 @@ Moving into `done/` and back is `rename` through the hub. Contract:
 | tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide | 100 |
 | findings | `queue/findings/` | the directory itself | 001 |
 | workbench | `user/<name>/workbench/` | all `user/*/workbench/` including `done/` — project-wide | 001 |
+| todos | `todos/` | the directory including `done/` | 001 |
+
+**Todos become documents in the collection** (decided 2026-10-19, built 2026-10-20 in task
+097, not yet released). The todos were one file, `k-playbook-local/data/todos.json`, owned by
+Go and reached only through `k_playbook_todo_*` and `k-playbook todo` (`/k-todo`, the GUI page
+`/workflows/todos`). `docs/knowledge-layout.md` ("What stays outside") left that file on disk
+as control, not knowledge — the same line also kept `tasks/` outside, and those moved with task
+088. The todos followed: one document per entry under `todos/` with `done/`, project-wide and
+not under `user/<name>/`, because a todo belongs to the project, not to a person. Numbering as
+in the table (the directory itself, start 001; after deleting the highest number it is handed
+out again); `created` comes from the frontmatter for migrated entries (even empty), else from
+Kephalaion's stamp; the date of ticking off is a `done:` frontmatter field written before the
+`rename` into `done/`. Nothing changed in Kephalaion. Built: `Write` and `Delete` in the Go
+client, the kind `todos` in the kind table (kept out of the `doc` tools), the four
+`k_playbook_todo_*` tools and `k-playbook todo` on the collection with a `search`, the GUI with
+creation, ticking off, reopening and a search (todo #14), and `k-playbook todo migrate`, which
+took over the 28 entries of this repo with their ids. Without a usable Kephalaion there are no
+todos, in the GUI as well. Contract: `docs/mcp.md`, "Todo Contract and Migration". Still to
+follow: `commands/k-todo.md` (`kephalaion_unavailable`, `todos_not_migrated`, no `migrated`,
+`search`), `docs/knowledge-layout.md` and the other descriptions of the old store; taking over a
+not yet migrated `data/todos.json` in `k-playbook upgrade`; the MCP tools at an open session
+after the release. Until the release the installed binary still writes to `data/todos.json`;
+a new `k-playbook todo migrate` takes such a file over as a latecomer.
 
 **The briefing** (2026-10-16, task 086 — built, not yet put to use). `k-playbook briefing
 [--json]` and `k_playbook_briefing` are the one call at the start of a session: **data, not
@@ -372,6 +395,7 @@ when that step is built.
   pitfalls/
   queue/
     findings/          outstanding findings, numbered     (2026-10-14)
+  todos/             project todos, numbered, done/     (2026-10-19, built in task 097)
   user/
     <name>/            one directory per person           (2026-10-14)
       tasks/           numbered project-wide, done/
@@ -379,6 +403,21 @@ when that step is built.
 ```
 
 The shipped content is not part of it; it lies in `<hub>:k-playbook/defaults/`.
+
+**Two assistants: Claude Code and OpenCode** (decided 2026-10-18, task 095 — built
+2026-10-19, in the working tree). Cursor is no longer a supported assistant. It could not be
+measured — there is no Cursor CLI, the chat window was the only observation point — so every
+check in the assistants turned into a step for the user, and two assistants are easier to
+keep in step. The registry in the binary knows `.claude/` and `.opencode/` only, MCP setup
+writes `.mcp.json` and `opencode.json[c]`, the interface offers two assistants, and the
+`CLAUDE.md` stub says "erreicht OpenCode nicht". Projects that still carry a `.cursor/` from
+earlier setups run unchanged: k-playbook does not touch directories it no longer manages, and
+old symlinks in `.cursor/commands/` keep pointing at `k-playbook/commands/…`. Their
+`CLAUDE.md` keeps the old stub wording, because `applyIncludeFile` and `k-playbook upgrade`
+never rewrite an existing file; the check stays `ok` and only reports "daneben eigener
+Inhalt". Process detection for the session lock (`KindCursor` in `branches/sessions.go`)
+stays, like `KindCodex`: an open Cursor session still blocks a branch switch. What is left
+is item 19 of the work list.
 
 ## Target for `k-playbook.md` and `AGENTS.md` (task 086)
 
@@ -685,7 +724,7 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
 13. **First command as a hull** — built 2026-10-18 (task 092, in the working tree):
     `commands` is a kind of `k_playbook_doc_read`, read from `defaults/commands/`;
     `/k-upgrade` is hull plus text; `defaults/includes/` exists with a README. Open: the
-    check in Claude Code, OpenCode and Cursor after the next release (step 4 of the task).
+    check in Claude Code and OpenCode after the next release (step 4 of the task).
 14. **All prefixes and includes** — built 2026-10-18 (task 093, in the working tree):
     `ResolveDocRef` resolves `project:` and `keph:` (the client gained `Read`), include
     lines are inserted in every document with `--raw`/`includes: false` to switch off,
@@ -722,6 +761,19 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     inside both clients, the message and the restart hint come through unchanged
     (`k-playbook-local/material/befunde/command-huelle-verweis.md`, 2026-10-19). Not
     measured: the "download/install not possible" path.
+18. **Todos into the collection** — decided 2026-10-19, built 2026-10-20 (task 097, not yet
+    released): `todos/` with `done/`, one document per entry; client `Write`/`Delete`, todo
+    tools with `search`, GUI endpoints, creation, ticking off and search in the GUI,
+    `k-playbook todo migrate` (run once in this repo, 28 entries). Open: `commands/k-todo.md`,
+    `docs/knowledge-layout.md`, upgrade path, MCP follow-up test after the release; see
+    "Todos become documents in the collection" above.
+
+19. **Cursor leftovers** — added 2026-10-19 after task 095, three points: `/k-upgrade`
+    cleans up `.cursor/` in existing projects; `/k-upgrade` brings the stub wording of
+    `CLAUDE.md` in existing projects up to date, but only when the file is word for word the
+    old stub; the temporary guard line `/.cursor/` in this repo's `.gitignore` goes as soon as
+    the binary without the Cursor target is installed — until then the installed binary
+    recreates `.cursor/commands` on every `k-playbook context`.
 
 ## Findings
 

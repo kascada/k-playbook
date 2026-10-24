@@ -19,6 +19,12 @@ Die Felder jeder Sitzung:
   `disabled` werden übersprungen; die Überlagerung ist schon gerechnet.
 - `work` ist die eigene offene Arbeit.
 
+Die Umgebung: `health` ist die Umgebungsprüfung, im Klartext der Block `Umgebung:` gleich nach
+diesem Text. Nenne jeden Eintrag in deiner ersten Antwort (Stufe, Bereich, Satz). Einen Fehler
+nennst du, bevor du mit der Arbeit beginnst, und bietest die Abhilfe aus `hint` an; bei einer
+Warnung arbeitest du weiter. Nichts davon behebst du still — das tut der Nutzer oder beauftragt
+es ausdrücklich. Bei `Umgebung: keine Probleme` schweigst du; `k_playbook_health` prüft neu.
+
 Nicht selbst lesen: `K-PLAYBOOK.yaml` und die Katalogverzeichnisse unter `k-playbook/` und
 `k-playbook-local/`. Ihr Inhalt kommt mit dem Briefing.
 

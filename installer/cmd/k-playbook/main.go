@@ -7,7 +7,8 @@
 // `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
 // löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
-// Projekt gilt und was ansteht, `upgrade` aktualisiert das Programm und zieht
+// Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
+// Umgebung des Projekts, `upgrade` aktualisiert das Programm und zieht
 // das Projekt nach,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
@@ -34,8 +35,12 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "Fehler: %v\n", err)
-		os.Exit(1)
+		// Ein exitError ohne Text hat schon alles ausgegeben und setzt nur
+		// den Code; alles andere endet mit 1.
+		if err.Error() != "" {
+			fmt.Fprintf(os.Stderr, "Fehler: %v\n", err)
+		}
+		os.Exit(exitCodeOf(err))
 	}
 }
 
@@ -108,6 +113,11 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
 		// Klartext oder JSON, und sonst nichts.
 		return runBriefing(args[1:])
+	case "health":
+		// Ohne Wirt-Pflege wie briefing: die Ausgabe ist die Liste der
+		// Probleme, als Klartext oder JSON, und sonst nichts — und ein
+		// Skript liest den Exit-Code.
+		return runHealth(args[1:])
 	case "upgrade":
 		// Ohne Wirt-Pflege: der Nachzug meldet selbst je Schritt, was er tut,
 		// und seine Ausgabe wird von /k-upgrade wörtlich wiedergegeben — eine
@@ -276,6 +286,15 @@ Unterkommandos:
             angaben, die das Briefing noch nicht selbst abdeckt; zieht dabei
             wie context die Assistenten-Verlinkung nach. Dasselbe wie das
             MCP-Werkzeug k_playbook_briefing.
+  health    Nennt Fehler und Warnungen über die Umgebung des Projekts:
+            k-playbook health [--json]. Je Eintrag Stufe (error, warning),
+            Bereich (kephalaion, gh, baseTools, versionSources), ein Satz
+            und die Abhilfe; alle auf einmal, nichts wird repariert, kein
+            Token oder Wert steht darin. Ohne Problem die eine Zeile
+            „Umgebung: keine Probleme“ — derselbe Block wie im Briefing.
+            Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
+            Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
+            k_playbook_health.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

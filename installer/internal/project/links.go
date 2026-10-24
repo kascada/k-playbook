@@ -40,12 +40,11 @@ type Link struct {
 // k-playbook-local/, wobei ein gleichnamiger projekteigener Eintrag gewinnt.
 //
 // Skills stehen nur einmal: OpenCode durchsucht neben .opencode/skills/ auch
-// .claude/skills/, ein zweiter Ort wäre Dopplung. Cursor kennt kein
-// Skill-Konzept.
+// .claude/skills/, ein zweiter Ort wäre Dopplung.
 //
 // CLAUDE.md ist eine Include-Datei mit der Import-Zeile @AGENTS.md, weil Claude
-// Code ausschließlich CLAUDE.md liest und OpenCode wie Cursor AGENTS.md
-// bevorzugen. Früher war es ein Symlink: der hielt beide Dateien zwangsläufig
+// Code ausschließlich CLAUDE.md liest und OpenCode AGENTS.md bevorzugt.
+// Früher war es ein Symlink: der hielt beide Dateien zwangsläufig
 // gleich, brach aber bei jedem Editor, der beim Speichern atomar ersetzt, und
 // die Prüfung meldete danach „echte Datei statt Symlink". Der Import kennt
 // diesen Fall nicht. Sein Preis: zwei Dateien, die auseinanderlaufen können —
@@ -76,7 +75,6 @@ func Links() []Link {
 		{Path: filepath.Join(".claude", "commands"), Kind: KindCommands, Assistant: "Claude Code"},
 		{Path: filepath.Join(".claude", "skills"), Kind: KindSkills, Assistant: "Claude Code, OpenCode"},
 		{Path: filepath.Join(".opencode", "commands"), Kind: KindCommands, Assistant: "OpenCode"},
-		{Path: filepath.Join(".cursor", "commands"), Kind: KindCommands, Assistant: "Cursor"},
 		{Path: ClaudeInstructionsFile, Source: RootInstructionsFile, Assistant: "Claude Code", IsInclude: true, Optional: true},
 	}
 }
@@ -200,8 +198,8 @@ func LinksFixable(statuses []LinkStatus) bool {
 // würde — über alle Ziele hinweg und ohne Dopplung.
 //
 // Ohne die Zusammenfassung wäre die Zahl irreführend: dieselben Commands
-// stehen in .claude/, .opencode/ und .cursor/, ein neuer Command zählte also
-// dreifach. Gemeint ist aber der Eintrag, nicht seine Kopien.
+// stehen in .claude/ und .opencode/, ein neuer Command zählte also
+// doppelt. Gemeint ist aber der Eintrag, nicht seine Kopien.
 type LinkChanges struct {
 	// Added kommen dazu, Removed fallen weg, Repointed wechseln die Quelle.
 	Added     []string `json:"added,omitempty"`

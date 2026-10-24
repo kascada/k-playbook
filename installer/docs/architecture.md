@@ -176,10 +176,12 @@ beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Bri
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
-ist (`tasks`, `workbench`, `findings`: Ablage, Userbereich, Zählbereich, `done/`,
-Startnummer), steht allein in der Tabelle `project.DocKinds` (`project/userdocs.go`); eine neue
+ist (`tasks`, `workbench`, `findings`, `todos`: Ablage, Userbereich, Zählbereich, `done/`,
+Startnummer, eigene Werkzeuge), steht allein in der Tabelle `project.DocKinds` (`project/userdocs.go`); eine neue
 Sorte ist ein neuer Eintrag, die erlaubten Werte von `kind` in CLI und MCP-Schema kommen
-daraus. Die Fachlogik `project.UserDocs` spricht Kephalaion über die Schnittstelle `DocStore`
+daraus — ohne die Sorten mit `OwnTools` (`todos`), die nur über `k-playbook todo` und
+`k_playbook_todo_*` gehen (`project/todos.go`, über die Schnittstelle `TodoStore`, die
+zusätzlich `read`, `write` und `delete` braucht). Die Fachlogik `project.UserDocs` spricht Kephalaion über die Schnittstelle `DocStore`
 an, die `kephalaion.Client` (`internal/kephalaion/docs.go`: `list` aus der Replica, `create`
 und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`, `_list`,
 `_done` und `_reopen` sind die Hüllen darum. Vertrag:
@@ -223,11 +225,18 @@ installer/
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
-│   ├── todo.go                  Subkommando todo: list, add, update, delete, import
+│   ├── todo.go                  Subkommando todo: list (--search), add, update, delete,
+│   │                            migrate
 │   ├── knowledge.go             Subkommando knowledge: search, list, read, write, status
 │   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
 │   │                            Kephalaion-Collection
+│   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
+│   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
+├── internal/health/
+│   └── health.go                Sammelstelle der Umgebungsprüfung (Task 098): Level,
+│                                Problem, Report; Register für Quellen, Check fragt alle
+│                                und sortiert nach Bereich, Stufe, Satz
 ├── internal/hostenv/
 │   └── hostenv.go               Wo läuft das Programm: Container-Marker, WSL
 ├── internal/notify/
@@ -260,6 +269,8 @@ installer/
 │   ├── status.go                die eine Auskunft für Unterkommando und Web-API
 │   ├── refresh.go               selbsttätiger Nachzug beim Dienststart, Vermerk
 │   ├── lock_unix.go             flock im Laufzeitverzeichnis gegen gleichzeitige Dienste
+│   ├── guard.go                 Marke K_PLAYBOOK_NO_VSCODE_INSTALL im Testlauf setzen,
+│   │                            damit kein Test das echte VS Code anfasst
 │   └── vsix/                    die eingecheckte VSIX, gebaut mit `make vscode-vsix`
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
@@ -275,7 +286,7 @@ installer/
 │   │                            material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
-│   ├── mcp.go                   MCP-Registrierung in den drei Assistenten-Dateien
+│   ├── mcp.go                   MCP-Registrierung in den beiden Assistenten-Dateien
 │   ├── mcp_servers.go           alle MCP-Server aus denselben Dateien lesen, Pflichtlücken
 │   ├── mcp_required.go          tools.mcp.required lesen, Inventar zusammenführen
 │   ├── installed.go             den absoluten Pfad des installierten k-playbook auflösen
@@ -302,10 +313,18 @@ installer/
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
 │   │                            aus der Collection, als Verweise (Task 086); dazu der
+│   │                            Abschnitt health (Task 098) und der
 │   │                            Übergangsabschnitt context — der Rest der Kontext-
 │   │                            ausgabe aus ContextForDir (Task 091)
+│   ├── health.go                die Quellen der Umgebungsprüfung: Kephalaion-Anbindung,
+│   │                            gh, Basis-Werkzeuge, Quellenkonfiguration — bei init
+│   │                            in internal/health registriert (health darf project
+│   │                            nicht importieren, das Briefing trägt den Report)
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
-│   ├── todos.go                 data/todos.json lesen und schreiben, Migration und Import
+│   ├── todos.go                 Todos als Dokumente unter todos/ der Collection
+│   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
+│   ├── todo_doc.go              Dokumentformat eines Todos: Frontmatter, Rumpf = Text
+│   ├── todo_migrate.go          k-playbook todo migrate: data/todos.json übernehmen
 │   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
 │   │                            entlang der Überschriften, Search/List/Read/Status
 │   ├── knowledge_index.go       BM25-Index als cache/knowledge/index.json, Drift über
@@ -322,7 +341,8 @@ installer/
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
-│   ├── todos.go                 Todo-Endpunkte, offen und erledigt getrennt
+│   ├── todos.go                 Todo-Endpunkte: offen, erledigt, Suche; anlegen,
+│   │                            abhaken, wieder öffnen
 │   ├── chat.go                  Chat: Weiterleitung an den OpenCode-Dienst samt
 │   │                            Ereignisstrom, Anmeldung aus OPENCODE_SERVER_*
 │   ├── chat_guard.go            im Container nur ein eigener Dienst; Hinweis zum
@@ -337,6 +357,8 @@ installer/
 │   ├── gh.go update.go reviews.go
 │   ├── kephalaion.go            Anbindung an die Kephalaion-Collection: Anzeige mit
 │   │                            Zwischenspeicher, Kandidaten, Test, Eintragen
+│   ├── environment.go           GET /api/environment: der Report der Umgebungsprüfung
+│   │                            (health.Check) für die Karte „Umgebung“ der Statusseite
 │   ├── restart.go               Programm aktualisieren und den Dienst daraus neu starten:
 │   │                            Sperre, Übergabe der Laufzeitdatei, Rückfall
 │   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
@@ -377,6 +399,8 @@ installer/
 │   │                            done/reopen (Hüllen über project.UserDocs)
 │   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
 │   │                            project.BuildBriefing)
+│   ├── health.go                Werkzeug k_playbook_health (Hülle über health.Check,
+│   │                            Report unter health)
 │   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │   │                            write, publish, supersede, inbox_*, queue_*, status),
 │   │                            dünne Hüllen über project.Knowledge
@@ -420,9 +444,10 @@ installer/
 │   │                            Token-Kandidaten aus tokens/<hub>/<account>.token
 │   ├── client.go                minimaler Streamable-HTTP-Client: Sitzung, tools/call,
 │   │                            whoami
-│   ├── docs.go                  Client für die Collection: list, create, rename;
-│   │                            request_id, eine Wiederholung, outcome_unknown;
-│   │                            ToolError mit dem Code von Kephalaion
+│   ├── docs.go                  Client für die Collection: list, read, create, write,
+│   │                            rename, delete; request_id, eine Wiederholung,
+│   │                            outcome_unknown; ToolError mit dem Code von Kephalaion
+│   ├── kephtest/                Collection im Speicher für Tests (nur Tests)
 │   ├── check.go                 Prüfung und Zustände, lesbare Collections je Kandidat
 │   └── write.go                 nur den Block kephalaion: schreiben, Ignorieren sichern
 ├── internal/versionsources/
@@ -620,8 +645,10 @@ Grund ein anderer und führt zum selben Ergebnis: ableitbarer Inhalt, der jederz
 entsteht, veraltet im Repository unbemerkt und bläht die Historie. Umschaltbar bleiben
 beide trotzdem, in beide Richtungen, und einmal umgeschaltet bleibt es dabei.
 
-`data/` trägt keins von beidem: es hält Maschinendateien, die zum Projektstand gehören —
-allen voran `todos.json` — und wird ganz normal mitversioniert.
+`data/` trägt keins von beidem: es hält Maschinendateien, die zum Projektstand gehören, und
+wird ganz normal mitversioniert. Die Todos lagen bis Task 097 als `todos.json` darin; heute
+liegen sie in der Kephalaion-Collection, und `k-playbook todo migrate` legt die übernommene
+Datei als `todos.json.migriert` daneben ab.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
@@ -767,15 +794,14 @@ zusammensetzbar.
 | `.claude/commands` | Katalog `commands` | Claude Code |
 | `.claude/skills` | Katalog `skills` | Claude Code, OpenCode |
 | `.opencode/commands` | Katalog `commands` | OpenCode |
-| `.cursor/commands` | Katalog `commands` | Cursor |
 | `CLAUDE.md` | Include-Datei mit `@AGENTS.md` (`IsInclude`) | Claude Code |
 
 Skills stehen nur einmal: OpenCode durchsucht neben `.opencode/skills/` auch
-`.claude/skills/`, ein zweiter Ort wäre Dopplung. Cursor kennt kein Skill-Konzept.
+`.claude/skills/`, ein zweiter Ort wäre Dopplung.
 
 `CLAUDE.md` ist eine erzeugte reguläre Datei, die `AGENTS.md` über die Import-Zeile
 `ClaudeIncludeLine` (`"@" + RootInstructionsFile`) einbindet, weil Claude Code
-ausschließlich `CLAUDE.md` liest und OpenCode wie Cursor `AGENTS.md` bevorzugen. Früher
+ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt. Früher
 war es ein Symlink: der hielt beide Dateien zwangsläufig gleich, brach aber bei jedem
 Editor, der beim Speichern atomar ersetzt, und die Prüfung meldete danach `blocked` mit
 „echte Datei statt Symlink". Dieser Fall existiert nicht mehr. Der Preis: zwei Dateien,
@@ -913,7 +939,7 @@ Gate auf einen sauberen git-Zustand gibt es dagegen nicht — ein Arbeitsverzeic
 
 ### Einzel-Links statt Verzeichnis-Symlink
 
-Die vier Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Eintrag:
+Die drei Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Eintrag:
 
 ```text
 .claude/commands/
@@ -1249,8 +1275,8 @@ Umbenennung und Konflikt gehören ebenfalls in den Antworttext.
 
 `PendingLinkChanges()` liest vorher die Bilanz und meldet sie: dazugekommen, entfernt,
 auf eine andere Quelle umgesetzt. Die Namen werden **über alle Ziele zusammengefasst**,
-sonst zählte ein einzelner neuer Command dreifach — er steht in `.claude/`, `.opencode/`
-und `.cursor/`.
+sonst zählte ein einzelner neuer Command doppelt — er steht in `.claude/` und
+`.opencode/`.
 
 Schlägt das Nachziehen fehl, bleibt das Update gültig: der Pull ist durch, und die
 Verlinkung lässt sich über die Assistenten-Karte nachholen.
@@ -2353,7 +2379,9 @@ als Unterpunkt unter Setup, `/mcp` nicht.
 **Status** ist die Startseite: wer die Oberfläche öffnet, soll sehen, wie es um das Projekt
 steht, und nicht eine Einrichtung, die in aller Regel längst erledigt ist. Oben steht das
 Statusfeld mit der Anbindung an die Kephalaion-Collection (`/api/kephalaion`, siehe
-„Kephalaion-Anbindung“); trägt sie nicht, steht der Einrichtungsschritt davor. Darunter
+„Kephalaion-Anbindung“); trägt sie nicht, steht der Einrichtungsschritt davor. Dann die
+Karte „Umgebung“ mit dem Report der Umgebungsprüfung (`/api/environment`, siehe
+„Umgebungsprüfung: `health`“). Darunter
 folgen die drei Workflow-Karten und zuunterst das Bild der Wissensablage. Eine eigene Route
 für die Seite selbst gibt es nicht. Ohne Projektkonfiguration leitet `/` nach
 `/setup` um: jede Quelle der Statusseite antwortete leer, und der Umschalter führt dann
@@ -2388,7 +2416,7 @@ Setup-Seite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
 
 Setup hat seit der MCP-Server-Übersicht ebenfalls einen Unterpunkt, **MCP-Server** unter
 `/mcp-servers`. Die Seite vertieft keine Karte, sondern ist eine eigene Sicht auf das
-Projekt: alle Server der drei Assistenten in einer Matrix. Ihre Detailseiten
+Projekt: alle Server beider Assistenten in einer Matrix. Ihre Detailseiten
 `/mcp-servers/{assistant}/{name}` laufen unter demselben Unterpunkt — er ist bei jedem
 Pfad unter `/mcp-servers` aktiv, `aria-current="page"` führt nur die Übersicht selbst.
 `/mcp` bekommt keinen Unterpunkt: dorthin führen die Karte der Setup-Seite und die
@@ -2799,6 +2827,17 @@ Derselbe Verweis passt in jede Karte, die eine mitgelieferte Datei erklärt.
 Offen heißt bei Tasks: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte
 liegen in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine
 Aufgabe und steht nicht in der Liste der offenen.
+
+Die Todo-Seite liest und schreibt seit Task 097 die Kephalaion-Collection über dieselbe
+Fachlogik wie `k-playbook todo` (`project/todos.go`): Eingabefeld zum Anlegen
+(`POST /api/todos`), je Eintrag ein Knopf zum Abhaken bzw. Wiederöffnen
+(`POST /api/todos/{id}/done|reopen`) und eine eigene Karte „Suchen“
+(`GET /api/todos/search`), die offene und erledigte Treffer in einer Liste zeigt. Den
+Zustand sagt `code`: bei `kephalaion_unavailable` steht „Kephalaion nicht erreichbar“
+statt einer leeren Liste, und das Eingabefeld ist gesperrt; eine Ablehnung wie
+`todos_not_migrated` erscheint unter dem Eingabefeld, `hint` über der Liste. Nach jeder
+Änderung lädt die Seite die offenen, die schon geholten erledigten und eine laufende
+Suche neu.
 
 Jede Seite hat wieder ihr eigenes Skript: `tasks.js`, `reviews.js`, `todos.js`. Solange
 die drei Herkünfte eine Seite teilten, mussten sie sich `elements`, `load` und `render`
@@ -3231,6 +3270,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | Methode | Pfad | Zweck |
 |---|---|---|
 | `GET` | `/api/health` | Lebenszeichen des Fensters; antwortet mit Schlüssel, Version, Build-Kennung und PID des Servers |
+| `GET` | `/api/environment` | Umgebungsprüfung: der Report von `health.Check` unter `health` (`{ok, problems}`), derselbe wie `k-playbook health --json` und `k_playbook_health`; `available: false` ohne Projekt; nimmt keinen Wert aus der Anfrage, repariert nichts, kein Zwischenspeicher |
 | `POST` | `/api/shutdown` | Dienst beenden, für alle Fenster |
 | `GET` | `/api/config` | Anker suchen bzw. Ort vorschlagen |
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
@@ -3240,10 +3280,10 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
 | `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
-| `GET` | `/api/mcp` | MCP-Registrierung der drei Assistenten prüfen |
+| `GET` | `/api/mcp` | MCP-Registrierung beider Assistenten prüfen |
 | `POST` | `/api/mcp` | Registrierung herstellen; fremde Einträge bleiben unberührt |
 | `GET` | `/api/mcp/tools` | Werkzeug-Selbsttest: startet den registrierten Befehl als Subprozess |
-| `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json`, `opencode.json[c]` und `.cursor/mcp.json`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien; bei unlesbarer Pflichtliste `ok=false` und `requiredError` |
+| `GET` | `/api/mcp-servers` | alle MCP-Server aus `.mcp.json` und `opencode.json[c]`, dazu `tools.mcp.required` und die Lücken darin; liest nur Dateien; bei unlesbarer Pflichtliste `ok=false` und `requiredError` |
 | `GET` | `/api/mcp-servers/{assistant}/{name}[?file=…]` | Konfiguration eines Servers; `file` wählt unter gleichnamigen Einträgen (nur Vergleich mit `entry.file`); 404, wenn nichts passt; `requiredError` und `entry.required: null` bei unlesbarer Pflichtliste; startet nichts |
 | `POST` | `/api/mcp-servers/{assistant}/{name}/probe[?file=…]` | Messung: startet das konfigurierte Kommando als Subprozess; `started` nur, wenn ein Prozess lief; remote und unknown antworten ohne Start; gescheiterte Folgeanfragen als Hinweis in `message`; je Servername serialisiert; 404 wie beim GET |
 | `GET` | `/api/vscode` | Zustand der VS-Code-Erweiterung: eingebettete Fassung, Installationen aus `extensions.json`, die CLI, die ein Versuch jetzt nähme, und der letzte selbsttätige Nachzug dieses Dienstes; rein lesend, installiert nichts |
@@ -3279,8 +3319,11 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
 | `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
-| `GET` | `/api/todos` | offene Todos aus `data/todos.json` auflisten, read-only; migriert beim ersten Zugriff und meldet eine zurückgebliebene Markdown-Ablage in `hint` |
-| `GET` | `/api/todos/done` | abgehakte Todos auflisten, read-only |
+| `GET` | `/api/todos` | offene Todos aus der Kephalaion-Collection (`todos/`) auflisten; `code` `kephalaion_unavailable`, wenn Kephalaion nicht erreichbar ist; `hint` meldet ein nicht übernommenes `data/todos.json` oder eine zurückgebliebene `TODO.md` |
+| `GET` | `/api/todos/done` | abgehakte Todos (`todos/done/`) auflisten |
+| `GET` | `/api/todos/search?q=` | offene und erledigte Todos, deren Text `q` enthält (Groß- und Kleinschreibung egal) |
+| `POST` | `/api/todos` | ein Todo anlegen (`{"text", "origin"}`); Antwort `{ok, todo, code, message, hint}`, abgelehnt etwa mit `todos_not_migrated` |
+| `POST` | `/api/todos/{id}/done`, `/api/todos/{id}/reopen` | ein Todo abhaken bzw. wieder öffnen, Antwort wie beim Anlegen |
 | `GET` | `/api/chat/status` | ob der OpenCode-Dienst erreichbar, bereit und hier benutzbar ist, mit Adresse, Version, Projektverzeichnis, ob ein Passwort mitgeht und ob ein Container erkannt wurde; `blocked` und `hint`, wenn keiner benutzbar ist; read-only |
 | `GET` | `/api/chat/sessions` | oberste Sitzungen des Projekts beim Dienst, über `GET /session?roots=true&limit=50` |
 | `POST` | `/api/chat/sessions` | Sitzung anlegen, optional mit `title` |
@@ -3316,6 +3359,60 @@ nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Buil
 Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST
 /api/client-gone` gibt es nicht mehr; der Server endet nicht mehr mit dem Fenster.
 
+## Umgebungsprüfung: `health`
+
+`k-playbook health [--json]` nennt Fehler und Warnungen über die Umgebung des Projekts,
+`k_playbook_health` ist die MCP-Hülle darüber, und das Briefing trägt denselben Report als
+Abschnitt `health` (Fassung 4, Task 098). Alle drei rufen `health.Check` in
+`internal/health/`. Der Report hat `ok` — falsch, sobald ein Eintrag die Stufe `error` trägt;
+Warnungen lassen es wahr — und `problems`, je Eintrag `level`, `area`, `message` und `hint`,
+sortiert nach Bereich, dann Stufe, dann Satz. Die Prüfung bricht nicht beim ersten Problem
+ab, repariert nichts, und kein Eintrag nennt einen Token oder einen Wert aus einer Datei; der
+Eintrag zur unlesbaren `version-sources.yaml` nennt darum den Pfad, nicht die Meldung des
+Lesers, die eine Zeile der Datei zitieren kann (die steht weiter in
+`context.versionSources.error`).
+
+Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Register` und
+`Check`. Jede Quelle hängt sich mit `Register` ein; die vier heutigen — Kephalaion-Anbindung
+(eingetragen, aber nicht `ok`: `error`; nicht eingetragen: `warning`), gh (vorausgesetzt,
+aber nicht nutzbar: `warning`; unbekannter Wert in `tools.gh.status`: `error`),
+Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
+Quellenkonfiguration des Versionsinventars (da, aber unlesbar: `error`) — stehen in
+`project/health.go` und werden beim Laden des Pakets `project` registriert. Der Umweg ist
+der Importzyklus: Die Quellen lesen aus `project` (`GHState`, `DetectBaseTools`,
+`readVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
+darf `health` `project` nicht importieren. Eine weitere Quelle — als Nächstes die persönliche
+GitHub-Datei `~/.config/k-playbook/github.yaml` — registriert sich genauso, ohne dass
+Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet Felder der Kontextausgabe
+(`kephalaion`, `gh`, `baseTools`, `versionSources`), ersetzt aber keines; der Abbau der
+Kontextausgabe ist ein anderer Schritt.
+
+Im Klartext des Briefings steht der Block unmittelbar nach dem Text der immer geltenden
+Anweisungen und vor „Auf Abruf“, damit die Sitzung ihn liest, bevor sie etwas tut: ohne
+Problem die eine Zeile `Umgebung: keine Probleme`, sonst `Umgebung:` und je Eintrag
+`  [stufe] bereich: satz — abhilfe` (`healthText` in `cmd/k-playbook/health.go`, dieselbe
+Funktion für `k-playbook health`). Was die Sitzung damit tut, sagt
+`defaults/instructions/always/030-briefing.md`: in der ersten Antwort nennen, Fehler vor der
+Arbeit, nichts still beheben, die Abhilfe aus `hint` anbieten. Exit-Codes des Subkommandos:
+0 ohne Fehler, 1 mit mindestens einem Fehler, 2 bei Aufruffehlern — über `exitError` in
+`main.go`, das ohne Text schweigt und nur den Code setzt, weil die Liste schon auf stdout
+steht. `k-playbook briefing` endet auch mit Fehlern in `health` mit 0: Das Briefing meldet,
+es urteilt nicht. Der Vertrag steht in [`../../docs/mcp.md`](../../docs/mcp.md#health-contract).
+
+**In der Oberfläche.** Die Statusseite zeigt denselben Report in der Karte „Umgebung“
+(`static/status.html`, `loadEnvironment()` in `status.js`), geholt von `GET /api/environment`
+(`webui/environment.go`). Die Antwort ist `{available, health: {ok, problems}}` — der Report
+unter `health` wie beim MCP-Werkzeug, weil sein `ok` (keine Fehler) ein anderes ist als
+`available` (es gibt ein Projekt); ohne Projektkonfiguration fehlt er. Ohne Problem bleibt die
+Liste leer und im Meldungsfeld steht eine Zeile; sonst je Eintrag die Stufe als `.pill`
+(`Fehler`, `Warnung`), der Bereich als Beschriftung (`.environment-area`, in
+`styleLabelClasses`), der Satz und die Abhilfe. Die Marke der Karte zählt (`2 Fehler, 1
+Warnung`) und färbt darüber den Punkt im Blockmenü. Der Pfad heißt bewusst nicht
+`/api/health`: Der ist das Lebenszeichen des Fensters (§„Im Server“ unter dem GUI-Prozess),
+das jedes offene Fenster alle zehn Sekunden ruft und das billig bleiben muss;
+die Umgebungsprüfung fragt den Kephalaion-Node. Die Oberfläche rechnet nichts nach und
+repariert nichts; was ein Eintrag sagen darf, entscheidet das Paket `health`.
+
 ## Der MCP-Server
 
 `k-playbook mcp` bietet den aufgelösten Arbeitsstand einem Assistenten als Werkzeug an,
@@ -3333,7 +3430,8 @@ Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_d
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
 `k-playbook doc`, `k_playbook_briefing` (`briefing.go`) um `project.BuildBriefing`, wie
-`k-playbook briefing`, und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
+`k-playbook briefing`, `k_playbook_health` (`health.go`) um `health.Check`, wie
+`k-playbook health` (§„Umgebungsprüfung: `health`"), und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
 `k-playbook gui status` (§„Zustand erfragen: `gui status`"), und `k_playbook_notify` (`notify.go`) um
 `notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
@@ -3448,12 +3546,11 @@ irgendwo ein Fehler auftaucht.
 
 `project/mcp.go` ist der vierte Einrichtungspunkt neben der Verlinkung, nach demselben
 Muster: `CheckMCP()` misst, `ApplyMCP()` stellt her, `MCPStatus` trägt Zustand und
-Detailtext. Drei Ziele, zwei Schemata:
+Detailtext. Zwei Ziele, zwei Schemata:
 
 | Assistent | Datei | Schlüssel | Form |
 |---|---|---|---|
 | Claude Code | `.mcp.json` | `mcpServers` | `{"command": …, "args": ["mcp"]}` |
-| Cursor | `.cursor/mcp.json` | `mcpServers` | dasselbe |
 | OpenCode | `opencode.json` oder `opencode.jsonc` | `mcp` | `{"type": "local", "command": […, "mcp"], "enabled": true}` |
 
 Bei OpenCode ist `command` ein **Array** aus Kommando und Argumenten, nicht zwei Felder.
@@ -3607,12 +3704,12 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   Oberfläche erscheint.
 - **Symlink auf dem Weg** (`mcpTargetViaSymlink()`): Führt der Weg vom Hauptverzeichnis
   zur Zieldatei über einen Link, ergänzt der Start nichts und legt nichts an. Das gilt
-  für die Zieldatei selbst, auch als toten Link, und für ein verlinktes
-  Assistenten-Verzeichnis. Geprüft werden per `os.Lstat` nur die Bestandteile unterhalb
+  für die Zieldatei selbst, auch als toten Link, und für ein verlinktes Verzeichnis auf
+  dem Weg dorthin. Geprüft werden per `os.Lstat` nur die Bestandteile unterhalb
   des Hauptverzeichnisses, ein Projekt unter einem verlinkten Pfad wie `~/dev` → `/mnt/…`
   läuft normal. Ohne diese Prüfung schriebe der Start ins Linkziel, gemessen würde aber
-  der Pfad des Links: Ein ignorierter Link `.cursor/mcp.json` auf die erfasste
-  `.mcp.json` ergab `ls-files` Exit 1 und danach ` M .mcp.json`. **Überspringen statt
+  der Pfad des Links: Ein ignorierter Link auf eine erfasste `mcp.json` ergab `ls-files`
+  Exit 1 und danach ` M` an der erfassten Datei. **Überspringen statt
   auflösen:** Ein Link auf eine MCP-Datei ist eine bewusste Einrichtung des Projekts, und
   die übergeht der Start nicht. Beim Auflösen kämen neue offene Fragen hinzu: ein Ziel
   außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
@@ -3623,11 +3720,11 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
   `os.WriteFile` schreibt in denselben Inode.
 - **Spur des Assistenten** (`assistantTrace()`): eine fehlende Datei entsteht nur, wenn
-  das Assistenten-Verzeichnis — `.claude/`, `.cursor/`, `.opencode/` — mindestens einen
-  Eintrag trägt, der keiner der von `Links()` verwalteten Pfade ist, etwa
-  `.claude/settings.json` oder `.cursor/rules/`. Die Verzeichnisse selbst sind keine
-  Spur: `ApplyLinks()` legt sie in jedem Projekt an, schon auf dem Lesepfad. Ohne die
-  Bedingung entstünden bei jedem Start drei Dateien, die niemand braucht. Ein fehlender
+  das Assistenten-Verzeichnis — `.claude/`, `.opencode/` — mindestens einen Eintrag
+  trägt, der keiner der von `Links()` verwalteten Pfade ist, etwa `.claude/settings.json`
+  oder eine eigene Datei unter `.opencode/`. Die Verzeichnisse selbst sind keine Spur:
+  `ApplyLinks()` legt sie in jedem Projekt an, schon auf dem Lesepfad. Ohne die
+  Bedingung entstünden bei jedem Start zwei Dateien, die niemand braucht. Ein fehlender
   Eintrag in vorhandener Datei braucht keine Spur.
 - **Form beim Ersetzen** (`mcpRepairCommand()`): Erst wenn feststeht, dass geschrieben
   wird und der vorgefundene Eintrag veraltet ist, legt `applyMCPTarget()` das Kommando
@@ -3755,7 +3852,7 @@ das er nicht kann, brächte eine Fehlerantwort, und die sähe aus wie ein Ausfal
 ## MCP-Server in der Oberfläche
 
 `/mcp` zeigt den eigenen Server. `/mcp-servers` zeigt **alle**: eine Matrix der
-Servernamen gegen Claude Code, OpenCode und Cursor, die Pflichtliste aus
+Servernamen gegen Claude Code und OpenCode, die Pflichtliste aus
 `tools.mcp.required` mit ihren Lücken und die gelesenen Dateien. Jede Zelle führt zur
 Detailseite `/mcp-servers/{assistant}/{name}` mit der Konfiguration des Eintrags und, auf
 Knopfdruck, dem, was der Server anbietet: Name, Version, Protokoll, Capabilities,
@@ -3765,7 +3862,7 @@ Werkzeuge mit Parametern, bei Bedarf Vorlagen und Ressourcen.
 list` existieren, liefern aber nur Text ohne Vertrag — keine JSON-Option, Box-Zeichen und
 Farbcodes bei OpenCode —, brauchen je zwei bis drei Sekunden, weil sie jeden Server
 anpingen, und sagen nicht, ob ein Eintrag aus der globalen oder der Projektkonfiguration
-stammt. `project/mcp_servers.go` liest deshalb dieselben drei Dateien, die `MCPTargets`
+stammt. `project/mcp_servers.go` liest deshalb dieselben beiden Dateien, die `MCPTargets`
 schon für die Registrierung kennt, mit demselben `readJSONObject` (JWCC, Kommentare und
 Trailing Commas erlaubt) und derselben `mcpSection`; neu ist nur, dass über alle Schlüssel
 gelaufen wird statt auf `k-playbook` zu filtern. Was ein Assistent global kennt —
@@ -3782,7 +3879,7 @@ sehen. Die Registrierung schreibt nur in eine und meldet die Doppelung
 `mcpListTargets()` hängt die zweite Datei an `MCPTargets()` an. Ein Server, der nur in der
 zweiten steht, wäre sonst unsichtbar.
 
-**Drei Transportformen, eine davon ist „weiß nicht".** Claude Code und Cursor notieren
+**Drei Transportformen, eine davon ist „weiß nicht".** Claude Code notiert
 `command`+`args` (lokal) oder `type: http|sse`+`url` (remote); OpenCode `type: local` mit
 `command`-Array oder `type: remote` mit `url`, dazu `enabled` (fehlt → true). Alles, was
 in keine der beiden Formen passt, ist `unknown`: die Konfiguration wird gezeigt, wie sie
@@ -3791,7 +3888,7 @@ Tippfehler in einem Eintrag zum Ausfall der ganzen Seite; einer, der riete, star
 womöglich das Falsche. Eine unlesbare Datei hält die anderen ebenfalls nicht auf: ihr
 Zustand steht an der Datei, ihre Server fehlen.
 
-**`env` bleibt im Haus.** In `env` (Claude Code, Cursor) und `environment` (OpenCode)
+**`env` bleibt im Haus.** In `env` (Claude Code) und `environment` (OpenCode)
 stehen Tokens. `MCPServerEntry` hält sie in einem unexportierten Feld; ins JSON gehen nur
 die Schlüsselnamen (`envKeys`), und `Environ()` reicht die Werte ausschließlich an den
 Prozessstart der Messung. Ein Test kodiert die Liste und sucht nach dem Wert.
@@ -3997,7 +4094,7 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
 | `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs und den vorbelegten `.gitignore` | das Verzeichnis ganz fehlt |
-| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `.cursor/mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
+| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
 | `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; die abgelösten Zusatzblöcke Session-Memory und Befunde; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
@@ -4011,7 +4108,7 @@ außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„In
 Jeder Weg ist idempotent — ein zweiter Lauf schreibt
 nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas
 geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `ContextForDir()`
-heilt ausschließlich Symlinks unter `.claude/`, `.opencode/` und `.cursor/`; Dateien im
+heilt ausschließlich Symlinks unter `.claude/` und `.opencode/`; Dateien im
 Projekt anzulegen darf nicht bei jedem Command-Aufruf einer KI-Sitzung passieren, der
 ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttätig läuft
 und warum — gh-Entscheidung, Remediation-Modus, Update, Privat-Schalter, Tool-Installation,

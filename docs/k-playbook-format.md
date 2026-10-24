@@ -215,8 +215,8 @@ Its output lists the merged catalogs with the origin of each entry: `dist`,
 state](#the-resolved-working-state).
 
 Because commands and skills come from two sources, assistant destinations,
-`.claude/commands`, `.claude/skills`, `.opencode/commands`, and
-`.cursor/commands`, are real directories with **one symlink per entry**, not a
+`.claude/commands`, `.claude/skills`, and `.opencode/commands`, are real
+directories with **one symlink per entry**, not a
 directory symlink: it would point at exactly one source.
 
 ### What exists only once
@@ -583,7 +583,7 @@ decision applies to `github.com`.
 | `required` | list of strings | MCP server names the project expects in every assistant |
 
 Which MCP servers the project requires -- by the key under which they appear in
-`.mcp.json`, `opencode.json`, and `.cursor/mcp.json`. Both YAML list forms are
+`.mcp.json` and `opencode.json`. Both YAML list forms are
 read: block form with dashes and flow form `[k-playbook, atlassian]`. Names
 must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; any other name stops `context`, as
 an invalid language name does. The interface does not stop: the **/mcp-servers**
@@ -595,7 +595,7 @@ inside `mcp` is not the list.
 The block is optional. Without it, nothing is required and `context` reports
 `mcp.configured: false`; the **/mcp-servers** page of the interface then shows
 a snippet to copy. With it, the page marks every required name that is missing
-in one of the three assistant files. Nothing writes this block: it is edited by
+in one of the two assistant files. Nothing writes this block: it is edited by
 hand.
 
 ### `git`
