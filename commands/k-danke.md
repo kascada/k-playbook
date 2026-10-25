@@ -1,7 +1,7 @@
 ---
-description: Schließt eine Arbeitssitzung ab - legt die festgehaltenen Befunde vor, befördert Bestätigtes in die Dokumentation, sichert Betriebswissen und prüft, ob die Doku nachzuziehen ist. Nimmt kein Argument.
+description: Schließt eine Arbeitssitzung ab - legt die Befunde der Sitzung vor, trägt Fehlendes nach, lässt den Nutzer entscheiden, was aus ihnen werden soll, und prüft, ob die Doku nachzuziehen ist. Nimmt kein Argument.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
+allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__read, mcp__kephalaion__write]
 ---
 
 # k-danke
@@ -23,36 +23,22 @@ Er ist bewusst als **ein** Command angelegt, der wächst: welche Abschlussschrit
 richtet sich nach dem, was die Sitzung tatsächlich getan hat.
 
 Produces:
-- Ergänzungen in `k-playbook-local/material/befunde/<slug>.md` — was noch nicht
-  festgehalten war.
-- Nach Bestätigung: einen Eintrag in `k-playbook-local/guidelines/fallen.md` oder eine
-  projekteigene Regel unter `k-playbook-local/rules/`.
+- Nachgetragene Befunde in `keph:/queue/findings/`, mit `entstanden: k-danke`.
+- Nach Bestätigung: das Feld `ziel` in den Befunden dieser Sitzung.
 
-Nach `k-playbook-local/docs/` schreibt dieser Command **nicht** selbst; dafür ruft er
-`/k-docs-extract` auf.
+Sonst schreibt dieser Command nichts. Was aus einem Befund mit gesetztem `ziel` wird —
+Wissen, Betriebsfalle, Regel —, erledigt die spätere Übernahme aus der Queue, nicht dieser
+Command.
 
-## Schritt 1 — Pfade auflösen
+## Schritt 1 — Voraussetzungen
 
-Aus der Context-Ausgabe:
-
-- `BEFUNDE_DIR = <local.dir>/material/befunde`
-- `BEFUNDE_DISPLAY_PATH = k-playbook-local/material/befunde`
-- `GUIDELINES_DIR = <local.dir>/guidelines`
-- `FALLEN_PATH = <GUIDELINES_DIR>/fallen.md`
-- `LOCAL_RULES_DIR = <local.dir>/rules`
-- `RESOLVED_DOCS_DIR = <local.dir>/docs` — nur zum Lesen, für den Abgleich.
-
-Command-specific policy:
-
-- `BEFUNDE_DIR` ist das Erzeuger-Verzeichnis der Regel `befunde.md`. Fehlt es, lege es
-  ohne Rückfrage an — vor dem ersten Befund ist das der Normalzustand.
-- Fehlt `GUIDELINES_DIR` oder `LOCAL_RULES_DIR`, frage, ob genau dieses Verzeichnis
-  angelegt werden soll oder ob `/k-gui` laufen soll. Beide gehören zur Struktur, die das
-  Einrichten anlegt. Kein Ersatzpfad, kein harter Abbruch.
-- **Verbindlich ist die Regel `befunde.md`** aus `catalogs.rules`. Sie enthält Anlässe,
-  Dateiformat, Anhänge- und Konfliktregel; dieser Command wiederholt sie nicht.
-- Geschrieben wird ausschließlich in `BEFUNDE_DIR`, `FALLEN_PATH` und `LOCAL_RULES_DIR`.
-  `docs/` gehört seinen Erzeugern, `docs/README.md` gehört `/k-docs-index`.
+- **Verbindlich ist `k-playbook:/instructions/on-demand/befunde.md`.** Lies sie mit
+  `k_playbook_doc_read`, bevor du einen Befund liest oder schreibst. Sie enthält Ablage, Kopf,
+  Rumpf und das Widerlegen; dieser Command wiederholt sie nicht.
+- `COLLECTION = kephalaion.address` aus der Context-Ausgabe.
+- Steht `kephalaion.ok` nicht auf `true`, sind die Befunde weder zu lesen noch zu schreiben.
+  Sag das ausdrücklich, führe nur Schritt 6 aus und gib in Schritt 7 die Befunde, die
+  festzuhalten wären, vollständig im Text wieder.
 
 ## Schritt 2 — Bestimmen, was diese Sitzung getan hat
 
@@ -70,20 +56,25 @@ Dieser Schritt ist die Stelle, an der später weitere Abschlussarten andocken.
 
 ## Schritt 3 — Befunde vorlegen
 
-Lies die Dateien in `BEFUNDE_DIR`, deren Abschnitte die Kennung dieser Sitzung tragen, und
-zeige sie verdichtet — eine Zeile je Befund, nicht den Volltext:
+Die Kennung dieser Sitzung ist das Feld `session` des Briefings (im Klartext die Zeile
+`Sitzung:`). Wurde das Briefing in dieser Sitzung mehrmals geladen, gehören alle seine
+Kennungen dazu. Hole mit `k_playbook_doc_list`, Sorte `findings`, die offenen Befunde. Lies
+die, die du selbst angelegt hast, mit `k_playbook_doc_read` und behalte die, deren `sitzung`
+eine dieser Kennungen trägt. Zeige sie verdichtet — eine Zeile je Befund, nicht den Volltext:
 
 ```text
 /k-danke — in dieser Sitzung festgehalten
 ─────────────────────────────────────
-  importlauf-bricht-ab.md
-    [bestaetigt]   Abbruch kommt aus dem Timeout des Vorlaufs, nicht aus dem Parser
-    [widerlegt]    Es liegt nicht an der Zeichenkodierung
-  rechteproblem-cache.md
-    [unbestaetigt] Der Cache wird vermutlich zweimal angelegt
+  Importlauf bricht ab
+    012  [bestaetigt]   Abbruch kommt aus dem Timeout des Vorlaufs, nicht aus dem Parser
+    013  [widerlegt]    Es liegt nicht an der Zeichenkodierung
+  Rechteproblem im Cache
+    014  [unbestaetigt] Der Cache wird vermutlich zweimal angelegt
 ```
 
-Gibt es keine Einträge, obwohl die Sitzung analysiert hat, sage das ausdrücklich — es ist
+Gruppiert wird nach `thema`, die Zahl ist die Nummer des Dokuments.
+
+Gibt es keine Befunde, obwohl die Sitzung analysiert hat, sage das ausdrücklich — es ist
 der häufigste Fehlerfall, nicht ein leeres Ergebnis.
 
 ## Schritt 4 — Nachtragen, was fehlt
@@ -95,38 +86,38 @@ Achte besonders auf das, was am leichtesten verlorengeht:
 - Thesen, die sich als **falsch** erwiesen haben.
 - Der Grund, **warum** etwas so gebaut ist, wenn er erkennbar wurde.
 
-Trage Fehlendes nach — Format und Anhängeregel stehen in `befunde.md`. Ohne Rückfrage,
-aber melde je Datei eine Zeile.
+Trage Fehlendes als neue Befunde nach, mit `entstanden: k-danke`. Ohne Rückfrage, aber
+melde je Befund eine Zeile. Vorhandene Befunde werden dabei nicht geändert.
 
 Ist der Kontext dieser Sitzung bereits komprimiert worden, sage das: dann ist das
 Nachtragen unvollständig, und das ist ein Befund für den Nutzer.
 
-## Schritt 5 — Gelerntes einordnen
+## Schritt 5 — Ziel erfragen
 
 Frage **gebündelt**, in einem Zug, und schreibe nichts vorher:
 
 ```text
-Was davon soll dauerhaft festgehalten werden?
+Was soll aus diesen Befunden werden?
 
-  Projektwissen → Dokumentation
-    - Abbruch kommt aus dem Timeout des Vorlaufs         [ja | nein]
-
-  Betriebsfalle → guidelines/fallen.md
-    - Der Integrationstest läuft ohne Netz durch und sagt nichts aus   [ja | nein]
-
-  Prüfbare Regel → rules/
-    - Vor jedem Lauf die Rechte des Zielverzeichnisses prüfen          [ja | nein]
+  012  Abbruch kommt aus dem Timeout des Vorlaufs        [wissen | falle | regel | verwerfen | offen]
+  013  Es liegt nicht an der Zeichenkodierung            [wissen | falle | regel | verwerfen | offen]
+  014  Der Cache wird vermutlich zweimal angelegt        [wissen | falle | regel | verwerfen | offen]
 ```
 
-- **Projektwissen** wird nicht hier geschrieben, sondern in Schritt 7 über
-  `/k-docs-extract` befördert.
-- **Betriebsfalle** heißt: was man wissen muss, **bevor** man handelt. Anhängen an
-  `FALLEN_PATH`; existiert die Datei nicht, lege sie mit einer H1 und einem Einleitungssatz an.
-- **Prüfbare Regel** heißt: was jedes Mal zu geschehen hat. Eine Datei unter
-  `LOCAL_RULES_DIR`, aufgebaut wie die mitgelieferten Regeln.
+- **wissen** — Projektwissen für die Wissensablage.
+- **falle** — was man wissen muss, **bevor** man handelt.
+- **regel** — was jedes Mal zu geschehen hat.
+- **verwerfen** — nicht übernehmen.
+- **offen** — jetzt nicht entscheiden; `ziel` bleibt leer.
 
-Beide wirken dauerhaft und kosten künftige Sitzungen Aufmerksamkeit — deshalb nur nach
-ausdrücklicher Bestätigung, und im Zweifel lieber nicht.
+Schlage je Befund ein Ziel vor. Fallen und Regeln wirken dauerhaft und kosten künftige
+Sitzungen Aufmerksamkeit — schlage sie deshalb nur vor, wenn es klar ist, und im Zweifel
+`wissen`.
+
+Für jede Antwort außer `offen` setze `ziel` im Kopf des Befunds: lies ihn mit Kephalaion
+`read`, ändere nur diese Zeile und schreibe ihn mit `write` und `base_revision` aus dem
+`read` zurück. Antwortet `write` mit `stale_revision`, lies neu und versuche es einmal
+wieder.
 
 ## Schritt 6 — Doku nachziehen
 
@@ -142,45 +133,39 @@ Bleibt danach etwas offen, nenne es beim Abschluss, statt es still zu lassen.
 
 Kompakte Zusammenfassung:
 
-- Geschriebene und ergänzte Dateien unter `BEFUNDE_DISPLAY_PATH`, mit Dateinamen.
-- Was nach `fallen.md` oder `rules/` ging — oder ausdrücklich: nichts.
-- Ergebnis der Docs-Prüfung, mit offenen Punkten.
+- Die Befunde dieser Sitzung mit Nummer, davon die in Schritt 4 nachgetragenen.
 - Verteilung `bestaetigt` gegen `unbestaetigt` gegen `widerlegt`.
+- Verteilung der gesetzten `ziel` — oder ausdrücklich: keines gesetzt.
+- Ergebnis der Docs-Prüfung, mit offenen Punkten.
 
-Wurde in Schritt 5 Projektwissen zur Beförderung bestätigt, nenne als Folge-Command
-**`/k-docs-extract befunde`** — er verdichtet das Rohmaterial über die Wissenswerkzeuge nach
-`k-playbook-local/knowledge/extracted/` und hat dafür sein eigenes Bestätigungs-Gate. Die
-neuen Dokumente findet die Wissenssuche sofort; einen Lauf von `/k-docs-index` brauchen sie
-dafür nicht.
-
-Wurde nichts befördert, sage ausdrücklich, dass kein Folge-Command ansteht und die
-Sitzung abgeschlossen ist.
+Danach ist die Sitzung abgeschlossen. Einen Folge-Command gibt es nicht: die Befunde
+warten in `keph:/queue/findings/` auf die Übernahme.
 
 ## Fehlerfälle
 
-- `BEFUNDE_DIR` fehlt und die Sitzung hat nichts analysiert → kein Fehler. Sagen und
-  ohne Schritt 3 bis 5 weitermachen.
-- `BEFUNDE_DIR` ist leer, obwohl analysiert wurde → ausdrücklich melden und in Schritt 4
-  vollständig nachtragen. Nicht stillschweigend übergehen.
+- Kephalaion ist nicht erreichbar → sagen, nur Schritt 6 ausführen und die festzuhaltenden
+  Befunde vollständig im Abschluss wiedergeben. Nicht auf die Platte ausweichen.
+- Die Sitzung hat nichts analysiert → kein Fehler. Sagen und ohne Schritt 3 bis 5
+  weitermachen.
+- Keine Befunde dieser Sitzung, obwohl analysiert wurde → ausdrücklich melden und in
+  Schritt 4 vollständig nachtragen. Nicht stillschweigend übergehen.
 - Der Sitzungskontext wurde komprimiert → melden, dass das Nachtragen unvollständig sein
   kann, und trotzdem festhalten, was noch da ist.
-- `GUIDELINES_DIR` oder `LOCAL_RULES_DIR` fehlt → fragen, ob genau dieses Verzeichnis
-  angelegt werden soll, oder `/k-gui` nennen.
-- Eine Befund-Datei wurde seit dem Lesen von außen verändert → Konfliktregel aus
-  `befunde.md` anwenden, Zweitdatei anlegen und das ausdrücklich melden.
-- Der Nutzer bestätigt in Schritt 5 nichts → nichts schreiben und das im Abschluss sagen.
+- `write` antwortet beim Setzen von `ziel` zweimal mit `stale_revision` → den Befund
+  nennen und `ziel` dort offen lassen.
+- Der Nutzer entscheidet in Schritt 5 nichts → kein `ziel` setzen und das im Abschluss
+  sagen.
 
 ## Anti-Muster (nicht tun)
 
 - **Die Prüfung aus `/k-enforcement` nachbauen.** Sie kennt den zusammengeführten
   Regelkatalog; eine zweite Fassung läuft davon weg.
-- **Nach `docs/` oder `knowledge/` schreiben.** Auch wenn ein Befund dort thematisch
-  hinpasst: der Weg führt über `/k-docs-extract`, das die Herkunft und die Konfidenz
-  mitschreibt.
-- **Vor dem Gate in Schritt 5 schreiben.** Ein halb angelegter Eintrag aus einem
-  abgebrochenen Lauf sieht später aus wie bestätigtes Wissen.
-- **Alles nach `fallen.md` kippen.** Diese Datei wird künftig vor dem Handeln gelesen;
-  was dort ohne Not steht, kostet jede weitere Sitzung Aufmerksamkeit.
+- **Selbst übernehmen.** Nichts nach `docs/`, `knowledge/`, `guidelines/fallen.md` oder
+  `rules/` schreiben, auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
+- **`ziel` ohne Bestätigung setzen.** Der Vorschlag ist deiner, die Entscheidung gehört
+  dem Nutzer.
+- **Einen Befund umschreiben.** Außer `ziel` bleibt er, wie er geschrieben wurde; was
+  fehlt, ist ein neuer Befund.
 - **Die Sitzung zusammenfassen.** Dieser Command sammelt Befunde ein, er schreibt kein
   Protokoll. Was nichts erklärt, gehört nicht hinein.
 - **Bei leerem Ergebnis so tun, als sei alles gut.** Eine Analyse-Sitzung ohne einen

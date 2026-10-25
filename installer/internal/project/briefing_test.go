@@ -6,8 +6,10 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
@@ -188,6 +190,40 @@ func TestBriefingOhneVerzeichnisse(t *testing.T) {
 		if list == nil || len(list) != 0 {
 			t.Errorf("%s: %v, erwartet leere Liste", name, list)
 		}
+	}
+}
+
+// Die Sitzungskennung vergibt das Briefing selbst, je Aufruf neu: Zeitpunkt
+// des Briefings und sechs Zeichen Zufall. Sie hängt nicht an Kephalaion —
+// auch ohne nutzbare Collection hat die Sitzung eine Kennung.
+func TestBriefingVergibtSitzungskennung(t *testing.T) {
+	root := newContextProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	fixed := time.Date(2026, 10, 24, 18, 30, 12, 0, time.Local)
+	previous := now
+	now = func() time.Time { return fixed }
+	t.Cleanup(func() { now = previous })
+
+	first, err := BuildBriefing(context.Background(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	second, err := BuildBriefing(context.Background(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	pattern := regexp.MustCompile(`^20261024-183012-[0-9a-f]{6}$`)
+	for _, session := range []string{first.Session, second.Session} {
+		if !pattern.MatchString(session) {
+			t.Errorf("session %q passt nicht zu %s", session, pattern)
+		}
+	}
+	// Dieselbe Sekunde, zwei Briefings: der Zufall hält sie auseinander.
+	if first.Session == second.Session {
+		t.Errorf("zwei Briefings mit derselben Kennung %q", first.Session)
+	}
+	if first.Work.Available {
+		t.Errorf("Collection wider Erwarten nutzbar: %+v", first.Work)
 	}
 }
 
@@ -565,8 +601,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "4" {
-		t.Errorf("schemaVersion %q, erwartet 4", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "5" {
+		t.Errorf("schemaVersion %q, erwartet 5", briefing.SchemaVersion)
 	}
 	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
 		t.Errorf("health ohne Probleme: %+v", briefing.Health)

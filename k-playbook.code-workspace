@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "Keph vm:k-playbook",
+			"uri": "keph://vm/k-playbook"
+		},
+		{
+			"name": "Keph vm:k-playbook-dev",
+			"uri": "keph://vm/k-playbook-dev"
+		}
+	],
+	"settings": {}
+}

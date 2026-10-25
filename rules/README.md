@@ -6,7 +6,6 @@ Globale Regeln liegen hier im Repo. Projektlokale Regeln liegen im jeweiligen Zi
 
 ## Dateien
 
-- `befunde.md` - Regel: Erkenntnisse aus Analyse und Fehlersuche festhalten.
 - `design-entscheidungen.md` - Regel: Entscheidungen, die vom Zweck abhängen, trifft der Nutzer.
 - `command-authoring.md` - Regeln für neue oder geänderte Command-Dateien.
 - `review-authoring.md` - Regeln für neue oder geänderte Review-Rezepte.

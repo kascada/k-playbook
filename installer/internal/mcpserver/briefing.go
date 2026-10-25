@@ -42,7 +42,8 @@ func addBriefingTool(server *mcp.Server) {
 		Description: "Das Briefing zu Beginn einer Sitzung: was für dieses Projekt gilt und was ansteht. " +
 			"documents.always.content ist der Text der immer geltenden Anweisungen k-playbook:/instructions/always/, " +
 			"zusammengebaut wie bei k_playbook_doc_read — lies ihn zuerst, er ist der einzige Inhalt im Briefing; " +
-			"alles Weitere sind Verweise im Präfixschema, keine Pfade. documents: always (ref, content, parts), " +
+			"alles Weitere sind Verweise im Präfixschema, keine Pfade. session: die Kennung dieser Sitzung, je Aufruf " +
+			"neu vergeben — sie steht in allem, was die Sitzung später wiederfinden muss, etwa im Kopf eines Befunds. documents: always (ref, content, parts), " +
 			"onDemand, rules, reviews, guidelines — lokal und " +
 			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +

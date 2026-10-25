@@ -199,9 +199,58 @@ service per block, or one service when named; it prints what the file says, reso
 included, and nothing the file does not contain. Both create the template when the file is
 missing, as described above.
 
-Exit codes: `0` no problems, `1` at least one problem, `2` usage error. `--json` prints the
-configuration together with the `problems` list; the shape of the JSON is the shape of this
-page's tables and is fixed by the tests.
+Exit codes: `0` no problems, `1` at least one problem, `2` usage error. The one-time
+warning about a freshly created template does not change the exit code: a created file is a
+state to resolve, not a broken one.
+
+### JSON
+
+`--json` is for readers that must not parse text: an AI session and the interface. `check
+--json` prints this, here for a file with one problem:
+
+```json
+{
+  "file": "/home/alice/.config/k-playbook/github.yaml",
+  "created": false,
+  "services": {
+    "website": {
+      "repo": "acme/website",
+      "access": [
+        { "type": "gh", "login": "alice" }
+      ]
+    },
+    "backend": {
+      "repo": "acme-labs/backend",
+      "access": [
+        { "type": "ssh", "key": "/home/alice/.ssh/id_ed25519_acme_labs" },
+        { "type": "token", "file": "/home/alice/.config/github-tokens/acme-labs.token", "disabled": true }
+      ]
+    }
+  },
+  "problems": [
+    {
+      "level": "error",
+      "path": "services.backend.access[1]",
+      "message": "Der Pfad in file ist relativ.",
+      "hint": "Absoluten Pfad oder ~/… eintragen."
+    }
+  ]
+}
+```
+
+- `file` is the path that was read, after the override and `XDG_CONFIG_HOME` were applied.
+- `created` says whether this call wrote the template.
+- `services` mirrors the file: the same keys, `~` expanded, no comments, `disabled` only
+  where it is `true`. Services are in file order; the order of `access` is the precedence.
+  When the file could not be parsed, `services` is `{}`.
+- `problems` has `level` (`error`|`warning`), `path` (where in the file, `services.<name>` or
+  `services.<name>.access[<index>]`, `file` for the file as a whole), `message` and `hint`.
+  It is the same shape as an entry of the health check, so both are read the same way.
+  Messages and hints are German, like every other text k-playbook shows to people.
+
+`show --json` prints the same object without `problems`; with a service named, `services`
+holds only that one. Text and JSON carry the same information — nothing is only in one of
+them.
 
 The health check (Task 098) calls the same reader and lists its problems under the area
 `github`: structural problems as `error`, the one-time notice about a freshly created template

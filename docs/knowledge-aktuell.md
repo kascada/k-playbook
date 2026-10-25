@@ -304,6 +304,55 @@ itself, so after the takeover it is gone and `sources` has nothing left to point
 run moves it to the inbox first. Everything under `queue/` has no user area: `k_playbook_doc_list`
 ignores `user` there and takes the user from Kephalaion's `created.by`.
 
+**Writing the findings comes first, reading them later** (2026-10-24). The findings rule, the
+skill `befunde` and `/k-danke` are switched to `queue/findings/` on their own; the scheduled run
+that takes the entries over and `queue_list` for subdirectories follow as a step of their own.
+The switch does not wait for the `/k-docs-*` commands: they are outdated and are rebuilt in
+item 11 of the work list, so the step order of `docs/knowledge-layout.md` ("Migration") no
+longer binds the findings. With it the conflicts noted for the switch of the generators to
+`publish` on 2026-09-15 drop (`/k-docs-tools` updating tool by tool, the scope of
+`/k-docs-code`, `overlay-repo-analyse` writing into `code/`), and so does `/k-danke` handing
+over to `/k-docs-extract befunde`.
+
+The first step is built (2026-10-24, in the working tree, not yet measured in a session). The
+rule `rules/befunde.md` is gone; the format is an on-demand instruction,
+`k-playbook:/instructions/on-demand/befunde.md`, because it is guidance for writing a finding,
+not something `/k-enforcement` can check against a diff. `always/200-befunde-festhalten.md`
+names it, as `030-briefing.md` names `on-demand/briefing-felder.md`; the skill `ks-befunde` and
+`/k-danke` only point at it. The decisions behind it:
+
+- **One document per finding**, created with `k_playbook_doc_create` (kind `findings`) and
+  written once with Kephalaion `write`; nothing is appended. Related findings share the header
+  field `thema`, by which the takeover bundles them. A wrong finding is not changed; a new one
+  with `sicherheit: widerlegt` names the thesis in words.
+- **Findings are not referenced.** They wait for the takeover and disappear afterwards. What a
+  running effort needs as evidence goes into its workbench topic, what code needs into the
+  comment at the code.
+- **Header:** `title`, `thema`, `sicherheit`, `sitzung`, `entstanden` (`arbeit` or `k-danke`),
+  `ziel` — still German keys and no `type:`, so a finding never looks like a finished document.
+- **One kind, not two:** what `/k-danke` adds is an ordinary finding with `entstanden: k-danke`,
+  and the user's decision is the field `ziel` (`wissen`, `falle`, `regel`, `verwerfen`), set
+  only after confirmation. `/k-danke` no longer writes `guidelines/fallen.md`, `rules/` or
+  anything under `knowledge/`, and no longer hands over to `/k-docs-extract`; the takeover from
+  the queue acts on `ziel`. Until it exists, nothing reaches `fallen.md` or `rules/`.
+- **Without Kephalaion** the session does not fall back to the disk; it says so and gives the
+  finding in full in its answer.
+
+Step two moves the old findings in `material/befunde/` and the references to them (tasks, Go
+comments, docs). It is a conversion in `/k-upgrade` (`defaults/commands/k-upgrade.md`, step 3.1,
+written 2026-10-24), because judging what a finding is still worth needs the session, not the
+program: referenced findings become workbench topics and the references point there, the rest
+becomes workbench topics (something left to do), findings with `entstanden: migration` (only
+useful) or is dropped, each after the user confirms; processed files are deleted. Done tasks are
+not searched, their references stay as history. Until then `material/befunde/` stays as it is and is no longer written. The README text the
+setup writes into `material/` (`installer/internal/project/local.go`) and this repo's
+`material/README.md` say so since 2026-10-24; in an existing project, whose README the setup
+never rewrites, 3.1 replaces the old paragraph.
+The identifier for `sitzung` is the briefing's field `session` (briefing schema `"5"`,
+2026-10-24): k-playbook assigns it with every briefing, because only Claude Code puts one into
+the environment (`CLAUDE_CODE_SESSION_ID`) and OpenCode none (`OPENCODE`, `OPENCODE_PID` only,
+measured with `opencode run`).
+
 **Creating a named document** (2026-10-14, built 2026-10-15 — task 088, in the working tree). One procedure for tasks, findings and
 whatever needs it later: the caller passes the intended short name, k-playbook normalises it
 (lower case, hyphens), takes the highest number in the counting range plus one and creates
@@ -458,7 +507,7 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always.content` in the briefing is the text itself, already in reading order (since 2026-10-18); see the name clash below | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
 | `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
 | `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
-| `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; `k-playbook:/rules/befunde.md` resolves since task 086 | done (`NACHZIEHEN:` for the place `queue/findings/`) |
+| `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; the format since 2026-10-24 in `k-playbook:/instructions/on-demand/befunde.md` (was `k-playbook:/rules/befunde.md`) | done; the place is `queue/findings/` since 2026-10-24 |
 | — | how references are written and reached | `always/010-verweise.md` | done |
 
 **What remains as the minimal prompt.** The `anstoss` block in `AGENTS.md`, reworded at the
@@ -713,9 +762,12 @@ until the last step.
     `/k-danke` and the findings rule still write to the disk, and `k-playbook.md`, `AGENTS.md`
     and the context output do not mention the tools. Calling the MCP tools from an open session
     is a follow-up test after the next release. Still open: the rules for what goes where, the
-    scheduled run for `queue/findings/`, and `queue_list` for subdirectories.
+    scheduled run for `queue/findings/`, and `queue_list` for subdirectories. Next (2026-10-24):
+    the findings rule, the skill `befunde` and `/k-danke` write into `queue/findings/`; reading
+    the queue comes afterwards (see "Writing the findings comes first, reading them later").
 11. **Generators** — `/k-docs-*` write single documents into the project collection,
-    including the removal of stale ones.
+    including the removal of stale ones. The commands are outdated and get rebuilt here; the
+    six steps of `docs/knowledge-layout.md` ("Migration") are not carried out on them.
 12. **Delete the local files** — the old directories in the repo and the clone in the
     projects; setup, update and interface without `<project>/k-playbook/`.
 

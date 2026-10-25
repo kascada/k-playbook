@@ -98,7 +98,7 @@ from the output above — never from configuration, and never by searching.
 | hand-written documentation | `<local.dir>/docs/manual/` |
 | version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
 | raw material, never indexed | `<local.dir>/inbox/` — Quelle von `/k-docs-extract`; der bisherige Ort `<local.dir>/material/` wird bis Schritt 5 der Umstellung mitgelesen (`k-playbook/docs/knowledge-layout.md`, „Transitional reads“) |
-| findings from analysis and debugging | `<local.dir>/material/befunde/` — entsteht beim ersten Lauf von `/k-danke` oder des Skills `ks-befunde` |
+| findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md`. Der bisherige Ort `<local.dir>/material/befunde/` wird nicht mehr beschrieben |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
@@ -118,10 +118,8 @@ ausgenommen. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen Er
 sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
 `<local.dir>/material/` is the source side: raw notes, chat transcripts and hand-offs. It
-is never indexed. Exactly one subdirectory is written to: `material/befunde/`, where the
-skill `ks-befunde` and the command `/k-danke` record what an analysis or a debugging run
-produced — what was proven, what was disproven and which dead ends were ruled out. Its
-form is defined by the rule `befunde.md` in `catalogs.rules`. Everything else below
+is never indexed. Its subdirectory `material/befunde/` holds the findings written before
+they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
 `material/` is left untouched by every command, including `/k-docs-extract`, which still
 reads it as a previous location until step 5 of the switch to the knowledge store and never
 changes it. Its source is `<local.dir>/inbox/`, and it writes to `<local.dir>/knowledge/extracted/`

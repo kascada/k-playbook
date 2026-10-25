@@ -12,7 +12,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | Prefix | Meaning | Example |
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
-| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/xyz.md`, `k-playbook:/rules/befunde.md` |
+| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/rules/docs-sync.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/manual/abc.md` |
 

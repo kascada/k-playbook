@@ -1,6 +1,6 @@
 ---
 name: ks-befunde
-description: Use when analysing unfamiliar code, chasing a root cause, or verifying a thesis by test - so that what was found gets written down instead of living only in the session. Applies the rule k-playbook/rules/befunde.md and appends findings to k-playbook-local/material/befunde/ while the work is going on. Trigger keywords - "Fehlersuche", "Ursache", "warum funktioniert das", "wie hängt das zusammen", "herausgefunden", "Sackgasse", "analysieren", "debuggen".
+description: Use when analysing unfamiliar code, chasing a root cause, or verifying a thesis by test - so that what was found gets written down instead of living only in the session. Writes one document per finding into keph:/queue/findings/ while the work is going on, following k-playbook:/instructions/on-demand/befunde.md. Trigger keywords - "Fehlersuche", "Ursache", "warum funktioniert das", "wie hängt das zusammen", "herausgefunden", "Sackgasse", "analysieren", "debuggen".
 ---
 
 # Skill: Befunde
@@ -31,46 +31,38 @@ Immer wenn eine Arbeit Wissen erzeugt, das die nächste Sitzung sonst neu erarbe
 Nicht anwenden bei reiner Umsetzung nach bekanntem Muster, bei Formatierungen und
 überall dort, wo nichts herausgefunden, sondern nur ausgeführt wurde.
 
-## Regelquelle
+## Anweisung
 
-Verbindlich ist die Regel `befunde.md` aus `catalogs.rules` der Context-Ausgabe. Sie
-enthält Anlässe, Ablageort, Dateiformat, die Anhänge- und die Konfliktregel.
+Verbindlich ist `k-playbook:/instructions/on-demand/befunde.md`. Lies sie mit
+`k_playbook_doc_read` (ersatzweise `k-playbook read <verweis>`), bevor du den ersten
+Befund dieser Sitzung schreibst. Sie enthält Ablage, Kopf, Rumpf, das Widerlegen und was
+gilt, wenn Kephalaion nicht erreichbar ist.
 
-**Diese Regel wird gelesen und befolgt, nicht hier wiederholt.** Weicht der Skill von ihr
-ab, gilt die Regel.
+**Diese Anweisung wird gelesen und befolgt, nicht hier wiederholt.** Weicht der Skill von
+ihr ab, gilt die Anweisung.
 
 Wenn der Context-Aufruf fehlschlägt, ist das Verzeichnis kein k-playbook-Projekt; kurz
 darauf hinweisen und ohne Befund-Erfassung weiterarbeiten.
 
 ## Arbeitsweise
 
-1. **Sobald etwas belegt ist**, knapp anhängen: Befund, Beleg, Sicherheit. Nicht warten,
-   bis das ganze Bild steht — ein einzelner belegter Punkt ist ein Eintrag wert.
+1. **Sobald etwas belegt ist**, einen Befund anlegen: knapp, mit Befund, Beleg und
+   Sicherheit. Nicht warten, bis das ganze Bild steht — ein einzelner belegter Punkt ist
+   einen Befund wert.
 2. **Sobald ein Problem erkannt und gelöst ist**, ausführlicher: zusätzlich die
    ursprüngliche Frage, der erkennbare Hintergrund und vor allem die **ausgeschlossenen
    Wege**.
-3. Geschrieben wird **ohne Rückfrage**. Gemeldet wird in einer Zeile, welche Datei
-   ergänzt wurde — nicht ihr Inhalt.
-4. **In der Antwort die geschriebene Datei nennen.** Eine Analyse, deren Befund nirgends
-   auftaucht, gilt als nicht abgeschlossen.
+3. Geschrieben wird **ohne Rückfrage**. Gemeldet wird in einer Zeile, welcher Befund
+   angelegt wurde — nicht sein Inhalt.
+4. **In der Antwort den Verweis nennen.** Eine Analyse, deren Befund nirgends auftaucht,
+   gilt als nicht abgeschlossen.
 
-Ein Befund gehört zu einem Thema, nicht zu einer Sitzung: Gibt es zum Thema schon eine
-Datei, wird dort angehängt, statt eine zweite anzulegen.
-
-## Zwei Sorten, die woanders hingehören
-
-In derselben Arbeit fällt regelmäßig Wissen an, das kein Projektbefund ist:
-
-- **Betriebsfalle** — was man vor dem Handeln wissen muss („dieses Verzeichnis ist
-  gesperrt", „dieser Test sagt nichts aus"). Ziel: `k-playbook-local/guidelines/fallen.md`.
-- **Prüfbare Regel** — was jedes Mal zu geschehen hat. Ziel: `k-playbook-local/rules/`.
-
-Beides wird **nur nach ausdrücklicher Bestätigung** geschrieben; jeder Eintrag dort wirkt
-dauerhaft. Im Zweifel bis zum Abschluss der Sitzung sammeln und dort fragen.
+Ein Befund ist ein eigenes Dokument und wird danach nicht mehr geändert. Verwandte Befunde
+tragen dasselbe `thema`; angehängt wird nicht.
 
 ## Expliziter Abschluss
 
-Am Ende einer Sitzung schließt der Command den Vorgang ab — er legt die Einträge vor,
-befördert Bestätigtes in die Doku und zieht die Docs nach:
+Am Ende einer Sitzung schließt der Command den Vorgang ab — er legt die Befunde der Sitzung
+vor, trägt Fehlendes nach, fragt, was aus ihnen werden soll, und prüft den Docs-Nachzug:
 
 `/k-danke`

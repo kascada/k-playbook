@@ -362,6 +362,14 @@ corrected by superseding it with the right document; the chain stays as history.
 move before the interface stands. Moving early would mean building the tools against a moving
 target and migrating twice.
 
+**Superseded in part (2026-10-24).** The move to the project's Kephalaion collection overtakes
+this plan. The `/k-docs-*` commands are outdated and get rebuilt as generators that write into
+the collection; the findings go into the collection's `queue/findings/`, not through `write`
+into `knowledge/findings/`, and they are switched first, without waiting for the steps before
+them. The current plan is in [`knowledge-aktuell.md`](knowledge-aktuell.md) ("Writing the
+findings comes first, reading them later", work list items 10 and 11). The steps below and the
+table of transitional reads describe the state reached with task 073.
+
 **The migration is the switch of the writers.** There is no separate migration pass beside
 it. The writers go through the gate one after another, one step each, and no release runs
 between the steps:

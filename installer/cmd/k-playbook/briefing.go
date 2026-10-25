@@ -118,6 +118,7 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 		fmt.Fprintf(&b, "  Offene Befunde: %d\n", work.OpenFindings)
 	}
 	fmt.Fprintf(&b, "Projektdoku: %s\n", briefing.ProjectDocs)
+	fmt.Fprintf(&b, "Sitzung: %s\n", briefing.Session)
 
 	b.WriteString("\n" + briefingContextSeparator + "\n")
 	writeBriefingContext(&b, briefing.Context)
@@ -276,7 +277,8 @@ k-playbook context zieht der Aufruf dabei die Assistenten-Verlinkung nach; was
 sich geändert hat, steht im Rest unter links.
 
 Ohne --json steht der Klartext zum Lesen. Mit --json kommt die Antwort als
-JSON mit schemaVersion, documents (always mit content und parts, onDemand,
+JSON mit schemaVersion, session (die Kennung dieser Sitzung, je Aufruf neu),
+documents (always mit content und parts, onDemand,
 rules, reviews, guidelines), work (available, message, user, tasks, workbench,
 openFindings), projectDocs, health (ok, problems — je Eintrag level, area,
 message, hint) und context (available, message, dazu die übrigen Felder der

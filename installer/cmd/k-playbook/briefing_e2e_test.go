@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -86,6 +87,9 @@ func TestBriefingKlartext(t *testing.T) {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("Ausgabe enthält nicht %q:\n%s", want, stdout)
 		}
+	}
+	if !regexp.MustCompile(`\nProjektdoku: [^\n]+\nSitzung: \d{8}-\d{6}-[0-9a-f]{6}\n`).MatchString(stdout) {
+		t.Errorf("Ausgabe nennt die Sitzungskennung nicht nach der Projektdoku:\n%s", stdout)
 	}
 	briefingPart, contextPart, found := strings.Cut(stdout, briefingContextSeparator)
 	if !found {
@@ -227,7 +231,7 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &briefing); err != nil {
 		t.Fatalf("kein JSON: %v", err)
 	}
-	if briefing.SchemaVersion != "4" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
+	if briefing.SchemaVersion != "5" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
 		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
 	}
 }

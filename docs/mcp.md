@@ -1015,12 +1015,13 @@ and one line per entry `  [level] area: message — hint`. The subcommand `brief
 even with errors in `health` -- the briefing reports, it does not judge; the exit code belongs
 to `k-playbook health`.
 
-A successful answer is `{ok: true, tool, projectDir, schemaVersion, documents, work,
+A successful answer is `{ok: true, tool, projectDir, schemaVersion, session, documents, work,
 projectDocs, health, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"4"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`) |
+| `schemaVersion` | the version of the briefing output, `"5"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`) |
+| `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` after `Projektdoku` |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |

@@ -1,7 +1,7 @@
 ---
-description: Zieht Installation und Projekt nach — aktualisiert das Programm, wenn es älter ist als die Installation, und bringt AGENTS.md, CLAUDE.md, Verlinkung und MCP-Einträge auf den Stand; gibt die Meldung von k-playbook upgrade wieder.
+description: Zieht Installation und Projekt nach — aktualisiert das Programm, wenn es älter ist als die Installation, bringt AGENTS.md, CLAUDE.md, Verlinkung und MCP-Einträge auf den Stand und führt danach die Umstellungen durch, die eine Beurteilung brauchen, etwa die alten Befunde aus material/befunde/.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, Read, mcp__k-playbook__k_playbook_doc_read]
+allowed-tools: [Bash, Read, Edit, Grep, Glob, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__read, mcp__kephalaion__write]
 ---
 
 # k-upgrade

@@ -3,6 +3,8 @@ package project
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -38,8 +40,9 @@ import (
 
 // BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe. Fassung 2 hat den
 // Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
-// documents.always.content, Fassung 4 den Abschnitt health.
-const BriefingSchemaVersion = "4"
+// documents.always.content, Fassung 4 den Abschnitt health, Fassung 5 die
+// Sitzungskennung session.
+const BriefingSchemaVersion = "5"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -56,6 +59,12 @@ const (
 // Briefing ist die Antwort von `k-playbook briefing` und k_playbook_briefing.
 type Briefing struct {
 	SchemaVersion string `json:"schemaVersion"`
+	// Session ist die Kennung dieser Sitzung, je Briefing neu vergeben. Eine
+	// Sitzung lädt das Briefing einmal; was sie schreibt und später
+	// wiederfinden muss — ein Befund in queue/findings/ —, trägt diese
+	// Kennung. Vergeben wird sie hier, weil nur Claude Code eine eigene
+	// Kennung in die Umgebung legt, OpenCode keine (gemessen 2026-10-24).
+	Session string `json:"session"`
 	// Documents sind die Dokumente, die für dieses Projekt gelten — lokal und
 	// mitgeliefert schon gegeneinander aufgelöst.
 	Documents BriefingDocuments `json:"documents"`
@@ -360,6 +369,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	layers := ProjectDocLayers(projectDir)
 	briefing := Briefing{
 		SchemaVersion: BriefingSchemaVersion,
+		Session:       newSessionID(),
 		ProjectDocs:   DocSchemeProject + ":/" + LocalDirName + "/docs/README.md",
 	}
 
@@ -390,6 +400,17 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	briefing.Health = health.Check(ctx, projectDir)
 	briefing.Context = briefingContext(projectDir)
 	return briefing, nil
+}
+
+// newSessionID vergibt die Sitzungskennung: Zeitpunkt des Briefings, damit
+// sich Kennungen ordnen lassen, und sechs Zeichen Zufall, damit zwei
+// Sitzungen in derselben Sekunde verschieden bleiben. Ausgelagert, damit Tests
+// eine feste Kennung setzen können.
+var newSessionID = func() string {
+	random := make([]byte, 3)
+	// Seit Go 1.24 kehrt crypto/rand.Read nie mit einem Fehler zurück.
+	_, _ = rand.Read(random)
+	return now().Format("20060102-150405") + "-" + hex.EncodeToString(random)
 }
 
 // briefingAssembled liefert ein zusammengebautes Verzeichnis: seine Teile

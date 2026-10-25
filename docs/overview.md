@@ -39,10 +39,11 @@ in [`task-flow.md`](./task-flow.md).
 system is troubleshot, and the solution is worked out and presented. This is the
 one of the three that produces its result as an argument rather than as a
 diff: what was measured, what was ruled out, how certain the finding is. It is
-carried by the `ks-befunde` skill and the rule `k-playbook/rules/befunde.md`,
-which write findings to `k-playbook-local/material/befunde/` while the work is
-still going on, and by `/k-danke`, which presents them at the end of the session
-and promotes the confirmed ones into the documentation.
+carried by the instruction `k-playbook:/instructions/on-demand/befunde.md` and
+the `ks-befunde` skill, which write one document per finding to the project
+collection's `queue/findings/` while the work is still going on, and by
+`/k-danke`, which presents them at the end of the session and has the user
+choose what each one should become.
 
 **3 · Quality** — code quality analysis, code review, audits, remediation.
 `/k-review` runs a single recipe, `/k-audit` orchestrates a whole sweep with
