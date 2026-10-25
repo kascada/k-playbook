@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Task, Agent, mcp__k-playbook__k_p
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
@@ -95,7 +95,7 @@ If no `## Intent` section exists: skip the alignment check (Schritt 10).
 ## Fertig-Meldung
 
 Vor jeder Rückfrage an den Nutzer und am Ende meldet sich der Moderator auf dem Rechner
-des Nutzers, wie in `k-playbook/commands/_task/fertig-meldung.md` beschrieben. Die Stellen
+des Nutzers, wie in `.claude/commands/_task/fertig-meldung.md` beschrieben. Die Stellen
 in diesem Command: die Rückfrage in Schritt 7 und das Ende nach Schritt 11.
 
 ## Schritt 3 — Startübersicht ausgeben

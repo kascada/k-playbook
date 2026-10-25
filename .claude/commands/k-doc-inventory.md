@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-doc-inventory.md
+../../.k-playbook/share/commands/k-doc-inventory.md

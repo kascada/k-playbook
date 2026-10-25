@@ -7,7 +7,7 @@ description: Use when code, docs, tests, tasks, reviews, checks, or implementati
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
@@ -52,4 +52,4 @@ Für einen nachgelagerten, expliziten Check denselben Ablauf über den Command a
 
 Details und Prüfschritte stehen in:
 
-`<playbook.dir>/skills/enforcement/PLAYBOOK.md`
+`.claude/skills/enforcement/PLAYBOOK.md`

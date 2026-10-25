@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-todo.md
+../../.k-playbook/share/commands/k-todo.md

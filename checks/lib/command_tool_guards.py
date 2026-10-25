@@ -6,7 +6,9 @@ durch. Er ist ein Hinweisgeber, kein Shell-Parser; seine Grenzen sind bewusst:
 
 - Werkzeugliste ist allein die Spalte ``name`` aus scripts/base-tools.tsv.
 - Gelesen wird der effektive Command-Katalog: mitgelieferte Commands aus
-  <playbook>/commands/, projekteigene aus <config-root>/k-playbook-local/commands/.
+  <playbook>/share/commands/ — derselbe Stand, den das Binary dieser Version nach
+  ~/.local/share/k-playbook/ entpackt —, projekteigene aus
+  <config-root>/k-playbook-local/commands/.
   Vergleichseinheit ist der Pfad ab commands/; ein gleichnamiger lokaler Eintrag
   ersetzt den mitgelieferten, ein leerer schaltet ihn ab.
 - Geprüft wird immer der ganze Katalog, unabhängig von K_CHECK_MODE und
@@ -135,7 +137,7 @@ def is_empty_file(path: Path) -> bool:
 def effective_commands(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
     shipped: dict[str, Path] = {}
     local: dict[str, Path] = {}
-    collect_commands(playbook_dir / "commands", "", shipped)
+    collect_commands(playbook_dir / "share" / "commands", "", shipped)
     collect_commands(local_dir / "commands", "", local)
 
     result: dict[str, Path] = {}
@@ -691,7 +693,7 @@ def run() -> int:
 
     commands = effective_commands(playbook_dir, local_dir)
     if not commands:
-        status("skip", f"no command files found under {playbook_dir / 'commands'} or {local_dir / 'commands'}")
+        status("skip", f"no command files found under {playbook_dir / 'share' / 'commands'} or {local_dir / 'commands'}")
         return 0
 
     exceptions_path = script_dir / EXCEPTIONS_FILE

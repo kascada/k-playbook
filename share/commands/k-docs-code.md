@@ -9,14 +9,14 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
 Erzeugt semantische Projekt-Doku aus dem Code. Der eigentliche Ablauf liegt im
-nachladbaren Modul `k-playbook/commands/_docs/code.md`, damit `/k-docs` denselben
+nachladbaren Modul `.claude/commands/_docs/code.md`, damit `/k-docs` denselben
 Produzenten anbieten und ausführen kann.
 
 Produces:
@@ -24,7 +24,7 @@ Produces:
 
 ## Schritt 1 — Modul anwenden
 
-Wende `k-playbook/commands/_docs/code.md` an und führe den dort beschriebenen Ablauf mit
+Wende `.claude/commands/_docs/code.md` an und führe den dort beschriebenen Ablauf mit
 denselben `$ARGUMENTS` aus.
 
 Wenn das Modul fehlt, abbrechen und sagen, dass die k-playbook-Installation unvollständig
@@ -38,7 +38,7 @@ Herkünften den einzigen Index `k-playbook-local/docs/README.md` und registriert
 
 ## Fehlerfälle
 
-- Modul `k-playbook/commands/_docs/code.md` fehlt → abbrechen und `/k-gui` oder Update der
+- Modul `.claude/commands/_docs/code.md` fehlt → abbrechen und `/k-gui` oder Update der
   Installation nennen.
 
 ## Anti-Muster (nicht tun)

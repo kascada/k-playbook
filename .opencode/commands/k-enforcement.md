@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-enforcement.md
+../../.k-playbook/share/commands/k-enforcement.md

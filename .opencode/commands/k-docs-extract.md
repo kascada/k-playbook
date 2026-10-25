@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-docs-extract.md
+../../.k-playbook/share/commands/k-docs-extract.md

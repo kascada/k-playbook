@@ -1,1 +1,1 @@
-../../../k-playbook/commands/_task/fertig-meldung.md
+../../../.k-playbook/share/commands/_task/fertig-meldung.md

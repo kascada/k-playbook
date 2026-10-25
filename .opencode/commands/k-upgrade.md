@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-upgrade.md
+../../.k-playbook/share/commands/k-upgrade.md

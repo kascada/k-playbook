@@ -49,7 +49,7 @@ INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard insta
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host defaults-archive share-sync install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host defaults-archive install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -101,19 +101,6 @@ build: dist ## Alias für dist
 # holt es nach <hub>:k-playbook/defaults/. Lokal zum Prüfen vor einem Release.
 defaults-archive: ## Packt defaults/ wie das Release nach ./dist/k-playbook-defaults.tar.gz
 	@.github/scripts/pack-defaults.sh "$(INSTALLER_DIST_DIR)/$(DEFAULTS_ASSET)"
-
-# Übergang, bis commands/ und skills/ oben im Repo wegfallen: share/ trägt
-# Kopien davon, die das Binary einbettet. Ein Test im Installer
-# (TestShareGleichtDenAltenVerzeichnissen) wird rot, sobald beide abweichen.
-share-sync: ## Kopiert commands/ und skills/ nach share/ (Übergang)
-	$(require_writable)
-	@set -eu; \
-	  for dir in commands skills; do \
-	    rm -rf "share/$$dir"; \
-	    cp -R "$$dir" "share/$$dir"; \
-	    find "share/$$dir" -name __pycache__ -prune -exec rm -rf {} +; \
-	  done; \
-	  echo "share/ abgeglichen: commands/, skills/"
 
 # Die Verwechslung, gegen die das hier absichert: `make` läuft in der
 # Installation statt im Arbeitsstand. Der Build scheitert dann an der

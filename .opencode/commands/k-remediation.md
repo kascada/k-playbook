@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-remediation.md
+../../.k-playbook/share/commands/k-remediation.md

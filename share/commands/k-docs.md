@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
@@ -173,10 +173,10 @@ a producer automatically.
 Argument dispatch:
 
 - `status` or empty after the report → stop read-only.
-- `code` → apply `k-playbook/commands/_docs/code.md` with the remaining arguments.
-- `tools` → apply `k-playbook/commands/_docs/tools.md` with the remaining arguments.
+- `code` → apply `.claude/commands/_docs/code.md` with the remaining arguments.
+- `tools` → apply `.claude/commands/_docs/tools.md` with the remaining arguments.
 - `extract` → run the flow from `/k-docs-extract` with the remaining arguments.
-- `inventory` → apply `k-playbook/commands/_docs/inventory.md`. It takes no arguments; the
+- `inventory` → apply `.claude/commands/_docs/inventory.md`. It takes no arguments; the
   collection itself is the subcommand `k-playbook inventory`.
 - `index` → run the flow from `/k-docs-index`.
 

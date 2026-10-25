@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-danke.md
+../../.k-playbook/share/commands/k-danke.md

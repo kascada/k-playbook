@@ -8,7 +8,7 @@ allowed-tools: [Read, Edit, Bash, TodoWrite]
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
@@ -16,7 +16,7 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 
 Erhebt das Versionsinventar: die deklarierten Versionen aller Pakete, Tools, Runtimes,
 Container-Images und Helm-Abhängigkeiten, nach Umgebung getrennt und mit Herkunft je Zeile.
-Der eigentliche Ablauf liegt im nachladbaren Modul `k-playbook/commands/_docs/inventory.md`,
+Der eigentliche Ablauf liegt im nachladbaren Modul `.claude/commands/_docs/inventory.md`,
 damit `/k-docs` denselben Erzeuger anbieten und ausführen kann. Die Erhebung selbst macht
 das Subkommando `k-playbook inventory`; dieser Command baut dafür keine eigene Parserlogik
 nach.
@@ -28,7 +28,7 @@ Produces:
 
 ## Schritt 1 — Modul anwenden
 
-Wende `k-playbook/commands/_docs/inventory.md` an und führe den dort beschriebenen Ablauf
+Wende `.claude/commands/_docs/inventory.md` an und führe den dort beschriebenen Ablauf
 aus.
 
 Wenn das Modul fehlt, abbrechen und sagen, dass die k-playbook-Installation unvollständig
@@ -42,7 +42,7 @@ Inventardatei als Herkunft „Versionen" in den einzigen Index
 
 ## Fehlerfälle
 
-- Modul `k-playbook/commands/_docs/inventory.md` fehlt → abbrechen und `/k-gui` oder Update
+- Modul `.claude/commands/_docs/inventory.md` fehlt → abbrechen und `/k-gui` oder Update
   der Installation nennen.
 - `k-playbook inventory` meldet `unbekanntes Kommando` → die Installation ist älter als
   dieser Command. Melden, Update nennen, die Erhebung nicht von Hand nachbauen.

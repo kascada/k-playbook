@@ -1,1 +1,1 @@
-../../../k-playbook/commands/_review-run/review-input-contract.md
+../../../.k-playbook/share/commands/_review-run/review-input-contract.md

@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-gui.md
+../../.k-playbook/share/commands/k-gui.md

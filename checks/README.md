@@ -93,7 +93,7 @@ oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
 - **Werkzeugliste** ist allein die Spalte `name` aus `<playbook.dir>/scripts/base-tools.tsv`.
   Eine neue Zeile dort wirkt ohne Änderung am Check. Fehlt die Matrix, endet der Check mit
   `skip` und nennt den Pfad.
-- **Umfang** ist immer der ganze effektive Command-Katalog: `<playbook.dir>/commands/`
+- **Umfang** ist immer der ganze effektive Command-Katalog: `<playbook.dir>/share/commands/`
   zusammen mit `<config-root>/k-playbook-local/commands/`, verglichen über den Pfad ab
   `commands/`; ein gleichnamiger lokaler Command ersetzt den mitgelieferten, ein leerer
   schaltet ihn ab. `K_CHECK_MODE` und `K_CHECK_FILES_FROM` spielen keine Rolle — nur über

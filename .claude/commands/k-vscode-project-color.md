@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-vscode-project-color.md
+../../.k-playbook/share/commands/k-vscode-project-color.md

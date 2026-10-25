@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// commandModule liest ein Command-Modul aus dem Repo-Wurzelverzeichnis. Von
+// commandModule liest ein Command-Modul aus share/commands/ im Repo. Von
 // installer/internal/review/merge/ sind das vier Ebenen aufwärts.
 func commandModule(t *testing.T, parts ...string) string {
 	t.Helper()
-	elems := append([]string{"..", "..", "..", "..", "commands"}, parts...)
+	elems := append([]string{"..", "..", "..", "..", "share", "commands"}, parts...)
 	path := filepath.Clean(filepath.Join(elems...))
 	data, err := os.ReadFile(path)
 	if err != nil {

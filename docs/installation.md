@@ -80,8 +80,8 @@ k-playbook-local/
 ├── rules/         overlay for k-playbook/rules/
 ├── reviews/       overlay for k-playbook/reviews/
 ├── checks/        overlay for k-playbook/checks/
-├── commands/      overlay for k-playbook/commands/
-├── skills/        overlay for k-playbook/skills/
+├── commands/      overlay for ~/.local/share/k-playbook/commands/
+├── skills/        overlay for ~/.local/share/k-playbook/skills/
 ├── results/       everything reviews generate; see below
 ├── data/          machine files owned by k-playbook, versioned; holds todos.json
 ├── cache/         derived content this machine can rebuild at any time; see below

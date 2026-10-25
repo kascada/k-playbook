@@ -98,8 +98,11 @@ project/
 │   └── skills/     │     one symlink per skill; OpenCode reads along here
 ├── .opencode/      │
 │   └── commands/ ──┤
+├── .k-playbook/    │
+│   └── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
+│                   │        unpacked by the binary once per machine; not versioned
 ├── k-playbook/   ←─┤     the installation, fully replaceable
-│   ├── commands/ skills/ rules/ reviews/ checks/
+│   ├── rules/ reviews/ checks/
 │   ├── bin/ scripts/
 │   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/

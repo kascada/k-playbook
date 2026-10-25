@@ -5,7 +5,7 @@ description: Mitgelieferter Test-Skill, der nur prüft, ob mitgelieferte Skills 
 
 # Skill: Regenbogenforelle (Test, mitgeliefert)
 
-Dieser Skill ist ein Testsignal für **mitgelieferte** Skills aus `k-playbook/skills/`. Er hat
+Dieser Skill ist ein Testsignal für **mitgelieferte** Skills aus `~/.local/share/k-playbook/skills/`. Er hat
 keine Aufgabe außer sichtbar zu machen, dass er gefunden und geladen wurde. Ein Projekt kann
 für projekteigene Skills ein eigenes Gegenstück anlegen, etwa `bachforelle` unter
 `k-playbook-local/skills/`.

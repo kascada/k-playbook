@@ -1,7 +1,6 @@
 package sharedir
 
 import (
-	"bytes"
 	"errors"
 	"io/fs"
 	"os"
@@ -9,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/kascada/k-playbook/share"
 )
 
 func TestDirFrom(t *testing.T) {
@@ -177,59 +174,6 @@ func TestSumUnterscheidetPfadUndInhalt(t *testing.T) {
 	if a == b {
 		t.Fatal("verschiedene Bestände ergeben dieselbe Prüfsumme")
 	}
-}
-
-// TestShareGleichtDenAltenVerzeichnissen hält share/ und die alten
-// Verzeichnisse oben im Repo gleich, solange beide bestehen (Stufe 1 bis 3 von
-// Punkt 20 der Arbeitsliste in docs/knowledge-aktuell.md). Geprüft wird das
-// eingebettete FS, nicht share/ auf der Platte — so fällt auch auf, wenn das
-// Einbetten etwas auslässt.
-func TestShareGleichtDenAltenVerzeichnissen(t *testing.T) {
-	repo := os.DirFS(filepath.Join("..", "..", ".."))
-	for _, root := range share.Roots {
-		embedded := listFiles(t, share.Files, root)
-		onDisk := listFiles(t, repo, root)
-		for name := range onDisk {
-			if _, ok := embedded[name]; !ok {
-				t.Errorf("%s fehlt in share/ (make share-sync)", name)
-			}
-		}
-		for name, data := range embedded {
-			disk, ok := onDisk[name]
-			switch {
-			case !ok:
-				t.Errorf("share/%s gibt es oben im Repo nicht (make share-sync)", name)
-			case !bytes.Equal(data, disk):
-				t.Errorf("share/%s weicht von %s ab (make share-sync)", name, name)
-			}
-		}
-	}
-}
-
-func listFiles(t *testing.T, fsys fs.FS, root string) map[string][]byte {
-	t.Helper()
-	files := map[string][]byte{}
-	err := fs.WalkDir(fsys, root, func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			if entry.Name() == "__pycache__" {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		data, err := fs.ReadFile(fsys, name)
-		if err != nil {
-			return err
-		}
-		files[name] = data
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("%s lesen: %v", root, err)
-	}
-	return files
 }
 
 func assertFile(t *testing.T, dir, rel, want string) {

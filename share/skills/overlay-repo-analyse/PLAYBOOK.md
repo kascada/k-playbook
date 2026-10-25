@@ -323,7 +323,7 @@ Beschreibung + konkreter Diff-Ausschnitt
 Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 ```
 
-Vorlage in `<playbook.dir>/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
+Vorlage in `.claude/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
 
 ### Index bauen
 

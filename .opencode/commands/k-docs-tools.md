@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-docs-tools.md
+../../.k-playbook/share/commands/k-docs-tools.md

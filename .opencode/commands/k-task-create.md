@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-task-create.md
+../../.k-playbook/share/commands/k-task-create.md

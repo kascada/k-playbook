@@ -7,7 +7,7 @@ description: Use when the user wants to systematically understand a project that
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
@@ -44,7 +44,7 @@ Fünf Phasen:
 
 Details, Kommandos, Templates und Checkliste in:
 
-→ **`<playbook.dir>/skills/overlay-repo-analyse/PLAYBOOK.md`**
+→ **`.claude/skills/overlay-repo-analyse/PLAYBOOK.md`**
 
 ## Wichtigste Regel
 

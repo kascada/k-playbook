@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-audit.md
+../../.k-playbook/share/commands/k-audit.md

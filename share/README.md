@@ -16,10 +16,11 @@ bei jedem Aufruf die Prüfsumme des eingebetteten Inhalts mit der Datei
 `.inhalt-sha256` im Zielverzeichnis und entpackt nur bei Abweichung. Die Dateien
 dort sind schreibgeschützt.
 
-**Übergang (Stufe 1, Punkt 20 der Arbeitsliste in
-[`docs/knowledge-aktuell.md`](../docs/knowledge-aktuell.md)):** `commands/` und
-`skills/` liegen noch zusätzlich oben im Repo, und die Projekte verlinken weiter
-dorthin. Bis die alten Verzeichnisse wegfallen, wird jede Änderung an beiden
-Stellen gemacht; `make share-sync` kopiert oben nach hier, und ein Test im
-Installer schlägt fehl, sobald beide auseinanderlaufen. Eine Änderung hier ändert
-das Binary und verlangt damit einen VERSION-Bump.
+Die Projekte verlinken die Einträge durch `.k-playbook/share` (siehe
+`installer/docs/architecture.md`, „Der Umweg-Link `.k-playbook/share`“). Ein
+Command nennt ein Modul mit dem verlinkten Pfad, etwa
+`.claude/commands/_shared/context.md` (`rules/command-authoring.md`).
+
+Hier ist die einzige Fassung; `commands/` und `skills/` oben im Repo gibt es seit
+2026-10-25 nicht mehr. Eine Änderung hier ändert das Binary und verlangt damit
+einen VERSION-Bump.

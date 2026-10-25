@@ -1,1 +1,1 @@
-../../../k-playbook/commands/_docs/code.md
+../../../.k-playbook/share/commands/_docs/code.md

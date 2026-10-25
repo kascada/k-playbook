@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-verlauf.md
+../../.k-playbook/share/commands/k-verlauf.md

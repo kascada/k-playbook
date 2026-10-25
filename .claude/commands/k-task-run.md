@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-task-run.md
+../../.k-playbook/share/commands/k-task-run.md

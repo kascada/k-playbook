@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-test-check.md
+../../.k-playbook/share/commands/k-test-check.md

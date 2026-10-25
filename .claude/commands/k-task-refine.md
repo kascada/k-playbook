@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-task-refine.md
+../../.k-playbook/share/commands/k-task-refine.md

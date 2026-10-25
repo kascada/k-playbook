@@ -8,7 +8,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
@@ -291,7 +291,7 @@ automatisch als autoritativ behandeln.
 **7a — `AGENTS_FILE`:**
 
 - Existiert nicht → aus
-  `<playbook.dir>/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und
+  `.claude/skills/ai-session-memory/vorlagen/AGENTS.md.template` erzeugen und
   Platzhalter füllen (`<Projektname>`, „Was ist dieses Projekt?" aus der Übersichts-Doku
   ableiten, Themenbereiche aus den gefundenen Herkünften füllen, Kurzverweis-Tabelle aus
   dem „Häufige Fragen"-Block spiegeln). Die Pfade der Vorlage stimmen bereits mit
@@ -305,7 +305,7 @@ automatisch als autoritativ behandeln.
 **7b — `OPENCODE_CONFIG`:**
 
 - Existiert nicht → aus
-  `<playbook.dir>/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen.
+  `.claude/skills/ai-session-memory/vorlagen/opencode.json.template` erzeugen.
   `references.docs.path` muss `DOCS_REFERENCE_PATH` sein. `description` **konkret**
   befüllen: Projektname + Liste der wichtigsten Themen + Hinweis auf
   `DOCS_README_FROM_AGENTS` als Index (nicht die Template-Platzhalter stehen lassen).
@@ -349,7 +349,7 @@ Kompakte Zusammenfassung:
   fragen. Die Zielwahlregel entscheidet: geschrieben wird `opencode.json`, die andere
   Datei bleibt unangetastet. Die Doppelung im Abschluss melden — OpenCode führt beide
   zusammen, deshalb gehört eine davon aufgelöst.
-- Template unter `<playbook.dir>/skills/ai-session-memory/vorlagen/` fehlt → melden und
+- Template unter `.claude/skills/ai-session-memory/vorlagen/` fehlt → melden und
   die MEMORY-Registrierung überspringen; der Index ist davon unabhängig fertig.
 - `git mv` schlägt fehl (Datei ungetrackt, Index gesperrt) → die Datei liegen lassen, den
   Fehler nennen, mit den übrigen weitermachen.

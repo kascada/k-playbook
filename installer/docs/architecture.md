@@ -1442,11 +1442,11 @@ Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der U
   zuletzt geschrieben — ein abgebrochener Lauf wird beim nächsten Aufruf wiederholt. Was
   sonst im Verzeichnis liegt (`security-tools/`), bleibt unberührt. Die Dateien sind
   `0444`, die Verzeichnisse `0755`: gesperrte Verzeichnisse hielten auch ein `rm -rf` auf.
-- **Übergang:** `commands/` und `skills/` liegen zusätzlich oben im Repo und bleiben die
-  Quelle der Projekt-Links. `make share-sync` kopiert sie nach `share/`;
-  `TestShareGleichtDenAltenVerzeichnissen` vergleicht das eingebettete FS mit ihnen.
-  Weil `share/` ins Binary geht, beobachten der VERSION-Wächter und der Test-Workflow
-  auch `share/**`.
+- **Einzige Fassung:** `commands/` und `skills/` oben im Repo gibt es seit 2026-10-25 nicht
+  mehr; `share/` ist die Quelle. Weil `share/` ins Binary geht, beobachten der
+  VERSION-Wächter und der Test-Workflow auch `share/**`. Der Check
+  `check_command_tool_guards.sh` liest die mitgelieferten Commands aus
+  `<playbook.dir>/share/commands/` — derselbe Stand wie das Binary dieser Version.
 
 ### Entwicklungsstand
 

@@ -7,7 +7,7 @@ description: Use when the user wants existing project documentation (k-playbook-
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
@@ -62,11 +62,11 @@ Drei zusammenspielende Bausteine:
 Detaillierte Schritt-für-Schritt-Anleitung mit Prosa + abhakbarer
 Checkliste steht in:
 
-→ **`<playbook.dir>/skills/ai-session-memory/PLAYBOOK.md`**
+→ **`.claude/skills/ai-session-memory/PLAYBOOK.md`**
 
 Vorlagen zum Kopieren:
 
-→ **`<playbook.dir>/skills/ai-session-memory/vorlagen/`**
+→ **`.claude/skills/ai-session-memory/vorlagen/`**
 
 ## Wichtigste Regel
 

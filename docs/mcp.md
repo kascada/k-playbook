@@ -822,7 +822,7 @@ kinds `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/`, each
 file local before shipped, and as include targets `includes/` and `testdata/`. Only
 `instructions/always/` is assembled. Shipped `instructions/`, `commands/`, `includes/` and
 `testdata/` are read from `defaults/`; for `commands/` that is the text of a command, while
-the file under `k-playbook/commands/` is only the hull the assistant registers (task 092,
+the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
 `catalogs` in `k_playbook_context` (`overlayDocDir`): for `rules` and `reviews`, name,
 `origin` and `disabled` of an entry are the same over both ways, which a test checks.

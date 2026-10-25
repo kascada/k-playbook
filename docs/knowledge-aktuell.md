@@ -853,8 +853,8 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
        `commands/` and `skills/` and is its own Go module, embedded through a `replace` in
        `installer/go.mod`; no version directories (decided the same day: commands and skills
        differ little between versions). Every command except `version` and `help` compares a
-       content checksum and unpacks on a difference; files `0444`. `make share-sync` and a test
-       keep the copies equal; the VERSION guard watches `share/**`. Described in
+       content checksum and unpacks on a difference; files `0444`. Until stage 3 `make share-sync`
+       and a test kept the copies equal; the VERSION guard watches `share/**`. Described in
        [`architecture.md`](../installer/docs/architecture.md#mitgelieferte-dateien-unter-localsharek-playbook).
        Measured with an isolated `HOME`; not yet installed on a real machine.
     2. Link from there into the assistants. Planned globally (`~/.claude/…`); dropped the same
@@ -876,6 +876,14 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
        installed. Described in
        [`architecture.md`](../installer/docs/architecture.md#der-umweg-link-k-playbookshare).
     3. Remove the directories no longer used and go through docs, links and the interface.
+       **Done 2026-10-25 (in the working tree):** `commands/` and `skills/` at the top of the repo
+       are gone, `share/` is the only version; `make share-sync` and the drift test went with
+       them. References in the texts that pointed into the clone (`k-playbook/commands/…`,
+       `<playbook.dir>/commands/…`, `<playbook.dir>/skills/…`, 25 files) now name the linked path
+       `.claude/commands/…` / `.claude/skills/…`, which already carries the project's override;
+       `rules/command-authoring.md` says so and its "Erster Schritt" wording follows. The check
+       `check_command_tool_guards.sh` reads `<playbook.dir>/share/commands/`. The content of the
+       commands is not reviewed yet — only the references.
 
 21. **Project-own commands and skills into `<project>/.k-playbook/`** — wanted 2026-10-25,
     after item 20: `.k-playbook/` holds only what is new, and `k-playbook-local/` goes once its

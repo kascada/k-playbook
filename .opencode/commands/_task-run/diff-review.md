@@ -1,1 +1,1 @@
-../../../k-playbook/commands/_task-run/diff-review.md
+../../../.k-playbook/share/commands/_task-run/diff-review.md

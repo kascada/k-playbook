@@ -5,9 +5,9 @@ name: VERSION-Wächter
 # anzuheben, liefert deshalb neuen Inhalt mit altem Code aus — und niemand
 # merkt es, weil nichts abbricht. Genau dieser Fall wird hier rot.
 #
-# Content-Commits an rules, reviews, commands oder docs sind nicht betroffen:
-# sie ändern das Binary nicht und lösen keinen Download aus. share/ dagegen
-# bettet das Binary ein — eine Änderung dort ist eine am Binary.
+# Content-Commits an rules, reviews oder docs sind nicht betroffen: sie ändern
+# das Binary nicht und lösen keinen Download aus. share/ dagegen — Commands und
+# Skills — bettet das Binary ein; eine Änderung dort ist eine am Binary.
 
 on:
   push:

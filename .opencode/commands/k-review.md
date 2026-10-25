@@ -1,1 +1,1 @@
-../../k-playbook/commands/k-review.md
+../../.k-playbook/share/commands/k-review.md

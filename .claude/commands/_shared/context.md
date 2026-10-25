@@ -1,1 +1,1 @@
-../../../k-playbook/commands/_shared/context.md
+../../../.k-playbook/share/commands/_shared/context.md

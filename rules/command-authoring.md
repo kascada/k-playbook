@@ -13,17 +13,24 @@ Diese Regel beschreibt die **Form**. Was ein einzelner Command tut, steht in ihm
 
 Mitgelieferte Commands liegen unter:
 
-`<playbook.dir>/commands/`
+`~/.local/share/k-playbook/commands/` — das Binary entpackt sie je Rechner, die Quelle im
+Repo ist `share/commands/`
 
 Projekteigene Commands liegen unter:
 
 `<local.dir>/commands/`
 
+Beide erreicht der Assistent über die Verlinkung in `.claude/commands/` (und
+`.opencode/commands/`). Ein Command nennt ein Modul deshalb mit diesem Pfad, etwa
+`.claude/commands/_shared/context.md`: dort steht schon die Fassung, die nach der
+Verrechnung gilt.
+
 Beide Seiten werden Datei für Datei verrechnet; der Pfad ab `commands/` ist die
 Vergleichseinheit, einschließlich Namensraum. Eine gleichnamige projekteigene Datei
 ersetzt die mitgelieferte vollständig, eine leere Datei schaltet den Command ab.
 
-Geschrieben wird nie nach `<playbook.dir>/` — ein Update ersetzt das Verzeichnis.
+Geschrieben wird nie nach `~/.local/share/k-playbook/` oder `<playbook.dir>/` — ein Update
+ersetzt beide.
 
 `commands/_<name>/` ist ein Namensraum für **Module**, die von einem oder mehreren
 Commands eingebunden werden — keine Commands selbst. Es gibt drei Sorten Namensraum:
@@ -97,7 +104,7 @@ in jeder Command-Datei:
 ```text
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die

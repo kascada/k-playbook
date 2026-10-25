@@ -9,7 +9,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent, mcp
 
 ## Erster Schritt
 
-Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
 Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
 Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
@@ -26,7 +26,7 @@ kein vollständiges Review. Alle Rückfragen an den Nutzer bleiben im Hauptkonte
 
 **Fertig-Meldung.** Vor jeder Rückfrage an den Nutzer und am Ende des Commands meldet
 sich der Hauptkontext auf dem Rechner des Nutzers, wie in
-`k-playbook/commands/_task/fertig-meldung.md` beschrieben (Titel `<projekt>: <task> – <was>`,
+`.claude/commands/_task/fertig-meldung.md` beschrieben (Titel `<projekt>: <task> – <was>`,
 Body was passiert ist, `sound: true`). Die Stellen in diesem Command: die Rückfrage in
 Schritt 2, die Optionen in 4a, der Blocker in 4d, die Stopp-Abfrage in 4f und die
 Zusammenfassung in Schritt 6.
@@ -192,7 +192,7 @@ in einem Shell-Codeblock dieses Commands hat seinen eigenen.
 
 Mit `DIFF_ENABLED=true`:
 
-- `DIFF_REVIEW_MODULE = <playbook.dir>/commands/_task-run/diff-review.md`; eine
+- `DIFF_REVIEW_MODULE = .claude/commands/_task-run/diff-review.md`; eine
   gleichnamige Datei unter `<local.dir>/commands/_task-run/` ersetzt es nach
   `rules/command-authoring.md`. Der Hauptkontext liest das Modul nicht, er gibt nur den Pfad
   weiter. Fehlt es oder ist es leer, vor dem ersten Task abbrechen und `/k-gui` oder ein
