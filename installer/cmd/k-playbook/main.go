@@ -34,6 +34,7 @@ import (
 )
 
 func main() {
+	ensureShare(os.Args[1:])
 	if err := run(os.Args[1:]); err != nil {
 		// Ein exitError ohne Text hat schon alles ausgegeben und setzt nur
 		// den Code; alles andere endet mit 1.

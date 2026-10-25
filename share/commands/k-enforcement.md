@@ -1,0 +1,149 @@
+---
+description: Check the current work or target path against the effective rule catalog and report whether required follow-ups such as docs sync are done. Defaults to the current directory, or uses [target-dir] if given.
+argument-hint: [target-dir]
+# model: github-copilot/gpt-5.5
+allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
+---
+
+# k-enforcement
+
+## Erster Schritt
+
+Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
+Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+
+
+Check k-playbook enforcement rules for the current project.
+
+This command is the explicit after-the-fact or mid-work check. The matching Skill `ks-enforcement` applies the same rules continuously during implementation.
+
+## Schritt 1 — Ziel und Pfade auflösen
+
+From the context output:
+
+- The code to check is `project.repoRoot` — the rules apply to the code, not to the
+  playbook directory.
+- `DOCS_DIR = <local.dir>/docs`.
+- `CODE_DOCS_DIR = <DOCS_DIR>/code` — the only origin that follows the code. `libs/`
+  follows the libraries, `versions/` the declared versions, `manual/` and `extracted/`
+  follow nothing; they are all outside the docs-sync duty. `DOCS_DIR/README.md` is the
+  generated index and belongs to `/k-docs-index`.
+
+- If `$ARGUMENTS` is set, it names the directory to check. It must lie inside
+  `project.repoRoot`; otherwise stop and say so.
+- If `$ARGUMENTS` is empty, check the current working directory.
+
+Command-specific policy:
+
+- If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
+  docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
+  finding by itself — name it and move on.
+
+## Schritt 2 — Regeln und Checks laden
+
+Take `catalogs.rules` from the context output. It already merges the shipped catalog
+with the project-local one and records `origin` per entry — do not list directories
+yourself and do not re-derive which entry wins.
+
+Read the files in the order given and skip entries marked `disabled`. If the set is
+empty, report this and stop; an empty set is a deliberate project decision, not a
+reason to fall back to the shipped catalog.
+
+Take `catalogs.checks` from the same output. It is the effective check set, merged the
+same way, with `origin` per entry; entries switched off by an empty local script carry
+`disabled`. Do not list `checks/` directories yourself. These checks run through
+`<playbook.dir>/bin/k-check`, not through this command: `/k-enforcement` names them
+with their origin and does not execute them.
+
+Print a compact startup summary:
+
+```text
+Enforcement-Check
+─────────────────────────────
+Ziel:         <geprüftes Verzeichnis>
+Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
+Abgeschaltet: <D> (leere lokale Datei) | —
+Checks:       <K> aktiv  (<E> dist, <F> local, <G> override), <H> abgeschaltet
+              Lauf über <playbook.dir>/bin/k-check
+Docs:         k-playbook-local/docs/code | fehlt
+```
+
+## Schritt 3 — Änderungsumfang bestimmen
+
+If `project.repoRoot` is a git repo or inside a git worktree:
+
+1. Inspect `git status --short`.
+2. Inspect the current diff for tracked files (`git diff`) and staged files (`git diff --cached`) if present.
+3. Use the changed files as the primary check scope.
+
+If there is no git repo or no diff:
+
+- Ask what should be checked, unless `$ARGUMENTS` points to a specific subdirectory with obvious files.
+- For a pure rule-read request, summarize the loaded rules and stop.
+
+Do not modify files in this command unless the user explicitly asks to fix a found issue.
+
+## Schritt 4 — Regeln prüfen
+
+For each loaded rule:
+
+1. Decide whether it is relevant to the current scope.
+2. If relevant, check whether the current state satisfies it.
+3. If unclear, ask one short question instead of guessing.
+
+Rules apply to new or changed work, not retroactively to the entire legacy codebase, unless a rule explicitly says otherwise.
+
+## Schritt 5 — Docs-Sync prüfen
+
+Always perform this check when code files changed.
+
+Use the loaded rules, especially `docs-sync.md`, and inspect:
+
+- Changed source/config/schema/API files.
+- Docs under `CODE_DOCS_DIR`, if it exists. Do not report `libs/`, `versions/`,
+  `manual/`, `extracted/` or the generated `README.md` as out of sync — they do not
+  follow the code.
+- `README.md`, `AGENTS.md`, and obvious architecture/setup/API docs.
+
+Decide one of:
+
+- **Docs updated:** relevant docs were changed together with code.
+- **No docs needed:** explain why in one sentence.
+- **Docs missing:** name the likely docs that need an update.
+- **Unclear:** ask the user whether to update, create, or intentionally skip docs.
+
+Do not silently pass a code change without one of these outcomes.
+
+## Schritt 6 — Bericht
+
+Output:
+
+```text
+Enforcement
+─────────────────────────────
+Regeln geladen:  <N> aktiv (<A> dist, <B> local, <C> override, <D> abgeschaltet)
+Geprüfter Scope: <files/dirs or "kein Diff">
+Relevant:        <rule filenames>
+
+Ergebnis:
+- <rule> [dist|local|override]: ok | offen | unklar | verletzt
+
+Checks:          <K> aktiv (<E> dist, <F> local, <G> override, <H> abgeschaltet) — nicht ausgeführt
+- <check> [dist|local|override]
+- <check> [override, abgeschaltet]
+Lauf:            <playbook.dir>/bin/k-check --mode changed
+
+Docs-Sync:       angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Thema>) | unklar
+```
+
+The check list comes from `catalogs.checks` as loaded in Schritt 2. Do not report a check
+result you did not see: the checks are run through `<playbook.dir>/bin/k-check`, and
+`/k-enforcement` only names that call.
+
+If anything is `offen`, `unklar`, or `verletzt`, finish with the concrete next action and ask before editing.
+
+Folge-Command: keiner. Der Bericht und die genannte nächste Aktion sind das Ergebnis;
+korrigiert wird nur nach Freigabe in derselben Sitzung.

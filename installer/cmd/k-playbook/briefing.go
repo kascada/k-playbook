@@ -53,8 +53,8 @@ func runBriefing(args []string) error {
 	return writeBriefingText(os.Stdout, briefing)
 }
 
-// writeBriefingText rendert das Briefing zum Lesen: zuerst der Text der immer
-// geltenden Anweisungen, so wie `k-playbook read` ihn liefert — ohne die Liste
+// writeBriefingText rendert das Briefing zum Lesen: zuerst der Kopf
+// (briefingTextHead), dann der Text der immer geltenden Anweisungen, so wie `k-playbook read` ihn liefert — ohne die Liste
 // seiner Teile, die Herkunft steht nur in der JSON-Antwort —, dann der Block
 // der Umgebungsprüfung (healthText, derselbe wie bei `k-playbook health`),
 // dann je Abschnitt die Verweise mit Herkunft in Klammern und Titel, dahinter
@@ -62,6 +62,7 @@ func runBriefing(args []string) error {
 func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 	var b strings.Builder
 	always := briefing.Documents.Always
+	b.WriteString(briefingTextHead(briefing))
 	if strings.TrimSpace(always.Content) == "" {
 		fmt.Fprintf(&b, "(keine immer geltenden Anweisungen unter %s)\n", always.Ref)
 	} else {
@@ -118,13 +119,35 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 		fmt.Fprintf(&b, "  Offene Befunde: %d\n", work.OpenFindings)
 	}
 	fmt.Fprintf(&b, "Projektdoku: %s\n", briefing.ProjectDocs)
-	fmt.Fprintf(&b, "Sitzung: %s\n", briefing.Session)
 
 	b.WriteString("\n" + briefingContextSeparator + "\n")
 	writeBriefingContext(&b, briefing.Context)
 
 	_, err := io.WriteString(out, b.String())
 	return err
+}
+
+// briefingTextHead sind die ersten Zeilen des Klartexts: die Sitzungskennung,
+// die Aufforderung, die Ausgabe ganz zu lesen, und die Titel der immer
+// geltenden Teile. Sie stehen vorn, weil Sitzungen das Briefing in der Shell
+// kürzen — gemessen 2026-10-25: Claude Code las es mit `| head -80` und sah
+// weder die Anweisung zu Befunden noch die Kennung, die damals am Ende stand.
+// Was hier steht, übersteht jede Kürzung und sagt, was dahinter fehlt.
+func briefingTextHead(briefing project.Briefing) string {
+	var titles []string
+	for _, part := range briefing.Documents.Always.Parts {
+		if part.Origin != project.BriefingOriginDisabled {
+			titles = append(titles, part.Title)
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Sitzung: %s\n", briefing.Session)
+	b.WriteString("Lies diese Ausgabe ganz, nicht gekürzt: Alles darin gilt für die ganze Sitzung.\n")
+	if len(titles) > 0 {
+		fmt.Fprintf(&b, "Es gelten: %s\n", strings.Join(titles, " · "))
+	}
+	b.WriteString("\n")
+	return b.String()
 }
 
 // briefingContextSeparator trennt im Klartext das Briefing vom Übergangsabschnitt.
@@ -276,7 +299,9 @@ dem Verweis. Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts. Wie
 k-playbook context zieht der Aufruf dabei die Assistenten-Verlinkung nach; was
 sich geändert hat, steht im Rest unter links.
 
-Ohne --json steht der Klartext zum Lesen. Mit --json kommt die Antwort als
+Ohne --json steht der Klartext zum Lesen; seine ersten Zeilen nennen die
+Sitzungskennung, bitten, die Ausgabe ganz zu lesen, und zählen die geltenden
+Teile der immer geltenden Anweisungen auf. Mit --json kommt die Antwort als
 JSON mit schemaVersion, session (die Kennung dieser Sitzung, je Aufruf neu),
 documents (always mit content und parts, onDemand,
 rules, reviews, guidelines), work (available, message, user, tasks, workbench,

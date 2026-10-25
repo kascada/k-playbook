@@ -13,11 +13,13 @@ on:
   push:
     paths:
       - "installer/**"
+      - "share/**"
       - "Makefile"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
       - "installer/**"
+      - "share/**"
       - "Makefile"
       - ".github/workflows/test.yml"
   workflow_dispatch:

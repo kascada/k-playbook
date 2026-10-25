@@ -381,8 +381,8 @@ func TestBuildContextLehntFremdesSchemaAb(t *testing.T) {
 // welchem Weg die Installation zu ihrem Stand kam.
 func TestContextForDirZiehtVerlinkungNach(t *testing.T) {
 	root := newContextProject(t)
-	writeFile(t, filepath.Join(PlaybookDir(root), "commands", "k-test.md"), "test\n")
-	writeFile(t, filepath.Join(PlaybookDir(root), "skills", "beispiel", skillFileName), "# Beispiel\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "beispiel", skillFileName), "# Beispiel\n")
 
 	context, err := ContextForDir(root)
 	if err != nil {
@@ -414,7 +414,7 @@ func TestContextForDirZiehtVerlinkungNach(t *testing.T) {
 // als sie stehen zu lassen.
 func TestContextForDirHeiltNichtBeiUnbekannterFassung(t *testing.T) {
 	root := newContextProject(t)
-	writeFile(t, filepath.Join(PlaybookDir(root), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
 	write(t, ConfigPath(root), "schema_version: 99\n\nproject:\n  repo_root: .\n  vcs: git\n")
 
 	if _, err := ContextForDir(root); err == nil {

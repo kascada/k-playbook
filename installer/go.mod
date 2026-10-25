@@ -9,6 +9,7 @@ toolchain go1.26.4
 
 require (
 	github.com/google/jsonschema-go v0.4.3
+	github.com/kascada/k-playbook/share v0.0.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/yuin/goldmark v1.8.5
@@ -23,3 +24,8 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 )
+
+// Die Dateien, die das Binary nach ~/.local/share/k-playbook/ entpackt. Ein
+// eigenes Modul im selben Repo, weil go:embed nicht über installer/ hinaus
+// greift; siehe ../share/embed.go.
+replace github.com/kascada/k-playbook/share => ../share

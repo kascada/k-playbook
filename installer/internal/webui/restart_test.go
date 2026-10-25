@@ -16,6 +16,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // Die Tests hier bauen echte Programme mit gestempelter Version und starten
@@ -35,7 +36,15 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	// Kein Test liest das ~/.local/share/k-playbook dieses Rechners; wer
+	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an.
+	cleanupShare, err := sharetest.Isolate()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	code := m.Run()
+	cleanupShare()
 	if buildDir != "" {
 		_ = os.RemoveAll(buildDir)
 	}

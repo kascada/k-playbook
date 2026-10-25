@@ -67,8 +67,15 @@ func TestBriefingKlartext(t *testing.T) {
 	}
 	// Vorweg der Text der immer geltenden Anweisungen, wie `k-playbook read`
 	// ihn liefert; die Liste seiner Teile mit Herkunft steht nur im JSON.
-	if !strings.HasPrefix(stdout, "## A\n\n## B lokal\n\nText.\nHinweis: k-playbook:/instructions/always/notiz.md (lokal)") {
-		t.Errorf("Ausgabe beginnt nicht mit den immer geltenden Anweisungen:\n%s", stdout)
+	// Davor der Kopf, der jede Kürzung übersteht: Kennung, Aufforderung,
+	// die Titel der geltenden Teile — ohne den abgeschalteten.
+	head := regexp.MustCompile(`^Sitzung: \d{8}-\d{6}-[0-9a-f]{6}\nLies diese Ausgabe ganz, nicht gekürzt: Alles darin gilt für die ganze Sitzung\.\nEs gelten: A · B lokal\n\n`)
+	loc := head.FindStringIndex(stdout)
+	if loc == nil {
+		t.Fatalf("Ausgabe beginnt nicht mit dem Kopf:\n%s", stdout)
+	}
+	if !strings.HasPrefix(stdout[loc[1]:], "## A\n\n## B lokal\n\nText.\nHinweis: k-playbook:/instructions/always/notiz.md (lokal)") {
+		t.Errorf("auf den Kopf folgen nicht die immer geltenden Anweisungen:\n%s", stdout)
 	}
 	for _, absent := range []string{"Immer (", "[dist]  A\n", "[override]  B lokal\n", "[disabled]  200-c.md\n"} {
 		if strings.Contains(stdout, absent) {
@@ -88,8 +95,8 @@ func TestBriefingKlartext(t *testing.T) {
 			t.Errorf("Ausgabe enthält nicht %q:\n%s", want, stdout)
 		}
 	}
-	if !regexp.MustCompile(`\nProjektdoku: [^\n]+\nSitzung: \d{8}-\d{6}-[0-9a-f]{6}\n`).MatchString(stdout) {
-		t.Errorf("Ausgabe nennt die Sitzungskennung nicht nach der Projektdoku:\n%s", stdout)
+	if strings.Count(stdout, "Sitzung: ") != 1 {
+		t.Errorf("Sitzungskennung nicht genau einmal, im Kopf:\n%s", stdout)
 	}
 	briefingPart, contextPart, found := strings.Cut(stdout, briefingContextSeparator)
 	if !found {

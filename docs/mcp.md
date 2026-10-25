@@ -1015,13 +1015,22 @@ and one line per entry `  [level] area: message — hint`. The subcommand `brief
 even with errors in `health` -- the briefing reports, it does not judge; the exit code belongs
 to `k-playbook health`.
 
+**Head of the plain text** (2026-10-25). `k-playbook briefing` without `--json` starts with three
+lines before the text of the always-instructions: `Sitzung: <session>`, the request to read the
+output in full (`Lies diese Ausgabe ganz, nicht gekürzt: …`), and `Es gelten:` with the titles of
+the always-parts that are not disabled, joined by ` · ` (`briefingTextHead` in
+`cmd/k-playbook/briefing.go`). They stand first because sessions cut the output short in the
+shell: Claude Code read it with `| head -80` and missed both the instruction on findings and the
+identifier, which then stood at the end. Whatever is cut, these lines survive and name what the
+rest holds. The JSON answer is unchanged.
+
 A successful answer is `{ok: true, tool, projectDir, schemaVersion, session, documents, work,
 projectDocs, health, context}`:
 
 | Field | Content |
 |---|---|
 | `schemaVersion` | the version of the briefing output, `"5"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`) |
-| `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` after `Projektdoku` |
+| `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.rules`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |

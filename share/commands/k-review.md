@@ -1,0 +1,238 @@
+---
+description: Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
+argument-hint: [review-name]
+# model: github-copilot/gpt-5.5
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
+---
+
+# k-review
+
+## Erster Schritt
+
+Wende `k-playbook/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
+Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
+Dateien aus `instructions`.
+Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
+`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+
+
+Führe ein gezieltes Review gegen das aktuelle Projekt aus, anhand eines Review-Rezepts
+aus dem effektiven Katalog der Context-Ausgabe.
+
+This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in the `review-authoring` entry of `catalogs.rules`.
+
+Produces:
+- Im Report-Modus `review-input.json` und `review-triage.md` unter
+  `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`.
+- Im interaktiven Modus Änderungen am Code, je Stelle erst nach Freigabe.
+- Einen Eintrag in `<RESULTS_DISPLAY_PATH>/log.md` je Lauf.
+
+## Schritt 1 — Pfade auflösen
+
+Recipes come from `catalogs.reviews`; `/k-review` darf nur Einträge mit
+`review.enabled: true` auswählen oder explizit ausführen. Fehlt der Block, gilt
+`review.enabled: true`; `audit.enabled` steuert ausschließlich `/k-audit` und MCP-Läufe.
+Everything a review produces goes under
+`<local.dir>/results/`. `known-decisions.md` is not produced by a review — it is a
+hand-maintained input and lives one level up. From the context output:
+
+- `RESULTS_DIR` = `<local.dir>/results`
+- `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
+- `LOG_FILE` = `<RESULTS_DIR>/log.md`
+- `KNOWN_DECISIONS` = `<local.dir>/known-decisions.md`
+
+Command-specific policy:
+
+- If `RESULTS_DIR` does not exist: ask whether to create it now or run `/k-gui`; do not
+  use any fallback path.
+
+## Schritt 2 — Review bestimmen
+
+Take `catalogs.reviews` from the context output. It already merges shipped and
+project-local recipes and marks entries switched off by an empty local file. Each entry
+carries its `key` — the filename without `.md` and without the `review-` prefix, so
+`review-tech.md` has the key `tech`.
+
+If `$ARGUMENTS` is non-empty: treat it as the review name.
+
+**Name resolution:**
+- Normalize the argument to an overlay key: strip a leading `review-` and a trailing `.md`.
+- Look the key up in the effective catalog. A project-local recipe already won there,
+  so no separate fallback is needed.
+- If the key is not in the effective catalog but a local file switches it off,
+  say so explicitly instead of reporting it as unknown.
+- If the key resolves to a recipe with `review.enabled: false`, abort with: Dieses
+  Rezept ist für `/k-review` deaktiviert; es kann höchstens im Audit-Modus aktiv sein.
+
+If `$ARGUMENTS` is empty: build a selection list from the effective catalog and include
+only recipes with `review.enabled: true`. Do not show audit-only recipes as selectable.
+
+- For each entry, read its YAML frontmatter (`title`, `interval-weeks`) and, if available, the last log entry (see Schritt 6) to show `Letzter Lauf`.
+- Present as:
+
+```
+Verfügbare Reviews:
+
+  [P] review-python-comment-hardspots — Python: Kommentare an Hardspots
+       Letzter Lauf: 2025-11-04   Fällig ab: 2026-02-24
+  [D] review-tech                   — Tech-Debt-Analyse
+       Letzter Lauf: —              Fällig ab: —
+
+  P = projektlokal, D = mitgeliefert, Ü = überlagert eine mitgelieferte Vorlage
+
+Welches Review ausführen?
+```
+
+Wait for the user to pick one.
+
+## Schritt 3 — Review und known-decisions laden
+
+Load the resolved review file. Parse the YAML frontmatter into:
+
+- `name`
+- `title`
+- `interval-weeks` (integer; if missing, default to 12 and note this in the summary)
+- `scope-hint` (free text; may be missing)
+- `language` (optional; e.g. `python`)
+- `handoff` (optional; e.g. `/k-remediation` — see Schritt 5)
+- `result-family` (Pflicht, sobald `handoff` gesetzt ist; e.g. `dependency-cve` — report-mode reviews write to `<RESULTS_DISPLAY_PATH>/<result-family>/<YYYY-MM-DD>/`. Fehlt sie bei einem Report-Rezept: sauber abbrechen, siehe 5b)
+- `review.enabled` (optional; default `true` for this command)
+- `audit.enabled` (optional; default `false`, ignored by this command)
+
+If `KNOWN_DECISIONS` is set and the file exists:
+
+- Read it and hold its content in session context.
+- Announce briefly: „`known-decisions.md` geladen (N Einträge in Kategorien: …). Findings, die dort gedeckt sind, werden nicht als Fund gemeldet."
+
+If it doesn't exist:
+
+- Warn once: „Keine `known-decisions.md` unter `<Pfad>`. Es kann sein, dass bewusste Entscheidungen als Findings auftauchen — bitte im Zweifel korrigieren."
+- Continue.
+
+## Schritt 4 — Scope klären
+
+Show the review's `scope-hint` (if present) and ask the user to confirm or narrow the scope:
+
+- Welche Dateien / Verzeichnisse sollen geprüft werden?
+- Etwas explizit ausschließen?
+
+Do not proceed until the scope is clear.
+
+## Schritt 5 — Review ausführen
+
+There are two execution modes, selected by the review's frontmatter:
+
+### 5a — Interaktiver Modus (Standardfall — kein `handoff` gesetzt)
+
+Generischer Ablauf, der auf jede interaktive Review-Datei angewendet wird:
+
+1. **Scan** nach den Kriterien der Review-Datei. Kandidatenliste intern bilden.
+2. **Übersicht** zeigen — kompakt, Pfad+Zeile+Ein-Satz-Beschreibung pro Fund. Bei leerer Liste: ehrlich sagen („nichts gefunden") — das ist gültiges Ergebnis.
+3. **Rückfragen bündeln** — falls Gründe / Bewertung nicht ohne User-Input zu klären sind: **alle** Fragen in **einer** Nachricht sammeln, nicht Ping-Pong.
+4. **Stelle-für-Stelle**:
+   - Stelle mit Kontext zeigen.
+   - Reviewspezifischen Vorschlag machen (Kommentar / Fix / Findings-Notiz — was auch immer die Review-Datei vorsieht).
+   - **Warten auf Freigabe.** Optionen: `Okay` / `Änder so: ...` / `Skip`.
+   - Nur nach `Okay` (oder nach Anpassung + erneutem `Okay`) tatsächlich ändern.
+   - Diff/Snippet zeigen, dann nächste Stelle.
+5. **Hypothesen-Prinzip** — wenn der User eine Rückfrage nicht beantworten kann: beste Hypothese formulieren, **im Vorschlag** klar als Hypothese markieren (nicht im final einzufügenden Text). Nach Bestätigung ohne Hypothese-Hinweis einfügen.
+
+**Harte Regeln, immer:**
+
+- **Nie mehrere Stellen gleichzeitig ändern.** Pro Stelle: vorschlagen → Freigabe → einfügen → nächste.
+- **Kein Refactoring / keine Formatierung „nebenbei".**
+- **Keine Vermutungen als Fakten formulieren.** Falsche Begründungen sind schlimmer als gar keine.
+- **Reviewspezifischer Scope**, nichts anderes anfassen.
+
+### 5b — Report-Modus (`handoff` ist im Frontmatter gesetzt)
+
+Für Reviews, die ein Ergebnis-Dokument erzeugen statt Stelle-für-Stelle zu moderieren (z. B. `review-tech`):
+
+**`result-family` ist Pflicht.** Ein Report-Rezept ohne `result-family` hat keinen Ort,
+an den sein Ergebnis gehört: Es gibt genau einen Ergebnisweg, den Family-Ordner mit
+`review-input.json` und `review-triage.md`. Fehlt die Angabe im Frontmatter, brich sauber
+ab und nenne das Rezept samt fehlendem Feld — kein Ersatzpfad, keine projektweite
+Sammeldatei. Wer ein neues Report-Rezept schreibt, vergibt eine Familie.
+
+1. Analyse gemäß Review-Datei durchführen.
+2. Ergebnis schreiben. Alles landet unter `RESULTS_DIR`; keinen Ersatzpfad wählen.
+   `RUN_DIR` = `<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Dieses Verzeichnis bei Bedarf anlegen. Vor der Bewertung `review-input.json` schreiben; danach ausschließlich `review-triage.md` als aktuelles Endartefakt schreiben. Der Handoff zeigt immer auf `review-triage.md` in diesem Verzeichnis. Wie beide Dateien entstehen, sagt der Abschnitt unten.
+3. Am Ende: dem User exakten Handoff-Befehl nennen:
+   `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`
+4. **Kein Log-Eintrag mit „Findings übernommen/geskippt"** — nur Analyse-Lauf + Result-Pfad protokollieren (siehe Schritt 6).
+
+#### Zwei Module
+
+`RUN_DIR` ist das Family-Date-Verzeichnis
+`<RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/`. Unter diesem Namen arbeiten beide Module.
+
+1. **Belegvertrag.** Wende `commands/_review-run/review-input-contract.md` an und
+   schreibe `RUN_DIR/review-input.json` nach dem dort beschriebenen **Kern**. Die
+   merge-only-Felder bleiben weg: `/k-review` führt keine MCP-Werkzeuge, der Go-Merge
+   steht hier nie zur Verfügung. Für die stabilen Gruppen-IDs gilt die Report-Regel des
+   Vertrags; laufende Nummern sind ausgeschlossen.
+2. **Triage.** Wende danach `commands/_audit/review-scan-triage.md` wortlaut-treu an und
+   schreibe `RUN_DIR/review-triage.md`.
+
+**Wortlaut-treu anwenden** heißt: das Modul lesen und befolgen, ohne seine Regeln hier zu
+wiederholen. Pflichtabschnitte, Bündelung, Gewichtung von KI-Evidence, die Prioritäten
+`P1`/`P2`/`P3` und die Kategorien `S`/`T`/`K`/`F`/`A`/`X` stehen im Modul und nirgends
+sonst. Hier steht nur, was das Modul nicht wissen kann: welcher Ordner `RUN_DIR` ist und
+dass im Report-Modus kein Audit-Eintrag zu melden ist — `k_playbook_review_write_ai_entry`
+entfällt.
+
+**Nur `review-triage.md`.** Der Report-Modus schreibt genau zwei Dateien:
+`review-input.json` und `review-triage.md`. Ein zusätzliches `review-<name>.md` entsteht nicht. Der Abschnitt
+`## Perspektiven-Report-Format` der Family-Rezepte — `review-dependency-cve`,
+`review-iac-container`, `review-secret-scanning` — verlangt „die im `run.json`-Eintrag
+genannte Datei"; `run.json` gibt es nur im Audit-Lauf. Der Abschnitt ist damit
+audit-gebunden und greift im Report-Modus nicht. Das gilt für alle Family-Rezepte gleich.
+
+## Schritt 6 — Log-Eintrag
+
+Wenn `LOG_FILE` gesetzt ist:
+
+1. Datei anlegen, falls sie noch nicht existiert (Skelett siehe unten).
+2. Sektion für das Review sicherstellen (`## <title>` — anlegen falls nicht vorhanden).
+3. Felder aktualisieren:
+   - `Letzter Lauf`: `now.date`.
+   - `Fällig ab`: `now.date` + `interval-weeks` (als `YYYY-MM-DD`).
+4. Eine Zeile ans Protokoll am Dateiende anhängen:
+
+   | Datum | Review | Scope | Output |
+   |---|---|---|---|
+   | 2026-07-12 | review-python-comment-hardspots | src/upload.py, src/api.py | 3 Vorschläge / 2 übernommen / 1 skip |
+
+Wenn `RESULTS_DIR` fehlt: abbrechen und `/k-gui` empfehlen. Nicht nach einem Ersatzpfad für nur diesen Lauf fragen.
+
+**Log-Skelett** (nur beim ersten Anlegen):
+
+```markdown
+# Review-Log
+
+## Protokoll
+
+| Datum | Review | Scope | Output |
+|---|---|---|---|
+```
+
+Review-spezifische Sektionen (`## <title>` mit `Letzter Lauf` / `Fällig ab`) werden vor der Protokoll-Tabelle hinzugefügt, sobald das jeweilige Review das erste Mal läuft.
+
+## Schritt 7 — Abschluss
+
+- Kompakte Zusammenfassung: N geprüft / M übernommen / K geskippt / L nicht-adressiert.
+- Log-Datei-Pfad nennen.
+- Folge-Command je Modus:
+  - Report-Modus: den Handoff-Befehl aus 5b noch einmal wörtlich ausgeben —
+    `/k-remediation <RESULTS_DIR>/<result-family>/<YYYY-MM-DD>/review-triage.md`.
+  - Interaktiver Modus: wenn nicht-adressierte Findings übrig sind, dem User vorschlagen,
+    diese über `/k-task-create` in die Task-Pipeline zu übergeben. Nur auf Bestätigung
+    ausführen. Sind keine übrig oder lehnt der User ab, ausdrücklich sagen, dass kein
+    Folge-Command ansteht.
+
+## Fehlerfälle
+
+- **Review-Name nicht gefunden**: verfügbare Reviews auflisten und um Auswahl bitten (Schritt 2 wiederholen).
+- **Ambiguität** (mehrere Reviews matchen einen Teilnamen): vollständige Kandidatenliste zeigen, exakten Namen erfragen.
+- **Kein k-playbook-Projekt**: der Context-Aufruf schlägt fehl; abbrechen und `/k-gui` empfehlen.
+- **`RESULTS_DIR` fehlt im Dateisystem**: User fragen, ob genau dieses Verzeichnis angelegt werden soll oder `/k-gui` die Struktur reparieren soll; keinen anderen Pfad verwenden.

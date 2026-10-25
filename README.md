@@ -107,8 +107,8 @@ project/
     ├── rules/            overlay onto k-playbook/rules/
     ├── reviews/          overlay onto k-playbook/reviews/
     ├── checks/           overlay onto k-playbook/checks/
-    ├── commands/         overlay onto k-playbook/commands/
-    ├── skills/           overlay onto k-playbook/skills/
+    ├── commands/         overlay onto ~/.local/share/k-playbook/commands/
+    ├── skills/           overlay onto ~/.local/share/k-playbook/skills/
     ├── results/          everything reviews produce; not versioned
     ├── data/             machine files owned by k-playbook, versioned; holds todos.json
     ├── cache/            derived content, rebuildable at any time; not versioned

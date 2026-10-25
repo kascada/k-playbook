@@ -31,8 +31,8 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 
 | What | Where |
 |---|---|
-| shipped commands | `k-playbook/commands/` |
-| shipped skills | `k-playbook/skills/` |
+| shipped commands | `~/.local/share/k-playbook/commands/`, linked through `.k-playbook/share` |
+| shipped skills | `~/.local/share/k-playbook/skills/`, linked through `.k-playbook/share` |
 | shipped rules | `k-playbook/rules/` |
 | shipped review recipes | `k-playbook/reviews/` |
 | shipped checks | `k-playbook/checks/` |
@@ -156,8 +156,8 @@ Five directories exist twice. What applies is the union of both sides:
 | rules | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
 | review recipes | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
 | checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, top level only |
-| commands | `k-playbook/commands/` | `k-playbook-local/commands/` | `*.md`, recursive |
-| skills | `k-playbook/skills/` | `k-playbook-local/skills/` | directory with `SKILL.md` |
+| commands | `~/.local/share/k-playbook/commands/` | `k-playbook-local/commands/` | `*.md`, recursive |
+| skills | `~/.local/share/k-playbook/skills/` | `k-playbook-local/skills/` | directory with `SKILL.md` |
 
 The comparison unit is the **name**. Both sides use the same naming convention,
 so no derived key is required.
@@ -285,7 +285,7 @@ its parts, `on-demand/`, `rules/`, `reviews/`, `guidelines/`), and what is pendi
 the project's collection -- own open tasks and workbench topics, the number of open
 findings. References, never paths; no contents, with one exception: the text of the
 always-instructions itself (`documents.always.content`, the plain text starts with
-it), assembled as `k-playbook read k-playbook:/instructions/always/` assembles it,
+it after a three-line head: session, read-in-full request, titles of the parts), assembled as `k-playbook read k-playbook:/instructions/always/` assembles it,
 because every session reads it first. Both go through the same overlay
 (`overlayDocDir` in `project/docref.go`), so an entry has the same origin wherever
 it appears.

@@ -868,17 +868,21 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 
 	// commands: Registry und Verweis.
 	for rel, content := range map[string]string{
-		"k-playbook/commands/k-upgrade.md":          "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
+		"share:commands/k-upgrade.md":               "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
 		"k-playbook/defaults/commands/k-upgrade.md": "# k-upgrade\n\nText\n",
-		"k-playbook/commands/k-gui.md":              "# k-gui\n\nHülle\n",
+		"share:commands/k-gui.md":                   "# k-gui\n\nHülle\n",
 		"k-playbook/defaults/commands/k-gui.md":     "# k-gui\n\nText\n",
-		"k-playbook/commands/k-danke.md":            "# k-danke\n",
+		"share:commands/k-danke.md":                 "# k-danke\n",
 		"k-playbook/defaults/commands/k-danke.md":   "# k-danke\n\nText\n",
 		"k-playbook-local/commands/k-gui.md":        "# k-gui\n\nlokal\n",
 		"k-playbook-local/commands/k-danke.md":      "",
 		"k-playbook-local/commands/eigener.md":      "# eigener\n\nText.\n",
 	} {
+		// Die Hüllen liegen mitgeliefert unter ~/.local/share/k-playbook.
 		full := filepath.Join(root, filepath.FromSlash(rel))
+		if after, ok := strings.CutPrefix(rel, "share:"); ok {
+			full = filepath.Join(shipped(t), filepath.FromSlash(after))
+		}
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			t.Fatal(err)
 		}

@@ -19,8 +19,8 @@ func entryFor(t *testing.T, entries []RegistryEntry, name string) RegistryEntry 
 
 func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-a.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-b.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-b.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-b.md"), "projekteigen\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-c.md"), "projekteigen\n")
 
@@ -50,8 +50,8 @@ func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 // einzelne Datei aus _shared/ ersetzen, ohne den Rest zu kopieren.
 func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_shared", "a.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_shared", "b.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "a.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "b.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "_shared", "b.md"), "projekteigen\n")
 
 	entries := ResolveRegistry(root, KindCommands)
@@ -69,7 +69,7 @@ func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 func TestResolveRegistryErhaeltAuditNamensraumUndOverlaySchaltetAb(t *testing.T) {
 	root := t.TempDir()
 	name := "_audit/review-scan-triage.md"
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", filepath.FromSlash(name)), "# Modul\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", filepath.FromSlash(name)), "# Modul\n")
 
 	active := ActiveRegistry(root, KindCommands)
 	if len(active) != 1 || active[0].Name != name {
@@ -88,10 +88,10 @@ func TestResolveRegistryErhaeltAuditNamensraumUndOverlaySchaltetAb(t *testing.T)
 
 func TestResolveRegistryErhaeltDocsNamensraum(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-docs.md"), "# k-docs\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-docs-code.md"), "# k-docs-code\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_docs", "code.md"), "# Docs-Modul: Code\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_docs", "tools.md"), "# Docs-Modul: Tools\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-docs.md"), "# k-docs\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-docs-code.md"), "# k-docs-code\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_docs", "code.md"), "# Docs-Modul: Code\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_docs", "tools.md"), "# Docs-Modul: Tools\n")
 
 	entries := ResolveRegistry(root, KindCommands)
 	for _, name := range []string{"k-docs.md", "k-docs-code.md", "_docs/code.md", "_docs/tools.md"} {
@@ -104,7 +104,7 @@ func TestResolveRegistryErhaeltDocsNamensraum(t *testing.T) {
 // README.md beschreibt das Verzeichnis und ist kein Command.
 func TestResolveRegistryUebergehtReadme(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-a.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "README.md"), "# commands\n")
 
 	entries := ResolveRegistry(root, KindCommands)
@@ -115,7 +115,7 @@ func TestResolveRegistryUebergehtReadme(t *testing.T) {
 
 func TestResolveRegistryLeereDateiSchaltetAb(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-a.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "# hier nicht gebraucht\n")
 
 	if !entryFor(t, ResolveRegistry(root, KindCommands), "k-a.md").Disabled {
@@ -130,9 +130,9 @@ func TestResolveRegistryLeereDateiSchaltetAb(t *testing.T) {
 // überlagert wird das ganze Verzeichnis.
 func TestResolveRegistrySkills(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "alpha", skillFileName), "# Alpha\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "beta", skillFileName), "# Beta\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "kein-skill", "NOTIZ.md"), "kein Skill\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "beta", skillFileName), "# Beta\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "kein-skill", "NOTIZ.md"), "kein Skill\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "skills", "beta", skillFileName), "# Beta projekteigen\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "skills", "gamma", skillFileName), "# Gamma\n")
 
@@ -155,7 +155,7 @@ func TestResolveRegistrySkills(t *testing.T) {
 
 func TestResolveRegistrySkillLeereSkillDateiSchaltetAb(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "alpha", skillFileName), "# Alpha\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
 	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alpha", skillFileName), "# hier nicht gebraucht\n")
 
 	if !entryFor(t, ResolveRegistry(root, KindSkills), "alpha").Disabled {

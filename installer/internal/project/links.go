@@ -26,6 +26,8 @@ type Link struct {
 	Source string `json:"source,omitempty"`
 	// IsInclude unterscheidet die Include-Datei von Katalog-Links.
 	IsInclude bool `json:"isInclude,omitempty"`
+	// IsShare ist der Umweg-Link .k-playbook/share auf ~/.local/share/k-playbook.
+	IsShare bool `json:"isShare,omitempty"`
 	// Optional markiert Links, deren Quelle dem Projekt gehört. Fehlt sie, ist
 	// nichts zu tun — im Gegensatz zu einer fehlenden Quelle in der
 	// Installation, die auf eine beschädigte Installation hindeutet.
@@ -36,8 +38,17 @@ type Link struct {
 //
 // Commands und Skills werden Eintrag für Eintrag verlinkt, nicht als
 // Verzeichnis. Nur so lassen sich zwei Quellen zusammenführen: die
-// mitgelieferten aus k-playbook/ und die projekteigenen aus
+// mitgelieferten aus ~/.local/share/k-playbook/ und die projekteigenen aus
 // k-playbook-local/, wobei ein gleichnamiger projekteigener Eintrag gewinnt.
+//
+// Die mitgelieferten liegen außerhalb des Projekts und hängen am Home des
+// Rechners. Damit die Einzel-Links trotzdem relativ und eincheckbar bleiben,
+// zeigen sie durch einen einzigen Umweg-Link .k-playbook/share, der als
+// einziger absolut ist und in .k-playbook/.gitignore steht. Er steht zuerst,
+// weil ApplyLinks der Reihe nach einrichtet. Global in ~/.claude/ zu verlinken
+// scheidet aus: Claude Code nimmt bei gleichem Namen die globale Fassung, ein
+// Projekt könnte einen mitgelieferten Eintrag dort nicht ersetzen (gemessen
+// 2026-10-25 mit Claude Code 2.1.310; OpenCode 1.18.35 nimmt die des Projekts).
 //
 // Skills stehen nur einmal: OpenCode durchsucht neben .opencode/skills/ auch
 // .claude/skills/, ein zweiter Ort wäre Dopplung.
@@ -72,6 +83,7 @@ type Link struct {
 // ohne AGENTS.md dauerhaft einen offenen, nicht heilbaren Punkt.
 func Links() []Link {
 	return []Link{
+		{Path: shareLinkRel(), Assistant: "Claude Code, OpenCode", IsShare: true},
 		{Path: filepath.Join(".claude", "commands"), Kind: KindCommands, Assistant: "Claude Code"},
 		{Path: filepath.Join(".claude", "skills"), Kind: KindSkills, Assistant: "Claude Code, OpenCode"},
 		{Path: filepath.Join(".opencode", "commands"), Kind: KindCommands, Assistant: "OpenCode"},
@@ -252,8 +264,11 @@ func sortedKeys(set map[string]bool) []string {
 }
 
 func checkLink(projectRoot string, link Link) LinkStatus {
-	if link.IsInclude {
+	switch {
+	case link.IsInclude:
 		return checkIncludeFile(projectRoot, link)
+	case link.IsShare:
+		return checkShareLink(projectRoot, link)
 	}
 	return checkRegistryLink(projectRoot, link)
 }
@@ -388,7 +403,7 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 
 	if !RegistrySourcePresent(projectRoot, link.Kind) {
 		status.State = StateNoSource
-		status.Detail = string(link.Kind) + "/ fehlt in Installation und Projekt"
+		status.Detail = string(link.Kind) + "/ fehlt in ~/.local/share/k-playbook und im Projekt"
 		return status
 	}
 
@@ -481,7 +496,7 @@ func compareRegistry(target string, wanted []RegistryEntry) (linked int, missing
 
 		default:
 			destination, err := os.Readlink(linkPath)
-			if err != nil || destination != relativeSource(linkPath, entry.Path) {
+			if err != nil || destination != relativeSource(linkPath, entry.LinkSource()) {
 				wrong = append(wrong, entry.Name)
 				continue
 			}
@@ -510,15 +525,17 @@ func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntr
 	return stale
 }
 
-// ownedLinks sammelt rekursiv die Symlinks, die in die Installation oder ins
-// lokale Verzeichnis zeigen — also die, die von uns stammen.
+// ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, ins lokale
+// Verzeichnis oder in den Clone zeigen — also die, die von uns stammen. Der
+// Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
+// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben.
 func ownedLinks(projectRoot string, dir string, prefix string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
 	}
 
-	sources := []string{PlaybookDir(projectRoot), LocalDir(projectRoot)}
+	sources := []string{ShareLink(projectRoot), LocalDir(projectRoot), PlaybookDir(projectRoot)}
 	names := []string{}
 
 	for _, entry := range entries {
@@ -567,9 +584,12 @@ func ownedLinks(projectRoot string, dir string, prefix string) []string {
 func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 	for _, link := range Links() {
 		var err error
-		if link.IsInclude {
+		switch {
+		case link.IsInclude:
 			err = applyIncludeFile(projectRoot, link)
-		} else {
+		case link.IsShare:
+			err = applyShareLink(projectRoot, link)
+		default:
 			err = applyRegistryLink(projectRoot, link)
 		}
 		if err != nil {
@@ -783,7 +803,7 @@ func applyRegistryLink(projectRoot string, link Link) error {
 			}
 		}
 
-		if err := os.Symlink(relativeSource(linkPath, entry.Path), linkPath); err != nil {
+		if err := os.Symlink(relativeSource(linkPath, entry.LinkSource()), linkPath); err != nil {
 			return fmt.Errorf("%s verlinken: %w", entry.Name, err)
 		}
 	}

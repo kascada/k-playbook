@@ -509,6 +509,14 @@ func assertRegistryLinks(t *testing.T, root string, statuses []LinkStatus) {
 		if status.IsInclude {
 			continue
 		}
+		if status.IsShare {
+			// Der Umweg-Link, durch den die Katalog-Links zeigen: er muss
+			// stehen, ist aber selbst kein Katalog-Link.
+			if status.State != StateOK {
+				t.Errorf("%s: State = %q (%s), erwartet %q", status.Path, status.State, status.Detail, StateOK)
+			}
+			continue
+		}
 		registry++
 		if status.State != StateOK {
 			t.Errorf("%s: State = %q (%s), erwartet %q", status.Path, status.State, status.Detail, StateOK)

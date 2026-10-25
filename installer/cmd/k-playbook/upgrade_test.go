@@ -9,6 +9,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/buildinfo"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // alteAgentsVorlage ist eine AGENTS.md, wie das Binary sie bis zum Briefing
@@ -67,8 +68,8 @@ func upgradeProjectDir(t *testing.T, version string) string {
 	playbook := filepath.Join(root, project.PlaybookDirName)
 	for _, file := range []struct{ path, content string }{
 		{filepath.Join(playbook, project.VersionFileName), version + "\n"},
-		{filepath.Join(playbook, "commands", "k-test.md"), "test\n"},
-		{filepath.Join(playbook, "skills", "beispiel", "SKILL.md"), "# Beispiel\n"},
+		{filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n"},
+		{filepath.Join(sharetest.Dir(t), "skills", "beispiel", "SKILL.md"), "# Beispiel\n"},
 		{filepath.Join(root, project.RootInstructionsFile), alteAgentsVorlage},
 	} {
 		if err := os.MkdirAll(filepath.Dir(file.path), 0o755); err != nil {

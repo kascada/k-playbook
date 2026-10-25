@@ -351,7 +351,10 @@ never rewrites, 3.1 replaces the old paragraph.
 The identifier for `sitzung` is the briefing's field `session` (briefing schema `"5"`,
 2026-10-24): k-playbook assigns it with every briefing, because only Claude Code puts one into
 the environment (`CLAUDE_CODE_SESSION_ID`) and OpenCode none (`OPENCODE`, `OPENCODE_PID` only,
-measured with `opencode run`).
+measured with `opencode run`). The plain text carries it in its first line since 2026-10-25,
+together with the request to read the output in full and the titles of the always-parts
+(`briefingTextHead`), because a Claude Code session read the briefing with `| head -80` and so
+missed both the findings instruction and the identifier.
 
 **Creating a named document** (2026-10-14, built 2026-10-15 — task 088, in the working tree). One procedure for tasks, findings and
 whatever needs it later: the caller passes the intended short name, k-playbook normalises it
@@ -467,6 +470,20 @@ never rewrite an existing file; the check stays `ok` and only reports "daneben e
 Inhalt". Process detection for the session lock (`KindCursor` in `branches/sessions.go`)
 stays, like `KindCodex`: an open Cursor session still blocks a branch switch. What is left
 is item 19 of the work list.
+
+**Files that must lie on disk are installed once per machine** (2026-10-25). The end goal
+stays: the binary plus Kephalaion, no clone `<project>/k-playbook/`. Everything that can be
+read over MCP goes to Kephalaion. What the assistants need as a file on disk — today the
+commands and the skills — the binary carries embedded and unpacks into
+`~/.local/share/k-playbook/` (`$XDG_DATA_HOME` when set; the same path on macOS, because
+`~/Library/Application Support` has a space and the binary lies in `~/.local/bin` there too).
+Like today's `k-playbook/` it is shipped, read-only and the same for every project, so it is
+installed and updated once per machine, not per project. Size as of v0.16.11: commands and
+skills are 386 KB (139 KB packed) next to an 18.6 MB binary. The directory already holds
+`security-tools/`. A DevContainer mounts it or runs its own install. The commands' text keeps
+moving to Kephalaion (items 15 and 16 of the work list), the skills' later; what stays on disk
+then is the hull. This replaces the cache pulled from the hub that "Open" assumed. Three
+stages, item 20 of the work list.
 
 ## Target for `k-playbook.md` and `AGENTS.md` (task 086)
 
@@ -684,12 +701,13 @@ done and reopen all work; `keph:/user/kamran/workbench/001-workbench-einfuehren.
 protocol. Open: `/k-danke` does not ask about active topics yet; whether a finished topic is
 also resolved (confirmed parts as findings, open parts as tasks); the OpenCode measurement.
 
-**How commands and skills are read once the local files are gone.** Claude Code, OpenCode and
-Cursor find commands and skills only as files on disk, and checks and scripts must run.
-Without the clone the binary would probably `pull` `<hub>:k-playbook/defaults/` into a cache outside
-the project and link from there. `pull` creates every file with mode `0644` (16 executable
-files lose their bit) and `push` skips symlinks. Whether this carries in all three assistants
-has to be measured before the local files go.
+**How commands and skills are read once the local files are gone.** Claude Code and OpenCode
+find commands and skills only as files on disk, and checks and scripts must run. Decided
+2026-10-25 for commands and skills: embedded in the binary, unpacked into
+`~/.local/share/k-playbook/` (see "Files that must lie on disk are installed once per
+machine"). Still open: checks, scripts and `bin/` — whether they go the same way. The earlier
+idea, to `pull` `<hub>:k-playbook/defaults/` into a cache, would have lost the executable bit
+(`pull` creates every file with mode `0644`) and symlinks (`push` skips them).
 
 ## Work list
 
@@ -826,6 +844,42 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     old stub; the temporary guard line `/.cursor/` in this repo's `.gitignore` goes as soon as
     the binary without the Cursor target is installed — until then the installed binary
     recreates `.cursor/commands` on every `k-playbook context`.
+
+20. **Commands and skills from the binary into `~/.local/share/k-playbook/`** — decided
+    2026-10-25, three stages, each tested before the next:
+    1. Pack commands and skills at build time, embed the archive in the binary, unpack it into
+       `~/.local/share/k-playbook/` on install and update. Copies only, no links; nothing in the
+       projects changes yet. **Built 2026-10-25 (in the working tree):** `share/` holds copies of
+       `commands/` and `skills/` and is its own Go module, embedded through a `replace` in
+       `installer/go.mod`; no version directories (decided the same day: commands and skills
+       differ little between versions). Every command except `version` and `help` compares a
+       content checksum and unpacks on a difference; files `0444`. `make share-sync` and a test
+       keep the copies equal; the VERSION guard watches `share/**`. Described in
+       [`architecture.md`](../installer/docs/architecture.md#mitgelieferte-dateien-unter-localsharek-playbook).
+       Measured with an isolated `HOME`; not yet installed on a real machine.
+    2. Link from there into the assistants. Planned globally (`~/.claude/…`); dropped the same
+       day after the measurement below, so `legacy.RemoveGlobalLinks` stays as it is.
+       Projects do override shipped entries (2026-10-25: `squad-km-dev-setup` and `testomni2`
+       replace `k-docs*.md` and `_docs/`), and overriding by the same name stays as it is: the
+       link function resolves local before shipped (`ResolveRegistry`), only the shipped source
+       moves from the clone to `~/.local/share/k-playbook/`. **Measured 2026-10-25:** with the
+       same name globally and in the project, Claude Code 2.1.310 takes the global entry,
+       OpenCode 1.18.35 the project's — for commands and skills alike. Global links therefore
+       cannot be overridden per project in Claude Code; the shipped entries stay linked per
+       project. **Built 2026-10-25 (in the working tree):** every link points relatively through
+       one link `.k-playbook/share` → `~/.local/share/k-playbook/`, the only absolute one, kept
+       out of git by `.k-playbook/.gitignore`; the registry reads the shipped side at its real
+       place, links from the clone are repointed or removed by the existing check. Tried on a
+       copy of this repo: 33 entries repointed, the local `_audit/` override and `bachforelle`
+       stay in `k-playbook-local/`; Claude Code activates `regenbogenforelle` and
+       `bachforelle`, OpenCode lists the commands and all skills through the link. Not yet
+       installed. Described in
+       [`architecture.md`](../installer/docs/architecture.md#der-umweg-link-k-playbookshare).
+    3. Remove the directories no longer used and go through docs, links and the interface.
+
+21. **Project-own commands and skills into `<project>/.k-playbook/`** — wanted 2026-10-25,
+    after item 20: `.k-playbook/` holds only what is new, and `k-playbook-local/` goes once its
+    content has moved (to Kephalaion or here). Same names override as before. Not yet planned.
 
 ## Findings
 

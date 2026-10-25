@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // newProject baut ein Zielprojekt mit Installation darin auf.
@@ -15,8 +16,11 @@ func newProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, project.PlaybookDirName, "commands", "k-test.md"), "test\n")
-	writeFile(t, filepath.Join(root, project.PlaybookDirName, "skills", "beispiel", "SKILL.md"), "# Beispiel\n")
+	// Der Clone steht noch, solange er Regeln, Skripte und Checks trägt; die
+	// Commands und Skills kommen schon aus dem mitgelieferten Verzeichnis.
+	writeFile(t, filepath.Join(root, project.PlaybookDirName, project.VersionFileName), "v0.0.0\n")
+	writeFile(t, filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(sharetest.Dir(t), "skills", "beispiel", "SKILL.md"), "# Beispiel\n")
 	return root
 }
 

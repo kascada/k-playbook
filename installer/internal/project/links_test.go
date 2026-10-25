@@ -13,9 +13,9 @@ func newProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-test.md"), "test\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "_shared", "geteilt.md"), "geteilt\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "skills", "beispiel", skillFileName), "# Beispiel\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "geteilt.md"), "geteilt\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "beispiel", skillFileName), "# Beispiel\n")
 	return root
 }
 
@@ -147,7 +147,7 @@ func TestApplyLinksErsetztVerzeichnisSymlink(t *testing.T) {
 		t.Error("Verzeichnis-Symlink steht noch")
 	}
 	// Die Quelle darf dabei nicht durch den Link hindurch geleert worden sein.
-	if _, err := os.Stat(filepath.Join(root, PlaybookDirName, "commands", "k-test.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(shipped(t), "commands", "k-test.md")); err != nil {
 		t.Errorf("Quelle beschädigt: %v", err)
 	}
 }
@@ -216,7 +216,7 @@ func TestApplyLinksEntferntVerwaisteLinks(t *testing.T) {
 	if _, err := ApplyLinks(root); err != nil {
 		t.Fatalf("erster Lauf: %v", err)
 	}
-	if err := os.Remove(filepath.Join(root, PlaybookDirName, "commands", "k-test.md")); err != nil {
+	if err := os.Remove(filepath.Join(shipped(t), "commands", "k-test.md")); err != nil {
 		t.Fatalf("Command entfernen: %v", err)
 	}
 
@@ -683,8 +683,8 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 
 	// Ein Update bringt einen Command mit, nimmt einen weg, und das Projekt
 	// überschreibt einen dritten neuerdings selbst.
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-neu.md"), "neu\n")
-	if err := os.Remove(filepath.Join(root, PlaybookDirName, "commands", "k-test.md")); err != nil {
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-neu.md"), "neu\n")
+	if err := os.Remove(filepath.Join(shipped(t), "commands", "k-test.md")); err != nil {
 		t.Fatalf("Command entfernen: %v", err)
 	}
 	writeFile(t, filepath.Join(root, LocalDirName, "commands", "_shared", "geteilt.md"), "projekteigen\n")
@@ -717,7 +717,7 @@ func TestHealLinksZiehtUmbenanntenCommandNach(t *testing.T) {
 		t.Fatalf("ApplyLinks: %v", err)
 	}
 
-	commands := filepath.Join(PlaybookDir(root), "commands")
+	commands := filepath.Join(shipped(t), "commands")
 	if err := os.Rename(filepath.Join(commands, "k-test.md"), filepath.Join(commands, "k-task-test.md")); err != nil {
 		t.Fatalf("umbenennen: %v", err)
 	}

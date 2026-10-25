@@ -140,6 +140,9 @@ Links are created for Claude Code and OpenCode:
 project/
 ├── AGENTS.md             instructions, one source for all assistants
 ├── CLAUDE.md             include file with the line @AGENTS.md; the direction is fixed
+├── .k-playbook/
+│   ├── share             -> ~/.local/share/k-playbook, machine-local, not versioned
+│   └── .gitignore        contains /share
 ├── .claude/
 │   ├── commands/         one symlink per command
 │   └── skills/           one symlink per skill; OpenCode reads here too
@@ -147,14 +150,16 @@ project/
     └── commands/
 ```
 
-The three targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the installation or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
+The three targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the shipped entries or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
 
 ```text
 .claude/commands/
-  k-todo.md    -> ../../k-playbook/commands/k-todo.md          shipped
+  k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   shipped
   k-review.md  -> ../../k-playbook-local/commands/k-review.md  project-owned, replaces
   k-own.md     -> ../../k-playbook-local/commands/k-own.md     project-owned only
 ```
+
+The shipped commands and skills are unpacked by the binary once per machine into `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/` when set). The individual links reach them through the one link `.k-playbook/share`: that link is absolute and depends on the machine's home directory, so `.k-playbook/.gitignore` keeps it out of version control, while every link through it stays relative and can be committed. In a DevContainer whose home differs from the host's, each environment points `.k-playbook/share` at its own home when it heals the links; mount `~/.local/share/k-playbook` into the container under the host's path to avoid that. Linking the shipped entries globally (`~/.claude/commands/`) is not an option: with the same name in both places Claude Code takes the global one, so a project could no longer replace a shipped command.
 
 The interface compares this expected state with what is actually registered and reports deviations by name: what is missing, what points to the wrong source, what is orphaned, and what belongs to the project and therefore remains. It synchronizes them at the press of a button. An actual file that someone placed there themselves always takes precedence and is never replaced.
 

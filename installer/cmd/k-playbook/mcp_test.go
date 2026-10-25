@@ -16,6 +16,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // childEnv schaltet das Test-Binary in den Serverbetrieb. Der Server muss als
@@ -42,7 +43,16 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	// Kein Test liest das ~/.local/share/k-playbook dieses Rechners; wer
+	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an.
+	cleanup, err := sharetest.Isolate()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
 }
 
 // newProject legt ein Projekt an, wie es ContextForDir erwartet.
@@ -363,7 +373,7 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 
 func TestReviewStatusMeldetAuditModulUndFiltertAuditRezepte(t *testing.T) {
 	root := newMCPReviewProject(t)
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "commands", "_audit", "review-scan-triage.md"), "# Triage\n\nAktiv.\n")
+	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "commands", "_audit", "review-scan-triage.md"), "# Triage\n\nAktiv.\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-review-only.md"), "---\ntitle: Review Only\naudit:\n  enabled: false\nreview:\n  enabled: true\n---\n# Review Only\n")
 
 	stdout := speak(t, root, 2,

@@ -38,20 +38,50 @@ type RegistryEntry struct {
 	Disabled bool `json:"disabled,omitempty"`
 	// IsDir unterscheidet Skills (Verzeichnis) von Commands (Datei).
 	IsDir bool `json:"isDir,omitempty"`
+	// linkSource ist, worauf der Link im Assistenten-Verzeichnis zeigt. Bei
+	// mitgelieferten Einträgen der Weg durch .k-playbook/share, damit der Link
+	// relativ und damit eincheckbar bleibt; sonst gleich Path.
+	linkSource string
+}
+
+// LinkSource ist das Ziel des Links im Assistenten-Verzeichnis.
+func (e RegistryEntry) LinkSource() string {
+	if e.linkSource != "" {
+		return e.linkSource
+	}
+	return e.Path
 }
 
 // registryDirs sind die beiden Quellverzeichnisse einer Sorte, in
 // Überlagerungsreihenfolge: erst mitgeliefert, dann projekteigen.
+//
+// Mitgeliefert ist seit Stufe 2 von Punkt 20 der Arbeitsliste
+// (docs/knowledge-aktuell.md) ~/.local/share/k-playbook/, das das Binary für den
+// ganzen Rechner entpackt, nicht mehr der Clone k-playbook/. Gelesen wird am
+// echten Ort, damit der Katalog nicht davon abhängt, ob der Link
+// .k-playbook/share schon steht; verlinkt wird durch ihn hindurch.
 func registryDirs(projectDir string, kind AssetKind) (shipped string, local string) {
-	return filepath.Join(PlaybookDir(projectDir), string(kind)),
-		filepath.Join(LocalDir(projectDir), string(kind))
+	if dir := sharedDataDir(); dir != "" {
+		shipped = filepath.Join(dir, string(kind))
+	}
+	return shipped, filepath.Join(LocalDir(projectDir), string(kind))
 }
 
 // RegistrySourcePresent meldet, ob es überhaupt eine Quelle gibt. Fehlen beide,
 // ist nichts zu registrieren — das deutet auf eine unvollständige Installation.
 func RegistrySourcePresent(projectDir string, kind AssetKind) bool {
 	shipped, local := registryDirs(projectDir, kind)
-	return isDir(shipped) || isDir(local)
+	return (shipped != "" && isDir(shipped)) || isDir(local)
+}
+
+// throughShareLink bildet einen Pfad unter shippedDir auf denselben Pfad unter
+// .k-playbook/share/<sorte> ab.
+func throughShareLink(projectDir string, kind AssetKind, shippedDir string, path string) string {
+	rel, err := filepath.Rel(shippedDir, path)
+	if err != nil {
+		return path
+	}
+	return filepath.Join(ShareLink(projectDir), string(kind), rel)
 }
 
 // ResolveRegistry führt mitgelieferte und projekteigene Einträge zusammen.
@@ -66,7 +96,10 @@ func RegistrySourcePresent(projectDir string, kind AssetKind) bool {
 // kann; registriert werden sie nicht.
 func ResolveRegistry(projectDir string, kind AssetKind) []RegistryEntry {
 	shippedDir, localDir := registryDirs(projectDir, kind)
-	shipped := registrySources(shippedDir, kind)
+	shipped := map[string]string{}
+	if shippedDir != "" {
+		shipped = registrySources(shippedDir, kind)
+	}
 	local := registrySources(localDir, kind)
 
 	names := map[string]bool{}
@@ -91,6 +124,7 @@ func ResolveRegistry(projectDir string, kind AssetKind) []RegistryEntry {
 		} else {
 			entry.Path = shipped[name]
 			entry.Origin = "dist"
+			entry.linkSource = throughShareLink(projectDir, kind, shippedDir, entry.Path)
 		}
 		entries = append(entries, entry)
 	}

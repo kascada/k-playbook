@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // assistantProject baut ein Projekt auf und macht es zum Arbeitsverzeichnis:
@@ -75,7 +76,7 @@ func TestAssistantHandlerZiehtUmbenennungNach(t *testing.T) {
 	root := assistantProject(t)
 	getAssistant(t)
 
-	commands := filepath.Join(project.PlaybookDir(root), "commands")
+	commands := filepath.Join(sharetest.Dir(t), "commands")
 	if err := os.Rename(filepath.Join(commands, "k-test.md"), filepath.Join(commands, "k-task-test.md")); err != nil {
 		t.Fatalf("umbenennen: %v", err)
 	}

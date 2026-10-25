@@ -232,6 +232,8 @@ installer/
 │   │                            Kephalaion-Collection
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
+│   ├── share.go                 vor jedem Kommando außer version und help:
+│   │                            ~/.local/share/k-playbook/ auf den eingebetteten Stand
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
 ├── internal/health/
 │   └── health.go                Sammelstelle der Umgebungsprüfung (Task 098): Level,
@@ -274,6 +276,10 @@ installer/
 │   └── vsix/                    die eingecheckte VSIX, gebaut mit `make vscode-vsix`
 ├── internal/legacy/
 │   └── global.go                host-globale Registrierung des alten Modells entfernen
+├── internal/sharedir/
+│   ├── sharedir.go              share/ (eigenes Modul, go:embed) nach
+│   │                            ~/.local/share/k-playbook/ entpacken, Prüfsumme statt Version
+│   └── lock_unix.go             flock im Zielverzeichnis gegen gleichzeitige Aufrufe
 ├── internal/markdown/
 │   └── markdown.go              die eine Goldmark-Konfiguration (GFM, WithAutoHeadingID),
 │                                geteilt von webui und project — dieselben Anker
@@ -286,6 +292,7 @@ installer/
 │   │                            material/ privat sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
+│   ├── sharelink.go             Umweg-Link .k-playbook/share auf ~/.local/share/k-playbook
 │   ├── mcp.go                   MCP-Registrierung in den beiden Assistenten-Dateien
 │   ├── mcp_servers.go           alle MCP-Server aus denselben Dateien lesen, Pflichtlücken
 │   ├── mcp_required.go          tools.mcp.required lesen, Inventar zusammenführen
@@ -759,8 +766,9 @@ so und wird nicht umgangen.
 
 ## Commands und Skills auflösen
 
-`project/registry.go` führt zusammen, was in `k-playbook/` mitgeliefert wird und was
-unter `k-playbook-local/` dazukommt. Es ist dieselbe Overlay-Regel wie bei rules, reviews
+`project/registry.go` führt zusammen, was mitgeliefert wird — seit Stufe 2 von Punkt 20
+der Arbeitsliste aus `~/.local/share/k-playbook/`, nicht mehr aus dem Clone `k-playbook/`
+— und was unter `k-playbook-local/` dazukommt. Es ist dieselbe Overlay-Regel wie bei rules, reviews
 und checks: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
 
 | Sorte | Einheit | Schlüssel | Abschalten durch |
@@ -791,6 +799,7 @@ zusammensetzbar.
 
 | Link | Inhalt | Wer liest |
 |---|---|---|
+| `.k-playbook/share` | Symlink auf `~/.local/share/k-playbook/` (`IsShare`) | beide, über die Katalog-Links |
 | `.claude/commands` | Katalog `commands` | Claude Code |
 | `.claude/skills` | Katalog `skills` | Claude Code, OpenCode |
 | `.opencode/commands` | Katalog `commands` | OpenCode |
@@ -943,12 +952,39 @@ Die drei Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Ein
 
 ```text
 .claude/commands/
-  k-todo.md    -> ../../k-playbook/commands/k-todo.md          dist
+  k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   dist
   k-review.md  -> ../../k-playbook-local/commands/k-review.md  override
   k-eigen.md   -> ../../k-playbook-local/commands/k-eigen.md   local
   _shared/
-    context.md   -> ../../../k-playbook/commands/_shared/context.md
+    context.md   -> ../../../.k-playbook/share/commands/_shared/context.md
 ```
+
+### Der Umweg-Link `.k-playbook/share`
+
+Die mitgelieferten Einträge liegen außerhalb des Projekts, in `~/.local/share/k-playbook/`,
+das das Binary je Rechner entpackt (siehe „Mitgelieferte Dateien unter
+`~/.local/share/k-playbook/`"). Ein Einzel-Link dorthin wäre absolut und hinge am Home des
+Rechners — eingecheckt zeigte er bei jedem anderen ins Leere. Deshalb zeigen alle
+Einzel-Links relativ in **einen** Link `.k-playbook/share` (`project/sharelink.go`), der als
+einziger absolut ist; `.k-playbook/.gitignore` nimmt ihn mit der Zeile `/share` aus, eine
+vorhandene Datei wird nur ergänzt. Er steht in `Links()` zuerst, weil `ApplyLinks()` der
+Reihe nach einrichtet.
+
+- **Lesen am echten Ort:** `registryDirs()` liest die mitgelieferte Seite direkt in
+  `~/.local/share/k-playbook/`, nicht durch den Link. `RegistryEntry.Path` ist die echte
+  Datei, `LinkSource()` der Weg durch `.k-playbook/share`. So hängt der Katalog nicht davon
+  ab, ob der Link schon steht, und die Bilanz vor dem ersten Einrichten stimmt.
+- **Zustände:** fehlt der Link, `missing`; zeigt er woandershin oder fehlt die Zeile in der
+  `.gitignore`, `stale` und heilbar; steht dort etwas Echtes, `blocked`; fehlt
+  `~/.local/share/k-playbook/`, `no-source` — dann gibt es auch keine mitgelieferten
+  Einzel-Links, die projekteigenen kommen trotzdem an.
+- **DevContainer:** Teilen Host und Container das Projekt bei verschiedenem Home, setzt jede
+  Umgebung den Link beim Heilen auf ihr eigenes. Wer das vermeiden will, bindet
+  `~/.local/share/k-playbook` im Container unter dem Pfad des Hosts ein.
+- **Nicht global:** Mit gleichem Namen global und im Projekt nimmt Claude Code (2.1.310) die
+  globale Fassung, OpenCode (1.18.35) die des Projekts — gemessen 2026-10-25. Global
+  verlinkte mitgelieferte Einträge ließen sich in Claude Code also nicht je Projekt
+  ersetzen; deshalb bleibt die Verlinkung im Projekt.
 
 Ein Verzeichnis-Symlink zeigt auf genau eine Quelle; damit käme entweder nur die
 Installation oder nur das Projekt an. Bis Fassung 0.4 war das so. `checkRegistryLink()`
@@ -972,8 +1008,10 @@ sonst wundert man sich, warum ein Override nicht greift —, aber der Gesamtzust
 das er nicht einlöst, ist schlechter als ein Hinweis.
 
 Die Gegenrichtung — `stale` — braucht ein Kriterium dafür, welche Links von uns stammen.
-`ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `k-playbook/` oder
-`k-playbook-local/` zeigen. Alles andere im Verzeichnis gehört dem Projekt und wird
+`ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `.k-playbook/share`,
+`k-playbook-local/` oder in den Clone `k-playbook/` zeigen. Der Clone steht dabei, damit die
+Links aus der Zeit vor Stufe 2 als unsere gelten: was noch im Katalog steht, ist `wrong` und
+wird umgesetzt, was nicht, ist `stale` und verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird
 weder bewertet noch angefasst.
 
 `ApplyLinks()` räumt erst die verwaisten Links weg und setzt dann die des Katalogs. Die
@@ -1357,8 +1395,9 @@ diese Trennung kollidierten beide.
 Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 
 **Das Binary** gibt es an mehreren Orten. **Die Dateien** — Skripte, Tool-Matrix, Regeln,
-Reviews, Checks — kommen dagegen **immer** aus `PlaybookDir(projektDir)`, also aus
-`<projekt>/k-playbook/`. Das Binary liest nie neben sich.
+Reviews, Checks — kommen dagegen aus `PlaybookDir(projektDir)`, also aus
+`<projekt>/k-playbook/`; nur Commands und Skills kommen seit Stufe 2 aus
+`~/.local/share/k-playbook/` (unten). Das Binary liest nie neben sich.
 
 Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist nicht an einen
 bestimmten Projekt-Clone gebunden. Es leitet den Projektinhalt ausschließlich aus dem
@@ -1373,6 +1412,41 @@ Arbeitsverzeichnis und dem Anker ab.
 gegen `SHA256SUMS` und ersetzt `~/.local/bin/k-playbook` atomar. Es gibt keinen
 Programm-Binary-Cache und keine Laufzeit-Auflösung mehr. Die Zuordnung eines laufenden
 Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
+
+### Mitgelieferte Dateien unter `~/.local/share/k-playbook/`
+
+Der Weg, auf dem der Clone `<projekt>/k-playbook/` wegfallen soll: Was die Assistenten als
+Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
+nach `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/`, wenn gesetzt; auf macOS
+derselbe Pfad). Heute sind das `commands/` und `skills/`. Stufe 1 von Punkt 20 der
+Arbeitsliste in [`docs/knowledge-aktuell.md`](../../docs/knowledge-aktuell.md) entpackt,
+Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der Umweg-Link
+`.k-playbook/share`").
+
+- **Quelle** ist `share/` oben im Repo, ein eigenes Go-Modul (`share/embed.go`,
+  `//go:embed all:commands all:skills`), das `installer/go.mod` per `replace` einbindet.
+  Ein Modul, weil `go:embed` nicht über `installer/` hinausgreift; so bettet jeder
+  gewöhnliche `go build` — Makefile, Release-Workflow, Tests — den Inhalt ein, ohne
+  Kopierschritt. `all:` nimmt die Module unter `commands/_*/` mit.
+- **Wann:** `main` ruft `sharedir.Ensure` vor jedem Kommando außer `version` und `help`,
+  nicht nur in der Wirt-Pflege: welcher Weg ein neues Binary hingelegt hat, soll keine
+  Rolle spielen. Bewusst in `main` und nicht in `run`, damit Tests, die `run` direkt
+  rufen, nicht ins echte Home schreiben. Nichts geht nach stdout; ein Fehler ist ein
+  Hinweis auf stderr und hält das Kommando nicht auf.
+- **Ob:** Verglichen wird die SHA-256 über Pfade und Inhalte mit `.inhalt-sha256` im
+  Zielverzeichnis, nicht die Version — jeder `make dev-install` derselben `VERSION`
+  trägt womöglich anderen Inhalt. Im Normalfall ist das eine kleine Datei lesen.
+- **Wie:** unter einer flock-Sperre im Zielverzeichnis in ein Zwischenverzeichnis
+  entpacken, dann je oberstem Verzeichnis tauschen: altes beiseite, neues an seinen
+  Platz, altes entfernen. `VERSION` nennt dem Leser das Programm, die Prüfsumme wird
+  zuletzt geschrieben — ein abgebrochener Lauf wird beim nächsten Aufruf wiederholt. Was
+  sonst im Verzeichnis liegt (`security-tools/`), bleibt unberührt. Die Dateien sind
+  `0444`, die Verzeichnisse `0755`: gesperrte Verzeichnisse hielten auch ein `rm -rf` auf.
+- **Übergang:** `commands/` und `skills/` liegen zusätzlich oben im Repo und bleiben die
+  Quelle der Projekt-Links. `make share-sync` kopiert sie nach `share/`;
+  `TestShareGleichtDenAltenVerzeichnissen` vergleicht das eingebettete FS mit ihnen.
+  Weil `share/` ins Binary geht, beobachten der VERSION-Wächter und der Test-Workflow
+  auch `share/**`.
 
 ### Entwicklungsstand
 

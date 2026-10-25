@@ -6,7 +6,8 @@ name: VERSION-Wächter
 # merkt es, weil nichts abbricht. Genau dieser Fall wird hier rot.
 #
 # Content-Commits an rules, reviews, commands oder docs sind nicht betroffen:
-# sie ändern das Binary nicht und lösen keinen Download aus.
+# sie ändern das Binary nicht und lösen keinen Download aus. share/ dagegen
+# bettet das Binary ein — eine Änderung dort ist eine am Binary.
 
 on:
   push:
@@ -14,6 +15,7 @@ on:
       - main
     paths:
       - "installer/**"
+      - "share/**"
       # Prosa baut nicht mit: eine Änderung dort verlangt kein neues Binary und
       # damit auch keinen VERSION-Bump.
       - "!installer/docs/**"
@@ -56,7 +58,7 @@ jobs:
           after_version="$(git show "$AFTER:VERSION" 2>/dev/null || true)"
 
           if [ "$before_version" = "$after_version" ]; then
-            echo "installer/ hat sich geändert, VERSION aber nicht ($after_version)." >&2
+            echo "installer/ oder share/ hat sich geändert, VERSION aber nicht ($after_version)." >&2
             echo "" >&2
             echo "Der Clone trägt kein Binary mehr; allein VERSION sagt, welches" >&2
             echo "Release dazugehört. Ohne Bump laufen alle Installationen mit dem" >&2
