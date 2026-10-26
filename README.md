@@ -28,7 +28,7 @@
   interrupted session resumes rather than starting over.
 - **Scan tools instead of guesswork.** gitleaks, trufflehog, trivy, semgrep, ruff,
   gosec, govulncheck, osv-scanner, grype, pip-audit and syft are listed in a matrix
-  under `scripts/`; `install-security-tools.sh` installs them, and every job writes
+  under `share/scripts/`; `install-security-tools.sh` installs them, and every job writes
   SARIF into the run directory. What was checked and what was not is stated with a
   reason on the entry.
 - **Its own MCP server.** `k-playbook mcp` gives the assistant the resolved paths,
@@ -103,7 +103,7 @@ project/
 │                   │        unpacked by the binary once per machine; not versioned
 ├── k-playbook/   ←─┤     the installation, fully replaceable
 │   ├── rules/ reviews/ checks/
-│   ├── bin/ scripts/
+│   ├── bin/
 │   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/
 └── k-playbook-local/ ←─┘ project-owned, committed

@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-// BaseToolMatrixPath ist die Matrix der Basis-Werkzeuge, relativ zur
-// Installation. Sie ist bewusst nicht die Security-Matrix: scanners.tsv
+// BaseToolMatrixPath ist die Matrix der Basis-Werkzeuge, relativ zu
+// SharedDir(). Sie ist bewusst nicht die Security-Matrix: scanners.tsv
 // referenziert jene über die Spalte tool, und jeder Eintrag dort wird zu einem
 // Lauf-Zustand in jedem Review.
 const BaseToolMatrixPath = "scripts/base-tools.tsv"
 
-// BaseToolScriptPath ist der Installer der Basis-Werkzeuge, relativ zur
-// Installation. Aufgerufen wird er von hier aus nie — er steht nur als Befehl
+// BaseToolScriptPath ist der Installer der Basis-Werkzeuge, relativ zu
+// SharedDir(). Aufgerufen wird er von hier aus nie — er steht nur als Befehl
 // in der Antwort.
 const BaseToolScriptPath = "scripts/install-base-tools.sh"
 
@@ -71,14 +71,15 @@ type BaseTools struct {
 	InstallCommand string `json:"installCommand"`
 }
 
-// BaseToolMatrix ist der Ort der Matrix in einer Installation.
+// BaseToolMatrix ist der Ort der Matrix, unter ~/.local/share/k-playbook/ wie
+// ToolMatrix.
 func BaseToolMatrix(projectDir string) string {
-	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(BaseToolMatrixPath))
+	return filepath.Join(SharedDir(), filepath.FromSlash(BaseToolMatrixPath))
 }
 
-// BaseToolScript ist der Ort des Installers in einer Installation.
+// BaseToolScript ist der Ort des Installers, wie BaseToolMatrix.
 func BaseToolScript(projectDir string) string {
-	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(BaseToolScriptPath))
+	return filepath.Join(SharedDir(), filepath.FromSlash(BaseToolScriptPath))
 }
 
 // baseToolEntry ist eine Zeile der Matrix, soweit der Befund sie braucht.
@@ -106,7 +107,7 @@ func DetectBaseTools(projectDir string) BaseTools {
 		if !os.IsNotExist(err) {
 			state.Error = err.Error()
 		} else {
-			state.Error = fmt.Sprintf("%s fehlt in der Installation", BaseToolMatrixPath)
+			state.Error = fmt.Sprintf("%s fehlt unter %s", BaseToolMatrixPath, SharedDir())
 		}
 		return state
 	}

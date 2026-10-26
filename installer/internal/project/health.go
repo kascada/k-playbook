@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
@@ -20,14 +21,22 @@ import (
 // Pakets; jedes Programm, das das Briefing, die CLI, den MCP-Server oder die
 // GUI baut, importiert project und hat sie damit.
 //
-// Nichts wird repariert, und kein Eintrag nennt einen Token oder einen Wert
-// aus einer Datei. Die Kontextausgabe bleibt unverändert; health ersetzt
-// keine Felder, es bewertet sie.
+// Die fünfte Quelle, github, wertet kein Feld der Kontextausgabe aus, sondern
+// liest die persönliche GitHub-Zugangsdatei über das Paket githubaccess; sie
+// steht hier neben den anderen, weil hier alle Quellen eingehängt werden und
+// githubaccess project nicht kennt.
+//
+// Repariert wird nichts — außer dass die Quelle github die fehlende
+// Zugangsdatei einmal als Vorlage anlegt, wie ihr Vertrag es will —, und kein
+// Eintrag nennt einen Token oder einen Wert aus einer Datei; Dienst- und
+// Schlüsselnamen dürfen vorkommen. Die Kontextausgabe bleibt unverändert;
+// health ersetzt keine Felder, es bewertet sie.
 func init() {
 	health.Register(healthKephalaion)
 	health.Register(healthGH)
 	health.Register(healthBaseTools)
 	health.Register(healthVersionSources)
+	health.Register(healthGitHub)
 }
 
 // healthKephalaion bewertet die Anbindung an die Collection: eingetragen, aber
@@ -148,4 +157,35 @@ func healthVersionSources(_ context.Context, projectDir string) []health.Problem
 		Hint: "Die Datei korrigieren oder entfernen; die Einzelheiten nennt k-playbook context unter versionSources.error, " +
 			"den Vertrag docs/version-inventory.md der Installation.",
 	}}
+}
+
+// healthGitHub trägt die Probleme der persönlichen GitHub-Zugangsdatei
+// (docs/github-access.md) ein: jedes Problem des Lesers als Eintrag mit
+// seiner Stufe, der Pfad in der Datei (file, services.<name>,
+// services.<name>.access[<i>]) vorn im Satz, weil ein health.Problem kein
+// eigenes Feld dafür hat. Eine leere Datei ergibt nichts; die einmalige
+// Meldung der frisch angelegten Vorlage ist die einzige warning, alles
+// andere error. Die Datei ist persönlich, nicht projektbezogen — projectDir
+// spielt keine Rolle.
+func healthGitHub(_ context.Context, _ string) []health.Problem {
+	path, err := githubaccess.Path()
+	if err != nil {
+		return []health.Problem{{
+			Level:   health.LevelError,
+			Area:    health.AreaGitHub,
+			Message: "Der Ort der GitHub-Zugangsdatei ist unbekannt: " + err.Error() + ".",
+			Hint:    "HOME oder XDG_CONFIG_HOME setzen oder den Pfad in " + githubaccess.EnvConfig + " nennen.",
+		}}
+	}
+	result := githubaccess.Load(path)
+	problems := make([]health.Problem, 0, len(result.Problems))
+	for _, problem := range result.Problems {
+		problems = append(problems, health.Problem{
+			Level:   health.Level(problem.Level),
+			Area:    health.AreaGitHub,
+			Message: problem.Path + ": " + problem.Message,
+			Hint:    problem.Hint,
+		})
+	}
+	return problems
 }

@@ -95,6 +95,29 @@ func stubUpgradeSteps(t *testing.T, update func(string) (project.UpdateResult, e
 	}
 }
 
+// installTargetInPath legt ein eigenes Home an, in dem ~/.local/bin/k-playbook
+// existiert und im PATH steht. Ohne das hängt der Ausgang an der Umgebung des
+// Laufs: program.CheckStatus hält das Programm nur dann für installierbar, wenn
+// `k-playbook` im PATH auf das Installationsziel zeigt — lokal meist der Fall,
+// auf dem GitHub-Runner nicht, und dort fielen die Tests mit Installation und
+// Re-Exec durch.
+func installTargetInPath(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	target, err := project.InstallTargetPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", filepath.Dir(target)+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func setOwnVersion(t *testing.T, version string) {
 	t.Helper()
 	before := buildinfo.Version
@@ -276,6 +299,7 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 // darüberlaufen. Am Ende steht der Hinweis auf den Neustart der Sitzung.
 func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 
 	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
@@ -329,6 +353,7 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 // nicht lief).
 func TestUpgradeReexecTraegtMCPReparaturWennPullEntfiel(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 
 	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
@@ -383,6 +408,7 @@ func TestUpgradeRepairMCPNurMitProjectOnly(t *testing.T) {
 // im Terminal; Schritt (2) läuft trotzdem, mit dem laufenden Programm.
 func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 	stubUpgradeSteps(t,
 		func(string) (project.UpdateResult, error) {

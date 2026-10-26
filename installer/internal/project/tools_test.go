@@ -13,7 +13,7 @@ func newInstallationWithScript(t *testing.T, body string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	scriptDir := filepath.Join(PlaybookDir(root), "scripts")
+	scriptDir := filepath.Join(shipped(t), "scripts")
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestCheckToolsOhneSkript(t *testing.T) {
 
 func TestReadToolLanguagesLiestMatrix(t *testing.T) {
 	root := newInstallationWithScript(t, "echo '{}'")
-	matrix := filepath.Join(PlaybookDir(root), filepath.FromSlash(ToolMatrixPath))
+	matrix := filepath.Join(shipped(t), filepath.FromSlash(ToolMatrixPath))
 	if err := os.WriteFile(matrix, []byte(`# Kommentar
 name	languages	required	installable	install_method	install_ref	asset_pattern	role	docker_image	version_args
 gitleaks	*	true	true	github	gitleaks/gitleaks	-	Secret	-	--version

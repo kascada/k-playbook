@@ -1,0 +1,7 @@
+services:
+  website:
+    repo: acme/website
+    access:
+      - type: gh
+        login: alice
+        file: ~/token

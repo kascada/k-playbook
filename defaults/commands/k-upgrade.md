@@ -3,24 +3,33 @@
 Zieht Programm und Projekt auf den aktuellen Stand von k-playbook. Zuerst das, was das
 Programm allein kann: das Binary, wenn das laufende älter ist als die Installation, danach
 `AGENTS.md` (Anstoß, abgelöste Blöcke), `CLAUDE.md`, die Verlinkung der Commands und Skills
-und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`. Danach die Umstellungen,
-die eine Beurteilung brauchen und deshalb die Sitzung macht, nicht das Programm. Der Command
-nimmt kein Argument.
+und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
+dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
+den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
+nachzieht. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
+macht, nicht das Programm. Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
 
 include: _shared/erster-schritt.md
 
-## Schritt 2 — Nachziehen
+## Schritt 2 — Ausgabe des Nachziehens
 
-Führe in der Shell aus:
+Die Ausgabe von `k-playbook upgrade` steht in der Hülle dieses Commands, unter „Ausgabe von
+`k-playbook upgrade`“. Gib sie unverändert wieder — jede Zeile, auch Hinweise und
+Fehlermeldungen wie „Download/Install nicht möglich“. Fasse nichts zusammen und lass nichts
+weg. In diesem Schritt führst du nichts anderes aus und änderst keine Datei. Was der Lauf
+nicht von selbst nachziehen konnte, steht in der Ausgabe als Hinweis; nenne ihn, behebe ihn
+nicht.
+
+Steht dort keine Ausgabe von `k-playbook upgrade` — die Zeile ist leer, nennt nur den Befehl
+selbst oder meldet, dass er nicht gefunden oder nicht ausgeführt wurde —, dann hat der
+Assistent die Einbettung nicht ausgeführt. Führe dann in der Shell aus:
 
     k-playbook upgrade
 
-Gib die Ausgabe unverändert wieder — jede Zeile, auch Hinweise und Fehlermeldungen wie
-„Download/Install nicht möglich“. Fasse nichts zusammen und lass nichts weg. In diesem
-Schritt führst du nichts anderes aus und änderst keine Datei. Was der Lauf nicht von selbst
-nachziehen konnte, steht in der Ausgabe als Hinweis; nenne ihn, behebe ihn nicht.
+und gib diese Ausgabe nach derselben Regel wieder. Nenne dazu in einer Zeile, dass die Hülle
+den Aufruf nicht ausgeführt hat.
 
 Steht in der Ausgabe, dass das Programm gewechselt hat und die Sitzung neu zu starten ist,
 endet der Command hier mit genau diesem Hinweis: Der laufende MCP-Server behält das alte

@@ -1,0 +1,13 @@
+services:
+  website:
+    repo: acme/website
+    access:
+      - type: public
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: public
+  website:
+    repo: acme/website-2
+    access:
+      - type: public

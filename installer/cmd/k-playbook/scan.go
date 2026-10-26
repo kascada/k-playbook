@@ -64,7 +64,7 @@ func runScan(args []string) error {
 		return nil
 	}
 
-	scanners, err := review.LoadScanners(review.ScannerCatalog(environment.PlaybookDir))
+	scanners, err := review.LoadScanners(review.ScannerCatalog(project.SharedDir()))
 	if err != nil {
 		return fmt.Errorf("Katalog der Scan-Jobs: %w", err)
 	}
@@ -79,7 +79,7 @@ func runScan(args []string) error {
 	options := review.Options{
 		RunDir:     runDir,
 		Target:     target,
-		ScriptsDir: filepath.Join(environment.PlaybookDir, "scripts"),
+		ScriptsDir: filepath.Join(project.SharedDir(), "scripts"),
 		Languages:  run.Languages,
 		Scanners:   scanners,
 		Tools:      resolveTools(preflight),

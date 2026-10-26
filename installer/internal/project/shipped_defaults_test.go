@@ -204,8 +204,31 @@ func inventoryBody(t *testing.T, content string) []byte {
 // /k-upgrade ist der erste Command auf dem Briefing: sein Text beginnt mit
 // `include: _shared/erster-schritt.md`, aufgelöst steht an der Stelle der
 // Rumpf des Moduls ohne Frontmatter, roh die Include-Zeile; die Felder kommen
-// aus dem Briefing, nicht mehr aus `k-playbook context`. Seit Task 096 ruft
-// der Text `k-playbook upgrade` und gibt dessen Meldung wieder.
+// aus dem Briefing, nicht mehr aus `k-playbook context`. Seit Task 096 gibt
+// der Text die Meldung von `k-playbook upgrade` wieder; seit 2026-10-25 führt
+// die Hülle den Aufruf aus, der Text ruft ihn nur noch als Rückfall.
+// Die Hülle von /k-upgrade führt `k-playbook upgrade` per Shell-Einbettung schon
+// beim Aufruf aus, vor dem Briefing des Textes: sonst zöge das Briefing die
+// Verlinkung noch mit dem alten Programm nach. Die Einbettung steht am
+// Zeilenanfang, so wie Claude Code und OpenCode sie erkennen (gemessen
+// 2026-10-25), und der Text nimmt auf ihre Ausgabe Bezug.
+func TestShareKUpgradeHuelleFuehrtUpgradeAus(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(data)
+	if !strings.Contains(hull, "\n!`k-playbook upgrade 2>&1`\n") {
+		t.Errorf("Hülle ohne Einbettung von k-playbook upgrade:\n%s", hull)
+	}
+	if !strings.Contains(hull, "allowed-tools: [Bash,") {
+		t.Errorf("Claude Code führt die Einbettung nur mit Bash in allowed-tools aus:\n%s", hull)
+	}
+	if text := readRepoDefault(t, "commands/k-upgrade.md"); !strings.Contains(text, "Ausgabe von\n`k-playbook upgrade`") {
+		t.Errorf("der Text nimmt keinen Bezug auf die Ausgabe der Hülle:\n%s", text)
+	}
+}
+
 func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	const ref = "k-playbook:/commands/k-upgrade.md"

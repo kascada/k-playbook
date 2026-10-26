@@ -485,7 +485,7 @@ func TestReleaseInstallUmgehtPathSchatten(t *testing.T) {
 		t.Fatalf("Schatten-install anlegen: %v", err)
 	}
 
-	common := filepath.Join(repoRoot(t), "scripts", "lib", "install-common.sh")
+	common := filepath.Join(repoRoot(t), "share", "scripts", "lib", "install-common.sh")
 	program := `die() { exit 1; }
 log() { :; }
 run_or_print() { "$@"; }

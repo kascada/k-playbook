@@ -360,7 +360,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
-| `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message`, `hint`; repairs nothing, never names a token or a value; like `k-playbook health --json` |
+| `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
@@ -1008,7 +1008,8 @@ The section `health` (version 4, task 098) is the environment check: the report 
 `health.Check` (`internal/health`), the same that `k_playbook_health` and `k-playbook health`
 return -- see "Health Contract" below. It **evaluates** fields of the section `context`
 (`kephalaion`, `gh`, `baseTools`, `versionSources`) and replaces none of them; the context
-output stays unchanged. In the plain text of `k-playbook briefing` the block stands right after
+output stays unchanged. The area `github` evaluates no context field: it reads the personal
+GitHub access file (`github-access.md`). In the plain text of `k-playbook briefing` the block stands right after
 the text of the always-instructions and before "Auf Abruf", so that a session reads it before
 it does anything: one line `Umgebung: keine Probleme` without a problem, otherwise `Umgebung:`
 and one line per entry `  [level] area: message — hint`. The subcommand `briefing` exits 0
@@ -1039,7 +1040,7 @@ projectDocs, health, context}`:
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
 | `projectDocs` | the entry of the project documentation, `project:/k-playbook-local/docs/README.md` |
-| `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message` (one sentence, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
+| `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
 | `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
@@ -1067,14 +1068,20 @@ for a `projectDir` that leads to no project, and `read_failed` when a layer coul
 same function behind the subcommand `k-playbook health [--json]` and behind the section
 `health` of the briefing. Its only input is `projectDir`. The check is a collecting point: every
 source registers itself (`health.Register`) and the check asks all of them, so a further source
--- next the personal GitHub file `~/.config/k-playbook/github.yaml` (workbench 002) -- joins
-without a change to briefing, CLI, MCP or GUI. The sources themselves live where their data is
-read, in `project/health.go`, registered when the package loads: `health` cannot import
-`project`, because `project.Briefing` carries the report. The check runs **without network**
-beyond what `kephalaion.Check` already asks the local node, it **repairs nothing**, and it
+joins without a change to briefing, CLI, MCP or GUI -- the fifth, the personal GitHub access
+file `~/.config/k-playbook/github.yaml` (`github-access.md`, workbench 002), joined that way. The
+sources themselves live where their data is read, in `project/health.go`, registered when the
+package loads: `health` cannot import `project`, because `project.Briefing` carries the report;
+the source `github` reads through `internal/githubaccess`, which knows neither. The check runs
+**without network** beyond what `kephalaion.Check` already asks the local node, it **repairs
+nothing** -- with one named exception: the source `github` writes the template for a missing
+access file once, because its contract wants it, and reports that as a `warning` --, and it
 **does not stop at the first problem**. No entry ever carries a token or a value from a file;
-the entry for an unreadable `version-sources.yaml` names the path, not the parser's message,
-which may quote a line of the file (that message stays in `context.versionSources.error`).
+service names and key names may appear (`services.backend.access[1]: Der Pfad in file ist
+relativ.`), values never. The entry for an unreadable `version-sources.yaml` names the path,
+not the parser's message, which may quote a line of the file (that message stays in
+`context.versionSources.error`); the entry for an unreadable `github.yaml` names the line
+number, not the line.
 
 The answer is `{ok: true, tool, projectDir, health: {ok, problems}}`. The report is nested under
 `health`, not embedded, because its `ok` (no errors) is a different thing from the envelope's
@@ -1091,6 +1098,8 @@ is always present, `[]` without a problem. The sources in this version:
 | `gh` | `tools.gh.status` has an unknown value (the context output fails on it) | `error` | set it to `unknown`, `enabled` or `disabled` |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
 | `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
+| `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
+| `github` | the access file was missing and this call wrote the template | `warning` | fill in the template; the next call finds an empty file and reports nothing |
 
 Exit codes of the subcommand: 0 without an error (warnings do not count), 1 with at least one
 error, 2 on a call error (unknown option, no project). Error codes of the tool in `error.code`:

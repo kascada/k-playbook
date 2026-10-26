@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -33,6 +34,7 @@ func environmentCall(t *testing.T, path string) (int, environmentResponse, strin
 // voraus, führt keine Matrix der Basis-Werkzeuge und keine
 // Quellenkonfiguration: genau ein Eintrag, ok bleibt wahr.
 func TestEnvironmentLiefertDenReport(t *testing.T) {
+	accesstest.Empty(t)
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)

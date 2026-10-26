@@ -1,0 +1,24 @@
+# Alle vier Zugangsarten, disabled und ein Deploy Key über host.
+services:
+  website:
+    repo: acme/website
+    access:
+      - type: gh
+        login: alice
+
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: ssh
+        key: ~/.ssh/id_ed25519_acme_labs
+      - type: token
+        file: ~/.config/github-tokens/acme-labs.token
+        disabled: true          # wartet auf die Freigabe der Organisation
+
+  playbook:
+    repo: example/k-playbook
+    access:
+      - type: ssh
+        host: github-example    # Alias in ~/.ssh/config, ein Deploy Key
+      - type: public
+        disabled: false

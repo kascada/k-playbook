@@ -32,6 +32,11 @@ func shareLinkRel() string {
 	return filepath.Join(ProjectDirName, shareLinkName)
 }
 
+// SharedDir ist das Verzeichnis der mitgelieferten Dateien dieses Rechners,
+// ~/.local/share/k-playbook — Ziel des Links .k-playbook/share und Ort von
+// scripts/. Leer, wenn es sich nicht bestimmen lässt.
+func SharedDir() string { return sharedDataDir() }
+
 // sharedDataDir ist das Ziel des Links: die mitgelieferten Dateien dieses
 // Rechners. Leer, wenn es sich nicht bestimmen lässt.
 func sharedDataDir() string {

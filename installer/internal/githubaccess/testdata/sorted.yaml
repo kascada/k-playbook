@@ -1,0 +1,12 @@
+services:
+  zeta:
+    repo: acme/zeta
+    access:
+      - type: token
+        file: relativ.token
+  alpha:
+    access:
+      - type: ssh
+        key: ~/.ssh/a
+        host: github-a
+extra: 1

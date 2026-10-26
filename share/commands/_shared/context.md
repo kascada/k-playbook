@@ -106,8 +106,8 @@ from the output above — never from configuration, and never by searching.
 | project-local commands | `<local.dir>/commands/` |
 | project-local skills | `<local.dir>/skills/` |
 | the check runner, project-local by contract | `<playbook.dir>/bin/k-check` |
-| scripts | `<playbook.dir>/scripts/` |
-| security tool matrix | `<playbook.dir>/scripts/security-tools.tsv` |
+| scripts | `~/.local/share/k-playbook/scripts/` |
+| security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
 
 Jedes Unterverzeichnis von `docs/` steht für eine Herkunft, nicht für ein einzelnes
 Werkzeug. Ein Werkzeug schreibt ausschließlich in Verzeichnisse seiner eigenen Herkunft;

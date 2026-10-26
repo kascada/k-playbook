@@ -31,7 +31,7 @@ func repoRoot(t *testing.T) string {
 
 func scriptPath(t *testing.T, name string) string {
 	t.Helper()
-	path := filepath.Join(repoRoot(t), "scripts", name)
+	path := filepath.Join(repoRoot(t), "share", "scripts", name)
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("Skript fehlt: %v", err)
 	}

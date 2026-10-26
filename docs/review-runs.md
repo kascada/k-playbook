@@ -453,7 +453,7 @@ the command reports this on stderr and leaves it as is.
 ### The Entry Is the Tool, the Job Is the Invocation
 
 An entry is a tool from the matrix. How that tool is invoked is specified in
-[`scripts/scanners.tsv`](../scripts/scanners.tsv): one row per **job**, with languages,
+[`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv): one row per **job**, with languages,
 time limit, and invocation including placeholders. A tool can have multiple jobs, one, or
 none:
 
@@ -557,7 +557,7 @@ project-wide, while `govulncheck` runs on one module.
 `candidates` is the number of files that could have been subjects under the job's
 **reference point**: the module for `workdir: module`, otherwise the run target. Which
 files count is specified by the `candidates` column in
-[`scripts/scanners.tsv`](../scripts/scanners.tsv):
+[`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv):
 
 | Kind | Candidate is | For |
 |---|---|---|

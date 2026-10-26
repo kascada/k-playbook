@@ -1,0 +1,13 @@
+services:
+  website:
+    repo: acme/website
+    access:
+      - type: gh
+        login: alice
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: ssh
+        key: ~/.ssh/id_ed25519_acme_labs
+      - type: token
+        file: tokens/acme-labs.token

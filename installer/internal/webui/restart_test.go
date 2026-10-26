@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -37,13 +38,22 @@ var (
 
 func TestMain(m *testing.M) {
 	// Kein Test liest das ~/.local/share/k-playbook dieses Rechners; wer
-	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an.
+	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an. Und
+	// keiner die persönliche GitHub-Zugangsdatei: /api/environment erreicht
+	// deren Leser, der sonst am echten Ort die Vorlage anlegte; ein
+	// gestarteter Dienst erbt den Override.
 	cleanupShare, err := sharetest.Isolate()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	cleanupGitHub, err := accesstest.Isolate()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	code := m.Run()
+	cleanupGitHub()
 	cleanupShare()
 	if buildDir != "" {
 		_ = os.RemoveAll(buildDir)

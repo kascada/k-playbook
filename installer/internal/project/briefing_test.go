@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -595,6 +596,7 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	stubBriefingDocs(t, unavailableDocs)
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
 	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
 
 	briefing, err := BuildBriefing(t.Context(), root)

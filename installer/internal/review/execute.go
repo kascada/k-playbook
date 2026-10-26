@@ -79,7 +79,7 @@ type Options struct {
 	// Target ist project.repo_root, absolut: der Gegenstand des Scans und das
 	// Arbeitsverzeichnis jedes Jobs.
 	Target string
-	// ScriptsDir ist das scripts/-Verzeichnis der Installation, für {scripts}.
+	// ScriptsDir ist das scripts/-Verzeichnis unter ~/.local/share/k-playbook/, für {scripts}.
 	ScriptsDir string
 	// Languages ist die Sprachauswahl des Laufs, aus run.json.
 	Languages []string

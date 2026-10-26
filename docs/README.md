@@ -28,8 +28,8 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why *Set up* writes an absolute path and when the bare command name is written instead. |
 | [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes, its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |
 | [`version-inventory.md`](./version-inventory.md) | The version inventory contract: data model, pin taxonomy, sources, trust boundary, `version-sources.yaml`. |
-| [`github-access.md`](./github-access.md) | The personal GitHub access file `~/.config/k-playbook/github.yaml`: services, access types (`gh`, `token`, `ssh`, `public`), `disabled`, what the reader reports, the template written when the file is missing, and `k-playbook github check` / `show`. Contract agreed, implementation in steps. |
-| [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract; to be absorbed into `github-access.md`. |
+| [`github-access.md`](./github-access.md) | The personal GitHub access file `~/.config/k-playbook/github.yaml`: services, access types (`gh`, `token`, `ssh`, `public`), `disabled`, the problems the reader reports, the template written when the file is missing, `k-playbook github check` / `show` with their JSON and exit codes, and the health area `github`. Step 1 (reading and checking) is implemented; availability and running under a service are outlook. |
+| [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract; absorbed into `github-access.md` in a later step, after availability. |
 | [`kephalaion-client.md`](./kephalaion-client.md) | The Kephalaion tools k-playbook calls itself (`whoami`, `list`, `create`, `rename`), what it expects of them — `create`/`rename` through the hub, `name_taken`, `list` from the replica and the replica lag measured, `request_id` with one retry, `replayed`, `outcome_unknown` versus `node_unreachable`, minimum node v0.3.1 —, and where the tools themselves are documented. |
 | [`verweisschema.md`](./verweisschema.md) | The reference scheme: one path with a prefix — `project:`, `k-playbook:`, `keph:` —, the access route per prefix, and how k-playbook resolves `k-playbook:` references and assembles directories such as `k-playbook:/instructions/always/`. |
 | [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
@@ -42,7 +42,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`../installer/README.md`](../installer/README.md) | Quick start and checks for working on the tool. |
 | [`../checks/README.md`](../checks/README.md) | Interface and use of `bin/k-check`. |
 | [`../rules/README.md`](../rules/README.md) | The shipped rules. |
-| [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv) | Canonical security tool matrix for the script, interface, and review recipes. |
+| [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv) | Canonical security tool matrix for the script, interface, and review recipes. |
 
 ## Skills
 
@@ -80,7 +80,8 @@ questions and the ordered work list.
 - `Kephalaion client` / `name_taken` / `rename` / `replica lag` / `request_id` / `replayed` / `outcome_unknown` / `kephalaion_unavailable` -> [`kephalaion-client.md`](./kephalaion-client.md)
 - `user area` / `user/<name>/` / `workbench` / `queue/findings/` / `k_playbook_doc_create` / `k_playbook_doc_list` / `k_playbook_doc_done` / `k_playbook_doc_reopen` / `k-playbook doc` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`knowledge-aktuell.md`](./knowledge-aktuell.md)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
-- `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md)
+- `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md), [`github-access.md`](./github-access.md#ssh-key-or-host)
+- `github.yaml` / `GitHub access file` / `service` / `k-playbook github` / `K_PLAYBOOK_GITHUB_CONFIG` / `health github` -> [`github-access.md`](./github-access.md), [`mcp.md`](./mcp.md#health-contract)
 - `installation` / `git clone` -> [`installation.md`](./installation.md)
 - `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
 - `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
@@ -112,7 +113,7 @@ questions and the ordered work list.
 - `reviews` -> [`code-review.md`](./code-review.md)
 - `review-code` / `code review recipe` / `diff of a task` -> [`code-review.md`](./code-review.md#code-review), [`../rules/review-authoring.md`](../rules/review-authoring.md)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
-- `security tools` / `tool matrix` -> [`installation.md`](./installation.md#security-tools), [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv)
+- `security tools` / `tool matrix` -> [`installation.md`](./installation.md#security-tools), [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv)
 - `tasks` -> [`task-flow.md`](./task-flow.md)
 - `update` / `git pull` -> [`installation.md`](./installation.md#update)
 - `version inventory` / `inventory` / `version-sources.yaml` / `pin type` / `trust boundary` -> [`version-inventory.md`](./version-inventory.md)

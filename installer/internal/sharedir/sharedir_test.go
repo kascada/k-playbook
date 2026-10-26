@@ -129,6 +129,26 @@ func TestEnsureEntpacktErsetztUndLaesstDanebenStehen(t *testing.T) {
 	}
 }
 
+// Gleicher Inhalt, neue Version — ein Release ohne Änderung an share/, oder
+// `make dev-install` vor dem Release derselben Dateien: entpackt wird nicht,
+// VERSION nennt trotzdem das neue Programm.
+func TestEnsureFuehrtVERSIONBeiGleichemInhaltNach(t *testing.T) {
+	dir := targetDir(t)
+	roots := []string{"commands"}
+	fsys := fstest.MapFS{"commands/a.md": {Data: []byte("a\n")}}
+	if _, err := ensure(dir, fsys, roots, "v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := ensure(dir, fsys, roots, "v1.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Error("gleicher Inhalt wurde neu entpackt")
+	}
+	assertFile(t, dir, VersionName, "v1.0.1\n")
+}
+
 func TestEnsureOhneVersionEntferntVERSION(t *testing.T) {
 	dir := targetDir(t)
 	roots := []string{"commands"}

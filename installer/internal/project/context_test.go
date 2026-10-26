@@ -436,7 +436,7 @@ func TestAusgelieferteRezepteScopenNurBekannteWerkzeuge(t *testing.T) {
 		t.Fatalf("reviews/: %v", err)
 	}
 
-	matrix, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "security-tools.tsv"))
+	matrix, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "scripts", "security-tools.tsv"))
 	if err != nil {
 		t.Fatalf("security-tools.tsv: %v", err)
 	}

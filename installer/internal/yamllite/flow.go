@@ -104,6 +104,8 @@ func (f *flowParser) parseMapping() (*Node, error) {
 		}
 		if _, seen := node.Fields[key]; !seen {
 			node.Keys = append(node.Keys, key)
+		} else {
+			node.Duplicates = append(node.Duplicates, Duplicate{Key: key, Line: f.line})
 		}
 		node.Fields[key] = value
 		f.skipSpace()

@@ -245,6 +245,9 @@ func writeToolMatrix(t *testing.T, root string, languages ...string) {
 	for _, language := range languages {
 		content += "werkzeug-" + language + "\t" + language + "\n"
 	}
+	// Das mitgelieferte Verzeichnis gehört dem Test, nicht dem leeren aus
+	// TestMain, das alle Tests teilen.
+	shipped(t)
 	writeFile(t, ToolMatrix(root), content)
 }
 

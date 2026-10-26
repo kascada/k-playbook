@@ -232,6 +232,8 @@ installer/
 │   │                            Kephalaion-Collection
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
+│   ├── github.go                Subkommando github: check und show [<dienst>] der
+│   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2
 │   ├── share.go                 vor jedem Kommando außer version und help:
 │   │                            ~/.local/share/k-playbook/ auf den eingebetteten Stand
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
@@ -239,6 +241,18 @@ installer/
 │   └── health.go                Sammelstelle der Umgebungsprüfung (Task 098): Level,
 │                                Problem, Report; Register für Quellen, Check fragt alle
 │                                und sortiert nach Bereich, Stufe, Satz
+├── internal/githubaccess/
+│   ├── path.go                  Ort der persönlichen GitHub-Zugangsdatei (Task 099,
+│   │                            docs/github-access.md): Override K_PLAYBOOK_GITHUB_CONFIG,
+│   │                            XDG_CONFIG_HOME, ~/.config/k-playbook/github.yaml
+│   ├── load.go                  Load: die Datei lesen und vollständig prüfen — Dienste,
+│   │                            repo, Zugänge je Typ, Pfade, disabled, doppelte Namen;
+│   │                            Konfiguration oder Probleme (nach Dateiposition), nie beides
+│   ├── template.go              die Vorlage bei fehlender Datei: Verzeichnis 0700, Datei
+│   │                            0600, services: {} und ein Beispiel je Zugangsart
+│   ├── accesstest/              Isolate und Empty für Tests: eigener Override, damit kein
+│   │                            Test die echte Datei liest oder dort die Vorlage anlegt
+│   └── testdata/                eine gültige Datei und je Problemart eine Datei
 ├── internal/hostenv/
 │   └── hostenv.go               Wo läuft das Programm: Container-Marker, WSL
 ├── internal/notify/
@@ -324,7 +338,8 @@ installer/
 │   │                            Übergangsabschnitt context — der Rest der Kontext-
 │   │                            ausgabe aus ContextForDir (Task 091)
 │   ├── health.go                die Quellen der Umgebungsprüfung: Kephalaion-Anbindung,
-│   │                            gh, Basis-Werkzeuge, Quellenkonfiguration — bei init
+│   │                            gh, Basis-Werkzeuge, Quellenkonfiguration und die
+│   │                            GitHub-Zugangsdatei (über githubaccess) — bei init
 │   │                            in internal/health registriert (health darf project
 │   │                            nicht importieren, das Briefing trägt den Report)
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
@@ -461,7 +476,8 @@ installer/
 │   └── versionsources.go        version-sources.yaml lesen — die eine Implementierung,
 │                                benutzt vom Sammler und von project/context.go
 ├── internal/yamllite/
-│   ├── yamllite.go              der YAML-Ausschnitt, den beide brauchen, mit Zeilennummer
+│   ├── yamllite.go              der YAML-Ausschnitt, den beide brauchen, mit Zeilennummer;
+│   │                            doppelte Schlüssel in Node.Duplicates (für githubaccess)
 │   └── flow.go                  Flow-Schreibweise: [a, b] und { k: v }
 ├── go.mod
 └── README.md
@@ -1394,10 +1410,10 @@ diese Trennung kollidierten beide.
 
 Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 
-**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Skripte, Tool-Matrix, Regeln,
-Reviews, Checks — kommen dagegen aus `PlaybookDir(projektDir)`, also aus
-`<projekt>/k-playbook/`; nur Commands und Skills kommen seit Stufe 2 aus
-`~/.local/share/k-playbook/` (unten). Das Binary liest nie neben sich.
+**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Regeln, Reviews, Checks —
+kommen dagegen aus `PlaybookDir(projektDir)`, also aus `<projekt>/k-playbook/`; Commands,
+Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und Severity-Katalog) kommen seit
+2026-10-25 aus `~/.local/share/k-playbook/` (unten). Das Binary liest nie neben sich.
 
 Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist nicht an einen
 bestimmten Projekt-Clone gebunden. Es leitet den Projektinhalt ausschließlich aus dem
@@ -1418,13 +1434,17 @@ Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 Der Weg, auf dem der Clone `<projekt>/k-playbook/` wegfallen soll: Was die Assistenten als
 Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
 nach `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/`, wenn gesetzt; auf macOS
-derselbe Pfad). Heute sind das `commands/` und `skills/`. Stufe 1 von Punkt 20 der
+derselbe Pfad). Heute sind das `commands/`, `skills/` und `scripts/`; letzteres liest das
+Binary selbst (`project.SharedDir()`: Tool-Matrizen, Preflight- und Installer-Skripte,
+`scanners.tsv` mit `{scripts}` für Scanner-Konfigurationen, `severity.tsv`). Gestartet
+werden die Skripte mit `bash <pfad>`, das Ausführrecht fehlt den entpackten Dateien bewusst. Stufe 1 von Punkt 20 der
 Arbeitsliste in [`docs/knowledge-aktuell.md`](../../docs/knowledge-aktuell.md) entpackt,
 Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der Umweg-Link
 `.k-playbook/share`").
 
 - **Quelle** ist `share/` oben im Repo, ein eigenes Go-Modul (`share/embed.go`,
-  `//go:embed all:commands all:skills`), das `installer/go.mod` per `replace` einbindet.
+  `//go:embed all:commands all:skills all:scripts`), das `installer/go.mod` per `replace`
+  einbindet.
   Ein Modul, weil `go:embed` nicht über `installer/` hinausgreift; so bettet jeder
   gewöhnliche `go build` — Makefile, Release-Workflow, Tests — den Inhalt ein, ohne
   Kopierschritt. `all:` nimmt die Module unter `commands/_*/` mit.
@@ -1436,6 +1456,8 @@ Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der U
 - **Ob:** Verglichen wird die SHA-256 über Pfade und Inhalte mit `.inhalt-sha256` im
   Zielverzeichnis, nicht die Version — jeder `make dev-install` derselben `VERSION`
   trägt womöglich anderen Inhalt. Im Normalfall ist das eine kleine Datei lesen.
+  `VERSION` wird auch bei gleichem Inhalt nachgeführt (`syncVersion`): ein Release, das
+  `share/` nicht ändert, entpackt nichts, soll dort aber trotzdem stehen.
 - **Wie:** unter einer flock-Sperre im Zielverzeichnis in ein Zwischenverzeichnis
   entpacken, dann je oberstem Verzeichnis tauschen: altes beiseite, neues an seinen
   Platz, altes entfernen. `VERSION` nennt dem Leser das Programm, die Prüfsumme wird
@@ -1503,7 +1525,7 @@ Schritt still. Ein Fehler dabei hält den Start nicht auf.
 ## Security-Tool-Preflight
 
 `CheckTools()` in `project/tools.go` ruft
-`k-playbook/scripts/install-security-tools.sh --json` auf und liest dessen JSON.
+`~/.local/share/k-playbook/scripts/install-security-tools.sh --json` auf und liest dessen JSON.
 
 Die Tool-Liste steht **nicht** im Go-Code. Sie kommt aus `scripts/security-tools.tsv`,
 derselben Matrix, die auch das Skript und die Review-Rezepte lesen. Dort steht auch, wie
@@ -1662,7 +1684,7 @@ GitHub-API, und für ein Basis-Werkzeug ist eine vorhandene Version wichtiger al
 durchläuft. Als root mit `apt-get` greift für jeden Eintrag Fall 1:
 
 ```dockerfile
-RUN bash /opt/projekt/k-playbook/scripts/install-base-tools.sh --install --yes
+RUN bash /opt/projekt/k-playbook/share/scripts/install-base-tools.sh --install --yes
 ```
 
 Ein DevContainer übernimmt dieselbe Zeile. Zwei Dinge sind dabei zu wissen:

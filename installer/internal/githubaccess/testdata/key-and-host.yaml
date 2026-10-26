@@ -1,0 +1,7 @@
+services:
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: ssh
+        key: ~/.ssh/id_ed25519
+        host: github-acme

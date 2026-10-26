@@ -1,0 +1,3 @@
+services:
+  website:
+    repo: acme/website

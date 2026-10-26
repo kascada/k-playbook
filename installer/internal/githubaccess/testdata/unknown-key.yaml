@@ -1,0 +1,6 @@
+services:
+  website:
+    repo: acme/website
+    rights: write
+    access:
+      - type: public

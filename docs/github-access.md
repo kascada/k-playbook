@@ -6,10 +6,11 @@ k-playbook reads and checks it, and what happens when it is missing.
 This page is the **single** definition. The reader, the subcommand, the check, and the tests
 refer to it and do not redefine any of it. What is not stated here is not defined.
 
-**Status (2026-10-24):** the format is agreed; nothing of it is implemented yet. This page
-is the contract the first task builds against. Later steps — availability of an access,
-running a command under a service, named operations — are listed under *Outlook* and are not
-part of the contract until they are specified here.
+**Status (2026-10-25):** step 1 is implemented (Task 099): the reader
+(`installer/internal/githubaccess`), the template, `k-playbook github check` and `show`, and
+the health area `github`. Later steps — availability of an access, running a command under a
+service, named operations — are listed under *Outlook* and are not part of the contract until
+they are specified here.
 
 ## What the file is, and is not
 
@@ -159,6 +160,7 @@ Problems in this step, all detected from the file alone:
 - An access with a missing required key, with a key that does not belong to its type, or
   with both `key` and `host`.
 - A relative path.
+- `disabled` with a value other than `true` or `false`.
 - A key the format does not know anywhere.
 
 What the reader does **not** check in this step: whether a `gh` login is known to `gh`,
@@ -184,7 +186,10 @@ exits `0`; the health check lists nothing. Only a file that *says* something wro
 The template is created only at the default location or at the path of the override. It is
 never created inside a project. If the directory cannot be created or written — a read-only
 mount in a container is the expected case — the problem says so and names the path to create
-on the host instead.
+on the host instead. If the path is occupied without being a readable file — a symbolic link
+whose target does not exist — the template cannot be created either: the problem says so,
+names the link and its target, and asks to remove the link or create the target. After the
+template step the reader reads the file at most once more; it never retries beyond that.
 
 ## The subcommand
 
@@ -199,6 +204,12 @@ service per block, or one service when named; it prints what the file says, reso
 included, and nothing the file does not contain. Both create the template when the file is
 missing, as described above.
 
+`show <service>` with a service that is not in the file is a usage error: one message that
+names the known services, exit `2`, no JSON object even with `--json`. `show` on a file with
+at least one `error` prints the problems exactly like `check` — in plain text the same lines,
+with `--json` the object of `check --json` (with `problems` and `services` as `{}`) — and
+exits `1`: there is no configuration to show, only the problems.
+
 Exit codes: `0` no problems, `1` at least one problem, `2` usage error. The one-time
 warning about a freshly created template does not change the exit code: a created file is a
 state to resolve, not a broken one.
@@ -206,7 +217,7 @@ state to resolve, not a broken one.
 ### JSON
 
 `--json` is for readers that must not parse text: an AI session and the interface. `check
---json` prints this, here for a file with one problem:
+--json` prints this, here for the file of the *Format* section without problems:
 
 ```json
 {
@@ -225,8 +236,26 @@ state to resolve, not a broken one.
         { "type": "ssh", "key": "/home/alice/.ssh/id_ed25519_acme_labs" },
         { "type": "token", "file": "/home/alice/.config/github-tokens/acme-labs.token", "disabled": true }
       ]
+    },
+    "playbook": {
+      "repo": "example/k-playbook",
+      "access": [
+        { "type": "ssh", "host": "github-example" },
+        { "type": "public" }
+      ]
     }
   },
+  "problems": []
+}
+```
+
+And this for a file with one problem — configuration or problems, never both:
+
+```json
+{
+  "file": "/home/alice/.config/k-playbook/github.yaml",
+  "created": false,
+  "services": {},
   "problems": [
     {
       "level": "error",
@@ -242,10 +271,13 @@ state to resolve, not a broken one.
 - `created` says whether this call wrote the template.
 - `services` mirrors the file: the same keys, `~` expanded, no comments, `disabled` only
   where it is `true`. Services are in file order; the order of `access` is the precedence.
-  When the file could not be parsed, `services` is `{}`.
+  As soon as one problem has level `error`, `services` is `{}`; the one-time `warning` of a
+  freshly created template leaves it as it is (empty, because the template is empty).
 - `problems` has `level` (`error`|`warning`), `path` (where in the file, `services.<name>` or
   `services.<name>.access[<index>]`, `file` for the file as a whole), `message` and `hint`.
-  It is the same shape as an entry of the health check, so both are read the same way.
+  An entry of the health check has `level`, `area`, `message` and `hint` but no `path`; the
+  health source `github` therefore puts the path in front of the message
+  (`services.backend.access[1]: Der Pfad in file ist relativ.`) and sets `area` to `github`.
   Messages and hints are German, like every other text k-playbook shows to people.
 
 `show --json` prints the same object without `problems`; with a service named, `services`
@@ -259,8 +291,9 @@ briefing, and is told once when the file has just come into being.
 
 ## Relation to other pages
 
-- `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. Once
-  that machine's services are in `github.yaml`, the page is absorbed into this one.
+- `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That
+  machine's services are in its `github.yaml` since step 1; the page is absorbed into this
+  one in a later step, after availability, when k-playbook can tell whether those aliases work.
 - `mcp.md` gets the `k_playbook_health` contract; this page does not define MCP tools.
 
 ## Outlook

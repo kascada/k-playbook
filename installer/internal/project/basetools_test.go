@@ -16,7 +16,7 @@ func newInstallationWithBaseMatrix(t *testing.T, body string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	scriptDir := filepath.Join(PlaybookDir(root), "scripts")
+	scriptDir := filepath.Join(shipped(t), "scripts")
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestBasisMatrixOhneFinalenZeilenumbruch(t *testing.T) {
 		t.Fatalf("Go-Leser meldet %d statt zwei Einträge: %+v", len(state.Missing), state.Missing)
 	}
 
-	script := filepath.Join(repoRootForBaseToolsTest(t), "scripts", "install-base-tools.sh")
+	script := filepath.Join(repoRootForBaseToolsTest(t), "share", "scripts", "install-base-tools.sh")
 	command := exec.Command("bash", script, "--json")
 	command.Env = []string{"K_BASE_TOOLS_MATRIX=" + matrix, "PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
 	output, err := command.Output()

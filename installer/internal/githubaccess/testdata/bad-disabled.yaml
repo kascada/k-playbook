@@ -1,0 +1,6 @@
+services:
+  website:
+    repo: acme/website
+    access:
+      - type: public
+        disabled: yes

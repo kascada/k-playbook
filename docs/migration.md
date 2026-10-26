@@ -183,7 +183,7 @@ pattern in stderr or stdout match, the runner executes the job as `skipped` with
 line as the reason; `failed` remains reserved for technical errors. Precedence remains clear:
 readable SARIF wins and remains `done`, broken non-empty SARIF remains `failed`, as do timeouts
 and runner cancellation. Details are in [`review-runs.md`](./review-runs.md#states) and the
-header line of [`scripts/scanners.tsv`](../scripts/scanners.tsv).
+header line of [`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv).
 
 **Completed: alternative 2, command orchestrated through MCP.** From Task 018
 (`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-audit` is now enabled: the

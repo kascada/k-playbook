@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-// ScannerCatalogName ist der Katalog der Scan-Jobs, relativ zur Installation.
+// ScannerCatalogName ist der Katalog der Scan-Jobs, relativ zu
+// ~/.local/share/k-playbook/ (project.SharedDir).
 const ScannerCatalogName = "scripts/scanners.tsv"
 
 // scannerColumns ist die Spaltenzahl einer Zeile. Sie steht fest, damit eine
@@ -117,9 +118,10 @@ type Scanner struct {
 	Args []string `json:"args"`
 }
 
-// ScannerCatalog ist der Ort des Katalogs in einer Installation.
-func ScannerCatalog(playbookDir string) string {
-	return filepath.Join(playbookDir, filepath.FromSlash(ScannerCatalogName))
+// ScannerCatalog ist der Ort des Katalogs unter sharedDir, dem Verzeichnis der
+// mitgelieferten Dateien.
+func ScannerCatalog(sharedDir string) string {
+	return filepath.Join(sharedDir, filepath.FromSlash(ScannerCatalogName))
 }
 
 // LoadScanners liest den Katalog und prüft ihn vollständig.

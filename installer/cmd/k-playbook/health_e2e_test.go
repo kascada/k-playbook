@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -20,6 +21,7 @@ func healthE2EProject(t *testing.T) string {
 	t.Helper()
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
 	return todoProjectRoot(t)
 }
 

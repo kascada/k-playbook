@@ -1,0 +1,2 @@
+services:
+  website: acme/website

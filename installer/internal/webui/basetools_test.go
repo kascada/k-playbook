@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 const baseToolsMatrixHeader = "name\tgroup\trole\tguarded\tmethods\tapt_package\tgithub_repo\tasset_ref\tasset_pattern\n"
@@ -20,7 +20,7 @@ func newProjectWithBaseMatrix(t *testing.T, body string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	scriptDir := filepath.Join(project.PlaybookDir(root), "scripts")
+	scriptDir := filepath.Join(sharetest.Dir(t), "scripts")
 	if err := os.MkdirAll(scriptDir, 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}

@@ -54,7 +54,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
 | Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
 | Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
-| Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `<playbook.dir>/scripts/`, `<playbook.dir>/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
+| Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
 
 **Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage
 `data/todos.json` gehört dem Werkzeug: gelesen und geschrieben wird sie über den

@@ -64,6 +64,19 @@ type Node struct {
 	Keys   []string
 	Fields map[string]*Node
 	Items  []*Node
+	// Duplicates nennt die Schlüssel einer Abbildung, die mehr als einmal
+	// vorkommen, je weiterem Vorkommen einen Eintrag mit dessen Zeile. Am
+	// Ergebnis ändert ein doppelter Schlüssel nichts: Der letzte Wert gewinnt,
+	// Keys führt ihn einmal — so war es immer, und die Leser des
+	// Versionsinventars verlassen sich darauf. Wer doppelte Schlüssel als
+	// Fehler ansieht (der Leser der GitHub-Zugangsdatei), liest sie hier ab.
+	Duplicates []Duplicate
+}
+
+// Duplicate ist ein weiteres Vorkommen eines Schlüssels in derselben Abbildung.
+type Duplicate struct {
+	Key  string
+	Line int
 }
 
 // Get folgt einem Schlüsselpfad und liefert nil, sobald ein Schritt ins Leere
@@ -351,6 +364,8 @@ func (p *parser) parseMapping(indent int) *Node {
 		child := p.parseValue(line, indent, rest)
 		if _, seen := node.Fields[key]; !seen {
 			node.Keys = append(node.Keys, key)
+		} else {
+			node.Duplicates = append(node.Duplicates, Duplicate{Key: key, Line: line.num})
 		}
 		node.Fields[key] = child
 	}
@@ -445,9 +460,12 @@ func (p *parser) parseItemMapping(line sourceLine, itemIndent int, key string, r
 	for _, siblingKey := range siblings.Keys {
 		if _, seen := node.Fields[siblingKey]; !seen {
 			node.Keys = append(node.Keys, siblingKey)
+		} else {
+			node.Duplicates = append(node.Duplicates, Duplicate{Key: siblingKey, Line: siblings.Fields[siblingKey].Line})
 		}
 		node.Fields[siblingKey] = siblings.Fields[siblingKey]
 	}
+	node.Duplicates = append(node.Duplicates, siblings.Duplicates...)
 	return node
 }
 

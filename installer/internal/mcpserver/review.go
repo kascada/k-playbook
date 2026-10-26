@@ -432,9 +432,9 @@ func scanReviewRun(ctx context.Context, req *mcp.CallToolRequest, env reviewEnvi
 			"message": "Keine Werkzeug-Einträge auszuführen.",
 		}, reviewToolError{}
 	}
-	scanners, err := review.LoadScanners(review.ScannerCatalog(env.PlaybookDir))
+	scanners, err := review.LoadScanners(review.ScannerCatalog(project.SharedDir()))
 	if err != nil {
-		return nil, wrapError(err, "read_failed", "Scanner-Katalog ist nicht lesbar.", map[string]any{"path": review.ScannerCatalog(env.PlaybookDir)})
+		return nil, wrapError(err, "read_failed", "Scanner-Katalog ist nicht lesbar.", map[string]any{"path": review.ScannerCatalog(project.SharedDir())})
 	}
 	preflight, err := project.CheckTools(env.Root, run.Languages)
 	if err != nil {
@@ -450,7 +450,7 @@ func scanReviewRun(ctx context.Context, req *mcp.CallToolRequest, env reviewEnvi
 	statuses, err := review.Execute(ctx, entries, review.Options{
 		RunDir:     runDir,
 		Target:     env.TargetDir,
-		ScriptsDir: filepath.Join(env.PlaybookDir, "scripts"),
+		ScriptsDir: filepath.Join(project.SharedDir(), "scripts"),
 		Languages:  run.Languages,
 		Scanners:   scanners,
 		Tools:      resolveReviewTools(preflight),
@@ -482,7 +482,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 		RunName:             input.Run,
 		RunDir:              runDir,
 		KPlaybookVersion:    mcpKPlaybookVersion(),
-		SeverityMappingPath: merge.SeverityCatalog(env.PlaybookDir),
+		SeverityMappingPath: merge.SeverityCatalog(project.SharedDir()),
 		LocalDir:            env.LocalDir,
 	})
 	if err != nil {

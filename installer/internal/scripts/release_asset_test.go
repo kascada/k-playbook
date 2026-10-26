@@ -53,7 +53,7 @@ func writeReleases(t *testing.T, tag string, names []string) string {
 // Skript; hier stehen sie als Minimalfassung.
 func resolveAsset(t *testing.T, assetRef, repo, pattern, osName, arch, releases string) result {
 	t.Helper()
-	lib := filepath.Join(repoRoot(t), "scripts", "lib", "install-common.sh")
+	lib := filepath.Join(repoRoot(t), "share", "scripts", "lib", "install-common.sh")
 	program := `set -euo pipefail
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '%s\n' "$*" >&2; }
@@ -180,7 +180,7 @@ func TestBestehendeMusterLoesenDasselbeAssetAuf(t *testing.T) {
 		},
 	}
 
-	entries := githubMatrixEntries(t, filepath.Join(repoRoot(t), "scripts", "security-tools.tsv"),
+	entries := githubMatrixEntries(t, filepath.Join(repoRoot(t), "share", "scripts", "security-tools.tsv"),
 		matrixColumns{name: 0, method: 4, ref: 5, pattern: 6})
 	if len(entries) == 0 {
 		t.Fatal("security-tools.tsv führt keinen github-Eintrag mehr")
@@ -229,7 +229,7 @@ func TestBestehendeMusterLoesenDasselbeAssetAuf(t *testing.T) {
 // Asset heißt ripgrep-…, das Programm heißt rg.
 func TestRipgrepMusterTrifftDieTargetTriples(t *testing.T) {
 	entry := matrixEntry{}
-	for _, candidate := range githubMatrixEntries(t, filepath.Join(repoRoot(t), "scripts", "base-tools.tsv"),
+	for _, candidate := range githubMatrixEntries(t, filepath.Join(repoRoot(t), "share", "scripts", "base-tools.tsv"),
 		matrixColumns{name: 0, method: 4, ref: 6, assetRef: 7, pattern: 8}) {
 		if candidate.name == "rg" {
 			entry = candidate

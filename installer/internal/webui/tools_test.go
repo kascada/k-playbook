@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 func TestPreflightBlockedByVenv(t *testing.T) {
@@ -24,7 +25,7 @@ func TestPreflightBlockedByVenv(t *testing.T) {
 
 func TestFallbackToolInstallCommand(t *testing.T) {
 	root := t.TempDir()
-	want := "bash '" + filepath.Join(root, project.PlaybookDirName, project.ToolScriptPath) + "' --languages python,go --install missing --method venv"
+	want := "bash '" + filepath.Join(sharetest.Dir(t), project.ToolScriptPath) + "' --languages python,go --install missing --method venv"
 
 	got := fallbackToolInstallCommand(root, []string{"python", "go"}, " --method venv")
 	if got != want {

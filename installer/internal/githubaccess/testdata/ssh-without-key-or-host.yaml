@@ -1,0 +1,5 @@
+services:
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: ssh

@@ -705,7 +705,10 @@ also resolved (confirmed parts as findings, open parts as tasks); the OpenCode m
 find commands and skills only as files on disk, and checks and scripts must run. Decided
 2026-10-25 for commands and skills: embedded in the binary, unpacked into
 `~/.local/share/k-playbook/` (see "Files that must lie on disk are installed once per
-machine"). Still open: checks, scripts and `bin/` — whether they go the same way. The earlier
+machine"). `scripts/` went the same way on 2026-10-25 (`share/scripts/`, read through
+`project.SharedDir()`; the Dockerfile line in the docs uses `k-playbook/share/scripts/` while
+the clone exists — how it reaches the script without the clone is still open). Still open:
+`checks/` and `bin/`. The earlier
 idea, to `pull` `<hub>:k-playbook/defaults/` into a cache, would have lost the executable bit
 (`pull` creates every file with mode `0644`) and symlinks (`push` skips them).
 

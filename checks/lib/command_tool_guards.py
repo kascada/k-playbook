@@ -4,7 +4,7 @@
 Der Check setzt den Abschnitt „Externe Werkzeuge" aus rules/command-authoring.md
 durch. Er ist ein Hinweisgeber, kein Shell-Parser; seine Grenzen sind bewusst:
 
-- Werkzeugliste ist allein die Spalte ``name`` aus scripts/base-tools.tsv.
+- Werkzeugliste ist allein die Spalte ``name`` aus share/scripts/base-tools.tsv.
 - Gelesen wird der effektive Command-Katalog: mitgelieferte Commands aus
   <playbook>/share/commands/ — derselbe Stand, den das Binary dieser Version nach
   ~/.local/share/k-playbook/ entpackt —, projekteigene aus
@@ -676,7 +676,7 @@ def run() -> int:
     script_dir = Path(sys.argv[1]).resolve()
     playbook_dir, local_dir, guessed = resolve_dirs(script_dir)
 
-    matrix = playbook_dir / "scripts" / "base-tools.tsv"
+    matrix = playbook_dir / "share" / "scripts" / "base-tools.tsv"
     if not matrix.is_file():
         # Ein geratener Pfad darf den Check nicht still per skip abschalten.
         if guessed:

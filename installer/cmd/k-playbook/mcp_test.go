@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
@@ -44,13 +45,22 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	// Kein Test liest das ~/.local/share/k-playbook dieses Rechners; wer
-	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an.
+	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an. Und
+	// keiner die persönliche GitHub-Zugangsdatei: health, briefing und der
+	// MCP-Kindprozess erreichen deren Leser, der sonst am echten Ort die
+	// Vorlage anlegte; der Kindprozess erbt den Override.
 	cleanup, err := sharetest.Isolate()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	cleanupGitHub, err := accesstest.Isolate()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	code := m.Run()
+	cleanupGitHub()
 	cleanup()
 	os.Exit(code)
 }
@@ -703,7 +713,7 @@ func newMCPReviewProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(root, "k-playbook", "scripts"),
+		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, "k-playbook", "reviews"),
 		filepath.Join(root, "k-playbook", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
@@ -716,15 +726,15 @@ func newMCPReviewProject(t *testing.T) string {
 	}
 	mustWriteMCPFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
+	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
+	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
+	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cat <<JSON
 {"playbookDir":"$root/k-playbook","languages":"go","tools":[{"name":"mockscan","languages":"go","status":"ok","path":"$root/mockscan","role":"Mock-Scanner"}]}
 JSON
 `)
-	if err := os.Chmod(filepath.Join(root, "k-playbook", "scripts", "install-security-tools.sh"), 0o755); err != nil {
+	if err := os.Chmod(filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), 0o755); err != nil {
 		t.Fatalf("Preflight chmod: %v", err)
 	}
 	mustWriteMCPFile(t, filepath.Join(root, "mockscan"), "#!/usr/bin/env bash\nprintf '%s' '{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"mockscan\",\"rules\":[{\"id\":\"R1\",\"name\":\"Regel\"}]}},\"results\":[{\"ruleId\":\"R1\",\"level\":\"warning\",\"message\":{\"text\":\"Fund\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"main.go\"},\"region\":{\"startLine\":1}}}]}]}]}'\n")

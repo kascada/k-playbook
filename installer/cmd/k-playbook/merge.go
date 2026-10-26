@@ -33,7 +33,7 @@ func runMerge(args []string) error {
 		RunName:             runName,
 		RunDir:              runDir,
 		KPlaybookVersion:    kPlaybookVersion(),
-		SeverityMappingPath: merge.SeverityCatalog(environment.PlaybookDir),
+		SeverityMappingPath: merge.SeverityCatalog(project.SharedDir()),
 		LocalDir:            localDir,
 	})
 	if err != nil {

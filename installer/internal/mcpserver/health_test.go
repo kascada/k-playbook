@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -44,6 +45,7 @@ func callHealth(t *testing.T, projectDir string) (healthEnvelope, map[string]any
 func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
 	root := newDocProject(t)
 
 	envelope, fields, result := callHealth(t, root)

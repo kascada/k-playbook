@@ -461,7 +461,7 @@ Only `github.com`. Enterprise instances would have their own accounts per host a
 
 Projects may work with their own `.venv`. Security tools are installed separately at host or user scope, never in a project venv. They are one of two deliberate exceptions to project locality: a scanner belongs to the work environment, not the project. Base tools are the second exception; see below.
 
-The canonical matrix is in [`../scripts/security-tools.tsv`](../scripts/security-tools.tsv). The installation script and interface read it; the list is not duplicated in Go code.
+The canonical matrix is in [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv). The installation script and interface read it; the list is not duplicated in Go code.
 
 Required tools:
 
@@ -489,15 +489,15 @@ Optional because they overlap with others: `golangci-lint` (Go quality, bundles 
 **Required applies per language.** A language-bound tool counts as a missing requirement only when its language was requested. Without an indication, no language binding counts as required, because without this information it cannot require what may not be needed:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh --languages python,go --preflight
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --languages python,go --preflight
 ```
 
 The interface shows the status read-only and installs nothing. The script itself does everything else:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh                       # status; this is the default
-k-playbook/scripts/install-security-tools.sh --install missing     # asks before installing
-k-playbook/scripts/install-security-tools.sh --help                # explains the methods
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh                       # status; this is the default
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing     # asks before installing
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --help                # explains the methods
 ```
 
 `--method` selects between `auto`, `native`, `docker`, `pipx`, and `venv`. Without `--yes`, the script shows the plan and asks.
@@ -515,7 +515,7 @@ deactivate
 `--method auto` is recommended: native binaries, Go tools, and Python CLI tools through `pipx` or dedicated tool venvs. To generally isolate Python CLI tools in venvs, use explicitly:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh --install missing --method venv
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing --method venv
 ```
 
 This also does not install into `<project>/.venv`, but into dedicated k-playbook tool venvs under `~/.local/share/k-playbook/security-tools/<tool>-venv`. `--method venv` applies only to Python CLI tools; GitHub-release and Go tools continue to use their native installation path. Each Python tool gets its own venv so their dependencies do not interfere; `--venv-root` can relocate the root.
@@ -524,15 +524,15 @@ This also does not install into `<project>/.venv`, but into dedicated k-playbook
 
 The second deliberate exception to project locality, and a different type from security tools: base tools are not scanners but the ground on which commands stand: `bash`, `git`, `curl` or `wget`, `tar`, `python3`, and `rg`. Either `curl` or `wget` is sufficient.
 
-The matrix is in [`../scripts/base-tools.tsv`](../scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
+The matrix is in [`../share/scripts/base-tools.tsv`](../share/scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
 
 **A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence ends a PR review hard.
 
 Inspect and install state:
 
 ```bash
-k-playbook/scripts/install-base-tools.sh --preflight
-k-playbook/scripts/install-base-tools.sh --install
+bash ~/.local/share/k-playbook/scripts/install-base-tools.sh --preflight
+bash ~/.local/share/k-playbook/scripts/install-base-tools.sh --install
 ```
 
 The script decides per tool: as root with `apt-get`, it installs system-wide through the package manager. Otherwise, it takes the user-local path from a GitHub release. Currently this applies only to `rg`, and this path needs no root. For `git`, `curl`, `wget`, `tar`, and `python3`, there is no useful user-local path; the script prints the `sudo apt-get` command and exits with status `3`, which distinguishes "there is no path for this tool here" from failure.
@@ -546,7 +546,7 @@ The target of the user-local path can be relocated through `--prefix` and `--bin
 `--yes` disables every prompt so a single RUN line can run unattended. As root with `apt-get`, the normal case in an image build, it installs everything system-wide:
 
 ```dockerfile
-RUN bash /opt/project/k-playbook/scripts/install-base-tools.sh --install --yes
+RUN bash /opt/project/k-playbook/share/scripts/install-base-tools.sh --install --yes
 ```
 
 If a tool has no path on this host, the run ends with `3`. This is not a failure, but `docker build` stops for it. If you do not want that, append `|| test $? -eq 3`; if you want to see the gap during the build, leave it in place.

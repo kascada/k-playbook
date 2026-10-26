@@ -39,10 +39,10 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | shipped guidelines | `k-playbook/guidelines/` |
 | shipped instructions, assembled and on demand | `k-playbook/defaults/instructions/always/`, `k-playbook/defaults/instructions/on-demand/` |
 | check runner | `k-playbook/bin/k-check` |
-| scripts | `k-playbook/scripts/` |
-| security tool matrix | `k-playbook/scripts/security-tools.tsv` |
-| base tool matrix | `k-playbook/scripts/base-tools.tsv` |
-| shared script library | `k-playbook/scripts/lib/` |
+| scripts | `~/.local/share/k-playbook/scripts/` |
+| security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
+| base tool matrix | `~/.local/share/k-playbook/scripts/base-tools.tsv` |
+| shared script library | `~/.local/share/k-playbook/scripts/lib/` |
 | project-owned rules | `k-playbook-local/rules/` |
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |

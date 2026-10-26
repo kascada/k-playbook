@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess"
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
@@ -18,7 +20,7 @@ import (
 func healthProject(t *testing.T) string {
 	t.Helper()
 	root := newContextProject(t)
-	scriptDir := filepath.Join(PlaybookDir(root), "scripts")
+	scriptDir := filepath.Join(shipped(t), "scripts")
 	mkdirAll(t, scriptDir)
 	write(t, filepath.Join(scriptDir, "base-tools.tsv"), baseMatrixHeader+"k-da\t-\tIst da\tja\tapt\tpaket\t-\t-\t-\n")
 	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), "schema_version: 1\nroots: []\nsources: []\n")
@@ -26,6 +28,7 @@ func healthProject(t *testing.T) string {
 	t.Setenv("GH_CONFIG_DIR", t.TempDir())
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
 	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
 	return root
 }
@@ -167,7 +170,7 @@ func TestHealthGHKonfigurationNichtLesbarIstFehler(t *testing.T) {
 
 func TestHealthBaseToolsJeFehlendemEineWarnung(t *testing.T) {
 	root := healthProject(t)
-	write(t, filepath.Join(PlaybookDir(root), "scripts", "base-tools.tsv"), baseMatrixHeader+
+	write(t, filepath.Join(shipped(t), "scripts", "base-tools.tsv"), baseMatrixHeader+
 		"k-da\t-\tIst da\tja\tapt\tpaket\t-\t-\t-\n"+
 		"k-weg\t-\tVolltextsuche\tnein\tapt,github\tpaket-weg\tbeispiel/weg\tweg\t^{tool}$\n"+
 		"k-fort\t-\tArchive\tnein\tapt\tpaket-fort\t-\t-\t-\n")
@@ -229,7 +232,7 @@ func TestHealthCheckSammeltAlleQuellen(t *testing.T) {
 	root := healthProject(t)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 	write(t, ConfigPath(root), "schema_version: 3\n\ntools:\n  gh:\n    status: enabled\n")
-	write(t, filepath.Join(PlaybookDir(root), "scripts", "base-tools.tsv"), baseMatrixHeader+"k-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n")
+	write(t, filepath.Join(shipped(t), "scripts", "base-tools.tsv"), baseMatrixHeader+"k-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n")
 	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), ": ungültig\n")
 
 	report := health.Check(context.Background(), root)
@@ -243,5 +246,50 @@ func TestHealthCheckSammeltAlleQuellen(t *testing.T) {
 	want := []string{health.AreaBaseTools, health.AreaGH, health.AreaKephalaion, health.AreaVersionSources}
 	if strings.Join(areas, ",") != strings.Join(want, ",") {
 		t.Errorf("Bereiche %v, erwartet %v", areas, want)
+	}
+}
+
+// Die Quelle github trägt die Probleme der persönlichen Zugangsdatei ein: der
+// Pfad in der Datei vorn im Satz, Stufe wie beim Leser, Bereich github. Eine
+// leere Datei ergibt nichts, eine fehlende einmal eine Warnung (die Vorlage),
+// eine defekte je Problem einen Fehler — nie ein Wert aus der Datei.
+func TestHealthGitHubTraegtDieProblemeDerZugangsdatei(t *testing.T) {
+	root := healthProject(t)
+
+	// Leer: nichts.
+	if problems := healthGitHub(context.Background(), root); len(problems) != 0 {
+		t.Errorf("leere Datei: %+v", problems)
+	}
+
+	// Fehlend: einmal die Warnung der Vorlage, danach nichts; OK bleibt wahr.
+	missing := filepath.Join(t.TempDir(), githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, missing)
+	report := health.Check(context.Background(), root)
+	if !report.OK || len(report.Problems) != 1 {
+		t.Fatalf("fehlende Datei: %+v", report)
+	}
+	got := report.Problems[0]
+	if got.Level != health.LevelWarning || got.Area != health.AreaGitHub || !strings.HasPrefix(got.Message, "file: Die Datei wurde gerade angelegt") || !strings.Contains(got.Hint, missing) {
+		t.Errorf("Vorlage: %+v", got)
+	}
+	if report := health.Check(context.Background(), root); !report.OK || len(report.Problems) != 0 {
+		t.Errorf("zweiter Aufruf: %+v", report)
+	}
+
+	// Defekt: je Problem ein Fehler mit Pfad, OK falsch.
+	write(t, missing, "services:\n  backend:\n    repo: acme-labs/backend\n    access:\n      - type: ssh\n        key: ~/.ssh/id\n      - type: token\n        file: relativ.token\n  web:\n    access:\n      - type: public\n")
+	report = health.Check(context.Background(), root)
+	if report.OK || len(report.Problems) != 2 {
+		t.Fatalf("defekte Datei: %+v", report)
+	}
+	// health sortiert nach Satz; der Pfad steht vorn.
+	if report.Problems[0].Message != "services.backend.access[1]: Der Pfad in file ist relativ." || report.Problems[0].Hint != "Absoluten Pfad oder ~/… eintragen." ||
+		report.Problems[1].Message != "services.web: Dem Dienst fehlt repo." {
+		t.Errorf("Einträge: %+v", report.Problems)
+	}
+	for _, problem := range report.Problems {
+		if problem.Level != health.LevelError || problem.Area != health.AreaGitHub || strings.Contains(problem.Message, "relativ.token") {
+			t.Errorf("Eintrag: %+v", problem)
+		}
 	}
 }

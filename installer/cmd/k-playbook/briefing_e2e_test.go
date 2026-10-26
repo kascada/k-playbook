@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -203,6 +204,7 @@ func TestBriefingOptionen(t *testing.T) {
 func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
 	root := briefingProject(t)
 
 	stdout, err := runBriefingCaptured(t)

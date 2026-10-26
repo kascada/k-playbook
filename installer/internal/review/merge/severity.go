@@ -22,8 +22,10 @@ type SeverityRule struct {
 	Notes      string
 }
 
-func SeverityCatalog(playbookDir string) string {
-	return filepath.Join(playbookDir, filepath.FromSlash(SeverityCatalogName))
+// SeverityCatalog ist der Ort der Zuordnung unter sharedDir, dem Verzeichnis
+// der mitgelieferten Dateien (~/.local/share/k-playbook/).
+func SeverityCatalog(sharedDir string) string {
+	return filepath.Join(sharedDir, filepath.FromSlash(SeverityCatalogName))
 }
 
 func LoadSeverityMapping(path string) (SeverityMapping, error) {

@@ -135,7 +135,7 @@ deactivate
 `.venv/bin`, `venv/bin`, or `env/bin` in `PATH` therefore block installations only, not the status display. `--method auto` is recommended. If Python CLI tools should explicitly be isolated in venvs, use dedicated k-playbook tool venvs:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh --install missing --method venv
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing --method venv
 ```
 
 The destination is `~/.local/share/k-playbook/security-tools/<tool>-venv`, not `<project>/.venv`.
@@ -145,7 +145,7 @@ The destination is `~/.local/share/k-playbook/security-tools/<tool>-venv`, not `
 The interface displays the status read-only. Install through the script:
 
 ```bash
-k-playbook/scripts/install-security-tools.sh --install missing
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing
 ```
 
 Without `--yes`, it shows the plan and asks. `--help` explains the `auto`, `native`, `docker`, `pipx`, and `venv` methods. It writes no project files and starts no scans.

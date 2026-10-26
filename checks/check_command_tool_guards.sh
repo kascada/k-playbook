@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-# Prüft, ob Commands externe Werkzeuge aus scripts/base-tools.tsv nur mit
+# Prüft, ob Commands externe Werkzeuge aus share/scripts/base-tools.tsv nur mit
 # lokalem Guard oder Rückfall aufrufen. Die Ausnahmen liegen ausschließlich in
 # command-tool-guard-exceptions.tsv neben diesem Skript; das Verzeichnis wird
 # deshalb an die Fachlogik übergeben.

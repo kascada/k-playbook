@@ -202,3 +202,47 @@ func TestParseLiestBlockskalareAlsListeneintrag(t *testing.T) {
 		t.Errorf("db.image = %q", got)
 	}
 }
+
+// Ein doppelter Schlüssel ändert am Ergebnis nichts — der letzte Wert gewinnt,
+// Keys führt ihn einmal —, wird aber mit der Zeile seines weiteren Vorkommens
+// in Duplicates festgehalten: in Blockabbildungen, in Listeneinträgen und in
+// Flow-Abbildungen.
+func TestParseHaeltDoppelteSchluesselFest(t *testing.T) {
+	root, err := Parse([]byte(`services:
+  a:
+    repo: x
+  b:
+    repo: y
+  a:
+    repo: z
+liste:
+  - type: ssh
+    key: k
+    type: gh
+flow: { p: 1, q: 2, p: 3 }
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	services := root.Get("services")
+	if keys := services.MapKeys(); len(keys) != 2 || keys[0] != "a" || keys[1] != "b" {
+		t.Errorf("Keys = %v", keys)
+	}
+	if got := services.Get("a", "repo").Str(); got != "z" {
+		t.Errorf("letzter Wert gewinnt nicht: %q", got)
+	}
+	if len(services.Duplicates) != 1 || services.Duplicates[0] != (Duplicate{Key: "a", Line: 6}) {
+		t.Errorf("Duplicates = %+v", services.Duplicates)
+	}
+	item := root.Get("liste").List()[0]
+	if item.Get("type").Str() != "gh" || len(item.Duplicates) != 1 || item.Duplicates[0] != (Duplicate{Key: "type", Line: 11}) {
+		t.Errorf("Listeneintrag: type=%q Duplicates=%+v", item.Get("type").Str(), item.Duplicates)
+	}
+	flow := root.Get("flow")
+	if flow.Get("p").Str() != "3" || len(flow.Duplicates) != 1 || flow.Duplicates[0].Key != "p" {
+		t.Errorf("Flow: p=%q Duplicates=%+v", flow.Get("p").Str(), flow.Duplicates)
+	}
+	if len(root.Duplicates) != 0 {
+		t.Errorf("Wurzel ohne Dubletten erwartet: %+v", root.Duplicates)
+	}
+}

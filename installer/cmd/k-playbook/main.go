@@ -8,7 +8,8 @@
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
 // löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
 // Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
-// Umgebung des Projekts, `upgrade` aktualisiert das Programm und zieht
+// Umgebung des Projekts, `github` liest und prüft die persönliche
+// GitHub-Zugangsdatei, `upgrade` aktualisiert das Programm und zieht
 // das Projekt nach,
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
@@ -119,6 +120,12 @@ func run(args []string) error {
 		// Probleme, als Klartext oder JSON, und sonst nichts — und ein
 		// Skript liest den Exit-Code.
 		return runHealth(args[1:])
+	case "github":
+		// Ohne Wirt-Pflege wie health: die Ausgabe ist die Konfiguration
+		// oder die Problemliste der persönlichen GitHub-Zugangsdatei, als
+		// Klartext oder JSON, und ein Skript liest den Exit-Code. Die Datei
+		// ist persönlich, kein Projekt wird gesucht.
+		return runGitHub(args[1:])
 	case "upgrade":
 		// Ohne Wirt-Pflege: der Nachzug meldet selbst je Schritt, was er tut,
 		// und seine Ausgabe wird von /k-upgrade wörtlich wiedergegeben — eine
@@ -289,13 +296,22 @@ Unterkommandos:
             MCP-Werkzeug k_playbook_briefing.
   health    Nennt Fehler und Warnungen über die Umgebung des Projekts:
             k-playbook health [--json]. Je Eintrag Stufe (error, warning),
-            Bereich (kephalaion, gh, baseTools, versionSources), ein Satz
-            und die Abhilfe; alle auf einmal, nichts wird repariert, kein
-            Token oder Wert steht darin. Ohne Problem die eine Zeile
+            Bereich (kephalaion, gh, baseTools, versionSources, github), ein
+            Satz und die Abhilfe; alle auf einmal, nichts wird repariert
+            (nur die fehlende GitHub-Zugangsdatei entsteht einmal als
+            Vorlage), kein Token oder Wert steht darin. Ohne Problem die eine Zeile
             „Umgebung: keine Probleme“ — derselbe Block wie im Briefing.
             Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
             Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
             k_playbook_health.
+  github    Liest und prüft die persönliche GitHub-Zugangsdatei
+            ~/.config/k-playbook/github.yaml: k-playbook github check|show
+            [<dienst>] [--json]. check nennt alle Probleme, sortiert nach
+            Position in der Datei, sonst Datei und Zahl der Dienste; show
+            zeigt die Konfiguration, je Dienst Repository und Zugänge. Fehlt
+            die Datei, entsteht einmal eine Vorlage. Exit-Code 0 ohne
+            Problem, 1 mit error, 2 bei Aufruffehlern. Vertrag:
+            docs/github-access.md.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

@@ -212,12 +212,12 @@ func TestScannerAppliesTo(t *testing.T) {
 // Der ausgelieferte Katalog muss lesbar sein und zur Tool-Matrix passen: ein
 // Job, dessen Werkzeug es nicht gibt, liefe nie und fiele auch nie auf.
 func TestAusgelieferterKatalogPasstZurToolMatrix(t *testing.T) {
-	scanners, err := LoadScanners(filepath.Join("..", "..", "..", "scripts", "scanners.tsv"))
+	scanners, err := LoadScanners(filepath.Join("..", "..", "..", "share", "scripts", "scanners.tsv"))
 	if err != nil {
 		t.Fatalf("scanners.tsv: %v", err)
 	}
 
-	matrix, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "security-tools.tsv"))
+	matrix, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "scripts", "security-tools.tsv"))
 	if err != nil {
 		t.Fatalf("security-tools.tsv: %v", err)
 	}

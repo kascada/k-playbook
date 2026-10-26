@@ -90,7 +90,7 @@ Ist der Target-Root kein Git-Repo, scannt der globale Runner keine nested Repos 
 `rules/command-authoring.md` durch: Ein Command ruft ein externes Werkzeug nur mit Guard
 oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
 
-- **Werkzeugliste** ist allein die Spalte `name` aus `<playbook.dir>/scripts/base-tools.tsv`.
+- **Werkzeugliste** ist allein die Spalte `name` aus `<playbook.dir>/share/scripts/base-tools.tsv` (derselbe Stand wie unter `~/.local/share/k-playbook/scripts/`).
   Eine neue Zeile dort wirkt ohne Änderung am Check. Fehlt die Matrix, endet der Check mit
   `skip` und nennt den Pfad.
 - **Umfang** ist immer der ganze effektive Command-Katalog: `<playbook.dir>/share/commands/`

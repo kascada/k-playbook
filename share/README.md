@@ -11,7 +11,8 @@ nach `defaults/` und damit nach Kephalaion.
 | `defaults/` | `<hub>:k-playbook/defaults/` (Kephalaion) |
 | `share/` | `~/.local/share/k-playbook/` (Platte) |
 
-Eingebettet werden `commands/` und `skills/` (`embed.go`). Das Binary vergleicht
+Eingebettet werden `commands/`, `skills/` und `scripts/` (`embed.go`); `scripts/`
+liest das Binary selbst und startet die Skripte darin mit `bash`. Das Binary vergleicht
 bei jedem Aufruf die Prüfsumme des eingebetteten Inhalts mit der Datei
 `.inhalt-sha256` im Zielverzeichnis und entpackt nur bei Abweichung. Die Dateien
 dort sind schreibgeschützt.

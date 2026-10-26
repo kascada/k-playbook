@@ -5,15 +5,19 @@
 //
 // Das Paket prüft selbst nichts. Jede Quelle hängt sich mit Register ein und
 // liefert ihre Probleme; Check ruft alle und sortiert. So stellt sich eine
-// weitere Quelle — als Nächstes die persönliche GitHub-Datei — daneben, ohne
-// dass Briefing, CLI oder GUI sich ändern. Die Quellen stehen bewusst nicht
-// hier: Die ersten vier lesen aus dem Paket project (gh, Basis-Werkzeuge,
-// Quellenkonfiguration, Kephalaion-Anbindung), und project trägt den Report
-// im Briefing — dieses Paket darf project darum nicht importieren. project
-// registriert seine Quellen beim Laden (project/health.go).
+// weitere Quelle daneben, ohne dass Briefing, CLI oder GUI sich ändern. Die
+// Quellen stehen bewusst nicht hier: Die ersten vier lesen aus dem Paket
+// project (gh, Basis-Werkzeuge, Quellenkonfiguration, Kephalaion-Anbindung),
+// die fünfte — die persönliche GitHub-Zugangsdatei, Paket githubaccess —
+// wird dort daneben eingehängt, und project trägt den Report im Briefing —
+// dieses Paket darf project darum nicht importieren. project registriert
+// seine Quellen beim Laden (project/health.go).
 //
-// Nichts wird repariert, und kein Eintrag nennt einen Token oder einen Wert
-// aus einer Datei: nur Stufe, Bereich, einen Satz und die Abhilfe.
+// Repariert wird nichts, mit einer benannten Ausnahme: Die Quelle github
+// legt die fehlende Zugangsdatei einmal als Vorlage an, weil ihr Vertrag das
+// so will; sie meldet es als warning. Kein Eintrag nennt einen Token oder
+// einen Wert aus einer Datei — Dienst- und Schlüsselnamen dürfen vorkommen,
+// Werte nie: nur Stufe, Bereich, einen Satz und die Abhilfe.
 package health
 
 import (
@@ -40,6 +44,7 @@ const (
 	AreaGH             = "gh"
 	AreaBaseTools      = "baseTools"
 	AreaVersionSources = "versionSources"
+	AreaGitHub         = "github"
 )
 
 // Problem ist ein Eintrag des Reports.

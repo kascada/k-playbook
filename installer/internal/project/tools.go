@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-// ToolScriptPath ist der Preflight, relativ zur Installation.
+// ToolScriptPath ist der Preflight, relativ zu SharedDir().
 const ToolScriptPath = "scripts/install-security-tools.sh"
 
-// ToolMatrixPath ist die kanonische Tool-Matrix, relativ zur Installation.
+// ToolMatrixPath ist die kanonische Tool-Matrix, relativ zu SharedDir().
 const ToolMatrixPath = "scripts/security-tools.tsv"
 
 // toolPreflightTimeout begrenzt den Aufruf. Der Preflight ruft je Tool ein
@@ -70,14 +70,17 @@ type ToolPreflight struct {
 	Tools                      []Tool `json:"tools"`
 }
 
-// ToolScript ist der Ort des Preflight-Skripts in einer Installation.
+// ToolScript ist der Ort des Preflight-Skripts. Es liegt seit 2026-10-25 nicht
+// mehr im Clone, sondern unter ~/.local/share/k-playbook/ und gilt damit für
+// jedes Projekt des Rechners; projectDir bleibt Parameter, damit die Aufrufer
+// nicht wissen müssen, woher die Datei kommt.
 func ToolScript(projectDir string) string {
-	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(ToolScriptPath))
+	return filepath.Join(SharedDir(), filepath.FromSlash(ToolScriptPath))
 }
 
-// ToolMatrix ist der Ort der Tool-Matrix in einer Installation.
+// ToolMatrix ist der Ort der Tool-Matrix, wie ToolScript.
 func ToolMatrix(projectDir string) string {
-	return filepath.Join(PlaybookDir(projectDir), filepath.FromSlash(ToolMatrixPath))
+	return filepath.Join(SharedDir(), filepath.FromSlash(ToolMatrixPath))
 }
 
 // ReadToolLanguages liest nur die Sprachliste aus der Tool-Matrix. Das braucht
@@ -145,7 +148,7 @@ func describePreflightError(message string, playbookDir string) error {
 func CheckTools(projectDir string, languages []string) (ToolPreflight, error) {
 	script := ToolScript(projectDir)
 	if !fileExists(script) {
-		return ToolPreflight{}, fmt.Errorf("%s fehlt in der Installation", ToolScriptPath)
+		return ToolPreflight{}, fmt.Errorf("%s fehlt unter %s", ToolScriptPath, SharedDir())
 	}
 
 	args := []string{script, "--json"}

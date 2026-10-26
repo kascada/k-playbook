@@ -1,0 +1,4 @@
+services:
+  website:
+    repo: acme/website
+    access: []

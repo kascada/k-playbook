@@ -1,0 +1,5 @@
+services:
+  website:
+    repo: https://github.com/acme/website.git
+    access:
+      - type: public

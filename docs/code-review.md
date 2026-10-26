@@ -284,7 +284,7 @@ Typical artifacts: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json
 `raw/trufflehog.json`.
 
 The tools are provided locally on the host by
-`k-playbook/scripts/install-security-tools.sh`. Missing tools are not installed into the project.
+`~/.local/share/k-playbook/scripts/install-security-tools.sh`. Missing tools are not installed into the project.
 
 ### Dependency CVE
 
@@ -632,11 +632,11 @@ active before installation. Python CLI tools are recommended through `pipx` or, 
 `--method venv`, in dedicated k-playbook tool virtual environments.
 
 ```bash
-k-playbook/scripts/install-security-tools.sh                    # status
-k-playbook/scripts/install-security-tools.sh --install missing  # asks before installation
-k-playbook/scripts/install-security-tools.sh --install missing --method venv  # dedicated tool virtual environments
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh                    # status
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing  # asks before installation
+bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missing --method venv  # dedicated tool virtual environments
 ```
 
 The required tools are canonically listed in
-[`../scripts/security-tools.tsv`](../scripts/security-tools.tsv). The script, interface, and review
+[`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv). The script, interface, and review
 recipes read the same matrix.

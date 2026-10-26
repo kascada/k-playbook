@@ -1,0 +1,4 @@
+services:
+  website:
+    access:
+      - type: public

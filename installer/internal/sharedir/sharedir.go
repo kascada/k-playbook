@@ -67,7 +67,8 @@ func dirFrom(getenv func(string) string, homeDir func() (string, error)) (string
 }
 
 // Ensure bringt das Zielverzeichnis auf den eingebetteten Stand und meldet,
-// ob es dazu entpacken musste. version landet nur in VERSION.
+// ob es dazu entpacken musste. version landet nur in VERSION und wird auch bei
+// gleichem Inhalt nachgeführt.
 func Ensure(version string) (bool, error) {
 	dir, err := Dir()
 	if err != nil {
@@ -83,7 +84,7 @@ func ensure(dir string, fsys fs.FS, roots []string, version string) (bool, error
 	}
 	// Der häufige Fall ohne Sperre: eine kleine Datei lesen und vergleichen.
 	if current(dir) == sum {
-		return false, nil
+		return false, syncVersion(dir, version)
 	}
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -96,7 +97,7 @@ func ensure(dir string, fsys fs.FS, roots []string, version string) (bool, error
 	defer release()
 	// Wer auf die Sperre gewartet hat, findet in der Regel nichts mehr zu tun.
 	if current(dir) == sum {
-		return false, nil
+		return false, syncVersion(dir, version)
 	}
 
 	staging, err := os.MkdirTemp(dir, ".neu-")
@@ -116,18 +117,33 @@ func ensure(dir string, fsys fs.FS, roots []string, version string) (bool, error
 		}
 	}
 
-	if version != "" {
-		if err := writeFile(filepath.Join(dir, VersionName), version+"\n"); err != nil {
-			return true, err
-		}
-	} else if err := os.Remove(filepath.Join(dir, VersionName)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return true, fmt.Errorf("%s entfernen: %w", VersionName, err)
+	if err := syncVersion(dir, version); err != nil {
+		return true, err
 	}
 	// Zuletzt: bricht der Lauf vorher ab, entpackt der nächste noch einmal.
 	if err := writeFile(filepath.Join(dir, SumName), sum+"\n"); err != nil {
 		return true, err
 	}
 	return true, nil
+}
+
+// syncVersion bringt VERSION auf version, ohne etwas zu schreiben, wenn es
+// schon stimmt. Es läuft auch, wenn der Inhalt gleich geblieben ist: Ein
+// Release ohne Änderung an share/ entpackt nichts, VERSION soll trotzdem das
+// Programm nennen, das zuletzt lief — sonst stünde dort nach `make dev-install`
+// und dem Release derselben Dateien die Version davor.
+func syncVersion(dir, version string) error {
+	path := filepath.Join(dir, VersionName)
+	if version == "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("%s entfernen: %w", VersionName, err)
+		}
+		return nil
+	}
+	if data, err := os.ReadFile(path); err == nil && strings.TrimSpace(string(data)) == version {
+		return nil
+	}
+	return writeFile(path, version+"\n")
 }
 
 // Sum ist die SHA-256 über Pfade und Inhalte aller Dateien unter roots, in
