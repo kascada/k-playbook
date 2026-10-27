@@ -253,13 +253,16 @@ Unterkommandos:
   merge     Fasst einen bestehenden Review-Lauf zusammen:
             k-playbook merge <lauf>. Das Ergebnis wird als Review-Input in das
             Laufverzeichnis geschrieben.
-  inventory Erhebt das Versionsinventar dieses Projekts und schreibt es nach
-            k-playbook-local/docs/versions/inventory.md: k-playbook inventory,
+  inventory Erhebt das Versionsinventar dieses Projekts und schreibt es in
+            die Collection des Projekts nach
+            keph:/docs/generated/versions/inventory.md: k-playbook inventory,
             ohne weitere Argumente. Gelesen werden nur deklarative Quellen —
             Manifeste, Lockfiles, Container-, DevContainer-, Helm- und
             CI-Dateien —, dazu die in k-playbook-local/version-sources.yaml
-            konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt die Datei
-            unangetastet. Vertrag: k-playbook/docs/version-inventory.md.
+            konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt das
+            Dokument unangetastet. Ohne bereite Kephalaion-Anbindung bricht
+            der Lauf ab (kephalaion_unavailable); einen Rückfall auf die
+            Platte gibt es nicht. Vertrag: k-playbook/docs/version-inventory.md.
   todo      Verwaltet die Todos des Projekts in
             k-playbook-local/data/todos.json: k-playbook todo list|add|update|
             delete|import. Die Ausgabe ist JSON auf stdout. Ohne Unterbefehl

@@ -47,10 +47,10 @@ locations derive from the location of `K-PLAYBOOK.yaml`:
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
-| project documentation | `k-playbook-local/docs/` |
+| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. On disk only `k-playbook-local/docs/code/` and `docs/libs/` remain |
 | tool profiles | `k-playbook-local/docs/libs/` |
-| version inventory | `k-playbook-local/docs/versions/` |
-| manually maintained docs | `k-playbook-local/docs/manual/` |
+| version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
+| manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
 | raw material | `k-playbook-local/material/` |
 | project-owned guidelines | `k-playbook-local/guidelines/` |
 | project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
@@ -80,17 +80,25 @@ turn determines the ownership rule:
 
 Every subdirectory of `docs/` represents an origin, not a single tool. A tool
 writes exclusively to directories of its own origin; the frontmatter field
-`generated.by` identifies which tool wrote an individual file. `docs/README.md`
-belongs exclusively to `/k-docs-index`. No command writes doc files in
-`docs/manual/`; the structure README created during setup is excepted. Flat
-`docs/*.md` files from before this structure have no producer: no command writes
-them, they are only listed.
+`generated.by` identifies which tool wrote an individual file. `docs/README.md` on
+disk belongs exclusively to `/k-docs-index`; since task 101 it is the old disk index,
+which `/k-upgrade` (3.2) clears, and the README that setup writes for `docs/` names
+`keph:/docs/` as the entry and is no index. No command writes doc files in
+`keph:/docs/manual/`; a `docs/manual/` on disk is a state from before the move and is
+moved by 3.2. Flat `docs/*.md` files from before this structure have no producer: no
+command writes them, they are only listed.
 
-`docs/code/`, `docs/libs/`, and `docs/versions/` are created
+`docs/code/` and `docs/libs/` are created
 on the first run of a tool from their origin: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill write to `docs/code/`, `/k-docs-tools` to
-`docs/libs/`, and `/k-doc-inventory` to `docs/versions/`. Setup does not create
-them; it creates `docs/manual/` and `material/`. `/k-docs-extract` no longer
+`docs/libs/`. `/k-doc-inventory` no longer writes here at all: the version
+inventory lives in the project collection as
+`keph:/docs/generated/versions/inventory.md`, and a `docs/versions/` left from
+before is a state of that time. Setup does not create
+them, and since task 101 it no longer creates `docs/manual/` either: hand-written
+documentation lives in `keph:/docs/manual/`, and a `docs/manual/` on disk is a state
+from before the move that `/k-upgrade` (3.2) moves. Setup still creates `material/`.
+`/k-docs-extract` no longer
 writes to `docs/extracted/`: it reads raw material from `inbox/` and writes to
 `knowledge/extracted/` through the knowledge tools; what lies in
 `docs/extracted/` from before stays and is still indexed by `/k-docs-index` until
@@ -112,7 +120,7 @@ itself. The template declares `schema_version: 1`; a configuration that uses
 it in the "Inventory" section, showing the path, status, and count of roots,
 sources, exclusions, and configured Helm values; it does not edit it.
 That section also offers the inventory prompt, the same run as `k-playbook
-inventory` and `/k-doc-inventory`. The contract is in
+inventory` and `/k-doc-inventory`, writing into the project collection. The contract is in
 [`version-inventory.md`](./version-inventory.md), and the requirement to update
 version jumps is in `rules/docs-sync.md`.
 

@@ -14,20 +14,24 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
 | `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/rules/docs-sync.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
-| `keph:` | the project's collection in Kephalaion | `keph:/manual/abc.md` |
+| `keph:` | the project's collection in Kephalaion | `keph:/docs/manual/abc.md` |
+| `keph:` with a trailing `/` | a directory in the project's collection, listed with Kephalaion `list` (`recursive`, `frontmatter`), its documents read one by one | `keph:/docs/` |
 
 More examples:
 
-- `project:/k-playbook-local/docs/README.md`
+- `project:/k-playbook-local/version-sources.yaml`
 - `k-playbook:/instructions/on-demand/<topic>.md`
-- `keph:/manual/<topic>.md`
+- `keph:/docs/manual/<topic>.md`
+- `keph:/docs/` (a directory)
 
 ## Rules
 
 - **After the prefix there is always a `/`.** The path runs from the root of the space the
   prefix names: the project root, the k-playbook space, the project's collection.
-- **A reference ending in `/` means a directory.** Only `k-playbook:` knows directories, and
-  only those on a fixed list are assembled -- today only `k-playbook:/instructions/always/`.
+- **A reference ending in `/` means a directory.** Only `k-playbook:` directories on a fixed
+  list are assembled -- today only `k-playbook:/instructions/always/`; any other
+  `k-playbook:` directory is an error. A `keph:` directory such as `keph:/docs/` is listed
+  with Kephalaion `list` and read document by document.
   The reader gets all files in it as one text, in the fixed order (see
   [Assembling a directory](#assembling-a-directory)). Every other directory, such as
   `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a

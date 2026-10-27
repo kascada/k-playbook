@@ -36,8 +36,6 @@ const (
 	opencodeSchemaKey       = "$schema"
 	opencodeSchemaURL       = "https://opencode.ai/config.json"
 	opencodeInstructionsKey = "instructions"
-	opencodeReferencesKey   = "references"
-	opencodeDocsKey         = "docs"
 )
 
 // MCPSchema unterscheidet die beiden Schreibweisen, in denen ein Assistent
@@ -1089,7 +1087,6 @@ func newMCPFile(target MCPTarget, command string, args []string) ([]byte, error)
 	if target.Schema == MCPSchemaOpenCode {
 		content[opencodeSchemaKey] = opencodeSchemaURL
 		content[opencodeInstructionsKey] = []any{RootInstructionsFile}
-		content[opencodeReferencesKey] = map[string]any{opencodeDocsKey: opencodeDocsReference()}
 	}
 	content[string(target.Schema)] = map[string]any{MCPServerKey: mcpEntry(target.Schema, command, args)}
 
@@ -1157,19 +1154,12 @@ func patchMCPFile(raw []byte, target MCPTarget, sectionPresent bool, content map
 	return packed, nil
 }
 
-func opencodeDocsReference() map[string]any {
-	return map[string]any{
-		"path":        "./" + LocalDirName + "/docs",
-		"description": "Autoritative Projektdokumentation. Zuerst " + LocalDirName + "/docs/README.md als Index lesen, bevor Code analysiert wird.",
-	}
-}
-
 // opencodeMemoryConfigured meldet, ob am Memory-Block nichts mehr zu tun ist.
 //
 // Gefragt wird die Stelle, die auch patcht: was opencodeMemoryPatchOps stehen
 // lässt, gilt hier als eingerichtet. Beides auseinanderlaufen zu lassen kostete
 // genau das, was die Entscheidung verhindern soll — ein fremd getypter Wert
-// (instructions als Zeichenkette, references als Liste) galt als nicht
+// (instructions als Zeichenkette) galt als nicht
 // eingerichtet, die Patch-Folge hatte aber nichts zu ändern. Jedes Einrichten
 // schrieb und formatierte opencode.json dann neu, ohne dass sich inhaltlich
 // etwas bewegte.
@@ -1177,6 +1167,12 @@ func opencodeMemoryConfigured(content map[string]any) bool {
 	return len(opencodeMemoryPatchOps(content)) == 0
 }
 
+// opencodeMemoryPatchOps liefert, was am Memory-Block fehlt: nur noch der
+// Eintrag AGENTS.md unter instructions. Einen Eintrag references.docs mit dem
+// Einstieg der Projektdoku schreibt das Binary seit Task 101 nicht mehr — der
+// Einstieg ist keph:/docs/ und kommt aus dem Briefing; ein keph:-Verweis taugt
+// nicht als Pfad in references. Vorhandene Einträge bleiben stehen; die
+// Umstellung 3.2 in /k-upgrade schlägt vor, sie zu entfernen.
 func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 	ops := []jsonPatchOp{}
 	switch values := content[opencodeInstructionsKey].(type) {
@@ -1189,18 +1185,6 @@ func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 	default:
 		// Ein anderer Typ gehört dem Projekt. Hineingeschrieben wird dort
 		// nicht — und deshalb gilt der Block als eingerichtet.
-	}
-
-	encoded, _ := json.Marshal(opencodeDocsReference())
-	switch values := content[opencodeReferencesKey].(type) {
-	case nil:
-		ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey, Value: json.RawMessage(`{"docs":` + string(encoded) + `}`)})
-	case map[string]any:
-		if _, ok := values[opencodeDocsKey]; !ok {
-			ops = append(ops, jsonPatchOp{Op: "add", Path: "/" + opencodeReferencesKey + "/" + opencodeDocsKey, Value: encoded})
-		}
-	default:
-		// Wie oben: fremder Typ, nichts zu tun.
 	}
 	return ops
 }

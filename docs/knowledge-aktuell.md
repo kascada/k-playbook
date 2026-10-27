@@ -403,7 +403,7 @@ a new `k-playbook todo migrate` takes such a file over as a latecomer.
 [--json]` and `k_playbook_briefing` are the one call at the start of a session: **data, not
 prose** — which instructions, rules, reviews and guidelines apply, and what is pending in the
 project's collection. References in the prefix scheme (`k-playbook:/rules/befunde.md`,
-`keph:/user/kamran/tasks/100-….md`, `project:/k-playbook-local/docs/README.md`), never paths;
+`keph:/user/kamran/tasks/100-….md`, `keph:/docs/`), never paths;
 each document with title, description (frontmatter, else the first heading) and origin (`dist`,
 `local`, `override`, `disabled`); the own open tasks and active workbench topics (not in
 `done/`, what `k_playbook_doc_list` returns without `done`) with title, and the number of open
@@ -523,7 +523,7 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | `AGENTS.md` `anstoss` | "Für dieses Projekt gilt k-playbook. Rufe zu Beginn `k-playbook context` auf" | prompt — stays; at the switch reworded to one call, the briefing (`k_playbook_briefing`, else `k-playbook briefing`): what applies, what is pending, the text of the always-instructions (`documents.always.content`, since 2026-10-18) and — until the rest is taken apart — the environment from its section `context`. What the switch has to rebuild is under "Where `k-playbook context` is anchored" below | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
 | `AGENTS.md` `anstoss` | "lies die Dateien aus `instructions` in der angegebenen Reihenfolge" | drops: `documents.always.content` in the briefing is the text itself, already in reading order (since 2026-10-18); see the name clash below | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
 | `AGENTS.md` `anstoss` | "Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und die effektiven Kataloge" | drops: the directories are the fields `project`, `playbook` and `local` — their place is in the table "Context field → future place" below —, the catalogs with origin are in the briefing | done (task 096, 2026-10-19: `instructionsBlock()` is the briefing version, the `AGENTS.md` of this repo; the `k-playbook context` version is the second superseded one) |
-| `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done (`NACHZIEHEN:` for the `keph:` entry later) |
+| `AGENTS.md` `session-memory` | "Projektwissen zuerst": read `k-playbook-local/docs/README.md` first, code only when the docs fail | `always/100-projektwissen-zuerst.md`; the entry is also `projectDocs` in the briefing | done; since task 101 the entry is `keph:/docs/` (`NACHZIEHEN` done) |
 | `AGENTS.md` `befunde` | "Befunde festhalten": the finishing condition, the place, the fields, `/k-danke` | `always/200-befunde-festhalten.md`; the format since 2026-10-24 in `k-playbook:/instructions/on-demand/befunde.md` (was `k-playbook:/rules/befunde.md`) | done; the place is `queue/findings/` since 2026-10-24 |
 | — | how references are written and reached | `always/010-verweise.md` | done |
 
@@ -644,7 +644,7 @@ is rebuilt by task 091 — "build first, then put to use".
   `BuildContext` directly and are not affected. **To rebuild:** both go when the rest is
   empty; the healing of the assistant links moves into `BuildBriefing` first (row `links`
   above); `docs/mcp.md` (intro, tool table, "Briefing Contract"), `docs/k-playbook-format.md`
-  ("The resolved working state") and `k-playbook-local/docs/manual/assistenten-verlinkung.md`
+  ("The resolved working state") and `keph:/docs/manual/assistenten-verlinkung.md`
   ("Wo die Rechnung ausgelöst wird") follow.
 
 **Inventory of `k-playbook context` and `k_playbook_context`** (task 096, 2026-10-19; raised with
@@ -683,6 +683,30 @@ project names `k-playbook context` any more (checked: `rootInstructionsTemplate(
 | `checks/README.md:70/101` | checks do not call the context | stays on purpose |
 | `.claude/settings.local.json` | permission pattern | stays on purpose (local settings) |
 | `docs/knowledge-aktuell.md` | this file | stays on purpose |
+
+**The version inventory is the first producer writing into `keph:/docs/`** (2026-10-26,
+task 100). `/k-doc-inventory` and `k-playbook inventory` write
+`keph:/docs/generated/versions/inventory.md` into the project collection — `Read`, compare
+without `generated.at`, `Create` or `Write` with `base_revision` — and nothing to disk any
+more; without a ready binding there is no inventory (`kephalaion_unavailable`). The command
+is hull plus text (`share/commands/`, `defaults/commands/`), with the shared include
+`_shared/docs.md` for what holds for every docs command. It is the pattern for the other
+producers; the old file under `k-playbook-local/docs/versions/` is cleared by `/k-upgrade`
+3.2, and the briefing entry moves with it.
+
+**The entry of the project documentation is `keph:/docs/`** (2026-10-26, task 101).
+`projectDocs` in the briefing, `always/100-projektwissen-zuerst.md` and `010-verweise.md`
+name the directory in the project collection for every project, without a choice per
+project and without a fallback to disk: a session reads it with Kephalaion `list` on
+`docs/` (`recursive`, `frontmatter`) until Kephalaion generates `docs/index.md`; without a
+ready binding the documentation is out of reach and the session says so. The binary no
+longer writes `references.docs` into `opencode.json`, and `docs/manual` left
+`LocalStructure()`. `/k-upgrade` 3.2 moves what lies under `k-playbook-local/docs/` per
+origin — `versions/` is deleted (the producer writes to the collection), `manual/` is
+moved to `keph:/docs/manual/`, loose files are proposed, the old index and the references
+in `AGENTS.md`/`opencode.json` are removed —, each after confirmation; `code/` and
+`libs/` stay until their producers are switched. `/k-docs-index` and the skill
+`ai-session-memory` still restore the old index; 3.2 is repeatable.
 
 ## Open
 

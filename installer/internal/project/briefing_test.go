@@ -84,7 +84,7 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	if briefing.SchemaVersion != BriefingSchemaVersion {
 		t.Errorf("schemaVersion %q", briefing.SchemaVersion)
 	}
-	if briefing.ProjectDocs != "project:/k-playbook-local/docs/README.md" {
+	if briefing.ProjectDocs != "keph:/docs/" {
 		t.Errorf("projectDocs %q", briefing.ProjectDocs)
 	}
 

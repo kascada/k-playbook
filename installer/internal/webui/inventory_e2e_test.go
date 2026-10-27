@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -16,9 +17,11 @@ import (
 // über die API erhoben statt über das Subkommando, und das Ergebnis verglichen.
 //
 // Die Fixture wird kopiert, weil ein Projekt einen Anker braucht und in
-// testdata/ nichts geschrieben wird.
-func fixtureProject(t *testing.T, name string) string {
+// testdata/ nichts geschrieben wird. Das Inventar landet in der Collection im
+// Speicher.
+func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 	t.Helper()
+	store := inventoryStore(t)
 
 	source, err := filepath.Abs(filepath.Join("..", "inventory", "testdata", "projekte", name))
 	if err != nil {
@@ -35,32 +38,29 @@ func fixtureProject(t *testing.T, name string) string {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	chdir(t, root)
-	return root
+	return root, store
 }
 
 // Der API-Weg und der Weg der Fachlogik — den das Subkommando nimmt — erzeugen
-// dieselbe Datei. Verglichen wird byteweise: die Erhebung über die Fachlogik,
-// gerendert mit dem Zeitstempel, den die API geschrieben hat, muss die Datei
-// der API sein. Das ist genau der Vergleich, mit dem inventory.Write die
-// Byte-Stabilität entscheidet.
+// dasselbe Dokument. Verglichen wird byteweise: die Erhebung über die
+// Fachlogik, gerendert mit dem Zeitstempel, den die API geschrieben hat, muss
+// das Dokument der API sein. Das ist genau der Vergleich, mit dem
+// inventory.Write die Byte-Stabilität entscheidet.
 func TestVollstaendigeFixtureUeberDieAPIErgibtDieselbeDateiWieDieFachlogik(t *testing.T) {
-	root := fixtureProject(t, "vollstaendig")
+	root, store := fixtureProject(t, "vollstaendig")
 
 	code, response := postInventory(t)
 	if code != 200 || !response.OK || !response.Outcome.Written {
 		t.Fatalf("Anstoß: Status %d, Antwort %+v", code, response)
 	}
-	written, err := os.ReadFile(response.Outcome.Path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
-	}
+	written := storedInventory(t, store)
 
 	options := inventoryOptions(root)
 	result, err := inventory.Collect(options)
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
-	if expected := inventory.Render(result, response.Status.GeneratedAt); expected != string(written) {
+	if expected := inventory.Render(result, response.Status.GeneratedAt); expected != written {
 		t.Errorf("API-Datei und Fachlogik-Rendering unterscheiden sich:\n--- API\n%s\n--- Fachlogik\n%s", written, expected)
 	}
 	if response.Summary.Entries != len(result.Entries) || response.Summary.Sources != len(result.Sources) ||
@@ -89,9 +89,9 @@ func TestVollstaendigeFixtureUeberDieAPIErgibtDieselbeDateiWieDieFachlogik(t *te
 
 // Der Fall mit bewusst verschiedenen lokalen, DevContainer- und
 // Deployment-Versionen: die Abweichung erscheint in der Antwort — also in der
-// Anzeige — und in der Datei, mit allen drei Aussagen nebeneinander.
+// Anzeige — und im Dokument, mit allen drei Aussagen nebeneinander.
 func TestDreiKontexteAbweichungErscheintInAntwortUndDatei(t *testing.T) {
-	fixtureProject(t, "dreikontexte")
+	_, store := fixtureProject(t, "dreikontexte")
 
 	_, response := postInventory(t)
 	if !response.OK {
@@ -104,14 +104,10 @@ func TestDreiKontexteAbweichungErscheintInAntwortUndDatei(t *testing.T) {
 		t.Errorf("drei Kontexte sind umgebungsbedingt, nicht widersprüchlich: %+v", response.Summary)
 	}
 
-	content, err := os.ReadFile(response.Outcome.Path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
-	}
-	text := string(content)
+	text := storedInventory(t, store)
 	for _, needle := range []string{"python/poetry", inventory.DeviationEnvironmental, "==1.8.4", "1.8.2", "1.7.1"} {
 		if !strings.Contains(text, needle) {
-			t.Errorf("in der Datei fehlt %q", needle)
+			t.Errorf("im Dokument fehlt %q", needle)
 		}
 	}
 
@@ -119,6 +115,6 @@ func TestDreiKontexteAbweichungErscheintInAntwortUndDatei(t *testing.T) {
 	var file inventoryFileResponse
 	getJSON(t, "/api/inventory/file", &file)
 	if !strings.Contains(file.HTML, "python/poetry") || !strings.Contains(file.HTML, inventory.DeviationEnvironmental) {
-		t.Error("die Abweichung steht nicht in der gerenderten Datei")
+		t.Error("die Abweichung steht nicht im gerenderten Dokument")
 	}
 }

@@ -51,9 +51,6 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	if !isDir(filepath.Join(local, "tasks", "done")) {
 		t.Error("tasks/done fehlt")
 	}
-	if !isDir(filepath.Join(local, "docs", "manual")) {
-		t.Error("docs/manual fehlt")
-	}
 	if !fileExists(filepath.Join(local, VersionSourcesFileName)) {
 		t.Errorf("%s fehlt", VersionSourcesFileName)
 	}
@@ -89,6 +86,9 @@ func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) 
 // docs/code/, docs/libs/ und docs/versions/ gehören je einem Erzeuger und
 // entstehen beim ersten Lauf des jeweiligen Commands, nicht beim Einrichten.
 // docs/extracted/ ist seit Task 073 kein Ziel mehr und entsteht ebenso wenig.
+// docs/manual/ liegt seit Task 101 unter keph:/docs/manual/; legte das
+// Einrichten es neu an, brächte es zurück, was die Umstellung 3.2 in /k-upgrade
+// abgeräumt hat.
 func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 	root := t.TempDir()
 
@@ -96,7 +96,7 @@ func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	for _, name := range []string{"code", "libs", "extracted", "versions"} {
+	for _, name := range []string{"code", "libs", "extracted", "versions", "manual"} {
 		if pathExists(filepath.Join(LocalDir(root), "docs", name)) {
 			t.Errorf("docs/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", name)
 		}
@@ -147,7 +147,11 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	}
 }
 
-func TestCreateLocalLegtDocsIndexAn(t *testing.T) {
+// Die README von docs/ ist seit Task 101 eine Struktur-README: sie nennt den
+// Einstieg keph:/docs/ und was auf der Platte bleibt. Nennte sie sich weiter
+// Index oder verlangte, zuerst gelesen zu werden, legte das Einrichten den
+// alten Platten-Einstieg als Rückfall neu an.
+func TestCreateLocalLegtDocsReadmeOhneIndexAn(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
@@ -157,11 +161,17 @@ func TestCreateLocalLegtDocsIndexAn(t *testing.T) {
 	path := filepath.Join(LocalDir(root), "docs", "README.md")
 	content, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("Docs-Index lesen: %v", err)
+		t.Fatalf("Docs-README lesen: %v", err)
 	}
-	for _, want := range []string{"Projektwissen", "../../AGENTS.md"} {
-		if !strings.Contains(string(content), want) {
-			t.Errorf("Docs-Index enthält %q nicht:\n%s", want, content)
+	text := string(content)
+	for _, want := range []string{"keph:/docs/", "code/", "libs/"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("Docs-README enthält %q nicht:\n%s", want, text)
+		}
+	}
+	for _, stale := range []string{"Index", "zuerst", "/k-docs-index", "AGENTS.md"} {
+		if strings.Contains(text, stale) {
+			t.Errorf("Docs-README enthält noch %q:\n%s", stale, text)
 		}
 	}
 }

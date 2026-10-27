@@ -206,3 +206,68 @@ func TestVSCodeStatusNenntAbweichendeZweitfassung(t *testing.T) {
 		}
 	}
 }
+
+// vscodeProjekt legt ein Projekt mit K-PLAYBOOK.yaml an und, wenn local nicht
+// leer ist, k-playbook-local/K-PLAYBOOK.local.yaml mit diesem Inhalt.
+func vscodeProjekt(t *testing.T, local string) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	if err := os.WriteFile(filepath.Join(root, "K-PLAYBOOK.yaml"), []byte("schema_version: 3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if local != "" {
+		dir := filepath.Join(root, "k-playbook-local")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "K-PLAYBOOK.local.yaml"), []byte(local), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// Aus einem Unterverzeichnis heraus: Die Erweiterung ruft mit dem
+// Projektordner als Arbeitsverzeichnis, ein Aufruf von Hand aber von überall.
+func TestVSCodeCollectionsAusDerAnbindung(t *testing.T) {
+	root := vscodeProjekt(t, "kephalaion:\n  hub: vm\n  collection: omni\n  account: kamran-wsl\n")
+	sub := filepath.Join(root, "src")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	answer := collectWorkspaceFolders(sub)
+	if !answer.Configured || answer.Message != "" {
+		t.Fatalf("Antwort = %+v", answer)
+	}
+	if len(answer.Folders) != 2 ||
+		answer.Folders[0].URI != "keph://vm/k-playbook" ||
+		answer.Folders[1].URI != "keph://vm/omni" {
+		t.Fatalf("Ordner = %+v", answer.Folders)
+	}
+}
+
+// Ohne Anbindung und außerhalb eines Projekts ist das ein Zustand mit
+// Begründung, kein Fehler, und folders bleibt eine leere Liste statt null:
+// die Erweiterung liest beides als JSON.
+func TestVSCodeCollectionsNichtEingerichtet(t *testing.T) {
+	ohne := vscodeProjekt(t, "")
+	draussen := t.TempDir()
+	for name, dir := range map[string]string{"ohne Anbindung": ohne, "kein Projekt": draussen} {
+		answer := collectWorkspaceFolders(dir)
+		if answer.Configured || answer.Message == "" || answer.Folders == nil || len(answer.Folders) != 0 {
+			t.Fatalf("%s: Antwort = %+v", name, answer)
+		}
+	}
+	if answer := collectWorkspaceFolders(ohne); !strings.Contains(answer.Message, "K-PLAYBOOK.local.yaml") {
+		t.Fatalf("Meldung nennt die Datei nicht: %s", answer.Message)
+	}
+}
+
+func TestVSCodeCollectionsUnbekannteOption(t *testing.T) {
+	var out bytes.Buffer
+	if err := runVSCodeCollections([]string{"--yaml"}, &out); err == nil {
+		t.Fatal("kein Fehler bei unbekannter Option")
+	}
+}

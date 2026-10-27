@@ -64,15 +64,16 @@ func TestDescribeRejectionNenntDenAufgeloestenPfad(t *testing.T) {
 func TestPrintInventoryFuehrtAblehnungenUndHinweiseAus(t *testing.T) {
 	var out bytes.Buffer
 	printInventory(&out,
-		inventory.Options{ProjectDir: "/projekt", InventoryFile: "/projekt/k-playbook-local/docs/versions/inventory.md"},
+		inventory.Options{ProjectDir: "/projekt"},
 		inventory.Result{
 			Rejections: []inventory.Rejection{{Requested: "/srv/deploy/values.yaml", Reason: "keine freigegebene Wurzel"}},
 			Notes:      []inventory.Note{{Source: "Chart.yaml", Text: "defektes YAML"}},
 		},
-		inventory.Outcome{Path: "/projekt/k-playbook-local/docs/versions/inventory.md", Written: true, At: "2026-09-05T12:00:00Z"})
+		inventory.Outcome{Path: inventory.DocRef, Written: true, At: "2026-09-05T12:00:00Z", Revision: 12})
 
 	text := out.String()
-	for _, want := range []string{"/srv/deploy/values.yaml", "keine freigegebene Wurzel", "Chart.yaml", "defektes YAML", "Geschrieben:"} {
+	for _, want := range []string{"/srv/deploy/values.yaml", "keine freigegebene Wurzel", "Chart.yaml", "defektes YAML",
+		"Geschrieben: keph:/docs/generated/versions/inventory.md (erhoben 2026-09-05T12:00:00Z, Revision 12)"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("%q fehlt im Bericht:\n%s", want, text)
 		}
@@ -84,10 +85,10 @@ func TestPrintInventoryFuehrtAblehnungenUndHinweiseAus(t *testing.T) {
 func TestPrintInventoryMeldetDenUnveraendertenLauf(t *testing.T) {
 	var out bytes.Buffer
 	printInventory(&out, inventory.Options{ProjectDir: "/projekt"}, inventory.Result{},
-		inventory.Outcome{Path: "/projekt/k-playbook-local/docs/versions/inventory.md", At: "2026-09-01T08:00:00Z"})
+		inventory.Outcome{Path: inventory.DocRef, At: "2026-09-01T08:00:00Z", Revision: 3})
 
 	text := out.String()
-	if !strings.Contains(text, "Unverändert:") {
+	if !strings.Contains(text, "Unverändert: keph:/docs/generated/versions/inventory.md") {
 		t.Errorf("der unveränderte Lauf wird nicht benannt:\n%s", text)
 	}
 	if strings.Contains(text, "Geschrieben:") {
@@ -107,7 +108,7 @@ func TestPrintInventoryNenntNichtDurchsuchteBereiche(t *testing.T) {
 				{Pattern: "tests/fixtures/**", Origin: "configured", Reason: "ausgenommen", Skipped: 0},
 			},
 		},
-		inventory.Outcome{Path: "/projekt/k-playbook-local/docs/versions/inventory.md", At: "2026-09-05T12:00:00Z"})
+		inventory.Outcome{Path: inventory.DocRef, At: "2026-09-05T12:00:00Z"})
 
 	text := out.String()
 	for _, want := range []string{"Nicht durchsuchte Quellen:    3", "k-playbook/**",

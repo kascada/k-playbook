@@ -1,114 +1,104 @@
 package inventory
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"time"
+
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
-// Outcome sagt, was ein Lauf mit der Inventardatei gemacht hat.
+// Outcome sagt, was ein Lauf mit dem Inventar gemacht hat.
 type Outcome struct {
+	// Path ist der Ort des Inventars als Verweis: DocRef.
 	Path string `json:"path"`
-	// Written ist false, wenn der Bestand inhaltlich derselbe war und die Datei
-	// deshalb gar nicht angefasst wurde.
+	// Written ist false, wenn der Bestand inhaltlich derselbe war und das
+	// Dokument deshalb gar nicht angefasst wurde.
 	Written bool `json:"written"`
-	// At ist der Zeitstempel, der jetzt in der Datei steht: bei einem
+	// At ist der Zeitstempel, der jetzt im Dokument steht: bei einem
 	// geschriebenen Lauf der dieses Laufs, sonst der des Bestands.
 	At string `json:"at"`
+	// Revision ist die Revision des Dokuments nach dem Lauf: die des
+	// Bestands, wenn nichts geschrieben wurde, sonst die neue.
+	Revision int64 `json:"revision,omitempty"`
 	// Problem übernimmt einen sichtbaren Befund zum Bestand, etwa ein defektes
 	// Frontmatter. Dann wird neu geschrieben, weil ein Vergleich nicht möglich
 	// ist.
 	Problem string `json:"problem,omitempty"`
 }
 
-// Write setzt die Byte-Stabilitäts- und Zeitstempelregel des Vertrags um:
+// Write setzt die Byte-Stabilitäts- und Zeitstempelregel des Vertrags um,
+// gegen die Collection des Projekts:
 //
 //  1. Das vollständige Ergebnis wird im Speicher gerendert.
-//  2. Existiert die Datei, wird verglichen — ausgenommen `generated.at`, und
-//     ausgenommen nichts anderes.
+//  2. Liegt das Dokument in der Collection, wird verglichen — ausgenommen
+//     `generated.at`, und ausgenommen nichts anderes.
 //  3. Sind sie gleich, wird gar nicht geschrieben.
 //  4. Unterscheiden sie sich, wird vollständig neu geschrieben, mit
-//     `generated.at` = Zeitpunkt dieses Laufs.
-//  5. Existiert sie nicht, wird sie geschrieben.
+//     `generated.at` = Zeitpunkt dieses Laufs und der gelesenen Revision als
+//     base_revision: hat inzwischen jemand anders geschrieben, ist das ein
+//     sichtbarer Fehler (stale_revision), kein stilles Überschreiben.
+//  5. Fehlt das Dokument, wird es angelegt.
 //
 // Der Vergleich läuft über den Bestand selbst, nicht über eine Prüfsumme
 // daneben: derselbe Bestand wird ein zweites Mal gerendert, mit dem Zeitstempel,
 // der schon dort steht. Sind die Bytes dann gleich, hat sich nichts geändert.
-func Write(options Options, result Result) (Outcome, error) {
-	path := options.InventoryFile
-	if path == "" {
-		return Outcome{}, fmt.Errorf("kein Zielpfad für die Inventardatei angegeben")
+//
+// Ein Fehler des Stores kommt unverändert zurück; ohne erreichbares Kephalaion
+// gibt es kein Inventar und keinen Rückfall auf die Platte.
+func Write(ctx context.Context, store Store, options Options, result Result) (Outcome, error) {
+	if store == nil {
+		return Outcome{Path: DocRef}, fmt.Errorf("kein Zugang zur Collection des Projekts")
 	}
-	outcome := Outcome{Path: path}
+	outcome := Outcome{Path: DocRef}
 
-	existing, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		// Nichts da: schreiben.
-	case err != nil:
-		outcome.Problem = "Bestand nicht lesbar: " + err.Error()
+	read, err := store.Read(ctx, DocName)
+	if err != nil {
+		return outcome, fmt.Errorf("Bestand %s lesen: %w", DocRef, err)
+	}
+
+	var existing *kephalaion.ReadResult
+	switch read.Kind {
+	case kephalaion.ReadKindNone:
+		// Nichts da: anlegen.
+	case kephalaion.ReadKindDirectory:
+		return outcome, fmt.Errorf("unter %s liegt ein Verzeichnis, kein Dokument", DocRef)
 	default:
-		status := Status{Present: true, Path: path}
-		fillStatus(&status, existing)
+		existing = &read
+		status := StatusOf([]byte(*read.Content))
 		if status.Problem != "" {
 			outcome.Problem = status.Problem
-		} else if Render(result, status.GeneratedAt) == string(existing) {
+		} else if Render(result, status.GeneratedAt) == *read.Content {
 			outcome.At = status.GeneratedAt
+			outcome.Revision = read.Revision
 			return outcome, nil
 		}
 	}
 
 	at := options.now().Format(time.RFC3339)
-	if err := writeAtomic(path, []byte(Render(result, at))); err != nil {
-		return outcome, err
+	content := Render(result, at)
+	var doc kephalaion.Document
+	if existing == nil {
+		doc, err = store.Create(ctx, DocName, content)
+	} else {
+		doc, err = store.Write(ctx, DocName, content, existing.Revision)
+	}
+	if err != nil {
+		return outcome, fmt.Errorf("%s schreiben: %w", DocRef, err)
 	}
 	outcome.Written = true
 	outcome.At = at
+	outcome.Revision = doc.Revision
 	return outcome, nil
 }
 
 // Run erhebt und schreibt in einem Zug. Das ist der Weg, den jeder Einstieg
 // nimmt; die Vertrauensgrenze liegt dahinter und nicht beim Aufrufer.
-func Run(options Options) (Result, Outcome, error) {
+func Run(ctx context.Context, store Store, options Options) (Result, Outcome, error) {
 	result, err := Collect(options)
 	if err != nil {
-		return Result{}, Outcome{Path: options.InventoryFile}, err
+		return Result{}, Outcome{Path: DocRef}, err
 	}
-	outcome, err := Write(options, result)
+	outcome, err := Write(ctx, store, options, result)
 	return result, outcome, err
-}
-
-// writeAtomic schreibt über eine Nachbardatei und benennt um. Ein abgebrochener
-// Lauf lässt damit den alten Stand stehen statt eine halbe Datei.
-func writeAtomic(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("%s anlegen: %w", dir, err)
-	}
-	temporary, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*")
-	if err != nil {
-		return err
-	}
-	name := temporary.Name()
-	if _, err := temporary.Write(data); err != nil {
-		temporary.Close()
-		os.Remove(name)
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if err := os.Chmod(name, 0o644); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if err := os.Rename(name, path); err != nil {
-		os.Remove(name)
-		return err
-	}
-	return nil
 }

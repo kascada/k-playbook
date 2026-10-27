@@ -14,17 +14,18 @@
       <div class="layout">
 {{template "sidebar" .}}
         <!-- Eigener Bereich neben Docs: Docs zeigt die mitgelieferte Doku der
-             Installation, das Inventar ist eine erzeugte Datei des Projekts.
-             Das Menü links entsteht wie auf der Setup-Seite aus den Karten. -->
+             Installation, das Inventar ist ein erzeugtes Dokument des Projekts
+             in seiner Kephalaion-Collection. Das Menü links entsteht wie auf der
+             Setup-Seite aus den Karten. -->
         <div class="blocks">
-          <!-- Die Datei steht oben: sie ist der Gegenstand der Seite, alles
-               andere beschreibt nur ihren Zustand und ihre Herkunft. Das
+          <!-- Das Dokument steht oben: es ist der Gegenstand der Seite, alles
+               andere beschreibt nur seinen Zustand und seine Herkunft. Das
                Blockmenü links folgt dieser Reihenfolge von selbst. -->
           <section class="card" id="file-card">
             <div class="section-head">
               <div>
                 <p class="eyebrow" id="file-path"></p>
-                <h2>Inventardatei</h2>
+                <h2>Inventar</h2>
               </div>
             </div>
             <article id="file-viewer" class="doc-viewer"></article>
@@ -43,14 +44,17 @@
               Container-Images, Helm-Charts —, erhoben aus Manifesten, Lockfiles, Container-,
               DevContainer-, Helm- und CI-Dateien, nach Umgebung getrennt und mit Herkunft je
               Zeile. Gelesen wird nur; kein Netz, keine Installation, kein Ausführen eines
-              gefundenen Werkzeugs. Der Stand hier kommt aus dem Frontmatter der Inventardatei.
+              gefundenen Werkzeugs. Das Inventar liegt als Dokument in der Kephalaion-Collection
+              des Projekts unter <code>docs/generated/versions/</code>; ohne bereite Anbindung gibt
+              es kein Inventar und keinen Rückfall auf die Platte. Der Stand hier kommt aus dem
+              Frontmatter des Dokuments.
             </p>
             <dl id="status-facts" class="facts"></dl>
             <p id="status-message" class="message"></p>
             <p class="hint">
               „Aktualisieren“ erhebt neu — derselbe Lauf wie <code>k-playbook inventory</code>
-              und <code>/k-doc-inventory</code>. Ein Lauf ohne inhaltliche Änderung lässt die
-              Datei byte-identisch stehen, auch ihr Zeitstempel bleibt dann der alte.
+              und <code>/k-doc-inventory</code>. Ein Lauf ohne inhaltliche Änderung lässt das
+              Dokument byte-identisch stehen, auch Zeitstempel und Revision bleiben dann die alten.
             </p>
             <div id="run-progress" class="loading-inline hidden">
               <span class="loading-spinner" aria-hidden="true"></span>

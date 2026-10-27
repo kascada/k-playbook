@@ -1,8 +1,9 @@
 # The VS Code extension
 
 k-playbook ships its own VS Code extension, **k-playbook Workspace Tools**
-(`kascada.k-playbook-workspace-tools`). It is a collection of workspace actions; the
-first one opens OpenCode in a terminal tab inside the editor area.
+(`kascada.k-playbook-workspace-tools`). It is a collection of workspace actions: one opens
+OpenCode in a terminal tab inside the editor area, the other binds the project's
+Kephalaion collections into the workspace whenever a window starts.
 
 The extension travels inside the program binary. You are not meant to install it
 yourself: starting the interface once installs it and keeps it current.
@@ -12,6 +13,7 @@ yourself: starting the interface once installs it and keeps it current.
 | Command | Title | Keybinding |
 |---|---|---|
 | `kPlaybook.openCode` | k-playbook: OpenCode im neuen Tab | `ctrl+alt+shift+o`, mac `cmd+alt+shift+o` |
+| `kPlaybook.initWorkspace` | k-playbook: Kephalaion-Collections einbinden | — (runs on its own at window start) |
 
 The command opens a terminal **in the editor area** — a tab next to your files, not the
 panel at the bottom — and starts the OpenCode attach program in it. The working directory
@@ -23,8 +25,56 @@ Interface texts of the extension are German, like the rest of the interface.
 The extension runs in the workspace context (`extensionKind: ["workspace"]`), which is
 what makes it work the same under WSL, Remote SSH and in a dev container: it is installed
 into the VS Code *server* of that environment, not into the desktop client. It has no
-dependencies, no webview and no server of its own, and it is independent of any other
-extension.
+dependencies, no webview and no server of its own, and it requires no other extension:
+binding the Kephalaion collections only acts when the Kephalaion extension is installed.
+
+### Kephalaion collections in the workspace
+
+The Kephalaion extension shows a collection as a folder of a multi-root workspace
+(`keph://<hub>/<collection>`). Two of them belong in every window of a project: the public
+collection `k-playbook` and the project's own collection, both on the hub named in
+`k-playbook-local/K-PLAYBOOK.local.yaml`. The extension binds them in by itself on every
+window start (`activationEvents: ["onStartupFinished"]`); the command
+*k-playbook: Kephalaion-Collections einbinden* does the same on demand.
+
+Which collections those are, the extension does not work out itself. It asks the program,
+in the project folder:
+
+```bash
+k-playbook vscode collections          # one line per folder: uri and name
+k-playbook vscode collections --json   # {"configured", "folders": [{"uri", "name"}], "message"}
+```
+
+The program reads only the binding file and never asks the node, because it runs on every
+window start. Without a binding, outside a project or with an invalid name it answers
+`configured: false` with the reason in `message` and still exits 0: that is a state, not an
+error. Folder names follow the form `Keph <hub>:<collection>`.
+
+What the extension then does depends on the window:
+
+- **Everything bound:** nothing.
+- **A workspace file is open and something is missing:** it appends what is missing with
+  `updateWorkspaceFolders`. In a saved workspace VS Code writes that into the open file
+  itself, so nobody has to know which file it is.
+- **Only a folder is open:** adding folders here would create an untitled workspace that
+  VS Code discards on close. Instead it opens the folder's workspace file, and the window
+  reloads; the next start then fills in whatever is still missing. With no
+  `*.code-workspace` in the folder it creates `<foldername>.code-workspace` (the project
+  folder plus both collections); with exactly one it takes that one; with several it takes
+  the one named after the folder, or else says that one has to be opened by hand. An
+  existing file is never overwritten.
+
+At start, states that are no fault stay silent: no project folder, no binding, no
+Kephalaion extension, no `k-playbook` in `PATH`. A failure — the program fails or answers
+something unreadable, VS Code refuses the change, the file cannot be written — shows a
+warning. Run by hand, the command reports every outcome.
+
+A collection removed on purpose comes back at the next start. That is known and accepted
+for now.
+
+Mind `.gitignore`: a newly created `<foldername>.code-workspace` carries the machine-local
+hub alias and is not ignored by k-playbook. A project that does not want it committed
+ignores `*.code-workspace` itself.
 
 ## Settings
 
@@ -105,6 +155,7 @@ Two consequences worth knowing:
 k-playbook vscode install          # install or catch up
 k-playbook vscode status           # embedded version, installations, chosen CLI
 k-playbook vscode vsix -o ext.vsix # write the VSIX only
+k-playbook vscode collections      # the Kephalaion folders a window should have
 k-playbook version --all           # program version plus the extension version
 ```
 

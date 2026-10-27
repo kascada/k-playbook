@@ -70,7 +70,10 @@ type Briefing struct {
 	Documents BriefingDocuments `json:"documents"`
 	// Work ist, was in der Projekt-Collection für die eigene Arbeit ansteht.
 	Work BriefingWork `json:"work"`
-	// ProjectDocs ist der Einstieg der Projektdokumentation, als Verweis.
+	// ProjectDocs ist der Einstieg der Projektdokumentation: der
+	// Verzeichnis-Verweis keph:/docs/ in der Collection des Projekts, gelesen
+	// mit Kephalaion list (recursive, frontmatter), solange Kephalaion dort
+	// keine index.md erzeugt (Task 101). Kein Rückfall auf die Platte.
 	ProjectDocs string `json:"projectDocs"`
 	// Health ist die Umgebungsprüfung (Task 098): Fehler und Warnungen über
 	// die Umgebung des Projekts, alle auf einmal, je Eintrag Stufe, Bereich,
@@ -370,7 +373,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	briefing := Briefing{
 		SchemaVersion: BriefingSchemaVersion,
 		Session:       newSessionID(),
-		ProjectDocs:   DocSchemeProject + ":/" + LocalDirName + "/docs/README.md",
+		ProjectDocs:   DocSchemeKeph + ":/docs/",
 	}
 
 	always, err := briefingAssembled(ctx, layers, briefingAlwaysDir)

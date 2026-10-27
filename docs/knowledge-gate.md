@@ -78,8 +78,9 @@ from here:
    the table are in [`knowledge-layout.md`](knowledge-layout.md#migration).
 3. **Switch the entry point.** This is step 6 of the switch: `/k-docs-index` writes
    `knowledge/README.md` through `write` with `producer: docs-index`, and the generated
-   `AGENTS.md` tells a session to ask the store first. Until then `docs/README.md` stays the
-   authoritative entry point (see "Open points").
+   `AGENTS.md` tells a session to ask the store first. Since task 101 the entry of the
+   project documentation is `keph:/docs/` in the project collection (`projectDocs` in the
+   briefing); `docs/README.md` on disk is the old index (see "Open points").
 4. **Build the reading side.** `briefing` and the filters on `kind`, `state` and `subject`, as
    described under "Querying".
 5. **Tier two only on demand.** Vectors from a local model, or a database of its own, only if
@@ -334,8 +335,9 @@ is itself a transitional read and goes in step 6 (see
 ## Open points
 
 **The documentation index still lives in `docs/`.** `/k-docs-index` writes
-`k-playbook-local/docs/README.md`, which `AGENTS.md` declares the authoritative entry point,
-and knows nothing of `knowledge/`. In the store its place is `knowledge/README.md`, written
+`k-playbook-local/docs/README.md` and knows nothing of `knowledge/`; since task 101 that
+file is the old disk index — the entry point is `keph:/docs/` from the briefing, and
+`/k-upgrade` 3.2 clears the index and the references to it in `AGENTS.md`/`opencode.json`. In the store its place is `knowledge/README.md`, written
 by the same command through `write` with `producer: docs-index`; that switch is step 6 of the
 switch of the writers, together with the instruction in the generated `AGENTS.md`.
 

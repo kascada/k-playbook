@@ -20,8 +20,6 @@ type Options struct {
 	ProjectDir string
 	// SourcesFile ist k-playbook-local/version-sources.yaml.
 	SourcesFile string
-	// InventoryFile ist k-playbook-local/docs/versions/inventory.md.
-	InventoryFile string
 	// Now liefert den Erhebungszeitpunkt. Fehlt es, gilt time.Now.
 	Now func() time.Time
 }
@@ -33,24 +31,10 @@ func (o Options) now() time.Time {
 	return time.Now()
 }
 
-// Der Ort der Inventardatei innerhalb des lokalen Verzeichnisses. Die Namen
-// stehen im Vertrag und werden hier einmal gebunden, damit jeder Aufrufweg —
-// Subkommando, Command und die Oberfläche aus Task 043 — denselben Pfad
+// Der Ort des Inventars ist kein Pfad mehr, sondern der Name eines Dokuments
+// in der Collection des Projekts: DocName in store.go. Dort steht er einmal,
+// damit jeder Aufrufweg — Subkommando, Command und Oberfläche — denselben Ort
 // benutzt, statt ihn ein zweites Mal zusammenzusetzen.
-const (
-	localDocsDirName = "docs"
-	// VersionsDirName ist die fünfte Docs-Herkunft. Sie entsteht beim ersten
-	// Lauf ihres Erzeugers, nicht beim Einrichten.
-	VersionsDirName = "versions"
-	// FileName ist die Inventardatei selbst.
-	FileName = "inventory.md"
-)
-
-// FilePath ist der Ort der Inventardatei zu einem lokalen Verzeichnis:
-// <local.dir>/docs/versions/inventory.md.
-func FilePath(localDir string) string {
-	return filepath.Join(localDir, localDocsDirName, VersionsDirName, FileName)
-}
 
 // Collect erhebt das Inventar, ohne etwas zu schreiben.
 //

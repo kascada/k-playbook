@@ -225,9 +225,16 @@ directories of its own origin:
 /k-docs-code      → k-playbook-local/docs/code/
 /k-docs-tools     → k-playbook-local/docs/libs/
 /k-docs-extract   → k-playbook-local/knowledge/extracted/ (through the knowledge tools)
-/k-doc-inventory  → k-playbook-local/docs/versions/
-/k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json
+/k-doc-inventory  → keph:/docs/generated/versions/inventory.md (project collection)
+/k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json (old disk index, until its own switch)
 ```
+
+The entry of the project documentation is `keph:/docs/` in the project's collection
+(task 101): the briefing names it under `Projektdoku`, and a session reads it with
+Kephalaion `list` on `docs/` (`recursive`, `frontmatter`) until Kephalaion generates
+`docs/index.md`. Hand-written documentation lives under `keph:/docs/manual/`. There is
+no fallback to `k-playbook-local/docs/`; `/k-upgrade` (3.2) moves what lies there per
+origin into the collection or clears it, after confirmation.
 
 `/k-docs` is the guided entry point: it checks inventory, consistency, and
 session memory and offers the possible next step. The four producers create
@@ -247,16 +254,17 @@ where the knowledge search finds them and `docs/README.md` does not yet (see
 [knowledge-layout.md](knowledge-layout.md) and [mcp.md](mcp.md), "Knowledge
 Contract").
 
-`/k-docs-index` is the final step and the only one that writes `docs/README.md`:
-the index across the generated origins and the flat root files,
-`docs/manual/` included. It also registers
-the docs in `AGENTS.md` and `opencode.json`, or `opencode.jsonc` if only that
-file exists; it never creates a second file. Then restart the assistant so the
-new session memory takes effect.
+`/k-docs-index` is the only one that writes `docs/README.md` on disk: the index across
+the generated origins and the flat root files. It also registers the docs in `AGENTS.md`
+and `opencode.json`, or `opencode.jsonc` if only that file exists; it never creates a
+second file. Since task 101 that index is the old disk entry: the binary no longer writes
+`references.docs` into `opencode.json`, and `/k-upgrade` (3.2) proposes to remove the
+index and the references once their entries are moved; until `/k-docs-index` has its own
+switch, a run of it restores them and 3.2 proposes the clean-up again.
 
 Each subdirectory of `docs/` represents an origin; a file's frontmatter records
 which tool wrote it under `generated.by`. No command writes doc files in
-`docs/manual/`; other documentation maintained by a project also remains
+`keph:/docs/manual/`; other documentation maintained by a project also remains
 untouched. k-playbook claims only its own directory.
 
 ## Rules and checks

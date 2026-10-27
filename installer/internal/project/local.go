@@ -103,8 +103,7 @@ func LocalStructure() []LocalEntry {
 				"knowledge`, MCP-Werkzeuge k_playbook_knowledge_*). Fehlt er, baut ihn der nächste\n" +
 				"Zugriff neu; Änderungen am Tor vorbei erkennt er über Datei-Hashes selbst.",
 		},
-		{Path: "docs", Purpose: "Projektwissen für AI-Sessions, nach Herkunft getrennt: code/ von /k-docs-code, libs/ von /k-docs-tools, versions/ von /k-doc-inventory, manual/ von Hand. Die drei erzeugten Verzeichnisse legt jeweils ihr Erzeuger beim ersten Lauf an. /k-docs-extract schreibt nicht mehr hierher, sondern über die Wissenswerkzeuge nach ../knowledge/extracted/; ein vorhandenes extracted/ bleibt als Stand von vorher liegen. Die README dieses Verzeichnisses ist der einzige Index; /k-docs-index schreibt sie neu über die Ordner und die flachen Wurzeldateien. Das Wissenstor (`k-playbook knowledge`, MCP-Werkzeuge k_playbook_knowledge_*) liest und schreibt nicht hier, sondern in der Wissensablage ../knowledge/; dieses Verzeichnis trägt weiter, bis die Umstellung der Schreiber seine Dokumente dorthin überführt."},
-		{Path: filepath.Join("docs", "manual"), Purpose: "Von Hand gepflegte Dokumentation. Kein Command schreibt hier Doc-Dateien hinein; gelistet wird sie über den Index in ../README.md."},
+		{Path: "docs", Purpose: "Was von der Projektdoku noch auf der Platte liegt: code/ von /k-docs-code und libs/ von /k-docs-tools; beides legt sein Erzeuger beim ersten Lauf an. Der Einstieg der Projektdoku ist keph:/docs/ in der Collection des Projekts, nicht dieses Verzeichnis: dort liegen das Versionsinventar (keph:/docs/generated/versions/inventory.md, Erzeuger /k-doc-inventory und k-playbook inventory) und die handgeschriebene Doku (keph:/docs/manual/). Ein versions/, manual/ oder extracted/ von früher ist ein Stand von damals; die Umstellung 3.2 in /k-upgrade bringt ihn nach Kephalaion oder räumt ihn ab. /k-docs-extract schreibt über die Wissenswerkzeuge nach ../knowledge/extracted/. Das Wissenstor (`k-playbook knowledge`, MCP-Werkzeuge k_playbook_knowledge_*) liest und schreibt nicht hier, sondern in der Wissensablage ../knowledge/."},
 		{
 			Path:    InboxDirName,
 			Private: true,
@@ -394,17 +393,19 @@ func readmeTemplate(entry LocalEntry) string {
 		entry.Path, entry.Purpose)
 }
 
+// docsReadmeTemplate ist die Struktur-README von docs/. Sie ist kein Einstieg
+// und kein Index: der Einstieg der Projektdoku ist keph:/docs/ (Task 101), und
+// die README sagt nur, was auf der Platte bleibt, damit das Einrichten keinen
+// Rückfall auf die Platte anlegt.
 func docsReadmeTemplate() string {
 	return `# Projektdokumentation
 
-Dieser Index ist der Einstieg für Projektwissen in AI-Sessions. Er enthält noch
-keine fachlichen Dokumente.
+Der Einstieg der Projektdoku ist ` + "`keph:/docs/`" + ` in der Collection des Projekts, nicht
+dieses Verzeichnis. Das Briefing nennt ihn unter „Projektdoku“.
 
-Wenn Dokumentation entsteht, ergänzt /k-docs-index diese Datei um Übersicht,
-Stichwort-Index und direkte Fragen. Bis dahin gilt: Erst diesen Index lesen,
-dann nur bei Bedarf den Code untersuchen.
-
-Die AI-Session-Regel steht in ../../AGENTS.md.
+Hier liegt nur, was seine Erzeuger noch auf die Platte schreiben: ` + "`code/`" + ` von
+/k-docs-code und ` + "`libs/`" + ` von /k-docs-tools. Beides entsteht beim ersten Lauf des
+jeweiligen Commands.
 `
 }
 

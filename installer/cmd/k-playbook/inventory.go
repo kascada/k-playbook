@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,14 +11,19 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// runInventory erhebt das Versionsinventar und schreibt es nach
-// k-playbook-local/docs/versions/inventory.md.
+// runInventory erhebt das Versionsinventar und schreibt es in die Collection
+// des Projekts, nach inventory.DocRef (keph:/docs/generated/versions/inventory.md).
 //
 // Wie scan und merge sammelt das Kommando nur zusammen, was der Lauf braucht —
-// Projektwurzel, Quellenkonfiguration und Zielpfad — und reicht es an
-// internal/inventory weiter. Die Fachlogik steht dort, allen voran die
-// Vertrauensgrenze: sie ist einmal definiert und gilt für jeden Aufrufweg
+// Projektwurzel, Quellenkonfiguration und den Zugang zur Collection — und
+// reicht es an internal/inventory weiter. Die Fachlogik steht dort, allen voran
+// die Vertrauensgrenze: sie ist einmal definiert und gilt für jeden Aufrufweg
 // gleich, das Kommando öffnet keine Quelle an ihr vorbei.
+//
+// Den Zugang holt es wie die Todos über project.OpenInventoryStore. Ist
+// Kephalaion für das Projekt nicht bereit, bricht der Lauf mit
+// kephalaion_unavailable und dem Grund aus der Anbindung ab, bevor eine Quelle
+// gelesen wird; einen Rückfall auf die Platte gibt es nicht.
 //
 // Die Installation unter playbook.dir wird nicht gebraucht: das Inventar liest
 // die deklarativen Quellen des Projekts, keinen Katalog. Geprüft wird deshalb
@@ -33,16 +39,19 @@ func runInventory(args []string) error {
 			project.ConfigFileName, project.DisplayPath(environment.SearchedFrom))
 	}
 
+	store, err := project.OpenInventoryStore(environment.ProjectDir)
+	if err != nil {
+		return docError(err)
+	}
 	localDir := project.LocalDir(environment.ProjectDir)
 	options := inventory.Options{
-		ProjectDir:    environment.ProjectDir,
-		SourcesFile:   filepath.Join(localDir, project.VersionSourcesFileName),
-		InventoryFile: inventory.FilePath(localDir),
+		ProjectDir:  environment.ProjectDir,
+		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
 	}
 
-	result, outcome, err := inventory.Run(options)
+	result, outcome, err := inventory.Run(context.Background(), store, options)
 	if err != nil {
-		return err
+		return docError(err)
 	}
 
 	printInventory(os.Stdout, options, result, outcome)
@@ -108,16 +117,17 @@ func printInventory(out io.Writer, options inventory.Options, result inventory.R
 	if outcome.Problem != "" {
 		fmt.Fprintf(out, "Hinweis zum Bestand: %s\n", outcome.Problem)
 	}
-	// Ein Lauf ohne inhaltliche Änderung fasst die Datei nicht an. Das steht
-	// hier ausdrücklich, sonst liest sich ein unveränderter Zeitstempel wie ein
-	// fehlgeschlagener Lauf.
+	// Ein Lauf ohne inhaltliche Änderung fasst das Dokument nicht an. Das
+	// steht hier ausdrücklich, sonst liest sich ein unveränderter Zeitstempel
+	// wie ein fehlgeschlagener Lauf. Der Ort ist der keph:-Verweis; Hub und
+	// Collection dahinter stehen in der Anbindung des Projekts.
 	if outcome.Written {
-		fmt.Fprintf(out, "Geschrieben: %s (erhoben %s)\n",
-			project.DisplayPath(outcome.Path), outcome.At)
+		fmt.Fprintf(out, "Geschrieben: %s (erhoben %s, Revision %d)\n",
+			outcome.Path, outcome.At, outcome.Revision)
 		return
 	}
-	fmt.Fprintf(out, "Unverändert: %s — die Erhebung ist inhaltlich dieselbe (erhoben %s)\n",
-		project.DisplayPath(outcome.Path), outcome.At)
+	fmt.Fprintf(out, "Unverändert: %s — die Erhebung ist inhaltlich dieselbe (erhoben %s, Revision %d)\n",
+		outcome.Path, outcome.At, outcome.Revision)
 }
 
 // excludedSources ist die Zahl der Quellen, die eine Ausschlussregel übergangen

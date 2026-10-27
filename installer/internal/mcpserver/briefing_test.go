@@ -73,7 +73,7 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 	if envelope.Work.Available || envelope.Work.Message == "" || envelope.Work.Tasks == nil || envelope.Work.Workbench == nil {
 		t.Errorf("work: %+v", envelope.Work)
 	}
-	if envelope.ProjectDocs != "project:/k-playbook-local/docs/README.md" {
+	if envelope.ProjectDocs != "keph:/docs/" {
 		t.Errorf("projectDocs %q", envelope.ProjectDocs)
 	}
 	// Der Rest von k_playbook_context steht im Abschnitt context, ohne die

@@ -120,7 +120,19 @@ function renderInventory(data) {
 }
 
 function renderStatus(status, displayPath) {
-  addFact(elements.statusFacts, "Datei", displayPath || status.path || "");
+  addFact(elements.statusFacts, "Dokument", displayPath || status.path || "");
+
+  // Ohne bereite Kephalaion-Anbindung weiß niemand, ob das Inventar da ist:
+  // ein eigener Zustand, kein „fehlt“ — und kein Rückfall auf die Platte.
+  if (status.unavailable) {
+    elements.statusPill.className = "pill error";
+    elements.statusPill.textContent = "Nicht erreichbar";
+    elements.statusMessage.textContent = `Die Collection des Projekts ist nicht erreichbar: ${
+      status.message || "Kephalaion ist nicht bereit."
+    }\nOhne Kephalaion gibt es kein Inventar; die Anbindung steht in der Projekt-Collection auf der Setup-Seite.`;
+    addFact(elements.statusFacts, "Stand", "unbekannt");
+    return;
+  }
 
   if (!status.present) {
     elements.statusPill.className = "pill warn";
@@ -134,13 +146,14 @@ function renderStatus(status, displayPath) {
   if (status.problem) {
     elements.statusPill.className = "pill error";
     elements.statusPill.textContent = "Befund";
-    elements.statusMessage.textContent = `Bestand: ${status.problem}. Der nächste Lauf schreibt die Datei neu.`;
+    elements.statusMessage.textContent = `Bestand: ${status.problem}. Der nächste Lauf schreibt das Dokument neu.`;
   } else {
     elements.statusPill.className = "pill ok";
     elements.statusPill.textContent = "Vorhanden";
   }
 
   addFact(elements.statusFacts, "Zuletzt inhaltlich geändert", status.generatedAt || "unbekannt");
+  addFact(elements.statusFacts, "Revision", String(status.revision ?? "unbekannt"));
   addFact(elements.statusFacts, "Erzeuger", status.generatedBy || "unbekannt");
   addFact(elements.statusFacts, "Quellen gelesen", String(status.sourcesRead ?? 0));
   addFact(elements.statusFacts, "Quellen konfiguriert", String(status.sourcesConfigured ?? 0));
@@ -198,11 +211,12 @@ function renderRun(data) {
   if (!data.ok) {
     elements.runPill.className = "pill error";
     elements.runPill.textContent = "Abgebrochen";
-    // Ob die Datei angefasst wurde, sagt allein das Outcome: der Lauf kann an
-    // der Quellenkonfiguration scheitern oder erst beim Schreiben.
+    // Ob das Dokument angefasst wurde, sagt allein das Outcome: der Lauf kann
+    // an der Anbindung, an der Quellenkonfiguration oder erst beim Schreiben
+    // scheitern.
     const written = Boolean(data.outcome && data.outcome.written);
     elements.runMessage.textContent = `${data.message || "Erhebung abgebrochen."}\n${
-      written ? "Die Datei wurde geschrieben." : "Es wurde nichts geschrieben; der bisherige Stand bleibt."
+      written ? "Das Dokument wurde geschrieben." : "Es wurde nichts geschrieben; der bisherige Stand bleibt."
     }`;
     return;
   }
@@ -217,9 +231,10 @@ function renderRun(data) {
   elements.runPill.className = rejected > 0 || unevaluable > 0 ? "pill warn" : "pill ok";
   elements.runPill.textContent =
     rejected > 0 ? "Mit Ablehnungen" : unevaluable > 0 ? "Mit nicht auswertbaren Quellen" : "Erfolgreich";
+  const revision = outcome.revision ? `, Revision ${outcome.revision}` : "";
   elements.runMessage.textContent = outcome.written
-    ? `Geschrieben: ${data.displayPath || outcome.path} (erhoben ${outcome.at || ""}).`
-    : `Unverändert: ${data.displayPath || outcome.path} — die Erhebung ist inhaltlich dieselbe (erhoben ${outcome.at || ""}).`;
+    ? `Geschrieben: ${data.displayPath || outcome.path} (erhoben ${outcome.at || ""}${revision}).`
+    : `Unverändert: ${data.displayPath || outcome.path} — die Erhebung ist inhaltlich dieselbe (erhoben ${outcome.at || ""}${revision}).`;
   if (outcome.problem) {
     elements.runMessage.textContent += `\nHinweis zum Bestand: ${outcome.problem}`;
   }
@@ -306,7 +321,7 @@ function renderFile(data) {
   elements.fileViewer.classList.remove("empty");
   // Das HTML kommt aus dem eigenen Backend. Gerendert wird dort mit
   // abgeschaltetem Roh-HTML, es steht also nichts darin, was nicht aus der
-  // Markdown-Struktur der Datei stammt.
+  // Markdown-Struktur des Dokuments stammt.
   elements.fileViewer.innerHTML = data.html;
 }
 

@@ -1,28 +1,36 @@
 package inventory
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"io/fs"
-	"os"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
 
-// Status ist der maschinell lesbare Stand der Inventardatei.
+// Status ist der maschinell lesbare Stand des Inventars.
 //
 // Er kommt ausschließlich aus dem YAML-Block zwischen den beiden
-// `---`-Zeilen am Dateianfang. Der Markdown-Rumpf wird nie geparst — keine
-// Tabelle wird rückwärts gelesen, keine Überschrift ausgewertet. Genau deshalb
-// braucht es kein zweites Maschinenartefakt neben der Datei: es gäbe zwei
-// Antworten auf dieselbe Frage, und sie könnten auseinanderlaufen.
+// `---`-Zeilen am Anfang des Dokuments. Der Markdown-Rumpf wird nie geparst —
+// keine Tabelle wird rückwärts gelesen, keine Überschrift ausgewertet. Genau
+// deshalb braucht es kein zweites Maschinenartefakt neben dem Dokument: es
+// gäbe zwei Antworten auf dieselbe Frage, und sie könnten auseinanderlaufen.
 //
 // Diese Funktion ist die eine Statusquelle für den Sammler, für /k-docs, für
 // das Subkommando und für die Oberfläche aus Task 043.
 type Status struct {
-	Path              string `json:"path"`
-	Present           bool   `json:"present"`
+	// Path ist der Ort des Inventars als Verweis: DocRef.
+	Path    string `json:"path"`
+	Present bool   `json:"present"`
+	// Unavailable sagt, dass die Collection nicht erreichbar war: Ob das
+	// Inventar da ist, weiß dann niemand — das ist ein eigener Zustand, kein
+	// „fehlt“. Der Grund steht in Message.
+	Unavailable bool   `json:"unavailable,omitempty"`
+	Message     string `json:"message,omitempty"`
+	// Revision ist die Revision des Dokuments in der Collection, bei
+	// vorhandenem Bestand.
+	Revision          int64  `json:"revision,omitempty"`
 	GeneratedBy       string `json:"generatedBy,omitempty"`
 	GeneratedAt       string `json:"generatedAt,omitempty"`
 	SourcesConfigured int    `json:"sourcesConfigured"`
@@ -43,20 +51,43 @@ type Status struct {
 	Problem string `json:"problem,omitempty"`
 }
 
-// ReadStatus liest den Stand. Fehlt die Datei, ist das ein definierter Zustand
-// und kein Fehler.
-func ReadStatus(path string) Status {
-	status := Status{Path: path}
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return status
+// ReadStatus liest den Stand aus der Collection des Projekts. Fehlt das
+// Dokument, ist das ein definierter Zustand und kein Fehler. Ist die
+// Collection nicht erreichbar — kein Store, oder read scheitert —, ist das
+// ein anderer Zustand (Unavailable) und wird nicht als „fehlt“ ausgegeben.
+func ReadStatus(ctx context.Context, store Store) Status {
+	if store == nil {
+		return UnavailableStatus("kein Zugang zur Collection des Projekts")
 	}
+	read, err := store.Read(ctx, DocName)
 	if err != nil {
+		return UnavailableStatus(err.Error())
+	}
+	status := Status{Path: DocRef}
+	switch read.Kind {
+	case kephalaion.ReadKindNone:
+		return status
+	case kephalaion.ReadKindDirectory:
 		status.Present = true
-		status.Problem = "nicht lesbar: " + err.Error()
+		status.Problem = "unter " + DocRef + " liegt ein Verzeichnis, kein Dokument"
 		return status
 	}
-	status.Present = true
+	status = StatusOf([]byte(*read.Content))
+	status.Revision = read.Revision
+	return status
+}
+
+// UnavailableStatus ist der Stand, wenn die Collection nicht erreichbar ist.
+// Der Grund kommt vom Zugang (kephalaion_unavailable) oder vom Store.
+func UnavailableStatus(reason string) Status {
+	return Status{Path: DocRef, Unavailable: true, Message: reason}
+}
+
+// StatusOf ist der Stand eines vorliegenden Bestands: das Dokument ist da,
+// und was sein Frontmatter sagt, steht im Ergebnis. Der Sammler benutzt es
+// für den Vergleich, ReadStatus für die Auskunft.
+func StatusOf(data []byte) Status {
+	status := Status{Path: DocRef, Present: true}
 	fillStatus(&status, data)
 	return status
 }

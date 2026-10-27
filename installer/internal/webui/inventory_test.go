@@ -10,15 +10,18 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
 // newInventoryProject legt ein Projekt mit Anker und einer Quelle an und macht
 // es zum Arbeitsverzeichnis: die Handler leiten ihr Projekt über
-// project.Detect() daraus ab. Zurück kommt die aufgelöste Projektwurzel — die
-// Vertrauensgrenze vergleicht aufgelöste Pfade, und t.TempDir() liegt auf
-// manchen Rechnern hinter einem Symlink.
-func newInventoryProject(t *testing.T) string {
+// project.Detect() daraus ab. Das Inventar landet in einer Collection im
+// Speicher, die der Test an die Stelle des Zugangs setzt. Zurück kommt die
+// aufgelöste Projektwurzel — die Vertrauensgrenze vergleicht aufgelöste Pfade,
+// und t.TempDir() liegt auf manchen Rechnern hinter einem Symlink.
+func newInventoryProject(t *testing.T) (string, *kephtest.Store) {
 	t.Helper()
 
 	root := t.TempDir()
@@ -32,7 +35,32 @@ func newInventoryProject(t *testing.T) string {
 		t.Fatalf("schreiben: %v", err)
 	}
 	chdir(t, root)
-	return root
+	return root, inventoryStore(t)
+}
+
+// inventoryStore setzt eine Collection im Speicher an die Stelle von
+// project.OpenInventoryStore.
+func inventoryStore(t *testing.T) *kephtest.Store {
+	t.Helper()
+	store := kephtest.New()
+	original := project.OpenInventoryStore
+	realOpenInventoryStore = original
+	project.OpenInventoryStore = func(string) (inventory.Store, error) { return store, nil }
+	t.Cleanup(func() { project.OpenInventoryStore = original })
+	return store
+}
+
+// realOpenInventoryStore ist der echte Zugang, bevor ein Test ihn ersetzt hat.
+var realOpenInventoryStore func(string) (inventory.Store, error)
+
+// inventoryUnavailable setzt den echten Zugang wieder ein: Das Projekt hat
+// keine Anbindung, also scheitert er mit kephalaion_unavailable, ohne den
+// Node zu fragen.
+func inventoryUnavailable(t *testing.T, real func(string) (inventory.Store, error)) {
+	t.Helper()
+	original := project.OpenInventoryStore
+	project.OpenInventoryStore = real
+	t.Cleanup(func() { project.OpenInventoryStore = original })
 }
 
 func getJSON(t *testing.T, path string, target any) int {
@@ -76,10 +104,21 @@ func writeVersionSources(t *testing.T, root string, content string) string {
 	return path
 }
 
-// Vor dem ersten Lauf: die Datei fehlt, das ist ein definierter Zustand und
+// storedInventory ist das Inventar in der Collection; fehlt es, scheitert der
+// Test.
+func storedInventory(t *testing.T, store *kephtest.Store) string {
+	t.Helper()
+	content, ok := store.Content(inventory.DocName)
+	if !ok {
+		t.Fatalf("%s liegt nicht in der Collection: %v", inventory.DocName, store.Names())
+	}
+	return content
+}
+
+// Vor dem ersten Lauf: das Dokument fehlt, das ist ein definierter Zustand und
 // kein Fehler — und eine fehlende Quellenkonfiguration ebenso.
 func TestInventarStatusOhneInventarUndOhneKonfiguration(t *testing.T) {
-	root := newInventoryProject(t)
+	root, _ := newInventoryProject(t)
 
 	var response inventoryResponse
 	if status := getJSON(t, "/api/inventory", &response); status != http.StatusOK {
@@ -88,11 +127,11 @@ func TestInventarStatusOhneInventarUndOhneKonfiguration(t *testing.T) {
 	if !response.Available {
 		t.Fatal("das Projekt ist eingerichtet, die Antwort sagt nein")
 	}
-	if response.Status.Present || response.Status.Problem != "" {
+	if response.Status.Present || response.Status.Unavailable || response.Status.Problem != "" {
 		t.Errorf("Inventarstatus = %+v, erwartet fehlend ohne Befund", response.Status)
 	}
-	if response.DisplayPath != "k-playbook-local/docs/versions/inventory.md" {
-		t.Errorf("DisplayPath = %q", response.DisplayPath)
+	if response.DisplayPath != inventory.DocRef || response.Status.Path != inventory.DocRef {
+		t.Errorf("DisplayPath = %q, Status.Path = %q", response.DisplayPath, response.Status.Path)
 	}
 	if response.Sources.Present || response.Sources.Error != "" {
 		t.Errorf("Quellenkonfiguration = %+v, erwartet fehlend ohne Fehler", response.Sources)
@@ -106,42 +145,43 @@ func TestInventarStatusOhneInventarUndOhneKonfiguration(t *testing.T) {
 
 	var file inventoryFileResponse
 	getJSON(t, "/api/inventory/file", &file)
-	if !file.Available || file.Present || file.HTML != "" || file.Message == "" {
-		t.Errorf("Datei-Antwort ohne Inventar = %+v", file)
+	if !file.Available || file.Present || file.HTML != "" || file.Message == "" || file.Path != inventory.DocRef {
+		t.Errorf("Antwort ohne Inventar = %+v", file)
 	}
 }
 
-// Der Anstoß schreibt die Datei über inventory.Run; der Status danach ist der
-// aus dem Frontmatter — dieselbe Auskunft, die GET liefert. Ein zweiter
-// Anstoß ohne Änderung lässt die Datei byte-identisch stehen.
+// Der Anstoß schreibt das Dokument über inventory.Run in die Collection; der
+// Status danach ist der aus dem Frontmatter — dieselbe Auskunft, die GET
+// liefert. Ein zweiter Anstoß ohne Änderung lässt das Dokument byte-identisch
+// stehen, Revision eingeschlossen.
 func TestInventarAnstossSchreibtUndBleibtDanachByteStabil(t *testing.T) {
-	root := newInventoryProject(t)
-	path := inventory.FilePath(project.LocalDir(root))
+	_, store := newInventoryProject(t)
 
 	code, first := postInventory(t)
 	if code != http.StatusOK || !first.Available || !first.OK {
 		t.Fatalf("erster Anstoß: Status %d, Antwort %+v", code, first)
 	}
-	if !first.Outcome.Written || first.Outcome.Path != path {
-		t.Errorf("Outcome = %+v, erwartet geschrieben nach %s", first.Outcome, path)
+	if !first.Outcome.Written || first.Outcome.Path != inventory.DocRef || first.Outcome.Revision == 0 {
+		t.Errorf("Outcome = %+v, erwartet geschrieben nach %s", first.Outcome, inventory.DocRef)
 	}
 	if first.Summary.Sources != 1 || first.Summary.Entries != 1 || first.Summary.Rejected != 0 {
 		t.Errorf("Summary = %+v", first.Summary)
 	}
-	if first.DisplayPath != "k-playbook-local/docs/versions/inventory.md" {
+	if first.DisplayPath != inventory.DocRef {
 		t.Errorf("DisplayPath = %q", first.DisplayPath)
 	}
-	if !first.Status.Present || first.Status.GeneratedBy != inventory.GeneratedBy || first.Status.Entries != 1 {
+	if !first.Status.Present || first.Status.GeneratedBy != inventory.GeneratedBy || first.Status.Entries != 1 ||
+		first.Status.Revision != first.Outcome.Revision {
 		t.Errorf("Status nach dem Lauf = %+v", first.Status)
 	}
 	if first.Rejections == nil || first.Exclusions == nil || first.Notes == nil {
 		t.Error("Listen müssen als leere Listen kommen, nicht als null")
 	}
-
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
+	if names := store.Names(); len(names) != 1 || names[0] != inventory.DocName {
+		t.Errorf("in der Collection liegt %v, erwartet nur %s", names, inventory.DocName)
 	}
+
+	before := storedInventory(t, store)
 	// GET sagt dasselbe wie der Lauf.
 	var state inventoryResponse
 	getJSON(t, "/api/inventory", &state)
@@ -153,31 +193,28 @@ func TestInventarAnstossSchreibtUndBleibtDanachByteStabil(t *testing.T) {
 	if !second.OK || second.Outcome.Written {
 		t.Fatalf("zweiter Anstoß muss unverändert melden: %+v", second.Outcome)
 	}
-	if second.Outcome.At != first.Outcome.At {
-		t.Errorf("Zeitstempel = %q, erwartet der alte %q", second.Outcome.At, first.Outcome.At)
+	if second.Outcome.At != first.Outcome.At || second.Outcome.Revision != first.Outcome.Revision {
+		t.Errorf("Outcome = %+v, erwartet den alten Zeitstempel %q und Revision %d",
+			second.Outcome, first.Outcome.At, first.Outcome.Revision)
 	}
-	after, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
-	}
-	if string(before) != string(after) {
-		t.Error("der zweite Lauf hat die Datei verändert")
+	if after := storedInventory(t, store); before != after {
+		t.Error("der zweite Lauf hat das Dokument verändert")
 	}
 
-	// Die Datei ist im Bereich lesbar — ohne den Frontmatter-Block, der
+	// Das Dokument ist im Bereich lesbar — ohne den Frontmatter-Block, der
 	// steht als Status daneben.
 	var file inventoryFileResponse
 	getJSON(t, "/api/inventory/file", &file)
 	if !file.Present || file.Message != "" {
-		t.Fatalf("Datei-Antwort = %+v", file)
+		t.Fatalf("Antwort = %+v", file)
 	}
 	if !strings.Contains(file.HTML, "Versionsinventar") || !strings.Contains(file.HTML, "redis") {
-		t.Errorf("gerenderte Datei ohne Inhalt: %q", file.HTML)
+		t.Errorf("gerendertes Dokument ohne Inhalt: %q", file.HTML)
 	}
 	if strings.Contains(file.HTML, "sources-read") {
 		t.Error("das Frontmatter steht im gerenderten Text")
 	}
-	if file.Path != "k-playbook-local/docs/versions/inventory.md" {
+	if file.Path != inventory.DocRef {
 		t.Errorf("Path = %q", file.Path)
 	}
 }
@@ -187,7 +224,7 @@ func TestInventarAnstossSchreibtUndBleibtDanachByteStabil(t *testing.T) {
 // trägt die Ablehnung so, wie die Fachlogik sie meldet: angefragter Pfad,
 // aufgelöster Pfad, Grund. Der Lauf bricht deswegen nicht ab.
 func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
-	root := newInventoryProject(t)
+	root, store := newInventoryProject(t)
 	outside := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(outside); err == nil {
 		outside = resolved
@@ -224,13 +261,9 @@ func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 		t.Errorf("Ablehnung = %+v", response.Rejections[0])
 	}
 
-	// Die Ablehnung ist Inhalt der Datei.
-	content, err := os.ReadFile(response.Outcome.Path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
-	}
-	if !strings.Contains(string(content), foreign) {
-		t.Error("die abgelehnte Quelle steht nicht in der Inventardatei")
+	// Die Ablehnung ist Inhalt des Dokuments.
+	if !strings.Contains(storedInventory(t, store), foreign) {
+		t.Error("die abgelehnte Quelle steht nicht im Inventar")
 	}
 }
 
@@ -238,7 +271,7 @@ func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 // geschrieben wird — und GET zeigt sie als sichtbaren Zustand statt als
 // Nullergebnis.
 func TestInventarDefekteKonfigurationBrichtAbUndIstSichtbar(t *testing.T) {
-	root := newInventoryProject(t)
+	root, store := newInventoryProject(t)
 	writeVersionSources(t, root, "schema_version: 1\nroots: [/srv\n")
 
 	var state inventoryResponse
@@ -254,49 +287,96 @@ func TestInventarDefekteKonfigurationBrichtAbUndIstSichtbar(t *testing.T) {
 	if !strings.Contains(response.Message, project.VersionSourcesFileName) {
 		t.Errorf("die Meldung nennt die Datei nicht: %q", response.Message)
 	}
-	if _, err := os.Stat(inventory.FilePath(project.LocalDir(root))); !os.IsNotExist(err) {
-		t.Error("trotz Abbruch wurde eine Inventardatei geschrieben")
+	if len(store.Names()) != 0 {
+		t.Errorf("trotz Abbruch wurde geschrieben: %v", store.Names())
 	}
-	if response.Status.Present {
+	if response.Status.Present || response.Status.Unavailable {
 		t.Errorf("Status nach dem Abbruch = %+v", response.Status)
 	}
 }
 
 // Auch ein Schreibfehler ist ein sichtbarer Abbruch, kein stiller Erfolg: die
-// Meldung nennt den Grund, und Outcome.Written sagt, dass die Datei nicht
-// angefasst wurde. Provoziert wird er über eine reguläre Datei an der Stelle
-// des Zielverzeichnisses.
+// Meldung nennt den Grund und den Code, und Outcome.Written sagt, dass das
+// Dokument nicht angefasst wurde. Provoziert wird er über einen Hub, der den
+// write mit stale_revision ablehnt.
 func TestInventarSchreibfehlerBrichtSichtbarAb(t *testing.T) {
-	root := newInventoryProject(t)
-	inventoryFile := inventory.FilePath(project.LocalDir(root))
-	if err := os.MkdirAll(filepath.Dir(filepath.Dir(inventoryFile)), 0o755); err != nil {
-		t.Fatalf("anlegen: %v", err)
+	_, store := newInventoryProject(t)
+	store.Put(inventory.DocName, inventory.Render(inventory.Result{}, "2026-09-01T08:00:00Z"))
+	store.Fail["write"] = &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeStaleRevision, Message: "aktuelle Revision 7"}
+
+	code, response := postInventory(t)
+	if code != http.StatusOK || !response.Available || response.OK {
+		t.Fatalf("Status %d, Antwort %+v — erwartet Abbruch", code, response)
 	}
-	if err := os.WriteFile(filepath.Dir(inventoryFile), []byte("im Weg\n"), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
+	if !strings.HasPrefix(response.Message, "Erhebung abgebrochen: ") || !strings.Contains(response.Message, "(stale_revision)") {
+		t.Errorf("die Meldung nennt den Schreibfehler nicht mit Code: %q", response.Message)
+	}
+	if response.Outcome.Written {
+		t.Error("Outcome.Written trotz Schreibfehler")
+	}
+	// Der Stand kommt neu aus der Collection: dort liegt der alte Bestand,
+	// unverändert.
+	if !response.Status.Present || response.Status.GeneratedAt != "2026-09-01T08:00:00Z" || response.Status.Problem != "" {
+		t.Errorf("Status nach dem Abbruch = %+v", response.Status)
+	}
+}
+
+// Ohne bereite Kephalaion-Anbindung gibt es kein Inventar: GET zeigt den
+// Zustand „nicht erreichbar“ mit dem Grund — nicht „fehlt“ —, der Anstoß
+// bricht mit kephalaion_unavailable ab, ohne eine Quelle zu lesen, und die
+// Ansicht sagt, warum nichts da ist. Einen Rückfall auf die Platte gibt es
+// nicht.
+func TestInventarOhneKephalaionIstEinSichtbarerZustand(t *testing.T) {
+	root, _ := newInventoryProject(t)
+	inventoryUnavailable(t, realOpenInventoryStore)
+
+	var state inventoryResponse
+	getJSON(t, "/api/inventory", &state)
+	if !state.Available || !state.Status.Unavailable || state.Status.Present {
+		t.Fatalf("Status = %+v, erwartet nicht erreichbar", state.Status)
+	}
+	if !strings.Contains(state.Status.Message, "nicht bereit") || state.Status.Path != inventory.DocRef {
+		t.Errorf("Status = %+v", state.Status)
 	}
 
 	code, response := postInventory(t)
 	if code != http.StatusOK || !response.Available || response.OK {
 		t.Fatalf("Status %d, Antwort %+v — erwartet Abbruch", code, response)
 	}
-	if !strings.HasPrefix(response.Message, "Erhebung abgebrochen: ") || !strings.Contains(response.Message, "anlegen") {
-		t.Errorf("die Meldung nennt den Schreibfehler nicht: %q", response.Message)
+	if !strings.Contains(response.Message, "(kephalaion_unavailable)") || !strings.Contains(response.Message, "nicht bereit") {
+		t.Errorf("die Meldung nennt Code und Grund nicht: %q", response.Message)
 	}
-	if response.Outcome.Written {
-		t.Error("Outcome.Written trotz Schreibfehler")
+	if response.Outcome.Written || response.Outcome.Path != inventory.DocRef || !response.Status.Unavailable {
+		t.Errorf("Outcome = %+v, Status = %+v", response.Outcome, response.Status)
 	}
-	// Der Stand kommt neu von der Datei: dort liegt nichts Lesbares, und das
-	// sagt der Status als Problem — kein Erzeuger, keine Einträge.
-	if response.Status.GeneratedBy != "" || response.Status.Entries != 0 || response.Status.Problem == "" {
-		t.Errorf("Status nach dem Abbruch = %+v", response.Status)
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
+		t.Error("ohne Kephalaion darf nichts auf der Platte entstehen")
+	}
+
+	var file inventoryFileResponse
+	getJSON(t, "/api/inventory/file", &file)
+	if !file.Available || file.Present || !strings.Contains(file.Message, "kephalaion_unavailable") {
+		t.Errorf("Antwort = %+v", file)
+	}
+}
+
+// Ist der Node da, antwortet aber nicht, ist das ebenfalls „nicht erreichbar“
+// — gemeldet mit dem Fehler des Stores.
+func TestInventarStatusBeiNichtAntwortendemNode(t *testing.T) {
+	_, store := newInventoryProject(t)
+	store.Fail["read"] = &kephalaion.ToolError{Tool: "read", Code: kephalaion.CodeNodeUnreachable, Message: "Node antwortet nicht"}
+
+	var state inventoryResponse
+	getJSON(t, "/api/inventory", &state)
+	if !state.Status.Unavailable || !strings.Contains(state.Status.Message, "Node antwortet nicht") {
+		t.Errorf("Status = %+v", state.Status)
 	}
 }
 
 // Die konfigurierten Zusatzquellen und Ausschlüsse erscheinen als Zahlen —
 // gelesen mit demselben Leser wie im Sammler. Ein Formular gibt es nicht.
 func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
-	root := newInventoryProject(t)
+	root, _ := newInventoryProject(t)
 	writeVersionSources(t, root, "schema_version: 1\nroots:\n  - /srv/deploy\nsources:\n"+
 		"  - path: /srv/deploy/values.yaml\n    kind: helm\n    env: deployment\n"+
 		"  - path: docs/extra.txt\n    kind: python\n    env: lokal\n    optional: true\n"+
@@ -317,6 +397,7 @@ func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
 // POST weist mit 409 ab.
 func TestInventarOhneInstallation(t *testing.T) {
 	chdir(t, t.TempDir())
+	inventoryStore(t)
 
 	var state inventoryResponse
 	getJSON(t, "/api/inventory", &state)
@@ -333,7 +414,7 @@ func TestInventarOhneInstallation(t *testing.T) {
 // Der Anstoß ist ein POST und steht damit hinter der Herkunftsprüfung: eine
 // fremde Seite im Browser des Nutzers darf keine Erhebung auslösen.
 func TestInventarAnstossFremderHerkunftWirdAbgewiesen(t *testing.T) {
-	root := newInventoryProject(t)
+	_, store := newInventoryProject(t)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/inventory", nil)
 	request.Header.Set("Origin", "http://boese.example")
@@ -343,13 +424,13 @@ func TestInventarAnstossFremderHerkunftWirdAbgewiesen(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Errorf("Status = %d, erwartet %d", recorder.Code, http.StatusForbidden)
 	}
-	if _, err := os.Stat(inventory.FilePath(project.LocalDir(root))); !os.IsNotExist(err) {
-		t.Error("die abgewiesene Anfrage hat trotzdem geschrieben")
+	if len(store.Calls) != 0 || len(store.Names()) != 0 {
+		t.Error("die abgewiesene Anfrage hat trotzdem die Collection angefasst")
 	}
 }
 
 // Die Seite /inventory ist ein eigener Bereich: eigener Eintrag im Umschalter,
-// die Karten für Stand, Quellenkonfiguration und Datei, der Knopf zum
+// die Karten für Stand, Quellenkonfiguration und Dokument, der Knopf zum
 // Aktualisieren — und kein Formular für die Quellenkonfiguration.
 func TestInventarseiteTraegtDenBereich(t *testing.T) {
 	newInventoryProject(t)
@@ -362,6 +443,7 @@ func TestInventarseiteTraegtDenBereich(t *testing.T) {
 		`<a class="area-nav-item active" href="/inventory" aria-current="page">Inventar</a>`,
 		`id="status-card"`, `id="sources-card"`, `id="file-card"`,
 		`id="inventory-run"`, `/static/inventory.js`,
+		`docs/generated/versions/`,
 	} {
 		if !strings.Contains(body, needle) {
 			t.Errorf("auf /inventory fehlt %s", needle)
@@ -375,7 +457,7 @@ func TestInventarseiteTraegtDenBereich(t *testing.T) {
 // Eine nicht auswertbare Quelle steht in der Antwort mit Datei und Quellart,
 // und Lauf, Frontmatter und Fachlogik nennen dieselbe Zahl.
 func TestInventarAnstossFuehrtNichtAuswertbareQuellen(t *testing.T) {
-	root := newInventoryProject(t)
+	root, store := newInventoryProject(t)
 	if err := os.WriteFile(filepath.Join(root, "docker-compose.yml"), []byte("services: [\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
@@ -398,11 +480,7 @@ func TestInventarAnstossFuehrtNichtAuswertbareQuellen(t *testing.T) {
 			want, response.Summary.Unevaluable, response.Status.SourcesUnevaluable)
 	}
 
-	content, err := os.ReadFile(response.Outcome.Path)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
-	}
-	if !strings.Contains(string(content), "| `docker-compose.yml` | compose | dev | 0 | nicht auswertbar |") {
-		t.Errorf("die Quellentabelle zeigt den Zustand nicht:\n%s", content)
+	if !strings.Contains(storedInventory(t, store), "| `docker-compose.yml` | compose | dev | 0 | nicht auswertbar |") {
+		t.Errorf("die Quellentabelle zeigt den Zustand nicht:\n%s", storedInventory(t, store))
 	}
 }

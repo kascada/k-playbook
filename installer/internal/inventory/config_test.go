@@ -48,11 +48,12 @@ func TestDefekteQuellenkonfigurationBrichtDenLaufAb(t *testing.T) {
 			if _, err := Collect(options); err == nil {
 				t.Fatal("erwartet wurde ein Abbruch")
 			}
-			if _, _, err := Run(options); err == nil {
+			store := newRunStore(t)
+			if _, _, err := runInto(t, store, options); err == nil {
 				t.Fatal("Run muss denselben Abbruch weitergeben")
 			}
-			if _, err := os.Stat(options.InventoryFile); !os.IsNotExist(err) {
-				t.Error("bei einem Abbruch wird nichts geschrieben")
+			if len(store.Calls) != 0 || len(store.Names()) != 0 {
+				t.Error("bei einem Abbruch wird nichts geschrieben und nichts gelesen")
 			}
 		})
 	}

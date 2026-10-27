@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
@@ -333,6 +334,53 @@ func OpenKephDocs(projectDir string) (KephDocs, error) {
 		return KephDocs{}, err
 	}
 	return KephDocs{Store: client, User: user}, nil
+}
+
+// OpenInventoryStore öffnet den Zugang zur Collection des Projekts für das
+// Versionsinventar (inventory.DocName) — derselbe Weg wie OpenTodoStore und
+// OpenKephDocs, Fehler mit DocCodeKephalaionUnavailable. Austauschbar, damit
+// Tests den Node nicht fragen: Subkommando und Oberfläche setzen dann
+// kephtest.Store ein. Was der Store meldet, trägt die Codes der doc-Werkzeuge
+// (kephError): kephalaion_unavailable, stale_revision, outcome_unknown.
+// Ohne bereite Anbindung gibt es kein Inventar; einen Rückfall auf die
+// Platte gibt es nicht.
+var OpenInventoryStore = func(projectDir string) (inventory.Store, error) {
+	client, _, err := openKephClient(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	return inventoryStore{client: client}, nil
+}
+
+// inventoryStore ist der Kephalaion-Client hinter inventory.Store; er
+// übersetzt jeden Fehler in einen Code der doc-Werkzeuge, damit das
+// Inventar-Paket die Codes nicht kennen muss.
+type inventoryStore struct {
+	client *kephalaion.Client
+}
+
+func (s inventoryStore) Read(ctx context.Context, name string) (kephalaion.ReadResult, error) {
+	read, err := s.client.Read(ctx, name)
+	if err != nil {
+		return kephalaion.ReadResult{}, kephError(err)
+	}
+	return read, nil
+}
+
+func (s inventoryStore) Create(ctx context.Context, name, content string) (kephalaion.Document, error) {
+	doc, err := s.client.Create(ctx, name, content)
+	if err != nil {
+		return kephalaion.Document{}, kephError(err)
+	}
+	return doc, nil
+}
+
+func (s inventoryStore) Write(ctx context.Context, name, content string, baseRevision int64) (kephalaion.Document, error) {
+	doc, err := s.client.Write(ctx, name, content, baseRevision)
+	if err != nil {
+		return kephalaion.Document{}, kephError(err)
+	}
+	return doc, nil
 }
 
 // openKephClient ist der Zugang je Projekt: Status prüfen (kephalaion.ok),

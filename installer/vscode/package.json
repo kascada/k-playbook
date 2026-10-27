@@ -1,14 +1,14 @@
 {
   "name": "k-playbook-workspace-tools",
   "displayName": "k-playbook Workspace Tools",
-  "description": "Workspace-Aktionen von k-playbook — OpenCode in einem Terminal-Tab im Editor-Bereich",
-  "version": "0.1.0",
+  "description": "Workspace-Aktionen von k-playbook — OpenCode in einem Terminal-Tab im Editor-Bereich, Kephalaion-Collections im Arbeitsbereich",
+  "version": "0.2.0",
   "publisher": "kascada",
   "repository": "https://github.com/kascada/k-playbook",
   "engines": { "vscode": "^1.101.0" },
   "extensionKind": ["workspace"],
   "main": "./extension.js",
-  "activationEvents": [],
+  "activationEvents": ["onStartupFinished"],
   "contributes": {
     "commands": [
       {
@@ -16,6 +16,11 @@
         "title": "OpenCode im neuen Tab",
         "category": "k-playbook",
         "icon": "$(terminal)"
+      },
+      {
+        "command": "kPlaybook.initWorkspace",
+        "title": "Kephalaion-Collections einbinden",
+        "category": "k-playbook"
       }
     ],
     "configuration": {
@@ -47,6 +52,10 @@
       "commandPalette": [
         {
           "command": "kPlaybook.openCode",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "kPlaybook.initWorkspace",
           "when": "workspaceFolderCount > 0"
         }
       ]

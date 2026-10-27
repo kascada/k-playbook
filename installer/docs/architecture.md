@@ -98,8 +98,9 @@ das Kommando nur Lauf, Projektumgebung und Severity-Katalog auf; die Zusammenfü
 selbst steht in `internal/review/merge`. Es scannt nichts nach — was nicht im Lauf steht,
 kommt nicht in den Input.
 
-`inventory` erhebt das Versionsinventar des Projekts und schreibt es nach
-`k-playbook-local/docs/versions/inventory.md`. Es liest ausschließlich deklarative
+`inventory` erhebt das Versionsinventar des Projekts und schreibt es in die Collection des
+Projekts nach `keph:/docs/generated/versions/inventory.md` (Name `inventory.DocName`). Es
+liest ausschließlich deklarative
 Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateien, dazu die
 in `k-playbook-local/version-sources.yaml` konfigurierten —, fragt kein Netz und führt
 kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Installation
@@ -110,11 +111,15 @@ holt jede Quelle daraus wieder herein. Eine Quelle, die gelesen, aber als Ganzes
 ausgewertet werden konnte — eigener Parse-Fehler, fehlendes Wurzelpaket einer
 `package-lock.json`, fehlendes oder ausgeschlossenes Manifest eines Lockfiles —, steht als
 `nicht auswertbar` in der Quellentabelle und wird in der Übersicht, im Frontmatter und in
-der Ausgabe des Kommandos gezählt. Das Kommando sammelt Projektwurzel,
-Quellenkonfiguration und
-Zielpfad zusammen und reicht sie an `internal/inventory` weiter; dort liegen Parser,
-Vertrauensgrenze und Renderer. Ein Lauf ohne inhaltliche Änderung lässt die Datei
-byte-identisch stehen. Der Vertrag steht in
+der Ausgabe des Kommandos gezählt. Das Kommando sammelt Projektwurzel und
+Quellenkonfiguration zusammen, holt den Zugang zur Collection über
+`project.OpenInventoryStore` — derselbe Weg wie bei den Todos; ohne bereite Anbindung
+Abbruch mit `kephalaion_unavailable`, kein Rückfall auf die Platte — und reicht alles an
+`internal/inventory` weiter; dort liegen Parser, Vertrauensgrenze und Renderer, und dort
+steht der Schreibweg: Bestand lesen, bis auf `generated.at` vergleichen, fehlt er `create`,
+sonst `write` mit der gelesenen Revision als `base_revision` (`stale_revision` ist ein
+sichtbarer Fehler). Ein Lauf ohne inhaltliche Änderung lässt das Dokument byte-identisch
+stehen, Revision eingeschlossen. Der Vertrag steht in
 [`../../docs/version-inventory.md`](../../docs/version-inventory.md); denselben Lauf stoßen
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
@@ -330,7 +335,8 @@ installer/
 │   │                            guidelines/…, commands/… (der Text, die Hülle liegt beim
 │   │                            Assistenten), includes/…, testdata/… — und der
 │   │                            docIncluder, der Include-Zeilen einsetzt (Task 093)
-│   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente
+│   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
+│   │                            Zugänge OpenKephDocs, OpenInventoryStore
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
 │   │                            aus der Collection, als Verweise (Task 086); dazu der
@@ -361,7 +367,7 @@ installer/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
 │   ├── browser.go               Browser öffnen (Container-Erkennung aus hostenv)
 │   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
-│   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Datei
+│   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Dokument aus der Collection
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte: offen, erledigt, Suche; anlegen,
 │   │                            abhaken, wieder öffnen
@@ -453,9 +459,11 @@ installer/
 │   │                            die Paarregel; nicht prüfbare Formen melden sich als solche
 │   ├── helmvalues.go            konfigurierte Helm-Werte (helm_values) den gelesenen
 │   │                            values-Dateien zuordnen, Hinweise für wirkungslose Einträge
-│   ├── render.go                die Inventardatei erzeugen, deterministisch
-│   ├── write.go                 Byte-Stabilitätsregel: vergleichen, sonst nicht schreiben
-│   ├── status.go                Frontmatter der Inventardatei lesen (ReadStatus)
+│   ├── render.go                das Inventar erzeugen, deterministisch
+│   ├── store.go                 Ort in der Collection (DocName, DocRef), Store-Schnittstelle
+│   ├── write.go                 Byte-Stabilitätsregel gegen die Collection: lesen, vergleichen,
+│   │                            sonst create/write mit base_revision
+│   ├── status.go                Frontmatter des Inventars lesen (ReadStatus aus der Collection, StatusOf)
 │   ├── tomllite.go jsonc.go textutil.go
 │   │                            kleine Leser für TOML, JSON mit Kommentaren, Textzeilen
 │   └── testdata/projekte/       Fixture-Projekte für die Parser
@@ -597,12 +605,20 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 
 ```text
 rules/  reviews/  checks/  commands/  skills/  results/  data/  cache/  docs/
-docs/manual/  guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
+guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
 version-sources.yaml
 ```
 
-Die erzeugten Docs-Herkünfte — `docs/code/`, `docs/libs/` und `docs/versions/` — stehen
-bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres Erzeugers. `/k-docs-extract`
+`docs/manual/` steht seit Task 101 nicht mehr darin: handgeschriebene Doku liegt unter
+`keph:/docs/manual/`, und legte das Einrichten das Verzeichnis neu an, brächte es zurück,
+was `/k-upgrade` (3.2) abgeräumt hat. `docs/` bleibt, weil `code/` und `libs/` noch
+dorthin schreiben; seine README (`docsReadmeTemplate()`) nennt den Einstieg `keph:/docs/`
+und ist kein Index.
+
+Die erzeugten Docs-Herkünfte — `docs/code/` und `docs/libs/` — stehen
+bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres Erzeugers. Das Versionsinventar
+liegt seit Task 100 nicht mehr hier, sondern in der Collection des Projekts
+(`keph:/docs/generated/versions/inventory.md`). `/k-docs-extract`
 schreibt nicht mehr nach `docs/extracted/`, sondern über die Wissenswerkzeuge nach
 `knowledge/extracted/`; das Verzeichnis entsteht beim ersten `write`.
 
@@ -1981,6 +1997,31 @@ Zwei Entscheidungen darin sind gemessen:
 Beide Einstellungen (`kPlaybook.openCode.executable`, `kPlaybook.openCode.args`) haben
 `scope: "machine"`: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen.
 
+Der Befehl `kPlaybook.initWorkspace` bindet die öffentliche Collection `k-playbook` und
+die des Projekts als `keph://`-Ordner ein. Eine Aktion mit `onStartup` läuft zusätzlich
+bei jedem Fensterstart (`onStartupFinished`); `activate` wartet nicht darauf. Die
+Entscheidungen dahinter:
+
+- **Die Regel steht im Programm.** Welche Collections dazugehören, liefert
+  `k-playbook vscode collections --json` (`kephalaion.WorkspaceFolders`); die Erweiterung
+  liest `K-PLAYBOOK.local.yaml` nicht selbst. Der Aufruf liest nur die Datei und fragt
+  keinen Node, weil er bei jedem Fensterstart läuft.
+- **Welche Workspace-Datei, weiß nur die Erweiterung.** Von außen ist nicht zu erkennen,
+  welche Datei ein Fenster geöffnet hat; `vscode.workspace.workspaceFile` sagt es je
+  Fenster. Bei offener Datei trägt `updateWorkspaceFolders` nach, und VS Code schreibt es
+  in genau diese Datei. Das ersetzt das Devcontainer-Skript, das eine feste Datei anlegte.
+- **Im Ordner-Fenster wird geöffnet, nicht nachgetragen.** Nachtragen ergäbe einen
+  unbenannten Workspace, den VS Code beim Schließen verwirft. Die Workspace-Datei des
+  Ordners wird geöffnet, nötigenfalls zuerst angelegt (`flag: 'wx'`, nie überschrieben);
+  das Fenster lädt ungefragt neu.
+- **Nur mit Kephalaion-Erweiterung.** Ohne sie entstünden Ordner, die keiner öffnen kann.
+  Geprüft wird über `vscode.extensions.getExtension`, nicht über `extensionDependencies`:
+  die Erweiterung soll ohne Kephalaion installierbar bleiben.
+
+Ungemessen: ob `vscode.openFolder` aus einem Remote-Extension-Host (Dev Container, WSL)
+das Fenster mit der Workspace-Datei in derselben Remote-Umgebung neu öffnet, und ob
+`updateWorkspaceFolders` `keph://`-Ordner dort dauerhaft in die Datei schreibt.
+
 Getestet wird mit `node:test` gegen ein nachgebildetes `vscode`-Modul, nie gegen ein
 echtes VS Code — die Remote-CLI ignoriert `--extensions-dir` und schriebe in die laufende
 Umgebung. Dasselbe gilt auf der Go-Seite: `vscodeext.LookPath` ist eine Variable, damit
@@ -2831,30 +2872,33 @@ stößt seine Erhebung an. Der Vertrag steht in
 [`../../docs/version-inventory.md`](../../docs/version-inventory.md); die Oberfläche
 formuliert nichts davon neu.
 
-Die Seite hat vier Karten. **Stand** zeigt, ob die Inventardatei da ist, wann sie zuletzt
-inhaltlich geändert wurde, den Erzeuger und die Zahlen aus ihrem Frontmatter — Quellen
-gelesen und konfiguriert, Einträge, Abweichungen, abgelehnte und nicht durchsuchte
-Quellen, nicht auswertbare Quellen —, dazu den Pfad der Datei und den Knopf
-**Aktualisieren**. Solange der Lauf
+Die Seite hat vier Karten. **Stand** zeigt, ob das Inventar in der Collection da ist, wann
+es zuletzt inhaltlich geändert wurde, seine Revision, den Erzeuger und die Zahlen aus
+seinem Frontmatter — Quellen gelesen und konfiguriert, Einträge, Abweichungen, abgelehnte
+und nicht durchsuchte Quellen, nicht auswertbare Quellen —, dazu den `keph:`-Verweis des
+Dokuments und den Knopf **Aktualisieren**. Ist Kephalaion nicht bereit, zeigt die Karte
+„Nicht erreichbar“ mit dem Grund aus der Anbindung — ein eigener Zustand, kein „Fehlt“;
+einen Rückfall auf die Platte gibt es nicht. Solange der Lauf
 steht, ist der Knopf gesperrt und ein Ring daneben sagt, dass gearbeitet wird; ein Lauf
 liest jede Quelle des Projekts. **Letzter Lauf** erscheint danach: Erfolg oder Abbruch,
-ob geschrieben wurde oder die Datei unverändert blieb, die Zahlen des Laufs — dieselben,
+ob geschrieben wurde oder das Dokument unverändert blieb, die Zahlen des Laufs — dieselben,
 die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss, jede
 nicht auswertbare Quelle und jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt
 `version-sources.yaml`: Pfad, vorhanden oder fehlend oder defekt, und die Zahl der Wurzeln,
-Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte. **Inventardatei** zeigt die erzeugte Datei gerendert, ohne ihren
+Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte. **Inventar** zeigt das erzeugte Dokument gerendert, ohne seinen
 Frontmatter-Block — der steht als Stand darüber.
 
-Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter der Inventardatei
-und nirgends sonst; ein Zwischenartefakt gibt es nicht. Das ist die eine Statusquelle, die
-auch der Sammler, `/k-docs` und das Subkommando benutzen.
+Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter des Dokuments in der
+Collection und nirgends sonst; ein Zwischenartefakt gibt es nicht. Das ist die eine
+Statusquelle, die auch der Sammler, `/k-docs` und das Subkommando benutzen.
 
 **Nur die Fachlogik.** Die Handler in `webui/inventory.go` rufen ausschließlich
-`internal/inventory` auf: `inventory.FilePath` für den Ort der Datei, `inventory.ReadStatus`
+`internal/inventory` auf — mit dem Store aus `project.OpenInventoryStore`, demselben Zugang
+wie beim Subkommando: `inventory.DocName` für den Ort des Dokuments, `inventory.ReadStatus`
 für den Stand, `inventory.Run` für den Anstoß, `inventory.Body` zum Abtrennen des
 Frontmatters vor dem Rendern. Es gibt keinen zweiten Parser und keine Sonderbehandlung von
 Pfaden: `GET /api/inventory/file` nimmt keinen Pfad aus der Anfrage entgegen, sondern liest
-genau die eine Datei. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
+genau das eine Dokument. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
 unverändert und wird nicht zweitverwendet implementiert — ein abgelehnter Pfad steht in
 der Antwort so, wie die Fachlogik ihn meldet: angefragter Pfad, aufgelöster Pfad, Grund.
 Die Quellenkonfiguration liest derselbe `versionsources.Read` wie im Sammler und in
@@ -2868,12 +2912,14 @@ Eingabemaske bräuchte dafür eine eigene Validierung gegen das Quellenmodell un
 zweiten Schreibpfad neben `/k-doc-inventory`, der den Diff vor Augen hat. Es gibt deshalb
 weder ein Formular noch einen Endpunkt, der in `version-sources.yaml` schreibt. Der
 einzige schreibende Endpunkt des Bereichs ist `POST /api/inventory`, und der schreibt
-allein die Inventardatei — und auch die nur, wenn die Erhebung sich inhaltlich vom Bestand
-unterscheidet: die Byte-Stabilitätsregel steht in `inventory.Write`, nicht im Handler.
+allein das Inventar in die Collection — und auch das nur, wenn die Erhebung sich inhaltlich
+vom Bestand unterscheidet: die Byte-Stabilitätsregel steht in `inventory.Write`, nicht im
+Handler.
 Der POST steht wie jeder andere hinter der Herkunftsprüfung.
 
 **Eigener Bereich, eigene API.** Docs zeigt die mitgelieferte Doku der Installation; das
-Inventar ist eine erzeugte Datei des Projekts unter `k-playbook-local/docs/versions/`.
+Inventar ist ein erzeugtes Dokument des Projekts in seiner Collection unter
+`docs/generated/versions/`.
 Deshalb ein eigener Eintrag im Umschalter, eine eigene Seite und drei eigene Endpunkte —
 und keine Erweiterung von `/api/docs`. Das Blockmenü entsteht wie auf der Setup-Seite aus
 den Karten; unter 1080px entfällt es wie dort.

@@ -49,7 +49,9 @@ func addBriefingTool(server *mcp.Server) {
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
 			"ist Kephalaion nicht nutzbar, steht available false mit message. projectDocs: der Einstieg der " +
-			"Projektdoku. Einen Eintrag liest du mit k_playbook_doc_read (ref). health: die Umgebungsprüfung — ok " +
+			"Projektdoku, der Verzeichnis-Verweis keph:/docs/ in der Collection des Projekts — gelesen mit " +
+			"Kephalaion list auf docs/ (recursive, frontmatter), nicht mit k_playbook_doc_read; zuerst docs/index.md, " +
+			"sobald es sie gibt. Einen Eintrag unter documents liest du mit k_playbook_doc_read (ref). health: die Umgebungsprüfung — ok " +
 			"und problems, je Eintrag level (error, warning), area (kephalaion, gh, baseTools, versionSources), message " +
 			"und hint; nenne die Einträge in deiner ersten Antwort, Fehler vor der Arbeit, behebe nichts still — " +
 			"dieselbe Antwort wie k_playbook_health. context: der Übergangsabschnitt " +

@@ -41,12 +41,13 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
 | Befund aus Analyse oder Fehlersuche | `keph:/queue/findings/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Befund, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`, Nachträge von `/k-danke`; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
+| Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
 | Doku aus dem Code | `docs/code/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` | `/k-docs-code` |
 | Steckbrief zu Library oder Tool | `docs/libs/<name>.md` — entsteht beim ersten Lauf von `/k-docs-tools` | `/k-docs-tools` |
 | Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-extract` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |
-| Versionsinventar | `docs/versions/inventory.md` — entsteht beim ersten Lauf von `/k-doc-inventory` | `/k-doc-inventory`, `k-playbook inventory` |
-| Handgeschriebene Doku | `docs/manual/<slug>.md` | von Hand |
-| Doku-Index | `docs/README.md` | `/k-docs-index`, sonst niemand |
+| Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
+| Handgeschriebene Doku | `keph:/docs/manual/<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
+| Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
 | Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
@@ -63,11 +64,15 @@ eingeht. Die einzige Ausnahme ist die Auflösung eines Merge-Konflikts — beide
 Einträge behalten, `nextId` auf `max(id)+1` setzen —, und die macht ein Mensch.
 Eine ältere `TODO.md` wird beim ersten Zugriff übersetzt und danach entfernt.
 
-`docs/` ist nach Herkunft geteilt, nicht nach Thema. Das Unterverzeichnis sagt, wer
-die Datei erzeugt hat und was sie veralten lässt: `code/` folgt dem Code, `libs/` den
-Libraries, `versions/` den deklarierten Versionen, `extracted/` bleibt der Stand von
-damals, `manual/` folgt niemandem außer der Hand, die sie schreibt. Wer eine Datei
-in die falsche Herkunft legt, hängt sie an den falschen Nachzug.
+Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema — in `keph:/docs/` wie in
+dem, was unter `docs/` noch auf der Platte liegt. Das Unterverzeichnis sagt, wer die
+Datei erzeugt hat und was sie veralten lässt: `code/` folgt dem Code, `libs/` den
+Libraries (beide noch auf der Platte, bis ihre Erzeuger umgestellt sind),
+`generated/versions/` den deklarierten Versionen, `manual/` folgt niemandem außer der
+Hand, die sie schreibt (beide in der Collection). Ein `versions/`, `manual/` oder
+`extracted/` auf der Platte ist ein Stand von damals; `/k-upgrade` (3.2) bringt ihn nach
+Kephalaion oder räumt ihn ab. Wer eine Datei in die falsche Herkunft legt, hängt sie an
+den falschen Nachzug.
 
 ## Namen
 
@@ -91,11 +96,11 @@ in die falsche Herkunft legt, hängt sie an den falschen Nachzug.
   und wird nicht indiziert. Ausgewertet landet es über `/k-docs-extract` in
   `knowledge/extracted/`, mit Quelle und Konfidenz.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
-  `docs/README.md`. Eine weitere Sammlung daneben wird nicht gefunden und veraltet
-  unbemerkt.
-- **Handkorrekturen an erzeugten Dateien.** `docs/README.md` und
-  `docs/versions/inventory.md` werden von ihrem Erzeuger neu geschrieben; eine
-  Korrektur von Hand ist beim nächsten Lauf weg.
+  `keph:/docs/`, das Briefing nennt ihn unter `Projektdoku`. Eine weitere Sammlung
+  daneben — auch ein Index auf der Platte — wird nicht gefunden und veraltet unbemerkt.
+- **Handkorrekturen an erzeugten Dateien.** `keph:/docs/README.md` und
+  `keph:/docs/generated/versions/inventory.md` werden von ihrem Erzeuger neu geschrieben;
+  eine Korrektur von Hand ist beim nächsten Lauf weg.
 
 ## Was nicht ins Repository gehört
 

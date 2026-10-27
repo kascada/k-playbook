@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -367,7 +368,6 @@ func TestConfiguredSourceNoteWirdMarkdownSicherGerendert(t *testing.T) {
 }
 
 func TestReadStatusVollstaendigUnvollstaendigUndDefekt(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "inventory.md")
 	full := Render(Result{}, "2026-09-06T00:00:00Z")
 	cases := []struct {
 		name, content string
@@ -379,11 +379,8 @@ func TestReadStatusVollstaendigUnvollstaendigUndDefekt(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := os.WriteFile(path, []byte(tc.content), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			if got := ReadStatus(path).Problem != ""; got != tc.problem {
-				t.Errorf("Problem = %v, erwartet %v: %+v", got, tc.problem, ReadStatus(path))
+			if got := StatusOf([]byte(tc.content)).Problem != ""; got != tc.problem {
+				t.Errorf("Problem = %v, erwartet %v: %+v", got, tc.problem, StatusOf([]byte(tc.content)))
 			}
 		})
 	}
@@ -391,20 +388,16 @@ func TestReadStatusVollstaendigUnvollstaendigUndDefekt(t *testing.T) {
 
 func TestCorruptInventoryIsRewritten(t *testing.T) {
 	options := newRunProject(t)
-	if err := os.MkdirAll(filepath.Dir(options.InventoryFile), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(options.InventoryFile, []byte("---\ntype: [\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	_, outcome, err := Run(options)
+	store := newRunStore(t)
+	store.Put(DocName, "---\ntype: [\n---\n")
+	_, outcome, err := runInto(t, store, options)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !outcome.Written || outcome.Problem == "" {
 		t.Errorf("defekter Bestand muss sichtbar neu geschrieben werden: %+v", outcome)
 	}
-	if status := ReadStatus(options.InventoryFile); status.Problem != "" {
+	if status := ReadStatus(context.Background(), store); status.Problem != "" {
 		t.Errorf("neu geschriebener Bestand = %q", status.Problem)
 	}
 }

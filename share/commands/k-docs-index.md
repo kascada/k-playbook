@@ -1,10 +1,25 @@
 ---
-description: Build the single documentation index at k-playbook-local/docs/README.md from every origin — code/, libs/, extracted/, versions/, manual/ and unsorted flat files — check consistency, verify findability in at most two lookups, and register the docs in MEMORY (AGENTS.md + opencode.json). Takes no argument and always covers the whole docs directory.
+description: Entfällt — Build the single documentation index at k-playbook-local/docs/README.md from every origin — code/, libs/, extracted/, versions/, manual/ and unsorted flat files — check consistency, verify findability in at most two lookups, and register the docs in MEMORY (AGENTS.md + opencode.json). Takes no argument and always covers the whole docs directory.
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ---
 
 # k-docs-index
+
+## Entfällt
+
+Dieser Command entfällt. Den Einstieg in die Projektdoku liefert das Briefing
+(`keph:/docs/`), den Index je Verzeichnis erzeugt künftig Kephalaion; `AGENTS.md` und
+`opencode.json` brauchen keinen Verweis auf die Doku mehr. Führe nichts von dem aus, was
+darunter steht — nichts lesen, nichts schreiben, nichts anbieten. Sag dem Nutzer in einem
+Satz, dass `/k-docs-index` entfallen ist, und nenne, was es gibt:
+
+- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
+  `keph:/docs/generated/versions/inventory.md`;
+- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
+- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
+
+Der Text darunter bleibt stehen, bis der Command entfernt wird.
 
 ## Erster Schritt
 

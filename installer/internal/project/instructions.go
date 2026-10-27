@@ -396,7 +396,7 @@ func (r RootInstructionsRepair) Changed() bool {
 //     (Session-Memory, Befunde) werden entfernt — Reparaturen an Inhalt, den
 //     k-playbook selbst geschrieben hat, unabhängig davon, ob die Datei
 //     versioniert ist. Das ist die Regel der Startwege
-//     (k-playbook-local/docs/manual/assistenten-verlinkung.md).
+//     (keph:/docs/manual/assistenten-verlinkung.md).
 //   - Die Datei fehlt ganz und die Einordnung des Paars CLAUDE.md/AGENTS.md
 //     kennt weder Konflikt noch etwas zu verschieben: sie entsteht aus der
 //     Vorlage (createRootInstructions). Es gibt dann nichts zu überschreiben

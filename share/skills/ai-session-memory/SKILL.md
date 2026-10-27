@@ -1,9 +1,24 @@
 ---
 name: ks-ai-session-memory
-description: Use when the user wants existing project documentation (k-playbook-local/docs/, README, analysis notes) to be automatically loaded and prioritized by AI sessions instead of re-analyzed. Sets up AGENTS.md, opencode.json with instructions + references, and a keyword-indexed k-playbook-local/docs/README.md so future sessions consult docs first before reading code. Trigger keywords - "in memory", "damit du das nächste Mal weißt", "session context", "docs zuerst", "AGENTS.md", "OpenCode Konfig".
+description: Vorübergehend nicht verfügbar, während die Projektdoku nach keph:/docs/ umzieht. Nur verwenden, wenn der Nutzer diesen Skill ausdrücklich beim Namen nennt; dann meldet er, dass er nicht verfügbar ist.
 ---
 
 # Skill: AI Session Memory
+
+## Vorübergehend nicht verfügbar
+
+Dieser Skill wird auf die Projektdoku in Kephalaion (`keph:/docs/`) umgebaut und steht bis
+dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
+nichts schreiben, nichts anbieten. Insbesondere schreibst du weder `AGENTS.md` noch `opencode.json`: Den Einstieg in die Projektdoku liefert seit dem Umbau das Briefing.
+Sag dem Nutzer in einem Satz, dass `ks-ai-session-memory`
+vorübergehend nicht verfügbar ist, und nenne, was es schon gibt:
+
+- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
+  `keph:/docs/generated/versions/inventory.md`;
+- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
+- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
+
+Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 

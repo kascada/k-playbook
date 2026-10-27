@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/vscodeext"
 )
 
@@ -30,6 +33,13 @@ Unterkommandos:
                    Versuch jetzt nehmen würde.
   vsix -o <datei>  Schreibt nur die VSIX, etwa für „Extensions: Install from
                    VSIX…“ in einer Umgebung ohne CLI.
+  collections [--json]
+                   Nennt die Kephalaion-Collections, die ein VS-Code-Fenster
+                   dieses Projekts eingebunden haben soll: die öffentliche
+                   Collection k-playbook und die des Projekts, beide auf dem
+                   Hub aus k-playbook-local/K-PLAYBOOK.local.yaml. Die
+                   Erweiterung fragt das beim Start ab. Ohne Anbindung kein
+                   Fehler, sondern eine Auskunft.
 `
 
 // runVSCode führt das Unterkommando `vscode` aus.
@@ -48,6 +58,8 @@ func runVSCode(args []string) error {
 		return runVSCodeStatus(args[1:], os.Stdout)
 	case "vsix":
 		return runVSCodeVSIX(args[1:], os.Stdout)
+	case "collections":
+		return runVSCodeCollections(args[1:], os.Stdout)
 	default:
 		fmt.Fprint(os.Stderr, vscodeUsage)
 		return fmt.Errorf("unbekanntes Kommando: vscode %s", args[0])
@@ -172,4 +184,76 @@ func runVSCodeVSIX(args []string, out io.Writer) error {
 	fmt.Fprintf(out, "Geschrieben: %s\n", *target)
 	fmt.Fprintln(out, "In VS Code: „Extensions: Install from VSIX…“")
 	return nil
+}
+
+// vscodeCollections ist die Antwort von `vscode collections`. Die Erweiterung
+// liest sie als JSON; configured false ist ein Zustand, kein Fehler, und
+// message sagt, warum.
+type vscodeCollections struct {
+	Configured bool                         `json:"configured"`
+	Folders    []kephalaion.WorkspaceFolder `json:"folders"`
+	Message    string                       `json:"message,omitempty"`
+}
+
+func runVSCodeCollections(args []string, out io.Writer) error {
+	asJSON := false
+	for _, arg := range args {
+		if arg != "--json" {
+			return fmt.Errorf("vscode collections: unbekannte Option %s — erwartet wird [--json]", arg)
+		}
+		asJSON = true
+	}
+
+	start, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	answer := collectWorkspaceFolders(start)
+
+	if asJSON {
+		encoder := json.NewEncoder(out)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(answer)
+	}
+	if !answer.Configured {
+		fmt.Fprintf(out, "Nicht eingerichtet: %s\n", answer.Message)
+		return nil
+	}
+	for _, folder := range answer.Folders {
+		fmt.Fprintf(out, "%s  %s\n", folder.URI, folder.Name)
+	}
+	return nil
+}
+
+// collectWorkspaceFolders leitet die Ordner aus der Anbindung des Projekts
+// ab, in dem startDir liegt. Gelesen wird nur die Datei; der Node wird nicht
+// gefragt, denn die Erweiterung ruft das bei jedem Fensterstart.
+func collectWorkspaceFolders(startDir string) vscodeCollections {
+	answer := vscodeCollections{Folders: []kephalaion.WorkspaceFolder{}}
+	environment := project.DetectFrom(startDir)
+	if !environment.Installed {
+		answer.Message = fmt.Sprintf("kein k-playbook-Projekt — keine %s ab %s aufwärts",
+			project.ConfigFileName, project.DisplayPath(startDir))
+		return answer
+	}
+
+	binding, configured, err := kephalaion.ReadBinding(project.LocalDir(environment.ProjectDir))
+	if err != nil {
+		answer.Message = err.Error()
+		return answer
+	}
+	if !configured {
+		answer.Message = fmt.Sprintf("keine Anbindung an Kephalaion — Block %s: in %s/%s fehlt",
+			kephalaion.BlockName, project.LocalDirName, kephalaion.LocalFileName)
+		return answer
+	}
+
+	folders, err := kephalaion.WorkspaceFolders(binding)
+	if err != nil {
+		answer.Message = fmt.Sprintf("Anbindung in %s/%s: %v", project.LocalDirName, kephalaion.LocalFileName, err)
+		return answer
+	}
+	answer.Configured = true
+	answer.Folders = folders
+	return answer
 }

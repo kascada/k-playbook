@@ -89,7 +89,7 @@ func TestBriefingKlartext(t *testing.T) {
 		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n  k-playbook:/reviews/review-eigen.md  [local]  Eigenes Review\n",
 		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\n  k-playbook:/guidelines/stil.md  [local]  Stil\n",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
-		"Projektdoku: project:/k-playbook-local/docs/README.md\n",
+		"Projektdoku: keph:/docs/\n",
 		"\n" + briefingContextSeparator + "\n",
 	} {
 		if !strings.Contains(stdout, want) {

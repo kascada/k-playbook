@@ -1,11 +1,25 @@
 ---
-description: Turn raw material — chat transcripts, notes, hand-offs — from k-playbook-local/inbox/, and during the switch to the knowledge store from the previous location material/, into topic documents under k-playbook-local/knowledge/extracted/, written through the knowledge tools, clustered by meaning and marked with their sources and confidence. Takes a file or directory as inbox/… or material/… (or without the prefix, resolved against both), or lists raw pieces, queue entries and material if no argument is given.
+description: Vorübergehend nicht verfügbar (Umbau auf keph:/docs/) — Turn raw material — chat transcripts, notes, hand-offs — from k-playbook-local/inbox/, and during the switch to the knowledge store from the previous location material/, into topic documents under k-playbook-local/knowledge/extracted/, written through the knowledge tools, clustered by meaning and marked with their sources and confidence. Takes a file or directory as inbox/… or material/… (or without the prefix, resolved against both), or lists raw pieces, queue entries and material if no argument is given.
 argument-hint: [inbox/<quelle>/<pfad> | material/<pfad> | <pfad>]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_knowledge_write, mcp__k-playbook__k_playbook_knowledge_read, mcp__k-playbook__k_playbook_knowledge_list, mcp__k-playbook__k_playbook_knowledge_search, mcp__k-playbook__k_playbook_knowledge_status, mcp__k-playbook__k_playbook_knowledge_inbox_list, mcp__k-playbook__k_playbook_knowledge_inbox_read, mcp__k-playbook__k_playbook_knowledge_inbox_put, mcp__k-playbook__k_playbook_knowledge_queue_list, mcp__k-playbook__k_playbook_knowledge_queue_add]
 ---
 
 # k-docs-extract
+
+## Vorübergehend nicht verfügbar
+
+Dieser Command wird auf die Projektdoku in Kephalaion (`keph:/docs/`) umgebaut und steht bis
+dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
+nichts schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-docs-extract`
+vorübergehend nicht verfügbar ist, und nenne, was es schon gibt:
+
+- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
+  `keph:/docs/generated/versions/inventory.md`;
+- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
+- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
+
+Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 

@@ -1,8 +1,6 @@
 package inventory
 
 import (
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -344,11 +342,7 @@ func TestRenderTraegtVollstaendigesFrontmatter(t *testing.T) {
 		}
 	}
 
-	path := filepath.Join(t.TempDir(), "inventory.md")
-	if err := os.WriteFile(path, []byte(rendered), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
-	}
-	status := ReadStatus(path)
+	status := StatusOf([]byte(rendered))
 	if status.Problem != "" {
 		t.Fatalf("das erzeugte Frontmatter muss vollständig sein: %q", status.Problem)
 	}

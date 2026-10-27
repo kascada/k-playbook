@@ -208,7 +208,8 @@ tracked file alike.
 Anyone sharing a committed registration shares a form that works from the terminal and in a
 Dev Container, but not from the Dock. *Set up* does not help here: the bare name belongs to
 the accepted forms, so *Set up* leaves it in place. The only exception is an OpenCode
-configuration without the memory block (`instructions` with `AGENTS.md`, `references.docs`):
+configuration without the memory block (`instructions` with `AGENTS.md`; `references.docs` is
+no longer written since task 101, the entry of the project documentation comes from the briefing):
 there *Set up* rewrites the entry and writes the absolute path with it. The way out is to
 **enter the absolute path manually** in that environment. It is an accepted form as well, so
 neither automatic correction nor *Set up* replaces it -- in a repository that tracks the
@@ -1039,7 +1040,7 @@ projectDocs, health, context}`:
 | `work.user` | the own Kephalaion user whose work is listed |
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
-| `projectDocs` | the entry of the project documentation, `project:/k-playbook-local/docs/README.md` |
+| `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
 | `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |

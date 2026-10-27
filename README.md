@@ -4,8 +4,10 @@
 
 ## Why k-playbook
 
-- **It learns the project and keeps what it learned.** `/k-docs-code`, `/k-docs-tools`
-  and `/k-doc-inventory` write project knowledge into `k-playbook-local/docs/`, and
+- **It learns the project and keeps what it learned.** `/k-docs-code` and `/k-docs-tools`
+  write project knowledge into `k-playbook-local/docs/`, `/k-doc-inventory` writes the
+  version inventory into the project's Kephalaion collection
+  (`keph:/docs/generated/versions/inventory.md`), and
   `/k-docs-extract` distils raw material into the knowledge store
   `k-playbook-local/knowledge/extracted/`, where its search finds it; `/k-docs-index` anchors
   the docs in `AGENTS.md` and
@@ -13,10 +15,12 @@
   again. Review decisions persist as well: whatever is recorded in
   `known-decisions.md` as a false positive or an accepted risk never shows up as a
   finding in a later run.
-- **An indexed body of knowledge instead of code search.** `docs/README.md` is the one
-  index across all origins — `code/`, `libs/`, `extracted/`, `versions/`, `manual/` —
-  with an alphabetical keyword index and a question→file mapping. The claim: any
-  question reaches the right file in at most two lookups.
+- **A body of knowledge instead of code search.** The entry of the project
+  documentation is `keph:/docs/` in the project's Kephalaion collection; the briefing
+  names it, and a session reads it before it reads code. `docs/README.md` on disk is
+  the older index across the origins still on disk — `code/`, `libs/` — with an
+  alphabetical keyword index and a question→file mapping; `/k-upgrade` moves the rest
+  into the collection.
 - **Multi-agent loops instead of a single opinion.** `/k-task-refine` hardens tasks in
   rounds of Critic, Editor and Moderator — the advisors are read-only, only the
   Moderator writes, and every round lands in the review log. In an audit several
@@ -82,9 +86,11 @@ project/
 The same interface then creates the project-owned structure and sets up the linking for
 the assistants. If the environment has VS Code, it also installs the extension
 *k-playbook Workspace Tools* into the VS Code server there, in the background and without
-a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. Whoever never
-starts the interface installs it with `k-playbook vscode install`. See
-[`docs/vscode.md`](./docs/vscode.md).
+a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. With Kephalaion
+set up, the extension also binds the public collection `k-playbook` and the project's own
+collection into the workspace whenever a window starts, opening or creating the project's
+`.code-workspace` file if only the folder is open. Whoever never starts the interface
+installs it with `k-playbook vscode install`. See [`docs/vscode.md`](./docs/vscode.md).
 
 ## Directory structure
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -8,16 +9,22 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
 // Der Subkommando-Weg über die Fixture des Sammlers: runInventory sammelt nur
-// die drei Pfade zusammen und ruft inventory.Run — die Datei muss deshalb
-// byteweise das sein, was die Fachlogik für dieselben Optionen rendert. Der
-// API-Weg wird in internal/webui gegen dieselbe Fachlogik geprüft; zusammen
-// belegen beide Tests, dass Subkommando und API dieselbe Ausgabe erzeugen.
-func fixtureProject(t *testing.T, name string) string {
+// die Pfade und den Zugang zusammen und ruft inventory.Run — das Dokument in
+// der Collection muss deshalb byteweise das sein, was die Fachlogik für
+// dieselben Optionen rendert. Der API-Weg wird in internal/webui gegen
+// dieselbe Fachlogik geprüft; zusammen belegen beide Tests, dass Subkommando
+// und API dieselbe Ausgabe erzeugen. Die Collection liegt im Speicher.
+func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 	t.Helper()
+	store := kephtest.New()
+	original := project.OpenInventoryStore
+	project.OpenInventoryStore = func(string) (inventory.Store, error) { return store, nil }
+	t.Cleanup(func() { project.OpenInventoryStore = original })
 
 	source, err := filepath.Abs(filepath.Join("..", "..", "internal", "inventory", "testdata", "projekte", name))
 	if err != nil {
@@ -42,30 +49,34 @@ func fixtureProject(t *testing.T, name string) string {
 		t.Fatalf("nach %s wechseln: %v", root, err)
 	}
 	t.Cleanup(func() { os.Chdir(before) })
-	return root
+	return root, store
 }
 
 func fixtureOptions(root string) inventory.Options {
 	localDir := project.LocalDir(root)
 	return inventory.Options{
-		ProjectDir:    root,
-		SourcesFile:   filepath.Join(localDir, project.VersionSourcesFileName),
-		InventoryFile: inventory.FilePath(localDir),
+		ProjectDir:  root,
+		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
 	}
 }
 
 func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
-	root := fixtureProject(t, "vollstaendig")
+	root, store := fixtureProject(t, "vollstaendig")
 
-	if err := runInventory(nil); err != nil {
-		t.Fatalf("runInventory: %v", err)
+	out := captureStdout(t, func() {
+		if err := runInventory(nil); err != nil {
+			t.Fatalf("runInventory: %v", err)
+		}
+	})
+	if !strings.Contains(out, "Geschrieben: "+inventory.DocRef) {
+		t.Errorf("der Bericht nennt den keph:-Verweis nicht:\n%s", out)
 	}
 	options := fixtureOptions(root)
-	written, err := os.ReadFile(options.InventoryFile)
-	if err != nil {
-		t.Fatalf("Inventar lesen: %v", err)
+	written, ok := store.Content(inventory.DocName)
+	if !ok {
+		t.Fatalf("%s liegt nicht in der Collection: %v", inventory.DocName, store.Names())
 	}
-	status := inventory.ReadStatus(options.InventoryFile)
+	status := inventory.ReadStatus(context.Background(), store)
 	if status.Problem != "" || status.GeneratedBy != inventory.GeneratedBy {
 		t.Fatalf("Status = %+v", status)
 	}
@@ -74,8 +85,11 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
-	if expected := inventory.Render(result, status.GeneratedAt); expected != string(written) {
-		t.Error("die Datei des Subkommandos ist nicht das Rendering der Fachlogik")
+	if expected := inventory.Render(result, status.GeneratedAt); expected != written {
+		t.Error("das Dokument des Subkommandos ist nicht das Rendering der Fachlogik")
+	}
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
+		t.Error("das Subkommando hat auf der Platte geschrieben")
 	}
 	if status.Deviations != len(result.Deviations) || status.SourcesRead != len(result.Sources) {
 		t.Errorf("Status %+v, Fachlogik %d Abweichungen, %d Quellen", status, len(result.Deviations), len(result.Sources))
@@ -87,7 +101,7 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 // Ausgabe von runInventory gegen Pfad und Grund als Literale — nicht gegen die
 // Funktion, die den Bericht selbst formatiert.
 func TestSubkommandoNenntAbgelehntePfadeWieDieFachlogik(t *testing.T) {
-	root := fixtureProject(t, "dreikontexte")
+	root, _ := fixtureProject(t, "dreikontexte")
 	outside := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(outside); err == nil {
 		outside = resolved
@@ -140,4 +154,26 @@ func captureStdout(t *testing.T, fn func()) string {
 	fn()
 	writer.Close()
 	return <-done
+}
+
+// Ohne bereite Anbindung bricht das Subkommando mit kephalaion_unavailable
+// und dem Grund ab, bevor es eine Quelle liest; auf der Platte entsteht
+// nichts.
+func TestSubkommandoOhneKephalaionBrichtAb(t *testing.T) {
+	root, _ := fixtureProject(t, "vollstaendig")
+	project.OpenInventoryStore = func(string) (inventory.Store, error) {
+		_, err := project.OpenUserDocs(root)
+		return nil, err
+	}
+
+	err := runInventory(nil)
+	if err == nil {
+		t.Fatal("ohne Kephalaion muss das Subkommando abbrechen")
+	}
+	if !strings.Contains(err.Error(), "(kephalaion_unavailable)") || !strings.Contains(err.Error(), "nicht bereit") {
+		t.Errorf("der Fehler nennt Code und Grund nicht: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
+		t.Error("einen Rückfall auf die Platte gibt es nicht")
+	}
 }

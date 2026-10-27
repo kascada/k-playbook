@@ -1,11 +1,25 @@
 ---
-description: "Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action."
+description: "Vorübergehend nicht verfügbar (Umbau auf keph:/docs/) — Inspect the project documentation state, report consistency gaps and offer the available docs actions: code docs, tool references, material extraction, version inventory, index rebuild and memory registration. With an argument, dispatches directly to that action."
 argument-hint: [status|code|tools|extract|inventory|index]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_knowledge_list, mcp__k-playbook__k_playbook_knowledge_inbox_list]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_knowledge_list, mcp__k-playbook__k_playbook_knowledge_inbox_list, mcp__kephalaion__list]
 ---
 
 # k-docs
+
+## Vorübergehend nicht verfügbar
+
+Dieser Command wird auf die Projektdoku in Kephalaion (`keph:/docs/`) umgebaut und steht bis
+dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
+nichts schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-docs`
+vorübergehend nicht verfügbar ist, und nenne, was es schon gibt:
+
+- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
+  `keph:/docs/generated/versions/inventory.md`;
+- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
+- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
+
+Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 
@@ -36,9 +50,13 @@ From the context output:
   `/k-docs-extract` aus der Zeit vor der Wissensablage. Neue Auszüge liegen unter
   `k-playbook-local/knowledge/extracted/` und werden nur über das Werkzeug gezählt
   (`k-playbook knowledge list --kind extracted --json` bzw. `k_playbook_knowledge_list`).
-- `VERSIONS_DIR = <RESOLVED_DOCS_DIR>/versions`
-- `INVENTORY_FILE = <VERSIONS_DIR>/inventory.md`
-- `MANUAL_DIR = <RESOLVED_DOCS_DIR>/manual`
+- `INVENTORY_REF = keph:/docs/generated/versions/inventory.md` — das Inventar in der
+  Collection des Projekts, gelesen über `k_playbook_doc_read` (ersatzweise
+  `k-playbook read`). Ist `kephalaion.ok` in der Context-Ausgabe nicht `true`, ist das
+  Inventar nicht erreichbar — ein eigener Zustand, kein „fehlt“.
+- `MANUAL_REF = keph:/docs/manual/` — die handgeschriebene Doku in der Collection des
+  Projekts, gezählt über Kephalaion `list` (`path` `docs/manual`, `recursive`). Ist
+  `kephalaion.ok` nicht `true`, ist sie nicht erreichbar — ein eigener Zustand, kein „leer“.
 - `INBOX_DIR = <local.dir>/inbox` — die Quelle von `/k-docs-extract`, gelistet über
   `k-playbook knowledge inbox list --json` bzw. `k_playbook_knowledge_inbox_list`.
 - `MATERIAL_DIR = <local.dir>/material` — bisheriger Ort für Rohmaterial, bis Schritt 5 der
@@ -50,23 +68,30 @@ Command-specific policy:
 
 - If `RESOLVED_DOCS_DIR` is missing: ask whether to create exactly that directory or to run
   `/k-gui`. Do not use a fallback path and do not abort hard.
-- `CODE_DIR`, `LIBS_DIR` and `VERSIONS_DIR` are producer directories. Missing is normal; do
-  not create them during the status pass. `EXTRACTED_DIR` is no producer directory any more;
-  missing is normal too.
-- `MANUAL_DIR`, `INBOX_DIR` and `MATERIAL_DIR` are created by setup. If one is missing,
-  report it as a setup gap and offer `/k-gui`; do not create it silently.
+- `CODE_DIR` and `LIBS_DIR` are producer directories. Missing is normal; do not create them
+  during the status pass. `EXTRACTED_DIR` is no producer directory any more; missing is
+  normal too. A `versions/` under `RESOLVED_DOCS_DIR` is a leftover from before the move
+  of the inventory; it is neither counted nor read — 3.2 of `/k-upgrade` clears it.
+  A `manual/` under `RESOLVED_DOCS_DIR` is likewise a leftover from before the move of the
+  hand-written docs; it is neither counted nor read — 3.2 of `/k-upgrade` moves it.
+- `INBOX_DIR` and `MATERIAL_DIR` are created by setup. If one is missing, report it as a
+  setup gap and offer `/k-gui`; do not create it silently.
 - Without a confirmed action this command writes nothing.
 
 ## Schritt 2 — Bestand prüfen
 
 Collect these facts, compactly:
 
-- Doc files per origin: `code/`, `libs/`, `extracted/`, `versions/`, `manual/`, plus flat
-  `docs/*.md` except `README.md`.
-- For the inventory under `VERSIONS_DIR`, the frontmatter values `generated.at` and
-  `inventory.*`. Its **state** comes from there and from nowhere else — never derive it
-  from the Markdown body. Reading the entry tables is a different matter and happens only
-  for the authority check in Schritt 3.
+- Doc files per origin: `code/`, `libs/`, `extracted/`, plus flat `docs/*.md` except
+  `README.md`.
+- The number of documents under `MANUAL_REF`, through Kephalaion `list`.
+- For the inventory, read `INVENTORY_REF` through `k_playbook_doc_read` and take the
+  frontmatter values `generated.at` and `inventory.*`. Its **state** comes from there and
+  from nowhere else — never derive it from the Markdown body, and never from a file under
+  `docs/versions/`: that is a state from before the move, not the inventory. `not_found`
+  means absent; `kephalaion_unavailable` means unreachable, and that is what the report
+  says. Reading the entry tables is a different matter and happens only for the authority
+  check in Schritt 3.
 - The state of the version source configuration from `versionSources` in the context
   output. Do not read `k-playbook-local/version-sources.yaml` yourself.
 - Whether `INDEX_FILE` exists.
@@ -96,15 +121,18 @@ Report, but do not repair:
   - `docs/extracted/`: `k-docs-extract` — only the older extracts there. Documents under
     `knowledge/extracted/` carry no `generated.by`; their header is composed by the tool and
     not checked here.
-  - `docs/versions/`: `k-doc-inventory` — on both call paths, the subcommand
-    `k-playbook inventory` included.
+  - `INVENTORY_REF` (`keph:/docs/generated/versions/inventory.md`): `k-doc-inventory` — on
+    both call paths, the subcommand `k-playbook inventory` included. A file left under
+    `docs/versions/` is reported as a leftover from before the move, not checked.
 - Flat doc files under `docs/` besides `README.md`.
 - `libs/README.md` with an overview table instead of only explanatory text.
 - Missing index or missing memory registration in `AGENTS.md` / `opencode.json`.
 
-**Versionsangaben aus `LIBS_DIR` gegen das Inventar.** Only if the inventory exists. For
-every file under `LIBS_DIR`, take its frontmatter `version` and `version-pin` and look up
-the same tool in `INVENTORY_FILE`. Read only the inventory's context tables for that —
+**Versionsangaben aus `LIBS_DIR` gegen das Inventar.** Only if the inventory exists in the
+collection (Schritt 2); if it is unreachable, say so and skip the check. For every file
+under `LIBS_DIR`, take its frontmatter `version` and `version-pin` and look up the same
+tool in `INVENTORY_REF`, read through `k_playbook_doc_read`. Read only the inventory's
+context tables for that —
 `Gegenstand`, `Version` and `Pin` — and match by the canonical name behind the group key
 `<ecosystem>/<name>`; a tool that is not in the inventory is no finding, and neither is a
 lib file without `version`.
@@ -122,9 +150,10 @@ count these lines as inventory deviations: a deviation arises from two sources, 
 difference from two documents. Where both disagree, the inventory holds.
 
 The two origins do not blend: `docs/libs/` is **curated and pitfall-oriented** (a
-selection, one profile per tool, written by `/k-docs-tools`), `docs/versions/` is
-**complete and source-oriented** (every declared version from every source, with its
-origin per line, written by `/k-doc-inventory` through `k-playbook inventory`). Each
+selection, one profile per tool, written by `/k-docs-tools`), the inventory at
+`INVENTORY_REF` is **complete and source-oriented** (every declared version from every
+source, with its origin per line, written by `/k-doc-inventory` through
+`k-playbook inventory` into `keph:/docs/generated/versions/`). Each
 finding above therefore names both sides and the way to close it: refresh the inventory
 with `/k-doc-inventory` if it is older than the manifest, or refresh the profile with
 `/k-docs-tools` if its content — not just its number — is stale. When a version bump is
@@ -143,8 +172,7 @@ Build the option list from the facts, not from guesses:
 code/       <N> Dateien | fehlt
 libs/       <N> Dateien | fehlt
 extracted/  <N> in knowledge/extracted/, <N> älter in docs/extracted/ | fehlt
-versions/   <N> Dateien | fehlt
-manual/     <N> Dateien | fehlt
+manual/     <N> in keph:/docs/manual/ | leer | nicht erreichbar
 unsortiert  <N> Dateien
 Index       vorhanden | fehlt
 Memory      ok | fehlt AGENTS.md | fehlt opencode.json | unvollständig
@@ -176,8 +204,10 @@ Argument dispatch:
 - `code` → apply `.claude/commands/_docs/code.md` with the remaining arguments.
 - `tools` → apply `.claude/commands/_docs/tools.md` with the remaining arguments.
 - `extract` → run the flow from `/k-docs-extract` with the remaining arguments.
-- `inventory` → apply `.claude/commands/_docs/inventory.md`. It takes no arguments; the
-  collection itself is the subcommand `k-playbook inventory`.
+- `inventory` → read and follow `k-playbook:/commands/k-doc-inventory.md` through
+  `k_playbook_doc_read` (the text of `/k-doc-inventory`). It takes no arguments; the
+  collection itself is the subcommand `k-playbook inventory`, and the result lives at
+  `INVENTORY_REF`.
 - `index` → run the flow from `/k-docs-index`.
 
 When dispatching to a module or command, use the context already loaded in this session.

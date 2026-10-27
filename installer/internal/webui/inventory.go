@@ -2,26 +2,31 @@ package webui
 
 import (
 	"bytes"
+	"context"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Der Inventarbereich der Oberfläche: eigene Seite, eigene API, getrennt vom
 // Docs-Bereich. Der zeigt die mitgelieferte Doku aus k-playbook/docs und
-// kennt k-playbook-local/docs nicht — so hat es Task 037 festgelegt, und das
-// bleibt so. Das Inventar ist eine Datei des Projekts, keine der
-// Installation, und bekommt deshalb seinen eigenen Weg.
+// kennt das Inventar nicht — so hat es Task 037 festgelegt, und das bleibt
+// so. Das Inventar ist ein erzeugtes Dokument des Projekts in seiner
+// Collection (inventory.DocRef), keine Datei der Installation, und bekommt
+// deshalb seinen eigenen Weg.
 //
 // Die Handler hier rufen ausschließlich die Fachlogik aus internal/inventory
-// auf. Kein zweiter Parser, keine Sonderbehandlung von Pfaden: der Pfad der
-// Inventardatei ist fest (inventory.FilePath), der Anstoß ist inventory.Run,
-// und die Vertrauensgrenze liegt dahinter in trust.go — abgelehnte Pfade
-// stehen in der Antwort so, wie die Fachlogik sie meldet.
+// auf. Kein zweiter Parser, keine Sonderbehandlung von Pfaden: der Ort des
+// Inventars ist fest (inventory.DocName), der Anstoß ist inventory.Run, und
+// die Vertrauensgrenze liegt dahinter in trust.go — abgelehnte Pfade stehen
+// in der Antwort so, wie die Fachlogik sie meldet. Den Zugang zur Collection
+// öffnet project.OpenInventoryStore, derselbe Weg wie beim Subkommando; ohne
+// bereite Anbindung zeigt die Oberfläche einen sichtbaren Zustand
+// (kephalaion_unavailable) und fällt nicht auf die Platte zurück.
 //
 // Die Quellenkonfiguration wird nur angezeigt, nicht gepflegt. Die
 // Schreibregel des Vertrags verlangt ausdrückliche Bestätigung und rein
@@ -51,11 +56,14 @@ type inventorySourcesState struct {
 }
 
 // inventoryResponse ist der Stand des Inventars: Status aus dem Frontmatter
-// der Inventardatei — der einen Statusquelle — und der Zustand der
-// Quellenkonfiguration.
+// des Dokuments in der Collection — der einen Statusquelle — und der Zustand
+// der Quellenkonfiguration. Ist die Collection nicht erreichbar, sagt das
+// Status.Unavailable mit dem Grund in Status.Message.
 type inventoryResponse struct {
-	Available   bool                  `json:"available"`
-	Status      inventory.Status      `json:"status"`
+	Available bool             `json:"available"`
+	Status    inventory.Status `json:"status"`
+	// DisplayPath ist der Ort des Inventars, wie die Oberfläche ihn nennt:
+	// der keph:-Verweis.
 	DisplayPath string                `json:"displayPath"`
 	Sources     inventorySourcesState `json:"sources"`
 	Message     string                `json:"message,omitempty"`
@@ -72,7 +80,7 @@ type inventoryRunSummary struct {
 	Rejected          int `json:"rejected"`
 	Excluded          int `json:"excluded"`
 	// Unevaluable ist die Zahl der Quellen im Zustand „nicht auswertbar" —
-	// dieselbe Zahl wie in der Übersicht und im Frontmatter der Datei.
+	// dieselbe Zahl wie in der Übersicht und im Frontmatter des Dokuments.
 	Unevaluable int `json:"unevaluable"`
 	Notes       int `json:"notes"`
 }
@@ -83,11 +91,12 @@ type inventoryRunSummary struct {
 // im Inventar, und eine Lücke, die niemand sieht, ist schlimmer als ein Fehler.
 type inventoryRunResponse struct {
 	Available bool `json:"available"`
-	// OK ist false, wenn der Lauf abgebrochen hat: die Quellenkonfiguration
-	// ist nicht lesbar oder von fremder Fassung, oder das Schreiben der Datei
-	// ist fehlgeschlagen. Der Grund steht in Message; ob die Datei dabei
-	// geschrieben wurde, sagt allein Outcome.Written — das Schreiben ist
-	// atomar, ein Fehler lässt den alten Stand stehen.
+	// OK ist false, wenn der Lauf abgebrochen hat: Kephalaion ist nicht
+	// bereit, die Quellenkonfiguration ist nicht lesbar oder von fremder
+	// Fassung, oder das Schreiben in die Collection ist fehlgeschlagen
+	// (etwa stale_revision). Der Grund steht in Message; ob das Dokument
+	// dabei geschrieben wurde, sagt allein Outcome.Written — der Hub
+	// schreibt ganz oder gar nicht, ein Fehler lässt den alten Stand stehen.
 	OK         bool                  `json:"ok"`
 	Message    string                `json:"message,omitempty"`
 	Outcome    inventory.Outcome     `json:"outcome"`
@@ -104,29 +113,29 @@ type inventoryRunResponse struct {
 	DisplayPath string           `json:"displayPath"`
 }
 
-// inventoryFileResponse ist die Inventardatei, fertig gerendert.
+// inventoryFileResponse ist das Inventar, fertig gerendert.
 type inventoryFileResponse struct {
-	Available bool   `json:"available"`
-	Present   bool   `json:"present"`
-	Path      string `json:"path"`
-	HTML      string `json:"html,omitempty"`
-	Message   string `json:"message,omitempty"`
+	Available bool `json:"available"`
+	Present   bool `json:"present"`
+	// Path ist der keph:-Verweis des Dokuments.
+	Path    string `json:"path"`
+	HTML    string `json:"html,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
-// inventoryOptions sind die Optionen eines Laufs — dieselben drei Pfade, die
-// auch das Subkommando zusammensammelt. Der Zielpfad kommt aus der Fachlogik,
-// nicht aus einem zweiten Zusammensetzen hier.
+// inventoryOptions sind die Optionen eines Laufs — dieselben Pfade, die auch
+// das Subkommando zusammensammelt. Der Ort des Inventars ist keiner davon
+// mehr: er steht in der Fachlogik (inventory.DocName).
 func inventoryOptions(projectDir string) inventory.Options {
 	localDir := project.LocalDir(projectDir)
 	return inventory.Options{
-		ProjectDir:    projectDir,
-		SourcesFile:   filepath.Join(localDir, project.VersionSourcesFileName),
-		InventoryFile: inventory.FilePath(localDir),
+		ProjectDir:  projectDir,
+		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
 	}
 }
 
-// inventoryDisplayPath ist der Pfad der Inventardatei, wie die Oberfläche ihn
-// nennt: relativ zum Hauptverzeichnis.
+// inventoryDisplayPath ist der Pfad der Quellenkonfiguration, wie die
+// Oberfläche ihn nennt: relativ zum Hauptverzeichnis.
 func inventoryDisplayPath(projectDir string, path string) string {
 	if relative, err := filepath.Rel(projectDir, path); err == nil {
 		return filepath.ToSlash(relative)
@@ -156,12 +165,23 @@ func inventorySources(projectDir string, path string) inventorySourcesState {
 	return state
 }
 
-func inventoryState(projectDir string) inventoryResponse {
+// inventoryStatus ist der Stand aus der Collection. Ohne bereiten Zugang
+// ist er „nicht erreichbar“ mit dem Grund aus der Anbindung — ein eigener
+// Zustand, kein „fehlt“.
+func inventoryStatus(ctx context.Context, projectDir string) inventory.Status {
+	store, err := project.OpenInventoryStore(projectDir)
+	if err != nil {
+		return inventory.UnavailableStatus(err.Error())
+	}
+	return inventory.ReadStatus(ctx, store)
+}
+
+func inventoryState(ctx context.Context, projectDir string) inventoryResponse {
 	options := inventoryOptions(projectDir)
 	return inventoryResponse{
 		Available:   true,
-		Status:      inventory.ReadStatus(options.InventoryFile),
-		DisplayPath: inventoryDisplayPath(projectDir, options.InventoryFile),
+		Status:      inventoryStatus(ctx, projectDir),
+		DisplayPath: inventory.DocRef,
 		Sources:     inventorySources(projectDir, options.SourcesFile),
 	}
 }
@@ -172,15 +192,16 @@ func inventoryHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, inventoryResponse{})
 		return
 	}
-	writeJSON(w, http.StatusOK, inventoryState(environment.ProjectDir))
+	writeJSON(w, http.StatusOK, inventoryState(r.Context(), environment.ProjectDir))
 }
 
 // runInventoryHandler stößt die Erhebung an. Er ist der einzige schreibende
 // Endpunkt des Bereichs und steht wie jeder POST hinter der Herkunftsprüfung.
 //
-// Geschrieben wird ausschließlich die Inventardatei, und auch die nur, wenn
-// die Erhebung sich inhaltlich vom Bestand unterscheidet — das ist die
-// Byte-Stabilitätsregel des Vertrags, umgesetzt in inventory.Write, nicht hier.
+// Geschrieben wird ausschließlich das Inventar in der Collection, und auch
+// das nur, wenn die Erhebung sich inhaltlich vom Bestand unterscheidet — das
+// ist die Byte-Stabilitätsregel des Vertrags, umgesetzt in inventory.Write,
+// nicht hier.
 func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -193,22 +214,33 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	options := inventoryOptions(environment.ProjectDir)
 	response := inventoryRunResponse{
 		Available:   true,
-		DisplayPath: inventoryDisplayPath(environment.ProjectDir, options.InventoryFile),
+		DisplayPath: inventory.DocRef,
+		Outcome:     inventory.Outcome{Path: inventory.DocRef},
 		Rejections:  []inventory.Rejection{},
 		Exclusions:  []inventory.Exclusion{},
 		Unevaluable: []inventory.SourceRead{},
 		Notes:       []inventory.Note{},
 	}
 
-	result, outcome, err := inventory.Run(options)
+	store, err := project.OpenInventoryStore(environment.ProjectDir)
+	if err != nil {
+		// Kephalaion ist nicht bereit: Es wird nichts erhoben und nichts
+		// geschrieben, und die Oberfläche sagt, warum.
+		response.Message = "Erhebung abgebrochen: " + describeInventoryError(err)
+		response.Status = inventory.UnavailableStatus(err.Error())
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	result, outcome, err := inventory.Run(r.Context(), store, options)
 	if err != nil {
 		// Abgebrochen: Quellenkonfiguration nicht lesbar oder von fremder
 		// Fassung, oder das Schreiben ist fehlgeschlagen. Was davon, sagt err;
 		// ob geschrieben wurde, sagt outcome.Written. Der Stand kommt in jedem
-		// Fall neu von der Datei.
-		response.Message = "Erhebung abgebrochen: " + err.Error()
+		// Fall neu aus der Collection.
+		response.Message = "Erhebung abgebrochen: " + describeInventoryError(err)
 		response.Outcome = outcome
-		response.Status = inventory.ReadStatus(options.InventoryFile)
+		response.Status = inventory.ReadStatus(r.Context(), store)
 		writeJSON(w, http.StatusOK, response)
 		return
 	}
@@ -228,8 +260,23 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 	if result.Notes != nil {
 		response.Notes = result.Notes
 	}
-	response.Status = inventory.ReadStatus(options.InventoryFile)
+	response.Status = inventory.ReadStatus(r.Context(), store)
 	writeJSON(w, http.StatusOK, response)
+}
+
+// describeInventoryError nennt einen Fehler mit seinem Code, wenn er einen
+// trägt — kephalaion_unavailable, stale_revision —, wie das Subkommando. Der
+// Zugang übersetzt die Codes von Kephalaion in die der doc-Werkzeuge; ein
+// Store ohne diese Übersetzung nennt den Code von Kephalaion selbst.
+func describeInventoryError(err error) string {
+	code := project.DocRefErrorCode(err)
+	if code == "" {
+		code = kephalaion.ErrorCode(err)
+	}
+	if code != "" {
+		return err.Error() + " (" + code + ")"
+	}
+	return err.Error()
 }
 
 // summarizeInventoryRun zählt, was das Subkommando in seiner Übersicht
@@ -256,9 +303,10 @@ func summarizeInventoryRun(result inventory.Result) inventoryRunSummary {
 	return summary
 }
 
-// inventoryFileHandler liefert die Inventardatei gerendert. Der Pfad ist fest
-// und kommt nicht aus der Anfrage: dieser Endpunkt liest genau eine Datei, und
-// es gibt nichts zu prüfen, was ein Browser mitschicken könnte.
+// inventoryFileHandler liefert das Inventar gerendert. Der Ort ist fest und
+// kommt nicht aus der Anfrage: dieser Endpunkt liest genau das eine Dokument
+// aus der Collection, und es gibt nichts zu prüfen, was ein Browser
+// mitschicken könnte.
 //
 // Gerendert wird mit demselben Goldmark wie die mitgelieferte Doku — rohes
 // HTML bleibt abgeschaltet. Geteilt wird nur der Renderer; der Docs-Bereich
@@ -270,19 +318,22 @@ func inventoryFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options := inventoryOptions(environment.ProjectDir)
-	response := inventoryFileResponse{
-		Available: true,
-		Path:      inventoryDisplayPath(environment.ProjectDir, options.InventoryFile),
-	}
+	response := inventoryFileResponse{Available: true, Path: inventory.DocRef}
 
-	content, err := os.ReadFile(options.InventoryFile)
+	store, err := project.OpenInventoryStore(environment.ProjectDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			response.Message = "Das Inventar wurde noch nicht erhoben. „Aktualisieren“ erhebt es und legt die Datei an."
-		} else {
-			response.Message = "Inventardatei nicht lesbar: " + err.Error()
-		}
+		response.Message = "Kephalaion ist nicht bereit, das Inventar ist nicht erreichbar: " + describeInventoryError(err)
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+	read, err := store.Read(r.Context(), inventory.DocName)
+	if err != nil {
+		response.Message = "Inventar nicht lesbar: " + describeInventoryError(err)
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+	if read.Kind != kephalaion.ReadKindDocument {
+		response.Message = "Das Inventar wurde noch nicht erhoben. „Aktualisieren“ erhebt es und legt das Dokument in der Collection an."
 		writeJSON(w, http.StatusOK, response)
 		return
 	}
@@ -290,9 +341,9 @@ func inventoryFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Der Frontmatter-Block gehört nicht in die Ansicht: seine Werte stehen
 	// bereits als Status daneben. Abgetrennt wird er von der Fachlogik, die
-	// das Dateiformat kennt.
+	// das Dokumentformat kennt.
 	var rendered bytes.Buffer
-	if err := markdown.Convert(inventory.Body(content), &rendered); err != nil {
+	if err := markdown.Convert(inventory.Body([]byte(*read.Content)), &rendered); err != nil {
 		response.Message = "Markdown konnte nicht gerendert werden: " + err.Error()
 		writeJSON(w, http.StatusOK, response)
 		return

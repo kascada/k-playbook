@@ -421,7 +421,7 @@ and `docs/versions/` for `/k-docs-index` until steps 2 to 4. Every row names exa
 | `/k-docs-index`, follow-up hint | `material/` | recommends `/k-docs-extract` while raw material lies there | 5 | since task 073 |
 | `search`, hint on an empty store | `docs/` | the hint says that project knowledge lies under `k-playbook-local/docs/` until the migration | 6 | since task 073 |
 | `status`, note on the old location | `docs/learned/` | documents written there up to v0.7.0 would be invisible without it | 6 — moves the documents | since task 063 |
-| `AGENTS.md` (block from setup and from the skill `ai-session-memory`), `opencode.json` | `docs/README.md` as the entry point | the index knows `docs/` only; a new extract in `knowledge/extracted/` is found through `search`, not through the keyword index | 6 | since task 073 |
+| `AGENTS.md` (block from the skill `ai-session-memory`), `opencode.json` | `docs/README.md` as the entry point | the index knows `docs/` only; a new extract in `knowledge/extracted/` is found through `search`, not through the keyword index. Since task 101 the entry point is `keph:/docs/` from the briefing; setup no longer writes the block or `references.docs`, and `/k-upgrade` 3.2 removes existing references | 6 | since task 073 |
 | `/k-docs-index` | `docs/extracted/` | indexes the extracts written there before task 073; it is no target any more | 6 — moves them | since task 073 |
 | `/k-docs`, status report | `docs/extracted/` | counts the older extracts and checks their `generated.by` | 6 | since task 073 |
 | skill `ai-session-memory` | `docs/extracted/` | lists the origin directories, `extracted/` included, when it registers the docs | 6 | since task 073 |

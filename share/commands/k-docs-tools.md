@@ -1,11 +1,25 @@
 ---
-description: Detect project tools, libraries and stacks, let the user pick worthwhile entries, and write pitfall-focused references under k-playbook-local/docs/libs/. Thin wrapper around the _docs/tools module.
+description: Vorübergehend nicht verfügbar (Umbau auf keph:/docs/) — Detect project tools, libraries and stacks, let the user pick worthwhile entries, and write pitfall-focused references under k-playbook-local/docs/libs/. Thin wrapper around the _docs/tools module.
 argument-hint: [scope-dir]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite]
 ---
 
 # k-docs-tools
+
+## Vorübergehend nicht verfügbar
+
+Dieser Command wird auf die Projektdoku in Kephalaion (`keph:/docs/`) umgebaut und steht bis
+dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
+nichts schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-docs-tools`
+vorübergehend nicht verfügbar ist, und nenne, was es schon gibt:
+
+- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
+  `keph:/docs/generated/versions/inventory.md`;
+- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
+- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
+
+Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 

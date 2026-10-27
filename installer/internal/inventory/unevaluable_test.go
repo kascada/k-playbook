@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -151,7 +152,8 @@ func TestZustandNichtAuswertbarIstInJSONUndDateiGleich(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, _, err := Run(options)
+	store := newRunStore(t)
+	result, _, err := runInto(t, store, options)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -179,7 +181,7 @@ func TestZustandNichtAuswertbarIstInJSONUndDateiGleich(t *testing.T) {
 		}
 	}
 
-	status := ReadStatus(options.InventoryFile)
+	status := ReadStatus(context.Background(), store)
 	if status.Problem != "" {
 		t.Fatalf("Frontmatter: %s", status.Problem)
 	}

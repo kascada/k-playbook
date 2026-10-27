@@ -95,7 +95,7 @@ k-playbook-local/
 └── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
-The generated docs origins `docs/code/`, `docs/libs/`, and `docs/versions/` are not shown there: they arise on the first run of their generator. `/k-docs-extract` writes to `knowledge/extracted/` in the knowledge store instead, created by its first write; raw material for it goes into `inbox/`, and `material/` is still read as the previous location until step 5 of the switch (see [knowledge-layout.md](./knowledge-layout.md#transitional-reads)).
+The generated docs origins `docs/code/` and `docs/libs/` are not shown there: they arise on the first run of their generator. The version inventory no longer lives here: `/k-doc-inventory` and `k-playbook inventory` write `keph:/docs/generated/versions/inventory.md` into the project collection. `/k-docs-extract` writes to `knowledge/extracted/` in the knowledge store instead, created by its first write; raw material for it goes into `inbox/`, and `material/` is still read as the previous location until step 5 of the switch (see [knowledge-layout.md](./knowledge-layout.md#transitional-reads)).
 
 Every directory contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
@@ -557,8 +557,10 @@ If the environment has VS Code, starting the interface also installs the extensi
 **k-playbook Workspace Tools** into the VS Code server of that environment — in the
 background, without holding up the start, and without a window reload. It brings the
 command *k-playbook: OpenCode im neuen Tab*, which opens OpenCode in a terminal tab in
-the editor area. The extension travels inside the program binary, so a program update
-brings the matching version with it.
+the editor area. With Kephalaion set up, it also binds the public collection `k-playbook`
+and the project's collection into the workspace on every window start. The extension
+travels inside the program binary, so a program update brings the matching version with
+it.
 
 This is a deliberate exception to "k-playbook does not install tools by itself": an
 explicit first installation gets lost among the other setup steps. The only trigger is

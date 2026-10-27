@@ -132,13 +132,11 @@ func TestApplyMCPSchreibtBeideSchemata(t *testing.T) {
 	if !ok || !containsAnyString(instructions, RootInstructionsFile) {
 		t.Errorf("instructions = %v, erwartet %s", opencode[opencodeInstructionsKey], RootInstructionsFile)
 	}
-	references, ok := opencode[opencodeReferencesKey].(map[string]any)
-	if !ok {
-		t.Fatalf("opencode.json hat keinen references-Block: %v", opencode)
-	}
-	docs, ok := references[opencodeDocsKey].(map[string]any)
-	if !ok || docs["path"] != "./k-playbook-local/docs" {
-		t.Errorf("Docs-Referenz = %v, erwartet k-playbook-local/docs", references[opencodeDocsKey])
+	// Einen Block references.docs schreibt das Binary seit Task 101 nicht
+	// mehr: der Einstieg der Projektdoku ist keph:/docs/ und kommt aus dem
+	// Briefing.
+	if _, ok := opencode["references"]; ok {
+		t.Errorf("opencode.json hat einen references-Block bekommen: %v", opencode["references"])
 	}
 }
 
@@ -208,8 +206,8 @@ func TestApplyMCPLaesstFremdeEintraegeStehen(t *testing.T) {
 	if !ok || len(instructions) != 1 || instructions[0] != "AGENTS.md" {
 		t.Errorf("instructions verändert: %v", opencode["instructions"])
 	}
-	if _, ok := opencode[opencodeReferencesKey].(map[string]any)[opencodeDocsKey]; !ok {
-		t.Errorf("Docs-Referenz fehlt: %v", opencode)
+	if _, ok := opencode["references"]; ok {
+		t.Errorf("references-Block ergänzt, obwohl das Binary ihn nicht mehr schreibt: %v", opencode)
 	}
 }
 
@@ -508,11 +506,6 @@ func TestOpencodeMemoryFremderTypGiltAlsEingerichtet(t *testing.T) {
 	faelle := map[string]map[string]any{
 		"instructions als Zeichenkette": {
 			opencodeInstructionsKey: RootInstructionsFile,
-			opencodeReferencesKey:   map[string]any{opencodeDocsKey: opencodeDocsReference()},
-		},
-		"references als Liste": {
-			opencodeInstructionsKey: []any{RootInstructionsFile},
-			opencodeReferencesKey:   []any{opencodeDocsKey},
 		},
 	}
 

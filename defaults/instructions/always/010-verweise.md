@@ -9,15 +9,17 @@ Präfix sagt, wo der Inhalt liegt und wie du ihn liest.
 | `k-playbook:/<pfad>` | von k-playbook geliefert | MCP `k_playbook_doc_read` mit dem Verweis als `ref`; ersatzweise `k-playbook read <verweis>` |
 | `k-playbook:/instructions/always/` | das einzige Verzeichnis, das k-playbook zu einem Text zusammenbaut | wie `k-playbook:/<pfad>` |
 | `keph:/<pfad>` | Collection des Projekts in Kephalaion | Kephalaion `read` mit `collection` = `kephalaion.address` und `name` = Pfad ohne führenden `/` |
+| `keph:/<pfad>/` | ein Verzeichnis in der Collection des Projekts | Kephalaion `list` mit `collection` = `kephalaion.address`, `path` = Pfad ohne führenden `/`, `recursive` und `frontmatter`; dann `read` je Dokument |
 
 Die Felder `kephalaion.address`, `kephalaion.ok` und `kephalaion.user` stehen im Briefing
 unter `context` und in der Ausgabe von `k-playbook context`.
 
 Beispiele:
 
-- `project:/k-playbook-local/docs/README.md`
+- `project:/k-playbook-local/version-sources.yaml`
 - `k-playbook:/instructions/on-demand/<thema>.md`
-- `keph:/manual/<thema>.md`
+- `keph:/docs/manual/<thema>.md`
+- `keph:/docs/` (ein Verzeichnis)
 
 Regeln:
 
@@ -26,9 +28,11 @@ Regeln:
   ersetzt oder abschaltet. Wer selbst nachsieht, kann die falsche Fassung erwischen.
 - **Ein Verweis, der auf `/` endet, meint ein Verzeichnis.** Zusammengebaut wird nur
   `k-playbook:/instructions/always/`: Du bekommst alle Dateien darin als einen Text, in der
-  festgelegten Reihenfolge. Jedes andere Verzeichnis, etwa `on-demand/`, liest du einzeln mit
-  Dateinamen (`k-playbook:/instructions/on-demand/<thema>.md`); mit `/` am Ende fehlt der
-  Dateiname, und k-playbook meldet einen Fehler.
+  festgelegten Reihenfolge. Jedes andere `k-playbook:`-Verzeichnis, etwa `on-demand/`, liest
+  du einzeln mit Dateinamen (`k-playbook:/instructions/on-demand/<thema>.md`); mit `/` am
+  Ende fehlt der Dateiname, und k-playbook meldet einen Fehler. Ein `keph:`-Verzeichnis wie
+  `keph:/docs/` listest du dagegen mit Kephalaion `list` (`recursive`, `frontmatter`) und
+  liest die Dokumente darin einzeln.
 - **Ein Verweis, den k-playbook nicht kennt, ist ein Fehler.** Melde ihn und such die Datei
   nicht auf eigene Faust.
 - **Ein `keph:`-Verweis nennt weder Hub noch Collection.** Beides steht rechnerlokal in der

@@ -165,6 +165,119 @@ einem bestehenden Projekt der alte Text stehen.
 **g) Melden.** Je Datei eine Zeile: was aus ihr wurde (Workbench-Verweis, Zahl der Befunde,
 verworfen, liegen geblieben), dazu jede geänderte Verweisstelle als `pfad:zeile`.
 
+### 3.2 — Doku aus `k-playbook-local/docs/`
+
+Die Projektdoku liegt heute in der Collection des Projekts unter `keph:/docs/`; das Briefing
+nennt diesen Einstieg unter `Projektdoku`, und `k-playbook:/commands/_shared/docs.md` sagt,
+was darunter gilt. Früher lag sie unter `<context.local.dir>/docs/`, mit einem Index
+`docs/README.md` von `/k-docs-index` und Verweisen darauf in `AGENTS.md` und
+`opencode.json`. Diese Umstellung bringt die Doku je Bereich nach Kephalaion oder räumt
+sie ab — nichts verschwindet still, und ein Bereich, dessen Erzeuger noch auf die Platte
+schreibt, bleibt liegen.
+
+**Anlass:** Unter `<context.local.dir>/docs/` liegt mindestens eine Datei aus den Bereichen
+der Tabelle unten, oder `AGENTS.md` bzw. `opencode.json[c]` nennen
+`k-playbook-local/docs/README.md`. Braucht die Collection.
+
+Die Bereiche und ihr Ziel. Wird ein weiterer Erzeuger auf Kephalaion umgestellt, ändert
+dessen Task seine Zeile:
+
+| Bereich auf der Platte | Ziel | Vorgehen |
+|---|---|---|
+| `versions/` | `keph:/docs/generated/versions/` | Erzeuger (`/k-doc-inventory`, `k-playbook inventory`) schreibt schon nach Kephalaion: Plattendatei löschen; fehlt das Ziel, Erzeuger neu laufen lassen |
+| `code/` | `keph:/docs/generated/code/` | Erzeuger `/k-docs-code` schreibt noch auf die Platte: nicht anfassen |
+| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt noch auf die Platte: nicht anfassen |
+| `manual/` | `keph:/docs/manual/`, Pfad darunter gleich | von Hand geschrieben: verschieben; `manual/README.md` nicht verschieben (`README.md` erzeugt Kephalaion), sondern löschen |
+| `extracted/` und lose `.md` direkt unter `docs/` außer `README.md` | Vorschlag `keph:/docs/manual/<datei>` | je Datei verschieben oder verwerfen, der Nutzer entscheidet |
+| `README.md` | entfällt | der alte Index von `/k-docs-index`: löschen, sobald seine Einträge zu `manual/`, `versions/` und losen Dateien abgeräumt sind — auch wenn `code/` oder `libs/` noch liegen; sonst bliebe ein veralteter Index als stiller Rückfall |
+
+`docs/` selbst bleibt: `code/` und `libs/` schreiben noch dorthin. Legt das Einrichten die
+README von `docs/` neu an, ist das die Struktur-README ohne Index, kein Rückfall.
+
+**a) Bestand erheben.** Lies, was unter `<context.local.dir>/docs/` liegt, je Bereich der
+Tabelle. Lies dazu `keph:/docs/` mit Kephalaion `list` (`recursive`, `frontmatter`),
+Collection = `context.kephalaion.address`. Für jede Datei, die verschoben werden soll,
+prüfst du vorher:
+
+- Liegt unter dem Zielnamen schon ein Dokument, vergleiche beide. Gleich → nur die
+  Plattendatei löschen. Verschieden → beide zeigen; der Nutzer entscheidet, welche gilt.
+- Ist die Datei kein Text oder größer als 1 MiB, bleibt sie liegen und wird gemeldet.
+- Zeigt ein Link in der Datei aus `manual/` hinaus (etwa auf `../versions/…` oder in den
+  Code), merkst du ihn für die Meldung vor; umgeschrieben wird er nicht.
+
+Für einen umgestellten Erzeuger (heute `versions/`): fehlt sein Ziel in Kephalaion, erinnerst
+du daran, ihn neu laufen zu lassen. Beim Inventar bietest du an, `k-playbook inventory`
+gleich auszuführen; der Lauf ist deterministisch.
+
+`docs/README.md` ist der alte Index, wenn sein Frontmatter oder sein Inhalt ihn als Werk
+von `/k-docs-index` ausweist — die Übersicht je Herkunft mit Tabellen, der
+Stichwort-Index, „Häufige Fragen → direkter Sprung“. Trägt die Datei stattdessen nur den
+Text der Struktur-README aus dem Einrichten, ist nichts zu tun. Ist sie von Hand geschrieben
+und beides nicht, behandelst du sie wie eine lose Datei.
+
+**b) Alte Einstiegsverweise suchen.** Gesucht wird die Zeichenfolge
+`k-playbook-local/docs/README.md` in `AGENTS.md` sowie `opencode.json` und
+`opencode.jsonc` in `context.project.dir`, dazu in `opencode.json[c]` ein Eintrag
+`references.docs`, dessen `path` auf `./k-playbook-local/docs` zeigt. Der Einstieg kommt
+aus dem Briefing; das Programm schreibt diesen Eintrag nicht mehr neu. Vorschlag ist, den
+Eintrag bzw. den Absatz zu entfernen. Steht im Absatz in `AGENTS.md` mehr als der Verweis,
+schlägst du vor, nur den Verweis zu entfernen und den Rest stehen zu lassen.
+
+**c) Vorlegen.** Lege gebündelt vor, eine Zeile je Datei bzw. Bereich mit Vorschlag und
+Grund, in dieser Reihenfolge: umgestellte Erzeuger, `manual/`, lose Dateien und
+`extracted/`, der alte Index, die Verweise:
+
+```text
+Doku aus k-playbook-local/docs/
+  versions/inventory.md        [löschen]      liegt als keph:/docs/generated/versions/inventory.md, Stand 2026-10-25
+  manual/release.md            [verschieben]  → keph:/docs/manual/release.md, Ziel frei
+  manual/installation.md       [verschieben]  → keph:/docs/manual/installation.md, Ziel vorhanden und gleich: nur löschen
+  manual/README.md             [löschen]      README.md erzeugt Kephalaion
+  notizen.md                   [unklar]       lose Datei ohne Erzeuger; Vorschlag keph:/docs/manual/notizen.md
+  README.md                    [löschen]      alter Index von /k-docs-index, Einträge abgeräumt
+  code/, libs/                 [bleibt]       Erzeuger schreiben noch auf die Platte
+  opencode.json:19             [entfernen]    references.docs mit dem alten Einstieg
+  AGENTS.md:12                 [entfernen]    Verweis auf k-playbook-local/docs/README.md
+```
+
+- **löschen** — die Plattendatei entfällt, ihr Inhalt liegt in Kephalaion oder ist erzeugt.
+- **verschieben** — Kephalaion `create` unter dem Zielnamen, danach die Plattendatei löschen.
+- **entfernen** — ein Verweis in `AGENTS.md` oder `opencode.json[c]`.
+- **bleibt** — nicht Teil dieser Umstellung.
+- **unklar** — du kannst es nicht entscheiden; der Nutzer entscheidet, je Zeile.
+
+Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzelne Zeilen aus.
+
+**d) Ausführen, was bestätigt ist.** In der Reihenfolge der Vorlage:
+
+1. **verschieben:** Kephalaion `create` mit dem ganzen Inhalt der Datei unter dem
+   Zielnamen (ohne führenden `/`); bei einem gleichen Dokument am Ziel entfällt das
+   Schreiben, bei einem verschiedenen gilt die Entscheidung des Nutzers (`write` mit
+   `base_revision` aus dem `read`). Erst nach einem bestätigten Schreiben — die Antwort
+   nennt Revision und Größe — löschst du die Plattendatei.
+2. **löschen:** die Plattendatei entfernen. Der alte Index zuletzt, und nur, wenn alle Zeilen
+   zu `manual/`, `versions/` und losen Dateien ausgeführt sind; blieb eine davon liegen,
+   bleibt auch er und wird beim nächsten Lauf erneut vorgeschlagen.
+3. **entfernen:** in `opencode.json[c]` den Eintrag `references.docs` (ein leeres
+   `references` dazu); in `AGENTS.md` den Verweis bzw. Absatz. Die übrigen Einträge und die
+   Formatierung der Datei bleiben, wie sie sind.
+
+Ein Schritt, der fehlschlägt, lässt seine Datei liegen; der nächste Lauf nimmt sie wieder
+auf. Ihr Inhalt bleibt außerdem in der Git-Geschichte.
+
+**e) Aufräumen.** Ein Verzeichnis unter `docs/`, das danach leer ist (`manual/`, `versions/`,
+`extracted/`), löschst du mit. `docs/` selbst und seine README bleiben.
+
+**f) Melden.** Je Datei eine Zeile: was aus ihr wurde (`keph:`-Verweis, gelöscht, liegen
+geblieben und warum), dazu je vorgemerktem Link aus `manual/` hinaus `datei:zeile` und je
+entferntem Verweis `pfad:zeile`. Prüfe das Ergebnis mit Kephalaion `list` auf `docs/` und
+nenne, was dort jetzt liegt.
+
+Die Umstellung ist wiederholbar: `/k-docs-index` (auch über `/k-docs` → `index`) und der
+Skill `ai-session-memory` schreiben bis zu ihrer eigenen Umstellung den alten Index und
+die Verweise in `AGENTS.md`/`opencode.json` neu; der nächste Lauf schlägt das Abräumen dann
+erneut vor.
+
 ## Schritt 4 — Schluss
 
 Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist.

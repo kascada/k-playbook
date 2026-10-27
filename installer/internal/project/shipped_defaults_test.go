@@ -148,14 +148,14 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 	}
 }
 
-// Die drei Command-Module in defaults/commands/_shared/ sind über die Sorte
+// Die Command-Module in defaults/commands/_shared/ sind über die Sorte
 // commands erreichbar, tragen Frontmatter title und description und kommen als
 // Einzeldatei unverändert; erster-schritt.md bleibt wenige Zeilen. includes/
 // trägt weiterhin keinen Baustein — wie seine README sagt.
 func TestDefaultsCommandsSharedIncludes(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 
-	for _, name := range []string{"erster-schritt.md", "gh.md", "base-tools.md"} {
+	for _, name := range []string{"erster-schritt.md", "gh.md", "base-tools.md", "docs.md"} {
 		ref := "k-playbook:/commands/_shared/" + name
 		got := mustResolveDoc(t, layers, ref)
 		if got.Directory || got.Disabled || len(got.Parts) != 1 || got.Parts[0].Origin != DocOriginDist || len(got.Problems) != 0 || len(got.Includes) != 0 {
@@ -257,6 +257,85 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 		t.Errorf("k-upgrade liest nicht aus dem Briefing:\n%s", got.Content)
 	}
 	if len(got.Includes) != 1 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) {
+		t.Errorf("includes: %+v", got.Includes)
+	}
+	if len(got.Problems) != 0 || got.Disabled || got.Directory {
+		t.Errorf("Antwort: %+v", got)
+	}
+
+	raw, err := ResolveDocRefWith(context.Background(), layers, ref, DocReadOptions{Raw: true})
+	if err != nil {
+		t.Fatalf("roh: %v", err)
+	}
+	if raw.Content != file || len(raw.Includes) != 0 {
+		t.Errorf("roh: %q, includes %+v", raw.Content, raw.Includes)
+	}
+}
+
+// /k-doc-inventory ist seit Task 100 Hülle plus Text: Die Hülle in
+// share/commands/ nennt nur den Verweis, der Text in defaults/commands/
+// beginnt mit den Includes _shared/erster-schritt.md und _shared/docs.md,
+// stößt `k-playbook inventory` an und nennt den Ort des Inventars nur als
+// keph:-Verweis. Das Modul _docs/inventory.md gibt es nicht mehr.
+func TestDefaultsKDocInventoryIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-doc-inventory.md"
+	const inventoryRef = "keph:/docs/generated/versions/inventory.md"
+
+	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-doc-inventory.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hull), "`"+ref+"`") || strings.Contains(string(hull), "_docs/inventory") {
+		t.Errorf("Hülle ohne Verweis auf den Text oder noch mit dem Modul:\n%s", hull)
+	}
+	if !strings.Contains(string(hull), "mcp__k-playbook__k_playbook_doc_read") {
+		t.Errorf("Hülle erlaubt k_playbook_doc_read nicht:\n%s", hull)
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_docs", "inventory.md")); !os.IsNotExist(err) {
+		t.Error("share/commands/_docs/inventory.md ist noch da; der Ablauf steht im Text des Commands")
+	}
+
+	file := readRepoDefault(t, "commands/k-doc-inventory.md")
+	includes := []string{"erster-schritt.md", "docs.md"}
+	want := file
+	for _, name := range includes {
+		line := "include: _shared/" + name + "\n"
+		if !strings.Contains(file, "\n"+line) {
+			t.Fatalf("k-doc-inventory.md ohne %q:\n%s", line, file)
+		}
+		module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/"+name))))
+		want = strings.Replace(want, line, module+"\n", 1)
+	}
+	for _, needle := range []string{"k-playbook inventory", inventoryRef, "kephalaion_unavailable", "stale_revision"} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-doc-inventory.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{"k-playbook context", "/k-docs-index", "_docs/inventory", "INVENTORY_FILE", ".claude/commands/"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-doc-inventory.md trägt noch %q", stale)
+		}
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Content != want {
+		t.Errorf("eingesetzter Text:\n%q\nerwartet\n%q", got.Content, want)
+	}
+	if strings.Contains(got.Content, "\ninclude: ") || strings.Contains(got.Content, "title: Erster Schritt") ||
+		strings.Contains(got.Content, "title: Die Docs-Ablage") {
+		t.Errorf("Include-Zeile oder Frontmatter eines Moduls im eingesetzten Text:\n%s", got.Content)
+	}
+	for _, needle := range []string{"`documents.always.content`", "keph:/docs/", "generated/<erzeuger>/", "README.md` und `index.md"} {
+		if !strings.Contains(got.Content, needle) {
+			t.Errorf("der eingesetzte Text nennt %q nicht", needle)
+		}
+	}
+	wantIncludes := []DocInclude{
+		{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1},
+		{Ref: "k-playbook:/commands/_shared/docs.md", Origin: DocOriginDist, Depth: 1},
+	}
+	if len(got.Includes) != 2 || got.Includes[0] != wantIncludes[0] || got.Includes[1] != wantIncludes[1] {
 		t.Errorf("includes: %+v", got.Includes)
 	}
 	if len(got.Problems) != 0 || got.Disabled || got.Directory {

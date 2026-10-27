@@ -33,9 +33,9 @@ These names are fixed and used unchanged everywhere.
 | What | Name |
 |---|---|
 | Subcommand | `k-playbook inventory` |
-| Command | `/k-doc-inventory` (file `commands/k-doc-inventory.md`) |
-| Docs module | `commands/_docs/inventory.md` |
-| Inventory file | `k-playbook-local/docs/versions/inventory.md` |
+| Command | `/k-doc-inventory` — hull `share/commands/k-doc-inventory.md`, text `defaults/commands/k-doc-inventory.md`, read as `k-playbook:/commands/k-doc-inventory.md` |
+| Shared include of the docs commands | `defaults/commands/_shared/docs.md` |
+| Inventory document | `keph:/docs/generated/versions/inventory.md` — in the project collection (`kephalaion.address`), name `docs/generated/versions/inventory.md`; the constant `inventory.DocName` |
 | Source configuration | `k-playbook-local/version-sources.yaml` |
 | Generator in frontmatter | `generated.by: k-doc-inventory` |
 
@@ -45,8 +45,9 @@ it in every location at once, not silently in one place.
 
 `generated.by` is `k-doc-inventory` for **both** invocation paths, including when the
 subcommand was called directly. The origin identifies the generator, not the invocation
-path. `docs/versions/` is the only origin to which this generator writes, and it writes to
-no other.
+path. `docs/generated/versions/` in the project collection is the only place to which this
+generator writes, and it writes to no other — in particular not to
+`k-playbook-local/docs/` any more.
 
 ## Data model for an inventory row
 
@@ -803,11 +804,25 @@ but the distinction between reporting and collecting.
 If the field is entirely absent, the installation is older than it. This is the only case
 in which a command cannot evaluate it.
 
-## The Inventory File
+## The Inventory Document
 
-`k-playbook-local/docs/versions/inventory.md`. The `docs/versions/` directory is the fifth
-docs origin; it is not created during setup, but on the first run of its generator, like
-`docs/code/`, `docs/libs/`, and `docs/extracted/`.
+`keph:/docs/generated/versions/inventory.md`: one document in the project collection
+(`kephalaion.address`), under `docs/`, the part of the collection Kephalaion indexes, in
+`generated/versions/`, the directory of this generator (decided 2026-10-26, task 100). It
+is not created during setup, but on the first run of its generator: `Create` when the
+document is absent, `Write` with the read revision as `base_revision` otherwise.
+
+Every path writes through the same access: `project.OpenInventoryStore` opens the
+Kephalaion client of the project, `internal/inventory` knows only the small store
+interface (`Read`, `Create`, `Write`) and the document name. Without a ready Kephalaion
+binding (`kephalaion.ok` not `true`) there is **no inventory**: the subcommand aborts with
+`kephalaion_unavailable` and the reason from the binding, the interface shows the state
+"not reachable", and nothing falls back to disk. A file left under
+`k-playbook-local/docs/versions/` is a state from before the move, not the inventory; it
+is cleared by `/k-upgrade`, not by the generator.
+
+`k-playbook-local/version-sources.yaml` stays on disk, unchanged: it is the hand-maintained
+control of the collection, not its output.
 
 ### Frontmatter
 
@@ -944,13 +959,15 @@ read. The new counter says how many of those yielded nothing for that reason.
 The contract to which collector and tests refer equally:
 
 1. A run collects and renders the complete result **in memory**.
-2. If the inventory file exists, the result is compared with its contents, excluding
-   **only `generated.at`**.
-3. If they are equal, **nothing is written**. The file remains byte-identical, including
-   its old timestamp and file-system modification time.
-4. If they differ, the file is fully rewritten with `generated.at` set to the time of this
-   run.
-5. If it does not exist, it is written.
+2. If the inventory document exists in the collection (`Read`), the result is compared
+   with its content, excluding **only `generated.at`**.
+3. If they are equal, **nothing is written**. The document remains byte-identical,
+   including its old timestamp and its revision.
+4. If they differ, the document is fully rewritten with `generated.at` set to the time of
+   this run — `Write` with the read revision as `base_revision`. If someone else has
+   written in between, the hub rejects it with `stale_revision`; that is a visible error,
+   nothing is overwritten silently.
+5. If it does not exist, it is created (`Create`).
 
 It follows that `generated.at` is the time of the last **content change**, not of the last
 run. Anyone who wants to know when collection last happened collects again; the result is
@@ -971,16 +988,19 @@ created.**
 The interface from Task 043 needs four machine-readable values: state, time of the last
 collection, number of sources, and number of deviations. All four are in the frontmatter
 (`generated.at`, `inventory.sources-*`, `inventory.deviations`), and the state follows
-from whether the file exists. The number of sources that could not be evaluated is read
+from whether the document exists in the collection; "not reachable" (no ready Kephalaion
+binding, or the node does not answer) is a state of its own, reported with its reason and
+never shown as "absent". The number of sources that could not be evaluated is read
 the same way, from `inventory.sources-unevaluable`; a file without that key is an
 incomplete frontmatter like any other and is written again on the next run.
 
-Only the YAML block between the two `---` lines at the beginning of the file is read. The
+Only the YAML block between the two `---` lines at the beginning of the document is read. The
 Markdown body is **never** parsed: no table is read backward and no heading evaluated.
 That was precisely the requirement: status does not come from running text.
 
-This does not prohibit **reading** the file. It is documentation and is read like any
-other: for its comparison with `docs/libs/`, `/k-docs` inspects the context tables and
+This does not prohibit **reading** the document. It is documentation and is read like any
+other, through `k_playbook_doc_read` with the `keph:` reference: for its comparison with
+`docs/libs/`, `/k-docs` inspects the context tables and
 takes item, version, and pin type from there. The boundary is between status and content:
 status comes from frontmatter, nowhere else, and no machine derives it from the body.
 
@@ -996,11 +1016,14 @@ Three reasons argue against a separate JSON artifact:
   and an entry in the structure: work for four numbers that are already written.
 
 **Consequence for Stage 3:** The frontmatter reader is **one** function in `internal/`
-that returns a status value: `inventory.ReadStatus`, which returns `inventory.Status`.
-The collector, `/k-docs`, the subcommand, and the API from 043 use the same one; 043 does
-not build a second reader. If the file is absent, that is a defined state ("absent"), not
-an error. If it exists but its frontmatter is incomplete or invalid, that is a visible
-finding, not a silent zero result.
+that returns a status value: `inventory.ReadStatus`, which reads the document through the
+store and returns `inventory.Status`; `inventory.StatusOf` is the same reader over content
+already in hand, used by the collector for the comparison. `/k-docs`, the subcommand, and
+the API from 043 use the same one; 043 does not build a second reader. If the document is
+absent, that is a defined state ("absent"), not an error. If the collection is not
+reachable, that is another defined state ("not reachable"), with the reason. If the
+document exists but its frontmatter is incomplete or invalid, that is a visible finding,
+not a silent zero result.
 
 ## Error Cases
 
@@ -1027,7 +1050,10 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 | Lockfile readable, associated manifest excluded by `exclude:` | The lockfile contributes no entries and has the state `nicht auswertbar`. The exclusion also remains visible in the "Nicht durchsuchte Bereiche" (areas not searched) section; the notice names the matching exclusion rule. A lockfile explicitly named under `sources:` overrides the exclusion only for itself, not for its manifest. |
 | Workspace lockfile with a missing, unresolvable, excluded, or unreadable member manifest | The lockfile contributes no entries at all and has the state `nicht auswertbar`. The notice states root manifest, member declaration or resolved path, and reason; a partial union of remaining members is not allowed. |
 | Unknown file type below the project root | Silently skipped. Only what is searched can be absent. |
-| Inventory file exists, frontmatter invalid | Visible finding. The run collects again and writes the file because comparison is not possible. |
+| Inventory document exists, frontmatter invalid | Visible finding. The run collects again and writes the document because comparison is not possible. |
+| Kephalaion binding not ready (`kephalaion.ok` not `true`) | **Abort** with `kephalaion_unavailable` and the reason from the binding, before any source is read. No inventory, no fallback to disk; the interface shows "not reachable". |
+| Node does not answer while reading or writing | **Abort** with the error of the store (`kephalaion_unavailable`, or `outcome_unknown` after a sent write). Nothing is written to disk. |
+| `write` rejected with `stale_revision` | Visible error; the document in the collection stays as it was. Run again; if it repeats, say so. |
 
 ## Where This Applies
 
@@ -1036,8 +1062,11 @@ This page is the contract for:
 - the collector in `installer/internal/inventory/`, the source-configuration reader in
   `installer/internal/versionsources/`, and the YAML reader used by both in
   `installer/internal/yamllite/` (Task 042, Stage 3),
-- the `k-playbook inventory` subcommand and the `/k-doc-inventory` command with module
-  `commands/_docs/inventory.md` (Task 042, Stage 4),
+- the `k-playbook inventory` subcommand and the `/k-doc-inventory` command — hull in
+  `share/commands/`, text in `defaults/commands/` (Task 042, Stage 4; hull plus text and the
+  collection as the only location since Task 100),
+- the store access `project.OpenInventoryStore` and the document name `inventory.DocName`
+  (Task 100),
 - the inventory area of the interface and its API (Task 043),
 - the fixtures and tests of both tasks.
 

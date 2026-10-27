@@ -29,9 +29,9 @@ Geschrieben wird nur neben die Installation. Das Installationsverzeichnis selbst
 Unter `k-playbook-local/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, und nur eine davon folgt dem Code:
 
 - `docs/libs/` folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
-- `docs/manual/` ist handgepflegt und folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst.
+- Die handgeschriebene Doku, `keph:/docs/manual/` in der Projekt-Collection, folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst. Ein `docs/manual/` auf der Platte ist ein Stand von vor dem Umzug; die Umstellung 3.2 in `/k-upgrade` bringt ihn nach Kephalaion.
 - `docs/extracted/` hält fest, was vor der Umstellung auf die Wissensablage aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage. Dasselbe gilt für die Auszüge, die `/k-docs-extract` heute nach `k-playbook-local/knowledge/extracted/` schreibt.
-- `docs/versions/` folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht im Abschnitt „Nachzug bei Versionssprüngen" unten und wird hier nicht ein zweites Mal ausformuliert.
+- Das Versionsinventar, `keph:/docs/generated/versions/inventory.md` in der Projekt-Collection, folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht im Abschnitt „Nachzug bei Versionssprüngen" unten und wird hier nicht ein zweites Mal ausformuliert.
 - `docs/README.md` ist der erzeugte Index. Er wird nicht von Hand nachgezogen, sondern von `/k-docs-index` neu geschrieben.
 
 Ändert sich dort tatsächlich etwas, ist der Weg der jeweilige Erzeuger — nicht die Handkorrektur im selben Arbeitsgang.
@@ -40,13 +40,13 @@ Unter `k-playbook-local/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, 
 
 Ein Versionssprung ist keine Code-Änderung; die Verpflichtung oben greift für ihn nicht. Er hat trotzdem eine Pflicht, und sie steht hier — nicht in einem Skill-Text und nicht als Erinnerung.
 
-Ändert sich ein unterstütztes Manifest oder Lockfile — `pyproject.toml`, `requirements*.txt`, `go.mod`, `package.json`, `Cargo.toml`, `Gemfile`, ihre Lockfiles und die übrigen aus dem Vertrag —, eine Container-, DevContainer-, Compose-, Helm- oder CI-Datei, sodass eine Versionsangabe hinzukommt, wegfällt oder wechselt, dann veraltet `docs/versions/`, und das Inventar wird **im selben Arbeitsgang, über den Erzeuger** nachgezogen — nicht per Handkorrektur an `docs/versions/inventory.md`. Der Erzeuger ist auf jedem Weg derselbe Lauf:
+Ändert sich ein unterstütztes Manifest oder Lockfile — `pyproject.toml`, `requirements*.txt`, `go.mod`, `package.json`, `Cargo.toml`, `Gemfile`, ihre Lockfiles und die übrigen aus dem Vertrag —, eine Container-, DevContainer-, Compose-, Helm- oder CI-Datei, sodass eine Versionsangabe hinzukommt, wegfällt oder wechselt, dann veraltet das Inventar `keph:/docs/generated/versions/inventory.md`, und es wird **im selben Arbeitsgang, über den Erzeuger** nachgezogen — nicht per Handkorrektur am Dokument in der Collection und nicht an einer Datei unter `docs/versions/`. Der Erzeuger ist auf jedem Weg derselbe Lauf:
 
-- `/k-doc-inventory` im Assistenten (Modul `commands/_docs/inventory.md`),
+- `/k-doc-inventory` im Assistenten (Text `k-playbook:/commands/k-doc-inventory.md`),
 - `k-playbook inventory` auf der Kommandozeile,
 - der Bereich „Inventar" der Oberfläche (`k-playbook` ohne Argument, Knopf „Aktualisieren").
 
-Alle drei rufen dieselbe Go-Fachlogik und schreiben dieselbe Datei. Ein Lauf ohne inhaltliche Änderung lässt sie byte-identisch stehen — nachziehen kostet nichts, wenn nichts zu ändern war, und es gibt keinen Grund, es zu unterlassen.
+Alle drei rufen dieselbe Go-Fachlogik und schreiben dasselbe Dokument in der Collection. Ein Lauf ohne inhaltliche Änderung lässt es byte-identisch stehen — nachziehen kostet nichts, wenn nichts zu ändern war, und es gibt keinen Grund, es zu unterlassen.
 
 Zwei Fälle, die auseinanderzuhalten sind:
 
