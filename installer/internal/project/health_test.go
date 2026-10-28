@@ -293,3 +293,28 @@ func TestHealthGitHubTraegtDieProblemeDerZugangsdatei(t *testing.T) {
 		}
 	}
 }
+
+// Liest sich die Datei, beurteilt die Quelle die Verfügbarkeit: ein Dienst
+// ohne verfügbaren Zugang ist eine Warnung mit dem Grund des ersten Zugangs,
+// ein nutzbarer Dienst schweigt. GitHub wird dafür nicht gefragt; hier gibt
+// es weder gh noch ssh im PATH, und public braucht nichts.
+func TestHealthGitHubWarntBeiDienstOhneVerfuegbarenZugang(t *testing.T) {
+	root := healthProject(t)
+	// Das Basis-Werkzeug der Matrix bleibt im PATH, gh und ssh fehlen.
+	t.Setenv("PATH", fakeBinDir(t, filepath.Join(t.TempDir(), "aufrufe"), "k-da"))
+	t.Setenv("GH_CONFIG_DIR", t.TempDir())
+	path := filepath.Join(t.TempDir(), githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, path)
+	write(t, path, "services:\n  website:\n    repo: acme/website\n    access:\n      - type: gh\n        login: alice\n  docs:\n    repo: acme/docs\n    access:\n      - type: gh\n        login: alice\n      - type: public\n")
+
+	report := health.Check(context.Background(), root)
+	if !report.OK || len(report.Problems) != 1 {
+		t.Fatalf("Report: %+v", report)
+	}
+	got := report.Problems[0]
+	if got.Level != health.LevelWarning || got.Area != health.AreaGitHub ||
+		!strings.HasPrefix(got.Message, "services.website: kein verfügbarer Zugang — gh liegt nicht im PATH") ||
+		!strings.Contains(got.Hint, path) {
+		t.Errorf("Eintrag: %+v", got)
+	}
+}

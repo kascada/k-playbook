@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} - k-playbook</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body data-mode="{{.Mode}}">
+    <main class="shell">
+{{template "hero" .}}
+
+      <div class="layout">
+{{template "sidebar" .}}
+        <div class="blocks">
+          <!-- Die persönliche GitHub-Zugangsdatei (docs/github-access.md):
+               eine Datei je Person für alle Projekte dieses Rechners. Sie
+               enthält keine Geheimnisse, nur wo ein Zugang liegt. Diese Seite
+               zeigt sie und testet sie; geschrieben wird sie hier nicht —
+               bearbeitet wird im Editor, die Karte sagt, wo sie liegt.
+
+               Beim Laden fragt die Seite nur die Platte: GET /api/github-access
+               liest die Datei und beurteilt die Verfügbarkeit jedes Zugangs
+               ohne Netz. GitHub wird erst auf den Knopf hin gefragt — ein POST
+               je Dienst, damit sich die Blöcke einzeln füllen. -->
+          <section class="card" id="access-file-card">
+            <div class="section-head">
+              <div>
+                <h2>Datei</h2>
+              </div>
+              <span id="access-file-pill" class="pill muted">Laden...</span>
+            </div>
+            <p class="hint">
+              Je Dienst ein kurzer Name, das Repository und die Zugänge in der Reihenfolge, in
+              der sie versucht werden: <code>gh</code> (Login), <code>token</code> (Datei),
+              <code>ssh</code> (Schlüssel oder Alias), <code>public</code>. Verfügbar heißt, ohne
+              Netz beurteilt: Der Login ist in gh hinterlegt, die Token-Datei ist eine Zeile mit
+              Modus 0600, der Schlüssel liegt ohne Gruppen- und Weltrechte da, der Alias löst nach
+              github.com auf.
+            </p>
+            <dl id="access-file-facts" class="facts"></dl>
+            <ul id="access-problems" class="environment-list"></ul>
+            <p id="access-file-message" class="message"></p>
+          </section>
+
+          <section class="card" id="access-services-card">
+            <div class="section-head">
+              <div>
+                <h2>Dienste</h2>
+              </div>
+              <div class="access-actions">
+                <span id="access-services-pill" class="pill muted">Laden...</span>
+                <button type="button" class="secondary" id="access-test-all" disabled
+                        title="Fragt GitHub für jeden Dienst, ob seine verfügbaren Zugänge funktionieren. Mehrere Anfragen je Zugang, zehn Sekunden Frist je Anfrage.">Alle prüfen</button>
+              </div>
+            </div>
+            <p class="hint">
+              „Prüfen“ fragt GitHub: für <code>gh</code> und <code>token</code> Identität, Lese- und
+              Schreibrecht und Ablauf des Tokens, für <code>ssh</code> den Gruß von
+              <code>ssh -T</code> und <code>git ls-remote</code>, für <code>public</code> den
+              anonymen Zugriff. Deaktivierte und nicht verfügbare Zugänge werden übersprungen.
+              Kein Token erscheint auf dieser Seite.
+            </p>
+            <div id="access-services" class="access-services"></div>
+            <p id="access-services-message" class="message"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script src="/static/session.js"></script>
+    <script src="/static/nav.js"></script>
+    <script src="/static/github-access.js"></script>
+  </body>
+</html>

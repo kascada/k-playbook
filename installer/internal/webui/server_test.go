@@ -96,6 +96,13 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// der Oberfläche über das Netz, und das darf weder die Statusseite
 		// noch das Menü auslösen.
 		{path: "/github", markiert: `<a class="area-nav-item active" href="/github" aria-current="page">`},
+		// /github-access ist der Unterpunkt von GitHub: die persönliche
+		// Zugangsdatei, der Bereich ist aktiv, der Unterpunkt die offene Seite.
+		{
+			path:       "/github-access",
+			markiert:   `<a class="area-nav-item active" href="/github" aria-current="true">`,
+			unterpunkt: `<a class="area-nav-subitem active" href="/github-access" aria-current="page">`,
+		},
 		// /branches ist ein eigener Bereich neben GitHub und ohne gh erreichbar.
 		{path: "/branches", markiert: `<a class="area-nav-item active" href="/branches" aria-current="page">`},
 		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen

@@ -2,7 +2,6 @@ package project
 
 import (
 	"os"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -77,58 +76,6 @@ func TestParseGHStatus(t *testing.T) {
 				t.Errorf("configured = %t, erwartet %t", configured, testCase.configured)
 			}
 		})
-	}
-}
-
-func TestParseGHHosts(t *testing.T) {
-	content := `github.com:
-    user: zweitname
-    oauth_token: gho_geheim
-    git_protocol: https
-    users:
-        erstname:
-            oauth_token: gho_auch_geheim
-        zweitname:
-            oauth_token: gho_ebenfalls_geheim
-github.example.com:
-    user: fremder
-    users:
-        fremder:
-            oauth_token: gho_fremd
-`
-
-	active, accounts := parseGHHosts(content)
-	if active != "zweitname" {
-		t.Errorf("active = %q, erwartet zweitname", active)
-	}
-	// Der aktive Account gehört nach vorn, damit die Oberfläche ihn nicht
-	// heraussuchen muss.
-	want := []string{"zweitname", "erstname"}
-	if !slices.Equal(accounts, want) {
-		t.Errorf("accounts = %v, erwartet %v", accounts, want)
-	}
-	// Ein anderer Host darf sich nicht einmischen.
-	if slices.Contains(accounts, "fremder") {
-		t.Errorf("Account eines anderen Hosts übernommen: %v", accounts)
-	}
-}
-
-// Ältere gh-Fassungen kennen keinen users-Block. Dort ist `user` der einzige
-// Account und darf nicht verloren gehen.
-func TestParseGHHostsOhneUsersBlock(t *testing.T) {
-	active, accounts := parseGHHosts("github.com:\n    user: einziger\n    oauth_token: gho_geheim\n")
-	if active != "einziger" {
-		t.Errorf("active = %q, erwartet einziger", active)
-	}
-	if !slices.Equal(accounts, []string{"einziger"}) {
-		t.Errorf("accounts = %v, erwartet [einziger]", accounts)
-	}
-}
-
-func TestParseGHHostsOhneAnmeldung(t *testing.T) {
-	active, accounts := parseGHHosts("")
-	if active != "" || len(accounts) != 0 {
-		t.Errorf("active = %q, accounts = %v, erwartet leer", active, accounts)
 	}
 }
 

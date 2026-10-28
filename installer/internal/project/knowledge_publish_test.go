@@ -482,8 +482,7 @@ func TestKnowledgePublishFehlschlagBeimIndexschreibenLaesstAltenStand(t *testing
 }
 
 // Die beiden übrigen Fehlschläge lassen sich ohne Fehler-Hook im Produktivpfad
-// nicht erzeugen; ihre Fälle stehen in
-// material/befunde/wissensablage-schreibseite.md.
+// nicht erzeugen; die Gründe stehen in den Skip-Meldungen.
 func TestKnowledgePublishFehlschlagBeimChunkenUndBeimTausch(t *testing.T) {
 	t.Run("Chunken", func(t *testing.T) {
 		t.Skip("Chunken liest die eben mit 0o644 geschriebenen Dateien des Zwischenverzeichnisses; ein Lesefehler dazwischen ist über Rechte nicht erzeugbar, ohne das Schreiben selbst zu verhindern. Liegt vor dem Tausch und ist ein Abbruch ohne Tausch.")
@@ -504,8 +503,8 @@ func TestKnowledgePublishFehlschlagBeimChunkenUndBeimTausch(t *testing.T) {
 // ohne root nicht erzeugbar (siehe …FehlschlagBeimChunkenUndBeimTausch). Die
 // Reihenfolge belegt TestKnowledgePublishFehlschlagBeimIndexschreibenLaesstAltenStand:
 // scheitert das Indexschreiben und steht der alte Stand, war noch nicht
-// getauscht (Task 064, Etappe 6; nachgestellt in
-// material/befunde/wissensablage-schreibseite.md).
+// getauscht (Task 064, Etappe 6: mit dem Indexschreiben hinter dem Tausch
+// wird jener Test rot, dieser bleibt grün).
 func TestKnowledgePublishAbbruchZwischenIndexUndTausch(t *testing.T) {
 	root := knowledgeFixture(t)
 	if _, err := NewKnowledge(root).Status(); err != nil {

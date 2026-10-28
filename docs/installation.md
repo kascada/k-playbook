@@ -159,7 +159,27 @@ The three targets are **actual directories with individual symlinks**, not direc
   k-own.md     -> ../../k-playbook-local/commands/k-own.md     project-owned only
 ```
 
-The shipped commands and skills are unpacked by the binary once per machine into `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/` when set). The individual links reach them through the one link `.k-playbook/share`: that link is absolute and depends on the machine's home directory, so `.k-playbook/.gitignore` keeps it out of version control, while every link through it stays relative and can be committed. In a DevContainer whose home differs from the host's, each environment points `.k-playbook/share` at its own home when it heals the links; mount `~/.local/share/k-playbook` into the container under the host's path to avoid that. Linking the shipped entries globally (`~/.claude/commands/`) is not an option: with the same name in both places Claude Code takes the global one, so a project could no longer replace a shipped command.
+The shipped commands and skills are unpacked by the binary once per machine into `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/` when set). The individual links reach them through the one link `.k-playbook/share`: that link is absolute and depends on the machine's home directory, so `.k-playbook/.gitignore` keeps it out of version control, while every link through it stays relative and can be committed. Linking the shipped entries globally (`~/.claude/commands/`) is not an option: with the same name in both places Claude Code takes the global one, so a project could no longer replace a shipped command.
+
+**Host and DevContainer sharing the project.** If both work in the same project directory with different home directories, each one derives a different target for `.k-playbook/share` and points the link at its own home whenever it heals the links: on every briefing, `k-playbook context` and interface start. The other environment then loses all shipped commands and skills without an error, because Claude Code silently skips links without a target. Mounting `~/.local/share/k-playbook` under the host's path alone does not help: the binary in the container still derives its target from its own home.
+
+The fix is the variable `K_PLAYBOOK_SHARE_DIR`. It names the directory itself and takes precedence over `XDG_DATA_HOME` and the home directory; the binary unpacks there, links there and reads its scripts from there. k-playbook never sets it. The container sets it to the host's path, so both environments compute the same link target. On the host it stays unset. A relative value is an error that the link check reports by name, not a silent fallback to the home directory.
+
+```jsonc
+// .devcontainer/devcontainer.json
+"containerEnv": {
+  "K_PLAYBOOK_SHARE_DIR": "${localEnv:HOME}/.local/share/k-playbook"
+},
+"mounts": [
+  "source=k-playbook-share-${devcontainerId},target=${localEnv:HOME}/.local/share/k-playbook,type=volume"
+]
+```
+
+- **Own volume, not the host's directory.** Host and container unpack the version embedded in their own binary; sharing one directory would make them overwrite each other whenever the versions differ. The volume also keeps the security tools across rebuilds.
+- **Writable for the container user.** Docker creates a new mount point owned by root. Change its owner once, for example `sudo chown "$(id -u):$(id -g)" "$K_PLAYBOOK_SHARE_DIR"` in `postCreateCommand`.
+- **Host with `XDG_DATA_HOME`.** If the host sets it, its directory is `$XDG_DATA_HOME/k-playbook`, and the container's variable must name that path instead.
+
+Inside a container whose project directory is mounted from the host, the environment check warns while the variable is missing (area `share`, in the briefing and in `k-playbook health`). On the host it stays silent; there the commands simply disappear.
 
 The interface compares this expected state with what is actually registered and reports deviations by name: what is missing, what points to the wrong source, what is orphaned, and what belongs to the project and therefore remains. It synchronizes them at the press of a button. An actual file that someone placed there themselves always takes precedence and is never replaced.
 

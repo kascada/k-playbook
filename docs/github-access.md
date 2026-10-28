@@ -6,13 +6,15 @@ k-playbook reads and checks it, and what happens when it is missing.
 This page is the **single** definition. The reader, the subcommand, the check, and the tests
 refer to it and do not redefine any of it. What is not stated here is not defined.
 
-**Status (2026-10-27):** step 1 is implemented (Task 099): the reader
+**Status (2026-10-28):** step 1 is implemented (Task 099): the reader
 (`installer/internal/githubaccess`), the template, `k-playbook github check` and `show`, and
-the health area `github`. Step 2 is agreed and not yet implemented: *availability* of an
-access without network (part of `check`, `show` and the health check), the *test* against
-GitHub (`k-playbook github test`, `k_playbook_github_test`, the interface page), see the two
-sections of those names. Later steps — running a command under a service, named operations
-— are listed under *Outlook* and are not part of the contract until they are specified here.
+the health area `github`. Step 2 is implemented (Task 102): *availability* of an access
+without network (`availability.go`, part of `check`, `show` and the health check), the *test*
+against GitHub (`test.go`; `k-playbook github test`, `k_playbook_github_test`, the interface
+page `/github-access`), see the two sections of those names. The gh configuration is read by
+the shared package `internal/ghconfig`, which `project` and `githubaccess` both use. Later
+steps — running a command under a service, named operations — are listed under *Outlook* and
+are not part of the contract until they are specified here.
 
 ## What the file is, and is not
 
@@ -356,6 +358,7 @@ count), `1` when at least one `failed`, `2` usage error, including an unknown se
 ```
 
 `state` and `reason` are the availability of step 2; a binary of step 1 does not print them.
+`reason` is present only for `unavailable`.
 
 And this for a file with one problem — configuration or problems, never both:
 

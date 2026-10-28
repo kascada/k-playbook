@@ -7,14 +7,24 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/sharedir"
 )
 
 // Isolate setzt XDG_DATA_HOME auf ein leeres Verzeichnis und gibt die
 // Aufräumfunktion zurück. Gedacht für TestMain: Danach sieht jeder Test des
 // Pakets ein leeres mitgeliefertes Verzeichnis, solange er nicht Dir ruft.
+//
+// sharedir.EnvDir hat Vorrang vor XDG_DATA_HOME und wird deshalb entfernt;
+// sonst läsen Tests in einem DevContainer, der die Variable setzt, das echte
+// Verzeichnis.
 func Isolate() (cleanup func(), err error) {
 	empty, err := os.MkdirTemp("", "k-playbook-share-leer-")
 	if err != nil {
+		return nil, err
+	}
+	if err := os.Unsetenv(sharedir.EnvDir); err != nil {
+		os.RemoveAll(empty)
 		return nil, err
 	}
 	if err := os.Setenv("XDG_DATA_HOME", empty); err != nil {
@@ -34,6 +44,7 @@ func Dir(t *testing.T) string {
 		return dir.(string)
 	}
 	base := t.TempDir()
+	t.Setenv(sharedir.EnvDir, "")
 	t.Setenv("XDG_DATA_HOME", base)
 	dir := filepath.Join(base, "k-playbook")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

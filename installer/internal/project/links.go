@@ -403,7 +403,11 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 
 	if !RegistrySourcePresent(projectRoot, link.Kind) {
 		status.State = StateNoSource
-		status.Detail = string(link.Kind) + "/ fehlt in ~/.local/share/k-playbook und im Projekt"
+		shared := SharedDir()
+		if shared == "" {
+			shared = "den mitgelieferten Dateien"
+		}
+		status.Detail = string(link.Kind) + "/ fehlt in " + shared + " und im Projekt"
 		return status
 	}
 

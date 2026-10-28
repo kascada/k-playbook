@@ -14,7 +14,8 @@ import (
 // docs/knowledge-aktuell.md). Heute steht darin nur der Link share.
 const ProjectDirName = ".k-playbook"
 
-// shareLinkName ist der Link auf ~/.local/share/k-playbook/ in ProjectDirName.
+// shareLinkName ist der Link auf ~/.local/share/k-playbook/ (sharedir.Dir) in
+// ProjectDirName.
 const shareLinkName = "share"
 
 // shareIgnoreLine nimmt den Link aus der Versionskontrolle. Sein Ziel ist
@@ -49,18 +50,26 @@ func sharedDataDir() string {
 
 // checkShareLink prüft den Umweg-Link.
 //
-// Ein Link, der woandershin zeigt, ist StateStale und wird umgesetzt — der
-// typische Fall ist ein Projektverzeichnis, das Host und DevContainer mit
-// verschiedenem Home teilen: Jede Umgebung setzt ihn auf ihr eigenes. Wer das
-// Hin und Her vermeiden will, bindet ~/.local/share/k-playbook im Container
-// unter demselben Pfad ein wie auf dem Host.
+// Ein Link, der woandershin zeigt, ist StateStale und wird umgesetzt. Teilen
+// Host und DevContainer das Projekt bei verschiedenem Home, setzt deshalb jede
+// Umgebung ihn auf ihr eigenes, und in der anderen fehlen die mitgelieferten
+// Commands. Abhilfe ist sharedir.EnvDir im Container, gesetzt auf den Pfad
+// des Hosts: dann rechnen beide dasselbe Ziel aus. Ein fremdes Ziel stehen zu
+// lassen, solange es existiert, hilft dagegen nicht — im Container gibt es den
+// Pfad des Hosts nur, wenn auch das Entpacken dorthin geht, und ein Link auf
+// den Stand einer anderen Version bliebe still stehen.
 func checkShareLink(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
-	want := sharedDataDir()
-	if want == "" || !isDir(want) {
+	want, err := sharedir.Dir()
+	if err != nil {
 		status.State = StateNoSource
-		status.Detail = "~/.local/share/k-playbook fehlt; jeder Aufruf von k-playbook entpackt es"
+		status.Detail = "Verzeichnis der mitgelieferten Dateien unbekannt: " + err.Error()
+		return status
+	}
+	if !isDir(want) {
+		status.State = StateNoSource
+		status.Detail = want + " fehlt; jeder Aufruf von k-playbook entpackt es"
 		return status
 	}
 

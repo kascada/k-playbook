@@ -146,9 +146,9 @@ func TestFailureHoltGenauDasLogDiesesLaufs(t *testing.T) {
 	}
 }
 
-// Die Meldungen sind an gh 2.46.0 gemessen (Befund
-// github-stand-in-der-oberflaeche.md): ein verworfenes Log an Lauf 23831424363
-// von cli/cli, die Gegenfälle an diesem Repo und an einem, das es nicht gibt.
+// Die Meldungen sind an gh 2.46.0 gemessen: ein verworfenes Log an Lauf
+// 23831424363 von cli/cli, die Gegenfälle an diesem Repo und an einem, das es
+// nicht gibt.
 func TestFailureTrenntVerworfenesLogVonKennungUndZugriff(t *testing.T) {
 	cases := []struct {
 		name   string

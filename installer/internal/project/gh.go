@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
+
+	"github.com/kascada/k-playbook/installer/internal/ghconfig"
 )
 
-// GHHost ist der Host, um den es geht. Bewusst nur einer: Enterprise-Instanzen
-// hätten eigene Accounts je Host und eine eigene Entscheidung je Projekt; das
-// wäre ein anderes Feature als das hier.
-const GHHost = "github.com"
+// GHHost ist der Host, um den es geht — ghconfig.Host, hier unter dem Namen,
+// den die Oberfläche und die Kontextausgabe schon tragen. Bewusst nur einer:
+// Enterprise-Instanzen hätten eigene Accounts je Host und eine eigene
+// Entscheidung je Projekt; das wäre ein anderes Feature als das hier.
+const GHHost = ghconfig.Host
 
 // GHStatus ist die Projektentscheidung zur GitHub CLI.
 type GHStatus string
@@ -187,7 +189,9 @@ func ghBlock(status GHStatus) string {
 //
 // Bewusst ohne Aufruf von `gh auth status`: der prüft den Token beim Server und
 // kostet einen Netzzugriff. Dieser Befund soll billig genug sein, um in der
-// Kontextausgabe zu stehen.
+// Kontextausgabe zu stehen. Die gh-Konfiguration liest das Paket ghconfig,
+// das auch githubaccess für die Verfügbarkeit eines gh-Zugangs nutzt — eine
+// Fassung der Logik für beide.
 func DetectGH() GH {
 	state := GH{Host: GHHost, Accounts: []string{}}
 
@@ -196,14 +200,14 @@ func DetectGH() GH {
 		state.Path = path
 	}
 
-	active, accounts := readGHHosts(ghConfigDir())
+	active, accounts := ghconfig.ReadHosts(ghconfig.ConfigDir())
 	state.Account = active
 	state.Accounts = accounts
 	state.LoggedIn = len(accounts) > 0
 
 	// Ein Token in der Umgebung sticht die Konfigurationsdatei. Ohne diesen Fall
 	// meldete die Oberfläche „nicht angemeldet", während gh läuft.
-	if ghTokenFromEnv() {
+	if ghconfig.TokenFromEnv() {
 		state.TokenFromEnv = true
 		state.LoggedIn = true
 	}
@@ -219,115 +223,6 @@ func GHState(projectDir string) (GH, error) {
 	state.Status = status
 	state.Configured = configured
 	return state, err
-}
-
-func ghTokenFromEnv() bool {
-	for _, name := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if strings.TrimSpace(os.Getenv(name)) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-// ghConfigDir folgt derselben Reihenfolge wie gh selbst.
-func ghConfigDir() string {
-	if dir := strings.TrimSpace(os.Getenv("GH_CONFIG_DIR")); dir != "" {
-		return dir
-	}
-	if dir := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); dir != "" {
-		return filepath.Join(dir, "gh")
-	}
-	home := homeDir()
-	if home == "" {
-		return ""
-	}
-	return filepath.Join(home, ".config", "gh")
-}
-
-// readGHHosts liest die Accounts für GHHost aus hosts.yml.
-//
-// Gelesen werden nur `user` und die Namen unter `users`. Die Token-Zeilen daneben
-// werden übergangen und tauchen nirgends in einer Antwort auf.
-func readGHHosts(configDir string) (string, []string) {
-	if configDir == "" {
-		return "", []string{}
-	}
-	data, err := os.ReadFile(filepath.Join(configDir, "hosts.yml"))
-	if err != nil {
-		return "", []string{}
-	}
-	return parseGHHosts(string(data))
-}
-
-func parseGHHosts(content string) (string, []string) {
-	active := ""
-	accounts := []string{}
-
-	inHost := false
-	usersIndent := -1
-	accountIndent := -1
-
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := lineIndent(line)
-		key, value, found := strings.Cut(trimmed, ":")
-		if !found {
-			continue
-		}
-		key = strings.Trim(strings.TrimSpace(key), `"'`)
-		value = strings.TrimSpace(value)
-
-		if indent == 0 {
-			inHost = key == GHHost
-			usersIndent = -1
-			accountIndent = -1
-			continue
-		}
-		if !inHost {
-			continue
-		}
-
-		// Innerhalb von `users` stehen die Accountnamen; alles tiefer darunter
-		// gehört zum jeweiligen Account und interessiert hier nicht.
-		if usersIndent >= 0 {
-			if indent > usersIndent {
-				if accountIndent < 0 {
-					accountIndent = indent
-				}
-				if indent == accountIndent && value == "" {
-					accounts = addUnique(accounts, key)
-				}
-				continue
-			}
-			usersIndent = -1
-			accountIndent = -1
-		}
-
-		switch {
-		case key == "user" && value != "":
-			active = strings.Trim(value, `"'`)
-		case key == "users" && value == "":
-			usersIndent = indent
-		}
-	}
-
-	// Ältere gh-Fassungen kennen keinen users-Block; dort ist `user` der einzige
-	// Account. Und der aktive gehört nach vorn, damit die Oberfläche ihn nicht
-	// eigens heraussuchen muss.
-	if active != "" {
-		accounts = addUnique(accounts, active)
-		for index, name := range accounts {
-			if name == active && index > 0 {
-				accounts = append([]string{active}, append(accounts[:index:index], accounts[index+1:]...)...)
-				break
-			}
-		}
-	}
-	return active, accounts
 }
 
 func lineIndent(line string) int {

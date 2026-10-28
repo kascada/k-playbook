@@ -152,8 +152,7 @@ At the same hub and collection, node `wsl-kleist` on v0.3.1, with a freshly buil
 
 Not measured: a node that is cut off from its hub, a second node listing what the
 first one wrote, and the message for a node before v0.3.1 at a real node (covered by a unit
-test). Commands and output are in
-`k-playbook-local/material/befunde/ablage-userbereich-queue.md`.
+test).
 
 At the same hub and collection, with a freshly built binary (task 093, 2026-10-18):
 
@@ -163,7 +162,6 @@ At the same hub and collection, with a freshly built binary (task 093, 2026-10-1
   real name. The whole call, status check (`whoami`) and `read` included, took 0.05 s.
 - A missing name answered `not_found` (the node reports `kind: none`, no error); the
   directory name without `/` `invalid_input`. The document was deleted afterwards.
-  Output in `k-playbook-local/material/befunde/command-huelle-verweis.md`.
 
 At the same hub and collection, node `wsl-kleist` v0.3.1, with a freshly built binary
 (task 097, 2026-10-20):
@@ -179,7 +177,7 @@ At the same hub and collection, node `wsl-kleist` v0.3.1, with a freshly built b
   with `frontmatter`.
 
 Not measured: `stale_revision` at a real hub (covered by unit tests), a second node seeing the
-todos. Commands and output: `k-playbook-local/material/befunde/todos-in-der-collection.md`.
+todos.
 
 ## Where the tools are documented
 

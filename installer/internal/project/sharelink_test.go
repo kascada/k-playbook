@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/sharedir"
 )
 
 func readlink(t *testing.T, path string) string {
@@ -123,6 +125,61 @@ func TestHealLinksSetztFremdenShareUm(t *testing.T) {
 	}
 	if string(data) != "/eigenes\n/share\n" {
 		t.Errorf(".gitignore = %q", data)
+	}
+}
+
+// Host und DevContainer teilen das Projekt bei verschiedenem Home. Setzt der
+// Container sharedir.EnvDir auf den Pfad des Hosts, rechnen beide dasselbe
+// Ziel aus: kein Wechsel setzt den Link um, keiner meldet ihn als veraltet.
+func TestShareLinkBleibtBeiGesetzterVariableStehen(t *testing.T) {
+	root := newProject(t)
+	host := shipped(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Container: eigenes Home, die Variable nennt das Verzeichnis des Hosts.
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv(sharedir.EnvDir, host)
+	if status := statusFor(t, CheckLinks(root), shareLinkRel()); status.State != StateOK {
+		t.Fatalf("Container: State = %q (%s), erwartet %q", status.State, status.Detail, StateOK)
+	}
+	if repair := HealLinks(root); repair.Applied || repair.Error != "" {
+		t.Fatalf("Container: Heilung hat geschrieben: %+v", repair)
+	}
+	if got := readlink(t, ShareLink(root)); got != host {
+		t.Fatalf("Container: share zeigt auf %q, erwartet %q", got, host)
+	}
+
+	// Zurück auf den Host: ohne Variable, das eigene Home ist das Ziel.
+	t.Setenv(sharedir.EnvDir, "")
+	t.Setenv("XDG_DATA_HOME", filepath.Dir(host))
+	if repair := HealLinks(root); repair.Applied || repair.Error != "" {
+		t.Fatalf("Host: Heilung hat geschrieben: %+v", repair)
+	}
+	if got := readlink(t, ShareLink(root)); got != host {
+		t.Errorf("Host: share zeigt auf %q, erwartet %q", got, host)
+	}
+}
+
+// Eine relative Variable ist ein Fehler, der in der Prüfung mit Namen
+// ankommt — kein stiller Rückfall auf das eigene Home, der den Link wieder
+// umsetzte.
+func TestShareLinkMeldetRelativeVariable(t *testing.T) {
+	root := newProject(t)
+	host := shipped(t)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(sharedir.EnvDir, "relativ/k-playbook")
+
+	status := statusFor(t, CheckLinks(root), shareLinkRel())
+	if status.State != StateNoSource || !strings.Contains(status.Detail, sharedir.EnvDir) {
+		t.Fatalf("State = %q (%s), erwartet %q mit Variablennamen", status.State, status.Detail, StateNoSource)
+	}
+	HealLinks(root)
+	if got := readlink(t, ShareLink(root)); got != host {
+		t.Errorf("share zeigt auf %q, erwartet unverändert %q", got, host)
 	}
 }
 

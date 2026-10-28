@@ -237,8 +237,9 @@ installer/
 │   │                            Kephalaion-Collection
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
-│   ├── github.go                Subkommando github: check und show [<dienst>] der
-│   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2
+│   ├── github.go                Subkommando github: check, show und test [<dienst>] der
+│   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
+│   │                            check und show mit Verfügbarkeit, test gegen GitHub
 │   ├── share.go                 vor jedem Kommando außer version und help:
 │   │                            ~/.local/share/k-playbook/ auf den eingebetteten Stand
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
@@ -246,6 +247,12 @@ installer/
 │   └── health.go                Sammelstelle der Umgebungsprüfung (Task 098): Level,
 │                                Problem, Report; Register für Quellen, Check fragt alle
 │                                und sortiert nach Bereich, Stufe, Satz
+├── internal/ghconfig/
+│   └── ghconfig.go              die lokale gh-Konfiguration lesen, ohne gh zu rufen:
+│                                ConfigDir (GH_CONFIG_DIR, XDG, ~/.config/gh), Accounts aus
+│                                hosts.yml (nur user und die Namen unter users, nie ein
+│                                Token), TokenFromEnv; gemeinsam für project und
+│                                githubaccess, weil githubaccess project nicht importieren darf
 ├── internal/githubaccess/
 │   ├── path.go                  Ort der persönlichen GitHub-Zugangsdatei (Task 099,
 │   │                            docs/github-access.md): Override K_PLAYBOOK_GITHUB_CONFIG,
@@ -253,6 +260,15 @@ installer/
 │   ├── load.go                  Load: die Datei lesen und vollständig prüfen — Dienste,
 │   │                            repo, Zugänge je Typ, Pfade, disabled, doppelte Namen;
 │   │                            Konfiguration oder Probleme (nach Dateiposition), nie beides
+│   ├── availability.go          Judge: die Verfügbarkeit je Zugang ohne Netz (Task 102) —
+│   │                            gh-Login in der gh-Konfiguration, Token-Datei 0600 mit einer
+│   │                            Zeile, Schlüssel ohne Gruppen-/Weltrechte, Alias per ssh -G
+│   │                            nach github.com; Usable und FirstReason je Dienst
+│   ├── test.go                  Tester.Test: der Test gegen GitHub — API über eigenen
+│   │                            HTTP-Client (Token nur im Header), ssh -T und git
+│   │                            ls-remote, public anonym; 10 s je Aufruf; Report mit
+│   │                            result, identity, read, write, expires, warning, message;
+│   │                            redact entfernt das Token aus jeder Meldung
 │   ├── template.go              die Vorlage bei fehlender Datei: Verzeichnis 0700, Datei
 │   │                            0600, services: {} und ein Beispiel je Zugangsart
 │   ├── accesstest/              Isolate und Empty für Tests: eigener Override, damit kein
@@ -348,6 +364,10 @@ installer/
 │   │                            GitHub-Zugangsdatei (über githubaccess) — bei init
 │   │                            in internal/health registriert (health darf project
 │   │                            nicht importieren, das Briefing trägt den Report)
+│   ├── health_share.go          Quelle share der Umgebungsprüfung: warnt im Container
+│   │                            ohne K_PLAYBOOK_SHARE_DIR, wenn der Projektordner vom
+│   │                            Host eingehängt ist (mountinfo), und bei ungültiger
+│   │                            Variable
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 Todos als Dokumente unter todos/ der Collection
 │   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
@@ -391,9 +411,12 @@ installer/
 │   │                            Sperre, Übergabe der Laufzeitdatei, Rückfall
 │   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
 │   │                            die GitHub-Daten nur bei tools.gh.status: enabled
+│   ├── github_access.go         GET /api/github-access (check --json mit Verfügbarkeit,
+│   │                            ohne Netz) und POST /api/github-access/test (test --json,
+│   │                            optional service) für die Seite /github-access
 │   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
 │                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
-│                                inventory.html, branches.html, mcp.html, mcp-servers.html,
+│                                inventory.html, branches.html, github-access.html, mcp.html, mcp-servers.html,
 │                                mcp-server.html; sidebar.html, hero.html,
 │                                closed.html und workflow-cards.html (Fragmente
 │                                für linke Spalte, Kopf, Sperrfläche und
@@ -403,7 +426,7 @@ installer/
 │                                Markdown-Betrachter), status.js, app.js,
 │                                workflows.js (Zählung der Workflow-Karten),
 │                                workflows-page.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
-│                                knowledge.js, docs.js, inventory.js, branches.js, mcp.js,
+│                                knowledge.js, docs.js, inventory.js, branches.js, github-access.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
 │                                (Gestaltungswerte in :root, siehe „Gestaltung
 │                                der Oberfläche")
@@ -429,6 +452,9 @@ installer/
 │   │                            project.BuildBriefing)
 │   ├── health.go                Werkzeug k_playbook_health (Hülle über health.Check,
 │   │                            Report unter health)
+│   ├── github.go                Werkzeug k_playbook_github_test (Hülle über
+│   │                            githubaccess.Tester.Test, Report unter test; das
+│   │                            einzige Werkzeug mit Netz, nur auf Aufruf)
 │   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
 │   │                            write, publish, supersede, inbox_*, queue_*, status),
 │   │                            dünne Hüllen über project.Knowledge
@@ -1010,9 +1036,20 @@ Reihe nach einrichtet.
   `.gitignore`, `stale` und heilbar; steht dort etwas Echtes, `blocked`; fehlt
   `~/.local/share/k-playbook/`, `no-source` — dann gibt es auch keine mitgelieferten
   Einzel-Links, die projekteigenen kommen trotzdem an.
-- **DevContainer:** Teilen Host und Container das Projekt bei verschiedenem Home, setzt jede
-  Umgebung den Link beim Heilen auf ihr eigenes. Wer das vermeiden will, bindet
-  `~/.local/share/k-playbook` im Container unter dem Pfad des Hosts ein.
+- **DevContainer:** Teilen Host und Container das Projekt bei verschiedenem Home, rechnet
+  jede Umgebung ein anderes Ziel aus und setzt den Link beim Heilen auf ihr eigenes; in der
+  anderen fehlen dann alle mitgelieferten Commands. Abhilfe ist `K_PLAYBOOK_SHARE_DIR`
+  (`sharedir.EnvDir`), im Container auf den Pfad des Hosts gesetzt, mit eigenem Volume
+  darunter. Die Variable nennt das Verzeichnis selbst und hat Vorrang vor `XDG_DATA_HOME`
+  und dem Home; sie verschiebt Entpacken, Linkziel und `SharedDir()` gemeinsam. Ein
+  relativer Wert ist ein Fehler, den die Prüfung des Links mit Namen meldet, kein Rückfall
+  aufs Home. Verworfen: das Verzeichnis des Hosts einzuhängen (das Container-Binary rechnet
+  weiter aus seinem Home, und bei verschiedenen Versionen entpacken beide abwechselnd) und
+  ein existierendes fremdes Ziel stehen zu lassen (im Container fehlt der Host-Pfad, solange
+  nicht auch dorthin entpackt wird, und ein Link auf einen älteren Stand bliebe still
+  stehen). `sharetest` entfernt die Variable, damit Tests im Container nicht das echte
+  Verzeichnis lesen. Beispiel für `devcontainer.json`: `docs/installation.md`, „Host and
+  DevContainer sharing the project“.
 - **Nicht global:** Mit gleichem Namen global und im Projekt nimmt Claude Code (2.1.310) die
   globale Fassung, OpenCode (1.18.35) die des Projekts — gemessen 2026-10-25. Global
   verlinkte mitgelieferte Einträge ließen sich in Claude Code also nicht je Projekt
@@ -1102,8 +1139,7 @@ sich aus, und er ist dem Hauptverzeichnis vorbehalten.
 `ApplyRootInstructions()` legt `AGENTS.md` an, falls sie fehlt, und hängt sonst einen
 kurzen Anstoß an: den einen Aufruf einer Sitzung, `k-playbook briefing`, eingerückt als
 Shell-Befehl, dahinter das gleichwertige MCP-Werkzeug `k_playbook_briefing` — in dieser
-Reihenfolge wird der Block befolgt, umgekehrt nicht (gemessen 2026-10-18, Befund
-`command-huelle-verweis.md`). Die Vorlage `rootInstructionsTemplate()` ist Überschrift
+Reihenfolge wird der Block befolgt, umgekehrt nicht (gemessen 2026-10-18). Die Vorlage `rootInstructionsTemplate()` ist Überschrift
 plus dieser Block und sonst nichts: genau die `AGENTS.md` des Quell-Repos, und ein Test
 (`TestVorlageIstDieAgentsDatei`) hält beide gleich. Vorhandener Inhalt wird nie
 überschrieben. Der Marker `<!-- k-playbook:anstoss -->` verhindert, dass ein zweiter Lauf
@@ -1449,8 +1485,8 @@ Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 
 Der Weg, auf dem der Clone `<projekt>/k-playbook/` wegfallen soll: Was die Assistenten als
 Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
-nach `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/`, wenn gesetzt; auf macOS
-derselbe Pfad). Heute sind das `commands/`, `skills/` und `scripts/`; letzteres liest das
+nach `~/.local/share/k-playbook/` (`$K_PLAYBOOK_SHARE_DIR`, wenn gesetzt, sonst
+`$XDG_DATA_HOME/k-playbook/`; auf macOS derselbe Pfad). Heute sind das `commands/`, `skills/` und `scripts/`; letzteres liest das
 Binary selbst (`project.SharedDir()`: Tool-Matrizen, Preflight- und Installer-Skripte,
 `scanners.tsv` mit `{scripts}` für Scanner-Konfigurationen, `severity.tsv`). Gestartet
 werden die Skripte mit `bash <pfad>`, das Ausführrecht fehlt den entpackten Dateien bewusst. Stufe 1 von Punkt 20 der
@@ -2295,6 +2331,52 @@ des Default-Branchs, Checks, Review — sind `.pill` und damit Beschriftungen oh
 wie im Abschnitt „Gestaltung der Oberfläche" beschrieben. Die übrigen Beschriftungen der
 Seite (`.pr-branches`, `.pr-meta`, `.run-ref`, `.run-meta`, `.failure-count`) stehen in
 `styleLabelClasses` und werden vom selben Wächter geprüft.
+
+## GitHub-Zugänge in der Oberfläche
+
+Die Seite `/github-access` („GitHub-Zugänge“) zeigt die persönliche GitHub-Zugangsdatei
+`~/.config/k-playbook/github.yaml` nach dem Vertrag `docs/github-access.md` (Abschnitt
+*Interface page*): den Pfad, den Stand von `check` (Probleme oder eine Zeile), je Dienst
+einen Block mit Repository und den Zugängen in Vorrangreihenfolge samt ihrer Verfügbarkeit,
+und auf Knopfdruck den Test gegen GitHub. Sie ist der Unterpunkt des Bereichs GitHub —
+neben der Projektseite, aber über die Person: dieselbe Datei gilt für jedes Projekt dieses
+Rechners. Nichts auf der Seite schreibt die Datei; bearbeitet wird im Editor, die Karte
+„Datei“ sagt, wo sie liegt.
+
+**Zwei Endpunkte.** `GET /api/github-access` ist das Objekt von `check --json` — `file`,
+`created`, `services` mit `state` und `reason` je Zugang, `problems` —, dazu `available` und
+`message`, wenn die Datei als Ganzes nicht lesbar ist (ein Problem mit Pfad `file`; eine Datei
+mit einem Fehler im Inhalt bleibt `available`, die Seite zeigt die Probleme). Der GET ist ohne
+Netz: Er liest, legt gegebenenfalls die Vorlage an und beurteilt die Verfügbarkeit
+(`githubaccess.Judge`: gh-Konfiguration über `ghconfig`, Dateien, `ssh -G`).
+`POST /api/github-access/test` mit optionalem `service` ist das Objekt von `test --json`
+(`githubaccess.Tester.Test`) — der einzige Endpunkt dieser Seite mit Netz, hinter `sameOrigin`,
+und er läuft nur auf den Knopf hin: Weder der Seitenaufbau noch die Statusseite noch das Menü
+rufen ihn. Ein unbekannter `service` ist `400` mit einer Meldung, die die bekannten Dienste
+nennt (`known`), wie Exit 2 der CLI; eine Datei mit Fehlern `409` mit ihren Problemen; beides
+ohne Testergebnisse.
+
+**„Alle prüfen“ ist ein POST je Dienst.** Die Seite ruft den Endpunkt für jeden Dienst
+einzeln mit `service`, nebeneinander; jeder Block füllt sich, sobald seine Antwort da ist, und
+ein langsamer Dienst hält die anderen nicht auf. Der Endpunkt ohne `service` bleibt nach
+Vertrag bestehen. Eine eigene Frist setzt der Handler **nicht**: Jede Anfrage und jeder
+Kindprozess des Tests hat zehn Sekunden (`githubaccess.DefaultTimeout`), und ein Dienst mit
+drei Zugängen braucht im schlechtesten Fall ihre Summe — eine Server-Frist darüber schnitte
+genau den Lauf ab, den der Knopf anstößt. Bricht der Browser die Anfrage ab, antwortet der
+Handler nicht mehr, wie bei der GitHub-Ansicht.
+
+**Kein Token verlässt den Prozess.** Das Paket `githubaccess` hält das Token im Header seines
+HTTP-Clients, startet Kindprozesse ohne `GH_TOKEN`/`GITHUB_TOKEN` und redigiert jede Meldung;
+die Handler reichen Report und Probleme unverändert durch. Der POST nimmt einen Dienstnamen aus
+der Anfrage und vergleicht ihn nur mit den Namen aus der Datei; in keinen Pfad und keine
+Kommandozeile fließt ein Wert aus der Anfrage. Die Seite setzt alles aus den Antworten in
+`textContent`.
+
+**Gestaltung.** Zustände (`verfügbar`, `nicht verfügbar`, `deaktiviert`) und Ergebnisse (`ok`,
+`fehlgeschlagen`, `übersprungen`) sind `.pill`; das Repository eines Dienstes (`.access-repo`),
+was die Datei über einen Zugang sagt (`.access-what`) und die Meldung eines Ergebnisses
+(`.access-message`) sind Beschriftungen in `styleLabelClasses`. Die Probleme des Lesers nutzen
+die Liste der Umgebungsprüfung (`.environment-list`).
 
 ## Branches und Umgebungen
 
@@ -3529,6 +3611,17 @@ Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet Felder der Kontextau
 (`kephalaion`, `gh`, `baseTools`, `versionSources`), ersetzt aber keines; der Abbau der
 Kontextausgabe ist ein anderer Schritt.
 
+Die Quelle `share` (`project/health_share.go`) bewertet kein Feld der Kontextausgabe. Sie
+warnt, wenn der Link `.k-playbook/share` zwischen Host und DevContainer springen wird: im
+Container (`/.dockerenv`, `/run/.containerenv`), ohne `K_PLAYBOOK_SHARE_DIR`, mit einem
+Projektordner, der laut `/proc/self/mountinfo` vom Host eingehängt ist. Ein Bind-Mount trägt
+dort den Host-Pfad als Wurzel, ein Volume einen Pfad unter `…/volumes/`, das Dateisystem des
+Containers `overlay` (gemessen 2026-10-28, Docker Desktop 29.7.2 unter WSL). Sie prüft ohne
+Zustand: Einen beobachteten Wechsel des Links sähe nur, wer zuerst heilt — Briefing, GUI oder
+MCP —, die anderen fänden einen stimmenden Link. Deshalb warnt sie nur im Container, wo die
+Abhilfe hingehört; auf dem Host bleibt sie still. Daneben meldet sie eine ungültige Variable,
+auf jedem Rechner.
+
 Im Klartext des Briefings steht der Block unmittelbar nach dem Text der immer geltenden
 Anweisungen und vor „Auf Abruf“, damit die Sitzung ihn liest, bevor sie etwas tut: ohne
 Problem die eine Zeile `Umgebung: keine Probleme`, sonst `Umgebung:` und je Eintrag
@@ -4067,7 +4160,8 @@ Messung, und die Seite verweist dorthin.
 **Remote wird nicht angesprochen.** HTTP- und SSE-Server laufen hinter einer URL, und
 OAuth-Server wie Atlassian sind ohne die Token des Assistenten nicht messbar. Die
 Detailseite zeigt Konfiguration und Hinweis; der POST antwortet mit `started: false` und
-einer Meldung, ohne etwas zu tun.
+einer Meldung, ohne etwas zu tun. Ein Streamable-HTTP-Client ohne Anmeldung könnte
+öffentliche Remote-Server messen und wäre ein möglicher Folgeschritt.
 
 **`started` heißt: ein Prozess lief.** Den Wert liefert `probeMCPCommand` als zweites
 Ergebnis selbst — `true` genau dann, wenn `command.Start()` gelungen ist. Jeder Rückweg
@@ -4097,9 +4191,7 @@ dabei dem Schreibfehler auf das geschlossene stdin vor (`mcpResponseError`). Ein
 Antwort ohne ID, aber mit `error` — JSON-RPC schreibt `id: null`, wenn der Server die
 Anfrage nicht zuordnen kann — ist keine Benachrichtigung: `mcpReader` meldet sie sofort
 als Fehler der gerade ausstehenden Anfrage, fatal bei `initialize` und `tools/list`,
-Hinweis bei den Folgeanfragen. Benachrichtigungen ohne `error` werden weiter übersprungen. Ein Streamable-HTTP-Client ohne Anmeldung wäre ein
-möglicher Folgeschritt; er steht im Befund `k-playbook-local/material/befunde/
-mcp-server-erkennung.md`.
+Hinweis bei den Folgeanfragen. Benachrichtigungen ohne `error` werden weiter übersprungen.
 
 **Messen nur per POST, nur auf Knopfdruck.** Die Detailseite startet in den Projektdateien
 konfigurierte Kommandos — mit der geerbten Umgebung und Klartext-`env`. Wer diese

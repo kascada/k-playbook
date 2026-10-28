@@ -2172,3 +2172,107 @@ button.attention-highlight {
   font-size: var(--text-md);
   overflow-wrap: anywhere;
 }
+
+/* Die Seite /github-access: je Dienst ein Block (.access-service) mit
+   Kopfzeile — Name, Repository, Zustandsmarke, Knopf —, darunter je Zugang
+   eine Zeile (.access-row) mit dem, was die Datei sagt (.access-what), der
+   Verfügbarkeit (.pill) und nach dem Test dem Ergebnis (.access-result). Die
+   Probleme des Lesers nutzen die Liste der Umgebungsprüfung. .access-repo,
+   .access-what und .access-message sind Beschriftungen und stehen in
+   styleLabelClasses. */
+.access-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.access-services {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.access-services:empty {
+  display: none;
+}
+
+.access-service {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-inset);
+  background: var(--inset-bg);
+}
+
+.access-service-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.access-service-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+
+.access-service-head button {
+  margin-left: auto;
+}
+
+.access-repo {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.access-list {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.access-row {
+  display: grid;
+  gap: var(--space-3);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-5);
+}
+
+.access-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.access-what {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.access-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.access-result:empty {
+  display: none;
+}
+
+.access-facts {
+  margin-top: var(--space-3);
+}
+
+.access-service-message {
+  margin-top: var(--space-5);
+}
+
+.access-service-message:empty {
+  display: none;
+}

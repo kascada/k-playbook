@@ -8,10 +8,10 @@
 // Option ab, laufen Sprünge aus einem Treffer stumm ins Leere. Deshalb steht
 // die Konstruktion genau einmal, hier, und nicht in beiden Paketen.
 //
-// Gemessen gegen goldmark v1.8.5 (k-playbook-local/material/befunde/
-// goldmark-anker.md): Nicht-ASCII fällt aus den Ids ersatzlos heraus
-// („Überschriften" → „berschriften"), und die Eindeutigkeit zählt über den
-// ganzen Parser-Lauf („Ablauf" dreimal → ablauf, ablauf-1, ablauf-2).
+// Gemessen gegen goldmark v1.8.5 und in markdown_test.go festgehalten:
+// Nicht-ASCII fällt aus den Ids ersatzlos heraus („Überschriften" →
+// „berschriften"), und die Eindeutigkeit zählt über den ganzen Parser-Lauf
+// („Ablauf" dreimal → ablauf, ablauf-1, ablauf-2).
 package markdown
 
 import (

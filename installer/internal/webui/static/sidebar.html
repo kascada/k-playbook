@@ -14,8 +14,9 @@
                sofortige Umleitung. Deshalb ein eigener Zweig über Setup, das
                selbst außerhalb beider Zweige bleibt.
 
-               Zwei Bereiche haben mehrere gleichrangige Seiten. Workflows hat
-               drei, die als Unterpunkte darunter stehen; Setup hat die
+               Drei Bereiche haben mehrere gleichrangige Seiten. Workflows hat
+               drei, die als Unterpunkte darunter stehen; GitHub hat die Seite
+               der persönlichen Zugänge (/github-access) als Unterpunkt; Setup hat die
                Übersicht der MCP-Server, und ihre Detailseiten laufen unter
                demselben Unterpunkt: aktiv bei jedem Pfad unter /mcp-servers,
                aria-current="page" nur auf der Übersicht selbst. /mcp hat
@@ -37,6 +38,7 @@
             <a class="area-nav-subitem{{if eq .Page "/workflows/todos"}} active{{end}}" href="/workflows/todos"{{if eq .Page "/workflows/todos"}} aria-current="page"{{end}}>Todos</a>
             <a class="area-nav-item{{if eq .Area "chat"}} active{{end}}" href="/chat"{{if eq .Area "chat"}} aria-current="{{if eq .Page "/chat"}}page{{else}}true{{end}}"{{end}}>Chat</a>
             <a class="area-nav-item{{if eq .Area "github"}} active{{end}}" href="/github"{{if eq .Area "github"}} aria-current="{{if eq .Page "/github"}}page{{else}}true{{end}}"{{end}}>GitHub</a>
+            <a class="area-nav-subitem{{if eq .Page "/github-access"}} active{{end}}" href="/github-access"{{if eq .Page "/github-access"}} aria-current="page"{{end}}>Zugänge</a>
             <a class="area-nav-item{{if eq .Area "branches"}} active{{end}}" href="/branches"{{if eq .Area "branches"}} aria-current="{{if eq .Page "/branches"}}page{{else}}true{{end}}"{{end}}>Branches</a>
             <a class="area-nav-item{{if eq .Area "knowledge"}} active{{end}}" href="/knowledge"{{if eq .Area "knowledge"}} aria-current="{{if eq .Page "/knowledge"}}page{{else}}true{{end}}"{{end}}>Knowledge</a>
             <a class="area-nav-item{{if eq .Area "docs"}} active{{end}}" href="/docs"{{if eq .Area "docs"}} aria-current="{{if eq .Page "/docs"}}page{{else}}true{{end}}"{{end}}>Docs</a>

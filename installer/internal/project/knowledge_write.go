@@ -153,7 +153,7 @@ func oneOf(values []string, value string) bool {
 // bodyCarriesFrontmatter erkennt einen Dateikopf am Anfang des Rumpfs: ein
 // führender ---Block, der als YAML-Abbildung durchgeht. Ein führendes „---"
 // allein ist kein Kopf, sondern ein Thematic Break — gültiges Markdown, und
-// der Text dahinter bleibt Rumpf (belegt in material/befunde/wissenstor-mcp.md).
+// der Text dahinter bleibt Rumpf (TestKnowledgeWriteFuehrenderThematicBreak).
 //
 // Geschnitten wird wie in composeKnowledgeFile, das CRLF zu LF macht und
 // führende Zeilenumbrüche abschneidet — sonst ginge ein Rumpf mit Leerzeile

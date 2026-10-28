@@ -304,12 +304,15 @@ const labelRules = `k-playbook-local/guidelines/oberflaeche-gestaltung.md, Absch
 // der Seite /branches: Name eines Branches oder Worktrees, seine Kennzahlen,
 // die Überschrift einer Gruppe und der Titel eines Prüfpunkts. Die letzte ist
 // der Bereich eines Eintrags der Umgebungsprüfung auf der Statusseite; die
-// Stufe daneben ist .pill.
+// Stufe daneben ist .pill. Die drei letzten kommen von der Seite
+// /github-access: das Repository eines Dienstes, was die Datei über einen
+// Zugang sagt (Typ und Schlüssel) und die Meldung eines Ergebnisses.
 var styleLabelClasses = []string{
 	"pill", "version-badge",
 	"pr-branches", "pr-meta", "run-ref", "run-meta", "failure-count",
 	"branch-name", "branch-meta", "branch-group-title", "check-title",
 	"environment-area",
+	"access-repo", "access-what", "access-message",
 }
 
 // styleLabelDot ist der einzige Selektor, der eine Fläche tragen darf — der

@@ -24,6 +24,10 @@ func TestDirFrom(t *testing.T) {
 		want   string
 		fails  bool
 	}{
+		{name: "eigene Variable vor XDG_DATA_HOME", getenv: env(map[string]string{EnvDir: "/host/home/.local/share/k-playbook", "XDG_DATA_HOME": "/data"}), home: home, want: "/host/home/.local/share/k-playbook"},
+		{name: "eigene Variable wird bereinigt", getenv: env(map[string]string{EnvDir: " /host/share/ "}), home: home, want: "/host/share"},
+		{name: "relative eigene Variable ist ein Fehler", getenv: env(map[string]string{EnvDir: "share"}), home: home, fails: true},
+		{name: "leere eigene Variable zählt nicht", getenv: env(map[string]string{EnvDir: "  "}), home: home, want: "/home/u/.local/share/k-playbook"},
 		{name: "XDG_DATA_HOME", getenv: env(map[string]string{"XDG_DATA_HOME": "/data"}), home: home, want: "/data/k-playbook"},
 		{name: "relatives XDG_DATA_HOME zählt nicht", getenv: env(map[string]string{"XDG_DATA_HOME": "data"}), home: home, want: "/home/u/.local/share/k-playbook"},
 		{name: "Home", getenv: env(nil), home: home, want: "/home/u/.local/share/k-playbook"},

@@ -229,11 +229,9 @@ with the same file. A local version therefore carries the text itself and must n
 `k-playbook:/commands/<name>.md` — that would resolve to itself, because the local layer
 wins. Commands appear neither in the briefing (`documents`) nor in `catalogs`; the second way
 for a command is the registry, and a test checks that name, origin and disabled agree over
-both ways. The check in the assistants — does Claude Code, OpenCode or Cursor read the
-reference, with which tool, does it follow the text — is step 4 of task 092 after release
-and `make -C k-playbook-local nachziehen`; results go to
-`k-playbook-local/material/befunde/command-huelle-verweis.md`. Measured after that, not
-before: the shell embedding `` !`k-playbook read …` `` in Claude Code and OpenCode as an
+both ways. Checked 2026-10-18 after v0.16.5: Claude Code and OpenCode read the reference
+over MCP (`k_playbook_doc_read`) and follow the text; Cursor is no longer supported. Not yet
+measured: the shell embedding `` !`k-playbook read …` `` in Claude Code and OpenCode as an
 optimisation of the hull.
 
 **What every session needs comes with the briefing; what a command needs becomes an include**
@@ -830,7 +828,7 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     and decide the default route; `keph:` includes in always-instructions only with care
     (network). The first include came with task 094 (2026-10-18): `defaults/commands/k-upgrade.md`
     binds `_shared/erster-schritt.md`; see "What every session needs comes with the briefing" above.
-    Measured the same day (findings `command-huelle-verweis.md`): an `AGENTS.md` block that names
+    Measured the same day (2026-10-18): an `AGENTS.md` block that names
     the shell command `k-playbook briefing` first is followed by Claude Code (2 of 2), the
     MCP-first wording is not (0 of 2); OpenCode calls the MCP tool first either way. Sub-agents
     never call the briefing on their own (3 of 3 in Claude, with the block in their context), so
@@ -856,7 +854,7 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     clone at v0.16.10): `/k-upgrade` in Claude Code (headless `-p`) and in OpenCode
     (`opencode run`) both run `k-playbook upgrade`, `bin/install` replaces the binary from
     inside both clients, the message and the restart hint come through unchanged
-    (`k-playbook-local/material/befunde/command-huelle-verweis.md`, 2026-10-19). Not
+    (measured 2026-10-19). Not
     measured: the "download/install not possible" path.
 18. **Todos into the collection** — decided 2026-10-19, built 2026-10-20 (task 097, not yet
     released): `todos/` with `done/`, one document per entry; client `Write`/`Delete`, todo
@@ -915,7 +913,3 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
 21. **Project-own commands and skills into `<project>/.k-playbook/`** — wanted 2026-10-25,
     after item 20: `.k-playbook/` holds only what is new, and `k-playbook-local/` goes once its
     content has moved (to Kephalaion or here). Same names override as before. Not yet planned.
-
-## Findings
-
-Measured state and evidence: `k-playbook-local/material/befunde/kephalaion-anbindung.md`.

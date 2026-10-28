@@ -13,7 +13,11 @@ import (
 // githubFile legt eine Zugangsdatei mit content an und macht sie über den
 // Override zur Datei des Tests; ohne content fehlt die Datei. HOME zeigt
 // auf ein eigenes Verzeichnis, damit ~ in den Pfaden vorhersagbar aufgelöst
-// wird und die echte Datei des Rechners nie im Spiel ist.
+// wird und die echte Datei des Rechners nie im Spiel ist. Für die
+// Verfügbarkeit bekommt der Test eine eigene gh-Konfiguration mit dem
+// Account alice und einen PATH, in dem gh nichts tut und ssh -G nur den
+// Alias github-example nach github.com auflöst — der Rechner, auf dem der
+// Test läuft, spielt keine Rolle.
 func githubFile(t *testing.T, content string) (path string, home string) {
 	t.Helper()
 	home = t.TempDir()
@@ -25,7 +29,27 @@ func githubFile(t *testing.T, content string) (path string, home string) {
 			t.Fatal(err)
 		}
 	}
+
+	ghDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ghDir, "hosts.yml"), []byte("github.com:\n    user: alice\n    oauth_token: gho_geheim\n    users:\n        alice:\n            oauth_token: gho_geheim\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GH_CONFIG_DIR", ghDir)
+	bin := t.TempDir()
+	ssh := "#!/bin/sh\ncase \"$2\" in github-example|github.com) echo \"hostname github.com\" ;; *) echo \"hostname $2\" ;; esac\n"
+	for name, body := range map[string]string{"gh": "#!/bin/sh\nexit 0\n", "ssh": ssh} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin)
 	return path, home
+}
+
+// githubKeyMissing ist der Grund, den die Verfügbarkeit für den fehlenden
+// Schlüssel von backend nennt.
+func githubKeyMissing(home string) string {
+	return "Die Schlüsseldatei fehlt — den Pfad in key prüfen oder den Schlüssel nach " + home + "/.ssh/id_ed25519_acme_labs legen."
 }
 
 const githubValid = `services:
@@ -103,7 +127,9 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	if stdout != path+": 3 Dienste, keine Probleme\n" {
+	// backend hat nur einen fehlenden Schlüssel und ein deaktiviertes Token:
+	// der eine Dienst ohne verfügbaren Zugang, und die eine Zeile darunter.
+	if stdout != path+": 3 Dienste, 1 ohne verfügbaren Zugang, keine Probleme\nservices.backend.access[0]: nicht verfügbar — "+githubKeyMissing(home)+"\n" {
 		t.Errorf("Ausgabe: %q", stdout)
 	}
 
@@ -115,14 +141,26 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 	if len(top) != 4 || string(top["file"]) != `"`+path+`"` || string(top["created"]) != "false" || string(top["problems"]) != "[]" {
 		t.Errorf("JSON oben: %v", top)
 	}
-	// services: Dateireihenfolge, ~ aufgelöst, disabled nur wo wahr.
-	compact := strings.Join(strings.Fields(string(top["services"])), "")
-	want := strings.Join(strings.Fields(`{"website":{"repo":"acme/website","access":[{"type":"gh","login":"alice"}]},
-		"backend":{"repo":"acme-labs/backend","access":[{"type":"ssh","key":"`+home+`/.ssh/id_ed25519_acme_labs"},
-		{"type":"token","file":"`+home+`/.config/github-tokens/acme-labs.token","disabled":true}]},
-		"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example"},{"type":"public"}]}}`), "")
-	if compact != want {
-		t.Errorf("services:\n%s\nerwartet:\n%s", compact, want)
+	// services: Dateireihenfolge, ~ aufgelöst, disabled nur wo wahr, je
+	// Zugang state und bei unavailable der reason.
+	var services map[string]json.RawMessage
+	if err := json.Unmarshal(top["services"], &services); err != nil {
+		t.Fatalf("services: %v", err)
+	}
+	compact := func(raw json.RawMessage) string { return strings.Join(strings.Fields(string(raw)), "") }
+	reason, _ := json.Marshal(githubKeyMissing(home))
+	for name, want := range map[string]string{
+		"website":  `{"repo":"acme/website","access":[{"type":"gh","login":"alice","state":"available"}]}`,
+		"backend":  `{"repo":"acme-labs/backend","access":[{"type":"ssh","key":"` + home + `/.ssh/id_ed25519_acme_labs","state":"unavailable","reason":` + string(reason) + `},{"type":"token","file":"` + home + `/.config/github-tokens/acme-labs.token","disabled":true,"state":"disabled"}]}`,
+		"playbook": `{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","state":"available"},{"type":"public","state":"available"}]}`,
+	} {
+		if got := compact(services[name]); got != strings.Join(strings.Fields(want), "") {
+			t.Errorf("services.%s:\n%s\nerwartet:\n%s", name, got, want)
+		}
+	}
+	all := compact(top["services"])
+	if !(strings.Index(all, `"website":`) < strings.Index(all, `"backend":`) && strings.Index(all, `"backend":`) < strings.Index(all, `"playbook":`)) {
+		t.Errorf("services nicht in Dateireihenfolge: %s", all)
 	}
 }
 
@@ -202,9 +240,9 @@ func TestGitHubShowZeigtDieKonfiguration(t *testing.T) {
 		t.Fatalf("show: %v", err)
 	}
 	want := "Datei: " + path + "\n" +
-		"\nwebsite: acme/website\n  1. gh  login: alice\n" +
-		"\nbackend: acme-labs/backend\n  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs\n  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  (disabled)\n" +
-		"\nplaybook: example/k-playbook\n  1. ssh  host: github-example\n  2. public\n"
+		"\nwebsite: acme/website\n  1. gh  login: alice  [verfügbar]\n" +
+		"\nbackend: acme-labs/backend\n  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs  [nicht verfügbar — " + githubKeyMissing(home) + "]\n  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  [deaktiviert]\n" +
+		"\nplaybook: example/k-playbook\n  1. ssh  host: github-example  [verfügbar]\n  2. public  [verfügbar]\n"
 	if stdout != want {
 		t.Errorf("Ausgabe:\n%s\nerwartet:\n%s", stdout, want)
 	}
@@ -312,5 +350,119 @@ func TestGitHubAufruffehlerEndenMitZwei(t *testing.T) {
 	stdout, err := runGitHubCaptured(t, "--help")
 	if err != nil || !strings.Contains(stdout, "k-playbook github check [--json]") {
 		t.Errorf("Hilfe: %v %q", err, stdout)
+	}
+}
+
+// githubTestFile ist eine Datei für test ohne API-Zugänge: der Alias
+// github-example (Fake-ssh grüßt als Deploy Key, Fake-git liest), public
+// (Fake-git), ein fehlender Schlüssel (skipped) und ein deaktiviertes Token.
+// gh und token blieben außen vor — sie gingen an die echte API.
+const githubTestable = `services:
+  playbook:
+    repo: example/k-playbook
+    access:
+      - type: ssh
+        host: github-example
+      - type: public
+  backend:
+    repo: acme-labs/backend
+    access:
+      - type: ssh
+        key: ~/.ssh/id_ed25519_acme_labs
+      - type: token
+        file: ~/.config/github-tokens/acme-labs.token
+        disabled: true
+`
+
+// githubTestTools ergänzt den PATH aus githubFile um ein ssh, das -T mit
+// GitHubs Gruß beantwortet, und ein git, dessen ls-remote für URLs mit
+// „missing“ scheitert. ok sagt, ob der Gruß kommt.
+func githubTestTools(t *testing.T, ok bool) {
+	t.Helper()
+	bin := os.Getenv("PATH")
+	greet := "echo \"Hi example/k-playbook! You've successfully authenticated, but GitHub does not provide shell access.\" >&2; exit 1"
+	if !ok {
+		greet = "echo \"git@github.com: Permission denied (publickey).\" >&2; exit 255"
+	}
+	ssh := "#!/bin/sh\nif [ \"$1\" = \"-G\" ]; then case \"$2\" in github-example|github.com) echo \"hostname github.com\" ;; *) echo \"hostname $2\" ;; esac; exit 0; fi\n" + greet + "\n"
+	git := "#!/bin/sh\ncase \"$*\" in *missing*) echo \"ERROR: Repository not found.\" >&2; exit 128 ;; esac\necho \"abc\tHEAD\"\n"
+	for name, body := range map[string]string{"ssh": ssh, "git": git} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// test: je Dienst ein Block, je Zugang eine Zeile mit Ergebnis; JSON nach
+// Vertrag; Exit 0, wenn kein getesteter Zugang failed ist.
+func TestGitHubTestZeigtDieErgebnisse(t *testing.T) {
+	path, home := githubFile(t, githubTestable)
+	githubTestTools(t, true)
+
+	stdout, err := runGitHubCaptured(t, "test")
+	if err != nil {
+		t.Fatalf("test: %v", err)
+	}
+	want := "Datei: " + path + "\n" +
+		"\nplaybook: example/k-playbook\n" +
+		"  1. ssh  host: github-example  → ok — Identität example/k-playbook, lesen ja, schreiben unbekannt, Ablauf keiner\n" +
+		"  2. public  → ok — Identität anonymous, lesen ja, schreiben nein, Ablauf keiner\n" +
+		"\nbackend: acme-labs/backend\n" +
+		"  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs  → übersprungen: nicht verfügbar — " + githubKeyMissing(home) + "\n" +
+		"  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  → übersprungen: deaktiviert\n"
+	if stdout != want {
+		t.Errorf("Ausgabe:\n%s\nerwartet:\n%s", stdout, want)
+	}
+
+	stdout, err = runGitHubCaptured(t, "test", "playbook", "--json")
+	if err != nil {
+		t.Fatalf("test --json: %v", err)
+	}
+	top := decodeJSON(t, stdout)
+	if len(top) != 3 || string(top["file"]) != `"`+path+`"` || string(top["ok"]) != "true" {
+		t.Errorf("JSON oben: %v", top)
+	}
+	compact := strings.Join(strings.Fields(string(top["services"])), "")
+	if compact != `{"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","result":"ok","identity":"example/k-playbook","read":"yes","write":"unknown","expires":"none"},{"type":"public","result":"ok","identity":"anonymous","read":"yes","write":"no","expires":"none"}]}}` {
+		t.Errorf("services: %s", compact)
+	}
+}
+
+// Ein failed macht Exit 1 und ok false; die Meldung ist SSHs stderr.
+func TestGitHubTestMitFehlschlagEndetMitEins(t *testing.T) {
+	githubFile(t, githubTestable)
+	githubTestTools(t, false)
+
+	stdout, err := runGitHubCaptured(t, "test", "playbook")
+	if exitCodeOf(err) != githubExitProblems || err.Error() != "" {
+		t.Fatalf("Fehler: %v", err)
+	}
+	if !strings.Contains(stdout, "  1. ssh  host: github-example  → fehlgeschlagen: ssh -T git@github-example: git@github.com: Permission denied (publickey).\n") || !strings.Contains(stdout, "  2. public  → ok") {
+		t.Errorf("Ausgabe:\n%s", stdout)
+	}
+	stdout, err = runGitHubCaptured(t, "test", "--json")
+	if exitCodeOf(err) != githubExitProblems || string(decodeJSON(t, stdout)["ok"]) != "false" {
+		t.Errorf("--json: %v %s", err, stdout)
+	}
+}
+
+// test mit unbekanntem Dienst ist ein Aufruffehler wie bei show; mit einer
+// defekten Datei die Probleme wie check, Exit 1, nichts getestet.
+func TestGitHubTestAufruffehlerUndDefekteDatei(t *testing.T) {
+	githubFile(t, githubTestable)
+	githubTestTools(t, true)
+	stdout, err := runGitHubCaptured(t, "test", "nope")
+	if exitCodeOf(err) != githubExitUsage || !strings.Contains(err.Error(), "unbekannter Dienst nope") || !strings.Contains(err.Error(), "playbook, backend") || stdout != "" {
+		t.Errorf("unbekannter Dienst: %v %q", err, stdout)
+	}
+	if stdout, err := runGitHubCaptured(t, "test", "a", "b"); exitCodeOf(err) != githubExitUsage || stdout != "" {
+		t.Errorf("zwei Dienste: %v %q", err, stdout)
+	}
+
+	githubFile(t, githubBroken)
+	checkText, _ := runGitHubCaptured(t, "check")
+	stdout, err = runGitHubCaptured(t, "test")
+	if exitCodeOf(err) != githubExitProblems || stdout != checkText {
+		t.Errorf("defekte Datei: %v\n%s", err, stdout)
 	}
 }

@@ -17,6 +17,7 @@ The server offers the working state, the review, todo and knowledge tools,
 `k_playbook_doc_read` for references, the four `doc` tools for numbered documents in the
 project's Kephalaion collection, `k_playbook_briefing` for the start of a session,
 `k_playbook_health` for the errors and warnings about the project's environment,
+`k_playbook_github_test` for the test of the personal GitHub accesses against GitHub,
 `k_playbook_gui_status` for the state and the address
 of the project's interface, and `k_playbook_notify` for a desktop notification on the
 machine the server runs on.
@@ -361,7 +362,8 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_done` | move an own document into `done/` of its location |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
-| `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
+| `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
+| `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
@@ -1041,7 +1043,7 @@ projectDocs, health, context}`:
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
-| `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
+| `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
 | `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
@@ -1101,6 +1103,9 @@ is always present, `[]` without a problem. The sources in this version:
 | `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
 | `github` | the access file was missing and this call wrote the template | `warning` | fill in the template; the next call finds an empty file and reports nothing |
+| `github` | the file reads, but a service has no `available` access -- every access is `unavailable` or `disabled`, judged without the network (`github-access.md`, "Availability"): `services.<name>: kein verfügbarer Zugang — <reason of the first access>` | `warning` | set up an access of that service in the file; `k-playbook github check` names the reason per access |
+| `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |
+| `share` | k-playbook runs in a container (`/.dockerenv` or `/run/.containerenv`), `K_PLAYBOOK_SHARE_DIR` is not set, and the project directory lies on a bind mount from the host (in `/proc/self/mountinfo`: longest mount point containing the project, not `overlay`, root not `/` and not under `…/volumes/`) -- every call here points `.k-playbook/share` at the container's home and the host loses the shipped commands; on the host itself the source stays silent, and a project cloned into a container volume does not count (`installation.md`, "Host and DevContainer sharing the project") | `warning` | set `K_PLAYBOOK_SHARE_DIR` to `${localEnv:HOME}/.local/share/k-playbook` in `devcontainer.json`, with its own volume there and a `chown` in `postCreateCommand`; if nobody runs k-playbook in this project on the host, set it to the container's own directory |
 
 Exit codes of the subcommand: 0 without an error (warnings do not count), 1 with at least one
 error, 2 on a call error (unknown option, no project). Error codes of the tool in `error.code`:
@@ -1116,6 +1121,54 @@ answer, `available: false` and no report without a project configuration. `GET /
 is **not** this report: it stays the window's heartbeat of the "GUI Status Contract" below and
 must remain cheap, while the environment check asks the Kephalaion node. See the architecture
 document, "Umgebungsprüfung: `health`".
+
+### GitHub Test Contract
+
+`k_playbook_github_test` is a thin wrapper over `githubaccess.Tester.Test`
+(`internal/githubaccess/test.go`), the same function behind `k-playbook github test [<service>]
+[--json]` and behind the button *Alle prüfen* of the interface page *GitHub-Zugänge*
+(`github-access.md`, "Testing an access"). Its inputs are `projectDir` (required by contract
+like everywhere, although the file is personal and the project plays no role) and an optional
+`service`. It is the **only tool of this server that uses the network**: several requests per
+access, each with a timeout of ten seconds, and it runs only on this call -- neither the
+briefing nor `k_playbook_health` trigger it. It exists so that a session that just failed to
+push can find out which access works instead of guessing. It reads: it never pushes, never
+creates anything at GitHub, never changes the file.
+
+Before any request the tool judges the *availability* of every access without the network
+(`githubaccess.Judge`): `disabled` and `unavailable` accesses are `skipped` with their reason
+and are not contacted. Per type the test asks what `github-access.md` lists: `gh` and `token`
+through k-playbook's own HTTP client (`GET /user`, `GET /repos/<owner>/<repo>`, the header
+`github-authentication-token-expiration`), `ssh` through `ssh -T` and `git ls-remote`, `public`
+through `git ls-remote` over HTTPS without credentials. **No token leaves the process**: the
+token stands only in the `Authorization` header of the own client; the only child process that
+has to do with a token is `gh auth token --hostname github.com --user <login>`, which returns one
+and receives none; children run without `GH_TOKEN` and `GITHUB_TOKEN`; every message is passed
+through a redaction that removes the token and any prefix of it from eight characters.
+
+The answer is `{ok: true, tool, projectDir, test: {file, services, ok}}`. The report is nested
+under `test`, not embedded, because its `ok` (no tested access `failed`) is a different thing
+from the envelope's `ok` (the tool ran). `services` is an object in file order, per service
+`repo` and `access` in order of precedence, per access what the file says (`type`, `login`,
+`file`, `key`, `host`, `disabled`) and:
+
+| Field | Values |
+|---|---|
+| `result` | `ok`, `failed`, `skipped` |
+| `identity` | the login GitHub reported, `<owner>/<repo>` for a deploy key, `anonymous` for `public`; absent when nothing was reached |
+| `read`, `write` | `yes`, `no`, `unknown` (`write` is `unknown` for `ssh`: it cannot be told without a push) |
+| `expires` | `YYYY-MM-DD` or `none` |
+| `warning` | present when the expiry is within fourteen days (`läuft in 9 Tagen ab`) |
+| `message` | present for `failed` (GitHub's status code and text, or SSH's stderr, or `Zeitüberschreitung`) and for `skipped` (`deaktiviert`, or `nicht verfügbar — <reason>`) |
+
+Error codes of the tool in `error.code`: `invalid_input` for a missing `projectDir`,
+`project_not_found` for a `projectDir` that leads to no project, `github_config_invalid` when
+the file has at least one problem of level `error` (the message lists them like `k-playbook
+github check`; nothing is tested), `unknown_service` when `service` is not in the file (the
+message names the known services, like the subcommand's exit `2`). A `failed` access is not an
+error of the tool: the envelope stays `ok: true`, `test.ok` is `false`. Exit codes of the
+subcommand: `0` when every tested access is `ok`, `1` when at least one `failed`, `2` on a call
+error.
 
 ### GUI Status Contract
 

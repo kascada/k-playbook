@@ -41,7 +41,8 @@ type Problem struct {
 
 // Access ist ein Zugang eines Dienstes, wie die Datei ihn nennt: type und die
 // Schlüssel seines Typs, Pfade mit aufgelöstem ~. Disabled steht im JSON nur,
-// wenn es wahr ist.
+// wenn es wahr ist. State und Reason sind die Verfügbarkeit; Load lässt sie
+// leer, Judge trägt sie ein — im JSON fehlen sie dann.
 type Access struct {
 	Type     string `json:"type"`
 	Login    string `json:"login,omitempty"`
@@ -49,6 +50,24 @@ type Access struct {
 	Key      string `json:"key,omitempty"`
 	Host     string `json:"host,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
+	State    State  `json:"state,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// Describe nennt den Zugang in einem Wort und seinem Schlüssel, etwa
+// „gh login alice“ oder „ssh host github-example“ — für Textausgaben.
+func (a Access) Describe() string {
+	switch {
+	case a.Login != "":
+		return a.Type + " login " + a.Login
+	case a.File != "":
+		return a.Type + " file " + a.File
+	case a.Key != "":
+		return a.Type + " key " + a.Key
+	case a.Host != "":
+		return a.Type + " host " + a.Host
+	}
+	return a.Type
 }
 
 // Service ist ein Dienst: Name, Repository und die Zugänge in Vorrangreihenfolge.
@@ -85,6 +104,40 @@ func (s Services) MarshalJSON() ([]byte, error) {
 	}
 	b.WriteByte('}')
 	return b.Bytes(), nil
+}
+
+// UnmarshalJSON liest das Objekt in seiner Reihenfolge zurück — für die
+// Leser des JSON (Oberfläche, Tests), die die Dateireihenfolge behalten
+// sollen.
+func (s *Services) UnmarshalJSON(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	if token == nil {
+		*s = nil
+		return nil
+	}
+	if delim, ok := token.(json.Delim); !ok || delim != '{' {
+		return errors.New("services ist kein Objekt")
+	}
+	result := Services{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		name, _ := key.(string)
+		var service Service
+		if err := decoder.Decode(&service); err != nil {
+			return err
+		}
+		service.Name = name
+		result = append(result, service)
+	}
+	*s = result
+	return nil
 }
 
 // Lookup findet einen Dienst nach Namen.

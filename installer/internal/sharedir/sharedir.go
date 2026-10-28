@@ -1,5 +1,5 @@
 // Package sharedir entpackt die mitgereisten Dateien aus share/ nach
-// ~/.local/share/k-playbook/.
+// ~/.local/share/k-playbook/ (oder wohin EnvDir zeigt).
 //
 // Das Verzeichnis gilt für alle Projekte eines Rechners und wird einmal je
 // Rechner gepflegt, nicht je Projekt. Es ersetzt auf Dauer, was heute im Clone
@@ -46,16 +46,38 @@ const (
 	dirMode  = 0o755
 )
 
-// Dir ist das Zielverzeichnis: $XDG_DATA_HOME/k-playbook, sonst
-// ~/.local/share/k-playbook — auf macOS derselbe Pfad, weil das Binary dort
-// ebenfalls in ~/.local/bin liegt und ~/Library/Application Support ein
-// Leerzeichen trägt.
+// EnvDir nennt das Verzeichnis selbst, nicht wie XDG_DATA_HOME dessen
+// Elternverzeichnis, und hat Vorrang vor beiden anderen Quellen.
+//
+// Wozu: Host und DevContainer teilen den Projektordner, haben aber
+// verschiedene Homes. Der Link .k-playbook/share trägt das Verzeichnis als
+// absoluten Pfad; leitet jede Seite es aus ihrem eigenen Home ab, setzt jede
+// den Link bei jedem Aufruf auf ihr Ziel, und in der anderen fehlen alle
+// mitgelieferten Commands. Setzt der Container EnvDir auf den Pfad des Hosts,
+// kommen beide auf denselben Text. XDG_DATA_HOME scheidet dafür aus: es
+// verschöbe im Container auch die Daten anderer Werkzeuge.
+//
+// Ein relativer Wert ist ein Fehler, kein stiller Rückfall auf das Home: der
+// Rückfall brächte genau das Hin und Her zurück, gegen das die Variable
+// gesetzt wurde. Leer zählt als nicht gesetzt.
+const EnvDir = "K_PLAYBOOK_SHARE_DIR"
+
+// Dir ist das Zielverzeichnis: $K_PLAYBOOK_SHARE_DIR, sonst
+// $XDG_DATA_HOME/k-playbook, sonst ~/.local/share/k-playbook — auf macOS
+// derselbe Pfad, weil das Binary dort ebenfalls in ~/.local/bin liegt und
+// ~/Library/Application Support ein Leerzeichen trägt.
 func Dir() (string, error) {
 	return dirFrom(os.Getenv, os.UserHomeDir)
 }
 
 // dirFrom ist die Auflösung ohne Seiteneffekt, damit sie prüfbar ist.
 func dirFrom(getenv func(string) string, homeDir func() (string, error)) (string, error) {
+	if dir := strings.TrimSpace(getenv(EnvDir)); dir != "" {
+		if !filepath.IsAbs(dir) {
+			return "", fmt.Errorf("%s=%q ist kein absoluter Pfad", EnvDir, dir)
+		}
+		return filepath.Clean(dir), nil
+	}
 	if dir := strings.TrimSpace(getenv("XDG_DATA_HOME")); dir != "" && filepath.IsAbs(dir) {
 		return filepath.Join(dir, dirName), nil
 	}

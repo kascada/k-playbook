@@ -72,6 +72,7 @@ func Run(ctx context.Context) error {
 	addDocTools(server)
 	addBriefingTool(server)
 	addHealthTool(server)
+	addGitHubTestTool(server)
 	addGUITools(server)
 	addNotifyTool(server)
 

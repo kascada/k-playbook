@@ -444,8 +444,11 @@ func chatMessagesHandler(w http.ResponseWriter, r *http.Request) {
 // keine Auffüllung — sortierte alle eigenen Nutzernachrichten als Block vor
 // oder hinter alle fremden, dauerhaft und auch nach dem Laden.
 //
-// Belegt im Befund k-playbook-local/material/befunde/
-// opencode-im-browser-einbinden.md, Abschnitt „Kodierung der msg_…-Kennung".
+// Abgelesen an OpenCode 1.18.30 aus ~/.local/share/opencode/log/opencode.log:
+// alle Kennungen sind 30 Zeichen lang, und die Hexziffern zweier Kennungen
+// unterscheiden sich um 4096 × die Differenz ihrer Logzeiten in ms. Dass der
+// Dienst ein mitgeschicktes messageID übernimmt, zeigte der Browser-Durchgang
+// zu Task 067.
 
 const (
 	messageIDPrefix = "msg_"

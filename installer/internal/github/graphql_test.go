@@ -11,8 +11,7 @@ import (
 // Die Rümpfe und stderr-Zeilen dieser Tests sind am echten gh 2.46.0 gemessen,
 // außer beim Rate-Limit (siehe dort). gh endet bei jedem Feld `errors` mit
 // Exit 1, schreibt den Rumpf auf stdout und `gh: <message>` auf stderr — den
-// Typ nur auf stdout. Befund: k-playbook-local/material/befunde/
-// github-stand-in-der-oberflaeche.md.
+// Typ nur auf stdout.
 
 // graphQLFailure ist ein gescheiterter `gh api graphql`: Rumpf auf stdout,
 // Meldung auf stderr, Exit 1.

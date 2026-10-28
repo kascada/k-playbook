@@ -3,9 +3,11 @@
 // (Workbench 002, Schritt 1). Die Datei nennt je Dienst ein Repository und
 // die Zugänge in Vorrangreihenfolge — ein gh-Login, eine Token-Datei, ein
 // SSH-Schlüssel oder -Alias, oder gar keinen —, aber nie ein Geheimnis: Sie
-// sagt, wo ein Zugang liegt, nicht was er ist. Dieses Paket liest nur die
-// Datei selbst; die Dateien, auf die sie zeigt, fasst es nicht an, und ob ein
-// Zugang verfügbar ist, prüft es nicht (das kommt in einem späteren Schritt).
+// sagt, wo ein Zugang liegt, nicht was er ist. Load liest nur die Datei
+// selbst; die Dateien, auf die sie zeigt, fasst es nicht an. Ob ein Zugang
+// auf diesem Rechner verfügbar ist, beurteilt Judge als eigener Schritt ohne
+// Netz (availability.go, Schritt 2); ob er bei GitHub funktioniert, fragt
+// erst der Test (test.go), und der läuft nur auf ausdrücklichen Aufruf.
 //
 // Abgrenzung zu internal/github: Das fragt über gh die GitHub-API für die
 // Seite /branches und /k-pr-review; hier geht es allein um die lokale Datei.
@@ -13,8 +15,9 @@
 // Load liefert die Konfiguration oder die Probleme, nie beides und nie nur
 // das erste. Fehlt die Datei, legt Load einmal eine Vorlage an und meldet das
 // als warning; das ist die einzige Nebenwirkung des Pakets. Das Paket hängt
-// nur von der Standardbibliothek und yamllite ab, damit project es für die
-// Umgebungsprüfung einbinden kann.
+// nur von der Standardbibliothek, yamllite und ghconfig ab, damit project es
+// für die Umgebungsprüfung einbinden kann — project selbst darf es nicht
+// importieren, project/health.go importiert dieses Paket.
 package githubaccess
 
 import (

@@ -45,6 +45,7 @@ const ENVIRONMENT_AREA_LABELS = {
   "gh": "GitHub CLI",
   "baseTools": "Basis-Werkzeuge",
   "versionSources": "Versionsinventar",
+  "github": "GitHub-Zugänge",
 };
 
 const environmentElements = {

@@ -729,8 +729,7 @@ func TestZusatzbloeckeOhneAnstossmarker(t *testing.T) {
 // Datei ohne Anstoßmarker: Der Anstoß wird angehängt, der Block bleibt samt
 // Prosa stehen, der Hinweis kommt — und die Prüfung sagt genau das. Der in
 // diesem Lauf angehängte Anstoßmarker darf nie zur Grenze des Blocks werden;
-// sonst verschwände die Prosa mit dem Block (Befund vom 2026-10-19 in
-// k-playbook-local/material/befunde/assistenten-einstieg.md).
+// sonst verschwände die Prosa mit dem Block.
 func TestAbgewandelterZusatzblockOhneAnstossmarkerBehaeltProsa(t *testing.T) {
 	eigen := "# Unser Projekt\n\n" + findingsMarker + `
 ## Befunde festhalten

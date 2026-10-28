@@ -969,8 +969,8 @@ func TestChatSendetUndMeldetMessageID(t *testing.T) {
 // abgelesen aus ~/.local/share/opencode/log/opencode.log zur Logzeile
 // 2026-07-06T09:43:51.392Z. Zwei eigene Kennungen allein belegen die Ordnung
 // nicht: entscheidend ist die Ordnung gegen die Kennungen von OpenCode, weil
-// renderLog() im Browser per reinem Zeichenvergleich sortiert. Der Beleg steht
-// in k-playbook-local/material/befunde/opencode-im-browser-einbinden.md.
+// renderLog() im Browser per reinem Zeichenvergleich sortiert. Die Formel ist
+// aus der Differenz zweier solcher Kennungen gegen ihre Logzeiten abgeleitet.
 const chatObservedMessageID = "msg_f36d0094f001nAtF2QwVYJfSW7"
 
 // Die erzeugte Kennung hat dieselbe Gestalt wie eine echte und ordnet sich beim

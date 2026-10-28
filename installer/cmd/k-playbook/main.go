@@ -307,14 +307,18 @@ Unterkommandos:
             Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
             Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
             k_playbook_health.
-  github    Liest und prüft die persönliche GitHub-Zugangsdatei
-            ~/.config/k-playbook/github.yaml: k-playbook github check|show
-            [<dienst>] [--json]. check nennt alle Probleme, sortiert nach
-            Position in der Datei, sonst Datei und Zahl der Dienste; show
-            zeigt die Konfiguration, je Dienst Repository und Zugänge. Fehlt
-            die Datei, entsteht einmal eine Vorlage. Exit-Code 0 ohne
-            Problem, 1 mit error, 2 bei Aufruffehlern. Vertrag:
-            docs/github-access.md.
+  github    Liest, prüft und testet die persönliche GitHub-Zugangsdatei
+            ~/.config/k-playbook/github.yaml: k-playbook github
+            check|show|test [<dienst>] [--json]. check nennt alle Probleme,
+            sortiert nach Position in der Datei, sonst Datei, Zahl der
+            Dienste und die Zugänge, die auf diesem Rechner nicht verfügbar
+            sind; show zeigt die Konfiguration, je Dienst Repository und
+            Zugänge mit Verfügbarkeit; test fragt GitHub, ob die verfügbaren
+            Zugänge funktionieren — als einziger mit Netz, nur auf diesen
+            Aufruf hin, dasselbe wie das MCP-Werkzeug k_playbook_github_test.
+            Fehlt die Datei, entsteht einmal eine Vorlage. Exit-Code 0 ohne
+            Problem, 1 mit error (test: mit failed), 2 bei Aufruffehlern.
+            Vertrag: docs/github-access.md.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

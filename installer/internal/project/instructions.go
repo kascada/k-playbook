@@ -687,8 +687,8 @@ func rootInstructionsTemplate() string {
 // instructionsBlock ist der Anstoß: der eine Aufruf, mit dem eine Sitzung
 // alles bekommt, was für das Projekt gilt — das Briefing. Zuerst der
 // Shell-Befehl, eingerückt als Codeblock, dann das gleichwertige MCP-Werkzeug:
-// in dieser Reihenfolge wird der Block befolgt (gemessen 2026-10-18, Befund
-// `command-huelle-verweis.md`), umgekehrt nicht.
+// in dieser Reihenfolge wird der Block befolgt (gemessen 2026-10-18),
+// umgekehrt nicht.
 //
 // Er nennt bewusst keine Verzeichnisebenen: dieselbe Datei liegt im Projekt,
 // in der Installation und im Entwicklungsrepo, und ein Verweis auf eine Ebene

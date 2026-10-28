@@ -255,6 +255,11 @@ func routes(state *serverState) http.Handler {
 	// einem eigenen Endpunkt: geholt wird es erst beim Aufklappen eines roten
 	// Laufs, nie für alle Läufe beim Laden der Seite.
 	mux.HandleFunc("GET /api/github/runs/{id}/failure", githubRunFailureHandler)
+	// Die persönliche GitHub-Zugangsdatei (docs/github-access.md): lesend
+	// das Objekt von check --json samt Verfügbarkeit ohne Netz; der Test
+	// gegen GitHub nur per POST auf den Knopf hin, je Dienst ein Aufruf.
+	mux.HandleFunc("GET /api/github-access", githubAccessHandler)
+	mux.HandleFunc("POST /api/github-access/test", githubAccessTestHandler)
 	// Die Branches des Code-Repos: lesend die Liste samt Umgebungen und
 	// Worktrees; Fetch, Vorprüfung und Umschalten je eigener Endpunkt. Ein Fetch
 	// läuft nie ungefragt, umgeschaltet wird nur nach erneuter Prüfung.
@@ -339,6 +344,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /chat", chatPageHandler)
 	mux.HandleFunc("GET /chat/{id}", chatSessionPageHandler)
 	mux.HandleFunc("GET /github", githubPageHandler)
+	mux.HandleFunc("GET /github-access", githubAccessPageHandler)
 	mux.HandleFunc("GET /branches", branchesPageHandler)
 	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
@@ -559,6 +565,21 @@ var githubTemplate = pageTemplate("github.html")
 
 func githubPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, githubTemplate, areaGitHub, "/github", "GitHub")
+}
+
+// githubAccessTemplate ist die Seite „GitHub-Zugänge“: die persönliche
+// Zugangsdatei mit Pfad, check-Stand, je Dienst ein Block mit Zugängen und
+// Verfügbarkeit, und der Test gegen GitHub auf Knopfdruck. Sie ist der
+// Unterpunkt des Bereichs GitHub — neben der Projektseite, aber über die
+// Person: dieselbe Datei gilt für jedes Projekt dieses Rechners. Beim Laden
+// fragt sie nur die Platte; GitHub erst auf den Knopf hin.
+var githubAccessTemplate = pageTemplate("github-access.html")
+
+// githubAccessPage ist der Pfad der Seite.
+const githubAccessPage = "/github-access"
+
+func githubAccessPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, githubAccessTemplate, areaGitHub, githubAccessPage, "GitHub-Zugänge")
 }
 
 // branchesTemplate ist die Seite der Branches: Umgebungen, die geordnete Liste

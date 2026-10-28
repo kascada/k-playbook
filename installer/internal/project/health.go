@@ -164,8 +164,12 @@ func healthVersionSources(_ context.Context, projectDir string) []health.Problem
 // seiner Stufe, der Pfad in der Datei (file, services.<name>,
 // services.<name>.access[<i>]) vorn im Satz, weil ein health.Problem kein
 // eigenes Feld dafür hat. Eine leere Datei ergibt nichts; die einmalige
-// Meldung der frisch angelegten Vorlage ist die einzige warning, alles
-// andere error. Die Datei ist persönlich, nicht projektbezogen — projectDir
+// Meldung der frisch angelegten Vorlage ist eine warning, jedes Problem der
+// Datei ein error. Liest sich die Datei, beurteilt die Quelle dazu die
+// Verfügbarkeit jedes Zugangs ohne Netz (githubaccess.Judge): Ein Dienst, in
+// dem kein Zugang verfügbar ist, wird eine warning — die Datei trägt dann
+// nichts, was sich nutzen ließe. Weiter als das geht die Quelle nicht; GitHub
+// fragt sie nie. Die Datei ist persönlich, nicht projektbezogen — projectDir
 // spielt keine Rolle.
 func healthGitHub(_ context.Context, _ string) []health.Problem {
 	path, err := githubaccess.Path()
@@ -185,6 +189,20 @@ func healthGitHub(_ context.Context, _ string) []health.Problem {
 			Area:    health.AreaGitHub,
 			Message: problem.Path + ": " + problem.Message,
 			Hint:    problem.Hint,
+		})
+	}
+	if result.HasErrors() {
+		return problems
+	}
+	for _, service := range githubaccess.Judge(result.Services) {
+		if githubaccess.Usable(service) {
+			continue
+		}
+		problems = append(problems, health.Problem{
+			Level:   health.LevelWarning,
+			Area:    health.AreaGitHub,
+			Message: "services." + service.Name + ": kein verfügbarer Zugang — " + githubaccess.FirstReason(service),
+			Hint:    "Einen Zugang des Dienstes " + service.Name + " in " + path + " einrichten; k-playbook github check nennt je Zugang den Grund.",
 		})
 	}
 	return problems

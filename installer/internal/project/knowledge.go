@@ -127,8 +127,9 @@ func knowledgeKind(rel string) string {
 // Die README in der Wurzel gibt keine: sie ist erzeugte Navigation ohne
 // eigenen Inhalt, und ihr Stichwortindex — kurz, begriffsdicht, genau die
 // Form, die BM25 doppelt belohnt — verdrängte die Dokumente, auf die er
-// zeigt (belegt in material/befunde/wissenstor-mcp.md). List führt sie
-// weiter; Navigation ist dort besser aufgehoben als im Ranking.
+// zeigt (gemessen 2026-09-09 an v0.7.0: bei „ApplyLinks", „SHA256SUMS" und
+// „Symlink-Konflikt" stand README.md auf Platz 1 vor dem Ziel). List führt
+// sie weiter; Navigation ist dort besser aufgehoben als im Ranking.
 func knowledgeSearchable(rel string) bool {
 	return filepath.ToSlash(rel) != knowledgeReadmeName
 }
