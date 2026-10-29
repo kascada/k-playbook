@@ -479,6 +479,19 @@ func stubKephalaionCheck(t *testing.T, status kephalaion.Status) {
 	t.Cleanup(func() { kephalaionCheck = original })
 }
 
+// stubKephalaionBinary legt fest, ob kephalaion im PATH liegt.
+func stubKephalaionBinary(t *testing.T, present bool) {
+	t.Helper()
+	original := kephalaionBinary
+	kephalaionBinary = func() (string, bool) {
+		if present {
+			return "/opt/bin/kephalaion", true
+		}
+		return "", false
+	}
+	t.Cleanup(func() { kephalaionBinary = original })
+}
+
 func topLevelKeys(t *testing.T, value any) map[string]bool {
 	t.Helper()
 	data, err := json.Marshal(value)

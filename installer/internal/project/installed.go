@@ -28,6 +28,10 @@ const (
 // Meldungen eingesetzt wird.
 const BootstrapHint = BootstrapCommand + " (ohne make: " + BootstrapCommandNoMake + ")"
 
+// KephalaionInstallCommand installiert Kephalaion, wenn es fehlt. bin/install
+// ruft es am Ende auf, `k-playbook upgrade` in einem eigenen Schritt.
+const KephalaionInstallCommand = PlaybookDirName + "/bin/install-kephalaion"
+
 // installedBinDirName und installedBinSubDir bilden das Verzeichnis, in das
 // bin/install schreibt: ~/.local/bin. Die Aufteilung steht hier und nicht als
 // zusammengesetzter Pfad, damit filepath.Join den Trenner der Plattform setzt.

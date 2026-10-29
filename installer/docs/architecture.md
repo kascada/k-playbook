@@ -1395,6 +1395,21 @@ er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 
 ## Direktinstallation
 
+**Kephalaion.** Am Ende ruft `bin/install` `bin/install-kephalaion` auf: Liegt kein
+`kephalaion` im PATH, lädt das Skript das `install.sh` des neuesten Kephalaion-Releases und
+führt es aus; Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von Kephalaion. Ein
+vorhandenes `kephalaion` bleibt stehen, aktuell hält es sich mit `kephalaion upgrade`.
+Installiert wird nur das Binary, nicht Node, Dienst oder Token — im DevContainer kommt die
+config read-only vom Host, und der Node ist der des Hosts. Scheitert der Schritt, endet
+`bin/install` trotzdem mit 0: `program.Install()` misst den Erfolg des Programm-Updates an
+diesem Exit-Code, und Oberfläche wie `k-playbook upgrade` meldeten sonst ein gescheitertes
+Update, das es nicht gab. `k-playbook upgrade` ruft dasselbe Skript in einem eigenen Schritt
+zwischen Programm und Projekt (`program.InstallKephalaion()`), weil `bin/install` nur bei
+„älter" läuft. Der Schritt läuft im aufrufenden Prozess, nicht im neuen Programm nach einem
+Binärwechsel; dort hat `bin/install` ihn schon getan. `healthKephalaion()` nennt die
+Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
+schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
+
 `bin/install` bleibt im Projekt-Clone und installiert das passende, gegen `SHA256SUMS`
 geprüfte Release-Binary direkt nach `~/.local/bin/k-playbook`. Der normale Aufruf ist danach
 immer `k-playbook`; der GUI-**Start** installiert oder aktualisiert kein Binary selbst. Auf

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -19,11 +20,16 @@ import (
 // k-playbook upgrade — der eine Nachzug für Programm und Projekt, den /k-upgrade
 // aufruft.
 //
-// Zwei Schritte, je Schritt eine Meldung: (1) das Programm — `git pull` im
+// Drei Schritte, je Schritt eine Meldung: (1) das Programm — `git pull` im
 // Clone, danach das Binary über den Bootstrap des Clones, aber nur, wenn das
 // laufende Programm älter ist als der Clone (Regel aus restartAfterPull in
 // webui/update.go: nie „ungleich", sonst stufte das Entwicklungsrepo sein
-// neueres Programm herab); (2) das Projekt — ApplyAssistantSetup, also
+// neueres Programm herab); Kephalaion — fehlt es im PATH, installiert es
+// bin/install-kephalaion des Clones. Das ist ein eigener Schritt, weil
+// bin/install nur bei „älter" läuft: Ein aktuelles k-playbook ohne Kephalaion
+// bliebe sonst ohne. Er läuft im aufrufenden Prozess, nicht im neuen Programm
+// nach einem Binärwechsel; dort hat bin/install ihn schon getan; (2) das
+// Projekt — ApplyAssistantSetup, also
 // Einordnen von CLAUDE.md/AGENTS.md, Anstoß ersetzen und Zusatzblöcke
 // entfernen, Verlinkung; die MCP-Einträge repariert der Pull schon
 // (UpdateResult.MCPRepaired), ein eigenes RepairMCP läuft nur, wenn der Pull
@@ -51,6 +57,9 @@ var (
 	upgradeUpdate  = project.Update
 	upgradeInstall = program.Install
 	upgradeReexec  = reexecProjectStep
+	// Die Suche nach kephalaion im PATH (--check) und seine Installation.
+	upgradeFindKephalaion    = kephalaion.FindBinary
+	upgradeInstallKephalaion = program.InstallKephalaion
 )
 
 // upgradeOptions sind die Schalter des Aufrufs.
@@ -72,6 +81,9 @@ type upgradeReport struct {
 	Check         bool   `json:"check"`
 	// Program ist Schritt (1); fehlt bei --project-only.
 	Program *upgradeProgramReport `json:"program,omitempty"`
+	// Kephalaion ist der Schritt zwischen (1) und (2); fehlt bei
+	// --project-only.
+	Kephalaion *upgradeKephalaionReport `json:"kephalaion,omitempty"`
 	// Project ist Schritt (2): upgradeProjectReport, oder — nach einem
 	// Binärwechsel — die Antwort des neuen Programms, so wie sie kam.
 	Project any `json:"project,omitempty"`
@@ -104,6 +116,17 @@ type upgradeProgramReport struct {
 	// Error nennt, was in diesem Schritt scheiterte; die weiteren Schritte
 	// laufen trotzdem.
 	Error string `json:"error,omitempty"`
+}
+
+// upgradeKephalaionReport ist der Schritt Kephalaion.
+type upgradeKephalaionReport struct {
+	// Present: kephalaion liegt im PATH — vorher oder nach der Installation.
+	Present bool   `json:"present"`
+	Path    string `json:"path,omitempty"`
+	// Installed: bin/install-kephalaion ist gelaufen (nicht bei --check).
+	Installed bool   `json:"installed,omitempty"`
+	Output    string `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // upgradeProjectReport ist Schritt (2).
@@ -197,6 +220,11 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
 
+		kephalaionReport, lines := checkUpgradeKephalaion(environment)
+		report.Kephalaion = &kephalaionReport
+		report.Messages = append(report.Messages, lines...)
+		emit(lines)
+
 		result := checkUpgradeProject(environment.ProjectDir)
 		report.Project = &result
 		report.Messages = append(report.Messages, result.messages()...)
@@ -206,6 +234,11 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 
 	programReport, lines, target := upgradeProgram(environment)
 	report.Program = &programReport
+	report.Messages = append(report.Messages, lines...)
+	emit(lines)
+
+	kephalaionReport, lines := upgradeKephalaion(environment)
+	report.Kephalaion = &kephalaionReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
 
@@ -358,6 +391,52 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 			displayVersion(status.Running), displayVersion(status.Clone), status.Target))
 	}
 	return report, lines
+}
+
+// upgradeKephalaion ist der Schritt Kephalaion: fehlt kephalaion im PATH, läuft
+// bin/install-kephalaion des Clones. Ein Fehlschlag hält den Lauf nicht auf;
+// das Projekt wird trotzdem nachgezogen.
+func upgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
+	if !environment.PlaybookPresent {
+		return checkUpgradeKephalaion(environment)
+	}
+	report := upgradeKephalaionReport{}
+	result, err := upgradeInstallKephalaion(environment.ProjectDir)
+	report.Path, report.Installed, report.Output = result.Path, result.Installed, result.Output
+	report.Present = result.Path != ""
+	switch {
+	case err != nil:
+		report.Error = err.Error()
+		lines := []string{"Kephalaion: nicht installiert — " + strings.TrimSuffix(err.Error(), ".") +
+			". Nachholen im Terminal: " + project.KephalaionInstallCommand + " (ohne Clone: " + kephalaion.InstallCommand + ")."}
+		if result.Output != "" {
+			lines = append(lines, indent(result.Output))
+		}
+		return report, lines
+	case result.Installed:
+		lines := []string{"Kephalaion: installiert nach " + result.Path + "."}
+		if result.Output != "" {
+			lines = append(lines, indent(result.Output))
+		}
+		return report, lines
+	}
+	return report, []string{"Kephalaion: vorhanden (" + result.Path + ")."}
+}
+
+// checkUpgradeKephalaion meldet, ob kephalaion im PATH liegt, ohne zu
+// installieren. Ohne Clone gibt es kein bin/install-kephalaion; dann nennt die
+// Meldung die Installation aus dem README von Kephalaion.
+func checkUpgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
+	path, ok := upgradeFindKephalaion()
+	if ok {
+		return upgradeKephalaionReport{Present: true, Path: path}, []string{"Kephalaion: vorhanden (" + path + ")."}
+	}
+	if !environment.PlaybookPresent {
+		return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH, und ohne die Installation " +
+			project.PlaybookDirName + "/ installiert dieser Lauf es nicht. Von Hand: " + kephalaion.InstallCommand + "."}
+	}
+	return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH; ein Lauf installiert es über " +
+		project.KephalaionInstallCommand + "."}
 }
 
 // upgradeProject ist Schritt (2): derselbe Ablauf wie „Einrichten" in der
@@ -611,7 +690,7 @@ func printUpgradeUsage(out io.Writer) {
 Aufruf:
   k-playbook upgrade [--check] [--json]
 
-Zwei Schritte, je Schritt eine Meldung:
+Drei Schritte, je Schritt eine Meldung:
 
   1. Programm: git pull --ff-only im Clone k-playbook/, danach das Binary über
      k-playbook/bin/install — aber nur, wenn das laufende Programm älter ist
@@ -620,6 +699,11 @@ Zwei Schritte, je Schritt eine Meldung:
      Install, eine eigene Meldung, und Schritt 2 läuft mit dem laufenden
      Programm. Hat das Binary gewechselt, führt das neu installierte
      Programm Schritt 2 aus.
+     Kephalaion: liegt kein kephalaion im PATH, installiert es
+     k-playbook/bin/install-kephalaion über das install.sh des neuesten
+     Kephalaion-Releases. Ein vorhandenes bleibt unangetastet (aktualisieren:
+     kephalaion upgrade). Scheitert es, eine Meldung, und Schritt 2 läuft
+     trotzdem.
   2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
      Anstoß auf k-playbook briefing bringen, die abgelösten Session-Memory-
      und Befunde-Blöcke entfernen), CLAUDE.md als Include-Datei, die
@@ -631,8 +715,9 @@ Am Ende, wenn das Binary gewechselt hat: der Hinweis, die Sitzung neu zu
 starten — der MCP-Server der Sitzung behält das alte Programm.
 
 --check schreibt nichts: es meldet den Stand des Clones gegenüber dem Remote,
-den Stand des laufenden Programms gegenüber dem Clone und, was ein Lauf am
-Projekt täte. --json gibt den Bericht als JSON aus (schemaVersion, check,
-program, project, restartRequired, messages).
+den Stand des laufenden Programms gegenüber dem Clone, ob kephalaion im PATH
+liegt und, was ein Lauf am Projekt täte. --json gibt den Bericht als JSON aus
+(schemaVersion, check, program, kephalaion, project, restartRequired,
+messages).
 `)
 }

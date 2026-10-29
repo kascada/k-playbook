@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Installiert Kephalaion, wenn es auf diesem Rechner fehlt. k-playbook braucht
+# den Node für jedes keph:-Dokument, und ohne Binary gibt es keinen Node.
+#
+# Installiert wird über das install.sh aus dem neuesten Kephalaion-Release:
+# Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von Kephalaion,
+# und hier ist nichts nachzuziehen, wenn sie sich ändern. Ein vorhandenes
+# Kephalaion bleibt unangetastet — aktuell hält es sich selbst
+# (kephalaion upgrade), und herabgestuft wird nie.
+#
+# Nur das Binary. node init, service install und Token gehören nicht hierher:
+# Im DevContainer kommt die config read-only vom Host, und der Node ist der des
+# Hosts. Aufgerufen wird das Skript von bin/install und von
+# `k-playbook upgrade`.
+
+install_url="https://github.com/kephalaion/kephalaion/releases/latest/download/install.sh"
+
+fail() {
+  printf '%s\n' "$@" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'EOF'
+Verwendung: k-playbook/bin/install-kephalaion
+
+Installiert Kephalaion nach ~/.local/bin/kephalaion, wenn kein kephalaion im
+PATH liegt — über das install.sh des neuesten Kephalaion-Releases, das Binary
+und SHA256SUMS lädt und die Prüfsumme prüft. Ein vorhandenes Kephalaion bleibt
+unangetastet; aktualisiert wird es mit kephalaion upgrade.
+EOF
+}
+
+case "${1:-}" in
+  "") ;;
+  help|-h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
+
+if found="$(command -v kephalaion 2>/dev/null)"; then
+  printf 'Kephalaion vorhanden: %s\n' "${found}"
+  exit 0
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  download() { curl -fsSL --retry 2 --connect-timeout 15 --output "$1" "$2"; }
+elif command -v wget >/dev/null 2>&1; then
+  download() { wget -q --output-document="$1" "$2"; }
+else
+  fail "Weder curl noch wget verfügbar; Kephalaion kann nicht geladen werden."
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "${work}"' EXIT
+
+# Erst ganz laden, dann ausführen: Bricht der Download ab, läuft kein halbes
+# Skript, und ein Fehler beim Laden ist von einem Fehler der Installation zu
+# unterscheiden.
+printf 'Kephalaion fehlt; lade %s ...\n' "${install_url}"
+download "${work}/install.sh" "${install_url}" ||
+  fail "install.sh von Kephalaion nicht ladbar: ${install_url}"
+sh "${work}/install.sh"

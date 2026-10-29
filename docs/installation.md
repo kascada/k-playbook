@@ -21,6 +21,8 @@ The target directory must be named `k-playbook`: commands and skills address it 
 
 **Installation requires network access.** The binaries are not in the clone but are release assets. `bin/install` downloads exactly the matching asset and verifies it against the shipped `SHA256SUMS`.
 
+**Kephalaion is installed along with it.** k-playbook needs a Kephalaion node for every `keph:` document. If no `kephalaion` is on the `PATH`, `bin/install` then runs `k-playbook/bin/install-kephalaion`, which loads the `install.sh` of the latest Kephalaion release and runs it; that script downloads the binary and `SHA256SUMS`, verifies the checksum and installs to `~/.local/bin/kephalaion`. An existing `kephalaion` stays untouched, whatever its version: it updates itself with `kephalaion upgrade`. Only the binary is installed. Setting up the node, the service and the token stays with Kephalaion (`kephalaion node init`, `kephalaion service install`); in a DevContainer, where the configuration comes read-only from the host and the node is the host's, that is exactly right. If the step fails, `bin/install` still ends with exit code 0, because k-playbook itself is installed, and names the command to catch up. `k-playbook upgrade` runs the same script as a step of its own, also when the program is current and `bin/install` is not called, and `k-playbook health` names the installation as the remedy while `kephalaion` is missing and the connection is not ok.
+
 **`~/.local/bin` must be in PATH**: this is a requirement, not an aside. k-playbook is called exclusively by its name; without the PATH entry, it would be installed but not discoverable by anyone. If it is missing, the bootstrap stops before downloading anything and prints the line for the shell profile:
 
 ```bash

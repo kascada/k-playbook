@@ -153,7 +153,12 @@ func runBootstrap(projectDir string, playbookDir string) (string, int, error) {
 	if _, err := os.Stat(script); err != nil {
 		return "", -1, fmt.Errorf("Bootstrap nicht gefunden: %s", script)
 	}
+	return runScript(projectDir, script, project.BootstrapCommandNoMake)
+}
 
+// runScript führt ein Skript des Clones aus dem Hauptverzeichnis aus, mit
+// BootstrapTimeout; label ist der Aufruf, wie die Meldungen ihn nennen.
+func runScript(projectDir string, script string, label string) (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), BootstrapTimeout)
 	defer cancel()
 
@@ -167,14 +172,14 @@ func runBootstrap(projectDir string, playbookDir string) (string, int, error) {
 	text := strings.TrimSpace(string(output))
 
 	if ctx.Err() == context.DeadlineExceeded {
-		return text, -1, fmt.Errorf("%s hat nach %s nicht geendet", project.BootstrapCommandNoMake, BootstrapTimeout)
+		return text, -1, fmt.Errorf("%s hat nach %s nicht geendet", label, BootstrapTimeout)
 	}
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return text, exitErr.ExitCode(), fmt.Errorf("%s endete mit Exit-Code %d", project.BootstrapCommandNoMake, exitErr.ExitCode())
+			return text, exitErr.ExitCode(), fmt.Errorf("%s endete mit Exit-Code %d", label, exitErr.ExitCode())
 		}
-		return text, -1, fmt.Errorf("%s nicht ausführbar: %v", project.BootstrapCommandNoMake, err)
+		return text, -1, fmt.Errorf("%s nicht ausführbar: %v", label, err)
 	}
 	return text, 0, nil
 }

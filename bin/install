@@ -21,7 +21,8 @@ Aufgerufen wird beides aus dem Hauptverzeichnis des Projekts; ein Zielprojekt
 hat kein eigenes install-Target.
 
 Lädt das Release-Binary, das VERSION in diesem Clone nennt, prüft es gegen
-SHA256SUMS und installiert es nach ~/.local/bin/k-playbook.
+SHA256SUMS und installiert es nach ~/.local/bin/k-playbook. Fehlt Kephalaion
+auf diesem Rechner, installiert es danach bin/install-kephalaion.
 EOF
 }
 
@@ -260,4 +261,18 @@ if [[ -n "${foreign}" ]]; then
   printf 'den Bootstrap erneut ausführen:\n\n'
   printf '  make -C k-playbook install\n'
   printf '  oder ohne make: k-playbook/bin/install\n'
+fi
+
+# Kephalaion gehört zu jedem Rechner, auf dem k-playbook läuft; fehlt es, holt
+# install-kephalaion es nach. Scheitert das, endet dieser Lauf trotzdem mit 0:
+# k-playbook selbst ist installiert, und program.Install — der Weg von
+# `k-playbook upgrade` und der Oberfläche — misst den Erfolg an diesem Exit-Code.
+# Ein Fehlschlag hier meldete dort ein gescheitertes Programm-Update, das es
+# nicht gab. `k-playbook upgrade` holt Kephalaion in einem eigenen Schritt nach,
+# und k-playbook health nennt es, solange es fehlt.
+printf '\n'
+if ! "${script_dir}/install-kephalaion"; then
+  printf '\n' >&2
+  printf 'Kephalaion ist nicht installiert (siehe oben); k-playbook selbst ist es.\n' >&2
+  printf 'Nachholen: k-playbook/bin/install-kephalaion oder k-playbook upgrade\n' >&2
 fi

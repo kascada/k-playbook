@@ -44,27 +44,46 @@ func init() {
 // sind dann nicht erreichbar; nicht eingetragen ist eine Warnung. Was
 // kephalaion.Check am Node fragt, bleibt wie es ist; der Satz ist dessen
 // Message, die nie ein Token trägt.
+//
+// Fehlt kephalaion im PATH, ist das die Abhilfe vor jeder anderen: Ohne Binary
+// lässt sich weder ein Node einrichten noch eine Anbindung prüfen. Bei ok
+// schweigt die Prüfung auch ohne Binary — der Node kann der eines anderen
+// Rechners sein, etwa der des Hosts aus einem DevContainer.
 func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 	status := kephalaionCheck(projectDir)
 	if status.OK {
 		return nil
 	}
+	_, binary := kephalaionBinary()
 	if !status.Configured {
+		hint := "Die Anbindung in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
+			"ohne sie sind keph:-Verweise, Workbench und die eigene Arbeit im Briefing nicht erreichbar."
+		if !binary {
+			hint = kephalaionMissingHint
+		}
 		return []health.Problem{{
 			Level:   health.LevelWarning,
 			Area:    health.AreaKephalaion,
 			Message: status.Message,
-			Hint: "Die Anbindung in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
-				"ohne sie sind keph:-Verweise, Workbench und die eigene Arbeit im Briefing nicht erreichbar.",
+			Hint:    hint,
 		}}
+	}
+	hint := kephalaionHint(status.State)
+	if !binary {
+		hint = kephalaionMissingHint
 	}
 	return []health.Problem{{
 		Level:   health.LevelError,
 		Area:    health.AreaKephalaion,
 		Message: status.Message,
-		Hint:    kephalaionHint(status.State),
+		Hint:    hint,
 	}}
 }
+
+// kephalaionMissingHint ist die Abhilfe, wenn kephalaion nicht im PATH liegt.
+const kephalaionMissingHint = "Kephalaion ist auf diesem Rechner nicht installiert (kein " + kephalaion.BinaryName +
+	" im PATH). Installieren mit " + InstalledCommandName + " upgrade oder " + KephalaionInstallCommand +
+	"; danach die Anbindung einrichten (kephalaion status, k-playbook gui, Abschnitt Kephalaion)."
 
 // kephalaionHint nennt je Zustand den nächsten Schritt.
 func kephalaionHint(state kephalaion.State) string {

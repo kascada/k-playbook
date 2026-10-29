@@ -71,6 +71,14 @@ attached as assets to the release named by `VERSION` in the root directory.
 `bin/install` downloads the matching asset and verifies it against the shipped
 `SHA256SUMS`.
 
+**Kephalaion comes along.** If no `kephalaion` is on the `PATH`, `bin/install` then runs
+`bin/install-kephalaion`, which installs it through the `install.sh` of the latest
+Kephalaion release into `~/.local/bin/kephalaion`. Only the binary: setting up the node,
+the service and the token stays with Kephalaion (`kephalaion node init`, see its README);
+inside a devcontainer the node is usually the host's. An existing `kephalaion` is left
+alone — `kephalaion upgrade` updates it. If this step fails, `bin/install` still succeeds,
+because k-playbook itself is installed, and names the command to catch up.
+
 The last call opens the web interface in the browser. On first run it finds no
 `K-PLAYBOOK.yaml` yet and proposes where to create it: the directory above the clone. It
 also proposes where the project repository lives — either the main directory itself or a
@@ -213,7 +221,8 @@ If only commands, rules or recipes are new, `VERSION` does not change and the se
 running.
 
 In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
-the running program is older, then `AGENTS.md`, `CLAUDE.md`, linking and MCP entries —
+the running program is older, Kephalaion when it is missing from the `PATH`, then
+`AGENTS.md`, `CLAUDE.md`, linking and MCP entries —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
 only reports what a run would do.
 

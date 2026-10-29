@@ -328,8 +328,10 @@ Unterkommandos:
   upgrade   Aktualisiert das Programm und zieht das Projekt nach:
             k-playbook upgrade [--check] [--json]. Erst git pull im Clone
             und das Binary über k-playbook/bin/install, nur wenn das laufende
-            Programm älter ist als der Clone; dann AGENTS.md (Anstoß,
-            abgelöste Blöcke), CLAUDE.md, Verlinkung und MCP-Einträge. Je
+            Programm älter ist als der Clone; dann Kephalaion, wenn es im
+            PATH fehlt (k-playbook/bin/install-kephalaion); dann AGENTS.md
+            (Anstoß, abgelöste Blöcke), CLAUDE.md, Verlinkung und
+            MCP-Einträge. Je
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
             Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
             und meldet, was ein Lauf täte. Das Gegenstück zu /k-upgrade.

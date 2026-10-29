@@ -21,6 +21,10 @@ func KephalaionStatus(projectDir string) kephalaion.Status {
 	return kephalaionCheck(projectDir)
 }
 
+// kephalaionBinary ist austauschbar, damit Tests nicht vom PATH des Rechners
+// abhängen.
+var kephalaionBinary = kephalaion.FindBinary
+
 // kephalaionCheck ist austauschbar, damit Tests den Node nicht fragen.
 var kephalaionCheck = func(projectDir string) kephalaion.Status {
 	env := kephalaion.Env{}

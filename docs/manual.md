@@ -129,8 +129,10 @@ k-playbook
 
 Go is not required: `bin/install` is a shell script. It downloads the release
 asset for the current platform, verifies it against the shipped `SHA256SUMS`,
-and installs it to `~/.local/bin/k-playbook`. This one bootstrap needs network
-access, and `~/.local/bin` must be on `PATH`. The last command starts the
+and installs it to `~/.local/bin/k-playbook`. If `kephalaion` is missing from the
+`PATH`, it then installs it as well, through the `install.sh` of the latest
+Kephalaion release. This one bootstrap needs network access, and `~/.local/bin`
+must be on `PATH`. The last command starts the
 interface, which guides four steps: create configuration, create
 project-owned structure, register the MCP server, and link assistants. Each
 write happens only after confirmation.

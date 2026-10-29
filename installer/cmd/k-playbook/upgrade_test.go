@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,7 +80,23 @@ func upgradeProjectDir(t *testing.T, version string) string {
 			t.Fatal(err)
 		}
 	}
+	// Ob kephalaion im PATH liegt, hängt sonst am Rechner des Laufs.
+	stubKephalaion(t, kephalaionVorhanden, func(string) (program.KephalaionResult, error) {
+		return program.KephalaionResult{Path: "/opt/bin/kephalaion"}, nil
+	})
 	return root
+}
+
+func kephalaionVorhanden() (string, bool) { return "/opt/bin/kephalaion", true }
+
+func kephalaionFehlt() (string, bool) { return "", false }
+
+// stubKephalaion ersetzt die Suche nach kephalaion und seine Installation.
+func stubKephalaion(t *testing.T, find func() (string, bool), install func(string) (program.KephalaionResult, error)) {
+	t.Helper()
+	beforeFind, beforeInstall := upgradeFindKephalaion, upgradeInstallKephalaion
+	t.Cleanup(func() { upgradeFindKephalaion, upgradeInstallKephalaion = beforeFind, beforeInstall })
+	upgradeFindKephalaion, upgradeInstallKephalaion = find, install
 }
 
 func stubUpgradeSteps(t *testing.T, update func(string) (project.UpdateResult, error),
@@ -442,6 +459,81 @@ func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
 }
 
 // --json trägt dieselben Meldungen als Liste und die Teilergebnisse.
+// Fehlt kephalaion, installiert der Lauf es in einem eigenen Schritt — auch
+// dann, wenn das Programm aktuell ist und bin/install darum gar nicht läuft.
+func TestUpgradeInstalliertFehlendesKephalaion(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	called := false
+	stubKephalaion(t, kephalaionFehlt, func(string) (program.KephalaionResult, error) {
+		called = true
+		return program.KephalaionResult{Path: "/home/u/.local/bin/kephalaion", Installed: true, Output: "Installiert: /home/u/.local/bin/kephalaion"}, nil
+	})
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("upgrade: %v", err)
+		}
+	})
+	if !called {
+		t.Fatal("der Lauf hat Kephalaion nicht installiert")
+	}
+	for _, erwartet := range []string{"Programm-Stand: nichts zu tun", "Kephalaion: installiert nach /home/u/.local/bin/kephalaion.", "  Installiert: /home/u/.local/bin/kephalaion", "Verlinkung eingerichtet"} {
+		if !strings.Contains(stdout, erwartet) {
+			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
+		}
+	}
+	if strings.Index(stdout, "Kephalaion:") > strings.Index(stdout, "Verlinkung eingerichtet") {
+		t.Errorf("Kephalaion steht nicht vor dem Projektschritt:\n%s", stdout)
+	}
+}
+
+// Scheitert die Installation, ist das eine eigene Meldung mit dem Weg im
+// Terminal; das Projekt wird trotzdem nachgezogen.
+func TestUpgradeKephalaionfehlerHaeltDenLaufNichtAuf(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	stubKephalaion(t, kephalaionFehlt, func(string) (program.KephalaionResult, error) {
+		return program.KephalaionResult{Installed: true, Output: "kephalaion-Installation: Keine Verbindung"}, errors.New("k-playbook/bin/install-kephalaion endete mit Exit-Code 1")
+	})
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("upgrade: %v", err)
+		}
+	})
+	for _, erwartet := range []string{
+		"Kephalaion: nicht installiert — k-playbook/bin/install-kephalaion endete mit Exit-Code 1. Nachholen im Terminal: " + project.KephalaionInstallCommand,
+		"  kephalaion-Installation: Keine Verbindung",
+		"Verlinkung eingerichtet",
+	} {
+		if !strings.Contains(stdout, erwartet) {
+			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
+		}
+	}
+}
+
+// --check meldet ein fehlendes kephalaion und installiert es nicht.
+func TestUpgradeCheckMeldetFehlendesKephalaion(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	stubKephalaion(t, kephalaionFehlt, func(string) (program.KephalaionResult, error) {
+		t.Error("--check hat installiert")
+		return program.KephalaionResult{}, nil
+	})
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade([]string{"--check", "--json"}); err != nil {
+			t.Errorf("upgrade --check: %v", err)
+		}
+	})
+	for _, erwartet := range []string{`"kephalaion": {`, `"present": false`, "Kephalaion: fehlt im PATH; ein Lauf installiert es über " + project.KephalaionInstallCommand} {
+		if !strings.Contains(stdout, erwartet) {
+			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
+		}
+	}
+}
+
 func TestUpgradeJSON(t *testing.T) {
 	upgradeProjectDir(t, "v0.16.8")
 	setOwnVersion(t, "v0.16.8")

@@ -30,6 +30,7 @@ func healthProject(t *testing.T) string {
 	t.Setenv("GITHUB_TOKEN", "")
 	accesstest.Empty(t)
 	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
+	stubKephalaionBinary(t, true)
 	return root
 }
 
@@ -82,6 +83,34 @@ func TestHealthKephalaionEingetragenAberNichtOKIstFehler(t *testing.T) {
 		if report := health.Check(context.Background(), root); report.OK {
 			t.Errorf("%s: OK trotz Fehler", state)
 		}
+	}
+}
+
+// Fehlt kephalaion im PATH, ist die Installation die Abhilfe — eingetragen
+// oder nicht. Stufe und Satz bleiben die der Prüfung; bei ok schweigt sie auch
+// ohne Binary, denn der Node kann der eines anderen Rechners sein.
+func TestHealthKephalaionOhneBinaryNenntInstallation(t *testing.T) {
+	root := healthProject(t)
+	stubKephalaionBinary(t, false)
+
+	for _, status := range []kephalaion.Status{
+		{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."},
+		{Configured: true, State: kephalaion.StateNoKephalaion, Message: "Keine config von Kephalaion."},
+	} {
+		stubKephalaionCheck(t, status)
+		problems := healthKephalaion(context.Background(), root)
+		if len(problems) != 1 {
+			t.Fatalf("%s: Problems = %+v", status.State, problems)
+		}
+		got := problems[0]
+		if got.Message != status.Message || !strings.Contains(got.Hint, "k-playbook upgrade") || !strings.Contains(got.Hint, KephalaionInstallCommand) {
+			t.Errorf("%s: %+v", status.State, got)
+		}
+	}
+
+	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
+	if problems := healthKephalaion(context.Background(), root); len(problems) != 0 {
+		t.Errorf("ok ohne Binary meldet: %+v", problems)
 	}
 }
 
