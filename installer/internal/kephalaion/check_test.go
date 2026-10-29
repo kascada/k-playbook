@@ -164,7 +164,7 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 
 func TestCheckStatesBeforeTheNode(t *testing.T) {
 	local := t.TempDir()
-	env := Env{ConfigDir: t.TempDir()}
+	env := Env{UserDir: t.TempDir()}
 	if s := Check(context.Background(), local, env); s.State != StateNotConfigured || s.Configured {
 		t.Fatalf("nicht eingetragen: %+v", s)
 	}
@@ -179,17 +179,17 @@ func TestCheckStatesBeforeTheNode(t *testing.T) {
 		t.Fatalf("keine config: %+v", s)
 	}
 
-	writeFile(t, filepath.Join(env.ConfigDir, "config.yaml"), "node:\n  listen: 10.1.2.3:7433\n")
-	if s := Check(context.Background(), local, LoadEnv(env.ConfigDir)); s.State != StateNodeAddress {
+	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "node:\n  listen: 10.1.2.3:7433\n")
+	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateNodeAddress {
 		t.Fatalf("fremde Adresse: %+v", s)
 	}
-	writeFile(t, filepath.Join(env.ConfigDir, "config.yaml"), "hub:\n  db: x\n")
-	if s := Check(context.Background(), local, LoadEnv(env.ConfigDir)); s.State != StateNodeAddress {
+	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "hub:\n  db: x\n")
+	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateNodeAddress {
 		t.Fatalf("kein Node: %+v", s)
 	}
 
-	writeFile(t, filepath.Join(env.ConfigDir, "config.yaml"), "node:\n  listen: 127.0.0.1:7433\n")
-	if s := Check(context.Background(), local, LoadEnv(env.ConfigDir)); s.State != StateTokenMissing {
+	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "node:\n  listen: 127.0.0.1:7433\n")
+	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateTokenMissing {
 		t.Fatalf("ohne Token: %+v", s)
 	}
 }
@@ -316,7 +316,7 @@ func TestProbePairs(t *testing.T) {
 		return 200, "application/json", whoamiBody(`{"version":"v0.2.4","hubs":[{"hub":"vm","login":"missing","node":"n","sync":{}}],"unknown_hubs":["privat"]}`)
 	})
 	env := testEnv(t, node.server.URL+"/mcp")
-	writeFile(t, filepath.Join(env.ConfigDir, "tokens", "privat", "alice.token"), testToken)
+	writeFile(t, filepath.Join(env.UserDir, "tokens", "privat", "alice.token"), testToken)
 
 	pairs := ProbePairs(context.Background(), env)
 	if len(pairs) != 2 {
@@ -338,7 +338,7 @@ func TestProbePairsStopsWaitingWhenNodeIsDown(t *testing.T) {
 	addr := listener.Addr().String()
 	listener.Close()
 	env := testEnv(t, "http://"+addr+"/mcp")
-	writeFile(t, filepath.Join(env.ConfigDir, "tokens", "privat", "alice.token"), testToken)
+	writeFile(t, filepath.Join(env.UserDir, "tokens", "privat", "alice.token"), testToken)
 	pairs := ProbePairs(context.Background(), env)
 	if len(pairs) != 2 || pairs[0].State != StateNodeUnreachable || pairs[1].State != StateNodeUnreachable {
 		t.Fatalf("%+v", pairs)

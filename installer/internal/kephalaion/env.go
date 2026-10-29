@@ -21,27 +21,66 @@ import (
 // mit --listen; ohne Eintrag ist das also der Normalfall.
 const defaultNodeListen = "127.0.0.1:7433"
 
+// EnvConfigVar ist die Umgebungsvariable, mit der Kephalaion den Ort der
+// config ausdrücklich angibt (config.EnvConfig dort). Ist sie gesetzt, gilt
+// nur sie.
+const EnvConfigVar = "KEPHALAION_CONFIG"
+
+// SystemConfig ist der feste Ort der globalen config von Kephalaion
+// (config.SystemConfig dort).
+const SystemConfig = "/etc/kephalaion/config.yaml"
+
+// SystemConfigPath ist der Ort, an dem die Suche die globale config erwartet:
+// SystemConfig. Tests lenken ihn in ein temporäres Verzeichnis, damit sie das
+// echte /etc/kephalaion nicht sehen.
+var SystemConfigPath = SystemConfig
+
+// ConfigSource sagt, woher der Ort der geltenden config kommt — wie
+// config.Source in Kephalaion, ohne --config.
+type ConfigSource string
+
+// Die Quellen, in der Reihenfolge der Suche.
+const (
+	// SourceEnv: KEPHALAION_CONFIG.
+	SourceEnv ConfigSource = "env"
+	// SourceUser: die config des Users — weil es sie gibt, oder als Ort, an
+	// dem kephalaion init sie anlegt, wenn es weder sie noch die globale gibt.
+	SourceUser ConfigSource = "user"
+	// SourceSystem: die globale config, weil es die des Users nicht gibt.
+	SourceSystem ConfigSource = "system"
+)
+
 // Env ist die Kephalaion-Einrichtung dieses Rechners, soweit k-playbook sie
-// braucht: wo die config liegt, ob es sie gibt, die Adresse des Nodes und das
-// Token-Verzeichnis.
+// braucht: welche config gilt und woher, ob es sie gibt, die Adresse des
+// Nodes und das Token-Verzeichnis. Die config kann global sein; die Tokens
+// liegen immer beim User (tokens.go in Kephalaion).
 type Env struct {
-	// ConfigDir ist das Verzeichnis der config des Users:
-	// $XDG_CONFIG_HOME/kephalaion bzw. ~/.config/kephalaion.
-	ConfigDir string
-	// ConfigPresent sagt, ob ConfigDir/config.yaml existiert.
+	// UserDir ist das Verzeichnis der config des Users:
+	// $XDG_CONFIG_HOME/kephalaion bzw. ~/.config/kephalaion. Darin liegt das
+	// Token-Verzeichnis, auch wenn die globale config gilt. Leer, wenn das
+	// Heimatverzeichnis unbekannt ist.
+	UserDir string
+	// ConfigPath ist die config, die gilt, als absoluter Pfad. Gibt es keine,
+	// ist es der Ort beim User, an dem kephalaion init sie anlegt.
+	ConfigPath string
+	// ConfigSource sagt, woher ConfigPath kommt.
+	ConfigSource ConfigSource
+	// ConfigPresent sagt, ob es die geltende config gibt.
 	ConfigPresent bool
 	// Endpoint ist die URL von /mcp am Node, nur gesetzt, wenn die Adresse
 	// eine zulässige Loopback-Adresse ist.
 	Endpoint string
 	// AddressProblem erklärt, warum Endpoint fehlt, obwohl die config da ist.
 	AddressProblem string
-	// ConfigError ist gesetzt, wenn die config da, aber nicht lesbar ist.
+	// ConfigError ist gesetzt, wenn die config da, aber nicht lesbar ist; der
+	// Grund ohne Pfad und ohne Inhalt der Datei.
 	ConfigError string
 }
 
 // DefaultConfigDir liefert das Verzeichnis der config des Users wie
 // Kephalaion selbst (config.UserPath dort): $XDG_CONFIG_HOME/kephalaion, wenn
-// die Variable einen absoluten Pfad trägt, sonst ~/.config/kephalaion.
+// die Variable einen absoluten Pfad trägt, sonst ~/.config/kephalaion. Darin
+// liegt das Token-Verzeichnis, gleich welche config gilt.
 func DefaultConfigDir() (string, error) {
 	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" && filepath.IsAbs(v) {
 		return filepath.Join(v, "kephalaion"), nil
@@ -53,28 +92,98 @@ func DefaultConfigDir() (string, error) {
 	return filepath.Join(home, ".config", "kephalaion"), nil
 }
 
-// LoadEnv liest die Kephalaion-Einrichtung unter configDir. Eine fehlende
-// config ist kein Fehler, sondern ConfigPresent false.
-func LoadEnv(configDir string) Env {
-	env := Env{ConfigDir: configDir}
-	data, err := os.ReadFile(filepath.Join(configDir, "config.yaml"))
-	if errors.Is(err, fs.ErrNotExist) {
+// DefaultEnv ermittelt die Kephalaion-Einrichtung dieses Rechners in der
+// Reihenfolge, in der Kephalaion ohne --config seine config sucht
+// (config.Locate dort): KEPHALAION_CONFIG, absolut gemacht > die config des
+// Users, wenn es sie gibt > die globale (/etc/kephalaion/config.yaml), wenn
+// es sie gibt > der Ort beim User. Das Token-Verzeichnis bleibt in jedem Fall
+// das des Users. Eine fehlende config ist kein Fehler, sondern ConfigPresent
+// false.
+func DefaultEnv() Env {
+	userDir, err := DefaultConfigDir()
+	if err != nil {
+		userDir = ""
+	}
+	return locateEnv(userDir)
+}
+
+// locateEnv sucht die config wie DefaultEnv, mit userDir als Verzeichnis des
+// Users (leer, wenn es unbekannt ist), und liest sie.
+func locateEnv(userDir string) Env {
+	env := Env{UserDir: userDir}
+	userPath := ""
+	if userDir != "" {
+		userPath = filepath.Join(userDir, "config.yaml")
+	}
+	switch {
+	case os.Getenv(EnvConfigVar) != "":
+		value := os.Getenv(EnvConfigVar)
+		path, err := filepath.Abs(value)
+		if err != nil {
+			path = filepath.Clean(value)
+		}
+		env.ConfigPath, env.ConfigSource = path, SourceEnv
+	case userPath != "" && userFileExists(userPath):
+		env.ConfigPath, env.ConfigSource = userPath, SourceUser
+	case fileExists(SystemConfigPath):
+		env.ConfigPath, env.ConfigSource = filepath.Clean(SystemConfigPath), SourceSystem
+	default:
+		// Keine config: Erwartet wird sie beim User. Gelesen wird nichts —
+		// auch dann nicht, wenn die config des Users nur unzugänglich ist.
+		env.ConfigPath, env.ConfigSource = userPath, SourceUser
 		return env
+	}
+	loadConfig(&env)
+	return env
+}
+
+// fileExists sagt, ob es path gibt. Lässt sich das nicht feststellen, etwa
+// mangels Rechten, zählt die Datei als vorhanden: Dann meldet das Lesen den
+// Fehler, statt dass still eine andere config gilt (wie in Kephalaion).
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !errors.Is(err, fs.ErrNotExist)
+}
+
+// userFileExists sagt, ob es die config des Users gibt. Anders als bei der
+// globalen zählt eine, auf die der Aufrufer nicht zugreifen darf, als nicht
+// vorhanden: Sie gehört einem anderen User — etwa unter sudo mit dem HOME des
+// Aufrufers (wie in Kephalaion).
+func userFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrPermission)
+}
+
+// LoadEnv liest die Kephalaion-Einrichtung, deren config beim User unter
+// userDir liegt — ohne Suche, für Aufrufer, die den Ort schon kennen, etwa
+// Tests. Eine fehlende config ist kein Fehler, sondern ConfigPresent false.
+func LoadEnv(userDir string) Env {
+	env := Env{UserDir: userDir, ConfigPath: filepath.Join(userDir, "config.yaml"), ConfigSource: SourceUser}
+	loadConfig(&env)
+	return env
+}
+
+// loadConfig liest die config unter env.ConfigPath und setzt ConfigPresent,
+// ConfigError, Endpoint und AddressProblem.
+func loadConfig(env *Env) {
+	data, err := os.ReadFile(env.ConfigPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return
 	}
 	env.ConfigPresent = true
 	if err != nil {
-		env.ConfigError = "config.yaml nicht lesbar: " + err.Error()
-		return env
+		env.ConfigError = readFailure(err)
+		return
 	}
 	root, err := yamllite.Parse(data)
 	if err != nil {
-		env.ConfigError = "config.yaml ist kein lesbares YAML (" + describeYAMLError(err) + ")"
-		return env
+		env.ConfigError = "kein lesbares YAML (" + describeYAMLError(err) + ")"
+		return
 	}
 	node := root.Get("node")
 	if node == nil || node.Kind != yamllite.Mapping {
 		env.AddressProblem = "In der config von Kephalaion ist kein Node eingerichtet (Abschnitt node: fehlt)."
-		return env
+		return
 	}
 	listen := strings.TrimSpace(node.Get("listen").Str())
 	if listen == "" {
@@ -82,7 +191,20 @@ func LoadEnv(configDir string) Env {
 	}
 	endpoint, problem := loopbackEndpoint(listen)
 	env.Endpoint, env.AddressProblem = endpoint, problem
-	return env
+}
+
+// readFailure beschreibt einen Lesefehler ohne den Pfad, den die Meldung
+// ohnehin nennt. Fehlt das Leserecht, sagt es das in Worten: Das ist der
+// häufige Fall bei einer globalen config.
+func readFailure(err error) string {
+	if errors.Is(err, fs.ErrPermission) {
+		return "Leserecht für diesen User fehlt"
+	}
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return "Lesefehler (" + pathErr.Err.Error() + ")"
+	}
+	return "Lesefehler (" + err.Error() + ")"
 }
 
 // loopbackEndpoint bildet aus node.listen die URL von /mcp. Zulässig sind
@@ -127,9 +249,14 @@ func quoteListen(listen string) string {
 	return "(unzulässiger Wert)"
 }
 
-// TokensDir ist das Token-Verzeichnis neben der config.
+// TokensDir ist das Token-Verzeichnis neben der config des Users — auch
+// wenn die globale config gilt. Leer, wenn das Heimatverzeichnis unbekannt
+// ist.
 func (e Env) TokensDir() string {
-	return filepath.Join(e.ConfigDir, "tokens")
+	if e.UserDir == "" {
+		return ""
+	}
+	return filepath.Join(e.UserDir, "tokens")
 }
 
 // Candidate ist ein Paar aus Hub und Account, für das eine Token-Datei
@@ -154,6 +281,9 @@ type Pending struct {
 // und alles, was keine reguläre Datei ist.
 func (e Env) Candidates() (candidates []Candidate, pending []Pending) {
 	base := e.TokensDir()
+	if base == "" {
+		return nil, nil
+	}
 	hubs, err := os.ReadDir(base)
 	if err != nil {
 		return nil, nil

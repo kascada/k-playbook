@@ -2086,7 +2086,8 @@ Jedes Projekt arbeitet mit einer eigenen Collection in Kephalaion. Welche, steht
 rechnerlokal in `k-playbook-local/K-PLAYBOOK.local.yaml`, Block `kephalaion:` mit `hub`
 (Alias des Hub-Eintrags am Node dieses Rechners), `collection` und `account`. Die Datei ist
 nicht versioniert; ein Token steht nie darin, es bleibt in Kephalaions Datei
-`tokens/<hub>/<account>.token` neben dessen `config.yaml`. Das Paket `internal/kephalaion`
+`tokens/<hub>/<account>.token` neben der `config.yaml` des Users — auch wenn eine globale
+config gilt (Abschnitt „Die config von Kephalaion“). Das Paket `internal/kephalaion`
 liest, prüft und schreibt die Anbindung; es hängt nur von der Standardbibliothek und
 `yamllite` ab, damit `project` es einbinden kann.
 
@@ -2102,8 +2103,8 @@ der Umgebung, folgt keiner Weiterleitung (sie trüge die Header an ein anderes Z
 keine Verbindung offen. Die Zeitgrenze `DefaultTimeout` = 3 s gilt für die ganze Prüfung;
 eine abgewiesene Verbindung scheitert sofort.
 
-Die Adresse kommt aus `node.listen` der `config.yaml` (`$XDG_CONFIG_HOME/kephalaion`, sonst
-`~/.config/kephalaion`). Zulässig sind `127.0.0.1`, `[::1]` und `localhost`, das nicht
+Die Adresse kommt aus `node.listen` der geltenden `config.yaml` (Abschnitt „Die config von
+Kephalaion“). Zulässig sind `127.0.0.1`, `[::1]` und `localhost`, das nicht
 aufgelöst, sondern als `127.0.0.1` verwendet wird; eine Wildcard (`0.0.0.0`, `[::]`, leerer
 Host) wird zu `127.0.0.1` mit demselben Port. Ein `node:`-Abschnitt ohne `listen` gilt wie in
 Kephalaion selbst als `127.0.0.1:7433` — `kephalaion init` schreibt `listen` nur mit
@@ -2116,7 +2117,7 @@ Jeder Fehler wird ein Zustand, je einer mit eigenem Satz in `message`:
 |---|---|
 | `not-configured` | Datei oder Block `kephalaion:` fehlt |
 | `invalid-entry` | ein Name verstößt gegen die Namensregel, oder die Datei ist kein lesbares YAML |
-| `kephalaion-missing` | keine oder unlesbare `config.yaml` |
+| `kephalaion-missing` | keine oder unlesbare `config.yaml`; der Satz nennt die gesuchten Orte bzw. den Pfad der geltenden und bei fehlendem Leserecht „Leserecht für diesen User fehlt“ |
 | `node-address` | kein `node:`-Abschnitt oder keine Loopback-Adresse |
 | `token-missing` | kein Kandidat passt zu Hub und Account, oder seine Datei trägt kein Token der Form `keph_` + 43 Zeichen |
 | `node-unreachable` | keine Verbindung, Zeitüberschreitung, HTTP-Fehler oder unlesbare Antwort |
@@ -2140,6 +2141,31 @@ MCP-Konfiguration eines Assistenten dasselbe, noch gültige Token tragen.
 `k-playbook context` und das MCP-Werkzeug hängen das Ergebnis als `kephalaion` an
 (`project.KephalaionStatus`, gerufen in `ContextForDir`). `BuildContext` selbst fragt den Node
 nicht: Den rufen auch Werkzeuge, die nur den Katalog brauchen, etwa die Review-Auswahl.
+
+### Die config von Kephalaion
+
+`kephalaion.DefaultEnv` sucht die config in der Reihenfolge, in der Kephalaion selbst sie ohne
+`--config` sucht (`config.Locate` dort): `KEPHALAION_CONFIG`, absolut gemacht; sonst die config
+des Users (`$XDG_CONFIG_HOME/kephalaion/config.yaml`, sonst `~/.config/kephalaion/config.yaml`),
+wenn es sie gibt; sonst die globale `/etc/kephalaion/config.yaml`, wenn es sie gibt. Gibt es
+keine, ist der erwartete Ort der des Users. Wie in Kephalaion zählt eine config des Users, auf
+die der Aufrufer nicht zugreifen darf, als nicht vorhanden; eine globale dagegen als
+vorhanden, damit das Lesen den Fehler meldet, statt still eine andere config zu nehmen. Gibt
+es beide nebeneinander, gilt die des Users; den Fehler „zwei Arten auf einem Rechner“ meldet
+`kephalaion status`, k-playbook spiegelt ihn nicht.
+
+`Env` hält die geltende config (`ConfigPath`, `ConfigSource` = `env`, `user` oder `system`)
+getrennt vom Verzeichnis des Users (`UserDir`). Das Token-Verzeichnis ist immer
+`UserDir/tokens`, auch bei globaler config — so liest es auch Kephalaion
+(`assistant.TokensDir`). Ist das Heimatverzeichnis unbekannt, gibt es kein Token-Verzeichnis;
+ein relatives `tokens/` wird nie gelesen. Die Prüfung (`project.KephalaionStatus`), der
+Doc-Client (`userdocs.go`) und die Oberfläche (`webui/kephalaion.go`) holen die Einrichtung
+alle über `DefaultEnv`. Der Ort der globalen config ist die Paketvariable `SystemConfigPath`,
+damit Tests ihn umlenken.
+
+Die Meldungen nennen je den richtigen Pfad: „nicht eingerichtet“ die gesuchten Orte — bei
+`KEPHALAION_CONFIG` nur diesen Pfad und die Quelle —, „nicht lesbar“ den Pfad der geltenden
+config, „Token fehlt“ das Token-Verzeichnis des Users.
 
 ### Sicherheitsvertrag
 
@@ -2191,7 +2217,10 @@ nach dem Projektverzeichnis benannte, sonst die einzige. „Testen“ prüft die
 schreibt nichts; „Eintragen“ ist erst für genau die getestete Auswahl frei und prüft am
 Server erneut. Ohne nutzbares Paar zeigt die Karte die Admin-Schritte in der festgelegten
 Reihenfolge (Hub, Collection, Account je Rechner mit der Collection, User und Token);
-antwortet der Node für kein Paar, statt dessen den Hinweis, Kephalaion zu starten. Ein Paar,
+antwortet der Node für kein Paar, statt dessen den Hinweis, Kephalaion zu starten. Fehlt die config oder ist sie
+nicht lesbar, steht der Satz aus `configProblem` da; gilt eine config, die nicht die des Users
+ist (global oder aus `KEPHALAION_CONFIG`), nennt der Schritt sie und das Token-Verzeichnis des
+Users getrennt. Ein Paar,
 für das nur eine Datei `*.pending` liegt, erscheint als Hinweis auf
 `kephalaion node account check`. Bei bestehender Anbindung öffnet „Collection ändern“ den
 Schritt erneut, mit „Abbrechen“.
@@ -3541,7 +3570,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/branches/switch` | `{target, remote, stamp}`: prüft erneut und führt nur bei passendem Stempel und ohne Blockierendes `git switch` aus; sonst 409 mit der neuen Prüfung; kein force, kein Stash, kein Pull |
 | `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; ein verworfenes Log ist `log-gone`; nur lesend |
 | `GET` | `/api/kephalaion` | Anbindung an die Kephalaion-Collection aus `K-PLAYBOOK.local.yaml` samt Ergebnis der Prüfung über MCP (`status`), Ort der Datei, Zeitpunkt der Prüfung; Zwischenspeicher 30 s; nimmt keinen Wert aus der Anfrage |
-| `GET` | `/api/kephalaion/candidates` | Paare aus `tokens/<hub>/<account>.token` mit Zustand und lesbaren Collections, Paare mit nur `*.pending`, Adresse des Nodes, Vorauswahl, Admin-Schritte; nimmt keinen Wert aus der Anfrage |
+| `GET` | `/api/kephalaion/candidates` | Paare aus `tokens/<hub>/<account>.token` mit Zustand und lesbaren Collections, Paare mit nur `*.pending`, geltende config (`configPath`, `configSource`, `configProblem`) getrennt vom Token-Verzeichnis (`tokensDir`), Adresse des Nodes, Vorauswahl, Admin-Schritte; nimmt keinen Wert aus der Anfrage |
 | `POST` | `/api/kephalaion/test` | `{hub, account, collection}` prüfen; schreibt nichts; 400 bei Namen außerhalb der Namensregel |
 | `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` den Block `kephalaion:` (bei Bedarf dazu `k-playbook-local/.gitignore`); 409 mit Zustand bei nicht bestandenem Test oder versionierter Datei; verwirft den Zwischenspeicher |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |

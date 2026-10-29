@@ -40,15 +40,10 @@ import (
 // Seitenwechsel den Node.
 const kephalaionCacheTTL = 30 * time.Second
 
-// kephalaionEnv liefert die Kephalaion-Einrichtung dieses Rechners;
-// austauschbar für Tests.
-var kephalaionEnv = func() kephalaion.Env {
-	dir, err := kephalaion.DefaultConfigDir()
-	if err != nil {
-		return kephalaion.Env{}
-	}
-	return kephalaion.LoadEnv(dir)
-}
+// kephalaionEnv liefert die Kephalaion-Einrichtung dieses Rechners, in
+// derselben Reihenfolge gesucht wie von Kephalaion selbst; austauschbar für
+// Tests.
+var kephalaionEnv = kephalaion.DefaultEnv
 
 // kephalaionCache hält das letzte Ergebnis der Prüfung je Projekt.
 var kephalaionCache struct {
@@ -123,8 +118,18 @@ type kephalaionCandidatesResponse struct {
 	Available bool `json:"available"`
 	// ConfigPresent sagt, ob es eine config von Kephalaion gibt.
 	ConfigPresent bool `json:"configPresent"`
-	// ConfigDir ist ihr Verzeichnis in Anzeigeform.
-	ConfigDir string `json:"configDir"`
+	// ConfigPath ist die config, die gilt, in Anzeigeform; ohne config der
+	// Ort beim User, an dem kephalaion init sie anlegt.
+	ConfigPath string `json:"configPath"`
+	// ConfigSource sagt, woher sie kommt: env (KEPHALAION_CONFIG), user
+	// oder system (/etc/kephalaion/config.yaml).
+	ConfigSource kephalaion.ConfigSource `json:"configSource"`
+	// ConfigProblem ist der Satz, wenn die config fehlt oder nicht lesbar
+	// ist; er nennt die gesuchten bzw. gelesenen Pfade.
+	ConfigProblem string `json:"configProblem,omitempty"`
+	// TokensDir ist das Token-Verzeichnis des Users in Anzeigeform — auch
+	// bei globaler config.
+	TokensDir string `json:"tokensDir"`
 	// Endpoint ist die Adresse von /mcp am Node; leer, wenn unzulässig.
 	Endpoint string `json:"endpoint"`
 	// AddressProblem erklärt einen fehlenden Endpoint.
@@ -177,7 +182,10 @@ func kephalaionCandidatesHandler(w http.ResponseWriter, r *http.Request) {
 	response := kephalaionCandidatesResponse{
 		Available:      true,
 		ConfigPresent:  env.ConfigPresent,
-		ConfigDir:      project.DisplayPath(env.ConfigDir),
+		ConfigPath:     project.DisplayPath(env.ConfigPath),
+		ConfigSource:   env.ConfigSource,
+		ConfigProblem:  env.ConfigProblem(),
+		TokensDir:      project.DisplayPath(env.TokensDir()),
 		Endpoint:       env.Endpoint,
 		AddressProblem: env.AddressProblem,
 		Pairs:          kephalaion.ProbePairs(r.Context(), env),

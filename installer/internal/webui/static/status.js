@@ -360,10 +360,17 @@ function renderKephalaionCandidates(data) {
     els.message.textContent = data.message || "";
     return;
   }
-  if (!data.configPresent) {
-    notes.push(`Kephalaion ist auf diesem Rechner nicht eingerichtet: keine config unter ${data.configDir}.`);
+  if (data.configProblem) {
+    notes.push(data.configProblem);
   } else if (!data.endpoint) {
     notes.push(`Keine zulässige Adresse des Nodes: ${data.addressProblem || "unbekannt"}`);
+  }
+  if (data.configPresent && !data.configProblem && data.configSource && data.configSource !== "user") {
+    // Die config gilt nicht beim User, die Tokens liegen aber dort: Beide
+    // Orte getrennt nennen, damit niemand die Tokens neben der globalen
+    // config sucht.
+    const source = data.configSource === "env" ? "aus KEPHALAION_CONFIG" : "global";
+    notes.push(`Es gilt die config ${data.configPath} (${source}); die Token-Dateien liegen beim User unter ${data.tokensDir || "~/.config/kephalaion/tokens"}.`);
   }
   for (const pending of data.pending || []) {
     notes.push(`Für Account ${pending.account} am Hub ${pending.hub} liegt nur ein Token, das noch auf den Tausch wartet: `
@@ -400,7 +407,7 @@ function renderKephalaionCandidates(data) {
     els.form.hidden = false;
     renderKephalaionPairs();
   } else {
-    notes.push(`Keine Token-Datei unter ${data.configDir || "~/.config/kephalaion"}/tokens/<hub>/<account>.token gefunden.`);
+    notes.push(`Keine Token-Datei unter ${data.tokensDir || "~/.config/kephalaion/tokens"}/<hub>/<account>.token gefunden.`);
   }
   els.message.textContent = notes.join("\n");
 }

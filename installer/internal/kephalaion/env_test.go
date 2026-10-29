@@ -173,7 +173,7 @@ func TestCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env := Env{ConfigDir: dir}
+	env := Env{UserDir: dir}
 	candidates, pending := env.Candidates()
 	var got []string
 	for _, c := range candidates {
@@ -241,7 +241,7 @@ func TestFileContentNeverLeaks(t *testing.T) {
 		"kephalaion: {" + testToken + "}\n",
 		"kephalaion: [a, b] " + testToken + "\n",
 	}
-	env := Env{ConfigDir: t.TempDir()}
+	env := Env{UserDir: t.TempDir()}
 	for i, content := range locals {
 		local := t.TempDir()
 		writeFile(t, LocalFilePath(local), content)

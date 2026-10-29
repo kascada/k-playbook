@@ -424,8 +424,13 @@ reports `login: ok` for the hub and lists the collection among the readable ones
 more than the command `kephalaion node whoami`: that the node answers on `/mcp` and that the
 token is valid at the hub. It does not show whether the headers in an assistant's own MCP
 configuration carry the same, still valid token. The address comes from `node.listen` in
-Kephalaion's `config.yaml` (`$XDG_CONFIG_HOME` is honoured; without `listen` Kephalaion's
-default `127.0.0.1:7433` applies). Only `127.0.0.1`, `[::1]` and `localhost` are accepted; a
+the `config.yaml` that applies, found in the same order Kephalaion uses without `--config`:
+`KEPHALAION_CONFIG`, then the user's config (`$XDG_CONFIG_HOME/kephalaion/config.yaml` or
+`~/.config/kephalaion/config.yaml`) if it exists, then the global
+`/etc/kephalaion/config.yaml` if it exists. Without `listen` Kephalaion's default
+`127.0.0.1:7433` applies. The token files always stay with the user, under
+`~/.config/kephalaion/tokens/` (or `$XDG_CONFIG_HOME/kephalaion/tokens/`), even when the global
+config applies. Only `127.0.0.1`, `[::1]` and `localhost` are accepted; a
 wildcard (`0.0.0.0`, `[::]`) is reached on `127.0.0.1`, any other address is reported and never
 contacted. The whole check takes at most 3 seconds.
 

@@ -27,9 +27,5 @@ var kephalaionBinary = kephalaion.FindBinary
 
 // kephalaionCheck ist austauschbar, damit Tests den Node nicht fragen.
 var kephalaionCheck = func(projectDir string) kephalaion.Status {
-	env := kephalaion.Env{}
-	if dir, err := kephalaion.DefaultConfigDir(); err == nil {
-		env = kephalaion.LoadEnv(dir)
-	}
-	return kephalaion.Check(context.Background(), LocalDir(projectDir), env)
+	return kephalaion.Check(context.Background(), LocalDir(projectDir), kephalaion.DefaultEnv())
 }

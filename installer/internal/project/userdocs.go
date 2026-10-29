@@ -396,11 +396,7 @@ func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 	if err != nil {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "Anbindung nicht lesbar: %v", err)
 	}
-	env := kephalaion.Env{}
-	if dir, err := kephalaion.DefaultConfigDir(); err == nil {
-		env = kephalaion.LoadEnv(dir)
-	}
-	client, err := kephalaion.NewClient(binding, env)
+	client, err := kephalaion.NewClient(binding, kephalaion.DefaultEnv())
 	if err != nil {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "%v", err)
 	}

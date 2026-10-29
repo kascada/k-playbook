@@ -133,6 +133,11 @@ func TestKephalaionSaveWritesOnlyAfterPassedTest(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &candidates); err != nil {
 		t.Fatal(err)
 	}
+	// config und Token-Ort stehen getrennt da; die config trägt.
+	if !candidates.ConfigPresent || candidates.ConfigSource != kephalaion.SourceUser || candidates.ConfigProblem != "" ||
+		filepath.Base(candidates.ConfigPath) != "config.yaml" || filepath.Base(candidates.TokensDir) != "tokens" {
+		t.Fatalf("config und Tokens: %+v", candidates)
+	}
 	// Das Projektverzeichnis heißt nicht k-playbook; vorgewählt ist dann
 	// keine Collection, weil es zwei gibt.
 	if candidates.Preselect.Hub != "vm" || candidates.Preselect.Account != "kamran-wsl" {
@@ -264,5 +269,52 @@ func TestKephalaionResponsesDoNotQuoteFileContent(t *testing.T) {
 	code, body = kephCall(t, http.MethodGet, "/api/context", "", nil)
 	if code != 200 || !strings.Contains(body, `"state":"invalid-entry"`) {
 		t.Fatalf("/api/context: %d %s", code, body)
+	}
+}
+
+// Die Kandidaten nennen config und Token-Ort getrennt: Ohne config steht der
+// Satz mit beiden gesuchten Orten da, mit nur globaler config gilt sie, und
+// die Tokens bleiben beim User.
+func TestKephalaionCandidatesNameConfigAndTokensSeparately(t *testing.T) {
+	kephProject(t)
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv(kephalaion.EnvConfigVar, "")
+	originalPath := kephalaion.SystemConfigPath
+	systemPath := filepath.Join(t.TempDir(), "config.yaml")
+	kephalaion.SystemConfigPath = systemPath
+	kephalaionEnv = kephalaion.DefaultEnv
+	t.Cleanup(func() { kephalaion.SystemConfigPath = originalPath })
+	userDir := filepath.Join(xdg, "kephalaion")
+
+	read := func() kephalaionCandidatesResponse {
+		t.Helper()
+		code, body := kephCall(t, http.MethodGet, "/api/kephalaion/candidates", "", nil)
+		var response kephalaionCandidatesResponse
+		if code != 200 || json.Unmarshal([]byte(body), &response) != nil {
+			t.Fatalf("Kandidaten: %d %s", code, body)
+		}
+		return response
+	}
+
+	none := read()
+	if none.ConfigPresent || !strings.Contains(none.ConfigProblem, filepath.Join(userDir, "config.yaml")) ||
+		!strings.Contains(none.ConfigProblem, systemPath) {
+		t.Fatalf("ohne config: %+v", none)
+	}
+	if none.TokensDir != project.DisplayPath(filepath.Join(userDir, "tokens")) {
+		t.Fatalf("Token-Ort ohne config: %q", none.TokensDir)
+	}
+
+	if err := os.WriteFile(systemPath, []byte("node:\n  listen: 127.0.0.1:7433\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	global := read()
+	if !global.ConfigPresent || global.ConfigSource != kephalaion.SourceSystem || global.ConfigProblem != "" ||
+		global.ConfigPath != project.DisplayPath(systemPath) || global.Endpoint != "http://127.0.0.1:7433/mcp" {
+		t.Fatalf("nur global: %+v", global)
+	}
+	if global.TokensDir != project.DisplayPath(filepath.Join(userDir, "tokens")) {
+		t.Fatalf("Token-Ort bei globaler config: %q", global.TokensDir)
 	}
 }

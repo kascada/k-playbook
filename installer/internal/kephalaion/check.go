@@ -3,6 +3,7 @@ package kephalaion
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -133,21 +134,15 @@ type failure struct {
 // probe führt die Schritte bis zur Antwort von whoami aus: config, Adresse,
 // Kandidat, Token, Anfrage. Hub und Account müssen schon geprüft sein.
 func probe(ctx context.Context, hub, account string, env Env) (*whoamiOutput, *failure) {
-	if !env.ConfigPresent {
-		return nil, &failure{StateNoKephalaion,
-			"Kephalaion ist auf diesem Rechner nicht eingerichtet: keine config unter " + env.ConfigDir + "."}
-	}
-	if env.ConfigError != "" {
-		return nil, &failure{StateNoKephalaion, "Die config von Kephalaion ist nicht lesbar: " + env.ConfigError + "."}
+	if problem := env.ConfigProblem(); problem != "" {
+		return nil, &failure{StateNoKephalaion, problem}
 	}
 	if env.Endpoint == "" {
 		return nil, &failure{StateNodeAddress, "Keine zulässige Adresse des Nodes: " + env.AddressProblem}
 	}
 	candidate, ok := env.FindCandidate(hub, account)
 	if !ok {
-		return nil, &failure{StateTokenMissing, fmt.Sprintf(
-			"Keine Token-Datei für Account %s am Hub %s: tokens/%s/%s.token fehlt unter %s.",
-			account, hub, hub, account, env.ConfigDir)}
+		return nil, &failure{StateTokenMissing, tokenMissingMessage(env, hub, account)}
 	}
 	token, err := candidate.readToken()
 	if err != nil {
@@ -163,6 +158,46 @@ func probe(ctx context.Context, hub, account string, env Env) (*whoamiOutput, *f
 			fmt.Sprintf("Der Node antwortet nicht unter %s: %v.", env.Endpoint, err), token)}
 	}
 	return reply, nil
+}
+
+// ConfigProblem sagt in einem Satz, warum die config von Kephalaion nicht
+// trägt — keine da oder nicht lesbar —, mit den Pfaden, an denen gesucht
+// bzw. gelesen wurde; leer, wenn sie gelesen ist. Ein Inhalt der Datei steht
+// nie darin.
+func (e Env) ConfigProblem() string {
+	if !e.ConfigPresent {
+		return "Kephalaion ist auf diesem Rechner nicht eingerichtet: " + e.missingConfig() + "."
+	}
+	if e.ConfigError != "" {
+		return "Die config von Kephalaion unter " + e.ConfigPath + " ist nicht lesbar: " + e.ConfigError + "."
+	}
+	return ""
+}
+
+// missingConfig nennt die Orte, an denen die Suche keine config fand. Bei
+// KEPHALAION_CONFIG ist das nur dieser Pfad: Die Variable schließt die
+// übrigen Orte aus.
+func (e Env) missingConfig() string {
+	if e.ConfigSource == SourceEnv {
+		return "keine config unter " + e.ConfigPath + " (Quelle " + EnvConfigVar + ")"
+	}
+	system := filepath.Clean(SystemConfigPath)
+	if e.UserDir == "" {
+		return "keine config unter " + system + ", und die des Users ist unbekannt, weil das Heimatverzeichnis unbekannt ist"
+	}
+	return "keine config unter " + filepath.Join(e.UserDir, "config.yaml") + " und keine unter " + system
+}
+
+// tokenMissingMessage nennt das Token-Verzeichnis des Users, in dem die
+// Datei des Paars fehlt.
+func tokenMissingMessage(env Env, hub, account string) string {
+	dir := env.TokensDir()
+	if dir == "" {
+		return fmt.Sprintf("Keine Token-Datei für Account %s am Hub %s: Das Token-Verzeichnis ist unbekannt, weil das Heimatverzeichnis unbekannt ist.",
+			account, hub)
+	}
+	return fmt.Sprintf("Keine Token-Datei für Account %s am Hub %s: %s/%s.token fehlt im Token-Verzeichnis %s.",
+		account, hub, hub, account, dir)
 }
 
 // hubState wertet den Eintrag eines Hubs in der Antwort aus: alles bis zur
