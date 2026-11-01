@@ -33,23 +33,13 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "results", "data", "cache", "guidelines", "tasks", "priv", "material"} {
+	for _, name := range []string{"rules", "reviews", "checks", "commands", "skills", "results", "guidelines", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
 		}
 	}
-	// data/ hält Maschinendateien, die zum Projektstand gehören: es wird
-	// mitversioniert und ist deshalb weder privat noch vorbelegt.
-	for _, entry := range LocalStructure() {
-		if entry.Path != "data" {
-			continue
-		}
-		if entry.Private || entry.PrivateByDefault {
-			t.Errorf("data/ ist als privat geführt: Private=%v PrivateByDefault=%v", entry.Private, entry.PrivateByDefault)
-		}
-	}
-	if !isDir(filepath.Join(local, "tasks", "done")) {
-		t.Error("tasks/done fehlt")
+	if !fileExists(filepath.Join(local, InstructionsFileName)) {
+		t.Errorf("%s fehlt", InstructionsFileName)
 	}
 	if !fileExists(filepath.Join(local, VersionSourcesFileName)) {
 		t.Errorf("%s fehlt", VersionSourcesFileName)
@@ -83,51 +73,6 @@ func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) 
 	}
 }
 
-// docs/code/, docs/libs/ und docs/versions/ gehören je einem Erzeuger und
-// entstehen beim ersten Lauf des jeweiligen Commands, nicht beim Einrichten.
-// docs/extracted/ ist seit Task 073 kein Ziel mehr und entsteht ebenso wenig.
-// docs/manual/ liegt seit Task 101 unter keph:/docs/manual/; legte das
-// Einrichten es neu an, brächte es zurück, was die Umstellung 3.2 in /k-upgrade
-// abgeräumt hat.
-func TestCreateLocalLegtErzeugteDocsVerzeichnisseNichtAn(t *testing.T) {
-	root := t.TempDir()
-
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal: %v", err)
-	}
-
-	for _, name := range []string{"code", "libs", "extracted", "versions", "manual"} {
-		if pathExists(filepath.Join(LocalDir(root), "docs", name)) {
-			t.Errorf("docs/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", name)
-		}
-	}
-}
-
-// Die Zwecktexte von docs/ und material/ nennen docs/extracted/ nicht mehr als
-// Ziel (Task 073): /k-docs-extract schreibt über die Wissenswerkzeuge nach
-// knowledge/extracted/, und neues Rohmaterial gehört nach inbox/.
-func TestLocalStructureZweckNenntKnowledgeExtractedAlsZiel(t *testing.T) {
-	purposes := map[string]string{}
-	for _, entry := range LocalStructure() {
-		purposes[filepath.ToSlash(entry.Path)] = entry.Purpose
-	}
-	for _, name := range []string{"docs", "material"} {
-		purpose, ok := purposes[name]
-		if !ok {
-			t.Fatalf("%s fehlt in LocalStructure", name)
-		}
-		if strings.Contains(purpose, "docs/extracted/") || strings.Contains(purpose, "extracted/ von /k-docs-extract") {
-			t.Errorf("%s nennt docs/extracted/ als Ziel:\n%s", name, purpose)
-		}
-		if !strings.Contains(purpose, "../knowledge/extracted/") {
-			t.Errorf("%s nennt knowledge/extracted/ nicht:\n%s", name, purpose)
-		}
-	}
-	if !strings.Contains(purposes["material"], "../inbox/") {
-		t.Errorf("material nennt inbox/ nicht als Ort für neues Rohmaterial:\n%s", purposes["material"])
-	}
-}
-
 // Git speichert keine leeren Verzeichnisse; ohne README wären sie nach einem
 // Clone des Projekts verschwunden.
 func TestCreateLocalLegtReadmesAn(t *testing.T) {
@@ -147,88 +92,86 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	}
 }
 
-// Die README von docs/ ist seit Task 101 eine Struktur-README: sie nennt den
-// Einstieg keph:/docs/ und was auf der Platte bleibt. Nennte sie sich weiter
-// Index oder verlangte, zuerst gelesen zu werden, legte das Einrichten den
-// alten Platten-Einstieg als Rückfall neu an.
-func TestCreateLocalLegtDocsReadmeOhneIndexAn(t *testing.T) {
-	root := t.TempDir()
+// removedLocalEntries sind die neun Einträge, die Task 107 aus der Struktur
+// genommen hat: ihr Inhalt liegt in der Projekt-Collection oder zieht als
+// Nächstes dorthin.
+var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", InboxDirName, QueueDirName, KnowledgeDirName, CacheDirName}
 
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal: %v", err)
+// Das Einrichten legt die neun Einträge nicht mehr an und zählt sie nicht als
+// fehlend; ein Projekt ohne sie ist vollständig. Auch cache/ entsteht nicht
+// nebenbei — CreateLocal fasst die Wissensablage nicht mehr an.
+func TestCreateLocalLegtEntfernteEintraegeNichtAn(t *testing.T) {
+	inStructure := map[string]bool{}
+	for _, entry := range LocalStructure() {
+		inStructure[filepath.ToSlash(entry.Path)] = true
 	}
-
-	path := filepath.Join(LocalDir(root), "docs", "README.md")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("Docs-README lesen: %v", err)
-	}
-	text := string(content)
-	for _, want := range []string{"keph:/docs/", "code/", "libs/"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("Docs-README enthält %q nicht:\n%s", want, text)
+	for _, name := range removedLocalEntries {
+		if inStructure[name] {
+			t.Errorf("%s steht noch in LocalStructure", name)
 		}
 	}
-	for _, stale := range []string{"Index", "zuerst", "/k-docs-index", "AGENTS.md"} {
-		if strings.Contains(text, stale) {
-			t.Errorf("Docs-README enthält noch %q:\n%s", stale, text)
+
+	root := t.TempDir()
+	statuses, err := CreateLocal(root)
+	if err != nil {
+		t.Fatalf("CreateLocal: %v", err)
+	}
+	if !LocalOK(statuses) {
+		t.Fatalf("ohne die entfernten Einträge unvollständig: %+v", statuses)
+	}
+	for _, name := range removedLocalEntries {
+		if pathExists(filepath.Join(LocalDir(root), filepath.FromSlash(name))) {
+			t.Errorf("%s wurde beim Einrichten angelegt", name)
 		}
 	}
 }
 
-// Die drei Zonen der Wissensablage entstehen beim Einrichten, jede mit einer
-// README, die ihren Zweck in eigenen Worten trägt. inbox/ ist Rohmaterial mit
-// Tokens und Namen und darum privat umschaltbar wie material/ — aber nicht
-// vorbelegt: ob es ins Repository geht, entscheidet das Projekt. queue/ und
-// knowledge/ werden ganz normal versioniert. Die Erzeugerordner unterhalb von
-// knowledge/ legt nicht das Einrichten an, sondern der jeweilige Erzeuger.
-func TestCreateLocalLegtDieDreiZonenAn(t *testing.T) {
+// Ein Bestandsprojekt, in dem die alten Verzeichnisse noch liegen, bleibt
+// vollständig, und CreateLocal lässt sie stehen: abgeräumt wird allein über
+// /k-upgrade, nach Bestätigung.
+func TestCreateLocalLaesstAlteVerzeichnisseStehen(t *testing.T) {
 	root := t.TempDir()
+	for _, name := range removedLocalEntries {
+		readme := filepath.Join(LocalDir(root), filepath.FromSlash(name), "README.md")
+		if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(readme, []byte("# alt\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
-	if _, err := CreateLocal(root); err != nil {
+	statuses, err := CreateLocal(root)
+	if err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
-	local := LocalDir(root)
-
-	for name, want := range map[string]string{
-		InboxDirName:     "Archiv, keine Warteschlange",
-		QueueDirName:     "nichts offen",
-		KnowledgeDirName: "Eigentümer",
-	} {
-		if !isDir(filepath.Join(local, name)) {
-			t.Errorf("%s fehlt", name)
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(local, name, "README.md"))
-		if err != nil {
-			t.Errorf("%s/README.md fehlt: %v", name, err)
-			continue
-		}
-		if !strings.Contains(string(content), want) {
-			t.Errorf("%s/README.md trägt %q nicht:\n%s", name, want, content)
-		}
-		if pathExists(filepath.Join(local, name, PrivateIgnoreFile)) {
-			t.Errorf("%s wurde privat vorbelegt", name)
+	if !LocalOK(statuses) {
+		t.Fatalf("Bestandsprojekt unvollständig: %+v", statuses)
+	}
+	for _, status := range statuses {
+		for _, name := range removedLocalEntries {
+			if filepath.ToSlash(status.Path) == name {
+				t.Errorf("CheckLocal meldet den entfernten Eintrag %s", name)
+			}
 		}
 	}
-	for _, sub := range []string{"code", "libs", "versions", "extracted", "external", "findings", "pitfalls", "manual"} {
-		if pathExists(filepath.Join(local, KnowledgeDirName, sub)) {
-			t.Errorf("knowledge/%s wurde beim Einrichten angelegt, gehört aber seinem Erzeuger", sub)
+	for _, name := range removedLocalEntries {
+		content, err := os.ReadFile(filepath.Join(LocalDir(root), filepath.FromSlash(name), "README.md"))
+		if err != nil || string(content) != "# alt\n" {
+			t.Errorf("%s/README.md verändert: %q, %v", name, content, err)
 		}
 	}
+}
 
-	private := map[string]bool{}
+// Die Zwecktexte der übrigen Einträge zeigen nicht auf entfernte Verzeichnisse;
+// sie stehen in den READMEs, die das Einrichten schreibt.
+func TestLocalStructureZweckZeigtNichtAufEntfernteEintraege(t *testing.T) {
 	for _, entry := range LocalStructure() {
-		private[entry.Path] = entry.Private
-		if entry.PrivateByDefault && (entry.Path == InboxDirName || entry.Path == QueueDirName || entry.Path == KnowledgeDirName) {
-			t.Errorf("%s ist privat vorbelegt", entry.Path)
+		for _, name := range removedLocalEntries {
+			if strings.Contains(entry.Purpose, "../"+name+"/") {
+				t.Errorf("%s nennt ../%s/:\n%s", entry.Path, name, entry.Purpose)
+			}
 		}
-	}
-	if !private[InboxDirName] {
-		t.Error("inbox/ trägt das Private-Kennzeichen nicht")
-	}
-	if private[QueueDirName] || private[KnowledgeDirName] {
-		t.Error("queue/ oder knowledge/ tragen das Private-Kennzeichen, sind aber Projektwissen")
 	}
 }
 
@@ -297,9 +240,9 @@ func TestLocalStructureDecktOverlaySortenAb(t *testing.T) {
 	}
 }
 
-// priv/ und material/ werden angelegt wie jedes andere Verzeichnis. Dass ihr
-// Inhalt oft privat bleiben soll, steht in ihrer README — entschieden wird es
-// vom Projekt, nicht von k-playbook.
+// priv/ wird angelegt wie jedes andere Verzeichnis. Dass sein Inhalt oft
+// privat bleiben soll, steht in seiner README — entschieden wird es vom
+// Projekt, nicht von k-playbook.
 func TestCreateLocalLegtPrivateVerzeichnisseAn(t *testing.T) {
 	root := t.TempDir()
 
@@ -307,7 +250,7 @@ func TestCreateLocalLegtPrivateVerzeichnisseAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	for _, name := range []string{"priv", "material"} {
+	for _, name := range []string{"priv"} {
 		dir := filepath.Join(LocalDir(root), name)
 		if !isDir(dir) {
 			t.Errorf("%s/ fehlt", name)
@@ -501,115 +444,5 @@ func TestEnsureLocalLaesstOeffentlichGeschaltetesVerzeichnisOeffentlich(t *testi
 	}
 	if status := PrivacyStatusFor(root, entry); status.State != PrivacyPublic {
 		t.Errorf("State nach dem Start = %q, erwartet %q (%s)", status.State, PrivacyPublic, status.Reason)
-	}
-}
-
-// CreateLocal legt die README in knowledge/ durch das Tor an (Erzeuger
-// docs-index): mit Frontmatter, und der Index kennt sie. Ein gebauter, leerer
-// Index meldet danach keine Drift. Eine vorhandene README bleibt, wie sie ist
-// (Task 063, Etappe 3).
-func TestCreateLocalOhneDriftInKnowledge(t *testing.T) {
-	t.Run("neu", func(t *testing.T) {
-		root := t.TempDir()
-		if _, err := NewKnowledge(root).Status(); err != nil {
-			t.Fatalf("Status vor CreateLocal: %v", err)
-		}
-		if _, err := CreateLocal(root); err != nil {
-			t.Fatalf("CreateLocal: %v", err)
-		}
-		status, err := NewKnowledge(root).Status()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if status.Stale || status.StaleFiles != 0 || status.FileCount != 1 {
-			t.Errorf("Status nach CreateLocal: %+v", status)
-		}
-		content, err := os.ReadFile(filepath.Join(LocalDir(root), KnowledgeDirName, "README.md"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		head := parseKnowledgeFrontmatter(content)
-		if head.Title == "" || head.State == "" {
-			t.Errorf("README ohne title oder state:\n%s", content)
-		}
-		if !strings.Contains(string(content), "Eigentümer") {
-			t.Errorf("README ohne Zweck:\n%s", content)
-		}
-		if gitignore := filepath.Join(LocalDir(root), CacheDirName, PrivateIgnoreFile); !fileExists(gitignore) {
-			t.Error("cache/.gitignore fehlt")
-		}
-	})
-
-	t.Run("vorhandene README bleibt", func(t *testing.T) {
-		root := t.TempDir()
-		readme := filepath.Join(LocalDir(root), KnowledgeDirName, "README.md")
-		if err := os.MkdirAll(filepath.Dir(readme), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(readme, []byte("# eigener Index\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := CreateLocal(root); err != nil {
-			t.Fatalf("CreateLocal: %v", err)
-		}
-		if content, err := os.ReadFile(readme); err != nil || string(content) != "# eigener Index\n" {
-			t.Errorf("vorhandene README verändert: %q, %v", content, err)
-		}
-	})
-}
-
-// Scheitert beim Anlegen der README in knowledge/ nur der Index, steht die
-// Datei aber auf der Platte, läuft CreateLocal weiter und legt die übrigen
-// Einträge an (Task 064, Entscheidung 5). Der nächste Zugriff nimmt die README
-// über die Drift-Erkennung auf.
-func TestCreateLocalLaeuftBeiGeschriebenerReadmeWeiter(t *testing.T) {
-	root := t.TempDir()
-	if _, err := NewKnowledge(root).Status(); err != nil {
-		t.Fatalf("Status vor CreateLocal: %v", err)
-	}
-	cache := KnowledgeCacheDir(root)
-	denyWrite(t, cache)
-
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal bricht trotz geschriebener README ab: %v", err)
-	}
-	content, err := os.ReadFile(filepath.Join(KnowledgeDir(root), "README.md"))
-	if err != nil {
-		t.Fatalf("README fehlt: %v", err)
-	}
-	if head := parseKnowledgeFrontmatter(content); head.Title == "" || head.State == "" {
-		t.Errorf("README ohne title oder state:\n%s", content)
-	}
-	after := false
-	checked := 0
-	for _, status := range CheckLocal(root) {
-		if status.Path == KnowledgeDirName {
-			after = true
-			continue
-		}
-		if !after {
-			continue
-		}
-		checked++
-		if !status.Present {
-			t.Errorf("Eintrag nach knowledge/ nicht angelegt: %s", status.Path)
-		}
-	}
-	if checked == 0 {
-		t.Fatal("Vorbedingung: in LocalStructure steht nichts hinter knowledge/")
-	}
-
-	if err := os.Chmod(cache, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	status, err := NewKnowledge(root).Status()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status.FileCount != 1 || status.ByKind[KnowledgeRootKind].Files != 1 {
-		t.Errorf("README nicht indiziert: %+v", status)
-	}
-	if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
-		t.Errorf("zweiter Zugriff: %+v, %v", status, err)
 	}
 }

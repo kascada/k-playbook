@@ -808,7 +808,51 @@ func TestKnowledgeLeereOderFehlendeZoneAntwortetLeer(t *testing.T) {
 			if len(knowledge.Notes()) != 0 {
 				t.Errorf("Notizen bei leerer Zone: %v", knowledge.Notes())
 			}
+			// Ein genannter Pfad, den es nicht gibt, bleibt ein Eingabefehler
+			// — gleich, ob das Verzeichnis leer ist oder fehlt.
+			if _, err := knowledge.Read("manual/alt.md"); err == nil || !IsInputError(err) {
+				t.Errorf("Read: %v, erwartet einen Eingabefehler", err)
+			}
+			// Nichts zu indizieren: kein Index, kein cache/ (Task 107). Sonst
+			// käme cache/ nach dem Aufräumen durch /k-upgrade beim ersten
+			// list zurück.
+			if pathExists(filepath.Join(LocalDir(root), CacheDirName)) {
+				t.Error("cache/ ist durch einen Lesezugriff auf eine leere Ablage entstanden")
+			}
+			if name == "fehlt" && pathExists(KnowledgeDir(root)) {
+				t.Error("knowledge/ ist durch einen Lesezugriff entstanden")
+			}
 		})
+	}
+}
+
+// Liegt schon ein Index, wird er auch bei leerer Ablage abgeglichen und
+// zurückgeschrieben: cache/ ist dann ohnehin da, und ein stehengebliebener
+// Index meldete sonst bei jedem Zugriff dieselbe Drift.
+func TestKnowledgeIndexWirdBeiGeleerterAblageNachgefuehrt(t *testing.T) {
+	root := knowledgeFixture(t)
+	if _, err := NewKnowledge(root).Status(); err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+	if !fileExists(KnowledgeIndexFile(root)) {
+		t.Fatal("Vorbedingung: kein Index nach dem ersten Zugriff")
+	}
+	if err := os.RemoveAll(KnowledgeDir(root)); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := NewKnowledge(root).Status()
+	if err != nil {
+		t.Fatalf("Status nach dem Leeren: %v", err)
+	}
+	if status.FileCount != 0 || !status.Stale {
+		t.Errorf("Status nach dem Leeren = %+v, erwartet leer mit Drift", status)
+	}
+	if index := readIndexFile(t, root); len(index.Files) != 0 {
+		t.Errorf("Index nicht nachgeführt: %d Dateien", len(index.Files))
+	}
+	if status, err := NewKnowledge(root).Status(); err != nil || status.Stale {
+		t.Errorf("zweiter Zugriff: %+v, %v", status, err)
 	}
 }
 
@@ -867,10 +911,9 @@ func denyRead(t *testing.T, path string) {
 }
 
 // Der erste Zugriff legt cache/ an — und dabei die verwaltete .gitignore.
-// Ohne sie wäre der abgeleitete Index committierbar: CreateLocal schreibt sie
-// nur für ein Verzeichnis, das in seinem eigenen Lauf entsteht, und zieht sie
-// später nie nach. Ein Release mit `git add -A` nähme den Chunk-Abzug der
-// ganzen Doku mit.
+// Ohne sie wäre der abgeleitete Index committierbar: cache/ steht nicht in der
+// lokalen Struktur, und niemand sonst schreibt sie. Ein Release mit
+// `git add -A` nähme den Chunk-Abzug der ganzen Doku mit.
 func TestKnowledgeIndexLegtGitignoreFuerCacheAn(t *testing.T) {
 	root := knowledgeFixture(t)
 	cache := filepath.Join(LocalDir(root), CacheDirName)
@@ -894,7 +937,7 @@ func TestKnowledgeIndexLegtGitignoreFuerCacheAn(t *testing.T) {
 
 // Ein vorhandenes cache/ ohne .gitignore bleibt, wie es ist: dass ein Projekt
 // das Verzeichnis bewusst öffentlich gestellt hat, dreht kein Zugriff still
-// zurück — dieselbe Zurückhaltung wie in CreateLocal.
+// zurück.
 func TestKnowledgeIndexBringtEntfernteGitignoreNichtZurueck(t *testing.T) {
 	root := knowledgeFixture(t)
 	cache := filepath.Join(LocalDir(root), CacheDirName)

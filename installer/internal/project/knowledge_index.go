@@ -215,6 +215,9 @@ func (index *knowledgeIndex) removeFile(rel string) {
 // unlesbare Datei stale für immer auf true und schriebe den Index bei jedem
 // Zugriff neu, und die Drift-Meldung verlöre ihre Aussage.
 //
+// Ohne Index und ohne eine Datei in der Ablage schreibt open nichts: ein
+// Lesezugriff auf eine leere oder fehlende Ablage legt cache/ nicht an.
+//
 // Scheitert etwas, das nur den Cache betrifft — eine einzelne unlesbare Datei,
 // ein nicht beschreibbares cache/ —, antwortet der Zugriff trotzdem: der
 // vollständige Index steht im Speicher. Was dabei übergangen wurde, geht als
@@ -239,7 +242,14 @@ func (k *Knowledge) open() (*knowledgeIndex, error) {
 			index.replaceFile(rel, entry, chunks)
 		}
 		index.BuiltAt = knowledgeNow()
-		k.cache(index)
+		// Ohne Index und ohne etwas zu indizieren bleibt es beim Speicher:
+		// cache/ steht nicht mehr in der lokalen Struktur (Task 107) und soll
+		// nicht schon durch ein list oder search auf eine leere oder fehlende
+		// Ablage entstehen. Ein vorhandener Index wird unten weiter
+		// abgeglichen und zurückgeschrieben — cache/ liegt dann ja schon.
+		if len(paths) > 0 {
+			k.cache(index)
+		}
 		return index, nil
 	}
 

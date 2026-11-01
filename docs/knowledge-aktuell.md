@@ -404,9 +404,33 @@ there and in `always/300-arbeiten-in-tasks.md`; `k-playbook.md`, `defaults/k-pla
 table below). **Open:** the Tasks page of the interface (`/workflows/tasks`,
 `project.ListTasks()`) still reads `k-playbook-local/tasks/`, which is empty after 3.3; its
 switch to the collection is a task of its own, and until then `LocalStructure()` keeps
-`tasks/` and `tasks/done/` with a README that says where tasks live. After the release:
+`tasks/` and `tasks/done/` with a README that says where tasks live (superseded by task 107,
+2026-11-01: `LocalStructure()` drops `tasks/`, `tasks/done/` and seven more directories, and
+`/k-upgrade` 3.4 removes them once empty; the page shows what is left on disk). After the release:
 `/k-task-create` and `/k-task-run` on a trial task in Claude Code and OpenCode, `/k-upgrade`
 3.3 on this repo in a session of its own.
+
+**The task commands sharpened** (task 108, 2026-11-01, not yet released; checked against
+the text only). `on-demand/tasks.md` is the one place for the rules the commands used to
+repeat: references with a prefix (task, intent, everything a command writes into a task),
+foreign references rejected with `foreign_user` before anything is written, completed ones
+lead to the reopen question (`/k-task-run`) or "review anyway or stop" (`/k-task-refine`),
+the new marker lines `wieder geöffnet` and `abgebrochen` with the cut between body and run
+sections, the replica-lag rule (the write operations wait, `doc_grep`/`doc_read` do not; a
+lower revision right after one's own write is lag, only a higher one is `foreign_change`),
+counting before every append and a fixed path for every `outcome_unknown`. The new on-demand
+sheet `verweise-nachziehen.md` says what a reference is and how an old one is brought up to
+date; `/k-task-refine`, `/k-upgrade` 3.3 and the new check `checks/check_verweise.sh` follow
+it. `/k-upgrade` 3.3 now translates an old `## Fortschritt` table into progress lines when it
+moves a task. `/k-remediation` marks every task it creates with a line
+`Remediation-Anker: project:/<source> <bundle-id>` and matches only on it.
+`check_command_tool_guards.sh` also reads the command texts under `defaults/commands/`.
+**Open, measured only after the release:** the replica-lag rule in a real run in Claude Code
+and OpenCode (if the text rule is not enough, a waiting `doc_grep` becomes a task of its own),
+and 3.3 with progress tables in OMNI (`squad-km-dev-setup`). Also open: `check_verweise.sh`
+reads only files on disk; the tasks in the collection follow with the rebuild of the checks,
+and until then `/k-task-refine` brings the existing tasks (077, 078, 082, the OMNI tasks after
+their move) up to date when the user runs it on them.
 
 **Todos become documents in the collection** (decided 2026-10-19, built 2026-10-20 in task
 097, not yet released). The todos were one file, `k-playbook-local/data/todos.json`, owned by

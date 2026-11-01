@@ -36,7 +36,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 |---|---|---|
 | Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task, nicht unter `local.dir` | `/k-task-create`, `/k-remediation` über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
 | Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
-| Kurznotiz, unsortiert | `data/todos.json` | `/k-todo`, `k-playbook todo`, die Oberfläche |
+| Kurznotiz, unsortiert | `todos/` in der Projekt-Collection, nicht unter `local.dir` | `/k-todo`, `k-playbook todo`, die Oberfläche |
 | Review- und Audit-Lauf | `results/<YYYY-MM-DD>/` bzw. `results/<familie>/<YYYY-MM-DD>/` | `/k-review`, `/k-audit` |
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
 | Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
@@ -48,7 +48,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
 | Handgeschriebene Doku | `keph:/docs/manual/<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
-| Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
+| Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` — entsteht beim ersten Lauf von `k-playbook knowledge inbox put` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
@@ -56,13 +56,12 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
 | Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
 
-**Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage
-`data/todos.json` gehört dem Werkzeug: gelesen und geschrieben wird sie über den
-Command, über das Subkommando `k-playbook todo` oder über die Oberfläche. Wer sie
-selbst öffnet, führt eine zweite Auslegung des Formats ein, die in keine Prüfung
-eingeht. Die einzige Ausnahme ist die Auflösung eines Merge-Konflikts — beide
-Einträge behalten, `nextId` auf `max(id)+1` setzen —, und die macht ein Mensch.
-Eine ältere `TODO.md` wird beim ersten Zugriff übersetzt und danach entfernt.
+**Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage, die
+Dokumente unter `todos/` in der Projekt-Collection, gehört dem Werkzeug: gelesen und
+geschrieben wird sie über den Command, über das Subkommando `k-playbook todo` oder über
+die Oberfläche. Wer sie selbst öffnet, führt eine zweite Auslegung des Formats ein, die
+in keine Prüfung eingeht. Ein `data/todos.json` von früher übernimmt
+`k-playbook todo migrate`; eine ältere `TODO.md` wird nur noch gemeldet.
 
 Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema — in `keph:/docs/` wie in
 dem, was unter `docs/` noch auf der Platte liegt. Das Unterverzeichnis sagt, wer die

@@ -50,18 +50,17 @@ locations derive from the project root, the directory that holds
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
-| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. On disk only `k-playbook-local/docs/code/` and `docs/libs/` remain |
-| tool profiles | `k-playbook-local/docs/libs/` |
+| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; until their switch, `/k-docs-code` and `/k-docs-tools` create `docs/code/` and `docs/libs/` there on their first run |
+| tool profiles | `k-playbook-local/docs/libs/`, created by `/k-docs-tools` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
-| raw material | `k-playbook-local/material/` |
+| raw material | `k-playbook-local/inbox/`, created by the knowledge tools on the first write; a `material/` from before is the previous location |
 | project-owned guidelines | `k-playbook-local/guidelines/` |
 | project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
 | open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
-| completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; `k-playbook-local/tasks/` and `tasks/done/` stay on disk only for the interface until its Tasks page is switched |
-| machine files owned by k-playbook | `k-playbook-local/data/` |
-| derived, disposable content | `k-playbook-local/cache/` |
-| project todos | `k-playbook-local/data/todos.json` |
+| completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
+| derived, disposable content | `k-playbook-local/cache/`, created with its managed `.gitignore` when the knowledge gate writes its index |
+| project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
 | version sources | `k-playbook-local/version-sources.yaml` |
 | private content | `k-playbook-local/priv/` |
 | instructions, shipped | `k-playbook/k-playbook.md` |
@@ -73,46 +72,44 @@ Commands therefore no longer guess or read paths: they derive them.
 This also applies to project documentation. Previously, `paths.docs` was the
 only value allowed to point out of the k-playbook directory with `../`, so a
 project could continue using its existing docs. This special case is removed:
-`/k-docs-code` writes to `k-playbook-local/docs/code/`. `docs/` is organized
-into subdirectories by origin; the directory does not say how many tools write
-to an origin. Other documentation maintained by a project remains untouched:
-k-playbook claims only its own directory.
+the project documentation lives in `keph:/docs/`, and other documentation
+maintained by a project remains untouched: k-playbook claims only its own
+directory.
 
-Within `k-playbook-local/docs/`, the directory reveals the origin, which in
-turn determines the ownership rule:
+### What setup no longer creates
 
-Every subdirectory of `docs/` represents an origin, not a single tool. A tool
-writes exclusively to directories of its own origin; the frontmatter field
-`generated.by` identifies which tool wrote an individual file. `docs/README.md` on
-disk belongs exclusively to `/k-docs-index`; since task 101 it is the old disk index,
-which `/k-upgrade` (3.2) clears, and the README that setup writes for `docs/` names
-`keph:/docs/` as the entry and is no index. No command writes doc files in
-`keph:/docs/manual/`; a `docs/manual/` on disk is a state from before the move and is
-moved by 3.2. Flat `docs/*.md` files from before this structure have no producer: no
-command writes them, they are only listed.
+Since task 107, setup creates none of `docs/`, `tasks/`, `tasks/done/`, `data/`,
+`material/`, `inbox/`, `queue/`, `knowledge/` and `cache/`, and the setup page does
+not count them as missing: their content lives in the project collection or moves
+there next. In an existing project, `/k-upgrade` 3.4 deletes each of them that holds
+nothing but `README.md` files and the managed `.gitignore`, after the user confirms;
+anything else keeps the directory, and the command names what lies there.
 
-`docs/code/` and `docs/libs/` are created
-on the first run of a tool from their origin: `/k-docs-code` and the
-`ks-overlay-repo-analyse` skill write to `docs/code/`, `/k-docs-tools` to
-`docs/libs/`. `/k-doc-inventory` no longer writes here at all: the version
-inventory lives in the project collection as
-`keph:/docs/generated/versions/inventory.md`, and a `docs/versions/` left from
-before is a state of that time. Setup does not create
-them, and since task 101 it no longer creates `docs/manual/` either: hand-written
-documentation lives in `keph:/docs/manual/`, and a `docs/manual/` on disk is a state
-from before the move that `/k-upgrade` (3.2) moves. Setup still creates `material/`.
-`/k-docs-extract` no longer
-writes to `docs/extracted/`: it reads raw material from `inbox/` and writes to
-`knowledge/extracted/` through the knowledge tools; what lies in
-`docs/extracted/` from before stays and is still indexed by `/k-docs-index` until
-step 6 of the switch. Setup also creates the three zones of the knowledge store beside
-`docs/` -- `inbox/`, `queue/` and `knowledge/`, each with a README that says
-what it holds -- and the knowledge gate (`k-playbook knowledge`,
-`k_playbook_knowledge_*`) reads and writes only there; the owner directories
-below `knowledge/` are created by their producers on the first write. The
-migration is the switch of the writers to the store, one step each; until a
-writer is switched, `docs/` carries on for it (see
-[knowledge-layout.md](knowledge-layout.md#migration)).
+Until their own switch to the collection, a few producers still write to disk and
+create their directory on the first write, without a README:
+
+- `/k-docs-code` and the `ks-overlay-repo-analyse` skill write `docs/code/`,
+  `/k-docs-tools` writes `docs/libs/`; both commands are disabled while they move to
+  `keph:/docs/`. Within `docs/`, the directory reveals the origin: a tool writes
+  exclusively to directories of its own origin, and the frontmatter field
+  `generated.by` identifies which tool wrote an individual file.
+- The knowledge gate (`k-playbook knowledge`, `k_playbook_knowledge_*`) writes
+  `inbox/`, `queue/` and `knowledge/`, and the owner directories below `knowledge/`
+  are created by their producers on the first write. `/k-docs-extract` reads raw
+  material from `inbox/` and writes to `knowledge/extracted/` through these tools.
+  Reading, searching and listing without these directories answer empty, not with
+  an error (see [knowledge-layout.md](knowledge-layout.md#migration)).
+- The index of the knowledge gate lies in `cache/knowledge/`; `cache/` is created
+  together with its managed `.gitignore` when an index is written, and only when
+  `knowledge/` holds a file to index.
+
+What lies on disk from before keeps its meaning until `/k-upgrade` has moved it:
+`docs/README.md` is the old index of `/k-docs-index` and is cleared by 3.2, a
+`docs/manual/` or `docs/versions/` is a state from before the move, `docs/extracted/`
+is a state of that time, `material/befunde/` is emptied by 3.1, and `tasks/` is moved
+by 3.3. The version inventory lives in the project collection as
+`keph:/docs/generated/versions/inventory.md`, and hand-written documentation in
+`keph:/docs/manual/`.
 
 In contrast, setup creates the version inventory source configuration,
 `k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is
@@ -127,21 +124,17 @@ inventory` and `/k-doc-inventory`, writing into the project collection. The cont
 [`version-inventory.md`](./version-inventory.md), and the requirement to update
 version jumps is in `rules/docs-sync.md`.
 
-`k-playbook-local/material/` is the source side: raw material such as chat
-transcripts and notes. It is never indexed and no command writes to it. Like
-`priv/`, its contents are versioned normally; k-playbook does not write a
-`.gitignore` for it. Raw material commonly contains tokens, paths, and names;
-the project decides whether it should therefore stay outside the repository.
-
-Four directories are optional in this respect: `results/`, `cache/`, `priv/`,
-and `material/`. `results/` and `cache/` are made private during installation by
-default: review results are the state of one machine, not project knowledge, and
-everything under `cache/` is derived from the project and can be rebuilt at any
-time. All four can be switched. The interface's **Local settings** block shows
-the measured current state and switches it for **all four** directories;
-manually, this is controlled through a `.gitignore` in the directory itself,
-whose content is named by the relevant `README.md`. Details are in
-[`installation.md`](./installation.md#2-create-project-owned-structure).
+Two directories are optional in this respect: `results/` and `priv/`.
+`results/` is made private during installation by default: review results are
+the state of one machine, not project knowledge. Both can be switched. The
+interface's **Local settings** block shows the measured current state and
+switches it for **both** directories; manually, this is controlled through a
+`.gitignore` in the directory itself, whose content is named by the relevant
+`README.md`. `inbox/` and `material/` have no switch any more until their move
+to the collection: a managed `.gitignore` already in place stays and keeps
+working, and whoever does not want a newly created `inbox/` versioned adds the
+`.gitignore` by hand. `cache/` gets its managed `.gitignore` when it is created.
+Details are in [`installation.md`](./installation.md#2-create-project-owned-structure).
 
 ## Finding the anchor
 
@@ -253,16 +246,15 @@ Everything else has no counterpart on the other side:
 
 | | Directories |
 |---|---|
-| project-owned only | `results/`, `data/`, `cache/`, `docs/`, `tasks/`, `priv/`, `material/` |
+| project-owned only | `results/`, `priv/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
 
-`tasks/` is still created but holds no tasks any more: tasks are documents in the project
-collection (`keph:/user/<user>/tasks/`), and the directory stays only until the interface's
-Tasks page is switched; `/k-upgrade` 3.3 moves what still lies there.
-
-`docs/` appears in both rows but is not a pair: `k-playbook/docs/` documents
-k-playbook itself, while `k-playbook-local/docs/` documents the project. They
-are two different objects with the same name and nothing to merge.
+`docs/`, `tasks/`, `data/`, `cache/` and `material/` were project-owned only as well;
+setup no longer creates them (see [What setup no longer creates](#what-setup-no-longer-creates)).
+A `k-playbook-local/docs/` that a producer still writes is not a pair with
+`k-playbook/docs/` either: `k-playbook/docs/` documents k-playbook itself, the
+other the project. They are two different objects with the same name and nothing
+to merge.
 
 `guidelines/` is a pair since task 086 (2026-10-16): shipped `k-playbook/guidelines/`
 and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `rules/`

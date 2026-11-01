@@ -604,3 +604,27 @@ func TestKnowledgeReadNenntRueckstellungAufStderr(t *testing.T) {
 		t.Errorf("code/ steht nicht wieder: %v", statErr)
 	}
 }
+
+// Ohne inbox/, queue/ und knowledge/ — seit Task 107 der Normalfall eines
+// neuen Projekts — antworten list, search, status, inbox list und queue list
+// leer und ohne Fehler, und keines legt ein Verzeichnis an, auch cache/ nicht.
+func TestKnowledgeLesenOhneVerzeichnisseIstLeer(t *testing.T) {
+	root := todoProject(t)
+
+	for _, args := range [][]string{
+		{"list", "--json"},
+		{"search", "Release", "--json"},
+		{"status", "--json"},
+		{"inbox", "list", "--json"},
+		{"queue", "list", "--json"},
+	} {
+		if _, err := runKnowledgeCaptured(t, args...); err != nil {
+			t.Errorf("%v: %v", args, err)
+		}
+	}
+	for _, dir := range []string{project.InboxDir(root), project.QueueDir(root), project.KnowledgeDir(root), filepath.Join(project.LocalDir(root), project.CacheDirName)} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("%s ist durch einen Lesezugriff entstanden (%v)", dir, err)
+		}
+	}
+}

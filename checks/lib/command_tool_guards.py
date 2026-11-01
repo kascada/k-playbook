@@ -5,12 +5,18 @@ Der Check setzt den Abschnitt „Externe Werkzeuge" aus rules/command-authoring.
 durch. Er ist ein Hinweisgeber, kein Shell-Parser; seine Grenzen sind bewusst:
 
 - Werkzeugliste ist allein die Spalte ``name`` aus share/scripts/base-tools.tsv.
-- Gelesen wird der effektive Command-Katalog: mitgelieferte Commands aus
+- Gelesen wird der effektive Command-Katalog: mitgelieferte Hüllen aus
   <playbook>/share/commands/ — derselbe Stand, den das Binary dieser Version nach
   ~/.local/share/k-playbook/ entpackt —, projekteigene aus
   <config-root>/k-playbook-local/commands/.
   Vergleichseinheit ist der Pfad ab commands/; ein gleichnamiger lokaler Eintrag
   ersetzt den mitgelieferten, ein leerer schaltet ihn ab.
+- Dazu die Texte der Commands aus <playbook>/defaults/commands/, die k-playbook als
+  k-playbook:/commands/<name>.md ausliefert. Sie tragen einen eigenen Schlüssel,
+  den Pfad ab dem Playbook (defaults/commands/<name>.md), damit Hülle und Text
+  gleichen Namens sich nicht überschreiben. Ein projekteigener Eintrag gleichen
+  Namens ersetzt auch den Text (dieselbe Überlagerung wie bei k-playbook read);
+  er wird dann einmal geprüft, unter seinem Schlüssel ab commands/.
 - Geprüft wird immer der ganze Katalog, unabhängig von K_CHECK_MODE und
   K_CHECK_FILES_FROM. Nur so fällt ein veralteter Ausnahme-Eintrag auf.
 - Betrachtet werden umzäunte Codeblöcke mit der Sprachkennung bash, sh, shell
@@ -134,10 +140,15 @@ def is_empty_file(path: Path) -> bool:
     return all(not line.strip() or line.strip().startswith("#") for line in text.splitlines())
 
 
+TEXTS_KEY_PREFIX = "defaults/commands/"
+
+
 def effective_commands(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
     shipped: dict[str, Path] = {}
+    texts: dict[str, Path] = {}
     local: dict[str, Path] = {}
     collect_commands(playbook_dir / "share" / "commands", "", shipped)
+    collect_commands(playbook_dir / "defaults" / "commands", "", texts)
     collect_commands(local_dir / "commands", "", local)
 
     result: dict[str, Path] = {}
@@ -148,6 +159,12 @@ def effective_commands(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
             result[key] = local[key]
         else:
             result[key] = shipped[key]
+    # Texte unter defaults/commands/: eigener Schlüssel je Wurzel. Ein lokaler
+    # Eintrag gleichen Namens überlagert den Text und steht schon oben.
+    for key in sorted(texts):
+        if key in local:
+            continue
+        result[TEXTS_KEY_PREFIX + key] = texts[key]
     return result
 
 
@@ -639,7 +656,7 @@ def read_exceptions(path: Path, tools: set[str]) -> tuple[list[ExceptionEntry], 
         if not datei:
             errors.append("datei is empty")
         elif datei.startswith("/") or ".." in Path(datei).parts or not datei.endswith(".md"):
-            errors.append(f"datei '{datei}' is not a path below commands/")
+            errors.append(f"datei '{datei}' is not a path below commands/ or defaults/commands/")
         if not re.fullmatch(r"[0-9]+", zeile) or int(zeile) < 1:
             errors.append(f"zeile '{zeile}' is not a positive line number")
         if not werkzeug:

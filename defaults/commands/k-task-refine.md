@@ -57,16 +57,28 @@ Das Argument entscheidet:
 - **Leer:** die eigenen offenen Tasks aus `k_playbook_doc_list` (Sorte `tasks`, ohne `done`),
   sortiert nach der Nummer am Anfang des Dateinamens. Keine → „Keine offenen Tasks gefunden“
   und Schluss.
-- **Ein `keph:`-Verweis** (`keph:/user/…/tasks/<datei>`): genau dieser Task.
-- **Eine Nummer:** aufgelöst nach `on-demand/tasks.md`, „Wohin und Name“ — zuerst unter den
-  eigenen offenen, dann unter den eigenen erledigten Tasks; bei mehreren Treffern alle zeigen
-  und den Nutzer wählen lassen.
+- **Ein `keph:`-Verweis** (`keph:/user/…/tasks/<datei>`): genau dieser Task — nach den
+  Prüfungen aus `k-playbook:/instructions/on-demand/tasks.md`, „Fremde und erledigte
+  Verweise“, bevor etwas geschrieben wird. Ein fremder Verweis (User-Pfadteil weder `~` noch
+  `kephalaion.user`) wird abgewiesen, mit `foreign_user` in der Meldung; Schluss. Ein Verweis
+  unter `done/` führt zur Rückfrage unten.
+- **Eine Nummer:** aufgelöst nach `k-playbook:/instructions/on-demand/tasks.md`, „Wohin und
+  Name“ — zuerst unter den eigenen offenen, dann unter den eigenen erledigten Tasks; bei
+  mehreren Treffern alle zeigen und den Nutzer wählen lassen.
+- **Erledigt** — ein Treffer oder Verweis unter `done/`: Der Task ist schon abgeschlossen.
+  Fertig-Meldung (`Rückfrage: erledigter Task`), dann fragen: trotzdem prüfen — das
+  Review-Log kommt an das Dokument unter `done/`, der Task bleibt dort — oder abbrechen.
+  `/k-task-refine` öffnet keinen Task wieder; das tut `/k-task-run`.
 - **Sonst ein Pfad auf der Platte:** eine Datei oder ein Verzeichnis mit `.md`-Dateien, relativ
   zu `context.project.dir`. Gibt es ihn nicht, brich mit einer klaren Meldung ab. Sag dazu,
   dass dies ein ausdrückliches Einzelziel ist und nicht die Task-Warteschlange. Bei einem
   Verzeichnis: alle `.md` direkt darin, ohne `done/`, `old/` und Archive, sortiert nach der
   führenden Nummer (auch mit `_`), Dateien ohne Nummer übersprungen. Keine → „Keine
-  Dateien gefunden“ und Schluss.
+  Dateien gefunden“ und Schluss. Der Grund: Ein Verzeichnis als Ziel ist eine Folge
+  nummerierter Anweisungen, die in dieser Reihenfolge gelten — so lagen Tasks einst auf der
+  Platte, und so liegen Instruction-Dateien heute. `done/`, `old/` und Archive sind
+  Erledigtes, eine Datei ohne Nummer (etwa ein `README.md`) gehört nicht zur Folge; wer sie
+  prüfen will, nennt sie als Einzelziel.
 
 Merke die Ziele als `REVIEW_TARGETS`: je Eintrag der `keph:`-Verweis oder der absolute Pfad,
 dazu die Anzeigeform (der Verweis bzw. der projektrelative Pfad) und ob es ein Task in der
@@ -90,22 +102,26 @@ Der Entwickler soll nach Ausführung dieses Tasks die TTS-Anbindung
 ohne Rückfragen implementieren können.
 ```
 
-**Option B — Dateireferenz** (eine oder mehrere externe Dateien):
+**Option B — Verweise** im Intent: Was dafür gilt, steht in
+`k-playbook:/instructions/on-demand/tasks.md`, „Intent“; dieser Text erklärt es nicht neu.
+Ein Beispiel:
 
 ```markdown
 ## Intent
-[requirements.md](../requirements.md)
-[constraints.md](../constraints.md)
+Die TTS-Anbindung erfüllt die Anforderungen aus `project:/docs/requirements.md`.
+- Es gilt der Rahmen aus `keph:/docs/manual/tts.md`.
 ```
 
-Referenzen liest du und nimmst ihren Inhalt als Intent; stehen beide, gelten beide. Ohne
-`## Intent` entfällt der Alignment-Check (Schritt 11).
+Die Verweise liest du auf den Lesewegen dort mit und nimmst ihren Inhalt zum Intent; stehen
+Text und Verweise, gelten beide. Ohne `## Intent` entfällt der Alignment-Check (Schritt 11).
 
 ## Fertig-Meldung
 
 Vor jeder Rückfrage an den Nutzer und am Ende meldet sich der Moderator auf dem Rechner des
-Nutzers. Die Stellen in diesem Command: die Rückfrage in Schritt 8, die Rückfrage nach einem
-`foreign_change` und das Ende nach Schritt 12.
+Nutzers. Die Stellen in diesem Command: die Rückfragen in Schritt 2 (mehrere Treffer,
+erledigter Task), jedes ask-user in Schritt 6, die Rückfrage in Schritt 8, die Rückfrage nach
+einem nicht erreichten Intent in Schritt 11, die Rückfrage nach einem `foreign_change` und
+das Ende nach Schritt 12.
 
 include: _task/fertig-meldung.md
 
@@ -149,6 +165,8 @@ Check for:
 - WARNUNG  — potentially problematic or unclear framing
 - FEHLEND  — important constraint or context not specified
 
+References: Read k-playbook:/instructions/on-demand/verweise-nachziehen.md with k_playbook_doc_read and check every reference in the targets against it. A relative link or a bare path where a reference is meant is an issue like any other (WARNUNG); recommend the form with prefix. If the prefix is ambiguous by that file, say so instead of guessing. Leave evidence untouched as that file says (Review-Log, ## Ausführung and what follows it).
+
 Output format (table, no intro text):
 | ID | Kategorie | Datei | Stelle | Problem | Empfehlung |
 ```
@@ -161,7 +179,8 @@ Output format (table, no intro text):
 - Is the scope/framing reasonable?
 - (From round 2+) Did the Editor's changes introduce new problems?
 
-Do NOT flag: implementation choices, missing code details, style, minor wording.
+Do NOT flag: implementation choices, missing code details, style, minor wording. A reference
+without prefix is no wording question; it is flagged (see the prompt).
 
 ## Schritt 6 — Moderator: an den Editor routen
 
@@ -171,7 +190,8 @@ For each issue from the Critic, decide:
 - **skip** — non-blocking WARNUNG/FEHLEND; record but do not send.
 - **decide** — design decision the Moderator can resolve; record the decision.
 - **ask-user** — requires product/process input; pause loop, ask user (Fertig-Meldung
-  vorher), then continue.
+  vorher), then continue. A reference whose prefix is ambiguous by
+  `k-playbook:/instructions/on-demand/verweise-nachziehen.md` is always ask-user.
 
 Skip WARNUNGs and FEHLENDs unless they block execution. Store the routing table for the
 final Review-Log:
@@ -191,6 +211,8 @@ Do not fix silently — for every issue, state what you did (fixed / not fixed +
 
 ## Issues to address
 <insert all issues routed as pass, with IDs and Moderator decisions>
+
+For an issue about a reference, propose the form with prefix by k-playbook:/instructions/on-demand/verweise-nachziehen.md (read it with k_playbook_doc_read). Where the prefix is ambiguous by that file, do not guess; say so.
 
 ## Files
 <one line per target: the keph: reference or the absolute path>
@@ -214,6 +236,10 @@ The Moderator reviews the Editor output before changing anything:
     `since_revision` = `REVISION` dieses Tasks); die Antwort nennt die neue Revision, die ab
     jetzt `REVISION` ist. `text_not_unique` heißt: ALT mit mehr Umgebung erneut; `text_not_found`
     heißt: gegen `CURRENT_FILE_STATE` prüfen, ob die Stelle inzwischen anders heißt.
+    `outcome_unknown` heißt: nicht blind wiederholen, sondern nachlesen nach
+    `k-playbook:/instructions/on-demand/tasks.md`, „`outcome_unknown` je Operation“ — steht
+    NEU jetzt im Task, gilt die Revision aus dem Nachlesen als `REVISION`; sonst der feste Weg
+    dort.
   - an einer Plattendatei mit dem Edit-Werkzeug des Assistenten.
 - If the proposal is partially useful, apply only the minimal accepted subset and record the
   rejection reason.
@@ -248,6 +274,7 @@ Spawn a new Critic subagent with this prompt:
 
 ```
 You are the Critic in round <N> of a structured review loop.
+You are read-only. Do not modify documents or files or call write/edit tools.
 Below are issues you raised that the Editor did not fix, along with the Editor's reasoning.
 Also review the current state of the files for any NEW problems introduced by the Moderator-applied changes.
 
@@ -317,8 +344,9 @@ Plattendatei per Shell mit einem Heredoc, dessen Endmarke in Anführungszeichen 
 
 Ein Ziel, an dem nichts zu korrigieren war, ist trotzdem geprüft worden, und diese Prüfung
 muss sichtbar bleiben. `/k-task-run` erkennt an genau diesem Block (Kennzeile
-`## Review-Log (<datum>)`, siehe `on-demand/tasks.md`), ob ein Task jemals gegengelesen
-wurde; fehlt er, meldet `/k-task-run` den Task später als ungeprüft und fragt unnötig nach.
+`## Review-Log (<datum>)`, siehe `k-playbook:/instructions/on-demand/tasks.md`), ob ein Task
+jemals gegengelesen wurde; fehlt er, meldet `/k-task-run` den Task später als ungeprüft und
+fragt unnötig nach.
 
 Ergab die Prüfung keine Änderung, wird derselbe Block angehängt: Tabellen ohne Zeilen und
 unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`. `<datum>` ist
@@ -358,10 +386,16 @@ unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`. `<datum>` is
 - <ID>: <reason>
 ```
 
+Vor dem Anhängen an einen Task zählt der Moderator mit `k_playbook_doc_grep` und `count_only`
+die Zeile `^## Review-Log \(<datum>\)$` und merkt sich die Anzahl
+(`k-playbook:/instructions/on-demand/tasks.md`, „Zählen vor dem Anhängen“); die Revision aus
+dieser Antwort muss `REVISION` sein, sonst gilt der Replica-Nachlauf dort.
+
 Ein `foreign_change` beim Anhängen wird behandelt wie in Schritt 8: anhalten,
 Fertig-Meldung, Rückfrage; nach „weiter“ mit der Revision aus der Antwort erneut anhängen.
-Nach `outcome_unknown` nicht noch einmal anhängen, sondern mit `k_playbook_doc_grep`
-(`^## Review-Log \(<datum>\)$`, `count_only`) nachsehen, ob der Block angekommen ist.
+Nach `outcome_unknown` nicht noch einmal anhängen, sondern dieselbe Zeile erneut zählen: Ist
+die Zahl gestiegen, ist der Block angekommen; sonst gilt der feste Weg aus „`outcome_unknown`
+je Operation“ dort.
 
 Danach die Fertig-Meldung (`fertig`; der Body nennt Runden, gefixte und offene Issues).
 

@@ -36,17 +36,21 @@ vor. Im Entwurf steht an ihrer Stelle `<NNN>`.
 
 Sieh das Gespräch durch nach:
 
-- Dateien, Verweisen (`project:`, `k-playbook:`, `keph:`) und Dokumenten, die der Task
-  braucht → `## Referenzen`, je mit einem Halbsatz, warum.
+- Verweisen, die der Task braucht → `## Referenzen`, je mit einem Halbsatz, warum. Jeder
+  Eintrag ist ein Verweis mit Präfix (`project:/`, `k-playbook:/`, `keph:/`); eine Datei im
+  Projekt steht als `project:/<pfad>`, nicht als nackter Pfad. Lässt sich ein Präfix nicht
+  eindeutig zuordnen, gilt `k-playbook:/instructions/on-demand/verweise-nachziehen.md`: fragen,
+  nicht raten.
 - Werkzeugen über Read, Write, Edit, Bash, Glob und Grep hinaus — MCP-Werkzeuge, besondere
   Rechte — → `## Tools`. Die Standardwerkzeuge stehen nicht dort; `/k-task-run` erlaubt sie
   immer.
 
 ## Schritt 4 — Entwurf schreiben und bestätigen lassen
 
-Schreibe den Entwurf nach dem Abschnitt „Aufbau“ von `on-demand/tasks.md`: Frontmatter mit
-`title`, Überschrift `# Task <NNN> — <Titel>`, ein Satz zum Ergebnis, dann `## Intent`
-(Intent-Regel dort), `## Referenzen`, `## Tools`, `## Ziel`, `## Kontext`, `## Zu bauen` mit
+Schreibe den Entwurf nach dem Abschnitt „Aufbau“ von
+`k-playbook:/instructions/on-demand/tasks.md`: Frontmatter mit `title`, Überschrift
+`# Task <NNN> — <Titel>`, ein Satz zum Ergebnis, dann `## Intent` (Intent-Regel dort, Verweise
+darin mit Präfix), `## Referenzen`, `## Tools`, `## Ziel`, `## Kontext`, `## Zu bauen` mit
 `### Etappe N — Titel`, wenn die Arbeit in Etappen zerfällt. Leere oder nicht zutreffende
 Abschnitte entfallen. Zuschnitt: im Zweifel eine Datei, wie dort begründet.
 

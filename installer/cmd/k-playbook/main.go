@@ -263,9 +263,9 @@ Unterkommandos:
             Dokument unangetastet. Ohne bereite Kephalaion-Anbindung bricht
             der Lauf ab (kephalaion_unavailable); einen Rückfall auf die
             Platte gibt es nicht. Vertrag: k-playbook/docs/version-inventory.md.
-  todo      Verwaltet die Todos des Projekts in
-            k-playbook-local/data/todos.json: k-playbook todo list|add|update|
-            delete|import. Die Ausgabe ist JSON auf stdout. Ohne Unterbefehl
+  todo      Verwaltet die Todos des Projekts in der Projekt-Collection
+            (todos/): k-playbook todo list|add|update|delete|import. Die
+            Ausgabe ist JSON auf stdout. Ohne Unterbefehl
             und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
             gelesen oder geschrieben werden.
   knowledge Liest, durchsucht und schreibt die Wissensablage
@@ -273,8 +273,10 @@ Unterkommandos:
             read|write|publish|supersede|status, dazu inbox put|list|read
             für den Eingang und queue add|list|drop für die Warteschlange,
             jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
-            dessen Verzeichnis; der Index liegt unter
-            k-playbook-local/cache/knowledge/ und ist jederzeit verwerfbar.
+            dessen Verzeichnis; knowledge/, inbox/ und queue/ entstehen beim
+            ersten Schreiben, Lesen ohne sie ist leer. Der Index liegt unter
+            k-playbook-local/cache/knowledge/, entsteht erst, wenn es etwas zu
+            indizieren gibt, und ist jederzeit verwerfbar.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
             dahinter steht: k-playbook read <verweis> [--raw] [--json].
             project: eine Datei des Projekts, keph: ein Dokument der

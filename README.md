@@ -5,7 +5,8 @@
 ## Why k-playbook
 
 - **It learns the project and keeps what it learned.** `/k-docs-code` and `/k-docs-tools`
-  write project knowledge into `k-playbook-local/docs/`, `/k-doc-inventory` writes the
+  write project knowledge into `k-playbook-local/docs/` until their move to the collection,
+  `/k-doc-inventory` writes the
   version inventory into the project's Kephalaion collection
   (`keph:/docs/generated/versions/inventory.md`), and
   `/k-docs-extract` distils raw material into the knowledge store
@@ -129,28 +130,29 @@ project/
     ├── commands/         overlay onto ~/.local/share/k-playbook/commands/
     ├── skills/           overlay onto ~/.local/share/k-playbook/skills/
     ├── results/          everything reviews produce; not versioned
-    ├── data/             machine files owned by k-playbook, versioned; holds todos.json
-    ├── cache/            derived content, rebuildable at any time; not versioned
-    ├── docs/             project knowledge for AI sessions, separated by origin
-    │   └── manual/       hand-written docs; no command writes in here
     ├── guidelines/
-    ├── tasks/done/       kept for the interface only; tasks live in the project collection
     ├── priv/             notes and work in progress
-    ├── material/         raw material as a source for docs, never indexed
-    │   └── befunde/      findings from analysis and debugging, written by /k-danke
     ├── k-playbook.md     project-owned instruction layer
     └── version-sources.yaml   version sources of the version inventory, hand-maintained
 ```
 
-`k-playbook-local/` belongs in the project's repository. Four directories inside it are
-a matter of choice — `results/`, `cache/`, `priv/` and `material/`; two of them,
-`results/` and `cache/`, are already created as private during setup, and all four remain
-switchable. Review results are a snapshot from one machine and may contain found secrets
-in clear text; everything under `cache/` is derived from the project and can be rebuilt at
-any time. For `priv/` and `material/` the project decides, and k-playbook writes no
-`.gitignore` there on its own. `data/` is not part of that choice: it holds machine files
-that belong to the project's state. What currently applies is shown and switched by the **Local settings** block of the
-interface — measured with `git check-ignore`, not guessed.
+Tasks, todos and the project documentation live in the project's Kephalaion collection,
+so setup no longer creates `docs/`, `tasks/`, `data/`, `material/`, `inbox/`, `queue/`,
+`knowledge/` or `cache/`; `/k-upgrade` removes them from an existing project once they
+hold nothing but their README. Until their own switch, the knowledge tools still write
+`inbox/`, `queue/`, `knowledge/` and the index under `cache/`, and create each directory
+on the first write.
+
+`k-playbook-local/` belongs in the project's repository. Two directories inside it are
+a matter of choice — `results/` and `priv/`; `results/` is already created as private
+during setup, and both remain switchable. Review results are a snapshot from one machine
+and may contain found secrets in clear text. For `priv/` the project decides, and
+k-playbook writes no `.gitignore` there on its own. What currently applies is shown and
+switched by the **Local settings** block of the interface — measured with
+`git check-ignore`, not guessed. `inbox/` and `material/` have no switch any more until
+their move to the collection: a managed `.gitignore` already in place keeps working, and a
+newly created `inbox/` gets its `.gitignore` by hand. `cache/` gets the managed
+`.gitignore` when it is created.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
 one disables it. This holds for all five kinds — `rules/`, `reviews/`, `checks/`,
@@ -268,7 +270,7 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 - Installation and project ownership are strictly separated: `k-playbook/` is fully replaced on every update, everything beside it is never touched.
 - Shipped rules, reviews and checks are not edited. A project deviates by overlay: a local file of the same name replaces completely, an empty one disables.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
-- Tasks, reviews and results stay project-owned artifacts under `k-playbook-local/`.
+- Reviews and results stay project-owned artifacts under `k-playbook-local/`; tasks and todos are documents in the project collection.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
 - The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.
 - Nothing is written except after confirmation, step by step.

@@ -29,7 +29,9 @@ in der Kennzeilen-Tabelle von `k-playbook:/instructions/on-demand/tasks.md`. Wer
 Der Hauptkontext übergibt:
 
 - den `keph:`-Verweis des Task-Dokuments und seine aktuelle Revision,
-- die Ausführungswurzel,
+- `projectDir` für die k-playbook-Werkzeuge: `context.project.dir` des Hauptkontexts,
+- die Ausführungswurzel — sie gilt nur für `git`. Liegt sie woanders als `projectDir`
+  (`Target repo` im `## Ausführungskontext`), bleibt `projectDir` trotzdem das Projekt.
 - die Kennung des Snapshots dieses Tasks — ein Tree-Objekt in der Ausführungswurzel,
 - den Umfang: `ab Task-Beginn` oder `nur seit Fortsetzung`,
 - die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung, oder den
@@ -45,18 +47,27 @@ Der Hauptkontext übergibt:
 - **Nur anhängen, mit Revision.** Der Sub-Agent hängt seine Abschnitte mit
   `k_playbook_doc_append` an das Task-Dokument an (`ref` = der Verweis, `content` = der
   Abschnitt, `since_revision` = die übergebene Revision bzw. die Revision seines letzten
-  eigenen Anhängens; `projectDir` = die Ausführungswurzel des Projekts). Ersatzweise ohne
-  MCP: `k-playbook doc append <ref> --since <n> <<'EOF'` mit der Endmarke in
-  Anführungszeichen. Er ändert keine bestehende Zeile — keine Fortschrittszeile, nicht den
-  Kopf von `## Ausführung` und keinen Abschnitt eines früheren Laufs. Kennzeile,
-  Snapshot-Zeile, `**Zusammenfassung:**` und `**Status nach Review:**` schreibt allein der
-  Hauptkontext.
+  eigenen Anhängens; `projectDir` = das übergebene `projectDir`, nicht die
+  Ausführungswurzel). Ersatzweise ohne MCP, im Verzeichnis `projectDir`:
+  `k-playbook doc append <ref> --since <n> --json <<'EOF'` mit der Endmarke in
+  Anführungszeichen; `--json` liefert `revision` und bei einem Fehler den Code
+  (`foreign_change`, `outcome_unknown`). Er ändert keine bestehende Zeile — keine
+  Fortschrittszeile, nicht den Kopf von `## Ausführung` und keinen Abschnitt eines früheren
+  Laufs. Kennzeile, Snapshot-Zeile, `**Zusammenfassung:**` und `**Status nach Review:**`
+  schreibt allein der Hauptkontext.
 - **`foreign_change` hält an.** Antwortet `k_playbook_doc_append` mit `foreign_change`, hat
   seit der übergebenen Revision jemand anderes in den Task geschrieben. Der Sub-Agent schreibt
   nichts weiter und beendet den Lauf mit der Zeile `Foreign-Change: …` aus dem Abschnitt
-  „Rückgabe“. Nach `outcome_unknown` hängt er nicht noch einmal an, sondern prüft mit
-  `k_playbook_doc_grep` (`count_only`), ob seine Überschriftenzeile angekommen ist, und nimmt
-  die Revision aus dieser Antwort.
+  „Rückgabe“.
+- **Vor jedem Anhängen zählen.** Vor dem Anhängen eines Abschnitts zählt der Sub-Agent mit
+  `k_playbook_doc_grep` und `count_only` dessen Überschriftenzeile
+  (`^### Diff: Geänderte Dateien$` bzw. `^### Review: Befunde$`) und merkt sich die Anzahl, nach
+  `k-playbook:/instructions/on-demand/tasks.md`, „Zählen vor dem Anhängen“. Nach
+  `outcome_unknown` hängt er nicht blind noch einmal an, sondern zählt erneut: Ist die Zahl
+  gestiegen, ist der Abschnitt angekommen, und die Revision aus dieser Antwort gilt; sonst
+  folgt er dem festen Weg aus „`outcome_unknown` je Operation“ dort. Eine ältere Revision
+  direkt nach dem eigenen Anhängen ist der Replica-Nachlauf aus demselben Abschnitt, kein
+  fremder Schreiber.
 - **Nichts beheben.** Das Review ändert keinen Code und keine andere Datei; es schreibt nur
   in das Task-Dokument.
 - **Feste Reihenfolge.** Teil 1 läuft immer, Teil 2 nur nach Teil 1 und nur, wenn ein
@@ -181,9 +192,10 @@ gilt der Abschnitt „Abbruch“.
 
 - **Gegenstand** ist der vollständige Diff aus Teil 1, nicht der gekürzte Ausschnitt im
   Task-Dokument.
-- **Maßstab** ist die Task-Beschreibung, gelesen mit `k_playbook_doc_read`. Was `/k-task-run`
-  und dieses Modul in das Dokument geschrieben haben — Fortschrittszeilen, `## Ausführung`
-  und alles darunter —, gehört nicht dazu.
+- **Maßstab** ist die Task-Beschreibung, gelesen mit `k_playbook_doc_read` und geschnitten
+  nach `k-playbook:/instructions/on-demand/tasks.md`, „Rumpf und Lauf-Abschnitte“. Was
+  `/k-task-run` und dieses Modul in das Dokument geschrieben haben — Fortschrittszeilen,
+  `## Ausführung` und alles darunter —, gehört nicht dazu.
 - **Build und Tests.** Beleg sind die übergebenen Zeilen „Validierung“. Fehlen sie oder
   decken sie die Validierung nicht ab, die der Task vorschreibt, führst du die dort
   vorgeschriebenen Prüfbefehle in der Ausführungswurzel selbst aus. Lässt sich ein solcher

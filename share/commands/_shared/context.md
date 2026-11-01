@@ -96,7 +96,7 @@ from the output above — never from configuration, and never by searching.
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |
 | hand-written documentation | `keph:/docs/manual/` — in der Projekt-Collection, nicht unter `local.dir` |
 | version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
-| raw material, never indexed | `<local.dir>/inbox/` — Quelle von `/k-docs-extract`; der bisherige Ort `<local.dir>/material/` wird bis Schritt 5 der Umstellung mitgelesen (`k-playbook/docs/knowledge-layout.md`, „Transitional reads“) |
+| raw material, never indexed | `<local.dir>/inbox/` — Quelle von `/k-docs-extract`; entsteht beim ersten Lauf von `k-playbook knowledge inbox put`; der bisherige Ort `<local.dir>/material/` wird bis Schritt 5 der Umstellung mitgelesen (`k-playbook/docs/knowledge-layout.md`, „Transitional reads“) |
 | findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md`. Der bisherige Ort `<local.dir>/material/befunde/` wird nicht mehr beschrieben |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |

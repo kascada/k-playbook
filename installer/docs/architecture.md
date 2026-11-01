@@ -347,8 +347,8 @@ installer/
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
-│   ├── local_private.go         messen und umschalten, ob results/, cache/, priv/ und
-│   │                            material/ privat sind
+│   ├── local_private.go         messen und umschalten, ob results/ und priv/ privat
+│   │                            sind
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── sharelink.go             Umweg-Link .k-playbook/share auf ~/.local/share/k-playbook
@@ -675,30 +675,33 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-rules/  reviews/  checks/  commands/  skills/  results/  data/  cache/  docs/
-guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
-version-sources.yaml
+rules/  reviews/  checks/  commands/  skills/  results/  guidelines/  priv/
+k-playbook.md  version-sources.yaml
 ```
 
-`tasks/` und `tasks/done/` stehen seit Task 105 nur noch für die Oberfläche darin: Tasks
-sind Dokumente der Projekt-Collection (`keph:/user/<user>/tasks/`, Sorte `tasks` in
-`project.DocKinds`, Startnummer 1), kein Command liest oder schreibt sie auf der Platte, und
-`/k-upgrade` 3.3 zieht vorhandene Dateien um. Die README beider Verzeichnisse sagt das; die
-Verzeichnisse fallen, sobald die Seite Tasks der Oberfläche (`/workflows/tasks`,
-`project.ListTasks()`) auf die Collection umgestellt ist — ein eigener Task.
+Neun Einträge stehen seit Task 107 nicht mehr darin: `docs/`, `tasks/`, `tasks/done/`,
+`data/`, `material/`, `inbox/`, `queue/`, `knowledge/` und `cache/`. Ihr Inhalt liegt in
+der Projekt-Collection — Tasks (`keph:/user/<user>/tasks/`), Todos (`todos/`), die
+Projektdoku (`keph:/docs/`), Befunde (`queue/findings/`) — oder zieht als Nächstes dorthin,
+die Wissensablage. Herausnehmen war nötig, Löschen hätte nicht gereicht: `CreateLocal()`
+legt jeden fehlenden Eintrag samt README wieder an, und `LocalOK()` ist falsch, sobald
+einer fehlt. Ein Bestandsprojekt räumt `/k-upgrade` 3.4 auf: es löscht ein solches
+Verzeichnis nach Bestätigung, wenn darin nur `README.md` und die verwaltete `.gitignore`
+liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
+bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
 
-`docs/manual/` steht seit Task 101 nicht mehr darin: handgeschriebene Doku liegt unter
-`keph:/docs/manual/`, und legte das Einrichten das Verzeichnis neu an, brächte es zurück,
-was `/k-upgrade` (3.2) abgeräumt hat. `docs/` bleibt, weil `code/` und `libs/` noch
-dorthin schreiben; seine README (`docsReadmeTemplate()`) nennt den Einstieg `keph:/docs/`
-und ist kein Index.
-
-Die erzeugten Docs-Herkünfte — `docs/code/` und `docs/libs/` — stehen
-bewusst **nicht** darin: sie entstehen beim ersten Lauf ihres Erzeugers. Das Versionsinventar
-liegt seit Task 100 nicht mehr hier, sondern in der Collection des Projekts
-(`keph:/docs/generated/versions/inventory.md`). `/k-docs-extract`
-schreibt nicht mehr nach `docs/extracted/`, sondern über die Wissenswerkzeuge nach
-`knowledge/extracted/`; das Verzeichnis entsteht beim ersten `write`.
+Was bis zu seiner Umstellung noch auf die Platte schreibt, legt sein Verzeichnis beim
+ersten Schreiben selbst an, ohne README: `/k-docs-code` und `/k-docs-tools` `docs/code/`
+und `docs/libs/`, die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
+(`QueueAdd`) und `knowledge/<bereich>/` (`Write`, `Publish`). Lesen, Suchen und Listen ohne
+diese Verzeichnisse antworten leer (`scanKnowledgeTree`, `InboxList`, `QueueList`); ein
+genannter Pfad, den es nicht gibt, bleibt ein Eingabefehler. `cache/` entsteht über
+`ensureCacheDir()`, wenn das Wissenstor einen Index schreibt — und `open()` in
+`knowledge_index.go` schreibt ohne vorhandenen Index nur, wenn `knowledge/` eine Datei
+enthält; sonst käme `cache/` nach dem Aufräumen beim ersten `knowledge list` zurück.
+`project.ListTasks()` nimmt ein fehlendes `tasks/` als „keine Tasks"; die Seite Tasks der
+Oberfläche zeigt bis zu ihrer Umstellung nur, was noch auf der Platte liegt. Die
+Todo-Migration prüft nur, ob `data/todos.json` noch liegt, und braucht den Eintrag nicht.
 
 Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder Eintrag mit einem
 eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus
@@ -710,7 +713,7 @@ deklariert `schema_version: 1`, obwohl `versionsources` auch `2` liest: `2` brau
 `helm_values` einträgt, und eine neu angelegte Datei soll auch ältere Installationen
 desselben Projekts nicht aussperren.
 
-Jedes Verzeichnis bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
+Jedes Verzeichnis der Struktur bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
 würden. Mehr schreibt `CreateLocal()` nicht — mit **einer** Ausnahme: Einträge mit
 `PrivateByDefault` bekommen die verwaltete `.gitignore`, und zwar nur, wenn das
@@ -733,39 +736,32 @@ Umschaltung auf öffentlich ohnehin stehen, denn die setzt ein vorhandenes Verze
 voraus. Ein frisch geklontes Projekt ist damit nach dem ersten `k-playbook`-Aufruf
 eingerichtet, ohne dass jemand die Karte sieht.
 
-Dieselbe Bedingung gilt an der zweiten Stelle, an der `cache/` entstehen kann:
-`ensureCacheDir()` legt es beim ersten Zugriff des Wissenstors an und schreibt dabei
-die verwaltete `.gitignore` — aber nur, wenn das Verzeichnis in genau diesem Lauf
-entsteht. Ohne diesen Weg wäre der abgeleitete Suchindex committierbar, denn
-`CreateLocal()` zöge die Datei später nie nach; ein Release mit `git add -A` nähme den
+Dieselbe Bedingung gilt an der zweiten Stelle, an der eine verwaltete `.gitignore`
+entsteht: `ensureCacheDir()` legt `cache/` an, wenn das Wissenstor einen Index schreibt,
+und schreibt dabei die verwaltete `.gitignore` — aber nur, wenn das Verzeichnis in genau
+diesem Lauf entsteht. `cache/` steht nicht in der Struktur; ohne diesen Weg wäre der
+abgeleitete Suchindex committierbar, und ein Release mit `git add -A` nähme den
 Chunk-Abzug der ganzen Doku mit.
 
 Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
-überhaupt ansteht — `results/`, `cache/`, `priv/` **und** `material/`. Bei `priv/` ist der
-Grund offensichtlich: dort liegen eigene Notizen und Zwischenstände. Bei `material/` ist er
-derselbe und wird leicht übersehen: Rohmaterial sind Chat-Mitschnitte, Notizen und
-Zulieferungen, und die enthalten typischerweise Tokens, Pfade und Namen. Bei `cache/` ist
-der Inhalt aus dem Projekt abgeleitet und jederzeit neu baubar. Alle bekommen
-über dasselbe `Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt
-ausschließt und das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg.
-Das Feld geht als JSON an die Oberfläche und ist dort die Whitelist des Blocks
-[Lokale Einstellungen](#lokale-einstellungen).
+überhaupt ansteht — seit Task 107 `results/` und `priv/`. Bei `priv/` ist der Grund
+offensichtlich: dort liegen eigene Notizen und Zwischenstände. Beide bekommen über dasselbe
+`Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt ausschließt und
+das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg. Das Feld geht als
+JSON an die Oberfläche und ist dort die Whitelist des Blocks
+[Lokale Einstellungen](#lokale-einstellungen). `inbox/` und `material/` trugen es bis
+Task 107 auch; mit dem Herausnehmen aus der Struktur haben sie bis zu ihrer Umstellung in
+die Collection keine Schaltung mehr. Eine vorhandene verwaltete `.gitignore` bleibt liegen
+und wirkt weiter; wer ein neu angelegtes `inbox/` nicht versionieren will, legt sie von Hand
+an.
 
-`results/` und `cache/` unterscheiden sich in einem Punkt: sie tragen zusätzlich
-`PrivateByDefault` und sind damit die Verzeichnisse, die bei der Installation schon privat
-angelegt werden. Bei `priv/` und `material/` geht es um Geschmack, dort ist Zurückhaltung
-richtig. Bei `results/` nicht: ein Werkzeug, das gefundene Secrets im Klartext ins
-Repository des Nutzers schreibt, ist ein Fehler von k-playbook und keine
+`results/` unterscheidet sich in einem Punkt: es trägt zusätzlich `PrivateByDefault` und
+wird damit bei der Installation schon privat angelegt. Bei `priv/` geht es um Geschmack,
+dort ist Zurückhaltung richtig. Bei `results/` nicht: ein Werkzeug, das gefundene Secrets
+im Klartext ins Repository des Nutzers schreibt, ist ein Fehler von k-playbook und keine
 Projektentscheidung — und die Rohausgaben sind nur der schärfste Fall. Ein Review ist aus
-dem Code wiederholbar, sein Ergebnis ist ein Stand von einem Rechner. Bei `cache/` ist der
-Grund ein anderer und führt zum selben Ergebnis: ableitbarer Inhalt, der jederzeit neu
-entsteht, veraltet im Repository unbemerkt und bläht die Historie. Umschaltbar bleiben
-beide trotzdem, in beide Richtungen, und einmal umgeschaltet bleibt es dabei.
-
-`data/` trägt keins von beidem: es hält Maschinendateien, die zum Projektstand gehören, und
-wird ganz normal mitversioniert. Die Todos lagen bis Task 097 als `todos.json` darin; heute
-liegen sie in der Kephalaion-Collection, und `k-playbook todo migrate` legt die übernommene
-Datei als `todos.json.migriert` daneben ab.
+dem Code wiederholbar, sein Ergebnis ist ein Stand von einem Rechner. Umschaltbar bleibt es
+trotzdem, in beide Richtungen, und einmal umgeschaltet bleibt es dabei.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
@@ -776,9 +772,8 @@ Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
 ## Lokale Einstellungen
 
 Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
-stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für vier Verzeichnisse:
-ob der **Inhalt** von `results/`, `cache/`, `priv/` und `material/` aus der
-Versionskontrolle bleibt. `project/local_private.go` misst das und schaltet es um,
+stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für zwei Verzeichnisse:
+ob der **Inhalt** von `results/` und `priv/` aus der Versionskontrolle bleibt. `project/local_private.go` misst das und schaltet es um,
 `webui/local_private.go` reicht es an die Oberfläche.
 
 „Statt dass k-playbook es stillschweigend erzwingt" trägt auch für `results/`: dort ist
@@ -1586,8 +1581,11 @@ Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der U
 - **Einzige Fassung:** `commands/` und `skills/` oben im Repo gibt es seit 2026-10-25 nicht
   mehr; `share/` ist die Quelle. Weil `share/` ins Binary geht, beobachten der
   VERSION-Wächter und der Test-Workflow auch `share/**`. Der Check
-  `check_command_tool_guards.sh` liest die mitgelieferten Commands aus
-  `<playbook.dir>/share/commands/` — derselbe Stand wie das Binary dieser Version.
+  `check_command_tool_guards.sh` liest die mitgelieferten Hüllen aus
+  `<playbook.dir>/share/commands/` — derselbe Stand wie das Binary dieser Version — und seit
+  Task 108 die Texte der Commands aus `<playbook.dir>/defaults/commands/`, mit eigenem
+  Schlüssel je Wurzel; `check_verweise.sh` liest `defaults/`, `share/` und die
+  projekteigenen Gegenstücke.
 
 ### Entwicklungsstand
 
@@ -3145,8 +3143,11 @@ wäre die zweite Ansicht derselben Sache gewesen, samt Verweisauflösung und Mer
 Derselbe Verweis passt in jede Karte, die eine mitgelieferte Datei erklärt.
 
 Offen heißt bei Tasks: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte
-liegen in `done/`, und die `README.md` beschreibt das Verzeichnis — beides ist keine
-Aufgabe und steht nicht in der Liste der offenen.
+liegen in `done/`, und eine `README.md` von früher beschreibt das Verzeichnis — beides ist
+keine Aufgabe und steht nicht in der Liste der offenen. Seit Task 107 legt das Einrichten
+`tasks/` nicht mehr an: Tasks liegen in der Projekt-Collection, die Seite zeigt bis zu ihrer
+Umstellung nur, was noch auf der Platte liegt, und nach dem Aufräumen durch `/k-upgrade`
+nichts mehr (`ListTasks` nimmt ein fehlendes Verzeichnis als leer).
 
 Die Todo-Seite liest und schreibt seit Task 097 die Kephalaion-Collection über dieselbe
 Fachlogik wie `k-playbook todo` (`project/todos.go`): Eingabefeld zum Anlegen
@@ -3596,7 +3597,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
 | `GET` | `/api/local` | projekteigene Struktur prüfen |
 | `POST` | `/api/local` | fehlende Teile anlegen |
-| `GET` | `/api/local/private` | messen, ob der Inhalt von `results/`, `cache/`, `priv/` und `material/` privat ist |
+| `GET` | `/api/local/private` | messen, ob der Inhalt von `results/` und `priv/` privat ist |
 | `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
 | `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |

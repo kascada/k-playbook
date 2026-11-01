@@ -43,8 +43,10 @@
               <span id="tasks-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
-              Aus <code>k-playbook-local/tasks/</code>, nach Nummer geordnet. Erledigte liegen in
-              <code>done/</code> und stehen darunter.
+              Tasks liegen in der Projekt-Collection unter <code>keph:/user/&lt;user&gt;/tasks/</code>.
+              Bis zur Umstellung dieser Seite zeigt sie nur, was noch auf der Platte unter
+              <code>k-playbook-local/tasks/</code> liegt, nach Nummer geordnet; nachdem
+              <code>/k-upgrade</code> die Tasks umgezogen und das Verzeichnis abgeräumt hat, nichts mehr.
             </p>
             <div id="tasks-list" class="task-list empty"></div>
             <p id="tasks-message" class="message"></p>
@@ -62,8 +64,9 @@
               <span id="tasks-done-pill" class="pill muted">Aufklappen</span>
             </summary>
             <p class="hint">
-              Aus <code>k-playbook-local/tasks/done/</code>, dorthin verschoben von <code>/k-task-run</code>.
-              Die zuletzt abgearbeitete Nummer steht oben.
+              Was noch auf der Platte unter <code>k-playbook-local/tasks/done/</code> liegt; erledigte
+              Tasks liegen in der Projekt-Collection unter <code>done/</code>. Die zuletzt
+              abgearbeitete Nummer steht oben.
             </p>
             <div id="tasks-done-list" class="task-list empty"></div>
             <p id="tasks-done-message" class="message"></p>

@@ -15,8 +15,12 @@ the directories in use today rather than on top of them: the new names are free,
 migration is a move and never a rename during operation.
 
 **Status: built.** The three zones, the write tools and the index over `knowledge/` exist
-since task 056 (the zones are created by setup, the tools are `k-playbook knowledge …` and
-`k_playbook_knowledge_*`, see [`mcp.md`](mcp.md), "Knowledge Contract"). The migration is
+since task 056 (the tools are `k-playbook knowledge …` and `k_playbook_knowledge_*`, see
+[`mcp.md`](mcp.md), "Knowledge Contract"). Since task 107 setup no longer creates the zones
+or `cache/`: each zone is created, without a README, by the first write into it, and
+reading, searching and listing without it answer empty; the index creates `cache/` only
+when `knowledge/` holds a file to index. `/k-upgrade` 3.4 removes zones of an existing
+project that hold nothing but their README. The migration is
 under way, and it is not a move of its own: it is the switch of the writers to the gate, one
 step per writer (see "Migration"). Until the last step `docs/` holds what the writers not yet
 switched produce and stays the entry point, and `knowledge/` fills with every step. The reading

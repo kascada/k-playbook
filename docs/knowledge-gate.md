@@ -44,10 +44,10 @@ requirement; the instruction is what makes it happen. Everything below follows f
 |---|---|
 | Chunking, BM25 index, drift detection | built |
 | `search`, `list`, `read`, `status` over CLI and MCP | built |
-| The three zones `inbox/`, `queue/`, `knowledge/` and the write tools `write`, `publish`, `supersede`, `inbox_*`, `queue_*` | built, task 056; see [`knowledge-layout.md`](knowledge-layout.md) |
+| The three zones `inbox/`, `queue/`, `knowledge/` and the write tools `write`, `publish`, `supersede`, `inbox_*`, `queue_*` | built, task 056; see [`knowledge-layout.md`](knowledge-layout.md). Since task 107 setup no longer creates the zones: the write tools create each on the first write, and reading, searching and listing without them answer empty |
 | Classification of deposits (kind from the path, origin, state, format in the frontmatter) | built, task 056 |
 | `raw` and `superseded` out of search by default | built, task 056 |
-| Migration of `docs/` and `material/` into `knowledge/` | under way as the switch of the writers, six steps, no separate pass; step 1 `/k-docs-extract` (task 073). The locations still read meanwhile are in [`knowledge-layout.md`](knowledge-layout.md#transitional-reads). Superseded in part on 2026-10-24: the `/k-docs-*` commands get rebuilt for the project's collection, and the findings go into its `queue/findings/` first ([`knowledge-aktuell.md`](knowledge-aktuell.md)) |
+| Migration of `docs/` and `material/` into `knowledge/` | under way as the switch of the writers, six steps, no separate pass; step 1 `/k-docs-extract` (task 073). The locations still read meanwhile are in [`knowledge-layout.md`](knowledge-layout.md#transitional-reads). Superseded in part on 2026-10-24: the `/k-docs-*` commands get rebuilt for the project's collection, and the findings go into its `queue/findings/` first ([`knowledge-aktuell.md`](knowledge-aktuell.md)). Since task 107 setup no longer creates `docs/` and `material/`; `/k-upgrade` 3.4 removes them once they hold only their README |
 | Briefing call | built 2026-10-16 in another form than below (task 086): `k_playbook_briefing` / `k-playbook briefing` lists the documents that apply (instructions, rules, reviews, guidelines) and the own pending work in the project's collection, as references; the store's counts per kind/state/origin and freshness join later. See [`knowledge-aktuell.md`](knowledge-aktuell.md), "The briefing", and [`mcp.md`](mcp.md#briefing-contract) |
 | Filters on `kind`/`state`/`subject` | concept, this page |
 | Automatic learning from finished sessions | concept, see [`knowledge-storage.md`](knowledge-storage.md) |
@@ -117,7 +117,10 @@ document store, no service. The Markdown files are the truth; everything else is
 and disposable.
 
 The index lives beside it under `k-playbook-local/cache/knowledge/`, is never versioned,
-and can be deleted at any time. It rebuilds itself on the next access. It also carries a
+and can be deleted at any time. It rebuilds itself on the next access. `cache/` is not part
+of the project-owned structure (task 107): it is created with its managed `.gitignore` when
+an index is first written, and only when `knowledge/` holds a file to index — a read access
+to an empty or missing store keeps the index in memory and writes nothing. It also carries a
 hash per file and compares it against the tree, so a change made past the gate — a `git
 pull`, an editor, a generator run — is detected and corrected rather than silently
 outlasted.

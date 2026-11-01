@@ -52,6 +52,17 @@ More examples:
   the shipped layer behind `k-playbook:`; a direct reference would bypass the override by
   local content.
 
+## Bringing References up to Date
+
+Older text still carries relative links and bare paths where a reference is meant. How such
+a place is recognized, which prefix a bare path gets, what stays untouched as evidence and
+how it is changed stands once, for sessions, in
+`instructions/on-demand/verweise-nachziehen.md` (task 108); `/k-task-refine`, `/k-upgrade`
+3.3 and every later check follow it. `checks/check_verweise.sh` reports the part that is
+recognizable in the text of the shipped and project-own commands, instructions, rules,
+guidelines and skills; it does not correct anything, and deliberate exceptions are listed in
+`checks/verweis-exceptions.tsv` (see [checks/README.md](../checks/README.md#verweise-ohne-präfix)).
+
 ## Placeholder `~` for the Own User
 
 Shipped content has to name "your tasks" or "your workbench" without writing a user name

@@ -21,9 +21,12 @@ In short:
 - **Name and number.** `k_playbook_doc_create` (kind `tasks`) creates `<NNN>-<short-name>.md`; the number is the highest across all `user/*/tasks/` including `done/` plus one, starting at `001`. Only the file name has to be unique, not the number, so a number given as an argument is resolved among the own open tasks first, then `done/`, and the user chooses when several match.
 - **Header.** Frontmatter with `title`; the briefing and `k_playbook_doc_list` show it. The state is the location (`done/`) and the marker lines in the body, not a frontmatter field.
 - **Write path.** Only the creator writes the whole document (Kephalaion `write` right after `create`). Afterwards everything is appended with `k_playbook_doc_append`, changed with `k_playbook_doc_replace` or `k_playbook_doc_set_field`, read with `k_playbook_doc_read` (`section`, `lines`) and searched with `k_playbook_doc_grep` -- each with `since_revision`, the revision of the writer's own last write. A `foreign_change` answer means somebody else wrote in between: the command stops and asks the user who continues. The history of a task is its Kephalaion revisions, not Git.
-- **Progress.** A task with `### Etappe N` headings gets one appended line per completed stage, `<!-- k-task-run: etappe <n> erledigt <date> --> <evidence>`; a reset is a line `<!-- k-task-run: fortschritt zurückgesetzt <date> -->`. Per stage the last line after the last reset counts. There is no progress table any more.
+- **Progress.** A task with `### Etappe N` headings gets one appended line per completed stage, `<!-- k-task-run: etappe <n> erledigt <date> --> <evidence>`; a reset is a line `<!-- k-task-run: fortschritt zurückgesetzt <date> -->`. Per stage the last line after the last reset counts. There is no progress table any more; an old table `## Fortschritt` from the disk era is read only by `/k-upgrade` 3.3, which translates its completed rows into progress lines when it moves the task (task 108).
+- **References.** Every reference in a task carries a prefix (`project:/`, `k-playbook:/`, `keph:/`), the intent included; relative links and bare paths are reported, not guessed. What counts as a reference and how an old one is brought up to date is `k-playbook:/instructions/on-demand/verweise-nachziehen.md`; `/k-task-refine` checks it, `checks/check_verweise.sh` reports what is recognizable in the text of the commands and instructions (see [verweisschema.md](verweisschema.md#bringing-references-up-to-date)).
+- **Foreign and completed references.** A command that changes, appends to, moves or changes code on the strength of an existing task accepts only references whose user segment is `~` or the own user; a foreign one is rejected up front with `foreign_user`. Reading and searching (the `/k-remediation` comparison over all users) and creating during the move in `/k-upgrade` 3.3 are exempt. A reference under `done/` leads to the same question as a number that only matches a completed task: `/k-task-run` offers to reopen it, `/k-task-refine` asks whether to review it anyway or stop.
+- **Replica lag.** The node reads from its replica, which trails the hub. The write operations wait for it; `k_playbook_doc_grep` and `k_playbook_doc_read` do not. A read or count right after one's own write that shows a revision **below** one's own last one is the replica lagging -- wait briefly and read again, a few times; only a higher revision, or one that still differs after the retries, counts as `foreign_change`. The same holds for `not_found` right after one's own `k_playbook_doc_done`/`_reopen` under the new reference. Every append whose arrival is later checked by a heading or marker is counted first, and every `outcome_unknown` has a fixed path per operation (re-read, take the revision from that answer, write again only when nothing arrived). The rule stands once, in `tasks.md`, section "Lesen und schreiben".
 
-The **Tasks** page of the interface (`/workflows/tasks`) still shows the directory `k-playbook-local/tasks/`, which is empty after `/k-upgrade` 3.3 has moved the files; switching the page to the collection is a task of its own. The directories `tasks/` and `tasks/done/` are therefore still created, and their README says where tasks live now.
+The **Tasks** page of the interface (`/workflows/tasks`) still shows the directory `k-playbook-local/tasks/`; switching the page to the collection is a task of its own. Since task 107 setup no longer creates `tasks/` and `tasks/done/`: the page shows only what is left on disk, and nothing once `/k-upgrade` has moved the files (3.3) and removed the empty directory (3.4).
 
 Tasks written to disk by earlier versions are moved by `/k-upgrade`, conversion 3.3 "Tasks von der Platte": same file name and number, under the user the person chooses per line (proposed: the own user), open ones to `user/<user>/tasks/`, completed ones to `tasks/done/`, with a `title` frontmatter built from the first heading where it is missing; references to `k-playbook-local/tasks/` in the project are proposed for replacement. Nothing is deleted or moved without confirmation.
 
@@ -175,3 +178,16 @@ marker before reading the task, neither reads nor executes it again, and asks:
 There is no automatic fix, no new review, and no re-execution. A task that merely quotes
 the marker template carries a placeholder or another file name there and does not count as
 executed. All marker lines are listed in `on-demand/tasks.md`, section "Kennzeilen".
+
+Since task 108 two more marker lines exist:
+
+- `<!-- k-task-run: wieder geöffnet <file> <date> -->` -- appended by the main context after
+  `k_playbook_doc_reopen`, when a completed task is run again. The marker "ausgeführt" only
+  counts after the last such line, so a reopened task is executed again instead of being
+  offered for completion.
+- `<!-- k-task-run: abgebrochen <file> -->` -- the head of an aborted run (5e), written like
+  "ausgeführt" as the first line after `## Ausführung` and the blank line.
+
+A reader that wants the task without the sections of earlier runs cuts at the last
+`## Ausführung` line before the first marker "ausgeführt" or "abgebrochen"; without such a
+marker at the first `## Ausführung`, without that the whole task is its body.

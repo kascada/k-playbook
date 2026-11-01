@@ -137,6 +137,12 @@ Context-Ausgabe und bindet sie an ALL-CAPS-Namen, die der Rest der Datei benutzt
 Ein Command **rät nie einen Pfad und benutzt nie einen Fallback**. Was nicht aus der
 Context-Ausgabe kommt, wird nicht verwendet.
 
+Ein Verweis, dem eine KI folgen soll — und jeder, den ein Command in einen Task schreibt —,
+hat die Form aus `k-playbook:/instructions/always/010-verweise.md`, mit Präfix; was als
+Verweis gilt und wie ein alter nachgezogen wird, steht in
+`k-playbook:/instructions/on-demand/verweise-nachziehen.md`, und `checks/check_verweise.sh`
+meldet relative Links und nackte Pfade, wo ein Verweis gemeint ist.
+
 ## Command-specific policy
 
 Direkt nach der Pfadauflösung, im selben Schritt, steht ein Block

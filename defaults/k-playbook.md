@@ -19,7 +19,7 @@ verloren. Wer eine mitgelieferte Datei anpassen will, legt eine gleichnamige in
 `k-playbook-local/` an.
 
 Alles, was das Projekt selbst hervorbringt, gehört nach `k-playbook-local/`: eigene
-Regeln, Reviews, Checks, Commands und Skills, dazu Ergebnisse, Tasks, Notizen.
+Regeln, Reviews, Checks, Commands und Skills, dazu Ergebnisse und Notizen.
 
 ## Überlagern und Abschalten
 
@@ -79,7 +79,8 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 - **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
   `/k-docs-tools` und `/k-doc-inventory` erzeugen Doku, `/k-docs-index` baut den Index.
   `/k-docs-extract` verdichtet Rohmaterial aus `k-playbook-local/inbox/` und schreibt es
-  über die Wissenswerkzeuge nach `k-playbook-local/knowledge/extracted/`.
+  über die Wissenswerkzeuge nach `k-playbook-local/knowledge/extracted/`; bis zu ihrer
+  Umstellung schreiben die Wissenswerkzeuge noch auf die Platte.
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
   vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
   überführt Befunde in Tasks oder Fixes.

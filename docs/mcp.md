@@ -684,7 +684,10 @@ place that chunks, indexes, searches and writes; the load-bearing layer is the s
 `k-playbook knowledge`, and a binary that is too old answers it with `unbekanntes Kommando`. The
 envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on failure.
 The store is the zone `k-playbook-local/knowledge/`; `inbox/` and `queue/` lie beside it and
-are never indexed. [knowledge-layout.md](knowledge-layout.md) defines the zones, the owner per
+are never indexed. Setup does not create the zones (task 107): the write tools create them on
+the first write, and `search`, `list`, `status`, `inbox_list` and `queue_list` answer empty
+without them — `read` and `inbox_read` of a path that does not exist stay `invalid_input`. A
+read access to an empty or missing store writes no index and creates no `cache/`. [knowledge-layout.md](knowledge-layout.md) defines the zones, the owner per
 directory and the frontmatter; this section only fixes what the tools return.
 
 **Reading.** A search hit names `path`, `heading` (the heading verbatim, the leading field),
@@ -1060,7 +1063,10 @@ optional `since_revision`.
   the caller's own write: k-playbook waits briefly and reads again, up to three times; only a
   higher revision, or one that still differs after the attempts, is `foreign_change`. A
   `stale_revision` from the hub with `since_revision` set is `foreign_change` too. The caller
-  then does not catch up silently but asks the user who continues.
+  then does not catch up silently but asks the user who continues. `k_playbook_doc_grep` and
+  `k_playbook_doc_read` do **not** wait: a revision below one's own last write right after
+  writing is the replica lagging, and the caller waits and reads again itself
+  (`k-playbook:/instructions/on-demand/tasks.md`, "Replica-Nachlauf", task 108).
 - **Without `since_revision`** there is no precondition beyond the hub's own check: the write
   carries `base_revision` = the revision read; on `stale_revision` the document is read again,
   the change applied again, and the write retried up to three times; after that the answer is

@@ -14,9 +14,6 @@ import (
 // Name wird abgewiesen — der Eingang überschreibt nicht.
 func TestKnowledgeInboxPutListRead(t *testing.T) {
 	root := t.TempDir()
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatal(err)
-	}
 	knowledge := NewKnowledge(root)
 
 	rel, err := knowledge.InboxPut("chat", "2026-09-12.md", []byte("# Mitschnitt\n\nKennwort.\n"), "Aus dem Standup")
@@ -115,13 +112,24 @@ func TestKnowledgeInboxPutWeistAb(t *testing.T) {
 	if entries, err := knowledge.InboxList(""); err != nil || len(entries) != 0 {
 		t.Errorf("fehlender Eingang: %+v, %v", entries, err)
 	}
+	if _, err := knowledge.InboxRead("chat/fehlt.md"); err == nil || !IsInputError(err) {
+		t.Errorf("Lesen aus fehlendem Eingang: %v, erwartet einen Eingabefehler", err)
+	}
+	if pathExists(InboxDir(root)) {
+		t.Error("Eingang durch Lesen entstanden")
+	}
 }
 
 // Ein Eintrag entsteht mit vergebener Kennung, die Liste nennt ihn mit den
 // vier Feldern, drop löscht ihn — und hält den Grund nirgends fest.
 func TestKnowledgeQueueAddListDrop(t *testing.T) {
 	root := t.TempDir()
-	if _, err := CreateLocal(root); err != nil {
+	// Eine README aus der Zeit, als das Einrichten queue/ anlegte: drop lässt
+	// sie liegen, die Liste übergeht sie.
+	if err := os.MkdirAll(QueueDir(root), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(QueueDir(root), "README.md"), []byte("# queue\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	knowledge := NewKnowledge(root)
@@ -236,7 +244,7 @@ func TestKnowledgeQueueAddWeistAb(t *testing.T) {
 	}
 }
 
-// Liegt am Quellpfad eine Datei — die README aus CreateLocal als Quelle, eine
+// Liegt am Quellpfad eine Datei — eine alte README als Quelle, eine
 // abgelegte Datei als Zwischenverzeichnis im Namen —, ist das ein Eingabefehler
 // mit sprechender Meldung, bevor irgendetwas angelegt wird (Task 063, Etappe 5).
 func TestKnowledgeInboxPutQuellpfadIstDatei(t *testing.T) {

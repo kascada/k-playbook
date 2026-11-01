@@ -8,10 +8,10 @@ Platte.
 
 Unterstützt aktuelle und historische Formate:
 
-- Audit-Läufe wie `k-playbook-local/results/<date>/review-triage.md` mit `review-input.json` — der Hauptweg.
-- Aktuelle Result-Familien wie `k-playbook-local/results/<family>/<date>/review-triage.md` mit optionalem `review-input.json`.
-- Legacy-Result-Summaries wie `k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
-- Legacy-Result-Familien wie `k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, nur wenn im selben Ordner kein `review-triage.md` vorhanden ist.
+- Audit-Läufe wie `project:/k-playbook-local/results/<date>/review-triage.md` mit `review-input.json` — der Hauptweg.
+- Aktuelle Result-Familien wie `project:/k-playbook-local/results/<family>/<date>/review-triage.md` mit optionalem `review-input.json`.
+- Legacy-Result-Summaries wie `project:/k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
+- Legacy-Result-Familien wie `project:/k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, nur wenn im selben Ordner kein `review-triage.md` vorhanden ist.
 
 **`summary-*.md` ist ein reiner Lesepfad.** Seit dem Wegfall des nachgelagerten
 Priorisierungsschritts erzeugt nichts mehr eine Summary: weder `/k-audit` noch `/k-review`
@@ -61,15 +61,22 @@ Aus dem Briefing:
 - `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`,
   `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`,
   `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus `context.remediation`.
+- `REMEDIATION_TARGET_REF` = der Ziel-Root als Verweis: `project:/<target>/`, ohne führendes
+  `./`; für `target: .` die Projektwurzel `project:/`. So steht er in erzeugten Tasks
+  (Ziel-Root, `Target repo`).
 - `REMEDIATION_BASE_BRANCH` = aktueller Branch im Target-Repo, falls `target` ein Git-Repo
   ist; sonst unset. Bestimme ihn mit `git branch --show-current` im Target-Root. Wenn leer:
   nutze keinen geratenen Wert, sondern schreibe `Base branch: <manual>` in erzeugte Tasks.
 
 Command-specific policy:
 
-- Tasks brauchen die Collection. Steht `context.kephalaion.ok` nicht auf `true`, endet der
-  Command hier mit `context.kephalaion.message` (Abschnitt „Ohne Kephalaion“ in
-  `on-demand/tasks.md`): kein Task auf der Platte, kein Abgleich, kein Ersatzverzeichnis.
+- Tasks brauchen die Collection. Steht `context.kephalaion.ok` nicht auf `true`, bricht der
+  Command erst dort ab, wo er die Collection braucht — vor dem Abgleich gegen bestehende
+  Tasks (Schritt 5) und vor dem Anlegen eines Tasks (6c) —, mit `context.kephalaion.message`
+  (Abschnitt „Ohne Kephalaion“ in `k-playbook:/instructions/on-demand/tasks.md`): kein Task
+  auf der Platte, kein Abgleich, kein Ersatzverzeichnis. Im Modus `direct-allowed` laufen
+  Sofort-Fixes (S) und Akzeptieren (A) ohne Collection weiter; der Command sagt dann einmal,
+  dass weder Abgleich noch Tasks möglich sind.
 - Wenn `RESULTS_DIR` nicht existiert: fragen, ob genau dieses Verzeichnis angelegt werden
   soll, oder `/k-gui` nennen. Keinen anderen Pfad verwenden.
 - Wenn `mode: task-branch-pr` oder `mode: task-first` gesetzt ist, müssen
@@ -97,7 +104,7 @@ Akzeptierte direkte Argumente:
 - `<RESULTS_DIR>/<family>/<date>/review-triage.md`
 - Legacy: `<RESULTS_DIR>/summary-*.md`, soweit im Projekt noch eine liegt
 - Legacy: `<RESULTS_DIR>/<family>/<date>/assessment.md`, wenn dort kein `review-triage.md` liegt
-- Projektrelative Varianten davon, z. B. `k-playbook-local/results/2026-07-23/review-triage.md` oder `k-playbook-local/results/k-check/2026-07-23/review-triage.md`
+- Projektrelative Varianten davon, mit oder ohne Präfix `project:/`, z. B. `project:/k-playbook-local/results/2026-07-23/review-triage.md` oder `project:/k-playbook-local/results/k-check/2026-07-23/review-triage.md`
 
 Wenn nicht:
 
@@ -282,23 +289,40 @@ Falls die Datei eine Prioritätsspalte oder ein `Priorität`-Feld enthält: nach
 
 Dieser Abgleich sitzt **vor** der Task-Erzeugung: Ob ein Task überhaupt entsteht,
 entscheidet sich hier. Er läuft über alle Tasks der Projekt-Collection, offene und erledigte,
-aller User — ein Befund ist auch dann in Arbeit, wenn ein anderer den Task angelegt hat.
+aller User — ein Befund ist auch dann in Arbeit, wenn ein anderer den Task angelegt hat. Er
+liest und sucht nur; die Regel zu fremden Verweisen aus
+`k-playbook:/instructions/on-demand/tasks.md` greift deshalb nicht.
 
-1. Mit `k_playbook_doc_grep` über die Sorte: `kind: tasks`, `user: "*"`, `done: true`,
-   `pattern` = die **Quelle** der Arbeitsdatei als Regex (Punkte maskiert, etwa
-   `results/k-check/2026-07-23/review-triage\.md`). Die Antwort nennt je Treffer `ref` und
-   die Zeile; mehr als 200 Treffer meldet `truncated: true` — dann die Suche mit der
-   **Bündel-/Gruppen-ID** verfeinern.
-2. Für jeden Verweis aus Schritt 1 mit `k_playbook_doc_grep` auf `ref` prüfen, ob die
-   Bündel-/Gruppen-ID des geplanten Bündels darin steht (als Wort, etwa `\bB1\b` oder
-   `\bP1-01\b`). Beides schreibt Schritt 6c in jeden erzeugten Task, Quelle und ID, damit
-   dieser Abgleich ihn beim nächsten Lauf wiedererkennt.
+**Die Ankerzeile.** Jeder Task, den dieser Command anlegt, trägt je Bündel-/Gruppen-ID eine
+feste Zeile, als eigene Zeile am Zeilenanfang unter `## Kontext`, kein Listenpunkt (6c):
+
+```text
+Remediation-Anker: <QUELLE_REF> <bündel-id>
+```
+
+`QUELLE_REF` ist die Quelle der Arbeitsdatei als Verweis, `project:/<projektrelativer Pfad>`,
+etwa `project:/k-playbook-local/results/k-check/2026-07-23/review-triage.md`; `<bündel-id>`
+die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
+
+1. Je geplantem Bündel mit `k_playbook_doc_grep` über die Sorte suchen: `kind: tasks`,
+   `user: "*"`, `done: true`, `pattern` = die Ankerzeile, am Zeilenanfang und am Zeilenende
+   verankert, Punkte und andere Sonderzeichen maskiert, etwa
+   `^Remediation-Anker: project:/k-playbook-local/results/k-check/2026-07-23/review-triage\.md B1$`.
+   Die Antwort nennt je Treffer `ref` und die Zeile.
+2. **Alte Tasks ohne Anker.** Danach einmal mit dem bisherigen Muster suchen: `pattern` = der
+   projektrelative Pfad der Quelle als Regex (Punkte maskiert, etwa
+   `results/k-check/2026-07-23/review-triage\.md`); mehr als 200 Treffer meldet
+   `truncated: true`. Ein Treffer in einem Task ohne Ankerzeile für dieses Bündel wird
+   gemeldet („ohne Anker“, mit `ref`), gilt aber **nicht** still als Deckung: Das Bündel geht
+   weiter in die Abarbeitung, und vor dem Anlegen eines Tasks dafür (6c, Kategorie T,
+   Schritt 1) fragt der Command den Nutzer, ob der alte Task es abdeckt.
 3. Je geplantem Bündel entscheiden, ob ein bestehender Task es abdeckt.
 
-**Treffer-Kriterium.** Ein bestehender Task deckt einen Befund ab, wenn **Quelle und
-Bündel-/Gruppen-ID übereinstimmen**. Beides muss zutreffen. Titelähnlichkeit allein
-reicht nicht: derselbe Titel über zwei Läufen hinweg sagt nichts darüber, ob es derselbe
-Befund ist, und ein umformulierter Titel verdeckt sonst eine echte Deckung.
+**Treffer-Kriterium.** Ein bestehender Task deckt einen Befund ab, wenn er die
+**Ankerzeile** dieses Bündels trägt — Quelle und Bündel-/Gruppen-ID in genau dieser Form.
+Titelähnlichkeit allein reicht nicht: derselbe Titel über zwei Läufen hinweg sagt nichts
+darüber, ob es derselbe Befund ist, und ein umformulierter Titel verdeckt sonst eine echte
+Deckung.
 
 **Treffer in einem offenen Task** (Verweis ohne `/done/`) — der Befund ist bereits in Arbeit:
 
@@ -327,6 +351,7 @@ Befunde geladen: <N> offen
 Bündel: <M> geplant
 Bereits in Task:  <k>  (<Bündel-ID> -> <keph:-Verweis>)
 Früher erledigt:  <k>  (<Bündel-ID> -> <keph:-Verweis>, Befund bleibt offen)
+Ohne Anker:       <k>  (<Bündel-ID> -> <keph:-Verweis>, nicht als Deckung gewertet)
 Autonom: <liste der freigegebenen Kategorien>
 ```
 
@@ -339,19 +364,11 @@ Wenn `grouping: true`, arbeite die bestätigten Bündel ab. Innerhalb eines Bün
 Bei `mode: task-branch-pr`:
 
 1. Keine Produktcode-Dateien ändern.
-2. Pro bestätigtem Bündel einen Task anlegen.
-3. Der Task muss enthalten:
-    - alle Finding-IDs im Bündel.
-    - Result-Pfad und, falls vorhanden, `review-input.json` oder Legacy-`findings.md`.
-    - Ziel-Root (`target`), z. B. `./app`.
-    - vorgeschlagener Branch: `<branchPrefix><NNN>-<slug>`, `<NNN>` die Nummer aus der Antwort von `k_playbook_doc_create`.
-    - Hinweis: PR erforderlich.
-    - Abschnitt `## Ausführungskontext` unmittelbar nach `## Intent` mit Target-Repo, Base-Branch, Work-Branch, PR-Pflicht und Dirty-Worktree-Policy.
-    - Abschnitt `## Branch-Preflight` vor `## Zu bauen` mit klarer Pflicht: zuerst im Target-Repo den Dirty-State prüfen, dann vom Base-Branch den Work-Branch erstellen oder auf bestehenden Work-Branch wechseln, und erst danach Dateien ändern.
-    - Verifikationsplan für das Bündel.
-4. Bei aktuellen Result-Familien `review-triage.md` um `## Remediation-Status` mit dem `keph:`-Verweis des Tasks ergänzen oder aktualisieren. Bei Legacy-Result-Familien in `findings.md` bei allen Findings des Bündels `- Remediation: Task <NNN> - <keph:-Verweis>` ergänzen oder aktualisieren. Status bleibt offen, bis der Fix wirklich umgesetzt ist.
-5. Bei einer Legacy-Summary die Summary selbst um Task-/Handoff-Status für das Bündel ergänzen oder aktualisieren. Ergänzt wird nur der Status der Abarbeitung — die Summary wird nicht neu berechnet und keine zweite angelegt.
-6. `review-triage.md`, Legacy-`assessment.md` oder die Legacy-Summary bekommt/aktualisiert `## Remediation-Status` mit erzeugten Tasks und Bündeln.
+2. Pro bestätigtem Bündel einen Task anlegen, wie 6c, Kategorie T, es beschreibt — Inhalt,
+   Quelle, Ankerzeile, `## Ausführungskontext` und `## Branch-Preflight` stehen dort und
+   werden hier nicht wiederholt.
+3. Den Status in der Arbeitsdatei nach Schritt 7 setzen; er bleibt offen, bis der Fix
+   wirklich umgesetzt ist.
 
 Bei `mode: task-first`: analog, aber direkte Fixes können nach expliziter Einzelfreigabe erlaubt sein.
 
@@ -419,36 +436,43 @@ Den Task nach `k-playbook:/instructions/on-demand/tasks.md` anlegen — Ablage, 
 Nummer, Kopf und Aufbau stehen dort und werden hier nicht wiederholt:
 
 1. Abgleich prüfen: Deckt ein offener Task dieses Bündel bereits ab (Schritt 5,
-   Treffer-Kriterium Quelle plus Bündel-/Gruppen-ID)? Dann keinen zweiten Task anlegen,
-   sondern den Treffer melden und beim nächsten Bündel weitermachen. Ein Treffer unter
-   `done/` hält den Task nicht auf; er wird im neuen Task als Vorgeschichte genannt.
+   Treffer-Kriterium: die Ankerzeile)? Dann keinen zweiten Task anlegen, sondern den Treffer
+   melden und beim nächsten Bündel weitermachen. Ein Treffer unter `done/` hält den Task
+   nicht auf; er wird im neuen Task als Vorgeschichte genannt. Ein Treffer „ohne Anker“ führt
+   zur Rückfrage, ob der alte Task das Bündel abdeckt; nur ein Ja des Nutzers wertet ihn als
+   Deckung.
 2. `k_playbook_doc_create` mit `kind: tasks` und einem Kurznamen aus dem Befundtitel
-   (klein, Bindestriche). Die Antwort nennt `ref` und `number`; die Nummer vergibt
-   k-playbook.
-3. Inhalt nach dem Abschnitt „Aufbau“ von `on-demand/tasks.md` (Frontmatter mit `title`,
-   Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen) mit Kephalaion `write` schreiben,
-   `collection` = `context.kephalaion.address`, `name` = Pfad des Verweises ohne führenden
-   `/`. Kontext = Befundtext + Verweis auf die Ergebnisdatei. Ziel = die saubere Lösung (kein
-   Quick-and-Dirty).
+   (klein, Bindestriche). Die Antwort nennt `ref`, `number` und `name`; die Nummer vergibt
+   k-playbook. Für die Platzhalter unten gilt: `<NNN>` ist `number`, dreistellig mit
+   führenden Nullen; `<slug>` ist `name` ohne die Nummer mit Bindestrich davor und ohne
+   `.md`.
+3. Inhalt nach dem Abschnitt „Aufbau“ von `k-playbook:/instructions/on-demand/tasks.md`
+   (Frontmatter mit `title`, Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen) mit
+   Kephalaion `write` schreiben, `collection` = `context.kephalaion.address`, `name` = Pfad
+   des Verweises ohne führenden `/`. Kontext = Befundtext + die Quelle als Verweis
+   `QUELLE_REF` (`project:/…`). Ziel = die saubere Lösung (kein Quick-and-Dirty). Jeder
+   Verweis im Task hat die Form aus `k-playbook:/instructions/on-demand/tasks.md`,
+   „Verweise“ — Dateien des Projekts als `project:/…`.
 
-    **Pflichtanker in jedem Task: Quelle plus Bündel-/Gruppen-ID.** Beide Angaben sind
-    nicht bloß Herkunftsnachweis, sondern das Kriterium, an dem der Abgleich aus
-    Schritt 5 diesen Task beim nächsten Lauf wiedererkennt. Fehlt eine davon, entsteht
-    beim nächsten Lauf ein zweiter Task zum selben Befund. Sie gilt in **jedem**
-    `RESULT_FORMAT`:
+    **Pflichtanker in jedem Task: die Ankerzeile.** Je Bündel-/Gruppen-ID steht unter
+    `## Kontext` eine Zeile `Remediation-Anker: <QUELLE_REF> <bündel-id>` (Schritt 5), als
+    eigene Zeile am Zeilenanfang, kein Listenpunkt. Sie ist nicht bloß Herkunftsnachweis,
+    sondern das Kriterium, an dem der Abgleich aus Schritt 5 diesen Task beim nächsten Lauf
+    wiedererkennt. Fehlt sie, entsteht beim nächsten Lauf ein zweiter Task zum selben Befund.
+    Sie gilt in **jedem** `RESULT_FORMAT`. Daneben muss der Task enthalten:
 
-    - Bei `RESULT_FORMAT=audit-run` muss der Task enthalten: Quelle `k-playbook-local/results/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
-    - Bei `RESULT_FORMAT=result-family` muss der Task enthalten: Quelle `k-playbook-local/results/<family>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
-    - Bei `RESULT_FORMAT=summary` (Legacy-Lesepfad, siehe Schritt 2) muss der Task enthalten: Quelle `k-playbook-local/results/summary-<date>.md`, die Gruppen-ID aus der Summary (z. B. `P1-01`), dazu die von der Summary verlinkten Quellen und deren Bündel-/Finding-IDs, soweit sie dort stehen.
-    - Bei `RESULT_FORMAT=legacy-result-family` muss der Task enthalten: Quelle `k-playbook-local/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
-    - Bei Bündeln muss der Task enthalten: Bündelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root, vorgeschlagener Branch und PR-Pflicht aus der Remediation-Policy.
-    - Bei einem Treffer unter `done/` muss der Task den erledigten Vorgänger nennen: sein `keph:`-Verweis und der Umstand, dass derselbe Befund erneut aufgetreten ist.
-    - Bei `mode: task-branch-pr` muss der Task zusätzlich diese Struktur enthalten:
+    - Bei `RESULT_FORMAT=audit-run`: Quelle `project:/k-playbook-local/results/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
+    - Bei `RESULT_FORMAT=result-family`: Quelle `project:/k-playbook-local/results/<family>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
+    - Bei `RESULT_FORMAT=summary` (Legacy-Lesepfad, siehe Schritt 2): Quelle `project:/k-playbook-local/results/summary-<date>.md`, die Gruppen-ID aus der Summary (z. B. `P1-01`), dazu die von der Summary verlinkten Quellen und deren Bündel-/Finding-IDs, soweit sie dort stehen.
+    - Bei `RESULT_FORMAT=legacy-result-family`: Quelle `project:/k-playbook-local/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `project:/k-playbook-local/results/<family>/<date>/findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
+    - Bei Bündeln: Bündelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root als `REMEDIATION_TARGET_REF`, vorgeschlagener Branch `<REMEDIATION_BRANCH_PREFIX><NNN>-<slug>`, PR-Pflicht aus der Remediation-Policy und ein Verifikationsplan für das Bündel.
+    - Bei einem Treffer unter `done/`: den erledigten Vorgänger mit seinem `keph:`-Verweis und dem Umstand, dass derselbe Befund erneut aufgetreten ist.
+    - Bei `mode: task-branch-pr` zusätzlich diese Struktur, `## Ausführungskontext` unmittelbar nach `## Intent`, `## Branch-Preflight` vor `## Zu bauen`:
 
 ```markdown
 ## Ausführungskontext
 
-- Target repo: `<REMEDIATION_TARGET_DISPLAY>`
+- Target repo: `<REMEDIATION_TARGET_REF>`
 - Base branch: `<REMEDIATION_BASE_BRANCH or "<manual>">`
 - Work branch: `<REMEDIATION_BRANCH_PREFIX><NNN>-<slug>`
 - PR required: `<REMEDIATION_PR_REQUIRED>`
@@ -595,7 +619,7 @@ Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
 
 ## Schritt 8 — Log-Eintrag
 
-Nichts wird archiviert oder verschoben. Lauf-Verzeichnisse bleiben stabil unter `k-playbook-local/results/<date>/`, Family-Verzeichnisse unter `k-playbook-local/results/<family>/<date>/`; vorhandene Legacy-Summaries bleiben stabil dort liegen, wo sie liegen — direkt unter `k-playbook-local/results/`. Abschluss erfolgt bei Audit-Läufen und aktuellen Result-Familien über `## Remediation-Status` in `review-triage.md`, bei Legacy-Familien über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`, bei einer Legacy-Summary direkt in der Summary.
+Nichts wird archiviert oder verschoben. Lauf-Verzeichnisse bleiben stabil unter `project:/k-playbook-local/results/<date>/`, Family-Verzeichnisse unter `project:/k-playbook-local/results/<family>/<date>/`; vorhandene Legacy-Summaries bleiben stabil dort liegen, wo sie liegen — direkt unter `project:/k-playbook-local/results/`. Abschluss erfolgt bei Audit-Läufen und aktuellen Result-Familien über `## Remediation-Status` in `review-triage.md`, bei Legacy-Familien über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`, bei einer Legacy-Summary direkt in der Summary.
 
 Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auch dann, wenn er keinen einzigen Befund geändert hat:
 
@@ -644,4 +668,4 @@ ausdrücklich kein Folge-Command an.
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `<date>/review-triage.md` und `<family>/<date>/review-triage.md` in `<RESULTS_DIR>` auflisten; als Legacy zusätzlich vorhandene `summary-*.md` und `assessment.md` — letztere nur, wenn kein `review-triage.md` im selben Ordner existiert. Bei Formatabweichung: abbrechen statt raten.
 - **Kein k-playbook-Projekt**: das Briefing schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` fehlt im Dateisystem**: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen.
-- **Kephalaion nicht bereit** (`context.kephalaion.ok` nicht `true`, `kephalaion_unavailable`): abbrechen mit `context.kephalaion.message`; ohne Collection gibt es keine Tasks und keinen Abgleich, und auf die Platte wird nicht ausgewichen.
+- **Kephalaion nicht bereit** (`context.kephalaion.ok` nicht `true`, `kephalaion_unavailable`): vor dem Abgleich und vor dem Anlegen eines Tasks abbrechen mit `context.kephalaion.message` (Schritt 1); ohne Collection gibt es keine Tasks und keinen Abgleich, und auf die Platte wird nicht ausgewichen.

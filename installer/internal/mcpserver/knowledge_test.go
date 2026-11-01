@@ -1023,3 +1023,73 @@ func TestKnowledgeReadMeldetRueckstellungImHint(t *testing.T) {
 		t.Errorf("code/ steht nicht wieder: %v", err)
 	}
 }
+
+// Ohne inbox/, queue/ und knowledge/ — seit Task 107 der Normalfall eines
+// neuen Projekts — antworten die lesenden Werkzeuge leer, nicht mit einem
+// Fehler; ein genannter Pfad bleibt ein Eingabefehler. Keines legt dabei ein
+// Verzeichnis an, auch cache/ nicht.
+func TestKnowledgeWerkzeugeOhneVerzeichnisseAntwortenLeer(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	base := knowledgeBaseInput{ProjectDir: root}
+	ctx := context.Background()
+
+	result, _, err := knowledgeSearchTool(ctx, nil, knowledgeSearchInput{knowledgeBaseInput: base, Query: "Wächter"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK || len(knowledgeHitsOf(envelope)) != 0 || !strings.Contains(envelope.Hint, "nichts Durchsuchbares") {
+		t.Errorf("search: %#v", envelope)
+	}
+	result, _, err = knowledgeListTool(ctx, nil, knowledgeListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(rawKnowledgeJSON(t, result)["entries"]); got != "[]" {
+		t.Errorf("list: entries = %s, erwartet []", got)
+	}
+	result, _, err = knowledgeStatusTool(ctx, nil, knowledgeStatusInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); !envelope.OK || envelope.Status == nil || envelope.Status.FileCount != 0 {
+		t.Errorf("status: %#v", envelope)
+	}
+	result, _, err = knowledgeInboxListTool(ctx, nil, knowledgeInboxListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(rawKnowledgeJSON(t, result)["inbox"]); got != "[]" {
+		t.Errorf("inbox_list: inbox = %s, erwartet []", got)
+	}
+	result, _, err = knowledgeQueueListTool(ctx, nil, knowledgeQueueListInput{knowledgeBaseInput: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(rawKnowledgeJSON(t, result)["queue"]); got != "[]" {
+		t.Errorf("queue_list: queue = %s, erwartet []", got)
+	}
+
+	result, _, err = knowledgeReadTool(ctx, nil, knowledgeReadInput{knowledgeBaseInput: base, Path: "manual/fehlt.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Errorf("read: %#v", envelope)
+	}
+	result, _, err = knowledgeInboxReadTool(ctx, nil, knowledgeInboxReadInput{knowledgeBaseInput: base, Path: "chat/fehlt.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envelope := decodeKnowledgeEnvelope(t, result); envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" {
+		t.Errorf("inbox_read: %#v", envelope)
+	}
+
+	for _, dir := range []string{project.InboxDir(root), project.QueueDir(root), project.KnowledgeDir(root), filepath.Join(project.LocalDir(root), project.CacheDirName)} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("%s ist durch einen Lesezugriff entstanden (%v)", dir, err)
+		}
+	}
+}

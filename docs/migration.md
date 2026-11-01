@@ -305,7 +305,9 @@ to the existing document and removes the file.
 
 Two directories arrived with it: `k-playbook-local/data/` for machine files that belong to the
 project's state, versioned and without a `.gitignore`, and `k-playbook-local/cache/` for derived
-content that can be rebuilt at any time, private by default like `results/`.
+content that can be rebuilt at any time, private by default like `results/`. Both left the
+project-owned structure again with task 107: the todos live in the collection, and `cache/` is
+created only by the index of the knowledge gate.
 
 **Completed: namespace convention for command modules.** Decided together with Task 018 and
 anchored in `rules/command-authoring.md`: `commands/_<name>/` contains modules (not a command).

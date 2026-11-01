@@ -93,12 +93,16 @@ oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
 - **Werkzeugliste** ist allein die Spalte `name` aus `<playbook.dir>/share/scripts/base-tools.tsv` (derselbe Stand wie unter `~/.local/share/k-playbook/scripts/`).
   Eine neue Zeile dort wirkt ohne Änderung am Check. Fehlt die Matrix, endet der Check mit
   `skip` und nennt den Pfad.
-- **Umfang** ist immer der ganze effektive Command-Katalog: `<playbook.dir>/share/commands/`
-  zusammen mit `<config-root>/k-playbook-local/commands/`, verglichen über den Pfad ab
-  `commands/`; ein gleichnamiger lokaler Command ersetzt den mitgelieferten, ein leerer
-  schaltet ihn ab. `K_CHECK_MODE` und `K_CHECK_FILES_FROM` spielen keine Rolle — nur über
-  den ganzen Katalog lässt sich eine veraltete Ausnahme erkennen. Den Katalog liest der
-  Check selbst, ohne `k-playbook context`.
+- **Umfang** ist immer der ganze effektive Command-Katalog: die Hüllen unter
+  `<playbook.dir>/share/commands/` zusammen mit `<config-root>/k-playbook-local/commands/`,
+  verglichen über den Pfad ab `commands/`; ein gleichnamiger lokaler Command ersetzt den
+  mitgelieferten, ein leerer schaltet ihn ab. Dazu die Texte der Commands unter
+  `<playbook.dir>/defaults/commands/` (ausgeliefert als `k-playbook:/commands/<name>.md`)
+  mit eigenem Schlüssel, dem Pfad ab dem Playbook (`defaults/commands/k-task-run.md`),
+  damit Hülle und Text gleichen Namens sich nicht überschreiben; ein projekteigener Eintrag
+  gleichen Namens überlagert auch den Text und wird einmal geprüft. `K_CHECK_MODE` und
+  `K_CHECK_FILES_FROM` spielen keine Rolle — nur über den ganzen Katalog lässt sich eine
+  veraltete Ausnahme erkennen. Den Katalog liest der Check selbst, ohne `k-playbook context`.
 - **Erfasst** werden umzäunte Codeblöcke mit der Sprachkennung `bash`, `sh`, `shell` oder
   `zsh`, dazu `console` mit `$ `-Prompt. Blöcke ohne oder mit anderer Kennung, Fließtext
   und Backticks zählen nicht. Ein Aufruf ist der Programmname am Befehlsanfang: am
@@ -128,11 +132,45 @@ Fehler (Exit 2) statt mit `skip`, damit ein geratener Pfad den Check nicht unbem
 abschaltet. Eine projekteigene TSV allein überlagert nichts.
 
 Die TSV hat die Kopfzeile `datei`, `zeile`, `werkzeug`, `begründung`, getrennt durch
-Tabulatoren; Zeilen mit `#` sind Kommentare. `datei` ist der Pfad ab `commands/`, `zeile`
-die 1-basierte Zeile in dieser Datei. Ein Eintrag nimmt genau den einen Aufruf aus, auf
+Tabulatoren; Zeilen mit `#` sind Kommentare. `datei` ist der Pfad ab `commands/`, für die
+Texte unter `defaults/commands/` der Pfad ab dem Playbook; `zeile` die 1-basierte Zeile in
+dieser Datei. Ein Eintrag nimmt genau den einen Aufruf aus, auf
 den alle drei Werte passen. Ein Eintrag ohne passende Fundstelle, mit fehlender Spalte
 oder mit einem Werkzeug außerhalb der Matrix ist selbst ein `fail`. Bleiben nur exakt
 zugeordnete Ausnahmen, meldet der Check `ok` und nennt ihre Zahl in `K_CHECK_REASON`.
+
+## Verweise ohne Präfix
+
+`check_verweise.sh` (Fachlogik in `lib/verweise.py`) meldet Stellen, an denen ein Verweis
+gemeint ist, der die Form aus `k-playbook:/instructions/always/010-verweise.md` nicht hat.
+Was ein Verweis ist und wie er nachgezogen wird, steht in
+`k-playbook:/instructions/on-demand/verweise-nachziehen.md`; der Check setzt den Teil davon
+um, der am Text erkennbar ist. Er meldet, er korrigiert nicht — nachgezogen wird von einer
+KI nach dieser Datei.
+
+- **Umfang** ist immer derselbe, unabhängig von `K_CHECK_MODE` und `K_CHECK_FILES_FROM`:
+  alle `.md`- und `.md.template`-Dateien unter `<playbook.dir>/defaults/` (`commands/`,
+  `instructions/`, `rules/`, `guidelines/`) und `<playbook.dir>/share/` (`commands/`,
+  `skills/`) und unter den projekteigenen Gegenstücken in `<config-root>/k-playbook-local/`
+  (`commands/`, `instructions/`, `rules/`, `guidelines/`, `skills/`). Schlüssel ist der Pfad
+  ab dem Playbook bzw. ab dem Config-Root (`k-playbook-local/…`). Die Tasks in der
+  Projekt-Collection durchsucht der Check noch nicht; das kommt mit dem Umbau der Checks.
+- **Gemeldet** werden relative Markdown-Links, deren Ziel mit `../` oder `./` beginnt, überall
+  (Art `link`), und Pfade ohne Präfix in Backticks, die mit einer bekannten Wurzel beginnen
+  (`k-playbook-local/`, `k-playbook/`, `.claude/`, `.opencode/`, `share/`, `defaults/`,
+  `installer/`, `rules/`, `guidelines/`, `instructions/`, `docs/`, `checks/`, `bin/`,
+  `commands/`, `skills/`, `tasks/`), wenn sie unter einer Überschrift `Referenzen` stehen
+  oder in einer Zeile mit Lese-Anweisung (`lies`, `liest`, `lesen`, `siehe`) — Art `pfad`.
+  Andere Backtick-Pfade meldet er nicht.
+
+Ausnahmen stehen in `verweis-exceptions.tsv` neben dem wirksamen Skript, mit Kopfzeile
+`datei`, `zeile`, `art`, `begründung`. Jede Fundstelle steht einzeln; nur Bereiche mit
+Inhalt für Leser — Vorlagen wie `share/skills/*/vorlagen/` — bekommen einen Eintrag je
+Bereich (`datei` endet auf `/`, `zeile` und `art` sind `*`), in `commands/`,
+`instructions/` und `rules/` nie. Die Begründung nennt einen der Gründe „Inhalt für Leser“,
+„Ortsangabe“, „Plattenort“ oder „zurückgestellt“. Ein Eintrag ohne Fundstelle ist veraltet
+und selbst ein `fail`; wie beim Guard-Check gilt bei einem projekteigenen Override nur die
+TSV neben ihm.
 
 ## Global vs. Lokal
 

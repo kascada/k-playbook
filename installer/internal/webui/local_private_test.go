@@ -80,16 +80,26 @@ func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
 	}
-	if !response.Available || len(response.Entries) != 5 {
-		t.Fatalf("Available = %v, Einträge = %d, erwartet 5", response.Available, len(response.Entries))
+	if !response.Available || len(response.Entries) != 2 {
+		t.Fatalf("Available = %v, Einträge = %d, erwartet 2", response.Available, len(response.Entries))
 	}
 	if entry := privateEntry(t, response, "priv"); entry.State != project.PrivacyPublic {
 		t.Errorf("priv = %+v, erwartet %q", entry, project.PrivacyPublic)
 	}
 	privateEntry(t, response, "results")
-	privateEntry(t, response, "cache")
-	privateEntry(t, response, "material")
-	privateEntry(t, response, "inbox")
+}
+
+// cache/, inbox/ und material/ stehen seit Task 107 nicht mehr in der lokalen
+// Struktur und lassen sich deshalb nicht mehr umschalten.
+func TestSetLocalPrivateHandlerWeistEntfernteVerzeichnisseAb(t *testing.T) {
+	privateProject(t)
+
+	for _, path := range []string{"cache", "inbox", "material"} {
+		status, _ := postPrivate(t, `{"path":"`+path+`","private":true}`)
+		if status != http.StatusBadRequest {
+			t.Errorf("%s: Status = %d, erwartet 400", path, status)
+		}
+	}
 }
 
 // Der schreibende Weg: einschalten, danach ändert ein zweiter Aufruf nichts.

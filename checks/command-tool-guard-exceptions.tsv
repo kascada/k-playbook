@@ -11,7 +11,10 @@
 #
 # datei       Pfad ab commands/, z. B. k-pr-review.md oder _audit/x.md — derselbe
 #             Schlüssel, über den mitgelieferte und projekteigene Commands
-#             verrechnet werden.
+#             verrechnet werden. Für die Texte der Commands unter
+#             defaults/commands/ der Pfad ab dem Playbook, z. B.
+#             defaults/commands/k-task-run.md: Hülle und Text gleichen Namens
+#             haben so je einen eigenen Schlüssel.
 # zeile       1-basierte Zeilennummer des Aufrufs in dieser Datei.
 # werkzeug    Programmname aus base-tools.tsv.
 # begründung  Warum dieser Aufruf ohne Guard bleibt.

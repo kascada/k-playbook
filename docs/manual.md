@@ -48,7 +48,7 @@ flowchart LR
     Playbook --> Tool["bin/ · scripts/"]
 
     Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
-    Local --> Artifacts["results/ · data/ · cache/ · docs/ · guidelines/"]
+    Local --> Artifacts["results/ · guidelines/ · priv/"]
     Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
     Base --> Effective["effective set"]
@@ -256,7 +256,8 @@ Helm, and CI files. Skip a stage if it has no input.
 The knowledge gate -- `k-playbook knowledge` and the MCP tools
 `k_playbook_knowledge_*` -- no longer reads or writes here: it works on the
 knowledge store `k-playbook-local/knowledge/`, with `inbox/` and `queue/`
-beside it. The store fills as the writers are switched to it, one after another;
+beside it. Setup creates none of these directories, nor `docs/` (task 107): each
+arises with its first write, and reading without it answers empty. The store fills as the writers are switched to it, one after another;
 `/k-docs-extract` is the first and writes its extracts to `knowledge/extracted/`,
 where the knowledge search finds them and `docs/README.md` does not yet (see
 [knowledge-layout.md](knowledge-layout.md) and [mcp.md](mcp.md), "Knowledge

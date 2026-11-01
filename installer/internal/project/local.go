@@ -31,18 +31,15 @@ type LocalEntry struct {
 	Private bool `json:"private"`
 	// PrivateByDefault ist die Ausnahme davon: der Eintrag wird bei der
 	// Installation schon privat angelegt, statt die Wahl offen zu lassen.
-	// results/ und cache/ tragen das.
+	// results/ trägt das.
 	//
-	// Begründung: Bei priv/ und material/ geht es um Geschmack, dort ist die
-	// Zurückhaltung richtig. Ein Werkzeug, das gefundene Secrets im Klartext
-	// ins Repository des Nutzers schreibt, ist dagegen ein Fehler von
-	// k-playbook und keine Projektentscheidung — und die Rohausgaben sind nur
-	// der schärfste Fall: ein Review ist aus dem Code wiederholbar, sein
-	// Ergebnis ist ein Stand von einem Rechner. Bei cache/ ist der Grund ein
-	// anderer, führt aber zum selben Ergebnis: der Inhalt ist aus dem Projekt
-	// abgeleitet und entsteht jederzeit neu. Ableitbares gehört nicht ins
-	// Repository — es veraltet dort, ohne dass jemand es merkt, und bläht die
-	// Historie mit Ständen auf, die niemand liest.
+	// Begründung: Bei priv/ geht es um Geschmack, dort ist die Zurückhaltung
+	// richtig. Ein Werkzeug, das gefundene Secrets im Klartext ins Repository
+	// des Nutzers schreibt, ist dagegen ein Fehler von k-playbook und keine
+	// Projektentscheidung — und die Rohausgaben sind nur der schärfste Fall:
+	// ein Review ist aus dem Code wiederholbar, sein Ergebnis ist ein Stand von
+	// einem Rechner. cache/ steht nicht mehr in der Struktur (Task 107), bekommt
+	// aus einem verwandten Grund aber dieselbe Datei, siehe ensureCacheDir.
 	//
 	// Eine Erzwingung ist es trotzdem nicht: der Zustand bleibt in der
 	// Oberfläche umschaltbar, und geschrieben wird die verwaltete .gitignore
@@ -56,6 +53,12 @@ type LocalEntry struct {
 // gleichnamiger lokaler Eintrag ersetzt den mitgelieferten, ein leerer schaltet
 // ihn ab. Aufgelöst wird das in context.go (rules, reviews, checks) und in
 // registry.go (commands, skills).
+//
+// docs, tasks, tasks/done, data, material, inbox, queue, knowledge und cache
+// stehen nicht mehr hier (Task 107): ihr Inhalt liegt in der Projekt-Collection
+// oder zieht als Nächstes dorthin. Was die Wissenswerkzeuge bis dahin noch auf
+// die Platte schreiben, legt sein Verzeichnis beim ersten Schreiben selbst an;
+// /k-upgrade räumt die leeren Verzeichnisse eines Bestandsprojekts ab.
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
 		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
@@ -80,121 +83,10 @@ func LocalStructure() []LocalEntry {
 				"committet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore allein\n" +
 				"wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in der Historie.",
 		},
-		{
-			Path: "data",
-			Purpose: "Maschinendateien, die k-playbook selbst besitzt und die zum Projektstand gehören.\n" +
-				"Sie werden ganz normal mitversioniert; dieses Verzeichnis bekommt keine .gitignore.\n" +
-				"Geschrieben werden sie nur über k-playbook, nie von Hand.",
-		},
-		{
-			Path:             "cache",
-			Private:          true,
-			PrivateByDefault: true,
-			Purpose: "Was diese Maschine aus dem Projekt ableitet und jederzeit neu bauen kann.\n\n" +
-				"Alles hier ist wiederherstellbar. Wer etwas Unwiederbringliches ablegen will, braucht\n" +
-				"ein anderes Verzeichnis — dieses darf ohne Rückfrage gelöscht werden, und sein Inhalt\n" +
-				"bleibt aus der Versionskontrolle.\n\n" +
-				"k-playbook legt dafür beim erstmaligen Anlegen dieses Verzeichnisses eine .gitignore mit\n" +
-				"diesem Inhalt an:\n\n" +
-				"    *\n    !.gitignore\n    !README.md\n\n" +
-				"Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen Ist-Zustand und\n" +
-				"schaltet ihn um — auch wieder zurück; einmal umgeschaltet, bleibt es dabei.\n\n" +
-				"knowledge/index.json ist der Suchindex des Wissenstors über ../knowledge/ (`k-playbook\n" +
-				"knowledge`, MCP-Werkzeuge k_playbook_knowledge_*). Fehlt er, baut ihn der nächste\n" +
-				"Zugriff neu; Änderungen am Tor vorbei erkennt er über Datei-Hashes selbst.",
-		},
-		{Path: "docs", Purpose: "Was von der Projektdoku noch auf der Platte liegt: code/ von /k-docs-code und libs/ von /k-docs-tools; beides legt sein Erzeuger beim ersten Lauf an. Der Einstieg der Projektdoku ist keph:/docs/ in der Collection des Projekts, nicht dieses Verzeichnis: dort liegen das Versionsinventar (keph:/docs/generated/versions/inventory.md, Erzeuger /k-doc-inventory und k-playbook inventory) und die handgeschriebene Doku (keph:/docs/manual/). Ein versions/, manual/ oder extracted/ von früher ist ein Stand von damals; die Umstellung 3.2 in /k-upgrade bringt ihn nach Kephalaion oder räumt ihn ab. /k-docs-extract schreibt über die Wissenswerkzeuge nach ../knowledge/extracted/. Das Wissenstor (`k-playbook knowledge`, MCP-Werkzeuge k_playbook_knowledge_*) liest und schreibt nicht hier, sondern in der Wissensablage ../knowledge/."},
-		{
-			Path:    InboxDirName,
-			Private: true,
-			Purpose: "Der Eingang: was ankommt, bevor jemand es gelesen hat. Chat-Mitschnitte, Notizen,\n" +
-				"PDFs, Screenshots, HTML-Abzüge, Exporte — alles, was eine Person oder ein Connector\n" +
-				"ablegt, in dem Format, in dem es kommt. Unterteilt allein nach Quelle: inbox/<quelle>/…,\n" +
-				"die Quelle ist frei (confluence, chat, mail, scan).\n\n" +
-				"Es gibt keine Namensregel, kein Frontmatter und keine Pflicht über das Ablegen hinaus.\n" +
-				"Das ist die Bedingung dafür, dass überhaupt etwas abgelegt wird: ein Eingang, der\n" +
-				"Vorbereitung verlangt, wird einmal benutzt. Abgelegt wird über `k-playbook knowledge\n" +
-				"inbox put`, das MCP-Werkzeug k_playbook_knowledge_inbox_put oder schlicht mit dem\n" +
-				"Dateimanager.\n\n" +
-				"Der Eingang ist ein Archiv, keine Warteschlange. Etwas kann monatelang hier liegen,\n" +
-				"ohne dass jemand hineinsieht, und nichts ist offen, nur weil es hier liegt. Er wird\n" +
-				"nie indiziert und taucht in keiner Suche auf. Eine Verarbeitung verbraucht ihn nicht:\n" +
-				"ein Rohstück bleibt, nachdem daraus Wissen gemacht wurde — nur so lässt sich ein\n" +
-				"schlechter Extrakt aus derselben Quelle noch einmal ziehen. Gelöscht wird hier\n" +
-				"ausschließlich von Hand, nie als Nebenwirkung eines Laufs. Was kein Markdown ist,\n" +
-				"bleibt für immer hier; das Wissensdokument unter ../knowledge/ zeigt darauf.\n\n" +
-				"Der Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\n" +
-				"Tokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n" +
-				"„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n" +
-				".gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\n" +
-				"Von Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\n" +
-				"Inhalt:\n\n    *\n    !.gitignore\n    !README.md\n\n" +
-				"Was bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\n" +
-				"was schon gepusht wurde, bleibt in der Historie.",
-		},
-		{
-			Path: QueueDirName,
-			Purpose: "Die Warteschlange: was noch aussteht. Ein Eintrag ist ein Stück Arbeit — dieses\n" +
-				"Rohstück soll Wissen werden. Er ist eine kleine Markdown-Datei, die auf ihre Quelle\n" +
-				"im Eingang verweist statt sie zu kopieren, und das Zielverzeichnis unter ../knowledge/\n" +
-				"und den Grund nennt. Angelegt wird er über `k-playbook knowledge queue add` oder das\n" +
-				"MCP-Werkzeug k_playbook_knowledge_queue_add, das die Kennung selbst vergibt.\n\n" +
-				"Nach der Übernahme in die Ablage wird der Eintrag gelöscht — nicht verschoben, nicht\n" +
-				"archiviert, nicht abgehakt. Das erledigt `k-playbook knowledge write` selbst, wenn\n" +
-				"ihm der Eintrag genannt wird: gelöscht wird, nachdem das Dokument steht, und nur dann.\n" +
-				"Eine leere Warteschlange heißt deshalb: nichts offen. Das ist der ganze Zweck des\n" +
-				"Verzeichnisses. Ein Rückstand, der sich nur durch Zählen oder Filtern feststellen\n" +
-				"lässt, ist einer, den niemand liest.\n\n" +
-				"Ein Lauf, der scheitert, lässt seinen Eintrag liegen. Das Verzeichnis hält Arbeit,\n" +
-				"nicht Geschichte; was aus einer Quelle geworden ist, steht im origin des fertigen\n" +
-				"Dokuments. Wer einen Eintrag ohne Übernahme loswerden will, nimmt `k-playbook\n" +
-				"knowledge queue drop`. Indiziert wird hier nichts.",
-		},
-		{
-			Path: KnowledgeDirName,
-			Purpose: "Die Wissensablage: was gilt. Nur was hier liegt, wird indiziert, durchsucht, gelesen\n" +
-				"und in einer Antwort zitiert. Immer Markdown mit YAML-Frontmatter; was in einem anderen\n" +
-				"Format ankommt, wird am Eingang umgewandelt oder bleibt unter ../inbox/ liegen, mit\n" +
-				"einem Markdown-Stub hier, der es beschreibt. Ein Dokument je Thema, fortgeschrieben —\n" +
-				"nicht eines je Ereignis.\n\n" +
-				"Der Pfad trägt den Eigentümer, das Frontmatter das Thema: code/ gehört /k-docs-code,\n" +
-				"libs/ gehört /k-docs-tools, versions/ gehört /k-doc-inventory, extracted/ gehört\n" +
-				"/k-docs-extract, external/<system>/ je einem Connector, findings/ der Sitzung,\n" +
-				"pitfalls/ und manual/ einer Person, README.md dem Index-Command /k-docs-index. Genau ein\n" +
-				"Eigentümer je Verzeichnis, und nur der schreibt dort: die drei Generatoren code/, libs/\n" +
-				"und versions/ schreiben ihr Verzeichnis bei jedem Lauf als Ganzes neu, und was ein\n" +
-				"anderer dort abgelegt hätte, wäre danach spurlos weg.\n\n" +
-				"Geschrieben wird ausschließlich über das Werkzeug — `k-playbook knowledge write`,\n" +
-				"`publish` und `supersede` oder die MCP-Werkzeuge k_playbook_knowledge_*. Jede\n" +
-				"Schreibung nennt ihren Erzeuger, und ein Ziel außerhalb seines Verzeichnisses wird\n" +
-				"abgewiesen. Das Frontmatter baut das Werkzeug aus den übergebenen Feldern; niemand\n" +
-				"reicht einen fertigen Dateikopf durch. Gelöscht wird nichts: Überholtes bekommt\n" +
-				"`state: superseded`, fällt aus der Suche und bleibt lesbar.\n\n" +
-				"Der Suchindex darüber liegt unter ../cache/knowledge/ und ist jederzeit verwerfbar;\n" +
-				"Änderungen am Werkzeug vorbei erkennt er selbst über Datei-Hashes.",
-		},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
-		{
-			Path: "tasks",
-			Purpose: "Tasks liegen in der Projekt-Collection unter keph:/user/<user>/tasks/, erledigte\n" +
-				"darunter in done/; die Form steht in k-playbook:/instructions/on-demand/tasks.md.\n" +
-				"Kein Command liest oder schreibt hier noch Tasks. Dieses Verzeichnis bleibt, bis die\n" +
-				"Seite Tasks der Oberfläche auf die Collection umgestellt ist; was hier noch liegt,\n" +
-				"zieht /k-upgrade (3.3) um.",
-		},
-		{
-			Path: filepath.Join("tasks", "done"),
-			Purpose: "Erledigte Tasks liegen in der Projekt-Collection unter keph:/user/<user>/tasks/done/.\n" +
-				"Dieses Verzeichnis bleibt, bis die Seite Tasks der Oberfläche umgestellt ist.",
-		},
 		{
 			Path:    "priv",
 			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Ob er das soll, entscheidet das\nProjekt: Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen\nIst-Zustand dieses Verzeichnisses und schaltet ihn um — er legt die .gitignore\nan und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in\nder Historie; das macht kein Schalter rückgängig.",
-			Private: true,
-		},
-		{
-			Path:    "material",
-			Purpose: "Bisheriger Ort für Rohmaterial: Chat-Mitschnitte, Notizen, Zulieferungen.\nNeues Rohmaterial gehört nach ../inbox/. Hier wird nie indiziert; /k-docs-extract\nliest dieses Verzeichnis übergangsweise weiter und schreibt seine Auszüge über die\nWissenswerkzeuge nach ../knowledge/extracted/.\n\nHierher schreibt kein Command. Befunde aus Analyse und Fehlersuche lagen früher\nunter befunde/; heute ist jeder Befund ein eigenes Dokument in der\nProjekt-Collection unter queue/findings/, die Form steht in\nk-playbook:/instructions/on-demand/befunde.md. Ein vorhandenes befunde/ leert\n/k-upgrade: was noch zu tun ist, wird ein Workbench-Thema, was nur nützlich ist,\nein Befund in der Collection, der Rest entfällt. Alles andere in diesem\nVerzeichnis bleibt unangetastet.\n\nDer Inhalt wird ganz normal mitversioniert. Rohmaterial enthält typischerweise\nTokens, Pfade und Namen; soll es nicht ins Repository, schaltet der Block\n„Lokale Einstellungen\" in der Oberfläche dieses Verzeichnis um — er legt die\n.gitignore an und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nWas bereits committet ist, nimmt erst ein `git rm --cached` wieder heraus. Und\nwas schon gepusht wurde, bleibt in der Historie.",
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},
@@ -286,11 +178,7 @@ func CreateLocal(projectDir string) ([]LocalEntryStatus, error) {
 			return CheckLocal(projectDir), fmt.Errorf("%s anlegen: %w", entry.Path, err)
 		}
 		readme := filepath.Join(path, "README.md")
-		if entry.Path == KnowledgeDirName {
-			if err := createKnowledgeReadme(projectDir, readme, entry); err != nil {
-				return CheckLocal(projectDir), err
-			}
-		} else if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
+		if err := writeIfMissing(readme, readmeTemplate(entry)); err != nil {
 			return CheckLocal(projectDir), err
 		}
 		if fresh && entry.PrivateByDefault {
@@ -326,16 +214,16 @@ func EnsureLocal(projectDir string) ([]LocalEntryStatus, bool, error) {
 // ensureCacheDir legt cache/ an und schreibt dabei dieselbe verwaltete
 // .gitignore, die CreateLocal für einen Eintrag mit PrivateByDefault schreibt.
 //
-// Das Wissenstor legt sein cache/knowledge/ beim ersten Zugriff selbst an und
-// bringt cache/ damit nebenbei mit. Ohne diesen Weg entstünde es dann ohne
-// .gitignore, und CreateLocal zöge sie nie nach: der schreibt sie nur, wenn
-// das Verzeichnis in genau seinem Lauf entsteht. Der abgeleitete Index wäre
-// damit committierbar — ein Release mit `git add -A` nähme den Chunk-Abzug
-// der ganzen Doku mit.
+// cache/ steht nicht in LocalStructure() (Task 107): es entsteht nur hier, wenn
+// das Wissenstor einen Index schreibt — und das tut es nur, wenn die
+// Wissensablage etwas zu indizieren hat (siehe open in knowledge_index.go).
+// Ohne die .gitignore wäre der abgeleitete Index committierbar — ein Release
+// mit `git add -A` nähme den Chunk-Abzug der ganzen Doku mit. Der Inhalt ist
+// aus dem Projekt abgeleitet und entsteht jederzeit neu; Ableitbares gehört
+// nicht ins Repository.
 //
 // Nachträglich geschrieben wird nichts: ist cache/ schon da, bleibt es, wie
-// es ist. Ein bewusstes Umschalten auf öffentlich (makePublic) darf dieser
-// Weg so wenig zurückdrehen wie CreateLocal.
+// es ist — auch eine von Hand entfernte oder geänderte .gitignore.
 func ensureCacheDir(projectDir string) error {
 	dir := filepath.Join(LocalDir(projectDir), CacheDirName)
 	if pathExists(dir) {
@@ -362,62 +250,9 @@ func writeIfMissing(path string, content string) error {
 	return nil
 }
 
-// createKnowledgeReadme legt die README der Wissensablage an, wenn sie fehlt —
-// durch das Tor, als Erzeuger docs-index, dem sie gehört. So trägt sie
-// Frontmatter wie jedes Dokument der Ablage, und der Index kennt sie: ein
-// schon gebauter Index meldet danach keine Drift. state ist condensed, denn
-// der Text ist maschinell erzeugte Navigation, von niemandem geprüft; die
-// README ist ohnehin nie ein Suchtreffer. Eine vorhandene README bleibt, wie
-// sie ist — auch eine ohne Kopf, bis /k-docs-index sie neu schreibt.
-func createKnowledgeReadme(projectDir string, readme string, entry LocalEntry) error {
-	if pathExists(readme) {
-		return nil
-	}
-	_, err := NewKnowledge(projectDir).Write(string(ProducerDocsIndex), KnowledgeDocument{
-		Path:    knowledgeReadmeName,
-		Title:   "Wissensablage",
-		Subject: "Index der Wissensablage",
-		Origin:  "k-playbook, Einrichtung der Struktur",
-		State:   KnowledgeStateCondensed,
-		Body:    readmeTemplate(entry),
-	}, "")
-	if err != nil {
-		// Write schreibt erst die Datei, dann den Index. Steht die README
-		// danach auf der Platte, ist nur der Index gescheitert: der nächste
-		// Zugriff nimmt sie über die Drift-Erkennung auf, und CreateLocal legt
-		// die übrigen Einträge noch an (Task 064, Entscheidung 5). Einen
-		// Hinweiskanal hat CreateLocal nicht. Fehlt die Datei, bleibt es beim
-		// Fehler.
-		if fileExists(readme) {
-			return nil
-		}
-		return fmt.Errorf("%s anlegen: %w", filepath.Join(entry.Path, knowledgeReadmeName), err)
-	}
-	return nil
-}
-
 func readmeTemplate(entry LocalEntry) string {
-	if entry.Path == "docs" {
-		return docsReadmeTemplate()
-	}
 	return fmt.Sprintf("# %s\n\n%s\n\nDieses Verzeichnis gehört dem Projekt und wird von einem Update nie angefasst.\n",
 		entry.Path, entry.Purpose)
-}
-
-// docsReadmeTemplate ist die Struktur-README von docs/. Sie ist kein Einstieg
-// und kein Index: der Einstieg der Projektdoku ist keph:/docs/ (Task 101), und
-// die README sagt nur, was auf der Platte bleibt, damit das Einrichten keinen
-// Rückfall auf die Platte anlegt.
-func docsReadmeTemplate() string {
-	return `# Projektdokumentation
-
-Der Einstieg der Projektdoku ist ` + "`keph:/docs/`" + ` in der Collection des Projekts, nicht
-dieses Verzeichnis. Das Briefing nennt ihn unter „Projektdoku“.
-
-Hier liegt nur, was seine Erzeuger noch auf die Platte schreiben: ` + "`code/`" + ` von
-/k-docs-code und ` + "`libs/`" + ` von /k-docs-tools. Beides entsteht beim ersten Lauf des
-jeweiligen Commands.
-`
 }
 
 // fileTemplate liefert den Erstinhalt eines Datei-Eintrags.

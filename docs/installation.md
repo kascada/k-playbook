@@ -86,27 +86,23 @@ k-playbook-local/
 ├── commands/      overlay for ~/.local/share/k-playbook/commands/
 ├── skills/        overlay for ~/.local/share/k-playbook/skills/
 ├── results/       everything reviews generate; see below
-├── data/          machine files owned by k-playbook, versioned; holds todos.json
-├── cache/         derived content this machine can rebuild at any time; see below
-├── docs/          project knowledge for AI sessions, separated by origin
-│   └── manual/    manually maintained documentation; no command writes here
 ├── guidelines/
-├── tasks/done/    kept for the interface only; tasks live in the project collection
 ├── priv/          private notes; see below
-├── material/      raw material as a source for docs; see below
 ├── k-playbook.md  project-owned instruction layer
 └── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
-The generated docs origins `docs/code/` and `docs/libs/` are not shown there: they arise on the first run of their generator. The version inventory no longer lives here: `/k-doc-inventory` and `k-playbook inventory` write `keph:/docs/generated/versions/inventory.md` into the project collection. `/k-docs-extract` writes to `knowledge/extracted/` in the knowledge store instead, created by its first write; raw material for it goes into `inbox/`, and `material/` is still read as the previous location until step 5 of the switch (see [knowledge-layout.md](./knowledge-layout.md#transitional-reads)).
+Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/`, `material/`, `inbox/`, `queue/`, `knowledge/` and `cache/`, and the setup page does not count them as missing: tasks, todos and the project documentation live in the project collection (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`), and the knowledge store moves there next. In an existing project, `/k-upgrade` (conversion 3.4) deletes each of them that holds nothing but `README.md` files and the managed `.gitignore`, after confirmation; anything else keeps the directory and is named. Until their switch, a few producers still write to disk and create their directory on the first write, without a README: `/k-docs-code` and `/k-docs-tools` write `docs/code/` and `docs/libs/`; the knowledge tools write `inbox/`, `queue/` and `knowledge/` — `/k-docs-extract` reads raw material from `inbox/` (and `material/` as the previous location until step 5 of the switch, see [knowledge-layout.md](./knowledge-layout.md#transitional-reads)) and writes to `knowledge/extracted/`; and the index of the knowledge gate creates `cache/` with its managed `.gitignore`, but only when `knowledge/` holds a file to index. Reading, searching and listing without these directories answer empty.
 
-Every directory contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
+Every directory setup creates contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
-`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of four directories for which the project makes that decision: `results/`, `cache/`, `priv/`, and `material/`. For `priv/` and `material/`, k-playbook still does not write a `.gitignore` itself and does not decide what a project versions. `data/` is never among them: it holds machine files that belong to the project's state, above all `todos.json`.
+`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of two directories for which the project makes that decision: `results/` and `priv/`. For `priv/`, k-playbook does not write a `.gitignore` itself and does not decide what a project versions.
 
-`results/` and `cache/` are the exception: both are created as private on initial creation. Everything under `cache/` is derived from the project and can be rebuilt at any time, so it does not belong in the repository — it would go stale there unnoticed. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update.
+`results/` is the exception: it is created as private on initial creation. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update. `cache/` is no longer part of the structure, but gets the same managed `.gitignore` when the knowledge gate creates it: everything under it is derived from the project and can be rebuilt at any time, so it does not belong in the repository.
 
-This choice is visible and switchable in the **Local settings** section of the interface. For each directory, it uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
+`inbox/` and `material/` were switchable as well; with task 107 they left the structure and have no switch any more until their move to the collection. A managed `.gitignore` already in place stays and keeps working. Whoever does not want a newly created `inbox/` versioned adds a `.gitignore` there by hand with the three lines `*`, `!.gitignore` and `!README.md`.
+
+This choice is visible and switchable in the **Local settings** section of the interface, for `results/` and `priv/`. For each directory, it uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
 
 | State | Meaning |
 |---|---|
@@ -257,11 +253,11 @@ export BROWSER=/path/to/helper.sh   # receives the URL as an argument
 
 ## Reviews and tasks
 
-The **Workflows** section brings together the work queues, one page per kind: tasks, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/data/todos.json`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
+The **Workflows** section brings together the work queues, one page per kind: tasks, review runs from `k-playbook-local/results/`, and todos from the project collection (`todos/`). The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
 
 `/workflows` itself is the overview: it explains what the three kinds are, when to use each, and how much each currently holds. From there, one link per kind leads to its page.
 
-**Tasks** (`/workflows/tasks`) still reads the directory `k-playbook-local/tasks/`: it lists the open tasks there in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. Tasks themselves live in the project collection since task 105 (`keph:/user/<user>/tasks/`, see [`task-flow.md`](./task-flow.md)); the commands no longer read or write the directory, and after `/k-upgrade` 3.3 has moved the files it is empty. Switching this page to the collection is a task of its own; until then the page shows what is left on disk.
+**Tasks** (`/workflows/tasks`) still reads the directory `k-playbook-local/tasks/`: it lists the open tasks there in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. Tasks themselves live in the project collection since task 105 (`keph:/user/<user>/tasks/`, see [`task-flow.md`](./task-flow.md)); the commands no longer read or write the directory, and setup no longer creates it. Switching this page to the collection is a task of its own; until then the page shows only what is left on disk, and nothing once `/k-upgrade` has moved the files (3.3) and removed the empty directory (3.4).
 
 **Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
 
@@ -377,7 +373,7 @@ git mv k-playbook/reviews   k-playbook-local/reviews
 git mv k-playbook/TODO.md   k-playbook-local/TODO.md
 ```
 
-The moved `TODO.md` does not stay in that form: on the first todo access -- through the interface, `/k-todo`, or `k-playbook todo` -- it is translated into `k-playbook-local/data/todos.json` and then removed. Text, order, and done state are preserved.
+Moved task files are then taken into the project collection by `/k-upgrade` 3.3. The moved `TODO.md` is no longer taken over: todos live in the project collection (`todos/`), and the interface and `k-playbook todo` only report a leftover `TODO.md`.
 
 The old file's `paths.` section identifies the paths. Once they have moved, the button becomes available.
 

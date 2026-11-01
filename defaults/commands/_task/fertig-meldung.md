@@ -6,7 +6,7 @@ description: Modul für /k-task-run und /k-task-refine, eingebunden als include 
 `/k-task-run` und `/k-task-refine` laufen lange, und wer sie startet, schaut danach oft
 nicht mehr auf den Bildschirm. Der Command meldet sich deshalb auf dem Rechner des Nutzers,
 wenn er fertig ist oder etwas von ihm braucht — mit dem Werkzeug
-`mcp__k-playbook__k_playbook_notify`, `projectDir` ist `context.project.dir`.
+`k_playbook_notify` des MCP-Servers `k-playbook`, `projectDir` ist `context.project.dir`.
 
 ### Wann
 

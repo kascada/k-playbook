@@ -7,7 +7,8 @@ und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den fü
 dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
 nachzieht. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
-macht, nicht das Programm. Der Command nimmt kein Argument.
+macht, nicht das Programm, zuletzt das Aufräumen der Verzeichnisse, die das Einrichten nicht
+mehr anlegt. Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
 
@@ -51,6 +52,22 @@ Für alle Umstellungen gilt:
   entscheiden.
 - Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
   `true`, wird sie übersprungen; sag das und nenne den Grund aus `context.kephalaion.message`.
+- Eine Verweissuche im Projekt geht über alle Dateien, die unter `context.project.dir` auf der
+  Platte liegen, ob Git sie erfasst oder nicht. Aufgeräumt wird, was auf der Platte liegt, und
+  ein Verweis in einer ignorierten Datei zeigt nach dem Löschen genauso ins Leere. Deshalb
+  kein `git grep` und keine Suche, die Ignore-Dateien beachtet (`rg`, `ugrep`). In Claude
+  Code ersetzt die Shell schon `grep` durch eine solche Suche; nimm darum `command grep`:
+
+  ```sh
+  command grep -rnI --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.venv \
+    --exclude-dir=venv --exclude-dir=__pycache__ "<zeichenfolge>" <context.project.dir>
+  ```
+
+  Danach streichst du aus dem Ergebnis die Installation unter `context.playbook.dir` und
+  alles, was die Umstellung sonst ausnimmt. Eine Stelle in einem anderen Git-Repository
+  unterhalb des Projekts — einem Verzeichnis mit eigenem `.git`, etwa einem eingebetteten
+  Clone — nennst du in der Vorlage mit `[fremd]`: Sie zählt als Verweis, wird gemeldet und
+  nicht geändert.
 
 ### 3.1 — Befunde aus `material/befunde/`
 
@@ -68,8 +85,7 @@ beurteilst.
 
 **a) Verweise suchen.** Gesucht wird die Zeichenfolge `material/befunde/` in:
 
-- allen von Git erfassten Dateien des Projekts (`git grep -n "material/befunde/"` in
-  `context.project.dir`); ohne Git mit `grep -rn` über `context.project.dir`, ohne `.git/`;
+- allen Dateien des Projekts auf der Platte, nach der Verweissuche oben;
 - deinen offenen Tasks und aktiven Workbench-Themen aus dem Briefing (`work.tasks`,
   `work.workbench`), gelesen mit `k_playbook_doc_read`.
 
@@ -113,7 +129,8 @@ Verwiesene Befunde
 3. Jeden Verweis auf die Datei durch den `keph:`-Verweis des Themas ersetzen. Einen Anker
    (`#…`) dahinter lässt du weg.
 
-Für jede Datei mit `entfällt` entfernst du die Verweise wie beschrieben.
+Für jede Datei mit `entfällt` entfernst du die Verweise wie beschrieben. Stellen mit
+`[fremd]` bleiben in beiden Fällen unverändert.
 
 **d) Die übrigen Befund-Dateien beurteilen.** Jede Datei ohne Verweis prüfst du darauf, ob sie
 noch Wert hat. Lege gebündelt vor, eine Zeile je Datei mit Grund:
@@ -142,28 +159,13 @@ Eine Datei kann beides enthalten. Dann nenne beides, und die Datei wird geteilt.
 
 **f) Aufräumen.** Lösche jede Befund-Datei, die vollständig verarbeitet ist — erst wenn alles,
 was aus ihr werden sollte, geschrieben steht. Ihr Inhalt bleibt in der Git-Geschichte.
-`README.md` und das Verzeichnis selbst bleiben. Eine Datei, bei der etwas fehlgeschlagen ist,
-bleibt liegen, und der nächste Lauf nimmt sie wieder auf.
-
-Steht in `<context.local.dir>/material/README.md` noch der Absatz, der mit „Geschrieben wird
-hier nur an einer einzigen Stelle: nach befunde/“ beginnt, ersetze ihn — nur ihn — durch
-diesen:
-
-```text
-Hierher schreibt kein Command. Befunde aus Analyse und Fehlersuche lagen früher
-unter befunde/; heute ist jeder Befund ein eigenes Dokument in der
-Projekt-Collection unter queue/findings/, die Form steht in
-k-playbook:/instructions/on-demand/befunde.md. Ein vorhandenes befunde/ leert
-/k-upgrade: was noch zu tun ist, wird ein Workbench-Thema, was nur nützlich ist,
-ein Befund in der Collection, der Rest entfällt. Alles andere in diesem
-Verzeichnis bleibt unangetastet.
-```
-
-Das Einrichten schreibt diese README nur, wenn sie fehlt; ohne diesen Schritt bliebe in
-einem bestehenden Projekt der alte Text stehen.
+`README.md` und die Verzeichnisse fasst diese Umstellung nicht an; über `material/` samt
+`befunde/` entscheidet 3.4. Eine Datei, bei der etwas fehlgeschlagen ist, bleibt liegen, und
+der nächste Lauf nimmt sie wieder auf.
 
 **g) Melden.** Je Datei eine Zeile: was aus ihr wurde (Workbench-Verweis, Zahl der Befunde,
-verworfen, liegen geblieben), dazu jede geänderte Verweisstelle als `pfad:zeile`.
+verworfen, liegen geblieben), dazu jede geänderte Verweisstelle als `pfad:zeile` und jede
+Stelle mit `[fremd]`, die jetzt ins Leere zeigt.
 
 ### 3.2 — Doku aus `k-playbook-local/docs/`
 
@@ -191,8 +193,7 @@ dessen Task seine Zeile:
 | `extracted/` und lose `.md` direkt unter `docs/` außer `README.md` | Vorschlag `keph:/docs/manual/<datei>` | je Datei verschieben oder verwerfen, der Nutzer entscheidet |
 | `README.md` | entfällt | der alte Index von `/k-docs-index`: löschen, sobald seine Einträge zu `manual/`, `versions/` und losen Dateien abgeräumt sind — auch wenn `code/` oder `libs/` noch liegen; sonst bliebe ein veralteter Index als stiller Rückfall |
 
-`docs/` selbst bleibt: `code/` und `libs/` schreiben noch dorthin. Legt das Einrichten die
-README von `docs/` neu an, ist das die Struktur-README ohne Index, kein Rückfall.
+`docs/` selbst und seine README fasst diese Umstellung nicht an; darüber entscheidet 3.4.
 
 **a) Bestand erheben.** Lies, was unter `<context.local.dir>/docs/` liegt, je Bereich der
 Tabelle. Lies dazu `keph:/docs/` mit Kephalaion `list` (`recursive`, `frontmatter`),
@@ -212,8 +213,8 @@ gleich auszuführen; der Lauf ist deterministisch.
 `docs/README.md` ist der alte Index, wenn sein Frontmatter oder sein Inhalt ihn als Werk
 von `/k-docs-index` ausweist — die Übersicht je Herkunft mit Tabellen, der
 Stichwort-Index, „Häufige Fragen → direkter Sprung“. Trägt die Datei stattdessen nur den
-Text der Struktur-README aus dem Einrichten, ist nichts zu tun. Ist sie von Hand geschrieben
-und beides nicht, behandelst du sie wie eine lose Datei.
+Text der Struktur-README, die das Einrichten früher anlegte, ist nichts zu tun. Ist sie von
+Hand geschrieben und beides nicht, behandelst du sie wie eine lose Datei.
 
 **b) Alte Einstiegsverweise suchen.** Gesucht wird die Zeichenfolge
 `k-playbook-local/docs/README.md` in `AGENTS.md` sowie `opencode.json` und
@@ -235,7 +236,7 @@ Doku aus k-playbook-local/docs/
   manual/README.md             [löschen]      README.md erzeugt Kephalaion
   notizen.md                   [unklar]       lose Datei ohne Erzeuger; Vorschlag keph:/docs/manual/notizen.md
   README.md                    [löschen]      alter Index von /k-docs-index, Einträge abgeräumt
-  code/, libs/                 [bleibt]       Erzeuger schreiben noch auf die Platte
+  code/, libs/                 [bleibt]       nicht Teil dieser Umstellung, Erzeuger schreiben noch auf die Platte
   opencode.json:19             [entfernen]    references.docs mit dem alten Einstieg
   AGENTS.md:12                 [entfernen]    Verweis auf k-playbook-local/docs/README.md
 ```
@@ -266,7 +267,8 @@ Ein Schritt, der fehlschlägt, lässt seine Datei liegen; der nächste Lauf nimm
 auf. Ihr Inhalt bleibt außerdem in der Git-Geschichte.
 
 **e) Aufräumen.** Ein Verzeichnis unter `docs/`, das danach leer ist (`manual/`, `versions/`,
-`extracted/`), löschst du mit. `docs/` selbst und seine README bleiben.
+`extracted/`), löschst du mit. `docs/` selbst und seine README fasst diese Umstellung nicht
+an.
 
 **f) Melden.** Je Datei eine Zeile: was aus ihr wurde (`keph:`-Verweis, gelöscht, liegen
 geblieben und warum), dazu je vorgemerktem Link aus `manual/` hinaus `datei:zeile` und je
@@ -290,7 +292,8 @@ verschiebt die Dateien: gleicher Name, gleiche Nummer, beim richtigen User.
 **Anlass:** In `<context.local.dir>/tasks/`, `tasks/done/` oder `tasks/old/` liegt eine
 `.md`-Datei außer `README.md`. Braucht die Collection.
 
-Lies vorher `k-playbook:/instructions/on-demand/tasks.md`.
+Lies vorher `k-playbook:/instructions/on-demand/tasks.md` und
+`k-playbook:/instructions/on-demand/verweise-nachziehen.md`.
 
 **a) Bestand erheben.** Je Datei das Ziel: aus `tasks/` nach `user/<owner>/tasks/<gleicher
 Name>`, aus `tasks/done/` nach `user/<owner>/tasks/done/<gleicher Name>`. `<owner>` ist
@@ -307,55 +310,93 @@ Für jede Datei prüfst du vorher:
   er verschieden, zeigst du beide; der Nutzer entscheidet, welcher gilt.
 - **Kein Text oder größer als 1 MiB:** liegen lassen und melden.
 
-**Frontmatter.** Ein Task trägt `title` im Frontmatter (`on-demand/tasks.md`, „Kopf“). Fehlt
-es der Datei, bildest du es aus der ersten Überschrift `# Task <n> — <Titel>`: `title` ist
-`<Titel>`, ohne „Task <n> —“. Fehlt auch die, ist `title` der Dateiname ohne Nummer und
-`.md`, mit Leerzeichen statt Bindestrichen. Der übrige Inhalt bleibt Byte für Byte; das
-Frontmatter kommt davor. Trägt die Datei schon ein Frontmatter mit `title`, bleibt sie ganz
+**Frontmatter.** Ein Task trägt `title` im Frontmatter
+(`k-playbook:/instructions/on-demand/tasks.md`, „Kopf“). Fehlt es der Datei, bildest du es
+aus der ersten Überschrift `# Task <n> — <Titel>`: `title` ist `<Titel>`, ohne „Task <n> —“.
+Fehlt auch die, ist `title` der Dateiname ohne Nummer und `.md`, mit Leerzeichen statt
+Bindestrichen. Der übrige Inhalt bleibt Byte für Byte; das Frontmatter kommt davor. Trägt die
+Datei schon ein Frontmatter ohne `title`, kommt die Zeile `title: <Titel>` als erste Zeile in
+diesen Block — kein zweiter Block. Trägt sie ein Frontmatter mit `title`, bleibt sie ganz
 unverändert.
+
+**Fortschritt.** Ein Task mit einer alten Tabelle `## Fortschritt` und ohne Kennzeile
+`<!-- k-task-run: ausgeführt <datei> -->` bekommt seine erledigten Etappen als
+Fortschrittszeilen (`k-playbook:/instructions/on-demand/tasks.md`, „Fortschritt anhängend“,
+„Alte Tabelle `## Fortschritt`“), damit
+`/k-task-run` keine erledigte Etappe noch einmal ausführt. Je Zeile der Tabelle mit Status
+`erledigt` entsteht genau eine Zeile:
+
+```text
+<!-- k-task-run: etappe <n> erledigt <datum> --> <notiz>
+```
+
+- `<n>` ist die Nummer der Etappe aus der ersten Spalte (`<n> — <Titel>`). Sie muss zu einer
+  Überschrift `### Etappe <n> — <Titel>` desselben Tasks passen, Nummer und Titel.
+- `<datum>` ist das Datum aus der Tabelle, nicht `context.now.date`.
+- `<notiz>` ist die Notiz aus der Tabelle, einzeilig und auf etwa 200 Zeichen gekürzt
+  (Ende mit „…“); Durchgestrichenes (`~~…~~`) entfällt.
+- Zeilen mit einem anderen Status (`offen`, leer) ergeben keine Zeile; die Etappe bleibt
+  offen.
+- Lässt sich eine erledigte Zeile nicht eindeutig einer `### Etappe <n>` zuordnen — Nummer
+  fehlt, Titel weicht ab, Datum fehlt —, steht der ganze Task mit `[unklar]` in der Vorlage,
+  mit der Zeile, die nicht passt; der Nutzer entscheidet.
+- Die Tabelle bleibt als Beleg stehen.
 
 **b) Verweise suchen.** Gesucht wird die Zeichenfolge `k-playbook-local/tasks/` in:
 
-- allen von Git erfassten Dateien des Projekts (`git grep -n "k-playbook-local/tasks/"` in
-  `context.project.dir`; ohne Git mit `grep -rn` über `context.project.dir`, ohne `.git/`),
-  ohne `k-playbook-local/tasks/` selbst und ohne die Installation unter
-  `context.playbook.dir`;
+- allen Dateien des Projekts auf der Platte, nach der Verweissuche oben, ohne
+  `k-playbook-local/tasks/` selbst;
 - deinen offenen Tasks und aktiven Workbench-Themen aus dem Briefing (`work.tasks`,
-  `work.workbench`), gelesen mit `k_playbook_doc_read`.
+  `work.workbench`), gelesen mit `k_playbook_doc_read`;
+- den Task-Dateien, die nach a) umziehen — ihre Treffer werden nach dem Anlegen in den neuen
+  Dokumenten ersetzt (d).
 
 Vorschlag je Stelle: den Pfad durch den `keph:`-Verweis des Ziels ersetzen, das die Datei
-nach a) bekommt. Der Nutzer kann Zeilen ausnehmen — etwa Geschichte in `docs/migration.md`,
-die den alten Ort beschreibt und ihn weiter nennen darf.
+nach a) bekommt. Was ein Verweis ist, was als Beleg unberührt bleibt — Review-Logs,
+`## Ausführung` und was danach folgt, Diffs, erledigte Tasks — und wie nachgezogen wird,
+steht in `k-playbook:/instructions/on-demand/verweise-nachziehen.md`; 3.3 wiederholt es
+nicht. Command-eigen ist nur der Suchbegriff `k-playbook-local/tasks/` und sein Ersatz durch
+den `keph:`-Verweis. Der Nutzer kann Zeilen ausnehmen — etwa Geschichte in
+`project:/docs/migration.md`, die den alten Ort beschreibt und ihn weiter nennen darf.
 
 **c) Vorlegen.** Lege gebündelt vor, eine Zeile je Datei bzw. Stelle, in dieser Reihenfolge:
-offene Tasks, erledigte, `old/`, Verweise, Aufräumen:
+offene Tasks, erledigte, `old/`, Verweise:
 
 ```text
 Tasks von der Platte
   tasks/077-skills-sprechend-benennen.md   [verschieben]  → keph:/user/kamran/tasks/077-skills-sprechend-benennen.md, Ziel frei
-  tasks/082-status-mcp-server.md           [verschieben]  → keph:/user/anna/tasks/082-status-mcp-server.md (User anna); gehört danach kamran, anna braucht supersede
+  tasks/078-wissensablage-append.md        [verschieben]  → keph:/user/kamran/tasks/078-wissensablage-append.md, Ziel frei; Fortschritt: Etappen 1–3, 5 erledigt (4 Zeilen), 4 offen
+  tasks/079-beispiel.md                    [unklar]       Fortschritt: Zeile „3 — Doku“ passt zu keiner ### Etappe 3
+  tasks/082-status-mcp-server.md           [verschieben]  → keph:/user/anna/tasks/082-status-mcp-server.md (User anna); gehört danach kamran (created_by), anna braucht supersede
   tasks/done/104-doc-operationen.md        [verschieben]  → keph:/user/kamran/tasks/done/104-doc-operationen.md, Ziel vorhanden und gleich: nur löschen
   tasks/done/103-health.md                 [unklar]       Ziel vorhanden und verschieden; beide zeigen
   tasks/old/012-alt.md                     [unklar]       nach done/ oder verwerfen
   tasks/old/013-binaer.pdf                 [bleibt]       kein Text
   docs/migration.md:41                     [ersetzen]     k-playbook-local/tasks/097-… → keph:/user/kamran/tasks/done/097-…
   keph:/user/kamran/workbench/005-….md     [ersetzen]     zwei Stellen
-  tasks/README.md                          [ersetzen]     neuer Text (Tasks liegen in der Collection)
-  tasks/old/                               [löschen]      wenn danach leer
 ```
 
 - **verschieben** — Kephalaion `create` unter dem Zielnamen, danach die Plattendatei löschen.
-- **ersetzen** — ein Verweis in einer Datei oder einem Dokument; bei `tasks/README.md` der
-  ganze Text.
-- **löschen** — die Plattendatei bzw. das leere Verzeichnis entfällt.
+- **ersetzen** — ein Verweis in einer Datei oder einem Dokument.
+- **löschen** — die Plattendatei entfällt.
 - **bleibt** — nicht Teil dieser Umstellung.
 - **unklar** — du kannst es nicht entscheiden; der Nutzer entscheidet, je Zeile.
 
-Eine Zeile mit einem anderen User als `context.kephalaion.user` trägt den Hinweis: Das
-Dokument legst du an, also gehört es danach dir (`created_by`), nicht dem Ziel-User; der kann
-es nur anhängen oder nach `done/` verschieben, wenn er in der Collection das Recht
-`supersede` hat. Alternative: die Datei liegen lassen, und der Ziel-User zieht sie mit seinem
-eigenen `/k-upgrade` um. Beides steht in der Zeile; der Nutzer wählt.
+Eine Zeile mit einem anderen User als `context.kephalaion.user` trägt den Hinweis, dass danach
+zwei Prüfungen gegeneinander stehen:
+
+- **Kephalaion** prüft den Urheber: Das Dokument legst du an, also ist `created_by` dein User.
+  Ändern, anhängen, umbenennen (nach `done/` verschieben) darf mit dem Recht `write` nur der
+  Urheber; jeder andere, auch der Ziel-User, braucht in der Collection das Recht `supersede`.
+- **k-playbook** prüft den Pfad: Die Dokument-Werkzeuge (`k_playbook_doc_append`,
+  `_replace`, `_done` …) ändern nur Dokumente unter dem eigenen `user/<user>/`, gleich wer sie
+  angelegt hat; für dich ist das Dokument danach `foreign_user`.
+
+Der Ziel-User kann den Task deshalb nur weiterführen, wenn er `supersede` hat; du kannst es
+über k-playbook gar nicht. Was 3.3 an einem solchen Dokument nach dem Anlegen noch tun würde —
+Fortschrittszeilen, ersetzte Verweise —, steht deshalb schon im Inhalt, mit dem du es anlegst
+(d). Alternative: die Datei liegen lassen, und der Ziel-User zieht sie mit seinem eigenen
+`/k-upgrade` um. Beides steht in der Zeile; der Nutzer wählt.
 
 Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzelne Zeilen aus.
 
@@ -366,31 +407,120 @@ Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzeln
    `collection` = `context.kephalaion.address`. Bei einem gleichen Dokument am Ziel entfällt
    das Schreiben, bei einem verschiedenen gilt die Entscheidung des Nutzers (`write` mit
    `base_revision` aus dem `read`). Erst nach einem bestätigten Schreiben — die Antwort nennt
-   Revision und Größe — löschst du die Plattendatei.
-2. **ersetzen:** jeden bestätigten Verweis durch den `keph:`-Verweis des Ziels; in einer
-   Plattendatei mit dem Edit-Werkzeug, in einem Task oder Workbench-Thema mit
-   `k_playbook_doc_replace` (Task) bzw. Kephalaion `write` mit `base_revision` (Workbench).
-   Einen Anker (`#…`) hinter dem Pfad lässt du weg.
+   Revision und Größe — löschst du die Plattendatei. Bei einem Ziel unter einem anderen User
+   gehören die Fortschrittszeilen und die bestätigten Ersetzungen dieses Tasks schon in den
+   Inhalt des `create`: die Ersetzungen an ihrer Stelle, die Fortschrittszeilen am Ende, je
+   durch eine Leerzeile getrennt, wie `k_playbook_doc_append` sie setzen würde. Schritte 2
+   und 3 entfallen dann für dieses Dokument.
+2. **Fortschritt:** Je Task mit Fortschrittszeilen (a), unter dem eigenen User, mit
+   `k_playbook_doc_append`, eine Zeile je Aufruf, in der Reihenfolge der Etappen, nach dem
+   Schreibweg in `k-playbook:/instructions/on-demand/tasks.md`, „Lesen und schreiben“: Das
+   erste `since_revision` ist die Revision aus der Antwort des Schreibens in Schritt 1
+   (`create` bzw. `write`), jedes weitere die aus dem letzten Anhängen; vorher die Zeilen
+   `^<!-- k-task-run: etappe [0-9]+ erledigt ` zählen („Zählen vor dem Anhängen“). Stand das
+   Dokument am Ziel schon gleich da, kommt die erste Revision aus diesem Zählen, und eine
+   Zeile, die dort schon steht, wird nicht noch einmal angehängt.
+3. **ersetzen:** jeden bestätigten Verweis durch den `keph:`-Verweis des Ziels; in einer
+   Plattendatei mit dem Edit-Werkzeug, in einem Task mit `k_playbook_doc_replace` mit
+   `since_revision` — aus dem vorherigen `k_playbook_doc_read` dieses Tasks, bei einem eben
+   umgezogenen Task aus dem letzten Schreiben in Schritt 1 oder 2 —, in einem
+   Workbench-Thema mit Kephalaion `write` und `base_revision` aus dem `read`. Einen Anker
+   (`#…`) hinter dem Pfad lässt du weg. Liefert ein Lesen oder Zählen direkt nach dem eigenen
+   Schreiben eine ältere Revision, ist das der Replica-Nachlauf aus
+   `k-playbook:/instructions/on-demand/tasks.md`, kein fremder Schreiber.
 
 Ein Schritt, der fehlschlägt, lässt seine Datei liegen; der nächste Lauf nimmt sie wieder
 auf. Ihr Inhalt bleibt außerdem in der Git-Geschichte.
 
-**e) Aufräumen** — nur, wenn die Zeilen in c) bestätigt sind:
+Die READMEs von `tasks/` und `tasks/done/` und die Verzeichnisse selbst fasst diese
+Umstellung nicht an; darüber entscheidet 3.4.
 
-- `tasks/README.md` bekommt den Text, den das Einrichten heute schreibt
-  (`LocalStructure()` in `installer/internal/project/local.go`): Tasks liegen in der
-  Projekt-Collection, kein Command liest oder schreibt hier noch Tasks, das Verzeichnis
-  bleibt bis zur Umstellung der Oberfläche. Das Einrichten schreibt diese README nur, wenn
-  sie fehlt; ohne diesen Schritt bliebe in einem bestehenden Projekt der alte Text stehen.
-- `tasks/` und `tasks/done/` bleiben: Die Seite Tasks der Oberfläche zeigt bis zu ihrer
-  Umstellung noch dieses Verzeichnis, das danach leer ist. Ein leeres `tasks/old/` wird
-  gelöscht.
-
-**f) Melden.** Je Datei eine Zeile: der `keph:`-Verweis, unter dem sie jetzt liegt, oder der
-Grund, warum sie liegen blieb; je geänderte Stelle `pfad:zeile` bzw. der Verweis des
-Dokuments. Prüfe das Ergebnis mit `k_playbook_doc_list` (Sorte `tasks`, `user: "*"`,
+**e) Melden.** Je Datei eine Zeile: der `keph:`-Verweis, unter dem sie jetzt liegt, oder der
+Grund, warum sie liegen blieb, dazu die Zahl der Fortschrittszeilen, die der Task bekommen
+hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe das Ergebnis mit `k_playbook_doc_list` (Sorte `tasks`, `user: "*"`,
 `done: true`) und nenne, was dort jetzt liegt.
+
+### 3.4 — Aufräumen
+
+Das Einrichten legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection oder zieht als
+Nächstes dorthin. In einem bestehenden Projekt liegen sie noch, oft nur mit ihrer README.
+Diese Umstellung löscht jedes davon, das leer ist. Sie läuft nach 3.1 bis 3.3, damit zählt,
+was dort umgezogen ist. Die Liste gehört zu dieser Fassung des Commands; das Programm nennt
+sie nicht:
+
+- `docs/`
+- `tasks/`
+- `tasks/done/`
+- `data/`
+- `material/`
+- `inbox/`
+- `queue/`
+- `knowledge/`
+- `cache/`
+
+**Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
+die Collection nicht.
+
+**Vorbedingung:** Schritt 2 hat das Programm als aktuell gemeldet — in seiner Ausgabe steht
+die Zeile `Programm-Stand: nichts zu tun — …`. Fehlt sie, nennst du in einer Zeile, dass das
+Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeichnisse beim Knopf
+„Anlegen“ der Oberfläche wieder an. Dann bleibt alles liegen, und du gehst zu Schritt 4.
+
+**Leer** heißt: Im Verzeichnis liegt, auch in Unterverzeichnissen, nichts außer
+
+- Dateien mit dem Namen `README.md`,
+- Dateien mit dem Namen `.gitignore`, deren Inhalt genau der ist, den k-playbook verwaltet:
+  die drei Zeilen `*`, `!.gitignore` und `!README.md` in dieser Reihenfolge — Leerzeilen und
+  Leerraum am Zeilenrand zählen nicht mit,
+- Unterverzeichnissen, die ihrerseits in diesem Sinn leer sind, etwa `tasks/done/` mit seiner
+  README oder ein `inbox/<quelle>/` ohne Inhalt.
+
+Alles andere heißt „liegt anderes darin“: jede weitere Datei, eine `.gitignore` mit anderem
+Inhalt, ein anderes Dotfile, ein Symlink. Auch ein abgeleiteter Index wie
+`cache/knowledge/index.json` zählt dazu, obwohl er jederzeit neu entsteht.
+
+**a) Bestand erheben.** Lies je Verzeichnis, das liegt, alles darin, rekursiv und mit
+versteckten Dateien — ein Verzeichnislisting ohne Dotfiles reicht nicht, und einem Symlink
+folgst du nicht. Danach ist jedes Verzeichnis leer oder nicht. Liegt `tasks/` leer, gilt das
+auch für `tasks/done/`; beide stehen dann in einer Zeile `tasks/`.
+
+**b) Vorlegen.** Lege gebündelt vor, eine Zeile je Verzeichnis in der Reihenfolge der Liste:
+für ein leeres der Vorschlag, es zu löschen, mit dem, was darin liegt; für jedes andere die
+Zeile `bleibt: <was noch liegt>`. Genannt werden Pfade relativ zum Verzeichnis, eine README
+eingeschlossen, höchstens fünf; liegt mehr darin, dazu die Gesamtzahl der Dateien.
+
+```text
+Aufräumen in k-playbook-local/
+  docs/        [löschen]  nur README.md
+  tasks/       [löschen]  nur README.md, done/README.md
+  data/        bleibt: README.md, todos.json.migriert
+  material/    bleibt: README.md, notizen.md
+  inbox/       bleibt: README.md, .gitignore, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
+  queue/       [löschen]  nur README.md
+  cache/       bleibt: README.md, .gitignore, knowledge/index.json
+```
+
+Ein Verzeichnis, das nicht liegt, erscheint nicht. Warte auf die Antwort. Der Nutzer bestätigt
+die Vorlage ganz oder nimmt einzelne Zeilen aus.
+
+**c) Ausführen, was bestätigt ist.** Prüfe je bestätigter Zeile unmittelbar vor dem Löschen
+noch einmal, ob das Verzeichnis leer ist; zwischen Vorlage und Antwort kann etwas
+hinzugekommen sein. Ist es leer, löschst du es samt Inhalt im Dateisystem. Ist es das nicht
+mehr, bleibt es und wird mit dem Grund gemeldet. Committet wird nicht: Versionierte READMEs
+stehen danach als gelöscht in `git status`.
+
+**d) Melden.** Je Verzeichnis eine Zeile: gelöscht, oder `bleibt: …` mit dem Grund — liegt
+anderes darin, vom Nutzer ausgenommen oder beim zweiten Prüfen nicht mehr leer.
+
+Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, schlägt der nächste Lauf erneut
+vor, sobald es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3. Die
+Wissenswerkzeuge (`k-playbook knowledge`, MCP-Werkzeuge `k_playbook_knowledge_*`) legen
+`inbox/`, `queue/`, `knowledge/` und `cache/` bis zu ihrer Umstellung in die Collection beim
+Schreiben selbst wieder an, ohne README; das ist kein Fehler.
 
 ## Schritt 4 — Schluss
 
-Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist.
+Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist; für
+das Aufräumen die gelöschten Verzeichnisse und jede Zeile `bleibt: …`, oder dass es auf den
+Binärwechsel wartet.
