@@ -1,4 +1,4 @@
-# PLAYBOOK: Overlay-Repo-Analyse
+# Skill: Overlay-Repo-Analyse
 
 **Ziel:** Ein Projekt mit **Docker-Overlay-Pattern** vollständig verstehen
 und dokumentieren – insbesondere die Frage beantworten „was ist wirklich
@@ -10,6 +10,25 @@ Der größte Zeitfresser ist gründliches Lesen der Base.
 **Warum wichtig:** Overlay-Repos enthalten nur Delta-Dateien. Ohne die Base
 zu kennen, entstehen falsche Docs (Overlay-Code wird als Eigenentwicklung
 missverstanden, obwohl er zu 90 % aus der Base kommt).
+
+Produces:
+
+- `keph:/docs/generated/code/<NN>-<slug>.md` — Overlay- und Base-Docs, geschrieben über
+  `k_playbook_docs_checkout` und `k_playbook_docs_publish` (Phase 5).
+
+## Erster Schritt
+
+include: k-playbook:/commands/_shared/erster-schritt.md
+
+include: k-playbook:/commands/_shared/docs.md
+
+Dieser Skill ist ein Schreiber des Erzeugers `code`: sein Verzeichnis ist
+`keph:/docs/generated/code/`, das er sich mit `/k-docs-code` teilt. Seine Dokumente
+erkennst du an `generated.by: ks-overlay-repo-analyse`.
+
+Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`) und
+`context.project.dir`. Ohne `kephalaion.ok: true` kannst du analysieren, aber nichts
+schreiben (siehe die Ablage oben); sag das vor Phase 1.
 
 ---
 
@@ -61,10 +80,9 @@ done
 - Welche Repos gibt es? Bilden sie Paare (`*-ui` + `*-api`)?
 - Welches Repo hat `FROM ghcr.io/…` (= Overlay)? Welches nicht (= Base)?
 - Welche `docker-compose.yaml`-Services sind wo definiert?
-- Gibt es bereits einen `k-playbook-local/docs/`-Baum mit seinen
-  Herkunfts-Unterverzeichnissen (`code/`, `libs/`, `extracted/`, `versions/`,
-  `manual/`)?
-  Was liegt schon in `docs/code/`? Dieser Bestand bestimmt in Phase 5 die freien Nummern.
+- Was liegt schon in `keph:/docs/generated/code/`? Kephalaion `list` auf
+  `docs/generated/code` mit `frontmatter` zeigt Titel und `generated.by` — ohne etwas
+  zu holen. Den Bestand holt erst Phase 5.
 
 ### Ergebnis
 
@@ -81,8 +99,9 @@ Subagenten parallel**, weil das zeitaufwendig ist.
 
 ### Vorgehen mit Subagent
 
-Ein Subagent pro Repo, gestartet parallel. Prompt-Template siehe
-`vorlagen/subagent-prompt-overlay.md.template`.
+Ein Subagent pro Repo, gestartet parallel. Die Vorlage für den Auftrag steht unter
+`k-playbook:/commands/_skills/overlay-repo-analyse/subagent-prompt-overlay.md.template`;
+lies sie mit `k_playbook_doc_read`.
 
 Wichtige Instruktionen an den Subagenten:
 
@@ -104,8 +123,8 @@ Wichtige Instruktionen an den Subagenten:
 
 ### Ergebnis dieser Phase
 
-Zwischenstand-Docs, die aber noch mit „⚠️ noch nicht mit Base
-verglichen" markiert sein sollten.
+Zwischenstände, die noch mit „⚠️ noch nicht mit Base verglichen" markiert sind.
+Sie bleiben in der Sitzung; geschrieben wird erst in Phase 5.
 
 ---
 
@@ -117,11 +136,15 @@ Zwei Wege. Idealerweise beide.
 
 ```bash
 mkdir -p _bases   # falls Snapshots existieren
-git clone https://github.com/<org>/<base-repo>.git <base-repo>
+if command -v git >/dev/null 2>&1; then
+  git clone https://github.com/<org>/<base-repo>.git <base-repo>
 
-# Auf den Tag/Commit auschecken, der im Overlay gepinnt ist
-cd <base-repo>
-git checkout <sha aus dem <timestamp>-<sha>-Tag>
+  # Auf den Tag/Commit auschecken, der im Overlay gepinnt ist
+  cd <base-repo>
+  git checkout <sha aus dem <timestamp>-<sha>-Tag>
+else
+  echo "git fehlt — Weg B nehmen"
+fi
 ```
 
 **Vorteile:** vollständige Historie, Autoren, PRs, Issues.
@@ -227,17 +250,21 @@ Für andere Sprachen: `grep` anpassen. JS: `^(export )?(async )?function`,
 ### Rezept 5: Git als Diff-Werkzeug (elegant)
 
 ```bash
-cd <base-repo>
-git checkout -b _tmp_diff_check   # nicht auf main arbeiten
+if command -v git >/dev/null 2>&1; then
+  cd <base-repo>
+  git checkout -b _tmp_diff_check   # nicht auf main arbeiten
 
-cp -r ../<overlay-repo>/app/* app/
+  cp -r ../<overlay-repo>/app/* app/
 
-git status                # welche Dateien anders
-git diff --stat           # Zeilen-Statistik pro Datei
-git diff                  # voller Diff
+  git status                # welche Dateien anders
+  git diff --stat           # Zeilen-Statistik pro Datei
+  git diff                  # voller Diff
 
-# Zurück
-git checkout main && git branch -D _tmp_diff_check
+  # Zurück
+  git checkout main && git branch -D _tmp_diff_check
+else
+  echo "git fehlt — Rezept 1 bis 4 nehmen"
+fi
 ```
 
 Dieser Trick simuliert 1:1 das Dockerfile-`COPY` und zeigt jede Änderung.
@@ -257,31 +284,60 @@ Notiere: „Overlay ergänzt X um Feature Y (+N Zeilen)".
 
 ## Phase 5: Docs schreiben (bzw. korrigieren)
 
-Jetzt die Erkenntnisse in strukturierte Docs überführen. Wenn nach Phase 2
-schon Zwischen-Docs existieren, jetzt revidieren.
+Jetzt die Erkenntnisse in strukturierte Docs überführen — auf demselben Weg wie
+`/k-docs-code`: checkout, im Arbeitsverzeichnis schreiben, publish.
 
 ### Wohin die Docs gehen
 
 Alle Docs dieses Skills — Overlay-Docs **und** Base-Docs — gehen nach
-`k-playbook-local/docs/code/`. Das Verzeichnis trägt die Herkunft „aus Code
+`keph:/docs/generated/code/`. Das Verzeichnis trägt die Herkunft „aus Code
 abgeleitet", nicht ein einzelnes Werkzeug: `/k-docs-code` schreibt ebenfalls
 dorthin. Dass eine Base-Doc fremden Code beschreibt, der gar nicht im Projekt
 liegt, ändert an der Herkunft nichts.
 
-Existiert `k-playbook-local/docs/code/` noch nicht, legt dieser Lauf es an —
-das Verzeichnis gehört der Herkunft, nicht `/k-docs-code`.
+### checkout
 
-Dateiname: `<NN>-<slug>.md`, nach derselben Konvention wie `/k-docs-code`.
-Nummeriert wird in Einer-Schritten mit bewussten Lücken (`00`, `01`, …, `90`);
-die Nummer ist Sortier-Hilfe, keine lückenlose Zählung, und der Nummernkreis
-gilt nur innerhalb von `docs/code/`. **Vor dem Schreiben den vorhandenen
-Bestand in `k-playbook-local/docs/code/` sichten** und die nächsten freien
-Nummern vergeben, statt blind bei `00` zu beginnen — dort können schon Dateien
-aus `/k-docs-code`-Läufen liegen.
+Rufe `k_playbook_docs_checkout` mit `projectDir` = `context.project.dir` und
+`erzeuger: code` (ersatzweise `k-playbook docs checkout code --json`). `WORK_DIR` ist
+`dir` aus der Antwort.
 
-Jede Datei bekommt das Frontmatter aus der Vorlage, mit
-`generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }` — daran
-liest der Index Titel und Herkunft ab.
+- `state: existing` — ein Arbeitsverzeichnis liegt schon da. Nenne `existing.since`,
+  `existing.ageMinutes` und `existing.files` und frage: weitermachen oder verwerfen
+  (`discard: true`)? Ohne Antwort geht es nicht weiter.
+- `kephalaion_unavailable` — nichts wird geschrieben (siehe die Ablage oben). Die
+  Ergebnisse der Analyse in der Antwort zusammenfassen, keine Dateien auf der Platte.
+
+### Bestand lesen
+
+Lies alle Dokumente in `WORK_DIR`, bevor du schreibst: `generated.by`, `hints` und
+`questions` aus dem Frontmatter, den Text als Anregung. `hints` befolgst du.
+
+- **Zuständig** ist dieser Lauf nur für Dokumente mit
+  `generated.by: ks-overlay-repo-analyse`, die er in dieser Analyse behandelt.
+- Ein Dokument mit `generated.by: k-docs-code` — und jedes andere, das dieser Lauf nicht
+  behandelt — bleibt im Arbeitsverzeichnis **unverändert liegen**, samt `hints` und
+  `questions`. Nicht löschen, nicht umbenennen, nicht umschreiben: `publish` deutet eine
+  fehlende Datei als Löschung.
+- Neue Dateien bekommen die nächsten **freien Nummern im Arbeitsverzeichnis**:
+  `<NN>-<slug>.md`, Einer-Schritte mit bewussten Lücken (`00`, `01`, …, `90`), nicht blind
+  bei `00` beginnen. Ein umgeschriebenes Dokument behält seinen Namen.
+
+Zeige vor dem Schreiben die Liste: neu, umschreiben, entfällt (nur eigene), bleibt —
+dazu vorgeschlagene neue `hints` — und warte auf Bestätigung.
+
+### Frontmatter und Inhalt
+
+Jede Datei bekommt das Frontmatter aus der Vorlage
+`k-playbook:/commands/_skills/overlay-repo-analyse/overlay-doc.md.template` (lies sie mit
+`k_playbook_doc_read`):
+
+- `title` und `description` — Pflicht; ohne sie lehnt `publish` ab.
+- `generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-Zeitpunkt> }`.
+- `hints` unverändert übernommen. Neue nur vorschlagen und erst nach Bestätigung
+  eintragen; dasselbe gilt, wenn ein bestätigt entfallendes eigenes Dokument `hints` hat.
+- `questions: [ … ]` — die Fragen, die genau dieses Dokument beantwortet.
+
+Verwandte Dokumente im selben Verzeichnis nennst du mit ihrem Dateinamen.
 
 ### Wichtigste Regel
 
@@ -323,17 +379,22 @@ Beschreibung + konkreter Diff-Ausschnitt
 Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 ```
 
-Vorlage in `.claude/skills/overlay-repo-analyse/vorlagen/overlay-doc.md.template`
+### publish
 
-### Index bauen
+Rufe `k_playbook_docs_publish` mit `projectDir` = `context.project.dir` und
+`erzeuger: code` (ersatzweise `k-playbook docs publish code --json`); `allow_hints: true`
+nur nach bestätigten `hints`. Melde je Dokument `created`, `written`, `deleted`,
+`unchanged`, `conflict` oder `failed`.
 
-Der Index gehört `/k-docs-index` — dieser Skill schreibt und pflegt ihn nicht.
-Ein Lauf von `/k-docs-index` bildet den Abschluss: er nimmt die neuen Dateien
-aus `docs/code/` mit Titel und Herkunft auf und verankert sie für Folge-Sessions.
+- `conflict` — seit dem checkout in Kephalaion geändert. Vorlegen, nicht still
+  nachziehen; der Nutzer entscheidet, ob die eigene Änderung verworfen oder nach einem
+  neuen checkout (`discard: true`) übertragen wird.
+- `hints_changed` oder `invalid_input` — nichts geschrieben; vorlegen bzw. beheben, dann
+  erneut.
+- `failed` mit `outcome_unknown` — nicht wiederholen, mit Kephalaion `read` nachsehen.
 
-> **Pfad-Hinweis:** Projektlokale k-playbook-Dokumentation liegt fest unter
-> `k-playbook-local/docs/`, die Docs dieses Skills unter
-> `k-playbook-local/docs/code/`; alternative Docs-Pfade gibt es nicht.
+Die `README.md` des Verzeichnisses schreibt `publish`; einen Index schreibt dieser Skill
+nicht — er entsteht beim Indizieren.
 
 ---
 
@@ -351,7 +412,9 @@ aus `docs/code/` mit Titel und Herkunft auf und verankert sie für Folge-Session
 - Overlay-Dockerfile pinnt einen `<timestamp>-<sha>`-Tag
 - Im Base-Repo den passenden SHA auschecken:
   ```bash
-  git checkout <sha>
+  if command -v git >/dev/null 2>&1; then
+    git checkout <sha>
+  fi
   ```
 - Danach nochmal diffen
 
@@ -361,7 +424,7 @@ Häufig bei Overlays. Kann man tun:
 
 - Nur die Deltas testen (nicht die ganze Base-Funktionalität)
 - Bei Python: Base-Module per `sys.modules`-Stub mocken, echte Overlay-
-  Module testen (siehe CLARA `squad-cdt-chatbot-api/tests/`)
+  Module testen
 
 ### Riesige Ausgabe bei `diff -rq`
 
@@ -390,14 +453,13 @@ diff -rq --exclude=node_modules --exclude=.git "$BASE" "$OVR"
 - [ ] Neu/entfernte Funktionen aufgelistet
 - [ ] Bugs/Design-Brüche in Docs notiert
 - [ ] Doc-Struktur trennt sauber Base-Verhalten von Overlay-Delta
-- [ ] Falls Zwischen-Docs aus Phase 2 existierten: revidiert
+- [ ] Dokumente anderer Schreiber (`generated.by: k-docs-code`) unverändert gelassen
 - [ ] `_bases/`-Verzeichnis ggf. in `.gitignore` (falls Workspace unter Git)
-- [ ] Docs liegen in `k-playbook-local/docs/code/` und `/k-docs-index` ist anschließend gelaufen
+- [ ] Docs mit `publish` nach `keph:/docs/generated/code/` veröffentlicht, nichts offen
 
 ---
 
-## Verwandte Playbooks
+## Verwandte Commands
 
-- `/k-docs-index` (Command) – läuft **nach** diesem Playbook: baut den Index
-  über alle Herkünfte und verankert die entstandenen Docs für Folge-Sessions
-  als autoritativ.
+- `/k-docs-code` — der zweite Schreiber in `keph:/docs/generated/code/`: Code-Doku des
+  Projekts selbst, über denselben Weg checkout → publish.

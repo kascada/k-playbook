@@ -230,7 +230,7 @@ directories of its own origin:
 
 ```text
 /k-docs           → check inventory and offer possible docs actions
-/k-docs-code      → k-playbook-local/docs/code/
+/k-docs-code      → keph:/docs/generated/code/ (project collection, through k-playbook docs checkout|publish code)
 /k-docs-tools     → k-playbook-local/docs/libs/
 /k-docs-extract   → k-playbook-local/knowledge/extracted/ (through the knowledge tools)
 /k-doc-inventory  → keph:/docs/generated/versions/inventory.md (project collection)
@@ -243,6 +243,14 @@ Kephalaion `list` on `docs/` (`recursive`, `frontmatter`) until Kephalaion gener
 `docs/index.md`. Hand-written documentation lives under `keph:/docs/manual/`. There is
 no fallback to `k-playbook-local/docs/`; `/k-upgrade` (3.2) moves what lies there per
 origin into the collection or clears it, after confirmation.
+
+`/k-docs-code` and the skill `ks-overlay-repo-analyse` share
+`keph:/docs/generated/code/` (task 109): `k-playbook docs checkout code` fetches the
+directory into `.k-playbook/work/docs/code/`, the session writes the documents there, and
+`k-playbook docs publish code` reconciles -- a document changed in Kephalaion since the
+checkout is reported as a conflict, not overwritten, and the hand-maintained `hints` in each
+document's frontmatter change only after the user confirms. Each writer changes only its own
+documents (`generated.by`); the directory's `README.md` is written by `publish`.
 
 `/k-docs` is the guided entry point: it checks inventory, consistency, and
 session memory and offers the possible next step. The four producers create

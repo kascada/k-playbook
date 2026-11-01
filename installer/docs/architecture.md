@@ -23,8 +23,8 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `upgrade`, `vscode`, `version` und
-`stop`. Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `docs`, `upgrade`, `vscode`,
+`version` und `stop`. Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
 es gibt nur diese Übersicht aus.
 
 ```go
@@ -217,6 +217,10 @@ Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_do
 `_replace`, `_set_field` und `_grep` sind die Hüllen darum (`mcpserver/docedit.go`). Vertrag:
 [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Changing and Searching Documents“.
 
+`docs checkout|publish <erzeuger> [--discard|--allow-hints] [--json]` holt erzeugte Doku mit
+mehreren Dokumenten in ein Arbeitsverzeichnis und gleicht sie zurück ab (Task 109);
+Einzelheiten unter „Erzeugte Doku: checkout und publish“.
+
 `create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
 `request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per
 `whoami`). Bleibt der Ausgang nach dem Abschicken offen, schickt der Client denselben Aufruf
@@ -259,6 +263,8 @@ installer/
 │   ├── knowledge.go             Subkommando knowledge: search, list, read, write, status
 │   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
 │   │                            Kephalaion-Collection
+│   ├── docs.go                  Subkommando docs: checkout und publish eines Erzeugers
+│   │                            (--discard, --allow-hints, --json)
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
 │   ├── github.go                Subkommando github: check, show und test [<dienst>] der
@@ -378,6 +384,9 @@ installer/
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
 │   │                            Zugänge OpenKephDocs, OpenInventoryStore
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
+│   ├── docswork.go              Erzeugertabelle DocsProducers, DocsWork: checkout und
+│   │                            publish von docs/generated/<erzeuger>/ über
+│   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
 │   │                            aus der Collection, als Verweise (Task 086); dazu der
 │   │                            Abschnitt health (Task 098) und der
@@ -476,6 +485,8 @@ installer/
 │   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
 │   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
 │   │                            done/reopen (Hüllen über project.UserDocs)
+│   ├── docswork.go              Werkzeuge k_playbook_docs_checkout/publish (Hüllen über
+│   │                            project.DocsWork)
 │   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
 │   │                            project.BuildBriefing)
 │   ├── health.go                Werkzeug k_playbook_health (Hülle über health.Check,
@@ -691,8 +702,7 @@ liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt
 bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
 
 Was bis zu seiner Umstellung noch auf die Platte schreibt, legt sein Verzeichnis beim
-ersten Schreiben selbst an, ohne README: `/k-docs-code` und `/k-docs-tools` `docs/code/`
-und `docs/libs/`, die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
+ersten Schreiben selbst an, ohne README: `/k-docs-tools` `docs/libs/`, die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
 (`QueueAdd`) und `knowledge/<bereich>/` (`Write`, `Publish`). Lesen, Suchen und Listen ohne
 diese Verzeichnisse antworten leer (`scanKnowledgeTree`, `InboxList`, `QueueList`); ein
 genannter Pfad, den es nicht gibt, bleibt ein Eingabefehler. `cache/` entsteht über
@@ -2278,6 +2288,52 @@ Schritt erneut, mit „Abbrechen“.
 Sobald Task 082 die Abwahl liefert (Negativeintrag in `k-playbook-local/mcp-required.yaml`),
 entfällt für ein Projekt, das kephalaion abgewählt hat, die Führung zum Einrichtungsschritt.
 
+## Erzeugte Doku: checkout und publish
+
+Ein Erzeuger mit mehreren Dokumenten — heute `code`, geschrieben von `/k-docs-code` und dem
+Skill `ks-overlay-repo-analyse` — schreibt nicht Dokument für Dokument über Kephalaion,
+sondern über ein Arbeitsverzeichnis auf der Platte (Task 109, Workbench 004 Entscheidungen
+14–17): `k-playbook docs checkout <erzeuger>` holt, die Sitzung bearbeitet mit ihren
+Datei-Werkzeugen, `k-playbook docs publish <erzeuger>` gleicht ab. Teil-Scan und zweiter
+Schreiber gehen so ohne Sonderregel: Ein Lauf ändert im Arbeitsverzeichnis nur seine
+Dokumente, die übrigen liegen unverändert daneben, und was dort fehlt, löscht `publish`.
+Ein eigener Befehl statt `kephalaion node dir push`, weil der eine Freigabe je Verzeichnis
+bräuchte und die Regeln unten nicht durchsetzen könnte.
+
+Die Fachlogik ist `project.DocsWork` (`project/docswork.go`), geöffnet über `OpenDocsWork`
+— derselbe Weg zur Anbindung wie `OpenUserDocs`, ohne bereite Anbindung
+`kephalaion_unavailable` und kein Rückfall. Sie spricht Kephalaion über die Schnittstelle
+`DocsStore` an (`list`, `read`, `create`, `write`, `delete` von `kephalaion.Client`); Tests
+setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werkzeuge
+(`mcpserver/docswork.go`) sind Hüllen.
+
+- **Erzeugertabelle.** `project.DocsProducers`: Name, `title`, `description` und ein kurzer
+  Text je Erzeuger. Daraus kommen die erlaubten Werte von `erzeuger` und die `README.md` des
+  Verzeichnisses, die `publish` schreibt, wenn sie abweicht — die KI schreibt sie nie, und im
+  Arbeitsverzeichnis ist sie nicht erlaubt. Ein Verzeichnis kann mehrere Schreiber haben; die
+  Tabelle kennt das Verzeichnis, `generated.by` im Frontmatter den Schreiber.
+- **Arbeitsverzeichnis und Merkdatei.** `<projekt>/.k-playbook/work/docs/<erzeuger>/` trägt
+  die geholten Dokumente mit gleichem relativem Pfad; daneben die Merkdatei
+  `<erzeuger>.checkout.json` mit Collection, Zeitpunkt und je Dokument Pfad, Revision,
+  SHA-256 des Inhalts und `hints`. Rechnerlokal: `checkout` ergänzt `/work` in
+  `.k-playbook/.gitignore` (`ensureProjectIgnored`, dieselbe Pflege wie `/share` in
+  `sharelink.go`). Liegt beides schon da, wird nichts überschrieben; die Antwort nennt Alter
+  und Anzahl Dateien, `--discard` liest erst vollständig und ersetzt dann.
+- **Abgleich.** `publish` misst an der Merkdatei, nicht am aktuellen Stand in Kephalaion:
+  neu → `create`, geändert → `write` mit der Revision beim checkout, gelöscht → `delete` mit
+  dieser Revision. `stale_revision`, `name_taken` und `not_found` werden `conflict` und nicht
+  geschrieben. Vorher wird alles geprüft und eine Ablehnung schreibt nichts: nur `.md` nach
+  der Namensregel von Kephalaion, keine `README.md`, Frontmatter mit `title` und
+  `description`, `hints` unverändert — ein Dokument mit `hints` neu anlegen oder löschen
+  zählt als Änderung — außer mit `--allow-hints`.
+- **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
+  oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
+  und ein zweites `publish` schreibt nur den Rest.
+
+Vertrag der Werkzeuge: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Generated Docs:
+Checkout and Publish“; welche Kephalaion-Aufrufe dahinter stehen:
+[`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+
 ## GitHub CLI
 
 `project/gh.go` hält zwei Dinge auseinander, die in einer Karte zusammen erscheinen.
@@ -3775,7 +3831,8 @@ Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playboo
 Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
-`k-playbook doc`, `k_playbook_briefing` (`briefing.go`) um `project.BuildBriefing`, wie
+`k-playbook doc`, `k_playbook_docs_checkout/publish` (`docswork.go`) um `project.DocsWork`, wie
+`k-playbook docs`, `k_playbook_briefing` (`briefing.go`) um `project.BuildBriefing`, wie
 `k-playbook briefing`, `k_playbook_health` (`health.go`) um `health.Check`, wie
 `k-playbook health` (§„Umgebungsprüfung: `health`"), und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
 `k-playbook gui status` (§„Zustand erfragen: `gui status`"), und `k_playbook_notify` (`notify.go`) um

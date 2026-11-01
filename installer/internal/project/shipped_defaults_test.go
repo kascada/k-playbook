@@ -350,3 +350,182 @@ func TestDefaultsKDocInventoryIstHuelleUndText(t *testing.T) {
 		t.Errorf("roh: %q, includes %+v", raw.Content, raw.Includes)
 	}
 }
+
+// /k-docs-code ist seit Task 109 Hülle plus Text: Die Hülle nennt nur den
+// Verweis und erlaubt die Werkzeuge von checkout und publish; der Text beginnt
+// mit den Includes _shared/erster-schritt.md und _shared/docs.md, schreibt nur
+// über checkout/publish, scannt ab project.repoRoot ohne die Playbook-
+// Verzeichnisse und lässt Dokumente anderer Schreiber unverändert. Das Modul
+// _docs/code.md gibt es nicht mehr.
+func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-docs-code.md"
+
+	hullData, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-docs-code.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(hullData)
+	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "Vorübergehend nicht verfügbar") || strings.Contains(hull, "_docs/code") {
+		t.Errorf("Hülle ohne Verweis auf den Text oder noch mit dem alten Ablauf:\n%s", hull)
+	}
+	for _, tool := range []string{"mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
+		"mcp__k-playbook__k_playbook_docs_publish", "mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		if !strings.Contains(hull, tool) {
+			t.Errorf("Hülle erlaubt %s nicht", tool)
+		}
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_docs", "code.md")); !os.IsNotExist(err) {
+		t.Error("share/commands/_docs/code.md ist noch da; der Ablauf steht im Text des Commands")
+	}
+
+	file := readRepoDefault(t, "commands/k-docs-code.md")
+	want := file
+	for _, name := range []string{"erster-schritt.md", "docs.md"} {
+		line := "include: _shared/" + name + "\n"
+		if !strings.Contains(file, "\n"+line) {
+			t.Fatalf("k-docs-code.md ohne %q", line)
+		}
+		module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/"+name))))
+		want = strings.Replace(want, line, module+"\n", 1)
+	}
+	if strings.Index(file, "include: _shared/erster-schritt.md") > strings.Index(file, "## Schritt 2") {
+		t.Error("die Includes stehen nicht im ersten Schritt")
+	}
+	for _, needle := range []string{
+		"k_playbook_docs_checkout", "k_playbook_docs_publish", "keph:/docs/generated/code/", "context.project.repoRoot",
+		"`context.playbook.dir`", "`context.local.dir`", ".k-playbook/", "discard: true", "allow_hints",
+		"generated: { by: k-docs-code", "questions:", "hints", "kephalaion_unavailable", "outcome_unknown",
+		"generated.by: ks-overlay-repo-analyse", "unverändert liegen",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-docs-code.md nennt %q nicht", needle)
+		}
+	}
+	// Ein Dokument des Overlay-Skills wird nie als „entfällt“ vorgeschlagen.
+	if !strings.Contains(file, "**entfällt** schlägst du nur für Dokumente vor, für die dieser Lauf zuständig ist") ||
+		!strings.Contains(file, "bleibt       20-overlay-delta       generated.by: ks-overlay-repo-analyse") {
+		t.Error("k-docs-code.md regelt nicht, dass Dokumente anderer Schreiber bleiben")
+	}
+	for _, stale := range []string{"k-playbook context", "/k-docs-index", "_docs/code", ".claude/commands/", "CODE_DIR", "Vorübergehend"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-docs-code.md trägt noch %q", stale)
+		}
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Content != want || len(got.Problems) != 0 || len(got.Includes) != 2 {
+		t.Errorf("eingesetzter Text weicht ab: problems %v, includes %+v", got.Problems, got.Includes)
+	}
+
+	shared := readRepoDefault(t, "commands/_shared/docs.md")
+	for _, stale := range []string{"gehört genau einem Erzeuger", "als Ganzes", "erzeugt Kephalaion"} {
+		if strings.Contains(shared, stale) {
+			t.Errorf("_shared/docs.md trägt noch %q", stale)
+		}
+	}
+	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "`publish` aus der Erzeugertabelle", "Indizieren"} {
+		if !strings.Contains(shared, needle) {
+			t.Errorf("_shared/docs.md nennt %q nicht", needle)
+		}
+	}
+}
+
+// Der Skill ks-overlay-repo-analyse ist seit Task 109 Hülle plus Text: Die
+// Hülle unter share/skills/ bleibt ein Skill-Verzeichnis mit SKILL.md (so wird
+// sie weiter verlinkt) und nennt nur den Verweis; Text und Vorlagen liegen
+// unter defaults/commands/_skills/ und kommen über k-playbook:/commands/. Phase 5
+// schreibt über checkout/publish und lässt Dokumente von /k-docs-code
+// unverändert.
+func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/_skills/overlay-repo-analyse.md"
+	skillDir := filepath.Join("..", "..", "..", "share", "skills", "overlay-repo-analyse")
+
+	if _, ok := skillSources(filepath.Join("..", "..", "..", "share", "skills"))["overlay-repo-analyse"]; !ok {
+		t.Fatal("share/skills/overlay-repo-analyse wird nicht mehr als Skill erkannt")
+	}
+	entries, err := os.ReadDir(skillDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != skillFileName {
+		t.Errorf("Skill-Verzeichnis trägt mehr als die Hülle: %v", entries)
+	}
+	hull, err := os.ReadFile(filepath.Join(skillDir, skillFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hull), "name: ks-overlay-repo-analyse\n") || !strings.Contains(string(hull), "`"+ref+"`") ||
+		strings.Contains(string(hull), "_shared/context.md") || strings.Contains(string(hull), "/k-docs-index") {
+		t.Errorf("Hülle:\n%s", hull)
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Parts[0].Origin != DocOriginDist || len(got.Problems) != 0 || len(got.Includes) != 2 ||
+		got.Includes[0].Ref != "k-playbook:/commands/_shared/erster-schritt.md" || got.Includes[1].Ref != "k-playbook:/commands/_shared/docs.md" {
+		t.Errorf("Auflösung: parts %+v, problems %v, includes %+v", got.Parts, got.Problems, got.Includes)
+	}
+	file := readRepoDefault(t, "commands/_skills/overlay-repo-analyse.md")
+	for _, needle := range []string{
+		"k_playbook_docs_checkout", "k_playbook_docs_publish", "keph:/docs/generated/code/", "discard: true",
+		"generated: { by: ks-overlay-repo-analyse", "questions: [", "freien Nummern im Arbeitsverzeichnis",
+		"Ein Dokument mit `generated.by: k-docs-code`", "**unverändert liegen**",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("Skill-Text nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{"k-playbook-local/docs", "/k-docs-index", "_shared/context.md", "k-playbook context", ".claude/skills/", "PLAYBOOK.md"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("Skill-Text trägt noch %q", stale)
+		}
+	}
+
+	for _, name := range []string{"overlay-doc.md.template", "subagent-prompt-overlay.md.template"} {
+		template := "k-playbook:/commands/_skills/overlay-repo-analyse/" + name
+		if !strings.Contains(file, "`"+template+"`") {
+			t.Errorf("Skill-Text nennt die Vorlage %s nicht", template)
+		}
+		result := mustResolveDoc(t, layers, template)
+		if result.Content != readRepoDefault(t, "commands/_skills/overlay-repo-analyse/"+name) {
+			t.Errorf("%s nicht aus defaults/ aufgelöst", template)
+		}
+	}
+	doc := readRepoDefault(t, "commands/_skills/overlay-repo-analyse/overlay-doc.md.template")
+	if !strings.Contains(doc, "generated: { by: ks-overlay-repo-analyse") || !strings.Contains(doc, "questions:") || strings.Contains(doc, "](./") {
+		t.Errorf("Vorlage overlay-doc.md.template:\n%s", doc)
+	}
+}
+
+// /k-upgrade 3.2 räumt seit Task 109 die alte Code-Doku ab (löschen, nicht
+// verschieben) und sucht in AGENTS.md und opencode.json[c] nach dem ganzen
+// Präfix k-playbook-local/docs/; vorgeschlagen wird immer entfernen.
+func TestDefaultsKUpgradeDokuUmstellungCode(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.2 — "), strings.Index(file, "### 3.3 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.2 nicht gefunden")
+	}
+	section := file[start:end]
+	for _, needle := range []string{
+		"| `code/` | `keph:/docs/generated/code/` | Erzeuger `/k-docs-code` schreibt nach Kephalaion: Plattendateien löschen",
+		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt noch auf die Platte: nicht anfassen |",
+		"nennen das Präfix\n`k-playbook-local/docs/`",
+		"Der Vorschlag ist immer\n**entfernen**, nie umschreiben",
+		"`pfad:von-bis`",
+		"code/00-overview.md          [löschen]",
+		"AGENTS.md:254-264            [entfernen]",
+		"opencode.json:8              [entfernen]",
+		"Die Umstellung ist wiederholbar: `libs/` bleibt liegen",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.2 nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{"`/k-docs-code` schreibt noch auf die Platte", "code/, libs/", "Skill `ai-session-memory` schreiben"} {
+		if strings.Contains(section, stale) {
+			t.Errorf("3.2 trägt noch %q", stale)
+		}
+	}
+}

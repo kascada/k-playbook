@@ -5,54 +5,8 @@ description: Use when the user wants to systematically understand a project that
 
 # Skill: Overlay-Repo-Analyse
 
-## Erster Schritt
-
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
-
-
-**Kurzfassung.** Systematisches Vorgehen, um Projekte mit
-Docker-Overlay-Pattern (schlankes Overlay-Repo baut per `FROM base-image` +
-`COPY . .` auf ein größeres Base-Image auf) vollständig zu verstehen –
-inklusive der Frage „was ist wirklich Custom-Code vs. was kommt aus der
-Base".
-
-## Wann anwenden
-
-- Projekt hat ein Repo dessen `Dockerfile` mit `FROM ghcr.io/…` oder
-  ähnlichem beginnt und dann nur `COPY . .` macht.
-- Overlay-Repo enthält verdächtig wenige Dateien (keine `package.json`
-  oder `requirements.txt`, nur ein paar Configs).
-- Der Nutzer fragt „was macht dieser Overlay eigentlich neu?", „ist das RAG
-  handgeschrieben?", „was ändert sich gegenüber dem Base-Image?" oder
-  ähnliches.
-- Vor jeder Doku-Erstellung für Overlay-Projekte, damit die Doku nicht
-  Overlay-Inhalte als „Eigenentwicklung" fehlinterpretiert.
-
-## Was passiert
-
-Fünf Phasen:
-
-1. **Bestandsaufnahme** – Overlay-Repos oberflächlich erfassen.
-2. **Overlay-Analyse** – was steht wirklich im Repo.
-3. **Base beschaffen** – per Git-Clone oder Docker-Extract.
-4. **Diff Base ↔ Overlay** – quantifizieren welche Zeilen wirklich Custom sind.
-5. **Docs schreiben** – nach `k-playbook-local/docs/code/`, klar getrennt zwischen Base-Verhalten und Overlay-Delta.
-
-Details, Kommandos, Templates und Checkliste in:
-
-→ **`.claude/skills/overlay-repo-analyse/PLAYBOOK.md`**
-
-## Wichtigste Regel
-
-**Nie ohne Base-Analyse behaupten, dass Overlay-Code neu ist.** Das führt zu
-falschen Docs. Erst diffen, dann schreiben. Wenn Base nicht verfügbar ist,
-in der Doku explizit vermerken „konnte nicht mit Base verglichen werden".
-
-## Verwandte Playbooks
-
-- `/k-docs-index` (Command) – nimmt die im letzten Schritt geschriebenen Docs
-  in den Index auf und verankert sie dauerhaft für AI-Sessions.
+Der Text dieses Skills steht unter `k-playbook:/commands/_skills/overlay-repo-analyse.md`.
+Lies ihn nach der Verweisregel aus dem Briefing — MCP `k_playbook_doc_read` mit dem
+Verweis als `ref`, ersatzweise
+`k-playbook read k-playbook:/commands/_skills/overlay-repo-analyse.md` in der Shell — und
+befolge ihn. Diese Datei selbst enthält sonst nichts.

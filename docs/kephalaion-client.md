@@ -23,12 +23,12 @@ session and `whoami`, `docs.go` for `list`, `read`, `create`, `write`, `rename`,
 | Tool | Where | Called by | Arguments used |
 |---|---|---|---|
 | `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
-| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, `k_playbook_doc_grep` with `kind` (task 104), every todo access (task 097) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
-| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; `k_playbook_doc_append`, `_replace` and `_set_field` before every write, `k_playbook_doc_grep` per document (task 104); every todo access, one call per todo (task 097) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
-| `create` | through the hub | `k_playbook_doc_create`; `todo add` and `todo migrate` (task 097) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |
-| `write` | through the hub | `todo update` (text, `done:` field) (task 097); `k_playbook_doc_append`, `_replace`, `_set_field` and `k-playbook doc append`, `replace`, `set` (task 104) | `collection`, `name`, `content`, `base_revision` (the revision from the `read` just before), `request_id` |
+| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, `k_playbook_doc_grep` with `kind` (task 104), every todo access (task 097); `k_playbook_docs_checkout` on `docs/generated/<erzeuger>` with `recursive`, without `frontmatter` (task 109) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
+| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; `k_playbook_doc_append`, `_replace` and `_set_field` before every write, `k_playbook_doc_grep` per document (task 104); every todo access, one call per todo (task 097); `k_playbook_docs_checkout` per listed `.md`, `k_playbook_docs_publish` for the directory's `README.md` and, after a `conflict`, for the current revision (task 109) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
+| `create` | through the hub | `k_playbook_doc_create`; `todo add` and `todo migrate` (task 097); `k_playbook_docs_publish` for a document new in the working directory and for a missing `README.md` (task 109) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |
+| `write` | through the hub | `todo update` (text, `done:` field) (task 097); `k_playbook_doc_append`, `_replace`, `_set_field` and `k-playbook doc append`, `replace`, `set` (task 104); `k_playbook_docs_publish` for a changed document, with the revision of the checkout as `base_revision`, and for a differing `README.md` (task 109) | `collection`, `name`, `content`, `base_revision` (the revision from the `read` just before; for `docs publish` the one from the checkout record), `request_id` |
 | `rename` | through the hub | `k_playbook_doc_done`, `k_playbook_doc_reopen`; `todo update` with done/reopen (task 097) | `collection`, `name`, `new_name`, `request_id` |
-| `delete` | through the hub | `todo delete` (task 097) | `collection`, `name`, `base_revision`, `request_id`; never `recursive` |
+| `delete` | through the hub | `todo delete` (task 097); `k_playbook_docs_publish` for a document deleted in the working directory, with the revision of the checkout (task 109) | `collection`, `name`, `base_revision`, `request_id`; never `recursive` |
 
 Reading a document's content goes both ways since task 093: a session can call
 Kephalaion's `read` directly, and `k_playbook_doc_read` / `k-playbook read keph:/…` call it
@@ -41,7 +41,12 @@ Their contract: [`mcp.md`](./mcp.md#changing-and-searching-documents); the other
 create, list and move: [`mcp.md`](./mcp.md#document-tools-in-the-collection). The todo
 functions (task 097) write content and delete the same way (`Client.Write`,
 `Client.Delete`), since a todo is the document's body plus a few frontmatter fields:
-[`mcp.md`](./mcp.md#todo-contract-and-migration).
+[`mcp.md`](./mcp.md#todo-contract-and-migration). `k-playbook docs checkout|publish`
+(task 109) reads a whole producer directory under `docs/generated/` into a working
+directory on disk and reconciles it afterwards with `create`, `write` and `delete`, each
+`write`/`delete` on the revision recorded at checkout -- so a document changed in Kephalaion
+in between comes back as `stale_revision` and is reported as a conflict, not overwritten:
+[`mcp.md`](./mcp.md#generated-docs-checkout-and-publish).
 
 ## What k-playbook expects
 

@@ -166,25 +166,6 @@ func shareIgnored(projectRoot string) bool {
 
 // ensureShareIgnored ergänzt die Zeile, ohne Vorhandenes anzufassen.
 func ensureShareIgnored(projectRoot string) error {
-	if shareIgnored(projectRoot) {
-		return nil
-	}
-	path := shareIgnorePath(projectRoot)
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("%s lesen: %w", path, err)
-	}
-
-	content := string(data)
-	if content == "" {
-		content = "# Rechnerabhängig: zeigt auf ~/.local/share/k-playbook dieses Rechners.\n"
-	} else if !strings.HasSuffix(content, "\n") {
-		content += "\n"
-	}
-	content += shareIgnoreLine + "\n"
-
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("%s schreiben: %w", path, err)
-	}
-	return nil
+	return ensureProjectIgnored(projectRoot, shareIgnoreLine,
+		"# Rechnerabhängig: zeigt auf ~/.local/share/k-playbook dieses Rechners.\n")
 }

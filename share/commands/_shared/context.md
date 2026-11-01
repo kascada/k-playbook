@@ -90,7 +90,7 @@ from the output above — never from configuration, and never by searching.
 | completed tasks | `keph:/user/~/tasks/done/` — `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | todo | über `/k-todo` bzw. das Subkommando `k-playbook todo`; die Ablage besitzt Go |
 | project documentation | `keph:/docs/` — in der Projekt-Collection, nicht unter `local.dir`; das Briefing nennt den Einstieg unter `Projektdoku`, gelesen mit Kephalaion `list` (`recursive`, `frontmatter`), ohne Kephalaion nicht erreichbar |
-| code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |
+| code documentation | `keph:/docs/generated/code/` — in der Projekt-Collection, nicht unter `local.dir`; geschrieben von `/k-docs-code` und dem Skill `ks-overlay-repo-analyse` nur über `k-playbook docs checkout\|publish code`, ohne Kephalaion gibt es keine |
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
 | extracted knowledge | `<local.dir>/knowledge/extracted/` — nur über `k-playbook knowledge write` bzw. `k_playbook_knowledge_write`; entsteht beim ersten Lauf von `/k-docs-extract` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |

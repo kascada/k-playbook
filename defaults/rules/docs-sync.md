@@ -17,7 +17,7 @@ Bei jeder Code-Änderung gilt:
 
 Relevant sind insbesondere:
 
-- Die aus dem Code erzeugte Projekt-Doku, `keph:/docs/generated/code/` in der Projekt-Collection — bis zur Umstellung von `/k-docs-code` noch unter `k-playbook-local/docs/code/`. Sie folgt dem Code und veraltet mit ihm.
+- Die aus dem Code erzeugte Projekt-Doku, `keph:/docs/generated/code/` in der Projekt-Collection. Sie folgt dem Code und veraltet mit ihm; nachgezogen wird sie über `/k-docs-code`.
 - Architektur-, Betriebs-, Setup-, API- und Datenmodell-Dokumentation.
 - `README.md`, `AGENTS.md` oder andere Einstiegspunkte, wenn sie das geänderte Verhalten beschreiben.
 - Projektinterne Guidelines oder Known-Decisions, wenn die Änderung eine Konvention oder bewusste Entscheidung berührt.

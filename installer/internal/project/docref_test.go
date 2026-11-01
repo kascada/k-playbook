@@ -928,14 +928,17 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
 	playbook := t.TempDir()
 	for rel, content := range map[string]string{
-		"defaults/instructions/always/010-a.md": "## A\n",
-		"defaults/instructions/on-demand/x.md":  "## X\n",
-		"instructions/always/999-oben.md":       "## Oben\n",
-		"rules/befunde.md":                      "# Regel\n",
-		"defaults/rules/befunde.md":             "# Regel aus defaults\n",
-		"commands/k-upgrade.md":                 "# k-upgrade\n\nHülle\n",
-		"defaults/commands/k-upgrade.md":        "# k-upgrade\n\nText\n",
-		"commands/k-gui.md":                     "# k-gui\n\nnur oben\n",
+		"defaults/instructions/always/010-a.md":           "## A\n",
+		"defaults/instructions/on-demand/x.md":            "## X\n",
+		"instructions/always/999-oben.md":                 "## Oben\n",
+		"rules/befunde.md":                                "# Regel\n",
+		"defaults/rules/befunde.md":                       "# Regel aus defaults\n",
+		"commands/k-upgrade.md":                           "# k-upgrade\n\nHülle\n",
+		"defaults/commands/k-upgrade.md":                  "# k-upgrade\n\nText\n",
+		"commands/k-gui.md":                               "# k-gui\n\nnur oben\n",
+		"skills/overlay/SKILL.md":                         "# Skill\n\nHülle\n",
+		"defaults/commands/_skills/overlay.md":            "# Skill\n\nText\n",
+		"defaults/commands/_skills/overlay/v.md.template": "Vorlage\n",
 	} {
 		full := filepath.Join(playbook, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -963,6 +966,15 @@ func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
 	// Ein Command, der nur oben als Hülle liegt, hat keinen Text: not_found,
 	// kein Rückfall auf die Hülle.
 	expectDocError(t, layers, "k-playbook:/commands/k-gui.md", DocCodeNotFound)
+	// Der Text eines Skills liegt unter commands/_skills/ in defaults/ (Task
+	// 109); skills/ selbst ist keine Sorte unter k-playbook:.
+	if skill := mustResolveDoc(t, layers, "k-playbook:/commands/_skills/overlay.md"); skill.Content != "# Skill\n\nText\n" {
+		t.Errorf("Skill-Text aus defaults/commands/_skills/ erwartet: %q", skill.Content)
+	}
+	if tmpl := mustResolveDoc(t, layers, "k-playbook:/commands/_skills/overlay/v.md.template"); tmpl.Content != "Vorlage\n" {
+		t.Errorf("Vorlage des Skills: %q", tmpl.Content)
+	}
+	expectDocError(t, layers, "k-playbook:/skills/overlay/SKILL.md", DocCodeUnsupported)
 }
 
 // includeTree sind Ebenen mit Bausteinen für Include-Tests: Einzeldateien

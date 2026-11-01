@@ -1,0 +1,153 @@
+package mcpserver
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/kascada/k-playbook/installer/internal/project"
+)
+
+// Die Werkzeuge für erzeugte Doku mit mehreren Dokumenten (Task 109) —
+// Hüllen über project.DocsWork.Checkout und .Publish, dem Weg, den auch
+// `k-playbook docs checkout|publish` geht. Die erlaubten Erzeuger kommen aus
+// der Erzeugertabelle project.DocsProducers.
+const (
+	docsToolCheckout = "k_playbook_docs_checkout"
+	docsToolPublish  = "k_playbook_docs_publish"
+)
+
+// openDocsWork ist austauschbar, damit Tests den Node nicht fragen.
+var openDocsWork = project.OpenDocsWork
+
+type docsCheckoutInput struct {
+	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	Producer   string `json:"erzeuger" jsonschema:"Pflicht. Der Erzeuger; sein Verzeichnis ist keph:/docs/generated/<erzeuger>/."`
+	Discard    bool   `json:"discard,omitempty" jsonschema:"Ein vorhandenes Arbeitsverzeichnis samt Merkdatei verwerfen und neu holen — nur, wenn der Nutzer das entschieden hat."`
+}
+
+type docsPublishInput struct {
+	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	Producer   string `json:"erzeuger" jsonschema:"Pflicht. Der Erzeuger, wie beim checkout."`
+	AllowHints bool   `json:"allow_hints,omitempty" jsonschema:"hints ändern, ein Dokument mit hints löschen oder neu anlegen — nur nach Bestätigung durch den Nutzer. Die Antwort nennt jedes solche Dokument unter hintsChanged."`
+}
+
+// docsCheckoutEnvelope und docsPublishEnvelope sind die Antwortformen; die
+// Felder des Ergebnisses fehlen bei einem Fehler.
+type docsCheckoutEnvelope struct {
+	OK         bool   `json:"ok"`
+	Tool       string `json:"tool"`
+	ProjectDir string `json:"projectDir"`
+	*project.DocsCheckoutResult
+	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+}
+
+type docsPublishEnvelope struct {
+	OK         bool   `json:"ok"`
+	Tool       string `json:"tool"`
+	ProjectDir string `json:"projectDir"`
+	*project.DocsPublishResult
+	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+}
+
+// docsProducerSchema bildet das Eingabeschema aus dem Typ und setzt die
+// erlaubten Werte von erzeuger aus der Erzeugertabelle.
+func docsProducerSchema[T any]() *jsonschema.Schema {
+	schema, err := jsonschema.For[T](nil)
+	if err != nil {
+		panic(fmt.Sprintf("Schema für %T: %v", *new(T), err))
+	}
+	if prop, ok := schema.Properties["erzeuger"]; ok {
+		for _, name := range project.DocsProducerNames() {
+			prop.Enum = append(prop.Enum, name)
+		}
+	}
+	return schema
+}
+
+func addDocsWorkTools(server *mcp.Server) {
+	producers := strings.Join(project.DocsProducerNames(), ", ")
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        docsToolCheckout,
+		InputSchema: docsProducerSchema[docsCheckoutInput](),
+		Description: "Holt erzeugte Doku eines Erzeugers (" + producers + ") aus der Projekt-Collection in ein lokales " +
+			"Arbeitsverzeichnis: alle .md unter keph:/docs/generated/<erzeuger>/ außer README.md, rekursiv, nach " +
+			"<projectDir>/.k-playbook/work/docs/<erzeuger>/ mit gleichem relativem Pfad; daneben die Merkdatei " +
+			"<erzeuger>.checkout.json (Revision, Inhalts-Hash, hints je Dokument), an der publish misst. Dort bearbeitest " +
+			"du mit den Datei-Werkzeugen und veröffentlichst mit k_playbook_docs_publish. Antwort: state checked_out " +
+			"mit dir, record und docs (path, ref, revision) — oder state existing: Arbeitsverzeichnis oder Merkdatei " +
+			"liegen schon da (existing: since, ageMinutes, files, record), nichts geholt, nichts überschrieben; dann " +
+			"den Nutzer fragen: weitermachen oder verwerfen (discard: true holt neu). kephalaion_unavailable: nichts " +
+			"geschrieben, kein Rückfall auf die Platte; ein unbekannter Erzeuger ist invalid_input. Hülle über " +
+			"`k-playbook docs checkout`.",
+	}, docsCheckoutTool)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        docsToolPublish,
+		InputSchema: docsProducerSchema[docsPublishInput](),
+		Description: "Veröffentlicht das Arbeitsverzeichnis eines Erzeugers (" + producers + ") nach " +
+			"keph:/docs/generated/<erzeuger>/, gemessen an der Merkdatei vom checkout: neu → anlegen, geändert → " +
+			"schreiben mit der Revision beim checkout, im Arbeitsverzeichnis gelöscht → löschen, unverändert → nichts. " +
+			"Vorher geprüft, eine Ablehnung schreibt nichts: nur .md, keine README.md (invalid_input); jedes Dokument " +
+			"mit Frontmatter title und description (invalid_input); hints unverändert, und kein Dokument mit hints " +
+			"gelöscht oder neu angelegt — sonst hints_changed, außer mit allow_hints nach Bestätigung durch den Nutzer. " +
+			"Ein Dokument, das seit dem checkout in Kephalaion geändert, angelegt oder gelöscht wurde, wird nicht " +
+			"geschrieben, sondern als conflict gemeldet. Danach schreibt publish die README.md des Verzeichnisses selbst, " +
+			"wenn sie abweicht. Antwort: docs und readme je mit path, ref, status (created, written, deleted, unchanged, " +
+			"conflict, failed), revision, base (Revision beim checkout), bei conflict und failed code und message; " +
+			"hintsChanged, open (offene Dateien) und cleaned. Arbeitsverzeichnis und Merkdatei werden nur entfernt, wenn " +
+			"nichts offen ist; ein zweites publish schreibt dann nur den Rest. failed mit outcome_unknown: kann " +
+			"angekommen sein — nicht noch einmal veröffentlichen, sondern nachsehen. not_checked_out: kein checkout. " +
+			"kephalaion_unavailable: nichts geschrieben. Hülle über `k-playbook docs publish`.",
+	}, docsPublishTool)
+}
+
+func docsCheckoutTool(ctx context.Context, _ *mcp.CallToolRequest, input docsCheckoutInput) (*mcp.CallToolResult, any, error) {
+	fail := func(dir string, code string, err error) *mcp.CallToolResult {
+		return jsonToolResult(docsCheckoutEnvelope{OK: false, Tool: docsToolCheckout, ProjectDir: dir,
+			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+	}
+	projectDir, err := resolveProjectDir(input.ProjectDir)
+	if err != nil {
+		return fail(projectDir, projectDirErrorCode(err), err), nil, nil
+	}
+	if _, err := project.DocsProducerByName(input.Producer); err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	work, err := openDocsWork(projectDir)
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	result, err := work.Checkout(ctx, input.Producer, project.DocsCheckoutOptions{Discard: input.Discard})
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	return jsonToolResult(docsCheckoutEnvelope{OK: true, Tool: docsToolCheckout, ProjectDir: projectDir, DocsCheckoutResult: &result}, false), nil, nil
+}
+
+func docsPublishTool(ctx context.Context, _ *mcp.CallToolRequest, input docsPublishInput) (*mcp.CallToolResult, any, error) {
+	fail := func(dir string, code string, err error) *mcp.CallToolResult {
+		return jsonToolResult(docsPublishEnvelope{OK: false, Tool: docsToolPublish, ProjectDir: dir,
+			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+	}
+	projectDir, err := resolveProjectDir(input.ProjectDir)
+	if err != nil {
+		return fail(projectDir, projectDirErrorCode(err), err), nil, nil
+	}
+	if _, err := project.DocsProducerByName(input.Producer); err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	work, err := openDocsWork(projectDir)
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	result, err := work.Publish(ctx, input.Producer, project.DocsPublishOptions{AllowHints: input.AllowHints})
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	// Ein publish mit offenen Dateien ist kein Fehler des Werkzeugs: Die
+	// Antwort trägt je Dokument den Zustand, open und cleaned.
+	return jsonToolResult(docsPublishEnvelope{OK: true, Tool: docsToolPublish, ProjectDir: projectDir, DocsPublishResult: &result}, false), nil, nil
+}

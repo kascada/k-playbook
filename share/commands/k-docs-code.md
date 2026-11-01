@@ -1,60 +1,14 @@
 ---
-description: Vorübergehend nicht verfügbar (Umbau auf keph:/docs/) — Generate semantic project documentation from code under k-playbook-local/docs/code/. Defaults to the current directory, or uses [target-dir] if given. Thin wrapper around the _docs/code module.
-argument-hint: [target-dir]
+description: Erzeugt semantische Projektdoku aus dem Code und schreibt sie über k-playbook docs checkout/publish in die Collection des Projekts nach keph:/docs/generated/code/. Scope ist project.repoRoot; ein Argument ergänzt genau einen Pfad innerhalb des Projekts. Dünne Hülle über dem Text k-playbook:/commands/k-docs-code.md.
+argument-hint: [zusatz-pfad]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_docs_checkout, mcp__k-playbook__k_playbook_docs_publish, mcp__kephalaion__list, mcp__kephalaion__read]
 ---
 
 # k-docs-code
 
-## Vorübergehend nicht verfügbar
-
-Dieser Command wird auf die Projektdoku in Kephalaion (`keph:/docs/`) umgebaut und steht bis
-dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
-nichts schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-docs-code`
-vorübergehend nicht verfügbar ist, und nenne, was es schon gibt:
-
-- das Versionsinventar: `/k-doc-inventory`, Ergebnis unter
-  `keph:/docs/generated/versions/inventory.md`;
-- die Projektdoku: `keph:/docs/`, Einstieg im Briefing;
-- den Umzug alter Doku von der Platte: `/k-upgrade`, Umstellung 3.2.
-
-Der Text darunter bleibt als Vorlage für den Umbau stehen.
-
-## Erster Schritt
-
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
-
-Erzeugt semantische Projekt-Doku aus dem Code. Der eigentliche Ablauf liegt im
-nachladbaren Modul `.claude/commands/_docs/code.md`, damit `/k-docs` denselben
-Produzenten anbieten und ausführen kann.
-
-Produces:
-- `k-playbook-local/docs/code/<NN>-<slug>.md` — one file per coherent topic.
-
-## Schritt 1 — Modul anwenden
-
-Wende `.claude/commands/_docs/code.md` an und führe den dort beschriebenen Ablauf mit
-denselben `$ARGUMENTS` aus.
-
-Wenn das Modul fehlt, abbrechen und sagen, dass die k-playbook-Installation unvollständig
-oder veraltet ist. Keine Ersatzlogik nachbauen.
-
-## Schritt 2 — Abschluss
-
-Der Abschluss kommt aus dem Modul. Folge-Command: **`/k-docs-index`** — baut aus allen
-Herkünften den einzigen Index `k-playbook-local/docs/README.md` und registriert die Docs in
-`AGENTS.md` und `opencode.json`.
-
-## Fehlerfälle
-
-- Modul `.claude/commands/_docs/code.md` fehlt → abbrechen und `/k-gui` oder Update der
-  Installation nennen.
-
-## Anti-Muster (nicht tun)
-
-- **Ablauf duplizieren.** Änderungen gehören in `_docs/code.md`, nicht in diesen Wrapper.
+Der Text dieses Commands steht unter `k-playbook:/commands/k-docs-code.md`. Lies ihn
+nach der Verweisregel aus dem Briefing — MCP `k_playbook_doc_read` mit dem Verweis als
+`ref`, ersatzweise `k-playbook read k-playbook:/commands/k-docs-code.md` in der
+Shell — und befolge ihn mit denselben `$ARGUMENTS`. Diese Datei selbst enthält sonst
+nichts.

@@ -4,8 +4,11 @@
 
 ## Why k-playbook
 
-- **It learns the project and keeps what it learned.** `/k-docs-code` and `/k-docs-tools`
-  write project knowledge into `k-playbook-local/docs/` until their move to the collection,
+- **It learns the project and keeps what it learned.** `/k-docs-code` writes the code
+  documentation into the project's Kephalaion collection (`keph:/docs/generated/code/`)
+  through `k-playbook docs checkout|publish code`, which reports conflicts instead of
+  overwriting and keeps the hand-maintained `hints` of each document; `/k-docs-tools`
+  writes into `k-playbook-local/docs/libs/` until its move to the collection,
   `/k-doc-inventory` writes the
   version inventory into the project's Kephalaion collection
   (`keph:/docs/generated/versions/inventory.md`), and
@@ -19,9 +22,9 @@
 - **A body of knowledge instead of code search.** The entry of the project
   documentation is `keph:/docs/` in the project's Kephalaion collection; the briefing
   names it, and a session reads it before it reads code. `docs/README.md` on disk is
-  the older index across the origins still on disk — `code/`, `libs/` — with an
-  alphabetical keyword index and a question→file mapping; `/k-upgrade` moves the rest
-  into the collection.
+  the older index from before the move; `/k-upgrade` moves the rest into the collection,
+  deletes old code documentation on disk and removes the doc references from
+  `AGENTS.md`.
 - **Multi-agent loops instead of a single opinion.** `/k-task-refine` hardens tasks in
   rounds of Critic, Editor and Moderator — the advisors are read-only, only the
   Moderator writes, and every round lands in the review log. In an audit several

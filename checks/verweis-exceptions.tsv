@@ -31,7 +31,6 @@ defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot 
 defaults/instructions/always/030-briefing.md	28	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/instructions/always/100-projektwissen-zuerst.md	9	pfad	Ortsangabe: der Pfad ist das Argument von Kephalaion list in der Collection, kein Verweis.
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.
-share/commands/_docs/code.md	178	link	Inhalt für Leser: Vorlage der erzeugten Code-Doku, relative Links zwischen den erzeugten Dateien.
 share/commands/_docs/tools.md	230	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.
 share/commands/_docs/tools.md	231	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.
 share/commands/_docs/tools.md	258	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.

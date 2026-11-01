@@ -88,9 +88,10 @@ anything else keeps the directory, and the command names what lies there.
 Until their own switch to the collection, a few producers still write to disk and
 create their directory on the first write, without a README:
 
-- `/k-docs-code` and the `ks-overlay-repo-analyse` skill write `docs/code/`,
-  `/k-docs-tools` writes `docs/libs/`; both commands are disabled while they move to
-  `keph:/docs/`. Within `docs/`, the directory reveals the origin: a tool writes
+- `/k-docs-tools` writes `docs/libs/` and is disabled while it moves to `keph:/docs/`.
+  `/k-docs-code` and the `ks-overlay-repo-analyse` skill no longer write to disk: since
+  task 109 they go through `k-playbook docs checkout|publish code` into
+  `keph:/docs/generated/code/`. Within `docs/`, the directory reveals the origin: a tool writes
   exclusively to directories of its own origin, and the frontmatter field
   `generated.by` identifies which tool wrote an individual file.
 - The knowledge gate (`k-playbook knowledge`, `k_playbook_knowledge_*`) writes

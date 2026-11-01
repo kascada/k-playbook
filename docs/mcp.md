@@ -367,6 +367,8 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`; optional `since_revision` |
 | `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field; other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
+| `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew |
+| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
@@ -1126,6 +1128,68 @@ match, with `--count` `ref:count` per document (`ref:count:revision` for `keph:`
 with exit 1 and the code in parentheses at the end of the message; `foreign_change` writes the
 last lines to stderr, with `--json` the state (`ref`, `sinceRevision`, `revision`,
 `updatedBy`, `updatedAt`, `tail`) to stdout.
+
+### Generated Docs: Checkout and Publish
+
+A producer with several documents -- today only `code`, written by `/k-docs-code` and the skill
+`ks-overlay-repo-analyse` -- writes into `keph:/docs/generated/<erzeuger>/` through a
+machine-local working directory instead of single Kephalaion calls (task 109):
+`k_playbook_docs_checkout` fetches, the session edits with its file tools,
+`k_playbook_docs_publish` reconciles. The logic is `project.DocsWork` (`project/docswork.go`);
+the subcommand `k-playbook docs checkout|publish <erzeuger>` calls the same code. Valid
+producers come from the table `project.DocsProducers` (name, `title`, `description` and a short
+text for the directory's `README.md`); an unknown one is `invalid_input`, and the schema lists
+the valid ones as `enum` of `erzeuger`.
+
+**Inputs.** Both take `projectDir` (required by contract) and `erzeuger`;
+`k_playbook_docs_checkout` also `discard`, `k_playbook_docs_publish` also `allow_hints`.
+
+**Checkout.** Lists `docs/generated/<erzeuger>/` recursively and reads every `.md` except a
+`README.md` into `<projectDir>/.k-playbook/work/docs/<erzeuger>/` under the same relative
+path. Beside the directory, not inside it, it writes the checkout record
+`<erzeuger>.checkout.json`: collection, time, and per document path, revision, SHA-256 of
+the content and `hints` -- publish measures "changed" and "hints unchanged" against this
+record, not against the current state in Kephalaion. An empty directory gets a record too.
+`/work` is added to `.k-playbook/.gitignore`, as `/share` is. If the working directory or the
+record already exists, nothing is fetched or overwritten: the answer is `state: existing` with
+`existing` (`since`, `ageMinutes`, `files`, `record`), and the user decides whether to continue
+or to discard. `discard: true` reads everything first and only then replaces what lies there;
+if reading fails, it stays.
+
+**Publish.** First everything is checked, and a rejection writes nothing: only `.md` files
+below the working directory whose path segments follow Kephalaion's naming rule, no
+`README.md` (`invalid_input`); every document has frontmatter with `title` and `description`
+(`invalid_input`, all problems in one message); `hints` of a document known from the checkout
+are unchanged, and no document with non-empty `hints` is deleted (also as half of a rename)
+or newly created -- otherwise `hints_changed`, unless `allow_hints`, in which case the answer
+lists each such document under `hintsChanged`. Then per document, compared with the record:
+new → `create`; changed → `write` with the checkout revision as `base_revision`; deleted in
+the working directory → `delete` with that revision; unchanged → nothing. A document that
+was changed, created or deleted in Kephalaion since the checkout (`stale_revision`,
+`name_taken`, `not_found`) is reported as `conflict` with its current revision and not
+written. Afterwards publish writes `docs/generated/<erzeuger>/README.md` from the producer
+table, only when its content differs. The working directory and the record are removed only
+when no document is `conflict` or `failed` and the README went through; otherwise the record
+is updated with what was published, and a second publish after clearing up writes only the
+rest. Without a checkout the answer is `not_checked_out`.
+
+**Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
+
+| Tool | Fields on success |
+|---|---|
+| `k_playbook_docs_checkout` | `producer`, `ref` (`keph:/docs/generated/<erzeuger>/`), `dir`, `record`, `state` (`checked_out` or `existing`), `discarded`, `docs` (each `path`, `ref`, `revision`), `existing` |
+| `k_playbook_docs_publish` | `producer`, `ref`, `dir`, `docs` and `readme`, each `path`, `ref`, `status` (`created`, `written`, `deleted`, `unchanged`, `conflict`, `failed`), `revision`, `base` (the checkout revision), with `conflict` and `failed` also `code` and `message`; `hintsChanged`, `open` (the files left open) and `cleaned` |
+
+A publish with open files is not a tool error (`ok: true`); the CLI ends with exit 1 after the
+output. Error codes in `error.code`: `invalid_input`, `project_not_found`, `hints_changed`,
+`not_checked_out`, `kephalaion_unavailable` (nothing written, no fallback to disk). A document
+`failed` with `outcome_unknown` may have arrived: do not publish again blindly, look it up.
+
+**CLI.** `k-playbook docs checkout <erzeuger> [--discard] [--json]` and
+`k-playbook docs publish <erzeuger> [--allow-hints] [--json]`. Without `--json` checkout prints
+one line per document (path and revision) or the note about the existing working directory;
+publish prints status, reference and revision per document, tab-separated, then the README
+and the outcome.
 
 ### Briefing Contract
 

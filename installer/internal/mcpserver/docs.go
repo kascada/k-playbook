@@ -75,6 +75,7 @@ func addDocTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{Name: docToolRead, Description: docReadDescription}, docReadTool)
 	addUserDocTools(server)
 	addDocEditTools(server)
+	addDocsWorkTools(server)
 }
 
 // projectDocLayers ist austauschbar, damit Tests keph:-Verweise ohne Node

@@ -4,7 +4,8 @@
 // gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
 // einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
-// `inventory` erhebt das Versionsinventar des Projekts, `todo` verwaltet die
+// `inventory` erhebt das Versionsinventar des Projekts, `docs` holt erzeugte
+// Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo` verwaltet die
 // Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
 // löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
 // Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
@@ -111,6 +112,10 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie read: die Ausgabe ist der Verweis oder JSON
 		// und sonst nichts.
 		return runDoc(args[1:])
+	case "docs":
+		// Ohne Wirt-Pflege wie doc: die Ausgabe ist je Dokument eine Zeile
+		// oder JSON und sonst nichts.
+		return runDocs(args[1:])
 	case "briefing":
 		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
 		// Klartext oder JSON, und sonst nichts.
@@ -327,6 +332,13 @@ Unterkommandos:
             Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe
             wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done und
             _reopen.
+  docs      Erzeugte Doku in der Projekt-Collection auschecken und
+            veröffentlichen: k-playbook docs checkout <erzeuger> [--discard]
+            und k-playbook docs publish <erzeuger> [--allow-hints], je mit
+            --json. checkout holt keph:/docs/generated/<erzeuger>/ nach
+            .k-playbook/work/docs/<erzeuger>/, publish gleicht ab und meldet
+            Konflikte, statt zu überschreiben. Erzeuger: code. Dasselbe wie
+            die MCP-Werkzeuge k_playbook_docs_checkout und _publish.
   upgrade   Aktualisiert das Programm und zieht das Projekt nach:
             k-playbook upgrade [--check] [--json]. Erst git pull im Clone
             und das Binary über k-playbook/bin/install, nur wenn das laufende

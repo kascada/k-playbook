@@ -1,10 +1,9 @@
 ---
-type: Architecture
 title: <Overlay-Repo-Name>
 description: <Ein Satz: was dieses Overlay ist und über welcher Base es liegt.>
-tags: [<kurze-tags>]
-status: stable
-generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }
+generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-Zeitpunkt> }
+hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
+questions: [ "<Frage, die genau dieses Dokument beantwortet>", … ]
 ---
 
 # <Overlay-Repo-Name>
@@ -15,7 +14,7 @@ generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-datetime> }
 alles andere kommt aus der Base.
 
 > Für die Base (die die eigentliche Anwendung enthält), siehe
-> [`<NN>-<slug>.md`](./<NN>-<slug>.md) im selben Verzeichnis `docs/code/`.
+> `<NN>-<slug>.md` im selben Verzeichnis `keph:/docs/generated/code/`.
 
 ---
 
@@ -89,7 +88,7 @@ Kommentar zu den Details (Base gepinnt auf welchen Tag, was macht COPY, ...)
 docker compose up --build
 ```
 
-Env-Variablen: siehe Base-Doku (`<NN>-<slug>.md` in `docs/code/`).
+Env-Variablen: siehe Base-Doku (`<NN>-<slug>.md` im selben Verzeichnis).
 
 ## 8. Tests
 

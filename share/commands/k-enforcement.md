@@ -2,7 +2,7 @@
 description: Check the current work or target path against the effective rule catalog and report whether required follow-ups such as docs sync are done. Defaults to the current directory, or uses [target-dir] if given.
 argument-hint: [target-dir]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Bash, Glob, Grep, TodoWrite]
+allowed-tools: [Read, Bash, Glob, Grep, TodoWrite, mcp__kephalaion__list, mcp__kephalaion__read]
 ---
 
 # k-enforcement
@@ -26,11 +26,13 @@ From the context output:
 
 - The code to check is `project.repoRoot` — the rules apply to the code, not to the
   playbook directory.
-- `DOCS_DIR = <local.dir>/docs`.
-- `CODE_DOCS_DIR = <DOCS_DIR>/code` — the only origin that follows the code. `libs/`
-  follows the libraries, `versions/` the declared versions, `manual/` and `extracted/`
-  follow nothing; they are all outside the docs-sync duty. `DOCS_DIR/README.md` is the
-  generated index and belongs to `/k-docs-index`.
+- `CODE_DOCS_REF = keph:/docs/generated/code/` — the code documentation in the project
+  collection, the only origin that follows the code. List it with Kephalaion `list`
+  (`collection` = `kephalaion.address`, `path` = `docs/generated/code`, `recursive`,
+  `frontmatter`) and read single documents with `read`. `libs/` follows the libraries,
+  `versions/` the declared versions, `manual/` and `extracted/` follow nothing; they are
+  all outside the docs-sync duty, and so is the `README.md` of the directory, which
+  `k-playbook docs publish` writes.
 
 - If `$ARGUMENTS` is set, it names the directory to check. It must lie inside
   `project.repoRoot`; otherwise stop and say so.
@@ -38,9 +40,10 @@ From the context output:
 
 Command-specific policy:
 
-- If `CODE_DOCS_DIR` is missing, warn for the docs-sync check but do not invent a default
-  docs path. A missing `CODE_DOCS_DIR` in a project that never ran `/k-docs-code` is not a
-  finding by itself — name it and move on.
+- If `kephalaion.ok` is not `true`, `CODE_DOCS_REF` is not reachable: say so with
+  `kephalaion.message` for the docs-sync check and do not fall back to
+  `k-playbook-local/docs/code/`. An empty `CODE_DOCS_REF` in a project that never ran
+  `/k-docs-code` is not a finding by itself — name it and move on.
 
 ## Schritt 2 — Regeln und Checks laden
 
@@ -68,7 +71,7 @@ Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
 Abgeschaltet: <D> (leere lokale Datei) | —
 Checks:       <K> aktiv  (<E> dist, <F> local, <G> override), <H> abgeschaltet
               Lauf über <playbook.dir>/bin/k-check
-Docs:         k-playbook-local/docs/code | fehlt
+Docs:         keph:/docs/generated/code/ (<N> Dokumente) | leer | Kephalaion nicht bereit
 ```
 
 ## Schritt 3 — Änderungsumfang bestimmen
@@ -103,9 +106,10 @@ Always perform this check when code files changed.
 Use the loaded rules, especially `docs-sync.md`, and inspect:
 
 - Changed source/config/schema/API files.
-- Docs under `CODE_DOCS_DIR`, if it exists. Do not report `libs/`, `versions/`,
-  `manual/`, `extracted/` or the generated `README.md` as out of sync — they do not
-  follow the code.
+- Documents under `CODE_DOCS_REF`, if there are any. Do not report `libs/`, `versions/`,
+  `manual/`, `extracted/` or the `README.md` of a producer directory as out of sync — they
+  do not follow the code. An outdated code document is updated through `/k-docs-code`, not
+  by hand in the collection.
 - `README.md`, `AGENTS.md`, and obvious architecture/setup/API docs.
 
 Decide one of:
