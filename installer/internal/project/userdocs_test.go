@@ -256,7 +256,7 @@ func TestDocCreateStartnummer(t *testing.T) {
 	docs := newTestUserDocs(t, store, DocKinds)
 
 	for kind, want := range map[string]string{
-		"tasks":     "keph:/user/kamran/tasks/100-erste.md",
+		"tasks":     "keph:/user/kamran/tasks/001-erste.md",
 		"workbench": "keph:/user/kamran/workbench/001-erste.md",
 		"findings":  "keph:/queue/findings/001-erste.md",
 	} {
@@ -266,17 +266,26 @@ func TestDocCreateStartnummer(t *testing.T) {
 		}
 	}
 
-	// Höchstwert unter der Startnummer: die Startnummer.
-	store = newFakeDocStore("kamran", "user/kamran/tasks/042-alt.md")
-	created, err := newTestUserDocs(t, store, DocKinds).Create(context.Background(), "tasks", "neu")
+	// Höchstwert unter der Startnummer: die Startnummer. tasks beginnt seit
+	// Task 105 bei 1 wie die anderen Sorten (die Platten-Tasks ziehen unter
+	// gleichem Namen um); geprüft an einer Sorte mit höherer Startnummer.
+	hoch := []DocKind{{Kind: "hoch", Dir: "user/~/hoch", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 100}}
+	store = newFakeDocStore("kamran", "user/kamran/hoch/042-alt.md")
+	created, err := newTestUserDocs(t, store, hoch).Create(context.Background(), "hoch", "neu")
 	if err != nil || created.Number != 100 {
 		t.Fatalf("unter Start: %+v %v", created, err)
 	}
-	// Höchstwert ab der Startnummer: Höchstwert plus eins.
+	// Höchstwert ab der Startnummer: Höchstwert plus eins — auch bei tasks,
+	// deren Platten-Nummern nach dem Umzug weitergezählt werden.
 	store = newFakeDocStore("kamran", "user/kamran/tasks/100-alt.md")
 	created, err = newTestUserDocs(t, store, DocKinds).Create(context.Background(), "tasks", "neu")
 	if err != nil || created.Number != 101 || created.Name != "101-neu.md" || created.User != "kamran" {
 		t.Fatalf("ab Start: %+v %v", created, err)
+	}
+	store = newFakeDocStore("kamran", "user/kamran/tasks/042-alt.md")
+	created, err = newTestUserDocs(t, store, DocKinds).Create(context.Background(), "tasks", "neu")
+	if err != nil || created.Number != 43 {
+		t.Fatalf("tasks zählt ab 1 weiter: %+v %v", created, err)
 	}
 	// Bei Sorten ohne Userbereich kein User in der Antwort.
 	created, err = newTestUserDocs(t, newFakeDocStore("kamran"), DocKinds).Create(context.Background(), "findings", "b")
@@ -316,12 +325,12 @@ func TestDocCreateZaehltUeberUserUndDone(t *testing.T) {
 func TestDocCreateNameTakenWiederholt(t *testing.T) {
 	store := newFakeDocStore("kamran")
 	// Am Hub belegt, in der Replica noch nicht zu sehen.
-	store.docs["user/kamran/tasks/100-a.md"] = &fakeDoc{by: "kamran", hidden: true}
-	store.docs["user/kamran/tasks/101-a.md"] = &fakeDoc{by: "kamran", hidden: true}
+	store.docs["user/kamran/tasks/001-a.md"] = &fakeDoc{by: "kamran", hidden: true}
+	store.docs["user/kamran/tasks/002-a.md"] = &fakeDoc{by: "kamran", hidden: true}
 	docs := newTestUserDocs(t, store, DocKinds)
 
 	created, err := docs.Create(context.Background(), "tasks", "a")
-	if err != nil || created.Number != 102 {
+	if err != nil || created.Number != 3 {
 		t.Fatalf("%+v %v", created, err)
 	}
 	if len(store.creates) != 3 {
@@ -330,9 +339,9 @@ func TestDocCreateNameTakenWiederholt(t *testing.T) {
 
 	// Gleiche Nummer, anderer Name: erlaubt, kein Konflikt.
 	store = newFakeDocStore("kamran")
-	store.docs["user/kamran/tasks/100-a.md"] = &fakeDoc{hidden: true}
+	store.docs["user/kamran/tasks/001-a.md"] = &fakeDoc{hidden: true}
 	created, err = newTestUserDocs(t, store, DocKinds).Create(context.Background(), "tasks", "b")
-	if err != nil || created.Number != 100 {
+	if err != nil || created.Number != 1 {
 		t.Fatalf("gleiche Nummer: %+v %v", created, err)
 	}
 

@@ -4,11 +4,18 @@ priv/
 /installer/bin/
 
 # Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
-# unter k-playbook/, die Konfiguration daneben. Beides entsteht lokal beim
-# ersten Start und gehört nicht ins Quell-Repo. In einem echten Zielprojekt
-# gilt das Gegenteil: dort werden K-PLAYBOOK.yaml und k-playbook-local/
+# unter k-playbook/, die Konfiguration unter .k-playbook/. Beides entsteht
+# lokal beim ersten Start und gehört nicht ins Quell-Repo — eine versionierte
+# .k-playbook/K-PLAYBOOK.yaml läge in jedem Clone, und die Suche nach dem
+# Projekt bliebe in der Installation hängen. In einem echten Zielprojekt gilt
+# das Gegenteil: dort werden .k-playbook/K-PLAYBOOK.yaml und k-playbook-local/
 # committet.
+#
+# /K-PLAYBOOK.yaml ist der frühere Ort. Bis das neue Programm installiert ist,
+# liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;
+# das neue entfernt den Link beim ersten Aufruf.
 /K-PLAYBOOK.yaml
+/.k-playbook/K-PLAYBOOK.yaml
 /k-playbook/
 /k-playbook-local/
 

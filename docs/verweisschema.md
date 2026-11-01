@@ -96,7 +96,7 @@ subcommand `k-playbook read <ref>` (task 093). Both are thin hulls and behave th
 
 | Prefix | Route |
 |---|---|
-| `project:` | `k_playbook_doc_read` / `k-playbook read`: the file read from disk below the project root (the directory of `K-PLAYBOOK.yaml`), one layer, no overlay; a session may also read the file directly, it is the same file |
+| `project:` | `k_playbook_doc_read` / `k-playbook read`: the file read from disk below the project root (the directory holding `.k-playbook/K-PLAYBOOK.yaml`), one layer, no overlay; a session may also read the file directly, it is the same file |
 | `k-playbook:` | `k_playbook_doc_read` / `k-playbook read`, local before shipped; never directly from disk |
 | `keph:` | two routes until `010-verweise.md` is updated in the follow-up task, which also decides the default: `k_playbook_doc_read` / `k-playbook read`, which call the node's `read` through the Kephalaion client (`collection` = the binding's address, `name` = the path without the leading `/`, a segment `~` replaced by `kephalaion.user`); or Kephalaion `read` directly with `collection` = `kephalaion.address` from `k-playbook context` |
 

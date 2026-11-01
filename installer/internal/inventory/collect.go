@@ -15,7 +15,7 @@ import (
 // oder später die Web-API — löst Pfade auf und reicht sie herein; die Fachlogik
 // sucht sich nichts selbst.
 type Options struct {
-	// ProjectDir ist die Projektwurzel, das Verzeichnis der K-PLAYBOOK.yaml.
+	// ProjectDir ist die Projektwurzel, das Verzeichnis mit .k-playbook/K-PLAYBOOK.yaml.
 	// Sie ist immer eine erlaubte Wurzel.
 	ProjectDir string
 	// SourcesFile ist k-playbook-local/version-sources.yaml.

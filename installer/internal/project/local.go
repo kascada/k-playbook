@@ -174,8 +174,19 @@ func LocalStructure() []LocalEntry {
 				"Änderungen am Werkzeug vorbei erkennt er selbst über Datei-Hashes.",
 		},
 		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
-		{Path: "tasks", Purpose: "Offene Tasks, nummeriert als <nummer>-<name>.md."},
-		{Path: filepath.Join("tasks", "done"), Purpose: "Erledigte Tasks, nach der Ausführung hierher verschoben."},
+		{
+			Path: "tasks",
+			Purpose: "Tasks liegen in der Projekt-Collection unter keph:/user/<user>/tasks/, erledigte\n" +
+				"darunter in done/; die Form steht in k-playbook:/instructions/on-demand/tasks.md.\n" +
+				"Kein Command liest oder schreibt hier noch Tasks. Dieses Verzeichnis bleibt, bis die\n" +
+				"Seite Tasks der Oberfläche auf die Collection umgestellt ist; was hier noch liegt,\n" +
+				"zieht /k-upgrade (3.3) um.",
+		},
+		{
+			Path: filepath.Join("tasks", "done"),
+			Purpose: "Erledigte Tasks liegen in der Projekt-Collection unter keph:/user/<user>/tasks/done/.\n" +
+				"Dieses Verzeichnis bleibt, bis die Seite Tasks der Oberfläche umgestellt ist.",
+		},
 		{
 			Path:    "priv",
 			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Ob er das soll, entscheidet das\nProjekt: Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen\nIst-Zustand dieses Verzeichnisses und schaltet ihn um — er legt die .gitignore\nan und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in\nder Historie; das macht kein Schalter rückgängig.",

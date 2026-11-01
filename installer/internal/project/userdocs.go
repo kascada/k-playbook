@@ -76,13 +76,16 @@ type DocKind struct {
 }
 
 // DocKinds ist die Sorten-Tabelle (Task 088, Klärungen 2026-10-14). tasks
-// beginnt bei 100, damit sich die Nummern mit den bisherigen Task-Dateien auf
-// der Platte nicht überschneiden. todos (Task 097, Entscheidung 2026-10-19)
+// beginnt bei 1 wie die anderen Sorten (Task 105, Entscheidung 2026-11-01):
+// Die Task-Dateien von der Platte ziehen unter gleichem Namen und gleicher
+// Nummer in die Collection um, und eindeutig muss nur der Dateiname sein, nicht
+// die Nummer — eine Startnummer oberhalb der Platte, wie die frühere 100,
+// hätte nichts mehr zu trennen. todos (Task 097, Entscheidung 2026-10-19)
 // ist projektweit, zählt über todos/ samt done/ und hat eigene Werkzeuge
 // (todos.go): doc_create legte ein leeres Dokument an, doc_done verschöbe
 // ohne das Feld done:.
 var DocKinds = []DocKind{
-	{Kind: "tasks", Dir: "user/~/tasks", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 100},
+	{Kind: "tasks", Dir: "user/~/tasks", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "workbench", Dir: "user/~/workbench", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "findings", Dir: "queue/findings", UserArea: false, Counting: DocCountDir, Done: false, Start: 1},
 	{Kind: TodoKindName, Dir: "todos", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true},

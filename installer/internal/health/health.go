@@ -46,6 +46,7 @@ const (
 	AreaVersionSources = "versionSources"
 	AreaGitHub         = "github"
 	AreaShare          = "share"
+	AreaAnchor         = "anchor"
 )
 
 // Problem ist ein Eintrag des Reports.

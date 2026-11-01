@@ -1,7 +1,8 @@
 # K-PLAYBOOK.yaml format
 
-`K-PLAYBOOK.yaml` is the configuration of a project that uses k-playbook. It is
-also the **anchor**: its location determines the project's root directory.
+`.k-playbook/K-PLAYBOOK.yaml` is the configuration of a project that uses
+k-playbook. It is also the **anchor**: the directory that holds
+`.k-playbook/K-PLAYBOOK.yaml` is the project's root directory.
 
 ## Fundamental decision
 
@@ -11,7 +12,8 @@ configuration:
 
 ```text
 <project>/                 arbitrary name
-├── K-PLAYBOOK.yaml        the anchor
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml    the anchor
 ├── k-playbook/            the installation, fully replaceable
 └── k-playbook-local/      project-owned, committed
 ```
@@ -27,7 +29,8 @@ directory above it is irrelevant.
 ## No paths in configuration
 
 Earlier versions had a `paths:` block with nine keys. It no longer exists. All
-locations derive from the location of `K-PLAYBOOK.yaml`:
+locations derive from the project root, the directory that holds
+`.k-playbook/K-PLAYBOOK.yaml`:
 
 | What | Where |
 |---|---|
@@ -144,11 +147,28 @@ whose content is named by the relevant `README.md`. Details are in
 
 The procedure applies equally to the tool and to an assistant:
 
-1. If a directory was passed, it applies; check `<arg>/K-PLAYBOOK.yaml`.
-2. Otherwise search upwards from `realpath(CWD)`, one candidate per level: `<dir>/K-PLAYBOOK.yaml`.
+1. If a directory was passed, it applies; check `<arg>/.k-playbook/K-PLAYBOOK.yaml`.
+2. Otherwise search upwards from `realpath(CWD)`, one candidate per level: `<dir>/.k-playbook/K-PLAYBOOK.yaml`.
 3. On finding it: `PROJECT_DIR = <dir>`, `PLAYBOOK_DIR = <dir>/k-playbook`.
 4. `$HOME` and `/`, inclusive, are the boundary of the upward search.
 5. If nothing is found, report that no installation exists. Do not guess or create anything.
+
+The anchor is the **file** `.k-playbook/K-PLAYBOOK.yaml`, not the directory
+`.k-playbook/`. The k-playbook repository itself versions `.k-playbook/.gitignore`,
+so every installation `k-playbook/` carries a `.k-playbook/` of its own, and the
+link maintenance creates the directory even without a configuration. A search
+for the bare directory would find a project inside the installation.
+
+**Moving from the former place.** Until 2026-11 the anchor was `<project>/K-PLAYBOOK.yaml`,
+directly in the project root. The tool moves it before it checks a level: if
+`.k-playbook/K-PLAYBOOK.yaml` already exists, the file at the former place is
+deleted (a symlink: only the link); otherwise it is moved (a symlink: the file it
+points to). There is no phase in which both places are read. After the first call of
+the new program, an older program no longer finds the project: every environment
+of the project -- a second machine, a DevContainer, a colleague's checkout -- then
+needs the new program. The environment check (`k-playbook health`, area `anchor`)
+warns when the moved anchor is neither tracked nor ignored, or when the former
+place is still in the index.
 
 The upward search must **not** stop at the Git worktree root.
 `<project>/k-playbook/` is its own clone and therefore its own worktree; a
@@ -360,7 +380,7 @@ because it starts `--version` for every tool and takes noticeable time.
 nothing: it only checks `PATH` and `~/.config/gh/hosts.yml`, without a subprocess.
 
 The search starts at the working directory and proceeds upward. Without
-`K-PLAYBOOK.yaml`, the call stops with a message; it does the same for a
+`.k-playbook/K-PLAYBOOK.yaml`, the call stops with a message; it does the same for a
 `schema_version` other than `3`.
 
 ## Instructions
@@ -482,8 +502,10 @@ git:
 
 Required field. Current version: `3`.
 
-`3` describes the model documented here: an anchor in the project root,
-`k-playbook/` and `k-playbook-local/` beside it, and no paths in configuration.
+`3` describes the model documented here: an anchor `.k-playbook/K-PLAYBOOK.yaml`
+in the project root, `k-playbook/` and `k-playbook-local/` beside it, and no paths
+in configuration. The move of the anchor from `<project>/K-PLAYBOOK.yaml` into
+`.k-playbook/` did not change the number: the file and its fields stay the same.
 
 Older values belong to retired models and are no longer supported:
 
@@ -506,7 +528,8 @@ described in
 
 ### `project.repo_root`
 
-Required field. The project repository location relative to `K-PLAYBOOK.yaml`.
+Required field. The project repository location relative to the project root --
+the directory that holds `.k-playbook/`, not the directory of the file itself.
 
 Typical values:
 
@@ -529,7 +552,7 @@ Block for `/k-remediation`. The tool creates it with new projects.
 | Field | Type | Meaning |
 |---|---|---|
 | `mode` | enum | `task-branch-pr`, `task-first`, or `direct-allowed` |
-| `target` | string | remediation target relative to `K-PLAYBOOK.yaml`; default is `project.repo_root` |
+| `target` | string | remediation target relative to the project root (like `project.repo_root`); default is `project.repo_root` |
 | `grouping` | boolean | group findings into meaningful bundles before implementation |
 | `quick_wins` | boolean | highlight simple, high-impact bundles |
 | `branch_prefix` | string | recommended prefix for remediation branches |
@@ -639,6 +662,7 @@ ignore unknown blocks. Nothing writes this block; it is edited by hand.
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
+- The only thing the tool does unasked is the move from the former place `<project>/K-PLAYBOOK.yaml` into `.k-playbook/` ("Finding the anchor"); the content stays byte for byte.
 - Write only after confirmation, step by step.
 - The tool owns `schema_version` and `project.*`.
 - The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` and `git` are only read.
@@ -652,5 +676,7 @@ ignore unknown blocks. Nothing writes this block; it is edited by hand.
 
 ## Filename
 
-The canonical filename is `K-PLAYBOOK.yaml`. Do not create `K-PLAYBOOK.yml`, so
-the tool and commands need to check only one name.
+The canonical filename is `K-PLAYBOOK.yaml`, and it sits in `.k-playbook/`. Do not
+create `K-PLAYBOOK.yml`, so the tool and commands need to check only one name. A
+`K-PLAYBOOK.yaml` directly in the project root is the former place; the tool moves
+it ("Finding the anchor").

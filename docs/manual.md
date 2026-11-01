@@ -23,14 +23,15 @@ A project consists of three parts that never overlap:
 
 ```text
 project/
-├── K-PLAYBOOK.yaml       the anchor; its location determines the project root
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
 ├── k-playbook/           the installation, fully replaceable
 └── k-playbook-local/     project-owned, committed (except the contents of results/)
 ```
 
 | Part | Owner | What happens on update |
 |---|---|---|
-| `K-PLAYBOOK.yaml` | the project | remains untouched |
+| `.k-playbook/K-PLAYBOOK.yaml` | the project | remains untouched |
 | `k-playbook/` | k-playbook | is fully replaced |
 | `k-playbook-local/` | the project | remains untouched |
 
@@ -40,7 +41,7 @@ updated completely.
 
 ```mermaid
 flowchart LR
-    Anchor["K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
+    Anchor[".k-playbook/K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
     Anchor --> Local["k-playbook-local/"]
 
     Playbook --> Base["rules/ · reviews/ · checks/<br>commands/ · skills/"]

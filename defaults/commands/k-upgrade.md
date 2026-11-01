@@ -278,6 +278,119 @@ Skill `ai-session-memory` schreiben bis zu ihrer eigenen Umstellung den alten In
 die Verweise in `AGENTS.md`/`opencode.json` neu; der nächste Lauf schlägt das Abräumen dann
 erneut vor.
 
+### 3.3 — Tasks von der Platte
+
+Tasks lagen früher als Dateien unter `<context.local.dir>/tasks/`, erledigte unter
+`tasks/done/`, ausgemusterte unter `tasks/old/`. Heute ist ein Task ein Dokument in der
+Projekt-Collection unter `keph:/user/<user>/tasks/`, erledigt unter `done/`; die Form steht
+in `k-playbook:/instructions/on-demand/tasks.md`, und `/k-task-create`, `/k-task-refine`,
+`/k-task-run` und `/k-remediation` lesen und schreiben nur noch dort. Diese Umstellung
+verschiebt die Dateien: gleicher Name, gleiche Nummer, beim richtigen User.
+
+**Anlass:** In `<context.local.dir>/tasks/`, `tasks/done/` oder `tasks/old/` liegt eine
+`.md`-Datei außer `README.md`. Braucht die Collection.
+
+Lies vorher `k-playbook:/instructions/on-demand/tasks.md`.
+
+**a) Bestand erheben.** Je Datei das Ziel: aus `tasks/` nach `user/<owner>/tasks/<gleicher
+Name>`, aus `tasks/done/` nach `user/<owner>/tasks/done/<gleicher Name>`. `<owner>` ist
+vorgeschlagen `context.kephalaion.user`; der Nutzer kann je Zeile einen anderen User nennen.
+Dateien aus `tasks/old/` bekommen keinen Vorschlag — `[unklar]`: nach `done/` oder verwerfen,
+der Nutzer entscheidet.
+
+Für jede Datei prüfst du vorher:
+
+- **Kollision.** Liegt der Dateiname schon irgendwo unter `user/*/tasks/` — auch bei einem
+  anderen User oder unter `done/` —, zeigt es Kephalaion `list` auf `user/` mit `recursive`
+  (`collection` = `context.kephalaion.address`). Dann vergleichen: Ist der Inhalt gleich
+  (nach dem Ergänzen des Frontmatters, siehe unten), wird nur die Plattendatei gelöscht. Ist
+  er verschieden, zeigst du beide; der Nutzer entscheidet, welcher gilt.
+- **Kein Text oder größer als 1 MiB:** liegen lassen und melden.
+
+**Frontmatter.** Ein Task trägt `title` im Frontmatter (`on-demand/tasks.md`, „Kopf“). Fehlt
+es der Datei, bildest du es aus der ersten Überschrift `# Task <n> — <Titel>`: `title` ist
+`<Titel>`, ohne „Task <n> —“. Fehlt auch die, ist `title` der Dateiname ohne Nummer und
+`.md`, mit Leerzeichen statt Bindestrichen. Der übrige Inhalt bleibt Byte für Byte; das
+Frontmatter kommt davor. Trägt die Datei schon ein Frontmatter mit `title`, bleibt sie ganz
+unverändert.
+
+**b) Verweise suchen.** Gesucht wird die Zeichenfolge `k-playbook-local/tasks/` in:
+
+- allen von Git erfassten Dateien des Projekts (`git grep -n "k-playbook-local/tasks/"` in
+  `context.project.dir`; ohne Git mit `grep -rn` über `context.project.dir`, ohne `.git/`),
+  ohne `k-playbook-local/tasks/` selbst und ohne die Installation unter
+  `context.playbook.dir`;
+- deinen offenen Tasks und aktiven Workbench-Themen aus dem Briefing (`work.tasks`,
+  `work.workbench`), gelesen mit `k_playbook_doc_read`.
+
+Vorschlag je Stelle: den Pfad durch den `keph:`-Verweis des Ziels ersetzen, das die Datei
+nach a) bekommt. Der Nutzer kann Zeilen ausnehmen — etwa Geschichte in `docs/migration.md`,
+die den alten Ort beschreibt und ihn weiter nennen darf.
+
+**c) Vorlegen.** Lege gebündelt vor, eine Zeile je Datei bzw. Stelle, in dieser Reihenfolge:
+offene Tasks, erledigte, `old/`, Verweise, Aufräumen:
+
+```text
+Tasks von der Platte
+  tasks/077-skills-sprechend-benennen.md   [verschieben]  → keph:/user/kamran/tasks/077-skills-sprechend-benennen.md, Ziel frei
+  tasks/082-status-mcp-server.md           [verschieben]  → keph:/user/anna/tasks/082-status-mcp-server.md (User anna); gehört danach kamran, anna braucht supersede
+  tasks/done/104-doc-operationen.md        [verschieben]  → keph:/user/kamran/tasks/done/104-doc-operationen.md, Ziel vorhanden und gleich: nur löschen
+  tasks/done/103-health.md                 [unklar]       Ziel vorhanden und verschieden; beide zeigen
+  tasks/old/012-alt.md                     [unklar]       nach done/ oder verwerfen
+  tasks/old/013-binaer.pdf                 [bleibt]       kein Text
+  docs/migration.md:41                     [ersetzen]     k-playbook-local/tasks/097-… → keph:/user/kamran/tasks/done/097-…
+  keph:/user/kamran/workbench/005-….md     [ersetzen]     zwei Stellen
+  tasks/README.md                          [ersetzen]     neuer Text (Tasks liegen in der Collection)
+  tasks/old/                               [löschen]      wenn danach leer
+```
+
+- **verschieben** — Kephalaion `create` unter dem Zielnamen, danach die Plattendatei löschen.
+- **ersetzen** — ein Verweis in einer Datei oder einem Dokument; bei `tasks/README.md` der
+  ganze Text.
+- **löschen** — die Plattendatei bzw. das leere Verzeichnis entfällt.
+- **bleibt** — nicht Teil dieser Umstellung.
+- **unklar** — du kannst es nicht entscheiden; der Nutzer entscheidet, je Zeile.
+
+Eine Zeile mit einem anderen User als `context.kephalaion.user` trägt den Hinweis: Das
+Dokument legst du an, also gehört es danach dir (`created_by`), nicht dem Ziel-User; der kann
+es nur anhängen oder nach `done/` verschieben, wenn er in der Collection das Recht
+`supersede` hat. Alternative: die Datei liegen lassen, und der Ziel-User zieht sie mit seinem
+eigenen `/k-upgrade` um. Beides steht in der Zeile; der Nutzer wählt.
+
+Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzelne Zeilen aus.
+
+**d) Ausführen, was bestätigt ist.** In der Reihenfolge der Vorlage:
+
+1. **verschieben:** Kephalaion `create` mit dem ganzen Inhalt der Datei — Frontmatter
+   ergänzt, sonst Byte für Byte — unter dem Zielnamen (ohne führenden `/`),
+   `collection` = `context.kephalaion.address`. Bei einem gleichen Dokument am Ziel entfällt
+   das Schreiben, bei einem verschiedenen gilt die Entscheidung des Nutzers (`write` mit
+   `base_revision` aus dem `read`). Erst nach einem bestätigten Schreiben — die Antwort nennt
+   Revision und Größe — löschst du die Plattendatei.
+2. **ersetzen:** jeden bestätigten Verweis durch den `keph:`-Verweis des Ziels; in einer
+   Plattendatei mit dem Edit-Werkzeug, in einem Task oder Workbench-Thema mit
+   `k_playbook_doc_replace` (Task) bzw. Kephalaion `write` mit `base_revision` (Workbench).
+   Einen Anker (`#…`) hinter dem Pfad lässt du weg.
+
+Ein Schritt, der fehlschlägt, lässt seine Datei liegen; der nächste Lauf nimmt sie wieder
+auf. Ihr Inhalt bleibt außerdem in der Git-Geschichte.
+
+**e) Aufräumen** — nur, wenn die Zeilen in c) bestätigt sind:
+
+- `tasks/README.md` bekommt den Text, den das Einrichten heute schreibt
+  (`LocalStructure()` in `installer/internal/project/local.go`): Tasks liegen in der
+  Projekt-Collection, kein Command liest oder schreibt hier noch Tasks, das Verzeichnis
+  bleibt bis zur Umstellung der Oberfläche. Das Einrichten schreibt diese README nur, wenn
+  sie fehlt; ohne diesen Schritt bliebe in einem bestehenden Projekt der alte Text stehen.
+- `tasks/` und `tasks/done/` bleiben: Die Seite Tasks der Oberfläche zeigt bis zu ihrer
+  Umstellung noch dieses Verzeichnis, das danach leer ist. Ein leeres `tasks/old/` wird
+  gelöscht.
+
+**f) Melden.** Je Datei eine Zeile: der `keph:`-Verweis, unter dem sie jetzt liegt, oder der
+Grund, warum sie liegen blieb; je geänderte Stelle `pfad:zeile` bzw. der Verweis des
+Dokuments. Prüfe das Ergebnis mit `k_playbook_doc_list` (Sorte `tasks`, `user: "*"`,
+`done: true`) und nenne, was dort jetzt liegt.
+
 ## Schritt 4 — Schluss
 
 Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist.

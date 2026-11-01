@@ -132,7 +132,7 @@ func kephNameTaken(w http.ResponseWriter, id int, name string) {
 }
 
 func TestDocCreateNeuerSchluesselJeNummer(t *testing.T) {
-	// 100 ist belegt, 101 wird angelegt: zwei Aufrufe, zwei Schlüssel.
+	// 1 ist belegt, 2 wird angelegt: zwei Aufrufe, zwei Schlüssel.
 	node := &kephNode{answer: func(n int, call kephCall, w http.ResponseWriter, id int) {
 		if n == 1 {
 			kephNameTaken(w, id, call.name)
@@ -141,7 +141,7 @@ func TestDocCreateNeuerSchluesselJeNummer(t *testing.T) {
 		kephOK(w, id, call.name)
 	}}
 	created, err := newKephUserDocs(t, node).Create(context.Background(), "tasks", "a")
-	if err != nil || created.Number != 101 {
+	if err != nil || created.Number != 2 {
 		t.Fatalf("Create: %+v %v", created, err)
 	}
 	calls := node.recorded()
@@ -151,9 +151,9 @@ func TestDocCreateNeuerSchluesselJeNummer(t *testing.T) {
 }
 
 func TestDocCreateOffenDannNameTakenZiehtNaechsteNummer(t *testing.T) {
-	// Der erste Aufruf für 100 bleibt offen, die Wiederholung mit demselben
+	// Der erste Aufruf für 1 bleibt offen, die Wiederholung mit demselben
 	// Schlüssel klärt ihn als name_taken (ein anderer hatte die Nummer). Erst
-	// dann kommt 101, mit neuem Schlüssel.
+	// dann kommt 2, mit neuem Schlüssel.
 	node := &kephNode{answer: func(n int, call kephCall, w http.ResponseWriter, id int) {
 		switch n {
 		case 1:
@@ -165,12 +165,12 @@ func TestDocCreateOffenDannNameTakenZiehtNaechsteNummer(t *testing.T) {
 		}
 	}}
 	created, err := newKephUserDocs(t, node).Create(context.Background(), "tasks", "a")
-	if err != nil || created.Number != 101 {
+	if err != nil || created.Number != 2 {
 		t.Fatalf("Create: %+v %v", created, err)
 	}
 	calls := node.recorded()
 	if len(calls) != 3 || calls[0] != calls[1] || calls[2].requestID == calls[0].requestID ||
-		calls[2].name != "user/kamran/tasks/101-a.md" {
+		calls[2].name != "user/kamran/tasks/002-a.md" {
 		t.Fatalf("Aufrufe: %+v", calls)
 	}
 }

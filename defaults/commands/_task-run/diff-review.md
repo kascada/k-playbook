@@ -1,47 +1,64 @@
+---
+title: diff-review
+description: Ablauf des Review-Sub-Agenten von /k-task-run — den Diff eines Tasks gegen seinen Snapshot bilden, die Abschnitte mit k_playbook_doc_append an den Task anhängen, nach dem übergebenen Rezept prüfen und das Ergebnis samt Revision in festem Format zurückgeben.
+---
+
 # diff-review
 
 Dieses Modul ist kein Review-Katalog-Rezept. Es beschreibt den Ablauf des
 Review-Sub-Agenten von `/k-task-run`: den Diff eines Tasks gegen den Snapshot des Tasks
-bilden, in die Task-Datei schreiben und nach dem übergebenen Rezept prüfen. Eingebunden wird
-es nur von `/k-task-run`, in 4f; es liegt deshalb im Modulverzeichnis
+bilden, an das Task-Dokument anhängen und nach dem übergebenen Rezept prüfen. Eingebunden
+wird es nur von `/k-task-run`, in 5f; es liegt deshalb im Modulverzeichnis
 `commands/_task-run/` dieses Commands. Der Hauptkontext von `/k-task-run` liest das Modul
-nicht, er gibt dem Sub-Agenten nur seinen Pfad.
+nicht; er gibt dem Sub-Agenten nur den Verweis `k-playbook:/commands/_task-run/diff-review.md`,
+und der liest ihn mit `k_playbook_doc_read`.
 
 Was geprüft wird und wie ein Befund eingestuft wird, steht allein im Rezept — in seinem
 Abschnitt für den Diff eines Tasks und in den Prüfkriterien, die dieser Abschnitt anwendet.
-Dieses Modul wiederholt davon nichts. Es hält nur den Ablauf, die Form der Abschnitte in der
-Task-Datei und das Rückgabeformat.
+Dieses Modul wiederholt davon nichts. Es hält nur den Ablauf, die Form der Abschnitte im
+Task-Dokument und das Rückgabeformat.
 
 Überschriftenzeilen und Rückgabeformat sind der Vertrag zwischen diesem Modul und
 `/k-task-run`: Der Command zählt die Überschriftenzeilen, um zu prüfen, ob ein Lauf seinen
-Abschnitt geschrieben hat, und wertet die Rückgabe aus. Wer eines davon ändert, zieht
-`commands/k-task-run.md` im selben Zug nach.
+Abschnitt geschrieben hat, und wertet die Rückgabe aus. Die Überschriftenzeilen stehen auch
+in der Kennzeilen-Tabelle von `k-playbook:/instructions/on-demand/tasks.md`. Wer eines davon
+ändert, zieht `k-playbook:/commands/k-task-run.md` und diese Tabelle im selben Zug nach.
 
 ## Eingaben
 
 Der Hauptkontext übergibt:
 
-- den Pfad der Task-Datei,
+- den `keph:`-Verweis des Task-Dokuments und seine aktuelle Revision,
 - die Ausführungswurzel,
 - die Kennung des Snapshots dieses Tasks — ein Tree-Objekt in der Ausführungswurzel,
 - den Umfang: `ab Task-Beginn` oder `nur seit Fortsetzung`,
-- die Zeilen „Validierung" aus der letzten Rückgabe von Ausführung oder Behebung, oder den
+- die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung, oder den
   Vermerk, dass es keine gibt,
-- entweder den Pfad des wirksamen Rezepts — dann laufen Teil 1 und Teil 2 — oder die
-  Anweisung „nur Teil 1".
+- entweder den Verweis des wirksamen Rezepts (etwa `k-playbook:/reviews/review-code.md`) —
+  dann laufen Teil 1 und Teil 2 — oder die Anweisung „nur Teil 1“.
 
 ## Grundsätze
 
 - **Keine Rückfragen.** Der Sub-Agent fragt den Nutzer nicht. Offenes kommt nur über die
   Rückgabe zurück: als Befund oder, lässt sich das Review nicht abschließen, als Abbruch
-  (Abschnitt „Abbruch").
-- **Nur anhängen.** Der Sub-Agent hängt seine Abschnitte ans Ende der Task-Datei an, am
-  einfachsten per Shell mit einem Heredoc, dessen Endmarke in Anführungszeichen steht. Er
-  ändert keine bestehende Zeile — nicht `## Fortschritt`, nicht den Kopf von
-  `## Ausführung` und keinen Abschnitt eines früheren Laufs. Kennzeile, Snapshot-Zeile,
-  `**Zusammenfassung:**` und `**Status nach Review:**` schreibt allein der Hauptkontext.
-- **Nichts beheben.** Das Review ändert keinen Code und keine andere Datei als die
-  Task-Datei.
+  (Abschnitt „Abbruch“).
+- **Nur anhängen, mit Revision.** Der Sub-Agent hängt seine Abschnitte mit
+  `k_playbook_doc_append` an das Task-Dokument an (`ref` = der Verweis, `content` = der
+  Abschnitt, `since_revision` = die übergebene Revision bzw. die Revision seines letzten
+  eigenen Anhängens; `projectDir` = die Ausführungswurzel des Projekts). Ersatzweise ohne
+  MCP: `k-playbook doc append <ref> --since <n> <<'EOF'` mit der Endmarke in
+  Anführungszeichen. Er ändert keine bestehende Zeile — keine Fortschrittszeile, nicht den
+  Kopf von `## Ausführung` und keinen Abschnitt eines früheren Laufs. Kennzeile,
+  Snapshot-Zeile, `**Zusammenfassung:**` und `**Status nach Review:**` schreibt allein der
+  Hauptkontext.
+- **`foreign_change` hält an.** Antwortet `k_playbook_doc_append` mit `foreign_change`, hat
+  seit der übergebenen Revision jemand anderes in den Task geschrieben. Der Sub-Agent schreibt
+  nichts weiter und beendet den Lauf mit der Zeile `Foreign-Change: …` aus dem Abschnitt
+  „Rückgabe“. Nach `outcome_unknown` hängt er nicht noch einmal an, sondern prüft mit
+  `k_playbook_doc_grep` (`count_only`), ob seine Überschriftenzeile angekommen ist, und nimmt
+  die Revision aus dieser Antwort.
+- **Nichts beheben.** Das Review ändert keinen Code und keine andere Datei; es schreibt nur
+  in das Task-Dokument.
 - **Feste Reihenfolge.** Teil 1 läuft immer, Teil 2 nur nach Teil 1 und nur, wenn ein
   Rezept übergeben wurde. Jeder Lauf hängt seine Abschnitte neu an; die eines früheren Laufs
   bleiben stehen.
@@ -94,15 +111,13 @@ fehlgeschlagen.
 
 ### Diff bilden
 
-Verglichen werden die beiden Trees. Die Task-Datei selbst gehört nicht zum Diff des Tasks:
-Ihre Änderungen stammen von `/k-task-run` und aus diesem Modul. Liegt sie in der
-Ausführungswurzel, wird sie deshalb über ihren Pfad relativ zur Ausführungswurzel
-ausgenommen; liegt sie außerhalb, entfällt der Ausschluss.
+Verglichen werden die beiden Trees. Das Task-Dokument liegt in der Collection, nicht im
+Arbeitsbaum; es gibt nichts auszunehmen.
 
 ```bash
 if command -v git >/dev/null 2>&1; then
-  git -C "<Ausführungswurzel>" diff --stat "<Snapshot>" "<Stand>" -- . ":(exclude)<Task-Datei relativ>"
-  git -C "<Ausführungswurzel>" diff "<Snapshot>" "<Stand>" -- . ":(exclude)<Task-Datei relativ>"
+  git -C "<Ausführungswurzel>" diff --stat "<Snapshot>" "<Stand>"
+  git -C "<Ausführungswurzel>" diff "<Snapshot>" "<Stand>"
 fi
 ```
 
@@ -117,14 +132,14 @@ gleichermaßen.
 **Umfang:** <ab Task-Beginn | nur seit Fortsetzung>  
 **Snapshot:** `<Kennung>`
 
-<Ausgabe von git diff --stat in einem Codeblock, oder „Keine Änderungen seit dem Snapshot.">
+<Ausgabe von git diff --stat in einem Codeblock, oder „Keine Änderungen seit dem Snapshot.“>
 
 ### Diff: Code-Änderungen
 
-<Ausschnitte nach der Kürzungsregel, oder „Keine Änderungen seit dem Snapshot.">
+<Ausschnitte nach der Kürzungsregel, oder „Keine Änderungen seit dem Snapshot.“>
 ```
 
-Kürzungsregel für „Code-Änderungen":
+Kürzungsregel für „Code-Änderungen“:
 
 - Nur die wesentlichen Hunks; generierte Dateien, Lockfiles und Binärdateien entfallen.
 - Ist der Diff länger als etwa 100 Zeilen, wird Nebensächliches in Prosa zusammengefasst,
@@ -135,21 +150,22 @@ Kürzungsregel für „Code-Änderungen":
   Zeilenanfang sucht, und kein Codeblock aus dem Diff schließt den Zaun vorzeitig.
 - Prosa ohne Überschriften.
 
-Läuft nur Teil 1, ist hier Schluss. Die Rückgabe ist genau eine Zeile:
+Läuft nur Teil 1, ist hier Schluss. Die Rückgabe sind genau zwei Zeilen:
 
 ```text
 Diff: geschrieben | fehlgeschlagen — <Grund>
+Revision: <n>
 ```
 
 Schlägt Teil 1 in einem Lauf mit Teil 2 fehl, läuft Teil 2 nicht; es gilt der Abschnitt
-„Abbruch".
+„Abbruch“.
 
 ## Teil 2 — Review
 
 ### Rezept anwenden
 
-Lies das Rezept am übergebenen Pfad. Seinen Abschnitt für den Diff eines Tasks erkennst du
-an genau dieser Überschriftenzeile:
+Lies das Rezept am übergebenen Verweis mit `k_playbook_doc_read`. Seinen Abschnitt für den
+Diff eines Tasks erkennst du an genau dieser Überschriftenzeile:
 
 ```text
 ## Ergebnisform für den Diff eines Tasks
@@ -161,17 +177,17 @@ aufgabengebundenen Kriterien nimmst du von dort, die Prüfkriterien und Rule-IDs
 
 Fehlt dem Rezept — etwa einem projekteigenen Overlay — dieser Abschnitt oder darin die
 Einstufung, stufst du nicht selbst ein und greifst auf keinen anderen Review-Weg zurück: Es
-gilt der Abschnitt „Abbruch".
+gilt der Abschnitt „Abbruch“.
 
-- **Gegenstand** ist der vollständige Diff aus Teil 1, nicht der gekürzte Ausschnitt in der
-  Task-Datei.
-- **Maßstab** ist die Task-Beschreibung. Was `/k-task-run` und dieses Modul in die Datei
-  geschrieben haben — `## Fortschritt`, `## Ausführung` und alles darunter —, gehört nicht
-  dazu.
-- **Build und Tests.** Beleg sind die übergebenen Zeilen „Validierung". Fehlen sie oder
+- **Gegenstand** ist der vollständige Diff aus Teil 1, nicht der gekürzte Ausschnitt im
+  Task-Dokument.
+- **Maßstab** ist die Task-Beschreibung, gelesen mit `k_playbook_doc_read`. Was `/k-task-run`
+  und dieses Modul in das Dokument geschrieben haben — Fortschrittszeilen, `## Ausführung`
+  und alles darunter —, gehört nicht dazu.
+- **Build und Tests.** Beleg sind die übergebenen Zeilen „Validierung“. Fehlen sie oder
   decken sie die Validierung nicht ab, die der Task vorschreibt, führst du die dort
   vorgeschriebenen Prüfbefehle in der Ausführungswurzel selbst aus. Lässt sich ein solcher
-  Befehl nicht ausführen, steht das unter „Beleg für Build und Tests"; der Lauf bricht
+  Befehl nicht ausführen, steht das unter „Beleg für Build und Tests“; der Lauf bricht
   deshalb nicht ab.
 
 ### Abschnitt schreiben
@@ -180,7 +196,7 @@ gilt der Abschnitt „Abbruch".
 ### Review: Befunde
 
 **Umfang:** <ab Task-Beginn | nur seit Fortsetzung>  
-**Rezept:** `<Pfad des Rezepts>`  
+**Rezept:** `<Verweis des Rezepts>`  
 **Beleg für Build und Tests:** <übergeben | selbst ausgeführt: Befehl → Ergebnis | keiner — Grund>  
 **Ergebnis:** <n> kritisch, <n> wichtig, <n> Hinweis
 
@@ -190,9 +206,9 @@ gilt der Abschnitt „Abbruch".
 ```
 
 - Befunde in der Reihenfolge kritisch, wichtig, Hinweis; ohne Befunde statt der Tabelle
-  „Keine Befunde."
+  „Keine Befunde.“
 - Ein Befund zu Build oder Tests trägt statt `datei:zeile` den Prüfbefehl als Ort.
-- Die Zahlen unter „Ergebnis" stimmen mit der Tabelle überein.
+- Die Zahlen unter „Ergebnis“ stimmen mit der Tabelle überein.
 
 ### Rückgabe
 
@@ -203,21 +219,37 @@ Review: <n> kritisch, <n> wichtig, <n> Hinweis
 Umfang: ab Task-Beginn | nur seit Fortsetzung
 Kritisch:
   - <datei:zeile oder Prüfbefehl> — <ein Satz>
+Revision: <n>
 ```
 
-Ohne kritischen Befund lautet die dritte Zeile `Kritisch: keine`. „Umfang" wiederholt den
+Ohne kritischen Befund lautet die dritte Zeile `Kritisch: keine`. „Umfang“ wiederholt den
 übergebenen Umfang.
+
+**`Revision: <n>`** steht in jeder Rückgabe dieses Moduls — nach Teil 1 allein, nach Teil 2
+und beim Abbruch — und nennt die Revision des letzten eigenen Anhängens; wurde nichts
+angehängt, die übergebene. Damit setzt der Hauptkontext sein nächstes `since_revision`.
+Hat ein `k_playbook_doc_append` mit `foreign_change` geantwortet, steht statt `Revision: <n>`
+die Zeile
+
+```text
+Foreign-Change: <revision> <updatedBy> <updatedAt>
+```
+
+mit den Angaben aus der Antwort; der Sub-Agent hat dann nichts weiter geschrieben, und der
+Hauptkontext fragt den Nutzer, wer weitermacht.
 
 ## Abbruch
 
-Lässt sich das Review nicht abschließen — Teil 1 ist fehlgeschlagen, das Rezept fehlt am
-Pfad, ihm fehlt der Abschnitt oder darin die Einstufung —, schreibt der Sub-Agent keinen
-Abschnitt `### Review: Befunde` und gibt statt der Rückgabe oben genau eine Zeile zurück:
+Lässt sich das Review nicht abschließen — Teil 1 ist fehlgeschlagen, das Rezept ist am
+Verweis nicht lesbar, ihm fehlt der Abschnitt oder darin die Einstufung —, schreibt der
+Sub-Agent keinen Abschnitt `### Review: Befunde` und gibt statt der Rückgabe oben genau
+diese Zeilen zurück:
 
 ```text
 Abbruch: <Grund>
+Revision: <n>
 ```
 
-`/k-task-run` wertet jede Rückgabe, die nicht dem Format aus „Rückgabe" folgt, und jeden
+`/k-task-run` wertet jede Rückgabe, die nicht dem Format aus „Rückgabe“ folgt, und jeden
 Lauf ohne neuen Review-Abschnitt wie einen kritischen Befund (fail-closed). Ein Ersatz wie
 `Review: 0 kritisch, …` für ein nicht abgeschlossenes Review ist deshalb ausgeschlossen.

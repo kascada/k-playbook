@@ -392,6 +392,10 @@ installer/
 │   │                            ohne K_PLAYBOOK_SHARE_DIR, wenn der Projektordner vom
 │   │                            Host eingehängt ist (mountinfo), und bei ungültiger
 │   │                            Variable
+│   ├── health_anchor.go         Quelle anchor der Umgebungsprüfung: warnt, wenn der
+│   │                            Anker .k-playbook/K-PLAYBOOK.yaml im Worktree weder
+│   │                            versioniert noch ignoriert ist oder K-PLAYBOOK.yaml
+│   │                            am früheren Ort noch im Index steht (Task 106)
 │   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 Todos als Dokumente unter todos/ der Collection
 │   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
@@ -576,10 +580,27 @@ merkt sich Zeilennummern, weil die Herkunft einer Inventarzeile sie trägt.
 
 Der zentrale Mechanismus, in `project/discover.go`:
 
-1. Ab `startDir` aufwärts, ein Kandidat je Ebene: `<dir>/K-PLAYBOOK.yaml`.
+1. Ab `startDir` aufwärts, ein Kandidat je Ebene: `<dir>/.k-playbook/K-PLAYBOOK.yaml`
+   (`ConfigPath`).
 2. Fund: `ProjectDir = <dir>`, `PlaybookDir = <dir>/k-playbook`.
 3. Grenze sind `$HOME` und `/`, jeweils einschließlich.
 4. Nichts gefunden: `ErrNotFound`. Nicht raten, nichts anlegen.
+
+Der Anker ist die **Datei**, nicht das Verzeichnis `.k-playbook/`: Das Quell-Repo
+versioniert `.k-playbook/.gitignore`, jede Installation `k-playbook/` trägt das Verzeichnis
+also selbst, und die Link-Pflege (`sharelink.go`) legt es auch ohne Konfiguration an. Am
+Verzeichnis allein fände `Discover` ein Projekt in der Installation.
+
+**Umzug vom früheren Ort.** Bis 2026-11 lag der Anker als `<dir>/K-PLAYBOOK.yaml` direkt
+im Hauptverzeichnis (`legacyConfigPath`). `Discover` ruft vor der Prüfung jeder Ebene
+`migrateConfig`: Liegt am neuen Ort schon eine Datei, wird die alte gelöscht (bei einem
+Symlink nur der Link); sonst wird sie verschoben (bei einem Symlink die Datei, auf die er
+zeigt, und der Link entfernt). `CreateConfig` zieht ebenso um, bevor es anlegt. Es gibt
+keine Phase, in der beide Orte gelesen werden — ein Release genügt, und ein älteres
+Programm findet ein umgezogenes Projekt nicht mehr; jede Umgebung des Projekts braucht dann
+das neue. Die Quelle `anchor` der Umgebungsprüfung meldet, wenn der Umzug im Index noch
+nicht nachvollzogen ist (siehe „Umgebungsprüfung: `health`“). `bin/k-check` liest nur den
+neuen Ort.
 
 **Die Suche darf nicht am Git-Worktree-Root abbrechen.** `<projekt>/k-playbook/` ist ein
 eigener Clone und damit ein eigener Worktree; wer von dort aus sucht, käme sonst nie an
@@ -591,8 +612,8 @@ Es gibt **keine Fallunterscheidung** zwischen Entwicklungsrepo und Zielprojekt. 
 tragen ihre eigene `K-PLAYBOOK.yaml` und werden gleich behandelt. Der einzige Unterschied
 ist installiert oder nicht — siehe `Environment` in `project/environment.go`.
 
-Für das Entwicklungsrepo heißt das: der Anker ist `<repo>/K-PLAYBOOK.yaml`, die
-Installation liegt darunter in `<repo>/k-playbook/` und ist ein eigener Clone. Es gibt das
+Für das Entwicklungsrepo heißt das: der Anker ist `<repo>/.k-playbook/K-PLAYBOOK.yaml`
+(dort ignoriert, nicht versioniert), die Installation liegt darunter in `<repo>/k-playbook/` und ist ein eigener Clone. Es gibt das
 Playbook dort also zweimal — den Arbeitsstand im Repo und die installierte Fassung
 daneben. Dass beide auseinanderlaufen können, wird bewusst in Kauf genommen; gearbeitet
 wird am Repo-Stand, aufgelöst wird gegen die Installation.
@@ -3690,6 +3711,20 @@ MCP —, die anderen fänden einen stimmenden Link. Deshalb warnt sie nur im Con
 Abhilfe hingehört; auf dem Host bleibt sie still. Daneben meldet sie eine ungültige Variable,
 auf jedem Rechner.
 
+Die Quelle `anchor` (`project/health_anchor.go`, Task 106) meldet den Stand des Ankers
+`.k-playbook/K-PLAYBOOK.yaml` im Repository, als `warning` mit zwei Befunden: Der Anker liegt
+in einem Git-Worktree und ist dort weder versioniert (`ls-files --error-unmatch`) noch
+ignoriert (`check-ignore`) — ein Zustand, der auch ein frisches Projekt vor dem ersten Commit
+und einen absichtlich lokalen Anker trifft, deshalb nennt die Abhilfe beide Wege, `git add`
+und `.gitignore`. Und: Am früheren Ort, `K-PLAYBOOK.yaml` direkt im Hauptverzeichnis, steht
+noch eine Datei im Index, obwohl `Discover` sie beim ersten Aufruf des neuen Programms nach
+`.k-playbook/` gezogen hat (`migrateConfig`); nur dieser Befund spricht vom Umzug, Abhilfe
+`git rm --cached` und den Umzug committen. Die Quelle spricht nur bei positivem Befund: ohne
+Git, außerhalb eines Worktrees, bei `project.vcs` ungleich `git`, bei ignoriertem Anker (das
+Quell-Repo) und bei jedem Git-Fehler bleibt sie still. Sie nutzt dafür die Kette von
+`mcpGitTracked` (siehe „Registrierung“ im Abschnitt zu den MCP-Einträgen, `mcpTargetTracked()`),
+die genau diese Fälle schon auseinanderhält.
+
 Im Klartext des Briefings steht der Block unmittelbar nach dem Text der immer geltenden
 Anweisungen und vor „Auf Abruf“, damit die Sitzung ihn liest, bevor sie etwas tut: ohne
 Problem die eine Zeile `Umgebung: keine Probleme`, sonst `Umgebung:` und je Eintrag
@@ -4079,7 +4114,7 @@ richtet ein, sie räumt nicht ab.
 #### Die Bedingung, die bleibt
 
 Der eingetragene Pfad sagt, welches Binary startet — nicht, welches Projekt gemeint ist.
-Der Server löst das zur Laufzeit über die Aufwärtssuche nach `K-PLAYBOOK.yaml` ab seinem
+Der Server löst das zur Laufzeit über die Aufwärtssuche nach `.k-playbook/K-PLAYBOOK.yaml` ab seinem
 Arbeitsverzeichnis auf, und das ist das des Assistenten. Weicht `Environment.SearchedFrom`
 von `Environment.ProjectDir` ab, wurde schon die Oberfläche nicht im Hauptverzeichnis
 gestartet; dann zeigt `GET /api/mcp` `workdirMismatch` und der Hinweis wird deutlich

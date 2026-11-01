@@ -86,8 +86,8 @@ from the output above — never from configuration, and never by searching.
 
 | Artifact | Path |
 |---|---|
-| tasks | `<local.dir>/tasks/` |
-| completed tasks | `<local.dir>/tasks/done/` |
+| tasks | `keph:/user/~/tasks/` in der Projekt-Collection, ein Dokument je Task; Form nach `k-playbook:/instructions/on-demand/tasks.md`. Der bisherige Ort `<local.dir>/tasks/` wird nicht mehr beschrieben; `/k-upgrade` (3.3) zieht ihn um |
+| completed tasks | `keph:/user/~/tasks/done/` — `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | todo | über `/k-todo` bzw. das Subkommando `k-playbook todo`; die Ablage besitzt Go |
 | project documentation | `keph:/docs/` — in der Projekt-Collection, nicht unter `local.dir`; das Briefing nennt den Einstieg unter `Projektdoku`, gelesen mit Kephalaion `list` (`recursive`, `frontmatter`), ohne Kephalaion nicht erreichbar |
 | code documentation | `<local.dir>/docs/code/` — entsteht beim ersten Lauf von `/k-docs-code` oder des Skills `ks-overlay-repo-analyse` |

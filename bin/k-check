@@ -80,7 +80,7 @@ class CheckResult:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config-root", default=".", help="Root that contains K-PLAYBOOK.yaml.")
+    parser.add_argument("--config-root", default=".", help="Project root that contains .k-playbook/K-PLAYBOOK.yaml.")
     parser.add_argument(
         "--target-root",
         help="Root to scan. Defaults to --config-root. Relative paths are resolved against --config-root.",
@@ -138,7 +138,9 @@ def read_k_playbook(config_root: Path) -> dict[str, object]:
     Nested keys are flattened with dots, so `project.repo_root` is reachable
     directly.
     """
-    config_path = config_root / "K-PLAYBOOK.yaml"
+    # The binary moves a K-PLAYBOOK.yaml from the project root into .k-playbook/
+    # before anything reads it; this runner only knows the new place.
+    config_path = config_root / ".k-playbook" / "K-PLAYBOOK.yaml"
     if not config_path.exists():
         return {}
 
@@ -350,7 +352,7 @@ def unique_paths(paths) -> list[Path]:
 def local_checks_dir(config_root: Path, config: dict[str, object]) -> Path | None:
     """Project-local checks directory.
 
-    Its place is fixed by the layout: next to the K-PLAYBOOK.yaml, under
+    Its place is fixed by the layout: in the project root, under
     k-playbook-local/checks/. There is no configured path any more — a value that
     is always the same would only be a source of error.
     """
@@ -571,8 +573,8 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, object]]:
     if args.target_root:
         target_root = expand_path(args.target_root, config_root)
     else:
-        # With schema_version 2 the config lives in <project>/k-playbook/, so the code
-        # root is project.repo_root relative to it, normally "..".
+        # project.repo_root is relative to the project root, the directory that holds
+        # .k-playbook/K-PLAYBOOK.yaml -- not to the file itself. Normally ".".
         repo_root = config.get("project.repo_root")
         target_root = (config_root / repo_root).resolve() if isinstance(repo_root, str) and repo_root else config_root
     if not target_root.is_dir():

@@ -20,7 +20,7 @@ Tasks can also be read in the interface, on the **Tasks** page of the Workflows 
 
 The command:
 
-- derives the location from the position of `K-PLAYBOOK.yaml`.
+- derives the location from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`.
 - determines the next available number from open tasks and `done/`.
 - creates a filename such as `014-audiosocket-server.md`.
 - includes relevant references and special tools in the task file.

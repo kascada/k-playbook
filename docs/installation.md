@@ -51,7 +51,8 @@ It also proposes where the project repository is located, either the project roo
 
 ```text
 project/
-├── K-PLAYBOOK.yaml     the anchor; its location determines the project root
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml the anchor; the directory holding .k-playbook/ is the project root
 └── k-playbook/         the installation
 ```
 
@@ -128,7 +129,7 @@ project/
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
-It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it, and when it replaces an obsolete wrapper entry in a tracked file, it writes the bare name itself. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, where `K-PLAYBOOK.yaml` is located.
+It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it, and when it replaces an obsolete wrapper entry in a tracked file, it writes the bare name itself. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, the directory where `.k-playbook/K-PLAYBOOK.yaml` is located.
 
 Both files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
 
@@ -315,7 +316,7 @@ k-playbook
 
 This is not an additional everyday step, but the same call with which a session starts anyway.
 
-`k-playbook/` contains no project-owned content and is therefore completely replaceable, including by `rm -rf` and a new clone. `K-PLAYBOOK.yaml` and `k-playbook-local/` sit alongside it and remain untouched.
+`k-playbook/` contains no project-owned content and is therefore completely replaceable, including by `rm -rf` and a new clone. `.k-playbook/K-PLAYBOOK.yaml` and `k-playbook-local/` sit next to it in the main directory and remain untouched.
 
 At every interface startup, an existing installation is also set read-only. This is only a local protection layer against accidental writes; the update deliberately and temporarily lifts it.
 
@@ -357,7 +358,7 @@ Anyone carrying forward a project from one of the first versions will eventually
 K-PLAYBOOK.yaml has schema_version 1 and describes a retired model ...
 ```
 
-This is not an error in the project, but the consequence of a deliberate separation: the installation updates itself through `git pull`, while `K-PLAYBOOK.yaml` sits beside it and is never overwritten because it belongs to the project. At some point the tool is three models ahead while the file is still at the first. It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_version) explains why), but it can be reset.
+This is not an error in the project, but the consequence of a deliberate separation: the installation updates itself through `git pull`, while `.k-playbook/K-PLAYBOOK.yaml` sits beside it and is never overwritten because it belongs to the project. At some point the tool is three models ahead while the file is still at the first. It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_version) explains why), but it can be reset.
 
 Start the interface: the **Project configuration** section then appears again, names the found version and the model it describes, and offers **Reset and create again**. It:
 
@@ -621,7 +622,7 @@ The installation is write-protected. `make -C k-playbook installer-writable` mak
 
 Checklist for a project:
 
-- [ ] `K-PLAYBOOK.yaml` is in the project root, not in `k-playbook/`.
+- [ ] `.k-playbook/K-PLAYBOOK.yaml` is in the project root, not in `k-playbook/`. A `K-PLAYBOOK.yaml` directly in the project root is the former place; the tool moves it on its first call ([`k-playbook-format.md`](./k-playbook-format.md#finding-the-anchor)).
 - [ ] `schema_version: 3` is set.
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
@@ -645,7 +646,7 @@ The final item checks all preceding items at once: the command stops if configur
 
 **`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The interface resets it; see [A configuration from a retired model](#a-configuration-from-a-retired-model). If it is higher, the reverse is true: the installation is behind. Then `git pull` in `k-playbook/` helps, not a reset, which would discard the newer file.
 
-**The tool finds no project.** Then `K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location.
+**The tool finds no project.** Then `.k-playbook/K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location. One more cause: a program older than the move of the anchor into `.k-playbook/` (2026-11) does not find a project whose anchor has already moved. After the first call of the new program, every environment of the project -- a second machine, a DevContainer, a colleague's checkout -- needs the new program; `k-playbook upgrade` installs it.
 
 **An assistant sees foreign commands.** Typical after an installation from the old model: host-global symlinks apply to every project. Start the interface once; it removes them and reports what was removed.
 

@@ -10,8 +10,8 @@ Jeder Check wird mit seiner Herkunft ausgewiesen: `dist`, `local` oder `override
 
 Der Runner trennt zwei Roots:
 
-- `--config-root`: das k-playbook-Verzeichnis mit `K-PLAYBOOK.yaml`, also `<projekt>/k-playbook`.
-- `--target-root`: Codebaum, der gescannt wird. Default ist `project.repo_root` aus der Config, normalerweise das Projektverzeichnis über dem k-playbook-Verzeichnis.
+- `--config-root`: das Hauptverzeichnis des Projekts, in dem `.k-playbook/K-PLAYBOOK.yaml` liegt.
+- `--target-root`: Codebaum, der gescannt wird. Default ist `project.repo_root` aus der Config, aufgelöst gegen das Hauptverzeichnis — normalerweise `.`, also das Hauptverzeichnis selbst.
 
 ## Aufruf
 
@@ -23,7 +23,7 @@ Der Runner trennt zwei Roots:
 <playbook.dir>/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/k-playbook-local/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/k-playbook-local/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Config-Root ist standardmäßig das aktuelle Arbeitsverzeichnis; dort liegt die `K-PLAYBOOK.yaml`. Lokale Checks liegen fest unter `k-playbook-local/checks/`. Der Target-Root ergibt sich aus `project.repo_root`. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
+Der Config-Root ist standardmäßig das aktuelle Arbeitsverzeichnis; dort liegt `.k-playbook/K-PLAYBOOK.yaml`. Lokale Checks liegen fest unter `k-playbook-local/checks/`. Der Target-Root ergibt sich aus `project.repo_root`. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
 
 `--output <file>` schreibt die vollständige Runner-Ausgabe zusätzlich zu stdout/stderr in eine Raw-Datei. `--metadata-output <file>` schreibt Run-Metadaten als JSON, inklusive Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfügbar. Beide Optionen verweigern vorhandene Ziel-Dateien, damit auditierbare Artefakte nicht still überschrieben werden. Für Review-Läufe gehören diese Artefakte unter `<reviews>/results/k-check/YYYY-MM-DD/`.
 
@@ -57,7 +57,7 @@ Checks prüfen ihre Anwendbarkeit selbst: Sprache vorhanden, Tool installiert, r
 
 Checks bekommen diese Umgebungsvariablen:
 
-- `K_CHECK_CONFIG_ROOT` — Root mit `K-PLAYBOOK.yaml`.
+- `K_CHECK_CONFIG_ROOT` — Hauptverzeichnis mit `.k-playbook/K-PLAYBOOK.yaml`.
 - `K_CHECK_PLAYBOOK_DIR` — das Playbook-Verzeichnis, aus dem der Runner stammt
   (`<playbook.dir>`). Ein Check unter `k-playbook-local/checks/` kann es aus seinem
   eigenen Ort nicht ableiten.

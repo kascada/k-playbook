@@ -304,7 +304,7 @@ Nutze diese Quellen als Constraints, nicht als Anlass für ein separates `/k-rev
 Wichtig:
 
 - `catalogs.reviews` ist in diesem Command nur Referenz für mögliche Folge-Schritte, nicht der Default-Executor.
-- keine Dateien unter `<local.dir>/results/` oder `<local.dir>/tasks/` schreiben.
+- keine Dateien unter `<local.dir>/results/` schreiben und keine Tasks anlegen.
 - nur read-only Kommandos und Analyse.
 
 ### 6.2 — PR-Scope klassifizieren

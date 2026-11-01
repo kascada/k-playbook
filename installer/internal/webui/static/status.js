@@ -46,6 +46,8 @@ const ENVIRONMENT_AREA_LABELS = {
   "baseTools": "Basis-Werkzeuge",
   "versionSources": "Versionsinventar",
   "github": "GitHub-Zugänge",
+  "share": "Mitgelieferte Dateien",
+  "anchor": "Anker",
 };
 
 const environmentElements = {

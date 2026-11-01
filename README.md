@@ -87,7 +87,8 @@ playbook. Nothing is written before you confirm:
 
 ```text
 project/
-├── K-PLAYBOOK.yaml     the anchor; its location determines the main directory
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml the anchor; the directory holding .k-playbook/ is the main directory
 └── k-playbook/         the installation
 ```
 
@@ -104,7 +105,8 @@ installs it with `k-playbook vscode install`. See [`docs/vscode.md`](./docs/vsco
 
 ```text
 project/
-├── K-PLAYBOOK.yaml       the anchor
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml   the anchor
 ├── AGENTS.md             instructions, one source for all assistants
 ├── CLAUDE.md             include file holding the line @AGENTS.md; the direction is fixed
 ├── .claude/
@@ -265,7 +267,7 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 - Every project carries its own installation in a subdirectory. No fixed host path, no global symlink.
 - Installation and project ownership are strictly separated: `k-playbook/` is fully replaced on every update, everything beside it is never touched.
 - Shipped rules, reviews and checks are not edited. A project deviates by overlay: a local file of the same name replaces completely, an empty one disables.
-- Paths are not part of the configuration. They follow from the location of `K-PLAYBOOK.yaml`.
+- Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
 - Tasks, reviews and results stay project-owned artifacts under `k-playbook-local/`.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
 - The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.

@@ -23,10 +23,9 @@ func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 	t.Helper()
 	store := inventoryStore(t)
 
-	source, err := filepath.Abs(filepath.Join("..", "inventory", "testdata", "projekte", name))
-	if err != nil {
-		t.Fatalf("Fixture auflösen: %v", err)
-	}
+	// Relativ zum Paketverzeichnis (TestMain), nicht zum Arbeitsverzeichnis:
+	// das Paket läuft in einem leeren Temp-Verzeichnis.
+	source := filepath.Join(packageDir, "..", "inventory", "testdata", "projekte", name)
 	root := filepath.Join(t.TempDir(), name)
 	if resolved, err := filepath.EvalSymlinks(filepath.Dir(root)); err == nil {
 		root = filepath.Join(resolved, name)

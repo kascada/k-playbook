@@ -11,7 +11,7 @@ einzige Aufgabe; die jeweilige steckt im Subkommando.
 ```bash
 k-playbook                          # öffnet die Oberfläche im Browser
 k-playbook config create
-                                     # legt K-PLAYBOOK.yaml im aktuellen Verzeichnis an
+                                     # legt .k-playbook/K-PLAYBOOK.yaml im aktuellen Verzeichnis an
 k-playbook briefing                 # was für dieses Projekt gilt und was ansteht — der Einstieg jeder Sitzung
 k-playbook upgrade [--check]        # Programm aktualisieren und das Projekt nachziehen
 k-playbook context                  # gibt den aufgelösten Arbeitsstand als JSON aus (wird abgebaut)
@@ -54,7 +54,7 @@ ohnehin nur die gestartet wird.
 
 | Schritt | Ergebnis |
 |---|---|
-| Konfiguration anlegen | `K-PLAYBOOK.yaml` im Hauptverzeichnis |
+| Konfiguration anlegen | `.k-playbook/K-PLAYBOOK.yaml` im Hauptverzeichnis |
 | Projekteigene Struktur anlegen | `k-playbook-local/` mit READMEs je Verzeichnis |
 | Assistenten verlinken | `.claude/`, `.opencode/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 | VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |

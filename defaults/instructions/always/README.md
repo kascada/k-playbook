@@ -56,3 +56,7 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
 - `200-befunde-festhalten.md`: Erkenntnisse aus Analyse und Fehlersuche festhalten.
 - `210-workbench.md`: Den Stand eines laufenden Vorhabens in der Workbench führen. Steht
   hinter den Befunden, weil beide sagen, was eine Sitzung während der Arbeit festhält.
+- `300-arbeiten-in-tasks.md`: Was über einen trivialen Einzelschritt hinausgeht, wird ein
+  Task in `keph:/user/~/tasks/` — `/k-task-create`, `/k-task-refine`, `/k-task-run`. Steht
+  hinter Befunden und Workbench, weil es sagt, wie Arbeit ihren Weg nimmt, nachdem klar ist,
+  was festgehalten wird; die Form eines Tasks liegt in `on-demand/tasks.md`.

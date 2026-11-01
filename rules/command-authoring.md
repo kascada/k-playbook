@@ -165,6 +165,14 @@ Sie gilt für die Verzeichnisse, die das Einrichten anlegt — die aus `LocalStr
 **Sein eigenes Erzeuger-Verzeichnis legt ein Command ohne Rückfrage an**: dass es vor dem
 ersten Lauf fehlt, ist der Normalzustand, keine kaputte Installation.
 
+Eine Ausnahme von dieser Politik gibt es nicht mehr. Die Task-Commands (`/k-task-create`,
+`/k-task-refine`, `/k-task-run`, `/k-remediation`) hatten eine: Ohne Task-Verzeichnis brachen
+sie ab, statt nach dem Anlegen zu fragen. Tasks liegen heute in der Projekt-Collection
+(`keph:/user/~/tasks/`, `k-playbook:/instructions/on-demand/tasks.md`) und brauchen kein
+Verzeichnis unter `local.dir`; sie brauchen die Collection. Steht `context.kephalaion.ok`
+nicht auf `true`, bricht der Command mit `context.kephalaion.message` ab — das ist keine
+Frage nach einem Verzeichnis, und es gibt keinen Rückfall auf die Platte.
+
 ## Schluss
 
 Auf den letzten Schritt folgen zwei Sektionen, beide optional, in dieser Reihenfolge:

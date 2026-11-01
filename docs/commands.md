@@ -2,7 +2,7 @@
 
 Compact index of slash commands. Detailed flows are on dedicated topic pages; this page does not duplicate them.
 
-Shipped rules, review recipes, and checks are under `k-playbook/`; the shipped commands and skills are unpacked by the binary into `~/.local/share/k-playbook/` and linked through `.k-playbook/share` (source in the repo: `share/`). `k-playbook-local/` contains project-owned content: the same five kinds, plus tasks and results. Both locations derive from the location of `K-PLAYBOOK.yaml`; there are no configured paths anymore.
+Shipped rules, review recipes, and checks are under `k-playbook/`; the shipped commands and skills are unpacked by the binary into `~/.local/share/k-playbook/` and linked through `.k-playbook/share` (source in the repo: `share/`). `k-playbook-local/` contains project-owned content: the same five kinds, plus tasks and results. Both locations derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`; there are no configured paths anymore.
 
 A project-owned command with the name of a shipped command **replaces** it; an empty one disables it. This page lists the shipped commands; the assistants section in the interface shows what actually applies in a particular project.
 
@@ -81,7 +81,7 @@ Tasks arise directly from the conversation or from `/k-remediation`. In both cas
 
 ## Where commands find their targets
 
-No command reads or guesses a path. Everything derives from the location of `K-PLAYBOOK.yaml`:
+No command reads or guesses a path. Everything derives from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`:
 
 | Command | writes to |
 |---|---|

@@ -687,7 +687,7 @@ manual path; MCP is intended for chat orchestration without shelling out to the
 | `k_playbook_review_merge` | write `review-input.json` and `review-input.md` | `k-playbook merge <lauf>` |
 | `k_playbook_review_write_ai_entry` | write an AI entry's status | no CLI equivalent |
 
-All tools require `projectDir`, search upward from there for `K-PLAYBOOK.yaml`, and return
+All tools require `projectDir`, search upward from there for `.k-playbook/K-PLAYBOOK.yaml`, and return
 structured JSON envelopes. Errors are domain tool results with `ok: false`, not MCP
 protocol errors. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and
 nothing is executed; a `projectDir` that leads to no project is `project_not_found` (see

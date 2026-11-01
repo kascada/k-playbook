@@ -36,6 +36,12 @@ var (
 	builtPrograms = map[string]string{}
 )
 
+// packageDir ist das Verzeichnis dieses Pakets, festgehalten in TestMain,
+// bevor die Tests das Arbeitsverzeichnis verlassen. Alles, was relativ zum
+// Modul liegt — die Fixtures des Inventars, der Bau des Programms —, geht
+// von hier aus, nicht vom Arbeitsverzeichnis.
+var packageDir string
+
 func TestMain(m *testing.M) {
 	// Kein Test liest das ~/.local/share/k-playbook dieses Rechners; wer
 	// mitgelieferte Commands braucht, legt sie mit sharetest.Dir an. Und
@@ -52,7 +58,29 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	// Kein Test läuft im Verzeichnis dieses Pakets. Die Handler suchen das
+	// Projekt ab dem Arbeitsverzeichnis aufwärts (project.Detect), und das
+	// Paketverzeichnis liegt in einem echten k-playbook-Projekt — dem
+	// Quell-Repo. Ein Test ohne eigenes chdir fände dessen Anker und zöge
+	// ihn um (Discover migriert vor jeder Prüfung). Deshalb läuft das Paket
+	// in einem leeren Temp-Verzeichnis, in dem die Suche nichts findet.
+	packageDir, err = os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	workDir, err := os.MkdirTemp("", "k-playbook-webui-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := os.Chdir(workDir); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	code := m.Run()
+	_ = os.Chdir(packageDir)
+	_ = os.RemoveAll(workDir)
 	cleanupGitHub()
 	cleanupShare()
 	if buildDir != "" {
@@ -85,6 +113,9 @@ func buildProgram(t *testing.T, version string) string {
 	cmd := exec.Command(goBinary, "build", "-trimpath", "-buildvcs=false",
 		"-ldflags", "-X github.com/kascada/k-playbook/installer/internal/buildinfo.Version="+version,
 		"-o", output, "github.com/kascada/k-playbook/installer/cmd/k-playbook")
+	// Im Paketverzeichnis, nicht im Arbeitsverzeichnis der Tests (TestMain):
+	// außerhalb des Moduls kennt go build das Paket nicht.
+	cmd.Dir = packageDir
 	cmd.Env = buildEnviron
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Programm bauen: %v\n%s", err, out)

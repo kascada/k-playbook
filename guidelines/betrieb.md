@@ -34,8 +34,8 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 
 | Was | Wohin | Wer legt es ab |
 |---|---|---|
-| Task, offen | `tasks/<NNN>-<slug>.md` | `/k-task-create`, `/k-remediation` |
-| Task, erledigt | `tasks/done/<NNN>-<slug>.md` | `/k-task-run` verschiebt sie dorthin |
+| Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task, nicht unter `local.dir` | `/k-task-create`, `/k-remediation` über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
+| Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | Kurznotiz, unsortiert | `data/todos.json` | `/k-todo`, `k-playbook todo`, die Oberfläche |
 | Review- und Audit-Lauf | `results/<YYYY-MM-DD>/` bzw. `results/<familie>/<YYYY-MM-DD>/` | `/k-review`, `/k-audit` |
 | Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
@@ -76,8 +76,8 @@ den falschen Nachzug.
 
 ## Namen
 
-- **Tasks** tragen eine dreistellige Nummer, fortlaufend über `tasks/` **und**
-  `tasks/done/` hinweg: `047-basis-tools-review-fixes.md`.
+- **Tasks** tragen eine dreistellige Nummer, die k-playbook beim Anlegen vergibt; die
+  Nummernregel steht in `k-playbook:/instructions/on-demand/tasks.md`, nur dort.
 - **Doku aus Erzeugern** trägt eine zweistellige Nummer für die Lesereihenfolge:
   `00-overview.md`, `01-stack.md`.
 - **Review-Rezepte** heißen `review-<name>.md`, sonst findet der Katalog sie nicht.

@@ -12,7 +12,7 @@ If you only want to know whether everything is correct, open the interface and l
 
 ## Must I call `/k-gui` from a particular directory?
 
-Preferably from the project you mean. Starting at the working directory, the tool searches upwards for `K-PLAYBOOK.yaml` and uses the first match as the project root.
+Preferably from the project you mean. Starting at the working directory, the tool searches upwards for `.k-playbook/K-PLAYBOOK.yaml` and uses the directory of the first match as the project root.
 
 If it finds nothing, for example immediately after cloning, it does not guess. Instead, it proposes a location and lets you confirm it. The strongest indication is the Git repository in which the command is called: whoever starts the tool is usually in the project they mean.
 
@@ -36,18 +36,21 @@ Without a destination argument, the name is derived from the repository name and
 
 Because `k-playbook/` is completely replaced with every update. Everything owned by the project must sit beside it, otherwise it would be gone after the next `git pull`.
 
-Therefore, `K-PLAYBOOK.yaml` and `k-playbook-local/` are in the project root:
+Therefore, `.k-playbook/K-PLAYBOOK.yaml` and `k-playbook-local/` are in the project root:
 
 ```text
 project/
-├── K-PLAYBOOK.yaml        the anchor
+├── .k-playbook/
+│   └── K-PLAYBOOK.yaml    the anchor
 ├── k-playbook/            replaceable
 └── k-playbook-local/      project-owned
 ```
 
+Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The tool moves such a file into `.k-playbook/` on its first call; an older program then no longer finds the project, so every environment of the project needs the new program.
+
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the location of `K-PLAYBOOK.yaml`. Tasks are under `k-playbook-local/tasks/`, results under `k-playbook-local/results/`, and shipped rules under `k-playbook/rules/`.
+Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Tasks are under `k-playbook-local/tasks/`, results under `k-playbook-local/results/`, and shipped rules under `k-playbook/rules/`.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 

@@ -929,8 +929,17 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
       inside `k-playbook/`, and link maintenance creates `.k-playbook/` without any
       configuration. The file name is open. The path is built only in `project.ConfigPath`
       and checked in `project.Discover`; `bin/k-check` reads it on its own. Older binaries do
-      not find a moved anchor, so it takes two releases: first read both places, the new one
-      first, then move in `Discover`. In this repo `K-PLAYBOOK.yaml` is a symlink into
-      `k-playbook-local/`, which a plain rename would break.
+      not find a moved anchor. Decided 2026-11-01: one release, not two, because nobody else
+      uses k-playbook yet -- there is no phase reading both places. `Discover` moves before it
+      checks a level (`migrateConfig`): a file already at the new place wins and the old one is
+      deleted (a symlink: only the link), otherwise the old one is moved (a symlink: its target,
+      and the link removed). Status 2026-11-01 (task 106): built in `discover.go`, `CreateConfig`
+      moves too, tests in `discover_test.go`; the webui tests no longer run in the package
+      directory, so no test touches this repo's anchor (marker check over all packages); the
+      environment check has a source `anchor` that warns when `.k-playbook/K-PLAYBOOK.yaml` is
+      neither tracked nor ignored or the former place is still in the index; the docs name the
+      new place everywhere. In this repo `.k-playbook/K-PLAYBOOK.yaml` is ignored, and a bridge
+      link `K-PLAYBOOK.yaml` -> `.k-playbook/K-PLAYBOOK.yaml` serves the old installed program
+      until the new one removes it on its first call.
     - Open: an inventory of what lies in `k-playbook-local/` today, split into versioned
       (moves out) and unversioned (stays). Not yet planned.

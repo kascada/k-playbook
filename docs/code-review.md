@@ -109,7 +109,7 @@ Without an argument, the command shows the effective recipe set from `k-playbook
 
 The command:
 
-- derives locations from the position of `K-PLAYBOOK.yaml`.
+- derives locations from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`.
 - writes the log and results to `k-playbook-local/results/`.
 - separates the generic flow from concrete review criteria.
 - lets project-owned recipes completely replace shipped recipes with the same filename.
