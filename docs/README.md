@@ -80,6 +80,7 @@ questions and the ordered work list.
 - `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
 - `Kephalaion client` / `name_taken` / `rename` / `replica lag` / `request_id` / `replayed` / `outcome_unknown` / `kephalaion_unavailable` -> [`kephalaion-client.md`](./kephalaion-client.md)
 - `user area` / `user/<name>/` / `workbench` / `queue/findings/` / `k_playbook_doc_create` / `k_playbook_doc_list` / `k_playbook_doc_done` / `k_playbook_doc_reopen` / `k-playbook doc` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`knowledge-aktuell.md`](./knowledge-aktuell.md)
+- `k_playbook_doc_append` / `k_playbook_doc_replace` / `k_playbook_doc_set_field` / `k_playbook_doc_grep` / `since_revision` / `foreign_change` / `k-playbook doc append` -> [`mcp.md`](./mcp.md#changing-and-searching-documents)
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](./installation.md#github-cli), [`k-playbook-format.md`](./k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](./local-github-ssh.md), [`github-access.md`](./github-access.md#ssh-key-or-host)
 - `github.yaml` / `GitHub access file` / `service` / `k-playbook github` / `K_PLAYBOOK_GITHUB_CONFIG` / `health github` / `availability` / `k_playbook_github_test` / `/github-access` -> [`github-access.md`](./github-access.md), [`mcp.md`](./mcp.md#github-test-contract), [`mcp.md`](./mcp.md#health-contract)

@@ -270,13 +270,16 @@ func (k DocKind) match(name string) (docMatch, bool) {
 }
 
 // DocStore sind die Aufrufe an Kephalaion, die die doc-Werkzeuge brauchen.
-// *kephalaion.Client erfüllt sie; Tests setzen eine Fälschung ein. Create
-// und Rename tragen je Aufruf einen eigenen request_id und wiederholen nach
-// offenem Ausgang selbst, genau einmal mit demselben Schlüssel; was dann noch
-// offen ist, kommt als kephalaion.CodeOutcomeUnknown.
+// *kephalaion.Client erfüllt sie; Tests setzen eine Fälschung ein. Create,
+// Write und Rename tragen je Aufruf einen eigenen request_id und wiederholen
+// nach offenem Ausgang selbst, genau einmal mit demselben Schlüssel; was dann
+// noch offen ist, kommt als kephalaion.CodeOutcomeUnknown. Read und Write
+// brauchen die Änderungsoperationen (docedit.go) und grep über eine Sorte.
 type DocStore interface {
 	List(ctx context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error)
+	Read(ctx context.Context, name string) (kephalaion.ReadResult, error)
 	Create(ctx context.Context, name, content string) (kephalaion.Document, error)
+	Write(ctx context.Context, name, content string, baseRevision int64) (kephalaion.Document, error)
 	Rename(ctx context.Context, name, newName string) (kephalaion.Document, error)
 }
 
@@ -713,6 +716,9 @@ type DocMoved struct {
 	// From ist der alte Verweis, ~ schon ersetzt.
 	From string `json:"from"`
 	Kind string `json:"kind"`
+	// Revision ist die Revision nach dem Verschieben (rename erzeugt eine
+	// neue), damit ein Aufrufer danach mit since_revision weiterschreibt.
+	Revision int64 `json:"revision"`
 }
 
 // Done verschiebt ein eigenes Dokument aus der Ablage nach done/.
@@ -736,23 +742,8 @@ func (u *UserDocs) move(ctx context.Context, raw string, toDone bool) (DocMoved,
 	if ref.Dir || ref.Path == "" {
 		return DocMoved{}, docRefErrorf(DocCodeInvalidInput, "%s: ein Verzeichnis lässt sich nicht verschieben, erwartet ein Dokument", ref.Raw)
 	}
-	segments := strings.Split(ref.Path, "/")
-	for i, segment := range segments {
-		if segment == docUserSegment {
-			segments[i] = u.user
-		}
-	}
-	name := strings.Join(segments, "/")
-
-	var kind DocKind
-	var m docMatch
-	found := false
-	for _, candidate := range u.kinds {
-		if cm, ok := candidate.match(name); ok {
-			kind, m, found = candidate, cm, true
-			break
-		}
-	}
+	name := u.expandUser(ref.Path)
+	kind, m, found := u.matchKind(name)
 	if found && kind.OwnTools {
 		return DocMoved{}, ownToolsError(kind)
 	}
@@ -786,5 +777,5 @@ func (u *UserDocs) move(ctx context.Context, raw string, toDone bool) (DocMoved,
 	if doc.Name != "" {
 		to = doc.Name
 	}
-	return DocMoved{Ref: DocSchemeKeph + ":/" + to, From: DocSchemeKeph + ":/" + from, Kind: kind.Kind}, nil
+	return DocMoved{Ref: DocSchemeKeph + ":/" + to, From: DocSchemeKeph + ":/" + from, Kind: kind.Kind, Revision: doc.Revision}, nil
 }

@@ -183,8 +183,52 @@ func deref(value *string) string {
 // memDocStore ist ein Kephalaion im Speicher für die Hüllen-Tests.
 type memDocStore struct {
 	docs map[string]string
-	// writeFail lässt create und rename mit diesem Fehler scheitern.
+	// writeFail lässt create, write und rename mit diesem Fehler scheitern.
 	writeFail error
+	// content und revs tragen Inhalt und Revision je Dokument, rev die
+	// letzte vergebene Revision.
+	content map[string]string
+	revs    map[string]int64
+	rev     int64
+}
+
+func (s *memDocStore) Read(_ context.Context, name string) (kephalaion.ReadResult, error) {
+	by, ok := s.docs[name]
+	if !ok {
+		return kephalaion.ReadResult{Kind: kephalaion.ReadKindNone, Name: name}, nil
+	}
+	content := s.content[name]
+	return kephalaion.ReadResult{Kind: kephalaion.ReadKindDocument, Name: name, Revision: s.revision(name), Content: &content,
+		Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: by}}, nil
+}
+
+func (s *memDocStore) Write(_ context.Context, name, content string, base int64) (kephalaion.Document, error) {
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
+	if _, ok := s.docs[name]; !ok {
+		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeNotFound, Message: "fehlt"}
+	}
+	if base > 0 && base != s.revision(name) {
+		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeStaleRevision, Message: "veraltet"}
+	}
+	s.content[name] = content
+	return kephalaion.Document{Name: name, Revision: s.bump(name)}, nil
+}
+
+// revision ist die Revision eines Dokuments; eines ohne eigene bekommt
+// beim ersten Blick eine.
+func (s *memDocStore) revision(name string) int64 {
+	if s.revs[name] == 0 {
+		s.bump(name)
+	}
+	return s.revs[name]
+}
+
+func (s *memDocStore) bump(name string) int64 {
+	s.rev++
+	s.revs[name] = s.rev
+	return s.rev
 }
 
 func (s *memDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error) {
@@ -207,7 +251,7 @@ func (s *memDocStore) Create(_ context.Context, name, _ string) (kephalaion.Docu
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
 	s.docs[name] = "kamran"
-	return kephalaion.Document{Name: name}, nil
+	return kephalaion.Document{Name: name, Revision: s.bump(name)}, nil
 }
 
 func (s *memDocStore) Rename(_ context.Context, name, newName string) (kephalaion.Document, error) {
@@ -223,13 +267,16 @@ func (s *memDocStore) Rename(_ context.Context, name, newName string) (kephalaio
 	}
 	delete(s.docs, name)
 	s.docs[newName] = by
-	return kephalaion.Document{Name: newName}, nil
+	s.content[newName] = s.content[name]
+	delete(s.content, name)
+	delete(s.revs, name)
+	return kephalaion.Document{Name: newName, Revision: s.bump(newName)}, nil
 }
 
 // useMemDocs ersetzt den Zugang zu Kephalaion durch einen im Speicher.
 func useMemDocs(t *testing.T, names ...string) *memDocStore {
 	t.Helper()
-	store := &memDocStore{docs: map[string]string{}}
+	store := &memDocStore{docs: map[string]string{}, content: map[string]string{}, revs: map[string]int64{}}
 	for _, name := range names {
 		store.docs[name] = "anna"
 	}
@@ -408,7 +455,7 @@ func TestDocHuellenOhneKephalaion(t *testing.T) {
 }
 
 func TestDocKindSchemaAusDerTabelle(t *testing.T) {
-	for _, schema := range []*jsonschema.Schema{docKindSchema[docCreateInput](), docKindSchema[docListInput]()} {
+	for _, schema := range []*jsonschema.Schema{docKindSchema[docCreateInput](), docKindSchema[docListInput](), docKindSchema[docGrepInput]()} {
 		var got []string
 		for _, value := range schema.Properties["kind"].Enum {
 			got = append(got, value.(string))
@@ -424,6 +471,19 @@ func TestDocKindSchemaAusDerTabelle(t *testing.T) {
 	}
 	if _, ok := docKindSchema[docMoveInput]().Properties["kind"]; ok {
 		t.Fatal("done/reopen haben kein kind")
+	}
+	// Die Änderungswerkzeuge haben kein kind, aber ref und since_revision
+	// mit Beschreibung.
+	for _, schema := range []*jsonschema.Schema{docEditSchema[docAppendInput](), docEditSchema[docReplaceInput](), docEditSchema[docSetFieldInput]()} {
+		if _, ok := schema.Properties["kind"]; ok {
+			t.Fatal("Änderungswerkzeug mit kind")
+		}
+		if schema.Properties["ref"].Description == "" || schema.Properties["since_revision"].Description == "" {
+			t.Fatalf("ref/since_revision ohne Beschreibung: %+v", schema.Properties)
+		}
+	}
+	if grep := docKindSchema[docGrepInput](); !slicesContain(grep.Required, "pattern") || slicesContain(grep.Required, "kind") {
+		t.Fatalf("grep: required %v", grep.Required)
 	}
 }
 

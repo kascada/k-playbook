@@ -108,8 +108,6 @@ func LegacyTodoFile(projectDir string) string {
 // offenem Ausgang selbst, genau einmal.
 type TodoStore interface {
 	DocStore
-	Read(ctx context.Context, name string) (kephalaion.ReadResult, error)
-	Write(ctx context.Context, name, content string, baseRevision int64) (kephalaion.Document, error)
 	Delete(ctx context.Context, name string, baseRevision int64) (kephalaion.Document, error)
 }
 

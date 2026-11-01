@@ -15,7 +15,14 @@ type fakeDoc struct {
 	title string
 	// hidden fehlt in der Replica (list), lebt aber am Hub (create) — der
 	// Rückstand der Replica.
-	hidden bool
+	hidden   bool
+	content  string
+	revision int64
+	// lagReads lässt so viele read noch den Stand lagContent/lagRevision
+	// liefern — die Replica läuft dem Hub nach.
+	lagReads    int
+	lagContent  string
+	lagRevision int64
 }
 
 // fakeDocStore ist ein Kephalaion im Speicher: create und rename prüfen den
@@ -27,17 +34,75 @@ type fakeDocStore struct {
 	fail error
 	// createFail lässt nur create scheitern.
 	createFail error
-	creates    []string
-	renames    [][2]string
-	lists      []kephalaion.ListRequest
+	// staleWrites lässt so viele write mit stale_revision scheitern.
+	staleWrites int
+	// writeFail lässt nur write scheitern.
+	writeFail error
+	creates   []string
+	renames   [][2]string
+	lists     []kephalaion.ListRequest
+	reads     []string
+	writes    []string
+	revision  int64
 }
 
 func newFakeDocStore(user string, names ...string) *fakeDocStore {
 	store := &fakeDocStore{docs: map[string]*fakeDoc{}, user: user}
 	for _, name := range names {
-		store.docs[name] = &fakeDoc{by: user}
+		store.put(name, "")
 	}
 	return store
+}
+
+// put legt ein Dokument mit Inhalt an, mit der nächsten Revision.
+func (s *fakeDocStore) put(name, content string) *fakeDoc {
+	s.revision++
+	doc := &fakeDoc{by: s.user, content: content, revision: s.revision}
+	s.docs[name] = doc
+	return doc
+}
+
+func (s *fakeDocStore) Read(_ context.Context, name string) (kephalaion.ReadResult, error) {
+	s.reads = append(s.reads, name)
+	if s.fail != nil {
+		return kephalaion.ReadResult{}, s.fail
+	}
+	doc, ok := s.docs[name]
+	if !ok {
+		return kephalaion.ReadResult{Kind: kephalaion.ReadKindNone, Name: name}, nil
+	}
+	content, revision := doc.content, doc.revision
+	if doc.lagReads > 0 {
+		doc.lagReads--
+		content, revision = doc.lagContent, doc.lagRevision
+	}
+	return kephalaion.ReadResult{Kind: kephalaion.ReadKindDocument, Name: name, Revision: revision, Content: &content,
+		Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: doc.by}}, nil
+}
+
+func (s *fakeDocStore) Write(_ context.Context, name, content string, base int64) (kephalaion.Document, error) {
+	s.writes = append(s.writes, name)
+	if s.fail != nil {
+		return kephalaion.Document{}, s.fail
+	}
+	if s.writeFail != nil {
+		return kephalaion.Document{}, s.writeFail
+	}
+	doc, ok := s.docs[name]
+	if !ok {
+		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeNotFound, Message: "fehlt"}
+	}
+	if s.staleWrites > 0 {
+		s.staleWrites--
+		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeStaleRevision, Message: "veraltet"}
+	}
+	if base > 0 && base != doc.revision {
+		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "write", Code: kephalaion.CodeStaleRevision, Message: "veraltet"}
+	}
+	s.revision++
+	doc.content, doc.revision, doc.by = content, s.revision, s.user
+	size := int64(len(content))
+	return kephalaion.Document{Name: name, Revision: doc.revision, Size: &size}, nil
 }
 
 func (s *fakeDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kephalaion.Entry, error) {
@@ -79,8 +144,8 @@ func (s *fakeDocStore) Create(_ context.Context, name, _ string) (kephalaion.Doc
 	if _, ok := s.docs[name]; ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
-	s.docs[name] = &fakeDoc{by: s.user}
-	return kephalaion.Document{Name: name}, nil
+	doc := s.put(name, "")
+	return kephalaion.Document{Name: name, Revision: doc.revision}, nil
 }
 
 func (s *fakeDocStore) Rename(_ context.Context, name, newName string) (kephalaion.Document, error) {
@@ -96,8 +161,10 @@ func (s *fakeDocStore) Rename(_ context.Context, name, newName string) (kephalai
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeNameTaken, Message: "Ziel belegt"}
 	}
 	delete(s.docs, name)
+	s.revision++
+	doc.revision = s.revision
 	s.docs[newName] = doc
-	return kephalaion.Document{Name: newName}, nil
+	return kephalaion.Document{Name: newName, Revision: doc.revision}, nil
 }
 
 func newTestUserDocs(t *testing.T, store *fakeDocStore, kinds []DocKind) *UserDocs {
@@ -348,9 +415,16 @@ func TestDocDoneUndReopen(t *testing.T) {
 	if err != nil || moved.Ref != "keph:/user/kamran/tasks/done/100-a.md" || moved.From != "keph:/user/kamran/tasks/100-a.md" {
 		t.Fatalf("done: %+v %v", moved, err)
 	}
+	// rename erzeugt eine neue Revision; die Antwort trägt sie.
+	if want := store.docs["user/kamran/tasks/done/100-a.md"].revision; moved.Revision != want || want < 2 {
+		t.Fatalf("done: Revision %d, erwartet %d", moved.Revision, want)
+	}
 	moved, err = docs.Reopen(context.Background(), moved.Ref)
 	if err != nil || moved.Ref != "keph:/user/kamran/tasks/100-a.md" || moved.Kind != "tasks" {
 		t.Fatalf("reopen: %+v %v", moved, err)
+	}
+	if want := store.docs["user/kamran/tasks/100-a.md"].revision; moved.Revision != want {
+		t.Fatalf("reopen: Revision %d, erwartet %d", moved.Revision, want)
 	}
 }
 

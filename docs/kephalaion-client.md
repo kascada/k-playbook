@@ -23,19 +23,23 @@ session and `whoami`, `docs.go` for `list`, `read`, `create`, `write`, `rename`,
 | Tool | Where | Called by | Arguments used |
 |---|---|---|---|
 | `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
-| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, every todo access (task 097) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
-| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; every todo access, one call per todo (task 097) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
+| `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, `k_playbook_doc_grep` with `kind` (task 104), every todo access (task 097) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
+| `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; `k_playbook_doc_append`, `_replace` and `_set_field` before every write, `k_playbook_doc_grep` per document (task 104); every todo access, one call per todo (task 097) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
 | `create` | through the hub | `k_playbook_doc_create`; `todo add` and `todo migrate` (task 097) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |
-| `write` | through the hub | `todo update` (text, `done:` field) (task 097) | `collection`, `name`, `content`, `base_revision` (the revision from the `read` just before), `request_id` |
+| `write` | through the hub | `todo update` (text, `done:` field) (task 097); `k_playbook_doc_append`, `_replace`, `_set_field` and `k-playbook doc append`, `replace`, `set` (task 104) | `collection`, `name`, `content`, `base_revision` (the revision from the `read` just before), `request_id` |
 | `rename` | through the hub | `k_playbook_doc_done`, `k_playbook_doc_reopen`; `todo update` with done/reopen (task 097) | `collection`, `name`, `new_name`, `request_id` |
 | `delete` | through the hub | `todo delete` (task 097) | `collection`, `name`, `base_revision`, `request_id`; never `recursive` |
 
 Reading a document's content goes both ways since task 093: a session can call
 Kephalaion's `read` directly, and `k_playbook_doc_read` / `k-playbook read keph:/…` call it
-through this client (`Client.Read`). Writing is still done directly by the session with
-Kephalaion's `write`; the `doc` tools only create, list and move. Their contract:
-[`mcp.md`](./mcp.md#document-tools-in-the-collection). The todo functions (task 097) are the
-first in k-playbook that write content and delete themselves (`Client.Write`,
+through this client (`Client.Read`). Writing goes both ways since task 104: a session can
+still call Kephalaion's `write` directly with the whole content, and the change operations
+`k_playbook_doc_append`, `_replace` and `_set_field` (`k-playbook doc append|replace|set`)
+read, change and write inside k-playbook (`Client.Read`, then `Client.Write` with
+`base_revision` = the revision just read), so the content never passes through the session.
+Their contract: [`mcp.md`](./mcp.md#changing-and-searching-documents); the other `doc` tools
+create, list and move: [`mcp.md`](./mcp.md#document-tools-in-the-collection). The todo
+functions (task 097) write content and delete the same way (`Client.Write`,
 `Client.Delete`), since a todo is the document's body plus a few frontmatter fields:
 [`mcp.md`](./mcp.md#todo-contract-and-migration).
 
@@ -53,9 +57,13 @@ first in k-playbook that write content and delete themselves (`Client.Write`,
   (old) name.
 - **`stale_revision`** from `write` and `delete` (and `rename`, which k-playbook calls without
   it): the document no longer has the revision given as `base_revision`; nothing is written,
-  the message names the current revision. The todo functions read the document from the
-  replica, then write or delete on that revision, so a change another machine made in
-  between is not silently overwritten.
+  the message names the current revision. The todo functions and the change operations of
+  task 104 read the document from the replica, then write or delete on that revision, so a
+  change another machine made in between is not silently overwritten. Only the hub checks
+  `base_revision`; since the replica can lag behind the hub, a `stale_revision` can also
+  mean the replica has not caught up yet, and a new `read` resolves that. The change
+  operations re-read and retry up to three times without `since_revision`; with it, a
+  `stale_revision` is reported as `foreign_change`.
 - **`write` with unchanged content** writes nothing at the hub: no new revision, the answer
   carries the existing row.
 - **`delete` sets a tombstone** (`deleted: true` in the answer, new revision). Without

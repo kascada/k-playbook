@@ -14,8 +14,10 @@ resp. `context.links` (`k_playbook_briefing`); if the field is absent, everythin
 up to date.
 
 The server offers the working state, the review, todo and knowledge tools,
-`k_playbook_doc_read` for references, the four `doc` tools for numbered documents in the
-project's Kephalaion collection, `k_playbook_briefing` for the start of a session,
+`k_playbook_doc_read` for references, the `doc` tools for numbered documents in the
+project's Kephalaion collection -- creating, listing and moving them, changing them without
+their content passing through the session, and searching them --, `k_playbook_briefing` for
+the start of a session,
 `k_playbook_health` for the errors and warnings about the project's environment,
 `k_playbook_github_test` for the test of the personal GitHub accesses against GitHub,
 `k_playbook_gui_status` for the state and the address
@@ -356,11 +358,15 @@ then nothing is written and the interface says so.
 | `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
 | `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
 | `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
-| `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false` |
+| `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
-| `k_playbook_doc_done` | move an own document into `done/` of its location |
-| `k_playbook_doc_reopen` | move an own document from `done/` back into its location |
+| `k_playbook_doc_done` | move an own document into `done/` of its location; the answer carries the `revision` after the move |
+| `k_playbook_doc_reopen` | move an own document from `done/` back into its location; the answer carries the `revision` after the move |
+| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings` without its content passing through the session; optional precondition `since_revision` |
+| `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`; optional `since_revision` |
+| `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field; other fields and the body stay byte for byte; optional `since_revision` |
+| `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
@@ -810,12 +816,24 @@ classified, what the query surface looks like, and which decisions rest on which
 ### Doc Read Contract
 
 `k_playbook_doc_read` is a thin wrapper over `project.ResolveDocRef` (`project/docref.go`); the
-subcommand `k-playbook read <ref> [--raw] [--json]` calls the same function and serves for
-testing and as a fallback. Its input is `projectDir` (required by contract, like every tool),
-`ref`, a reference in the prefix scheme of [verweisschema.md](verweisschema.md) exactly as it
-stands in the text, and the optional `includes` (boolean, default `true`; `false` delivers the
-raw text with its include lines, the counterpart of `--raw`). `ref` in that scheme is the
-lasting contract of the tool: which source lies behind it is invisible to the caller.
+subcommand `k-playbook read <ref> [--raw] [--lines <from-to>|--section <heading>] [--json]`
+calls the same function and serves for testing and as a fallback. Its input is `projectDir`
+(required by contract, like every tool), `ref`, a reference in the prefix scheme of
+[verweisschema.md](verweisschema.md) exactly as it stands in the text, the optional `includes`
+(boolean, default `true`; `false` delivers the raw text with its include lines, the
+counterpart of `--raw`), and one of two optional selections (task 104), which exclude each
+other:
+
+- `lines` -- `from-to`, 1-based and inclusive (`10-20`), or `from-` up to the end. A range
+  beyond the end stops at the end; one that starts behind it is empty content, no error.
+- `section` -- a heading line exactly as it stands in the document, for example `## Intent`:
+  from the first such line up to the next heading of the same or a higher level, outside code
+  blocks and the frontmatter. No match is `section_not_found`; a value that is not a heading
+  line (`#` to `######` followed by a space) is `invalid_input`.
+
+Both act after include lines are inserted, and only on a single file; for a directory, or with
+both set, they are `invalid_input`. `ref` in that scheme is the lasting contract of the tool:
+which source lies behind it is invisible to the caller.
 
 All three prefixes are resolved (task 093; [verweisschema.md](verweisschema.md#access-route-per-prefix)):
 `project:` a file of the project from disk below the project root, one layer; `keph:` a
@@ -838,12 +856,18 @@ the body of their target, recursively up to depth 10, in every document the tool
 [verweisschema.md](verweisschema.md#includes) has the rules.
 
 A successful answer is `{ok: true, tool, projectDir, ref, directory, content, disabled, hint,
-parts, problems, includes}`:
+parts, problems, includes, totalLines, revision}`:
 
 - `ref` -- the reference in canonical form (for `keph:` with the real user name);
   `directory` -- whether it ended in `/`.
 - `content` -- a single file with its frontmatter, include lines replaced; for a directory
-  the parts without frontmatter, separated by a blank line. Always present, `""` when empty.
+  the parts without frontmatter, separated by a blank line; with `lines` or `section` only that
+  part, byte for byte. Always present, `""` when empty.
+- `totalLines` -- the number of lines of the whole content after inserting includes, also when
+  `content` carries only a part. Always present.
+- `revision` -- only for `keph:`: the revision of the document as the node's replica has it,
+  so that a caller can set `since_revision` of the change operations without reading the whole
+  content. Whoever needs only the revision uses `k_playbook_doc_grep` with `count_only`.
 - `disabled` -- `true` for a single `k-playbook:` file that an empty local file disables. That
   is not an error: `content` is `""` and `hint` says why. For a directory it stays `false`,
   even when every part is disabled; `project:` and `keph:` never disable, an empty file is
@@ -863,7 +887,8 @@ Error codes, in the envelope's `error.code` like the knowledge tools:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` without naming an assembled directory (today only `k-playbook:/instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, `project:/docs/`, `keph:/user/~/tasks/`, an unknown directory, a file with a trailing `/`; an include line with more than one argument |
+| `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` without naming an assembled directory (today only `k-playbook:/instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/rules/`, `project:/docs/`, `keph:/user/~/tasks/`, an unknown directory, a file with a trailing `/`; an include line with more than one argument; `lines` not of the form `from-to`/`from-`, `section` not a heading line, both set, or either on a directory |
+| `section_not_found` | the heading of `section` does not occur outside code blocks and the frontmatter |
 | `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `rules/`, `reviews/`, `guidelines/`, `commands/`, `includes/` and `testdata/` (for example `checks/` or `skills/`); the message names only the reader kinds |
 | `not_found` | neither layer has the file or the assembled directory, the project has no such file, or the node reports `none` for the name in the collection; there is no fallback to reading anywhere else |
 | `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; no fallback |
@@ -884,10 +909,11 @@ that part.
 `k_playbook_doc_create`, `_list`, `_done` and `_reopen` create numbered documents in the
 project's Kephalaion collection, list them per user, and move them into `done/` and back.
 They are thin wrappers over `project.UserDocs` (`project/userdocs.go`); the subcommand
-`k-playbook doc create|list|done|reopen [--json]` calls the same code. Writing a document's
-content is not part of them: a session does that directly with Kephalaion's `write`, with
-`collection` = `kephalaion.address`. Reading goes through `k_playbook_doc_read` with the
-`keph:` reference (task 093) or directly with Kephalaion's `read`. Which Kephalaion tools are
+`k-playbook doc create|list|done|reopen [--json]` calls the same code. Changing a document's
+content goes through the change operations of the next section (task 104) or directly with
+Kephalaion's `write`, with `collection` = `kephalaion.address`. Reading goes through
+`k_playbook_doc_read` with the `keph:` reference (task 093) or directly with Kephalaion's
+`read`. Which Kephalaion tools are
 called underneath and what is expected of them: [kephalaion-client.md](kephalaion-client.md).
 
 **Kinds.** What a kind is comes from one table, `project.DocKinds`; a new kind is a new
@@ -958,7 +984,7 @@ user area is rejected. Directories come into being in Kephalaion with their firs
 |---|---|
 | `k_playbook_doc_create` | `ref` (the `keph:` reference with the real user name, e.g. `keph:/user/kamran/tasks/100-name.md`; without user area `keph:/queue/findings/001-name.md`), `kind`, `number`, `name` (file name), `user` (absent without user area) |
 | `k_playbook_doc_list` | `kind`, `user` (the filter applied, a name or `*`; empty without user area), `done`, `items`, `hint` (only when a filter did not apply). Each item: `ref`, `title` (frontmatter `title`, else the file name), `user` (from the path; without user area the creator from Kephalaion's `created.by`, else empty), `created`, `updated`, `done` |
-| `k_playbook_doc_done`, `k_playbook_doc_reopen` | `ref` (the new reference with the real name), `from` (the old one, `~` resolved), `kind` |
+| `k_playbook_doc_done`, `k_playbook_doc_reopen` | `ref` (the new reference with the real name), `from` (the old one, `~` resolved), `kind`, `revision` (the revision after the move -- `rename` creates a new one --, so that a caller continues with `since_revision` on the new reference) |
 
 Error codes in `error.code`:
 
@@ -976,8 +1002,121 @@ Error codes in `error.code`:
 | `kephalaion_error` | any other error from Kephalaion; the message names its code |
 
 The CLI prints one line per result without `--json` (for `list`: reference, title, user,
-updated, and `done`, separated by tabs) and ends with exit 1 on an error, the code in
-parentheses at the end of the message.
+updated, and `done`, separated by tabs; for `done` and `reopen` the new reference, the
+revision only with `--json`) and ends with exit 1 on an error, the code in parentheses at the
+end of the message.
+
+### Changing and Searching Documents
+
+`k_playbook_doc_append`, `_replace` and `_set_field` change a document of the project's
+collection, `k_playbook_doc_grep` searches one or all of a kind -- without the content passing
+through the caller's context (task 104). The hub offers only `write` with the whole content,
+so each change operation is built in the binary: read, change, write with `base_revision`.
+All three go through one function, `UserDocs.edit` (`project/docedit.go`); grep is
+`project.GrepDocRef` and `UserDocs.Grep` (`project/docgrep.go`). The subcommands `k-playbook
+doc append|replace|set|grep` call the same code. Kephalaion itself is unchanged.
+
+**Scope of the change operations.** A `keph:` reference to one document of a kind without
+tools of its own -- `tasks`, `workbench`, `findings` --, open or under `done/`; for kinds with
+a user area only own documents (`foreign_user`), as for `doc_done`. A segment `~` is replaced by
+`kephalaion.user`. Every other reference -- `todos/`, `docs/`, any other `keph:` path, a
+directory, `project:`, `k-playbook:` -- is `invalid_input`, decided without reading.
+
+**Inputs.** All take `projectDir` (required by contract) and, except grep, `ref` and the
+optional `since_revision`.
+
+| Tool | Further inputs |
+|---|---|
+| `k_playbook_doc_append` | `content`, the text to append; empty or only whitespace is `invalid_input` |
+| `k_playbook_doc_replace` | `old`, a text that has to occur exactly once (empty is `invalid_input`); `new`, the replacement (empty deletes `old`) |
+| `k_playbook_doc_set_field` | `key`, of the form `[a-z][a-z0-9_-]*`; either `value` (a YAML scalar) or `unset: true`, exactly one |
+| `k_playbook_doc_grep` | `pattern`, a Go regular expression (RE2) matched line by line; either `ref` (a single file as for `k_playbook_doc_read`: `project:`, `k-playbook:` or `keph:`) or `kind` with optional `user` and `done` as for `k_playbook_doc_list`; `count_only` |
+
+**Behaviour.**
+
+- `append`: if the content does not end with a line break, one is added, then a blank line,
+  then the text, which ends with exactly one line break. An empty document gets only the
+  text. So every entry starts at the beginning of a line, what a heredoc in `/k-task-run`
+  had to ensure by hand.
+- `replace`: `old` must occur exactly once. No match is `text_not_found`; several are
+  `text_not_unique`, the message names the count -- give more surrounding text in `old`.
+- `set_field`: the frontmatter at the beginning of the document; without one, setting creates
+  `---\n<key>: <value>\n---\n` followed by a blank line before the body, and unsetting changes
+  nothing. A field spans its line and the following indented lines or list items. Setting
+  replaces it, or appends the field at the end of the frontmatter; unsetting removes it.
+  Other fields, their order and the body stay byte for byte. The value is quoted (double
+  quotes, escapes as in Go) when YAML would read it differently: empty, surrounding space,
+  a leading indicator, `: `, ` #`, a line break, `true`/`false`/`null`/…, a number.
+- **Unchanged content writes nothing** and creates no revision: the answer is `changed:
+  false` with the revision read.
+- **`since_revision`** is the revision the caller last saw -- from the answer of its last
+  change, from `k_playbook_doc_read` or from `k_playbook_doc_grep` with `count_only`. A document
+  has one writer at a time; `since_revision` detects that someone else wrote anyway. If the
+  revision read differs, the operation refuses with `foreign_change` and writes nothing. If
+  the revision read is *below* `since_revision`, the node's replica has not yet caught up with
+  the caller's own write: k-playbook waits briefly and reads again, up to three times; only a
+  higher revision, or one that still differs after the attempts, is `foreign_change`. A
+  `stale_revision` from the hub with `since_revision` set is `foreign_change` too. The caller
+  then does not catch up silently but asks the user who continues.
+- **Without `since_revision`** there is no precondition beyond the hub's own check: the write
+  carries `base_revision` = the revision read; on `stale_revision` the document is read again,
+  the change applied again, and the write retried up to three times; after that the answer is
+  `stale_revision`.
+- `request_id`, the retry after an open outcome and `outcome_unknown` are those of
+  `Client.Write` (see "Document Tools in the Collection"). After `outcome_unknown` do **not**
+  append or change again: read back (`k_playbook_doc_read`, or `k_playbook_doc_grep` with
+  `count_only` for the revision) whether the change arrived.
+- `grep` searches the stored text -- include lines are not inserted -- so that lines and
+  matches fit what `replace` and `append` change. For `kind`, the documents are selected as by
+  `k_playbook_doc_list` and read one by one; one that vanished between `list` and `read` is
+  skipped.
+
+**Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
+
+| Tool | Fields on success |
+|---|---|
+| `k_playbook_doc_append`, `_replace`, `_set_field` | `ref` (with the real user name), `revision` (after writing; unchanged: the one read), `size` (bytes), `changed` |
+| `k_playbook_doc_grep` | `matches` (each `ref`, `line` 1-based, `text` without the line break; at most 200, absent without a match and with `count_only`), `count` (all matches, also beyond 200), `truncated` (`true` when there were more than 200), with `ref` as target `ref` and for `keph:` `revision`; with `kind` as target `kind`, `user`, `done` and `hint` as in `k_playbook_doc_list`; with `count_only` instead of `matches` `counts`, each `ref`, `count` (also 0) and for `keph:` `revision` |
+
+With `foreign_change` the envelope (`ok: false`) also carries how the document stands now:
+`ref`, `revision` (the current one), `sinceRevision`, `updatedBy` and `updatedAt` (who wrote
+last) and `tail`, the last 20 lines of the document -- what the user needs for the question
+who continues.
+
+Error codes in `error.code`, beyond those of "Document Tools in the Collection"
+(`invalid_input`, `project_not_found`, `not_found`, `foreign_user`, `kephalaion_unavailable`,
+`outcome_unknown`, `stale_revision`, `kephalaion_error`):
+
+| Code | When |
+|---|---|
+| `foreign_change` | the document does not have the revision `since_revision`: someone else wrote; nothing written |
+| `text_not_found` | `old` does not occur |
+| `text_not_unique` | `old` occurs more than once; the message names the count |
+| `section_not_found` | (`k_playbook_doc_read` only) the heading of `section` does not occur |
+
+`grep` reports the codes of `k_playbook_doc_read` for `ref` and those of `k_playbook_doc_list`
+for `kind`; an invalid pattern, both or neither of `ref` and `kind`, or `user`/`done` with `ref`
+are `invalid_input`.
+
+**CLI.**
+
+- `k-playbook doc append <ref> [--since N] [--json]` reads the text from stdin, so that a
+  heredoc with a quoted end marker passes backticks and `$(…)` unchanged:
+  `k-playbook doc append <ref> <<'EOF'`.
+- `k-playbook doc replace <ref> [--since N] [--json]` reads `{"old": …, "new": …}` as JSON
+  from stdin.
+- `k-playbook doc set <ref> <key> <value> [--since N] [--json]` and
+  `k-playbook doc set <ref> --unset <key> [--since N] [--json]`; a value starting with `-`
+  stands after `--`.
+- `k-playbook doc grep (<ref> | --kind K [--user U] [--done]) <pattern> [--count] [--json]`;
+  a pattern starting with `-` stands after `--`.
+
+Without `--json` a change prints one line, reference and revision separated by a tab, and
+`unverändert` as a third field when nothing was written; grep prints `ref:line:text` per
+match, with `--count` `ref:count` per document (`ref:count:revision` for `keph:`). Errors end
+with exit 1 and the code in parentheses at the end of the message; `foreign_change` writes the
+last lines to stderr, with `--json` the state (`ref`, `sinceRevision`, `revision`,
+`updatedBy`, `updatedAt`, `tail`) to stdout.
 
 ### Briefing Contract
 

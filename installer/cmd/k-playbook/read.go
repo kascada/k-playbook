@@ -20,20 +20,36 @@ import (
 // Datei, übergangene Teile — gehen nach stderr, damit der Inhalt für sich
 // weiterverarbeitet werden kann. Beides ist kein Fehler: Exit 0.
 func runRead(args []string) error {
-	const usage = "read <verweis> [--raw] [--json]"
+	const usage = "read <verweis> [--raw] [--lines <von-bis>|--section <überschrift>] [--json]"
 
 	asJSON := false
 	raw := false
+	var lines, section string
 	var positional []string
-	for _, arg := range args {
-		switch arg {
-		case "--json":
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
 			asJSON = true
-		case "--raw":
+		case arg == "--raw":
 			raw = true
-		case "-h", "--help", "help":
+		case arg == "-h" || arg == "--help" || arg == "help":
 			printReadUsage(os.Stdout)
 			return nil
+		case arg == "--lines" || arg == "--section":
+			if i+1 >= len(args) {
+				return fmt.Errorf("%s erwartet einen Wert — erwartet wird %s", arg, usage)
+			}
+			i++
+			if arg == "--lines" {
+				lines = args[i]
+			} else {
+				section = args[i]
+			}
+		case strings.HasPrefix(arg, "--lines="):
+			lines = strings.TrimPrefix(arg, "--lines=")
+		case strings.HasPrefix(arg, "--section="):
+			section = strings.TrimPrefix(arg, "--section=")
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return fmt.Errorf("unbekannte Option %s — erwartet wird %s", arg, usage)
@@ -54,7 +70,7 @@ func runRead(args []string) error {
 		return err
 	}
 	result, err := project.ResolveDocRefWith(context.Background(), project.ProjectDocLayers(projectDir), positional[0],
-		project.DocReadOptions{Raw: raw})
+		project.DocReadOptions{Raw: raw, Lines: lines, Section: section})
 	if err != nil {
 		if code := project.DocRefErrorCode(err); code != "" {
 			return fmt.Errorf("%w (%s)", err, code)
@@ -88,7 +104,7 @@ func printReadUsage(out io.Writer) {
 	fmt.Fprint(out, `k-playbook read — einen Verweis auflösen
 
 Aufruf:
-  k-playbook read <verweis> [--raw] [--json]
+  k-playbook read <verweis> [--raw] [--lines <von-bis>|--section <überschrift>] [--json]
 
 Löst einen Verweis im Präfixschema auf (docs/verweisschema.md) — dieselbe
 Fachlogik wie das MCP-Werkzeug k_playbook_doc_read. Gesucht wird das Projekt
@@ -131,10 +147,22 @@ sind Fehler mit der Kette der Dokumente; bei einem Verzeichnis fällt nur der
 betroffene Teil aus und steht auf stderr. Mit --raw bleibt der Text, wie er
 ist: Include-Zeilen stehen lesbar da.
 
+Teile einer Einzeldatei, nach dem Einsetzen der Includes; beide schließen
+sich aus und gelten nicht für ein Verzeichnis (invalid_input):
+  --lines <von-bis>
+            Nur diese Zeilen, 1-basiert und einschließlich, etwa 10-20;
+            10- bis zum Ende.
+  --section <überschrift>
+            Nur den Abschnitt ab der ersten Zeile, die genau so lautet, etwa
+            "## Intent", bis vor die nächste Überschrift gleicher oder höherer
+            Ebene; Überschriften in Code-Blöcken zählen nicht. Kein Treffer:
+            section_not_found.
+
 Ohne --json steht auf stdout nur der Inhalt. Mit --json kommt die Antwort als
 JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled),
-problems und includes (ref, origin, depth, disabled — die eingesetzten Ziele
-in Lesereihenfolge). Ein unbekannter Verweis ist ein Fehler (not_found);
+problems, includes (ref, origin, depth, disabled — die eingesetzten Ziele
+in Lesereihenfolge), totalLines (Zeilen des ganzen Inhalts) und bei keph:
+revision. Ein unbekannter Verweis ist ein Fehler (not_found);
 k-playbook: außerhalb von instructions/, rules/, reviews/, guidelines/ und
 commands/ wird nicht aufgelöst (unsupported).
 `)

@@ -439,6 +439,14 @@ type DocResult struct {
 	// Includes nennt die eingesetzten Ziele in Lesereihenfolge, mit Tiefe;
 	// leer mit DocReadOptions.Raw. Woraus ein Text zusammengesetzt wurde.
 	Includes []DocInclude `json:"includes"`
+	// Revision ist die Revision des Dokuments in der Collection, nur bei
+	// keph: — damit ein Aufrufer since_revision setzen kann, ohne den ganzen
+	// Inhalt zu lesen.
+	Revision int64 `json:"revision,omitempty"`
+	// TotalLines ist die Zahl der Zeilen des ganzen Inhalts nach dem
+	// Einsetzen der Includes, auch wenn Content nur einen Teil trägt
+	// (DocReadOptions.Lines, DocReadOptions.Section).
+	TotalLines int `json:"totalLines"`
 }
 
 // DocInclude ist ein eingesetztes Include-Ziel.
@@ -462,6 +470,14 @@ type DocReadOptions struct {
 	// Raw liefert den Rohtext: Include-Zeilen bleiben stehen, nichts wird
 	// eingesetzt. Standard ist einsetzen.
 	Raw bool
+	// Lines ist ein Zeilenbereich von-bis oder von-, 1-basiert und
+	// einschließlich: Content trägt nur diese Zeilen. Schließt Section aus.
+	Lines string
+	// Section ist eine Überschriftenzeile wie „## Intent“: Content trägt den
+	// Abschnitt ab ihrem ersten Vorkommen bis vor die nächste Überschrift
+	// gleicher oder höherer Ebene, außerhalb von Code-Blöcken. Kein Treffer
+	// ist section_not_found. Schließt Lines aus.
+	Section string
 }
 
 // ResolveDocRef löst einen Verweis mit den Standardoptionen auf: Includes
@@ -481,11 +497,85 @@ func ResolveDocRef(layers DocLayers, raw string) (DocResult, error) {
 // problems, der Teil wird ausgelassen, die übrigen bleiben — eine fehlerhafte
 // Include-Zeile in einer lokalen Always-Anweisung legt den Sitzungsstart
 // nicht lahm, und nichts scheitert still.
+//
+// Lines und Section wirken nach dem Einsetzen der Includes und nur auf
+// Einzeldateien; bei einem Verzeichnis sind sie invalid_input, wie beide
+// zusammen.
 func ResolveDocRefWith(ctx context.Context, layers DocLayers, raw string, opts DocReadOptions) (DocResult, error) {
 	ref, err := ParseDocRef(raw)
 	if err != nil {
 		return DocResult{}, err
 	}
+	part, err := newDocPartOptions(ref, opts)
+	if err != nil {
+		return DocResult{}, err
+	}
+	result, err := resolveDocRefFull(ctx, layers, ref, opts)
+	if err != nil {
+		return DocResult{}, err
+	}
+	result.TotalLines = docLineCount(result.Content)
+	if err := part.apply(&result); err != nil {
+		return DocResult{}, err
+	}
+	return result, nil
+}
+
+// docPartOptions sind Lines und Section, geprüft.
+type docPartOptions struct {
+	lines   *docLineRange
+	section string
+}
+
+// newDocPartOptions prüft Lines und Section, bevor gelesen wird.
+func newDocPartOptions(ref DocRef, opts DocReadOptions) (docPartOptions, error) {
+	var part docPartOptions
+	lines, section := strings.TrimSpace(opts.Lines), strings.TrimSpace(opts.Section)
+	if lines == "" && section == "" {
+		return part, nil
+	}
+	if lines != "" && section != "" {
+		return part, docRefErrorf(DocCodeInvalidInput, "lines und section schließen sich aus; eines von beiden angeben")
+	}
+	if ref.Dir {
+		return part, docRefErrorf(DocCodeInvalidInput, "%s: lines und section gelten nur für eine Einzeldatei, nicht für ein Verzeichnis", ref.Raw)
+	}
+	if lines != "" {
+		r, err := parseDocLines(lines)
+		if err != nil {
+			return part, err
+		}
+		part.lines = &r
+		return part, nil
+	}
+	heading, err := validateDocSection(section)
+	if err != nil {
+		return part, err
+	}
+	part.section = heading
+	return part, nil
+}
+
+// apply schneidet den Inhalt zu.
+func (p docPartOptions) apply(result *DocResult) error {
+	switch {
+	case p.lines != nil:
+		result.Content = sliceDocLines(result.Content, *p.lines)
+	case p.section != "":
+		content, ok := docSection(result.Content, p.section)
+		if !ok {
+			return docRefErrorf(DocCodeSectionNotFound, "%s: die Überschrift %q kommt nicht vor (außerhalb von Code-Blöcken)",
+				result.Ref, p.section)
+		}
+		result.Content = content
+	}
+	return nil
+}
+
+// resolveDocRefFull löst einen geprüften Verweis ganz auf, mit Includes nach
+// opts.
+func resolveDocRefFull(ctx context.Context, layers DocLayers, ref DocRef, opts DocReadOptions) (DocResult, error) {
+	var err error
 	x := &docIncluder{ctx: ctx, layers: layers, opts: opts}
 	var result DocResult
 	switch ref.Scheme {
@@ -708,6 +798,7 @@ func resolveKephDoc(ctx context.Context, layers DocLayers, ref DocRef) (DocResul
 		Content:  content,
 		Parts:    []DocPart{{Name: path.Base(name), Origin: DocOriginKeph}},
 		Problems: []string{},
+		Revision: read.Revision,
 	}, nil
 }
 

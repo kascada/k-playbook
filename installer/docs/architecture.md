@@ -152,9 +152,12 @@ ein Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nu
 Meldung; bei einer Datei scheitert der Lesevorgang, in einem zusammengebauten Verzeichnis
 fällt nur der Teil aus und steht unter `problems`); `--raw` lässt sie stehen. Ohne `--json`
 steht auf stdout nur der Inhalt, Hinweise (abgeschaltet, übergangene Teile) gehen nach
-stderr. Das MCP-Werkzeug `k_playbook_doc_read` ist die Hülle darum (Parameter `includes`);
-beide rufen `project.ResolveDocRefWith` (`project/docref.go`), das Briefing und ältere
-Aufrufer `project.ResolveDocRef` mit den Standardoptionen.
+stderr. `--lines <von-bis>` und `--section <überschrift>` liefern nur einen Teil einer
+Einzeldatei, nach dem Einsetzen der Includes (`project/docslice.go`); `--json` nennt
+`totalLines` und bei `keph:` die `revision`. Das MCP-Werkzeug `k_playbook_doc_read` ist die
+Hülle darum (Parameter `includes`, `lines`, `section`); beide rufen
+`project.ResolveDocRefWith` (`project/docref.go`), das Briefing und ältere Aufrufer
+`project.ResolveDocRef` mit den Standardoptionen.
 
 `briefing [--json]` gibt das Briefing aus (Task 086): vorweg den Text der immer geltenden
 Anweisungen `k-playbook:/instructions/always/` (`documents.always.content`, zusammengebaut von
@@ -186,12 +189,33 @@ Startnummer, eigene Werkzeuge), steht allein in der Tabelle `project.DocKinds` (
 Sorte ist ein neuer Eintrag, die erlaubten Werte von `kind` in CLI und MCP-Schema kommen
 daraus — ohne die Sorten mit `OwnTools` (`todos`), die nur über `k-playbook todo` und
 `k_playbook_todo_*` gehen (`project/todos.go`, über die Schnittstelle `TodoStore`, die
-zusätzlich `read`, `write` und `delete` braucht). Die Fachlogik `project.UserDocs` spricht Kephalaion über die Schnittstelle `DocStore`
-an, die `kephalaion.Client` (`internal/kephalaion/docs.go`: `list` aus der Replica, `create`
-und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`, `_list`,
-`_done` und `_reopen` sind die Hüllen darum. Vertrag:
+zusätzlich `delete` braucht). Die Fachlogik `project.UserDocs` spricht Kephalaion über die Schnittstelle `DocStore`
+an, die `kephalaion.Client` (`internal/kephalaion/docs.go`: `list` und `read` aus der Replica,
+`create`, `write` und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`, `_list`,
+`_done` und `_reopen` sind die Hüllen darum; `done` und `reopen` nennen mit `--json` die
+Revision nach dem Verschieben. Vertrag:
 [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Document Tools in the Collection“;
 was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+
+`doc append|replace|set [--since N] [--json]` ändert ein Dokument der Sorten ohne eigene
+Werkzeuge (`tasks`, `workbench`, `findings`, offen oder unter `done/`, bei Userbereich nur
+eigene), ohne dass der Inhalt durch die Sitzung läuft (Task 104): `append` liest den Text von
+stdin (Heredoc mit `<<'EOF'`), `replace` `{"old": …, "new": …}` als JSON von stdin, `set`
+setzt ein Frontmatter-Feld oder entfernt es mit `--unset`. Alle drei setzen auf eine
+Kernfunktion auf, `UserDocs.edit` in `project/docedit.go`: Verweis auflösen wie bei `done`,
+lesen (`DocStore.Read`), `--since` gegen die gelesene Revision prüfen — darunter heißt
+nachlaufende Replica, also warten und bis zu dreimal neu lesen; abweichend ist
+`foreign_change` mit Revision, letztem Schreiber und den letzten 20 Zeilen —, die Änderung
+anwenden, bei gleichem Inhalt nichts schreiben, sonst `DocStore.Write` mit `base_revision` =
+gelesene Revision; `stale_revision` ohne `--since` liest neu und wiederholt bis zu dreimal,
+mit `--since` ist es `foreign_change`. `request_id` und Wiederholung nach offenem Ausgang
+übernimmt `kephalaion.Client.Write`. `doc grep (<verweis> | --kind K [--user U] [--done])
+<muster> [--count] [--json]` sucht zeilenweise nach einem RE2-Muster im gespeicherten Text
+ohne Includes (`project.GrepDocRef` über dieselben Ebenen wie `read`, `UserDocs.Grep` über die
+Liste von `doc list`; `project/docgrep.go`), höchstens 200 Treffer, `--count` nennt je
+Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_doc_append`,
+`_replace`, `_set_field` und `_grep` sind die Hüllen darum (`mcpserver/docedit.go`). Vertrag:
+[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Changing and Searching Documents“.
 
 `create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
 `request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per

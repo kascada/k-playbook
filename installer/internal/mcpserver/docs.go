@@ -24,6 +24,8 @@ type docReadInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 	Ref        string `json:"ref" jsonschema:"Pflicht. Der Verweis im Präfixschema, so wie er im Text steht: project:/<pfad> für eine Datei des Projekts ab seiner Wurzel, keph:/<pfad> für ein Dokument der Projekt-Collection (~ als ganzer Pfadteil steht für den eigenen User), k-playbook:/instructions/on-demand/thema.md für eine mitgelieferte oder lokale Datei oder k-playbook:/instructions/always/ (mit / am Ende) für das zusammengebaute Verzeichnis — das einzige; jeder andere Verweis mit / am Ende, etwa k-playbook:/instructions/on-demand/, k-playbook:/rules/ oder project:/docs/, ist invalid_input, weil der Dateiname fehlt. Unter k-playbook: werden instructions/, rules/, reviews/, guidelines/ und commands/ aufgelöst (etwa k-playbook:/rules/befunde.md, k-playbook:/commands/k-upgrade.md); andere k-playbook:-Pfade sind unsupported."`
 	Includes   *bool  `json:"includes,omitempty" jsonschema:"Include-Zeilen (include: <verweis>) durch den Rumpf des Ziels ersetzen, rekursiv. Standard true. Mit false kommt der Rohtext, Include-Zeilen bleiben lesbar stehen — das Gegenstück zu k-playbook read --raw."`
+	Lines      string `json:"lines,omitempty" jsonschema:"Nur diese Zeilen liefern: von-bis, 1-basiert und einschließlich (etwa 10-20), oder von- bis zum Ende. Wirkt nach dem Einsetzen der Includes, nur auf eine Einzeldatei; schließt section aus."`
+	Section    string `json:"section,omitempty" jsonschema:"Nur den Abschnitt liefern, der mit dieser Überschriftenzeile beginnt, genau wie sie im Dokument steht (etwa ## Intent): bis vor die nächste Überschrift gleicher oder höherer Ebene, außerhalb von Code-Blöcken, erster Treffer. Kein Treffer: section_not_found. Nur auf eine Einzeldatei; schließt lines aus."`
 }
 
 // docEnvelope ist die Antwortform von k_playbook_doc_read. Die Felder der
@@ -41,6 +43,8 @@ type docEnvelope struct {
 	Parts      *[]project.DocPart      `json:"parts,omitempty"`
 	Problems   *[]string               `json:"problems,omitempty"`
 	Includes   *[]project.DocInclude   `json:"includes,omitempty"`
+	Revision   int64                   `json:"revision,omitempty"`
+	TotalLines *int                    `json:"totalLines,omitempty"`
 	Error      *knowledgeErrorEnvelope `json:"error,omitempty"`
 }
 
@@ -58,7 +62,11 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 	"absolut oder relativ im selben Präfix) sind schon durch den Rumpf des Ziels ersetzt, rekursiv bis Tiefe 10; " +
 	"includes: false liefert den Rohtext. Die Antwort trägt content, disabled (abgeschaltete Datei: leer, kein " +
 	"Fehler, mit hint), parts (name, origin, disabled), problems (übergangene Dateien und Teile, deren Include " +
-	"scheiterte — mit Kette) und includes (ref, origin, depth, disabled — die eingesetzten Ziele). Ein unbekannter " +
+	"scheiterte — mit Kette), includes (ref, origin, depth, disabled — die eingesetzten Ziele), totalLines (Zeilen " +
+	"des ganzen Inhalts) und bei keph: revision (für since_revision der Änderungswerkzeuge). lines (von-bis oder " +
+	"von-) oder section (eine Überschriftenzeile wie ## Intent, bis vor die nächste gleicher oder höherer Ebene) " +
+	"liefern nur einen Teil einer Einzeldatei, nach dem Einsetzen der Includes; fehlt die Überschrift: " +
+	"section_not_found. Ein unbekannter " +
 	"Verweis ist ein Fehler (not_found) — dann nicht selbst auf der Platte suchen; ein Include-Zyklus ist " +
 	"include_cycle, eine Kette über Tiefe 10 include_too_deep, jeweils mit der Kette in der Meldung. Hülle über " +
 	"`k-playbook read`."
@@ -66,15 +74,20 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 func addDocTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{Name: docToolRead, Description: docReadDescription}, docReadTool)
 	addUserDocTools(server)
+	addDocEditTools(server)
 }
+
+// projectDocLayers ist austauschbar, damit Tests keph:-Verweise ohne Node
+// lesen.
+var projectDocLayers = project.ProjectDocLayers
 
 func docReadTool(ctx context.Context, req *mcp.CallToolRequest, input docReadInput) (*mcp.CallToolResult, any, error) {
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
 		return docErrorResult(projectDir, input.Ref, projectDirErrorCode(err), err), nil, nil
 	}
-	opts := project.DocReadOptions{Raw: input.Includes != nil && !*input.Includes}
-	result, err := project.ResolveDocRefWith(ctx, project.ProjectDocLayers(projectDir), input.Ref, opts)
+	opts := project.DocReadOptions{Raw: input.Includes != nil && !*input.Includes, Lines: input.Lines, Section: input.Section}
+	result, err := project.ResolveDocRefWith(ctx, projectDocLayers(projectDir), input.Ref, opts)
 	if err != nil {
 		code := project.DocRefErrorCode(err)
 		if code == "" {
@@ -86,7 +99,7 @@ func docReadTool(ctx context.Context, req *mcp.CallToolRequest, input docReadInp
 		OK: true, Tool: docToolRead, ProjectDir: projectDir,
 		Ref: result.Ref, Directory: &result.Directory, Content: &result.Content,
 		Disabled: &result.Disabled, Hint: result.Hint, Parts: &result.Parts, Problems: &result.Problems,
-		Includes: &result.Includes,
+		Includes: &result.Includes, Revision: result.Revision, TotalLines: &result.TotalLines,
 	}, false), nil, nil
 }
 
@@ -211,13 +224,16 @@ func addUserDocTools(server *mcp.Server) {
 			"(foreign_user), Sorte ohne done/ (done_unsupported), Dokument schon in done/ oder in keiner Ablage " +
 			"(wrong_dir); belegtes Ziel: name_taken, nichts überschrieben. kephalaion_unavailable und outcome_unknown " +
 			"wie bei k_playbook_doc_create: bei outcome_unknown nicht wiederholen, sondern mit k_playbook_doc_list " +
-			"(done: true) nachsehen. Antwort: ref (neu, mit echtem Namen), from, kind. Hülle über `k-playbook doc done`.",
+			"(done: true) nachsehen. Antwort: ref (neu, mit echtem Namen), from, kind und revision — die Revision nach dem " +
+			"Verschieben (rename erzeugt eine neue), mit der du danach per since_revision weiterschreibst. Hülle über " +
+			"`k-playbook doc done`.",
 	}, docDoneTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolReopen,
 		InputSchema: docKindSchema[docMoveInput](),
 		Description: "Holt ein eigenes Dokument aus done/ zurück in seine Ablage — der umgekehrte Weg von " +
-			"k_playbook_doc_done, mit denselben Ablehnungen (wrong_dir, wenn es nicht in done/ liegt). Hülle über " +
+			"k_playbook_doc_done, mit denselben Ablehnungen (wrong_dir, wenn es nicht in done/ liegt) und derselben " +
+			"Antwort samt revision. Hülle über " +
 			"`k-playbook doc reopen`.",
 	}, docReopenTool)
 }

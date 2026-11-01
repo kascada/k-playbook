@@ -366,3 +366,28 @@ func TestReadKUpgradeAusDefaultsMitInclude(t *testing.T) {
 		t.Errorf("includes: %+v", result.Includes)
 	}
 }
+
+func TestReadZeilenUndAbschnitt(t *testing.T) {
+	readProject(t)
+
+	stdout, _, err := runReadCaptured(t, "k-playbook:/instructions/on-demand/thema.md", "--section", "## Thema")
+	if err != nil || stdout != "## Thema\n" {
+		t.Fatalf("--section: %q %v", stdout, err)
+	}
+	stdout, _, err = runReadCaptured(t, "k-playbook:/instructions/on-demand/thema.md", "--lines=2-3", "--json")
+	var result project.DocResult
+	if err != nil || json.Unmarshal([]byte(stdout), &result) != nil || result.Content != "title: Thema\ndescription: D\n" || result.TotalLines != 6 {
+		t.Fatalf("--lines --json: %q %v", stdout, err)
+	}
+	_, _, err = runReadCaptured(t, "k-playbook:/instructions/on-demand/thema.md", "--section", "## Fehlt")
+	if err == nil || !strings.HasSuffix(err.Error(), "(section_not_found)") {
+		t.Fatalf("section_not_found: %v", err)
+	}
+	_, _, err = runReadCaptured(t, "k-playbook:/instructions/always/", "--lines", "1-2")
+	if err == nil || !strings.HasSuffix(err.Error(), "(invalid_input)") {
+		t.Fatalf("Verzeichnis: %v", err)
+	}
+	if _, _, err = runReadCaptured(t, "k-playbook:/instructions/on-demand/thema.md", "--lines"); err == nil {
+		t.Fatal("--lines ohne Wert angenommen")
+	}
+}
