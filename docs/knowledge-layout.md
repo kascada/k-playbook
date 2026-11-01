@@ -164,9 +164,12 @@ and never touches the first two.
 
 ## What stays outside
 
-`results/` (review runs and their artifacts), `tasks/`, `rules/`, `data/todos.json` and
-`priv/`. That is control and record, not knowledge: it steers a run or documents that one
-happened. None of it answers a question about the project, and none of it moves.
+`results/` (review runs and their artifacts), `rules/` and `priv/`. That is control and
+record, not knowledge: it steers a run or documents that one happened. None of it answers a
+question about the project, and none of it is indexed. Tasks and todos are in the collection
+too since tasks 088, 097 and 105 (`user/<name>/tasks/`, `todos/`), but outside `docs/` and
+therefore outside the knowledge store: control, not knowledge, only now reachable over
+Kephalaion instead of the disk.
 
 ## Access: everything through the gate
 

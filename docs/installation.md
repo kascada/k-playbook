@@ -91,7 +91,7 @@ k-playbook-local/
 ├── docs/          project knowledge for AI sessions, separated by origin
 │   └── manual/    manually maintained documentation; no command writes here
 ├── guidelines/
-├── tasks/done/
+├── tasks/done/    kept for the interface only; tasks live in the project collection
 ├── priv/          private notes; see below
 ├── material/      raw material as a source for docs; see below
 ├── k-playbook.md  project-owned instruction layer
@@ -257,11 +257,11 @@ export BROWSER=/path/to/helper.sh   # receives the URL as an argument
 
 ## Reviews and tasks
 
-The **Workflows** section brings together the work queues, one page per kind: tasks from `k-playbook-local/tasks/`, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/data/todos.json`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
+The **Workflows** section brings together the work queues, one page per kind: tasks, review runs from `k-playbook-local/results/`, and todos from `k-playbook-local/data/todos.json`. The three pages are listed under Workflows in the switcher on the left, on every page — the way to the tasks does not lead through the overview.
 
 `/workflows` itself is the overview: it explains what the three kinds are, when to use each, and how much each currently holds. From there, one link per kind leads to its page.
 
-**Tasks** (`/workflows/tasks`) lists the open tasks in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. "without task refine" is not an error, but it is why `/k-task-run` asks before execution.
+**Tasks** (`/workflows/tasks`) still reads the directory `k-playbook-local/tasks/`: it lists the open tasks there in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. Tasks themselves live in the project collection since task 105 (`keph:/user/<user>/tasks/`, see [`task-flow.md`](./task-flow.md)); the commands no longer read or write the directory, and after `/k-upgrade` 3.3 has moved the files it is empty. Switching this page to the collection is a task of its own; until then the page shows what is left on disk.
 
 **Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
 

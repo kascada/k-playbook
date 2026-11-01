@@ -922,7 +922,7 @@ from it.
 
 | Kind | Location in the collection | User area | Numbering range | `done/` | Start |
 |---|---|---|---|---|---|
-| `tasks` | `user/<name>/tasks/` | yes | all `user/*/tasks/` including `done/`, project-wide | yes | 100 |
+| `tasks` | `user/<name>/tasks/` | yes | all `user/*/tasks/` including `done/`, project-wide | yes | 001 |
 | `workbench` | `user/<name>/workbench/` | yes | all `user/*/workbench/` including `done/`, project-wide | yes | 001 |
 | `findings` | `queue/findings/` | no | the directory | no | 001 |
 | `todos` | `todos/` | no | the directory including `done/` | yes | 001 |
@@ -934,7 +934,10 @@ tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…`
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
 user area is rejected. Directories come into being in Kephalaion with their first document.
-`tasks` starts at 100 so its numbers do not collide with the task files on disk.
+`tasks` starts at 001 like the other kinds (task 105): the task files from disk move into the
+collection under the same name and number, and only the file name has to be unique, not the
+number -- the earlier start at 100, meant to keep clear of the files on disk, had nothing left
+to separate.
 
 **Inputs.** All four take `projectDir` (required by contract, like every tool).
 

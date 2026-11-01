@@ -57,8 +57,8 @@ locations derive from the project root, the directory that holds
 | raw material | `k-playbook-local/material/` |
 | project-owned guidelines | `k-playbook-local/guidelines/` |
 | project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
-| open tasks | `k-playbook-local/tasks/` |
-| completed tasks | `k-playbook-local/tasks/done/` |
+| open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
+| completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; `k-playbook-local/tasks/` and `tasks/done/` stay on disk only for the interface until its Tasks page is switched |
 | machine files owned by k-playbook | `k-playbook-local/data/` |
 | derived, disposable content | `k-playbook-local/cache/` |
 | project todos | `k-playbook-local/data/todos.json` |
@@ -255,6 +255,10 @@ Everything else has no counterpart on the other side:
 |---|---|
 | project-owned only | `results/`, `data/`, `cache/`, `docs/`, `tasks/`, `priv/`, `material/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
+
+`tasks/` is still created but holds no tasks any more: tasks are documents in the project
+collection (`keph:/user/<user>/tasks/`), and the directory stays only until the interface's
+Tasks page is switched; `/k-upgrade` 3.3 moves what still lies there.
 
 `docs/` appears in both rows but is not a pair: `k-playbook/docs/` documents
 k-playbook itself, while `k-playbook-local/docs/` documents the project. They

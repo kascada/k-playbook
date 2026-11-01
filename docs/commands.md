@@ -85,7 +85,7 @@ No command reads or guesses a path. Everything derives from the project root, th
 
 | Command | writes to |
 |---|---|
-| `/k-task-create`, `/k-task-run` | `k-playbook-local/tasks/`, completed tasks to `tasks/done/`; `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/` |
+| `/k-task-create`, `/k-task-run` | `keph:/user/<user>/tasks/` in the project collection, completed tasks to `done/` below it (`k_playbook_doc_done`); nothing on disk. `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/` |
 | `/k-todo` | `k-playbook-local/data/todos.json`, written only through `k-playbook todo` or the MCP tools |
 | `/k-review`, `/k-audit` | `k-playbook-local/results/` |
 | `/k-docs-code`, skill `ks-overlay-repo-analyse` | `k-playbook-local/docs/code/` |

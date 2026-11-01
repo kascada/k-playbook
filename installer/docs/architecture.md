@@ -680,6 +680,13 @@ guidelines/  tasks/  tasks/done/  priv/  material/  k-playbook.md
 version-sources.yaml
 ```
 
+`tasks/` und `tasks/done/` stehen seit Task 105 nur noch für die Oberfläche darin: Tasks
+sind Dokumente der Projekt-Collection (`keph:/user/<user>/tasks/`, Sorte `tasks` in
+`project.DocKinds`, Startnummer 1), kein Command liest oder schreibt sie auf der Platte, und
+`/k-upgrade` 3.3 zieht vorhandene Dateien um. Die README beider Verzeichnisse sagt das; die
+Verzeichnisse fallen, sobald die Seite Tasks der Oberfläche (`/workflows/tasks`,
+`project.ListTasks()`) auf die Collection umgestellt ist — ein eigener Task.
+
 `docs/manual/` steht seit Task 101 nicht mehr darin: handgeschriebene Doku liegt unter
 `keph:/docs/manual/`, und legte das Einrichten das Verzeichnis neu an, brächte es zurück,
 was `/k-upgrade` (3.2) abgeräumt hat. `docs/` bleibt, weil `code/` und `libs/` noch

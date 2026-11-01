@@ -362,18 +362,51 @@ whatever needs it later: the caller passes the intended short name, k-playbook n
 whole file name has to be unique, not the number;** two documents with the same number and
 different names are accepted. The answer is the `keph:` reference with the real user name, and
 the session reads and writes the document directly over Kephalaion. A kind is one entry in a
-table; below the highest number the kind's start number applies. Tasks start at 100 so they do
-not collide with the task files on disk — counting those files along was dropped (2026-10-14).
+table; below the highest number the kind's start number applies. Tasks started at 100 so they
+would not collide with the task files on disk — counting those files along was dropped
+(2026-10-14); since task 105 (2026-11-01) they start at 1 like the other kinds, because the
+files move into the collection under the same name and number (see "Tasks go to the
+collection" below).
 Moving into `done/` and back is `rename` through the hub. Contract:
 [`mcp.md`](./mcp.md#document-tools-in-the-collection); what k-playbook expects of Kephalaion:
 [`kephalaion-client.md`](./kephalaion-client.md).
 
 | Kind | Stored in | Counting range | Start |
 |---|---|---|---|
-| tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide | 100 |
+| tasks | `user/<name>/tasks/` | all `user/*/tasks/` including `done/` — project-wide | 001 (was 100 until task 105) |
 | findings | `queue/findings/` | the directory itself | 001 |
 | workbench | `user/<name>/workbench/` | all `user/*/workbench/` including `done/` — project-wide | 001 |
 | todos | `todos/` | the directory including `done/` | 001 |
+
+**Tasks go to the collection** (decided 2026-11-01, built the same day in tasks 104 and 105;
+not yet measured in a session). A task is a document under `user/<name>/tasks/`, completed
+under `done/`; nothing is written to `k-playbook-local/tasks/` any more, and without
+Kephalaion there is no fallback to disk. Decided: the move is a plain move (same file name
+and number, under the user the person chooses per line), `done/` moves along, a task carries
+frontmatter with `title` only, the state is the location plus the marker lines in the body,
+and the write path is the set of document operations built in task 104 — `append`,
+`replace`, `set_field`, `read` with `section`/`lines`, `grep`, each with `since_revision`;
+one writer at a time, `foreign_change` makes the command stop and ask who continues. Built in
+task 105: the always part `defaults/instructions/always/300-arbeiten-in-tasks.md` (the first
+paragraph of "Wie gearbeitet wird") and the on-demand sheet
+`defaults/instructions/on-demand/tasks.md`, which holds the form of a task once — location,
+name and number (start 1), header, structure, life cycle, marker lines, appended progress
+lines `<!-- k-task-run: etappe <n> erledigt <datum> --> <beleg>` with a reset line instead of
+the `## Fortschritt` table, the write path and the sub-agent revision chain; `/k-task-create`,
+`/k-task-refine`, `/k-task-run` and `/k-remediation` as hull plus text, the modules
+`_task-run/diff-review.md` and `_task/fertig-meldung.md` under `defaults/commands/`;
+`/k-upgrade` 3.3 "Tasks von der Platte"; `betrieb.md`, `command-authoring.md` (both copies),
+`_shared/context.md` and the docs. **Deliberately left as it is until the switch step
+(build first, then put to use):** `k-playbook.md:22` still names tasks under
+`k-playbook-local/`, and the first paragraph of "Wie gearbeitet wird" now stands twice —
+there and in `always/300-arbeiten-in-tasks.md`; `k-playbook.md`, `defaults/k-playbook.md`,
+`AGENTS.md` and the context output are unchanged (row "Wie gearbeitet wird" in the target
+table below). **Open:** the Tasks page of the interface (`/workflows/tasks`,
+`project.ListTasks()`) still reads `k-playbook-local/tasks/`, which is empty after 3.3; its
+switch to the collection is a task of its own, and until then `LocalStructure()` keeps
+`tasks/` and `tasks/done/` with a README that says where tasks live. After the release:
+`/k-task-create` and `/k-task-run` on a trial task in Claude Code and OpenCode, `/k-upgrade`
+3.3 on this repo in a session of its own.
 
 **Todos become documents in the collection** (decided 2026-10-19, built 2026-10-20 in task
 097, not yet released). The todos were one file, `k-playbook-local/data/todos.json`, owned by
@@ -513,7 +546,7 @@ Places: `always/<n>` is a part of `instructions/always/` (shipped numbers below 
 | `k-playbook.md` | "Zwei Verzeichnisse, zwei Eigentümer": the tree, never write into `k-playbook/`, everything project-owned into `k-playbook-local/`, override with a file of the same name | `always/020-zwei-ebenen.md` was the proposal for the two layers and the two rules. Since task 094 (2026-10-18) the part "never write into `k-playbook/`, the roots come from the briefing (`context.project.dir`, `context.local.dir`, `context.playbook.dir`), everything project-owned under `local.dir`" stands in `always/030-briefing.md`; the detail of where a file goes stays in `k-playbook:/guidelines/betrieb.md`. What is left for a `020-zwei-ebenen.md` is only the overlay rule (a file of the same name replaces, an empty one disables) — whether that still needs an always part of its own or is covered by `origin` in the briefing and `on-demand/ueberlagern.md` is noted here, not decided and not built | partly done (094); rest open |
 | `k-playbook.md` | "Überlagern und Abschalten": replace by name, empty disables, the unit per kind, commands and skills must be registered | `on-demand/ueberlagern.md`, for the session that creates, overrides or disables an entry; what a session needs every time — read `k-playbook:` only through k-playbook, origin per entry — is already in `always/010-verweise.md` and in the briefing (`origin`) | open |
 | `k-playbook.md` | "Wo was liegt": no assumptions about paths, `k-playbook context` resolves directories and catalogs | prompt: the one call stays the `anstoss` block; the catalogs with origin are in the briefing | open |
-| `k-playbook.md` | "Wie gearbeitet wird", first paragraph: anything beyond a trivial step becomes a task (`/k-task-create`, `/k-task-refine`, `/k-task-run`) | `always/300-arbeiten-in-tasks.md` | open |
+| `k-playbook.md` | "Wie gearbeitet wird", first paragraph: anything beyond a trivial step becomes a task (`/k-task-create`, `/k-task-refine`, `/k-task-run`) | `always/300-arbeiten-in-tasks.md` | built (task 105, 2026-11-01); the paragraph stands twice until the switch step, and `k-playbook.md:22` still names tasks under `k-playbook-local/` on purpose |
 | `k-playbook.md` | "Wie gearbeitet wird", overview of the shipped commands and the interface (`k-playbook`, `/k-gui`) | `on-demand/commands.md`; the briefing deliberately lists no commands or skills, the assistant has them registered, and `k-playbook/docs/commands.md` keeps the detail | open |
 | `k-playbook.md` | "Wie gearbeitet wird", last paragraph: what applies in a project is the catalog from `context`, a local command replaces or disables the shipped one | drops into `on-demand/ueberlagern.md` (same rule) | open |
 | `k-playbook.md` | "Umgang mit Befunden": `remediation.mode`, the three modes, `configured: false` means ask | `on-demand/remediation.md`, read by `/k-remediation` and when a review finding is handled; the values themselves are the field `remediation` — its place is in the table "Context field → future place" below | open |
@@ -808,6 +841,11 @@ until the last step.
     scheduled run for `queue/findings/`, and `queue_list` for subdirectories. Next (2026-10-24):
     the findings rule, the skill `befunde` and `/k-danke` write into `queue/findings/`; reading
     the queue comes afterwards (see "Writing the findings comes first, reading them later").
+    **Tasks put to use (2026-11-01, tasks 104 and 105):** the document operations in the binary
+    and `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-remediation` on the collection,
+    `/k-upgrade` 3.3 for the files on disk; see "Tasks go to the collection". Still open here:
+    the Tasks page of the interface, the scheduled run for `queue/findings/`, `queue_list` for
+    subdirectories, and the measurement in both clients after the release.
 11. **Generators** — `/k-docs-*` write single documents into the project collection,
     including the removal of stale ones. The commands are outdated and get rebuilt here; the
     six steps of `docs/knowledge-layout.md` ("Migration") are not carried out on them.

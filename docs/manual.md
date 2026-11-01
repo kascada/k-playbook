@@ -48,7 +48,8 @@ flowchart LR
     Playbook --> Tool["bin/ · scripts/"]
 
     Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
-    Local --> Artifacts["results/ · data/ · cache/ · docs/ · tasks/ · guidelines/"]
+    Local --> Artifacts["results/ · data/ · cache/ · docs/ · guidelines/"]
+    Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
     Base --> Effective["effective set"]
     Overlay --> Effective
@@ -59,10 +60,11 @@ flowchart LR
 ### Paths are derived, not stored in config
 
 There is no longer a `paths:` block. Every location derives from the location
-of `K-PLAYBOOK.yaml`: tasks are under `k-playbook-local/tasks/`, results under
-`k-playbook-local/results/`, project knowledge under `k-playbook-local/docs/`,
-and shipped rules under `k-playbook/rules/`. A command therefore neither guesses
-nor reads a path: it derives it.
+of `K-PLAYBOOK.yaml`: results are under `k-playbook-local/results/`, project
+knowledge under `keph:/docs/` in the project collection, and shipped rules under
+`k-playbook/rules/`. Tasks are documents in the project collection as well,
+`keph:/user/<user>/tasks/`, not files on disk. A command therefore neither guesses
+nor reads a path: it derives it, or it takes the reference.
 
 The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
@@ -174,7 +176,7 @@ flowchart TD
     Small -->|no| Task["/k-task-create"]
     Task --> ReviewLoop["/k-task-refine"]
     ReviewLoop --> Run["/k-task-run"]
-    Run --> Done["Move task to tasks/done/"]
+    Run --> Done["Task moves to done/ in the collection"]
 
     Start --> Review["/k-review <name>"]
     Review --> Mode{"Review mode"}
@@ -196,8 +198,11 @@ For planned work that should not be completed in a short chat step:
 /k-task-run
 ```
 
-Tasks arise directly from the conversation or from `/k-remediation`. Details
-are in [`task-flow.md`](./task-flow.md).
+Tasks arise directly from the conversation or from `/k-remediation`. A task is a
+document in the project collection under `keph:/user/<user>/tasks/`, completed
+under `done/`; the briefing lists the own open ones under `work.tasks`, and the
+form of a task stands once, in `k-playbook:/instructions/on-demand/tasks.md`.
+Details are in [`task-flow.md`](./task-flow.md).
 
 ### Code review flow
 

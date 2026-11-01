@@ -50,7 +50,7 @@ Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The
 
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Tasks are under `k-playbook-local/tasks/`, results under `k-playbook-local/results/`, and shipped rules under `k-playbook/rules/`.
+Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped rules under `k-playbook/rules/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 

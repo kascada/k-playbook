@@ -134,7 +134,7 @@ project/
     ├── docs/             project knowledge for AI sessions, separated by origin
     │   └── manual/       hand-written docs; no command writes in here
     ├── guidelines/
-    ├── tasks/done/
+    ├── tasks/done/       kept for the interface only; tasks live in the project collection
     ├── priv/             notes and work in progress
     ├── material/         raw material as a source for docs, never indexed
     │   └── befunde/      findings from analysis and debugging, written by /k-danke
