@@ -26,15 +26,16 @@ func newContextProject(t *testing.T) string {
 			t.Fatalf("%s anlegen: %v", dir, err)
 		}
 	}
-	if err := os.WriteFile(ConfigPath(root), []byte("schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n"), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	writeFile(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
 	return root
 }
 
 func write(t *testing.T, path string, content string) {
 	t.Helper()
 
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("%s anlegen: %v", filepath.Dir(path), err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("%s schreiben: %v", path, err)
 	}

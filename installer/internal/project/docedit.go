@@ -150,7 +150,7 @@ func (u *UserDocs) Replace(ctx context.Context, ref, old, new string, opts DocEd
 		return DocEdited{}, docRefErrorf(DocCodeInvalidInput, "kein Text zum Ersetzen angegeben (old ist leer)")
 	}
 	return u.edit(ctx, ref, opts, func(content string) (string, error) {
-		switch n := strings.Count(content, old); {
+		switch n := countOverlapping(content, old); {
 		case n == 0:
 			return "", docRefErrorf(DocCodeTextNotFound, "der zu ersetzende Text kommt im Dokument nicht vor")
 		case n > 1:
@@ -159,6 +159,23 @@ func (u *UserDocs) Replace(ctx context.Context, ref, old, new string, opts DocEd
 		}
 		return strings.Replace(content, old, new, 1), nil
 	})
+}
+
+// countOverlapping zählt die Vorkommen von sub in s, auch überlappende:
+// Nach einem Treffer geht die Suche eine Stelle weiter, nicht um len(sub).
+// strings.Count würde "x\nx\n" in "x\nx\nx\n" nur einmal zählen, obwohl der
+// Text an zwei Stellen steht und ein Ersetzen damit nicht eindeutig ist.
+// sub darf nicht leer sein.
+func countOverlapping(s, sub string) int {
+	n := 0
+	for {
+		i := strings.Index(s, sub)
+		if i < 0 {
+			return n
+		}
+		n++
+		s = s[i+1:]
+	}
 }
 
 // SetField setzt das Frontmatter-Feld key auf value oder entfernt es, wenn

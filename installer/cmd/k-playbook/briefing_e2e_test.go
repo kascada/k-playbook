@@ -109,7 +109,7 @@ func TestBriefingKlartext(t *testing.T) {
 		t.Errorf("Briefing nennt den Projektpfad:\n%s", briefingPart)
 	}
 	for _, want := range []string{
-		"\n  project:\n    config: " + filepath.Join(root, "K-PLAYBOOK.yaml") + "\n    dir: " + root + "\n",
+		"\n  project:\n    config: " + project.ConfigPath(root) + "\n    dir: " + root + "\n",
 		"\n  now:\n    date: ",
 		"\n  catalogs:\n    checks: (keine)\n",
 		"\n  kephalaion:\n",
@@ -131,9 +131,7 @@ func TestBriefingKlartext(t *testing.T) {
 // das Briefing steht davor, und das Subkommando endet mit 0.
 func TestBriefingKlartextOhneKontext(t *testing.T) {
 	root := briefingProject(t)
-	if err := os.WriteFile(filepath.Join(root, "K-PLAYBOOK.yaml"), []byte("schema_version: 99\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 99\n")
 
 	stdout, err := runBriefingCaptured(t)
 	if err != nil {

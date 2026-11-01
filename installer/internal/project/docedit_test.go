@@ -199,6 +199,37 @@ func TestDocReplace(t *testing.T) {
 	}
 }
 
+func TestDocReplaceUeberlappend(t *testing.T) {
+	ctx := context.Background()
+	docs, store, _ := newEditDocs(t, "# A\nx\nx\nx\n")
+
+	// "x\nx\n" steht an zwei Stellen (überlappend); strings.Count sähe nur eine.
+	_, err := docs.Replace(ctx, "keph:/"+editTask, "x\nx\n", "y\n", DocEditOptions{})
+	wantCode(t, err, DocCodeTextNotUnique)
+	if !strings.Contains(err.Error(), "2-mal") {
+		t.Fatalf("Anzahl fehlt: %v", err)
+	}
+	if len(store.writes) != 0 {
+		t.Fatal("abgelehnt und doch geschrieben")
+	}
+
+	cases := []struct {
+		s, sub string
+		want   int
+	}{
+		{"x\nx\nx\n", "x\nx\n", 2},
+		{"aaaa", "aa", 3},
+		{"a b a\nc\n", "a", 2},
+		{"abc", "d", 0},
+		{"abc", "abc", 1},
+	}
+	for _, c := range cases {
+		if got := countOverlapping(c.s, c.sub); got != c.want {
+			t.Errorf("countOverlapping(%q, %q) = %d, want %d", c.s, c.sub, got, c.want)
+		}
+	}
+}
+
 func TestDocSetFieldRegel(t *testing.T) {
 	str := func(s string) *string { return &s }
 	cases := []struct {

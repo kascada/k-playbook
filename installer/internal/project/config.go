@@ -254,7 +254,8 @@ func suggestRepoRoot(projectDir string) (string, []string) {
 	return "", candidates
 }
 
-// CreateConfig legt die K-PLAYBOOK.yaml im Hauptverzeichnis an.
+// CreateConfig legt die K-PLAYBOOK.yaml unter .k-playbook/ im Hauptverzeichnis
+// an; das Verzeichnis entsteht, wenn es fehlt.
 //
 // Eine vorhandene Datei wird nie überschrieben: sie gehört dem Projekt und
 // kann Werte enthalten, die hier nicht bekannt sind.
@@ -266,6 +267,12 @@ func CreateConfig(projectDir string, repoRoot string) error {
 		return fmt.Errorf("%s ist kein Verzeichnis", projectDir)
 	}
 
+	// Anlegen kommt ohne Discover aus. Ohne den Umzug entstünde neben einer
+	// Datei am früheren Ort eine neue, und der nächste Discover löschte die
+	// alte samt ihren Werten.
+	if err := migrateConfig(projectDir); err != nil {
+		return err
+	}
 	path := ConfigPath(projectDir)
 	if pathExists(path) {
 		return fmt.Errorf("%s existiert bereits", ConfigFileName)
@@ -280,20 +287,23 @@ func CreateConfig(projectDir string, repoRoot string) error {
 		vcs = "git"
 	}
 
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("%s anlegen: %w", ProjectDirName, err)
+	}
 	return os.WriteFile(path, []byte(renderConfig(repoRoot, vcs)), 0o644)
 }
 
 func renderConfig(repoRoot string, vcs string) string {
 	return fmt.Sprintf(`# k-playbook
 #
-# Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.
-# Die Installation liegt daneben unter %s/ und ist vollständig
-# ersetzbar; projekteigene Dateien gehören nicht hinein.
+# Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts: das
+# Verzeichnis über .k-playbook/. Die Installation liegt dort unter %s/
+# und ist vollständig ersetzbar; projekteigene Dateien gehören nicht hinein.
 
 schema_version: %s
 
 project:
-  # Ort des Projekt-Repositorys, relativ zu dieser Datei.
+  # Ort des Projekt-Repositorys, relativ zum Hauptverzeichnis.
   repo_root: %s
   vcs: %s
 

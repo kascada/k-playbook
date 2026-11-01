@@ -42,9 +42,7 @@ func TestVersionGibtNurDieVersionAus(t *testing.T) {
 // genau eine Zeile im Terminal. Gleich, neuer und unbekannt bleiben still.
 func TestStartAusAelteremProgrammMeldetEineZeile(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, project.ConfigFileName), []byte("schema_version: 3\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
 	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName), 0o755); err != nil {
 		t.Fatal(err)
 	}

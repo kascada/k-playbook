@@ -10,9 +10,7 @@ func writeConfig(t *testing.T, content string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	if err := os.WriteFile(ConfigPath(root), []byte(content), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	writeFile(t, ConfigPath(root), content)
 	return root
 }
 

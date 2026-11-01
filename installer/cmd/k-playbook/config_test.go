@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
 func TestRunConfigCreateLegtAnkerImAktuellenVerzeichnisAn(t *testing.T) {
@@ -26,7 +28,7 @@ func TestRunConfigCreateLegtAnkerImAktuellenVerzeichnisAn(t *testing.T) {
 		t.Fatalf("runConfig: %v", err)
 	}
 
-	content, err := os.ReadFile(filepath.Join(root, "K-PLAYBOOK.yaml"))
+	content, err := os.ReadFile(project.ConfigPath(root))
 	if err != nil {
 		t.Fatalf("Konfiguration lesen: %v", err)
 	}
@@ -37,17 +39,18 @@ func TestRunConfigCreateLegtAnkerImAktuellenVerzeichnisAn(t *testing.T) {
 	}
 }
 
+// Eine Datei am früheren Ort direkt im Hauptverzeichnis zählt als vorhandener
+// Anker: Sie zieht um und bleibt unverändert.
 func TestRunConfigCreateLehntVorhandenenAnkerAb(t *testing.T) {
 	root := t.TempDir()
-	path := filepath.Join(root, "K-PLAYBOOK.yaml")
-	if err := os.WriteFile(path, []byte("eigenständig\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, project.ConfigFileName), []byte("eigenständig\n"), 0o644); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 
 	if err := runConfig([]string{"create", root}); err == nil {
 		t.Fatal("runConfig hat einen vorhandenen Anker nicht abgelehnt")
 	}
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(project.ConfigPath(root))
 	if err != nil {
 		t.Fatalf("Konfiguration lesen: %v", err)
 	}

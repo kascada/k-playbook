@@ -117,9 +117,7 @@ func TestCreateConfigSetztVcsNoneOhneRepo(t *testing.T) {
 func TestCreateConfigUeberschreibtNicht(t *testing.T) {
 	root := t.TempDir()
 	original := "schema_version: 2\n# von Hand gepflegt\n"
-	if err := os.WriteFile(ConfigPath(root), []byte(original), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	writeFile(t, ConfigPath(root), original)
 
 	if err := CreateConfig(root, "."); err == nil {
 		t.Fatal("CreateConfig hat eine vorhandene Datei nicht abgelehnt")
@@ -150,9 +148,7 @@ project:
   repo_root: G
   vcs: git
 `
-	if err := os.WriteFile(ConfigPath(root), []byte(content), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	writeFile(t, ConfigPath(root), content)
 
 	config, err := ReadConfig(root)
 	if err != nil {
@@ -184,9 +180,7 @@ andere:
 project:
   repo_root: richtig
 `
-	if err := os.WriteFile(ConfigPath(root), []byte(content), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	writeFile(t, ConfigPath(root), content)
 
 	config, err := ReadConfig(root)
 	if err != nil {

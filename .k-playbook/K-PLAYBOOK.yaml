@@ -1,0 +1,35 @@
+# k-playbook
+#
+# Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts.
+# Die Installation liegt daneben unter k-playbook/ und ist
+# vollstaendig ersetzbar; projekteigene Dateien gehoeren nicht hinein.
+
+schema_version: 3
+
+project:
+  # Ort des Projekt-Repositorys, relativ zu dieser Datei.
+  repo_root: .
+  vcs: git
+  languages:
+    # Sie entscheiden, welche Security-Tools gebraucht werden;
+    # sprachunabhängige gelten immer.
+    - go
+    - python
+
+remediation:
+  # Wie Befunde aus Reviews abgearbeitet werden.
+  mode: task-first
+  target: .
+  grouping: true
+  quick_wins: true
+  branch_prefix: remediation/
+  # Aus dem Modus abgeleitet; Commands lesen sie direkt.
+  pr_required: false
+  direct_fixes: true
+
+tools:
+  gh:
+    # Soll die GitHub CLI genutzt werden? unknown, enabled oder disabled.
+    # Ob gh auf diesem Rechner liegt, steht bewusst nicht hier: das ist ein
+    # Host-Befund und gehoert in die Kontextausgabe.
+    status: enabled

@@ -76,7 +76,7 @@ func gitProject(t *testing.T, version string) (string, string) {
 	gitCmd(t, upstream, "push", "-u", "origin", "main")
 
 	projectDir := filepath.Join(base, "projekt")
-	writeFile(t, filepath.Join(projectDir, project.ConfigFileName), "schema_version: 3\n")
+	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
 	gitCmd(t, projectDir, "clone", remote, project.PlaybookDirName)
 	t.Cleanup(func() { makeWritable(projectDir) })
 	return projectDir, upstream

@@ -913,3 +913,24 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
 21. **Project-own commands and skills into `<project>/.k-playbook/`** — wanted 2026-10-25,
     after item 20: `.k-playbook/` holds only what is new, and `k-playbook-local/` goes once its
     content has moved (to Kephalaion or here). Same names override as before. Not yet planned.
+    Changed 2026-11-01 by item 22: `k-playbook-local/` stays, for unversioned content only.
+22. **`k-playbook-local/` keeps only what is not versioned** — decided 2026-11-01. The
+    directory stays and becomes the place for machine-local, unversioned content;
+    everything versioned moves out, to the project collection or to `.k-playbook/`. The
+    clone `k-playbook/` goes as planned (item 12). Consequences:
+    - `K-PLAYBOOK.local.yaml` stays where it is. Today Git keeps it out through a line that
+      `WriteBinding` adds to `k-playbook-local/.gitignore`
+      (`installer/internal/kephalaion/write.go`). Once nothing versioned is left, the
+      directory ignores itself as a whole, as `.k-playbook/.gitignore` does for `share`, and
+      the single line goes.
+    - The anchor `K-PLAYBOOK.yaml` (versioned, `schema_version: 3`) moves out of the project
+      root into `.k-playbook/`, as a file and not the bare directory: every installation
+      clone carries `.k-playbook/.gitignore`, so a directory anchor would find a project
+      inside `k-playbook/`, and link maintenance creates `.k-playbook/` without any
+      configuration. The file name is open. The path is built only in `project.ConfigPath`
+      and checked in `project.Discover`; `bin/k-check` reads it on its own. Older binaries do
+      not find a moved anchor, so it takes two releases: first read both places, the new one
+      first, then move in `Discover`. In this repo `K-PLAYBOOK.yaml` is a symlink into
+      `k-playbook-local/`, which a plain rename would break.
+    - Open: an inventory of what lies in `k-playbook-local/` today, split into versioned
+      (moves out) and unversioned (stays). Not yet planned.

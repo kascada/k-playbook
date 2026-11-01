@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -828,8 +829,12 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 // Stand kam.
 func ContextForDir(startDir string) (Context, error) {
 	projectDir, err := Discover(startDir)
-	if err != nil {
+	if errors.Is(err, ErrNotFound) {
 		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
+	}
+	if err != nil {
+		// Der Umzug vom früheren Ort ist gescheitert; „nicht gefunden“ wäre falsch.
+		return Context{}, err
 	}
 
 	// Erst bauen, dann heilen. Bricht der Aufbau an einer unlesbaren oder zu

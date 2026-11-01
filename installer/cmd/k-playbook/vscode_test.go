@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/vscodeext"
 )
 
@@ -213,9 +214,7 @@ func vscodeProjekt(t *testing.T, local string) string {
 	t.Helper()
 	root := t.TempDir()
 	t.Setenv("HOME", root)
-	if err := os.WriteFile(filepath.Join(root, "K-PLAYBOOK.yaml"), []byte("schema_version: 3\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
 	if local != "" {
 		dir := filepath.Join(root, "k-playbook-local")
 		if err := os.MkdirAll(dir, 0o755); err != nil {

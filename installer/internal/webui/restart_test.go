@@ -115,7 +115,7 @@ func newRestartFixture(t *testing.T, running string, clone string, asset string,
 
 	projectDir := t.TempDir()
 	playbook := filepath.Join(projectDir, project.PlaybookDirName)
-	writeFile(t, filepath.Join(projectDir, project.ConfigFileName), "schema_version: 3\n")
+	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
 	writeFile(t, filepath.Join(playbook, project.VersionFileName), clone+"\n")
 	writeFile(t, filepath.Join(playbook, program.SumsFileName), fileSum(t, asset)+"  "+program.AssetName()+"\n")
 	// Der Stub ersetzt wie bin/install atomar über mktemp und mv: ein `cp`

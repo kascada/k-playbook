@@ -684,7 +684,7 @@ func newReviewProject(t *testing.T) string {
 			t.Fatalf("%s anlegen: %v", dir, err)
 		}
 	}
-	mustWriteFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
+	mustWriteFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
 	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")

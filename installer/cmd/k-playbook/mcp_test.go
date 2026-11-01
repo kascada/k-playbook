@@ -83,10 +83,7 @@ func newProject(t *testing.T) string {
 			t.Fatalf("%s anlegen: %v", dir, err)
 		}
 	}
-	config := filepath.Join(root, "K-PLAYBOOK.yaml")
-	if err := os.WriteFile(config, []byte("schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n"), 0o644); err != nil {
-		t.Fatalf("Config anlegen: %v", err)
-	}
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
 	return root
 }
 
@@ -673,10 +670,7 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 			name: "fremde schema_version",
 			dir: func(t *testing.T) string {
 				root := newProject(t)
-				config := filepath.Join(root, "K-PLAYBOOK.yaml")
-				if err := os.WriteFile(config, []byte("schema_version: 2\n\nproject:\n  repo_root: .\n"), 0o644); err != nil {
-					t.Fatalf("Config überschreiben: %v", err)
-				}
+				mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 2\n\nproject:\n  repo_root: .\n")
 				return root
 			},
 		},
@@ -729,7 +723,7 @@ func newMCPReviewProject(t *testing.T) string {
 			t.Fatalf("%s anlegen: %v", dir, err)
 		}
 	}
-	mustWriteMCPFile(t, filepath.Join(root, "K-PLAYBOOK.yaml"), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
