@@ -17,7 +17,7 @@ function fakeRun(error, stdout, stderr = '') {
 }
 
 test('ruft das Programm im Projektordner und gibt seine Antwort zurück', async () => {
-	const answer = { configured: true, folders: [{ uri: 'keph://vm/k-playbook', name: 'Keph vm:k-playbook' }] };
+	const answer = { configured: true, folders: [{ uri: 'keph://vm/omni', name: 'Keph vm:omni' }] };
 	const { run, calls } = fakeRun(null, JSON.stringify(answer));
 
 	assert.deepEqual(await readCollections('/bin/k-playbook', '/projekt', run), answer);

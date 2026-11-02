@@ -31,9 +31,10 @@ binding the Kephalaion collections only acts when the Kephalaion extension is in
 ### Kephalaion collections in the workspace
 
 The Kephalaion extension shows a collection as a folder of a multi-root workspace
-(`keph://<hub>/<collection>`). Two of them belong in every window of a project: the public
-collection `k-playbook` and the project's own collection, both on the hub named in
-`k-playbook-local/K-PLAYBOOK.local.yaml`. The extension binds them in by itself on every
+(`keph://<hub>/<collection>`). One of them belongs in every window of a project: the
+project's own collection, on the hub named in `k-playbook-local/K-PLAYBOOK.local.yaml`. The
+public collection `k-playbook` is not bound in; its content reaches the session through
+k-playbook itself. The extension binds the project's collection in by itself on every
 window start (`activationEvents: ["onStartupFinished"]`); the command
 *k-playbook: Kephalaion-Collections einbinden* does the same on demand.
 
@@ -60,7 +61,7 @@ What the extension then does depends on the window:
   VS Code discards on close. Instead it opens the folder's workspace file, and the window
   reloads; the next start then fills in whatever is still missing. With no
   `*.code-workspace` in the folder it creates `<foldername>.code-workspace` (the project
-  folder plus both collections); with exactly one it takes that one; with several it takes
+  folder plus the project's collection); with exactly one it takes that one; with several it takes
   the one named after the folder, or else says that one has to be opened by hand. An
   existing file is never overwritten.
 

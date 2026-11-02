@@ -22,12 +22,20 @@ import (
 // In main und nicht in run, damit die Tests, die run direkt rufen, nicht in
 // das echte Home schreiben. Ausgenommen sind version und help: Die Oberfläche
 // fragt mit `version` eine Datei am Installationsziel ab, bevor sie
-// entscheidet, ob sie installiert — dieser Aufruf soll nichts anfassen.
+// entscheidet, ob sie installiert — dieser Aufruf soll nichts anfassen —,
+// und github run, das außerhalb der Umgebung seines Befehls nichts ändert.
 func ensureShare(args []string) {
 	if len(args) > 0 {
 		switch args[0] {
 		case "version", "help", "-h", "--help":
 			return
+		case "github":
+			// github run richtet nur die Umgebung eines Befehls ein und
+			// schreibt sonst nichts (docs/github-access.md, What is set up);
+			// die mitgelieferten Dateien braucht es nicht.
+			if len(args) > 1 && args[1] == "run" {
+				return
+			}
 		}
 	}
 	if _, err := sharedir.Ensure(guiproc.OwnVersion()); err != nil {

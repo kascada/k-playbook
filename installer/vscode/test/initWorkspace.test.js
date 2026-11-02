@@ -10,7 +10,6 @@ const { state, reset, vscode } = require('./stub');
 const action = require('../actions/initWorkspace');
 
 const kephalaion = 'kascada.kephalaion';
-const oeffentlich = { uri: 'keph://vm/k-playbook', name: 'Keph vm:k-playbook' };
 const projekt = { uri: 'keph://vm/omni', name: 'Keph vm:omni' };
 
 const echteDeps = { ...action.deps };
@@ -19,7 +18,7 @@ let aufrufe;
 
 // einrichten gibt jedem Test einen eigenen Projektordner, eine vorhandene
 // Kephalaion-Erweiterung und ein Programm, das mit answer antwortet.
-function einrichten(answer = { configured: true, folders: [oeffentlich, projekt] }) {
+function einrichten(answer = { configured: true, folders: [projekt] }) {
 	state.extensions[kephalaion] = { id: kephalaion };
 	state.workspaceFolders = [{ name: path.basename(dir), uri: vscode.Uri.file(dir) }];
 	action.deps.resolveExecutable = () => '/bin/k-playbook';
@@ -91,7 +90,7 @@ test('ein scheiternder Aufruf wird beim Start als Warnung gemeldet, von Hand als
 test('sind alle Collections eingebunden, wird nichts geändert', async () => {
 	einrichten();
 	state.workspaceFile = vscode.Uri.file(path.join(dir, 'x.code-workspace'));
-	state.workspaceFolders.push(keph(oeffentlich), keph(projekt));
+	state.workspaceFolders.push(keph(projekt));
 
 	await action.onStartup();
 	assert.deepEqual([state.updates, geoeffnet(), state.warningMessages], [[], [], []]);
@@ -100,12 +99,11 @@ test('sind alle Collections eingebunden, wird nichts geändert', async () => {
 test('mit offener Workspace-Datei wird nur das Fehlende hinten angefügt', async () => {
 	einrichten();
 	state.workspaceFile = vscode.Uri.file(path.join(dir, 'x.code-workspace'));
-	state.workspaceFolders.push(keph(oeffentlich));
 
 	await action.onStartup();
 	assert.equal(state.updates.length, 1);
 	const { start, deleteCount, added } = state.updates[0];
-	assert.deepEqual([start, deleteCount], [2, 0]);
+	assert.deepEqual([start, deleteCount], [1, 0]);
 	assert.deepEqual(added.map((folder) => [folder.uri.toString(), folder.name]), [[projekt.uri, projekt.name]]);
 	assert.deepEqual([geoeffnet(), state.warningMessages, state.infoMessages], [[], [], []]);
 });
@@ -126,7 +124,7 @@ test('nur ein Ordner offen, keine Workspace-Datei: anlegen und öffnen', async (
 	const name = `${path.basename(dir)}.code-workspace`;
 	const angelegt = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
 	assert.deepEqual(angelegt, {
-		folders: [{ path: '.' }, { name: oeffentlich.name, uri: oeffentlich.uri }, { name: projekt.name, uri: projekt.uri }],
+		folders: [{ path: '.' }, { name: projekt.name, uri: projekt.uri }],
 		settings: {},
 	});
 	assert.equal(geoeffnet().length, 1);

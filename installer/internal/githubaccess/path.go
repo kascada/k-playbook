@@ -8,6 +8,9 @@
 // auf diesem Rechner verfügbar ist, beurteilt Judge als eigener Schritt ohne
 // Netz (availability.go, Schritt 2); ob er bei GitHub funktioniert, fragt
 // erst der Test (test.go), und der läuft nur auf ausdrücklichen Aufruf.
+// Für `k-playbook github run` (Schritt 3) wählt Choose ohne Netz je Kanal
+// einen Zugang (choose.go), und ChildEnv baut daraus die Umgebung des
+// Kindprozesses (runenv.go); beide schreiben nichts.
 //
 // Abgrenzung zu internal/github: Das fragt über gh die GitHub-API für die
 // Seite /branches und /k-pr-review; hier geht es allein um die lokale Datei.

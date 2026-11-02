@@ -414,7 +414,8 @@ behind the blocks stays, and a block without a boundary stays with a hint. This
 runs at setup, at the start of the interface and with `k-playbook upgrade`.
 
 `k-playbook upgrade` is the one catch-up in the terminal, the subcommand behind
-`/k-upgrade`: first the program — `git pull --ff-only` in the clone, then the
+`/k-upgrade`: first the program — `git pull --ff-only` in the clone (a clone
+still on `git@github.com:kascada/k-playbook` is switched to HTTPS first), then the
 binary through `k-playbook/bin/install`, only when the running program is older
 than the clone's `VERSION` —, then the project: `AGENTS.md`, `CLAUDE.md` as the
 include file, the linking of commands and skills, the MCP entries. After a

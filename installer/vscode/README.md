@@ -25,9 +25,10 @@ liegt der Befehl als Knopf in der Titelzeile des Editors.
 ### Kephalaion-Collections im Arbeitsbereich
 
 Bei jedem Fensterstart (`activationEvents: ["onStartupFinished"]`) bindet die Erweiterung
-zwei Collections als Ordner ein: die öffentliche Collection `k-playbook` und die des
-Projekts, beide auf dem Hub aus `k-playbook-local/K-PLAYBOOK.local.yaml`. Welche das sind,
-fragt sie das Programm: `k-playbook vscode collections --json`, im Projektordner. Die Regel
+die Collection des Projekts als Ordner ein, auf dem Hub aus
+`k-playbook-local/K-PLAYBOOK.local.yaml`. Die öffentliche Collection `k-playbook` gehört
+nicht dazu: ihr Inhalt kommt über k-playbook selbst. Welche Collection es ist, fragt sie das
+Programm: `k-playbook vscode collections --json`, im Projektordner. Die Regel
 steht damit nur im Programm.
 
 - **Alles eingebunden:** nichts zu tun.

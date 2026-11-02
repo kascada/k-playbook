@@ -50,7 +50,7 @@ and no fixed host path; every project carries its own.
 
 ```bash
 cd /path/to/project
-git clone git@github.com:kascada/k-playbook.git
+git clone https://github.com/kascada/k-playbook.git
 make -C k-playbook install
 k-playbook
 ```

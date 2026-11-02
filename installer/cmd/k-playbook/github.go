@@ -31,7 +31,8 @@ const (
 // Konfiguration, wie sie gelesen wurde, beide mit der Verfügbarkeit jedes
 // Zugangs ohne Netz; `test` fragt GitHub, ob die verfügbaren Zugänge
 // funktionieren — der einzige Unterbefehl mit Netz, und er läuft nur auf
-// diesen Aufruf hin. Alle drei legen die Vorlage an, wenn die Datei fehlt.
+// diesen Aufruf hin; `run` startet einen Befehl unter dem Zugang eines
+// Dienstes (githubrun.go). Alle legen die Vorlage an, wenn die Datei fehlt.
 // Die Datei ist persönlich, nicht projektbezogen — ein Projekt wird nicht
 // gesucht.
 func runGitHub(args []string) error {
@@ -44,6 +45,10 @@ func runGitHub(args []string) error {
 	case "-h", "--help", "help":
 		printGitHubUsage(os.Stdout)
 		return nil
+	case "run":
+		// Eigene Zerlegung: alles nach -- gehört dem Befehl, und eigene
+		// Fehler enden mit 125 statt 2 (docs/github-access.md).
+		return runGitHubRun(rest)
 	case "check", "show", "test":
 	default:
 		printGitHubUsage(os.Stderr)
@@ -321,6 +326,7 @@ Aufruf:
   k-playbook github check [--json]
   k-playbook github show [<dienst>] [--json]
   k-playbook github test [<dienst>] [--json]
+  k-playbook github run <dienst> [--write] [--use <typ>] [--skip <typ>]… [--quiet] -- <befehl> [<arg>…]
 
 Die Datei ~/.config/k-playbook/github.yaml (bzw. $XDG_CONFIG_HOME/k-playbook/
 github.yaml, Override K_PLAYBOOK_GITHUB_CONFIG) nennt je Dienst ein Repository
@@ -351,16 +357,20 @@ Vertrag: docs/github-access.md.
           Meldung oder Kommandozeile. Mit --json das Objekt {file, services,
           ok}, je Zugang result (ok, failed, skipped), identity, read, write,
           expires, warning, message.
+  run     Startet einen Befehl mit dem Zugang des Dienstes, eingerichtet nur
+          in seiner Umgebung; Wahl ohne Netz, kein Rückfall. Eigene
+          Exit-Codes 125, 126, 127, sonst der des Befehls. Einzelheiten:
+          k-playbook github run --help.
 
 Verfügbar heißt, ohne Netz beurteilt: der gh-Login ist in gh hinterlegt, die
 Token-Datei ist eine Zeile mit Modus 0600, der Schlüssel liegt ohne Gruppen-
 und Weltrechte da, der Alias löst per ssh -G nach github.com auf.
 
-Fehlt die Datei, legen alle drei einmal eine Vorlage an (Verzeichnis 0700,
+Fehlt die Datei, legen alle vier einmal eine Vorlage an (Verzeichnis 0700,
 Datei 0600, services: {} und ein Beispiel je Zugangsart) und melden das als
 warning; der nächste Aufruf findet eine leere Datei und meldet nichts.
 
-Exit-Code 0 ohne Problem (die Warnung der Vorlage zählt nicht; ein nicht
+Exit-Code von check, show und test: 0 ohne Problem (die Warnung der Vorlage zählt nicht; ein nicht
 verfügbarer Zugang ist ein Zustand, kein Problem), 1 mit mindestens einem
 error — bei test: mit mindestens einem failed —, 2 bei Aufruffehlern, auch
 bei einem Dienst, der nicht in der Datei steht. Die Probleme der Datei und

@@ -270,7 +270,11 @@ installer/
 │   ├── github.go                Subkommando github: check, show und test [<dienst>] der
 │   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
 │   │                            check und show mit Verfügbarkeit, test gegen GitHub
-│   ├── share.go                 vor jedem Kommando außer version und help:
+│   ├── githubrun.go             github run <dienst> [--write] [--use] [--skip]… [--quiet]
+│   │                            -- <befehl>: Wahl (Choose), Umgebung (ChildEnv), Zeile auf
+│   │                            stderr, dann exec auf den Befehl; Exit oder Signal des
+│   │                            Befehls, eigene Fehler 125/126/127
+│   ├── share.go                 vor jedem Kommando außer version, help und github run:
 │   │                            ~/.local/share/k-playbook/ auf den eingebetteten Stand
 │   └── vscode.go                Subkommando vscode: install, status, vsix -o <datei>
 ├── internal/health/
@@ -299,6 +303,14 @@ installer/
 │   │                            ls-remote, public anonym; 10 s je Aufruf; Report mit
 │   │                            result, identity, read, write, expires, warning, message;
 │   │                            redact entfernt das Token aus jeder Meldung
+│   ├── choose.go                Choose: für github run (Task 110) je Kanal höchstens ein
+│   │                            Zugang ohne Netz — git der erste verfügbare, api der erste
+│   │                            verfügbare mit Token; --write, --use, --skip
+│   ├── runenv.go                ChildEnv: die Umgebung des Befehls — insteadOf und
+│   │                            Credential-Helper über GIT_CONFIG_* hinter denen des
+│   │                            Aufrufers, nur für die URLs des Repos; GIT_SSH_COMMAND,
+│   │                            GH_TOKEN/GITHUB_TOKEN, GIT_TERMINAL_PROMPT=0; ReadToken,
+│   │                            RunLine
 │   ├── template.go              die Vorlage bei fehlender Datei: Verzeichnis 0700, Datei
 │   │                            0600, services: {} und ein Beispiel je Zugangsart
 │   ├── accesstest/              Isolate und Empty für Tests: eigener Override, damit kein
@@ -2119,8 +2131,10 @@ Zwei Entscheidungen darin sind gemessen:
 Beide Einstellungen (`kPlaybook.openCode.executable`, `kPlaybook.openCode.args`) haben
 `scope: "machine"`: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen.
 
-Der Befehl `kPlaybook.initWorkspace` bindet die öffentliche Collection `k-playbook` und
-die des Projekts als `keph://`-Ordner ein. Eine Aktion mit `onStartup` läuft zusätzlich
+Der Befehl `kPlaybook.initWorkspace` bindet die Collection des Projekts als
+`keph://`-Ordner ein. Die öffentliche Collection `k-playbook` bindet er nicht ein: ihr
+Inhalt kommt über k-playbook selbst (`k-playbook:`-Verweise), als Ordner wäre er nur
+Ballast im Explorer. Eine Aktion mit `onStartup` läuft zusätzlich
 bei jedem Fensterstart (`onStartupFinished`); `activate` wartet nicht darauf. Die
 Entscheidungen dahinter:
 
@@ -2538,6 +2552,47 @@ Kommandozeile fließt ein Wert aus der Anfrage. Die Seite setzt alles aus den An
 was die Datei über einen Zugang sagt (`.access-what`) und die Meldung eines Ergebnisses
 (`.access-message`) sind Beschriftungen in `styleLabelClasses`. Die Probleme des Lesers nutzen
 die Liste der Umgebungsprüfung (`.environment-list`).
+
+## Befehl unter einem Dienst (github run)
+
+`k-playbook github run <dienst> -- <befehl>` (Task 110, Vertrag `docs/github-access.md`,
+Abschnitt *Running a command under a service*) startet einen Befehl mit dem Zugang eines
+Dienstes. Die Teile:
+
+- **Wahl ohne Netz** (`githubaccess.Choose`): `run` lädt und prüft die ganze Datei, schickt
+  aber nur den genannten Dienst durch `Judge`, weil `ssh -G` je Alias bis zu drei Sekunden
+  brauchen darf und `run` in jedem Make-Ziel läuft.
+- **Umgebung des Befehls** (`githubaccess.ChildEnv`): die git-Einträge über
+  `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` hinter denen des Aufrufers.
+  Der Credential-Helper steht unter `credential.<url mit Pfad>.helper`, ohne `useHttpPath`:
+  git wendet die URL-Konfiguration mit Pfad an und streicht den Pfad erst danach (gemessen
+  mit git 2.53.0, belegt im Test mit echtem git). Vor dem eigenen Helper steht ein leerer
+  Eintrag, der die Helper des Rechners für diese URL zurücksetzt; sonst riefe git nach der
+  Anmeldung `store` beim Helper des Rechners und legte das Token ab. Der Helper liest das Token
+  aus `GH_TOKEN`/`GITHUB_TOKEN` und antwortet nur auf `get`.
+  Jede Umlenkung steht doppelt, als `insteadOf` und als `pushInsteadOf`, und die Zielform wird
+  zuerst auf sich selbst gelenkt. git nimmt das längste passende Präfix, die Umlenkung des
+  Repos auf sich selbst schlägt deshalb eine des Rechners für ganz `github.com`; und die
+  Push-URL sucht git zuerst unter `pushInsteadOf`, ein `insteadOf` allein verlöre gegen ein
+  `pushInsteadOf` des Rechners (gemessen mit git 2.53.0, belegt im Test mit einer globalen
+  Konfiguration im Temp-HOME).
+- **`exec`, kein Kindprozess**: `run` ersetzt sich mit `syscall.Exec` durch den Befehl. Der
+  Befehl bleibt in der Prozessgruppe des Terminals; ein Strg-C erreicht ihn so genau einmal.
+  Ein Kindprozess mit Signalweitergabe hätte ihm jedes SIGINT an die Gruppe doppelt
+  zugestellt. Exit-Code und Ende durch ein Signal sind die des Befehls; eine Shell als
+  Aufrufer meldet nach einem Signal `128 + n`. 126 und 127 stellt `run` vor dem Ersetzen fest:
+  Gesucht wird der Befehl wie bei `execvp` (`resolveCommand`), damit sie dem Verhalten von
+  `env` entsprechen — ein leerer Name ist 127. Kehrt `syscall.Exec` doch zurück, ist ENOENT 127
+  und alles andere 126. Vor dem Ersetzen bleibt nichts zu tun: Die Zeile auf stderr ist
+  ungepuffert geschrieben, Go öffnet Dateien mit `O_CLOEXEC`, und `run` legt keine temporären
+  Dateien an. Gebaut wird nur für Linux und macOS; `syscall.Exec` gibt es auf beiden.
+- **Nichts außerhalb**: `ensureShare` läuft für `github run` nicht, damit der Aufruf außer der
+  Vorlage einer fehlenden Datei nichts schreibt.
+
+Die e2e-Tests (`cmd/k-playbook/githubrun_e2e_test.go`) starten das Test-Binary als eigenen
+Prozess: `TestMain` in `mcp_test.go` führt mit `K_PLAYBOOK_TEST_MAIN_ARGS` (ein JSON-Feld)
+`run()` aus wie `main`; mit `exec` ersetzt sich dieses Test-Binary durch den Befehl. So sind
+Exit-Code, stderr, SIGTERM an `run` und ein einmaliges SIGINT an die Prozessgruppe echt prüfbar.
 
 ## Branches und Umgebungen
 

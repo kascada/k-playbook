@@ -27,7 +27,7 @@ The advantage is that projects can use different versions. A project that is not
 Yes. Commands and skills refer to it by that name. The name of the project directory above it does not matter.
 
 ```bash
-git clone git@github.com:kascada/k-playbook.git
+git clone https://github.com/kascada/k-playbook.git
 ```
 
 Without a destination argument, the name is derived from the repository name and is therefore correct automatically. You need your own argument only for a fork or mirror cloned under a different name; then it must be `k-playbook`.

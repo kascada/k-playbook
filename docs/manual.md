@@ -125,7 +125,7 @@ that names `k-playbook briefing`; existing content remains untouched.
 
 ```bash
 cd /path/to/project
-git clone git@github.com:kascada/k-playbook.git
+git clone https://github.com/kascada/k-playbook.git
 make -C k-playbook install
 k-playbook
 ```

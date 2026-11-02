@@ -6,29 +6,16 @@ import (
 	"testing"
 )
 
-func TestWorkspaceFoldersOeffentlicheZuerst(t *testing.T) {
+// Die öffentliche Collection k-playbook gehört nicht in den Workspace; ihr
+// Inhalt kommt über k-playbook selbst.
+func TestWorkspaceFoldersNurDieDesProjekts(t *testing.T) {
 	folders, err := WorkspaceFolders(Binding{Hub: "vm", Collection: "omni", Account: "kamran-wsl"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []WorkspaceFolder{
-		{URI: "keph://vm/k-playbook", Name: "Keph vm:k-playbook"},
-		{URI: "keph://vm/omni", Name: "Keph vm:omni"},
-	}
+	want := []WorkspaceFolder{{URI: "keph://vm/omni", Name: "Keph vm:omni"}}
 	if !reflect.DeepEqual(folders, want) {
 		t.Fatalf("Ordner = %+v, erwartet %+v", folders, want)
-	}
-}
-
-// Ist die Collection des Projekts die öffentliche, steht sie einmal da: ein
-// doppelter Ordner im Workspace wäre zweimal dieselbe Wurzel.
-func TestWorkspaceFoldersOhneDoppelteOeffentliche(t *testing.T) {
-	folders, err := WorkspaceFolders(Binding{Hub: "vm", Collection: PublicCollection})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(folders) != 1 || folders[0].URI != "keph://vm/k-playbook" {
-		t.Fatalf("Ordner = %+v, erwartet nur die öffentliche", folders)
 	}
 }
 

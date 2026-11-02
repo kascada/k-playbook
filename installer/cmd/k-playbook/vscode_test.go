@@ -240,9 +240,7 @@ func TestVSCodeCollectionsAusDerAnbindung(t *testing.T) {
 	if !answer.Configured || answer.Message != "" {
 		t.Fatalf("Antwort = %+v", answer)
 	}
-	if len(answer.Folders) != 2 ||
-		answer.Folders[0].URI != "keph://vm/k-playbook" ||
-		answer.Folders[1].URI != "keph://vm/omni" {
+	if len(answer.Folders) != 1 || answer.Folders[0].URI != "keph://vm/omni" {
 		t.Fatalf("Ordner = %+v", answer.Folders)
 	}
 }

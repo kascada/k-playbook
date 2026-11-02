@@ -4,7 +4,7 @@ k-playbook is cloned into the project it is meant to support. There is no centra
 
 ```bash
 cd /path/to/project
-git clone git@github.com:kascada/k-playbook.git
+git clone https://github.com/kascada/k-playbook.git
 make -C k-playbook install
 k-playbook
 ```
@@ -16,6 +16,8 @@ k-playbook/bin/install
 ```
 
 The target directory must be named `k-playbook`: commands and skills address it by that name. Without a destination argument, the name derives from the repository name and is therefore correct automatically; you need a custom argument only when cloning a fork or mirror under another name. It must then be `k-playbook`.
+
+**No SSH key needed.** The repository is public; cloning and updating over HTTPS need neither an SSH key nor a token. Earlier versions of this guide cloned with `git@github.com:kascada/k-playbook.git`, so every update asked for a key. The next update (`k-playbook upgrade`, `/k-upgrade` or the update button in the interface) switches such a clone to `https://github.com/kascada/k-playbook.git` and says so. A host alias from `~/.ssh/config` (`git@github-<name>:…`) and any other repository stay as they are.
 
 **Go is not required.** `bin/install` downloads the release binary suitable for the platform and installs it to `~/.local/bin/k-playbook`. On macOS and in the DevContainer, the installer runs in its own environment and therefore installs the matching macOS or Linux binary.
 
@@ -291,7 +293,7 @@ An assistant can receive the same information as a tool instead of retrieving it
 
 ## Update
 
-The convenient path is the interface. After startup, it checks with `git ls-remote` whether the installation is behind the remote and updates it at the press of a button with `git pull --ff-only`. It briefly makes `k-playbook/` writable and then sets it read-only again. Deliberately `ls-remote` rather than `fetch`: the check runs without being requested and must not touch repository state. Deliberately `--ff-only`: a merge in the clone would create local history that nobody maintains.
+The convenient path is the interface. After startup, it checks with `git ls-remote` whether the installation is behind the remote and updates it at the press of a button with `git pull --ff-only`. It briefly makes `k-playbook/` writable and then sets it read-only again. Deliberately `ls-remote` rather than `fetch`: the check runs without being requested and must not touch repository state. Deliberately `--ff-only`: a merge in the clone would create local history that nobody maintains. If the clone still carries the SSH address of the public repository, the check asks over HTTPS without touching the clone, and the update switches the remote to HTTPS before pulling (see [No SSH key needed](#installation)).
 
 Manually, it works the same way:
 

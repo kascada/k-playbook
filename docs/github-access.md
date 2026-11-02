@@ -12,9 +12,13 @@ the health area `github`. Step 2 is implemented (Task 102): *availability* of an
 without network (`availability.go`, part of `check`, `show` and the health check), the *test*
 against GitHub (`test.go`; `k-playbook github test`, `k_playbook_github_test`, the interface
 page `/github-access`), see the two sections of those names. The gh configuration is read by
-the shared package `internal/ghconfig`, which `project` and `githubaccess` both use. Later
-steps — running a command under a service, named operations — are listed under *Outlook* and
-are not part of the contract until they are specified here.
+the shared package `internal/ghconfig`, which `project` and `githubaccess` both use.
+
+**Status (2026-11-02):** step 3 is implemented (Task 110): *Running a command under a
+service*, `k-playbook github run` — the choice per channel (`choose.go`), the environment of
+the child (`runenv.go`) and the verb (`cmd/k-playbook/githubrun.go`). Later steps — named
+operations among them — are listed under *Outlook* and are not part of the contract until they
+are specified here.
 
 ## What the file is, and is not
 
@@ -41,7 +45,7 @@ These names are fixed and used unchanged everywhere.
 | File | `$XDG_CONFIG_HOME/k-playbook/github.yaml`, or `~/.config/k-playbook/github.yaml` when `XDG_CONFIG_HOME` is unset or not an absolute path |
 | Override | environment variable `K_PLAYBOOK_GITHUB_CONFIG=<path>`; the path is used as given |
 | Subcommand | `k-playbook github <verb>` |
-| Verbs | `check`, `show` (step 1), `test` (step 2) |
+| Verbs | `check`, `show` (step 1), `test` (step 2), `run` (step 3) |
 | Health area | `github` (see Task 098, the environment check in the briefing) |
 | MCP tool | `k_playbook_github_test` (step 2); contract in `mcp.md` |
 | Interface page | *GitHub-Zugänge*, `/github-access` (step 2) |
@@ -92,7 +96,7 @@ is valid and means: nothing configured yet.
 | Key | Required | Meaning |
 |---|---|---|
 | `repo` | yes | `<owner>/<repo>` on github.com. No URL, no `.git`. The host is always github.com; that includes every organisation on GitHub Enterprise Cloud, managed users included, because they live on github.com. Only GitHub Enterprise **Server** — a company's own installation under its own host name — is out of scope, in line with `gh` support elsewhere in k-playbook (`GHHost`). |
-| `access` | yes, at least one entry | The accesses in order of precedence. The first entry that is available is used; see *Availability*. |
+| `access` | yes, at least one entry | The accesses in order of precedence. The first entry that is available is used; see *Availability*, and for `run` the two channels under *Running a command under a service*. |
 
 Unknown keys are an error. Two services may name the same repository; that is how one
 person keeps a writing and a read-only service for the same repo apart, if they want to.
@@ -296,7 +300,11 @@ and `message` when the file cannot be read at all.
 k-playbook github check [--json]
 k-playbook github show [<service>] [--json]
 k-playbook github test [<service>] [--json]
+k-playbook github run <service> [--write] [--use <type>] [--skip <type>]… [--quiet] -- <command> [<arg>…]
 ```
+
+`run` has its own section, *Running a command under a service*, including its exit codes;
+what follows here is about `check`, `show` and `test`.
 
 `check` reads the file and prints the problems; without problems it prints one line that
 names the file, the number of services and the number of services without an available
@@ -436,6 +444,142 @@ as `warning`, a service without an available access as `warning` (see *Availabil
 empty file produces nothing. A session therefore sees a broken or unusable file in its
 briefing, and is told once when the file has just come into being.
 
+## Running a command under a service
+
+`run` starts one command with the access of a service set up for that process, and for
+nothing else. It is how scripts and Make targets reach a repository without knowing which
+access applies: they name the service and keep their own logic — which branch, which lease,
+which merge rule — in their own code. `run` replaces the hand-made setup that scripts carry
+today (`gh auth token -u`, `GH_TOKEN`, a credential helper, `insteadOf`).
+
+```
+k-playbook github run OMNI-GW -- git push origin feature/x
+k-playbook github run OMNI-GW -- gh pr create --base development --draft --fill
+k-playbook github run chapter-mcps -- gh release download v1.2.0 -p '*.tar.gz'
+```
+
+`run` needs no k-playbook project; the service is the only context. It is a command-line verb
+only: there is no MCP tool and no button for it, because running an arbitrary command is not
+something an AI session or the interface should be offered. AI sessions get named operations
+instead (*Outlook*).
+
+### Choosing the accesses
+
+The choice is made **without the network**, from the availability of every access (see
+*Availability*), and in file order: the order of `access` is the precedence, and each person
+decides it in their own file. `run` chooses two things, because a command may need two:
+
+| Channel | Used for | Chosen access |
+|---|---|---|
+| `git` | git's transport: clone, fetch, pull, push, ls-remote | the first `available` access of any type |
+| `api` | `gh` and anything else that reads `GH_TOKEN`/`GITHUB_TOKEN` | the first `available` access of type `token` or `gh` |
+
+`make omni-pr` is the reason: it pushes and then opens a pull request. With `ssh` first in the
+file the push goes over SSH and the pull request still gets a token, if the service has one.
+When the `git` channel chooses a `token` or `gh` access, it is the same access as the `api`
+channel — the first available one is also the first available one with a token — so a command
+never sees two different tokens.
+
+Options narrow the choice; they apply to both channels:
+
+- `--write` skips `public`. Without it, `public` may be chosen for `git` like any other access.
+- `--use <type>` considers only accesses of that type (`gh`, `token`, `ssh`, `public`).
+- `--skip <type>` leaves accesses of that type out; it may be given more than once.
+
+A channel without a usable access stays empty; that alone is not an error, because the command
+may not need it. Only when **both** channels are empty does `run` refuse to start the command.
+
+There is **no automatic fallback**. `run` starts the command exactly once. If it fails, its exit
+code is returned and nothing else happens: `run` sees only an exit code and cannot tell a
+rejected credential from a failing command, and repeating `gh pr create` or `gh pr merge` with
+another access could create or merge twice. A caller that wants another access says so —
+`--skip ssh`, `--use token` — and an AI session asks `k_playbook_github_test` first.
+
+### What is set up
+
+Everything is set up in the environment of the command only. No file is written — except
+the template, which `run` creates like every other read when the file is missing (see *When the
+file is missing*; `run` then ends with `125`, because the template names no service) —, no git
+configuration outside that process changes, `gh auth switch` is never called. Existing
+`GIT_CONFIG_COUNT` entries of the caller are kept; `run` appends its own after them.
+
+| Chosen for `git` | Setup |
+|---|---|
+| `token`, `gh` | SSH forms of the repository URL are rewritten to `https://github.com/<owner>/<repo>`; credential helpers of the machine are cleared for that URL, and a credential helper for it answers with the token. Clearing them keeps git from handing the token to a helper of the machine (`store` after a successful login), which would keep it outside the process. |
+| `ssh` with `key` | HTTPS forms are rewritten to `git@github.com:<owner>/<repo>`; `GIT_SSH_COMMAND="ssh -i <key> -o IdentitiesOnly=yes"`. |
+| `ssh` with `host` | HTTPS forms and `git@github.com:` forms are rewritten to `git@<host>:<owner>/<repo>`. |
+| `public` | SSH forms are rewritten to HTTPS; credential helpers are cleared for that URL, so no other credential of the machine is used. |
+
+| Chosen for `api` | Setup |
+|---|---|
+| `token`, `gh` | `GH_TOKEN` and `GITHUB_TOKEN` are set to the token. |
+| none | `GH_TOKEN` and `GITHUB_TOKEN` are removed from the child's environment, so the command does not quietly use a token the caller happened to have. |
+
+Rules:
+
+- **Only this repository.** Rewrites and the credential helper are bound to the URLs of the
+  service's repository: `https://github.com/<owner>/<repo>`, `git@github.com:<owner>/<repo>`,
+  `ssh://git@github.com/<owner>/<repo>`, each with and without `.git`, and the `git@<host>:` form
+  of every `host` alias the service itself lists. Other repositories in the same command —
+  submodules, a second clone — are left as the machine has them. git matches `insteadOf` by
+  prefix; the form without `.git` therefore also catches a repository whose name only starts
+  with the same text (`acme/web` and `acme/website`). That is accepted: a command run under one
+  service rarely touches such a neighbour, and the form with `.git` is exact.
+- **The target form is pinned.** The form the table rewrites to is also rewritten to itself,
+  with and without `.git`, so a rewrite of the machine cannot take it elsewhere. git applies
+  the longest matching prefix, and the repository's own URL is longer than a rule for all of
+  `github.com`, such as `url."git@github.com:".insteadOf https://github.com/`.
+- **Fetch and push.** Every rewrite, the pinned target form included, is set up for fetch and
+  push (`insteadOf` and `pushInsteadOf`), so a push rewrite of the machine cannot take the push
+  elsewhere. git looks for the push URL under `pushInsteadOf` first; an `insteadOf` alone would
+  lose to a `pushInsteadOf` of the machine.
+- **The token.** For a `gh` access the token is read with `gh auth token -u <login>` when
+  `run` starts; for a `token` access from the file. It is in the child's environment —
+  necessarily, `gh` and git's credential helper read it there — and therefore visible to every
+  process the command starts. It is never on a command line, never in a git configuration
+  value (the helper reads it from the environment), and never in any output of `run`.
+- **No prompts.** `GIT_TERMINAL_PROMPT=0` is set, so a rejected credential ends the command
+  instead of waiting for a password nobody types.
+- Standard input, output and error, the working directory and every other variable are passed
+  through unchanged.
+
+### Output and exit codes
+
+Before starting the command, `run` writes one line to standard error that names the service and
+both choices, for example `github run OMNI-GW: git über token ~/.config/github-tokens/koelnmesse-IT.token, api über token`
+or `… git über ssh host github.com-km, api über gh kkl_kmde`; an empty channel reads `api: keiner`.
+`--quiet` suppresses the line. Standard output belongs to the command alone.
+
+The line is `github run <service>: <git part>, <api part>`. A channel names its access as
+`über <type> <what the file says>`:
+
+| Access | Part |
+|---|---|
+| `gh` | `über gh <login>` |
+| `token` | `über token <file>` |
+| `ssh` with `key` | `über ssh key <key>` |
+| `ssh` with `host` | `über ssh host <host>` |
+| `public` | `über public` |
+| none | `git: keiner` or `api: keiner` |
+
+Paths under the home directory are shown with `~`. The api part names only the type — `api über
+token`, `api über gh` — when it is the same access as the git part, which is always so when git
+uses a `token` or `gh` access; otherwise it names login or path like the git part (`api über gh
+kkl_kmde` after `git über ssh host github.com-km`).
+
+The exit code is the command's. `run`'s own failures use the codes `env` uses, so they do not
+collide with the command's:
+
+| Code | Meaning |
+|---|---|
+| the command's | the command ran. `run` replaces itself with the command, so a signal reaches the command directly and once, and a command ended by a signal ends `run` by the same signal, which a shell reports as `128 + <signal>` |
+| `125` | `run` itself failed: usage error, unknown service (the message names the known services), a file with problems, no usable access in either channel, the token could not be read |
+| `126` | the command was found but cannot be executed |
+| `127` | the command was not found |
+
+Every failure of `run` itself is one German message on standard error with what to do, like the
+problems of *Reading the file*; `k-playbook github check` names the reason per access.
+
 ## Relation to other pages
 
 - `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That
@@ -448,11 +592,15 @@ briefing, and is told once when the file has just come into being.
 
 Not part of the contract yet; each will be specified here before it is built.
 
-- **Running under a service**: `k-playbook github run <service> [--write] -- <command>`,
-  which sets up the chosen access for that one process (token through a credential helper,
-  `GIT_SSH_COMMAND`, `insteadOf` between SSH and HTTPS) and never prints the credential.
+- **Choosing an access for a caller**: a verb and an MCP tool that name, per service, the
+  accesses that work right now in file order — without the network by default, with `--test`
+  against GitHub. Requested from OMNI on 2026-11-02; what a script gets (the first, all, or a
+  choice) and that it gets the way to a credential, never its value, are still to be specified.
 - **Reverse lookup**: from a repository's remote to the service that names it.
-- **Named operations** with project rules, as CLI and MCP.
+- **Named operations** with project rules, as CLI and MCP — the way AI sessions reach GitHub,
+  since `run` is not offered to them: first the reading ones (fetch with status, list of pull
+  requests), then pushing a feature branch and a draft pull request, each with approval, merging
+  last.
 - **A shared, versioned part** for projects where every person uses the same repositories
   with different accounts.
 - **Containers**: `~/.config/k-playbook` mounted read-only; what the template step does there

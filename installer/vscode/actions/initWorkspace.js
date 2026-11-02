@@ -1,6 +1,6 @@
-// Aktion „Kephalaion-Collections einbinden“: bindet die öffentliche
-// Collection k-playbook und die des Projekts als Ordner in den Arbeitsbereich
-// ein. Sie läuft bei jedem Fensterstart von selbst (onStartup) und ist von
+// Aktion „Kephalaion-Collections einbinden“: bindet die Collection des
+// Projekts als Ordner in den Arbeitsbereich ein; welche das ist, sagt das
+// Programm. Sie läuft bei jedem Fensterstart von selbst (onStartup) und ist von
 // Hand aufrufbar (run).
 //
 // Drei Fälle:

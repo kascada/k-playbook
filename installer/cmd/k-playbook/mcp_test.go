@@ -26,6 +26,10 @@ import (
 // abgreifen.
 const childEnv = "K_PLAYBOOK_TEST_MCP_CHILD"
 
+// mainArgsEnv schaltet das Test-Binary in den Betrieb als k-playbook mit den
+// Argumenten aus dieser Variablen (ein JSON-Feld von Zeichenketten).
+const mainArgsEnv = "K_PLAYBOOK_TEST_MAIN_ARGS"
+
 func TestMain(m *testing.M) {
 	// Der abgekoppelte Server: spawnServer startet das eigene Binary — im
 	// Test dieses hier — mit der Servermarke. run() nimmt denselben Weg wie im
@@ -41,6 +45,25 @@ func TestMain(m *testing.M) {
 		if err := run([]string{"mcp"}); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	// Das Test-Binary als k-playbook mit den Argumenten aus mainArgsEnv, mit
+	// derselben Fehlerausgabe und demselben Exit-Code wie main — für
+	// Prüfungen, die einen eigenen Prozess brauchen (github run: Exit-Code,
+	// stderr, Signale).
+	if raw, ok := os.LookupEnv(mainArgsEnv); ok {
+		os.Unsetenv(mainArgsEnv)
+		var args []string
+		if err := json.Unmarshal([]byte(raw), &args); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := run(args); err != nil {
+			if err.Error() != "" {
+				fmt.Fprintf(os.Stderr, "Fehler: %v\n", err)
+			}
+			os.Exit(exitCodeOf(err))
 		}
 		os.Exit(0)
 	}
