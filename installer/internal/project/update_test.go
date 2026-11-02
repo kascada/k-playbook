@@ -263,3 +263,123 @@ func TestUpdateKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
 		t.Errorf("MCPRepairedPortable = %v, erwartet [.mcp.json]", result.MCPRepairedPortable)
 	}
 }
+
+func TestPublicFetchURL(t *testing.T) {
+	cases := map[string]bool{
+		"git@github.com:kascada/k-playbook.git":           true,
+		"git@github.com:kascada/k-playbook":               true,
+		"git@github.com:Kascada/K-Playbook.git":           true,
+		"ssh://git@github.com/kascada/k-playbook.git":     true,
+		"ssh://git@github.com/kascada/k-playbook/":        true,
+		"https://github.com/kascada/k-playbook.git":       false,
+		"git@github-kamranbycloud:kascada/k-playbook.git": false,
+		"git@github.com:jemand/k-playbook.git":            false,
+		"git@github.com:kascada/k-playbook-fork.git":      false,
+		"/tmp/remote.git":                                 false,
+	}
+	for url, want := range cases {
+		got, ok := publicFetchURL(url)
+		if ok != want {
+			t.Errorf("publicFetchURL(%q) ok = %v, erwartet %v", url, ok, want)
+		}
+		if ok && got != PublicRepoURL {
+			t.Errorf("publicFetchURL(%q) = %q, erwartet %q", url, got, PublicRepoURL)
+		}
+	}
+}
+
+// withSSHRemote trägt im Clone die SSH-Adresse des offiziellen Repos ein und
+// biegt die HTTPS-Adresse per insteadOf auf das lokale Remote um. So bleibt
+// der Test ohne Netz, und ein Zugriff über SSH schlüge fehl.
+func withSSHRemote(t *testing.T, projectDir string, remoteDir string) {
+	t.Helper()
+
+	dir := PlaybookDir(projectDir)
+	run(t, dir, "git", "remote", "set-url", "origin", "git@github.com:kascada/k-playbook.git")
+	run(t, dir, "git", "config", "url."+remoteDir+".insteadOf", PublicRepoURL)
+}
+
+func pushSecondCommit(t *testing.T, remoteDir string) {
+	t.Helper()
+
+	other := filepath.Join(t.TempDir(), "anderer")
+	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
+	run(t, other, "git", "config", "user.email", "test@example.com")
+	run(t, other, "git", "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(other, "neu.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("Datei anlegen: %v", err)
+	}
+	run(t, other, "git", "add", "-A")
+	run(t, other, "git", "commit", "-m", "zweiter Stand")
+	run(t, other, "git", "push")
+}
+
+func remoteURL(t *testing.T, projectDir string) string {
+	t.Helper()
+
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	cmd.Dir = PlaybookDir(projectDir)
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("remote.origin.url lesen: %v", err)
+	}
+	return string(output[:len(output)-1])
+}
+
+func TestUpdateStelltSSHRemoteAufHTTPSUm(t *testing.T) {
+	projectDir, remoteDir := newGitInstallation(t)
+	withSSHRemote(t, projectDir, remoteDir)
+	pushSecondCommit(t, remoteDir)
+	if err := SetInstallationReadOnly(projectDir); err != nil {
+		t.Fatalf("Installation sperren: %v", err)
+	}
+
+	result, err := Update(projectDir)
+	if err != nil {
+		t.Fatalf("Update: %v\n%s", err, result.Output)
+	}
+	if result.RemoteSwitched != PublicRepoURL {
+		t.Errorf("RemoteSwitched = %q, erwartet %q", result.RemoteSwitched, PublicRepoURL)
+	}
+	if got := remoteURL(t, projectDir); got != PublicRepoURL {
+		t.Errorf("remote.origin.url = %q, erwartet %q", got, PublicRepoURL)
+	}
+	if !fileExists(filepath.Join(PlaybookDir(projectDir), "neu.txt")) {
+		t.Error("Update hat den neuen Stand nicht eingespielt")
+	}
+	assertNotWritable(t, filepath.Join(PlaybookDir(projectDir), ".git", "config"))
+}
+
+func TestUpdateLaesstAndereRemotesStehen(t *testing.T) {
+	projectDir, remoteDir := newGitInstallation(t)
+
+	result, err := Update(projectDir)
+	if err != nil {
+		t.Fatalf("Update: %v\n%s", err, result.Output)
+	}
+	if result.RemoteSwitched != "" {
+		t.Errorf("RemoteSwitched = %q, erwartet leer", result.RemoteSwitched)
+	}
+	if got := remoteURL(t, projectDir); got != remoteDir {
+		t.Errorf("remote.origin.url = %q, erwartet %q", got, remoteDir)
+	}
+}
+
+func TestCheckUpdateFragtSSHRemoteUeberHTTPS(t *testing.T) {
+	projectDir, remoteDir := newGitInstallation(t)
+	withSSHRemote(t, projectDir, remoteDir)
+
+	// Gleicher Stand ist nur über das umgebogene lokale Remote zu haben: über
+	// SSH wäre es nicht erreichbar oder das echte GitHub mit anderem Stand.
+	status, err := CheckUpdate(projectDir)
+	if err != nil {
+		t.Fatalf("CheckUpdate: %v", err)
+	}
+	if status.Available || status.Remote == "" || status.Remote != status.Local {
+		t.Errorf("nicht über das lokale Remote gefragt: %+v", status)
+	}
+	// Die Prüfung fasst den Clone nicht an.
+	if got := remoteURL(t, projectDir); got != "git@github.com:kascada/k-playbook.git" {
+		t.Errorf("remote.origin.url = %q, CheckUpdate hat umgestellt", got)
+	}
+}

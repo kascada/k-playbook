@@ -107,6 +107,9 @@ type upgradeProgramReport struct {
 	// Pulled: der Pull im Clone ist gelaufen.
 	Pulled     bool   `json:"pulled,omitempty"`
 	PullOutput string `json:"pullOutput,omitempty"`
+	// RemoteSwitched: der Upstream trug die SSH-Adresse des offiziellen Repos
+	// und zeigt jetzt auf diese HTTPS-Adresse.
+	RemoteSwitched string `json:"remoteSwitched,omitempty"`
 	// Installed: bin/install hat das Binary ersetzt.
 	Installed     bool   `json:"installed,omitempty"`
 	InstallOutput string `json:"installOutput,omitempty"`
@@ -291,6 +294,10 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 	default:
 		result, err := upgradeUpdate(environment.ProjectDir)
 		report.PullOutput = result.Output
+		report.RemoteSwitched = result.RemoteSwitched
+		if result.RemoteSwitched != "" {
+			lines = append(lines, "Programm: Remote des Clones von SSH auf "+result.RemoteSwitched+" umgestellt; das Repo ist öffentlich, der Pull braucht keinen Schlüssel.")
+		}
 		if err != nil {
 			report.Error = err.Error()
 			lines = append(lines, "Programm: Pull im Clone fehlgeschlagen — "+err.Error()+"; ohne Netz oder bei lokalen Änderungen im Clone ist das zu erwarten. Das Projekt wird mit dem laufenden Programm nachgezogen.")
@@ -698,7 +705,10 @@ Drei Schritte, je Schritt eine Meldung:
      oder ohne Netz eine Meldung, kein Abbruch; scheitert Download oder
      Install, eine eigene Meldung, und Schritt 2 läuft mit dem laufenden
      Programm. Hat das Binary gewechselt, führt das neu installierte
-     Programm Schritt 2 aus.
+     Programm Schritt 2 aus. Trägt der Clone die SSH-Adresse des
+     öffentlichen Repos (git@github.com:kascada/k-playbook), stellt der Lauf
+     sie vor dem Pull auf https://github.com/kascada/k-playbook.git um; ein
+     Alias-Host aus ~/.ssh/config bleibt stehen.
      Kephalaion: liegt kein kephalaion im PATH, installiert es
      k-playbook/bin/install-kephalaion über das install.sh des neuesten
      Kephalaion-Releases. Ein vorhandenes bleibt unangetastet (aktualisieren:
@@ -714,7 +724,8 @@ Drei Schritte, je Schritt eine Meldung:
 Am Ende, wenn das Binary gewechselt hat: der Hinweis, die Sitzung neu zu
 starten — der MCP-Server der Sitzung behält das alte Programm.
 
---check schreibt nichts: es meldet den Stand des Clones gegenüber dem Remote,
+--check schreibt nichts: es meldet den Stand des Clones gegenüber dem Remote
+(bei der SSH-Adresse des öffentlichen Repos über HTTPS gefragt),
 den Stand des laufenden Programms gegenüber dem Clone, ob kephalaion im PATH
 liegt und, was ein Lauf am Projekt täte. --json gibt den Bericht als JSON aus
 (schemaVersion, check, program, kephalaion, project, restartRequired,

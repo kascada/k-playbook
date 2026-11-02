@@ -50,7 +50,7 @@ locations derive from the project root, the directory that holds
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
-| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; until their switch, `/k-docs-code` and `/k-docs-tools` create `docs/code/` and `docs/libs/` there on their first run |
+| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` through `k-playbook docs checkout|publish`, and until its switch `/k-docs-tools` creates `docs/libs/` there on its first run |
 | tool profiles | `k-playbook-local/docs/libs/`, created by `/k-docs-tools` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |

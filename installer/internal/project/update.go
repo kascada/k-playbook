@@ -62,8 +62,16 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 		return UpdateStatus{}, err
 	}
 
+	// Trägt der Clone noch die SSH-Adresse des offiziellen Repos, fragt die
+	// Prüfung über HTTPS: sie soll keinen Schlüssel verlangen und den Clone
+	// nicht anfassen. Umgestellt wird erst beim Update.
+	query := remoteName
+	if public, ok := remotePublicURL(ctx, dir, remoteName); ok {
+		query = public
+	}
+
 	remoteBranch := strings.TrimPrefix(mergeRef, "refs/heads/")
-	line, err := GitOutput(ctx, dir, "ls-remote", "--heads", remoteName, remoteBranch)
+	line, err := GitOutput(ctx, dir, "ls-remote", "--heads", query, remoteBranch)
 	if ctx.Err() == context.DeadlineExceeded {
 		return UpdateStatus{Branch: branch, Message: "Der Remote hat nicht rechtzeitig geantwortet."}, nil
 	}
@@ -94,6 +102,9 @@ type UpdateResult struct {
 	// Version ist die VERSION der Installation nach dem Pull.
 	Version string `json:"version"`
 	Message string `json:"message"`
+	// RemoteSwitched ist die HTTPS-Adresse, auf die der Upstream vor dem Pull
+	// umgestellt wurde, weil er die SSH-Form des offiziellen Repos trug.
+	RemoteSwitched string `json:"remoteSwitched,omitempty"`
 	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag beim Update
 	// selbsttätig korrigiert wurde — relativ zum Hauptverzeichnis.
 	MCPRepaired []string `json:"mcpRepaired,omitempty"`
@@ -119,19 +130,24 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
 	defer cancel()
 
+	switched, err := usePublicRemote(ctx, dir)
+	if err != nil {
+		return UpdateResult{}, fmt.Errorf("Remote auf %s umstellen: %w", PublicRepoURL, err)
+	}
+
 	cmd := exec.CommandContext(ctx, "git", "pull", "--ff-only")
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(output))
 
 	if ctx.Err() == context.DeadlineExceeded {
-		return UpdateResult{Output: text}, fmt.Errorf("git pull hat nach %s nicht geantwortet", pullTimeout)
+		return UpdateResult{Output: text, RemoteSwitched: switched}, fmt.Errorf("git pull hat nach %s nicht geantwortet", pullTimeout)
 	}
 	if err != nil {
-		return UpdateResult{Output: text}, fmt.Errorf("git pull --ff-only fehlgeschlagen")
+		return UpdateResult{Output: text, RemoteSwitched: switched}, fmt.Errorf("git pull --ff-only fehlgeschlagen")
 	}
 
-	result = UpdateResult{Output: text}
+	result = UpdateResult{Output: text, RemoteSwitched: switched}
 
 	versionAfter := InstalledVersion(dir)
 	// Seit die Binaries Release-Assets sind, hängt alles an VERSION: der Clone

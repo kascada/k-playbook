@@ -1391,6 +1391,17 @@ auflösen. Die Installation ist normalerweise read-only; `Update()` macht sie un
 vor dem Pull für den Eigentümer beschreibbar und setzt sie per `defer` danach wieder
 read-only.
 
+Das Repo ist öffentlich, die Anleitung ließ es aber lange per SSH klonen. Ein so
+angelegter Clone verlangte bei jedem Pull einen Schlüssel. `publicremote.go` erkennt die
+SSH-Formen des offiziellen Repos auf github.com (`git@github.com:kascada/k-playbook`,
+`ssh://git@github.com/kascada/k-playbook`, mit oder ohne `.git`). `Update()` stellt den
+Upstream dann vor dem Pull bleibend auf `https://github.com/kascada/k-playbook.git` um und
+meldet das in `UpdateResult.RemoteSwitched`; `k-playbook upgrade` gibt es als eigene Zeile
+aus. `CheckUpdate()` fragt in diesem Fall nur über HTTPS und lässt den Clone unverändert.
+Gelesen wird der rohe Eintrag `remote.<name>.url`, nicht `git remote get-url`, das
+`insteadOf` schon angewendet hat. Ein Alias-Host aus `~/.ssh/config` (`git@github-<name>:…`)
+und jedes andere Repo bleiben stehen: Wer so etwas einträgt, hat das bewusst gewählt.
+
 Beim Start der Oberfläche ruft `protectProjectInstallation()` denselben Schutz auf. Das
 ist keine Sicherheitsgrenze gegen den Besitzer des Verzeichnisses, sondern eine wirksame
 Barriere gegen versehentliche Schreibwerkzeuge: in `k-playbook/` wird nur noch in
