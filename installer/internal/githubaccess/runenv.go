@@ -63,19 +63,32 @@ func formsOf(service Service) repoForms {
 	return forms
 }
 
-// sshForms sind alle SSH-Formen: git@github.com:, ssh://git@github.com/ und
-// die Aliase.
-func (f repoForms) sshForms() []string {
-	return append([]string{f.scp, f.sshURL}, f.aliases...)
+// all sind alle Formen des Repositorys: https, git@github.com:,
+// ssh://git@github.com/ und die Aliase.
+func (f repoForms) all() []string {
+	return append([]string{f.https, f.scp, f.sshURL}, f.aliases...)
 }
 
 // GitConfig nennt die Einträge der git-Konfiguration, die run für den
 // git-Kanal einrichtet, in dieser Reihenfolge. Ohne Zugang für git: keine.
+// Jede Zugangsart lenkt alle Formen des Repositorys auf ihre Zielform um;
+// sie unterscheiden sich nur in der Zielform und in den Helpern.
 func GitConfig(service Service, git *Access) []ConfigEntry {
 	if git == nil {
 		return nil
 	}
 	forms := formsOf(service)
+	var target string
+	switch {
+	case git.Type == "token" || git.Type == "gh" || git.Type == "public":
+		target = forms.https
+	case git.Type == "ssh" && git.Key != "":
+		target = forms.scp
+	case git.Type == "ssh":
+		target = "git@" + git.Host + ":" + service.Repo
+	default:
+		return nil
+	}
 	var entries []ConfigEntry
 	// rewrite lenkt jede Quellform auf target um, mit und ohne .git: git
 	// nimmt das längste passende insteadOf, die Form mit .git trifft also
@@ -86,7 +99,7 @@ func GitConfig(service Service, git *Access) []ConfigEntry {
 	// Jede Umlenkung steht zweimal, als insteadOf und als pushInsteadOf: git
 	// sucht die Push-URL zuerst unter pushInsteadOf, und ein pushInsteadOf
 	// des Rechners ginge sonst jedem insteadOf von run vor.
-	rewrite := func(target string, sources ...string) {
+	rewrite := func(sources ...string) {
 		for i, source := range append([]string{target}, sources...) {
 			if i > 0 && source == target {
 				continue
@@ -113,21 +126,12 @@ func GitConfig(service Service, git *Access) []ConfigEntry {
 		}
 	}
 
-	switch {
-	case git.Type == "token" || git.Type == "gh":
-		rewrite(forms.https, forms.sshForms()...)
+	rewrite(forms.all()...)
+	switch git.Type {
+	case "token", "gh":
 		helpers(true)
-	case git.Type == "public":
-		rewrite(forms.https, forms.sshForms()...)
+	case "public":
 		helpers(false)
-	case git.Type == "ssh" && git.Key != "":
-		// Nach der Tabelle des Vertrags nur die https-Formen; ssh:// und
-		// Aliase bleiben, wie sie sind.
-		rewrite(forms.scp, forms.https)
-	case git.Type == "ssh":
-		// Nach der Tabelle des Vertrags die https-Formen und git@github.com:;
-		// ssh:// und andere Aliase bleiben, wie sie sind.
-		rewrite("git@"+git.Host+":"+service.Repo, forms.https, forms.scp)
 	}
 	return entries
 }

@@ -31,7 +31,7 @@ Datei schaltet die mitgelieferte ab; ihr Inhalt darf dann den Grund nennen.
 `betrieb.md`. Der Grund steht im Abschnitt „Zusammenführung": eine gleichnamige
 projekteigene Datei ersetzt die mitgelieferte vollständig. Der erste Lauf, der einen
 Eintrag nach `k-playbook-local/guidelines/betrieb.md` schriebe, schaltete damit die
-mitgelieferte Ablage-Guideline still ab — samt der Regeln zu `data/`, `cache/` und der
+mitgelieferte Ablage-Guideline still ab — samt der Regeln zu `cache/` und der
 Todo-Verwaltung, die dort stehen.
 
 Die Trennung ist auch inhaltlich die richtige: `betrieb.md` sagt, wohin etwas gehört,

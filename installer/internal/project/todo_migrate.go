@@ -13,22 +13,31 @@ import (
 // Übernahme von data/todos.json in die Collection (`k-playbook todo
 // migrate`, Task 097, Etappe 6). Allein dieser Weg liest die Datei.
 //
-// Erster Lauf (noch kein data/todos.json.migriert): Jeder Eintrag wird ein
-// Dokument mit festem Namen <id dreistellig>-<kurzname>.md, nicht über die
-// Nummernvergabe — so bleiben die bisherigen Nummern erhalten. Übersprungen
-// wird ein Eintrag nur, wenn unter todos/ oder todos/done/ ein Dokument mit
-// seiner Nummer und demselben Text liegt; ein anderer Text bricht ab, ebenso
-// ein Dokument, dessen Nummer nicht aus todos.json stammt. Geprüft wird vor
-// dem ersten Anlegen.
+// Erstlauf oder Nachzügler entscheidet der Inhalt (Task 112): Ein Lauf ist
+// ein Nachzügler, wenn data/todos.json.migriert liegt oder unter todos/ bzw.
+// todos/done/ ein Dokument liegt, das nicht zu todos.json passt — seine
+// Nummer kommt dort nicht vor, oder sie kommt vor, aber mit anderem Text.
+// Sonst ist es ein Erstlauf: bei leerer Collection oder wenn jedes Dokument
+// passt, etwa nach einem abgebrochenen Erstlauf. Die Merkdatei allein reicht
+// nicht, weil /k-upgrade 3.4 data/ samt den umbenannten Dateien abräumt.
 //
-// Nachzügler (data/todos.json.migriert besteht schon, etwa weil ein älteres
-// Binary nach der Übernahme wieder nach data/todos.json geschrieben hat): Die
-// Einträge werden über die normale Nummernvergabe angehängt; übersprungen
-// wird nur, wessen Text schon als Dokument vorliegt, damit ein Wiederholen
-// nach einem Abbruch nichts doppelt anlegt.
+// Erstlauf: Jeder Eintrag wird ein Dokument mit festem Namen <id
+// dreistellig>-<kurzname>.md, nicht über die Nummernvergabe — so bleiben die
+// bisherigen Nummern erhalten. Übersprungen wird ein Eintrag, dessen Nummer
+// schon mit demselben Text als Dokument vorliegt; so setzt ein Lauf nach
+// einem Abbruch den Erstlauf fort.
+//
+// Nachzügler (etwa weil ein älteres Binary nach der Übernahme wieder nach
+// data/todos.json geschrieben hat, oder weil die Collection schon eigene
+// Todos hat): Die Einträge werden über die normale Nummernvergabe angehängt,
+// ihre alten Nummern bleiben nicht erhalten; übersprungen wird nur, wessen
+// Text schon als Dokument vorliegt, damit nichts doppelt angelegt wird —
+// auch nicht beim Wiederholen nach einem Abbruch. „Doppelt“ heißt gleicher
+// Text: Wurde ein Dokument nach einem abgebrochenen Erstlauf bearbeitet,
+// steht sein alter Text danach als neuer Eintrag daneben.
 //
 // Erst wenn alle Einträge angekommen sind, wird die Datei umbenannt: beim
-// ersten Lauf nach todos.json.migriert, ein Nachzügler nach
+// Erstlauf nach todos.json.migriert, ein Nachzügler nach
 // todos.json.nachzuegler-<datum>[-<n>]. Ein vorhandener Name wird nie
 // überschrieben; umbenannte Dateien liest niemand mehr.
 
@@ -154,7 +163,7 @@ func MigrateTodos(ctx context.Context, projectDir string) (TodoMigration, error)
 		return result, err
 	}
 
-	if fileExists(TodoMigratedFile(projectDir)) {
+	if fileExists(TodoMigratedFile(projectDir)) || !matchesLegacyTodos(todos, existing) {
 		result.Mode = TodoMigrationLatecomer
 		err = access.migrateLatecomer(ctx, todos, existing, &result)
 	} else {
@@ -200,36 +209,42 @@ func migrationTarget(projectDir, mode string) (string, error) {
 	return "", fmt.Errorf("kein freier Name für den Nachzügler unter %s", todoRel(""))
 }
 
-// migrateFirst ist der erste Lauf: erst prüfen, dann anlegen.
-func (a *todoAccess) migrateFirst(ctx context.Context, todos []legacyTodo, existing []todoEntry, result *TodoMigration) error {
-	sourceIDs := map[int]bool{}
+// matchesLegacyTodos sagt, ob jedes Dokument der Collection zu einem Eintrag
+// aus todos.json passt: gleiche Nummer, gleicher Text. Nur dann ist ein Lauf
+// ohne todos.json.migriert ein Erstlauf.
+func matchesLegacyTodos(todos []legacyTodo, existing []todoEntry) bool {
+	texts := map[int]string{}
 	for _, todo := range todos {
-		sourceIDs[todo.ID] = true
+		texts[todo.ID] = legacyTodoDoc(todo).Text
 	}
-	byNumber := map[int][]todoEntry{}
 	for _, entry := range existing {
-		if !sourceIDs[entry.todo.ID] {
-			return docRefErrorf(DocCodeInvalidInput, "Übernahme abgebrochen, nichts angelegt: %s trägt die Nummer %d, die nicht aus %s stammt — "+
-				"erst klären, ob es gelöscht oder nach der Übernahme neu angelegt werden soll", entry.name, entry.todo.ID, todoRel(TodoFileName))
+		text, ok := texts[entry.todo.ID]
+		if !ok || entry.todo.Text != text {
+			return false
 		}
-		byNumber[entry.todo.ID] = append(byNumber[entry.todo.ID], entry)
+	}
+	return true
+}
+
+// migrateFirst ist der Erstlauf: Jedes vorhandene Dokument passt zu
+// todos.json (matchesLegacyTodos); angelegt wird, was noch fehlt, unter der
+// alten Nummer.
+func (a *todoAccess) migrateFirst(ctx context.Context, todos []legacyTodo, existing []todoEntry, result *TodoMigration) error {
+	byNumber := map[int]string{}
+	for _, entry := range existing {
+		if _, ok := byNumber[entry.todo.ID]; !ok {
+			byNumber[entry.todo.ID] = entry.name
+		}
 	}
 
 	var pending []legacyTodo
 	for _, todo := range todos {
-		docs := byNumber[todo.ID]
-		if len(docs) == 0 {
+		name, ok := byNumber[todo.ID]
+		if !ok {
 			pending = append(pending, todo)
 			continue
 		}
-		text := legacyTodoDoc(todo).Text
-		for _, doc := range docs {
-			if doc.todo.Text != text {
-				return docRefErrorf(DocCodeInvalidInput, "Übernahme abgebrochen, nichts angelegt: Eintrag %d aus %s liegt schon als %s vor, aber mit anderem Text",
-					todo.ID, todoRel(TodoFileName), doc.name)
-			}
-		}
-		result.Skipped = append(result.Skipped, TodoMigrationEntry{SourceID: todo.ID, ID: todo.ID, Name: docs[0].name,
+		result.Skipped = append(result.Skipped, TodoMigrationEntry{SourceID: todo.ID, ID: todo.ID, Name: name,
 			Reason: "liegt mit demselben Text schon vor"})
 	}
 

@@ -468,7 +468,8 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 Das Einrichten legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
 sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection oder zieht als
 Nächstes dorthin. In einem bestehenden Projekt liegen sie noch, oft nur mit ihrer README.
-Diese Umstellung löscht jedes davon, das leer ist. Sie läuft nach 3.1 bis 3.3, damit zählt,
+Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
+Übernahmereste der Todos. Sie läuft nach 3.1 bis 3.3, damit zählt,
 was dort umgezogen ist. Die Liste gehört zu dieser Fassung des Commands; das Programm nennt
 sie nicht:
 
@@ -499,6 +500,15 @@ Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeich
 - Unterverzeichnissen, die ihrerseits in diesem Sinn leer sind, etwa `tasks/done/` mit seiner
   README oder ein `inbox/<quelle>/` ohne Inhalt.
 
+**Ausnahme für `data/`.** Direkt unter `data/`, nicht in einem Unterverzeichnis, zählen auch
+die Übernahmereste von `k-playbook todo migrate` wie eine `README.md`: die Datei
+`todos.json.migriert` und jede Datei `todos.json.nachzuegler-<datum>` oder
+`todos.json.nachzuegler-<datum>-<n>` (`<datum>` als `JJJJ-MM-TT`). Jede zählt für sich, auch
+ohne die andere; ein `data/` mit `README.md` und nur Nachzügler-Dateien ist also ebenfalls
+leer. Diese Dateien liest niemand mehr, und `k-playbook todo migrate` erkennt einen Nachzügler
+auch ohne sie. Liegt dagegen `data/todos.json` selbst noch da, ist sie noch nicht übernommen:
+`data/` bleibt, und seine Zeile nennt `k-playbook todo migrate`.
+
 Alles andere heißt „liegt anderes darin“: jede weitere Datei, eine `.gitignore` mit anderem
 Inhalt, ein anderes Dotfile, ein Symlink. Auch ein abgeleiteter Index wie
 `cache/knowledge/index.json` zählt dazu, obwohl er jederzeit neu entsteht.
@@ -511,25 +521,32 @@ auch für `tasks/done/`; beide stehen dann in einer Zeile `tasks/`.
 **b) Vorlegen.** Lege gebündelt vor, eine Zeile je Verzeichnis in der Reihenfolge der Liste:
 für ein leeres der Vorschlag, es zu löschen, mit dem, was darin liegt; für jedes andere die
 Zeile `bleibt: <was noch liegt>`. Genannt werden Pfade relativ zum Verzeichnis, eine README
-eingeschlossen, höchstens fünf; liegt mehr darin, dazu die Gesamtzahl der Dateien.
+eingeschlossen, höchstens fünf; liegt mehr darin, dazu die Gesamtzahl der Dateien. Bleibt
+`data/`, weil `todos.json` darin liegt, endet seine Zeile mit `— erst k-playbook todo migrate`.
 
 ```text
 Aufräumen in k-playbook-local/
   docs/        [löschen]  nur README.md
   tasks/       [löschen]  nur README.md, done/README.md
-  data/        bleibt: README.md, todos.json.migriert
+  data/        [löschen]  nur README.md, todos.json.migriert
   material/    bleibt: README.md, notizen.md
   inbox/       bleibt: README.md, .gitignore, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
   queue/       [löschen]  nur README.md
   cache/       bleibt: README.md, .gitignore, knowledge/index.json
 ```
 
+Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
+
+```text
+  data/        bleibt: README.md, todos.json — erst k-playbook todo migrate
+```
+
 Ein Verzeichnis, das nicht liegt, erscheint nicht. Warte auf die Antwort. Der Nutzer bestätigt
 die Vorlage ganz oder nimmt einzelne Zeilen aus.
 
 **c) Ausführen, was bestätigt ist.** Prüfe je bestätigter Zeile unmittelbar vor dem Löschen
-noch einmal, ob das Verzeichnis leer ist; zwischen Vorlage und Antwort kann etwas
-hinzugekommen sein. Ist es leer, löschst du es samt Inhalt im Dateisystem. Ist es das nicht
+noch einmal, ob das Verzeichnis leer ist, für `data/` mit derselben Ausnahme; zwischen Vorlage
+und Antwort kann etwas hinzugekommen sein, etwa eine neue `data/todos.json`. Ist es leer, löschst du es samt Inhalt im Dateisystem. Ist es das nicht
 mehr, bleibt es und wird mit dem Grund gemeldet. Committet wird nicht: Versionierte READMEs
 stehen danach als gelöscht in `git status`.
 

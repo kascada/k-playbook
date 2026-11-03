@@ -79,7 +79,7 @@ func TestGitConfigJeZugangsart(t *testing.T) {
 			"credential.https://github.com/acme/web.helper=",
 		)},
 		// Ein Fall ausgeschrieben, damit die Form der Einträge feststeht.
-		{"ssh key: https auf git@github.com:", runService(key, alias), 0, []string{
+		{"ssh key: alle Formen auf git@github.com:", runService(key, alias), 0, []string{
 			"url.git@github.com:acme/web.git.insteadOf=git@github.com:acme/web.git",
 			"url.git@github.com:acme/web.insteadOf=git@github.com:acme/web",
 			"url.git@github.com:acme/web.git.pushInsteadOf=git@github.com:acme/web.git",
@@ -88,11 +88,19 @@ func TestGitConfigJeZugangsart(t *testing.T) {
 			"url.git@github.com:acme/web.insteadOf=https://github.com/acme/web",
 			"url.git@github.com:acme/web.git.pushInsteadOf=https://github.com/acme/web.git",
 			"url.git@github.com:acme/web.pushInsteadOf=https://github.com/acme/web",
+			"url.git@github.com:acme/web.git.insteadOf=ssh://git@github.com/acme/web.git",
+			"url.git@github.com:acme/web.insteadOf=ssh://git@github.com/acme/web",
+			"url.git@github.com:acme/web.git.pushInsteadOf=ssh://git@github.com/acme/web.git",
+			"url.git@github.com:acme/web.pushInsteadOf=ssh://git@github.com/acme/web",
+			"url.git@github.com:acme/web.git.insteadOf=git@github-acme:acme/web.git",
+			"url.git@github.com:acme/web.insteadOf=git@github-acme:acme/web",
+			"url.git@github.com:acme/web.git.pushInsteadOf=git@github-acme:acme/web.git",
+			"url.git@github.com:acme/web.pushInsteadOf=git@github-acme:acme/web",
 		}},
-		{"ssh host: https und git@github.com: auf den Alias", runService(alias, oldAlias), 0,
-			rewrites("git@github-acme:acme/web", https, "git@github.com:acme/web")},
+		{"ssh host: alle Formen auf den Alias, auch der deaktivierte", runService(alias, oldAlias), 0,
+			rewrites("git@github-acme:acme/web", https, "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-alt:acme/web")},
 		{"ssh host github.com: die Zielform nur einmal", runService(Access{Type: "ssh", Host: "github.com", State: StateAvailable}), 0,
-			rewrites("git@github.com:acme/web", https)},
+			rewrites("git@github.com:acme/web", https, "ssh://git@github.com/acme/web")},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -305,18 +313,21 @@ func gitIn(t *testing.T, env []string, stdin string, args ...string) (string, er
 	return string(out), err
 }
 
+// Jede Zugangsart lenkt jede Form des Repositorys auf ihre Zielform, auch
+// die Form eines zweiten host-Alias desselben Dienstes.
 func TestChildEnvUmlenkungMitEchtemGit(t *testing.T) {
 	_, environ := realGit(t)
 	alias := Access{Type: "ssh", Host: "github-acme", State: StateAvailable}
+	second := Access{Type: "ssh", Host: "github-alt", State: StateAvailable}
 	cases := []struct {
 		name    string
 		service Service
 		target  string
 	}{
-		{"gh", runService(Access{Type: "gh", Login: "alice", State: StateAvailable}, alias), "https://github.com/acme/web"},
-		{"public", runService(Access{Type: "public", State: StateAvailable}, alias), "https://github.com/acme/web"},
-		{"ssh key", runService(Access{Type: "ssh", Key: "/k/id", State: StateAvailable}, alias), "git@github.com:acme/web"},
-		{"ssh host", runService(alias), "git@github-acme:acme/web"},
+		{"gh", runService(Access{Type: "gh", Login: "alice", State: StateAvailable}, alias, second), "https://github.com/acme/web"},
+		{"public", runService(Access{Type: "public", State: StateAvailable}, alias, second), "https://github.com/acme/web"},
+		{"ssh key", runService(Access{Type: "ssh", Key: "/k/id", State: StateAvailable}, alias, second), "git@github.com:acme/web"},
+		{"ssh host", runService(alias, second), "git@github-acme:acme/web"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -329,26 +340,20 @@ func TestChildEnvUmlenkungMitEchtemGit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, form := range []string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web"} {
+			for _, form := range []string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web", "git@github-alt:acme/web"} {
 				for _, suffix := range []string{".git", ""} {
 					got, err := gitIn(t, env, "", "ls-remote", "--get-url", form+suffix)
 					if err != nil {
 						t.Fatalf("git ls-remote --get-url: %v %s", err, got)
 					}
 					expected := c.target + suffix
-					// Nach der Tabelle des Vertrags bleiben bei ssh key
-					// ssh:// und Aliase stehen, bei ssh host ssh://.
-					if (c.name == "ssh key" && !strings.HasPrefix(form, "https://")) ||
-						(c.name == "ssh host" && strings.HasPrefix(form, "ssh://")) {
-						expected = form + suffix
-					}
 					if strings.TrimSpace(got) != expected {
 						t.Errorf("%s → %s, erwartet %s", form+suffix, strings.TrimSpace(got), expected)
 					}
 				}
 			}
 			// Ein fremdes Repository bleibt, wie es ist.
-			for _, foreign := range []string{"git@github.com:acme/other.git", "https://github.com/other/web.git", "git@github-acme:acme/other.git"} {
+			for _, foreign := range []string{"git@github.com:acme/other.git", "https://github.com/other/web.git", "ssh://git@github.com/acme/other.git", "git@github-acme:acme/other.git", "git@github-alt:acme/other.git"} {
 				got, _ := gitIn(t, env, "", "ls-remote", "--get-url", foreign)
 				if strings.TrimSpace(got) != foreign {
 					t.Errorf("fremdes Repo %s → %s", foreign, strings.TrimSpace(got))
@@ -360,10 +365,9 @@ func TestChildEnvUmlenkungMitEchtemGit(t *testing.T) {
 
 // Umlenkungen des Rechners für ganz github.com, als insteadOf und als
 // pushInsteadOf, in der globalen Konfiguration des Temp-HOME: https auf SSH
-// und SSH (auch über den Alias) auf https. Unter run bleibt jede Form des
-// Repositorys, die run einrichtet, bei der gewählten Form, beim Abholen wie
-// beim Push; die Formen, die run nicht anfasst, und fremde Repositorys
-// bleiben, wie der Rechner sie hat.
+// und jede SSH-Form (ssh://, beide Aliase) woandershin. Unter run geht jede
+// Form des Repositorys bei jeder Zugangsart auf die gewählte Form, beim
+// Abholen wie beim Push; fremde Repositorys bleiben, wie der Rechner sie hat.
 func TestChildEnvGegenUmlenkungenDesRechners(t *testing.T) {
 	_, environ := realGit(t)
 	for _, kind := range []string{"insteadOf", "pushInsteadOf"} {
@@ -371,6 +375,8 @@ func TestChildEnvGegenUmlenkungenDesRechners(t *testing.T) {
 			"git@github.com:":      "https://github.com/",
 			"https://github.com/":  "git@github.com:",
 			"https://example.org/": "git@github-acme:",
+			"https://example.net/": "ssh://git@github.com/",
+			"https://example.com/": "git@github-alt:",
 		} {
 			if out, err := gitIn(t, environ, "", "config", "--global", "--add", "url."+target+"."+kind, source); err != nil {
 				t.Fatalf("git config: %v %s", err, out)
@@ -407,25 +413,20 @@ func TestChildEnvGegenUmlenkungenDesRechners(t *testing.T) {
 	}
 
 	alias := Access{Type: "ssh", Host: "github-acme", State: StateAvailable}
+	second := Access{Type: "ssh", Host: "github-alt", State: StateAvailable}
 	cases := []struct {
 		name    string
 		service Service
 		target  string
-		forms   []string // die Formen, die run auf target lenkt
 	}{
-		{"token", runService(Access{Type: "token", File: "/t/a.token", State: StateAvailable}, alias), "https://github.com/acme/web",
-			[]string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web"}},
-		{"gh", runService(Access{Type: "gh", Login: "alice", State: StateAvailable}, alias), "https://github.com/acme/web",
-			[]string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web"}},
-		{"public", runService(Access{Type: "public", State: StateAvailable}, alias), "https://github.com/acme/web",
-			[]string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web"}},
-		{"ssh key", runService(Access{Type: "ssh", Key: "/k/id", State: StateAvailable}, alias), "git@github.com:acme/web",
-			[]string{"git@github.com:acme/web", "https://github.com/acme/web"}},
-		{"ssh host", runService(alias), "git@github-acme:acme/web",
-			[]string{"git@github-acme:acme/web", "https://github.com/acme/web", "git@github.com:acme/web"}},
+		{"token", runService(Access{Type: "token", File: "/t/a.token", State: StateAvailable}, alias, second), "https://github.com/acme/web"},
+		{"gh", runService(Access{Type: "gh", Login: "alice", State: StateAvailable}, alias, second), "https://github.com/acme/web"},
+		{"public", runService(Access{Type: "public", State: StateAvailable}, alias, second), "https://github.com/acme/web"},
+		{"ssh key", runService(Access{Type: "ssh", Key: "/k/id", State: StateAvailable}, alias, second), "git@github.com:acme/web"},
+		{"ssh host", runService(alias, second), "git@github-acme:acme/web"},
 	}
-	all := []string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web"}
-	foreign := []string{"https://github.com/other/web.git", "git@github.com:acme/other.git", "git@github-acme:acme/other.git"}
+	all := []string{"https://github.com/acme/web", "git@github.com:acme/web", "ssh://git@github.com/acme/web", "git@github-acme:acme/web", "git@github-alt:acme/web"}
+	foreign := []string{"https://github.com/other/web.git", "git@github.com:acme/other.git", "ssh://git@github.com/acme/other.git", "git@github-acme:acme/other.git", "git@github-alt:acme/other.git"}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			choice := Choose(c.service, ChooseOptions{})
@@ -437,19 +438,11 @@ func TestChildEnvGegenUmlenkungenDesRechners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			covered := map[string]bool{}
-			for _, form := range c.forms {
-				covered[form] = true
-			}
 			for _, form := range all {
 				for _, suffix := range []string{".git", ""} {
 					fetch, push := urls(env, form+suffix)
-					expectedFetch, expectedPush := c.target+suffix, c.target+suffix
-					if !covered[form] {
-						expectedFetch, expectedPush = urls(environ, form+suffix)
-					}
-					if fetch != expectedFetch || push != expectedPush {
-						t.Errorf("%s → fetch %s, push %s; erwartet %s, %s", form+suffix, fetch, push, expectedFetch, expectedPush)
+					if expected := c.target + suffix; fetch != expected || push != expected {
+						t.Errorf("%s → fetch %s, push %s; erwartet %s", form+suffix, fetch, push, expected)
 					}
 				}
 			}

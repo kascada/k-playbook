@@ -28,8 +28,9 @@ import (
 // Wird das Todo mit der höchsten Nummer gelöscht, bekommt das nächste neue
 // dieselbe Nummer. Das ist hingenommen.
 
-// TodoDataDirName ist das Verzeichnis der Maschinendateien unter
-// k-playbook-local/. Es trug die frühere Ablage data/todos.json.
+// TodoDataDirName ist das frühere Verzeichnis der Maschinendateien unter
+// k-playbook-local/. Es trug die frühere Ablage data/todos.json; das
+// Einrichten legt es nicht mehr an (Task 107).
 const TodoDataDirName = "data"
 
 // TodoFileName ist die frühere Ablage der Todos, eine JSON-Datei unter data/.
@@ -38,8 +39,8 @@ const TodoDataDirName = "data"
 const TodoFileName = "todos.json"
 
 // TodoMigratedFileName ist der Name, unter dem migrate die frühere Ablage
-// nach der ersten vollständigen Übernahme ablegt. Er wird nie überschrieben
-// und nie mehr gelesen.
+// nach der ersten vollständigen Übernahme ablegt. Er wird nie überschrieben,
+// die Datei nie mehr gelesen; migrate prüft nur, ob sie liegt.
 const TodoMigratedFileName = TodoFileName + ".migriert"
 
 // LegacyTodoFileName ist die noch frühere Ablage als Markdown-Checkliste. Sie
@@ -87,7 +88,7 @@ type TodoNotice struct {
 	Hint string `json:"hint,omitempty"`
 }
 
-// TodoDataDir ist das Verzeichnis der Maschinendateien eines Projekts.
+// TodoDataDir ist das frühere Verzeichnis der Maschinendateien eines Projekts.
 func TodoDataDir(projectDir string) string {
 	return filepath.Join(LocalDir(projectDir), TodoDataDirName)
 }

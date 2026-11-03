@@ -2570,6 +2570,8 @@ Dienstes. Die Teile:
   Eintrag, der die Helper des Rechners für diese URL zurücksetzt; sonst riefe git nach der
   Anmeldung `store` beim Helper des Rechners und legte das Token ab. Der Helper liest das Token
   aus `GH_TOKEN`/`GITHUB_TOKEN` und antwortet nur auf `get`.
+  Jede Zugangsart lenkt alle Formen des Repos auf ihre Zielform (`GitConfig`, Task 111); die
+  Zugangsarten unterscheiden sich nur in der Zielform, in den Helpern und in `GIT_SSH_COMMAND`.
   Jede Umlenkung steht doppelt, als `insteadOf` und als `pushInsteadOf`, und die Zielform wird
   zuerst auf sich selbst gelenkt. git nimmt das längste passende Präfix, die Umlenkung des
   Repos auf sich selbst schlägt deshalb eine des Rechners für ganz `github.com`; und die

@@ -113,9 +113,6 @@ Projekt abgeleitet und jederzeit neu baubar. Ableitbares im Repository veraltet
 unbemerkt. Wer etwas Unwiederbringliches ablegen will, braucht ein anderes Verzeichnis —
 `cache/` darf ohne Rückfrage gelöscht werden.
 
-`data/` gehört dagegen ins Repository: dort liegen Maschinendateien, die zum
-Projektstand gehören, allen voran `todos.json`.
-
 Bei `priv/` und `material/` entscheidet das Projekt. Was gerade gilt, zeigt die
 Oberfläche im Block **Lokale Einstellungen** — gemessen mit `git check-ignore`, nicht
 geraten.

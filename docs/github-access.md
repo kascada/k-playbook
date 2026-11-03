@@ -503,12 +503,16 @@ file is missing*; `run` then ends with `125`, because the template names no serv
 configuration outside that process changes, `gh auth switch` is never called. Existing
 `GIT_CONFIG_COUNT` entries of the caller are kept; `run` appends its own after them.
 
-| Chosen for `git` | Setup |
-|---|---|
-| `token`, `gh` | SSH forms of the repository URL are rewritten to `https://github.com/<owner>/<repo>`; credential helpers of the machine are cleared for that URL, and a credential helper for it answers with the token. Clearing them keeps git from handing the token to a helper of the machine (`store` after a successful login), which would keep it outside the process. |
-| `ssh` with `key` | HTTPS forms are rewritten to `git@github.com:<owner>/<repo>`; `GIT_SSH_COMMAND="ssh -i <key> -o IdentitiesOnly=yes"`. |
-| `ssh` with `host` | HTTPS forms and `git@github.com:` forms are rewritten to `git@<host>:<owner>/<repo>`. |
-| `public` | SSH forms are rewritten to HTTPS; credential helpers are cleared for that URL, so no other credential of the machine is used. |
+Every access chosen for `git` has a target form, the URL git uses for the repository under
+`run`; every form of the repository is rewritten to it (see the rules below). The accesses
+differ only in the target form and in their own setup:
+
+| Chosen for `git` | Target form | Own setup |
+|---|---|---|
+| `token`, `gh` | `https://github.com/<owner>/<repo>` | Credential helpers of the machine are cleared for that URL, and a credential helper for it answers with the token. Clearing them keeps git from handing the token to a helper of the machine (`store` after a successful login), which would keep it outside the process. |
+| `ssh` with `key` | `git@github.com:<owner>/<repo>` | `GIT_SSH_COMMAND="ssh -i <key> -o IdentitiesOnly=yes"`. |
+| `ssh` with `host` | `git@<host>:<owner>/<repo>` | None; SSH takes the key from the alias. |
+| `public` | `https://github.com/<owner>/<repo>` | Credential helpers are cleared for that URL, so no other credential of the machine is used. |
 
 | Chosen for `api` | Setup |
 |---|---|
@@ -520,15 +524,21 @@ Rules:
 - **Only this repository.** Rewrites and the credential helper are bound to the URLs of the
   service's repository: `https://github.com/<owner>/<repo>`, `git@github.com:<owner>/<repo>`,
   `ssh://git@github.com/<owner>/<repo>`, each with and without `.git`, and the `git@<host>:` form
-  of every `host` alias the service itself lists. Other repositories in the same command —
-  submodules, a second clone — are left as the machine has them. git matches `insteadOf` by
-  prefix; the form without `.git` therefore also catches a repository whose name only starts
-  with the same text (`acme/web` and `acme/website`). That is accepted: a command run under one
-  service rarely touches such a neighbour, and the form with `.git` is exact.
-- **The target form is pinned.** The form the table rewrites to is also rewritten to itself,
-  with and without `.git`, so a rewrite of the machine cannot take it elsewhere. git applies
-  the longest matching prefix, and the repository's own URL is longer than a rule for all of
-  `github.com`, such as `url."git@github.com:".insteadOf https://github.com/`.
+  of every `host` alias the service itself lists, the aliases of disabled accesses included.
+  Other repositories in the same command — submodules, a second clone — are left as the
+  machine has them. git matches `insteadOf` by prefix; the form without `.git` therefore also
+  catches a repository whose name only starts with the same text (`acme/web` and
+  `acme/website`). That is accepted: a command run under one service rarely touches such a
+  neighbour, and the form with `.git` is exact.
+- **Every form goes to the target form.** For every access, each form listed under *Only this
+  repository* is rewritten to the target form of the chosen access. Which forms are rewritten
+  does not depend on the type; only the target form does. A script or a clone that writes the
+  URL in another form — `ssh://`, or the alias of another `host` access of the same service —
+  therefore still goes through the access the line on standard error names.
+- **The target form is pinned.** The target form is also rewritten to itself, with and without
+  `.git`, so a rewrite of the machine cannot take it elsewhere. git applies the longest matching
+  prefix, and the repository's own URL is longer than a rule for all of `github.com`, such as
+  `url."git@github.com:".insteadOf https://github.com/`.
 - **Fetch and push.** Every rewrite, the pinned target form included, is set up for fetch and
   push (`insteadOf` and `pushInsteadOf`), so a push rewrite of the machine cannot take the push
   elsewhere. git looks for the push URL under `pushInsteadOf` first; an `insteadOf` alone would

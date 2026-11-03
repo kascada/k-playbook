@@ -650,19 +650,26 @@ response carries a `hint` naming `k-playbook todo migrate`, listing shows the co
 only, and add, update and delete are rejected with **`todos_not_migrated`**, so that no new todo
 takes a number a former entry is meant to keep. `k-playbook todo migrate`:
 
-- **First run** (no `data/todos.json.migriert` yet): creates one document per entry under the
-  fixed name `<id, three digits>-<short-name>.md`, not through the numbering, so the former ids
-  survive; done entries go straight to `todos/done/`. The frontmatter is the format above, with
+- **First run or latecomer** is decided by content, not by the marker file alone (`/k-upgrade`
+  3.4 may remove `data/` together with the renamed files): a run is a latecomer if
+  `data/todos.json.migriert` exists **or** a document under `todos/` or `todos/done/` does not
+  match `todos.json` — its number does not occur there, or it does, but with a different text.
+  Otherwise it is a first run: with an empty collection, or when every document matches, e.g.
+  after an aborted first run.
+- **First run**: creates one document per entry under the fixed name
+  `<id, three digits>-<short-name>.md`, not through the numbering, so the former ids survive;
+  done entries go straight to `todos/done/`. The frontmatter is the format above, with
   `created` always written (empty when the entry had none), `done`, `origin`, `doneMigrated`.
-  An entry is skipped only if a document with its number already exists in `todos/` or
-  `todos/done/` **and** has the same text; a different text aborts and names the entry. A
-  document whose number does not come from `todos.json` aborts as well. Only once every entry
-  has arrived is the file renamed to `data/todos.json.migriert`.
-- **Latecomer** (`todos.json.migriert` exists, and a `data/todos.json` has appeared again, for
-  example written by an older installed binary): its entries are appended through the normal
-  numbering, done ones straight to `todos/done/`, with the same frontmatter; an entry whose text
-  already exists as a document is skipped, so a repeated run after an abort creates nothing
-  twice. Afterwards the file is renamed under a name of its own
+  An entry whose number already exists as a document with the same text is skipped, so a run
+  after an abort continues the first run with the former numbers. Only once every entry has
+  arrived is the file renamed to `data/todos.json.migriert`.
+- **Latecomer** (for example a `data/todos.json` written again by an older installed binary, or
+  a collection that already holds todos of its own): its entries are appended through the
+  normal numbering, so their former ids are not kept, done ones straight to `todos/done/`, with
+  the same frontmatter; an entry whose text already exists as a document is skipped, so nothing
+  is created twice and no number collides, also on a repeated run after an abort. "Twice" means
+  the same text: a document edited after an aborted first run keeps its new text, and the old
+  one is added beside it. Afterwards the file is renamed under a name of its own
   (`todos.json.nachzuegler-<date>[-<n>]`).
 - `todos.json.migriert` is never overwritten; renamed files are never read again. The output
   names the created and skipped entries. `migrate` can be repeated.

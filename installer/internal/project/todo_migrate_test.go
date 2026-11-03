@@ -21,6 +21,7 @@ const legacyTodosJSON = `{
   ]
 }`
 
+// Leere Collection, kein todos.json.migriert: Erstlauf mit den alten Nummern.
 func TestMigrateTodosErsterLauf(t *testing.T) {
 	root := todoProject(t)
 	store := newFakeTodoStore()
@@ -95,13 +96,22 @@ func TestMigrateTodosWiederholbarNachAbbruch(t *testing.T) {
 		t.Fatalf("Abbruch: %+v", result)
 	}
 
+	// Ohne todos.json.migriert und mit nur passenden Dokumenten setzt der
+	// nächste Lauf den Erstlauf fort: Die alten Nummern bleiben.
 	useTodoStore(t, store)
 	result, err = MigrateTodos(ctx, root)
-	if err != nil || len(result.Skipped) != 2 || len(result.Created) != 2 || result.RenamedTo == "" {
+	if err != nil || result.Mode != TodoMigrationFirst || len(result.Skipped) != 2 || len(result.Created) != 2 ||
+		result.RenamedTo != "k-playbook-local/data/todos.json.migriert" {
 		t.Fatalf("Wiederholung: %+v %v", result, err)
 	}
 	if len(store.docs) != 4 {
 		t.Fatalf("doppelt angelegt: %d Dokumente", len(store.docs))
+	}
+	for _, name := range []string{"todos/001-offen-ohne-datum.md", "todos/done/003-erledigt-aus-der-markdown-zeit.md",
+		"todos/004-mit-herkunft.md", "todos/done/005-von-hand-erledigt.md"} {
+		if _, ok := store.docs[name]; !ok {
+			t.Errorf("%s fehlt: alte Nummer nicht erhalten", name)
+		}
 	}
 }
 
@@ -120,13 +130,17 @@ func (s *failNthCreate) Create(ctx context.Context, name, content string) (kepha
 	return s.fakeTodoStore.Create(ctx, name, content)
 }
 
-func TestMigrateTodosBrichtVorDemAnlegenAb(t *testing.T) {
+// Ohne todos.json.migriert, aber mit einem Dokument, das nicht zu
+// todos.json passt: Nachzügler, angehängt über die Nummernvergabe, nichts
+// doppelt.
+func TestMigrateTodosNachzueglerOhneMerkdatei(t *testing.T) {
 	stamp := "2026-10-01T12:00:00.000Z"
 	cases := map[string]struct {
-		name, content, want string
+		name, content string
+		firstNew      int
 	}{
-		"fremde Nummer": {"todos/007-neu.md", "Neu angelegt\n", "007-neu.md trägt die Nummer 7"},
-		"anderer Text":  {"todos/004-x.md", "Anderer Text\n", "Eintrag 4"},
+		"fremde Nummer": {"todos/007-neu.md", "Neu angelegt\n", 8},
+		"anderer Text":  {"todos/004-x.md", "Anderer Text\n", 5},
 	}
 	for label, c := range cases {
 		t.Run(label, func(t *testing.T) {
@@ -135,13 +149,36 @@ func TestMigrateTodosBrichtVorDemAnlegenAb(t *testing.T) {
 			useTodoStore(t, store)
 			writeProjectFile(t, TodoFile(root), legacyTodosJSON)
 			store.put(c.name, c.content, stamp, stamp)
-			store.calls = nil
+			// Ein passendes Dokument dazu: Es wird übersprungen, nicht doppelt angelegt.
+			store.put("todos/001-offen-ohne-datum.md", "---\ncreated: \"\"\n---\n\nOffen ohne Datum\n", stamp, stamp)
 			result, err := MigrateTodos(context.Background(), root)
-			if err == nil || !strings.Contains(err.Error(), c.want) || !strings.Contains(err.Error(), "nichts angelegt") {
-				t.Fatalf("Abbruch: %v", err)
+			if err != nil || result.Mode != TodoMigrationLatecomer {
+				t.Fatalf("Nachzügler: %+v %v", result, err)
 			}
-			if len(store.writes()) != 0 || len(result.Created) != 0 || !fileExists(TodoFile(root)) {
-				t.Fatalf("trotz Abbruch geschrieben: %v %+v", store.writes(), result)
+			if len(result.Skipped) != 1 || result.Skipped[0].SourceID != 1 || len(result.Created) != 3 {
+				t.Fatalf("Ergebnis: %+v", result)
+			}
+			numbers := map[int]bool{}
+			for i, created := range result.Created {
+				if created.ID != c.firstNew+i || numbers[created.ID] {
+					t.Errorf("Nummer von %+v, erwartet %d", created, c.firstNew+i)
+				}
+				numbers[created.ID] = true
+			}
+			if len(store.docs) != 5 {
+				t.Fatalf("Dokumente: %d, erwartet 5", len(store.docs))
+			}
+			texts := map[string]bool{}
+			for name, doc := range store.docs {
+				text := strings.TrimSpace(doc.content[strings.LastIndex(doc.content, "\n\n")+1:])
+				if texts[text] {
+					t.Errorf("%s: Text doppelt: %q", name, text)
+				}
+				texts[text] = true
+			}
+			if !strings.HasPrefix(result.RenamedTo, "k-playbook-local/data/todos.json.nachzuegler-"+today()) ||
+				fileExists(TodoFile(root)) || fileExists(TodoMigratedFile(root)) {
+				t.Fatalf("umbenannt nach %q", result.RenamedTo)
 			}
 		})
 	}

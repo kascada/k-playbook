@@ -82,8 +82,11 @@ Since task 107, setup creates none of `docs/`, `tasks/`, `tasks/done/`, `data/`,
 `material/`, `inbox/`, `queue/`, `knowledge/` and `cache/`, and the setup page does
 not count them as missing: their content lives in the project collection or moves
 there next. In an existing project, `/k-upgrade` 3.4 deletes each of them that holds
-nothing but `README.md` files and the managed `.gitignore`, after the user confirms;
-anything else keeps the directory, and the command names what lies there.
+nothing but `README.md` files and the managed `.gitignore` — directly under `data/` the
+renamed leftovers of `k-playbook todo migrate` (`todos.json.migriert`,
+`todos.json.nachzuegler-<date>[-<n>]`) count the same, while a `data/todos.json` not yet
+taken over keeps it —, after the user confirms; anything else keeps the directory, and the
+command names what lies there.
 
 Until their own switch to the collection, a few producers still write to disk and
 create their directory on the first write, without a README:

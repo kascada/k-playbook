@@ -15,9 +15,10 @@ Dateien aus `instructions`.
 Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 `K-PLAYBOOK.yaml` wird nicht selbst gelesen.
 
-Die Todos liegen in `k-playbook-local/data/todos.json`. Diese Datei gehört Go.
-**Sie wird in diesem Command nie gelesen und nie geschrieben** — weder mit Read
-noch mit Write oder Edit. Jede Auskunft und jede Änderung läuft über den
+Die Todos liegen als Dokumente unter `todos/` in der Projekt-Collection, die
+erledigten unter `todos/done/`. Ihr Format gehört Go. **Sie werden in diesem
+Command nie direkt gelesen und nie direkt geschrieben** — weder über Kephalaion
+noch mit Read, Write oder Edit. Jede Auskunft und jede Änderung läuft über den
 Zugriffsweg aus Schritt 1.
 
 ## Schritt 1 — Zugriffsweg wählen
@@ -69,12 +70,11 @@ Rückfrage.
 
 ## Schritt 3 — Nebenmeldungen weitergeben
 
-- `migrated: <anzahl>` — dieser Aufruf hat eine vorhandene `TODO.md` nach
-  `data/todos.json` übersetzt und danach entfernt. Einmal nennen, dann normal
-  weiterarbeiten.
-- `hint` — eine `TODO.md` liegt noch neben der JSON-Datei. Kein Fehler: gelesen
-  und geschrieben wird die JSON-Datei. Den Hinweis samt genanntem Ausweg
-  weitergeben und **nicht** von Hand aufräumen.
+- `hint` — eine frühere Ablage liegt noch auf der Platte: ein noch nicht
+  übernommenes `k-playbook-local/data/todos.json` (Ausweg `k-playbook todo
+  migrate`) oder eine zurückgebliebene `TODO.md`, die nicht übernommen wird. Kein
+  Fehler: Die Liste zeigt, was in der Collection liegt. Den Hinweis samt
+  genanntem Ausweg weitergeben und **nicht** von Hand aufräumen.
 
 Folge-Command: keiner. Mit der Ausgabe des Aufrufs ist die Todo-Verwaltung
 abgeschlossen.
@@ -89,11 +89,11 @@ abgeschlossen.
 
 ## Anti-Muster (nicht tun)
 
-- **`data/todos.json` von Hand lesen oder schreiben.** Auch nicht „nur kurz
-  nachsehen": es gäbe dann zwei Auslegungen des Formats, und die zweite ginge in
-  keine Prüfung ein. Einzige Ausnahme im ganzen Projekt ist die Auflösung eines
-  Merge-Konflikts, und die macht ein Mensch.
-- **Eine `TODO.md` schreiben oder anlegen.** Die Markdown-Ablage ist Geschichte;
-  sie wird beim ersten Zugriff übersetzt.
+- **Die Dokumente unter `todos/` von Hand lesen oder schreiben.** Auch nicht
+  „nur kurz nachsehen": es gäbe dann zwei Auslegungen des Formats, und die zweite
+  ginge in keine Prüfung ein.
+- **Eine `TODO.md` oder ein `data/todos.json` schreiben oder anlegen.** Beide
+  Ablagen sind Geschichte; ein `data/todos.json` von früher übernimmt allein
+  `k-playbook todo migrate`.
 - **Erledigtes löschen.** Abhaken behält den Eintrag, Löschen wirft ihn weg.
 - **Bei einem Stichwort ungefragt schreiben.** Erst Treffer zeigen, dann handeln.
