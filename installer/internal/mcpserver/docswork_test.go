@@ -162,3 +162,87 @@ func TestDocsWorkToolsSchema(t *testing.T) {
 		}
 	}
 }
+
+// exclude_add über MCP: trägt ein, meldet Verworfenes unter rejected, lässt
+// die Datei bei nichts Neuem unberührt, und die Kontextausgabe trägt die
+// Liste danach. Ohne Muster ist das invalid_input.
+func TestDocsExcludeAddToolAblauf(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	ctx := context.Background()
+
+	result, _, _ := docsExcludeAddTool(ctx, nil, docsExcludeAddInput{ProjectDir: root, Patterns: []string{"docs/", "../weg"}})
+	added := decodeDocsWork[docsExcludeEnvelope](t, result)
+	if result.IsError || !added.OK || added.Tool != docsToolExcludeAdd || added.DocsExcludeResult == nil || !added.Changed ||
+		len(added.Added) != 1 || added.Added[0] != "docs/" || len(added.Exclude) != 1 ||
+		len(added.Rejected) != 1 || added.Rejected[0].Pattern != "../weg" || added.Rejected[0].Reason == "" {
+		t.Fatalf("exclude_add: %+v", added)
+	}
+	before, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, _, _ = docsExcludeAddTool(ctx, nil, docsExcludeAddInput{ProjectDir: root, Patterns: []string{"docs/"}})
+	again := decodeDocsWork[docsExcludeEnvelope](t, result)
+	if result.IsError || !again.OK || again.Changed || len(again.Added) != 0 || len(again.Exclude) != 1 {
+		t.Fatalf("exclude_add Duplikat: %+v", again)
+	}
+	after, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil || string(after) != string(before) {
+		t.Fatalf("Datei bei nichts Neuem geändert: %v\n%s", err, after)
+	}
+
+	built, err := project.BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if len(built.Docs.Exclude) != 1 || built.Docs.Exclude[0] != "docs/" {
+		t.Errorf("context.docs.exclude = %v", built.Docs.Exclude)
+	}
+
+	result, _, _ = docsExcludeAddTool(ctx, nil, docsExcludeAddInput{ProjectDir: root})
+	empty := decodeDocsWork[docsExcludeEnvelope](t, result)
+	if !result.IsError || empty.OK || empty.Error == nil || empty.Error.Code != project.DocCodeInvalidInput {
+		t.Fatalf("exclude_add ohne Muster: %+v", empty)
+	}
+	if !strings.Contains(string(after), "docs:") {
+		t.Errorf("Block fehlt:\n%s", after)
+	}
+}
+
+// exclude_add mit Zeilenumbruch im Muster: verworfen unter rejected, die
+// Datei trägt außerhalb des Blocks byte-gleich nur das gültige Muster dazu,
+// und die gemeldete Liste ist die, die die Kontextausgabe danach liest.
+func TestDocsExcludeAddToolVerwirftZeilenumbruch(t *testing.T) {
+	root := t.TempDir()
+	content := "schema_version: 3\ndocs:\n  exclude:\n    - keep/\ntail: x\n"
+	if err := os.MkdirAll(filepath.Dir(project.ConfigPath(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(project.ConfigPath(root), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, _, _ := docsExcludeAddTool(context.Background(), nil,
+		docsExcludeAddInput{ProjectDir: root, Patterns: []string{"a\nd", "neu/"}})
+	added := decodeDocsWork[docsExcludeEnvelope](t, result)
+	if result.IsError || !added.OK || added.DocsExcludeResult == nil || !added.Changed ||
+		strings.Join(added.Added, ",") != "neu/" || strings.Join(added.Exclude, ",") != "keep/,neu/" ||
+		len(added.Rejected) != 1 || added.Rejected[0].Pattern != "a\nd" || !strings.Contains(added.Rejected[0].Reason, "Steuerzeichen") {
+		t.Fatalf("exclude_add: %+v", added)
+	}
+	after, err := os.ReadFile(project.ConfigPath(root))
+	if want := "schema_version: 3\ndocs:\n  exclude:\n    - keep/\n    - neu/\ntail: x\n"; err != nil || string(after) != want {
+		t.Fatalf("Datei danach: %v\n%q\nerwartet:\n%q", err, after, want)
+	}
+	built, err := project.BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if strings.Join(built.Docs.Exclude, ",") != strings.Join(added.Exclude, ",") || len(built.Docs.Problems) != 0 {
+		t.Errorf("context.docs = %+v; gemeldet %q", built.Docs, added.Exclude)
+	}
+}

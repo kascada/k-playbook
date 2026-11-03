@@ -369,6 +369,7 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
 | `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew |
 | `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open |
+| `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `context.docs.exclude`; creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
@@ -1198,6 +1199,30 @@ one line per document (path and revision) or the note about the existing working
 publish prints status, reference and revision per document, tab-separated, then the README
 and the outcome.
 
+**Permanent exclusions.** `k_playbook_docs_exclude_add` (task 116) writes what a project
+excludes from the code scan once and for all, so a docs command no longer has to be told in
+every preflight -- and never reads or edits `K-PLAYBOOK.yaml` itself. The logic is
+`project.AddDocsExclude` (`project/docs_exclude.go`); the subcommand
+`k-playbook docs exclude add <pattern>… [--json]` calls the same code (after `--` every
+argument counts as a pattern). It needs no Kephalaion binding. Inputs: `projectDir` (required
+by contract) and `patterns`, a list; without a non-empty pattern the answer is
+`invalid_input`. Each pattern is checked as when reading the block
+([`k-playbook-format.md`](./k-playbook-format.md#docs)): absolute, leaving
+`project.repo_root` with `..`, or containing a line break, carriage return or other control
+character → not written, reported under `rejected` with `reason`. A
+pattern already in the list is skipped. If nothing is new, the file stays byte for byte
+(`changed: false`); otherwise the new entries are inserted as lines of their own behind the
+last entry of the list, and every other line stays byte for byte -- entries already there,
+neighbouring keys such as `include:`, comments. A missing block is appended through
+`replaceTopLevelBlock`. A form that cannot be extended safely, such as the flow form
+`exclude: [docs/]`, is not rewritten: the answer is `unsupported` with the line and the
+reason, nothing is written (details in
+[`k-playbook-format.md`](./k-playbook-format.md#docs)). Fields on success: `config` (the file path), `exclude` (the valid
+list afterwards), `added`, `rejected` (each `pattern`, `reason`), `changed`. Rejected patterns
+are not a tool error (`ok: true`); the CLI ends with exit 1 after the output. A command calls
+the tool only after the user confirmed saving and reloads the briefing afterwards, because
+`K-PLAYBOOK.yaml` was written.
+
 ### Briefing Contract
 
 `k_playbook_briefing` is a thin wrapper over `project.BuildBriefing` (`project/briefing.go`);
@@ -1264,7 +1289,7 @@ projectDocs, health, context}`:
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as

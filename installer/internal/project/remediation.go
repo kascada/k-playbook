@@ -185,7 +185,7 @@ func replaceTopLevelBlock(content string, name string, block string) string {
 
 	start := -1
 	for index, line := range lines {
-		if isTopLevelYAMLLine(line) && strings.TrimSpace(line) == name+":" {
+		if isTopLevelYAMLLine(line) && isBlockStart(line, name) {
 			start = index
 			break
 		}
@@ -212,13 +212,41 @@ func replaceTopLevelBlock(content string, name string, block string) string {
 		}
 	}
 
+	// Kommentare ohne Einrückung am Ende des Blocks gehören zu dem, was
+	// folgt — etwa der auskommentierte Block docs: einer neuen Konfiguration
+	// zwischen remediation: und tools:. Die eigenen Kommentare eines Blocks
+	// sind eingerückt und werden mit ersetzt.
+	cut := end
+	for index := end - 1; index > start; index-- {
+		trimmed := strings.TrimSpace(lines[index])
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasPrefix(lines[index], "#") {
+			break
+		}
+		cut = index
+	}
+
 	result := append([]string{}, lines[:start]...)
 	result = append(result, strings.Split(strings.TrimRight(block, "\n"), "\n")...)
-	if end < len(lines) {
+	if cut < len(lines) {
 		result = append(result, "")
-		result = append(result, lines[end:]...)
+		result = append(result, lines[cut:]...)
 	}
 	return strings.TrimRight(strings.Join(result, "\n"), "\n") + "\n"
+}
+
+// isBlockStart erkennt die Kopfzeile `name:` eines Blocks, auch mit einem
+// Kommentar dahinter. Ohne das legte ein Schreiber neben `docs:  # …` einen
+// zweiten Block gleichen Namens an.
+func isBlockStart(line string, name string) bool {
+	rest, found := strings.CutPrefix(strings.TrimSpace(line), name+":")
+	if !found {
+		return false
+	}
+	rest = strings.TrimSpace(rest)
+	return rest == "" || strings.HasPrefix(rest, "#")
 }
 
 // isTopLevelYAMLLine erkennt eine Zeile ohne Einrückung, die kein Kommentar

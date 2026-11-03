@@ -173,3 +173,105 @@ func TestDocsSubkommandoFehler(t *testing.T) {
 		t.Errorf("ohne Kephalaion geschrieben: %v", err)
 	}
 }
+
+// docs exclude add über die CLI: trägt ein, --json trägt die Antwort von
+// project, ein Duplikat lässt die Datei unberührt, Verworfenes endet nach der
+// Ausgabe mit Exit 1, Aufruffehler ohne Schreiben.
+func TestDocsExcludeSubkommandoAblauf(t *testing.T) {
+	root := todoProjectRoot(t)
+
+	stdout, _, err := runDocsCaptured(t, "exclude", "add", "docs/", "rules/")
+	if err != nil || !strings.Contains(stdout, "Eingetragen in ") || !strings.Contains(stdout, "docs.exclude: docs/, rules/") {
+		t.Fatalf("exclude add: %q %v", stdout, err)
+	}
+	config, err := project.ReadConfig(root)
+	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,rules/" {
+		t.Fatalf("ReadConfig: %v %v", config.DocsExclude, err)
+	}
+	before, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err = runDocsCaptured(t, "exclude", "add", "docs/", "--json")
+	var result project.DocsExcludeResult
+	if err != nil || json.Unmarshal([]byte(stdout), &result) != nil || result.Changed || len(result.Added) != 0 || len(result.Exclude) != 2 {
+		t.Fatalf("exclude add Duplikat: %q %v", stdout, err)
+	}
+	if after, _ := os.ReadFile(project.ConfigPath(root)); string(after) != string(before) {
+		t.Errorf("Datei bei nichts Neuem geändert:\n%s", after)
+	}
+
+	stdout, _, err = runDocsCaptured(t, "exclude", "add", "--json", "--", "../weg", "-gen/")
+	result = project.DocsExcludeResult{}
+	if err == nil || !strings.Contains(err.Error(), "../weg") || json.Unmarshal([]byte(stdout), &result) != nil ||
+		len(result.Rejected) != 1 || len(result.Added) != 1 || result.Added[0] != "-gen/" {
+		t.Fatalf("exclude add verworfen: %q %v", stdout, err)
+	}
+
+	for _, args := range [][]string{
+		{"exclude"},
+		{"exclude", "add"},
+		{"exclude", "add", "--allow-hints", "x/"},
+		{"exclude", "remove", "x/"},
+	} {
+		stdout, _, err := runDocsCaptured(t, args...)
+		if len(args) == 1 {
+			if err != nil || !strings.Contains(stdout, "k-playbook docs exclude add <muster>") {
+				t.Errorf("%v: Hilfe erwartet: %q %v", args, stdout, err)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("%v: kein Fehler", args)
+		}
+	}
+	config, err = project.ReadConfig(root)
+	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,rules/,-gen/" {
+		t.Errorf("Liste nach Aufruffehlern: %v %v", config.DocsExclude, err)
+	}
+}
+
+// docs exclude add mit Zeilenumbruch im Muster über die CLI: verworfen mit
+// Grund (Exit 1), in der Textausgabe in Anführungszeichen statt umgebrochen;
+// das gültige Muster daneben kommt dazu, außerhalb des Blocks bleibt die Datei
+// byte-gleich, und die gemeldete Liste ist die, die ReadConfig danach liest —
+// ohne Block (er wird angelegt) und mit Block.
+func TestDocsExcludeSubkommandoVerwirftZeilenumbruch(t *testing.T) {
+	root := todoProjectRoot(t)
+	before, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := runDocsCaptured(t, "exclude", "add", "--", "a\nd", "neu/")
+	if err == nil || !strings.Contains(err.Error(), `"a\nd"`) || !strings.Contains(stdout, `Verworfen: "a\nd" — `) ||
+		!strings.Contains(stdout, "docs.exclude: neu/\n") {
+		t.Fatalf("exclude add ohne Block: %q %v", stdout, err)
+	}
+	first, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(first), strings.TrimRight(string(before), "\n")+"\n\n") ||
+		!strings.HasSuffix(string(first), "  exclude:\n    - neu/\n") || strings.Contains(string(first), "\nd\n") {
+		t.Fatalf("Datei nach dem Anlegen:\n%s", first)
+	}
+
+	stdout, _, err = runDocsCaptured(t, "exclude", "add", "--json", "--", "b\r\ne", "zwei/")
+	var result project.DocsExcludeResult
+	if err == nil || json.Unmarshal([]byte(stdout), &result) != nil || len(result.Rejected) != 1 ||
+		result.Rejected[0].Pattern != "b\r\ne" || !strings.Contains(result.Rejected[0].Reason, "Steuerzeichen") ||
+		strings.Join(result.Added, ",") != "zwei/" {
+		t.Fatalf("exclude add mit Block: %q %v", stdout, err)
+	}
+	second, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil || string(second) != string(first)+"    - zwei/\n" {
+		t.Fatalf("Datei nach dem Ergänzen: %v\n%s", err, second)
+	}
+	config, err := project.ReadConfig(root)
+	if err != nil || strings.Join(config.DocsExclude, ",") != strings.Join(result.Exclude, ",") ||
+		strings.Join(result.Exclude, ",") != "neu/,zwei/" || len(config.DocsProblems) != 0 {
+		t.Errorf("ReadConfig: %q %+v %v; gemeldet %q", config.DocsExclude, config.DocsProblems, err, result.Exclude)
+	}
+}

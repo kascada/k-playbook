@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -18,7 +20,8 @@ var openDocsWork = project.OpenDocsWork
 // Arbeitsverzeichnis und veröffentlicht sie wieder (Task 109): k-playbook
 // docs checkout|publish <erzeuger> — dieselbe Fachlogik, die die
 // MCP-Werkzeuge k_playbook_docs_checkout und k_playbook_docs_publish als
-// Hülle anbieten.
+// Hülle anbieten. docs exclude add trägt dauerhafte Ausschlüsse für den
+// Code-Scan ein (Task 116, runDocsExclude).
 //
 // Ohne --json steht auf stdout eine knappe Zeile je Dokument; mit --json die
 // Antwort als JSON. Ein Fehler endet mit Exit 1 und nennt seinen Code; ein
@@ -34,6 +37,8 @@ func runDocs(args []string) error {
 		printDocsUsage(os.Stdout)
 		return nil
 	case "checkout", "publish":
+	case "exclude":
+		return runDocsExclude(rest)
 	default:
 		printDocsUsage(os.Stderr)
 		return fmt.Errorf("unbekannter Unterbefehl: docs %s", sub)
@@ -115,6 +120,96 @@ func runDocs(args []string) error {
 	return nil
 }
 
+// runDocsExclude ist `k-playbook docs exclude add <muster>… [--json]`: trägt
+// Muster in docs.exclude von K-PLAYBOOK.yaml ein (project.AddDocsExclude) —
+// dieselbe Fachlogik wie das MCP-Werkzeug k_playbook_docs_exclude_add. Nach
+// `--` zählt alles als Muster, auch was mit - beginnt. Verworfene Muster enden
+// nach der Ausgabe mit Exit 1.
+func runDocsExclude(args []string) error {
+	const usage = "docs exclude add <muster>… [--json]"
+	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		printDocsUsage(os.Stdout)
+		return nil
+	}
+	if args[0] != "add" {
+		printDocsUsage(os.Stderr)
+		return fmt.Errorf("unbekannter Unterbefehl: docs exclude %s — erwartet wird %s", args[0], usage)
+	}
+	var asJSON, literal bool
+	var patterns []string
+	for _, arg := range args[1:] {
+		switch {
+		case literal:
+			patterns = append(patterns, arg)
+		case arg == "--":
+			literal = true
+		case arg == "--json":
+			asJSON = true
+		case arg == "-h" || arg == "--help":
+			printDocsUsage(os.Stdout)
+			return nil
+		case strings.HasPrefix(arg, "-"):
+			return fmt.Errorf("unbekannte Option %s — erwartet wird %s", arg, usage)
+		default:
+			patterns = append(patterns, arg)
+		}
+	}
+	if len(patterns) == 0 {
+		return fmt.Errorf("kein Muster angegeben — erwartet wird %s", usage)
+	}
+
+	projectDir, err := todoProjectDir()
+	if err != nil {
+		return err
+	}
+	result, err := project.AddDocsExclude(projectDir, patterns)
+	if err != nil {
+		return docError(err)
+	}
+	if asJSON {
+		if err := printDocsJSON(result); err != nil {
+			return err
+		}
+	} else {
+		printDocsExclude(os.Stdout, result)
+	}
+	if len(result.Rejected) > 0 {
+		rejected := make([]string, 0, len(result.Rejected))
+		for _, problem := range result.Rejected {
+			rejected = append(rejected, displayDocsPattern(problem.Pattern))
+		}
+		return fmt.Errorf("verworfen, nicht eingetragen: %s", strings.Join(rejected, ", "))
+	}
+	return nil
+}
+
+// printDocsExclude schreibt die Antwort von docs exclude add ohne --json.
+func printDocsExclude(out io.Writer, result project.DocsExcludeResult) {
+	if len(result.Added) > 0 {
+		fmt.Fprintf(out, "Eingetragen in %s: %s\n", project.DisplayPath(result.Config), strings.Join(result.Added, ", "))
+	} else {
+		fmt.Fprintf(out, "Nichts neu; %s unverändert.\n", project.DisplayPath(result.Config))
+	}
+	for _, problem := range result.Rejected {
+		fmt.Fprintf(out, "Verworfen: %s — %s\n", displayDocsPattern(problem.Pattern), problem.Reason)
+	}
+	list := "—"
+	if len(result.Exclude) > 0 {
+		list = strings.Join(result.Exclude, ", ")
+	}
+	fmt.Fprintf(out, "docs.exclude: %s\n", list)
+}
+
+// displayDocsPattern zeigt ein verworfenes Muster in einer Zeile: Trägt es ein
+// Steuerzeichen, etwa einen Zeilenumbruch, erscheint es in Anführungszeichen
+// mit Escapes, statt die Ausgabe umzubrechen.
+func displayDocsPattern(pattern string) string {
+	if strings.ContainsFunc(pattern, func(r rune) bool { return unicode.IsControl(r) || r == '\u2028' || r == '\u2029' }) {
+		return strconv.Quote(pattern)
+	}
+	return pattern
+}
+
 func printDocsJSON(result any) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
@@ -172,6 +267,7 @@ func printDocsUsage(out io.Writer) {
 Aufruf:
   k-playbook docs checkout <erzeuger> [--discard] [--json]
   k-playbook docs publish <erzeuger> [--allow-hints] [--json]
+  k-playbook docs exclude add <muster>… [--json]
 
 Erzeuger: %s. Jeder hat ein Verzeichnis keph:/docs/generated/<erzeuger>/ in
 der Projekt-Collection.
@@ -197,18 +293,32 @@ der Projekt-Collection.
             in Konflikt oder fehlgeschlagen ist; ein zweites publish schreibt
             dann nur noch den Rest.
 
+  exclude add
+            Trägt Muster in den Block docs.exclude von .k-playbook/K-PLAYBOOK.yaml
+            ein und legt ihn an, wenn er fehlt; außerhalb des Blocks bleibt die
+            Datei unverändert. Die Muster gelten wie in einer .gitignore,
+            relativ zu project.repo_root. Ein absolutes Muster, eines, das
+            mit .. aus project.repo_root führt, oder eines mit Zeilenumbruch
+            oder anderem Steuerzeichen wird nicht eingetragen, sondern
+            mit Grund gemeldet (Exit 1 nach der Ausgabe); eines, das schon
+            dasteht, wird übersprungen. Ist nichts neu, bleibt die Datei
+            unberührt. Die Docs-Erzeuger lesen die Liste aus context.docs.exclude.
+            --json: config, exclude (die Liste danach), added, rejected
+            (pattern, reason) und changed. Nach -- zählt alles als Muster.
+
 Ausgabe von publish: je Dokument Zustand (created, written, deleted,
 unchanged, conflict, failed), Verweis und Revision, durch Tabulatoren
 getrennt. Bleibt etwas offen, endet der Aufruf mit Exit 1.
 
 Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
 eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok) und für
-publish ein Node ab v0.3.1. Dasselbe wie die MCP-Werkzeuge
-k_playbook_docs_checkout und k_playbook_docs_publish.
+publish ein Node ab v0.3.1; exclude add braucht keine. Dasselbe wie die
+MCP-Werkzeuge k_playbook_docs_checkout, k_playbook_docs_publish und
+k_playbook_docs_exclude_add.
 
 Fehlercodes stehen in Klammern am Ende der Meldung. kephalaion_unavailable:
 beim Hub ist nichts angekommen, nichts geschrieben. invalid_input: unbekannter
-Erzeuger oder Ablehnung im Arbeitsverzeichnis. hints_changed: hints geändert
+Erzeuger, Ablehnung im Arbeitsverzeichnis oder exclude add ohne Muster. hints_changed: hints geändert
 ohne --allow-hints. not_checked_out: publish ohne checkout. Bei einem Dokument
 mit outcome_unknown nicht noch einmal veröffentlichen, sondern nachsehen.
 `, strings.Join(project.DocsProducerNames(), ", "))

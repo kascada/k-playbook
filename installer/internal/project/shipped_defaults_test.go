@@ -370,7 +370,8 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		t.Errorf("Hülle ohne Verweis auf den Text oder noch mit dem alten Ablauf:\n%s", hull)
 	}
 	for _, tool := range []string{"mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
-		"mcp__k-playbook__k_playbook_docs_publish", "mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
+		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
 		if !strings.Contains(hull, tool) {
 			t.Errorf("Hülle erlaubt %s nicht", tool)
 		}
@@ -397,6 +398,8 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		"`context.playbook.dir`", "`context.local.dir`", ".k-playbook/", "discard: true", "allow_hints",
 		"generated: { by: k-docs-code", "questions:", "hints", "kephalaion_unavailable", "outcome_unknown",
 		"generated.by: ks-overlay-repo-analyse", "unverändert liegen",
+		"context.docs.exclude", "context.docs.problems", "k_playbook_docs_exclude_add", "Aus K-PLAYBOOK.yaml",
+		"k-playbook docs exclude add", "„Neu laden“",
 	} {
 		if !strings.Contains(file, needle) {
 			t.Errorf("k-docs-code.md nennt %q nicht", needle)
@@ -424,7 +427,8 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 			t.Errorf("_shared/docs.md trägt noch %q", stale)
 		}
 	}
-	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "`publish` aus der Erzeugertabelle", "Indizieren"} {
+	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "`publish` aus der Erzeugertabelle", "Indizieren",
+		"`docs.exclude`", "`context.docs.exclude`", "`k_playbook_docs_exclude_add`"} {
 		if !strings.Contains(shared, needle) {
 			t.Errorf("_shared/docs.md nennt %q nicht", needle)
 		}

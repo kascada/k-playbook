@@ -296,8 +296,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 39 {
-		t.Fatalf("tools/list meldet nicht genau neununddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 40 {
+		t.Fatalf("tools/list meldet nicht genau vierzig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -340,6 +340,7 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_doc_grep",
 		"k_playbook_docs_checkout",
 		"k_playbook_docs_publish",
+		"k_playbook_docs_exclude_add",
 		"k_playbook_briefing",
 		"k_playbook_health",
 		"k_playbook_github_test",
@@ -376,8 +377,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 39 {
-		t.Fatalf("tools/list meldet nicht neununddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 40 {
+		t.Fatalf("tools/list meldet nicht vierzig Werkzeuge: %v", responses[1])
 	}
 
 	for id, call := range []struct {
@@ -486,8 +487,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 38 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 38", withProjectDir)
+	if withProjectDir != 39 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 39", withProjectDir)
 	}
 }
 

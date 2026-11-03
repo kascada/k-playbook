@@ -219,7 +219,9 @@ Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_do
 
 `docs checkout|publish <erzeuger> [--discard|--allow-hints] [--json]` holt erzeugte Doku mit
 mehreren Dokumenten in ein Arbeitsverzeichnis und gleicht sie zurück ab (Task 109);
-Einzelheiten unter „Erzeugte Doku: checkout und publish“.
+`docs exclude add <muster>… [--json]` trägt dauerhafte Ausschlüsse für den Code-Scan in
+`docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einzelheiten unter „Erzeugte Doku:
+checkout und publish“.
 
 `create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
 `request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per
@@ -399,6 +401,8 @@ installer/
 │   ├── docswork.go              Erzeugertabelle DocsProducers, DocsWork: checkout und
 │   │                            publish von docs/generated/<erzeuger>/ über
 │   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei
+│   ├── docs_exclude.go          Block docs: — docs.exclude zeilenweise lesen und prüfen
+│   │                            (context.docs), AddDocsExclude trägt Muster ein
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
 │   │                            aus der Collection, als Verweise (Task 086); dazu der
 │   │                            Abschnitt health (Task 098) und der
@@ -498,7 +502,8 @@ installer/
 │   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
 │   │                            done/reopen (Hüllen über project.UserDocs)
 │   ├── docswork.go              Werkzeuge k_playbook_docs_checkout/publish (Hüllen über
-│   │                            project.DocsWork)
+│   │                            project.DocsWork) und k_playbook_docs_exclude_add
+│   │                            (Hülle über project.AddDocsExclude)
 │   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
 │   │                            project.BuildBriefing)
 │   ├── health.go                Werkzeug k_playbook_health (Hülle über health.Check,
@@ -668,7 +673,8 @@ liegt, sondern was in `project.repo_root` gehört:
 ## Config lesen ohne YAML-Parser
 
 `ReadConfig()` liest zeilenweise statt mit einem YAML-Parser. Gelesen werden nur wenige
-Skalare — `schema_version`, `project.repo_root`, `project.vcs` — und der zeilenweise
+Skalare — `schema_version`, `project.repo_root`, `project.vcs` — und die Liste
+`docs.exclude` (`parseDocsExclude`, ebenfalls zeilenweise), und der zeilenweise
 Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke unangetastet, wenn später
 zurückgeschrieben wird. Die Datei gehört dem Projekt und kann Werte tragen, die das
 Werkzeug nicht kennt.
@@ -2354,6 +2360,23 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
 - **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
   oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
   und ein zweites `publish` schreibt nur den Rest.
+- **Dauerhafte Ausschlüsse** (Task 116). Was ein Projekt vom Code-Scan ausnimmt, steht im
+  Block `docs.exclude` von `K-PLAYBOOK.yaml`, nicht im Command. `parseDocsExclude`
+  (`project/docs_exclude.go`) liest ihn zeilenweise für `ReadConfig`, nur die Blockliste,
+  eingerückt oder in der Spalte von `exclude:`;
+  ein absolutes Muster, eines, das mit `..` aus `project.repo_root` führt, oder eines mit
+  Zeilenumbruch oder anderem Steuerzeichen (`checkDocsExcludePattern`) landet mit
+  Grund in `context.docs.problems` statt in `context.docs.exclude`. `AddDocsExclude` prüft
+  ebenso, überspringt Doppelte, lässt die Datei bei nichts Neuem byte-gleich und fügt sonst
+  nur die neuen Zeilen hinter den letzten Eintrag ein (`planDocsExcludeEdit`); jede andere
+  Zeile, auch `include:`, Kommentare und Verworfenes, bleibt stehen. Nur ein fehlender Block
+  entsteht über `replaceTopLevelBlock`. Eine Form, die sich nicht sicher ergänzen lässt —
+  etwa die Flussform `exclude: [docs/]` —, ist `unsupported`, geschrieben wird nichts.
+  Subkommando `docs exclude add` und Werkzeug
+  `k_playbook_docs_exclude_add` sind Hüllen; Kephalaion braucht es dafür nicht. Eine neue
+  Konfiguration trägt den Block nur als Kommentar (`docsBlockExample`); damit
+  `SetRemediationMode` ihn nicht mitnimmt, gehören Kommentare ohne Einrückung am Ende eines
+  ersetzten Blocks seit Task 116 zum Folgenden.
 
 Vertrag der Werkzeuge: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Generated Docs:
 Checkout and Publish“; welche Kephalaion-Aufrufe dahinter stehen:

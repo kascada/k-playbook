@@ -13,7 +13,9 @@ Produces:
 
 Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` selbst; das
 Arbeitsverzeichnis unter `.k-playbook/work/docs/code/` entfernt `publish` nach einem
-vollständigen Abgleich.
+vollständigen Abgleich. Einzige Ausnahme: Bestätigt der Nutzer in Schritt 7, die im
+Preflight ergänzten Ausschlüsse zu speichern, trägt `k_playbook_docs_exclude_add` sie in
+`docs.exclude` von `K-PLAYBOOK.yaml` ein.
 
 ## Schritt 1 — Briefing und Scope
 
@@ -31,6 +33,9 @@ Aus dem Briefing brauchst du:
   (siehe die Ablage oben).
 - `context.project.dir`, `context.project.repoRoot`, `context.local.dir`,
   `context.playbook.dir`.
+- `context.docs.exclude` und `context.docs.problems` — die dauerhaften Ausschlüsse des
+  Projekts aus `K-PLAYBOOK.yaml` und die Einträge, die dort verworfen wurden. Die Datei
+  selbst liest du nie.
 
 **Scope** — aus Briefing und Argument, nicht geraten:
 
@@ -60,9 +65,16 @@ Aus dem Briefing brauchst du:
   `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*` — dazu alles, was eine
   `.gitignore` unter `SCAN_ROOT` ausnimmt (Einträge als Glob-Muster, verschachtelte
   `.gitignore` nach bestem Vermögen).
+- **Aus `K-PLAYBOOK.yaml`**, ohne Rückfrage: die Muster aus `context.docs.exclude`. Sie
+  gelten wie in einer `.gitignore` unter `SCAN_ROOT`. Ein Pfad, den `$ARGUMENTS`
+  ausdrücklich nennt, wird trotzdem gescannt, auch wenn ein Eintrag ihn ausschließt. Was
+  unter `context.docs.problems` steht, wurde verworfen und gilt nicht; der Preflight nennt
+  es.
 
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
-ergänzen:
+ergänzen. Ergänzte Ausschlüsse gelten für diesen Lauf; du merkst sie dir als
+`NEW_EXCLUDES`, Muster wie in einer `.gitignore`, relativ zu `SCAN_ROOT`. Ob sie
+gespeichert werden, fragt erst Schritt 7.
 
 ```text
 /k-docs-code — Preflight
@@ -74,6 +86,8 @@ Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <EXTRA_PATH> | —
 Immer außen   k-playbook/, k-playbook-local/, .k-playbook/, .git/
 Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
+Aus K-PLAYBOOK.yaml  <context.docs.exclude, durch Komma getrennt> | —
+              verworfen: <pattern> — <reason>   (je Eintrag aus context.docs.problems)
 Ausschlüsse   <kompakte Liste der übrigen wirksamen Ausschlüsse>
 ```
 
@@ -94,7 +108,8 @@ Rufe `k_playbook_docs_checkout` mit `projectDir` = `context.project.dir` und
   Ohne Antwort geht es nicht weiter.
 - `kephalaion_unavailable` — nichts geschrieben; der Command endet wie in der Ablage oben.
 
-Geschrieben wird ab hier nur in `WORK_DIR`.
+Geschrieben wird ab hier nur in `WORK_DIR`. Einzige Ausnahme ist der bestätigte Eintrag
+über `k_playbook_docs_exclude_add` in Schritt 7.
 
 ## Schritt 3 — Lesen
 
@@ -104,8 +119,8 @@ dir `generated.by`, `hints` und `questions` aus dem Frontmatter.
 - `hints` sind der einzige von Hand gepflegte Teil eines erzeugten Dokuments: kurze Sätze,
   worauf dieser Lauf achten soll — etwa Zusatzquellen oder Schwerpunkte. Befolge sie.
   Nennt ein `hint` eine Zusatzquelle innerhalb von `context.project.dir`, gehört sie für
-  dieses Dokument zum Scan — mit denselben Ausschlüssen wie in Schritt 1, nie die
-  immer ausgeschlossenen Verzeichnisse.
+  dieses Dokument zum Scan — mit denselben Ausschlüssen wie in Schritt 1, auch denen aus
+  `context.docs.exclude` und `NEW_EXCLUDES`, nie die immer ausgeschlossenen Verzeichnisse.
 - Den bisherigen Text nimmst du als Anregung, nicht als Vorlage zum Abschreiben.
 - **Zuständig** ist dieser Lauf nur für Dokumente mit `generated.by: k-docs-code` (oder dem
   Altwert `k-code2docs`), deren Thema im Scope aus Schritt 1 liegt. Alle anderen — mit
@@ -267,6 +282,15 @@ Arbeitsverzeichnis und Merkdatei bleiben liegen, solange etwas offen ist (`open`
 
 ## Schritt 7 — Abschluss
 
+**Ausschlüsse speichern.** Hat der Nutzer im Preflight Ausschlüsse ergänzt
+(`NEW_EXCLUDES`), fragst du einmal, ob sie dauerhaft in `K-PLAYBOOK.yaml` gespeichert
+werden sollen, und nennst sie dabei. Nach Ja rufst du `k_playbook_docs_exclude_add` mit
+`projectDir` = `context.project.dir` und `patterns` = `NEW_EXCLUDES` auf (ersatzweise
+`k-playbook docs exclude add <muster>… --json`) und nennst `exclude` und `rejected` aus der
+Antwort. Danach lädst du das Briefing neu
+(`k-playbook:/instructions/on-demand/briefing-felder.md`, „Neu laden“). Bei Nein, oder wenn
+nichts ergänzt wurde, entfällt dieser Teil. Die Datei liest und bearbeitest du nie selbst.
+
 Kompakte Zusammenfassung:
 
 - Je Dokument der Zustand aus `publish`, gezählt nach neu, umgeschrieben, entfallen,
@@ -276,7 +300,8 @@ Kompakte Zusammenfassung:
 - Der beschriebene Stand aus Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
 - Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/code/` und ins
-  Arbeitsverzeichnis `WORK_DISPLAY_PATH`.
+  Arbeitsverzeichnis `WORK_DISPLAY_PATH` — und, nur wenn der Nutzer es bestätigt hat, über
+  `k_playbook_docs_exclude_add` nach `docs.exclude` in `K-PLAYBOOK.yaml`.
 - Folge-Command: keiner. Den Index über `keph:/docs/` erzeugt das Indizieren, nicht ein
   Command.
 
@@ -289,9 +314,16 @@ Kompakte Zusammenfassung:
 - `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `context.project.dir` oder in
   einem der immer ausgeschlossenen Verzeichnisse → abbrechen, den Pfad nennen.
 - `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.
-- `k_playbook_docs_checkout` ist unbekannt oder `k-playbook docs` meldet
-  `unbekanntes Kommando` → die Installation ist älter als dieser Command: melden,
-  `/k-upgrade` nennen, nichts von Hand nach Kephalaion schreiben.
+- `k_playbook_docs_checkout` oder `k_playbook_docs_exclude_add` ist unbekannt, oder
+  `k-playbook docs` meldet `unbekanntes Kommando` bzw. `unbekannter Unterbefehl` → die
+  Installation ist älter als dieser Command: melden, `/k-upgrade` nennen, nichts von Hand
+  nach Kephalaion oder in `K-PLAYBOOK.yaml` schreiben.
+- `k_playbook_docs_exclude_add` nennt Einträge unter `rejected` → mit `reason` nennen; sie
+  stehen nicht in der Datei, die übrigen sind trotzdem eingetragen.
+- `k_playbook_docs_exclude_add` meldet `unsupported` → `docs.exclude` steht in einer Form,
+  die das Programm nicht sicher ergänzt (etwa `exclude: [docs/]`); nichts ist eingetragen.
+  Die Meldung mit Zeile und Grund nennen; der Nutzer stellt die Liste selbst um, du bearbeitest
+  `K-PLAYBOOK.yaml` nicht.
 - `publish` meldet `conflict`, `hints_changed` oder `failed` → wie in Schritt 6.
 - Der Scan findet keine Kernlogik, nur Framework-Standard → das sagen und keine Doku
   erfinden.
@@ -312,6 +344,9 @@ Kompakte Zusammenfassung:
 - **Direkt in die Collection schreiben.** Nicht mit Kephalaion `write` oder `create` an
   `publish` vorbei — die Regeln (Frontmatter, `hints`, Konflikte) setzt nur `publish`
   durch.
+- **`K-PLAYBOOK.yaml` selbst lesen oder bearbeiten.** Die Ausschlüsse kommen aus
+  `context.docs.exclude`, eingetragen wird nur über `k_playbook_docs_exclude_add` und nur
+  nach Bestätigung.
 - **`README.md` oder `index.md` schreiben.** Die README schreibt `publish`, den Index das
   Indizieren.
 - **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf; `k-playbook-local/docs/`

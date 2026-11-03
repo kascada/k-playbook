@@ -15,9 +15,14 @@ import (
 // Hüllen über project.DocsWork.Checkout und .Publish, dem Weg, den auch
 // `k-playbook docs checkout|publish` geht. Die erlaubten Erzeuger kommen aus
 // der Erzeugertabelle project.DocsProducers.
+//
+// Dazu k_playbook_docs_exclude_add (Task 116): Hülle über
+// project.AddDocsExclude wie `k-playbook docs exclude add`. Ein Command trägt
+// damit dauerhafte Ausschlüsse ein, ohne K-PLAYBOOK.yaml selbst zu lesen.
 const (
-	docsToolCheckout = "k_playbook_docs_checkout"
-	docsToolPublish  = "k_playbook_docs_publish"
+	docsToolCheckout   = "k_playbook_docs_checkout"
+	docsToolPublish    = "k_playbook_docs_publish"
+	docsToolExcludeAdd = "k_playbook_docs_exclude_add"
 )
 
 // openDocsWork ist austauschbar, damit Tests den Node nicht fragen.
@@ -33,6 +38,19 @@ type docsPublishInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 	Producer   string `json:"erzeuger" jsonschema:"Pflicht. Der Erzeuger, wie beim checkout."`
 	AllowHints bool   `json:"allow_hints,omitempty" jsonschema:"hints ändern, ein Dokument mit hints löschen oder neu anlegen — nur nach Bestätigung durch den Nutzer. Die Antwort nennt jedes solche Dokument unter hintsChanged."`
+}
+
+type docsExcludeAddInput struct {
+	ProjectDir string   `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	Patterns   []string `json:"patterns" jsonschema:"Pflicht. Die Muster, wie in einer .gitignore, relativ zu project.repo_root — nur die, deren Speichern der Nutzer bestätigt hat."`
+}
+
+type docsExcludeEnvelope struct {
+	OK         bool   `json:"ok"`
+	Tool       string `json:"tool"`
+	ProjectDir string `json:"projectDir"`
+	*project.DocsExcludeResult
+	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
 }
 
 // docsCheckoutEnvelope und docsPublishEnvelope sind die Antwortformen; die
@@ -102,6 +120,40 @@ func addDocsWorkTools(server *mcp.Server) {
 			"angekommen sein — nicht noch einmal veröffentlichen, sondern nachsehen. not_checked_out: kein checkout. " +
 			"kephalaion_unavailable: nichts geschrieben. Hülle über `k-playbook docs publish`.",
 	}, docsPublishTool)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: docsToolExcludeAdd,
+		Description: "Trägt Muster dauerhaft in den Block docs.exclude von .k-playbook/K-PLAYBOOK.yaml ein — was die " +
+			"Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen; gelesen wird die Liste aus " +
+			"context.docs.exclude. Fehlt der Block, wird er angelegt; außerhalb des Blocks bleibt die Datei unverändert. " +
+			"Muster gelten wie in einer .gitignore, relativ zu project.repo_root. Ein absolutes Muster, eines, das mit " +
+			".. aus project.repo_root führt, oder eines mit Zeilenumbruch oder anderem Steuerzeichen wird nicht " +
+			"eingetragen, sondern unter rejected mit reason gemeldet; eines, " +
+			"das schon dasteht, wird übersprungen; ist nichts neu, bleibt die Datei unberührt (changed: false). Eingefügt " +
+			"werden nur die neuen Zeilen, jede andere bleibt stehen; steht docs.exclude in einer Form, die sich nicht " +
+			"sicher ergänzen lässt (etwa die Flussform exclude: [docs/]), ist das unsupported mit Zeile und Grund, und " +
+			"nichts wird geschrieben. Nur nach " +
+			"Bestätigung durch den Nutzer aufrufen. Antwort: config (Pfad), exclude (die Liste danach), added, rejected " +
+			"(pattern, reason), changed. Danach das Briefing neu laden. Ohne Muster: invalid_input. Braucht keine " +
+			"Kephalaion-Anbindung. Hülle über `k-playbook docs exclude add`.",
+	}, docsExcludeAddTool)
+}
+
+func docsExcludeAddTool(_ context.Context, _ *mcp.CallToolRequest, input docsExcludeAddInput) (*mcp.CallToolResult, any, error) {
+	fail := func(dir string, code string, err error) *mcp.CallToolResult {
+		return jsonToolResult(docsExcludeEnvelope{OK: false, Tool: docsToolExcludeAdd, ProjectDir: dir,
+			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+	}
+	projectDir, err := resolveProjectDir(input.ProjectDir)
+	if err != nil {
+		return fail(projectDir, projectDirErrorCode(err), err), nil, nil
+	}
+	result, err := project.AddDocsExclude(projectDir, input.Patterns)
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	// Verworfene Muster sind kein Fehler des Werkzeugs: Die Antwort nennt sie
+	// unter rejected, die gültigen sind trotzdem eingetragen.
+	return jsonToolResult(docsExcludeEnvelope{OK: true, Tool: docsToolExcludeAdd, ProjectDir: projectDir, DocsExcludeResult: &result}, false), nil, nil
 }
 
 func docsCheckoutTool(ctx context.Context, _ *mcp.CallToolRequest, input docsCheckoutInput) (*mcp.CallToolResult, any, error) {

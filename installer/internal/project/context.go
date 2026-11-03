@@ -41,6 +41,10 @@ type Context struct {
 	Playbook     ContextDir     `json:"playbook"`
 	Local        ContextDir     `json:"local"`
 	Remediation  Remediation    `json:"remediation"`
+	// Docs ist der Block docs: — was die Docs-Erzeuger beim Code-Scan
+	// zusätzlich auslassen (exclude) und welche Einträge verworfen wurden
+	// (problems). Commands lesen die Liste von hier, nie aus der Datei.
+	Docs ContextDocs `json:"docs"`
 	// GH ist die Entscheidung zur GitHub CLI samt Host-Befund. Anders als der
 	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
 	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
@@ -382,6 +386,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Playbook:       ContextDir{Dir: playbookDir},
 		Local:          ContextDir{Dir: localDir},
 		Remediation:    remediation,
+		Docs:           contextDocs(config),
 		GH:             gh,
 		MCP:            MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
 		Git:            gitSettings,

@@ -288,6 +288,7 @@ configuration and the filesystem:
 | `project` | project root, `repoRoot`, `vcs`, configuration location |
 | `playbook`, `local` | the two resolved directories |
 | `remediation` | the policy, including a default when the block is missing |
+| `docs` | the `docs:` block: `exclude` is the list of valid patterns from `docs.exclude` (empty without the block), `problems` the rejected entries, each with `pattern` and `reason` |
 | `gh` | the GitHub CLI decision and host finding |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
@@ -460,7 +461,17 @@ remediation:
   # Derived from the mode; commands read these directly.
   pr_required: false
   direct_fixes: true
+
+# docs:
+#   # Excluded from the code scan of the docs producers, in addition to the
+#   # fixed exclusions. Patterns as in .gitignore, relative to project.repo_root.
+#   # Add with `k-playbook docs exclude add <pattern>…`.
+#   exclude:
+#     - docs/
+#     - rules/
 ```
+
+The `docs:` block is written as a comment only: without it nothing changes.
 
 ## Complete example
 
@@ -479,6 +490,11 @@ remediation:
   branch_prefix: remediation/
   pr_required: true
   direct_fixes: false
+
+docs:
+  exclude:
+    - docs/
+    - rules/
 
 tools:
   gh:
@@ -660,6 +676,57 @@ switch permission as not checkable. Both list forms are read for `allow`.
 Adding the block does not change `schema_version`: it is optional, and older installations
 ignore unknown blocks. Nothing writes this block; it is edited by hand.
 
+### `docs`
+
+Optional block for the docs producers such as `/k-docs-code` (task 116).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `exclude` | list of strings | patterns excluded from the code scan, in addition to the fixed exclusions of the command text |
+
+The patterns mean the same as in a `.gitignore` placed in `project.repo_root`, the scan root
+of `/k-docs-code` -- for example `docs/` excludes every directory named `docs`, `rules/x.md`
+is bound to the root. Only the block form is read, one `- <pattern>` per line, indented
+deeper than `exclude:` or -- equally valid YAML -- in the same column as `exclude:`; quotes
+are removed, and a comment after an entry, empty entries and
+duplicates are skipped. A one-line value such as `exclude: [docs/]` is not read but reported;
+`exclude: []` is the empty list.
+
+An entry that is absolute (leading `/` or `\`, a drive letter such as `C:\`, or `~/`) or that
+leaves `project.repo_root` with `..` is not used: `context` reports it under
+`docs.problems` with its reason and continues. A leading `/` counts as absolute even though
+`.gitignore` would read it as anchored: the list names paths in the project, and an absolute
+path must not silently pass as a pattern. A leading `!` is removed for this check. An entry
+that contains a line break, carriage return or other control character (tab, NUL, DEL, NEL)
+or a Unicode line or paragraph separator is rejected the same way: a pattern stands on one
+line. On reading this only hits such a character in the middle of a line or as an escape in a
+quoted entry.
+
+`k-playbook context` and the briefing carry the list as `context.docs.exclude` and the
+rejected entries as `context.docs.problems`. Commands read it from there, never from the file.
+`/k-docs-code` applies it to every scan, including additional sources from `hints`; a path
+given explicitly as the argument is scanned anyway. Without the block, `exclude` is empty and
+nothing changes.
+
+The block is written by `k-playbook docs exclude add <pattern>… [--json]` and the MCP tool
+`k_playbook_docs_exclude_add` (`projectDir`, `patterns`), both over the same logic; a docs
+command calls the tool only after the user confirmed saving. Each pattern is checked as when
+reading and rejected with a reason if it is absolute, leaves `project.repo_root` or contains
+a line break or other control character -- written raw, a line break would put a line outside
+the block; a pattern already in the list is skipped; if nothing is new the file stays byte for byte. Otherwise the
+new entries are inserted as lines of their own behind the last entry of the list, in its
+column; every other line stays byte for byte -- entries already there (including rejected
+ones), neighbouring keys such as `include:`, comments in and outside the block. A `docs:`
+block without `exclude:` gets the key behind its last indented line; a missing block is
+appended at the end. `exclude: []` becomes the block list (the `[]` goes, a comment behind it
+stays). A form that cannot be extended safely -- a one-line value such as the flow form
+`exclude: [docs/]`, `docs:` with a value in its header line or as a list, `exclude:` twice,
+or lines under `exclude:` that are not `- <pattern>` in one column -- is not rewritten: the
+answer is `unsupported` with the line and the reason, and nothing is written. The answer names `exclude` (the list afterwards), `added`, `rejected`
+(`pattern`, `reason`), `changed`, and `config`, the file path.
+
+Adding the block does not change `schema_version`.
+
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
@@ -668,6 +735,7 @@ ignore unknown blocks. Nothing writes this block; it is edited by hand.
 - The tool owns `schema_version` and `project.*`.
 - The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` and `git` are only read.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
+- `docs.exclude` is written only by `k-playbook docs exclude add` and `k_playbook_docs_exclude_add`, after the user confirmed; only lines for new entries are inserted into the `docs:` block, nothing in it is rendered again, and a form that cannot be extended safely is refused (`unsupported`). A missing block is appended; unindented comments before the next block belong to what follows and stay, such as the commented `docs:` example of a new file.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.
 - Host-local installation states do not belong in this file. What differs per machine — for
   now only the Kephalaion binding (hub alias, collection, account) — lives in

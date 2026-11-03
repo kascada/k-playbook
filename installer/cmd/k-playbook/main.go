@@ -337,8 +337,11 @@ Unterkommandos:
             und k-playbook docs publish <erzeuger> [--allow-hints], je mit
             --json. checkout holt keph:/docs/generated/<erzeuger>/ nach
             .k-playbook/work/docs/<erzeuger>/, publish gleicht ab und meldet
-            Konflikte, statt zu überschreiben. Erzeuger: code. Dasselbe wie
-            die MCP-Werkzeuge k_playbook_docs_checkout und _publish.
+            Konflikte, statt zu überschreiben. Erzeuger: code. Dazu
+            k-playbook docs exclude add <muster>… [--json]: trägt dauerhafte
+            Ausschlüsse für den Code-Scan in docs.exclude von K-PLAYBOOK.yaml
+            ein. Dasselbe wie die MCP-Werkzeuge k_playbook_docs_checkout,
+            _publish und _exclude_add.
   upgrade   Aktualisiert das Programm und zieht das Projekt nach:
             k-playbook upgrade [--check] [--json]. Erst git pull im Clone
             und das Binary über k-playbook/bin/install, nur wenn das laufende

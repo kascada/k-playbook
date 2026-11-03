@@ -38,6 +38,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.playbook.dir` | Die Installation. Nur lesen; sie wird bei jedem Update ersetzt. |
 | `context.local.dir` | Alles, was das Projekt besitzt. |
 | `context.remediation` | Wie Befunde abgearbeitet werden: `mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`. |
+| `context.docs` | Was die Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen, aus dem Block `docs` in `K-PLAYBOOK.yaml`: `exclude` (Muster wie in `.gitignore`, relativ zu `project.repoRoot`; leer ohne Block) und `problems` (verworfene Einträge, je `pattern` und `reason`). Von hier lesen — nie die Datei selbst; eingetragen wird über `k_playbook_docs_exclude_add`. |
 | `context.gh` | Ob das Projekt die GitHub CLI nutzt und ob sie auf diesem Rechner nutzbar ist; Einzelheiten unten. |
 | `context.mcp` | Die Pflichtliste der MCP-Server aus der Konfiguration (`required`, `configured`). Liest kein Command; Sache der Oberfläche. |
 | `context.git` | Ob die Oberfläche das Umschalten des Branches anbietet (`switch`, `allow`, `environments`, `configured`). Liest kein Command. |

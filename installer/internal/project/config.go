@@ -21,6 +21,10 @@ type Config struct {
 	SchemaVersion string `json:"schemaVersion"`
 	RepoRoot      string `json:"repoRoot"`
 	VCS           string `json:"vcs"`
+	// DocsExclude sind die gültigen Muster aus docs.exclude, DocsProblems die
+	// verworfenen mit Grund (docs_exclude.go). Ohne Block sind beide leer.
+	DocsExclude  []string             `json:"docsExclude,omitempty"`
+	DocsProblems []DocsExcludeProblem `json:"docsProblems,omitempty"`
 }
 
 // SchemaStatus benennt, wie die gefundene schema_version zum Werkzeug steht.
@@ -101,7 +105,8 @@ const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\"
 
 // ReadConfig liest die Konfiguration eines Projekts.
 //
-// Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare, und der
+// Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare und die Liste
+// docs.exclude (parseDocsExclude, ebenfalls zeilenweise), und der
 // zeilenweise Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke
 // unangetastet, wenn später zurückgeschrieben wird.
 func ReadConfig(projectDir string) (Config, error) {
@@ -141,6 +146,7 @@ func ReadConfig(projectDir string) (Config, error) {
 			config.VCS = value
 		}
 	}
+	config.DocsExclude, config.DocsProblems = parseDocsExclude(string(data))
 	return config, nil
 }
 
@@ -308,9 +314,10 @@ project:
   vcs: %s
 
 %s
+%s
 tools:
 %s`, PlaybookDirName, SchemaVersion, repoRoot, vcs,
-		remediationBlock(DefaultRemediationMode), ghBlock(DefaultGHStatus))
+		remediationBlock(DefaultRemediationMode), docsBlockExample, ghBlock(DefaultGHStatus))
 }
 
 func pathExists(path string) bool {

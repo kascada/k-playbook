@@ -1,6 +1,6 @@
 ---
 title: Die Docs-Ablage in der Projekt-Collection
-description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, hints und questions im Frontmatter, Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), README.md und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
+description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, hints und questions im Frontmatter, dauerhafte Ausschlüsse in docs.exclude, Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), README.md und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
 ---
 
 Die Projektdokumentation liegt in der Collection des Projekts unter `keph:/docs/`; das ist
@@ -44,6 +44,10 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
     publish, keine Befunde, keine Rückfragen an den Nutzer — und melden ihre Unklarheiten
     und die Stellen zurück, an denen die bisherige Fassung nicht mehr stimmt. Sammeln,
     vorlegen und veröffentlichen tut nur der Lauf selbst.
+- Dauerhafte Ausschlüsse für den Code-Scan eines Projekts stehen in `docs.exclude` von
+  `K-PLAYBOOK.yaml`: gelesen aus `context.docs.exclude`, eingetragen nur über
+  `k_playbook_docs_exclude_add` (`k-playbook docs exclude add`) nach Bestätigung durch den
+  Nutzer. Die Datei selbst liest und bearbeitet kein Docs-Command.
 - `docs/manual/` ist von Hand gepflegt; `docs/sources/` verlinkt Quellen außerhalb von
   Kephalaion. Beides fasst ein Erzeuger nicht an.
 - `README.md` und `index.md` schreibt kein Command-Text: Die `README.md` von
