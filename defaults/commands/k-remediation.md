@@ -309,13 +309,29 @@ die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
    verankert, Punkte und andere Sonderzeichen maskiert, etwa
    `^Remediation-Anker: project:/k-playbook-local/results/k-check/2026-07-23/review-triage\.md B1$`.
    Die Antwort nennt je Treffer `ref` und die Zeile.
-2. **Alte Tasks ohne Anker.** Danach einmal mit dem bisherigen Muster suchen: `pattern` = der
-   projektrelative Pfad der Quelle als Regex (Punkte maskiert, etwa
-   `results/k-check/2026-07-23/review-triage\.md`); mehr als 200 Treffer meldet
-   `truncated: true`. Ein Treffer in einem Task ohne Ankerzeile für dieses Bündel wird
-   gemeldet („ohne Anker“, mit `ref`), gilt aber **nicht** still als Deckung: Das Bündel geht
-   weiter in die Abarbeitung, und vor dem Anlegen eines Tasks dafür (6c, Kategorie T,
-   Schritt 1) fragt der Command den Nutzer, ob der alte Task es abdeckt.
+2. **Alte Tasks ohne Anker.** Ein alter Task ist einer ohne **jede** Ankerzeile; ein Task mit
+   Anker für ein anderes Bündel derselben Quelle ist keiner. Gesucht wird in drei Schritten,
+   jeweils mit `count_only`: Die Antwort nennt dann je Dokument einen Zähler, auch 0, und die
+   Grenze von 200 Treffern gilt nicht.
+
+   a) **Tasks mit Anker.** Einmal über alle Tasks (`kind: tasks`, `user: "*"`, `done: true`)
+      mit `pattern` = `^Remediation-Anker: ` suchen. Jeder Task mit einem Zähler über 0 trägt
+      einen Anker.
+   b) **Tasks, die die Quelle nennen.** Einmal ebenso mit dem bisherigen Muster suchen:
+      `pattern` = der projektrelative Pfad der Quelle als Regex (Punkte maskiert, etwa
+      `results/k-check/2026-07-23/review-triage\.md`). Von den Tasks mit einem Zähler über 0
+      jeden verwerfen, dessen `ref` unter a) einen Zähler über 0 hat. Übrig bleiben die alten
+      Tasks, die die Quelle nennen.
+   c) **Zuordnung zum Bündel.** Für jeden übrigen Task je geplantem Bündel mit
+      `k_playbook_doc_grep` (`ref` = der Task, `count_only`) nach der Bündel-ID als ganzem Wort
+      suchen, Sonderzeichen maskiert, etwa `\bB1\b` oder `\bP1-01\b`. Nur bei einem Zähler
+      über 0 wird der Task für dieses Bündel gemeldet („ohne Anker“, mit `ref`). Er gilt
+      **nicht** still als Deckung: Das Bündel geht weiter in die Abarbeitung, und vor dem
+      Anlegen eines Tasks dafür (6c, Kategorie T, Schritt 1) fragt der Command den Nutzer, ob
+      der alte Task es abdeckt; nur ein Ja wertet ihn als Deckung.
+
+   Ein übriger Task, der keine ID eines geplanten Bündels enthält, wird einmal gemeldet
+   („nennt die Quelle, kein Bündel zuzuordnen“, mit `ref`), ohne Rückfrage.
 3. Je geplantem Bündel entscheiden, ob ein bestehender Task es abdeckt.
 
 **Treffer-Kriterium.** Ein bestehender Task deckt einen Befund ab, wenn er die
@@ -438,9 +454,8 @@ Nummer, Kopf und Aufbau stehen dort und werden hier nicht wiederholt:
 1. Abgleich prüfen: Deckt ein offener Task dieses Bündel bereits ab (Schritt 5,
    Treffer-Kriterium: die Ankerzeile)? Dann keinen zweiten Task anlegen, sondern den Treffer
    melden und beim nächsten Bündel weitermachen. Ein Treffer unter `done/` hält den Task
-   nicht auf; er wird im neuen Task als Vorgeschichte genannt. Ein Treffer „ohne Anker“ führt
-   zur Rückfrage, ob der alte Task das Bündel abdeckt; nur ein Ja des Nutzers wertet ihn als
-   Deckung.
+   nicht auf; er wird im neuen Task als Vorgeschichte genannt. Ist für dieses Bündel ein alter
+   Task „ohne Anker“ gemeldet, gilt die Rückfrage aus Schritt 5, Punkt 2c.
 2. `k_playbook_doc_create` mit `kind: tasks` und einem Kurznamen aus dem Befundtitel
    (klein, Bindestriche). Die Antwort nennt `ref`, `number` und `name`; die Nummer vergibt
    k-playbook. Für die Platzhalter unten gilt: `<NNN>` ist `number`, dreistellig mit

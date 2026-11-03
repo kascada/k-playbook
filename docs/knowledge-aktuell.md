@@ -410,7 +410,7 @@ switch to the collection is a task of its own, and until then `LocalStructure()`
 `/k-task-create` and `/k-task-run` on a trial task in Claude Code and OpenCode, `/k-upgrade`
 3.3 on this repo in a session of its own.
 
-**The task commands sharpened** (task 108, 2026-11-01, not yet released; checked against
+**The task commands sharpened** (task 108, 2026-11-01, released in v0.16.20; checked against
 the text only). `on-demand/tasks.md` is the one place for the rules the commands used to
 repeat: references with a prefix (task, intent, everything a command writes into a task),
 foreign references rejected with `foreign_user` before anything is written, completed ones
@@ -425,6 +425,12 @@ it. `/k-upgrade` 3.3 now translates an old `## Fortschritt` table into progress 
 moves a task. `/k-remediation` marks every task it creates with a line
 `Remediation-Anker: project:/<source> <bundle-id>` and matches only on it.
 `check_command_tool_guards.sh` also reads the command texts under `defaults/commands/`.
+Two review findings fixed afterwards (task 113, 2026-11-03, not yet released): in fenced code
+blocks `check_verweise.sh` counts neither headings nor `pfad` findings, `link` still counts
+everywhere (a `## Referenzen` in a template no longer opens the area, a `# comment` in a shell
+block no longer ends it); `/k-remediation` asks only about old tasks without any anchor line,
+and only for the bundles whose ID they contain. Tests for both checks live in `checks/tests/`
+and run with `make test`.
 **Open, measured only after the release:** the replica-lag rule in a real run in Claude Code
 and OpenCode (if the text rule is not enough, a waiting `doc_grep` becomes a task of its own),
 and 3.3 with progress tables in OMNI (`squad-km-dev-setup`). Also open: `check_verweise.sh`

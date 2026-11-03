@@ -81,6 +81,10 @@ Ein Check sieht nur den Text. Er erkennt
   sie unter `## Referenzen` stehen oder in einer Zeile mit Lese-Anweisung (`lies`, `liest`,
   `lesen`, `siehe`).
 
+In umzäunten Codeblöcken zählen Überschriften und Pfade ohne Präfix nicht: Ein `## Referenzen`
+in einer Vorlage öffnet keinen Bereich, ein `# Kommentar` in einem Shell-Block beendet keinen.
+Relative Links meldet der Check weiter überall, auch in Codeblöcken.
+
 Er erkennt nicht, ob ein Pfad in anderem Fließtext gelesen werden soll, und nicht, welches von
 zwei Präfixen gemeint ist. Der Check findet und meldet; er korrigiert nicht. Korrigiert wird
 von einer KI nach dieser Anweisung. Eine gemeldete Stelle, die doch eine Ortsangabe ist, kommt

@@ -35,6 +35,12 @@ Aus dem Briefing brauchst du:
 **Scope** — aus Briefing und Argument, nicht geraten:
 
 - `SCAN_ROOT = context.project.repoRoot` — immer, nicht das aktuelle Verzeichnis.
+- **Stand** — beschrieben wird der Arbeitsbaum von `SCAN_ROOT`, wie er ausgecheckt ist.
+  Branch und Commit stehen im Preflight (`git -C <SCAN_ROOT> rev-parse --abbrev-ref HEAD`,
+  `git -C <SCAN_ROOT> log -1 --format=%h`, dazu ob `git status --porcelain` leer ist). Ist es
+  nicht der Standard-Branch oder ist der Arbeitsbaum nicht sauber, fragst du im Preflight,
+  welcher Stand beschrieben wird. Ein anderer Stand wird mit `git show <ref>:<pfad>` und
+  `git grep <muster> <ref>` gelesen; der Arbeitsbaum wird nicht umgeschaltet.
 - `$ARGUMENTS` ergänzt den Scope um **genau einen** Pfad, statt ihn zu ersetzen. Er muss
   existieren und innerhalb von `context.project.dir` liegen; relativ gilt er ab
   `context.project.dir`. Fehlt er oder liegt er außerhalb, abbrechen und den Pfad nennen —
@@ -60,6 +66,7 @@ ergänzen:
 Collection    <context.kephalaion.address>
 Ziel          keph:/docs/generated/code/
 Scope         <SCAN_ROOT> (project.repoRoot)
+Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <EXTRA_PATH> | —
 Immer außen   k-playbook/, k-playbook-local/, .k-playbook/
 Ausschlüsse   <kompakte Liste der wirksamen Ausschlüsse>
@@ -91,12 +98,18 @@ dir `generated.by`, `hints` und `questions` aus dem Frontmatter.
 
 - `hints` sind der einzige von Hand gepflegte Teil eines erzeugten Dokuments: kurze Sätze,
   worauf dieser Lauf achten soll — etwa Zusatzquellen oder Schwerpunkte. Befolge sie.
+  Nennt ein `hint` eine Zusatzquelle innerhalb von `context.project.dir`, gehört sie für
+  dieses Dokument zum Scan — mit denselben Ausschlüssen wie in Schritt 1, nie die drei
+  immer ausgeschlossenen Verzeichnisse.
 - Den bisherigen Text nimmst du als Anregung, nicht als Vorlage zum Abschreiben.
 - **Zuständig** ist dieser Lauf nur für Dokumente mit `generated.by: k-docs-code` (oder dem
   Altwert `k-code2docs`), deren Thema im Scope aus Schritt 1 liegt. Alle anderen — mit
   `generated.by: ks-overlay-repo-analyse`, ohne `generated.by` oder mit einem Thema außerhalb
   des Scans — bleiben im Arbeitsverzeichnis **unverändert liegen**, samt `hints` und
   `questions`.
+- Ein eigenes Dokument, dessen Thema außerhalb des Scans liegt, bleibt ebenso liegen —
+  und veraltet, solange kein Lauf es erfasst. Merke dir, welcher Pfad es abdecken würde;
+  Schritt 4 schlägt dafür einen `hint` mit dieser Zusatzquelle vor.
 
 ## Schritt 4 — Analysieren und Struktur vorschlagen
 
@@ -116,9 +129,15 @@ Bedeutung, nicht nach Verzeichnissen. Suche nach:
 - **Altlasten** — sichtbare Deprecations, TODOs, alte Muster, getrennt notiert.
 
 Nicht aufnehmen: Framework-Standard ohne Eigenanteil, Kommentare, die den Code
-nacherzählen, Signaturen einzelner Funktionen. Bei sehr großen Repos in Sub-Agenten
-aufteilen (einer je Subsystem-Kandidat), jedem die Ausschlüsse und die Regel „nur
-Bedeutung, keine Zeilenlisten“ mitgeben.
+nacherzählen, Signaturen einzelner Funktionen — dazu, was die Ablage oben ausschließt.
+Was der Scan an möglichen Fehlern und Altlasten findet, steht unter `## Randfälle` oder in
+einem Dokument für bekannte Macken, nicht in Befunden.
+
+**Sub-Agenten.** Bei sehr großen Repos teilst du Analyse und Schreiben auf, einen
+Sub-Agenten je Thema, nach den Regeln der Ablage oben. Jeder bekommt zusätzlich
+`SCAN_ROOT`, `EXTRA_PATH`, die Ausschlüsse, den Stand aus Schritt 1, sein Thema, `WORK_DIR`,
+die bisherige Fassung seines Dokuments samt `hints`, die Vorlage aus Schritt 5 und die
+Regel „nur Bedeutung, keine Zeilenlisten“; er meldet außerdem Dateiname und Zeilenzahl.
 
 Zeige dann eine **kompakte** Liste, nicht die Doku selbst:
 
@@ -129,6 +148,7 @@ Struktur für keph:/docs/generated/code/:
   umschreiben  02-architektur         Komponenten und wie sie zusammenspielen
   entfällt     07-altes-thema         <Grund>
   bleibt       20-overlay-delta       generated.by: ks-overlay-repo-analyse — nicht behandelt
+  bleibt       13-entwicklungsumgebung  außerhalb des Scans (.devcontainer/) — hint vorgeschlagen
   …
 
 Aus dem Scan:  <2–3 Beobachtungen, die den Vorschlag begründen>
@@ -148,6 +168,9 @@ OK / zusammenlegen / trennen / streichen / umbenennen?
 
 ## Schritt 5 — Schreiben
 
+Setze zuerst `GENERATED_AT` wie in der Ablage oben (`date -Iseconds`), falls Sub-Agenten
+ihn nicht schon in Schritt 4 brauchten.
+
 Je bestätigtem Thema eine Datei `<WORK_DIR>/<NN>-<slug>.md`, mit den Datei-Werkzeugen.
 Dateinamen klein, nur `a–z`, `0–9`, `.`, `_`, `-`. Keine `README.md`, keine anderen
 Dateien als `.md`.
@@ -156,7 +179,7 @@ Dateien als `.md`.
 ---
 title: <Titel>
 description: <Ein Satz: was dieses Dokument erklärt.>
-generated: { by: k-docs-code, at: <ISO-8601-Zeitpunkt> }
+generated: { by: k-docs-code, at: <GENERATED_AT> }
 hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
 questions: [ "<Frage, die ein Neuer in der ersten Woche stellt>", … ]
 ---
@@ -200,8 +223,8 @@ Regeln:
 - Stellen im Code immer als `pfad:zeile`. Verwandte Themen im selben Verzeichnis mit ihrem
   Dateinamen, andere Teile der Projektdoku als `keph:`-Verweis — ein isoliertes Dokument ist
   ein Fehler.
-- Keine erfundenen Erklärungen: Ist eine Stelle unklar, fragen statt raten, gebündelt je
-  Dokument.
+- Keine erfundenen Erklärungen: Unklarheiten — auch die der Sub-Agenten — legst du wie in
+  der Ablage oben vor `publish` vor; was offen bleibt, nennt Schritt 7.
 - Keine Fließtextwände; Sprache wie im Projekt vereinbart, in der Regel Deutsch.
 
 Nach jeder geschriebenen Datei kurz melden: Dateiname und Zeilenzahl, nicht der Inhalt.
@@ -243,7 +266,9 @@ Kompakte Zusammenfassung:
 
 - Je Dokument der Zustand aus `publish`, gezählt nach neu, umgeschrieben, entfallen,
   unverändert; dazu die unberührten Dokumente anderer Schreiber.
-- Geänderte `hints` (nur mit Bestätigung) und offene Fragen aus Schritt 5.
+- Geänderte `hints` (nur mit Bestätigung) und die offen gebliebenen Unklarheiten aus
+  Schritt 5.
+- Der beschriebene Stand aus Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
 - Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/code/` und ins
   Arbeitsverzeichnis `WORK_DISPLAY_PATH`.

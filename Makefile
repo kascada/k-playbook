@@ -175,6 +175,7 @@ gui: dev-install ## Baut, installiert und startet die GUI
 
 test: ## Führt die Tests aus
 	cd installer && go test ./...
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s checks/tests
 	@if command -v node >/dev/null 2>&1; then \
 	  $(MAKE) --no-print-directory vscode-test; \
 	else \

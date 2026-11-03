@@ -103,7 +103,9 @@ Ein Subagent pro Repo, gestartet parallel. Die Vorlage für den Auftrag steht un
 `k-playbook:/commands/_skills/overlay-repo-analyse/subagent-prompt-overlay.md.template`;
 lies sie mit `k_playbook_doc_read`.
 
-Wichtige Instruktionen an den Subagenten:
+Für die Subagenten gelten die Regeln der Docs-Ablage aus dem ersten Schritt; in dieser Phase
+schreiben sie gar nichts, auch nicht ins Arbeitsverzeichnis. Wichtige Instruktionen an den
+Subagenten:
 
 - Nur analysieren was **tatsächlich im Repo** liegt, keine Annahmen über
   Base-Image-Inhalte
@@ -332,7 +334,8 @@ Jede Datei bekommt das Frontmatter aus der Vorlage
 `k_playbook_doc_read`):
 
 - `title` und `description` — Pflicht; ohne sie lehnt `publish` ab.
-- `generated: { by: ks-overlay-repo-analyse, at: <ISO-8601-Zeitpunkt> }`.
+- `generated: { by: ks-overlay-repo-analyse, at: <GENERATED_AT> }` — `GENERATED_AT` wie in
+  der Docs-Ablage aus dem ersten Schritt.
 - `hints` unverändert übernommen. Neue nur vorschlagen und erst nach Bestätigung
   eintragen; dasselbe gilt, wenn ein bestätigt entfallendes eigenes Dokument `hints` hat.
 - `questions: [ … ]` — die Fragen, die genau dieses Dokument beantwortet.

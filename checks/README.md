@@ -162,6 +162,10 @@ KI nach dieser Datei.
   `commands/`, `skills/`, `tasks/`), wenn sie unter einer Überschrift `Referenzen` stehen
   oder in einer Zeile mit Lese-Anweisung (`lies`, `liest`, `lesen`, `siehe`) — Art `pfad`.
   Andere Backtick-Pfade meldet er nicht.
+- **Codeblöcke:** In umzäunten Codeblöcken (` ``` ` oder `~~~`, erkannt wie beim
+  Guard-Check) zählen Überschriften und `pfad`-Funde nicht, `link` gilt weiter überall. Ein
+  `## Referenzen` in einer Vorlage öffnet also keinen Bereich, ein `# Kommentar` in einem
+  Shell-Block beendet keinen.
 
 Ausnahmen stehen in `verweis-exceptions.tsv` neben dem wirksamen Skript, mit Kopfzeile
 `datei`, `zeile`, `art`, `begründung`. Jede Fundstelle steht einzeln; nur Bereiche mit
@@ -171,6 +175,13 @@ Bereich (`datei` endet auf `/`, `zeile` und `art` sind `*`), in `commands/`,
 „Ortsangabe“, „Plattenort“ oder „zurückgestellt“. Ein Eintrag ohne Fundstelle ist veraltet
 und selbst ein `fail`; wie beim Guard-Check gilt bei einem projekteigenen Override nur die
 TSV neben ihm.
+
+## Tests
+
+Die Fachlogik beider Checks hat Tests unter `checks/tests/` (`test_verweise.py`,
+`test_command_tool_guards.py`), mit `unittest` aus der Standardbibliothek. Sie laufen mit
+`make test` im Quell-Repo, einzeln mit `python3 -m unittest discover -s checks/tests`.
+`k-check` führt nur `checks/*.sh` aus; die Tests laufen dort nicht mit.
 
 ## Global vs. Lokal
 

@@ -21,6 +21,10 @@ sind bewusst:
     in einer Zeile mit Lese-Anweisung (lies, liest, lesen, siehe).
   Andere Backtick-Pfade meldet er nicht: Ob ein Pfad im Fließtext gelesen werden
   soll und welches von zwei Präfixen gemeint ist, sieht man am Text nicht.
+- In umzäunten Codeblöcken (``` oder ~~~, erkannt wie in command_tool_guards.py)
+  zählen Überschriften und ``pfad``-Funde nicht; ``link`` gilt weiter überall. Ein
+  ``## Referenzen`` in einer Vorlage öffnet also keinen Bereich, ein ``# Kommentar``
+  in einem Shell-Block beendet keinen.
 - Geprüft wird immer der ganze Umfang, unabhängig von K_CHECK_MODE und
   K_CHECK_FILES_FROM. Nur so fällt ein veralteter Ausnahme-Eintrag auf.
 
@@ -35,7 +39,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from command_tool_guards import resolve_dirs
+from command_tool_guards import FENCE, resolve_dirs
 from common import fail_technical, finish_findings, status
 
 
@@ -97,11 +101,45 @@ def source_files(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
 # --- Fundstellen -------------------------------------------------------------
 
 
+def fence_closing(line: str) -> re.Pattern[str] | None:
+    """Öffnet die Zeile einen umzäunten Codeblock, das Muster seiner Schlusszeile.
+
+    Dieselbe Erkennung wie shell_blocks in command_tool_guards.py: ``` oder ~~~,
+    mindestens drei Zeichen, beliebig eingerückt; eine Backtick-Zeile mit Backtick
+    in der Info öffnet keinen Block. Geschlossen wird mit demselben Zeichen in
+    mindestens gleicher Länge und sonst nichts in der Zeile; ohne Schlusszeile
+    reicht der Block bis zum Dateiende.
+    """
+    match = FENCE.match(line)
+    if not match:
+        return None
+    fence = match["fence"]
+    if fence[0] == "`" and "`" in match["info"]:
+        return None
+    return re.compile(rf"^[ \t]*{re.escape(fence[0])}{{{len(fence)},}}[ \t]*$")
+
+
 def scan(lines: list[str]) -> list[tuple[int, str, str]]:
-    """Fundstellen als (Zeile, Art, Text) liefern."""
+    """Fundstellen als (Zeile, Art, Text) liefern.
+
+    In einem umzäunten Codeblock zählen keine Überschriften und keine Funde der
+    Art ``pfad``; ``link`` wird auch dort gemeldet.
+    """
     found: list[tuple[int, str, str]] = []
     references_level = 0  # >0: unter einer Überschrift „Referenzen“ dieser Ebene
+    closing: re.Pattern[str] | None = None  # gesetzt: innerhalb eines Codeblocks
     for number, line in enumerate(lines, start=1):
+        if closing is not None:
+            if closing.match(line):
+                closing = None
+            in_code = True
+        else:
+            closing = fence_closing(line)
+            in_code = closing is not None
+        if in_code:  # Codeblock samt Zaunzeilen: nur relative Links zählen
+            if REL_LINK.search(line):
+                found.append((number, "link", line.strip()))
+            continue
         heading = HEADING.match(line)
         if heading:
             level = len(heading[1])
