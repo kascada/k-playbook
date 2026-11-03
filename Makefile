@@ -36,6 +36,14 @@ VSCODE_VSIX := installer/internal/vscodeext/vsix/k-playbook-workspace-tools.vsix
 # stolpern. 4.0.0 verlangt ein repository-Feld in package.json.
 VSCE_VERSION := 4.0.0
 
+# Über welchen Dienst aus der persönlichen github.yaml der Release-Weg GitHub
+# erreicht (`k-playbook github run`). Konto und Zugangsart stehen dort, nicht
+# hier; ein anderer Rechner setzt einen anderen Namen, etwa
+# GITHUB_SERVICE=… make release VERSION=v0.1.0. Gebraucht wird das nur von
+# release und release-publish, und dort nur vom Maintainer.
+K_PLAYBOOK ?= k-playbook
+GITHUB_SERVICE ?= k-playbook
+
 # Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
 # darunter und ist ein eigener Clone. Sie trägt deshalb den zuletzt gepushten
 # Stand, nicht den, an dem gerade gearbeitet wird — und die Oberfläche liest
@@ -244,6 +252,18 @@ define require_toolchain
 	  }
 endef
 
+# Pushes und gh-Aufrufe des Release-Wegs laufen über `k-playbook github run`,
+# nicht über das aktive gh-Konto oder den SSH-Alias in der origin-URL. Geprüft
+# wird vor dem ersten Schritt, der etwas anlegt: ohne k-playbook entstünden
+# Commit und Tag lokal, und erst der Push bräche ab.
+define require_k_playbook
+	@command -v $(K_PLAYBOOK) >/dev/null 2>&1 || { \
+	  printf '%s fehlt (K_PLAYBOOK). Pushes und gh-Aufrufe von %s laufen über\n' "$(K_PLAYBOOK)" "$(GOAL)" >&2; \
+	  printf '%s github run %s; ohne k-playbook gibt es keinen Zugang zu GitHub.\n' "$(K_PLAYBOOK)" "$(GITHUB_SERVICE)" >&2; \
+	  exit 1; \
+	}
+endef
+
 define require_version_arg
 	@test -n "$(VERSION)" || { \
 	  printf 'Aufruf: make %s VERSION=v0.1.0\n' "$(GOAL)" >&2; \
@@ -257,6 +277,7 @@ endef
 release: ## Baut das Release, committet VERSION und SHA256SUMS und pusht den Tag (VERSION=v0.1.0)
 	$(require_version_arg)
 	$(require_toolchain)
+	$(require_k_playbook)
 	@set -eu; \
 	  dirty="$$(git status --porcelain)"; \
 	  test -z "$$dirty" || { \
@@ -284,12 +305,16 @@ release: ## Baut das Release, committet VERSION und SHA256SUMS und pusht den Tag
 	@git add "$(INSTALLER_VERSION_FILE)" "$(INSTALLER_SUMS_FILE)"
 	@git commit -m "Release $(VERSION)"
 	@git tag -a "$(VERSION)" -m "Release $(VERSION)"
-	@git push origin "refs/tags/$(VERSION)"
+	@$(K_PLAYBOOK) github run $(GITHUB_SERVICE) --write -- git push origin "refs/tags/$(VERSION)"
 	@echo ""
 	@echo "Tag $(VERSION) gepusht. CI baut jetzt und lädt die Assets hoch."
 	@echo "Danach, und erst danach:"
 	@echo "  make release-publish VERSION=$(VERSION)"
 
+# gh bekommt das Repository mit --repo aus `github show`, nicht aus dem
+# origin-Remote: dessen URL kann einen SSH-Alias tragen, den gh nicht kennt.
+# Die Asset-Liste wird einmal gelesen und ohne 2>/dev/null — ein Abbruch von
+# `run` (Exit 125, kein Zugang) erschiene sonst als fehlendes Asset.
 release-publish: ## Bringt den getaggten Commit auf main — erst wenn die Assets liegen
 	$(require_version_arg)
 	@set -eu; \
@@ -299,21 +324,43 @@ release-publish: ## Bringt den getaggten Commit auf main — erst wenn die Asset
 	    printf 'HEAD ist nicht der getaggte Commit (%s vs. %s).\n' "$$head" "$$tagged" >&2; \
 	    exit 1; \
 	  }
+	$(require_k_playbook)
 	@set -eu; \
 	  command -v gh >/dev/null 2>&1 || { \
 	    printf 'Ohne gh lässt sich hier nicht prüfen, ob die Assets liegen.\n' >&2; \
-	    printf 'Von Hand nachsehen und dann: git push origin main\n' >&2; \
+	    printf 'Von Hand nachsehen und dann:\n' >&2; \
+	    printf '  %s github run %s --write -- git push origin main\n' "$(K_PLAYBOOK)" "$(GITHUB_SERVICE)" >&2; \
+	    exit 1; \
+	  }; \
+	  command -v jq >/dev/null 2>&1 || { \
+	    printf 'jq fehlt. Ohne jq lässt sich das Repository des Dienstes %s nicht lesen.\n' "$(GITHUB_SERVICE)" >&2; \
+	    exit 1; \
+	  }; \
+	  dienst="$$($(K_PLAYBOOK) github show $(GITHUB_SERVICE) --json)" || { \
+	    printf '%s github show %s ist fehlgeschlagen (siehe oben).\n' "$(K_PLAYBOOK)" "$(GITHUB_SERVICE)" >&2; \
+	    printf 'Der Dienst steht in der persönlichen github.yaml; ein anderer Name: GITHUB_SERVICE=…\n' >&2; \
+	    exit 1; \
+	  }; \
+	  slug="$$(printf '%s\n' "$$dienst" | jq -r --arg d "$(GITHUB_SERVICE)" '.services[$$d].repo // empty')"; \
+	  test -n "$$slug" || { \
+	    printf 'Zum Dienst %s nennt %s github show kein Repository (services.%s.repo).\n' \
+	      "$(GITHUB_SERVICE)" "$(K_PLAYBOOK)" "$(GITHUB_SERVICE)" >&2; \
+	    exit 1; \
+	  }; \
+	  vorhanden="$$($(K_PLAYBOOK) github run $(GITHUB_SERVICE) --quiet -- \
+	    gh release view "$(VERSION)" --repo "$$slug" --json assets --jq '.assets[].name')" || { \
+	    printf 'Das Release %s in %s ließ sich nicht lesen (siehe oben).\n' "$(VERSION)" "$$slug" >&2; \
+	    printf 'VERSION darf erst auf main, wenn alle Assets liegen.\n' >&2; \
 	    exit 1; \
 	  }; \
 	  for name in $(foreach target,$(INSTALLER_RELEASE_TARGETS),$(INSTALLER_BINARY)-$(target)) $(DEFAULTS_ASSET); do \
-	    gh release view "$(VERSION)" --json assets \
-	      --jq '.assets[].name' 2>/dev/null | grep -qx "$$name" || { \
+	    printf '%s\n' "$$vorhanden" | grep -qx "$$name" || { \
 	      printf 'Im Release %s fehlt das Asset %s.\n' "$(VERSION)" "$$name" >&2; \
 	      printf 'VERSION darf erst auf main, wenn alle Assets liegen.\n' >&2; \
 	      exit 1; \
 	    }; \
 	  done
-	@git push origin main
+	@$(K_PLAYBOOK) github run $(GITHUB_SERVICE) --write -- git push origin main
 	@echo "$(VERSION) ist auf main."
 
 installer-build: build ## Alias für build

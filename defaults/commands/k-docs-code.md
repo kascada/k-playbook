@@ -50,11 +50,15 @@ Aus dem Briefing brauchst du:
   (`k-playbook/`), `context.local.dir` (`k-playbook-local/`) und
   `<context.project.dir>/.k-playbook/`. Zeigt `$ARGUMENTS` in einen davon, abbrechen und
   sagen, dass diese Verzeichnisse nie zur Code-Doku gehören.
-- **Weitere Ausschlüsse**, ohne Rückfrage: `.git/`, `venv/`, `.venv/`, `env/`,
-  `node_modules/`, `dist/`, `build/`, `target/`, `_bases/`, `.next/`, `.nuxt/`,
-  `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `coverage/`, `htmlcov/`,
-  `.tox/`, `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*` — dazu alles, was
-  eine `.gitignore` unter `SCAN_ROOT` ausnimmt (Einträge als Glob-Muster, verschachtelte
+- **Versteckte Pfade** sind ausgeschlossen, ohne Rückfrage: jede Datei und jedes
+  Verzeichnis, dessen Name mit `.` beginnt, auf jeder Ebene — etwa `.git/`, `.github/`,
+  `.claude/`, `.opencode/`, `.devcontainer/`, `.venv/`, `.env`. Ein versteckter Pfad kommt
+  nur in den Scan, wenn `$ARGUMENTS` oder ein `hint` (Schritt 3) ihn ausdrücklich nennt;
+  `.git/` und `.k-playbook/` nie.
+- **Weitere Ausschlüsse**, ohne Rückfrage: `venv/`, `env/`, `node_modules/`, `dist/`,
+  `build/`, `target/`, `_bases/`, `__pycache__/`, `coverage/`, `htmlcov/`,
+  `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*` — dazu alles, was eine
+  `.gitignore` unter `SCAN_ROOT` ausnimmt (Einträge als Glob-Muster, verschachtelte
   `.gitignore` nach bestem Vermögen).
 
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
@@ -68,8 +72,9 @@ Ziel          keph:/docs/generated/code/
 Scope         <SCAN_ROOT> (project.repoRoot)
 Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <EXTRA_PATH> | —
-Immer außen   k-playbook/, k-playbook-local/, .k-playbook/
-Ausschlüsse   <kompakte Liste der wirksamen Ausschlüsse>
+Immer außen   k-playbook/, k-playbook-local/, .k-playbook/, .git/
+Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
+Ausschlüsse   <kompakte Liste der übrigen wirksamen Ausschlüsse>
 ```
 
 Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben.
@@ -99,7 +104,7 @@ dir `generated.by`, `hints` und `questions` aus dem Frontmatter.
 - `hints` sind der einzige von Hand gepflegte Teil eines erzeugten Dokuments: kurze Sätze,
   worauf dieser Lauf achten soll — etwa Zusatzquellen oder Schwerpunkte. Befolge sie.
   Nennt ein `hint` eine Zusatzquelle innerhalb von `context.project.dir`, gehört sie für
-  dieses Dokument zum Scan — mit denselben Ausschlüssen wie in Schritt 1, nie die drei
+  dieses Dokument zum Scan — mit denselben Ausschlüssen wie in Schritt 1, nie die
   immer ausgeschlossenen Verzeichnisse.
 - Den bisherigen Text nimmst du als Anregung, nicht als Vorlage zum Abschreiben.
 - **Zuständig** ist dieser Lauf nur für Dokumente mit `generated.by: k-docs-code` (oder dem

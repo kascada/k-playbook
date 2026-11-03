@@ -267,6 +267,10 @@ make release VERSION=v0.2.0          # builds, commits VERSION and SHA256SUMS, p
 make release-publish VERSION=v0.2.0  # brings the same commit onto main
 ```
 
+The pushes and `gh` calls of `make release` and `make release-publish` run through
+`k-playbook github run k-playbook` (see [`docs/github-access.md`](./docs/github-access.md)); the
+service name can be overridden with `GITHUB_SERVICE=…`.
+
 ## Core principles
 
 - Every project carries its own installation in a subdirectory. No fixed host path, no global symlink.
