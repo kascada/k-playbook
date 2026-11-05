@@ -233,12 +233,15 @@ func TestStateFehltOhneJudge(t *testing.T) {
 		t.Fatalf("valid.yaml: %+v", result.Problems)
 	}
 	encoded := string(mustJSON(t, result.Services))
-	if strings.Contains(encoded, `"state"`) || strings.Contains(encoded, `"reason"`) {
-		t.Errorf("state ohne Judge: %s", encoded)
+	if strings.Contains(encoded, `"state"`) || strings.Contains(encoded, `"reason"`) || strings.Contains(encoded, `"selected"`) {
+		t.Errorf("state oder selected ohne Judge: %s", encoded)
 	}
 	encoded = string(mustJSON(t, Judge(result.Services)))
 	if !strings.Contains(encoded, `"state":"available"`) || !strings.Contains(encoded, `"state":"unavailable"`) {
 		t.Errorf("state nach Judge fehlt: %s", encoded)
+	}
+	if strings.Count(encoded, `"selected":{"read":{`) != len(result.Services) {
+		t.Errorf("selected nach Judge fehlt an einem Dienst: %s", encoded)
 	}
 }
 

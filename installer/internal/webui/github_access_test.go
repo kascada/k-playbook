@@ -97,7 +97,25 @@ func TestGitHubAccessLiefertCheckMitVerfuegbarkeit(t *testing.T) {
 	if backend[0].State != githubaccess.StateUnavailable || !strings.Contains(backend[0].Reason, "Schlüsseldatei fehlt") || backend[1].State != githubaccess.StateDisabled {
 		t.Errorf("backend: %+v", backend)
 	}
-	for _, want := range []string{`"available":true`, `"file":"` + path + `"`, `"created":false`, `"problems":[]`, `"state":"available"`, `"state":"unavailable"`, `"reason":"`, `"state":"disabled"`} {
+	// selected kommt aus Judge und damit ohne eigenen Code im Handler:
+	// playbook git über den Alias, api ohne Zugang, mit und ohne --write;
+	// backend hat keinen verfügbaren Zugang.
+	for _, service := range response.Services {
+		if service.Selected == nil {
+			t.Fatalf("%s ohne selected: %s", service.Name, body)
+		}
+	}
+	playbookSelected, backendSelected := response.Services[0].Selected, response.Services[1].Selected
+	for mode, index := range map[string]githubaccess.ChannelIndex{"read": playbookSelected.Read, "write": playbookSelected.Write} {
+		if index.Git == nil || *index.Git != 0 || index.API != nil {
+			t.Errorf("playbook selected.%s: %+v", mode, index)
+		}
+	}
+	if !backendSelected.Read.Empty() || !backendSelected.Write.Empty() {
+		t.Errorf("backend selected: %+v", backendSelected)
+	}
+	for _, want := range []string{`"available":true`, `"file":"` + path + `"`, `"created":false`, `"problems":[]`, `"state":"available"`, `"state":"unavailable"`, `"reason":"`, `"state":"disabled"`,
+		`"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}}`, `"selected":{"read":{"git":null,"api":null},"write":{"git":null,"api":null}}`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Antwort enthält %s nicht: %s", want, body)
 		}

@@ -48,7 +48,6 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 
 | Skill | Purpose |
 |---|---|
-| [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md) | Establish docs as the authoritative source for AI sessions. |
 | [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md) | Apply shipped and project-owned rules while working. |
 | [`../defaults/commands/_skills/overlay-repo-analyse.md`](../defaults/commands/_skills/overlay-repo-analyse.md) | Systematically analyze and document Docker overlay repositories; writes into `keph:/docs/generated/code/` through `k-playbook docs checkout\|publish code`. The skill under `share/skills/overlay-repo-analyse/` is a hull that reads this text as `k-playbook:/commands/_skills/overlay-repo-analyse.md`. |
 
@@ -74,7 +73,7 @@ questions and the ordered work list.
 - `sections` / `setup` / `workflows` / `switch` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-and-tasks)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `commands` -> [`commands.md`](./commands.md)
-- `docs first` -> [`manual.md`](./manual.md#docs-first), [`../skills/ai-session-memory/PLAYBOOK.md`](../skills/ai-session-memory/PLAYBOOK.md)
+- `docs first` -> [`manual.md`](./manual.md#docs-first)
 - `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
 - `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)

@@ -40,7 +40,8 @@ const (
 // spürbar zu verlangsamen.
 const sshResolveTimeout = 3 * time.Second
 
-// Judge beurteilt jeden Zugang jedes Dienstes und trägt State und Reason ein.
+// Judge beurteilt jeden Zugang jedes Dienstes und trägt State und Reason ein,
+// danach je Dienst Selected, die Wahl von run aus diesen Zuständen (Select).
 // Der Inhalt einer Token-Datei wird gelesen, um ihn zu beurteilen, und
 // verlässt die Funktion nicht: Kein Feld, keine Meldung trägt ihn. Judge
 // verändert die übergebenen Dienste und gibt sie zurück.
@@ -76,6 +77,8 @@ func Judge(services Services) Services {
 				access.State, access.Reason = StateAvailable, ""
 			}
 		}
+		selected := Select(services[s])
+		services[s].Selected = &selected
 	}
 	return services
 }

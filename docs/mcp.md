@@ -372,7 +372,7 @@ then nothing is written and the interface says so.
 | `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `context.docs.exclude`; creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing except that the source `github` writes the template for a missing access file once; never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
-| `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
+| `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`, per service `selected` (the choice of `github run`) and `selectedOk`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
@@ -1411,6 +1411,12 @@ from the envelope's `ok` (the tool ran). `services` is an object in file order, 
 | `expires` | `YYYY-MM-DD` or `none` |
 | `warning` | present when the expiry is within fourteen days (`läuft in 9 Tagen ab`) |
 | `message` | present for `failed` (GitHub's status code and text, or SSH's stderr, or `Zeitüberschreitung`) and for `skipped` (`deaktiviert`, or `nicht verfügbar — <reason>`) |
+
+Per service the report also carries `selected` and `selectedOk` (`github-access.md`, "JSON"):
+`selected` is the access `k-playbook github run` would choose, per channel (`git`, `api`) as an
+index into `access` or `null`, for `run` without options (`read`) and with `--write` (`write`),
+taken from the availability before the test; `selectedOk` says per channel whether that access
+is `ok` (`true`), `failed` or `skipped` (`false`), or `null` where `selected` is `null`.
 
 Error codes of the tool in `error.code`: `invalid_input` for a missing `projectDir`,
 `project_not_found` for a `projectDir` that leads to no project, `github_config_invalid` when

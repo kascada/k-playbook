@@ -70,11 +70,15 @@ func (a Access) Describe() string {
 	return a.Type
 }
 
-// Service ist ein Dienst: Name, Repository und die Zugänge in Vorrangreihenfolge.
+// Service ist ein Dienst: Name, Repository und die Zugänge in
+// Vorrangreihenfolge. Selected ist die Wahl von run (Select); Load lässt sie
+// leer, Judge trägt sie mit der Verfügbarkeit ein — so hat jeder Weg nach
+// Judge sie, und ohne Beurteilung fehlt sie im JSON.
 type Service struct {
-	Name   string   `json:"-"`
-	Repo   string   `json:"repo"`
-	Access []Access `json:"access"`
+	Name     string     `json:"-"`
+	Repo     string     `json:"repo"`
+	Access   []Access   `json:"access"`
+	Selected *Selection `json:"selected,omitempty"`
 }
 
 // Services sind die Dienste in Dateireihenfolge. Im JSON eine Abbildung von

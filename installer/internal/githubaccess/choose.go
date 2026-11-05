@@ -129,3 +129,85 @@ func NoAccessMessage(service Service, options ChooseOptions) string {
 	}
 	return strings.Join(parts, "; ")
 }
+
+// Selection ist die Wahl von run für einen Dienst als Indizes in seinem
+// access (docs/github-access.md, Abschnitt JSON, Feld selected): Read ist
+// run ohne Optionen, Write ist run --write. Sie kommt aus Choose und aus
+// nichts sonst; Kombinationen mit --use und --skip nennt sie nicht.
+type Selection struct {
+	Read  ChannelIndex `json:"read"`
+	Write ChannelIndex `json:"write"`
+}
+
+// ChannelIndex ist je Kanal der Index des gewählten Zugangs in access; nil
+// (im JSON null) heißt, der Kanal hat keinen Zugang.
+type ChannelIndex struct {
+	Git *int `json:"git"`
+	API *int `json:"api"`
+}
+
+// Empty sagt, ob beide Kanäle leer sind — genau dann endet run in dieser
+// Form mit „kein verwendbarer Zugang“.
+func (c ChannelIndex) Empty() bool {
+	return c.Git == nil && c.API == nil
+}
+
+// Equal sagt, ob beide Kanäle dieselben Zugänge nennen.
+func (c ChannelIndex) Equal(other ChannelIndex) bool {
+	same := func(a, b *int) bool {
+		return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
+	}
+	return same(c.Git, other.Git) && same(c.API, other.API)
+}
+
+// Choice macht aus den Indizes wieder eine Wahl mit Zeigern in accesses —
+// für die Textzeilen, die RunLine mit run teilen.
+func (c ChannelIndex) Choice(accesses []Access) Choice {
+	at := func(index *int) *Access {
+		if index == nil || *index < 0 || *index >= len(accesses) {
+			return nil
+		}
+		return &accesses[*index]
+	}
+	return Choice{Git: at(c.Git), API: at(c.API)}
+}
+
+// Select ist die Wahl von run zu einem beurteilten Dienst: Choose ohne
+// Optionen und mit Write, die Zeiger übersetzt in ihre Position in
+// service.Access. Eine zweite Regel gibt es nicht.
+func Select(service Service) Selection {
+	return Selection{
+		Read:  indexOf(service, Choose(service, ChooseOptions{})),
+		Write: indexOf(service, Choose(service, ChooseOptions{Write: true})),
+	}
+}
+
+// indexOf übersetzt die Zeiger einer Wahl in Indizes von service.Access.
+func indexOf(service Service, choice Choice) ChannelIndex {
+	find := func(access *Access) *int {
+		if access == nil {
+			return nil
+		}
+		for index := range service.Access {
+			if &service.Access[index] == access {
+				return &index
+			}
+		}
+		return nil
+	}
+	return ChannelIndex{Git: find(choice.Git), API: find(choice.API)}
+}
+
+// SelectionOK sagt je Kanal von Selection, ob der gewählte Zugang den Test
+// bestanden hat: true bei ok, false bei failed oder skipped, nil, wo
+// Selection nil ist. Nur im Report von test.
+type SelectionOK struct {
+	Read  ChannelOK `json:"read"`
+	Write ChannelOK `json:"write"`
+}
+
+// ChannelOK ist das Testergebnis je Kanal.
+type ChannelOK struct {
+	Git *bool `json:"git"`
+	API *bool `json:"api"`
+}

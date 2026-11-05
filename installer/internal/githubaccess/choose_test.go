@@ -3,6 +3,7 @@ package githubaccess
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -181,5 +182,85 @@ func TestValidType(t *testing.T) {
 		if ValidType(typ) {
 			t.Errorf("%q gilt als Typ", typ)
 		}
+	}
+}
+
+// describeIndex nennt die Indizes eines Kanalpaars kurz, etwa „git=0 api=-“.
+func describeIndex(index ChannelIndex) string {
+	part := func(value *int) string {
+		if value == nil {
+			return "-"
+		}
+		return strconv.Itoa(*value)
+	}
+	return "git=" + part(index.Git) + " api=" + part(index.API)
+}
+
+// Select übersetzt Choose ohne Optionen und mit --write in Indizes von
+// access: Reihenfolge der Datei, public nur ohne --write, api nur über
+// token oder gh, deaktivierte und nicht verfügbare nie.
+func TestSelectNenntDieIndizesVonChoose(t *testing.T) {
+	disabledToken := tokenA
+	disabledToken.Disabled, disabledToken.State = true, StateDisabled
+	missingKey := sshKey
+	missingKey.State, missingKey.Reason = StateUnavailable, "Die Schlüsseldatei fehlt."
+	cases := []struct {
+		name        string
+		service     Service
+		read, write string
+	}{
+		{"Reihenfolge der Datei", judged(sshHost, ghAlice, tokenA), "git=0 api=1", "git=0 api=1"},
+		{"gh vor ssh: beide Kanäle derselbe", judged(ghAlice, sshHost), "git=0 api=0", "git=0 api=0"},
+		{"public nur in read", judged(public, sshKey), "git=0 api=-", "git=1 api=-"},
+		{"nur public: write ganz leer", judged(public), "git=0 api=-", "git=- api=-"},
+		{"api überspringt ssh und public", judged(public, sshHost, ghBob), "git=0 api=2", "git=1 api=2"},
+		{"deaktiviert und nicht verfügbar nie", judged(disabledToken, missingKey, ghAlice), "git=2 api=2", "git=2 api=2"},
+		{"kein verfügbarer Zugang: vier null", judged(disabledToken, missingKey), "git=- api=-", "git=- api=-"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			selection := Select(c.service)
+			if got := describeIndex(selection.Read); got != c.read {
+				t.Errorf("read %s, erwartet %s", got, c.read)
+			}
+			if got := describeIndex(selection.Write); got != c.write {
+				t.Errorf("write %s, erwartet %s", got, c.write)
+			}
+			// Zurück in eine Wahl: dieselben Zeiger wie Choose.
+			if got, want := describeChoice(selection.Read.Choice(c.service.Access)), describeChoice(Choose(c.service, ChooseOptions{})); got != want {
+				t.Errorf("read als Wahl %s, Choose %s", got, want)
+			}
+			if got, want := describeChoice(selection.Write.Choice(c.service.Access)), describeChoice(Choose(c.service, ChooseOptions{Write: true})); got != want {
+				t.Errorf("write als Wahl %s, Choose %s", got, want)
+			}
+		})
+	}
+}
+
+// Im JSON steht null für einen leeren Kanal, nicht ein fehlendes Feld.
+func TestSelectionJSON(t *testing.T) {
+	encoded := string(mustJSON(t, Select(judged(public))))
+	if encoded != `{"read":{"git":0,"api":null},"write":{"git":null,"api":null}}` {
+		t.Errorf("JSON %s", encoded)
+	}
+}
+
+// Judge setzt selected an jedem Dienst aus den Zuständen, die es eben
+// eingetragen hat.
+func TestJudgeSetztSelected(t *testing.T) {
+	fakeTools(t, true)
+	ghHosts(t, "bob")
+	services := Judge(Services{
+		{Name: "a", Repo: "x/a", Access: []Access{{Type: "gh", Login: "alice"}, {Type: "ssh", Host: "github-example"}, {Type: "public"}}},
+		{Name: "b", Repo: "x/b", Access: []Access{{Type: "gh", Login: "alice", Disabled: true}}},
+	})
+	if services[0].Selected == nil || services[1].Selected == nil {
+		t.Fatalf("selected fehlt: %+v", services)
+	}
+	if got := describeIndex(services[0].Selected.Read) + " / " + describeIndex(services[0].Selected.Write); got != "git=1 api=- / git=1 api=-" {
+		t.Errorf("a: %s", got)
+	}
+	if !services[1].Selected.Read.Empty() || !services[1].Selected.Write.Empty() {
+		t.Errorf("b: %+v", services[1].Selected)
 	}
 }

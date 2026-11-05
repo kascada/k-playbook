@@ -247,6 +247,14 @@ func ReadToken(ctx context.Context, access Access) (string, error) {
 // ebenfalls Typ und Schlüssel. Ein leerer Kanal heißt „git: keiner“ bzw.
 // „api: keiner“.
 func RunLine(name string, choice Choice, home string) string {
+	git, api := ChannelParts(choice, home)
+	return "github run " + name + ": " + git + ", " + api
+}
+
+// ChannelParts sind die beiden Teile der Zeile von run, „git über …“ und
+// „api über …“ bzw. „git: keiner“ und „api: keiner“ — für RunLine und für
+// die Zeilen, mit denen check, show und test die Wahl von run nennen.
+func ChannelParts(choice Choice, home string) (git string, api string) {
 	part := func(channel Channel, access *Access, short bool) string {
 		if access == nil {
 			return string(channel) + ": keiner"
@@ -256,7 +264,7 @@ func RunLine(name string, choice Choice, home string) string {
 		}
 		return string(channel) + " über " + describeForLine(*access, home)
 	}
-	return "github run " + name + ": " + part(ChannelGit, choice.Git, false) + ", " + part(ChannelAPI, choice.API, choice.SameAccess())
+	return part(ChannelGit, choice.Git, false), part(ChannelAPI, choice.API, choice.SameAccess())
 }
 
 // describeForLine nennt einen Zugang wie in den Beispielen des Vertrags:

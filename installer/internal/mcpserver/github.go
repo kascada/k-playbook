@@ -65,7 +65,9 @@ func addGitHubTestTool(server *mcp.Server) {
 			"pusht nie, ändert die Datei nicht. test.services: je Dienst repo und access, je Zugang result (ok, failed, " +
 			"skipped — deaktiviert, nicht verfügbar), identity (Login, <owner>/<repo> für einen Deploy Key, anonymous), " +
 			"read und write (yes, no, unknown), expires (Datum oder none), warning (Ablauf in weniger als 14 Tagen), " +
-			"message (GitHubs Antwort bei failed, der Grund bei skipped); test.ok ist false, sobald ein Zugang failed ist. " +
+			"message (GitHubs Antwort bei failed, der Grund bei skipped); je Dienst selected (die Wahl von `k-playbook github run` " +
+			"je Kanal git und api als Index in access oder null, read ohne und write mit --write, aus der Verfügbarkeit vor " +
+			"dem Test) und selectedOk (true, wenn der gewählte Zugang ok ist); test.ok ist false, sobald ein Zugang failed ist. " +
 			"Kein Token steht in der Antwort. Dieselbe Antwort wie `k-playbook github test [<dienst>] --json` unter test.",
 	}, githubTestToolHandler)
 }

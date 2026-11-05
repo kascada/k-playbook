@@ -37,5 +37,3 @@ share/commands/_docs/tools.md	258	link	Inhalt für Leser: Vorlage der erzeugten 
 share/commands/k-docs-index.md	157	link	Inhalt für Leser: zitierte Vorlage aus der Tool-Doku.
 share/commands/k-audit.md	386	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.
 share/commands/k-docs-extract.md	134	pfad	Ortsangabe in einer Verneinung (das Verzeichnis wird nicht gelesen).
-share/skills/ai-session-memory/PLAYBOOK.md	121	link	Inhalt für Leser: zitierter Kopf der erzeugten docs/README.md.
-share/skills/*/vorlagen/	*	*	Inhalt für Leser: Vorlagen, die ein Skill in das Projekt schreibt; ihre Links gelten im erzeugten Dokument.

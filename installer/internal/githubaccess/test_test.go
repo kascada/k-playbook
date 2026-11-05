@@ -323,7 +323,10 @@ func TestTestReportUndJSON(t *testing.T) {
 	text := string(encoded)
 	for _, want := range []string{
 		`"file":"/pfad/github.yaml"`,
-		`"services":{"website":{"repo":"acme/website","access":[{"type":"gh","login":"alice","result":"ok","identity":"alice","read":"yes","write":"yes","expires":"2027-03-01"},{"type":"token","file":"` + token + `","disabled":true,"result":"skipped","message":"deaktiviert"}]},"playbook":`,
+		`"services":{"website":{"repo":"acme/website","access":[{"type":"gh","login":"alice","result":"ok","identity":"alice","read":"yes","write":"yes","expires":"2027-03-01"},{"type":"token","file":"` + token + `","disabled":true,"result":"skipped","message":"deaktiviert"}],"selected":{"read":{"git":0,"api":0},"write":{"git":0,"api":0}}`,
+		`},"playbook":`,
+		`"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}},"selectedOk":{"read":{"git":true,"api":null},"write":{"git":true,"api":null}}`,
+		`"selectedOk":{"read":{"git":true,"api":true},"write":{"git":true,"api":true}}},"playbook":`,
 		`{"type":"ssh","host":"github-example","result":"ok","identity":"example/k-playbook","read":"yes","write":"unknown","expires":"none"}`,
 		`{"type":"ssh","key":"/nicht/da","result":"skipped","message":"nicht verfügbar — Die Schlüsseldatei fehlt`,
 		`"ok":true}`,
@@ -336,10 +339,18 @@ func TestTestReportUndJSON(t *testing.T) {
 		t.Errorf("state/reason im Testreport: %s", text)
 	}
 
-	// Ein failed macht ok falsch; skipped nicht.
+	// Ein failed macht ok falsch; skipped nicht. Der gewählte Zugang ist
+	// failed: selected bleibt, selectedOk ist false.
 	services = Services{{Name: "x", Repo: "acme/missing", Access: []Access{{Type: "public"}}}}
-	if report := tester.Test(context.Background(), "/pfad", services); report.OK {
+	report = tester.Test(context.Background(), "/pfad", services)
+	if report.OK {
 		t.Errorf("ok trotz failed: %+v", report)
+	}
+	if got := string(mustJSON(t, report.Services[0].SelectedOK)); got != `{"read":{"git":false,"api":null},"write":{"git":null,"api":null}}` {
+		t.Errorf("selectedOk: %s", got)
+	}
+	if got := string(mustJSON(t, report.Services[0].Selected)); got != `{"read":{"git":0,"api":null},"write":{"git":null,"api":null}}` {
+		t.Errorf("selected: %s", got)
 	}
 }
 

@@ -271,7 +271,8 @@ installer/
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
 │   ├── github.go                Subkommando github: check, show und test [<dienst>] der
 │   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
-│   │                            check und show mit Verfügbarkeit, test gegen GitHub
+│   │                            check und show mit Verfügbarkeit, test gegen GitHub; alle
+│   │                            drei mit der Wahl von run (selected, Zeilen „run: …“)
 │   ├── githubrun.go             github run <dienst> [--write] [--use] [--skip]… [--quiet]
 │   │                            -- <befehl>: Wahl (Choose), Umgebung (ChildEnv), Zeile auf
 │   │                            stderr, dann exec auf den Befehl; Exit oder Signal des
@@ -299,20 +300,24 @@ installer/
 │   ├── availability.go          Judge: die Verfügbarkeit je Zugang ohne Netz (Task 102) —
 │   │                            gh-Login in der gh-Konfiguration, Token-Datei 0600 mit einer
 │   │                            Zeile, Schlüssel ohne Gruppen-/Weltrechte, Alias per ssh -G
-│   │                            nach github.com; Usable und FirstReason je Dienst
+│   │                            nach github.com; setzt danach je Dienst Selected (Select);
+│   │                            Usable und FirstReason je Dienst
 │   ├── test.go                  Tester.Test: der Test gegen GitHub — API über eigenen
 │   │                            HTTP-Client (Token nur im Header), ssh -T und git
 │   │                            ls-remote, public anonym; 10 s je Aufruf; Report mit
-│   │                            result, identity, read, write, expires, warning, message;
+│   │                            result, identity, read, write, expires, warning, message,
+│   │                            je Dienst selected (vor dem Test) und selectedOk;
 │   │                            redact entfernt das Token aus jeder Meldung
 │   ├── choose.go                Choose: für github run (Task 110) je Kanal höchstens ein
 │   │                            Zugang ohne Netz — git der erste verfügbare, api der erste
-│   │                            verfügbare mit Token; --write, --use, --skip
+│   │                            verfügbare mit Token; --write, --use, --skip. Select:
+│   │                            Choose ohne Optionen und mit --write als Indizes in access
+│   │                            (selected in check, show, test; Task 118)
 │   ├── runenv.go                ChildEnv: die Umgebung des Befehls — insteadOf und
 │   │                            Credential-Helper über GIT_CONFIG_* hinter denen des
 │   │                            Aufrufers, nur für die URLs des Repos; GIT_SSH_COMMAND,
 │   │                            GH_TOKEN/GITHUB_TOKEN, GIT_TERMINAL_PROMPT=0; ReadToken,
-│   │                            RunLine
+│   │                            RunLine und ChannelParts (auch für die Zeilen von selected)
 │   ├── template.go              die Vorlage bei fehlender Datei: Verzeichnis 0700, Datei
 │   │                            0600, services: {} und ein Beispiel je Zugangsart
 │   ├── accesstest/              Isolate und Empty für Tests: eigener Override, damit kein

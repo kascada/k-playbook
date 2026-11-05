@@ -6,7 +6,8 @@ Programm allein kann: das Binary, wenn das laufende älter ist als die Installat
 und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
 dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
-nachzieht. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
+nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
+`scripts/k-upgrade-umbau.sh`. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
 macht, nicht das Programm, zuletzt das Aufräumen der Verzeichnisse, die das Einrichten nicht
 mehr anlegt. Der Command nimmt kein Argument.
 
@@ -31,6 +32,21 @@ Assistent die Einbettung nicht ausgeführt. Führe dann in der Shell aus:
 
 und gib diese Ausgabe nach derselben Regel wieder. Nenne dazu in einer Zeile, dass die Hülle
 den Aufruf nicht ausgeführt hat.
+
+**Projekteigener Umbau.** Liegt im Projekt die Datei
+`<context.project.dir>/scripts/k-upgrade-umbau.sh`, führst du sie direkt danach aus, mit
+`context.project.dir` als Arbeitsverzeichnis:
+
+    bash scripts/k-upgrade-umbau.sh
+
+Das Skript gehört dem Projekt und räumt vor den Umstellungen ab, was sie sonst einzeln prüfen
+müssten, etwa ganze Verzeichnisse. Es läuft deshalb vor Schritt 3 und ohne Rückfrage; die
+Bestätigungsregel aus Schritt 3 gilt für das Skript nicht. Gib seine Ausgabe nach derselben
+Regel wie oben unverändert wieder. Endet es mit einem Exit-Code ungleich 0, nenne den Code
+und frag, ob Schritt 3 trotzdem laufen soll; die Umstellungen auf einem halb umgebauten
+Projekt laufen zu lassen, entscheidet der Nutzer. Fehlt die Datei, meldest du nichts dazu.
+Schritt 3 stellt seinen Bestand erst danach fest, also nach dem, was das Skript gelöscht
+oder verschoben hat.
 
 Steht in der Ausgabe, dass das Programm gewechselt hat und die Sitzung neu zu starten ist,
 endet der Command hier mit genau diesem Hinweis: Der laufende MCP-Server behält das alte

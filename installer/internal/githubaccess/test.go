@@ -95,11 +95,15 @@ type AccessResult struct {
 }
 
 // ServiceResult ist das Ergebnis eines Dienstes: Repository und je Zugang ein
-// Ergebnis in Vorrangreihenfolge.
+// Ergebnis in Vorrangreihenfolge. Selected ist die Wahl von run aus der
+// Verfügbarkeit vor dem Test, dieselbe wie bei check und show — der Test
+// wählt nicht neu; SelectedOK sagt, ob die gewählten Zugänge ok sind.
 type ServiceResult struct {
-	Name   string         `json:"-"`
-	Repo   string         `json:"repo"`
-	Access []AccessResult `json:"access"`
+	Name       string         `json:"-"`
+	Repo       string         `json:"repo"`
+	Access     []AccessResult `json:"access"`
+	Selected   *Selection     `json:"selected,omitempty"`
+	SelectedOK *SelectionOK   `json:"selectedOk,omitempty"`
 }
 
 // ServiceResults sind die getesteten Dienste in Dateireihenfolge; im JSON ein
@@ -225,7 +229,7 @@ func (t *Tester) Test(ctx context.Context, file string, services Services) Repor
 	Judge(services)
 	report := Report{File: file, Services: ServiceResults{}, OK: true}
 	for _, service := range services {
-		result := ServiceResult{Name: service.Name, Repo: service.Repo, Access: []AccessResult{}}
+		result := ServiceResult{Name: service.Name, Repo: service.Repo, Access: []AccessResult{}, Selected: service.Selected}
 		for _, access := range service.Access {
 			outcome := t.TestAccess(ctx, service.Repo, access)
 			if outcome.Result == ResultFailed {
@@ -233,9 +237,29 @@ func (t *Tester) Test(ctx context.Context, file string, services Services) Repor
 			}
 			result.Access = append(result.Access, outcome)
 		}
+		result.SelectedOK = selectedOK(result.Selected, result.Access)
 		report.Services = append(report.Services, result)
 	}
 	return report
+}
+
+// selectedOK liest zu jedem gewählten Zugang sein Testergebnis ab: true bei
+// ok, false sonst, nil für einen Kanal ohne Zugang. Ohne Auswahl nil.
+func selectedOK(selection *Selection, results []AccessResult) *SelectionOK {
+	if selection == nil {
+		return nil
+	}
+	ok := func(index *int) *bool {
+		if index == nil || *index < 0 || *index >= len(results) {
+			return nil
+		}
+		value := results[*index].Result == ResultOK
+		return &value
+	}
+	channel := func(index ChannelIndex) ChannelOK {
+		return ChannelOK{Git: ok(index.Git), API: ok(index.API)}
+	}
+	return &SelectionOK{Read: channel(selection.Read), Write: channel(selection.Write)}
 }
 
 // TestAccess prüft einen Zugang gegen das Repository <owner>/<repo>. Der

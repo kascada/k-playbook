@@ -20,6 +20,11 @@ the child (`runenv.go`) and the verb (`cmd/k-playbook/githubrun.go`). Later step
 operations among them — are listed under *Outlook* and are not part of the contract until they
 are specified here.
 
+**Status (2026-11-05):** the choice of `run` is readable without running it (Task 118): the field
+`selected` per service in `check`, `show` and `test --json`, `selectedOk` in `test --json`, and
+the matching lines in their text (*The subcommand*, *JSON*). Both come from `Select` in
+`choose.go`, which applies `Choose` and nothing else.
+
 ## What the file is, and is not
 
 A person works with several GitHub repositories, often under several GitHub accounts, and
@@ -292,7 +297,8 @@ expiry and the message of a failure. Nothing on the page writes the file: editin
 editor, the page says where the file is. Endpoints: `GET /api/github-access` returns the
 object of `check --json`; `POST /api/github-access/test` with an optional `service` returns
 the object of `test --json`. Like every other `GET` of the interface it carries `available`
-and `message` when the file cannot be read at all.
+and `message` when the file cannot be read at all. Both pass the objects through unchanged, so
+`selected` and `selectedOk` (*JSON*) are in them; the page does not show them yet.
 
 ## The subcommand
 
@@ -308,12 +314,49 @@ what follows here is about `check`, `show` and `test`.
 
 `check` reads the file and prints the problems; without problems it prints one line that
 names the file, the number of services and the number of services without an available
-access, followed by one line per access that is `unavailable` (`services.backend.access[0]:
-nicht verfügbar — <reason>`). `show` prints the configuration as read, one service per
-block, or one service when named; it prints what the file says, resolved paths included, each
-access with its availability, and nothing the file does not contain. Both create the template
-when the file is missing, as described above. `test` runs *Testing an access* for all services
-or the named one and prints one block per service with one line per access and its result.
+access, followed per service by one line per access that is `unavailable`
+(`services.backend.access[0]: nicht verfügbar — <reason>`) and the choice of `run` for that
+service (`backend run: kein Zugang`, see below). `show` prints the configuration as read, one
+service per block, or one service when named; it prints what the file says, resolved paths
+included, each access with its availability, then the choice of `run`, and nothing the file
+does not contain. Both create the template when the file is missing, as described above.
+`test` runs *Testing an access* for all services or the named one and prints one block per
+service with one line per access and its result, then the choice of `run` with the result of
+each chosen access.
+
+The choice of `run` is the field `selected` of the JSON (below) in the parts of `run`'s own line
+(*Output and exit codes*): one line for `run` without options, and a second one only when
+`--write` chooses differently. In `show` and `test` the lines are indented under the service, in
+`check` the service name stands in front:
+
+```
+playbook: example/k-playbook
+  1. ssh  host: github-example  [verfügbar]
+  2. public  [verfügbar]
+  run: git über ssh host github-example, api: keiner
+
+offen: acme/offen
+  1. public  [verfügbar]
+  2. ssh  key: /home/alice/.ssh/id_offen  [verfügbar]
+  run: git über public, api: keiner
+  mit --write: git über ssh key ~/.ssh/id_offen, api: keiner
+
+website: acme/website
+  1. gh  login: alice  [verfügbar]
+  run: git über gh alice, api über gh
+
+backend: acme-labs/backend
+  1. ssh  key: /home/alice/.ssh/id_ed25519_acme_labs  [nicht verfügbar — …]
+  2. token  file: /home/alice/.config/github-tokens/acme-labs.token  [deaktiviert]
+  run: kein Zugang
+```
+
+A service with only `public` reads `run: git über public, api: keiner` and `mit --write: kein
+Zugang`. `check` prints the same parts as `website run: git über gh alice, api über gh` and
+`offen mit --write: …`. `test` adds the result of each chosen access to its channel —
+`run: git über ssh host github-example → fehlgeschlagen, api: keiner` — with the words of its
+access lines (`ok`, `fehlgeschlagen`, `übersprungen`); the choice itself is the one before the
+test (see `selectedOk` below).
 
 `show <service>` with a service that is not in the file is a usage error: one message that
 names the known services, exit `2`, no JSON object even with `--json`. `show` on a file with
@@ -342,7 +385,11 @@ count), `1` when at least one `failed`, `2` usage error, including an unknown se
       "repo": "acme/website",
       "access": [
         { "type": "gh", "login": "alice", "state": "available" }
-      ]
+      ],
+      "selected": {
+        "read":  { "git": 0, "api": 0 },
+        "write": { "git": 0, "api": 0 }
+      }
     },
     "backend": {
       "repo": "acme-labs/backend",
@@ -351,14 +398,22 @@ count), `1` when at least one `failed`, `2` usage error, including an unknown se
           "reason": "Die Schlüsseldatei fehlt." },
         { "type": "token", "file": "/home/alice/.config/github-tokens/acme-labs.token", "disabled": true,
           "state": "disabled" }
-      ]
+      ],
+      "selected": {
+        "read":  { "git": null, "api": null },
+        "write": { "git": null, "api": null }
+      }
     },
     "playbook": {
       "repo": "example/k-playbook",
       "access": [
         { "type": "ssh", "host": "github-example", "state": "available" },
         { "type": "public", "state": "available" }
-      ]
+      ],
+      "selected": {
+        "read":  { "git": 0, "api": null },
+        "write": { "git": 0, "api": null }
+      }
     }
   },
   "problems": []
@@ -366,7 +421,9 @@ count), `1` when at least one `failed`, `2` usage error, including an unknown se
 ```
 
 `state` and `reason` are the availability of step 2; a binary of step 1 does not print them.
-`reason` is present only for `unavailable`.
+`reason` is present only for `unavailable`. `selected` is the choice of `run` for the service
+(Task 118); a binary before it does not print it, and a reader that does not know it can ignore
+it.
 
 And this for a file with one problem — configuration or problems, never both:
 
@@ -392,6 +449,19 @@ And this for a file with one problem — configuration or problems, never both:
   where it is `true`. Services are in file order; the order of `access` is the precedence.
   As soon as one problem has level `error`, `services` is `{}`; the one-time `warning` of a
   freshly created template leaves it as it is (empty, because the template is empty).
+- `selected` is, per service, the access `run` would choose, per channel, as the index into
+  that service's `access`: `read` is `run` without options, `write` is `run --write`, each with
+  `git` and `api`; `null` means the channel has no access. It comes from the same rule as `run`
+  (*Choosing the accesses*): the same function, applied to the availability after `state` was
+  judged, so it can never differ from what `run` does. For `read` and `write` separately: both
+  channels are `null` exactly when `run` in that form chooses no access and ends with „kein
+  verwendbarer Zugang für <service>“ and exit `125`. The two may differ: a service with only
+  `public` has `git` in `read`, and `write` is `null` in both channels. Other failures that end
+  `run` at its start — the token cannot be read, the environment cannot be built, the command is
+  not found — are not predicted by `selected`. Combinations with `--use` and `--skip` are not
+  listed; a script that uses them applies them itself. `selected` is present wherever the
+  availability was judged: `check`, `show`, `test`, `GET /api/github-access`; with a problem of
+  level `error`, `services` is `{}` and there is no `selected`.
 - `problems` has `level` (`error`|`warning`), `path` (where in the file, `services.<name>` or
   `services.<name>.access[<index>]`, `file` for the file as a whole), `message` and `hint`.
   An entry of the health check has `level`, `area`, `message` and `hint` but no `path`; the
@@ -416,7 +486,9 @@ them.
           "result": "ok", "identity": "alice", "read": "yes", "write": "unknown", "expires": "none" },
         { "type": "token", "file": "/home/alice/.config/github-tokens/acme-labs.token", "disabled": true,
           "result": "skipped", "message": "deaktiviert" }
-      ]
+      ],
+      "selected":   { "read": { "git": 0, "api": null }, "write": { "git": 0, "api": null } },
+      "selectedOk": { "read": { "git": true, "api": null }, "write": { "git": true, "api": null } }
     },
     "playbook": {
       "repo": "example/k-playbook",
@@ -424,7 +496,9 @@ them.
         { "type": "ssh", "host": "github-example",
           "result": "failed", "message": "git@github.com: Permission denied (publickey)." },
         { "type": "public", "result": "ok", "identity": "anonymous", "read": "yes", "write": "no", "expires": "none" }
-      ]
+      ],
+      "selected":   { "read": { "git": 0, "api": null }, "write": { "git": 0, "api": null } },
+      "selectedOk": { "read": { "git": false, "api": null }, "write": { "git": false, "api": null } }
     }
   },
   "ok": false
@@ -437,6 +511,13 @@ them.
 - `read` and `write` are `yes`, `no` or `unknown`; `expires` is a date (`YYYY-MM-DD`) or
   `none`; `warning` is present when the expiry is within fourteen days.
 - `ok` is true when no tested access `failed`.
+- `selected` is the same as in `check --json`: `test` does not choose anew. It is taken from the
+  availability before the test, without the network, never from the results — in the example
+  `playbook` keeps the `ssh` access although it `failed` and `public` is `ok`, because that is
+  what `run` would take.
+- `selectedOk` has the form of `selected` and says per channel whether the chosen access passed
+  the test: `true` for `ok`, `false` for `failed` or `skipped`, `null` where `selected` is
+  `null`. It is only in `test --json`.
 
 The health check (Task 098) calls the same reader and lists its problems under the area
 `github`: structural problems as `error`, the one-time notice about a freshly created template
@@ -488,6 +569,10 @@ Options narrow the choice; they apply to both channels:
 
 A channel without a usable access stays empty; that alone is not an error, because the command
 may not need it. Only when **both** channels are empty does `run` refuse to start the command.
+
+A script or a session that wants to know the choice without running anything reads `selected`
+from `check --json`, `show --json` or `test --json` (*JSON*): the same function computes it, for
+`run` without options and for `run --write`.
 
 There is **no automatic fallback**. `run` starts the command exactly once. If it fails, its exit
 code is returned and nothing else happens: `run` sees only an exit code and cannot tell a
@@ -602,10 +687,9 @@ problems of *Reading the file*; `k-playbook github check` names the reason per a
 
 Not part of the contract yet; each will be specified here before it is built.
 
-- **Choosing an access for a caller**: a verb and an MCP tool that name, per service, the
-  accesses that work right now in file order — without the network by default, with `--test`
-  against GitHub. Requested from OMNI on 2026-11-02; what a script gets (the first, all, or a
-  choice) and that it gets the way to a credential, never its value, are still to be specified.
+- **Choosing an access for a caller**: answered by `selected` (Task 118) — no verb of its own.
+  `check`, `show` and `test` name per service the access `run` would choose, with and without
+  `--write`; `test` adds whether it works (`selectedOk`). Requested from OMNI on 2026-11-02.
 - **Reverse lookup**: from a repository's remote to the service that names it.
 - **Named operations** with project rules, as CLI and MCP — the way AI sessions reach GitHub,
   since `run` is not offered to them: first the reading ones (fetch with status, list of pull

@@ -113,10 +113,17 @@ func newGitHubRunSetup(t *testing.T, content string) githubRunSetup {
 	return s
 }
 
-// command baut den Aufruf des Test-Binarys als k-playbook mit args.
+// command baut den Aufruf des Test-Binarys als k-playbook github run args.
 func (s githubRunSetup) command(t *testing.T, extraEnv []string, args ...string) *exec.Cmd {
 	t.Helper()
-	raw, err := json.Marshal(append([]string{"github", "run"}, args...))
+	return s.commandArgs(t, extraEnv, append([]string{"github", "run"}, args...)...)
+}
+
+// commandArgs baut den Aufruf des Test-Binarys als k-playbook mit args, in
+// derselben Umgebung wie run — etwa für github show.
+func (s githubRunSetup) commandArgs(t *testing.T, extraEnv []string, args ...string) *exec.Cmd {
+	t.Helper()
+	raw, err := json.Marshal(args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,5 +489,62 @@ while :; do wait; done`
 	data, _ := os.ReadFile(log)
 	if got := strings.Count(string(data), "INT\n"); got != 1 {
 		t.Errorf("SIGINT %d-mal beim Befehl angekommen, erwartet einmal", got)
+	}
+}
+
+// run wählt wie selected: Je Dienst der Fixture nennt die Zeile von run
+// ohne Optionen und mit --write dieselben Zugänge wie selected.read bzw.
+// selected.write aus github show --json in derselben Umgebung. Endet run
+// mit „kein verwendbarer Zugang“, sind dort beide Kanäle null, und
+// umgekehrt; ein anderer Fehler von run (kaputt: Token nicht zu bekommen)
+// lässt selected gesetzt.
+func TestGitHubRunWaehltWieSelected(t *testing.T) {
+	s := newGitHubRunSetup(t, githubRunFile)
+	cmd := s.commandArgs(t, nil, "github", "show", "--json")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("show --json: %v %s", err, stderr.String())
+	}
+	if strings.Contains(stdout.String(), runCanary[:12]) {
+		t.Fatalf("Token in show --json")
+	}
+	views := githubSelectionViews(t, stdout.String(), false)
+	if len(views) != 6 {
+		t.Fatalf("Dienste: %+v", views)
+	}
+
+	seen := map[string]bool{}
+	for _, view := range views {
+		for _, write := range []bool{false, true} {
+			index, args, mode := view.selected.Read, []string{view.name, "--", "true"}, "read"
+			if write {
+				index, args, mode = view.selected.Write, []string{view.name, "--write", "--", "true"}, "write"
+			}
+			_, stderr, code := s.run(t, "", args...)
+			noAccess := strings.Contains(stderr, "kein verwendbarer Zugang für "+view.name)
+			switch {
+			case index.Empty() != noAccess:
+				t.Errorf("%s %s: selected %s, run %d %q", view.name, mode, describeChannelIndex(index), code, stderr)
+			case noAccess:
+				if code != githubRunExitFailed {
+					t.Errorf("%s %s: Exit %d", view.name, mode, code)
+				}
+				seen[view.name+" "+mode+" leer"] = true
+			case code == 0:
+				if want := "github run " + view.name + ": " + githubExpectedChoice(view.accesses, index, s.home, false) + "\n"; stderr != want {
+					t.Errorf("%s %s: run %q, selected %q", view.name, mode, stderr, want)
+				}
+			case code == githubRunExitFailed && strings.Contains(stderr, "das Token für "+view.name+" ist nicht zu bekommen"):
+				seen[view.name+" "+mode+" token"] = true
+			default:
+				t.Errorf("%s %s: unerwartet %d %q", view.name, mode, code, stderr)
+			}
+		}
+	}
+	for _, want := range []string{"aus read leer", "aus write leer", "offen write leer", "kaputt read token", "kaputt write token"} {
+		if !seen[want] {
+			t.Errorf("Fall %s nicht gesehen: %v", want, seen)
+		}
 	}
 }

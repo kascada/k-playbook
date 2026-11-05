@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -129,7 +131,12 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 	}
 	// backend hat nur einen fehlenden Schlüssel und ein deaktiviertes Token:
 	// der eine Dienst ohne verfügbaren Zugang, und die eine Zeile darunter.
-	if stdout != path+": 3 Dienste, 1 ohne verfügbaren Zugang, keine Probleme\nservices.backend.access[0]: nicht verfügbar — "+githubKeyMissing(home)+"\n" {
+	// Je Dienst dazu die Wahl von run, nach den Zeilen zum Dienst.
+	if stdout != path+": 3 Dienste, 1 ohne verfügbaren Zugang, keine Probleme\n"+
+		"website run: git über gh alice, api über gh\n"+
+		"services.backend.access[0]: nicht verfügbar — "+githubKeyMissing(home)+"\n"+
+		"backend run: kein Zugang\n"+
+		"playbook run: git über ssh host github-example, api: keiner\n" {
 		t.Errorf("Ausgabe: %q", stdout)
 	}
 
@@ -150,9 +157,9 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 	compact := func(raw json.RawMessage) string { return strings.Join(strings.Fields(string(raw)), "") }
 	reason, _ := json.Marshal(githubKeyMissing(home))
 	for name, want := range map[string]string{
-		"website":  `{"repo":"acme/website","access":[{"type":"gh","login":"alice","state":"available"}]}`,
-		"backend":  `{"repo":"acme-labs/backend","access":[{"type":"ssh","key":"` + home + `/.ssh/id_ed25519_acme_labs","state":"unavailable","reason":` + string(reason) + `},{"type":"token","file":"` + home + `/.config/github-tokens/acme-labs.token","disabled":true,"state":"disabled"}]}`,
-		"playbook": `{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","state":"available"},{"type":"public","state":"available"}]}`,
+		"website":  `{"repo":"acme/website","access":[{"type":"gh","login":"alice","state":"available"}],"selected":{"read":{"git":0,"api":0},"write":{"git":0,"api":0}}}`,
+		"backend":  `{"repo":"acme-labs/backend","access":[{"type":"ssh","key":"` + home + `/.ssh/id_ed25519_acme_labs","state":"unavailable","reason":` + string(reason) + `},{"type":"token","file":"` + home + `/.config/github-tokens/acme-labs.token","disabled":true,"state":"disabled"}],"selected":{"read":{"git":null,"api":null},"write":{"git":null,"api":null}}}`,
+		"playbook": `{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","state":"available"},{"type":"public","state":"available"}],"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}}}`,
 	} {
 		if got := compact(services[name]); got != strings.Join(strings.Fields(want), "") {
 			t.Errorf("services.%s:\n%s\nerwartet:\n%s", name, got, want)
@@ -240,9 +247,9 @@ func TestGitHubShowZeigtDieKonfiguration(t *testing.T) {
 		t.Fatalf("show: %v", err)
 	}
 	want := "Datei: " + path + "\n" +
-		"\nwebsite: acme/website\n  1. gh  login: alice  [verfügbar]\n" +
-		"\nbackend: acme-labs/backend\n  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs  [nicht verfügbar — " + githubKeyMissing(home) + "]\n  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  [deaktiviert]\n" +
-		"\nplaybook: example/k-playbook\n  1. ssh  host: github-example  [verfügbar]\n  2. public  [verfügbar]\n"
+		"\nwebsite: acme/website\n  1. gh  login: alice  [verfügbar]\n  run: git über gh alice, api über gh\n" +
+		"\nbackend: acme-labs/backend\n  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs  [nicht verfügbar — " + githubKeyMissing(home) + "]\n  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  [deaktiviert]\n  run: kein Zugang\n" +
+		"\nplaybook: example/k-playbook\n  1. ssh  host: github-example  [verfügbar]\n  2. public  [verfügbar]\n  run: git über ssh host github-example, api: keiner\n"
 	if stdout != want {
 		t.Errorf("Ausgabe:\n%s\nerwartet:\n%s", stdout, want)
 	}
@@ -407,9 +414,11 @@ func TestGitHubTestZeigtDieErgebnisse(t *testing.T) {
 		"\nplaybook: example/k-playbook\n" +
 		"  1. ssh  host: github-example  → ok — Identität example/k-playbook, lesen ja, schreiben unbekannt, Ablauf keiner\n" +
 		"  2. public  → ok — Identität anonymous, lesen ja, schreiben nein, Ablauf keiner\n" +
+		"  run: git über ssh host github-example → ok, api: keiner\n" +
 		"\nbackend: acme-labs/backend\n" +
 		"  1. ssh  key: " + home + "/.ssh/id_ed25519_acme_labs  → übersprungen: nicht verfügbar — " + githubKeyMissing(home) + "\n" +
-		"  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  → übersprungen: deaktiviert\n"
+		"  2. token  file: " + home + "/.config/github-tokens/acme-labs.token  → übersprungen: deaktiviert\n" +
+		"  run: kein Zugang\n"
 	if stdout != want {
 		t.Errorf("Ausgabe:\n%s\nerwartet:\n%s", stdout, want)
 	}
@@ -423,7 +432,7 @@ func TestGitHubTestZeigtDieErgebnisse(t *testing.T) {
 		t.Errorf("JSON oben: %v", top)
 	}
 	compact := strings.Join(strings.Fields(string(top["services"])), "")
-	if compact != `{"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","result":"ok","identity":"example/k-playbook","read":"yes","write":"unknown","expires":"none"},{"type":"public","result":"ok","identity":"anonymous","read":"yes","write":"no","expires":"none"}]}}` {
+	if compact != `{"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","result":"ok","identity":"example/k-playbook","read":"yes","write":"unknown","expires":"none"},{"type":"public","result":"ok","identity":"anonymous","read":"yes","write":"no","expires":"none"}],"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}},"selectedOk":{"read":{"git":true,"api":null},"write":{"git":true,"api":null}}}}` {
 		t.Errorf("services: %s", compact)
 	}
 }
@@ -464,5 +473,324 @@ func TestGitHubTestAufruffehlerUndDefekteDatei(t *testing.T) {
 	stdout, err = runGitHubCaptured(t, "test")
 	if exitCodeOf(err) != githubExitProblems || stdout != checkText {
 		t.Errorf("defekte Datei: %v\n%s", err, stdout)
+	}
+}
+
+// githubSelectionFile hat Dienste, an denen sich die Wahl von run mit und
+// ohne --write unterscheidet, einen mit getrenntem api-Kanal und einen ohne
+// verfügbaren Zugang. gh liefert im PATH von githubFile kein Token: test
+// meldet es failed, ohne die API zu fragen.
+const githubSelectionFile = `services:
+  playbook:
+    repo: example/k-playbook
+    access:
+      - type: ssh
+        host: github-example
+      - type: public
+  offen:
+    repo: acme/offen
+    access:
+      - type: public
+      - type: ssh
+        key: ~/.ssh/id_offen
+  nurpublic:
+    repo: acme/nurpublic
+    access:
+      - type: public
+  mitgh:
+    repo: acme/mitgh
+    access:
+      - type: ssh
+        host: github-example
+      - type: gh
+        login: alice
+  aus:
+    repo: acme/aus
+    access:
+      - type: ssh
+        key: ~/.ssh/fehlt
+`
+
+// githubSelectionView ist, was ein Test aus dem JSON von check, show oder
+// test über die Wahl eines Dienstes liest: die Zugänge (bei test mit
+// result), selected und bei test selectedOk.
+type githubSelectionView struct {
+	name     string
+	accesses []githubaccess.AccessResult
+	selected *githubaccess.Selection
+	ok       *githubaccess.SelectionOK
+}
+
+// githubSelectionViews liest services aus dem JSON von check/show (report
+// false) oder test (report true) in Dateireihenfolge.
+func githubSelectionViews(t *testing.T, stdout string, report bool) []githubSelectionView {
+	t.Helper()
+	raw := decodeJSON(t, stdout)["services"]
+	var views []githubSelectionView
+	if report {
+		var services githubaccess.ServiceResults
+		if err := json.Unmarshal(raw, &services); err != nil {
+			t.Fatalf("services: %v", err)
+		}
+		for _, service := range services {
+			views = append(views, githubSelectionView{service.Name, service.Access, service.Selected, service.SelectedOK})
+		}
+		return views
+	}
+	var services githubaccess.Services
+	if err := json.Unmarshal(raw, &services); err != nil {
+		t.Fatalf("services: %v", err)
+	}
+	for _, service := range services {
+		accesses := make([]githubaccess.AccessResult, len(service.Access))
+		for index, access := range service.Access {
+			accesses[index] = githubaccess.AccessResult{Type: access.Type, Login: access.Login, File: access.File, Key: access.Key, Host: access.Host}
+		}
+		views = append(views, githubSelectionView{name: service.Name, accesses: accesses, selected: service.Selected})
+	}
+	return views
+}
+
+// githubExpectedChoice baut den Text einer Wahl aus Indizes und Zugängen nach
+// der Tabelle im Vertrag (Output and exit codes), unabhängig vom Code, der
+// ihn schreibt: „git über …, api über …“, ohne Zugang „kein Zugang“. Mit
+// results hängt jeder gewählte Kanal „→ <ergebnis>“ an.
+func githubExpectedChoice(accesses []githubaccess.AccessResult, index githubaccess.ChannelIndex, home string, results bool) string {
+	if index.Git == nil && index.API == nil {
+		return "kein Zugang"
+	}
+	tilde := func(path string) string {
+		if rest, ok := strings.CutPrefix(path, home+"/"); ok {
+			return "~/" + rest
+		}
+		return path
+	}
+	part := func(channel string, at *int, short bool) string {
+		if at == nil {
+			return channel + ": keiner"
+		}
+		access := accesses[*at]
+		what := access.Type
+		switch {
+		case short:
+		case access.Type == "gh":
+			what = "gh " + access.Login
+		case access.Type == "token":
+			what = "token " + tilde(access.File)
+		case access.Type == "ssh" && access.Key != "":
+			what = "ssh key " + tilde(access.Key)
+		case access.Type == "ssh":
+			what = "ssh host " + access.Host
+		}
+		text := channel + " über " + what
+		if results {
+			text += " → " + map[githubaccess.Outcome]string{githubaccess.ResultOK: "ok", githubaccess.ResultFailed: "fehlgeschlagen", githubaccess.ResultSkipped: "übersprungen"}[access.Result]
+		}
+		return text
+	}
+	same := index.Git != nil && index.API != nil && *index.Git == *index.API
+	return part("git", index.Git, false) + ", " + part("api", index.API, same)
+}
+
+// githubExpectedLines sind die Zeilen, die der Text zu selected tragen
+// muss: run, und wo --write abweicht, mit --write — jeweils mit prefix.
+func githubExpectedLines(views []githubSelectionView, home string, results bool, prefix func(name string) string) []string {
+	var lines []string
+	for _, view := range views {
+		read := githubExpectedChoice(view.accesses, view.selected.Read, home, results)
+		lines = append(lines, prefix(view.name)+"run: "+read)
+		if write := githubExpectedChoice(view.accesses, view.selected.Write, home, results); !view.selected.Write.Equal(view.selected.Read) {
+			lines = append(lines, prefix(view.name)+"mit --write: "+write)
+		}
+	}
+	return lines
+}
+
+// githubSelectionTextLines zieht aus einem Text die Zeilen zur Wahl von run:
+// bei show und test eingerückt, bei check mit dem Dienstnamen vorn.
+func githubSelectionTextLines(text string) []string {
+	var lines []string
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimPrefix(line, "  ")
+		if _, rest, found := strings.Cut(line, " "); found && !strings.HasPrefix(line, " ") && (strings.HasPrefix(rest, "run: ") || strings.HasPrefix(rest, "mit --write: ")) {
+			lines = append(lines, line)
+		} else if strings.HasPrefix(line, "  ") && (strings.HasPrefix(trimmed, "run: ") || strings.HasPrefix(trimmed, "mit --write: ")) {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+func describeChannelIndex(index githubaccess.ChannelIndex) string {
+	part := func(value *int) string {
+		if value == nil {
+			return "null"
+		}
+		return strconv.Itoa(*value)
+	}
+	return part(index.Git) + "/" + part(index.API)
+}
+
+func describeChannelOK(ok githubaccess.ChannelOK) string {
+	part := func(value *bool) string {
+		if value == nil {
+			return "null"
+		}
+		return strconv.FormatBool(*value)
+	}
+	return part(ok.Git) + "/" + part(ok.API)
+}
+
+// selected in check, show und test: dieselbe Wahl in allen dreien, nach der
+// Regel von run, und der Text nennt für read und --write dieselben Zugänge
+// wie das JSON. test meldet dazu selectedOk aus den Ergebnissen.
+func TestGitHubSelectedInCheckShowUndTest(t *testing.T) {
+	_, home := githubFile(t, githubSelectionFile)
+	githubTestTools(t, true)
+	if err := os.MkdirAll(filepath.Join(home, ".ssh"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".ssh", "id_offen"), []byte("schlüssel\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outputs := []string{}
+	capture := func(args ...string) string {
+		t.Helper()
+		stdout, err := runGitHubCaptured(t, args...)
+		if err != nil && exitCodeOf(err) != githubExitProblems {
+			t.Fatalf("%v: %v", args, err)
+		}
+		outputs = append(outputs, stdout)
+		return stdout
+	}
+
+	show := githubSelectionViews(t, capture("show", "--json"), false)
+	want := map[string]string{
+		"playbook":  "read 0/null write 0/null",
+		"offen":     "read 0/null write 1/null",
+		"nurpublic": "read 0/null write null/null",
+		"mitgh":     "read 0/1 write 0/1",
+		"aus":       "read null/null write null/null",
+	}
+	if len(show) != len(want) {
+		t.Fatalf("Dienste: %+v", show)
+	}
+	for _, view := range show {
+		if view.selected == nil {
+			t.Fatalf("%s ohne selected", view.name)
+		}
+		if got := "read " + describeChannelIndex(view.selected.Read) + " write " + describeChannelIndex(view.selected.Write); got != want[view.name] {
+			t.Errorf("%s: selected %s, erwartet %s", view.name, got, want[view.name])
+		}
+	}
+
+	// show: Text und JSON nennen dieselben Zugänge.
+	indent := func(string) string { return "  " }
+	showText := capture("show")
+	if got, expected := githubSelectionTextLines(showText), githubExpectedLines(show, home, false, indent); strings.Join(got, "\n") != strings.Join(expected, "\n") {
+		t.Errorf("show-Text:\n%s\nerwartet aus JSON:\n%s", strings.Join(got, "\n"), strings.Join(expected, "\n"))
+	}
+	for _, line := range []string{
+		"  run: git über public, api: keiner\n  mit --write: git über ssh key ~/.ssh/id_offen, api: keiner\n",
+		"  run: git über public, api: keiner\n  mit --write: kein Zugang\n",
+		"  run: git über ssh host github-example, api über gh alice\n",
+		"  run: kein Zugang\n",
+	} {
+		if !strings.Contains(showText, line) {
+			t.Errorf("show-Text ohne %q:\n%s", line, showText)
+		}
+	}
+
+	// check: dieselbe Wahl, im Text mit dem Dienstnamen vorn.
+	check := githubSelectionViews(t, capture("check", "--json"), false)
+	byName := func(name string) string { return name + " " }
+	if got, expected := githubSelectionTextLines(capture("check")), githubExpectedLines(check, home, false, byName); strings.Join(got, "\n") != strings.Join(expected, "\n") {
+		t.Errorf("check-Text:\n%s\nerwartet aus JSON:\n%s", strings.Join(got, "\n"), strings.Join(expected, "\n"))
+	}
+	for index := range check {
+		if !reflect.DeepEqual(check[index].selected, show[index].selected) {
+			t.Errorf("%s: check %+v, show %+v", check[index].name, check[index].selected, show[index].selected)
+		}
+	}
+
+	// test: dieselbe Wahl wie show, dazu selectedOk aus den Ergebnissen; der
+	// Text hängt an jeden gewählten Kanal sein Ergebnis.
+	report := githubSelectionViews(t, capture("test", "--json"), true)
+	for index, view := range report {
+		if !reflect.DeepEqual(view.selected, show[index].selected) {
+			t.Errorf("%s: test %+v, show %+v", view.name, view.selected, show[index].selected)
+		}
+		githubCheckSelectedOK(t, view)
+	}
+	if got, expected := githubSelectionTextLines(capture("test")), githubExpectedLines(report, home, true, indent); strings.Join(got, "\n") != strings.Join(expected, "\n") {
+		t.Errorf("test-Text:\n%s\nerwartet aus JSON:\n%s", strings.Join(got, "\n"), strings.Join(expected, "\n"))
+	}
+	if got := describeChannelOK(report[3].ok.Read); report[3].name != "mitgh" || got != "true/false" {
+		t.Errorf("mitgh selectedOk.read %s: ssh ok, gh ohne Token failed", got)
+	}
+
+	for _, output := range outputs {
+		if strings.Contains(output, "gho_geheim") {
+			t.Errorf("Token in der Ausgabe:\n%s", output)
+		}
+	}
+}
+
+// githubCheckSelectedOK prüft selectedOk eines Dienstes gegen die
+// Ergebnisse der gewählten Zugänge: true genau bei ok, null wo selected null.
+func githubCheckSelectedOK(t *testing.T, view githubSelectionView) {
+	t.Helper()
+	if view.ok == nil {
+		t.Fatalf("%s ohne selectedOk", view.name)
+	}
+	pairs := []struct {
+		index *int
+		ok    *bool
+	}{
+		{view.selected.Read.Git, view.ok.Read.Git}, {view.selected.Read.API, view.ok.Read.API},
+		{view.selected.Write.Git, view.ok.Write.Git}, {view.selected.Write.API, view.ok.Write.API},
+	}
+	for _, pair := range pairs {
+		switch {
+		case pair.index == nil && pair.ok != nil:
+			t.Errorf("%s: selectedOk gesetzt, wo selected null ist", view.name)
+		case pair.index != nil && (pair.ok == nil || *pair.ok != (view.accesses[*pair.index].Result == githubaccess.ResultOK)):
+			t.Errorf("%s: selectedOk passt nicht zum Ergebnis von access[%d] (%s)", view.name, *pair.index, view.accesses[*pair.index].Result)
+		}
+	}
+}
+
+// Der gewählte Zugang ist failed, ein späterer ok: test wählt nicht neu —
+// selected bleibt, selectedOk ist false, und der Text sagt es am Kanal.
+func TestGitHubTestGewaehlterZugangFailed(t *testing.T) {
+	_, home := githubFile(t, githubTestable)
+	githubTestTools(t, false)
+
+	show, err := runGitHubCaptured(t, "show", "playbook", "--json")
+	if err != nil {
+		t.Fatalf("show: %v", err)
+	}
+	stdout, err := runGitHubCaptured(t, "test", "playbook", "--json")
+	if exitCodeOf(err) != githubExitProblems {
+		t.Fatalf("test --json: %v", err)
+	}
+	before, after := githubSelectionViews(t, show, false)[0], githubSelectionViews(t, stdout, true)[0]
+	if !reflect.DeepEqual(before.selected, after.selected) {
+		t.Errorf("selected vor dem Test %+v, im Report %+v", before.selected, after.selected)
+	}
+	if after.accesses[0].Result != githubaccess.ResultFailed || after.accesses[1].Result != githubaccess.ResultOK {
+		t.Fatalf("Ergebnisse: %+v", after.accesses)
+	}
+	if got := describeChannelIndex(after.selected.Read) + " " + describeChannelOK(after.ok.Read) + " " + describeChannelOK(after.ok.Write); got != "0/null false/null false/null" {
+		t.Errorf("selected/selectedOk: %s", got)
+	}
+	githubCheckSelectedOK(t, after)
+
+	text, _ := runGitHubCaptured(t, "test", "playbook")
+	if got, expected := githubSelectionTextLines(text), githubExpectedLines([]githubSelectionView{after}, home, true, func(string) string { return "  " }); strings.Join(got, "\n") != strings.Join(expected, "\n") {
+		t.Errorf("test-Text:\n%s\nerwartet aus JSON:\n%s", strings.Join(got, "\n"), strings.Join(expected, "\n"))
+	}
+	if !strings.Contains(text, "  run: git über ssh host github-example → fehlgeschlagen, api: keiner\n") {
+		t.Errorf("test-Text:\n%s", text)
 	}
 }

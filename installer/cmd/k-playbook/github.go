@@ -148,6 +148,7 @@ func githubTestText(report githubaccess.Report) string {
 		b.WriteString("Keine Dienste eingetragen.\n")
 		return b.String()
 	}
+	home, _ := os.UserHomeDir()
 	for _, service := range report.Services {
 		b.WriteString("\n")
 		fmt.Fprintf(&b, "%s: %s\n", service.Name, service.Repo)
@@ -160,8 +161,30 @@ func githubTestText(report githubaccess.Report) string {
 			}
 			b.WriteString("  → " + githubResultText(access) + "\n")
 		}
+		accesses := make([]githubaccess.Access, len(service.Access))
+		for index, access := range service.Access {
+			accesses[index] = githubaccess.Access{Type: access.Type, Login: access.Login, File: access.File, Key: access.Key, Host: access.Host, Disabled: access.Disabled}
+		}
+		mark := func(index int) string {
+			return " → " + githubOutcomeWord(service.Access[index].Result)
+		}
+		for _, line := range githubSelectionLines(service.Selected, accesses, home, mark) {
+			fmt.Fprintf(&b, "  %s\n", line)
+		}
 	}
 	return b.String()
+}
+
+// githubOutcomeWord ist das Ergebnis eines Zugangs in einem Wort, wie es die
+// Zeilen von test beginnen: ok, fehlgeschlagen, übersprungen.
+func githubOutcomeWord(result githubaccess.Outcome) string {
+	switch result {
+	case githubaccess.ResultOK:
+		return "ok"
+	case githubaccess.ResultFailed:
+		return "fehlgeschlagen"
+	}
+	return "übersprungen"
 }
 
 // githubResultText ist das Ergebnis eines Zugangs in einem Satz.
@@ -242,11 +265,15 @@ func githubCheckText(result githubaccess.Result) string {
 			}
 		}
 		b.WriteString(", keine Probleme\n")
+		home, _ := os.UserHomeDir()
 		for _, service := range result.Services {
 			for index, access := range service.Access {
 				if access.State == githubaccess.StateUnavailable {
 					fmt.Fprintf(&b, "services.%s.access[%d]: nicht verfügbar — %s\n", service.Name, index, access.Reason)
 				}
+			}
+			for _, line := range githubSelectionLines(service.Selected, service.Access, home, nil) {
+				fmt.Fprintf(&b, "%s %s\n", service.Name, line)
 			}
 		}
 		return b.String()
@@ -277,6 +304,7 @@ func githubShowText(result githubaccess.Result) string {
 		b.WriteString("Keine Dienste eingetragen.\n")
 		return b.String()
 	}
+	home, _ := os.UserHomeDir()
 	for _, service := range result.Services {
 		b.WriteString("\n")
 		fmt.Fprintf(&b, "%s: %s\n", service.Name, service.Repo)
@@ -290,8 +318,41 @@ func githubShowText(result githubaccess.Result) string {
 			b.WriteString("  " + githubStateText(access))
 			b.WriteString("\n")
 		}
+		for _, line := range githubSelectionLines(service.Selected, service.Access, home, nil) {
+			fmt.Fprintf(&b, "  %s\n", line)
+		}
 	}
 	return b.String()
+}
+
+// githubSelectionLines nennt die Wahl von run (selected) in Textform, mit
+// den Teilen der Zeile von run: „run: git über …, api über …“ oder „run:
+// kein Zugang“, und nur wenn --write anders wählt, dazu „mit --write: …“.
+// mark hängt an den Teil eines gewählten Zugangs etwas an — bei test sein
+// Ergebnis. Ohne selected (nicht beurteilt) keine Zeile.
+func githubSelectionLines(selected *githubaccess.Selection, accesses []githubaccess.Access, home string, mark func(index int) string) []string {
+	if selected == nil {
+		return nil
+	}
+	text := func(index githubaccess.ChannelIndex) string {
+		choice := index.Choice(accesses)
+		if choice.Empty() {
+			return "kein Zugang"
+		}
+		git, api := githubaccess.ChannelParts(choice, home)
+		if mark != nil && choice.Git != nil {
+			git += mark(*index.Git)
+		}
+		if mark != nil && choice.API != nil {
+			api += mark(*index.API)
+		}
+		return git + ", " + api
+	}
+	lines := []string{"run: " + text(selected.Read)}
+	if !selected.Write.Equal(selected.Read) {
+		lines = append(lines, "mit --write: "+text(selected.Write))
+	}
+	return lines
 }
 
 // githubStateText ist die Verfügbarkeit eines Zugangs in Textform:
@@ -339,14 +400,18 @@ Vertrag: docs/github-access.md.
           der Datei, je Zeile „[stufe] pfad: satz — abhilfe“. Ohne Problem
           eine Zeile mit Datei, Zahl der Dienste und Zahl der Dienste ohne
           verfügbaren Zugang, danach je nicht verfügbarem Zugang eine Zeile
-          mit dem Grund. Mit --json das Objekt {file, created, services,
+          mit dem Grund und je Dienst die Wahl von run („<dienst> run: git
+          über …, api über …“, weicht --write ab, dazu „<dienst> mit
+          --write: …“). Mit --json das Objekt {file, created, services,
           problems}, je Zugang state (available, unavailable, disabled) und
-          reason; sobald ein error vorliegt, ist services leer.
+          reason, je Dienst selected; sobald ein error vorliegt, ist
+          services leer.
   show    Zeigt die Konfiguration, wie sie gelesen wurde: je Dienst ein Block
           mit Repository und Zugängen samt Verfügbarkeit, Pfade mit
-          aufgelöstem ~; mit <dienst> nur diesen. Mit --json dasselbe Objekt
-          wie check ohne problems. Bei einer Datei mit error gibt show die
-          Probleme aus wie check.
+          aufgelöstem ~, darunter die Wahl von run („run: …“, „mit --write:
+          …“); mit <dienst> nur diesen. Mit --json dasselbe Objekt wie check
+          ohne problems. Bei einer Datei mit error gibt show die Probleme
+          aus wie check.
   test    Fragt GitHub, ob die verfügbaren Zugänge funktionieren — der
           einzige Unterbefehl mit Netz, mehrere Anfragen je Zugang, zehn
           Sekunden Frist je Anfrage. gh und token über die API (Identität,
@@ -356,11 +421,19 @@ Vertrag: docs/github-access.md.
           Zugänge werden übersprungen. Kein Token erscheint in Ausgabe,
           Meldung oder Kommandozeile. Mit --json das Objekt {file, services,
           ok}, je Zugang result (ok, failed, skipped), identity, read, write,
-          expires, warning, message.
+          expires, warning, message, je Dienst selected wie bei show (aus
+          der Verfügbarkeit vor dem Test) und selectedOk; im Text die Zeilen
+          von show mit dem Ergebnis je gewähltem Kanal.
   run     Startet einen Befehl mit dem Zugang des Dienstes, eingerichtet nur
           in seiner Umgebung; Wahl ohne Netz, kein Rückfall. Eigene
           Exit-Codes 125, 126, 127, sonst der des Befehls. Einzelheiten:
           k-playbook github run --help.
+
+selected nennt je Dienst die Wahl von run als Index in access: read ist run
+ohne Optionen, write run --write, je Kanal git und api, null ohne Zugang.
+Beide Kanäle null heißt: run endet in dieser Form mit „kein verwendbarer
+Zugang“. Andere Fehler von run (Token nicht zu bekommen, Befehl nicht
+gefunden) sagt selected nicht voraus; --use und --skip nennt es nicht.
 
 Verfügbar heißt, ohne Netz beurteilt: der gh-Login ist in gh hinterlegt, die
 Token-Datei ist eine Zeile mit Modus 0600, der Schlüssel liegt ohne Gruppen-
