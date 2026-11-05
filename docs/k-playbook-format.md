@@ -85,8 +85,8 @@ there next. In an existing project, `/k-upgrade` 3.4 deletes each of them that h
 nothing but `README.md` files and the managed `.gitignore` — directly under `data/` the
 renamed leftovers of `k-playbook todo migrate` (`todos.json.migriert`,
 `todos.json.nachzuegler-<date>[-<n>]`) count the same, while a `data/todos.json` not yet
-taken over keeps it —, after the user confirms; anything else keeps the directory, and the
-command names what lies there.
+taken over keeps it —, without asking (task 117); anything else keeps the directory, and the
+command only names what lies there.
 
 Until their own switch to the collection, a few producers still write to disk and
 create their directory on the first write, without a README:

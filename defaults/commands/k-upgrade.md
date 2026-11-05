@@ -63,9 +63,11 @@ von selbst übersprungen.
 Für alle Umstellungen gilt:
 
 - Gelöscht, verschoben oder überschrieben wird erst nach Bestätigung. Lege je Umstellung
-  gebündelt vor, was du vorhast, und warte auf die Antwort.
+  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind die leeren
+  Verzeichnisse aus 3.4, und nur sie: Die löscht 3.4 ohne Vorlage und ohne auf eine Antwort zu
+  warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
-  entscheiden.
+  entscheiden; in 3.4, das nichts vorlegt, steht es in der Meldung, ohne neue Rückfrage.
 - Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
   `true`, wird sie übersprungen; sag das und nenne den Grund aus `context.kephalaion.message`.
 - Eine Verweissuche im Projekt geht über alle Dateien, die unter `context.project.dir` auf der
@@ -485,9 +487,9 @@ Das Einrichten legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr a
 sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection oder zieht als
 Nächstes dorthin. In einem bestehenden Projekt liegen sie noch, oft nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
-Übernahmereste der Todos. Sie läuft nach 3.1 bis 3.3, damit zählt,
-was dort umgezogen ist. Die Liste gehört zu dieser Fassung des Commands; das Programm nennt
-sie nicht:
+Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
+Sie läuft nach 3.1 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
+Fassung des Commands; das Programm nennt sie nicht:
 
 - `docs/`
 - `tasks/`
@@ -534,20 +536,32 @@ versteckten Dateien — ein Verzeichnislisting ohne Dotfiles reicht nicht, und e
 folgst du nicht. Danach ist jedes Verzeichnis leer oder nicht. Liegt `tasks/` leer, gilt das
 auch für `tasks/done/`; beide stehen dann in einer Zeile `tasks/`.
 
-**b) Vorlegen.** Lege gebündelt vor, eine Zeile je Verzeichnis in der Reihenfolge der Liste:
-für ein leeres der Vorschlag, es zu löschen, mit dem, was darin liegt; für jedes andere die
-Zeile `bleibt: <was noch liegt>`. Genannt werden Pfade relativ zum Verzeichnis, eine README
+**b) Einteilen.** Jedes Verzeichnis gehört danach in eine von zwei Gruppen: die leeren, die c)
+löscht, und die übrigen, die liegen bleiben. Den Inhalt einer `README.md` prüfst und bewertest
+du nicht; ob ein Verzeichnis leer ist, entscheidet allein die Definition oben. Vorgelegt wird
+nichts, und 3.4 stellt keine Frage: Auch wenn es nur Zeilen `bleibt: …` gibt, sind sie eine
+Meldung.
+
+**c) Leere löschen.** Prüfe je leerem Verzeichnis unmittelbar vor dem Löschen noch einmal, ob
+es leer ist, für `data/` mit derselben Ausnahme; zwischen Erhebung und Löschen kann etwas
+hinzugekommen sein, etwa eine neue `data/todos.json`. Ist es leer, löschst du es samt Inhalt
+im Dateisystem. Ist es das nicht mehr, bleibt es und wird mit dem Grund gemeldet. Committet
+wird nicht: Versionierte READMEs stehen danach als gelöscht in `git status`.
+
+**d) Melden.** Je Verzeichnis eine Zeile in der Reihenfolge der Liste: `gelöscht: <was darin
+lag>`, oder `bleibt: <was noch liegt>` mit dem Grund — liegt anderes darin oder beim
+zweiten Prüfen nicht mehr leer. Genannt werden Pfade relativ zum Verzeichnis, eine README
 eingeschlossen, höchstens fünf; liegt mehr darin, dazu die Gesamtzahl der Dateien. Bleibt
 `data/`, weil `todos.json` darin liegt, endet seine Zeile mit `— erst k-playbook todo migrate`.
 
 ```text
 Aufräumen in k-playbook-local/
-  docs/        [löschen]  nur README.md
-  tasks/       [löschen]  nur README.md, done/README.md
-  data/        [löschen]  nur README.md, todos.json.migriert
+  docs/        gelöscht: README.md
+  tasks/       gelöscht: README.md, done/README.md
+  data/        gelöscht: README.md, todos.json.migriert
   material/    bleibt: README.md, notizen.md
   inbox/       bleibt: README.md, .gitignore, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
-  queue/       [löschen]  nur README.md
+  queue/       gelöscht: README.md
   cache/       bleibt: README.md, .gitignore, knowledge/index.json
 ```
 
@@ -557,20 +571,10 @@ Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
   data/        bleibt: README.md, todos.json — erst k-playbook todo migrate
 ```
 
-Ein Verzeichnis, das nicht liegt, erscheint nicht. Warte auf die Antwort. Der Nutzer bestätigt
-die Vorlage ganz oder nimmt einzelne Zeilen aus.
+Ein Verzeichnis, das nicht liegt, erscheint nicht. Auf die Meldung folgt keine Frage.
 
-**c) Ausführen, was bestätigt ist.** Prüfe je bestätigter Zeile unmittelbar vor dem Löschen
-noch einmal, ob das Verzeichnis leer ist, für `data/` mit derselben Ausnahme; zwischen Vorlage
-und Antwort kann etwas hinzugekommen sein, etwa eine neue `data/todos.json`. Ist es leer, löschst du es samt Inhalt im Dateisystem. Ist es das nicht
-mehr, bleibt es und wird mit dem Grund gemeldet. Committet wird nicht: Versionierte READMEs
-stehen danach als gelöscht in `git status`.
-
-**d) Melden.** Je Verzeichnis eine Zeile: gelöscht, oder `bleibt: …` mit dem Grund — liegt
-anderes darin, vom Nutzer ausgenommen oder beim zweiten Prüfen nicht mehr leer.
-
-Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, schlägt der nächste Lauf erneut
-vor, sobald es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3. Die
+Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, löscht der nächste Lauf, sobald
+es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3. Die
 Wissenswerkzeuge (`k-playbook knowledge`, MCP-Werkzeuge `k_playbook_knowledge_*`) legen
 `inbox/`, `queue/`, `knowledge/` und `cache/` bis zu ihrer Umstellung in die Collection beim
 Schreiben selbst wieder an, ohne README; das ist kein Fehler.

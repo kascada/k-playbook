@@ -720,7 +720,7 @@ Projektdoku (`keph:/docs/`), Befunde (`queue/findings/`) — oder zieht als Näc
 die Wissensablage. Herausnehmen war nötig, Löschen hätte nicht gereicht: `CreateLocal()`
 legt jeden fehlenden Eintrag samt README wieder an, und `LocalOK()` ist falsch, sobald
 einer fehlt. Ein Bestandsprojekt räumt `/k-upgrade` 3.4 auf: es löscht ein solches
-Verzeichnis nach Bestätigung, wenn darin nur `README.md` und die verwaltete `.gitignore`
+Verzeichnis ohne Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore`
 liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
 bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
 
