@@ -374,7 +374,7 @@ func TestReadStatusVollstaendigUnvollstaendigUndDefekt(t *testing.T) {
 		problem       bool
 	}{
 		{"vollständig", full, false},
-		{"unvollständig", "---\ntype: Version Inventory\n---\n", true},
+		{"unvollständig", "---\ntitle: Versionsinventar\n---\n", true},
 		{"syntaktisch defekt", "---\ntype: [\n---\n", true},
 	}
 	for _, tc := range cases {

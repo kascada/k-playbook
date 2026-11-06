@@ -192,26 +192,25 @@ nennt diesen Einstieg unter `Projektdoku`, und `k-playbook:/commands/_shared/doc
 was darunter gilt. Früher lag sie unter `<context.local.dir>/docs/`, mit einem Index
 `docs/README.md` von `/k-docs-index` und Verweisen darauf in `AGENTS.md` und
 `opencode.json`. Diese Umstellung bringt die Doku je Bereich nach Kephalaion oder räumt
-sie ab — nichts verschwindet still, und ein Bereich, dessen Erzeuger noch auf die Platte
-schreibt (heute nur `libs/`), bleibt liegen. Der Doku-Index steht nur noch in `docs/` der
-Collection; `AGENTS.md` und `opencode.json[c]` tragen keinen Doku-Index und keine
-Doku-Verweise mehr.
+sie ab — nichts verschwindet still. Alle Erzeuger schreiben inzwischen nach Kephalaion;
+was sie auf der Platte hinterlassen haben, wird gelöscht und neu erzeugt, nicht verschoben.
+Der Doku-Index steht nur noch in `docs/` der Collection; `AGENTS.md` und
+`opencode.json[c]` tragen keinen Doku-Index und keine Doku-Verweise mehr.
 
 **Anlass:** Unter `<context.local.dir>/docs/` liegt mindestens eine Datei aus den Bereichen
 der Tabelle unten, oder `AGENTS.md` bzw. `opencode.json[c]` nennen das Präfix
 `k-playbook-local/docs/` (dieselbe Suche wie in b). Braucht die Collection.
 
-Die Bereiche und ihr Ziel. Wird ein weiterer Erzeuger auf Kephalaion umgestellt, ändert
-dessen Task seine Zeile:
+Die Bereiche und ihr Ziel:
 
 | Bereich auf der Platte | Ziel | Vorgehen |
 |---|---|---|
 | `versions/` | `keph:/docs/generated/versions/` | Erzeuger (`/k-doc-inventory`, `k-playbook inventory`) schreibt schon nach Kephalaion: Plattendatei löschen; fehlt das Ziel, Erzeuger neu laufen lassen |
 | `code/` | `keph:/docs/generated/code/` | Erzeuger `/k-docs-code` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-code`. Kein Verschieben — der alte Stand bleibt in der Git-Geschichte |
-| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt noch auf die Platte: nicht anfassen |
+| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-tools`. Kein Verschieben — der alte Stand bleibt in der Git-Geschichte |
 | `manual/` | `keph:/docs/manual/`, Pfad darunter gleich | von Hand geschrieben: verschieben; `manual/README.md` nicht verschieben (`README.md` schreibt kein Command, sie entsteht beim Indizieren), sondern löschen |
 | `extracted/` und lose `.md` direkt unter `docs/` außer `README.md` | Vorschlag `keph:/docs/manual/<datei>` | je Datei verschieben oder verwerfen, der Nutzer entscheidet |
-| `README.md` | entfällt | der alte Index von `/k-docs-index`: löschen, sobald seine Einträge zu `manual/`, `versions/`, `code/` und losen Dateien abgeräumt sind — auch wenn `libs/` noch liegt; sonst bliebe ein veralteter Index als stiller Rückfall |
+| `README.md` | entfällt | der alte Index von `/k-docs-index`: löschen, sobald seine Einträge zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien abgeräumt sind; sonst bliebe ein veralteter Index als stiller Rückfall |
 
 `docs/` selbst und seine README fasst diese Umstellung nicht an; darüber entscheidet 3.4.
 
@@ -226,13 +225,15 @@ prüfst du vorher:
 - Zeigt ein Link in der Datei aus `manual/` hinaus (etwa auf `../versions/…` oder in den
   Code), merkst du ihn für die Meldung vor; umgeschrieben wird er nicht.
 
-Für einen umgestellten Erzeuger (heute `versions/` und `code/`): fehlt sein Ziel in
-Kephalaion, erinnerst du daran, ihn neu laufen zu lassen. Beim Inventar bietest du an,
+Für die Erzeuger (`versions/`, `code/` und `libs/`): fehlt ihr Ziel in Kephalaion,
+erinnerst du daran, sie neu laufen zu lassen. Beim Inventar bietest du an,
 `k-playbook inventory` gleich auszuführen; der Lauf ist deterministisch. `/k-docs-code`
-fragt nach Scope und Struktur und läuft deshalb nicht nebenbei — nenne ihn als nächsten
-Schritt. Jede Datei unter `code/` wird einzeln zum Löschen vorgeschlagen, auch wenn
-`keph:/docs/generated/code/` noch leer ist: Ihr Inhalt bleibt in der Git-Geschichte, und der
-Erzeuger schreibt das Verzeichnis neu.
+fragt nach Scope und Struktur, `/k-docs-tools` nach der Auswahl der Kandidaten; beide laufen
+deshalb nicht nebenbei — nenne sie als nächsten Schritt, `/k-docs-tools` nach dem Inventar,
+auf dem es aufbaut. Jede Datei unter `code/` und `libs/` wird einzeln zum Löschen
+vorgeschlagen, auch wenn `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` noch
+leer ist: Ihr Inhalt bleibt in der Git-Geschichte, und der Erzeuger schreibt das Verzeichnis
+neu.
 
 `docs/README.md` ist der alte Index, wenn sein Frontmatter oder sein Inhalt ihn als Werk
 von `/k-docs-index` ausweist — die Übersicht je Herkunft mit Tabellen, der
@@ -253,27 +254,26 @@ Collection; das Programm schreibt keinen dieser Verweise mehr neu. Der Vorschlag
 - in einem sonst eigenständigen Absatz nur den Verweis; der Rest bleibt stehen;
 - `references.docs` in `opencode.json[c]`.
 
-Das gilt für alle Verweise mit dem Präfix, auch für solche auf `libs/`: Die Dateien dort
-bleiben liegen, bis `/k-docs-tools` umgestellt ist, sind bis dahin aber nicht mehr verwiesen.
-Je Fundstelle merkst du `pfad:zeile` vor, bei einer Tabelle oder einem Absatz über mehrere
-Zeilen `pfad:von-bis`.
+Das gilt für alle Verweise mit dem Präfix, auch für solche auf `libs/`. Je Fundstelle
+merkst du `pfad:zeile` vor, bei einer Tabelle oder einem Absatz über mehrere Zeilen
+`pfad:von-bis`.
 
 **c) Vorlegen.** Lege gebündelt vor, eine Zeile je Datei bzw. Bereich mit Vorschlag und
-Grund, in dieser Reihenfolge: umgestellte Erzeuger, `manual/`, lose Dateien und
+Grund, in dieser Reihenfolge: die Erzeuger, `manual/`, lose Dateien und
 `extracted/`, der alte Index, die Verweise. Ein Beispiel aus einem Projekt mit alter
-Code-Doku und einer Index-Tabelle in `AGENTS.md`:
+Code-Doku, alten Steckbriefen und einer Index-Tabelle in `AGENTS.md`:
 
 ```text
 Doku aus k-playbook-local/docs/
   versions/inventory.md        [löschen]      liegt als keph:/docs/generated/versions/inventory.md, Stand 2026-10-25
   code/00-overview.md          [löschen]      Erzeuger /k-docs-code schreibt nach keph:/docs/generated/code/; neu erzeugen mit /k-docs-code
   code/13-rag-pipeline.md      [löschen]      dito; keph:/docs/generated/code/ trägt schon 17 Dokumente
+  libs/celery.md               [löschen]      Erzeuger /k-docs-tools schreibt nach keph:/docs/generated/libs/; neu erzeugen mit /k-docs-tools
   manual/release.md            [verschieben]  → keph:/docs/manual/release.md, Ziel frei
   manual/installation.md       [verschieben]  → keph:/docs/manual/installation.md, Ziel vorhanden und gleich: nur löschen
   manual/README.md             [löschen]      README.md schreibt kein Command, sie entsteht beim Indizieren
   notizen.md                   [unklar]       lose Datei ohne Erzeuger; Vorschlag keph:/docs/manual/notizen.md
   README.md                    [löschen]      alter Index von /k-docs-index, Einträge abgeräumt
-  libs/                        [bleibt]       nicht Teil dieser Umstellung, /k-docs-tools schreibt noch auf die Platte
   AGENTS.md:54                 [entfernen]    Absatz „Docs zuerst …“, sein Kern ist der Verweis auf k-playbook-local/docs/
   AGENTS.md:82-83              [entfernen]    Verzeichnisbaum der alten Ablage
   AGENTS.md:224                [entfernen]    nur der Verweis auf k-playbook-local/docs/libs/…, der Absatz bleibt
@@ -286,7 +286,8 @@ Doku aus k-playbook-local/docs/
 - **verschieben** — Kephalaion `create` unter dem Zielnamen, danach die Plattendatei löschen.
 - **entfernen** — eine Tabelle, ein Absatz oder ein einzelner Verweis in `AGENTS.md`, oder
   `references.docs` in `opencode.json[c]`; nie umgeschrieben.
-- **bleibt** — nicht Teil dieser Umstellung.
+- **bleibt** — nicht Teil dieser Umstellung, etwa eine Datei, die kein Text oder größer als
+  1 MiB ist.
 - **unklar** — du kannst es nicht entscheiden; der Nutzer entscheidet, je Zeile.
 
 Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzelne Zeilen aus.
@@ -299,7 +300,7 @@ Warte auf die Antwort. Der Nutzer bestätigt die Vorlage ganz oder nimmt einzeln
    `base_revision` aus dem `read`). Erst nach einem bestätigten Schreiben — die Antwort
    nennt Revision und Größe — löschst du die Plattendatei.
 2. **löschen:** die Plattendatei entfernen. Der alte Index zuletzt, und nur, wenn alle Zeilen
-   zu `manual/`, `versions/`, `code/` und losen Dateien ausgeführt sind; blieb eine davon
+   zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien ausgeführt sind; blieb eine davon
    liegen, bleibt auch er und wird beim nächsten Lauf erneut vorgeschlagen.
 3. **entfernen:** in `opencode.json[c]` den Eintrag `references.docs` (ein leeres
    `references` dazu); in `AGENTS.md` die bestätigte Tabelle, den Absatz bzw. den einzelnen
@@ -309,7 +310,7 @@ Ein Schritt, der fehlschlägt, lässt seine Datei liegen; der nächste Lauf nimm
 auf. Ihr Inhalt bleibt außerdem in der Git-Geschichte.
 
 **e) Aufräumen.** Ein Verzeichnis unter `docs/`, das danach leer ist (`manual/`, `versions/`,
-`code/`, `extracted/`), löschst du mit. `docs/` selbst und seine README fasst diese
+`code/`, `libs/`, `extracted/`), löschst du mit. `docs/` selbst und seine README fasst diese
 Umstellung nicht an.
 
 **f) Melden.** Je Datei eine Zeile: was aus ihr wurde (`keph:`-Verweis, gelöscht, liegen
@@ -317,9 +318,8 @@ geblieben und warum), dazu je vorgemerktem Link aus `manual/` hinaus `datei:zeil
 entferntem Verweis `pfad:zeile`. Prüfe das Ergebnis mit Kephalaion `list` auf `docs/` und
 nenne, was dort jetzt liegt.
 
-Die Umstellung ist wiederholbar: `libs/` bleibt liegen, solange `/k-docs-tools` noch auf
-die Platte schreibt. Ist es umgestellt, ändert sein Task die Zeile `libs/`, und der nächste
-Lauf schlägt auch dort das Abräumen vor.
+Die Umstellung ist wiederholbar: Was ein Lauf liegen ließ — eine ausgenommene Zeile, ein
+fehlgeschlagener Schritt, der alte Index —, schlägt der nächste Lauf wieder vor.
 
 ### 3.3 — Tasks von der Platte
 

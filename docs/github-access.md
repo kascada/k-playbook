@@ -700,8 +700,10 @@ its own.
   its reader creates a missing file once as the template, as described under *When the file
   is missing* (`services: {}`, `0600`, the one-time warning under `Umgebung:`). In the
   briefing the field then shows `present: true` without services; `present: false` appears
-  there only when the template cannot be created (a read-only path in a container, an occupied
-  path). `k-playbook context` runs no environment check and reports a missing file as
+  there only when the template cannot be created because the path is read-only (in a
+  container, say). A path occupied by something else — a directory where the file belongs, or a
+  file where its parent directory belongs — is not "missing": `Peek` reports `present: true`
+  with an `error`, and the line says that the file has errors. `k-playbook context` runs no environment check and reports a missing file as
   `present: false`.
 - `problems`: the problems of *Reading the file*, in the form of `check --json`. With an
   `error`, `services` is `{}` and `projectServices` `[]`.
@@ -722,8 +724,8 @@ its own.
 
 No network, no token value; the field writes nothing (the template above comes from the
 environment check, not from the field). The cost beyond `context.gh` is `Judge` (gh's
-configuration, file checks, `ssh -G` per `host`, 3 s limit each), three local `git` calls and at
-most one more `ssh -G` for a remote alias the file does not name. That is why `ContextForDir`
+configuration, file checks, `ssh -G` per `host`, 3 s limit each), three local `git` calls (four when the
+upstream remote carries no URL and `origin` is read as well) and at most one more `ssh -G` for a remote alias the file does not name. That is why `ContextForDir`
 fills the field and `BuildContext` does not: the interface and the review selection over MCP do
 not pay for it.
 

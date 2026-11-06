@@ -192,7 +192,9 @@ func writeBriefingContext(b *strings.Builder, section project.BriefingContext) {
 // alle passenden Dienste. Leer, wenn der Rest das Feld nicht trägt. Fehlte die
 // Datei, hat die Umgebungsprüfung desselben Briefings sie vorher als Vorlage
 // angelegt; die Zeile sagt dann „(Dienste: keine)“, und „keine
-// Zugangsdatei“ bleibt dem Fall, in dem das nicht ging.
+// Zugangsdatei“ bleibt dem Fall, in dem das nicht ging, weil der Pfad
+// schreibgeschützt ist. Ist der Pfad anders belegt (ein Verzeichnis an der
+// Stelle der Datei), meldet Peek einen error, und die Zeile nennt Fehler.
 func briefingGitHubLine(section project.BriefingContext) string {
 	raw, ok := section.Field("github")
 	if !section.Available || !ok {
@@ -376,7 +378,8 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     was k-playbook github run dafür wählt, sonst „kein Dienst für
     <owner>/<repo>“ — auch gleich nachdem die Umgebungsprüfung eine fehlende
     Datei als Vorlage angelegt hat („Dienste: keine“) — oder „keine
-    Zugangsdatei“, wenn sich die Vorlage nicht anlegen ließ; das volle Objekt
+    Zugangsdatei“, wenn sich die Vorlage nicht anlegen ließ (schreibgeschützter
+    Pfad); das volle Objekt
     steht im JSON unter context.github;
   - hinter einer Trennzeile den Rest von k-playbook context — die
     Umgebungsangaben (Pfade, Werkzeuge, gh, git, Kephalaion-Anbindung …), die

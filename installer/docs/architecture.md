@@ -744,7 +744,7 @@ liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt
 bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
 
 Was bis zu seiner Umstellung noch auf die Platte schreibt, legt sein Verzeichnis beim
-ersten Schreiben selbst an, ohne README: `/k-docs-tools` `docs/libs/`, die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
+ersten Schreiben selbst an, ohne README: die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
 (`QueueAdd`) und `knowledge/<bereich>/` (`Write`, `Publish`). Lesen, Suchen und Listen ohne
 diese Verzeichnisse antworten leer (`scanKnowledgeTree`, `InboxList`, `QueueList`); ein
 genannter Pfad, den es nicht gibt, bleibt ein Eingabefehler. `cache/` entsteht über
@@ -2366,7 +2366,16 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   Text je Erzeuger. Daraus kommen die erlaubten Werte von `erzeuger` und die `README.md` des
   Verzeichnisses, die `publish` schreibt, wenn sie abweicht — die KI schreibt sie nie, und im
   Arbeitsverzeichnis ist sie nicht erlaubt. Ein Verzeichnis kann mehrere Schreiber haben; die
-  Tabelle kennt das Verzeichnis, `generated.by` im Frontmatter den Schreiber.
+  Tabelle kennt das Verzeichnis, `generated.by` im Frontmatter den Schreiber. Heute stehen
+  darin `code` (`/k-docs-code`, Skill `ks-overlay-repo-analyse`) und `libs` (`/k-docs-tools`,
+  Task 120); das Inventar steht nicht darin, es ist ein Dokument und schreibt selbst.
+- **Ein Kopf.** Jedes Dokument unter `docs/` trägt denselben Frontmatter — `title`,
+  `description`, `generated` (`by`, `at`, optional `stats`), `hints`, `questions`, `sources`,
+  `verified` —, beschrieben einmal in `defaults/commands/_shared/docs.md` (Task 120).
+  `publish` prüft davon nur `title`, `description` und unveränderte `hints`; fremde Felder
+  lehnt es nicht ab, damit unveränderte Dokumente im alten Kopf nicht blockieren. Das
+  Inventar trägt seine Zahlen unter `generated.stats`; `inventory.ReadStatus` liest sie dort
+  und bei einem Bestand im alten Kopf bis zum nächsten Lauf aus dem Block `inventory:`.
 - **Arbeitsverzeichnis und Merkdatei.** `<projekt>/.k-playbook/work/docs/<erzeuger>/` trägt
   die geholten Dokumente mit gleichem relativem Pfad; daneben die Merkdatei
   `<erzeuger>.checkout.json` mit Collection, Zeitpunkt und je Dokument Pfad, Revision,

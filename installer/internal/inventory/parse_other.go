@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// Die weiteren Manifesttypen, die schon /k-docs-tools erkennt. Die Semantik ist
-// überall dieselbe: Manifest und Lockfile beide, nur direkte Abhängigkeiten,
-// Scope aus dem Abschnitt.
+// Die weiteren Manifesttypen aus docs/version-inventory.md („Other manifest
+// types“), die früher /k-docs-tools selbst erkannte. Die Semantik ist überall
+// dieselbe: Manifest und Lockfile beide, nur direkte Abhängigkeiten, Scope aus
+// dem Abschnitt.
 
 func parseRust(c *collector) {
 	doc := parseTOML(c.file.Data)

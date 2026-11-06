@@ -337,7 +337,7 @@ Unterkommandos:
             und k-playbook docs publish <erzeuger> [--allow-hints], je mit
             --json. checkout holt keph:/docs/generated/<erzeuger>/ nach
             .k-playbook/work/docs/<erzeuger>/, publish gleicht ab und meldet
-            Konflikte, statt zu überschreiben. Erzeuger: code. Dazu
+            Konflikte, statt zu überschreiben. Erzeuger: code, libs. Dazu
             k-playbook docs exclude add <muster>… [--json]: trägt dauerhafte
             Ausschlüsse für den Code-Scan in docs.exclude von K-PLAYBOOK.yaml
             ein. Dasselbe wie die MCP-Werkzeuge k_playbook_docs_checkout,

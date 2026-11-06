@@ -28,7 +28,7 @@ Geschrieben wird nur neben die Installation. Das Installationsverzeichnis selbst
 
 Unter `keph:/docs/` hat jedes Unterverzeichnis eine eigene Herkunft, und nur eine davon folgt dem Code:
 
-- `keph:/docs/generated/libs/` — bis zur Umstellung von `/k-docs-tools` noch `k-playbook-local/docs/libs/` — folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
+- `keph:/docs/generated/libs/` in der Projekt-Collection, die Steckbriefe von `/k-docs-tools`, folgt den Libraries des Projekts, nicht seinem Code. Eine Code-Änderung veraltet es nicht; ein Versionssprung einer Library schon.
 - Die handgeschriebene Doku, `keph:/docs/manual/` in der Projekt-Collection, folgt keinem Erzeuger. Wer sie ändern will, ändert sie bewusst. Ein `docs/manual/` auf der Platte ist ein Stand von vor dem Umzug; die Umstellung 3.2 in `/k-upgrade` bringt ihn nach Kephalaion.
 - Ein `docs/extracted/` auf der Platte hält fest, was vor der Umstellung auf die Wissensablage aus Rohmaterial gewonnen wurde — ein Stand von damals, mit Quelle und Konfidenz. Er wird nicht nachgezogen, sonst verliert er seine Aussage. Dasselbe gilt für die Auszüge, die `/k-docs-extract` heute nach `k-playbook-local/knowledge/extracted/` schreibt.
 - Das Versionsinventar, `keph:/docs/generated/versions/inventory.md` in der Projekt-Collection, folgt den deklarierten Versionen des Projekts, nicht seinem Code. Eine Code-Änderung veraltet das Inventar nicht; eine geänderte Versionsangabe in einem Manifest, einer Container-, Helm- oder CI-Datei schon. Was ein solcher Versionssprung an Nachzug auslöst, steht im Abschnitt „Nachzug bei Versionssprüngen" unten und wird hier nicht ein zweites Mal ausformuliert.
@@ -55,7 +55,7 @@ Zwei Fälle, die auseinanderzuhalten sind:
 
 Die Quellenkonfiguration `k-playbook-local/version-sources.yaml` folgt dabei der Schreibregel des Vertrags („Source Configuration" in `k-playbook/docs/version-inventory.md`): nur nach ausdrücklicher Bestätigung, nur ergänzend, bestehende Einträge, Kommentare und Reihenfolge bleiben erhalten. Sie wird hier nicht neu und nicht strenger formuliert.
 
-`docs/libs/` bleibt davon getrennt. Ein Versionssprung veraltet auch die Steckbriefe dort, nachgezogen werden sie aber über `/k-docs-tools`, nicht durch Umschreiben aus dem Inventar. Weichen beide voneinander ab, gibt das Inventar die Auskunft, und `/k-docs` meldet den Unterschied als Hinweis; die Abgrenzung steht in `commands/_docs/tools.md` und `commands/k-docs.md`.
+Die Steckbriefe unter `keph:/docs/generated/libs/` bleiben davon getrennt. Ein Versionssprung veraltet auch sie, nachgezogen werden sie aber über `/k-docs-tools`, nicht durch Umschreiben aus dem Inventar — zuerst das Inventar, danach die Steckbriefe, denn `/k-docs-tools` nimmt seine Kandidaten aus dem Inventar und nennt in `sources` die Versionen, gegen die gelesen wurde. Weichen beide voneinander ab, gibt das Inventar die Auskunft, und `/k-docs` meldet den Unterschied als Hinweis; die Abgrenzung steht im Vertrag des Inventars (`k-playbook/docs/version-inventory.md`) und im Text von `/k-docs-tools` (`k-playbook:/commands/k-docs-tools.md`).
 
 ## Nicht automatisch dokumentieren
 

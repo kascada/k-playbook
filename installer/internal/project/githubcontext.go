@@ -37,8 +37,9 @@ type ContextGitHub struct {
 	Services githubaccess.Services `json:"services"`
 }
 
-// githubContextTimeout begrenzt die drei git-Aufrufe, mit denen das Remote
-// gelesen wird. Sie lesen nur die lokale Konfiguration.
+// githubContextTimeout begrenzt die drei git-Aufrufe (vier, wenn das
+// Upstream-Remote keine Adresse trägt und origin dazukommt), mit denen das
+// Remote gelesen wird. Sie lesen nur die lokale Konfiguration.
 const githubContextTimeout = 5 * time.Second
 
 // contextGitHub baut das Feld github. gitDir ist das Verzeichnis, ab dem git
@@ -46,7 +47,7 @@ const githubContextTimeout = 5 * time.Second
 // unterhalb des Projekts (etwa k-playbook-local/) sein eigenes Remote
 // bekommt. Kein Netz, kein Token-Wert, keine Datei geschrieben; die Kosten
 // sind Judge (gh-Konfiguration, Dateien, `ssh -G` je ssh host, Frist 3 s je
-// Host), drei git-Aufrufe und höchstens ein weiteres `ssh -G` für einen
+// Host), drei bis vier git-Aufrufe und höchstens ein weiteres `ssh -G` für einen
 // Remote-Alias, den die Datei nicht nennt.
 func contextGitHub(gitDir string) *ContextGitHub {
 	field := &ContextGitHub{Problems: []githubaccess.Problem{}, ProjectServices: []string{}, Services: githubaccess.Services{}}

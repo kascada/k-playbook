@@ -14,13 +14,14 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 )
 
-// Die Erzeugertabelle ist gültig und trägt in diesem Stand genau code; ein
-// unbekannter Erzeuger ist invalid_input und nennt die erlaubten.
+// Die Erzeugertabelle ist gültig und trägt in diesem Stand code und libs
+// (Task 120); ein unbekannter Erzeuger ist invalid_input und nennt die
+// erlaubten.
 func TestDocsProducersTabelle(t *testing.T) {
 	if err := ValidateDocsProducers(DocsProducers); err != nil {
 		t.Fatalf("Tabelle ungültig: %v", err)
 	}
-	if got := DocsProducerNames(); !reflect.DeepEqual(got, []string{"code"}) {
+	if got := DocsProducerNames(); !reflect.DeepEqual(got, []string{"code", "libs"}) {
 		t.Errorf("Erzeuger: %v", got)
 	}
 	code, err := DocsProducerByName("code")
@@ -30,8 +31,21 @@ func TestDocsProducersTabelle(t *testing.T) {
 	if code.Ref() != "keph:/docs/generated/code/" || code.docName("a/01-x.md") != "docs/generated/code/a/01-x.md" {
 		t.Errorf("Orte: %s, %s", code.Ref(), code.docName("a/01-x.md"))
 	}
-	_, err = DocsProducerByName("libs")
-	if DocRefErrorCode(err) != DocCodeInvalidInput || !strings.Contains(err.Error(), "code") {
+	libs, err := DocsProducerByName("libs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if libs.Ref() != "keph:/docs/generated/libs/" || libs.docName("python-celery.md") != "docs/generated/libs/python-celery.md" {
+		t.Errorf("Orte: %s, %s", libs.Ref(), libs.docName("python-celery.md"))
+	}
+	for _, needle := range []string{"/k-docs-tools", "keph:/docs/generated/versions/inventory.md", "`sources`", "`hints`",
+		"`k-playbook docs checkout libs`", "`k-playbook docs publish libs`"} {
+		if !strings.Contains(libs.Description+libs.Text, needle) {
+			t.Errorf("libs nennt %q nicht", needle)
+		}
+	}
+	_, err = DocsProducerByName("tools")
+	if DocRefErrorCode(err) != DocCodeInvalidInput || !strings.Contains(err.Error(), "code, libs") {
 		t.Errorf("unbekannter Erzeuger: %v (%s)", err, DocRefErrorCode(err))
 	}
 
@@ -396,7 +410,7 @@ func TestDocsCheckoutOhneKephalaion(t *testing.T) {
 		t.Errorf("Vorhandenes verworfen: %q", got)
 	}
 
-	if _, err := work.Checkout(context.Background(), "libs", DocsCheckoutOptions{}); DocRefErrorCode(err) != DocCodeInvalidInput {
+	if _, err := work.Checkout(context.Background(), "tools", DocsCheckoutOptions{}); DocRefErrorCode(err) != DocCodeInvalidInput {
 		t.Errorf("unbekannter Erzeuger: %v", err)
 	}
 }

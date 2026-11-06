@@ -48,8 +48,8 @@ type DocsProducer struct {
 // DocsProducers ist die Erzeugertabelle. Ein Verzeichnis kann mehrere
 // Schreiber haben (in code/ /k-docs-code und ks-overlay-repo-analyse,
 // erkennbar an generated.by); die Tabelle kennt das Verzeichnis, nicht die
-// Schreiber. versions/ steht nicht darin: das Inventar ist ein Dokument und
-// schreibt selbst (inventory.DocName).
+// Schreiber. libs/ schreibt /k-docs-tools (Task 120). versions/ steht nicht
+// darin: das Inventar ist ein Dokument und schreibt selbst (inventory.DocName).
 var DocsProducers = []DocsProducer{
 	{
 		Name:  "code",
@@ -62,6 +62,22 @@ var DocsProducers = []DocsProducer{
 			"Von Hand gepflegt sind nur die `hints` im Frontmatter: kurze Sätze, worauf der nächste Lauf achten soll. " +
 			"Alles andere wird beim nächsten Lauf neu geschrieben.\n\n" +
 			"Geschrieben wird über `k-playbook docs checkout code` und `k-playbook docs publish code`. Diese README " +
+			"schreibt `publish` selbst.",
+	},
+	{
+		Name:  "libs",
+		Title: "Steckbriefe zu Libraries und Tools",
+		Description: "Kuratierte Steckbriefe zu den nicht-trivialen Libraries und Tools des Projekts — Pitfalls und Idiome, " +
+			"je Gegenstand des Versionsinventars ein Dokument, geschrieben von /k-docs-tools.",
+		Text: "Jedes Dokument beschreibt eine Library oder ein Tool aus dem Versionsinventar " +
+			"(`keph:/docs/generated/versions/inventory.md`) — Rolle im Projekt, Version und Migration, Pitfalls, Idiome " +
+			"und Anti-Patterns; kein Ersatz für die offizielle Doku. Gegen welchen Eintrag und welche Version des " +
+			"Inventars gelesen wurde, steht im Frontmatter unter `sources`; weicht das Inventar inzwischen ab, gibt es " +
+			"die Auskunft. Wer es geschrieben hat, steht unter `generated.by` (`k-docs-tools`); `questions` nennt die " +
+			"Fragen, die das Dokument beantwortet.\n\n" +
+			"Von Hand gepflegt sind nur die `hints` im Frontmatter: kurze Sätze, worauf der nächste Lauf achten soll. " +
+			"Alles andere wird beim nächsten Lauf neu geschrieben.\n\n" +
+			"Geschrieben wird über `k-playbook docs checkout libs` und `k-playbook docs publish libs`. Diese README " +
 			"schreibt `publish` selbst.",
 	},
 }

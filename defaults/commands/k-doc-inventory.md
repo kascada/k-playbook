@@ -56,7 +56,8 @@ Zwei Auskünfte, beide ohne eigene Dateilektüre:
    `k_playbook_doc_read` (ersatzweise `k-playbook read`). Kommt `not_found`, fehlt das
    Inventar — der Normalzustand vor dem ersten Lauf. Sonst nimm **nur** den YAML-Block
    zwischen den beiden `---`-Zeilen am Anfang — `generated.at` und die Zahlen unter
-   `inventory:`. Der Markdown-Rumpf wird nie geparst.
+   `generated.stats` (ein Inventar im alten Kopf trägt sie noch im Block `inventory:`; der
+   nächste Lauf schreibt es im neuen). Der Markdown-Rumpf wird nie geparst.
 
 Zeige die Lage kompakt:
 

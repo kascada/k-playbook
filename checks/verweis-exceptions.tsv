@@ -31,9 +31,6 @@ defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot 
 defaults/instructions/always/030-briefing.md	28	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/instructions/always/100-projektwissen-zuerst.md	9	pfad	Ortsangabe: der Pfad ist das Argument von Kephalaion list in der Collection, kein Verweis.
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.
-share/commands/_docs/tools.md	230	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.
-share/commands/_docs/tools.md	231	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.
-share/commands/_docs/tools.md	258	link	Inhalt für Leser: Vorlage der erzeugten Tool-Doku.
 share/commands/k-docs-index.md	157	link	Inhalt für Leser: zitierte Vorlage aus der Tool-Doku.
 share/commands/k-audit.md	386	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.
 share/commands/k-docs-extract.md	134	pfad	Ortsangabe in einer Verneinung (das Verzeichnis wird nicht gelesen).

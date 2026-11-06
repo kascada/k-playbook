@@ -19,12 +19,16 @@ discovered tool. It does not assess which version is actually active at runtime,
 does not consolidate environments: it documents every discovered assertion with context
 and origin.
 
-Distinction from `docs/libs/`: `/k-docs-tools` produces **curated, pitfall-oriented**
-profiles for selected tools. The inventory is **complete and source-oriented** and does
-not select. Both share the pin taxonomy so that two languages for the same thing do not
-emerge. If version declarations differ, the inventory provides the answer; `docs/libs/`
-is not automatically rewritten for that reason, but the difference is reported as a
-notice.
+Distinction from `keph:/docs/generated/libs/`: `/k-docs-tools` produces **curated,
+pitfall-oriented** profiles for selected items. The inventory is **complete and
+source-oriented** and does not select. Since task 120 `/k-docs-tools` takes its candidates
+from this inventory and scans no manifest itself: every item of the inventory is a
+candidate, and each profile names in `sources` the inventory item and the versions it was
+read against (`resource: keph:/docs/generated/versions/inventory.md`, `item`, `version`).
+Both speak the pin taxonomy below, which is defined only here, so that two languages for
+the same thing do not emerge. If version declarations differ, the inventory provides the
+answer; a profile is not automatically rewritten for that reason, but the difference is
+reported as a notice.
 
 ## Names
 
@@ -82,13 +86,14 @@ This is not instability, but changed origin.
 
 ## Pin taxonomy
 
-The taxonomy is the one from `commands/_docs/tools.md`, **extended**. The three existing
-values retain their literal meanings there; they are quoted here, not reworded:
+This section is the only definition of the taxonomy; `/k-docs-tools` and every other
+reader take it from here. The first three values are the ones the library profiles of
+`/k-docs-tools` have always used, with these literal meanings:
 
 > `exact` (`==1.2.3`, `1.2.3`) / `range` (`^1`, `>=1,<2`, `~1.2`) / `floating` (`*`, no
 > declaration).
 
-Three values are added:
+The inventory adds three values:
 
 | Value | Meaning |
 |---|---|
@@ -179,7 +184,7 @@ carries its own environment label.
 **No exclusion is silent.** Every rule appears in the "Nicht durchsuchte Bereiche" (areas
 not searched) section of the inventory file, with pattern, origin (`installation` or
 `configured`), reason, and the number of sources skipped as a result. The total
-additionally appears in frontmatter under `inventory.sources-excluded` and in the
+additionally appears in frontmatter under `generated.stats.sources-excluded` and in the
 "Übersicht" (overview) section as `Nicht durchsuchte Quellen`. A rule without matches is
 included too: "nothing was found here" and "this location was not searched" are two
 different assertions, and the difference belongs in the file.
@@ -231,11 +236,11 @@ not to this project.
 
 ### Other manifest types
 
-The same ones that `/k-docs-tools` already recognizes: `Cargo.toml`/`Cargo.lock`,
-`Gemfile`/`Gemfile.lock`, `composer.json`/`composer.lock`, `pom.xml`,
-`build.gradle`/`build.gradle.kts`, `mix.exs`/`mix.lock`. Semantics as above: both manifest
-and lockfile; lockfiles follow the general direct-dependency rule in this section; scope
-comes from the section.
+The ones `/k-docs-tools` recognized itself before it moved onto this inventory:
+`Cargo.toml`/`Cargo.lock`, `Gemfile`/`Gemfile.lock`, `composer.json`/`composer.lock`,
+`pom.xml`, `build.gradle`/`build.gradle.kts`, `mix.exs`/`mix.lock`. Semantics as above:
+both manifest and lockfile; lockfiles follow the general direct-dependency rule in this
+section; scope comes from the section.
 
 - `mix.exs` has no sections. There, the scope comes from `only:` of the individual
   dependency, evaluated over the complete dependency entry even if it spans several lines.
@@ -453,15 +458,16 @@ Both types appear in the "Abweichungen" (deviations) section of the inventory fi
 `widersprüchlich` first. The number of deviations is the number of groups with a deviation,
 not the number of involved rows.
 
-A difference between `docs/libs/` and the inventory is **not** a deviation in this sense:
-it arises not from two sources but from two documents. `/k-docs` reports it as a separate,
-non-remediating finding; the inventory prevails.
+A difference between a profile in `keph:/docs/generated/libs/` and the inventory is
+**not** a deviation in this sense: it arises not from two sources but from two documents.
+`/k-docs` reports it as a separate, non-remediating finding; the inventory prevails.
 
-The frontmatter pair `version`/`version-pin` of a file from `docs/libs/` is compared with
-the item of the same name in the inventory's context tables, matched by the name after the
-group key `<ecosystem>/<name>`. A tool that does not appear in the inventory is not a
-finding, nor is a lib file without `version`. `docs/libs/` is **not** rewritten in the
-process, not even after confirmation: those files belong to `/k-docs-tools`.
+The entries of a profile's `sources` whose `resource` is this inventory — `item` and
+`version`, one entry per version the profile was read against — are compared with the rows
+of that item in the inventory's context tables, matched by the group key
+`<ecosystem>/<name>`. An item that no longer appears in the inventory is not a finding, nor
+is a profile entry without `version`. A profile is **not** rewritten in the process, not
+even after confirmation: those documents belong to `/k-docs-tools`.
 
 ## Trust Boundary
 
@@ -826,32 +832,41 @@ control of the collection, not its output.
 
 ### Frontmatter
 
-It must be complete; otherwise `/k-docs` step 3 and `/k-docs-index` step 4 report a
-finding. `generated.by` alone is insufficient.
+The inventory carries the one frontmatter shared by every document under `keph:/docs/`,
+defined once in `defaults/commands/_shared/docs.md` (section "Der Kopf", task 120): `title`,
+`description`, and `generated`. Its own numbers are under `generated.stats`, the optional
+place for a generator's figures; indexing skips them. The inventory writes no other
+frontmatter field. The frontmatter must be complete; otherwise status reports a finding
+(see "Where 043 Gets Status"). `generated.by` alone is insufficient.
 
 ```yaml
 ---
-type: Version Inventory
 title: Versionsinventar
 description: Vollständige Übersicht der deklarierten Versionen dieses Projekts, nach Umgebung getrennt und mit Herkunft je Zeile.
-tags: [versions, inventory, dependencies]
-status: stable
-generated: { by: k-doc-inventory, at: <RFC 3339> }
-inventory:
-  sources-configured: <N>
-  sources-read: <N>
-  entries: <N>
-  deviations: <N>
-  rejected: <N>
-  sources-excluded: <N>
-  sources-unevaluable: <N>
+generated:
+  by: k-doc-inventory
+  at: <RFC 3339>
+  stats:
+    sources-configured: <N>
+    sources-read: <N>
+    entries: <N>
+    deviations: <N>
+    rejected: <N>
+    sources-excluded: <N>
+    sources-unevaluable: <N>
 ---
 ```
 
 `generated.at` is the collection time; there is only this one timestamp.
 
-The keys and the values of `type`, `tags`, and `status` are fixed identifiers and stay
-English. `title` and `description` are German, in the exact wording the renderer writes.
+The keys under `generated.stats` are fixed identifiers and stay English. `title` and
+`description` are German, in the exact wording the renderer writes.
+
+**Old frontmatter.** Before task 120 the inventory carried `type`, `tags`, `status`, and its
+numbers in a block `inventory:` with the same keys. Such a document is still read until the
+next run: if `generated.stats` is absent, the numbers come from `inventory:`. Such a
+document never equals the new rendering, so the next run rewrites it in the new
+frontmatter.
 
 ### Structure
 
@@ -870,8 +885,8 @@ here in the renderer's exact wording, with English explanations alongside:
    `Abweichungen` (deviations), `Abgelehnte Quellen` (rejections), `Nicht durchsuchte
    Quellen` (sources skipped by an exclusion rule), `Nicht auswertbare Quellen` (sources
    read but not evaluable as a whole, see below), and `Hinweise` (notices). The first seven
-   carry the same numbers as the `inventory.*` keys in frontmatter; `Hinweise` appears only
-   here.
+   carry the same numbers as the `generated.stats.*` keys in frontmatter; `Hinweise` appears
+   only here.
 3. `## <label>` for each environment label in the fixed order `lokal`, `dev`,
    `devcontainer`, `ci`, `deployment`; labels without entries are omitted. It contains a
    table with the columns `Gegenstand` (item: `<ecosystem>/<name>`, the group key), `Art`
@@ -944,8 +959,8 @@ unreadable `install_requires`, or a configured Helm value that was not applied, 
 The state appears identically in every output:
 
 - in the file: the `Zustand` column of `## Ausgewertete Quellen`, the counter
-  `Nicht auswertbare Quellen` in `## Übersicht`, and `inventory.sources-unevaluable` in
-  frontmatter;
+  `Nicht auswertbare Quellen` in `## Übersicht`, and `generated.stats.sources-unevaluable`
+  in frontmatter;
 - in JSON: `unevaluable: true` on the source in `sources` of the collection result, and
   `sourcesUnevaluable` in the status read from frontmatter;
 - in the interface and in the subcommand output: the same counter, and each such source
@@ -987,12 +1002,15 @@ created.**
 
 The interface from Task 043 needs four machine-readable values: state, time of the last
 collection, number of sources, and number of deviations. All four are in the frontmatter
-(`generated.at`, `inventory.sources-*`, `inventory.deviations`), and the state follows
-from whether the document exists in the collection; "not reachable" (no ready Kephalaion
+(`generated.at`, `generated.stats.sources-*`, `generated.stats.deviations`), and the state
+follows from whether the document exists in the collection; "not reachable" (no ready Kephalaion
 binding, or the node does not answer) is a state of its own, reported with its reason and
 never shown as "absent". The number of sources that could not be evaluated is read
-the same way, from `inventory.sources-unevaluable`; a file without that key is an
-incomplete frontmatter like any other and is written again on the next run.
+the same way, from `generated.stats.sources-unevaluable`; a file without that key is an
+incomplete frontmatter like any other and is written again on the next run. A document in
+the old frontmatter (block `inventory:` instead of `generated.stats`) is read from that
+block until the next run; the check for missing fields no longer requires `type`,
+`status`, or `tags`.
 
 Only the YAML block between the two `---` lines at the beginning of the document is read. The
 Markdown body is **never** parsed: no table is read backward and no heading evaluated.
@@ -1000,7 +1018,7 @@ That was precisely the requirement: status does not come from running text.
 
 This does not prohibit **reading** the document. It is documentation and is read like any
 other, through `k_playbook_doc_read` with the `keph:` reference: for its comparison with
-`docs/libs/`, `/k-docs` inspects the context tables and
+`keph:/docs/generated/libs/`, `/k-docs` inspects the context tables and
 takes item, version, and pin type from there. The boundary is between status and content:
 status comes from frontmatter, nowhere else, and no machine derives it from the body.
 

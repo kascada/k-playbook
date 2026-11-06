@@ -105,20 +105,30 @@ func fillStatus(status *Status, data []byte) {
 	}
 	status.GeneratedBy = root.Get("generated", "by").Str()
 	status.GeneratedAt = root.Get("generated", "at").Str()
-	status.SourcesConfigured, _ = root.Get("inventory", "sources-configured").Int()
-	status.SourcesRead, _ = root.Get("inventory", "sources-read").Int()
-	status.Entries, _ = root.Get("inventory", "entries").Int()
-	status.Deviations, _ = root.Get("inventory", "deviations").Int()
-	status.Rejected, _ = root.Get("inventory", "rejected").Int()
-	status.SourcesExcluded, _ = root.Get("inventory", "sources-excluded").Int()
-	status.SourcesUnevaluable, _ = root.Get("inventory", "sources-unevaluable").Int()
+
+	// Die Zahlen stehen seit Task 120 unter generated.stats. Ein Bestand im
+	// alten Kopf trägt sie im Block `inventory:`; er wird bis zum nächsten Lauf
+	// weiter gelesen, der ihn im neuen Kopf schreibt.
+	statsPath, stats := "generated.stats", root.Get("generated", "stats")
+	if stats == nil {
+		if legacy := root.Get("inventory"); legacy != nil {
+			statsPath, stats = "inventory", legacy
+		}
+	}
+	targets := map[string]*int{
+		"sources-configured":  &status.SourcesConfigured,
+		"sources-read":        &status.SourcesRead,
+		"entries":             &status.Entries,
+		"deviations":          &status.Deviations,
+		"rejected":            &status.Rejected,
+		"sources-excluded":    &status.SourcesExcluded,
+		"sources-unevaluable": &status.SourcesUnevaluable,
+	}
 
 	var missing []string
 	for _, field := range []struct{ name, value string }{
-		{"type", root.Get("type").Str()},
 		{"title", root.Get("title").Str()},
 		{"description", root.Get("description").Str()},
-		{"status", root.Get("status").Str()},
 		{"generated.by", status.GeneratedBy},
 		{"generated.at", status.GeneratedAt},
 	} {
@@ -126,28 +136,18 @@ func fillStatus(status *Status, data []byte) {
 			missing = append(missing, field.name)
 		}
 	}
-	if tags := root.Get("tags"); tags == nil || len(tags.List()) == 0 {
-		missing = append(missing, "tags")
-	}
-	for _, field := range []struct {
-		name string
-		node *yamllite.Node
-	}{
-		{"inventory.sources-configured", root.Get("inventory", "sources-configured")},
-		{"inventory.sources-read", root.Get("inventory", "sources-read")},
-		{"inventory.entries", root.Get("inventory", "entries")},
-		{"inventory.deviations", root.Get("inventory", "deviations")},
-		{"inventory.rejected", root.Get("inventory", "rejected")},
-		{"inventory.sources-excluded", root.Get("inventory", "sources-excluded")},
-		{"inventory.sources-unevaluable", root.Get("inventory", "sources-unevaluable")},
-	} {
-		if field.node == nil || field.node.Str() == "" {
-			missing = append(missing, field.name)
+	for _, key := range statKeys {
+		name, node := statsPath+"."+key, stats.Get(key)
+		if node == nil || node.Str() == "" {
+			missing = append(missing, name)
 			continue
 		}
-		if _, ok := field.node.Int(); !ok {
-			missing = append(missing, field.name+" (ungültig)")
+		value, ok := node.Int()
+		if !ok {
+			missing = append(missing, name+" (ungültig)")
+			continue
 		}
+		*targets[key] = value
 	}
 	if len(missing) > 0 {
 		status.Problem = "unvollständiges Frontmatter, es fehlt: " + strings.Join(missing, ", ")

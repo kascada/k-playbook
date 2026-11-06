@@ -8,7 +8,8 @@
   documentation into the project's Kephalaion collection (`keph:/docs/generated/code/`)
   through `k-playbook docs checkout|publish code`, which reports conflicts instead of
   overwriting and keeps the hand-maintained `hints` of each document; `/k-docs-tools`
-  writes into `k-playbook-local/docs/libs/` until its move to the collection,
+  writes pitfall-oriented library profiles into `keph:/docs/generated/libs/` the same
+  way, its candidates taken from the version inventory,
   `/k-doc-inventory` writes the
   version inventory into the project's Kephalaion collection
   (`keph:/docs/generated/versions/inventory.md`), and

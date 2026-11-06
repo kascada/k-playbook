@@ -50,8 +50,8 @@ locations derive from the project root, the directory that holds
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
-| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` through `k-playbook docs checkout|publish`, and until its switch `/k-docs-tools` creates `docs/libs/` there on its first run |
-| tool profiles | `k-playbook-local/docs/libs/`, created by `/k-docs-tools` |
+| project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
+| tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
 | raw material | `k-playbook-local/inbox/`, created by the knowledge tools on the first write; a `material/` from before is the previous location |
@@ -91,10 +91,11 @@ command only names what lies there.
 Until their own switch to the collection, a few producers still write to disk and
 create their directory on the first write, without a README:
 
-- `/k-docs-tools` writes `docs/libs/` and is disabled while it moves to `keph:/docs/`.
-  `/k-docs-code` and the `ks-overlay-repo-analyse` skill no longer write to disk: since
-  task 109 they go through `k-playbook docs checkout|publish code` into
-  `keph:/docs/generated/code/`. Within `docs/`, the directory reveals the origin: a tool writes
+- The docs producers no longer write to disk: `/k-docs-code` and the
+  `ks-overlay-repo-analyse` skill go through `k-playbook docs checkout|publish code` into
+  `keph:/docs/generated/code/` (task 109), `/k-docs-tools` through
+  `k-playbook docs checkout|publish libs` into `keph:/docs/generated/libs/` (task 120).
+  Within `docs/`, the directory reveals the origin: a tool writes
   exclusively to directories of its own origin, and the frontmatter field
   `generated.by` identifies which tool wrote an individual file.
 - The knowledge gate (`k-playbook knowledge`, `k_playbook_knowledge_*`) writes

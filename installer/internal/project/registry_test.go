@@ -91,10 +91,9 @@ func TestResolveRegistryErhaeltDocsNamensraum(t *testing.T) {
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-docs.md"), "# k-docs\n")
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-docs-code.md"), "# k-docs-code\n")
 	writeFile(t, filepath.Join(shipped(t), "commands", "_docs", "code.md"), "# Docs-Modul: Code\n")
-	writeFile(t, filepath.Join(shipped(t), "commands", "_docs", "tools.md"), "# Docs-Modul: Tools\n")
 
 	entries := ResolveRegistry(root, KindCommands)
-	for _, name := range []string{"k-docs.md", "k-docs-code.md", "_docs/code.md", "_docs/tools.md"} {
+	for _, name := range []string{"k-docs.md", "k-docs-code.md", "_docs/code.md"} {
 		if got := entryFor(t, entries, name).Origin; got != "dist" {
 			t.Errorf("%s Origin = %q, erwartet dist", name, got)
 		}

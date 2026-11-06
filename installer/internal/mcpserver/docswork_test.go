@@ -116,7 +116,7 @@ func TestDocsWorkToolsFehler(t *testing.T) {
 	if envelope := decodeDocsWork[docsCheckoutEnvelope](t, result); !result.IsError || envelope.Error.Code != "invalid_input" {
 		t.Errorf("ohne projectDir: %+v", envelope)
 	}
-	result, _, _ = docsCheckoutTool(ctx, nil, docsCheckoutInput{ProjectDir: root, Producer: "libs"})
+	result, _, _ = docsCheckoutTool(ctx, nil, docsCheckoutInput{ProjectDir: root, Producer: "tools"})
 	if envelope := decodeDocsWork[docsCheckoutEnvelope](t, result); !result.IsError || envelope.Error.Code != project.DocCodeInvalidInput {
 		t.Errorf("unbekannter Erzeuger: %+v", envelope)
 	}
@@ -154,10 +154,10 @@ func TestDocsWorkToolsSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(data), `"erzeuger":{"type":"string","description":`) && !strings.Contains(string(data), `"enum":["code"]`) {
+		if !strings.Contains(string(data), `"erzeuger":{"type":"string","description":`) && !strings.Contains(string(data), `"enum":["code","libs"]`) {
 			t.Errorf("Schema ohne Erzeuger: %s", data)
 		}
-		if !strings.Contains(string(data), `"enum":["code"]`) {
+		if !strings.Contains(string(data), `"enum":["code","libs"]`) {
 			t.Errorf("Schema ohne enum: %s", data)
 		}
 	}

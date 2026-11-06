@@ -138,6 +138,51 @@ func TestDocsSubkommandoAblauf(t *testing.T) {
 	}
 }
 
+// Der Erzeuger libs (Task 120) geht denselben Weg wie code: checkout holt
+// docs/generated/libs/, publish legt neue Steckbriefe an, schreibt die README
+// des Verzeichnisses aus der Erzeugertabelle und räumt auf; code bleibt
+// unberührt.
+func TestDocsSubkommandoLibs(t *testing.T) {
+	root := todoProjectRoot(t)
+	store := useCLIDocsWork(t)
+	store.Put("docs/generated/code/01-a.md", "---\ntitle: A\ndescription: D\n---\n")
+	store.Put("docs/generated/libs/python-celery.md", "---\ntitle: celery\ndescription: D\ngenerated: { by: k-docs-tools, at: 2026-11-01T10:00:00+01:00 }\n---\n")
+
+	stdout, _, err := runDocsCaptured(t, "checkout", "libs")
+	if err != nil || !strings.Contains(stdout, "Geholt: 1 Dokumente aus keph:/docs/generated/libs/") || !strings.Contains(stdout, "python-celery.md\t") {
+		t.Fatalf("checkout libs: %q %v", stdout, err)
+	}
+	work := project.DocsWorkDir(root, "libs")
+	if _, err := os.Stat(filepath.Join(work, "python-celery.md")); err != nil {
+		t.Fatalf("nicht geholt: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(work, "01-a.md")); !os.IsNotExist(err) {
+		t.Errorf("Dokument aus code/ im Arbeitsverzeichnis von libs: %v", err)
+	}
+	neu := "---\ntitle: goldmark\ndescription: D\ngenerated: { by: k-docs-tools, at: 2026-11-06T10:00:00+01:00 }\n" +
+		"sources:\n  - resource: keph:/docs/generated/versions/inventory.md\n    item: go/github.com/yuin/goldmark\n    version: v1.7.8\n---\n"
+	if err := os.WriteFile(filepath.Join(work, "go-github.com-yuin-goldmark.md"), []byte(neu), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err = runDocsCaptured(t, "publish", "libs", "--json")
+	var publish project.DocsPublishResult
+	if err != nil || json.Unmarshal([]byte(stdout), &publish) != nil || !publish.Cleaned || publish.Readme.Status != project.DocsCreated {
+		t.Fatalf("publish libs: %q %v", stdout, err)
+	}
+	if content, ok := store.Content("docs/generated/libs/go-github.com-yuin-goldmark.md"); !ok || content != neu {
+		t.Errorf("nicht angelegt: %q", content)
+	}
+	if readme, ok := store.Content("docs/generated/libs/README.md"); !ok || !strings.Contains(readme, "title: Steckbriefe zu Libraries und Tools") {
+		t.Errorf("README von libs/: %q", readme)
+	}
+	if content, _ := store.Content("docs/generated/code/01-a.md"); content != "---\ntitle: A\ndescription: D\n---\n" {
+		t.Errorf("code/ verändert: %q", content)
+	}
+	if _, err := os.Stat(work); !os.IsNotExist(err) {
+		t.Errorf("Arbeitsverzeichnis nicht entfernt: %v", err)
+	}
+}
+
 // Aufruffehler, unbekannter Erzeuger und fehlendes Kephalaion enden mit
 // einer Meldung samt Code, ohne etwas zu schreiben.
 func TestDocsSubkommandoFehler(t *testing.T) {
@@ -155,7 +200,7 @@ func TestDocsSubkommandoFehler(t *testing.T) {
 			t.Errorf("%v: kein Fehler", args)
 		}
 	}
-	if _, _, err := runDocsCaptured(t, "checkout", "libs"); err == nil || !strings.Contains(err.Error(), "(invalid_input)") {
+	if _, _, err := runDocsCaptured(t, "checkout", "tools"); err == nil || !strings.Contains(err.Error(), "(invalid_input)") {
 		t.Errorf("unbekannter Erzeuger: %v", err)
 	}
 	stdout, _, err := runDocsCaptured(t, "--help")

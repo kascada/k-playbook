@@ -17,9 +17,10 @@
 //     gelesen werden konnte, steht als Ablehnung oder Hinweis im Ergebnis.
 package inventory
 
-// Pin ist die Pin-Art. Die ersten drei Werte sind die aus
-// commands/_docs/tools.md und behalten dort ihre Bedeutung; die letzten drei
-// sind die Erweiterung aus dem Vertrag. Eine zweite Taxonomie entsteht nicht.
+// Pin ist die Pin-Art. Die Taxonomie steht allein in docs/version-inventory.md
+// („Pin taxonomy“): die ersten drei Werte sind die ursprünglichen der
+// Steckbriefe von /k-docs-tools, die letzten drei die Erweiterung des
+// Inventars. Eine zweite Taxonomie entsteht nicht.
 const (
 	PinExact    = "exact"
 	PinRange    = "range"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -395,15 +396,26 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		t.Error("die Includes stehen nicht im ersten Schritt")
 	}
 	for _, needle := range []string{
-		"k_playbook_docs_checkout", "k_playbook_docs_publish", "keph:/docs/generated/code/", "context.project.repoRoot",
-		"`context.playbook.dir`", "`context.local.dir`", ".k-playbook/", "discard: true", "allow_hints",
+		"k_playbook_docs_checkout", "k_playbook_docs_publish", "keph:/docs/generated/code/", ".k-playbook/",
+		"discard: true", "allow_hints",
 		"generated: { by: k-docs-code", "questions:", "hints", "kephalaion_unavailable", "outcome_unknown",
 		"generated.by: ks-overlay-repo-analyse", "unverändert liegen",
-		"context.docs.exclude", "context.docs.problems", "k_playbook_docs_exclude_add", "Aus K-PLAYBOOK.yaml",
-		"k-playbook docs exclude add", "„Neu laden“",
+		"k_playbook_docs_exclude_add", "NEW_EXCLUDES", "Abschnitt „Scope“", "Abschnitt „Der Kopf“",
+		"<die Scope-Zeilen aus dem Abschnitt „Scope“>",
 	} {
 		if !strings.Contains(file, needle) {
 			t.Errorf("k-docs-code.md nennt %q nicht", needle)
+		}
+	}
+	// Kopf und Scope stehen seit Task 120 allein in _shared/docs.md; der Text
+	// des Commands verweist darauf und wiederholt sie nicht.
+	for _, repeated := range []string{
+		"SCAN_ROOT = context.project.repoRoot", "**Versteckte Pfade**", "`tests/fixtures/`", "Aus K-PLAYBOOK.yaml",
+		"context.docs.exclude", "context.docs.problems", "„Neu laden“", "(etwa `exclude: [docs/]`)", "k-playbook docs exclude add",
+		"`verified:` trägt nur ein Mensch", "`title` und `description` sind Pflicht", "eine Frage, eine\n  Datei",
+	} {
+		if strings.Contains(file, repeated) {
+			t.Errorf("k-docs-code.md wiederholt %q aus _shared/docs.md", repeated)
 		}
 	}
 	// Ein Dokument des Overlay-Skills wird nie als „entfällt“ vorgeschlagen.
@@ -433,6 +445,219 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		if !strings.Contains(shared, needle) {
 			t.Errorf("_shared/docs.md nennt %q nicht", needle)
 		}
+	}
+	assertSharedDocsKopfUndScope(t, shared)
+}
+
+// assertSharedDocsKopfUndScope prüft die beiden Abschnitte, die Task 120 in
+// _shared/docs.md gesammelt hat: den einen Kopf aller Dokumente unter docs/
+// mit seinen Feldern und den Scope der Erzeuger, die den Code durchsuchen,
+// samt seiner Geltung nur für /k-docs-code und /k-docs-tools.
+func assertSharedDocsKopfUndScope(t *testing.T, shared string) {
+	t.Helper()
+	kopf, scope := strings.Index(shared, "\n### Der Kopf\n"), strings.Index(shared, "\n### Scope\n")
+	if kopf < 0 || scope < kopf {
+		t.Fatalf("_shared/docs.md ohne die Abschnitte „Der Kopf“ und „Scope“ in dieser Reihenfolge")
+	}
+	head, scopeText := shared[kopf:scope], squashSpace(shared[scope:])
+	order := []string{"\ntitle: ", "\ndescription: ", "\ngenerated: { by: <erzeuger>, at: <GENERATED_AT>, stats: { … } }",
+		"\nhints: ", "\nquestions: ", "\nsources:\n  - resource: ", "\n    item: ", "\n    version: ", "\nverified: "}
+	last := -1
+	for _, field := range order {
+		at := strings.Index(head, field)
+		if at < 0 || at < last {
+			t.Errorf("Kopf: Feld %q fehlt oder steht nicht in der Reihenfolge des Schemas", strings.TrimSpace(field))
+			continue
+		}
+		last = at
+	}
+	for _, needle := range []string{"`title` — Pflicht", "`description` — Pflicht, ein Satz", "`stats` ist optional",
+		"kein Suchinhalt", "`verified` — trägt nur ein Mensch ein", "Darüber hinaus schreibt kein Erzeuger ein Kopffeld",
+		"`type`", "`tags`", "`status`", "`inventory:`"} {
+		if !strings.Contains(squashSpace(head), needle) {
+			t.Errorf("Kopf nennt %q nicht", needle)
+		}
+	}
+	for _, needle := range []string{
+		"gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und `/k-docs-tools`",
+		"`/k-doc-inventory` und `ks-overlay-repo-analyse` binden dieses Modul auch ein, wenden den Scope aber nicht an",
+		"`SCAN_ROOT = context.project.repoRoot`", "**Stand**", "`EXTRA_PATH`", "**Immer ausgeschlossen**",
+		"`context.playbook.dir`", "`context.local.dir`", "`<context.project.dir>/.k-playbook/`", "**Versteckte Pfade**",
+		"**Weitere Ausschlüsse**", "`.gitignore`", "`context.docs.exclude`", "`context.docs.problems`", "Aus K-PLAYBOOK.yaml",
+		"`NEW_EXCLUDES`", "**Ausschlüsse speichern.**", "`k_playbook_docs_exclude_add`", "k-playbook docs exclude add",
+		"„Neu laden“", "`rejected`", "`unsupported`",
+	} {
+		if !strings.Contains(scopeText, needle) {
+			t.Errorf("Scope nennt %q nicht", needle)
+		}
+	}
+}
+
+// squashSpace fasst Zeilenumbrüche und Leerraum zu je einem Leerzeichen
+// zusammen, damit ein Satz unabhängig vom Umbruch gefunden wird.
+func squashSpace(text string) string {
+	return strings.Join(strings.Fields(text), " ")
+}
+
+// /k-docs-tools ist seit Task 120 Hülle plus Text wie /k-docs-code: Die Hülle
+// nennt nur den Verweis, ist nicht mehr abgeschaltet und erlaubt WebFetch
+// und die Werkzeuge von checkout und publish; der Text nimmt die Kandidaten
+// allein aus dem Inventar, schreibt über checkout/publish mit dem Erzeuger
+// libs, belegt nur den gemeinsamen Kopf und verweist für Kopf und Scope auf
+// _shared/docs.md. Das Modul _docs/tools.md gibt es nicht mehr.
+func TestDefaultsKDocsToolsIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-docs-tools.md"
+
+	hullData, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-docs-tools.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(hullData)
+	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "Vorübergehend nicht verfügbar") || strings.Contains(hull, "_docs/tools") {
+		t.Errorf("Hülle ohne Verweis auf den Text, noch abgeschaltet oder mit dem alten Ablauf:\n%s", hull)
+	}
+	description := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "description: "); ok {
+			description = value
+		}
+	}
+	if !strings.Contains(description, "keph:/docs/generated/libs/") || strings.Contains(description, "k-playbook-local/docs/libs/") {
+		t.Errorf("description nennt nicht keph:/docs/generated/libs/ oder noch die Platte: %q", description)
+	}
+	for _, tool := range []string{"WebFetch", "mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
+		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
+		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		if !strings.Contains(hull, tool) {
+			t.Errorf("Hülle erlaubt %s nicht", tool)
+		}
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_docs", "tools.md")); !os.IsNotExist(err) {
+		t.Error("share/commands/_docs/tools.md ist noch da; der Ablauf steht im Text des Commands")
+	}
+
+	file := readRepoDefault(t, "commands/k-docs-tools.md")
+	want := file
+	for _, name := range []string{"erster-schritt.md", "docs.md"} {
+		line := "include: _shared/" + name + "\n"
+		if !strings.Contains(file, "\n"+line) {
+			t.Fatalf("k-docs-tools.md ohne %q", line)
+		}
+		module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/"+name))))
+		want = strings.Replace(want, line, module+"\n", 1)
+	}
+	if strings.Index(file, "include: _shared/erster-schritt.md") > strings.Index(file, "## Schritt 2") {
+		t.Error("die Includes stehen nicht im ersten Schritt")
+	}
+	for _, needle := range []string{
+		"k_playbook_docs_checkout", "k_playbook_docs_publish", "`erzeuger: libs`", "keph:/docs/generated/libs/",
+		"keph:/docs/generated/versions/inventory.md", "`generated.stats.entries`", "`k-playbook inventory`",
+		"keinen Lauf und keinen eigenen Scan", "Kandidaten sind alle Gegenstände des Inventars",
+		"begrenzt nur dieses Zählen, nicht die Liste", "generated: { by: k-docs-tools", "`k-tools-scan`",
+		"Abschnitt „Scope“", "Abschnitt „Der Kopf“", "<die Scope-Zeilen aus dem Abschnitt „Scope“>",
+		"resource: keph:/docs/generated/versions/inventory.md", "item: <gegenstand>", "version: <version>",
+		"go-github.com-yuin-goldmark", "`docs/version-inventory.md`", "Known-Pitfall-Liste", "**höchstens drei**",
+		"vorhanden", "nicht\nvorausgewählt", "discard: true", "allow_hints", "kephalaion_unavailable", "outcome_unknown",
+		"unverändert liegen",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-docs-tools.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{
+		"k-playbook context", "/k-docs-index", "_docs/tools", ".claude/commands/", "LIBS_DIR", "Vorübergehend",
+		"type: Tool Reference", "last-reviewed:", "severity:", "version-pin:", "lib: ", "## Offene Fragen",
+		"SCAN_ROOT = context.project.repoRoot", "**Versteckte Pfade**", "„Neu laden“", "Transitive-only",
+	} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-docs-tools.md trägt noch %q", stale)
+		}
+	}
+
+	// Die Vorlage in Schritt 6 belegt nur Felder des gemeinsamen Kopfs.
+	start := strings.Index(file, "```markdown\n---\n")
+	if start < 0 {
+		t.Fatal("k-docs-tools.md ohne Vorlage mit Frontmatter")
+	}
+	block, ok := inventory.FrontmatterBlock([]byte(file[start+len("```markdown\n"):]))
+	if !ok {
+		t.Fatal("Vorlage ohne geschlossenes Frontmatter")
+	}
+	for _, line := range strings.Split(block, "\n") {
+		key, _, _ := strings.Cut(line, ":")
+		if line != "" && !strings.HasPrefix(line, " ") && !slices.Contains([]string{"title", "description", "generated", "hints", "questions", "sources", "verified"}, key) {
+			t.Errorf("Vorlage trägt das fremde Kopffeld %q", key)
+		}
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Content != want || len(got.Problems) != 0 || len(got.Includes) != 2 {
+		t.Errorf("eingesetzter Text weicht ab: problems %v, includes %+v", got.Problems, got.Includes)
+	}
+}
+
+// /k-docs ist Hülle plus Text: Er berichtet über keph:/docs/ und gibt an die
+// drei Erzeuger weiter, in der Reihenfolge Inventar, Code, Tools; vom alten
+// Verteiler über die Platte bleibt nichts.
+func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-docs.md"
+
+	hullData, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-docs.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(hullData)
+	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "Vorübergehend nicht verfügbar") || strings.Contains(hull, "_docs/") {
+		t.Errorf("Hülle ohne Verweis auf den Text, noch abgeschaltet oder mit dem alten Ablauf:\n%s", hull)
+	}
+	for _, tool := range []string{"WebFetch", "mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
+		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
+		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		if !strings.Contains(hull, tool) {
+			t.Errorf("Hülle erlaubt %s nicht", tool)
+		}
+	}
+	if strings.Contains(hull, "knowledge") {
+		t.Error("Hülle erlaubt noch Werkzeuge der Wissensablage")
+	}
+
+	file := readRepoDefault(t, "commands/k-docs.md")
+	want := file
+	for _, name := range []string{"erster-schritt.md", "docs.md"} {
+		line := "include: _shared/" + name + "\n"
+		if !strings.Contains(file, "\n"+line) {
+			t.Fatalf("k-docs.md ohne %q", line)
+		}
+		module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/"+name))))
+		want = strings.Replace(want, line, module+"\n", 1)
+	}
+	if strings.Index(file, "include: _shared/erster-schritt.md") > strings.Index(file, "## Schritt 2") {
+		t.Error("die Includes stehen nicht im ersten Schritt")
+	}
+	for _, needle := range []string{
+		"k-playbook:/commands/k-doc-inventory.md", "k-playbook:/commands/k-docs-code.md", "k-playbook:/commands/k-docs-tools.md",
+		"`recursive: true`, `frontmatter: true`", "`generated.stats`", "alter Kopf", "`alle`",
+		"nacheinander `inventory`, `code`, `tools`, in genau dieser Reihenfolge", "Es wurde nichts geschrieben",
+		"kephalaion_unavailable", "/k-upgrade",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-docs.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{
+		"k-playbook context", "/k-docs-index", "/k-docs-extract", "_docs/", ".claude/commands/", "Vorübergehend",
+		"RESOLVED_DOCS_DIR", "knowledge", "opencode.json", "inbox/", "material/",
+	} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-docs.md trägt noch %q", stale)
+		}
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Content != want || len(got.Problems) != 0 || len(got.Includes) != 2 {
+		t.Errorf("eingesetzter Text weicht ab: problems %v, includes %+v", got.Problems, got.Includes)
 	}
 }
 
@@ -474,7 +699,7 @@ func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
 	file := readRepoDefault(t, "commands/_skills/overlay-repo-analyse.md")
 	for _, needle := range []string{
 		"k_playbook_docs_checkout", "k_playbook_docs_publish", "keph:/docs/generated/code/", "discard: true",
-		"generated: { by: ks-overlay-repo-analyse", "questions: [", "freien Nummern im Arbeitsverzeichnis",
+		"generated: { by: ks-overlay-repo-analyse", "Abschnitt „Der Kopf“", "freien Nummern im Arbeitsverzeichnis",
 		"Ein Dokument mit `generated.by: k-docs-code`", "**unverändert liegen**",
 	} {
 		if !strings.Contains(file, needle) {
@@ -497,9 +722,23 @@ func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
 			t.Errorf("%s nicht aus defaults/ aufgelöst", template)
 		}
 	}
+	if !strings.Contains(squashSpace(file), "Den Scope der Docs-Ablage wendet dieser Skill nicht an") {
+		t.Error("Skill-Text sagt nicht, dass er den Scope der Docs-Ablage nicht anwendet")
+	}
 	doc := readRepoDefault(t, "commands/_skills/overlay-repo-analyse/overlay-doc.md.template")
-	if !strings.Contains(doc, "generated: { by: ks-overlay-repo-analyse") || !strings.Contains(doc, "questions:") || strings.Contains(doc, "](./") {
+	if !strings.Contains(doc, "generated: { by: ks-overlay-repo-analyse") || !strings.Contains(doc, "questions: [") || strings.Contains(doc, "](./") {
 		t.Errorf("Vorlage overlay-doc.md.template:\n%s", doc)
+	}
+	// Die Vorlage belegt nur Felder des gemeinsamen Kopfs.
+	if block, ok := inventory.FrontmatterBlock([]byte(doc)); ok {
+		for _, line := range strings.Split(block, "\n") {
+			key, _, _ := strings.Cut(line, ":")
+			if line != "" && !strings.HasPrefix(line, " ") && !slices.Contains([]string{"title", "description", "generated", "hints", "questions", "sources", "verified"}, key) {
+				t.Errorf("Vorlage overlay-doc.md.template trägt das fremde Kopffeld %q", key)
+			}
+		}
+	} else {
+		t.Error("Vorlage overlay-doc.md.template ohne Frontmatter")
 	}
 }
 
@@ -515,20 +754,57 @@ func TestDefaultsKUpgradeDokuUmstellungCode(t *testing.T) {
 	section := file[start:end]
 	for _, needle := range []string{
 		"| `code/` | `keph:/docs/generated/code/` | Erzeuger `/k-docs-code` schreibt nach Kephalaion: Plattendateien löschen",
-		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt noch auf die Platte: nicht anfassen |",
+		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-tools`",
 		"nennen das Präfix\n`k-playbook-local/docs/`",
 		"Der Vorschlag ist immer\n**entfernen**, nie umschreiben",
 		"`pfad:von-bis`",
 		"code/00-overview.md          [löschen]",
 		"AGENTS.md:254-264            [entfernen]",
 		"opencode.json:8              [entfernen]",
-		"Die Umstellung ist wiederholbar: `libs/` bleibt liegen",
+		"Die Umstellung ist wiederholbar",
 	} {
 		if !strings.Contains(section, needle) {
 			t.Errorf("3.2 nennt %q nicht", needle)
 		}
 	}
 	for _, stale := range []string{"`/k-docs-code` schreibt noch auf die Platte", "code/, libs/", "Skill `ai-session-memory` schreiben"} {
+		if strings.Contains(section, stale) {
+			t.Errorf("3.2 trägt noch %q", stale)
+		}
+	}
+}
+
+// /k-upgrade 3.2 räumt seit Task 120 auch libs/ ab wie code/: löschen, neu
+// erzeugen mit /k-docs-tools. Kein Bereich bleibt mehr liegen, weil sein
+// Erzeuger noch auf die Platte schreibt; alter Index, Aufräumen leerer
+// Verzeichnisse und das Beispiel ziehen libs/ mit.
+func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.2 — "), strings.Index(file, "### 3.3 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.2 nicht gefunden")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-tools`. Kein Verschieben",
+		"Für die Erzeuger (`versions/`, `code/` und `libs/`)",
+		"Jede Datei unter `code/` und `libs/` wird einzeln zum Löschen vorgeschlagen",
+		"`keph:/docs/generated/libs/` noch leer ist",
+		"`/k-docs-tools` nach dem Inventar",
+		"Einträge zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien abgeräumt sind",
+		"alle Zeilen zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien ausgeführt sind",
+		"(`manual/`, `versions/`, `code/`, `libs/`, `extracted/`), löschst du mit",
+		"libs/celery.md [löschen] Erzeuger /k-docs-tools schreibt nach keph:/docs/generated/libs/",
+		"auch für solche auf `libs/`.",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.2 nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{
+		"schreibt noch auf die Platte", "heute nur `libs/`", "auch wenn `libs/` noch liegt", "libs/ [bleibt]",
+		"bis `/k-docs-tools` umgestellt ist", "`libs/` bleibt liegen", "umgestellten Erzeuger", "ändert dessen Task seine Zeile",
+	} {
 		if strings.Contains(section, stale) {
 			t.Errorf("3.2 trägt noch %q", stale)
 		}

@@ -10,11 +10,13 @@ import (
 // Aufrufwegen gleich: die Herkunft benennt den Erzeuger, nicht den Aufrufweg.
 const GeneratedBy = "k-doc-inventory"
 
-// Titel und Beschreibung stehen wortgleich im Vertrag. Ein fehlendes `title`
-// oder `description` wird von /k-docs Schritt 3 und /k-docs-index Schritt 4 als
-// Befund gemeldet — `generated.by` allein genügt nicht.
+// Titel und Beschreibung stehen wortgleich im Vertrag. Der Kopf ist der eine
+// Kopf aller Dokumente unter docs/ (defaults/commands/_shared/docs.md, Task
+// 120): title, description und generated; die Zahlen des Inventars stehen
+// unter generated.stats, damit der Stand weiter nur aus dem Kopf kommt.
+// Fehlt `title` oder `description`, ist das ein Befund — `generated.by`
+// allein genügt nicht.
 const (
-	frontmatterType        = "Version Inventory"
 	frontmatterTitle       = "Versionsinventar"
 	frontmatterDescription = "Vollständige Übersicht der deklarierten Versionen dieses Projekts, nach Umgebung getrennt und mit Herkunft je Zeile."
 )
@@ -27,20 +29,15 @@ func Render(result Result, at string) string {
 	var out strings.Builder
 
 	out.WriteString("---\n")
-	fmt.Fprintf(&out, "type: %s\n", frontmatterType)
 	fmt.Fprintf(&out, "title: %s\n", frontmatterTitle)
 	fmt.Fprintf(&out, "description: %s\n", frontmatterDescription)
-	out.WriteString("tags: [versions, inventory, dependencies]\n")
-	out.WriteString("status: stable\n")
-	fmt.Fprintf(&out, "generated: { by: %s, at: %s }\n", GeneratedBy, at)
-	out.WriteString("inventory:\n")
-	fmt.Fprintf(&out, "  sources-configured: %d\n", result.ConfiguredSources)
-	fmt.Fprintf(&out, "  sources-read: %d\n", len(result.Sources))
-	fmt.Fprintf(&out, "  entries: %d\n", len(result.Entries))
-	fmt.Fprintf(&out, "  deviations: %d\n", len(result.Deviations))
-	fmt.Fprintf(&out, "  rejected: %d\n", len(result.Rejections))
-	fmt.Fprintf(&out, "  sources-excluded: %d\n", excludedCount(result))
-	fmt.Fprintf(&out, "  sources-unevaluable: %d\n", len(result.UnevaluableSources()))
+	out.WriteString("generated:\n")
+	fmt.Fprintf(&out, "  by: %s\n", GeneratedBy)
+	fmt.Fprintf(&out, "  at: %s\n", at)
+	out.WriteString("  stats:\n")
+	for _, stat := range statsOf(result) {
+		fmt.Fprintf(&out, "    %s: %d\n", stat.key, stat.value)
+	}
 	out.WriteString("---\n\n")
 
 	fmt.Fprintf(&out, "# %s\n\n", frontmatterTitle)
@@ -56,6 +53,31 @@ func Render(result Result, at string) string {
 	renderRejections(&out, result)
 
 	return out.String()
+}
+
+// statKeys sind die Schlüssel unter generated.stats, in der Reihenfolge des
+// Vertrags. Dieselben Schlüssel standen bis Task 120 im Block `inventory:`;
+// status.go liest einen solchen Bestand bis zum nächsten Lauf weiter.
+var statKeys = []string{
+	"sources-configured", "sources-read", "entries", "deviations", "rejected", "sources-excluded", "sources-unevaluable",
+}
+
+type stat struct {
+	key   string
+	value int
+}
+
+// statsOf sind die Zahlen eines Ergebnisses unter den Schlüsseln aus statKeys.
+func statsOf(result Result) []stat {
+	values := []int{
+		result.ConfiguredSources, len(result.Sources), len(result.Entries), len(result.Deviations),
+		len(result.Rejections), excludedCount(result), len(result.UnevaluableSources()),
+	}
+	stats := make([]stat, len(statKeys))
+	for index, key := range statKeys {
+		stats[index] = stat{key: key, value: values[index]}
+	}
+	return stats
 }
 
 func renderOverview(out *strings.Builder, result Result) {

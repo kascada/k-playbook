@@ -329,16 +329,13 @@ dazu vorgeschlagene neue `hints` — und warte auf Bestätigung.
 
 ### Frontmatter und Inhalt
 
-Jede Datei bekommt das Frontmatter aus der Vorlage
+Jede Datei trägt den Kopf aus dem Abschnitt „Der Kopf“ der Docs-Ablage im ersten Schritt —
+`title`, `description`, `generated`, `hints`, `questions`, bei Bedarf `sources`; mehr nicht.
+Wie dieser Skill ihn belegt, zeigt die Vorlage
 `k-playbook:/commands/_skills/overlay-repo-analyse/overlay-doc.md.template` (lies sie mit
-`k_playbook_doc_read`):
-
-- `title` und `description` — Pflicht; ohne sie lehnt `publish` ab.
-- `generated: { by: ks-overlay-repo-analyse, at: <GENERATED_AT> }` — `GENERATED_AT` wie in
-  der Docs-Ablage aus dem ersten Schritt.
-- `hints` unverändert übernommen. Neue nur vorschlagen und erst nach Bestätigung
-  eintragen; dasselbe gilt, wenn ein bestätigt entfallendes eigenes Dokument `hints` hat.
-- `questions: [ … ]` — die Fragen, die genau dieses Dokument beantwortet.
+`k_playbook_doc_read`): `generated: { by: ks-overlay-repo-analyse, at: <GENERATED_AT> }`,
+`GENERATED_AT` wie in der Docs-Ablage. Den Scope der Docs-Ablage wendet dieser Skill nicht
+an; er analysiert die Repos aus Phase 1.
 
 Verwandte Dokumente im selben Verzeichnis nennst du mit ihrem Dateinamen.
 

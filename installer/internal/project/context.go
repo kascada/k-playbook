@@ -94,7 +94,7 @@ type Context struct {
 	// ~/.config/k-playbook/github.yaml zum Repo des Arbeitsstands gehört und
 	// welche Zugänge `k-playbook github run` dafür wählt — dieselbe Quelle
 	// und Auswahl wie `github show`. Anders als GH kostet das Unterprozesse:
-	// drei git-Aufrufe für das Remote und `ssh -G` je ssh host der Datei
+	// drei bis vier git-Aufrufe für das Remote und `ssh -G` je ssh host der Datei
 	// (Frist 3 s je Host), dazu der Blick in die gh-Konfiguration; kein Netz,
 	// kein Token-Wert, keine Vorlage. Gefüllt wird das Feld deshalb von
 	// ContextForDir, nicht von BuildContext — die Oberfläche und die

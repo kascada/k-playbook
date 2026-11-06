@@ -42,7 +42,7 @@ func TestDefekteComposeDateiIstNichtAuswertbar(t *testing.T) {
 
 	rendered := Render(result, "2026-09-16T00:00:00Z")
 	for _, want := range []string{
-		"  sources-unevaluable: 1\n",
+		"    sources-unevaluable: 1\n",
 		"- Nicht auswertbare Quellen: 1\n",
 		"| Datei | Quellart | Label | Einträge | Zustand | Note |\n",
 		"| `docker-compose.yml` | compose | dev | 0 | nicht auswertbar | — |\n",
@@ -195,10 +195,10 @@ func TestZustandNichtAuswertbarIstInJSONUndDateiGleich(t *testing.T) {
 // beim nächsten Lauf neu geschrieben, statt still 0 zu melden.
 func TestFrontmatterOhneUnevaluableIstUnvollstaendig(t *testing.T) {
 	rendered := Render(Result{}, "2026-09-16T00:00:00Z")
-	old := strings.Replace(rendered, "  sources-unevaluable: 0\n", "", 1)
+	old := strings.Replace(rendered, "    sources-unevaluable: 0\n", "", 1)
 	status := Status{}
 	fillStatus(&status, []byte(old))
-	if !strings.Contains(status.Problem, "inventory.sources-unevaluable") {
+	if !strings.Contains(status.Problem, "generated.stats.sources-unevaluable") {
 		t.Errorf("Problem = %q", status.Problem)
 	}
 }

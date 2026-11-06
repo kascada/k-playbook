@@ -231,7 +231,7 @@ directories of its own origin:
 ```text
 /k-docs           → check inventory and offer possible docs actions
 /k-docs-code      → keph:/docs/generated/code/ (project collection, through k-playbook docs checkout|publish code)
-/k-docs-tools     → k-playbook-local/docs/libs/
+/k-docs-tools     → keph:/docs/generated/libs/ (project collection, through k-playbook docs checkout|publish libs)
 /k-docs-extract   → k-playbook-local/knowledge/extracted/ (through the knowledge tools)
 /k-doc-inventory  → keph:/docs/generated/versions/inventory.md (project collection)
 /k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json (old disk index, until its own switch)

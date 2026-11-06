@@ -341,3 +341,24 @@ func TestReadStatusMeldetUnvollstaendigesFrontmatter(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// Ein Bestand im alten Kopf (vor Task 120) ist lesbar, gleicht aber nie dem
+// neuen Rendern: der nächste Lauf schreibt ihn im neuen Kopf.
+func TestAlterKopfWirdBeimNaechstenLaufUmgeschrieben(t *testing.T) {
+	options := newRunProject(t)
+	store := newRunStore(t)
+	store.Put(DocName, legacyHead)
+
+	_, outcome, err := runInto(t, store, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !outcome.Written || outcome.Problem != "" {
+		t.Errorf("Outcome = %+v, erwartet geschrieben ohne Befund", outcome)
+	}
+	stored := storedInventory(t, store)
+	block, _ := FrontmatterBlock([]byte(stored))
+	if !strings.Contains(block, "\n  stats:\n") || strings.Contains(block, "inventory:") || strings.Contains(block, "type:") {
+		t.Errorf("Kopf nach dem Lauf:\n%s", block)
+	}
+}

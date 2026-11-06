@@ -329,16 +329,22 @@ func TestRenderTraegtVollstaendigesFrontmatter(t *testing.T) {
 	rendered := Render(result, "2026-09-05T12:00:00+02:00")
 
 	for _, needle := range []string{
-		"type: Version Inventory",
-		"title: Versionsinventar",
-		"description: Vollständige Übersicht",
-		"tags: [versions, inventory, dependencies]",
-		"generated: { by: k-doc-inventory, at: 2026-09-05T12:00:00+02:00 }",
+		"---\ntitle: Versionsinventar\ndescription: Vollständige Übersicht",
+		"\ngenerated:\n  by: k-doc-inventory\n  at: 2026-09-05T12:00:00+02:00\n  stats:\n    sources-configured: ",
+		"\n    sources-unevaluable: 0\n---\n",
 		"## Übersicht", "## Abweichungen", "## Ausgewertete Quellen",
 		"## Abgelehnte Quellen und Hinweise",
 	} {
 		if !strings.Contains(rendered, needle) {
 			t.Errorf("im Rumpf fehlt %q", needle)
+		}
+	}
+	// Der Kopf ist seit Task 120 der gemeinsame aller Dokumente unter docs/:
+	// keine eigenen Felder des Inventars mehr.
+	block, _ := FrontmatterBlock([]byte(rendered))
+	for _, stale := range []string{"type:", "tags:", "status:", "inventory:"} {
+		if strings.Contains(block, "\n"+stale) || strings.HasPrefix(block, stale) {
+			t.Errorf("Kopf trägt noch %q:\n%s", stale, block)
 		}
 	}
 
