@@ -43,15 +43,39 @@ func upstreamRemote(ctx context.Context, dir string) string {
 	return remoteName
 }
 
-// remotePublicURL liefert die HTTPS-Adresse für remoteName, wenn dessen
-// eingetragene Adresse eine SSH-Form des offiziellen Repos ist. Gelesen wird
-// der rohe Eintrag, nicht `git remote get-url`: das wendet insteadOf an.
-func remotePublicURL(ctx context.Context, dir string, remoteName string) (string, bool) {
+// remoteRawURL liest die eingetragene Adresse von remoteName, den rohen
+// Eintrag remote.<name>.url — nicht `git remote get-url`: das wendet
+// insteadOf an. Leer, wenn es den Eintrag nicht gibt.
+func remoteRawURL(ctx context.Context, dir string, remoteName string) string {
 	url, err := GitOutput(ctx, dir, "config", "--get", "remote."+remoteName+".url")
 	if err != nil {
+		return ""
+	}
+	return url
+}
+
+// remotePublicURL liefert die HTTPS-Adresse für remoteName, wenn dessen
+// eingetragene Adresse (remoteRawURL) eine SSH-Form des offiziellen Repos ist.
+func remotePublicURL(ctx context.Context, dir string, remoteName string) (string, bool) {
+	url := remoteRawURL(ctx, dir, remoteName)
+	if url == "" {
 		return "", false
 	}
 	return publicFetchURL(url)
+}
+
+// projectRemoteURL ist der rohe Eintrag des Remotes, das für die Zuordnung
+// eines Arbeitsstands zu einem Repo zählt: das Upstream-Remote des aktuellen
+// Branches (upstreamRemote), sonst origin — auch dann, wenn der Upstream
+// keine Adresse trägt, etwa „.“ für einen lokalen Branch. Leer ohne Repo
+// oder ohne ein solches Remote.
+func projectRemoteURL(ctx context.Context, dir string) string {
+	if remoteName := upstreamRemote(ctx, dir); remoteName != "" {
+		if url := remoteRawURL(ctx, dir, remoteName); url != "" {
+			return url
+		}
+	}
+	return remoteRawURL(ctx, dir, "origin")
 }
 
 // usePublicRemote stellt den Upstream des Clones bleibend auf PublicRepoURL

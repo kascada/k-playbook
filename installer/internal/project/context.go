@@ -90,6 +90,18 @@ type Context struct {
 	// nachgezogen wurde und was offen blieb. Fehlt das Feld, stimmte alles —
 	// eine Meldung, die bei jedem Aufruf dasselbe sagt, liest niemand mehr.
 	Links *ContextLinks `json:"links,omitempty"`
+	// GitHub nennt, welcher Dienst der persönlichen Zugangsdatei
+	// ~/.config/k-playbook/github.yaml zum Repo des Arbeitsstands gehört und
+	// welche Zugänge `k-playbook github run` dafür wählt — dieselbe Quelle
+	// und Auswahl wie `github show`. Anders als GH kostet das Unterprozesse:
+	// drei git-Aufrufe für das Remote und `ssh -G` je ssh host der Datei
+	// (Frist 3 s je Host), dazu der Blick in die gh-Konfiguration; kein Netz,
+	// kein Token-Wert, keine Vorlage. Gefüllt wird das Feld deshalb von
+	// ContextForDir, nicht von BuildContext — die Oberfläche und die
+	// Review-Auswahl über MCP tragen die Kosten nicht. Siehe contextGitHub.
+	// Die Vorlage einer fehlenden Datei legt im Briefing die vorher laufende
+	// Umgebungsprüfung an (healthGitHub → Load), nicht das Feld.
+	GitHub *ContextGitHub `json:"github,omitempty"`
 }
 
 // VersionSources ist der Zustand von k-playbook-local/version-sources.yaml in
@@ -854,5 +866,8 @@ func ContextForDir(startDir string) (Context, error) {
 	built.Links = contextLinks(HealLinks(projectDir))
 	status := KephalaionStatus(projectDir)
 	built.Kephalaion = &status
+	// Das Remote ab startDir, nicht ab projectDir: Ein eigenes Repo unterhalb
+	// des Projekts hat sein eigenes.
+	built.GitHub = contextGitHub(startDir)
 	return built, nil
 }

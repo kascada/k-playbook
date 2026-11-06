@@ -175,7 +175,19 @@ keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen. Umge
 `guidelines` (Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code); lässt sich
 die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der Rest über
 `ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
-(`context.links`). Im Klartext steht der Rest hinter der Trennzeile „Noch aus k-playbook
+(`context.links`). Ebenfalls nur `ContextForDir` füllt `context.github` (Task 119,
+`project/githubcontext.go`): welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des
+Startverzeichnisses gehört und was `github run` dafür wählt — `githubaccess.Peek` (ohne
+Vorlage), `Judge` mit `selected`, das Remote roh über `projectRemoteURL`. Das Feld legt nichts
+an; im Briefing läuft aber `health.Check` vorher, und dessen Quelle `github` (`Load`) legt eine
+fehlende Datei einmal als Vorlage an. Im Briefing steht dann `present: true` ohne Dienste
+(„Dienste: keine“), `present: false` nur, wenn die Vorlage nicht anzulegen war; `k-playbook
+context` prüft die Umgebung nicht und zeigt `present: false`. Das Startverzeichnis
+reicht `project.BuildBriefingFrom` von CLI (Arbeitsverzeichnis) und MCP (`projectDir` vor der
+Suche) durch, damit der Rest derselbe ist wie bei `k-playbook context` im selben Verzeichnis.
+Im Klartext steht dazu nach `Projektdoku:` eine Zeile `GitHub: …` (`briefingGitHubLine` in
+`cmd/k-playbook/briefing.go`), gebaut aus `githubSelectionLines` wie bei `github show`; im
+Rest steht `github` ohne `services`. Im Klartext steht der Rest hinter der Trennzeile „Noch aus k-playbook
 context — wird abgebaut“. Die Listen kommen aus den vorhandenen Funktionen
 (`overlayDocDir`/`assembleDocDir` in `project/docref.go`, `UserDocs.List` hinter
 `k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing` (`project/briefing.go`); das
@@ -296,7 +308,11 @@ installer/
 │   │                            XDG_CONFIG_HOME, ~/.config/k-playbook/github.yaml
 │   ├── load.go                  Load: die Datei lesen und vollständig prüfen — Dienste,
 │   │                            repo, Zugänge je Typ, Pfade, disabled, doppelte Namen;
-│   │                            Konfiguration oder Probleme (nach Dateiposition), nie beides
+│   │                            Konfiguration oder Probleme (nach Dateiposition), nie beides;
+│   │                            Peek: dasselbe ohne Vorlage (context.github, Task 119)
+│   ├── remote.go                RepoOfRemote: <owner>/<repo> aus einem rohen Remote in den
+│   │                            Formen von formsOf; RemoteWithoutCredentials, NamesSSHHost,
+│   │                            SSHHostIsGitHub (ssh -G wie bei Judge; Task 119)
 │   ├── availability.go          Judge: die Verfügbarkeit je Zugang ohne Netz (Task 102) —
 │   │                            gh-Login in der gh-Konfiguration, Token-Datei 0600 mit einer
 │   │                            Zeile, Schlüssel ohne Gruppen-/Weltrechte, Alias per ssh -G
@@ -388,6 +404,9 @@ installer/
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
 │   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir
+│   ├── githubcontext.go         context.github für ContextForDir (Task 119): Peek, Judge,
+│   │                            das Remote ab dem Startverzeichnis (publicremote.go:
+│   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
 │   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
 │   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward

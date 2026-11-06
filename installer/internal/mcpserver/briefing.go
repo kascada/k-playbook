@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -73,7 +74,16 @@ func briefingToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input brie
 	if err != nil {
 		return fail(projectDir, projectDirErrorCode(err), err), nil, nil
 	}
-	briefing, err := project.BuildBriefing(ctx, projectDir)
+	// Der Rest ab dem übergebenen Verzeichnis, wie k_playbook_context es
+	// nimmt: Liegt es in einem eigenen Repo unterhalb des Projekts, nennt
+	// context.github dessen Remote.
+	startDir := projectDir
+	if input.ProjectDir != "" {
+		if absolute, err := filepath.Abs(input.ProjectDir); err == nil {
+			startDir = absolute
+		}
+	}
+	briefing, err := project.BuildBriefingFrom(ctx, projectDir, startDir)
 	if err != nil {
 		return fail(projectDir, "read_failed", err), nil, nil
 	}

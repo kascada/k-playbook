@@ -350,6 +350,7 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 	full := context
 	full.Kephalaion = &kephalaion.Status{}
 	full.Links = &ContextLinks{}
+	full.GitHub = &ContextGitHub{}
 	contextKeys := topLevelKeys(t, full)
 	for key := range topLevelKeys(t, briefing) {
 		if key == "schemaVersion" {
@@ -395,6 +396,9 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 	// Was ContextForDir über BuildContext hinaus füllt, ist auch da.
 	if raw, ok := rest.Field("kephalaion"); !ok || !strings.Contains(string(raw), "Keine Collection eingetragen") {
 		t.Errorf("context.kephalaion: %s", raw)
+	}
+	if raw, ok := rest.Field("github"); !ok || !strings.Contains(string(raw), `"projectServices":[]`) {
+		t.Errorf("context.github: %s", raw)
 	}
 	// Ein übriges Feld steht unverändert da, wie `k-playbook context` es ausgibt.
 	want, _ := json.Marshal(context.Project)

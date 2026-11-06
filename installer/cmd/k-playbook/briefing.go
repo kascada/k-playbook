@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -40,7 +41,14 @@ func runBriefing(args []string) error {
 	if err != nil {
 		return err
 	}
-	briefing, err := project.BuildBriefing(context.Background(), projectDir)
+	// Der Rest wie `k-playbook context` ab dem Arbeitsverzeichnis: Liegt es
+	// in einem eigenen Repo unterhalb des Projekts, nennt context.github
+	// dessen Remote.
+	workdir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	briefing, err := project.BuildBriefingFrom(context.Background(), projectDir, workdir)
 	if err != nil {
 		return err
 	}
@@ -119,6 +127,11 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 		fmt.Fprintf(&b, "  Offene Befunde: %d\n", work.OpenFindings)
 	}
 	fmt.Fprintf(&b, "Projektdoku: %s\n", briefing.ProjectDocs)
+	// Die Dienste der GitHub-Zugangsdatei als eigene Zeile, nicht im Block
+	// Umgebung: Der gehört zur Umgebungsprüfung (healthText).
+	if line := briefingGitHubLine(briefing.Context); line != "" {
+		b.WriteString(line + "\n")
+	}
 
 	b.WriteString("\n" + briefingContextSeparator + "\n")
 	writeBriefingContext(&b, briefing.Context)
@@ -163,8 +176,79 @@ func writeBriefingContext(b *strings.Builder, section project.BriefingContext) {
 		return
 	}
 	for _, field := range section.Fields {
-		writeContextValue(b, "  ", field.Name, decodeContextValue(field.Value))
+		value := decodeContextValue(field.Value)
+		// github steht schon als Zeile oben; services nur im JSON.
+		if object, ok := value.(map[string]any); ok && field.Name == "github" {
+			delete(object, "services")
+		}
+		writeContextValue(b, "  ", field.Name, value)
 	}
+}
+
+// briefingGitHubLine ist die Zeile zu context.github: welcher Dienst der
+// Zugangsdatei zu diesem Repo gehört und was `k-playbook github run` dafür
+// wählt — aus denselben Teilen wie bei `github show` (githubSelectionLines,
+// ChannelParts). Je nach Lage „keine Zugangsdatei“, „kein Dienst für …“ oder
+// alle passenden Dienste. Leer, wenn der Rest das Feld nicht trägt. Fehlte die
+// Datei, hat die Umgebungsprüfung desselben Briefings sie vorher als Vorlage
+// angelegt; die Zeile sagt dann „(Dienste: keine)“, und „keine
+// Zugangsdatei“ bleibt dem Fall, in dem das nicht ging.
+func briefingGitHubLine(section project.BriefingContext) string {
+	raw, ok := section.Field("github")
+	if !section.Available || !ok {
+		return ""
+	}
+	var field project.ContextGitHub
+	if err := json.Unmarshal(raw, &field); err != nil {
+		return ""
+	}
+	const prefix = "GitHub: "
+	hasError := false
+	for _, problem := range field.Problems {
+		if problem.Level == githubaccess.LevelError {
+			hasError = true
+		}
+	}
+	switch {
+	case field.File == "" && hasError:
+		return prefix + "Ort der Zugangsdatei unbekannt — " + field.Problems[0].Message
+	case !field.Present:
+		return prefix + "keine Zugangsdatei"
+	case hasError:
+		return prefix + "die Zugangsdatei hat Fehler — k-playbook github check nennt sie"
+	}
+	names := "keine"
+	if len(field.Services) > 0 {
+		names = strings.Join(field.Services.Names(), ", ")
+	}
+	if field.Repo == "" {
+		return prefix + "kein GitHub-Remote erkannt (Dienste: " + names + ")"
+	}
+	if len(field.ProjectServices) == 0 {
+		return prefix + "kein Dienst für " + field.Repo + " (Dienste: " + names + ")"
+	}
+	home, _ := os.UserHomeDir()
+	parts := make([]string, 0, len(field.ProjectServices))
+	for _, name := range field.ProjectServices {
+		service, ok := field.Services.Lookup(name)
+		if !ok {
+			continue
+		}
+		lines := githubSelectionLines(service.Selected, service.Access, home, nil)
+		if len(lines) == 0 {
+			lines = []string{"run: nicht beurteilt"}
+		}
+		text := strings.Join(lines, "; ")
+		if len(field.ProjectServices) > 1 {
+			text = name + " " + text
+		}
+		parts = append(parts, text)
+	}
+	label := "Dienst "
+	if len(field.ProjectServices) > 1 {
+		label = "Dienste "
+	}
+	return prefix + "dieses Repo = " + label + strings.Join(field.ProjectServices, ", ") + " — " + strings.Join(parts, "; ")
 }
 
 // decodeContextValue liest einen JSON-Wert in seine Go-Form; Zahlen bleiben
@@ -287,6 +371,13 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     Arbeitsstände mit Titel und die Zahl der offenen Befunde — offen heißt
     nicht in done/; ist Kephalaion nicht nutzbar, steht das dort;
   - den Einstieg der Projektdoku als Verweis;
+  - eine Zeile GitHub: welcher Dienst der persönlichen Zugangsdatei
+    (k-playbook github show) zum Repo des Arbeitsverzeichnisses gehört und
+    was k-playbook github run dafür wählt, sonst „kein Dienst für
+    <owner>/<repo>“ — auch gleich nachdem die Umgebungsprüfung eine fehlende
+    Datei als Vorlage angelegt hat („Dienste: keine“) — oder „keine
+    Zugangsdatei“, wenn sich die Vorlage nicht anlegen ließ; das volle Objekt
+    steht im JSON unter context.github;
   - hinter einer Trennzeile den Rest von k-playbook context — die
     Umgebungsangaben (Pfade, Werkzeuge, gh, git, Kephalaion-Anbindung …), die
     das Briefing noch nicht selbst abdeckt; ohne catalogs.rules,

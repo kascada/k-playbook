@@ -47,6 +47,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `<local.dir>/version-sources.yaml`: ob sie da ist, welche Wurzeln außerhalb des Projekts sie öffnet, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie die Datei selbst. Einzelheiten unten. |
 | `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
 | `context.links` | Die Selbstheilung der Assistenten-Verknüpfungen: `healed`, `open`, `note`. Nur da, wenn es etwas zu melden gab; `note` sagt, was das für diese Sitzung heißt. |
+| `context.github` | Welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des Arbeitsverzeichnisses gehört und welche Zugänge `k-playbook github run` dafür wählt: `file`, `present`, `problems`, `remote`, `repo`, `projectServices`, `services`. Im Klartext eine eigene Zeile `GitHub:` nach `Projektdoku:`. Einzelheiten unten. |
 
 ### `versionSources`
 
@@ -85,6 +86,37 @@ zu laden. Weitere Quellen hängen sich hier ein; die Liste der Bereiche wächst 
 `gh.loggedIn`, `gh.account` und `gh.ready` sind ein Befund über diesen Rechner. `gh.ready`
 heißt beides: Die CLI ist da, und ein Konto ist hinterlegt. Gelesen wird das aus der
 Konfiguration von gh, nicht gegen den Server geprüft — ein Token kann also abgelaufen sein.
+
+Abgrenzung zu `context.github`: `gh.status` bleibt die Entscheidung des Projekts, ob es gh
+überhaupt nutzt. `gh.account` ist nur das gerade aktive Konto von gh und gilt allein dort, wo
+kein Dienst aus `context.github.projectServices` passt; passt einer, sagt dessen `selected`,
+welcher Zugang gilt.
+
+### `github`
+
+`context.github` kommt aus derselben Quelle wie `k-playbook github show`: der persönlichen
+Zugangsdatei `~/.config/k-playbook/github.yaml` (Ort nach `K_PLAYBOOK_GITHUB_CONFIG` bzw.
+`XDG_CONFIG_HOME`). `file` ist ihr Pfad, `present`, ob sie dort liegt. Das Feld selbst legt
+nichts an; die Umgebungsprüfung im selben Briefing läuft aber vorher und legt eine fehlende
+Datei einmal als Vorlage an (`services: {}`, 0600, mit einer einmaligen Warnung unter
+`Umgebung:`). Im Briefing steht dann `present: true` ohne Dienste, und die Zeile sagt „GitHub:
+kein Dienst für <owner>/<repo> (Dienste: keine)“ bzw. „kein GitHub-Remote erkannt (Dienste:
+keine)“. „GitHub: keine Zugangsdatei“ zeigt das Briefing nur, wenn sich die Vorlage nicht
+anlegen lässt, etwa bei einem schreibgeschützten Pfad im Container; `k-playbook context` prüft
+die Umgebung nicht und zeigt bei fehlender Datei `present: false`. `problems` sind die
+Probleme der Datei in der Form von `k-playbook github check --json`; bei einem `error` sind
+`services` `{}` und `projectServices` `[]`. `remote` ist der Eintrag des Remotes, das zählt —
+das Upstream-Remote des aktuellen Branches, sonst `origin`, roh gelesen ohne `insteadOf` und
+ohne Zugangsdaten —, `repo` daraus `<owner>/<repo>`; beide leer ohne Remote oder ohne eine Form,
+die `run` umlenkt (https, `git@github.com:`, `ssh://git@github.com/`, ein SSH-Alias, den die
+Datei nennt oder `ssh -G` nach github.com auflöst). `projectServices` sind die Dienste, deren
+`repo` gleich `repo` ist (Groß- und Kleinschreibung zählen nicht), in Dateireihenfolge, meist
+einer. `services` ist dasselbe Objekt wie bei `github show --json`, je Zugang mit `state` und
+`reason` und je Dienst mit `selected`, der Wahl von `run`. Kein Netz, kein Token-Wert. Im
+Klartext steht die Zeile `GitHub: dieses Repo = Dienst <name> — run: git über …, api über …`
+bzw. „kein Dienst für <owner>/<repo>“ oder „kein GitHub-Remote erkannt“; den Rest hinter der Trennzeile zeigt `github` ohne
+`services`. Das Feld zeigt den Stand beim Laden des Briefings, `k-playbook github show` den
+aktuellen.
 
 ### Neu laden
 

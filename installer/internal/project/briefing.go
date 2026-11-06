@@ -248,9 +248,9 @@ var briefingCoveredContextFields = []string{
 // context.links. Austauschbar für Tests.
 var briefingContextForDir = ContextForDir
 
-// briefingContext baut den Abschnitt. Jeder Fehler ist ein Zustand.
-func briefingContext(projectDir string) BriefingContext {
-	built, err := briefingContextForDir(projectDir)
+// briefingContext baut den Abschnitt ab startDir. Jeder Fehler ist ein Zustand.
+func briefingContext(startDir string) BriefingContext {
+	built, err := briefingContextForDir(startDir)
 	if err != nil {
 		return BriefingContext{Message: err.Error()}
 	}
@@ -369,6 +369,16 @@ var openBriefingDocs = OpenUserDocs
 // nutzbare Collection ist ein Zustand in Work, eine nicht baubare
 // Kontextausgabe einer in Context, beides kein Fehler.
 func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
+	return BuildBriefingFrom(ctx, projectDir, projectDir)
+}
+
+// BuildBriefingFrom ist BuildBriefing mit dem Verzeichnis, aus dem der Aufruf
+// kommt (startDir; projectDir ist das daraus gefundene Projekt). Der Rest
+// kommt dann aus ContextForDir(startDir) — genau wie `k-playbook context` im
+// selben Verzeichnis —, und context.github liest das Remote des Repos, in dem
+// startDir liegt: ein eigenes Repo unterhalb des Projekts (k-playbook-local/)
+// bekommt sein eigenes.
+func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) (Briefing, error) {
 	layers := ProjectDocLayers(projectDir)
 	briefing := Briefing{
 		SchemaVersion: BriefingSchemaVersion,
@@ -401,7 +411,7 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 
 	briefing.Work = briefingWork(ctx, projectDir)
 	briefing.Health = health.Check(ctx, projectDir)
-	briefing.Context = briefingContext(projectDir)
+	briefing.Context = briefingContext(startDir)
 	return briefing, nil
 }
 

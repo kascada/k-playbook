@@ -211,6 +211,27 @@ func Load(path string) Result {
 			return finish(result)
 		}
 	}
+	return parse(result, data, err)
+}
+
+// Peek liest die Datei unter path wie Load, legt aber keine Vorlage an:
+// Fehlt sie, ist present false und das Ergebnis leer — keine Dienste, kein
+// Problem. Für Ausgaben, die nur berichten, etwa das Briefing
+// (context.github); die Vorlage bleibt check, show, test, run und der
+// Umgebungsprüfung.
+func Peek(path string) (result Result, present bool) {
+	result = Result{File: path, Services: Services{}, Problems: []Problem{}}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return result, false
+	}
+	return parse(result, data, err), true
+}
+
+// parse prüft den gelesenen Inhalt der Datei (oder den Lesefehler err) und
+// schließt das Ergebnis ab — der gemeinsame Teil von Load und Peek.
+func parse(result Result, data []byte, err error) Result {
+	path := result.File
 	if err != nil {
 		result.Problems = append(result.Problems, Problem{
 			Level: LevelError, Path: PathFile,

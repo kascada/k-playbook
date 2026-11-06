@@ -124,6 +124,7 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 	}
 	built.Kephalaion = &kephalaion.Status{}
 	built.Links = &ContextLinks{}
+	built.GitHub = &ContextGitHub{}
 	fields, err := briefingContextFields(built)
 	if err != nil {
 		t.Fatalf("briefingContextFields: %v", err)

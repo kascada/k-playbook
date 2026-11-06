@@ -675,6 +675,70 @@ collide with the command's:
 Every failure of `run` itself is one German message on standard error with what to do, like the
 problems of *Reading the file*; `k-playbook github check` names the reason per access.
 
+## In the briefing
+
+The briefing (`k_playbook_briefing`, `k-playbook briefing`) and `k-playbook context` carry the
+field `context.github` (task 119), so that a session does not have to guess which service
+reaches GitHub for the repository it works in. Same source, same choice as `show`: `Path`, the
+file read without creating the template (`Peek`), `Judge` with `selected`. There is no rule of
+its own.
+
+```json
+"github": {
+  "file": "/home/alice/.config/k-playbook/github.yaml",
+  "present": true,
+  "problems": [],
+  "remote": "git@github-example:acme-labs/backend.git",
+  "repo": "acme-labs/backend",
+  "projectServices": ["backend"],
+  "services": { "backend": { "repo": "acme-labs/backend", "access": [ … ], "selected": { … } } }
+}
+```
+
+- `file`, `present`: the path after *Names* and whether the file is there. The field itself
+  creates nothing (`Peek`). The environment check of the same briefing runs first, though, and
+  its reader creates a missing file once as the template, as described under *When the file
+  is missing* (`services: {}`, `0600`, the one-time warning under `Umgebung:`). In the
+  briefing the field then shows `present: true` without services; `present: false` appears
+  there only when the template cannot be created (a read-only path in a container, an occupied
+  path). `k-playbook context` runs no environment check and reports a missing file as
+  `present: false`.
+- `problems`: the problems of *Reading the file*, in the form of `check --json`. With an
+  `error`, `services` is `{}` and `projectServices` `[]`.
+- `remote`, `repo`: the remote that counts is the upstream remote of the current branch,
+  otherwise `origin`, read raw from `remote.<name>.url` — `git remote get-url` would apply
+  `insteadOf`, including the one of `run`. git looks for the repository from the directory of
+  the call (the working directory, or `projectDir` of the MCP tool), so a repository of its own
+  below the project gets its own remote. `repo` is `<owner>/<repo>` for the forms `run`
+  redirects: `https://github.com/…`, `git@github.com:…`, `ssh://git@github.com/…` and
+  `git@<alias>:…`, each with or without `.git`; an alias counts when a service of the file
+  names it as `host` (no subprocess) or, otherwise, when `ssh -G <alias>` resolves to
+  github.com. Any other host or form leaves both empty. `remote` carries no credentials: in a
+  form with a scheme (`https://`, `ssh://`) everything before the `@` is dropped; the scp form
+  stays as it is, it cannot carry a password.
+- `projectServices`: the services whose `repo` equals `repo`, case-insensitively, in file order
+  — usually one.
+- `services`: the same object as `show --json`, with `state`, `reason` and `selected`.
+
+No network, no token value; the field writes nothing (the template above comes from the
+environment check, not from the field). The cost beyond `context.gh` is `Judge` (gh's
+configuration, file checks, `ssh -G` per `host`, 3 s limit each), three local `git` calls and at
+most one more `ssh -G` for a remote alias the file does not name. That is why `ContextForDir`
+fills the field and `BuildContext` does not: the interface and the review selection over MCP do
+not pay for it.
+
+In the plain text of `k-playbook briefing` the field is one line right after `Projektdoku:`,
+built from the same parts as the `run:` lines of `show`, for example
+`GitHub: dieses Repo = Dienst backend — run: git über ssh host github-example, api über gh alice`;
+otherwise `GitHub: kein Dienst für acme-labs/foo (Dienste: …)`,
+`GitHub: kein GitHub-Remote erkannt (Dienste: …)`
+or, with several matching services, all of them. Right after the environment check created
+the template the line reads `GitHub: kein Dienst für acme-labs/foo (Dienste: keine)`;
+`GitHub: keine Zugangsdatei` appears in the briefing only when the template could not be
+created. The rest behind the separator shows `github`
+without `services`. The field is the state when the briefing was loaded; `k-playbook github
+show` gives the current one.
+
 ## Relation to other pages
 
 - `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That
@@ -690,7 +754,9 @@ Not part of the contract yet; each will be specified here before it is built.
 - **Choosing an access for a caller**: answered by `selected` (Task 118) — no verb of its own.
   `check`, `show` and `test` name per service the access `run` would choose, with and without
   `--write`; `test` adds whether it works (`selectedOk`). Requested from OMNI on 2026-11-02.
-- **Reverse lookup**: from a repository's remote to the service that names it.
+- **Reverse lookup**: from a repository's remote to the service that names it — for the
+  briefing answered by `context.github.projectServices` (task 119, *In the briefing*); a verb
+  of its own is not specified.
 - **Named operations** with project rules, as CLI and MCP — the way AI sessions reach GitHub,
   since `run` is not offered to them: first the reading ones (fetch with status, list of pull
   requests), then pushing a feature branch and a draft pull request, each with approval, merging
