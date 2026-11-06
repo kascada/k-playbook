@@ -145,8 +145,8 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 		t.Fatalf("check --json: %v", err)
 	}
 	top := decodeJSON(t, stdout)
-	if len(top) != 4 || string(top["file"]) != `"`+path+`"` || string(top["created"]) != "false" || string(top["problems"]) != "[]" {
-		t.Errorf("JSON oben: %v", top)
+	if len(top) != 4 || string(top["file"]) != `"`+path+`"` || string(top["present"]) != "true" || string(top["problems"]) != "[]" {
+		t.Errorf("JSON oben: %s", stdout)
 	}
 	// services: Dateireihenfolge, ~ aufgelöst, disabled nur wo wahr, je
 	// Zugang state und bei unavailable der reason.
@@ -171,32 +171,42 @@ func TestGitHubCheckOhneProblemeIstEineZeile(t *testing.T) {
 	}
 }
 
-// Die fehlende Datei: Vorlage angelegt, eine warning, Exit 0; der zweite
-// Aufruf meldet eine leere Datei ohne Problem.
-func TestGitHubCheckLegtVorlageAnUndEndetMitNull(t *testing.T) {
+// Die fehlende Datei: kein Problem, Exit 0, eine Zeile mit dem Hinweis auf
+// init — und keine Datei entsteht, auch nicht beim zweiten Aufruf. Im JSON
+// present false, hint, problems leer, kein created. Erst init legt sie an;
+// danach meldet check eine leere Datei ohne Problem.
+func TestGitHubCheckOhneDateiLegtNichtsAnUndEndetMitNull(t *testing.T) {
 	path, _ := githubFile(t, "")
 
-	stdout, err := runGitHubCaptured(t, "check")
-	if err != nil {
-		t.Fatalf("check: %v", err)
-	}
-	if !strings.HasPrefix(stdout, "[warning] file: Die Datei wurde gerade angelegt und ist leer") || !strings.Contains(stdout, " — ") || strings.Count(stdout, "\n") != 1 {
-		t.Errorf("Ausgabe: %q", stdout)
-	}
-	info, statErr := os.Stat(path)
-	if statErr != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("Vorlage: %v %v", info, statErr)
+	for range 2 {
+		stdout, err := runGitHubCaptured(t, "check")
+		if err != nil {
+			t.Fatalf("check: %v", err)
+		}
+		if stdout != path+": keine Zugangsdatei — k-playbook github init legt sie an\n" {
+			t.Errorf("Ausgabe: %q", stdout)
+		}
+		if _, statErr := os.Lstat(path); !os.IsNotExist(statErr) {
+			t.Fatalf("Datei angelegt: %v", statErr)
+		}
 	}
 
-	stdout, err = runGitHubCaptured(t, "check", "--json")
+	stdout, err := runGitHubCaptured(t, "check", "--json")
 	if err != nil {
-		t.Fatalf("zweiter Aufruf: %v", err)
+		t.Fatalf("check --json: %v", err)
 	}
 	top := decodeJSON(t, stdout)
-	if string(top["created"]) != "false" || string(top["services"]) != "{}" || string(top["problems"]) != "[]" {
-		t.Errorf("zweiter Aufruf: %v", top)
+	if _, has := top["created"]; has || string(top["present"]) != "false" || string(top["hint"]) != `"`+githubaccess.MissingHint+`"` ||
+		string(top["services"]) != "{}" || string(top["problems"]) != "[]" {
+		t.Errorf("JSON: %s", stdout)
+	}
+	if _, statErr := os.Lstat(path); !os.IsNotExist(statErr) {
+		t.Fatalf("Datei angelegt: %v", statErr)
 	}
 
+	if _, err := runGitHubCaptured(t, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
 	stdout, err = runGitHubCaptured(t, "check")
 	if err != nil || stdout != path+": keine Dienste, keine Probleme\n" {
 		t.Errorf("leere Datei: %q %v", stdout, err)
@@ -219,8 +229,8 @@ func TestGitHubCheckMitFehlerEndetMitEins(t *testing.T) {
 		t.Fatalf("--json: %v", err)
 	}
 	top := decodeJSON(t, stdout)
-	if string(top["file"]) != `"`+path+`"` || string(top["created"]) != "false" || string(top["services"]) != "{}" {
-		t.Errorf("JSON: %v", top)
+	if string(top["file"]) != `"`+path+`"` || string(top["present"]) != "true" || string(top["services"]) != "{}" {
+		t.Errorf("JSON: %s", stdout)
 	}
 	var problems []map[string]string
 	if err := json.Unmarshal(top["problems"], &problems); err != nil || len(problems) != 1 {
@@ -267,8 +277,8 @@ func TestGitHubShowZeigtDieKonfiguration(t *testing.T) {
 		t.Fatalf("show --json: %v", err)
 	}
 	top := decodeJSON(t, stdout)
-	if len(top) != 3 || string(top["file"]) != `"`+path+`"` || string(top["created"]) != "false" {
-		t.Errorf("JSON oben: %v", top)
+	if len(top) != 3 || string(top["file"]) != `"`+path+`"` || string(top["present"]) != "true" {
+		t.Errorf("JSON oben: %s", stdout)
 	}
 	if _, has := top["problems"]; has {
 		t.Error("show --json trägt problems")
@@ -324,27 +334,38 @@ func TestGitHubShowBeiFehlerhafterDateiZeigtDieProbleme(t *testing.T) {
 	}
 }
 
-// Die frisch angelegte Vorlage bei show: Datei, Warnung, keine Dienste; JSON
-// mit created true.
-func TestGitHubShowNachVorlage(t *testing.T) {
+// show und test ohne Datei: die Datei und der Hinweis auf init, Exit 0,
+// auch mit einem Dienstnamen; im JSON present false und hint, bei test ok
+// true ohne Dienste. Keine Datei entsteht, und GitHub wird nicht gefragt.
+func TestGitHubShowUndTestOhneDatei(t *testing.T) {
 	path, _ := githubFile(t, "")
+	want := "Datei: " + path + "\nKeine Zugangsdatei — k-playbook github init legt sie an.\n"
 
-	stdout, err := runGitHubCaptured(t, "show")
-	if err != nil {
-		t.Fatalf("show: %v", err)
+	for _, args := range [][]string{{"show"}, {"show", "website"}, {"test"}, {"test", "website"}} {
+		stdout, err := runGitHubCaptured(t, args...)
+		if err != nil || stdout != want {
+			t.Errorf("%v: %q %v", args, stdout, err)
+		}
 	}
-	if !strings.HasPrefix(stdout, "Datei: "+path+"\n[warning] file: Die Datei wurde gerade angelegt") || !strings.HasSuffix(stdout, "Keine Dienste eingetragen.\n") {
-		t.Errorf("Ausgabe:\n%s", stdout)
+	stdout, err := runGitHubCaptured(t, "show", "--json")
+	top := decodeJSON(t, stdout)
+	if err != nil || len(top) != 4 || string(top["present"]) != "false" || string(top["hint"]) != `"`+githubaccess.MissingHint+`"` || string(top["services"]) != "{}" {
+		t.Errorf("show --json: %s %v", stdout, err)
 	}
-	if _, err := os.Stat(path); err != nil {
-		t.Errorf("Vorlage fehlt: %v", err)
+	stdout, err = runGitHubCaptured(t, "test", "--json")
+	top = decodeJSON(t, stdout)
+	if err != nil || string(top["present"]) != "false" || string(top["ok"]) != "true" || string(top["hint"]) != `"`+githubaccess.MissingHint+`"` || string(top["services"]) != "{}" {
+		t.Errorf("test --json: %s %v", stdout, err)
+	}
+	if _, statErr := os.Lstat(path); !os.IsNotExist(statErr) {
+		t.Errorf("Datei angelegt: %v", statErr)
 	}
 }
 
 func TestGitHubAufruffehlerEndenMitZwei(t *testing.T) {
 	githubFile(t, githubValid)
 
-	for _, args := range [][]string{{"nope"}, {"check", "--nein"}, {"check", "website"}, {"show", "a", "b"}} {
+	for _, args := range [][]string{{"nope"}, {"check", "--nein"}, {"check", "website"}, {"show", "a", "b"}, {"init", "--nein"}, {"init", "website"}} {
 		stdout, err := runGitHubCaptured(t, args...)
 		if exitCodeOf(err) != githubExitUsage || err.Error() == "" {
 			t.Errorf("%v: %v", args, err)
@@ -355,8 +376,82 @@ func TestGitHubAufruffehlerEndenMitZwei(t *testing.T) {
 	}
 
 	stdout, err := runGitHubCaptured(t, "--help")
-	if err != nil || !strings.Contains(stdout, "k-playbook github check [--json]") {
+	if err != nil || !strings.Contains(stdout, "k-playbook github check [--json]") || !strings.Contains(stdout, "k-playbook github init [--json]") {
 		t.Errorf("Hilfe: %v %q", err, stdout)
+	}
+}
+
+// init legt die Vorlage an (0600, Inhalt Template), Exit 0; der zweite
+// Aufruf lässt die Datei stehen und sagt das, ebenfalls Exit 0. Mit --json
+// das Objekt {file, created, problems}.
+func TestGitHubInitLegtVorlageAnUndLaesstVorhandeneStehen(t *testing.T) {
+	path, _ := githubFile(t, "")
+
+	stdout, err := runGitHubCaptured(t, "init")
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	if !strings.HasPrefix(stdout, path+": angelegt (Verzeichnis 0700, Datei 0600)") || strings.Count(stdout, "\n") != 1 {
+		t.Errorf("Ausgabe: %q", stdout)
+	}
+	info, statErr := os.Stat(path)
+	if statErr != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("Vorlage: %v %v", info, statErr)
+	}
+	if content, _ := os.ReadFile(path); string(content) != githubaccess.Template {
+		t.Errorf("Inhalt:\n%s", content)
+	}
+
+	own := githubValid
+	if err := os.WriteFile(path, []byte(own), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, err = runGitHubCaptured(t, "init")
+	if err != nil || stdout != path+": schon vorhanden, nichts geändert\n" {
+		t.Errorf("zweiter Aufruf: %q %v", stdout, err)
+	}
+	stdout, err = runGitHubCaptured(t, "init", "--json")
+	if err != nil {
+		t.Fatalf("init --json: %v", err)
+	}
+	top := decodeJSON(t, stdout)
+	if len(top) != 3 || string(top["file"]) != `"`+path+`"` || string(top["created"]) != "false" || string(top["problems"]) != "[]" {
+		t.Errorf("JSON: %s", stdout)
+	}
+	if content, _ := os.ReadFile(path); string(content) != own {
+		t.Errorf("vorhandene Datei überschrieben:\n%s", content)
+	}
+}
+
+// Lässt sich die Vorlage nicht anlegen (schreibgeschütztes Verzeichnis wie
+// im Container), endet init mit 1 und nennt, was auf dem Host anzulegen ist.
+func TestGitHubInitImSchreibgeschuetztenVerzeichnis(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("als root greift der Schreibschutz nicht")
+	}
+	githubFile(t, "")
+	locked := filepath.Join(t.TempDir(), "gesperrt")
+	if err := os.Mkdir(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o700) })
+	path := filepath.Join(locked, githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, path)
+
+	stdout, err := runGitHubCaptured(t, "init")
+	if exitCodeOf(err) != githubExitProblems {
+		t.Fatalf("Exit: %v (Code %d)", err, exitCodeOf(err))
+	}
+	if !strings.HasPrefix(stdout, "[error] file: Die Datei lässt sich nicht anlegen") || !strings.Contains(stdout, "Auf dem Host anlegen: "+path) {
+		t.Errorf("Ausgabe: %q", stdout)
+	}
+	stdout, err = runGitHubCaptured(t, "init", "--json")
+	top := decodeJSON(t, stdout)
+	if exitCodeOf(err) != githubExitProblems || string(top["created"]) != "false" || !strings.Contains(string(top["problems"]), "Auf dem Host anlegen") {
+		t.Errorf("JSON: %s (%v)", stdout, err)
+	}
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		t.Errorf("Datei entstanden: %v", err)
 	}
 }
 
@@ -428,8 +523,8 @@ func TestGitHubTestZeigtDieErgebnisse(t *testing.T) {
 		t.Fatalf("test --json: %v", err)
 	}
 	top := decodeJSON(t, stdout)
-	if len(top) != 3 || string(top["file"]) != `"`+path+`"` || string(top["ok"]) != "true" {
-		t.Errorf("JSON oben: %v", top)
+	if len(top) != 4 || string(top["file"]) != `"`+path+`"` || string(top["present"]) != "true" || string(top["ok"]) != "true" {
+		t.Errorf("JSON oben: %s", stdout)
 	}
 	compact := strings.Join(strings.Fields(string(top["services"])), "")
 	if compact != `{"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example","result":"ok","identity":"example/k-playbook","read":"yes","write":"unknown","expires":"none"},{"type":"public","result":"ok","identity":"anonymous","read":"yes","write":"no","expires":"none"}],"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}},"selectedOk":{"read":{"git":true,"api":null},"write":{"git":true,"api":null}}}}` {

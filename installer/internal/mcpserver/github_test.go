@@ -137,3 +137,32 @@ func TestGitHubTestWerkzeugFehler(t *testing.T) {
 		t.Errorf("ohne Projekt: %#v", envelope)
 	}
 }
+
+// Fehlt die Zugangsdatei, ist das kein Fehler: ok true, test.present false,
+// test.hint nennt `k-playbook github init`, keine Dienste, test.ok true —
+// auch mit service. Angelegt wird nichts.
+func TestGitHubTestWerkzeugOhneDatei(t *testing.T) {
+	githubTestSetup(t)
+	root := newDocProject(t)
+	dir := filepath.Join(t.TempDir(), "fehlt")
+	path := filepath.Join(dir, githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, path)
+
+	for _, service := range []string{"", "docs"} {
+		envelope, fields, result := callGitHubTest(t, root, service)
+		if result.IsError || !envelope.OK || envelope.Error != nil || envelope.Test == nil {
+			t.Fatalf("%q: Umschlag: %#v", service, envelope)
+		}
+		report := *envelope.Test
+		if report.Present || report.File != path || report.Hint != githubaccess.MissingHint || !strings.Contains(report.Hint, "k-playbook github init") || len(report.Services) != 0 || !report.OK {
+			t.Errorf("%q: Report: %+v", service, report)
+		}
+		test, _ := fields["test"].(map[string]any)
+		if test["present"] != false {
+			t.Errorf("%q: present fehlt im JSON: %v", service, fields)
+		}
+	}
+	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+		t.Errorf("Verzeichnis angelegt: %v", err)
+	}
+}

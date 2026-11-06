@@ -169,11 +169,22 @@ func (s *ServiceResults) UnmarshalJSON(data []byte) error {
 
 // Report ist das Ergebnis von Test: die Datei, die getesteten Dienste und
 // OK, wahr, wenn kein getesteter Zugang failed ist — übersprungene zählen
-// nicht.
+// nicht. Present ist bei Test immer wahr; fehlt die Datei, ist der Report
+// der von MissingReport: present falsch, hint MissingHint, keine Dienste, ok.
 type Report struct {
 	File     string         `json:"file"`
+	Present  bool           `json:"present"`
+	Hint     string         `json:"hint,omitempty"`
 	Services ServiceResults `json:"services"`
 	OK       bool           `json:"ok"`
+}
+
+// MissingReport ist der Report für eine fehlende Datei: nichts getestet,
+// nichts gescheitert, dazu der Hinweis auf `k-playbook github init`. So
+// antworten `github test --json`, k_playbook_github_test und der Test-Endpunkt
+// der Oberfläche gleich, ohne dass jemand die Datei anlegt.
+func MissingReport(file string) Report {
+	return Report{File: file, Present: false, Hint: MissingHint, Services: ServiceResults{}, OK: true}
 }
 
 // Tester trägt, was der Test von außen braucht: die API-Adresse, die Frist
@@ -227,7 +238,7 @@ func (t *Tester) now() time.Time {
 // Report; gelesen ist die Datei schon.
 func (t *Tester) Test(ctx context.Context, file string, services Services) Report {
 	Judge(services)
-	report := Report{File: file, Services: ServiceResults{}, OK: true}
+	report := Report{File: file, Present: true, Services: ServiceResults{}, OK: true}
 	for _, service := range services {
 		result := ServiceResult{Name: service.Name, Repo: service.Repo, Access: []AccessResult{}, Selected: service.Selected}
 		for _, access := range service.Access {

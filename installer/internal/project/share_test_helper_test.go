@@ -13,7 +13,7 @@ import (
 // eigenes XDG_DATA_HOME läse jeder Test, der den Katalog auflöst, die
 // mitgelieferten Commands dieses Rechners. Ebenso von der persönlichen
 // GitHub-Zugangsdatei: Jedes health.Check — also jedes Briefing — erreicht
-// deren Leser, und der legte am echten Ort die Vorlage an.
+// deren Leser, und der läse sonst die Datei dieses Rechners.
 func TestMain(m *testing.M) {
 	cleanup, err := sharetest.Isolate()
 	if err != nil {

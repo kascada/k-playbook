@@ -16,14 +16,19 @@ import (
 )
 
 // Level ist die Stufe eines Problems; die Namen sind die der Umgebungsprüfung.
+// Der Leser kennt nur error: Eine fehlende Datei ist kein Problem (Present),
+// und die Warnung „kein verfügbarer Zugang“ ist Sache der Umgebungsprüfung.
 type Level string
 
 const (
 	// LevelError: Die Datei sagt etwas Falsches; es gibt dann keine Konfiguration.
 	LevelError Level = "error"
-	// LevelWarning: nur die einmalige Meldung der frisch angelegten Vorlage.
-	LevelWarning Level = "warning"
 )
+
+// MissingHint ist der Satz, den jeder Leseweg bei fehlender Datei nennt —
+// check, show, test, run, MCP und Oberfläche; im JSON steht er unter hint.
+// Angelegt wird die Datei nur auf ausdrücklichen Aufruf (Init).
+const MissingHint = "keine Zugangsdatei — k-playbook github init legt sie an"
 
 // PathFile ist der Pfad eines Problems, das die Datei als Ganzes betrifft.
 const PathFile = "file"
@@ -164,11 +169,15 @@ func (s Services) Names() []string {
 }
 
 // Result ist das Ergebnis von Load: die Konfiguration oder die Probleme.
-// Sobald ein error vorliegt, ist Services leer; die einmalige warning der
-// frisch angelegten Vorlage zählt dabei nicht. Problems ist nie nil.
+// Sobald ein error vorliegt, ist Services leer. Problems ist nie nil.
+// Present ist falsch, wenn unter File nichts liegt — dann gibt es weder
+// Dienste noch Probleme, und Hint trägt MissingHint. Ein belegter Pfad ohne
+// lesbare Datei (ein symbolischer Link, dessen Ziel fehlt) ist dagegen
+// vorhanden und ein error.
 type Result struct {
 	File     string    `json:"file"`
-	Created  bool      `json:"created"`
+	Present  bool      `json:"present"`
+	Hint     string    `json:"hint,omitempty"`
 	Services Services  `json:"services"`
 	Problems []Problem `json:"problems"`
 }
@@ -184,52 +193,32 @@ func (r Result) HasErrors() bool {
 	return false
 }
 
-// Load liest die Datei unter path und prüft sie vollständig. Fehlt sie, wird
-// einmal die Vorlage angelegt (Created, eine warning). Alles, was die Datei
+// Load liest die Datei unter path und prüft sie vollständig. Es schreibt
+// nichts: Fehlt die Datei, ist Present falsch, und das Ergebnis trägt keine
+// Dienste, kein Problem und den Hinweis MissingHint. Alles, was die Datei
 // selbst sagt, wird geprüft; nichts, worauf sie zeigt, wird gelesen.
+//
+// „Fehlt“ heißt: Unter path liegt nichts, auch kein Link. os.ReadFile meldet
+// für einen symbolischen Link, dessen Ziel fehlt, ebenfalls ErrNotExist;
+// erst os.Lstat unterscheidet ihn. Er ist ein belegter Pfad und ein error,
+// denn Init könnte dort nichts anlegen.
 func Load(path string) Result {
-	result := Result{File: path, Problems: []Problem{}}
+	result := Result{File: path, Present: true, Services: Services{}, Problems: []Problem{}}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		created, problem := createTemplate(path)
-		result.Created = created
-		if problem != nil {
-			result.Problems = append(result.Problems, *problem)
-			if problem.Level == LevelError {
-				return finish(result)
-			}
+		if _, lstatErr := os.Lstat(path); errors.Is(lstatErr, fs.ErrNotExist) {
+			result.Present = false
+			result.Hint = MissingHint
+			return result
 		}
-		// Genau ein zweites Lesen, keine Rekursion: Jetzt steht die Vorlage
-		// da, oder jemand anderes hat die Datei zwischen Lesen und Anlegen
-		// geschrieben. Fehlt sie dann noch immer, ist der Pfad belegt, ohne
-		// eine lesbare Datei zu sein — ein symbolischer Link, dessen Ziel
-		// fehlt: ReadFile sieht nichts, O_EXCL sieht etwas. Ein erneutes
-		// Load fände denselben Zustand und liefe endlos.
-		data, err = os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			result.Problems = append(result.Problems, occupiedPathProblem(path))
-			return finish(result)
-		}
+		result.Problems = append(result.Problems, occupiedPathProblem(path))
+		return finish(result)
 	}
 	return parse(result, data, err)
 }
 
-// Peek liest die Datei unter path wie Load, legt aber keine Vorlage an:
-// Fehlt sie, ist present false und das Ergebnis leer — keine Dienste, kein
-// Problem. Für Ausgaben, die nur berichten, etwa das Briefing
-// (context.github); die Vorlage bleibt check, show, test, run und der
-// Umgebungsprüfung.
-func Peek(path string) (result Result, present bool) {
-	result = Result{File: path, Services: Services{}, Problems: []Problem{}}
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return result, false
-	}
-	return parse(result, data, err), true
-}
-
 // parse prüft den gelesenen Inhalt der Datei (oder den Lesefehler err) und
-// schließt das Ergebnis ab — der gemeinsame Teil von Load und Peek.
+// schließt das Ergebnis ab.
 func parse(result Result, data []byte, err error) Result {
 	path := result.File
 	if err != nil {
@@ -271,9 +260,9 @@ func finish(result Result) Result {
 }
 
 // occupiedPathProblem beschreibt einen Pfad, den ReadFile als fehlend meldet,
-// obwohl die Vorlage dort nicht anzulegen war: Der erwartete Fall ist ein
-// symbolischer Link, dessen Ziel fehlt. Die Meldung nennt den Link und sein
-// Ziel; ohne Abhilfe könnte Load die Vorlage nie anlegen.
+// obwohl dort etwas liegt: Der erwartete Fall ist ein symbolischer Link,
+// dessen Ziel fehlt. Die Meldung nennt den Link und sein Ziel; ohne Abhilfe
+// könnte Init die Vorlage dort nie anlegen.
 func occupiedPathProblem(path string) Problem {
 	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
 		target, readErr := os.Readlink(path)
@@ -281,12 +270,12 @@ func occupiedPathProblem(path string) Problem {
 			target = "(unbekannt)"
 		}
 		return Problem{Level: LevelError, Path: PathFile,
-			Message: "Die Datei fehlt und lässt sich nicht anlegen: Der Pfad ist ein symbolischer Link, dessen Ziel " + target + " es nicht gibt.",
-			Hint:    "Den Link " + path + " entfernen oder sein Ziel als Datei mit dem Inhalt services: {} anlegen (Modus 0600); das Format steht in docs/github-access.md."}
+			Message: "Die Datei ist nicht lesbar: Der Pfad ist ein symbolischer Link, dessen Ziel " + target + " es nicht gibt.",
+			Hint:    "Den Link " + path + " entfernen (danach legt k-playbook github init die Vorlage an) oder sein Ziel als Datei mit dem Inhalt services: {} anlegen (Modus 0600); das Format steht in docs/github-access.md."}
 	}
 	return Problem{Level: LevelError, Path: PathFile,
-		Message: "Die Datei fehlt und lässt sich nicht anlegen: Der Pfad ist belegt, aber nicht lesbar.",
-		Hint:    "Prüfen, was unter " + path + " liegt, und es entfernen; danach legt k-playbook die Vorlage an."}
+		Message: "Die Datei ist nicht lesbar: Der Pfad ist belegt, aber nicht als Datei.",
+		Hint:    "Prüfen, was unter " + path + " liegt, und es entfernen; danach legt k-playbook github init die Vorlage an."}
 }
 
 // describeReadError nennt den Grund eines Lesefehlers ohne den Pfad zu

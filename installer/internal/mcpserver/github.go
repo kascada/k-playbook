@@ -68,6 +68,7 @@ func addGitHubTestTool(server *mcp.Server) {
 			"message (GitHubs Antwort bei failed, der Grund bei skipped); je Dienst selected (die Wahl von `k-playbook github run` " +
 			"je Kanal git und api als Index in access oder null, read ohne und write mit --write, aus der Verfügbarkeit vor " +
 			"dem Test) und selectedOk (true, wenn der gewählte Zugang ok ist); test.ok ist false, sobald ein Zugang failed ist. " +
+			"Fehlt die Datei, ist test.present false, test.hint nennt `k-playbook github init` (legt sie an), und nichts wird getestet. " +
 			"Kein Token steht in der Antwort. Dieselbe Antwort wie `k-playbook github test [<dienst>] --json` unter test.",
 	}, githubTestToolHandler)
 }
@@ -88,6 +89,13 @@ func githubTestToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input gi
 		return fail(githubErrConfig, "Der Ort der GitHub-Zugangsdatei ist unbekannt: "+err.Error()+".")
 	}
 	result := githubaccess.Load(path)
+	if !result.Present {
+		// Wie `github test --json`: kein Fehler, nichts getestet, present
+		// false und der Hinweis auf `k-playbook github init`. Angelegt wird
+		// hier nichts; die Sitzung ruft dafür die CLI.
+		report := githubaccess.MissingReport(path)
+		return jsonToolResult(githubTestEnvelope{OK: true, Tool: githubTestTool, ProjectDir: projectDir, Test: &report}, false), nil, nil
+	}
 	if result.HasErrors() {
 		lines := make([]string, 0, len(result.Problems))
 		for _, problem := range result.Problems {

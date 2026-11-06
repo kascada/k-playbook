@@ -13,9 +13,9 @@
 // dieses Paket darf project darum nicht importieren. project registriert
 // seine Quellen beim Laden (project/health.go).
 //
-// Repariert wird nichts, mit einer benannten Ausnahme: Die Quelle github
-// legt die fehlende Zugangsdatei einmal als Vorlage an, weil ihr Vertrag das
-// so will; sie meldet es als warning. Kein Eintrag nennt einen Token oder
+// Repariert und geschrieben wird nichts — auch die Quelle github legt eine
+// fehlende Zugangsdatei nicht an; das tut nur `k-playbook github init`. Kein
+// Eintrag nennt einen Token oder
 // einen Wert aus einer Datei — Dienst- und Schlüsselnamen dürfen vorkommen,
 // Werte nie: nur Stufe, Bereich, einen Satz und die Abhilfe.
 package health

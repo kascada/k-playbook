@@ -70,8 +70,13 @@ func githubAccessGet(t *testing.T) (int, githubAccessResponse, string) {
 
 func githubAccessPost(t *testing.T, body string) (int, string) {
 	t.Helper()
+	return githubAccessPostTo(t, "/api/github-access/test", body)
+}
+
+func githubAccessPostTo(t *testing.T, target string, body string) (int, string) {
+	t.Helper()
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/github-access/test", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	routes(&serverState{}).ServeHTTP(recorder, request)
 	return recorder.Code, recorder.Body.String()
@@ -83,7 +88,7 @@ func TestGitHubAccessLiefertCheckMitVerfuegbarkeit(t *testing.T) {
 	path := githubAccessSetup(t)
 
 	code, response, body := githubAccessGet(t)
-	if code != http.StatusOK || !response.Available || response.File != path || response.Created || len(response.Problems) != 0 {
+	if code != http.StatusOK || !response.Available || response.File != path || !response.Present || response.Hint != "" || len(response.Problems) != 0 {
 		t.Fatalf("Antwort: %d %s", code, body)
 	}
 	if len(response.Services) != 2 || response.Services[0].Name != "playbook" || response.Services[1].Name != "backend" {
@@ -114,7 +119,7 @@ func TestGitHubAccessLiefertCheckMitVerfuegbarkeit(t *testing.T) {
 	if !backendSelected.Read.Empty() || !backendSelected.Write.Empty() {
 		t.Errorf("backend selected: %+v", backendSelected)
 	}
-	for _, want := range []string{`"available":true`, `"file":"` + path + `"`, `"created":false`, `"problems":[]`, `"state":"available"`, `"state":"unavailable"`, `"reason":"`, `"state":"disabled"`,
+	for _, want := range []string{`"available":true`, `"file":"` + path + `"`, `"present":true`, `"problems":[]`, `"state":"available"`, `"state":"unavailable"`, `"reason":"`, `"state":"disabled"`,
 		`"selected":{"read":{"git":0,"api":null},"write":{"git":0,"api":null}}`, `"selected":{"read":{"git":null,"api":null},"write":{"git":null,"api":null}}`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Antwort enthält %s nicht: %s", want, body)
@@ -221,13 +226,87 @@ func TestGitHubAccessTestFehler(t *testing.T) {
 	}
 }
 
+// Fehlt die Datei, legt GET nichts an: available bleibt wahr (die Lage ist
+// bekannt), present ist falsch, hint nennt init, keine Probleme. Der Test-POST antwortet wie test --json mit
+// present false, ohne zu testen. Erst POST /api/github-access/init legt die
+// Vorlage an (0600) — derselbe Code wie github init —, danach liest GET eine
+// leere Datei; ein zweiter POST lässt sie stehen.
+func TestGitHubAccessOhneDateiUndAnlegen(t *testing.T) {
+	githubAccessSetup(t)
+	dir := filepath.Join(t.TempDir(), "fehlt")
+	path := filepath.Join(dir, githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, path)
+
+	code, response, body := githubAccessGet(t)
+	if code != http.StatusOK || !response.Available || response.Present || response.Hint != githubaccess.MissingHint || len(response.Problems) != 0 || len(response.Services) != 0 || response.Message != "" {
+		t.Fatalf("ohne Datei: %d %s", code, body)
+	}
+	if strings.Contains(body, `"created"`) || !strings.Contains(body, `"present":false`) {
+		t.Errorf("JSON ohne Datei: %s", body)
+	}
+	code, body = githubAccessPost(t, `{"service":"playbook"}`)
+	var report githubaccess.Report
+	if err := json.Unmarshal([]byte(body), &report); err != nil || code != http.StatusOK || report.Present || report.Hint != githubaccess.MissingHint || len(report.Services) != 0 || !report.OK {
+		t.Errorf("Test ohne Datei: %d %v %s", code, err, body)
+	}
+	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+		t.Fatalf("Lesen hat angelegt: %v", err)
+	}
+
+	code, body = githubAccessPostTo(t, "/api/github-access/init", "")
+	var created githubaccess.InitResult
+	if err := json.Unmarshal([]byte(body), &created); err != nil || code != http.StatusOK || !created.Created || created.File != path || len(created.Problems) != 0 {
+		t.Fatalf("anlegen: %d %v %s", code, err, body)
+	}
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("Vorlage: %v %v", info, err)
+	}
+	if content, _ := os.ReadFile(path); string(content) != githubaccess.Template {
+		t.Errorf("Inhalt:\n%s", content)
+	}
+	if code, response, body := githubAccessGet(t); code != http.StatusOK || !response.Present || len(response.Problems) != 0 || len(response.Services) != 0 {
+		t.Errorf("nach dem Anlegen: %d %s", code, body)
+	}
+	code, body = githubAccessPostTo(t, "/api/github-access/init", "")
+	if err := json.Unmarshal([]byte(body), &created); err != nil || code != http.StatusOK || created.Created || len(created.Problems) != 0 {
+		t.Errorf("zweites Anlegen: %d %v %s", code, err, body)
+	}
+}
+
+// Lässt sich die Vorlage nicht anlegen (schreibgeschütztes Verzeichnis wie im
+// Container), antwortet der Knopf-Endpunkt mit 409 und demselben Hinweis für
+// den Host wie github init; nichts entsteht.
+func TestGitHubAccessAnlegenImSchreibgeschuetztenVerzeichnis(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("als root greift der Schreibschutz nicht")
+	}
+	githubAccessSetup(t)
+	locked := filepath.Join(t.TempDir(), "gesperrt")
+	if err := os.Mkdir(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o700) })
+	path := filepath.Join(locked, githubaccess.FileName)
+	t.Setenv(githubaccess.EnvConfig, path)
+
+	code, body := githubAccessPostTo(t, "/api/github-access/init", "")
+	var result githubaccess.InitResult
+	if err := json.Unmarshal([]byte(body), &result); err != nil || code != http.StatusConflict || result.Created || len(result.Problems) != 1 ||
+		!strings.Contains(result.Problems[0].Hint, "Auf dem Host anlegen: "+path) {
+		t.Errorf("gesperrt: %d %v %s", code, err, body)
+	}
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		t.Errorf("Datei entstanden: %v", err)
+	}
+}
+
 // Die Seite selbst lädt, trägt beide Karten und bindet ihr Skript ein.
 func TestGitHubAccessSeite(t *testing.T) {
 	status, body := getPage(t, githubAccessPage)
 	if status != http.StatusOK {
 		t.Fatalf("Status = %d", status)
 	}
-	for _, want := range []string{`id="access-file-card"`, `id="access-services-card"`, `id="access-test-all"`, `/static/github-access.js`, `<h1>GitHub-Zugänge</h1>`} {
+	for _, want := range []string{`id="access-file-card"`, `id="access-services-card"`, `id="access-test-all"`, `id="access-init"`, `/static/github-access.js`, `<h1>GitHub-Zugänge</h1>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Seite enthält %s nicht", want)
 		}

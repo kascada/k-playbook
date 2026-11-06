@@ -177,12 +177,12 @@ die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der R
 `ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
 (`context.links`). Ebenfalls nur `ContextForDir` füllt `context.github` (Task 119,
 `project/githubcontext.go`): welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des
-Startverzeichnisses gehört und was `github run` dafür wählt — `githubaccess.Peek` (ohne
-Vorlage), `Judge` mit `selected`, das Remote roh über `projectRemoteURL`. Das Feld legt nichts
-an; im Briefing läuft aber `health.Check` vorher, und dessen Quelle `github` (`Load`) legt eine
-fehlende Datei einmal als Vorlage an. Im Briefing steht dann `present: true` ohne Dienste
-(„Dienste: keine“), `present: false` nur, wenn die Vorlage nicht anzulegen war; `k-playbook
-context` prüft die Umgebung nicht und zeigt `present: false`. Das Startverzeichnis
+Startverzeichnisses gehört und was `github run` dafür wählt — `githubaccess.Load` (schreibt
+nie), `Judge` mit `selected`, das Remote roh über `projectRemoteURL`. Das Briefing legt nichts
+an, auch nicht die Quelle `github` von `health.Check`, die vorher läuft (Task 121): Fehlt die
+Datei, ist `present` falsch, die Umgebung schweigt dazu, und die Zeile sagt „GitHub: keine
+Zugangsdatei“; ein Symlink ohne Ziel ist belegt (`present` wahr, ein error). Angelegt wird die
+Datei nur mit `k-playbook github init` oder dem Knopf der Oberfläche. Das Startverzeichnis
 reicht `project.BuildBriefingFrom` von CLI (Arbeitsverzeichnis) und MCP (`projectDir` vor der
 Suche) durch, damit der Rest derselbe ist wie bei `k-playbook context` im selben Verzeichnis.
 Im Klartext steht dazu nach `Projektdoku:` eine Zeile `GitHub: …` (`briefingGitHubLine` in
@@ -281,10 +281,12 @@ installer/
 │   │                            (--discard, --allow-hints, --json)
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
-│   ├── github.go                Subkommando github: check, show und test [<dienst>] der
-│   │                            persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
-│   │                            check und show mit Verfügbarkeit, test gegen GitHub; alle
-│   │                            drei mit der Wahl von run (selected, Zeilen „run: …“)
+│   ├── github.go                Subkommando github: init, check, show und test [<dienst>]
+│   │                            der persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
+│   │                            init legt die Vorlage an (allein, Task 121), check und show
+│   │                            mit Verfügbarkeit, test gegen GitHub; die drei mit der Wahl
+│   │                            von run (selected, Zeilen „run: …“); ohne Datei der
+│   │                            Hinweis auf init, Exit 0
 │   ├── githubrun.go             github run <dienst> [--write] [--use] [--skip]… [--quiet]
 │   │                            -- <befehl>: Wahl (Choose), Umgebung (ChildEnv), Zeile auf
 │   │                            stderr, dann exec auf den Befehl; Exit oder Signal des
@@ -309,7 +311,8 @@ installer/
 │   ├── load.go                  Load: die Datei lesen und vollständig prüfen — Dienste,
 │   │                            repo, Zugänge je Typ, Pfade, disabled, doppelte Namen;
 │   │                            Konfiguration oder Probleme (nach Dateiposition), nie beides;
-│   │                            Peek: dasselbe ohne Vorlage (context.github, Task 119)
+│   │                            schreibt nie — fehlt die Datei, Present false und
+│   │                            MissingHint; Lstat trennt fehlt von belegt (Task 121)
 │   ├── remote.go                RepoOfRemote: <owner>/<repo> aus einem rohen Remote in den
 │   │                            Formen von formsOf; RemoteWithoutCredentials, NamesSSHHost,
 │   │                            SSHHostIsGitHub (ssh -G wie bei Judge; Task 119)
@@ -334,10 +337,12 @@ installer/
 │   │                            Aufrufers, nur für die URLs des Repos; GIT_SSH_COMMAND,
 │   │                            GH_TOKEN/GITHUB_TOKEN, GIT_TERMINAL_PROMPT=0; ReadToken,
 │   │                            RunLine und ChannelParts (auch für die Zeilen von selected)
-│   ├── template.go              die Vorlage bei fehlender Datei: Verzeichnis 0700, Datei
-│   │                            0600, services: {} und ein Beispiel je Zugangsart
+│   ├── template.go              Init: die Vorlage auf Anforderung (github init, Knopf der
+│   │                            Oberfläche; Task 121) — Verzeichnis 0700, Datei 0600,
+│   │                            services: {} und ein Beispiel je Zugangsart; eine
+│   │                            vorhandene Datei bleibt, ein belegter Pfad ist ein error
 │   ├── accesstest/              Isolate und Empty für Tests: eigener Override, damit kein
-│   │                            Test die echte Datei liest oder dort die Vorlage anlegt
+│   │                            Test die echte Datei liest oder dort etwas anlegt
 │   └── testdata/                eine gültige Datei und je Problemart eine Datei
 ├── internal/hostenv/
 │   └── hostenv.go               Wo läuft das Programm: Container-Marker, WSL
@@ -404,7 +409,7 @@ installer/
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
 │   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir
-│   ├── githubcontext.go         context.github für ContextForDir (Task 119): Peek, Judge,
+│   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
 │   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
 │   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
@@ -489,8 +494,10 @@ installer/
 │   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
 │   │                            die GitHub-Daten nur bei tools.gh.status: enabled
 │   ├── github_access.go         GET /api/github-access (check --json mit Verfügbarkeit,
-│   │                            ohne Netz) und POST /api/github-access/test (test --json,
-│   │                            optional service) für die Seite /github-access
+│   │                            ohne Netz, schreibt nichts), POST /api/github-access/init
+│   │                            (init --json, Knopf „Anlegen“) und POST
+│   │                            /api/github-access/test (test --json, optional service)
+│   │                            für die Seite /github-access
 │   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
 │                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
 │                                inventory.html, branches.html, github-access.html, mcp.html, mcp-servers.html,
@@ -2571,21 +2578,28 @@ Die Seite `/github-access` („GitHub-Zugänge“) zeigt die persönliche GitHub
 einen Block mit Repository und den Zugängen in Vorrangreihenfolge samt ihrer Verfügbarkeit,
 und auf Knopfdruck den Test gegen GitHub. Sie ist der Unterpunkt des Bereichs GitHub —
 neben der Projektseite, aber über die Person: dieselbe Datei gilt für jedes Projekt dieses
-Rechners. Nichts auf der Seite schreibt die Datei; bearbeitet wird im Editor, die Karte
-„Datei“ sagt, wo sie liegt.
+Rechners. Bearbeitet wird im Editor, die Karte „Datei“ sagt, wo sie liegt. Geschrieben wird
+die Datei nur auf den Knopf „Anlegen“ hin, den die Karte allein bei fehlender Datei zeigt
+(Task 121).
 
-**Zwei Endpunkte.** `GET /api/github-access` ist das Objekt von `check --json` — `file`,
-`created`, `services` mit `state` und `reason` je Zugang, `problems` —, dazu `available` und
-`message`, wenn die Datei als Ganzes nicht lesbar ist (ein Problem mit Pfad `file`; eine Datei
-mit einem Fehler im Inhalt bleibt `available`, die Seite zeigt die Probleme). Der GET ist ohne
-Netz: Er liest, legt gegebenenfalls die Vorlage an und beurteilt die Verfügbarkeit
-(`githubaccess.Judge`: gh-Konfiguration über `ghconfig`, Dateien, `ssh -G`).
+**Drei Endpunkte.** `GET /api/github-access` ist das Objekt von `check --json` — `file`,
+`present`, `hint` (nur ohne Datei), `services` mit `state` und `reason` je Zugang, `problems`
+—, dazu `available` und `message`, wenn die Datei als Ganzes nicht lesbar ist (ein Problem mit
+Pfad `file`; eine Datei mit einem Fehler im Inhalt bleibt `available`, die Seite zeigt die
+Probleme; eine fehlende Datei auch, mit `present: false`). Der GET ist ohne Netz und schreibt
+nichts: Er liest und beurteilt die Verfügbarkeit (`githubaccess.Judge`: gh-Konfiguration über
+`ghconfig`, Dateien, `ssh -G`). `POST /api/github-access/init` hinter `sameOrigin`, ohne Werte
+aus der Anfrage, ist das Objekt von `init --json` (`githubaccess.Init`, derselbe Code wie
+`k-playbook github init`): `200` mit `created`, ob die Vorlage eben angelegt wurde, `409` mit
+dem Problem, wenn es nicht ging — im schreibgeschützten Container mit dem Hinweis, was auf dem
+Host anzulegen ist.
 `POST /api/github-access/test` mit optionalem `service` ist das Objekt von `test --json`
 (`githubaccess.Tester.Test`) — der einzige Endpunkt dieser Seite mit Netz, hinter `sameOrigin`,
 und er läuft nur auf den Knopf hin: Weder der Seitenaufbau noch die Statusseite noch das Menü
 rufen ihn. Ein unbekannter `service` ist `400` mit einer Meldung, die die bekannten Dienste
 nennt (`known`), wie Exit 2 der CLI; eine Datei mit Fehlern `409` mit ihren Problemen; beides
-ohne Testergebnisse.
+ohne Testergebnisse. Ohne Datei ist die Antwort `200` mit dem Report von `test --json` ohne
+Datei (`present: false`, `hint`, nichts getestet).
 
 **„Alle prüfen“ ist ein POST je Dienst.** Die Seite ruft den Endpunkt für jeden Dienst
 einzeln mit `service`, nebeneinander; jeder Block füllt sich, sobald seine Antwort da ist, und
@@ -2644,8 +2658,8 @@ Dienstes. Die Teile:
   und alles andere 126. Vor dem Ersetzen bleibt nichts zu tun: Die Zeile auf stderr ist
   ungepuffert geschrieben, Go öffnet Dateien mit `O_CLOEXEC`, und `run` legt keine temporären
   Dateien an. Gebaut wird nur für Linux und macOS; `syscall.Exec` gibt es auf beiden.
-- **Nichts außerhalb**: `ensureShare` läuft für `github run` nicht, damit der Aufruf außer der
-  Vorlage einer fehlenden Datei nichts schreibt.
+- **Nichts außerhalb**: `ensureShare` läuft für `github run` nicht, damit der Aufruf nichts
+  schreibt; fehlt die Zugangsdatei, endet `run` mit 125 und dem Hinweis auf `github init`.
 
 Die e2e-Tests (`cmd/k-playbook/githubrun_e2e_test.go`) starten das Test-Binary als eigenen
 Prozess: `TestMain` in `mcp_test.go` führt mit `K_PLAYBOOK_TEST_MAIN_ARGS` (ein JSON-Feld)

@@ -17,10 +17,9 @@ var newGitHubTester = githubaccess.NewTester
 
 // Exit-Codes von `k-playbook github`: 0 ohne Problem, 1 mit mindestens einem
 // error, 2 bei Aufruffehlern — unbekannter Unterbefehl, unbekannte Option,
-// unbekannter Dienst. Die einmalige warning der frisch angelegten Vorlage
-// ändert den Exit-Code nicht: eine angelegte Datei ist ein Zustand, den der
-// Nutzer auflöst, kein defekter. Bei `test` heißt 1: mindestens ein
-// getesteter Zugang ist failed; übersprungene zählen nicht.
+// unbekannter Dienst. Eine fehlende Datei ist kein Problem und endet mit 0;
+// bei `init` heißt 1: Die Vorlage ließ sich nicht anlegen. Bei `test` heißt
+// 1: mindestens ein getesteter Zugang ist failed; übersprungene zählen nicht.
 const (
 	githubExitProblems = 1
 	githubExitUsage    = 2
@@ -32,9 +31,9 @@ const (
 // Zugangs ohne Netz; `test` fragt GitHub, ob die verfügbaren Zugänge
 // funktionieren — der einzige Unterbefehl mit Netz, und er läuft nur auf
 // diesen Aufruf hin; `run` startet einen Befehl unter dem Zugang eines
-// Dienstes (githubrun.go). Alle legen die Vorlage an, wenn die Datei fehlt.
-// Die Datei ist persönlich, nicht projektbezogen — ein Projekt wird nicht
-// gesucht.
+// Dienstes (githubrun.go). Keiner davon schreibt: Fehlt die Datei, nennen sie
+// githubaccess.MissingHint. Angelegt wird sie allein mit `init`. Die Datei
+// ist persönlich, nicht projektbezogen — ein Projekt wird nicht gesucht.
 func runGitHub(args []string) error {
 	if len(args) == 0 {
 		printGitHubUsage(os.Stdout)
@@ -49,6 +48,8 @@ func runGitHub(args []string) error {
 		// Eigene Zerlegung: alles nach -- gehört dem Befehl, und eigene
 		// Fehler enden mit 125 statt 2 (docs/github-access.md).
 		return runGitHubRun(rest)
+	case "init":
+		return runGitHubInit(rest)
 	case "check", "show", "test":
 	default:
 		printGitHubUsage(os.Stderr)
@@ -80,6 +81,12 @@ func runGitHub(args []string) error {
 		return exitError{code: githubExitUsage, err: err}
 	}
 	result := githubaccess.Load(path)
+	// Ohne Datei gibt es nichts zu prüfen, zu zeigen oder zu testen: der
+	// Hinweis auf init, Exit 0, kein Problem — auch mit einem Dienstnamen,
+	// denn der erste Schritt ist dann init, nicht ein anderer Name.
+	if !result.Present {
+		return githubMissing(sub, result, asJSON)
+	}
 	// Die Verfügbarkeit ist ein eigener Schritt nach dem Lesen: ohne Netz,
 	// aber mit Blick auf gh-Konfiguration, Dateien und ssh -G. Bei einem
 	// error gibt es keine Konfiguration und nichts zu beurteilen.
@@ -131,10 +138,37 @@ func runGitHub(args []string) error {
 	}
 
 	if asJSON {
-		return writeJSON(os.Stdout, githubShow{File: result.File, Created: result.Created, Services: result.Services})
+		return writeJSON(os.Stdout, githubShow{File: result.File, Present: result.Present, Hint: result.Hint, Services: result.Services})
 	}
 	_, err = io.WriteString(os.Stdout, githubShowText(result))
 	return err
+}
+
+// githubMissing gibt aus, was check, show und test bei fehlender Datei sagen:
+// im Text die Datei und MissingHint, im JSON die übliche Form mit present
+// false und hint — bei test der Report von MissingReport. Exit 0.
+func githubMissing(sub string, result githubaccess.Result, asJSON bool) error {
+	if asJSON {
+		switch sub {
+		case "check":
+			return writeJSON(os.Stdout, result)
+		case "show":
+			return writeJSON(os.Stdout, githubShow{File: result.File, Present: false, Hint: result.Hint, Services: githubaccess.Services{}})
+		}
+		return writeJSON(os.Stdout, githubaccess.MissingReport(result.File))
+	}
+	if sub == "check" {
+		_, err := io.WriteString(os.Stdout, result.File+": "+githubaccess.MissingHint+"\n")
+		return err
+	}
+	_, err := io.WriteString(os.Stdout, "Datei: "+result.File+"\n"+githubMissingSentence()+"\n")
+	return err
+}
+
+// githubMissingSentence ist MissingHint als Satz, für die Blöcke von show
+// und test.
+func githubMissingSentence() string {
+	return strings.ToUpper(githubaccess.MissingHint[:1]) + githubaccess.MissingHint[1:] + "."
 }
 
 // githubTestText rendert den Testreport: die Datei, dann je Dienst ein
@@ -229,8 +263,61 @@ func githubExpiresText(expires string) string {
 // githubShow ist das JSON von `show`: das Objekt von `check` ohne problems.
 type githubShow struct {
 	File     string                `json:"file"`
-	Created  bool                  `json:"created"`
+	Present  bool                  `json:"present"`
+	Hint     string                `json:"hint,omitempty"`
 	Services githubaccess.Services `json:"services"`
+}
+
+// runGitHubInit legt die Zugangsdatei als Vorlage an (githubaccess.Init) —
+// der einzige Unterbefehl, der sie schreibt. Liegt sie schon da, bleibt sie
+// unverändert, Exit 0. Lässt sie sich nicht anlegen, endet init mit 1 und
+// nennt die Abhilfe, im schreibgeschützten Container was auf dem Host
+// anzulegen ist.
+func runGitHubInit(args []string) error {
+	asJSON := false
+	for _, arg := range args {
+		switch arg {
+		case "--json":
+			asJSON = true
+		case "-h", "--help":
+			printGitHubUsage(os.Stdout)
+			return nil
+		default:
+			return exitError{code: githubExitUsage, err: fmt.Errorf("unbekanntes Argument %s — erwartet wird github init [--json]", arg)}
+		}
+	}
+	path, err := githubaccess.Path()
+	if err != nil {
+		return exitError{code: githubExitUsage, err: err}
+	}
+	result := githubaccess.Init(path)
+	if asJSON {
+		if err := writeJSON(os.Stdout, result); err != nil {
+			return err
+		}
+	} else if _, err := io.WriteString(os.Stdout, githubInitText(result)); err != nil {
+		return err
+	}
+	if result.HasErrors() {
+		return exitError{code: githubExitProblems}
+	}
+	return nil
+}
+
+// githubInitText rendert das Ergebnis von init in einer Zeile: angelegt,
+// schon vorhanden, oder das Problem in der Form von check.
+func githubInitText(result githubaccess.InitResult) string {
+	if result.HasErrors() {
+		var b strings.Builder
+		for _, problem := range result.Problems {
+			fmt.Fprintf(&b, "[%s] %s: %s — %s\n", problem.Level, problem.Path, problem.Message, problem.Hint)
+		}
+		return b.String()
+	}
+	if result.Created {
+		return result.File + ": angelegt (Verzeichnis 0700, Datei 0600) — trage deine Dienste ein; das Format steht in docs/github-access.md\n"
+	}
+	return result.File + ": schon vorhanden, nichts geändert\n"
 }
 
 func writeJSON(out io.Writer, value any) error {
@@ -289,8 +376,8 @@ func githubCheckText(result githubaccess.Result) string {
 	return b.String()
 }
 
-// githubShowText rendert die Konfiguration: die Datei, die einmalige
-// Warnung der Vorlage, dann je Dienst ein Block mit Repository und den
+// githubShowText rendert die Konfiguration: die Datei, dann je Dienst ein
+// Block mit Repository und den
 // Zugängen in Vorrangreihenfolge — was die Datei sagt, aufgelöste Pfade
 // eingeschlossen, und nichts, was sie nicht enthält — dazu je Zugang seine
 // Verfügbarkeit in eckigen Klammern.
@@ -381,9 +468,10 @@ func countServices(n int) string {
 }
 
 func printGitHubUsage(out io.Writer) {
-	fmt.Fprint(out, `k-playbook github — die persönliche GitHub-Zugangsdatei lesen, prüfen und testen
+	fmt.Fprint(out, `k-playbook github — die persönliche GitHub-Zugangsdatei anlegen, lesen, prüfen und testen
 
 Aufruf:
+  k-playbook github init [--json]
   k-playbook github check [--json]
   k-playbook github show [<dienst>] [--json]
   k-playbook github test [<dienst>] [--json]
@@ -396,13 +484,21 @@ github.yaml, Override K_PLAYBOOK_GITHUB_CONFIG) nennt je Dienst ein Repository
 ein Zugang liegt; die Dateien, auf die sie zeigt, werden nicht gelesen.
 Vertrag: docs/github-access.md.
 
+  init    Legt die Datei als Vorlage an: Verzeichnis 0700, Datei 0600,
+          services: {} und ein auskommentiertes Beispiel je Zugangsart — der
+          einzige Unterbefehl, der sie schreibt. Liegt sie schon da, bleibt
+          sie unverändert (Exit 0). Lässt sie sich nicht anlegen (belegter
+          Pfad, schreibgeschütztes Verzeichnis etwa im Container), endet
+          init mit 1 und nennt, was zu tun ist — im Container, was auf dem
+          Host anzulegen ist. Mit --json das Objekt {file, created,
+          problems}.
   check   Liest die Datei und nennt alle Probleme, sortiert nach Position in
           der Datei, je Zeile „[stufe] pfad: satz — abhilfe“. Ohne Problem
           eine Zeile mit Datei, Zahl der Dienste und Zahl der Dienste ohne
           verfügbaren Zugang, danach je nicht verfügbarem Zugang eine Zeile
           mit dem Grund und je Dienst die Wahl von run („<dienst> run: git
           über …, api über …“, weicht --write ab, dazu „<dienst> mit
-          --write: …“). Mit --json das Objekt {file, created, services,
+          --write: …“). Mit --json das Objekt {file, present, services,
           problems}, je Zugang state (available, unavailable, disabled) und
           reason, je Dienst selected; sobald ein error vorliegt, ist
           services leer.
@@ -419,11 +515,11 @@ Vertrag: docs/github-access.md.
           ssh -T und git ls-remote (schreiben bleibt unbekannt), public über
           git ls-remote ohne Anmeldung. Deaktivierte und nicht verfügbare
           Zugänge werden übersprungen. Kein Token erscheint in Ausgabe,
-          Meldung oder Kommandozeile. Mit --json das Objekt {file, services,
-          ok}, je Zugang result (ok, failed, skipped), identity, read, write,
-          expires, warning, message, je Dienst selected wie bei show (aus
-          der Verfügbarkeit vor dem Test) und selectedOk; im Text die Zeilen
-          von show mit dem Ergebnis je gewähltem Kanal.
+          Meldung oder Kommandozeile. Mit --json das Objekt {file, present,
+          services, ok}, je Zugang result (ok, failed, skipped), identity,
+          read, write, expires, warning, message, je Dienst selected wie bei
+          show (aus der Verfügbarkeit vor dem Test) und selectedOk; im Text
+          die Zeilen von show mit dem Ergebnis je gewähltem Kanal.
   run     Startet einen Befehl mit dem Zugang des Dienstes, eingerichtet nur
           in seiner Umgebung; Wahl ohne Netz, kein Rückfall. Eigene
           Exit-Codes 125, 126, 127, sonst der des Befehls. Einzelheiten:
@@ -439,11 +535,12 @@ Verfügbar heißt, ohne Netz beurteilt: der gh-Login ist in gh hinterlegt, die
 Token-Datei ist eine Zeile mit Modus 0600, der Schlüssel liegt ohne Gruppen-
 und Weltrechte da, der Alias löst per ssh -G nach github.com auf.
 
-Fehlt die Datei, legen alle vier einmal eine Vorlage an (Verzeichnis 0700,
-Datei 0600, services: {} und ein Beispiel je Zugangsart) und melden das als
-warning; der nächste Aufruf findet eine leere Datei und meldet nichts.
+Die Datei ist freiwillig, und kein Lesen legt sie an. Fehlt sie, melden
+check, show und test „keine Zugangsdatei — k-playbook github init legt sie
+an“ und enden mit 0; im JSON ist present false, hint trägt den Satz, und
+problems bleibt leer. run endet mit 125 und demselben Hinweis.
 
-Exit-Code von check, show und test: 0 ohne Problem (die Warnung der Vorlage zählt nicht; ein nicht
+Exit-Code von check, show und test: 0 ohne Problem (auch ohne Datei; ein nicht
 verfügbarer Zugang ist ein Zustand, kein Problem), 1 mit mindestens einem
 error — bei test: mit mindestens einem failed —, 2 bei Aufruffehlern, auch
 bei einem Dienst, der nicht in der Datei steht. Die Probleme der Datei und

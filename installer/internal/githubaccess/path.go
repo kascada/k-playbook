@@ -16,8 +16,10 @@
 // Seite /branches und /k-pr-review; hier geht es allein um die lokale Datei.
 //
 // Load liefert die Konfiguration oder die Probleme, nie beides und nie nur
-// das erste. Fehlt die Datei, legt Load einmal eine Vorlage an und meldet das
-// als warning; das ist die einzige Nebenwirkung des Pakets. Das Paket hängt
+// das erste. Es schreibt nichts: Fehlt die Datei, sagt das Result.Present,
+// und jeder Leseweg nennt MissingHint. Angelegt wird sie allein über Init
+// (`k-playbook github init`, der Knopf der Oberfläche); das ist die einzige
+// Nebenwirkung des Pakets. Das Paket hängt
 // nur von der Standardbibliothek, yamllite und ghconfig ab, damit project es
 // für die Umgebungsprüfung einbinden kann — project selbst darf es nicht
 // importieren, project/health.go importiert dieses Paket.
@@ -32,7 +34,7 @@ import (
 const (
 	// EnvConfig ist der Override auf den Pfad der Datei, für Tests und für
 	// Container, die die Datei an anderer Stelle einhängen. Ist er gesetzt,
-	// gilt nur er — auch für das Anlegen der Vorlage.
+	// gilt nur er — auch für Init.
 	EnvConfig = "K_PLAYBOOK_GITHUB_CONFIG"
 	// ConfigDirName ist das Verzeichnis unter $XDG_CONFIG_HOME bzw. ~/.config.
 	ConfigDirName = "k-playbook"

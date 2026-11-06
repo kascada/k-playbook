@@ -178,9 +178,8 @@ const githubTwoServices = `services:
         login: alice
 `
 
-// Das Feld allein legt nichts an. Im Briefing legt die vorher laufende
-// Umgebungsprüfung die Vorlage an; das belegt
-// TestBriefingGitHubVorlageDurchUmgebungspruefung in cmd/k-playbook.
+// Das Feld legt nichts an, und das Briefing als Ganzes auch nicht; das belegt
+// TestBriefingLegtBeiFehlenderZugangsdateiNichtsAn in cmd/k-playbook.
 func TestContextGitHubDateiFehlt(t *testing.T) {
 	githubFakes(t)
 	path := filepath.Join(t.TempDir(), "fehlt", githubaccess.FileName)

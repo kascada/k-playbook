@@ -10,7 +10,7 @@ import (
 
 // TestMain schirmt das Paket von der persönlichen GitHub-Zugangsdatei des
 // Rechners ab: k_playbook_health und k_playbook_briefing erreichen deren
-// Leser, und der legte bei fehlender Datei am echten Ort die Vorlage an.
+// Leser, und der läse sonst die Datei dieses Rechners.
 func TestMain(m *testing.M) {
 	cleanup, err := accesstest.Isolate()
 	if err != nil {

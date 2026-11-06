@@ -25,6 +25,12 @@ are specified here.
 the matching lines in their text (*The subcommand*, *JSON*). Both come from `Select` in
 `choose.go`, which applies `Choose` and nothing else.
 
+**Status (2026-11-06):** the file is created only on request (Task 121): `k-playbook github
+init` and the button *Anlegen* on the interface page write the template; no read does —
+neither the briefing, the health check, `check`, `show`, `test`, `run`, the MCP tool nor the
+page. A missing file is no problem: `present: false` and a hint to `init` (*When the file is
+missing*).
+
 ## What the file is, and is not
 
 A person works with several GitHub repositories, often under several GitHub accounts, and
@@ -50,14 +56,14 @@ These names are fixed and used unchanged everywhere.
 | File | `$XDG_CONFIG_HOME/k-playbook/github.yaml`, or `~/.config/k-playbook/github.yaml` when `XDG_CONFIG_HOME` is unset or not an absolute path |
 | Override | environment variable `K_PLAYBOOK_GITHUB_CONFIG=<path>`; the path is used as given |
 | Subcommand | `k-playbook github <verb>` |
-| Verbs | `check`, `show` (step 1), `test` (step 2), `run` (step 3) |
+| Verbs | `check`, `show` (step 1), `test` (step 2), `run` (step 3), `init` (Task 121) |
 | Health area | `github` (see Task 098, the environment check in the briefing) |
 | MCP tool | `k_playbook_github_test` (step 2); contract in `mcp.md` |
 | Interface page | *GitHub-Zugänge*, `/github-access` (step 2) |
 
 The override exists for tests and for containers that mount the file somewhere else. It is
 the only second place to look: when the variable is set, the default location is ignored,
-including for creating the template.
+including for `init`.
 
 ## Format
 
@@ -218,27 +224,52 @@ in ways this step does not want to encode.
 
 ## When the file is missing
 
-A missing file is a state the person has to resolve, not a crash. On the first read that
-finds no file, k-playbook:
+The file is **optional**. Whoever does not use the GitHub access file notices nothing of it, and
+**no read creates it**: not the briefing, not the health check, not `check`, `show`, `test` or
+`run`, not `k_playbook_github_test`, not the interface page. A missing file is not a problem:
+
+- the health check lists nothing under `github`;
+- the briefing line reads `GitHub: keine Zugangsdatei` (*In the briefing*);
+- `check`, `show` and `test` print the hint *keine Zugangsdatei — `k-playbook github init` legt
+  sie an* and exit `0`; with `--json` the object carries `"present": false` and that sentence
+  as `hint`, and `problems` stays empty — there is no level below `error` for it;
+- `run` ends with `125` and names `k-playbook github init`;
+- `k_playbook_github_test` answers `ok: true` with `test.present: false` and the hint, no
+  error code;
+- the interface page shows *Keine Zugangsdatei* and a button *Anlegen*.
+
+"Missing" means nothing is at the path, not even a link. A path that is occupied without
+being a readable file — a symbolic link whose target does not exist — is not missing: the
+reader tells the two apart without creating anything (`os.Lstat`) and reports the link as an
+`error` that names it and its target; `present` is `true` then.
+
+The file is created by **`k-playbook github init [--json]`**, or by the button *Anlegen* on the
+interface page, which calls the same code (`githubaccess.Init`). An AI session that wants the
+file calls `init`; it does not write the YAML itself, so template, modes and the container
+case stay in one place. `init`:
 
 1. creates the directory (`~/.config/k-playbook`, mode `0700`) if it does not exist;
 2. writes a template, mode `0600`, containing `services: {}` and a commented example of every
    access type, so the person can fill it in without opening this page;
-3. reports, once, as a `warning`: *The file was just created and is empty — add your
-   services.* The call that created the template is the one that carries the warning; a
-   later call finds an existing, empty file and reports nothing.
+3. prints `<path>: angelegt (Verzeichnis 0700, Datei 0600) — trage deine Dienste ein; …` and
+   exits `0`.
+
+When the file is already there, `init` writes nothing, whatever it contains, prints `<path>:
+schon vorhanden, nichts geändert` and exits `0`. `init --json` prints `{file, created,
+problems}`; `created` says whether this call wrote the template. `k-playbook upgrade` does not
+create the file.
 
 An **empty file** — `services: {}`, or only comments — is not a problem. A machine may have no
 GitHub work at all, or none that goes through this file yet. `check` says so in one line and
 exits `0`; the health check lists nothing. Only a file that *says* something wrong is a problem.
 
-The template is created only at the default location or at the path of the override. It is
-never created inside a project. If the directory cannot be created or written — a read-only
-mount in a container is the expected case — the problem says so and names the path to create
-on the host instead. If the path is occupied without being a readable file — a symbolic link
-whose target does not exist — the template cannot be created either: the problem says so,
-names the link and its target, and asks to remove the link or create the target. After the
-template step the reader reads the file at most once more; it never retries beyond that.
+`init` creates the template only at the default location or at the path of the override. It
+is never created inside a project. If the directory cannot be created or written — a
+read-only mount in a container is the expected case — `init` reports an `error` that names the
+path to create on the host instead, and exits `1`; the button answers with the same hint. If
+the path is occupied without being a readable file — a symbolic link whose target does not
+exist, or a directory — `init` creates nothing either: the problem names what is there and
+asks to remove it (or, for a link, to create its target).
 
 ## Testing an access
 
@@ -282,7 +313,9 @@ Rules:
 
 `k_playbook_github_test` takes `projectDir` (as every tool) and an optional `service`, runs
 the same test and returns the object of `test --json` under `test`, wrapped in the usual
-envelope (`ok`, `tool`, `projectDir`, `error`). It exists so that a session that just failed
+envelope (`ok`, `tool`, `projectDir`, `error`). Without a file it answers `ok: true` with
+`test.present: false` and the hint to `k-playbook github init`, tests nothing and creates
+nothing; there is no MCP tool for `init` — a session calls the CLI. It exists so that a session that just failed
 to push can find out which access works instead of guessing — a read-only question with a
 network cost the session asks for knowingly. The full tool contract lives in `mcp.md`.
 
@@ -293,16 +326,21 @@ about the person, not the project: it shows the file path, the state of `check` 
 one line), and one block per service with the repository and the accesses in order, each with
 type, what the file says, and its availability. A button *Alle prüfen* runs `test` for all
 services, a button per service runs it for one; the results fill in identity, read, write,
-expiry and the message of a failure. Nothing on the page writes the file: editing stays in the
-editor, the page says where the file is. Endpoints: `GET /api/github-access` returns the
-object of `check --json`; `POST /api/github-access/test` with an optional `service` returns
-the object of `test --json`. Like every other `GET` of the interface it carries `available`
-and `message` when the file cannot be read at all. Both pass the objects through unchanged, so
+expiry and the message of a failure. Editing stays in the editor, the page says where the
+file is. The page writes the file only when it is missing and the button *Anlegen* is pressed
+— the only time the button is shown; it calls the same code as `k-playbook github init`, and in
+a read-only container it shows the same hint for the host. Endpoints: `GET
+/api/github-access` returns the object of `check --json` and writes nothing (without a file:
+`present: false`, `hint`); `POST /api/github-access/init` returns the object of `init --json`,
+`409` when the template cannot be created; `POST /api/github-access/test` with an optional
+`service` returns the object of `test --json`. Like every other `GET` of the interface it
+carries `available` and `message` when the file cannot be read at all. Both pass the objects through unchanged, so
 `selected` and `selectedOk` (*JSON*) are in them; the page does not show them yet.
 
 ## The subcommand
 
 ```
+k-playbook github init [--json]
 k-playbook github check [--json]
 k-playbook github show [<service>] [--json]
 k-playbook github test [<service>] [--json]
@@ -310,7 +348,8 @@ k-playbook github run <service> [--write] [--use <type>] [--skip <type>]… [--q
 ```
 
 `run` has its own section, *Running a command under a service*, including its exit codes;
-what follows here is about `check`, `show` and `test`.
+`init` is described under *When the file is missing*; what follows here is about `check`,
+`show` and `test`.
 
 `check` reads the file and prints the problems; without problems it prints one line that
 names the file, the number of services and the number of services without an available
@@ -319,7 +358,8 @@ access, followed per service by one line per access that is `unavailable`
 service (`backend run: kein Zugang`, see below). `show` prints the configuration as read, one
 service per block, or one service when named; it prints what the file says, resolved paths
 included, each access with its availability, then the choice of `run`, and nothing the file
-does not contain. Both create the template when the file is missing, as described above.
+does not contain. Neither writes anything; without a file both print the hint to `init`, as
+described above.
 `test` runs *Testing an access* for all services or the named one and prints one block per
 service with one line per access and its result, then the choice of `run` with the result of
 each chosen access.
@@ -364,9 +404,9 @@ at least one `error` prints the problems exactly like `check` — in plain text 
 with `--json` the object of `check --json` (with `problems` and `services` as `{}`) — and
 exits `1`: there is no configuration to show, only the problems.
 
-Exit codes: `0` no problems, `1` at least one problem, `2` usage error. The one-time
-warning about a freshly created template does not change the exit code: a created file is a
-state to resolve, not a broken one. An `unavailable` access does not change the exit code of
+Exit codes: `0` no problems, `1` at least one problem, `2` usage error. A missing file is no
+problem and exits `0` — also with a service named, because the first step is then `init`, not
+another name. An `unavailable` access does not change the exit code of
 `check` or `show` either — it is a state, reported as a warning by the health check, not a
 problem of the file. For `test`: `0` when every tested access is `ok` (skipped ones do not
 count), `1` when at least one `failed`, `2` usage error, including an unknown service.
@@ -379,7 +419,7 @@ count), `1` when at least one `failed`, `2` usage error, including an unknown se
 ```json
 {
   "file": "/home/alice/.config/k-playbook/github.yaml",
-  "created": false,
+  "present": true,
   "services": {
     "website": {
       "repo": "acme/website",
@@ -430,7 +470,7 @@ And this for a file with one problem — configuration or problems, never both:
 ```json
 {
   "file": "/home/alice/.config/k-playbook/github.yaml",
-  "created": false,
+  "present": true,
   "services": {},
   "problems": [
     {
@@ -444,11 +484,23 @@ And this for a file with one problem — configuration or problems, never both:
 ```
 
 - `file` is the path that was read, after the override and `XDG_CONFIG_HOME` were applied.
-- `created` says whether this call wrote the template.
+- `present` says whether something is at that path. Without a file it is `false`, `services`
+  is `{}`, `problems` is `[]`, and `hint` carries *keine Zugangsdatei — k-playbook github init
+  legt sie an*; `hint` is absent otherwise:
+
+  ```json
+  {
+    "file": "/home/alice/.config/k-playbook/github.yaml",
+    "present": false,
+    "hint": "keine Zugangsdatei — k-playbook github init legt sie an",
+    "services": {},
+    "problems": []
+  }
+  ```
+
 - `services` mirrors the file: the same keys, `~` expanded, no comments, `disabled` only
   where it is `true`. Services are in file order; the order of `access` is the precedence.
-  As soon as one problem has level `error`, `services` is `{}`; the one-time `warning` of a
-  freshly created template leaves it as it is (empty, because the template is empty).
+  As soon as one problem has level `error`, `services` is `{}`.
 - `selected` is, per service, the access `run` would choose, per channel, as the index into
   that service's `access`: `read` is `run` without options, `write` is `run --write`, each with
   `git` and `api`; `null` means the channel has no access. It comes from the same rule as `run`
@@ -462,7 +514,7 @@ And this for a file with one problem — configuration or problems, never both:
   listed; a script that uses them applies them itself. `selected` is present wherever the
   availability was judged: `check`, `show`, `test`, `GET /api/github-access`; with a problem of
   level `error`, `services` is `{}` and there is no `selected`.
-- `problems` has `level` (`error`|`warning`), `path` (where in the file, `services.<name>` or
+- `problems` has `level` (always `error`; the reader has no other level), `path` (where in the file, `services.<name>` or
   `services.<name>.access[<index>]`, `file` for the file as a whole), `message` and `hint`.
   An entry of the health check has `level`, `area`, `message` and `hint` but no `path`; the
   health source `github` therefore puts the path in front of the message
@@ -470,7 +522,7 @@ And this for a file with one problem — configuration or problems, never both:
   Messages and hints are German, like every other text k-playbook shows to people.
 
 `show --json` prints the same object without `problems`; with a service named, `services`
-holds only that one. Text and JSON carry the same information — nothing is only in one of
+holds only that one. Without a file it is `{file, present: false, hint, services: {}}`. Text and JSON carry the same information — nothing is only in one of
 them.
 
 `test --json` prints the file, the services tested and one result per access:
@@ -478,6 +530,7 @@ them.
 ```json
 {
   "file": "/home/alice/.config/k-playbook/github.yaml",
+  "present": true,
   "services": {
     "backend": {
       "repo": "acme-labs/backend",
@@ -511,6 +564,8 @@ them.
 - `read` and `write` are `yes`, `no` or `unknown`; `expires` is a date (`YYYY-MM-DD`) or
   `none`; `warning` is present when the expiry is within fourteen days.
 - `ok` is true when no tested access `failed`.
+- `present` is `false` only without a file: then nothing was tested, `services` is `{}`, `ok`
+  is `true`, and `hint` carries the sentence about `init`, as in `check --json`.
 - `selected` is the same as in `check --json`: `test` does not choose anew. It is taken from the
   availability before the test, without the network, never from the results — in the example
   `playbook` keeps the `ssh` access although it `failed` and `public` is `ok`, because that is
@@ -520,10 +575,10 @@ them.
   `null`. It is only in `test --json`.
 
 The health check (Task 098) calls the same reader and lists its problems under the area
-`github`: structural problems as `error`, the one-time notice about a freshly created template
-as `warning`, a service without an available access as `warning` (see *Availability*). An
-empty file produces nothing. A session therefore sees a broken or unusable file in its
-briefing, and is told once when the file has just come into being.
+`github`: structural problems as `error`, a service without an available access as `warning`
+(see *Availability*). An empty file produces nothing, and neither does a missing one — the
+health check never creates it. A session therefore sees a broken or unusable file in its
+briefing, and nothing when it does not use the file.
 
 ## Running a command under a service
 
@@ -582,10 +637,9 @@ another access could create or merge twice. A caller that wants another access s
 
 ### What is set up
 
-Everything is set up in the environment of the command only. No file is written — except
-the template, which `run` creates like every other read when the file is missing (see *When the
-file is missing*; `run` then ends with `125`, because the template names no service) —, no git
-configuration outside that process changes, `gh auth switch` is never called. Existing
+Everything is set up in the environment of the command only. No file is written — when the
+file is missing, `run` ends with `125` and names `k-playbook github init` (see *When the file is
+missing*) —, no git configuration outside that process changes, `gh auth switch` is never called. Existing
 `GIT_CONFIG_COUNT` entries of the caller are kept; `run` appends its own after them.
 
 Every access chosen for `git` has a target form, the URL git uses for the repository under
@@ -668,7 +722,7 @@ collide with the command's:
 | Code | Meaning |
 |---|---|
 | the command's | the command ran. `run` replaces itself with the command, so a signal reaches the command directly and once, and a command ended by a signal ends `run` by the same signal, which a shell reports as `128 + <signal>` |
-| `125` | `run` itself failed: usage error, unknown service (the message names the known services), a file with problems, no usable access in either channel, the token could not be read |
+| `125` | `run` itself failed: usage error, no file (the message names `k-playbook github init`), unknown service (the message names the known services), a file with problems, no usable access in either channel, the token could not be read |
 | `126` | the command was found but cannot be executed |
 | `127` | the command was not found |
 
@@ -679,9 +733,8 @@ problems of *Reading the file*; `k-playbook github check` names the reason per a
 
 The briefing (`k_playbook_briefing`, `k-playbook briefing`) and `k-playbook context` carry the
 field `context.github` (task 119), so that a session does not have to guess which service
-reaches GitHub for the repository it works in. Same source, same choice as `show`: `Path`, the
-file read without creating the template (`Peek`), `Judge` with `selected`. There is no rule of
-its own.
+reaches GitHub for the repository it works in. Same source, same choice as `show`: `Path`,
+`Load` (which never writes), `Judge` with `selected`. There is no rule of its own.
 
 ```json
 "github": {
@@ -695,16 +748,13 @@ its own.
 }
 ```
 
-- `file`, `present`: the path after *Names* and whether the file is there. The field itself
-  creates nothing (`Peek`). The environment check of the same briefing runs first, though, and
-  its reader creates a missing file once as the template, as described under *When the file
-  is missing* (`services: {}`, `0600`, the one-time warning under `Umgebung:`). In the
-  briefing the field then shows `present: true` without services; `present: false` appears
-  there only when the template cannot be created because the path is read-only (in a
-  container, say). A path occupied by something else — a directory where the file belongs, or a
-  file where its parent directory belongs — is not "missing": `Peek` reports `present: true`
-  with an `error`, and the line says that the file has errors. `k-playbook context` runs no environment check and reports a missing file as
-  `present: false`.
+- `file`, `present`: the path after *Names* and whether the file is there. The briefing
+  creates nothing — neither the field nor the environment check that runs before it (*When the
+  file is missing*). Without a file the field shows `present: false` and the line reads
+  `GitHub: keine Zugangsdatei`. A path occupied by something else — a symbolic link whose
+  target does not exist, a directory where the file belongs, or a file where its parent
+  directory belongs — is not "missing": the field reports `present: true` with an `error`, and
+  the line says that the file has errors.
 - `problems`: the problems of *Reading the file*, in the form of `check --json`. With an
   `error`, `services` is `{}` and `projectServices` `[]`.
 - `remote`, `repo`: the remote that counts is the upstream remote of the current branch,
@@ -722,8 +772,7 @@ its own.
   — usually one.
 - `services`: the same object as `show --json`, with `state`, `reason` and `selected`.
 
-No network, no token value; the field writes nothing (the template above comes from the
-environment check, not from the field). The cost beyond `context.gh` is `Judge` (gh's
+No network, no token value; the field writes nothing. The cost beyond `context.gh` is `Judge` (gh's
 configuration, file checks, `ssh -G` per `host`, 3 s limit each), three local `git` calls (four when the
 upstream remote carries no URL and `origin` is read as well) and at most one more `ssh -G` for a remote alias the file does not name. That is why `ContextForDir`
 fills the field and `BuildContext` does not: the interface and the review selection over MCP do
@@ -734,10 +783,10 @@ built from the same parts as the `run:` lines of `show`, for example
 `GitHub: dieses Repo = Dienst backend — run: git über ssh host github-example, api über gh alice`;
 otherwise `GitHub: kein Dienst für acme-labs/foo (Dienste: …)`,
 `GitHub: kein GitHub-Remote erkannt (Dienste: …)`
-or, with several matching services, all of them. Right after the environment check created
-the template the line reads `GitHub: kein Dienst für acme-labs/foo (Dienste: keine)`;
-`GitHub: keine Zugangsdatei` appears in the briefing only when the template could not be
-created. The rest behind the separator shows `github`
+or, with several matching services, all of them; without a file
+`GitHub: keine Zugangsdatei`, and with an `error` in the file
+`GitHub: die Zugangsdatei hat Fehler — k-playbook github check nennt sie`. The rest behind the
+separator shows `github`
 without `services`. The field is the state when the briefing was loaded; `k-playbook github
 show` gives the current one.
 
@@ -765,5 +814,5 @@ Not part of the contract yet; each will be specified here before it is built.
   last.
 - **A shared, versioned part** for projects where every person uses the same repositories
   with different accounts.
-- **Containers**: `~/.config/k-playbook` mounted read-only; what the template step does there
-  is described above, the mount itself is the project's business.
+- **Containers**: `~/.config/k-playbook` mounted read-only; what `init` does there is
+  described above, the mount itself is the project's business.

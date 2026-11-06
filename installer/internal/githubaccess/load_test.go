@@ -29,7 +29,7 @@ func TestLoadLiestGueltigeDatei(t *testing.T) {
 	_, home := isolate(t)
 
 	result := Load(testdata("valid.yaml"))
-	if len(result.Problems) != 0 || result.Created {
+	if len(result.Problems) != 0 || !result.Present {
 		t.Fatalf("Probleme: %+v", result.Problems)
 	}
 	if got := result.Services.Names(); strings.Join(got, ",") != "website,backend,playbook" {
@@ -60,7 +60,7 @@ func TestLoadLeereDateiIstKeinProblem(t *testing.T) {
 	isolate(t)
 	for _, name := range []string{"empty.yaml", "empty-mapping.yaml"} {
 		result := Load(testdata(name))
-		if len(result.Problems) != 0 || len(result.Services) != 0 || result.Services == nil || result.Created {
+		if len(result.Problems) != 0 || len(result.Services) != 0 || result.Services == nil || !result.Present {
 			t.Errorf("%s: %+v", name, result)
 		}
 	}
@@ -107,7 +107,7 @@ func TestLoadMeldetJedeProblemart(t *testing.T) {
 		if got.Level != LevelError || got.Path != tc.path || !strings.Contains(got.Message, tc.message) || got.Hint == "" {
 			t.Errorf("%s: %+v", tc.file, got)
 		}
-		if result.Services != nil || result.Created {
+		if result.Services != nil || !result.Present {
 			t.Errorf("%s: Services trotz error: %+v", tc.file, result.Services)
 		}
 	}
@@ -178,7 +178,7 @@ func TestResultJSONHatDieFormDesVertrags(t *testing.T) {
 	}
 	text := string(data)
 	wantOrder := `"services":{"website":{"repo":"acme/website","access":[{"type":"gh","login":"alice"}]},"backend":{"repo":"acme-labs/backend","access":[{"type":"ssh","key":"` + filepath.Join(home, ".ssh", "id_ed25519_acme_labs") + `"},{"type":"token","file":"` + filepath.Join(home, ".config", "github-tokens", "acme-labs.token") + `","disabled":true}]},"playbook":{"repo":"example/k-playbook","access":[{"type":"ssh","host":"github-example"},{"type":"public"}]}},"problems":[]}`
-	if !strings.HasSuffix(text, wantOrder) || !strings.HasPrefix(text, `{"file":"testdata/valid.yaml","created":false,`) {
+	if !strings.HasSuffix(text, wantOrder) || !strings.HasPrefix(text, `{"file":"testdata/valid.yaml","present":true,`) {
 		t.Errorf("JSON: %s", text)
 	}
 

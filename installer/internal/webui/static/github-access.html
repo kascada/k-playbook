@@ -17,8 +17,11 @@
           <!-- Die persönliche GitHub-Zugangsdatei (docs/github-access.md):
                eine Datei je Person für alle Projekte dieses Rechners. Sie
                enthält keine Geheimnisse, nur wo ein Zugang liegt. Diese Seite
-               zeigt sie und testet sie; geschrieben wird sie hier nicht —
-               bearbeitet wird im Editor, die Karte sagt, wo sie liegt.
+               zeigt sie und testet sie; bearbeitet wird im Editor, die Karte
+               sagt, wo sie liegt. Die Datei ist freiwillig: Fehlt sie, zeigt
+               die Karte „Keine Zugangsdatei“ und den Knopf „Anlegen“, der die
+               Vorlage anlegt wie k-playbook github init — sonst schreibt die
+               Seite nichts.
 
                Beim Laden fragt die Seite nur die Platte: GET /api/github-access
                liest die Datei und beurteilt die Verfügbarkeit jedes Zugangs
@@ -29,7 +32,11 @@
               <div>
                 <h2>Datei</h2>
               </div>
-              <span id="access-file-pill" class="pill muted">Laden...</span>
+              <div class="access-actions">
+                <span id="access-file-pill" class="pill muted">Laden...</span>
+                <button type="button" class="secondary" id="access-init" hidden
+                        title="Legt die Zugangsdatei als Vorlage an — wie k-playbook github init: Verzeichnis 0700, Datei 0600, ein Beispiel je Zugangsart. Eine vorhandene Datei bleibt unverändert.">Anlegen</button>
+              </div>
             </div>
             <p class="hint">
               Je Dienst ein kurzer Name, das Repository und die Zugänge in der Reihenfolge, in

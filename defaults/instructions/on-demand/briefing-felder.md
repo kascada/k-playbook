@@ -96,14 +96,14 @@ welcher Zugang gilt.
 
 `context.github` kommt aus derselben Quelle wie `k-playbook github show`: der persönlichen
 Zugangsdatei `~/.config/k-playbook/github.yaml` (Ort nach `K_PLAYBOOK_GITHUB_CONFIG` bzw.
-`XDG_CONFIG_HOME`). `file` ist ihr Pfad, `present`, ob sie dort liegt. Das Feld selbst legt
-nichts an; die Umgebungsprüfung im selben Briefing läuft aber vorher und legt eine fehlende
-Datei einmal als Vorlage an (`services: {}`, 0600, mit einer einmaligen Warnung unter
-`Umgebung:`). Im Briefing steht dann `present: true` ohne Dienste, und die Zeile sagt „GitHub:
-kein Dienst für <owner>/<repo> (Dienste: keine)“ bzw. „kein GitHub-Remote erkannt (Dienste:
-keine)“. „GitHub: keine Zugangsdatei“ zeigt das Briefing nur, wenn sich die Vorlage nicht
-anlegen lässt, etwa bei einem schreibgeschützten Pfad im Container; `k-playbook context` prüft
-die Umgebung nicht und zeigt bei fehlender Datei `present: false`. `problems` sind die
+`XDG_CONFIG_HOME`). `file` ist ihr Pfad, `present`, ob sie dort liegt. Die Datei ist
+freiwillig, und das Briefing legt nichts an — weder das Feld noch die Umgebungsprüfung, die
+vorher läuft. Fehlt sie, ist `present` falsch, die Umgebung nennt nichts dazu, und die Zeile
+sagt „GitHub: keine Zugangsdatei“. Angelegt wird sie nur ausdrücklich mit `k-playbook github
+init` (oder dem Knopf „Anlegen“ der Oberfläche); eine Sitzung schreibt das YAML nicht selbst.
+Ein belegter Pfad ohne lesbare Datei, etwa ein symbolischer Link ohne Ziel, gilt nicht als
+fehlend: `present` ist wahr, `problems` trägt den `error`, und die Zeile sagt, dass die Datei
+Fehler hat. `problems` sind die
 Probleme der Datei in der Form von `k-playbook github check --json`; bei einem `error` sind
 `services` `{}` und `projectServices` `[]`. `remote` ist der Eintrag des Remotes, das zählt —
 das Upstream-Remote des aktuellen Branches, sonst `origin`, roh gelesen ohne `insteadOf` und
@@ -114,7 +114,8 @@ Datei nennt oder `ssh -G` nach github.com auflöst). `projectServices` sind die 
 einer. `services` ist dasselbe Objekt wie bei `github show --json`, je Zugang mit `state` und
 `reason` und je Dienst mit `selected`, der Wahl von `run`. Kein Netz, kein Token-Wert. Im
 Klartext steht die Zeile `GitHub: dieses Repo = Dienst <name> — run: git über …, api über …`
-bzw. „kein Dienst für <owner>/<repo>“ oder „kein GitHub-Remote erkannt“; den Rest hinter der Trennzeile zeigt `github` ohne
+bzw. „kein Dienst für <owner>/<repo>“, „kein GitHub-Remote erkannt“, „keine Zugangsdatei“ oder
+„die Zugangsdatei hat Fehler“; den Rest hinter der Trennzeile zeigt `github` ohne
 `services`. Das Feld zeigt den Stand beim Laden des Briefings, `k-playbook github show` den
 aktuellen.
 

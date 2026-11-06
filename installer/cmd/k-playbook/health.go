@@ -120,9 +120,9 @@ Aufruf:
 Prüft die Umgebung des Projekts und nennt alles, was nicht stimmt — nicht nur
 das erste Problem. Je Eintrag Stufe (error oder warning), Bereich, ein Satz
 und die Abhilfe; nie ein Token oder ein Wert aus einer Datei (Dienst- und
-Schlüsselnamen dürfen vorkommen). Repariert wird nichts — außer dass der
-Bereich github die fehlende Zugangsdatei einmal als Vorlage anlegt. Die
-Bereiche heute:
+Schlüsselnamen dürfen vorkommen). Repariert und geschrieben wird nichts —
+auch keine fehlende GitHub-Zugangsdatei; die legt k-playbook github init an.
+Die Bereiche heute:
 
   kephalaion      eingetragen, aber nicht ok: error; nicht eingetragen: warning
   gh              das Projekt setzt gh voraus (tools.gh.status enabled), aber
@@ -132,8 +132,9 @@ Bereiche heute:
                   oder von unbekannter Fassung: error
   github          die persönliche GitHub-Zugangsdatei ~/.config/k-playbook/
                   github.yaml sagt etwas Falsches: je Problem ein error mit
-                  dem Pfad in der Datei vorn im Satz; Datei fehlte und wurde
-                  gerade als Vorlage angelegt: einmal warning
+                  dem Pfad in der Datei vorn im Satz; je Dienst ohne
+                  verfügbaren Zugang eine warning; eine fehlende Datei ist
+                  kein Eintrag
 
 Ohne --json der Klartext: ohne Problem die Zeile „Umgebung: keine Probleme“,
 sonst „Umgebung:“ und je Eintrag „[stufe] bereich: satz — abhilfe“ — derselbe

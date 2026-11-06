@@ -13,12 +13,12 @@ import (
 // Dienst der persönlichen Zugangsdatei (docs/github-access.md) zum Repo des
 // Arbeitsstands gehört und welche Zugänge `k-playbook github run` dafür
 // wählt, dazu die übrigen Dienste. Dieselbe Quelle und dieselbe Auswahl wie
-// `github show`: Path, Peek statt Load, Judge mit selected.
+// `github show`: Path, Load, Judge mit selected.
 type ContextGitHub struct {
 	// File ist der Ort der Datei nach githubaccess.Path, Present, ob sie
-	// dort liegt. Fehlt sie, legt das Feld keine Vorlage an. Im Briefing
-	// läuft aber die Umgebungsprüfung vorher (healthGitHub → Load) und legt
-	// sie an; dort ist Present deshalb nur falsch, wenn das nicht ging.
+	// dort liegt. Fehlt sie, legt niemand im Briefing sie an — weder das
+	// Feld noch die Umgebungsprüfung davor (healthGitHub); Present ist dann
+	// falsch. Ein Symlink ohne Ziel ist belegt: Present wahr, ein error.
 	File    string `json:"file"`
 	Present bool   `json:"present"`
 	// Problems sind die Probleme des Lesers in der Form von `github check
@@ -60,9 +60,9 @@ func contextGitHub(gitDir string) *ContextGitHub {
 			Hint:    "HOME oder XDG_CONFIG_HOME setzen oder den Pfad in " + githubaccess.EnvConfig + " nennen.",
 		})
 	} else {
-		result, present := githubaccess.Peek(path)
-		field.File, field.Present, field.Problems = path, present, result.Problems
-		if present && !result.HasErrors() && result.Services != nil {
+		result := githubaccess.Load(path)
+		field.File, field.Present, field.Problems = path, result.Present, result.Problems
+		if result.Present && !result.HasErrors() && result.Services != nil {
 			field.Services = githubaccess.Judge(result.Services)
 		}
 	}

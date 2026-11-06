@@ -280,8 +280,9 @@ func TestHealthCheckSammeltAlleQuellen(t *testing.T) {
 
 // Die Quelle github trägt die Probleme der persönlichen Zugangsdatei ein: der
 // Pfad in der Datei vorn im Satz, Stufe wie beim Leser, Bereich github. Eine
-// leere Datei ergibt nichts, eine fehlende einmal eine Warnung (die Vorlage),
-// eine defekte je Problem einen Fehler — nie ein Wert aus der Datei.
+// leere Datei ergibt nichts, eine fehlende auch — und sie bleibt fehlend, die
+// Quelle legt nichts an —, eine defekte je Problem einen Fehler, nie ein Wert
+// aus der Datei.
 func TestHealthGitHubTraegtDieProblemeDerZugangsdatei(t *testing.T) {
 	root := healthProject(t)
 
@@ -290,24 +291,25 @@ func TestHealthGitHubTraegtDieProblemeDerZugangsdatei(t *testing.T) {
 		t.Errorf("leere Datei: %+v", problems)
 	}
 
-	// Fehlend: einmal die Warnung der Vorlage, danach nichts; OK bleibt wahr.
-	missing := filepath.Join(t.TempDir(), githubaccess.FileName)
+	// Fehlend: nichts, OK bleibt wahr, und keine Datei entsteht.
+	missingDir := filepath.Join(t.TempDir(), "fehlt")
+	missing := filepath.Join(missingDir, githubaccess.FileName)
 	t.Setenv(githubaccess.EnvConfig, missing)
-	report := health.Check(context.Background(), root)
-	if !report.OK || len(report.Problems) != 1 {
-		t.Fatalf("fehlende Datei: %+v", report)
+	for range 2 {
+		if report := health.Check(context.Background(), root); !report.OK || len(report.Problems) != 0 {
+			t.Fatalf("fehlende Datei: %+v", report)
+		}
 	}
-	got := report.Problems[0]
-	if got.Level != health.LevelWarning || got.Area != health.AreaGitHub || !strings.HasPrefix(got.Message, "file: Die Datei wurde gerade angelegt") || !strings.Contains(got.Hint, missing) {
-		t.Errorf("Vorlage: %+v", got)
+	if _, err := os.Lstat(missingDir); !os.IsNotExist(err) {
+		t.Fatalf("Verzeichnis angelegt: %v", err)
 	}
-	if report := health.Check(context.Background(), root); !report.OK || len(report.Problems) != 0 {
-		t.Errorf("zweiter Aufruf: %+v", report)
+	if err := os.MkdirAll(missingDir, 0o700); err != nil {
+		t.Fatal(err)
 	}
 
 	// Defekt: je Problem ein Fehler mit Pfad, OK falsch.
 	write(t, missing, "services:\n  backend:\n    repo: acme-labs/backend\n    access:\n      - type: ssh\n        key: ~/.ssh/id\n      - type: token\n        file: relativ.token\n  web:\n    access:\n      - type: public\n")
-	report = health.Check(context.Background(), root)
+	report := health.Check(context.Background(), root)
 	if report.OK || len(report.Problems) != 2 {
 		t.Fatalf("defekte Datei: %+v", report)
 	}

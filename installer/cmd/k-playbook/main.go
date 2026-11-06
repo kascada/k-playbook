@@ -308,23 +308,24 @@ Unterkommandos:
             k-playbook health [--json]. Je Eintrag Stufe (error, warning),
             Bereich (kephalaion, gh, baseTools, versionSources, github), ein
             Satz und die Abhilfe; alle auf einmal, nichts wird repariert
-            (nur die fehlende GitHub-Zugangsdatei entsteht einmal als
-            Vorlage), kein Token oder Wert steht darin. Ohne Problem die eine Zeile
+            oder angelegt, kein Token oder Wert steht darin. Ohne Problem die eine Zeile
             „Umgebung: keine Probleme“ — derselbe Block wie im Briefing.
             Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
             Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
             k_playbook_health.
-  github    Liest, prüft und testet die persönliche GitHub-Zugangsdatei
-            ~/.config/k-playbook/github.yaml: k-playbook github
-            check|show|test [<dienst>] [--json]. check nennt alle Probleme,
+  github    Legt an, liest, prüft und testet die persönliche GitHub-
+            Zugangsdatei ~/.config/k-playbook/github.yaml: k-playbook github
+            init|check|show|test [<dienst>] [--json]. init legt die Vorlage
+            an (als einziger; eine vorhandene Datei bleibt). check nennt alle Probleme,
             sortiert nach Position in der Datei, sonst Datei, Zahl der
             Dienste und die Zugänge, die auf diesem Rechner nicht verfügbar
             sind; show zeigt die Konfiguration, je Dienst Repository und
             Zugänge mit Verfügbarkeit; test fragt GitHub, ob die verfügbaren
             Zugänge funktionieren — als einziger mit Netz, nur auf diesen
             Aufruf hin, dasselbe wie das MCP-Werkzeug k_playbook_github_test.
-            Fehlt die Datei, entsteht einmal eine Vorlage. Exit-Code 0 ohne
-            Problem, 1 mit error (test: mit failed), 2 bei Aufruffehlern.
+            Fehlt die Datei, nennen sie den Hinweis auf init und enden mit 0.
+            Exit-Code 0 ohne Problem, 1 mit error (test: mit failed; init:
+            nicht anlegbar), 2 bei Aufruffehlern.
             Vertrag: docs/github-access.md.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].

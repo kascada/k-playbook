@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
+	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -143,14 +144,14 @@ func TestBriefingGitHubOhneTokenWert(t *testing.T) {
 	}
 }
 
-// Fehlt die Zugangsdatei, legt nicht das Feld context.github sie an, sondern
-// die Umgebungsprüfung desselben Briefings, die vorher läuft (healthGitHub →
-// Load): einmal die Vorlage mit services: {} und 0600, dazu die einmalige
-// Warnung unter Umgebung. Das Feld sieht die Datei danach schon — present
-// wahr, keine Dienste —, und die Zeile sagt „Dienste: keine“, nicht „keine
-// Zugangsdatei“. Die bleibt dem Fall, in dem sich die Vorlage nicht anlegen
-// lässt.
-func TestBriefingGitHubVorlageDurchUmgebungspruefung(t *testing.T) {
+// Fehlt die Zugangsdatei, legt das Briefing nichts an — weder das Feld
+// context.github noch die Umgebungsprüfung desselben Briefings: Keine Datei
+// und kein Verzeichnis entstehen, die Umgebung nennt nichts im Bereich
+// github, und die Zeile sagt „GitHub: keine Zugangsdatei“; im JSON ist
+// present falsch. Ein symbolischer Link ohne Ziel an der Stelle der Datei
+// ist dagegen belegt: Die Zeile nennt Fehler, und die Umgebungsprüfung
+// meldet einen error; auch dort entsteht nichts.
+func TestBriefingLegtBeiFehlenderZugangsdateiNichtsAn(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git nicht verfügbar")
 	}
@@ -162,28 +163,24 @@ func TestBriefingGitHubVorlageDurchUmgebungspruefung(t *testing.T) {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	config := filepath.Join(t.TempDir(), "fehlt", githubaccess.FileName)
+	dir := filepath.Join(t.TempDir(), "fehlt")
+	config := filepath.Join(dir, githubaccess.FileName)
 	t.Setenv(githubaccess.EnvConfig, config)
 
 	text, err := runBriefingCaptured(t)
 	if err != nil {
 		t.Fatalf("briefing: %v", err)
 	}
-	info, err := os.Stat(config)
-	if err != nil {
-		t.Fatalf("Vorlage nicht angelegt: %v", err)
+	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+		t.Fatalf("Verzeichnis der Zugangsdatei angelegt: %v", err)
 	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("Vorlage mit %v, erwartet 0600", info.Mode().Perm())
+	if !strings.Contains(text, "\nGitHub: keine Zugangsdatei\n") {
+		t.Errorf("Zeile ohne Zugangsdatei:\n%s", text)
 	}
-	if !strings.Contains(text, "Die Datei wurde gerade angelegt") {
-		t.Errorf("einmalige Warnung fehlt unter Umgebung:\n%s", text)
-	}
-	if !strings.Contains(text, "\nGitHub: kein Dienst für kascada/k-playbook (Dienste: keine)\n") || strings.Contains(text, "keine Zugangsdatei") {
-		t.Errorf("Zeile nach angelegter Vorlage:\n%s", text)
+	if strings.Contains(text, "] github: ") || strings.Contains(text, "angelegt") {
+		t.Errorf("Umgebung nennt die fehlende Zugangsdatei:\n%s", text)
 	}
 
-	// JSON im zweiten Lauf: die Datei liegt, present ist wahr, keine Dienste.
 	asJSON, err := runBriefingCaptured(t, "--json")
 	if err != nil {
 		t.Fatalf("briefing --json: %v", err)
@@ -192,36 +189,39 @@ func TestBriefingGitHubVorlageDurchUmgebungspruefung(t *testing.T) {
 	if err := json.Unmarshal([]byte(asJSON), &briefing); err != nil {
 		t.Fatal(err)
 	}
+	for _, problem := range briefing.Health.Problems {
+		if problem.Area == health.AreaGitHub {
+			t.Errorf("Umgebung mit Eintrag github: %+v", problem)
+		}
+	}
 	raw, _ := briefing.Context.Field("github")
 	var field project.ContextGitHub
 	if err := json.Unmarshal(raw, &field); err != nil {
 		t.Fatalf("context.github: %v\n%s", err, raw)
 	}
-	if !field.Present || field.File != config || len(field.Services) != 0 || len(field.ProjectServices) != 0 || field.Repo != "kascada/k-playbook" {
-		t.Errorf("context.github nach angelegter Vorlage: %s", raw)
+	if field.Present || field.File != config || len(field.Problems) != 0 || len(field.Services) != 0 || field.Repo != "kascada/k-playbook" {
+		t.Errorf("context.github ohne Datei: %s", raw)
+	}
+	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+		t.Fatalf("Verzeichnis der Zugangsdatei angelegt: %v", err)
 	}
 
-	// Lässt sich die Vorlage nicht anlegen (schreibgeschütztes Verzeichnis
-	// wie in einem Container), meldet die Umgebungsprüfung einen Fehler, und
-	// die Zeile sagt „keine Zugangsdatei“.
-	if os.Geteuid() == 0 {
-		t.Skip("als root greift der Schreibschutz nicht")
+	// Symlink ohne Ziel: belegt, nicht fehlend.
+	linkDir := t.TempDir()
+	link := filepath.Join(linkDir, githubaccess.FileName)
+	target := filepath.Join(linkDir, "ziel", githubaccess.FileName)
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("kein Symlink möglich: %v", err)
 	}
-	locked := filepath.Join(t.TempDir(), "gesperrt")
-	if err := os.Mkdir(locked, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(locked, 0o700) })
-	blocked := filepath.Join(locked, githubaccess.FileName)
-	t.Setenv(githubaccess.EnvConfig, blocked)
+	t.Setenv(githubaccess.EnvConfig, link)
 	text, err = runBriefingCaptured(t)
 	if err != nil {
 		t.Fatalf("briefing: %v", err)
 	}
-	if _, err := os.Stat(blocked); !os.IsNotExist(err) {
-		t.Errorf("Datei im schreibgeschützten Verzeichnis: %v", err)
+	if !strings.Contains(text, "\nGitHub: die Zugangsdatei hat Fehler — k-playbook github check nennt sie\n") || !strings.Contains(text, "[error] github: file: Die Datei ist nicht lesbar: Der Pfad ist ein symbolischer Link") {
+		t.Errorf("Symlink ohne Ziel:\n%s", text)
 	}
-	if !strings.Contains(text, "\nGitHub: keine Zugangsdatei\n") {
-		t.Errorf("Zeile ohne anlegbare Vorlage:\n%s", text)
+	if _, err := os.Lstat(target); !os.IsNotExist(err) {
+		t.Errorf("Ziel des Links angelegt: %v", err)
 	}
 }

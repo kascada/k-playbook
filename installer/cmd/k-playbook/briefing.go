@@ -189,12 +189,11 @@ func writeBriefingContext(b *strings.Builder, section project.BriefingContext) {
 // Zugangsdatei zu diesem Repo gehört und was `k-playbook github run` dafür
 // wählt — aus denselben Teilen wie bei `github show` (githubSelectionLines,
 // ChannelParts). Je nach Lage „keine Zugangsdatei“, „kein Dienst für …“ oder
-// alle passenden Dienste. Leer, wenn der Rest das Feld nicht trägt. Fehlte die
-// Datei, hat die Umgebungsprüfung desselben Briefings sie vorher als Vorlage
-// angelegt; die Zeile sagt dann „(Dienste: keine)“, und „keine
-// Zugangsdatei“ bleibt dem Fall, in dem das nicht ging, weil der Pfad
-// schreibgeschützt ist. Ist der Pfad anders belegt (ein Verzeichnis an der
-// Stelle der Datei), meldet Peek einen error, und die Zeile nennt Fehler.
+// alle passenden Dienste. Leer, wenn der Rest das Feld nicht trägt. Das
+// Briefing legt die Datei nicht an — weder das Feld noch die
+// Umgebungsprüfung —; fehlt sie, sagt die Zeile „keine Zugangsdatei“. Ist der
+// Pfad anders belegt (ein Symlink ohne Ziel, ein Verzeichnis an der Stelle
+// der Datei), meldet Load einen error, und die Zeile nennt Fehler.
 func briefingGitHubLine(section project.BriefingContext) string {
 	raw, ok := section.Field("github")
 	if !section.Available || !ok {
@@ -376,11 +375,9 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
   - eine Zeile GitHub: welcher Dienst der persönlichen Zugangsdatei
     (k-playbook github show) zum Repo des Arbeitsverzeichnisses gehört und
     was k-playbook github run dafür wählt, sonst „kein Dienst für
-    <owner>/<repo>“ — auch gleich nachdem die Umgebungsprüfung eine fehlende
-    Datei als Vorlage angelegt hat („Dienste: keine“) — oder „keine
-    Zugangsdatei“, wenn sich die Vorlage nicht anlegen ließ (schreibgeschützter
-    Pfad); das volle Objekt
-    steht im JSON unter context.github;
+    <owner>/<repo>“ oder „keine Zugangsdatei“ — das Briefing legt sie nicht
+    an, das tut nur k-playbook github init; das volle Objekt steht im JSON
+    unter context.github;
   - hinter einer Trennzeile den Rest von k-playbook context — die
     Umgebungsangaben (Pfade, Werkzeuge, gh, git, Kephalaion-Anbindung …), die
     das Briefing noch nicht selbst abdeckt; ohne catalogs.rules,

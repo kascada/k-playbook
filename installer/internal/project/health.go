@@ -26,8 +26,8 @@ import (
 // steht hier neben den anderen, weil hier alle Quellen eingehängt werden und
 // githubaccess project nicht kennt.
 //
-// Repariert wird nichts — außer dass die Quelle github die fehlende
-// Zugangsdatei einmal als Vorlage anlegt, wie ihr Vertrag es will —, und kein
+// Repariert wird nichts — auch die Quelle github legt eine fehlende
+// Zugangsdatei nicht an; das tut nur `k-playbook github init` —, und kein
 // Eintrag nennt einen Token oder einen Wert aus einer Datei; Dienst- und
 // Schlüsselnamen dürfen vorkommen. Die Kontextausgabe bleibt unverändert;
 // health ersetzt keine Felder, es bewertet sie.
@@ -182,9 +182,9 @@ func healthVersionSources(_ context.Context, projectDir string) []health.Problem
 // (docs/github-access.md) ein: jedes Problem des Lesers als Eintrag mit
 // seiner Stufe, der Pfad in der Datei (file, services.<name>,
 // services.<name>.access[<i>]) vorn im Satz, weil ein health.Problem kein
-// eigenes Feld dafür hat. Eine leere Datei ergibt nichts; die einmalige
-// Meldung der frisch angelegten Vorlage ist eine warning, jedes Problem der
-// Datei ein error. Liest sich die Datei, beurteilt die Quelle dazu die
+// eigenes Feld dafür hat. Eine fehlende Datei ergibt nichts — sie ist
+// freiwillig, und die Quelle legt sie nicht an —, eine leere auch; jedes
+// Problem der Datei ist ein error. Liest sich die Datei, beurteilt die Quelle dazu die
 // Verfügbarkeit jedes Zugangs ohne Netz (githubaccess.Judge): Ein Dienst, in
 // dem kein Zugang verfügbar ist, wird eine warning — die Datei trägt dann
 // nichts, was sich nutzen ließe. Weiter als das geht die Quelle nicht; GitHub
@@ -201,6 +201,9 @@ func healthGitHub(_ context.Context, _ string) []health.Problem {
 		}}
 	}
 	result := githubaccess.Load(path)
+	if !result.Present {
+		return nil
+	}
 	problems := make([]health.Problem, 0, len(result.Problems))
 	for _, problem := range result.Problems {
 		problems = append(problems, health.Problem{

@@ -17,14 +17,21 @@ import (
 // je Dienst einen Block mit Repository und den Zugängen in Vorrangreihenfolge
 // samt Verfügbarkeit, und auf Knopfdruck den Test gegen GitHub. Sie steht
 // neben den Projektseiten, handelt aber von der Person: die Datei gilt für
-// jedes Projekt dieses Rechners. Nichts auf der Seite schreibt die Datei;
-// bearbeitet wird im Editor, die Seite sagt, wo sie liegt.
+// jedes Projekt dieses Rechners. Bearbeitet wird im Editor, die Seite sagt,
+// wo die Datei liegt. Geschrieben wird sie hier nur auf den Knopf „Anlegen“,
+// den die Seite zeigt, solange die Datei fehlt — über denselben Code wie
+// `k-playbook github init` (githubaccess.Init).
 //
-// Zwei Endpunkte. GET /api/github-access ist das Objekt von `check --json`
-// (file, created, services mit state und reason, problems), dazu available
-// und message wie bei jedem GET der Oberfläche, wenn die Datei gar nicht
-// lesbar ist. Er ist ohne Netz: Lesen, Vorlage anlegen, Verfügbarkeit
-// beurteilen (gh-Konfiguration, Dateien, ssh -G). POST /api/github-access/test
+// Drei Endpunkte. GET /api/github-access ist das Objekt von `check --json`
+// (file, present, hint, services mit state und reason, problems), dazu
+// available und message wie bei jedem GET der Oberfläche, wenn die Datei
+// gar nicht lesbar ist. Er ist ohne Netz und schreibt nichts: Lesen,
+// Verfügbarkeit beurteilen (gh-Konfiguration, Dateien, ssh -G); fehlt die
+// Datei, ist present falsch. POST /api/github-access/init ist das Objekt von
+// `init --json` (file, created, problems): legt die Vorlage an oder lässt
+// eine vorhandene Datei stehen; scheitert es — im schreibgeschützten
+// Container —, antwortet er mit 409 und der Abhilfe für den Host.
+// POST /api/github-access/test
 // mit optionalem service ist das Objekt von `test --json` — der einzige
 // Endpunkt dieser Seite mit Netz, und er läuft nur auf den Knopf hin: weder
 // der Seitenaufbau noch die Statusseite noch das Menü rufen ihn. Die Seite
@@ -49,11 +56,13 @@ var newGitHubAccessTester = githubaccess.NewTester
 // von check --json, dazu available und message. available ist falsch, wenn
 // der Ort der Datei unbekannt ist oder die Datei als Ganzes nicht lesbar
 // (ein Problem mit Pfad file); problems trägt dann trotzdem, was der Leser
-// sagt.
+// sagt. Eine fehlende Datei ist lesbar im Sinn von available: present
+// falsch, hint der Hinweis auf init, keine Probleme.
 type githubAccessResponse struct {
 	Available bool                   `json:"available"`
 	File      string                 `json:"file,omitempty"`
-	Created   bool                   `json:"created"`
+	Present   bool                   `json:"present"`
+	Hint      string                 `json:"hint,omitempty"`
 	Services  githubaccess.Services  `json:"services"`
 	Problems  []githubaccess.Problem `json:"problems"`
 	Message   string                 `json:"message,omitempty"`
@@ -71,7 +80,7 @@ func githubAccessHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := githubaccess.Load(path)
-	response := githubAccessResponse{Available: true, File: result.File, Created: result.Created, Services: result.Services, Problems: result.Problems}
+	response := githubAccessResponse{Available: true, File: result.File, Present: result.Present, Hint: result.Hint, Services: result.Services, Problems: result.Problems}
 	if response.Services == nil {
 		response.Services = githubaccess.Services{}
 	}
@@ -86,6 +95,31 @@ func githubAccessHandler(w http.ResponseWriter, r *http.Request) {
 		githubaccess.Judge(response.Services)
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+// githubAccessInitHandler legt die Zugangsdatei als Vorlage an — derselbe
+// Code wie `k-playbook github init`, dieselbe Antwort wie `init --json`.
+// POST hinter sameOrigin, ohne Werte aus der Anfrage: der Pfad kommt allein
+// aus githubaccess.Path. Liegt die Datei schon da, bleibt sie unverändert
+// (200, created falsch). Lässt sie sich nicht anlegen, 409 mit dem Problem
+// samt Abhilfe — im schreibgeschützten Container der Hinweis, was auf dem
+// Host anzulegen ist.
+func githubAccessInitHandler(w http.ResponseWriter, r *http.Request) {
+	path, err := githubaccess.Path()
+	if err != nil {
+		writeJSON(w, http.StatusConflict, githubaccess.InitResult{Problems: []githubaccess.Problem{{
+			Level: githubaccess.LevelError, Path: githubaccess.PathFile,
+			Message: "Der Ort der GitHub-Zugangsdatei ist unbekannt: " + err.Error() + ".",
+			Hint:    "HOME oder XDG_CONFIG_HOME setzen oder den Pfad in " + githubaccess.EnvConfig + " nennen.",
+		}}})
+		return
+	}
+	result := githubaccess.Init(path)
+	if result.HasErrors() {
+		writeJSON(w, http.StatusConflict, result)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // maxGitHubAccessRequest begrenzt den Rumpf des POST: ein Dienstname.
@@ -128,6 +162,12 @@ func githubAccessTestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := githubaccess.Load(path)
+	if !result.Present {
+		// Wie `github test --json`: nichts getestet, present falsch, der
+		// Hinweis auf init.
+		writeJSON(w, http.StatusOK, githubaccess.MissingReport(path))
+		return
+	}
 	if result.HasErrors() {
 		writeJSON(w, http.StatusConflict, githubAccessTestError{
 			Message:  "Die Zugangsdatei " + path + " hat Probleme; nichts getestet.",

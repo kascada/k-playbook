@@ -96,11 +96,10 @@ type Context struct {
 	// und Auswahl wie `github show`. Anders als GH kostet das Unterprozesse:
 	// drei bis vier git-Aufrufe für das Remote und `ssh -G` je ssh host der Datei
 	// (Frist 3 s je Host), dazu der Blick in die gh-Konfiguration; kein Netz,
-	// kein Token-Wert, keine Vorlage. Gefüllt wird das Feld deshalb von
-	// ContextForDir, nicht von BuildContext — die Oberfläche und die
+	// kein Token-Wert, nichts geschrieben — auch keine Zugangsdatei, wenn sie
+	// fehlt; die legt nur `k-playbook github init` an. Gefüllt wird das Feld
+	// von ContextForDir, nicht von BuildContext — die Oberfläche und die
 	// Review-Auswahl über MCP tragen die Kosten nicht. Siehe contextGitHub.
-	// Die Vorlage einer fehlenden Datei legt im Briefing die vorher laufende
-	// Umgebungsprüfung an (healthGitHub → Load), nicht das Feld.
 	GitHub *ContextGitHub `json:"github,omitempty"`
 }
 

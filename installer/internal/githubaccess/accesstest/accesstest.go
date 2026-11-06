@@ -1,6 +1,6 @@
 // Package accesstest gibt Tests eine eigene GitHub-Zugangsdatei, damit kein
 // Test die persönliche ~/.config/k-playbook/github.yaml des Rechners liest
-// oder — bei fehlender Datei — dort die Vorlage anlegt. Sobald die Quelle
+// oder — über Init — dort etwas anlegt. Sobald die Quelle
 // github in der Umgebungsprüfung registriert ist, erreicht jedes health.Check
 // und jedes Briefing den Leser; jedes Testpaket, das dorthin kommt, schirmt
 // sich in TestMain mit Isolate ab, wie sharetest.Isolate es für
@@ -18,8 +18,9 @@ import (
 
 // Isolate setzt den Override K_PLAYBOOK_GITHUB_CONFIG auf eine Datei in einem
 // leeren Verzeichnis und gibt die Aufräumfunktion zurück. Gedacht für
-// TestMain: Danach legt ein Test, der den Leser erreicht, höchstens dort die
-// Vorlage an, nie am echten Ort.
+// TestMain: Danach liest ein Test, der den Leser erreicht, eine fehlende
+// Datei in einem leeren Verzeichnis, und ein Init landet dort, nie am echten
+// Ort.
 func Isolate() (cleanup func(), err error) {
 	dir, err := os.MkdirTemp("", "k-playbook-github-leer-")
 	if err != nil {

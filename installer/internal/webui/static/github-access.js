@@ -7,8 +7,10 @@
 // Verfügbarkeit ohne Netz. GitHub wird erst gefragt, wenn jemand „Prüfen“
 // oder „Alle prüfen“ drückt: je Dienst ein eigener POST /api/github-access/test
 // mit service, damit sich die Blöcke einzeln füllen und ein langsamer Dienst
-// die anderen nicht aufhält. Geschrieben wird nichts: die Datei gehört in den
-// Editor, die Seite sagt, wo sie liegt. Alles aus den Antworten steht in
+// die anderen nicht aufhält. Bearbeitet wird die Datei im Editor, die Seite
+// sagt, wo sie liegt. Geschrieben wird nur auf „Anlegen“ hin, den Knopf, den
+// die Seite allein bei fehlender Datei zeigt: POST /api/github-access/init,
+// derselbe Code wie k-playbook github init. Alles aus den Antworten steht in
 // textContent — kein Wert wird als HTML gedeutet.
 
 buildBlockNav();
@@ -19,6 +21,7 @@ startSession((message) => {
 
 const elements = {
   filePill: document.getElementById("access-file-pill"),
+  init: document.getElementById("access-init"),
   fileFacts: document.getElementById("access-file-facts"),
   problems: document.getElementById("access-problems"),
   fileMessage: document.getElementById("access-file-message"),
@@ -58,6 +61,7 @@ const ANSWER_LABEL = { yes: "ja", no: "nein", unknown: "unbekannt" };
 const serviceBlocks = new Map();
 
 elements.testAll.addEventListener("click", testAll);
+elements.init.addEventListener("click", initFile);
 
 loadAccess();
 
@@ -108,6 +112,7 @@ function renderFile(data) {
   elements.fileFacts.replaceChildren();
   elements.problems.replaceChildren();
   elements.fileMessage.textContent = "";
+  elements.init.hidden = true;
 
   if (data.file) {
     const code = document.createElement("code");
@@ -123,6 +128,16 @@ function renderFile(data) {
     return;
   }
 
+  if (data.present === false) {
+    // Die Datei ist freiwillig: kein Problem, nur der Weg, sie anzulegen.
+    setPill(elements.filePill, "muted", "Keine Zugangsdatei");
+    elements.fileMessage.textContent =
+      "Es gibt noch keine Zugangsdatei. „Anlegen“ legt die Vorlage an wie k-playbook github init; danach trägst du deine Dienste im Editor ein.";
+    elements.init.hidden = false;
+    elements.init.disabled = false;
+    return;
+  }
+
   const services = Object.entries(data.services || {});
   const unusable = services.filter(([, service]) => !usable(service)).length;
   fact(elements.fileFacts, "Dienste", countLabel(services.length, "Dienst", "Dienste", "keine Dienste"));
@@ -134,17 +149,46 @@ function renderFile(data) {
   const errors = problems.filter((problem) => problem.level === "error").length;
   if (!problems.length) {
     setPill(elements.filePill, "ok", "Keine Probleme");
-    elements.fileMessage.textContent = data.created
-      ? "Die Datei wurde gerade als Vorlage angelegt — trage deine Dienste im Editor ein."
-      : services.length
-        ? "Die Datei liest sich ohne Probleme."
-        : "Die Datei liest sich ohne Probleme; noch ist kein Dienst eingetragen.";
+    elements.fileMessage.textContent = services.length
+      ? "Die Datei liest sich ohne Probleme."
+      : "Die Datei liest sich ohne Probleme; noch ist kein Dienst eingetragen.";
     return;
   }
   setPill(elements.filePill, errors ? "error" : "warn", problemCountLabel(errors, problems.length - errors));
   for (const problem of problems) {
     elements.problems.append(renderProblem(problem));
   }
+}
+
+// „Anlegen“: die Vorlage über POST /api/github-access/init, danach die
+// Seite neu lesen. Scheitert es — im schreibgeschützten Container —, steht
+// die Meldung samt Abhilfe für den Host unter der Karte.
+async function initFile() {
+  elements.init.disabled = true;
+  elements.fileMessage.textContent = "Die Zugangsdatei wird angelegt...";
+  let data;
+  let status;
+  try {
+    const response = await fetch("/api/github-access/init", { method: "POST" });
+    status = response.status;
+    data = await response.json();
+  } catch {
+    elements.fileMessage.textContent = "Die Zugangsdatei konnte nicht angelegt werden.";
+    elements.init.disabled = false;
+    return;
+  }
+  if (status !== 200) {
+    const problem = (data.problems || [])[0];
+    elements.fileMessage.textContent = problem
+      ? `${problem.message} ${problem.hint || ""}`.trim()
+      : "Die Zugangsdatei konnte nicht angelegt werden.";
+    elements.init.disabled = false;
+    return;
+  }
+  await loadAccess();
+  elements.fileMessage.textContent = data.created
+    ? "Die Vorlage ist angelegt — trage deine Dienste im Editor ein."
+    : "Die Zugangsdatei lag schon da und ist unverändert.";
 }
 
 function usable(service) {
@@ -206,6 +250,11 @@ function renderServices(data) {
   if (!data.available) {
     setPill(elements.servicesPill, "muted", "Keine Angabe");
     elements.servicesMessage.textContent = "Solange die Datei nicht lesbar ist, gibt es keine Dienste.";
+    return;
+  }
+  if (data.present === false) {
+    setPill(elements.servicesPill, "muted", "keine");
+    elements.servicesMessage.textContent = "Ohne Zugangsdatei gibt es keine Dienste.";
     return;
   }
   const services = Object.entries(data.services || {});

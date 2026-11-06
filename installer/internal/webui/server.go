@@ -256,9 +256,11 @@ func routes(state *serverState) http.Handler {
 	// Laufs, nie für alle Läufe beim Laden der Seite.
 	mux.HandleFunc("GET /api/github/runs/{id}/failure", githubRunFailureHandler)
 	// Die persönliche GitHub-Zugangsdatei (docs/github-access.md): lesend
-	// das Objekt von check --json samt Verfügbarkeit ohne Netz; der Test
-	// gegen GitHub nur per POST auf den Knopf hin, je Dienst ein Aufruf.
+	// das Objekt von check --json samt Verfügbarkeit ohne Netz; angelegt nur
+	// per POST auf den Knopf „Anlegen“ hin (wie github init); der Test gegen
+	// GitHub nur per POST auf den Knopf hin, je Dienst ein Aufruf.
 	mux.HandleFunc("GET /api/github-access", githubAccessHandler)
+	mux.HandleFunc("POST /api/github-access/init", githubAccessInitHandler)
 	mux.HandleFunc("POST /api/github-access/test", githubAccessTestHandler)
 	// Die Branches des Code-Repos: lesend die Liste samt Umgebungen und
 	// Worktrees; Fetch, Vorprüfung und Umschalten je eigener Endpunkt. Ein Fetch

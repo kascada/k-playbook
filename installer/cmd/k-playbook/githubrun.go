@@ -36,8 +36,8 @@ type githubRunArgs struct {
 // des Befehls (ChildEnv), eine Zeile auf stderr, dann genau ein Start ohne
 // Rückfall — run ersetzt sich durch den Befehl (execCommand). Exit-Code und
 // Ende durch ein Signal sind damit die des Befehls; eigene Fehler enden mit
-// 125, 126 oder 127 und einer Meldung auf stderr. Außer der Vorlage, die
-// jedes Lesen anlegt, wenn die Datei fehlt, schreibt run nichts.
+// 125, 126 oder 127 und einer Meldung auf stderr. run schreibt nichts; fehlt
+// die Datei, endet es mit 125 und dem Hinweis auf `k-playbook github init`.
 func runGitHubRun(args []string) error {
 	parsed, help, err := parseGitHubRun(args)
 	if help {
@@ -53,15 +53,15 @@ func runGitHubRun(args []string) error {
 		return runFailed("%v", err)
 	}
 	result := githubaccess.Load(path)
+	if !result.Present {
+		return runFailed("%s (%s); danach den Dienst %s dort eintragen (Format in docs/github-access.md)", githubaccess.MissingHint, path, parsed.service)
+	}
 	if result.HasErrors() {
 		first := result.Problems[0]
 		return runFailed("%s hat %s, zuerst %s: %s — k-playbook github check nennt alle mit Abhilfe", path, countProblems(len(result.Problems)), first.Path, first.Message)
 	}
 	service, ok := result.Services.Lookup(parsed.service)
 	if !ok {
-		if result.Created {
-			return runFailed("unbekannter Dienst %s: %s wurde eben als Vorlage angelegt und nennt noch keinen Dienst — den Dienst dort eintragen (Format in docs/github-access.md)", parsed.service, path)
-		}
 		known := "keiner"
 		if names := result.Services.Names(); len(names) > 0 {
 			known = strings.Join(names, ", ")

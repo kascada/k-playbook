@@ -292,15 +292,15 @@ func TestGitHubRunDefekteUndFehlendeDatei(t *testing.T) {
 		t.Errorf("defekte Datei: %d %q", code, stderr)
 	}
 
-	// Fehlt die Datei, legt run wie jedes Lesen die Vorlage an und endet
-	// mit 125, weil sie keinen Dienst nennt.
+	// Fehlt die Datei, endet run mit 125 und dem Hinweis auf github init;
+	// angelegt wird nichts.
 	s = newGitHubRunSetup(t, "")
 	_, stderr, code = s.run(t, "", "website", "--", "true")
-	if code != 125 || !strings.Contains(stderr, "unbekannter Dienst website: "+s.config+" wurde eben als Vorlage angelegt") {
+	if code != 125 || !strings.Contains(stderr, "keine Zugangsdatei — k-playbook github init legt sie an ("+s.config+")") || !strings.Contains(stderr, "den Dienst website") {
 		t.Errorf("fehlende Datei: %d %q", code, stderr)
 	}
-	if info, err := os.Stat(s.config); err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("Vorlage nicht angelegt: %v", err)
+	if _, err := os.Lstat(s.config); !os.IsNotExist(err) {
+		t.Errorf("Datei angelegt: %v", err)
 	}
 }
 
