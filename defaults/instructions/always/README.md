@@ -60,3 +60,8 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
   Task in `keph:/user/~/tasks/` — `/k-task-create`, `/k-task-refine`, `/k-task-run`. Steht
   hinter Befunden und Workbench, weil es sagt, wie Arbeit ihren Weg nimmt, nachdem klar ist,
   was festgehalten wird; die Form eines Tasks liegt in `on-demand/tasks.md`.
+- `400-github-ueber-run.md`: Netzbefehle von git und `gh` gegen das Repo eines Dienstes
+  laufen über `k-playbook github run <dienst>`; ohne Dienst gilt das Bisherige. Steht als
+  Letztes, weil es nicht sagt, wie Arbeit festgehalten oder geführt wird, sondern einen
+  einzelnen Zugriffsweg regelt, den die Sitzung erst beim Ausführen braucht; Ausnahmen,
+  Fehlerbild und Verbote liegen in `on-demand/github.md`.

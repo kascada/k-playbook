@@ -596,8 +596,10 @@ k-playbook github run chapter-mcps -- gh release download v1.2.0 -p '*.tar.gz'
 
 `run` needs no k-playbook project; the service is the only context. It is a command-line verb
 only: there is no MCP tool and no button for it, because running an arbitrary command is not
-something an AI session or the interface should be offered. AI sessions get named operations
-instead (*Outlook*).
+something the MCP server or the interface should offer. AI sessions with a shell use it there,
+as the instruction "GitHub über run" says (`defaults/instructions/always/400-github-ueber-run.md`,
+details in `defaults/instructions/on-demand/github.md`), until named operations replace it
+(*Outlook*).
 
 ### Choosing the accesses
 
@@ -790,6 +792,10 @@ separator shows `github`
 without `services`. The field is the state when the briefing was loaded; `k-playbook github
 show` gives the current one.
 
+The instruction "GitHub über run" (`defaults/instructions/always/400-github-ueber-run.md`)
+evaluates this line: it takes the service for the repository of the working directory from it,
+with `projectServices` only beside it, and works as before when the line names no service.
+
 ## Relation to other pages
 
 - `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That
@@ -808,10 +814,11 @@ Not part of the contract yet; each will be specified here before it is built.
 - **Reverse lookup**: from a repository's remote to the service that names it — for the
   briefing answered by `context.github.projectServices` (task 119, *In the briefing*); a verb
   of its own is not specified.
-- **Named operations** with project rules, as CLI and MCP — the way AI sessions reach GitHub,
-  since `run` is not offered to them: first the reading ones (fetch with status, list of pull
-  requests), then pushing a feature branch and a draft pull request, each with approval, merging
-  last.
+- **Named operations** with project rules, as CLI and MCP — the way AI sessions will reach
+  GitHub. Until then sessions with a shell use `run` after the instruction "GitHub über run";
+  it stays without an MCP tool and without a button. First the reading ones (fetch with
+  status, list of pull requests), then pushing a feature branch and a draft pull request, each
+  with approval, merging last.
 - **A shared, versioned part** for projects where every person uses the same repositories
   with different accounts.
 - **Containers**: `~/.config/k-playbook` mounted read-only; what `init` does there is

@@ -117,7 +117,9 @@ Klartext steht die Zeile `GitHub: dieses Repo = Dienst <name> — run: git über
 bzw. „kein Dienst für <owner>/<repo>“, „kein GitHub-Remote erkannt“, „keine Zugangsdatei“ oder
 „die Zugangsdatei hat Fehler“; den Rest hinter der Trennzeile zeigt `github` ohne
 `services`. Das Feld zeigt den Stand beim Laden des Briefings, `k-playbook github show` den
-aktuellen.
+aktuellen. Was eine Sitzung mit der Zeile tut — GitHub über `k-playbook github run <dienst>`
+erreichen —, steht in der immer geltenden Anweisung „GitHub über run“; die Einzelheiten in
+`k-playbook:/instructions/on-demand/github.md`.
 
 ### Neu laden
 
