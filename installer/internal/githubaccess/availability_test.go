@@ -222,6 +222,25 @@ func TestUsableUndFirstReason(t *testing.T) {
 	}
 }
 
+// Der Befund aus Task 102: Ist der erste Zugang deaktiviert und ein späterer
+// nicht verfügbar, nennt FirstReason den Grund des späteren — nicht „alle
+// Zugänge sind deaktiviert“.
+func TestFirstReasonUeberspringtDeaktivierte(t *testing.T) {
+	fakeTools(t, true)
+	missingKey := filepath.Join(t.TempDir(), "id_fehlt")
+	service := Judge(Services{{Name: "d", Repo: "x/d", Access: []Access{
+		{Type: "token", File: "/nicht/da.token", Disabled: true},
+		{Type: "ssh", Key: missingKey},
+	}}})[0]
+	if Usable(service) {
+		t.Fatal("Dienst nutzbar, obwohl kein Zugang verfügbar ist")
+	}
+	reason := FirstReason(service)
+	if !strings.Contains(reason, "Die Schlüsseldatei fehlt") || strings.Contains(reason, "deaktiviert") {
+		t.Errorf("FirstReason: %q, erwartet den Grund des ssh-Zugangs", reason)
+	}
+}
+
 // Load trägt keine Zustände ein: Das JSON eines ungeprüften Zugangs hat weder
 // state noch reason, das eines beurteilten beide.
 func TestStateFehltOhneJudge(t *testing.T) {

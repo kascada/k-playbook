@@ -15,12 +15,19 @@ import (
 // in der Reihenfolge, in der sie geschrieben wurden. Fetch und Switch brauchen
 // das: git schreibt „Switched to branch …" und den Fortschritt eines Fetch auf
 // stderr, und github.ExecRunner behält stderr nur im Fehlerfall. Es erfüllt
-// dasselbe Interface github.Runner und bleibt damit dieselbe Naht.
+// dasselbe Interface github.Runner und bleibt damit dieselbe Naht; mit
+// RunEnv auch github.EnvRunner, für den Fetch über den Zugang eines Dienstes.
 type CombinedRunner struct{}
 
-func (CombinedRunner) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+func (r CombinedRunner) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+	return r.RunEnv(ctx, dir, nil, name, args...)
+}
+
+// RunEnv ist Run mit eigener Umgebung; nil heißt die des Servers.
+func (CombinedRunner) RunEnv(ctx context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
+	command.Env = env
 	command.WaitDelay = time.Second
 	var output bytes.Buffer
 	command.Stdout = &output
@@ -48,6 +55,11 @@ type FetchResult struct {
 	Output  string    `json:"output"`
 	Message string    `json:"message"`
 	Fetch   FetchInfo `json:"fetch"`
+	// Via ist die Zeile von `k-playbook github run`, wenn der Fetch über den
+	// Zugang eines Dienstes lief oder laufen sollte; leer ohne Dienst.
+	Via string `json:"via,omitempty"`
+	// AccessLink ist die Seite der Zugangsdatei, wenn die Abhilfe dort liegt.
+	AccessLink string `json:"accessLink,omitempty"`
 }
 
 // fetchArgs ist der eine Fetch, den die Oberfläche kennt. --prune entfernt
@@ -58,12 +70,14 @@ var fetchArgs = []string{"fetch", "--all", "--prune"}
 
 // Fetch holt den Stand aller Remotes. Er läuft nur auf ausdrückliche Anforderung:
 // die Liste arbeitet sonst mit den vorhandenen Remote-Tracking-Refs. runner ist
-// in der Regel ein CombinedRunner; nil heißt ebenfalls CombinedRunner.
-func Fetch(ctx context.Context, runner github.Runner, repoDir string) FetchResult {
+// in der Regel ein CombinedRunner; nil heißt ebenfalls CombinedRunner. env ist
+// die Umgebung des Fetch: mit einem Dienst der Zugangsdatei dessen
+// Kindumgebung (der git-Kanal von `k-playbook github run`), sonst nil.
+func Fetch(ctx context.Context, runner github.Runner, repoDir string, env []string) FetchResult {
 	if runner == nil {
 		runner = CombinedRunner{}
 	}
-	repo := Repo{Runner: runner, Dir: repoDir}
+	repo := Repo{Runner: runner, Dir: repoDir, Env: env}
 	result := FetchResult{Command: "git " + strings.Join(fetchArgs, " ")}
 	out, err := repo.run(ctx, FetchTimeout, fetchArgs...)
 	result.Output = strings.TrimSpace(string(out))

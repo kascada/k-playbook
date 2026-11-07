@@ -22,6 +22,7 @@ const elements = {
   overviewPill: document.getElementById("gh-overview-pill"),
   overviewFacts: document.getElementById("gh-overview-facts"),
   aliasHint: document.getElementById("gh-alias-hint"),
+  via: document.getElementById("gh-via"),
   overviewMessage: document.getElementById("gh-overview-message"),
 
   pullsPill: document.getElementById("gh-pulls-pill"),
@@ -61,6 +62,12 @@ const STATE_TONE = {
   // Server nicht. Der Eintrag hält die Liste der Zustände vollständig.
   canceled: "muted",
   error: "error",
+  // Der Weg über einen Dienst der Zugangsdatei: In keinem dieser Zustände
+  // startet gh, und keiner fällt auf das aktive gh-Konto zurück.
+  "access-file-error": "error",
+  "service-no-access": "error",
+  "service-no-api": "warn",
+  "service-setup": "error",
 };
 
 const STATE_LABEL = {
@@ -78,6 +85,10 @@ const STATE_LABEL = {
   timeout: "Zeitüberschreitung",
   canceled: "Abgebrochen",
   error: "Fehler",
+  "access-file-error": "Zugangsdatei fehlerhaft",
+  "service-no-access": "Kein Zugang",
+  "service-no-api": "Kein api-Zugang",
+  "service-setup": "Zugang nicht eingerichtet",
 };
 
 loadOverview();
@@ -101,8 +112,36 @@ function handledState(data, pill, message) {
     return false;
   }
   setPill(pill, STATE_TONE[data.state] || "warn", STATE_LABEL[data.state] || "Unbekannt");
-  message.textContent = data.message || "Unbekannter Zustand.";
+  showMessage(message, data, "Unbekannter Zustand.");
   return true;
+}
+
+// Der Satz eines Zustands, und wenn die Abhilfe in der Zugangsdatei liegt,
+// der Verweis auf deren Seite daneben.
+function showMessage(node, data, fallback) {
+  node.textContent = data.message || fallback;
+  if (data.accessLink) {
+    const link = document.createElement("a");
+    link.href = data.accessLink;
+    link.textContent = "GitHub-Zugänge öffnen";
+    node.append(" ", link);
+  }
+}
+
+// Worüber gelesen wird: Dienst und Zugang in der Form der Zeile von
+// k-playbook github run, ohne Dienst das aktive gh-Konto.
+function showVia(node, via) {
+  node.replaceChildren();
+  node.classList.toggle("hidden", !via);
+  if (!via) {
+    return;
+  }
+  const line = document.createElement("code");
+  line.textContent = via.line;
+  node.append(via.kind === "service" ? "Gelesen über den Dienst: " : "Gelesen ohne Dienst über: ", line);
+  if (via.note) {
+    node.append(" " + via.note);
+  }
 }
 
 function emptyList(node, text) {
@@ -143,6 +182,7 @@ async function loadOverview() {
 
   elements.overviewFacts.replaceChildren();
   elements.overviewMessage.textContent = "";
+  showVia(elements.via, data.via);
   if (handledState(data, elements.overviewPill, elements.overviewMessage)) {
     return;
   }
@@ -615,7 +655,7 @@ async function loadFailure(run, body) {
   if (data.state !== "ok") {
     const text = document.createElement("p");
     text.className = "hint gh-note";
-    text.textContent = data.message || "Das Log ist nicht abrufbar.";
+    showMessage(text, data, "Das Log ist nicht abrufbar.");
     // Ein Lauf-404 heißt falsche Kennung oder fehlender Zugriff — gh trennt
     // beides nicht. Die Marke „Kein Zugriff" behauptete eines davon.
     const label = data.state === "no-access" ? "Nicht abrufbar" : STATE_LABEL[data.state] || "Unbekannt";

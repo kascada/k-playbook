@@ -31,6 +31,11 @@ neither the briefing, the health check, `check`, `show`, `test`, `run`, the MCP 
 page. A missing file is no problem: `present: false` and a hint to `init` (*When the file is
 missing*).
 
+**Status (2026-11-07):** the interface reaches GitHub like `run` (Task 126): `/github` and
+`/branches` read through the service of the repository and fetch over its `git` channel, and
+fall back to the active `gh` login only when the repository has no service (*In the
+interface*). `FirstReason` now names the first access that is not disabled.
+
 ## What the file is, and is not
 
 A person works with several GitHub repositories, often under several GitHub accounts, and
@@ -213,7 +218,8 @@ What "in place" means per type:
 
 A service is **usable** when at least one access is `available`. A service whose accesses are
 all `unavailable` or `disabled` is reported by the health check as a `warning` under `github`
-(`services.<name>: kein verfügbarer Zugang — <reason of the first access>`), because the
+(`services.<name>: kein verfügbarer Zugang — <reason of the first access that is not disabled>`;
+when every access is disabled, `alle Zugänge sind deaktiviert`), because the
 file still parses but nothing in it can be used. The health check does not go further than
 this: it never contacts GitHub.
 
@@ -805,6 +811,56 @@ channel calls no `gh` — `run` only removes `GH_TOKEN`/`GITHUB_TOKEN`, and `gh`
 its active login (measured 2026-11-07) —, and without a service `context.gh` as before, with the
 access file and help setting it up as the remedy when that fails. `context.gh.ready` and
 `context.gh.account` therefore count only without a service.
+
+## In the interface
+
+The pages `/github` and `/branches` of the interface (`k-playbook` without arguments) reach
+GitHub the way `run` would (task 126). For the repository of the project — `repo_root`, not the
+main directory — they determine the service exactly like the briefing (*In the briefing*: the
+upstream remote, otherwise `origin`, read raw; the alias rule) and choose with the same code as
+`run`: `Load`, `Judge`, `Choose` without options, `ReadToken`, `ChildEnv`. The interface only
+reads, so it never passes `--write`. There is no rule of its own.
+
+| Case | `gh` (reading, both pages) | `git fetch --all --prune` (button on `/branches`) |
+|---|---|---|
+| a service names the repository, both channels chosen | with the child environment of the service: `GH_TOKEN`/`GITHUB_TOKEN` from the `api` access | over the `git` channel: `GitConfig` rewrites the forms of the service's repository, `GIT_SSH_COMMAND` for `ssh` with `key`, `GIT_TERMINAL_PROMPT=0` |
+| the service has no `api` channel (only `ssh` or `public`, or no `token`/`gh` access available) | not started — `ChildEnv` removes the token variables, and `gh` would quietly use its active login; the page says that service `<name>` has no api access | runs over the `git` channel |
+| a service matches, but no access is available | not started; the page shows the reason (`NoAccessMessage`) | not started, as `run` would not start |
+| the file has an `error`, or its location is unknown | not started; the page says the file is faulty, lists the problems and points to `/github-access` and `k-playbook github check` | not started; the local branches stay visible |
+| no service: no file, or a file without errors that names no service for the repository | as before, over the active `gh` login | as before, with the machine's git configuration |
+
+- **Several services** for one repository: the interface cannot ask. It takes the first in
+  file order and says so on the page.
+- **No fallback.** When a call over the service fails, the page shows that failure; it does not
+  retry with the active login. Nothing falls back when a service matches but `Choose` is empty
+  either.
+- **`tools.gh.status: disabled`** still blocks `gh` (`disabled` on `/github`, no GitHub data on
+  `/branches`). The fetch is not affected; it is git, not the GitHub CLI.
+- **Other remotes** of a `fetch --all` run as before: `GitConfig` only redirects the forms of
+  the service's repository. An `ssh` access with `key` sets `GIT_SSH_COMMAND` for the whole
+  process and therefore for other `ssh` remotes as well — as with `run`.
+- **Without a service, as a remedy.** When the old way fails — `gh` not installed, not logged in,
+  or the API answers 401; on `/branches` also a failed fetch — the message names the access file:
+  a service for this repository makes the page read through its access, the button „Anlegen“ on
+  `/github-access` creates the template, and an AI session helps set it up. The page links
+  `/github-access`.
+- **Cost.** The choice is made once per request, inside its budget (on `/branches` the 10 s of
+  the `gh` queries): `Load`, three or four local `git` calls for the remote (5 s limit, at most one
+  `ssh -G` for an alias the file does not name) and `Judge` for the one service taken — not for
+  every service of the file, as with `run`; each `ssh -G` has its 3 s limit. The token is read
+  only when `gh` or the fetch is actually about to start.
+- **No token** in an argument, a log line, the JSON of `/api/github/*` and `/api/branches*` or a
+  message: it is only in `GH_TOKEN`/`GITHUB_TOKEN` of the child environment. Tests with a fake
+  token cover each page.
+
+The page names what it reads through. With a service it is the line of `run`
+(*Output and exit codes*), for example on `/github`
+`Gelesen über den Dienst: github run k-playbook: git über ssh host github-example, api über gh alice`
+and on `/branches` as the fact „GitHub-Zugang“; the JSON carries it as
+`via: {"kind": "service", "service": "<name>", "line": "<RunLine>", "note": "<several services>"}`.
+Without a service `via.kind` is `account` and the line names the active login
+(`aktives gh-Konto <login>`, or the token variables of the server's environment). A fetch over a
+service answers with the same line in `via`.
 
 ## Relation to other pages
 

@@ -32,8 +32,14 @@
             </div>
             <p class="hint">
               Das Repo löst <code>gh</code> selbst auf, nicht diese Seite: das Remote kann ein
-              SSH-Alias sein, den allein die SSH-Konfiguration kennt.
+              SSH-Alias sein, den allein die SSH-Konfiguration kennt. Nennt ein Dienst der
+              <a href="/github-access">GitHub-Zugangsdatei</a> das Repo, liest die Seite über
+              dessen Zugang, sonst über das aktive gh-Konto.
             </p>
+            <!-- Worüber gelesen wird: mit Dienst der Zugangsdatei dessen Zugang,
+                 gewählt wie bei k-playbook github run, sonst das aktive
+                 gh-Konto. -->
+            <p id="gh-via" class="hint gh-note hidden"></p>
             <dl id="gh-overview-facts" class="facts"></dl>
             <p id="gh-alias-hint" class="hint warn gh-note hidden"></p>
             <p id="gh-overview-message" class="message"></p>

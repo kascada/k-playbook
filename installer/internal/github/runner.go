@@ -47,6 +47,30 @@ type Runner interface {
 	Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error)
 }
 
+// EnvRunner ist ein Runner, der einem Kommando eine eigene Umgebung mitgibt —
+// die Kindumgebung eines Dienstes der Zugangsdatei (githubaccess.ChildEnv),
+// mit der die Oberfläche GitHub so erreicht wie `k-playbook github run`. env
+// ersetzt die Umgebung ganz, wie exec.Cmd.Env; nil heißt die des Servers. Ein
+// Token steht nur in env, nie in den Argumenten.
+type EnvRunner interface {
+	RunEnv(ctx context.Context, dir string, env []string, name string, args ...string) ([]byte, error)
+}
+
+// RunWithEnv führt ein Kommando mit env aus. Ohne env genügt jeder Runner.
+// Mit env muss der Runner sie annehmen können; einer, der es nicht kann,
+// bekommt das Kommando nicht — sonst liefe es still mit der Umgebung des
+// Servers und damit über das aktive gh-Konto.
+func RunWithEnv(ctx context.Context, runner Runner, dir string, env []string, name string, args ...string) ([]byte, error) {
+	if env == nil {
+		return runner.Run(ctx, dir, name, args...)
+	}
+	envRunner, ok := runner.(EnvRunner)
+	if !ok {
+		return nil, &CommandError{Name: name, Args: args, ExitCode: -1, Err: errors.New("der Runner nimmt keine Umgebung an; ohne sie liefe der Aufruf über das aktive gh-Konto")}
+	}
+	return envRunner.RunEnv(ctx, dir, env, name, args...)
+}
+
 // CommandError trägt, was ein gescheitertes Kommando gesagt hat. Die Stderr
 // bleibt erhalten, weil erst sie die Einordnung erlaubt (401, 403, Rate-Limit).
 type CommandError struct {
@@ -71,9 +95,15 @@ func (e *CommandError) Unwrap() error { return e.Err }
 // Tests.
 type ExecRunner struct{}
 
-func (ExecRunner) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+func (r ExecRunner) Run(ctx context.Context, dir string, name string, args ...string) ([]byte, error) {
+	return r.RunEnv(ctx, dir, nil, name, args...)
+}
+
+// RunEnv ist Run mit eigener Umgebung; nil heißt die des Servers.
+func (ExecRunner) RunEnv(ctx context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
+	command.Env = env
 	command.WaitDelay = waitDelay
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
@@ -106,11 +136,20 @@ type Client struct {
 	// ein eigenes Parsen der URL nicht auflösen könnte.
 	Dir     string
 	Timeout time.Duration
+	// Env ist die Umgebung der gh-Aufrufe: mit einem Dienst der Zugangsdatei
+	// dessen Kindumgebung (Token in GH_TOKEN/GITHUB_TOKEN, nie in einem
+	// Argument), ohne Dienst nil und damit die des Servers. Die git-Aufrufe
+	// des Clients lesen nur den Arbeitsstand und laufen ohne sie: Unter den
+	// Umlenkungen des Dienstes nennte `git remote get-url` die Zielform von
+	// run statt des eingetragenen Remotes. Der Runner muss Env annehmen
+	// können (EnvRunner), sonst startet kein gh.
+	Env []string
 }
 
-// NewClient ist der Standardfall: echte Kommandos, Standardfrist.
-func NewClient(dir string) *Client {
-	return &Client{Runner: ExecRunner{}, Dir: dir, Timeout: DefaultTimeout}
+// NewClient ist der Standardfall: echte Kommandos, Standardfrist. env ist
+// die Umgebung der gh-Aufrufe, nil die des Servers.
+func NewClient(dir string, env []string) *Client {
+	return &Client{Runner: ExecRunner{}, Dir: dir, Timeout: DefaultTimeout, Env: env}
 }
 
 func (c *Client) timeout() time.Duration {
@@ -122,23 +161,23 @@ func (c *Client) timeout() time.Duration {
 
 // gh ruft das gh-Binary mit der Frist des Clients auf.
 func (c *Client) gh(ctx context.Context, args ...string) ([]byte, error) {
-	return c.run(ctx, c.timeout(), "gh", args...)
+	return c.run(ctx, c.timeout(), c.Env, "gh", args...)
 }
 
 // ghWithTimeout ruft gh mit einer eigenen Frist auf. Nur das Log eines Laufs
 // braucht das: es ist die einzige Abfrage, die spürbar länger dauern darf.
 func (c *Client) ghWithTimeout(ctx context.Context, timeout time.Duration, args ...string) ([]byte, error) {
-	return c.run(ctx, timeout, "gh", args...)
+	return c.run(ctx, timeout, c.Env, "gh", args...)
 }
 
 // git ruft git auf. Tag und Commits seit dem Tag kommen aus dem Arbeitsstand
 // und nicht aus der API: sie stehen lokal, und ein Netzaufruf dafür wäre
 // verschenkt.
 func (c *Client) git(ctx context.Context, args ...string) ([]byte, error) {
-	return c.run(ctx, c.timeout(), "git", args...)
+	return c.run(ctx, c.timeout(), nil, "git", args...)
 }
 
-func (c *Client) run(ctx context.Context, timeout time.Duration, name string, args ...string) ([]byte, error) {
+func (c *Client) run(ctx context.Context, timeout time.Duration, env []string, name string, args ...string) ([]byte, error) {
 	runner := c.Runner
 	if runner == nil {
 		runner = ExecRunner{}
@@ -150,7 +189,7 @@ func (c *Client) run(ctx context.Context, timeout time.Duration, name string, ar
 	}
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	out, err := runner.Run(callCtx, c.Dir, name, args...)
+	out, err := RunWithEnv(callCtx, runner, c.Dir, env, name, args...)
 	if err != nil {
 		// Ein Prozess, den der Kontext beendet hat, meldet sich als
 		// „signal: killed": os/exec zieht den Exit-Status dem Kontextfehler

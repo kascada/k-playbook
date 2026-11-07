@@ -95,14 +95,23 @@ func Usable(service Service) bool {
 }
 
 // FirstReason nennt den Grund des ersten Zugangs eines Dienstes ohne
-// verfügbaren Zugang — für die Warnung der Umgebungsprüfung. Trägt der erste
-// Zugang keinen Grund, weil er deaktiviert ist, sagt der Satz das.
+// verfügbaren Zugang, der nicht deaktiviert ist — für die Warnung der
+// Umgebungsprüfung und überall, wo nur ein Grund Platz hat. Ein deaktivierter
+// Zugang trägt keinen Grund und wird übersprungen, sonst hieße es für
+// [token deaktiviert, ssh key fehlt] „alle Zugänge sind deaktiviert“ und der
+// fehlende Schlüssel bliebe ungenannt (Task 102, Review). Erst wenn alle
+// deaktiviert sind, sagt der Satz das.
 func FirstReason(service Service) string {
 	if len(service.Access) == 0 {
 		return "kein Zugang eingetragen"
 	}
-	if reason := service.Access[0].Reason; reason != "" {
-		return reason
+	for _, access := range service.Access {
+		if access.State == StateDisabled || access.Disabled {
+			continue
+		}
+		if access.Reason != "" {
+			return access.Reason
+		}
 	}
 	return "alle Zugänge sind deaktiviert"
 }

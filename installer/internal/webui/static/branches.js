@@ -92,6 +92,29 @@ function branchFact(term, detail) {
   branchView.facts.append(row);
 }
 
+// Ein Satz samt Verweis auf die Seite der Zugangsdatei, wenn die Abhilfe
+// dort liegt — wie auf der GitHub-Seite.
+function withAccessLink(node, data) {
+  if (data && data.accessLink) {
+    const link = document.createElement("a");
+    link.href = data.accessLink;
+    link.textContent = "GitHub-Zugänge öffnen";
+    node.append(" ", link);
+  }
+}
+
+// Worüber die Seite GitHub erreicht: der Dienst in der Form der Zeile von
+// k-playbook github run, ohne Dienst das aktive gh-Konto.
+function viaDetail(via) {
+  const detail = document.createElement("span");
+  const line = branchNode("code", "", via.line);
+  detail.append(via.kind === "service" ? "Dienst: " : "ohne Dienst: ", line);
+  if (via.note) {
+    detail.append(" " + via.note);
+  }
+  return detail;
+}
+
 function shortSha(sha) {
   return (sha || "").slice(0, 7);
 }
@@ -145,7 +168,14 @@ async function loadBranches() {
   renderFacts(data);
   renderGroups(data);
   renderWorktrees(data);
-  branchView.fetchButton.disabled = false;
+  // Bei fehlerhafter Zugangsdatei oder ohne verfügbaren Zugang des Dienstes
+  // läuft kein Fetch, auch nicht über die git-Konfiguration des Rechners.
+  const block = data.fetchBlock;
+  branchView.fetchButton.disabled = Boolean(block);
+  if (block) {
+    branchView.fetchMessage.textContent = block.message || "git fetch läuft nicht.";
+    withAccessLink(branchView.fetchMessage, block);
+  }
 }
 
 function renderEnvironments(data) {
@@ -155,8 +185,10 @@ function renderEnvironments(data) {
   const gh = data.github || {};
   if (!gh.enabled) {
     branchView.envMessage.textContent = "Ohne gh: nur Festlegungen und Vorschläge aus Namen. " + (gh.message || "");
+    withAccessLink(branchView.envMessage, gh);
   } else if (gh.state !== "ok") {
     branchView.envMessage.textContent = "GitHub-Daten fehlen, Liste und Umgebungen zeigen nur den lokalen Stand: " + (gh.message || "");
+    withAccessLink(branchView.envMessage, gh);
   } else {
     // Eine Teilabfrage kann allein scheitern, etwa an der Zeitgrenze; dann
     // fehlen nur ihre Daten, und der Satz sagt, welche.
@@ -248,6 +280,9 @@ function renderFacts(data) {
     branchFact("Default-Branch", "unbekannt: " + (def.reason || ""));
   }
   branchFact("Letzter Fetch", fetchAge(data.fetch));
+  if (data.via) {
+    branchFact("GitHub-Zugang", viaDetail(data.via));
+  }
   if (data.git && !data.git.aheadBehind && data.git.reason) {
     branchFact(`git ${data.git.version}`, data.git.reason);
   }
@@ -409,7 +444,9 @@ async function runFetch() {
   try {
     const response = await fetch("/api/branches/fetch", { method: "POST" });
     const result = await response.json();
-    branchView.fetchMessage.textContent = [result.message, result.output].filter(Boolean).join("\n");
+    const via = result.via ? `Über ${result.via}` : "";
+    branchView.fetchMessage.textContent = [via, result.message, result.output].filter(Boolean).join("\n");
+    withAccessLink(branchView.fetchMessage, result);
   } catch {
     branchView.fetchMessage.textContent = "Der Fetch konnte nicht ausgeführt werden.";
   } finally {

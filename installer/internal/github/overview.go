@@ -13,6 +13,9 @@ import (
 // Arbeitsstand seit dem letzten Tag.
 type Overview struct {
 	Result
+	// Via sagt, worüber gelesen wird: Dienst und Zugang bzw. das aktive
+	// gh-Konto. Setzt die Oberfläche, nicht FetchOverview.
+	Via *Via `json:"via,omitempty"`
 	// Repo ist `owner/name`, wie gh es aufgelöst hat — nicht aus der
 	// Remote-URL geparst. Das Remote kann ein SSH-Alias sein, den nur die
 	// SSH-Konfiguration auflöst.

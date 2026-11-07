@@ -59,32 +59,80 @@ const (
 	// StateError: alles Übrige. Der Text sagt, was gh gemeldet hat, gekürzt
 	// auf die erste Zeile.
 	StateError State = "error"
+
+	// Die Zustände des Weges über einen Dienst der Zugangsdatei (Task 126).
+	// In keinem startet gh, und keiner fällt auf das aktive gh-Konto zurück;
+	// der Satz kommt aus project.GitHubRoute und nennt die Abhilfe.
+
+	// StateAccessFileError: Die Zugangsdatei ist fehlerhaft oder ihr Ort
+	// unbekannt. Ob das Repo einen Dienst hat, ist damit offen.
+	StateAccessFileError State = "access-file-error"
+	// StateServiceNoAccess: Ein Dienst nennt das Repo, hat aber keinen
+	// verfügbaren Zugang.
+	StateServiceNoAccess State = "service-no-access"
+	// StateServiceNoAPI: Der Dienst hat keinen api-Zugang (token oder gh).
+	StateServiceNoAPI State = "service-no-api"
+	// StateServiceSetup: Das Token des Dienstes ist nicht zu bekommen, oder
+	// die Umgebung lässt sich nicht bauen.
+	StateServiceSetup State = "service-setup"
 )
+
+// AccessPage ist die Seite der GitHub-Zugangsdatei, auf die ein Zustand
+// verweist, dessen Abhilfe dort liegt.
+const AccessPage = "/github-access"
 
 // Result ist der gemeinsame Kopf jeder Antwort dieses Pakets: der Zustand und
 // der Satz, der ihn erklärt. Leer bleibt Message nur bei StateOK.
 type Result struct {
 	State   State  `json:"state"`
 	Message string `json:"message"`
+	// AccessLink ist AccessPage, wenn die Abhilfe in der Zugangsdatei liegt:
+	// bei den Zuständen des Weges über einen Dienst und, ohne Dienst, bei
+	// not-installed, not-logged-in und bad-credentials. Die Seite setzt dann
+	// einen Verweis neben den Satz.
+	AccessLink string `json:"accessLink,omitempty"`
 }
+
+// Via sagt, worüber die Oberfläche GitHub liest (Task 126): über einen Dienst
+// der Zugangsdatei — Line ist dann die Zeile von `k-playbook github run`
+// (githubaccess.RunLine) — oder ohne Dienst über das aktive gh-Konto.
+type Via struct {
+	// Kind ist ViaService oder ViaAccount.
+	Kind    string `json:"kind"`
+	Service string `json:"service,omitempty"`
+	Line    string `json:"line"`
+	// Note ist ein Satz dazu, etwa zu mehreren passenden Diensten.
+	Note string `json:"note,omitempty"`
+}
+
+const (
+	// ViaService: über den Zugang eines Dienstes, gewählt wie bei run.
+	ViaService = "service"
+	// ViaAccount: ohne Dienst, über das aktive gh-Konto wie bisher.
+	ViaAccount = "account"
+)
 
 // stateMessages ist der erklärende Satz je Zustand. Jeder Zustand ohne Daten
 // ist erklärt statt leer — das ist die Zusage der Ansicht.
 var stateMessages = map[State]string{
-	StateNoProject:      "Keine K-PLAYBOOK.yaml gefunden. Ohne Projekt gibt es kein Repo, dessen Stand hier stehen könnte.",
-	StateDisabled:       "Dieses Projekt nutzt gh nicht (tools.gh.status: disabled). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
-	StateUndecided:      "Für dieses Projekt ist noch nicht entschieden, ob gh genutzt wird (tools.gh.status: unknown). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
-	StateNotInstalled:   "gh liegt nicht im PATH. Ohne das Binary kann diese Seite nichts abfragen.",
-	StateNotLoggedIn:    "gh ist installiert, aber kein Konto hinterlegt. Anmelden im Terminal mit „gh auth login\".",
-	StateBadCredentials: "gh ist angemeldet, die API weist den Token aber ab (401). Er ist abgelaufen oder zurückgezogen; im Terminal mit „gh auth login\" neu anmelden.",
-	StateNoRemote:       "Kein GitHub-Remote gefunden. Diese Seite zeigt den Stand des Repos, zu dem das Arbeitsverzeichnis gehört.",
-	StateNoAccess:       "Kein Zugriff auf das Repo (403 oder 404). Entweder fehlt dem angemeldeten Konto das Recht, oder es gibt das Repo unter diesem Namen nicht.",
-	StateLogGone:        "Das Log dieses Laufs liegt bei GitHub nicht mehr vor. Der Lauf selbst ist abrufbar, sein Log-Archiv aber verworfen — nach Ablauf der Aufbewahrungsfrist (standardmäßig 90 Tage) oder weil die Logs gelöscht wurden. Das Ergebnis des Laufs steht weiter auf github.com.",
-	StateRateLimited:    "Das API-Kontingent von GitHub ist aufgebraucht. Später erneut laden.",
-	StateNetwork:        "GitHub war nicht erreichbar. Netzverbindung prüfen.",
-	StateTimeout:        "Die Abfrage hat zu lange gedauert und wurde abgebrochen.",
-	StateCanceled:       "Die Anfrage wurde abgebrochen, bevor gh geantwortet hat.",
-	StateError:          "Die Abfrage ist fehlgeschlagen.",
+	StateNoProject:       "Keine K-PLAYBOOK.yaml gefunden. Ohne Projekt gibt es kein Repo, dessen Stand hier stehen könnte.",
+	StateDisabled:        "Dieses Projekt nutzt gh nicht (tools.gh.status: disabled). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
+	StateUndecided:       "Für dieses Projekt ist noch nicht entschieden, ob gh genutzt wird (tools.gh.status: unknown). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
+	StateNotInstalled:    "gh liegt nicht im PATH. Ohne das Binary kann diese Seite nichts abfragen.",
+	StateNotLoggedIn:     "gh ist installiert, aber kein Konto hinterlegt. Anmelden im Terminal mit „gh auth login\".",
+	StateBadCredentials:  "gh ist angemeldet, die API weist den Token aber ab (401). Er ist abgelaufen oder zurückgezogen; im Terminal mit „gh auth login\" neu anmelden.",
+	StateNoRemote:        "Kein GitHub-Remote gefunden. Diese Seite zeigt den Stand des Repos, zu dem das Arbeitsverzeichnis gehört.",
+	StateNoAccess:        "Kein Zugriff auf das Repo (403 oder 404). Entweder fehlt dem angemeldeten Konto das Recht, oder es gibt das Repo unter diesem Namen nicht.",
+	StateLogGone:         "Das Log dieses Laufs liegt bei GitHub nicht mehr vor. Der Lauf selbst ist abrufbar, sein Log-Archiv aber verworfen — nach Ablauf der Aufbewahrungsfrist (standardmäßig 90 Tage) oder weil die Logs gelöscht wurden. Das Ergebnis des Laufs steht weiter auf github.com.",
+	StateRateLimited:     "Das API-Kontingent von GitHub ist aufgebraucht. Später erneut laden.",
+	StateNetwork:         "GitHub war nicht erreichbar. Netzverbindung prüfen.",
+	StateTimeout:         "Die Abfrage hat zu lange gedauert und wurde abgebrochen.",
+	StateCanceled:        "Die Anfrage wurde abgebrochen, bevor gh geantwortet hat.",
+	StateError:           "Die Abfrage ist fehlgeschlagen.",
+	StateAccessFileError: "Die GitHub-Zugangsdatei ist fehlerhaft; die Oberfläche liest GitHub deshalb nicht.",
+	StateServiceNoAccess: "Der Dienst dieses Repos hat keinen verfügbaren Zugang.",
+	StateServiceNoAPI:    "Der Dienst dieses Repos hat keinen api-Zugang; gh startet nicht.",
+	StateServiceSetup:    "Der Zugang des Dienstes ließ sich nicht einrichten.",
 }
 
 // Explain ist der Satz zu einem Zustand.

@@ -127,8 +127,8 @@ func enableGitHub(t *testing.T, runner github.Runner) {
 	t.Setenv("GH_TOKEN", "nur-fuer-die-vorpruefung")
 
 	before := newGitHubClient
-	newGitHubClient = func(dir string) *github.Client {
-		return &github.Client{Runner: runner, Dir: dir, Timeout: github.DefaultTimeout}
+	newGitHubClient = func(dir string, env []string) *github.Client {
+		return &github.Client{Runner: runner, Dir: dir, Timeout: github.DefaultTimeout, Env: env}
 	}
 	t.Cleanup(func() { newGitHubClient = before })
 }

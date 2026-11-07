@@ -34,6 +34,10 @@ type Repo struct {
 	Dir    string
 	// Timeout gilt je Aufruf; 0 heißt DefaultTimeout.
 	Timeout time.Duration
+	// Env ist die Umgebung der Aufrufe, nil die des Servers. Gesetzt nur für
+	// den Fetch über den Zugang eines Dienstes; der Runner muss sie annehmen
+	// können (github.EnvRunner).
+	Env []string
 }
 
 func (r Repo) runner() github.Runner {
@@ -67,7 +71,7 @@ func (r Repo) run(ctx context.Context, timeout time.Duration, args ...string) ([
 	}
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	out, err := r.runner().Run(callCtx, r.Dir, "git", args...)
+	out, err := github.RunWithEnv(callCtx, r.runner(), r.Dir, r.Env, "git", args...)
 	if err != nil {
 		if cause := callCtx.Err(); cause != nil {
 			return out, fmt.Errorf("%w: %w", cause, err)

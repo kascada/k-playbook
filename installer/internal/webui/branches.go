@@ -93,15 +93,18 @@ func applySettingsError(policy *branches.SwitchPolicy, err error) {
 
 // branchesGitHub beschafft die GitHub-Daten. „Mit gh" heißt tools.gh.status =
 // enabled und gh bereit; bei unknown oder disabled startet kein gh-Prozess,
-// auch wenn gh installiert ist — dieselbe Vorprüfung wie auf /github.
-func branchesGitHub(ctx context.Context) branches.GitHubData {
-	client, result, ok := githubClient()
-	if !ok {
-		return branches.GitHubData{Result: result, Environments: []string{}, Deployments: []github.Deployment{}}
+// auch wenn gh installiert ist — dieselbe Vorprüfung wie auf /github, mit
+// demselben Weg über einen Dienst der Zugangsdatei (route, schon bestimmt).
+func branchesGitHub(ctx context.Context, route *project.GitHubRoute) branches.GitHubData {
+	access := githubClientRoute(ctx, route, true)
+	client := access.client
+	if client == nil {
+		return branches.GitHubData{Result: access.result, Environments: []string{}, Deployments: []github.Deployment{}}
 	}
 	data := branches.GitHubData{Enabled: true, Environments: []string{}, Deployments: []github.Deployment{}}
 
 	repo, defaultBranch, result := client.RepoDefault(ctx)
+	access.hint(&result)
 	data.Result = result
 	if result.State != github.StateOK {
 		return data
@@ -145,8 +148,12 @@ func branchesHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, emptyListing(resolved, state, message))
 		return
 	}
+	// Der Weg über einen Dienst wird einmal je Anfrage bestimmt, im Budget
+	// der gh-Abfragen: Er braucht nur lokale Aufrufe (Remote, Judge für den
+	// einen Dienst), und das Token liest erst die Umgebung für gh darin.
 	ghCtx, ghCancel := context.WithTimeout(r.Context(), branchesGitHubBudget)
-	gh := branchesGitHub(ghCtx)
+	route := resolveGitHubRoute(ghCtx, resolved.repoDir)
+	gh := branchesGitHub(ghCtx, route)
 	ghCancel()
 
 	ctx, cancel := context.WithTimeout(r.Context(), branchesBudget)
@@ -159,8 +166,38 @@ func branchesHandler(w http.ResponseWriter, r *http.Request) {
 		Runner:     branchesReadRunner,
 	})
 	applySettingsError(&listing.Switch, resolved.settingsErr)
+	listing.Via, listing.FetchBlock = branchesRoute(resolved.projectDir, route)
 	writeGitHubJSON(w, r, listing)
 }
+
+// branchesRoute nennt, worüber die Seite GitHub erreicht — wie die
+// GitHub-Seite —, und ob der Fetch gesperrt ist: bei fehlerhafter
+// Zugangsdatei und ohne verfügbaren Zugang läuft er nicht, ohne api-Kanal
+// schon (über den git-Kanal). tools.gh.status betrifft den Fetch nicht.
+func branchesRoute(projectDir string, route *project.GitHubRoute) (*github.Via, *github.Result) {
+	if route == nil {
+		state, _ := project.GHState(projectDir)
+		via := accountVia(state)
+		via.Note = accountNote + " git fetch läuft über die git-Konfiguration des Rechners."
+		return via, nil
+	}
+	var via *github.Via
+	if route.State != project.GitHubRouteFileError {
+		via = serviceVia(route)
+	}
+	if route.GitReady() {
+		return via, nil
+	}
+	state := github.StateServiceNoAccess
+	if route.State == project.GitHubRouteFileError {
+		state = github.StateAccessFileError
+	}
+	return via, &github.Result{State: state, Message: "git fetch läuft nicht. " + route.Message, AccessLink: github.AccessPage}
+}
+
+// fetchHint ist der Satz, den ein gescheiterter Fetch ohne Dienst trägt:
+// derselbe Hinweis auf die Zugangsdatei wie auf der GitHub-Seite.
+const fetchHint = " Abhilfe, wenn es an der Anmeldung liegt: eine GitHub-Zugangsdatei mit einem Dienst für dieses Repo — dann läuft der Fetch über dessen Zugang. Auf der Seite GitHub-Zugänge legt „Anlegen“ die Vorlage an; beim Einrichten hilft eine KI-Sitzung."
 
 // emptyListing ist die Antwort ohne Liste: ein Zustand mit Satz, die Listen
 // leer und nicht null.
@@ -188,7 +225,36 @@ func branchesFetchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	branchesActionMu.Lock()
 	defer branchesActionMu.Unlock()
-	writeJSON(w, http.StatusOK, branches.Fetch(r.Context(), branchesActionRunner, resolved.repoDir))
+
+	// Mit Dienst über dessen git-Kanal, wie `k-playbook github run <dienst> --
+	// git fetch --all --prune`: GitConfig lenkt nur die Formen des
+	// Dienst-Repos um, die übrigen Remotes laufen wie bisher; ein ssh-Zugang
+	// mit key setzt GIT_SSH_COMMAND für den ganzen Prozess, also auch für
+	// fremde ssh-Remotes — wie bei run. Ohne verfügbaren Zugang und bei
+	// fehlerhafter Datei läuft kein Fetch und kein Rückfall.
+	route := resolveGitHubRoute(r.Context(), resolved.repoDir)
+	var env []string
+	if route != nil {
+		if !route.GitReady() {
+			writeJSON(w, http.StatusConflict, branches.FetchResult{Message: "git fetch läuft nicht. " + route.Message, AccessLink: github.AccessPage})
+			return
+		}
+		var err error
+		env, err = route.Environment(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusConflict, branches.FetchResult{Message: "git fetch läuft nicht. " + err.Error(), AccessLink: github.AccessPage, Via: route.Line})
+			return
+		}
+	}
+	result := branches.Fetch(r.Context(), branchesActionRunner, resolved.repoDir, env)
+	switch {
+	case route != nil:
+		result.Via = route.Line
+	case !result.OK:
+		result.Message += fetchHint
+		result.AccessLink = github.AccessPage
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // checkOptionsFor baut die Vorgaben einer Vorprüfung. Die Sitzungsprüfung nimmt

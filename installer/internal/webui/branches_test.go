@@ -146,9 +146,9 @@ func TestBranchesAPIOhneEntscheidungKeinGH(t *testing.T) {
 			t.Setenv("GH_TOKEN", "nur-fuer-die-vorpruefung")
 
 			before := newGitHubClient
-			newGitHubClient = func(dir string) *github.Client {
+			newGitHubClient = func(dir string, env []string) *github.Client {
 				t.Errorf("gh-Client angelegt, obwohl tools.gh.status = %s", status)
-				return before(dir)
+				return before(dir, env)
 			}
 			t.Cleanup(func() { newGitHubClient = before })
 
@@ -274,8 +274,8 @@ func enableGitHubInCurrentProject(t *testing.T, runner github.Runner) {
 	t.Setenv("GH_CONFIG_DIR", t.TempDir())
 	t.Setenv("GH_TOKEN", "nur-fuer-die-vorpruefung")
 	before := newGitHubClient
-	newGitHubClient = func(dir string) *github.Client {
-		return &github.Client{Runner: runner, Dir: dir, Timeout: github.DefaultTimeout}
+	newGitHubClient = func(dir string, env []string) *github.Client {
+		return &github.Client{Runner: runner, Dir: dir, Timeout: github.DefaultTimeout, Env: env}
 	}
 	t.Cleanup(func() { newGitHubClient = before })
 }

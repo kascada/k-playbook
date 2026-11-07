@@ -87,6 +87,13 @@ type Listing struct {
 	Default Default      `json:"defaultBranch"`
 	Fetch   FetchInfo    `json:"fetch"`
 	GitHub  GitHubData   `json:"github"`
+	// Via sagt, worüber die Seite GitHub erreicht: über einen Dienst der
+	// Zugangsdatei (die Zeile von run) oder ohne Dienst wie bisher. Setzt die
+	// Oberfläche.
+	Via *github.Via `json:"via,omitempty"`
+	// FetchBlock ist gesetzt, wenn git fetch nicht laufen darf: Zugangsdatei
+	// fehlerhaft oder kein verfügbarer Zugang des Dienstes.
+	FetchBlock *github.Result `json:"fetchBlock,omitempty"`
 
 	Groups       []Group       `json:"groups"`
 	Worktrees    []Worktree    `json:"worktrees"`

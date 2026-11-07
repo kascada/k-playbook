@@ -397,6 +397,9 @@ installer/
 │   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
 │   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
+│   ├── githubroute.go           Weg der Oberfläche zu GitHub (Task 126): Dienst aus dem
+│   │                            Remote, Judge nur für ihn, Choose, RunLine; Environment
+│   │                            liest das Token und baut ChildEnv
 │   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
 │   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
@@ -468,7 +471,8 @@ installer/
 │   ├── restart.go               Programm aktualisieren und den Dienst daraus neu starten:
 │   │                            Sperre, Übergabe der Laufzeitdatei, Rückfall
 │   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
-│   │                            die GitHub-Daten nur bei tools.gh.status: enabled
+│   │                            die GitHub-Daten nur bei tools.gh.status: enabled, gh und
+│   │                            Fetch über den Dienst der Zugangsdatei (Task 126)
 │   ├── github_access.go         GET /api/github-access (check --json mit Verfügbarkeit,
 │   │                            ohne Netz, schreibt nichts), POST /api/github-access/init
 │   │                            (init --json, Knopf „Anlegen“) und POST
@@ -500,6 +504,7 @@ installer/
 │   ├── check.go                 Vorprüfung: Prüfpunkte, Prüfstempel
 │   ├── sessions.go              Prozessquelle /proc, Einordnung laufender Sitzungen
 │   └── actions.go               Fetch und Switch, CombinedRunner für stdout und stderr
+│                                (RunEnv: mit eigener Umgebung)
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
 │   ├── review.go                Werkzeuge k_playbook_review_*
@@ -2435,6 +2440,27 @@ Entscheidung auf `disabled` oder `unknown`, ruft der Server `gh` gar nicht auf �
 die Zusage des Zustands und nicht bloß eine andere Beschriftung. Die Seite sagt dann, wo
 die Entscheidung fällt: im Block „GitHub CLI" auf der Setup-Seite.
 
+**Über den Dienst der Zugangsdatei (Task 126).** Nennt ein Dienst der persönlichen
+Zugangsdatei das Repo (Vertrag `docs/github-access.md`, Abschnitt *In the interface*), läuft
+`gh` mit dessen Kindumgebung, gewählt wie bei `k-playbook github run` und mit demselben Code.
+`project.ResolveGitHubRoute` bestimmt den Dienst aus dem Remote wie `context.github`
+(`projectRemoteURL`, `githubRemoteRepo`), beurteilt nur ihn (`Judge`), wählt mit `Choose` ohne
+Optionen und nennt die Zeile von run (`RunLine`); `GitHubRoute.Environment` liest erst beim Start
+das Token (`ReadToken`) und baut `ChildEnv`. Ohne api-Kanal, ohne verfügbaren Zugang und bei
+fehlerhafter Datei (oder unbekanntem Ort) entsteht kein Client: Die Zustände
+`service-no-api`, `service-no-access` und `access-file-error` tragen den Satz des Weges, und
+es gibt keinen Rückfall auf das aktive Konto. Ohne Dienst gilt das Bisherige; scheitert es an
+`not-installed`, `not-logged-in` oder `bad-credentials`, hängt `githubAccess.hint` die
+Zugangsdatei als Abhilfe an, mit `accessLink: /github-access`. Die Kopfzeile trägt `via`
+(Dienst und Zeile von run, ohne Dienst das aktive Konto) und zeigt es über den Fakten. Die
+Umgebung bekommt nur `gh`: `github.Client.Env` geht über `github.RunWithEnv` an einen
+`EnvRunner` (`ExecRunner.RunEnv`); einem Runner ohne `RunEnv` gibt `RunWithEnv` nichts mit Umgebung,
+sonst liefe er still über das aktive Konto. Die git-Aufrufe der Kopfzeile lesen nur den
+Arbeitsstand und laufen ohne sie — unter den Umlenkungen des Dienstes nennte
+`git remote get-url` die Zielform von run statt des eingetragenen Remotes. Das Token steht
+nur in `GH_TOKEN`/`GITHUB_TOKEN` der Kindumgebung; `github_route_test.go` belegt mit einem
+Fake-Token, dass es weder im JSON noch im Log noch in einem Argument steht.
+
 **Vier Endpunkte, einer je Karte.** Aus demselben Grund wie bei `/api/mcp/tools`: hinter
 jedem steht ein Subprozess, und eine langsame Abfrage soll die anderen Karten nicht
 aufhalten. Ausgelöst werden sie allein von `/github`; weder die Statusseite noch das Menü
@@ -2709,6 +2735,23 @@ Worktrees kommen aus `git worktree list --porcelain`, samt `prunable` und `locke
 und nennt das Alter von `FETCH_HEAD`. `POST /api/branches/fetch` führt
 `git fetch --all --prune` aus — `--prune`, weil erst dadurch ein gelöschter Upstream als
 `[gone]` erscheint. Lokale Branches und der Arbeitsbaum bleiben unberührt.
+
+**Über den Dienst der Zugangsdatei.** Der Weg (`project.ResolveGitHubRoute`, wie auf
+`/github`) wird einmal je Anfrage bestimmt, für `GET /api/branches` im Budget der gh-Abfragen.
+Die gh-Abfragen laufen mit der Kindumgebung des Dienstes, `POST /api/branches/fetch` über
+dessen git-Kanal: `branches.Fetch` nimmt die Umgebung an und gibt sie über `Repo.Env` an
+`CombinedRunner.RunEnv`. `GitConfig` lenkt nur die Formen des Dienst-Repos um, die übrigen
+Remotes von `--all` laufen wie bisher; ein ssh-Zugang mit key setzt `GIT_SSH_COMMAND` für den
+ganzen Prozess, also auch für fremde ssh-Remotes — wie bei run. Ohne api-Kanal startet kein gh,
+der Fetch läuft. Ohne verfügbaren Zugang und bei fehlerhafter Zugangsdatei weder gh noch Fetch:
+Die Liste trägt `fetchBlock` (der Knopf ist gesperrt, der Satz verweist auf `/github-access`),
+der POST antwortet `409` ohne Fetch, und die lokalen Branches stehen trotzdem da.
+`tools.gh.status` sperrt nur gh, nicht den Fetch. Die Seite nennt den Weg als Fakt
+„GitHub-Zugang“ (`via`, wie auf `/github`); ein Fetch über einen Dienst nennt die Zeile von run
+in `via`. Ohne Dienst wie bisher; ein gescheiterter Fetch trägt dann denselben Hinweis auf die
+Zugangsdatei. `branches_route_test.go` belegt mit Fake-Runner und Fake-Token, dass das Token
+weder im JSON von `/branches` und vom Fetch noch in Meldungen (auch `CommandError.Args`/`Stderr`)
+noch im Log noch in einem Argument steht.
 
 **„Mit gh“** heißt `tools.gh.status: enabled` und `gh` bereit, geprüft von derselben
 Vorprüfung wie auf `/github`. Bei `unknown` oder `disabled` startet kein gh-Prozess, auch
@@ -3718,11 +3761,11 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
 | `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
 | `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
-| `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`; Frist 20 s für die ganze Anfrage; nur lesend |
+| `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`, dazu `via` (Dienst der Zugangsdatei und Zeile von run, ohne Dienst das aktive Konto); Frist 20 s für die ganze Anfrage, samt Wahl des Dienstes; nur lesend |
 | `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; Frist 20 s samt Auflösen; nur lesend |
 | `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; Frist 20 s; nur lesend |
-| `GET` | `/api/branches` | Branches des Code-Repos geordnet, mit Upstream, Abstand zum Default-Branch, „gemergt“, Umgebungen, Worktrees und Alter des letzten Fetch; mit gh zusätzlich Default-Branch von GitHub, offener PR je Branch und letztes Deployment je Environment; kein Fetch; Fristen: gh 10 s, danach git-Liste 20 s; läuft gh ab, kommt die Liste ohne GitHub-Daten mit `github.state: timeout` |
-| `POST` | `/api/branches/fetch` | `git fetch --all --prune` im Code-Repo, nur auf Knopfdruck; antwortet mit Ausgabe und neuem Fetch-Alter |
+| `GET` | `/api/branches` | Branches des Code-Repos geordnet, mit Upstream, Abstand zum Default-Branch, „gemergt“, Umgebungen, Worktrees und Alter des letzten Fetch; mit gh zusätzlich Default-Branch von GitHub, offener PR je Branch und letztes Deployment je Environment; kein Fetch; Fristen: gh 10 s, danach git-Liste 20 s; läuft gh ab, kommt die Liste ohne GitHub-Daten mit `github.state: timeout`; `via` nennt den Weg zu GitHub, `fetchBlock`, warum kein Fetch läuft |
+| `POST` | `/api/branches/fetch` | `git fetch --all --prune` im Code-Repo, nur auf Knopfdruck, mit Dienst über dessen git-Kanal (`via` nennt die Zeile von run); antwortet mit Ausgabe und neuem Fetch-Alter; 409 ohne Fetch bei fehlerhafter Zugangsdatei oder ohne verfügbaren Zugang des Dienstes |
 | `GET` | `/api/branches/switch-check` | Vorprüfung für `target` (optional `remote`): jeder Prüfpunkt mit Ergebnis und Begründung, `offered`, genauer git-Befehl und Prüfstempel; nur lesend; 400 bei unzulässigem Namen |
 | `POST` | `/api/branches/switch` | `{target, remote, stamp}`: prüft erneut und führt nur bei passendem Stempel und ohne Blockierendes `git switch` aus; sonst 409 mit der neuen Prüfung; kein force, kein Stash, kein Pull |
 | `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; ein verworfenes Log ist `log-gone`; nur lesend |

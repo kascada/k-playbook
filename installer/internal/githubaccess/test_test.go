@@ -47,6 +47,9 @@ func fakeGitHubAPI(t *testing.T) *httptest.Server {
 				w.Header().Set("github-authentication-token-expiration", "2026-10-01 10:00:00 UTC")
 			case testToken:
 				w.Header().Set("github-authentication-token-expiration", "2027-03-01 10:00:00 UTC")
+			case "ghp_ODD_EXPIRY":
+				// Ein Ablauf, den keins der Layouts liest.
+				w.Header().Set("github-authentication-token-expiration", "irgendwann im Frühjahr")
 			}
 			writeJSON(http.StatusOK, `{"login":"alice","id":1}`)
 		case "/repos/acme/website":
@@ -416,5 +419,23 @@ func TestRedact(t *testing.T) {
 	}
 	if got := redact("unverändert", ""); got != "unverändert" {
 		t.Errorf("leer: %q", got)
+	}
+}
+
+// Der Hinweis aus Task 102: Parst der Ablauf-Header in keinem Layout, steht
+// der Rohwert in expires — kein YYYY-MM-DD, nicht none —, und Ablauf- und
+// Warnprüfung entfallen: Der Zugang ist ok, ohne Warnung.
+func TestTestAblaufHeaderOhneLayout(t *testing.T) {
+	fakeTestTools(t)
+	tester := newTester(t)
+	got := tester.TestAccess(context.Background(), "acme/website", available(Access{Type: "token", File: tokenFile(t, "ghp_ODD_EXPIRY")}))
+	if got.Result != ResultOK || got.Expires != "irgendwann im Frühjahr" || got.Warning != "" || got.Read != AnswerYes {
+		t.Errorf("Ablauf ohne Layout: %+v", got)
+	}
+	if got.Expires == ExpiresNone {
+		t.Error("expires ist none, obwohl der Header da war")
+	}
+	if _, err := time.Parse("2006-01-02", got.Expires); err == nil {
+		t.Errorf("expires sieht aus wie ein Datum: %q", got.Expires)
 	}
 }
