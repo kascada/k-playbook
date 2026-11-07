@@ -387,9 +387,9 @@ func TestDocHuellenFehlercodes(t *testing.T) {
 	for _, c := range cases {
 		result := c.result()
 		var envelope struct {
-			OK    bool                    `json:"ok"`
-			Ref   string                  `json:"ref"`
-			Error *knowledgeErrorEnvelope `json:"error"`
+			OK    bool           `json:"ok"`
+			Ref   string         `json:"ref"`
+			Error *errorEnvelope `json:"error"`
 		}
 		decodeEnvelope(t, result, &envelope)
 		if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != c.code || envelope.Ref != "" {
@@ -415,8 +415,8 @@ func TestDocHuellenOffenerAusgangUndNodeCodes(t *testing.T) {
 		r2, _, _ := docDoneTool(ctx, nil, docMoveInput{ProjectDir: root, Ref: "keph:/user/~/tasks/100-a.md"})
 		for i, result := range []*mcp.CallToolResult{r1, r2} {
 			var envelope struct {
-				OK    bool                    `json:"ok"`
-				Error *knowledgeErrorEnvelope `json:"error"`
+				OK    bool           `json:"ok"`
+				Error *errorEnvelope `json:"error"`
 			}
 			decodeEnvelope(t, result, &envelope)
 			if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != want {
@@ -445,7 +445,7 @@ func TestDocHuellenOhneKephalaion(t *testing.T) {
 	results = append(results, r)
 	for i, result := range results {
 		var envelope struct {
-			Error *knowledgeErrorEnvelope `json:"error"`
+			Error *errorEnvelope `json:"error"`
 		}
 		decodeEnvelope(t, result, &envelope)
 		if !result.IsError || envelope.Error == nil || envelope.Error.Code != project.DocCodeKephalaionUnavailable {

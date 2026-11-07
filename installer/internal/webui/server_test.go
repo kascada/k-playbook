@@ -105,9 +105,6 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		},
 		// /branches ist ein eigener Bereich neben GitHub und ohne gh erreichbar.
 		{path: "/branches", markiert: `<a class="area-nav-item active" href="/branches" aria-current="page">`},
-		// /knowledge ist ein eigener Bereich über Docs: er zeigt das Wissen
-		// des Projekts, nicht das Nachschlagewerk der Installation.
-		{path: "/knowledge", markiert: `<a class="area-nav-item active" href="/knowledge" aria-current="page">`},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
 		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
 		// Blockmenü wie die Setup-Seite.
@@ -221,7 +218,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/knowledge", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
+	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -257,7 +254,7 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	if count := strings.Count(body, `class="area-nav-item`); count != 1 {
 		t.Errorf("Einträge im Umschalter = %d, erwartet genau 1", count)
 	}
-	for _, ziel := range []string{"/workflows", "/chat", "/knowledge", "/docs", "/inventory"} {
+	for _, ziel := range []string{"/workflows", "/chat", "/docs", "/inventory"} {
 		if strings.Contains(body, `href="`+ziel+`"`) {
 			t.Errorf("der Umschalter führt nach %s, obwohl nichts eingerichtet ist", ziel)
 		}
@@ -319,12 +316,6 @@ func TestStartseiteLeitetOhneKonfigurationUm(t *testing.T) {
 			`<p id="status-message" class="message hidden"></p>`,
 			`id="closed"`,
 			`/static/service.js`,
-			// Das Bild der Wissensablage: zuunterst, aufgeklappt, mit Verweis
-			// in die Doku.
-			`id="knowledge-picture-card"`,
-			`<details id="knowledge-picture-fold" open>`,
-			`href="/docs?file=knowledge-storage.md"`,
-			`/static/docview.js`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("die Statusseite enthält %q nicht", want)

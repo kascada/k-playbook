@@ -44,11 +44,9 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
 | Doku aus dem Code | `keph:/docs/generated/code/<NN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir`; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/code/`, ohne Kephalaion gibt es keine | `/k-docs-code` und der Skill `ks-overlay-repo-analyse`, nur über `k-playbook docs checkout\|publish code` |
 | Steckbrief zu Library oder Tool | `keph:/docs/generated/libs/<name>.md` — in der Projekt-Collection, nicht unter `local.dir`; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/libs/`, ohne Kephalaion gibt es keine | `/k-docs-tools`, nur über `k-playbook docs checkout\|publish libs` |
-| Wissen aus Rohmaterial | `knowledge/extracted/<NN>-<slug>.md` — entsteht beim ersten Lauf von `/k-docs-extract` | `/k-docs-extract`, nur über `k-playbook knowledge write` bzw. die MCP-Werkzeuge |
 | Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
 | Handgeschriebene Doku | `keph:/docs/manual/<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
-| Rohmaterial: Verläufe, Mitschriften, Übergaben | `inbox/<quelle>/` — entsteht beim ersten Lauf von `k-playbook knowledge inbox put` (bisheriger Ort `material/`, bis Schritt 5 der Umstellung mitgelesen) | von Hand, `k-playbook knowledge inbox put` |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
 | Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
@@ -91,9 +89,6 @@ den falschen Nachzug.
   hinausgeht, wird eine Task — nicht `plan.md`, nicht `konzept.md` neben dem Code.
 - **Ergebnisse in `checks/`.** Dort liegen ausführbare Checks. Ein Ergebnis daneben
   sieht beim nächsten Lauf wie ein Skript aus.
-- **Rohmaterial in `docs/`.** Was noch nicht ausgewertet ist, liegt in `inbox/`
-  und wird nicht indiziert. Ausgewertet landet es über `/k-docs-extract` in
-  `knowledge/extracted/`, mit Quelle und Konfidenz.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
   `keph:/docs/`, das Briefing nennt ihn unter `Projektdoku`. Eine weitere Sammlung
   daneben — auch ein Index auf der Platte — wird nicht gefunden und veraltet unbemerkt.

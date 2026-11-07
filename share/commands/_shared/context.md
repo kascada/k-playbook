@@ -92,11 +92,9 @@ from the output above — never from configuration, and never by searching.
 | project documentation | `keph:/docs/` — in der Projekt-Collection, nicht unter `local.dir`; das Briefing nennt den Einstieg unter `Projektdoku`, gelesen mit Kephalaion `list` (`recursive`, `frontmatter`), ohne Kephalaion nicht erreichbar |
 | code documentation | `keph:/docs/generated/code/` — in der Projekt-Collection, nicht unter `local.dir`; geschrieben von `/k-docs-code` und dem Skill `ks-overlay-repo-analyse` nur über `k-playbook docs checkout\|publish code`, ohne Kephalaion gibt es keine |
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
-| extracted knowledge | `<local.dir>/knowledge/extracted/` — nur über `k-playbook knowledge write` bzw. `k_playbook_knowledge_write`; entsteht beim ersten Lauf von `/k-docs-extract` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |
 | hand-written documentation | `keph:/docs/manual/` — in der Projekt-Collection, nicht unter `local.dir` |
 | version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
-| raw material, never indexed | `<local.dir>/inbox/` — Quelle von `/k-docs-extract`; entsteht beim ersten Lauf von `k-playbook knowledge inbox put`; der bisherige Ort `<local.dir>/material/` wird bis Schritt 5 der Umstellung mitgelesen (`k-playbook/docs/knowledge-layout.md`, „Transitional reads“) |
 | findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md`. Der bisherige Ort `<local.dir>/material/befunde/` wird nicht mehr beschrieben |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
@@ -111,18 +109,15 @@ from the output above — never from configuration, and never by searching.
 Jedes Unterverzeichnis von `docs/` steht für eine Herkunft, nicht für ein einzelnes
 Werkzeug. Ein Werkzeug schreibt ausschließlich in Verzeichnisse seiner eigenen Herkunft;
 welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
-`generated.by`. `docs/README.md` auf der Platte gehört allein `/k-docs-index`; es ist der
-alte Platten-Index, den `/k-upgrade` (3.2) abräumt. In `keph:/docs/manual/` schreibt kein
+`generated.by`. `docs/README.md` auf der Platte ist der alte Platten-Index, den
+`/k-upgrade` (3.2) abräumt. In `keph:/docs/manual/` schreibt kein
 Command Doc-Dateien. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen
 Erzeuger: sie werden nur gelistet, geschrieben werden sie von keinem Command.
 
-`<local.dir>/material/` is the source side: raw notes, chat transcripts and hand-offs. It
-is never indexed. Its subdirectory `material/befunde/` holds the findings written before
-they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
-`material/` is left untouched by every command, including `/k-docs-extract`, which still
-reads it as a previous location until step 5 of the switch to the knowledge store and never
-changes it. Its source is `<local.dir>/inbox/`, and it writes to `<local.dir>/knowledge/extracted/`
-only through the knowledge tools.
+`<local.dir>/material/` is the old source side: raw notes, chat transcripts and hand-offs.
+Nothing reads or indexes it. Its subdirectory `material/befunde/` holds the findings written
+before they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
+`material/` is left untouched by every command.
 
 `<local.dir>/rules/`, `reviews/`, `checks/` and `guidelines/` are the project-local side
 of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain

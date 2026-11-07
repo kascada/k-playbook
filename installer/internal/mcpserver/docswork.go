@@ -50,7 +50,7 @@ type docsExcludeEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocsExcludeResult
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 // docsCheckoutEnvelope und docsPublishEnvelope sind die Antwortformen; die
@@ -60,7 +60,7 @@ type docsCheckoutEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocsCheckoutResult
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 type docsPublishEnvelope struct {
@@ -68,7 +68,7 @@ type docsPublishEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocsPublishResult
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 // docsProducerSchema bildet das Eingabeschema aus dem Typ und setzt die
@@ -141,7 +141,7 @@ func addDocsWorkTools(server *mcp.Server) {
 func docsExcludeAddTool(_ context.Context, _ *mcp.CallToolRequest, input docsExcludeAddInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docsExcludeEnvelope{OK: false, Tool: docsToolExcludeAdd, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
@@ -159,7 +159,7 @@ func docsExcludeAddTool(_ context.Context, _ *mcp.CallToolRequest, input docsExc
 func docsCheckoutTool(ctx context.Context, _ *mcp.CallToolRequest, input docsCheckoutInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docsCheckoutEnvelope{OK: false, Tool: docsToolCheckout, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
@@ -182,7 +182,7 @@ func docsCheckoutTool(ctx context.Context, _ *mcp.CallToolRequest, input docsChe
 func docsPublishTool(ctx context.Context, _ *mcp.CallToolRequest, input docsPublishInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docsPublishEnvelope{OK: false, Tool: docsToolPublish, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

@@ -35,11 +35,11 @@ type githubTestInput struct {
 // eingebettet, denn sein ok (kein failed) ist ein anderes als das des
 // Umschlags (Werkzeug gelaufen); bei einem Fehler fehlt er.
 type githubTestEnvelope struct {
-	OK         bool                    `json:"ok"`
-	Tool       string                  `json:"tool"`
-	ProjectDir string                  `json:"projectDir"`
-	Test       *githubaccess.Report    `json:"test,omitempty"`
-	Error      *knowledgeErrorEnvelope `json:"error,omitempty"`
+	OK         bool                 `json:"ok"`
+	Tool       string               `json:"tool"`
+	ProjectDir string               `json:"projectDir"`
+	Test       *githubaccess.Report `json:"test,omitempty"`
+	Error      *errorEnvelope       `json:"error,omitempty"`
 }
 
 // Die Fehlercodes des Werkzeugs neben invalid_input und project_not_found.
@@ -77,11 +77,11 @@ func githubTestToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input gi
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
 		return jsonToolResult(githubTestEnvelope{OK: false, Tool: githubTestTool, ProjectDir: projectDir,
-			Error: &knowledgeErrorEnvelope{Code: projectDirErrorCode(err), Message: err.Error()}}, true), nil, nil
+			Error: &errorEnvelope{Code: projectDirErrorCode(err), Message: err.Error()}}, true), nil, nil
 	}
 	fail := func(code string, message string) (*mcp.CallToolResult, any, error) {
 		return jsonToolResult(githubTestEnvelope{OK: false, Tool: githubTestTool, ProjectDir: projectDir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: message}}, true), nil, nil
+			Error: &errorEnvelope{Code: code, Message: message}}, true), nil, nil
 	}
 
 	path, err := githubaccess.Path()

@@ -6,8 +6,7 @@
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `docs` holt erzeugte
 // Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo` verwaltet die
-// Todos, `knowledge` liest, durchsucht und schreibt die Wissensablage, `read`
-// löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
+// Todos, `read` löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
 // Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
 // Umgebung des Projekts, `github` liest und prüft die persönliche
 // GitHub-Zugangsdatei, `upgrade` aktualisiert das Programm und zieht
@@ -100,12 +99,8 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege aus demselben Grund wie context: die Ausgabe ist
 		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
 		return runTodo(args[1:])
-	case "knowledge":
-		// Ohne Wirt-Pflege wie todo: die Ausgabe ist maschinenlesbar, und
-		// der Zugriff soll nichts anfassen außer dem eigenen Index.
-		return runKnowledge(args[1:])
 	case "read":
-		// Ohne Wirt-Pflege wie knowledge: stdout trägt den Inhalt hinter dem
+		// Ohne Wirt-Pflege wie todo: stdout trägt den Inhalt hinter dem
 		// Verweis und sonst nichts.
 		return runRead(args[1:])
 	case "doc":
@@ -273,15 +268,6 @@ Unterkommandos:
             Ausgabe ist JSON auf stdout. Ohne Unterbefehl
             und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
             gelesen oder geschrieben werden.
-  knowledge Liest, durchsucht und schreibt die Wissensablage
-            k-playbook-local/knowledge/: k-playbook knowledge search|list|
-            read|write|publish|supersede|status, dazu inbox put|list|read
-            für den Eingang und queue add|list|drop für die Warteschlange,
-            jeweils mit --json für maschinenlesbare Ausgabe. Jede Schreibung nennt ihren Erzeuger und geht nur in
-            dessen Verzeichnis; knowledge/, inbox/ und queue/ entstehen beim
-            ersten Schreiben, Lesen ohne sie ist leer. Der Index liegt unter
-            k-playbook-local/cache/knowledge/, entsteht erst, wenn es etwas zu
-            indizieren gibt, und ist jederzeit verwerfbar.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
             dahinter steht: k-playbook read <verweis> [--raw] [--json].
             project: eine Datei des Projekts, keph: ein Dokument der

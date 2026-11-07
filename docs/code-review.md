@@ -481,11 +481,8 @@ read in the repository.
 Because this scope is homogeneous, the usual managed ignore content (`*`, `!.gitignore`,
 `!README.md`) remains sufficient. `results/` is therefore the directory that k-playbook creates
 privately during setup; like `priv/`, it remains switchable through the **Local settings** section
-of the interface — since task 107 these two are the only switchable directories. `cache/` is no
-longer part of the structure and gets the same managed `.gitignore` when the knowledge gate creates
-it. `inbox/` and `material/` have no switch any more until their move to the collection: a managed
-`.gitignore` already in place keeps working, and a newly created `inbox/` gets its `.gitignore` by
-hand. Nothing changes automatically for existing projects: the managed `.gitignore` is created only
+of the interface — since task 107 these two are the only switchable directories. `material/` has no
+switch any more; a managed `.gitignore` already in place keeps working. Nothing changes automatically for existing projects: the managed `.gitignore` is created only
 when the directory is first created.
 
 ## Artifacts Per Family

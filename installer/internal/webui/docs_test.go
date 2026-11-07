@@ -12,8 +12,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// Eine Doku-Datei kann einen Frontmatter-Block tragen — knowledge-storage.md tut
-// es. Er gehört nicht in die Ansicht: Goldmark läse ihn sonst als Trennlinie
+// Eine Doku-Datei kann einen Frontmatter-Block tragen — die meisten unter
+// docs/ tun es. Er gehört nicht in die Ansicht: Goldmark läse ihn sonst als Trennlinie
 // mit anschließender Überschrift, und die Datei begänne mit ihren eigenen
 // Kopfdaten statt mit ihrem Text.
 func TestDokuOhneFrontmatterGerendert(t *testing.T) {
@@ -25,8 +25,8 @@ func TestDokuOhneFrontmatterGerendert(t *testing.T) {
 	if err := os.MkdirAll(docs, 0o755); err != nil {
 		t.Fatalf("Doku-Verzeichnis anlegen: %v", err)
 	}
-	datei := "knowledge-storage.md"
-	inhalt := "---\ntitle: Knowledge Storage\ndescription: Weg des Wissens.\n---\n\n# Knowledge Storage\n\nWohin das Wissen fließt.\n"
+	datei := "beispiel.md"
+	inhalt := "---\ntitle: Beispiel\ndescription: Eine Seite mit Kopf.\n---\n\n# Beispiel\n\nDer Text der Seite.\n"
 	if err := os.WriteFile(filepath.Join(docs, datei), []byte(inhalt), 0o644); err != nil {
 		t.Fatalf("Datei schreiben: %v", err)
 	}
@@ -49,12 +49,12 @@ func TestDokuOhneFrontmatterGerendert(t *testing.T) {
 	if strings.Contains(response.HTML, "title:") || strings.Contains(response.HTML, "description:") {
 		t.Errorf("das Frontmatter steht in der Ansicht: %s", response.HTML)
 	}
-	if !strings.Contains(response.HTML, "<h1") || !strings.Contains(response.HTML, "Knowledge Storage") {
+	if !strings.Contains(response.HTML, "<h1") || !strings.Contains(response.HTML, "Beispiel") {
 		t.Errorf("die Überschrift der Datei fehlt: %s", response.HTML)
 	}
 	// Der Titel kommt weiterhin aus der ersten Überschrift, nicht aus dem
 	// abgetrennten Block.
-	if response.Title != "Knowledge Storage" {
+	if response.Title != "Beispiel" {
 		t.Errorf("Titel = %q", response.Title)
 	}
 }

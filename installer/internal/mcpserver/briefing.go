@@ -34,7 +34,7 @@ type briefingEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.Briefing
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 func addBriefingTool(server *mcp.Server) {
@@ -68,7 +68,7 @@ func addBriefingTool(server *mcp.Server) {
 func briefingToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input briefingInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(briefingEnvelope{OK: false, Tool: briefingTool, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

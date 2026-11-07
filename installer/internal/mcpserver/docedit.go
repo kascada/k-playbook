@@ -68,18 +68,18 @@ type docGrepInput struct {
 // foreign_change trägt sie zum Fehler, wie das Dokument jetzt steht:
 // revision, updatedBy, updatedAt und tail.
 type docEditEnvelope struct {
-	OK            bool                    `json:"ok"`
-	Tool          string                  `json:"tool"`
-	ProjectDir    string                  `json:"projectDir"`
-	Ref           string                  `json:"ref,omitempty"`
-	Revision      *int64                  `json:"revision,omitempty"`
-	Size          *int64                  `json:"size,omitempty"`
-	Changed       *bool                   `json:"changed,omitempty"`
-	SinceRevision int64                   `json:"sinceRevision,omitempty"`
-	UpdatedBy     string                  `json:"updatedBy,omitempty"`
-	UpdatedAt     string                  `json:"updatedAt,omitempty"`
-	Tail          *string                 `json:"tail,omitempty"`
-	Error         *knowledgeErrorEnvelope `json:"error,omitempty"`
+	OK            bool           `json:"ok"`
+	Tool          string         `json:"tool"`
+	ProjectDir    string         `json:"projectDir"`
+	Ref           string         `json:"ref,omitempty"`
+	Revision      *int64         `json:"revision,omitempty"`
+	Size          *int64         `json:"size,omitempty"`
+	Changed       *bool          `json:"changed,omitempty"`
+	SinceRevision int64          `json:"sinceRevision,omitempty"`
+	UpdatedBy     string         `json:"updatedBy,omitempty"`
+	UpdatedAt     string         `json:"updatedAt,omitempty"`
+	Tail          *string        `json:"tail,omitempty"`
+	Error         *errorEnvelope `json:"error,omitempty"`
 }
 
 type docGrepEnvelope struct {
@@ -87,7 +87,7 @@ type docGrepEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocGrepResult
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 const docEditCommon = " Abgelehnt: anderer Verweis als ein Dokument der Sorten tasks, workbench, findings (offen oder unter " +
@@ -175,7 +175,7 @@ func docSetFieldTool(ctx context.Context, _ *mcp.CallToolRequest, input docSetFi
 // foreign_change mit dem Stand des Dokuments.
 func docEditFailure(tool, projectDir, ref, code string, err error) *mcp.CallToolResult {
 	envelope := docEditEnvelope{OK: false, Tool: tool, ProjectDir: projectDir, Ref: strings.TrimSpace(ref),
-		Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}
+		Error: &errorEnvelope{Code: code, Message: err.Error()}}
 	if change, ok := project.DocForeignChangeOf(err); ok {
 		envelope.Ref = change.Ref
 		envelope.Revision = &change.Revision
@@ -208,7 +208,7 @@ func docEdit(tool, dir string, edit func(*project.UserDocs) (project.DocEdited, 
 func docGrepTool(ctx context.Context, _ *mcp.CallToolRequest, input docGrepInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docGrepEnvelope{OK: false, Tool: docToolGrep, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

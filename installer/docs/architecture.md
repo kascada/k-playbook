@@ -23,7 +23,7 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `knowledge`, `docs`, `upgrade`, `vscode`,
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `upgrade`, `vscode`,
 `version` und `stop`. Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
 es gibt nur diese Übersicht aus.
 
@@ -123,20 +123,6 @@ stehen, Revision eingeschlossen. Der Vertrag steht in
 [`../../docs/version-inventory.md`](../../docs/version-inventory.md); denselben Lauf stoßen
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
-
-`knowledge search|list|read|write|publish|supersede|status` samt den Gruppen `inbox
-put|list|read` und `queue add|list|drop` ist das Wissenstor über die Wissensablage
-`k-playbook-local/knowledge/` mit dem Eingang `inbox/` und der Warteschlange `queue/`
-daneben, jeweils mit `--json`. Es ist die tragende Schicht: die MCP-Werkzeuge
-`k_playbook_knowledge_*` sind Hüllen um dieselben Funktionen in `project/knowledge*.go`,
-und ein Client ohne registrierten MCP-Server fällt auf das Subkommando zurück — antwortet
-auch das mit `unbekanntes Kommando`, ist die Installation zu alt. Jede Schreibung nennt
-ihren Erzeuger und geht nur in dessen Verzeichnis (`project/knowledge_producer.go`); ein
-Generator veröffentlicht sein Verzeichnis als Ganzes. Der Index liegt verwerfbar unter
-`k-playbook-local/cache/knowledge/`. Der Vertrag steht in
-[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Knowledge Contract"; ohne Unterbefehl
-oder mit `--help` fasst das Kommando keine Daten an und legt den Index nicht an, damit es
-als Rauchtest nach einem Release folgenlos bleibt.
 
 `read <verweis> [--raw] [--json]` löst einen Verweis im Präfixschema auf
 ([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
@@ -274,7 +260,6 @@ installer/
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
 │   ├── todo.go                  Subkommando todo: list (--search), add, update, delete,
 │   │                            migrate
-│   ├── knowledge.go             Subkommando knowledge: search, list, read, write, status
 │   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
 │   │                            Kephalaion-Collection
 │   ├── docs.go                  Subkommando docs: checkout und publish eines Erzeugers
@@ -455,15 +440,6 @@ installer/
 │   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
 │   ├── todo_doc.go              Dokumentformat eines Todos: Frontmatter, Rumpf = Text
 │   ├── todo_migrate.go          k-playbook todo migrate: data/todos.json übernehmen
-│   ├── knowledge.go             Wissenstor über k-playbook-local/knowledge/: chunken
-│   │                            entlang der Überschriften, Search/List/Read/Status
-│   ├── knowledge_index.go       BM25-Index als cache/knowledge/index.json, Drift über
-│   │                            Datei-Hashes, Neubau bei indexVersion/Goldmark-Wechsel
-│   ├── knowledge_producer.go    Erzeugertabelle: wer wohin schreiben darf, Pfadprüfung
-│   ├── knowledge_write.go       Write: Frontmatter aus Feldern, Queue-Eintrag fällt danach
-│   ├── knowledge_publish.go     Publish (Verzeichnistausch der Generatoren), Supersede
-│   ├── knowledge_inbox.go       Eingang: InboxPut/List/Read, Notiz als Sidecar
-│   ├── knowledge_queue.go       Warteschlange: QueueAdd/List/Drop
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
@@ -499,18 +475,18 @@ installer/
 │   │                            /api/github-access/test (test --json, optional service)
 │   │                            für die Seite /github-access
 │   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
-│                                todos.html, chat.html, chat-session.html, knowledge.html, docs.html,
+│                                todos.html, chat.html, chat-session.html, docs.html,
 │                                inventory.html, branches.html, github-access.html, mcp.html, mcp-servers.html,
 │                                mcp-server.html; sidebar.html, hero.html,
 │                                closed.html und workflow-cards.html (Fragmente
 │                                für linke Spalte, Kopf, Sperrfläche und
 │                                Workflow-Karten), session.js, nav.js,
 │                                service.js (Update, Dienst, Sperrfläche),
-│                                disclosure.js, docview.js (geteilter
-│                                Markdown-Betrachter), status.js, app.js,
+│                                disclosure.js, docview.js (Markdown-Betrachter
+│                                der Docs-Seite), status.js, app.js,
 │                                workflows.js (Zählung der Workflow-Karten),
 │                                workflows-page.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
-│                                knowledge.js, docs.js, inventory.js, branches.js, github-access.js, mcp.js,
+│                                docs.js, inventory.js, branches.js, github-access.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
 │                                (Gestaltungswerte in :root, siehe „Gestaltung
 │                                der Oberfläche")
@@ -542,9 +518,6 @@ installer/
 │   ├── github.go                Werkzeug k_playbook_github_test (Hülle über
 │   │                            githubaccess.Tester.Test, Report unter test; das
 │   │                            einzige Werkzeug mit Netz, nur auf Aufruf)
-│   ├── knowledge.go             Werkzeuge k_playbook_knowledge_* (search, list, read,
-│   │                            write, publish, supersede, inbox_*, queue_*, status),
-│   │                            dünne Hüllen über project.Knowledge
 │   ├── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
 │   │                            guiproc.StatusForDir)
 │   └── notify.go                Werkzeug k_playbook_notify (Hülle über notify.Send)
@@ -608,10 +581,9 @@ installer/
 Trennung hält die Fachlogik testbar. `internal/mcpserver` steht neben `webui`: beide
 sind Fassaden auf `project`, die eine über HTTP, die andere über JSON-RPC.
 
-`internal/markdown` liegt unter beiden, weil beide Goldmark brauchen und es genau eine
-Konfiguration geben darf: `webui` rendert damit die Doku, `project/knowledge.go` entnimmt
-demselben Parser-Lauf die Überschriften-Anker für die Suchtreffer. Zwei Konfigurationen
-wären zwei Slug-Regeln, und ein Sprung aus einem Treffer liefe stumm ins Leere.
+`internal/markdown` trägt die eine Goldmark-Konfiguration: `webui` rendert damit die Doku.
+Zwei Konfigurationen wären zwei Slug-Regeln, und ein Sprung zu einem Anker liefe stumm ins
+Leere.
 
 `internal/review` bekommt seine Vorgaben ebenfalls von außen — Laufverzeichnis, Ziel,
 Sprachen, Katalog und die aufgelösten Werkzeuge stehen in `review.Options`. Deshalb
@@ -739,25 +711,20 @@ rules/  reviews/  checks/  commands/  skills/  results/  guidelines/  priv/
 k-playbook.md  version-sources.yaml
 ```
 
-Neun Einträge stehen seit Task 107 nicht mehr darin: `docs/`, `tasks/`, `tasks/done/`,
-`data/`, `material/`, `inbox/`, `queue/`, `knowledge/` und `cache/`. Ihr Inhalt liegt in
-der Projekt-Collection — Tasks (`keph:/user/<user>/tasks/`), Todos (`todos/`), die
-Projektdoku (`keph:/docs/`), Befunde (`queue/findings/`) — oder zieht als Nächstes dorthin,
-die Wissensablage. Herausnehmen war nötig, Löschen hätte nicht gereicht: `CreateLocal()`
+Fünf Einträge stehen seit Task 107 nicht mehr darin: `docs/`, `tasks/`, `tasks/done/`,
+`data/` und `material/`. Ihr Inhalt liegt in der Projekt-Collection — Tasks
+(`keph:/user/<user>/tasks/`), Todos (`todos/`), die Projektdoku (`keph:/docs/`), Befunde
+(`queue/findings/`). Herausnehmen war nötig, Löschen hätte nicht gereicht: `CreateLocal()`
 legt jeden fehlenden Eintrag samt README wieder an, und `LocalOK()` ist falsch, sobald
 einer fehlt. Ein Bestandsprojekt räumt `/k-upgrade` 3.4 auf: es löscht ein solches
 Verzeichnis ohne Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore`
 liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
 bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
 
-Was bis zu seiner Umstellung noch auf die Platte schreibt, legt sein Verzeichnis beim
-ersten Schreiben selbst an, ohne README: die Wissenswerkzeuge `inbox/<quelle>/` (`InboxPut`), `queue/`
-(`QueueAdd`) und `knowledge/<bereich>/` (`Write`, `Publish`). Lesen, Suchen und Listen ohne
-diese Verzeichnisse antworten leer (`scanKnowledgeTree`, `InboxList`, `QueueList`); ein
-genannter Pfad, den es nicht gibt, bleibt ein Eingabefehler. `cache/` entsteht über
-`ensureCacheDir()`, wenn das Wissenstor einen Index schreibt — und `open()` in
-`knowledge_index.go` schreibt ohne vorhandenen Index nur, wenn `knowledge/` eine Datei
-enthält; sonst käme `cache/` nach dem Aufräumen beim ersten `knowledge list` zurück.
+Die frühere Wissensablage auf der Platte samt Suchindex hat Task 123 mit dem Wissenstor
+entfernt; nichts im Programm schreibt oder liest dort noch. Ein Bestandsprojekt räumt
+`/k-upgrade` 3.0 auf: Abgeleitetes und Rohmaterial ohne Rückfrage, jede Wissensdatei nach
+Vorlage.
 `project.ListTasks()` nimmt ein fehlendes `tasks/` als „keine Tasks"; die Seite Tasks der
 Oberfläche zeigt bis zu ihrer Umstellung nur, was noch auf der Platte liegt. Die
 Todo-Migration prüft nur, ob `data/todos.json` noch liegt, und braucht den Eintrag nicht.
@@ -795,24 +762,15 @@ Umschaltung auf öffentlich ohnehin stehen, denn die setzt ein vorhandenes Verze
 voraus. Ein frisch geklontes Projekt ist damit nach dem ersten `k-playbook`-Aufruf
 eingerichtet, ohne dass jemand die Karte sieht.
 
-Dieselbe Bedingung gilt an der zweiten Stelle, an der eine verwaltete `.gitignore`
-entsteht: `ensureCacheDir()` legt `cache/` an, wenn das Wissenstor einen Index schreibt,
-und schreibt dabei die verwaltete `.gitignore` — aber nur, wenn das Verzeichnis in genau
-diesem Lauf entsteht. `cache/` steht nicht in der Struktur; ohne diesen Weg wäre der
-abgeleitete Suchindex committierbar, und ein Release mit `git add -A` nähme den
-Chunk-Abzug der ganzen Doku mit.
-
 Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
 überhaupt ansteht — seit Task 107 `results/` und `priv/`. Bei `priv/` ist der Grund
 offensichtlich: dort liegen eigene Notizen und Zwischenstände. Beide bekommen über dasselbe
 `Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt ausschließt und
 das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg. Das Feld geht als
 JSON an die Oberfläche und ist dort die Whitelist des Blocks
-[Lokale Einstellungen](#lokale-einstellungen). `inbox/` und `material/` trugen es bis
-Task 107 auch; mit dem Herausnehmen aus der Struktur haben sie bis zu ihrer Umstellung in
-die Collection keine Schaltung mehr. Eine vorhandene verwaltete `.gitignore` bleibt liegen
-und wirkt weiter; wer ein neu angelegtes `inbox/` nicht versionieren will, legt sie von Hand
-an.
+[Lokale Einstellungen](#lokale-einstellungen). `material/` trug es bis Task 107 auch;
+mit dem Herausnehmen aus der Struktur hat es keine Schaltung mehr. Eine vorhandene
+verwaltete `.gitignore` bleibt liegen und wirkt weiter.
 
 `results/` unterscheidet sich in einem Punkt: es trägt zusätzlich `PrivateByDefault` und
 wird damit bei der Installation schon privat angelegt. Bei `priv/` geht es um Geschmack,
@@ -2875,9 +2833,9 @@ Beschriftungen der Seite (`.branch-name`, `.branch-meta`, `.branch-group-title`,
 
 ## Bereiche und die linke Spalte
 
-Die Oberfläche hat neun Bereiche: **Status** unter `/`, **Setup** unter `/setup`,
+Die Oberfläche hat acht Bereiche: **Status** unter `/`, **Setup** unter `/setup`,
 **Workflows** unter `/workflows`, **Chat** unter `/chat`, **GitHub** unter `/github`,
-**Branches** unter `/branches`, **Knowledge** unter `/knowledge`, **Docs** unter `/docs` und **Inventar** unter
+**Branches** unter `/branches`, **Docs** unter `/docs` und **Inventar** unter
 `/inventory`. `/mcp` ist keine weitere Sorte, sondern die Detailseite des Setup-Blocks
 und trägt dessen Bereich. Dasselbe gilt für `/mcp-servers` und die Detailseiten
 `/mcp-servers/{assistant}/{name}` darunter — mit einem Unterschied: die Übersicht steht
@@ -2889,7 +2847,7 @@ Statusfeld mit der Anbindung an die Kephalaion-Collection (`/api/kephalaion`, si
 „Kephalaion-Anbindung“); trägt sie nicht, steht der Einrichtungsschritt davor. Dann die
 Karte „Umgebung“ mit dem Report der Umgebungsprüfung (`/api/environment`, siehe
 „Umgebungsprüfung: `health`“). Darunter
-folgen die drei Workflow-Karten und zuunterst das Bild der Wissensablage. Eine eigene Route
+folgen die drei Workflow-Karten. Eine eigene Route
 für die Seite selbst gibt es nicht. Ohne Projektkonfiguration leitet `/` nach
 `/setup` um: jede Quelle der Statusseite antwortete leer, und der Umschalter führt dann
 ohnehin nur dorthin. `GET /` ist zugleich das Auffangmuster des Mux; `statusPageHandler`
@@ -2901,17 +2859,11 @@ Umleitung.
 Nichts auf der Statusseite ist eine Abschrift. Die drei Workflow-Karten sind das Fragment
 `static/workflow-cards.html` (`{{define "workflow-cards"}}`), das auch `/workflows`
 einbindet; ihre Zahlen holt `loadWorkflowCounts()` aus `workflows.js`, siehe „Workflows:
-Tasks, Reviews und Todos". Das Bild holt `loadDocInto()` aus `docview.js`, siehe
-„Knowledge in der Oberfläche".
+Tasks, Reviews und Todos".
 
 GitHub ist ein eigener Bereich und keine Karte der Statusseite. Der Grund steht unter
 „Die GitHub-Ansicht": seine Karten fragen als einzige der Oberfläche über das Netz, und
 das darf weder ein Aufruf von `/` noch das Menü auslösen.
-
-Knowledge steht **über** Docs, und das ist die Aussage der Reihenfolge: Docs ist das
-Nachschlagewerk der Installation, die Wissensablage ist das, was im Projekt an Wissen
-zusammenkommt. Zurzeit zeigt der Bereich genau eine Datei; was er wird, steht unter
-„Knowledge in der Oberfläche".
 
 Ein Bereich ist nicht dasselbe wie eine Seite. Workflows hat vier: die Übersicht unter
 `/workflows` und je eine für **Tasks**, **Reviews** und **Todos** darunter. Sie sind
@@ -3173,24 +3125,20 @@ Bereich mit eigener API (siehe „Das Versionsinventar in der Oberfläche") und 
 getrennt. Eine zweite Docs-Wurzel in Werkzeug, API und Oberfläche wäre teurer als der
 eigene Bereich gewesen und hätte eine bewusst getroffene Entscheidung rückgängig gemacht.
 
-Den eigenen Zugriffsweg, den diese Entscheidung als Bedingung nannte, gibt es inzwischen —
-über die Wissensablage `k-playbook-local/knowledge/`, nicht über `docs/`: `project.Knowledge`
-(`project/knowledge*.go`) sucht, listet, liest und schreibt dort, erreichbar über das
-Subkommando `k-playbook knowledge` und die
-MCP-Werkzeuge `k_playbook_knowledge_*` (siehe „Der MCP-Server"). Er teilt mit dieser Seite
-nur die Goldmark-Konfiguration aus `internal/markdown`, nicht die Endpunkte und nicht die
-Pfadprüfung: `read` prüft seit Task 063 wie das Schreiben über `KnowledgeRelPath`. Wege durch
-verlinkte Verzeichnisse, die der Index nicht sieht, weisen seit Task 064 `read`, `write` und
-`supersede` über dieselbe Hilfe ab (`rejectLinkedKnowledgeDir`); `publish` ersetzt ein
-verlinktes Verzeichnis beim Tausch durch ein echtes. `read` öffnet den Index nicht, stellt aber
-wie jeder Zugriff ein verwaistes `.<dir>-alt-*` eines abgebrochenen `publish` zurück
-(`restoreRetired`) und meldet das über `Notes`. Ein `/api/knowledge/*` für die Seite `/knowledge`
-ist ein Folge-Task; bis dahin liest sie weiter `/api/docs/file`.
+Die Projektdoku liegt inzwischen in der Projekt-Collection unter `keph:/docs/` und wird über
+Kephalaion gelesen, nicht über diese Seite. Das Wissenstor über `k-playbook-local/knowledge/`,
+das hier früher als eigener Zugriffsweg stand, hat Task 123 samt Seite `/knowledge` entfernt.
 
 `project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,
 ersatzweise den Dateinamen. Die `README.md` steht vorn, sie ist der Einstieg. Fehlt das
 Verzeichnis, ist das ein Befund und keine leere Liste: die Antwort trägt dann eine
 Meldung mit dem erwarteten Pfad.
+
+**Frontmatter wird abgetrennt.** Die meisten Dateien der Doku tragen `title` und
+`description` für den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt
+Überschrift, und die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert
+deshalb `inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter
+ist der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift.
 
 `project.ReadDoc()` liefert den Rohtext, gerendert wird erst in `webui/docs.go` mit
 Goldmark (GFM, `WithAutoHeadingID`). Rohes HTML aus der Quelle bleibt abgeschaltet — das
@@ -3399,47 +3347,6 @@ oder als `done/<datei>.md` eine erledigte, Endung `.md`. Erledigte sind der einz
 Grund, den flachen Vergleich mit `filepath.Base()` zu verlassen; genau dieses eine
 Verzeichnis, genau eine Ebene tiefer — alles andere fällt weiterhin weg. Die Namen aus
 beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
-
-## Knowledge in der Oberfläche
-
-Der Bereich **Knowledge** zeigt vorerst genau eine Datei: `knowledge-storage.md` aus der
-mitgelieferten Doku, den Weg des Wissens von der Quelle bis zu seiner Nutzung durch die
-KI. Die Auflistung der abgelegten Einträge kommt später als weiterer Block darunter —
-deshalb steht der Text schon jetzt in einer Karte und nicht als ganze Seite, und deshalb
-ist es ein eigener Bereich und keine Karte im Bereich Docs.
-
-Gelesen wird über `GET /api/docs/file`, den Endpunkt der mitgelieferten Doku. Ein eigener
-Endpunkt käme erst mit der Auflistung infrage: solange genau eine mitgelieferte Datei
-gezeigt wird, wäre er dieselbe Antwort unter einem zweiten Namen. Fehlt die Datei — die
-Installation daneben kann einen älteren Stand tragen —, steht der Grund als Meldung in
-der Karte.
-
-**Der Betrachter ist geteilt.** Anker, Querverweise und Mermaid stehen in
-`static/docview.js`; `docs.js` und `knowledge.js` benutzen dasselbe. Was sie
-unterscheidet, bleibt bei ihnen: welche Datei geöffnet wird, und wohin ein Verweis führt.
-Im Bereich Docs führt er in dieselbe Karte, weil der Index daneben mitzieht; auf der
-Knowledge-Seite gibt es keinen Index, ein Verweis geht deshalb nach
-`/docs?file=<datei>`. Die Kopie der Mermaid-Behandlung war die Alternative und wäre die
-zweite Stelle gewesen, an der ein Diagramm zu zeichnen ist.
-
-**Das Bild steht auch auf der Statusseite.** Holen und Zeichnen stehen in
-`loadDocInto(viewer, path, {firstDiagramOnly})` in `docview.js`; `knowledge.js` zeigt damit
-die ganze Datei, die Statusseite allein ihren ersten Mermaid-Block — kein zweiter Renderer,
-keine Kopie des Diagramms. Die Funktion setzt den herausgelösten Block **erst ein und lässt
-ihn dann zeichnen**: `renderMermaidDiagrams()` überspringt jeden Block, der nicht im Dokument
-hängt, ohne Bild und ohne Meldung. In `knowledge.js` konnte sie nicht stehen — das baut beim
-Laden Blockmenü und Sitzung und führt `const elements` und `function render`. Das Diagramm
-ist englisch beschriftet wie die ganze mitgelieferte Doku; die Karte sagt darüber auf
-Deutsch, was es zeigt. Weil es groß ist, steht die Karte zuunterst, das Bild in einem
-`<details>`, das offen startet, und daneben führt „In Docs öffnen" nach
-`/docs?file=knowledge-storage.md`. Ohne Netz bleibt Mermaid aus; dann steht die Meldung
-von `docview.js` über dem Quelltext, und die übrige Seite steht.
-
-**Frontmatter wird abgetrennt.** `knowledge-storage.md` trägt `title` und `description` für
-den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt Überschrift, und
-die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert deshalb
-`inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter ist
-der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift.
 
 ## Chat in der Oberfläche
 
@@ -3861,7 +3768,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Status; ohne
 Projektkonfiguration eine Umleitung nach `/setup`), `/setup`, `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/branches`, `/knowledge`,
+`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/branches`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` mit denselben
 Fragmenten für Kopf, linke Spalte, Sperrfläche und Workflow-Karten — keine Seite trägt
@@ -3962,11 +3869,9 @@ zwangsläufig eine abweichende Antwort.
 
 Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie das
 Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
-lassen. Dazu kommen drei Familien nach demselben Muster „Subkommando trägt, MCP ist
-Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik, `k_playbook_todo_*`
-(`todos.go`) um `project/todos.go` und `k_playbook_knowledge_*` (`knowledge.go`) um
-`project.Knowledge` — das Wissenstor über `k-playbook-local/knowledge/` samt Eingang und
-Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_doc_read`
+lassen. Dazu kommen zwei Familien nach demselben Muster „Subkommando trägt, MCP ist
+Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik und `k_playbook_todo_*`
+(`todos.go`) um `project/todos.go`. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
 `k-playbook doc`, `k_playbook_docs_checkout/publish` (`docswork.go`) um `project.DocsWork`, wie
@@ -3977,14 +3882,15 @@ Warteschlange, das auch `k-playbook knowledge` bedient. Dazu kommt `k_playbook_d
 `notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
-Fehlerfall. Tool-Tabelle und Verträge stehen in
+Fehlerfall; den gemeinsamen Fehlerteil trägt `errorEnvelope` (`error_envelope.go`).
+Tool-Tabelle und Verträge stehen in
 [`../../docs/mcp.md`](../../docs/mcp.md).
 
-`projectDir` ist in allen drei Familien Pflicht, im abgeleiteten Schema aber optional
-(`omitempty` an `knowledgeBaseInput`, `todoBaseInput`, `reviewBaseInput`). Sonst wiese die
+`projectDir` ist in allen Familien Pflicht, im abgeleiteten Schema aber optional
+(`omitempty` an `todoBaseInput`, `reviewBaseInput` und den übrigen Eingaben). Sonst wiese die
 Schemaprüfung des SDK einen Aufruf ohne das Feld ab, bevor die Hülle läuft, und der Aufrufer
 bekäme nur ihren nackten Text statt des Umschlags. Geprüft wird stattdessen an einer Stelle:
-`checkProjectDir` in `server.go`, benutzt von `resolveProjectDir` (Wissen, Todos) und
+`checkProjectDir` in `server.go`, benutzt von `resolveProjectDir` (Todos und die übrigen) und
 `resolveReviewEnvironment` (Review). Fehlend, leer oder nur Leerraum ergibt `invalid_input` mit
 der Meldung aus `projectDirMissingMessage` („nichts ausgeführt“, mit `projectDir` wiederholen);
 einen Rückfall auf das Arbeitsverzeichnis des Servers gibt es nicht. `project_not_found` bleibt

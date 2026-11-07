@@ -63,8 +63,9 @@ von selbst übersprungen.
 Für alle Umstellungen gilt:
 
 - Gelöscht, verschoben oder überschrieben wird erst nach Bestätigung. Lege je Umstellung
-  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind die leeren
-  Verzeichnisse aus 3.4, und nur sie: Die löscht 3.4 ohne Vorlage und ohne auf eine Antwort zu
+  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind zwei Fälle, und
+  nur sie: `cache/`, `inbox/` und `queue/` aus 3.0 a), die 3.0 ohne Inhaltsprüfung löscht, und
+  die leeren Verzeichnisse aus 3.4. Beide löschen ohne Vorlage und ohne auf eine Antwort zu
   warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
   entscheiden; in 3.4, das nichts vorlegt, steht es in der Meldung, ohne neue Rückfrage.
@@ -86,6 +87,63 @@ Für alle Umstellungen gilt:
   unterhalb des Projekts — einem Verzeichnis mit eigenem `.git`, etwa einem eingebetteten
   Clone — nennst du in der Vorlage mit `[fremd]`: Sie zählt als Verweis, wird gemeldet und
   nicht geändert.
+
+### 3.0 — Wissensablage auf der Platte
+
+Die Wissensablage lag früher auf der Platte unter `<context.local.dir>/`: verdichtetes Wissen
+in `knowledge/`, Rohmaterial im Eingang `inbox/`, die Warteschlange `queue/` und der Suchindex
+unter `cache/`, geschrieben über das Subkommando `k-playbook knowledge` und die MCP-Werkzeuge
+`k_playbook_knowledge_*`. Beides gibt es nicht mehr: Projektwissen liegt in `keph:/docs/`,
+Befunde liegen in `keph:/queue/findings/`, und Rohmaterial hat keinen Nachfolger. Diese
+Umstellung räumt die vier Verzeichnisse ab; sie läuft als erste.
+
+**Anlass:** Unter `<context.local.dir>/` liegt `cache/`, `inbox/`, `queue/` oder `knowledge/`.
+Die Collection braucht nur b).
+
+**Vorbedingung:** wie in 3.4 — Schritt 2 hat das Programm als aktuell gemeldet, in seiner
+Ausgabe steht die Zeile `Programm-Stand: nichts zu tun — …`. Fehlt sie, nennst du in einer
+Zeile, dass 3.0 auf den Binärwechsel wartet: Ein älteres Programm schreibt mit seinen
+Wissenswerkzeugen wieder in diese Verzeichnisse. Dann bleibt alles liegen, und du gehst zu 3.1.
+
+**a) `cache/`, `inbox/` und `queue/` löschen.** Ohne Inhaltsprüfung und ohne Rückfrage — die
+erste Ausnahme von der Bestätigungsregel oben: `cache/` ist abgeleitet, `inbox/` ist
+Rohmaterial ohne Leser, und die Einträge in `queue/` zeigen auf `inbox/`. Zähle je Verzeichnis,
+das liegt, die Dateien darin, rekursiv und mit versteckten Dateien; einem Symlink folgst du
+nicht. Dann löschst du das Verzeichnis samt Inhalt im Dateisystem. Committet wird nicht. Je
+Verzeichnis eine Zeile:
+
+```text
+Wissensablage auf der Platte
+  cache/       gelöscht: 3 Dateien
+  inbox/       gelöscht: 45 Dateien
+  queue/       gelöscht: 2 Dateien
+```
+
+**b) `knowledge/` vorlegen.** Braucht die Collection. Jede Datei unter `knowledge/`, rekursiv,
+außer `README.md` und einer `.gitignore` mit dem verwalteten Inhalt (Definition „Leer“ in
+3.4), geht durch das Verfahren, das 3.2 für `extracted/` und lose Dateien hat: die Prüfungen
+aus 3.2 a) für Dateien, die verschoben werden sollen, dann c) Vorlegen bis f) Melden. Ein
+zweites Verfahren gibt es nicht. Abweichend davon gilt:
+
+- Je Datei steht `[verschieben] → keph:/docs/manual/<name>.md` oder `[löschen]`. `<name>` ist
+  ein Vorschlag aus Pfad oder Thema der Datei; der Nutzer kann ihn in der Vorlage ändern.
+- Ergeben zwei Dateien denselben Vorschlag, stehen beide auf `[unklar]`.
+- Beim Verschieben baust du das Frontmatter auf `title`, `description` und `sources` um:
+  `title` bleibt, `description` sagt in einem Satz, was die Datei enthält, `sources` nennt
+  ihre Quellen. Verweise auf `inbox/…` entfernst du, im Frontmatter wie im Text; die übrigen
+  Felder der alten Ablage entfallen.
+
+```text
+Wissensablage auf der Platte: knowledge/
+  extracted/01-release.md          [verschieben]  → keph:/docs/manual/release.md, Ziel frei
+  external/opencode/server-api.md  [verschieben]  → keph:/docs/manual/opencode-server-api.md, Ziel frei
+  findings/alt.md                  [löschen]      Befund von damals; Befunde liegen heute in keph:/queue/findings/
+```
+
+Nach dem Ausführen löschst du `knowledge/`, wenn darin nur noch `README.md`, die verwaltete
+`.gitignore` und Unterverzeichnisse liegen, die in diesem Sinn leer sind. Sonst bleibt es, und
+die Meldung nennt, was noch darin liegt. Die Umstellung ist wiederholbar: Was ein Lauf liegen
+ließ, schlägt der nächste wieder vor.
 
 ### 3.1 — Befunde aus `material/befunde/`
 
@@ -483,12 +541,12 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
-sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection oder zieht als
-Nächstes dorthin. In einem bestehenden Projekt liegen sie noch, oft nur mit ihrer README.
+Das Einrichten legt fünf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection. In einem bestehenden
+Projekt liegen sie noch, oft nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
-Sie läuft nach 3.1 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
+Sie läuft nach 3.0 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
 Fassung des Commands; das Programm nennt sie nicht:
 
 - `docs/`
@@ -496,10 +554,6 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `tasks/done/`
 - `data/`
 - `material/`
-- `inbox/`
-- `queue/`
-- `knowledge/`
-- `cache/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
 die Collection nicht.
@@ -516,7 +570,7 @@ Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeich
   die drei Zeilen `*`, `!.gitignore` und `!README.md` in dieser Reihenfolge — Leerzeilen und
   Leerraum am Zeilenrand zählen nicht mit,
 - Unterverzeichnissen, die ihrerseits in diesem Sinn leer sind, etwa `tasks/done/` mit seiner
-  README oder ein `inbox/<quelle>/` ohne Inhalt.
+  README oder ein `material/befunde/` ohne Inhalt.
 
 **Ausnahme für `data/`.** Direkt unter `data/`, nicht in einem Unterverzeichnis, zählen auch
 die Übernahmereste von `k-playbook todo migrate` wie eine `README.md`: die Datei
@@ -528,8 +582,7 @@ auch ohne sie. Liegt dagegen `data/todos.json` selbst noch da, ist sie noch nich
 `data/` bleibt, und seine Zeile nennt `k-playbook todo migrate`.
 
 Alles andere heißt „liegt anderes darin“: jede weitere Datei, eine `.gitignore` mit anderem
-Inhalt, ein anderes Dotfile, ein Symlink. Auch ein abgeleiteter Index wie
-`cache/knowledge/index.json` zählt dazu, obwohl er jederzeit neu entsteht.
+Inhalt, ein anderes Dotfile, ein Symlink.
 
 **a) Bestand erheben.** Lies je Verzeichnis, das liegt, alles darin, rekursiv und mit
 versteckten Dateien — ein Verzeichnislisting ohne Dotfiles reicht nicht, und einem Symlink
@@ -559,10 +612,7 @@ Aufräumen in k-playbook-local/
   docs/        gelöscht: README.md
   tasks/       gelöscht: README.md, done/README.md
   data/        gelöscht: README.md, todos.json.migriert
-  material/    bleibt: README.md, notizen.md
-  inbox/       bleibt: README.md, .gitignore, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
-  queue/       gelöscht: README.md
-  cache/       bleibt: README.md, .gitignore, knowledge/index.json
+  material/    bleibt: README.md, notizen.md, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
 ```
 
 Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
@@ -574,13 +624,12 @@ Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
 Ein Verzeichnis, das nicht liegt, erscheint nicht. Auf die Meldung folgt keine Frage.
 
 Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, löscht der nächste Lauf, sobald
-es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3. Die
-Wissenswerkzeuge (`k-playbook knowledge`, MCP-Werkzeuge `k_playbook_knowledge_*`) legen
-`inbox/`, `queue/`, `knowledge/` und `cache/` bis zu ihrer Umstellung in die Collection beim
-Schreiben selbst wieder an, ohne README; das ist kein Fehler.
+es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3.
 
 ## Schritt 4 — Schluss
 
 Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist; für
-das Aufräumen die gelöschten Verzeichnisse und jede Zeile `bleibt: …`, oder dass es auf den
-Binärwechsel wartet.
+3.0 je gelöschtem Verzeichnis die Zahl seiner Dateien und je Datei aus `knowledge/` ihr Ziel
+(`keph:`-Verweis, gelöscht oder liegen geblieben), für das Aufräumen die gelöschten
+Verzeichnisse und jede Zeile `bleibt: …` — oder bei 3.0 und beim Aufräumen, dass sie auf den
+Binärwechsel warten.

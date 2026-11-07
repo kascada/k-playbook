@@ -348,7 +348,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /github", githubPageHandler)
 	mux.HandleFunc("GET /github-access", githubAccessPageHandler)
 	mux.HandleFunc("GET /branches", branchesPageHandler)
-	mux.HandleFunc("GET /knowledge", knowledgePageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
@@ -426,13 +425,6 @@ const (
 	// unter Workflows: auch dort geht es um die tägliche Arbeit, aber im
 	// Gespräch statt über Dateien.
 	areaChat = "chat"
-	// areaKnowledge ist der Bereich der Wissensablage. Er steht über Docs:
-	// Docs ist das Nachschlagewerk der Installation, die Wissensablage das,
-	// was im Projekt an Wissen zusammenkommt — unter k-playbook-local/ in
-	// den drei Zonen inbox/, queue/ und knowledge/, beschrieben in
-	// docs/knowledge-layout.md. Die Seite zeigt vorerst das Zielbild; die
-	// Zonen selbst listet sie erst, wenn ein /api/knowledge/* sie liefert.
-	areaKnowledge = "knowledge"
 	// areaGitHub ist der Bereich der GitHub-Ansicht. Eigener Bereich und keine
 	// Karte auf der Statusseite: die Seite fragt bei jedem Aufruf über gh nach
 	// draußen, und das darf weder die Statusseite noch das Menü auslösen.
@@ -465,7 +457,7 @@ func pageTemplate(name string) *template.Template {
 // statusTemplate ist die Statusseite unter /: der Kopf mit den Knöpfen für
 // Update und Dienst, der Einrichtungsschritt der Kephalaion-Anbindung (nur
 // sichtbar, wenn sie nicht trägt), das Statusfeld mit der Anbindung, die
-// Workflow-Karten und das Bild der Wissensablage.
+// Umgebungsprüfung und die Workflow-Karten.
 var statusTemplate = pageTemplate("status.html")
 
 // statusPageHandler prüft zuerst den Pfad und leitet erst danach um: GET / ist
@@ -546,16 +538,6 @@ func chatSessionPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	renderPage(w, chatSessionTemplate, areaChat, "/chat/"+id, "Chat")
-}
-
-// knowledgeTemplate ist die Seite der Wissensablage. Vorerst zeigt sie genau
-// eine Datei, knowledge-storage.md aus der mitgelieferten Doku; die Auflistung der
-// abgelegten Einträge kommt später als weiterer Block darunter. Deshalb schon
-// jetzt ein eigener Bereich und keine Karte im Bereich Docs.
-var knowledgeTemplate = pageTemplate("knowledge.html")
-
-func knowledgePageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, knowledgeTemplate, areaKnowledge, "/knowledge", "Knowledge")
 }
 
 // githubTemplate ist die Seite des GitHub-Stands: Repo und Zugang, Pull

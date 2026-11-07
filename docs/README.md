@@ -7,7 +7,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 
 | Document | Content |
 |---|---|
-| [`overview.md`](./overview.md) | What k-playbook is for: the three kinds of work — building, diagnosis, quality — the means that apply to all of them, and the knowledge store they share. One diagram. |
+| [`overview.md`](./overview.md) | What k-playbook is for: the three kinds of work — building, diagnosis, quality — the means that apply to all of them, and the project documentation in `keph:/docs/` they share. One diagram. |
 | [`manual.md`](./manual.md) | Purpose, core model, standard workflows, operating rules. The central page. |
 | [`installation.md`](./installation.md) | Clone, the four setup steps, security tools, updating, troubleshooting. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | The contract: `K-PLAYBOOK.yaml`, directory layout, overlay rules. |
@@ -21,9 +21,6 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`code-review.md`](./code-review.md) | Both review paths, `/k-audit` and `/k-review`: flow, division of labour, result families, artifacts, status values, and the handoff to `/k-remediation`. |
 | [`review-runs.md`](./review-runs.md) | The run model: `run.json`, entries, operating modes of catalog recipes, merge, known decisions. |
 | [`task-flow.md`](./task-flow.md) | `/k-task-create`, `/k-task-refine`, `/k-task-run`. |
-| [`knowledge-gate.md`](./knowledge-gate.md) | **Entry page for the knowledge store.** Why it exists, what is built, how we proceed, how a deposit is classified by kind, origin, state and format, the query surface, the staged plan for the index, and the measurements the decisions rest on. Links the two pages below. |
-| [`knowledge-layout.md`](./knowledge-layout.md) | The storage layout under `k-playbook-local`: the three zones `inbox/`, `queue/` and `knowledge/`, the ownership rule, the frontmatter contract, the table of what lands where, the write tools every deposit goes through, and the migration. |
-| [`knowledge-storage.md`](./knowledge-storage.md) | The picture of the knowledge store: how knowledge flows through the three zones and back out through the index and the MCP server. Vectors and a database of their own are deferred. Shown in the interface under Knowledge. |
 | [`pr-review.md`](./pr-review.md) | `/k-pr-review` for specific GitHub pull requests. |
 | [`mcp.md`](./mcp.md) | The MCP server: registering it, approval in Claude Code, why *Set up* writes an absolute path and when the bare command name is written instead. |
 | [`vscode.md`](./vscode.md) | The VS Code extension *k-playbook Workspace Tools*: what it contributes (OpenCode in a tab, Kephalaion collections in the workspace), its settings, how it is installed automatically when the service starts, which CLI is called, why the VSIX is checked in, and how to add another action. |

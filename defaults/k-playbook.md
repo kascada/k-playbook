@@ -77,10 +77,7 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 
 - **Projekt** — `/k-gui` startet die Oberfläche.
 - **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
-  `/k-docs-tools` und `/k-doc-inventory` erzeugen Doku, `/k-docs-index` baut den Index.
-  `/k-docs-extract` verdichtet Rohmaterial aus `k-playbook-local/inbox/` und schreibt es
-  über die Wissenswerkzeuge nach `k-playbook-local/knowledge/extracted/`; bis zu ihrer
-  Umstellung schreiben die Wissenswerkzeuge noch auf die Platte.
+  `/k-docs-tools` und `/k-doc-inventory` erzeugen Doku unter `keph:/docs/generated/`.
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
   vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
   überführt Befunde in Tasks oder Fixes.

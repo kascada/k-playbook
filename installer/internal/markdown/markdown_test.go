@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// Die drei Eigenschaften, auf die sich beide Seiten verlassen: die Oberfläche
-// beim Rendern der Doku, das Wissenstor beim Bilden seiner Anker. Sie sind hier
-// festgenagelt, weil eine Änderung an New() sonst nur an einer stummen
-// Fehlfunktion auffiele — ein Sprung aus einem Suchtreffer, der ins Leere geht.
+// Die Eigenschaften, auf die sich die Oberfläche beim Rendern der Doku
+// verlässt. Sie sind hier festgenagelt, weil eine Änderung an New() sonst nur
+// an einer stummen Fehlfunktion auffiele — ein Sprung zu einem Anker, der ins
+// Leere geht.
 func TestNewBildetUeberschriftenIDs(t *testing.T) {
 	html := rendern(t, "## Freigabe\n")
 
@@ -29,9 +29,8 @@ func TestNewVerwirftNichtASCIIAusIDs(t *testing.T) {
 	}
 }
 
-// Die Eindeutigkeit zählt über den ganzen Lauf, nicht je Abschnitt. Darauf
-// beruht die Festlegung des Wissenstors, jede Datei einmal ganz zu parsen und
-// erst danach zu chunken.
+// Die Eindeutigkeit zählt über den ganzen Lauf, nicht je Abschnitt: Wer eine
+// Datei in Teilen parst, bekommt andere Ids als die gerenderte Ansicht.
 func TestNewZaehltWiederholteUeberschriftenDurch(t *testing.T) {
 	html := rendern(t, "## Ablauf\n\ntext\n\n## Ablauf\n\ntext\n\n## Ablauf\n")
 

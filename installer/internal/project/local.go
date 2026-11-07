@@ -38,8 +38,7 @@ type LocalEntry struct {
 	// des Nutzers schreibt, ist dagegen ein Fehler von k-playbook und keine
 	// Projektentscheidung — und die Rohausgaben sind nur der schärfste Fall:
 	// ein Review ist aus dem Code wiederholbar, sein Ergebnis ist ein Stand von
-	// einem Rechner. cache/ steht nicht mehr in der Struktur (Task 107), bekommt
-	// aus einem verwandten Grund aber dieselbe Datei, siehe ensureCacheDir.
+	// einem Rechner.
 	//
 	// Eine Erzwingung ist es trotzdem nicht: der Zustand bleibt in der
 	// Oberfläche umschaltbar, und geschrieben wird die verwaltete .gitignore
@@ -54,11 +53,10 @@ type LocalEntry struct {
 // ihn ab. Aufgelöst wird das in context.go (rules, reviews, checks) und in
 // registry.go (commands, skills).
 //
-// docs, tasks, tasks/done, data, material, inbox, queue, knowledge und cache
-// stehen nicht mehr hier (Task 107): ihr Inhalt liegt in der Projekt-Collection
-// oder zieht als Nächstes dorthin. Was die Wissenswerkzeuge bis dahin noch auf
-// die Platte schreiben, legt sein Verzeichnis beim ersten Schreiben selbst an;
-// /k-upgrade räumt die leeren Verzeichnisse eines Bestandsprojekts ab.
+// docs, tasks, tasks/done, data und material stehen nicht mehr hier (Task
+// 107): ihr Inhalt liegt in der Projekt-Collection. /k-upgrade räumt die
+// leeren Verzeichnisse eines Bestandsprojekts ab, dazu die Reste der früheren
+// Wissensablage auf der Platte (Task 123).
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
 		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
@@ -209,30 +207,6 @@ func EnsureLocal(projectDir string) ([]LocalEntryStatus, bool, error) {
 	}
 	statuses, err := CreateLocal(projectDir)
 	return statuses, true, err
-}
-
-// ensureCacheDir legt cache/ an und schreibt dabei dieselbe verwaltete
-// .gitignore, die CreateLocal für einen Eintrag mit PrivateByDefault schreibt.
-//
-// cache/ steht nicht in LocalStructure() (Task 107): es entsteht nur hier, wenn
-// das Wissenstor einen Index schreibt — und das tut es nur, wenn die
-// Wissensablage etwas zu indizieren hat (siehe open in knowledge_index.go).
-// Ohne die .gitignore wäre der abgeleitete Index committierbar — ein Release
-// mit `git add -A` nähme den Chunk-Abzug der ganzen Doku mit. Der Inhalt ist
-// aus dem Projekt abgeleitet und entsteht jederzeit neu; Ableitbares gehört
-// nicht ins Repository.
-//
-// Nachträglich geschrieben wird nichts: ist cache/ schon da, bleibt es, wie
-// es ist — auch eine von Hand entfernte oder geänderte .gitignore.
-func ensureCacheDir(projectDir string) error {
-	dir := filepath.Join(LocalDir(projectDir), CacheDirName)
-	if pathExists(dir) {
-		return nil
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("%s anlegen: %w", dir, err)
-	}
-	return writeIfMissing(filepath.Join(dir, PrivateIgnoreFile), managedIgnoreContent())
 }
 
 // writeIfMissing schreibt nur, wenn nichts da ist. Projektinhalte werden nie

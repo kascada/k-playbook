@@ -26,11 +26,11 @@ type healthInput struct {
 // eingebettet, denn sein ok (keine Fehler) ist ein anderes als das des
 // Umschlags (Werkzeug gelaufen); bei einem Fehler fehlt er.
 type healthEnvelope struct {
-	OK         bool                    `json:"ok"`
-	Tool       string                  `json:"tool"`
-	ProjectDir string                  `json:"projectDir"`
-	Health     *health.Report          `json:"health,omitempty"`
-	Error      *knowledgeErrorEnvelope `json:"error,omitempty"`
+	OK         bool           `json:"ok"`
+	Tool       string         `json:"tool"`
+	ProjectDir string         `json:"projectDir"`
+	Health     *health.Report `json:"health,omitempty"`
+	Error      *errorEnvelope `json:"error,omitempty"`
 }
 
 func addHealthTool(server *mcp.Server) {
@@ -49,7 +49,7 @@ func healthToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input health
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
 		return jsonToolResult(healthEnvelope{OK: false, Tool: healthTool, ProjectDir: projectDir,
-			Error: &knowledgeErrorEnvelope{Code: projectDirErrorCode(err), Message: err.Error()}}, true), nil, nil
+			Error: &errorEnvelope{Code: projectDirErrorCode(err), Message: err.Error()}}, true), nil, nil
 	}
 	report := health.Check(ctx, projectDir)
 	return jsonToolResult(healthEnvelope{OK: true, Tool: healthTool, ProjectDir: projectDir, Health: &report}, false), nil, nil

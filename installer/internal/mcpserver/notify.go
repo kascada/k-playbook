@@ -34,7 +34,7 @@ type notifyEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*notify.Result
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 // notifySend ist notify.Send, als Variable: die Tests der Hülle sollen keinen
@@ -58,7 +58,7 @@ func addNotifyTool(server *mcp.Server) {
 func notifyTool(ctx context.Context, _ *mcp.CallToolRequest, input notifyInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(notifyEnvelope{OK: false, Tool: notifyToolName, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

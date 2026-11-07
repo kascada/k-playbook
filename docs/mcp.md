@@ -13,7 +13,7 @@ by k-playbook itself. The response lists what happened under `links` (`k_playboo
 resp. `context.links` (`k_playbook_briefing`); if the field is absent, everything was already
 up to date.
 
-The server offers the working state, the review, todo and knowledge tools,
+The server offers the working state, the review and todo tools,
 `k_playbook_doc_read` for references, the `doc` tools for numbered documents in the
 project's Kephalaion collection -- creating, listing and moving them, changing them without
 their content passing through the session, and searching them --, `k_playbook_briefing` for
@@ -31,8 +31,8 @@ project. There is no fallback to that directory.
 starts with `Pflicht.`. The reason is the answer a caller gets: a field marked required in the
 schema is rejected by the SDK's schema validation before the tool runs, with a bare text
 (`validating "arguments": validating root: required: missing properties: ["projectDir"]`) --
-no envelope, no code, nothing that says the call did nothing. That is how a `knowledge_write`
-got lost once. The tools therefore check the parameter themselves: missing, empty, or only
+no envelope, no code, nothing that says the call did nothing. That is how a write call of a former
+tool got lost once. The tools therefore check the parameter themselves: missing, empty, or only
 whitespace yields the family's envelope with `ok: false`, code `invalid_input`, and the same
 message in all families -- `projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf
 mit projectDir, dem Projektverzeichnis mit K-PLAYBOOK.yaml (absoluter Pfad).` A `projectDir`
@@ -345,19 +345,6 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
-| `k_playbook_knowledge_search` | search the knowledge store `k-playbook-local/knowledge/` section by section; hits carry `path`, `heading`, `excerpt`, `kind`, `origin`, `state`, `rank`, `anchor`; documents in state `raw` or `superseded` and the root `README.md` are not hits |
-| `k_playbook_knowledge_list` | list the files of the store with `path`, `title` (frontmatter `title`, else the first heading, else the file name), `kind`, `origin`, `state`; the README comes first, raw and superseded documents included |
-| `k_playbook_knowledge_read` | read one file of the store as Markdown |
-| `k_playbook_knowledge_write` | write one document: `producer` from the closed list, `path` inside the producer's directory, the frontmatter as fields (`title`, `subject`, `origin`, `state`, `format`, `sources`), `body` without a header, optional `queue` entry that is deleted once the document exists |
-| `k_playbook_knowledge_publish` | a generator (`docs-code`, `docs-tools`, `inventory`) hands over its complete `documents` and the store swaps the directory atomically; reports how many were written and removed |
-| `k_playbook_knowledge_supersede` | set `state: superseded` on a document, record `successor` and `superseded_reason`; nothing is deleted |
-| `k_playbook_knowledge_inbox_put` | drop a raw piece into `k-playbook-local/inbox/<source>/<name>` from `content` or `file`, with an optional `note` stored beside it |
-| `k_playbook_knowledge_inbox_list` | list the raw pieces of the inbox with `path`, `source`, `name`, `format`, `size`, `modified`, `note` |
-| `k_playbook_knowledge_inbox_read` | read one raw piece as text; text formats only |
-| `k_playbook_knowledge_queue_add` | add a queue entry from `origin`, `target`, `reason`; the tool assigns the `id` |
-| `k_playbook_knowledge_queue_list` | list the backlog, oldest first; empty means nothing outstanding |
-| `k_playbook_knowledge_queue_drop` | delete a queue entry without a takeover; the `reason` is not recorded |
-| `k_playbook_knowledge_status` | report kind and size of the search index: `indexKind`, `model`, `dims`, `fileCount`, `chunkCount`, `byKind`, `builtAt`, `indexVersion`, `stale`, `staleFiles` |
 | `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
@@ -687,145 +674,6 @@ The envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `mes
 failure. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and nothing is
 written; a `projectDir` that leads to no project is `project_not_found`.
 
-### Knowledge Contract
-
-The knowledge tools follow the same pattern: thin wrappers over `project.Knowledge`, the one
-place that chunks, indexes, searches and writes; the load-bearing layer is the subcommand
-`k-playbook knowledge`, and a binary that is too old answers it with `unbekanntes Kommando`. The
-envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `message` on failure.
-The store is the zone `k-playbook-local/knowledge/`; `inbox/` and `queue/` lie beside it and
-are never indexed. Setup does not create the zones (task 107): the write tools create them on
-the first write, and `search`, `list`, `status`, `inbox_list` and `queue_list` answer empty
-without them — `read` and `inbox_read` of a path that does not exist stay `invalid_input`. A
-read access to an empty or missing store writes no index and creates no `cache/`. [knowledge-layout.md](knowledge-layout.md) defines the zones, the owner per
-directory and the frontmatter; this section only fixes what the tools return.
-
-**Reading.** A search hit names `path`, `heading` (the heading verbatim, the leading field),
-`excerpt` (the start of the section, at most 400 characters), `kind` (the directory under
-`knowledge/`, which is the owner: `code`, `libs`, `versions`, `extracted`, `external`,
-`findings`, `pitfalls`, `manual`, or `root` for a flat file), `origin` and `state` from the
-document's frontmatter, `rank` (from 1; the order is the statement, there is no score) and
-`anchor` (the Goldmark heading id, a display aid). `kind` is read from the path and never from
-the document; `origin` is the actual provenance and lives only in the frontmatter -- the two
-were one field called `source` in v0.7.0 and were split before anything consumed them.
-Documents in state `raw` or `superseded` are not hits, and neither is the root `README.md`,
-which is generated navigation whose keyword index would otherwise outrank the documents it
-points at; `list` carries all of them with their `state`, and `read` returns any of them.
-`read` only returns what the index can see: its path is checked like a write path -- relative,
-inside the zone, no hidden segment, a Markdown file -- and a path through a symbolically
-linked directory, which the index does not descend into, is refused as `invalid_input`; a
-linked file is indexed and readable. Like every access, `read` first puts an orphaned
-`.<dir>-alt-*` of an interrupted `publish` back, and its result reports that in `hint` (the
-subcommand on stderr). There is no filter on `state`; that belongs to the reading
-side. The `title` that `list`
-reports is the frontmatter `title` when the document has one, otherwise its first heading,
-otherwise the file name -- what a caller had to give `write` comes back on reading, and a
-file without a header still gets a readable name. `search` always carries
-`hits` and `list` always carries `entries`, empty ones included -- the same as the `--json`
-output of the subcommand. The other tools omit both keys rather than sending `null`.
-When the store has no section that could be a hit at all -- no chunk outside the root
-`README.md`, and none from a document in state `raw` or `superseded` --, `search` says so in
-`hint` (the subcommand on stderr, its stdout stays `Keine Treffer …` or the plain JSON), whatever
-the query and the `kind` filter: the store has nothing searchable yet, and project knowledge
-lies under `k-playbook-local/docs/` until the migration. Without it an empty store would read
-like "nothing on this topic". A store with sections that the query does not hit carries no
-such hint. The pointer at `docs/` is a transitional read and goes in step 6 of the switch of
-the writers ([knowledge-layout.md](knowledge-layout.md#transitional-reads)).
-
-**Writing.** Every write names its `producer` from the closed list in the layout, and the
-`path` -- relative to `knowledge/`, reported back exactly as `read`, `list` and `search`
-name it -- must lie in that producer's directory. Three refusals, three messages: an unknown
-producer, a path that leads out of the zone, and a target inside the zone but outside the
-producer's directory. The frontmatter is composed by the tool from `title`, `subject`,
-`origin`, `state` (`raw`, `condensed`, `reviewed`; `superseded` is refused), optional
-`format` (`markdown` by default, or `text`, `html`, `image`, `pdf`) and `sources`; `updated`
-is set by the tool. The `body` is Markdown without a header, and a body that carries one is
-refused rather than passed through -- also when blank lines, leading whitespace or CRLF line
-endings come before it. `write` optionally names a `queue` entry, which is
-deleted after the document exists and the index knows it -- not before, and not if the write
-failed. `write` does not overwrite a document whose file carries `state: superseded`: the call
-is refused before anything is written, and the file, the index and a named queue entry stay as
-they are. A later run of the same producer would otherwise reset the state silently and lose
-`successor`; whoever wants to change the topic writes the successor or supersedes it.
-A `write` path through a symbolically linked directory is refused as `invalid_input` before
-anything is read, created or written: the file would lie where the index does not look.
-`publish` is not affected; its swap replaces a linked directory with a real one.
-The generators `docs-code`, `docs-tools` and `inventory` cannot `write`: they
-`publish` their complete set of `documents`, and the tool builds the new directory beside the
-old one, writes the index that describes it and only then swaps it, so a run that dies halfway
-leaves the previous state untouched; the result says how many were `written` and `removed`.
-The paths of `documents` are relative to the generator's directory: a path that already starts with it, in any case (`code/overview.md` or `Code/overview.md` for
-`docs-code`), is refused as `invalid_input`, on the command line
-as well, instead of landing in `code/code/` -- a generator directory therefore holds no
-subdirectory of its own name. If a swap is interrupted between its two renames, the next access -- `read` included -- puts the set-aside directory `.<dir>-alt-*` back under its name before drift detection runs,
-provided the target is missing and exactly one candidate lies there; it never replaces an
-existing target. [knowledge-layout.md](knowledge-layout.md#the-write-tools) spells out every
-failure case.
-An empty set -- `documents: []` or the field left out -- is refused as `invalid_input` before
-anything is created: `publish` never empties a directory, on either path.
-On the command line, `publish --from <dir>` reads every Markdown file below `<dir>` with the
-same fields in its frontmatter, checks them and recomposes the header -- nothing is copied.
-`supersede` sets `state: superseded`, `successor` and `superseded_reason`, refreshes
-`updated` and leaves the body; the successor must already exist in the store and must be able to be a search hit: it is
-refused exactly when search hides it by its state (`raw`, `superseded`), so a successor without a
-header or without `state` is allowed. Refused as `invalid_input`: a document or a successor
-under `code/`, `libs/` or `versions/` and the root `README.md` on either side -- all recognised
-without regard to case (`Code/x.md`, `readme.md`) --, a document that is already superseded, a
-successor that search hides, and a document or successor through a linked directory. The result names both
-paths cleaned: `./findings/y.md` comes back as `findings/y.md`. A supersession is final; the
-rules and the way to correct a wrong successor are in
-[knowledge-layout.md](knowledge-layout.md#superseding).
-
-**Inbox and queue.** `inbox_put` stores a raw piece under `inbox/<source>/<name>` as it is
--- any format, no frontmatter, no index -- and refuses an occupied name as well as a path on
-which a file lies where a directory is needed (`README.md` as `source`, an existing piece as an
-intermediate directory in `name`); a `note` is stored
-beside it as `<name>.note` and shown by `inbox_list` at the piece's entry. `inbox_read` reads
-text formats only (`md`, `markdown`, `txt`, `html`, `htm`, `json`, `yaml`, `yml`, `csv`, `xml`, `log`).
-`queue_add` takes `origin`, `target` (a directory relative to `knowledge/`, checked for path
-safety only) and `reason` and assigns the `id` itself; `queue_list` returns the backlog with
-those fields plus `added` and any `notes`; `queue_drop` deletes an entry and records nothing.
-
-**Error codes.** The `code` says whether the arguments or the environment are wrong, so a
-caller can decide between correcting and giving up. `invalid_input` is reserved for input
-errors, which the core (`project.InputError`) distinguishes and the wrappers only relay: an
-unknown producer, a path out of the zone or outside the producer's directory, a missing or
-malformed field, a body with a header, a refused `state`, an empty `documents` set, a
-non-text format at `inbox_read`, an occupied inbox name or a file on its path, a `publish` path that starts with the generator's directory (in any case), a `supersede` target or
-successor in a generator directory or the root `README.md` (in any case), an already superseded
-target, a successor that search hides by its state, a `write` onto a superseded document, a
-`read` path with a hidden segment, a `read`, `write` or `supersede` path through a linked
-directory -- and "not there": a missing path
-at `read` or `supersede`, a missing successor at `supersede`, an unknown queue `id` at
-`queue_drop` or `write`, a missing inbox path at `inbox_read`. The caller named something
-that does not exist and can correct it; no separate code. Everything else is the
-environment: the writing tools (`write`, `publish`, `supersede`, `inbox_put`, `queue_add`,
-`queue_drop`) answer `write_failed`, the reading tools (`read`, `search`, `list`,
-`inbox_read`, `inbox_list`, `queue_list`, `status`) answer `read_failed` -- for instance an
-unwritable `knowledge/`, or a path that exists but cannot be read. A missing, empty, or
-whitespace-only `projectDir` is `invalid_input` as well, before anything is resolved or
-written (see the top of this page). `project_not_found` stays the code for a `projectDir` that
-is given but leads to no k-playbook project.
-
-`status` reports `stale: true` and `staleFiles` when the last access found files changed
-behind the tools' back and re-read them. The same report can mean an interrupted or a
-concurrently running `publish`: its index is written before its swap, so for that moment, or
-after a crash in it, the index describes a set the disk does not hold, and the access returns
-to what is on disk -- although nobody wrote past the gate. A `hint` appears -- at `read` as well -- when an access had to skip something without failing over it: an unwritable `cache/`, an unreadable file, a
-set-aside directory put back after an interrupted swap -- and at `search` when the store has nothing searchable yet (see "Reading"). `status` also names hidden leftovers of
-a swap (`.<dir>-neu-*`, `.<dir>-alt-*`), which are never deleted automatically, and Markdown
-files at the old location `k-playbook-local/docs/learned/`, which the store no longer reads. Unreadable is
-not drift: a file whose hash cannot be taken is reported in the `hint`, its index entry is
-dropped once, and it stays invisible to the comparison -- no `stale`, no rewrite of the index
--- until it is readable again; its return then counts as drift like any new file. `status` also
-carries `model` and `dims`, empty while the index is lexical: they are the place where an
-index built with one embedding model and queried with another would show up instead of
-quietly returning nonsense.
-
-This section describes what is built. The concept it belongs to -- how a deposit is
-classified, what the query surface looks like, and which decisions rest on which measurements
--- is in [knowledge-gate.md](knowledge-gate.md).
-
 ### Doc Read Contract
 
 `k_playbook_doc_read` is a thin wrapper over `project.ResolveDocRef` (`project/docref.go`); the
@@ -896,7 +744,7 @@ parts, problems, includes, totalLines, revision}`:
   `depth` (1 for an include of the main document) and `disabled`. Always present, `[]`
   without includes and with `includes: false`.
 
-Error codes, in the envelope's `error.code` like the knowledge tools:
+Error codes, in the envelope's `error.code` like the other tool families:
 
 | Code | When |
 |---|---|
@@ -1301,9 +1149,8 @@ switched.
 
 Deliberately not in the briefing's own sections: contents (except `documents.always.content`,
 see above), commands, skills, checks, scripts,
-k-playbook's own docs and the local knowledge store `k-playbook-local/knowledge/` -- that one joins later, with
-counts per kind, state and origin and the freshness that
-[knowledge-gate.md](knowledge-gate.md#querying-the-surface) described for its briefing.
+and k-playbook's own docs. The project documentation appears only as its entry
+`keph:/docs/` (`projectDocs`).
 
 Error codes in `error.code`: `invalid_input` for a missing `projectDir`, `project_not_found`
 for a `projectDir` that leads to no project, and `read_failed` when a layer could not be read

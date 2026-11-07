@@ -56,9 +56,9 @@ func writeManagedIgnore(t *testing.T, root string) {
 }
 
 // Die zwei privaten Verzeichnisse stehen zur Wahl — und nur sie. results/ ist
-// bei der Installation vorbelegt, umschaltbar bleibt es trotzdem. cache/,
-// inbox/ und material/ stehen seit Task 107 nicht mehr in der Struktur und
-// haben damit keine Schaltung mehr.
+// bei der Installation vorbelegt, umschaltbar bleibt es trotzdem. material/
+// steht seit Task 107 nicht mehr in der Struktur, cache/ und inbox/ gibt es
+// seit Task 123 nicht mehr; keines hat eine Schaltung.
 func TestPrivateEntriesNenntResultsUndPriv(t *testing.T) {
 	paths := []string{}
 	for _, entry := range PrivateEntries() {

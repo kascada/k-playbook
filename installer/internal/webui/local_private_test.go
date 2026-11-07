@@ -89,8 +89,8 @@ func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	privateEntry(t, response, "results")
 }
 
-// cache/, inbox/ und material/ stehen seit Task 107 nicht mehr in der lokalen
-// Struktur und lassen sich deshalb nicht mehr umschalten.
+// material/ steht seit Task 107 nicht mehr in der lokalen Struktur, cache/ und
+// inbox/ gibt es seit Task 123 nicht mehr; keines lässt sich umschalten.
 func TestSetLocalPrivateHandlerWeistEntfernteVerzeichnisseAb(t *testing.T) {
 	privateProject(t)
 

@@ -7,8 +7,8 @@
 // aus der geladenen Dateiliste — dieser Bereich hat genau einen Inhalt.
 //
 // Quelle ist /api/docs; gelesen wird nur. Das Anzeigen selbst — Anker,
-// Querverweise, Mermaid — steht in docview.js und wird mit /knowledge geteilt;
-// hier steht, welche Datei geöffnet wird.
+// Querverweise, Mermaid — steht in docview.js; hier steht, welche Datei
+// geöffnet wird.
 
 const elements = {
   blockNav: document.getElementById("block-nav"),

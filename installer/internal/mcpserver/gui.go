@@ -33,7 +33,7 @@ type guiStatusEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*guiproc.StatusReport
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 func addGUITools(server *mcp.Server) {
@@ -53,7 +53,7 @@ func addGUITools(server *mcp.Server) {
 func guiStatusTool(ctx context.Context, _ *mcp.CallToolRequest, input guiStatusInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(guiStatusEnvelope{OK: false, Tool: guiToolStatus, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

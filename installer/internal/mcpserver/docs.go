@@ -32,20 +32,20 @@ type docReadInput struct {
 // Antwort sind Zeiger, damit eine Fehlerantwort sie gar nicht erst trägt,
 // eine Erfolgsantwort aber immer — auch content "", parts [] und includes [].
 type docEnvelope struct {
-	OK         bool                    `json:"ok"`
-	Tool       string                  `json:"tool"`
-	ProjectDir string                  `json:"projectDir"`
-	Ref        string                  `json:"ref,omitempty"`
-	Directory  *bool                   `json:"directory,omitempty"`
-	Content    *string                 `json:"content,omitempty"`
-	Disabled   *bool                   `json:"disabled,omitempty"`
-	Hint       string                  `json:"hint,omitempty"`
-	Parts      *[]project.DocPart      `json:"parts,omitempty"`
-	Problems   *[]string               `json:"problems,omitempty"`
-	Includes   *[]project.DocInclude   `json:"includes,omitempty"`
-	Revision   int64                   `json:"revision,omitempty"`
-	TotalLines *int                    `json:"totalLines,omitempty"`
-	Error      *knowledgeErrorEnvelope `json:"error,omitempty"`
+	OK         bool                  `json:"ok"`
+	Tool       string                `json:"tool"`
+	ProjectDir string                `json:"projectDir"`
+	Ref        string                `json:"ref,omitempty"`
+	Directory  *bool                 `json:"directory,omitempty"`
+	Content    *string               `json:"content,omitempty"`
+	Disabled   *bool                 `json:"disabled,omitempty"`
+	Hint       string                `json:"hint,omitempty"`
+	Parts      *[]project.DocPart    `json:"parts,omitempty"`
+	Problems   *[]string             `json:"problems,omitempty"`
+	Includes   *[]project.DocInclude `json:"includes,omitempty"`
+	Revision   int64                 `json:"revision,omitempty"`
+	TotalLines *int                  `json:"totalLines,omitempty"`
+	Error      *errorEnvelope        `json:"error,omitempty"`
 }
 
 // docReadDescription ist die Werkzeugbeschreibung von k_playbook_doc_read;
@@ -107,7 +107,7 @@ func docReadTool(ctx context.Context, req *mcp.CallToolRequest, input docReadInp
 func docErrorResult(projectDir string, ref string, code string, err error) *mcp.CallToolResult {
 	return jsonToolResult(docEnvelope{
 		OK: false, Tool: docToolRead, ProjectDir: projectDir, Ref: ref,
-		Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()},
+		Error: &errorEnvelope{Code: code, Message: err.Error()},
 	}, true)
 }
 
@@ -149,7 +149,7 @@ type docCreateEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocCreated
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 type docListEnvelope struct {
@@ -157,7 +157,7 @@ type docListEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocList
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 type docMoveEnvelope struct {
@@ -165,7 +165,7 @@ type docMoveEnvelope struct {
 	Tool       string `json:"tool"`
 	ProjectDir string `json:"projectDir"`
 	*project.DocMoved
-	Error *knowledgeErrorEnvelope `json:"error,omitempty"`
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 // docKindSchema bildet das Eingabeschema aus dem Typ und setzt die erlaubten
@@ -242,7 +242,7 @@ func addUserDocTools(server *mcp.Server) {
 func docCreateTool(ctx context.Context, _ *mcp.CallToolRequest, input docCreateInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docCreateEnvelope{OK: false, Tool: docToolCreate, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
@@ -262,7 +262,7 @@ func docCreateTool(ctx context.Context, _ *mcp.CallToolRequest, input docCreateI
 func docListTool(ctx context.Context, _ *mcp.CallToolRequest, input docListInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docListEnvelope{OK: false, Tool: docToolList, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {
@@ -291,7 +291,7 @@ func docMove(ctx context.Context, tool string, input docMoveInput,
 	move func(*project.UserDocs, context.Context, string) (project.DocMoved, error)) *mcp.CallToolResult {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docMoveEnvelope{OK: false, Tool: tool, ProjectDir: dir,
-			Error: &knowledgeErrorEnvelope{Code: code, Message: err.Error()}}, true)
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
 	}
 	projectDir, err := resolveProjectDir(input.ProjectDir)
 	if err != nil {

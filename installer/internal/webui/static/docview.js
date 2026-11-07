@@ -1,65 +1,8 @@
 "use strict";
 
-// Der gemeinsame Betrachter für gerenderte Markdown-Dateien.
-//
-// Zwei Seiten zeigen dasselbe: /docs die ausgewählte Datei der mitgelieferten
-// Doku, /knowledge die Wissensablage. Was beide brauchen — Anker, Querverweise
-// und Mermaid — steht deshalb hier und nicht zweimal daneben. Die Statusseite
-// zeigt aus der Wissensablage allein das Bild und holt es über denselben Weg
-// wie /knowledge. Was sie
-// unterscheidet, bleibt bei ihnen: welche Datei geöffnet wird, und wohin ein
-// Verweis führt.
-
-// Holt eine Datei der mitgelieferten Doku über GET /api/docs/file und setzt
-// sie in viewer. /knowledge zeigt die ganze Datei, die Statusseite mit
-// firstDiagramOnly allein ihr erstes Mermaid-Diagramm — beide über diesen
-// einen Weg, damit Holen und Zeichnen nicht zweimal daneben stehen.
-//
-// Die Antwort geht an den Aufrufer zurück: er übernimmt Titel und Pfad und
-// entscheidet, wohin eine Meldung gehört. Konnte nichts gezeigt werden, ist
-// viewer leer und der Grund steht in available oder message. Ein Fehler beim
-// Holen wirft; auch den fängt der Aufrufer.
-async function loadDocInto(viewer, path, { firstDiagramOnly = false } = {}) {
-  const response = await fetch(`/api/docs/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
-  const data = await response.json();
-
-  // Die Installation daneben kann einen älteren Stand tragen, in dem es die
-  // Datei noch nicht gibt. Dann steht der Grund in der Meldung — eine leere
-  // Karte wäre dafür die falsche Auskunft.
-  if (!data.available || data.message) {
-    viewer.textContent = "";
-    return data;
-  }
-
-  if (!firstDiagramOnly) {
-    showDoc(viewer, data.html);
-    return data;
-  }
-
-  if (!showFirstDiagram(viewer, data.html)) {
-    viewer.textContent = "";
-    data.message = `${path} enthält kein Mermaid-Diagramm.`;
-  }
-  return data;
-}
-
-// Setzt aus dem gerenderten Text allein den ersten Mermaid-Block in viewer und
-// lässt ihn zeichnen. Falsch, wenn der Text keinen hat.
-//
-// Erst einsetzen, dann zeichnen: renderMermaidDiagrams überspringt jeden Block,
-// der nicht im Dokument hängt — ohne Bild und ohne Meldung.
-function showFirstDiagram(viewer, html) {
-  const parsed = document.createElement("template");
-  parsed.innerHTML = html || "";
-  const block = parsed.content.querySelector("pre > code.language-mermaid");
-  if (!block) {
-    return false;
-  }
-  viewer.classList.remove("empty");
-  viewer.replaceChildren(block.closest("pre"));
-  renderMermaidDiagrams(viewer);
-  return true;
-}
+// Der Betrachter für gerenderte Markdown-Dateien der Seite /docs: Anker,
+// Querverweise und Mermaid. Was die Seite selbst ausmacht, bleibt bei ihr:
+// welche Datei geöffnet wird, und wohin ein Verweis führt.
 
 // Setzt den gerenderten Text in die Karte und springt an die gewünschte
 // Stelle. Das HTML kommt aus dem eigenen Backend, gerendert mit abgeschaltetem
@@ -165,9 +108,7 @@ function scrollToAnchor(viewer, anchor) {
 // Der zweite Anlauf gilt Ankern, die ein Mensch geschrieben hat. Goldmark wirft
 // Nicht-ASCII aus seinen Überschriften-Ids ersatzlos weg: aus „Doku in der
 // Oberfläche" wird `doku-in-der-oberflche`. Wer den Verweis von Hand setzt,
-// schreibt aber `#doku-in-der-oberfläche`, und der träfe nie — in
-// `k-playbook-local/docs/README.md` stehen sieben solcher Anker, erzeugt von
-// /k-docs-index. Nachsichtig zu sein ist hier die bessere Seite: der
+// schreibt aber `#doku-in-der-oberfläche`, und der träfe nie. Nachsichtig zu sein ist hier die bessere Seite: der
 // Markdown-Quelltext bleibt lesbar, und bestehende Verweise heilen von selbst.
 // Die Alternative wären verstümmelte Anker im Quelltext, die für einen Leser
 // wie Tippfehler aussehen.

@@ -160,8 +160,8 @@ warten in `keph:/queue/findings/` auf die Übernahme.
 
 - **Die Prüfung aus `/k-enforcement` nachbauen.** Sie kennt den zusammengeführten
   Regelkatalog; eine zweite Fassung läuft davon weg.
-- **Selbst übernehmen.** Nichts nach `docs/`, `knowledge/`, `guidelines/fallen.md` oder
-  `rules/` schreiben, auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
+- **Selbst übernehmen.** Nichts nach `docs/`, `guidelines/fallen.md` oder `rules/`
+  schreiben, auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
 - **`ziel` ohne Bestätigung setzen.** Der Vorschlag ist deiner, die Entscheidung gehört
   dem Nutzer.
 - **Einen Befund umschreiben.** Außer `ziel` bleibt er, wie er geschrieben wurde; was

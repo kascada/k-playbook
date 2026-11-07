@@ -296,8 +296,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 40 {
-		t.Fatalf("tools/list meldet nicht genau vierzig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 27 {
+		t.Fatalf("tools/list meldet nicht genau siebenundzwanzig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -316,19 +316,6 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_todo_add",
 		"k_playbook_todo_update",
 		"k_playbook_todo_delete",
-		"k_playbook_knowledge_search",
-		"k_playbook_knowledge_list",
-		"k_playbook_knowledge_read",
-		"k_playbook_knowledge_write",
-		"k_playbook_knowledge_publish",
-		"k_playbook_knowledge_supersede",
-		"k_playbook_knowledge_inbox_put",
-		"k_playbook_knowledge_inbox_list",
-		"k_playbook_knowledge_inbox_read",
-		"k_playbook_knowledge_queue_add",
-		"k_playbook_knowledge_queue_list",
-		"k_playbook_knowledge_queue_drop",
-		"k_playbook_knowledge_status",
 		"k_playbook_doc_read",
 		"k_playbook_doc_create",
 		"k_playbook_doc_list",
@@ -377,8 +364,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 40 {
-		t.Fatalf("tools/list meldet nicht vierzig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 27 {
+		t.Fatalf("tools/list meldet nicht siebenundzwanzig Werkzeuge: %v", responses[1])
 	}
 
 	for id, call := range []struct {
@@ -487,8 +474,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 39 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 39", withProjectDir)
+	if withProjectDir != 26 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 26", withProjectDir)
 	}
 }
 
@@ -523,11 +510,8 @@ var projectDirCalls = []struct {
 	name string
 	args map[string]any
 }{
-	{name: "k_playbook_knowledge_status", args: map[string]any{}},
-	{name: "k_playbook_knowledge_write", args: map[string]any{
-		"producer": "session", "path": "findings/ohne-projectdir.md", "title": "Ohne projectDir",
-		"subject": "MCP", "origin": "Test", "state": "reviewed", "body": "# Ohne projectDir\n\nInhalt.\n",
-	}},
+	{name: "k_playbook_health", args: map[string]any{}},
+	{name: "k_playbook_docs_exclude_add", args: map[string]any{"patterns": []any{"ohne-projectdir/"}}},
 	{name: "k_playbook_todo_list", args: map[string]any{}},
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
 	{name: "k_playbook_review_status", args: map[string]any{}},
@@ -595,26 +579,32 @@ func TestFehlendesProjectDirIstEingabefehler(t *testing.T) {
 		}
 	}
 
-	knowledgeFile := filepath.Join(project.KnowledgeDir(root), "findings", "ohne-projectdir.md")
-	if _, err := os.Stat(knowledgeFile); !os.IsNotExist(err) {
-		t.Errorf("knowledge_write ohne projectDir hat geschrieben: %s (%v)", knowledgeFile, err)
+	excludeWritten := func() bool {
+		data, err := os.ReadFile(project.ConfigPath(root))
+		if err != nil {
+			t.Fatalf("Konfiguration lesen: %v", err)
+		}
+		return strings.Contains(string(data), "ohne-projectdir/")
+	}
+	if excludeWritten() {
+		t.Errorf("docs_exclude_add ohne projectDir hat geschrieben: %s", project.ConfigPath(root))
 	}
 	// Gegenprobe: mit projectDir schreibt derselbe Aufruf im selben Projekt.
-	// Sonst bewiese das Fehlen der Datei oben nichts. todo_add kommt mit
+	// Sonst bewiese das Fehlen des Musters oben nichts. todo_add kommt mit
 	// projectDir bis zur Collection — das Projekt hat keine Anbindung, also
 	// kephalaion_unavailable statt invalid_input.
 	stdout := speak(t, root, 3,
 		initialize(1),
 		initialized,
-		callTool(2, "k_playbook_knowledge_write", withProjectDir(projectDirCalls[1].args, root)),
+		callTool(2, "k_playbook_docs_exclude_add", withProjectDir(projectDirCalls[1].args, root)),
 		callTool(3, "k_playbook_todo_add", withProjectDir(projectDirCalls[3].args, root)),
 	)
 	responses = decodeResponses(t, stdout, 1, 2, 3)
 	if isError := result(t, responses[1])["isError"]; isError == true {
 		t.Fatalf("Gegenprobe mit projectDir schlug fehl: %s", toolText(t, responses[1]))
 	}
-	if _, err := os.Stat(knowledgeFile); err != nil {
-		t.Errorf("Gegenprobe: %s fehlt: %v", knowledgeFile, err)
+	if !excludeWritten() {
+		t.Errorf("Gegenprobe: Muster fehlt in %s", project.ConfigPath(root))
 	}
 	var todoEnvelope toolEnvelope
 	if err := json.Unmarshal([]byte(toolText(t, responses[2])), &todoEnvelope); err != nil ||

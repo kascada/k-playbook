@@ -221,13 +221,12 @@ weiter hinten, etwa in `<werkzeug> … && … || …`, zählt nicht.
 Ein Guard in einem anderen Codeblock oder ein Verweis auf `baseTools` genügt nicht.
 Erfassungsumfang und Grenzen stehen in `checks/README.md`.
 
-**Bekannte, bewusst zurückgestellte Ausnahme.** Task 045 hat fünf Commands genannt, die
-`git` ohne ausdrücklichen Guard aufrufen: `k-task-run.md`, `k-pr-review.md`,
-`k-enforcement.md`, `k-remediation.md` und `k-docs-index.md`. Als Aufruf in einem
-Shell-Codeblock steht `git` ohne Guard heute nur noch in `k-pr-review.md`.
-`k-task-run.md` hat seit Task 080 keine Fundstelle mehr: seine `git`-Aufrufe in
-Shell-Codeblöcken stehen hinter einem Guard. Die übrigen drei nennen `git` im Fließtext und
-haben keine Fundstelle. Der Fehlschlag ist in `k-pr-review.md` selbsterklärend, und ohne git
+**Bekannte, bewusst zurückgestellte Ausnahme.** Task 045 hat Commands genannt, die `git`
+ohne ausdrücklichen Guard aufrufen; davon gibt es noch `k-task-run.md`, `k-pr-review.md`,
+`k-enforcement.md` und `k-remediation.md`. Als Aufruf in einem Shell-Codeblock steht `git`
+ohne Guard heute nur noch in `k-pr-review.md`. `k-task-run.md` hat seit Task 080 keine
+Fundstelle mehr: seine `git`-Aufrufe in Shell-Codeblöcken stehen hinter einem Guard. Die
+übrigen zwei nennen `git` im Fließtext und haben keine Fundstelle. Der Fehlschlag ist in `k-pr-review.md` selbsterklärend, und ohne git
 gäbe es das Repository nicht, in dem k-playbook arbeitet.
 
 Jede dieser Fundstellen steht einzeln mit `datei`, `zeile`, `werkzeug` und `begründung` in

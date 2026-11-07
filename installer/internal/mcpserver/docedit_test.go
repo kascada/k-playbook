@@ -15,17 +15,17 @@ func slicesContain(list []string, value string) bool { return slices.Contains(li
 
 // docEditAnswer ist die Antwort eines Änderungswerkzeugs, zerlegt.
 type docEditAnswer struct {
-	OK            bool                    `json:"ok"`
-	Tool          string                  `json:"tool"`
-	Ref           string                  `json:"ref"`
-	Revision      int64                   `json:"revision"`
-	Size          int64                   `json:"size"`
-	Changed       *bool                   `json:"changed"`
-	SinceRevision int64                   `json:"sinceRevision"`
-	UpdatedBy     string                  `json:"updatedBy"`
-	UpdatedAt     string                  `json:"updatedAt"`
-	Tail          *string                 `json:"tail"`
-	Error         *knowledgeErrorEnvelope `json:"error"`
+	OK            bool           `json:"ok"`
+	Tool          string         `json:"tool"`
+	Ref           string         `json:"ref"`
+	Revision      int64          `json:"revision"`
+	Size          int64          `json:"size"`
+	Changed       *bool          `json:"changed"`
+	SinceRevision int64          `json:"sinceRevision"`
+	UpdatedBy     string         `json:"updatedBy"`
+	UpdatedAt     string         `json:"updatedAt"`
+	Tail          *string        `json:"tail"`
+	Error         *errorEnvelope `json:"error"`
 }
 
 func TestDocAppendReplaceSetUeberHuellen(t *testing.T) {
@@ -145,16 +145,16 @@ func TestDocGrepUeberHuelle(t *testing.T) {
 	ctx := context.Background()
 
 	type grepAnswer struct {
-		OK        bool                    `json:"ok"`
-		Tool      string                  `json:"tool"`
-		Ref       string                  `json:"ref"`
-		Revision  int64                   `json:"revision"`
-		Kind      string                  `json:"kind"`
-		Matches   []project.DocGrepMatch  `json:"matches"`
-		Counts    []project.DocGrepCount  `json:"counts"`
-		Count     int                     `json:"count"`
-		Truncated bool                    `json:"truncated"`
-		Error     *knowledgeErrorEnvelope `json:"error"`
+		OK        bool                   `json:"ok"`
+		Tool      string                 `json:"tool"`
+		Ref       string                 `json:"ref"`
+		Revision  int64                  `json:"revision"`
+		Kind      string                 `json:"kind"`
+		Matches   []project.DocGrepMatch `json:"matches"`
+		Counts    []project.DocGrepCount `json:"counts"`
+		Count     int                    `json:"count"`
+		Truncated bool                   `json:"truncated"`
+		Error     *errorEnvelope         `json:"error"`
 	}
 	result, _, _ := docGrepTool(ctx, nil, docGrepInput{ProjectDir: root, Kind: "tasks", Done: true, Pattern: "^status:"})
 	var answer grepAnswer

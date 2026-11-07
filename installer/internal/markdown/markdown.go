@@ -1,12 +1,10 @@
 // Package markdown trägt die eine Goldmark-Konfiguration, mit der k-playbook
 // Markdown liest.
 //
-// Die Oberfläche rendert damit die Doku, das Wissenstor in project/ bildet
-// damit die Anker seiner Chunks. Beide müssen dieselbe Konfiguration benutzen:
-// parser.WithAutoHeadingID erzeugt die Überschriften-Ids, gegen die die
-// Anzeige einen Suchtreffer auflöst — weicht die Bildung auch nur in einer
-// Option ab, laufen Sprünge aus einem Treffer stumm ins Leere. Deshalb steht
-// die Konstruktion genau einmal, hier, und nicht in beiden Paketen.
+// Die Oberfläche rendert damit die Doku. parser.WithAutoHeadingID erzeugt die
+// Überschriften-Ids, gegen die ein Verweis mit Anker aufgelöst wird — liest
+// ein zweiter Leser dieselben Dateien mit einer anderen Option, laufen Sprünge
+// stumm ins Leere. Deshalb steht die Konstruktion genau einmal, hier.
 //
 // Gemessen gegen goldmark v1.8.5 und in markdown_test.go festgehalten:
 // Nicht-ASCII fällt aus den Ids ersatzlos heraus („Überschriften" →

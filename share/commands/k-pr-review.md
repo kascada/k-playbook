@@ -99,8 +99,8 @@ Aus der Context-Ausgabe:
 - `DOCS_DIR` = `<local.dir>/docs`.
 - `CODE_DOCS_DIR` = `<DOCS_DIR>/code` — Phase 2 braucht es für die Docs-Sync-Pflicht. Nur
   diese Herkunft folgt dem Code; `libs/`, `versions/`, `manual/` und `extracted/` sind
-  davon ausgenommen, und `DOCS_DIR/README.md` ist der erzeugte Index von
-  `/k-docs-index`.
+  davon ausgenommen, und `DOCS_DIR/README.md` ist der alte Platten-Index, den `/k-upgrade`
+  (3.2) abräumt.
 - `EFFECTIVE_RULES` = `catalogs.rules`, inklusive Herkunft je Regel.
 
 Command-specific policy:

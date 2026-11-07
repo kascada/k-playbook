@@ -160,7 +160,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 | Group | Commands | Purpose |
 |---|---|---|
 | Project | `/k-gui` | Start the interface, check and set up project state |
-| Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-docs-extract`, `/k-doc-inventory`, `/k-docs-index` | Check, document, and register project knowledge by origin for AI sessions |
+| Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
 | Code review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-remediation` | Assess PRs, run reviews and audits, address findings |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
 | Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check rules, diagnose tests, read histories, mark VS Code |
@@ -224,7 +224,7 @@ The complete flow and the artifact model are in
 
 ### Docs first
 
-Project knowledge should be documented and registered for AI sessions. The
+Project knowledge should be documented in the project collection. The
 workflow follows the origins of the docs; each tool writes exclusively to
 directories of its own origin:
 
@@ -232,9 +232,7 @@ directories of its own origin:
 /k-docs           → check inventory and offer possible docs actions
 /k-docs-code      → keph:/docs/generated/code/ (project collection, through k-playbook docs checkout|publish code)
 /k-docs-tools     → keph:/docs/generated/libs/ (project collection, through k-playbook docs checkout|publish libs)
-/k-docs-extract   → k-playbook-local/knowledge/extracted/ (through the knowledge tools)
 /k-doc-inventory  → keph:/docs/generated/versions/inventory.md (project collection)
-/k-docs-index     → k-playbook-local/docs/README.md + AGENTS.md + opencode.json (old disk index, until its own switch)
 ```
 
 The entry of the project documentation is `keph:/docs/` in the project's collection
@@ -253,31 +251,18 @@ document's frontmatter change only after the user confirms. Each writer changes 
 documents (`generated.by`); the directory's `README.md` is written by `publish`.
 
 `/k-docs` is the guided entry point: it checks inventory, consistency, and
-session memory and offers the possible next step. The four producers create
-content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries,
-`/k-docs-extract` reads raw material from `k-playbook-local/inbox/` -- and, until step 5
-of the switch to the knowledge store, from the previous location
-`k-playbook-local/material/` ([transitional reads](knowledge-layout.md#transitional-reads))
---, and
+session memory and offers the possible next step. The three producers create
+content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries, and
 `/k-doc-inventory` reads declared versions from manifests, lockfiles, container,
-Helm, and CI files. Skip a stage if it has no input.
-The knowledge gate -- `k-playbook knowledge` and the MCP tools
-`k_playbook_knowledge_*` -- no longer reads or writes here: it works on the
-knowledge store `k-playbook-local/knowledge/`, with `inbox/` and `queue/`
-beside it. Setup creates none of these directories, nor `docs/` (task 107): each
-arises with its first write, and reading without it answers empty. The store fills as the writers are switched to it, one after another;
-`/k-docs-extract` is the first and writes its extracts to `knowledge/extracted/`,
-where the knowledge search finds them and `docs/README.md` does not yet (see
-[knowledge-layout.md](knowledge-layout.md) and [mcp.md](mcp.md), "Knowledge
-Contract").
+Helm, and CI files. Skip a stage if it has no input. Raw material has no inbox of its
+own (task 123); full-text search over `keph:/docs/` is Kephalaion's.
 
-`/k-docs-index` is the only one that writes `docs/README.md` on disk: the index across
-the generated origins and the flat root files. It also registers the docs in `AGENTS.md`
-and `opencode.json`, or `opencode.jsonc` if only that file exists; it never creates a
-second file. Since task 101 that index is the old disk entry: the binary no longer writes
-`references.docs` into `opencode.json`, and `/k-upgrade` (3.2) proposes to remove the
-index and the references once their entries are moved; until `/k-docs-index` has its own
-switch, a run of it restores them and 3.2 proposes the clean-up again.
+A `docs/README.md` on disk is the old index from before the move to the collection: the
+binary no longer writes `references.docs` into `opencode.json`, and `/k-upgrade` (3.2)
+proposes to remove the index and the references to it in `AGENTS.md` and
+`opencode.json[c]` once their entries are moved. The former knowledge directories under
+`k-playbook-local/` are gone as well (task 123); `/k-upgrade` (3.0) clears what is left of
+them in an existing project.
 
 Each subdirectory of `docs/` represents an origin; a file's frontmatter records
 which tool wrote it under `generated.by`. No command writes doc files in

@@ -12,6 +12,14 @@ documentation and leaves this file; the file is deleted when nothing remains ope
 
 As of: 2026-10-18.
 
+**Overtaken by task 123 (2026-11-06):** the knowledge store on disk
+(`k-playbook-local/knowledge/`, `inbox/`, `queue/` and the index under `cache/`), the knowledge
+gate with `k-playbook knowledge` and the tools `k_playbook_knowledge_*`, `/k-docs-extract`,
+`/k-docs-index` and the pages `knowledge-gate.md`, `knowledge-layout.md` and
+`knowledge-storage.md` are gone. Project knowledge lies in `keph:/docs/` alone, findings in
+`keph:/queue/findings/` alone, and raw material has no inbox. Passages below that describe the
+store, its queue or these commands are retrospective.
+
 ## Goal
 
 k-playbook is installed as a binary only. There is no clone under `<project>/k-playbook/`
@@ -301,6 +309,10 @@ today only points at a raw piece in the inbox. A finding in the queue carries it
 itself, so after the takeover it is gone and `sources` has nothing left to point at, unless the
 run moves it to the inbox first. Everything under `queue/` has no user area: `k_playbook_doc_list`
 ignores `user` there and takes the user from Kephalaion's `created.by`.
+**Overtaken (task 123, 2026-11-06):** `queue_list` for subdirectories and the takeover "into the
+knowledge store" are dropped together with the knowledge store on disk; the target of the takeover
+is `keph:/docs/`, and the findings are read through the document operations (`doc_list`,
+`doc_grep`), not through a queue of the knowledge gate.
 
 **Writing the findings comes first, reading them later** (2026-10-24). The findings rule, the
 skill `befunde` and `/k-danke` are switched to `queue/findings/` on their own; the scheduled run
@@ -483,9 +495,10 @@ not cover itself (see "Target for `k-playbook.md` and `AGENTS.md`" below); nothi
 both the briefing's own sections and the context output. `guidelines` is an overlay kind for
 `k_playbook_doc_read` and the briefing; the field `guidelines` of the context output stays
 local-only as the one named exception until the context output is switched. The briefing of
-[`knowledge-gate.md`](./knowledge-gate.md#querying-the-surface) merges into this one: the
+`knowledge-gate.md` ("Querying the surface") merges into this one: the
 document list exists now; the counts per kind, state and origin and the freshness come with the
-knowledge store later. Contract: [`mcp.md`](./mcp.md#briefing-contract); what moves where:
+knowledge store later (overtaken: both the store and `knowledge-gate.md` are gone since task
+123). Contract: [`mcp.md`](./mcp.md#briefing-contract); what moves where:
 "Target for `k-playbook.md` and `AGENTS.md`" below.
 
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
@@ -768,7 +781,8 @@ origin — `versions/` is deleted (the producer writes to the collection), `manu
 moved to `keph:/docs/manual/`, loose files are proposed, the old index and the references
 in `AGENTS.md`/`opencode.json` are removed —, each after confirmation; `code/` and
 `libs/` stay until their producers are switched. `/k-docs-index` and the skill
-`ai-session-memory` still restore the old index; 3.2 is repeatable.
+`ai-session-memory` still restore the old index; 3.2 is repeatable. (Overtaken: the skill is
+gone since 2026-11-04, `/k-docs-index` since task 123.)
 
 ## Open
 
@@ -877,6 +891,8 @@ until the last step.
     `/k-upgrade` 3.3 for the files on disk; see "Tasks go to the collection". Still open here:
     the Tasks page of the interface, the scheduled run for `queue/findings/`, `queue_list` for
     subdirectories, and the measurement in both clients after the release.
+    **Task 123 (2026-11-06):** `queue_list` for subdirectories is dropped with the knowledge
+    gate; the takeover of findings goes to `keph:/docs/`, not into a store on disk.
 11. **Generators** — `/k-docs-*` write single documents into the project collection,
     including the removal of stale ones. The commands are outdated and get rebuilt here; the
     six steps of `docs/knowledge-layout.md` ("Migration") are not carried out on them.
@@ -1011,4 +1027,6 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
       link `K-PLAYBOOK.yaml` -> `.k-playbook/K-PLAYBOOK.yaml` serves the old installed program
       until the new one removes it on its first call.
     - Open: an inventory of what lies in `k-playbook-local/` today, split into versioned
-      (moves out) and unversioned (stays). Not yet planned.
+      (moves out) and unversioned (stays). Not yet planned. With task 123 (2026-11-06)
+      `knowledge/`, `inbox/`, `queue/` and `cache/` leave that inventory: nothing writes there
+      any more, and `/k-upgrade` 3.0 clears them in existing projects.

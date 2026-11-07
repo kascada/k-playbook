@@ -68,7 +68,6 @@ func Run(ctx context.Context) error {
 	}, contextTool)
 	addReviewTools(server)
 	addTodoTools(server)
-	addKnowledgeTools(server)
 	addDocTools(server)
 	addBriefingTool(server)
 	addHealthTool(server)

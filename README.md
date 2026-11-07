@@ -12,12 +12,8 @@
   way, its candidates taken from the version inventory,
   `/k-doc-inventory` writes the
   version inventory into the project's Kephalaion collection
-  (`keph:/docs/generated/versions/inventory.md`), and
-  `/k-docs-extract` distils raw material into the knowledge store
-  `k-playbook-local/knowledge/extracted/`, where its search finds it; `/k-docs-index` anchors
-  the docs in `AGENTS.md` and
-  `opencode.json`, so the next session starts from it instead of reading the code
-  again. Review decisions persist as well: whatever is recorded in
+  (`keph:/docs/generated/versions/inventory.md`), so the next session starts from that
+  documentation instead of reading the code again. Review decisions persist as well: whatever is recorded in
   `known-decisions.md` as a false positive or an accepted risk never shows up as a
   finding in a later run.
 - **A body of knowledge instead of code search.** The entry of the project
@@ -141,11 +137,11 @@ project/
 ```
 
 Tasks, todos and the project documentation live in the project's Kephalaion collection,
-so setup no longer creates `docs/`, `tasks/`, `data/`, `material/`, `inbox/`, `queue/`,
-`knowledge/` or `cache/`; `/k-upgrade` removes them from an existing project once they
-hold nothing but their README. Until their own switch, the knowledge tools still write
-`inbox/`, `queue/`, `knowledge/` and the index under `cache/`, and create each directory
-on the first write.
+so setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
+them from an existing project once they hold nothing but their README. The former
+knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) clears what
+is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
+deletion.
 
 `k-playbook-local/` belongs in the project's repository. Two directories inside it are
 a matter of choice — `results/` and `priv/`; `results/` is already created as private
@@ -153,10 +149,8 @@ during setup, and both remain switchable. Review results are a snapshot from one
 and may contain found secrets in clear text. For `priv/` the project decides, and
 k-playbook writes no `.gitignore` there on its own. What currently applies is shown and
 switched by the **Local settings** block of the interface — measured with
-`git check-ignore`, not guessed. `inbox/` and `material/` have no switch any more until
-their move to the collection: a managed `.gitignore` already in place keeps working, and a
-newly created `inbox/` gets its `.gitignore` by hand. `cache/` gets the managed
-`.gitignore` when it is created.
+`git check-ignore`, not guessed. `material/` has no switch any more; a managed
+`.gitignore` already in place keeps working.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
 one disables it. This holds for all five kinds — `rules/`, `reviews/`, `checks/`,

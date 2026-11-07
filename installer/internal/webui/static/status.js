@@ -2,17 +2,12 @@
 
 // Seite "Status": die Startseite der Oberfläche. Sie zeigt, wie es um das
 // Projekt steht: zuerst die Anbindung an die Kephalaion-Collection, dann die
-// Umgebungsprüfung, darunter die Workflow-Karten und das Bild der
-// Wissensablage.
+// Umgebungsprüfung, darunter die Workflow-Karten.
 //
 // Nichts davon steht hier ein zweites Mal: Knöpfe und Sperrfläche bedient
-// service.js, die Zahlen der Workflow-Karten holt workflows.js, und das Bild
-// der Wissensablage holt und zeichnet docview.js. Klassisches Skript wie alle
-// übrigen — jeder Name auf oberster Ebene teilt sich den Namensraum mit
-// session.js, nav.js, service.js, docview.js und workflows.js.
-
-// Die Datei, deren erstes Diagramm die Karte zeigt.
-const STATUS_KNOWLEDGE_FILE = "knowledge-storage.md";
+// service.js, und die Zahlen der Workflow-Karten holt workflows.js.
+// Klassisches Skript wie alle übrigen — jeder Name auf oberster Ebene teilt
+// sich den Namensraum mit session.js, nav.js, service.js und workflows.js.
 
 // Kurze Zustandswörter der Prüfung für die Marken; der volle Satz kommt vom
 // Server (status.message).
@@ -102,7 +97,6 @@ kephalaionElements.cancel.addEventListener("click", closeKephalaionSetup);
 loadKephalaion();
 loadEnvironment();
 loadWorkflowCounts(document.getElementById("status-workflows-message"));
-loadKnowledgePicture();
 
 // Die Umgebungsprüfung: der Report aus /api/environment. Ohne Problem eine
 // Zeile, sonst die Liste; die Marke der Karte sagt, wie viele Fehler oder
@@ -189,18 +183,6 @@ function renderEnvironmentProblem(problem) {
     item.append(hint);
   }
   return item;
-}
-
-async function loadKnowledgePicture() {
-  const viewer = document.getElementById("knowledge-picture");
-  const message = document.getElementById("knowledge-picture-message");
-  try {
-    const data = await loadDocInto(viewer, STATUS_KNOWLEDGE_FILE, { firstDiagramOnly: true });
-    message.textContent = data.available ? data.message || "" : "Keine Projektkonfiguration gefunden.";
-  } catch {
-    viewer.textContent = "";
-    message.textContent = "Das Bild der Wissensablage konnte nicht geladen werden.";
-  }
 }
 
 function kephalaionLabel(state) {

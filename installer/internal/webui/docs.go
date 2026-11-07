@@ -10,9 +10,8 @@ import (
 )
 
 // markdown rendert die Doku. Die Konfiguration — GFM, automatische
-// Überschriften-Ids, kein rohes HTML — steht in internal/markdown und ist
-// dieselbe, mit der das Wissenstor in project/ die Anker seiner Chunks bildet:
-// nur so treffen Sprünge aus einem Suchtreffer die gerenderte Überschrift.
+// Überschriften-Ids, kein rohes HTML — steht in internal/markdown, an genau
+// einer Stelle.
 var markdown = mdconfig.New()
 
 // docsResponse ist die Liste der verfügbaren Dateien.

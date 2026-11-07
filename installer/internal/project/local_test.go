@@ -92,14 +92,15 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	}
 }
 
-// removedLocalEntries sind die neun Einträge, die Task 107 aus der Struktur
-// genommen hat: ihr Inhalt liegt in der Projekt-Collection oder zieht als
-// Nächstes dorthin.
-var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", InboxDirName, QueueDirName, KnowledgeDirName, CacheDirName}
+// removedLocalEntries sind die neun Einträge, die nicht mehr zur Struktur
+// gehören: docs bis material hat Task 107 herausgenommen, ihr Inhalt liegt in
+// der Projekt-Collection; inbox, queue, knowledge und cache waren die
+// Wissensablage auf der Platte, die Task 123 entfernt hat.
+var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", "inbox", "queue", "knowledge", "cache"}
 
 // Das Einrichten legt die neun Einträge nicht mehr an und zählt sie nicht als
 // fehlend; ein Projekt ohne sie ist vollständig. Auch cache/ entsteht nicht
-// nebenbei — CreateLocal fasst die Wissensablage nicht mehr an.
+// nebenbei.
 func TestCreateLocalLegtEntfernteEintraegeNichtAn(t *testing.T) {
 	inStructure := map[string]bool{}
 	for _, entry := range LocalStructure() {
