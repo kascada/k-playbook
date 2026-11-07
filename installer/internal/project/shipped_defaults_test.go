@@ -810,3 +810,190 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 		}
 	}
 }
+
+// Die Doku-Aufträge (Task 124): Die Anweisung doku-auftraege.md beschreibt
+// Kopf und Lebenslauf, docs-sync nennt das Einreihen als Normalfall, /k-docs
+// zählt die offenen Aufträge, und die beiden Erzeuger listen sie im Preflight
+// und schließen sie nach einem erfolgreichen publish ab — alles über die
+// doc-Werkzeuge, die ihre Hüllen erlauben.
+func TestDefaultsDocsAuftraege(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+
+	instruction := mustResolveDoc(t, layers, "k-playbook:/instructions/on-demand/doku-auftraege.md").Content
+	if !strings.HasPrefix(instruction, "---\ntitle: Doku-Aufträge\ndescription: ") {
+		t.Errorf("doku-auftraege.md ohne title und description:\n%.200s", instruction)
+	}
+	for _, needle := range []string{
+		"keph:/queue/docs/", "Sorte `docs`", "erzeuger: code | tools", "pfade:", "anlass:", "sitzung:", "entstanden:",
+		"Ein Auftrag je Sitzung und Erzeuger", "Kein Doppel", "`^sitzung: <session>$`", "Wann nicht eingereiht wird",
+		"Wer ihn schreibt", "Wer ihn abschließt", "Was nicht hineingehört", "`/k-enforcement`", "`open` leer", "`cleaned` ist wahr",
+	} {
+		if !strings.Contains(squashSpace(instruction), squashSpace(needle)) {
+			t.Errorf("doku-auftraege.md nennt %q nicht", needle)
+		}
+	}
+
+	sync := readRepoDefault(t, "rules/docs-sync.md")
+	project, err := os.ReadFile(filepath.Join("..", "..", "..", "rules", "docs-sync.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(project) != sync {
+		t.Error("rules/docs-sync.md und defaults/rules/docs-sync.md weichen voneinander ab")
+	}
+	for _, needle := range []string{"k-playbook:/instructions/on-demand/doku-auftraege.md", "„Nachzug eingereiht“",
+		"`erzeuger: tools`", "**einzureihen**"} {
+		if !strings.Contains(sync, needle) {
+			t.Errorf("docs-sync.md nennt %q nicht", needle)
+		}
+	}
+
+	shared := readRepoDefault(t, "commands/_shared/docs.md")
+	section := shared[strings.Index(shared, "\n### Doku-Aufträge\n"):]
+	for _, needle := range []string{"`k_playbook_doc_grep` mit `kind: docs`", "`^erzeuger: code$`", "`^erzeuger: tools$`",
+		"`ORDERS`", "`k_playbook_doc_done`", "`open` leer", "`cleaned` ist wahr", "bleiben offen", "engen den Scope nicht ein"} {
+		if !strings.Contains(squashSpace(section), needle) {
+			t.Errorf("_shared/docs.md, Doku-Aufträge, nennt %q nicht", needle)
+		}
+	}
+	for name, erzeuger := range map[string]string{"k-docs-code": "code", "k-docs-tools": "tools"} {
+		file := readRepoDefault(t, "commands/"+name+".md")
+		for _, needle := range []string{"`erzeuger: " + erzeuger + "`", "`ORDERS`", "<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>",
+			"keph:/queue/docs/done/"} {
+			if !strings.Contains(file, needle) {
+				t.Errorf("%s.md nennt %q nicht", name, needle)
+			}
+		}
+	}
+	docs := readRepoDefault(t, "commands/k-docs.md")
+	for _, needle := range []string{"`kind: docs`", "Aufträge    <N> (<N> code, <N> tools), ältester <entstanden> | keine",
+		"<N> Aufträge offen"} {
+		if !strings.Contains(docs, needle) {
+			t.Errorf("k-docs.md nennt %q nicht", needle)
+		}
+	}
+	for _, name := range []string{"k-docs", "k-docs-code", "k-docs-tools"} {
+		hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", name+".md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tool := range []string{"mcp__k-playbook__k_playbook_doc_list", "mcp__k-playbook__k_playbook_doc_grep",
+			"mcp__k-playbook__k_playbook_doc_done"} {
+			if !strings.Contains(string(hull), tool) {
+				t.Errorf("Hülle %s erlaubt %s nicht", name, tool)
+			}
+		}
+	}
+}
+
+// /k-enforcement ist seit Task 124 Hülle plus Text: Die Hülle nennt nur den
+// Verweis und erlaubt genau die Werkzeuge des Prüfberichts samt Einreihen;
+// der Text ist deutsch, beginnt mit dem Include _shared/erster-schritt.md,
+// nimmt die Regeln aus documents.rules, prüft dieselbe Dateimenge wie
+// k-check --mode changed, führt k-check selbst aus und reiht erst nach
+// Freigabe einen Doku-Auftrag ein. _shared/context.md, catalogs.rules,
+// extracted/ und der Skill ks-enforcement kommen nicht mehr vor.
+func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-enforcement.md"
+
+	hullData, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-enforcement.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(hullData)
+	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "## Schritt") || strings.Contains(hull, "_shared/context.md") {
+		t.Errorf("Hülle ohne Verweis auf den Text oder noch mit dem alten Ablauf:\n%s", hull)
+	}
+	allowed := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "allowed-tools: "); ok {
+			allowed = value
+		}
+	}
+	want := "[Read, Bash, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, " +
+		"mcp__k-playbook__k_playbook_doc_create, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, " +
+		"mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write]"
+	if allowed != want {
+		t.Errorf("allowed-tools:\n%s\nerwartet\n%s", allowed, want)
+	}
+
+	file := readRepoDefault(t, "commands/k-enforcement.md")
+	line := "include: _shared/erster-schritt.md\n"
+	if !strings.Contains(file, "\n"+line) {
+		t.Fatalf("k-enforcement.md ohne %q", line)
+	}
+	if strings.Index(file, line) > strings.Index(file, "## Schritt 2") {
+		t.Error("das Include steht nicht im ersten Schritt")
+	}
+	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
+	wantText := strings.Replace(file, line, module+"\n", 1)
+	for _, needle := range []string{
+		"`documents.rules`", "`k_playbook_doc_read`", "gegen `HEAD`, samt\nunverfolgten",
+		"git -C \"$ROOT\" diff --name-only HEAD", "git -C \"$ROOT\" ls-files --others --exclude-standard",
+		"bin/k-check\" --mode changed", "--target-root \"<context.project.repoRoot>\"", "--files-from", "k-playbook:/rules/docs-sync.md",
+		"k-playbook:/instructions/on-demand/doku-auftraege.md", "nach Freigabe", "`k_playbook_doc_create` mit `kind: docs`",
+		"Kephalaion `write`", "`^sitzung: <session>$`", "eingereiht", "nachzuziehen", "Folge-Command: keiner",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-enforcement.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{"_shared/context.md", "catalogs.rules", "catalogs.checks", "extracted/", "ks-enforcement",
+		"k-playbook context", "Check k-playbook enforcement rules", "nicht ausgeführt"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-enforcement.md trägt noch %q", stale)
+		}
+	}
+
+	// Der Skill ks-enforcement ist entfallen; die Regeln wendet jede Sitzung
+	// über die always-Anweisung an.
+	if _, ok := skillSources(filepath.Join("..", "..", "..", "share", "skills"))["enforcement"]; ok {
+		t.Error("share/skills/enforcement ist noch da")
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if got.Content != wantText || len(got.Problems) != 0 || len(got.Includes) != 1 {
+		t.Errorf("eingesetzter Text weicht ab: problems %v, includes %+v", got.Problems, got.Includes)
+	}
+}
+
+// Die always-Anweisung „Regeln anwenden“ (Task 124) steht im zusammengebauten
+// Text zwischen Workbench und Tasks und verweist auf die Doku-Aufträge und
+// /k-enforcement; /k-task-run reiht im Hauptkontext ein, /k-danke zählt
+// „eingereiht“ als erledigt.
+func TestDefaultsRegelnAnwenden(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	part := readRepoDefault(t, "instructions/always/220-regeln-anwenden.md")
+	if !strings.HasPrefix(part, "---\ntitle: Regeln anwenden\n---\n") {
+		t.Errorf("220-regeln-anwenden.md ohne title:\n%.120s", part)
+	}
+	for _, needle := range []string{"`documents.rules`", "`k_playbook_doc_read`", "k-playbook:/rules/docs-sync.md",
+		"k-playbook:/instructions/on-demand/doku-auftraege.md", "`/k-enforcement`"} {
+		if !strings.Contains(part, needle) {
+			t.Errorf("220-regeln-anwenden.md nennt %q nicht", needle)
+		}
+	}
+	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/").Content
+	workbench, rules, tasks := strings.Index(always, "## Die Workbench"), strings.Index(always, "## Regeln anwenden"),
+		strings.Index(always, "## Arbeiten in Tasks")
+	if workbench < 0 || rules < workbench || tasks < rules {
+		t.Errorf("Reihenfolge im zusammengebauten Text: Workbench %d, Regeln %d, Tasks %d", workbench, rules, tasks)
+	}
+
+	run := readRepoDefault(t, "commands/k-task-run.md")
+	for _, needle := range []string{"`CHANGED_PATHS`", "git diff --cached --name-only \"<SNAPSHOT>\"",
+		"k-playbook:/instructions/on-demand/doku-auftraege.md", "**Doku-Nachzug.**", "die Sub-Agenten laden das Briefing nicht"} {
+		if !strings.Contains(run, needle) {
+			t.Errorf("k-task-run.md nennt %q nicht", needle)
+		}
+	}
+	danke, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-danke.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(danke), "Der Ausgang **„eingereiht“** zählt als erledigt") ||
+		!strings.Contains(string(danke), "Auffangnetz") {
+		t.Error("k-danke.md zählt „eingereiht“ nicht als erledigt oder ist kein Auffangnetz mehr")
+	}
+}

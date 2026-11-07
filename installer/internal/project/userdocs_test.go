@@ -187,7 +187,7 @@ func TestDocKindsTabelleIstGueltig(t *testing.T) {
 	if err := ValidateDocKinds(DocKinds); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(DocKindNames(DocKinds), ","); got != "tasks,workbench,findings" {
+	if got := strings.Join(DocKindNames(DocKinds), ","); got != "tasks,workbench,findings,docs" {
 		t.Fatalf("Sorten: %s", got)
 	}
 }
@@ -259,6 +259,7 @@ func TestDocCreateStartnummer(t *testing.T) {
 		"tasks":     "keph:/user/kamran/tasks/001-erste.md",
 		"workbench": "keph:/user/kamran/workbench/001-erste.md",
 		"findings":  "keph:/queue/findings/001-erste.md",
+		"docs":      "keph:/queue/docs/001-erste.md",
 	} {
 		created, err := docs.Create(context.Background(), kind, "Erste")
 		if err != nil || created.Ref != want {
@@ -434,6 +435,56 @@ func TestDocDoneUndReopen(t *testing.T) {
 	}
 	if want := store.docs["user/kamran/tasks/100-a.md"].revision; moved.Revision != want {
 		t.Fatalf("reopen: Revision %d, erwartet %d", moved.Revision, want)
+	}
+}
+
+// Die Doku-Aufträge (Task 124): projektweit unter queue/docs/, gezählt
+// über die Ablage samt done/, erledigt nach queue/docs/done/.
+func TestDocsAuftraegeCreateListDone(t *testing.T) {
+	store := newFakeDocStore("kamran", "queue/docs/done/004-alt.md")
+	store.docs["queue/docs/done/004-alt.md"].by = "anna"
+	docs := newTestUserDocs(t, store, DocKinds)
+	ctx := context.Background()
+
+	created, err := docs.Create(ctx, "docs", "Code nach Umbau")
+	if err != nil || created.Ref != "keph:/queue/docs/005-code-nach-umbau.md" || created.User != "" || created.Kind != "docs" {
+		t.Fatalf("create: %+v %v", created, err)
+	}
+	second, err := docs.Create(ctx, "docs", "Libs")
+	if err != nil || second.Number != 6 {
+		t.Fatalf("zweiter: %+v %v", second, err)
+	}
+
+	list, err := docs.List(ctx, DocListOptions{Kind: "docs"})
+	if err != nil || len(list.Items) != 2 || list.User != "" {
+		t.Fatalf("offen: %+v %v", list, err)
+	}
+	for _, item := range list.Items {
+		if item.Done || !strings.HasPrefix(item.Ref, "keph:/queue/docs/0") {
+			t.Fatalf("offener Eintrag: %+v", item)
+		}
+	}
+
+	moved, err := docs.Done(ctx, created.Ref)
+	if err != nil || moved.Ref != "keph:/queue/docs/done/005-code-nach-umbau.md" || moved.Kind != "docs" {
+		t.Fatalf("done: %+v %v", moved, err)
+	}
+	list, _ = docs.List(ctx, DocListOptions{Kind: "docs"})
+	if len(list.Items) != 1 || list.Items[0].Ref != second.Ref {
+		t.Fatalf("offen nach done: %+v", list.Items)
+	}
+	list, _ = docs.List(ctx, DocListOptions{Kind: "docs", Done: true})
+	if len(list.Items) != 3 {
+		t.Fatalf("mit done: %+v", list.Items)
+	}
+	// Ein Auftrag, den ein anderer angelegt hat, schließt jeder ab: Die
+	// Sorte hat keinen Userbereich.
+	moved, err = docs.Reopen(ctx, "keph:/queue/docs/done/004-alt.md")
+	if err != nil || moved.Ref != "keph:/queue/docs/004-alt.md" {
+		t.Fatalf("reopen: %+v %v", moved, err)
+	}
+	if _, err := docs.Done(ctx, moved.Ref); err != nil {
+		t.Fatalf("done fremder Auftrag: %v", err)
 	}
 }
 

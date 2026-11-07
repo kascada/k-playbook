@@ -642,6 +642,27 @@ func removeDocsWork(dir, recordFile string) error {
 	return nil
 }
 
+// removeEmptyDocsWorkParents räumt nach einem aufgeräumten publish die
+// Elternverzeichnisse des Arbeitsverzeichnisses ab — .k-playbook/work/docs/
+// und .k-playbook/work/ —, wenn sie danach leer sind (Task 124). Nur der
+// publish-Pfad ruft es, nicht removeDocsWork: checkout mit discard legt das
+// Arbeitsverzeichnis gleich wieder an. Das Abräumen ist Ordnung, kein Teil
+// des Abgleichs; ein Fehler dabei ändert das Ergebnis von publish nicht, und
+// ein nicht leeres Verzeichnis — etwa das Arbeitsverzeichnis eines anderen
+// Erzeugers — bleibt stehen.
+func removeEmptyDocsWorkParents(dir string) {
+	docsDir := filepath.Dir(dir)
+	for _, parent := range []string{docsDir, filepath.Dir(docsDir)} {
+		entries, err := os.ReadDir(parent)
+		if err != nil || len(entries) != 0 {
+			return
+		}
+		if err := os.Remove(parent); err != nil {
+			return
+		}
+	}
+}
+
 // DocsPublishOptions sind die Schalter von publish. AllowHints erlaubt,
 // hints zu ändern, ein Dokument mit hints zu löschen oder neu anzulegen —
 // nur nach Bestätigung durch den Nutzer; die Antwort nennt jedes solche
@@ -761,6 +782,7 @@ func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOpt
 			return result, err
 		}
 		result.Cleaned = true
+		removeEmptyDocsWorkParents(dir)
 		return result, nil
 	}
 	if err := writeDocsRecord(recordFile, record); err != nil {

@@ -72,6 +72,7 @@ The command:
 - stops before a task moves to `done/` when its review reports a critical finding.
 - moves successfully completed tasks to `done/` with `k_playbook_doc_done`; the intent check is appended to the new reference under `done/`.
 - leaves aborted or partially executed tasks open.
+- queues the follow-up of the generated documentation when the run changed code (task 124): before releasing a task's snapshot the main context notes the changed file names against it (names only, no diff), and at the end it queues one documentation order per producer in `keph:/queue/docs/` following `k-playbook:/instructions/on-demand/doku-auftraege.md` -- not when there is no generated documentation yet or an order of this session already exists. The execution subagents do not load the briefing and do not queue anything.
 
 If a task contains `### Etappe` headings, the execution subagent appends a progress line immediately after every completed stage, not only at the end, so progress survives a hard interruption. A later `/k-task-run` reads the lines and offers to resume at the first open stage. The lines are the only source of progress; nothing is inferred from the code or `git log`.
 

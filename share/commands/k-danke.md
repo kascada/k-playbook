@@ -1,7 +1,7 @@
 ---
 description: Schließt eine Arbeitssitzung ab - legt die Befunde der Sitzung vor, trägt Fehlendes nach, lässt den Nutzer entscheiden, was aus ihnen werden soll, und prüft, ob die Doku nachzuziehen ist. Nimmt kein Argument.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__read, mcp__kephalaion__write]
+allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write]
 ---
 
 # k-danke
@@ -122,10 +122,17 @@ wieder.
 ## Schritt 6 — Doku nachziehen
 
 Wurde in dieser Sitzung Code geändert, greift die Regel `docs-sync.md`. Sie verlangt den
-Nachzug **im selben Arbeitsgang**; dieser Schritt ist das Auffangnetz, nicht der Hauptweg.
+Nachzug **im selben Arbeitsgang** — für Handdoku, `README.md` und `AGENTS.md` als Änderung,
+für die erzeugte Doku als eingereihten Auftrag in `keph:/queue/docs/`
+(`k-playbook:/instructions/on-demand/doku-auftraege.md`). Dieser Schritt ist das Auffangnetz,
+nicht der Hauptweg.
 
 Führe dafür **`/k-enforcement`** aus. Baue die Prüfung nicht nach — sie gehört dorthin und
 kennt den vollständigen Regelkatalog.
+
+Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein
+offener Auftrag dieser Sitzung vor, oder reiht `/k-enforcement` ihn nach Freigabe ein, ist
+der Nachzug für diese Sitzung getan; nenne den Verweis im Abschluss.
 
 Bleibt danach etwas offen, nenne es beim Abschluss, statt es still zu lassen.
 
@@ -136,7 +143,7 @@ Kompakte Zusammenfassung:
 - Die Befunde dieser Sitzung mit Nummer, davon die in Schritt 4 nachgetragenen.
 - Verteilung `bestaetigt` gegen `unbestaetigt` gegen `widerlegt`.
 - Verteilung der gesetzten `ziel` — oder ausdrücklich: keines gesetzt.
-- Ergebnis der Docs-Prüfung, mit offenen Punkten.
+- Ergebnis der Docs-Prüfung, mit offenen Punkten; eingereihte Doku-Aufträge mit Verweis.
 
 Danach ist die Sitzung abgeschlossen. Einen Folge-Command gibt es nicht: die Befunde
 warten in `keph:/queue/findings/` auf die Übernahme.

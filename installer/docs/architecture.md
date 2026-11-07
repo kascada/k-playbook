@@ -182,7 +182,7 @@ beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Bri
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
-ist (`tasks`, `workbench`, `findings`, `todos`: Ablage, Userbereich, Zählbereich, `done/`,
+ist (`tasks`, `workbench`, `findings`, `docs`, `todos`: Ablage, Userbereich, Zählbereich, `done/`,
 Startnummer, eigene Werkzeuge), steht allein in der Tabelle `project.DocKinds` (`project/userdocs.go`); eine neue
 Sorte ist ein neuer Eintrag, die erlaubten Werte von `kind` in CLI und MCP-Schema kommen
 daraus — ohne die Sorten mit `OwnTools` (`todos`), die nur über `k-playbook todo` und
@@ -196,7 +196,7 @@ Revision nach dem Verschieben. Vertrag:
 was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
 
 `doc append|replace|set [--since N] [--json]` ändert ein Dokument der Sorten ohne eigene
-Werkzeuge (`tasks`, `workbench`, `findings`, offen oder unter `done/`, bei Userbereich nur
+Werkzeuge (`tasks`, `workbench`, `findings`, `docs`, offen oder unter `done/`, bei Userbereich nur
 eigene), ohne dass der Inhalt durch die Sitzung läuft (Task 104): `append` liest den Text von
 stdin (Heredoc mit `<<'EOF'`), `replace` `{"old": …, "new": …}` als JSON von stdin, `set`
 setzt ein Frontmatter-Feld oder entfernt es mit `--unset`. Alle drei setzen auf eine
@@ -2357,7 +2357,10 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   zählt als Änderung — außer mit `--allow-hints`.
 - **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
   oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
-  und ein zweites `publish` schreibt nur den Rest.
+  und ein zweites `publish` schreibt nur den Rest. Ist aufgeräumt (`cleaned`), entfernt
+  `publish` auch `.k-playbook/work/docs/` und `.k-playbook/work/`, wenn sie danach leer sind
+  (`removeEmptyDocsWorkParents`, Task 124) — nur im publish-Pfad, nicht in `removeDocsWork`,
+  das auch `checkout --discard` nutzt.
 - **Dauerhafte Ausschlüsse** (Task 116). Was ein Projekt vom Code-Scan ausnimmt, steht im
   Block `docs.exclude` von `K-PLAYBOOK.yaml`, nicht im Command. `parseDocsExclude`
   (`project/docs_exclude.go`) liest ihn zeilenweise für `ReadConfig`, nur die Blockliste,

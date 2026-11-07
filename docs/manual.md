@@ -272,8 +272,15 @@ untouched. k-playbook claims only its own directory.
 ## Rules and checks
 
 Shipped rules are in `k-playbook/rules/`, project-owned rules in
-`k-playbook-local/rules/`. They are not automatically applied to every task:
-the `enforcement` skill or `/k-enforcement` command explicitly brings them in.
+`k-playbook-local/rules/`. The briefing lists the effective set under `Regeln:`, and the
+always-instruction "Regeln anwenden" makes every session read the rules that concern its
+diff and apply them before it finishes a change. `/k-enforcement` is the explicit report:
+it checks the changed files of the working tree against these rules, runs
+`k-check --mode changed` over the same files and reports the docs follow-up. After a code
+change the generated documentation is not regenerated on the spot: the session queues a
+documentation order in `keph:/queue/docs/`
+(`k-playbook:/instructions/on-demand/doku-auftraege.md`), which `/k-docs-code` or
+`/k-docs-tools` works off in one run; `/k-docs` shows the open orders.
 
 `k-playbook/bin/k-check` is not a slash command but a CLI runner for the
 effective set of shipped and project-owned `.sh` checks:

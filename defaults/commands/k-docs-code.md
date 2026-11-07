@@ -11,6 +11,9 @@ Produces:
 - `keph:/docs/generated/code/<NN>-<slug>.md` — ein Dokument je zusammenhängendem Thema,
   geschrieben von `k_playbook_docs_publish`.
 
+Dazu verschiebt der Lauf nach einem erfolgreichen `publish` die Doku-Aufträge aus dem
+Preflight nach `keph:/queue/docs/done/` (Abschnitt „Doku-Aufträge“ der Docs-Ablage).
+
 Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` selbst; das
 Arbeitsverzeichnis unter `.k-playbook/work/docs/code/` entfernt `publish` nach einem
 vollständigen Abgleich. Einzige Ausnahme: Bestätigt der Nutzer in Schritt 7, die im
@@ -34,6 +37,9 @@ Der Scope ist der aus dem Abschnitt „Scope“ der Docs-Ablage oben: `SCAN_ROOT
 `EXTRA_PATH` aus `$ARGUMENTS`, die Ausschlüsse und `NEW_EXCLUDES`. Er wird hier nicht
 wiederholt.
 
+Die offenen Doku-Aufträge mit `erzeuger: code` suchst du wie im Abschnitt
+„Doku-Aufträge“ der Ablage oben und merkst sie dir als `ORDERS`.
+
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
 ergänzen (`NEW_EXCLUDES`, wie im Abschnitt „Scope“).
 
@@ -43,6 +49,7 @@ ergänzen (`NEW_EXCLUDES`, wie im Abschnitt „Scope“).
 Collection    <context.kephalaion.address>
 Ziel          keph:/docs/generated/code/
 <die Scope-Zeilen aus dem Abschnitt „Scope“>
+<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>
 ```
 
 Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben.
@@ -226,6 +233,9 @@ oder `failed`, mit Revision; dazu `hintsChanged`, `readme` und ob aufgeräumt wu
 
 Arbeitsverzeichnis und Merkdatei bleiben liegen, solange etwas offen ist (`open`).
 
+Ist `open` leer und `cleaned` wahr, schließt du die Aufträge aus `ORDERS` ab, wie im
+Abschnitt „Doku-Aufträge“ der Ablage oben; sonst bleiben alle offen.
+
 ## Schritt 7 — Abschluss
 
 **Ausschlüsse speichern** wie im Abschnitt „Scope“ der Ablage, wenn der Nutzer im
@@ -239,8 +249,10 @@ Kompakte Zusammenfassung:
   Schritt 5.
 - Der beschriebene Stand aus Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
-- Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/code/` und ins
-  Arbeitsverzeichnis `WORK_DISPLAY_PATH` — und, nur wenn der Nutzer es bestätigt hat, über
+- Die Doku-Aufträge: abgeschlossen mit Verweis, offen geblieben mit Grund, oder keine.
+- Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/code/`, ins
+  Arbeitsverzeichnis `WORK_DISPLAY_PATH` und — beim Abschließen der Aufträge — nach
+  `keph:/queue/docs/done/` — und, nur wenn der Nutzer es bestätigt hat, über
   `k_playbook_docs_exclude_add` nach `docs.exclude` in `K-PLAYBOOK.yaml`.
 - Folge-Command: keiner. Den Index über `keph:/docs/` erzeugt das Indizieren, nicht ein
   Command.

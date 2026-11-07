@@ -27,7 +27,11 @@ const docSinceSchema = "Die Revision, die du zuletzt gesehen hast — aus deinem
 	"aus k_playbook_doc_read oder aus k_playbook_doc_grep mit count_only. Weicht das Dokument davon ab, hat ein anderer " +
 	"geschrieben: foreign_change, nichts geschrieben. Ohne since_revision keine Vorbedingung."
 
-const docEditRefSchema = "Pflicht. Der keph:-Verweis auf ein Dokument der Sorten tasks, workbench oder findings, offen oder " +
+// docEditKinds sind die Sorten, die die Änderungswerkzeuge erreichen, aus der
+// Sorten-Tabelle project.DocKinds.
+var docEditKinds = strings.Join(project.DocKindNames(project.DocKinds), ", ")
+
+var docEditRefSchema = "Pflicht. Der keph:-Verweis auf ein Dokument der Sorten " + docEditKinds + ", offen oder " +
 	"unter done/, bei Sorten mit Userbereich ein eigenes; ~ steht für den eigenen User, etwa keph:/user/~/tasks/100-name.md."
 
 type docAppendInput struct {
@@ -90,7 +94,7 @@ type docGrepEnvelope struct {
 	Error *errorEnvelope `json:"error,omitempty"`
 }
 
-const docEditCommon = " Abgelehnt: anderer Verweis als ein Dokument der Sorten tasks, workbench, findings (offen oder unter " +
+var docEditCommon = " Abgelehnt: anderer Verweis als ein Dokument der Sorten " + docEditKinds + " (offen oder unter " +
 	"done/) — invalid_input; fremder User — foreign_user; Dokument fehlt — not_found. since_revision: weicht das " +
 	"Dokument ab, ist das foreign_change — nichts geschrieben; die Antwort trägt revision, updatedBy, updatedAt und " +
 	"tail (die letzten 20 Zeilen); dann nicht still nachziehen, sondern den Nutzer fragen, wer weitermacht. Ohne " +

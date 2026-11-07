@@ -20,6 +20,8 @@ Produces:
 - Je Task eine Ref `refs/k-task-run/<TASK_STEM>` in der Ausführungswurzel, bis der Task
   nach `done/` wandert.
 - Bei `PR required: true` einen Pull Request über `gh`.
+- Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`
+  (Schritt 7, `k-playbook:/instructions/on-demand/doku-auftraege.md`).
 
 ## Schritt 1 — Briefing und Form
 
@@ -665,7 +667,29 @@ Versuch bleibt ungeprüft`.
    `done/` liegt, dann die Revision mit `k_playbook_doc_grep` und `count_only` unter
    `TASK_REF_DONE` holen; nicht noch einmal verschieben, solange es dort liegt. Ein
    `not_found` unter `TASK_REF_DONE` direkt nach dem Verschieben ist der Replica-Nachlauf.
-2. Snapshot freigeben — die Ref wird mit dem Verschieben nach `done/` entfernt:
+2. Geänderte Pfade merken — nur die Namen, für den Doku-Nachzug in Schritt 7. Mit Snapshot
+   vergleicht ein temporärer Index den Stand nach dem Task mit ihm, neu angelegte Dateien
+   eingeschlossen; Inhalte kommen nicht in den Hauptkontext:
+
+   ```bash
+   if command -v git >/dev/null 2>&1; then
+     (
+       cd "<EXEC_ROOT>" || exit 1
+       tmp_dir="$(mktemp -d)" || exit 1
+       cp "$(git rev-parse --git-path index)" "$tmp_dir/index" 2>/dev/null || true
+       GIT_INDEX_FILE="$tmp_dir/index" git add -A &&
+         GIT_INDEX_FILE="$tmp_dir/index" git diff --cached --name-only "<SNAPSHOT>"
+       status=$?
+       rm -rf "$tmp_dir"
+       exit "$status"
+     )
+   fi
+   ```
+
+   Die Ausgabe ergänzt `CHANGED_PATHS`, die Pfade aller Tasks dieses Laufs, relativ zur
+   Ausführungswurzel. Ohne Snapshot gibt es diese Liste nicht; dann merkst du dir den Task als
+   „Pfade unbekannt“.
+3. Snapshot freigeben — die Ref wird mit dem Verschieben nach `done/` entfernt:
 
    ```bash
    if command -v git >/dev/null 2>&1; then
@@ -781,6 +805,29 @@ Ohne Intent entfällt dieser Schritt still.
 
 ## Schritt 7 — Abschließende Zusammenfassung
 
+**Doku-Nachzug.** Vor der Zusammenfassung prüft der Hauptkontext, ob der Lauf Code geändert
+hat, und reiht dann den Nachzug der erzeugten Doku ein — er, nicht der
+Ausführungs-Sub-Agent, denn die Sub-Agenten laden das Briefing nicht. Maßgeblich sind
+`k-playbook:/rules/docs-sync.md` und `k-playbook:/instructions/on-demand/doku-auftraege.md`;
+dieser Text wiederholt sie nicht.
+
+- Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
+  Quelltext unter `context.project.repoRoot` außerhalb von `k-playbook/`, `k-playbook-local/`,
+  `.k-playbook/`, versteckten Pfaden und `context.docs.exclude`; ein geändertes Manifest oder
+  Lockfile betrifft `tools`.
+- Je betroffenem Erzeuger gilt der Ablauf aus `doku-auftraege.md`: keine erzeugte Doku unter
+  `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` (Kephalaion `list`) → nichts
+  einreihen; sonst mit `k_playbook_doc_grep` (`kind: docs`) nach einem offenen Auftrag mit
+  `sitzung` = `session` aus dem Briefing und demselben `erzeuger` suchen; fehlt er,
+  `k_playbook_doc_create` mit `kind: docs` und gleich danach Kephalaion `write` mit dem Kopf
+  aus `doku-auftraege.md` — `pfade` aus `CHANGED_PATHS`, `anlass` ein Satz mit den
+  Tasknummern. Das geschieht ohne Rückfrage: Ein Auftrag ändert keine Doku, er merkt den
+  Nachzug vor.
+- Ändert der Lauf ein Manifest, ist das Inventar sofort nachzuziehen; das tut dieser Command
+  nicht, die Zeile „Doku“ nennt `/k-doc-inventory`.
+- Ohne Kephalaion oder bei einem Task mit „Pfade unbekannt“ wird für ihn nichts eingereiht;
+  die Zeile „Doku“ nennt den Nachzug als offen und `/k-enforcement`.
+
 Nach allen Tasks zuerst die Fertig-Meldung (`fertig` oder `abgebrochen`; der Body trägt die
 Zeilen „Erfolgreich“, „Angehalten“ und „Abgebrochen“ in Kurzform), dann eine knappe
 Zusammenfassung:
@@ -794,6 +841,8 @@ Angehalten:    <TASK_FILE> - <Grund>
 Abgebrochen:   <TASK_FILE, falls vorhanden> - <Grund>
 Übersprungen:  <TASK_FILEs, falls vorhanden>
 Intent:        Ja / Teilweise / Nein / - (kein Intent)
+Doku:          eingereiht <verweis> [, <verweis>] | schon eingereiht <verweis> | kein Code geändert
+               | keine erzeugte Doku | offen — <Grund>, /k-enforcement  [; Inventar: /k-doc-inventory]
 ```
 
 Die Zeile „Review“ steht je erfolgreichem Task und gibt das letzte gültige Review wieder:

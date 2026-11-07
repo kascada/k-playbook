@@ -45,7 +45,6 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 
 | Skill | Purpose |
 |---|---|
-| [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md) | Apply shipped and project-owned rules while working. |
 | [`../defaults/commands/_skills/overlay-repo-analyse.md`](../defaults/commands/_skills/overlay-repo-analyse.md) | Systematically analyze and document Docker overlay repositories; writes into `keph:/docs/generated/code/` through `k-playbook docs checkout\|publish code`. The skill under `share/skills/overlay-repo-analyse/` is a hull that reads this text as `k-playbook:/commands/_skills/overlay-repo-analyse.md`. |
 
 ## Migration
@@ -71,7 +70,8 @@ questions and the ordered work list.
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `commands` -> [`commands.md`](./commands.md)
 - `docs first` -> [`manual.md`](./manual.md#docs-first)
-- `enforcement` / `rules` -> [`../rules/README.md`](../rules/README.md), [`../skills/enforcement/PLAYBOOK.md`](../skills/enforcement/PLAYBOOK.md)
+- `enforcement` / `rules` / `/k-enforcement` -> [`../rules/README.md`](../rules/README.md), [`commands.md`](./commands.md), [`manual.md`](./manual.md#rules-and-checks)
+- `queue/docs/` / `documentation orders` / `Doku-Aufträge` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`commands.md`](./commands.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
 - `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
 - `Kephalaion client` / `name_taken` / `rename` / `replica lag` / `request_id` / `replayed` / `outcome_unknown` / `kephalaion_unavailable` -> [`kephalaion-client.md`](./kephalaion-client.md)

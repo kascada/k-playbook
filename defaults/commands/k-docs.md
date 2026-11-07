@@ -47,6 +47,15 @@ weiterblättern). Daraus, ohne ein Dokument einzeln zu lesen:
   Rumpf.
 - Dokumente unter `docs/` außerhalb der Bereiche der Tabelle: unsortiert.
 
+Dazu die offenen Doku-Aufträge in `keph:/queue/docs/`
+(`k-playbook:/instructions/on-demand/doku-auftraege.md`): ein `k_playbook_doc_list` mit
+`kind: docs`, ohne `done` — die erledigten unter `done/` zählen nicht. Für die Aufteilung
+nach Erzeuger und den ältesten Auftrag ein `k_playbook_doc_grep` mit `kind: docs` und dem
+Muster `^(erzeuger|entstanden): `; je Auftrag gelten seine Zeilen `erzeuger:` und
+`entstanden:`. Gelesen wird kein Auftrag einzeln. `invalid_input`, weil die Sorte `docs`
+unbekannt ist, heißt: Die Installation ist älter als dieser Command — die Zeile `Aufträge`
+in Schritt 4 nennt dann `/k-upgrade`.
+
 Dazu auf der Platte, nur nachsehen:
 
 - `<context.local.dir>/docs/` — liegen dort noch Dateien außer `README.md`, ist die
@@ -115,14 +124,15 @@ Libs        <N> Steckbriefe, zuletzt <generated.at> | leer
 Handdoku    <N> Dokumente | leer
 Quellen     <N> Verweise | leer
 Unsortiert  <N> Dokumente | —
+Aufträge    <N> (<N> code, <N> tools), ältester <entstanden> | keine
 Befunde     <N> (<Kategorien>) | keine
 Offen       Platte: <N> Dateien unter k-playbook-local/docs/ → /k-upgrade 3.2 | —
             Arbeitsverzeichnis: <erzeuger> seit <alter> | —
 
 Mögliche Aktionen:
   1. inventory  Versionsinventar erheben            → /k-doc-inventory
-  2. code       Doku aus dem Code                   → /k-docs-code
-  3. tools      Steckbriefe der Libraries und Tools → /k-docs-tools
+  2. code       Doku aus dem Code                   → /k-docs-code    <N> Aufträge offen
+  3. tools      Steckbriefe der Libraries und Tools → /k-docs-tools   <N> Aufträge offen
   4. alle       1, 2 und 3 nacheinander
   5. status     nur diesen Bericht
 
@@ -130,7 +140,10 @@ Was soll ich tun?
 ```
 
 `tools` setzt das Inventar voraus. Fehlt es, steht bei 3 „braucht das Inventar (1)“; `alle`
-erhebt es zuerst.
+erhebt es zuerst. Bei 2 und 3 steht die Zahl der offenen Aufträge des Erzeugers
+(`erzeuger: code` bzw. `erzeuger: tools`); ohne offene Aufträge entfällt der Zusatz. Der
+gewählte Erzeuger listet sie in seinem Preflight und schließt sie nach einem erfolgreichen
+`publish` ab.
 
 ## Schritt 5 — Weitergeben
 
@@ -161,7 +174,7 @@ Text verlangt es.
 
 Im Statuslauf:
 
-- Dokumente je Bereich und Befunde je Kategorie, gezählt.
+- Dokumente je Bereich, offene Aufträge und Befunde je Kategorie, gezählt.
 - Ausdrücklich: Es wurde nichts geschrieben.
 - Folge-Command: einer der Erzeuger aus Schritt 4, sobald der Nutzer ihn wählt; ohne Wahl
   keiner. Sind Reste auf der Platte gemeldet: `/k-upgrade`.

@@ -417,7 +417,12 @@ func TestDocsCheckoutOhneKephalaion(t *testing.T) {
 
 func writeWorkFile(t *testing.T, root, rel, content string) {
 	t.Helper()
-	file := filepath.Join(DocsWorkDir(root, "code"), filepath.FromSlash(rel))
+	writeWorkFileFor(t, root, "code", rel, content)
+}
+
+func writeWorkFileFor(t *testing.T, root, producer, rel, content string) {
+	t.Helper()
+	file := filepath.Join(DocsWorkDir(root, producer), filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -553,6 +558,70 @@ func TestDocsPublishAbgleich(t *testing.T) {
 	}
 	if content, _ := store.Content("docs/generated/code/README.md"); content != code.readme() {
 		t.Errorf("README: %q", content)
+	}
+}
+
+// Nach einem aufgeräumten publish sind auch .k-playbook/work/docs/ und
+// .k-playbook/work/ weg, wenn sie leer sind (Task 124); liegt dort noch das
+// Arbeitsverzeichnis eines anderen Erzeugers, bleiben sie. Ein publish mit
+// offenem Konflikt räumt nichts ab, checkout mit discard ebenso wenig.
+func TestDocsPublishRaeumtLeereElternAb(t *testing.T) {
+	root, store, work := docsWorkFixture(t)
+	store.Put("docs/generated/code/01-a.md", docsDoc("A"))
+	store.Put("docs/generated/libs/go.md", docsDoc("Go"))
+	docsRoot := filepath.Dir(DocsWorkDir(root, "code"))
+	workRoot := filepath.Dir(docsRoot)
+
+	for _, name := range []string{"code", "libs"} {
+		if _, err := work.Checkout(context.Background(), name, DocsCheckoutOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// checkout mit discard räumt nur das eigene Arbeitsverzeichnis ab.
+	if _, err := work.Checkout(context.Background(), "code", DocsCheckoutOptions{Discard: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(DocsWorkDir(root, "code")); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	result, err := work.Publish(context.Background(), "code", DocsPublishOptions{})
+	if err != nil || !result.Cleaned {
+		t.Fatalf("code: %+v %v", result, err)
+	}
+	if _, err := os.Stat(DocsWorkDir(root, "libs")); err != nil {
+		t.Fatalf("Arbeitsverzeichnis libs entfernt: %v", err)
+	}
+	if _, err := os.Stat(docsRoot); err != nil {
+		t.Fatalf("%s entfernt, obwohl libs noch liegt: %v", docsRoot, err)
+	}
+
+	// Ein offener Konflikt: nichts wird aufgeräumt.
+	writeWorkFileFor(t, root, "libs", "go.md", docsDoc("Go lokal"))
+	store.Put("docs/generated/libs/go.md", docsDoc("Go fremd"))
+	result, err = work.Publish(context.Background(), "libs", DocsPublishOptions{})
+	if err != nil || result.Cleaned || len(result.Open) != 1 {
+		t.Fatalf("Konflikt: %+v %v", result, err)
+	}
+	if _, err := os.Stat(docsRoot); err != nil {
+		t.Fatalf("%s nach Konflikt entfernt: %v", docsRoot, err)
+	}
+
+	// Geklärt und neu geholt: Das letzte publish räumt beide Eltern ab.
+	if _, err := work.Checkout(context.Background(), "libs", DocsCheckoutOptions{Discard: true}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = work.Publish(context.Background(), "libs", DocsPublishOptions{})
+	if err != nil || !result.Cleaned {
+		t.Fatalf("libs: %+v %v", result, err)
+	}
+	for _, gone := range []string{docsRoot, workRoot} {
+		if _, err := os.Stat(gone); !os.IsNotExist(err) {
+			t.Errorf("%s nicht entfernt: %v", gone, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, ProjectDirName)); err != nil {
+		t.Errorf(".k-playbook/ selbst entfernt: %v", err)
 	}
 }
 

@@ -346,16 +346,16 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
 | `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/rules/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
-| `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
+| `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location; the answer carries the `revision` after the move |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location; the answer carries the `revision` after the move |
-| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings` without its content passing through the session; optional precondition `since_revision` |
+| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings`, `docs` without its content passing through the session; optional precondition `since_revision` |
 | `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`; optional `since_revision` |
 | `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field; other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
 | `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
-| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open |
+| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
 | `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `context.docs.exclude`; creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, rules, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing and writes nothing -- a missing access file is no entry and stays missing (`k-playbook github init` creates it); never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
@@ -786,11 +786,17 @@ from it.
 | `tasks` | `user/<name>/tasks/` | yes | all `user/*/tasks/` including `done/`, project-wide | yes | 001 |
 | `workbench` | `user/<name>/workbench/` | yes | all `user/*/workbench/` including `done/`, project-wide | yes | 001 |
 | `findings` | `queue/findings/` | no | the directory | no | 001 |
+| `docs` | `queue/docs/` | no | the directory including `done/` | yes | 001 |
 | `todos` | `todos/` | no | the directory including `done/` | yes | 001 |
 
 `todos` has tools of its own (`OwnTools`, task 097) and is not reachable through the `doc`
 tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…` reference is
 `invalid_input` there. Contract: "Todo Contract and Migration".
+
+`docs` are the documentation orders (task 124): one per session and producer, written after a
+code change, closed by `/k-docs-code` or `/k-docs-tools` after a successful `publish` with
+`k_playbook_doc_done` into `queue/docs/done/`. Head and life cycle:
+`k-playbook:/instructions/on-demand/doku-auftraege.md`.
 
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
@@ -881,9 +887,9 @@ All three go through one function, `UserDocs.edit` (`project/docedit.go`); grep 
 doc append|replace|set|grep` call the same code. Kephalaion itself is unchanged.
 
 **Scope of the change operations.** A `keph:` reference to one document of a kind without
-tools of its own -- `tasks`, `workbench`, `findings` --, open or under `done/`; for kinds with
+tools of its own -- `tasks`, `workbench`, `findings`, `docs` --, open or under `done/`; for kinds with
 a user area only own documents (`foreign_user`), as for `doc_done`. A segment `~` is replaced by
-`kephalaion.user`. Every other reference -- `todos/`, `docs/`, any other `keph:` path, a
+`kephalaion.user`. Every other reference -- `todos/`, `docs/` (the documentation, not `queue/docs/`), any other `keph:` path, a
 directory, `project:`, `k-playbook:` -- is `invalid_input`, decided without reading.
 
 **Inputs.** All take `projectDir` (required by contract) and, except grep, `ref` and the

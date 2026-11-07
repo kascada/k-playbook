@@ -13,6 +13,9 @@ Produces:
 - `keph:/docs/generated/libs/<name>.md` — ein Steckbrief je ausgewähltem Gegenstand des
   Inventars, geschrieben von `k_playbook_docs_publish`.
 
+Dazu verschiebt der Lauf nach einem erfolgreichen `publish` die Doku-Aufträge aus dem
+Preflight nach `keph:/queue/docs/done/` (Abschnitt „Doku-Aufträge“ der Docs-Ablage).
+
 Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` selbst; das
 Arbeitsverzeichnis unter `.k-playbook/work/docs/libs/` entfernt `publish` nach einem
 vollständigen Abgleich. Ausnahmen: Bestätigt der Nutzer im Abschluss, die im Preflight
@@ -60,6 +63,9 @@ Einträge, `generated.stats.entries` — ein Inventar im alten Kopf trägt sie n
 `EXTRA_PATH` aus `$ARGUMENTS`, die Ausschlüsse und `NEW_EXCLUDES`. Er begrenzt hier nur das
 Zählen der Nutzung im Code (Schritt 4), nicht die Liste der Kandidaten.
 
+Die offenen Doku-Aufträge mit `erzeuger: tools` suchst du wie im Abschnitt
+„Doku-Aufträge“ der Ablage oben und merkst sie dir als `ORDERS`.
+
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
 ergänzen (`NEW_EXCLUDES`, wie im Abschnitt „Scope“).
 
@@ -70,6 +76,7 @@ Collection    <context.kephalaion.address>
 Ziel          keph:/docs/generated/libs/
 Inventar      erhoben <generated.at>, <N> Einträge | Hinweis: <Problem im Kopf>
 <die Scope-Zeilen aus dem Abschnitt „Scope“>
+<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>
 ```
 
 Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben.
@@ -345,6 +352,9 @@ oder `failed`, mit Revision; dazu `hintsChanged`, `readme` und ob aufgeräumt wu
 
 Arbeitsverzeichnis und Merkdatei bleiben liegen, solange etwas offen ist (`open`).
 
+Ist `open` leer und `cleaned` wahr, schließt du die Aufträge aus `ORDERS` ab, wie im
+Abschnitt „Doku-Aufträge“ der Ablage oben; sonst bleiben alle offen.
+
 ## Schritt 8 — Abschluss
 
 **Ausschlüsse speichern** wie im Abschnitt „Scope“ der Ablage, wenn der Nutzer im
@@ -359,8 +369,10 @@ Kompakte Zusammenfassung:
 - Der Stand des Inventars (`generated.at`) und der beschriebene Stand des Codes aus
   Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
-- Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/libs/` und ins
-  Arbeitsverzeichnis `WORK_DISPLAY_PATH` — und, nur wenn der Nutzer es bestätigt hat, über
+- Die Doku-Aufträge: abgeschlossen mit Verweis, offen geblieben mit Grund, oder keine.
+- Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/libs/`, ins
+  Arbeitsverzeichnis `WORK_DISPLAY_PATH` und — beim Abschließen der Aufträge — nach
+  `keph:/queue/docs/done/` — und, nur wenn der Nutzer es bestätigt hat, über
   `k-playbook inventory` nach `keph:/docs/generated/versions/inventory.md` und über
   `k_playbook_docs_exclude_add` nach `docs.exclude` in `K-PLAYBOOK.yaml`.
 - Hinweis: Nach einem Versionssprung zieht zuerst das Inventar nach (`/k-doc-inventory`),
