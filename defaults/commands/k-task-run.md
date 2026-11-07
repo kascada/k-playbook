@@ -19,7 +19,8 @@ Produces:
   `k_playbook_doc_done`.
 - Je Task eine Ref `refs/k-task-run/<TASK_STEM>` in der Ausführungswurzel, bis der Task
   nach `done/` wandert.
-- Bei `PR required: true` einen Pull Request über `gh`.
+- Bei `PR required: true` einen Pull Request über `gh`, mit Dienst über `k-playbook github run`
+  (5f.1).
 - Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`
   (Schritt 7, `k-playbook:/instructions/on-demand/doku-auftraege.md`).
 
@@ -703,6 +704,16 @@ Erst nach der Stopp-Abfrage aus 5f. Trägt der `## Ausführungskontext` des Task
 `PR required: true`, folgt der PR, nachdem der Task abgeschlossen ist und ein lokaler Commit
 existiert.
 
+Zugang: Für Push und PR gilt der folgende Block. Das Ziel-Repo ist das der aufgelösten
+Ausführungswurzel aus 5a.1 (`Target repo`), nicht zwingend das Arbeitsverzeichnis.
+
+include: _shared/gh.md
+
+Merke daraus `GH_SERVICE`, den Dienst für das Ziel-Repo; leer ohne Dienst. Push und PR
+schreiben nach GitHub: Mit Dienst laufen beide über `k-playbook github run <GH_SERVICE> --write`,
+ohne Dienst wie bisher über das aktive Konto. Vorher nennst du den Zugang, wie der Block es
+verlangt.
+
 Preflight:
 
 1. In der aufgelösten Ausführungswurzel aus 5a.1 arbeiten.
@@ -711,6 +722,13 @@ Preflight:
    dass vor dem PR ein Commit nötig ist.
 4. Prüfen, dass der Branch einen Upstream hat. Ohne Upstream vor dem Push fragen; nie still
    pushen.
+5. Pushen. Mit Dienst:
+
+   ```bash
+   k-playbook github run <GH_SERVICE> --write -- git -C "<EXEC_ROOT>" push -u origin <Work branch>
+   ```
+
+   Ohne Dienst derselbe git-Aufruf ohne das vorangestellte `k-playbook github run … --`.
 
 PR-Text:
 
@@ -722,10 +740,10 @@ PR-Text:
   die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung; bekannte
   Restrisiken oder Tests, die nicht laufen konnten.
 
-PR anlegen mit `gh pr create --body-file <datei>`:
+PR anlegen mit `--body-file <datei>`, mit Dienst so:
 
 ```bash
-gh pr create \
+k-playbook github run <GH_SERVICE> --write -- gh pr create \
   --base <Base branch> \
   --head <Work branch> \
   --title "<knapper Titel>" \
@@ -734,10 +752,14 @@ gh pr create \
 
 Kein `--body "...\n..."`: Bash übergibt in normalen doppelten Anführungszeichen ein
 wörtliches Backslash-n. Ist ein Inline-Body unvermeidlich, ein Heredoc oder ANSI-C-Quoting
-nehmen; `--body-file` bleibt der Weg.
+nehmen; `--body-file` bleibt der Weg. Ohne Dienst derselbe Aufruf ohne das vorangestellte
+`k-playbook github run <GH_SERVICE> --write --`.
 
-Ist `gh` nicht da oder nicht angemeldet (`context.gh.ready` falsch), den genauen
-`gh pr create --body-file ...`-Befehl und den Inhalt der Body-Datei zum Nachmachen ausgeben.
+Gibt es nach dem Block oben keinen nutzbaren Weg — `gh` gesperrt, ein Dienst ohne Kanal `api`,
+ohne Dienst `context.gh.ready` falsch — oder scheitert Push oder PR an der Anmeldung, gib den
+genauen Befehl (mit Dienst in der Form mit `k-playbook github run`) und den Inhalt der
+Body-Datei zum Nachmachen aus. Dazu kommt der Hinweis auf die Zugangsdatei samt dem Angebot,
+beim Einrichten zu helfen („Die Zugangsdatei als Abhilfe“ im Block oben).
 
 ### 5g — Weiter
 

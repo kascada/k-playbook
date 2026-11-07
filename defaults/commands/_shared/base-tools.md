@@ -10,7 +10,8 @@ nichts, sag nichts. Nenne für jeden Eintrag, den ein Command in diesem Lauf tat
 braucht, das Werkzeug, was `role` als Preis nennt, und `context.baseTools.installCommand` als
 den Weg, es zu bekommen. Warne nicht allgemein und nenne keine Werkzeuge, die dieser Lauf
 nicht berührt. Ein fehlendes Basis-Werkzeug **warnt, es bricht den Lauf nicht ab** — das ist
-der Unterschied zu `gh.ready`, das ein PR-Review beendet. Wo es einen Ersatzweg gibt, nimm
+der Unterschied zu einem fehlenden GitHub-Zugang nach
+`k-playbook:/commands/_shared/gh.md`, der ein PR-Review beendet. Wo es einen Ersatzweg gibt, nimm
 ihn und sag, dass du es getan hast. Installiere nie selbst: Der Befehl wird genannt, nie
 ausgeführt. Gemessen wird nur die Anwesenheit im `PATH`; eine Shell-Funktion oder ein Alias
 ist unsichtbar — unter Claude Code kann `rg` als fehlend gemeldet werden, obwohl es

@@ -2,7 +2,7 @@
 description: "List open GitHub pull requests for the configured repo target or load a specific PR directly, then present a compact overview, a PR assessment, and an optional follow-up action: approve, merge, or create a local validation branch."
 argument-hint: "[pr-number|#pr-number|github-pr-url] [quick|standard|deep]"
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Bash, TodoWrite]
+allowed-tools: [Read, Bash, TodoWrite, mcp__k-playbook__k_playbook_doc_read]
 ---
 
 # k-pr-review
@@ -114,33 +114,66 @@ Validierung:
 
 - `PR_TARGET_DIR` muss existieren.
 - `PR_TARGET_DIR` muss ein Git-Repo sein.
-- `gh` muss nutzbar sein. Das steht in `gh` aus der Context-Ausgabe und wird nicht selbst
-  ermittelt:
-  - `gh.status: disabled` — abbrechen; dieses Projekt hat sich gegen gh entschieden, ein
-    PR-Review ist damit nicht vorgesehen.
-  - `gh.status: unknown` — abbrechen und `/k-gui` nennen; dort fällt die Entscheidung.
-  - `gh.ready: false` — abbrechen und benennen, was fehlt: Installation von `gh` oder
-    `gh auth login --hostname github.com`. Beides gehört ins Terminal des Users.
-- Merke `GH_ACCOUNT` = `gh.account`. Schritt 9 nennt ihn vor jeder Schreibaktion.
 
-Ermittle dann das GitHub-Repo:
+Ermittle dann das GitHub-Repo, ohne `gh`:
+
+- Ist `PR_SELECTOR` eine PR-URL, kommt `<owner>/<repo>` aus der URL.
+- Sonst aus dem Remote `origin` in `PR_TARGET_DIR`:
 
 ```bash
-gh repo view --json nameWithOwner,url,defaultBranchRef
+if command -v git >/dev/null 2>&1; then
+  git -C "<PR_TARGET_DIR>" remote get-url origin
+fi
 ```
 
-Führe den Befehl in `PR_TARGET_DIR` aus.
+  `<owner>/<repo>` ergibt sich aus den Formen `https://github.com/…`, `git@github.com:…`,
+  `ssh://git@github.com/…` und `git@<alias>:…`, je mit oder ohne `.git`.
+
+Ergibt sich kein GitHub-Repo:
+
+- sauber abbrechen und sagen, dass das Repo weder aus dem Remote noch aus der URL auflösbar ist
+- keine heuristische Repo-Raterei aus beliebigen Remotes
+
+Merke `GH_REPO` = `<owner>/<repo>` und `GH_REPO_URL` = `https://github.com/<GH_REPO>`.
+
+Den Zugang bestimmt allein `k-playbook:/commands/_shared/gh.md`. Lies die Datei jetzt mit
+`k_playbook_doc_read` (ohne MCP: `k-playbook read k-playbook:/commands/_shared/gh.md`) und
+befolge sie für `GH_REPO`: Ist `GH_REPO` gleich `context.github.repo`, nennt
+`context.github.projectServices` den Dienst, sonst `k-playbook github show`. Merke:
+
+- `GH_SERVICE` — der Dienst für `GH_REPO`; leer ohne Dienst.
+- `<GH>` — steht im Rest dieses Commands vor jedem lesenden Netzbefehl, `gh` wie git: mit
+  Dienst für `k-playbook github run <GH_SERVICE> --`, ohne Dienst für nichts.
+- `<GH_WRITE>` — steht vor jedem schreibenden Aufruf (freigeben, kommentieren, mergen): mit
+  Dienst für `k-playbook github run <GH_SERVICE> --write --`, ohne Dienst für nichts.
+- `GH_ACCESS` — der Zugang, den `gh.md` vor dem Schreiben zu nennen verlangt: mit Dienst
+  Dienst und Zugang, ohne Dienst das aktive Konto. Schritt 9 nennt ihn vor jeder
+  Schreibaktion.
+
+Gibt es nach `gh.md` keinen nutzbaren Weg — `gh.status` ist `disabled` oder `unknown`, der
+Dienst hat keinen Kanal `api` (`selected.read.api` ist `null`), ohne Dienst ist `gh.ready`
+falsch —: abbrechen und die Meldung aus `gh.md` geben, einschließlich des Hinweises auf die
+Zugangsdatei und des Angebots, beim Einrichten zu helfen. Ein PR-Review braucht `gh`.
+
+Lade dann den Default-Branch (`GH_DEFAULT_BRANCH`):
+
+```bash
+<GH> gh repo view <GH_REPO> --json defaultBranchRef
+```
 
 Wenn das fehlschlägt:
 
-- sauber abbrechen und sagen, dass das Repo nicht per `gh` auflösbar ist oder GitHub-Auth fehlt
-- keine heuristische Repo-Raterei aus beliebigen Remotes
+- sauber abbrechen und die Meldung von `gh` nennen
+- deutet sie auf die Anmeldung: ohne Dienst der Hinweis auf die Zugangsdatei samt Hilfe aus
+  `gh.md`, mit Dienst der Vorschlag, `k-playbook github test <GH_SERVICE>` zu prüfen
 
 Merke:
 
 - `GH_REPO`
 - `GH_REPO_URL`
 - `GH_DEFAULT_BRANCH`
+- `GH_SERVICE`
+- `GH_ACCESS`
 - `PR_TARGET_DISPLAY`
 - `DOCS_DIR`
 - `CODE_DOCS_DIR`
@@ -153,7 +186,7 @@ Merke:
 Lade die offenen PRs:
 
 ```bash
-gh pr list --repo <GH_REPO> --state open --limit 30 --json number,title,author,baseRefName,headRefName,isDraft,updatedAt,url
+<GH> gh pr list --repo <GH_REPO> --state open --limit 30 --json number,title,author,baseRefName,headRefName,isDraft,updatedAt,url
 ```
 
 Wenn keine offenen PRs existieren:
@@ -202,13 +235,13 @@ Merke den normalisierten Wert als `PR_SELECTOR`.
 Wenn `PR_SELECTOR` numerisch ist, lade den PR gegen das bereits aufgelöste Repo:
 
 ```bash
-gh pr view <PR_SELECTOR> --repo <GH_REPO> --json number,title,url,state,isDraft,author,createdAt,updatedAt,baseRefName,headRefName,mergeable,reviewDecision,additions,deletions,changedFiles,labels,body
+<GH> gh pr view <PR_SELECTOR> --repo <GH_REPO> --json number,title,url,state,isDraft,author,createdAt,updatedAt,baseRefName,headRefName,mergeable,reviewDecision,additions,deletions,changedFiles,labels,body
 ```
 
 Wenn `PR_SELECTOR` eine URL ist, darf direkt gegen diese URL geladen werden:
 
 ```bash
-gh pr view <PR_SELECTOR> --json number,title,url,state,isDraft,author,createdAt,updatedAt,baseRefName,headRefName,mergeable,reviewDecision,additions,deletions,changedFiles,labels,body
+<GH> gh pr view <PR_SELECTOR> --json number,title,url,state,isDraft,author,createdAt,updatedAt,baseRefName,headRefName,mergeable,reviewDecision,additions,deletions,changedFiles,labels,body
 ```
 
 Lade zusätzlich:
@@ -216,21 +249,21 @@ Lade zusätzlich:
 - bei numerischem `PR_SELECTOR`:
 
 ```bash
-gh pr diff <PR_SELECTOR> --repo <GH_REPO> --name-only
-gh pr checks <PR_SELECTOR> --repo <GH_REPO>
+<GH> gh pr diff <PR_SELECTOR> --repo <GH_REPO> --name-only
+<GH> gh pr checks <PR_SELECTOR> --repo <GH_REPO>
 ```
 
 - bei URL-`PR_SELECTOR`:
 
 ```bash
-gh pr diff <PR_SELECTOR> --name-only
-gh pr checks <PR_SELECTOR>
+<GH> gh pr diff <PR_SELECTOR> --name-only
+<GH> gh pr checks <PR_SELECTOR>
 ```
 
 Regeln:
 
-- Wenn `gh pr checks` keine Checks findet oder non-zero endet, das als `keine oder keine sauber abrufbaren Checks` behandeln, nicht als harten Command-Fehler.
-- Wenn `gh pr view` fehlschlägt: abbrechen und die konkrete `PR_SELECTOR`-Form nennen, die nicht geladen werden konnte.
+- Wenn `<GH> gh pr checks` keine Checks findet oder non-zero endet, das als `keine oder keine sauber abrufbaren Checks` behandeln, nicht als harten Command-Fehler.
+- Wenn `<GH> gh pr view` fehlschlägt: abbrechen und die konkrete `PR_SELECTOR`-Form nennen, die nicht geladen werden konnte.
 - Nicht den kompletten Diff ausgeben.
 - Noch keine Merge-Freigabe ableiten.
 
@@ -255,7 +288,7 @@ Review:      <reviewDecision oder "—">
 Mergebar:    <mergeable oder "unknown">
 Diff:        <changedFiles> Dateien, +<additions> / -<deletions>
 Labels:      <comma list oder "—">
-Checks:      <kurze Zusammenfassung aus `gh pr checks` oder "—">
+Checks:      <kurze Zusammenfassung aus `<GH> gh pr checks` oder "—">
 ```
 
 Danach:
@@ -461,17 +494,19 @@ Wenn die Empfehlung `branch erstellen und weiter testen` ist, nenne diese Option
 
 ## Schritt 9 — Folgeaktion ausführen
 
-Approve, Merge und Kommentar sind nach außen sichtbar und laufen unter dem Account, der
-auf diesem Rechner gerade aktiv ist — der gilt maschinenweit und kann seit dem letzten
-Mal in einem anderen Projekt umgeschaltet worden sein. Nenne deshalb vor der ersten
-Schreibaktion `GH_ACCOUNT` in einer Zeile, etwa:
+Approve, Merge und Kommentar sind nach außen sichtbar. Nenne vor der ersten Schreibaktion
+`GH_ACCESS` in einer Zeile, wie es `k-playbook:/commands/_shared/gh.md` („Vor dem Schreiben
+nennen“) verlangt, etwa:
 
 ```
-Ausgeführt wird als GitHub-Account <GH_ACCOUNT>.
+Ausgeführt über Dienst <GH_SERVICE>, Zugang <Zugang aus selected.write>.
+Ausgeführt wird als GitHub-Account <aktives Konto>.   (ohne Dienst)
 ```
 
-Ist `GH_ACCOUNT` leer, läuft die Anmeldung über `GH_TOKEN`/`GITHUB_TOKEN`; sag das
-genauso, statt einen Namen zu erfinden.
+Mit Dienst laufen die Schreibaktionen mit `<GH_WRITE>`. Hat der Dienst für das Schreiben
+keinen Kanal `api` (`selected.write.api` ist `null`), führe keine Schreibaktion aus, sondern
+gib die Meldung aus `gh.md` („Dienst ohne Kanal `api`“) samt Angebot, beim Einrichten zu
+helfen.
 
 ### 9.1 — Direkt annehmen
 
@@ -481,7 +516,7 @@ Wenn der User `direkt annehmen` wählt:
 
    Regel:
 
-   - Für `gh pr review`, `gh pr comment` oder ähnliche PR-Kommentare niemals mehrzeilige Texte inline per `-b "...\n..."` oder `--body "...\n..."` bauen.
+   - Für `<GH_WRITE> gh pr review`, `<GH_WRITE> gh pr comment` oder ähnliche PR-Kommentare niemals mehrzeilige Texte inline per `-b "...\n..."` oder `--body "...\n..."` bauen.
    - Stattdessen immer eine temporäre Datei und `--body-file <temp-file>` verwenden, damit Shell-Interpolation, Backticks und Newlines nicht zerbrechen.
 
 2. Führe ein GitHub-Approval aus:
@@ -489,13 +524,13 @@ Wenn der User `direkt annehmen` wählt:
    - numerischer Selektor:
 
    ```bash
-   gh pr review <PR_SELECTOR> --repo <GH_REPO> --approve --body-file <temp-file>
+   <GH_WRITE> gh pr review <PR_SELECTOR> --repo <GH_REPO> --approve --body-file <temp-file>
    ```
 
    - URL-Selektor:
 
    ```bash
-   gh pr review <PR_SELECTOR> --approve --body-file <temp-file>
+   <GH_WRITE> gh pr review <PR_SELECTOR> --approve --body-file <temp-file>
    ```
 
 3. Approval-Text kurz und sachlich halten, z. B. Scope, Modus und wichtigste Signale.
@@ -557,18 +592,19 @@ Wenn der User `branch erstellen und weiter testen` wählt:
    pr-review/441-python-jose
    ```
 
-4. Branch anlegen via GitHub-PR-Checkout:
+4. Branch anlegen via GitHub-PR-Checkout. `pr checkout` holt per git und läuft deshalb mit
+   `<GH>`, ohne `--write`, weil er nur liest:
 
    - numerischer Selektor:
 
    ```bash
-   gh pr checkout <PR_SELECTOR> --repo <GH_REPO> --branch <LOCAL_VALIDATION_BRANCH>
+   <GH> gh pr checkout <PR_SELECTOR> --repo <GH_REPO> --branch <LOCAL_VALIDATION_BRANCH>
    ```
 
    - URL-Selektor:
 
    ```bash
-   gh pr checkout <PR_SELECTOR> --branch <LOCAL_VALIDATION_BRANCH>
+   <GH> gh pr checkout <PR_SELECTOR> --branch <LOCAL_VALIDATION_BRANCH>
    ```
 
 5. Danach den kleinsten sinnvollen erweiterten Testlauf passend zum Scope ausführen.
@@ -625,13 +661,13 @@ Merge-Befehl:
 - numerischer Selektor:
 
 ```bash
-gh pr merge <PR_SELECTOR> --repo <GH_REPO> --merge
+<GH_WRITE> gh pr merge <PR_SELECTOR> --repo <GH_REPO> --merge
 ```
 
 - URL-Selektor:
 
 ```bash
-gh pr merge <PR_SELECTOR> --merge
+<GH_WRITE> gh pr merge <PR_SELECTOR> --merge
 ```
 
 Regeln:
@@ -661,7 +697,7 @@ Beispiel:
 
 ```bash
 git switch <baseRefName>
-git pull --ff-only origin <baseRefName>
+<GH> git pull --ff-only origin <baseRefName>
 git branch -D <LOCAL_VALIDATION_BRANCH>
 ```
 
@@ -679,7 +715,7 @@ Führe am Ende immer eine kurze Repo-Sauberkeitsprüfung aus:
 git status --short --branch
 ```
 
-Wenn ein PR gemerged wurde und du bereits auf dem Base-Branch stehst, ziehe zusätzlich den aktuellen Stand per Fast-Forward nach.
+Wenn ein PR gemerged wurde und du bereits auf dem Base-Branch stehst, ziehe zusätzlich den aktuellen Stand per Fast-Forward nach (`<GH> git pull --ff-only origin <baseRefName>`).
 
 Am Ende kurz sagen, was ausgeführt wurde:
 
@@ -708,7 +744,7 @@ entschieden.
 
 - Kein k-playbook-Projekt (Context-Aufruf schlägt fehl) -> sauber abbrechen und `/k-gui` empfehlen
 - `project.repoRoot` oder das engere `remediation.target` ist gesetzt, aber der Pfad fehlt oder ist kein Git-Repo -> sauber abbrechen
-- `gh` fehlt oder ist nicht authentifiziert -> sauber abbrechen und das Problem klar benennen
+- kein nutzbarer GitHub-Zugang (`gh` fehlt oder ist nicht angemeldet, Dienst ohne Kanal `api`, Anmeldung gescheitert) -> sauber abbrechen und die Meldung aus `k-playbook:/commands/_shared/gh.md` geben: Zugangsdatei anlegen, Hilfe beim Einrichten anbieten; nie selbst anmelden
 - mehr als zwei Argumente oder ungültige Argument-Kombination -> gültige Formen nennen und stoppen
 - offene PR-Liste ist leer -> melden und stoppen
 - ungültiger PR-Selektor -> gültige Formate nennen und stoppen

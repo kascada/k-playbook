@@ -88,9 +88,12 @@ heißt beides: Die CLI ist da, und ein Konto ist hinterlegt. Gelesen wird das au
 Konfiguration von gh, nicht gegen den Server geprüft — ein Token kann also abgelaufen sein.
 
 Abgrenzung zu `context.github`: `gh.status` bleibt die Entscheidung des Projekts, ob es gh
-überhaupt nutzt. `gh.account` ist nur das gerade aktive Konto von gh und gilt allein dort, wo
-kein Dienst aus `context.github.projectServices` passt; passt einer, sagt dessen `selected`,
-welcher Zugang gilt.
+überhaupt nutzt, und gilt in beiden Fällen — `disabled` sperrt `gh` auch unter
+`k-playbook github run`, git über `run` nicht. `gh.ready` und `gh.account` gelten nur noch ohne
+Dienst: `gh.account` ist nur das gerade aktive Konto von gh und zählt allein dort, wo kein
+Dienst für das Ziel-Repo passt; passt einer, sagt dessen `selected`, welcher Zugang gilt.
+Welcher Zweig gilt und was ein Command dann tut, entscheidet
+`k-playbook:/commands/_shared/gh.md`.
 
 ### `github`
 

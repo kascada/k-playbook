@@ -796,6 +796,16 @@ The instruction "GitHub über run" (`defaults/instructions/always/400-github-ueb
 evaluates this line: it takes the service for the repository of the working directory from it,
 with `projectServices` only beside it, and works as before when the line names no service.
 
+Commands and reviews that reach GitHub — `/k-pr-review`, the PR step of `/k-task-run` and the
+review `review-dependabot-alerts` — decide the access in one place,
+`defaults/commands/_shared/gh.md` (task 125): the service by the repository the command targets
+(`projectServices` for the working directory's repository, `show` for any other), `gh.status`
+first in both branches, with a service `run` (`--write` for writing), a service without an `api`
+channel calls no `gh` — `run` only removes `GH_TOKEN`/`GITHUB_TOKEN`, and `gh` then falls back to
+its active login (measured 2026-11-07) —, and without a service `context.gh` as before, with the
+access file and help setting it up as the remedy when that fails. `context.gh.ready` and
+`context.gh.account` therefore count only without a service.
+
 ## Relation to other pages
 
 - `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That
@@ -815,8 +825,9 @@ Not part of the contract yet; each will be specified here before it is built.
   briefing answered by `context.github.projectServices` (task 119, *In the briefing*); a verb
   of its own is not specified.
 - **Named operations** with project rules, as CLI and MCP — the way AI sessions will reach
-  GitHub. Until then sessions with a shell use `run` after the instruction "GitHub über run";
-  it stays without an MCP tool and without a button. First the reading ones (fetch with
+  GitHub. Until then sessions with a shell use `run` after the instruction "GitHub über run",
+  and the commands and reviews that call `gh` use it through `defaults/commands/_shared/gh.md`
+  (task 125, *In the briefing*); it stays without an MCP tool and without a button. First the reading ones (fetch with
   status, list of pull requests), then pushing a feature branch and a draft pull request, each
   with approval, merging last.
 - **A shared, versioned part** for projects where every person uses the same repositories

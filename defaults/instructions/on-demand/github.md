@@ -1,6 +1,6 @@
 ---
 title: GitHub über run
-description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, gh.status disabled, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, die fünf Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
+description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, gh.status disabled, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
 ---
 
 ## GitHub über run
@@ -26,7 +26,11 @@ Danach:
 - genau ein Dienst passt: diesen nehmen;
 - mehrere passen: den Nutzer fragen, welcher gilt;
 - keiner passt (keine Zugangsdatei, kein GitHub-Remote, kein Dienst mit diesem `repo`): wie
-  bisher, also nach `context.gh` bzw. nach der eigenen Regel des Commands.
+  bisher, also nach `context.gh` (Abschnitt „Ohne Dienst“).
+
+Commands und Reviews, die GitHub erreichen, entscheiden den Zugang an einer Stelle:
+`k-playbook:/commands/_shared/gh.md`. Sie binden sie ein oder lesen sie und wiederholen sie
+nicht.
 
 ### gh gesperrt
 
@@ -62,16 +66,33 @@ Deutet der Fehler auf die Anmeldung, prüft `k_playbook_github_test` (ersatzweis
 oder `--skip <typ>` schlägst du vor; du nimmst sie nicht selbst. Nacktes `gh` oder `git` als
 Ersatz gibt es nicht.
 
+### Ohne Dienst
+
+Ohne Dienst gilt der bisherige Weg über das aktive Konto von `gh`: `context.gh.ready` und das
+aktive Konto aus `context.gh` zählen nur hier. Geht dieser Weg nicht — `context.gh.ready` ist falsch,
+oder ein Aufruf scheitert an der Anmeldung (etwa HTTP 401) —, lautet die Meldung: Lege die
+Zugangsdatei an. Dazu bietest du an, beim Einrichten zu helfen, statt nur auf die Anmeldung
+von `gh` zu verweisen:
+
+- `k-playbook github init` rufst du nur, wenn der Nutzer es will.
+- Den Eintrag für den Dienst schlägst du vor: `repo` aus `context.github.repo` bzw. aus dem
+  Ziel-Repo, die Zugangsart nach Rückfrage. `gh` braucht einen Zugang vom Typ `gh` oder
+  `token`; `ssh` und `public` bedienen nur git.
+- Der Nutzer trägt den Eintrag ein; du schreibst die Datei nicht (Abschnitt „Verbote“).
+- Danach prüfen `k-playbook github check` und `k-playbook github test <dienst>` (ersatzweise
+  `k_playbook_github_test`) den Eintrag.
+
+Dasselbe Angebot gilt, wenn ein Dienst keinen Zugang vom Typ `gh` oder `token` hat und ein
+`gh`-Aufruf ansteht. `run` entfernt dann nur `GH_TOKEN` und `GITHUB_TOKEN`, und `gh` nähme still
+das aktive Login des Rechners; deshalb rufst du in diesem Fall kein `gh`
+(`k-playbook:/commands/_shared/gh.md`, „Dienst ohne Kanal `api`“).
+
 ### Ausnahmen
 
 In diesen Fällen arbeitest du wie bisher, ohne `run`:
 
 - **Kein Dienst** bzw. keine Zugangsdatei (siehe „Den Dienst bestimmen“).
 - **Lokale git-Befehle ohne Netz**, etwa status, log, diff, commit, branch.
-- **Commands mit eigener gh-Regel:** `/k-pr-review`, der PR-Schritt in `/k-task-run` und das
-  Review `k-playbook:/reviews/review-dependabot-alerts.md` folgen bis zu ihrer Umstellung ihrer
-  eigenen Regel.
-  <!-- NACHZIEHEN: Die Commands mit eigener gh-Regel werden auf run umgestellt; danach entfällt diese Ausnahme und mit ihr context.gh. -->
 - **Make-Ziele und Skripte:** Die, die `run` schon selbst rufen, laufen ohne weitere Hülle.
   Die übrigen wickelst du nicht in `run` ein; sie laufen wie bisher.
 - **Eine ausdrückliche Ansage des Nutzers**, etwa einen bestimmten Zugang oder nacktes `gh` zu

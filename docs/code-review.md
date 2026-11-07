@@ -410,7 +410,7 @@ their inputs are available as evidence in `review-input.json` or a separate scop
 | Recipe | Reason |
 |---|---|
 | `review-k-check-security.md` | `k-check` results are not yet modeled as evidence in the merge. |
-| `review-dependabot-alerts.md` | Input arrives externally through `gh api` and is not yet a tool entry in the run merge. |
+| `review-dependabot-alerts.md` | Input arrives externally through `gh api` — with a service of the personal access file through `k-playbook github run` (`defaults/commands/_shared/gh.md`) — and is not yet a tool entry in the run merge. |
 
 Both recipes contain their detailed examination themselves: their **Position in the audit run
 model** section states which part of the evidence contract blocks them and what a conversion would

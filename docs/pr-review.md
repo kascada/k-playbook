@@ -89,6 +89,20 @@ The flow has already been exercised in practice:
 7. Merge PR `#454`
 8. Clean up local branches and check repository state
 
+## GitHub Access
+
+Which access reaches GitHub is decided in one place, `defaults/commands/_shared/gh.md`
+(`k-playbook:/commands/_shared/gh.md`), which the command reads before its first call (task
+125). The repository comes from the PR URL or from `origin` in `project.repoRoot`, not from
+`gh`. When a service of the personal access file ([github-access.md](./github-access.md))
+names that repository, every `gh` call and every network command of git runs through
+`k-playbook github run <service>`, the writing ones (approve, comment, merge) with `--write`;
+`gh pr checkout` only reads and runs without it. A service without a `gh` or `token` access
+calls no `gh` at all, because `gh` would otherwise fall back to the active login. Without a
+service the active `gh` account is used as before (`context.gh`); when that does not work,
+the command points to the access file and offers to help set it up. Before writing, it names
+service and access, or the `gh` account without a service.
+
 ## Open Boundary
 
 If GitHub blocks an action because of branch protection, missing permissions, or self-approval, the command should report this clearly and must not attempt a silent workaround.

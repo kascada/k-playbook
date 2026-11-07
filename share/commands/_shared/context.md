@@ -74,10 +74,13 @@ field is absent on an installation older than it. The full contract is in
 `<playbook.dir>/docs/version-inventory.md`.
 
 `gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
-`disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. `gh.installed`, `gh.loggedIn`,
-`gh.account` and `gh.ready` are a host finding for this machine only. `gh.ready` means
-both: the CLI is there and an account is on file. It is read from gh's own configuration,
-not verified against the server, so a token can still be expired.
+`disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. It applies whether or not a
+service of the personal GitHub access file matches the repository: `disabled` keeps `gh`
+out, under `k-playbook github run` too. `gh.installed`, `gh.loggedIn`, `gh.account` and
+`gh.ready` are a host finding for this machine only, and they count only where no service
+matches; where one does, its `selected` says which access applies. `gh.ready` means both:
+the CLI is there and an account is on file. It is read from gh's own configuration, not
+verified against the server, so a token can still be expired.
 
 ## Where the rest lives
 
@@ -154,25 +157,21 @@ run, and the producing command creates its own directory without asking.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
 - Never write into `playbook.dir`. It is replaced on every update. Everything a command
   produces goes into `local.dir`.
-- **Before calling `gh`, check `gh` from this output.** Stop and report instead of
-  calling it when `gh.status` is `disabled` (the project decided against it), when
-  `gh.status` is `unknown` (nobody decided yet — point to `/k-gui`), or when `gh.ready`
-  is false. In the last case name which half is missing: install `gh`, or run
-  `gh auth login --hostname github.com`. Never install and never sign in yourself —
-  both change the host, and signing in needs a browser.
+- **Before the first call to GitHub — `gh`, or a network command of git — read
+  `k-playbook:/commands/_shared/gh.md` with `k_playbook_doc_read` (without MCP:
+  `k-playbook read k-playbook:/commands/_shared/gh.md`) and follow it.** It alone decides
+  which access applies, what to check first, what to report when GitHub cannot be reached
+  and what to name before writing; this module does not repeat it.
 - **Before calling a base tool, check `baseTools` from this output.** It lists the tools
   k-playbook itself calls — `bash`, `git`, `curl` or `wget`, `tar`, `python3`, `rg`.
   Say something only when `baseTools.missing` is non-empty; when nothing is missing, say
   nothing. For each entry that a command in this run actually needs, name the tool, what
   `role` says it costs you, and `baseTools.installCommand` as the way to get it. Do not
   warn in general terms and do not list tools this run does not touch. A missing base
-  tool **warns, it does not stop the run** — that is the difference from `gh.ready`,
-  which ends a PR review. Where a fallback exists, take it and say that you did. Never
+  tool **warns, it does not stop the run** — that is the difference from a missing
+  GitHub access, which ends a PR review. Where a fallback exists, take it and say that you did. Never
   install anything yourself: the command is printed, never run. Note that presence is
   measured in `PATH` only, so a shell function or alias is invisible — under Claude Code
   `rg` may be reported as missing although it works; that is known and accepted.
   When `baseTools.present` is false the matrix could not be read; say nothing about base
   tools then, rather than guessing.
-- **Name `gh.account` before writing to GitHub.** Approving, merging or commenting is
-  externally visible and acts as whoever is signed in. The active account is machine-wide
-  and may have been switched in another project since.

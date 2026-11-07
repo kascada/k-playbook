@@ -45,8 +45,8 @@ Punkte stehen dem entgegen, und der zweite ist nicht aus dem Rezept heraus lösb
    Rezept heraus ist das nicht zu heilen: `scope.paths` ist der weitere Rahmen, die
    Ausschlüsse sind der engere.
 3. **Ein Evidence-Rezept liest Code, dieses liest eine fremde API.** Der Lauf führt
-   Evidence-Rezepte auf dem Code im Pfad-Scope aus. Dieses Rezept braucht Netz und eine
-   `gh`-Anmeldung, und sein Pfad-Scope wäre eine Behauptung: Es liest die Manifeste nicht,
+   Evidence-Rezepte auf dem Code im Pfad-Scope aus. Dieses Rezept braucht Netz und einen
+   GitHub-Zugang für `gh`, und sein Pfad-Scope wäre eine Behauptung: Es liest die Manifeste nicht,
    es beschriftet seine Funde nur damit. Für „dieser Eintrag braucht Netz" gibt es im
    Laufmodell bisher keinen Ausdruck.
 
@@ -78,9 +78,24 @@ braucht, bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
 - Keine Dependency-Upgrades, keine Lockfile-Änderungen und keine Dependabot-PR-Erzeugung
   durch dieses Review.
 
+## Zugang zu GitHub
+
+Welcher Zugang gilt, entscheidet der folgende Block; Ziel-Repo ist das Repo des Projekts.
+
+include: k-playbook:/commands/_shared/gh.md
+
+Die Alerts liest das Review nur, nie schreibend: mit Dienst als
+`k-playbook github run <dienst> -- gh api …`, ohne `--write`; ohne Dienst als `gh api …` über
+das aktive Konto. Im Review gibt es keine Rückfrage. Gibt es keinen nutzbaren Weg (`gh`
+gesperrt oder unentschieden, ein Dienst ohne Kanal `api`, ohne Dienst `context.gh.ready`
+falsch, eine gescheiterte Anmeldung) oder passen mehrere Dienste, steht das mit der Meldung aus
+dem Block im Ergebnis, und das Review wertet nichts aus. Hilfe beim Einrichten der
+Zugangsdatei bietet erst die Hauptsitzung an.
+
 ## Abgrenzung
 
-- Dieses Review konsumiert GitHub Dependabot Alerts über `gh api`.
+- Dieses Review konsumiert GitHub Dependabot Alerts über `gh api`, mit Dienst über
+  `k-playbook github run` (Abschnitt „Zugang zu GitHub“).
 - Es ersetzt lokale Scans mit `pip-audit`, `trivy` oder `grype` nicht; diese gehören zu
   `/k-review dependency-cve`.
 - Wenn für ein Projekt GitHub Dependabot als Quelle der Wahrheit reicht, darf dieses
