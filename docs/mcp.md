@@ -350,9 +350,9 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones |
 | `k_playbook_doc_done` | move an own document into `done/` of its location; the answer carries the `revision` after the move |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location; the answer carries the `revision` after the move |
-| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings`, `docs` without its content passing through the session; optional precondition `since_revision` |
-| `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`; optional `since_revision` |
-| `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field; other fields and the body stay byte for byte; optional `since_revision` |
+| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings`, `docs`, or of the hand-written documentation under `docs/manual/`, without its content passing through the session; optional precondition `since_revision` |
+| `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`, in a document of those kinds or under `docs/manual/`; optional `since_revision` |
+| `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field of a document of those kinds (not `docs/manual/`); other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
 | `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
 | `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
@@ -889,7 +889,15 @@ doc append|replace|set|grep` call the same code. Kephalaion itself is unchanged.
 **Scope of the change operations.** A `keph:` reference to one document of a kind without
 tools of its own -- `tasks`, `workbench`, `findings`, `docs` --, open or under `done/`; for kinds with
 a user area only own documents (`foreign_user`), as for `doc_done`. A segment `~` is replaced by
-`kephalaion.user`. Every other reference -- `todos/`, `docs/` (the documentation, not `queue/docs/`), any other `keph:` path, a
+`kephalaion.user`. For `append` and `replace` additionally one document of the hand-written
+documentation under `docs/manual/`, at any depth (decision 2026-11-08, prompted by a manual
+page in a target project): a manual page of 20 to 60 KB would otherwise pass through the caller's
+context as a whole to change one paragraph. The manual belongs to everyone -- no user area,
+no `foreign_user`; `since_revision` catches two writers. `set_field` does not reach it
+(`invalid_input`): the manual has no mandatory frontmatter, and `set_field` would create one
+where none belongs. The areas beyond the kinds come from one table, `project.DocEditAreas`
+(`project/docedit.go`). Every other reference -- `todos/`, `docs/index.md`, `docs/generated/`
+(owned by the producers through `docs checkout/publish`), any other `keph:` path, a
 directory, `project:`, `k-playbook:` -- is `invalid_input`, decided without reading.
 
 **Inputs.** All take `projectDir` (required by contract) and, except grep, `ref` and the

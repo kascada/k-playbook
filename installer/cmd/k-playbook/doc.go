@@ -373,6 +373,7 @@ func docError(err error) error {
 
 func printDocUsage(out io.Writer) {
 	kinds := strings.Join(project.DocKindNames(project.DocKinds), ", ")
+	areas := "keph:/" + strings.Join(project.DocEditAreaDirs(project.DocEditAreas), ", keph:/")
 	fmt.Fprintf(out, `k-playbook doc — nummerierte Dokumente in der Kephalaion-Collection
 
 Aufruf:
@@ -403,7 +404,9 @@ Sorten: %s.
   reopen  Holt es aus done/ zurück.
 
 Ändern, ohne den Inhalt zu lesen — für ein Dokument der Sorten, offen oder
-unter done/, bei Sorten mit Userbereich ein eigenes:
+unter done/, bei Sorten mit Userbereich ein eigenes; append und replace auch
+für die Handdoku unter %s, auch in Unterverzeichnissen — sie
+gehört allen —, set nicht:
 
   append  Hängt den Text von stdin an: Endet das Dokument nicht mit einem
           Zeilenumbruch, kommt einer dazu, dann eine Leerzeile, dann der Text
@@ -413,7 +416,8 @@ unter done/, bei Sorten mit Userbereich ein eigenes:
             EOF
   replace Ersetzt "old", das genau einmal vorkommen muss, durch "new" (leer
           löscht); beides als JSON von stdin. Kein Treffer: text_not_found,
-          mehrere: text_not_unique.
+          mehrere: text_not_unique. Der Weg, eine Stelle einer Handbuchseite
+          nachzuziehen, statt sie ganz neu zu schreiben.
   set     Setzt ein Feld im Frontmatter (legt eines an, wenn es fehlt) oder
           entfernt es mit --unset. Andere Felder und der Rumpf bleiben Byte
           für Byte. Ein Wert, der mit - beginnt, steht nach --.
@@ -428,8 +432,8 @@ unter done/, bei Sorten mit Userbereich ein eigenes:
   stale_revision neu gelesen und bis zu dreimal wiederholt.
 
   grep    Findet Zeilen nach einem regulären Ausdruck (RE2) in einer
-          Einzeldatei hinter einem Verweis (project:, k-playbook:, keph:)
-          oder mit --kind in allen Dokumenten einer Sorte, ausgewählt wie bei
+          Einzeldatei hinter einem Verweis (project:, k-playbook:, keph: —
+          jeder keph:-Verweis, auch die Handdoku) oder mit --kind in allen Dokumenten einer Sorte, ausgewählt wie bei
           list. Gesucht wird im gespeicherten Text, ohne eingesetzte
           Includes. Ausgabe je Treffer ref:zeile:text, höchstens 200; mit
           --count je Dokument ref:anzahl, bei keph: ref:anzahl:revision. Ein
@@ -446,5 +450,5 @@ beim Hub ist nichts angekommen. outcome_unknown: der Vorgang kann beim Hub
 angekommen sein, auch nach der Wiederholung mit demselben Schlüssel — nicht
 noch einmal aufrufen, sondern nachsehen: bei create, done und reopen mit doc
 list, bei append, replace und set mit read oder grep --count.
-`, kinds)
+`, kinds, areas)
 }

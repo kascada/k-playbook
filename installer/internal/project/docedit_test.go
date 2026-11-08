@@ -284,14 +284,16 @@ func TestDocEditGeltungsbereich(t *testing.T) {
 	store.put("user/kamran/workbench/001-w.md", "x\n")
 	store.put("queue/findings/003-f.md", "x\n")
 	store.put("todos/004-t.md", "x\n")
-	store.put("docs/manual/a.md", "x\n")
+	store.put("docs/index.md", "x\n")
+	store.put("docs/generated/code/a.md", "x\n")
 	docs := newTestUserDocs(t, store, DocKinds)
 	ctx := context.Background()
 
 	_, err := docs.Append(ctx, "keph:/user/anna/tasks/101-b.md", "y", DocEditOptions{})
 	wantCode(t, err, DocCodeForeignUser)
 	for _, ref := range []string{
-		"keph:/todos/004-t.md", "keph:/docs/manual/a.md", "project:/README.md", "k-playbook:/rules/a.md",
+		"keph:/todos/004-t.md", "keph:/docs/index.md", "keph:/docs/generated/code/a.md", "keph:/docs/manual",
+		"project:/README.md", "k-playbook:/rules/a.md",
 		"keph:/user/~/tasks/", "keph:/user/~/tasks/sub/100-a.md",
 	} {
 		_, err := docs.Append(ctx, ref, "y", DocEditOptions{})
@@ -312,6 +314,72 @@ func TestDocEditGeltungsbereich(t *testing.T) {
 	wantCode(t, err, DocCodeNotFound)
 	_, err = docs.Append(ctx, "keph:/user/~/tasks/done/102-c.md", "y", DocEditOptions{SinceRevision: -1})
 	wantCode(t, err, DocCodeInvalidInput)
+}
+
+// Die Handdoku unter docs/manual/ (DocEditAreas) erreichen append und replace,
+// beliebig tief und ohne Userbereich; set nicht, und außerhalb des Bereichs
+// bleibt docs/ gesperrt. Entschieden wird ohne zu lesen.
+func TestDocEditHanddoku(t *testing.T) {
+	noEditWait(t)
+	store := newFakeDocStore("kamran")
+	page := store.put("docs/manual/local-dev-start.md", "---\ntitle: Start\n---\n\nAlt eins.\n")
+	store.put("docs/manual/tief/unten.md", "x\n")
+	docs := newTestUserDocs(t, store, DocKinds)
+	ctx := context.Background()
+
+	edited, err := docs.Replace(ctx, "keph:/docs/manual/local-dev-start.md", "Alt eins.", "Neu eins.",
+		DocEditOptions{SinceRevision: page.revision})
+	if err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	if !edited.Changed || edited.Ref != "keph:/docs/manual/local-dev-start.md" || edited.Revision != page.revision {
+		t.Fatalf("Antwort: %+v (Dokument jetzt Revision %d)", edited, page.revision)
+	}
+	if page.content != "---\ntitle: Start\n---\n\nNeu eins.\n" {
+		t.Fatalf("Inhalt: %q", page.content)
+	}
+	if _, err := docs.Append(ctx, "keph:/docs/manual/tief/unten.md", "y", DocEditOptions{}); err != nil {
+		t.Fatalf("append tief: %v", err)
+	}
+
+	before := len(store.reads)
+	value := "v"
+	_, err = docs.SetField(ctx, "keph:/docs/manual/local-dev-start.md", "title", &value, DocEditOptions{})
+	wantCode(t, err, DocCodeInvalidInput)
+	if !strings.Contains(err.Error(), "Handdoku") || !strings.Contains(err.Error(), "append und replace") {
+		t.Fatalf("Meldung nennt den Bereich nicht: %v", err)
+	}
+	_, err = docs.Append(ctx, "keph:/docs/manual/", "y", DocEditOptions{})
+	wantCode(t, err, DocCodeInvalidInput)
+	if len(store.reads) != before {
+		t.Fatalf("abgelehnt und doch gelesen: %v", store.reads[before:])
+	}
+
+	_, err = docs.Replace(ctx, "keph:/docs/manual/fehlt.md", "a", "b", DocEditOptions{})
+	wantCode(t, err, DocCodeNotFound)
+	_, err = docs.Replace(ctx, "keph:/docs/manual/local-dev-start.md", "Neu eins.", "x",
+		DocEditOptions{SinceRevision: page.revision + 5})
+	wantCode(t, err, DocCodeForeignChange)
+}
+
+func TestDocEditBereicheValidierung(t *testing.T) {
+	cases := map[string][]DocEditArea{
+		"ohne Operation": {{Dir: "docs/manual", Label: "x"}},
+		"Sorte darunter": {{Dir: "queue", Label: "x", Append: true}},
+		"in einer Sorte": {{Dir: "queue/docs/sub", Label: "x", Append: true}},
+		"gleich Sorte":   {{Dir: "todos", Label: "x", Append: true}},
+		"doppelt":        {{Dir: "docs/manual", Label: "x", Append: true}, {Dir: "docs/manual/a", Label: "y", Append: true}},
+		"User-Segment":   {{Dir: "docs/~", Label: "x", Append: true}},
+		"leeres Segment": {{Dir: "docs//manual", Label: "x", Append: true}},
+	}
+	for name, areas := range cases {
+		if err := validateDocEditAreas(areas, DocKinds); err == nil {
+			t.Errorf("%s: kein Fehler", name)
+		}
+	}
+	if err := validateDocEditAreas(DocEditAreas, DocKinds); err != nil {
+		t.Fatalf("DocEditAreas: %v", err)
+	}
 }
 
 func TestDocEditKephalaionFehler(t *testing.T) {

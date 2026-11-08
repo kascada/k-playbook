@@ -238,7 +238,9 @@ directories of its own origin:
 The entry of the project documentation is `keph:/docs/` in the project's collection
 (task 101): the briefing names it under `Projektdoku`, and a session reads it with
 Kephalaion `list` on `docs/` (`recursive`, `frontmatter`) until Kephalaion generates
-`docs/index.md`. Hand-written documentation lives under `keph:/docs/manual/`. There is
+`docs/index.md`. Hand-written documentation lives under `keph:/docs/manual/`; a session
+changes a page in place with `k_playbook_doc_replace` and `k_playbook_doc_append` (with
+`since_revision`), not by rewriting it with Kephalaion `write`. There is
 no fallback to `k-playbook-local/docs/`; `/k-upgrade` (3.2) moves what lies there per
 origin into the collection or clears it, after confirmation.
 

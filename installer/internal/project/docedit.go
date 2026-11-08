@@ -19,7 +19,9 @@ import (
 // über die eine Funktion edit.
 //
 // Geltungsbereich: Dokumente der Sorten in DocKinds ohne eigene Werkzeuge,
-// offen oder unter done/; bei Sorten mit Userbereich nur die eigenen.
+// offen oder unter done/, bei Sorten mit Userbereich nur die eigenen — und
+// für Append und Replace die Bereiche in DocEditAreas, heute die Handdoku
+// unter docs/manual/ (Entscheidung 2026-11-08).
 //
 // Ein Dokument hat zu einer Zeit einen Schreiber. since_revision ist die
 // Revision, die der Aufrufer zuletzt gesehen hat — aus seinem letzten
@@ -39,6 +41,111 @@ const (
 	// die Meldung nennt die Anzahl.
 	DocCodeTextNotUnique = "text_not_unique"
 )
+
+// docEditOp ist eine der Änderungsoperationen; der Geltungsbereich fragt
+// danach, denn nicht jeder Bereich lässt jede zu.
+type docEditOp string
+
+const (
+	docEditAppend   docEditOp = "append"
+	docEditReplace  docEditOp = "replace"
+	docEditSetField docEditOp = "set"
+)
+
+// DocEditArea ist ein Bereich der Collection, dessen Dokumente die
+// Änderungsoperationen erreichen, ohne dass er eine Sorte ist: ohne Nummern,
+// ohne create, list, done und reopen, ohne Userbereich. Was darin liegt,
+// gehört allen; since_revision fängt zwei Schreiber ab.
+type DocEditArea struct {
+	// Dir ist das Verzeichnis in der Collection, ohne Schrägstrich am Ende.
+	// Alles darunter zählt, auch in Unterverzeichnissen.
+	Dir string
+	// Label nennt den Bereich in Meldungen.
+	Label string
+	// Append, Replace und SetField sagen, welche Operationen den Bereich
+	// erreichen.
+	Append, Replace, SetField bool
+}
+
+// DocEditAreas sind die Bereiche (Entscheidung 2026-11-08, Anlass war eine
+// Handbuchseite in einem Zielprojekt): die Handdoku unter docs/manual/, für
+// append und replace. Bisher blieb für eine Handbuchseite nur Kephalaion write mit dem
+// ganzen Inhalt, und bei 20 bis 60 KB läuft so die ganze Seite durch den
+// Kontext des Aufrufers, um einen Absatz zu tauschen. set bleibt außen vor:
+// Handdoku hat kein Pflicht-Frontmatter, und set legte eines an, wo keines
+// hingehört. docs/generated/ gehört den Erzeugern über docs checkout/publish
+// und ist kein Bereich.
+var DocEditAreas = []DocEditArea{
+	{Dir: "docs/manual", Label: "Handdoku", Append: true, Replace: true},
+}
+
+// DocEditAreaDirs sind die Verzeichnisse der Bereiche mit Schrägstrich am
+// Ende, für Meldungen und Hilfetexte.
+func DocEditAreaDirs(areas []DocEditArea) []string {
+	dirs := make([]string, 0, len(areas))
+	for _, area := range areas {
+		dirs = append(dirs, area.Dir+"/")
+	}
+	return dirs
+}
+
+// allows sagt, ob die Operation den Bereich erreicht.
+func (a DocEditArea) allows(op docEditOp) bool {
+	switch op {
+	case docEditAppend:
+		return a.Append
+	case docEditReplace:
+		return a.Replace
+	case docEditSetField:
+		return a.SetField
+	}
+	return false
+}
+
+// allowed nennt die Operationen, die den Bereich erreichen, für Meldungen.
+func (a DocEditArea) allowed() string {
+	var ops []string
+	for _, op := range []docEditOp{docEditAppend, docEditReplace, docEditSetField} {
+		if a.allows(op) {
+			ops = append(ops, string(op))
+		}
+	}
+	return strings.Join(ops, " und ")
+}
+
+// contains sagt, ob name unter dem Bereich liegt, beliebig tief.
+func (a DocEditArea) contains(name string) bool {
+	return strings.HasPrefix(name, a.Dir+"/") && len(name) > len(a.Dir)+1
+}
+
+// validateDocEditAreas prüft die Bereiche: gültige Pfade, mindestens eine
+// Operation, und keiner überschneidet sich mit einem anderen oder mit der
+// Ablage einer Sorte — sonst entschiede die Reihenfolge der Prüfung, welche
+// Regeln gelten.
+func validateDocEditAreas(areas []DocEditArea, kinds []DocKind) error {
+	for i, area := range areas {
+		label := fmt.Sprintf("Bereich %d (%q)", i+1, area.Dir)
+		for _, segment := range strings.Split(area.Dir, "/") {
+			if segment == "" || segment == "." || segment == ".." || strings.HasPrefix(segment, ".") || segment == docUserSegment {
+				return fmt.Errorf("%s: kein Pfad aus gültigen Segmenten", label)
+			}
+		}
+		if !area.Append && !area.Replace && !area.SetField {
+			return fmt.Errorf("%s: keine Operation erlaubt", label)
+		}
+		for j, other := range areas {
+			if i != j && (area.Dir == other.Dir || strings.HasPrefix(other.Dir, area.Dir+"/")) {
+				return fmt.Errorf("Bereiche %q und %q überschneiden sich", area.Dir, other.Dir)
+			}
+		}
+		for _, kind := range kinds {
+			if area.Dir == kind.Dir || strings.HasPrefix(kind.Dir, area.Dir+"/") || strings.HasPrefix(area.Dir, kind.Dir+"/") {
+				return fmt.Errorf("%s überschneidet sich mit der Ablage %q der Sorte %s", label, kind.Dir, kind.Kind)
+			}
+		}
+	}
+	return nil
+}
 
 // docEditRetries ist die Zahl der Wiederholungen: nach stale_revision ohne
 // since_revision neu lesen und noch einmal schreiben, und mit since_revision
@@ -125,7 +232,7 @@ func (u *UserDocs) Append(ctx context.Context, ref, text string, opts DocEditOpt
 	if strings.TrimSpace(text) == "" {
 		return DocEdited{}, docRefErrorf(DocCodeInvalidInput, "kein Text zum Anhängen angegeben")
 	}
-	return u.edit(ctx, ref, opts, func(content string) (string, error) {
+	return u.edit(ctx, ref, docEditAppend, opts, func(content string) (string, error) {
 		return appendDocText(content, text), nil
 	})
 }
@@ -149,7 +256,7 @@ func (u *UserDocs) Replace(ctx context.Context, ref, old, new string, opts DocEd
 	if old == "" {
 		return DocEdited{}, docRefErrorf(DocCodeInvalidInput, "kein Text zum Ersetzen angegeben (old ist leer)")
 	}
-	return u.edit(ctx, ref, opts, func(content string) (string, error) {
+	return u.edit(ctx, ref, docEditReplace, opts, func(content string) (string, error) {
 		switch n := countOverlapping(content, old); {
 		case n == 0:
 			return "", docRefErrorf(DocCodeTextNotFound, "der zu ersetzende Text kommt im Dokument nicht vor")
@@ -187,7 +294,7 @@ func (u *UserDocs) SetField(ctx context.Context, ref, key string, value *string,
 	if !docFieldKeyPattern.MatchString(key) {
 		return DocEdited{}, docRefErrorf(DocCodeInvalidInput, "Feld %q passt nicht zur Form [a-z][a-z0-9_-]*", key)
 	}
-	return u.edit(ctx, ref, opts, func(content string) (string, error) {
+	return u.edit(ctx, ref, docEditSetField, opts, func(content string) (string, error) {
 		return setDocField(content, key, value), nil
 	})
 }
@@ -251,28 +358,37 @@ func isDocFieldContinuation(line string) bool {
 }
 
 // editTarget löst den Verweis einer Änderungsoperation auf: ein keph:-Verweis
-// auf ein Dokument einer Sorte ohne eigene Werkzeuge, offen oder unter done/;
-// bei Sorten mit Userbereich ein eigenes. Zurück kommt der volle Name in der
-// Collection.
-func (u *UserDocs) editTarget(raw string) (string, error) {
+// auf ein Dokument einer Sorte ohne eigene Werkzeuge, offen oder unter done/,
+// bei Sorten mit Userbereich ein eigenes — oder auf ein Dokument eines
+// Bereichs (DocEditAreas), der die Operation op zulässt. Zurück kommt der
+// volle Name in der Collection. Entschieden wird ohne zu lesen.
+func (u *UserDocs) editTarget(raw string, op docEditOp) (string, error) {
 	ref, err := ParseDocRef(raw)
 	if err != nil {
 		return "", err
 	}
 	kinds := strings.Join(DocKindNames(u.kinds), ", ")
+	areas := strings.Join(DocEditAreaDirs(u.areas), ", ")
 	if ref.Scheme != DocSchemeKeph {
 		return "", docRefErrorf(DocCodeInvalidInput,
-			"%s: geändert werden nur keph:-Verweise auf Dokumente der Sorten %s", ref.Raw, kinds)
+			"%s: geändert werden nur keph:-Verweise auf Dokumente der Sorten %s oder unter %s", ref.Raw, kinds, areas)
 	}
 	if ref.Dir || ref.Path == "" {
 		return "", docRefErrorf(DocCodeInvalidInput, "%s: ein Verzeichnis lässt sich nicht ändern, erwartet ein Dokument", ref.Raw)
 	}
 	name := u.expandUser(ref.Path)
+	if area, ok := u.matchArea(name); ok {
+		if !area.allows(op) {
+			return "", docRefErrorf(DocCodeInvalidInput,
+				"%s liegt in der %s (%s/); dort gilt %s nicht, nur %s", ref.Raw, area.Label, area.Dir, op, area.allowed())
+		}
+		return name, nil
+	}
 	kind, m, found := u.matchKind(name)
 	if !found || kind.OwnTools {
 		return "", docRefErrorf(DocCodeInvalidInput,
-			"%s liegt in keiner Ablage der Sorten %s und nicht in deren done/ — andere Dokumente ändern diese Werkzeuge nicht",
-			ref.Raw, kinds)
+			"%s liegt in keiner Ablage der Sorten %s, nicht in deren done/ und nicht unter %s — andere Dokumente ändern diese Werkzeuge nicht",
+			ref.Raw, kinds, areas)
 	}
 	if kind.UserArea && m.user != u.user {
 		return "", docRefErrorf(DocCodeForeignUser, "%s gehört %s, nicht %s; geändert werden nur eigene Dokumente",
@@ -290,6 +406,16 @@ func (u *UserDocs) expandUser(refPath string) string {
 		}
 	}
 	return strings.Join(segments, "/")
+}
+
+// matchArea sucht den Bereich, unter dem name liegt.
+func (u *UserDocs) matchArea(name string) (DocEditArea, bool) {
+	for _, area := range u.areas {
+		if area.contains(name) {
+			return area, true
+		}
+	}
+	return DocEditArea{}, false
 }
 
 // matchKind sucht die Sorte, in deren Ablage oder done/ name liegt.
@@ -312,11 +438,11 @@ func (u *UserDocs) matchKind(name string) (DocKind, docMatch, bool) {
 // stale_revision ein foreign_change. request_id und Wiederholung nach offenem
 // Ausgang macht der Client (kephalaion.Client.Write); was dann offen bleibt,
 // ist outcome_unknown.
-func (u *UserDocs) edit(ctx context.Context, raw string, opts DocEditOptions, change func(string) (string, error)) (DocEdited, error) {
+func (u *UserDocs) edit(ctx context.Context, raw string, op docEditOp, opts DocEditOptions, change func(string) (string, error)) (DocEdited, error) {
 	if opts.SinceRevision < 0 {
 		return DocEdited{}, docRefErrorf(DocCodeInvalidInput, "since_revision %d ist keine Revision", opts.SinceRevision)
 	}
-	name, err := u.editTarget(raw)
+	name, err := u.editTarget(raw, op)
 	if err != nil {
 		return DocEdited{}, err
 	}

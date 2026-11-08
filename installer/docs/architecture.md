@@ -197,7 +197,11 @@ was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../.
 
 `doc append|replace|set [--since N] [--json]` ändert ein Dokument der Sorten ohne eigene
 Werkzeuge (`tasks`, `workbench`, `findings`, `docs`, offen oder unter `done/`, bei Userbereich nur
-eigene), ohne dass der Inhalt durch die Sitzung läuft (Task 104): `append` liest den Text von
+eigene), ohne dass der Inhalt durch die Sitzung läuft (Task 104); `append` und `replace` auch
+ein Dokument der Handdoku unter `docs/manual/`, beliebig tief, ohne Userbereich — die Bereiche
+außerhalb der Sorten stehen in der Tabelle `project.DocEditAreas` (`project/docedit.go`), je
+Bereich mit den erlaubten Operationen; `set` erreicht die Handdoku nicht (Entscheidung
+2026-11-08). `append` liest den Text von
 stdin (Heredoc mit `<<'EOF'`), `replace` `{"old": …, "new": …}` als JSON von stdin, `set`
 setzt ein Frontmatter-Feld oder entfernt es mit `--unset`. Alle drei setzen auf eine
 Kernfunktion auf, `UserDocs.edit` in `project/docedit.go`: Verweis auflösen wie bei `done`,

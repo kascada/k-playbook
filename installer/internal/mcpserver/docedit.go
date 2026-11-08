@@ -15,7 +15,9 @@ import (
 // Hüllen über project.UserDocs.Append, .Replace, .SetField und .Grep sowie
 // project.GrepDocRef, dem Weg, den auch `k-playbook doc append|replace|set|grep`
 // geht. Der Inhalt bleibt im Programm: Die Antwort nennt Verweis, Revision,
-// Größe und ob geschrieben wurde, nicht den Text.
+// Größe und ob geschrieben wurde, nicht den Text. Geltungsbereich: die Sorten
+// ohne eigene Werkzeuge und, für append und replace, die Bereiche aus
+// project.DocEditAreas (Handdoku unter docs/manual/).
 const (
 	docToolAppend   = "k_playbook_doc_append"
 	docToolReplace  = "k_playbook_doc_replace"
@@ -28,11 +30,24 @@ const docSinceSchema = "Die Revision, die du zuletzt gesehen hast — aus deinem
 	"geschrieben: foreign_change, nichts geschrieben. Ohne since_revision keine Vorbedingung."
 
 // docEditKinds sind die Sorten, die die Änderungswerkzeuge erreichen, aus der
-// Sorten-Tabelle project.DocKinds.
-var docEditKinds = strings.Join(project.DocKindNames(project.DocKinds), ", ")
+// Sorten-Tabelle project.DocKinds; docEditAreas die Bereiche außerhalb der
+// Sorten, die append und replace erreichen (project.DocEditAreas).
+var (
+	docEditKinds = strings.Join(project.DocKindNames(project.DocKinds), ", ")
+	docEditAreas = "keph:/" + strings.Join(project.DocEditAreaDirs(project.DocEditAreas), ", keph:/")
+)
 
 var docEditRefSchema = "Pflicht. Der keph:-Verweis auf ein Dokument der Sorten " + docEditKinds + ", offen oder " +
 	"unter done/, bei Sorten mit Userbereich ein eigenes; ~ steht für den eigenen User, etwa keph:/user/~/tasks/100-name.md."
+
+// docEditRefAreaSchema ergänzt die Beschreibung von ref um die Bereiche, für
+// append und replace; docEditRefNoAreaSchema sagt set_field, dass sie dort
+// nicht gelten.
+var (
+	docEditRefAreaSchema = docEditRefSchema + " Oder ein Dokument der Handdoku unter " + docEditAreas +
+		" (auch in Unterverzeichnissen), etwa keph:/docs/manual/einrichtung.md — sie gehört allen, kein Userbereich."
+	docEditRefNoAreaSchema = docEditRefSchema + " Die Handdoku unter " + docEditAreas + " erreicht set_field nicht (invalid_input)."
+)
 
 type docAppendInput struct {
 	ProjectDir    string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
@@ -95,7 +110,8 @@ type docGrepEnvelope struct {
 }
 
 var docEditCommon = " Abgelehnt: anderer Verweis als ein Dokument der Sorten " + docEditKinds + " (offen oder unter " +
-	"done/) — invalid_input; fremder User — foreign_user; Dokument fehlt — not_found. since_revision: weicht das " +
+	"done/) oder — nur bei append und replace — der Handdoku unter " + docEditAreas + " — invalid_input; fremder User — " +
+	"foreign_user; Dokument fehlt — not_found. since_revision: weicht das " +
 	"Dokument ab, ist das foreign_change — nichts geschrieben; die Antwort trägt revision, updatedBy, updatedAt und " +
 	"tail (die letzten 20 Zeilen); dann nicht still nachziehen, sondern den Nutzer fragen, wer weitermacht. Ohne " +
 	"since_revision wird nach stale_revision neu gelesen und bis zu dreimal wiederholt. Antwort: ref, revision, size, " +
@@ -106,32 +122,37 @@ var docEditCommon = " Abgelehnt: anderer Verweis als ein Dokument der Sorten " +
 func addDocEditTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolAppend,
-		InputSchema: docEditSchema[docAppendInput](),
-		Description: "Hängt content an ein Dokument der Collection an, ohne dass der Inhalt durch deinen Kontext läuft: " +
+		InputSchema: docEditSchema[docAppendInput](docEditRefAreaSchema),
+		Description: "Hängt content an ein Dokument der Collection an — ein Dokument der Sorten " + docEditKinds +
+			" oder der Handdoku unter " + docEditAreas + " —, ohne dass der Inhalt durch deinen Kontext läuft: " +
 			"Endet das Dokument nicht mit einem Zeilenumbruch, kommt einer dazu, dann eine Leerzeile, dann der Text mit " +
 			"genau einem Zeilenumbruch am Ende — jeder Eintrag beginnt am Zeilenanfang." + docEditCommon +
 			" Hülle über `k-playbook doc append`.",
 	}, docAppendTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolReplace,
-		InputSchema: docEditSchema[docReplaceInput](),
-		Description: "Ersetzt in einem Dokument der Collection den Text old, der genau einmal vorkommen muss, durch new " +
-			"(leer löscht). Kein Treffer: text_not_found; mehrere: text_not_unique mit der Anzahl — dann mehr Umgebung " +
-			"in old mitgeben." + docEditCommon + " Hülle über `k-playbook doc replace`.",
+		InputSchema: docEditSchema[docReplaceInput](docEditRefAreaSchema),
+		Description: "Ersetzt in einem Dokument der Collection — ein Dokument der Sorten " + docEditKinds +
+			" oder der Handdoku unter " + docEditAreas + " — den Text old, der genau einmal vorkommen muss, durch new " +
+			"(leer löscht), ohne dass der Inhalt durch deinen Kontext läuft; der Weg, eine Stelle einer Handbuchseite " +
+			"nachzuziehen, statt sie ganz mit write neu zu schreiben. Kein Treffer: text_not_found; mehrere: " +
+			"text_not_unique mit der Anzahl — dann mehr Umgebung in old mitgeben." + docEditCommon +
+			" Hülle über `k-playbook doc replace`.",
 	}, docReplaceTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolSetField,
-		InputSchema: docEditSchema[docSetFieldInput](),
-		Description: "Setzt ein Feld im Frontmatter eines Dokuments der Collection (value, ein YAML-Skalar, quotiert " +
-			"wenn nötig) oder entfernt es (unset). Fehlt das Frontmatter, wird beim Setzen eines angelegt. Andere " +
-			"Felder, ihre Reihenfolge und der Rumpf bleiben Byte für Byte." + docEditCommon +
+		InputSchema: docEditSchema[docSetFieldInput](docEditRefNoAreaSchema),
+		Description: "Setzt ein Feld im Frontmatter eines Dokuments der Sorten " + docEditKinds + " (value, ein " +
+			"YAML-Skalar, quotiert wenn nötig) oder entfernt es (unset); nicht für die Handdoku. Fehlt das Frontmatter, " +
+			"wird beim Setzen eines angelegt. Andere Felder, ihre Reihenfolge und der Rumpf bleiben Byte für Byte." + docEditCommon +
 			" Hülle über `k-playbook doc set`.",
 	}, docSetFieldTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        docToolGrep,
 		InputSchema: docKindSchema[docGrepInput](),
 		Description: "Findet Zeilen nach einem Muster (RE2), ohne den Inhalt zu lesen: in einer Einzeldatei (ref, wie " +
-			"bei k_playbook_doc_read) oder in allen Dokumenten einer Sorte (kind mit user und done wie bei " +
+			"bei k_playbook_doc_read — jeder keph:-Verweis, auch die Handdoku unter " + docEditAreas + ") oder in allen " +
+			"Dokumenten einer Sorte (kind mit user und done wie bei " +
 			"k_playbook_doc_list). Gesucht wird im gespeicherten Text, ohne eingesetzte Includes. Antwort: matches " +
 			"(ref, line, text; fehlt ohne Treffer), count und bei einem keph:-ref revision; höchstens 200 Treffer, " +
 			"darüber truncated: true. Mit count_only statt matches counts (ref, count, revision je Dokument, auch 0) — " +
@@ -140,11 +161,12 @@ func addDocEditTools(server *mcp.Server) {
 }
 
 // docEditSchema ist das Eingabeschema der Änderungswerkzeuge mit den
-// Beschreibungen von ref und since_revision.
-func docEditSchema[T any]() *jsonschema.Schema {
+// Beschreibungen von ref (refSchema, je nachdem, ob das Werkzeug die
+// Bereiche erreicht) und since_revision.
+func docEditSchema[T any](refSchema string) *jsonschema.Schema {
 	schema := docKindSchema[T]()
 	if prop, ok := schema.Properties["ref"]; ok {
-		prop.Description = docEditRefSchema
+		prop.Description = refSchema
 	}
 	if prop, ok := schema.Properties["since_revision"]; ok {
 		prop.Description = docSinceSchema

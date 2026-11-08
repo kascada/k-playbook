@@ -106,7 +106,10 @@ offen. Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`.
   (`/k-doc-inventory`); der Lauf ist billig und lässt das Dokument ohne inhaltliche Änderung
   byte-gleich stehen.
 - **Handdoku, `README.md`, `AGENTS.md`.** Sie werden im selben Arbeitsgang angepasst wie der
-  Code, nicht eingereiht.
+  Code, nicht eingereiht. Eine Handbuchseite unter `keph:/docs/manual/` ändert
+  `k_playbook_doc_replace` stellenweise, `k_playbook_doc_append` hängt an — mit
+  `since_revision`, wie `k-playbook:/rules/docs-sync.md` es beschreibt; nicht als Ganzes mit
+  `write`.
 - **Ein Teil-Scope.** Ein Auftrag engt den Lauf nicht auf seine Pfade ein.
 - **Inhalt für die Doku.** Was ein Erzeuger schreiben soll, findet er im Code. Erkenntnisse
   sind Befunde (`k-playbook:/instructions/on-demand/befunde.md`), Arbeitsstände gehören in die

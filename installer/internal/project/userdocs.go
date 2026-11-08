@@ -291,6 +291,9 @@ type DocStore interface {
 // UserDocs ist der Zugang zu den nummerierten Dokumenten eines Users.
 type UserDocs struct {
 	kinds []DocKind
+	// areas sind die Bereiche außerhalb der Sorten, die die
+	// Änderungsoperationen erreichen (docedit.go); immer DocEditAreas.
+	areas []DocEditArea
 	store DocStore
 	user  string
 }
@@ -300,10 +303,13 @@ func NewUserDocs(kinds []DocKind, store DocStore, user string) (*UserDocs, error
 	if err := ValidateDocKinds(kinds); err != nil {
 		return nil, fmt.Errorf("Sorten-Tabelle ungültig: %w", err)
 	}
+	if err := validateDocEditAreas(DocEditAreas, kinds); err != nil {
+		return nil, fmt.Errorf("Bereiche der Änderungsoperationen ungültig: %w", err)
+	}
 	if !docNamePattern.MatchString(user) {
 		return nil, docRefErrorf(DocCodeKephalaionUnavailable, "Kephalaion nennt keinen gültigen User (%q)", user)
 	}
-	return &UserDocs{kinds: kinds, store: store, user: user}, nil
+	return &UserDocs{kinds: kinds, areas: DocEditAreas, store: store, user: user}, nil
 }
 
 // User ist der eigene User.

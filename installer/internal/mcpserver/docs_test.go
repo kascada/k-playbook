@@ -474,13 +474,21 @@ func TestDocKindSchemaAusDerTabelle(t *testing.T) {
 	}
 	// Die Änderungswerkzeuge haben kein kind, aber ref und since_revision
 	// mit Beschreibung.
-	for _, schema := range []*jsonschema.Schema{docEditSchema[docAppendInput](), docEditSchema[docReplaceInput](), docEditSchema[docSetFieldInput]()} {
+	for _, schema := range []*jsonschema.Schema{docEditSchema[docAppendInput](docEditRefAreaSchema),
+		docEditSchema[docReplaceInput](docEditRefAreaSchema), docEditSchema[docSetFieldInput](docEditRefNoAreaSchema)} {
 		if _, ok := schema.Properties["kind"]; ok {
 			t.Fatal("Änderungswerkzeug mit kind")
 		}
 		if schema.Properties["ref"].Description == "" || schema.Properties["since_revision"].Description == "" {
 			t.Fatalf("ref/since_revision ohne Beschreibung: %+v", schema.Properties)
 		}
+	}
+	// append und replace nennen die Handdoku als Ziel, set_field schließt sie aus.
+	if ref := docEditSchema[docReplaceInput](docEditRefAreaSchema).Properties["ref"].Description; !strings.Contains(ref, "keph:/docs/manual/") {
+		t.Fatalf("replace nennt die Handdoku nicht: %s", ref)
+	}
+	if ref := docEditSchema[docSetFieldInput](docEditRefNoAreaSchema).Properties["ref"].Description; !strings.Contains(ref, "erreicht set_field nicht") {
+		t.Fatalf("set_field schließt die Handdoku nicht aus: %s", ref)
 	}
 	if grep := docKindSchema[docGrepInput](); !slicesContain(grep.Required, "pattern") || slicesContain(grep.Required, "kind") {
 		t.Fatalf("grep: required %v", grep.Required)
