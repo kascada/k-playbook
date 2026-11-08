@@ -543,8 +543,7 @@ func chatSessionPageHandler(w http.ResponseWriter, r *http.Request) {
 // githubTemplate ist die Seite des GitHub-Stands: Repo und Zugang, Pull
 // Requests, CI-Läufe. Eigener Bereich, weil ihre Karten als einzige der
 // Oberfläche über das Netz fragen — als Karte auf der Statusseite hinge jeder
-// Aufruf von / an GitHub. Geschrieben wird nichts: Approve und Merge bleiben
-// bei /k-pr-review.
+// Aufruf von / an GitHub. Geschrieben wird nichts.
 var githubTemplate = pageTemplate("github.html")
 
 func githubPageHandler(w http.ResponseWriter, r *http.Request) {

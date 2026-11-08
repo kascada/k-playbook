@@ -14,10 +14,8 @@
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Diese Seite liest, sie schreibt nichts nach GitHub. Approve,
-               Merge und Kommentare bleiben bei /k-pr-review; ein PR zeigt
-               deshalb seinen Befehl zum Kopieren und keinen Knopf, der etwas
-               auslöst.
+          <!-- Diese Seite liest, sie schreibt nichts nach GitHub; ein PR
+               verlinkt auf GitHub und hat keinen Knopf, der etwas auslöst.
 
                Je Karte ein eigener Endpunkt: dahinter steht ein gh-Subprozess
                mit Netzzugriff, und eine langsame Abfrage soll die übrigen
@@ -54,8 +52,7 @@
             </div>
             <p class="hint">
               Offene zuerst, darunter die zuletzt geschlossenen und gemergten. Jeder PR nennt
-              <code>Quell-Branch → Ziel-Branch</code>. Gelesen wird nur; Approve und Merge laufen
-              über <code>/k-pr-review &lt;nr&gt;</code> im Assistenten.
+              <code>Quell-Branch → Ziel-Branch</code>. Gelesen wird nur.
             </p>
             <div id="gh-pulls-open" class="pr-list empty">Noch nicht geladen.</div>
 

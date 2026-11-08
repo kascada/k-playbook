@@ -161,7 +161,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 |---|---|---|
 | Project | `/k-gui` | Start the interface, check and set up project state |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
-| Code review | `/k-pr-review`, `/k-review`, `/k-audit`, `/k-remediation` | Assess PRs, run reviews and audits, address findings |
+| Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
 | Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check rules, diagnose tests, read histories, mark VS Code |
 
@@ -314,6 +314,5 @@ Details are in [`../checks/README.md`](../checks/README.md) and
 | Commands | [`commands.md`](./commands.md) |
 | Project configuration | [`k-playbook-format.md`](./k-playbook-format.md) |
 | Code review flow | [`code-review.md`](./code-review.md) |
-| PR review | [`pr-review.md`](./pr-review.md) |
 | Task flow | [`task-flow.md`](./task-flow.md) |
 | FAQ | [`faq.md`](./faq.md) |

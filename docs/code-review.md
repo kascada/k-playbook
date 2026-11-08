@@ -1,8 +1,7 @@
 # Code Review Flow
 
 This page describes how a review runs in k-playbook: the two paths that lead into it, the
-artifacts they create, the result families, and the handoff to `/k-remediation`. Reviews of a
-specific GitHub pull request are described in [`pr-review.md`](./pr-review.md).
+artifacts they create, the result families, and the handoff to `/k-remediation`.
 
 Both paths end in the same artifact, `review-triage.md`, and in the same handoff — for
 `/k-review` that holds in report mode; an interactive run moderates edits and creates no result
@@ -614,7 +613,6 @@ delegation.
 
 ## Scope
 
-- `/k-pr-review` is responsible for specific GitHub PRs.
 - `/k-audit` is the only place where findings from multiple sources are consolidated and
   deduplicated. It is also the only review path that uses the MCP server.
 - `/k-review` assesses or creates findings but does not directly implement larger remediation,

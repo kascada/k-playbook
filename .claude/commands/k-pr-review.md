@@ -1,1 +1,0 @@
-../../.k-playbook/share/commands/k-pr-review.md

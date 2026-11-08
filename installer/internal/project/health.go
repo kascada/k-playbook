@@ -104,8 +104,8 @@ func kephalaionHint(state kephalaion.State) string {
 }
 
 // healthGH bewertet die GitHub CLI: Setzt das Projekt gh voraus (status
-// enabled), aber die CLI ist nicht nutzbar, ist das eine Warnung — Commands
-// wie /k-pr-review brechen dann ab. Ein unbekannter Wert in tools.gh.status
+// enabled), aber die CLI ist nicht nutzbar, ist das eine Warnung — das
+// Dependabot-Review bricht dann ab. Ein unbekannter Wert in tools.gh.status
 // ist ein Fehler: Er lässt auch die Kontextausgabe scheitern. Der Fehler aus
 // GHState wird nicht angehängt: Er zitiert den Wert aus der Datei wörtlich,
 // und der gehört in die Kontextausgabe, nicht in den Report. Der Satz nennt

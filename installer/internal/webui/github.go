@@ -12,8 +12,7 @@ import (
 )
 
 // Die GitHub-Ansicht liest den Stand des Repos über das gh-Binary. Sie
-// schreibt nichts nach GitHub: Approve, Merge und Kommentare bleiben bei
-// /k-pr-review, das die Seite nur als Befehl zum Kopieren nennt.
+// schreibt nichts nach GitHub.
 //
 // Je Karte ein eigener Endpunkt. Der Grund ist derselbe wie bei
 // /api/mcp/tools: dahinter steht ein Subprozess mit Netzzugriff, und eine

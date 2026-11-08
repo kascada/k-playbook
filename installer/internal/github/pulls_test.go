@@ -127,16 +127,6 @@ func TestPullsErkenntGemergtUndGeschlossen(t *testing.T) {
 	}
 }
 
-// Die Ansicht schreibt nichts nach GitHub. Was ein PR anbietet, ist der Befehl
-// zum Kopieren — kein Knopf, der etwas auslöst.
-func TestPullsNenntDenEinstiegUeberKPrReview(t *testing.T) {
-	pulls := ParsePulls(readFixture(t, "pulls.json"))
-
-	if command := pullByNumber(t, pulls.Open, 42).Command; command != "/k-pr-review 42" {
-		t.Errorf("Befehl %q, erwartet /k-pr-review 42", command)
-	}
-}
-
 // Dieses Repo hat keine PRs. Die leere Liste ist ein gültiger Zustand und muss
 // als solcher aussehen — nicht als Fehler und nicht als null.
 func TestPullsOhneEintraegeIstEinGueltigerZustand(t *testing.T) {

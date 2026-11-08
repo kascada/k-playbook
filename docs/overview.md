@@ -47,8 +47,8 @@ choose what each one should become.
 
 **3 · Quality** — code quality analysis, code review, audits, remediation.
 `/k-review` runs a single recipe, `/k-audit` orchestrates a whole sweep with
-scanners, evidence recipes, merge and perspectives, `/k-pr-review` assesses a
-specific pull request, and `/k-remediation` turns the findings into work.
+scanners, evidence recipes, merge and perspectives, and `/k-remediation` turns
+the findings into work.
 Details in [`code-review.md`](./code-review.md) and
 [`review-runs.md`](./review-runs.md).
 

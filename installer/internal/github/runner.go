@@ -7,7 +7,7 @@
 // Fehlereinordnung und JSON-Auswertung. Zwei Zuständigkeiten, zwei Pakete.
 //
 // Gelesen wird ausschließlich. Kein Aufruf dieses Pakets verändert etwas an
-// GitHub; Approve, Merge und Kommentare bleiben bei /k-pr-review.
+// GitHub.
 package github
 
 import (

@@ -45,7 +45,7 @@ func GHChoices() []GHChoice {
 		{
 			Status:      GHEnabled,
 			Label:       "gh wird genutzt",
-			Description: "Commands wie /k-pr-review und das Dependabot-Review dürfen gh voraussetzen und brechen ab, wenn es fehlt oder keine Anmeldung besteht.",
+			Description: "Das Dependabot-Review darf gh voraussetzen und bricht ab, wenn es fehlt oder keine Anmeldung besteht.",
 		},
 		{
 			Status:      GHDisabled,

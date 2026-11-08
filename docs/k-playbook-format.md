@@ -600,8 +600,7 @@ versioned project configuration.
 |---|---|---|
 | `status` | enum | `unknown`, `enabled`, or `disabled` |
 
-Whether this project uses the GitHub CLI. It is used by `/k-pr-review` and the
-Dependabot review.
+Whether this project uses the GitHub CLI. It is used by the Dependabot review.
 
 **The default is `unknown`.** It is an explicit state, not a silent no: without
 a decision, a command cannot know whether a missing `gh` is a problem or

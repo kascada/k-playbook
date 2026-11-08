@@ -802,8 +802,8 @@ The instruction "GitHub über run" (`defaults/instructions/always/400-github-ueb
 evaluates this line: it takes the service for the repository of the working directory from it,
 with `projectServices` only beside it, and works as before when the line names no service.
 
-Commands and reviews that reach GitHub — `/k-pr-review`, the PR step of `/k-task-run` and the
-review `review-dependabot-alerts` — decide the access in one place,
+Commands and reviews that reach GitHub — the PR step of `/k-task-run` and the review
+`review-dependabot-alerts` — decide the access in one place,
 `defaults/commands/_shared/gh.md` (task 125): the service by the repository the command targets
 (`projectServices` for the working directory's repository, `show` for any other), `gh.status`
 first in both branches, with a service `run` (`--write` for writing), a service without an `api`

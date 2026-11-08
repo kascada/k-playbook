@@ -10,8 +10,7 @@ wiederholt sie nicht. Fehlerbild, Exit-Codes und Verbote stehen in
 **Den Dienst bestimmen.** Maßgeblich ist das Repo, auf das der Befehl zielt, nicht das
 Arbeitsverzeichnis. `context.github.projectServices` und die Briefing-Zeile `GitHub:` gelten
 nur für das Repo des Arbeitsverzeichnisses. Für ein anderes Repo — etwa `Target repo` in
-`/k-task-run` oder eine PR-URL in `/k-pr-review` — nennt `k-playbook github show` alle Dienste
-mit ihrem `repo`. Passt genau ein Dienst, nimmst du ihn; passen mehrere, fragst du, welcher
+`/k-task-run` — nennt `k-playbook github show` alle Dienste mit ihrem `repo`. Passt genau ein Dienst, nimmst du ihn; passen mehrere, fragst du, welcher
 gilt; passt keiner, gilt der Zweig „Ohne Dienst“. Einzelheiten stehen im Abschnitt „Den Dienst
 bestimmen“ in `k-playbook:/instructions/on-demand/github.md`.
 

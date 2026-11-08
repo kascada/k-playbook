@@ -9,7 +9,7 @@
 #
 # Fields: datei	zeile	werkzeug	begründung
 #
-# datei       Pfad ab commands/, z. B. k-pr-review.md oder _audit/x.md — derselbe
+# datei       Pfad ab commands/, z. B. k-review.md oder _audit/x.md — derselbe
 #             Schlüssel, über den mitgelieferte und projekteigene Commands
 #             verrechnet werden. Für die Texte der Commands unter
 #             defaults/commands/ der Pfad ab dem Playbook, z. B.
@@ -24,8 +24,3 @@
 # Aufruf, meldet der Check den Eintrag als veraltet: Zeile nachziehen und die
 # Begründung dabei erneut prüfen.
 datei	zeile	werkzeug	begründung
-k-pr-review.md	576	git	Arbeitsbaum vor dem Branch-Wechsel prüfen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend (rules/command-authoring.md, Externe Werkzeuge).
-k-pr-review.md	686	git	Arbeitsbaum vor dem Löschen des Validierungs-Branches prüfen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
-k-pr-review.md	699	git	Rückkehr auf den Base-Branch beim Aufräumen; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
-k-pr-review.md	701	git	Löschen des lokalen Validierungs-Branches; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.
-k-pr-review.md	715	git	Abschließende Sauberkeitsprüfung des Repositorys; ohne git gibt es kein Repository, der Fehlschlag ist selbsterklärend.

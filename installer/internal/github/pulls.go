@@ -53,9 +53,6 @@ type PullRequest struct {
 	Checks         string   `json:"checks"`
 	Mergeable      string   `json:"mergeable"`
 	Labels         []string `json:"labels"`
-	// Command ist der Einstieg zum Kopieren. Die Ansicht schreibt nichts nach
-	// GitHub; Approve und Merge laufen über /k-pr-review.
-	Command string `json:"command"`
 }
 
 // Pulls ist die Antwort der PR-Karte: offene oben, zuletzt geschlossene
@@ -278,7 +275,6 @@ func convertPull(node pullNode, defaultBranch string) PullRequest {
 		ReviewDecision: node.ReviewDecision,
 		Mergeable:      node.Mergeable,
 		Labels:         []string{},
-		Command:        "/k-pr-review " + strconv.Itoa(node.Number),
 	}
 	if node.Author != nil {
 		pull.Author = node.Author.Login

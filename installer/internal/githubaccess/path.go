@@ -13,7 +13,7 @@
 // Kindprozesses (runenv.go); beide schreiben nichts.
 //
 // Abgrenzung zu internal/github: Das fragt über gh die GitHub-API für die
-// Seite /branches und /k-pr-review; hier geht es allein um die lokale Datei.
+// Seiten /branches und /github; hier geht es allein um die lokale Datei.
 //
 // Load liefert die Konfiguration oder die Probleme, nie beides und nie nur
 // das erste. Es schreibt nichts: Fehlt die Datei, sagt das Result.Present,

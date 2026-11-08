@@ -10,7 +10,6 @@ A project-owned command with the name of a shipped command **replaces** it; an e
 
 | Topic | Detail page |
 |---|---|
-| PR review | [`pr-review.md`](./pr-review.md) |
 | Code review flow | [`code-review.md`](./code-review.md) |
 | Task flow | [`task-flow.md`](./task-flow.md) |
 | Installation | [`installation.md`](./installation.md) |
@@ -33,7 +32,6 @@ New commands become visible only after linking is in place and the assistant has
 | **Session** | | |
 | `/k-danke` | Close a working session | presents the session's findings in the collection's `queue/findings/`, adds what is missing, sets each finding's `ziel` (`wissen`, `falle`, `regel`, `verwerfen`) after the user confirms it, and checks the docs follow-up via `/k-enforcement` as a safety net -- a documentation order of this session in `keph:/queue/docs/` counts as done; it writes nothing else, the takeover from the queue does the rest. What gets recorded while working is defined by `k-playbook:/instructions/on-demand/befunde.md` and applied by the skill `ks-befunde` |
 | **Code review** | | |
-| `/k-pr-review` | Load and assess GitHub PRs and optionally approve, merge, or validate them locally | [`pr-review.md`](./pr-review.md) |
 | `/k-review` | Run review recipes | [`code-review.md`](./code-review.md) |
 | `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge | [`review-runs.md`](./review-runs.md) |
 | `/k-remediation` | Bundle findings and turn them into tasks or fixes | [`code-review.md`](./code-review.md) |
@@ -60,10 +58,9 @@ The code-review family is deliberately staged:
 | focused individual review recipe, interactive or as a report | `/k-review <name>` | interactive change proposals or `<family>/YYYY-MM-DD/review-input.json` and `review-triage.md` |
 | harden a task/instruction file before execution | `/k-task-refine [path]` | review log directly in the reviewed task/instruction file |
 
-1. `/k-pr-review` assesses a specific pull request and remains read-only by default.
-2. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or `review-triage.md` as a report handoff.
-3. `/k-audit` orchestrates the run model: creates or continues a run, starts scanners, runs evidence recipes before the merge, starts the merge, leads perspectives afterward, and writes `review-triage.md`.
-4. `/k-remediation <result>` plans how to address findings. It takes exactly one result file; merging happens exclusively in the audit run.
+1. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or `review-triage.md` as a report handoff.
+2. `/k-audit` orchestrates the run model: creates or continues a run, starts scanners, runs evidence recipes before the merge, starts the merge, leads perspectives afterward, and writes `review-triage.md`.
+3. `/k-remediation <result>` plans how to address findings. It takes exactly one result file; merging happens exclusively in the audit run.
 
 When `/k-remediation` creates tasks, they belong in the normal task flow: first `/k-task-refine`, then `/k-task-run`.
 

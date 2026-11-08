@@ -222,14 +222,14 @@ Ein Guard in einem anderen Codeblock oder ein Verweis auf `baseTools` genügt ni
 Erfassungsumfang und Grenzen stehen in `checks/README.md`.
 
 **Bekannte, bewusst zurückgestellte Ausnahme.** Task 045 hat Commands genannt, die `git`
-ohne ausdrücklichen Guard aufrufen; davon gibt es noch `k-task-run.md`, `k-pr-review.md`,
-`k-enforcement.md` und `k-remediation.md`. Als Aufruf in einem Shell-Codeblock steht `git`
-ohne Guard heute nur noch in `k-pr-review.md`. `k-task-run.md` hat seit Task 080 keine
-Fundstelle mehr: seine `git`-Aufrufe in Shell-Codeblöcken stehen hinter einem Guard. Die
-übrigen zwei nennen `git` im Fließtext und haben keine Fundstelle. Der Fehlschlag ist in `k-pr-review.md` selbsterklärend, und ohne git
-gäbe es das Repository nicht, in dem k-playbook arbeitet.
+ohne ausdrücklichen Guard aufrufen; davon gibt es noch `k-task-run.md`, `k-enforcement.md`
+und `k-remediation.md`. Als Aufruf in einem Shell-Codeblock steht `git` ohne Guard heute in
+keinem mitgelieferten Command mehr. `k-task-run.md` hat seit Task 080 keine Fundstelle mehr:
+seine `git`-Aufrufe in Shell-Codeblöcken stehen hinter einem Guard. Die übrigen zwei nennen
+`git` im Fließtext und haben keine Fundstelle. Die Ausnahmeliste enthält deshalb heute
+keinen Eintrag.
 
-Jede dieser Fundstellen steht einzeln mit `datei`, `zeile`, `werkzeug` und `begründung` in
+Jede zurückgestellte Fundstelle steht einzeln mit `datei`, `zeile`, `werkzeug` und `begründung` in
 `command-tool-guard-exceptions.tsv` neben dem wirksamen Check, mitgeliefert also unter
 `checks/`. Ein Eintrag nimmt genau diesen Aufruf aus, keinen weiteren desselben Werkzeugs
 in derselben Datei. Verschiebt eine Änderung den Aufruf, meldet der Check den Eintrag als

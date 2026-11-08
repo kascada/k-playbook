@@ -79,8 +79,7 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
 - **Docs** — `/k-docs` prüft den Bestand und verzweigt; `/k-docs-code`,
   `/k-docs-tools` und `/k-doc-inventory` erzeugen Doku unter `keph:/docs/generated/`.
 - **Review** — `/k-review` führt ein einzelnes Rezept aus, `/k-audit` einen
-  vollständigen Sweep, `/k-pr-review` bewertet einen Pull Request, `/k-remediation`
-  überführt Befunde in Tasks oder Fixes.
+  vollständigen Sweep, `/k-remediation` überführt Befunde in Tasks oder Fixes.
 - **Task-Flow** — `/k-task-create`, `/k-task-refine`, `/k-task-run`; `/k-todo` pflegt die
   Todos des Projekts über `k-playbook todo`.
 - **Sitzung** — `/k-danke` schließt eine Arbeitssitzung ab: er legt die Befunde vor, die

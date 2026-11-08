@@ -1874,21 +1874,6 @@ button.attention-highlight {
   overflow-wrap: anywhere;
 }
 
-/* Der Einstieg zum Abschreiben. Ein Codeblock, kein Knopf: diese Seite löst
-   nichts aus, Approve und Merge laufen über /k-pr-review im Assistenten. */
-.pr-command {
-  display: inline-block;
-  justify-self: start;
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-5);
-  color: var(--accent-strong);
-  background: var(--field-bg);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  overflow-x: auto;
-}
-
 /* Kopf und Kennzahlen eines Laufs. Beim roten Lauf ist dieser Block das
    summary: die Kennzahlen bleiben dadurch auch zugeklappt lesbar. */
 .run-summary {

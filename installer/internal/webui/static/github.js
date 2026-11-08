@@ -3,7 +3,7 @@
 // Seite "GitHub": Repo und Zugang, Pull Requests, CI-Läufe.
 //
 // Gelesen wird nur. Kein Element dieser Seite schreibt nach GitHub; ein PR
-// nennt den Befehl für /k-pr-review zum Kopieren, mehr nicht.
+// verlinkt auf GitHub, mehr nicht.
 //
 // Die drei Karten laden unabhängig voneinander. Das ist der Grund für die drei
 // Endpunkte: hinter jedem steht ein gh-Subprozess mit Netzzugriff, und eine
@@ -457,12 +457,6 @@ function pullRow(pull, defaultBranch) {
   meta.className = "pr-meta";
   meta.textContent = pullMeta(pull);
   item.append(meta);
-
-  // Kein Knopf, der etwas auslöst: der Einstieg ist der Befehl im Assistenten.
-  const command = document.createElement("code");
-  command.className = "pr-command";
-  command.textContent = pull.command || `/k-pr-review ${pull.number}`;
-  item.append(command);
   return item;
 }
 

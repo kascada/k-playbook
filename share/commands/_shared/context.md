@@ -169,7 +169,7 @@ run, and the producing command creates its own directory without asking.
   `role` says it costs you, and `baseTools.installCommand` as the way to get it. Do not
   warn in general terms and do not list tools this run does not touch. A missing base
   tool **warns, it does not stop the run** — that is the difference from a missing
-  GitHub access, which ends a PR review. Where a fallback exists, take it and say that you did. Never
+  GitHub access, which stops the run. Where a fallback exists, take it and say that you did. Never
   install anything yourself: the command is printed, never run. Note that presence is
   measured in `PATH` only, so a shell function or alias is invisible — under Claude Code
   `rg` may be reported as missing although it works; that is known and accepted.

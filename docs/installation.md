@@ -452,7 +452,7 @@ without a collection. "Collection ändern" on the status page opens the setup st
 
 ## GitHub CLI
 
-`/k-pr-review` and the Dependabot review work through `gh`. The **GitHub CLI** card separates two things that are easily confused.
+The Dependabot review works through `gh`. The **GitHub CLI** card separates two things that are easily confused.
 
 One is the **project's decision**: whether it uses `gh`. It is set here and stored in `K-PLAYBOOK.yaml` under `tools.gh.status`. Until it is made, its value is `unknown`, and the card shows it in red, not as a cosmetic defect, but because a command otherwise cannot tell whether a missing `gh` is a problem or intentional. Commands requiring `gh` stop at `unknown`.
 
@@ -473,7 +473,7 @@ If several accounts are stored, the card names them and shows the switch command
 gh auth switch --hostname github.com --user <account>
 ```
 
-Deliberately a command, not a button. Switching applies to every terminal and project on this machine, not only this one, and an approval or merge then runs under the new name. `/k-pr-review` therefore names the active account before every write action.
+Deliberately a command, not a button. Switching applies to every terminal and project on this machine, not only this one, and every later `gh` call without a service then runs under the new name.
 
 Only `github.com`. Enterprise instances would have their own accounts per host and a separate decision per project; that would be different from this.
 
@@ -546,7 +546,7 @@ The second deliberate exception to project locality, and a different type from s
 
 The matrix is in [`../share/scripts/base-tools.tsv`](../share/scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
 
-**A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence ends a PR review hard.
+**A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence stops a command that needs it.
 
 Inspect and install state:
 

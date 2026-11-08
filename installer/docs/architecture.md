@@ -1777,7 +1777,7 @@ eine Shell zu starten; das kostet den Unterprozess, den der Kontext gerade nicht
 soll, und machte den Befund von der Shell des Aufrufers abhängig.
 
 **Warnen statt blockieren.** Ein fehlendes Basis-Werkzeug beendet keinen Lauf. Das ist der
-Unterschied zu `gh.ready`, das ein PR-Review hart abbricht. `commands/_shared/context.md`
+Unterschied zu `gh.ready`, das einen Command, der `gh` braucht, hart anhält. `commands/_shared/context.md`
 schreibt vor, dass ein Command die Lücke benennt — Werkzeug, Rolle, Installationsbefehl —
 und mit dem Rückfall weiterarbeitet, wo es einen gibt.
 
@@ -2430,9 +2430,8 @@ bleiben, um in jeder Kontextausgabe zu stehen. `internal/github` macht das Gegen
 startet `gh` als Subprozess gegen die API, mit Frist, Fehlereinordnung und Auswertung
 der Antwort. Zwei Zuständigkeiten, zwei Pakete.
 
-**Nur lesend.** Kein Aufruf dieses Pakets verändert etwas an GitHub. Approve, Merge und
-Kommentare bleiben bei `/k-pr-review`; ein PR zeigt deshalb `/k-pr-review <nr>` zum
-Abschreiben und keinen Knopf, der etwas auslöst.
+**Nur lesend.** Kein Aufruf dieses Pakets verändert etwas an GitHub. Ein PR verlinkt auf
+GitHub und zeigt keinen Knopf, der etwas auslöst.
 
 **Nur bei `tools.gh.status: enabled`.** Die Vorprüfung entscheidet aus Dateien, bevor ein
 Subprozess startet: die Projektentscheidung und der netzfreie Host-Befund. Steht die
