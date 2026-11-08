@@ -1,1 +1,1 @@
-../../../k-playbook-local/commands/_audit/review-scan-triage.md
+../../../.k-playbook/share/commands/_audit/review-scan-triage.md
