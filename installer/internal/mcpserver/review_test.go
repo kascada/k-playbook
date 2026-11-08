@@ -48,8 +48,8 @@ func TestReviewStatusAvailable(t *testing.T) {
 
 func TestReviewStatusAvailableTrenntAuditUndReviewAktivierung(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-review-only.md"), "---\ntitle: Review Only\nreview:\n  enabled: true\n---\n# Review Only\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-disabled.md"), "---\naudit:\n  enabled: false\nreview:\n  enabled: false\n---\n# Disabled\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-review-only.md"), "---\ntitle: Review Only\nreview:\n  enabled: true\n---\n# Review Only\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-disabled.md"), "---\naudit:\n  enabled: false\nreview:\n  enabled: false\n---\n# Disabled\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -268,7 +268,7 @@ func TestReviewStatusExistingZeigtGespeichertenScopeSnapshot(t *testing.T) {
 	entry := aiEntry("tech")
 	entry.Scope = &review.Scope{Tools: []string{"old-tool"}}
 	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, entry})
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [new-tool]\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [new-tool]\nreview:\n  enabled: true\n---\n# Fallback\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
 	if err != nil {
@@ -672,8 +672,8 @@ func newReviewProject(t *testing.T) string {
 	dirs := []string{
 		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, "k-playbook", "commands", "_audit"),
-		filepath.Join(root, "k-playbook", "reviews"),
-		filepath.Join(root, "k-playbook", "rules"),
+		filepath.Join(root, "k-playbook", "defaults", "reviews"),
+		filepath.Join(root, "k-playbook", "defaults", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
 		filepath.Join(root, project.ProjectDirName, "commands", "_audit"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
@@ -686,7 +686,7 @@ func newReviewProject(t *testing.T) string {
 	}
 	mustWriteFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), preflightScript(t))
@@ -883,7 +883,7 @@ func TestReadAIRecipeMetadataLiestEvidenceVertrag(t *testing.T) {
 	path := filepath.Join(root, "review-tech.md")
 	mustWriteFile(t, path, evidenceRecipe())
 
-	metadata, err := readAIRecipeMetadata("review-tech", path)
+	metadata, err := readAIRecipeMetadata(root, "review-tech", path)
 	if err != nil {
 		t.Fatalf("readAIRecipeMetadata: %v", err)
 	}
@@ -917,7 +917,7 @@ func TestReadAIRecipeMetadataHaeltPerspektiveUnveraendert(t *testing.T) {
 	path := filepath.Join(root, "review-tech.md")
 	mustWriteFile(t, path, "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 
-	metadata, err := readAIRecipeMetadata("review-tech", path)
+	metadata, err := readAIRecipeMetadata(root, "review-tech", path)
 	if err != nil {
 		t.Fatalf("readAIRecipeMetadata: %v", err)
 	}
@@ -952,7 +952,7 @@ func TestReadAIRecipeMetadataMeldetUnzulaessigeEvidenceKombination(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "review-x.md")
 			mustWriteFile(t, path, recipe)
-			metadata, err := readAIRecipeMetadata("review-x", path)
+			metadata, err := readAIRecipeMetadata(t.TempDir(), "review-x", path)
 			if err != nil {
 				t.Fatalf("readAIRecipeMetadata: %v", err)
 			}
@@ -965,7 +965,7 @@ func TestReadAIRecipeMetadataMeldetUnzulaessigeEvidenceKombination(t *testing.T)
 
 func TestReviewStatusAvailableTrenntEvidenceVonPerspektiven(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-hardspots.md"), evidenceRecipe())
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-hardspots.md"), evidenceRecipe())
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -1017,7 +1017,7 @@ func TestReviewStatusAvailableTrenntEvidenceVonPerspektiven(t *testing.T) {
 
 func TestReviewStatusAvailableHaeltUngueltigenAuditVertragAusDerAuswahl(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-broken.md"),
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-broken.md"),
 		"---\ntitle: Kaputt\naudit:\n  enabled: true\n  mode: evidence\n  resultRequired: true\n  ruleIds: [x]\n  scope:\n    paths: [installer/**]\n---\n# Kaputt\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
@@ -1057,7 +1057,7 @@ func TestReviewStatusAvailableHaeltUngueltigenAuditVertragAusDerAuswahl(t *testi
 
 func TestReviewCreateFriertModusUndPfadScopeEin(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "reviews", "review-hardspots.md"), evidenceRecipe())
+	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-hardspots.md"), evidenceRecipe())
 
 	result, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Day: "2026-08-19"})
 	if err != nil {
@@ -1191,7 +1191,7 @@ func containsValue(values []any, wanted string) bool {
 // Katalog, Betriebsart und Pfad-Scope im Eintrag eingefroren.
 func evidenceRun(t *testing.T, root string, name string) (string, review.Entry) {
 	t.Helper()
-	recipePath := filepath.Join(root, "k-playbook", "reviews", "review-"+name+".md")
+	recipePath := filepath.Join(root, "k-playbook", "defaults", "reviews", "review-"+name+".md")
 	mustWriteFile(t, recipePath, evidenceRecipe())
 	entry := review.Entry{
 		Name:           name,
@@ -1745,7 +1745,7 @@ func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
 	}
 
 	root := newReviewProject(t)
-	reviewsDir := filepath.Join(root, "k-playbook", "reviews")
+	reviewsDir := filepath.Join(root, "k-playbook", "defaults", "reviews")
 	// Nur die Rezepte des Arbeitsstands sollen im Katalog stehen, nicht die
 	// Vorlage aus newReviewProject.
 	if err := os.RemoveAll(reviewsDir); err != nil {
@@ -1792,7 +1792,7 @@ func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
 			continue
 		}
 
-		metadata, err := readAIRecipeMetadata(entry.Key, entry.Path)
+		metadata, err := readAIRecipeMetadata(root, entry.Key, entry.Path)
 		if err != nil {
 			t.Errorf("%s: readAIRecipeMetadata: %v", name, err)
 			continue

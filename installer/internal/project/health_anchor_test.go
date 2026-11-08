@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/health"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
 // anchorRepo legt ein Projekt an, dessen Hauptverzeichnis ein Git-Repository
@@ -35,6 +36,8 @@ func anchorProblemsOf(t *testing.T, root string) []health.Problem {
 
 func TestHealthAnchorNichtVersioniertWarnt(t *testing.T) {
 	root := anchorRepo(t)
+	// Eine bereite Anbindung, damit nur die Warnung des Ankers bleibt.
+	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."})
 	writeFile(t, filepath.Join(root, "README.md"), "x\n")
 	run(t, root, "git", "add", "README.md")
 	run(t, root, "git", "commit", "-q", "-m", "erster Stand")

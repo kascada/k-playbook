@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,12 +20,12 @@ func briefingProject(t *testing.T) string {
 
 	root := readProject(t)
 	files := map[string]string{
-		"k-playbook/rules/befunde.md":              "# Regel: Befunde\n\nText.\n",
-		"k-playbook/reviews/review-code.md":        "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/guidelines/betrieb.md":         "# Betrieb\n\nText.\n",
-		"k-playbook-local/rules/befunde.md":        "# Abgeschaltet.\n",
-		"k-playbook-local/guidelines/stil.md":      "# Stil\n\nText.\n",
-		"k-playbook-local/reviews/review-eigen.md": "# Eigenes Review\n\nText.\n",
+		"k-playbook/defaults/rules/befunde.md":       "# Regel: Befunde\n\nText.\n",
+		"k-playbook/defaults/reviews/review-code.md": "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"k-playbook/defaults/guidelines/betrieb.md":  "# Betrieb\n\nText.\n",
+		"k-playbook-local/rules/befunde.md":          "# Abgeschaltet.\n",
+		"k-playbook-local/guidelines/stil.md":        "# Stil\n\nText.\n",
+		"k-playbook-local/reviews/review-eigen.md":   "# Eigenes Review\n\nText.\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -196,9 +197,10 @@ func TestBriefingOptionen(t *testing.T) {
 // Der Block der Umgebungsprüfung steht im Klartext unmittelbar nach dem Text
 // der immer geltenden Anweisungen und vor „Auf Abruf“ — so liest die Sitzung
 // ihn, bevor sie etwas tut. Im Testprojekt ist die Anbindung nicht
-// eingetragen: eine Warnung; mit unlesbarer Quellenkonfiguration dazu ein
-// Fehler, und das Subkommando endet trotzdem mit 0 — das Briefing meldet, es
-// urteilt nicht.
+// eingetragen: ein Fehler (die mitgelieferte Ebene kommt hier aus dem Store
+// des Tests, defaultstest); mit unlesbarer Quellenkonfiguration ein zweiter,
+// und das Subkommando endet trotzdem mit 0 — das Briefing meldet, es urteilt
+// nicht.
 func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
@@ -209,7 +211,7 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("briefing: %v", err)
 	}
-	block := "nicht aufgenommen\n\nUmgebung:\n  [warning] kephalaion: Keine Collection eingetragen"
+	block := "nicht aufgenommen\n\nUmgebung:\n  [error] kephalaion: Keine Collection eingetragen"
 	if !strings.Contains(stdout, block) {
 		t.Errorf("Block fehlt oder steht falsch:\n%s", stdout)
 	}
@@ -240,5 +242,28 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	}
 	if briefing.SchemaVersion != "5" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
 		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
+	}
+}
+
+// Ohne mitgelieferte Ebene endet `k-playbook briefing` mit einem Fehler —
+// Exit-Code ungleich 0 — und gibt nichts aus: kein Briefing aus der lokalen
+// Ebene allein.
+func TestBriefingOhneMitgelieferteEbeneEndetMitFehler(t *testing.T) {
+	briefingProject(t)
+	original := project.OpenDefaultsStore
+	project.OpenDefaultsStore = func(string) (project.DefaultsStore, string, error) {
+		return nil, "vm:k-playbook", errors.New("Kephalaion ist für dieses Projekt nicht bereit")
+	}
+	t.Cleanup(func() { project.OpenDefaultsStore = original })
+
+	stdout, err := runBriefingCaptured(t)
+	if err == nil || exitCodeOf(err) == 0 {
+		t.Fatalf("briefing: %v (Code %d), erwartet einen Fehler", err, exitCodeOf(err))
+	}
+	if project.DocRefErrorCode(err) != project.DocCodeKephalaionUnavailable || !strings.Contains(err.Error(), "/k-gui") {
+		t.Errorf("Fehler: %v", err)
+	}
+	if stdout != "" {
+		t.Errorf("Ausgabe trotz Fehler:\n%s", stdout)
 	}
 }

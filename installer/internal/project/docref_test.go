@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -660,11 +661,7 @@ func (failingDocSource) Read(string) ([]byte, error)           { return nil, err
 // Der mitgelieferte Stand im Repo lässt sich auflösen: 010-verweise.md steht
 // vorn, und die Muster-Datei unter on-demand trägt Frontmatter.
 func TestDocRefMitgelieferterStand(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		t.Fatalf("Repo-Wurzel: %v", err)
-	}
-	layers := DocLayers{Dist: NewShippedDocSource(root), Local: NewDiskDocSource(t.TempDir())}
+	layers := DocLayers{Dist: repoDefaultsSource(t), Local: NewDiskDocSource(t.TempDir())}
 
 	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/")
 	if len(always.Parts) == 0 || always.Parts[0].Name != "010-verweise.md" {
@@ -802,19 +799,19 @@ func TestDocRefSorteCommands(t *testing.T) {
 func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	root := newContextProject(t)
 	files := map[string]string{
-		"k-playbook/rules/befunde.md":              "# Befunde\n\nText.\n",
-		"k-playbook/rules/docs-sync.md":            "# Docs\n\nmitgeliefert\n",
-		"k-playbook/rules/README.md":               "# Liesmich\n",
-		"k-playbook/reviews/review-code.md":        "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
-		"k-playbook/reviews/review-tech.md":        "# Tech\n",
-		"k-playbook/reviews/review-sast.md":        "# SAST\n",
-		"k-playbook/reviews/notiz.md":              "# kein Rezept\n",
-		"k-playbook-local/rules/docs-sync.md":      "# Docs\n\nlokal\n",
-		"k-playbook-local/rules/eigene.md":         "# Eigene\n\nText.\n",
-		"k-playbook-local/rules/aus.md":            "",
-		"k-playbook-local/reviews/review-tech.md":  "# Abgeschaltet.\n",
-		"k-playbook-local/reviews/review-eigen.md": "# Eigen\n\nText.\n",
-		"k-playbook-local/reviews/.versteckt.md":   "# versteckt\n",
+		"k-playbook/defaults/rules/befunde.md":       "# Befunde\n\nText.\n",
+		"k-playbook/defaults/rules/docs-sync.md":     "# Docs\n\nmitgeliefert\n",
+		"k-playbook/defaults/rules/README.md":        "# Liesmich\n",
+		"k-playbook/defaults/reviews/review-code.md": "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
+		"k-playbook/defaults/reviews/review-tech.md": "# Tech\n",
+		"k-playbook/defaults/reviews/review-sast.md": "# SAST\n",
+		"k-playbook/defaults/reviews/notiz.md":       "# kein Rezept\n",
+		"k-playbook-local/rules/docs-sync.md":        "# Docs\n\nlokal\n",
+		"k-playbook-local/rules/eigene.md":           "# Eigene\n\nText.\n",
+		"k-playbook-local/rules/aus.md":              "",
+		"k-playbook-local/reviews/review-tech.md":    "# Abgeschaltet.\n",
+		"k-playbook-local/reviews/review-eigen.md":   "# Eigen\n\nText.\n",
+		"k-playbook-local/reviews/.versteckt.md":     "# versteckt\n",
 	}
 	for rel, content := range files {
 		write(t, filepath.Join(root, filepath.FromSlash(rel)), content)
@@ -840,7 +837,11 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 			if entry.Disabled {
 				continue
 			}
-			data, err := os.ReadFile(entry.Path)
+			// Mitgeliefert ist Path der Verweis, nicht ein Pfad auf der Platte.
+			if entry.Origin == DocOriginDist && entry.Path != ref {
+				t.Errorf("%s: Path %q, erwartet den Verweis", ref, entry.Path)
+			}
+			data, err := ReadCatalogEntry(root, entry.Path)
 			if err != nil {
 				t.Fatalf("%s lesen: %v", entry.Path, err)
 			}
@@ -899,6 +900,9 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	if _, ok := context.Catalogs["commands"]; ok {
 		t.Error("commands im Katalog der Kontextausgabe")
 	}
+	// Neue Ebenen: die mitgelieferte hat defaults/ beim ersten Zugriff
+	// gelistet, vor den Commands oben.
+	layers = ProjectDocLayers(root)
 	registry := ResolveRegistry(root, KindCommands)
 	if len(registry) != 6 {
 		t.Fatalf("Registry: %+v", registry)
@@ -943,59 +947,69 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	}
 }
 
-// Die mitgelieferte Ebene liest instructions/ und commands/ aus defaults/,
-// die übrigen Sorten von oben — es gibt nur eine Fassung der Anweisungen,
-// keine Kopie; bei commands/ liegt oben die Hülle, in defaults/ der Text.
-func TestShippedDocSourceLiestInstructionsAusDefaults(t *testing.T) {
-	playbook := t.TempDir()
-	for rel, content := range map[string]string{
-		"defaults/instructions/always/010-a.md":           "## A\n",
-		"defaults/instructions/on-demand/x.md":            "## X\n",
-		"instructions/always/999-oben.md":                 "## Oben\n",
-		"rules/befunde.md":                                "# Regel\n",
-		"defaults/rules/befunde.md":                       "# Regel aus defaults\n",
-		"commands/k-upgrade.md":                           "# k-upgrade\n\nHülle\n",
-		"defaults/commands/k-upgrade.md":                  "# k-upgrade\n\nText\n",
-		"commands/k-gui.md":                               "# k-gui\n\nnur oben\n",
-		"skills/overlay/SKILL.md":                         "# Skill\n\nHülle\n",
-		"defaults/commands/_skills/overlay.md":            "# Skill\n\nText\n",
-		"defaults/commands/_skills/overlay/v.md.template": "Vorlage\n",
-	} {
-		full := filepath.Join(playbook, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	layers := DocLayers{Dist: NewShippedDocSource(playbook), Local: NewDiskDocSource(t.TempDir())}
+// Die mitgelieferte Ebene eines Projekts liest jede Sorte aus der
+// öffentlichen Collection unter defaults/ (Task 131) — instructions,
+// commands, rules, reviews, guidelines. Was oben in der Installation
+// k-playbook/ liegt, liest sie nicht: weder eine Regel noch eine Hülle.
+func TestProjectDocLayersLiestAllesAusDefaults(t *testing.T) {
+	root := t.TempDir()
+	writeDocTree(t, filepath.Join(root, "k-playbook"), map[string]string{
+		"instructions/always/999-oben.md": "## Oben\n",
+		"rules/befunde.md":                "# Regel von oben\n",
+		"guidelines/betrieb.md":           "# Betrieb von oben\n",
+		"commands/k-upgrade.md":           "# k-upgrade\n\nHülle\n",
+		"commands/k-gui.md":               "# k-gui\n\nnur oben\n",
+		"skills/overlay/SKILL.md":         "# Skill\n\nHülle\n",
+	})
+	store := defaultsStore(map[string]string{
+		"instructions/always/010-a.md":           "## A\n",
+		"instructions/on-demand/x.md":            "## X\n",
+		"rules/befunde.md":                       "# Regel aus defaults\n",
+		"reviews/review-code.md":                 "# Code\n",
+		"guidelines/betrieb.md":                  "# Betrieb aus defaults\n",
+		"commands/k-upgrade.md":                  "# k-upgrade\n\nText\n",
+		"commands/_skills/overlay.md":            "# Skill\n\nText\n",
+		"commands/_skills/overlay/v.md.template": "Vorlage\n",
+	})
+	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) { return store, testDefaultsAddress, nil })
+	layers := ProjectDocLayers(root)
 
 	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/")
 	if len(always.Parts) != 1 || always.Parts[0].Name != "010-a.md" {
 		t.Errorf("always aus defaults/ erwartet, bekommen: %+v", always.Parts)
 	}
-	if x := mustResolveDoc(t, layers, "k-playbook:/instructions/on-demand/x.md"); x.Content != "## X\n" {
-		t.Errorf("on-demand aus defaults/: %q", x.Content)
-	}
-	if rule := mustResolveDoc(t, layers, "k-playbook:/rules/befunde.md"); rule.Content != "# Regel\n" {
-		t.Errorf("rules weiter von oben erwartet: %q", rule.Content)
-	}
-	if cmd := mustResolveDoc(t, layers, "k-playbook:/commands/k-upgrade.md"); cmd.Content != "# k-upgrade\n\nText\n" {
-		t.Errorf("commands aus defaults/ erwartet, nicht die Hülle: %q", cmd.Content)
+	for ref, want := range map[string]string{
+		"k-playbook:/instructions/on-demand/x.md":            "## X\n",
+		"k-playbook:/rules/befunde.md":                       "# Regel aus defaults\n",
+		"k-playbook:/reviews/review-code.md":                 "# Code\n",
+		"k-playbook:/guidelines/betrieb.md":                  "# Betrieb aus defaults\n",
+		"k-playbook:/commands/k-upgrade.md":                  "# k-upgrade\n\nText\n",
+		"k-playbook:/commands/_skills/overlay.md":            "# Skill\n\nText\n",
+		"k-playbook:/commands/_skills/overlay/v.md.template": "Vorlage\n",
+	} {
+		if got := mustResolveDoc(t, layers, ref); got.Content != want {
+			t.Errorf("%s: %q, erwartet %q aus defaults/", ref, got.Content, want)
+		}
 	}
 	// Ein Command, der nur oben als Hülle liegt, hat keinen Text: not_found,
 	// kein Rückfall auf die Hülle.
 	expectDocError(t, layers, "k-playbook:/commands/k-gui.md", DocCodeNotFound)
-	// Der Text eines Skills liegt unter commands/_skills/ in defaults/ (Task
-	// 109); skills/ selbst ist keine Sorte unter k-playbook:.
-	if skill := mustResolveDoc(t, layers, "k-playbook:/commands/_skills/overlay.md"); skill.Content != "# Skill\n\nText\n" {
-		t.Errorf("Skill-Text aus defaults/commands/_skills/ erwartet: %q", skill.Content)
-	}
-	if tmpl := mustResolveDoc(t, layers, "k-playbook:/commands/_skills/overlay/v.md.template"); tmpl.Content != "Vorlage\n" {
-		t.Errorf("Vorlage des Skills: %q", tmpl.Content)
-	}
 	expectDocError(t, layers, "k-playbook:/skills/overlay/SKILL.md", DocCodeUnsupported)
+}
+
+// Ohne Installation k-playbook/ im Projekt bleibt die mitgelieferte Ebene
+// dieselbe: Sie hängt allein an der Collection.
+func TestProjectDocLayersOhneInstallation(t *testing.T) {
+	root := t.TempDir()
+	store := defaultsStore(map[string]string{"commands/k-task-create.md": "# k-task-create\n\nText\n"})
+	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) { return store, testDefaultsAddress, nil })
+	if _, err := os.Stat(PlaybookDir(root)); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("k-playbook/ darf es hier nicht geben: %v", err)
+	}
+	got := mustResolveDoc(t, ProjectDocLayers(root), "k-playbook:/commands/k-task-create.md")
+	if got.Content != "# k-task-create\n\nText\n" {
+		t.Errorf("Command-Text ohne Installation: %q", got.Content)
+	}
 }
 
 // includeTree sind Ebenen mit Bausteinen für Include-Tests: Einzeldateien
@@ -1394,7 +1408,7 @@ func repoDefaultsLayers(t *testing.T) DocLayers {
 	if _, err := os.Stat(filepath.Join(repo, "defaults", "testdata", "includes", "README.md")); err != nil {
 		t.Fatalf("defaults/testdata/includes/ im Repo nicht gefunden: %v", err)
 	}
-	return DocLayers{Dist: NewShippedDocSource(repo), Local: NewDiskDocSource(t.TempDir())}
+	return DocLayers{Dist: repoDefaultsSource(t), Local: NewDiskDocSource(t.TempDir())}
 }
 
 // Die festen Fälle in defaults/testdata/includes/: jeder einmal mit und

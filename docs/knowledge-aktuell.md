@@ -165,7 +165,9 @@ as a copy in `defaults/instructions/` for the hub, kept equal by a test. **Since
 lies only in `defaults/instructions/`:** the installation reads it there (`NewShippedDocSource`
 in `docref.go`), the release packs the same files, the top-level copy, the test and the drift
 check in `pack-defaults.sh` are gone. `rules/`, `reviews/` and `guidelines/` are still read at
-the top of the repo until their own switch.
+the top of the repo until their own switch. *Since 2026-11-08 (task 131)* the binary reads
+every shipped kind from `<hub>:k-playbook/defaults/` instead (`NewKephDefaultsSource` in
+`defaultsdocs.go`); `NewShippedDocSource` is gone.
 
 **`k_playbook_doc_read` and `k-playbook read`** (2026-10-14, task 087; all three prefixes
 since 2026-10-18, task 093). The MCP tool and the subcommand are thin hulls over one function,
@@ -840,6 +842,10 @@ until the last step.
    author `system`.
 7. **AGENTS.md reads the public collection** — the instructions point at
    `<hub>:k-playbook/defaults/` over MCP instead of the local `k-playbook/`.
+   *Partial step 2026-11-08 (task 131):* the binary now reads `defaults/` from the hub —
+   every `k-playbook:` reference, the briefing and the catalogs `rules`/`reviews` resolve the
+   shipped layer from `<hub>:k-playbook/defaults/`, without a fallback to the disk.
+   `AGENTS.md` is unchanged. Not done.
 8. **Project files into the project collection** — decide how the files of
    `k-playbook-local/` that correspond to the shipped ones (rules, commands, skills, checks,
    reviews, `k-playbook.md`) get there; adapt AGENTS.md.
@@ -898,6 +904,10 @@ until the last step.
     six steps of `docs/knowledge-layout.md` ("Migration") are not carried out on them.
 12. **Delete the local files** — the old directories in the repo and the clone in the
     projects; setup, update and interface without `<project>/k-playbook/`.
+    *Partial step 2026-11-08 (task 131):* the binary now reads `defaults/` from the hub, so
+    no text behind `k-playbook:` comes from the clone any more; `AGENTS.md` is unchanged.
+    What still hangs on the clone (version, `bin/install`, update via git, `docs/`, checks
+    …) is collected in the workbench topic "Clone abschaffen". Not done.
 
 Added 2026-10-18 (task 092); these come before step 12, in this order:
 

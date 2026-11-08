@@ -85,7 +85,14 @@ func briefingToolHandler(ctx context.Context, _ *mcp.CallToolRequest, input brie
 	}
 	briefing, err := project.BuildBriefingFrom(ctx, projectDir, startDir)
 	if err != nil {
-		return fail(projectDir, "read_failed", err), nil, nil
+		// Ohne mitgelieferte Ebene (Kephalaion nicht bereit, <hub>:k-playbook
+		// fehlt oder ist leer) scheitert das Briefing als Ganzes, mit dem
+		// Code der Ursache; jede andere unlesbare Ebene ist read_failed.
+		code := "read_failed"
+		if project.DocRefErrorCode(err) == project.DocCodeKephalaionUnavailable {
+			code = project.DocCodeKephalaionUnavailable
+		}
+		return fail(projectDir, code, err), nil, nil
 	}
 	return jsonToolResult(briefingEnvelope{OK: true, Tool: briefingTool, ProjectDir: projectDir, Briefing: &briefing}, false), nil, nil
 }

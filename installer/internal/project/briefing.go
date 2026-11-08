@@ -245,12 +245,14 @@ var briefingCoveredContextFields = []string{
 // briefingContextForDir ist die Quelle des Abschnitts: ContextForDir, dieselbe
 // Funktion wie `k-playbook context` — kein Nachbau. Sie heilt dabei die
 // Assistenten-Links; das Ergebnis steht wie dort unter links, hier als
-// context.links. Austauschbar für Tests.
-var briefingContextForDir = ContextForDir
+// context.links. Die Kataloge darin lesen die mitgelieferte Ebene des
+// Briefings mit (shared), statt sie ein zweites Mal vom Node zu holen.
+// Austauschbar für Tests.
+var briefingContextForDir = contextForDir
 
 // briefingContext baut den Abschnitt ab startDir. Jeder Fehler ist ein Zustand.
-func briefingContext(startDir string) BriefingContext {
-	built, err := briefingContextForDir(startDir)
+func briefingContext(startDir string, projectDir string, shared DocSource) BriefingContext {
+	built, err := briefingContextForDir(startDir, projectDir, shared)
 	if err != nil {
 		return BriefingContext{Message: err.Error()}
 	}
@@ -367,7 +369,10 @@ var openBriefingDocs = OpenUserDocs
 // BuildBriefing stellt das Briefing eines Projekts zusammen. Ein Fehler ist
 // nur die Umgebung — eine Ebene, die sich nicht lesen lässt; eine nicht
 // nutzbare Collection ist ein Zustand in Work, eine nicht baubare
-// Kontextausgabe einer in Context, beides kein Fehler.
+// Kontextausgabe einer in Context, beides kein Fehler. Die mitgelieferte
+// Ebene liegt in <hub>:k-playbook unter defaults/: Ist sie nicht lesbar,
+// scheitert das Briefing als Ganzes mit DocCodeKephalaionUnavailable — die
+// lokale Ebene steht nie allein da.
 func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 	return BuildBriefingFrom(ctx, projectDir, projectDir)
 }
@@ -411,7 +416,7 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 
 	briefing.Work = briefingWork(ctx, projectDir)
 	briefing.Health = health.Check(ctx, projectDir)
-	briefing.Context = briefingContext(startDir)
+	briefing.Context = briefingContext(startDir, projectDir, layers.Dist)
 	return briefing, nil
 }
 

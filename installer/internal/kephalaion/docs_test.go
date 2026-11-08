@@ -331,3 +331,96 @@ func TestClientFehlerOhneToken(t *testing.T) {
 		t.Fatalf("Token im Fehler: %v", err)
 	}
 }
+
+// Ein Reader meldet sich einmal an und liest dann über dieselbe Sitzung:
+// ein initialize für ein list und mehrere read.
+func TestReaderEineSitzung(t *testing.T) {
+	node := &toolNode{reply: func(call toolCall) (bool, string, string) {
+		if call.Name == "list" {
+			return false, `{"entries":[{"kind":"document","name":"defaults/VERSION"}],"more":false}`, ""
+		}
+		name, _ := call.Args["name"].(string)
+		return false, `{"kind":"document","address":"vm:k-playbook","name":"` + name + `","content":"x"}`, ""
+	}}
+	server := startToolNode(t, node)
+	reader := newTestClient(t, server.URL+"/mcp").Reader()
+	ctx := context.Background()
+	if entries, err := reader.List(ctx, ListRequest{Path: "defaults", Recursive: true}); err != nil || len(entries) != 1 {
+		t.Fatalf("List: %+v, %v", entries, err)
+	}
+	for _, name := range []string{"defaults/a.md", "defaults/b.md", "defaults/c.md"} {
+		doc, err := reader.Read(ctx, name)
+		if err != nil || doc.Content == nil || *doc.Content != "x" {
+			t.Fatalf("Read %s: %+v, %v", name, doc, err)
+		}
+	}
+	if inits := node.initCount(); inits != 1 {
+		t.Errorf("%d-mal angemeldet, erwartet einmal", inits)
+	}
+	if calls := node.recorded(); len(calls) != 4 {
+		t.Errorf("%d Aufrufe, erwartet 4", len(calls))
+	}
+}
+
+// Scheitert die Anmeldung, meldet der Reader beim nächsten Aufruf neu an.
+func TestReaderMeldetNachFehlschlagNeuAn(t *testing.T) {
+	node := &toolNode{
+		failInit: func(n int) bool { return n == 1 },
+		reply: func(call toolCall) (bool, string, string) {
+			return false, `{"kind":"document","address":"vm:k-playbook","name":"a.md","content":"x"}`, ""
+		},
+	}
+	server := startToolNode(t, node)
+	reader := newTestClient(t, server.URL+"/mcp").Reader()
+	if _, err := reader.Read(context.Background(), "a.md"); ErrorCode(err) != CodeNodeUnreachable {
+		t.Fatalf("erster Aufruf: %v, erwartet %s", err, CodeNodeUnreachable)
+	}
+	if _, err := reader.Read(context.Background(), "a.md"); err != nil {
+		t.Fatalf("zweiter Aufruf: %v", err)
+	}
+	if inits := node.initCount(); inits != 2 {
+		t.Errorf("%d Anmeldungen, erwartet 2", inits)
+	}
+}
+
+// Ein Pool liest gleichzeitig über höchstens n Sitzungen; nacheinander
+// gelesen bleibt es bei einer.
+func TestReaderPoolHoechstensNSitzungen(t *testing.T) {
+	node := &toolNode{reply: func(call toolCall) (bool, string, string) {
+		name, _ := call.Args["name"].(string)
+		return false, `{"kind":"document","address":"vm:k-playbook","name":"` + name + `","content":"` + name + `"}`, ""
+	}}
+	server := startToolNode(t, node)
+	pool := newTestClient(t, server.URL+"/mcp").ReaderPool(3)
+	if pool.Size() != 3 || pool.Address() != "vm:k-playbook" {
+		t.Fatalf("Pool: Größe %d, Adresse %q", pool.Size(), pool.Address())
+	}
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		if _, err := pool.Read(ctx, "a.md"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inits := node.initCount(); inits != 1 {
+		t.Fatalf("nacheinander %d Anmeldungen, erwartet eine", inits)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("d%02d.md", i)
+			doc, err := pool.Read(ctx, name)
+			if err != nil || doc.Content == nil || *doc.Content != name {
+				t.Errorf("Read %s: %+v, %v", name, doc, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	if inits := node.initCount(); inits > 3 {
+		t.Errorf("%d Anmeldungen, erwartet höchstens 3", inits)
+	}
+	if empty := newTestClient(t, server.URL+"/mcp").ReaderPool(0); empty.Size() != 1 {
+		t.Errorf("Pool mit 0: Größe %d, erwartet 1", empty.Size())
+	}
+}

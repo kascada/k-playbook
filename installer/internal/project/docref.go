@@ -27,7 +27,9 @@ import (
 // den Node; beide haben eine Ebene, ohne Überlagerung und Zusammenbau.
 // k-playbook: löst die Sorten in docRefKinds auf; dahinter stehen zwei Ebenen
 // — die mitgelieferte und die lokale —, die über eine austauschbare Quelle
-// gelesen werden: heute die Platte, später womöglich Kephalaion. Wer aufruft,
+// gelesen werden: die mitgelieferte aus der öffentlichen Collection
+// <hub>:k-playbook unter defaults/ (defaultsdocs.go), die lokale von der
+// Platte. Wer aufruft,
 // sieht davon nichts; er bekommt den Inhalt mit lokal und mitgeliefert schon
 // gegeneinander aufgelöst.
 //
@@ -264,13 +266,15 @@ type DocLayers struct {
 	Keph func() (KephDocs, error)
 }
 
-// ProjectDocLayers sind die Quellen eines Projekts auf der Platte: die
-// Installation k-playbook/ (siehe NewShippedDocSource), die projekteigene
-// Ebene (siehe NewProjectLocalDocSource), das Projekt selbst ab seiner Wurzel
-// und, auf Abruf, seine Collection (OpenKephDocs).
+// ProjectDocLayers sind die Quellen eines Projekts: die mitgelieferte Ebene
+// aus der öffentlichen Collection <hub>:k-playbook unter defaults/ (siehe
+// NewProjectDefaultsSource, geöffnet erst beim ersten Zugriff), die
+// projekteigene Ebene auf der Platte (siehe NewProjectLocalDocSource), das
+// Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
+// (OpenKephDocs). Von der Installation k-playbook/ liest keine Ebene mehr.
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
-		Dist:    NewShippedDocSource(PlaybookDir(projectDir)),
+		Dist:    NewProjectDefaultsSource(projectDir),
 		Local:   NewProjectLocalDocSource(projectDir),
 		Project: NewDiskDocSource(projectDir),
 		Keph:    memoKephDocs(func() (KephDocs, error) { return OpenKephDocs(projectDir) }),
@@ -289,48 +293,6 @@ func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
 		return docs, err
 	}
 }
-
-// defaultsDirName ist das Verzeichnis der Installation, das den Lieferumfang
-// für den Hub trägt; sein Inhalt wird zum Release gepackt und landet unter
-// <hub>:k-playbook/defaults/.
-const defaultsDirName = "defaults"
-
-// NewShippedDocSource ist die mitgelieferte Ebene einer Installation. Die
-// Sorte instructions/ liegt nur in defaults/instructions/ — einmal, für Hub
-// und Installation gleichermaßen; eine zweite Fassung oben im Repo, die mit
-// der Kopie gleichzuhalten wäre, gibt es seit 2026-10-17 nicht mehr. Ebenso
-// liest die Sorte commands/ aus defaults/commands/: dort liegt der Text eines
-// Commands, oben in commands/ nur seine Hülle für den Assistenten — zwei
-// verschiedene Dateien, keine Kopie. includes/ und testdata/ gibt es nur in
-// defaults/. Die übrigen Sorten (rules/, reviews/, guidelines/) lesen bis zu
-// ihrer Umstellung weiter die oberste Ebene der Installation, weil auch die
-// Kataloge der Kontextausgabe dort lesen.
-func NewShippedDocSource(playbookDir string) DocSource {
-	return shippedDocSource{
-		top:      NewDiskDocSource(playbookDir),
-		defaults: NewDiskDocSource(filepath.Join(playbookDir, defaultsDirName)),
-	}
-}
-
-type shippedDocSource struct {
-	top      DocSource
-	defaults DocSource
-}
-
-// pick wählt die Quelle nach dem ersten Segment des Pfads: instructions/,
-// commands/, includes/ und testdata/ aus defaults/, alles andere von oben.
-// Der Pfad bleibt derselbe, weil defaults/ denselben Aufbau hat.
-func (s shippedDocSource) pick(p string) DocSource {
-	first, _, _ := strings.Cut(p, "/")
-	switch first {
-	case docInstructionsRoot, docCommandsRoot, docIncludesRoot, docTestdataRoot:
-		return s.defaults
-	}
-	return s.top
-}
-
-func (s shippedDocSource) List(dir string) ([]DocSourceEntry, error) { return s.pick(dir).List(dir) }
-func (s shippedDocSource) Read(file string) ([]byte, error)          { return s.pick(file).Read(file) }
 
 // NewProjectLocalDocSource ist die projekteigene Ebene hinter k-playbook:.
 // Die Sorte commands/ liest aus .k-playbook/commands/, demselben Ort, aus dem

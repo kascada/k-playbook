@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 )
 
 // TestMain schirmt das Paket von der persönlichen GitHub-Zugangsdatei des
@@ -17,7 +18,9 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	cleanupDefaults := defaultstest.Isolate()
 	code := m.Run()
+	cleanupDefaults()
 	cleanup()
 	os.Exit(code)
 }

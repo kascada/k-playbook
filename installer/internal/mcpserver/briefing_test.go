@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -101,5 +102,27 @@ func TestBriefingWerkzeugFehlercodes(t *testing.T) {
 	envelope, result = callBriefing(t, t.TempDir())
 	if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != "project_not_found" {
 		t.Errorf("ohne Projekt: %#v", envelope)
+	}
+}
+
+// Ohne mitgelieferte Ebene ist das Briefing ein Werkzeugfehler mit dem Code
+// kephalaion_unavailable, nicht read_failed, und ohne halbes Briefing.
+func TestBriefingWerkzeugOhneMitgelieferteEbene(t *testing.T) {
+	root := newDocProject(t)
+	original := project.OpenDefaultsStore
+	project.OpenDefaultsStore = func(string) (project.DefaultsStore, string, error) {
+		return nil, "vm:k-playbook", errors.New("Kephalaion ist für dieses Projekt nicht bereit")
+	}
+	t.Cleanup(func() { project.OpenDefaultsStore = original })
+
+	envelope, result := callBriefing(t, root)
+	if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != project.DocCodeKephalaionUnavailable {
+		t.Fatalf("Umschlag: %#v", envelope)
+	}
+	if envelope.Briefing != nil {
+		t.Errorf("halbes Briefing in der Fehlerantwort: %#v", envelope.Briefing)
+	}
+	if !strings.Contains(envelope.Error.Message, "/k-gui") {
+		t.Errorf("Meldung ohne Abhilfe: %q", envelope.Error.Message)
 	}
 }

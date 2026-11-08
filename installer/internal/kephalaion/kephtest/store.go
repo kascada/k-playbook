@@ -6,7 +6,12 @@ package kephtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -46,6 +51,51 @@ func (s *Store) Put(name, content string) {
 	defer s.mu.Unlock()
 	s.revision++
 	s.Docs[name] = &Doc{Content: content, Revision: s.revision, Created: Stamp, Updated: Stamp}
+}
+
+// PutDir legt jede Datei unter dir als Dokument prefix/<relativer Pfad> an,
+// etwa das defaults/ des Repos als defaults/ der öffentlichen Collection.
+// Verzeichnisse entstehen wie in Kephalaion nur implizit.
+// Ein verlinktes dir wird aufgelöst.
+func (s *Store) PutDir(prefix, dir string) error {
+	dir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	return filepath.WalkDir(dir, func(full string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(dir, full)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(full)
+		if err != nil {
+			return err
+		}
+		s.Put(path.Join(prefix, filepath.ToSlash(rel)), string(data))
+		return nil
+	})
+}
+
+// DefaultsVersion ist der Inhalt von defaults/VERSION, den Defaults setzt.
+const DefaultsVersion = "v0.0.0-test\n"
+
+// Defaults baut die öffentliche Collection k-playbook im Speicher:
+// defaults/VERSION und jede Datei unter dir als defaults/<relativer Pfad> —
+// etwa aus dem defaults/ des Repos oder aus dem Baum, den ein Test als
+// Installation anlegt. Fehlt dir, steht nur VERSION darin.
+func Defaults(dir string) (*Store, error) {
+	store := New()
+	store.Put("defaults/VERSION", DefaultsVersion)
+	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+		return store, nil
+	}
+	if err := store.PutDir("defaults", dir); err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 // Content ist der Inhalt eines Dokuments, ok sagt, ob es lebt.

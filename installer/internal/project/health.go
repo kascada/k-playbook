@@ -36,9 +36,10 @@ func init() {
 	health.Register(healthGitHub)
 }
 
-// healthKephalaion bewertet die Anbindung an die Collection: eingetragen, aber
-// nicht ok, ist ein Fehler — keph:-Verweise und die eigene Arbeit im Briefing
-// sind dann nicht erreichbar; nicht eingetragen ist eine Warnung. Was
+// healthKephalaion bewertet die Anbindung an die Collection: Jede nicht
+// bereite Anbindung ist ein Fehler, auch eine nicht eingetragene — ohne sie
+// gibt es keine mitgelieferten Texte (k-playbook:, das Briefing; Task 131),
+// keine keph:-Verweise und keine eigene Arbeit im Briefing. Was
 // kephalaion.Check am Node fragt, bleibt wie es ist; der Satz ist dessen
 // Message, die nie ein Token trägt.
 //
@@ -54,12 +55,13 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 	_, binary := kephalaionBinary()
 	if !status.Configured {
 		hint := "Die Anbindung in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
-			"ohne sie sind keph:-Verweise, Workbench und die eigene Arbeit im Briefing nicht erreichbar."
+			"ohne sie gibt es keine mitgelieferten Texte (k-playbook:, das Briefing), und keph:-Verweise, " +
+			"Workbench und die eigene Arbeit sind nicht erreichbar."
 		if !binary {
 			hint = kephalaionMissingHint
 		}
 		return []health.Problem{{
-			Level:   health.LevelWarning,
+			Level:   health.LevelError,
 			Area:    health.AreaKephalaion,
 			Message: status.Message,
 			Hint:    hint,

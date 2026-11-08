@@ -236,14 +236,20 @@ Two layers, compared by name:
 
 | Layer | Directory | Origin |
 |---|---|---|
-| shipped | the installation `k-playbook/` — a clone of this repo; `instructions/`, `commands/`, `includes/` and `testdata/` are read from `defaults/`, the other kinds at the top level | `dist` |
+| shipped | the public collection `<hub>:k-playbook` under `defaults/` — what the hub fetched from the latest release; every kind is read there, with the same path below `defaults/` | `dist` |
 | local | `k-playbook-local/`; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129 | `local`, or `override` when it replaces a shipped file of the same name |
 
-The shipped instructions exist once, in `defaults/instructions/`: the installation reads
-them there (`NewShippedDocSource` in `docref.go`), and the release packs the same files for
-the hub. Until 2026-10-17 a copy lay at the top of the repo as well, kept equal by a test;
-that copy is gone. `rules/`, `reviews/` and `guidelines/` still lie at the top of the repo
-until their own switch, because the catalogs of `k-playbook context` read them there.
+The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
+`defaultsdocs.go`): the hub is the one of the project binding, the collection is always
+`k-playbook`, the account is the binding's. No code reads the shipped layer from the clone
+`k-playbook/` any more. Kephalaion is mandatory for it: without a ready binding, or with an
+empty `defaults/` (no `defaults/VERSION`), every `k-playbook:` reference — and the briefing as
+a whole — fails with `kephalaion_unavailable` and a remedy; there is no fallback to the disk,
+and the local layer is never served alone. The shipped instructions exist once, in
+`defaults/instructions/` of this repo; the release packs them for the hub. Until 2026-10-17 a
+copy lay at the top of the repo as well; that copy is gone. `rules/`, `reviews/` and
+`guidelines/` at the top of the repo have the same content as their `defaults/` copies and are
+no longer read by the binary.
 
 `commands/` is read from `defaults/commands/` as well, but the file at the top of the repo
 is not a copy: `commands/<name>.md` is the hull the assistant registers, frontmatter plus the
@@ -254,18 +260,20 @@ text here — so it carries the text itself and must not point at the same refer
 would resolve to that file. First command on this route: `/k-upgrade` (task 092).
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
-layer. Today the source is the disk; later it can be Kephalaion without the caller noticing.
+layer. The shipped layer is Kephalaion, the local layer the disk; the caller does not notice
+the difference.
 
 There is **one** overlay, not two: `overlayDocDir` in `docref.go` lays the two layers of a
 directory over each other -- same name wins locally, an empty local file disables -- and the
 catalogs of `k-playbook context` (`resolveCatalog`), the references here and the briefing all
 go through it. A test compares both ways for `rules` and `reviews`: name, origin and
 `disabled` of every catalog entry are what `k-playbook:/<kind>/<name>` answers, and the
-content behind the reference is the file the catalog names. The one named exception is the
+content behind the reference is what the catalog's `path` names -- for a shipped entry that
+`path` is the reference itself. The one named exception is the
 field `guidelines` of the context output, which still lists only
 `k-playbook-local/guidelines/` until the context output is switched; for references and the
-briefing, `guidelines` is a regular overlay kind with shipped `k-playbook/guidelines/` and
-local `k-playbook-local/guidelines/`.
+briefing, `guidelines` is a regular overlay kind with shipped
+`<hub>:k-playbook/defaults/guidelines/` and local `k-playbook-local/guidelines/`.
 
 ### A single file
 

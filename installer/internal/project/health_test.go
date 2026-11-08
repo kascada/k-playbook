@@ -42,7 +42,10 @@ func TestHealthOhneProblemeIstLeer(t *testing.T) {
 	}
 }
 
-func TestHealthKephalaionNichtEingetragenWarnt(t *testing.T) {
+// Nicht eingetragen ist ein Fehler wie jede andere nicht bereite Anbindung:
+// Ohne Kephalaion gibt es keine mitgelieferten Texte (Task 131). Die Abhilfe
+// nennt die Oberfläche und sagt, was fehlt.
+func TestHealthKephalaionNichtEingetragenIstFehler(t *testing.T) {
 	root := healthProject(t)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen: In K-PLAYBOOK.local.yaml fehlt der Block kephalaion:."})
 
@@ -51,11 +54,12 @@ func TestHealthKephalaionNichtEingetragenWarnt(t *testing.T) {
 		t.Fatalf("Problems = %+v", problems)
 	}
 	got := problems[0]
-	if got.Level != health.LevelWarning || got.Area != health.AreaKephalaion || !strings.HasPrefix(got.Message, "Keine Collection eingetragen") || !strings.Contains(got.Hint, "k-playbook gui") {
+	if got.Level != health.LevelError || got.Area != health.AreaKephalaion || !strings.HasPrefix(got.Message, "Keine Collection eingetragen") ||
+		!strings.Contains(got.Hint, "k-playbook gui") || !strings.Contains(got.Hint, "mitgelieferten Texte") {
 		t.Errorf("Eintrag: %+v", got)
 	}
-	if report := health.Check(context.Background(), root); !report.OK || len(report.Problems) != 1 {
-		t.Errorf("Warnung lässt OK nicht wahr: %+v", report)
+	if report := health.Check(context.Background(), root); report.OK || len(report.Problems) != 1 {
+		t.Errorf("Fehler lässt OK wahr: %+v", report)
 	}
 }
 

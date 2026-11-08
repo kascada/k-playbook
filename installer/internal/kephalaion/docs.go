@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -310,6 +311,10 @@ func (c *Client) List(ctx context.Context, req ListRequest) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	return c.list(ctx, session, req)
+}
+
+func (c *Client) list(ctx context.Context, session *toolSession, req ListRequest) ([]Entry, error) {
 	entries := []Entry{}
 	cursor := ""
 	for page := 0; page < maxListPages; page++ {
@@ -364,6 +369,10 @@ func (c *Client) Read(ctx context.Context, name string) (ReadResult, error) {
 	if err != nil {
 		return ReadResult{}, err
 	}
+	return c.read(ctx, session, name)
+}
+
+func (c *Client) read(ctx context.Context, session *toolSession, name string) (ReadResult, error) {
 	var out ReadResult
 	if err := c.call(ctx, session, "read", map[string]any{"collection": c.address, "name": name}, &out); err != nil {
 		return ReadResult{}, err
@@ -378,6 +387,142 @@ func (c *Client) Read(ctx context.Context, name string) (ReadResult, error) {
 		return ReadResult{}, &ToolError{Tool: "read", Code: CodeNodeUnreachable, Message: "Antwort ohne content"}
 	}
 	return out, nil
+}
+
+// Reader liest über eine einzige Sitzung am Node: List und Read wie beim
+// Client, aber die Anmeldung geschieht einmal, beim ersten Aufruf, statt je
+// Aufruf. Für viele Lesevorgänge nacheinander, etwa die mitgelieferte Ebene
+// eines Briefings (Task 131); gemessen spart das je Dokument zwei der drei
+// Anfragen an den Node. Nur lesend — Create, Write und die übrigen
+// schreibenden Vorgänge haben ihre eigene Sitzung je Versuch. Ein Reader ist
+// für einen Aufrufer zur Zeit gedacht; die Aufrufe laufen nacheinander.
+// Scheitert die Anmeldung, wird beim nächsten Aufruf neu angemeldet.
+type Reader struct {
+	client  *Client
+	mu      sync.Mutex
+	session *toolSession
+}
+
+// Reader baut einen Reader über diesen Client; angemeldet wird erst beim
+// ersten Aufruf.
+func (c *Client) Reader() *Reader {
+	return &Reader{client: c}
+}
+
+// Address ist die Adresse der Collection, <hub>:<collection>.
+func (r *Reader) Address() string { return r.client.address }
+
+func (r *Reader) sessionFor(ctx context.Context, tool string) (*toolSession, error) {
+	if r.session != nil {
+		return r.session, nil
+	}
+	session, err := r.client.open(ctx, tool)
+	if err != nil {
+		return nil, err
+	}
+	r.session = session
+	return session, nil
+}
+
+// List ist Client.List über die Sitzung des Readers.
+func (r *Reader) List(ctx context.Context, req ListRequest) ([]Entry, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+	session, err := r.sessionFor(ctx, "list")
+	if err != nil {
+		return nil, err
+	}
+	return r.client.list(ctx, session, req)
+}
+
+// Read ist Client.Read über die Sitzung des Readers.
+func (r *Reader) Read(ctx context.Context, name string) (ReadResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, toolTimeout)
+	defer cancel()
+	session, err := r.sessionFor(ctx, "read")
+	if err != nil {
+		return ReadResult{}, err
+	}
+	return r.client.read(ctx, session, name)
+}
+
+// ReaderPool verteilt List und Read auf bis zu n Reader, je mit eigener
+// Sitzung, angemeldet erst bei ihrem ersten Aufruf. Wer nacheinander liest,
+// kommt mit einer Sitzung aus; wer gleichzeitig liest, bekommt bis zu n. Ein
+// read am Node braucht einige Millisekunden; nebeneinander gelesen sinkt die
+// Zeit für viele Dokumente auf einen Bruchteil (gemessen in Task 131). Sicher
+// für gleichzeitige Aufrufe.
+type ReaderPool struct {
+	client *Client
+	// slots begrenzt die gleichzeitigen Aufrufe auf die Größe des Pools.
+	slots chan struct{}
+	mu    sync.Mutex
+	// idle sind die freien Reader, der zuletzt zurückgegebene oben: Wer
+	// nacheinander liest, bekommt immer denselben, schon angemeldeten.
+	idle []*Reader
+}
+
+// ReaderPool baut einen Pool aus bis zu n Readern über diesen Client; n
+// unter 1 zählt als 1. Ein Reader entsteht erst, wenn ein Aufruf keinen
+// freien findet.
+func (c *Client) ReaderPool(n int) *ReaderPool {
+	if n < 1 {
+		n = 1
+	}
+	return &ReaderPool{client: c, slots: make(chan struct{}, n)}
+}
+
+// Address ist die Adresse der Collection, <hub>:<collection>.
+func (p *ReaderPool) Address() string { return p.client.address }
+
+// Size ist die Zahl der Reader und damit der gleichzeitigen Aufrufe.
+func (p *ReaderPool) Size() int { return cap(p.slots) }
+
+func (p *ReaderPool) take(ctx context.Context) (*Reader, error) {
+	select {
+	case p.slots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, &ToolError{Tool: "read", Code: CodeNodeUnreachable, Message: "kein Reader frei: " + ctx.Err().Error()}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if n := len(p.idle); n > 0 {
+		reader := p.idle[n-1]
+		p.idle = p.idle[:n-1]
+		return reader, nil
+	}
+	return p.client.Reader(), nil
+}
+
+func (p *ReaderPool) put(reader *Reader) {
+	p.mu.Lock()
+	p.idle = append(p.idle, reader)
+	p.mu.Unlock()
+	<-p.slots
+}
+
+// List ist Client.List über einen freien Reader.
+func (p *ReaderPool) List(ctx context.Context, req ListRequest) ([]Entry, error) {
+	reader, err := p.take(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer p.put(reader)
+	return reader.List(ctx, req)
+}
+
+// Read ist Client.Read über einen freien Reader.
+func (p *ReaderPool) Read(ctx context.Context, name string) (ReadResult, error) {
+	reader, err := p.take(ctx)
+	if err != nil {
+		return ReadResult{}, err
+	}
+	defer p.put(reader)
+	return reader.Read(ctx, name)
 }
 
 // Create legt ein Dokument an, über den Hub. Lebt unter dem Namen schon ein

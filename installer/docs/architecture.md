@@ -130,7 +130,9 @@ steht — `project:` eine Datei des Projekts ab seiner Wurzel (`os.DirFS`, eine 
 ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zugang wie
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
 `rules/`, `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
-Include-Ziele `includes/` und `testdata/`, zusammen `docRefKinds`), lokal vor mitgeliefert,
+Include-Ziele `includes/` und `testdata/`, zusammen `docRefKinds`), lokal vor mitgeliefert —
+mitgeliefert heißt seit Task 131 aus `<hub>:k-playbook/defaults/` über den Node (siehe „Die
+mitgelieferte Ebene aus `<hub>:k-playbook`“),
 ein Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
 `instructions/always/`) zu einem Text zusammengebaut; jeder andere mit `/` am Ende ist
 `invalid_input` („Dateiname fehlt“). Include-Zeilen (`include: <verweis>`) setzt der
@@ -409,6 +411,11 @@ installer/
 │   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  mitgelieferte Doku auflisten und lesen
+│   ├── defaultsdocs.go          die mitgelieferte Ebene hinter k-playbook: aus
+│   │                            <hub>:k-playbook/defaults/ (Task 131): OpenDefaultsStore,
+│   │                            NewKephDefaultsSource — ein rekursives list, Vorauslesen,
+│   │                            kephalaion_unavailable ohne Rückfall auf die Platte
+│   ├── defaultstest/            OpenDefaultsStore im Speicher für Tests anderer Pakete
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
 │   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
 │   │                            für resolveCatalog), ResolveDocRef für alle drei Präfixe —
@@ -572,7 +579,9 @@ installer/
 │   │                            whoami
 │   ├── docs.go                  Client für die Collection: list, read, create, write,
 │   │                            rename, delete; request_id, eine Wiederholung,
-│   │                            outcome_unknown; ToolError mit dem Code von Kephalaion
+│   │                            outcome_unknown; ToolError mit dem Code von Kephalaion;
+│   │                            Reader (eine Sitzung für viele Lesevorgänge) und
+│   │                            ReaderPool (bis zu n Sitzungen nebeneinander)
 │   ├── kephtest/                Collection im Speicher für Tests (nur Tests)
 │   ├── check.go                 Prüfung und Zustände, lesbare Collections je Kandidat
 │   └── write.go                 nur den Block kephalaion: schreiben, Ignorieren sichern
@@ -1183,6 +1192,55 @@ Zustände in `LinkState`:
 | `no-source` | es gibt nichts zu verlinken; an `CLAUDE.md` nennt der Detailtext, ob ein Stub schon ins Leere zeigt |
 | `conflict` | `CLAUDE.md` und `AGENTS.md` lassen sich nicht auflösen, ohne Inhalt zu verlieren oder zu verdoppeln — typisch eine echte `CLAUDE.md` ohne wirksame Import-Zeile neben `AGENTS.md`; der Detailtext nennt die Auflösungen |
 
+## Die mitgelieferte Ebene aus `<hub>:k-playbook`
+
+Seit Task 131 liest das Binary die mitgelieferte Ebene hinter `k-playbook:` — und damit die
+Texte im Briefing, `k-playbook read`, `k_playbook_doc_read` und die Kataloge `rules` und
+`reviews` — aus der öffentlichen Collection `<hub>:k-playbook` unter `defaults/`, nicht mehr
+aus dem Clone `<projekt>/k-playbook/`. Die Kette: Der Release packt `defaults/` und `VERSION`
+nach `k-playbook-defaults.tar.gz` (`.github/scripts/pack-defaults.sh`), der Hub holt das
+Archiv aus dem neuesten Release nach `<hub>:k-playbook/defaults/` (`fetch_release` in
+Kephalaion), der Node gleicht die Collection auf den Rechner ab. Darunter gilt derselbe Pfad
+wie unter `k-playbook:` — `k-playbook:/rules/docs-sync.md` ist
+`<hub>:k-playbook/defaults/rules/docs-sync.md`.
+
+- **Zugang.** `OpenDefaultsStore` (`project/defaultsdocs.go`) geht denselben Weg wie
+  `openKephClient` — Status (`kephalaion.ok`), Anbindung, Umgebung — mit Hub und Account der
+  Projekt-Anbindung und der festen Collection `k-playbook`. Geschrieben wird dort nie.
+- **Quelle.** `NewKephDefaultsSource` öffnet den Zugang höchstens einmal je `DocLayers` und
+  listet `defaults/` einmal rekursiv. Danach kennt sie jeden Namen: `List` antwortet ohne
+  weiteren Aufruf, Verzeichnisse sind implizit (eines gibt es, wenn ein Dokument darunter
+  liegt; sonst `fs.ErrNotExist`), `Read` fragt den Node nur nach Dateien, die es gibt, und
+  jede höchstens einmal. Ob der Lieferumfang angekommen ist, entscheidet `defaults/VERSION`.
+- **Ohne Kephalaion kein Rückfall.** Anbindung nicht bereit, Collection fehlt oder ist nicht
+  lesbar, `defaults/VERSION` fehlt: Jeder Zugriff ist `kephalaion_unavailable`, die Meldung
+  nennt Ursache und Abhilfe (Kephalaion über `/k-gui` einrichten, beim Hub-Betreiber
+  `fetch_release` für `<hub>:k-playbook` anstoßen). Das Briefing scheitert dann als Ganzes:
+  `k-playbook briefing` endet mit 1 und gibt nichts aus, `k_playbook_briefing` antwortet mit
+  dem Code `kephalaion_unavailable`. Die lokale Ebene wird nie allein ausgegeben — auch ein
+  `k-playbook:`-Verweis mit lokaler Datei scheitert. Die Umgebungsprüfung meldet eine nicht
+  eingetragene Anbindung deshalb als `error`.
+- **Laufzeit.** Ein `read` am Node dauert einige Millisekunden, das Briefing liest einige
+  Dutzend Dokumente. Gemessen am 2026-11-08 im Quell-Repo: vorher (Clone von der Platte) im
+  Median rund 0,17–0,20 s, mit einer Sitzung je Dokument 0,55–0,77 s. Darum bündelt die
+  Quelle: Der Store ist ein `kephalaion.ReaderPool` mit 8 Sitzungen, die erst bei Bedarf
+  angemeldet werden; `List` liest die Dateien eines Verzeichnisses nebeneinander voraus (wer
+  ein Verzeichnis listet, liest danach dessen Dateien); der Kontextabschnitt des Briefings
+  nimmt dieselbe Quelle wie die Dokumente (`contextForDir` mit `shared`). Danach im Median
+  rund 0,28–0,32 s, unter dem Doppelten.
+- **Versionsversatz, bewusst hingenommen.** Die Command-Hüllen und der Code kommen aus dem
+  Binary, die Texte vom Hub. Der Hub holt einen neuen Release nur beim Anlegen der
+  Collection, von Hand oder auf Anfrage — ein neueres Binary kann also auf ältere Texte
+  treffen (am 2026-11-08: Binary aus dem Arbeitsbaum nach v0.16.32, `defaults/VERSION` auf
+  dem Hub v0.16.31). Eine Versionsprüfung gibt es nicht; sie ist ein offener Punkt des
+  Vorhabens „Clone abschaffen“. Im Quell-Repo selbst gilt damit der veröffentlichte Stand vom
+  Hub, nicht der Arbeitsbaum `defaults/` — wie vorher mit dem Clone.
+- **Tests** fragen den Node nicht: Das Paket `project` setzt in `TestMain` einen
+  `kephtest.Store` ein, gefüllt beim Öffnen aus dem Baum, den ein Test unter
+  `k-playbook/defaults/` anlegt (`isolateDefaults`); die anderen Pakete nehmen dafür
+  `project/defaultstest`. Tests gegen den echten Lieferumfang füllen den Store aus dem
+  `defaults/` des Repos (`kephtest.Defaults`).
+
 ## Instruktionen
 
 Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
@@ -1191,7 +1249,7 @@ Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
 |---|---|---|
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
-| `k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
+| `<hub>:k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | der Hub holt den neuen Release |
 | `k-playbook-local/instructions/` | nur dieses Projekt | bleibt |
 
 Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
@@ -1203,13 +1261,13 @@ schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Ver
 `always/` baut die Teile mit Ziffer vorn zu einem Text zusammen, numerisch sortiert über beide
 Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `always/` —
 `on-demand/` und `instructions/` selbst werden nur einzeln mit Dateinamen gelesen. Die mitgelieferten Anweisungen liegen einmal, in
-`defaults/instructions/`: `NewShippedDocSource` (`project/docref.go`) liest die Sorte
-`instructions` dort — ebenso `commands`, deren Text in `defaults/commands/` liegt, während
-`commands/` oben nur die Hülle für den Assistenten trägt (Task 092), und die Include-Sorten
-`includes` und `testdata` (Task 093) — und die übrigen Sorten
-weiter von der obersten Ebene der Installation,
-weil die Kataloge der Kontextausgabe dort lesen. Die Kopie oben im Repo samt
-Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
+`defaults/instructions/` des Quell-Repos; der Release packt sie, der Hub legt sie nach
+`<hub>:k-playbook/defaults/instructions/`, und von dort liest das Binary sie (Task 131,
+`NewKephDefaultsSource` in `project/defaultsdocs.go`) — ebenso jede andere Sorte unter
+`k-playbook:`: `commands`, deren Text in `defaults/commands/` liegt, während die Hülle für den
+Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `testdata`
+(Task 093) und `rules`, `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
+keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
 steht, entscheidet Task 086. Regeln und Zugriffswege:
 [`../../docs/verweisschema.md`](../../docs/verweisschema.md).
 
@@ -1352,6 +1410,20 @@ Drei Sorten, definiert in `catalogKinds()`:
 | `rules` | `rules/` | `*.md` |
 | `reviews` | `reviews/` | `review-*.md` |
 | `checks` | `checks/` | `*.sh` |
+
+Mitgeliefert liegen `rules` und `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`:
+`resolveCatalog()` nimmt dafür dieselbe Quelle wie die Verweise (`NewProjectDefaultsSource`),
+`checks` liest weiter aus der Installation `k-playbook/checks/` (die Checks fallen ohnehin
+weg). `path` eines Eintrags ist darum nicht immer ein Plattenpfad: projekteigen die Datei
+unter `k-playbook-local/<sorte>/`, mitgeliefert bei `checks` die Datei in der Installation,
+bei `rules` und `reviews` der Verweis `k-playbook:/<sorte>/<name>`. Wer den Inhalt braucht,
+liest über `project.ReadCatalogEntry()` — Verweis über `ProjectDocLayers`, sonst die Platte;
+so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein Rezept, auch den `recipePath`
+eines älteren Laufs. Ist die mitgelieferte Ebene nicht lesbar (`kephalaion_unavailable`),
+scheitert `BuildContext()` nicht — die Kontextausgabe trägt unter `kephalaion`, warum —, führt
+`rules` und `reviews` aber leer statt nur mit der lokalen Ebene und nennt den Grund in
+`catalogsProblem`; die Review-Auswahl der MCP-Werkzeuge bricht dann mit
+`kephalaion_unavailable` ab.
 
 Die Vergleichseinheit ist der **Dateiname** — beide Seiten benutzen dieselbe
 Namenskonvention, ein abgeleiteter Schlüssel wäre unnötiger Zwischenschritt. `key` gibt
@@ -2238,8 +2310,10 @@ Hub gilt und dass die Collection lesbar ist. Sie belegt nicht, dass die Header i
 MCP-Konfiguration eines Assistenten dasselbe, noch gültige Token tragen.
 
 `k-playbook context` und das MCP-Werkzeug hängen das Ergebnis als `kephalaion` an
-(`project.KephalaionStatus`, gerufen in `ContextForDir`). `BuildContext` selbst fragt den Node
-nicht: Den rufen auch Werkzeuge, die nur den Katalog brauchen, etwa die Review-Auswahl.
+(`project.KephalaionStatus`, gerufen in `ContextForDir`). `BuildContext` selbst hängt es nicht
+an, fragt den Node seit Task 131 aber für die Kataloge `rules` und `reviews`: deren
+mitgelieferte Ebene liegt in `<hub>:k-playbook` (siehe „Die mitgelieferte Ebene aus
+`<hub>:k-playbook`“).
 
 ### Die config von Kephalaion
 
@@ -3853,7 +3927,8 @@ Lesers, die eine Zeile der Datei zitieren kann (die steht weiter in
 
 Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Register` und
 `Check`. Jede Quelle hängt sich mit `Register` ein; die drei aus dem Kontext — Kephalaion-Anbindung
-(eingetragen, aber nicht `ok`: `error`; nicht eingetragen: `warning`), Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
+(nicht `ok`: `error`, auch nicht eingetragen — seit Task 131, weil es ohne Kephalaion keine
+mitgelieferten Texte gibt; vorher war das eine `warning`), Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
 Quellenkonfiguration des Versionsinventars (da, aber unlesbar: `error`) — stehen in
 `project/health.go` und werden beim Laden des Pakets `project` registriert. Der Umweg ist
 der Importzyklus: Die Quellen lesen aus `project` (`DetectBaseTools`,

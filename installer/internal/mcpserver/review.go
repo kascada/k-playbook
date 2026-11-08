@@ -546,7 +546,7 @@ func writeAIEntry(env reviewEnvironment, input reviewWriteAIEntryInput) (map[str
 		StartedAt:  input.StartedAt,
 		FinishedAt: input.FinishedAt,
 	}
-	outcome, toolErr := evaluateEvidenceJob(runDir, entry, input)
+	outcome, toolErr := evaluateEvidenceJob(env.Root, runDir, entry, input)
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
@@ -619,7 +619,7 @@ type evidenceOutcome struct {
 // Der Scope wirkt dazwischen als Teilannahme: verworfene Funde verschwinden aus
 // dem SARIF, ihre Zahl und die ersten Pfade stehen im Grund, der Eintrag bleibt
 // gültig.
-func evaluateEvidenceJob(runDir string, entry review.Entry, input reviewWriteAIEntryInput) (evidenceOutcome, reviewToolError) {
+func evaluateEvidenceJob(root string, runDir string, entry review.Entry, input reviewWriteAIEntryInput) (evidenceOutcome, reviewToolError) {
 	if input.Job == nil {
 		return evidenceOutcome{}, reviewToolError{}
 	}
@@ -648,7 +648,7 @@ func evaluateEvidenceJob(runDir string, entry review.Entry, input reviewWriteAIE
 			Details: map[string]any{"entry": input.Entry, "sarif": relative, "path": sarifPath},
 		}
 	}
-	ruleIDs, toolErr := evidenceRuleIDs(entry)
+	ruleIDs, toolErr := evidenceRuleIDs(root, entry)
 	if toolErr.Code != "" {
 		return evidenceOutcome{}, toolErr
 	}
@@ -685,7 +685,7 @@ func evaluateEvidenceJob(runDir string, entry review.Entry, input reviewWriteAIE
 // und keine Festlegung des Laufs. Wer sie ändert, ändert sie für alle Läufe —
 // und ein Rezept, das seinen Evidence-Vertrag inzwischen nicht mehr erfüllt,
 // soll beim Melden auffallen und nicht mit einer halben Prüfung durchgehen.
-func evidenceRuleIDs(entry review.Entry) ([]string, reviewToolError) {
+func evidenceRuleIDs(root string, entry review.Entry) ([]string, reviewToolError) {
 	if strings.TrimSpace(entry.RecipePath) == "" {
 		return nil, reviewToolError{
 			Code:    "recipe_contract_invalid",
@@ -693,7 +693,7 @@ func evidenceRuleIDs(entry review.Entry) ([]string, reviewToolError) {
 			Details: map[string]any{"entry": entry.Name},
 		}
 	}
-	metadata, err := readAIRecipeMetadata(entry.RecipeKey, entry.RecipePath)
+	metadata, err := readAIRecipeMetadata(root, entry.RecipeKey, entry.RecipePath)
 	if err != nil {
 		return nil, wrapError(err, "read_failed", "Review-Rezept ist nicht lesbar.", map[string]any{"entry": entry.Name, "path": entry.RecipePath})
 	}
@@ -1282,11 +1282,20 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 	if err != nil {
 		return reviewSelectionBase{}, wrapError(err, "read_failed", "Review-Katalog ist nicht lesbar.", map[string]any{"projectDir": env.Root})
 	}
+	if built.CatalogsProblem != "" {
+		// Ohne die mitgelieferte Ebene wäre der Katalog nur halb: keine
+		// Auswahl, die still die mitgelieferten Rezepte weglässt.
+		return reviewSelectionBase{}, reviewToolError{
+			Code:    project.DocCodeKephalaionUnavailable,
+			Message: "Review-Katalog ist nicht lesbar: " + built.CatalogsProblem,
+			Details: map[string]any{"projectDir": env.Root},
+		}
+	}
 	for _, entry := range built.Catalogs["reviews"] {
 		if entry.Disabled {
 			continue
 		}
-		metadata, err := readAIRecipeMetadata(entry.Key, entry.Path)
+		metadata, err := readAIRecipeMetadata(env.Root, entry.Key, entry.Path)
 		if err != nil {
 			return reviewSelectionBase{}, wrapError(err, "read_failed", "Review-Rezept ist nicht lesbar.", map[string]any{"path": entry.Path, "key": entry.Key})
 		}
@@ -1511,8 +1520,13 @@ func cloneReviewScope(scope *review.Scope) *review.Scope {
 	return cloned
 }
 
-func readAIRecipeMetadata(key string, path string) (aiRecipeMetadata, error) {
-	data, err := os.ReadFile(path)
+// readAIRecipeMetadata liest die Angaben eines Rezepts über seinen Pfad aus
+// dem Katalog: ein mitgeliefertes Rezept ist ein Verweis k-playbook:/reviews/…
+// und kommt über die Ebenen des Projekts aus <hub>:k-playbook, ein
+// projekteigenes (oder ein Pfad aus einem älteren Lauf) von der Platte
+// (project.ReadCatalogEntry).
+func readAIRecipeMetadata(root string, key string, path string) (aiRecipeMetadata, error) {
+	data, err := project.ReadCatalogEntry(root, path)
 	if err != nil {
 		return aiRecipeMetadata{}, err
 	}

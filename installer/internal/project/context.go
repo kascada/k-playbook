@@ -1,9 +1,11 @@
 package project
 
 import (
+	stdcontext "context"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -68,9 +70,15 @@ type Context struct {
 	// fehlend, obwohl der Aufruf funktioniert; die Begründung steht am Typ
 	// BaseTools. Ein fehlendes Basis-Werkzeug warnt und blockiert nicht —
 	// anders als gh.ready.
-	BaseTools  BaseTools                 `json:"baseTools"`
-	Catalogs   map[string][]CatalogEntry `json:"catalogs"`
-	Guidelines []string                  `json:"guidelines"`
+	BaseTools BaseTools                 `json:"baseTools"`
+	Catalogs  map[string][]CatalogEntry `json:"catalogs"`
+	// CatalogsProblem sagt, warum catalogs.rules und catalogs.reviews leer
+	// sind: Ihre mitgelieferte Ebene liegt in <hub>:k-playbook unter
+	// defaults/ und ist ohne Kephalaion nicht lesbar. Die lokale Ebene steht
+	// dann nicht allein da — beide Kataloge bleiben leer. Leer, wenn die
+	// Kataloge gelesen wurden.
+	CatalogsProblem string   `json:"catalogsProblem,omitempty"`
+	Guidelines      []string `json:"guidelines"`
 	// VersionSources ist der Zustand der Quellenkonfiguration des
 	// Versionsinventars. Sie steht hier, weil Commands Konfiguration
 	// ausschließlich aus dieser Ausgabe lesen: eine Datei, die nur der Sammler
@@ -271,7 +279,13 @@ type CatalogEntry struct {
 	// mitgeliefert und projekteigen.
 	Name string `json:"name"`
 	// Key ist der handliche Aufrufname: ohne Endung und ohne Sortenpräfix.
-	Key  string `json:"key"`
+	Key string `json:"key"`
+	// Path sagt, wo der wirksame Eintrag liegt: bei einem projekteigenen der
+	// Pfad auf der Platte unter k-playbook-local/; bei einem mitgelieferten
+	// rules- oder reviews-Eintrag der Verweis k-playbook:/<sorte>/<name> —
+	// diese Ebene liegt in <hub>:k-playbook, nicht auf der Platte; gelesen
+	// wird er mit ReadCatalogEntry. Mitgelieferte checks liegen weiter in der
+	// Installation.
 	Path string `json:"path"`
 	// Origin: dist, local oder override.
 	Origin string `json:"origin"`
@@ -341,6 +355,14 @@ var guidelinesKind = catalogKind{name: "guidelines", dirName: "guidelines", suff
 
 // BuildContext stellt den Arbeitsstand zusammen.
 func BuildContext(projectDir string) (Context, error) {
+	return buildContext(projectDir, nil)
+}
+
+// buildContext ist BuildContext mit der mitgelieferten Ebene der Kataloge
+// rules und reviews; nil heißt eine eigene (NewProjectDefaultsSource). Das
+// Briefing reicht seine durch, damit es dieselben Dokumente nicht zweimal vom
+// Node liest.
+func buildContext(projectDir string, defaults DocSource) (Context, error) {
 	config, err := ReadConfig(projectDir)
 	if err != nil {
 		return Context{}, err
@@ -401,12 +423,19 @@ func BuildContext(projectDir string) (Context, error) {
 		VersionSources: readVersionSources(localDir),
 	}
 
+	if defaults == nil {
+		defaults = NewProjectDefaultsSource(projectDir)
+	}
 	for _, kind := range catalogKinds() {
-		entries, err := resolveCatalog(
-			filepath.Join(playbookDir, kind.dirName),
-			filepath.Join(localDir, kind.dirName),
-			kind,
-		)
+		entries, err := resolveCatalog(projectDir, defaults, kind)
+		if errDefaultsUnavailable(err) {
+			// Die mitgelieferte Ebene fehlt: keine Kataloge aus der lokalen
+			// Ebene allein. Der Rest der Kontextausgabe bleibt — er trägt
+			// unter kephalaion, warum.
+			context.Catalogs[kind.name] = []CatalogEntry{}
+			context.CatalogsProblem = err.Error()
+			continue
+		}
 		if err != nil {
 			return Context{}, err
 		}
@@ -420,14 +449,23 @@ func BuildContext(projectDir string) (Context, error) {
 // Verweise und das Briefing anwenden; eine zweite Fassung der Regel gäbe
 // irgendwann eine zweite Antwort.
 //
+// Die mitgelieferte Ebene von rules und reviews ist defaults, dieselbe
+// Quelle wie hinter k-playbook:-Verweisen (<hub>:k-playbook unter
+// defaults/); checks liest weiter aus der Installation k-playbook/.
+//
 // Vergleichseinheit ist der Dateiname: beide Seiten benutzen dieselbe
 // Namenskonvention. Ein projekteigener Eintrag ersetzt den gleichnamigen
 // mitgelieferten vollständig; ist er leer, gilt der Eintrag als abgeschaltet.
 // Ein fehlendes Verzeichnis ist ein leerer Katalog; eine unlesbare Datei ist
 // ein Fehler, kein stiller Eintrag ohne Befund.
-func resolveCatalog(shippedDir string, localDir string, kind catalogKind) ([]CatalogEntry, error) {
-	layers := DocLayers{Dist: NewDiskDocSource(shippedDir), Local: NewDiskDocSource(localDir)}
-	resolved, _, err := overlayDocDir(layers, "", func(name string) bool { return isCatalogEntry(name, kind) })
+func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]CatalogEntry, error) {
+	playbookDir := PlaybookDir(projectDir)
+	localDir := LocalDir(projectDir)
+	layers := DocLayers{Dist: defaults, Local: NewDiskDocSource(localDir)}
+	if kind.name == "checks" {
+		layers.Dist = NewDiskDocSource(playbookDir)
+	}
+	resolved, _, err := overlayDocDir(layers, kind.dirName, func(name string) bool { return isCatalogEntry(name, kind) })
 	if err != nil {
 		return nil, fmt.Errorf("Katalog %s: %w", kind.name, err)
 	}
@@ -435,11 +473,14 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) ([]Cat
 	entries := make([]CatalogEntry, 0, len(resolved))
 	for _, item := range resolved {
 		entry := CatalogEntry{Name: item.Name, Key: catalogKey(item.Name, kind), Origin: item.Origin, Disabled: item.Disabled}
-		dir := shippedDir
-		if item.Origin != DocOriginDist {
-			dir = localDir
+		switch {
+		case item.Origin != DocOriginDist:
+			entry.Path = filepath.Join(localDir, kind.dirName, item.Name)
+		case kind.name == "checks":
+			entry.Path = filepath.Join(playbookDir, kind.dirName, item.Name)
+		default:
+			entry.Path = DocSchemeKPlaybook + ":/" + path.Join(kind.dirName, item.Name)
 		}
-		entry.Path = filepath.Join(dir, item.Name)
 		if kind.name == "reviews" && !entry.Disabled {
 			modes := parseReviewModes(item.Content)
 			entry.Audit = &CatalogMode{
@@ -458,6 +499,22 @@ func resolveCatalog(shippedDir string, localDir string, kind catalogKind) ([]Cat
 		entries = append(entries, entry)
 	}
 	return entries, nil
+}
+
+// ReadCatalogEntry liest den wirksamen Inhalt eines Katalogeintrags über
+// seinen Path: einen Verweis k-playbook:/… über die Ebenen des Projekts
+// (ProjectDocLayers, Rohtext ohne eingesetzte Includes), sonst die Datei auf
+// der Platte — einen projekteigenen Eintrag oder einen Pfad aus einem älteren
+// Lauf.
+func ReadCatalogEntry(projectDir string, entryPath string) ([]byte, error) {
+	if !strings.HasPrefix(entryPath, DocSchemeKPlaybook+":/") {
+		return os.ReadFile(entryPath)
+	}
+	result, err := ResolveDocRefWith(stdcontext.Background(), ProjectDocLayers(projectDir), entryPath, DocReadOptions{Raw: true})
+	if err != nil {
+		return nil, err
+	}
+	return []byte(result.Content), nil
 }
 
 type reviewModes struct {
@@ -838,6 +895,12 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 // Katalog dieses Projekts, nicht dem Weg, auf dem die Installation zu ihrem
 // Stand kam.
 func ContextForDir(startDir string) (Context, error) {
+	return contextForDir(startDir, "", nil)
+}
+
+// contextForDir ist ContextForDir; liegt startDir im Projekt sharedDir, lesen
+// die Kataloge die mitgelieferte Ebene aus shared statt aus einer eigenen.
+func contextForDir(startDir string, sharedDir string, shared DocSource) (Context, error) {
 	projectDir, err := Discover(startDir)
 	if errors.Is(err, ErrNotFound) {
 		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
@@ -851,7 +914,11 @@ func ContextForDir(startDir string) (Context, error) {
 	// neuen Konfiguration ab, wird auch nichts eingerichtet: ein Werkzeug, das
 	// die Fassung nicht versteht, soll die Registrierung nicht nach seinen
 	// Regeln umschreiben.
-	built, err := BuildContext(projectDir)
+	var defaults DocSource
+	if shared != nil && projectDir == sharedDir {
+		defaults = shared
+	}
+	built, err := buildContext(projectDir, defaults)
 	if err != nil {
 		return Context{}, err
 	}

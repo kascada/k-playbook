@@ -14,8 +14,8 @@ func newContextProject(t *testing.T) string {
 
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(PlaybookDir(root), "rules"),
-		filepath.Join(PlaybookDir(root), "reviews"),
+		filepath.Join(PlaybookDir(root), "defaults", "rules"),
+		filepath.Join(PlaybookDir(root), "defaults", "reviews"),
 		filepath.Join(PlaybookDir(root), "checks"),
 		filepath.Join(LocalDir(root), "rules"),
 		filepath.Join(LocalDir(root), "reviews"),
@@ -53,8 +53,8 @@ func entryByName(entries []CatalogEntry, name string) (CatalogEntry, bool) {
 func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "rules", "docs-sync.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(PlaybookDir(root), "rules", "review-authoring.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "rules", "docs-sync.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "rules", "review-authoring.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(LocalDir(root), "rules", "docs-sync.md"), "# eigene Fassung\n")
 	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# nur lokal\n")
 
@@ -134,8 +134,8 @@ func TestBuildContextUeberspringtNichtEintraege(t *testing.T) {
 func TestBuildContextBildetKeys(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-secret-scanning.md"), "# Rezept\n")
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "nicht-passend.md"), "# kein Review\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-secret-scanning.md"), "# Rezept\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "nicht-passend.md"), "# kein Review\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -157,8 +157,8 @@ func TestBuildContextBildetKeys(t *testing.T) {
 func TestBuildContextZeigtReviewModi(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-audit-only.md\n  scope:\n    tools: [gitleaks, trufflehog]\nreview:\n  enabled: false\n---\n# Audit\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-audit-only.md\n  scope:\n    tools: [gitleaks, trufflehog]\nreview:\n  enabled: false\n---\n# Audit\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -200,7 +200,7 @@ func TestBuildContextZeigtReviewModi(t *testing.T) {
 func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-scope.md"), "---\naudit:\n  enabled: true\n  scope:\n    tools:\n      - pip-audit\n      - trivy\nreview:\n  enabled: true\n---\n# Scope\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-scope.md"), "---\naudit:\n  enabled: true\n  scope:\n    tools:\n      - pip-audit\n      - trivy\nreview:\n  enabled: true\n---\n# Scope\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
 func TestBuildContextLiestEvidenceVertragAlsBlocklisten(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-evidence.md"),
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-evidence.md"),
 		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds:\n    - tech-veraltet\n    - tech-kopplung\n  scope:\n    paths:\n      - installer/**\n      - commands/**\nreview:\n  enabled: true\n---\n# Evidence\n")
 
 	context, err := BuildContext(root)
@@ -262,7 +262,7 @@ func TestBuildContextLiestEvidenceVertragAlsBlocklisten(t *testing.T) {
 func TestBuildContextLiestEvidenceVertragAlsInlineListen(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "reviews", "review-evidence-inline.md"),
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-evidence-inline.md"),
 		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds: [tech-veraltet, tech-kopplung]\n  scope:\n    paths: [\"installer/**\"]\nreview:\n  enabled: false\n---\n# Evidence\n")
 
 	context, err := BuildContext(root)

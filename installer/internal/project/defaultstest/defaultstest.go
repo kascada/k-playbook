@@ -1,0 +1,32 @@
+// Package defaultstest schirmt Tests anderer Pakete von der öffentlichen
+// Collection k-playbook am Node dieses Rechners ab: Isolate setzt
+// project.OpenDefaultsStore auf einen Store im Speicher (kephtest), gefüllt
+// beim Öffnen aus dem Baum, den ein Test unter k-playbook/defaults/ seines
+// Projekts anlegt — dem Lieferumfang, wie der Release ihn packt. Gelesen wird
+// über den Store, nicht über die Platte. Nur Tests importieren das Paket; das
+// Paket project selbst hat dafür eine eigene Fassung (defaults_test_helper_test.go),
+// weil es dieses Paket nicht importieren kann.
+package defaultstest
+
+import (
+	"path/filepath"
+
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/project"
+)
+
+// Address ist die Adresse der öffentlichen Collection in Tests.
+const Address = "test:k-playbook"
+
+// Isolate setzt den Store ein und gibt die Rücknahme zurück — für TestMain.
+func Isolate() func() {
+	original := project.OpenDefaultsStore
+	project.OpenDefaultsStore = func(projectDir string) (project.DefaultsStore, string, error) {
+		store, err := kephtest.Defaults(filepath.Join(project.PlaybookDir(projectDir), "defaults"))
+		if err != nil {
+			return nil, Address, err
+		}
+		return store, Address, nil
+	}
+	return func() { project.OpenDefaultsStore = original }
+}

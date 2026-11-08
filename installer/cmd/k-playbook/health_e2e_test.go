@@ -14,7 +14,7 @@ import (
 )
 
 // healthE2EProject legt ein Projekt an, in dem genau ein Problem steht: die
-// Anbindung an Kephalaion ist nicht eingetragen (eine Warnung). gh ist nicht
+// Anbindung an Kephalaion ist nicht eingetragen (ein Fehler, Task 131). gh ist nicht
 // vorausgesetzt, eine Matrix der Basis-Werkzeuge fehlt, die
 // Quellenkonfiguration auch — alles drei schweigt.
 func healthE2EProject(t *testing.T) string {
@@ -46,18 +46,21 @@ func runHealthCaptured(t *testing.T, args ...string) (string, error) {
 	return string(stdout), runErr
 }
 
-func TestHealthKlartextMitWarnungEndetMitNull(t *testing.T) {
+// Die nicht eingetragene Anbindung ist ein Fehler: Ohne Kephalaion gibt es
+// keine mitgelieferten Texte (Task 131). Der Klartext nennt ihn, das
+// Subkommando endet mit healthExitProblems.
+func TestHealthKlartextNichtEingetragenIstFehler(t *testing.T) {
 	healthE2EProject(t)
 
 	stdout, err := runHealthCaptured(t)
-	if err != nil {
-		t.Fatalf("health: %v", err)
+	if err == nil || err.Error() != "" || exitCodeOf(err) != healthExitProblems {
+		t.Fatalf("Fehler: %v (Code %d)", err, exitCodeOf(err))
 	}
-	if !strings.HasPrefix(stdout, "Umgebung:\n  [warning] kephalaion: Keine Collection eingetragen") || !strings.Contains(stdout, " — ") {
+	if !strings.HasPrefix(stdout, "Umgebung:\n  [error] kephalaion: Keine Collection eingetragen") || !strings.Contains(stdout, " — ") {
 		t.Errorf("Ausgabe:\n%s", stdout)
 	}
-	if strings.Contains(stdout, "[error]") {
-		t.Errorf("Ausgabe nennt einen Fehler:\n%s", stdout)
+	if !strings.Contains(stdout, "mitgelieferten Texte") {
+		t.Errorf("Abhilfe nennt nicht, was fehlt:\n%s", stdout)
 	}
 }
 
@@ -91,7 +94,7 @@ func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 		t.Fatalf("Report: %+v", report)
 	}
 	// Sortiert nach Bereich: kephalaion vor versionSources.
-	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelWarning ||
+	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
 		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelError || report.Problems[1].Hint == "" {
 		t.Errorf("Problems: %+v", report.Problems)
 	}

@@ -13,7 +13,9 @@ import (
 // eigenes XDG_DATA_HOME läse jeder Test, der den Katalog auflöst, die
 // mitgelieferten Commands dieses Rechners. Ebenso von der persönlichen
 // GitHub-Zugangsdatei: Jedes health.Check — also jedes Briefing — erreicht
-// deren Leser, und der läse sonst die Datei dieses Rechners.
+// deren Leser, und der läse sonst die Datei dieses Rechners. Und von der
+// öffentlichen Collection k-playbook am Node dieses Rechners
+// (isolateDefaults).
 func TestMain(m *testing.M) {
 	cleanup, err := sharetest.Isolate()
 	if err != nil {
@@ -25,7 +27,9 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	cleanupDefaults := isolateDefaults()
 	code := m.Run()
+	cleanupDefaults()
 	cleanupGitHub()
 	cleanup()
 	os.Exit(code)

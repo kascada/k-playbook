@@ -30,10 +30,11 @@ test -d "$src" || fail "$src/ fehlt; aufrufen aus dem Wurzelverzeichnis des Repo
 test -f VERSION || fail "VERSION fehlt im Wurzelverzeichnis."
 test ! -e "$src/VERSION" || fail "$src/VERSION darf es nicht geben; VERSION kommt beim Packen aus dem Wurzelverzeichnis."
 
-# instructions/ liegt nur hier, in defaults/instructions/ — Installation und
-# Hub lesen dieselbe Fassung (installer/internal/project/docref.go,
-# NewShippedDocSource). Eine Kopie oben im Repo gibt es seit 2026-10-17 nicht
-# mehr; nichts ist gleichzuhalten.
+# instructions/ liegt nur hier, in defaults/instructions/. Das Binary liest
+# die mitgelieferte Ebene aus dem, was der Hub aus diesem Archiv nach
+# <hub>:k-playbook/defaults/ legt (installer/internal/project/defaultsdocs.go,
+# Task 131). Eine Kopie oben im Repo gibt es seit 2026-10-17 nicht mehr;
+# nichts ist gleichzuhalten.
 test -d "$src/instructions" || fail "$src/instructions/ fehlt."
 
 other="$(find "$src" ! -type f ! -type d)"

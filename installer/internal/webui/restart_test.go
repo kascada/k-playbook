@@ -17,6 +17,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
@@ -78,7 +79,9 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	cleanupDefaults := defaultstest.Isolate()
 	code := m.Run()
+	cleanupDefaults()
 	_ = os.Chdir(packageDir)
 	_ = os.RemoveAll(workDir)
 	cleanupGitHub()

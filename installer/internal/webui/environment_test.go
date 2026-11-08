@@ -30,9 +30,10 @@ func environmentCall(t *testing.T, path string) (int, environmentResponse, strin
 // TestEnvironmentLiefertDenReport: der Endpunkt antwortet mit dem Report von
 // health.Check unter health, in derselben Struktur wie `k-playbook health
 // --json`. Das Projekt hier hat keine Kephalaion-Anbindung eingetragen — die
-// Quelle meldet das als Warnung, ohne den Node zu fragen —, setzt gh nicht
-// voraus, führt keine Matrix der Basis-Werkzeuge und keine
-// Quellenkonfiguration: genau ein Eintrag, ok bleibt wahr.
+// Quelle meldet das als Fehler (Task 131: ohne Kephalaion keine
+// mitgelieferten Texte), ohne den Node zu fragen —, setzt gh nicht voraus,
+// führt keine Matrix der Basis-Werkzeuge und keine Quellenkonfiguration:
+// genau ein Eintrag, ok ist falsch.
 func TestEnvironmentLiefertDenReport(t *testing.T) {
 	accesstest.Empty(t)
 	root := t.TempDir()
@@ -49,22 +50,22 @@ func TestEnvironmentLiefertDenReport(t *testing.T) {
 		t.Fatalf("Antwort ohne Report: %s", body)
 	}
 	report := *response.Health
-	if !report.OK {
-		t.Errorf("ok = false, erwartet true (eine Warnung lässt ok wahr): %s", body)
+	if report.OK {
+		t.Errorf("ok = true, erwartet false (ein Fehler macht ok falsch): %s", body)
 	}
 	if len(report.Problems) != 1 {
 		t.Fatalf("Problems = %+v, erwartet genau den Eintrag zur fehlenden Anbindung", report.Problems)
 	}
 	problem := report.Problems[0]
-	if problem.Level != health.LevelWarning || problem.Area != health.AreaKephalaion {
-		t.Errorf("Eintrag = %+v, erwartet warning im Bereich kephalaion", problem)
+	if problem.Level != health.LevelError || problem.Area != health.AreaKephalaion {
+		t.Errorf("Eintrag = %+v, erwartet error im Bereich kephalaion", problem)
 	}
 	if problem.Message == "" || problem.Hint == "" {
 		t.Errorf("Eintrag ohne Satz oder Abhilfe: %+v", problem)
 	}
 	// Dieselbe Struktur wie der Report der CLI: die vier Felder je Eintrag,
 	// problems nie null.
-	for _, want := range []string{`"ok":true`, `"problems":[{`, `"level":"warning"`, `"area":"kephalaion"`, `"message":"`, `"hint":"`} {
+	for _, want := range []string{`"ok":false`, `"problems":[{`, `"level":"error"`, `"area":"kephalaion"`, `"message":"`, `"hint":"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Antwort enthält %s nicht: %s", want, body)
 		}

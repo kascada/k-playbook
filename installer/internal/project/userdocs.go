@@ -401,6 +401,13 @@ func (s inventoryStore) Write(ctx context.Context, name, content string, baseRev
 // Anbindung lesen, Umgebung laden, Client bauen. Zurück kommen der Client
 // und der User hinter dem Account.
 func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
+	return openKephClientFor(projectDir, "")
+}
+
+// openKephClientFor ist openKephClient für eine andere Collection auf
+// demselben Hub, mit demselben Account — etwa DefaultsCollectionName. Leer
+// heißt: die Collection der Anbindung.
+func openKephClientFor(projectDir string, collection string) (*kephalaion.Client, string, error) {
 	status := KephalaionStatus(projectDir)
 	if !status.OK {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable,
@@ -409,6 +416,9 @@ func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 	binding, _, err := kephalaion.ReadBinding(LocalDir(projectDir))
 	if err != nil {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "Anbindung nicht lesbar: %v", err)
+	}
+	if collection != "" {
+		binding.Collection = collection
 	}
 	client, err := kephalaion.NewClient(binding, kephalaion.DefaultEnv())
 	if err != nil {

@@ -510,7 +510,11 @@ AI entries later validates against this copy, not against recipe text that may h
 `scope.tools` and `scope.paths` are therefore a snapshot: existing runs retain their scope
 even if the recipe changes later. `mode` is written explicitly, including for `perspective`,
 so the run itself says how an entry was intended; an empty field in an old run is read as
-`perspective`.
+`perspective`. `recipePath` is the `path` of the catalog entry: for a shipped recipe the
+reference `k-playbook:/reviews/<name>` -- the shipped layer lies in `<hub>:k-playbook`, not on
+disk (task 131) --, for a project-owned one the file under `k-playbook-local/reviews/`. The
+tools read a recipe through `project.ReadCatalogEntry`, which resolves the reference and also
+still reads the disk paths of older runs.
 
 For `mode: evidence`, `resultRequired` is forced to `false` -- the required artifact is
 `raw/<entry>.sarif`, and with `true`, `k_playbook_review_status` would report every
@@ -702,13 +706,16 @@ document of the project's collection through the node's replica (Kephalaion `rea
 client, access as for the `doc` tools, `~` replaced by `kephalaion.user`); `k-playbook:` the
 kinds `instructions/`, `rules/`, `reviews/`, `guidelines/` and `commands/`, each a single
 file local before shipped, and as include targets `includes/` and `testdata/`. Only
-`instructions/always/` is assembled. Shipped `instructions/`, `commands/`, `includes/` and
-`testdata/` are read from `defaults/`; for `commands/` that is the text of a command, while
+`instructions/always/` is assembled. The shipped layer of every kind is read from the public
+collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): hub and
+account of the project binding, collection `k-playbook`; without a ready binding, or with an
+empty `defaults/`, a `k-playbook:` reference is `kephalaion_unavailable`, also when a local file
+exists -- no fallback to the clone `k-playbook/`. For `commands/` that is the text of a command, while
 the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
 `catalogs` in `k_playbook_context` (`overlayDocDir`): for `rules` and `reviews`, name,
 `origin` and `disabled` of an entry are the same over both ways, which a test checks.
-`guidelines` is an overlay kind here -- shipped `k-playbook/guidelines/` and local
+`guidelines` is an overlay kind here -- shipped `<hub>:k-playbook/defaults/guidelines/` and local
 `k-playbook-local/guidelines/` -- while the field `guidelines` of the context output still
 lists only the local files (see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
 
@@ -752,7 +759,7 @@ Error codes, in the envelope's `error.code` like the other tool families:
 | `section_not_found` | the heading of `section` does not occur outside code blocks and the frontmatter |
 | `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `rules/`, `reviews/`, `guidelines/`, `commands/`, `includes/` and `testdata/` (for example `checks/` or `skills/`); the message names only the reader kinds |
 | `not_found` | neither layer has the file or the assembled directory, the project has no such file, or the node reports `none` for the name in the collection; there is no fallback to reading anywhere else |
-| `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; no fallback |
+| `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; a `k-playbook:` reference whose shipped layer `<hub>:k-playbook/defaults/` cannot be read -- binding not ready, collection missing or unreadable, `defaults/VERSION` missing --, even when a local file exists; no fallback |
 | `kephalaion_error` | the node rejected `read` with a message (collection not readable, replica never synced, invalid name); the message is the node's |
 | `include_cycle` | an include target is already open in the chain -- `a.md` includes `b.md`, `b.md` includes `a.md`; the message carries the chain |
 | `include_too_deep` | an include would lie deeper than 10; the message carries the chain |
@@ -1151,13 +1158,13 @@ projectDocs, health, context}`:
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `instructions`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.rules` and `catalogs.reviews` (`documents.rules`, `documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
 `catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
 shipped, an empty local file disables. `guidelines` is an overlay kind here -- shipped
-`k-playbook/guidelines/` and local `k-playbook-local/guidelines/` --, while the field
+`<hub>:k-playbook/defaults/guidelines/` and local `k-playbook-local/guidelines/` --, while the field
 `guidelines` of the context output still lists only the local files until the context output is
 switched.
 
@@ -1167,8 +1174,14 @@ and k-playbook's own docs. The project documentation appears only as its entry
 `keph:/docs/` (`projectDocs`).
 
 Error codes in `error.code`: `invalid_input` for a missing `projectDir`, `project_not_found`
-for a `projectDir` that leads to no project, and `read_failed` when a layer could not be read
--- a half briefing would look like a whole one, so the tool stops instead.
+for a `projectDir` that leads to no project, `kephalaion_unavailable` when the shipped layer
+cannot be read -- Kephalaion not ready, the collection `<hub>:k-playbook` missing or unreadable,
+or its `defaults/` empty (no `defaults/VERSION`); the message names the cause and the remedy
+(set up Kephalaion via `/k-gui`, or ask the hub operator to run `fetch_release` for
+`<hub>:k-playbook`) --, and `read_failed` when another layer could not be read. A half briefing
+would look like a whole one, so the tool stops instead; the local layer is never returned on
+its own (task 131). `k-playbook briefing` exits with 1 and prints nothing to stdout in the
+same cases.
 
 ### Health Contract
 
@@ -1201,7 +1214,7 @@ is always present, `[]` without a problem. The sources in this version:
 | Area | Condition | Level | Hint |
 |---|---|---|---|
 | `kephalaion` | the block `kephalaion:` is in `K-PLAYBOOK.local.yaml`, but the state of `kephalaion.Check` is not `ok` (invalid entry, no Kephalaion on this machine, node unreachable, token missing, login invalid, hub unknown or never synced, collection unreadable …) | `error` | per state: fix the entry, check the node (`kephalaion status`), check the account, sync the hub, or choose a readable collection in the GUI |
-| `kephalaion` | not configured | `warning` | set up the binding in the GUI; without it `keph:` references, workbench and `work` are out of reach |
+| `kephalaion` | not configured | `error` (a `warning` until task 131) | set up the binding in the GUI; without it there are no shipped texts (`k-playbook:`, the briefing) and `keph:` references, workbench and `work` are out of reach |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
 | `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |

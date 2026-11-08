@@ -40,8 +40,9 @@ func callHealth(t *testing.T, projectDir string) (healthEnvelope, map[string]any
 }
 
 // Das Werkzeug ist die Hülle über health.Check: der Report steht unter
-// health, im üblichen Umschlag. Ohne Anbindung ist genau eine Warnung da; sie
-// lässt health.ok wahr.
+// health, im üblichen Umschlag. Ohne Anbindung ist genau ein Fehler da — seit
+// Task 131 hängen die mitgelieferten Texte an Kephalaion —; er macht
+// health.ok falsch, der Umschlag bleibt ok.
 func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
@@ -53,7 +54,7 @@ func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 		t.Fatalf("Umschlag: %#v", envelope)
 	}
 	report := *envelope.Health
-	if !report.OK || len(report.Problems) != 1 || report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelWarning {
+	if report.OK || len(report.Problems) != 1 || report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError {
 		t.Errorf("Report: %+v", report)
 	}
 	if _, embedded := fields["problems"]; embedded {
@@ -63,7 +64,7 @@ func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 		t.Errorf("error steht in einer guten Antwort: %v", fields)
 	}
 
-	// Ein Fehler macht health.ok falsch; der Umschlag bleibt ok.
+	// Ein zweiter Fehler kommt dazu; der Umschlag bleibt ok.
 	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
 	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
 		t.Fatal(err)

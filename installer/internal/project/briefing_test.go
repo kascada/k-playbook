@@ -29,14 +29,14 @@ func newBriefingProject(t *testing.T) string {
 		"k-playbook/defaults/instructions/always/README.md":       "# Liesmich\n",
 		"k-playbook/defaults/instructions/on-demand/muster.md":    "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
 		"k-playbook/defaults/instructions/on-demand/release.md":   "## Release fahren\n",
-		"k-playbook/rules/befunde.md":                             "# Regel: Befunde\n\nText.\n",
-		"k-playbook/rules/docs-sync.md":                           "# Regel: Docs\n\nmitgeliefert\n",
-		"k-playbook/rules/README.md":                              "# Regeln\n",
-		"k-playbook/reviews/review-code.md":                       "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/reviews/review-tech.md":                       "# Tech-Review\n",
-		"k-playbook/reviews/notiz.md":                             "# kein Rezept\n",
-		"k-playbook/guidelines/betrieb.md":                        "# Betrieb: Ablageorte\n\nText.\n",
-		"k-playbook/guidelines/README.md":                         "# Guidelines\n",
+		"k-playbook/defaults/rules/befunde.md":                    "# Regel: Befunde\n\nText.\n",
+		"k-playbook/defaults/rules/docs-sync.md":                  "# Regel: Docs\n\nmitgeliefert\n",
+		"k-playbook/defaults/rules/README.md":                     "# Regeln\n",
+		"k-playbook/defaults/reviews/review-code.md":              "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"k-playbook/defaults/reviews/review-tech.md":              "# Tech-Review\n",
+		"k-playbook/defaults/reviews/notiz.md":                    "# kein Rezept\n",
+		"k-playbook/defaults/guidelines/betrieb.md":               "# Betrieb: Ablageorte\n\nText.\n",
+		"k-playbook/defaults/guidelines/README.md":                "# Guidelines\n",
 		"k-playbook-local/instructions/always/100-wissen.md":      "## Projektwissen lokal\n\nText.\n",
 		"k-playbook-local/instructions/always/200-befunde.md":     "# Abgeschaltet: keine Befunde.\n",
 		"k-playbook-local/instructions/always/1000-eigen.md":      "## Eigene Anweisung\n\nText.\n",
@@ -634,7 +634,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 		t.Errorf("health im JSON: %s", encoded)
 	}
 
-	// Eine Warnung und ein Fehler: beide da, ok falsch, Reihenfolge nach Bereich.
+	// Zwei Fehler — die nicht eingetragene Anbindung ist seit Task 131 einer:
+	// beide da, ok falsch, Reihenfolge nach Bereich.
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), ": ungültig\n")
 	briefing, err = BuildBriefing(t.Context(), root)
@@ -645,7 +646,7 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if report.OK || len(report.Problems) != 2 {
 		t.Fatalf("health: %+v", report)
 	}
-	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelWarning ||
+	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
 		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelError {
 		t.Errorf("Einträge: %+v", report.Problems)
 	}

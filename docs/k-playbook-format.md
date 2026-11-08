@@ -38,11 +38,11 @@ locations derive from the project root, the directory that holds
 |---|---|
 | shipped commands | `~/.local/share/k-playbook/commands/`, linked through `.k-playbook/share` |
 | shipped skills | `~/.local/share/k-playbook/skills/`, linked through `.k-playbook/share` |
-| shipped rules | `k-playbook/rules/` |
-| shipped review recipes | `k-playbook/reviews/` |
+| shipped rules | `<hub>:k-playbook/defaults/rules/` (Kephalaion, since task 131) |
+| shipped review recipes | `<hub>:k-playbook/defaults/reviews/` (Kephalaion, since task 131) |
 | shipped checks | `k-playbook/checks/` |
-| shipped guidelines | `k-playbook/guidelines/` |
-| shipped instructions, assembled and on demand | `k-playbook/defaults/instructions/always/`, `k-playbook/defaults/instructions/on-demand/` |
+| shipped guidelines | `<hub>:k-playbook/defaults/guidelines/` (Kephalaion, since task 131) |
+| shipped instructions, assembled and on demand | `<hub>:k-playbook/defaults/instructions/always/`, `<hub>:k-playbook/defaults/instructions/on-demand/` (Kephalaion, since task 131) |
 | check runner | `k-playbook/bin/k-check` |
 | scripts | `~/.local/share/k-playbook/scripts/` |
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
@@ -177,8 +177,8 @@ Five directories exist twice. What applies is the union of both sides:
 
 | Kind | Shipped | Project-owned | Unit |
 |---|---|---|---|
-| rules | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
-| review recipes | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
+| rules | `<hub>:k-playbook/defaults/rules/` | `k-playbook-local/rules/` | `*.md` |
+| review recipes | `<hub>:k-playbook/defaults/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
 | checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, top level only |
 | commands | `~/.local/share/k-playbook/commands/` | `.k-playbook/commands/` | `*.md`, recursive |
 | skills | `~/.local/share/k-playbook/skills/` | `.k-playbook/skills/` | directory with `SKILL.md` |
@@ -265,7 +265,8 @@ A `k-playbook-local/docs/` that a producer still writes is not a pair with
 other the project. They are two different objects with the same name and nothing
 to merge.
 
-`guidelines/` is a pair since task 086 (2026-10-16): shipped `k-playbook/guidelines/`
+`guidelines/` is a pair since task 086 (2026-10-16): shipped
+`<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`)
 and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `rules/`
 -- a file of the same name replaces, an empty one disables. `k_playbook_doc_read`
 (`k-playbook:/guidelines/<name>.md`) and the briefing resolve it that way. The field
@@ -297,14 +298,18 @@ configuration and the filesystem:
 | `gh` | the GitHub CLI host finding for this machine |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
-| `catalogs` | `rules`, `reviews`, `checks`, merged |
-| `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped `k-playbook/guidelines/`, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
+| `catalogs` | `rules`, `reviews`, `checks`, merged; the shipped side of `rules` and `reviews` comes from `<hub>:k-playbook/defaults/` (task 131) |
+| `catalogsProblem` | only when the shipped layer of `rules` and `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty): why both lists are empty -- they are never shown from the local layer alone; the rest of the output stays, and `kephalaion` says more |
+| `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped guidelines, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
 extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`),
-and `disabled`, where applicable.
+and `disabled`, where applicable. `path` is a file on disk for a project-owned entry and for
+a shipped check; for a shipped rule or recipe it is the reference
+`k-playbook:/<kind>/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
+that layer lies in `<hub>:k-playbook` (task 131).
 
 This means no command has to apply overlay rules itself. There is one answer,
 and everyone receives the same one.
