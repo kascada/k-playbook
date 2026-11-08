@@ -280,7 +280,7 @@ maintained by hand for the hub — no script (`pack-defaults.sh`, workflows, Mak
 it; `diff` between the two being empty is the check. The check against the installation —
 `k-playbook read k-playbook:/instructions/always/`, `k-playbook briefing`,
 `k_playbook_doc_read`, and one run of `/k-upgrade` in Claude Code — follows the next release
-and `make -C k-playbook-local nachziehen`; the Go tests against the working tree `defaults/`
+and `make -C priv nachziehen`; the Go tests against the working tree `defaults/`
 (`installer/internal/project/shipped_defaults_test.go`) are the acceptance until then.
 **Put to use later:** `rules/command-authoring.md:31` still says `commands/_shared/` holds
 "genau eine Datei: `context.md`" — reworded when the rule gains the hull form (work list 15);

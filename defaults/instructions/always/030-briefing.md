@@ -14,7 +14,9 @@ Die Felder jeder Sitzung:
 
 - `context.now.date` ist das Datum. Nie raten, nie `date` rufen.
 - `context.project.dir`, `context.local.dir` und `context.playbook.dir` sind die drei Wurzeln.
-  Alles Projekteigene liegt unter `local.dir`; nach `playbook.dir` wird nie geschrieben.
+  Projekteigenes liegt unter `local.dir`, projekteigene Commands und Skills unter
+  `.k-playbook/commands/` und `.k-playbook/skills/` im `project.dir`; nach `playbook.dir` wird
+  nie geschrieben.
 - `documents.*` sind Verweise, gelesen mit `k_playbook_doc_read`. Einträge mit der Herkunft
   `disabled` werden übersprungen; die Überlagerung ist schon gerechnet.
 - `work` ist die eigene offene Arbeit.

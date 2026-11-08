@@ -1,23 +1,32 @@
 # Private/local material
-priv/
 .priv/
 /installer/bin/
 
-# Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
-# unter k-playbook/, die Konfiguration unter .k-playbook/. Beides entsteht
-# lokal beim ersten Start und gehört nicht ins Quell-Repo — eine versionierte
-# .k-playbook/K-PLAYBOOK.yaml läge in jedem Clone, und die Suche nach dem
-# Projekt bliebe in der Installation hängen. In einem echten Zielprojekt gilt
-# das Gegenteil: dort werden .k-playbook/K-PLAYBOOK.yaml und k-playbook-local/
-# committet.
+# Zwei Repos über derselben Wurzel: Dieses Verzeichnis ist Arbeitsverzeichnis
+# des Quell-Repos (kascada/k-playbook) und des privaten Dev-Repos
+# (kascada/k-playbook-dev; Git-Verzeichnis priv/.git, core.worktree = ../..).
+# Das Dev-Repo versioniert .k-playbook/, priv/ und für den Übergang
+# k-playbook-local/, das Quell-Repo alles andere. Eine versionierte
+# .k-playbook/K-PLAYBOOK.yaml im Quell-Repo läge in jedem Clone, auch in der
+# Installation, und die Suche nach dem Projekt bliebe dort hängen.
+#
+# Die Ausnahmen der drei Verzeichnisse stehen nicht hier, sondern im
+# info/exclude beider Repos, versioniert in priv/quell-exclude und
+# priv/dev-exclude (siehe priv/README.md). Diese .gitignore darf sie nicht
+# ausblenden: Sie gilt auch im Dev-Repo und geht dort dessen info/exclude vor —
+# das Dev-Repo sähe die Verzeichnisse dann nicht mehr. Dass das Quell-Repo sie
+# trotzdem nicht aufnimmt, prüft make -C priv quell-ausnahmen vor jedem Commit
+# aus Release und Sicherung.
+#
+# Die Installation unter k-playbook/ entsteht lokal beim ersten Start und gehört
+# in keins der beiden Repos. In einem echten Zielprojekt gilt das Gegenteil:
+# dort werden .k-playbook/K-PLAYBOOK.yaml und k-playbook-local/ committet.
 #
 # /K-PLAYBOOK.yaml ist der frühere Ort. Bis das neue Programm installiert ist,
 # liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;
 # das neue entfernt den Link beim ersten Aufruf.
 /K-PLAYBOOK.yaml
-/.k-playbook/K-PLAYBOOK.yaml
 /k-playbook/
-/k-playbook-local/
 
 # Registrierung des MCP-Servers. Ihr Kommando ist relativ und hängt damit am
 # Arbeitsverzeichnis des Clients — was hier passt, passt anderswo nicht. Dazu

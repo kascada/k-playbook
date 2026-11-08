@@ -146,10 +146,14 @@ The procedure applies equally to the tool and to an assistant:
 5. If nothing is found, report that no installation exists. Do not guess or create anything.
 
 The anchor is the **file** `.k-playbook/K-PLAYBOOK.yaml`, not the directory
-`.k-playbook/`. The k-playbook repository itself versions `.k-playbook/.gitignore`,
-so every installation `k-playbook/` carries a `.k-playbook/` of its own, and the
-link maintenance creates the directory even without a configuration. A search
-for the bare directory would find a project inside the installation.
+`.k-playbook/`. The link maintenance creates the directory even without a
+configuration (for the `share` link), so a `.k-playbook/` can exist where no
+project is. The k-playbook repository itself no longer versions anything under
+`.k-playbook/` — in its own checkout that directory belongs to a separate private
+development repository —, so after the release following v0.16.30 an installation
+`k-playbook/` carries a `.k-playbook/` only when the link maintenance creates it
+there. The conclusion stands: a search for the bare directory could find a project
+inside the installation.
 
 **Moving from the former place.** Until 2026-11 the anchor was `<project>/K-PLAYBOOK.yaml`,
 directly in the project root. The tool moves it before it checks a level: if

@@ -51,7 +51,8 @@ GITHUB_SERVICE ?= k-playbook
 PLAYBOOK_DIR := k-playbook
 # Im Entwicklungsrepo liegt die Installation stets unter k-playbook/. Die
 # Schreibschutz-Targets dürfen deshalb nie auf . fallen und den Arbeitsstand
-# einschließlich k-playbook-local/ sperren.
+# sperren, samt der Verzeichnisse des privaten Dev-Repos über derselben Wurzel
+# (.k-playbook/, priv/, k-playbook-local/; siehe priv/README.md).
 INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard installer)),$(PLAYBOOK_DIR),.)
 # Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.

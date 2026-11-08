@@ -329,6 +329,14 @@ Between the two steps, commands, the prompt block in `AGENTS.md`, and the MCP re
 
 For the new commands to reach the assistant, restart it afterwards: Claude Code and OpenCode discover them at startup.
 
+### A project's own conversion script
+
+`/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before the conversions 3.0 to 3.4. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversions should run anyway. If the file is missing, nothing is said about it.
+
+The script is meant for what the project can clear away as a whole, entire directories for instance, so that the conversions do not have to check each entry one by one. The conversions take stock only after it has run.
+
+Only `/k-upgrade` runs the script. The update button in the interface, `k-playbook upgrade` in the terminal and `make -C k-playbook installer-update` do not call it. k-playbook neither ships nor creates the file; the project writes it and keeps it under version control like any other script.
+
 ### Existing projects: the linking is converted
 
 Anyone updating a project from a version through 0.4 finds the assistant linking to convert after the update. One click handles it; nothing is deleted or overwritten:
