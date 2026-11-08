@@ -290,7 +290,7 @@ configuration and the filesystem:
 | `playbook`, `local` | the two resolved directories |
 | `remediation` | the policy, including a default when the block is missing |
 | `docs` | the `docs:` block: `exclude` is the list of valid patterns from `docs.exclude` (empty without the block), `problems` the rejected entries, each with `pattern` and `reason` |
-| `gh` | the GitHub CLI decision and host finding |
+| `gh` | the GitHub CLI host finding for this machine |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `rules`, `reviews`, `checks`, merged |
@@ -366,11 +366,12 @@ review logs, result directories, and summary-file names. Not every assistant's
 host tells it today's date, and a guessed date in a log is worse than none. It
 is the only field that ages: it identifies invocation time, not write time.
 
-`gh` combines two things that must remain separate: `status` and `configured`
-are the project decision from `tools.gh` and versioned in the file; `installed`,
-`path`, `loggedIn`, `account`, `accounts`, and `tokenFromEnv` are findings for
-this particular machine. `ready` summarizes what a command needs to know: gh
-exists and an account is configured.
+`gh` is a finding for this particular machine only: `installed`, `path`,
+`loggedIn`, `account`, `accounts`, and `tokenFromEnv`. `ready` summarizes what a
+command needs to know: gh exists and an account is configured. There is no
+project decision about gh: whether gh is used follows from the personal GitHub
+access file (`docs/github-access.md`) and, without a service for the repository,
+from `ready`.
 
 The finding is read from gh configuration, not checked against the server: a
 stored token may have expired. If certainty is needed, run `gh auth status`;
@@ -498,8 +499,6 @@ docs:
     - rules/
 
 tools:
-  gh:
-    status: enabled
   mcp:
     required:
       - k-playbook
@@ -606,23 +605,18 @@ Important: this contains project decisions, not host facts. Whether `gitleaks`
 or `trivy` is installed on this machine belongs in a preflight report, not in a
 versioned project configuration.
 
-#### `tools.gh`
+#### `tools.gh` (removed)
 
-| Field | Type | Meaning |
-|---|---|---|
-| `status` | enum | `unknown`, `enabled`, or `disabled` |
-
-Whether this project uses the GitHub CLI. It is used by the Dependabot review.
-
-**The default is `unknown`.** It is an explicit state, not a silent no: without
-a decision, a command cannot know whether a missing `gh` is a problem or
-intentional. The interface therefore shows `unknown` as an open item, and
-commands requiring `gh` stop on it. Any value other than the three stated is an
-error and stops `context`: a typo must not look like a decision.
-
-The block says nothing about whether `gh` exists on this machine. That is a host
-finding and exists only in context output. Nor is there a host here: the
-decision applies to `github.com`.
+Until task 128 a block `tools.gh` with `status` (`unknown`, `enabled`,
+`disabled`) held the project's decision whether it uses the GitHub CLI. It is
+gone: whether gh is in play is decided by the way to GitHub alone — with a
+service of the personal GitHub access file, its selected access; without one,
+`gh.ready` from the context output. An existing block is ignored, also with an
+unknown value, and nothing fails on it. Setting up the project (`k-playbook
+upgrade`, or setting up and updating in the interface) removes it together with
+its comments, without asking, and says so in its answer
+(`AssistantSetup.configBlocksRemoved`); other blocks under `tools:` stay, and an
+empty `tools:` goes as well.
 
 #### `tools.mcp`
 
@@ -658,8 +652,7 @@ serves which environment.
 | `allow` | list of strings | branch patterns a switch may target; `*` matches any characters including `/`; empty means every branch |
 | `environments` | mapping | environment name → branch name, in file order |
 
-**The default is `unknown`.** As with `tools.gh.status`, it is an explicit state, not a silent
-no: without the block the page lists branches and environments but offers no switch and says
+**The default is `unknown`.** It is an explicit state, not a silent no: without the block the page lists branches and environments but offers no switch and says
 where the decision belongs. `off` is the decision not to switch from the interface.
 
 `environments` is the only authoritative source for which branch serves an environment.
@@ -733,7 +726,7 @@ Adding the block does not change `schema_version`.
 - The only thing the tool does unasked is the move from the former place `<project>/K-PLAYBOOK.yaml` into `.k-playbook/` ("Finding the anchor"); the content stays byte for byte.
 - Write only after confirmation, step by step.
 - The tool owns `schema_version` and `project.*`.
-- The interface owns only `tools.gh`. It writes the `gh:` sub-block; an adjacent block for another tool remains untouched. For new projects, it creates it as `unknown` so the open decision is visible in the file. `tools.mcp` and `git` are only read.
+- The interface writes nothing under `tools:`; `tools.mcp` and `git` are only read. The one exception is removing the obsolete block `tools.gh` while setting up (section `tools.gh` (removed)); other blocks under `tools:` and their comments stay, and an empty `tools:` is removed. A new file has no `tools:` line.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - `docs.exclude` is written only by `k-playbook docs exclude add` and `k_playbook_docs_exclude_add`, after the user confirmed; only lines for new entries are inserted into the `docs:` block, nothing in it is rendered again, and a form that cannot be extended safely is refused (`unsupported`). A missing block is appended; unindented comments before the next block belong to what follows and stay, such as the commented `docs:` example of a new file.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.

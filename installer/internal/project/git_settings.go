@@ -14,9 +14,9 @@ import (
 type GitSwitch string
 
 const (
-	// GitSwitchUnknown: noch nicht entschieden. Ausdrücklicher Zustand wie
-	// tools.gh.status unknown — die Seite zeigt die Liste, bietet keinen
-	// Wechsel an und nennt die offene Entscheidung.
+	// GitSwitchUnknown: noch nicht entschieden. Ausdrücklicher Zustand — die
+	// Seite zeigt die Liste, bietet keinen Wechsel an und nennt die offene
+	// Entscheidung.
 	GitSwitchUnknown GitSwitch = "unknown"
 	// GitSwitchOffer: Umschalten wird angeboten, nach Vorprüfung und
 	// Bestätigung.

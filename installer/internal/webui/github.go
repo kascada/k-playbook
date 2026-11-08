@@ -102,12 +102,11 @@ var resolveGitHubRoute = project.ResolveGitHubRoute
 
 // githubClient prüft die Voraussetzungen und liefert den Client dazu.
 //
-// Geprüft wird **vor** jedem Netzaufruf, und zwar aus Dateien: die
-// Projektentscheidung aus tools.gh.status und der netzfreie Host-Befund aus
-// project.DetectGH. Steht die Entscheidung nicht auf enabled, ruft der Server
-// gh gar nicht auf — das ist die Zusage des Zustands „disabled".
+// Geprüft wird **vor** jedem Netzaufruf, und zwar aus Dateien: der netzfreie
+// Host-Befund aus project.DetectGH. Eine Projektentscheidung über gh gibt es
+// nicht mehr (Task 128); ob gh startet, entscheidet allein der Weg.
 //
-// Danach der Weg (Task 126): Nennt ein Dienst der Zugangsdatei das Repo,
+// Der Weg (Task 126): Nennt ein Dienst der Zugangsdatei das Repo,
 // läuft gh mit dessen Kindumgebung, gewählt wie bei `k-playbook github run`
 // (project.ResolveGitHubRoute). Hat er keinen api-Zugang oder gar keinen
 // verfügbaren, oder ist die Datei fehlerhaft, startet kein gh und es gibt
@@ -126,23 +125,7 @@ func githubClientRoute(ctx context.Context, route *project.GitHubRoute, resolved
 		return githubAccess{result: github.Fail(github.StateNoProject)}
 	}
 
-	state, err := project.GHState(environment.ProjectDir)
-	if err != nil {
-		// Der Fehlertext von gh wird eingeordnet statt durchgereicht; für einen
-		// Fehler an der eigenen Konfiguration gilt dasselbe. Der Dateiname sagt,
-		// wo nachzusehen ist — die rohe Meldung gehört ins Log, nicht in die Karte.
-		return githubAccess{result: github.Result{
-			State:   github.StateError,
-			Message: "Die Datei " + project.ConfigFileName + " ließ sich nicht lesen. Dort steht, ob die Oberfläche gh nutzen darf.",
-		}}
-	}
-
-	switch state.Status {
-	case project.GHDisabled:
-		return githubAccess{result: github.Fail(github.StateDisabled)}
-	case project.GHUnknown:
-		return githubAccess{result: github.Fail(github.StateUndecided)}
-	}
+	state := project.DetectGH()
 
 	// Gearbeitet wird in der Repo-Wurzel, nicht im Hauptverzeichnis: aus ihr
 	// löst gh das Remote auf, und die Tag-Abfragen sind git-Aufrufe.

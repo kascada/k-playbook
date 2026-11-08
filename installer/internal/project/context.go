@@ -45,7 +45,7 @@ type Context struct {
 	// zusätzlich auslassen (exclude) und welche Einträge verworfen wurden
 	// (problems). Commands lesen die Liste von hier, nie aus der Datei.
 	Docs ContextDocs `json:"docs"`
-	// GH ist die Entscheidung zur GitHub CLI samt Host-Befund. Anders als der
+	// GH ist der Befund zur GitHub CLI auf diesem Rechner. Anders als der
 	// Security-Preflight kostet der nichts: ein Blick in den PATH und in die
 	// gh-Konfiguration, kein Unterprozess und kein Netzzugriff.
 	GH GH `json:"gh"`
@@ -354,14 +354,8 @@ func BuildContext(projectDir string) (Context, error) {
 	if err != nil {
 		return Context{}, err
 	}
-	// Ein unbekannter Wert bricht ab, statt als „nicht entschieden" durchzugehen:
-	// ein Tippfehler würde sonst wie eine Entscheidung aussehen.
-	gh, err := GHState(projectDir)
-	if err != nil {
-		return Context{}, err
-	}
-	// Aus demselben Grund: ein unzulässiger Sprachname bricht ab, statt still
-	// zu verschwinden und die Werkzeugauswahl unbemerkt zu verschieben.
+	// Ein unzulässiger Sprachname bricht ab, statt still zu verschwinden und
+	// die Werkzeugauswahl unbemerkt zu verschieben.
 	languages, _, err := ReadLanguages(projectDir)
 	if err != nil {
 		return Context{}, err
@@ -398,7 +392,7 @@ func BuildContext(projectDir string) (Context, error) {
 		Local:          ContextDir{Dir: localDir},
 		Remediation:    remediation,
 		Docs:           contextDocs(config),
-		GH:             gh,
+		GH:             DetectGH(),
 		MCP:            MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
 		Git:            gitSettings,
 		BaseTools:      DetectBaseTools(projectDir),

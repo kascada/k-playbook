@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,40 +45,84 @@ var githubEndpoints = []string{
 	"/api/github/runs/35002675449/failure",
 }
 
-// Die Vorprüfung entscheidet aus Dateien, bevor irgendein Subprozess startet.
-// Steht tools.gh.status nicht auf enabled, ruft der Server gh gar nicht auf —
-// das ist die Zusage des Zustands, nicht bloß eine andere Beschriftung.
-func TestGitHubAPIFragtOhneEntscheidungNicht(t *testing.T) {
-	tests := []struct {
-		name   string
-		status project.GHStatus
-		want   github.State
-	}{
-		{name: "abgeschaltet", status: project.GHDisabled, want: github.StateDisabled},
-		{name: "unentschieden", status: project.GHUnknown, want: github.StateUndecided},
-	}
-
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			root := t.TempDir()
-			if err := project.CreateConfig(root, "."); err != nil {
-				t.Fatalf("Konfiguration anlegen: %v", err)
-			}
-			if err := project.SetGHStatus(root, testCase.status); err != nil {
-				t.Fatalf("tools.gh.status setzen: %v", err)
-			}
-			chdir(t, root)
+// Ein alter Block tools.gh in K-PLAYBOOK.yaml entscheidet nichts mehr (Task
+// 128): Auch mit status: disabled oder unknown, oder einem unbekannten Wert,
+// fragt die Seite GitHub, sobald es einen Weg gibt — ohne Dienst ein bereites
+// gh. Der Runner muss also gerufen werden; vorher gab es dafür die Zustände
+// disabled und undecided, die keinen Prozess starteten.
+func TestGitHubAPIIgnoriertAltenGHBlock(t *testing.T) {
+	for _, value := range []string{"disabled", "unknown", "vielleicht"} {
+		t.Run(value, func(t *testing.T) {
+			runner := &countingRunner{}
+			enableGitHub(t, runner)
+			appendLegacyGHBlock(t, project.Detect().ProjectDir, value)
 
 			for _, path := range githubEndpoints {
 				result := getGitHubAPI(t, path)
-				if result.State != testCase.want {
-					t.Errorf("%s: Zustand %q, erwartet %q", path, result.State, testCase.want)
-				}
-				if result.Message == "" {
-					t.Errorf("%s: Zustand ohne Erklärung", path)
+				if result.State == "disabled" || result.State == "undecided" {
+					t.Errorf("%s: alter Zustand %q", path, result.State)
 				}
 			}
+			if runner.calls == 0 {
+				t.Errorf("tools.gh.status: %s hat gh trotz bereitem gh abgehalten", value)
+			}
 		})
+	}
+}
+
+// Ohne Dienst und ohne bereites gh startet kein gh-Prozess: Der Zustand sagt,
+// was fehlt, und verweist auf die Zugangsdatei.
+func TestGitHubAPIOhneBereitesGHFragtNicht(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	chdir(t, root)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("GH_CONFIG_DIR", t.TempDir())
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+	before := newGitHubClient
+	newGitHubClient = func(dir string, env []string) *github.Client {
+		t.Errorf("gh-Client angelegt, obwohl gh nicht bereit ist")
+		return before(dir, env)
+	}
+	t.Cleanup(func() { newGitHubClient = before })
+
+	for _, path := range githubEndpoints {
+		result := getGitHubAPI(t, path)
+		if result.State != github.StateNotInstalled || result.Message == "" {
+			t.Errorf("%s: Zustand %q (%q), erwartet %q", path, result.State, result.Message, github.StateNotInstalled)
+		}
+	}
+}
+
+// countingRunner zählt die Aufrufe und antwortet mit einem Fehler; es geht nur
+// darum, ob gh überhaupt gerufen wird.
+type countingRunner struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (r *countingRunner) Run(_ context.Context, _ string, _ string, _ ...string) ([]byte, error) {
+	r.mu.Lock()
+	r.calls++
+	r.mu.Unlock()
+	return nil, errors.New("Gezählt.")
+}
+
+// appendLegacyGHBlock hängt einen alten Block tools.gh an K-PLAYBOOK.yaml an,
+// wie ihn Fassungen vor Task 128 schrieben.
+func appendLegacyGHBlock(t *testing.T, projectDir string, value string) {
+	t.Helper()
+	path := project.ConfigPath(projectDir)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, []byte("\ntools:\n  gh:\n    status: "+value+"\n")...)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -97,8 +142,8 @@ func TestGitHubAPIOhneProjekt(t *testing.T) {
 	}
 }
 
-// enableGitHub legt ein Projekt mit tools.gh.status: enabled an, in dem die
-// Vorprüfung durchgeht, und setzt runner als Runner jedes Clients ein.
+// enableGitHub legt ein Projekt ohne Dienst an, in dem die Vorprüfung
+// durchgeht (gh bereit), und setzt runner als Runner jedes Clients ein.
 //
 // Die Vorprüfung liest nur Dateien und die Umgebung: ein ausführbares `gh` im
 // PATH und ein Token in GH_TOKEN genügen ihr. Aufgerufen wird dieses `gh` nie —
@@ -112,9 +157,6 @@ func enableGitHub(t *testing.T, runner github.Runner) {
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
-	}
-	if err := project.SetGHStatus(root, project.GHEnabled); err != nil {
-		t.Fatalf("tools.gh.status setzen: %v", err)
 	}
 	chdir(t, root)
 

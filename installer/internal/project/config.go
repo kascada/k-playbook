@@ -314,10 +314,8 @@ project:
   vcs: %s
 
 %s
-%s
-tools:
 %s`, PlaybookDirName, SchemaVersion, repoRoot, vcs,
-		remediationBlock(DefaultRemediationMode), docsBlockExample, ghBlock(DefaultGHStatus))
+		remediationBlock(DefaultRemediationMode), docsBlockExample)
 }
 
 func pathExists(path string) bool {

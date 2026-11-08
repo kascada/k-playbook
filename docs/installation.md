@@ -453,11 +453,7 @@ without a collection. "Collection ändern" on the status page opens the setup st
 
 ## GitHub CLI
 
-The Dependabot review works through `gh`. The **GitHub CLI** card separates two things that are easily confused.
-
-One is the **project's decision**: whether it uses `gh`. It is set here and stored in `K-PLAYBOOK.yaml` under `tools.gh.status`. Until it is made, its value is `unknown`, and the card shows it in red, not as a cosmetic defect, but because a command otherwise cannot tell whether a missing `gh` is a problem or intentional. Commands requiring `gh` stop at `unknown`.
-
-The other is the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine.
+The **GitHub CLI** card shows the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine. There is nothing to decide on the card: whether `gh` is used follows from the personal GitHub access file (`docs/github-access.md`) — with a service for the repository its selected access, without one this finding. Commands without a service stop when `gh` is missing or not logged in and name the access file as the remedy.
 
 Install and sign in through the terminal, just as with security tools: both change the host, and `gh auth login` needs a browser. The card shows the appropriate command.
 

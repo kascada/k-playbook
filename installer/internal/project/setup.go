@@ -27,10 +27,16 @@ type AssistantSetup struct {
 	// RootBlocksRemoved nennt die abgelösten Zusatzblöcke, die aus AGENTS.md
 	// entfernt wurden; ihr Inhalt kommt mit dem Briefing.
 	RootBlocksRemoved []string `json:"rootBlocksRemoved,omitempty"`
+	// ConfigBlocksRemoved nennt die abgelösten Blöcke, die aus K-PLAYBOOK.yaml
+	// entfernt wurden — heute nur LegacyGHBlockName (Task 128). Wie bei
+	// RootRefreshed ist das eine Änderung an einer Projektdatei und steht
+	// deshalb in der Antwort, nicht nur im Log.
+	ConfigBlocksRemoved []string `json:"configBlocksRemoved,omitempty"`
 }
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
-// Auflösen der Instruktionsdateien, dann der Anstoß, dann die Verlinkung.
+// Auflösen der Instruktionsdateien, dann der Anstoß, dann die Verlinkung,
+// zuletzt das Entfernen abgelöster Blöcke aus K-PLAYBOOK.yaml.
 //
 // Die Reihenfolge steckt bewusst hier und nicht in ApplyLinks. Im
 // Einrichten-Pfad läuft ApplyLinks nach ApplyRootInstructions — dann hätte die
@@ -76,6 +82,18 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 		errs = append(errs, err)
 	}
 	setup.Links = statuses
+
+	// Der alte Block tools.gh fällt ohne Rückfrage und ohne Schritt in
+	// /k-upgrade: Gelesen wird er nicht mehr, und er entscheidet nichts. Das
+	// geschieht nur hier im Schreibweg des Einrichtens, nicht in Discover —
+	// Kontext, Briefing und MCP lesen nur.
+	removed, err := RemoveLegacyGHBlock(projectDir)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if removed {
+		setup.ConfigBlocksRemoved = append(setup.ConfigBlocksRemoved, LegacyGHBlockName)
+	}
 
 	return setup, errors.Join(errs...)
 }

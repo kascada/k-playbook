@@ -11,7 +11,7 @@ import (
 // DefaultLanguages gilt, solange project.languages fehlt und die Erkennung
 // aus den Manifesten (DetectLanguages) leer ausfällt.
 //
-// Anders als bei tools.gh gibt es hier kein unknown: eine leere Auswahl wäre
+// Anders als bei git.switch gibt es hier kein unknown: eine leere Auswahl wäre
 // nicht dasselbe wie eine offene Frage, sondern hieße "keine sprachgebundenen
 // Tools" — und das ist eine Aussage, die niemand getroffen hat. Python ist die
 // Vorauswahl, weil es die häufigste Sprache in den Projekten ist, die

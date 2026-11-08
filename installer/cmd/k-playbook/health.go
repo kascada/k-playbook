@@ -125,8 +125,6 @@ auch keine fehlende GitHub-Zugangsdatei; die legt k-playbook github init an.
 Die Bereiche heute:
 
   kephalaion      eingetragen, aber nicht ok: error; nicht eingetragen: warning
-  gh              das Projekt setzt gh voraus (tools.gh.status enabled), aber
-                  die CLI fehlt oder ist nicht angemeldet: warning
   baseTools       je fehlendem Basis-Werkzeug eine warning
   versionSources  k-playbook-local/version-sources.yaml da, aber nicht lesbar
                   oder von unbekannter Fassung: error

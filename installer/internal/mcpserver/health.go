@@ -38,7 +38,7 @@ func addHealthTool(server *mcp.Server) {
 		Name: healthTool,
 		Description: "Prüft die Umgebung des Projekts und nennt alle Fehler und Warnungen auf einmal — repariert nichts. " +
 			"health.ok ist false, sobald ein Eintrag die Stufe error trägt; Warnungen lassen es true. health.problems: " +
-			"je Eintrag level (error, warning), area (kephalaion, gh, baseTools, versionSources), message (ein Satz, nie ein " +
+			"je Eintrag level (error, warning), area (kephalaion, baseTools, versionSources, …), message (ein Satz, nie ein " +
 			"Token oder Wert) und hint (die Abhilfe), sortiert nach area, dann level. Ohne Problem ist problems leer. " +
 			"Das Briefing (k_playbook_briefing) trägt denselben Report unter health; dieses Werkzeug ist für den Aufruf " +
 			"zwischendurch, etwa nach einer Abhilfe. Dieselbe Antwort wie `k-playbook health --json`.",

@@ -20,7 +20,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `documents.onDemand`, `documents.rules`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Mitgeliefert und projektlokal sind schon gegeneinander aufgelöst. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
 | `work` | Die eigene offene Arbeit aus der Projekt-Collection: `available` und `message` (ob die Collection lesbar war und sonst warum nicht), `user` (der eigene Kephalaion-User), `tasks` und `workbench` (je `ref`, `title`, `updated`; offen heißt: nicht in `done/`), `openFindings` (Zahl der offenen Befunde in `queue/findings/`). |
 | `projectDocs` | Der Einstieg der Projektdokumentation, als Verweis. |
-| `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `gh`, `baseTools`, `versionSources`), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
+| `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, …), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
 | `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.rules`, `catalogs.reviews` und `guidelines` fehlen darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
 
 ### Der Abschnitt `context`
@@ -39,7 +39,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.local.dir` | Alles, was das Projekt besitzt. |
 | `context.remediation` | Wie Befunde abgearbeitet werden: `mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`. |
 | `context.docs` | Was die Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen, aus dem Block `docs` in `K-PLAYBOOK.yaml`: `exclude` (Muster wie in `.gitignore`, relativ zu `project.repoRoot`; leer ohne Block) und `problems` (verworfene Einträge, je `pattern` und `reason`). Von hier lesen — nie die Datei selbst; eingetragen wird über `k_playbook_docs_exclude_add`. |
-| `context.gh` | Ob das Projekt die GitHub CLI nutzt und ob sie auf diesem Rechner nutzbar ist; Einzelheiten unten. |
+| `context.gh` | Der Befund zur GitHub CLI auf diesem Rechner: installiert, angemeldet, aktives Konto, bereit; Einzelheiten unten. |
 | `context.mcp` | Die Pflichtliste der MCP-Server aus der Konfiguration (`required`, `configured`). Liest kein Command; Sache der Oberfläche. |
 | `context.git` | Ob die Oberfläche das Umschalten des Branches anbietet (`switch`, `allow`, `environments`, `configured`). Liest kein Command. |
 | `context.baseTools` | Die Werkzeuge, die k-playbook selbst aufruft, und was davon fehlt: `matrix`, `present`, `missing` (je `name`, `role`, `methods`), `ok`, `installCommand`. |
@@ -66,11 +66,10 @@ vollständige Vertrag steht in `<playbook.dir>/docs/version-inventory.md`.
 ### `health`
 
 `health` bewertet, was `context` an Umgebungsangaben trägt, und ersetzt nichts davon: Die
-Felder `context.kephalaion`, `context.gh`, `context.baseTools` und `context.versionSources`
+Felder `context.kephalaion`, `context.baseTools` und `context.versionSources`
 stehen weiter unverändert da. Die Einträge heute: Die Anbindung an Kephalaion ist eingetragen,
 aber nicht `ok` — `error`, denn `keph:`-Verweise und `work` sind dann nicht erreichbar; sie
-ist nicht eingetragen — `warning`. Das Projekt setzt gh voraus (`context.gh.status` ist
-`enabled`), aber `context.gh.ready` ist falsch — `warning`. Je fehlendem Basis-Werkzeug
+ist nicht eingetragen — `warning`. Je fehlendem Basis-Werkzeug
 (`context.baseTools.missing`) — `warning`. Die Quellenkonfiguration des Versionsinventars
 ist da, aber nicht lesbar oder von unbekannter Fassung (`context.versionSources.error`) —
 `error`; der Eintrag nennt den Pfad, die Einzelheiten stehen in `context.versionSources.error`.
@@ -81,16 +80,14 @@ zu laden. Weitere Quellen hängen sich hier ein; die Liste der Bereiche wächst 
 
 ### `gh`
 
-`context.gh` trägt zwei getrennte Dinge. `gh.status` ist die Entscheidung des Projekts —
-`enabled`, `disabled` oder `unknown` — und steht in `K-PLAYBOOK.yaml`. `gh.installed`,
-`gh.loggedIn`, `gh.account` und `gh.ready` sind ein Befund über diesen Rechner. `gh.ready`
+`context.gh` ist ein Befund über diesen Rechner: `gh.installed`, `gh.loggedIn`, `gh.account`,
+`gh.accounts` und `gh.ready`. Eine Entscheidung des Projekts über gh gibt es nicht. `gh.ready`
 heißt beides: Die CLI ist da, und ein Konto ist hinterlegt. Gelesen wird das aus der
 Konfiguration von gh, nicht gegen den Server geprüft — ein Token kann also abgelaufen sein.
 
-Abgrenzung zu `context.github`: `gh.status` bleibt die Entscheidung des Projekts, ob es gh
-überhaupt nutzt, und gilt in beiden Fällen — `disabled` sperrt `gh` auch unter
-`k-playbook github run`, git über `run` nicht. `gh.ready` und `gh.account` gelten nur noch ohne
-Dienst: `gh.account` ist nur das gerade aktive Konto von gh und zählt allein dort, wo kein
+Abgrenzung zu `context.github`: Ob gh im Spiel ist, entscheidet allein der Weg zu GitHub — mit
+Dienst dessen gewählter Zugang, ohne Dienst `gh.ready`. `gh.ready` und `gh.account` gelten nur
+ohne Dienst: `gh.account` ist nur das gerade aktive Konto von gh und zählt allein dort, wo kein
 Dienst für das Ziel-Repo passt; passt einer, sagt dessen `selected`, welcher Zugang gilt.
 Welcher Zweig gilt und was ein Command dann tut, entscheidet
 `k-playbook:/commands/_shared/gh.md`.

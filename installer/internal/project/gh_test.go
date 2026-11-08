@@ -1,174 +1,37 @@
 package project
 
 import (
-	"os"
+	"encoding/json"
 	"strings"
 	"testing"
 )
 
-func TestParseGHStatus(t *testing.T) {
-	cases := []struct {
-		name       string
-		content    string
-		want       GHStatus
-		configured bool
-		wantErr    bool
-	}{
-		{
-			name:       "ohne tools-Block gilt unknown",
-			content:    "schema_version: 3\n\nproject:\n  repo_root: .\n",
-			want:       GHUnknown,
-			configured: false,
-		},
-		{
-			name:       "gelesen wird tools.gh.status",
-			content:    "tools:\n  gh:\n    status: enabled\n",
-			want:       GHEnabled,
-			configured: true,
-		},
-		{
-			name: "ein Nachbarblock stört nicht",
-			content: `tools:
-  beispiel-tool:
-    target: app
-    report:
-      status: enabled
-  gh:
-    status: disabled
-`,
-			want:       GHDisabled,
-			configured: true,
-		},
-		{
-			name: "status außerhalb von gh zählt nicht",
-			content: `tools:
-  beispiel-tool:
-    report:
-      status: enabled
-`,
-			want:       GHUnknown,
-			configured: false,
-		},
-		{
-			name:       "ein unbekannter Wert ist ein Fehler",
-			content:    "tools:\n  gh:\n    status: vielleicht\n",
-			configured: true,
-			wantErr:    true,
-		},
-	}
+// Ein altes K-PLAYBOOK.yaml mit tools.gh bricht nichts (Task 128): Der Block
+// wird nicht mehr gelesen, auch nicht mit einem unbekannten Wert, und die
+// Kontextausgabe trägt nur noch den Befund dieses Rechners.
+func TestBuildContextIgnoriertAltenGHBlock(t *testing.T) {
+	for _, value := range []string{"disabled", "enabled", "unknown", "vielleicht"} {
+		t.Run(value, func(t *testing.T) {
+			root := newContextProject(t)
+			write(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n\ntools:\n  gh:\n    status: "+value+"\n")
 
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			status, configured, err := parseGHStatus(testCase.content)
-			if testCase.wantErr {
-				if err == nil {
-					t.Fatalf("kein Fehler für %q", testCase.content)
-				}
-				return
-			}
+			built, err := BuildContext(root)
 			if err != nil {
-				t.Fatalf("unerwarteter Fehler: %v", err)
+				t.Fatalf("BuildContext mit tools.gh.status: %s: %v", value, err)
 			}
-			if status != testCase.want {
-				t.Errorf("status = %q, erwartet %q", status, testCase.want)
+			if built.GH.Host != GHHost {
+				t.Errorf("context.gh.host = %q, erwartet %q", built.GH.Host, GHHost)
 			}
-			if configured != testCase.configured {
-				t.Errorf("configured = %t, erwartet %t", configured, testCase.configured)
+			data, err := json.Marshal(built.GH)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, field := range []string{`"status"`, `"configured"`} {
+				if strings.Contains(string(data), field) {
+					t.Errorf("context.gh trägt noch %s: %s", field, data)
+				}
 			}
 		})
-	}
-}
-
-func TestSetGHStatusLegtBlockAn(t *testing.T) {
-	dir := writeConfig(t, `schema_version: 3
-
-project:
-  repo_root: .
-  vcs: git
-
-remediation:
-  mode: task-first
-`)
-
-	if err := SetGHStatus(dir, GHEnabled); err != nil {
-		t.Fatalf("SetGHStatus: %v", err)
-	}
-
-	updated := readConfig(t, dir)
-	if !strings.Contains(updated, "tools:\n  gh:\n") {
-		t.Errorf("tools.gh fehlt:\n%s", updated)
-	}
-	// Was vorher dastand, bleibt stehen.
-	if !strings.Contains(updated, "mode: task-first") {
-		t.Errorf("remediation verloren:\n%s", updated)
-	}
-
-	status, configured, err := parseGHStatus(updated)
-	if err != nil {
-		t.Fatalf("parseGHStatus: %v", err)
-	}
-	if status != GHEnabled || !configured {
-		t.Errorf("status = %q, configured = %t", status, configured)
-	}
-}
-
-// Der Nachbar im tools-Block gehört einem anderen Tool und darf beim Schreiben
-// nicht verlorengehen.
-func TestSetGHStatusLaesstNachbarblockStehen(t *testing.T) {
-	dir := writeConfig(t, `schema_version: 3
-
-tools:
-  beispiel-tool:
-    target: app
-    languages:
-      - python
-    report:
-      status: disabled
-  gh:
-    status: enabled
-`)
-
-	if err := SetGHStatus(dir, GHDisabled); err != nil {
-		t.Fatalf("SetGHStatus: %v", err)
-	}
-
-	updated := readConfig(t, dir)
-	for _, want := range []string{"beispiel-tool:", "target: app", "- python", "report:"} {
-		if !strings.Contains(updated, want) {
-			t.Errorf("%q verloren:\n%s", want, updated)
-		}
-	}
-
-	status, _, err := parseGHStatus(updated)
-	if err != nil {
-		t.Fatalf("parseGHStatus: %v", err)
-	}
-	if status != GHDisabled {
-		t.Errorf("status = %q, erwartet disabled", status)
-	}
-}
-
-// Zweimal schreiben darf keinen zweiten Block hinterlassen.
-func TestSetGHStatusIstWiederholbar(t *testing.T) {
-	dir := writeConfig(t, "schema_version: 3\n\ntools:\n  gh:\n    status: unknown\n")
-
-	for _, status := range []GHStatus{GHEnabled, GHDisabled, GHEnabled} {
-		if err := SetGHStatus(dir, status); err != nil {
-			t.Fatalf("SetGHStatus(%q): %v", status, err)
-		}
-	}
-
-	updated := readConfig(t, dir)
-	if count := strings.Count(updated, "  gh:\n"); count != 1 {
-		t.Errorf("gh-Block %d-mal vorhanden:\n%s", count, updated)
-	}
-}
-
-func TestSetGHStatusLehntUnbekanntesAb(t *testing.T) {
-	dir := writeConfig(t, "schema_version: 3\n")
-
-	if err := SetGHStatus(dir, GHStatus("vielleicht")); err == nil {
-		t.Fatal("unbekannter Status wurde geschrieben")
 	}
 }
 
@@ -207,13 +70,4 @@ func TestDetectGHMitTokenAusDerUmgebung(t *testing.T) {
 	if state.Account != "" {
 		t.Errorf("Account = %q, erwartet leer: die Umgebung kennt keinen Namen", state.Account)
 	}
-}
-
-func readConfig(t *testing.T, dir string) string {
-	t.Helper()
-	data, err := os.ReadFile(ConfigPath(dir))
-	if err != nil {
-		t.Fatalf("Konfiguration lesen: %v", err)
-	}
-	return string(data)
 }

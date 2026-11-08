@@ -191,6 +191,11 @@ func TestCreateConfigSchreibtDocsAlsKommentar(t *testing.T) {
 	if strings.Contains(string(data), "\ndocs:") {
 		t.Errorf("Block steht nicht nur als Kommentar da:\n%s", data)
 	}
+	// Die Vorlage legt keinen Block tools.gh mehr an, und ohne Block darunter
+	// auch keine Zeile tools: (Task 128).
+	if strings.Contains(string(data), "\ntools:") || strings.Contains(string(data), "  gh:") {
+		t.Errorf("Vorlage schreibt tools: oder gh::\n%s", data)
+	}
 
 	config, err := ReadConfig(root)
 	if err != nil {
@@ -211,10 +216,6 @@ func TestCreateConfigSchreibtDocsAlsKommentar(t *testing.T) {
 	}
 	if built.Docs.Exclude == nil || len(built.Docs.Exclude) != 0 {
 		t.Errorf("context.docs.exclude = %#v, erwartet []", built.Docs.Exclude)
-	}
-	gh, err := GHState(root)
-	if err != nil || gh.Status != DefaultGHStatus {
-		t.Errorf("GHState = %+v, %v — der Block tools: muss hinter dem Kommentar weiter gelesen werden", gh, err)
 	}
 }
 

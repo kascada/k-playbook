@@ -15,19 +15,15 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/branches"
 	"github.com/kascada/k-playbook/installer/internal/github"
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
-	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
 // branchesServiceProject ist newBranchesProject mit einem GitHub-Remote für
-// origin, tools.gh.status: enabled, einem gh im PATH, das nie laufen darf,
+// origin, einem gh im PATH, das nie laufen darf,
 // und der Zugangsdatei config (leer: keine).
 func branchesServiceProject(t *testing.T, config string) string {
 	t.Helper()
 	root, _ := newBranchesProject(t, "")
 	branchesGit(t, root, "remote", "set-url", "origin", "https://github.com/kascada/k-playbook.git")
-	if err := project.SetGHStatus(root, project.GHEnabled); err != nil {
-		t.Fatal(err)
-	}
 	bin := t.TempDir()
 	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\necho \"gh gestartet: $*\" >&2\nexit 99\n"), 0o755); err != nil {
 		t.Fatal(err)

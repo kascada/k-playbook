@@ -45,8 +45,6 @@ const FOLD_FROM = 8;
 // dabei trägt, hängt daran, ob etwas kaputt ist oder nur nicht vorgesehen.
 const STATE_TONE = {
   ok: "ok",
-  disabled: "muted",
-  undecided: "warn",
   "no-project": "muted",
   "not-installed": "warn",
   "not-logged-in": "warn",
@@ -71,8 +69,6 @@ const STATE_TONE = {
 };
 
 const STATE_LABEL = {
-  disabled: "Nicht genutzt",
-  undecided: "Offen",
   "no-project": "Kein Projekt",
   "not-installed": "gh fehlt",
   "not-logged-in": "Nicht angemeldet",

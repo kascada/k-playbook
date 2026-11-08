@@ -1,8 +1,6 @@
 package project
 
 import (
-	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -11,71 +9,17 @@ import (
 
 // GHHost ist der Host, um den es geht — ghconfig.Host, hier unter dem Namen,
 // den die Oberfläche und die Kontextausgabe schon tragen. Bewusst nur einer:
-// Enterprise-Instanzen hätten eigene Accounts je Host und eine eigene
-// Entscheidung je Projekt; das wäre ein anderes Feature als das hier.
+// Enterprise-Instanzen hätten eigene Accounts je Host; das wäre ein anderes
+// Feature als das hier.
 const GHHost = ghconfig.Host
 
-// GHStatus ist die Projektentscheidung zur GitHub CLI.
-type GHStatus string
-
-const (
-	// GHUnknown: noch nicht entschieden. Ausdrücklicher Zustand, kein
-	// stillschweigendes Nein — die Oberfläche zeigt ihn als offenen Punkt.
-	GHUnknown GHStatus = "unknown"
-	// GHEnabled: das Projekt setzt gh voraus.
-	GHEnabled GHStatus = "enabled"
-	// GHDisabled: das Projekt kommt ohne gh aus.
-	GHDisabled GHStatus = "disabled"
-)
-
-// DefaultGHStatus gilt, solange nichts in der Datei steht.
-const DefaultGHStatus = GHUnknown
-
-// GHChoice beschreibt eine Entscheidung für die Auswahl in der Oberfläche.
-type GHChoice struct {
-	Status      GHStatus `json:"status"`
-	Label       string   `json:"label"`
-	Description string   `json:"description"`
-}
-
-// GHChoices sind die wählbaren Entscheidungen. `unknown` fehlt bewusst: es ist
-// der Ausgangszustand, keine Wahl.
-func GHChoices() []GHChoice {
-	return []GHChoice{
-		{
-			Status:      GHEnabled,
-			Label:       "gh wird genutzt",
-			Description: "Das Dependabot-Review darf gh voraussetzen und bricht ab, wenn es fehlt oder keine Anmeldung besteht.",
-		},
-		{
-			Status:      GHDisabled,
-			Label:       "gh wird nicht genutzt",
-			Description: "Commands, die gh brauchen, melden das als nicht vorgesehen, statt zur Installation aufzufordern.",
-		},
-	}
-}
-
-// ValidGHStatus meldet, ob der Wert bekannt ist.
-func ValidGHStatus(status GHStatus) bool {
-	switch status {
-	case GHUnknown, GHEnabled, GHDisabled:
-		return true
-	}
-	return false
-}
-
-// GH ist der zusammengeführte Zustand: die Projektentscheidung aus der
-// Konfiguration und der Host-Befund.
-//
-// Beides gehört zusammen in eine Antwort, aber nicht in dieselbe Datei: die
-// Entscheidung ist versioniert, der Befund gilt nur für diesen Rechner.
+// GH ist der Befund zur GitHub CLI auf diesem Rechner. Eine Projektentscheidung
+// darüber gibt es nicht mehr (Task 128): Ob gh genutzt wird, ergibt sich aus
+// der GitHub-Zugangsdatei, ohne Dienst daraus, ob gh bereit ist (Ready). Ein
+// alter Block tools.gh in K-PLAYBOOK.yaml wird nicht gelesen; das Einrichten
+// entfernt ihn (RemoveLegacyGHBlock).
 type GH struct {
 	Host string `json:"host"`
-	// Status ist die Projektentscheidung aus tools.gh.status.
-	Status GHStatus `json:"status"`
-	// Configured meldet, ob der Wert in der Datei stand. Ohne Eintrag gilt
-	// unknown, und die Oberfläche kann das als offenen Punkt zeigen.
-	Configured bool `json:"configured"`
 	// Installed und Path sind der Host-Befund.
 	Installed bool   `json:"installed"`
 	Path      string `json:"path"`
@@ -93,95 +37,6 @@ type GH struct {
 	TokenFromEnv bool `json:"tokenFromEnv"`
 	// Ready fasst zusammen, was ein Command wissen muss: gh ist da und angemeldet.
 	Ready bool `json:"ready"`
-}
-
-// ReadGH liest die Projektentscheidung aus tools.gh.status.
-func ReadGH(projectDir string) (GHStatus, bool, error) {
-	data, err := os.ReadFile(ConfigPath(projectDir))
-	if err != nil {
-		return DefaultGHStatus, false, err
-	}
-	return parseGHStatus(string(data))
-}
-
-// parseGHStatus liest tools.gh.status zeilenweise. Wie beim Rest der
-// Konfiguration bewusst ohne YAML-Parser: gelesen wird ein Skalar, und
-// Kommentare, Reihenfolge und unbekannte Blöcke bleiben unangetastet, wenn
-// später zurückgeschrieben wird.
-func parseGHStatus(content string) (GHStatus, bool, error) {
-	inTools := false
-	toolsIndent := -1
-	ghIndent := -1
-
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := lineIndent(line)
-		key, value, found := strings.Cut(trimmed, ":")
-		if !found {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		if indent == 0 {
-			inTools = key == "tools"
-			toolsIndent = 0
-			ghIndent = -1
-			continue
-		}
-		if !inTools {
-			continue
-		}
-		// Zurück auf die Ebene der Tool-Namen: der gh-Block ist zu Ende.
-		if ghIndent >= 0 && indent <= ghIndent {
-			ghIndent = -1
-		}
-		if ghIndent < 0 {
-			if key == "gh" && value == "" && indent > toolsIndent {
-				ghIndent = indent
-			}
-			continue
-		}
-		if key == "status" {
-			status := GHStatus(value)
-			if !ValidGHStatus(status) {
-				return DefaultGHStatus, true, fmt.Errorf("tools.gh.status hat den unbekannten Wert %q; erlaubt sind unknown, enabled und disabled", value)
-			}
-			return status, true, nil
-		}
-	}
-	return DefaultGHStatus, false, nil
-}
-
-// SetGHStatus schreibt die Projektentscheidung nach tools.gh.status.
-//
-// Ersetzt wird nur der gh-Block. Ein danebenliegender Block eines anderen Tools
-// bleibt unberührt.
-func SetGHStatus(projectDir string, status GHStatus) error {
-	if !ValidGHStatus(status) {
-		return fmt.Errorf("unbekannter gh-Status: %s", status)
-	}
-
-	path := ConfigPath(projectDir)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	updated := replaceNestedBlock(string(data), "tools", "gh", ghBlock(status))
-	return os.WriteFile(path, []byte(updated), 0o644)
-}
-
-func ghBlock(status GHStatus) string {
-	return fmt.Sprintf(`  gh:
-    # Soll die GitHub CLI genutzt werden? unknown, enabled oder disabled.
-    # Ob gh auf diesem Rechner liegt, steht bewusst nicht hier: das ist ein
-    # Host-Befund und gehört in die Kontextausgabe.
-    status: %s
-`, status)
 }
 
 // DetectGH liest den Host-Befund: liegt gh im PATH, und ist ein Account
@@ -214,15 +69,6 @@ func DetectGH() GH {
 
 	state.Ready = state.Installed && state.LoggedIn
 	return state
-}
-
-// GHState führt Entscheidung und Befund zusammen.
-func GHState(projectDir string) (GH, error) {
-	state := DetectGH()
-	status, configured, err := ReadGH(projectDir)
-	state.Status = status
-	state.Configured = configured
-	return state, err
 }
 
 func lineIndent(line string) int {

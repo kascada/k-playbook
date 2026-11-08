@@ -56,7 +56,7 @@ fields from two loads.
 | `local.dir` | Everything the project owns. |
 | `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
 | `remediation` | How findings are to be worked off. |
-| `gh` | Whether this project uses the GitHub CLI, and whether it is usable on this machine. |
+| `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
 | `guidelines` | Project guideline files. |
 | `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that file yourself. |
 
@@ -73,14 +73,12 @@ finding, not an empty result. The
 field is absent on an installation older than it. The full contract is in
 `<playbook.dir>/docs/version-inventory.md`.
 
-`gh` carries two separate things. `gh.status` is the project's decision — `enabled`,
-`disabled` or `unknown` — and lives in `K-PLAYBOOK.yaml`. It applies whether or not a
-service of the personal GitHub access file matches the repository: `disabled` keeps `gh`
-out, under `k-playbook github run` too. `gh.installed`, `gh.loggedIn`, `gh.account` and
-`gh.ready` are a host finding for this machine only, and they count only where no service
-matches; where one does, its `selected` says which access applies. `gh.ready` means both:
-the CLI is there and an account is on file. It is read from gh's own configuration, not
-verified against the server, so a token can still be expired.
+`gh` is a host finding for this machine only: `gh.installed`, `gh.loggedIn`, `gh.account`,
+`gh.accounts` and `gh.ready`. There is no project decision about gh. Whether gh is in play is
+decided by the way to GitHub alone: these fields count only where no service of the personal
+GitHub access file matches the repository; where one does, its `selected` says which access
+applies. `gh.ready` means both: the CLI is there and an account is on file. It is read from
+gh's own configuration, not verified against the server, so a token can still be expired.
 
 ## Where the rest lives
 

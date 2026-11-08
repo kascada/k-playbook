@@ -1,6 +1,6 @@
 ---
 title: GitHub-Zugang vor dem ersten Aufruf
-description: Welcher Zugang für GitHub gilt, bevor ein Command oder Review gh oder einen Netzbefehl von git ruft — Dienst nach dem Ziel-Repo, context.gh.status in beiden Zweigen, mit Dienst k-playbook github run samt --write, ein Dienst ohne Kanal api, ohne Dienst context.gh.ready und context.gh.account, die Zugangsdatei als Abhilfe samt Hilfe beim Einrichten und das Nennen vor dem Schreiben.
+description: Welcher Zugang für GitHub gilt, bevor ein Command oder Review gh oder einen Netzbefehl von git ruft — Dienst nach dem Ziel-Repo, mit Dienst k-playbook github run samt --write, ein Dienst ohne Kanal api, ohne Dienst context.gh.ready und context.gh.account, die Zugangsdatei als Abhilfe samt Hilfe beim Einrichten und das Nennen vor dem Schreiben.
 ---
 
 Diese Stelle entscheidet, welcher Zugang für GitHub gilt. Wer sie einbindet oder liest,
@@ -13,12 +13,6 @@ nur für das Repo des Arbeitsverzeichnisses. Für ein anderes Repo — etwa `Tar
 `/k-task-run` — nennt `k-playbook github show` alle Dienste mit ihrem `repo`. Passt genau ein Dienst, nimmst du ihn; passen mehrere, fragst du, welcher
 gilt; passt keiner, gilt der Zweig „Ohne Dienst“. Einzelheiten stehen im Abschnitt „Den Dienst
 bestimmen“ in `k-playbook:/instructions/on-demand/github.md`.
-
-**Zuerst `context.gh.status`, in beiden Zweigen.** Steht er auf `disabled`, hat sich das
-Projekt gegen `gh` entschieden: kein `gh`, auch nicht unter `run`; halte an und melde es. Steht
-er auf `unknown`, hat niemand entschieden: halte an und verweise auf `/k-gui`. Netzbefehle von
-git über `run` betrifft das nicht — `gh.status` ist die Entscheidung über die GitHub CLI, nicht
-über git.
 
 **Mit Dienst.** Jeder Netzbefehl gegen das Repo — git (clone, fetch, pull, push, ls-remote)
 und jedes `gh` — läuft als `k-playbook github run <dienst> -- …`; was nach GitHub schreibt

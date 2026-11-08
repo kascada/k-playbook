@@ -108,9 +108,16 @@ func TestBranchesAPIOhneProjekt(t *testing.T) {
 	}
 }
 
-// Die Liste steht ohne gh da; der Default-Branch kommt aus origin/HEAD.
+// Die Liste steht ohne gh da; der Default-Branch kommt aus origin/HEAD. Ohne
+// Dienst und ohne bereites gh kommen keine GitHub-Daten hinzu — PATH und
+// gh-Konfiguration sind deshalb von denen des Rechners getrennt.
 func TestBranchesAPIListeOhneGH(t *testing.T) {
 	newBranchesProject(t, "")
+	gitPath, _ := exec.LookPath("git")
+	t.Setenv("PATH", filepath.Dir(gitPath))
+	t.Setenv("GH_CONFIG_DIR", t.TempDir())
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
 	listing := getBranches(t)
 	if listing.State != branches.StateOK {
 		t.Fatalf("State = %q: %s", listing.State, listing.Message)
@@ -126,16 +133,14 @@ func TestBranchesAPIListeOhneGH(t *testing.T) {
 	}
 }
 
-// „Mit gh" heißt tools.gh.status = enabled. Bei unknown und disabled kommen keine
-// GitHub-Daten hinzu, auch wenn gh installiert und angemeldet ist — und es startet
-// kein gh-Prozess.
-func TestBranchesAPIOhneEntscheidungKeinGH(t *testing.T) {
-	for _, status := range []project.GHStatus{project.GHUnknown, project.GHDisabled} {
-		t.Run(string(status), func(t *testing.T) {
+// Ein alter Block tools.gh entscheidet nichts mehr (Task 128): Mit bereitem gh
+// und ohne Dienst kommen die GitHub-Daten hinzu, auch bei status: unknown oder
+// disabled — der gh-Client wird angelegt.
+func TestBranchesAPIIgnoriertAltenGHBlock(t *testing.T) {
+	for _, value := range []string{"unknown", "disabled"} {
+		t.Run(value, func(t *testing.T) {
 			root, _ := newBranchesProject(t, "")
-			if err := project.SetGHStatus(root, status); err != nil {
-				t.Fatal(err)
-			}
+			appendLegacyGHBlock(t, root, value)
 			bin := t.TempDir()
 			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\nexit 99\n"), 0o755); err != nil {
 				t.Fatal(err)
@@ -145,16 +150,17 @@ func TestBranchesAPIOhneEntscheidungKeinGH(t *testing.T) {
 			t.Setenv("GH_CONFIG_DIR", t.TempDir())
 			t.Setenv("GH_TOKEN", "nur-fuer-die-vorpruefung")
 
+			created := 0
 			before := newGitHubClient
 			newGitHubClient = func(dir string, env []string) *github.Client {
-				t.Errorf("gh-Client angelegt, obwohl tools.gh.status = %s", status)
-				return before(dir, env)
+				created++
+				return &github.Client{Runner: &countingRunner{}, Dir: dir, Timeout: github.DefaultTimeout, Env: env}
 			}
 			t.Cleanup(func() { newGitHubClient = before })
 
 			listing := getBranches(t)
-			if listing.State != branches.StateOK || listing.GitHub.Enabled || listing.Default.Source != "remote-head" {
-				t.Errorf("listing: State=%q GitHub=%+v Default=%+v", listing.State, listing.GitHub, listing.Default)
+			if listing.State != branches.StateOK || created == 0 || !listing.GitHub.Enabled {
+				t.Errorf("tools.gh.status: %s — State=%q created=%d GitHub=%+v", value, listing.State, created, listing.GitHub)
 			}
 		})
 	}
@@ -257,14 +263,10 @@ func TestBranchesAPIGitHubZeitgrenzeLaesstListeStehen(t *testing.T) {
 	}
 }
 
-// enableGitHubInCurrentProject setzt tools.gh.status = enabled im Projekt des
-// Arbeitsverzeichnisses und leitet jeden gh-Aufruf an runner.
+// enableGitHubInCurrentProject macht gh im Projekt des Arbeitsverzeichnisses
+// bereit (ohne Dienst) und leitet jeden gh-Aufruf an runner.
 func enableGitHubInCurrentProject(t *testing.T, runner github.Runner) {
 	t.Helper()
-	environment := project.Detect()
-	if err := project.SetGHStatus(environment.ProjectDir, project.GHEnabled); err != nil {
-		t.Fatal(err)
-	}
 	bin := t.TempDir()
 	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\nexit 99\n"), 0o755); err != nil {
 		t.Fatal(err)

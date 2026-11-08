@@ -116,6 +116,9 @@ func describeSetup(setup project.AssistantSetup) string {
 	if len(setup.RootBlocksRemoved) > 0 {
 		parts = append(parts, describeRemovedBlocks(setup.RootBlocksRemoved))
 	}
+	if len(setup.ConfigBlocksRemoved) > 0 {
+		parts = append(parts, project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
+	}
 	// Ein Block, der sich nicht abgrenzen ließ (Root.Hint), steht nicht hier:
 	// er kommt als Fehler aus ApplyAssistantSetup und damit ohnehin in den
 	// Text; beim Lesen der Karte zeigt ihn der Zustand der Wurzeldatei.

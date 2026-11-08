@@ -47,8 +47,8 @@ type Options struct {
 }
 
 // GitHubData sind die GitHub-Daten, die der Aufrufer beschafft hat. Enabled ist
-// nur wahr bei tools.gh.status = enabled und bereitem gh; sonst bleiben alle
-// Felder leer, auch wenn gh installiert ist.
+// nur wahr, wenn es einen Weg zur API gibt — einen Dienst der Zugangsdatei mit
+// api-Kanal oder, ohne Dienst, ein bereites gh; sonst bleiben alle Felder leer.
 type GitHubData struct {
 	Enabled bool `json:"enabled"`
 	// Result ist der Zustand der Vorprüfung oder des ersten Aufrufs.

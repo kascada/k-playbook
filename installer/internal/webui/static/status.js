@@ -37,7 +37,6 @@ const ENVIRONMENT_LEVEL_LABELS = {
 
 const ENVIRONMENT_AREA_LABELS = {
   "kephalaion": "Kephalaion",
-  "gh": "GitHub CLI",
   "baseTools": "Basis-Werkzeuge",
   "versionSources": "Versionsinventar",
   "github": "GitHub-Zugänge",

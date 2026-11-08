@@ -1,6 +1,6 @@
 ---
 title: GitHub über run
-description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, gh.status disabled, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
+description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
 ---
 
 ## GitHub über run
@@ -31,12 +31,6 @@ Danach:
 Commands und Reviews, die GitHub erreichen, entscheiden den Zugang an einer Stelle:
 `k-playbook:/commands/_shared/gh.md`. Sie binden sie ein oder lesen sie und wiederholen sie
 nicht.
-
-### gh gesperrt
-
-Steht `context.gh.status` auf `disabled`, nutzt das Projekt `gh` nicht — auch nicht unter `run`.
-Netzbefehle von git über `run` bleiben davon unberührt: `gh.status` ist die Entscheidung über
-die GitHub CLI, nicht über git.
 
 ### Schreiben
 

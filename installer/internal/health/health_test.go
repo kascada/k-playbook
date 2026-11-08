@@ -76,20 +76,20 @@ func TestCheckSammeltAlleUndWertetStufen(t *testing.T) {
 // Die Reihenfolge ist stabil: Bereich, dann Stufe (error vor warning), dann
 // Satz — unabhängig davon, in welcher Reihenfolge die Quellen liefern.
 func TestCheckSortiertNachBereichDannStufe(t *testing.T) {
-	ghWarn := Problem{Level: LevelWarning, Area: AreaGH, Message: "gh fehlt."}
+	githubWarn := Problem{Level: LevelWarning, Area: AreaGitHub, Message: "Kein Zugang verfügbar."}
 	kephWarn := Problem{Level: LevelWarning, Area: AreaKephalaion, Message: "nicht eingetragen."}
 	kephErr := Problem{Level: LevelError, Area: AreaKephalaion, Message: "Node antwortet nicht."}
 	toolB := Problem{Level: LevelWarning, Area: AreaBaseTools, Message: "b fehlt."}
 	toolA := Problem{Level: LevelWarning, Area: AreaBaseTools, Message: "a fehlt."}
 
-	withSources(t, fixed(kephWarn, ghWarn), fixed(toolB, kephErr, toolA))
+	withSources(t, fixed(kephWarn, githubWarn), fixed(toolB, kephErr, toolA))
 	got := Check(context.Background(), "/p").Problems
-	want := []Problem{toolA, toolB, ghWarn, kephErr, kephWarn}
+	want := []Problem{toolA, toolB, githubWarn, kephErr, kephWarn}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Reihenfolge:\n%+v\nerwartet\n%+v", got, want)
 	}
 
-	withSources(t, fixed(toolA, kephErr, toolB), fixed(ghWarn, kephWarn))
+	withSources(t, fixed(toolA, kephErr, toolB), fixed(githubWarn, kephWarn))
 	if again := Check(context.Background(), "/p").Problems; !reflect.DeepEqual(again, want) {
 		t.Errorf("Reihenfolge hängt von den Quellen ab:\n%+v", again)
 	}

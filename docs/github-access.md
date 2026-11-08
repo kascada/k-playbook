@@ -805,8 +805,8 @@ with `projectServices` only beside it, and works as before when the line names n
 Commands and reviews that reach GitHub — the PR step of `/k-task-run` and the review
 `review-dependabot-alerts` — decide the access in one place,
 `defaults/commands/_shared/gh.md` (task 125): the service by the repository the command targets
-(`projectServices` for the working directory's repository, `show` for any other), `gh.status`
-first in both branches, with a service `run` (`--write` for writing), a service without an `api`
+(`projectServices` for the working directory's repository, `show` for any other), with a
+service `run` (`--write` for writing), a service without an `api`
 channel calls no `gh` — `run` only removes `GH_TOKEN`/`GITHUB_TOKEN`, and `gh` then falls back to
 its active login (measured 2026-11-07) —, and without a service `context.gh` as before, with the
 access file and help setting it up as the remedy when that fails. `context.gh.ready` and
@@ -834,8 +834,9 @@ reads, so it never passes `--write`. There is no rule of its own.
 - **No fallback.** When a call over the service fails, the page shows that failure; it does not
   retry with the active login. Nothing falls back when a service matches but `Choose` is empty
   either.
-- **`tools.gh.status: disabled`** still blocks `gh` (`disabled` on `/github`, no GitHub data on
-  `/branches`). The fetch is not affected; it is git, not the GitHub CLI.
+- **No project switch.** Whether `gh` runs depends only on the route above: there is no
+  project setting that blocks it (task 128). The fetch
+  never depended on it; it is git, not the GitHub CLI.
 - **Other remotes** of a `fetch --all` run as before: `GitConfig` only redirects the forms of
   the service's repository. An `ssh` access with `key` sets `GIT_SSH_COMMAND` for the whole
   process and therefore for other `ssh` remotes as well — as with `run`.

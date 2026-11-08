@@ -15,7 +15,6 @@ const elements = {
   remediationMessage: document.getElementById("remediation-message"),
   ghCard: document.getElementById("gh-card"),
   ghPill: document.getElementById("gh-pill"),
-  ghChoices: document.getElementById("gh-choices"),
   ghFacts: document.getElementById("gh-facts"),
   ghMessage: document.getElementById("gh-message"),
   ghCommand: document.getElementById("gh-command"),
@@ -783,10 +782,11 @@ function renderRemediation(data) {
   }
 }
 
-// Der gh-Block trennt zwei Dinge, die leicht verwechselt werden: die Entscheidung
-// des Projekts steht in der Konfiguration und wird hier gesetzt; ob gh auf diesem
-// Rechner liegt und angemeldet ist, ist ein Befund und wird nur gezeigt.
-// Installation und Anmeldung bleiben im Terminal, wie bei den Security-Tools.
+// Der gh-Block zeigt nur den Befund dieses Rechners: ob gh im PATH liegt und
+// angemeldet ist. Eine Projektentscheidung über gh gibt es nicht mehr; ob gh
+// genutzt wird, ergibt sich aus der GitHub-Zugangsdatei, ohne Dienst aus diesem
+// Befund. Installation und Anmeldung bleiben im Terminal, wie bei den
+// Security-Tools.
 async function loadGH() {
   elements.ghPill.className = "pill muted";
   elements.ghPill.textContent = "Prüfen...";
@@ -799,23 +799,7 @@ async function loadGH() {
   }
 }
 
-async function setGH(status) {
-  elements.ghPill.className = "pill muted";
-  elements.ghPill.textContent = "Speichern...";
-  try {
-    const response = await fetch("/api/gh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    renderGH(await response.json());
-  } catch {
-    elements.ghMessage.textContent = "Speichern fehlgeschlagen.";
-  }
-}
-
 function renderGH(data) {
-  elements.ghChoices.replaceChildren();
   elements.ghFacts.replaceChildren();
   elements.ghMessage.textContent = data.message || "";
   elements.ghCommand.classList.add("hidden");
@@ -823,56 +807,12 @@ function renderGH(data) {
   const current = data.current || {};
   const commands = data.commands || {};
 
-  for (const choice of data.choices || []) {
-    const selected = current.status === choice.status;
-
-    const label = document.createElement("label");
-    label.className = selected ? "choice selected" : "choice";
-
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "gh-status";
-    input.value = choice.status;
-    input.checked = selected;
-    input.addEventListener("change", () => setGH(choice.status));
-
-    const text = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "choice-label";
-    title.textContent = choice.label;
-    const description = document.createElement("p");
-    description.className = "choice-description";
-    description.textContent = choice.description;
-    text.append(title, description);
-
-    label.append(input, text);
-    elements.ghChoices.append(label);
-  }
-
   addFact(elements.ghFacts, "gh", current.installed ? current.path : "nicht im PATH gefunden");
   if (current.installed) {
     addFact(elements.ghFacts, "Anmeldung", ghAccountLabel(current));
     if ((current.accounts || []).length > 1) {
       addFact(elements.ghFacts, "Hinterlegte Accounts", current.accounts.join(", "));
     }
-  }
-
-  // Die offene Entscheidung ist ein Fehler und kein Hinweis: ohne sie wissen die
-  // Commands nicht, ob ein fehlendes gh ein Problem oder gewollt ist.
-  if (current.status !== "enabled" && current.status !== "disabled") {
-    elements.ghPill.className = "pill error";
-    elements.ghPill.textContent = "Nicht entschieden";
-    if (!data.message) {
-      elements.ghMessage.textContent =
-        "Noch nicht entschieden. Commands, die gh brauchen, brechen ab, bis hier eine Wahl steht.";
-    }
-    return;
-  }
-
-  if (current.status === "disabled") {
-    elements.ghPill.className = "pill muted";
-    elements.ghPill.textContent = "Nicht genutzt";
-    return;
   }
 
   if (!current.installed) {
@@ -891,16 +831,6 @@ function renderGH(data) {
 
   elements.ghPill.className = "pill ok";
   elements.ghPill.textContent = current.account ? `Angemeldet als ${current.account}` : "Angemeldet";
-
-  // Der Wechsel gilt für jedes Terminal und jedes Projekt auf diesem Rechner.
-  // Deshalb steht er hier als Befehl und nicht als Knopf: wer ihn ausführt, tut
-  // es bewusst und sieht danach das Ergebnis in seiner Shell.
-  if ((current.accounts || []).length > 1) {
-    showGHCommand(
-      "Umschalten gilt für alle Terminals und Projekte auf diesem Rechner, nicht nur für dieses:",
-      commands.switch,
-    );
-  }
 }
 
 function ghAccountLabel(current) {

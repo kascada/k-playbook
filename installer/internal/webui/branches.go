@@ -91,10 +91,9 @@ func applySettingsError(policy *branches.SwitchPolicy, err error) {
 	policy.Message = "Der Abschnitt git: in " + project.ConfigFileName + " ist fehlerhaft, deshalb wird nicht umgeschaltet: " + err.Error()
 }
 
-// branchesGitHub beschafft die GitHub-Daten. „Mit gh" heißt tools.gh.status =
-// enabled und gh bereit; bei unknown oder disabled startet kein gh-Prozess,
-// auch wenn gh installiert ist — dieselbe Vorprüfung wie auf /github, mit
-// demselben Weg über einen Dienst der Zugangsdatei (route, schon bestimmt).
+// branchesGitHub beschafft die GitHub-Daten — dieselbe Vorprüfung wie auf
+// /github, mit demselben Weg über einen Dienst der Zugangsdatei (route, schon
+// bestimmt); ohne Dienst nur, wenn gh bereit ist.
 func branchesGitHub(ctx context.Context, route *project.GitHubRoute) branches.GitHubData {
 	access := githubClientRoute(ctx, route, true)
 	client := access.client
@@ -166,18 +165,17 @@ func branchesHandler(w http.ResponseWriter, r *http.Request) {
 		Runner:     branchesReadRunner,
 	})
 	applySettingsError(&listing.Switch, resolved.settingsErr)
-	listing.Via, listing.FetchBlock = branchesRoute(resolved.projectDir, route)
+	listing.Via, listing.FetchBlock = branchesRoute(route)
 	writeGitHubJSON(w, r, listing)
 }
 
 // branchesRoute nennt, worüber die Seite GitHub erreicht — wie die
 // GitHub-Seite —, und ob der Fetch gesperrt ist: bei fehlerhafter
 // Zugangsdatei und ohne verfügbaren Zugang läuft er nicht, ohne api-Kanal
-// schon (über den git-Kanal). tools.gh.status betrifft den Fetch nicht.
-func branchesRoute(projectDir string, route *project.GitHubRoute) (*github.Via, *github.Result) {
+// schon (über den git-Kanal).
+func branchesRoute(route *project.GitHubRoute) (*github.Via, *github.Result) {
 	if route == nil {
-		state, _ := project.GHState(projectDir)
-		via := accountVia(state)
+		via := accountVia(project.DetectGH())
 		via.Note = accountNote + " git fetch läuft über die git-Konfiguration des Rechners."
 		return via, nil
 	}

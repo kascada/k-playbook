@@ -392,7 +392,8 @@ installer/
 │   ├── remediation.go           remediation:-Block lesen und setzen
 │   ├── context.go               Arbeitsstand auflösen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
-│   ├── gh.go                    tools.gh lesen und setzen, gh-Befund dieses Rechners
+│   ├── gh.go                    gh-Befund dieses Rechners, Zeilenhelfer für verschachtelte Blöcke
+│   ├── gh_legacy.go             alten Block tools.gh beim Einrichten entfernen (Task 128)
 │   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir
 │   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
@@ -426,7 +427,7 @@ installer/
 │   │                            Übergangsabschnitt context — der Rest der Kontext-
 │   │                            ausgabe aus ContextForDir (Task 091)
 │   ├── health.go                die Quellen der Umgebungsprüfung: Kephalaion-Anbindung,
-│   │                            gh, Basis-Werkzeuge, Quellenkonfiguration und die
+│   │                            Basis-Werkzeuge, Quellenkonfiguration und die
 │   │                            GitHub-Zugangsdatei (über githubaccess) — bei init
 │   │                            in internal/health registriert (health darf project
 │   │                            nicht importieren, das Briefing trägt den Report)
@@ -471,8 +472,8 @@ installer/
 │   ├── restart.go               Programm aktualisieren und den Dienst daraus neu starten:
 │   │                            Sperre, Übergabe der Laufzeitdatei, Rückfall
 │   ├── branches.go              Branches: Liste, Fetch, Vorprüfung, Umschalten; beschafft
-│   │                            die GitHub-Daten nur bei tools.gh.status: enabled, gh und
-│   │                            Fetch über den Dienst der Zugangsdatei (Task 126)
+│   │                            die GitHub-Daten nur, wenn es einen Weg zur API gibt; gh
+│   │                            und Fetch über den Dienst der Zugangsdatei (Task 126)
 │   ├── github_access.go         GET /api/github-access (check --json mit Verfügbarkeit,
 │   │                            ohne Netz, schreibt nichts), POST /api/github-access/init
 │   │                            (init --json, Knopf „Anlegen“) und POST
@@ -2399,16 +2400,19 @@ Checkout and Publish“; welche Kephalaion-Aufrufe dahinter stehen:
 
 ## GitHub CLI
 
-`project/gh.go` hält zwei Dinge auseinander, die in einer Karte zusammen erscheinen.
-
-Die Projektentscheidung steht in `K-PLAYBOOK.yaml` unter `tools.gh.status` und wird
-zeilenweise gelesen und geschrieben, wie der Rest der Konfiguration. `SetGHStatus()`
-ersetzt nur den `gh:`-Unterblock; `replaceNestedBlock()` lässt einen danebenliegenden
-Block eines anderen Tools stehen. Der Default ist `unknown` und
-kein `disabled`: ohne Entscheidung weiß ein Command nicht, ob ein fehlendes `gh` ein
-Problem oder gewollt ist, und die Oberfläche zeigt den offenen Punkt rot. Ein unbekannter
-Wert lässt `BuildContext()` abbrechen, damit ein Tippfehler nicht wie eine Entscheidung
-aussieht.
+`project/gh.go` trägt nur den Befund dieses Rechners. Eine Projektentscheidung über gh
+gibt es nicht mehr (Task 128): Ob gh im Spiel ist, entscheidet allein der Weg zu GitHub —
+mit Dienst der Zugangsdatei dessen gewählter Zugang, ohne Dienst `gh.ready`. Der frühere
+Block `tools.gh` mit `status` (`unknown`, `enabled`, `disabled`) wird nirgends gelesen;
+Kontext, Briefing und MCP lassen ihn auch mit unbekanntem Wert stehen. Entfernt wird er nur
+im Schreibweg des Einrichtens: `ApplyAssistantSetup()` ruft `RemoveLegacyGHBlock()`
+(`project/gh_legacy.go`), ohne Rückfrage und ohne Schritt in `/k-upgrade`, und meldet es in
+`AssistantSetup.ConfigBlocksRemoved`; `k-playbook upgrade` (auch `--check`) und
+`describeSetup` nennen es in einem Satz. Gebaut ist das auf denselben Zeilenhelfern wie
+`replaceNestedBlock()` (`isTopLevelYAMLLine`, `lineIndent`): Andere Blöcke unter `tools:` und
+ihre Kommentare bleiben, ein Kommentar auf oberster Ebene über `tools:` auch (in der alten
+Vorlage der auskommentierte Block `docs:`); bleibt unter `tools:` nichts, fällt auch `tools:`.
+Die Vorlage von `CreateConfig()` legt keinen Block `tools:` mehr an.
 
 Der Host-Befund kommt aus `DetectGH()`: ein `exec.LookPath("gh")` und ein Blick in
 `hosts.yml` im gh-Konfigurationsverzeichnis, dazu `GH_TOKEN`/`GITHUB_TOKEN`, die die
@@ -2420,11 +2424,11 @@ Netzzugriff. Deshalb steht der Befund anders als der Security-Preflight im Konte
 kostet nichts. Der Preis ist, dass ein abgelaufener Token als Anmeldung gilt — das sagen
 Karte und Doku ausdrücklich.
 
-Geschrieben wird nur die Entscheidung. Installation und Anmeldung bleiben im Terminal,
-aus demselben Grund wie bei den Security-Tools; `gh auth login` will ohnehin einen
-Browser. Auch das Umschalten zwischen Accounts steht nur als Befehl da: es gilt
-maschinenweit für jedes Terminal und jedes Projekt, und ein Approve läuft danach unter
-dem neuen Namen. Ein Knopf in einer Projektoberfläche würde diese Reichweite verdecken.
+Die Setup-Karte „GitHub CLI" zeigt nur den Befund (`GET /api/gh`) und schreibt nichts.
+Installation und Anmeldung bleiben im Terminal, aus demselben Grund wie bei den
+Security-Tools; `gh auth login` will ohnehin einen Browser. Das Umschalten zwischen Accounts
+bietet die Karte nicht an: es gilt maschinenweit für jedes Terminal und jedes Projekt, und
+mit einem Dienst der Zugangsdatei legt dieser den Zugang fest.
 
 ## Die GitHub-Ansicht
 
@@ -2442,11 +2446,9 @@ der Antwort. Zwei Zuständigkeiten, zwei Pakete.
 **Nur lesend.** Kein Aufruf dieses Pakets verändert etwas an GitHub. Ein PR verlinkt auf
 GitHub und zeigt keinen Knopf, der etwas auslöst.
 
-**Nur bei `tools.gh.status: enabled`.** Die Vorprüfung entscheidet aus Dateien, bevor ein
-Subprozess startet: die Projektentscheidung und der netzfreie Host-Befund. Steht die
-Entscheidung auf `disabled` oder `unknown`, ruft der Server `gh` gar nicht auf — das ist
-die Zusage des Zustands und nicht bloß eine andere Beschriftung. Die Seite sagt dann, wo
-die Entscheidung fällt: im Block „GitHub CLI" auf der Setup-Seite.
+**Nur mit einem Weg.** Die Vorprüfung entscheidet aus Dateien, bevor ein Subprozess
+startet: aus dem Weg (unten) und dem netzfreien Host-Befund. Eine Projektentscheidung prüft
+sie nicht mehr (Task 128); die Zustände `disabled` und `undecided` gibt es nicht mehr.
 
 **Über den Dienst der Zugangsdatei (Task 126).** Nennt ein Dienst der persönlichen
 Zugangsdatei das Repo (Vertrag `docs/github-access.md`, Abschnitt *In the interface*), läuft
@@ -2514,7 +2516,7 @@ Schlüssel. Welches Konto dahintersteht, steht nirgends im Arbeitsstand; es zu e
 hieße `ssh -T` zu rufen. Der Hinweis nennt deshalb nur den Alias.
 
 **Feste Zustände statt roher Fehlertexte.** Jede Antwort trägt ein Zustandsfeld und den
-Satz, der es erklärt: `ok`, `no-project`, `disabled`, `undecided`, `not-installed`,
+Satz, der es erklärt: `ok`, `no-project`, `not-installed`,
 `not-logged-in`, `bad-credentials`, `no-remote`, `no-access`, `log-gone`, `rate-limited`,
 `network`, `timeout`, `canceled`, `error`. `bad-credentials` steht eigens neben
 `not-logged-in`, weil `DetectGH()` „angemeldet" allein aus der gh-Konfiguration liest und
@@ -2700,8 +2702,7 @@ git:
 
 `project/git_settings.go` schneidet den Block zeilenweise aus der Datei und gibt nur ihn an
 `yamllite`: ein Fehler in einem fremden Block macht ihn nicht unlesbar, und geschrieben wird
-nichts. Ohne Abschnitt gilt `switch: unknown` — ein ausdrücklicher Zustand wie bei
-`tools.gh.status`: die Seite zeigt die Liste, bietet keinen Wechsel an und nennt die offene
+nichts. Ohne Abschnitt gilt `switch: unknown` — ein ausdrücklicher Zustand: die Seite zeigt die Liste, bietet keinen Wechsel an und nennt die offene
 Entscheidung. Ein unbekannter Wert, ein unbekannter Schlüssel, ein leerer Eintrag in
 `allow`, eine Umgebung ohne Branch, ein unzulässiger Branch-Name oder dieselbe Umgebung in
 zwei Schreibweisen (`Prod:` und `prod:`) lassen `BuildContext()` abbrechen — Umgebungen werden
@@ -2754,16 +2755,15 @@ ganzen Prozess, also auch für fremde ssh-Remotes — wie bei run. Ohne api-Kana
 der Fetch läuft. Ohne verfügbaren Zugang und bei fehlerhafter Zugangsdatei weder gh noch Fetch:
 Die Liste trägt `fetchBlock` (der Knopf ist gesperrt, der Satz verweist auf `/github-access`),
 der POST antwortet `409` ohne Fetch, und die lokalen Branches stehen trotzdem da.
-`tools.gh.status` sperrt nur gh, nicht den Fetch. Die Seite nennt den Weg als Fakt
+Die Seite nennt den Weg als Fakt
 „GitHub-Zugang“ (`via`, wie auf `/github`); ein Fetch über einen Dienst nennt die Zeile von run
 in `via`. Ohne Dienst wie bisher; ein gescheiterter Fetch trägt dann denselben Hinweis auf die
 Zugangsdatei. `branches_route_test.go` belegt mit Fake-Runner und Fake-Token, dass das Token
 weder im JSON von `/branches` und vom Fetch noch in Meldungen (auch `CommandError.Args`/`Stderr`)
 noch im Log noch in einem Argument steht.
 
-**„Mit gh“** heißt `tools.gh.status: enabled` und `gh` bereit, geprüft von derselben
-Vorprüfung wie auf `/github`. Bei `unknown` oder `disabled` startet kein gh-Prozess, auch
-wenn gh installiert ist. Mit gh laufen `gh repo view` (Repo und Default-Branch), danach
+**„Mit gh“** heißt: es gibt einen Weg zur API — ein Dienst mit api-Kanal oder, ohne Dienst,
+ein bereites `gh` —, geprüft von derselben Vorprüfung wie auf `/github`. Mit gh laufen `gh repo view` (Repo und Default-Branch), danach
 nebeneinander die PR-Abfrage der GitHub-Ansicht (offener PR je Branch) und Environments samt
 letztem Deployment je Environment. Die gh-Abfragen teilen sich ein eigenes Budget von 10 s
 (`branchesGitHubBudget`); die git-Liste hat danach ihr eigenes von 20 s (`branchesBudget`).
@@ -3767,8 +3767,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
 | `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
-| `GET` | `/api/gh` | `tools.gh` lesen, dazu den gh-Befund dieses Rechners |
-| `POST` | `/api/gh` | `tools.gh.status` setzen; installiert und meldet nichts an |
+| `GET` | `/api/gh` | der gh-Befund dieses Rechners für die Setup-Karte „GitHub CLI"; schreibt nichts |
 | `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`, dazu `via` (Dienst der Zugangsdatei und Zeile von run, ohne Dienst das aktive Konto); Frist 20 s für die ganze Anfrage, samt Wahl des Dienstes; nur lesend |
 | `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; Frist 20 s samt Auflösen; nur lesend |
 | `GET` | `/api/github/runs` | die letzten 20 Läufe mit Branch oder Tag, Ereignis, Dauer und Ergebnis; ohne Logs; Frist 20 s; nur lesend |
@@ -3849,19 +3848,19 @@ Lesers, die eine Zeile der Datei zitieren kann (die steht weiter in
 `context.versionSources.error`).
 
 Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Register` und
-`Check`. Jede Quelle hängt sich mit `Register` ein; die vier heutigen — Kephalaion-Anbindung
-(eingetragen, aber nicht `ok`: `error`; nicht eingetragen: `warning`), gh (vorausgesetzt,
-aber nicht nutzbar: `warning`; unbekannter Wert in `tools.gh.status`: `error`),
-Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
+`Check`. Jede Quelle hängt sich mit `Register` ein; die drei aus dem Kontext — Kephalaion-Anbindung
+(eingetragen, aber nicht `ok`: `error`; nicht eingetragen: `warning`), Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
 Quellenkonfiguration des Versionsinventars (da, aber unlesbar: `error`) — stehen in
 `project/health.go` und werden beim Laden des Pakets `project` registriert. Der Umweg ist
-der Importzyklus: Die Quellen lesen aus `project` (`GHState`, `DetectBaseTools`,
+der Importzyklus: Die Quellen lesen aus `project` (`DetectBaseTools`,
 `readVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
 darf `health` `project` nicht importieren. Eine weitere Quelle — als Nächstes die persönliche
 GitHub-Datei `~/.config/k-playbook/github.yaml` — registriert sich genauso, ohne dass
 Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet Felder der Kontextausgabe
-(`kephalaion`, `gh`, `baseTools`, `versionSources`), ersetzt aber keines; der Abbau der
-Kontextausgabe ist ein anderer Schritt.
+(`kephalaion`, `baseTools`, `versionSources`), ersetzt aber keines; der Abbau der
+Kontextausgabe ist ein anderer Schritt. Einen Bereich `gh` gibt es nicht mehr (Task 128):
+Ohne Dienst und ohne bereites gh bleibt die Prüfung bewusst still, auch bei einem Remote auf
+GitHub; ein Dienst ohne verfügbaren Zugang warnt unter `github`.
 
 Die Quelle `share` (`project/health_share.go`) bewertet kein Feld der Kontextausgabe. Sie
 warnt, wenn der Link `.k-playbook/share` zwischen Host und DevContainer springen wird: im

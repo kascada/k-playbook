@@ -2,9 +2,7 @@ package project
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/health"
@@ -15,13 +13,13 @@ import (
 // für health.Check: Sie bewertet einen Befund, den die Kontextausgabe heute
 // schon trägt, und macht daraus Einträge mit Stufe, Bereich, Satz und
 // Abhilfe. Die Quellen stehen hier und nicht im Paket health, weil sie aus
-// diesem Paket lesen (GHState, DetectBaseTools, readVersionSources,
+// diesem Paket lesen (DetectBaseTools, readVersionSources,
 // kephalaionCheck) und das Briefing in diesem Paket den Report trägt — health
 // kann project darum nicht importieren. Eingehängt werden sie beim Laden des
 // Pakets; jedes Programm, das das Briefing, die CLI, den MCP-Server oder die
 // GUI baut, importiert project und hat sie damit.
 //
-// Die fünfte Quelle, github, wertet kein Feld der Kontextausgabe aus, sondern
+// Die vierte Quelle, github, wertet kein Feld der Kontextausgabe aus, sondern
 // liest die persönliche GitHub-Zugangsdatei über das Paket githubaccess; sie
 // steht hier neben den anderen, weil hier alle Quellen eingehängt werden und
 // githubaccess project nicht kennt.
@@ -33,7 +31,6 @@ import (
 // health ersetzt keine Felder, es bewertet sie.
 func init() {
 	health.Register(healthKephalaion)
-	health.Register(healthGH)
 	health.Register(healthBaseTools)
 	health.Register(healthVersionSources)
 	health.Register(healthGitHub)
@@ -101,43 +98,6 @@ func kephalaionHint(state kephalaion.State) string {
 		return "Leserecht auf die Collection beantragen oder in der Oberfläche eine lesbare Collection wählen (k-playbook gui, Abschnitt Kephalaion)."
 	}
 	return "Die Anbindung in der Oberfläche prüfen (k-playbook gui, Abschnitt Kephalaion)."
-}
-
-// healthGH bewertet die GitHub CLI: Setzt das Projekt gh voraus (status
-// enabled), aber die CLI ist nicht nutzbar, ist das eine Warnung — das
-// Dependabot-Review bricht dann ab. Ein unbekannter Wert in tools.gh.status
-// ist ein Fehler: Er lässt auch die Kontextausgabe scheitern. Der Fehler aus
-// GHState wird nicht angehängt: Er zitiert den Wert aus der Datei wörtlich,
-// und der gehört in die Kontextausgabe, nicht in den Report. Der Satz nennt
-// Datei, Feld und die erlaubten Werte.
-func healthGH(_ context.Context, projectDir string) []health.Problem {
-	gh, err := GHState(projectDir)
-	if err != nil {
-		message := "Das Feld tools.gh.status in " + ConfigFileName + " hat einen unbekannten Wert; erlaubt sind unknown, enabled und disabled."
-		var pathErr *fs.PathError
-		if errors.As(err, &pathErr) {
-			message = "Die Datei " + ConfigFileName + " ist nicht lesbar; die Entscheidung zur GitHub CLI (tools.gh.status) fehlt damit."
-		}
-		return []health.Problem{{
-			Level:   health.LevelError,
-			Area:    health.AreaGH,
-			Message: message,
-			Hint:    "tools.gh.status in " + ConfigFileName + " auf unknown, enabled oder disabled setzen — oder in der Oberfläche wählen (k-playbook gui).",
-		}}
-	}
-	if gh.Status != GHEnabled || gh.Ready {
-		return nil
-	}
-	problem := health.Problem{Level: health.LevelWarning, Area: health.AreaGH}
-	switch {
-	case !gh.Installed:
-		problem.Message = "Das Projekt setzt die GitHub CLI voraus, aber gh liegt nicht im PATH."
-		problem.Hint = "gh installieren (https://cli.github.com) und mit gh auth login anmelden."
-	default:
-		problem.Message = "Das Projekt setzt die GitHub CLI voraus, aber für " + gh.Host + " ist kein Konto hinterlegt."
-		problem.Hint = "gh auth login ausführen."
-	}
-	return []health.Problem{problem}
 }
 
 // healthBaseTools bewertet die Basis-Werkzeuge: je fehlendem eine Warnung mit

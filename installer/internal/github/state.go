@@ -17,13 +17,6 @@ const (
 	// StateNoProject: es gibt keine K-PLAYBOOK.yaml und damit kein Projekt,
 	// auf das sich die Ansicht beziehen könnte.
 	StateNoProject State = "no-project"
-	// StateDisabled: das Projekt hat entschieden, gh nicht zu nutzen
-	// (tools.gh.status = disabled). Der Server ruft gh dann gar nicht auf.
-	StateDisabled State = "disabled"
-	// StateUndecided: tools.gh.status steht auf unknown. Ausdrücklicher
-	// Zustand, kein stillschweigendes Nein — die Entscheidung fällt auf der
-	// Setup-Seite.
-	StateUndecided State = "undecided"
 	// StateNotInstalled: gh liegt nicht im PATH.
 	StateNotInstalled State = "not-installed"
 	// StateNotLoggedIn: gh ist da, aber es ist kein Konto hinterlegt.
@@ -116,8 +109,6 @@ const (
 // ist erklärt statt leer — das ist die Zusage der Ansicht.
 var stateMessages = map[State]string{
 	StateNoProject:       "Keine K-PLAYBOOK.yaml gefunden. Ohne Projekt gibt es kein Repo, dessen Stand hier stehen könnte.",
-	StateDisabled:        "Dieses Projekt nutzt gh nicht (tools.gh.status: disabled). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
-	StateUndecided:       "Für dieses Projekt ist noch nicht entschieden, ob gh genutzt wird (tools.gh.status: unknown). Die Entscheidung steht auf der Setup-Seite im Block „GitHub CLI\".",
 	StateNotInstalled:    "gh liegt nicht im PATH. Ohne das Binary kann diese Seite nichts abfragen.",
 	StateNotLoggedIn:     "gh ist installiert, aber kein Konto hinterlegt. Anmelden im Terminal mit „gh auth login\".",
 	StateBadCredentials:  "gh ist angemeldet, die API weist den Token aber ab (401). Er ist abgelaufen oder zurückgezogen; im Terminal mit „gh auth login\" neu anmelden.",

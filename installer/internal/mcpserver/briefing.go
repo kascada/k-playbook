@@ -53,7 +53,7 @@ func addBriefingTool(server *mcp.Server) {
 			"Projektdoku, der Verzeichnis-Verweis keph:/docs/ in der Collection des Projekts — gelesen mit " +
 			"Kephalaion list auf docs/ (recursive, frontmatter), nicht mit k_playbook_doc_read; zuerst docs/index.md, " +
 			"sobald es sie gibt. Einen Eintrag unter documents liest du mit k_playbook_doc_read (ref). health: die Umgebungsprüfung — ok " +
-			"und problems, je Eintrag level (error, warning), area (kephalaion, gh, baseTools, versionSources), message " +
+			"und problems, je Eintrag level (error, warning), area (kephalaion, baseTools, versionSources, …), message " +
 			"und hint; nenne die Einträge in deiner ersten Antwort, Fehler vor der Arbeit, behebe nichts still — " +
 			"dieselbe Antwort wie k_playbook_health. context: der Übergangsabschnitt " +
 			"mit dem Rest von k_playbook_context — die Umgebungsangaben (Pfade, Werkzeuge, gh, git, mcp, " +

@@ -755,8 +755,8 @@ wörtliches Backslash-n. Ist ein Inline-Body unvermeidlich, ein Heredoc oder ANS
 nehmen; `--body-file` bleibt der Weg. Ohne Dienst derselbe Aufruf ohne das vorangestellte
 `k-playbook github run <GH_SERVICE> --write --`.
 
-Gibt es nach dem Block oben keinen nutzbaren Weg — `gh` gesperrt, ein Dienst ohne Kanal `api`,
-ohne Dienst `context.gh.ready` falsch — oder scheitert Push oder PR an der Anmeldung, gib den
+Gibt es nach dem Block oben keinen nutzbaren Weg — ein Dienst ohne Kanal `api`, ohne Dienst
+`context.gh.ready` falsch — oder scheitert Push oder PR an der Anmeldung, gib den
 genauen Befehl (mit Dienst in der Form mit `k-playbook github run`) und den Inhalt der
 Body-Datei zum Nachmachen aus. Dazu kommt der Hinweis auf die Zugangsdatei samt dem Angebot,
 beim Einrichten zu helfen („Die Zugangsdatei als Abhilfe“ im Block oben).

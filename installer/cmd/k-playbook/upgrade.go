@@ -466,7 +466,8 @@ func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
 	// entstanden.
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
 	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
-		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated
+		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
+		len(setup.ConfigBlocksRemoved) > 0
 
 	if repairMCP {
 		writes, err := project.RepairMCP(projectDir, project.MCPWriteOutdatedAndUnversioned)
@@ -506,6 +507,9 @@ func (r upgradeProjectReport) messages() []string {
 		}
 		if len(setup.RootBlocksRemoved) > 0 {
 			lines = append(lines, "Projekt: "+strings.Join(setup.RootBlocksRemoved, " und ")+" aus "+project.RootInstructionsFile+" entfernt; der Inhalt kommt mit dem Briefing.")
+		}
+		if len(setup.ConfigBlocksRemoved) > 0 {
+			lines = append(lines, "Projekt: "+project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
 		}
 	}
 	switch {
@@ -551,6 +555,9 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	}
 	if root.Hint != "" {
 		report.Pending = append(report.Pending, "von Hand: "+root.Hint)
+	}
+	if project.LegacyGHBlockPresent(projectDir) {
+		report.Pending = append(report.Pending, "der abgelöste Block "+project.LegacyGHBlockName+" würde aus "+project.ConfigFileName+" entfernt.")
 	}
 
 	statuses := project.CheckLinks(projectDir)

@@ -41,7 +41,6 @@ const (
 // dieselben benutzen.
 const (
 	AreaKephalaion     = "kephalaion"
-	AreaGH             = "gh"
 	AreaBaseTools      = "baseTools"
 	AreaVersionSources = "versionSources"
 	AreaGitHub         = "github"

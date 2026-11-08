@@ -244,7 +244,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/base-tools", baseToolsHandler)
 	mux.HandleFunc("GET /api/reviews", reviewsHandler)
 	mux.HandleFunc("GET /api/gh", ghHandler)
-	mux.HandleFunc("POST /api/gh", setGHHandler)
 	// Je Karte der Seite /github ein eigener Endpunkt: dahinter steht ein
 	// gh-Subprozess mit Netzzugriff, und eine langsame Abfrage soll die
 	// übrigen Karten nicht aufhalten. Nur lesend, ohne Cache.

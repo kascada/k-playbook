@@ -86,9 +86,9 @@ include: k-playbook:/commands/_shared/gh.md
 
 Die Alerts liest das Review nur, nie schreibend: mit Dienst als
 `k-playbook github run <dienst> -- gh api …`, ohne `--write`; ohne Dienst als `gh api …` über
-das aktive Konto. Im Review gibt es keine Rückfrage. Gibt es keinen nutzbaren Weg (`gh`
-gesperrt oder unentschieden, ein Dienst ohne Kanal `api`, ohne Dienst `context.gh.ready`
-falsch, eine gescheiterte Anmeldung) oder passen mehrere Dienste, steht das mit der Meldung aus
+das aktive Konto. Im Review gibt es keine Rückfrage. Gibt es keinen nutzbaren Weg (ein Dienst
+ohne Kanal `api`, ohne Dienst `context.gh.ready` falsch, eine gescheiterte Anmeldung) oder
+passen mehrere Dienste, steht das mit der Meldung aus
 dem Block im Ergebnis, und das Review wertet nichts aus. Hilfe beim Einrichten der
 Zugangsdatei bietet erst die Hauptsitzung an.
 

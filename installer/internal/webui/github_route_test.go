@@ -24,7 +24,7 @@ import (
 // Argument.
 const routeFakeToken = "ghp_fake_ui_token_126"
 
-// serviceProject legt ein Projekt mit tools.gh.status: enabled an, dessen
+// serviceProject legt ein Projekt an, dessen
 // Repo das Remote remote hat, und eine Zugangsdatei mit config. Im PATH
 // liegen ein gh, das nie laufen darf, und git. Zurück kommt das
 // Projektverzeichnis.
@@ -48,9 +48,6 @@ func serviceProject(t *testing.T, remote string, config string) string {
 	}
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
-	}
-	if err := project.SetGHStatus(root, project.GHEnabled); err != nil {
-		t.Fatalf("tools.gh.status setzen: %v", err)
 	}
 	chdir(t, root)
 
