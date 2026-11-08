@@ -251,7 +251,8 @@ clone, it means three things:
   clone, then set up. In reverse, setup still resolves the catalog from the old state and creates
   the links again.
 - **A project-local overlay otherwise remains alive.** A same-named file under
-  `k-playbook-local/commands/` previously overlaid the shipped command. If the shipped one is
+  `.k-playbook/commands/` (before task 129 `k-playbook-local/commands/`) previously overlaid
+  the shipped command. If the shipped one is
   removed, it no longer overlays anything, but becomes an independent project-owned command and
   remains registered. It must be deleted in the target project.
 

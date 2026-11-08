@@ -29,7 +29,8 @@ func readProject(t *testing.T) string {
 		"k-playbook/commands/k-upgrade.md":                    "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
 		"k-playbook/defaults/commands/k-upgrade.md":           "# k-upgrade\n\nText aus defaults.\n",
 		"k-playbook/defaults/commands/k-gui.md":               "# k-gui\n\nText aus defaults.\n",
-		"k-playbook-local/commands/k-gui.md":                  "# k-gui\n\nlokal\n",
+		".k-playbook/commands/k-gui.md":                       "# k-gui\n\nlokal\n",
+		"k-playbook-local/commands/k-upgrade.md":              "# am alten Ort, nicht mehr gelesen\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))

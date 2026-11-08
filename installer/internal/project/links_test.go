@@ -161,7 +161,7 @@ func TestApplyLinksZiehtOverrideNach(t *testing.T) {
 		t.Fatalf("erster Lauf: %v", err)
 	}
 
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-test.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-test.md"), "projekteigen\n")
 
 	status := statusFor(t, CheckLinks(root), claudeCommands())
 	if status.State != StateIncomplete {
@@ -191,7 +191,7 @@ func TestApplyLinksZiehtOverrideNach(t *testing.T) {
 // Ein projekteigener Command ohne Gegenstück kommt einfach dazu.
 func TestApplyLinksRegistriertLokaleCommands(t *testing.T) {
 	root := newProject(t)
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-eigen.md"), "eigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-eigen.md"), "eigen\n")
 
 	statuses, err := ApplyLinks(root)
 	if err != nil {
@@ -247,7 +247,7 @@ func TestApplyLinksEntferntAbgeschalteteCommands(t *testing.T) {
 	if _, err := ApplyLinks(root); err != nil {
 		t.Fatalf("erster Lauf: %v", err)
 	}
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-test.md"), "# hier nicht gebraucht\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-test.md"), "# hier nicht gebraucht\n")
 
 	statuses, err := ApplyLinks(root)
 	if err != nil {
@@ -687,7 +687,7 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	if err := os.Remove(filepath.Join(shipped(t), "commands", "k-test.md")); err != nil {
 		t.Fatalf("Command entfernen: %v", err)
 	}
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "_shared", "geteilt.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "_shared", "geteilt.md"), "projekteigen\n")
 
 	changes := PendingLinkChanges(CheckLinks(root))
 	if len(changes.Added) != 1 || changes.Added[0] != "k-neu.md" {
@@ -787,5 +787,100 @@ func TestHealLinksWendetNichtsAnWennNichtsHeilbarIst(t *testing.T) {
 	}
 	if repair.Quiet() {
 		t.Error("ein offener Punkt muss gemeldet werden")
+	}
+}
+
+// Verschwindet ein Eintrag aus .k-playbook/commands/ oder .k-playbook/skills/,
+// ist sein Link verwaist und wird abgeräumt: beide Orte zählen als eigene
+// Quellen (ownedLinks).
+func TestApplyLinksRaeumtEintragAmNeuenOrtAb(t *testing.T) {
+	root := newProject(t)
+	command := filepath.Join(root, ProjectDirName, "commands", "k-eigen.md")
+	skill := filepath.Join(root, ProjectDirName, "skills", "forelle")
+	writeFile(t, command, "eigen\n")
+	writeFile(t, filepath.Join(skill, skillFileName), "# Forelle\n\nText.\n")
+
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("erster Lauf: %v", err)
+	}
+	if got := readlink(t, filepath.Join(root, ".claude", "skills", "forelle")); got != filepath.FromSlash("../../.k-playbook/skills/forelle") {
+		t.Errorf("forelle zeigt auf %q", got)
+	}
+
+	if err := os.Remove(command); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(skill); err != nil {
+		t.Fatal(err)
+	}
+	if status := statusFor(t, CheckLinks(root), claudeCommands()); len(status.Stale) != 1 || status.Stale[0] != "k-eigen.md" {
+		t.Errorf("Commands Stale = %v, erwartet [k-eigen.md]", status.Stale)
+	}
+	if status := statusFor(t, CheckLinks(root), filepath.Join(".claude", "skills")); len(status.Stale) != 1 || status.Stale[0] != "forelle" {
+		t.Errorf("Skills Stale = %v, erwartet [forelle]", status.Stale)
+	}
+
+	statuses, err := ApplyLinks(root)
+	if err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if !LinksOK(statuses) {
+		t.Fatalf("nicht eingerichtet: %+v", statuses)
+	}
+	for _, rel := range []string{
+		filepath.Join(".claude", "commands", "k-eigen.md"),
+		filepath.Join(".opencode", "commands", "k-eigen.md"),
+		filepath.Join(".claude", "skills", "forelle"),
+	} {
+		if _, err := os.Lstat(filepath.Join(root, rel)); err == nil {
+			t.Errorf("%s steht noch", rel)
+		}
+	}
+}
+
+// Links aus dem alten Stand in k-playbook-local/commands/ und
+// k-playbook-local/skills/ gehören k-playbook: Sie werden abgeräumt oder
+// durch den mitgelieferten Eintrag ersetzt, auch wenn die Datei am alten Ort
+// noch liegt — gelesen wird sie nicht mehr (Task 129).
+func TestApplyLinksRaeumtLinksInDenAltenOrtAb(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-test.md"), "alt\n")
+	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-alt.md"), "alt\n")
+	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alt", skillFileName), "# Alt\n\nText.\n")
+
+	commands := filepath.Join(root, ".claude", "commands")
+	skills := filepath.Join(root, ".claude", "skills")
+	for link, source := range map[string]string{
+		filepath.Join(commands, "k-test.md"): "../../k-playbook-local/commands/k-test.md",
+		filepath.Join(commands, "k-alt.md"):  "../../k-playbook-local/commands/k-alt.md",
+		filepath.Join(skills, "alt"):         "../../k-playbook-local/skills/alt",
+	} {
+		if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.FromSlash(source), link); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	status := statusFor(t, CheckLinks(root), claudeCommands())
+	if len(status.Wrong) != 1 || status.Wrong[0] != "k-test.md" || len(status.Stale) != 1 || status.Stale[0] != "k-alt.md" {
+		t.Errorf("Wrong = %v, Stale = %v, erwartet [k-test.md] und [k-alt.md]", status.Wrong, status.Stale)
+	}
+
+	statuses, err := ApplyLinks(root)
+	if err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if !LinksOK(statuses) {
+		t.Fatalf("nicht eingerichtet: %+v", statuses)
+	}
+	if got := readlink(t, filepath.Join(commands, "k-test.md")); got != filepath.FromSlash("../../.k-playbook/share/commands/k-test.md") {
+		t.Errorf("k-test.md zeigt auf %q, erwartet den mitgelieferten", got)
+	}
+	for _, path := range []string{filepath.Join(commands, "k-alt.md"), filepath.Join(skills, "alt")} {
+		if _, err := os.Lstat(path); err == nil {
+			t.Errorf("%s steht noch", path)
+		}
 	}
 }

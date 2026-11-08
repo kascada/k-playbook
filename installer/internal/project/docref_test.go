@@ -834,7 +834,7 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 			ref := "k-playbook:/" + kind + "/" + entry.Name
 			result := mustResolveDoc(t, layers, ref)
 			part := result.Parts[0]
-			if part.Name != entry.Name || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
+			if part.Name != filepath.Base(filepath.FromSlash(entry.Name)) || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
 				t.Errorf("%s: Verweis %+v, Katalog %+v", ref, part, entry)
 			}
 			if entry.Disabled {
@@ -874,9 +874,17 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 		"k-playbook/defaults/commands/k-gui.md":     "# k-gui\n\nText\n",
 		"share:commands/k-danke.md":                 "# k-danke\n",
 		"k-playbook/defaults/commands/k-danke.md":   "# k-danke\n\nText\n",
-		"k-playbook-local/commands/k-gui.md":        "# k-gui\n\nlokal\n",
-		"k-playbook-local/commands/k-danke.md":      "",
-		"k-playbook-local/commands/eigener.md":      "# eigener\n\nText.\n",
+		"share:commands/_x/eins.md":                 "# eins\n\nHülle\n",
+		"share:commands/_x/zwei.md":                 "# zwei\n\nHülle\n",
+		"k-playbook/defaults/commands/_x/eins.md":   "# eins\n\nText\n",
+		"k-playbook/defaults/commands/_x/zwei.md":   "# zwei\n\nText\n",
+		".k-playbook/commands/k-gui.md":             "# k-gui\n\nlokal\n",
+		".k-playbook/commands/k-danke.md":           "",
+		".k-playbook/commands/eigener.md":           "# eigener\n\nText.\n",
+		".k-playbook/commands/_x/eins.md":           "# eins\n\nlokal\n",
+		// Der frühere Ort wird nicht mehr gelesen (Task 129).
+		"k-playbook-local/commands/k-upgrade.md": "",
+		"k-playbook-local/commands/alt.md":       "# alt\n\nText.\n",
 	} {
 		// Die Hüllen liegen mitgeliefert unter ~/.local/share/k-playbook.
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -892,14 +900,27 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 		t.Error("commands im Katalog der Kontextausgabe")
 	}
 	registry := ResolveRegistry(root, KindCommands)
-	if len(registry) != 4 {
+	if len(registry) != 6 {
 		t.Fatalf("Registry: %+v", registry)
+	}
+	origins := map[string]string{}
+	for _, entry := range registry {
+		origins[entry.Name] = entry.Origin
+	}
+	if want := map[string]string{"_x/eins.md": "override", "_x/zwei.md": "dist", "eigener.md": "local", "k-danke.md": "override", "k-gui.md": "override", "k-upgrade.md": "dist"}; !reflect.DeepEqual(origins, want) {
+		t.Errorf("Herkünfte %v, erwartet %v", origins, want)
+	}
+	if _, err := ResolveDocRef(layers, "k-playbook:/commands/alt.md"); DocRefErrorCode(err) != DocCodeNotFound {
+		t.Errorf("Datei am alten Ort über k-playbook:/commands/ erreichbar: %v", err)
+	}
+	if doc := mustResolveDoc(t, layers, "k-playbook:/commands/k-upgrade.md"); doc.Disabled || !strings.HasSuffix(doc.Content, "Text\n") {
+		t.Errorf("leere Datei am alten Ort schaltet ab: %+v", doc)
 	}
 	for _, entry := range registry {
 		ref := "k-playbook:/commands/" + entry.Name
 		result := mustResolveDoc(t, layers, ref)
 		part := result.Parts[0]
-		if part.Name != entry.Name || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
+		if part.Name != filepath.Base(filepath.FromSlash(entry.Name)) || part.Origin != entry.Origin || part.Disabled != entry.Disabled || result.Disabled != entry.Disabled {
 			t.Errorf("%s: Verweis %+v, Registry %+v", ref, part, entry)
 		}
 		if entry.Disabled {

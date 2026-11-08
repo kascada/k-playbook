@@ -200,7 +200,7 @@ Later recipe changes otherwise do not alter existing runs.
 The `scan-triage` module entry receives the same run metadata from the effective command
 namespace: `recipePath` points to `commands/_audit/review-scan-triage.md`,
 `defaultResult` is `review-triage.md`, and `resultRequired` is `true`. An empty local
-overlay under `k-playbook-local/commands/_audit/review-scan-triage.md` disables this entry.
+overlay under `.k-playbook/commands/_audit/review-scan-triage.md` disables this entry.
 
 ## Catalog Recipes in the Run
 

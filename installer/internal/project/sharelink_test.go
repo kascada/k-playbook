@@ -24,7 +24,7 @@ func readlink(t *testing.T, path string) string {
 // ihn aus.
 func TestApplyLinksVerlinktDurchShare(t *testing.T) {
 	root := newProject(t)
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-eigen.md"), "eigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-eigen.md"), "eigen\n")
 
 	statuses, err := ApplyLinks(root)
 	if err != nil {
@@ -42,7 +42,7 @@ func TestApplyLinksVerlinktDurchShare(t *testing.T) {
 		filepath.Join(".claude", "commands", "_shared", "geteilt.md"): "../../../.k-playbook/share/commands/_shared/geteilt.md",
 		filepath.Join(".opencode", "commands", "k-test.md"):           "../../.k-playbook/share/commands/k-test.md",
 		filepath.Join(".claude", "skills", "beispiel"):                "../../.k-playbook/share/skills/beispiel",
-		filepath.Join(".claude", "commands", "k-eigen.md"):            "../../k-playbook-local/commands/k-eigen.md",
+		filepath.Join(".claude", "commands", "k-eigen.md"):            "../../.k-playbook/commands/k-eigen.md",
 	}
 	for rel, want := range cases {
 		if got := readlink(t, filepath.Join(root, rel)); got != filepath.FromSlash(want) {
@@ -205,7 +205,7 @@ func TestShareLinkBlockiertDurchVerzeichnis(t *testing.T) {
 // könnte; projekteigene Einträge kommen trotzdem an.
 func TestShareLinkOhneMitgeliefertes(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-eigen.md"), "eigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-eigen.md"), "eigen\n")
 
 	statuses, err := ApplyLinks(root)
 	if err != nil {
@@ -217,7 +217,7 @@ func TestShareLinkOhneMitgeliefertes(t *testing.T) {
 	if _, err := os.Lstat(ShareLink(root)); !os.IsNotExist(err) {
 		t.Errorf("Link angelegt (%v)", err)
 	}
-	if got := readlink(t, filepath.Join(root, ".claude", "commands", "k-eigen.md")); !strings.Contains(got, LocalDirName) {
+	if got := readlink(t, filepath.Join(root, ".claude", "commands", "k-eigen.md")); got != filepath.FromSlash("../../.k-playbook/commands/k-eigen.md") {
 		t.Errorf("k-eigen.md zeigt auf %q", got)
 	}
 }

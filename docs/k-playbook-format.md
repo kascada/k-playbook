@@ -13,7 +13,9 @@ configuration:
 ```text
 <project>/                 arbitrary name
 ├── .k-playbook/
-│   └── K-PLAYBOOK.yaml    the anchor
+│   ├── K-PLAYBOOK.yaml    the anchor
+│   ├── commands/          project-owned commands, committed (only when used)
+│   └── skills/            project-owned skills, committed (only when used)
 ├── k-playbook/            the installation, fully replaceable
 └── k-playbook-local/      project-owned, committed
 ```
@@ -46,6 +48,8 @@ locations derive from the project root, the directory that holds
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
 | base tool matrix | `~/.local/share/k-playbook/scripts/base-tools.tsv` |
 | shared script library | `~/.local/share/k-playbook/scripts/lib/` |
+| project-owned commands | `.k-playbook/commands/` — setup does not create it; it appears when the project puts a command there |
+| project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
 | project-owned rules | `k-playbook-local/rules/` |
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | `k-playbook-local/checks/` |
@@ -78,12 +82,14 @@ directory.
 
 Since task 107, setup creates none of `docs/`, `tasks/`, `tasks/done/`, `data/` and
 `material/`, and the setup page does not count them as missing: their content lives in
-the project collection. In an existing project, `/k-upgrade` 3.4 deletes each of them that holds
+the project collection. Since task 129 the same holds for `commands/` and `skills/`: their
+content lives in `.k-playbook/commands/` and `.k-playbook/skills/`. In an existing project, `/k-upgrade` 3.4 deletes each of them that holds
 nothing but `README.md` files and the managed `.gitignore` — directly under `data/` the
 renamed leftovers of `k-playbook todo migrate` (`todos.json.migriert`,
 `todos.json.nachzuegler-<date>[-<n>]`) count the same, while a `data/todos.json` not yet
 taken over keeps it —, without asking (task 117); anything else keeps the directory, and the
-command only names what lies there.
+command only names what lies there. For `commands/` and `skills/` it names each entry with its
+target below `.k-playbook/` and moves only when the user explicitly asks for it.
 
 The docs producers no longer write to disk: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill go through `k-playbook docs checkout|publish code` into
@@ -170,11 +176,17 @@ Five directories exist twice. What applies is the union of both sides:
 | rules | `k-playbook/rules/` | `k-playbook-local/rules/` | `*.md` |
 | review recipes | `k-playbook/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
 | checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, top level only |
-| commands | `~/.local/share/k-playbook/commands/` | `k-playbook-local/commands/` | `*.md`, recursive |
-| skills | `~/.local/share/k-playbook/skills/` | `k-playbook-local/skills/` | directory with `SKILL.md` |
+| commands | `~/.local/share/k-playbook/commands/` | `.k-playbook/commands/` | `*.md`, recursive |
+| skills | `~/.local/share/k-playbook/skills/` | `.k-playbook/skills/` | directory with `SKILL.md` |
 
 The comparison unit is the **name**. Both sides use the same naming convention,
 so no derived key is required.
+
+Project-owned commands and skills live in `.k-playbook/` since task 129, versioned next to
+the configuration; the former place `k-playbook-local/commands/` and
+`k-playbook-local/skills/` is no longer read, neither by the linking nor by
+`k-playbook:/commands/<name>.md`. A file left there has no effect; `/k-upgrade` 3.4 names it
+with its target.
 
 For commands, it is the path below `commands/`, including the namespace: a local
 `commands/_shared/context.md` replaces exactly that file, while the rest of

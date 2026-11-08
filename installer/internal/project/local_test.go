@@ -33,9 +33,21 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "commands", "skills", "results", "guidelines", "priv"} {
+	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
+		}
+	}
+	// Projekteigene Commands und Skills liegen in .k-playbook/ (Task 129);
+	// angelegt wird weder der alte noch der neue Ort.
+	for _, dir := range []string{
+		filepath.Join(local, "commands"),
+		filepath.Join(local, "skills"),
+		ProjectAssetDir(root, KindCommands),
+		ProjectAssetDir(root, KindSkills),
+	} {
+		if pathExists(dir) {
+			t.Errorf("%s angelegt", dir)
 		}
 	}
 	if !fileExists(filepath.Join(local, InstructionsFileName)) {

@@ -8,11 +8,14 @@ sind bewusst:
 
 - Gelesen werden die mitgelieferten Quellen unter <playbook>/defaults/ (commands/,
   instructions/, rules/, guidelines/) und <playbook>/share/ (commands/, skills/) und
-  ihre projekteigenen Gegenstücke unter <config-root>/k-playbook-local/ (commands/,
-  instructions/, rules/, guidelines/, skills/), jeweils alle .md- und
-  .md.template-Dateien. Schlüssel ist der Pfad ab dem Playbook (defaults/…,
-  share/…) bzw. ab der Konfigurationswurzel (k-playbook-local/…). Die Tasks in der
-  Projekt-Collection durchsucht der Check nicht.
+  ihre projekteigenen Gegenstücke: commands/ und skills/ unter
+  <config-root>/.k-playbook/, instructions/, rules/ und guidelines/ unter
+  <config-root>/k-playbook-local/, jeweils alle .md- und .md.template-Dateien.
+  Schlüssel ist der Pfad ab dem Playbook (defaults/…, share/…) bzw. ab der
+  Konfigurationswurzel (.k-playbook/…, k-playbook-local/…). Den früheren Ort
+  k-playbook-local/commands/ und k-playbook-local/skills/ liest der Check nicht mehr,
+  wie das Programm seit Task 129. Die Tasks in der Projekt-Collection durchsucht der
+  Check nicht.
 - Gemeldet wird je Zeile und Art höchstens einmal:
   - ``link`` — ein relativer Markdown-Link, ``](../…)`` oder ``](./…)``, überall,
     auch in Codeblöcken (Vorlagen, die ein Command schreibt);
@@ -39,7 +42,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from command_tool_guards import FENCE, resolve_dirs
+from command_tool_guards import FENCE, PROJECT_DIR_NAME, config_root, resolve_dirs
 from common import fail_technical, finish_findings, status
 
 
@@ -50,13 +53,15 @@ KINDS = ("link", "pfad")
 
 PLAYBOOK_SCOPE = ("defaults/commands", "defaults/instructions", "defaults/rules",
                   "defaults/guidelines", "share/commands", "share/skills")
-LOCAL_SCOPE = ("commands", "instructions", "rules", "guidelines", "skills")
+LOCAL_SCOPE = ("instructions", "rules", "guidelines")
+# Projekteigene Commands und Skills liegen in .k-playbook/, nicht in k-playbook-local/.
+PROJECT_SCOPE = ("commands", "skills")
 
 # Bereiche, für die es keinen Eintrag je Bereich gibt: Hier steht jede Fundstelle
 # einzeln in der Ausnahmeliste.
 NO_AREA_SEGMENTS = {"commands", "instructions", "rules"}
 
-KNOWN_ROOTS = ("k-playbook-local", "k-playbook", ".claude", ".opencode", "share", "defaults",
+KNOWN_ROOTS = ("k-playbook-local", "k-playbook", ".k-playbook", ".claude", ".opencode", "share", "defaults",
                "installer", "rules", "guidelines", "instructions", "docs", "checks", "bin",
                "commands", "skills", "tasks")
 
@@ -89,10 +94,13 @@ def collect(directory: Path, key_prefix: str, files: dict[str, Path]) -> None:
             files[key] = entry
 
 
-def source_files(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
+def source_files(playbook_dir: Path, local_dir: Path, project_dir: Path) -> dict[str, Path]:
+    """project_dir ist <config-root>/.k-playbook/."""
     files: dict[str, Path] = {}
     for part in PLAYBOOK_SCOPE:
         collect(playbook_dir / part, part, files)
+    for part in PROJECT_SCOPE:
+        collect(project_dir / part, f"{PROJECT_DIR_NAME}/{part}", files)
     for part in LOCAL_SCOPE:
         collect(local_dir / part, f"{LOCAL_DIR_NAME}/{part}", files)
     return files
@@ -201,7 +209,7 @@ def read_exceptions(path: Path) -> tuple[list[ExceptionEntry], list[str]]:
         if not datei:
             errors.append("datei is empty")
         elif datei.startswith("/") or ".." in parts:
-            errors.append(f"datei '{datei}' is not a path below the playbook or k-playbook-local/")
+            errors.append(f"datei '{datei}' is not a path below the playbook, .k-playbook/ or k-playbook-local/")
         elif area:
             if zeile != "*":
                 errors.append("an area (datei ending in /) needs zeile '*'")
@@ -242,10 +250,12 @@ def run() -> int:
         return fail_technical("usage: verweise.py <check-script-dir>")
     script_dir = Path(sys.argv[1]).resolve()
     playbook_dir, local_dir, _ = resolve_dirs(script_dir)
+    project_dir = config_root() / PROJECT_DIR_NAME
 
-    files = source_files(playbook_dir, local_dir)
+    files = source_files(playbook_dir, local_dir, project_dir)
     if not files:
-        status("skip", f"no sources found under {playbook_dir / 'defaults'}, {playbook_dir / 'share'} or {local_dir}")
+        status("skip", f"no sources found under {playbook_dir / 'defaults'}, {playbook_dir / 'share'}, "
+                       f"{project_dir} or {local_dir}")
         return 0
 
     exceptions_path = script_dir / EXCEPTIONS_FILE

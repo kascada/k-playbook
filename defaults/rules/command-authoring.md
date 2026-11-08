@@ -18,7 +18,9 @@ Repo ist `share/commands/`
 
 Projekteigene Commands liegen unter:
 
-`<local.dir>/commands/`
+`<project.dir>/.k-playbook/commands/` — versioniert neben der Konfiguration; das Einrichten
+legt das Verzeichnis nicht an, es entsteht mit dem ersten eigenen Command. Den früheren Ort
+`<local.dir>/commands/` liest seit Task 129 nichts mehr.
 
 Beide erreicht der Assistent über die Verlinkung in `.claude/commands/` (und
 `.opencode/commands/`). Ein Command nennt ein Modul deshalb mit diesem Pfad, etwa

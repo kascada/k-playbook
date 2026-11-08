@@ -8,7 +8,7 @@ description: Mitgelieferter Test-Skill, der nur prüft, ob mitgelieferte Skills 
 Dieser Skill ist ein Testsignal für **mitgelieferte** Skills aus `~/.local/share/k-playbook/skills/`. Er hat
 keine Aufgabe außer sichtbar zu machen, dass er gefunden und geladen wurde. Ein Projekt kann
 für projekteigene Skills ein eigenes Gegenstück anlegen, etwa `bachforelle` unter
-`k-playbook-local/skills/`.
+`.k-playbook/skills/`.
 
 ## Was zu tun ist
 

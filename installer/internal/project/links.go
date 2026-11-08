@@ -39,7 +39,11 @@ type Link struct {
 // Commands und Skills werden Eintrag für Eintrag verlinkt, nicht als
 // Verzeichnis. Nur so lassen sich zwei Quellen zusammenführen: die
 // mitgelieferten aus ~/.local/share/k-playbook/ und die projekteigenen aus
-// k-playbook-local/, wobei ein gleichnamiger projekteigener Eintrag gewinnt.
+// .k-playbook/commands/ und .k-playbook/skills/, wobei ein gleichnamiger
+// projekteigener Eintrag gewinnt. Ein Verzeichnis-Link, auch auf ein
+// Sammelverzeichnis beider Quellen, schiede aus einem zweiten Grund aus: Er
+// verschluckte echte Dateien, die ein Projekt ohne k-playbook direkt in
+// .claude/commands/ legt; heute gewinnen sie als StateBlocked.
 //
 // Die mitgelieferten liegen außerhalb des Projekts und hängen am Home des
 // Rechners. Damit die Einzel-Links trotzdem relativ und eincheckbar bleiben,
@@ -529,17 +533,26 @@ func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntr
 	return stale
 }
 
-// ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, ins lokale
-// Verzeichnis oder in den Clone zeigen — also die, die von uns stammen. Der
-// Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
-// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben.
+// ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, in die
+// projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/, ins
+// lokale Verzeichnis oder in den Clone zeigen — also die, die von uns stammen.
+// Der Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
+// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben;
+// ebenso das lokale Verzeichnis für die Links in den früheren Ort
+// k-playbook-local/<sorte>/, den seit Task 129 nichts mehr liest.
 func ownedLinks(projectRoot string, dir string, prefix string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
 	}
 
-	sources := []string{ShareLink(projectRoot), LocalDir(projectRoot), PlaybookDir(projectRoot)}
+	sources := []string{
+		ShareLink(projectRoot),
+		ProjectAssetDir(projectRoot, KindCommands),
+		ProjectAssetDir(projectRoot, KindSkills),
+		LocalDir(projectRoot),
+		PlaybookDir(projectRoot),
+	}
 	names := []string{}
 
 	for _, entry := range entries {

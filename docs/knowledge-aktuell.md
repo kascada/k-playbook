@@ -232,7 +232,7 @@ binary generates hulls from `defaults/commands/` (own task). (2) **The hull has 
 `rules/command-authoring.md` demands the section word for word; the rule stays unchanged,
 the reviews in `/k-task-run` do not count it as a finding, and the hull form becomes a rule
 only when the binary generates hulls. (3) **Two layers apply at once:** a project-owned
-`k-playbook-local/commands/<name>.md` replaces the hull (registry) and the text (resolution)
+`.k-playbook/commands/<name>.md` (before task 129 `k-playbook-local/commands/`) replaces the hull (registry) and the text (resolution)
 with the same file. A local version therefore carries the text itself and must not point at
 `k-playbook:/commands/<name>.md` — that would resolve to itself, because the local layer
 wins. Commands appear neither in the briefing (`documents`) nor in `catalogs`; the second way
@@ -266,7 +266,7 @@ when k-playbook is not installed) — the rules come with the briefing's own alw
 tools. The three lie in `defaults/commands/_shared/`, not in `defaults/includes/`:
 `commands/_shared/` is the namespace `rules/command-authoring.md` already fixes for command
 modules, a relative include from a command stays in the kind `commands` and takes part in the
-commands' overlay (a local `k-playbook-local/commands/_shared/erster-schritt.md` replaces the block);
+commands' overlay (a project-owned `.k-playbook/commands/_shared/erster-schritt.md` replaces the block);
 `includes/` stays for blocks that more than one kind uses. (4) **`/k-upgrade` is the first
 reader:** its text begins with `include: _shared/erster-schritt.md` and takes `context.playbook.dir`
 from the briefing instead of calling `k-playbook context`; `k-playbook read

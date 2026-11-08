@@ -106,8 +106,6 @@ installs it with `k-playbook vscode install`. See [`docs/vscode.md`](./docs/vsco
 
 ```text
 project/
-├── .k-playbook/
-│   └── K-PLAYBOOK.yaml   the anchor
 ├── AGENTS.md             instructions, one source for all assistants
 ├── CLAUDE.md             include file holding the line @AGENTS.md; the direction is fixed
 ├── .claude/
@@ -116,19 +114,20 @@ project/
 ├── .opencode/      │
 │   └── commands/ ──┤
 ├── .k-playbook/    │
-│   └── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
-│                   │        unpacked by the binary once per machine; not versioned
-├── k-playbook/   ←─┤     the installation, fully replaceable
+│   ├── K-PLAYBOOK.yaml   the anchor
+│   ├── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
+│   │               │        unpacked by the binary once per machine; not versioned
+│   ├── commands/ ←─┤     project-owned commands, committed (only when used)
+│   └── skills/   ←─┘     project-owned skills, committed (only when used)
+├── k-playbook/           the installation, fully replaceable
 │   ├── rules/ reviews/ checks/
 │   ├── bin/
 │   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/
-└── k-playbook-local/ ←─┘ project-owned, committed
+└── k-playbook-local/     project-owned, committed
     ├── rules/            overlay onto k-playbook/rules/
     ├── reviews/          overlay onto k-playbook/reviews/
     ├── checks/           overlay onto k-playbook/checks/
-    ├── commands/         overlay onto ~/.local/share/k-playbook/commands/
-    ├── skills/           overlay onto ~/.local/share/k-playbook/skills/
     ├── results/          everything reviews produce; not versioned
     ├── guidelines/
     ├── priv/             notes and work in progress
@@ -138,7 +137,10 @@ project/
 
 Tasks, todos and the project documentation live in the project's Kephalaion collection,
 so setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
-them from an existing project once they hold nothing but their README. The former
+them from an existing project once they hold nothing but their README. Project-owned
+commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/` since task
+129; `k-playbook-local/commands/` and `k-playbook-local/skills/` are no longer read, and
+`/k-upgrade` removes them once empty or names each entry left there with its target. The former
 knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) clears what
 is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
 deletion.
@@ -153,8 +155,8 @@ switched by the **Local settings** block of the interface — measured with
 `.gitignore` already in place keeps working.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
-one disables it. This holds for all five kinds — `rules/`, `reviews/`, `checks/`,
-`commands/` and `skills/`.
+one disables it. This holds for `rules/`, `reviews/` and `checks/`, and in the same way for
+`commands/` and `skills/` in `.k-playbook/`.
 
 That is why `.claude/commands/` and the other two targets are **real directories with
 individual symlinks**, not directory symlinks: only that way do both sources arrive. The

@@ -84,8 +84,8 @@ verified against the server, so a token can still be expired.
 
 ## Where the rest lives
 
-The layout is fixed. Everything below is derived from `local.dir` and `playbook.dir`
-from the output above — never from configuration, and never by searching.
+The layout is fixed. Everything below is derived from `local.dir`, `playbook.dir` and
+`project.dir` from the output above — never from configuration, and never by searching.
 
 | Artifact | Path |
 |---|---|
@@ -103,8 +103,8 @@ from the output above — never from configuration, and never by searching.
 | review results | `<local.dir>/results/<family>/<date>/` |
 | review log | `<local.dir>/results/log.md` |
 | unversioned working files | `<local.dir>/priv/` |
-| project-local commands | `<local.dir>/commands/` |
-| project-local skills | `<local.dir>/skills/` |
+| project-local commands | `<project.dir>/.k-playbook/commands/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command |
+| project-local skills | `<project.dir>/.k-playbook/skills/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill |
 | the check runner, project-local by contract | `<playbook.dir>/bin/k-check` |
 | scripts | `~/.local/share/k-playbook/scripts/` |
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
@@ -126,11 +126,13 @@ before they moved to `keph:/queue/findings/`; nothing writes there any more. Eve
 of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain
 the merged result.
 
-`<local.dir>/commands/` and `skills/` overlay the shipped ones by the same rule, but they
-are not in `catalogs`: the assistant loaded them at startup, so by the time a command
-runs, the effective set is already in place. They matter only when you **write** one —
-put it there, never into `playbook.dir`, and note that it takes effect after `/k-gui`
-has linked it and the assistant has been restarted.
+`<project.dir>/.k-playbook/commands/` and `skills/` overlay the shipped ones by the same
+rule, but they are not in `catalogs`: the assistant loaded them at startup, so by the time a
+command runs, the effective set is already in place. They matter only when you **write**
+one — put it there, never into `playbook.dir` and no longer into `<local.dir>/commands/` or
+`<local.dir>/skills/`, which nothing reads since task 129, and note that it takes effect
+after the next `k-playbook briefing` or `/k-gui` has linked it and the assistant has been
+restarted.
 
 If a directory listed here is missing, ask whether to create exactly that directory or to
 run `/k-gui`, which restores the project-local structure. Do not stop hard, do not create

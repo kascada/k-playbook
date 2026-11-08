@@ -107,13 +107,15 @@ It is deliberately not named `AGENTS.md`: assistants read that name themselves, 
 
 ## Can I add my own slash commands?
 
-Yes. `k-playbook-local/commands/` holds them, and `k-playbook-local/skills/` holds custom skills. The same rule applies as for rules and reviews: the same name replaces the shipped item, and an empty entry disables it.
+Yes. `.k-playbook/commands/` holds them, and `.k-playbook/skills/` holds custom skills, both versioned next to the configuration. Setup does not create the two directories; create them when you put the first entry there. The same rule applies as for rules and reviews: the same name replaces the shipped item, and an empty entry disables it.
 
 ```text
-k-playbook-local/commands/k-own.md    new, only in this project
-k-playbook-local/commands/k-todo.md   replaces the shipped item
-k-playbook-local/skills/my-skill/SKILL.md
+.k-playbook/commands/k-own.md    new, only in this project
+.k-playbook/commands/k-todo.md   replaces the shipped item
+.k-playbook/skills/my-skill/SKILL.md
 ```
+
+The former place, `k-playbook-local/commands/` and `k-playbook-local/skills/`, is no longer read since task 129; `/k-upgrade` names what is left there with its target.
 
 The new command is registered automatically: at the next `k-playbook briefing`, the call at the beginning of every session, or when the assistants section of the interface is next displayed. Then restart the assistant; it reads commands at startup.
 
@@ -121,7 +123,7 @@ For commands, the path from `commands/` counts: a local `commands/_shared/x.md` 
 
 ## Why are `.claude/commands/` and `.opencode/commands/` full of symlinks?
 
-Because entries come from two sources. A directory symlink points to exactly one of them, so it would provide either only `k-playbook/` or only `k-playbook-local/`. The target is therefore an actual directory with one link for each command or skill, pointing to the version that applies under the overlay rule.
+Because entries come from two sources. A directory symlink points to exactly one of them, so it would provide either only the shipped entries or only `.k-playbook/commands/`. The target is therefore an actual directory with one link for each command or skill, pointing to the version that applies under the overlay rule.
 
 Older installations still have one directory symlink there. It is detected and replaced with individual links at the next synchronization.
 

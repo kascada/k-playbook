@@ -237,7 +237,7 @@ Two layers, compared by name:
 | Layer | Directory | Origin |
 |---|---|---|
 | shipped | the installation `k-playbook/` — a clone of this repo; `instructions/`, `commands/`, `includes/` and `testdata/` are read from `defaults/`, the other kinds at the top level | `dist` |
-| local | `k-playbook-local/` | `local`, or `override` when it replaces a shipped file of the same name |
+| local | `k-playbook-local/`; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129 | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped instructions exist once, in `defaults/instructions/`: the installation reads
 them there (`NewShippedDocSource` in `docref.go`), and the release packs the same files for
@@ -248,8 +248,8 @@ until their own switch, because the catalogs of `k-playbook context` read them t
 `commands/` is read from `defaults/commands/` as well, but the file at the top of the repo
 is not a copy: `commands/<name>.md` is the hull the assistant registers, frontmatter plus the
 reference, and `defaults/commands/<name>.md` is the text behind the reference. A hull without
-a text in `defaults/` is `not_found`; there is no fallback to the hull. A local
-`k-playbook-local/commands/<name>.md` replaces both at once — the hull in the registry and the
+a text in `defaults/` is `not_found`; there is no fallback to the hull. A project-owned
+`.k-playbook/commands/<name>.md` replaces both at once — the hull in the registry and the
 text here — so it carries the text itself and must not point at the same reference, which
 would resolve to that file. First command on this route: `/k-upgrade` (task 092).
 

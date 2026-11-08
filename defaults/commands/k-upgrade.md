@@ -541,9 +541,11 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt fünf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
-sie nicht mehr als fehlend: Ihr Inhalt liegt in der Projekt-Collection. In einem bestehenden
-Projekt liegen sie noch, oft nur mit ihrer README.
+Das Einrichten legt sieben Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Collection, der von
+`commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
+`<context.project.dir>/.k-playbook/skills/`. In einem bestehenden Projekt liegen sie noch, oft
+nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
 Sie läuft nach 3.0 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
@@ -554,6 +556,8 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `tasks/done/`
 - `data/`
 - `material/`
+- `commands/`
+- `skills/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
 die Collection nicht.
@@ -561,7 +565,9 @@ die Collection nicht.
 **Vorbedingung:** Schritt 2 hat das Programm als aktuell gemeldet — in seiner Ausgabe steht
 die Zeile `Programm-Stand: nichts zu tun — …`. Fehlt sie, nennst du in einer Zeile, dass das
 Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeichnisse beim Knopf
-„Anlegen“ der Oberfläche wieder an. Dann bleibt alles liegen, und du gehst zu Schritt 4.
+„Anlegen“ der Oberfläche wieder an. Für `commands/` und `skills/` trifft das genau: Erst das
+neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`; mit einem älteren verschwände eine
+umgezogene Datei aus der Verlinkung. Dann bleibt alles liegen, und du gehst zu Schritt 4.
 
 **Leer** heißt: Im Verzeichnis liegt, auch in Unterverzeichnissen, nichts außer
 
@@ -607,12 +613,30 @@ zweiten Prüfen nicht mehr leer. Genannt werden Pfade relativ zum Verzeichnis, e
 eingeschlossen, höchstens fünf; liegt mehr darin, dazu die Gesamtzahl der Dateien. Bleibt
 `data/`, weil `todos.json` darin liegt, endet seine Zeile mit `— erst k-playbook todo migrate`.
 
+Für `commands/` und `skills/` weicht die Zeile `bleibt:` ab, wenn anderes darin liegt. Statt
+höchstens fünf Pfaden nennt sie als Grund, dass diese Dateien mit diesem Programm nicht mehr
+wirken, und darunter steht je Eintrag eine eigene Zeile mit seinem Ziel
+`.k-playbook/<sorte>/<gleicher pfad>`:
+
+- unter `commands/` je Datei, auch in Namensräumen wie `_audit/`, mit gleichem Pfad ab
+  `commands/`;
+- unter `skills/` je Eintrag direkt darin, ein Skill-Verzeichnis als Ganzes.
+
+Dateien mit dem Namen `README.md` und die verwaltete `.gitignore` ziehen nicht um und
+erscheinen dort nicht. Liegt am Ziel schon etwas, steht `Ziel belegt` hinter der Zeile.
+
 ```text
 Aufräumen in k-playbook-local/
   docs/        gelöscht: README.md
   tasks/       gelöscht: README.md, done/README.md
   data/        gelöscht: README.md, todos.json.migriert
   material/    bleibt: README.md, notizen.md, chat/2026-09-12.md, chat/2026-09-13.md, scan/seite.pdf (45 Dateien)
+  commands/    bleibt: wirkt mit diesem Programm nicht mehr, Ziel je Datei
+    k-eigen.md       → .k-playbook/commands/k-eigen.md
+    _audit/notiz.md  → .k-playbook/commands/_audit/notiz.md
+    k-gui.md         → .k-playbook/commands/k-gui.md  Ziel belegt
+  skills/      bleibt: wirkt mit diesem Programm nicht mehr, Ziel je Skill
+    forelle/         → .k-playbook/skills/forelle/
 ```
 
 Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
@@ -623,6 +647,24 @@ Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
 
 Ein Verzeichnis, das nicht liegt, erscheint nicht. Auf die Meldung folgt keine Frage.
 
+Bleibt `commands/` oder `skills/`, folgt auf die Meldung ein Hinweis, ebenfalls ohne Frage:
+Umgebaut wird von Hand oder auf ausdrücklichen Zuruf des Nutzers in derselben Sitzung; 3.4
+zieht nicht von selbst um. Das Löschen am alten Ort und die Dateien am neuen gehören in den
+nächsten Commit des Projekts; eine versionierte Datei verschoben mit `git mv` behält ihre
+Geschichte.
+
+**e) Umziehen auf Zuruf.** Sagt der Nutzer in derselben Sitzung ausdrücklich, dass umgezogen
+wird, verschiebst du genau die Einträge, die d) mit Ziel genannt hat, Pfad und Namensraum
+gleich; fehlende Verzeichnisse unter `.k-playbook/` legst du dabei an. Einen versionierten
+Eintrag verschiebst du mit `git mv`, wenn `git` da ist (`baseTools`) und
+`git ls-files --error-unmatch <pfad>` ihn kennt, sonst mit `mv`. Ein Eintrag mit
+`Ziel belegt` bleibt liegen und wird genannt; zusammengeführt wird nicht. Danach lädst du das
+Briefing neu (`k-playbook briefing`; der Katalog hat sich geändert), das die Verlinkung
+nachzieht, prüfst, dass die Links in `.claude/commands/`,
+`.opencode/commands/` und `.claude/skills/` für die umgezogenen Einträge auf
+`.k-playbook/<sorte>/` zeigen, und führst c) und d) für `commands/` und `skills/` noch
+einmal aus.
+
 Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, löscht der nächste Lauf, sobald
 es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3.
 
@@ -631,5 +673,6 @@ es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3.
 Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist; für
 3.0 je gelöschtem Verzeichnis die Zahl seiner Dateien und je Datei aus `knowledge/` ihr Ziel
 (`keph:`-Verweis, gelöscht oder liegen geblieben), für das Aufräumen die gelöschten
-Verzeichnisse und jede Zeile `bleibt: …` — oder bei 3.0 und beim Aufräumen, dass sie auf den
+Verzeichnisse und jede Zeile `bleibt: …`, bei `commands/` und `skills/` mit den Zeilen je
+Eintrag und dem, was e) umgezogen hat — oder bei 3.0 und beim Aufräumen, dass sie auf den
 Binärwechsel warten.

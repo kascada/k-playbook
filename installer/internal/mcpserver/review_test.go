@@ -80,7 +80,7 @@ func TestReviewStatusAvailableTrenntAuditUndReviewAktivierung(t *testing.T) {
 
 func TestReviewStatusAvailableOhneScanTriageBeiLeeremOverlay(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, project.LocalDirName, "commands", filepath.FromSlash(scanTriageModule)), "# abgeschaltet\n")
+	mustWriteFile(t, filepath.Join(root, project.ProjectDirName, "commands", filepath.FromSlash(scanTriageModule)), "# abgeschaltet\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestReviewStatusAvailableOhneScanTriageBeiLeeremOverlay(t *testing.T) {
 
 func TestReviewStatusAvailableScanTriageOverlayOverride(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, project.LocalDirName, "commands", filepath.FromSlash(scanTriageModule)), "# Lokales Modul\n\nAktiv.\n")
+	mustWriteFile(t, filepath.Join(root, project.ProjectDirName, "commands", filepath.FromSlash(scanTriageModule)), "# Lokales Modul\n\nAktiv.\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -675,7 +675,7 @@ func newReviewProject(t *testing.T) string {
 		filepath.Join(root, "k-playbook", "reviews"),
 		filepath.Join(root, "k-playbook", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
-		filepath.Join(root, "k-playbook-local", "commands", "_audit"),
+		filepath.Join(root, project.ProjectDirName, "commands", "_audit"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
 	}

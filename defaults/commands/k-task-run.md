@@ -193,8 +193,8 @@ konfigurieren und nichts zu suchen:
 Mit `DIFF_ENABLED=true`:
 
 - `DIFF_REVIEW_MODULE = k-playbook:/commands/_task-run/diff-review.md`; eine gleichnamige
-  Datei unter `<context.local.dir>/commands/_task-run/` ersetzt es nach der Überlagerung
-  von k-playbook. Der Hauptkontext liest das Modul nicht, er gibt nur den Verweis weiter.
+  Datei unter `<context.project.dir>/.k-playbook/commands/_task-run/` ersetzt es nach der
+  Überlagerung von k-playbook. Der Hauptkontext liest das Modul nicht, er gibt nur den Verweis weiter.
 - Grundlage des Diffs ist ein Snapshot je Task (5b.1), kein Commit je Lauf. Er schließt nicht
   committete und ungetrackte Änderungen ein, auch die der Vorgänger im selben Lauf. Ein
   schmutziger Arbeitsbaum verfälscht den Diff deshalb nicht; ob schmutzige Dateien für einen

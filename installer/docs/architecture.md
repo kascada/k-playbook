@@ -712,7 +712,7 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-rules/  reviews/  checks/  commands/  skills/  results/  guidelines/  priv/
+rules/  reviews/  checks/  results/  guidelines/  priv/
 k-playbook.md  version-sources.yaml
 ```
 
@@ -725,6 +725,14 @@ einer fehlt. Ein Bestandsprojekt räumt `/k-upgrade` 3.4 auf: es löscht ein sol
 Verzeichnis ohne Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore`
 liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
 bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
+
+`commands/` und `skills/` stehen seit Task 129 ebenfalls nicht mehr darin. Projekteigene
+Commands und Skills liegen in `.k-playbook/commands/` und `.k-playbook/skills/`
+(`ProjectAssetDir()` in `project/registry.go`), versioniert neben der Konfiguration; das
+Einrichten legt beide nicht an. Den alten Ort liest nichts mehr, auch nicht als Übergang:
+weder die Registry (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
+(`NewProjectLocalDocSource()` in `project/docref.go`). `/k-upgrade` 3.4 löscht die leeren alten
+Verzeichnisse und nennt sonst jeden Eintrag mit seinem Ziel.
 
 Die frühere Wissensablage auf der Platte samt Suchindex hat Task 123 mit dem Wissenstor
 entfernt; nichts im Programm schreibt oder liest dort noch. Ein Bestandsprojekt räumt
@@ -1080,8 +1088,8 @@ Die drei Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Ein
 ```text
 .claude/commands/
   k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   dist
-  k-review.md  -> ../../k-playbook-local/commands/k-review.md  override
-  k-eigen.md   -> ../../k-playbook-local/commands/k-eigen.md   local
+  k-review.md  -> ../../.k-playbook/commands/k-review.md       override
+  k-eigen.md   -> ../../.k-playbook/commands/k-eigen.md        local
   _shared/
     context.md   -> ../../../.k-playbook/share/commands/_shared/context.md
 ```
@@ -1147,8 +1155,9 @@ das er nicht einlöst, ist schlechter als ein Hinweis.
 
 Die Gegenrichtung — `stale` — braucht ein Kriterium dafür, welche Links von uns stammen.
 `ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `.k-playbook/share`,
-`k-playbook-local/` oder in den Clone `k-playbook/` zeigen. Der Clone steht dabei, damit die
-Links aus der Zeit vor Stufe 2 als unsere gelten: was noch im Katalog steht, ist `wrong` und
+`.k-playbook/commands/`, `.k-playbook/skills/`, `k-playbook-local/` oder in den Clone
+`k-playbook/` zeigen. Clone und `k-playbook-local/` stehen dabei, damit die Links aus der Zeit
+vor Stufe 2 und vor Task 129 als unsere gelten: was noch im Katalog steht, ist `wrong` und
 wird umgesetzt, was nicht, ist `stale` und verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird
 weder bewertet noch angefasst.
 

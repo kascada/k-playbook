@@ -265,13 +265,13 @@ type DocLayers struct {
 }
 
 // ProjectDocLayers sind die Quellen eines Projekts auf der Platte: die
-// Installation k-playbook/ (siehe NewShippedDocSource), k-playbook-local/,
-// das Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
-// (OpenKephDocs).
+// Installation k-playbook/ (siehe NewShippedDocSource), die projekteigene
+// Ebene (siehe NewProjectLocalDocSource), das Projekt selbst ab seiner Wurzel
+// und, auf Abruf, seine Collection (OpenKephDocs).
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
 		Dist:    NewShippedDocSource(PlaybookDir(projectDir)),
-		Local:   NewDiskDocSource(LocalDir(projectDir)),
+		Local:   NewProjectLocalDocSource(projectDir),
 		Project: NewDiskDocSource(projectDir),
 		Keph:    memoKephDocs(func() (KephDocs, error) { return OpenKephDocs(projectDir) }),
 	}
@@ -331,6 +331,41 @@ func (s shippedDocSource) pick(p string) DocSource {
 
 func (s shippedDocSource) List(dir string) ([]DocSourceEntry, error) { return s.pick(dir).List(dir) }
 func (s shippedDocSource) Read(file string) ([]byte, error)          { return s.pick(file).Read(file) }
+
+// NewProjectLocalDocSource ist die projekteigene Ebene hinter k-playbook:.
+// Die Sorte commands/ liest aus .k-playbook/commands/, demselben Ort, aus dem
+// die Verlinkung projekteigene Commands nimmt (ProjectAssetDir), samt der
+// Bausteine unter commands/_shared/. Eine Datei dort ersetzt Hülle und Text
+// zugleich. Die übrigen Sorten (rules/, reviews/, guidelines/, instructions/,
+// includes/) lesen bis zu ihrem Umzug weiter aus k-playbook-local/. Den
+// früheren Ort k-playbook-local/commands/ liest seit Task 129 nichts mehr.
+func NewProjectLocalDocSource(projectDir string) DocSource {
+	return projectLocalDocSource{
+		local:   NewDiskDocSource(LocalDir(projectDir)),
+		project: NewDiskDocSource(filepath.Join(projectDir, ProjectDirName)),
+	}
+}
+
+type projectLocalDocSource struct {
+	local   DocSource
+	project DocSource
+}
+
+// pick wählt nach dem ersten Segment: commands/ aus .k-playbook/, alles andere
+// aus k-playbook-local/. Der Pfad bleibt derselbe, weil .k-playbook/commands/
+// denselben Aufbau hat.
+func (s projectLocalDocSource) pick(p string) DocSource {
+	first, _, _ := strings.Cut(p, "/")
+	if first == docCommandsRoot {
+		return s.project
+	}
+	return s.local
+}
+
+func (s projectLocalDocSource) List(dir string) ([]DocSourceEntry, error) {
+	return s.pick(dir).List(dir)
+}
+func (s projectLocalDocSource) Read(file string) ([]byte, error) { return s.pick(file).Read(file) }
 
 // NewDiskDocSource ist eine DocSource über ein Verzeichnis auf der Platte.
 // Gelesen wird über fs.FS: Pfade, die aus der Wurzel herausführen, weist das

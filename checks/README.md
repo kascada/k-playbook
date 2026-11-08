@@ -94,7 +94,8 @@ oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
   Eine neue Zeile dort wirkt ohne Änderung am Check. Fehlt die Matrix, endet der Check mit
   `skip` und nennt den Pfad.
 - **Umfang** ist immer der ganze effektive Command-Katalog: die Hüllen unter
-  `<playbook.dir>/share/commands/` zusammen mit `<config-root>/k-playbook-local/commands/`,
+  `<playbook.dir>/share/commands/` zusammen mit `<config-root>/.k-playbook/commands/`
+  (den früheren Ort `<config-root>/k-playbook-local/commands/` liest der Check nicht mehr),
   verglichen über den Pfad ab `commands/`; ein gleichnamiger lokaler Command ersetzt den
   mitgelieferten, ein leerer schaltet ihn ab. Dazu die Texte der Commands unter
   `<playbook.dir>/defaults/commands/` (ausgeliefert als `k-playbook:/commands/<name>.md`)
@@ -151,13 +152,16 @@ KI nach dieser Datei.
 - **Umfang** ist immer derselbe, unabhängig von `K_CHECK_MODE` und `K_CHECK_FILES_FROM`:
   alle `.md`- und `.md.template`-Dateien unter `<playbook.dir>/defaults/` (`commands/`,
   `instructions/`, `rules/`, `guidelines/`) und `<playbook.dir>/share/` (`commands/`,
-  `skills/`) und unter den projekteigenen Gegenstücken in `<config-root>/k-playbook-local/`
-  (`commands/`, `instructions/`, `rules/`, `guidelines/`, `skills/`). Schlüssel ist der Pfad
-  ab dem Playbook bzw. ab dem Config-Root (`k-playbook-local/…`). Die Tasks in der
+  `skills/`) und unter den projekteigenen Gegenstücken: `commands/` und `skills/` in
+  `<config-root>/.k-playbook/`, `instructions/`, `rules/` und `guidelines/` in
+  `<config-root>/k-playbook-local/`. Schlüssel ist der Pfad ab dem Playbook bzw. ab dem
+  Config-Root (`.k-playbook/…`, `k-playbook-local/…`); eine Ausnahme mit `datei` unter
+  `.k-playbook/commands/` oder `.k-playbook/skills/` ist gültig. Den früheren Ort
+  `k-playbook-local/commands/` und `k-playbook-local/skills/` liest der Check nicht mehr. Die Tasks in der
   Projekt-Collection durchsucht der Check noch nicht; das kommt mit dem Umbau der Checks.
 - **Gemeldet** werden relative Markdown-Links, deren Ziel mit `../` oder `./` beginnt, überall
   (Art `link`), und Pfade ohne Präfix in Backticks, die mit einer bekannten Wurzel beginnen
-  (`k-playbook-local/`, `k-playbook/`, `.claude/`, `.opencode/`, `share/`, `defaults/`,
+  (`k-playbook-local/`, `k-playbook/`, `.k-playbook/`, `.claude/`, `.opencode/`, `share/`, `defaults/`,
   `installer/`, `rules/`, `guidelines/`, `instructions/`, `docs/`, `checks/`, `bin/`,
   `commands/`, `skills/`, `tasks/`), wenn sie unter einer Überschrift `Referenzen` stehen
   oder in einer Zeile mit Lese-Anweisung (`lies`, `liest`, `lesen`, `siehe`) — Art `pfad`.

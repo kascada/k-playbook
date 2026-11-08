@@ -21,8 +21,8 @@ func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-b.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-b.md"), "projekteigen\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-c.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-b.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-c.md"), "projekteigen\n")
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 3 {
@@ -37,7 +37,7 @@ func TestResolveRegistryFuehrtQuellenZusammen(t *testing.T) {
 	if overridden.Origin != "override" {
 		t.Errorf("k-b.md Origin = %q, erwartet override", overridden.Origin)
 	}
-	if want := filepath.Join(root, LocalDirName, "commands", "k-b.md"); overridden.Path != want {
+	if want := filepath.Join(root, ProjectDirName, "commands", "k-b.md"); overridden.Path != want {
 		t.Errorf("k-b.md Path = %q, erwartet die projekteigene Fassung", overridden.Path)
 	}
 
@@ -52,7 +52,7 @@ func TestResolveRegistryLoestNamensraeumeAuf(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "a.md"), "mitgeliefert\n")
 	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "b.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "_shared", "b.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "_shared", "b.md"), "projekteigen\n")
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 2 {
@@ -76,7 +76,7 @@ func TestResolveRegistryErhaeltAuditNamensraumUndOverlaySchaltetAb(t *testing.T)
 		t.Fatalf("aktive Commands = %+v, erwartet %s", active, name)
 	}
 
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", filepath.FromSlash(name)), "# abgeschaltet\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", filepath.FromSlash(name)), "# abgeschaltet\n")
 	entry := entryFor(t, ResolveRegistry(root, KindCommands), name)
 	if !entry.Disabled || entry.Origin != "override" {
 		t.Fatalf("Overlay = %+v, erwartet abgeschalteten Override", entry)
@@ -104,7 +104,7 @@ func TestResolveRegistryErhaeltDocsNamensraum(t *testing.T) {
 func TestResolveRegistryUebergehtReadme(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "README.md"), "# commands\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "README.md"), "# commands\n")
 
 	entries := ResolveRegistry(root, KindCommands)
 	if len(entries) != 1 {
@@ -115,7 +115,7 @@ func TestResolveRegistryUebergehtReadme(t *testing.T) {
 func TestResolveRegistryLeereDateiSchaltetAb(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "# hier nicht gebraucht\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-a.md"), "# hier nicht gebraucht\n")
 
 	if !entryFor(t, ResolveRegistry(root, KindCommands), "k-a.md").Disabled {
 		t.Error("leere projekteigene Datei hat den Eintrag nicht abgeschaltet")
@@ -132,8 +132,8 @@ func TestResolveRegistrySkills(t *testing.T) {
 	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
 	writeFile(t, filepath.Join(shipped(t), "skills", "beta", skillFileName), "# Beta\n")
 	writeFile(t, filepath.Join(shipped(t), "skills", "kein-skill", "NOTIZ.md"), "kein Skill\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "skills", "beta", skillFileName), "# Beta projekteigen\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "skills", "gamma", skillFileName), "# Gamma\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "skills", "beta", skillFileName), "# Beta projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "skills", "gamma", skillFileName), "# Gamma\n")
 
 	entries := ResolveRegistry(root, KindSkills)
 	if len(entries) != 3 {
@@ -155,7 +155,7 @@ func TestResolveRegistrySkills(t *testing.T) {
 func TestResolveRegistrySkillLeereSkillDateiSchaltetAb(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alpha", skillFileName), "# hier nicht gebraucht\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "skills", "alpha", skillFileName), "# hier nicht gebraucht\n")
 
 	if !entryFor(t, ResolveRegistry(root, KindSkills), "alpha").Disabled {
 		t.Error("leere SKILL.md hat den Skill nicht abgeschaltet")
@@ -168,8 +168,48 @@ func TestRegistrySourcePresent(t *testing.T) {
 		t.Error("ohne Quellverzeichnis darf nichts gemeldet werden")
 	}
 
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "k-a.md"), "projekteigen\n")
 	if !RegistrySourcePresent(root, KindCommands) {
 		t.Error("das lokale Verzeichnis allein muss als Quelle zählen")
+	}
+}
+
+// Der frühere Ort k-playbook-local/<sorte>/ wird seit Task 129 nicht mehr
+// gelesen: weder ein neuer Name noch eine abschaltende leere Datei wirkt dort.
+func TestResolveRegistryLiestAltenOrtNicht(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
+	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "")
+	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-alt.md"), "alt\n")
+	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alpha", skillFileName), "")
+	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alt", skillFileName), "# Alt\n\nText.\n")
+
+	commands := ResolveRegistry(root, KindCommands)
+	if len(commands) != 1 || commands[0].Name != "k-a.md" || commands[0].Origin != "dist" || commands[0].Disabled {
+		t.Errorf("Commands: %+v, erwartet nur k-a.md mitgeliefert", commands)
+	}
+	skills := ResolveRegistry(root, KindSkills)
+	if len(skills) != 1 || skills[0].Name != "alpha" || skills[0].Origin != "dist" || skills[0].Disabled {
+		t.Errorf("Skills: %+v, erwartet nur alpha mitgeliefert", skills)
+	}
+	if want := filepath.Join(root, ProjectDirName, "commands"); ProjectAssetDir(root, KindCommands) != want {
+		t.Errorf("ProjectAssetDir = %q, erwartet %q", ProjectAssetDir(root, KindCommands), want)
+	}
+}
+
+// Namensräume am neuen Ort werden Datei für Datei verrechnet.
+func TestResolveRegistryNamensraumAmNeuenOrt(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(shipped(t), "commands", "_x", "eins.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_x", "zwei.md"), "mitgeliefert\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "_x", "eins.md"), "projekteigen\n")
+
+	entries := ResolveRegistry(root, KindCommands)
+	if got := entryFor(t, entries, "_x/eins.md"); got.Origin != "override" || got.Path != filepath.Join(root, ProjectDirName, "commands", "_x", "eins.md") {
+		t.Errorf("_x/eins.md: %+v", got)
+	}
+	if got := entryFor(t, entries, "_x/zwei.md").Origin; got != "dist" {
+		t.Errorf("_x/zwei.md Origin = %q, erwartet dist", got)
 	}
 }

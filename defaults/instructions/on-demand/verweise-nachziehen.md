@@ -43,14 +43,23 @@ dann wie ein nackter Pfad behandelt. Ein Pfad mit `k-playbook-local/<sorte>/…`
 lokale Fassung; gelesen wird sie trotzdem als `k-playbook:/<sorte>/…`, weil k-playbook die
 Überlagerung rechnet.
 
+Projekteigene Commands und Skills liegen in `.k-playbook/` (Task 129):
+
+- `.k-playbook/commands/…` ist die lokale Fassung von `k-playbook:/commands/…` und wird so
+  gelesen; ein alter Pfad `k-playbook-local/commands/…` ebenso.
+- Skills sind keine Sorte von `k-playbook:`. `.k-playbook/skills/…` und ein alter Pfad
+  `k-playbook-local/skills/…` werden `project:/.k-playbook/skills/…`.
+
 **Mehrdeutig** ist ein Pfad, der zu zwei Präfixen passt. Der häufigste Fall steht im
 k-playbook-Repo selbst: `defaults/commands/x.md` ist
 
 - `k-playbook:/commands/x.md`, wenn der Text gelesen werden soll, wie er ausgeliefert wird,
 - `project:/defaults/commands/x.md`, wenn die Quelle gemeint ist, die geändert wird.
 
-Ebenso `rules/x.md` (`k-playbook:/rules/x.md` oder die Repo-Kopie `project:/rules/x.md`) und
-`tasks/…` (ein Task in `keph:/user/<user>/tasks/…` oder eine alte Datei auf der Platte). Was
+Ebenso `.k-playbook/commands/x.md`: `project:/.k-playbook/commands/x.md`, wenn die Datei
+gemeint ist, die geändert wird, und `k-playbook:/commands/x.md`, wenn der wirksame Text gelesen
+werden soll. Ebenso `rules/x.md` (`k-playbook:/rules/x.md` oder die Repo-Kopie
+`project:/rules/x.md`) und `tasks/…` (ein Task in `keph:/user/<user>/tasks/…` oder eine alte Datei auf der Platte). Was
 sich aus dem Satz um den Pfad nicht eindeutig zuordnen lässt, wird erfragt, nicht geraten.
 
 ### Was unberührt bleibt

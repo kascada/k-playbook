@@ -49,7 +49,9 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
-| Projekteigene Regel, Rezept, Check, Command, Skill | `rules/`, `reviews/`, `checks/`, `commands/`, `skills/` | von Hand |
+| Projekteigene Regel, Rezept, Check | `rules/`, `reviews/`, `checks/` | von Hand |
+| Projekteigener Command | `.k-playbook/commands/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
+| Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
 | Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
 | Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
 | Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |

@@ -16,7 +16,7 @@ LIB = Path(__file__).resolve().parent.parent / "lib"
 # verweise.py importiert common und command_tool_guards ohne Paket.
 sys.path.insert(0, str(LIB))
 
-from verweise import ExceptionEntry, read_exceptions, scan  # noqa: E402
+from verweise import ExceptionEntry, read_exceptions, scan, source_files  # noqa: E402
 
 
 def lines(text: str) -> list[str]:
@@ -176,6 +176,47 @@ class ExceptionsTest(unittest.TestCase):
         ))
         self.assertEqual([(e.datei, e.zeile, e.art) for e in entries], [("defaults/rules/a.md", 5, "link")])
         self.assertEqual(len(problems), 4)
+
+    def test_line_entry_below_project_commands_and_skills_is_valid(self) -> None:
+        entries, problems = read_exceptions(self.write(
+            ".k-playbook/commands/k-eigen.md\t3\tpfad\tOrtsangabe\n"
+            ".k-playbook/skills/forelle/SKILL.md\t4\tlink\tVorlage\n"
+        ))
+        self.assertEqual(problems, [])
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(entries[0].covers(".k-playbook/commands/k-eigen.md", 3, "pfad"))
+
+
+class SourceFilesTest(unittest.TestCase):
+    """Projekteigene Commands und Skills kommen aus .k-playbook/, der alte Ort zählt nicht."""
+
+    def test_project_sources_from_dot_k_playbook_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def put(rel: str) -> Path:
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# x\n", encoding="utf-8")
+                return path
+            command = put(".k-playbook/commands/_x/eins.md")
+            skill = put(".k-playbook/skills/forelle/SKILL.md")
+            rule = put("k-playbook-local/rules/r.md")
+            put("k-playbook-local/commands/alt.md")
+            put("k-playbook-local/skills/alt/SKILL.md")
+            files = source_files(root / "k-playbook", root / "k-playbook-local", root / ".k-playbook")
+        self.assertEqual(files, {
+            ".k-playbook/commands/_x/eins.md": command,
+            ".k-playbook/skills/forelle/SKILL.md": skill,
+            "k-playbook-local/rules/r.md": rule,
+        })
+
+    def test_dot_k_playbook_is_a_known_root(self) -> None:
+        text = lines("""
+            ## Referenzen
+
+            - `.k-playbook/commands/k-eigen.md`
+            """)
+        self.assertEqual(kinds(scan(text)), [(3, "pfad")])
 
 
 class RunTest(unittest.TestCase):

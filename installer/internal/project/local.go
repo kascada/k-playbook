@@ -48,22 +48,22 @@ type LocalEntry struct {
 
 // LocalStructure beschreibt, was ein Projekt braucht.
 //
-// rules, reviews, checks, commands und skills sind die Overlay-Sorten: ein
-// gleichnamiger lokaler Eintrag ersetzt den mitgelieferten, ein leerer schaltet
-// ihn ab. Aufgelöst wird das in context.go (rules, reviews, checks) und in
-// registry.go (commands, skills).
+// rules, reviews und checks sind die Overlay-Sorten hier: ein gleichnamiger
+// lokaler Eintrag ersetzt den mitgelieferten, ein leerer schaltet ihn ab.
+// Aufgelöst wird das in context.go.
 //
 // docs, tasks, tasks/done, data und material stehen nicht mehr hier (Task
-// 107): ihr Inhalt liegt in der Projekt-Collection. /k-upgrade räumt die
-// leeren Verzeichnisse eines Bestandsprojekts ab, dazu die Reste der früheren
-// Wissensablage auf der Platte (Task 123).
+// 107): ihr Inhalt liegt in der Projekt-Collection. commands und skills
+// ebenso nicht (Task 129): projekteigene Commands und Skills liegen in
+// .k-playbook/commands/ und .k-playbook/skills/ (registry.go), die das
+// Einrichten nicht anlegt. /k-upgrade räumt die leeren Verzeichnisse eines
+// Bestandsprojekts ab, dazu die Reste der früheren Wissensablage auf der
+// Platte (Task 123).
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
 		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
 		{Path: "reviews", Purpose: "Projekteigene Review-Rezepte, benannt als review-<name>.md."},
 		{Path: "checks", Purpose: "Projekteigene Checks als *.sh, ausgeführt über " + PlaybookDirName + "/bin/k-check."},
-		{Path: "commands", Purpose: "Projekteigene Commands als *.md. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/commands/; gleicher Name ersetzt, eine leere Datei schaltet ab. Unterverzeichnisse bilden Namensräume und werden Datei für Datei verrechnet."},
-		{Path: "skills", Purpose: "Projekteigene Skills, je ein Verzeichnis mit SKILL.md darin. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/skills/; gleicher Verzeichnisname ersetzt den Skill als Ganzes, eine leere SKILL.md schaltet ihn ab."},
 		{
 			Path:             "results",
 			Private:          true,

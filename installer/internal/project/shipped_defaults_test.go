@@ -811,6 +811,54 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 	}
 }
 
+// /k-upgrade 3.4 räumt seit Task 129 auch commands/ und skills/ unter
+// k-playbook-local/ ab: leer wird gelöscht, sonst je Eintrag mit Ziel unter
+// .k-playbook/ genannt; umgezogen wird nur auf ausdrücklichen Zuruf. Die
+// Hülle nennt beide Verzeichnisse in ihrer description.
+func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "## Schritt 4 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.4 nicht gefunden")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"legt sieben Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
+		"- `material/` - `commands/` - `skills/`",
+		"Erst das neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`",
+		"diese Dateien mit diesem Programm nicht mehr wirken",
+		"`.k-playbook/<sorte>/<gleicher pfad>`",
+		"Liegt am Ziel schon etwas, steht `Ziel belegt` hinter der Zeile.",
+		"Dateien mit dem Namen `README.md` und die verwaltete `.gitignore` ziehen nicht um",
+		"k-gui.md → .k-playbook/commands/k-gui.md Ziel belegt",
+		"forelle/ → .k-playbook/skills/forelle/",
+		"Umgebaut wird von Hand oder auf ausdrücklichen Zuruf des Nutzers in derselben Sitzung",
+		"gehören in den nächsten Commit des Projekts",
+		"`git mv`",
+		"Ein Eintrag mit `Ziel belegt` bleibt liegen und wird genannt; zusammengeführt wird nicht.",
+		"Briefing neu (`k-playbook briefing`; der Katalog hat sich geändert), das die Verlinkung nachzieht",
+		"führst c) und d) für `commands/` und `skills/` noch einmal aus",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.4 nennt %q nicht", needle)
+		}
+	}
+	if strings.Contains(section, "fünf Verzeichnisse") {
+		t.Error("3.4 zählt noch fünf Verzeichnisse")
+	}
+
+	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills)", "mit seinem Ziel unter .k-playbook/"} {
+		if !strings.Contains(string(hull), needle) {
+			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
+		}
+	}
+}
+
 // Die Doku-Aufträge (Task 124): Die Anweisung doku-auftraege.md beschreibt
 // Kopf und Lebenslauf, docs-sync nennt das Einreihen als Normalfall, /k-docs
 // zählt die offenen Aufträge, und die beiden Erzeuger listen sie im Preflight

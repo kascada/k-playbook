@@ -60,11 +60,23 @@ func (e RegistryEntry) LinkSource() string {
 // ganzen Rechner entpackt, nicht mehr der Clone k-playbook/. Gelesen wird am
 // echten Ort, damit der Katalog nicht davon abhängt, ob der Link
 // .k-playbook/share schon steht; verlinkt wird durch ihn hindurch.
+//
+// Projekteigen ist .k-playbook/<sorte>/ (ProjectAssetDir), versioniert neben
+// der Konfiguration. Der frühere Ort k-playbook-local/<sorte>/ wird seit Task
+// 129 nicht mehr gelesen, auch nicht als Übergang: was dort noch liegt, wirkt
+// nicht mehr, und /k-upgrade nennt es mit seinem Ziel.
 func registryDirs(projectDir string, kind AssetKind) (shipped string, local string) {
 	if dir := sharedDataDir(); dir != "" {
 		shipped = filepath.Join(dir, string(kind))
 	}
-	return shipped, filepath.Join(LocalDir(projectDir), string(kind))
+	return shipped, ProjectAssetDir(projectDir, kind)
+}
+
+// ProjectAssetDir ist das Verzeichnis der projekteigenen Einträge einer Sorte:
+// .k-playbook/commands/ oder .k-playbook/skills/. Das Einrichten legt es nicht
+// an; es entsteht, wenn das Projekt etwas hineinlegt.
+func ProjectAssetDir(projectDir string, kind AssetKind) string {
+	return filepath.Join(projectDir, ProjectDirName, string(kind))
 }
 
 // RegistrySourcePresent meldet, ob es überhaupt eine Quelle gibt. Fehlen beide,

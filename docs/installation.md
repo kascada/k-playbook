@@ -85,8 +85,6 @@ k-playbook-local/
 ├── rules/         overlay for k-playbook/rules/
 ├── reviews/       overlay for k-playbook/reviews/
 ├── checks/        overlay for k-playbook/checks/
-├── commands/      overlay for ~/.local/share/k-playbook/commands/
-├── skills/        overlay for ~/.local/share/k-playbook/skills/
 ├── results/       everything reviews generate; see below
 ├── guidelines/
 ├── priv/          private notes; see below
@@ -94,7 +92,7 @@ k-playbook-local/
 └── version-sources.yaml   version sources for the version inventory, maintained manually
 ```
 
-Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/` and `material/`, and the setup page does not count them as missing: tasks, todos and the project documentation live in the project collection (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`). In an existing project, `/k-upgrade` (conversion 3.4) deletes each of them that holds nothing but `README.md` files and the managed `.gitignore` (directly under `data/` also the renamed leftovers `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not yet taken over keeps it), without asking (task 117); anything else keeps the directory and is only named. The former knowledge directories on disk, with their search index, are gone since task 123; in an existing project `/k-upgrade` (conversion 3.0) clears what is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for deletion.
+Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/` and `material/`, and the setup page does not count them as missing: tasks, todos and the project documentation live in the project collection (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`). Since task 129 the same holds for `commands/` and `skills/`: project-owned commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/`, versioned next to the configuration. Setup does not create these two either; they appear when the project puts something there. The former place under `k-playbook-local/` is no longer read; `/k-upgrade` 3.4 names every entry left there with its target and moves only when asked. In an existing project, `/k-upgrade` (conversion 3.4) deletes each of them that holds nothing but `README.md` files and the managed `.gitignore` (directly under `data/` also the renamed leftovers `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not yet taken over keeps it), without asking (task 117); anything else keeps the directory and is only named. The former knowledge directories on disk, with their search index, are gone since task 123; in an existing project `/k-upgrade` (conversion 3.0) clears what is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for deletion.
 
 Every directory setup creates contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
@@ -143,7 +141,9 @@ project/
 ├── CLAUDE.md             include file with the line @AGENTS.md; the direction is fixed
 ├── .k-playbook/
 │   ├── share             -> ~/.local/share/k-playbook, machine-local, not versioned
-│   └── .gitignore        contains /share
+│   ├── .gitignore        contains /share
+│   ├── commands/         project-owned commands, versioned (only when used)
+│   └── skills/           project-owned skills, versioned (only when used)
 ├── .claude/
 │   ├── commands/         one symlink per command
 │   └── skills/           one symlink per skill; OpenCode reads here too
@@ -151,13 +151,13 @@ project/
     └── commands/
 ```
 
-The three targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the shipped entries or only `k-playbook-local/`. Each link points to the version that applies under the overlay rule:
+The three targets are **actual directories with individual symlinks**, not directory symlinks. A directory symlink points to exactly one source, so it would provide either only the shipped entries or only `.k-playbook/commands/`; it would also swallow real files a project puts directly into `.claude/commands/`, which today win over the catalog. Each link points to the version that applies under the overlay rule:
 
 ```text
 .claude/commands/
   k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   shipped
-  k-review.md  -> ../../k-playbook-local/commands/k-review.md  project-owned, replaces
-  k-own.md     -> ../../k-playbook-local/commands/k-own.md     project-owned only
+  k-review.md  -> ../../.k-playbook/commands/k-review.md       project-owned, replaces
+  k-own.md     -> ../../.k-playbook/commands/k-own.md          project-owned only
 ```
 
 The shipped commands and skills are unpacked by the binary once per machine into `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/` when set). The individual links reach them through the one link `.k-playbook/share`: that link is absolute and depends on the machine's home directory, so `.k-playbook/.gitignore` keeps it out of version control, while every link through it stays relative and can be committed. Linking the shipped entries globally (`~/.claude/commands/`) is not an option: with the same name in both places Claude Code takes the global one, so a project could no longer replace a shipped command.
@@ -329,16 +329,17 @@ Between the two steps, commands, the prompt block in `AGENTS.md`, and the MCP re
 
 For the new commands to reach the assistant, restart it afterwards: Claude Code and OpenCode discover them at startup.
 
-### Existing projects: two things are added
+### Existing projects: the linking is converted
 
-Anyone updating a project from a version through 0.4 finds two things after the update. One click handles both; nothing is deleted or overwritten:
+Anyone updating a project from a version through 0.4 finds the assistant linking to convert after the update. One click handles it; nothing is deleted or overwritten:
 
 | Where | What the interface reports | What to do |
 |---|---|---|
-| Project-owned structure | `Missing entries: commands, skills` | **Create**: the two overlay directories are created with their README |
 | Assistant linking | `Directory symlink from an older version` | **Set up**: the symlink is replaced with individual links |
 
-The second point is the actual conversion: `.claude/commands -> ../k-playbook/commands` becomes an actual directory with one link per command. The source in `k-playbook/` remains untouched.
+Versions before task 129 also reported `Missing entries: commands, skills` for the project-owned structure; setup no longer creates these two under `k-playbook-local/` (see above).
+
+This is the actual conversion: `.claude/commands -> ../k-playbook/commands` becomes an actual directory with one link per command. The source in `k-playbook/` remains untouched.
 
 Individual links belong in the project's repository and are committed. A fresh clone then has commands registered immediately.
 
@@ -619,7 +620,7 @@ Checklist for a project:
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
 - [ ] `k-playbook-local/` exists completely and is committed in the project repository, except for the contents of `results/`, which are excluded from the outset in a new installation.
-- [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks to `k-playbook/` or `k-playbook-local/`; the interface reports them as configured.
+- [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.
 - [ ] `k-playbook context` completes and names the expected catalogs.
@@ -632,7 +633,9 @@ The final item checks all preceding items at once: the command stops if configur
 
 **Slash commands do not appear.** Start the interface: it compares the catalog with what is registered and names missing commands. Restart the assistant after setup.
 
-**A new command from `k-playbook-local/commands/` is missing.** It is not registered automatically: the interface reports it as missing and creates the link at the press of a button. The same applies when a project-owned file has newly replaced a shipped command; then the existing link still points to the old source.
+**A new command from `.k-playbook/commands/` is missing.** It is not registered automatically: the interface reports it as missing and creates the link at the press of a button. The same applies when a project-owned file has newly replaced a shipped command; then the existing link still points to the old source.
+
+**A project-owned command or skill under `k-playbook-local/` has no effect.** Since task 129 only `.k-playbook/commands/` and `.k-playbook/skills/` are read. Move the entry there with the same path, or let `/k-upgrade` 3.4 name what is left.
 
 **Skills are not triggered.** Every skill directory must contain `SKILL.md`; without it, the directory does not count as a skill and is not linked. Then restart the assistant.
 

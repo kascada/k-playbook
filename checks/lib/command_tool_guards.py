@@ -8,7 +8,9 @@ durch. Er ist ein Hinweisgeber, kein Shell-Parser; seine Grenzen sind bewusst:
 - Gelesen wird der effektive Command-Katalog: mitgelieferte Hüllen aus
   <playbook>/share/commands/ — derselbe Stand, den das Binary dieser Version nach
   ~/.local/share/k-playbook/ entpackt —, projekteigene aus
-  <config-root>/k-playbook-local/commands/.
+  <config-root>/.k-playbook/commands/. Den früheren Ort
+  <config-root>/k-playbook-local/commands/ liest der Check nicht mehr, wie das
+  Programm seit Task 129.
   Vergleichseinheit ist der Pfad ab commands/; ein gleichnamiger lokaler Eintrag
   ersetzt den mitgelieferten, ein leerer schaltet ihn ab.
 - Dazu die Texte der Commands aus <playbook>/defaults/commands/, die k-playbook als
@@ -53,6 +55,7 @@ from common import fail_technical, finish_findings, status
 EXCEPTIONS_FILE = "command-tool-guard-exceptions.tsv"
 EXCEPTIONS_HEADER = ["datei", "zeile", "werkzeug", "begründung"]
 LOCAL_DIR_NAME = "k-playbook-local"
+PROJECT_DIR_NAME = ".k-playbook"
 PLAYBOOK_DIR_NAME = "k-playbook"
 SHELL_LANGUAGES = {"bash", "sh", "shell", "zsh"}
 CONSOLE_LANGUAGE = "console"
@@ -75,14 +78,22 @@ def resolve_dirs(script_dir: Path) -> tuple[Path, Path, bool]:
     k-playbook-local/checks/ bleibt dann nur die Annahme k-playbook/ neben
     k-playbook-local/. Der dritte Wert sagt, ob der Pfad so geraten wurde.
     """
-    config_root = Path(os.environ.get("K_CHECK_CONFIG_ROOT") or os.getcwd()).resolve()
-    local_dir = config_root / LOCAL_DIR_NAME
+    local_dir = config_root() / LOCAL_DIR_NAME
     given = os.environ.get("K_CHECK_PLAYBOOK_DIR")
     if given:
         return Path(given).resolve(), local_dir, False
     if script_dir == (local_dir / "checks").resolve():
-        return config_root / PLAYBOOK_DIR_NAME, local_dir, True
+        return config_root() / PLAYBOOK_DIR_NAME, local_dir, True
     return script_dir.parent, local_dir, False
+
+
+def config_root() -> Path:
+    return Path(os.environ.get("K_CHECK_CONFIG_ROOT") or os.getcwd()).resolve()
+
+
+def project_commands_dir(root: Path) -> Path:
+    """Ort der projekteigenen Commands: <config-root>/.k-playbook/commands/."""
+    return root / PROJECT_DIR_NAME / "commands"
 
 
 # --- Matrix ------------------------------------------------------------------
@@ -143,13 +154,14 @@ def is_empty_file(path: Path) -> bool:
 TEXTS_KEY_PREFIX = "defaults/commands/"
 
 
-def effective_commands(playbook_dir: Path, local_dir: Path) -> dict[str, Path]:
+def effective_commands(playbook_dir: Path, project_commands: Path) -> dict[str, Path]:
+    """Effektiver Katalog; project_commands ist .k-playbook/commands/ des Projekts."""
     shipped: dict[str, Path] = {}
     texts: dict[str, Path] = {}
     local: dict[str, Path] = {}
     collect_commands(playbook_dir / "share" / "commands", "", shipped)
     collect_commands(playbook_dir / "defaults" / "commands", "", texts)
-    collect_commands(local_dir / "commands", "", local)
+    collect_commands(project_commands, "", local)
 
     result: dict[str, Path] = {}
     for key in sorted(set(shipped) | set(local)):
@@ -691,7 +703,7 @@ def run() -> int:
     if len(sys.argv) != 2:
         return fail_technical("usage: command_tool_guards.py <check-script-dir>")
     script_dir = Path(sys.argv[1]).resolve()
-    playbook_dir, local_dir, guessed = resolve_dirs(script_dir)
+    playbook_dir, _local_dir, guessed = resolve_dirs(script_dir)
 
     matrix = playbook_dir / "share" / "scripts" / "base-tools.tsv"
     if not matrix.is_file():
@@ -708,9 +720,10 @@ def run() -> int:
     except (OSError, UnicodeDecodeError, ValueError) as exc:
         return fail_technical(str(exc))
 
-    commands = effective_commands(playbook_dir, local_dir)
+    project_commands = project_commands_dir(config_root())
+    commands = effective_commands(playbook_dir, project_commands)
     if not commands:
-        status("skip", f"no command files found under {playbook_dir / 'share' / 'commands'} or {local_dir / 'commands'}")
+        status("skip", f"no command files found under {playbook_dir / 'share' / 'commands'} or {project_commands}")
         return 0
 
     exceptions_path = script_dir / EXCEPTIONS_FILE

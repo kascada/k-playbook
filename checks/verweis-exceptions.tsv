@@ -9,7 +9,9 @@
 # Fields: datei	zeile	art	begründung
 #
 # datei       Pfad ab dem Playbook (defaults/…, share/…) bzw. ab der
-#             Konfigurationswurzel (k-playbook-local/…). Endet er auf /, ist er ein
+#             Konfigurationswurzel: .k-playbook/commands/… und .k-playbook/skills/…
+#             für projekteigene Commands und Skills, k-playbook-local/… für die
+#             übrigen Sorten. Endet er auf /, ist er ein
 #             Bereich (Muster mit * erlaubt): ein Eintrag für alle Fundstellen darin.
 #             Bereiche gibt es nur für Inhalt für Leser, nie in commands/,
 #             instructions/ oder rules/ — dort steht jede Fundstelle einzeln.
