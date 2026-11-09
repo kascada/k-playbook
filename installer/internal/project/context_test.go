@@ -457,7 +457,11 @@ func TestAusgelieferteRezepteScopenNurBekannteWerkzeuge(t *testing.T) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
-		modes := readReviewModes(filepath.Join(reviewsDir, entry.Name()))
+		data, err := os.ReadFile(filepath.Join(reviewsDir, entry.Name()))
+		if err != nil {
+			t.Fatalf("%s: %v", entry.Name(), err)
+		}
+		modes := parseReviewModes(data)
 		if modes.Scope == nil {
 			continue
 		}

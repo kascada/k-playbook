@@ -1417,9 +1417,18 @@ Mitgeliefert liegen `rules` und `reviews` seit Task 131 in `<hub>:k-playbook/def
 weg). `path` eines Eintrags ist darum nicht immer ein Plattenpfad: projekteigen die Datei
 unter `k-playbook-local/<sorte>/`, mitgeliefert bei `checks` die Datei in der Installation,
 bei `rules` und `reviews` der Verweis `k-playbook:/<sorte>/<name>`. Wer den Inhalt braucht,
-liest über `project.ReadCatalogEntry()` — Verweis über `ProjectDocLayers`, sonst die Platte;
-so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein Rezept, auch den `recipePath`
-eines älteren Laufs. Ist die mitgelieferte Ebene nicht lesbar (`kephalaion_unavailable`),
+liest über `project.ReadCatalogEntry()` — Verweis über frische `ProjectDocLayers`, sonst die
+Platte; so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein einzelnes Rezept, auch
+den `recipePath` eines älteren Laufs. Wer viele Einträge liest, baut den Katalog mit
+`project.BuildContextWithLayers()` — derselbe Kontext wie `BuildContext()`, dazu die Ebenen,
+deren mitgelieferte Ebene die Kataloge schon gelesen hat — und liest die Einträge mit
+`project.ReadCatalogEntryWith()` aus diesen Ebenen. So hält es die Review-Auswahl
+(`buildSelectionBase()`): Die mitgelieferte Ebene wird je Auswahl einmal geöffnet, nicht
+einmal je Rezept, und die Rezepte kommen aus dem Zwischenspeicher, den das Auflisten des
+Katalogs gefüllt hat (Task 132: vorher 10 Aufrufe von `OpenDefaultsStore` je Auswahl, danach
+1). Die Angaben eines Rezepts liest in beiden Fällen `parseAIRecipeMetadata()`
+(`parseAIRecipeFrontmatter()`, sonst `firstHeading()`), nicht `CatalogEntry.Audit`. Ist die
+mitgelieferte Ebene nicht lesbar (`kephalaion_unavailable`),
 scheitert `BuildContext()` nicht — die Kontextausgabe trägt unter `kephalaion`, warum —, führt
 `rules` und `reviews` aber leer statt nur mit der lokalen Ebene und nennt den Grund in
 `catalogsProblem`; die Review-Auswahl der MCP-Werkzeuge bricht dann mit

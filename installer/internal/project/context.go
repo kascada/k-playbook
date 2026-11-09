@@ -358,6 +358,22 @@ func BuildContext(projectDir string) (Context, error) {
 	return buildContext(projectDir, nil)
 }
 
+// BuildContextWithLayers ist BuildContext und gibt dazu die Ebenen des
+// Projekts zurück (ProjectDocLayers), deren mitgelieferte Ebene die Kataloge
+// rules und reviews schon gelesen hat. Wer danach Einträge dieser Kataloge
+// liest, nimmt sie über ReadCatalogEntryWith aus diesen Ebenen: Die
+// mitgelieferte Ebene ist dann einmal geöffnet und hält die gelesenen
+// Dateien, statt je Eintrag einen neuen Zugang zum Node aufzubauen (Task 132,
+// die Review-Auswahl). Context selbst bleibt dabei, wie BuildContext ihn baut.
+func BuildContextWithLayers(projectDir string) (Context, DocLayers, error) {
+	layers := ProjectDocLayers(projectDir)
+	built, err := buildContext(projectDir, layers.Dist)
+	if err != nil {
+		return Context{}, DocLayers{}, err
+	}
+	return built, layers, nil
+}
+
 // buildContext ist BuildContext mit der mitgelieferten Ebene der Kataloge
 // rules und reviews; nil heißt eine eigene (NewProjectDefaultsSource). Das
 // Briefing reicht seine durch, damit es dieselben Dokumente nicht zweimal vom
@@ -502,15 +518,25 @@ func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]
 }
 
 // ReadCatalogEntry liest den wirksamen Inhalt eines Katalogeintrags über
-// seinen Path: einen Verweis k-playbook:/… über die Ebenen des Projekts
+// seinen Path: einen Verweis k-playbook:/… über frische Ebenen des Projekts
 // (ProjectDocLayers, Rohtext ohne eingesetzte Includes), sonst die Datei auf
 // der Platte — einen projekteigenen Eintrag oder einen Pfad aus einem älteren
-// Lauf.
+// Lauf. Jeder Aufruf mit einem Verweis öffnet die mitgelieferte Ebene neu;
+// wer mehrere Einträge liest, nimmt ReadCatalogEntryWith.
 func ReadCatalogEntry(projectDir string, entryPath string) ([]byte, error) {
 	if !strings.HasPrefix(entryPath, DocSchemeKPlaybook+":/") {
 		return os.ReadFile(entryPath)
 	}
-	result, err := ResolveDocRefWith(stdcontext.Background(), ProjectDocLayers(projectDir), entryPath, DocReadOptions{Raw: true})
+	return ReadCatalogEntryWith(ProjectDocLayers(projectDir), entryPath)
+}
+
+// ReadCatalogEntryWith ist ReadCatalogEntry über schon gebaute Ebenen, etwa
+// die aus BuildContextWithLayers.
+func ReadCatalogEntryWith(layers DocLayers, entryPath string) ([]byte, error) {
+	if !strings.HasPrefix(entryPath, DocSchemeKPlaybook+":/") {
+		return os.ReadFile(entryPath)
+	}
+	result, err := ResolveDocRefWith(stdcontext.Background(), layers, entryPath, DocReadOptions{Raw: true})
 	if err != nil {
 		return nil, err
 	}
@@ -525,15 +551,6 @@ type reviewModes struct {
 	DefaultResult  string
 	RuleIDs        []string
 	Scope          *CatalogScope
-}
-
-// readReviewModes liest die Modi eines Rezepts von der Platte.
-func readReviewModes(path string) reviewModes {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return reviewModes{AuditEnabled: false, ReviewEnabled: true}
-	}
-	return parseReviewModes(data)
 }
 
 // parseReviewModes liest die Modi aus dem Frontmatter eines schon gelesenen

@@ -1278,7 +1278,10 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		candidates = append(candidates, candidate)
 	}
 
-	built, err := project.BuildContext(env.Root)
+	// Die Ebenen aus dem Aufbau des Katalogs lesen danach auch die Rezepte:
+	// Die mitgelieferte Ebene ist dann einmal geöffnet und hält die Rezepte
+	// schon, statt je Rezept einen neuen Zugang zum Node aufzubauen.
+	built, layers, err := project.BuildContextWithLayers(env.Root)
 	if err != nil {
 		return reviewSelectionBase{}, wrapError(err, "read_failed", "Review-Katalog ist nicht lesbar.", map[string]any{"projectDir": env.Root})
 	}
@@ -1295,10 +1298,11 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		if entry.Disabled {
 			continue
 		}
-		metadata, err := readAIRecipeMetadata(env.Root, entry.Key, entry.Path)
+		data, err := project.ReadCatalogEntryWith(layers, entry.Path)
 		if err != nil {
 			return reviewSelectionBase{}, wrapError(err, "read_failed", "Review-Rezept ist nicht lesbar.", map[string]any{"path": entry.Path, "key": entry.Key})
 		}
+		metadata := parseAIRecipeMetadata(entry.Key, data)
 		if !metadata.Enabled {
 			continue
 		}
@@ -1522,14 +1526,22 @@ func cloneReviewScope(scope *review.Scope) *review.Scope {
 
 // readAIRecipeMetadata liest die Angaben eines Rezepts über seinen Pfad aus
 // dem Katalog: ein mitgeliefertes Rezept ist ein Verweis k-playbook:/reviews/…
-// und kommt über die Ebenen des Projekts aus <hub>:k-playbook, ein
+// und kommt über frische Ebenen des Projekts aus <hub>:k-playbook, ein
 // projekteigenes (oder ein Pfad aus einem älteren Lauf) von der Platte
-// (project.ReadCatalogEntry).
+// (project.ReadCatalogEntry). Die Auswahl liest viele Rezepte und nimmt
+// deshalb die Ebenen aus dem Aufbau des Katalogs (buildSelectionBase).
 func readAIRecipeMetadata(root string, key string, path string) (aiRecipeMetadata, error) {
 	data, err := project.ReadCatalogEntry(root, path)
 	if err != nil {
 		return aiRecipeMetadata{}, err
 	}
+	return parseAIRecipeMetadata(key, data), nil
+}
+
+// parseAIRecipeMetadata liest die Angaben aus dem schon gelesenen Inhalt
+// eines Rezepts: Frontmatter (parseAIRecipeFrontmatter), sonst die erste
+// Überschrift, sonst der Schlüssel als Titel.
+func parseAIRecipeMetadata(key string, data []byte) aiRecipeMetadata {
 	metadata := aiRecipeMetadata{Enabled: false, ReviewEnabled: true, ResultRequired: true}
 	content := string(data)
 	body := content
@@ -1560,7 +1572,7 @@ func readAIRecipeMetadata(root string, key string, path string) (aiRecipeMetadat
 	if metadata.Title == "" {
 		metadata.Title = key
 	}
-	return metadata, nil
+	return metadata
 }
 
 func frontmatterEnd(content string) int {

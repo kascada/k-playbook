@@ -513,8 +513,11 @@ so the run itself says how an entry was intended; an empty field in an old run i
 `perspective`. `recipePath` is the `path` of the catalog entry: for a shipped recipe the
 reference `k-playbook:/reviews/<name>` -- the shipped layer lies in `<hub>:k-playbook`, not on
 disk (task 131) --, for a project-owned one the file under `k-playbook-local/reviews/`. The
-tools read a recipe through `project.ReadCatalogEntry`, which resolves the reference and also
-still reads the disk paths of older runs.
+tools read a single recipe through `project.ReadCatalogEntry`, which resolves the reference and
+also still reads the disk paths of older runs. The selection in `k_playbook_review_status`
+(`available`) and `k_playbook_review_create` reads all recipes through the layers it built the
+catalog with (`project.BuildContextWithLayers`, `project.ReadCatalogEntryWith`), so it opens
+the shipped layer once per selection instead of once per recipe (task 132).
 
 For `mode: evidence`, `resultRequired` is forced to `false` -- the required artifact is
 `raw/<entry>.sarif`, and with `true`, `k_playbook_review_status` would report every

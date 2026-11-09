@@ -69,7 +69,9 @@ vollständige Vertrag steht in `<playbook.dir>/docs/version-inventory.md`.
 Felder `context.kephalaion`, `context.baseTools` und `context.versionSources`
 stehen weiter unverändert da. Die Einträge heute: Die Anbindung an Kephalaion ist eingetragen,
 aber nicht `ok` — `error`, denn `keph:`-Verweise und `work` sind dann nicht erreichbar; sie
-ist nicht eingetragen — `warning`. Je fehlendem Basis-Werkzeug
+ist nicht eingetragen — ebenfalls `error`. Ohne Anbindung gibt es auch kein Briefing: Es
+scheitert mit `kephalaion_unavailable`, weil die mitgelieferten Texte aus der Collection
+kommen. Je fehlendem Basis-Werkzeug
 (`context.baseTools.missing`) — `warning`. Die Quellenkonfiguration des Versionsinventars
 ist da, aber nicht lesbar oder von unbekannter Fassung (`context.versionSources.error`) —
 `error`; der Eintrag nennt den Pfad, die Einzelheiten stehen in `context.versionSources.error`.

@@ -210,7 +210,8 @@ nicht — sie liefern einen Teil davon.
 Betroffen sind die AI-Einträge mit `mode: evidence` — in der Statusausgabe die Liste
 `evidenceEntries` — im Zustand `start` oder `running`. Je Eintrag:
 
-1. Lade den im Lauf gespeicherten `recipePath`.
+1. Lade das Rezept aus dem im Lauf gespeicherten `recipePath`: Beginnt er mit
+   `k-playbook:`, mit `k_playbook_doc_read`, sonst als Datei mit dem Lese-Werkzeug.
 2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.paths`. Der
    Pfad-Scope ist verbindlich und wird nicht aus dem Chat-Gedächtnis erweitert; innerhalb
    der Globs gelten zusätzlich die zentralen Ausschlüsse der Modulsuche (`k-playbook`,
@@ -339,7 +340,8 @@ Führe diesen Schritt erst aus, wenn `review-input.json` im Laufordner vorhanden
 Für AI-Einträge mit `mode: perspective` aus `catalogs.reviews` — in der Statusausgabe die
 Liste `perspectiveEntries` — mit Zustand `start` oder `running`:
 
-1. Lade den im Lauf gespeicherten `recipePath`.
+1. Lade das Rezept aus dem im Lauf gespeicherten `recipePath`: Beginnt er mit
+   `k-playbook:`, mit `k_playbook_doc_read`, sonst als Datei mit dem Lese-Werkzeug.
 2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.tools`.
 3. Führe den Review als Perspektive auf `review-input.json` aus: Gruppen gehören in die
    Perspektive, wenn mindestens eine Evidence ein `evidence.tool` aus `scope.tools`
